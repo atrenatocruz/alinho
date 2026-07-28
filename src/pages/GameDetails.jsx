@@ -108,8 +108,8 @@ export default function GameDetails() {
         .from('teams')
         .select(`
           *,
-          player1:profiles!teams_player1_id_fkey (id, name),
-          player2:profiles!teams_player2_id_fkey (id, name)
+          player1:profiles!teams_player1_id_fkey (id, name, avatar_url),
+          player2:profiles!teams_player2_id_fkey (id, name, avatar_url)
         `)
         .eq('game_id', id)
 
@@ -681,6 +681,20 @@ export default function GameDetails() {
   const rounds = [...new Set(matches.map(m => m.round_number))].sort((a, b) => a - b)
   const tctStandings = !isSobeDesce && teams.length ? standings(teams, matches) : []
 
+  // Top duplas for the results share card — combined points of both players
+  // in the pair, from the same per-player mixStats the leaderboard above
+  // uses (works the same way for both mix formats, no extra query needed).
+  const pointsByUser = Object.fromEntries(mixStats.map(s => [s.user_id, s.points_earned || 0]))
+  const duplaStats = teams
+    .map(t => ({
+      id: t.id,
+      name: teamName(t.id),
+      player1: t.player1,
+      player2: t.player2,
+      points: (pointsByUser[t.player1_id] || 0) + (pointsByUser[t.player2_id] || 0),
+    }))
+    .sort((a, b) => b.points - a.points)
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -747,6 +761,14 @@ export default function GameDetails() {
           message={buildShareMessage()}
           url={shareUrl}
           onClose={() => setShowShare(false)}
+          imageCard={{
+            variant: game.status === 'finished' && duplaStats.length > 0 ? 'podium' : 'invite',
+            game,
+            people,
+            capacity,
+            duplas: duplaStats,
+            formattedDate: formatDate(game.date),
+          }}
         />
       )}
 
