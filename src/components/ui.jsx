@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
-import { MapPin, CheckCircle2, ChevronRight, ChevronDown, ChevronLeft, Lock, Play, Calendar, X, Share2, MessageCircle, Link2 } from 'lucide-react'
+import { MapPin, CheckCircle2, ChevronRight, ChevronDown, ChevronLeft, Lock, Play, Calendar, X, Share2, MessageCircle, Link2, ImageDown } from 'lucide-react'
+import ShareCard, { CARD_W, CARD_H } from './ShareCard'
 
 /* ─── Date fields ────────────────────────────────────────────────────────
    Native <input type=date/datetime-local> pickers open reliably on iOS
@@ -597,12 +598,48 @@ export function MixCard({ game, joined = false }) {
 /* ─── ShareModal ─────────────────────────────────────────────────────────
    Share sheet used for mixes: editable caption + link, WhatsApp + native
    share (when the device supports it) + copy-link fallback. */
-export function ShareModal({ title = 'Partilhar', message, url, onClose }) {
+export function ShareModal({ title = 'Partilhar', message, url, onClose, imageCard }) {
   const [caption, setCaption] = useState(message)
   const [editingCaption, setEditingCaption] = useState(false)
   const [copied, setCopied] = useState(false)
+  const shareCardRef = useRef(null)
+  const [generatingImage, setGeneratingImage] = useState(false)
+  const [imageError, setImageError] = useState('')
+  const [imageSavedHint, setImageSavedHint] = useState(false)
 
   const fullText = `${caption}\n\n🔗 ${url}`
+
+  const handleShareImage = async () => {
+    setGeneratingImage(true)
+    setImageError('')
+    setImageSavedHint(false)
+    try {
+      const blob = await shareCardRef.current.exportPng()
+      const file = new File([blob], 'alinho-mix.png', { type: 'image/png' })
+      if (typeof navigator !== 'undefined' && navigator.canShare?.({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title, text: caption })
+        } catch {
+          // user cancelled the OS share sheet — nothing to do
+        }
+      } else {
+        const objectUrl = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = objectUrl
+        a.download = 'alinho-mix.png'
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        URL.revokeObjectURL(objectUrl)
+        setImageSavedHint(true)
+      }
+    } catch (error) {
+      console.error('Error generating share image:', error)
+      setImageError('Não foi possível gerar a imagem. Tenta novamente.')
+    } finally {
+      setGeneratingImage(false)
+    }
+  }
 
   const handleCopyLink = async () => {
     try {
@@ -657,6 +694,35 @@ export function ShareModal({ title = 'Partilhar', message, url, onClose }) {
         </div>
 
         <div className="px-5 pb-5 space-y-4">
+          {imageCard && (
+            <div className="space-y-3 pb-4 border-b border-line">
+              <div className="flex justify-center">
+                <div
+                  style={{ width: CARD_W * 0.55, height: CARD_H * 0.55 }}
+                  className="relative overflow-hidden rounded-ctrl shadow-card"
+                >
+                  <div style={{ transform: 'scale(0.55)', transformOrigin: 'top left', width: CARD_W, height: CARD_H }}>
+                    <ShareCard ref={shareCardRef} {...imageCard} />
+                  </div>
+                </div>
+              </div>
+
+              {imageError && (
+                <p className="text-danger text-sm font-extrabold text-center">{imageError}</p>
+              )}
+              {imageSavedHint && (
+                <p className="text-ok text-sm font-extrabold text-center">
+                  Imagem guardada — abre o Instagram e escolhe-a nos teus stories.
+                </p>
+              )}
+
+              <PrimaryButton onClick={handleShareImage} disabled={generatingImage} className="w-full">
+                <ImageDown size={20} />
+                {generatingImage ? 'A gerar imagem…' : 'Partilhar imagem'}
+              </PrimaryButton>
+            </div>
+          )}
+
           <div className="bg-canvas rounded-ctrl p-3.5 text-sm text-ink-900 whitespace-pre-line">
             {fullText}
           </div>
