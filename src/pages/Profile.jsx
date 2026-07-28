@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { User, Award, Trophy, Target, Flame, LogOut, Camera } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { hashPhone } from '../lib/hashPhone'
 import { uploadAvatar, removeAvatar } from '../lib/avatarStorage'
-import { PrimaryButton, LevelBadge, GuestBadge, DateField, Avatar, Select } from '../components/ui'
+import { PrimaryButton, LevelBadge, GuestBadge, DateField, Avatar, Select, EmptyState } from '../components/ui'
 
 export default function Profile() {
   const { profile, updateProfile, updateMembership, currentMembership, currentOrganizationId, isGuest, signOut } = useAuth()
@@ -19,6 +19,8 @@ export default function Profile() {
   const [phone, setPhone] = useState('')
   const [phoneError, setPhoneError] = useState('')
   const [stats, setStats] = useState(null)
+  const [mixHistory, setMixHistory] = useState([])
+  const [mixHistoryLoading, setMixHistoryLoading] = useState(true)
   const [loading, setLoading] = useState(false)
   const [saved, setSaved] = useState(false)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
@@ -34,6 +36,7 @@ export default function Profile() {
       setGender(profile.gender || '')
       if (!isGuest && currentOrganizationId) {
         loadStats()
+        loadMixHistory()
       }
     }
   }, [profile, currentMembership, currentOrganizationId])
@@ -51,6 +54,73 @@ export default function Profile() {
       setStats(data)
     } catch (error) {
       console.error('Error loading stats:', error)
+    }
+  }
+
+  // Placement per mix isn't stored anywhere — mix_player_stats only has
+  // points_earned/mix_won — so it's derived the same way GameDetails.jsx's
+  // results share card does: group teams by combined points_earned and
+  // rank descending, then find where this player's dupla landed.
+  const loadMixHistory = async () => {
+    setMixHistoryLoading(true)
+    try {
+      const { data: statsRows, error: statsError } = await supabase
+        .from('mix_player_stats')
+        .select('game_id, game:games (id, title, date, location)')
+        .eq('user_id', profile.id)
+        .eq('organization_id', currentOrganizationId)
+      if (statsError) throw statsError
+
+      const gameIds = (statsRows || []).map((r) => r.game_id)
+      if (gameIds.length === 0) {
+        setMixHistory([])
+        return
+      }
+
+      const [{ data: teamsData, error: teamsError }, { data: allStatsData, error: allStatsError }] = await Promise.all([
+        supabase.from('teams').select('id, game_id, player1_id, player2_id').in('game_id', gameIds),
+        supabase.from('mix_player_stats').select('game_id, user_id, points_earned').in('game_id', gameIds),
+      ])
+      if (teamsError) throw teamsError
+      if (allStatsError) throw allStatsError
+
+      const pointsByGameUser = new Map(
+        (allStatsData || []).map((s) => [`${s.game_id}:${s.user_id}`, s.points_earned || 0])
+      )
+      const teamsByGame = new Map()
+      ;(teamsData || []).forEach((t) => {
+        if (!teamsByGame.has(t.game_id)) teamsByGame.set(t.game_id, [])
+        teamsByGame.get(t.game_id).push(t)
+      })
+
+      const history = (statsRows || [])
+        .filter((row) => row.game)
+        .map((row) => {
+          const teams = teamsByGame.get(row.game_id) || []
+          const ranked = teams
+            .map((t) => ({
+              isMine: t.player1_id === profile.id || t.player2_id === profile.id,
+              points: (pointsByGameUser.get(`${row.game_id}:${t.player1_id}`) || 0) +
+                      (pointsByGameUser.get(`${row.game_id}:${t.player2_id}`) || 0),
+            }))
+            .sort((a, b) => b.points - a.points)
+          const position = ranked.findIndex((t) => t.isMine) + 1
+          return {
+            gameId: row.game_id,
+            title: row.game.title,
+            date: row.game.date,
+            location: row.game.location,
+            position: position || null,
+            totalDuplas: teams.length,
+          }
+        })
+        .sort((a, b) => new Date(b.date) - new Date(a.date))
+
+      setMixHistory(history)
+    } catch (error) {
+      console.error('Error loading mix history:', error)
+    } finally {
+      setMixHistoryLoading(false)
     }
   }
 
@@ -119,6 +189,9 @@ export default function Profile() {
       setLoading(false)
     }
   }
+
+  const formatMixDate = (dateString) =>
+    new Date(dateString).toLocaleDateString('pt-PT', { day: '2-digit', month: 'short', year: 'numeric' })
 
   const gamesPlayed = (stats?.game_wins || 0) + (stats?.game_losses || 0)
   const winRate = gamesPlayed > 0
@@ -255,6 +328,45 @@ export default function Profile() {
               <p className="text-xs text-muted">{label}</p>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Mix history */}
+      {!mixHistoryLoading && (
+        <div>
+          <h3 className="text-lg text-ink-900 mb-3">Histórico de mixes</h3>
+
+          {mixHistory.length === 0 ? (
+            <EmptyState
+              icon={Trophy}
+              title="Ainda não tens mixes terminados"
+              subtitle="Quando terminares o teu primeiro mix, o histórico aparece aqui."
+            />
+          ) : (
+            <div className="space-y-2.5">
+              {mixHistory.map((m) => (
+                <Link
+                  key={m.gameId}
+                  to={`/jogo/${m.gameId}`}
+                  className="card press flex items-center gap-3 hover:shadow-lift"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="font-extrabold text-ink-900 text-sm truncate">{m.title}</p>
+                    <p className="text-[11px] text-muted mt-0.5 truncate">
+                      {formatMixDate(m.date)}{m.location ? ` · ${m.location}` : ''}
+                    </p>
+                  </div>
+                  {m.position && (
+                    <span className={`text-xs font-extrabold px-2.5 py-1.5 rounded-full shrink-0 tabular-nums ${
+                      m.position === 1 ? 'bg-lime-400 text-ink-900' : 'bg-ink-50 text-ink-700'
+                    }`}>
+                      {m.position}º de {m.totalDuplas}
+                    </span>
+                  )}
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
