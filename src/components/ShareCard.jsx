@@ -54,12 +54,12 @@ function CardShell({ children }) {
   )
 }
 
-function LogoFooter() {
+function LogoFooter({ tagline = 'junta-te no alinho' }) {
   return (
     <div className="mt-auto flex flex-col items-center gap-2.5 pt-8">
       <img src={logoWordmark} alt="alinho" style={{ height: 24 }} />
       <p className="text-[11px] font-mono font-extrabold tracking-[0.2em] uppercase text-ink-200">
-        junta-te no alinho
+        {tagline}
       </p>
     </div>
   )
@@ -96,33 +96,36 @@ function InviteCard({ game, people, capacity, formattedDate }) {
   )
 }
 
-function PodiumCard({ game, mixStats }) {
-  const top = mixStats.slice(0, 3)
+function PodiumCard({ game, duplas }) {
+  const top = duplas.slice(0, 3)
   return (
     <CardShell>
       <p className="text-[13px] font-mono font-extrabold tracking-[0.2em] uppercase text-lime-400 mb-3">
         🏆 Resultados do mix
       </p>
-      <h1 className="text-[26px] leading-[1.2] font-bold text-white font-display mb-10">
+      <h1 className="text-[26px] leading-[1.2] font-bold text-white font-display mb-2">
         {game.title}
       </h1>
-      <div className="space-y-4">
-        {top.map((s, i) => (
+      {game.location && (
+        <p className="text-[15px] text-ink-200 font-semibold">{game.location}</p>
+      )}
+      <div className="space-y-4 mt-8">
+        {top.map((d, i) => (
           <div
-            key={s.id}
+            key={d.id}
             className={`flex items-center gap-4 rounded-2xl px-4 py-4 ${i === 0 ? 'bg-lime-400/15' : 'bg-white/5'}`}
           >
             <span className="text-2xl shrink-0 leading-none">{MEDAL[i]}</span>
             <span className="flex-1 min-w-0 text-white font-extrabold text-lg truncate">
-              {s.user?.name || '—'}
+              {d.name}
             </span>
             <span className="text-lime-400 font-extrabold text-xl tabular-nums shrink-0">
-              {s.points_earned}
+              {d.points}
             </span>
           </div>
         ))}
       </div>
-      <LogoFooter />
+      <LogoFooter tagline="E tu alinhas?" />
     </CardShell>
   )
 }
@@ -130,7 +133,7 @@ function PodiumCard({ game, mixStats }) {
 /* Imperative `exportPng()` is the only thing consumers need — ShareModal
    calls it on tap, not on every render, since rasterizing is not free. */
 const ShareCard = forwardRef(function ShareCard(props, ref) {
-  const { variant, game, people = [], capacity, mixStats = [], formattedDate } = props
+  const { variant, game, people = [], capacity, duplas = [], formattedDate } = props
   const nodeRef = useRef(null)
 
   useImperativeHandle(ref, () => ({
@@ -151,7 +154,7 @@ const ShareCard = forwardRef(function ShareCard(props, ref) {
   return (
     <div ref={nodeRef}>
       {variant === 'podium'
-        ? <PodiumCard game={game} mixStats={mixStats} />
+        ? <PodiumCard game={game} duplas={duplas} />
         : <InviteCard game={game} people={people} capacity={capacity} formattedDate={formattedDate} />}
     </div>
   )
