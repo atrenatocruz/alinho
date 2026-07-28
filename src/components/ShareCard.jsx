@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle, useRef } from 'react'
+import { forwardRef, useImperativeHandle, useRef, useState, useEffect } from 'react'
 import { toPng } from 'html-to-image'
 import logoWordmark from '../logo/primary-dark-card.svg'
 
@@ -8,8 +8,7 @@ import logoWordmark from '../logo/primary-dark-card.svg'
    exported at 3x pixel ratio via html-to-image — keeps the JSX readable
    instead of juggling four-digit arbitrary pixel classes. Two variants:
    "invite" (promote an open/upcoming mix) and "podium" (finished mix
-   leaderboard, top 3). Player photos are intentionally skipped in favor of
-   initials — avoids CORS/rasterization failures on cross-origin avatar URLs.
+   leaderboard, top 3).
    ════════════════════════════════════════════════════════════════════════ */
 
 export const CARD_W = 360
@@ -22,19 +21,60 @@ function initial(name) {
   return (name || '?').trim().charAt(0).toUpperCase()
 }
 
-/* Shows the player's photo when they have one (crossOrigin="anonymous" is
-   required for toPng to rasterize a cross-origin image without tainting the
-   canvas — Supabase Storage's public bucket URLs send the CORS headers this
-   needs), otherwise the initial-in-a-circle fallback. */
+/* html-to-image has to fetch every remote <img> to inline it as base64
+   before rasterizing. That fetch is unreliable in the wild (mobile
+   networks, redirects, edge-cache responses missing CORS headers) — it
+   fails silently on real devices, leaving a broken-image icon baked into
+   the exported PNG instead of throwing something we could catch. So each
+   avatar photo is pre-converted to a data: URL ourselves, on mount, with a
+   tiny in-memory cache (avoids re-fetching if the share sheet is reopened).
+   A data: URL needs no network at export time, and any fetch failure here
+   just falls back to the initials circle instead of a broken image. */
+const avatarDataUrlCache = new Map()
+
+function useAvatarDataUrl(url) {
+  const [dataUrl, setDataUrl] = useState(() => (url && avatarDataUrlCache.get(url)) || null)
+
+  useEffect(() => {
+    if (!url) { setDataUrl(null); return }
+    const cached = avatarDataUrlCache.get(url)
+    if (cached) { setDataUrl(cached); return }
+
+    let cancelled = false
+    setDataUrl(null)
+    fetch(url, { mode: 'cors' })
+      .then((res) => { if (!res.ok) throw new Error('avatar fetch failed'); return res.blob() })
+      .then((blob) => new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result)
+        reader.onerror = () => reject(reader.error)
+        reader.readAsDataURL(blob)
+      }))
+      .then((result) => {
+        avatarDataUrlCache.set(url, result)
+        if (!cancelled) setDataUrl(result)
+      })
+      .catch(() => {
+        // leave dataUrl null — CardAvatar falls back to the initials circle
+      })
+    return () => { cancelled = true }
+  }, [url])
+
+  return dataUrl
+}
+
+/* Shows the player's photo once it's been pulled in as a local data: URL,
+   otherwise the initial-in-a-circle fallback (also used while the photo is
+   still loading, and permanently if it has none / fails to load). */
 function CardAvatar({ name, url, size = 40, ring = false }) {
+  const dataUrl = useAvatarDataUrl(url)
   const base = { width: size, height: size }
   const ringClass = ring ? 'ring-2 ring-ink-900' : ''
-  if (url) {
+  if (dataUrl) {
     return (
       <img
-        src={url}
+        src={dataUrl}
         alt={name || ''}
-        crossOrigin="anonymous"
         style={base}
         className={`rounded-full object-cover shrink-0 ${ringClass}`}
       />
