@@ -747,6 +747,14 @@ export default function GameDetails() {
           message={buildShareMessage()}
           url={shareUrl}
           onClose={() => setShowShare(false)}
+          imageCard={{
+            variant: game.status === 'finished' && mixStats.length > 0 ? 'podium' : 'invite',
+            game,
+            people,
+            capacity,
+            mixStats,
+            formattedDate: formatDate(game.date),
+          }}
         />
       )}
 
