@@ -21,69 +21,98 @@ function initial(name) {
   return (name || '?').trim().charAt(0).toUpperCase()
 }
 
-/* html-to-image has to fetch every remote <img> to inline it as base64
-   before rasterizing. That fetch is unreliable in the wild (mobile
-   networks, redirects, edge-cache responses missing CORS headers) — it
-   fails silently on real devices, leaving a broken-image icon baked into
-   the exported PNG instead of throwing something we could catch. So each
-   avatar photo is pre-converted to a data: URL ourselves, on mount, with a
-   tiny in-memory cache (avoids re-fetching if the share sheet is reopened).
-   A data: URL needs no network at export time, and any fetch failure here
-   just falls back to the initials circle instead of a broken image. */
-const avatarDataUrlCache = new Map()
+/* Circular avatars broke in a WebKit-specific way once actually shared:
+   clipping a photo <img> into a circle with CSS (border-radius +
+   object-fit: cover) rasterizes fine in Chrome/the in-app preview, but
+   comes out as torn artifacts on iOS once html-to-image's SVG-foreignObject
+   technique rasterizes it (confirmed on-device — initials, which are a
+   plain colored <div>, always rendered fine; only actual <img> photos broke).
+   Fix: do the circular crop ourselves with <canvas> ahead of time and hand
+   CardAvatar an already-circular PNG — no CSS clipping left for WebKit to
+   get wrong. Baked at EXPORT_PIXEL_RATIO so it's still sharp at export size. */
+const avatarBakeCache = new Map()
 
-function useAvatarDataUrl(url) {
-  const [dataUrl, setDataUrl] = useState(() => (url && avatarDataUrlCache.get(url)) || null)
-
-  useEffect(() => {
-    if (!url) { setDataUrl(null); return }
-    const cached = avatarDataUrlCache.get(url)
-    if (cached) { setDataUrl(cached); return }
-
-    let cancelled = false
-    setDataUrl(null)
-    fetch(url, { mode: 'cors' })
-      .then((res) => { if (!res.ok) throw new Error('avatar fetch failed'); return res.blob() })
-      .then((blob) => new Promise((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = () => resolve(reader.result)
-        reader.onerror = () => reject(reader.error)
-        reader.readAsDataURL(blob)
-      }))
-      .then((result) => {
-        avatarDataUrlCache.set(url, result)
-        if (!cancelled) setDataUrl(result)
-      })
-      .catch(() => {
-        // leave dataUrl null — CardAvatar falls back to the initials circle
-      })
-    return () => { cancelled = true }
-  }, [url])
-
-  return dataUrl
+function loadImageElement(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = () => reject(new Error('avatar image failed to decode'))
+    img.src = src
+  })
 }
 
-/* Shows the player's photo once it's been pulled in as a local data: URL,
+function bakeCircularAvatar(img, size, ring) {
+  const dim = Math.round(size * EXPORT_PIXEL_RATIO)
+  const canvas = document.createElement('canvas')
+  canvas.width = dim
+  canvas.height = dim
+  const ctx = canvas.getContext('2d')
+  const r = dim / 2
+
+  ctx.save()
+  ctx.beginPath()
+  ctx.arc(r, r, r, 0, Math.PI * 2)
+  ctx.closePath()
+  ctx.clip()
+  const scale = Math.max(dim / img.naturalWidth, dim / img.naturalHeight)
+  const w = img.naturalWidth * scale
+  const h = img.naturalHeight * scale
+  ctx.drawImage(img, (dim - w) / 2, (dim - h) / 2, w, h)
+  ctx.restore()
+
+  if (ring) {
+    ctx.beginPath()
+    ctx.arc(r, r, r - dim * 0.03, 0, Math.PI * 2)
+    ctx.lineWidth = dim * 0.06
+    ctx.strokeStyle = '#040404' // ink-900, matches the card background
+    ctx.stroke()
+  }
+
+  return canvas.toDataURL('image/png')
+}
+
+function useCircularAvatar(url, size, ring) {
+  const cacheKey = url ? `${url}|${size}|${ring}` : null
+  const [bakedUrl, setBakedUrl] = useState(() => (cacheKey && avatarBakeCache.get(cacheKey)) || null)
+
+  useEffect(() => {
+    if (!cacheKey) { setBakedUrl(null); return }
+    const cached = avatarBakeCache.get(cacheKey)
+    if (cached) { setBakedUrl(cached); return }
+
+    let cancelled = false
+    setBakedUrl(null)
+    fetch(url, { mode: 'cors' })
+      .then((res) => { if (!res.ok) throw new Error('avatar fetch failed'); return res.blob() })
+      .then((blob) => loadImageElement(URL.createObjectURL(blob)))
+      .then((img) => {
+        const baked = bakeCircularAvatar(img, size, ring)
+        avatarBakeCache.set(cacheKey, baked)
+        if (!cancelled) setBakedUrl(baked)
+      })
+      .catch(() => {
+        // leave bakedUrl null — CardAvatar falls back to the initials circle
+      })
+    return () => { cancelled = true }
+  }, [url, size, ring, cacheKey])
+
+  return bakedUrl
+}
+
+/* Shows the player's photo once it's been baked into a local circular PNG,
    otherwise the initial-in-a-circle fallback (also used while the photo is
-   still loading, and permanently if it has none / fails to load). */
+   still loading, and permanently if it has none / fails to load). The baked
+   photo needs no rounding/clipping classes — it's already circular. */
 function CardAvatar({ name, url, size = 40, ring = false }) {
-  const dataUrl = useAvatarDataUrl(url)
+  const bakedUrl = useCircularAvatar(url, size, ring)
   const base = { width: size, height: size }
-  const ringClass = ring ? 'ring-2 ring-ink-900' : ''
-  if (dataUrl) {
-    return (
-      <img
-        src={dataUrl}
-        alt={name || ''}
-        style={base}
-        className={`rounded-full object-cover shrink-0 ${ringClass}`}
-      />
-    )
+  if (bakedUrl) {
+    return <img src={bakedUrl} alt={name || ''} style={base} className="shrink-0" />
   }
   return (
     <div
       style={base}
-      className={`rounded-full bg-ink-700 text-lime-400 flex items-center justify-center font-extrabold shrink-0 ${ringClass}`}
+      className={`rounded-full bg-ink-700 text-lime-400 flex items-center justify-center font-extrabold shrink-0 ${ring ? 'ring-2 ring-ink-900' : ''}`}
     >
       <span style={{ fontSize: size * 0.4 }}>{initial(name)}</span>
     </div>
