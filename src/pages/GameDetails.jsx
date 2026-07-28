@@ -108,8 +108,8 @@ export default function GameDetails() {
         .from('teams')
         .select(`
           *,
-          player1:profiles!teams_player1_id_fkey (id, name),
-          player2:profiles!teams_player2_id_fkey (id, name)
+          player1:profiles!teams_player1_id_fkey (id, name, avatar_url),
+          player2:profiles!teams_player2_id_fkey (id, name, avatar_url)
         `)
         .eq('game_id', id)
 
@@ -689,6 +689,8 @@ export default function GameDetails() {
     .map(t => ({
       id: t.id,
       name: teamName(t.id),
+      player1: t.player1,
+      player2: t.player2,
       points: (pointsByUser[t.player1_id] || 0) + (pointsByUser[t.player2_id] || 0),
     }))
     .sort((a, b) => b.points - a.points)

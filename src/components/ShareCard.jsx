@@ -22,11 +22,28 @@ function initial(name) {
   return (name || '?').trim().charAt(0).toUpperCase()
 }
 
-function CardAvatar({ name, size = 40 }) {
+/* Shows the player's photo when they have one (crossOrigin="anonymous" is
+   required for toPng to rasterize a cross-origin image without tainting the
+   canvas — Supabase Storage's public bucket URLs send the CORS headers this
+   needs), otherwise the initial-in-a-circle fallback. */
+function CardAvatar({ name, url, size = 40, ring = false }) {
+  const base = { width: size, height: size }
+  const ringClass = ring ? 'ring-2 ring-ink-900' : ''
+  if (url) {
+    return (
+      <img
+        src={url}
+        alt={name || ''}
+        crossOrigin="anonymous"
+        style={base}
+        className={`rounded-full object-cover shrink-0 ${ringClass}`}
+      />
+    )
+  }
   return (
     <div
-      style={{ width: size, height: size }}
-      className="rounded-full bg-ink-700 text-lime-400 flex items-center justify-center font-extrabold shrink-0"
+      style={base}
+      className={`rounded-full bg-ink-700 text-lime-400 flex items-center justify-center font-extrabold shrink-0 ${ringClass}`}
     >
       <span style={{ fontSize: size * 0.4 }}>{initial(name)}</span>
     </div>
@@ -81,7 +98,7 @@ function InviteCard({ game, people, capacity, formattedDate }) {
         {game.location && <p>{game.location}</p>}
       </div>
       <div className="flex items-center gap-2 flex-wrap mb-3">
-        {shown.map((p, i) => <CardAvatar key={p.id || i} name={p.name} />)}
+        {shown.map((p, i) => <CardAvatar key={p.id || i} name={p.name} url={p.avatar_url} />)}
         {overflow > 0 && (
           <div style={{ width: 40, height: 40 }} className="rounded-full bg-white/10 text-white flex items-center justify-center font-extrabold text-sm">
             +{overflow}
@@ -113,10 +130,14 @@ function PodiumCard({ game, duplas }) {
         {top.map((d, i) => (
           <div
             key={d.id}
-            className={`flex items-center gap-4 rounded-2xl px-4 py-4 ${i === 0 ? 'bg-lime-400/15' : 'bg-white/5'}`}
+            className={`flex items-center gap-3 rounded-2xl px-4 py-4 ${i === 0 ? 'bg-lime-400/15' : 'bg-white/5'}`}
           >
             <span className="text-2xl shrink-0 leading-none">{MEDAL[i]}</span>
-            <span className="flex-1 min-w-0 text-white font-extrabold text-lg truncate">
+            <div className="flex -space-x-2 shrink-0">
+              <CardAvatar name={d.player1?.name} url={d.player1?.avatar_url} size={34} ring />
+              <CardAvatar name={d.player2?.name} url={d.player2?.avatar_url} size={34} ring />
+            </div>
+            <span className="flex-1 min-w-0 text-white font-extrabold text-base truncate">
               {d.name}
             </span>
             <span className="text-lime-400 font-extrabold text-xl tabular-nums shrink-0">
