@@ -203,8 +203,8 @@ export default function Home() {
               <button
                 key={t.key}
                 onClick={() => setTab(t.key)}
-                className={`flex-1 py-2.5 rounded-ctrl text-sm font-extrabold transition-colors duration-fast ${
-                  tab === t.key ? 'bg-surface text-ink-900 shadow-card' : 'text-muted hover:text-ink-900'
+                className={`flex-1 py-2.5 rounded-ctrl text-sm font-extrabold transition-all duration-fast ${
+                  tab === t.key ? 'bg-canvas text-ink-900 shadow-lift border border-line' : 'text-muted hover:text-ink-900'
                 }`}
               >
                 {t.label}
