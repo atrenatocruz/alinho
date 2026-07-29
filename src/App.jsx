@@ -9,6 +9,7 @@ import GameDetails from './pages/GameDetails'
 import Rankings from './pages/Rankings'
 import PlayerDetails from './pages/PlayerDetails'
 import Profile from './pages/Profile'
+import CreatePrivateMatch from './pages/CreatePrivateMatch'
 import Admin from './pages/Admin'
 import Instructions from './pages/Instructions'
 
@@ -125,6 +126,16 @@ function AppRoutes() {
           <ProtectedRoute showSplash={showSplash}>
             <Layout>
               <Profile />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/jogos-privados/novo"
+        element={
+          <ProtectedRoute showSplash={showSplash}>
+            <Layout>
+              <CreatePrivateMatch />
             </Layout>
           </ProtectedRoute>
         }
