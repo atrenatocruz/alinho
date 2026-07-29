@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { User, Award, Trophy, Target, Flame, LogOut, Camera } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { hashPhone } from '../lib/hashPhone'
 import { uploadAvatar, removeAvatar } from '../lib/avatarStorage'
-import { PrimaryButton, LevelBadge, GuestBadge, DateField, Avatar, Select } from '../components/ui'
+import { getMyPrivateMatches, getGlobalRankings } from '../lib/privateMatches'
+import { PrimaryButton, LevelBadge, GuestBadge, DateField, Avatar, Select, EmptyState } from '../components/ui'
 
 export default function Profile() {
   const { profile, updateProfile, updateMembership, currentMembership, currentOrganizationId, isGuest, signOut } = useAuth()
@@ -19,6 +20,9 @@ export default function Profile() {
   const [phone, setPhone] = useState('')
   const [phoneError, setPhoneError] = useState('')
   const [stats, setStats] = useState(null)
+  const [privateMatchHistory, setPrivateMatchHistory] = useState([])
+  const [privateMatchHistoryLoading, setPrivateMatchHistoryLoading] = useState(true)
+  const [globalPoints, setGlobalPoints] = useState(null)
   const [loading, setLoading] = useState(false)
   const [saved, setSaved] = useState(false)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
@@ -34,6 +38,8 @@ export default function Profile() {
       setGender(profile.gender || '')
       if (!isGuest && currentOrganizationId) {
         loadStats()
+        loadPrivateMatchHistory()
+        loadGlobalPoints()
       }
     }
   }, [profile, currentMembership, currentOrganizationId])
@@ -51,6 +57,27 @@ export default function Profile() {
       setStats(data)
     } catch (error) {
       console.error('Error loading stats:', error)
+    }
+  }
+
+  const loadPrivateMatchHistory = async () => {
+    setPrivateMatchHistoryLoading(true)
+    try {
+      const data = await getMyPrivateMatches()
+      setPrivateMatchHistory(data.filter((m) => m.status === 'confirmed'))
+    } catch (error) {
+      console.error('Error loading private match history:', error)
+    } finally {
+      setPrivateMatchHistoryLoading(false)
+    }
+  }
+
+  const loadGlobalPoints = async () => {
+    try {
+      const data = await getGlobalRankings()
+      setGlobalPoints(data.find((p) => p.user_id === profile.id) || null)
+    } catch (error) {
+      console.error('Error loading global points:', error)
     }
   }
 
@@ -255,6 +282,53 @@ export default function Profile() {
               <p className="text-xs text-muted">{label}</p>
             </div>
           ))}
+        </div>
+      )}
+
+      {globalPoints && (
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-extrabold text-ink-900">Ranking global</p>
+            <span className="text-2xl font-extrabold text-ink-900 tabular-nums">{globalPoints.total_points}</span>
+          </div>
+          <p className="text-[11px] text-muted mt-1">
+            {globalPoints.club_points} pontos de clubes · {globalPoints.private_points} pontos de jogos entre amigos
+          </p>
+        </div>
+      )}
+
+      {/* Private match history */}
+      {!privateMatchHistoryLoading && (
+        <div>
+          <h3 className="text-lg text-ink-900 mb-3">Jogos entre amigos</h3>
+
+          {privateMatchHistory.length === 0 ? (
+            <EmptyState
+              icon={Trophy}
+              title="Ainda não tens jogos entre amigos"
+              subtitle="Cria um jogo 2x2 fora do clube para começares o teu histórico."
+            />
+          ) : (
+            <div className="space-y-2.5">
+              {privateMatchHistory.map((m) => {
+                const teamLabel = (prefix) =>
+                  [m[`${prefix}_player1_name`], m[`${prefix}_player2_name`]].filter(Boolean).join(' + ')
+                return (
+                  <Link key={m.id} to="/jogos-privados" className="card press flex items-center justify-between hover:shadow-lift">
+                    <div className="min-w-0">
+                      <p className="font-extrabold text-ink-900 text-sm truncate">
+                        {teamLabel('team_a')} vs {teamLabel('team_b')}
+                      </p>
+                      <p className="text-[11px] text-muted mt-0.5">{m.score_a} - {m.score_b}</p>
+                    </div>
+                    <span className="text-xs font-extrabold px-2.5 py-1.5 rounded-full shrink-0 tabular-nums bg-ink-50 text-ink-700">
+                      {m.my_points} pts
+                    </span>
+                  </Link>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
 
