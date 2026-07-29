@@ -5,11 +5,13 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { LevelBadge, EmptyState, MixCard, Avatar, Select } from '../components/ui'
 import { winRatePct, buildMonthlyLeaderboard } from '../lib/statsLogic'
+import { getGlobalRankings } from '../lib/privateMatches'
 
 const TABS = [
   { key: 'geral', label: 'Geral' },
   { key: 'mensal', label: 'Mensal' },
   { key: 'mixes', label: 'Mixes' },
+  { key: 'global', label: 'Global' },
 ]
 
 export default function Rankings() {
@@ -29,12 +31,16 @@ export default function Rankings() {
   // Mixes
   const [mixes, setMixes] = useState([])
 
+  // Global
+  const [globalRankings, setGlobalRankings] = useState([])
+
   useEffect(() => {
     if (!currentOrganizationId) return
     loadRankings()
     loadPlayers()
     loadMonthly()
     loadMixes()
+    loadGlobalRankings()
   }, [currentOrganizationId])
 
   // level/is_guest live on `memberships` now — this org's membership list,
@@ -152,6 +158,15 @@ export default function Rankings() {
       setMixes(withLevels)
     } catch (error) {
       console.error('Error loading mixes:', error)
+    }
+  }
+
+  const loadGlobalRankings = async () => {
+    try {
+      const data = await getGlobalRankings()
+      setGlobalRankings(data)
+    } catch (error) {
+      console.error('Error loading global rankings:', error)
     }
   }
 
@@ -384,6 +399,43 @@ export default function Rankings() {
           <div className="space-y-3.5">
             {mixes.map(game => (
               <MixCard key={game.id} game={game} joined={isUserJoined(game)} />
+            ))}
+          </div>
+        )
+      )}
+
+      {/* ─── Global ─────────────────────────────────────────────────────── */}
+      {tab === 'global' && (
+        globalRankings.length === 0 ? (
+          <EmptyState
+            icon={Trophy}
+            title="Ranking global em branco"
+            subtitle="Joga mixes ou jogos entre amigos para apareceres aqui."
+          />
+        ) : (
+          <div className="space-y-3">
+            {globalRankings.map((player, index) => (
+              <Link
+                key={player.user_id}
+                to={`/jogador/${player.user_id}`}
+                className={`card press block hover:shadow-lift ${index === 0 ? 'ring-2 ring-lime-400' : ''}`}
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className={`w-11 h-11 rounded-ctrl flex items-center justify-center font-extrabold text-lg shrink-0 tabular-nums ${positionStyle(index)}`}>
+                    {index + 1}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-base text-ink-900 truncate">{player.name}</h3>
+                    <p className="text-[11px] text-muted mt-0.5">
+                      {player.club_points} pts clube · {player.private_points} pts amigos
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="text-2xl font-extrabold text-ink-900 tabular-nums">{player.total_points}</span>
+                    <p className="text-[11px] text-muted">pontos</p>
+                  </div>
+                </div>
+              </Link>
             ))}
           </div>
         )
