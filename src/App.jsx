@@ -9,6 +9,7 @@ import GameDetails from './pages/GameDetails'
 import Rankings from './pages/Rankings'
 import PlayerDetails from './pages/PlayerDetails'
 import Profile from './pages/Profile'
+import PrivateMatches from './pages/PrivateMatches'
 import CreatePrivateMatch from './pages/CreatePrivateMatch'
 import JoinPrivateMatch from './pages/JoinPrivateMatch'
 import Admin from './pages/Admin'
@@ -127,6 +128,16 @@ function AppRoutes() {
           <ProtectedRoute showSplash={showSplash}>
             <Layout>
               <Profile />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/jogos-privados"
+        element={
+          <ProtectedRoute showSplash={showSplash}>
+            <Layout>
+              <PrivateMatches />
             </Layout>
           </ProtectedRoute>
         }

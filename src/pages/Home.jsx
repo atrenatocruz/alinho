@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { CalendarX2, Users } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -152,6 +152,16 @@ export default function Home() {
         )}
         <h2 className="text-3xl text-ink-900">Próximos jogos</h2>
       </div>
+
+      <Link to="/jogos-privados" className="card press flex items-center gap-3 hover:shadow-lift">
+        <div className="w-10 h-10 rounded-ctrl bg-lime-400/15 text-lime-600 flex items-center justify-center shrink-0">
+          <Users size={18} />
+        </div>
+        <div>
+          <p className="font-extrabold text-ink-900 text-sm">Jogo entre amigos</p>
+          <p className="text-[11px] text-muted">Regista um 2x2 fora do clube</p>
+        </div>
+      </Link>
 
       {!currentOrganizationId ? (
         <EmptyState
