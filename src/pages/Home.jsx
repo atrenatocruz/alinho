@@ -1,13 +1,19 @@
 import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { CalendarX2, Users } from 'lucide-react'
+import { CalendarX2, Trophy, Users } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { MixCard, EmptyState, PrimaryButton } from '../components/ui'
 
+const TABS = [
+  { key: 'ativos', label: 'Mixs Ativos' },
+  { key: 'terminados', label: 'Mixs Terminados' },
+]
+
 export default function Home() {
   const [games, setGames] = useState([])
   const [loading, setLoading] = useState(true)
+  const [tab, setTab] = useState('ativos')
   const { user, profile, currentOrganizationId, joinOrganization } = useAuth()
   const [searchParams] = useSearchParams()
   const [joinSlug, setJoinSlug] = useState('')
@@ -134,6 +140,13 @@ export default function Home() {
     return game.participants?.some(p => p.user_id === user.id || p.partner_id === user.id)
   }
 
+  const isFinished = (game) => game.status === 'completed' || game.status === 'finished'
+  // games is already sorted ascending by date from the query, so finished
+  // just needs reversing to show the most recent one first.
+  const activeGames = games.filter((game) => !isFinished(game))
+  const finishedGames = [...games.filter(isFinished)].reverse()
+  const visibleGames = tab === 'ativos' ? activeGames : finishedGames
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -193,18 +206,44 @@ export default function Home() {
             )
           }
         />
-      ) : games.length === 0 ? (
-        <EmptyState
-          icon={CalendarX2}
-          title="Campo livre… por agora"
-          subtitle="Ainda não há jogos marcados. Volta em breve — ou dá um toque ao admin."
-        />
       ) : (
-        <div className="space-y-3.5">
-          {games.map(game => (
-            <MixCard key={game.id} game={game} joined={isUserJoined(game)} />
-          ))}
-        </div>
+        <>
+          <div className="flex gap-1 p-1 bg-ink-50 rounded-ctrl">
+            {TABS.map(t => (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className={`flex-1 py-2.5 rounded-ctrl text-sm font-extrabold transition-all duration-fast ${
+                  tab === t.key ? 'bg-canvas text-ink-900 shadow-lift border border-line' : 'text-muted hover:text-ink-900'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          {visibleGames.length === 0 ? (
+            tab === 'ativos' ? (
+              <EmptyState
+                icon={CalendarX2}
+                title="Campo livre… por agora"
+                subtitle="Ainda não há jogos marcados. Volta em breve — ou dá um toque ao admin."
+              />
+            ) : (
+              <EmptyState
+                icon={Trophy}
+                title="Ainda não há mixs terminados"
+                subtitle="O histórico de mixs aparece aqui assim que houver um terminado."
+              />
+            )
+          ) : (
+            <div className="space-y-3.5">
+              {visibleGames.map(game => (
+                <MixCard key={game.id} game={game} joined={isUserJoined(game)} />
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   )

@@ -740,11 +740,11 @@ export default function GameDetails() {
 
       <div className="flex items-center justify-between">
         <button
-          onClick={() => navigate('/')}
+          onClick={() => navigate(-1)}
           className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm min-h-[44px] pr-3"
         >
           <ArrowLeft size={20} />
-          Jogos
+          Voltar
         </button>
         <button
           onClick={() => setShowShare(true)}
