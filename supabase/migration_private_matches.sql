@@ -49,6 +49,11 @@ CREATE TABLE private_match_stats (
   UNIQUE (private_match_id, user_id)
 );
 
+-- get_global_rankings() aggregates this whole table by user_id, and the
+-- SELECT policy below filters every read by it. The UNIQUE index above
+-- leads with private_match_id, so it can't serve a user_id-only lookup.
+CREATE INDEX idx_private_match_stats_user_id ON private_match_stats(user_id);
+
 ALTER TABLE private_match_stats ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can view their own private match stats"

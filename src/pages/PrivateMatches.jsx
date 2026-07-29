@@ -10,9 +10,11 @@ const OPEN_SLOTS = [
   { key: 'team_b_player2', idField: 'team_b_player2_id' },
 ]
 
-function ScoreForm({ match, onSubmit }) {
-  const [scoreA, setScoreA] = useState('')
-  const [scoreB, setScoreB] = useState('')
+// initialScore* prefill the fields when the form is reopened to correct an
+// already-submitted score; onCancel is only passed in that same case.
+function ScoreForm({ match, onSubmit, initialScoreA = '', initialScoreB = '', onCancel }) {
+  const [scoreA, setScoreA] = useState(initialScoreA)
+  const [scoreB, setScoreB] = useState(initialScoreB)
   const [saving, setSaving] = useState(false)
 
   const handleSubmit = async (e) => {
@@ -26,13 +28,24 @@ function ScoreForm({ match, onSubmit }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex items-center gap-2 mt-3">
-      <input type="number" value={scoreA} onChange={(e) => setScoreA(e.target.value)} className="input-field w-16 text-center" placeholder="0" required />
-      <span className="text-muted font-extrabold">-</span>
-      <input type="number" value={scoreB} onChange={(e) => setScoreB(e.target.value)} className="input-field w-16 text-center" placeholder="0" required />
-      <PrimaryButton type="submit" disabled={saving} className="flex-1">
-        {saving ? 'A guardar…' : 'Registar resultado'}
-      </PrimaryButton>
+    <form onSubmit={handleSubmit} className="mt-3">
+      <div className="flex items-center gap-2">
+        <input type="number" min="0" value={scoreA} onChange={(e) => setScoreA(e.target.value)} className="input-field w-16 text-center" placeholder="0" required />
+        <span className="text-muted font-extrabold">-</span>
+        <input type="number" min="0" value={scoreB} onChange={(e) => setScoreB(e.target.value)} className="input-field w-16 text-center" placeholder="0" required />
+        <PrimaryButton type="submit" disabled={saving} className="flex-1">
+          {saving ? 'A guardar…' : 'Registar resultado'}
+        </PrimaryButton>
+      </div>
+      {onCancel && (
+        <button
+          type="button"
+          onClick={onCancel}
+          className="mt-2 text-xs font-extrabold text-muted hover:text-ink-900"
+        >
+          Cancelar
+        </button>
+      )}
     </form>
   )
 }
@@ -76,6 +89,20 @@ const teamLabel = (m, prefix) => {
 export default function PrivateMatches() {
   const [matches, setMatches] = useState([])
   const [loading, setLoading] = useState(true)
+  // Pending matches whose already-submitted score is being corrected.
+  // submit_private_match_score allows any of the 4 players to overwrite
+  // while pending, but there's no dispute flow — without this a typo'd
+  // score would permanently block confirmation.
+  const [editingScoreIds, setEditingScoreIds] = useState(new Set())
+
+  const toggleEditScore = (matchId) => {
+    setEditingScoreIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(matchId)) next.delete(matchId)
+      else next.add(matchId)
+      return next
+    })
+  }
 
   const load = useCallback(async () => {
     try {
@@ -93,6 +120,14 @@ export default function PrivateMatches() {
   const handleSubmitScore = async (matchId, scoreA, scoreB) => {
     try {
       await submitPrivateMatchScore(matchId, scoreA, scoreB)
+      // Only closes the editor on success — a rejected score keeps the
+      // form open with what was typed.
+      setEditingScoreIds((prev) => {
+        if (!prev.has(matchId)) return prev
+        const next = new Set(prev)
+        next.delete(matchId)
+        return next
+      })
       await load()
     } catch (error) {
       console.error('Error submitting score:', error)
@@ -138,18 +173,37 @@ export default function PrivateMatches() {
           <div className="space-y-3">
             {pending.map((m) => {
               const canConfirm = m.is_creator && m.score_a !== null && m.team_a_player2_id && m.team_b_player1_id && m.team_b_player2_id
+              const hasScore = m.score_a !== null && m.score_b !== null
+              const isEditingScore = editingScoreIds.has(m.id)
               return (
                 <div key={m.id} className="card">
                   <p className="font-extrabold text-ink-900 text-sm">{teamLabel(m, 'team_a')} vs {teamLabel(m, 'team_b')}</p>
-                  {m.score_a !== null && m.score_b !== null ? (
-                    <p className="text-sm text-muted mt-1">
-                      Resultado: {m.score_a} - {m.score_b}
-                      {!m.is_creator ? ' · aguarda confirmação de quem criou o jogo' : ''}
-                    </p>
+                  {hasScore && !isEditingScore ? (
+                    <>
+                      <p className="text-sm text-muted mt-1">
+                        Resultado: {m.score_a} - {m.score_b}
+                        {!m.is_creator ? ' · aguarda confirmação de quem criou o jogo' : ''}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => toggleEditScore(m.id)}
+                        className="mt-1 text-xs font-extrabold text-ink-700 hover:text-ink-900"
+                      >
+                        Editar resultado
+                      </button>
+                    </>
                   ) : (
-                    <ScoreForm match={m} onSubmit={handleSubmitScore} />
+                    <ScoreForm
+                      match={m}
+                      onSubmit={handleSubmitScore}
+                      initialScoreA={hasScore ? m.score_a : ''}
+                      initialScoreB={hasScore ? m.score_b : ''}
+                      onCancel={isEditingScore ? () => toggleEditScore(m.id) : undefined}
+                    />
                   )}
-                  {canConfirm && (
+                  {/* Hidden mid-edit so the creator can't confirm the old
+                      stored score while a correction sits unsubmitted. */}
+                  {canConfirm && !isEditingScore && (
                     <PrimaryButton onClick={() => handleConfirm(m.id)} className="w-full mt-3">
                       Confirmar resultado
                     </PrimaryButton>

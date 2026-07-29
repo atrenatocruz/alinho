@@ -13,6 +13,12 @@ export default function Login() {
   const [searchParams] = useSearchParams()
   const { signUp, signIn, signInWithGoogle, signInAsAdmin, updateProfile } = useAuth()
 
+  // Where to land after a successful sign-in. ProtectedRoute sets ?redirect=
+  // when it bounces a logged-out visitor off a guarded URL (invite links
+  // above all), so they resume where they were headed instead of at Home.
+  // Separate mechanism from ?org=<slug> above, which Home.jsx consumes.
+  const redirectTo = searchParams.get('redirect') || '/'
+
   // Capture ?org=<slug> into sessionStorage immediately on mount — it has
   // to survive both a full-page Google OAuth redirect and App.jsx's
   // instant client-side redirect away from /login once logged in, so
@@ -27,7 +33,7 @@ export default function Login() {
 
   const handleAdminBypass = () => {
     signInAsAdmin()
-    navigate('/')
+    navigate(redirectTo)
   }
 
   const [googleLoading, setGoogleLoading] = useState(false)
@@ -69,7 +75,7 @@ export default function Login() {
     try {
       const { error } = await signIn(loginEmail, loginPassword)
       if (error) throw error
-      navigate('/')
+      navigate(redirectTo)
     } catch (err) {
       setError(err.message || 'Email ou password incorretos')
     } finally {
@@ -142,7 +148,7 @@ export default function Login() {
         if (profileError) throw profileError
       }
 
-      navigate('/')
+      navigate(redirectTo)
     } catch (err) {
       setError(err.message || 'Erro ao criar conta')
     } finally {

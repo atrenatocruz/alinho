@@ -51,7 +51,10 @@ AS $$
 DECLARE
   v_match private_matches;
 BEGIN
-  IF p_slot NOT IN ('team_a_player2', 'team_b_player1', 'team_b_player2') THEN
+  -- The IS NULL arm matters: `NULL NOT IN (...)` evaluates to NULL, not
+  -- TRUE, so without it an explicit NULL slot falls through the guard and
+  -- gets treated as team_b_player2 by the ELSE branch below.
+  IF p_slot IS NULL OR p_slot NOT IN ('team_a_player2', 'team_b_player1', 'team_b_player2') THEN
     RAISE EXCEPTION 'Posição inválida';
   END IF;
 
@@ -95,6 +98,14 @@ GRANT EXECUTE ON FUNCTION claim_private_match_slot(UUID, TEXT) TO authenticated;
 -- Cross-org player search for the "invite by search" flow. Bypasses the
 -- org-restricted `profiles` RLS policy on purpose (SECURITY DEFINER) —
 -- only whitelisted, already-non-sensitive columns are returned.
+--
+-- Synthetic accounts created by the admin-create-test-user Edge Function
+-- get real `profiles` rows, so they'd otherwise be searchable and could be
+-- pulled into a real match (earning points in the global ranking). They're
+-- flagged per-organization on `memberships.is_test`, with no equivalent
+-- column on `profiles`, hence the NOT EXISTS. Deliberately keyed on
+-- is_test alone: real per-club guests (is_guest = true, is_test = false)
+-- are genuine people and must stay searchable.
 CREATE OR REPLACE FUNCTION search_players(p_query TEXT)
 RETURNS TABLE (id UUID, name TEXT, avatar_url TEXT)
 LANGUAGE sql
@@ -106,6 +117,9 @@ AS $$
   WHERE length(trim(p_query)) >= 2
     AND p.id <> auth.uid()
     AND p.name ILIKE '%' || trim(p_query) || '%'
+    AND NOT EXISTS (
+      SELECT 1 FROM memberships m WHERE m.user_id = p.id AND m.is_test = true
+    )
   ORDER BY p.name
   LIMIT 10;
 $$;

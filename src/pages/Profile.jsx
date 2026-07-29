@@ -44,9 +44,15 @@ export default function Profile() {
       setPreferredSide(profile.preferred_side || 'both')
       setBirthday(profile.birthday || '')
       setGender(profile.gender || '')
+      // player_stats/mix_player_stats are org-scoped, so those two genuinely
+      // need a current organization. Private matches are org-independent by
+      // design — gating them on an org left club-less users stuck on a
+      // never-resolving privateMatchHistoryLoading.
       if (!isGuest && currentOrganizationId) {
         loadStats()
         loadMixHistory()
+      }
+      if (!isGuest) {
         loadPrivateMatchHistory()
         loadGlobalPoints()
       }

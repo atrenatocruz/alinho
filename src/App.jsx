@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Layout from './components/Layout'
 import SplashScreen from './components/SplashScreen'
@@ -22,13 +22,18 @@ import Instructions from './pages/Instructions'
 // exactly as before.
 const ProtectedRoute = ({ children, showSplash }) => {
   const { user } = useAuth()
+  const location = useLocation()
 
   if (showSplash) {
     return <SplashScreen />
   }
 
   if (!user) {
-    return <Navigate to="/login" />
+    // Invite links (/jogos-privados/:id/entrar?slot=…) are by design opened
+    // by people with no session yet — bouncing them to a bare /login lost
+    // the match id and slot, so Login sends them back here after auth.
+    const redirectTo = encodeURIComponent(location.pathname + location.search)
+    return <Navigate to={`/login?redirect=${redirectTo}`} />
   }
 
   return children

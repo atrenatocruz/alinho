@@ -29,6 +29,11 @@ BEGIN
   IF p_score_a IS NULL OR p_score_b IS NULL OR p_score_a = p_score_b THEN
     RAISE EXCEPTION 'Resultado inválido';
   END IF;
+  -- Without this, e.g. (-5, -9) passes the tie check and records a "win"
+  -- for team A off two negative games.
+  IF p_score_a < 0 OR p_score_b < 0 THEN
+    RAISE EXCEPTION 'Resultado inválido';
+  END IF;
 
   UPDATE private_matches
   SET score_a = p_score_a,
