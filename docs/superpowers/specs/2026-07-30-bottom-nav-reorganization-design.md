@@ -60,11 +60,17 @@ list, switching active club) is deferred to a future spec.
 
 ### New icon: `src/components/icons/PadelIcon.jsx`
 
-lucide-react has no padel-racket glyph. Port Google's Material Symbols
-"padel" glyph as a standalone SVG React component, restyled to match
-lucide's stroke conventions (`stroke="currentColor"`, `strokeWidth={2}`,
-`fill="none"`, 24×24 viewBox) so it sits visually consistent with the
-other nav icons, which are all lucide components.
+lucide-react has no padel-racket glyph. Google's Material Symbols
+"padel" glyph (Apache-2.0 licensed, fetched from
+`google/material-design-icons`) is a single **filled** path on a
+`0 -960 960 960` viewBox — Material Symbols Outlined is still a solid
+shape with cutout details, unlike lucide's stroke icons, so it can't be
+faithfully restyled into a stroke icon without hand-redrawing (out of
+scope — risk of an inaccurate glyph outweighs visual purity here). The
+component renders the glyph as-is: `fill="currentColor"`, sized via a
+`size` prop (default `24`, called with `size={20}` in the nav to match
+the lucide icons alongside it), same `currentColor` inheritance so
+active/inactive nav coloring still works.
 
 ## Rankings (`src/pages/Rankings.jsx`) — tab reorder/rename only
 
