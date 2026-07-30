@@ -8,15 +8,15 @@ import { winRatePct, buildMonthlyLeaderboard } from '../lib/statsLogic'
 import { getGlobalRankings } from '../lib/privateMatches'
 
 const TABS = [
-  { key: 'geral', label: 'Geral' },
+  { key: 'global', label: 'Geral' },
+  { key: 'geral', label: 'Por Clube' },
   { key: 'mensal', label: 'Mensal' },
   { key: 'mixes', label: 'Mixes' },
-  { key: 'global', label: 'Global' },
 ]
 
 export default function Rankings() {
   const { profile, currentOrganizationId, currentOrganization } = useAuth()
-  const [tab, setTab] = useState('geral')
+  const [tab, setTab] = useState('global')
   const [loading, setLoading] = useState(true)
 
   // Geral
