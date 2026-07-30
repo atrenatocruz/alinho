@@ -1,4 +1,5 @@
 import { EmptyState } from '../components/ui'
+import PadelIcon from '../components/icons/PadelIcon'
 
 export default function Clubes() {
   return (
@@ -8,6 +9,7 @@ export default function Clubes() {
       </div>
 
       <EmptyState
+        icon={PadelIcon}
         title="Em breve"
         subtitle="Informação de clubes e cortes vai aparecer aqui."
       />

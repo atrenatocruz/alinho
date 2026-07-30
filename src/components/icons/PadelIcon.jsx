@@ -1,3 +1,5 @@
+// Path data sourced from Google's Material Symbols icon set
+// (github.com/google/material-design-icons), licensed under Apache-2.0.
 export default function PadelIcon({ size = 24, className = '' }) {
   return (
     <svg

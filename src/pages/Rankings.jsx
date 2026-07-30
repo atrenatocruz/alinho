@@ -33,6 +33,7 @@ export default function Rankings() {
 
   // Global
   const [globalRankings, setGlobalRankings] = useState([])
+  const [globalLoading, setGlobalLoading] = useState(true)
 
   useEffect(() => {
     // The global ranking is org-independent — it has to load even for a
@@ -173,6 +174,8 @@ export default function Rankings() {
       setGlobalRankings(data)
     } catch (error) {
       console.error('Error loading global rankings:', error)
+    } finally {
+      setGlobalLoading(false)
     }
   }
 
@@ -200,7 +203,9 @@ export default function Rankings() {
   return (
     <div className="space-y-5">
       <div>
-        <p className="text-muted text-sm mb-0.5">{currentOrganization?.name}</p>
+        {tab === 'geral' && (
+          <p className="text-muted text-sm mb-0.5">{currentOrganization?.name}</p>
+        )}
         <h2 className="text-3xl text-ink-900">Classificação</h2>
       </div>
 
@@ -412,7 +417,11 @@ export default function Rankings() {
 
       {/* ─── Global ─────────────────────────────────────────────────────── */}
       {tab === 'global' && (
-        globalRankings.length === 0 ? (
+        loading || globalLoading ? (
+          <div className="flex items-center justify-center py-16">
+            <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
+          </div>
+        ) : globalRankings.length === 0 ? (
           <EmptyState
             icon={Trophy}
             title="Ranking global em branco"

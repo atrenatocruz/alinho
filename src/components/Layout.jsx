@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Home, Users, Trophy, User, Settings, LogOut, HelpCircle, Phone, X } from 'lucide-react'
+import { Home, Users, Trophy, Settings, LogOut, HelpCircle, Phone, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { LevelBadge, PrimaryButton, Avatar } from './ui'
 import { hashPhone } from '../lib/hashPhone'
@@ -148,17 +148,19 @@ export default function Layout({ children }) {
   }
 
   // Guests only see Jogos + Perfil
+  // `icon` is omitted for Perfil — the render loop always shows the real
+  // Avatar there instead of an icon (see isPerfil below).
   const navItems = isGuest
     ? [
         { path: '/', icon: Home, label: 'Jogos' },
-        { path: '/perfil', icon: User, label: 'Perfil' },
+        { path: '/perfil', label: 'Perfil' },
       ]
     : [
         { path: '/', icon: Home, label: 'Jogos' },
         { path: '/comunidade', icon: Users, label: 'Comunidade' },
         { path: '/clubes', icon: PadelIcon, label: 'Clubes' },
         { path: '/rankings', icon: Trophy, label: 'Rankings' },
-        { path: '/perfil', icon: User, label: 'Perfil' },
+        { path: '/perfil', label: 'Perfil' },
       ]
 
   if (isAdmin) {
