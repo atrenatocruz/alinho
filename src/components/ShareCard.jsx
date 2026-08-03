@@ -247,9 +247,9 @@ function DuplaPlayers({ team, compact, avatarSize }) {
   return (
     <div className={compact ? 'space-y-1' : 'space-y-1.5'}>
       {[team?.player1, team?.player2].map((player, idx) => (
-        <div key={player?.id || idx} className="flex items-center gap-2">
+        <div key={player?.id || idx} className="flex items-center gap-2 min-w-0">
           <CardAvatar name={player?.name} url={player?.avatar_url} size={avatarSize} ring />
-          <span className={`text-white font-extrabold truncate ${compact ? 'text-[12px]' : 'text-sm'}`}>
+          <span className={`text-white font-extrabold leading-tight min-w-0 ${compact ? 'text-[12px]' : 'text-sm'}`}>
             {player?.name || '?'}
           </span>
         </div>
@@ -290,9 +290,15 @@ function DuplasCard({ game, duplas }) {
               <p className={`font-mono font-extrabold uppercase tracking-wide text-lime-400 ${compact ? 'text-[9px] mb-1.5' : 'text-[11px] mb-2'}`}>
                 Campo {m.court_number}
               </p>
-              <DuplaPlayers team={a} compact={compact} avatarSize={avatarSize} />
-              <p className={`text-center font-extrabold text-ink-200 ${compact ? 'text-[10px] my-1' : 'text-xs my-1.5'}`}>vs</p>
-              <DuplaPlayers team={b} compact={compact} avatarSize={avatarSize} />
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <DuplaPlayers team={a} compact={compact} avatarSize={avatarSize} />
+                </div>
+                <p className={`shrink-0 font-extrabold text-ink-200 ${compact ? 'text-[10px]' : 'text-xs'}`}>vs</p>
+                <div className="flex-1 min-w-0">
+                  <DuplaPlayers team={b} compact={compact} avatarSize={avatarSize} />
+                </div>
+              </div>
             </div>
           )
         })}
