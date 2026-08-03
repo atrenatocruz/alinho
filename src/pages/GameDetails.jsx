@@ -13,6 +13,8 @@ import {
 import { winRatePct } from '../lib/statsLogic'
 import { getGlobalRankings } from '../lib/privateMatches'
 
+const SIDE_LABEL = { left: 'Esquerda', right: 'Direita', both: 'Ambos' }
+
 export default function GameDetails() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -112,8 +114,8 @@ export default function GameDetails() {
         .from('teams')
         .select(`
           *,
-          player1:profiles!teams_player1_id_fkey (id, name, avatar_url),
-          player2:profiles!teams_player2_id_fkey (id, name, avatar_url)
+          player1:profiles!teams_player1_id_fkey (id, name, avatar_url, preferred_side),
+          player2:profiles!teams_player2_id_fkey (id, name, avatar_url, preferred_side)
         `)
         .eq('game_id', id)
 
@@ -1025,7 +1027,9 @@ export default function GameDetails() {
                             <div key={player?.id || idx} className="flex items-center gap-2">
                               <Avatar name={player?.name} url={player?.avatar_url} size="w-8 h-8 text-xs" />
                               <span className="flex-1 min-w-0 text-sm font-extrabold text-ink-900 truncate">{player?.name || '?'}</span>
-                              <span className="text-xs font-extrabold text-muted tabular-nums shrink-0">{pointsById[player?.id] ?? 0} pts</span>
+                              <span className="text-xs font-extrabold text-muted tabular-nums shrink-0">
+                                {pointsById[player?.id] ?? 0} pts · {SIDE_LABEL[player?.preferred_side] || 'Ambos'}
+                              </span>
                             </div>
                           ))}
                         </div>
@@ -1242,7 +1246,7 @@ export default function GameDetails() {
                     ? <GuestBadge label={person.is_test ? 'Teste' : 'Convidado'} />
                     : (
                       <span className="text-sm font-extrabold text-ink-700 tabular-nums shrink-0">
-                        {pointsById[person.id] ?? 0} pts
+                        {pointsById[person.id] ?? 0} pts · {SIDE_LABEL[person.preferred_side] || 'Ambos'}
                       </span>
                     )}
                   {isAdmin && (
@@ -1288,7 +1292,7 @@ export default function GameDetails() {
                   ? <GuestBadge label={person.is_test ? 'Teste' : 'Convidado'} />
                   : (
                     <span className="text-sm font-extrabold text-ink-700 tabular-nums shrink-0">
-                      {pointsById[person.id] ?? 0} pts
+                      {pointsById[person.id] ?? 0} pts · {SIDE_LABEL[person.preferred_side] || 'Ambos'}
                     </span>
                   )}
                 {isAdmin && (
