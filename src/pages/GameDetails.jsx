@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Calendar, MapPin, ArrowLeft, UserPlus, User, Check, Lock, Trophy, Play, ChevronRight, Swords, X, Repeat, Share2, ChevronDown } from 'lucide-react'
+import { Calendar, MapPin, ArrowLeft, UserPlus, User, Check, Lock, Trophy, Play, ChevronRight, Swords, X, Repeat, Share2, ChevronDown, RotateCcw } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton, LevelBadge, GuestBadge, PlayerAvatarRow, EmptyState, ShareModal, RoundTimer, Avatar, Select } from '../components/ui'
@@ -450,6 +450,37 @@ export default function GameDetails() {
     } catch (error) {
       console.error('Error starting mix:', error)
       setMixError(error.message || 'Erro ao começar o mix')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // Aborts an in-progress mix so the admin can reform duplas and start over
+  // — deletes the teams (cascades to their matches) and reopens the game
+  // for "Começar Mix". Only reachable before finalize_mix runs, so no
+  // player_stats/mix_player_stats rows exist yet to roll back.
+  const handleStopMix = async () => {
+    const msg = matches.length > 0
+      ? 'Isto apaga as duplas e todos os resultados registados neste mix, para poderes recomeçar. Tens a certeza?'
+      : 'Isto apaga as duplas formadas, para poderes recomeçar. Tens a certeza?'
+    if (!confirm(msg)) return
+
+    setBusy(true)
+    setMixError('')
+    try {
+      const { error: teamsError } = await supabase.from('teams').delete().eq('game_id', id)
+      if (teamsError) throw teamsError
+
+      const { error: statusError } = await supabase
+        .from('games')
+        .update({ status: 'closed', winner_team_id: null })
+        .eq('id', id)
+      if (statusError) throw statusError
+
+      loadGameDetails()
+    } catch (error) {
+      console.error('Error stopping mix:', error)
+      setMixError('Erro ao parar o mix')
     } finally {
       setBusy(false)
     }
@@ -1150,6 +1181,18 @@ export default function GameDetails() {
                   {busy ? 'A finalizar…' : 'Terminar Mix'}
                 </PrimaryButton>
               )}
+
+              {/* Aborta o mix todo (apaga duplas + resultados) para recomeçar
+                  do zero — diferente de "Terminar Mix", que finaliza com um
+                  vencedor e atualiza o ranking. */}
+              <button
+                onClick={handleStopMix}
+                disabled={busy}
+                className="w-full inline-flex items-center justify-center gap-1.5 text-danger text-sm font-extrabold min-h-[44px] px-2"
+              >
+                <RotateCcw size={16} />
+                Parar Mix
+              </button>
             </div>
           )}
         </>
