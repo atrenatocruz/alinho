@@ -131,10 +131,10 @@ function LogoWatermark() {
 }
 
 // autoHeight lets the card grow to fit its content (CARD_H as a floor via
-// minHeight) instead of a hard-fixed height — DuplasCard uses this since
-// its list of pairs can't be capped upfront and the card can't scroll to
-// hide overflow. InviteCard/PodiumCard keep the fixed CARD_H: their
-// content is always capped (top-3 duplas, 6 avatars + overflow badge).
+// minHeight) instead of a hard-fixed height — DuplasCard and PodiumCard use
+// this since their lists of pairs can't be capped upfront and the card
+// can't scroll to hide overflow. InviteCard keeps the fixed CARD_H: its
+// content is always capped (6 avatars + overflow badge).
 function CardShell({ children, autoHeight = false }) {
   return (
     <div
@@ -191,8 +191,9 @@ function InviteCard({ game, people, capacity, formattedDate }) {
 
 function PodiumCard({ game, duplas }) {
   const top = duplas.slice(0, 3)
+  const rest = duplas.slice(3)
   return (
-    <CardShell>
+    <CardShell autoHeight>
       <p className="text-[13px] font-mono font-extrabold tracking-[0.2em] uppercase text-lime-400 mb-3">
         🏆 Resultados do mix
       </p>
@@ -213,7 +214,7 @@ function PodiumCard({ game, duplas }) {
               <CardAvatar name={d.player1?.name} url={d.player1?.avatar_url} size={34} />
               <CardAvatar name={d.player2?.name} url={d.player2?.avatar_url} size={34} />
             </div>
-            <span className="flex-1 min-w-0 text-white font-extrabold text-base truncate">
+            <span className="flex-1 min-w-0 text-white font-extrabold text-base leading-tight">
               {d.name}
             </span>
             <span className="text-lime-400 font-extrabold text-xl tabular-nums shrink-0">
@@ -222,6 +223,23 @@ function PodiumCard({ game, duplas }) {
           </div>
         ))}
       </div>
+      {rest.length > 0 && (
+        <div className="space-y-1 mt-3">
+          {rest.map((d, i) => (
+            <div key={d.id} className="flex items-center gap-3 rounded-xl px-4 py-2">
+              <span className="text-[11px] font-extrabold text-ink-200 tabular-nums shrink-0 w-4">
+                {i + 4}
+              </span>
+              <span className="flex-1 min-w-0 text-white font-semibold text-[13px] leading-tight">
+                {d.name}
+              </span>
+              <span className="text-lime-400 font-extrabold text-sm tabular-nums shrink-0">
+                {d.points}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
       <LogoFooter />
     </CardShell>
   )
@@ -235,11 +253,14 @@ function PodiumCard({ game, duplas }) {
 // typical mix's worth of duplas.
 const DUPLAS_COMPACT_THRESHOLD = 5
 
-function DuplaPlayers({ team, compact, avatarSize }) {
+function DuplaPlayers({ team, compact, avatarSize, align = 'start' }) {
   return (
-    <div className={compact ? 'space-y-1' : 'space-y-1.5'}>
+    <div className={`${compact ? 'space-y-1' : 'space-y-1.5'} w-full`}>
       {[team?.player1, team?.player2].map((player, idx) => (
-        <div key={player?.id || idx} className="flex items-center gap-2 min-w-0">
+        <div
+          key={player?.id || idx}
+          className={`flex items-center gap-2 min-w-0 ${align === 'end' ? 'justify-end' : ''}`}
+        >
           <CardAvatar name={player?.name} url={player?.avatar_url} size={avatarSize} />
           <span className={`text-white font-extrabold leading-tight min-w-0 ${compact ? 'text-[12px]' : 'text-sm'}`}>
             {player?.name || '?'}
@@ -282,11 +303,11 @@ function DuplasCard({ game, duplas }) {
               <p className={`font-mono font-extrabold uppercase tracking-wide text-lime-400 ${compact ? 'text-[9px] mb-1.5' : 'text-[11px] mb-2'}`}>
                 Campo {m.court_number}
               </p>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center">
                 <div className="flex-1 min-w-0">
-                  <DuplaPlayers team={a} compact={compact} avatarSize={avatarSize} />
+                  <DuplaPlayers team={a} compact={compact} avatarSize={avatarSize} align="end" />
                 </div>
-                <p className={`shrink-0 font-extrabold text-ink-200 ${compact ? 'text-[10px]' : 'text-xs'}`}>vs</p>
+                <p className={`shrink-0 font-extrabold text-ink-200 ${compact ? 'text-[10px] px-1.5' : 'text-xs px-2'}`}>vs</p>
                 <div className="flex-1 min-w-0">
                   <DuplaPlayers team={b} compact={compact} avatarSize={avatarSize} />
                 </div>
