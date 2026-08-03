@@ -42,7 +42,7 @@ function loadImageElement(src) {
   })
 }
 
-function bakeCircularAvatar(img, size, ring) {
+function bakeCircularAvatar(img, size) {
   const dim = Math.round(size * EXPORT_PIXEL_RATIO)
   const canvas = document.createElement('canvas')
   canvas.width = dim
@@ -61,19 +61,11 @@ function bakeCircularAvatar(img, size, ring) {
   ctx.drawImage(img, (dim - w) / 2, (dim - h) / 2, w, h)
   ctx.restore()
 
-  if (ring) {
-    ctx.beginPath()
-    ctx.arc(r, r, r - dim * 0.03, 0, Math.PI * 2)
-    ctx.lineWidth = dim * 0.06
-    ctx.strokeStyle = '#040404' // ink-900, matches the card background
-    ctx.stroke()
-  }
-
   return canvas.toDataURL('image/png')
 }
 
-function useCircularAvatar(url, size, ring) {
-  const cacheKey = url ? `${url}|${size}|${ring}` : null
+function useCircularAvatar(url, size) {
+  const cacheKey = url ? `${url}|${size}` : null
   const [bakedUrl, setBakedUrl] = useState(() => (cacheKey && avatarBakeCache.get(cacheKey)) || null)
 
   useEffect(() => {
@@ -87,7 +79,7 @@ function useCircularAvatar(url, size, ring) {
       .then((res) => { if (!res.ok) throw new Error('avatar fetch failed'); return res.blob() })
       .then((blob) => loadImageElement(URL.createObjectURL(blob)))
       .then((img) => {
-        const baked = bakeCircularAvatar(img, size, ring)
+        const baked = bakeCircularAvatar(img, size)
         avatarBakeCache.set(cacheKey, baked)
         if (!cancelled) setBakedUrl(baked)
       })
@@ -95,7 +87,7 @@ function useCircularAvatar(url, size, ring) {
         // leave bakedUrl null — CardAvatar falls back to the initials circle
       })
     return () => { cancelled = true }
-  }, [url, size, ring, cacheKey])
+  }, [url, size, cacheKey])
 
   return bakedUrl
 }
@@ -104,8 +96,8 @@ function useCircularAvatar(url, size, ring) {
    otherwise the initial-in-a-circle fallback (also used while the photo is
    still loading, and permanently if it has none / fails to load). The baked
    photo needs no rounding/clipping classes — it's already circular. */
-function CardAvatar({ name, url, size = 40, ring = false }) {
-  const bakedUrl = useCircularAvatar(url, size, ring)
+function CardAvatar({ name, url, size = 40 }) {
+  const bakedUrl = useCircularAvatar(url, size)
   const base = { width: size, height: size }
   if (bakedUrl) {
     return <img src={bakedUrl} alt={name || ''} style={base} className="shrink-0" />
@@ -113,7 +105,7 @@ function CardAvatar({ name, url, size = 40, ring = false }) {
   return (
     <div
       style={base}
-      className={`rounded-full bg-ink-700 text-lime-400 flex items-center justify-center font-extrabold shrink-0 ${ring ? 'ring-2 ring-ink-900' : ''}`}
+      className="rounded-full bg-ink-700 text-lime-400 flex items-center justify-center font-extrabold shrink-0"
     >
       <span style={{ fontSize: size * 0.4 }}>{initial(name)}</span>
     </div>
@@ -217,9 +209,9 @@ function PodiumCard({ game, duplas }) {
             className={`flex items-center gap-3 rounded-2xl px-4 py-4 ${i === 0 ? 'bg-lime-400/15' : 'bg-white/5'}`}
           >
             <span className="text-2xl shrink-0 leading-none">{MEDAL[i]}</span>
-            <div className="flex -space-x-2 shrink-0">
-              <CardAvatar name={d.player1?.name} url={d.player1?.avatar_url} size={34} ring />
-              <CardAvatar name={d.player2?.name} url={d.player2?.avatar_url} size={34} ring />
+            <div className="flex gap-1 shrink-0">
+              <CardAvatar name={d.player1?.name} url={d.player1?.avatar_url} size={34} />
+              <CardAvatar name={d.player2?.name} url={d.player2?.avatar_url} size={34} />
             </div>
             <span className="flex-1 min-w-0 text-white font-extrabold text-base truncate">
               {d.name}
@@ -248,7 +240,7 @@ function DuplaPlayers({ team, compact, avatarSize }) {
     <div className={compact ? 'space-y-1' : 'space-y-1.5'}>
       {[team?.player1, team?.player2].map((player, idx) => (
         <div key={player?.id || idx} className="flex items-center gap-2 min-w-0">
-          <CardAvatar name={player?.name} url={player?.avatar_url} size={avatarSize} ring />
+          <CardAvatar name={player?.name} url={player?.avatar_url} size={avatarSize} />
           <span className={`text-white font-extrabold leading-tight min-w-0 ${compact ? 'text-[12px]' : 'text-sm'}`}>
             {player?.name || '?'}
           </span>
