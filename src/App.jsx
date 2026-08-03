@@ -74,6 +74,18 @@ const AdminRoute = ({ children, showSplash }) => {
   return children
 }
 
+// Redirects to Home when the private-matches feature flag is off — covers
+// direct navigation/bookmarks to a card that's already hidden on Home.
+const PrivateMatchesRoute = ({ children }) => {
+  const { isPrivateMatchesEnabled } = useAuth()
+
+  if (!isPrivateMatchesEnabled) {
+    return <Navigate to="/" />
+  }
+
+  return children
+}
+
 function AppRoutes() {
   const { user, loading: authLoading } = useAuth()
   const [minDurationElapsed, setMinDurationElapsed] = useState(false)
@@ -163,9 +175,11 @@ function AppRoutes() {
         path="/jogos-privados"
         element={
           <ProtectedRoute showSplash={showSplash}>
-            <Layout>
-              <PrivateMatches />
-            </Layout>
+            <PrivateMatchesRoute>
+              <Layout>
+                <PrivateMatches />
+              </Layout>
+            </PrivateMatchesRoute>
           </ProtectedRoute>
         }
       />
@@ -173,9 +187,11 @@ function AppRoutes() {
         path="/jogos-privados/novo"
         element={
           <ProtectedRoute showSplash={showSplash}>
-            <Layout>
-              <CreatePrivateMatch />
-            </Layout>
+            <PrivateMatchesRoute>
+              <Layout>
+                <CreatePrivateMatch />
+              </Layout>
+            </PrivateMatchesRoute>
           </ProtectedRoute>
         }
       />
@@ -183,9 +199,11 @@ function AppRoutes() {
         path="/jogos-privados/:id/entrar"
         element={
           <ProtectedRoute showSplash={showSplash}>
-            <Layout>
-              <JoinPrivateMatch />
-            </Layout>
+            <PrivateMatchesRoute>
+              <Layout>
+                <JoinPrivateMatch />
+              </Layout>
+            </PrivateMatchesRoute>
           </ProtectedRoute>
         }
       />
