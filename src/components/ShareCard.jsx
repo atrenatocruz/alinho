@@ -1,6 +1,7 @@
 import { forwardRef, useImperativeHandle, useRef, useState, useEffect } from 'react'
 import { toPng } from 'html-to-image'
 import logoWordmark from '../logo/primary-dark-card.svg'
+import { seedCourts } from '../lib/mixLogic'
 
 /* ════════════════════════════════════════════════════════════════════════
    ShareCard — branded, rasterizable Instagram Story card (1080×1920).
@@ -128,7 +129,7 @@ function LogoWatermark() {
   return (
     <svg
       viewBox="0 0 27.1915 27.1915"
-      className="absolute left-1/2 top-1/2 w-[440px] h-[440px] -translate-x-1/2 -translate-y-1/2 opacity-[0.07]"
+      className="absolute left-1/2 top-1/2 w-[440px] h-[440px] -translate-x-1/2 -translate-y-1/2 opacity-[0.035]"
       aria-hidden="true"
     >
       <path d="M23.517 13.5958 C23.517 8.1164 19.075 3.6745 13.595 3.6745 C8.116 3.6745 3.674 8.1164 3.674 13.5958 C3.674 19.0751 8.116 23.517 13.595 23.517 V27.1915 C6.087 27.1915 0 21.1045 0 13.5958 C0 6.087 6.087 0 13.595 0 C21.104 0 27.191 6.087 27.191 13.5958 C27.191 21.1045 21.104 27.1915 13.595 27.1915 V23.517 C19.075 23.517 23.517 19.0751 23.517 13.5958 Z" fill="#C5DD01" />
@@ -242,9 +243,33 @@ function PodiumCard({ game, duplas }) {
 // typical mix's worth of duplas.
 const DUPLAS_COMPACT_THRESHOLD = 5
 
+function DuplaPlayers({ team, compact, avatarSize }) {
+  return (
+    <div className={compact ? 'space-y-1' : 'space-y-1.5'}>
+      {[team?.player1, team?.player2].map((player, idx) => (
+        <div key={player?.id || idx} className="flex items-center gap-2">
+          <CardAvatar name={player?.name} url={player?.avatar_url} size={avatarSize} ring />
+          <span className={`text-white font-extrabold truncate ${compact ? 'text-[12px]' : 'text-sm'}`}>
+            {player?.name || '?'}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// Grouped by court instead of a flat "Dupla N" list — reuses seedCourts,
+// the same seed_ranking-sorted pairing Round 1 actually uses, so this
+// preview matches the real court draw (court 1 = the two highest-seed
+// duplas facing off, down to the lowest-seed duplas on the last court). A
+// leftover unpaired dupla (odd count) is dropped, same as seedCourts.
 function DuplasCard({ game, duplas }) {
   const compact = duplas.length >= DUPLAS_COMPACT_THRESHOLD
   const avatarSize = compact ? 22 : 34
+  const numCourts = game.num_courts || Math.ceil(duplas.length / 2)
+  const teamById = Object.fromEntries(duplas.map(d => [d.id, d]))
+  const courtMatches = seedCourts(duplas, numCourts)
+
   return (
     <CardShell autoHeight>
       <p className="text-[13px] font-mono font-extrabold tracking-[0.2em] uppercase text-lime-400 mb-3">
@@ -257,23 +282,20 @@ function DuplasCard({ game, duplas }) {
         <p className="text-[15px] text-ink-200 font-semibold">{game.location}</p>
       )}
       <div className={`${compact ? 'space-y-1.5 mt-4' : 'space-y-3 mt-8'} flex-1 overflow-hidden`}>
-        {duplas.map((d, i) => (
-          <div key={d.id} className={`rounded-2xl bg-white/5 ${compact ? 'px-3 py-2' : 'px-4 py-3'}`}>
-            <p className={`font-mono font-extrabold uppercase tracking-wide text-lime-400 ${compact ? 'text-[9px] mb-1' : 'text-[11px] mb-2'}`}>
-              Dupla {i + 1}
-            </p>
-            <div className={compact ? 'space-y-1' : 'space-y-1.5'}>
-              {[d.player1, d.player2].map((player, idx) => (
-                <div key={player?.id || idx} className="flex items-center gap-2">
-                  <CardAvatar name={player?.name} url={player?.avatar_url} size={avatarSize} ring />
-                  <span className={`text-white font-extrabold truncate ${compact ? 'text-[12px]' : 'text-sm'}`}>
-                    {player?.name || '?'}
-                  </span>
-                </div>
-              ))}
+        {courtMatches.map((m) => {
+          const a = teamById[m.team_a_id]
+          const b = teamById[m.team_b_id]
+          return (
+            <div key={m.court_number} className={`rounded-2xl bg-white/5 ${compact ? 'px-3 py-2.5' : 'px-4 py-3.5'}`}>
+              <p className={`font-mono font-extrabold uppercase tracking-wide text-lime-400 ${compact ? 'text-[9px] mb-1.5' : 'text-[11px] mb-2'}`}>
+                Campo {m.court_number}
+              </p>
+              <DuplaPlayers team={a} compact={compact} avatarSize={avatarSize} />
+              <p className={`text-center font-extrabold text-ink-200 ${compact ? 'text-[10px] my-1' : 'text-xs my-1.5'}`}>vs</p>
+              <DuplaPlayers team={b} compact={compact} avatarSize={avatarSize} />
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
       <LogoFooter tagline="junta-te no alinho" />
     </CardShell>
