@@ -16,6 +16,7 @@ export default function Comunidade() {
         selected={null}
         onSelect={(player) => navigate(`/jogador/${player.id}`)}
         onClear={() => {}}
+        browseByDefault
       />
     </div>
   )

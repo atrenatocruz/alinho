@@ -1,20 +1,48 @@
 import { useState, useEffect, useRef } from 'react'
 import { Search, X } from 'lucide-react'
-import { searchPlayers } from '../lib/privateMatches'
+import { searchPlayers, listPlayers } from '../lib/privateMatches'
 import { Avatar } from './ui'
 
-export default function PlayerSearch({ label, selected, onSelect, onClear, excludeIds = [] }) {
+export default function PlayerSearch({ label, selected, onSelect, onClear, excludeIds = [], browseByDefault = false }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [open, setOpen] = useState(false)
   const timeoutRef = useRef(null)
 
+  // Loads the default browse list once on mount (Comunidade only — pages
+  // that don't pass browseByDefault keep the old "empty until you type"
+  // behavior, e.g. opponent search in CreatePrivateMatch).
+  useEffect(() => {
+    if (!browseByDefault) return
+    let cancelled = false
+    listPlayers().then((data) => {
+      if (!cancelled) {
+        setResults(data)
+        setOpen(true)
+      }
+    }).catch((error) => {
+      console.error('Error loading players:', error)
+    })
+    return () => { cancelled = true }
+  }, [browseByDefault])
+
   useEffect(() => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current)
-    if (query.trim().length < 2) {
+
+    const trimmed = query.trim()
+
+    if (trimmed.length === 0) {
+      // Leave the mount effect's browse list on screen instead of wiping
+      // it the instant this effect re-runs for the empty initial query.
+      if (!browseByDefault) setResults([])
+      return
+    }
+
+    if (trimmed.length < 2) {
       setResults([])
       return
     }
+
     timeoutRef.current = setTimeout(async () => {
       try {
         const data = await searchPlayers(query)
@@ -24,7 +52,7 @@ export default function PlayerSearch({ label, selected, onSelect, onClear, exclu
       }
     }, 300)
     return () => clearTimeout(timeoutRef.current)
-  }, [query])
+  }, [query, browseByDefault])
 
   if (selected) {
     return (
@@ -38,7 +66,9 @@ export default function PlayerSearch({ label, selected, onSelect, onClear, exclu
     )
   }
 
+  const isSearching = query.trim().length >= 2
   const visibleResults = results.filter((p) => !excludeIds.includes(p.id))
+  const showEmptyState = open && isSearching && visibleResults.length === 0
 
   return (
     <div className="relative">
@@ -54,20 +84,24 @@ export default function PlayerSearch({ label, selected, onSelect, onClear, exclu
           className="flex-1 bg-transparent outline-none text-sm"
         />
       </div>
-      {open && visibleResults.length > 0 && (
+      {open && (visibleResults.length > 0 || showEmptyState) && (
         <div className="absolute z-10 mt-1 w-full bg-surface rounded-ctrl border border-line shadow-lift divide-y divide-line max-h-64 overflow-y-auto">
-          {visibleResults.map((player) => (
-            <button
-              key={player.id}
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => { onSelect(player); setQuery(''); setResults([]); setOpen(false) }}
-              className="w-full flex items-center gap-3 p-3 hover:bg-ink-50 text-left"
-            >
-              <Avatar name={player.name} url={player.avatar_url} size="w-9 h-9 text-sm" />
-              <p className="font-extrabold text-ink-900 text-sm truncate">{player.name}</p>
-            </button>
-          ))}
+          {showEmptyState ? (
+            <p className="p-3 text-sm text-muted text-center">Nenhum jogador encontrado</p>
+          ) : (
+            visibleResults.map((player) => (
+              <button
+                key={player.id}
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => { onSelect(player); setQuery(''); setResults([]); setOpen(false) }}
+                className="w-full flex items-center gap-3 p-3 hover:bg-ink-50 text-left"
+              >
+                <Avatar name={player.name} url={player.avatar_url} size="w-9 h-9 text-sm" />
+                <p className="font-extrabold text-ink-900 text-sm truncate">{player.name}</p>
+              </button>
+            ))
+          )}
         </div>
       )}
     </div>
