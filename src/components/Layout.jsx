@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Home, Trophy, User, Settings, LogOut, HelpCircle, Phone, X } from 'lucide-react'
+import { Home, Users, Trophy, Settings, LogOut, HelpCircle, Phone, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { LevelBadge, PrimaryButton } from './ui'
+import { LevelBadge, PrimaryButton, Avatar } from './ui'
 import { hashPhone } from '../lib/hashPhone'
+import PadelIcon from './icons/PadelIcon'
 
 // Re-prompt at most once per day once dismissed — a nudge, not a gate.
 const PHONE_PROMPT_DISMISSED_KEY = 'phonePromptDismissedDate'
@@ -147,15 +148,19 @@ export default function Layout({ children }) {
   }
 
   // Guests only see Jogos + Perfil
+  // `icon` is omitted for Perfil — the render loop always shows the real
+  // Avatar there instead of an icon (see isPerfil below).
   const navItems = isGuest
     ? [
         { path: '/', icon: Home, label: 'Jogos' },
-        { path: '/perfil', icon: User, label: 'Perfil' },
+        { path: '/perfil', label: 'Perfil' },
       ]
     : [
         { path: '/', icon: Home, label: 'Jogos' },
-        { path: '/rankings', icon: Trophy, label: 'Ranking' },
-        { path: '/perfil', icon: User, label: 'Perfil' },
+        { path: '/comunidade', icon: Users, label: 'Comunidade' },
+        { path: '/clubes', icon: PadelIcon, label: 'Clubes' },
+        { path: '/rankings', icon: Trophy, label: 'Rankings' },
+        { path: '/perfil', label: 'Perfil' },
       ]
 
   if (isAdmin) {
@@ -211,6 +216,7 @@ export default function Layout({ children }) {
                         ring-1 ring-white/10">
           {navItems.map(({ path, icon: Icon, label }) => {
             const isActive = location.pathname === path
+            const isPerfil = path === '/perfil'
             return (
               <Link
                 key={path}
@@ -224,7 +230,16 @@ export default function Layout({ children }) {
                     : 'text-ink-200 hover:text-white w-12'
                 }`}
               >
-                <Icon size={20} strokeWidth={2} className="shrink-0" />
+                {isPerfil ? (
+                  <Avatar
+                    name={profile?.name}
+                    url={profile?.avatar_url}
+                    size="w-6 h-6 text-[10px]"
+                    colorClass="bg-ink-700 text-white"
+                  />
+                ) : (
+                  <Icon size={20} strokeWidth={2} className="shrink-0" />
+                )}
                 {/* label morphs in on the active item — island style */}
                 <span
                   className={`text-xs font-extrabold whitespace-nowrap overflow-hidden transition-all duration-base ${

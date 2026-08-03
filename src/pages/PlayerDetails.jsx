@@ -20,7 +20,16 @@ export default function PlayerDetails() {
   const [h2hMatches, setH2hMatches] = useState([])
 
   useEffect(() => {
-    if (!currentOrganizationId) return
+    // An org-less signed-in member (zero club memberships) can still land
+    // here — e.g. via Comunidade's cross-club search. There's no
+    // organization to scope the queries to, so skip loading, but resolve
+    // both loading flags or the page spins forever (falls through to the
+    // not-found empty state below instead).
+    if (!currentOrganizationId) {
+      setLoading(false)
+      setH2hLoading(false)
+      return
+    }
     loadPlayer()
     loadH2h()
   }, [id, currentOrganizationId])
@@ -97,8 +106,8 @@ export default function PlayerDetails() {
     return (
       <EmptyState
         icon={Award}
-        title="Jogador não encontrado"
-        subtitle="Este jogador já não existe ou foi removido."
+        title="Não foi possível carregar este perfil"
+        subtitle="Pode ser um jogador de outro clube ou pode já não estar disponível."
         action={
           <PrimaryButton variant="navy" onClick={() => navigate('/rankings')}>
             Voltar à classificação
