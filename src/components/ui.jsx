@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { MapPin, CheckCircle2, ChevronRight, ChevronDown, ChevronLeft, Lock, Play, Calendar, X, Share2, MessageCircle, Link2, ImageDown } from 'lucide-react'
-import ShareCard, { CARD_W, shareCardHeight } from './ShareCard'
+import ShareCard, { CARD_W, CARD_H } from './ShareCard'
 
 /* ─── Date fields ────────────────────────────────────────────────────────
    Native <input type=date/datetime-local> pickers open reliably on iOS
@@ -603,11 +603,29 @@ export function ShareModal({ title = 'Partilhar', message, url, onClose, imageCa
   const [editingCaption, setEditingCaption] = useState(false)
   const [copied, setCopied] = useState(false)
   const shareCardRef = useRef(null)
+  const previewMeasureRef = useRef(null)
+  const [cardHeight, setCardHeight] = useState(CARD_H)
   const [generatingImage, setGeneratingImage] = useState(false)
   const [imageError, setImageError] = useState('')
   const [imageSavedHint, setImageSavedHint] = useState(false)
 
   const fullText = `${caption}\n\n🔗 ${url}`
+
+  // Some cards (DuplasCard) size themselves to their content instead of a
+  // fixed height — measure the actual rendered height so the preview
+  // container matches exactly what exportPng() will rasterize, instead of
+  // guessing a size upfront. ResizeObserver also catches late layout shifts
+  // (e.g. a custom font finishing load after first paint).
+  useEffect(() => {
+    if (!imageCard) return
+    const el = previewMeasureRef.current
+    if (!el) return
+    const update = () => setCardHeight(Math.max(CARD_H, el.scrollHeight))
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [imageCard])
 
   const handleShareImage = async () => {
     setGeneratingImage(true)
@@ -698,11 +716,13 @@ export function ShareModal({ title = 'Partilhar', message, url, onClose, imageCa
             <div className="space-y-3 pb-4 border-b border-line">
               <div className="flex justify-center">
                 <div
-                  style={{ width: CARD_W * 0.55, height: shareCardHeight(imageCard.variant, { duplas: imageCard.duplas }) * 0.55 }}
+                  style={{ width: CARD_W * 0.55, height: cardHeight * 0.55 }}
                   className="relative overflow-hidden rounded-ctrl shadow-card"
                 >
-                  <div style={{ transform: 'scale(0.55)', transformOrigin: 'top left', width: CARD_W, height: shareCardHeight(imageCard.variant, { duplas: imageCard.duplas }) }}>
-                    <ShareCard ref={shareCardRef} {...imageCard} />
+                  <div style={{ transform: 'scale(0.55)', transformOrigin: 'top left', width: CARD_W }}>
+                    <div ref={previewMeasureRef}>
+                      <ShareCard ref={shareCardRef} {...imageCard} />
+                    </div>
                   </div>
                 </div>
               </div>

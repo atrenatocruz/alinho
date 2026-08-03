@@ -121,9 +121,9 @@ function CardAvatar({ name, url, size = 40, ring = false }) {
 
 /* Faint court-line motif, echoing EmptyState's — a quiet brand texture
    behind the content rather than a blank dark rectangle. */
-function CourtMotif({ height = CARD_H }) {
+function CourtMotif() {
   return (
-    <svg viewBox={`0 0 ${CARD_W} ${height}`} className="absolute inset-0 w-full h-full" fill="none">
+    <svg viewBox={`0 0 ${CARD_W} ${CARD_H}`} className="absolute inset-0 w-full h-full" fill="none">
       <rect x="40" y="150" width="280" height="420" rx="24" stroke="#C5DD01" strokeOpacity="0.08" strokeWidth="3" />
       <line x1="180" y1="150" x2="180" y2="570" stroke="#C5DD01" strokeOpacity="0.08" strokeWidth="3" />
       <line x1="40" y1="360" x2="320" y2="360" stroke="#C5DD01" strokeOpacity="0.08" strokeWidth="3" strokeDasharray="8 10" />
@@ -131,13 +131,18 @@ function CourtMotif({ height = CARD_H }) {
   )
 }
 
-// height defaults to the standard Instagram-Story size (CARD_H); DuplasCard
-// overrides it so a long list of pairs can never be clipped off the bottom
-// of a fixed-height, non-scrolling exported image (see shareCardHeight).
-function CardShell({ children, height = CARD_H }) {
+// autoHeight lets the card grow to fit its content (CARD_H as a floor via
+// minHeight) instead of a hard-fixed height — DuplasCard uses this since
+// its list of pairs can't be capped upfront and the card can't scroll to
+// hide overflow. InviteCard/PodiumCard keep the fixed CARD_H: their
+// content is always capped (top-3 duplas, 6 avatars + overflow badge).
+function CardShell({ children, autoHeight = false }) {
   return (
-    <div style={{ width: CARD_W, height }} className="relative overflow-hidden bg-ink-900 flex flex-col">
-      <CourtMotif height={height} />
+    <div
+      style={autoHeight ? { width: CARD_W, minHeight: CARD_H } : { width: CARD_W, height: CARD_H }}
+      className="relative overflow-hidden bg-ink-900 flex flex-col"
+    >
+      <CourtMotif />
       <div className="relative flex-1 flex flex-col px-8 pt-14 pb-10">{children}</div>
     </div>
   )
@@ -223,33 +228,19 @@ function PodiumCard({ game, duplas }) {
   )
 }
 
-// The card can't scroll (it's rasterized to a static image), so instead of
-// a fixed 640px canvas that clips a long list of pairs, the export height
-// grows with the number of duplas. Two density tiers on top of that keep
-// it from getting silly-tall: normal spacing for a typical mix (≤4
-// duplas), compact (smaller avatars, tighter rows) once there are more.
+// The card can't scroll (it's rasterized to a static image) and its height
+// now auto-fits the content (see CardShell's autoHeight), so a long list of
+// pairs simply makes the exported image taller instead of clipping. This
+// density tier just keeps a big list from looking sparse/oversized:
+// compact (smaller avatars, tighter rows) once there are more than a
+// typical mix's worth of duplas.
 const DUPLAS_COMPACT_THRESHOLD = 5
-const DUPLAS_HEADER_H = 240 // label + title + location + top padding
-const DUPLAS_FOOTER_H = 120 // LogoFooter + bottom padding
-const DUPLAS_ROW_H_NORMAL = 120 // one dupla block: 34px avatars, normal spacing
-const DUPLAS_ROW_H_COMPACT = 100 // one dupla block: 22px avatars, tight spacing
-
-// Exported so ShareModal's on-screen preview (src/components/ui.jsx) can
-// size its container identically to what exportPng() will actually
-// rasterize — same formula, single source of truth, no separate DOM
-// measurement needed to keep the two in sync.
-export function shareCardHeight(variant, { duplas = [] } = {}) {
-  if (variant !== 'duplas') return CARD_H
-  const rowH = duplas.length >= DUPLAS_COMPACT_THRESHOLD ? DUPLAS_ROW_H_COMPACT : DUPLAS_ROW_H_NORMAL
-  return Math.max(CARD_H, DUPLAS_HEADER_H + duplas.length * rowH + DUPLAS_FOOTER_H)
-}
 
 function DuplasCard({ game, duplas }) {
   const compact = duplas.length >= DUPLAS_COMPACT_THRESHOLD
   const avatarSize = compact ? 22 : 34
-  const height = shareCardHeight('duplas', { duplas })
   return (
-    <CardShell height={height}>
+    <CardShell autoHeight>
       <p className="text-[13px] font-mono font-extrabold tracking-[0.2em] uppercase text-lime-400 mb-3">
         🎾 Duplas
       </p>
@@ -293,9 +284,15 @@ const ShareCard = forwardRef(function ShareCard(props, ref) {
     exportPng: async () => {
       const node = nodeRef.current
       if (!node) throw new Error('Card not ready')
+      // Measured, not estimated: scrollHeight reflects the node's actual
+      // layout height regardless of the 0.55 CSS-transform scale the
+      // on-screen preview wraps it in (transforms don't affect layout
+      // metrics), so this is exact for autoHeight cards (DuplasCard) and a
+      // no-op for fixed-height ones (InviteCard/PodiumCard, always CARD_H).
+      const height = Math.max(CARD_H, node.scrollHeight)
       const dataUrl = await toPng(node, {
         width: CARD_W,
-        height: shareCardHeight(variant, { duplas }),
+        height,
         pixelRatio: EXPORT_PIXEL_RATIO,
         cacheBust: true,
       })
