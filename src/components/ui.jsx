@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { MapPin, CheckCircle2, ChevronRight, ChevronDown, ChevronLeft, Lock, Play, Calendar, X, Share2, MessageCircle, Link2, ImageDown } from 'lucide-react'
-import ShareCard, { CARD_W, CARD_H } from './ShareCard'
+import ShareCard, { CARD_W, shareCardHeight } from './ShareCard'
 
 /* ─── Date fields ────────────────────────────────────────────────────────
    Native <input type=date/datetime-local> pickers open reliably on iOS
@@ -698,10 +698,10 @@ export function ShareModal({ title = 'Partilhar', message, url, onClose, imageCa
             <div className="space-y-3 pb-4 border-b border-line">
               <div className="flex justify-center">
                 <div
-                  style={{ width: CARD_W * 0.55, height: CARD_H * 0.55 }}
+                  style={{ width: CARD_W * 0.55, height: shareCardHeight(imageCard.variant, { duplas: imageCard.duplas }) * 0.55 }}
                   className="relative overflow-hidden rounded-ctrl shadow-card"
                 >
-                  <div style={{ transform: 'scale(0.55)', transformOrigin: 'top left', width: CARD_W, height: CARD_H }}>
+                  <div style={{ transform: 'scale(0.55)', transformOrigin: 'top left', width: CARD_W, height: shareCardHeight(imageCard.variant, { duplas: imageCard.duplas }) }}>
                     <ShareCard ref={shareCardRef} {...imageCard} />
                   </div>
                 </div>

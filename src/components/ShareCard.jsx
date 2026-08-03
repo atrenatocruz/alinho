@@ -121,9 +121,9 @@ function CardAvatar({ name, url, size = 40, ring = false }) {
 
 /* Faint court-line motif, echoing EmptyState's — a quiet brand texture
    behind the content rather than a blank dark rectangle. */
-function CourtMotif() {
+function CourtMotif({ height = CARD_H }) {
   return (
-    <svg viewBox={`0 0 ${CARD_W} ${CARD_H}`} className="absolute inset-0 w-full h-full" fill="none">
+    <svg viewBox={`0 0 ${CARD_W} ${height}`} className="absolute inset-0 w-full h-full" fill="none">
       <rect x="40" y="150" width="280" height="420" rx="24" stroke="#C5DD01" strokeOpacity="0.08" strokeWidth="3" />
       <line x1="180" y1="150" x2="180" y2="570" stroke="#C5DD01" strokeOpacity="0.08" strokeWidth="3" />
       <line x1="40" y1="360" x2="320" y2="360" stroke="#C5DD01" strokeOpacity="0.08" strokeWidth="3" strokeDasharray="8 10" />
@@ -131,10 +131,13 @@ function CourtMotif() {
   )
 }
 
-function CardShell({ children }) {
+// height defaults to the standard Instagram-Story size (CARD_H); DuplasCard
+// overrides it so a long list of pairs can never be clipped off the bottom
+// of a fixed-height, non-scrolling exported image (see shareCardHeight).
+function CardShell({ children, height = CARD_H }) {
   return (
-    <div style={{ width: CARD_W, height: CARD_H }} className="relative overflow-hidden bg-ink-900 flex flex-col">
-      <CourtMotif />
+    <div style={{ width: CARD_W, height }} className="relative overflow-hidden bg-ink-900 flex flex-col">
+      <CourtMotif height={height} />
       <div className="relative flex-1 flex flex-col px-8 pt-14 pb-10">{children}</div>
     </div>
   )
@@ -220,17 +223,33 @@ function PodiumCard({ game, duplas }) {
   )
 }
 
-// Fixed-height canvas (640px), no scroll — a list of pairs has to fit
-// without one. Two density tiers keep it legible either way: normal for
-// a typical mix (≤4 duplas), compact (smaller avatars, tighter spacing)
-// once there are more pairs than that.
+// The card can't scroll (it's rasterized to a static image), so instead of
+// a fixed 640px canvas that clips a long list of pairs, the export height
+// grows with the number of duplas. Two density tiers on top of that keep
+// it from getting silly-tall: normal spacing for a typical mix (≤4
+// duplas), compact (smaller avatars, tighter rows) once there are more.
 const DUPLAS_COMPACT_THRESHOLD = 5
+const DUPLAS_HEADER_H = 240 // label + title + location + top padding
+const DUPLAS_FOOTER_H = 120 // LogoFooter + bottom padding
+const DUPLAS_ROW_H_NORMAL = 120 // one dupla block: 34px avatars, normal spacing
+const DUPLAS_ROW_H_COMPACT = 100 // one dupla block: 22px avatars, tight spacing
+
+// Exported so ShareModal's on-screen preview (src/components/ui.jsx) can
+// size its container identically to what exportPng() will actually
+// rasterize — same formula, single source of truth, no separate DOM
+// measurement needed to keep the two in sync.
+export function shareCardHeight(variant, { duplas = [] } = {}) {
+  if (variant !== 'duplas') return CARD_H
+  const rowH = duplas.length >= DUPLAS_COMPACT_THRESHOLD ? DUPLAS_ROW_H_COMPACT : DUPLAS_ROW_H_NORMAL
+  return Math.max(CARD_H, DUPLAS_HEADER_H + duplas.length * rowH + DUPLAS_FOOTER_H)
+}
 
 function DuplasCard({ game, duplas }) {
   const compact = duplas.length >= DUPLAS_COMPACT_THRESHOLD
   const avatarSize = compact ? 22 : 34
+  const height = shareCardHeight('duplas', { duplas })
   return (
-    <CardShell>
+    <CardShell height={height}>
       <p className="text-[13px] font-mono font-extrabold tracking-[0.2em] uppercase text-lime-400 mb-3">
         🎾 Duplas
       </p>
@@ -276,7 +295,7 @@ const ShareCard = forwardRef(function ShareCard(props, ref) {
       if (!node) throw new Error('Card not ready')
       const dataUrl = await toPng(node, {
         width: CARD_W,
-        height: CARD_H,
+        height: shareCardHeight(variant, { duplas }),
         pixelRatio: EXPORT_PIXEL_RATIO,
         cacheBust: true,
       })
