@@ -253,16 +253,26 @@ function PodiumCard({ game, duplas }) {
 // typical mix's worth of duplas.
 const DUPLAS_COMPACT_THRESHOLD = 5
 
+// align="end" (the team on the left of "vs") reverses each row so the
+// avatar — fixed-size, unlike the name — sits flush against "vs" at a
+// constant offset. Right-justifying the row as a whole instead (an
+// earlier attempt) broke down here: a two-line wrapped name gives that
+// row a different total cluster width than a one-line row, so the
+// avatars stopped lining up vertically between the two rows of the same
+// team. Anchoring on the avatar side keeps both rows' avatars at the
+// same x regardless of how the name wraps.
 function DuplaPlayers({ team, compact, avatarSize, align = 'start' }) {
   return (
     <div className={`${compact ? 'space-y-1' : 'space-y-1.5'} w-full`}>
       {[team?.player1, team?.player2].map((player, idx) => (
         <div
           key={player?.id || idx}
-          className={`flex items-center gap-2 min-w-0 ${align === 'end' ? 'justify-end' : ''}`}
+          className={`flex items-center gap-2 min-w-0 w-full ${align === 'end' ? 'flex-row-reverse' : ''}`}
         >
           <CardAvatar name={player?.name} url={player?.avatar_url} size={avatarSize} />
-          <span className={`text-white font-extrabold leading-tight min-w-0 ${compact ? 'text-[12px]' : 'text-sm'}`}>
+          <span
+            className={`text-white font-extrabold leading-tight min-w-0 ${compact ? 'text-[12px]' : 'text-sm'} ${align === 'end' ? 'text-right' : ''}`}
+          >
             {player?.name || '?'}
           </span>
         </div>
