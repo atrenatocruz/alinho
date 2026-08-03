@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Calendar, MapPin, ArrowLeft, UserPlus, User, Check, Lock, Trophy, Play, ChevronRight, Swords, X, Repeat, Share2 } from 'lucide-react'
+import { Calendar, MapPin, ArrowLeft, UserPlus, User, Check, Lock, Trophy, Play, ChevronRight, Swords, X, Repeat, Share2, ChevronDown } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton, LevelBadge, GuestBadge, PlayerAvatarRow, EmptyState, ShareModal, RoundTimer, Avatar, Select } from '../components/ui'
@@ -34,6 +34,8 @@ export default function GameDetails() {
   const [editingPairs, setEditingPairs] = useState(false)
   const [swapPick, setSwapPick] = useState(null) // { teamId, slot: 'player1_id'|'player2_id' }
   const [showShare, setShowShare] = useState(false)
+  const [duplasExpanded, setDuplasExpanded] = useState(true)
+  const [showDuplasShare, setShowDuplasShare] = useState(false)
   const [mixStats, setMixStats] = useState([])
   const [addingTestUser, setAddingTestUser] = useState(false)
 
@@ -659,6 +661,14 @@ export default function GameDetails() {
     return lines.join('\n')
   }
 
+  const buildDuplasShareMessage = () => {
+    const lines = [`🎾 Duplas — ${game?.title || 'Mix'}`, '']
+    teams.forEach((t, i) => {
+      lines.push(`Dupla ${i + 1}: ${t.player1?.name || '?'} & ${t.player2?.name || '?'}`)
+    })
+    return lines.join('\n')
+  }
+
   // Every person in the game (rows + partners), for list + capacity
   const people = participants.flatMap(p => [
     { ...p.user, rowOwner: true, rowId: p.id, hasPartner: !!p.partner },
@@ -880,67 +890,116 @@ export default function GameDetails() {
         <>
           {/* Duplas */}
           <div className="card">
-            <div className="flex items-center justify-between mb-3">
+            <div
+              className="flex items-center justify-between mb-3 cursor-pointer"
+              onClick={() => setDuplasExpanded(v => !v)}
+            >
               <h3 className="text-lg text-ink-900">Duplas</h3>
-              {isAdmin && game.status === 'in_progress' && (
-                <button
-                  onClick={() => {
-                    setEditingPairs(v => !v)
-                    setSwapPick(null)
-                  }}
-                  className="inline-flex items-center gap-1.5 text-ink-700 text-sm font-extrabold min-h-[44px] px-2"
-                >
-                  <Repeat size={16} />
-                  {editingPairs ? 'Concluir' : 'Editar duplas'}
-                </button>
-              )}
+              <div className="flex items-center gap-1">
+                {duplasExpanded && (
+                  <>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setShowDuplasShare(true) }}
+                      className="inline-flex items-center gap-1.5 text-ink-700 text-sm font-extrabold min-h-[44px] px-2"
+                    >
+                      <Share2 size={16} />
+                      Partilhar
+                    </button>
+                    {isAdmin && game.status === 'in_progress' && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setEditingPairs(v => !v)
+                          setSwapPick(null)
+                        }}
+                        className="inline-flex items-center gap-1.5 text-ink-700 text-sm font-extrabold min-h-[44px] px-2"
+                      >
+                        <Repeat size={16} />
+                        {editingPairs ? 'Concluir' : 'Editar duplas'}
+                      </button>
+                    )}
+                  </>
+                )}
+                <ChevronDown
+                  size={20}
+                  className={`text-muted transition-transform duration-fast shrink-0 ${duplasExpanded ? 'rotate-180' : ''}`}
+                />
+              </div>
             </div>
 
-            {editingPairs && (
-              <p className="text-muted text-sm mb-3 bg-ink-50 rounded-ctrl px-3 py-2.5">
-                Toca em <strong className="text-ink-900">dois jogadores</strong> (de duplas diferentes) para os trocar.
-              </p>
-            )}
+            {duplasExpanded && (
+              <>
+                {editingPairs && (
+                  <p className="text-muted text-sm mb-3 bg-ink-50 rounded-ctrl px-3 py-2.5">
+                    Toca em <strong className="text-ink-900">dois jogadores</strong> (de duplas diferentes) para os trocar.
+                  </p>
+                )}
 
-            <div className="space-y-2">
-              {teams.map((t, i) => (
-                <div key={t.id} className={`flex items-center gap-3 rounded-ctrl p-3 ${
-                  t.id === game.winner_team_id ? 'bg-lime-400/20' : 'bg-canvas'
-                }`}>
-                  <span className="w-7 h-7 rounded-full bg-ink-700 text-white text-xs font-extrabold flex items-center justify-center shrink-0">
-                    {i + 1}
-                  </span>
-                  {editingPairs ? (
-                    <div className="flex-1 flex items-center gap-1.5 flex-wrap">
-                      {[['player1_id', t.player1], ['player2_id', t.player2]].map(([slot, player]) => {
-                        const picked = swapPick?.teamId === t.id && swapPick?.slot === slot
-                        return (
-                          <button
-                            key={slot}
-                            onClick={() => handlePickForSwap(t.id, slot)}
-                            disabled={busy}
-                            className={`px-3 py-2 min-h-[40px] rounded-full text-sm font-extrabold transition-all duration-fast active:scale-[0.97] ${
-                              picked
-                                ? 'bg-lime-400 text-ink-900 ring-2 ring-ink-900'
-                                : 'bg-surface text-ink-900 border border-line hover:border-ink-200'
-                            }`}
-                          >
-                            {player?.name?.split(' ')[0] || '?'}
-                          </button>
-                        )
-                      })}
+                <div className="space-y-2">
+                  {teams.map((t, i) => (
+                    <div key={t.id} className={`rounded-ctrl p-3 ${
+                      t.id === game.winner_team_id ? 'bg-lime-400/20' : 'bg-canvas'
+                    }`}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <p className="text-[11px] font-extrabold text-muted uppercase tracking-wide">
+                          Dupla {i + 1}
+                        </p>
+                        <div className="flex items-center gap-1.5">
+                          {t.id === game.winner_team_id && <span>🏆</span>}
+                          {(t.player1?.is_guest || t.player2?.is_guest) && <GuestBadge />}
+                        </div>
+                      </div>
+                      {editingPairs ? (
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {[['player1_id', t.player1], ['player2_id', t.player2]].map(([slot, player]) => {
+                            const picked = swapPick?.teamId === t.id && swapPick?.slot === slot
+                            return (
+                              <button
+                                key={slot}
+                                onClick={() => handlePickForSwap(t.id, slot)}
+                                disabled={busy}
+                                className={`px-3 py-2 min-h-[40px] rounded-full text-sm font-extrabold transition-all duration-fast active:scale-[0.97] ${
+                                  picked
+                                    ? 'bg-lime-400 text-ink-900 ring-2 ring-ink-900'
+                                    : 'bg-surface text-ink-900 border border-line hover:border-ink-200'
+                                }`}
+                              >
+                                {player?.name?.split(' ')[0] || '?'}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      ) : (
+                        <div className="space-y-1.5">
+                          {[t.player1, t.player2].map((player, idx) => (
+                            <div key={player?.id || idx} className="flex items-center gap-2">
+                              <Avatar name={player?.name} url={player?.avatar_url} size="w-8 h-8 text-xs" />
+                              <span className="text-sm font-extrabold text-ink-900 truncate">{player?.name || '?'}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <p className="flex-1 font-extrabold text-ink-900 truncate">
-                      {teamName(t.id)}
-                      {t.id === game.winner_team_id && ' 🏆'}
-                    </p>
-                  )}
-                  {(t.player1?.is_guest || t.player2?.is_guest) && <GuestBadge />}
+                  ))}
                 </div>
-              ))}
-            </div>
+              </>
+            )}
           </div>
+
+          {showDuplasShare && (
+            <ShareModal
+              title="Partilhar Duplas"
+              message={buildDuplasShareMessage()}
+              url={shareUrl}
+              onClose={() => setShowDuplasShare(false)}
+              imageCard={{
+                variant: 'duplas',
+                game,
+                duplas: teams,
+                formattedDate: formatDate(game.date),
+              }}
+            />
+          )}
 
           {/* Classificação (todos contra todos) */}
           {!isSobeDesce && roundsStarted && tctStandings.length > 0 && (
