@@ -62,7 +62,7 @@ function Segmented({ options, value, onChange }) {
 }
 
 export default function Admin() {
-  const { profile: currentUser, currentOrganizationId } = useAuth()
+  const { profile: currentUser, currentOrganizationId, isPrivateMatchesEnabled, refreshFeatureFlags } = useAuth()
   const [activeTab, setActiveTab] = useState('games') // 'games', 'members', 'settings'
   const [games, setGames] = useState([])
   const [members, setMembers] = useState([])
@@ -70,6 +70,7 @@ export default function Admin() {
   const [loading, setLoading] = useState(true)
   const [showCreateGame, setShowCreateGame] = useState(false)
   const [editingGame, setEditingGame] = useState(null)
+  const [savingFlag, setSavingFlag] = useState(false)
 
   // Form states
   const [gameForm, setGameForm] = useState(EMPTY_GAME_FORM)
@@ -328,6 +329,23 @@ export default function Admin() {
     } catch (error) {
       console.error('Error updating settings:', error)
       alert('Erro ao atualizar definições')
+    }
+  }
+
+  const handleTogglePrivateMatches = async () => {
+    setSavingFlag(true)
+    try {
+      const { error } = await supabase.rpc('admin_set_feature_flag', {
+        p_key: 'private_matches',
+        p_enabled: !isPrivateMatchesEnabled,
+      })
+      if (error) throw error
+      await refreshFeatureFlags()
+    } catch (error) {
+      console.error('Error toggling private matches flag:', error)
+      alert('Erro ao atualizar funcionalidade: ' + error.message)
+    } finally {
+      setSavingFlag(false)
     }
   }
 
@@ -763,6 +781,28 @@ export default function Admin() {
                   Guardar definições
                 </button>
               </form>
+
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <h4 className="text-base font-semibold text-ink-900 mb-1">
+                  Funcionalidades da app
+                </h4>
+                <p className="text-sm text-gray-500 mb-4">
+                  Afeta todos os clubes — não é específico deste grupo.
+                </p>
+                <label className="flex items-center justify-between gap-4 p-3 rounded-ctrl border border-line">
+                  <div>
+                    <p className="font-extrabold text-ink-900 text-sm">Jogo entre amigos</p>
+                    <p className="text-[11px] text-muted">Permite criar jogos 2x2 fora do clube</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={isPrivateMatchesEnabled}
+                    disabled={savingFlag}
+                    onChange={handleTogglePrivateMatches}
+                    className="w-5 h-5 shrink-0"
+                  />
+                </label>
+              </div>
             </div>
           )}
         </>
