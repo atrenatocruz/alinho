@@ -220,6 +220,50 @@ function PodiumCard({ game, duplas }) {
   )
 }
 
+// Fixed-height canvas (640px), no scroll — a list of pairs has to fit
+// without one. Two density tiers keep it legible either way: normal for
+// a typical mix (≤4 duplas), compact (smaller avatars, tighter spacing)
+// once there are more pairs than that.
+const DUPLAS_COMPACT_THRESHOLD = 5
+
+function DuplasCard({ game, duplas }) {
+  const compact = duplas.length >= DUPLAS_COMPACT_THRESHOLD
+  const avatarSize = compact ? 22 : 34
+  return (
+    <CardShell>
+      <p className="text-[13px] font-mono font-extrabold tracking-[0.2em] uppercase text-lime-400 mb-3">
+        🎾 Duplas
+      </p>
+      <h1 className={`${compact ? 'text-[22px] mb-1' : 'text-[26px] mb-2'} leading-[1.2] font-bold text-white font-display`}>
+        {game.title}
+      </h1>
+      {game.location && (
+        <p className="text-[15px] text-ink-200 font-semibold">{game.location}</p>
+      )}
+      <div className={`${compact ? 'space-y-1.5 mt-4' : 'space-y-3 mt-8'} flex-1 overflow-hidden`}>
+        {duplas.map((d, i) => (
+          <div key={d.id} className={`rounded-2xl bg-white/5 ${compact ? 'px-3 py-2' : 'px-4 py-3'}`}>
+            <p className={`font-mono font-extrabold uppercase tracking-wide text-lime-400 ${compact ? 'text-[9px] mb-1' : 'text-[11px] mb-2'}`}>
+              Dupla {i + 1}
+            </p>
+            <div className={compact ? 'space-y-1' : 'space-y-1.5'}>
+              {[d.player1, d.player2].map((player, idx) => (
+                <div key={player?.id || idx} className="flex items-center gap-2">
+                  <CardAvatar name={player?.name} url={player?.avatar_url} size={avatarSize} ring />
+                  <span className={`text-white font-extrabold truncate ${compact ? 'text-[12px]' : 'text-sm'}`}>
+                    {player?.name || '?'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      <LogoFooter tagline="junta-te no alinho" />
+    </CardShell>
+  )
+}
+
 /* Imperative `exportPng()` is the only thing consumers need — ShareModal
    calls it on tap, not on every render, since rasterizing is not free. */
 const ShareCard = forwardRef(function ShareCard(props, ref) {
@@ -245,6 +289,8 @@ const ShareCard = forwardRef(function ShareCard(props, ref) {
     <div ref={nodeRef}>
       {variant === 'podium'
         ? <PodiumCard game={game} duplas={duplas} />
+        : variant === 'duplas'
+        ? <DuplasCard game={game} duplas={duplas} />
         : <InviteCard game={game} people={people} capacity={capacity} formattedDate={formattedDate} />}
     </div>
   )
