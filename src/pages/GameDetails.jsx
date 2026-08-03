@@ -425,23 +425,16 @@ export default function GameDetails() {
     setBusy(true)
     setMixError('')
     try {
-      // seeds from current stats
-      const playerIds = participants.flatMap(p => [p.user_id, p.partner_id]).filter(Boolean)
-      const { data: statsRows } = await supabase
-        .from('player_stats')
-        .select('user_id, mix_wins, game_wins, game_losses')
-        .eq('organization_id', currentOrganizationId)
-        .in('user_id', playerIds)
-      const statsById = Object.fromEntries((statsRows || []).map(s => [s.user_id, s]))
-
       // Global club points (cross-club, excludes jogos-entre-amigos points)
-      // — used to pair solo players with the closest-level compatible
-      // partner instead of whoever happened to be next in the queue.
+      // — drives both who pairs with whom (closest points, no side
+      // preference) and each dupla's seed_ranking (sum of both players'
+      // points), so the strongest duplas by this same number land on
+      // court 1 down to the weakest on the last court (see seedCourts).
       const globalRankings = await getGlobalRankings()
       const pointsById = Object.fromEntries(globalRankings.map(r => [r.user_id, r.club_points || 0]))
 
       // 4.1 formação de duplas
-      const duplas = formDuplas(participants, statsById, pointsById)
+      const duplas = formDuplas(participants, pointsById)
       if (duplas.length < 2) throw new Error('São precisas pelo menos 2 duplas')
 
       const { error: teamsError } = await supabase

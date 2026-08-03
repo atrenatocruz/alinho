@@ -2,16 +2,14 @@
    Mix engine — pure tournament logic (no I/O, fully testable).
 
    Documented decisions:
-   - Dupla seed = Σ per player (mix_wins×100 + game_wins×10 − game_losses).
-   - Solo pairing: left+right first, "both" fills either side (side
-     preference is a hard constraint — never overridden). Within whichever
-     pools are compatible, players are matched by closest global club
-     points (each pool sorted descending, paired front-to-front), so a
-     strong player partners with the strongest available compatible
-     partner instead of whoever happened to sign up nearby in the queue.
-     Same-side leftovers (no cross-side/both partner left) pair by
-     adjacent rank in that sorted pool, for the same reason — no longer
-     random (superseded former decision #4).
+   - Solo pairing ignores preferred_side entirely (superseded former
+     decision #4 and its side-preference successor): every solo is sorted
+     by global club points (pointsById) descending and paired front-to-
+     front (1st with 2nd, 3rd with 4th, ...), so each player partners with
+     whoever's closest to their own level, points-wise, full stop.
+   - Dupla seed = Σ pointsById per player (same points used to pair them),
+     so seedCourts (below) puts the highest-points duplas on court 1 down
+     to the lowest-points duplas on the last court.
    - Sobe e desce winner = winning dupla of court 1 in the last round (#1).
    - No draws allowed in any match (#3).
    - Todos contra todos: full round-robin (circle method). If fewer rounds
@@ -41,17 +39,13 @@ export const countPeople = (participants = []) =>
 export const totalRounds = (game) =>
   Math.max(1, Math.floor((game.court_time_minutes || 90) / (game.game_time_minutes || 20)))
 
-const seedScore = (s) =>
-  s ? (s.mix_wins || 0) * 100 + (s.game_wins || 0) * 10 - (s.game_losses || 0) : 0
-
 /**
  * Form duplas from confirmed participant rows.
- * Rows with partner keep their dupla; solos pair left+right (preferred_side,
- * a hard constraint), "both" fills gaps. Within compatible pools, players
- * are matched by closest points (pointsById) — see the file-header note.
- * Returns [{ player1, player2, seed }].
+ * Rows with partner keep their dupla; solos are sorted by global points
+ * (pointsById) and paired adjacent-rank — closest points, no side
+ * preference. Returns [{ player1, player2, seed }], seed = Σ points.
  */
-export function formDuplas(participants, statsById = {}, pointsById = {}) {
+export function formDuplas(participants, pointsById = {}) {
   const duplas = []
   const solos = []
 
@@ -60,37 +54,17 @@ export function formDuplas(participants, statsById = {}, pointsById = {}) {
     else if (row.user) solos.push(row.user)
   }
 
-  const sideOf = u =>
-    u?.preferred_side === 'left' || u?.preferred_side === 'right' ? u.preferred_side : 'both'
   const pointsOf = u => pointsById[u?.id] ?? 0
-  // Highest points first in every pool — each branch below shifts from the
-  // front of both pools, so it always joins whoever's currently strongest
-  // on each compatible side, the closest match available without breaking
-  // the side-preference constraint.
-  const byPointsDesc = (a, b) => pointsOf(b) - pointsOf(a)
-  const L = solos.filter(u => sideOf(u) === 'left').sort(byPointsDesc)
-  const R = solos.filter(u => sideOf(u) === 'right').sort(byPointsDesc)
-  const B = solos.filter(u => sideOf(u) === 'both').sort(byPointsDesc)
+  solos.sort((a, b) => pointsOf(b) - pointsOf(a))
 
-  while (L.length + R.length + B.length >= 2) {
-    let a, b
-    if (L.length && R.length) { a = L.shift(); b = R.shift() }
-    else if (L.length && B.length) { a = L.shift(); b = B.shift() }
-    else if (R.length && B.length) { a = B.shift(); b = R.shift() }
-    else if (B.length >= 2) { a = B.shift(); b = B.shift() }
-    else {
-      // only same-side players left — pair adjacent ranks (closest points)
-      const pool = L.length >= 2 ? L : R
-      a = pool.shift()
-      b = pool.shift()
-    }
-    duplas.push([a, b])
+  while (solos.length >= 2) {
+    duplas.push([solos.shift(), solos.shift()])
   }
 
   return duplas.map(([p1, p2]) => ({
     player1: p1,
     player2: p2,
-    seed: seedScore(statsById[p1?.id]) + seedScore(statsById[p2?.id]),
+    seed: pointsOf(p1) + pointsOf(p2),
   }))
 }
 
