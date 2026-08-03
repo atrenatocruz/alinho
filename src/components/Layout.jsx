@@ -169,14 +169,8 @@ export default function Layout({ children }) {
 
   return (
     <div className="min-h-screen bg-canvas pb-32">
-      {/* Header — dark liquid glass. paddingTop pushes the row below the
-          status bar while letting the dark background itself run all the
-          way up into the safe area (PWA/notch), instead of leaving a
-          strip of the canvas background showing above it. */}
-      <header
-        className="sticky top-0 z-10 bg-ink-900/95 backdrop-blur-xl border-b border-white/5 supports-[backdrop-filter]:bg-ink-900/85 rounded-b-[28px]"
-        style={{ paddingTop: 'env(safe-area-inset-top)' }}
-      >
+      {/* Header — dark liquid glass */}
+      <header className="sticky top-0 z-10 bg-ink-900/95 backdrop-blur-xl border-b border-white/5 supports-[backdrop-filter]:bg-ink-900/85">
         <div className="max-w-2xl mx-auto px-4 h-16 flex items-center justify-between">
           <Link to="/" className="leading-none">
             <Wordmark />
