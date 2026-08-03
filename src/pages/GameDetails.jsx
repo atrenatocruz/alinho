@@ -4,7 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Calendar, MapPin, ArrowLeft, UserPlus, User, Check, Lock, Trophy, Play, ChevronRight, Swords, X, Repeat, Share2, ChevronDown, RotateCcw } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { PrimaryButton, LevelBadge, GuestBadge, PlayerAvatarRow, EmptyState, ShareModal, RoundTimer, Avatar, Select } from '../components/ui'
+import { PrimaryButton, GuestBadge, PlayerAvatarRow, EmptyState, ShareModal, RoundTimer, Avatar, Select } from '../components/ui'
 import {
   countPeople, totalRounds, formDuplas, seedCourts, nextSobeDesce,
   roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches,
@@ -39,6 +39,7 @@ export default function GameDetails() {
   const [showDuplasShare, setShowDuplasShare] = useState(false)
   const [mixStats, setMixStats] = useState([])
   const [addingTestUser, setAddingTestUser] = useState(false)
+  const [pointsById, setPointsById] = useState({})
 
   useEffect(() => {
     loadGameDetails()
@@ -122,6 +123,17 @@ export default function GameDetails() {
         .eq('game_id', id)
         .order('round_number')
         .order('court_number')
+
+      // Global club points (cross-club, excludes jogos-entre-amigos) shown
+      // next to each player instead of/alongside their level, and summed
+      // per dupla once the mix has started — same source handleStartMix
+      // uses to pair solos, kept in state here so it survives re-renders.
+      try {
+        const globalRankings = await getGlobalRankings()
+        setPointsById(Object.fromEntries(globalRankings.map((r) => [r.user_id, r.club_points || 0])))
+      } catch (error) {
+        console.error('Error loading global points:', error)
+      }
 
       setParticipants((confirmedRows || []).map((p) => ({
         ...p,
@@ -980,7 +992,7 @@ export default function GameDetails() {
                     }`}>
                       <div className="flex items-center justify-between mb-1.5">
                         <p className="text-[11px] font-extrabold text-muted uppercase tracking-wide">
-                          Dupla {i + 1}
+                          Dupla {i + 1} · {(pointsById[t.player1?.id] ?? 0) + (pointsById[t.player2?.id] ?? 0)} pts
                         </p>
                         <div className="flex items-center gap-1.5">
                           {t.id === game.winner_team_id && <span>🏆</span>}
@@ -1012,7 +1024,8 @@ export default function GameDetails() {
                           {[t.player1, t.player2].map((player, idx) => (
                             <div key={player?.id || idx} className="flex items-center gap-2">
                               <Avatar name={player?.name} url={player?.avatar_url} size="w-8 h-8 text-xs" />
-                              <span className="text-sm font-extrabold text-ink-900 truncate">{player?.name || '?'}</span>
+                              <span className="flex-1 min-w-0 text-sm font-extrabold text-ink-900 truncate">{player?.name || '?'}</span>
+                              <span className="text-xs font-extrabold text-muted tabular-nums shrink-0">{pointsById[player?.id] ?? 0} pts</span>
                             </div>
                           ))}
                         </div>
@@ -1227,7 +1240,11 @@ export default function GameDetails() {
                   </div>
                   {person.is_guest
                     ? <GuestBadge label={person.is_test ? 'Teste' : 'Convidado'} />
-                    : <LevelBadge level={person.level} />}
+                    : (
+                      <span className="text-sm font-extrabold text-ink-700 tabular-nums shrink-0">
+                        {pointsById[person.id] ?? 0} pts
+                      </span>
+                    )}
                   {isAdmin && (
                     <button
                       onClick={() => handleRemovePerson(person)}
@@ -1269,7 +1286,11 @@ export default function GameDetails() {
                 </div>
                 {person.is_guest
                   ? <GuestBadge label={person.is_test ? 'Teste' : 'Convidado'} />
-                  : <LevelBadge level={person.level} />}
+                  : (
+                    <span className="text-sm font-extrabold text-ink-700 tabular-nums shrink-0">
+                      {pointsById[person.id] ?? 0} pts
+                    </span>
+                  )}
                 {isAdmin && (
                   <button
                     onClick={() => handleRemovePerson(person)}
