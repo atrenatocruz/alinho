@@ -433,8 +433,29 @@ export default function GameDetails() {
       const globalRankings = await getGlobalRankings()
       const pointsById = Object.fromEntries(globalRankings.map(r => [r.user_id, r.club_points || 0]))
 
+      // Duplas from the most recent previous mix at this club — solos
+      // whose points-based pairing would recreate one of these get
+      // reshuffled with the next-closest points instead (see formDuplas).
+      const { data: previousGames } = await supabase
+        .from('games')
+        .select('id')
+        .eq('organization_id', currentOrganizationId)
+        .lt('date', game.date)
+        .order('date', { ascending: false })
+        .limit(1)
+      let repeatPairKeys = new Set()
+      if (previousGames?.[0]) {
+        const { data: previousTeams } = await supabase
+          .from('teams')
+          .select('player1_id, player2_id')
+          .eq('game_id', previousGames[0].id)
+        repeatPairKeys = new Set(
+          (previousTeams || []).map(t => [t.player1_id, t.player2_id].sort().join('|'))
+        )
+      }
+
       // 4.1 formação de duplas
-      const duplas = formDuplas(participants, pointsById)
+      const duplas = formDuplas(participants, pointsById, repeatPairKeys)
       if (duplas.length < 2) throw new Error('São precisas pelo menos 2 duplas')
 
       const { error: teamsError } = await supabase

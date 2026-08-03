@@ -4,9 +4,12 @@
    Documented decisions:
    - Solo pairing ignores preferred_side entirely (superseded former
      decision #4 and its side-preference successor): every solo is sorted
-     by global club points (pointsById) descending and paired front-to-
-     front (1st with 2nd, 3rd with 4th, ...), so each player partners with
-     whoever's closest to their own level, points-wise, full stop.
+     by global club points (pointsById) descending. Each player takes the
+     closest-points remaining partner, except one already ruled out by
+     repeatPairKeys (same two players paired last mix) — that candidate is
+     skipped in favor of the next-closest below, cascading further down if
+     that's also a repeat, so a repeat is only ever accepted as a last
+     resort (nobody left unpaired).
    - Dupla seed = Σ pointsById per player (same points used to pair them),
      so seedCourts (below) puts the highest-points duplas on court 1 down
      to the lowest-points duplas on the last court.
@@ -42,10 +45,12 @@ export const totalRounds = (game) =>
 /**
  * Form duplas from confirmed participant rows.
  * Rows with partner keep their dupla; solos are sorted by global points
- * (pointsById) and paired adjacent-rank — closest points, no side
- * preference. Returns [{ player1, player2, seed }], seed = Σ points.
+ * (pointsById) and paired closest-rank-first, skipping a candidate whose
+ * pairing is in repeatPairKeys (same two players paired last mix) in favor
+ * of the next-closest below — see the file-header note.
+ * Returns [{ player1, player2, seed }], seed = Σ points.
  */
-export function formDuplas(participants, pointsById = {}) {
+export function formDuplas(participants, pointsById = {}, repeatPairKeys = new Set()) {
   const duplas = []
   const solos = []
 
@@ -57,8 +62,14 @@ export function formDuplas(participants, pointsById = {}) {
   const pointsOf = u => pointsById[u?.id] ?? 0
   solos.sort((a, b) => pointsOf(b) - pointsOf(a))
 
+  const pairKey = (a, b) => [a?.id, b?.id].sort().join('|')
+
   while (solos.length >= 2) {
-    duplas.push([solos.shift(), solos.shift()])
+    const a = solos.shift()
+    let idx = solos.findIndex(candidate => !repeatPairKeys.has(pairKey(a, candidate)))
+    if (idx === -1) idx = 0 // everyone left is a repeat — accept the closest rather than leave a gap
+    const b = solos.splice(idx, 1)[0]
+    duplas.push([a, b])
   }
 
   return duplas.map(([p1, p2]) => ({
