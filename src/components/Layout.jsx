@@ -206,9 +206,18 @@ export default function Layout({ children }) {
       </main>
 
       {/* Nav — floating dynamic island, liquid glass */}
+      {/* translateZ(0) + will-change force this onto its own compositing
+          layer — without it, iOS Safari has a known bug where a `fixed`
+          element containing a `backdrop-filter` descendant (the pill below)
+          detaches from the viewport during momentum scrolling and ends up
+          drifting up the page with the content instead of staying pinned. */}
       <nav
         className="fixed inset-x-0 z-20 flex justify-center pointer-events-none px-4"
-        style={{ bottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
+        style={{
+          bottom: 'calc(1rem + env(safe-area-inset-bottom))',
+          transform: 'translateZ(0)',
+          willChange: 'transform',
+        }}
       >
         <div className="pointer-events-auto flex items-center gap-1 p-1.5 rounded-full
                         bg-ink-900/95 supports-[backdrop-filter]:bg-ink-900/90 backdrop-blur-xl
