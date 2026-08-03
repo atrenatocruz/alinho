@@ -155,7 +155,7 @@ function CardShell({ children, autoHeight = false }) {
   )
 }
 
-function LogoFooter({ tagline = 'junta-te no alinho' }) {
+function LogoFooter({ tagline = 'E tu, alinhas?' }) {
   return (
     <div className="mt-auto flex flex-col items-center gap-2.5 pt-8">
       <img src={logoWordmark} alt="alinho" style={{ height: 24 }} />
@@ -230,7 +230,7 @@ function PodiumCard({ game, duplas }) {
           </div>
         ))}
       </div>
-      <LogoFooter tagline="E tu alinhas?" />
+      <LogoFooter />
     </CardShell>
   )
 }
@@ -297,7 +297,7 @@ function DuplasCard({ game, duplas }) {
           )
         })}
       </div>
-      <LogoFooter tagline="junta-te no alinho" />
+      <LogoFooter />
     </CardShell>
   )
 }
