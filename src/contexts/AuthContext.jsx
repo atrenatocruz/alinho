@@ -41,6 +41,7 @@ export const AuthProvider = ({ children }) => {
   const [memberships, setMemberships] = useState([])
   const [currentOrganizationId, setCurrentOrganizationId] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [isPrivateMatchesEnabled, setIsPrivateMatchesEnabled] = useState(true)
 
   useEffect(() => {
     // Restore dev admin bypass if it was activated previously.
@@ -103,6 +104,16 @@ export const AuthProvider = ({ children }) => {
     if (error) console.error('Failed to join organization from pending slug:', error)
   }
 
+  const loadFeatureFlags = async () => {
+    const { data, error } = await supabase.from('feature_flags').select('key, enabled')
+    if (error) {
+      console.error('Error loading feature flags:', error)
+      return
+    }
+    const privateMatchesFlag = data?.find((f) => f.key === 'private_matches')
+    setIsPrivateMatchesEnabled(privateMatchesFlag?.enabled ?? true)
+  }
+
   const loadProfile = async (userId, retried = false) => {
     try {
       const { data: profileData, error: profileError } = await supabase
@@ -122,6 +133,7 @@ export const AuthProvider = ({ children }) => {
       setProfile(profileData)
 
       await consumePendingOrgSlug()
+      await loadFeatureFlags()
 
       let { data: membershipData, error: membershipError } = await supabase
         .from('memberships')
@@ -296,6 +308,8 @@ export const AuthProvider = ({ children }) => {
     isAdmin: currentMembership?.is_admin === true,
     isGuest: currentMembership?.is_guest === true,
     loading,
+    isPrivateMatchesEnabled,
+    refreshFeatureFlags: loadFeatureFlags,
     signUp,
     signIn,
     signInWithGoogle,
