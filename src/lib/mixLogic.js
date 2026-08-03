@@ -3,8 +3,15 @@
 
    Documented decisions:
    - Dupla seed = Σ per player (mix_wins×100 + game_wins×10 − game_losses).
-   - Pairing fallback: left+right first, "both" fills either side; if only
-     same-side players remain they are paired RANDOMLY (user decision #4).
+   - Solo pairing: left+right first, "both" fills either side (side
+     preference is a hard constraint — never overridden). Within whichever
+     pools are compatible, players are matched by closest global club
+     points (each pool sorted descending, paired front-to-front), so a
+     strong player partners with the strongest available compatible
+     partner instead of whoever happened to sign up nearby in the queue.
+     Same-side leftovers (no cross-side/both partner left) pair by
+     adjacent rank in that sorted pool, for the same reason — no longer
+     random (superseded former decision #4).
    - Sobe e desce winner = winning dupla of court 1 in the last round (#1).
    - No draws allowed in any match (#3).
    - Todos contra todos: full round-robin (circle method). If fewer rounds
@@ -39,11 +46,12 @@ const seedScore = (s) =>
 
 /**
  * Form duplas from confirmed participant rows.
- * Rows with partner keep their dupla; solos pair left+right (preferred_side),
- * "both" fills gaps, same-side leftovers pair randomly.
+ * Rows with partner keep their dupla; solos pair left+right (preferred_side,
+ * a hard constraint), "both" fills gaps. Within compatible pools, players
+ * are matched by closest points (pointsById) — see the file-header note.
  * Returns [{ player1, player2, seed }].
  */
-export function formDuplas(participants, statsById = {}) {
+export function formDuplas(participants, statsById = {}, pointsById = {}) {
   const duplas = []
   const solos = []
 
@@ -54,9 +62,15 @@ export function formDuplas(participants, statsById = {}) {
 
   const sideOf = u =>
     u?.preferred_side === 'left' || u?.preferred_side === 'right' ? u.preferred_side : 'both'
-  const L = solos.filter(u => sideOf(u) === 'left')
-  const R = solos.filter(u => sideOf(u) === 'right')
-  const B = solos.filter(u => sideOf(u) === 'both')
+  const pointsOf = u => pointsById[u?.id] ?? 0
+  // Highest points first in every pool — each branch below shifts from the
+  // front of both pools, so it always joins whoever's currently strongest
+  // on each compatible side, the closest match available without breaking
+  // the side-preference constraint.
+  const byPointsDesc = (a, b) => pointsOf(b) - pointsOf(a)
+  const L = solos.filter(u => sideOf(u) === 'left').sort(byPointsDesc)
+  const R = solos.filter(u => sideOf(u) === 'right').sort(byPointsDesc)
+  const B = solos.filter(u => sideOf(u) === 'both').sort(byPointsDesc)
 
   while (L.length + R.length + B.length >= 2) {
     let a, b
@@ -65,10 +79,10 @@ export function formDuplas(participants, statsById = {}) {
     else if (R.length && B.length) { a = B.shift(); b = R.shift() }
     else if (B.length >= 2) { a = B.shift(); b = B.shift() }
     else {
-      // only same-side players left → random pairing (documented fallback)
+      // only same-side players left — pair adjacent ranks (closest points)
       const pool = L.length >= 2 ? L : R
-      a = pool.splice(Math.floor(Math.random() * pool.length), 1)[0]
-      b = pool.splice(Math.floor(Math.random() * pool.length), 1)[0]
+      a = pool.shift()
+      b = pool.shift()
     }
     duplas.push([a, b])
   }

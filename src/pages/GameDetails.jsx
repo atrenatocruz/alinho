@@ -11,6 +11,7 @@ import {
   PHASE_LABEL, FORMAT_LABEL,
 } from '../lib/mixLogic'
 import { winRatePct } from '../lib/statsLogic'
+import { getGlobalRankings } from '../lib/privateMatches'
 
 export default function GameDetails() {
   const { id } = useParams()
@@ -419,8 +420,14 @@ export default function GameDetails() {
         .in('user_id', playerIds)
       const statsById = Object.fromEntries((statsRows || []).map(s => [s.user_id, s]))
 
+      // Global club points (cross-club, excludes jogos-entre-amigos points)
+      // — used to pair solo players with the closest-level compatible
+      // partner instead of whoever happened to be next in the queue.
+      const globalRankings = await getGlobalRankings()
+      const pointsById = Object.fromEntries(globalRankings.map(r => [r.user_id, r.club_points || 0]))
+
       // 4.1 formação de duplas
-      const duplas = formDuplas(participants, statsById)
+      const duplas = formDuplas(participants, statsById, pointsById)
       if (duplas.length < 2) throw new Error('São precisas pelo menos 2 duplas')
 
       const { error: teamsError } = await supabase
