@@ -6,6 +6,12 @@ export const searchPlayers = async (query) => {
   return data || []
 }
 
+export const listPlayers = async (limit = 20) => {
+  const { data, error } = await supabase.rpc('list_players', { p_limit: limit })
+  if (error) throw error
+  return data || []
+}
+
 export const createPrivateMatch = async ({ teamAPlayer2Id, teamBPlayer1Id, teamBPlayer2Id }) => {
   const { data, error } = await supabase.rpc('create_private_match', {
     p_team_a_player2_id: teamAPlayer2Id || null,
