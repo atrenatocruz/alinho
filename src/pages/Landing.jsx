@@ -219,12 +219,101 @@ function Features() {
   )
 }
 
+const STEPS = [
+  {
+    number: '1',
+    title: 'Cria a tua conta',
+    description: 'Regista-te com o Google ou com o teu email — leva menos de um minuto.',
+  },
+  {
+    number: '2',
+    title: 'Junta-te a um mix',
+    description: 'Entra num jogo aberto sozinho ou com parceiro. Ou cria um, se fores admin do grupo.',
+  },
+  {
+    number: '3',
+    title: 'Acompanha os resultados',
+    description: 'Submete o resultado no fim e vê o ranking do grupo atualizar-se na hora.',
+  },
+]
+
+function HowItWorks() {
+  return (
+    <section className="bg-surface py-20 px-5">
+      <div className="max-w-5xl mx-auto">
+        <div className="text-center max-w-lg mx-auto mb-12">
+          <p className="font-mono text-xs font-extrabold uppercase tracking-widest text-ink-700 mb-3">
+            Como funciona
+          </p>
+          <h2 className="text-3xl text-ink-900">Três passos e estás em jogo</h2>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-5">
+          {STEPS.map((step, i) => (
+            <div key={step.number} className="relative">
+              {i < STEPS.length - 1 && (
+                <div
+                  className="hidden lg:block absolute top-6 left-[calc(50%+28px)] right-[calc(-50%+28px)] h-px border-t-2 border-dashed border-line"
+                  aria-hidden="true"
+                />
+              )}
+              <div className="relative w-12 h-12 rounded-full bg-ink-900 text-lime-400 font-mono font-extrabold text-lg flex items-center justify-center mb-4 mx-auto lg:mx-0">
+                {step.number}
+              </div>
+              <h3 className="text-lg text-ink-900 mb-1.5 text-center lg:text-left">{step.title}</h3>
+              <p className="text-sm text-muted text-center lg:text-left">{step.description}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function ClosingCta() {
+  return (
+    <section className="bg-ink-900 py-16 px-5 text-center">
+      <div className="max-w-lg mx-auto">
+        <h2 className="text-3xl text-white mb-6">Pronto para organizar o próximo mix?</h2>
+        <Link
+          to="/login?mode=signup"
+          className="btn-primary inline-flex items-center justify-center"
+        >
+          Criar conta
+        </Link>
+      </div>
+    </section>
+  )
+}
+
+function Footer() {
+  const year = new Date().getFullYear()
+  return (
+    <footer className="bg-canvas py-10 px-5 border-t border-line">
+      <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+        <Wordmark variant="light" />
+        <div className="flex items-center gap-6">
+          <Link to="/login" className="text-ink-700 font-extrabold text-sm hover:underline">
+            Entrar
+          </Link>
+          <Link to="/instrucoes" className="text-ink-700 font-extrabold text-sm hover:underline">
+            Instruções
+          </Link>
+        </div>
+        <p className="text-muted text-xs">&copy; {year} alinho</p>
+      </div>
+    </footer>
+  )
+}
+
 export default function Landing() {
   return (
     <div className="min-h-screen bg-canvas">
       <Nav />
       <Hero />
       <Features />
+      <HowItWorks />
+      <ClosingCta />
+      <Footer />
     </div>
   )
 }
