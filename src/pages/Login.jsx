@@ -6,11 +6,13 @@ import { Wordmark } from '../components/Layout'
 import { hashPhone } from '../lib/hashPhone'
 
 export default function Login() {
-  const [mode, setMode] = useState('login') // 'login' or 'signup'
+  const [searchParams] = useSearchParams()
+  // Landing page's "Criar conta" CTA links to /login?mode=signup so it
+  // lands directly on the signup tab instead of the login tab.
+  const [mode, setMode] = useState(() => (searchParams.get('mode') === 'signup' ? 'signup' : 'login'))
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
   const { signUp, signIn, signInWithGoogle, signInAsAdmin, updateProfile } = useAuth()
 
   // Where to land after a successful sign-in. ProtectedRoute sets ?redirect=
