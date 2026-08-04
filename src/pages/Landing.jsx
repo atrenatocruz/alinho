@@ -1,13 +1,29 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { CheckCircle2, MapPin, Lock, Calendar, Trophy, Users, MessageCircle } from 'lucide-react'
 import { Wordmark } from '../components/Layout'
 import PadelIcon from '../components/icons/PadelIcon'
+
+// Builds the /login href, preserving ?org=<slug> from the current URL (the
+// invite-link mechanism — see Home.jsx / Login.jsx) so landing-page CTAs
+// don't silently drop it for logged-out visitors landing on `/?org=...`.
+function useLoginHref() {
+  const [params] = useSearchParams()
+  const org = params.get('org')
+  return (mode) => {
+    const q = new URLSearchParams()
+    if (mode) q.set('mode', mode)
+    if (org) q.set('org', org)
+    const s = q.toString()
+    return s ? `/login?${s}` : '/login'
+  }
+}
 
 // Sticky nav — transparent over the hero, solidifies once scrolled past it,
 // matching Layout.jsx's header treatment for logged-in pages.
 function Nav() {
   const [scrolled, setScrolled] = useState(false)
+  const loginHref = useLoginHref()
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8)
@@ -30,7 +46,7 @@ function Nav() {
         </Link>
         <div className="flex items-center gap-4">
           <Link
-            to="/login"
+            to={loginHref()}
             className="text-white/80 hover:text-white font-extrabold text-sm transition-colors duration-fast"
           >
             Entrar
@@ -44,7 +60,7 @@ function Nav() {
               utilities are required here so the link actually sizes and
               centers like a button. */}
           <Link
-            to="/login?mode=signup"
+            to={loginHref('signup')}
             className="btn-primary hidden sm:inline-flex items-center justify-center"
           >
             Criar conta
@@ -102,6 +118,7 @@ function HeroMockCard() {
 }
 
 function Hero() {
+  const loginHref = useLoginHref()
   return (
     <section className="relative bg-ink-900 overflow-hidden">
       {/* Court lines + dashed net-line motif, evolved from Login.jsx's hero */}
@@ -130,13 +147,13 @@ function Hero() {
                 min-h-[48px] and vertical padding have no effect on the
                 default `display: inline` a Link/<a> renders as. */}
             <Link
-              to="/login?mode=signup"
+              to={loginHref('signup')}
               className="btn-primary inline-flex items-center justify-center"
             >
               Criar conta
             </Link>
             <Link
-              to="/login"
+              to={loginHref()}
               className="inline-flex items-center justify-center font-extrabold py-3.5 px-6 rounded-ctrl min-h-[48px] text-base
                          border border-white/20 text-white hover:bg-white/10
                          transition-all duration-fast active:scale-[0.98]"
@@ -256,11 +273,11 @@ function HowItWorks() {
                   aria-hidden="true"
                 />
               )}
-              <div className="relative w-12 h-12 rounded-full bg-ink-900 text-lime-400 font-mono font-extrabold text-lg flex items-center justify-center mb-4 mx-auto lg:mx-0">
+              <div className="relative w-12 h-12 rounded-full bg-ink-900 text-lime-400 font-mono font-extrabold text-lg flex items-center justify-center mb-4 mx-auto">
                 {step.number}
               </div>
-              <h3 className="text-lg text-ink-900 mb-1.5 text-center lg:text-left">{step.title}</h3>
-              <p className="text-sm text-muted text-center lg:text-left">{step.description}</p>
+              <h3 className="text-lg text-ink-900 mb-1.5 text-center">{step.title}</h3>
+              <p className="text-sm text-muted text-center">{step.description}</p>
             </div>
           ))}
         </div>
@@ -270,12 +287,13 @@ function HowItWorks() {
 }
 
 function ClosingCta() {
+  const loginHref = useLoginHref()
   return (
     <section className="bg-ink-900 py-16 px-5 text-center">
       <div className="max-w-lg mx-auto">
         <h2 className="text-3xl text-white mb-6">Pronto para organizar o próximo mix?</h2>
         <Link
-          to="/login?mode=signup"
+          to={loginHref('signup')}
           className="btn-primary inline-flex items-center justify-center"
         >
           Criar conta
@@ -287,12 +305,13 @@ function ClosingCta() {
 
 function Footer() {
   const year = new Date().getFullYear()
+  const loginHref = useLoginHref()
   return (
     <footer className="bg-canvas py-10 px-5 border-t border-line">
       <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
         <Wordmark variant="light" />
         <div className="flex items-center gap-6">
-          <Link to="/login" className="text-ink-700 font-extrabold text-sm hover:underline">
+          <Link to={loginHref()} className="text-ink-700 font-extrabold text-sm hover:underline">
             Entrar
           </Link>
           <Link to="/instrucoes" className="text-ink-700 font-extrabold text-sm hover:underline">
