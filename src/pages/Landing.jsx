@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { CheckCircle2, MapPin, Lock } from 'lucide-react'
+import { CheckCircle2, MapPin, Lock, Calendar, Trophy, Users, MessageCircle } from 'lucide-react'
 import { Wordmark } from '../components/Layout'
+import PadelIcon from '../components/icons/PadelIcon'
 
 // Sticky nav — transparent over the hero, solidifies once scrolled past it,
 // matching Layout.jsx's header treatment for logged-in pages.
@@ -153,11 +154,77 @@ function Hero() {
   )
 }
 
+const FEATURES = [
+  {
+    icon: Calendar,
+    title: 'Jogos',
+    description: 'Cria mixes com data, hora e local. Entra sozinho ou com o teu parceiro — o resto o grupo trata.',
+  },
+  {
+    icon: Trophy,
+    title: 'Rankings',
+    description: 'Vitórias, taxa de vitória e pontos calculados automaticamente a cada resultado submetido.',
+  },
+  {
+    icon: Users,
+    title: 'Comunidade',
+    description: 'Vê quem está no grupo, o nível de cada jogador e quem já jogaste antes.',
+  },
+  {
+    icon: PadelIcon,
+    title: 'Clubes',
+    description: 'Informação dos clubes onde o grupo costuma jogar, tudo num só lugar.',
+  },
+  {
+    icon: Lock,
+    title: 'Jogos privados',
+    description: 'Cria um mix só por convite, para quando não é preciso o grupo todo.',
+  },
+  {
+    icon: MessageCircle,
+    title: 'Bot do WhatsApp',
+    description: 'Responde "In" ou "Out" no grupo do WhatsApp para entrar ou sair de um mix, sem abrir a app.',
+  },
+]
+
+function FeatureCard({ icon: Icon, title, description }) {
+  return (
+    <div className="card">
+      <div className="w-11 h-11 rounded-full bg-lime-400/15 text-lime-600 flex items-center justify-center mb-4">
+        <Icon size={20} />
+      </div>
+      <h3 className="text-lg text-ink-900 mb-1.5">{title}</h3>
+      <p className="text-sm text-muted">{description}</p>
+    </div>
+  )
+}
+
+function Features() {
+  return (
+    <section className="bg-canvas py-20 px-5">
+      <div className="max-w-5xl mx-auto">
+        <div className="text-center max-w-lg mx-auto mb-12">
+          <p className="font-mono text-xs font-extrabold uppercase tracking-widest text-ink-700 mb-3">
+            O que a app faz
+          </p>
+          <h2 className="text-3xl text-ink-900">Tudo o que o grupo precisa, numa só app</h2>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {FEATURES.map((f) => (
+            <FeatureCard key={f.title} {...f} />
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
 export default function Landing() {
   return (
     <div className="min-h-screen bg-canvas">
       <Nav />
       <Hero />
+      <Features />
     </div>
   )
 }
