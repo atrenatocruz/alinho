@@ -1,7 +1,163 @@
+import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
+import { CheckCircle2, MapPin, Lock } from 'lucide-react'
+import { Wordmark } from '../components/Layout'
+
+// Sticky nav — transparent over the hero, solidifies once scrolled past it,
+// matching Layout.jsx's header treatment for logged-in pages.
+function Nav() {
+  const [scrolled, setScrolled] = useState(false)
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
+  return (
+    <header
+      className={`fixed top-0 inset-x-0 z-20 transition-colors duration-base ${
+        scrolled
+          ? 'bg-ink-900/95 backdrop-blur-xl border-b border-white/5 supports-[backdrop-filter]:bg-ink-900/85'
+          : 'bg-transparent'
+      }`}
+    >
+      <div className="max-w-5xl mx-auto px-5 h-16 flex items-center justify-between">
+        <Link to="/" className="leading-none">
+          <Wordmark />
+        </Link>
+        <div className="flex items-center gap-4">
+          <Link
+            to="/login"
+            className="text-white/80 hover:text-white font-extrabold text-sm transition-colors duration-fast"
+          >
+            Entrar
+          </Link>
+          {/* Hidden on narrow mobile to avoid crowding — the hero below
+              already carries a full-size "Criar conta" CTA. */}
+          {/* `.btn-primary` only ever styles real <button> elements elsewhere
+              in this codebase (see src/pages/Admin.jsx, src/components/ui.jsx)
+              — it relies on min-h-[48px], which has no effect on the default
+              `display: inline` a Link/<a> renders as. inline-flex + centering
+              utilities are required here so the link actually sizes and
+              centers like a button. */}
+          <Link
+            to="/login?mode=signup"
+            className="btn-primary hidden sm:inline-flex items-center justify-center"
+          >
+            Criar conta
+          </Link>
+        </div>
+      </div>
+    </header>
+  )
+}
+
+// Illustrative mockup of a real game card (same visual grammar as
+// MixCard in src/components/ui.jsx) — hardcoded content, no live data,
+// no screenshot asset needed.
+function HeroMockCard() {
+  return (
+    <div className="card w-full max-w-sm shadow-lift" style={{ transform: 'rotate(-3deg)' }}>
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div>
+          <p className="text-xs font-extrabold uppercase tracking-widest text-ink-700">Sábado</p>
+          <p className="text-2xl text-ink-900 leading-tight">18:00</p>
+        </div>
+        <span className="inline-flex items-center gap-1.5 bg-lime-400 text-ink-900 text-xs font-extrabold px-3 py-1.5 rounded-full">
+          <CheckCircle2 size={14} /> Inscrito
+        </span>
+      </div>
+
+      <h3 className="text-lg text-ink-900 leading-snug mb-1">Mix de sábado</h3>
+      <p className="flex items-center gap-1.5 text-muted text-sm mb-4">
+        <MapPin size={15} className="shrink-0" /> Padel Clube da Cidade
+      </p>
+
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pt-3 border-t border-line">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="flex -space-x-2">
+            {['J', 'M', 'A', 'S'].map((letter, i) => (
+              <div
+                key={letter}
+                style={{ zIndex: 4 - i }}
+                className="w-9 h-9 text-sm rounded-full flex items-center justify-center shrink-0 font-extrabold bg-ink-700 text-white ring-2 ring-surface"
+              >
+                {letter}
+              </div>
+            ))}
+          </div>
+          <span className="text-sm font-extrabold text-ink-900 tabular-nums">
+            4<span className="text-muted font-normal">/4</span>
+          </span>
+        </div>
+        <span className="ml-auto inline-flex items-center gap-1.5 bg-ok/10 text-ok text-[11px] font-extrabold px-2.5 py-1 rounded-full">
+          <Lock size={13} className="shrink-0" /> Mix fechado — campo reservado
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function Hero() {
+  return (
+    <section className="relative bg-ink-900 overflow-hidden">
+      {/* Court lines + dashed net-line motif, evolved from Login.jsx's hero */}
+      <svg
+        viewBox="0 0 800 500"
+        className="absolute inset-0 w-full h-full text-white/[0.05]"
+        preserveAspectRatio="xMidYMid slice"
+        aria-hidden="true"
+      >
+        <rect x="60" y="-60" width="680" height="600" rx="24" stroke="currentColor" strokeWidth="3" fill="none" />
+        <line x1="400" y1="-60" x2="400" y2="540" stroke="currentColor" strokeWidth="3" />
+        <line x1="60" y1="240" x2="740" y2="240" stroke="currentColor" strokeWidth="3" strokeDasharray="10 12" />
+      </svg>
+
+      <div className="relative max-w-5xl mx-auto px-5 pt-20 pb-24 lg:pt-28 lg:pb-32 lg:flex lg:items-center lg:gap-12">
+        <div className="lg:flex-1 animate-fade-up">
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl text-white leading-tight max-w-xl">
+            Os teus jogos de padel, finalmente organizados.
+          </h1>
+          <p className="text-ink-200 text-lg mt-5 max-w-md">
+            Sem mais grupos de WhatsApp perdidos ou folhas de cálculo. Cria
+            mixes, junta o grupo e acompanha o ranking — tudo num só sítio.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 mt-8">
+            {/* Both CTAs need inline-flex + centering utilities explicitly —
+                min-h-[48px] and vertical padding have no effect on the
+                default `display: inline` a Link/<a> renders as. */}
+            <Link
+              to="/login?mode=signup"
+              className="btn-primary inline-flex items-center justify-center"
+            >
+              Criar conta
+            </Link>
+            <Link
+              to="/login"
+              className="inline-flex items-center justify-center font-extrabold py-3.5 px-6 rounded-ctrl min-h-[48px] text-base
+                         border border-white/20 text-white hover:bg-white/10
+                         transition-all duration-fast active:scale-[0.98]"
+            >
+              Já tenho conta
+            </Link>
+          </div>
+        </div>
+
+        <div className="mt-14 lg:mt-0 lg:flex-1 flex justify-center animate-fade-up">
+          <HeroMockCard />
+        </div>
+      </div>
+    </section>
+  )
+}
+
 export default function Landing() {
   return (
-    <div className="min-h-screen bg-canvas flex items-center justify-center">
-      <p className="text-ink-900">Landing page placeholder</p>
+    <div className="min-h-screen bg-canvas">
+      <Nav />
+      <Hero />
     </div>
   )
 }
