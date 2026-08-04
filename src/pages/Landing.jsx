@@ -19,8 +19,8 @@ function useLoginHref() {
   }
 }
 
-// Sticky nav — transparent over the hero, solidifies once scrolled past it,
-// matching Layout.jsx's header treatment for logged-in pages.
+// Fixed nav — floats transparently over the hero, solidifies once scrolled
+// past it, matching Layout.jsx's header treatment for logged-in pages.
 function Nav() {
   const [scrolled, setScrolled] = useState(false)
   const loginHref = useLoginHref()
@@ -89,16 +89,18 @@ function HeroMockCard() {
 
       <h3 className="text-lg text-ink-900 leading-snug mb-1">Mix de sábado</h3>
       <p className="flex items-center gap-1.5 text-muted text-sm mb-4">
-        <MapPin size={15} className="shrink-0" /> Padel Clube da Cidade
+        <MapPin size={15} className="shrink-0" /> Alinho Padel Club
       </p>
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pt-3 border-t border-line">
         <div className="flex items-center gap-3 min-w-0">
           <div className="flex -space-x-2">
-            {['J', 'M', 'A', 'S'].map((letter, i) => (
+            {/* 8 players spelling "ALINHOPT" — a small branding wink in the
+                illustrative mockup, not real data. */}
+            {['A', 'L', 'I', 'N', 'H', 'O', 'P', 'T'].map((letter, i, letters) => (
               <div
                 key={letter}
-                style={{ zIndex: 4 - i }}
+                style={{ zIndex: letters.length - i }}
                 className="w-9 h-9 text-sm rounded-full flex items-center justify-center shrink-0 font-extrabold bg-ink-700 text-white ring-2 ring-surface"
               >
                 {letter}
@@ -106,7 +108,7 @@ function HeroMockCard() {
             ))}
           </div>
           <span className="text-sm font-extrabold text-ink-900 tabular-nums">
-            4<span className="text-muted font-normal">/4</span>
+            8<span className="text-muted font-normal">/8</span>
           </span>
         </div>
         <span className="ml-auto inline-flex items-center gap-1.5 bg-ok/10 text-ok text-[11px] font-extrabold px-2.5 py-1 rounded-full">
@@ -139,8 +141,8 @@ function Hero() {
             Os teus jogos de padel, finalmente organizados.
           </h1>
           <p className="text-ink-200 text-lg mt-5 max-w-md">
-            Sem mais grupos de WhatsApp perdidos ou folhas de cálculo. Cria
-            mixes, junta o grupo e acompanha o ranking — tudo num só sítio.
+            Sem mais folhas de cálculo ou resultados perdidos. Cria jogos,
+            junta-te a mixs e acompanha o ranking — tudo num só sítio.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 mt-8">
             {/* Both CTAs need inline-flex + centering utilities explicitly —
@@ -175,7 +177,7 @@ const FEATURES = [
   {
     icon: Calendar,
     title: 'Jogos',
-    description: 'Cria mixes com data, hora e local. Entra sozinho ou com o teu parceiro — o resto o grupo trata.',
+    description: 'Cria jogos com data, hora e local. Entra sozinho ou com o teu parceiro — o resto o grupo trata.',
   },
   {
     icon: Trophy,
@@ -195,7 +197,7 @@ const FEATURES = [
   {
     icon: Lock,
     title: 'Jogos privados',
-    description: 'Cria um mix só por convite, para quando não é preciso o grupo todo.',
+    description: 'Cria um jogo só por convite, para quando não é preciso o grupo todo.',
   },
   {
     icon: MessageCircle,
@@ -224,7 +226,7 @@ function Features() {
           <p className="font-mono text-xs font-extrabold uppercase tracking-widest text-ink-700 mb-3">
             O que a app faz
           </p>
-          <h2 className="text-3xl text-ink-900">Tudo o que o grupo precisa, numa só app</h2>
+          <h2 className="text-3xl text-ink-900">Tudo o que um grupo precisa, numa só app</h2>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {FEATURES.map((f) => (
@@ -264,15 +266,20 @@ function HowItWorks() {
           </p>
           <h2 className="text-3xl text-ink-900">Três passos e estás em jogo</h2>
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-5">
-          {STEPS.map((step, i) => (
+        <div className="relative grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-5">
+          {/* One dashed line spanning from the first circle's center to the
+              last circle's center, painted BEHIND the step circles (it's
+              the first child, so DOM/paint order puts every later sibling
+              on top) — their opaque bg-ink-900 masks the line where it
+              passes under them, giving a continuous "through the circles"
+              look without fragile per-gap calc() math tied to column width. */}
+          <div
+            className="hidden lg:block absolute top-6 h-px border-t-2 border-dashed border-line"
+            style={{ left: 'calc(100% / 6)', right: 'calc(100% / 6)' }}
+            aria-hidden="true"
+          />
+          {STEPS.map((step) => (
             <div key={step.number} className="relative">
-              {i < STEPS.length - 1 && (
-                <div
-                  className="hidden lg:block absolute top-6 left-[calc(50%+28px)] right-[calc(-50%+28px)] h-px border-t-2 border-dashed border-line"
-                  aria-hidden="true"
-                />
-              )}
               <div className="relative w-12 h-12 rounded-full bg-ink-900 text-lime-400 font-mono font-extrabold text-lg flex items-center justify-center mb-4 mx-auto">
                 {step.number}
               </div>
@@ -291,7 +298,7 @@ function ClosingCta() {
   return (
     <section className="bg-ink-900 py-16 px-5 text-center">
       <div className="max-w-lg mx-auto">
-        <h2 className="text-3xl text-white mb-6">Pronto para organizar o próximo mix?</h2>
+        <h2 className="text-3xl text-white mb-6">Pronto para alinhar no próximo mix?</h2>
         <Link
           to={loginHref('signup')}
           className="btn-primary inline-flex items-center justify-center"
