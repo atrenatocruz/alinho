@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Layout from './components/Layout'
 import SplashScreen from './components/SplashScreen'
 import Login from './pages/Login'
+import Landing from './pages/Landing'
 import Home from './pages/Home'
 import GameDetails from './pages/GameDetails'
 import Rankings from './pages/Rankings'
@@ -104,11 +105,15 @@ function AppRoutes() {
       <Route
         path="/"
         element={
-          <ProtectedRoute showSplash={showSplash}>
+          showSplash ? (
+            <SplashScreen />
+          ) : user ? (
             <Layout>
               <Home />
             </Layout>
-          </ProtectedRoute>
+          ) : (
+            <Landing />
+          )
         }
       />
       <Route
