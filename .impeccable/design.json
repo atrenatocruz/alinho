@@ -1,0 +1,132 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-05T01:00:00Z",
+  "title": "Design System: alinho",
+  "extensions": {
+    "colorMeta": {
+      "near-black": { "role": "primary", "displayName": "Near Black", "canonical": "#040404", "tonalRamp": ["#040404", "#1F2937", "#4B5563", "#9CA3AF", "#F3F4F6"] },
+      "ink-700": { "role": "primary", "displayName": "Charcoal", "canonical": "#1F2937" },
+      "ink-500": { "role": "primary", "displayName": "Dark Gray", "canonical": "#4B5563" },
+      "ink-200": { "role": "primary", "displayName": "Medium Gray", "canonical": "#9CA3AF" },
+      "ink-50": { "role": "neutral", "displayName": "Light Gray", "canonical": "#F3F4F6" },
+      "match-lime": { "role": "secondary", "displayName": "Match Lime", "canonical": "#C5DD01", "tonalRamp": ["#F8FCD4", "#C5DD01", "#99B200"] },
+      "lime-600": { "role": "secondary", "displayName": "Hover Lime", "canonical": "#99B200" },
+      "lime-100": { "role": "secondary", "displayName": "Lime Tint", "canonical": "#F8FCD4" },
+      "canvas": { "role": "neutral", "displayName": "Canvas", "canonical": "#FFFFFF" },
+      "surface": { "role": "neutral", "displayName": "Surface", "canonical": "#F3F4F6" },
+      "line": { "role": "neutral", "displayName": "Line", "canonical": "#E5E7EB" },
+      "ok": { "role": "semantic", "displayName": "Ok Green", "canonical": "#10B981" },
+      "danger": { "role": "semantic", "displayName": "Danger Red", "canonical": "#EF4444" },
+      "warning": { "role": "semantic", "displayName": "Warning Amber", "canonical": "#F59E0B" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Headlines and section titles (Outfit, bold/semibold/medium by level)." },
+      "body": { "displayName": "Body", "purpose": "Standard copy and form labels (Geist Sans)." },
+      "label": { "displayName": "Label", "purpose": "Uppercase, tracked-wide status text — badges, chips, eyebrows (Geist Mono, always extrabold)." }
+    },
+    "shadows": [
+      { "name": "card", "value": "0 1px 2px rgba(4,4,4,0.05), 0 4px 16px rgba(4,4,4,0.06)", "purpose": "Resting elevation for cards and sheets." },
+      { "name": "lift", "value": "0 2px 4px rgba(4,4,4,0.07), 0 10px 28px rgba(4,4,4,0.10)", "purpose": "Hover/active elevation for tappable cards and open sheets/modals." }
+    ],
+    "motion": [
+      { "name": "fade-up", "value": "220ms ease-out both", "purpose": "Page/section entrance." },
+      { "name": "pop", "value": "250ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both", "purpose": "Modal/sheet entrance." },
+      { "name": "fade-in", "value": "180ms ease-out both", "purpose": "Backdrop/overlay entrance." },
+      { "name": "pulse-soft", "value": "1.6s ease-in-out infinite", "purpose": "Live/in-progress state indicator." },
+      { "name": "duration-fast", "value": "150ms", "purpose": "Hover/press micro-interactions." },
+      { "name": "duration-base", "value": "200ms", "purpose": "Nav/tab transitions." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "lg", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Main CTA — Match Lime fill, near-black text, darkens on hover.",
+      "html": "<button class=\"ds-btn-primary\">Criar jogo</button>",
+      "css": ".ds-btn-primary { background: #C5DD01; color: #040404; font-family: 'Geist Sans', sans-serif; font-weight: 800; font-size: 16px; padding: 14px 24px; min-height: 48px; border: none; border-radius: 12px; box-shadow: 0 1px 2px rgba(4,4,4,0.05), 0 4px 16px rgba(4,4,4,0.06); transition: background 0.15s ease, transform 0.15s ease; cursor: pointer; } .ds-btn-primary:hover { background: #99B200; } .ds-btn-primary:focus-visible { outline: 2px solid #040404; outline-offset: 2px; } .ds-btn-primary:active { transform: scale(0.98); }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Quiet outline button — used beside a primary CTA.",
+      "html": "<button class=\"ds-btn-secondary\">Cancelar</button>",
+      "css": ".ds-btn-secondary { background: #F3F4F6; color: #040404; font-family: 'Geist Sans', sans-serif; font-weight: 800; font-size: 16px; padding: 14px 24px; min-height: 48px; border: 1px solid #E5E7EB; border-radius: 12px; transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease; cursor: pointer; } .ds-btn-secondary:hover { border-color: #9CA3AF; } .ds-btn-secondary:focus-visible { outline: 2px solid #040404; outline-offset: 2px; } .ds-btn-secondary:active { transform: scale(0.98); }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Recessed light-gray container on the white canvas, the base surface for game/list items.",
+      "html": "<div class=\"ds-card\"><p class=\"ds-card-eyebrow\">Hoje</p><p class=\"ds-card-title\">19:30 — Mix de sexta</p></div>",
+      "css": ".ds-card { background: #F3F4F6; border-radius: 16px; padding: 20px; box-shadow: 0 1px 2px rgba(4,4,4,0.05), 0 4px 16px rgba(4,4,4,0.06); transition: box-shadow 0.2s ease; } .ds-card:hover { box-shadow: 0 2px 4px rgba(4,4,4,0.07), 0 10px 28px rgba(4,4,4,0.10); } .ds-card-eyebrow { font-family: 'Geist Mono', monospace; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; font-size: 11px; color: #1F2937; margin: 0 0 4px; } .ds-card-title { font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 20px; color: #040404; margin: 0; }"
+    },
+    {
+      "name": "Input Field",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "Standard text input — surface background, line border, ink-500 focus.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"O teu nome\" />",
+      "css": ".ds-input { width: 100%; box-sizing: border-box; background: #F3F4F6; border: 1px solid #E5E7EB; border-radius: 12px; padding: 14px 16px; min-height: 48px; font-family: 'Geist Sans', sans-serif; font-size: 16px; color: #040404; transition: border-color 0.15s ease, box-shadow 0.15s ease; } .ds-input::placeholder { color: rgba(75,85,99,0.6); } .ds-input:focus { outline: none; border-color: #4B5563; box-shadow: 0 0 0 2px #F3F4F6; }"
+    },
+    {
+      "name": "Level Badge",
+      "kind": "chip",
+      "refersTo": "badge-level",
+      "description": "Player skill-level pill — near-black on lime by default.",
+      "html": "<span class=\"ds-badge-level\">INT</span>",
+      "css": ".ds-badge-level { display: inline-flex; align-items: center; border-radius: 9999px; font-family: 'Geist Mono', monospace; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; font-size: 11px; padding: 2px 8px; background: #040404; color: #C5DD01; }"
+    },
+    {
+      "name": "Level Badge (Me)",
+      "kind": "chip",
+      "refersTo": "badge-level-me",
+      "description": "Same badge, inverted to lime-on-black when it represents the current user — an instant self-identification signal.",
+      "html": "<span class=\"ds-badge-level-me\">N4</span>",
+      "css": ".ds-badge-level-me { display: inline-flex; align-items: center; border-radius: 9999px; font-family: 'Geist Mono', monospace; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; font-size: 11px; padding: 2px 8px; background: #C5DD01; color: #040404; }"
+    },
+    {
+      "name": "Guest Badge",
+      "kind": "chip",
+      "refersTo": "badge-guest",
+      "description": "Dashed-border pill marking non-regular/provisional participants.",
+      "html": "<span class=\"ds-badge-guest\">Convidado</span>",
+      "css": ".ds-badge-guest { display: inline-flex; align-items: center; border-radius: 9999px; font-family: 'Geist Mono', monospace; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; font-size: 11px; padding: 2px 8px; background: #FFFFFF; color: #4B5563; border: 1px dashed #9CA3AF; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Night Court",
+    "overview": "alinho reads like a padel court under floodlights at night: near-black surfaces (#040404) stand in for the dark court and sky, and Match Lime (#C5DD01) — the padel ball itself — is the one thing on screen allowed to glow. Everything else stays disciplined graphite and white so that single accent never has competition. The voice is confident sports-tech: bold Outfit headlines, extrabold labels on every tappable surface, liquid-glass header and floating \"dynamic island\" bottom nav, all built for a player glancing at a phone mid-game rather than someone settling in to read.\n\nThis is a deliberate break from the app's prior identity (\"Os Padeleiros\": court-blue + volt-green, Manrope type, an off-white canvas with white cards floating via shadow). alinho flips that relationship — a pure-white canvas with recessed light-gray cards — and drops the two-hue sports palette for one near-black family plus a single sharp accent.",
+    "keyCharacteristics": [
+      "One accent, used sparingly: Match Lime never competes with itself on a single screen.",
+      "Near-black chrome (header, bottom nav) rendered as liquid glass; page content stays flat and tonal, no drop-shadow drama.",
+      "Every interactive label is extrabold; nothing tappable is ever a light or regular weight.",
+      "The court-line + dashed-net SVG motif recurs as the background signature wherever a dark, ink-900 surface appears.",
+      "48px minimum tap targets and active:scale-[0.98] press feedback everywhere — tactile, one-thumb, built for quick decisions."
+    ],
+    "rules": [
+      { "name": "The One Ball Rule", "body": "Match Lime appears for exactly one focal thing per screen — the primary CTA, or the single most important state (joined, live, confirmed, \"this is you\"). If two elements compete for lime at once, one of them is wrong.", "section": "colors" },
+      { "name": "The Darker-Hover Rule", "body": "Lime always gets darker on hover/active (lime-400 → lime-600), never lighter. This is a deliberate style-guide choice, not an oversight — don't \"fix\" it back to a lighter hover.", "section": "colors" },
+      { "name": "The Extrabold-If-Tappable Rule", "body": "Any text on a button, badge, chip, or nav item is font-extrabold. Regular and medium weights are reserved for reading copy, never for something the user taps or that signals state.", "section": "typography" },
+      { "name": "The Liquid-Glass-Exception Rule", "body": "backdrop-blur is reserved for the persistent header and bottom-nav chrome. Page content never uses blur — if a surface needs to feel distinct, use the tonal surface/canvas relationship instead.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do reserve Match Lime for exactly one focal thing per screen (see The One Ball Rule).",
+      "Do keep every tappable label font-extrabold — buttons, badges, nav labels, chips.",
+      "Do give every tap target a 48px minimum height.",
+      "Do make lime hover darker (lime-600), never lighter.",
+      "Do use a dashed border specifically to mean empty, provisional, or guest — never for a filled/confirmed element.",
+      "Do reuse the court-line + dashed-net SVG motif at low opacity as the background signature on any ink-900 hero or sheet, rather than inventing a new background pattern per surface."
+    ],
+    "donts": [
+      "Don't bring back the old court-blue/volt-green palette, Manrope typeface, or the old off-white-canvas/white-floating-card relationship — that's the superseded \"Os Padeleiros\" identity, and the canvas/card relationship is deliberately inverted from it now.",
+      "Don't use heavy, directional drop shadows for depth. Cards are flat-plus-tonal, not \"lifted.\" Reserve backdrop-blur exclusively for the persistent header/bottom-nav chrome.",
+      "Don't fabricate metrics, testimonials, user counts, or screenshots anywhere in the UI (binding constraint from PRODUCT.md)."
+    ]
+  }
+}

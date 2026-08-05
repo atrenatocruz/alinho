@@ -1,9 +1,39 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Eye, EyeOff, Lock } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton, DateField, Select } from '../components/ui'
 import { Wordmark } from '../components/Layout'
 import { hashPhone } from '../lib/hashPhone'
+
+// Module scope, not nested in Login: an inline component would be recreated
+// (and remounted — dropping focus and its own `visible` state) on every
+// keystroke in any field, since every keystroke re-renders the parent.
+function PasswordField({ value, onChange, placeholder, autoComplete, minLength, required }) {
+  const [visible, setVisible] = useState(false)
+  return (
+    <div className="relative">
+      <input
+        type={visible ? 'text' : 'password'}
+        value={value}
+        onChange={onChange}
+        className="input-field pr-12"
+        placeholder={placeholder}
+        autoComplete={autoComplete}
+        minLength={minLength}
+        required={required}
+      />
+      <button
+        type="button"
+        onClick={() => setVisible((v) => !v)}
+        aria-label={visible ? 'Ocultar password' : 'Mostrar password'}
+        className="absolute right-1 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center rounded-full text-muted hover:text-ink-900 hover:bg-ink-50 transition-colors duration-fast"
+      >
+        {visible ? <EyeOff size={18} /> : <Eye size={18} />}
+      </button>
+    </div>
+  )
+}
 
 export default function Login() {
   const [searchParams] = useSearchParams()
@@ -258,18 +288,18 @@ export default function Login() {
                   onChange={(e) => setLoginEmail(e.target.value)}
                   className="input-field"
                   placeholder="nome@exemplo.pt"
+                  autoComplete="email"
                   required
                 />
               </div>
 
               <div>
                 <label className={inputLabel}>Password</label>
-                <input
-                  type="password"
+                <PasswordField
                   value={loginPassword}
                   onChange={(e) => setLoginPassword(e.target.value)}
-                  className="input-field"
                   placeholder="••••••••"
+                  autoComplete="current-password"
                   required
                 />
               </div>
@@ -297,6 +327,7 @@ export default function Login() {
                   onChange={(e) => setSignupName(e.target.value)}
                   className="input-field"
                   placeholder="João Silva"
+                  autoComplete="name"
                   required
                 />
               </div>
@@ -309,6 +340,7 @@ export default function Login() {
                   onChange={(e) => setSignupEmail(e.target.value)}
                   className="input-field"
                   placeholder="nome@exemplo.pt"
+                  autoComplete="email"
                   required
                 />
               </div>
@@ -321,6 +353,7 @@ export default function Login() {
                   onChange={(e) => setSignupPhone(e.target.value)}
                   className="input-field"
                   placeholder="912 345 678"
+                  autoComplete="tel"
                 />
                 <p className="text-xs text-muted mt-1.5">Só é preciso se quiseres usar o bot do WhatsApp. Podes adicionar mais tarde no Perfil.</p>
               </div>
@@ -350,12 +383,11 @@ export default function Login() {
 
               <div>
                 <label className={inputLabel}>Password</label>
-                <input
-                  type="password"
+                <PasswordField
                   value={signupPassword}
                   onChange={(e) => setSignupPassword(e.target.value)}
-                  className="input-field"
                   placeholder="••••••••"
+                  autoComplete="new-password"
                   minLength={6}
                   required
                 />
@@ -364,12 +396,11 @@ export default function Login() {
 
               <div>
                 <label className={inputLabel}>Confirmar password</label>
-                <input
-                  type="password"
+                <PasswordField
                   value={signupConfirmPassword}
                   onChange={(e) => setSignupConfirmPassword(e.target.value)}
-                  className="input-field"
                   placeholder="••••••••"
+                  autoComplete="new-password"
                   minLength={6}
                   required
                 />
@@ -390,16 +421,16 @@ export default function Login() {
           {import.meta.env.DEV && (
             <button
               onClick={handleAdminBypass}
-              className="w-full mt-4 py-3 px-4 rounded-ctrl font-extrabold text-sm border border-dashed border-ink-500 text-ink-700 hover:bg-ink-50 transition-all duration-fast min-h-[48px]"
+              className="w-full mt-4 flex items-center justify-center gap-2 py-3 px-4 rounded-ctrl font-extrabold text-sm border border-dashed border-ink-500 text-ink-700 hover:bg-ink-50 transition-all duration-fast min-h-[48px]"
             >
-              🔓 Entrar como Admin (dev)
+              <Lock size={16} /> Entrar como Admin (dev)
             </button>
           )}
 
           <div className="mt-8 text-center">
-            <a href="/instrucoes" className="text-ink-700 font-extrabold text-sm hover:underline">
+            <Link to="/instrucoes" className="text-ink-700 font-extrabold text-sm hover:underline">
               Ver instruções de utilização
-            </a>
+            </Link>
           </div>
         </div>
       </div>

@@ -1,8 +1,55 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { CheckCircle2, MapPin, Lock, Calendar, Trophy, Users, MessageCircle } from 'lucide-react'
 import { Wordmark } from '../components/Layout'
 import PadelIcon from '../components/icons/PadelIcon'
+
+// Fires once, the first time the ref'd element enters the viewport — drives
+// the .reveal / .reveal-visible transition (src/index.css) instead of a
+// mount-time animation, so below-the-fold sections come alive as the visitor
+// scrolls to them rather than animating uselessly offscreen on page load.
+function useReveal() {
+  const ref = useRef(null)
+  const [visible, setVisible] = useState(false)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true)
+          observer.disconnect()
+        }
+      },
+      { threshold: 0.2 }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+  return [ref, visible]
+}
+
+// One-shot count from `start` to `target` on mount — used on the hero mock
+// card so the player count visibly fills in, a small concrete stand-in for
+// the real-time updates the copy promises. Skips straight to `target` under
+// prefers-reduced-motion.
+function useCountUp(target, start) {
+  const [value, setValue] = useState(start)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setValue(target)
+      return
+    }
+    let current = start
+    const id = setInterval(() => {
+      current += 1
+      setValue(current)
+      if (current >= target) clearInterval(id)
+    }, 220)
+    return () => clearInterval(id)
+  }, [target, start])
+  return value
+}
 
 // Builds the /login href, preserving ?org=<slug> from the current URL (the
 // invite-link mechanism — see Home.jsx / Login.jsx) so landing-page CTAs
@@ -47,7 +94,7 @@ function Nav() {
         <div className="flex items-center gap-4">
           <Link
             to={loginHref()}
-            className="text-white/80 hover:text-white font-extrabold text-sm transition-colors duration-fast"
+            className="inline-flex items-center min-h-[44px] px-1 text-white/80 hover:text-white font-extrabold text-sm transition-colors duration-fast"
           >
             Entrar
           </Link>
@@ -75,6 +122,7 @@ function Nav() {
 // MixCard in src/components/ui.jsx) — hardcoded content, no live data,
 // no screenshot asset needed.
 function HeroMockCard() {
+  const players = useCountUp(8, 5)
   return (
     <div className="card w-full max-w-sm shadow-lift" style={{ transform: 'rotate(-3deg)' }}>
       <div className="flex items-start justify-between gap-3 mb-3">
@@ -108,11 +156,11 @@ function HeroMockCard() {
             ))}
           </div>
           <span className="text-sm font-extrabold text-ink-900 tabular-nums">
-            8<span className="text-muted font-normal">/8</span>
+            {players}<span className="text-muted font-normal">/8</span>
           </span>
         </div>
         <span className="ml-auto inline-flex items-center gap-1.5 bg-ok/10 text-ok text-[11px] font-extrabold px-2.5 py-1 rounded-full">
-          <Lock size={13} className="shrink-0" /> Mix fechado — campo reservado
+          <Lock size={13} className="shrink-0" /> Mix fechado, campo reservado
         </span>
       </div>
     </div>
@@ -142,7 +190,7 @@ function Hero() {
           </h1>
           <p className="text-ink-200 text-lg mt-5 max-w-md">
             Sem mais folhas de cálculo ou resultados perdidos. Cria jogos,
-            junta-te a mixs e acompanha o ranking — tudo num só sítio.
+            junta-te a mixs e acompanha o ranking.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 mt-8">
             {/* Both CTAs need inline-flex + centering utilities explicitly —
@@ -173,11 +221,14 @@ function Hero() {
   )
 }
 
-const FEATURES = [
+// WhatsApp bot gets its own spotlighted tile below (see Features) — it's
+// alinho's real differentiator per PRODUCT.md's Positioning (meet players in
+// the chat thread they already use), not just another item in a grid.
+const OTHER_FEATURES = [
   {
     icon: Calendar,
     title: 'Jogos',
-    description: 'Cria jogos com data, hora e local. Entra sozinho ou com o teu parceiro — o resto o grupo trata.',
+    description: 'Cria jogos com data, hora e local. Entra sozinho ou com o teu parceiro. O resto fica com o grupo.',
   },
   {
     icon: Trophy,
@@ -199,39 +250,79 @@ const FEATURES = [
     title: 'Jogos privados',
     description: 'Cria um jogo só por convite, para quando não é preciso o grupo todo.',
   },
-  {
-    icon: MessageCircle,
-    title: 'Bot do WhatsApp',
-    description: 'Responde "In" ou "Out" no grupo do WhatsApp para entrar ou sair de um mix, sem abrir a app.',
-  },
 ]
 
-function FeatureCard({ icon: Icon, title, description }) {
+// Shows the actual mechanism instead of describing it: a bot prompt and the
+// one-word reply that's alinho's real differentiator (PRODUCT.md Positioning).
+// Plays once, staggered, the first time the tile scrolls into view.
+function WhatsAppDemo({ visible }) {
+  const reveal = (delayMs) => ({
+    transitionDelay: `${delayMs}ms`,
+  })
   return (
-    <div className="card">
-      <div className="w-11 h-11 rounded-full bg-lime-400/15 text-lime-600 flex items-center justify-center mb-4">
-        <Icon size={20} />
+    <div className="mt-6 space-y-2" aria-hidden="true">
+      <div
+        className={`reveal ${visible ? 'reveal-visible' : ''} max-w-[85%] rounded-ctrl rounded-bl-sm bg-white/10 text-ink-200 text-xs px-3 py-2`}
+        style={reveal(0)}
+      >
+        Sábado, 18:00. Mix de sábado, quem entra?
       </div>
-      <h3 className="text-lg text-ink-900 mb-1.5">{title}</h3>
-      <p className="text-sm text-muted">{description}</p>
+      <div
+        className={`reveal ${visible ? 'reveal-visible' : ''} max-w-[45%] ml-auto rounded-ctrl rounded-br-sm bg-[#25D366] text-ink-900 text-xs font-extrabold px-3 py-2 text-center`}
+        style={reveal(500)}
+      >
+        In
+      </div>
+      <div
+        className={`reveal ${visible ? 'reveal-visible' : ''} flex items-center gap-1.5 text-[11px] text-lime-400 font-extrabold pt-1`}
+        style={reveal(950)}
+      >
+        <CheckCircle2 size={12} /> Confirmado no mix
+      </div>
     </div>
   )
 }
 
+function FeatureRow({ icon: Icon, title, description }) {
+  return (
+    <div className="flex items-start gap-4 py-5 first:pt-0">
+      <div className="w-10 h-10 shrink-0 rounded-full bg-lime-400/15 text-lime-600 flex items-center justify-center">
+        <Icon size={18} />
+      </div>
+      <div>
+        <h3 className="text-base font-semibold text-ink-900 mb-0.5">{title}</h3>
+        <p className="text-sm text-muted">{description}</p>
+      </div>
+    </div>
+  )
+}
+
+// One spotlighted tile (the real differentiator, per PRODUCT.md) beside a
+// plain divided list for the rest — deliberately not six identical cards.
 function Features() {
+  const [whatsappRef, whatsappVisible] = useReveal()
   return (
     <section className="bg-canvas py-20 px-5">
       <div className="max-w-5xl mx-auto">
-        <div className="text-center max-w-lg mx-auto mb-12">
-          <p className="font-mono text-xs font-extrabold uppercase tracking-widest text-ink-700 mb-3">
-            O que a app faz
-          </p>
-          <h2 className="text-3xl text-ink-900">Tudo o que um grupo precisa, numa só app</h2>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {FEATURES.map((f) => (
-            <FeatureCard key={f.title} {...f} />
-          ))}
+        <h2 className="text-3xl text-ink-900 max-w-lg mb-12">Tudo o que um grupo precisa, numa só app</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-x-10 gap-y-8">
+          <div ref={whatsappRef} className="lg:col-span-2 rounded-card bg-ink-900 p-7 flex flex-col justify-between min-h-[240px]">
+            <div>
+              <div className="w-11 h-11 rounded-full bg-[#25D366]/15 text-[#25D366] flex items-center justify-center mb-5">
+                <MessageCircle size={20} />
+              </div>
+              <h3 className="text-xl text-white mb-2">Bot do WhatsApp</h3>
+              <p className="text-ink-200 text-sm leading-relaxed">
+                Responde "In" ou "Out" no grupo do WhatsApp e o alinho trata do resto do mix.
+              </p>
+              <WhatsAppDemo visible={whatsappVisible} />
+            </div>
+          </div>
+          <div className="lg:col-span-3 divide-y divide-line border-t border-line lg:border-t-0">
+            {OTHER_FEATURES.map((f) => (
+              <FeatureRow key={f.title} {...f} />
+            ))}
+          </div>
         </div>
       </div>
     </section>
@@ -242,7 +333,7 @@ const STEPS = [
   {
     number: '1',
     title: 'Cria a tua conta',
-    description: 'Regista-te com o Google ou com o teu email — leva menos de um minuto.',
+    description: 'Regista-te com o Google ou com o teu email. Leva menos de um minuto.',
   },
   {
     number: '2',
@@ -261,9 +352,6 @@ function HowItWorks() {
     <section className="bg-surface py-20 px-5">
       <div className="max-w-5xl mx-auto">
         <div className="text-center max-w-lg mx-auto mb-12">
-          <p className="font-mono text-xs font-extrabold uppercase tracking-widest text-ink-700 mb-3">
-            Como funciona
-          </p>
           <h2 className="text-3xl text-ink-900">Três passos e estás em jogo</h2>
         </div>
         <div className="relative grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-5">
@@ -318,10 +406,10 @@ function Footer() {
       <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
         <Wordmark variant="light" />
         <div className="flex items-center gap-6">
-          <Link to={loginHref()} className="text-ink-700 font-extrabold text-sm hover:underline">
+          <Link to={loginHref()} className="inline-flex items-center min-h-[44px] px-1 text-ink-700 font-extrabold text-sm hover:underline">
             Entrar
           </Link>
-          <Link to="/instrucoes" className="text-ink-700 font-extrabold text-sm hover:underline">
+          <Link to="/instrucoes" className="inline-flex items-center min-h-[44px] px-1 text-ink-700 font-extrabold text-sm hover:underline">
             Instruções
           </Link>
         </div>

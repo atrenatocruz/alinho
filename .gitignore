@@ -26,6 +26,14 @@ dist-ssr
 # Git worktrees (isolated workspaces for feature work)
 .worktrees/
 
+# Impeccable design skill — local/ephemeral only; design.json and
+# live/config.json are real project config and stay tracked.
+.impeccable/config.local.json
+.impeccable/hook.cache.json
+.impeccable/live/roots.json
+.impeccable/live/sessions/
+.impeccable/live/accept-receipts/
+
 # Environment variables
 .env
 .env.local

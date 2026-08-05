@@ -145,3 +145,20 @@
   .animate-fade-up, .animate-pop, .animate-fade-in, .animate-pulse-soft { animation: none; }
   .press { transition: none; }
 }
+
+/* Scroll-triggered reveal (JS toggles .reveal-visible via IntersectionObserver
+   in Landing.jsx). Transition-based, not a keyframe animation, so the hidden
+   state is never left stranded: reduced-motion forces the visible state
+   directly rather than disabling a fill-mode that set it. */
+.reveal {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 500ms cubic-bezier(0.16, 1, 0.3, 1), transform 500ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.reveal-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; transition: none; }
+}
