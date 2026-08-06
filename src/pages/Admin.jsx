@@ -28,6 +28,26 @@ const FORMATS = [
   { value: 'sobe_desce', label: 'Sobe e desce' },
   { value: 'todos_contra_todos', label: 'Todos contra todos' },
 ]
+const RECURRENCE_FREQUENCIES = [
+  { value: 'daily', label: 'Diariamente' },
+  { value: 'weekly', label: 'Semanalmente' },
+  { value: 'monthly', label: 'Mensalmente' },
+  { value: 'yearly', label: 'Anualmente' },
+]
+const RECURRENCE_ENDS = [
+  { value: 'never', label: 'Nunca' },
+  { value: 'on_date', label: 'Até uma data' },
+  { value: 'after_occurrences', label: 'Após X ocorrências' },
+]
+
+const EMPTY_RECURRENCE = {
+  enabled: false,
+  frequency: 'weekly',
+  endsType: 'never',
+  endsOn: '',
+  endsAfterOccurrences: '',
+  nextRunAt: '',
+}
 
 const EMPTY_GAME_FORM = {
   title: '',
@@ -39,6 +59,7 @@ const EMPTY_GAME_FORM = {
   court_time_minutes: 90,
   game_time_minutes: 20,
   format: 'sobe_desce',
+  recurrence: EMPTY_RECURRENCE,
 }
 
 /* Segmented tab selector for form options */
@@ -168,6 +189,69 @@ export default function Admin() {
     setSettings(data)
   }
 
+  // Fields shared between creating and updating a game_recurrences row —
+  // the rule itself plus the snapshot of settings future Mixes will copy.
+  const recurrencePayloadFromGame = (game, recurrence) => ({
+    frequency: recurrence.frequency,
+    ends_type: recurrence.endsType,
+    ends_on: recurrence.endsType === 'on_date' ? new Date(`${recurrence.endsOn}T23:59:59`).toISOString() : null,
+    ends_after_occurrences: recurrence.endsType === 'after_occurrences' ? parseInt(recurrence.endsAfterOccurrences, 10) : null,
+    mix_offset_seconds: Math.round(
+      (new Date(game.date).getTime() - new Date(recurrence.nextRunAt).getTime()) / 1000
+    ),
+    next_run_at: new Date(recurrence.nextRunAt).toISOString(),
+    title: game.title,
+    location: game.location,
+    price_per_player: game.price_per_player,
+    prize: game.prize,
+    num_courts: game.num_courts,
+    court_time_minutes: game.court_time_minutes,
+    game_time_minutes: game.game_time_minutes,
+    format: game.format,
+  })
+
+  const validateRecurrence = (recurrence) => {
+    if (!recurrence.enabled) return null
+    if (!recurrence.nextRunAt) return 'Escolhe a data e hora em que o próximo Mix deve ser criado automaticamente'
+    if (recurrence.endsType === 'on_date' && !recurrence.endsOn) return 'Escolhe a data em que a recorrência termina'
+    if (recurrence.endsType === 'after_occurrences' && (!recurrence.endsAfterOccurrences || parseInt(recurrence.endsAfterOccurrences, 10) < 1)) {
+      return 'Indica um número de ocorrências válido'
+    }
+    return null
+  }
+
+  // Inserts the game_recurrences row for a newly-flagged origin Mix, then
+  // links `game` back to it. Used both when recurrence is turned on at
+  // creation time (handleCreateGame) and when it's turned on while editing
+  // a Mix that wasn't recurring yet (handleUpdateGame, Task 3).
+  const createRecurrence = async (game, recurrence, userId) => {
+    const { data: newRecurrence, error: recurrenceError } = await supabase
+      .from('game_recurrences')
+      .insert([{
+        ...recurrencePayloadFromGame(game, recurrence),
+        organization_id: currentOrganizationId,
+        created_by: userId,
+      }])
+      .select()
+      .single()
+
+    if (recurrenceError) {
+      console.error('Error creating recurrence:', recurrenceError)
+      alert('O Mix foi criado, mas não foi possível ativar a recorrência: ' + recurrenceError.message)
+      return
+    }
+
+    const { error: linkError } = await supabase
+      .from('games')
+      .update({ recurrence_id: newRecurrence.id, is_recurrence_origin: true })
+      .eq('id', game.id)
+
+    if (linkError) {
+      console.error('Error linking game to recurrence:', linkError)
+      alert('O Mix foi criado, mas não foi possível ligá-lo à recorrência: ' + linkError.message)
+    }
+  }
+
   const handleCreateGame = async (e) => {
     e.preventDefault()
 
@@ -175,6 +259,14 @@ export default function Admin() {
     // input's `required` attribute — it's a fully custom component now.
     if (!gameForm.date) {
       alert('Escolhe uma data e hora para o jogo')
+      return
+    }
+
+    const { recurrence, ...gameFields } = gameForm
+
+    const recurrenceError = validateRecurrence(recurrence)
+    if (recurrenceError) {
+      alert(recurrenceError)
       return
     }
 
@@ -186,7 +278,7 @@ export default function Admin() {
       const numCourts = Math.min(6, Math.max(1, parseInt(gameForm.num_courts, 10) || 1))
 
       console.log('Creating game with data:', {
-        ...gameForm,
+        ...gameFields,
         created_by: user.id,
         status: 'open'
       })
@@ -195,7 +287,7 @@ export default function Admin() {
         .from('games')
         .insert([
           {
-            ...gameForm,
+            ...gameFields,
             organization_id: currentOrganizationId,
             // datetime-local is Portugal wall-clock; store the real instant
             date: new Date(gameForm.date).toISOString(),
@@ -214,6 +306,11 @@ export default function Admin() {
       }
 
       console.log('Game created successfully:', data)
+
+      if (recurrence.enabled) {
+        await createRecurrence(data[0], recurrence, user.id)
+      }
+
       setShowCreateGame(false)
       setGameForm(EMPTY_GAME_FORM)
       loadGames()
@@ -236,10 +333,13 @@ export default function Admin() {
       // clamped to a valid 1-6 count here at submit time.
       const numCourts = Math.min(6, Math.max(1, parseInt(gameForm.num_courts, 10) || 1))
 
+      // Destructure recurrence so it's never spread into the games table update
+      const { recurrence, ...gameFields } = gameForm
+
       const { error } = await supabase
         .from('games')
         .update({
-          ...gameForm,
+          ...gameFields,
           date: new Date(gameForm.date).toISOString(),
           num_courts: numCourts,
           max_players: numCourts * 4,
@@ -375,6 +475,7 @@ export default function Admin() {
       court_time_minutes: game.court_time_minutes || 90,
       game_time_minutes: game.game_time_minutes || 20,
       format: game.format || 'sobe_desce',
+      recurrence: EMPTY_RECURRENCE,
     })
   }
 
@@ -564,6 +665,98 @@ export default function Admin() {
                         onChange={(v) => setGameForm({ ...gameForm, format: v })}
                       />
                     </div>
+
+                    {(!editingGame || (editingGame.is_recurrence_origin && editingGame.recurrence?.is_active)) && (
+                      <div className="border-t border-line pt-4 space-y-4">
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={gameForm.recurrence.enabled}
+                            onChange={(e) => setGameForm({
+                              ...gameForm,
+                              recurrence: { ...gameForm.recurrence, enabled: e.target.checked }
+                            })}
+                            className="w-5 h-5"
+                          />
+                          <span className="text-sm font-medium text-gray-700">Mix recorrente</span>
+                        </label>
+
+                        {gameForm.recurrence.enabled && (
+                          <>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Frequência
+                              </label>
+                              <Segmented
+                                options={RECURRENCE_FREQUENCIES}
+                                value={gameForm.recurrence.frequency}
+                                onChange={(v) => setGameForm({
+                                  ...gameForm,
+                                  recurrence: { ...gameForm.recurrence, frequency: v }
+                                })}
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Termina
+                              </label>
+                              <Segmented
+                                options={RECURRENCE_ENDS}
+                                value={gameForm.recurrence.endsType}
+                                onChange={(v) => setGameForm({
+                                  ...gameForm,
+                                  recurrence: { ...gameForm.recurrence, endsType: v }
+                                })}
+                              />
+                              {gameForm.recurrence.endsType === 'on_date' && (
+                                <input
+                                  type="date"
+                                  value={gameForm.recurrence.endsOn}
+                                  onChange={(e) => setGameForm({
+                                    ...gameForm,
+                                    recurrence: { ...gameForm.recurrence, endsOn: e.target.value }
+                                  })}
+                                  className="input-field mt-2"
+                                  required
+                                />
+                              )}
+                              {gameForm.recurrence.endsType === 'after_occurrences' && (
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={gameForm.recurrence.endsAfterOccurrences}
+                                  onChange={(e) => setGameForm({
+                                    ...gameForm,
+                                    recurrence: { ...gameForm.recurrence, endsAfterOccurrences: e.target.value }
+                                  })}
+                                  className="input-field mt-2"
+                                  placeholder="ex: 10"
+                                  required
+                                />
+                              )}
+                            </div>
+
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Criar automaticamente em
+                              </label>
+                              <DateTimeField
+                                value={gameForm.recurrence.nextRunAt}
+                                onChange={(v) => setGameForm({
+                                  ...gameForm,
+                                  recurrence: { ...gameForm.recurrence, nextRunAt: v }
+                                })}
+                                required
+                              />
+                              <p className="text-sm text-muted mt-1.5">
+                                Data e hora em que o próximo Mix desta série deve ser criado — não é a data do Mix em si.
+                              </p>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
 
                     <div className="flex gap-3">
                       <button type="submit" className="btn-primary flex-1">
