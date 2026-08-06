@@ -33,6 +33,8 @@ const EMPTY_GAME_FORM = {
   title: '',
   date: '',
   location: '',
+  price_per_player: '',
+  prize: '',
   num_courts: 1,
   court_time_minutes: 90,
   game_time_minutes: 20,
@@ -199,6 +201,7 @@ export default function Admin() {
             date: new Date(gameForm.date).toISOString(),
             num_courts: numCourts,
             max_players: numCourts * 4, // derived
+            price_per_player: gameForm.price_per_player === '' ? null : parseFloat(gameForm.price_per_player),
             created_by: user.id,
             status: 'open'
           }
@@ -240,6 +243,7 @@ export default function Admin() {
           date: new Date(gameForm.date).toISOString(),
           num_courts: numCourts,
           max_players: numCourts * 4,
+          price_per_player: gameForm.price_per_player === '' ? null : parseFloat(gameForm.price_per_player),
         })
         .eq('id', editingGame.id)
 
@@ -365,6 +369,8 @@ export default function Admin() {
       title: game.title,
       date: toLocalInput(game.date),
       location: game.location || '',
+      price_per_player: game.price_per_player ?? '',
+      prize: game.prize || '',
       num_courts: game.num_courts || 1,
       court_time_minutes: game.court_time_minutes || 90,
       game_time_minutes: game.game_time_minutes || 20,
@@ -474,6 +480,34 @@ export default function Admin() {
                         onChange={(e) => setGameForm({ ...gameForm, location: e.target.value })}
                         className="input-field"
                         placeholder="Clube de Padel"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Preço por jogador (€)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.5"
+                        min="0"
+                        value={gameForm.price_per_player}
+                        onChange={(e) => setGameForm({ ...gameForm, price_per_player: e.target.value })}
+                        className="input-field"
+                        placeholder="ex: 5"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Prémio
+                      </label>
+                      <input
+                        type="text"
+                        value={gameForm.prize}
+                        onChange={(e) => setGameForm({ ...gameForm, prize: e.target.value })}
+                        className="input-field"
+                        placeholder="ex: Vouchers para os vencedores"
                       />
                     </div>
 
