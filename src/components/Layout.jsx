@@ -219,7 +219,8 @@ export default function Layout({ children }) {
           willChange: 'transform',
         }}
       >
-        <div className="pointer-events-auto flex items-center gap-1 p-1.5 rounded-full
+        <div className="pointer-events-auto flex items-center gap-0.5 p-1 rounded-full
+                        max-w-full overflow-x-auto no-scrollbar
                         bg-ink-900/95 supports-[backdrop-filter]:bg-ink-900/90 backdrop-blur-xl
                         shadow-[0_8px_32px_rgba(11,37,69,0.35)]
                         ring-1 ring-white/10">
@@ -232,11 +233,11 @@ export default function Layout({ children }) {
                 to={path}
                 aria-current={isActive ? 'page' : undefined}
                 aria-label={label}
-                className={`flex items-center justify-center gap-1.5 h-12 rounded-full
+                className={`flex flex-col items-center justify-center h-11 rounded-full shrink-0
                             transition-all duration-base ${
                   isActive
-                    ? 'bg-white/15 text-lime-400 px-4'
-                    : 'text-ink-200 hover:text-white w-12'
+                    ? 'bg-white/15 text-lime-400 px-3'
+                    : 'text-ink-200 hover:text-white w-11'
                 }`}
               >
                 {isPerfil ? (
@@ -247,12 +248,12 @@ export default function Layout({ children }) {
                     colorClass="bg-ink-700 text-white"
                   />
                 ) : (
-                  <Icon size={20} strokeWidth={2} className="shrink-0" />
+                  <Icon size={19} strokeWidth={2} className="shrink-0" />
                 )}
-                {/* label morphs in on the active item — island style */}
+                {/* label morphs in below the icon on the active item — island style */}
                 <span
-                  className={`text-xs font-extrabold whitespace-nowrap overflow-hidden transition-all duration-base ${
-                    isActive ? 'max-w-[80px] opacity-100' : 'max-w-0 opacity-0'
+                  className={`text-[10px] font-extrabold leading-none whitespace-nowrap overflow-hidden transition-all duration-base ${
+                    isActive ? 'max-h-3 opacity-100 mt-1' : 'max-h-0 opacity-0'
                   }`}
                 >
                   {label}

@@ -117,6 +117,19 @@
   }
 }
 
+@layer utilities {
+  /* Hides the scrollbar on an overflow-x-auto row while keeping it
+     scrollable — used as the bottom nav's overflow safety net so a
+     narrow viewport with many items scrolls instead of clipping. */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 /* ─── Motion — subtle & fast ─────────────────────────────────────────────── */
 @keyframes fade-up {
   from { opacity: 0; transform: translateY(8px); }
