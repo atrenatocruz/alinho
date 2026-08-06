@@ -113,6 +113,8 @@ function buildMixBlock({ game, people, capacity, suplentes = [] }, { showCode })
   if (showCode) lines.push(`🆔 Código: ${game.short_code}`)
   lines.push(`📅 ${formatDateTime(game.date)}`)
   if (game.location) lines.push(`📍 ${game.location}`)
+  if (game.price_per_player > 0) lines.push(`💶 ${game.price_per_player}€/jogador`)
+  if (game.prize) lines.push(`🏆 Prémio: ${game.prize}`)
   lines.push(`🏟️ ${game.num_courts} campo(s) · ${capacity} vagas`)
   lines.push('')
 
