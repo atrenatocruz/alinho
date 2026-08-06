@@ -55,6 +55,8 @@ CREATE TABLE games (
   title TEXT NOT NULL,
   date TIMESTAMPTZ NOT NULL,
   location TEXT,
+  price_per_player NUMERIC(6,2),
+  prize TEXT,
   max_players INTEGER DEFAULT 4, -- derived = num_courts * 4, written by the app
   num_courts INTEGER NOT NULL DEFAULT 1,
   court_time_minutes INTEGER NOT NULL DEFAULT 90,
