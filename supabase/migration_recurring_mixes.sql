@@ -6,7 +6,7 @@
 -- Extensions → search "pg_cron" → Enable, then re-run this file.
 -- ════════════════════════════════════════════════════════════════════════
 
-CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA extensions;
+CREATE EXTENSION IF NOT EXISTS pg_cron;
 
 -- ── game_recurrences: the recurrence rule + a snapshot of the settings ──
 -- copied into every auto-created Mix. The Mix that owns this row
@@ -20,6 +20,8 @@ CREATE TABLE game_recurrences (
   ends_type TEXT NOT NULL CHECK (ends_type IN ('never', 'on_date', 'after_occurrences')),
   ends_on TIMESTAMPTZ,
   ends_after_occurrences INTEGER,
+  CHECK (ends_type <> 'on_date' OR ends_on IS NOT NULL),
+  CHECK (ends_type <> 'after_occurrences' OR ends_after_occurrences IS NOT NULL),
   occurrences_created INTEGER NOT NULL DEFAULT 1, -- the original Mix counts as occurrence 1
   mix_offset_seconds INTEGER NOT NULL, -- (mix date) - (auto-create date), fixed at creation time
   next_run_at TIMESTAMPTZ NOT NULL,
@@ -47,6 +49,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS games_recurrence_date_key
 ALTER TABLE game_recurrences ENABLE ROW LEVEL SECURITY;
 
 -- Mirrors the games RLS policies: members can view, only org admins manage.
+-- DROP POLICY IF EXISTS guards make this migration file safe to re-run.
+DROP POLICY IF EXISTS "Org members can view game recurrences" ON game_recurrences;
 CREATE POLICY "Org members can view game recurrences"
   ON game_recurrences FOR SELECT
   USING (EXISTS (
@@ -54,6 +58,7 @@ CREATE POLICY "Org members can view game recurrences"
     WHERE memberships.organization_id = game_recurrences.organization_id AND memberships.user_id = auth.uid()
   ));
 
+DROP POLICY IF EXISTS "Org admins can create game recurrences" ON game_recurrences;
 CREATE POLICY "Org admins can create game recurrences"
   ON game_recurrences FOR INSERT
   WITH CHECK (EXISTS (
@@ -62,6 +67,7 @@ CREATE POLICY "Org admins can create game recurrences"
       AND memberships.user_id = auth.uid() AND memberships.is_admin
   ));
 
+DROP POLICY IF EXISTS "Org admins can update game recurrences" ON game_recurrences;
 CREATE POLICY "Org admins can update game recurrences"
   ON game_recurrences FOR UPDATE
   USING (EXISTS (
@@ -70,6 +76,7 @@ CREATE POLICY "Org admins can update game recurrences"
       AND memberships.user_id = auth.uid() AND memberships.is_admin
   ));
 
+DROP POLICY IF EXISTS "Org admins can delete game recurrences" ON game_recurrences;
 CREATE POLICY "Org admins can delete game recurrences"
   ON game_recurrences FOR DELETE
   USING (EXISTS (
@@ -116,12 +123,14 @@ BEGIN
     ON CONFLICT (recurrence_id, date) WHERE recurrence_id IS NOT NULL DO NOTHING;
 
     UPDATE game_recurrences
-    SET next_run_at = rec.next_run_at + (CASE rec.frequency
-          WHEN 'daily'   THEN interval '1 day'
-          WHEN 'weekly'  THEN interval '1 week'
-          WHEN 'monthly' THEN interval '1 month'
-          WHEN 'yearly'  THEN interval '1 year'
-        END),
+    SET next_run_at = (
+          (rec.next_run_at AT TIME ZONE 'Europe/Lisbon') + (CASE rec.frequency
+                WHEN 'daily'   THEN interval '1 day'
+                WHEN 'weekly'  THEN interval '1 week'
+                WHEN 'monthly' THEN interval '1 month'
+                WHEN 'yearly'  THEN interval '1 year'
+              END)
+        ) AT TIME ZONE 'Europe/Lisbon',
         occurrences_created = occurrences_created + 1,
         updated_at = now()
     WHERE id = rec.id;

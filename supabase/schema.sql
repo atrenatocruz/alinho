@@ -4,7 +4,7 @@
 -- the whole reason this isn't a database-per-tenant design).
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA extensions;
+CREATE EXTENSION IF NOT EXISTS pg_cron;
 
 -- ── Organizations (clubs) ──────────────────────────────────────────────
 CREATE TABLE organizations (
@@ -58,6 +58,8 @@ CREATE TABLE game_recurrences (
   ends_type TEXT NOT NULL CHECK (ends_type IN ('never', 'on_date', 'after_occurrences')),
   ends_on TIMESTAMPTZ,
   ends_after_occurrences INTEGER,
+  CHECK (ends_type <> 'on_date' OR ends_on IS NOT NULL),
+  CHECK (ends_type <> 'after_occurrences' OR ends_after_occurrences IS NOT NULL),
   occurrences_created INTEGER NOT NULL DEFAULT 1, -- the original Mix counts as occurrence 1
   mix_offset_seconds INTEGER NOT NULL, -- (mix date) - (auto-create date), fixed at creation time
   next_run_at TIMESTAMPTZ NOT NULL,
@@ -858,12 +860,14 @@ BEGIN
     ON CONFLICT (recurrence_id, date) WHERE recurrence_id IS NOT NULL DO NOTHING;
 
     UPDATE game_recurrences
-    SET next_run_at = rec.next_run_at + (CASE rec.frequency
-          WHEN 'daily'   THEN interval '1 day'
-          WHEN 'weekly'  THEN interval '1 week'
-          WHEN 'monthly' THEN interval '1 month'
-          WHEN 'yearly'  THEN interval '1 year'
-        END),
+    SET next_run_at = (
+          (rec.next_run_at AT TIME ZONE 'Europe/Lisbon') + (CASE rec.frequency
+                WHEN 'daily'   THEN interval '1 day'
+                WHEN 'weekly'  THEN interval '1 week'
+                WHEN 'monthly' THEN interval '1 month'
+                WHEN 'yearly'  THEN interval '1 year'
+              END)
+        ) AT TIME ZONE 'Europe/Lisbon',
         occurrences_created = occurrences_created + 1,
         updated_at = now()
     WHERE id = rec.id;
