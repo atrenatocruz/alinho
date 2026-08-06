@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Calendar, Users, Trash2, Edit2, Check, X, UserX } from 'lucide-react'
+import { Plus, Calendar, Users, Trash2, Edit2, Check, X, UserX, Repeat } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { DateTimeField, Avatar } from '../components/ui'
@@ -413,6 +413,8 @@ export default function Admin() {
     if (!confirm('Tens a certeza que queres eliminar este jogo?')) return
 
     try {
+      const gameToDelete = games.find(g => g.id === gameId)
+
       const { error } = await supabase
         .from('games')
         .delete()
@@ -420,11 +422,39 @@ export default function Admin() {
 
       if (error) throw error
 
+      // The origin Mix is the only place the "Mix recorrente" toggle lives —
+      // deleting it must also stop the recurrence, otherwise it would keep
+      // creating Mixes automatically with no UI left to turn it off from.
+      if (gameToDelete?.is_recurrence_origin && gameToDelete.recurrence?.is_active) {
+        await supabase
+          .from('game_recurrences')
+          .update({ is_active: false, updated_at: new Date().toISOString() })
+          .eq('id', gameToDelete.recurrence_id)
+      }
+
       alert('Jogo eliminado com sucesso!')
       loadGames()
     } catch (error) {
       console.error('Error deleting game:', error)
       alert('Erro ao eliminar jogo')
+    }
+  }
+
+  const handleStopRecurrence = async (recurrenceId) => {
+    if (!confirm('Parar esta recorrência? Os Mixes já criados mantêm-se; não serão criados mais Mixes automaticamente.')) return
+
+    try {
+      const { error } = await supabase
+        .from('game_recurrences')
+        .update({ is_active: false, updated_at: new Date().toISOString() })
+        .eq('id', recurrenceId)
+
+      if (error) throw error
+
+      loadGames()
+    } catch (error) {
+      console.error('Error stopping recurrence:', error)
+      alert('Erro ao parar a recorrência: ' + error.message)
     }
   }
 
@@ -863,6 +893,23 @@ export default function Admin() {
                               {FORMAT_LABEL[game.format] || 'Sobe e desce'} • {game.num_courts || 1} {(game.num_courts || 1) === 1 ? 'campo' : 'campos'} • {totalRounds(game)} rondas
                             </p>
                           </div>
+                          {game.recurrence?.is_active && (
+                            <div className="mt-2 flex items-center gap-2 flex-wrap">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-lime-100 text-lime-800 text-xs font-bold">
+                                <Repeat size={12} />
+                                Recorrente
+                              </span>
+                              {!game.is_recurrence_origin && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleStopRecurrence(game.recurrence.id)}
+                                  className="text-xs font-semibold text-red-600 hover:underline"
+                                >
+                                  Parar recorrência
+                                </button>
+                              )}
+                            </div>
+                          )}
                         </div>
                         
                         <div className="flex gap-2">
