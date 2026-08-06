@@ -236,7 +236,7 @@ export default function Layout({ children }) {
                 className={`flex flex-col items-center justify-center h-11 rounded-full shrink-0
                             transition-all duration-base ${
                   isActive
-                    ? 'bg-white/15 text-lime-400 px-3'
+                    ? 'bg-white/15 text-lime-400 w-[92px]'
                     : 'text-ink-200 hover:text-white w-11'
                 }`}
               >
