@@ -58,8 +58,8 @@ CREATE TABLE game_recurrences (
   ends_type TEXT NOT NULL CHECK (ends_type IN ('never', 'on_date', 'after_occurrences')),
   ends_on TIMESTAMPTZ,
   ends_after_occurrences INTEGER,
-  occurrences_created INTEGER NOT NULL DEFAULT 1,
-  mix_offset_seconds INTEGER NOT NULL,
+  occurrences_created INTEGER NOT NULL DEFAULT 1, -- the original Mix counts as occurrence 1
+  mix_offset_seconds INTEGER NOT NULL, -- (mix date) - (auto-create date), fixed at creation time
   next_run_at TIMESTAMPTZ NOT NULL,
   title TEXT NOT NULL,
   location TEXT,
@@ -855,7 +855,7 @@ BEGIN
       rec.num_courts, rec.num_courts * 4, rec.court_time_minutes, rec.game_time_minutes, rec.format,
       'open', rec.created_by, rec.id, false
     )
-    ON CONFLICT (recurrence_id, date) DO NOTHING;
+    ON CONFLICT (recurrence_id, date) WHERE recurrence_id IS NOT NULL DO NOTHING;
 
     UPDATE game_recurrences
     SET next_run_at = rec.next_run_at + (CASE rec.frequency
@@ -872,12 +872,6 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION process_due_game_recurrences() FROM public;
-
-SELECT cron.schedule(
-  'process-game-recurrences',
-  '*/5 * * * *',
-  $$SELECT process_due_game_recurrences()$$
-);
 
 -- ════════════════════════════════════════════════════════════════════════
 -- Storage: player avatar photos (public read, owner-only write — see
@@ -903,3 +897,14 @@ CREATE POLICY "Users can update their own avatar"
 CREATE POLICY "Users can delete their own avatar"
   ON storage.objects FOR DELETE
   USING (bucket_id = 'avatars' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+-- ════════════════════════════════════════════════════════════════════════
+-- Recurring Mixes: background job (pg_cron)
+-- See supabase/migration_recurring_mixes.sql for the full rationale.
+-- ════════════════════════════════════════════════════════════════════════
+
+SELECT cron.schedule(
+  'process-game-recurrences',
+  '*/5 * * * *',
+  $$SELECT process_due_game_recurrences()$$
+);

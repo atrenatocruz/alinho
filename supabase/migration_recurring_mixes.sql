@@ -113,7 +113,7 @@ BEGIN
       rec.num_courts, rec.num_courts * 4, rec.court_time_minutes, rec.game_time_minutes, rec.format,
       'open', rec.created_by, rec.id, false
     )
-    ON CONFLICT (recurrence_id, date) DO NOTHING;
+    ON CONFLICT (recurrence_id, date) WHERE recurrence_id IS NOT NULL DO NOTHING;
 
     UPDATE game_recurrences
     SET next_run_at = rec.next_run_at + (CASE rec.frequency
