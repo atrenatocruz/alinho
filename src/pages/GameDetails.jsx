@@ -871,10 +871,10 @@ export default function GameDetails() {
               href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(game.location)}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2.5"
+              className="inline-flex items-center gap-2 bg-lime-100 text-ink-900 rounded-full pl-2.5 pr-3 py-1.5 -ml-1 hover:bg-lime-400/40 transition-colors"
             >
-              <MapPin size={20} className="text-ink-700 shrink-0" />
-              <span>{game.location}</span>
+              <MapPin size={18} className="text-lime-600 shrink-0" />
+              <span className="font-medium">{game.location}</span>
             </a>
           )}
           <div className="flex items-center gap-2.5">
