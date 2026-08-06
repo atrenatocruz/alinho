@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Home, Users, Trophy, Settings, LogOut, HelpCircle, Phone, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { LevelBadge, PrimaryButton, Avatar } from './ui'
+import { PrimaryButton, Avatar } from './ui'
 import { hashPhone } from '../lib/hashPhone'
+import { getGlobalRankings } from '../lib/privateMatches'
 import PadelIcon from './icons/PadelIcon'
 
 // Re-prompt at most once per day once dismissed — a nudge, not a gate.
@@ -128,12 +129,33 @@ export function Wordmark({ className = '', variant = 'dark' }) {
 export default function Layout({ children }) {
   const location = useLocation()
   const navigate = useNavigate()
-  const { signOut, profile, updateProfile, currentMembership, isAdmin, isGuest } = useAuth()
+  const { signOut, profile, updateProfile, isAdmin, isGuest } = useAuth()
 
   const today = new Date().toISOString().slice(0, 10)
   const [phonePromptDismissed, setPhonePromptDismissed] = useState(
     () => typeof window !== 'undefined' && localStorage.getItem(PHONE_PROMPT_DISMISSED_KEY) === today
   )
+
+  // Header badge shows the player's global points (club + friend games
+  // combined, same figure as the "Ranking global" card on Profile) instead
+  // of their club level — level is club-scoped and less meaningful now that
+  // players can belong to several clubs.
+  const [globalPoints, setGlobalPoints] = useState(null)
+  useEffect(() => {
+    if (!profile?.id || isGuest) {
+      setGlobalPoints(null)
+      return
+    }
+    let cancelled = false
+    getGlobalRankings()
+      .then((data) => {
+        if (!cancelled) setGlobalPoints(data.find((p) => p.user_id === profile.id) || null)
+      })
+      .catch((error) => console.error('Error loading global points:', error))
+    return () => {
+      cancelled = true
+    }
+  }, [profile?.id, isGuest])
 
   const needsPhone = profile && !isGuest && !profile.phone_hash && !phonePromptDismissed
 
@@ -177,9 +199,12 @@ export default function Layout({ children }) {
           </Link>
 
           <div className="flex items-center gap-1">
-            {currentMembership?.level && !isGuest && (
-              <Link to="/perfil" title="O teu nível" className="mr-2">
-                <LevelBadge level={currentMembership.level} me />
+            {globalPoints && (
+              <Link to="/perfil" title="Os teus pontos globais" className="mr-2">
+                <span className="inline-flex items-center rounded-full font-mono font-extrabold tracking-wide
+                                  bg-lime-400 text-ink-900 text-[11px] px-2 py-0.5 tabular-nums">
+                  {globalPoints.total_points} pts
+                </span>
               </Link>
             )}
             <Link
