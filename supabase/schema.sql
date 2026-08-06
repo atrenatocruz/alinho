@@ -4,6 +4,7 @@
 -- the whole reason this isn't a database-per-tenant design).
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA extensions;
 
 -- ── Organizations (clubs) ──────────────────────────────────────────────
 CREATE TABLE organizations (
@@ -48,6 +49,31 @@ CREATE TABLE memberships (
   UNIQUE (user_id, organization_id)
 );
 
+-- ── Recurring Mixes (game_recurrences) ────────────────────────────────
+CREATE TABLE game_recurrences (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  organization_id UUID NOT NULL REFERENCES organizations(id),
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  frequency TEXT NOT NULL CHECK (frequency IN ('daily', 'weekly', 'monthly', 'yearly')),
+  ends_type TEXT NOT NULL CHECK (ends_type IN ('never', 'on_date', 'after_occurrences')),
+  ends_on TIMESTAMPTZ,
+  ends_after_occurrences INTEGER,
+  occurrences_created INTEGER NOT NULL DEFAULT 1,
+  mix_offset_seconds INTEGER NOT NULL,
+  next_run_at TIMESTAMPTZ NOT NULL,
+  title TEXT NOT NULL,
+  location TEXT,
+  price_per_player NUMERIC(6,2),
+  prize TEXT,
+  num_courts INTEGER NOT NULL,
+  court_time_minutes INTEGER NOT NULL,
+  game_time_minutes INTEGER NOT NULL,
+  format TEXT NOT NULL,
+  created_by UUID REFERENCES profiles(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT TIMEZONE('utc', NOW()),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT TIMEZONE('utc', NOW())
+);
+
 -- ── Games (mixes) ─────────────────────────────────────────────────────
 CREATE TABLE games (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -65,9 +91,14 @@ CREATE TABLE games (
   status TEXT DEFAULT 'open', -- open, closed, in_progress, finished, cancelled
   winner_team_id UUID,
   created_by UUID REFERENCES profiles(id),
+  recurrence_id UUID REFERENCES game_recurrences(id),
+  is_recurrence_origin BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()),
   updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW())
 );
+
+CREATE UNIQUE INDEX games_recurrence_date_key
+  ON games(recurrence_id, date) WHERE recurrence_id IS NOT NULL;
 
 -- ── Participants (signups) ────────────────────────────────────────────
 CREATE TABLE participants (
@@ -145,6 +176,7 @@ ALTER TABLE organizations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE memberships ENABLE ROW LEVEL SECURITY;
 ALTER TABLE games ENABLE ROW LEVEL SECURITY;
+ALTER TABLE game_recurrences ENABLE ROW LEVEL SECURITY;
 ALTER TABLE participants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE teams ENABLE ROW LEVEL SECURITY;
 ALTER TABLE matches ENABLE ROW LEVEL SECURITY;
@@ -270,6 +302,38 @@ CREATE POLICY "Org admins can delete games"
   USING (EXISTS (
     SELECT 1 FROM memberships
     WHERE memberships.organization_id = games.organization_id
+      AND memberships.user_id = auth.uid() AND memberships.is_admin
+  ));
+
+-- game_recurrences: mirrors the games policies above.
+CREATE POLICY "Org members can view game recurrences"
+  ON game_recurrences FOR SELECT
+  USING (EXISTS (
+    SELECT 1 FROM memberships
+    WHERE memberships.organization_id = game_recurrences.organization_id AND memberships.user_id = auth.uid()
+  ));
+
+CREATE POLICY "Org admins can create game recurrences"
+  ON game_recurrences FOR INSERT
+  WITH CHECK (EXISTS (
+    SELECT 1 FROM memberships
+    WHERE memberships.organization_id = game_recurrences.organization_id
+      AND memberships.user_id = auth.uid() AND memberships.is_admin
+  ));
+
+CREATE POLICY "Org admins can update game recurrences"
+  ON game_recurrences FOR UPDATE
+  USING (EXISTS (
+    SELECT 1 FROM memberships
+    WHERE memberships.organization_id = game_recurrences.organization_id
+      AND memberships.user_id = auth.uid() AND memberships.is_admin
+  ));
+
+CREATE POLICY "Org admins can delete game recurrences"
+  ON game_recurrences FOR DELETE
+  USING (EXISTS (
+    SELECT 1 FROM memberships
+    WHERE memberships.organization_id = game_recurrences.organization_id
       AND memberships.user_id = auth.uid() AND memberships.is_admin
   ));
 
@@ -752,6 +816,68 @@ $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 REVOKE EXECUTE ON FUNCTION admin_set_membership_admin(UUID, UUID, BOOLEAN) FROM anon, public;
 GRANT EXECUTE ON FUNCTION admin_set_membership_admin(UUID, UUID, BOOLEAN) TO authenticated;
+
+-- ════════════════════════════════════════════════════════════════════════
+-- Recurring Mixes: background job (pg_cron)
+-- See supabase/migration_recurring_mixes.sql for the full rationale.
+-- ════════════════════════════════════════════════════════════════════════
+
+CREATE OR REPLACE FUNCTION process_due_game_recurrences()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  rec RECORD;
+  v_new_date TIMESTAMPTZ;
+BEGIN
+  FOR rec IN
+    SELECT * FROM game_recurrences
+    WHERE is_active = true AND next_run_at <= now()
+    FOR UPDATE SKIP LOCKED
+  LOOP
+    v_new_date := rec.next_run_at + make_interval(secs => rec.mix_offset_seconds);
+
+    IF (rec.ends_type = 'on_date' AND v_new_date > rec.ends_on)
+       OR (rec.ends_type = 'after_occurrences' AND rec.occurrences_created >= rec.ends_after_occurrences) THEN
+      UPDATE game_recurrences SET is_active = false, updated_at = now() WHERE id = rec.id;
+      CONTINUE;
+    END IF;
+
+    INSERT INTO games (
+      organization_id, title, date, location, price_per_player, prize,
+      num_courts, max_players, court_time_minutes, game_time_minutes, format,
+      status, created_by, recurrence_id, is_recurrence_origin
+    )
+    VALUES (
+      rec.organization_id, rec.title, v_new_date, rec.location, rec.price_per_player, rec.prize,
+      rec.num_courts, rec.num_courts * 4, rec.court_time_minutes, rec.game_time_minutes, rec.format,
+      'open', rec.created_by, rec.id, false
+    )
+    ON CONFLICT (recurrence_id, date) DO NOTHING;
+
+    UPDATE game_recurrences
+    SET next_run_at = rec.next_run_at + (CASE rec.frequency
+          WHEN 'daily'   THEN interval '1 day'
+          WHEN 'weekly'  THEN interval '1 week'
+          WHEN 'monthly' THEN interval '1 month'
+          WHEN 'yearly'  THEN interval '1 year'
+        END),
+        occurrences_created = occurrences_created + 1,
+        updated_at = now()
+    WHERE id = rec.id;
+  END LOOP;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION process_due_game_recurrences() FROM public;
+
+SELECT cron.schedule(
+  'process-game-recurrences',
+  '*/5 * * * *',
+  $$SELECT process_due_game_recurrences()$$
+);
 
 -- ════════════════════════════════════════════════════════════════════════
 -- Storage: player avatar photos (public read, owner-only write — see
