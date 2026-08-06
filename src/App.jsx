@@ -19,19 +19,41 @@ import Admin from './pages/Admin'
 import Instructions from './pages/Instructions'
 
 // showSplash covers both the auth check and the splash's minimum display
-// duration (see AppRoutes) — while true, these guards show the splash
-// instead of their normal redirect/children logic. /login and /instrucoes
-// are unguarded routes and intentionally keep rendering immediately,
-// exactly as before.
-const ProtectedRoute = ({ children, showSplash }) => {
-  const { user } = useAuth()
+// duration (see AppRoutes) — while true, Guard shows the splash instead of
+// its normal redirect/children logic. /login and /instrucoes are unguarded
+// routes and intentionally keep rendering immediately, exactly as before.
+//
+// This is the ONE component every authenticated route passes through, with
+// Layout always rendered as its direct child. Routes used to each wrap
+// Layout in their own guard (ProtectedRoute/MemberRoute/AdminRoute/
+// PrivateMatchesRoute) — since those are different component types, React
+// tore down and remounted Layout (and the bottom nav inside it, resetting
+// its CSS transitions) every time navigation crossed between differently
+// -guarded routes, e.g. Jogos -> Comunidade. Routing every page through
+// this single component keeps Layout's identity — and the nav's mid
+// -transition state — stable across every in-app navigation.
+const Guard = ({ require, showSplash, children }) => {
+  const { user, isGuest, isAdmin, isPrivateMatchesEnabled } = useAuth()
   const location = useLocation()
 
   if (showSplash) {
     return <SplashScreen />
   }
 
+  // "/" is the one public route: signed-out visitors see the Landing page
+  // (no nav shell), signed-in ones see Home inside Layout.
+  if (require === 'home') {
+    return user ? <Layout>{children}</Layout> : <Landing />
+  }
+
+  if (require === 'admin') {
+    return isAdmin ? <Layout>{children}</Layout> : <Navigate to="/" />
+  }
+
   if (!user) {
+    if (require === 'member') {
+      return <Navigate to="/login" />
+    }
     // Invite links (/jogos-privados/:id/entrar?slot=…) are by design opened
     // by people with no session yet — bouncing them to a bare /login lost
     // the match id and slot, so Login sends them back here after auth.
@@ -39,52 +61,18 @@ const ProtectedRoute = ({ children, showSplash }) => {
     return <Navigate to={`/login?redirect=${redirectTo}`} />
   }
 
-  return children
-}
-
-// Members-only route: guests are redirected to Jogos
-const MemberRoute = ({ children, showSplash }) => {
-  const { user, isGuest } = useAuth()
-
-  if (showSplash) {
-    return <SplashScreen />
-  }
-
-  if (!user) {
-    return <Navigate to="/login" />
-  }
-
-  if (isGuest) {
+  // Members-only: guests are redirected to Jogos
+  if (require === 'member' && isGuest) {
     return <Navigate to="/" />
   }
 
-  return children
-}
-
-const AdminRoute = ({ children, showSplash }) => {
-  const { isAdmin } = useAuth()
-
-  if (showSplash) {
-    return <SplashScreen />
-  }
-
-  if (!isAdmin) {
+  // Redirects to Home when the private-matches feature flag is off — covers
+  // direct navigation/bookmarks to a card that's already hidden on Home.
+  if (require === 'privateMatches' && !isPrivateMatchesEnabled) {
     return <Navigate to="/" />
   }
 
-  return children
-}
-
-// Redirects to Home when the private-matches feature flag is off — covers
-// direct navigation/bookmarks to a card that's already hidden on Home.
-const PrivateMatchesRoute = ({ children }) => {
-  const { isPrivateMatchesEnabled } = useAuth()
-
-  if (!isPrivateMatchesEnabled) {
-    return <Navigate to="/" />
-  }
-
-  return children
+  return <Layout>{children}</Layout>
 }
 
 function AppRoutes() {
@@ -105,121 +93,89 @@ function AppRoutes() {
       <Route
         path="/"
         element={
-          showSplash ? (
-            <SplashScreen />
-          ) : user ? (
-            <Layout>
-              <Home />
-            </Layout>
-          ) : (
-            <Landing />
-          )
+          <Guard require="home" showSplash={showSplash}>
+            <Home />
+          </Guard>
         }
       />
       <Route
         path="/jogo/:id"
         element={
-          <ProtectedRoute showSplash={showSplash}>
-            <Layout>
-              <GameDetails />
-            </Layout>
-          </ProtectedRoute>
+          <Guard require="protected" showSplash={showSplash}>
+            <GameDetails />
+          </Guard>
         }
       />
       <Route
         path="/rankings"
         element={
-          <MemberRoute showSplash={showSplash}>
-            <Layout>
-              <Rankings />
-            </Layout>
-          </MemberRoute>
+          <Guard require="member" showSplash={showSplash}>
+            <Rankings />
+          </Guard>
         }
       />
       <Route
         path="/comunidade"
         element={
-          <MemberRoute showSplash={showSplash}>
-            <Layout>
-              <Comunidade />
-            </Layout>
-          </MemberRoute>
+          <Guard require="member" showSplash={showSplash}>
+            <Comunidade />
+          </Guard>
         }
       />
       <Route
         path="/clubes"
         element={
-          <MemberRoute showSplash={showSplash}>
-            <Layout>
-              <Clubes />
-            </Layout>
-          </MemberRoute>
+          <Guard require="member" showSplash={showSplash}>
+            <Clubes />
+          </Guard>
         }
       />
       <Route
         path="/jogador/:id"
         element={
-          <MemberRoute showSplash={showSplash}>
-            <Layout>
-              <PlayerDetails />
-            </Layout>
-          </MemberRoute>
+          <Guard require="member" showSplash={showSplash}>
+            <PlayerDetails />
+          </Guard>
         }
       />
       <Route
         path="/perfil"
         element={
-          <ProtectedRoute showSplash={showSplash}>
-            <Layout>
-              <Profile />
-            </Layout>
-          </ProtectedRoute>
+          <Guard require="protected" showSplash={showSplash}>
+            <Profile />
+          </Guard>
         }
       />
       <Route
         path="/jogos-privados"
         element={
-          <ProtectedRoute showSplash={showSplash}>
-            <PrivateMatchesRoute>
-              <Layout>
-                <PrivateMatches />
-              </Layout>
-            </PrivateMatchesRoute>
-          </ProtectedRoute>
+          <Guard require="privateMatches" showSplash={showSplash}>
+            <PrivateMatches />
+          </Guard>
         }
       />
       <Route
         path="/jogos-privados/novo"
         element={
-          <ProtectedRoute showSplash={showSplash}>
-            <PrivateMatchesRoute>
-              <Layout>
-                <CreatePrivateMatch />
-              </Layout>
-            </PrivateMatchesRoute>
-          </ProtectedRoute>
+          <Guard require="privateMatches" showSplash={showSplash}>
+            <CreatePrivateMatch />
+          </Guard>
         }
       />
       <Route
         path="/jogos-privados/:id/entrar"
         element={
-          <ProtectedRoute showSplash={showSplash}>
-            <PrivateMatchesRoute>
-              <Layout>
-                <JoinPrivateMatch />
-              </Layout>
-            </PrivateMatchesRoute>
-          </ProtectedRoute>
+          <Guard require="privateMatches" showSplash={showSplash}>
+            <JoinPrivateMatch />
+          </Guard>
         }
       />
       <Route
         path="/admin"
         element={
-          <AdminRoute showSplash={showSplash}>
-            <Layout>
-              <Admin />
-            </Layout>
-          </AdminRoute>
+          <Guard require="admin" showSplash={showSplash}>
+            <Admin />
+          </Guard>
         }
       />
     </Routes>
