@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Calendar, MapPin, ArrowLeft, UserPlus, User, Check, Lock, Trophy, Play, ChevronRight, Swords, X, Repeat, Share2, ChevronDown, RotateCcw } from 'lucide-react'
+import { Calendar, MapPin, ArrowLeft, UserPlus, User, Check, Lock, Trophy, Play, ChevronRight, Swords, X, Repeat, Share2, ChevronDown, RotateCcw, Euro } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton, GuestBadge, PlayerAvatarRow, EmptyState, ShareModal, RoundTimer, Avatar, Select } from '../components/ui'
@@ -867,10 +867,15 @@ export default function GameDetails() {
             <span className="capitalize">{formatDate(game.date)}</span>
           </div>
           {game.location && (
-            <div className="flex items-center gap-2.5">
+            <a
+              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(game.location)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2.5"
+            >
               <MapPin size={20} className="text-ink-700 shrink-0" />
               <span>{game.location}</span>
-            </div>
+            </a>
           )}
           <div className="flex items-center gap-2.5">
             <Swords size={20} className="text-ink-700 shrink-0" />
@@ -878,6 +883,18 @@ export default function GameDetails() {
               {FORMAT_LABEL[game.format] || 'Sobe e desce'} • {numCourts} {numCourts === 1 ? 'campo' : 'campos'} • {roundsTotal} rondas de {game.game_time_minutes || 20}min
             </span>
           </div>
+          {game.price_per_player > 0 && (
+            <div className="flex items-center gap-2.5">
+              <Euro size={20} className="text-ink-700 shrink-0" />
+              <span>{game.price_per_player}€ / jogador</span>
+            </div>
+          )}
+          {game.prize && (
+            <div className="flex items-center gap-2.5">
+              <Trophy size={20} className="text-ink-700 shrink-0" />
+              <span>Prémio: {game.prize}</span>
+            </div>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mt-5 pt-4 border-t border-line">
