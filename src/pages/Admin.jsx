@@ -128,6 +128,15 @@ export default function Admin() {
             user_id,
             partner_id,
             status
+          ),
+          recurrence:game_recurrences (
+            id,
+            is_active,
+            frequency,
+            ends_type,
+            ends_on,
+            ends_after_occurrences,
+            next_run_at
           )
         `)
         .eq('organization_id', currentOrganizationId)
@@ -320,6 +329,24 @@ export default function Admin() {
     }
   }
 
+  // Updates the snapshot + rule on the origin Mix's recurrence. Only ever
+  // called from handleUpdateGame when editing the origin of an active
+  // recurrence — already-created Mixes are never touched by this.
+  const updateRecurrence = async (recurrenceId, game, recurrence) => {
+    const { error } = await supabase
+      .from('game_recurrences')
+      .update({
+        ...recurrencePayloadFromGame(game, recurrence),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', recurrenceId)
+
+    if (error) {
+      console.error('Error updating recurrence:', error)
+      alert('O Mix foi atualizado, mas não foi possível atualizar a recorrência: ' + error.message)
+    }
+  }
+
   const handleUpdateGame = async (e) => {
     e.preventDefault()
 
@@ -328,15 +355,22 @@ export default function Admin() {
       return
     }
 
+    // Destructure recurrence so it's never spread into the games table update
+    const { recurrence, ...gameFields } = gameForm
+    const hadActiveRecurrence = editingGame.is_recurrence_origin && editingGame.recurrence?.is_active
+
+    const recurrenceError = validateRecurrence(recurrence)
+    if (recurrenceError) {
+      alert(recurrenceError)
+      return
+    }
+
     try {
       // See handleCreateGame — num_courts is a raw string while typing,
       // clamped to a valid 1-6 count here at submit time.
       const numCourts = Math.min(6, Math.max(1, parseInt(gameForm.num_courts, 10) || 1))
 
-      // Destructure recurrence so it's never spread into the games table update
-      const { recurrence, ...gameFields } = gameForm
-
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('games')
         .update({
           ...gameFields,
@@ -346,8 +380,25 @@ export default function Admin() {
           price_per_player: gameForm.price_per_player === '' ? null : parseFloat(gameForm.price_per_player),
         })
         .eq('id', editingGame.id)
+        .select()
+        .single()
 
       if (error) throw error
+
+      if (hadActiveRecurrence && recurrence.enabled) {
+        // Origin Mix, recurrence still on: keep the shared rule/snapshot in sync.
+        await updateRecurrence(editingGame.recurrence.id, data, recurrence)
+      } else if (hadActiveRecurrence && !recurrence.enabled) {
+        // Origin Mix, toggled off: stop creating future Mixes. Never reactivated later.
+        await supabase
+          .from('game_recurrences')
+          .update({ is_active: false, updated_at: new Date().toISOString() })
+          .eq('id', editingGame.recurrence.id)
+      } else if (!hadActiveRecurrence && recurrence.enabled) {
+        // Wasn't recurring (never was, or a previous recurrence was stopped): start a new one.
+        const { data: { user } } = await supabase.auth.getUser()
+        await createRecurrence(data, recurrence, user.id)
+      }
 
       setEditingGame(null)
       setGameForm(EMPTY_GAME_FORM)
@@ -465,6 +516,7 @@ export default function Admin() {
 
   const startEditGame = (game) => {
     setEditingGame(game)
+    const hasActiveRecurrence = game.is_recurrence_origin && game.recurrence?.is_active
     setGameForm({
       title: game.title,
       date: toLocalInput(game.date),
@@ -475,7 +527,16 @@ export default function Admin() {
       court_time_minutes: game.court_time_minutes || 90,
       game_time_minutes: game.game_time_minutes || 20,
       format: game.format || 'sobe_desce',
-      recurrence: EMPTY_RECURRENCE,
+      recurrence: hasActiveRecurrence
+        ? {
+            enabled: true,
+            frequency: game.recurrence.frequency,
+            endsType: game.recurrence.ends_type,
+            endsOn: game.recurrence.ends_on ? toLocalInput(game.recurrence.ends_on).slice(0, 10) : '',
+            endsAfterOccurrences: game.recurrence.ends_after_occurrences ?? '',
+            nextRunAt: toLocalInput(game.recurrence.next_run_at),
+          }
+        : EMPTY_RECURRENCE,
     })
   }
 
