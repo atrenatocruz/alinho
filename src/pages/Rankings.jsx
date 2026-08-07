@@ -429,14 +429,11 @@ export default function Rankings() {
           />
         ) : (
           <div className="space-y-3">
-            {/* Not a <Link>: the global ranking spans every club, and
-                /jogador/:id reads `profiles` under an org-mates-only RLS
-                policy — so most rows here would land on "Jogador não
-                encontrado". Static card instead of a dead end. */}
             {globalRankings.map((player, index) => (
-              <div
+              <Link
                 key={player.user_id}
-                className={`card block ${index === 0 ? 'ring-2 ring-lime-400' : ''}`}
+                to={`/jogador/${player.user_id}`}
+                className={`card press block hover:shadow-lift ${index === 0 ? 'ring-2 ring-lime-400' : ''}`}
               >
                 <div className="flex items-center gap-3.5">
                   <div className={`w-11 h-11 rounded-ctrl flex items-center justify-center font-extrabold text-lg shrink-0 tabular-nums ${positionStyle(index)}`}>
@@ -453,7 +450,7 @@ export default function Rankings() {
                     <p className="text-[11px] text-muted">pontos</p>
                   </div>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         )

@@ -2,51 +2,36 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Trophy, Target, Award, Swords, ChevronDown } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton, LevelBadge, EmptyState, Avatar } from '../components/ui'
 import { winRatePct } from '../lib/statsLogic'
 
+// Aggregated across every club the player belongs to (not scoped to the
+// viewer's currentOrganizationId) via get_player_profile/get_head_to_head_*
+// — this page works for any player in the app, not just someone who
+// shares a club with the viewer.
 export default function PlayerDetails() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { currentOrganizationId } = useAuth()
   const [player, setPlayer] = useState(null)
-  const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  const [h2h, setH2h] = useState([])
+  const [h2h, setH2h] = useState(null)
   const [h2hLoading, setH2hLoading] = useState(true)
-  const [expandedOpponent, setExpandedOpponent] = useState(null)
+  const [expanded, setExpanded] = useState(false)
   const [h2hMatches, setH2hMatches] = useState([])
+  const [matchesLoading, setMatchesLoading] = useState(false)
 
   useEffect(() => {
-    // An org-less signed-in member (zero club memberships) can still land
-    // here — e.g. via Comunidade's cross-club search. There's no
-    // organization to scope the queries to, so skip loading, but resolve
-    // both loading flags or the page spins forever (falls through to the
-    // not-found empty state below instead).
-    if (!currentOrganizationId) {
-      setLoading(false)
-      setH2hLoading(false)
-      return
-    }
     loadPlayer()
     loadH2h()
-  }, [id, currentOrganizationId])
+  }, [id])
 
   const loadPlayer = async () => {
     setLoading(true)
     try {
-      const [{ data: profileData, error: profileError }, { data: membershipData, error: membershipError }, { data: statsData, error: statsError }] = await Promise.all([
-        supabase.from('profiles').select('id, name, avatar_url').eq('id', id).single(),
-        supabase.from('memberships').select('level').eq('user_id', id).eq('organization_id', currentOrganizationId).maybeSingle(),
-        supabase.from('player_stats').select('*').eq('user_id', id).eq('organization_id', currentOrganizationId).maybeSingle(),
-      ])
-      if (profileError) throw profileError
-      if (membershipError) throw membershipError
-      if (statsError) throw statsError
-      setPlayer({ ...profileData, level: membershipData?.level })
-      setStats(statsData)
+      const { data, error } = await supabase.rpc('get_player_profile', { p_user_id: id })
+      if (error) throw error
+      setPlayer(data?.[0] || null)
     } catch (error) {
       console.error('Error loading player:', error)
     } finally {
@@ -56,15 +41,12 @@ export default function PlayerDetails() {
 
   const loadH2h = async () => {
     setH2hLoading(true)
-    setExpandedOpponent(null)
+    setExpanded(false)
     setH2hMatches([])
     try {
-      const { data, error } = await supabase.rpc('mix_head_to_head', {
-        p_user_id: id,
-        p_organization_id: currentOrganizationId,
-      })
+      const { data, error } = await supabase.rpc('get_head_to_head_summary', { p_opponent_id: id })
       if (error) throw error
-      setH2h(data || [])
+      setH2h(data?.[0] || { wins: 0, losses: 0, matches_played: 0 })
     } catch (error) {
       console.error('Error loading head-to-head:', error)
     } finally {
@@ -72,22 +54,21 @@ export default function PlayerDetails() {
     }
   }
 
-  const toggleOpponent = async (opponentId) => {
-    if (expandedOpponent === opponentId) {
-      setExpandedOpponent(null)
+  const toggleExpanded = async () => {
+    if (expanded) {
+      setExpanded(false)
       return
     }
-    setExpandedOpponent(opponentId)
+    setExpanded(true)
+    setMatchesLoading(true)
     try {
-      const { data, error } = await supabase.rpc('mix_head_to_head_matches', {
-        p_user_id: id,
-        p_opponent_id: opponentId,
-        p_organization_id: currentOrganizationId,
-      })
+      const { data, error } = await supabase.rpc('get_head_to_head_matches', { p_opponent_id: id })
       if (error) throw error
       setH2hMatches(data || [])
     } catch (error) {
       console.error('Error loading match history:', error)
+    } finally {
+      setMatchesLoading(false)
     }
   }
 
@@ -107,7 +88,7 @@ export default function PlayerDetails() {
       <EmptyState
         icon={Award}
         title="Não foi possível carregar este perfil"
-        subtitle="Pode ser um jogador de outro clube ou pode já não estar disponível."
+        subtitle="Pode já não estar disponível."
         action={
           <PrimaryButton variant="navy" onClick={() => navigate('/rankings')}>
             Voltar à classificação
@@ -117,12 +98,12 @@ export default function PlayerDetails() {
     )
   }
 
-  const played = (stats?.game_wins || 0) + (stats?.game_losses || 0)
-  const winRate = winRatePct(stats?.game_wins || 0, played)
+  const played = (player.game_wins || 0) + (player.game_losses || 0)
+  const winRate = winRatePct(player.game_wins || 0, played)
 
   const statTiles = [
-    { icon: Trophy, value: stats?.total_points || 0, label: 'Pontos', cls: 'text-lime-600' },
-    { icon: Award, value: `${stats?.mix_wins || 0}/${stats?.mixes_played || 0}`, label: 'Mixes ganhos', cls: 'text-ink-700' },
+    { icon: Trophy, value: player.total_points || 0, label: 'Pontos', cls: 'text-lime-600' },
+    { icon: Award, value: `${player.mix_wins || 0}/${player.mixes_played || 0}`, label: 'Mixes ganhos', cls: 'text-ink-700' },
     { icon: Target, value: played, label: 'Jogos', cls: 'text-ink-700' },
     { icon: Award, value: `${winRate}%`, label: 'Taxa de vitória', cls: 'text-ok' },
   ]
@@ -153,9 +134,13 @@ export default function PlayerDetails() {
             <Avatar name={player.name} url={player.avatar_url} size="w-20 h-20 text-3xl" colorClass="bg-lime-400 text-ink-900" />
           </div>
           <h2 className="text-2xl text-white">{player.name}</h2>
-          <div className="mt-2.5">
-            <LevelBadge level={player.level} size="md" />
-          </div>
+          {/* level is only ever populated when the viewer shares a club
+              with this player — club-scoped and meaningless otherwise */}
+          {player.level && (
+            <div className="mt-2.5">
+              <LevelBadge level={player.level} size="md" />
+            </div>
+          )}
         </div>
       </div>
 
@@ -170,7 +155,10 @@ export default function PlayerDetails() {
         ))}
       </div>
 
-      {/* Confrontos diretos */}
+      {/* Confrontos diretos — this page now always targets one specific
+          player, so it's a single row (this player vs the viewer) that
+          expands to the combined mix + private-match list, instead of a
+          list of every opponent the viewer has ever faced. */}
       <div>
         <h3 className="text-lg text-ink-900 mb-3">Confrontos diretos</h3>
 
@@ -178,68 +166,56 @@ export default function PlayerDetails() {
           <div className="flex items-center justify-center py-10">
             <div className="animate-spin rounded-full h-8 w-8 border-[3px] border-ink-50 border-t-ink-700"></div>
           </div>
-        ) : h2h.length === 0 ? (
+        ) : !h2h || h2h.matches_played === 0 ? (
           <EmptyState
             icon={Swords}
             title="Sem confrontos registados"
-            subtitle="Ainda não há jogos com resultado entre este jogador e outros."
+            subtitle="Ainda não há jogos com resultado entre ti e este jogador."
           />
         ) : (
-          <div className="space-y-2.5">
-            {h2h.map(o => {
-              const isOpen = expandedOpponent === o.opponent_id
-              return (
-                <div key={o.opponent_id} className="card p-0 overflow-hidden">
-                  <button
-                    onClick={() => toggleOpponent(o.opponent_id)}
-                    aria-expanded={isOpen}
-                    className="w-full flex items-center gap-3 px-4 py-3.5 min-h-[56px] transition-colors duration-fast hover:bg-ink-50"
-                  >
-                    <div className="w-9 h-9 bg-ink-700 text-white rounded-full flex items-center justify-center font-extrabold text-sm shrink-0">
-                      {(o.opponent_name || '?').charAt(0).toUpperCase()}
-                    </div>
-                    <p className="flex-1 min-w-0 text-left font-extrabold text-ink-900 truncate">{o.opponent_name}</p>
-                    <span className="text-sm font-extrabold tabular-nums shrink-0">
-                      <span className="text-ok">{o.wins}V</span>
-                      <span className="text-muted"> – </span>
-                      <span className="text-danger">{o.losses}D</span>
-                    </span>
-                    <ChevronDown
-                      size={20}
-                      className={`text-muted transition-transform duration-base shrink-0 ${isOpen ? 'rotate-180' : ''}`}
-                    />
-                  </button>
+          <div className="card p-0 overflow-hidden">
+            <button
+              onClick={toggleExpanded}
+              aria-expanded={expanded}
+              className="w-full flex items-center gap-3 px-4 py-3.5 min-h-[56px] transition-colors duration-fast hover:bg-ink-50"
+            >
+              <Avatar name={player.name} url={player.avatar_url} size="w-9 h-9 text-sm" />
+              <p className="flex-1 min-w-0 text-left font-extrabold text-ink-900 truncate">{player.name}</p>
+              <span className="text-sm font-extrabold tabular-nums shrink-0">
+                <span className="text-ok">{h2h.wins}V</span>
+                <span className="text-muted"> – </span>
+                <span className="text-danger">{h2h.losses}D</span>
+              </span>
+              <ChevronDown
+                size={20}
+                className={`text-muted transition-transform duration-base shrink-0 ${expanded ? 'rotate-180' : ''}`}
+              />
+            </button>
 
-                  {isOpen && (
-                    <div className="border-t border-line divide-y divide-line animate-fade-up">
-                      {h2hMatches.length === 0 ? (
-                        <p className="text-muted text-sm text-center py-4">A carregar…</p>
-                      ) : (
-                        h2hMatches.map(m => (
-                          <div key={m.match_id} className="flex items-center gap-3 px-4 py-3">
-                            <div className="flex-1 min-w-0">
-                              <p className="font-extrabold text-ink-900 text-sm truncate">{m.game_title}</p>
-                              <p className="text-[11px] text-muted">
-                                {formatMatchDate(m.match_date)} • Ronda {m.round_number}
-                                {m.phase !== 'group' ? ` • ${m.phase}` : ''}
-                              </p>
-                            </div>
-                            <span className="text-base font-extrabold tabular-nums shrink-0">
-                              {m.player_score}–{m.opponent_score}
-                            </span>
-                            <span className={`text-[11px] font-extrabold uppercase px-2 py-1 rounded-full shrink-0 ${
-                              m.won ? 'bg-ok/10 text-ok' : 'bg-danger/10 text-danger'
-                            }`}>
-                              {m.won ? 'V' : 'D'}
-                            </span>
-                          </div>
-                        ))
-                      )}
+            {expanded && (
+              <div className="border-t border-line divide-y divide-line animate-fade-up">
+                {matchesLoading ? (
+                  <p className="text-muted text-sm text-center py-4">A carregar…</p>
+                ) : (
+                  h2hMatches.map(m => (
+                    <div key={m.match_id} className="flex items-center gap-3 px-4 py-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-extrabold text-ink-900 text-sm truncate">{m.label}</p>
+                        <p className="text-[11px] text-muted">{formatMatchDate(m.match_date)}</p>
+                      </div>
+                      <span className="text-base font-extrabold tabular-nums shrink-0">
+                        {m.player_score}–{m.opponent_score}
+                      </span>
+                      <span className={`text-[11px] font-extrabold uppercase px-2 py-1 rounded-full shrink-0 ${
+                        m.won ? 'bg-ok/10 text-ok' : 'bg-danger/10 text-danger'
+                      }`}>
+                        {m.won ? 'V' : 'D'}
+                      </span>
                     </div>
-                  )}
-                </div>
-              )
-            })}
+                  ))
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
