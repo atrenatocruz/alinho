@@ -17,5 +17,13 @@ export default defineConfig({
     maskable: {
       sizes: [512],
     },
+    // Generated but not used directly (see note above) — the generator's
+    // internal instructions resolver errors if the `apple` preset key is
+    // missing entirely, so this stays populated as a harmless no-op; its
+    // output file is discarded after each run.
+    apple: {
+      sizes: [180],
+      padding: 0,
+    },
   },
 })
