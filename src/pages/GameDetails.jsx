@@ -1283,6 +1283,9 @@ export default function GameDetails() {
                             <span className="text-muted font-normal text-sm"> · tu</span>
                           )}
                         </p>
+                        <div className="mt-1">
+                          <GuestBadge label={person.is_test ? 'Teste' : 'Convidado'} />
+                        </div>
                       </div>
                     </>
                   ) : (
@@ -1295,16 +1298,12 @@ export default function GameDetails() {
                             <span className="text-muted font-normal text-sm"> · tu</span>
                           )}
                         </p>
+                        <p className="text-xs text-muted truncate">
+                          {pointsById[person.id] ?? 0} pts · {SIDE_LABEL[person.preferred_side] || 'Ambos'}
+                        </p>
                       </div>
                     </Link>
                   )}
-                  {person.is_guest
-                    ? <GuestBadge label={person.is_test ? 'Teste' : 'Convidado'} />
-                    : (
-                      <span className="text-sm font-extrabold text-ink-700 tabular-nums shrink-0">
-                        {pointsById[person.id] ?? 0} pts · {SIDE_LABEL[person.preferred_side] || 'Ambos'}
-                      </span>
-                    )}
                   {isAdmin && (
                     <button
                       onClick={() => handleRemovePerson(person)}
@@ -1345,6 +1344,9 @@ export default function GameDetails() {
                           <span className="text-muted font-normal text-sm"> · tu</span>
                         )}
                       </p>
+                      <div className="mt-1">
+                        <GuestBadge label={person.is_test ? 'Teste' : 'Convidado'} />
+                      </div>
                     </div>
                   </>
                 ) : (
@@ -1357,16 +1359,12 @@ export default function GameDetails() {
                           <span className="text-muted font-normal text-sm"> · tu</span>
                         )}
                       </p>
+                      <p className="text-xs text-muted truncate">
+                        {pointsById[person.id] ?? 0} pts · {SIDE_LABEL[person.preferred_side] || 'Ambos'}
+                      </p>
                     </div>
                   </Link>
                 )}
-                {person.is_guest
-                  ? <GuestBadge label={person.is_test ? 'Teste' : 'Convidado'} />
-                  : (
-                    <span className="text-sm font-extrabold text-ink-700 tabular-nums shrink-0">
-                      {pointsById[person.id] ?? 0} pts · {SIDE_LABEL[person.preferred_side] || 'Ambos'}
-                    </span>
-                  )}
                 {isAdmin && (
                   <button
                     onClick={() => handleRemovePerson(person)}
