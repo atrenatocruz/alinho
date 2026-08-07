@@ -40,6 +40,12 @@ const RECURRENCE_ENDS = [
   { value: 'after_occurrences', label: 'Após X ocorrências' },
 ]
 
+const DONE_STATUSES = ['finished', 'completed', 'cancelled']
+const GAME_FILTERS = [
+  { value: 'upcoming', label: 'A decorrer / Futuros' },
+  { value: 'finished', label: 'Terminados' },
+]
+
 const EMPTY_RECURRENCE = {
   enabled: false,
   frequency: 'weekly',
@@ -93,6 +99,7 @@ export default function Admin() {
   const [loading, setLoading] = useState(true)
   const [showCreateGame, setShowCreateGame] = useState(false)
   const [editingGame, setEditingGame] = useState(null)
+  const [gameFilter, setGameFilter] = useState('upcoming')
   const [savingFlag, setSavingFlag] = useState(false)
 
   // Form states
@@ -894,8 +901,14 @@ export default function Admin() {
               )}
 
               {/* Games List */}
+              <Segmented options={GAME_FILTERS} value={gameFilter} onChange={setGameFilter} />
+
               <div className="space-y-3">
-                {games.map(game => {
+                {games
+                  .filter(game => gameFilter === 'finished'
+                    ? DONE_STATUSES.includes(game.status)
+                    : !DONE_STATUSES.includes(game.status))
+                  .map(game => {
                   const peopleCount = (game.participants || [])
                     .filter(p => p.status === 'confirmed')
                     .reduce((n, p) => n + 1 + (p.partner_id ? 1 : 0), 0)
