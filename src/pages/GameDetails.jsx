@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { Calendar, MapPin, ArrowLeft, UserPlus, User, Check, Lock, Trophy, Play, ChevronRight, Swords, X, Repeat, Share2, ChevronDown, RotateCcw, Euro } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -1056,8 +1056,17 @@ export default function GameDetails() {
                         <div className="space-y-1.5">
                           {[t.player1, t.player2].map((player, idx) => (
                             <div key={player?.id || idx} className="flex items-center gap-2">
-                              <Avatar name={player?.name} url={player?.avatar_url} size="w-8 h-8 text-xs" />
-                              <span className="flex-1 min-w-0 text-sm font-extrabold text-ink-900 truncate">{player?.name || '?'}</span>
+                              {player?.id && !player.is_guest ? (
+                                <Link to={`/jogador/${player.id}`} className="flex items-center gap-2 flex-1 min-w-0">
+                                  <Avatar name={player?.name} url={player?.avatar_url} size="w-8 h-8 text-xs" />
+                                  <span className="flex-1 min-w-0 text-sm font-extrabold text-ink-900 truncate">{player?.name || '?'}</span>
+                                </Link>
+                              ) : (
+                                <>
+                                  <Avatar name={player?.name} url={player?.avatar_url} size="w-8 h-8 text-xs" />
+                                  <span className="flex-1 min-w-0 text-sm font-extrabold text-ink-900 truncate">{player?.name || '?'}</span>
+                                </>
+                              )}
                               <span className="text-xs font-extrabold text-muted tabular-nums shrink-0">
                                 {pointsById[player?.id] ?? 0} pts · {SIDE_LABEL[player?.preferred_side] || 'Ambos'}
                               </span>
@@ -1264,15 +1273,31 @@ export default function GameDetails() {
                     person.id === user.id ? 'bg-lime-400/20' : 'bg-canvas'
                   }`}
                 >
-                  <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-extrabold text-ink-900 truncate">
-                      {person.name}
-                      {person.id === user.id && (
-                        <span className="text-muted font-normal text-sm"> · tu</span>
-                      )}
-                    </p>
-                  </div>
+                  {person.is_guest ? (
+                    <>
+                      <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-extrabold text-ink-900 truncate">
+                          {person.name}
+                          {person.id === user.id && (
+                            <span className="text-muted font-normal text-sm"> · tu</span>
+                          )}
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <Link to={`/jogador/${person.id}`} className="flex items-center gap-3 flex-1 min-w-0">
+                      <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-extrabold text-ink-900 truncate">
+                          {person.name}
+                          {person.id === user.id && (
+                            <span className="text-muted font-normal text-sm"> · tu</span>
+                          )}
+                        </p>
+                      </div>
+                    </Link>
+                  )}
                   {person.is_guest
                     ? <GuestBadge label={person.is_test ? 'Teste' : 'Convidado'} />
                     : (
@@ -1310,15 +1335,31 @@ export default function GameDetails() {
                 }`}
               >
                 <span className="w-6 text-center font-extrabold text-muted text-sm shrink-0">{idx + 1}º</span>
-                <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" />
-                <div className="flex-1 min-w-0">
-                  <p className="font-extrabold text-ink-900 truncate">
-                    {person.name}
-                    {person.id === user.id && (
-                      <span className="text-muted font-normal text-sm"> · tu</span>
-                    )}
-                  </p>
-                </div>
+                {person.is_guest ? (
+                  <>
+                    <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-extrabold text-ink-900 truncate">
+                        {person.name}
+                        {person.id === user.id && (
+                          <span className="text-muted font-normal text-sm"> · tu</span>
+                        )}
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <Link to={`/jogador/${person.id}`} className="flex items-center gap-3 flex-1 min-w-0">
+                    <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-extrabold text-ink-900 truncate">
+                        {person.name}
+                        {person.id === user.id && (
+                          <span className="text-muted font-normal text-sm"> · tu</span>
+                        )}
+                      </p>
+                    </div>
+                  </Link>
+                )}
                 {person.is_guest
                   ? <GuestBadge label={person.is_test ? 'Teste' : 'Convidado'} />
                   : (
