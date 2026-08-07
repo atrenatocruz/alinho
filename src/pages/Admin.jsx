@@ -232,11 +232,13 @@ export default function Admin() {
     return d
   }
 
-  const validateRecurrence = (recurrence, mixDateStr) => {
+  const validateRecurrence = (recurrence, mixDateStr, checkNextRunAt = true) => {
     if (!recurrence.enabled) return null
-    if (!recurrence.nextRunAt) return 'Escolhe a data e hora em que o próximo Mix deve ser criado automaticamente'
-    if (new Date(recurrence.nextRunAt).getTime() >= new Date(mixDateStr).getTime()) {
-      return 'A data de "criar automaticamente em" tem de ser antes da data e hora do Mix'
+    if (checkNextRunAt) {
+      if (!recurrence.nextRunAt) return 'Escolhe a data e hora em que o próximo Mix deve ser criado automaticamente'
+      if (new Date(recurrence.nextRunAt).getTime() >= new Date(mixDateStr).getTime()) {
+        return 'A data de "criar automaticamente em" tem de ser antes da data e hora do Mix'
+      }
     }
     if (recurrence.endsType === 'on_date' && !recurrence.endsOn) return 'Escolhe a data em que a recorrência termina'
     if (recurrence.endsType === 'after_occurrences' && (!recurrence.endsAfterOccurrences || parseInt(recurrence.endsAfterOccurrences, 10) < 1)) {
@@ -379,7 +381,7 @@ export default function Admin() {
     const { recurrence, ...gameFields } = gameForm
     const hadActiveRecurrence = editingGame.is_recurrence_origin && editingGame.recurrence?.is_active
 
-    const recurrenceError = validateRecurrence(recurrence, gameForm.date)
+    const recurrenceError = validateRecurrence(recurrence, gameForm.date, !hadActiveRecurrence)
     if (recurrenceError) {
       alert(recurrenceError)
       return
@@ -848,22 +850,24 @@ export default function Admin() {
                               )}
                             </div>
 
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Criar automaticamente em
-                              </label>
-                              <DateTimeField
-                                value={gameForm.recurrence.nextRunAt}
-                                onChange={(v) => setGameForm({
-                                  ...gameForm,
-                                  recurrence: { ...gameForm.recurrence, nextRunAt: v }
-                                })}
-                                required
-                              />
-                              <p className="text-sm text-muted mt-1.5">
-                                Tem de ser antes da data deste Mix — a mesma distância no tempo é usada para criar cada Mix futuro (ex.: 3 dias antes → cada novo Mix é criado 3 dias antes de acontecer).
-                              </p>
-                            </div>
+                            {!(editingGame && editingGame.is_recurrence_origin && editingGame.recurrence?.is_active) && (
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                  Criar automaticamente em
+                                </label>
+                                <DateTimeField
+                                  value={gameForm.recurrence.nextRunAt}
+                                  onChange={(v) => setGameForm({
+                                    ...gameForm,
+                                    recurrence: { ...gameForm.recurrence, nextRunAt: v }
+                                  })}
+                                  required
+                                />
+                                <p className="text-sm text-muted mt-1.5">
+                                  Tem de ser antes da data deste Mix — a mesma distância no tempo é usada para criar cada Mix futuro (ex.: 3 dias antes → cada novo Mix é criado 3 dias antes de acontecer).
+                                </p>
+                              </div>
+                            )}
                           </>
                         )}
                       </div>
