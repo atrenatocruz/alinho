@@ -761,6 +761,10 @@ export default function GameDetails() {
   // in the pair, from the same per-player mixStats the leaderboard above
   // uses (works the same way for both mix formats, no extra query needed).
   const pointsByUser = Object.fromEntries(mixStats.map(s => [s.user_id, s.points_earned || 0]))
+  // mix_player_stats doesn't carry is_guest — cross-reference the
+  // participants list (which does) so guest rows in "Estatísticas do Mix"
+  // stay non-clickable, same as everywhere else.
+  const isGuestById = Object.fromEntries(people.map(p => [p.id, !!p.is_guest]))
   const duplaStats = teams
     .map(t => ({
       id: t.id,
@@ -928,13 +932,8 @@ export default function GameDetails() {
         <div className="card">
           <h3 className="text-lg text-ink-900 mb-3">Estatísticas do Mix</h3>
           <div className="space-y-1.5">
-            {mixStats.map((s, i) => (
-              <div key={s.id} className="flex items-center gap-3 py-2 border-b border-line last:border-0">
-                <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-extrabold tabular-nums shrink-0 ${
-                  i === 0 ? 'bg-lime-400 text-ink-900' : 'bg-ink-50 text-ink-700'
-                }`}>
-                  {i + 1}
-                </span>
+            {mixStats.map((s, i) => {
+              const nameBlock = (
                 <div className="flex-1 min-w-0">
                   <p className="font-extrabold text-ink-900 truncate">
                     {s.user?.name || '—'}
@@ -944,12 +943,26 @@ export default function GameDetails() {
                     {s.matches_won}/{s.matches_played} jogos • {winRatePct(s.matches_won, s.matches_played)}% vitórias
                   </p>
                 </div>
-                <div className="text-right shrink-0">
-                  <p className="text-lg font-extrabold text-ink-900 tabular-nums">{s.points_earned}</p>
-                  <p className="text-[11px] text-muted">pontos</p>
+              )
+              return (
+                <div key={s.id} className="flex items-center gap-3 py-2 border-b border-line last:border-0">
+                  <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-extrabold tabular-nums shrink-0 ${
+                    i === 0 ? 'bg-lime-400 text-ink-900' : 'bg-ink-50 text-ink-700'
+                  }`}>
+                    {i + 1}
+                  </span>
+                  {isGuestById[s.user_id] ? nameBlock : (
+                    <Link to={`/jogador/${s.user_id}`} className="flex-1 min-w-0">
+                      {nameBlock}
+                    </Link>
+                  )}
+                  <div className="text-right shrink-0">
+                    <p className="text-lg font-extrabold text-ink-900 tabular-nums">{s.points_earned}</p>
+                    <p className="text-[11px] text-muted">pontos</p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}
