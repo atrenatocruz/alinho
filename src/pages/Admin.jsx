@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Plus, Calendar, Users, Trash2, Edit2, Check, X, UserX, Repeat } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { DateTimeField, Avatar } from '../components/ui'
+import { DateField, DateTimeField, Avatar } from '../components/ui'
 import { totalRounds, FORMAT_LABEL } from '../lib/mixLogic'
 
 // datetime-local <-> stored timestamptz helpers (keeps Portugal wall-clock)
@@ -823,16 +823,16 @@ export default function Admin() {
                                 })}
                               />
                               {gameForm.recurrence.endsType === 'on_date' && (
-                                <input
-                                  type="date"
-                                  value={gameForm.recurrence.endsOn}
-                                  onChange={(e) => setGameForm({
-                                    ...gameForm,
-                                    recurrence: { ...gameForm.recurrence, endsOn: e.target.value }
-                                  })}
-                                  className="input-field mt-2"
-                                  required
-                                />
+                                <div className="mt-2">
+                                  <DateField
+                                    value={gameForm.recurrence.endsOn}
+                                    onChange={(v) => setGameForm({
+                                      ...gameForm,
+                                      recurrence: { ...gameForm.recurrence, endsOn: v }
+                                    })}
+                                    placeholder="Seleciona a data final"
+                                  />
+                                </div>
                               )}
                               {gameForm.recurrence.endsType === 'after_occurrences' && (
                                 <input
