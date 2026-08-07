@@ -231,11 +231,14 @@ export default function Layout({ children }) {
       </main>
 
       {/* Nav — floating dynamic island, liquid glass */}
-      {/* translateZ(0) + will-change force this onto its own compositing
-          layer — without it, iOS Safari has a known bug where a `fixed`
-          element containing a `backdrop-filter` descendant (the pill below)
-          detaches from the viewport during momentum scrolling and ends up
-          drifting up the page with the content instead of staying pinned. */}
+      {/* iOS Safari has a known bug where a `fixed` element containing a
+          `backdrop-filter` descendant detaches from the viewport during
+          momentum scrolling and drifts up the page with the content instead
+          of staying pinned. Promoting just this `nav` wrapper to its own
+          GPU layer (translateZ(0) below) wasn't enough to stop it recurring
+          — the backdrop-blur itself lives one level down, on the pill, so
+          that's the layer that actually needs forcing onto the GPU. Both
+          elements carry the hack now. */}
       <nav
         className="fixed inset-x-0 z-20 flex justify-center pointer-events-none px-4"
         style={{
@@ -244,11 +247,18 @@ export default function Layout({ children }) {
           willChange: 'transform',
         }}
       >
-        <div className="pointer-events-auto flex items-center gap-0.5 p-1 rounded-full
+        <div
+          className="pointer-events-auto flex items-center gap-0.5 p-1 rounded-full
                         max-w-full overflow-x-auto no-scrollbar
                         bg-ink-900/95 supports-[backdrop-filter]:bg-ink-900/90 backdrop-blur-xl
                         shadow-[0_8px_32px_rgba(11,37,69,0.35)]
-                        ring-1 ring-white/10">
+                        ring-1 ring-white/10"
+          style={{
+            transform: 'translateZ(0)',
+            willChange: 'transform',
+            WebkitBackfaceVisibility: 'hidden',
+          }}
+        >
           {navItems.map(({ path, icon: Icon, label }) => {
             const isActive = location.pathname === path
             const isPerfil = path === '/perfil'
