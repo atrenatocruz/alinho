@@ -24,10 +24,23 @@ export async function connectWhatsApp({ onGroupMessage }) {
   // live, even after WhatsApp cycles the connection (which happens
   // routinely, not just on real outages).
   let sock
+  let connecting = false
+  let reconnectAttempts = 0
 
   async function start() {
-    const { state, saveCreds } = await useMultiFileAuthState(config.authDir)
-    const { version } = await fetchLatestBaileysVersion()
+    if (connecting) {
+      logger.warn('start() called while a connection attempt is already in progress, skipping.')
+      return
+    }
+    connecting = true
+    let state, saveCreds, version
+    try {
+      ;({ state, saveCreds } = await useMultiFileAuthState(config.authDir))
+      ;({ version } = await fetchLatestBaileysVersion())
+    } catch (err) {
+      connecting = false
+      throw err
+    }
 
     sock = makeWASocket({
       version,
@@ -47,6 +60,8 @@ export async function connectWhatsApp({ onGroupMessage }) {
       }
 
       if (connection === 'open') {
+        connecting = false
+        reconnectAttempts = 0
         logger.info('WhatsApp connection established.')
         try {
           const groups = await sock.groupFetchAllParticipating()
@@ -60,6 +75,7 @@ export async function connectWhatsApp({ onGroupMessage }) {
       }
 
       if (connection === 'close') {
+        connecting = false
         const statusCode = lastDisconnect?.error?.output?.statusCode
         const loggedOut = statusCode === DisconnectReason.loggedOut
         if (loggedOut) {
@@ -68,8 +84,17 @@ export async function connectWhatsApp({ onGroupMessage }) {
           )
           return
         }
-        logger.warn({ statusCode }, 'Connection closed, reconnecting…')
-        start().catch((err) => logger.error({ err }, 'Reconnect failed'))
+        // Back off instead of hammering an immediate retry: rapid repeated
+        // connection attempts on the same account (e.g. during a flaky
+        // network spell) look like abusive/bot-like linking behaviour to
+        // WhatsApp and are a known trigger for temporary "can't link new
+        // devices" blocks on the account.
+        reconnectAttempts += 1
+        const delayMs = Math.min(30_000, reconnectAttempts * 5_000)
+        logger.warn({ statusCode, delayMs }, 'Connection closed, reconnecting…')
+        setTimeout(() => {
+          start().catch((err) => logger.error({ err }, 'Reconnect failed'))
+        }, delayMs)
       }
     })
 
