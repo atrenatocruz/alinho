@@ -67,6 +67,19 @@ $$;
 REVOKE ALL ON FUNCTION in_global_org(UUID) FROM public;
 GRANT EXECUTE ON FUNCTION in_global_org(UUID) TO authenticated;
 
+CREATE OR REPLACE FUNCTION org_is_global(p_organization_id UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+STABLE
+AS $$
+  SELECT COALESCE((SELECT is_global FROM organizations WHERE id = p_organization_id), FALSE);
+$$;
+
+REVOKE ALL ON FUNCTION org_is_global(UUID) FROM public;
+GRANT EXECUTE ON FUNCTION org_is_global(UUID) TO authenticated;
+
 DROP POLICY IF EXISTS "See own profile or profiles of org-mates" ON profiles;
 CREATE POLICY "See own profile, org-mates, or global-org members"
   ON profiles FOR SELECT
@@ -84,10 +97,7 @@ CREATE POLICY "Org members or anyone can view player stats of a global org"
       SELECT 1 FROM memberships
       WHERE memberships.organization_id = player_stats.organization_id AND memberships.user_id = auth.uid()
     )
-    OR EXISTS (
-      SELECT 1 FROM organizations o
-      WHERE o.id = player_stats.organization_id AND o.is_global = TRUE
-    )
+    OR org_is_global(player_stats.organization_id)
   );
 
 DROP POLICY IF EXISTS "Org members can view mix player stats" ON mix_player_stats;
@@ -98,10 +108,7 @@ CREATE POLICY "Org members or anyone can view mix player stats of a global org"
       SELECT 1 FROM memberships
       WHERE memberships.organization_id = mix_player_stats.organization_id AND memberships.user_id = auth.uid()
     )
-    OR EXISTS (
-      SELECT 1 FROM organizations o
-      WHERE o.id = mix_player_stats.organization_id AND o.is_global = TRUE
-    )
+    OR org_is_global(mix_player_stats.organization_id)
   );
 
 -- ── 4. Follow / approve / reject / leave ──────────────────────────────────
