@@ -219,6 +219,9 @@ export default function Home() {
                     placeholder="ou introduz o código de um clube privado"
                     className="input-field text-center text-sm"
                   />
+                  <PrimaryButton type="submit" variant="ghost" disabled={!joinSlug.trim()} className="w-full">
+                    Entrar no clube
+                  </PrimaryButton>
                   {joinError && <p className="text-xs text-danger">{joinError}</p>}
                 </form>
               </div>

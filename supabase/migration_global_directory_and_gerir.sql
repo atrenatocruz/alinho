@@ -7,6 +7,12 @@
 -- ════════════════════════════════════════════════════════════════════════
 
 -- ── 1. organizations: opt-in public discovery ────────────────────────────
+-- Every existing organization defaults to is_global=FALSE, open_join=FALSE.
+-- This means the Rankings "Geral" tab (which now only sums is_global=TRUE
+-- clubs) will show empty for everyone immediately after this migration
+-- runs, until an admin flips "Clube público" on in Definições. Accepted
+-- deliberately (2026-08-17) rather than auto-backfilling — no code change
+-- needed, just documenting the expected transient state.
 ALTER TABLE organizations ADD COLUMN is_global BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE organizations ADD COLUMN open_join BOOLEAN NOT NULL DEFAULT FALSE;
 
@@ -206,6 +212,35 @@ $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 REVOKE EXECUTE ON FUNCTION reject_membership_request(UUID) FROM anon, public;
 GRANT EXECUTE ON FUNCTION reject_membership_request(UUID) TO authenticated;
+
+-- Requester identity for the Pedidos queue — a plain client-side select
+-- can't see the requester's profile (they may not share any org with the
+-- admin yet, and this may be their first is_global club), so this reads
+-- through SECURITY DEFINER instead, same pattern as list_global_organizations.
+CREATE OR REPLACE FUNCTION list_membership_requests(p_organization_id UUID)
+RETURNS TABLE (
+  id UUID,
+  user_id UUID,
+  created_at TIMESTAMPTZ,
+  name TEXT,
+  avatar_url TEXT
+) AS $$
+BEGIN
+  IF NOT is_org_admin(p_organization_id) THEN
+    RAISE EXCEPTION 'Apenas admins podem ver os pedidos deste clube';
+  END IF;
+
+  RETURN QUERY
+  SELECT r.id, r.user_id, r.created_at, p.name, p.avatar_url
+  FROM membership_requests r
+  JOIN profiles p ON p.id = r.user_id
+  WHERE r.organization_id = p_organization_id AND r.status = 'pending'
+  ORDER BY r.created_at ASC;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+REVOKE EXECUTE ON FUNCTION list_membership_requests(UUID) FROM anon, public;
+GRANT EXECUTE ON FUNCTION list_membership_requests(UUID) TO authenticated;
 
 -- Self-service unfollow/leave. Blocked if the caller is that org's last
 -- admin — an orphaned, unmanageable club is worse than a blocked click.

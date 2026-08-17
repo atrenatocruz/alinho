@@ -18,8 +18,15 @@ const SIDE_LABEL = { left: 'Esquerda', right: 'Direita', both: 'Ambos' }
 export default function GameDetails() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { user, profile, isGuest, isAdmin, currentOrganizationId } = useAuth()
+  const { user, profile, isGuest, memberships } = useAuth()
   const [game, setGame] = useState(null)
+  // isAdmin/gameOrganizationId are derived from the specific mix being
+  // viewed, not the app-wide "current organization" — Home now links to
+  // mixs from every club a player belongs to, so "current org" is not
+  // necessarily this mix's club.
+  const gameMembership = game ? memberships.find((m) => m.organization_id === game.organization_id) : null
+  const isAdmin = gameMembership?.is_admin ?? false
+  const gameOrganizationId = game?.organization_id ?? null
   const [participants, setParticipants] = useState([])
   const [waitlist, setWaitlist] = useState([])
   const [teams, setTeams] = useState([])
@@ -173,13 +180,13 @@ export default function GameDetails() {
   }
 
   const loadAllUsers = async () => {
-    if (!currentOrganizationId) return
+    if (!gameOrganizationId) return
     try {
       // Partner picker is this org's member list — guests never appear in it
       const { data, error } = await supabase
         .from('memberships')
         .select('user_id, profile:profiles(id, name)')
-        .eq('organization_id', currentOrganizationId)
+        .eq('organization_id', gameOrganizationId)
         .eq('is_guest', false)
         .neq('user_id', user.id)
 
@@ -260,7 +267,7 @@ export default function GameDetails() {
     setJoinError('')
     try {
       const { data, error } = await supabase.functions.invoke('admin-create-test-user', {
-        body: { organization_id: currentOrganizationId },
+        body: { organization_id: gameOrganizationId },
       })
       if (error) throw error
 
@@ -439,7 +446,7 @@ export default function GameDetails() {
       const { data: previousGames } = await supabase
         .from('games')
         .select('id')
-        .eq('organization_id', currentOrganizationId)
+        .eq('organization_id', gameOrganizationId)
         .lt('date', game.date)
         .order('date', { ascending: false })
         .limit(1)

@@ -208,12 +208,9 @@ export default function GerirClube() {
   }
 
   const loadRequests = async () => {
-    const { data, error } = await supabase
-      .from('membership_requests')
-      .select('id, created_at, user_id, profile:profiles(name, avatar_url)')
-      .eq('organization_id', currentOrganizationId)
-      .eq('status', 'pending')
-      .order('created_at', { ascending: true })
+    const { data, error } = await supabase.rpc('list_membership_requests', {
+      p_organization_id: currentOrganizationId,
+    })
 
     if (error) {
       console.error('Error loading membership requests:', error)
@@ -1080,8 +1077,8 @@ export default function GerirClube() {
                   </h3>
                   {requests.map((req) => (
                     <div key={req.id} className="card flex items-center gap-3">
-                      <Avatar name={req.profile?.name} url={req.profile?.avatar_url} size="w-9 h-9 text-sm" />
-                      <p className="flex-1 min-w-0 font-extrabold text-ink-900 truncate">{req.profile?.name || 'Jogador'}</p>
+                      <Avatar name={req.name} url={req.avatar_url} size="w-9 h-9 text-sm" />
+                      <p className="flex-1 min-w-0 font-extrabold text-ink-900 truncate">{req.name || 'Jogador'}</p>
                       <button
                         onClick={() => handleApproveRequest(req.id)}
                         className="w-9 h-9 flex items-center justify-center rounded-full bg-ok/10 text-ok hover:bg-ok/20 transition-colors duration-fast"
