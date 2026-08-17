@@ -15,7 +15,8 @@ import Clubes from './pages/Clubes'
 import PrivateMatches from './pages/PrivateMatches'
 import CreatePrivateMatch from './pages/CreatePrivateMatch'
 import JoinPrivateMatch from './pages/JoinPrivateMatch'
-import Admin from './pages/Admin'
+import Gerir from './pages/Gerir'
+import GerirClube from './pages/GerirClube'
 import Instructions from './pages/Instructions'
 
 // showSplash covers both the auth check and the splash's minimum display
@@ -171,10 +172,18 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/admin"
+        path="/gerir"
         element={
-          <Guard require="admin" showSplash={showSplash}>
-            <Admin />
+          <Guard require="protected" showSplash={showSplash}>
+            <Gerir />
+          </Guard>
+        }
+      />
+      <Route
+        path="/gerir/:slug"
+        element={
+          <Guard require="protected" showSplash={showSplash}>
+            <GerirClube />
           </Guard>
         }
       />
