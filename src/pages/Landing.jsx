@@ -101,7 +101,7 @@ function Nav() {
           {/* Hidden on narrow mobile to avoid crowding — the hero below
               already carries a full-size "Criar conta" CTA. */}
           {/* `.btn-primary` only ever styles real <button> elements elsewhere
-              in this codebase (see src/pages/Admin.jsx, src/components/ui.jsx)
+              in this codebase (see src/components/ui.jsx)
               — it relies on min-h-[48px], which has no effect on the default
               `display: inline` a Link/<a> renders as. inline-flex + centering
               utilities are required here so the link actually sizes and
