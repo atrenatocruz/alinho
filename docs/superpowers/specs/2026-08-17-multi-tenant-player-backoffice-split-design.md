@@ -9,7 +9,7 @@ Phase 1 ([2026-07-16-multi-tenant-design.md](2026-07-16-multi-tenant-design.md))
 
 This phase does three things together, because they share the same root cause (a club-scoped mental model bleeding into the player's cross-club experience):
 
-1. **Split player app from club backoffice.** Management (mixs, members, settings) moves to `<slug>.alinho.pt`, a per-club backoffice. The player-facing app at `alinho.pt` drops `/admin` entirely.
+1. **Split player app from club backoffice.** Management (mixs, members, settings) moves to `/gerir`, a distinctly-laid-out backoffice section within the same app. The player-facing app drops `/admin` entirely.
 2. **Player Home aggregates across every club a player belongs to** instead of showing one club at a time.
 3. **Optional public discovery.** A club can opt into being `is_global`: listed in a new "Clubes & Grupos" directory, counted in a combined global ranking/community, joinable via "Follow" (instantly if `open_join`, otherwise via an admin-approved request). Non-global clubs stay exactly as private and invite-only as they are today.
 
@@ -65,23 +65,20 @@ This is what makes "Comunidade Global" and "Ranking Global" show people you don'
 - `approve_membership_request(p_request_id UUID)` / `reject_membership_request(p_request_id UUID)` — guarded by "caller is admin of the request's organization"; approve creates the `membership` row and marks the request `approved`.
 - `leave_organization(p_organization_id UUID)` — self-service unfollow/leave, blocked if the caller is that org's last admin (an orphaned, unmanageable club is worse than a blocked click).
 
-## Routing & session architecture
+## Routing architecture
 
-**Session storage moves from `localStorage` to a cookie-based `SupportedStorage` adapter**, `Domain=.alinho.pt; Secure; SameSite=Lax`, split across 2-3 cookies to stay under per-cookie size limits. This is what makes login transparent between `alinho.pt` and any `<slug>.alinho.pt`.
+**Revision (2026-08-17):** the original design put the backoffice on `<slug>.alinho.pt`, a separate origin. Dropped in favor of a same-origin, path-based split — a PWA manifest is scoped per origin, so two origins means two separately-installed PWAs (two home-screen icons, two service workers), and it's exactly admins-who-are-also-players who'd feel that fragmentation most. Keeping everything on one origin sidesteps that entirely, and as a side effect removes the need for cross-origin session sharing altogether — `localStorage` already works, nothing to change there.
 
-**One Vercel deployment, hostname-based split** (the existing `vercel.json` SPA rewrite already serves any hostname to the same `index.html`):
+**Single app, new top-level route:**
 ```
-App.jsx
- ├─ hostname ∈ {alinho.pt, www.alinho.pt, localhost}  -> <PlayerApp/>  (today's routes, minus /admin)
- └─ hostname = <slug>.alinho.pt                        -> <BackofficeApp/>  (resolves slug -> organization)
+/gerir            -> list of orgs the caller administers; 1 result redirects straight to /gerir/:slug
+/gerir/:slug      -> backoffice for that org (games / members / settings — see below)
 ```
-`BackofficeApp` looks up the organization by the hostname's slug. If the signed-in user isn't an admin of that specific organization, it shows a distinct "no access" state — not a 404 (they may well be an admin of a *different* club).
+Guarded the same way `/admin` is guarded today (`Guard require="admin"` in `App.jsx`), except the check becomes "is admin of *this* `:slug`" rather than a single global `isAdmin` flag — someone can be admin of one club and merely a player in another, so the guard needs the specific org, not just "is admin of something." A backoffice-specific layout replaces `Layout` here (no player bottom-nav; a header identifying which club is being managed instead).
 
-**Local dev:** no real subdomains on `localhost`. A dev-only `?__backoffice=<slug>` query param forces `BackofficeApp` to mount, gated by `import.meta.env.DEV` — same pattern already used for the `MOCK_ADMIN_KEY` dev bypass in `AuthContext`.
+**No new infrastructure.** No wildcard domain, no DNS/TLS changes, no dev-only hostname workaround — `/gerir/:slug` behaves identically in local dev and production, like every other route in the app.
 
-**Infrastructure (one-time, outside the codebase):** add `*.alinho.pt` as a wildcard domain on the Vercel project; DNS `CNAME *.alinho.pt -> cname.vercel-dns.com`; Vercel issues the wildcard TLS certificate automatically.
-
-**Invite links:** the player-facing invite link stays `alinho.pt/login?org=<slug>` (unchanged). A new, separate "Gerir" link/button (shown to admins from the Clubes & Grupos directory) points straight at `<slug>.alinho.pt`.
+**Invite links:** the player-facing invite link stays `alinho.pt/login?org=<slug>` (unchanged). The "Gerir" link/button shown to admins from the Clubes & Grupos directory now points at `/gerir/<slug>` — an in-app navigation, not a domain switch, so it opens inside the same installed PWA.
 
 ## Player experience changes
 
@@ -95,17 +92,16 @@ App.jsx
 
 ## Backoffice (replaces `/admin`)
 
-Today's three `/admin` tabs (`games`, `members`, `settings`) move to `<slug>.alinho.pt` unchanged in logic, plus:
+Today's three `/admin` tabs (`games`, `members`, `settings`) move to `/gerir/:slug` unchanged in logic, plus:
 - **Membros** gains a "Pedidos" view listing pending `membership_requests` for that org (only populated when `is_global=true, open_join=false`), with accept/reject.
 - **Definições** gains `is_global` and `open_join` toggles (`open_join` only editable/relevant while `is_global` is on).
 
-`/admin` is removed from `PlayerApp`; any bookmark to it redirects to `alinho.pt`. An admin of multiple clubs switches between them by switching subdomain (via "Gerir" links from the directory), not via an in-backoffice switcher.
+`/admin` is removed; any bookmark to it redirects to `/gerir`. An admin of multiple clubs switches between them by navigating back to `/gerir` (the picker) or via "Gerir" links from the directory — an in-app navigation, same as any other route change.
 
 ## Error handling & edge cases
 
-- Cookie session exceeds a size limit (unlikely with the 2-3 cookie split) — falls back to origin-local session instead of breaking the app; logs so this is detectable in production.
-- Hostname slug doesn't match any organization — a clear "este clube não existe" page linking back to `alinho.pt`, not a blank screen.
-- Authenticated but not an admin of *this* club's backoffice — distinct "sem acesso" state (see Routing section).
+- `:slug` in `/gerir/:slug` doesn't match any organization — a clear "este clube não existe" page with a link back to `/gerir`, not a blank screen.
+- Authenticated but not an admin of *this* club's backoffice (e.g. typed/bookmarked someone else's `/gerir/:slug`) — distinct "sem acesso" state, not a 404 (they may well be an admin of a *different* club).
 - Duplicate follow/join-request clicks — idempotent via the partial unique index; `follow_organization` returns success rather than erroring on an existing pending request.
 - Rejected request re-submitted later — allowed (partial unique index only covers `pending`), preserving rejection history.
 - Last admin of a club tries to leave or self-demote — blocked by `leave_organization`/the admin-demotion RPC.
@@ -126,11 +122,11 @@ No automated test suite exists in this project (frontend or SQL migrations) — 
 **Frontend (manual, in-browser):**
 - A player in 2+ clubs sees Home mixs from both, tagged by club; Rankings/Comunidade "O meu clube" prompts a club choice, "Global" shows only `is_global` clubs.
 - Full Follow flow on an open club (immediate) and a restricted club (request → backoffice approval → shows up on Home).
-- Session: log in on `alinho.pt`, navigate to `<slug>.alinho.pt` without re-authenticating (the critical test from the Routing section) — verify in a private/incognito window to rule out a stale prior session.
-- Logout on one subdomain ends the session on the other.
+- Admin of exactly one club: `/gerir` redirects straight to `/gerir/:slug`. Admin of 2+: `/gerir` shows a picker.
+- Only one PWA install/icon end to end — install the app as a player, become admin of a club, confirm no second install prompt or icon appears for `/gerir`.
 - An old `?org=slug` link still works for a non-global club.
-- An admin of only one club visiting a different club's `<slug>.alinho.pt` sees "sem acesso", not a generic error.
+- An admin of only one club navigating to a different club's `/gerir/:slug` (typed or bookmarked) sees "sem acesso", not a generic error.
 
 ## Open questions
 
-None outstanding — all decisions in this document were confirmed during brainstorming (2026-08-17): both architecture forks (cookie-based shared session; join-request-with-approval for restricted clubs) were chosen explicitly over the alternatives considered.
+None outstanding — all decisions in this document were confirmed during brainstorming (2026-08-17), including one revision made mid-review: the backoffice moved from a `<slug>.alinho.pt` subdomain to a same-origin `/gerir` route after the PWA-fragmentation trade-off surfaced (see Routing architecture). The join-request-with-approval flow for restricted clubs was chosen explicitly over the alternatives considered and stands as designed.
