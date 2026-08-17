@@ -64,6 +64,7 @@ This is what makes "Comunidade Global" and "Ranking Global" show people you don'
   - `open_join = false` → inserts into `membership_requests` (no-op if a `pending` row already exists), returns `'pending'`
 - `approve_membership_request(p_request_id UUID)` / `reject_membership_request(p_request_id UUID)` — guarded by "caller is admin of the request's organization"; approve creates the `membership` row and marks the request `approved`.
 - `leave_organization(p_organization_id UUID)` — self-service unfollow/leave, blocked if the caller is that org's last admin (an orphaned, unmanageable club is worse than a blocked click).
+- `search_players`, `list_players`, `get_global_rankings` — existing `SECURITY DEFINER` RPCs, patched to respect the same visibility rule as the RLS change above (see Player experience changes below for why).
 
 ## Routing architecture
 
@@ -84,9 +85,10 @@ Guarded the same way `/admin` is guarded today (`Guard require="admin"` in `App.
 
 **Home** — query changes from `.eq('organization_id', currentOrganizationId)` to `.in('organization_id', <all membership org ids>)`. Each `MixCard` gains a small club name/logo tag since mixs from different clubs now share one list. Empty state changes from "paste a club slug" to "you don't follow any club yet", pointing at the new directory. The `?org=slug` direct-invite path is untouched — still the only way into a non-global club.
 
-**Rankings / Comunidade** — each gains a second-level tab, reusing the tab pattern already on Home:
-- "O meu clube" — today's per-club behavior (picker if 2+ memberships).
-- "Global" — combines every `is_global = true` organization, regardless of whether the viewer follows it.
+**Rankings / Comunidade** — **revision (2026-08-17):** both pages already have a "global" surface, but with no privacy gate at all today — `Comunidade.jsx`'s search (`search_players`/`list_players`) returns literally any real player regardless of club, and Rankings' existing "Geral" tab (`get_global_rankings()`) sums a player's points across every organization they belong to. All three are `SECURITY DEFINER` functions that bypass `profiles`/`player_stats` RLS entirely by design, so today a non-global (private) club's members and points are already fully exposed app-wide. No new tabs needed — instead, patch these three existing RPCs to apply the same visibility rule as the RLS change above (shares an org with the caller, OR the row's org is `is_global`):
+- `search_players`, `list_players` — add `AND (shares_org_with(p.id) OR EXISTS (SELECT 1 FROM memberships m JOIN organizations o ON o.id = m.organization_id WHERE m.user_id = p.id AND o.is_global = TRUE))`.
+- `get_global_rankings()` — the `club` CTE's `player_stats` scan gains `JOIN organizations o ON o.id = ps.organization_id WHERE o.is_global = TRUE` (private clubs' points stop counting toward this leaderboard; `private` CTE, i.e. jogos entre amigos, is unaffected — those already aren't club-scoped).
+Rankings' existing "Por Clube" tab (per-club, members-only) is unaffected — unchanged query, unchanged privacy model.
 
 **Clubes & Grupos** (replaces the `Clubes.jsx` "Em breve" placeholder entirely — same nav slot, new purpose): lists every `is_global = true` organization with name, logo, member count, and a context-dependent action button (Follow / Pedido enviado / A seguir·Deixar de seguir). Non-global clubs never appear here.
 
@@ -118,6 +120,8 @@ No automated test suite exists in this project (frontend or SQL migrations) — 
 - `follow_organization` on the open org creates a membership immediately; on the restricted org it creates a pending request and *no* membership.
 - `approve_membership_request` fails when called by an admin of a *different* org.
 - Calling `follow_organization` twice in a row doesn't error or duplicate rows.
+- `search_players`/`list_players` no longer return a player whose only club is `is_global=false` and not shared with the caller; still return them to a caller who shares that club, or to anyone once the club is `is_global=true`.
+- `get_global_rankings()` no longer includes points from an `is_global=false` club.
 
 **Frontend (manual, in-browser):**
 - A player in 2+ clubs sees Home mixs from both, tagged by club; Rankings/Comunidade "O meu clube" prompts a club choice, "Global" shows only `is_global` clubs.
