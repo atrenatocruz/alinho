@@ -754,36 +754,36 @@ export default function Admin() {
         <p className="text-gray-600 mt-1">Gerir jogos, membros e definições</p>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-2 overflow-x-auto">
+      {/* Tabs — same pill style as Home.jsx/Rankings.jsx's tab rows */}
+      <div className="flex gap-1 p-1 bg-ink-50 rounded-ctrl overflow-x-auto">
         <button
           onClick={() => setActiveTab('games')}
-          className={`px-6 py-3 rounded-xl font-semibold transition-all whitespace-nowrap ${
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-ctrl text-sm font-extrabold whitespace-nowrap transition-all duration-fast ${
             activeTab === 'games'
-              ? 'bg-ink-700 text-white'
-              : 'bg-white text-gray-600 hover:bg-gray-50'
+              ? 'bg-canvas text-ink-900 shadow-lift border border-line'
+              : 'text-muted hover:text-ink-900'
           }`}
         >
-          <Calendar className="inline mr-2" size={20} />
+          <Calendar size={16} />
           Jogos
         </button>
         <button
           onClick={() => setActiveTab('members')}
-          className={`px-6 py-3 rounded-xl font-semibold transition-all whitespace-nowrap ${
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-ctrl text-sm font-extrabold whitespace-nowrap transition-all duration-fast ${
             activeTab === 'members'
-              ? 'bg-ink-700 text-white'
-              : 'bg-white text-gray-600 hover:bg-gray-50'
+              ? 'bg-canvas text-ink-900 shadow-lift border border-line'
+              : 'text-muted hover:text-ink-900'
           }`}
         >
-          <Users className="inline mr-2" size={20} />
+          <Users size={16} />
           Membros
         </button>
         <button
           onClick={() => setActiveTab('settings')}
-          className={`px-6 py-3 rounded-xl font-semibold transition-all whitespace-nowrap ${
+          className={`flex-1 py-2.5 px-3 rounded-ctrl text-sm font-extrabold whitespace-nowrap transition-all duration-fast ${
             activeTab === 'settings'
-              ? 'bg-ink-700 text-white'
-              : 'bg-white text-gray-600 hover:bg-gray-50'
+              ? 'bg-canvas text-ink-900 shadow-lift border border-line'
+              : 'text-muted hover:text-ink-900'
           }`}
         >
           Definições
