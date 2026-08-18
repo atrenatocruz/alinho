@@ -52,7 +52,8 @@ const EMPTY_RECURRENCE = {
   endsType: 'never',
   endsOn: '',
   endsAfterOccurrences: '',
-  nextRunAt: '',
+  launchDaysBefore: '',
+  launchTime: '09:00',
 }
 
 const EMPTY_GAME_FORM = {
@@ -143,7 +144,7 @@ export default function Admin() {
             ends_type,
             ends_on,
             ends_after_occurrences,
-            next_run_at
+            mix_offset_seconds
           )
         `)
         .eq('organization_id', currentOrganizationId)
@@ -207,9 +208,9 @@ export default function Admin() {
 
   // Fields shared between creating and updating a game_recurrences row —
   // the rule itself plus the snapshot of settings future Mixes will copy.
-  // Deliberately excludes mix_offset_seconds/next_run_at: those are set
-  // once at creation time (see createRecurrence) and must never be
-  // recomputed on an edit of the origin Mix, or the schedule corrupts.
+  // Excludes mix_offset_seconds: createRecurrence/updateRecurrence compute
+  // and attach it separately (see computeLaunchOffsetSeconds below), since
+  // it depends on the launch-fields input, not on the snapshot/rule fields.
   const recurrenceSnapshotAndRule = (game, recurrence) => ({
     frequency: recurrence.frequency,
     ends_type: recurrence.endsType,
@@ -225,11 +226,10 @@ export default function Admin() {
     format: game.format,
   })
 
-  // Mirrors the cron function's own step (see process_due_game_recurrences
-  // in supabase/schema.sql) — by construction, offset = (mix date) -
-  // (entered "criar automaticamente em"), so the first tick from the
-  // entered value would always land exactly on the origin Mix's own date.
-  // Seeding next_run_at one step ahead skips that guaranteed no-op tick.
+  // Computes the date one frequency step after `date` — used to pre-create
+  // the first pending occurrence when a recurrence starts (createRecurrence
+  // below), mirroring what process_due_game_recurrences (supabase/schema.sql)
+  // does for every occurrence after that.
   const advanceByFrequency = (date, frequency) => {
     const d = new Date(date)
     if (frequency === 'daily') d.setDate(d.getDate() + 1)
@@ -239,14 +239,37 @@ export default function Admin() {
     return d
   }
 
-  const validateRecurrence = (recurrence, mixDateStr, checkNextRunAt = true) => {
+  // Converts the "N dias antes, às HH:MM" input into the same
+  // mix_offset_seconds shape the rest of the system (and the cron
+  // function) already works with: seconds between the mix's own
+  // date/time and the computed launch date/time.
+  const computeLaunchOffsetSeconds = (mixDateStr, daysBefore, launchTime) => {
+    const mixDate = new Date(mixDateStr)
+    const launchDate = new Date(mixDate)
+    launchDate.setDate(launchDate.getDate() - parseInt(daysBefore, 10))
+    const [hh, mm] = launchTime.split(':').map(Number)
+    launchDate.setHours(hh, mm, 0, 0)
+    return Math.round((mixDate.getTime() - launchDate.getTime()) / 1000)
+  }
+
+  // Inverse of computeLaunchOffsetSeconds — used to populate the edit form
+  // from a stored mix_offset_seconds value.
+  const deriveLaunchFields = (mixDateStr, mixOffsetSeconds) => {
+    const mixDate = new Date(mixDateStr)
+    const launchDate = new Date(mixDate.getTime() - mixOffsetSeconds * 1000)
+    const mixMidnight = new Date(mixDate.getFullYear(), mixDate.getMonth(), mixDate.getDate())
+    const launchMidnight = new Date(launchDate.getFullYear(), launchDate.getMonth(), launchDate.getDate())
+    const daysBefore = Math.round((mixMidnight.getTime() - launchMidnight.getTime()) / 86400000)
+    const launchTime = `${String(launchDate.getHours()).padStart(2, '0')}:${String(launchDate.getMinutes()).padStart(2, '0')}`
+    return { daysBefore, launchTime }
+  }
+
+  const validateRecurrence = (recurrence) => {
     if (!recurrence.enabled) return null
-    if (checkNextRunAt) {
-      if (!recurrence.nextRunAt) return 'Escolhe a data e hora em que o próximo Mix deve ser criado automaticamente'
-      if (new Date(recurrence.nextRunAt).getTime() >= new Date(mixDateStr).getTime()) {
-        return 'A data de "criar automaticamente em" tem de ser antes da data e hora do Mix'
-      }
+    if (!recurrence.launchDaysBefore || parseInt(recurrence.launchDaysBefore, 10) < 1) {
+      return 'Indica quantos dias antes o mix deve ser lançado'
     }
+    if (!recurrence.launchTime) return 'Escolhe a que horas o mix deve ser lançado'
     if (recurrence.endsType === 'on_date' && !recurrence.endsOn) return 'Escolhe a data em que a recorrência termina'
     if (recurrence.endsType === 'after_occurrences' && (!recurrence.endsAfterOccurrences || parseInt(recurrence.endsAfterOccurrences, 10) < 1)) {
       return 'Indica um número de ocorrências válido'
@@ -259,14 +282,13 @@ export default function Admin() {
   // creation time (handleCreateGame) and when it's turned on while editing
   // a Mix that wasn't recurring yet (handleUpdateGame, Task 3).
   const createRecurrence = async (game, recurrence, userId) => {
+    const mixOffsetSeconds = computeLaunchOffsetSeconds(game.date, recurrence.launchDaysBefore, recurrence.launchTime)
+
     const { data: newRecurrence, error: recurrenceError } = await supabase
       .from('game_recurrences')
       .insert([{
         ...recurrenceSnapshotAndRule(game, recurrence),
-        mix_offset_seconds: Math.round(
-          (new Date(game.date).getTime() - new Date(recurrence.nextRunAt).getTime()) / 1000
-        ),
-        next_run_at: advanceByFrequency(new Date(recurrence.nextRunAt), recurrence.frequency).toISOString(),
+        mix_offset_seconds: mixOffsetSeconds,
         organization_id: currentOrganizationId,
         created_by: userId,
       }])
@@ -287,6 +309,37 @@ export default function Admin() {
     if (linkError) {
       console.error('Error linking game to recurrence:', linkError)
       alert('O Mix foi criado, mas não foi possível ligá-lo à recorrência: ' + linkError.message)
+      return
+    }
+
+    // Pre-create the next occurrence as `pending`, same as the cron will
+    // do for every occurrence after this one — under the old model this
+    // was left for the cron to create later; now it must exist immediately.
+    const nextDate = advanceByFrequency(new Date(game.date), recurrence.frequency)
+    const { error: pendingError } = await supabase
+      .from('games')
+      .insert([{
+        organization_id: currentOrganizationId,
+        title: game.title,
+        date: nextDate.toISOString(),
+        location: game.location,
+        price_per_player: game.price_per_player,
+        prize: game.prize,
+        num_courts: game.num_courts,
+        max_players: (game.num_courts || 1) * 4,
+        court_time_minutes: game.court_time_minutes,
+        game_time_minutes: game.game_time_minutes,
+        format: game.format,
+        status: 'pending',
+        created_by: userId,
+        recurrence_id: newRecurrence.id,
+        is_recurrence_origin: false,
+        launch_at: new Date(nextDate.getTime() - mixOffsetSeconds * 1000).toISOString(),
+      }])
+
+    if (pendingError) {
+      console.error('Error pre-creating next occurrence:', pendingError)
+      alert('O Mix e a recorrência foram criados, mas não foi possível pré-criar o próximo Mix: ' + pendingError.message)
     }
   }
 
@@ -302,7 +355,7 @@ export default function Admin() {
 
     const { recurrence, ...gameFields } = gameForm
 
-    const recurrenceError = validateRecurrence(recurrence, gameForm.date)
+    const recurrenceError = validateRecurrence(recurrence)
     if (recurrenceError) {
       alert(recurrenceError)
       return
@@ -362,10 +415,13 @@ export default function Admin() {
   // called from handleUpdateGame when editing the origin of an active
   // recurrence — already-created Mixes are never touched by this.
   const updateRecurrence = async (recurrenceId, game, recurrence) => {
+    const mixOffsetSeconds = computeLaunchOffsetSeconds(game.date, recurrence.launchDaysBefore, recurrence.launchTime)
+
     const { error } = await supabase
       .from('game_recurrences')
       .update({
         ...recurrenceSnapshotAndRule(game, recurrence),
+        mix_offset_seconds: mixOffsetSeconds,
         updated_at: new Date().toISOString(),
       })
       .eq('id', recurrenceId)
@@ -373,6 +429,33 @@ export default function Admin() {
     if (error) {
       console.error('Error updating recurrence:', error)
       alert('O Mix foi atualizado, mas não foi possível atualizar a recorrência: ' + error.message)
+      return
+    }
+
+    // Keep the already pre-created pending occurrence's launch time in sync
+    // — otherwise changing "quantos dias antes" here would only take
+    // effect two cycles from now instead of the very next one.
+    const { data: pendingGame, error: pendingFetchError } = await supabase
+      .from('games')
+      .select('id, date')
+      .eq('recurrence_id', recurrenceId)
+      .eq('status', 'pending')
+      .maybeSingle()
+
+    if (pendingFetchError) {
+      console.error('Error finding pending occurrence:', pendingFetchError)
+      return
+    }
+    if (!pendingGame) return
+
+    const { error: launchUpdateError } = await supabase
+      .from('games')
+      .update({ launch_at: new Date(new Date(pendingGame.date).getTime() - mixOffsetSeconds * 1000).toISOString() })
+      .eq('id', pendingGame.id)
+
+    if (launchUpdateError) {
+      console.error('Error updating pending occurrence launch time:', launchUpdateError)
+      alert('A recorrência foi atualizada, mas não foi possível atualizar a hora de lançamento do próximo Mix: ' + launchUpdateError.message)
     }
   }
 
@@ -388,7 +471,7 @@ export default function Admin() {
     const { recurrence, ...gameFields } = gameForm
     const hadActiveRecurrence = editingGame.is_recurrence_origin && editingGame.recurrence?.is_active
 
-    const recurrenceError = validateRecurrence(recurrence, gameForm.date, !hadActiveRecurrence)
+    const recurrenceError = validateRecurrence(recurrence)
     if (recurrenceError) {
       alert(recurrenceError)
       return
@@ -576,6 +659,9 @@ export default function Admin() {
   const startEditGame = (game) => {
     setEditingGame(game)
     const hasActiveRecurrence = game.is_recurrence_origin && game.recurrence?.is_active
+    const launchFields = hasActiveRecurrence
+      ? deriveLaunchFields(game.date, game.recurrence.mix_offset_seconds)
+      : null
     setGameForm({
       title: game.title,
       date: toLocalInput(game.date),
@@ -593,7 +679,8 @@ export default function Admin() {
             endsType: game.recurrence.ends_type,
             endsOn: game.recurrence.ends_on ? toLocalInput(game.recurrence.ends_on).slice(0, 10) : '',
             endsAfterOccurrences: game.recurrence.ends_after_occurrences ?? '',
-            nextRunAt: toLocalInput(game.recurrence.next_run_at),
+            launchDaysBefore: String(launchFields.daysBefore),
+            launchTime: launchFields.launchTime,
           }
         : EMPTY_RECURRENCE,
     })
@@ -857,24 +944,41 @@ export default function Admin() {
                               )}
                             </div>
 
-                            {!(editingGame && editingGame.is_recurrence_origin && editingGame.recurrence?.is_active) && (
-                              <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                  Criar automaticamente em
-                                </label>
-                                <DateTimeField
-                                  value={gameForm.recurrence.nextRunAt}
-                                  onChange={(v) => setGameForm({
-                                    ...gameForm,
-                                    recurrence: { ...gameForm.recurrence, nextRunAt: v }
-                                  })}
-                                  required
-                                />
-                                <p className="text-sm text-muted mt-1.5">
-                                  Tem de ser antes da data deste Mix — a mesma distância no tempo é usada para criar cada Mix futuro (ex.: 3 dias antes → cada novo Mix é criado 3 dias antes de acontecer).
-                                </p>
-                              </div>
-                            )}
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Lançar quantos dias antes
+                              </label>
+                              <input
+                                type="number"
+                                min="1"
+                                value={gameForm.recurrence.launchDaysBefore}
+                                onChange={(e) => setGameForm({
+                                  ...gameForm,
+                                  recurrence: { ...gameForm.recurrence, launchDaysBefore: e.target.value }
+                                })}
+                                className="input-field"
+                                placeholder="ex: 3"
+                                required
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                A que horas
+                              </label>
+                              <input
+                                type="time"
+                                value={gameForm.recurrence.launchTime}
+                                onChange={(e) => setGameForm({
+                                  ...gameForm,
+                                  recurrence: { ...gameForm.recurrence, launchTime: e.target.value }
+                                })}
+                                className="input-field"
+                                required
+                              />
+                              <p className="text-sm text-muted mt-1.5">
+                                O próximo Mix fica visível e disponível para inscrições nesta altura — a mesma distância é reaplicada em cada Mix seguinte.
+                              </p>
+                            </div>
                           </>
                         )}
                       </div>
@@ -971,12 +1075,14 @@ export default function Admin() {
                         game.status === 'open' ? 'bg-blue-100 text-blue-700' :
                         game.status === 'closed' ? 'bg-green-100 text-green-700' :
                         game.status === 'in_progress' ? 'bg-lime-400 text-ink-900' :
+                        game.status === 'pending' ? 'bg-amber-100 text-amber-700' :
                         game.status === 'completed' || game.status === 'finished' ? 'bg-gray-100 text-gray-700' :
                         'bg-red-100 text-red-700'
                       }`}>
                         {game.status === 'open' && 'Aberto'}
                         {game.status === 'closed' && 'Mix fechado — campo reservado'}
                         {game.status === 'in_progress' && 'A decorrer'}
+                        {game.status === 'pending' && 'Pendente — ainda não foi lançado'}
                         {(game.status === 'completed' || game.status === 'finished') && 'Terminado'}
                         {game.status === 'cancelled' && 'Cancelado'}
                       </div>
