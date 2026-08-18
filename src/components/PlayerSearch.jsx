@@ -3,7 +3,7 @@ import { Search, X } from 'lucide-react'
 import { searchPlayers, listPlayers } from '../lib/privateMatches'
 import { Avatar } from './ui'
 
-export default function PlayerSearch({ label, selected, onSelect, onClear, excludeIds = [], browseByDefault = false }) {
+export default function PlayerSearch({ label, selected, onSelect, onClear, excludeIds = [], browseByDefault = false, searchFn = searchPlayers }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [open, setOpen] = useState(false)
@@ -45,14 +45,14 @@ export default function PlayerSearch({ label, selected, onSelect, onClear, exclu
 
     timeoutRef.current = setTimeout(async () => {
       try {
-        const data = await searchPlayers(query)
+        const data = await searchFn(query)
         setResults(data)
       } catch (error) {
         console.error('Error searching players:', error)
       }
     }, 300)
     return () => clearTimeout(timeoutRef.current)
-  }, [query, browseByDefault])
+  }, [query, browseByDefault, searchFn])
 
   if (selected) {
     return (
