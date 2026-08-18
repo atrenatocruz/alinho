@@ -118,7 +118,7 @@ export default function Home() {
 
       // Show all games that are not cancelled
       const filteredGames = (data || [])
-        .filter((game) => game.status !== 'cancelled')
+        .filter((game) => game.status !== 'cancelled' && game.status !== 'pending')
         .map((game) => ({
           ...game,
           participants: (game.participants || []).map((p) => ({

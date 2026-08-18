@@ -142,6 +142,7 @@ export default function Rankings() {
           `)
           .eq('organization_id', currentOrganizationId)
           .neq('status', 'cancelled')
+          .neq('status', 'pending')
           .order('date', { ascending: false }),
         loadMembershipMap(),
       ])
