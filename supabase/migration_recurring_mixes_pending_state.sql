@@ -55,7 +55,7 @@ BEGIN
     WHERE g.status = 'pending' AND g.launch_at <= now() AND gr.is_active = true
     FOR UPDATE OF g SKIP LOCKED
   LOOP
-    UPDATE games SET status = 'open', updated_at = now() WHERE id = rec.pending_game_id;
+    UPDATE games SET status = 'open', updated_at = now(), launch_at = NULL WHERE id = rec.pending_game_id;
 
     v_new_date := (
       (rec.pending_date AT TIME ZONE 'Europe/Lisbon') + (CASE rec.frequency

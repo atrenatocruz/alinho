@@ -312,10 +312,29 @@ export default function Admin() {
       return
     }
 
+    // Respect the "termina" rule before pre-creating the next occurrence —
+    // mirrors the same check process_due_game_recurrences() makes before
+    // every insert (supabase/schema.sql), so a recurrence limited to N
+    // occurrences or an end date doesn't produce one extra mix.
+    const nextDate = advanceByFrequency(new Date(game.date), recurrence.frequency)
+    const pastEnd =
+      (recurrence.endsType === 'on_date' && nextDate > new Date(`${recurrence.endsOn}T23:59:59`)) ||
+      (recurrence.endsType === 'after_occurrences' && 1 >= parseInt(recurrence.endsAfterOccurrences, 10))
+
+    if (pastEnd) {
+      const { error: deactivateError } = await supabase
+        .from('game_recurrences')
+        .update({ is_active: false })
+        .eq('id', newRecurrence.id)
+      if (deactivateError) {
+        console.error('Error deactivating recurrence past its end:', deactivateError)
+      }
+      return
+    }
+
     // Pre-create the next occurrence as `pending`, same as the cron will
     // do for every occurrence after this one — under the old model this
     // was left for the cron to create later; now it must exist immediately.
-    const nextDate = advanceByFrequency(new Date(game.date), recurrence.frequency)
     const { error: pendingError } = await supabase
       .from('games')
       .insert([{
@@ -340,6 +359,18 @@ export default function Admin() {
     if (pendingError) {
       console.error('Error pre-creating next occurrence:', pendingError)
       alert('O Mix e a recorrência foram criados, mas não foi possível pré-criar o próximo Mix: ' + pendingError.message)
+      return
+    }
+
+    // Origin (1) + the pending occurrence just created (1) = 2. Known and
+    // exact at this point, since this function only ever runs once per
+    // fresh recurrence — no need for a database-side increment expression.
+    const { error: countError } = await supabase
+      .from('game_recurrences')
+      .update({ occurrences_created: 2 })
+      .eq('id', newRecurrence.id)
+    if (countError) {
+      console.error('Error updating occurrences_created:', countError)
     }
   }
 
@@ -459,6 +490,29 @@ export default function Admin() {
     }
   }
 
+  // Deactivates a recurrence and removes its not-yet-launched pending
+  // occurrence, if one exists — stopping a recurrence shouldn't leave a
+  // mix behind that will never launch and never gets cleaned up.
+  const deactivateRecurrence = async (recurrenceId) => {
+    const { error } = await supabase
+      .from('game_recurrences')
+      .update({ is_active: false, updated_at: new Date().toISOString() })
+      .eq('id', recurrenceId)
+    if (error) {
+      console.error('Error deactivating recurrence:', error)
+      throw error
+    }
+
+    const { error: cleanupError } = await supabase
+      .from('games')
+      .delete()
+      .eq('recurrence_id', recurrenceId)
+      .eq('status', 'pending')
+    if (cleanupError) {
+      console.error('Error removing pending occurrence:', cleanupError)
+    }
+  }
+
   const handleUpdateGame = async (e) => {
     e.preventDefault()
 
@@ -482,14 +536,24 @@ export default function Admin() {
       // clamped to a valid 1-6 count here at submit time.
       const numCourts = Math.min(6, Math.max(1, parseInt(gameForm.num_courts, 10) || 1))
 
+      const newDate = new Date(gameForm.date)
+      // A `pending` row is a normal editable mix — if its own date moves,
+      // its launch time (relative to that date) must move with it, or the
+      // mix launches at the wrong moment relative to what the admin sees.
+      const pendingLaunchUpdate =
+        editingGame.status === 'pending' && editingGame.recurrence
+          ? { launch_at: new Date(newDate.getTime() - editingGame.recurrence.mix_offset_seconds * 1000).toISOString() }
+          : {}
+
       const { data, error } = await supabase
         .from('games')
         .update({
           ...gameFields,
-          date: new Date(gameForm.date).toISOString(),
+          date: newDate.toISOString(),
           num_courts: numCourts,
           max_players: numCourts * 4,
           price_per_player: gameForm.price_per_player === '' ? null : parseFloat(gameForm.price_per_player),
+          ...pendingLaunchUpdate,
         })
         .eq('id', editingGame.id)
         .select()
@@ -502,10 +566,7 @@ export default function Admin() {
         await updateRecurrence(editingGame.recurrence.id, data, recurrence)
       } else if (hadActiveRecurrence && !recurrence.enabled) {
         // Origin Mix, toggled off: stop creating future Mixes. Never reactivated later.
-        await supabase
-          .from('game_recurrences')
-          .update({ is_active: false, updated_at: new Date().toISOString() })
-          .eq('id', editingGame.recurrence.id)
+        await deactivateRecurrence(editingGame.recurrence.id)
       } else if (!hadActiveRecurrence && recurrence.enabled) {
         // Wasn't recurring (never was, or a previous recurrence was stopped): start a new one.
         const { data: { user } } = await supabase.auth.getUser()
@@ -538,10 +599,7 @@ export default function Admin() {
       // deleting it must also stop the recurrence, otherwise it would keep
       // creating Mixes automatically with no UI left to turn it off from.
       if (gameToDelete?.is_recurrence_origin && gameToDelete.recurrence?.is_active) {
-        await supabase
-          .from('game_recurrences')
-          .update({ is_active: false, updated_at: new Date().toISOString() })
-          .eq('id', gameToDelete.recurrence_id)
+        await deactivateRecurrence(gameToDelete.recurrence_id)
       }
 
       alert('Jogo eliminado com sucesso!')
@@ -553,16 +611,10 @@ export default function Admin() {
   }
 
   const handleStopRecurrence = async (recurrenceId) => {
-    if (!confirm('Parar esta recorrência? Os Mixes já criados mantêm-se; não serão criados mais Mixes automaticamente.')) return
+    if (!confirm('Parar esta recorrência? Os Mixes já criados mantêm-se; o próximo Mix pendente (ainda não lançado) será removido; não serão criados mais Mixes automaticamente.')) return
 
     try {
-      const { error } = await supabase
-        .from('game_recurrences')
-        .update({ is_active: false, updated_at: new Date().toISOString() })
-        .eq('id', recurrenceId)
-
-      if (error) throw error
-
+      await deactivateRecurrence(recurrenceId)
       loadGames()
     } catch (error) {
       console.error('Error stopping recurrence:', error)

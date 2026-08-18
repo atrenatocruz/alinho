@@ -61,7 +61,7 @@ CREATE TABLE game_recurrences (
   CHECK (ends_type <> 'on_date' OR ends_on IS NOT NULL),
   CHECK (ends_type <> 'after_occurrences' OR ends_after_occurrences IS NOT NULL),
   occurrences_created INTEGER NOT NULL DEFAULT 1, -- the original Mix counts as occurrence 1
-  mix_offset_seconds INTEGER NOT NULL, -- (mix date) - (auto-create date), fixed at creation time
+  mix_offset_seconds INTEGER NOT NULL, -- (mix date) - (launch date); recomputed whenever the launch fields are edited (see updateRecurrence in src/pages/Admin.jsx)
   title TEXT NOT NULL,
   location TEXT,
   price_per_player NUMERIC(6,2),
@@ -89,7 +89,7 @@ CREATE TABLE games (
   court_time_minutes INTEGER NOT NULL DEFAULT 90,
   game_time_minutes INTEGER NOT NULL DEFAULT 20,
   format TEXT NOT NULL DEFAULT 'sobe_desce' CHECK (format IN ('sobe_desce', 'todos_contra_todos')),
-  status TEXT DEFAULT 'open', -- open, closed, in_progress, finished, cancelled
+  status TEXT DEFAULT 'open', -- open, pending, closed, in_progress, finished, cancelled
   winner_team_id UUID,
   launch_at TIMESTAMPTZ, -- nullable; meaningful only while status = 'pending'
   created_by UUID REFERENCES profiles(id),
@@ -841,7 +841,7 @@ BEGIN
     WHERE g.status = 'pending' AND g.launch_at <= now() AND gr.is_active = true
     FOR UPDATE OF g SKIP LOCKED
   LOOP
-    UPDATE games SET status = 'open', updated_at = now() WHERE id = rec.pending_game_id;
+    UPDATE games SET status = 'open', updated_at = now(), launch_at = NULL WHERE id = rec.pending_game_id;
 
     v_new_date := (
       (rec.pending_date AT TIME ZONE 'Europe/Lisbon') + (CASE rec.frequency
