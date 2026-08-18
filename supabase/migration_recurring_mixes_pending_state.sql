@@ -29,6 +29,8 @@ FROM game_recurrences rec
 WHERE rec.is_active = true
 ON CONFLICT (recurrence_id, date) WHERE recurrence_id IS NOT NULL DO NOTHING;
 
+UPDATE game_recurrences SET occurrences_created = occurrences_created + 1 WHERE is_active = true;
+
 -- ── 3. next_run_at is obsolete — every pending row now carries its own
 --       launch_at instead of one shared "next creation time" ────────────
 ALTER TABLE game_recurrences DROP COLUMN next_run_at;
