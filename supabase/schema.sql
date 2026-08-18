@@ -61,8 +61,7 @@ CREATE TABLE game_recurrences (
   CHECK (ends_type <> 'on_date' OR ends_on IS NOT NULL),
   CHECK (ends_type <> 'after_occurrences' OR ends_after_occurrences IS NOT NULL),
   occurrences_created INTEGER NOT NULL DEFAULT 1, -- the original Mix counts as occurrence 1
-  mix_offset_seconds INTEGER NOT NULL, -- (mix date) - (auto-create date), fixed at creation time
-  next_run_at TIMESTAMPTZ NOT NULL,
+  mix_offset_seconds INTEGER NOT NULL, -- (mix date) - (launch date); recomputed whenever the launch fields are edited (see updateRecurrence in src/pages/Admin.jsx)
   title TEXT NOT NULL,
   location TEXT,
   price_per_player NUMERIC(6,2),
@@ -90,8 +89,9 @@ CREATE TABLE games (
   court_time_minutes INTEGER NOT NULL DEFAULT 90,
   game_time_minutes INTEGER NOT NULL DEFAULT 20,
   format TEXT NOT NULL DEFAULT 'sobe_desce' CHECK (format IN ('sobe_desce', 'todos_contra_todos')),
-  status TEXT DEFAULT 'open', -- open, closed, in_progress, finished, cancelled
+  status TEXT DEFAULT 'open', -- open, pending, closed, in_progress, finished, cancelled
   winner_team_id UUID,
+  launch_at TIMESTAMPTZ, -- nullable; meaningful only while status = 'pending'
   created_by UUID REFERENCES profiles(id),
   recurrence_id UUID REFERENCES game_recurrences(id),
   is_recurrence_origin BOOLEAN NOT NULL DEFAULT false,
@@ -835,11 +835,22 @@ DECLARE
   v_new_date TIMESTAMPTZ;
 BEGIN
   FOR rec IN
-    SELECT * FROM game_recurrences
-    WHERE is_active = true AND next_run_at <= now()
-    FOR UPDATE SKIP LOCKED
+    SELECT g.id AS pending_game_id, g.date AS pending_date, gr.*
+    FROM games g
+    JOIN game_recurrences gr ON gr.id = g.recurrence_id
+    WHERE g.status = 'pending' AND g.launch_at <= now() AND gr.is_active = true
+    FOR UPDATE OF g SKIP LOCKED
   LOOP
-    v_new_date := rec.next_run_at + make_interval(secs => rec.mix_offset_seconds);
+    UPDATE games SET status = 'open', updated_at = now(), launch_at = NULL WHERE id = rec.pending_game_id;
+
+    v_new_date := (
+      (rec.pending_date AT TIME ZONE 'Europe/Lisbon') + (CASE rec.frequency
+            WHEN 'daily'   THEN interval '1 day'
+            WHEN 'weekly'  THEN interval '1 week'
+            WHEN 'monthly' THEN interval '1 month'
+            WHEN 'yearly'  THEN interval '1 year'
+          END)
+    ) AT TIME ZONE 'Europe/Lisbon';
 
     IF (rec.ends_type = 'on_date' AND v_new_date > rec.ends_on)
        OR (rec.ends_type = 'after_occurrences' AND rec.occurrences_created >= rec.ends_after_occurrences) THEN
@@ -850,26 +861,18 @@ BEGIN
     INSERT INTO games (
       organization_id, title, date, location, price_per_player, prize,
       num_courts, max_players, court_time_minutes, game_time_minutes, format,
-      status, created_by, recurrence_id, is_recurrence_origin
+      status, created_by, recurrence_id, is_recurrence_origin, launch_at
     )
     VALUES (
       rec.organization_id, rec.title, v_new_date, rec.location, rec.price_per_player, rec.prize,
       rec.num_courts, rec.num_courts * 4, rec.court_time_minutes, rec.game_time_minutes, rec.format,
-      'open', rec.created_by, rec.id, false
+      'pending', rec.created_by, rec.id, false,
+      v_new_date - make_interval(secs => rec.mix_offset_seconds)
     )
     ON CONFLICT (recurrence_id, date) WHERE recurrence_id IS NOT NULL DO NOTHING;
 
     UPDATE game_recurrences
-    SET next_run_at = (
-          (rec.next_run_at AT TIME ZONE 'Europe/Lisbon') + (CASE rec.frequency
-                WHEN 'daily'   THEN interval '1 day'
-                WHEN 'weekly'  THEN interval '1 week'
-                WHEN 'monthly' THEN interval '1 month'
-                WHEN 'yearly'  THEN interval '1 year'
-              END)
-        ) AT TIME ZONE 'Europe/Lisbon',
-        occurrences_created = occurrences_created + 1,
-        updated_at = now()
+    SET occurrences_created = occurrences_created + 1, updated_at = now()
     WHERE id = rec.id;
   END LOOP;
 END;
