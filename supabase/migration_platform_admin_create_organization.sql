@@ -21,7 +21,7 @@ RETURNS UUID AS $$
 DECLARE
   v_org_id UUID;
 BEGIN
-  IF NOT (SELECT is_platform_admin FROM profiles WHERE id = auth.uid()) THEN
+  IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND is_platform_admin) THEN
     RAISE EXCEPTION 'Apenas super admins podem criar clubes';
   END IF;
 
@@ -51,7 +51,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  IF NOT (SELECT is_platform_admin FROM profiles WHERE id = auth.uid()) THEN
+  IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND is_platform_admin) THEN
     RAISE EXCEPTION 'Apenas super admins podem pesquisar todos os jogadores';
   END IF;
 
