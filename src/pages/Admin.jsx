@@ -523,7 +523,11 @@ export default function Admin() {
 
     // Destructure recurrence so it's never spread into the games table update
     const { recurrence, ...gameFields } = gameForm
-    const hadActiveRecurrence = editingGame.is_recurrence_origin && editingGame.recurrence?.is_active
+    // Any mix in an active recurring series shares the same underlying
+    // game_recurrences row (via recurrence_id) — not just the origin — so
+    // recurrence management works from any of them, not only the one that
+    // happened to start it.
+    const hadActiveRecurrence = !!editingGame.recurrence?.is_active
 
     const recurrenceError = validateRecurrence(recurrence)
     if (recurrenceError) {
@@ -715,7 +719,7 @@ export default function Admin() {
 
   const startEditGame = (game) => {
     setEditingGame(game)
-    const hasActiveRecurrence = game.is_recurrence_origin && game.recurrence?.is_active
+    const hasActiveRecurrence = !!game.recurrence?.is_active
     const launchFields = hasActiveRecurrence
       ? deriveLaunchFields(game.date, game.recurrence.mix_offset_seconds)
       : null
@@ -930,7 +934,7 @@ export default function Admin() {
                       />
                     </div>
 
-                    {(!editingGame || editingGame.is_recurrence_origin) && (
+                    {(!editingGame || !editingGame.recurrence || editingGame.recurrence.is_active) && (
                       <div className="border-t border-line pt-4 space-y-4">
                         <label className="flex items-center gap-3 cursor-pointer">
                           <input
