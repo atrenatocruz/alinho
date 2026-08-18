@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Plus, Calendar, Users, Trash2, Edit2, Check, X, UserX, Repeat } from 'lucide-react'
+import { useParams, Link } from 'react-router-dom'
+import { Plus, Calendar, Users, Trash2, Edit2, Check, X, UserX, Repeat, Clock, ArrowLeft } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { DateField, DateTimeField, Avatar } from '../components/ui'
@@ -91,11 +92,15 @@ function Segmented({ options, value, onChange }) {
   )
 }
 
-export default function Admin() {
-  const { profile: currentUser, currentOrganizationId, isPrivateMatchesEnabled, refreshFeatureFlags } = useAuth()
+export default function GerirClube() {
+  const { slug } = useParams()
+  const { profile: currentUser, memberships, isPrivateMatchesEnabled, refreshFeatureFlags } = useAuth()
+  const [org, setOrg] = useState(null)
+  const [orgLoading, setOrgLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('games') // 'games', 'members', 'settings'
   const [games, setGames] = useState([])
   const [members, setMembers] = useState([])
+  const [requests, setRequests] = useState([])
   const [settings, setSettings] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showCreateGame, setShowCreateGame] = useState(false)
@@ -105,6 +110,17 @@ export default function Admin() {
 
   // Form states
   const [gameForm, setGameForm] = useState(EMPTY_GAME_FORM)
+
+  // Resolve the org from the URL slug. `Guard` (App.jsx) only checks
+  // "is logged in" for this route — per-org admin authorization happens
+  // here, once we know which specific org the slug points to.
+  useEffect(() => {
+    const membership = memberships.find((m) => m.organization?.slug === slug)
+    setOrg(membership?.is_admin ? membership.organization : null)
+    setOrgLoading(false)
+  }, [slug, memberships])
+
+  const currentOrganizationId = org?.id
 
   useEffect(() => {
     if (currentOrganizationId) loadData()
@@ -116,7 +132,7 @@ export default function Admin() {
       if (activeTab === 'games') {
         await loadGames()
       } else if (activeTab === 'members') {
-        await loadMembers()
+        await Promise.all([loadMembers(), loadRequests()])
       } else if (activeTab === 'settings') {
         await loadSettings()
       }
@@ -190,6 +206,40 @@ export default function Admin() {
       .sort((a, b) => a.name.localeCompare(b.name))
 
     setMembers(merged)
+  }
+
+  const loadRequests = async () => {
+    const { data, error } = await supabase.rpc('list_membership_requests', {
+      p_organization_id: currentOrganizationId,
+    })
+
+    if (error) {
+      console.error('Error loading membership requests:', error)
+      return
+    }
+    setRequests(data || [])
+  }
+
+  const handleApproveRequest = async (requestId) => {
+    try {
+      const { error } = await supabase.rpc('approve_membership_request', { p_request_id: requestId })
+      if (error) throw error
+      await Promise.all([loadMembers(), loadRequests()])
+    } catch (error) {
+      console.error('Error approving request:', error)
+      alert('Erro ao aprovar pedido: ' + error.message)
+    }
+  }
+
+  const handleRejectRequest = async (requestId) => {
+    try {
+      const { error } = await supabase.rpc('reject_membership_request', { p_request_id: requestId })
+      if (error) throw error
+      await loadRequests()
+    } catch (error) {
+      console.error('Error rejecting request:', error)
+      alert('Erro ao rejeitar pedido: ' + error.message)
+    }
   }
 
   const loadSettings = async () => {
@@ -677,7 +727,9 @@ export default function Admin() {
         .update({
           robot_contact: settings.robot_contact,
           name: settings.name,
-          points_rules: settings.points_rules
+          points_rules: settings.points_rules,
+          is_global: settings.is_global,
+          open_join: settings.open_join,
         })
         .eq('id', settings.id)
 
@@ -747,11 +799,33 @@ export default function Admin() {
     })
   }
 
+  if (orgLoading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
+      </div>
+    )
+  }
+
+  if (!org) {
+    return (
+      <div className="card text-center py-12 px-6">
+        <h2 className="text-xl text-ink-900 mb-2">Sem acesso</h2>
+        <p className="text-muted text-sm mb-6">
+          Ou este clube não existe, ou não és admin dele.
+        </p>
+        <Link to="/gerir" className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline">
+          <ArrowLeft size={16} /> Voltar aos clubes que geres
+        </Link>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-3xl font-bold text-ink-900">Painel Admin</h2>
-        <p className="text-gray-600 mt-1">Gerir jogos, membros e definições</p>
+        <h2 className="text-3xl font-bold text-ink-900">Gerir: {org.name}</h2>
+        <p className="text-gray-600 mt-1">Jogos, membros e definições deste clube</p>
       </div>
 
       {/* Tabs — same pill style as Home.jsx/Rankings.jsx's tab rows */}
@@ -1163,6 +1237,34 @@ export default function Admin() {
                 </p>
               </div>
 
+              {requests.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-extrabold text-ink-900 flex items-center gap-1.5">
+                    <Clock size={14} /> Pedidos de entrada ({requests.length})
+                  </h3>
+                  {requests.map((req) => (
+                    <div key={req.id} className="card flex items-center gap-3">
+                      <Avatar name={req.name} url={req.avatar_url} size="w-9 h-9 text-sm" />
+                      <p className="flex-1 min-w-0 font-extrabold text-ink-900 truncate">{req.name || 'Jogador'}</p>
+                      <button
+                        onClick={() => handleApproveRequest(req.id)}
+                        className="w-9 h-9 flex items-center justify-center rounded-full bg-ok/10 text-ok hover:bg-ok/20 transition-colors duration-fast"
+                        title="Aprovar"
+                      >
+                        <Check size={18} />
+                      </button>
+                      <button
+                        onClick={() => handleRejectRequest(req.id)}
+                        className="w-9 h-9 flex items-center justify-center rounded-full text-danger hover:bg-danger/10 transition-colors duration-fast"
+                        title="Rejeitar"
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {members.map(member => (
                 <div key={member.id} className="card">
                   <div className="flex items-center gap-3.5">
@@ -1314,6 +1416,41 @@ export default function Admin() {
                       />
                     </div>
                   </div>
+                </div>
+
+                <div className="pt-2 border-t border-gray-200">
+                  <h4 className="text-base font-semibold text-ink-900 mt-6 mb-1">
+                    Visibilidade pública
+                  </h4>
+                  <p className="text-sm text-gray-500 mb-4">
+                    Um clube público aparece em "Clubes & Grupos", conta para o ranking geral, e os seus membros ficam pesquisáveis por qualquer jogador.
+                  </p>
+                  <label className="flex items-center justify-between gap-4 p-3 rounded-ctrl border border-line mb-3">
+                    <div>
+                      <p className="font-extrabold text-ink-900 text-sm">Clube público</p>
+                      <p className="text-[11px] text-muted">Aparece em Clubes & Grupos</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={settings.is_global}
+                      onChange={(e) => setSettings({ ...settings, is_global: e.target.checked })}
+                      className="w-5 h-5 shrink-0"
+                    />
+                  </label>
+                  {settings.is_global && (
+                    <label className="flex items-center justify-between gap-4 p-3 rounded-ctrl border border-line">
+                      <div>
+                        <p className="font-extrabold text-ink-900 text-sm">Entrada livre</p>
+                        <p className="text-[11px] text-muted">Sem isto, pedidos de entrada precisam da tua aprovação</p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={settings.open_join}
+                        onChange={(e) => setSettings({ ...settings, open_join: e.target.checked })}
+                        className="w-5 h-5 shrink-0"
+                      />
+                    </label>
+                  )}
                 </div>
 
                 <button type="submit" className="btn-primary w-full">

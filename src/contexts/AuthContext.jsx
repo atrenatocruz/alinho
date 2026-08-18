@@ -292,6 +292,28 @@ export const AuthProvider = ({ children }) => {
     return { data, error }
   }
 
+  // Follows (joins immediately, or requests to join) a public "is_global"
+  // organization from the Clubes & Grupos directory — mirrors
+  // follow_organization()'s own 'joined' | 'pending' return value so the
+  // caller can update its button state without a second round trip.
+  const followOrganization = async (organizationId) => {
+    const { data, error } = await supabase.rpc('follow_organization', { p_organization_id: organizationId })
+    if (!error && data === 'joined' && user) {
+      await loadProfile(user.id)
+    }
+    return { data, error }
+  }
+
+  // Leaves a club the caller currently belongs to. Blocked server-side if
+  // the caller is that org's last admin.
+  const leaveOrganization = async (organizationId) => {
+    const { error } = await supabase.rpc('leave_organization', { p_organization_id: organizationId })
+    if (!error && user) {
+      await loadProfile(user.id)
+    }
+    return { error }
+  }
+
   const switchOrganization = (organizationId) => {
     setCurrentOrganizationId(organizationId)
   }
@@ -305,6 +327,8 @@ export const AuthProvider = ({ children }) => {
     currentOrganizationId,
     currentOrganization: currentMembership?.organization ?? null,
     currentMembership,
+    adminOrganizations: memberships.filter((m) => m.is_admin).map((m) => m.organization),
+    isAdminOfAny: memberships.some((m) => m.is_admin),
     isAdmin: currentMembership?.is_admin === true,
     isGuest: currentMembership?.is_guest === true,
     loading,
@@ -318,6 +342,8 @@ export const AuthProvider = ({ children }) => {
     updateProfile,
     updateMembership,
     joinOrganization,
+    followOrganization,
+    leaveOrganization,
     switchOrganization,
   }
 

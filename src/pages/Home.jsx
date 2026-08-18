@@ -14,7 +14,7 @@ export default function Home() {
   const [games, setGames] = useState([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('ativos')
-  const { user, profile, currentOrganizationId, joinOrganization, isPrivateMatchesEnabled } = useAuth()
+  const { user, profile, memberships, currentOrganizationId, joinOrganization, isPrivateMatchesEnabled } = useAuth()
   const [searchParams] = useSearchParams()
   const [joinSlug, setJoinSlug] = useState('')
   const [joining, setJoining] = useState(false)
@@ -49,12 +49,15 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const orgIds = memberships.map((m) => m.organization_id)
+  const orgIdsKey = orgIds.slice().sort().join(',')
+
   useEffect(() => {
-    // No org yet (e.g. signed in without an invite link) — nothing to
-    // load. Without this, `loading` would stay true forever: the effect
-    // below never runs, so setLoading(false) never fires and the page
-    // spins indefinitely instead of showing the "no club" message.
-    if (!currentOrganizationId) {
+    // No memberships yet — nothing to load. Without this, `loading` would
+    // stay true forever: loadGames never runs, so setLoading(false) never
+    // fires and the page spins indefinitely instead of showing the
+    // "no clubs followed" message.
+    if (orgIds.length === 0) {
       setLoading(false)
       return
     }
@@ -75,14 +78,21 @@ export default function Home() {
     return () => {
       subscription.unsubscribe()
     }
-  }, [currentOrganizationId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orgIdsKey])
 
   const loadGames = async () => {
     try {
+      if (orgIds.length === 0) {
+        setGames([])
+        return
+      }
+
       const { data, error } = await supabase
         .from('games')
         .select(`
           *,
+          organization:organizations (name, group_logo_url),
           participants (
             id,
             user_id,
@@ -92,7 +102,7 @@ export default function Home() {
             partner:profiles!participants_partner_id_fkey (name, avatar_url)
           )
         `)
-        .eq('organization_id', currentOrganizationId)
+        .in('organization_id', orgIds)
         .order('date', { ascending: true })
 
       if (error) {
@@ -100,19 +110,22 @@ export default function Home() {
         throw error
       }
 
-      // level/is_guest moved to `memberships` (per-org) — fetch this org's
-      // memberships once and merge onto each participant's user/partner so
-      // MixCard's existing shape (p.user.level, p.user.is_guest) still works.
+      // level/is_guest live on `memberships` (per-org) — fetch every org's
+      // membership rows once, keyed by org+user (the same person can have
+      // a different level in each club, and cards from different clubs
+      // are now mixed together in one list).
       const { data: memberRows, error: memberError } = await supabase
         .from('memberships')
-        .select('user_id, level, is_guest')
-        .eq('organization_id', currentOrganizationId)
+        .select('user_id, organization_id, level, is_guest')
+        .in('organization_id', orgIds)
       if (memberError) throw memberError
-      const membershipByUser = new Map((memberRows || []).map((m) => [m.user_id, m]))
+      const membershipByKey = new Map(
+        (memberRows || []).map((m) => [`${m.organization_id}:${m.user_id}`, m])
+      )
 
-      const attachMembership = (person, userId) => {
+      const attachMembership = (person, userId, organizationId) => {
         if (!person) return person
-        const m = membershipByUser.get(userId)
+        const m = membershipByKey.get(`${organizationId}:${userId}`)
         return { ...person, level: m?.level, is_guest: m?.is_guest ?? false }
       }
 
@@ -123,8 +136,8 @@ export default function Home() {
           ...game,
           participants: (game.participants || []).map((p) => ({
             ...p,
-            user: attachMembership(p.user, p.user_id),
-            partner: attachMembership(p.partner, p.partner_id),
+            user: attachMembership(p.user, p.user_id, game.organization_id),
+            partner: attachMembership(p.partner, p.partner_id, game.organization_id),
           })),
         }))
 
@@ -178,33 +191,40 @@ export default function Home() {
         </Link>
       )}
 
-      {!currentOrganizationId ? (
+      {memberships.length === 0 ? (
         <EmptyState
           icon={Users}
-          title="Ainda não pertences a nenhum clube"
+          title="Ainda não segues nenhum clube"
           subtitle={
             joining
               ? 'A juntar-te ao clube…'
-              : 'Escreve o nome do clube que o admin te deu, ou usa o link de convite.'
+              : 'Descobre clubes públicos em Clubes & Grupos, ou usa um link de convite direto.'
           }
           action={
             !joining && (
-              <form
-                onSubmit={(e) => { e.preventDefault(); handleJoin() }}
-                className="space-y-3 max-w-xs mx-auto"
-              >
-                <input
-                  type="text"
-                  value={joinSlug}
-                  onChange={(e) => setJoinSlug(e.target.value)}
-                  placeholder="nome do clube"
-                  className="input-field text-center"
-                />
-                {joinError && <p className="text-xs text-danger">{joinError}</p>}
-                <PrimaryButton type="submit" disabled={!joinSlug.trim()} className="w-full">
-                  Entrar no clube
-                </PrimaryButton>
-              </form>
+              <div className="space-y-4 max-w-xs mx-auto">
+                <Link to="/clubes">
+                  <PrimaryButton type="button" className="w-full">
+                    Ver Clubes & Grupos
+                  </PrimaryButton>
+                </Link>
+                <form
+                  onSubmit={(e) => { e.preventDefault(); handleJoin() }}
+                  className="space-y-2"
+                >
+                  <input
+                    type="text"
+                    value={joinSlug}
+                    onChange={(e) => setJoinSlug(e.target.value)}
+                    placeholder="ou introduz o código de um clube privado"
+                    className="input-field text-center text-sm"
+                  />
+                  <PrimaryButton type="submit" variant="ghost" disabled={!joinSlug.trim()} className="w-full">
+                    Entrar no clube
+                  </PrimaryButton>
+                  {joinError && <p className="text-xs text-danger">{joinError}</p>}
+                </form>
+              </div>
             )
           }
         />
@@ -241,7 +261,7 @@ export default function Home() {
           ) : (
             <div className="space-y-3.5">
               {visibleGames.map(game => (
-                <MixCard key={game.id} game={game} joined={isUserJoined(game)} />
+                <MixCard key={game.id} game={game} joined={isUserJoined(game)} showClub={memberships.length > 1} />
               ))}
             </div>
           )}

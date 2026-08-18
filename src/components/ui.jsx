@@ -509,7 +509,7 @@ export function EmptyState({ icon: Icon, title, subtitle, action }) {
 /* ─── MixCard ────────────────────────────────────────────────────────────
    Scannable at a glance: when, where, levels, slots, my state.
    States: open | closed (court reservado) | completed | joined. */
-export function MixCard({ game, joined = false }) {
+export function MixCard({ game, joined = false, showClub = false }) {
   // Every person in the game — a row with partner counts as 2 players
   const players = (game.participants || [])
     .filter(p => p.status === 'confirmed')
@@ -568,6 +568,11 @@ export function MixCard({ game, joined = false }) {
         ) : null}
       </div>
 
+      {showClub && game.organization?.name && (
+        <p className="text-[11px] font-extrabold uppercase tracking-widest text-lime-700 mb-1">
+          {game.organization.name}
+        </p>
+      )}
       <h3 className="text-lg text-ink-900 leading-snug mb-1">{game.title}</h3>
       {game.location && (
         <p className="flex items-center gap-1.5 text-muted text-sm mb-4">

@@ -129,7 +129,7 @@ export function Wordmark({ className = '', variant = 'dark' }) {
 export default function Layout({ children }) {
   const location = useLocation()
   const navigate = useNavigate()
-  const { signOut, profile, updateProfile, isAdmin, isGuest } = useAuth()
+  const { signOut, profile, updateProfile, isAdminOfAny, isGuest } = useAuth()
 
   const today = new Date().toISOString().slice(0, 10)
   const [phonePromptDismissed, setPhonePromptDismissed] = useState(
@@ -185,8 +185,8 @@ export default function Layout({ children }) {
         { path: '/perfil', label: 'Perfil' },
       ]
 
-  if (isAdmin) {
-    navItems.push({ path: '/admin', icon: Settings, label: 'Admin' })
+  if (isAdminOfAny) {
+    navItems.push({ path: '/gerir', icon: Settings, label: 'Gerir' })
   }
 
   return (
