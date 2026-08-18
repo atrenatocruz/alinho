@@ -11,7 +11,7 @@
 
 -- ── 1. profiles gains is_platform_admin — granted only via direct SQL,
 --       same manual philosophy that already governs who can create clubs. ──
-ALTER TABLE profiles ADD COLUMN is_platform_admin BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_platform_admin BOOLEAN NOT NULL DEFAULT FALSE;
 
 -- ── 2. create_organization — creates the org and its first admin
 --       membership atomically, so a club can never exist with nobody able
@@ -51,7 +51,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND is_platform_admin) THEN
+  IF NOT EXISTS (SELECT 1 FROM profiles pr WHERE pr.id = auth.uid() AND pr.is_platform_admin) THEN
     RAISE EXCEPTION 'Apenas super admins podem pesquisar todos os jogadores';
   END IF;
 
@@ -60,6 +60,9 @@ BEGIN
   FROM profiles p
   WHERE length(trim(p_query)) >= 2
     AND p.name ILIKE '%' || trim(p_query) || '%'
+    AND NOT EXISTS (
+      SELECT 1 FROM memberships m WHERE m.user_id = p.id AND m.is_test = true
+    )
   ORDER BY p.name
   LIMIT 10;
 END;

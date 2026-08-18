@@ -185,7 +185,7 @@ export default function Layout({ children }) {
         { path: '/perfil', label: 'Perfil' },
       ]
 
-  if (isAdminOfAny) {
+  if (isAdminOfAny || profile?.is_platform_admin) {
     navItems.push({ path: '/gerir', icon: Settings, label: 'Gerir' })
   }
 
