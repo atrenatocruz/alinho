@@ -565,8 +565,13 @@ export default function Admin() {
         // Origin Mix, recurrence still on: keep the shared rule/snapshot in sync.
         await updateRecurrence(editingGame.recurrence.id, data, recurrence)
       } else if (hadActiveRecurrence && !recurrence.enabled) {
-        // Origin Mix, toggled off: stop creating future Mixes. Never reactivated later.
-        await deactivateRecurrence(editingGame.recurrence.id)
+        // Origin Mix, toggled off: stop creating future Mixes and remove the
+        // already pre-created pending occurrence. Confirmed explicitly —
+        // this is destructive and easy to trigger by accident (e.g. a stray
+        // click on the checkbox before an unrelated edit).
+        if (confirm('Desativar a recorrência deste Mix? O próximo Mix pendente (ainda não lançado) será removido.')) {
+          await deactivateRecurrence(editingGame.recurrence.id)
+        }
       } else if (!hadActiveRecurrence && recurrence.enabled) {
         // Wasn't recurring (never was, or a previous recurrence was stopped): start a new one.
         const { data: { user } } = await supabase.auth.getUser()
@@ -925,7 +930,7 @@ export default function Admin() {
                       />
                     </div>
 
-                    {(!editingGame || editingGame.is_recurrence_origin || !editingGame.recurrence?.is_active) && (
+                    {(!editingGame || editingGame.is_recurrence_origin) && (
                       <div className="border-t border-line pt-4 space-y-4">
                         <label className="flex items-center gap-3 cursor-pointer">
                           <input
@@ -1134,7 +1139,7 @@ export default function Admin() {
                         {game.status === 'open' && 'Aberto'}
                         {game.status === 'closed' && 'Mix fechado — campo reservado'}
                         {game.status === 'in_progress' && 'A decorrer'}
-                        {game.status === 'pending' && 'Pendente — ainda não foi lançado'}
+                        {game.status === 'pending' && `Pendente — lança a ${formatDate(game.launch_at)}`}
                         {(game.status === 'completed' || game.status === 'finished') && 'Terminado'}
                         {game.status === 'cancelled' && 'Cancelado'}
                       </div>
