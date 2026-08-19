@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { Calendar, MapPin, ArrowLeft, UserPlus, User, Check, Lock, Trophy, Play, ChevronRight, Swords, X, Repeat, Share2, ChevronDown, RotateCcw, Euro } from 'lucide-react'
+import { Calendar, MapPin, ArrowLeft, UserPlus, User, Check, Lock, Trophy, Play, ChevronRight, Swords, X, Repeat, Share2, ChevronDown, RotateCcw, Euro, GripVertical } from 'lucide-react'
+import { DndContext, useDraggable, useDroppable, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core'
+import { CSS } from '@dnd-kit/utilities'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton, GuestBadge, PlayerAvatarRow, EmptyState, ShareModal, RoundTimer, Avatar, Select } from '../components/ui'
@@ -42,7 +44,8 @@ export default function GameDetails() {
   const [busy, setBusy] = useState(false)
   const [scores, setScores] = useState({}) // matchId -> {a, b}
   const [editingPairs, setEditingPairs] = useState(false)
-  const [swapPick, setSwapPick] = useState(null) // { teamId, slot: 'player1_id'|'player2_id' }
+  const [editedTeams, setEditedTeams] = useState([]) // staged copy of `teams`, only written to DB on Concluir
+  const [activeDragChip, setActiveDragChip] = useState(null) // { teamId, slot, player } — for the drag overlay
   const [showShare, setShowShare] = useState(false)
   const [duplasExpanded, setDuplasExpanded] = useState(true)
   const [showDuplasShare, setShowDuplasShare] = useState(false)
@@ -125,6 +128,7 @@ export default function GameDetails() {
           player2:profiles!teams_player2_id_fkey (id, name, avatar_url, preferred_side)
         `)
         .eq('game_id', id)
+        .order('created_at')
 
       const { data: matchesData } = await supabase
         .from('matches')
@@ -385,37 +389,80 @@ export default function GameDetails() {
     }
   }
 
-  /* ─── Admin: swap players between duplas ──────────────────────────── */
+  /* ─── Admin: swap players between duplas (drag and drop) ───────────── */
 
-  const handlePickForSwap = (teamId, slot) => {
-    if (!swapPick) {
-      setSwapPick({ teamId, slot })
-      return
-    }
-    if (swapPick.teamId === teamId && swapPick.slot === slot) {
-      setSwapPick(null) // tapped the same player — deselect
-      return
-    }
-    doSwap(swapPick, { teamId, slot })
+  const startEditingPairs = () => {
+    setEditedTeams(teams.map(t => ({ ...t })))
+    setEditingPairs(true)
   }
 
-  const doSwap = async (pickA, pickB) => {
-    const a = teams.find(t => t.id === pickA.teamId)
-    const b = teams.find(t => t.id === pickB.teamId)
-    if (!a || !b || a.id === b.id) {
-      setSwapPick(null) // swapping within the same dupla changes nothing
+  const cancelEditingPairs = () => {
+    setEditingPairs(false)
+    setEditedTeams([])
+    setActiveDragChip(null)
+  }
+
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 8 } }),
+  )
+
+  const parseChipId = (chipId) => {
+    const [teamId, slot] = chipId.split('::')
+    return { teamId, slot }
+  }
+
+  const handleDragStart = (event) => {
+    const { teamId, slot } = parseChipId(event.active.id)
+    const team = editedTeams.find(t => t.id === teamId)
+    setActiveDragChip({ teamId, slot, player: team?.[slot === 'player1_id' ? 'player1' : 'player2'] })
+  }
+
+  const handleDragEnd = (event) => {
+    setActiveDragChip(null)
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const from = parseChipId(active.id)
+    const to = parseChipId(over.id)
+    if (from.teamId === to.teamId) return // same dupla — nothing to swap
+
+    setEditedTeams(prev => {
+      const next = prev.map(t => ({ ...t }))
+      const teamA = next.find(t => t.id === from.teamId)
+      const teamB = next.find(t => t.id === to.teamId)
+      if (!teamA || !teamB) return prev
+      const objKeyA = from.slot === 'player1_id' ? 'player1' : 'player2'
+      const objKeyB = to.slot === 'player1_id' ? 'player1' : 'player2'
+      const idA = teamA[from.slot], objA = teamA[objKeyA]
+      const idB = teamB[to.slot], objB = teamB[objKeyB]
+      teamA[from.slot] = idB; teamA[objKeyA] = objB
+      teamB[to.slot] = idA; teamB[objKeyB] = objA
+      return next
+    })
+  }
+
+  const saveEditedPairs = async () => {
+    const changed = editedTeams.filter(et => {
+      const original = teams.find(t => t.id === et.id)
+      return original && (original.player1_id !== et.player1_id || original.player2_id !== et.player2_id)
+    })
+    if (changed.length === 0) {
+      setEditingPairs(false)
+      setEditedTeams([])
       return
     }
     setBusy(true)
     setMixError('')
     try {
-      const pa = a[pickA.slot]
-      const pb = b[pickB.slot]
-      const { error: e1 } = await supabase.from('teams').update({ [pickA.slot]: pb }).eq('id', a.id)
-      if (e1) throw e1
-      const { error: e2 } = await supabase.from('teams').update({ [pickB.slot]: pa }).eq('id', b.id)
-      if (e2) throw e2
-      setSwapPick(null)
+      const results = await Promise.all(
+        changed.map(et => supabase.from('teams')
+          .update({ player1_id: et.player1_id, player2_id: et.player2_id })
+          .eq('id', et.id))
+      )
+      const failed = results.find(r => r.error)
+      if (failed) throw failed.error
+      setEditingPairs(false)
+      setEditedTeams([])
       loadGameDetails()
     } catch (error) {
       console.error('Error swapping players:', error)
@@ -999,7 +1046,7 @@ export default function GameDetails() {
             >
               <h3 className="text-lg text-ink-900">Duplas</h3>
               <div className="flex items-center gap-1">
-                {duplasExpanded && (
+                {duplasExpanded && !editingPairs && (
                   <>
                     <button
                       onClick={(e) => { e.stopPropagation(); setShowDuplasShare(true) }}
@@ -1010,17 +1057,31 @@ export default function GameDetails() {
                     </button>
                     {isAdmin && game.status === 'in_progress' && (
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setEditingPairs(v => !v)
-                          setSwapPick(null)
-                        }}
+                        onClick={(e) => { e.stopPropagation(); startEditingPairs() }}
                         className="inline-flex items-center gap-1.5 text-ink-700 text-sm font-extrabold min-h-[44px] px-2"
                       >
                         <Repeat size={16} />
-                        {editingPairs ? 'Concluir' : 'Editar duplas'}
+                        Editar duplas
                       </button>
                     )}
+                  </>
+                )}
+                {duplasExpanded && editingPairs && (
+                  <>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); cancelEditingPairs() }}
+                      disabled={busy}
+                      className="inline-flex items-center gap-1.5 text-muted text-sm font-extrabold min-h-[44px] px-2 disabled:opacity-40"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); saveEditedPairs() }}
+                      disabled={busy}
+                      className="inline-flex items-center gap-1.5 text-ink-700 text-sm font-extrabold min-h-[44px] px-2 disabled:opacity-40"
+                    >
+                      {busy ? 'A guardar…' : 'Concluir'}
+                    </button>
                   </>
                 )}
                 <ChevronDown
@@ -1034,45 +1095,62 @@ export default function GameDetails() {
               <>
                 {editingPairs && (
                   <p className="text-muted text-sm mb-3 bg-ink-50 rounded-ctrl px-3 py-2.5">
-                    Toca em <strong className="text-ink-900">dois jogadores</strong> (de duplas diferentes) para os trocar.
+                    Arrasta um jogador para <strong className="text-ink-900">outra dupla</strong> para os trocar.
                   </p>
                 )}
 
-                <div className="space-y-2">
-                  {teams.map((t, i) => (
-                    <div key={t.id} className={`rounded-ctrl p-3 ${
-                      t.id === game.winner_team_id ? 'bg-lime-400/20' : 'bg-canvas'
-                    }`}>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <p className="text-[11px] font-extrabold text-muted uppercase tracking-wide">
-                          Dupla {i + 1} · {(pointsById[t.player1?.id] ?? 0) + (pointsById[t.player2?.id] ?? 0)} pts
-                        </p>
-                        <div className="flex items-center gap-1.5">
-                          {t.id === game.winner_team_id && <span>🏆</span>}
-                          {(t.player1?.is_guest || t.player2?.is_guest) && <GuestBadge />}
+                {editingPairs ? (
+                  <DndContext sensors={dndSensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+                    <div className="space-y-2">
+                      {editedTeams.map((t, i) => (
+                        <div key={t.id} className={`rounded-ctrl p-3 ${
+                          t.id === game.winner_team_id ? 'bg-lime-400/20' : 'bg-canvas'
+                        }`}>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <p className="text-[11px] font-extrabold text-muted uppercase tracking-wide">
+                              Dupla {i + 1} · {(pointsById[t.player1?.id] ?? 0) + (pointsById[t.player2?.id] ?? 0)} pts
+                            </p>
+                            <div className="flex items-center gap-1.5">
+                              {t.id === game.winner_team_id && <span>🏆</span>}
+                              {(t.player1?.is_guest || t.player2?.is_guest) && <GuestBadge />}
+                            </div>
+                          </div>
+                          <div className="space-y-1.5">
+                            {[['player1_id', t.player1], ['player2_id', t.player2]].map(([slot, player]) => (
+                              <SwapChip key={slot} id={`${t.id}::${slot}`} player={player} disabled={busy} />
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                      {editingPairs ? (
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          {[['player1_id', t.player1], ['player2_id', t.player2]].map(([slot, player]) => {
-                            const picked = swapPick?.teamId === t.id && swapPick?.slot === slot
-                            return (
-                              <button
-                                key={slot}
-                                onClick={() => handlePickForSwap(t.id, slot)}
-                                disabled={busy}
-                                className={`px-3 py-2 min-h-[40px] rounded-full text-sm font-extrabold transition-all duration-fast active:scale-[0.97] ${
-                                  picked
-                                    ? 'bg-lime-400 text-ink-900 ring-2 ring-ink-900'
-                                    : 'bg-surface text-ink-900 border border-line hover:border-ink-200'
-                                }`}
-                              >
-                                {player?.name?.split(' ')[0] || '?'}
-                              </button>
-                            )
-                          })}
+                      ))}
+                    </div>
+                    {createPortal(
+                      <DragOverlay>
+                        {activeDragChip && (
+                          <div className="flex items-center gap-2 px-2.5 py-2 rounded-ctrl border border-ink-900 bg-surface shadow-card">
+                            <GripVertical size={16} className="text-muted shrink-0" />
+                            <Avatar name={activeDragChip.player?.name} url={activeDragChip.player?.avatar_url} size="w-7 h-7 text-xs" />
+                            <span className="text-sm font-extrabold text-ink-900">{activeDragChip.player?.name || '?'}</span>
+                          </div>
+                        )}
+                      </DragOverlay>,
+                      document.body
+                    )}
+                  </DndContext>
+                ) : (
+                  <div className="space-y-2">
+                    {teams.map((t, i) => (
+                      <div key={t.id} className={`rounded-ctrl p-3 ${
+                        t.id === game.winner_team_id ? 'bg-lime-400/20' : 'bg-canvas'
+                      }`}>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <p className="text-[11px] font-extrabold text-muted uppercase tracking-wide">
+                            Dupla {i + 1} · {(pointsById[t.player1?.id] ?? 0) + (pointsById[t.player2?.id] ?? 0)} pts
+                          </p>
+                          <div className="flex items-center gap-1.5">
+                            {t.id === game.winner_team_id && <span>🏆</span>}
+                            {(t.player1?.is_guest || t.player2?.is_guest) && <GuestBadge />}
+                          </div>
                         </div>
-                      ) : (
                         <div className="space-y-1.5">
                           {[t.player1, t.player2].map((player, idx) => (
                             <div key={player?.id || idx} className="flex items-center gap-2">
@@ -1093,10 +1171,10 @@ export default function GameDetails() {
                             </div>
                           ))}
                         </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -1513,6 +1591,35 @@ export default function GameDetails() {
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+/* ─── SwapChip ───────────────────────────────────────────────────────────
+   One player row inside "Editar duplas": draggable AND droppable on the
+   same id, so dropping one chip onto another swaps the two players. */
+function SwapChip({ id, player, disabled }) {
+  const draggable = useDraggable({ id, disabled })
+  const droppable = useDroppable({ id })
+
+  const style = draggable.transform
+    ? { transform: CSS.Translate.toString(draggable.transform), zIndex: 10 }
+    : undefined
+
+  return (
+    <div
+      ref={(node) => { draggable.setNodeRef(node); droppable.setNodeRef(node) }}
+      style={style}
+      {...draggable.listeners}
+      {...draggable.attributes}
+      className={`flex items-center gap-2 px-2.5 py-2 rounded-ctrl border touch-none select-none
+                  transition-colors duration-fast
+                  ${draggable.isDragging ? 'opacity-30' : ''}
+                  ${droppable.isOver && !draggable.isDragging ? 'border-ink-900 bg-lime-400/20' : 'border-line bg-surface'}`}
+    >
+      <GripVertical size={16} className="text-muted shrink-0" />
+      <Avatar name={player?.name} url={player?.avatar_url} size="w-7 h-7 text-xs" />
+      <span className="flex-1 min-w-0 text-sm font-extrabold text-ink-900 truncate">{player?.name || '?'}</span>
     </div>
   )
 }
