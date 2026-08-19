@@ -46,7 +46,6 @@ export default function GameDetails() {
   const [editingPairs, setEditingPairs] = useState(false)
   const [editedTeams, setEditedTeams] = useState([]) // staged copy of `teams`, only written to DB on Concluir
   const [activeDragChip, setActiveDragChip] = useState(null) // { teamId, slot, player } — for the drag overlay
-  const [justSwappedIds, setJustSwappedIds] = useState(() => new Set()) // chip ids to flash lime right after a swap
   const [showShare, setShowShare] = useState(false)
   const [duplasExpanded, setDuplasExpanded] = useState(true)
   const [showDuplasShare, setShowDuplasShare] = useState(false)
@@ -401,7 +400,6 @@ export default function GameDetails() {
     setEditingPairs(false)
     setEditedTeams([])
     setActiveDragChip(null)
-    setJustSwappedIds(new Set())
   }
 
   const dndSensors = useSensors(
@@ -441,10 +439,6 @@ export default function GameDetails() {
       teamB[to.slot] = idA; teamB[objKeyB] = objA
       return next
     })
-
-    // Brief lime flash on both chips so a swap never reads as "nothing happened"
-    setJustSwappedIds(new Set([active.id, over.id]))
-    window.setTimeout(() => setJustSwappedIds(new Set()), 900)
   }
 
   const saveEditedPairs = async () => {
@@ -1164,27 +1158,18 @@ export default function GameDetails() {
                             </div>
                           </div>
                           <div className="space-y-1.5">
-                            {[['player1_id', t.player1], ['player2_id', t.player2]].map(([slot, player]) => {
-                              const chipId = `${t.id}::${slot}`
-                              return (
-                                <SwapChip
-                                  key={slot}
-                                  id={chipId}
-                                  player={player}
-                                  disabled={busy}
-                                  justSwapped={justSwappedIds.has(chipId)}
-                                />
-                              )
-                            })}
+                            {[['player1_id', t.player1], ['player2_id', t.player2]].map(([slot, player]) => (
+                              <SwapChip key={slot} id={`${t.id}::${slot}`} player={player} disabled={busy} />
+                            ))}
                           </div>
                         </div>
                       ))}
                     </div>
                     {createPortal(
-                      <DragOverlay dropAnimation={{ duration: 200, easing: 'cubic-bezier(0.2, 0.9, 0.3, 1.2)' }}>
+                      <DragOverlay>
                         {activeDragChip && (
-                          <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-ctrl border border-ink-900 bg-surface shadow-lift rotate-1">
-                            <GripVertical size={16} className="text-ink-200 shrink-0" />
+                          <div className="flex items-center gap-2 px-2.5 py-2 rounded-ctrl border border-ink-900 bg-surface shadow-card">
+                            <GripVertical size={16} className="text-muted shrink-0" />
                             <Avatar name={activeDragChip.player?.name} url={activeDragChip.player?.avatar_url} size="w-7 h-7 text-xs" />
                             <span className="text-sm font-extrabold text-ink-900">{activeDragChip.player?.name || '?'}</span>
                           </div>
@@ -1651,30 +1636,14 @@ export default function GameDetails() {
 
 /* ─── SwapChip ───────────────────────────────────────────────────────────
    One player row inside "Editar duplas": draggable AND droppable on the
-   same id, so dropping one chip onto another swaps the two players.
-   States (per DESIGN.md): resting card (shadow-card), lifted while
-   dragged (shadow-lift + slight scale/rotate baked into the dnd transform
-   since an inline style.transform would otherwise clobber a Tailwind
-   scale utility), lime-tinted while a valid drop target, and — because a
-   completed swap only changes a row's *content* in place, not its
-   position, it's easy to miss — a brief lime pop (justSwapped) so the
-   change is never silent. The vacated source slot goes dashed/empty,
-   reusing the app's existing "dashed = empty/provisional" convention. */
-function SwapChip({ id, player, disabled, justSwapped }) {
+   same id, so dropping one chip onto another swaps the two players. */
+function SwapChip({ id, player, disabled }) {
   const draggable = useDraggable({ id, disabled })
   const droppable = useDroppable({ id })
 
   const style = draggable.transform
-    ? { transform: `${CSS.Translate.toString(draggable.transform)} scale(1.04) rotate(-1deg)`, zIndex: 10 }
+    ? { transform: CSS.Translate.toString(draggable.transform), zIndex: 10 }
     : undefined
-
-  const stateClass = draggable.isDragging
-    ? 'opacity-50 border-dashed border-ink-200 bg-canvas shadow-lift'
-    : droppable.isOver
-    ? 'border-ink-900 bg-lime-100 shadow-lift scale-[1.02]'
-    : justSwapped
-    ? 'border-lime-400 bg-lime-100 shadow-card animate-pop'
-    : 'border-line bg-surface shadow-card hover:border-ink-200 hover:shadow-lift'
 
   return (
     <div
@@ -1682,10 +1651,12 @@ function SwapChip({ id, player, disabled, justSwapped }) {
       style={style}
       {...draggable.listeners}
       {...draggable.attributes}
-      className={`flex items-center gap-2.5 px-3 py-2.5 rounded-ctrl border touch-none select-none
-                  transition-all duration-base cursor-grab active:cursor-grabbing ${stateClass}`}
+      className={`flex items-center gap-2 px-2.5 py-2 rounded-ctrl border touch-none select-none
+                  transition-colors duration-fast
+                  ${draggable.isDragging ? 'opacity-30' : ''}
+                  ${droppable.isOver && !draggable.isDragging ? 'border-ink-900 bg-lime-400/20' : 'border-line bg-surface'}`}
     >
-      <GripVertical size={16} className="text-ink-200 shrink-0" />
+      <GripVertical size={16} className="text-muted shrink-0" />
       <Avatar name={player?.name} url={player?.avatar_url} size="w-7 h-7 text-xs" />
       <span className="flex-1 min-w-0 text-sm font-extrabold text-ink-900 truncate">{player?.name || '?'}</span>
     </div>
