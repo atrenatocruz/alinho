@@ -1,7 +1,6 @@
 import { forwardRef, useImperativeHandle, useRef, useState, useEffect } from 'react'
 import { toPng } from 'html-to-image'
 import logoWordmark from '../logo/primary-dark-card.svg'
-import { seedCourts } from '../lib/mixLogic'
 
 /* ════════════════════════════════════════════════════════════════════════
    ShareCard — branded, rasterizable Instagram Story card (1080×1920).
@@ -281,17 +280,23 @@ function DuplaPlayers({ team, compact, avatarSize, align = 'start' }) {
   )
 }
 
-// Grouped by court instead of a flat "Dupla N" list — reuses seedCourts,
-// the same seed_ranking-sorted pairing Round 1 actually uses, so this
-// preview matches the real court draw (court 1 = the two highest-seed
-// duplas facing off, down to the lowest-seed duplas on the last court). A
-// leftover unpaired dupla (odd count) is dropped, same as seedCourts.
+// Grouped by court by list position (1st & 2nd dupla → court 1, 3rd & 4th
+// → court 2, ...) rather than seed_ranking — seed_ranking is set once when
+// duplas are formed and never updated by a manual admin swap, so sorting by
+// it here would show a different (stale) pairing than the app's own Duplas
+// view, which pairs the same way. A leftover unpaired dupla (odd count) is
+// dropped, since the card can't show a dupla with no opponent.
 function DuplasCard({ game, duplas }) {
   const compact = duplas.length >= DUPLAS_COMPACT_THRESHOLD
   const avatarSize = compact ? 22 : 34
   const numCourts = game.num_courts || Math.ceil(duplas.length / 2)
   const teamById = Object.fromEntries(duplas.map(d => [d.id, d]))
-  const courtMatches = seedCourts(duplas, numCourts)
+  const courtMatches = []
+  for (let c = 1; c <= numCourts; c++) {
+    const a = duplas[(c - 1) * 2]
+    const b = duplas[(c - 1) * 2 + 1]
+    if (a && b) courtMatches.push({ court_number: c, team_a_id: a.id, team_b_id: b.id })
+  }
 
   return (
     <CardShell autoHeight>

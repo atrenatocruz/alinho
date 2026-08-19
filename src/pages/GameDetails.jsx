@@ -444,7 +444,7 @@ export default function GameDetails() {
     // a swap only changes content in place, so without this it can read as
     // if the drag did nothing.
     setJustSwappedId(over.id)
-    window.setTimeout(() => setJustSwappedId((current) => (current === over.id ? null : current)), 1400)
+    window.setTimeout(() => setJustSwappedId((current) => (current === over.id ? null : current)), 900)
 
     setEditedTeams(prev => {
       const next = prev.map(t => ({ ...t }))
@@ -866,8 +866,26 @@ export default function GameDetails() {
 
   const duplaLabel = (t) => `${t?.player1?.name || '?'} & ${t?.player2?.name || '?'}`
 
+  // Pairs duplas into courts by their position in the list (1st & 2nd →
+  // court 1, 3rd & 4th → court 2, ...) rather than by seed_ranking. Used
+  // for the "Duplas" preview (screen + share text) only — NOT for the
+  // actual Round 1 draw (handleStartRound1 still uses seedCourts there,
+  // seeding real matches by strength). seed_ranking is set once when
+  // duplas are formed and never updated by a manual admin swap, so
+  // sorting this preview by it would silently re-shuffle a dupla the
+  // admin just dragged into a specific spot into a different court.
+  const pairIntoCourts = (teamsArray, maxCourts) => {
+    const matches = []
+    for (let c = 1; c <= maxCourts; c++) {
+      const a = teamsArray[(c - 1) * 2]
+      const b = teamsArray[(c - 1) * 2 + 1]
+      if (a && b) matches.push({ court_number: c, team_a_id: a.id, team_b_id: b.id })
+    }
+    return matches
+  }
+
   const buildDuplasShareMessage = () => {
-    const courtMatches = seedCourts(teams, numCourts)
+    const courtMatches = pairIntoCourts(teams, numCourts)
     const pairedIds = new Set(courtMatches.flatMap(m => [m.team_a_id, m.team_b_id]))
     const leftover = teams.filter(t => !pairedIds.has(t.id))
 
@@ -1238,7 +1256,7 @@ export default function GameDetails() {
                 ) : (
                   <div className="space-y-2">
                     {(() => {
-                      const courtMatches = seedCourts(teams, numCourts)
+                      const courtMatches = pairIntoCourts(teams, numCourts)
                       const pairedIds = new Set(courtMatches.flatMap(m => [m.team_a_id, m.team_b_id]))
                       const leftover = teams.filter(t => !pairedIds.has(t.id))
                       return (
@@ -1711,7 +1729,7 @@ function SwapChip({ id, player, disabled, justSwapped }) {
       className={`relative flex items-center gap-2 px-2.5 py-2 rounded-ctrl border touch-none select-none
                   transition-colors duration-fast
                   ${draggable.isDragging ? 'opacity-30' : ''}
-                  ${droppable.isOver && !draggable.isDragging ? 'border-ink-900 bg-lime-400/20' : 'border-line bg-surface'}`}
+                  border-line ${droppable.isOver && !draggable.isDragging ? 'bg-lime-400/20' : 'bg-surface'}`}
     >
       <GripVertical size={16} className="text-muted shrink-0" />
       <Avatar name={player?.name} url={player?.avatar_url} size="w-7 h-7 text-xs" />
