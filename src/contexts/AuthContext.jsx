@@ -304,6 +304,18 @@ export const AuthProvider = ({ children }) => {
     return { data, error }
   }
 
+  // Platform-admin-only: grants the caller an admin membership in any club,
+  // so opening its Gerir page for the first time works instead of hitting
+  // "Sem acesso". Reloads memberships afterward, same as followOrganization,
+  // so adminOrganizations/currentMembership pick up the new club right away.
+  const ensureOrgAdminAccess = async (organizationId) => {
+    const { error } = await supabase.rpc('platform_admin_ensure_org_access', { p_organization_id: organizationId })
+    if (!error && user) {
+      await loadProfile(user.id)
+    }
+    return { error }
+  }
+
   // Leaves a club the caller currently belongs to. Blocked server-side if
   // the caller is that org's last admin.
   const leaveOrganization = async (organizationId) => {
@@ -343,6 +355,7 @@ export const AuthProvider = ({ children }) => {
     updateMembership,
     joinOrganization,
     followOrganization,
+    ensureOrgAdminAccess,
     leaveOrganization,
     switchOrganization,
   }

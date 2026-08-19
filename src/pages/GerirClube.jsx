@@ -94,7 +94,7 @@ function Segmented({ options, value, onChange }) {
 
 export default function GerirClube() {
   const { slug } = useParams()
-  const { profile: currentUser, memberships, isPrivateMatchesEnabled, refreshFeatureFlags } = useAuth()
+  const { profile: currentUser, memberships, adminOrganizations, isPrivateMatchesEnabled, refreshFeatureFlags, ensureOrgAdminAccess } = useAuth()
   const [org, setOrg] = useState(null)
   const [orgLoading, setOrgLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('games') // 'games', 'members', 'settings'
@@ -114,11 +114,59 @@ export default function GerirClube() {
   // Resolve the org from the URL slug. `Guard` (App.jsx) only checks
   // "is logged in" for this route — per-org admin authorization happens
   // here, once we know which specific org the slug points to.
+  //
+  // Platform admins aren't necessarily a member of every club, so a slug
+  // with no matching membership doesn't mean "no access" for them — it
+  // means "not joined yet". ensureOrgAdminAccess grants them a real admin
+  // membership (see migration_platform_admin_full_access.sql), after which
+  // every other club-scoped query/RPC on this page works exactly as it
+  // does for a normal org admin.
   useEffect(() => {
-    const membership = memberships.find((m) => m.organization?.slug === slug)
-    setOrg(membership?.is_admin ? membership.organization : null)
-    setOrgLoading(false)
-  }, [slug, memberships])
+    let cancelled = false
+
+    const resolveOrg = async () => {
+      const membership = memberships.find((m) => m.organization?.slug === slug)
+      if (membership?.is_admin) {
+        setOrg(membership.organization)
+        setOrgLoading(false)
+        return
+      }
+
+      if (!currentUser?.is_platform_admin) {
+        setOrg(null)
+        setOrgLoading(false)
+        return
+      }
+
+      const { data: anyOrg, error } = await supabase
+        .from('organizations')
+        .select('*')
+        .eq('slug', slug)
+        .maybeSingle()
+
+      if (cancelled) return
+
+      if (error || !anyOrg) {
+        setOrg(null)
+        setOrgLoading(false)
+        return
+      }
+
+      const { error: accessError } = await ensureOrgAdminAccess(anyOrg.id)
+      if (cancelled) return
+
+      if (accessError) {
+        console.error('Error granting platform admin access:', accessError)
+        setOrg(null)
+      } else {
+        setOrg(anyOrg)
+      }
+      setOrgLoading(false)
+    }
+
+    resolveOrg()
+    return () => { cancelled = true }
+  }, [slug, memberships, currentUser?.is_platform_admin, ensureOrgAdminAccess])
 
   const currentOrganizationId = org?.id
 
@@ -824,6 +872,11 @@ export default function GerirClube() {
   return (
     <div className="space-y-6">
       <div>
+        {(adminOrganizations.length > 1 || currentUser?.is_platform_admin) && (
+          <Link to="/gerir" className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline mb-2">
+            <ArrowLeft size={16} /> Voltar aos clubes que geres
+          </Link>
+        )}
         <h2 className="text-3xl font-bold text-ink-900">Gerir: {org.name}</h2>
         <p className="text-gray-600 mt-1">Jogos, membros e definições deste clube</p>
       </div>
