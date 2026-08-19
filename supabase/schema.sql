@@ -462,30 +462,33 @@ CREATE TRIGGER game_full_trigger
 AFTER INSERT OR UPDATE ON participants
 FOR EACH ROW EXECUTE FUNCTION check_game_full();
 
--- Promote suplentes (waitlisted participants) into freed slots when someone
--- leaves, oldest-first; only reopens the game for fresh signups once the
--- waitlist is empty. Loops because a single DELETE can free 2 slots at
--- once (a pair leaving), and suplentes are solo — one promotion per slot.
-CREATE OR REPLACE FUNCTION check_game_promote()
-RETURNS TRIGGER AS $$
+-- Promote suplentes (waitlisted participants) into freed/opened slots,
+-- oldest-first; only reopens the game for fresh signups once the waitlist
+-- is empty. Shared by two triggers: someone leaving (a DELETE frees up to
+-- 2 slots at once for a pair, suplentes are solo — one promotion per
+-- slot) and an admin raising capacity (adding a court) on an already-full
+-- mix, which otherwise left suplentes stranded even though there was now
+-- room for them.
+CREATE OR REPLACE FUNCTION promote_waitlist(p_game_id UUID)
+RETURNS VOID AS $$
 DECLARE
   cap INTEGER;
   people INTEGER;
   v_waitlisted_id UUID;
 BEGIN
-  SELECT COALESCE(max_players, num_courts * 4) INTO cap FROM games WHERE id = OLD.game_id;
+  SELECT COALESCE(max_players, num_courts * 4) INTO cap FROM games WHERE id = p_game_id;
 
   LOOP
     SELECT COALESCE(SUM(1 + CASE WHEN partner_id IS NOT NULL THEN 1 ELSE 0 END), 0)
       INTO people
       FROM participants
-     WHERE game_id = OLD.game_id AND status = 'confirmed';
+     WHERE game_id = p_game_id AND status = 'confirmed';
 
     EXIT WHEN people >= cap;
 
     SELECT id INTO v_waitlisted_id
       FROM participants
-     WHERE game_id = OLD.game_id AND status = 'waitlisted'
+     WHERE game_id = p_game_id AND status = 'waitlisted'
      ORDER BY created_at
      LIMIT 1;
 
@@ -499,13 +502,19 @@ BEGIN
   SELECT COALESCE(SUM(1 + CASE WHEN partner_id IS NOT NULL THEN 1 ELSE 0 END), 0)
     INTO people
     FROM participants
-   WHERE game_id = OLD.game_id AND status = 'confirmed';
+   WHERE game_id = p_game_id AND status = 'confirmed';
 
   IF people < cap THEN
     UPDATE games SET status = 'open', updated_at = NOW()
-    WHERE id = OLD.game_id AND status = 'closed';
+    WHERE id = p_game_id AND status = 'closed';
   END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
+CREATE OR REPLACE FUNCTION check_game_promote()
+RETURNS TRIGGER AS $$
+BEGIN
+  PERFORM promote_waitlist(OLD.game_id);
   RETURN OLD;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
@@ -513,6 +522,31 @@ $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 CREATE TRIGGER game_promote_trigger
 AFTER DELETE ON participants
 FOR EACH ROW EXECUTE FUNCTION check_game_promote();
+
+-- Capacity going up (admin adds a court to a full mix) should promote
+-- suplentes the same way a departure does. A decrease deliberately does
+-- nothing here — it didn't free anything and shouldn't reopen or touch
+-- the waitlist.
+CREATE OR REPLACE FUNCTION check_game_capacity_increase()
+RETURNS TRIGGER AS $$
+DECLARE
+  old_cap INTEGER;
+  new_cap INTEGER;
+BEGIN
+  old_cap := COALESCE(OLD.max_players, OLD.num_courts * 4);
+  new_cap := COALESCE(NEW.max_players, NEW.num_courts * 4);
+
+  IF new_cap > old_cap THEN
+    PERFORM promote_waitlist(NEW.id);
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+CREATE TRIGGER game_capacity_increase_trigger
+AFTER UPDATE OF num_courts, max_players ON games
+FOR EACH ROW EXECUTE FUNCTION check_game_capacity_increase();
 
 -- Create a profile (identity only — no membership) on signup. Attaching
 -- to an organization is a separate step (see join_organization below),
