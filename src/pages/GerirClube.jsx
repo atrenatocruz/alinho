@@ -1,10 +1,19 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { Loader } from '@googlemaps/js-api-loader'
 import { Plus, Calendar, Users, Trash2, Edit2, Check, X, UserX, Repeat, Clock, ArrowLeft } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { DateField, DateTimeField, Avatar } from '../components/ui'
 import { totalRounds, FORMAT_LABEL } from '../lib/mixLogic'
+
+// Undefined (not just falsy-empty-string) when the env var is unset, so the
+// "Local" field falls back to a plain text input rather than throwing on a
+// missing key — see .env.example.
+const GOOGLE_PLACES_API_KEY = import.meta.env.VITE_GOOGLE_PLACES_API_KEY || null
+const placesLoader = GOOGLE_PLACES_API_KEY
+  ? new Loader({ apiKey: GOOGLE_PLACES_API_KEY, version: 'weekly' })
+  : null
 
 // datetime-local <-> stored timestamptz helpers (keeps Portugal wall-clock)
 const toLocalInput = (d) => {
@@ -110,6 +119,41 @@ export default function GerirClube() {
 
   // Form states
   const [gameForm, setGameForm] = useState(EMPTY_GAME_FORM)
+  const locationInputRef = useRef(null)
+
+  // Wires Google Places Autocomplete onto the plain "Local" input whenever
+  // the create/edit form is open. No-ops when VITE_GOOGLE_PLACES_API_KEY
+  // isn't set — the input just stays a normal text field.
+  useEffect(() => {
+    if (!placesLoader || !(showCreateGame || editingGame)) return
+
+    let autocomplete
+    let cancelled = false
+
+    placesLoader.importLibrary('places').then(({ Autocomplete }) => {
+      if (cancelled || !locationInputRef.current) return
+      autocomplete = new Autocomplete(locationInputRef.current, {
+        fields: ['name', 'formatted_address'],
+        types: ['establishment'],
+        componentRestrictions: { country: 'pt' },
+      })
+      // Functional update: this listener is attached once per form-open,
+      // so a plain `gameForm.location` closure would go stale if the
+      // admin edits other fields (title, date...) before picking a place.
+      autocomplete.addListener('place_changed', () => {
+        const place = autocomplete.getPlace()
+        const value = place.name && place.formatted_address
+          ? `${place.name} - ${place.formatted_address}`
+          : place.formatted_address || place.name || ''
+        if (value) setGameForm((form) => ({ ...form, location: value }))
+      })
+    }).catch((error) => console.error('Error loading Google Places:', error))
+
+    return () => {
+      cancelled = true
+      if (autocomplete) window.google?.maps?.event?.clearInstanceListeners(autocomplete)
+    }
+  }, [showCreateGame, editingGame])
 
   // Resolve the org from the URL slug. `Guard` (App.jsx) only checks
   // "is logged in" for this route — per-org admin authorization happens
@@ -971,6 +1015,7 @@ export default function GerirClube() {
                         Local
                       </label>
                       <input
+                        ref={locationInputRef}
                         type="text"
                         value={gameForm.location}
                         onChange={(e) => setGameForm({ ...gameForm, location: e.target.value })}
