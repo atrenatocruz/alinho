@@ -32,7 +32,7 @@ Open http://localhost:5173. There's a dev-only "Entrar como Admin" shortcut on t
 
 ## Deployment
 
-See [`DEPLOYMENT.md`](DEPLOYMENT.md) for the full picture (current live setup, plus how to stand up a fresh environment). Short version: the web app auto-deploys to Vercel on every push to `main`; the WhatsApp bot currently runs locally and has a documented path to AWS EC2 in [`whatsapp-bot/README.md`](whatsapp-bot/README.md).
+See [`DEPLOYMENT.md`](DEPLOYMENT.md) for the full picture (current live setup, plus how to stand up a fresh environment). Short version: the web app auto-deploys to Vercel on every push to `main`; the WhatsApp bot runs on an AWS EC2 free-tier instance (deploy steps in [`whatsapp-bot/README.md`](whatsapp-bot/README.md)) and needs a manual redeploy for code changes to take effect.
 
 ## Database changes
 

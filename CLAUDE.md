@@ -19,7 +19,7 @@ alinho is a multi-tenant padel game management app: club admins create games ("m
 - **Web app** (`src/`): Vite + React + React Router + Tailwind, deployed to Vercel, auto-deploy on push to `main`.
 - **Backend**: Supabase (Postgres + Auth + Realtime). No ORM, no migration runner — `supabase/schema.sql` is the base schema, `supabase/migration_*.sql` is a dated, sequential stack of hand-run changes. **A migration file existing in the repo does not mean it's live** — someone has to paste it into the Supabase SQL Editor. Always say so explicitly when you add one, and check whether it needs running before assuming a schema change is in effect.
 - **Multi-tenancy**: `organizations` (clubs) + `memberships` (per-user, per-org: `is_admin`, `is_guest`, `level`). `profiles` holds only identity that's global across clubs. `profiles.is_platform_admin` (manually granted) is a separate, higher tier — can create new clubs and manage any club, not just ones they're a member of.
-- **WhatsApp bot** (`whatsapp-bot/`): separate Node/Baileys process, one per club, uses the Supabase **service-role** key (bypasses RLS) — kept as its own process rather than folded into the web app for exactly that reason. Currently runs locally, not deployed — see `DEPLOYMENT.md`.
+- **WhatsApp bot** (`whatsapp-bot/`): separate Node/Baileys process, one per club, uses the Supabase **service-role** key (bypasses RLS) — kept as its own process rather than folded into the web app for exactly that reason. Deployed on AWS EC2 (free tier) — see `DEPLOYMENT.md`. Unlike the web app, it has no CI/auto-deploy — a code change needs a manual redeploy to the instance.
 
 ## Workflow this repo uses
 
