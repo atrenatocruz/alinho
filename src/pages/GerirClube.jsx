@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Loader } from '@googlemaps/js-api-loader'
+import { setOptions, importLibrary } from '@googlemaps/js-api-loader'
 import { Plus, Calendar, Users, Trash2, Edit2, Check, X, UserX, Repeat, Clock, ArrowLeft } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -9,11 +9,11 @@ import { totalRounds, FORMAT_LABEL } from '../lib/mixLogic'
 
 // Undefined (not just falsy-empty-string) when the env var is unset, so the
 // "Local" field falls back to a plain text input rather than throwing on a
-// missing key — see .env.example.
+// missing key — see .env.example. setOptions() only records config (must
+// run before the first importLibrary() call) — it doesn't fetch anything
+// itself, so it's safe to call at module scope even if Places is never used.
 const GOOGLE_PLACES_API_KEY = import.meta.env.VITE_GOOGLE_PLACES_API_KEY || null
-const placesLoader = GOOGLE_PLACES_API_KEY
-  ? new Loader({ apiKey: GOOGLE_PLACES_API_KEY, version: 'weekly' })
-  : null
+if (GOOGLE_PLACES_API_KEY) setOptions({ key: GOOGLE_PLACES_API_KEY, v: 'weekly' })
 
 // datetime-local <-> stored timestamptz helpers (keeps Portugal wall-clock)
 const toLocalInput = (d) => {
@@ -125,12 +125,12 @@ export default function GerirClube() {
   // the create/edit form is open. No-ops when VITE_GOOGLE_PLACES_API_KEY
   // isn't set — the input just stays a normal text field.
   useEffect(() => {
-    if (!placesLoader || !(showCreateGame || editingGame)) return
+    if (!GOOGLE_PLACES_API_KEY || !(showCreateGame || editingGame)) return
 
     let autocomplete
     let cancelled = false
 
-    placesLoader.importLibrary('places').then(({ Autocomplete }) => {
+    importLibrary('places').then(({ Autocomplete }) => {
       if (cancelled || !locationInputRef.current) return
       autocomplete = new Autocomplete(locationInputRef.current, {
         fields: ['name', 'formatted_address'],
