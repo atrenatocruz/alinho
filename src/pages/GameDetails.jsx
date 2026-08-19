@@ -46,6 +46,7 @@ export default function GameDetails() {
   const [editingPairs, setEditingPairs] = useState(false)
   const [editedTeams, setEditedTeams] = useState([]) // staged copy of `teams`, only written to DB on Concluir
   const [activeDragChip, setActiveDragChip] = useState(null) // { teamId, slot, player } — for the drag overlay
+  const [justSwappedId, setJustSwappedId] = useState(null) // chip id that just received a dragged player — brief lime confirmation
   const [showShare, setShowShare] = useState(false)
   const [duplasExpanded, setDuplasExpanded] = useState(true)
   const [showDuplasShare, setShowDuplasShare] = useState(false)
@@ -400,6 +401,7 @@ export default function GameDetails() {
     setEditingPairs(false)
     setEditedTeams([])
     setActiveDragChip(null)
+    setJustSwappedId(null)
   }
 
   const dndSensors = useSensors(
@@ -437,6 +439,12 @@ export default function GameDetails() {
     const to = parseChipId(over.id)
     if (from.teamId === to.teamId) return // same dupla — nothing to swap
     dropTargetIdRef.current = over.id
+
+    // Brief lime confirmation on the slot that now holds the dragged player —
+    // a swap only changes content in place, so without this it can read as
+    // if the drag did nothing.
+    setJustSwappedId(over.id)
+    window.setTimeout(() => setJustSwappedId((current) => (current === over.id ? null : current)), 1400)
 
     setEditedTeams(prev => {
       const next = prev.map(t => ({ ...t }))
@@ -1198,9 +1206,18 @@ export default function GameDetails() {
                             </div>
                           </div>
                           <div className="space-y-1.5">
-                            {[['player1_id', t.player1], ['player2_id', t.player2]].map(([slot, player]) => (
-                              <SwapChip key={slot} id={`${t.id}::${slot}`} player={player} disabled={busy} />
-                            ))}
+                            {[['player1_id', t.player1], ['player2_id', t.player2]].map(([slot, player]) => {
+                              const chipId = `${t.id}::${slot}`
+                              return (
+                                <SwapChip
+                                  key={slot}
+                                  id={chipId}
+                                  player={player}
+                                  disabled={busy}
+                                  justSwapped={justSwappedId === chipId}
+                                />
+                              )
+                            })}
                           </div>
                         </div>
                       ))}
@@ -1677,7 +1694,7 @@ export default function GameDetails() {
 /* ─── SwapChip ───────────────────────────────────────────────────────────
    One player row inside "Editar duplas": draggable AND droppable on the
    same id, so dropping one chip onto another swaps the two players. */
-function SwapChip({ id, player, disabled }) {
+function SwapChip({ id, player, disabled, justSwapped }) {
   const draggable = useDraggable({ id, disabled })
   const droppable = useDroppable({ id })
 
@@ -1691,7 +1708,7 @@ function SwapChip({ id, player, disabled }) {
       style={style}
       {...draggable.listeners}
       {...draggable.attributes}
-      className={`flex items-center gap-2 px-2.5 py-2 rounded-ctrl border touch-none select-none
+      className={`relative flex items-center gap-2 px-2.5 py-2 rounded-ctrl border touch-none select-none
                   transition-colors duration-fast
                   ${draggable.isDragging ? 'opacity-30' : ''}
                   ${droppable.isOver && !draggable.isDragging ? 'border-ink-900 bg-lime-400/20' : 'border-line bg-surface'}`}
@@ -1699,6 +1716,9 @@ function SwapChip({ id, player, disabled }) {
       <GripVertical size={16} className="text-muted shrink-0" />
       <Avatar name={player?.name} url={player?.avatar_url} size="w-7 h-7 text-xs" />
       <span className="flex-1 min-w-0 text-sm font-extrabold text-ink-900 truncate">{player?.name || '?'}</span>
+      {justSwapped && (
+        <span className="absolute inset-0 rounded-ctrl bg-lime-400/20 pointer-events-none animate-swap-confirm" />
+      )}
     </div>
   )
 }
