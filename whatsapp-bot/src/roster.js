@@ -4,32 +4,30 @@ import { HELP_FOOTER } from './messages.js'
 
 /** Loads a game plus its confirmed participants (flattened to one entry per person, partners included — mirrors GameDetails.jsx's `people` derivation). */
 export async function loadGame(gameId) {
-  const { data: game, error: gameError } = await supabase
-    .from('games')
-    .select('*')
-    .eq('id', gameId)
-    .single()
+  // These three don't depend on each other's results (participants/waitlisted
+  // only need gameId, not the loaded game row) — fire them together instead
+  // of awaiting one at a time.
+  const [gameResult, participantsResult, waitlistedResult] = await Promise.all([
+    supabase.from('games').select('*').eq('id', gameId).single(),
+    supabase.from('participants').select('user_id, partner_id').eq('game_id', gameId).eq('status', 'confirmed'),
+    // FIFO queue order, matching the promotion order in check_game_promote().
+    supabase
+      .from('participants')
+      .select('user_id')
+      .eq('game_id', gameId)
+      .eq('status', 'waitlisted')
+      .order('created_at', { ascending: true }),
+  ])
 
+  const { data: game, error: gameError } = gameResult
   if (gameError) throw new Error(`Failed to load game ${gameId}: ${gameError.message}`)
 
-  const { data: participants, error: participantsError } = await supabase
-    .from('participants')
-    .select('user_id, partner_id')
-    .eq('game_id', gameId)
-    .eq('status', 'confirmed')
-
+  const { data: participants, error: participantsError } = participantsResult
   if (participantsError) {
     throw new Error(`Failed to load participants for game ${gameId}: ${participantsError.message}`)
   }
 
-  // FIFO queue order, matching the promotion order in check_game_promote().
-  const { data: waitlisted, error: waitlistedError } = await supabase
-    .from('participants')
-    .select('user_id')
-    .eq('game_id', gameId)
-    .eq('status', 'waitlisted')
-    .order('created_at', { ascending: true })
-
+  const { data: waitlisted, error: waitlistedError } = waitlistedResult
   if (waitlistedError) {
     throw new Error(`Failed to load waitlisted participants for game ${gameId}: ${waitlistedError.message}`)
   }
@@ -68,8 +66,18 @@ export async function loadGame(gameId) {
   return { game, people, capacity, suplentes }
 }
 
+// Re-fetched on every single "in"/"out" (often several times a minute in a
+// busy group); a few seconds of staleness on "which mixes are open" is a
+// good trade for skipping the query — capacity/roster state itself is
+// never cached, only this list.
+const OPEN_MIXES_CACHE_TTL_MS = 5_000
+let openMixesCache = null
+let openMixesCachedAt = 0
+
 /** All mixes currently open for signups — the source of truth for "which mixes exist right now" (replaces the old single active-game pointer, since several can be open at once). */
 export async function getOpenMixes() {
+  if (openMixesCache && Date.now() - openMixesCachedAt < OPEN_MIXES_CACHE_TTL_MS) return openMixesCache
+
   const { data, error } = await supabase
     .from('games')
     .select('*')
@@ -79,7 +87,10 @@ export async function getOpenMixes() {
     .order('date', { ascending: true })
 
   if (error) throw new Error(`Failed to load open mixes: ${error.message}`)
-  return data
+
+  openMixesCache = data
+  openMixesCachedAt = Date.now()
+  return openMixesCache
 }
 
 function firstNameLastInitial(fullName) {

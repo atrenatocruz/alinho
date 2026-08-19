@@ -82,6 +82,13 @@ function formatMixLine(mix) {
  * disambiguation prompts reply directly.
  */
 export async function handleGroupMessage({ groupJid, senderPn, text, message }, { sendText }) {
+  // Gate on hardcoded, in-memory checks first — normal group chatter never
+  // matches either of these, so it never touches the DB (getSettings used
+  // to run unconditionally here, costing every message a query).
+  const pending = getPendingConfirmation(senderPn, groupJid)
+  const parsed = parseCommand(text)
+  if (!pending && !parsed) return
+
   const settings = await getSettings()
   if (!settings.whatsapp_group_jid || groupJid !== settings.whatsapp_group_jid) return
 
@@ -90,17 +97,21 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message }, 
   // back to /help, except the help listing itself.
   const reply = (msg) => sendText(groupJid, `${msg}${HELP_FOOTER}`, { quoted: message })
 
+  const NOT_FOUND_MSG = `🤖 Não te encontrei na app 😅 Regista-te primeiro em ${config.appUrl} e confirma o teu número de telemóvel no perfil.`
+
   async function resolveProfileOrReply() {
     const profile = await resolveProfileByPhoneJid(senderPn)
-    if (!profile) {
-      await reply(
-        `🤖 Não te encontrei na app 😅 Regista-te primeiro em ${config.appUrl} e confirma o teu número de telemóvel no perfil.`
-      )
-    }
+    if (!profile) await reply(NOT_FOUND_MSG)
     return profile
   }
 
-  const pending = getPendingConfirmation(senderPn, groupJid)
+  // Same check as resolveProfileOrReply, but for a profile already resolved
+  // (e.g. fetched in parallel with getOpenMixes below) — avoids a redundant query.
+  async function requireProfile(profile) {
+    if (!profile) await reply(NOT_FOUND_MSG)
+    return profile
+  }
+
   if (pending) {
     const normalized = stripAccents(text.trim().toLowerCase())
     const key = pendingKey(senderPn, groupJid)
@@ -149,7 +160,6 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message }, 
     // genuine command, not a stray reply).
   }
 
-  const parsed = parseCommand(text)
   if (!parsed) return
   const { action, code } = parsed
 
@@ -158,7 +168,9 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message }, 
     return
   }
 
-  const openMixes = await getOpenMixes()
+  // Both actions always end up needing the sender's profile, so resolve it
+  // alongside getOpenMixes instead of waiting for that query to finish first.
+  const [openMixes, resolvedProfile] = await Promise.all([getOpenMixes(), resolveProfileByPhoneJid(senderPn)])
   if (openMixes.length === 0) {
     await reply('🤖 Não há nenhum mix com inscrições abertas neste momento.')
     return
@@ -167,7 +179,7 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message }, 
   // Joins/leaves a specific, already-resolved mix — the same logic
   // regardless of how that mix got picked (explicit code, the only-one-open
   // shortcut, or being the one mix the sender is in for a bare "out").
-  async function actOnGame(mixRow, knownProfile) {
+  async function actOnGame(mixRow, profile) {
     const { game, people, capacity } = await loadGame(mixRow.id)
     const gameIsFuture = new Date(game.date).getTime() > Date.now()
 
@@ -180,7 +192,7 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message }, 
       return
     }
 
-    const profile = knownProfile ?? (await resolveProfileOrReply())
+    profile = await requireProfile(profile)
     if (!profile) return
 
     const { data: existingRows, error: existingError } = await supabase
@@ -254,12 +266,12 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message }, 
       await reply(`🤖 Não encontrei nenhum mix aberto com o código ${code}.`)
       return
     }
-    await actOnGame(game, null)
+    await actOnGame(game, resolvedProfile)
     return
   }
 
   if (openMixes.length === 1) {
-    await actOnGame(openMixes[0], null)
+    await actOnGame(openMixes[0], resolvedProfile)
     return
   }
 
@@ -272,9 +284,9 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message }, 
     return
   }
 
-  // action === 'out': resolve the sender first so an unknown sender still
+  // action === 'out': check the sender first so an unknown sender still
   // gets the existing rejection instead of a confusing "which mix?" prompt.
-  const profile = await resolveProfileOrReply()
+  const profile = await requireProfile(resolvedProfile)
   if (!profile) return
 
   const { data: rows, error } = await supabase
