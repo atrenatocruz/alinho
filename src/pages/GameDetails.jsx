@@ -120,7 +120,15 @@ export default function GameDetails() {
       const confirmedRows = (participantsData || []).filter((p) => p.status === 'confirmed')
       const waitlistRows = (participantsData || []).filter((p) => p.status === 'waitlisted')
 
-      // Mix data (duplas + jogos sorteados)
+      // Mix data (duplas + jogos sorteados). All of a game's teams are
+      // bulk-inserted in one statement (handleStartMix), so they share the
+      // exact same created_at — ordering by it alone doesn't actually
+      // discriminate between rows, and Postgres is then free to return them
+      // in a different order after any UPDATE (e.g. an admin player swap),
+      // which is exactly what made the Dupla/Campo list reorder itself
+      // under editing. seed_ranking (set once at formation, untouched by
+      // swaps) and id (immutable) are both genuinely stable tiebreakers, so
+      // stacking them guarantees the same row order on every load.
       const { data: teamsData } = await supabase
         .from('teams')
         .select(`
@@ -130,6 +138,8 @@ export default function GameDetails() {
         `)
         .eq('game_id', id)
         .order('created_at')
+        .order('seed_ranking', { ascending: false })
+        .order('id')
 
       const { data: matchesData } = await supabase
         .from('matches')
