@@ -767,6 +767,41 @@ export default function GameDetails() {
     return `${first(t.player1)} / ${first(t.player2)}`
   }
 
+  // Read-only "Duplas" display: one team's points/badges + its two player rows.
+  const renderDuplaBlock = (t) => (
+    <div key={t.id}>
+      <div className="flex items-center justify-between mb-1.5">
+        <p className="text-[11px] font-extrabold text-muted uppercase tracking-wide">
+          {(pointsById[t.player1?.id] ?? 0) + (pointsById[t.player2?.id] ?? 0)} pts
+        </p>
+        <div className="flex items-center gap-1.5">
+          {t.id === game.winner_team_id && <span>🏆</span>}
+          {(t.player1?.is_guest || t.player2?.is_guest) && <GuestBadge />}
+        </div>
+      </div>
+      <div className="space-y-1.5">
+        {[t.player1, t.player2].map((player, idx) => (
+          <div key={player?.id || idx} className="flex items-center gap-2">
+            {player?.id && !player.is_guest ? (
+              <Link to={`/jogador/${player.id}`} className="flex items-center gap-2 flex-1 min-w-0">
+                <Avatar name={player?.name} url={player?.avatar_url} size="w-8 h-8 text-xs" />
+                <span className="flex-1 min-w-0 text-sm font-extrabold text-ink-900 truncate">{player?.name || '?'}</span>
+              </Link>
+            ) : (
+              <>
+                <Avatar name={player?.name} url={player?.avatar_url} size="w-8 h-8 text-xs" />
+                <span className="flex-1 min-w-0 text-sm font-extrabold text-ink-900 truncate">{player?.name || '?'}</span>
+              </>
+            )}
+            <span className="text-xs font-extrabold text-muted tabular-nums shrink-0">
+              {pointsById[player?.id] ?? 0} pts · {SIDE_LABEL[player?.preferred_side] || 'Ambos'}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+
   const shareUrl = typeof window !== 'undefined' ? window.location.href : ''
   const buildShareMessage = () => {
     const lines = [`🎾 ${game?.title || 'Mix'}`, `📅 ${game ? formatDate(game.date) : ''}`]
@@ -781,11 +816,18 @@ export default function GameDetails() {
     return lines.join('\n')
   }
 
+  const duplaLabel = (t) => `${t?.player1?.name || '?'} & ${t?.player2?.name || '?'}`
+
   const buildDuplasShareMessage = () => {
+    const courtMatches = seedCourts(teams, numCourts)
+    const pairedIds = new Set(courtMatches.flatMap(m => [m.team_a_id, m.team_b_id]))
+    const leftover = teams.filter(t => !pairedIds.has(t.id))
+
     const lines = [`🎾 Duplas — ${game?.title || 'Mix'}`, '']
-    teams.forEach((t, i) => {
-      lines.push(`Dupla ${i + 1}: ${t.player1?.name || '?'} & ${t.player2?.name || '?'}`)
+    courtMatches.forEach((m) => {
+      lines.push(`Campo ${m.court_number}: ${duplaLabel(teamById[m.team_a_id])} vs ${duplaLabel(teamById[m.team_b_id])}`)
     })
+    leftover.forEach((t) => lines.push(duplaLabel(t)))
     return lines.join('\n')
   }
 
@@ -1138,41 +1180,38 @@ export default function GameDetails() {
                   </DndContext>
                 ) : (
                   <div className="space-y-2">
-                    {teams.map((t, i) => (
-                      <div key={t.id} className={`rounded-ctrl p-3 ${
-                        t.id === game.winner_team_id ? 'bg-lime-400/20' : 'bg-canvas'
-                      }`}>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <p className="text-[11px] font-extrabold text-muted uppercase tracking-wide">
-                            Dupla {i + 1} · {(pointsById[t.player1?.id] ?? 0) + (pointsById[t.player2?.id] ?? 0)} pts
-                          </p>
-                          <div className="flex items-center gap-1.5">
-                            {t.id === game.winner_team_id && <span>🏆</span>}
-                            {(t.player1?.is_guest || t.player2?.is_guest) && <GuestBadge />}
-                          </div>
-                        </div>
-                        <div className="space-y-1.5">
-                          {[t.player1, t.player2].map((player, idx) => (
-                            <div key={player?.id || idx} className="flex items-center gap-2">
-                              {player?.id && !player.is_guest ? (
-                                <Link to={`/jogador/${player.id}`} className="flex items-center gap-2 flex-1 min-w-0">
-                                  <Avatar name={player?.name} url={player?.avatar_url} size="w-8 h-8 text-xs" />
-                                  <span className="flex-1 min-w-0 text-sm font-extrabold text-ink-900 truncate">{player?.name || '?'}</span>
-                                </Link>
-                              ) : (
-                                <>
-                                  <Avatar name={player?.name} url={player?.avatar_url} size="w-8 h-8 text-xs" />
-                                  <span className="flex-1 min-w-0 text-sm font-extrabold text-ink-900 truncate">{player?.name || '?'}</span>
-                                </>
-                              )}
-                              <span className="text-xs font-extrabold text-muted tabular-nums shrink-0">
-                                {pointsById[player?.id] ?? 0} pts · {SIDE_LABEL[player?.preferred_side] || 'Ambos'}
-                              </span>
+                    {(() => {
+                      const courtMatches = seedCourts(teams, numCourts)
+                      const pairedIds = new Set(courtMatches.flatMap(m => [m.team_a_id, m.team_b_id]))
+                      const leftover = teams.filter(t => !pairedIds.has(t.id))
+                      return (
+                        <>
+                          {courtMatches.map((m) => {
+                            const a = teamById[m.team_a_id]
+                            const b = teamById[m.team_b_id]
+                            return (
+                              <div key={m.court_number} className="rounded-ctrl p-3 bg-canvas">
+                                <p className="text-[11px] font-extrabold text-lime-600 uppercase tracking-wide mb-2">
+                                  Campo {m.court_number}
+                                </p>
+                                {renderDuplaBlock(a)}
+                                <div className="flex items-center gap-2 py-2">
+                                  <div className="flex-1 h-px bg-line" />
+                                  <span className="text-[11px] font-extrabold text-muted uppercase tracking-wide">vs</span>
+                                  <div className="flex-1 h-px bg-line" />
+                                </div>
+                                {renderDuplaBlock(b)}
+                              </div>
+                            )
+                          })}
+                          {leftover.map((t) => (
+                            <div key={t.id} className="rounded-ctrl p-3 bg-canvas">
+                              {renderDuplaBlock(t)}
                             </div>
                           ))}
-                        </div>
-                      </div>
-                    ))}
+                        </>
+                      )
+                    })()}
                   </div>
                 )}
               </>
