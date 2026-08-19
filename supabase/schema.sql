@@ -1,4 +1,4 @@
--- Os Padeleiros / Alinho — multi-tenant schema
+-- alinho — multi-tenant schema
 -- Tenant boundary = organization_id, via the `memberships` join table
 -- (a person can belong to more than one organization at once — that's
 -- the whole reason this isn't a database-per-tenant design).

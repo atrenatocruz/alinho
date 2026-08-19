@@ -2,7 +2,7 @@
 # Create the app first with: fly launch --no-deploy (run from whatsapp-bot/)
 # then adjust `app` below to match the name you were given.
 
-app = "padeleiros-wa-bot"
+app = "alinho-wa-bot"
 primary_region = "mad"
 
 [build]

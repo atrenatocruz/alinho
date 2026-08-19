@@ -1,4 +1,4 @@
-# Auditoria de Segurança — padel.app
+# Auditoria de Segurança — alinho (então "padel.app")
 
 **Data:** 2026-07-16
 **Âmbito:** revisão completa do projeto (schema SQL/RLS, triggers, funções, autenticação, páginas com escritas na BD, histórico git, dependências).

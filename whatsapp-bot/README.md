@@ -4,7 +4,7 @@ Always-on Node process that posts padel mix rosters into a WhatsApp group and le
 
 Uses [Baileys](https://github.com/WhiskeySockets/Baileys), an unofficial library that logs in as a real WhatsApp Web device — this is the only way to participate in a group thread (Meta's official Cloud API is 1:1-only and cannot post to or read from groups). Use a spare/secondary phone number for the linked account, not a personal one.
 
-See the root [README setup guide] (or ask the assistant that built this) for the full step-by-step: run the DB migration, deploy to Fly.io, scan the pairing QR, and configure the target group JID.
+See the root [`README.md`](../README.md) / [`DEPLOYMENT.md`](../DEPLOYMENT.md) for how this fits into the rest of the app. This file covers the bot itself: run it locally, or deploy it (Fly.io or AWS EC2), scan the pairing QR, and configure the target group JID.
 
 ## Local development
 
@@ -54,18 +54,18 @@ Any small instance works — `t2.micro`/`t3.micro` (free-tier eligible), Ubuntu 
 
 5. **Build and run it, auto-restarting on crash or instance reboot:**
    ```bash
-   docker build -t padel-wa-bot .
-   docker run -d --name padel-wa-bot \
+   docker build -t alinho-wa-bot .
+   docker run -d --name alinho-wa-bot \
      --restart unless-stopped \
      --env-file .env \
      -v $(pwd)/baileys-auth:/app/baileys-auth \
-     padel-wa-bot
+     alinho-wa-bot
    ```
    The `-v` mount persists the WhatsApp session on the instance's own disk. Unlike Fly.io, no extra "volume" setup is needed — EC2's root EBS disk is already persistent across reboots by default.
 
 6. **Scan the pairing QR** (one-time):
    ```bash
-   docker logs -f padel-wa-bot
+   docker logs -f alinho-wa-bot
    ```
    Scan it with the bot's WhatsApp (Linked devices), then Ctrl+C — the container keeps running in the background regardless.
 

@@ -1,289 +1,78 @@
-# 📋 Guia do Administrador - Os Padeleiros
+# Guia do Administrador — alinho
 
-Bem-vindo ao guia completo para administradores da app "Os Padeleiros".
+Guia para quem administra um clube ou grupo na alinho.
 
-## 🎯 Responsabilidades do Admin
+## Responsabilidades do admin
 
-Como administrador, podes:
-- ✅ Criar, editar e eliminar jogos
-- ✅ Gerir membros e permissões
-- ✅ Confirmar resultados
-- ✅ Configurar definições do grupo
-- ✅ Ver estatísticas e ranking
+Como administrador de um clube, podes:
+- Criar, editar e eliminar jogos (mixes)
+- Ativar recorrência num mix, para que se repita automaticamente
+- Gerir membros: promover/remover admins, remover membros
+- Aprovar ou rejeitar pedidos de entrada (se o clube for público mas não de entrada livre)
+- Configurar definições do clube (nome, sistema de pontos, visibilidade pública)
 
-## 🚀 Primeiros Passos
-
-### 1. Aceder ao Painel Admin
+## Aceder ao painel de gestão
 
 1. Entra na app com a tua conta
-2. Clica no ícone ⚙️ **Admin** na barra inferior
-3. Verás três separadores: **Jogos**, **Membros** e **Definições**
+2. Clica em **Gerir** na barra inferior
+3. Se geres mais do que um clube, escolhe qual — caso contrário entras diretamente
+4. Dentro de um clube verás três separadores: **Jogos**, **Membros** e **Definições**
 
-## 📅 Gerir Jogos
+## Gerir jogos
 
-### Criar um Novo Jogo
+### Criar um novo jogo
 
-1. Vai ao separador **Jogos**
-2. Clica em **Criar novo jogo**
-3. Preenche os campos:
-   - **Título**: Nome do jogo (ex: "Mix de Domingo")
-   - **Data e hora**: Quando vai ser o jogo
-   - **Local**: Onde vai ser (ex: "Clube de Padel Lisboa")
-   - **Nº máximo de jogadores**: Normalmente 4
-4. Clica em **Criar**
+1. Separador **Jogos** → **Criar novo jogo**
+2. Preenche título, data e hora, local, preço por jogador, prémio, número de campos, tempo de court, tempo de jogo e formato
+3. Opcionalmente, ativa **Mix recorrente** e define a frequência, quando termina, e quantos dias/horas antes o próximo mix deve ser lançado automaticamente
+4. **Criar**
 
-**Dica**: Cria jogos com antecedência para os membros se organizarem!
+### Editar ou eliminar um jogo
 
-### Editar um Jogo
+Ícones de editar/eliminar em cada jogo na lista. Eliminar não pode ser desfeito — se já houver jogadores inscritos, avisa-os antes.
 
-1. Encontra o jogo na lista
-2. Clica no ícone ✏️ (editar)
-3. Altera os campos necessários
-4. Clica em **Atualizar**
+### Estados dos jogos
 
-**Nota**: Se já houver jogadores inscritos, avisa-os da alteração!
+- **Aberto** — jogadores podem entrar
+- **Fechado** — campo reservado, número de jogadores atingido
+- **Pendente** — uma ocorrência futura de um mix recorrente, ainda não lançada
+- **A decorrer** — jogo em curso
+- **Terminado** — jogo já realizado
+- **Cancelado**
 
-### Eliminar um Jogo
+### Suplentes
 
-1. Encontra o jogo na lista
-2. Clica no ícone 🗑️ (eliminar)
-3. Confirma a eliminação
+Quando um jogo enche, mais inscrições entram numa lista de espera e são promovidas automaticamente à medida que vagas abrem.
 
-**Atenção**: Esta ação não pode ser desfeita!
+## Gerir membros
 
-### Estados dos Jogos
+No separador **Membros** vês todos os membros do clube, com nome, nível e estado de admin, mais os pedidos de entrada pendentes (se aplicável).
 
-- 🔵 **Aberto**: Jogadores podem entrar
-- 🟢 **Fechado**: 4 jogadores confirmados, campo reservado
-- ⚪ **Terminado**: Jogo já foi realizado
-- 🔴 **Cancelado**: Jogo foi cancelado
+- **Tornar/retirar admin**: botão junto a cada membro.
+- **Remover um membro**: ícone de remoção junto a cada membro — a conta e as estatísticas dele noutros clubes mantêm-se, isto só remove a ligação a este clube.
 
-## 👥 Gerir Membros
+## Definições do clube
 
-### Ver Lista de Membros
+- **Nome do grupo**
+- **Sistema de pontos**: pontos por jogo disputado, por jogo ganho, por participar num mix, por ganhar o mix — só afeta mixes finalizados a partir do momento da alteração
+- **Clube público**: aparece em "Clubes & Grupos", conta para o ranking geral, e os membros ficam pesquisáveis por qualquer jogador
+- **Entrada livre**: se o clube for público, controla se quem pede para entrar é aprovado automaticamente ou fica pendente da tua aprovação
 
-1. Vai ao separador **Membros**
-2. Vês todos os membros do grupo com:
-   - Nome e nível
-   - Contacto
-   - Estatísticas (jogos e vitórias)
-   - Estado de admin
+## Boas práticas
 
-### Promover/Remover Admin
+- Cria jogos com alguma antecedência e com título/local claros
+- Não elimines jogos com jogadores já inscritos sem avisar
+- Tem pelo menos 2 admins ativos por clube
+- Dá permissões de admin só a quem precisa
 
-1. Encontra o membro na lista
-2. Clica em **Tornar admin** ou **Remover admin**
-3. Confirma a alteração
+## Perguntas frequentes
 
-**Importante**: Escolhe admins de confiança que ajudem a gerir o grupo!
+**Quantos admins devo ter?** Recomenda-se 2-3 admins ativos.
 
-### Remover Membros
+**Posso reverter um resultado depois de submetido?** Não diretamente pela app — contacta quem tem acesso ao painel Supabase.
 
-Atualmente não é possível remover membros pela app. Se necessário:
-1. Vai ao painel do Supabase
-2. Table Editor > profiles
-3. Elimina o utilizador
+**Como adiciono novos membros?** Partilha o link do clube (ou o link de convite, se configurado) — eles registam-se e ficam associados automaticamente.
 
-## ⚙️ Configurar Definições
+**A app funciona offline?** Parcialmente — instala como PWA (ecrã principal do telemóvel) para a melhor experiência.
 
-### Editar Nome do Grupo
-
-1. Vai ao separador **Definições**
-2. Altera o campo **Nome do grupo**
-3. Clica em **Guardar definições**
-
-### Adicionar Contacto do Robot
-
-1. Vai ao separador **Definições**
-2. Adiciona o número no campo **Contacto do Robot**
-3. Clica em **Guardar definições**
-
-**Nota**: Este campo é apenas informativo. Notificações automáticas não estão ativas.
-
-## 🏆 Gerir Resultados
-
-### Como Funcionam os Resultados
-
-1. Após um jogo, qualquer jogador participante pode registar o resultado
-2. O resultado é guardado automaticamente
-3. As estatísticas de todos os jogadores são atualizadas
-4. O ranking é recalculado
-
-### Ver Resultados
-
-1. Vai à lista de jogos
-2. Clica num jogo **Terminado**
-3. Vês o resultado final
-
-## 📊 Entender o Ranking
-
-O ranking é calculado automaticamente com base em:
-- **Vitórias** (mais importante)
-- **Taxa de vitória** (%)
-- **Pontos marcados**
-
-**Nota**: Não é possível editar manualmente o ranking. Apenas registar resultados corretos.
-
-## 💡 Boas Práticas
-
-### Criação de Jogos
-
-✅ **Fazer:**
-- Criar jogos com pelo menos 2-3 dias de antecedência
-- Incluir sempre o local exato
-- Usar títulos descritivos ("Mix Sábado 10h" em vez de "Jogo 1")
-- Confirmar disponibilidade do campo antes de criar
-
-❌ **Evitar:**
-- Criar jogos duplicados
-- Eliminar jogos com jogadores já inscritos sem avisar
-- Alterar horários à última hora
-
-### Gestão de Membros
-
-✅ **Fazer:**
-- Adicionar novos membros pessoalmente
-- Verificar se o perfil está completo (nome, nível)
-- Ter pelo menos 2 admins ativos
-- Comunicar alterações importantes
-
-❌ **Evitar:**
-- Dar permissões de admin sem necessidade
-- Aceitar membros desconhecidos
-
-### Comunicação
-
-✅ **Fazer:**
-- Usar o grupo de WhatsApp para avisos importantes
-- Avisar com antecedência sobre alterações
-- Responder a dúvidas dos membros
-- Partilhar o link das instruções com novos membros
-
-## 🆘 Resolver Problemas Comuns
-
-### "Não consigo criar jogos"
-
-- Verifica se tens permissões de admin
-- Verifica se preencheste todos os campos obrigatórios
-- Tenta fazer refresh à página
-
-### "Um jogador não consegue entrar num jogo"
-
-- Verifica se o jogo já está cheio (4/4)
-- Verifica se o jogo não está fechado ou terminado
-- Pede ao jogador para fazer logout/login
-
-### "O resultado não foi guardado"
-
-- Verifica se o jogo tem exatamente 4 jogadores
-- Verifica se os resultados estão em formato número
-- Tenta novamente após alguns minutos
-
-### "A app não está a funcionar"
-
-1. Faz refresh à página (F5)
-2. Limpa a cache do browser
-3. Tenta noutro browser
-4. Verifica se há atualizações pendentes
-5. Contacta o suporte técnico
-
-## 🔐 Segurança
-
-### Proteger a Conta Admin
-
-- ✅ Usa um email/telemóvel seguro
-- ✅ Não partilhes os teus dados de acesso
-- ✅ Sai da app quando usares computadores partilhados
-- ✅ Verifica regularmente a lista de admins
-
-### Proteção de Dados
-
-- A app usa encriptação para todos os dados
-- Apenas admins veem contactos completos
-- Não partilhes dados pessoais dos membros
-
-## 📱 Notificações (Futuro)
-
-Atualmente, a app **não envia notificações automáticas**. 
-
-Para notificar os membros:
-- Usa o grupo de WhatsApp
-- Envia mensagem individual
-- Combina um sistema de notificações futuro
-
-### Integração Futura de Notificações
-
-Em desenvolvimento:
-- WhatsApp Cloud API (pago)
-- Twilio SMS (pago)
-- Telegram Bot (gratuito) ✅ Recomendado
-
-## 📞 Contactos Úteis
-
-### Suporte Técnico
-
-Se precisares de ajuda técnica:
-1. Consulta o README.md do projeto
-2. Verifica as instruções no `/instrucoes`
-3. Contacta o desenvolvedor
-
-### Acesso ao Painel Supabase
-
-Para gestão avançada:
-- URL: [supabase.com](https://supabase.com)
-- Precisa de acesso de administrador do projeto
-- Permite ver/editar dados diretamente
-
-## 🎓 Formação de Novos Admins
-
-Quando adicionares um novo admin:
-
-1. ✅ Partilha este guia
-2. ✅ Explica as responsabilidades
-3. ✅ Mostra como criar/editar jogos
-4. ✅ Explica as boas práticas
-5. ✅ Dá acesso ao grupo de admins
-
-## 📝 Checklist Semanal do Admin
-
-Todas as semanas:
-- [ ] Criar jogos para a próxima semana
-- [ ] Verificar se há jogos pendentes de confirmação
-- [ ] Confirmar resultados não registados
-- [ ] Responder a dúvidas no grupo
-- [ ] Verificar se há novos membros
-
-## 🏆 Dicas para um Grupo Ativo
-
-1. **Regularidade**: Cria jogos fixos (ex: todos os sábados às 10h)
-2. **Variedade**: Alterna horários para incluir mais pessoas
-3. **Comunicação**: Mantém o grupo animado
-4. **Reconhecimento**: Destaca vitórias e milestones
-5. **Diversão**: O objetivo é jogar e divertir!
-
----
-
-## ❓ Perguntas Frequentes
-
-**P: Quantos admins devo ter?**
-R: Recomendamos 2-3 admins ativos para garantir que há sempre alguém disponível.
-
-**P: Posso reverter um resultado?**
-R: Atualmente não. Tem cuidado ao registar resultados.
-
-**P: Como adiciono novos membros?**
-R: Partilha o link da app. Eles registam-se automaticamente.
-
-**P: Posso personalizar o logo?**
-R: Sim! Substitui os ficheiros em `public/` (consulta o README).
-
-**P: A app funciona offline?**
-R: Parcialmente. Instala como PWA para melhor experiência.
-
----
-
-**Boa gestão! 🎾**
-
-Para dúvidas adicionais, consulta o README.md ou contacta o suporte.
-
-
+**Existe um bot de WhatsApp?** Sim, por clube — publica o roster do mix no grupo e sincroniza respostas "In"/"Out"/"Fora" com a app. Precisa de ser configurado à parte (não faz parte deste guia — fala com quem gere a infraestrutura técnica do teu clube).
