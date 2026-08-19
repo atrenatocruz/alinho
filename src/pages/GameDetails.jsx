@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { Calendar, MapPin, ArrowLeft, UserPlus, User, Check, Lock, Trophy, Play, ChevronRight, Swords, X, Repeat, Share2, ChevronDown, RotateCcw, Euro, GripVertical } from 'lucide-react'
@@ -418,13 +418,25 @@ export default function GameDetails() {
     setActiveDragChip({ teamId, slot, player: team?.[slot === 'player1_id' ? 'player1' : 'player2'] })
   }
 
+  // dnd-kit's default drop animation always flies the overlay back to the
+  // dragged chip's OWN slot, since that's "where the draggable lives" as far
+  // as it knows — but a swap moves the chip's content to the OTHER slot, so
+  // that default reads as "the drag didn't do anything". swapDropAnimation
+  // (passed to DragOverlay below) overrides the landing spot to wherever a
+  // valid swap actually dropped it, using this ref so the custom animation
+  // (fired from a dnd-kit-internal effect, after this handler already ran)
+  // knows the target without waiting on React state.
+  const dropTargetIdRef = useRef(null)
+
   const handleDragEnd = (event) => {
     setActiveDragChip(null)
     const { active, over } = event
+    dropTargetIdRef.current = null
     if (!over || active.id === over.id) return
     const from = parseChipId(active.id)
     const to = parseChipId(over.id)
     if (from.teamId === to.teamId) return // same dupla — nothing to swap
+    dropTargetIdRef.current = over.id
 
     setEditedTeams(prev => {
       const next = prev.map(t => ({ ...t }))
@@ -438,6 +450,34 @@ export default function GameDetails() {
       teamA[from.slot] = idB; teamA[objKeyA] = objB
       teamB[to.slot] = idA; teamB[objKeyB] = objA
       return next
+    })
+  }
+
+  // Lands the drag overlay where it was actually dropped instead of dnd-kit's
+  // default (fly back to the dragged chip's own slot) — see dropTargetIdRef.
+  // Falls back to the library's own default (undefined return) when there's
+  // no recorded target, e.g. a drag that ended outside any valid dupla.
+  const swapDropAnimation = (args) => {
+    const { active, dragOverlay, droppableContainers, transform } = args
+    const targetRect = dropTargetIdRef.current
+      ? droppableContainers.get(dropTargetIdRef.current)?.rect?.current
+      : null
+    if (!targetRect) return undefined
+
+    const delta = { x: dragOverlay.rect.left - targetRect.left, y: dragOverlay.rect.top - targetRect.top }
+    const finalTransform = { ...transform, x: transform.x - delta.x, y: transform.y - delta.y, scaleX: 1, scaleY: 1 }
+    const keyframes = [
+      { transform: CSS.Transform.toString(transform) },
+      { transform: CSS.Transform.toString(finalTransform) },
+    ]
+
+    active.node.style.opacity = '0'
+    const animation = dragOverlay.node.animate(keyframes, { duration: 220, easing: 'ease', fill: 'forwards' })
+    return new Promise((resolve) => {
+      animation.onfinish = () => {
+        active.node.style.opacity = ''
+        resolve()
+      }
     })
   }
 
@@ -1166,7 +1206,7 @@ export default function GameDetails() {
                       ))}
                     </div>
                     {createPortal(
-                      <DragOverlay>
+                      <DragOverlay dropAnimation={swapDropAnimation}>
                         {activeDragChip && (
                           <div className="flex items-center gap-2 px-2.5 py-2 rounded-ctrl border border-ink-900 bg-surface shadow-card">
                             <GripVertical size={16} className="text-muted shrink-0" />
