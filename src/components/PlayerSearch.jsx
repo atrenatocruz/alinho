@@ -1,42 +1,18 @@
 import { useState, useEffect, useRef } from 'react'
 import { Search, X } from 'lucide-react'
-import { searchPlayers, listPlayers } from '../lib/privateMatches'
+import { searchPlayers } from '../lib/privateMatches'
 import { Avatar } from './ui'
 
-export default function PlayerSearch({ label, selected, onSelect, onClear, excludeIds = [], browseByDefault = false, searchFn = searchPlayers }) {
+export default function PlayerSearch({ label, selected, onSelect, onClear, excludeIds = [], searchFn = searchPlayers }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [open, setOpen] = useState(false)
   const timeoutRef = useRef(null)
 
-  // Loads the default browse list once on mount (Comunidade only — pages
-  // that don't pass browseByDefault keep the old "empty until you type"
-  // behavior, e.g. opponent search in CreatePrivateMatch).
-  useEffect(() => {
-    if (!browseByDefault) return
-    let cancelled = false
-    listPlayers().then((data) => {
-      if (!cancelled) {
-        setResults(data)
-        setOpen(true)
-      }
-    }).catch((error) => {
-      console.error('Error loading players:', error)
-    })
-    return () => { cancelled = true }
-  }, [browseByDefault])
-
   useEffect(() => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current)
 
     const trimmed = query.trim()
-
-    if (trimmed.length === 0) {
-      // Leave the mount effect's browse list on screen instead of wiping
-      // it the instant this effect re-runs for the empty initial query.
-      if (!browseByDefault) setResults([])
-      return
-    }
 
     if (trimmed.length < 2) {
       setResults([])
@@ -52,7 +28,7 @@ export default function PlayerSearch({ label, selected, onSelect, onClear, exclu
       }
     }, 300)
     return () => clearTimeout(timeoutRef.current)
-  }, [query, browseByDefault, searchFn])
+  }, [query, searchFn])
 
   if (selected) {
     return (
