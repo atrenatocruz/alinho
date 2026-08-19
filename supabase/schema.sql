@@ -45,6 +45,7 @@ CREATE TABLE memberships (
   is_admin BOOLEAN NOT NULL DEFAULT FALSE,
   is_guest BOOLEAN NOT NULL DEFAULT FALSE,
   level TEXT NOT NULL DEFAULT 'iniciante', -- iniciante, intermédio, avançado (ou N2-N6)
+  is_favorite BOOLEAN NOT NULL DEFAULT FALSE, -- this club's mixs float to the top of "Próximos jogos"
   created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()),
   UNIQUE (user_id, organization_id)
 );
@@ -274,6 +275,19 @@ CREATE POLICY "See own memberships"
 CREATE POLICY "Org admins see all memberships in their org"
   ON memberships FOR SELECT
   USING (is_org_admin(organization_id));
+
+-- Self-service fields only (level, is_favorite) — promoting to admin is
+-- deliberately routed through admin_set_membership_admin() (SECURITY
+-- DEFINER) instead, so a member can't PATCH their own is_admin/is_guest
+-- via a direct table update. The column-level GRANTs below enforce that
+-- even though this policy's USING/WITH CHECK matches the whole row.
+CREATE POLICY "Users can update own membership self-service fields"
+  ON memberships FOR UPDATE
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
+
+REVOKE UPDATE ON memberships FROM authenticated;
+GRANT UPDATE (level, is_favorite) ON memberships TO authenticated;
 
 -- games: members of the org can view; org admins can create/update/delete.
 CREATE POLICY "Org members can view games"

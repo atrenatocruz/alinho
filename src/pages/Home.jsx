@@ -156,8 +156,14 @@ export default function Home() {
   const isFinished = (game) => game.status === 'completed' || game.status === 'finished'
   // games is already sorted ascending by date from the query, so finished
   // just needs reversing to show the most recent one first.
-  const activeGames = games.filter((game) => !isFinished(game))
-  const finishedGames = [...games.filter(isFinished)].reverse()
+  const favoriteOrgIds = new Set(memberships.filter((m) => m.is_favorite).map((m) => m.organization_id))
+  // Array.prototype.sort is stable, so this only moves favorited-club
+  // games ahead of the rest — the date order already in `games` (or its
+  // reverse, for finished) is preserved within each of the two groups.
+  const byFavoriteFirst = (a, b) =>
+    Number(favoriteOrgIds.has(b.organization_id)) - Number(favoriteOrgIds.has(a.organization_id))
+  const activeGames = games.filter((game) => !isFinished(game)).sort(byFavoriteFirst)
+  const finishedGames = [...games.filter(isFinished)].reverse().sort(byFavoriteFirst)
   const visibleGames = tab === 'ativos' ? activeGames : finishedGames
 
   if (loading) {

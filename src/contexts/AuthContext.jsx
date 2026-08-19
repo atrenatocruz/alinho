@@ -281,6 +281,28 @@ export const AuthProvider = ({ children }) => {
     return { data, error }
   }
 
+  // Toggles the caller's favorite flag on an arbitrary club membership (not
+  // necessarily the current org — Clubes & Grupos lists every club the
+  // user follows, not just the active one). Favorited clubs' mixs float to
+  // the top of Home's "Próximos jogos".
+  const toggleFavoriteOrganization = async (organizationId, isFavorite) => {
+    if (!user) return { error: new Error('No user logged in') }
+
+    const { data, error } = await supabase
+      .from('memberships')
+      .update({ is_favorite: isFavorite })
+      .eq('user_id', user.id)
+      .eq('organization_id', organizationId)
+      .select('*, organization:organizations(*)')
+      .single()
+
+    if (!error) {
+      setMemberships((prev) => prev.map((m) => (m.id === data.id ? data : m)))
+    }
+
+    return { data, error }
+  }
+
   // Attaches the current user to an organization by slug — used by both
   // signup paths (email/password and Google) right after auth completes,
   // whenever there's a pending ?org=<slug> to consume.
@@ -353,6 +375,7 @@ export const AuthProvider = ({ children }) => {
     signOut,
     updateProfile,
     updateMembership,
+    toggleFavoriteOrganization,
     joinOrganization,
     followOrganization,
     ensureOrgAdminAccess,
