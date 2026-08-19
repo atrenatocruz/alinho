@@ -11,7 +11,7 @@ export default defineConfig({
       manifest: {
         name: 'alinho',
         short_name: 'alinho',
-        description: 'App para gerir jogos de padel do grupo alinho',
+        description: 'A comunidade de jogadores, grupos e clubes de padel.',
         theme_color: '#040404',
         background_color: '#FFFFFF',
         display: 'standalone',
