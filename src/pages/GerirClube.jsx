@@ -1,19 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { setOptions, importLibrary } from '@googlemaps/js-api-loader'
 import { Plus, Calendar, Users, Trash2, Edit2, Check, X, UserX, Repeat, Clock, ArrowLeft } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
 import { DateField, DateTimeField, Avatar } from '../components/ui'
 import { totalRounds, FORMAT_LABEL } from '../lib/mixLogic'
-
-// Undefined (not just falsy-empty-string) when the env var is unset, so the
-// "Local" field falls back to a plain text input rather than throwing on a
-// missing key — see .env.example. setOptions() only records config (must
-// run before the first importLibrary() call) — it doesn't fetch anything
-// itself, so it's safe to call at module scope even if Places is never used.
-const GOOGLE_PLACES_API_KEY = import.meta.env.VITE_GOOGLE_PLACES_API_KEY || null
-if (GOOGLE_PLACES_API_KEY) setOptions({ key: GOOGLE_PLACES_API_KEY, v: 'weekly' })
 
 // datetime-local <-> stored timestamptz helpers (keeps Portugal wall-clock)
 const toLocalInput = (d) => {
@@ -121,67 +113,11 @@ export default function GerirClube() {
   const [gameForm, setGameForm] = useState(EMPTY_GAME_FORM)
   const locationInputRef = useRef(null)
 
-  // Wires Google Places Autocomplete onto the plain "Local" input whenever
-  // the create/edit form is open. No-ops when VITE_GOOGLE_PLACES_API_KEY
-  // isn't set — the input just stays a normal text field.
-  useEffect(() => {
-    if (!GOOGLE_PLACES_API_KEY || !(showCreateGame || editingGame)) return
-
-    let autocomplete
-    let cancelled = false
-    let bodyObserver
-    let widthObserver
-    let syncPacWidth
-
-    importLibrary('places').then(({ Autocomplete }) => {
-      if (cancelled || !locationInputRef.current) return
-      autocomplete = new Autocomplete(locationInputRef.current, {
-        fields: ['name', 'formatted_address'],
-        types: ['establishment'],
-        componentRestrictions: { country: 'pt' },
-      })
-      // Functional update: this listener is attached once per form-open,
-      // so a plain `gameForm.location` closure would go stale if the
-      // admin edits other fields (title, date...) before picking a place.
-      autocomplete.addListener('place_changed', () => {
-        const place = autocomplete.getPlace()
-        const value = place.name && place.formatted_address
-          ? `${place.name} - ${place.formatted_address}`
-          : place.formatted_address || place.name || ''
-        if (value) setGameForm((form) => ({ ...form, location: value }))
-      })
-
-      // Google sets .pac-container's width inline, once, from the input's
-      // measured width at the moment the dropdown is first created — it
-      // doesn't keep re-syncing it, so it can drift from the input's actual
-      // rendered width. Force it to match, on creation and on any resize.
-      syncPacWidth = () => {
-        const pac = document.querySelector('.pac-container')
-        const input = locationInputRef.current
-        if (!pac || !input) return
-        const width = `${input.getBoundingClientRect().width}px`
-        if (pac.style.width !== width) pac.style.width = width
-      }
-      bodyObserver = new MutationObserver(() => {
-        const pac = document.querySelector('.pac-container')
-        if (pac && !widthObserver) {
-          syncPacWidth()
-          widthObserver = new MutationObserver(syncPacWidth)
-          widthObserver.observe(pac, { attributes: true, attributeFilter: ['style'] })
-        }
-      })
-      bodyObserver.observe(document.body, { childList: true })
-      window.addEventListener('resize', syncPacWidth)
-    }).catch((error) => console.error('Error loading Google Places:', error))
-
-    return () => {
-      cancelled = true
-      bodyObserver?.disconnect()
-      widthObserver?.disconnect()
-      if (syncPacWidth) window.removeEventListener('resize', syncPacWidth)
-      if (autocomplete) window.google?.maps?.event?.clearInstanceListeners(autocomplete)
-    }
-  }, [showCreateGame, editingGame])
+  useGooglePlacesAutocomplete(
+    locationInputRef,
+    showCreateGame || editingGame,
+    (value) => setGameForm((form) => ({ ...form, location: value }))
+  )
 
   // Resolve the org from the URL slug. `Guard` (App.jsx) only checks
   // "is logged in" for this route — per-org admin authorization happens
