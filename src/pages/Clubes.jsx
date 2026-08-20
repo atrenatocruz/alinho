@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { Users, UserPlus, Clock, Heart } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -96,7 +97,7 @@ export default function Clubes() {
             const membership = memberships.find((m) => m.organization_id === club.id)
             const isFavorite = membership?.is_favorite === true
             return (
-            <div key={club.id} className="card flex items-center gap-3.5">
+            <Link key={club.id} to={`/clube/${club.slug}`} className="card press flex items-center gap-3.5 hover:shadow-lift">
               <Avatar name={club.name} url={club.group_logo_url} size="w-11 h-11 text-sm" />
               <div className="flex-1 min-w-0">
                 <h3 className="font-extrabold text-ink-900 truncate">{club.name}</h3>
@@ -108,7 +109,7 @@ export default function Clubes() {
               {club.my_status === 'member' ? (
                 <>
                   <button
-                    onClick={() => handleToggleFavorite(club, isFavorite)}
+                    onClick={(e) => { e.preventDefault(); handleToggleFavorite(club, isFavorite) }}
                     disabled={favoritingOn === club.id}
                     aria-label={isFavorite ? 'Remover dos favoritos' : 'Marcar como favorito'}
                     title={isFavorite ? 'Remover dos favoritos' : 'Marcar como favorito — os mixs deste clube aparecem primeiro em Próximos jogos'}
@@ -117,7 +118,7 @@ export default function Clubes() {
                     <Heart size={20} className={isFavorite ? 'fill-lime-400 text-lime-400' : 'text-ink-200'} />
                   </button>
                   <button
-                    onClick={() => handleUnfollow(club)}
+                    onClick={(e) => { e.preventDefault(); handleUnfollow(club) }}
                     disabled={actingOn === club.id}
                     className="whitespace-nowrap text-xs font-extrabold px-3 py-2 min-h-[44px] rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast disabled:opacity-40"
                   >
@@ -130,7 +131,7 @@ export default function Clubes() {
                 </span>
               ) : (
                 <button
-                  onClick={() => handleFollow(club)}
+                  onClick={(e) => { e.preventDefault(); handleFollow(club) }}
                   disabled={actingOn === club.id}
                   className="whitespace-nowrap inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[44px] rounded-full bg-lime-400 text-ink-900 hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
                 >
@@ -138,7 +139,7 @@ export default function Clubes() {
                   {club.open_join ? 'Seguir' : 'Pedir para entrar'}
                 </button>
               )}
-            </div>
+            </Link>
             )
           })}
         </div>
