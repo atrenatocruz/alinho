@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Plus, Calendar, Users, Trash2, Edit2, Check, X, UserX, Repeat, Clock, ArrowLeft } from 'lucide-react'
+import { Plus, Calendar, Users, Trash2, Edit2, Check, X, UserX, Repeat, Clock, ArrowLeft, Camera } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
+import { uploadClubLogo, removeClubLogo } from '../lib/clubLogoStorage'
 import { DateField, DateTimeField, Avatar } from '../components/ui'
 import { totalRounds, FORMAT_LABEL } from '../lib/mixLogic'
 
@@ -112,11 +113,21 @@ export default function GerirClube() {
   // Form states
   const [gameForm, setGameForm] = useState(EMPTY_GAME_FORM)
   const locationInputRef = useRef(null)
+  const clubLocationInputRef = useRef(null)
+  const clubLogoInputRef = useRef(null)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [logoError, setLogoError] = useState('')
 
   useGooglePlacesAutocomplete(
     locationInputRef,
     showCreateGame || editingGame,
     (value) => setGameForm((form) => ({ ...form, location: value }))
+  )
+
+  useGooglePlacesAutocomplete(
+    clubLocationInputRef,
+    activeTab === 'settings',
+    (value) => setSettings((s) => ({ ...s, location: value }))
   )
 
   // Resolve the org from the URL slug. `Guard` (App.jsx) only checks
@@ -774,6 +785,36 @@ export default function GerirClube() {
     }
   }
 
+  const handleLogoSelect = async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = '' // allow re-selecting the same file later
+    if (!file) return
+    setLogoError('')
+    setUploadingLogo(true)
+    try {
+      const group_logo_url = await uploadClubLogo(settings.id, file)
+      setSettings((s) => ({ ...s, group_logo_url }))
+    } catch (error) {
+      console.error('Error uploading club logo:', error)
+      setLogoError('Não foi possível enviar o logo. Tenta novamente.')
+    } finally {
+      setUploadingLogo(false)
+    }
+  }
+
+  const handleRemoveLogo = async () => {
+    setUploadingLogo(true)
+    try {
+      await removeClubLogo(settings.id)
+      setSettings((s) => ({ ...s, group_logo_url: null }))
+    } catch (error) {
+      console.error('Error removing club logo:', error)
+      setLogoError('Não foi possível remover o logo. Tenta novamente.')
+    } finally {
+      setUploadingLogo(false)
+    }
+  }
+
   const handleUpdateSettings = async (e) => {
     e.preventDefault()
 
@@ -783,6 +824,12 @@ export default function GerirClube() {
         .update({
           robot_contact: settings.robot_contact,
           name: settings.name,
+          description: settings.description,
+          location: settings.location,
+          phone: settings.phone,
+          instagram: settings.instagram,
+          website: settings.website,
+          group_logo_url: settings.group_logo_url,
           points_rules: settings.points_rules,
           is_global: settings.is_global,
           open_join: settings.open_join,
@@ -1420,10 +1467,112 @@ export default function GerirClube() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Logo do grupo (em breve)
+                    Logo do clube
                   </label>
-                  <div className="border-2 border-dashed border-gray-300 rounded-2xl p-8 text-center text-gray-500">
-                    Funcionalidade de upload em desenvolvimento
+                  <div className="flex items-center gap-4">
+                    <div className="relative w-16 h-16 shrink-0">
+                      <Avatar name={settings.name} url={settings.group_logo_url} size="w-16 h-16 text-xl" />
+                      <button
+                        type="button"
+                        onClick={() => clubLogoInputRef.current?.click()}
+                        disabled={uploadingLogo}
+                        aria-label="Alterar logo do clube"
+                        className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-ink-900 text-white flex items-center justify-center
+                                   ring-2 ring-canvas hover:bg-ink-700 transition-colors duration-fast disabled:opacity-50"
+                      >
+                        {uploadingLogo ? (
+                          <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                        ) : (
+                          <Camera size={14} />
+                        )}
+                      </button>
+                      <input
+                        ref={clubLogoInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleLogoSelect}
+                        className="hidden"
+                      />
+                    </div>
+                    {settings.group_logo_url && (
+                      <button
+                        type="button"
+                        onClick={handleRemoveLogo}
+                        disabled={uploadingLogo}
+                        className="text-danger text-sm font-extrabold hover:underline disabled:opacity-50"
+                      >
+                        Remover logo
+                      </button>
+                    )}
+                  </div>
+                  {logoError && (
+                    <p className="text-danger text-sm font-extrabold mt-2">{logoError}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Descrição
+                  </label>
+                  <textarea
+                    value={settings.description || ''}
+                    onChange={(e) => setSettings({ ...settings, description: e.target.value })}
+                    className="input-field resize-none"
+                    rows={4}
+                    placeholder="Uma breve descrição do clube, visível no perfil público"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Localização
+                  </label>
+                  <input
+                    ref={clubLocationInputRef}
+                    type="text"
+                    value={settings.location || ''}
+                    onChange={(e) => setSettings({ ...settings, location: e.target.value })}
+                    className="input-field"
+                    placeholder="Morada ou nome do clube"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Telefone
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.phone || ''}
+                      onChange={(e) => setSettings({ ...settings, phone: e.target.value })}
+                      className="input-field"
+                      placeholder="+351 XXX XXX XXX"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Instagram
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.instagram || ''}
+                      onChange={(e) => setSettings({ ...settings, instagram: e.target.value })}
+                      className="input-field"
+                      placeholder="@oclube"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Website
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.website || ''}
+                      onChange={(e) => setSettings({ ...settings, website: e.target.value })}
+                      className="input-field"
+                      placeholder="oclube.pt"
+                    />
                   </div>
                 </div>
 
