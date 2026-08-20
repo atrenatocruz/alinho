@@ -130,6 +130,56 @@
   }
 }
 
+/* ─── Google Places Autocomplete dropdown ────────────────────────────────
+   Google appends `.pac-container` straight to <body>, outside the React
+   tree and outside any Tailwind @layer, and injects its own stylesheet
+   asynchronously (load order vs. this file isn't guaranteed) — so the
+   handful of properties that matter for the look are forced with
+   !important rather than relying on cascade order. Selectors themselves
+   are effectively global by construction, so plain rules are fine. */
+.pac-container {
+  margin-top: 4px;
+  padding: 4px 0;
+  border: 1px solid rgb(var(--line)) !important;
+  border-radius: var(--radius-ctrl) !important;
+  box-shadow: var(--shadow-lift) !important;
+  background-color: rgb(var(--surface)) !important;
+  font-family: 'Geist Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+}
+.pac-container:empty {
+  display: none !important;
+}
+.pac-item {
+  padding: 10px 16px;
+  border-top: 1px solid rgb(var(--line));
+  font-family: inherit;
+  font-size: 1rem;
+  line-height: 1.4;
+  color: rgb(var(--ink-900));
+  cursor: pointer;
+}
+.pac-item:first-child {
+  border-top: none;
+}
+.pac-item:hover,
+.pac-item-selected {
+  background-color: rgb(var(--lime-100)) !important;
+}
+.pac-icon {
+  margin-top: 4px;
+}
+.pac-item-query {
+  color: rgb(var(--ink-900));
+  font-size: inherit;
+  font-weight: 500;
+}
+.pac-matched {
+  font-weight: 700;
+}
+.pac-logo:after {
+  margin: 6px 12px 8px;
+}
+
 /* ─── Motion — subtle & fast ─────────────────────────────────────────────── */
 @keyframes fade-up {
   from { opacity: 0; transform: translateY(8px); }
