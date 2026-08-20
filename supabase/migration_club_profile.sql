@@ -14,11 +14,11 @@
 
 -- ── 1. organizations gains public-profile fields — all nullable, a
 --       section on the profile page just doesn't render when empty. ──────
-ALTER TABLE organizations ADD COLUMN description TEXT;
-ALTER TABLE organizations ADD COLUMN location TEXT;
-ALTER TABLE organizations ADD COLUMN phone TEXT;
-ALTER TABLE organizations ADD COLUMN instagram TEXT;
-ALTER TABLE organizations ADD COLUMN website TEXT;
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS location TEXT;
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS phone TEXT;
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS instagram TEXT;
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS website TEXT;
 
 -- ── 2. club-logos Storage bucket — public read (logos aren't sensitive),
 --       write restricted to that org's admins via the existing
@@ -27,18 +27,22 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('club-logos', 'club-logos', true)
 ON CONFLICT (id) DO NOTHING;
 
+DROP POLICY IF EXISTS "Club logos are publicly accessible" ON storage.objects;
 CREATE POLICY "Club logos are publicly accessible"
   ON storage.objects FOR SELECT
   USING (bucket_id = 'club-logos');
 
+DROP POLICY IF EXISTS "Org admins can upload their club logo" ON storage.objects;
 CREATE POLICY "Org admins can upload their club logo"
   ON storage.objects FOR INSERT
   WITH CHECK (bucket_id = 'club-logos' AND is_org_admin((storage.foldername(name))[1]::uuid));
 
+DROP POLICY IF EXISTS "Org admins can update their club logo" ON storage.objects;
 CREATE POLICY "Org admins can update their club logo"
   ON storage.objects FOR UPDATE
   USING (bucket_id = 'club-logos' AND is_org_admin((storage.foldername(name))[1]::uuid));
 
+DROP POLICY IF EXISTS "Org admins can delete their club logo" ON storage.objects;
 CREATE POLICY "Org admins can delete their club logo"
   ON storage.objects FOR DELETE
   USING (bucket_id = 'club-logos' AND is_org_admin((storage.foldername(name))[1]::uuid));
@@ -92,7 +96,7 @@ AS $$
         )
       ) ORDER BY g.date)
       FROM games g
-      WHERE g.organization_id = o.id AND g.status NOT IN ('finished', 'completed', 'cancelled')
+      WHERE g.organization_id = o.id AND g.status NOT IN ('finished', 'completed', 'cancelled', 'pending')
     ), '[]'::json)::jsonb
   FROM organizations o
   WHERE o.slug = p_slug

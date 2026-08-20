@@ -126,7 +126,7 @@ export default function GerirClube() {
 
   useGooglePlacesAutocomplete(
     clubLocationInputRef,
-    activeTab === 'settings',
+    activeTab === 'settings' && !loading && !!settings,
     (value) => setSettings((s) => ({ ...s, location: value }))
   )
 
@@ -793,6 +793,8 @@ export default function GerirClube() {
     setUploadingLogo(true)
     try {
       const group_logo_url = await uploadClubLogo(settings.id, file)
+      const { error } = await supabase.from('organizations').update({ group_logo_url }).eq('id', settings.id)
+      if (error) throw error
       setSettings((s) => ({ ...s, group_logo_url }))
     } catch (error) {
       console.error('Error uploading club logo:', error)
@@ -803,9 +805,12 @@ export default function GerirClube() {
   }
 
   const handleRemoveLogo = async () => {
+    setLogoError('')
     setUploadingLogo(true)
     try {
       await removeClubLogo(settings.id)
+      const { error } = await supabase.from('organizations').update({ group_logo_url: null }).eq('id', settings.id)
+      if (error) throw error
       setSettings((s) => ({ ...s, group_logo_url: null }))
     } catch (error) {
       console.error('Error removing club logo:', error)

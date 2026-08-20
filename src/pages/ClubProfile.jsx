@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, Users, UserPlus, Clock, Heart, MapPin, Phone, Instagram, Globe, Calendar } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -20,20 +20,28 @@ export default function ClubProfile() {
   const [notFound, setNotFound] = useState(false)
   const [acting, setActing] = useState(false)
   const [favoriting, setFavoriting] = useState(false)
+  // Guards against an in-flight request for a stale slug (or a stale
+  // handleFollow/handleUnfollow reload) resolving after a newer one and
+  // clobbering state — each load() call captures its own generation and
+  // only applies its result if it's still the latest.
+  const requestIdRef = useRef(0)
 
   const load = async () => {
+    const requestId = ++requestIdRef.current
     try {
       const data = await getClubProfile(slug)
+      if (requestId !== requestIdRef.current) return
       if (!data) {
         setNotFound(true)
       } else {
         setClub(data)
       }
     } catch (error) {
+      if (requestId !== requestIdRef.current) return
       console.error('Error loading club profile:', error)
       setNotFound(true)
     } finally {
-      setLoading(false)
+      if (requestId === requestIdRef.current) setLoading(false)
     }
   }
 
