@@ -129,6 +129,9 @@ export default function GerirClube() {
 
     let autocomplete
     let cancelled = false
+    let bodyObserver
+    let widthObserver
+    let syncPacWidth
 
     importLibrary('places').then(({ Autocomplete }) => {
       if (cancelled || !locationInputRef.current) return
@@ -147,10 +150,35 @@ export default function GerirClube() {
           : place.formatted_address || place.name || ''
         if (value) setGameForm((form) => ({ ...form, location: value }))
       })
+
+      // Google sets .pac-container's width inline, once, from the input's
+      // measured width at the moment the dropdown is first created — it
+      // doesn't keep re-syncing it, so it can drift from the input's actual
+      // rendered width. Force it to match, on creation and on any resize.
+      syncPacWidth = () => {
+        const pac = document.querySelector('.pac-container')
+        const input = locationInputRef.current
+        if (!pac || !input) return
+        const width = `${input.getBoundingClientRect().width}px`
+        if (pac.style.width !== width) pac.style.width = width
+      }
+      bodyObserver = new MutationObserver(() => {
+        const pac = document.querySelector('.pac-container')
+        if (pac && !widthObserver) {
+          syncPacWidth()
+          widthObserver = new MutationObserver(syncPacWidth)
+          widthObserver.observe(pac, { attributes: true, attributeFilter: ['style'] })
+        }
+      })
+      bodyObserver.observe(document.body, { childList: true })
+      window.addEventListener('resize', syncPacWidth)
     }).catch((error) => console.error('Error loading Google Places:', error))
 
     return () => {
       cancelled = true
+      bodyObserver?.disconnect()
+      widthObserver?.disconnect()
+      if (syncPacWidth) window.removeEventListener('resize', syncPacWidth)
       if (autocomplete) window.google?.maps?.event?.clearInstanceListeners(autocomplete)
     }
   }, [showCreateGame, editingGame])
@@ -1238,7 +1266,22 @@ export default function GerirClube() {
               )}
 
               {/* Games List */}
-              <Segmented options={GAME_FILTERS} value={gameFilter} onChange={setGameFilter} />
+              <div className="flex gap-1 p-1 bg-ink-50 rounded-ctrl overflow-x-auto">
+                {GAME_FILTERS.map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setGameFilter(opt.value)}
+                    className={`flex-1 py-2.5 px-3 rounded-ctrl text-sm font-extrabold whitespace-nowrap transition-all duration-fast ${
+                      gameFilter === opt.value
+                        ? 'bg-canvas text-ink-900 shadow-lift border border-line'
+                        : 'text-muted hover:text-ink-900'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
 
               <div className="space-y-3">
                 {games
