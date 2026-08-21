@@ -5,8 +5,11 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
 import { uploadClubLogo, removeClubLogo } from '../lib/clubLogoStorage'
+import { createGroup } from '../lib/platformAdmin'
 import { DateField, DateTimeField, Avatar } from '../components/ui'
 import { totalRounds, FORMAT_LABEL } from '../lib/mixLogic'
+
+const sanitizeSlug = (value) => value.toLowerCase().replace(/[^a-z0-9-]/g, '')
 
 // datetime-local <-> stored timestamptz helpers (keeps Portugal wall-clock)
 const toLocalInput = (d) => {
@@ -117,6 +120,12 @@ export default function GerirClube() {
   const clubLogoInputRef = useRef(null)
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [logoError, setLogoError] = useState('')
+  const [showCreateGroup, setShowCreateGroup] = useState(false)
+  const [groupName, setGroupName] = useState('')
+  const [groupSlug, setGroupSlug] = useState('')
+  const [creatingGroup, setCreatingGroup] = useState(false)
+  const [groupError, setGroupError] = useState('')
+  const [createdGroupName, setCreatedGroupName] = useState(null)
 
   useGooglePlacesAutocomplete(
     locationInputRef,
@@ -864,6 +873,28 @@ export default function GerirClube() {
       alert('Erro ao atualizar funcionalidade: ' + error.message)
     } finally {
       setSavingFlag(false)
+    }
+  }
+
+  const handleCreateGroup = async () => {
+    setGroupError('')
+    setCreatingGroup(true)
+    try {
+      await createGroup(groupName.trim(), groupSlug.trim(), org.id, currentUser.id)
+      setCreatedGroupName(groupName.trim())
+      setShowCreateGroup(false)
+      setGroupName('')
+      setGroupSlug('')
+    } catch (error) {
+      console.error('Error creating group:', error)
+      const message = error?.message || ''
+      if (message.toLowerCase().includes('duplicate key value violates unique constraint') || message.toLowerCase().includes('slug')) {
+        setGroupError('Já existe um clube ou grupo com este identificador — escolhe outro')
+      } else {
+        setGroupError('Não foi possível criar o grupo. Tenta novamente.')
+      }
+    } finally {
+      setCreatingGroup(false)
     }
   }
 
@@ -1688,6 +1719,61 @@ export default function GerirClube() {
                   Guardar definições
                 </button>
               </form>
+
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <h4 className="text-base font-semibold text-ink-900 mb-1">
+                  Grupos dentro deste clube
+                </h4>
+                <p className="text-sm text-gray-500 mb-4">
+                  Um grupo tem os seus próprios mixes e membros, mas vive dentro deste clube — útil para uma equipa, torneio, ou turma específica.
+                </p>
+                {!showCreateGroup ? (
+                  <button type="button" onClick={() => setShowCreateGroup(true)} className="btn-secondary w-full">
+                    Criar grupo dentro deste clube
+                  </button>
+                ) : (
+                  <div className="space-y-3">
+                    <input
+                      type="text"
+                      value={groupName}
+                      onChange={(e) => setGroupName(e.target.value)}
+                      className="input-field"
+                      placeholder="Nome do grupo"
+                    />
+                    <input
+                      type="text"
+                      value={groupSlug}
+                      onChange={(e) => setGroupSlug(sanitizeSlug(e.target.value))}
+                      className="input-field"
+                      placeholder="slug-do-grupo"
+                    />
+                    {groupError && (
+                      <p className="text-danger text-sm font-extrabold">{groupError}</p>
+                    )}
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={handleCreateGroup}
+                        disabled={!groupName.trim() || !groupSlug.trim() || creatingGroup}
+                        className="btn-primary flex-1"
+                      >
+                        {creatingGroup ? 'A criar…' : 'Criar grupo'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setShowCreateGroup(false); setGroupName(''); setGroupSlug(''); setGroupError('') }}
+                        disabled={creatingGroup}
+                        className="btn-secondary flex-1"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {createdGroupName && (
+                  <p className="text-sm text-ok font-extrabold mt-3">Grupo "{createdGroupName}" criado com sucesso!</p>
+                )}
+              </div>
 
               <div className="mt-6 pt-6 border-t border-gray-200">
                 <h4 className="text-base font-semibold text-ink-900 mb-1">
