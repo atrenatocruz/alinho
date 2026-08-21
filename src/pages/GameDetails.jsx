@@ -1636,20 +1636,12 @@ export default function GameDetails() {
                 className="w-full"
               >
                 <User size={20} />
-                {joining ? 'A inscrever…' : 'Entrar sozinho'}
+                {joining ? 'A inscrever…' : 'Entrar'}
               </PrimaryButton>
-              {/* Guests join alone only — the partner picker is a member list */}
-              {!isGuest && peopleCount + 2 <= capacity && (
-                <PrimaryButton
-                  variant="ghost"
-                  onClick={() => setJoinMode('partner')}
-                  disabled={joining}
-                  className="w-full"
-                >
-                  <UserPlus size={20} />
-                  Entrar com parceiro
-                </PrimaryButton>
-              )}
+              {/* "Entrar com parceiro" button hidden for now (not deleted —
+                  setJoinMode('partner') and the partner-picker block below
+                  still work, this is the only entry point removed) —
+                  planned for reintroduction later. */}
             </>
           )}
 
