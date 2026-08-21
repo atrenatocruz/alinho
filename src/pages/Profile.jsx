@@ -7,7 +7,7 @@ import { hashPhone } from '../lib/hashPhone'
 import { uploadAvatar, removeAvatar } from '../lib/avatarStorage'
 import { getMyPrivateMatches, getGlobalRankings } from '../lib/privateMatches'
 import { listIncomingFriendRequests, acceptFriendRequest, removeFriendRequest, listFriends } from '../lib/friends'
-import { PrimaryButton, LevelBadge, GuestBadge, DateField, Avatar, Select, EmptyState } from '../components/ui'
+import { PrimaryButton, LevelBadge, GuestBadge, DateField, Avatar, Select, EmptyState, RankBadge } from '../components/ui'
 
 const TABS = [
   { key: 'perfil', label: 'Perfil' },
@@ -49,6 +49,7 @@ export default function Profile() {
   const [privateMatchHistory, setPrivateMatchHistory] = useState([])
   const [privateMatchHistoryLoading, setPrivateMatchHistoryLoading] = useState(true)
   const [globalPoints, setGlobalPoints] = useState(null)
+  const [globalRank, setGlobalRank] = useState(null)
   const [loading, setLoading] = useState(false)
   const [saved, setSaved] = useState(false)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
@@ -227,7 +228,9 @@ export default function Profile() {
   const loadGlobalPoints = async () => {
     try {
       const data = await getGlobalRankings()
-      setGlobalPoints(data.find((p) => p.user_id === profile.id) || null)
+      const index = data.findIndex((p) => p.user_id === profile.id)
+      setGlobalPoints(index === -1 ? null : data[index])
+      setGlobalRank(index === -1 ? null : index + 1)
     } catch (error) {
       console.error('Error loading global points:', error)
     }
@@ -410,6 +413,11 @@ export default function Profile() {
           <div className="mt-2.5">
             <LevelBadge level={currentMembership?.level} me size="md" />
           </div>
+          {globalRank && (
+            <div className="mt-2">
+              <RankBadge rank={globalRank} size="md" />
+            </div>
+          )}
           {profile?.avatar_url && (
             <button
               type="button"

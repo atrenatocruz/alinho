@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
-import { MapPin, CheckCircle2, ChevronRight, ChevronDown, ChevronLeft, Lock, Play, Calendar, X, Share2, MessageCircle, Link2, ImageDown } from 'lucide-react'
+import { MapPin, CheckCircle2, ChevronRight, ChevronDown, ChevronLeft, Lock, Play, Calendar, X, Share2, MessageCircle, Link2, ImageDown, Trophy } from 'lucide-react'
 import ShareCard, { CARD_W, CARD_H } from './ShareCard'
 
 /* ─── Date fields ────────────────────────────────────────────────────────
@@ -404,6 +404,34 @@ export function LevelBadge({ level, range, me = false, size = 'sm' }) {
                   ${me ? 'bg-lime-400 text-ink-900' : 'bg-ink-900 text-lime-400'}`}
     >
       {text}
+    </span>
+  )
+}
+
+/* ─── RankBadge ──────────────────────────────────────────────────────────
+   This player's position in the global ranking (get_global_rankings) —
+   shown on both PlayerDetails.jsx and Profile.jsx. Same colour steps as
+   Rankings.jsx's positionStyle: lime for 1st, dark tones for 2nd/3rd,
+   neutral past that. `rank` is a plain 1-based position, computed by the
+   caller from get_global_rankings' array order (already points-desc). */
+export function RankBadge({ rank, size = 'md' }) {
+  if (!rank) return null
+  const sizes = {
+    sm: 'text-[11px] px-2 py-0.5 gap-1',
+    md: 'text-sm px-3 py-1.5 gap-1.5',
+  }
+  const style =
+    rank === 1 ? 'bg-lime-400 text-ink-900'
+    : rank === 2 ? 'bg-ink-900 text-white'
+    : rank === 3 ? 'bg-ink-700 text-white'
+    : 'bg-ink-50 text-ink-700'
+  return (
+    <span
+      title="Posição no ranking global"
+      className={`inline-flex items-center rounded-full font-extrabold tabular-nums ${sizes[size]} ${style}`}
+    >
+      <Trophy size={size === 'sm' ? 12 : 14} />
+      #{rank} no ranking global
     </span>
   )
 }

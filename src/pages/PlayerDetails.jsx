@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { ArrowLeft, Trophy, Target, Award, Swords, ChevronDown, UserPlus, UserCheck, Clock, Lock, ShieldCheck } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { PrimaryButton, LevelBadge, EmptyState, Avatar } from '../components/ui'
+import { PrimaryButton, LevelBadge, EmptyState, Avatar, RankBadge } from '../components/ui'
 import { winRatePct } from '../lib/statsLogic'
 import { sendFriendRequest, acceptFriendRequest, removeFriendRequest } from '../lib/friends'
+import { getGlobalRankings } from '../lib/privateMatches'
 
 // Aggregated across every club the player belongs to (not scoped to the
 // viewer's currentOrganizationId) via get_player_profile/get_head_to_head_*
@@ -26,6 +27,7 @@ export default function PlayerDetails() {
   const [matchHistory, setMatchHistory] = useState([])
   const [matchHistoryLoading, setMatchHistoryLoading] = useState(true)
   const [expandedMixes, setExpandedMixes] = useState(new Set())
+  const [globalRank, setGlobalRank] = useState(null)
 
   const toggleMix = (gameId) => {
     setExpandedMixes((prev) => {
@@ -40,7 +42,18 @@ export default function PlayerDetails() {
     loadPlayer()
     loadH2h()
     loadMatchHistory()
+    loadGlobalRank()
   }, [id])
+
+  const loadGlobalRank = async () => {
+    try {
+      const rankings = await getGlobalRankings()
+      const index = rankings.findIndex((p) => p.user_id === id)
+      setGlobalRank(index === -1 ? null : index + 1)
+    } catch (error) {
+      console.error('Error loading global rank:', error)
+    }
+  }
 
   const loadPlayer = async () => {
     setLoading(true)
@@ -253,6 +266,15 @@ export default function PlayerDetails() {
           {player.level && (
             <div className="mt-2.5">
               <LevelBadge level={player.level} size="md" />
+            </div>
+          )}
+          {/* Same privacy gate as the stat tiles below — results_visibility
+              controls both, so no point showing a rank derived from hidden
+              points. globalRank is null when the player has no ranked
+              points yet, not just when it's hidden. */}
+          {!resultsHidden && globalRank && (
+            <div className="mt-2.5">
+              <RankBadge rank={globalRank} size="md" />
             </div>
           )}
           <p className="text-white/60 text-xs mt-2.5">
