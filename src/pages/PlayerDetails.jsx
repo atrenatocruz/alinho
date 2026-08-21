@@ -25,6 +25,16 @@ export default function PlayerDetails() {
 
   const [matchHistory, setMatchHistory] = useState([])
   const [matchHistoryLoading, setMatchHistoryLoading] = useState(true)
+  const [expandedMixes, setExpandedMixes] = useState(new Set())
+
+  const toggleMix = (gameId) => {
+    setExpandedMixes((prev) => {
+      const next = new Set(prev)
+      if (next.has(gameId)) next.delete(gameId)
+      else next.add(gameId)
+      return next
+    })
+  }
 
   useEffect(() => {
     loadPlayer()
@@ -190,6 +200,27 @@ export default function PlayerDetails() {
     { icon: Target, value: played, label: 'Jogos', cls: 'text-ink-700' },
     { icon: Award, value: `${winRate}%`, label: 'Taxa de vitória', cls: 'text-ok' },
   ]
+
+  // A mix with several rounds ("todos contra todos") returns one row per
+  // round, all sharing the same game_id — grouped here into one
+  // collapsible card instead of repeating the mix's title/date per round.
+  // Private matches (game_id null) are already a single match each, so
+  // they stay as their own flat, non-collapsible entries.
+  const matchGroups = []
+  const mixGroupByGameId = new Map()
+  for (const m of matchHistory) {
+    if (m.game_id) {
+      let group = mixGroupByGameId.get(m.game_id)
+      if (!group) {
+        group = { type: 'mix', game_id: m.game_id, label: m.label, date: m.match_date, matches: [] }
+        mixGroupByGameId.set(m.game_id, group)
+        matchGroups.push(group)
+      }
+      group.matches.push(m)
+    } else {
+      matchGroups.push({ type: 'private', match: m })
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -403,23 +434,65 @@ export default function PlayerDetails() {
             subtitle="Este jogador ainda não tem jogos com resultado."
           />
         ) : (
-          <div className="card p-0 overflow-hidden divide-y divide-line">
-            {matchHistory.map((m) => (
-              <div key={m.match_id} className="flex items-center gap-3 px-4 py-3">
-                <div className="flex-1 min-w-0">
-                  <p className="font-extrabold text-ink-900 text-sm truncate">{m.label}</p>
-                  <p className="text-[11px] text-muted">{formatMatchDate(m.match_date)}</p>
+          <div className="space-y-3">
+            {matchGroups.map((group) =>
+              group.type === 'private' ? (
+                <div key={group.match.match_id} className="card flex items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-extrabold text-ink-900 text-sm truncate">{group.match.label}</p>
+                    <p className="text-[11px] text-muted">{formatMatchDate(group.match.match_date)}</p>
+                  </div>
+                  <span className="text-base font-extrabold tabular-nums shrink-0">
+                    {group.match.player_score}–{group.match.opponent_score}
+                  </span>
+                  <span className={`text-[11px] font-extrabold uppercase px-2 py-1 rounded-full shrink-0 ${
+                    group.match.won ? 'bg-ok/10 text-ok' : 'bg-danger/10 text-danger'
+                  }`}>
+                    {group.match.won ? 'V' : 'D'}
+                  </span>
                 </div>
-                <span className="text-base font-extrabold tabular-nums shrink-0">
-                  {m.player_score}–{m.opponent_score}
-                </span>
-                <span className={`text-[11px] font-extrabold uppercase px-2 py-1 rounded-full shrink-0 ${
-                  m.won ? 'bg-ok/10 text-ok' : 'bg-danger/10 text-danger'
-                }`}>
-                  {m.won ? 'V' : 'D'}
-                </span>
-              </div>
-            ))}
+              ) : (
+                <div key={group.game_id} className="card p-0 overflow-hidden">
+                  <button
+                    onClick={() => toggleMix(group.game_id)}
+                    aria-expanded={expandedMixes.has(group.game_id)}
+                    className="w-full flex items-center gap-3 px-4 py-3.5 min-h-[56px] transition-colors duration-fast hover:bg-ink-50"
+                  >
+                    <div className="flex-1 min-w-0 text-left">
+                      <p className="font-extrabold text-ink-900 text-sm truncate">{group.label}</p>
+                      <p className="text-[11px] text-muted">{formatMatchDate(group.date)}</p>
+                    </div>
+                    <span className="text-sm font-extrabold tabular-nums shrink-0">
+                      <span className="text-ok">{group.matches.filter((m) => m.won).length}V</span>
+                      <span className="text-muted"> – </span>
+                      <span className="text-danger">{group.matches.filter((m) => !m.won).length}D</span>
+                    </span>
+                    <ChevronDown
+                      size={20}
+                      className={`text-muted transition-transform duration-base shrink-0 ${expandedMixes.has(group.game_id) ? 'rotate-180' : ''}`}
+                    />
+                  </button>
+
+                  {expandedMixes.has(group.game_id) && (
+                    <div className="border-t border-line divide-y divide-line animate-fade-up">
+                      {group.matches.map((m, i) => (
+                        <div key={m.match_id} className="flex items-center gap-3 px-4 py-3">
+                          <p className="flex-1 min-w-0 text-sm text-muted">Jogo {i + 1}</p>
+                          <span className="text-base font-extrabold tabular-nums shrink-0">
+                            {m.player_score}–{m.opponent_score}
+                          </span>
+                          <span className={`text-[11px] font-extrabold uppercase px-2 py-1 rounded-full shrink-0 ${
+                            m.won ? 'bg-ok/10 text-ok' : 'bg-danger/10 text-danger'
+                          }`}>
+                            {m.won ? 'V' : 'D'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            )}
           </div>
         )}
       </div>
