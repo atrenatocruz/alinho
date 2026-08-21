@@ -28,15 +28,19 @@ CREATE TABLE player_follows (
 );
 ALTER TABLE player_follows ENABLE ROW LEVEL SECURITY;
 
+-- TO authenticated on all three: without it the policies default to `public`,
+-- which includes the unauthenticated `anon` role — an anonymous client with
+-- just the publishable key could read the whole follow graph. Any signed-in
+-- user still sees any follow relationship, which is the intended behaviour.
 CREATE POLICY "Follows are publicly visible"
-  ON player_follows FOR SELECT USING (true);
+  ON player_follows FOR SELECT TO authenticated USING (true);
 
 CREATE POLICY "Users can follow others"
-  ON player_follows FOR INSERT
+  ON player_follows FOR INSERT TO authenticated
   WITH CHECK (auth.uid() = follower_id);
 
 CREATE POLICY "Users can unfollow"
-  ON player_follows FOR DELETE
+  ON player_follows FOR DELETE TO authenticated
   USING (auth.uid() = follower_id);
 
 -- ── 3. search_organizations — unified search across clubs + groups for the
@@ -101,6 +105,14 @@ BEGIN
     END IF;
     IF NOT (is_org_admin(p_parent_org_id) OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND is_platform_admin)) THEN
       RAISE EXCEPTION 'Sem permissão para criar um grupo neste clube';
+    END IF;
+    -- A club admin may only appoint themselves as the new group's admin —
+    -- otherwise they could force any other user into an admin membership,
+    -- without consent, by calling this RPC directly. Platform admins keep the
+    -- ability to appoint someone else (same as create_organization).
+    IF p_admin_user_id <> auth.uid()
+       AND NOT EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND is_platform_admin) THEN
+      RAISE EXCEPTION 'Só podes criar um grupo com te tornares admin dele';
     END IF;
 
     INSERT INTO organizations (name, slug, kind, parent_organization_id, is_global, open_join, points_rules)

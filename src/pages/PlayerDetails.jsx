@@ -62,7 +62,14 @@ export default function PlayerDetails() {
           .insert({ follower_id: profile.id, followed_id: id })
         if (error) throw error
       }
-      await loadPlayer()
+      // Patch local state instead of calling loadPlayer() — that sets
+      // loading=true, which the top-level render guard turns into replacing
+      // the whole page with a spinner just to flip one button.
+      setPlayer((p) => ({
+        ...p,
+        is_following: !p.is_following,
+        followers_count: (p.followers_count ?? 0) + (p.is_following ? -1 : 1),
+      }))
     } catch (error) {
       console.error('Error toggling follow:', error)
       alert('Não foi possível atualizar. Tenta novamente.')
