@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Home, Users, Trophy, Settings, LogOut, HelpCircle, Phone, X } from 'lucide-react'
+import { Home, Users, Trophy, Settings, LogOut, HelpCircle, Phone, X, Bell } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton, Avatar } from './ui'
 import { hashPhone } from '../lib/hashPhone'
 import { getGlobalRankings } from '../lib/privateMatches'
+import { listIncomingFriendRequests } from '../lib/friends'
 
 // Re-prompt at most once per day once dismissed — a nudge, not a gate.
 const PHONE_PROMPT_DISMISSED_KEY = 'phonePromptDismissedDate'
@@ -156,6 +157,26 @@ export default function Layout({ children }) {
     }
   }, [profile?.id, isGuest])
 
+  // Refetched on every route change too (not just profile/isGuest), so the
+  // dot clears shortly after accepting/declining on /perfil without a full
+  // reload — cheap since it's just a count of a small pending-requests list.
+  const [pendingFriendRequests, setPendingFriendRequests] = useState(0)
+  useEffect(() => {
+    if (!profile?.id || isGuest) {
+      setPendingFriendRequests(0)
+      return
+    }
+    let cancelled = false
+    listIncomingFriendRequests()
+      .then((data) => {
+        if (!cancelled) setPendingFriendRequests(data.length)
+      })
+      .catch((error) => console.error('Error loading friend request count:', error))
+    return () => {
+      cancelled = true
+    }
+  }, [profile?.id, isGuest, location.pathname])
+
   const needsPhone = profile && !isGuest && !profile.phone_hash && !phonePromptDismissed
 
   const dismissPhonePrompt = () => {
@@ -205,6 +226,19 @@ export default function Layout({ children }) {
                 </span>
               </Link>
             )}
+            <Link
+              to="/perfil"
+              title={pendingFriendRequests > 0 ? `${pendingFriendRequests} pedido${pendingFriendRequests === 1 ? '' : 's'} de amizade` : 'Notificações'}
+              className="relative w-11 h-11 flex items-center justify-center rounded-full text-ink-200 hover:text-white hover:bg-white/10 transition-colors duration-fast"
+            >
+              <Bell size={21} />
+              {pendingFriendRequests > 0 && (
+                <span
+                  aria-hidden="true"
+                  className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-lime-400 ring-2 ring-ink-900"
+                />
+              )}
+            </Link>
             <Link
               to="/instrucoes"
               title="Instruções"
