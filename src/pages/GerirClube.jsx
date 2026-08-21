@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useParams, Link } from 'react-router-dom'
 import { Plus, Calendar, Users, Trash2, Edit2, Check, X, UserX, Repeat, Clock, ArrowLeft, Camera, Settings } from 'lucide-react'
 import { supabase } from '../lib/supabase'
@@ -1540,7 +1541,7 @@ export default function GerirClube() {
           {/* Settings — modal, triggered by the gear icon next to the title
               (no longer a tab, per the redesign: rename lives inline in the
               title itself, everything else stays in this overlay). */}
-          {activeTab === 'settings' && settings && (
+          {activeTab === 'settings' && settings && createPortal(
             <div
               className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-ink-900/70 animate-fade-in"
               onClick={() => setActiveTab('games')}
@@ -1899,7 +1900,8 @@ export default function GerirClube() {
                 </label>
               </div>
               </div>
-            </div>
+            </div>,
+            document.body
           )}
         </>
       )}
