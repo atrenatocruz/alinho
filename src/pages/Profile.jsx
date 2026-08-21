@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { User, Award, Trophy, Target, Flame, LogOut, Camera, UserCheck, X, Users } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -24,7 +24,14 @@ const VISIBILITY_OPTIONS = [
 export default function Profile() {
   const { profile, updateProfile, updateMembership, currentMembership, currentOrganizationId, isGuest, signOut } = useAuth()
   const navigate = useNavigate()
-  const [tab, setTab] = useState('perfil')
+  const [searchParams] = useSearchParams()
+  const [tab, setTab] = useState(() => (TABS.some((t) => t.key === searchParams.get('tab')) ? searchParams.get('tab') : 'perfil'))
+  // Re-applies whenever ?tab= changes without a full remount — the bell
+  // dropdown links here from an already-mounted Profile (same route).
+  useEffect(() => {
+    const requested = searchParams.get('tab')
+    if (requested && TABS.some((t) => t.key === requested)) setTab(requested)
+  }, [searchParams])
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(profile?.name || '')
   const [level, setLevel] = useState(currentMembership?.level || 'iniciante')
@@ -445,35 +452,6 @@ export default function Profile() {
 
       {tab === 'perfil' && (
         <>
-        {/* Pedidos de amizade */}
-        {friendRequests.length > 0 && (
-          <div className="card space-y-3">
-            <p className="text-sm font-extrabold text-ink-900">Pedidos de amizade</p>
-            {friendRequests.map((req) => (
-              <div key={req.id} className="flex items-center gap-3">
-                <Avatar name={req.requester_name} url={req.requester_avatar_url} size="w-10 h-10 text-sm" />
-                <p className="flex-1 min-w-0 font-extrabold text-ink-900 text-sm truncate">{req.requester_name}</p>
-                <button
-                  onClick={() => handleAcceptFriendRequest(req.id)}
-                  disabled={friendRequestActing === req.id}
-                  aria-label="Aceitar pedido"
-                  className="w-9 h-9 shrink-0 rounded-full bg-lime-400 text-ink-900 flex items-center justify-center hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
-                >
-                  <UserCheck size={16} />
-                </button>
-                <button
-                  onClick={() => handleDeclineFriendRequest(req.id)}
-                  disabled={friendRequestActing === req.id}
-                  aria-label="Recusar pedido"
-                  className="w-9 h-9 shrink-0 rounded-full bg-ink-50 text-ink-700 flex items-center justify-center hover:bg-ink-200 transition-colors duration-fast disabled:opacity-40"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
         {/* Stats */}
         {statTiles && (
           <div className="grid grid-cols-2 gap-3">
@@ -697,6 +675,35 @@ export default function Profile() {
 
       {tab === 'amigos' && (
         <>
+        {/* Pedidos de amizade */}
+        {friendRequests.length > 0 && (
+          <div className="card space-y-3">
+            <p className="text-sm font-extrabold text-ink-900">Pedidos de amizade</p>
+            {friendRequests.map((req) => (
+              <div key={req.id} className="flex items-center gap-3">
+                <Avatar name={req.requester_name} url={req.requester_avatar_url} size="w-10 h-10 text-sm" />
+                <p className="flex-1 min-w-0 font-extrabold text-ink-900 text-sm truncate">{req.requester_name}</p>
+                <button
+                  onClick={() => handleAcceptFriendRequest(req.id)}
+                  disabled={friendRequestActing === req.id}
+                  aria-label="Aceitar pedido"
+                  className="w-9 h-9 shrink-0 rounded-full bg-lime-400 text-ink-900 flex items-center justify-center hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
+                >
+                  <UserCheck size={16} />
+                </button>
+                <button
+                  onClick={() => handleDeclineFriendRequest(req.id)}
+                  disabled={friendRequestActing === req.id}
+                  aria-label="Recusar pedido"
+                  className="w-9 h-9 shrink-0 rounded-full bg-ink-50 text-ink-700 flex items-center justify-center hover:bg-ink-200 transition-colors duration-fast disabled:opacity-40"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         {friendsLoading ? (
           <div className="flex items-center justify-center py-16">
             <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>

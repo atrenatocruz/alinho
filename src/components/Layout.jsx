@@ -158,20 +158,21 @@ export default function Layout({ children }) {
   }, [profile?.id, isGuest])
 
   // Refetched on every route change too (not just profile/isGuest), so the
-  // dot clears shortly after accepting/declining on /perfil without a full
-  // reload — cheap since it's just a count of a small pending-requests list.
-  const [pendingFriendRequests, setPendingFriendRequests] = useState(0)
+  // dropdown clears shortly after accepting/declining on /perfil without a
+  // full reload — cheap since it's just a small pending-requests list.
+  const [friendRequests, setFriendRequests] = useState([])
+  const [showNotifications, setShowNotifications] = useState(false)
   useEffect(() => {
     if (!profile?.id || isGuest) {
-      setPendingFriendRequests(0)
+      setFriendRequests([])
       return
     }
     let cancelled = false
     listIncomingFriendRequests()
       .then((data) => {
-        if (!cancelled) setPendingFriendRequests(data.length)
+        if (!cancelled) setFriendRequests(data)
       })
-      .catch((error) => console.error('Error loading friend request count:', error))
+      .catch((error) => console.error('Error loading friend requests:', error))
     return () => {
       cancelled = true
     }
@@ -226,19 +227,64 @@ export default function Layout({ children }) {
                 </span>
               </Link>
             )}
-            <Link
-              to="/perfil"
-              title={pendingFriendRequests > 0 ? `${pendingFriendRequests} pedido${pendingFriendRequests === 1 ? '' : 's'} de amizade` : 'Notificações'}
-              className="relative w-11 h-11 flex items-center justify-center rounded-full text-ink-200 hover:text-white hover:bg-white/10 transition-colors duration-fast"
-            >
-              <Bell size={21} />
-              {pendingFriendRequests > 0 && (
-                <span
-                  aria-hidden="true"
-                  className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-lime-400 ring-2 ring-ink-900"
-                />
+            <div className="relative">
+              <button
+                onClick={() => setShowNotifications((v) => !v)}
+                title="Notificações"
+                aria-expanded={showNotifications}
+                className="relative w-11 h-11 flex items-center justify-center rounded-full text-ink-200 hover:text-white hover:bg-white/10 transition-colors duration-fast"
+              >
+                <Bell size={21} />
+                {friendRequests.length > 0 && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-lime-400 ring-2 ring-ink-900"
+                  />
+                )}
+              </button>
+
+              {showNotifications && (
+                <>
+                  {/* Transparent backdrop closes the dropdown on outside tap
+                      — same pattern as PhoneRequiredModal below. */}
+                  <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
+                  <div className="absolute right-0 top-full mt-2 w-80 max-w-[85vw] bg-surface rounded-card shadow-lift ring-1 ring-line z-50 overflow-hidden animate-pop text-left">
+                    <div className="px-4 py-3 border-b border-line">
+                      <p className="font-extrabold text-ink-900">Notificações</p>
+                    </div>
+                    {friendRequests.length === 0 ? (
+                      <div className="p-4 text-center">
+                        <p className="text-sm text-muted mb-3">Sem notificações novas</p>
+                        <Link
+                          to="/perfil?tab=amigos"
+                          onClick={() => setShowNotifications(false)}
+                          className="inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast"
+                        >
+                          Ver amigos
+                        </Link>
+                      </div>
+                    ) : (
+                      <div className="max-h-80 overflow-y-auto divide-y divide-line">
+                        {friendRequests.map((req) => (
+                          <Link
+                            key={req.id}
+                            to="/perfil?tab=amigos"
+                            onClick={() => setShowNotifications(false)}
+                            className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50"
+                          >
+                            <Avatar name={req.requester_name} url={req.requester_avatar_url} size="w-9 h-9 text-sm" />
+                            <p className="flex-1 min-w-0 text-sm text-ink-900">
+                              <span className="font-extrabold">{req.requester_name}</span> quer ser teu amigo
+                            </p>
+                            <span aria-hidden="true" className="w-2 h-2 rounded-full bg-lime-400 shrink-0" />
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
-            </Link>
+            </div>
             <Link
               to="/instrucoes"
               title="Instruções"
