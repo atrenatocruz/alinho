@@ -10,8 +10,14 @@ import { Avatar, EmptyState } from '../components/ui'
 // the whole community — not just a truncated preview.
 const BROWSE_LIMIT = 100
 
+const TABS = [
+  { key: 'players', label: 'Jogadores' },
+  { key: 'orgs', label: 'Clubes & Grupos' },
+]
+
 export default function Comunidade() {
   const { memberships, followOrganization, leaveOrganization, toggleFavoriteOrganization } = useAuth()
+  const [tab, setTab] = useState('players')
   const [query, setQuery] = useState('')
   const [players, setPlayers] = useState([])
   const [organizations, setOrganizations] = useState([])
@@ -114,7 +120,6 @@ export default function Comunidade() {
 
   const clubs = organizations.filter((o) => o.kind === 'club')
   const groups = organizations.filter((o) => o.kind === 'group')
-  const totalResults = players.length + organizations.length
 
   const renderOrgRow = (org) => {
     const membership = memberships.find((m) => m.organization_id === org.id)
@@ -176,7 +181,11 @@ export default function Comunidade() {
       <div>
         <h2 className="text-3xl text-ink-900">Comunidade</h2>
         <p className="text-muted text-sm mt-0.5">
-          {loading ? 'A carregar…' : `${totalResults} resultado${totalResults === 1 ? '' : 's'} na comunidade`}
+          {loading
+            ? 'A carregar…'
+            : tab === 'players'
+            ? `${players.length} jogador${players.length === 1 ? '' : 'es'} na comunidade`
+            : `${organizations.length} resultado${organizations.length === 1 ? '' : 's'} entre clubes e grupos`}
         </p>
       </div>
 
@@ -191,43 +200,61 @@ export default function Comunidade() {
         />
       </div>
 
+      {/* Tabs */}
+      <div className="flex gap-1 p-1 bg-ink-50 rounded-ctrl">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`flex-1 py-2.5 rounded-ctrl text-sm font-extrabold transition-all duration-fast ${
+              tab === t.key ? 'bg-canvas text-ink-900 shadow-lift border border-line' : 'text-muted hover:text-ink-900'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
       {loading ? (
         <div className="flex items-center justify-center py-16">
           <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
         </div>
-      ) : totalResults === 0 ? (
+      ) : tab === 'players' ? (
+        players.length === 0 ? (
+          <EmptyState
+            icon={Users}
+            title="Nenhum jogador encontrado"
+            subtitle={query.trim() ? 'Tenta outro nome.' : 'Ainda não há jogadores na comunidade.'}
+          />
+        ) : (
+          <div className="card p-0 overflow-hidden divide-y divide-line">
+            {players.map((player) => (
+              <Link
+                key={player.id}
+                to={`/jogador/${player.id}`}
+                className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50"
+              >
+                <Avatar name={player.name} url={player.avatar_url} size="w-10 h-10 text-sm" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-extrabold text-ink-900 text-sm truncate">{player.name}</p>
+                  {player.club_names && (
+                    <p className="text-[11px] font-extrabold uppercase tracking-widest text-lime-700 truncate mt-0.5">
+                      {player.club_names}
+                    </p>
+                  )}
+                </div>
+              </Link>
+            ))}
+          </div>
+        )
+      ) : clubs.length === 0 && groups.length === 0 ? (
         <EmptyState
           icon={Users}
           title="Nada encontrado"
-          subtitle={query.trim() ? 'Tenta outro nome.' : 'Ainda não há ninguém na comunidade.'}
+          subtitle={query.trim() ? 'Tenta outro nome.' : 'Ainda não há clubes nem grupos na comunidade.'}
         />
       ) : (
         <div className="space-y-6">
-          {players.length > 0 && (
-            <div className="space-y-3">
-              <h3 className="text-sm font-extrabold text-ink-900 uppercase tracking-wide">Jogadores</h3>
-              <div className="card p-0 overflow-hidden divide-y divide-line">
-                {players.map((player) => (
-                  <Link
-                    key={player.id}
-                    to={`/jogador/${player.id}`}
-                    className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50"
-                  >
-                    <Avatar name={player.name} url={player.avatar_url} size="w-10 h-10 text-sm" />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-extrabold text-ink-900 text-sm truncate">{player.name}</p>
-                      {player.club_names && (
-                        <p className="text-[11px] font-extrabold uppercase tracking-widest text-lime-700 truncate mt-0.5">
-                          {player.club_names}
-                        </p>
-                      )}
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
-
           {clubs.length > 0 && (
             <div className="space-y-3">
               <h3 className="text-sm font-extrabold text-ink-900 uppercase tracking-wide">Clubes</h3>
