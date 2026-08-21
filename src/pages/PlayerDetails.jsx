@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Trophy, Target, Award, Swords, ChevronDown, UserPlus, UserCheck, Clock, Lock, Users } from 'lucide-react'
+import { useParams, useNavigate, Link } from 'react-router-dom'
+import { ArrowLeft, Trophy, Target, Award, Swords, ChevronDown, UserPlus, UserCheck, Clock, Lock, ShieldCheck } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { PrimaryButton, LevelBadge, EmptyState, Avatar } from '../components/ui'
 import { winRatePct } from '../lib/statsLogic'
@@ -23,9 +23,13 @@ export default function PlayerDetails() {
   const [h2hMatches, setH2hMatches] = useState([])
   const [matchesLoading, setMatchesLoading] = useState(false)
 
+  const [matchHistory, setMatchHistory] = useState([])
+  const [matchHistoryLoading, setMatchHistoryLoading] = useState(true)
+
   useEffect(() => {
     loadPlayer()
     loadH2h()
+    loadMatchHistory()
   }, [id])
 
   const loadPlayer = async () => {
@@ -126,6 +130,19 @@ export default function PlayerDetails() {
     }
   }
 
+  const loadMatchHistory = async () => {
+    setMatchHistoryLoading(true)
+    try {
+      const { data, error } = await supabase.rpc('get_player_match_history', { p_user_id: id })
+      if (error) throw error
+      setMatchHistory(data || [])
+    } catch (error) {
+      console.error('Error loading match history:', error)
+    } finally {
+      setMatchHistoryLoading(false)
+    }
+  }
+
   const formatMatchDate = (dateString) =>
     new Date(dateString).toLocaleDateString('pt-PT', { day: '2-digit', month: 'short', year: 'numeric' })
 
@@ -156,6 +173,14 @@ export default function PlayerDetails() {
   // section for this viewer (a player with genuinely zero games returns 0,
   // never null) — game_wins/losses etc. are nulled the same way, together.
   const resultsHidden = player.total_points === null
+  // activity/clubs are never nulled for the owner, so this only ever fires
+  // for someone else's profile — matches the same can_view_section rule
+  // the backend enforces (public always visible; friends only if the
+  // backend's own friendship_status says 'friends'; private never).
+  const isHidden = (visibility) =>
+    !player.my_profile && (visibility === 'private' || (visibility === 'friends' && player.friendship_status !== 'friends'))
+  const activityHidden = isHidden(player.activity_visibility)
+  const clubsHidden = isHidden(player.clubs_visibility)
   const played = (player.game_wins || 0) + (player.game_losses || 0)
   const winRate = winRatePct(player.game_wins || 0, played)
 
@@ -202,11 +227,6 @@ export default function PlayerDetails() {
           <p className="text-white/60 text-xs mt-2.5">
             {player.friends_count} {player.friends_count === 1 ? 'amigo' : 'amigos'}
           </p>
-          {player.club_names && (
-            <p className="text-white/60 text-xs mt-1 flex items-center justify-center gap-1.5">
-              <Users size={12} /> {player.club_names}
-            </p>
-          )}
           {!player.my_profile && (
             player.friendship_status === 'friends' ? (
               <button
@@ -263,6 +283,35 @@ export default function PlayerDetails() {
         </div>
       )}
 
+      {/* Clubes & Grupos */}
+      <div>
+        <h3 className="text-lg text-ink-900 mb-3">Clubes & Grupos</h3>
+        {clubsHidden ? (
+          <div className="card text-center py-6 text-muted">
+            <Lock size={18} className="mx-auto mb-1.5" />
+            <p className="text-sm">Este jogador mantém os clubes privados.</p>
+          </div>
+        ) : !player.clubs || player.clubs.length === 0 ? (
+          <EmptyState
+            icon={ShieldCheck}
+            title="Sem clubes"
+            subtitle="Este jogador ainda não pertence a nenhum clube ou grupo."
+          />
+        ) : (
+          <div className="space-y-3">
+            {player.clubs.map((c) => (
+              <Link key={c.id} to={`/clube/${c.slug}`} className="card press flex items-center gap-3.5 hover:shadow-lift">
+                <Avatar name={c.name} size="w-10 h-10 text-sm" />
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-extrabold text-ink-900 truncate">{c.name}</h4>
+                  {c.kind === 'group' && <p className="text-[11px] font-extrabold uppercase tracking-widest text-lime-700">Grupo</p>}
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Confrontos diretos — this page now always targets one specific
           player, so it's a single row (this player vs the viewer) that
           expands to the combined mix + private-match list, instead of a
@@ -273,6 +322,11 @@ export default function PlayerDetails() {
         {h2hLoading ? (
           <div className="flex items-center justify-center py-10">
             <div className="animate-spin rounded-full h-8 w-8 border-[3px] border-ink-50 border-t-ink-700"></div>
+          </div>
+        ) : activityHidden ? (
+          <div className="card text-center py-6 text-muted">
+            <Lock size={18} className="mx-auto mb-1.5" />
+            <p className="text-sm">Este jogador mantém a atividade privada.</p>
           </div>
         ) : !h2h || h2h.matches_played === 0 ? (
           <EmptyState
@@ -324,6 +378,48 @@ export default function PlayerDetails() {
                 )}
               </div>
             )}
+          </div>
+        )}
+      </div>
+
+      {/* Histórico de jogos — this player's own matches (mixes + confirmed
+          private matches), independent of who's viewing. */}
+      <div>
+        <h3 className="text-lg text-ink-900 mb-3">Histórico de jogos</h3>
+
+        {matchHistoryLoading ? (
+          <div className="flex items-center justify-center py-10">
+            <div className="animate-spin rounded-full h-8 w-8 border-[3px] border-ink-50 border-t-ink-700"></div>
+          </div>
+        ) : activityHidden ? (
+          <div className="card text-center py-6 text-muted">
+            <Lock size={18} className="mx-auto mb-1.5" />
+            <p className="text-sm">Este jogador mantém a atividade privada.</p>
+          </div>
+        ) : matchHistory.length === 0 ? (
+          <EmptyState
+            icon={Swords}
+            title="Sem jogos registados"
+            subtitle="Este jogador ainda não tem jogos com resultado."
+          />
+        ) : (
+          <div className="card p-0 overflow-hidden divide-y divide-line">
+            {matchHistory.map((m) => (
+              <div key={m.match_id} className="flex items-center gap-3 px-4 py-3">
+                <div className="flex-1 min-w-0">
+                  <p className="font-extrabold text-ink-900 text-sm truncate">{m.label}</p>
+                  <p className="text-[11px] text-muted">{formatMatchDate(m.match_date)}</p>
+                </div>
+                <span className="text-base font-extrabold tabular-nums shrink-0">
+                  {m.player_score}–{m.opponent_score}
+                </span>
+                <span className={`text-[11px] font-extrabold uppercase px-2 py-1 rounded-full shrink-0 ${
+                  m.won ? 'bg-ok/10 text-ok' : 'bg-danger/10 text-danger'
+                }`}>
+                  {m.won ? 'V' : 'D'}
+                </span>
+              </div>
+            ))}
           </div>
         )}
       </div>
