@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Trophy, Target, Award, Swords, ChevronDown, UserPlus } from 'lucide-react'
+import { ArrowLeft, Trophy, Target, Award, Swords, ChevronDown, UserPlus, Lock, Users } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton, LevelBadge, EmptyState, Avatar } from '../components/ui'
@@ -137,6 +137,10 @@ export default function PlayerDetails() {
     )
   }
 
+  // total_points is only ever null when results_visibility hid the whole
+  // section for this viewer (a player with genuinely zero games returns 0,
+  // never null) — game_wins/losses etc. are nulled the same way, together.
+  const resultsHidden = player.total_points === null
   const played = (player.game_wins || 0) + (player.game_losses || 0)
   const winRate = winRatePct(player.game_wins || 0, played)
 
@@ -183,6 +187,11 @@ export default function PlayerDetails() {
           <p className="text-white/60 text-xs mt-2.5">
             {player.followers_count} {player.followers_count === 1 ? 'seguidor' : 'seguidores'} · {player.following_count} a seguir
           </p>
+          {player.club_names && (
+            <p className="text-white/60 text-xs mt-1 flex items-center justify-center gap-1.5">
+              <Users size={12} /> {player.club_names}
+            </p>
+          )}
           {!player.my_profile && (
             <button
               onClick={handleFollowToggle}
@@ -201,15 +210,22 @@ export default function PlayerDetails() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-3">
-        {statTiles.map(({ icon: Icon, value, label, cls }) => (
-          <div key={label} className="card text-center py-5">
-            <Icon size={20} className={`mx-auto mb-1.5 ${cls}`} />
-            <p className="text-2xl font-extrabold text-ink-900 tabular-nums">{value}</p>
-            <p className="text-xs text-muted">{label}</p>
-          </div>
-        ))}
-      </div>
+      {resultsHidden ? (
+        <div className="card text-center py-6 text-muted">
+          <Lock size={18} className="mx-auto mb-1.5" />
+          <p className="text-sm">Este jogador mantém os resultados privados.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          {statTiles.map(({ icon: Icon, value, label, cls }) => (
+            <div key={label} className="card text-center py-5">
+              <Icon size={20} className={`mx-auto mb-1.5 ${cls}`} />
+              <p className="text-2xl font-extrabold text-ink-900 tabular-nums">{value}</p>
+              <p className="text-xs text-muted">{label}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Confrontos diretos — this page now always targets one specific
           player, so it's a single row (this player vs the viewer) that

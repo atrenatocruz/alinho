@@ -13,6 +13,12 @@ const TABS = [
   { key: 'historico', label: 'Histórico' },
 ]
 
+const VISIBILITY_OPTIONS = [
+  { value: 'public', label: 'Público' },
+  { value: 'friends', label: 'Amigos' },
+  { value: 'private', label: 'Privado' },
+]
+
 export default function Profile() {
   const { profile, updateProfile, updateMembership, currentMembership, currentOrganizationId, isGuest, signOut } = useAuth()
   const navigate = useNavigate()
@@ -23,6 +29,9 @@ export default function Profile() {
   const [preferredSide, setPreferredSide] = useState(profile?.preferred_side || 'both')
   const [birthday, setBirthday] = useState(profile?.birthday || '')
   const [gender, setGender] = useState(profile?.gender || '')
+  const [activityVisibility, setActivityVisibility] = useState(profile?.activity_visibility || 'public')
+  const [resultsVisibility, setResultsVisibility] = useState(profile?.results_visibility || 'public')
+  const [clubsVisibility, setClubsVisibility] = useState(profile?.clubs_visibility || 'public')
   const [phone, setPhone] = useState('')
   const [phoneError, setPhoneError] = useState('')
   const [stats, setStats] = useState(null)
@@ -209,7 +218,15 @@ export default function Profile() {
     setLoading(true)
 
     try {
-      const updates = { name, preferred_side: preferredSide, birthday: birthday || null, gender }
+      const updates = {
+        name,
+        preferred_side: preferredSide,
+        birthday: birthday || null,
+        gender,
+        activity_visibility: activityVisibility,
+        results_visibility: resultsVisibility,
+        clubs_visibility: clubsVisibility,
+      }
       if (phone) {
         updates.phone_hash = await hashPhone(phone)
       }
@@ -501,6 +518,27 @@ export default function Profile() {
                 <p className="text-xs text-muted mt-1.5">Usado na formação de duplas dos mixes</p>
               </div>
 
+              <div className="pt-2 border-t border-line">
+                <h4 className="text-sm font-extrabold text-ink-900 mt-4 mb-1">Privacidade</h4>
+                <p className="text-xs text-muted mb-3">
+                  Escolhe quem vê cada secção do teu perfil. "Amigos" = jogadores que se seguem mutuamente.
+                </p>
+                <div className="space-y-3">
+                  <div>
+                    <label className={inputLabel}>Atividade (confrontos diretos)</label>
+                    <Select value={activityVisibility} onChange={setActivityVisibility} options={VISIBILITY_OPTIONS} />
+                  </div>
+                  <div>
+                    <label className={inputLabel}>Resultados (pontos e estatísticas)</label>
+                    <Select value={resultsVisibility} onChange={setResultsVisibility} options={VISIBILITY_OPTIONS} />
+                  </div>
+                  <div>
+                    <label className={inputLabel}>Clubes (a que pertences)</label>
+                    <Select value={clubsVisibility} onChange={setClubsVisibility} options={VISIBILITY_OPTIONS} />
+                  </div>
+                </div>
+              </div>
+
               <div className="flex gap-3 pt-2">
                 <PrimaryButton type="submit" disabled={loading} className="flex-1">
                   {loading ? 'A guardar…' : 'Guardar'}
@@ -514,6 +552,9 @@ export default function Profile() {
                     setLevel(currentMembership?.level || 'iniciante')
                     setBirthday(profile.birthday || '')
                     setGender(profile.gender || '')
+                    setActivityVisibility(profile.activity_visibility || 'public')
+                    setResultsVisibility(profile.results_visibility || 'public')
+                    setClubsVisibility(profile.clubs_visibility || 'public')
                     setPhone('')
                     setPhoneError('')
                   }}
