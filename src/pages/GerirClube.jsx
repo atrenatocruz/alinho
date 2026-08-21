@@ -1353,7 +1353,10 @@ export default function GerirClube() {
                 </div>
               )}
 
-              {/* Games List */}
+              {/* Games List — tab switcher + list wrapped in one card, so
+                  they read as a single unit instead of a floating pill row
+                  above a loose stack of cards. */}
+              <div className="card space-y-4">
               <div className="flex gap-1 p-1 bg-ink-50 rounded-ctrl overflow-x-auto">
                 {GAME_FILTERS.map(opt => (
                   <button
@@ -1382,7 +1385,7 @@ export default function GerirClube() {
                     .reduce((n, p) => n + 1 + (p.partner_id ? 1 : 0), 0)
 
                   return (
-                    <div key={game.id} className="card">
+                    <div key={game.id} className="bg-canvas rounded-ctrl border border-line p-4">
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex-1">
                           <h3 className="text-xl font-semibold text-ink-900 mb-2">
@@ -1453,6 +1456,7 @@ export default function GerirClube() {
                     </div>
                   )
                 })}
+              </div>
               </div>
             </div>
           )}
