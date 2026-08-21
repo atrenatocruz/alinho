@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Trophy, Target, Award, Swords, ChevronDown, UserPlus, Lock, Users } from 'lucide-react'
+import { ArrowLeft, Trophy, Target, Award, Swords, ChevronDown, UserPlus, UserCheck, Clock, Lock, Users } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton, LevelBadge, EmptyState, Avatar } from '../components/ui'
 import { winRatePct } from '../lib/statsLogic'
+import { sendFriendRequest, acceptFriendRequest, removeFriendRequest } from '../lib/friends'
 
 // Aggregated across every club the player belongs to (not scoped to the
 // viewer's currentOrganizationId) via get_player_profile/get_head_to_head_*
@@ -13,10 +13,9 @@ import { winRatePct } from '../lib/statsLogic'
 export default function PlayerDetails() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { profile } = useAuth()
   const [player, setPlayer] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [followActing, setFollowActing] = useState(false)
+  const [friendActing, setFriendActing] = useState(false)
 
   const [h2h, setH2h] = useState(null)
   const [h2hLoading, setH2hLoading] = useState(true)
@@ -42,39 +41,55 @@ export default function PlayerDetails() {
     }
   }
 
-  const handleFollowToggle = async () => {
-    setFollowActing(true)
+  // Patches local state instead of calling loadPlayer() — that sets
+  // loading=true, which the top-level render guard turns into replacing
+  // the whole page with a spinner just to flip one button.
+  const handleSendRequest = async () => {
+    setFriendActing(true)
     try {
-      if (player.is_following) {
-        if (!confirm(`Deixar de seguir ${player.name}?`)) {
-          setFollowActing(false)
-          return
-        }
-        const { error } = await supabase
-          .from('player_follows')
-          .delete()
-          .eq('follower_id', profile.id)
-          .eq('followed_id', id)
-        if (error) throw error
-      } else {
-        const { error } = await supabase
-          .from('player_follows')
-          .insert({ follower_id: profile.id, followed_id: id })
-        if (error) throw error
-      }
-      // Patch local state instead of calling loadPlayer() — that sets
-      // loading=true, which the top-level render guard turns into replacing
-      // the whole page with a spinner just to flip one button.
+      const status = await sendFriendRequest(id)
       setPlayer((p) => ({
         ...p,
-        is_following: !p.is_following,
-        followers_count: (p.followers_count ?? 0) + (p.is_following ? -1 : 1),
+        friendship_status: status === 'accepted' ? 'friends' : 'pending_sent',
+        friends_count: status === 'accepted' ? (p.friends_count ?? 0) + 1 : p.friends_count,
       }))
     } catch (error) {
-      console.error('Error toggling follow:', error)
+      console.error('Error sending friend request:', error)
+      alert('Não foi possível enviar o pedido. Tenta novamente.')
+    } finally {
+      setFriendActing(false)
+    }
+  }
+
+  const handleAcceptRequest = async () => {
+    setFriendActing(true)
+    try {
+      await acceptFriendRequest(player.friendship_request_id)
+      setPlayer((p) => ({ ...p, friendship_status: 'friends', friends_count: (p.friends_count ?? 0) + 1 }))
+    } catch (error) {
+      console.error('Error accepting friend request:', error)
+      alert('Não foi possível aceitar o pedido. Tenta novamente.')
+    } finally {
+      setFriendActing(false)
+    }
+  }
+
+  const handleRemoveFriendship = async (confirmMessage) => {
+    if (!confirm(confirmMessage)) return
+    setFriendActing(true)
+    try {
+      await removeFriendRequest(player.friendship_request_id)
+      setPlayer((p) => ({
+        ...p,
+        friendship_status: 'none',
+        friendship_request_id: null,
+        friends_count: p.friendship_status === 'friends' ? Math.max(0, (p.friends_count ?? 0) - 1) : p.friends_count,
+      }))
+    } catch (error) {
+      console.error('Error removing friend request:', error)
       alert('Não foi possível atualizar. Tenta novamente.')
     } finally {
-      setFollowActing(false)
+      setFriendActing(false)
     }
   }
 
@@ -185,7 +200,7 @@ export default function PlayerDetails() {
             </div>
           )}
           <p className="text-white/60 text-xs mt-2.5">
-            {player.followers_count} {player.followers_count === 1 ? 'seguidor' : 'seguidores'} · {player.following_count} a seguir
+            {player.friends_count} {player.friends_count === 1 ? 'amigo' : 'amigos'}
           </p>
           {player.club_names && (
             <p className="text-white/60 text-xs mt-1 flex items-center justify-center gap-1.5">
@@ -193,18 +208,39 @@ export default function PlayerDetails() {
             </p>
           )}
           {!player.my_profile && (
-            <button
-              onClick={handleFollowToggle}
-              disabled={followActing}
-              className={`mt-3 inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full transition-colors duration-fast disabled:opacity-40 ${
-                player.is_following
-                  ? 'bg-white/10 text-white hover:bg-white/20'
-                  : 'bg-lime-400 text-ink-900 hover:bg-lime-600'
-              }`}
-            >
-              <UserPlus size={14} />
-              {player.is_following ? 'A seguir' : 'Seguir'}
-            </button>
+            player.friendship_status === 'friends' ? (
+              <button
+                onClick={() => handleRemoveFriendship(`Deixar de ser amigo de ${player.name}?`)}
+                disabled={friendActing}
+                className="mt-3 inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors duration-fast disabled:opacity-40"
+              >
+                <UserCheck size={14} /> Amigos
+              </button>
+            ) : player.friendship_status === 'pending_sent' ? (
+              <button
+                onClick={() => handleRemoveFriendship('Cancelar o pedido de amizade?')}
+                disabled={friendActing}
+                className="mt-3 inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full bg-white/10 text-white/70 hover:bg-white/20 transition-colors duration-fast disabled:opacity-40"
+              >
+                <Clock size={14} /> Pedido enviado
+              </button>
+            ) : player.friendship_status === 'pending_received' ? (
+              <button
+                onClick={handleAcceptRequest}
+                disabled={friendActing}
+                className="mt-3 inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full bg-lime-400 text-ink-900 hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
+              >
+                <UserCheck size={14} /> Aceitar pedido
+              </button>
+            ) : (
+              <button
+                onClick={handleSendRequest}
+                disabled={friendActing}
+                className="mt-3 inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full bg-lime-400 text-ink-900 hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
+              >
+                <UserPlus size={14} /> Adicionar amigo
+              </button>
+            )
           )}
         </div>
       </div>

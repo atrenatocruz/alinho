@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { User, Award, Trophy, Target, Flame, LogOut, Camera } from 'lucide-react'
+import { User, Award, Trophy, Target, Flame, LogOut, Camera, UserCheck, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { hashPhone } from '../lib/hashPhone'
 import { uploadAvatar, removeAvatar } from '../lib/avatarStorage'
 import { getMyPrivateMatches, getGlobalRankings } from '../lib/privateMatches'
+import { listIncomingFriendRequests, acceptFriendRequest, removeFriendRequest } from '../lib/friends'
 import { PrimaryButton, LevelBadge, GuestBadge, DateField, Avatar, Select, EmptyState } from '../components/ui'
 
 const TABS = [
@@ -44,6 +45,8 @@ export default function Profile() {
   const [saved, setSaved] = useState(false)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [photoError, setPhotoError] = useState('')
+  const [friendRequests, setFriendRequests] = useState([])
+  const [friendRequestActing, setFriendRequestActing] = useState(null)
   const fileInputRef = useRef(null)
 
   useEffect(() => {
@@ -64,9 +67,44 @@ export default function Profile() {
       if (!isGuest) {
         loadPrivateMatchHistory()
         loadGlobalPoints()
+        loadFriendRequests()
       }
     }
   }, [profile, currentMembership, currentOrganizationId])
+
+  const loadFriendRequests = async () => {
+    try {
+      setFriendRequests(await listIncomingFriendRequests())
+    } catch (error) {
+      console.error('Error loading friend requests:', error)
+    }
+  }
+
+  const handleAcceptFriendRequest = async (requestId) => {
+    setFriendRequestActing(requestId)
+    try {
+      await acceptFriendRequest(requestId)
+      setFriendRequests((reqs) => reqs.filter((r) => r.id !== requestId))
+    } catch (error) {
+      console.error('Error accepting friend request:', error)
+      alert('Não foi possível aceitar o pedido. Tenta novamente.')
+    } finally {
+      setFriendRequestActing(null)
+    }
+  }
+
+  const handleDeclineFriendRequest = async (requestId) => {
+    setFriendRequestActing(requestId)
+    try {
+      await removeFriendRequest(requestId)
+      setFriendRequests((reqs) => reqs.filter((r) => r.id !== requestId))
+    } catch (error) {
+      console.error('Error declining friend request:', error)
+      alert('Não foi possível recusar o pedido. Tenta novamente.')
+    } finally {
+      setFriendRequestActing(null)
+    }
+  }
 
   const loadStats = async () => {
     try {
@@ -391,6 +429,35 @@ export default function Profile() {
 
       {tab === 'perfil' && (
         <>
+        {/* Pedidos de amizade */}
+        {friendRequests.length > 0 && (
+          <div className="card space-y-3">
+            <p className="text-sm font-extrabold text-ink-900">Pedidos de amizade</p>
+            {friendRequests.map((req) => (
+              <div key={req.id} className="flex items-center gap-3">
+                <Avatar name={req.requester_name} url={req.requester_avatar_url} size="w-10 h-10 text-sm" />
+                <p className="flex-1 min-w-0 font-extrabold text-ink-900 text-sm truncate">{req.requester_name}</p>
+                <button
+                  onClick={() => handleAcceptFriendRequest(req.id)}
+                  disabled={friendRequestActing === req.id}
+                  aria-label="Aceitar pedido"
+                  className="w-9 h-9 shrink-0 rounded-full bg-lime-400 text-ink-900 flex items-center justify-center hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
+                >
+                  <UserCheck size={16} />
+                </button>
+                <button
+                  onClick={() => handleDeclineFriendRequest(req.id)}
+                  disabled={friendRequestActing === req.id}
+                  aria-label="Recusar pedido"
+                  className="w-9 h-9 shrink-0 rounded-full bg-ink-50 text-ink-700 flex items-center justify-center hover:bg-ink-200 transition-colors duration-fast disabled:opacity-40"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Stats */}
         {statTiles && (
           <div className="grid grid-cols-2 gap-3">
