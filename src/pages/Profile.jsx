@@ -1,16 +1,17 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { User, Award, Trophy, Target, Flame, LogOut, Camera, UserCheck, X } from 'lucide-react'
+import { User, Award, Trophy, Target, Flame, LogOut, Camera, UserCheck, X, Users } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { hashPhone } from '../lib/hashPhone'
 import { uploadAvatar, removeAvatar } from '../lib/avatarStorage'
 import { getMyPrivateMatches, getGlobalRankings } from '../lib/privateMatches'
-import { listIncomingFriendRequests, acceptFriendRequest, removeFriendRequest } from '../lib/friends'
+import { listIncomingFriendRequests, acceptFriendRequest, removeFriendRequest, listFriends } from '../lib/friends'
 import { PrimaryButton, LevelBadge, GuestBadge, DateField, Avatar, Select, EmptyState } from '../components/ui'
 
 const TABS = [
   { key: 'perfil', label: 'Perfil' },
+  { key: 'amigos', label: 'Amigos' },
   { key: 'historico', label: 'Histórico' },
 ]
 
@@ -47,6 +48,8 @@ export default function Profile() {
   const [photoError, setPhotoError] = useState('')
   const [friendRequests, setFriendRequests] = useState([])
   const [friendRequestActing, setFriendRequestActing] = useState(null)
+  const [friends, setFriends] = useState([])
+  const [friendsLoading, setFriendsLoading] = useState(true)
   const fileInputRef = useRef(null)
 
   useEffect(() => {
@@ -68,6 +71,7 @@ export default function Profile() {
         loadPrivateMatchHistory()
         loadGlobalPoints()
         loadFriendRequests()
+        loadFriends()
       }
     }
   }, [profile, currentMembership, currentOrganizationId])
@@ -80,11 +84,23 @@ export default function Profile() {
     }
   }
 
+  const loadFriends = async () => {
+    setFriendsLoading(true)
+    try {
+      setFriends(await listFriends())
+    } catch (error) {
+      console.error('Error loading friends:', error)
+    } finally {
+      setFriendsLoading(false)
+    }
+  }
+
   const handleAcceptFriendRequest = async (requestId) => {
     setFriendRequestActing(requestId)
     try {
       await acceptFriendRequest(requestId)
       setFriendRequests((reqs) => reqs.filter((r) => r.id !== requestId))
+      loadFriends()
     } catch (error) {
       console.error('Error accepting friend request:', error)
       alert('Não foi possível aceitar o pedido. Tenta novamente.')
@@ -676,6 +692,35 @@ export default function Profile() {
             </div>
           )}
         </div>
+        </>
+      )}
+
+      {tab === 'amigos' && (
+        <>
+        {friendsLoading ? (
+          <div className="flex items-center justify-center py-16">
+            <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
+          </div>
+        ) : friends.length === 0 ? (
+          <EmptyState
+            icon={Users}
+            title="Ainda não tens amigos"
+            subtitle="Envia um pedido de amizade a partir do perfil de outro jogador."
+          />
+        ) : (
+          <div className="card p-0 overflow-hidden divide-y divide-line">
+            {friends.map((f) => (
+              <Link
+                key={f.id}
+                to={`/jogador/${f.id}`}
+                className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50"
+              >
+                <Avatar name={f.name} url={f.avatar_url} size="w-11 h-11 text-sm" />
+                <p className="flex-1 min-w-0 font-extrabold text-ink-900 text-sm truncate">{f.name}</p>
+              </Link>
+            ))}
+          </div>
+        )}
         </>
       )}
 

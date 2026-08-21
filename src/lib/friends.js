@@ -26,3 +26,9 @@ export const listIncomingFriendRequests = async () => {
   if (error) throw error
   return data || []
 }
+
+export const listFriends = async () => {
+  const { data, error } = await supabase.rpc('list_friends')
+  if (error) throw error
+  return data || []
+}
