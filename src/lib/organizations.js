@@ -11,3 +11,9 @@ export const searchOrganizations = async (query) => {
   if (error) throw error
   return data || []
 }
+
+export const getOrganizationRankings = async () => {
+  const { data, error } = await supabase.rpc('get_organization_rankings')
+  if (error) throw error
+  return data || []
+}
