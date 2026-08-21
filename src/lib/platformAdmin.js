@@ -15,3 +15,14 @@ export const createOrganization = async (name, slug, adminUserId) => {
   if (error) throw error
   return data
 }
+
+export const createGroup = async (name, slug, parentOrgId, adminUserId) => {
+  const { data, error } = await supabase.rpc('create_group', {
+    p_name: name,
+    p_slug: slug,
+    p_parent_org_id: parentOrgId || null,
+    p_admin_user_id: adminUserId,
+  })
+  if (error) throw error
+  return data
+}

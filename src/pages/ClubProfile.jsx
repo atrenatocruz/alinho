@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Users, UserPlus, Clock, Heart, MapPin, Phone, Instagram, Globe, Calendar } from 'lucide-react'
+import { ArrowLeft, Users, UserPlus, Clock, Heart, MapPin, Phone, Instagram, Globe, Calendar, Building2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { getClubProfile } from '../lib/clubProfile'
 import { Avatar, EmptyState, PrimaryButton } from '../components/ui'
@@ -107,8 +107,8 @@ export default function ClubProfile() {
   if (notFound || !club) {
     return (
       <div className="space-y-5">
-        <Link to="/clubes" className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline">
-          <ArrowLeft size={16} /> Voltar a Clubes & Grupos
+        <Link to="/comunidade" className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline">
+          <ArrowLeft size={16} /> Voltar à Comunidade
         </Link>
         <EmptyState
           icon={PadelIcon}
@@ -121,9 +121,18 @@ export default function ClubProfile() {
 
   return (
     <div className="space-y-5">
-      <Link to="/clubes" className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline">
-        <ArrowLeft size={16} /> Voltar a Clubes & Grupos
+      <Link to="/comunidade" className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline">
+        <ArrowLeft size={16} /> Voltar à Comunidade
       </Link>
+
+      {club.kind === 'group' && club.parent_slug && (
+        <Link
+          to={`/clube/${club.parent_slug}`}
+          className="inline-flex items-center gap-1.5 text-sm font-extrabold text-lime-700 hover:underline"
+        >
+          <Building2 size={14} /> Grupo dentro de {club.parent_name}
+        </Link>
+      )}
 
       <div className="card flex items-center gap-3.5">
         <Avatar name={club.name} url={club.group_logo_url} size="w-16 h-16 text-xl" />
@@ -173,7 +182,7 @@ export default function ClubProfile() {
         </div>
       )}
 
-      {club.location && (
+      {club.kind === 'club' && club.location && (
         <div className="card">
           <h3 className="text-sm font-extrabold text-ink-900 uppercase tracking-wide mb-2 flex items-center gap-1.5">
             <MapPin size={15} /> Localização
@@ -182,7 +191,7 @@ export default function ClubProfile() {
         </div>
       )}
 
-      {(club.phone || club.instagram || club.website) && (
+      {club.kind === 'club' && (club.phone || club.instagram || club.website) && (
         <div className="card space-y-2">
           <h3 className="text-sm font-extrabold text-ink-900 uppercase tracking-wide mb-2">Contactos</h3>
           {club.phone && (

@@ -348,6 +348,16 @@ export const AuthProvider = ({ children }) => {
     return { error }
   }
 
+  // Re-reads profile + memberships from the server. Needed after any action
+  // that creates/changes a membership server-side without going through one
+  // of the wrappers above (e.g. create_group, which inserts an admin
+  // membership for the caller) — otherwise the client's memberships array
+  // stays stale until a full page reload.
+  const refreshMemberships = async () => {
+    if (!user) return
+    await loadProfile(user.id)
+  }
+
   const switchOrganization = (organizationId) => {
     setCurrentOrganizationId(organizationId)
   }
@@ -380,6 +390,7 @@ export const AuthProvider = ({ children }) => {
     followOrganization,
     ensureOrgAdminAccess,
     leaveOrganization,
+    refreshMemberships,
     switchOrganization,
   }
 

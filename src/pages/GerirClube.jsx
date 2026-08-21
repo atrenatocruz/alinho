@@ -5,8 +5,11 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
 import { uploadClubLogo, removeClubLogo } from '../lib/clubLogoStorage'
+import { createGroup } from '../lib/platformAdmin'
 import { DateField, DateTimeField, Avatar } from '../components/ui'
 import { totalRounds, FORMAT_LABEL } from '../lib/mixLogic'
+
+const sanitizeSlug = (value) => value.toLowerCase().replace(/[^a-z0-9-]/g, '')
 
 // datetime-local <-> stored timestamptz helpers (keeps Portugal wall-clock)
 const toLocalInput = (d) => {
@@ -96,7 +99,7 @@ function Segmented({ options, value, onChange }) {
 
 export default function GerirClube() {
   const { slug } = useParams()
-  const { profile: currentUser, memberships, adminOrganizations, isPrivateMatchesEnabled, refreshFeatureFlags, ensureOrgAdminAccess } = useAuth()
+  const { profile: currentUser, memberships, adminOrganizations, isPrivateMatchesEnabled, refreshFeatureFlags, ensureOrgAdminAccess, refreshMemberships } = useAuth()
   const [org, setOrg] = useState(null)
   const [orgLoading, setOrgLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('games') // 'games', 'members', 'settings'
@@ -117,6 +120,12 @@ export default function GerirClube() {
   const clubLogoInputRef = useRef(null)
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [logoError, setLogoError] = useState('')
+  const [showCreateGroup, setShowCreateGroup] = useState(false)
+  const [groupName, setGroupName] = useState('')
+  const [groupSlug, setGroupSlug] = useState('')
+  const [creatingGroup, setCreatingGroup] = useState(false)
+  const [groupError, setGroupError] = useState('')
+  const [createdGroupName, setCreatedGroupName] = useState(null)
 
   useGooglePlacesAutocomplete(
     locationInputRef,
@@ -867,6 +876,36 @@ export default function GerirClube() {
     }
   }
 
+  const handleCreateGroup = async () => {
+    setGroupError('')
+    setCreatingGroup(true)
+    try {
+      await createGroup(groupName.trim(), groupSlug.trim(), org.id, currentUser.id)
+      // create_group inserts the caller's admin membership server-side — pull
+      // it into the client before the admin can navigate to /gerir/<slug>,
+      // otherwise the org resolver there sees a stale memberships array and
+      // bounces them to "Sem acesso" until a manual page reload.
+      await refreshMemberships()
+      setCreatedGroupName(groupName.trim())
+      setShowCreateGroup(false)
+      setGroupName('')
+      setGroupSlug('')
+    } catch (error) {
+      console.error('Error creating group:', error)
+      const message = error?.message || ''
+      if (message.toLowerCase().includes('duplicate key value violates unique constraint') || message.toLowerCase().includes('slug')) {
+        setGroupError('Já existe um clube ou grupo com este identificador — escolhe outro')
+      } else {
+        // The RPC's own RAISE EXCEPTION messages are already pt-PT, so show
+        // them verbatim rather than hiding the real reason behind a generic
+        // "tenta novamente" the admin can't act on.
+        setGroupError(message || 'Não foi possível criar o grupo. Tenta novamente.')
+      }
+    } finally {
+      setCreatingGroup(false)
+    }
+  }
+
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleString('pt-PT', {
       day: '2-digit',
@@ -1528,58 +1567,65 @@ export default function GerirClube() {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Localização
-                  </label>
-                  <input
-                    ref={clubLocationInputRef}
-                    type="text"
-                    value={settings.location || ''}
-                    onChange={(e) => setSettings({ ...settings, location: e.target.value })}
-                    className="input-field"
-                    placeholder="Morada ou nome do clube"
-                  />
-                </div>
+                {/* Localização + contactos are club-only: ClubProfile.jsx hides
+                    them entirely for groups, so offering them here would let a
+                    group admin save data that's never displayed anywhere. */}
+                {org?.kind !== 'group' && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Localização
+                      </label>
+                      <input
+                        ref={clubLocationInputRef}
+                        type="text"
+                        value={settings.location || ''}
+                        onChange={(e) => setSettings({ ...settings, location: e.target.value })}
+                        className="input-field"
+                        placeholder="Morada ou nome do clube"
+                      />
+                    </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Telefone
-                    </label>
-                    <input
-                      type="text"
-                      value={settings.phone || ''}
-                      onChange={(e) => setSettings({ ...settings, phone: e.target.value })}
-                      className="input-field"
-                      placeholder="+351 XXX XXX XXX"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Instagram
-                    </label>
-                    <input
-                      type="text"
-                      value={settings.instagram || ''}
-                      onChange={(e) => setSettings({ ...settings, instagram: e.target.value })}
-                      className="input-field"
-                      placeholder="@oclube"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Website
-                    </label>
-                    <input
-                      type="text"
-                      value={settings.website || ''}
-                      onChange={(e) => setSettings({ ...settings, website: e.target.value })}
-                      className="input-field"
-                      placeholder="oclube.pt"
-                    />
-                  </div>
-                </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Telefone
+                        </label>
+                        <input
+                          type="text"
+                          value={settings.phone || ''}
+                          onChange={(e) => setSettings({ ...settings, phone: e.target.value })}
+                          className="input-field"
+                          placeholder="+351 XXX XXX XXX"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Instagram
+                        </label>
+                        <input
+                          type="text"
+                          value={settings.instagram || ''}
+                          onChange={(e) => setSettings({ ...settings, instagram: e.target.value })}
+                          className="input-field"
+                          placeholder="@oclube"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Website
+                        </label>
+                        <input
+                          type="text"
+                          value={settings.website || ''}
+                          onChange={(e) => setSettings({ ...settings, website: e.target.value })}
+                          className="input-field"
+                          placeholder="oclube.pt"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 <div className="pt-2 border-t border-gray-200">
                   <h4 className="text-base font-semibold text-ink-900 mt-6 mb-1">
@@ -1654,12 +1700,12 @@ export default function GerirClube() {
                     Visibilidade pública
                   </h4>
                   <p className="text-sm text-gray-500 mb-4">
-                    Um clube público aparece em "Clubes & Grupos", conta para o ranking geral, e os seus membros ficam pesquisáveis por qualquer jogador.
+                    Um clube público aparece na Comunidade, conta para o ranking geral, e os seus membros ficam pesquisáveis por qualquer jogador.
                   </p>
                   <label className="flex items-center justify-between gap-4 p-3 rounded-ctrl border border-line mb-3">
                     <div>
                       <p className="font-extrabold text-ink-900 text-sm">Clube público</p>
-                      <p className="text-[11px] text-muted">Aparece em Clubes & Grupos</p>
+                      <p className="text-[11px] text-muted">Aparece na Comunidade</p>
                     </div>
                     <input
                       type="checkbox"
@@ -1688,6 +1734,66 @@ export default function GerirClube() {
                   Guardar definições
                 </button>
               </form>
+
+              {/* Only clubs can contain groups — create_group rejects a group
+                  as a parent server-side, so don't offer it on a group's own
+                  Gerir page (the heading would be wrong there too). */}
+              {org?.kind !== 'group' && (
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <h4 className="text-base font-semibold text-ink-900 mb-1">
+                    Grupos dentro deste clube
+                  </h4>
+                  <p className="text-sm text-gray-500 mb-4">
+                    Um grupo tem os seus próprios mixes e membros, mas vive dentro deste clube — útil para uma equipa, torneio, ou turma específica.
+                  </p>
+                  {!showCreateGroup ? (
+                    <button type="button" onClick={() => setShowCreateGroup(true)} className="btn-secondary w-full">
+                      Criar grupo dentro deste clube
+                    </button>
+                  ) : (
+                    <div className="space-y-3">
+                      <input
+                        type="text"
+                        value={groupName}
+                        onChange={(e) => setGroupName(e.target.value)}
+                        className="input-field"
+                        placeholder="Nome do grupo"
+                      />
+                      <input
+                        type="text"
+                        value={groupSlug}
+                        onChange={(e) => setGroupSlug(sanitizeSlug(e.target.value))}
+                        className="input-field"
+                        placeholder="slug-do-grupo"
+                      />
+                      {groupError && (
+                        <p className="text-danger text-sm font-extrabold">{groupError}</p>
+                      )}
+                      <div className="flex gap-3">
+                        <button
+                          type="button"
+                          onClick={handleCreateGroup}
+                          disabled={!groupName.trim() || !groupSlug.trim() || creatingGroup}
+                          className="btn-primary flex-1"
+                        >
+                          {creatingGroup ? 'A criar…' : 'Criar grupo'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setShowCreateGroup(false); setGroupName(''); setGroupSlug(''); setGroupError('') }}
+                          disabled={creatingGroup}
+                          className="btn-secondary flex-1"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {createdGroupName && (
+                    <p className="text-sm text-ok font-extrabold mt-3">Grupo "{createdGroupName}" criado com sucesso!</p>
+                  )}
+                </div>
+              )}
 
               <div className="mt-6 pt-6 border-t border-gray-200">
                 <h4 className="text-base font-semibold text-ink-900 mb-1">

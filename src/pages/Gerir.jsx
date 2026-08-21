@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { Avatar, EmptyState, PrimaryButton } from '../components/ui'
 import PlayerSearch from '../components/PlayerSearch'
-import { searchAnyPlayer, createOrganization } from '../lib/platformAdmin'
+import { searchAnyPlayer, createOrganization, createGroup } from '../lib/platformAdmin'
 
 const sanitizeSlug = (value) => value.toLowerCase().replace(/[^a-z0-9-]/g, '')
 
@@ -15,6 +15,7 @@ export default function Gerir() {
   const isPlatformAdmin = !!profile?.is_platform_admin
 
   const [showCreateForm, setShowCreateForm] = useState(false)
+  const [kind, setKind] = useState('club')
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
   const [selectedAdmin, setSelectedAdmin] = useState(null)
@@ -50,6 +51,7 @@ export default function Gerir() {
 
   const resetCreateForm = () => {
     setShowCreateForm(false)
+    setKind('club')
     setName('')
     setSlug('')
     setSelectedAdmin(null)
@@ -61,7 +63,11 @@ export default function Gerir() {
     setSaving(true)
     try {
       const newSlug = slug.trim()
-      await createOrganization(name.trim(), newSlug, selectedAdmin.id)
+      if (kind === 'club') {
+        await createOrganization(name.trim(), newSlug, selectedAdmin.id)
+      } else {
+        await createGroup(name.trim(), newSlug, null, selectedAdmin.id)
+      }
       // The appointed admin gets the only membership create_organization
       // creates (see migration_platform_admin_create_organization.sql) — if
       // that's someone else, the platform admin has no membership to land
@@ -99,7 +105,27 @@ export default function Gerir() {
         </PrimaryButton>
       ) : (
         <>
-          <h3 className="font-extrabold text-ink-900">Criar novo clube</h3>
+          <h3 className="font-extrabold text-ink-900">Criar novo clube ou grupo</h3>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setKind('club')}
+              className={`flex-1 text-sm font-extrabold py-2.5 rounded-ctrl border transition-colors duration-fast ${
+                kind === 'club' ? 'bg-ink-900 text-white border-ink-900' : 'bg-surface text-ink-700 border-line'
+              }`}
+            >
+              Clube
+            </button>
+            <button
+              type="button"
+              onClick={() => setKind('group')}
+              className={`flex-1 text-sm font-extrabold py-2.5 rounded-ctrl border transition-colors duration-fast ${
+                kind === 'group' ? 'bg-ink-900 text-white border-ink-900' : 'bg-surface text-ink-700 border-line'
+              }`}
+            >
+              Grupo independente
+            </button>
+          </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Nome</label>
             <input
@@ -107,7 +133,7 @@ export default function Gerir() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="input-field"
-              placeholder="ex: Padel Clube Lisboa"
+              placeholder={kind === 'club' ? 'ex: Padel Clube Lisboa' : 'ex: Torneio de Verão'}
             />
           </div>
           <div>
@@ -117,7 +143,7 @@ export default function Gerir() {
               value={slug}
               onChange={(e) => setSlug(sanitizeSlug(e.target.value))}
               className="input-field"
-              placeholder="ex: padel-clube-lisboa"
+              placeholder={kind === 'club' ? 'ex: padel-clube-lisboa' : 'ex: torneio-de-verao'}
             />
           </div>
           <div>
@@ -141,7 +167,7 @@ export default function Gerir() {
               disabled={!name.trim() || !slug.trim() || !selectedAdmin || saving}
               className="flex-1"
             >
-              {saving ? 'A criar…' : 'Criar clube'}
+              {saving ? 'A criar…' : kind === 'club' ? 'Criar clube' : 'Criar grupo'}
             </PrimaryButton>
             <PrimaryButton variant="ghost" onClick={resetCreateForm} disabled={saving} className="flex-1">
               Cancelar

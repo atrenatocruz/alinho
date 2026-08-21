@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Trophy, Target, Award, Swords, ChevronDown } from 'lucide-react'
+import { ArrowLeft, Trophy, Target, Award, Swords, ChevronDown, UserPlus } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton, LevelBadge, EmptyState, Avatar } from '../components/ui'
 import { winRatePct } from '../lib/statsLogic'
 
@@ -12,8 +13,10 @@ import { winRatePct } from '../lib/statsLogic'
 export default function PlayerDetails() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { profile } = useAuth()
   const [player, setPlayer] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [followActing, setFollowActing] = useState(false)
 
   const [h2h, setH2h] = useState(null)
   const [h2hLoading, setH2hLoading] = useState(true)
@@ -36,6 +39,42 @@ export default function PlayerDetails() {
       console.error('Error loading player:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleFollowToggle = async () => {
+    setFollowActing(true)
+    try {
+      if (player.is_following) {
+        if (!confirm(`Deixar de seguir ${player.name}?`)) {
+          setFollowActing(false)
+          return
+        }
+        const { error } = await supabase
+          .from('player_follows')
+          .delete()
+          .eq('follower_id', profile.id)
+          .eq('followed_id', id)
+        if (error) throw error
+      } else {
+        const { error } = await supabase
+          .from('player_follows')
+          .insert({ follower_id: profile.id, followed_id: id })
+        if (error) throw error
+      }
+      // Patch local state instead of calling loadPlayer() — that sets
+      // loading=true, which the top-level render guard turns into replacing
+      // the whole page with a spinner just to flip one button.
+      setPlayer((p) => ({
+        ...p,
+        is_following: !p.is_following,
+        followers_count: (p.followers_count ?? 0) + (p.is_following ? -1 : 1),
+      }))
+    } catch (error) {
+      console.error('Error toggling follow:', error)
+      alert('Não foi possível atualizar. Tenta novamente.')
+    } finally {
+      setFollowActing(false)
     }
   }
 
@@ -140,6 +179,23 @@ export default function PlayerDetails() {
             <div className="mt-2.5">
               <LevelBadge level={player.level} size="md" />
             </div>
+          )}
+          <p className="text-white/60 text-xs mt-2.5">
+            {player.followers_count} {player.followers_count === 1 ? 'seguidor' : 'seguidores'} · {player.following_count} a seguir
+          </p>
+          {!player.my_profile && (
+            <button
+              onClick={handleFollowToggle}
+              disabled={followActing}
+              className={`mt-3 inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full transition-colors duration-fast disabled:opacity-40 ${
+                player.is_following
+                  ? 'bg-white/10 text-white hover:bg-white/20'
+                  : 'bg-lime-400 text-ink-900 hover:bg-lime-600'
+              }`}
+            >
+              <UserPlus size={14} />
+              {player.is_following ? 'A seguir' : 'Seguir'}
+            </button>
           )}
         </div>
       </div>
