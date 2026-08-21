@@ -5,7 +5,6 @@ import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton, Avatar } from './ui'
 import { hashPhone } from '../lib/hashPhone'
 import { getGlobalRankings } from '../lib/privateMatches'
-import PadelIcon from './icons/PadelIcon'
 
 // Re-prompt at most once per day once dismissed — a nudge, not a gate.
 const PHONE_PROMPT_DISMISSED_KEY = 'phonePromptDismissedDate'
@@ -180,7 +179,6 @@ export default function Layout({ children }) {
     : [
         { path: '/', icon: Home, label: 'Jogos' },
         { path: '/comunidade', icon: Users, label: 'Comunidade' },
-        { path: '/clubes', icon: PadelIcon, label: 'Clubes' },
         { path: '/rankings', icon: Trophy, label: 'Rankings' },
         { path: '/perfil', label: 'Perfil' },
       ]

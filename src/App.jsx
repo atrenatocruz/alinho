@@ -11,7 +11,6 @@ import Rankings from './pages/Rankings'
 import PlayerDetails from './pages/PlayerDetails'
 import Profile from './pages/Profile'
 import Comunidade from './pages/Comunidade'
-import Clubes from './pages/Clubes'
 import ClubProfile from './pages/ClubProfile'
 import PrivateMatches from './pages/PrivateMatches'
 import CreatePrivateMatch from './pages/CreatePrivateMatch'
@@ -121,14 +120,6 @@ function AppRoutes() {
         element={
           <Guard require="member" showSplash={showSplash}>
             <Comunidade />
-          </Guard>
-        }
-      />
-      <Route
-        path="/clubes"
-        element={
-          <Guard require="member" showSplash={showSplash}>
-            <Clubes />
           </Guard>
         }
       />

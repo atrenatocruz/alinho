@@ -107,8 +107,8 @@ export default function ClubProfile() {
   if (notFound || !club) {
     return (
       <div className="space-y-5">
-        <Link to="/clubes" className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline">
-          <ArrowLeft size={16} /> Voltar a Clubes & Grupos
+        <Link to="/comunidade" className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline">
+          <ArrowLeft size={16} /> Voltar à Comunidade
         </Link>
         <EmptyState
           icon={PadelIcon}
@@ -121,8 +121,8 @@ export default function ClubProfile() {
 
   return (
     <div className="space-y-5">
-      <Link to="/clubes" className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline">
-        <ArrowLeft size={16} /> Voltar a Clubes & Grupos
+      <Link to="/comunidade" className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline">
+        <ArrowLeft size={16} /> Voltar à Comunidade
       </Link>
 
       <div className="card flex items-center gap-3.5">

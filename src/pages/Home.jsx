@@ -204,14 +204,14 @@ export default function Home() {
           subtitle={
             joining
               ? 'A juntar-te ao clube…'
-              : 'Descobre clubes públicos em Clubes & Grupos, ou usa um link de convite direto.'
+              : 'Descobre clubes e grupos na Comunidade, ou usa um link de convite direto.'
           }
           action={
             !joining && (
               <div className="space-y-4 max-w-xs mx-auto">
-                <Link to="/clubes">
+                <Link to="/comunidade">
                   <PrimaryButton type="button" className="w-full">
-                    Ver Clubes & Grupos
+                    Ver Comunidade
                   </PrimaryButton>
                 </Link>
                 <form
