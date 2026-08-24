@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Trophy, Copy, Check } from 'lucide-react'
-import { getMyPrivateMatches, submitPrivateMatchScore, confirmPrivateMatch } from '../lib/privateMatches'
+import { Plus, Trophy, Copy, Check, Trash2 } from 'lucide-react'
+import { getMyPrivateMatches, submitPrivateMatchScore, confirmPrivateMatch, deletePrivateMatch } from '../lib/privateMatches'
 import { PrimaryButton, EmptyState } from '../components/ui'
 
 const OPEN_SLOTS = [
@@ -145,6 +145,17 @@ export default function PrivateMatches() {
     }
   }
 
+  const handleDelete = async (matchId) => {
+    if (!confirm('Eliminar este jogo? Esta ação não pode ser desfeita.')) return
+    try {
+      await deletePrivateMatch(matchId)
+      await load()
+    } catch (error) {
+      console.error('Error deleting match:', error)
+      alert('Não foi possível eliminar o jogo.')
+    }
+  }
+
   const pending = matches.filter((m) => m.status === 'pending')
   const confirmed = matches.filter((m) => m.status === 'confirmed')
 
@@ -177,7 +188,19 @@ export default function PrivateMatches() {
               const isEditingScore = editingScoreIds.has(m.id)
               return (
                 <div key={m.id} className="card">
-                  <p className="font-extrabold text-ink-900 text-sm">{teamLabel(m, 'team_a')} vs {teamLabel(m, 'team_b')}</p>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-extrabold text-ink-900 text-sm">{teamLabel(m, 'team_a')} vs {teamLabel(m, 'team_b')}</p>
+                    {m.is_creator && (
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(m.id)}
+                        aria-label="Eliminar jogo"
+                        className="shrink-0 text-muted hover:text-danger"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
                   {hasScore && !isEditingScore ? (
                     <>
                       <p className="text-sm text-muted mt-1">

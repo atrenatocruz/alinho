@@ -41,6 +41,11 @@ export const confirmPrivateMatch = async (matchId) => {
   if (error) throw error
 }
 
+export const deletePrivateMatch = async (matchId) => {
+  const { error } = await supabase.rpc('delete_private_match', { p_match_id: matchId })
+  if (error) throw error
+}
+
 export const getMyPrivateMatches = async () => {
   const { data, error } = await supabase.rpc('get_my_private_matches')
   if (error) throw error
