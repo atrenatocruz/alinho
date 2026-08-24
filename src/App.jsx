@@ -20,6 +20,7 @@ import JoinPrivateMatch from './pages/JoinPrivateMatch'
 import Gerir from './pages/Gerir'
 import GerirClube from './pages/GerirClube'
 import Instructions from './pages/Instructions'
+import MixOffline from './pages/MixOffline'
 
 // showSplash covers both the auth check and the splash's minimum display
 // duration (see AppRoutes) — while true, Guard shows the splash instead of
@@ -114,6 +115,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
       <Route path="/instrucoes" element={<Instructions />} />
+      <Route path="/mix-offline" element={<MixOffline />} />
       <Route
         path="/"
         element={
