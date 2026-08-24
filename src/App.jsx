@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'r
 import { WifiOff } from 'lucide-react'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { PrimaryButton } from './components/ui'
-import Layout from './components/Layout'
+import Layout, { Wordmark } from './components/Layout'
 import SplashScreen from './components/SplashScreen'
 import Login from './pages/Login'
 import Landing from './pages/Landing'
@@ -43,6 +43,7 @@ import Instructions from './pages/Instructions'
 const LoadErrorScreen = ({ onRetry }) => (
   <div className="min-h-screen flex items-center justify-center px-6 bg-canvas">
     <div className="text-center max-w-xs">
+      <Wordmark variant="light" className="h-8 mx-auto mb-8" />
       <WifiOff size={40} className="mx-auto mb-4 text-ink-700" />
       <h1 className="text-lg text-ink-900 mb-1">Não foi possível carregar os teus dados</h1>
       <p className="text-muted text-sm mb-6">Pode ser um problema temporário de ligação. Tenta novamente.</p>
