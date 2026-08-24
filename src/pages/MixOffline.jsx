@@ -15,6 +15,22 @@ function loadSaved() {
   }
 }
 
+// Pulls court count + player names straight out of the WhatsApp bot's
+// "Mix completo!" confirmation message, so the admin doesn't have to
+// retype 16 names by hand when the DB (and so the real app) is down.
+// Title-line "🎾 …" is anchored at column 0, which numbered player rows
+// ("N. 🎾 Nome") never are, so the two never collide.
+function parseBotMessage(text) {
+  const titleMatch = text.match(/^🎾\s*(.+)$/m)
+  const courtsMatch = text.match(/🏟️\s*(\d+)\s*campo/)
+  const names = [...text.matchAll(/^\s*\d+\.\s*🎾\s*(.+?)\s*$/gm)].map((m) => m[1].trim())
+  return {
+    title: titleMatch?.[1]?.trim() ?? null,
+    numCourts: courtsMatch ? parseInt(courtsMatch[1], 10) : null,
+    names,
+  }
+}
+
 /* Plan-B mix tool: forms duplas and draws "sobe e desce" rounds entirely
    client-side, reusing the same pure logic as GameDetails.jsx (mixLogic.js)
    — no Supabase call anywhere on this page, so it keeps working even
@@ -28,6 +44,8 @@ export default function MixOffline() {
   const [numCourts, setNumCourts] = useState(saved?.numCourts ?? 1)
   const [teams, setTeams] = useState(saved?.teams ?? null)
   const [rounds, setRounds] = useState(saved?.rounds ?? [])
+  const [pasteText, setPasteText] = useState('')
+  const [parseResult, setParseResult] = useState(null) // { title, numCourts, names } | 'empty' | null
 
   useEffect(() => {
     try {
@@ -36,6 +54,17 @@ export default function MixOffline() {
       // storage unavailable (private mode, quota) — tool still works for this session
     }
   }, [namesText, numCourts, teams, rounds])
+
+  const handleExtractFromBotMessage = () => {
+    const { title, numCourts: extractedCourts, names: extractedNames } = parseBotMessage(pasteText)
+    if (extractedNames.length === 0) {
+      setParseResult('empty')
+      return
+    }
+    setNamesText(extractedNames.join('\n'))
+    if (extractedCourts) setNumCourts(extractedCourts)
+    setParseResult({ title, numCourts: extractedCourts, names: extractedNames })
+  }
 
   const names = namesText.split('\n').map((n) => n.trim()).filter(Boolean)
   const minPeople = numCourts * 4
@@ -104,6 +133,37 @@ export default function MixOffline() {
         {!teams ? (
           <div className="card">
             <label className="block text-sm font-extrabold text-ink-900 mb-1.5">
+              Colar mensagem do bot (opcional)
+            </label>
+            <textarea
+              value={pasteText}
+              onChange={(e) => setPasteText(e.target.value)}
+              rows={4}
+              placeholder={'Cola aqui a mensagem "Mix completo!" do bot do WhatsApp…'}
+              className="input-field resize-none mb-2 text-xs"
+            />
+            <button
+              type="button"
+              onClick={handleExtractFromBotMessage}
+              disabled={!pasteText.trim()}
+              className="text-sm font-extrabold text-ink-700 hover:text-ink-900 disabled:opacity-40 disabled:pointer-events-none mb-1.5"
+            >
+              Extrair jogadores e campos ↓
+            </button>
+            {parseResult === 'empty' && (
+              <p className="text-danger text-xs font-extrabold mb-4">
+                Não encontrei jogadores nessa mensagem — confirma que colaste o texto completo.
+              </p>
+            )}
+            {parseResult && parseResult !== 'empty' && (
+              <p className="text-ok text-xs font-extrabold mb-4">
+                {parseResult.title ? `"${parseResult.title}" — ` : ''}
+                {parseResult.names.length} jogadores{parseResult.numCourts ? `, ${parseResult.numCourts} campos` : ''} extraídos.
+                A ordem em baixo vem da inscrição, não da força — reordena se quiseres duplas mais equilibradas.
+              </p>
+            )}
+
+            <label className="block text-sm font-extrabold text-ink-900 mb-1.5 mt-4">
               Jogadores confirmados (um por linha, do mais forte para o mais fraco)
             </label>
             <textarea
