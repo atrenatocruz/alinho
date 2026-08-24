@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
 const AuthContext = createContext({})
@@ -114,70 +114,95 @@ export const AuthProvider = ({ children }) => {
     setIsPrivateMatchesEnabled(privateMatchesFlag?.enabled ?? true)
   }
 
-  const loadProfile = async (userId, retried = false) => {
-    try {
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single()
+  // getSession() and onAuthStateChange (below) both call loadProfile on
+  // mount, firing two near-simultaneous requests for the same user — this
+  // ref lets the second call reuse the first's in-flight promise instead of
+  // racing it (observed in prod logs as repeated 401s on the profile fetch
+  // right after a fresh Google login, immediately following a successful
+  // /auth/v1/user, which then left profile/memberships blank forever since
+  // the old code only retried on PGRST116).
+  const profileRequestRef = useRef(null)
 
-      if (profileError) {
-        // Right after signup the profile trigger may not have committed yet — retry once.
-        if (profileError.code === 'PGRST116' && !retried) {
-          setTimeout(() => loadProfile(userId, true), 600)
-          return
-        }
-        throw profileError
-      }
-      setProfile(profileData)
-
-      await consumePendingOrgSlug()
-      await loadFeatureFlags()
-
-      let { data: membershipData, error: membershipError } = await supabase
-        .from('memberships')
-        .select('*, organization:organizations(*)')
-        .eq('user_id', userId)
-
-      if (membershipError) throw membershipError
-
-      // Single-club phase: anyone who signs in with no membership at all
-      // (no invite link, no pending slug) auto-joins the one existing club
-      // instead of hitting a "pick a club" dead end. No slug/env var — the
-      // RPC finds the single organization itself, and raises once a second
-      // organization exists, so this sunsets automatically. The
-      // invite-link/manual-join flow (Home.jsx) already handles the
-      // multi-club case and keeps working unchanged.
-      if ((membershipData?.length ?? 0) === 0) {
-        const { error: autoJoinError } = await supabase.rpc('join_default_organization')
-        if (autoJoinError) {
-          console.error('Failed to auto-join default organization:', autoJoinError)
-        } else {
-          const { data: refetched, error: refetchError } = await supabase
-            .from('memberships')
-            .select('*, organization:organizations(*)')
-            .eq('user_id', userId)
-          if (refetchError) throw refetchError
-          membershipData = refetched
-        }
-      }
-
-      setMemberships(membershipData || [])
-
-      // Keep the previously-selected org if still a member of it, otherwise
-      // default to the first membership. No switcher UI yet (not needed
-      // until someone is regularly juggling 2+ orgs) — this is just the
-      // fallback selection logic.
-      setCurrentOrganizationId((prev) => {
-        if (prev && membershipData?.some((m) => m.organization_id === prev)) return prev
-        return membershipData?.[0]?.organization_id ?? null
-      })
-    } catch (error) {
-      console.error('Error loading profile:', error)
-    } finally {
-      setLoading(false)
+  const loadProfile = (userId, retried = false) => {
+    if (!retried && profileRequestRef.current?.userId === userId) {
+      return profileRequestRef.current.promise
     }
+
+    const promise = (async () => {
+      try {
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .single()
+
+        if (profileError) {
+          // Right after signup the profile trigger may not have committed
+          // yet (PGRST116), or a fresh OAuth session can 401 momentarily at
+          // the Supabase edge gateway — one retry covers both.
+          if (!retried) {
+            setTimeout(() => loadProfile(userId, true), 600)
+            return
+          }
+          throw profileError
+        }
+        setProfile(profileData)
+
+        await consumePendingOrgSlug()
+        await loadFeatureFlags()
+
+        let { data: membershipData, error: membershipError } = await supabase
+          .from('memberships')
+          .select('*, organization:organizations(*)')
+          .eq('user_id', userId)
+
+        if (membershipError) throw membershipError
+
+        // Single-club phase: anyone who signs in with no membership at all
+        // (no invite link, no pending slug) auto-joins the one existing club
+        // instead of hitting a "pick a club" dead end. No slug/env var — the
+        // RPC finds the single organization itself, and raises once a second
+        // organization exists, so this sunsets automatically. The
+        // invite-link/manual-join flow (Home.jsx) already handles the
+        // multi-club case and keeps working unchanged.
+        if ((membershipData?.length ?? 0) === 0) {
+          const { error: autoJoinError } = await supabase.rpc('join_default_organization')
+          if (autoJoinError) {
+            console.error('Failed to auto-join default organization:', autoJoinError)
+          } else {
+            const { data: refetched, error: refetchError } = await supabase
+              .from('memberships')
+              .select('*, organization:organizations(*)')
+              .eq('user_id', userId)
+            if (refetchError) throw refetchError
+            membershipData = refetched
+          }
+        }
+
+        setMemberships(membershipData || [])
+
+        // Keep the previously-selected org if still a member of it, otherwise
+        // default to the first membership. No switcher UI yet (not needed
+        // until someone is regularly juggling 2+ orgs) — this is just the
+        // fallback selection logic.
+        setCurrentOrganizationId((prev) => {
+          if (prev && membershipData?.some((m) => m.organization_id === prev)) return prev
+          return membershipData?.[0]?.organization_id ?? null
+        })
+      } catch (error) {
+        console.error('Error loading profile:', error)
+      } finally {
+        setLoading(false)
+        if (profileRequestRef.current?.userId === userId) {
+          profileRequestRef.current = null
+        }
+      }
+    })()
+
+    if (!retried) {
+      profileRequestRef.current = { userId, promise }
+    }
+    return promise
   }
 
   const signUp = async (email, password, userData) => {
