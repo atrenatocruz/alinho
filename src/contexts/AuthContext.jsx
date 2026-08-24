@@ -42,6 +42,11 @@ export const AuthProvider = ({ children }) => {
   const [currentOrganizationId, setCurrentOrganizationId] = useState(null)
   const [loading, setLoading] = useState(true)
   const [isPrivateMatchesEnabled, setIsPrivateMatchesEnabled] = useState(true)
+  // Set only once every retry in loadProfile has been exhausted — lets the
+  // UI show a "couldn't load your data, try again" screen instead of
+  // silently rendering as if the account had no profile/memberships (see
+  // the 2026-08-24 Supabase platform incident that prompted this).
+  const [profileError, setProfileError] = useState(false)
 
   useEffect(() => {
     // Restore dev admin bypass if it was activated previously.
@@ -123,29 +128,34 @@ export const AuthProvider = ({ children }) => {
   // the old code only retried on PGRST116).
   const profileRequestRef = useRef(null)
 
-  const loadProfile = (userId, retried = false) => {
-    if (!retried && profileRequestRef.current?.userId === userId) {
-      return profileRequestRef.current.promise
+  // Backoff schedule for retrying a failed profile load (see the
+  // 2026-08-24 Supabase platform incident that intermittently 401'd fresh
+  // session JWTs at the API gateway for several seconds at a time) —
+  // spread out further than the old single 600ms retry so the app can
+  // outlast that kind of blip instead of giving up after one attempt.
+  const PROFILE_RETRY_DELAYS_MS = [700, 1500, 3000]
+
+  const loadProfile = (userId, attempt = 0) => {
+    if (attempt === 0) {
+      if (profileRequestRef.current?.userId === userId) {
+        return profileRequestRef.current.promise
+      }
+      setLoading(true)
+      setProfileError(false)
     }
 
     const promise = (async () => {
       try {
-        const { data: profileData, error: profileError } = await supabase
+        const { data: profileData, error: fetchError } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', userId)
           .single()
 
-        if (profileError) {
-          // Right after signup the profile trigger may not have committed
-          // yet (PGRST116), or a fresh OAuth session can 401 momentarily at
-          // the Supabase edge gateway — one retry covers both.
-          if (!retried) {
-            setTimeout(() => loadProfile(userId, true), 600)
-            return
-          }
-          throw profileError
-        }
+        // Right after signup the profile trigger may not have committed yet
+        // (PGRST116) — same retry path handles both that and a transient
+        // gateway rejection.
+        if (fetchError) throw fetchError
         setProfile(profileData)
 
         await consumePendingOrgSlug()
@@ -189,20 +199,33 @@ export const AuthProvider = ({ children }) => {
           if (prev && membershipData?.some((m) => m.organization_id === prev)) return prev
           return membershipData?.[0]?.organization_id ?? null
         })
-      } catch (error) {
-        console.error('Error loading profile:', error)
-      } finally {
+
         setLoading(false)
-        if (profileRequestRef.current?.userId === userId) {
+      } catch (error) {
+        if (attempt < PROFILE_RETRY_DELAYS_MS.length) {
+          setTimeout(() => loadProfile(userId, attempt + 1), PROFILE_RETRY_DELAYS_MS[attempt])
+          return
+        }
+        console.error('Error loading profile:', error)
+        setProfileError(true)
+        setLoading(false)
+      } finally {
+        if (attempt === 0) {
           profileRequestRef.current = null
         }
       }
     })()
 
-    if (!retried) {
+    if (attempt === 0) {
       profileRequestRef.current = { userId, promise }
     }
     return promise
+  }
+
+  // Manual escape hatch for the "couldn't load your data" screen (App.jsx)
+  // — re-runs the same retry-with-backoff loadProfile from attempt 0.
+  const retryProfile = () => {
+    if (user) loadProfile(user.id)
   }
 
   const signUp = async (email, password, userData) => {
@@ -401,6 +424,8 @@ export const AuthProvider = ({ children }) => {
     isAdmin: currentMembership?.is_admin === true,
     isGuest: currentMembership?.is_guest === true,
     loading,
+    profileError,
+    retryProfile,
     isPrivateMatchesEnabled,
     refreshFeatureFlags: loadFeatureFlags,
     signUp,

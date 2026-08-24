@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { WifiOff } from 'lucide-react'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { PrimaryButton } from './components/ui'
 import Layout from './components/Layout'
 import SplashScreen from './components/SplashScreen'
 import Login from './pages/Login'
@@ -33,12 +35,32 @@ import Instructions from './pages/Instructions'
 // -guarded routes, e.g. Jogos -> Comunidade. Routing every page through
 // this single component keeps Layout's identity — and the nav's mid
 // -transition state — stable across every in-app navigation.
+// Shown when a signed-in user's profile/memberships failed to load after
+// every retry (see AuthContext's loadProfile) — without this, the guarded
+// pages below silently render as if the account had no data at all
+// (blank profile, "no clubs"), which reads as broken rather than as a
+// temporary problem.
+const LoadErrorScreen = ({ onRetry }) => (
+  <div className="min-h-screen flex items-center justify-center px-6 bg-canvas">
+    <div className="text-center max-w-xs">
+      <WifiOff size={40} className="mx-auto mb-4 text-ink-700" />
+      <h1 className="text-lg text-ink-900 mb-1">Não foi possível carregar os teus dados</h1>
+      <p className="text-muted text-sm mb-6">Pode ser um problema temporário de ligação. Tenta novamente.</p>
+      <PrimaryButton onClick={onRetry} className="w-full">Tentar novamente</PrimaryButton>
+    </div>
+  </div>
+)
+
 const Guard = ({ require, showSplash, children }) => {
-  const { user, isGuest, isAdmin, isPrivateMatchesEnabled } = useAuth()
+  const { user, isGuest, isAdmin, isPrivateMatchesEnabled, profileError, retryProfile } = useAuth()
   const location = useLocation()
 
   if (showSplash) {
     return <SplashScreen />
+  }
+
+  if (user && profileError) {
+    return <LoadErrorScreen onRetry={retryProfile} />
   }
 
   // "/" is the one public route: signed-out visitors see the Landing page
