@@ -42,9 +42,9 @@ import MixOffline from './pages/MixOffline'
 // (blank profile, "no clubs"), which reads as broken rather than as a
 // temporary problem.
 // 5 taps anywhere on the screen within 2s of each other jump to the
-// no-backend Plan B tool (/mix-offline) — an escape hatch a stressed
-// admin/client can find without needing to be told the URL, for exactly
-// the kind of prolonged outage that put this screen up in the first place.
+// no-backend Plan B tool (/mix-offline) — deliberately undocumented in the
+// UI itself; admins are told about the gesture out of band so regular
+// users don't stumble into it during an ordinary transient failure.
 const PLAN_B_TAP_TARGET = 5
 const PLAN_B_TAP_WINDOW_MS = 2000
 
@@ -72,7 +72,6 @@ const LoadErrorScreen = ({ onRetry }) => {
         <h1 className="text-lg text-ink-900 mb-1">Não foi possível carregar os teus dados</h1>
         <p className="text-muted text-sm mb-6">Pode ser um problema temporário de ligação. Tenta novamente.</p>
         <PrimaryButton onClick={onRetry} className="w-full">Tentar novamente</PrimaryButton>
-        <p className="text-muted text-xs mt-6">Continua sem funcionar? Toca 5x neste ecrã para o modo sem app.</p>
       </div>
     </div>
   )
