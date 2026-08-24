@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import { Trophy, RotateCcw } from 'lucide-react'
+import { Trophy, RotateCcw, Share2, Download } from 'lucide-react'
 import { Wordmark } from '../components/Layout'
-import { PrimaryButton } from '../components/ui'
+import { PrimaryButton, ShareModal } from '../components/ui'
 import { formDuplas, seedCourts, nextSobeDesce, standings } from '../lib/mixLogic'
 
 const STORAGE_KEY = 'alinho-mix-offline-v1'
@@ -31,6 +31,17 @@ function parseBotMessage(text) {
   }
 }
 
+function slugify(text) {
+  return (
+    (text || 'mix')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '') || 'mix'
+  )
+}
+
 /* Plan-B mix tool: forms duplas and runs a full "sobe e desce" mix — score
    entry, next round, and a final classification — entirely client-side,
    reusing the same pure logic as GameDetails.jsx (mixLogic.js). No
@@ -43,6 +54,7 @@ export default function MixOffline() {
   const saved = loadSaved()
   const [namesText, setNamesText] = useState(saved?.namesText ?? '')
   const [numCourts, setNumCourts] = useState(saved?.numCourts ?? 1)
+  const [gameTitle, setGameTitle] = useState(saved?.gameTitle ?? 'Mix')
   const [teams, setTeams] = useState(saved?.teams ?? null)
   const [rounds, setRounds] = useState(saved?.rounds ?? [])
   const [finished, setFinished] = useState(saved?.finished ?? false)
@@ -50,14 +62,18 @@ export default function MixOffline() {
   const [parseResult, setParseResult] = useState(null) // { title, numCourts, names } | 'empty' | null
   const [scoreInputs, setScoreInputs] = useState({}) // { [matchIndex]: { a, b } }
   const [scoreError, setScoreError] = useState('')
+  const [shareMode, setShareMode] = useState(null) // 'duplas' | 'final' | null
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ namesText, numCourts, teams, rounds, finished }))
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ namesText, numCourts, gameTitle, teams, rounds, finished })
+      )
     } catch {
       // storage unavailable (private mode, quota) — tool still works for this session
     }
-  }, [namesText, numCourts, teams, rounds, finished])
+  }, [namesText, numCourts, gameTitle, teams, rounds, finished])
 
   const handleExtractFromBotMessage = () => {
     const { title, numCourts: extractedCourts, names: extractedNames } = parseBotMessage(pasteText)
@@ -67,6 +83,7 @@ export default function MixOffline() {
     }
     setNamesText(extractedNames.join('\n'))
     if (extractedCourts) setNumCourts(extractedCourts)
+    if (title) setGameTitle(title)
     setParseResult({ title, numCourts: extractedCourts, names: extractedNames })
   }
 
@@ -141,7 +158,81 @@ export default function MixOffline() {
     setFinished(false)
     setScoreInputs({})
     setScoreError('')
+    setGameTitle('Mix')
   }
+
+  // Exports everything needed to later populate the real app once it's back
+  // up: duplas, every round's scores, and the final ranking (when the mix
+  // has ended). JSON rather than anything fancier — an admin (or a future
+  // Claude session) can read it directly, and it's trivial to turn into
+  // insert statements for `teams`/`matches` afterwards.
+  const handleDownloadFile = () => {
+    const data = {
+      exportedAt: new Date().toISOString(),
+      title: gameTitle,
+      numCourts,
+      duplas: teams.map((t) => ({ player1: t.player1.name, player2: t.player2.name, seed: t.seed_ranking })),
+      rounds: rounds.map((round) =>
+        round.map((m) => ({
+          court_number: m.court_number,
+          team_a: teamLabel(m.team_a_id),
+          team_b: teamLabel(m.team_b_id),
+          score_a: m.score_a ?? null,
+          score_b: m.score_b ?? null,
+          winner: m.winner_team_id ? teamLabel(m.winner_team_id) : null,
+        }))
+      ),
+      finished,
+      finalStandings: finished
+        ? finalStandings.map((s, i) => ({
+            position: i + 1,
+            dupla: teamLabel(s.team.id),
+            wins: s.wins,
+            diff: s.diff,
+            scored: s.scored,
+          }))
+        : null,
+    }
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `alinho-mix-offline-${slugify(gameTitle)}-${new Date().toISOString().slice(0, 10)}.json`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  const gameForShare = { title: gameTitle, location: null, num_courts: numCourts }
+  const shareUrl = typeof window !== 'undefined' ? window.location.href : ''
+
+  const buildDuplasShareText = () => {
+    const lines = [`🎾 Duplas — ${gameTitle}`, '']
+    for (let c = 1; c <= numCourts; c++) {
+      const a = teams[(c - 1) * 2]
+      const b = teams[(c - 1) * 2 + 1]
+      if (a && b) {
+        lines.push(`Campo ${c}: ${a.player1.name} / ${a.player2.name} vs ${b.player1.name} / ${b.player2.name}`)
+      }
+    }
+    teams.slice(numCourts * 2).forEach((t) => lines.push(`${t.player1.name} / ${t.player2.name}`))
+    return lines.join('\n')
+  }
+
+  const buildFinalShareText = () => {
+    const lines = [`🎾 ${gameTitle}`]
+    if (finalStandings[0]) lines.push('', `🏆 Vencedores: ${teamLabel(finalStandings[0].team.id)}`)
+    return lines.join('\n')
+  }
+
+  const podiumDuplas = finalStandings.map((s) => ({
+    id: s.team.id,
+    name: teamLabel(s.team.id),
+    player1: s.team.player1,
+    player2: s.team.player2,
+    points: s.wins,
+  }))
 
   return (
     <div className="min-h-screen bg-canvas px-5 py-8">
@@ -192,7 +283,15 @@ export default function MixOffline() {
               </p>
             )}
 
-            <label className="block text-sm font-extrabold text-ink-900 mb-1.5 mt-4">
+            <label className="block text-sm font-extrabold text-ink-900 mb-1.5 mt-4">Nome do mix</label>
+            <input
+              type="text"
+              value={gameTitle}
+              onChange={(e) => setGameTitle(e.target.value)}
+              className="input-field mb-4"
+            />
+
+            <label className="block text-sm font-extrabold text-ink-900 mb-1.5">
               Jogadores confirmados (um por linha, do mais forte para o mais fraco)
             </label>
             <textarea
@@ -245,6 +344,14 @@ export default function MixOffline() {
                 </div>
               ))}
             </div>
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <PrimaryButton variant="ghost" onClick={() => setShareMode('final')} className="flex items-center justify-center gap-1.5">
+                <Share2 size={16} /> Partilhar
+              </PrimaryButton>
+              <PrimaryButton variant="ghost" onClick={handleDownloadFile} className="flex items-center justify-center gap-1.5">
+                <Download size={16} /> Guardar ficheiro
+              </PrimaryButton>
+            </div>
             <PrimaryButton variant="ghost" onClick={handleReset} className="w-full flex items-center justify-center gap-1.5">
               <RotateCcw size={16} /> Novo mix
             </PrimaryButton>
@@ -254,9 +361,17 @@ export default function MixOffline() {
             <div className="card mb-4">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-base text-ink-900">Ronda {rounds.length}</h2>
-                <button onClick={handleReset} className="text-xs font-extrabold text-danger flex items-center gap-1">
-                  <RotateCcw size={14} /> Recomeçar
-                </button>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => setShareMode('duplas')} className="text-xs font-extrabold text-ink-700 flex items-center gap-1">
+                    <Share2 size={14} /> Duplas
+                  </button>
+                  <button onClick={handleDownloadFile} className="text-xs font-extrabold text-ink-700 flex items-center gap-1">
+                    <Download size={14} /> Guardar
+                  </button>
+                  <button onClick={handleReset} className="text-xs font-extrabold text-danger flex items-center gap-1">
+                    <RotateCcw size={14} /> Recomeçar
+                  </button>
+                </div>
               </div>
               {scoreError && <p className="text-danger text-xs font-extrabold mb-3">{scoreError}</p>}
               <div className="space-y-3">
@@ -324,6 +439,25 @@ export default function MixOffline() {
               Terminar mix
             </PrimaryButton>
           </>
+        )}
+
+        {shareMode === 'duplas' && teams && (
+          <ShareModal
+            title="Partilhar Duplas"
+            message={buildDuplasShareText()}
+            url={shareUrl}
+            onClose={() => setShareMode(null)}
+            imageCard={{ variant: 'duplas', game: gameForShare, duplas: teams }}
+          />
+        )}
+        {shareMode === 'final' && teams && (
+          <ShareModal
+            title="Partilhar Mix"
+            message={buildFinalShareText()}
+            url={shareUrl}
+            onClose={() => setShareMode(null)}
+            imageCard={{ variant: 'podium', game: gameForShare, duplas: podiumDuplas }}
+          />
         )}
       </div>
     </div>
