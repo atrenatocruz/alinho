@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { WifiOff } from 'lucide-react'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { PrimaryButton } from './components/ui'
@@ -41,17 +41,42 @@ import MixOffline from './pages/MixOffline'
 // pages below silently render as if the account had no data at all
 // (blank profile, "no clubs"), which reads as broken rather than as a
 // temporary problem.
-const LoadErrorScreen = ({ onRetry }) => (
-  <div className="min-h-screen flex items-center justify-center px-6 bg-canvas">
-    <div className="text-center max-w-xs">
-      <Wordmark variant="light" className="h-8 mx-auto mb-8" />
-      <WifiOff size={40} className="mx-auto mb-4 text-ink-700" />
-      <h1 className="text-lg text-ink-900 mb-1">Não foi possível carregar os teus dados</h1>
-      <p className="text-muted text-sm mb-6">Pode ser um problema temporário de ligação. Tenta novamente.</p>
-      <PrimaryButton onClick={onRetry} className="w-full">Tentar novamente</PrimaryButton>
+// 5 taps anywhere on the screen within 2s of each other jump to the
+// no-backend Plan B tool (/mix-offline) — an escape hatch a stressed
+// admin/client can find without needing to be told the URL, for exactly
+// the kind of prolonged outage that put this screen up in the first place.
+const PLAN_B_TAP_TARGET = 5
+const PLAN_B_TAP_WINDOW_MS = 2000
+
+const LoadErrorScreen = ({ onRetry }) => {
+  const navigate = useNavigate()
+  const tapCountRef = useRef(0)
+  const lastTapAtRef = useRef(0)
+
+  const handleTap = () => {
+    const now = Date.now()
+    if (now - lastTapAtRef.current > PLAN_B_TAP_WINDOW_MS) tapCountRef.current = 0
+    lastTapAtRef.current = now
+    tapCountRef.current += 1
+    if (tapCountRef.current >= PLAN_B_TAP_TARGET) {
+      tapCountRef.current = 0
+      navigate('/mix-offline')
+    }
+  }
+
+  return (
+    <div onClick={handleTap} className="min-h-screen flex items-center justify-center px-6 bg-canvas">
+      <div className="text-center max-w-xs">
+        <Wordmark variant="light" className="h-8 mx-auto mb-8" />
+        <WifiOff size={40} className="mx-auto mb-4 text-ink-700" />
+        <h1 className="text-lg text-ink-900 mb-1">Não foi possível carregar os teus dados</h1>
+        <p className="text-muted text-sm mb-6">Pode ser um problema temporário de ligação. Tenta novamente.</p>
+        <PrimaryButton onClick={onRetry} className="w-full">Tentar novamente</PrimaryButton>
+        <p className="text-muted text-xs mt-6">Continua sem funcionar? Toca 5x neste ecrã para o modo sem app.</p>
+      </div>
     </div>
-  </div>
-)
+  )
+}
 
 const Guard = ({ require, showSplash, children }) => {
   const { user, isGuest, isAdmin, isPrivateMatchesEnabled, profileError, retryProfile } = useAuth()
