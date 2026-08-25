@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { CalendarX2, Trophy, Users } from 'lucide-react'
+import { CalendarX2, Trophy, Users, UserPlus } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { MixCard, EmptyState, PrimaryButton, Avatar } from '../components/ui'
+import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
 
 const TABS = [
   { key: 'ativos', label: 'Mixs Ativos' },
@@ -14,7 +15,8 @@ export default function Home() {
   const [games, setGames] = useState([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('ativos')
-  const { user, profile, memberships, currentOrganizationId, joinOrganization, isPrivateMatchesEnabled } = useAuth()
+  const { user, profile, memberships, currentOrganizationId, joinOrganization, isPrivateMatchesEnabled, isAdminOfAny } = useAuth()
+  const [joinRequestsTotal, setJoinRequestsTotal] = useState(0)
   const [searchParams] = useSearchParams()
   const [joinSlug, setJoinSlug] = useState('')
   const [joining, setJoining] = useState(false)
@@ -48,6 +50,25 @@ export default function Home() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Discreet admin-only nudge — same underlying data as the header bell and
+  // Gerir nav badge, fetched independently since Home doesn't share Layout's
+  // component tree.
+  useEffect(() => {
+    if (!profile?.id || !isAdminOfAny) {
+      setJoinRequestsTotal(0)
+      return
+    }
+    let cancelled = false
+    listPendingMembershipRequestsForAdmin(profile.id)
+      .then((data) => {
+        if (!cancelled) setJoinRequestsTotal(data.reduce((sum, org) => sum + org.count, 0))
+      })
+      .catch((error) => console.error('Error loading membership join requests:', error))
+    return () => {
+      cancelled = true
+    }
+  }, [profile?.id, isAdminOfAny])
 
   const orgIds = memberships.map((m) => m.organization_id)
   const orgIdsKey = orgIds.slice().sort().join(',')
@@ -201,6 +222,17 @@ export default function Home() {
         )}
         <h2 className="text-3xl text-ink-900">Próximos jogos</h2>
       </div>
+
+      {joinRequestsTotal > 0 && (
+        <Link to="/gerir" className="card press flex items-center gap-3 bg-amber-50 hover:shadow-lift">
+          <div className="w-10 h-10 rounded-ctrl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+            <UserPlus size={18} />
+          </div>
+          <p className="text-sm text-amber-800 font-semibold">
+            {joinRequestsTotal} {joinRequestsTotal === 1 ? 'pedido pendente' : 'pedidos pendentes'} de entrada num grupo/clube
+          </p>
+        </Link>
+      )}
 
       {isPrivateMatchesEnabled && (
         <Link to="/jogos-privados" className="card press flex items-center gap-3 hover:shadow-lift">

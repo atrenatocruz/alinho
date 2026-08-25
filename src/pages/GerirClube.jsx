@@ -206,13 +206,21 @@ export default function GerirClube() {
     if (currentOrganizationId) loadData()
   }, [activeTab, currentOrganizationId])
 
+  // Fetched independently of which tab is open, so the "Membros" tab badge
+  // (pending join-request count) is visible as soon as an org is selected —
+  // an admin shouldn't have to open Membros first just to find out there's
+  // something waiting there.
+  useEffect(() => {
+    if (currentOrganizationId) loadRequests()
+  }, [currentOrganizationId])
+
   const loadData = async () => {
     setLoading(true)
     try {
       if (activeTab === 'games') {
         await loadGames()
       } else if (activeTab === 'members') {
-        await Promise.all([loadMembers(), loadRequests()])
+        await loadMembers()
       } else if (activeTab === 'settings') {
         await loadSettings()
       }
@@ -1075,6 +1083,11 @@ export default function GerirClube() {
         >
           <Users size={16} />
           Membros
+          {requests.length > 0 && (
+            <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-lime-400 text-ink-900 text-[11px] font-extrabold tabular-nums">
+              {requests.length}
+            </span>
+          )}
         </button>
       </div>
 

@@ -6,6 +6,7 @@ import { PrimaryButton, Avatar } from './ui'
 import { hashPhone } from '../lib/hashPhone'
 import { getGlobalRankings } from '../lib/privateMatches'
 import { listIncomingFriendRequests } from '../lib/friends'
+import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
 
 // Re-prompt at most once per day once dismissed — a nudge, not a gate.
 const PHONE_PROMPT_DISMISSED_KEY = 'phonePromptDismissedDate'
@@ -178,6 +179,30 @@ export default function Layout({ children }) {
     }
   }, [profile?.id, isGuest, location.pathname])
 
+  // Same refetch-on-route-change pattern as friend requests above. Only
+  // fetched for org admins — matches the isAdminOfAny gate on the "Gerir"
+  // nav item below, since a non-admin has no membership_requests visible
+  // to them via RLS anyway.
+  const [joinRequestsByOrg, setJoinRequestsByOrg] = useState([])
+  useEffect(() => {
+    if (!profile?.id || isGuest || !isAdminOfAny) {
+      setJoinRequestsByOrg([])
+      return
+    }
+    let cancelled = false
+    listPendingMembershipRequestsForAdmin(profile.id)
+      .then((data) => {
+        if (!cancelled) setJoinRequestsByOrg(data)
+      })
+      .catch((error) => console.error('Error loading membership join requests:', error))
+    return () => {
+      cancelled = true
+    }
+  }, [profile?.id, isGuest, isAdminOfAny, location.pathname])
+
+  const joinRequestsTotal = joinRequestsByOrg.reduce((sum, org) => sum + org.count, 0)
+  const notificationsTotal = friendRequests.length + joinRequestsTotal
+
   const needsPhone = profile && !isGuest && !profile.phone_hash && !phonePromptDismissed
 
   const dismissPhonePrompt = () => {
@@ -235,11 +260,13 @@ export default function Layout({ children }) {
                 className="relative w-11 h-11 flex items-center justify-center rounded-full text-ink-200 hover:text-white hover:bg-white/10 transition-colors duration-fast"
               >
                 <Bell size={21} />
-                {friendRequests.length > 0 && (
+                {notificationsTotal > 0 && (
                   <span
                     aria-hidden="true"
-                    className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-lime-400 ring-2 ring-ink-900"
-                  />
+                    className="absolute top-1.5 right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-lime-400 text-ink-900 ring-2 ring-ink-900 text-[11px] font-extrabold flex items-center justify-center tabular-nums"
+                  >
+                    {notificationsTotal}
+                  </span>
                 )}
               </button>
 
@@ -252,7 +279,7 @@ export default function Layout({ children }) {
                     <div className="px-4 py-3 border-b border-line">
                       <p className="font-extrabold text-ink-900">Notificações</p>
                     </div>
-                    {friendRequests.length === 0 ? (
+                    {notificationsTotal === 0 ? (
                       <div className="p-4 text-center">
                         <p className="text-sm text-muted mb-3">Sem notificações novas</p>
                         <Link
@@ -265,6 +292,24 @@ export default function Layout({ children }) {
                       </div>
                     ) : (
                       <div className="max-h-80 overflow-y-auto divide-y divide-line">
+                        {joinRequestsByOrg.map((org) => (
+                          <Link
+                            key={org.organizationId}
+                            to="/gerir"
+                            onClick={() => setShowNotifications(false)}
+                            className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50"
+                          >
+                            <div className="w-9 h-9 rounded-full bg-ink-50 text-ink-700 flex items-center justify-center shrink-0">
+                              <Users size={16} />
+                            </div>
+                            <p className="flex-1 min-w-0 text-sm text-ink-900">
+                              <span className="font-extrabold">{org.count}</span>{' '}
+                              {org.count === 1 ? 'pedido de entrada em' : 'pedidos de entrada em'}{' '}
+                              <span className="font-extrabold">{org.name}</span>
+                            </p>
+                            <span aria-hidden="true" className="w-2 h-2 rounded-full bg-lime-400 shrink-0" />
+                          </Link>
+                        ))}
                         {friendRequests.map((req) => (
                           <Link
                             key={req.id}
@@ -340,19 +385,28 @@ export default function Layout({ children }) {
           {navItems.map(({ path, icon: Icon, label }) => {
             const isActive = location.pathname === path
             const isPerfil = path === '/perfil'
+            const isGerir = path === '/gerir'
             return (
               <Link
                 key={path}
                 to={path}
                 aria-current={isActive ? 'page' : undefined}
                 aria-label={label}
-                className={`flex flex-col items-center justify-center h-11 rounded-full shrink-0
+                className={`relative flex flex-col items-center justify-center h-11 rounded-full shrink-0
                             transition-all duration-base ${
                   isActive
                     ? 'bg-white/15 text-lime-400 w-[92px]'
                     : 'text-ink-200 hover:text-white w-11'
                 }`}
               >
+                {isGerir && joinRequestsTotal > 0 && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute top-0.5 right-2 min-w-[16px] h-[16px] px-1 rounded-full bg-lime-400 text-ink-900 ring-2 ring-ink-900 text-[10px] font-extrabold flex items-center justify-center tabular-nums"
+                  >
+                    {joinRequestsTotal}
+                  </span>
+                )}
                 {isPerfil ? (
                   <Avatar
                     name={profile?.name}
