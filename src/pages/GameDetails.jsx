@@ -91,6 +91,7 @@ export default function GameDetails() {
 
   const loadGameDetails = async () => {
     try {
+      setRecurrenceHistory([])
       const { data: gameData, error: gameError } = await supabase
         .from('games')
         .select('*')

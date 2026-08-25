@@ -894,7 +894,10 @@ BEGIN
     -- otherwise two occurrences of the same recurring mix can be visible
     -- and joinable at once. Left pending; picked up again next tick once
     -- the previous occurrence is closed out (or auto-cancelled by
-    -- migration_cancel_stale_mixes.sql after 24h).
+    -- migration_cancel_stale_mixes.sql after 24h — that migration MUST
+    -- already be applied on this database, or an abandoned occurrence
+    -- here jams its series' next occurrence indefinitely instead of
+    -- self-clearing).
     IF EXISTS (
       SELECT 1 FROM games
       WHERE recurrence_id = rec.id AND status IN ('open', 'closed', 'in_progress')

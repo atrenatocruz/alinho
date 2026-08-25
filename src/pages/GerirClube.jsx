@@ -1469,6 +1469,45 @@ export default function GerirClube() {
                         {(game.status === 'completed' || game.status === 'finished') && 'Terminado'}
                         {game.status === 'cancelled' && 'Cancelado'}
                       </div>
+
+                      {entry.history.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-line space-y-2">
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                            Outras datas desta recorrência
+                          </p>
+                          {entry.history.map((h) => (
+                            <div key={h.id} className="flex items-center justify-between gap-2 bg-canvas rounded-lg px-3 py-2 border border-line">
+                              <div className="min-w-0">
+                                <p className="text-sm text-ink-900 truncate">{formatDate(h.date)}</p>
+                                <p className="text-xs text-gray-500">
+                                  {h.status === 'open' && 'Aberto'}
+                                  {h.status === 'closed' && 'Fechado'}
+                                  {h.status === 'in_progress' && 'A decorrer'}
+                                  {h.status === 'pending' && 'Pendente'}
+                                  {(h.status === 'completed' || h.status === 'finished') && 'Terminado'}
+                                  {h.status === 'cancelled' && 'Cancelado'}
+                                </p>
+                              </div>
+                              <div className="flex gap-1 shrink-0">
+                                <button
+                                  onClick={() => startEditGame(h)}
+                                  className="p-1.5 text-ink-700 hover:bg-blue-50 rounded-lg transition-colors"
+                                  title="Editar"
+                                >
+                                  <Edit2 size={16} />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteGame(h.id)}
+                                  className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                  title="Eliminar"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )
                 })}
