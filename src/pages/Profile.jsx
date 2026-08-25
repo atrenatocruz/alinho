@@ -7,7 +7,7 @@ import { hashPhone } from '../lib/hashPhone'
 import { uploadAvatar, removeAvatar } from '../lib/avatarStorage'
 import { getMyPrivateMatches, getGlobalRankings } from '../lib/privateMatches'
 import { listIncomingFriendRequests, acceptFriendRequest, removeFriendRequest, listFriends } from '../lib/friends'
-import { PrimaryButton, LevelBadge, GuestBadge, DateField, Avatar, Select, EmptyState, RankBadge, RatingBadge } from '../components/ui'
+import { PrimaryButton, GuestBadge, DateField, Avatar, Select, EmptyState, RankBadge, RatingBadge } from '../components/ui'
 import { formatRating } from '../lib/elo'
 
 const TABS = [
@@ -23,7 +23,7 @@ const VISIBILITY_OPTIONS = [
 ]
 
 export default function Profile() {
-  const { profile, updateProfile, updateMembership, currentMembership, currentOrganizationId, isGuest, signOut } = useAuth()
+  const { profile, updateProfile, currentOrganizationId, isGuest, signOut } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [tab, setTab] = useState(() => (TABS.some((t) => t.key === searchParams.get('tab')) ? searchParams.get('tab') : 'perfil'))
@@ -35,7 +35,6 @@ export default function Profile() {
   }, [searchParams])
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(profile?.name || '')
-  const [level, setLevel] = useState(currentMembership?.level || 'iniciante')
   const [preferredSide, setPreferredSide] = useState(profile?.preferred_side || 'both')
   const [birthday, setBirthday] = useState(profile?.birthday || '')
   const [gender, setGender] = useState(profile?.gender || '')
@@ -64,7 +63,6 @@ export default function Profile() {
   useEffect(() => {
     if (profile) {
       setName(profile.name)
-      setLevel(currentMembership?.level || 'iniciante')
       setPreferredSide(profile.preferred_side || 'both')
       setBirthday(profile.birthday || '')
       setGender(profile.gender || '')
@@ -83,7 +81,7 @@ export default function Profile() {
         loadFriends()
       }
     }
-  }, [profile, currentMembership, currentOrganizationId])
+  }, [profile, currentOrganizationId])
 
   const loadFriendRequests = async () => {
     try {
@@ -297,8 +295,6 @@ export default function Profile() {
       }
       const { error: profileError } = await updateProfile(updates)
       if (profileError) throw profileError
-      const { error: membershipError } = await updateMembership({ level })
-      if (membershipError) throw membershipError
       setPhone('')
       setEditing(false)
       setSaved(true)
@@ -412,7 +408,9 @@ export default function Profile() {
           </div>
           <h2 className="text-2xl text-white">{profile?.name}</h2>
           <div className="mt-2.5">
-            <LevelBadge level={currentMembership?.level} me size="md" />
+            <span className="inline-flex items-center rounded-full font-mono font-extrabold tracking-wide bg-lime-400 text-ink-900 text-sm px-3 py-1 tabular-nums">
+              {formatRating(profile?.rating)} pts
+            </span>
           </div>
           {globalRank && (
             <div className="mt-2">
@@ -474,9 +472,10 @@ export default function Profile() {
           </div>
         )}
 
-        {/* Global ranking breakdown — o número grande é o rating (Elo),
-            a mesma métrica que ordena o #N do RankBadge; os pontos de
-            assiduidade ficam como detalhe. */}
+        {/* Global ranking — o número grande é o rating (Elo), a mesma
+            métrica que ordena o #N do RankBadge; a legenda mostra o
+            historial de mixes em vez da antiga soma de pontos de
+            clube/amigos. */}
         {globalPoints && (
           <div className="card">
             <div className="flex items-center justify-between">
@@ -487,7 +486,7 @@ export default function Profile() {
               <span className="text-2xl font-extrabold text-ink-900 tabular-nums">{formatRating(profile?.rating)}</span>
             </div>
             <p className="text-[11px] text-muted mt-1">
-              {globalPoints.club_points} pontos de clubes · {globalPoints.private_points} pontos de jogos entre amigos
+              🎾 {globalPoints.mix_wins || 0} mixes ganhos em {globalPoints.mixes_played || 0} jogados
             </p>
           </div>
         )}
@@ -540,24 +539,6 @@ export default function Profile() {
                   options={[
                     { value: 'masculino', label: 'Masculino' },
                     { value: 'feminino', label: 'Feminino' },
-                  ]}
-                />
-              </div>
-
-              <div>
-                <label className={inputLabel}>Nível de jogo</label>
-                <Select
-                  value={level}
-                  onChange={setLevel}
-                  options={[
-                    { value: 'iniciante', label: 'Iniciante' },
-                    { value: 'intermédio', label: 'Intermédio' },
-                    { value: 'avançado', label: 'Avançado' },
-                    { value: 'N2', label: 'N2' },
-                    { value: 'N3', label: 'N3' },
-                    { value: 'N4', label: 'N4' },
-                    { value: 'N5', label: 'N5' },
-                    { value: 'N6', label: 'N6' },
                   ]}
                 />
               </div>
@@ -624,7 +605,6 @@ export default function Profile() {
                   onClick={() => {
                     setEditing(false)
                     setName(profile.name)
-                    setLevel(currentMembership?.level || 'iniciante')
                     setBirthday(profile.birthday || '')
                     setGender(profile.gender || '')
                     setActivityVisibility(profile.activity_visibility || 'public')
@@ -668,11 +648,6 @@ export default function Profile() {
               <div>
                 <p className={fieldLabel}>Nº de telemóvel</p>
                 <p className={fieldValue}>{profile?.phone_hash ? 'Associado ✓' : 'Não associado'}</p>
-              </div>
-
-              <div>
-                <p className={fieldLabel}>Nível auto-declarado (este clube)</p>
-                <p className={fieldValue}>{currentMembership?.level}</p>
               </div>
 
               <div>

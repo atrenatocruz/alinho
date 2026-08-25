@@ -438,7 +438,7 @@ export function RankBadge({ rank, size = 'md' }) {
   if (!rank) return null
   const sizes = {
     sm: 'text-[11px] px-2 py-0.5 gap-1',
-    md: 'text-sm px-3 py-1.5 gap-1.5',
+    md: 'text-sm px-2.5 py-1 gap-1',
   }
   const style =
     rank === 1 ? 'bg-lime-400 text-ink-900'
@@ -451,7 +451,7 @@ export function RankBadge({ rank, size = 'md' }) {
       className={`inline-flex items-center rounded-full font-extrabold tabular-nums ${sizes[size]} ${style}`}
     >
       <Trophy size={size === 'sm' ? 12 : 14} />
-      #{rank} no ranking global
+      #{rank}
     </span>
   )
 }

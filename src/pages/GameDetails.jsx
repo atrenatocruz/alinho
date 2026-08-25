@@ -177,13 +177,13 @@ export default function GameDetails() {
         .order('round_number')
         .order('court_number')
 
-      // Global club points (cross-club, excludes jogos-entre-amigos) shown
-      // next to each player instead of/alongside their level, and summed
-      // per dupla once the mix has started — same source handleStartMix
-      // uses to pair solos, kept in state here so it survives re-renders.
+      // Elo rating shown next to each player instead of/alongside their
+      // level, and summed per dupla once the mix has started — same source
+      // handleStartMix uses to pair solos, kept in state here so it
+      // survives re-renders.
       try {
         const globalRankings = await getGlobalRankings()
-        setPointsById(Object.fromEntries(globalRankings.map((r) => [r.user_id, r.club_points || 0])))
+        setPointsById(Object.fromEntries(globalRankings.map((r) => [r.user_id, Math.round(r.rating || 0)])))
       } catch (error) {
         console.error('Error loading global points:', error)
       }
@@ -566,13 +566,12 @@ export default function GameDetails() {
     setBusy(true)
     setMixError('')
     try {
-      // Global club points (cross-club, excludes jogos-entre-amigos points)
-      // — drives both who pairs with whom (closest points, no side
-      // preference) and each dupla's seed_ranking (sum of both players'
-      // points), so the strongest duplas by this same number land on
-      // court 1 down to the weakest on the last court (see seedCourts).
+      // Elo rating — drives both who pairs with whom (closest points, no
+      // side preference) and each dupla's seed_ranking (sum of both
+      // players' points), so the strongest duplas by this same number land
+      // on court 1 down to the weakest on the last court (see seedCourts).
       const globalRankings = await getGlobalRankings()
-      const pointsById = Object.fromEntries(globalRankings.map(r => [r.user_id, r.club_points || 0]))
+      const pointsById = Object.fromEntries(globalRankings.map(r => [r.user_id, Math.round(r.rating || 0)]))
 
       // Duplas from the most recent previous mix at this club — solos
       // whose points-based pairing would recreate one of these get
@@ -1588,7 +1587,7 @@ export default function GameDetails() {
                           )}
                         </p>
                         <p className="text-xs text-muted truncate">
-                          {pointsById[person.id] ?? 0} pts · {SIDE_LABEL[person.preferred_side] || 'Ambos'}
+                          <span className="font-extrabold text-ink-900">{pointsById[person.id] ?? 0} pts</span> · {SIDE_LABEL[person.preferred_side] || 'Ambos'}
                         </p>
                       </div>
                     </Link>
@@ -1649,7 +1648,7 @@ export default function GameDetails() {
                         )}
                       </p>
                       <p className="text-xs text-muted truncate">
-                        {pointsById[person.id] ?? 0} pts · {SIDE_LABEL[person.preferred_side] || 'Ambos'}
+                        <span className="font-extrabold text-ink-900">{pointsById[person.id] ?? 0} pts</span> · {SIDE_LABEL[person.preferred_side] || 'Ambos'}
                       </p>
                     </div>
                   </Link>
