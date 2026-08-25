@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
-import { MapPin, CheckCircle2, ChevronRight, ChevronDown, ChevronLeft, Lock, Play, Calendar, X, Share2, MessageCircle, Link2, ImageDown, Trophy } from 'lucide-react'
+import { MapPin, CheckCircle2, ChevronRight, ChevronDown, ChevronLeft, Lock, Play, Calendar, X, Share2, MessageCircle, Link2, ImageDown, Trophy, Repeat } from 'lucide-react'
 import ShareCard, { CARD_W, CARD_H } from './ShareCard'
 
 /* ─── Date fields ────────────────────────────────────────────────────────
@@ -599,6 +599,11 @@ export function MixCard({ game, joined = false, showClub = false }) {
       {showClub && game.organization?.name && (
         <p className="text-[11px] font-extrabold uppercase tracking-widest text-lime-700 mb-1">
           {game.organization.name}
+        </p>
+      )}
+      {game.recurrence_id && (
+        <p className="flex items-center gap-1 text-[11px] font-extrabold uppercase tracking-widest text-lime-700 mb-1">
+          <Repeat size={12} /> Recorrente
         </p>
       )}
       <h3 className="text-lg text-ink-900 leading-snug mb-1">{game.title}</h3>
