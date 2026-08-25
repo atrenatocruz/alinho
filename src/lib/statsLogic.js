@@ -20,7 +20,10 @@ export const monthLabel = (key) => {
 
 /**
  * Build a month-by-month leaderboard from mix_player_stats rows.
- * rows: [{ user_id, user: {name, level}, points_earned, matches_played, matches_won, mix_won, game: {date} }]
+ * rows: [{ user_id, user: {name, level}, rating_delta, matches_played, matches_won, mix_won, game: {date} }]
+ * points is the player's net Elo change for the month (rating_delta summed
+ * across their mixes, rounded) — can go negative on a losing month, unlike
+ * the old assiduidade points_earned it replaced.
  * Returns { months: [{key, label}] (newest first), byMonth: { [key]: [{...player, points, victories, played, participations, mixesWon, winRate}] } }
  */
 export function buildMonthlyLeaderboard(rows) {
@@ -35,7 +38,7 @@ export function buildMonthlyLeaderboard(rows) {
       user: row.user,
       points: 0, victories: 0, played: 0, participations: 0, mixesWon: 0,
     })
-    entry.points += row.points_earned || 0
+    entry.points += row.rating_delta || 0
     entry.victories += row.matches_won || 0
     entry.played += row.matches_played || 0
     entry.participations += 1
@@ -47,7 +50,7 @@ export function buildMonthlyLeaderboard(rows) {
     Object.entries(byMonth).map(([key, players]) => [
       key,
       Object.values(players)
-        .map(p => ({ ...p, winRate: winRatePct(p.victories, p.played) }))
+        .map(p => ({ ...p, points: Math.round(p.points), winRate: winRatePct(p.victories, p.played) }))
         .sort((a, b) => b.points - a.points || b.victories - a.victories),
     ])
   )

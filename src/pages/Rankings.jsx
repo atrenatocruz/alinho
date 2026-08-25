@@ -363,7 +363,7 @@ export default function Rankings() {
                         </p>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="text-2xl font-extrabold text-ink-900 tabular-nums">{p.points}</p>
+                        <p className="text-2xl font-extrabold text-ink-900 tabular-nums">{p.points > 0 ? `+${p.points}` : p.points}</p>
                         <p className="text-[11px] text-muted">pontos</p>
                       </div>
                     </div>
@@ -435,7 +435,7 @@ export default function Rankings() {
                     <div className="mt-0.5 flex items-center gap-2">
                       <RatingBadge rating={player.rating} gender={player.gender} />
                       <span className="text-[11px] text-muted truncate">
-                        {player.club_points} pts clube · {player.private_points} pts amigos
+                        🏆 {player.mix_wins || 0}/{player.mixes_played || 0} mixes
                       </span>
                     </div>
                   </div>

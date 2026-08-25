@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { ArrowLeft, Trophy, Target, Award, Swords, ChevronDown, UserPlus, UserCheck, Clock, Lock, ShieldCheck } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { PrimaryButton, LevelBadge, EmptyState, Avatar, RankBadge, RatingBadge } from '../components/ui'
+import { formatRating } from '../lib/elo'
 import { winRatePct } from '../lib/statsLogic'
 import { sendFriendRequest, acceptFriendRequest, removeFriendRequest } from '../lib/friends'
 import { getGlobalRankings } from '../lib/privateMatches'
@@ -210,7 +211,7 @@ export default function PlayerDetails() {
   const winRate = winRatePct(player.game_wins || 0, played)
 
   const statTiles = [
-    { icon: Trophy, value: player.total_points || 0, label: 'Pontos', cls: 'text-lime-600' },
+    { icon: Trophy, value: formatRating(globalEntry?.rating), label: 'Pontos', cls: 'text-lime-600' },
     { icon: Award, value: `${player.mix_wins || 0}/${player.mixes_played || 0}`, label: 'Mixes ganhos', cls: 'text-ink-700' },
     { icon: Target, value: played, label: 'Jogos', cls: 'text-ink-700' },
     { icon: Award, value: `${winRate}%`, label: 'Taxa de vitória', cls: 'text-ok' },

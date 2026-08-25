@@ -3,9 +3,8 @@ import { createPortal } from 'react-dom'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Home, Users, Trophy, Settings, LogOut, HelpCircle, Phone, X, Bell } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { PrimaryButton, Avatar } from './ui'
+import { PrimaryButton, Avatar, RatingBadge } from './ui'
 import { hashPhone } from '../lib/hashPhone'
-import { getGlobalRankings } from '../lib/privateMatches'
 import { listIncomingFriendRequests } from '../lib/friends'
 import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
 
@@ -138,27 +137,6 @@ export default function Layout({ children }) {
     () => typeof window !== 'undefined' && localStorage.getItem(PHONE_PROMPT_DISMISSED_KEY) === today
   )
 
-  // Header badge shows the player's global points (club + friend games
-  // combined, same figure as the "Ranking global" card on Profile) instead
-  // of their club level — level is club-scoped and less meaningful now that
-  // players can belong to several clubs.
-  const [globalPoints, setGlobalPoints] = useState(null)
-  useEffect(() => {
-    if (!profile?.id || isGuest) {
-      setGlobalPoints(null)
-      return
-    }
-    let cancelled = false
-    getGlobalRankings()
-      .then((data) => {
-        if (!cancelled) setGlobalPoints(data.find((p) => p.user_id === profile.id) || null)
-      })
-      .catch((error) => console.error('Error loading global points:', error))
-    return () => {
-      cancelled = true
-    }
-  }, [profile?.id, isGuest])
-
   // Refetched on every route change too (not just profile/isGuest), so the
   // dropdown clears shortly after accepting/declining on /perfil without a
   // full reload — cheap since it's just a small pending-requests list.
@@ -245,12 +223,9 @@ export default function Layout({ children }) {
           </Link>
 
           <div className="flex items-center gap-1">
-            {globalPoints && (
-              <Link to="/perfil" title="Os teus pontos globais" className="mr-2">
-                <span className="inline-flex items-center rounded-full font-mono font-extrabold tracking-wide
-                                  bg-lime-400 text-ink-900 text-[11px] px-2 py-0.5 tabular-nums">
-                  {globalPoints.total_points} pts
-                </span>
+            {profile?.rating != null && (
+              <Link to="/perfil" title="O teu nível" className="mr-2">
+                <RatingBadge rating={profile.rating} gender={profile.gender} me />
               </Link>
             )}
             <div className="relative">
