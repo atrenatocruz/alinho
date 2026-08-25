@@ -17,6 +17,16 @@ import { getGlobalRankings } from '../lib/privateMatches'
 
 const SIDE_LABEL = { left: 'Esquerda', right: 'Direita', both: 'Ambos' }
 
+const HISTORY_STATUS_LABEL = {
+  open: 'Aberto',
+  closed: 'Fechado',
+  in_progress: 'A decorrer',
+  pending: 'Pendente',
+  finished: 'Terminado',
+  completed: 'Terminado',
+  cancelled: 'Cancelado',
+}
+
 export default function GameDetails() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -53,6 +63,8 @@ export default function GameDetails() {
   const [mixStats, setMixStats] = useState([])
   const [addingTestUser, setAddingTestUser] = useState(false)
   const [pointsById, setPointsById] = useState({})
+  const [recurrenceHistory, setRecurrenceHistory] = useState([])
+  const [historyExpanded, setHistoryExpanded] = useState(false)
 
   useEffect(() => {
     loadGameDetails()
@@ -87,6 +99,22 @@ export default function GameDetails() {
 
       if (gameError) throw gameError
       setGame(gameData)
+
+      if (gameData.recurrence_id) {
+        const { data: historyData, error: historyError } = await supabase
+          .from('games')
+          .select('id, date, status, winner_team_id')
+          .eq('recurrence_id', gameData.recurrence_id)
+          .neq('id', gameData.id)
+          .order('date', { ascending: false })
+        if (historyError) {
+          console.error('Error loading recurrence history:', historyError)
+        } else {
+          setRecurrenceHistory(historyData || [])
+        }
+      } else {
+        setRecurrenceHistory([])
+      }
 
       // level/is_guest live on `memberships` now (per-org) — fetch this
       // org's memberships once and merge onto every nested profile object
@@ -1090,6 +1118,44 @@ export default function GameDetails() {
           )}
         </div>
       </div>
+
+      {/* Histórico — other occurrences of the same recurring mix */}
+      {recurrenceHistory.length > 0 && (
+        <div className="card p-0 overflow-hidden">
+          <button
+            onClick={() => setHistoryExpanded((v) => !v)}
+            aria-expanded={historyExpanded}
+            className="w-full flex items-center gap-3 px-4 py-3.5 min-h-[56px] transition-colors duration-fast hover:bg-ink-50"
+          >
+            <Repeat size={18} className="text-ink-700 shrink-0" />
+            <p className="flex-1 min-w-0 text-left font-extrabold text-ink-900">Histórico</p>
+            <span className="text-sm text-muted">{recurrenceHistory.length}</span>
+            <ChevronDown
+              size={20}
+              className={`text-muted transition-transform duration-base shrink-0 ${historyExpanded ? 'rotate-180' : ''}`}
+            />
+          </button>
+
+          {historyExpanded && (
+            <div className="border-t border-line divide-y divide-line animate-fade-up">
+              {recurrenceHistory.map((h) => (
+                <Link
+                  key={h.id}
+                  to={`/jogo/${h.id}`}
+                  className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-ink-50 transition-colors duration-fast"
+                >
+                  <span className="text-sm text-ink-900 capitalize">
+                    {new Date(h.date).toLocaleDateString('pt-PT', { weekday: 'short', day: 'numeric', month: 'short' })}
+                  </span>
+                  <span className="text-xs font-extrabold text-muted">
+                    {HISTORY_STATUS_LABEL[h.status] || h.status}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Winner (mix finalizado) */}
       {game.status === 'finished' && game.winner_team_id && (
