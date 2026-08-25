@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { ArrowLeft, Trophy, Target, Award, Swords, ChevronDown, UserPlus, UserCheck, Clock, Lock, ShieldCheck } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { PrimaryButton, LevelBadge, EmptyState, Avatar, RankBadge } from '../components/ui'
+import { PrimaryButton, LevelBadge, EmptyState, Avatar, RankBadge, RatingBadge } from '../components/ui'
 import { winRatePct } from '../lib/statsLogic'
 import { sendFriendRequest, acceptFriendRequest, removeFriendRequest } from '../lib/friends'
 import { getGlobalRankings } from '../lib/privateMatches'
@@ -28,6 +28,7 @@ export default function PlayerDetails() {
   const [matchHistoryLoading, setMatchHistoryLoading] = useState(true)
   const [expandedMixes, setExpandedMixes] = useState(new Set())
   const [globalRank, setGlobalRank] = useState(null)
+  const [globalEntry, setGlobalEntry] = useState(null)
 
   const toggleMix = (gameId) => {
     setExpandedMixes((prev) => {
@@ -50,6 +51,7 @@ export default function PlayerDetails() {
       const rankings = await getGlobalRankings()
       const index = rankings.findIndex((p) => p.user_id === id)
       setGlobalRank(index === -1 ? null : index + 1)
+      setGlobalEntry(index === -1 ? null : rankings[index])
     } catch (error) {
       console.error('Error loading global rank:', error)
     }
@@ -273,8 +275,9 @@ export default function PlayerDetails() {
               points. globalRank is null when the player has no ranked
               points yet, not just when it's hidden. */}
           {!resultsHidden && globalRank && (
-            <div className="mt-2.5">
+            <div className="mt-2.5 flex items-center justify-center gap-2">
               <RankBadge rank={globalRank} size="md" />
+              <RatingBadge rating={globalEntry?.rating} gender={globalEntry?.gender} size="md" />
             </div>
           )}
           <p className="text-white/60 text-xs mt-2.5">
