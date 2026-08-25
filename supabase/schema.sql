@@ -889,6 +889,19 @@ BEGIN
     WHERE g.status = 'pending' AND g.launch_at <= now() AND gr.is_active = true
     FOR UPDATE OF g SKIP LOCKED
   LOOP
+    -- Don't launch (or advance the chain past) this occurrence while a
+    -- previous one in the same series is still open/closed/in_progress —
+    -- otherwise two occurrences of the same recurring mix can be visible
+    -- and joinable at once. Left pending; picked up again next tick once
+    -- the previous occurrence is closed out (or auto-cancelled by
+    -- migration_cancel_stale_mixes.sql after 24h).
+    IF EXISTS (
+      SELECT 1 FROM games
+      WHERE recurrence_id = rec.id AND status IN ('open', 'closed', 'in_progress')
+    ) THEN
+      CONTINUE;
+    END IF;
+
     UPDATE games SET status = 'open', updated_at = now(), launch_at = NULL WHERE id = rec.pending_game_id;
 
     v_new_date := (
