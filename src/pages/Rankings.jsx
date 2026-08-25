@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom'
 import { Trophy, Award, Calendar } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { LevelBadge, EmptyState, MixCard, Avatar, Select } from '../components/ui'
+import { RatingBadge, EmptyState, MixCard, Avatar, Select } from '../components/ui'
+import { formatRating } from '../lib/elo'
 import { winRatePct, buildMonthlyLeaderboard } from '../lib/statsLogic'
 import { getGlobalRankings } from '../lib/privateMatches'
 import { getOrganizationRankings } from '../lib/organizations'
@@ -65,7 +66,7 @@ export default function Rankings() {
   const loadMembershipMap = async () => {
     const { data, error } = await supabase
       .from('memberships')
-      .select('user_id, is_guest, level, profile:profiles(name, avatar_url)')
+      .select('user_id, is_guest, level, profile:profiles(name, avatar_url, rating, gender)')
       .eq('organization_id', currentOrganizationId)
     if (error) throw error
     return new Map((data || []).map((m) => [m.user_id, m]))
@@ -79,7 +80,8 @@ export default function Rankings() {
       ])
       if (statsError) throw statsError
 
-      // Ranking: total points → mix wins → game wins → win rate
+      // Ranking: Elo → mix wins → game wins → win rate. O total_points
+      // (assiduidade) saiu da ordenação principal — vive no tab Mensal.
       const rankedData = (statsRows || [])
         .map((stat) => {
           const m = membershipByUser.get(stat.user_id)
@@ -88,13 +90,15 @@ export default function Rankings() {
           return {
             ...stat,
             user: { name: m.profile?.name, level: m.level },
+            rating: m.profile?.rating ?? null,
+            gender: m.profile?.gender,
             gamesPlayed: played,
             winRate: winRatePct(stat.game_wins || 0, played),
           }
         })
         .filter(Boolean)
         .sort((a, b) =>
-          (b.total_points || 0) - (a.total_points || 0) ||
+          (b.rating ?? -1) - (a.rating ?? -1) ||
           (b.mix_wins || 0) - (a.mix_wins || 0) ||
           (b.game_wins || 0) - (a.game_wins || 0) ||
           b.winRate - a.winRate
@@ -278,7 +282,7 @@ export default function Rankings() {
                         {player.user?.name}
                       </h3>
                       <div className="mt-0.5 flex items-center gap-2">
-                        <LevelBadge level={player.user?.level} />
+                        <RatingBadge rating={player.rating} gender={player.gender} />
                         <span className="text-[11px] text-muted">
                           🏆 {player.mix_wins || 0}/{player.mixes_played || 0} mixes
                         </span>
@@ -289,7 +293,7 @@ export default function Rankings() {
                       <div className="flex items-center gap-1.5 justify-end">
                         <Trophy size={16} className="text-lime-600" />
                         <span className="text-2xl font-extrabold text-ink-900 tabular-nums">
-                          {player.total_points || 0}
+                          {formatRating(player.rating)}
                         </span>
                       </div>
                       <p className="text-[11px] text-muted">pontos</p>
@@ -428,12 +432,15 @@ export default function Rankings() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="text-base text-ink-900 truncate">{player.name}</h3>
-                    <p className="text-[11px] text-muted mt-0.5">
-                      {player.club_points} pts clube · {player.private_points} pts amigos
-                    </p>
+                    <div className="mt-0.5 flex items-center gap-2">
+                      <RatingBadge rating={player.rating} gender={player.gender} />
+                      <span className="text-[11px] text-muted truncate">
+                        {player.club_points} pts clube · {player.private_points} pts amigos
+                      </span>
+                    </div>
                   </div>
                   <div className="text-right shrink-0">
-                    <span className="text-2xl font-extrabold text-ink-900 tabular-nums">{player.total_points}</span>
+                    <span className="text-2xl font-extrabold text-ink-900 tabular-nums">{formatRating(player.rating)}</span>
                     <p className="text-[11px] text-muted">pontos</p>
                   </div>
                 </div>

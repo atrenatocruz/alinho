@@ -7,7 +7,8 @@ import { hashPhone } from '../lib/hashPhone'
 import { uploadAvatar, removeAvatar } from '../lib/avatarStorage'
 import { getMyPrivateMatches, getGlobalRankings } from '../lib/privateMatches'
 import { listIncomingFriendRequests, acceptFriendRequest, removeFriendRequest, listFriends } from '../lib/friends'
-import { PrimaryButton, LevelBadge, GuestBadge, DateField, Avatar, Select, EmptyState, RankBadge } from '../components/ui'
+import { PrimaryButton, LevelBadge, GuestBadge, DateField, Avatar, Select, EmptyState, RankBadge, RatingBadge } from '../components/ui'
+import { formatRating } from '../lib/elo'
 
 const TABS = [
   { key: 'perfil', label: 'Perfil' },
@@ -473,12 +474,17 @@ export default function Profile() {
           </div>
         )}
 
-        {/* Global ranking breakdown */}
+        {/* Global ranking breakdown — o número grande é o rating (Elo),
+            a mesma métrica que ordena o #N do RankBadge; os pontos de
+            assiduidade ficam como detalhe. */}
         {globalPoints && (
           <div className="card">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-extrabold text-ink-900">Ranking global</p>
-              <span className="text-2xl font-extrabold text-ink-900 tabular-nums">{globalPoints.total_points}</span>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-extrabold text-ink-900">Ranking global</p>
+                <RatingBadge rating={profile?.rating} gender={profile?.gender} />
+              </div>
+              <span className="text-2xl font-extrabold text-ink-900 tabular-nums">{formatRating(profile?.rating)}</span>
             </div>
             <p className="text-[11px] text-muted mt-1">
               {globalPoints.club_points} pontos de clubes · {globalPoints.private_points} pontos de jogos entre amigos
@@ -665,8 +671,18 @@ export default function Profile() {
               </div>
 
               <div>
-                <p className={fieldLabel}>Nível de jogo</p>
+                <p className={fieldLabel}>Nível auto-declarado (este clube)</p>
                 <p className={fieldValue}>{currentMembership?.level}</p>
+              </div>
+
+              <div>
+                <p className={fieldLabel}>Ranking (calculado dos resultados)</p>
+                <div className="flex items-center gap-2">
+                  <p className={fieldValue}>
+                    {profile?.rating != null ? `${formatRating(profile.rating)} pontos` : 'Ainda sem ranking'}
+                  </p>
+                  <RatingBadge rating={profile?.rating} gender={profile?.gender} />
+                </div>
               </div>
 
               <div>

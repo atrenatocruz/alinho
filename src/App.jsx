@@ -21,6 +21,7 @@ import Gerir from './pages/Gerir'
 import GerirClube from './pages/GerirClube'
 import Instructions from './pages/Instructions'
 import MixOffline from './pages/MixOffline'
+import EscolherNivel from './pages/EscolherNivel'
 
 // showSplash covers both the auth check and the splash's minimum display
 // duration (see AppRoutes) — while true, Guard shows the splash instead of
@@ -78,7 +79,7 @@ const LoadErrorScreen = ({ onRetry }) => {
 }
 
 const Guard = ({ require, showSplash, children }) => {
-  const { user, isGuest, isAdmin, isPrivateMatchesEnabled, profileError, retryProfile } = useAuth()
+  const { user, profile, isGuest, isAdmin, isPrivateMatchesEnabled, profileError, retryProfile } = useAuth()
   const location = useLocation()
 
   if (showSplash) {
@@ -87,6 +88,15 @@ const Guard = ({ require, showSplash, children }) => {
 
   if (user && profileError) {
     return <LoadErrorScreen onRetry={retryProfile} />
+  }
+
+  // Auto-classificação do primeiro registo (Elo v1): contas novas escolhem
+  // o nível de entrada antes de usar a app. Comparação estrita com null —
+  // contas de antes da migração têm o carimbo preenchido, e um cliente a
+  // falar com uma BD ainda sem a coluna vê `undefined`; nenhum dos dois
+  // pode ficar preso aqui.
+  if (user && profile && profile.rating_onboarded_at === null) {
+    return <EscolherNivel />
   }
 
   // "/" is the one public route: signed-out visitors see the Landing page

@@ -37,7 +37,9 @@ What alinho actually does today, and what's explicitly not built yet. Kept in sy
 
 ## Rankings & stats
 
-- Per-club ranking plus a cross-club **Geral** (global) ranking that only counts `is_global` clubs' points, so a private club's numbers don't leak into a ranking non-members can see.
+- **Elo rating (Ranking v1)**: every player has one global rating (`profiles.rating`), recalculated inside `finalize_mix` after each mix from actual match results — divisor 400, individual FIDE-style K (40/30/20), pair rating = average, partner redistribution capped at 35/65, merit bonus (1% of own rating to the winning pair, +0.5% for a perfect night) paid proportionally by the other participants. Public bands M1–M6/F1–F6 (`< 700` Iniciante, 700–999 band 6, then 200-point bands) derived from the rating. Full spec: `RANKING.md` + `docs/superpowers/specs/2026-08-25-elo-ranking-design.md`.
+- **First-registration self-assessment**: brand-new accounts pick Iniciado (700) / Regular (900) / Avançado (1100) on a one-time blocking screen before entering the app; pre-existing accounts never see it (seeded at 900 via the backfill migration, history replayed on top).
+- The **Geral** (global) and **Por Clube** ranking tabs order by Elo rating; `total_points` (attendance-flavored) still accumulates and drives the Mensal tab and the Clubes & Grupos ranking. The global tab still only counts `is_global` clubs' points, so a private club's numbers don't leak into a ranking non-members can see.
 - Per-player stats: matches played/won, points, mix wins — configurable points-per-action per club (`organizations.points_rules`).
 - Unified player profile page (`/jogador/:id`) — one identity across every club a person plays in.
 

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { MapPin, CheckCircle2, ChevronRight, ChevronDown, ChevronLeft, Lock, Play, Calendar, X, Share2, MessageCircle, Link2, ImageDown, Trophy, Repeat } from 'lucide-react'
 import ShareCard, { CARD_W, CARD_H } from './ShareCard'
+import { ratingBand } from '../lib/elo'
 
 /* ─── Date fields ────────────────────────────────────────────────────────
    Native <input type=date/datetime-local> pickers open reliably on iOS
@@ -362,6 +363,36 @@ export const levelRange = (levels) => {
   return lo === hi ? lo : `${lo} – ${hi}`
 }
 
+/* ─── BadgePill ──────────────────────────────────────────────────────────
+   Pill partilhado por LevelBadge e RatingBadge — as duas famílias de badge
+   têm de se manter visualmente idênticas, por isso o markup vive uma vez. */
+function BadgePill({ text, title, me = false, size = 'sm' }) {
+  const sizes = {
+    sm: 'text-[11px] px-2 py-0.5',
+    md: 'text-sm px-3 py-1',
+  }
+  return (
+    <span
+      title={title}
+      className={`inline-flex items-center rounded-full font-mono font-extrabold tracking-wide uppercase
+                  ${sizes[size]}
+                  ${me ? 'bg-lime-400 text-ink-900' : 'bg-ink-900 text-lime-400'}`}
+    >
+      {text}
+    </span>
+  )
+}
+
+/* ─── RatingBadge ────────────────────────────────────────────────────────
+   Banda pública do Elo (M6, F4, INI…) — mesmo visual do LevelBadge, mas
+   derivada do rating em vez do nível auto-declarado. Não renderiza nada
+   para contas ainda sem rating. */
+export function RatingBadge({ rating, gender, me = false, size = 'sm' }) {
+  const band = ratingBand(rating, gender)
+  if (!band) return null
+  return <BadgePill text={band.label} title={band.full} me={me} size={size} />
+}
+
 /* ─── PrimaryButton ──────────────────────────────────────────────────────
    variant: "lime" (main CTA) | "navy" | "ghost" | "danger" | "whatsapp" */
 export function PrimaryButton({ variant = 'lime', className = '', children, ...props }) {
@@ -392,20 +423,7 @@ export function PrimaryButton({ variant = 'lime', className = '', children, ...p
 export function LevelBadge({ level, range, me = false, size = 'sm' }) {
   const text = range ?? levelMeta(level).label
   const title = range ? `Níveis ${range}` : levelMeta(level).full
-  const sizes = {
-    sm: 'text-[11px] px-2 py-0.5',
-    md: 'text-sm px-3 py-1',
-  }
-  return (
-    <span
-      title={title}
-      className={`inline-flex items-center rounded-full font-mono font-extrabold tracking-wide uppercase
-                  ${sizes[size]}
-                  ${me ? 'bg-lime-400 text-ink-900' : 'bg-ink-900 text-lime-400'}`}
-    >
-      {text}
-    </span>
-  )
+  return <BadgePill text={text} title={title} me={me} size={size} />
 }
 
 /* ─── RankBadge ──────────────────────────────────────────────────────────
@@ -413,7 +431,9 @@ export function LevelBadge({ level, range, me = false, size = 'sm' }) {
    shown on both PlayerDetails.jsx and Profile.jsx. Same colour steps as
    Rankings.jsx's positionStyle: lime for 1st, dark tones for 2nd/3rd,
    neutral past that. `rank` is a plain 1-based position, computed by the
-   caller from get_global_rankings' array order (already points-desc). */
+   caller from get_global_rankings' array order — since Elo v1 that order
+   is rating-desc (Elo), NOT total_points-desc; any number shown next to
+   this badge should be the rating, not the points. */
 export function RankBadge({ rank, size = 'md' }) {
   if (!rank) return null
   const sizes = {
