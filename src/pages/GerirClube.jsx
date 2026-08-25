@@ -9,6 +9,7 @@ import { uploadClubLogo, removeClubLogo } from '../lib/clubLogoStorage'
 import { createGroup } from '../lib/platformAdmin'
 import { DateField, DateTimeField, Avatar } from '../components/ui'
 import { totalRounds, FORMAT_LABEL } from '../lib/mixLogic'
+import { groupGamesBySeries } from '../lib/recurrenceGrouping'
 
 const sanitizeSlug = (value) => value.toLowerCase().replace(/[^a-z0-9-]/g, '')
 
@@ -1389,11 +1390,12 @@ export default function GerirClube() {
               </div>
 
               <div className="space-y-3">
-                {games
-                  .filter(game => gameFilter === 'finished'
-                    ? DONE_STATUSES.includes(game.status)
-                    : !DONE_STATUSES.includes(game.status))
-                  .map(game => {
+                {groupGamesBySeries(games)
+                  .filter(entry => gameFilter === 'finished'
+                    ? DONE_STATUSES.includes(entry.game.status)
+                    : !DONE_STATUSES.includes(entry.game.status))
+                  .map(entry => {
+                  const game = entry.game
                   const peopleCount = (game.participants || [])
                     .filter(p => p.status === 'confirmed')
                     .reduce((n, p) => n + 1 + (p.partner_id ? 1 : 0), 0)
