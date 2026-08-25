@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Home, Users, Trophy, Settings, LogOut, HelpCircle, Phone, X, Bell } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -270,12 +271,16 @@ export default function Layout({ children }) {
                 )}
               </button>
 
-              {showNotifications && (
+              {showNotifications && createPortal(
                 <>
-                  {/* Transparent backdrop closes the dropdown on outside tap
-                      — same pattern as PhoneRequiredModal below. */}
+                  {/* header has backdrop-blur-xl, which makes it the
+                      containing block for `fixed` descendants — a fixed
+                      backdrop rendered inside it only ever covers the
+                      header strip, not the page, so outside-tap-to-close
+                      silently no-ops. Portaling to body escapes that,
+                      same fix as the Definições modal (GerirClube.jsx). */}
                   <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
-                  <div className="absolute right-0 top-full mt-2 w-80 max-w-[85vw] bg-surface rounded-card shadow-lift ring-1 ring-line z-50 overflow-hidden animate-pop text-left">
+                  <div className="fixed top-[4.5rem] right-4 w-80 max-w-[85vw] bg-surface rounded-card shadow-lift ring-1 ring-line z-50 overflow-hidden animate-pop text-left">
                     <div className="px-4 py-3 border-b border-line">
                       <p className="font-extrabold text-ink-900">Notificações</p>
                     </div>
@@ -327,7 +332,8 @@ export default function Layout({ children }) {
                       </div>
                     )}
                   </div>
-                </>
+                </>,
+                document.body
               )}
             </div>
             <Link
