@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { CalendarX2, Trophy, Users } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { MixCard, EmptyState, PrimaryButton } from '../components/ui'
+import { MixCard, EmptyState, PrimaryButton, Avatar } from '../components/ui'
 
 const TABS = [
   { key: 'ativos', label: 'Mixs Ativos' },
@@ -166,6 +166,23 @@ export default function Home() {
   const finishedGames = [...games.filter(isFinished)].reverse().sort(byFavoriteFirst)
   const visibleGames = tab === 'ativos' ? activeGames : finishedGames
 
+  // Grouped by club/group when the player belongs to more than one — makes
+  // it obvious at a glance whose mix each card belongs to, instead of a
+  // small per-card label buried in a flat list. Preserves visibleGames'
+  // existing order (favorites first, then date) by grouping on first
+  // occurrence rather than re-sorting.
+  const groupedGames = []
+  const gamesByOrgId = new Map()
+  for (const game of visibleGames) {
+    let group = gamesByOrgId.get(game.organization_id)
+    if (!group) {
+      group = { organization_id: game.organization_id, organization: game.organization, games: [] }
+      gamesByOrgId.set(game.organization_id, group)
+      groupedGames.push(group)
+    }
+    group.games.push(game)
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -264,10 +281,28 @@ export default function Home() {
                 subtitle="O histórico de mixs aparece aqui assim que houver um terminado."
               />
             )
+          ) : memberships.length > 1 ? (
+            <div className="space-y-6">
+              {groupedGames.map((group) => (
+                <div key={group.organization_id} className="space-y-3">
+                  <div className="flex items-center gap-2.5">
+                    <Avatar name={group.organization?.name} url={group.organization?.group_logo_url} size="w-7 h-7 text-xs" />
+                    <h3 className="text-sm font-extrabold text-ink-900 uppercase tracking-wide truncate">
+                      {group.organization?.name}
+                    </h3>
+                  </div>
+                  <div className="space-y-3.5">
+                    {group.games.map((game) => (
+                      <MixCard key={game.id} game={game} joined={isUserJoined(game)} showClub={false} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : (
             <div className="space-y-3.5">
               {visibleGames.map(game => (
-                <MixCard key={game.id} game={game} joined={isUserJoined(game)} showClub={memberships.length > 1} />
+                <MixCard key={game.id} game={game} joined={isUserJoined(game)} showClub={false} />
               ))}
             </div>
           )}

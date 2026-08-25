@@ -1,28 +1,46 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
-import { User, Award, Trophy, Target, Flame, LogOut, Camera } from 'lucide-react'
+import { useNavigate, useSearchParams, Link } from 'react-router-dom'
+import { User, Award, Trophy, Target, Flame, LogOut, Camera, UserCheck, X, Users } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { hashPhone } from '../lib/hashPhone'
 import { uploadAvatar, removeAvatar } from '../lib/avatarStorage'
 import { getMyPrivateMatches, getGlobalRankings } from '../lib/privateMatches'
-import { PrimaryButton, LevelBadge, GuestBadge, DateField, Avatar, Select, EmptyState } from '../components/ui'
+import { listIncomingFriendRequests, acceptFriendRequest, removeFriendRequest, listFriends } from '../lib/friends'
+import { PrimaryButton, LevelBadge, GuestBadge, DateField, Avatar, Select, EmptyState, RankBadge } from '../components/ui'
 
 const TABS = [
   { key: 'perfil', label: 'Perfil' },
+  { key: 'amigos', label: 'Amigos' },
   { key: 'historico', label: 'Histórico' },
+]
+
+const VISIBILITY_OPTIONS = [
+  { value: 'public', label: 'Público' },
+  { value: 'friends', label: 'Amigos' },
+  { value: 'private', label: 'Privado' },
 ]
 
 export default function Profile() {
   const { profile, updateProfile, updateMembership, currentMembership, currentOrganizationId, isGuest, signOut } = useAuth()
   const navigate = useNavigate()
-  const [tab, setTab] = useState('perfil')
+  const [searchParams] = useSearchParams()
+  const [tab, setTab] = useState(() => (TABS.some((t) => t.key === searchParams.get('tab')) ? searchParams.get('tab') : 'perfil'))
+  // Re-applies whenever ?tab= changes without a full remount — the bell
+  // dropdown links here from an already-mounted Profile (same route).
+  useEffect(() => {
+    const requested = searchParams.get('tab')
+    if (requested && TABS.some((t) => t.key === requested)) setTab(requested)
+  }, [searchParams])
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(profile?.name || '')
   const [level, setLevel] = useState(currentMembership?.level || 'iniciante')
   const [preferredSide, setPreferredSide] = useState(profile?.preferred_side || 'both')
   const [birthday, setBirthday] = useState(profile?.birthday || '')
   const [gender, setGender] = useState(profile?.gender || '')
+  const [activityVisibility, setActivityVisibility] = useState(profile?.activity_visibility || 'public')
+  const [resultsVisibility, setResultsVisibility] = useState(profile?.results_visibility || 'public')
+  const [clubsVisibility, setClubsVisibility] = useState(profile?.clubs_visibility || 'public')
   const [phone, setPhone] = useState('')
   const [phoneError, setPhoneError] = useState('')
   const [stats, setStats] = useState(null)
@@ -31,10 +49,15 @@ export default function Profile() {
   const [privateMatchHistory, setPrivateMatchHistory] = useState([])
   const [privateMatchHistoryLoading, setPrivateMatchHistoryLoading] = useState(true)
   const [globalPoints, setGlobalPoints] = useState(null)
+  const [globalRank, setGlobalRank] = useState(null)
   const [loading, setLoading] = useState(false)
   const [saved, setSaved] = useState(false)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [photoError, setPhotoError] = useState('')
+  const [friendRequests, setFriendRequests] = useState([])
+  const [friendRequestActing, setFriendRequestActing] = useState(null)
+  const [friends, setFriends] = useState([])
+  const [friendsLoading, setFriendsLoading] = useState(true)
   const fileInputRef = useRef(null)
 
   useEffect(() => {
@@ -55,9 +78,57 @@ export default function Profile() {
       if (!isGuest) {
         loadPrivateMatchHistory()
         loadGlobalPoints()
+        loadFriendRequests()
+        loadFriends()
       }
     }
   }, [profile, currentMembership, currentOrganizationId])
+
+  const loadFriendRequests = async () => {
+    try {
+      setFriendRequests(await listIncomingFriendRequests())
+    } catch (error) {
+      console.error('Error loading friend requests:', error)
+    }
+  }
+
+  const loadFriends = async () => {
+    setFriendsLoading(true)
+    try {
+      setFriends(await listFriends())
+    } catch (error) {
+      console.error('Error loading friends:', error)
+    } finally {
+      setFriendsLoading(false)
+    }
+  }
+
+  const handleAcceptFriendRequest = async (requestId) => {
+    setFriendRequestActing(requestId)
+    try {
+      await acceptFriendRequest(requestId)
+      setFriendRequests((reqs) => reqs.filter((r) => r.id !== requestId))
+      loadFriends()
+    } catch (error) {
+      console.error('Error accepting friend request:', error)
+      alert('Não foi possível aceitar o pedido. Tenta novamente.')
+    } finally {
+      setFriendRequestActing(null)
+    }
+  }
+
+  const handleDeclineFriendRequest = async (requestId) => {
+    setFriendRequestActing(requestId)
+    try {
+      await removeFriendRequest(requestId)
+      setFriendRequests((reqs) => reqs.filter((r) => r.id !== requestId))
+    } catch (error) {
+      console.error('Error declining friend request:', error)
+      alert('Não foi possível recusar o pedido. Tenta novamente.')
+    } finally {
+      setFriendRequestActing(null)
+    }
+  }
 
   const loadStats = async () => {
     try {
@@ -157,7 +228,9 @@ export default function Profile() {
   const loadGlobalPoints = async () => {
     try {
       const data = await getGlobalRankings()
-      setGlobalPoints(data.find((p) => p.user_id === profile.id) || null)
+      const index = data.findIndex((p) => p.user_id === profile.id)
+      setGlobalPoints(index === -1 ? null : data[index])
+      setGlobalRank(index === -1 ? null : index + 1)
     } catch (error) {
       console.error('Error loading global points:', error)
     }
@@ -209,7 +282,15 @@ export default function Profile() {
     setLoading(true)
 
     try {
-      const updates = { name, preferred_side: preferredSide, birthday: birthday || null, gender }
+      const updates = {
+        name,
+        preferred_side: preferredSide,
+        birthday: birthday || null,
+        gender,
+        activity_visibility: activityVisibility,
+        results_visibility: resultsVisibility,
+        clubs_visibility: clubsVisibility,
+      }
       if (phone) {
         updates.phone_hash = await hashPhone(phone)
       }
@@ -332,6 +413,11 @@ export default function Profile() {
           <div className="mt-2.5">
             <LevelBadge level={currentMembership?.level} me size="md" />
           </div>
+          {globalRank && (
+            <div className="mt-2">
+              <RankBadge rank={globalRank} size="md" />
+            </div>
+          )}
           {profile?.avatar_url && (
             <button
               type="button"
@@ -501,6 +587,27 @@ export default function Profile() {
                 <p className="text-xs text-muted mt-1.5">Usado na formação de duplas dos mixes</p>
               </div>
 
+              <div className="pt-2 border-t border-line">
+                <h4 className="text-sm font-extrabold text-ink-900 mt-4 mb-1">Privacidade</h4>
+                <p className="text-xs text-muted mb-3">
+                  Escolhe quem vê cada secção do teu perfil. "Amigos" = jogadores que se seguem mutuamente.
+                </p>
+                <div className="space-y-3">
+                  <div>
+                    <label className={inputLabel}>Atividade (confrontos diretos)</label>
+                    <Select value={activityVisibility} onChange={setActivityVisibility} options={VISIBILITY_OPTIONS} />
+                  </div>
+                  <div>
+                    <label className={inputLabel}>Resultados (pontos e estatísticas)</label>
+                    <Select value={resultsVisibility} onChange={setResultsVisibility} options={VISIBILITY_OPTIONS} />
+                  </div>
+                  <div>
+                    <label className={inputLabel}>Clubes (a que pertences)</label>
+                    <Select value={clubsVisibility} onChange={setClubsVisibility} options={VISIBILITY_OPTIONS} />
+                  </div>
+                </div>
+              </div>
+
               <div className="flex gap-3 pt-2">
                 <PrimaryButton type="submit" disabled={loading} className="flex-1">
                   {loading ? 'A guardar…' : 'Guardar'}
@@ -514,6 +621,9 @@ export default function Profile() {
                     setLevel(currentMembership?.level || 'iniciante')
                     setBirthday(profile.birthday || '')
                     setGender(profile.gender || '')
+                    setActivityVisibility(profile.activity_visibility || 'public')
+                    setResultsVisibility(profile.results_visibility || 'public')
+                    setClubsVisibility(profile.clubs_visibility || 'public')
                     setPhone('')
                     setPhoneError('')
                   }}
@@ -568,6 +678,64 @@ export default function Profile() {
             </div>
           )}
         </div>
+        </>
+      )}
+
+      {tab === 'amigos' && (
+        <>
+        {/* Pedidos de amizade */}
+        {friendRequests.length > 0 && (
+          <div className="card space-y-3">
+            <p className="text-sm font-extrabold text-ink-900">Pedidos de amizade</p>
+            {friendRequests.map((req) => (
+              <div key={req.id} className="flex items-center gap-3">
+                <Avatar name={req.requester_name} url={req.requester_avatar_url} size="w-10 h-10 text-sm" />
+                <p className="flex-1 min-w-0 font-extrabold text-ink-900 text-sm truncate">{req.requester_name}</p>
+                <button
+                  onClick={() => handleAcceptFriendRequest(req.id)}
+                  disabled={friendRequestActing === req.id}
+                  aria-label="Aceitar pedido"
+                  className="w-9 h-9 shrink-0 rounded-full bg-lime-400 text-ink-900 flex items-center justify-center hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
+                >
+                  <UserCheck size={16} />
+                </button>
+                <button
+                  onClick={() => handleDeclineFriendRequest(req.id)}
+                  disabled={friendRequestActing === req.id}
+                  aria-label="Recusar pedido"
+                  className="w-9 h-9 shrink-0 rounded-full bg-ink-50 text-ink-700 flex items-center justify-center hover:bg-ink-200 transition-colors duration-fast disabled:opacity-40"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {friendsLoading ? (
+          <div className="flex items-center justify-center py-16">
+            <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
+          </div>
+        ) : friends.length === 0 ? (
+          <EmptyState
+            icon={Users}
+            title="Ainda não tens amigos"
+            subtitle="Envia um pedido de amizade a partir do perfil de outro jogador."
+          />
+        ) : (
+          <div className="card p-0 overflow-hidden divide-y divide-line">
+            {friends.map((f) => (
+              <Link
+                key={f.id}
+                to={`/jogador/${f.id}`}
+                className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50"
+              >
+                <Avatar name={f.name} url={f.avatar_url} size="w-11 h-11 text-sm" />
+                <p className="flex-1 min-w-0 font-extrabold text-ink-900 text-sm truncate">{f.name}</p>
+              </Link>
+            ))}
+          </div>
+        )}
         </>
       )}
 

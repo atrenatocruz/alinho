@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useParams, Link } from 'react-router-dom'
-import { Plus, Calendar, Users, Trash2, Edit2, Check, X, UserX, Repeat, Clock, ArrowLeft, Camera } from 'lucide-react'
+import { Plus, Calendar, Users, Trash2, Edit2, Check, X, UserX, Repeat, Clock, ArrowLeft, Camera, Settings } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
@@ -112,6 +113,9 @@ export default function GerirClube() {
   const [editingGame, setEditingGame] = useState(null)
   const [gameFilter, setGameFilter] = useState('upcoming')
   const [savingFlag, setSavingFlag] = useState(false)
+  const [editingName, setEditingName] = useState(false)
+  const [nameInput, setNameInput] = useState('')
+  const [renamingOrg, setRenamingOrg] = useState(false)
 
   // Form states
   const [gameForm, setGameForm] = useState(EMPTY_GAME_FORM)
@@ -852,10 +856,36 @@ export default function GerirClube() {
 
       if (error) throw error
 
+      setOrg((o) => ({ ...o, name: settings.name }))
       alert('Definições atualizadas com sucesso!')
     } catch (error) {
       console.error('Error updating settings:', error)
       alert('Erro ao atualizar definições')
+    }
+  }
+
+  // Inline rename from the page title — separate from the full Definições
+  // form so a quick name fix doesn't require opening the settings modal.
+  // Saves immediately on blur/Enter and updates `org` right away so the
+  // title reflects the new name without a reload.
+  const handleRenameOrg = async () => {
+    const trimmed = nameInput.trim()
+    if (!trimmed || trimmed === org.name) {
+      setEditingName(false)
+      return
+    }
+    setRenamingOrg(true)
+    try {
+      const { error } = await supabase.from('organizations').update({ name: trimmed }).eq('id', org.id)
+      if (error) throw error
+      setOrg((o) => ({ ...o, name: trimmed }))
+      setSettings((s) => (s ? { ...s, name: trimmed } : s))
+      setEditingName(false)
+    } catch (error) {
+      console.error('Error renaming organization:', error)
+      alert('Não foi possível atualizar o nome. Tenta novamente.')
+    } finally {
+      setRenamingOrg(false)
     }
   }
 
@@ -976,8 +1006,50 @@ export default function GerirClube() {
             <ArrowLeft size={16} /> Voltar aos clubes que geres
           </Link>
         )}
-        <h2 className="text-3xl font-bold text-ink-900">Gerir: {org.name}</h2>
-        <p className="text-gray-600 mt-1">Jogos, membros e definições deste clube</p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            {editingName ? (
+              <div className="flex items-center gap-2">
+                <span className="text-3xl font-bold text-ink-900 shrink-0">Gerir:</span>
+                <input
+                  type="text"
+                  value={nameInput}
+                  onChange={(e) => setNameInput(e.target.value)}
+                  onBlur={handleRenameOrg}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') e.currentTarget.blur()
+                    if (e.key === 'Escape') setEditingName(false)
+                  }}
+                  disabled={renamingOrg}
+                  autoFocus
+                  className="text-3xl font-bold text-ink-900 bg-transparent border-b-2 border-lime-400 outline-none min-w-0 flex-1 disabled:opacity-50"
+                />
+              </div>
+            ) : (
+              <h2 className="text-3xl font-bold text-ink-900 flex items-center gap-2 min-w-0">
+                <span className="truncate">Gerir: {org.name}</span>
+                <button
+                  type="button"
+                  onClick={() => { setNameInput(org.name); setEditingName(true) }}
+                  aria-label="Editar nome"
+                  className="shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-muted hover:text-ink-900 hover:bg-ink-50 transition-colors duration-fast"
+                >
+                  <Edit2 size={16} />
+                </button>
+              </h2>
+            )}
+            <p className="text-gray-600 mt-1">Jogos, membros e definições deste clube</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActiveTab('settings')}
+            title="Definições"
+            aria-label="Definições"
+            className="shrink-0 w-11 h-11 flex items-center justify-center rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast"
+          >
+            <Settings size={20} />
+          </button>
+        </div>
       </div>
 
       {/* Tabs — same pill style as Home.jsx/Rankings.jsx's tab rows */}
@@ -1003,16 +1075,6 @@ export default function GerirClube() {
         >
           <Users size={16} />
           Membros
-        </button>
-        <button
-          onClick={() => setActiveTab('settings')}
-          className={`flex-1 py-2.5 px-3 rounded-ctrl text-sm font-extrabold whitespace-nowrap transition-all duration-fast ${
-            activeTab === 'settings'
-              ? 'bg-canvas text-ink-900 shadow-lift border border-line'
-              : 'text-muted hover:text-ink-900'
-          }`}
-        >
-          Definições
         </button>
       </div>
 
@@ -1292,7 +1354,10 @@ export default function GerirClube() {
                 </div>
               )}
 
-              {/* Games List */}
+              {/* Games List — tab switcher + list wrapped in one card, so
+                  they read as a single unit instead of a floating pill row
+                  above a loose stack of cards. */}
+              <div className="card space-y-4">
               <div className="flex gap-1 p-1 bg-ink-50 rounded-ctrl overflow-x-auto">
                 {GAME_FILTERS.map(opt => (
                   <button
@@ -1321,7 +1386,7 @@ export default function GerirClube() {
                     .reduce((n, p) => n + 1 + (p.partner_id ? 1 : 0), 0)
 
                   return (
-                    <div key={game.id} className="card">
+                    <div key={game.id} className="bg-canvas rounded-ctrl border border-line p-4">
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex-1">
                           <h3 className="text-xl font-semibold text-ink-900 mb-2">
@@ -1392,6 +1457,7 @@ export default function GerirClube() {
                     </div>
                   )
                 })}
+              </div>
               </div>
             </div>
           )}
@@ -1472,13 +1538,30 @@ export default function GerirClube() {
             </div>
           )}
 
-          {/* Settings Tab */}
-          {activeTab === 'settings' && settings && (
-            <div className="card">
-              <h3 className="text-xl font-semibold text-ink-900 mb-6">
-                Definições do Grupo
-              </h3>
-              
+          {/* Settings — modal, triggered by the gear icon next to the title
+              (no longer a tab, per the redesign: rename lives inline in the
+              title itself, everything else stays in this overlay). */}
+          {activeTab === 'settings' && settings && createPortal(
+            <div
+              className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-ink-900/70 animate-fade-in"
+              onClick={() => setActiveTab('games')}
+            >
+              <div
+                className="bg-surface rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-lg max-h-[90vh] overflow-y-auto p-6 animate-pop relative"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('games')}
+                  aria-label="Fechar"
+                  className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full text-muted hover:bg-ink-50 hover:text-ink-900 transition-colors duration-fast"
+                >
+                  <X size={18} />
+                </button>
+                <h3 className="text-xl font-semibold text-ink-900 mb-6 pr-8">
+                  Definições do Grupo
+                </h3>
+
               <form onSubmit={handleUpdateSettings} className="space-y-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1816,7 +1899,9 @@ export default function GerirClube() {
                   />
                 </label>
               </div>
-            </div>
+              </div>
+            </div>,
+            document.body
           )}
         </>
       )}

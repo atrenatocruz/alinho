@@ -21,4 +21,8 @@ export const config = {
   port: Number(process.env.PORT) || 8080,
   pairingPhone: process.env.PAIRING_PHONE || null,
   appUrl: process.env.APP_URL || 'https://alinho.pt',
+  // How many hours before a mix's date to send the game-day reminder.
+  reminderHoursBefore: Number(process.env.REMINDER_HOURS_BEFORE) || 3,
+  // Wall-clock hour (Europe/Lisbon) the daily "mixes still open" digest fires at.
+  dailyDigestHour: Number(process.env.DAILY_DIGEST_HOUR) || 10,
 }

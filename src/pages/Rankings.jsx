@@ -1,11 +1,17 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Trophy, Award, ChevronDown, Calendar } from 'lucide-react'
+import { Trophy, Award, Calendar } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { LevelBadge, EmptyState, MixCard, Avatar, Select } from '../components/ui'
 import { winRatePct, buildMonthlyLeaderboard } from '../lib/statsLogic'
 import { getGlobalRankings } from '../lib/privateMatches'
+import { getOrganizationRankings } from '../lib/organizations'
+
+const SECTIONS = [
+  { key: 'players', label: 'Jogadores' },
+  { key: 'orgs', label: 'Clubes & Grupos' },
+]
 
 const TABS = [
   { key: 'global', label: 'Geral' },
@@ -16,13 +22,12 @@ const TABS = [
 
 export default function Rankings() {
   const { profile, currentOrganizationId, currentOrganization } = useAuth()
+  const [section, setSection] = useState('players')
   const [tab, setTab] = useState('global')
   const [loading, setLoading] = useState(true)
 
   // Geral
   const [rankings, setRankings] = useState([])
-  const [players, setPlayers] = useState([])
-  const [showPlayers, setShowPlayers] = useState(false)
 
   // Mensal
   const [monthly, setMonthly] = useState({ months: [], byMonth: {} })
@@ -35,17 +40,22 @@ export default function Rankings() {
   const [globalRankings, setGlobalRankings] = useState([])
   const [globalLoading, setGlobalLoading] = useState(true)
 
+  // Clubes & Grupos
+  const [orgRankings, setOrgRankings] = useState([])
+  const [orgRankingsLoading, setOrgRankingsLoading] = useState(true)
+
   useEffect(() => {
-    // The global ranking is org-independent — it has to load even for a
-    // user who isn't in any club, and `loading` has to resolve for them
-    // too (only loadRankings clears it, and that one needs an org).
+    // The global ranking and the club/group ranking are both org-independent
+    // — they have to load even for a user who isn't in any club, and
+    // `loading` has to resolve for them too (only loadRankings clears it,
+    // and that one needs an org).
     loadGlobalRankings()
+    loadOrgRankings()
     if (!currentOrganizationId) {
       setLoading(false)
       return
     }
     loadRankings()
-    loadPlayers()
     loadMonthly()
     loadMixes()
   }, [currentOrganizationId])
@@ -59,19 +69,6 @@ export default function Rankings() {
       .eq('organization_id', currentOrganizationId)
     if (error) throw error
     return new Map((data || []).map((m) => [m.user_id, m]))
-  }
-
-  const loadPlayers = async () => {
-    try {
-      const membershipByUser = await loadMembershipMap()
-      const list = [...membershipByUser.entries()]
-        .filter(([, m]) => !m.is_guest)
-        .map(([userId, m]) => ({ id: userId, name: m.profile?.name || 'Jogador', level: m.level, avatar_url: m.profile?.avatar_url }))
-        .sort((a, b) => a.name.localeCompare(b.name))
-      setPlayers(list)
-    } catch (error) {
-      console.error('Error loading players:', error)
-    }
   }
 
   const loadRankings = async () => {
@@ -180,6 +177,16 @@ export default function Rankings() {
     }
   }
 
+  const loadOrgRankings = async () => {
+    try {
+      setOrgRankings(await getOrganizationRankings())
+    } catch (error) {
+      console.error('Error loading organization rankings:', error)
+    } finally {
+      setOrgRankingsLoading(false)
+    }
+  }
+
   const isUserJoined = (game) =>
     game.participants?.some(p => p.user_id === profile?.id || p.partner_id === profile?.id)
 
@@ -210,6 +217,23 @@ export default function Rankings() {
         <h2 className="text-3xl text-ink-900">Classificação</h2>
       </div>
 
+      {/* Sections — Jogadores vs Clubes & Grupos */}
+      <div className="flex gap-1 p-1 bg-ink-50 rounded-ctrl">
+        {SECTIONS.map((s) => (
+          <button
+            key={s.key}
+            onClick={() => setSection(s.key)}
+            className={`flex-1 py-2.5 rounded-ctrl text-sm font-extrabold transition-all duration-fast ${
+              section === s.key ? 'bg-canvas text-ink-900 shadow-lift border border-line' : 'text-muted hover:text-ink-900'
+            }`}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      {section === 'players' && (
+      <>
       {/* Tabs */}
       <div className="flex gap-1 p-1 bg-ink-50 rounded-ctrl">
         {TABS.map(t => (
@@ -290,44 +314,6 @@ export default function Rankings() {
               ))}
             </div>
           )}
-
-          {/* Lista de jogadores — collapsible */}
-          <div className="card p-0 overflow-hidden">
-            <button
-              onClick={() => setShowPlayers(v => !v)}
-              aria-expanded={showPlayers}
-              className="w-full flex items-center justify-between px-5 py-4 min-h-[56px] transition-colors duration-fast hover:bg-ink-50"
-            >
-              <span className="text-lg font-extrabold text-ink-900">
-                Lista de jogadores
-                <span className="text-muted font-normal text-sm ml-2">({players.length})</span>
-              </span>
-              <ChevronDown
-                size={20}
-                className={`text-muted transition-transform duration-base ${showPlayers ? 'rotate-180' : ''}`}
-              />
-            </button>
-
-            {showPlayers && (
-              <div className="border-t border-line divide-y divide-line animate-fade-up">
-                {players.length === 0 ? (
-                  <p className="text-muted text-sm text-center py-6">Ainda não há jogadores registados</p>
-                ) : (
-                  players.map(p => (
-                    <Link
-                      key={p.id}
-                      to={`/jogador/${p.id}`}
-                      className="flex items-center gap-3 px-5 py-3 transition-colors duration-fast hover:bg-ink-50"
-                    >
-                      <Avatar name={p.name} url={p.avatar_url} size="w-9 h-9 text-sm" />
-                      <p className="flex-1 min-w-0 font-extrabold text-ink-900 truncate">{p.name}</p>
-                      <LevelBadge level={p.level} />
-                    </Link>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
         </>
       )}
 
@@ -448,6 +434,50 @@ export default function Rankings() {
                   </div>
                   <div className="text-right shrink-0">
                     <span className="text-2xl font-extrabold text-ink-900 tabular-nums">{player.total_points}</span>
+                    <p className="text-[11px] text-muted">pontos</p>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )
+      )}
+      </>
+      )}
+
+      {/* ─── Clubes & Grupos ────────────────────────────────────────────── */}
+      {section === 'orgs' && (
+        orgRankingsLoading ? (
+          <div className="flex items-center justify-center py-16">
+            <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
+          </div>
+        ) : orgRankings.length === 0 ? (
+          <EmptyState
+            icon={Trophy}
+            title="Ranking em branco"
+            subtitle="Assim que um clube ou grupo público tiver jogos, aparece aqui."
+          />
+        ) : (
+          <div className="space-y-3">
+            {orgRankings.map((org, index) => (
+              <Link
+                key={org.id}
+                to={`/clube/${org.slug}`}
+                className={`card press block hover:shadow-lift ${index === 0 ? 'ring-2 ring-lime-400' : ''}`}
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className={`w-11 h-11 rounded-ctrl flex items-center justify-center font-extrabold text-lg shrink-0 tabular-nums ${positionStyle(index)}`}>
+                    {index + 1}
+                  </div>
+                  <Avatar name={org.name} url={org.group_logo_url} size="w-11 h-11 text-sm" />
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-base text-ink-900 truncate">{org.name}</h3>
+                    <p className="text-[11px] text-muted mt-0.5">
+                      {org.kind === 'group' ? 'Grupo' : 'Clube'} · {org.member_count} {org.member_count === 1 ? 'membro' : 'membros'}
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="text-2xl font-extrabold text-ink-900 tabular-nums">{org.total_points}</span>
                     <p className="text-[11px] text-muted">pontos</p>
                   </div>
                 </div>
