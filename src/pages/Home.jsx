@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { MixCard, EmptyState, PrimaryButton, Avatar } from '../components/ui'
 import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
+import { groupGamesBySeries } from '../lib/recurrenceGrouping'
 
 const TABS = [
   { key: 'ativos', label: 'Mixs Ativos' },
@@ -183,25 +184,32 @@ export default function Home() {
   // reverse, for finished) is preserved within each of the two groups.
   const byFavoriteFirst = (a, b) =>
     Number(favoriteOrgIds.has(b.organization_id)) - Number(favoriteOrgIds.has(a.organization_id))
-  const activeGames = games.filter((game) => !isFinished(game)).sort(byFavoriteFirst)
-  const finishedGames = [...games.filter(isFinished)].reverse().sort(byFavoriteFirst)
-  const visibleGames = tab === 'ativos' ? activeGames : finishedGames
+  // One entry per recurring series (its representative occurrence) plus
+  // one per one-off mix — see src/lib/recurrenceGrouping.js. Bucketed into
+  // active/finished by the REPRESENTATIVE's own status, so a series with
+  // a currently active occurrence shows under Ativos even if older
+  // occurrences in the same series already finished.
+  const seriesEntries = groupGamesBySeries(games)
+  const activeEntries = seriesEntries.filter((entry) => !isFinished(entry.game)).sort((a, b) => byFavoriteFirst(a.game, b.game))
+  const finishedEntries = [...seriesEntries.filter((entry) => isFinished(entry.game))].reverse().sort((a, b) => byFavoriteFirst(a.game, b.game))
+  const visibleEntries = tab === 'ativos' ? activeEntries : finishedEntries
 
   // Grouped by club/group when the player belongs to more than one — makes
   // it obvious at a glance whose mix each card belongs to, instead of a
-  // small per-card label buried in a flat list. Preserves visibleGames'
+  // small per-card label buried in a flat list. Preserves visibleEntries'
   // existing order (favorites first, then date) by grouping on first
   // occurrence rather than re-sorting.
   const groupedGames = []
   const gamesByOrgId = new Map()
-  for (const game of visibleGames) {
-    let group = gamesByOrgId.get(game.organization_id)
+  for (const entry of visibleEntries) {
+    const orgId = entry.game.organization_id
+    let group = gamesByOrgId.get(orgId)
     if (!group) {
-      group = { organization_id: game.organization_id, organization: game.organization, games: [] }
-      gamesByOrgId.set(game.organization_id, group)
+      group = { organization_id: orgId, organization: entry.game.organization, entries: [] }
+      gamesByOrgId.set(orgId, group)
       groupedGames.push(group)
     }
-    group.games.push(game)
+    group.entries.push(entry)
   }
 
   if (loading) {
@@ -299,7 +307,7 @@ export default function Home() {
             ))}
           </div>
 
-          {visibleGames.length === 0 ? (
+          {visibleEntries.length === 0 ? (
             tab === 'ativos' ? (
               <EmptyState
                 icon={CalendarX2}
@@ -324,8 +332,8 @@ export default function Home() {
                     </h3>
                   </div>
                   <div className="space-y-3.5">
-                    {group.games.map((game) => (
-                      <MixCard key={game.id} game={game} joined={isUserJoined(game)} showClub={false} />
+                    {group.entries.map((entry) => (
+                      <MixCard key={entry.game.id} game={entry.game} joined={isUserJoined(entry.game)} showClub={false} />
                     ))}
                   </div>
                 </div>
@@ -333,8 +341,8 @@ export default function Home() {
             </div>
           ) : (
             <div className="space-y-3.5">
-              {visibleGames.map(game => (
-                <MixCard key={game.id} game={game} joined={isUserJoined(game)} showClub={false} />
+              {visibleEntries.map((entry) => (
+                <MixCard key={entry.game.id} game={entry.game} joined={isUserJoined(entry.game)} showClub={false} />
               ))}
             </div>
           )}
