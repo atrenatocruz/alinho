@@ -59,6 +59,16 @@ person. The inline panel in `GerirClube.jsx` becomes the primary path; the
 standalone routes stay as a secondary path, with their visibility tightened
 (see §3).
 
+**Why does `follow_organization` need a group-specific branch?**
+It currently refuses any org where `is_global = FALSE` ("Este clube não é
+público") — correct for its original purpose (a stranger joining a public
+club via the directory), but wrong for a group: a group's `is_global` no
+longer drives any visibility decision after this change (§2.5–§2.8), and a
+club member requesting to join a sibling group inside a *private*
+(`is_global = FALSE`) club must still work. The fix is a dedicated branch —
+allowed when the caller already holds a membership in the group's parent
+club, regardless of the group's own `is_global` value.
+
 **Why not restructure `games`/mixes at all?**
 A mix already belongs to exactly one `organization_id`, and a group is just
 another row in `organizations` — creating a mix "for a group" already means
@@ -167,12 +177,72 @@ from `migration_elo_rating.sql`), not per-membership, so `avg_rating` here
 averages each group member's global rating — the same source `GroupLevelBadge`
 already reads elsewhere (per `2026-08-25-elo-ranking-design.md`).
 
-### 2.4 `list_global_organizations()` — MODIFY
+### 2.4 `follow_organization(p_organization_id UUID)` — MODIFY
+
+```sql
+CREATE OR REPLACE FUNCTION follow_organization(p_organization_id UUID)
+RETURNS TEXT AS $$
+DECLARE
+  v_kind TEXT;
+  v_parent_id UUID;
+  v_is_global BOOLEAN;
+  v_open_join BOOLEAN;
+BEGIN
+  SELECT kind, parent_organization_id, is_global, open_join
+    INTO v_kind, v_parent_id, v_is_global, v_open_join
+  FROM organizations WHERE id = p_organization_id;
+
+  IF v_kind IS NULL THEN
+    RAISE EXCEPTION 'Clube não encontrado';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM memberships WHERE user_id = auth.uid() AND organization_id = p_organization_id
+  ) THEN
+    RETURN 'joined';
+  END IF;
+
+  IF v_kind = 'group' AND v_parent_id IS NOT NULL THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM memberships WHERE user_id = auth.uid() AND organization_id = v_parent_id
+    ) THEN
+      RAISE EXCEPTION 'Só membros do clube podem pedir para entrar neste grupo';
+    END IF;
+    -- open_join is always FALSE for club-scoped groups (§2.2) — always the
+    -- request branch, regardless of is_global.
+  ELSE
+    IF NOT v_is_global THEN
+      RAISE EXCEPTION 'Este clube não é público';
+    END IF;
+    IF v_open_join THEN
+      INSERT INTO memberships (user_id, organization_id)
+      VALUES (auth.uid(), p_organization_id)
+      ON CONFLICT (user_id, organization_id) DO NOTHING;
+      RETURN 'joined';
+    END IF;
+  END IF;
+
+  INSERT INTO membership_requests (user_id, organization_id)
+  VALUES (auth.uid(), p_organization_id)
+  ON CONFLICT (user_id, organization_id) WHERE (status = 'pending') DO NOTHING;
+  RETURN 'pending';
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+```
+
+Same signature and return values (`'joined'` / `'pending'`) as today, so
+`followOrganization` in `AuthContext.jsx` needs no change — `GerirClube.jsx`'s
+group panel (§3.1) calls it exactly like `Comunidade.jsx` already does for
+clubs. Independent groups (`parent_organization_id IS NULL`) fall through to
+the unchanged `ELSE` branch — still gated on `is_global`/`open_join` as
+before (out of scope, §6).
+
+### 2.5 `list_global_organizations()` — MODIFY
 
 Add `WHERE o.is_global = TRUE AND o.kind = 'club'`. Groups stop appearing in
 the public directory (Comunidade, Rankings' "Clubes & Grupos") entirely.
 
-### 2.5 `search_organizations(p_query TEXT)` — MODIFY
+### 2.6 `search_organizations(p_query TEXT)` — MODIFY
 
 Same filter: add `AND o.kind = 'club'`. (Superseded either way once
 `list_global_organizations`/`search_organizations` no longer need to carry
@@ -180,7 +250,7 @@ Same filter: add `AND o.kind = 'club'`. (Superseded either way once
 stay in the return shape for forward-compatibility but will always be
 `'club'`/`NULL`/`NULL` after this change.)
 
-### 2.6 `get_organization_rankings()` — MODIFY
+### 2.7 `get_organization_rankings()` — MODIFY
 
 Rankings.jsx's "Clubes & Grupos" tab calls this RPC (`getOrganizationRankings`
 in `src/lib/organizations.js`), not `list_global_organizations` — a separate
@@ -189,7 +259,7 @@ Add `AND o.kind = 'club'` here too, and align its `avg_rating` subquery with
 `list_club_groups` (§2.3) by keeping its existing `m.is_guest = FALSE`
 filter — no other change.
 
-### 2.7 `get_club_profile(p_slug TEXT)` — MODIFY
+### 2.8 `get_club_profile(p_slug TEXT)` — MODIFY
 
 Change the visibility `WHERE` clause to branch on `kind`:
 
@@ -246,15 +316,15 @@ already isolate it correctly.
 
 ### 3.3 `Comunidade.jsx` — drop the "Grupos" section
 
-With `list_global_organizations`/`search_organizations` now club-only (§2.4,
-§2.5), the "Grupos" section of Comunidade naturally renders empty — remove
+With `list_global_organizations`/`search_organizations` now club-only (§2.5,
+§2.6), the "Grupos" section of Comunidade naturally renders empty — remove
 the section and its heading rather than leaving a permanently-empty block.
 Independent groups (§6) are explicitly out of scope, so this section has no
 remaining content to show under any circumstances after this change.
 
 ### 3.4 `Rankings.jsx` — "Clubes & Grupos" tab
 
-Its data source is `get_organization_rankings` (§2.6), not
+Its data source is `get_organization_rankings` (§2.7), not
 `list_global_organizations` — a separate RPC, now also club-only. Rename the
 tab label from "Clubes & Grupos" to "Clubes" and drop the
 `org.kind === 'group' ? 'Grupo' : 'Clube'` branch (always "Clube" now, for
@@ -292,10 +362,11 @@ Contains, in order:
 2. `CREATE OR REPLACE FUNCTION create_group` (§2.2 — `open_join = FALSE` for
    club-scoped groups)
 3. `CREATE FUNCTION list_club_groups` (§2.3)
-4. `CREATE OR REPLACE FUNCTION list_global_organizations` (§2.4)
-5. `CREATE OR REPLACE FUNCTION search_organizations` (§2.5)
-6. `CREATE OR REPLACE FUNCTION get_organization_rankings` (§2.6)
-7. `CREATE OR REPLACE FUNCTION get_club_profile` (§2.7)
+4. `CREATE OR REPLACE FUNCTION follow_organization` (§2.4)
+5. `CREATE OR REPLACE FUNCTION list_global_organizations` (§2.5)
+6. `CREATE OR REPLACE FUNCTION search_organizations` (§2.6)
+7. `CREATE OR REPLACE FUNCTION get_organization_rankings` (§2.7)
+8. `CREATE OR REPLACE FUNCTION get_club_profile` (§2.8)
 
 Per this repo's convention, this file existing in the repo does not mean
 it's live — it must be pasted into Supabase → SQL Editor and run before any
