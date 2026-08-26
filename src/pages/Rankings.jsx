@@ -484,8 +484,7 @@ export default function Rankings() {
                     </p>
                   </div>
                   <div className="text-right shrink-0">
-                    <span className="text-2xl font-extrabold text-ink-900 tabular-nums">{org.total_points}</span>
-                    <p className="text-[11px] text-muted">pontos</p>
+                    <RatingBadge rating={org.avg_rating} size="md" />
                   </div>
                 </div>
               </Link>
