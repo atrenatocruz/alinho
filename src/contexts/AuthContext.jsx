@@ -85,6 +85,9 @@ export const AuthProvider = ({ children }) => {
         setMemberships([])
         setCurrentOrganizationId(null)
         setLoading(false)
+        // A later sign-in is a real "boot" transition, not a background
+        // refresh — let it show the splash again.
+        initialLoadDoneRef.current = false
       }
     })
 
@@ -128,6 +131,13 @@ export const AuthProvider = ({ children }) => {
   // the old code only retried on PGRST116).
   const profileRequestRef = useRef(null)
 
+  // `loading` drives App.jsx's full-screen splash, meant to show once per
+  // app boot. onAuthStateChange calls loadProfile again on every Supabase
+  // auth event though — including a silent background TOKEN_REFRESHED —
+  // and without this guard each of those flipped `loading` true again,
+  // flashing the splash over whatever page was open mid-navigation.
+  const initialLoadDoneRef = useRef(false)
+
   // Backoff schedule for retrying a failed profile load (see the
   // 2026-08-24 Supabase platform incident that intermittently 401'd fresh
   // session JWTs at the API gateway for several seconds at a time) —
@@ -136,11 +146,12 @@ export const AuthProvider = ({ children }) => {
   const PROFILE_RETRY_DELAYS_MS = [700, 1500, 3000]
 
   const loadProfile = (userId, attempt = 0) => {
+    const isInitialLoad = !initialLoadDoneRef.current
     if (attempt === 0) {
       if (profileRequestRef.current?.userId === userId) {
         return profileRequestRef.current.promise
       }
-      setLoading(true)
+      if (isInitialLoad) setLoading(true)
       setProfileError(false)
     }
 
@@ -201,6 +212,7 @@ export const AuthProvider = ({ children }) => {
         })
 
         setLoading(false)
+        initialLoadDoneRef.current = true
       } catch (error) {
         if (attempt < PROFILE_RETRY_DELAYS_MS.length) {
           setTimeout(() => loadProfile(userId, attempt + 1), PROFILE_RETRY_DELAYS_MS[attempt])
@@ -209,6 +221,7 @@ export const AuthProvider = ({ children }) => {
         console.error('Error loading profile:', error)
         setProfileError(true)
         setLoading(false)
+        initialLoadDoneRef.current = true
       } finally {
         if (attempt === 0) {
           profileRequestRef.current = null

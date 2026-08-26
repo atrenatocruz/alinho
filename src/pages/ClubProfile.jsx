@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, Users, UserPlus, Clock, Heart, MapPin, Phone, Instagram, Globe, Calendar, Building2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { getClubProfile } from '../lib/clubProfile'
+import { getClubProfile, listOrganizationMembers } from '../lib/clubProfile'
 import { listClubGroups } from '../lib/organizations'
 import { Avatar, EmptyState, PrimaryButton } from '../components/ui'
 import PadelIcon from '../components/icons/PadelIcon'
@@ -23,6 +23,9 @@ export default function ClubProfile() {
   const [favoriting, setFavoriting] = useState(false)
   const [groups, setGroups] = useState([])
   const [groupActingOn, setGroupActingOn] = useState(null)
+  const [members, setMembers] = useState([])
+  const [membersLoading, setMembersLoading] = useState(false)
+  const [showMembers, setShowMembers] = useState(false)
   // Guards against an in-flight request for a stale slug (or a stale
   // handleFollow/handleUnfollow reload) resolving after a newer one and
   // clobbering state — each load() call captures its own generation and
@@ -51,9 +54,32 @@ export default function ClubProfile() {
   useEffect(() => {
     setLoading(true)
     setNotFound(false)
+    setShowMembers(false)
+    setMembers([])
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug])
+
+  // Loaded on demand (mirrors the "Confrontos diretos" expand pattern) —
+  // previously there was no way to see who the club's members were from
+  // this public page at all, only from the admin "Gerir" panel.
+  const handleToggleMembers = async () => {
+    if (showMembers) {
+      setShowMembers(false)
+      return
+    }
+    setShowMembers(true)
+    if (members.length > 0) return
+    setMembersLoading(true)
+    try {
+      const data = await listOrganizationMembers(club.id)
+      setMembers(data)
+    } catch (error) {
+      console.error('Error loading club members:', error)
+    } finally {
+      setMembersLoading(false)
+    }
+  }
 
   // Only a club member can see its groups (list_club_groups' own gate is
   // club membership) — no point calling it otherwise, it would just return
@@ -170,9 +196,19 @@ export default function ClubProfile() {
         <Avatar name={club.name} url={club.group_logo_url} size="w-16 h-16 text-xl" />
         <div className="flex-1 min-w-0">
           <h2 className="text-2xl text-ink-900 truncate">{club.name}</h2>
-          <p className="text-sm text-muted flex items-center gap-1.5">
-            <Users size={13} /> {club.member_count} {club.member_count === 1 ? 'membro' : 'membros'}
-          </p>
+          {club.member_count > 0 ? (
+            <button
+              type="button"
+              onClick={handleToggleMembers}
+              className="text-sm text-muted flex items-center gap-1.5 hover:underline"
+            >
+              <Users size={13} /> {club.member_count} {club.member_count === 1 ? 'membro' : 'membros'}
+            </button>
+          ) : (
+            <p className="text-sm text-muted flex items-center gap-1.5">
+              <Users size={13} /> {club.member_count} membros
+            </p>
+          )}
         </div>
 
         {club.my_status === 'member' ? (
@@ -196,6 +232,31 @@ export default function ClubProfile() {
           </PrimaryButton>
         )}
       </div>
+
+      {showMembers && (
+        <div className="card p-0 overflow-hidden animate-fade-up">
+          {membersLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-[3px] border-ink-50 border-t-ink-700"></div>
+            </div>
+          ) : members.length === 0 ? (
+            <p className="text-muted text-sm text-center py-6">Sem membros visíveis.</p>
+          ) : (
+            <div className="divide-y divide-line">
+              {members.map((m) => (
+                <Link
+                  key={m.id}
+                  to={`/jogador/${m.id}`}
+                  className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50"
+                >
+                  <Avatar name={m.name} url={m.avatar_url} size="w-9 h-9 text-sm" />
+                  <p className="flex-1 min-w-0 font-extrabold text-ink-900 text-sm truncate">{m.name}</p>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {club.my_status === 'member' && (
         <button

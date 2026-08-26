@@ -5,3 +5,9 @@ export async function getClubProfile(slug) {
   if (error) throw error
   return data?.[0] || null
 }
+
+export async function listOrganizationMembers(organizationId) {
+  const { data, error } = await supabase.rpc('list_organization_members', { p_organization_id: organizationId })
+  if (error) throw error
+  return data || []
+}

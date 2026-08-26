@@ -1831,7 +1831,7 @@ export default function GerirClube() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Contacto do Robot (placeholder)
+                    Contacto do Robot
                   </label>
                   <input
                     type="text"

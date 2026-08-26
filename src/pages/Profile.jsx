@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabase'
 import { hashPhone } from '../lib/hashPhone'
 import { uploadAvatar, removeAvatar } from '../lib/avatarStorage'
 import { getMyPrivateMatches, getGlobalRankings } from '../lib/privateMatches'
-import { listIncomingFriendRequests, acceptFriendRequest, removeFriendRequest, listFriends } from '../lib/friends'
+import { listIncomingFriendRequests, acceptFriendRequest, removeFriendRequest, listFriends, listOutgoingFriendRequests } from '../lib/friends'
 import { listIncomingOrganizationInvites, acceptOrganizationInvite, declineOrganizationInvite } from '../lib/orgInvites'
 import { PrimaryButton, GuestBadge, DateField, Avatar, Select, EmptyState, RankBadge, RatingBadge } from '../components/ui'
 import { formatRating } from '../lib/elo'
@@ -58,6 +58,8 @@ export default function Profile() {
   const [photoError, setPhotoError] = useState('')
   const [friendRequests, setFriendRequests] = useState([])
   const [friendRequestActing, setFriendRequestActing] = useState(null)
+  const [outgoingRequests, setOutgoingRequests] = useState([])
+  const [outgoingRequestActing, setOutgoingRequestActing] = useState(null)
   const [friends, setFriends] = useState([])
   const [friendsLoading, setFriendsLoading] = useState(true)
   const [orgInvites, setOrgInvites] = useState([])
@@ -83,6 +85,7 @@ export default function Profile() {
         loadPrivateMatchHistory()
         loadGlobalPoints()
         loadFriendRequests()
+        loadOutgoingRequests()
         loadFriends()
         loadOrgInvites()
       }
@@ -94,6 +97,27 @@ export default function Profile() {
       setFriendRequests(await listIncomingFriendRequests())
     } catch (error) {
       console.error('Error loading friend requests:', error)
+    }
+  }
+
+  const loadOutgoingRequests = async () => {
+    try {
+      setOutgoingRequests(await listOutgoingFriendRequests())
+    } catch (error) {
+      console.error('Error loading outgoing friend requests:', error)
+    }
+  }
+
+  const handleCancelOutgoingRequest = async (requestId) => {
+    setOutgoingRequestActing(requestId)
+    try {
+      await removeFriendRequest(requestId)
+      setOutgoingRequests((reqs) => reqs.filter((r) => r.id !== requestId))
+    } catch (error) {
+      console.error('Error cancelling friend request:', error)
+      alert('Não foi possível cancelar o pedido. Tenta novamente.')
+    } finally {
+      setOutgoingRequestActing(null)
     }
   }
 
@@ -738,6 +762,29 @@ export default function Profile() {
                   onClick={() => handleDeclineFriendRequest(req.id)}
                   disabled={friendRequestActing === req.id}
                   aria-label="Recusar pedido"
+                  className="w-9 h-9 shrink-0 rounded-full bg-ink-50 text-ink-700 flex items-center justify-center hover:bg-ink-200 transition-colors duration-fast disabled:opacity-40"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Pedidos enviados — sent requests were previously invisible
+            anywhere on the profile until the other person acted on them. */}
+        {outgoingRequests.length > 0 && (
+          <div className="card space-y-3">
+            <p className="text-sm font-extrabold text-ink-900">Pedidos enviados</p>
+            {outgoingRequests.map((req) => (
+              <div key={req.id} className="flex items-center gap-3">
+                <Avatar name={req.addressee_name} url={req.addressee_avatar_url} size="w-10 h-10 text-sm" />
+                <p className="flex-1 min-w-0 font-extrabold text-ink-900 text-sm truncate">{req.addressee_name}</p>
+                <span className="text-[11px] font-extrabold uppercase tracking-wide text-muted shrink-0">Pendente</span>
+                <button
+                  onClick={() => handleCancelOutgoingRequest(req.id)}
+                  disabled={outgoingRequestActing === req.id}
+                  aria-label="Cancelar pedido"
                   className="w-9 h-9 shrink-0 rounded-full bg-ink-50 text-ink-700 flex items-center justify-center hover:bg-ink-200 transition-colors duration-fast disabled:opacity-40"
                 >
                   <X size={16} />

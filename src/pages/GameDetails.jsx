@@ -1165,9 +1165,35 @@ export default function GameDetails() {
         </div>
       )}
 
+      {/* Jump nav — a finished mix stacks stats, duplas per court, then
+          every round in one continuous scroll with no way to skip ahead
+          (e.g. straight to Ronda 4). Plain anchors, no JS: cheap and works
+          even before the page finishes hydrating. */}
+      {game.status === 'finished' && rounds.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-1 px-1">
+          {mixStats.length > 0 && (
+            <a href="#mix-stats" className="shrink-0 text-xs font-extrabold px-3 py-2 min-h-[36px] inline-flex items-center rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast">
+              Estatísticas
+            </a>
+          )}
+          <a href="#mix-duplas" className="shrink-0 text-xs font-extrabold px-3 py-2 min-h-[36px] inline-flex items-center rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast">
+            Duplas
+          </a>
+          {rounds.map((r) => (
+            <a
+              key={r}
+              href={`#mix-ronda-${r}`}
+              className="shrink-0 text-xs font-extrabold px-3 py-2 min-h-[36px] inline-flex items-center rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast"
+            >
+              Ronda {r}
+            </a>
+          ))}
+        </div>
+      )}
+
       {/* Estatísticas do mix — classificação final por pontos */}
       {game.status === 'finished' && mixStats.length > 0 && (
-        <div className="card">
+        <div id="mix-stats" className="card scroll-mt-24">
           <h3 className="text-lg text-ink-900 mb-3">Estatísticas do Mix</h3>
           <div className="space-y-1.5">
             {mixStats.map((s, i) => {
@@ -1223,7 +1249,7 @@ export default function GameDetails() {
       {mixStarted && (
         <>
           {/* Duplas */}
-          <div className="card">
+          <div id="mix-duplas" className="card scroll-mt-24">
             <div
               className="flex items-center justify-between mb-3 cursor-pointer"
               onClick={() => setDuplasExpanded(v => !v)}
@@ -1409,7 +1435,7 @@ export default function GameDetails() {
             const phase = ms[0]?.phase || 'group'
             const isCurrent = r === maxRound && game.status === 'in_progress'
             return (
-              <div key={r} className={`card ${isCurrent ? 'ring-2 ring-lime-400' : ''}`}>
+              <div key={r} id={`mix-ronda-${r}`} className={`card scroll-mt-24 ${isCurrent ? 'ring-2 ring-lime-400' : ''}`}>
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-lg text-ink-900">
                     Ronda {r}

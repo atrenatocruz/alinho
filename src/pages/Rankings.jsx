@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { Trophy, Award, Calendar } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { RatingBadge, GroupLevelBadge, EmptyState, MixCard, Avatar, Select } from '../components/ui'
+import { RatingBadge, GroupLevelBadge, EmptyState, Avatar, Select } from '../components/ui'
 import { formatRating } from '../lib/elo'
 import { winRatePct, buildMonthlyLeaderboard } from '../lib/statsLogic'
 import { getGlobalRankings } from '../lib/privateMatches'
@@ -18,11 +18,10 @@ const TABS = [
   { key: 'global', label: 'Geral' },
   { key: 'geral', label: 'Por Clube' },
   { key: 'mensal', label: 'Mensal' },
-  { key: 'mixes', label: 'Mixes' },
 ]
 
 export default function Rankings() {
-  const { profile, currentOrganizationId, currentOrganization } = useAuth()
+  const { currentOrganizationId, currentOrganization, memberships, switchOrganization } = useAuth()
   const [section, setSection] = useState('players')
   const [tab, setTab] = useState('global')
   const [loading, setLoading] = useState(true)
@@ -33,9 +32,6 @@ export default function Rankings() {
   // Mensal
   const [monthly, setMonthly] = useState({ months: [], byMonth: {} })
   const [selectedMonth, setSelectedMonth] = useState(null)
-
-  // Mixes
-  const [mixes, setMixes] = useState([])
 
   // Global
   const [globalRankings, setGlobalRankings] = useState([])
@@ -58,7 +54,6 @@ export default function Rankings() {
     }
     loadRankings()
     loadMonthly()
-    loadMixes()
   }, [currentOrganizationId])
 
   // level/is_guest live on `memberships` now — this org's membership list,
@@ -128,48 +123,6 @@ export default function Rankings() {
     }
   }
 
-  const loadMixes = async () => {
-    try {
-      const [{ data, error }, membershipByUser] = await Promise.all([
-        supabase
-          .from('games')
-          .select(`
-            *,
-            participants (
-              id, user_id, partner_id, status,
-              user:profiles!participants_user_id_fkey (name, avatar_url, rating),
-              partner:profiles!participants_partner_id_fkey (name, avatar_url, rating)
-            )
-          `)
-          .eq('organization_id', currentOrganizationId)
-          .neq('status', 'cancelled')
-          .neq('status', 'pending')
-          .order('date', { ascending: false }),
-        loadMembershipMap(),
-      ])
-
-      if (error) throw error
-
-      const attach = (person, userId) => {
-        if (!person) return person
-        const m = membershipByUser.get(userId)
-        return { ...person, level: m?.level, is_guest: m?.is_guest ?? false }
-      }
-      const withLevels = (data || []).map((game) => ({
-        ...game,
-        participants: (game.participants || []).map((p) => ({
-          ...p,
-          user: attach(p.user, p.user_id),
-          partner: attach(p.partner, p.partner_id),
-        })),
-      }))
-
-      setMixes(withLevels)
-    } catch (error) {
-      console.error('Error loading mixes:', error)
-    }
-  }
-
   const loadGlobalRankings = async () => {
     try {
       const data = await getGlobalRankings()
@@ -190,9 +143,6 @@ export default function Rankings() {
       setOrgRankingsLoading(false)
     }
   }
-
-  const isUserJoined = (game) =>
-    game.participants?.some(p => p.user_id === profile?.id || p.partner_id === profile?.id)
 
   // Position chip: 1st gets the lime, 2nd/3rd get ink tones, rest neutral
   const positionStyle = (i) => {
@@ -215,7 +165,7 @@ export default function Rankings() {
   return (
     <div className="space-y-5">
       <div>
-        {tab === 'geral' && (
+        {tab === 'geral' && memberships.length <= 1 && (
           <p className="text-muted text-sm mb-0.5">{currentOrganization?.name}</p>
         )}
         <h2 className="text-3xl text-ink-900">Classificação</h2>
@@ -235,6 +185,21 @@ export default function Rankings() {
           </button>
         ))}
       </div>
+
+      {/* Level badges (M6, N5, INI…) show up all over the app with no
+          explanation of what they mean — a native title="" tooltip exists
+          on the badge itself, but that's invisible on a touch screen.
+          <details> keeps this tap-friendly on mobile with zero extra JS. */}
+      <details className="card group">
+        <summary className="text-sm font-extrabold text-ink-900 cursor-pointer select-none list-none flex items-center justify-between">
+          Como funcionam os níveis?
+          <span className="text-muted transition-transform duration-fast group-open:rotate-180">⌄</span>
+        </summary>
+        <p className="text-sm text-muted mt-2">
+          O nível vai de 1 (mais alto) a 6 (mais baixo); abaixo disso aparece "INI" (iniciante). A letra indica o género
+          (M ou F) ou, num clube ou grupo, a média dos membros (N).
+        </p>
+      </details>
 
       {section === 'players' && (
       <>
@@ -256,6 +221,17 @@ export default function Rankings() {
       {/* ─── Geral ──────────────────────────────────────────────────────── */}
       {tab === 'geral' && (
         <>
+          {/* No selector existed anywhere in the app to change which club's
+              ranking this shows — it silently mirrored whatever org happened
+              to be "current", with no visible way to switch. */}
+          {memberships.length > 1 && (
+            <Select
+              value={currentOrganizationId || ''}
+              onChange={switchOrganization}
+              options={memberships.map((m) => ({ value: m.organization_id, label: m.organization?.name }))}
+            />
+          )}
+
           {rankings.length === 0 ? (
             <EmptyState
               icon={Award}
@@ -387,23 +363,6 @@ export default function Rankings() {
             </>
           )}
         </>
-      )}
-
-      {/* ─── Mixes ──────────────────────────────────────────────────────── */}
-      {tab === 'mixes' && (
-        mixes.length === 0 ? (
-          <EmptyState
-            icon={Calendar}
-            title="Sem mixes"
-            subtitle="Ainda não há mixes registados."
-          />
-        ) : (
-          <div className="space-y-3.5">
-            {mixes.map(game => (
-              <MixCard key={game.id} game={game} joined={isUserJoined(game)} />
-            ))}
-          </div>
-        )
       )}
 
       {/* ─── Global ─────────────────────────────────────────────────────── */}

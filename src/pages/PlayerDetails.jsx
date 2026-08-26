@@ -279,12 +279,15 @@ export default function PlayerDetails() {
           </p>
           {!player.my_profile && (
             player.friendship_status === 'friends' ? (
+              // Label reads as an action ("Deixar de seguir"), not "Amigos" —
+              // sharing that word with the "amigos" count right above it read
+              // as one navigable element ("view friends list") instead of two.
               <button
-                onClick={() => handleRemoveFriendship(`Deixar de ser amigo de ${player.name}?`)}
+                onClick={() => handleRemoveFriendship(`Deixar de seguir ${player.name}? Se mudares de ideias, vais ter de enviar um novo pedido de amizade.`)}
                 disabled={friendActing}
                 className="mt-3 inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors duration-fast disabled:opacity-40"
               >
-                <UserCheck size={14} /> Amigos
+                <UserCheck size={14} /> Deixar de seguir
               </button>
             ) : player.friendship_status === 'pending_sent' ? (
               <button
@@ -392,7 +395,11 @@ export default function PlayerDetails() {
               className="w-full flex items-center gap-3 px-4 py-3.5 min-h-[56px] transition-colors duration-fast hover:bg-ink-50"
             >
               <Avatar name={player.name} url={player.avatar_url} size="w-9 h-9 text-sm" />
-              <p className="flex-1 min-w-0 text-left font-extrabold text-ink-900 truncate">{player.name}</p>
+              {/* h2h.wins/losses is always the viewer's own record (the RPC
+                  compares auth.uid() vs this player) — labelling the row with
+                  just this player's name made it read as his record against
+                  himself instead of the viewer's record against him. */}
+              <p className="flex-1 min-w-0 text-left font-extrabold text-ink-900 truncate">Tu vs. {player.name}</p>
               <span className="text-sm font-extrabold tabular-nums shrink-0">
                 <span className="text-ok">{h2h.wins}V</span>
                 <span className="text-muted"> – </span>
