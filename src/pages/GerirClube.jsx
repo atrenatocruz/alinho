@@ -125,6 +125,7 @@ export default function GerirClube() {
 
   // Form states
   const [gameForm, setGameForm] = useState(EMPTY_GAME_FORM)
+  const [mixScopeId, setMixScopeId] = useState('')
   const locationInputRef = useRef(null)
   const clubLocationInputRef = useRef(null)
   const clubLogoInputRef = useRef(null)
@@ -684,7 +685,7 @@ export default function GerirClube() {
         .insert([
           {
             ...gameFields,
-            organization_id: currentOrganizationId,
+            organization_id: mixScopeId || currentOrganizationId,
             // datetime-local is Portugal wall-clock; store the real instant
             date: new Date(gameForm.date).toISOString(),
             num_courts: numCourts,
@@ -709,6 +710,7 @@ export default function GerirClube() {
 
       setShowCreateGame(false)
       setGameForm(EMPTY_GAME_FORM)
+      setMixScopeId('')
       loadGames()
     } catch (error) {
       console.error('Error creating game:', error)
@@ -1254,6 +1256,24 @@ export default function GerirClube() {
                     {editingGame ? 'Editar jogo' : 'Criar novo jogo'}
                   </h3>
                   <form onSubmit={editingGame ? handleUpdateGame : handleCreateGame} className="space-y-4">
+                    {!editingGame && clubGroups.some((g) => g.can_manage) && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Âmbito
+                        </label>
+                        <select
+                          value={mixScopeId}
+                          onChange={(e) => setMixScopeId(e.target.value)}
+                          className="input-field"
+                        >
+                          <option value="">Todo o clube</option>
+                          {clubGroups.filter((g) => g.can_manage).map((g) => (
+                            <option key={g.id} value={g.id}>{g.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Título
@@ -1496,6 +1516,7 @@ export default function GerirClube() {
                           setShowCreateGame(false)
                           setEditingGame(null)
                           setGameForm(EMPTY_GAME_FORM)
+                          setMixScopeId('')
                         }}
                         className="btn-secondary flex-1"
                       >
