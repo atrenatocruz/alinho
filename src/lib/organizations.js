@@ -18,6 +18,12 @@ export const getOrganizationRankings = async () => {
   return data || []
 }
 
+export const listClubGroups = async (clubId) => {
+  const { data, error } = await supabase.rpc('list_club_groups', { p_club_id: clubId })
+  if (error) throw error
+  return data || []
+}
+
 // RLS on membership_requests already scopes SELECT to: rows the caller owns
 // (user_id = auth.uid()) OR rows for an org the caller admins (is_org_admin).
 // Excluding the caller's own outgoing requests leaves exactly the incoming
