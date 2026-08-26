@@ -44,7 +44,7 @@ AS $$
     ) AS avg_rating
   FROM organizations o
   WHERE o.is_global = TRUE
-  ORDER BY total_points DESC, o.name;
+  ORDER BY avg_rating DESC NULLS LAST, o.name;
 $$;
 
 REVOKE ALL ON FUNCTION get_organization_rankings() FROM public;
