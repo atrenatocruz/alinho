@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react'
-import { createPortal } from 'react-dom'
 import { useParams, Link } from 'react-router-dom'
 import { Plus, Calendar, Users, Trash2, Edit2, Check, X, UserX, Repeat, Clock, ArrowLeft, Camera, Settings } from 'lucide-react'
 import { supabase } from '../lib/supabase'
@@ -857,7 +856,6 @@ export default function GerirClube() {
           instagram: settings.instagram,
           website: settings.website,
           group_logo_url: settings.group_logo_url,
-          points_rules: settings.points_rules,
           is_global: settings.is_global,
           open_join: settings.open_join,
         })
@@ -1061,36 +1059,39 @@ export default function GerirClube() {
         </div>
       </div>
 
-      {/* Tabs — same pill style as Home.jsx/Rankings.jsx's tab rows */}
-      <div className="flex gap-1 p-1 bg-ink-50 rounded-ctrl overflow-x-auto">
-        <button
-          onClick={() => setActiveTab('games')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-ctrl text-sm font-extrabold whitespace-nowrap transition-all duration-fast ${
-            activeTab === 'games'
-              ? 'bg-canvas text-ink-900 shadow-lift border border-line'
-              : 'text-muted hover:text-ink-900'
-          }`}
-        >
-          <Calendar size={16} />
-          Jogos
-        </button>
-        <button
-          onClick={() => setActiveTab('members')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-ctrl text-sm font-extrabold whitespace-nowrap transition-all duration-fast ${
-            activeTab === 'members'
-              ? 'bg-canvas text-ink-900 shadow-lift border border-line'
-              : 'text-muted hover:text-ink-900'
-          }`}
-        >
-          <Users size={16} />
-          Membros
-          {requests.length > 0 && (
-            <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-lime-400 text-ink-900 text-[11px] font-extrabold tabular-nums">
-              {requests.length}
-            </span>
-          )}
-        </button>
-      </div>
+      {/* Tabs — same pill style as Home.jsx/Rankings.jsx's tab rows.
+          Hidden while the settings page is open (it isn't one of the tabs). */}
+      {activeTab !== 'settings' && (
+        <div className="flex gap-1 p-1 bg-ink-50 rounded-ctrl overflow-x-auto">
+          <button
+            onClick={() => setActiveTab('games')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-ctrl text-sm font-extrabold whitespace-nowrap transition-all duration-fast ${
+              activeTab === 'games'
+                ? 'bg-canvas text-ink-900 shadow-lift border border-line'
+                : 'text-muted hover:text-ink-900'
+            }`}
+          >
+            <Calendar size={16} />
+            Jogos
+          </button>
+          <button
+            onClick={() => setActiveTab('members')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-ctrl text-sm font-extrabold whitespace-nowrap transition-all duration-fast ${
+              activeTab === 'members'
+                ? 'bg-canvas text-ink-900 shadow-lift border border-line'
+                : 'text-muted hover:text-ink-900'
+            }`}
+          >
+            <Users size={16} />
+            Membros
+            {requests.length > 0 && (
+              <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-lime-400 text-ink-900 text-[11px] font-extrabold tabular-nums">
+                {requests.length}
+              </span>
+            )}
+          </button>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-12">
@@ -1592,29 +1593,22 @@ export default function GerirClube() {
             </div>
           )}
 
-          {/* Settings — modal, triggered by the gear icon next to the title
-              (no longer a tab, per the redesign: rename lives inline in the
-              title itself, everything else stays in this overlay). */}
-          {activeTab === 'settings' && settings && createPortal(
-            <div
-              className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-ink-900/70 animate-fade-in"
-              onClick={() => setActiveTab('games')}
-            >
-              <div
-                className="bg-surface rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-lg max-h-[90vh] overflow-y-auto p-6 animate-pop relative"
-                onClick={(e) => e.stopPropagation()}
+          {/* Settings — a normal in-place page, triggered by the gear icon
+              next to the title (rename lives inline in the title itself,
+              everything else lives here). Back button returns to Jogos
+              instead of closing an overlay. */}
+          {activeTab === 'settings' && settings && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setActiveTab('games')}
+                className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline mb-4"
               >
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('games')}
-                  aria-label="Fechar"
-                  className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full text-muted hover:bg-ink-50 hover:text-ink-900 transition-colors duration-fast"
-                >
-                  <X size={18} />
-                </button>
-                <h3 className="text-xl font-semibold text-ink-900 mb-6 pr-8">
-                  Definições do Grupo
-                </h3>
+                <ArrowLeft size={16} /> Voltar
+              </button>
+              <h3 className="text-xl font-semibold text-ink-900 mb-6">
+                Definições do Grupo
+              </h3>
 
               <form onSubmit={handleUpdateSettings} className="space-y-6">
                 <div>
@@ -1766,74 +1760,6 @@ export default function GerirClube() {
 
                 <div className="pt-2 border-t border-gray-200">
                   <h4 className="text-base font-semibold text-ink-900 mt-6 mb-1">
-                    Sistema de pontos
-                  </h4>
-                  <p className="text-sm text-gray-500 mb-4">
-                    Pontos atribuídos a cada jogador quando um mix é finalizado. Alterar
-                    estes valores só afeta mixes finalizados a partir de agora.
-                  </p>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Por jogo disputado
-                      </label>
-                      <input
-                        type="number" min="0"
-                        value={settings.points_rules?.point_per_match_played ?? 0}
-                        onChange={(e) => setSettings({
-                          ...settings,
-                          points_rules: { ...settings.points_rules, point_per_match_played: parseInt(e.target.value, 10) || 0 }
-                        })}
-                        className="input-field"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Por jogo ganho
-                      </label>
-                      <input
-                        type="number" min="0"
-                        value={settings.points_rules?.point_per_match_win ?? 0}
-                        onChange={(e) => setSettings({
-                          ...settings,
-                          points_rules: { ...settings.points_rules, point_per_match_win: parseInt(e.target.value, 10) || 0 }
-                        })}
-                        className="input-field"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Por participar num mix
-                      </label>
-                      <input
-                        type="number" min="0"
-                        value={settings.points_rules?.point_per_mix_participation ?? 0}
-                        onChange={(e) => setSettings({
-                          ...settings,
-                          points_rules: { ...settings.points_rules, point_per_mix_participation: parseInt(e.target.value, 10) || 0 }
-                        })}
-                        className="input-field"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Por ganhar o mix
-                      </label>
-                      <input
-                        type="number" min="0"
-                        value={settings.points_rules?.point_per_mix_win ?? 0}
-                        onChange={(e) => setSettings({
-                          ...settings,
-                          points_rules: { ...settings.points_rules, point_per_mix_win: parseInt(e.target.value, 10) || 0 }
-                        })}
-                        className="input-field"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-2 border-t border-gray-200">
-                  <h4 className="text-base font-semibold text-ink-900 mt-6 mb-1">
                     Visibilidade pública
                   </h4>
                   <p className="text-sm text-gray-500 mb-4">
@@ -1932,30 +1858,30 @@ export default function GerirClube() {
                 </div>
               )}
 
-              <div className="mt-6 pt-6 border-t border-gray-200">
-                <h4 className="text-base font-semibold text-ink-900 mb-1">
-                  Funcionalidades da app
-                </h4>
-                <p className="text-sm text-gray-500 mb-4">
-                  Afeta todos os clubes — não é específico deste grupo.
-                </p>
-                <label className="flex items-center justify-between gap-4 p-3 rounded-ctrl border border-line">
-                  <div>
-                    <p className="font-extrabold text-ink-900 text-sm">Jogo entre amigos</p>
-                    <p className="text-[11px] text-muted">Permite criar jogos 2x2 fora do clube</p>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={isPrivateMatchesEnabled}
-                    disabled={savingFlag}
-                    onChange={handleTogglePrivateMatches}
-                    className="w-5 h-5 shrink-0"
-                  />
-                </label>
-              </div>
-              </div>
-            </div>,
-            document.body
+              {currentUser?.is_platform_admin && (
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <h4 className="text-base font-semibold text-ink-900 mb-1">
+                    Funcionalidades da app
+                  </h4>
+                  <p className="text-sm text-gray-500 mb-4">
+                    Afeta todos os clubes — não é específico deste grupo.
+                  </p>
+                  <label className="flex items-center justify-between gap-4 p-3 rounded-ctrl border border-line">
+                    <div>
+                      <p className="font-extrabold text-ink-900 text-sm">Jogo entre amigos</p>
+                      <p className="text-[11px] text-muted">Permite criar jogos 2x2 fora do clube</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={isPrivateMatchesEnabled}
+                      disabled={savingFlag}
+                      onChange={handleTogglePrivateMatches}
+                      className="w-5 h-5 shrink-0"
+                    />
+                  </label>
+                </div>
+              )}
+            </div>
           )}
         </>
       )}
