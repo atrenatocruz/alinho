@@ -40,13 +40,15 @@ export default function Home() {
   }
 
   // Invite links carry ?org=<slug>, but that's normally only consumed by
-  // the /login page — someone who's already signed in (with no club yet)
-  // gets redirected straight past /login to here without it ever being
-  // read. Pick it up here too, so an invite link works for an existing,
-  // club-less session, not just a fresh signup.
+  // the /login page — someone who's already signed in gets redirected
+  // straight past /login to here without it ever being read. Pick it up
+  // here too, so an invite link works for any existing session, not just
+  // a fresh signup — join_organization is idempotent and doesn't change
+  // which club is currently selected, so it's safe even for someone
+  // who's already a member elsewhere.
   useEffect(() => {
     const orgSlug = searchParams.get('org')
-    if (orgSlug && !currentOrganizationId) {
+    if (orgSlug) {
       handleJoin(orgSlug)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
