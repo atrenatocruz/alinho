@@ -7,12 +7,14 @@ import { hashPhone } from '../lib/hashPhone'
 import { uploadAvatar, removeAvatar } from '../lib/avatarStorage'
 import { getMyPrivateMatches, getGlobalRankings } from '../lib/privateMatches'
 import { listIncomingFriendRequests, acceptFriendRequest, removeFriendRequest, listFriends } from '../lib/friends'
+import { listIncomingOrganizationInvites, acceptOrganizationInvite, declineOrganizationInvite } from '../lib/orgInvites'
 import { PrimaryButton, GuestBadge, DateField, Avatar, Select, EmptyState, RankBadge, RatingBadge } from '../components/ui'
 import { formatRating } from '../lib/elo'
 
 const TABS = [
   { key: 'perfil', label: 'Perfil' },
   { key: 'amigos', label: 'Amigos' },
+  { key: 'convites', label: 'Convites' },
   { key: 'historico', label: 'Histórico' },
 ]
 
@@ -23,7 +25,7 @@ const VISIBILITY_OPTIONS = [
 ]
 
 export default function Profile() {
-  const { profile, updateProfile, currentOrganizationId, isGuest, signOut } = useAuth()
+  const { profile, updateProfile, currentOrganizationId, isGuest, signOut, refreshMemberships } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [tab, setTab] = useState(() => (TABS.some((t) => t.key === searchParams.get('tab')) ? searchParams.get('tab') : 'perfil'))
@@ -58,6 +60,9 @@ export default function Profile() {
   const [friendRequestActing, setFriendRequestActing] = useState(null)
   const [friends, setFriends] = useState([])
   const [friendsLoading, setFriendsLoading] = useState(true)
+  const [orgInvites, setOrgInvites] = useState([])
+  const [orgInvitesLoading, setOrgInvitesLoading] = useState(true)
+  const [orgInviteActing, setOrgInviteActing] = useState(null)
   const fileInputRef = useRef(null)
 
   useEffect(() => {
@@ -79,6 +84,7 @@ export default function Profile() {
         loadGlobalPoints()
         loadFriendRequests()
         loadFriends()
+        loadOrgInvites()
       }
     }
   }, [profile, currentOrganizationId])
@@ -126,6 +132,44 @@ export default function Profile() {
       alert('Não foi possível recusar o pedido. Tenta novamente.')
     } finally {
       setFriendRequestActing(null)
+    }
+  }
+
+  const loadOrgInvites = async () => {
+    setOrgInvitesLoading(true)
+    try {
+      setOrgInvites(await listIncomingOrganizationInvites())
+    } catch (error) {
+      console.error('Error loading organization invites:', error)
+    } finally {
+      setOrgInvitesLoading(false)
+    }
+  }
+
+  const handleAcceptOrgInvite = async (inviteId) => {
+    setOrgInviteActing(inviteId)
+    try {
+      await acceptOrganizationInvite(inviteId)
+      setOrgInvites((invs) => invs.filter((i) => i.id !== inviteId))
+      await refreshMemberships()
+    } catch (error) {
+      console.error('Error accepting organization invite:', error)
+      alert('Não foi possível aceitar o convite. Tenta novamente.')
+    } finally {
+      setOrgInviteActing(null)
+    }
+  }
+
+  const handleDeclineOrgInvite = async (inviteId) => {
+    setOrgInviteActing(inviteId)
+    try {
+      await declineOrganizationInvite(inviteId)
+      setOrgInvites((invs) => invs.filter((i) => i.id !== inviteId))
+    } catch (error) {
+      console.error('Error declining organization invite:', error)
+      alert('Não foi possível recusar o convite. Tenta novamente.')
+    } finally {
+      setOrgInviteActing(null)
     }
   }
 
@@ -728,6 +772,48 @@ export default function Profile() {
           </div>
         )}
         </>
+      )}
+
+      {tab === 'convites' && (
+        orgInvitesLoading ? (
+          <div className="flex items-center justify-center py-16">
+            <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
+          </div>
+        ) : orgInvites.length === 0 ? (
+          <EmptyState
+            icon={Users}
+            title="Sem convites pendentes"
+            subtitle="Convites de admins de clube para te juntares aparecem aqui."
+          />
+        ) : (
+          <div className="card space-y-3">
+            {orgInvites.map((inv) => (
+              <div key={inv.id} className="flex items-center gap-3">
+                <Avatar name={inv.organization_name} url={inv.organization_logo_url} size="w-10 h-10 text-sm" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-extrabold text-ink-900 text-sm truncate">{inv.organization_name}</p>
+                  <p className="text-xs text-muted truncate">Convidado por {inv.invited_by_name}</p>
+                </div>
+                <button
+                  onClick={() => handleAcceptOrgInvite(inv.id)}
+                  disabled={orgInviteActing === inv.id}
+                  aria-label="Aceitar convite"
+                  className="w-9 h-9 shrink-0 rounded-full bg-lime-400 text-ink-900 flex items-center justify-center hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
+                >
+                  <UserCheck size={16} />
+                </button>
+                <button
+                  onClick={() => handleDeclineOrgInvite(inv.id)}
+                  disabled={orgInviteActing === inv.id}
+                  aria-label="Recusar convite"
+                  className="w-9 h-9 shrink-0 rounded-full bg-ink-50 text-ink-700 flex items-center justify-center hover:bg-ink-200 transition-colors duration-fast disabled:opacity-40"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )
       )}
 
       {tab === 'historico' && (
