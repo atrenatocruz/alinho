@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { MapPin, CheckCircle2, ChevronRight, ChevronDown, ChevronLeft, Lock, Play, Calendar, X, Share2, MessageCircle, Link2, ImageDown, Trophy, Repeat } from 'lucide-react'
 import ShareCard, { CARD_W, CARD_H } from './ShareCard'
-import { ratingBand } from '../lib/elo'
+import { ratingBand, groupRatingBand } from '../lib/elo'
 
 /* ─── Date fields ────────────────────────────────────────────────────────
    Native <input type=date/datetime-local> pickers open reliably on iOS
@@ -333,39 +333,14 @@ export function DateTimeField({ value, onChange, placeholder = 'Seleciona data e
 
 /* ════════════════════════════════════════════════════════════════════════
    UI kit — alinho
-   Reusable components: PrimaryButton, LevelBadge, PlayerAvatarRow,
+   Reusable components: PrimaryButton, RatingBadge, PlayerAvatarRow,
    EmptyState, MixCard. Design tokens live in src/index.css.
    ════════════════════════════════════════════════════════════════════════ */
 
-/* ─── Level helpers ──────────────────────────────────────────────────────
-   One canonical mapping so a level is never ambiguous anywhere in the app. */
-const LEVEL_META = {
-  iniciante:    { label: 'INI', full: 'Iniciante',  rank: 1 },
-  N6:           { label: 'N6',  full: 'Nível 6',    rank: 2 },
-  N5:           { label: 'N5',  full: 'Nível 5',    rank: 3 },
-  'intermédio': { label: 'INT', full: 'Intermédio', rank: 3 },
-  N4:           { label: 'N4',  full: 'Nível 4',    rank: 4 },
-  N3:           { label: 'N3',  full: 'Nível 3',    rank: 5 },
-  'avançado':   { label: 'AVA', full: 'Avançado',   rank: 5 },
-  N2:           { label: 'N2',  full: 'Nível 2',    rank: 6 },
-}
-
-export const levelMeta = (level) =>
-  LEVEL_META[level] || { label: '—', full: 'Sem nível', rank: 0 }
-
-/** Range string for a set of players, e.g. "INT – AVA" or "INT". */
-export const levelRange = (levels) => {
-  const known = levels.map(levelMeta).filter(m => m.rank > 0)
-  if (known.length === 0) return null
-  const sorted = [...known].sort((a, b) => a.rank - b.rank)
-  const lo = sorted[0].label
-  const hi = sorted[sorted.length - 1].label
-  return lo === hi ? lo : `${lo} – ${hi}`
-}
-
 /* ─── BadgePill ──────────────────────────────────────────────────────────
-   Pill partilhado por LevelBadge e RatingBadge — as duas famílias de badge
-   têm de se manter visualmente idênticas, por isso o markup vive uma vez. */
+   Pill partilhado por RatingBadge e GroupLevelBadge — as várias famílias
+   de badge têm de se manter visualmente idênticas, por isso o markup vive
+   uma vez. */
 function BadgePill({ text, title, me = false, size = 'sm' }) {
   const sizes = {
     sm: 'text-[11px] px-2 py-0.5',
@@ -384,13 +359,21 @@ function BadgePill({ text, title, me = false, size = 'sm' }) {
 }
 
 /* ─── RatingBadge ────────────────────────────────────────────────────────
-   Banda pública do Elo (M6, F4, INI…) — mesmo visual do LevelBadge, mas
-   derivada do rating em vez do nível auto-declarado. Não renderiza nada
+   Banda pública do Elo (M6, F4, INI…), derivada do rating do jogador. Não renderiza nada
    para contas ainda sem rating. */
 export function RatingBadge({ rating, gender, me = false, size = 'sm' }) {
   const band = ratingBand(rating, gender)
   if (!band) return null
   return <BadgePill text={band.label} title={band.full} me={me} size={size} />
+}
+
+/* ─── GroupLevelBadge ────────────────────────────────────────────────────
+   Mesmo visual do RatingBadge, mas para a média de um clube/grupo (prefixo
+   N em vez de M/F — ver groupRatingBand). Não renderiza nada sem rating. */
+export function GroupLevelBadge({ rating, size = 'sm' }) {
+  const band = groupRatingBand(rating)
+  if (!band) return null
+  return <BadgePill text={band.label} title={band.full} size={size} />
 }
 
 /* ─── PrimaryButton ──────────────────────────────────────────────────────
@@ -415,15 +398,6 @@ export function PrimaryButton({ variant = 'lime', className = '', children, ...p
       {children}
     </button>
   )
-}
-
-/* ─── LevelBadge ─────────────────────────────────────────────────────────
-   Impossible to misread: bold label on ink. `me` gets the lime treatment.
-   Pass `range` (string) instead of `level` for a level range. */
-export function LevelBadge({ level, range, me = false, size = 'sm' }) {
-  const text = range ?? levelMeta(level).label
-  const title = range ? `Níveis ${range}` : levelMeta(level).full
-  return <BadgePill text={text} title={title} me={me} size={size} />
 }
 
 /* ─── RankBadge ──────────────────────────────────────────────────────────
@@ -562,12 +536,15 @@ export function MixCard({ game, joined = false, showClub = false }) {
   const players = (game.participants || [])
     .filter(p => p.status === 'confirmed')
     .flatMap(p => [
-      { id: p.user_id, name: p.user?.name, level: p.user?.level, isGuest: p.user?.is_guest, avatar_url: p.user?.avatar_url },
-      ...(p.partner_id ? [{ id: p.partner_id, name: p.partner?.name, level: p.partner?.level, isGuest: p.partner?.is_guest, avatar_url: p.partner?.avatar_url }] : []),
+      { id: p.user_id, name: p.user?.name, rating: p.user?.rating, isGuest: p.user?.is_guest, avatar_url: p.user?.avatar_url },
+      ...(p.partner_id ? [{ id: p.partner_id, name: p.partner?.name, rating: p.partner?.rating, isGuest: p.partner?.is_guest, avatar_url: p.partner?.avatar_url }] : []),
     ])
 
-  // Guests count as players but their (default) level shouldn't skew the range
-  const range = levelRange(players.filter(p => !p.isGuest).map(p => p.level))
+  // Guests count as players but their rating shouldn't skew the group level
+  const ratedPlayers = players.filter(p => !p.isGuest && p.rating != null)
+  const avgRating = ratedPlayers.length > 0
+    ? ratedPlayers.reduce((sum, p) => sum + p.rating, 0) / ratedPlayers.length
+    : null
   // A full game reads as closed even if the stored status lagged behind
   const capacity = game.max_players || (game.num_courts || 1) * 4
   const isFull = players.length >= capacity
@@ -636,7 +613,7 @@ export function MixCard({ game, joined = false, showClub = false }) {
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pt-3 border-t border-line">
         <div className="flex items-center gap-3 min-w-0">
           <PlayerAvatarRow players={players} max={game.max_players} size="sm" />
-          {range && <LevelBadge range={range} />}
+          <GroupLevelBadge rating={avgRating} />
         </div>
         {game.status === 'open' && !joined && !isFull && (
           <span className="ml-auto inline-flex items-center gap-0.5 text-ink-700 text-sm font-extrabold">

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { Trophy, Award, Calendar } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { RatingBadge, EmptyState, MixCard, Avatar, Select } from '../components/ui'
+import { RatingBadge, GroupLevelBadge, EmptyState, MixCard, Avatar, Select } from '../components/ui'
 import { formatRating } from '../lib/elo'
 import { winRatePct, buildMonthlyLeaderboard } from '../lib/statsLogic'
 import { getGlobalRankings } from '../lib/privateMatches'
@@ -137,8 +137,8 @@ export default function Rankings() {
             *,
             participants (
               id, user_id, partner_id, status,
-              user:profiles!participants_user_id_fkey (name, avatar_url),
-              partner:profiles!participants_partner_id_fkey (name, avatar_url)
+              user:profiles!participants_user_id_fkey (name, avatar_url, rating),
+              partner:profiles!participants_partner_id_fkey (name, avatar_url, rating)
             )
           `)
           .eq('organization_id', currentOrganizationId)
@@ -484,7 +484,8 @@ export default function Rankings() {
                     </p>
                   </div>
                   <div className="text-right shrink-0">
-                    <RatingBadge rating={org.avg_rating} size="md" />
+                    <p className="text-[11px] text-muted mb-1">Nível do Grupo</p>
+                    <GroupLevelBadge rating={org.avg_rating} size="md" />
                   </div>
                 </div>
               </Link>

@@ -29,6 +29,16 @@ export function ratingBand(rating, gender) {
   return { label: `${prefix}${band.num}`, full: `Nível ${prefix}${band.num}` }
 }
 
+/** Banda de um clube/grupo (média do Elo dos membros) — mesmas bandas que
+    ratingBand, mas com prefixo 'N' fixo em vez de M/F: não faz sentido
+    atribuir um género a uma média de clube. */
+export function groupRatingBand(rating) {
+  if (rating == null) return null
+  const band = BANDS.find((b) => rating >= b.min)
+  if (!band) return { label: 'NINI', full: 'Nível Iniciante' }
+  return { label: `N${band.num}`, full: `Nível N${band.num}` }
+}
+
 export const formatRating = (rating) => (rating == null ? '—' : String(Math.round(rating)))
 
 // Níveis do ecrã de auto-classificação (primeiro registo). As keys são o

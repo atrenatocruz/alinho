@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { ArrowLeft, Trophy, Target, Award, Swords, ChevronDown, UserPlus, UserCheck, Clock, Lock, ShieldCheck } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { PrimaryButton, LevelBadge, EmptyState, Avatar, RankBadge, RatingBadge } from '../components/ui'
+import { PrimaryButton, EmptyState, Avatar, RankBadge, RatingBadge } from '../components/ui'
 import { formatRating } from '../lib/elo'
 import { winRatePct } from '../lib/statsLogic'
 import { sendFriendRequest, acceptFriendRequest, removeFriendRequest } from '../lib/friends'
@@ -264,13 +264,6 @@ export default function PlayerDetails() {
             <Avatar name={player.name} url={player.avatar_url} size="w-20 h-20 text-3xl" colorClass="bg-lime-400 text-ink-900" />
           </div>
           <h2 className="text-2xl text-white">{player.name}</h2>
-          {/* level is only ever populated when the viewer shares a club
-              with this player — club-scoped and meaningless otherwise */}
-          {player.level && (
-            <div className="mt-2.5">
-              <LevelBadge level={player.level} size="md" />
-            </div>
-          )}
           {/* Same privacy gate as the stat tiles below — results_visibility
               controls both, so no point showing a rank derived from hidden
               points. globalRank is null when the player has no ranked
