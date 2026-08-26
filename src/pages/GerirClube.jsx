@@ -126,6 +126,7 @@ export default function GerirClube() {
   // Form states
   const [gameForm, setGameForm] = useState(EMPTY_GAME_FORM)
   const [mixScopeId, setMixScopeId] = useState('')
+  const [createdMixScope, setCreatedMixScope] = useState(null)
   const locationInputRef = useRef(null)
   const clubLocationInputRef = useRef(null)
   const clubLogoInputRef = useRef(null)
@@ -230,10 +231,18 @@ export default function GerirClube() {
 
   // Only clubs contain groups — a group's own Gerir page has none of its
   // own (create_group rejects a group as a parent), so this stays empty
-  // there and the scope picker in the create-game form (Task 4) never
-  // renders on a group's own page either.
+  // there and the scope picker in the create-game form never renders on a
+  // group's own page either. GerirClube doesn't remount when navigating
+  // from a club's page to one of its groups' pages (same route, `slug`
+  // just changes) — without the else branch here, clubGroups/mixScopeId
+  // would keep the PARENT club's data after that navigation.
   useEffect(() => {
-    if (currentOrganizationId && org?.kind !== 'group') loadClubGroups()
+    if (currentOrganizationId && org?.kind !== 'group') {
+      loadClubGroups()
+    } else {
+      setClubGroups([])
+      setMixScopeId('')
+    }
   }, [currentOrganizationId, org?.kind])
 
   const loadClubGroups = async () => {
@@ -708,9 +717,11 @@ export default function GerirClube() {
         await createRecurrence(data[0], recurrence, user.id)
       }
 
+      const scopedGroup = mixScopeId ? clubGroups.find((g) => g.id === mixScopeId) : null
       setShowCreateGame(false)
       setGameForm(EMPTY_GAME_FORM)
       setMixScopeId('')
+      setCreatedMixScope(scopedGroup ? { name: scopedGroup.name, slug: scopedGroup.slug } : null)
       loadGames()
     } catch (error) {
       console.error('Error creating game:', error)
@@ -1242,12 +1253,26 @@ export default function GerirClube() {
           {activeTab === 'games' && (
             <div className="space-y-4">
               <button
-                onClick={() => setShowCreateGame(true)}
+                onClick={() => { setShowCreateGame(true); setCreatedMixScope(null) }}
                 className="btn-primary w-full flex items-center justify-center gap-2"
               >
                 <Plus size={20} />
                 Criar novo jogo
               </button>
+
+              {createdMixScope && (
+                <div className="card bg-lime-50 border border-lime-200 flex items-center justify-between gap-3">
+                  <p className="text-sm text-ink-900">
+                    Mix criado no grupo <strong>{createdMixScope.name}</strong>.
+                  </p>
+                  <Link
+                    to={`/gerir/${createdMixScope.slug}`}
+                    className="text-xs font-extrabold text-lime-700 hover:underline whitespace-nowrap shrink-0"
+                  >
+                    Ver mix →
+                  </Link>
+                </div>
+              )}
 
               {/* Create/Edit Game Form */}
               {(showCreateGame || editingGame) && (

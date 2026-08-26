@@ -8,7 +8,11 @@
 -- Run this whole file in Supabase → SQL Editor → New query → Run.
 -- ════════════════════════════════════════════════════════════════════════
 
--- ── 1. is_org_admin — a club admin is also admin of every child group ────
+-- ── 1. is_org_admin — a club admin is also admin of every child group.
+--       Reads `organizations` in addition to `memberships`; safe from RLS
+--       recursion because SECURITY DEFINER (owned by postgres) bypasses
+--       both tables' RLS policies entirely, same reasoning documented in
+--       migration_fix_membership_recursion.sql. ──────────────────────────
 CREATE OR REPLACE FUNCTION is_org_admin(p_organization_id UUID)
 RETURNS BOOLEAN
 LANGUAGE sql
@@ -47,6 +51,10 @@ BEGIN
     IF NOT (is_org_admin(p_parent_org_id) OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND is_platform_admin)) THEN
       RAISE EXCEPTION 'Sem permissão para criar um grupo neste clube';
     END IF;
+    -- A club admin may only appoint themselves as the new group's admin —
+    -- otherwise they could force any other user into an admin membership,
+    -- without consent, by calling this RPC directly. Platform admins keep
+    -- the ability to appoint someone else (same as create_organization).
     IF p_admin_user_id <> auth.uid()
        AND NOT EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND is_platform_admin) THEN
       RAISE EXCEPTION 'Só podes criar um grupo com te tornares admin dele';
@@ -78,7 +86,7 @@ GRANT EXECUTE ON FUNCTION create_group(TEXT, TEXT, UUID, UUID) TO authenticated;
 -- ── 3. list_club_groups — tiered visibility for a club's own groups: any
 --       club member sees a group's name/id/their own status; only group
 --       members (or the club admin, via #1) see member_count/avg_rating. ──
-CREATE FUNCTION list_club_groups(p_club_id UUID)
+CREATE OR REPLACE FUNCTION list_club_groups(p_club_id UUID)
 RETURNS TABLE (
   id UUID,
   name TEXT,
@@ -104,7 +112,7 @@ AS $$
     END,
     is_org_admin(g.id),
     CASE WHEN is_org_admin(g.id) OR EXISTS (SELECT 1 FROM memberships m WHERE m.organization_id = g.id AND m.user_id = auth.uid())
-      THEN (SELECT COUNT(*) FROM memberships m WHERE m.organization_id = g.id) END,
+      THEN (SELECT COUNT(*) FROM memberships m WHERE m.organization_id = g.id AND m.is_guest = FALSE) END,
     CASE WHEN is_org_admin(g.id) OR EXISTS (SELECT 1 FROM memberships m WHERE m.organization_id = g.id AND m.user_id = auth.uid())
       THEN (
         SELECT AVG(p.rating) FROM memberships m
@@ -357,3 +365,174 @@ $$;
 
 REVOKE ALL ON FUNCTION get_club_profile(TEXT) FROM public;
 GRANT EXECUTE ON FUNCTION get_club_profile(TEXT) TO authenticated;
+
+-- ── 9. search_players / list_players / get_player_profile — club-only
+--       "clubs" listings, matching the directory RPCs above. Without this,
+--       a club member who isn't in one of the club's groups could still
+--       see who's in it via the Comunidade player directory's club tag or
+--       a player's profile "clubs" list — the same leak this migration's
+--       visibility model is supposed to close, just reached through a
+--       different RPC. Return shapes unchanged → CREATE OR REPLACE for
+--       all three. ─────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION search_players(p_query TEXT)
+RETURNS TABLE (id UUID, name TEXT, avatar_url TEXT, club_names TEXT)
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT p.id, p.name, p.avatar_url, clubs.club_names
+  FROM profiles p
+  LEFT JOIN LATERAL (
+    SELECT string_agg(DISTINCT o.name, ', ' ORDER BY o.name) AS club_names
+    FROM memberships m
+    JOIN organizations o ON o.id = m.organization_id
+    WHERE m.user_id = p.id AND o.kind = 'club'
+  ) clubs ON true
+  WHERE length(trim(p_query)) >= 2
+    AND p.id <> auth.uid()
+    AND p.name ILIKE '%' || trim(p_query) || '%'
+    AND NOT EXISTS (
+      SELECT 1 FROM memberships m WHERE m.user_id = p.id AND m.is_test = true
+    )
+    AND (shares_org_with(p.id) OR in_global_org(p.id))
+  ORDER BY p.name
+  LIMIT 10;
+$$;
+
+REVOKE ALL ON FUNCTION search_players(TEXT) FROM public;
+GRANT EXECUTE ON FUNCTION search_players(TEXT) TO authenticated;
+
+CREATE OR REPLACE FUNCTION list_players(p_limit INTEGER DEFAULT 20)
+RETURNS TABLE (id UUID, name TEXT, avatar_url TEXT, club_names TEXT)
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT p.id, p.name, p.avatar_url, clubs.club_names
+  FROM profiles p
+  LEFT JOIN LATERAL (
+    SELECT string_agg(DISTINCT o.name, ', ' ORDER BY o.name) AS club_names
+    FROM memberships m
+    JOIN organizations o ON o.id = m.organization_id
+    WHERE m.user_id = p.id AND o.kind = 'club'
+  ) clubs ON true
+  WHERE p.id <> auth.uid()
+    AND NOT EXISTS (
+      SELECT 1 FROM memberships m WHERE m.user_id = p.id AND m.is_test = true
+    )
+    AND (shares_org_with(p.id) OR in_global_org(p.id))
+  ORDER BY p.created_at DESC
+  LIMIT p_limit;
+$$;
+
+REVOKE ALL ON FUNCTION list_players(INTEGER) FROM public;
+GRANT EXECUTE ON FUNCTION list_players(INTEGER) TO authenticated;
+
+CREATE OR REPLACE FUNCTION get_player_profile(p_user_id UUID)
+RETURNS TABLE (
+  id UUID,
+  name TEXT,
+  avatar_url TEXT,
+  level TEXT,
+  game_wins BIGINT,
+  game_losses BIGINT,
+  mix_wins BIGINT,
+  mixes_played BIGINT,
+  club_points BIGINT,
+  private_points BIGINT,
+  total_points BIGINT,
+  friends_count BIGINT,
+  friendship_status TEXT,
+  friendship_request_id UUID,
+  my_profile BOOLEAN,
+  clubs JSONB,
+  activity_visibility TEXT,
+  results_visibility TEXT,
+  clubs_visibility TEXT
+)
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+STABLE
+AS $$
+  WITH club_stats AS (
+    SELECT
+      COALESCE(SUM(ps.game_wins), 0) AS game_wins,
+      COALESCE(SUM(ps.game_losses), 0) AS game_losses,
+      COALESCE(SUM(ps.mix_wins), 0) AS mix_wins,
+      COALESCE(SUM(ps.mixes_played), 0) AS mixes_played,
+      COALESCE(SUM(ps.total_points), 0) AS club_points
+    FROM player_stats ps
+    WHERE ps.user_id = p_user_id
+  ),
+  private_stats AS (
+    SELECT COALESCE(SUM(pms.points_earned), 0) AS private_points
+    FROM private_match_stats pms
+    WHERE pms.user_id = p_user_id
+  ),
+  shared_level AS (
+    SELECT m.level
+    FROM memberships m
+    WHERE m.user_id = p_user_id
+      AND EXISTS (
+        SELECT 1 FROM memberships caller
+        WHERE caller.user_id = auth.uid()
+          AND caller.organization_id = m.organization_id
+      )
+    LIMIT 1
+  ),
+  friends_count AS (
+    SELECT COUNT(*) AS n FROM friend_requests
+    WHERE status = 'accepted' AND (requester_id = p_user_id OR addressee_id = p_user_id)
+  ),
+  my_request AS (
+    SELECT id, requester_id, status FROM friend_requests
+    WHERE (requester_id = auth.uid() AND addressee_id = p_user_id)
+       OR (requester_id = p_user_id AND addressee_id = auth.uid())
+    LIMIT 1
+  ),
+  clubs AS (
+    SELECT COALESCE(
+      json_agg(json_build_object('id', o.id, 'name', o.name, 'slug', o.slug, 'kind', o.kind) ORDER BY o.name),
+      '[]'::json
+    ) AS list
+    FROM memberships m
+    JOIN organizations o ON o.id = m.organization_id
+    WHERE m.user_id = p_user_id AND o.kind = 'club'
+  ),
+  vis AS (
+    SELECT activity_visibility, results_visibility, clubs_visibility
+    FROM profiles WHERE id = p_user_id
+  )
+  SELECT
+    p.id,
+    p.name,
+    p.avatar_url,
+    (SELECT level FROM shared_level),
+    CASE WHEN can_view_section(p_user_id, (SELECT results_visibility FROM vis)) THEN club_stats.game_wins END,
+    CASE WHEN can_view_section(p_user_id, (SELECT results_visibility FROM vis)) THEN club_stats.game_losses END,
+    CASE WHEN can_view_section(p_user_id, (SELECT results_visibility FROM vis)) THEN club_stats.mix_wins END,
+    CASE WHEN can_view_section(p_user_id, (SELECT results_visibility FROM vis)) THEN club_stats.mixes_played END,
+    CASE WHEN can_view_section(p_user_id, (SELECT results_visibility FROM vis)) THEN club_stats.club_points END,
+    CASE WHEN can_view_section(p_user_id, (SELECT results_visibility FROM vis)) THEN private_stats.private_points END,
+    CASE WHEN can_view_section(p_user_id, (SELECT results_visibility FROM vis)) THEN club_stats.club_points + private_stats.private_points END,
+    (SELECT n FROM friends_count),
+    CASE
+      WHEN p_user_id = auth.uid() THEN 'self'
+      WHEN NOT EXISTS (SELECT 1 FROM my_request) THEN 'none'
+      WHEN (SELECT status FROM my_request) = 'accepted' THEN 'friends'
+      WHEN (SELECT requester_id FROM my_request) = auth.uid() THEN 'pending_sent'
+      ELSE 'pending_received'
+    END,
+    (SELECT id FROM my_request),
+    p_user_id = auth.uid(),
+    CASE WHEN can_view_section(p_user_id, (SELECT clubs_visibility FROM vis)) THEN (SELECT list FROM clubs) END::jsonb,
+    (SELECT activity_visibility FROM vis),
+    (SELECT results_visibility FROM vis),
+    (SELECT clubs_visibility FROM vis)
+  FROM profiles p, club_stats, private_stats
+  WHERE p.id = p_user_id;
+$$;
+
+REVOKE ALL ON FUNCTION get_player_profile(UUID) FROM public;
+GRANT EXECUTE ON FUNCTION get_player_profile(UUID) TO authenticated;

@@ -188,7 +188,7 @@ export default function Comunidade() {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Procurar jogador, clube ou grupo..."
+          placeholder="Procurar jogador ou clube..."
           className="flex-1 bg-transparent outline-none text-sm"
         />
       </div>

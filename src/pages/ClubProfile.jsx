@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, Users, UserPlus, Clock, Heart, MapPin, Phone, Instagram, Globe, Calendar, Building2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { getClubProfile } from '../lib/clubProfile'
+import { listClubGroups } from '../lib/organizations'
 import { Avatar, EmptyState, PrimaryButton } from '../components/ui'
 import PadelIcon from '../components/icons/PadelIcon'
 
@@ -20,6 +21,8 @@ export default function ClubProfile() {
   const [notFound, setNotFound] = useState(false)
   const [acting, setActing] = useState(false)
   const [favoriting, setFavoriting] = useState(false)
+  const [groups, setGroups] = useState([])
+  const [groupActingOn, setGroupActingOn] = useState(null)
   // Guards against an in-flight request for a stale slug (or a stale
   // handleFollow/handleUnfollow reload) resolving after a newer one and
   // clobbering state — each load() call captures its own generation and
@@ -51,6 +54,35 @@ export default function ClubProfile() {
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug])
+
+  // Only a club member can see its groups (list_club_groups' own gate is
+  // club membership) — no point calling it otherwise, it would just return
+  // zero rows. This is the reachable, member-facing counterpart to the
+  // admin-only groups panel in GerirClube.jsx.
+  useEffect(() => {
+    if (club?.kind === 'club' && club.my_status === 'member') {
+      listClubGroups(club.id)
+        .then(setGroups)
+        .catch((error) => console.error('Error loading club groups:', error))
+    } else {
+      setGroups([])
+    }
+  }, [club?.id, club?.kind, club?.my_status])
+
+  const handleRequestJoinGroup = async (group) => {
+    setGroupActingOn(group.id)
+    try {
+      const { error } = await followOrganization(group.id)
+      if (error) throw error
+      const data = await listClubGroups(club.id)
+      setGroups(data)
+    } catch (error) {
+      console.error('Error requesting to join group:', error)
+      alert(error.message || 'Não foi possível pedir para entrar. Tenta novamente.')
+    } finally {
+      setGroupActingOn(null)
+    }
+  }
 
   const handleFollow = async () => {
     setActing(true)
@@ -209,6 +241,55 @@ export default function ClubProfile() {
               <Globe size={15} className="shrink-0" /> {club.website}
             </a>
           )}
+        </div>
+      )}
+
+      {groups.length > 0 && (
+        <div>
+          <h3 className="text-lg text-ink-900 mb-3">Grupos</h3>
+          <div className="space-y-3">
+            {groups.map((group) => {
+              const isMemberish = group.can_manage || group.my_status === 'member' || group.my_status === 'admin'
+              return (
+                <div key={group.id} className="card flex items-center gap-3.5">
+                  <Avatar name={group.name} url={group.group_logo_url} size="w-11 h-11 text-sm" />
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-extrabold text-ink-900 truncate">{group.name}</h4>
+                    {isMemberish ? (
+                      <p className="text-sm text-muted">
+                        {group.member_count} {group.member_count === 1 ? 'membro' : 'membros'}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-muted">
+                        {group.my_status === 'pending' ? 'Pedido enviado' : 'Grupo dentro deste clube'}
+                      </p>
+                    )}
+                  </div>
+                  {isMemberish ? (
+                    <Link
+                      to={`/clube/${group.slug}`}
+                      className="shrink-0 whitespace-nowrap text-xs font-extrabold px-3.5 py-2 min-h-[44px] rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast inline-flex items-center"
+                    >
+                      Ver grupo
+                    </Link>
+                  ) : group.my_status === 'pending' ? (
+                    <span className="shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 text-xs font-extrabold px-3 py-2 rounded-full bg-ink-50 text-muted">
+                      <Clock size={14} /> Pedido enviado
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleRequestJoinGroup(group)}
+                      disabled={groupActingOn === group.id}
+                      className="shrink-0 whitespace-nowrap text-xs font-extrabold px-3.5 py-2 min-h-[44px] rounded-full bg-lime-400 text-ink-900 hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
+                    >
+                      Pedir para entrar
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
 
