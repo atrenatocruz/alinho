@@ -16,9 +16,9 @@ export default function Home() {
   const [games, setGames] = useState([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('ativos')
-  const { user, profile, memberships, currentOrganizationId, joinOrganization, isPrivateMatchesEnabled, isAdminOfAny } = useAuth()
+  const { user, profile, memberships, joinOrganization, isPrivateMatchesEnabled, isAdminOfAny } = useAuth()
   const [joinRequestsTotal, setJoinRequestsTotal] = useState(0)
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [joinSlug, setJoinSlug] = useState('')
   const [joining, setJoining] = useState(false)
   const [joinError, setJoinError] = useState('')
@@ -50,6 +50,11 @@ export default function Home() {
     const orgSlug = searchParams.get('org')
     if (orgSlug) {
       handleJoin(orgSlug)
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('org')
+        return next
+      }, { replace: true })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
