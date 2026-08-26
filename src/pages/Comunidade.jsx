@@ -12,7 +12,7 @@ const BROWSE_LIMIT = 100
 
 const TABS = [
   { key: 'players', label: 'Jogadores' },
-  { key: 'orgs', label: 'Clubes & Grupos' },
+  { key: 'orgs', label: 'Clubes' },
 ]
 
 export default function Comunidade() {
@@ -90,8 +90,7 @@ export default function Comunidade() {
   }
 
   const handleUnfollow = async (org) => {
-    const noun = org.kind === 'group' ? 'grupo' : 'clube'
-    if (!confirm(`Deixar de seguir ${org.name}? Deixas de ver os mixs deste ${noun}.`)) return
+    if (!confirm(`Deixar de seguir ${org.name}? Deixas de ver os mixs deste clube.`)) return
     setActingOn(org.id)
     try {
       const { error } = await leaveOrganization(org.id)
@@ -119,7 +118,6 @@ export default function Comunidade() {
   }
 
   const clubs = organizations.filter((o) => o.kind === 'club')
-  const groups = organizations.filter((o) => o.kind === 'group')
 
   const renderOrgRow = (org) => {
     const membership = memberships.find((m) => m.organization_id === org.id)
@@ -129,11 +127,6 @@ export default function Comunidade() {
         <Avatar name={org.name} url={org.group_logo_url} size="w-11 h-11 text-sm" />
         <div className="flex-1 min-w-0">
           <h3 className="font-extrabold text-ink-900 truncate">{org.name}</h3>
-          {org.kind === 'group' && org.parent_name && (
-            <p className="text-[11px] font-extrabold uppercase tracking-widest text-lime-700 truncate mt-0.5">
-              Grupo dentro de {org.parent_name}
-            </p>
-          )}
           <p className="text-sm text-muted flex items-center gap-1.5">
             <Users size={13} /> {org.member_count} {org.member_count === 1 ? 'membro' : 'membros'}
           </p>
@@ -185,7 +178,7 @@ export default function Comunidade() {
             ? 'A carregar…'
             : tab === 'players'
             ? `${players.length} jogador${players.length === 1 ? '' : 'es'} na comunidade`
-            : `${organizations.length} resultado${organizations.length === 1 ? '' : 's'} entre clubes e grupos`}
+            : `${organizations.length} clube${organizations.length === 1 ? '' : 's'} na comunidade`}
         </p>
       </div>
 
@@ -247,28 +240,14 @@ export default function Comunidade() {
             ))}
           </div>
         )
-      ) : clubs.length === 0 && groups.length === 0 ? (
+      ) : clubs.length === 0 ? (
         <EmptyState
           icon={Users}
           title="Nada encontrado"
-          subtitle={query.trim() ? 'Tenta outro nome.' : 'Ainda não há clubes nem grupos na comunidade.'}
+          subtitle={query.trim() ? 'Tenta outro nome.' : 'Ainda não há clubes na comunidade.'}
         />
       ) : (
-        <div className="space-y-6">
-          {clubs.length > 0 && (
-            <div className="space-y-3">
-              <h3 className="text-sm font-extrabold text-ink-900 uppercase tracking-wide">Clubes</h3>
-              <div className="space-y-3">{clubs.map(renderOrgRow)}</div>
-            </div>
-          )}
-
-          {groups.length > 0 && (
-            <div className="space-y-3">
-              <h3 className="text-sm font-extrabold text-ink-900 uppercase tracking-wide">Grupos</h3>
-              <div className="space-y-3">{groups.map(renderOrgRow)}</div>
-            </div>
-          )}
-        </div>
+        <div className="space-y-3">{clubs.map(renderOrgRow)}</div>
       )}
     </div>
   )
