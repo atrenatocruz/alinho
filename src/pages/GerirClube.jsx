@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Plus, Calendar, Users, Trash2, Edit2, Check, X, UserX, Repeat, Clock, ArrowLeft, Camera, Settings } from 'lucide-react'
+import { Plus, Calendar, Users, Trash2, Edit2, Check, X, UserX, Repeat, Clock, ArrowLeft, Camera, Settings, Copy } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
@@ -9,6 +9,9 @@ import { createGroup } from '../lib/platformAdmin'
 import { DateField, DateTimeField, Avatar } from '../components/ui'
 import { totalRounds, FORMAT_LABEL } from '../lib/mixLogic'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
+import PlayerSearch from '../components/PlayerSearch'
+import { searchPlayers } from '../lib/privateMatches'
+import { inviteToOrganization } from '../lib/orgInvites'
 
 const sanitizeSlug = (value) => value.toLowerCase().replace(/[^a-z0-9-]/g, '')
 
@@ -106,6 +109,7 @@ export default function GerirClube() {
   const [activeTab, setActiveTab] = useState('games') // 'games', 'members', 'settings'
   const [games, setGames] = useState([])
   const [members, setMembers] = useState([])
+  const [linkCopied, setLinkCopied] = useState(false)
   const [requests, setRequests] = useState([])
   const [settings, setSettings] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -327,6 +331,28 @@ export default function GerirClube() {
     } catch (error) {
       console.error('Error rejecting request:', error)
       alert('Erro ao rejeitar pedido: ' + error.message)
+    }
+  }
+
+  const handleInvitePlayer = async (player) => {
+    try {
+      const status = await inviteToOrganization(org.id, player.id)
+      alert(status === 'pending' ? `Convite enviado a ${player.name}.` : `${player.name} já tinha um convite pendente.`)
+    } catch (error) {
+      console.error('Error inviting player:', error)
+      alert(error.message?.includes('já é membro') ? `${player.name} já é membro deste clube.` : 'Não foi possível enviar o convite.')
+    }
+  }
+
+  const handleCopyInviteLink = async () => {
+    const link = `${window.location.origin}/login?org=${org.slug}`
+    try {
+      await navigator.clipboard.writeText(link)
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2000)
+    } catch (error) {
+      console.error('Error copying invite link:', error)
+      alert('Não foi possível copiar o link.')
     }
   }
 
@@ -1520,6 +1546,28 @@ export default function GerirClube() {
           {/* Members Tab */}
           {activeTab === 'members' && (
             <div className="space-y-3">
+              <div className="card space-y-4">
+                <div>
+                  <h3 className="text-sm font-extrabold text-ink-900 mb-2">Convidar jogador</h3>
+                  <PlayerSearch
+                    label="Pesquisar por nome..."
+                    searchFn={searchPlayers}
+                    excludeIds={members.map((m) => m.id)}
+                    onSelect={handleInvitePlayer}
+                  />
+                </div>
+                <div className="pt-3 border-t border-line">
+                  <button
+                    type="button"
+                    onClick={handleCopyInviteLink}
+                    className="w-full flex items-center justify-center gap-2 text-sm font-extrabold px-4 py-2.5 rounded-ctrl bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast"
+                  >
+                    <Copy size={16} />
+                    {linkCopied ? 'Link copiado!' : 'Copiar link de convite'}
+                  </button>
+                </div>
+              </div>
+
               <div className="card bg-blue-50">
                 <p className="text-gray-700">
                   <strong>Total de membros:</strong> {members.length}
