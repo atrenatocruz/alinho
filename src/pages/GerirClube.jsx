@@ -6,6 +6,8 @@ import { useAuth } from '../contexts/AuthContext'
 import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
 import { uploadClubLogo, removeClubLogo } from '../lib/clubLogoStorage'
 import { createGroup } from '../lib/platformAdmin'
+import { listClubGroups } from '../lib/organizations'
+import { formatRating } from '../lib/elo'
 import { DateField, DateTimeField, Avatar } from '../components/ui'
 import { totalRounds, FORMAT_LABEL } from '../lib/mixLogic'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
@@ -103,7 +105,7 @@ function Segmented({ options, value, onChange }) {
 
 export default function GerirClube() {
   const { slug } = useParams()
-  const { profile: currentUser, memberships, adminOrganizations, isPrivateMatchesEnabled, refreshFeatureFlags, ensureOrgAdminAccess, refreshMemberships } = useAuth()
+  const { profile: currentUser, memberships, adminOrganizations, isPrivateMatchesEnabled, refreshFeatureFlags, ensureOrgAdminAccess, refreshMemberships, followOrganization } = useAuth()
   const [org, setOrg] = useState(null)
   const [orgLoading, setOrgLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('games') // 'games', 'members', 'settings'
@@ -134,6 +136,13 @@ export default function GerirClube() {
   const [creatingGroup, setCreatingGroup] = useState(false)
   const [groupError, setGroupError] = useState('')
   const [createdGroupName, setCreatedGroupName] = useState(null)
+  const [clubGroups, setClubGroups] = useState([])
+  const [groupsLoading, setGroupsLoading] = useState(false)
+  const [expandedGroupId, setExpandedGroupId] = useState(null)
+  const [expandedGroupMembers, setExpandedGroupMembers] = useState([])
+  const [expandedGroupRequests, setExpandedGroupRequests] = useState([])
+  const [expandedGroupLoading, setExpandedGroupLoading] = useState(false)
+  const [groupActingOn, setGroupActingOn] = useState(null)
 
   useGooglePlacesAutocomplete(
     locationInputRef,
@@ -217,6 +226,107 @@ export default function GerirClube() {
   useEffect(() => {
     if (currentOrganizationId) loadRequests()
   }, [currentOrganizationId])
+
+  // Only clubs contain groups — a group's own Gerir page has none of its
+  // own (create_group rejects a group as a parent), so this stays empty
+  // there and the scope picker in the create-game form (Task 4) never
+  // renders on a group's own page either.
+  useEffect(() => {
+    if (currentOrganizationId && org?.kind !== 'group') loadClubGroups()
+  }, [currentOrganizationId, org?.kind])
+
+  const loadClubGroups = async () => {
+    setGroupsLoading(true)
+    try {
+      const data = await listClubGroups(currentOrganizationId)
+      setClubGroups(data)
+    } catch (error) {
+      console.error('Error loading club groups:', error)
+    } finally {
+      setGroupsLoading(false)
+    }
+  }
+
+  const loadExpandedGroupDetails = async (groupId) => {
+    setExpandedGroupLoading(true)
+    try {
+      const [membersRes, requestsRes] = await Promise.all([
+        supabase
+          .from('memberships')
+          .select('id, is_admin, is_guest, level, user_id, profile:profiles(*)')
+          .eq('organization_id', groupId)
+          .eq('is_guest', false),
+        supabase.rpc('list_membership_requests', { p_organization_id: groupId }),
+      ])
+      if (membersRes.error) throw membersRes.error
+      if (requestsRes.error) throw requestsRes.error
+
+      const merged = (membersRes.data || [])
+        .map((m) => ({
+          id: m.user_id,
+          name: m.profile?.name || 'Jogador',
+          is_admin: m.is_admin,
+          level: m.level,
+          avatar_url: m.profile?.avatar_url,
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name))
+
+      setExpandedGroupMembers(merged)
+      setExpandedGroupRequests(requestsRes.data || [])
+    } catch (error) {
+      console.error('Error loading group details:', error)
+      alert('Erro ao carregar detalhes do grupo: ' + error.message)
+    } finally {
+      setExpandedGroupLoading(false)
+    }
+  }
+
+  const handleToggleGroupExpand = (group) => {
+    if (expandedGroupId === group.id) {
+      setExpandedGroupId(null)
+      return
+    }
+    setExpandedGroupId(group.id)
+    setExpandedGroupMembers([])
+    setExpandedGroupRequests([])
+    if (group.can_manage) loadExpandedGroupDetails(group.id)
+  }
+
+  const handleApproveGroupRequest = async (requestId, groupId) => {
+    try {
+      const { error } = await supabase.rpc('approve_membership_request', { p_request_id: requestId })
+      if (error) throw error
+      await Promise.all([loadClubGroups(), loadExpandedGroupDetails(groupId)])
+    } catch (error) {
+      console.error('Error approving group request:', error)
+      alert('Erro ao aprovar pedido: ' + error.message)
+    }
+  }
+
+  const handleRejectGroupRequest = async (requestId, groupId) => {
+    try {
+      const { error } = await supabase.rpc('reject_membership_request', { p_request_id: requestId })
+      if (error) throw error
+      await loadExpandedGroupDetails(groupId)
+    } catch (error) {
+      console.error('Error rejecting group request:', error)
+      alert('Erro ao rejeitar pedido: ' + error.message)
+    }
+  }
+
+  const handleRequestJoinGroup = async (group) => {
+    setGroupActingOn(group.id)
+    try {
+      const { error } = await followOrganization(group.id)
+      if (error) throw error
+      await loadClubGroups()
+    } catch (error) {
+      console.error('Error requesting to join group:', error)
+      alert(error.message || 'Não foi possível pedir para entrar. Tenta novamente.')
+    } finally {
+      setGroupActingOn(null)
+    }
+  }
 
   const loadData = async () => {
     setLoading(true)
@@ -949,6 +1059,7 @@ export default function GerirClube() {
       // otherwise the org resolver there sees a stale memberships array and
       // bounces them to "Sem acesso" until a manual page reload.
       await refreshMemberships()
+      await loadClubGroups()
       setCreatedGroupName(groupName.trim())
       setShowCreateGroup(false)
       setGroupName('')
@@ -1857,6 +1968,110 @@ export default function GerirClube() {
                   <p className="text-sm text-gray-500 mb-4">
                     Um grupo tem os seus próprios mixes e membros, mas vive dentro deste clube — útil para uma equipa, torneio, ou turma específica.
                   </p>
+
+                  {groupsLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-[3px] border-ink-50 border-t-ink-700"></div>
+                    </div>
+                  ) : clubGroups.length > 0 && (
+                    <div className="space-y-3 mb-4">
+                      {clubGroups.map((group) => {
+                        const isMemberish = group.can_manage || group.my_status === 'member' || group.my_status === 'admin'
+                        return (
+                          <div key={group.id} className="card p-0 overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleGroupExpand(group)}
+                              className="w-full flex items-center gap-3 p-4 text-left"
+                            >
+                              <Avatar name={group.name} url={group.group_logo_url} size="w-10 h-10 text-sm" />
+                              <div className="flex-1 min-w-0">
+                                <h5 className="font-extrabold text-ink-900 truncate">{group.name}</h5>
+                                {isMemberish ? (
+                                  <p className="text-[11px] text-muted mt-0.5">
+                                    {group.member_count} {group.member_count === 1 ? 'membro' : 'membros'}
+                                    {group.avg_rating != null && ` · Nível médio ${formatRating(group.avg_rating)}`}
+                                  </p>
+                                ) : (
+                                  <p className="text-[11px] text-muted mt-0.5">
+                                    {group.my_status === 'pending' ? 'Pedido pendente' : 'Não és membro'}
+                                  </p>
+                                )}
+                              </div>
+                              {!group.can_manage && group.my_status === 'none' && (
+                                <span
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={(e) => { e.stopPropagation(); handleRequestJoinGroup(group) }}
+                                  className={`shrink-0 whitespace-nowrap text-xs font-extrabold px-3.5 py-2 min-h-[44px] rounded-full bg-lime-400 text-ink-900 hover:bg-lime-600 transition-colors duration-fast inline-flex items-center ${groupActingOn === group.id ? 'opacity-40 pointer-events-none' : ''}`}
+                                >
+                                  Pedir para entrar
+                                </span>
+                              )}
+                            </button>
+
+                            {expandedGroupId === group.id && group.can_manage && (
+                              <div className="px-4 pb-4 space-y-3 border-t border-line pt-3">
+                                {expandedGroupLoading ? (
+                                  <div className="flex items-center justify-center py-6">
+                                    <div className="animate-spin rounded-full h-6 w-6 border-[3px] border-ink-50 border-t-ink-700"></div>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <Link
+                                      to={`/gerir/${group.slug}`}
+                                      className="inline-flex items-center gap-1.5 text-xs font-extrabold text-lime-700 hover:underline"
+                                    >
+                                      Gerir grupo completo →
+                                    </Link>
+
+                                    {expandedGroupRequests.length > 0 && (
+                                      <div className="space-y-2">
+                                        <h6 className="text-xs font-extrabold text-ink-900 flex items-center gap-1.5">
+                                          <Clock size={12} /> Pedidos de entrada ({expandedGroupRequests.length})
+                                        </h6>
+                                        {expandedGroupRequests.map((req) => (
+                                          <div key={req.id} className="flex items-center gap-2">
+                                            <Avatar name={req.name} url={req.avatar_url} size="w-7 h-7 text-xs" />
+                                            <p className="flex-1 min-w-0 text-sm font-extrabold text-ink-900 truncate">{req.name || 'Jogador'}</p>
+                                            <button
+                                              onClick={() => handleApproveGroupRequest(req.id, group.id)}
+                                              className="w-8 h-8 flex items-center justify-center rounded-full bg-ok/10 text-ok hover:bg-ok/20 transition-colors duration-fast"
+                                              title="Aprovar"
+                                            >
+                                              <Check size={16} />
+                                            </button>
+                                            <button
+                                              onClick={() => handleRejectGroupRequest(req.id, group.id)}
+                                              className="w-8 h-8 flex items-center justify-center rounded-full text-danger hover:bg-danger/10 transition-colors duration-fast"
+                                              title="Rejeitar"
+                                            >
+                                              <X size={16} />
+                                            </button>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+
+                                    <div className="space-y-1.5">
+                                      {expandedGroupMembers.map((member) => (
+                                        <div key={member.id} className="flex items-center gap-2">
+                                          <Avatar name={member.name} url={member.avatar_url} size="w-7 h-7 text-xs" />
+                                          <p className="flex-1 min-w-0 text-sm text-ink-900 truncate">{member.name}</p>
+                                          {member.is_admin && <span className="w-2 h-2 rounded-full bg-lime-600 shrink-0" title="Admin" />}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+
                   {!showCreateGroup ? (
                     <button type="button" onClick={() => setShowCreateGroup(true)} className="btn-secondary w-full">
                       Criar grupo dentro deste clube
