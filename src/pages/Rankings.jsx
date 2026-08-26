@@ -11,7 +11,7 @@ import { getOrganizationRankings } from '../lib/organizations'
 
 const SECTIONS = [
   { key: 'players', label: 'Jogadores' },
-  { key: 'orgs', label: 'Clubes & Grupos' },
+  { key: 'orgs', label: 'Clubes' },
 ]
 
 const TABS = [
@@ -452,7 +452,7 @@ export default function Rankings() {
       </>
       )}
 
-      {/* ─── Clubes & Grupos ────────────────────────────────────────────── */}
+      {/* ─── Clubes ─────────────────────────────────────────────────────── */}
       {section === 'orgs' && (
         orgRankingsLoading ? (
           <div className="flex items-center justify-center py-16">
@@ -462,7 +462,7 @@ export default function Rankings() {
           <EmptyState
             icon={Trophy}
             title="Ranking em branco"
-            subtitle="Assim que um clube ou grupo público tiver jogos, aparece aqui."
+            subtitle="Assim que um clube público tiver jogos, aparece aqui."
           />
         ) : (
           <div className="space-y-3">
@@ -480,11 +480,11 @@ export default function Rankings() {
                   <div className="flex-1 min-w-0">
                     <h3 className="text-base text-ink-900 truncate">{org.name}</h3>
                     <p className="text-[11px] text-muted mt-0.5">
-                      {org.kind === 'group' ? 'Grupo' : 'Clube'} · {org.member_count} {org.member_count === 1 ? 'membro' : 'membros'}
+                      Clube · {org.member_count} {org.member_count === 1 ? 'membro' : 'membros'}
                     </p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-[11px] text-muted mb-1">Nível do Grupo</p>
+                    <p className="text-[11px] text-muted mb-1">Nível do Clube</p>
                     <GroupLevelBadge rating={org.avg_rating} size="md" />
                   </div>
                 </div>
