@@ -7,6 +7,7 @@ import { PrimaryButton, Avatar, RatingBadge } from './ui'
 import { hashPhone } from '../lib/hashPhone'
 import { listIncomingFriendRequests } from '../lib/friends'
 import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
+import { listIncomingOrganizationInvites } from '../lib/orgInvites'
 
 // Re-prompt at most once per day once dismissed — a nudge, not a gate.
 const PHONE_PROMPT_DISMISSED_KEY = 'phonePromptDismissedDate'
@@ -158,6 +159,24 @@ export default function Layout({ children }) {
     }
   }, [profile?.id, isGuest, location.pathname])
 
+  // Same refetch-on-route-change pattern as friendRequests above.
+  const [orgInvites, setOrgInvites] = useState([])
+  useEffect(() => {
+    if (!profile?.id || isGuest) {
+      setOrgInvites([])
+      return
+    }
+    let cancelled = false
+    listIncomingOrganizationInvites()
+      .then((data) => {
+        if (!cancelled) setOrgInvites(data)
+      })
+      .catch((error) => console.error('Error loading organization invites:', error))
+    return () => {
+      cancelled = true
+    }
+  }, [profile?.id, isGuest, location.pathname])
+
   // Same refetch-on-route-change pattern as friend requests above. Only
   // fetched for org admins — matches the isAdminOfAny gate on the "Gerir"
   // nav item below, since a non-admin has no membership_requests visible
@@ -180,7 +199,7 @@ export default function Layout({ children }) {
   }, [profile?.id, isGuest, isAdminOfAny, location.pathname])
 
   const joinRequestsTotal = joinRequestsByOrg.reduce((sum, org) => sum + org.count, 0)
-  const notificationsTotal = friendRequests.length + joinRequestsTotal
+  const notificationsTotal = friendRequests.length + joinRequestsTotal + orgInvites.length
 
   const needsPhone = profile && !isGuest && !profile.phone_hash && !phonePromptDismissed
 
@@ -286,6 +305,20 @@ export default function Layout({ children }) {
                               <span className="font-extrabold">{org.count}</span>{' '}
                               {org.count === 1 ? 'pedido de entrada em' : 'pedidos de entrada em'}{' '}
                               <span className="font-extrabold">{org.name}</span>
+                            </p>
+                            <span aria-hidden="true" className="w-2 h-2 rounded-full bg-lime-400 shrink-0" />
+                          </Link>
+                        ))}
+                        {orgInvites.map((inv) => (
+                          <Link
+                            key={inv.id}
+                            to="/perfil?tab=convites"
+                            onClick={() => setShowNotifications(false)}
+                            className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50"
+                          >
+                            <Avatar name={inv.organization_name} url={inv.organization_logo_url} size="w-9 h-9 text-sm" />
+                            <p className="flex-1 min-w-0 text-sm text-ink-900">
+                              Convite para entrar em <span className="font-extrabold">{inv.organization_name}</span>
                             </p>
                             <span aria-hidden="true" className="w-2 h-2 rounded-full bg-lime-400 shrink-0" />
                           </Link>
