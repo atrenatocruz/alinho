@@ -86,6 +86,7 @@ const EMPTY_GAME_FORM = {
   game_time_minutes: 20,
   format: 'sobe_desce',
   gender_restriction: 'indiferente',
+  auto_start_hours_before: '',
   recurrence: EMPTY_RECURRENCE,
 }
 
@@ -550,6 +551,7 @@ export default function GerirClube() {
     game_time_minutes: game.game_time_minutes,
     format: game.format,
     gender_restriction: game.gender_restriction,
+    auto_start_hours_before: game.auto_start_hours_before,
   })
 
   // Computes the date one frequency step after `date` — used to pre-create
@@ -676,6 +678,7 @@ export default function GerirClube() {
         game_time_minutes: game.game_time_minutes,
         format: game.format,
         gender_restriction: game.gender_restriction,
+        auto_start_hours_before: game.auto_start_hours_before,
         status: 'pending',
         created_by: userId,
         recurrence_id: newRecurrence.id,
@@ -743,6 +746,7 @@ export default function GerirClube() {
             num_courts: numCourts,
             max_players: numCourts * 4, // derived
             price_per_player: gameForm.price_per_player === '' ? null : parseFloat(gameForm.price_per_player),
+            auto_start_hours_before: gameForm.auto_start_hours_before === '' ? null : parseInt(gameForm.auto_start_hours_before, 10),
             created_by: user.id,
             status: 'open'
           }
@@ -1181,6 +1185,7 @@ export default function GerirClube() {
       game_time_minutes: game.game_time_minutes || 20,
       format: game.format || 'sobe_desce',
       gender_restriction: game.gender_restriction || 'indiferente',
+      auto_start_hours_before: game.auto_start_hours_before ?? '',
       recurrence: hasActiveRecurrence
         ? {
             enabled: true,
@@ -1491,6 +1496,23 @@ export default function GerirClube() {
                         value={gameForm.gender_restriction}
                         onChange={(v) => setGameForm({ ...gameForm, gender_restriction: v })}
                       />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Começar automaticamente (opcional)
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={gameForm.auto_start_hours_before}
+                        onChange={(e) => setGameForm({ ...gameForm, auto_start_hours_before: e.target.value })}
+                        className="input-field"
+                        placeholder="ex: 2 (horas antes do jogo)"
+                      />
+                      <p className="text-sm text-muted mt-1.5">
+                        As duplas são formadas e o mix começa sozinho, com aviso no WhatsApp. Deixa em branco para começar manualmente.
+                      </p>
                     </div>
 
                     {/* Recurring Mixes are not available to self-serve groups:
