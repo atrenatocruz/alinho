@@ -127,6 +127,15 @@ function buildMixBlock({ game, people, capacity, suplentes = [] }, { showCode })
   if (game.price_per_player > 0) lines.push(`💶 ${game.price_per_player}€/jogador`)
   if (game.prize) lines.push(`🏆 Prémio: ${game.prize}`)
   lines.push(`🏟️ ${game.num_courts} campo(s) · ${capacity} vagas`)
+  if (!isCancelled) {
+    const closedCourts = Math.floor(people.length / 4)
+    let closedLine = `🔒 ${closedCourts}/${game.num_courts} campos fechados`
+    if (people.length < capacity) {
+      const missing = (4 - (people.length % 4)) % 4 || 4
+      closedLine += ` · Faltam ${missing} para fechar o próximo campo`
+    }
+    lines.push(closedLine)
+  }
   lines.push('')
 
   if (isCancelled) {

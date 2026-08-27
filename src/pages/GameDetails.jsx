@@ -1148,6 +1148,14 @@ export default function GameDetails() {
             players={people.map(p => ({ id: p.id, name: p.name, avatar_url: p.avatar_url }))}
             max={capacity}
           />
+          {game.status === 'open' && (
+            <span className="text-xs text-muted w-full">
+              🔒 {Math.floor(peopleCount / 4)}/{numCourts} campos fechados
+              {peopleCount < capacity && (
+                <> · Faltam {(4 - (peopleCount % 4)) % 4 || 4} para fechar o próximo campo</>
+              )}
+            </span>
+          )}
           {showClosed && (
             <span className="ml-auto inline-flex items-center gap-1.5 bg-ok/10 text-ok text-xs font-extrabold px-3 py-1.5 rounded-full">
               <Lock size={14} className="shrink-0" /> Mix fechado — campo reservado
