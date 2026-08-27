@@ -38,6 +38,8 @@ export default function GameDetails() {
   // necessarily this mix's club.
   const gameMembership = game ? memberships.find((m) => m.organization_id === game.organization_id) : null
   const isAdmin = gameMembership?.is_admin ?? false
+  const [scorekeeperIds, setScorekeeperIds] = useState([])
+  const [scorekeeperBusy, setScorekeeperBusy] = useState(null)
   const isScorekeeper = scorekeeperIds.includes(user.id)
   const gameOrganizationId = game?.organization_id ?? null
   const [participants, setParticipants] = useState([])
@@ -67,8 +69,6 @@ export default function GameDetails() {
   const [recurrenceHistory, setRecurrenceHistory] = useState([])
   const [historyExpanded, setHistoryExpanded] = useState(false)
   const [finishedTab, setFinishedTab] = useState('stats') // 'stats' | 'duplas' | 'rondas' — tabs for a finished mix's results
-  const [scorekeeperIds, setScorekeeperIds] = useState([])
-  const [scorekeeperBusy, setScorekeeperBusy] = useState(null)
 
   useEffect(() => {
     loadGameDetails()
