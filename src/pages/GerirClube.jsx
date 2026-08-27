@@ -40,6 +40,12 @@ const FORMATS = [
   { value: 'sobe_desce', label: 'Sobe e desce' },
   { value: 'todos_contra_todos', label: 'Todos contra todos' },
 ]
+const GENDER_RESTRICTIONS = [
+  { value: 'indiferente', label: 'Indiferente' },
+  { value: 'misto', label: 'Misto' },
+  { value: 'masculino', label: 'Só homens' },
+  { value: 'feminino', label: 'Só mulheres' },
+]
 const RECURRENCE_FREQUENCIES = [
   { value: 'daily', label: 'Diariamente' },
   { value: 'weekly', label: 'Semanalmente' },
@@ -78,6 +84,7 @@ const EMPTY_GAME_FORM = {
   court_time_minutes: 90,
   game_time_minutes: 20,
   format: 'sobe_desce',
+  gender_restriction: 'indiferente',
   recurrence: EMPTY_RECURRENCE,
 }
 
@@ -508,6 +515,7 @@ export default function GerirClube() {
     court_time_minutes: game.court_time_minutes,
     game_time_minutes: game.game_time_minutes,
     format: game.format,
+    gender_restriction: game.gender_restriction,
   })
 
   // Computes the date one frequency step after `date` — used to pre-create
@@ -633,6 +641,7 @@ export default function GerirClube() {
         court_time_minutes: game.court_time_minutes,
         game_time_minutes: game.game_time_minutes,
         format: game.format,
+        gender_restriction: game.gender_restriction,
         status: 'pending',
         created_by: userId,
         recurrence_id: newRecurrence.id,
@@ -1137,6 +1146,7 @@ export default function GerirClube() {
       court_time_minutes: game.court_time_minutes || 90,
       game_time_minutes: game.game_time_minutes || 20,
       format: game.format || 'sobe_desce',
+      gender_restriction: game.gender_restriction || 'indiferente',
       recurrence: hasActiveRecurrence
         ? {
             enabled: true,
@@ -1435,6 +1445,17 @@ export default function GerirClube() {
                         options={FORMATS}
                         value={gameForm.format}
                         onChange={(v) => setGameForm({ ...gameForm, format: v })}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Género
+                      </label>
+                      <Segmented
+                        options={GENDER_RESTRICTIONS}
+                        value={gameForm.gender_restriction}
+                        onChange={(v) => setGameForm({ ...gameForm, gender_restriction: v })}
                       />
                     </div>
 

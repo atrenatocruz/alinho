@@ -206,3 +206,10 @@ export const FORMAT_LABEL = {
   sobe_desce: 'Sobe e desce',
   todos_contra_todos: 'Todos contra todos',
 }
+
+export const GENDER_RESTRICTION_LABEL = {
+  masculino: 'Só homens',
+  feminino: 'Só mulheres',
+  misto: 'Misto',
+  indiferente: 'Indiferente',
+}

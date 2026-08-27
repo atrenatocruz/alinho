@@ -10,7 +10,7 @@ import { PrimaryButton, GuestBadge, PlayerAvatarRow, EmptyState, ShareModal, Rou
 import {
   countPeople, totalRounds, formDuplas, seedCourts, nextSobeDesce,
   roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches,
-  PHASE_LABEL, FORMAT_LABEL,
+  PHASE_LABEL, FORMAT_LABEL, GENDER_RESTRICTION_LABEL,
 } from '../lib/mixLogic'
 import { winRatePct } from '../lib/statsLogic'
 import { getGlobalRankings } from '../lib/privateMatches'
@@ -948,6 +948,13 @@ export default function GameDetails() {
   const waitlistPeople = waitlist.map(w => ({ ...w.user, rowOwner: true, rowId: w.id, hasPartner: false }))
   const isUserWaitlisted = waitlist.some(w => w.user_id === user.id)
   const canJoin = game?.status === 'open' && peopleCount < capacity && !isUserJoined
+  // 'misto'/'indiferente' impose no eligibility restriction — only
+  // 'masculino'/'feminino' require the joining player's own profile to
+  // match. The real enforcement is the participants INSERT RLS policy
+  // (migration_mix_gender_restriction.sql) — this only decides whether to
+  // show the join button or a friendly explanation instead of a raw error.
+  const genderRestricted = game?.gender_restriction && !['indiferente', 'misto'].includes(game.gender_restriction)
+  const genderMismatch = genderRestricted && profile?.gender !== game.gender_restriction
   const mixStarted = game?.status === 'in_progress' || game?.status === 'finished'
   // A full game counts as closed even if the stored status lagged behind
   // (e.g. players who joined before the auto-close trigger existed)
@@ -1086,6 +1093,9 @@ export default function GameDetails() {
             <Swords size={20} className="text-ink-700 shrink-0" />
             <span>
               {FORMAT_LABEL[game.format] || 'Sobe e desce'} • {numCourts} {numCourts === 1 ? 'campo' : 'campos'} • {roundsTotal} rondas de {game.game_time_minutes || 20}min
+              {game.gender_restriction && game.gender_restriction !== 'indiferente' && (
+                <> • {GENDER_RESTRICTION_LABEL[game.gender_restriction]}</>
+              )}
             </span>
           </div>
           {game.price_per_player > 0 && (
@@ -1857,23 +1867,29 @@ export default function GameDetails() {
           )}
 
           {canJoin && !joinMode && (
-            <>
-              <PrimaryButton
-                onClick={handleJoinAlone}
-                disabled={joining}
-                className="w-full"
-              >
-                <User size={20} />
-                {joining ? 'A inscrever…' : 'Entrar'}
-              </PrimaryButton>
-              {/* "Entrar com parceiro" button hidden for now (not deleted —
-                  setJoinMode('partner') and the partner-picker block below
-                  still work, this is the only entry point removed) —
-                  planned for reintroduction later. */}
-            </>
+            genderMismatch ? (
+              <div className="bg-ink-50 text-muted px-4 py-3 rounded-ctrl text-sm font-extrabold text-center">
+                Este mix é {GENDER_RESTRICTION_LABEL[game.gender_restriction].toLowerCase()} — não podes entrar.
+              </div>
+            ) : (
+              <>
+                <PrimaryButton
+                  onClick={handleJoinAlone}
+                  disabled={joining}
+                  className="w-full"
+                >
+                  <User size={20} />
+                  {joining ? 'A inscrever…' : 'Entrar'}
+                </PrimaryButton>
+                {/* "Entrar com parceiro" button hidden for now (not deleted —
+                    setJoinMode('partner') and the partner-picker block below
+                    still work, this is the only entry point removed) —
+                    planned for reintroduction later. */}
+              </>
+            )
           )}
 
-          {isFull && !isUserJoined && !isUserWaitlisted && (
+          {isFull && !isUserJoined && !isUserWaitlisted && !genderMismatch && (
             <PrimaryButton
               variant="ghost"
               onClick={handleJoinAsSuplente}
