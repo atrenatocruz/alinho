@@ -26,3 +26,12 @@ export const createGroup = async (name, slug, parentOrgId, adminUserId) => {
   if (error) throw error
   return data
 }
+
+export const createSelfServeGroup = async (name, slug) => {
+  const { data, error } = await supabase.rpc('create_self_serve_group', {
+    p_name: name,
+    p_slug: slug,
+  })
+  if (error) throw error
+  return data
+}
