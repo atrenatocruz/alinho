@@ -8,6 +8,8 @@ import { winRatePct } from '../lib/statsLogic'
 import { sendFriendRequest, acceptFriendRequest, removeFriendRequest } from '../lib/friends'
 import { getGlobalRankings } from '../lib/privateMatches'
 
+const SIDE_LABEL = { left: 'Esquerda', right: 'Direita', both: 'Ambos' }
+
 // Aggregated across every club the player belongs to (not scoped to the
 // viewer's currentOrganizationId) via get_player_profile/get_head_to_head_*
 // — this page works for any player in the app, not just someone who
@@ -264,6 +266,11 @@ export default function PlayerDetails() {
             <Avatar name={player.name} url={player.avatar_url} size="w-20 h-20 text-3xl" colorClass="bg-lime-400 text-ink-900" />
           </div>
           <h2 className="text-2xl text-white">{player.name}</h2>
+          {/* Not gated by results_visibility — playing side isn't a result,
+              and knowing it is the whole point when inviting a stranger. */}
+          <p className="text-white/60 text-xs mt-1">
+            Joga do lado: {SIDE_LABEL[player.preferred_side] || 'Ambos'}
+          </p>
           {/* Same privacy gate as the stat tiles below — results_visibility
               controls both, so no point showing a rank derived from hidden
               points. globalRank is null when the player has no ranked
