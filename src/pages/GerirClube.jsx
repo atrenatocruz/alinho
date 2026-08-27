@@ -725,7 +725,17 @@ export default function GerirClube() {
       loadGames()
     } catch (error) {
       console.error('Error creating game:', error)
-      alert('Erro ao criar jogo: ' + error.message)
+      // A self-serve group's caps (3 concurrent active mixes, 4 courts per
+      // mix) live in the games INSERT RLS policy, which fails with a raw
+      // English "new row violates row-level security policy" message.
+      // Postgres doesn't say *which* clause of the policy failed, so this
+      // is one combined message covering both caps rather than a guess.
+      const message = error?.message || ''
+      if (org?.self_serve && message.toLowerCase().includes('row-level security policy')) {
+        alert('Este mix excede os limites do grupo self-serve (máx. 3 mixes ativos em simultâneo, 4 campos por mix).')
+      } else {
+        alert('Erro ao criar jogo: ' + error.message)
+      }
     }
   }
 
@@ -874,7 +884,15 @@ export default function GerirClube() {
       loadGames()
     } catch (error) {
       console.error('Error updating game:', error)
-      alert('Erro ao atualizar jogo')
+      // The games UPDATE policy carries the same self-serve caps as the
+      // INSERT one, so an edit can now trip them too — say so instead of a
+      // bare "Erro ao atualizar jogo" the admin can't act on.
+      const message = error?.message || ''
+      if (org?.self_serve && message.toLowerCase().includes('row-level security policy')) {
+        alert('Este mix excede os limites do grupo self-serve (máx. 3 mixes ativos em simultâneo, 4 campos por mix).')
+      } else {
+        alert('Erro ao atualizar jogo')
+      }
     }
   }
 
@@ -1420,7 +1438,13 @@ export default function GerirClube() {
                       />
                     </div>
 
-                    {(!editingGame || !editingGame.recurrence || editingGame.recurrence.is_active) && (
+                    {/* Recurring Mixes are not available to self-serve groups:
+                        process_due_game_recurrences() creates occurrences
+                        server-side, bypassing the 3-concurrent-active-mix cap
+                        the games RLS policy enforces on direct inserts. Same
+                        !org?.self_serve gating as the "Visibilidade pública"
+                        section in Definições. */}
+                    {!org?.self_serve && (!editingGame || !editingGame.recurrence || editingGame.recurrence.is_active) && (
                       <div className="border-t border-line pt-4 space-y-4">
                         <label className="flex items-center gap-3 cursor-pointer">
                           <input
@@ -1963,40 +1987,42 @@ export default function GerirClube() {
                   </>
                 )}
 
-                <div className="pt-2 border-t border-gray-200">
-                  <h4 className="text-base font-semibold text-ink-900 mt-6 mb-1">
-                    Visibilidade pública
-                  </h4>
-                  <p className="text-sm text-gray-500 mb-4">
-                    Um clube público aparece na Comunidade, conta para o ranking geral, e os seus membros ficam pesquisáveis por qualquer jogador.
-                  </p>
-                  <label className="flex items-center justify-between gap-4 p-3 rounded-ctrl border border-line mb-3">
-                    <div>
-                      <p className="font-extrabold text-ink-900 text-sm">Clube público</p>
-                      <p className="text-[11px] text-muted">Aparece na Comunidade</p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={settings.is_global}
-                      onChange={(e) => setSettings({ ...settings, is_global: e.target.checked })}
-                      className="w-5 h-5 shrink-0"
-                    />
-                  </label>
-                  {settings.is_global && (
-                    <label className="flex items-center justify-between gap-4 p-3 rounded-ctrl border border-line">
+                {!org?.self_serve && (
+                  <div className="pt-2 border-t border-gray-200">
+                    <h4 className="text-base font-semibold text-ink-900 mt-6 mb-1">
+                      Visibilidade pública
+                    </h4>
+                    <p className="text-sm text-gray-500 mb-4">
+                      Um clube público aparece na Comunidade, conta para o ranking geral, e os seus membros ficam pesquisáveis por qualquer jogador.
+                    </p>
+                    <label className="flex items-center justify-between gap-4 p-3 rounded-ctrl border border-line mb-3">
                       <div>
-                        <p className="font-extrabold text-ink-900 text-sm">Entrada livre</p>
-                        <p className="text-[11px] text-muted">Sem isto, pedidos de entrada precisam da tua aprovação</p>
+                        <p className="font-extrabold text-ink-900 text-sm">Clube público</p>
+                        <p className="text-[11px] text-muted">Aparece na Comunidade</p>
                       </div>
                       <input
                         type="checkbox"
-                        checked={settings.open_join}
-                        onChange={(e) => setSettings({ ...settings, open_join: e.target.checked })}
+                        checked={settings.is_global}
+                        onChange={(e) => setSettings({ ...settings, is_global: e.target.checked })}
                         className="w-5 h-5 shrink-0"
                       />
                     </label>
-                  )}
-                </div>
+                    {settings.is_global && (
+                      <label className="flex items-center justify-between gap-4 p-3 rounded-ctrl border border-line">
+                        <div>
+                          <p className="font-extrabold text-ink-900 text-sm">Entrada livre</p>
+                          <p className="text-[11px] text-muted">Sem isto, pedidos de entrada precisam da tua aprovação</p>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={settings.open_join}
+                          onChange={(e) => setSettings({ ...settings, open_join: e.target.checked })}
+                          className="w-5 h-5 shrink-0"
+                        />
+                      </label>
+                    )}
+                  </div>
+                )}
 
                 <button type="submit" className="btn-primary w-full">
                   Guardar definições

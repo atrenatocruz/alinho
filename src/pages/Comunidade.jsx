@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
-import { Link } from 'react-router-dom'
-import { Search, Users, UserPlus, Clock, Heart } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Search, Users, UserPlus, Clock, Heart, Plus } from 'lucide-react'
 import { searchPlayers, listPlayers } from '../lib/privateMatches'
 import { searchOrganizations, listGlobalOrganizations } from '../lib/organizations'
+import { createSelfServeGroup } from '../lib/platformAdmin'
 import { useAuth } from '../contexts/AuthContext'
 import { Avatar, EmptyState } from '../components/ui'
 
@@ -15,8 +16,16 @@ const TABS = [
   { key: 'orgs', label: 'Clubes' },
 ]
 
+const sanitizeSlug = (value) => value.toLowerCase().replace(/[^a-z0-9-]/g, '')
+
 export default function Comunidade() {
-  const { memberships, followOrganization, leaveOrganization, toggleFavoriteOrganization } = useAuth()
+  const { memberships, followOrganization, leaveOrganization, toggleFavoriteOrganization, adminOrganizations, refreshMemberships } = useAuth()
+  const navigate = useNavigate()
+  const [showCreateGroupForm, setShowCreateGroupForm] = useState(false)
+  const [groupName, setGroupName] = useState('')
+  const [groupSlug, setGroupSlug] = useState('')
+  const [creatingGroup, setCreatingGroup] = useState(false)
+  const [createGroupError, setCreateGroupError] = useState('')
   const [tab, setTab] = useState('players')
   const [query, setQuery] = useState('')
   const [players, setPlayers] = useState([])
@@ -117,6 +126,37 @@ export default function Comunidade() {
     }
   }
 
+  const mySelfServeGroup = adminOrganizations.find((o) => o.self_serve)
+
+  const handleCreateGroup = async () => {
+    setCreateGroupError('')
+    setCreatingGroup(true)
+    try {
+      await createSelfServeGroup(groupName.trim(), groupSlug.trim())
+      // create_self_serve_group inserts the caller's admin membership
+      // server-side — pull it into the client before navigating, otherwise
+      // GerirClube's org resolver reads a stale memberships array and
+      // bounces the brand-new creator to "Sem acesso" until a manual
+      // reload. Same reason handleCreateGroup in GerirClube.jsx does this.
+      await refreshMemberships()
+      navigate(`/gerir/${groupSlug.trim()}`)
+    } catch (err) {
+      console.error('Error creating self-serve group:', err)
+      const message = err?.message || ''
+      if (message.includes('Já és admin de um grupo self-serve')) {
+        setCreateGroupError('Já és admin de um grupo. Só podes criar um.')
+      } else if (message.toLowerCase().includes('duplicate key value violates unique constraint') || message.toLowerCase().includes('slug')) {
+        // organizations.slug is globally unique across clubs and groups, so
+        // the collision can be with either — same wording GerirClube.jsx uses.
+        setCreateGroupError('Já existe um clube ou grupo com este identificador — escolhe outro')
+      } else {
+        setCreateGroupError('Não foi possível criar o grupo. Tenta novamente.')
+      }
+    } finally {
+      setCreatingGroup(false)
+    }
+  }
+
   const clubs = organizations.filter((o) => o.kind === 'club')
 
   const renderOrgRow = (org) => {
@@ -181,6 +221,79 @@ export default function Comunidade() {
             : `${organizations.length} clube${organizations.length === 1 ? '' : 's'} na comunidade`}
         </p>
       </div>
+
+      {mySelfServeGroup ? (
+        <Link to={`/gerir/${mySelfServeGroup.slug}`} className="card press flex items-center gap-3.5 hover:shadow-lift">
+          <Avatar name={mySelfServeGroup.name} url={mySelfServeGroup.group_logo_url} size="w-11 h-11 text-sm" />
+          <div className="flex-1 min-w-0">
+            <h3 className="font-extrabold text-ink-900 truncate">{mySelfServeGroup.name}</h3>
+            <p className="text-sm text-muted">O meu grupo</p>
+          </div>
+        </Link>
+      ) : (
+        <div className="card space-y-4">
+          {!showCreateGroupForm ? (
+            <button
+              type="button"
+              onClick={() => setShowCreateGroupForm(true)}
+              className="btn-primary w-full flex items-center justify-center gap-2"
+            >
+              <Plus size={18} />
+              Criar o meu grupo
+            </button>
+          ) : (
+            <>
+              <h3 className="font-extrabold text-ink-900">Criar o meu grupo</h3>
+              <p className="text-sm text-gray-500">
+                Até 30 membros, 3 mixes ativos em simultâneo, 4 campos por mix. Sem pagamentos.
+              </p>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Nome</label>
+                <input
+                  type="text"
+                  value={groupName}
+                  onChange={(e) => setGroupName(e.target.value)}
+                  className="input-field"
+                  placeholder="ex: Os Sextas-Feiras"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Slug</label>
+                <input
+                  type="text"
+                  value={groupSlug}
+                  onChange={(e) => setGroupSlug(sanitizeSlug(e.target.value))}
+                  className="input-field"
+                  placeholder="ex: os-sextas-feiras"
+                />
+              </div>
+
+              {createGroupError && (
+                <div className="bg-danger/10 text-danger px-4 py-3 rounded-ctrl text-sm font-extrabold">{createGroupError}</div>
+              )}
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={handleCreateGroup}
+                  disabled={!groupName.trim() || !groupSlug.trim() || creatingGroup}
+                  className="btn-primary flex-1 disabled:opacity-40"
+                >
+                  {creatingGroup ? 'A criar…' : 'Criar grupo'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowCreateGroupForm(false); setGroupName(''); setGroupSlug(''); setCreateGroupError('') }}
+                  disabled={creatingGroup}
+                  className="flex-1 text-sm font-extrabold px-3 py-2 min-h-[44px] rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast disabled:opacity-40"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       <div className="flex items-center gap-2 input-field">
         <Search size={16} className="text-muted shrink-0" />
