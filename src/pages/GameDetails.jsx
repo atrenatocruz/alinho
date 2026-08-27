@@ -38,6 +38,7 @@ export default function GameDetails() {
   // necessarily this mix's club.
   const gameMembership = game ? memberships.find((m) => m.organization_id === game.organization_id) : null
   const isAdmin = gameMembership?.is_admin ?? false
+  const isScorekeeper = scorekeeperIds.includes(user.id)
   const gameOrganizationId = game?.organization_id ?? null
   const [participants, setParticipants] = useState([])
   const [waitlist, setWaitlist] = useState([])
@@ -66,6 +67,8 @@ export default function GameDetails() {
   const [recurrenceHistory, setRecurrenceHistory] = useState([])
   const [historyExpanded, setHistoryExpanded] = useState(false)
   const [finishedTab, setFinishedTab] = useState('stats') // 'stats' | 'duplas' | 'rondas' — tabs for a finished mix's results
+  const [scorekeeperIds, setScorekeeperIds] = useState([])
+  const [scorekeeperBusy, setScorekeeperBusy] = useState(null)
 
   useEffect(() => {
     loadGameDetails()
@@ -177,6 +180,12 @@ export default function GameDetails() {
         .eq('game_id', id)
         .order('round_number')
         .order('court_number')
+
+      const { data: scorekeeperRows } = await supabase
+        .from('game_scorekeepers')
+        .select('user_id')
+        .eq('game_id', id)
+      setScorekeeperIds((scorekeeperRows || []).map((r) => r.user_id))
 
       // Elo rating shown next to each player instead of/alongside their
       // level, and summed per dupla once the mix has started — same source
@@ -712,6 +721,28 @@ export default function GameDetails() {
     } catch (error) {
       console.error('Error saving score:', error)
       setMixError('Erro ao guardar o resultado')
+    }
+  }
+
+  // Delegates (or revokes) score-entry for THIS mix only, while it's
+  // in_progress — matches.js's own RLS policy is the actual enforcement
+  // (migration_game_scorekeepers.sql), this just toggles membership.
+  const handleToggleScorekeeper = async (playerId) => {
+    setScorekeeperBusy(playerId)
+    try {
+      if (scorekeeperIds.includes(playerId)) {
+        const { error } = await supabase.from('game_scorekeepers').delete().eq('game_id', id).eq('user_id', playerId)
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('game_scorekeepers').insert([{ game_id: id, user_id: playerId }])
+        if (error) throw error
+      }
+      await loadGameDetails()
+    } catch (error) {
+      console.error('Error toggling scorekeeper:', error)
+      alert('Não foi possível atualizar. Tenta novamente.')
+    } finally {
+      setScorekeeperBusy(null)
     }
   }
 
@@ -1441,6 +1472,38 @@ export default function GameDetails() {
             </div>
           )}
 
+          {/* Marcadores de resultado — admin delegates score entry for this
+              mix to one or more players, so they don't have to walk court
+              to court collecting results themselves. Scoped to this game
+              only, and only while it's in_progress (see migration). */}
+          {isAdmin && (
+            <div className="card space-y-3">
+              <div>
+                <h3 className="text-lg text-ink-900">Marcadores de resultado</h3>
+                <p className="text-sm text-muted">
+                  Estes jogadores também podem registar resultados neste mix.
+                </p>
+              </div>
+              <div className="space-y-2">
+                {people.filter((p, i, arr) => arr.findIndex((x) => x.id === p.id) === i).map((p) => (
+                  <div key={p.id} className="flex items-center gap-3">
+                    <Avatar name={p.name} url={p.avatar_url} size="w-8 h-8 text-xs" />
+                    <p className="flex-1 min-w-0 text-sm font-extrabold text-ink-900 truncate">{p.name}</p>
+                    <button
+                      onClick={() => handleToggleScorekeeper(p.id)}
+                      disabled={scorekeeperBusy === p.id}
+                      className={`text-xs font-extrabold px-3 py-2 min-h-[36px] rounded-full transition-colors duration-fast disabled:opacity-40 ${
+                        scorekeeperIds.includes(p.id) ? 'bg-lime-400 text-ink-900' : 'bg-ink-50 text-ink-700 hover:bg-ink-200'
+                      }`}
+                    >
+                      {scorekeeperIds.includes(p.id) ? 'Marcador' : 'Tornar marcador'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Rondas */}
           {rounds.map(r => {
             const ms = matches.filter(m => m.round_number === r)
@@ -1471,7 +1534,7 @@ export default function GameDetails() {
                   {ms.map(m => {
                     const done = !!m.winner_team_id
                     const s = scores[m.id] || { a: '', b: '' }
-                    const editable = !done && isAdmin && game.status === 'in_progress'
+                    const editable = !done && (isAdmin || isScorekeeper) && game.status === 'in_progress'
                     // one row per dupla — full-width names, no truncation
                     const teamRow = (teamId, scoreVal, scoreKey) => {
                       const isWinner = done && m.winner_team_id === teamId
@@ -1601,7 +1664,7 @@ export default function GameDetails() {
                           {ms.map(m => {
                             const done = !!m.winner_team_id
                             const s = scores[m.id] || { a: '', b: '' }
-                            const editable = !done && isAdmin && game.status === 'in_progress'
+                            const editable = !done && (isAdmin || isScorekeeper) && game.status === 'in_progress'
                             // one row per dupla — full-width names, no truncation
                             const teamRow = (teamId, scoreVal, scoreKey) => {
                               const isWinner = done && m.winner_team_id === teamId
