@@ -14,6 +14,7 @@ import { groupGamesBySeries } from '../lib/recurrenceGrouping'
 import PlayerSearch from '../components/PlayerSearch'
 import { searchPlayers } from '../lib/privateMatches'
 import { inviteToOrganization } from '../lib/orgInvites'
+import { DAY_LABEL, listPendingTeacherRequests, approveTeacherProfile, rejectTeacherProfile } from '../lib/teachers'
 
 const sanitizeSlug = (value) => value.toLowerCase().replace(/[^a-z0-9-]/g, '')
 
@@ -120,6 +121,7 @@ export default function GerirClube() {
   const [members, setMembers] = useState([])
   const [linkCopied, setLinkCopied] = useState(false)
   const [requests, setRequests] = useState([])
+  const [teacherRequests, setTeacherRequests] = useState([])
   const [settings, setSettings] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showCreateGame, setShowCreateGame] = useState(false)
@@ -235,6 +237,38 @@ export default function GerirClube() {
   useEffect(() => {
     if (currentOrganizationId) loadRequests()
   }, [currentOrganizationId])
+
+  const loadTeacherRequests = async () => {
+    try {
+      setTeacherRequests(await listPendingTeacherRequests(currentOrganizationId))
+    } catch (error) {
+      console.error('Error loading teacher requests:', error)
+    }
+  }
+
+  useEffect(() => {
+    if (currentOrganizationId) loadTeacherRequests()
+  }, [currentOrganizationId])
+
+  const handleApproveTeacherRequest = async (id) => {
+    try {
+      await approveTeacherProfile(id)
+      await loadTeacherRequests()
+    } catch (error) {
+      console.error('Error approving teacher request:', error)
+      alert('Erro ao aprovar pedido de professor: ' + error.message)
+    }
+  }
+
+  const handleRejectTeacherRequest = async (id) => {
+    try {
+      await rejectTeacherProfile(id)
+      await loadTeacherRequests()
+    } catch (error) {
+      console.error('Error rejecting teacher request:', error)
+      alert('Erro ao rejeitar pedido de professor: ' + error.message)
+    }
+  }
 
   // Only clubs contain groups — a group's own Gerir page has none of its
   // own (create_group rejects a group as a parent), so this stays empty
@@ -1799,6 +1833,46 @@ export default function GerirClube() {
                       >
                         <X size={18} />
                       </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {teacherRequests.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-extrabold text-ink-900 flex items-center gap-1.5">
+                    <Clock size={14} /> Pedidos de professor ({teacherRequests.length})
+                  </h3>
+                  {teacherRequests.map((req) => (
+                    <div key={req.id} className="card space-y-2">
+                      <div className="flex items-center gap-3">
+                        <Avatar name={req.user?.name} url={req.user?.avatar_url} size="w-9 h-9 text-sm" />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-extrabold text-ink-900 truncate">{req.user?.name || 'Jogador'}</p>
+                          <p className="text-sm text-muted truncate">{req.contact}</p>
+                        </div>
+                        <button
+                          onClick={() => handleApproveTeacherRequest(req.id)}
+                          className="w-9 h-9 flex items-center justify-center rounded-full bg-ok/10 text-ok hover:bg-ok/20 transition-colors duration-fast"
+                          title="Aprovar"
+                        >
+                          <Check size={18} />
+                        </button>
+                        <button
+                          onClick={() => handleRejectTeacherRequest(req.id)}
+                          className="w-9 h-9 flex items-center justify-center rounded-full text-danger hover:bg-danger/10 transition-colors duration-fast"
+                          title="Rejeitar"
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
+                      {req.availability?.length > 0 && (
+                        <p className="text-[11px] text-muted">
+                          {req.availability
+                            .map((a) => `${DAY_LABEL[a.day_of_week]} ${a.start_time.slice(0, 5)}-${a.end_time.slice(0, 5)}`)
+                            .join(' • ')}
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>
