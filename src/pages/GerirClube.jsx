@@ -1963,40 +1963,42 @@ export default function GerirClube() {
                   </>
                 )}
 
-                <div className="pt-2 border-t border-gray-200">
-                  <h4 className="text-base font-semibold text-ink-900 mt-6 mb-1">
-                    Visibilidade pública
-                  </h4>
-                  <p className="text-sm text-gray-500 mb-4">
-                    Um clube público aparece na Comunidade, conta para o ranking geral, e os seus membros ficam pesquisáveis por qualquer jogador.
-                  </p>
-                  <label className="flex items-center justify-between gap-4 p-3 rounded-ctrl border border-line mb-3">
-                    <div>
-                      <p className="font-extrabold text-ink-900 text-sm">Clube público</p>
-                      <p className="text-[11px] text-muted">Aparece na Comunidade</p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={settings.is_global}
-                      onChange={(e) => setSettings({ ...settings, is_global: e.target.checked })}
-                      className="w-5 h-5 shrink-0"
-                    />
-                  </label>
-                  {settings.is_global && (
-                    <label className="flex items-center justify-between gap-4 p-3 rounded-ctrl border border-line">
+                {!org?.self_serve && (
+                  <div className="pt-2 border-t border-gray-200">
+                    <h4 className="text-base font-semibold text-ink-900 mt-6 mb-1">
+                      Visibilidade pública
+                    </h4>
+                    <p className="text-sm text-gray-500 mb-4">
+                      Um clube público aparece na Comunidade, conta para o ranking geral, e os seus membros ficam pesquisáveis por qualquer jogador.
+                    </p>
+                    <label className="flex items-center justify-between gap-4 p-3 rounded-ctrl border border-line mb-3">
                       <div>
-                        <p className="font-extrabold text-ink-900 text-sm">Entrada livre</p>
-                        <p className="text-[11px] text-muted">Sem isto, pedidos de entrada precisam da tua aprovação</p>
+                        <p className="font-extrabold text-ink-900 text-sm">Clube público</p>
+                        <p className="text-[11px] text-muted">Aparece na Comunidade</p>
                       </div>
                       <input
                         type="checkbox"
-                        checked={settings.open_join}
-                        onChange={(e) => setSettings({ ...settings, open_join: e.target.checked })}
+                        checked={settings.is_global}
+                        onChange={(e) => setSettings({ ...settings, is_global: e.target.checked })}
                         className="w-5 h-5 shrink-0"
                       />
                     </label>
-                  )}
-                </div>
+                    {settings.is_global && (
+                      <label className="flex items-center justify-between gap-4 p-3 rounded-ctrl border border-line">
+                        <div>
+                          <p className="font-extrabold text-ink-900 text-sm">Entrada livre</p>
+                          <p className="text-[11px] text-muted">Sem isto, pedidos de entrada precisam da tua aprovação</p>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={settings.open_join}
+                          onChange={(e) => setSettings({ ...settings, open_join: e.target.checked })}
+                          className="w-5 h-5 shrink-0"
+                        />
+                      </label>
+                    )}
+                  </div>
+                )}
 
                 <button type="submit" className="btn-primary w-full">
                   Guardar definições
