@@ -65,6 +65,7 @@ export default function GameDetails() {
   const [pointsById, setPointsById] = useState({})
   const [recurrenceHistory, setRecurrenceHistory] = useState([])
   const [historyExpanded, setHistoryExpanded] = useState(false)
+  const [finishedTab, setFinishedTab] = useState('stats') // 'stats' | 'duplas' | 'rondas' — tabs for a finished mix's results
 
   useEffect(() => {
     loadGameDetails()
@@ -1165,34 +1166,31 @@ export default function GameDetails() {
         </div>
       )}
 
-      {/* Jump nav — a finished mix stacks stats, duplas per court, then
-          every round in one continuous scroll with no way to skip ahead
-          (e.g. straight to Ronda 4). Plain anchors, no JS: cheap and works
-          even before the page finishes hydrating. */}
+      {/* Tabs — a finished mix's results (stats, duplas, rounds) are shown
+          one section at a time instead of stacked in a continuous scroll.
+          Matches the tab-bar pattern from Comunidade.jsx. */}
       {game.status === 'finished' && rounds.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-1 px-1">
-          {mixStats.length > 0 && (
-            <a href="#mix-stats" className="shrink-0 text-xs font-extrabold px-3 py-2 min-h-[36px] inline-flex items-center rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast">
-              Estatísticas
-            </a>
-          )}
-          <a href="#mix-duplas" className="shrink-0 text-xs font-extrabold px-3 py-2 min-h-[36px] inline-flex items-center rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast">
-            Duplas
-          </a>
-          {rounds.map((r) => (
-            <a
-              key={r}
-              href={`#mix-ronda-${r}`}
-              className="shrink-0 text-xs font-extrabold px-3 py-2 min-h-[36px] inline-flex items-center rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast"
+        <div className="flex gap-1 p-1 bg-ink-50 rounded-ctrl">
+          {[
+            { key: 'stats', label: 'Estatísticas' },
+            { key: 'duplas', label: 'Duplas' },
+            { key: 'rondas', label: 'Rondas' },
+          ].map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setFinishedTab(t.key)}
+              className={`flex-1 py-2.5 rounded-ctrl text-sm font-extrabold transition-all duration-fast ${
+                finishedTab === t.key ? 'bg-canvas text-ink-900 shadow-lift border border-line' : 'text-muted hover:text-ink-900'
+              }`}
             >
-              Ronda {r}
-            </a>
+              {t.label}
+            </button>
           ))}
         </div>
       )}
 
       {/* Estatísticas do mix — classificação final por pontos */}
-      {game.status === 'finished' && mixStats.length > 0 && (
+      {game.status === 'finished' && finishedTab === 'stats' && mixStats.length > 0 && (
         <div id="mix-stats" className="card scroll-mt-24">
           <h3 className="text-lg text-ink-900 mb-3">Estatísticas do Mix</h3>
           <div className="space-y-1.5">
@@ -1248,6 +1246,10 @@ export default function GameDetails() {
       {/* ─── Mix board ─────────────────────────────────────────────── */}
       {mixStarted && (
         <>
+          {/* In-progress mix: duplas-per-court, classificação, rounds — all
+              stacked as before. Untouched by the finished-mix tabs below. */}
+          {game.status === 'in_progress' && (
+            <>
           {/* Duplas */}
           <div id="mix-duplas" className="card scroll-mt-24">
             <div
@@ -1516,6 +1518,140 @@ export default function GameDetails() {
               </div>
             )
           })}
+            </>
+          )}
+
+          {/* Finished mix: same underlying data (duplas, group standings,
+              rounds), but shown one tab at a time instead of stacked.
+              Duplas here is a flat list — no "Campo N" grouping — since
+              court assignment stopped mattering once the mix ended. */}
+          {game.status === 'finished' && (
+            <>
+              {finishedTab === 'duplas' && teams.length > 0 && (
+                <div className="card">
+                  <h3 className="text-lg text-ink-900 mb-3">Duplas</h3>
+                  <div className="space-y-2">
+                    {teams.map((t) => (
+                      <div key={t.id} className="rounded-ctrl p-3 bg-canvas">
+                        {renderDuplaBlock(t)}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {finishedTab === 'rondas' && (
+                <>
+                  {/* Classificação (todos contra todos) */}
+                  {!isSobeDesce && roundsStarted && tctStandings.length > 0 && (
+                    <div className="card">
+                      <h3 className="text-lg text-ink-900 mb-3">Classificação — fase de grupo</h3>
+                      <div className="space-y-1.5">
+                        {tctStandings.map((s, i) => (
+                          <div key={s.team.id} className="flex items-center gap-3 text-sm py-1.5 border-b border-line last:border-0">
+                            <span className="w-6 font-extrabold text-ink-900 tabular-nums">{i + 1}</span>
+                            <span className="flex-1 font-extrabold text-ink-900 truncate">{teamName(s.team.id)}</span>
+                            <span className="text-muted tabular-nums" title="Vitórias">{s.wins}V</span>
+                            <span className="text-muted tabular-nums w-12 text-right" title="Diferença de pontos">
+                              {s.diff > 0 ? '+' : ''}{s.diff}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Rondas */}
+                  {rounds.map(r => {
+                    const ms = matches.filter(m => m.round_number === r)
+                    const phase = ms[0]?.phase || 'group'
+                    const isCurrent = r === maxRound && game.status === 'in_progress'
+                    return (
+                      <div key={r} id={`mix-ronda-${r}`} className={`card ${isCurrent ? 'ring-2 ring-lime-400' : ''}`}>
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="text-lg text-ink-900">
+                            Ronda {r}
+                            {phase !== 'group' && (
+                              <span className="ml-2 text-xs font-extrabold uppercase tracking-wide bg-ink-900 text-lime-400 px-2.5 py-1 rounded-full">
+                                {PHASE_LABEL[phase]}
+                              </span>
+                            )}
+                          </h3>
+                          {isCurrent && (
+                            <RoundTimer
+                              startedAt={game.round_started_at}
+                              durationMinutes={game.round_duration_minutes}
+                              isAdmin={isAdmin}
+                              onAdjust={isAdmin ? handleAdjustRoundDuration : undefined}
+                            />
+                          )}
+                        </div>
+
+                        <div className="space-y-2.5">
+                          {ms.map(m => {
+                            const done = !!m.winner_team_id
+                            const s = scores[m.id] || { a: '', b: '' }
+                            const editable = !done && isAdmin && game.status === 'in_progress'
+                            // one row per dupla — full-width names, no truncation
+                            const teamRow = (teamId, scoreVal, scoreKey) => {
+                              const isWinner = done && m.winner_team_id === teamId
+                              return (
+                                <div className={`flex items-center gap-3 rounded-ctrl px-3 py-2.5 ${
+                                  isWinner ? 'bg-lime-400/25' : 'bg-surface'
+                                }`}>
+                                  <span className={`flex-1 min-w-0 text-sm font-extrabold ${
+                                    done && !isWinner ? 'text-muted' : 'text-ink-900'
+                                  }`}>
+                                    {teamName(teamId)}
+                                    {isWinner && <span className="ml-1.5 text-lime-600">🏆</span>}
+                                  </span>
+                                  {done ? (
+                                    <span className={`text-xl font-extrabold tabular-nums shrink-0 ${
+                                      isWinner ? 'text-ink-900' : 'text-muted'
+                                    }`}>
+                                      {scoreVal}
+                                    </span>
+                                  ) : editable ? (
+                                    <input
+                                      type="number" min="0" inputMode="numeric"
+                                      value={s[scoreKey]}
+                                      onChange={e => setScores(prev => ({ ...prev, [m.id]: { ...s, [scoreKey]: e.target.value } }))}
+                                      className="w-16 px-2 py-2 text-center text-lg font-extrabold rounded-ctrl border border-line bg-surface shrink-0"
+                                      placeholder="0"
+                                    />
+                                  ) : null}
+                                </div>
+                              )
+                            }
+                            return (
+                              <div key={m.id} className="rounded-ctrl bg-canvas p-2.5">
+                                <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mb-2 px-1">
+                                  Campo {m.court_number}
+                                </p>
+                                <div className="space-y-1.5">
+                                  {teamRow(m.team_a_id, m.score_a, 'a')}
+                                  {teamRow(m.team_b_id, m.score_b, 'b')}
+                                </div>
+
+                                {editable && s.a !== '' && s.b !== '' && (
+                                  <button
+                                    onClick={() => handleSaveScore(m)}
+                                    className="mt-2.5 w-full py-2.5 rounded-ctrl bg-ink-900 text-lime-400 text-sm font-extrabold transition-all duration-fast active:scale-[0.98]"
+                                  >
+                                    Guardar resultado
+                                  </button>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </>
+              )}
+            </>
+          )}
 
           {/* Controlo de rondas (admin) — tudo manual, sem temporizador */}
           {isAdmin && game.status === 'in_progress' && (
