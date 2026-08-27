@@ -19,7 +19,7 @@ const TABS = [
 const sanitizeSlug = (value) => value.toLowerCase().replace(/[^a-z0-9-]/g, '')
 
 export default function Comunidade() {
-  const { memberships, followOrganization, leaveOrganization, toggleFavoriteOrganization, adminOrganizations } = useAuth()
+  const { memberships, followOrganization, leaveOrganization, toggleFavoriteOrganization, adminOrganizations, refreshMemberships } = useAuth()
   const navigate = useNavigate()
   const [showCreateGroupForm, setShowCreateGroupForm] = useState(false)
   const [groupName, setGroupName] = useState('')
@@ -133,6 +133,12 @@ export default function Comunidade() {
     setCreatingGroup(true)
     try {
       await createSelfServeGroup(groupName.trim(), groupSlug.trim())
+      // create_self_serve_group inserts the caller's admin membership
+      // server-side — pull it into the client before navigating, otherwise
+      // GerirClube's org resolver reads a stale memberships array and
+      // bounces the brand-new creator to "Sem acesso" until a manual
+      // reload. Same reason handleCreateGroup in GerirClube.jsx does this.
+      await refreshMemberships()
       navigate(`/gerir/${groupSlug.trim()}`)
     } catch (err) {
       console.error('Error creating self-serve group:', err)
@@ -140,7 +146,9 @@ export default function Comunidade() {
       if (message.includes('Já és admin de um grupo self-serve')) {
         setCreateGroupError('Já és admin de um grupo. Só podes criar um.')
       } else if (message.toLowerCase().includes('duplicate key value violates unique constraint') || message.toLowerCase().includes('slug')) {
-        setCreateGroupError('Já existe um grupo com este identificador — escolhe outro')
+        // organizations.slug is globally unique across clubs and groups, so
+        // the collision can be with either — same wording GerirClube.jsx uses.
+        setCreateGroupError('Já existe um clube ou grupo com este identificador — escolhe outro')
       } else {
         setCreateGroupError('Não foi possível criar o grupo. Tenta novamente.')
       }
