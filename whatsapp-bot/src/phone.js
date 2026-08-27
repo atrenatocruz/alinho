@@ -26,6 +26,45 @@ function hashPhone(digits) {
 }
 
 /**
+ * Creates a real (but never-logged-into) Supabase Auth user + profile +
+ * is_guest membership for a WhatsApp sender who has no registered profile
+ * yet — same shape as supabase/functions/admin-create-test-user, minus the
+ * caller-is-admin check (there's no admin caller here, the bot itself is
+ * the trusted actor via its service-role key). phone_hash/whatsapp_jid are
+ * set right after creation so this same sender resolves via
+ * resolveProfileByPhoneJid on their very next message, exactly like a real
+ * signup would.
+ */
+export async function createGuestProfile(phoneJid, displayName) {
+  const digits = phoneJid.split('@')[0]
+  const hash = hashPhone(digits)
+  const name = displayName?.trim() || 'Jogador'
+
+  const { data: created, error: createError } = await supabase.auth.admin.createUser({
+    email: `guest-${crypto.randomUUID()}@whatsapp.alinho.pt`,
+    email_confirm: true,
+    password: crypto.randomUUID(),
+    user_metadata: { name },
+  })
+  if (createError || !created?.user) {
+    throw new Error(`Failed to create guest auth user: ${createError?.message}`)
+  }
+
+  const { error: updateError } = await supabase
+    .from('profiles')
+    .update({ phone_hash: hash, whatsapp_jid: phoneJid })
+    .eq('id', created.user.id)
+  if (updateError) throw new Error(`Failed to set guest profile phone: ${updateError.message}`)
+
+  const { error: membershipError } = await supabase
+    .from('memberships')
+    .insert({ user_id: created.user.id, organization_id: config.organizationId, is_guest: true })
+  if (membershipError) throw new Error(`Failed to create guest membership: ${membershipError.message}`)
+
+  return { id: created.user.id, name }
+}
+
+/**
  * Resolves a WhatsApp phone-number JID (e.g. "351916376443@s.whatsapp.net")
  * to a profile that's actually a member of THIS bot's organization.
  */

@@ -1,7 +1,7 @@
 import { supabase } from './supabase.js'
 import { getSettings } from './settings.js'
 import { loadGame, getOpenMixes, formatDateTime } from './roster.js'
-import { resolveProfileByPhoneJid } from './phone.js'
+import { resolveProfileByPhoneJid, createGuestProfile } from './phone.js'
 import { config } from './config.js'
 import { HELP_TEXT, HELP_FOOTER } from './messages.js'
 
@@ -99,17 +99,27 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message }, 
 
   const NOT_FOUND_MSG = `🤖 Não te encontrei na app 😅 Regista-te primeiro em ${config.appUrl} e confirma o teu número de telemóvel no perfil.`
 
-  async function resolveProfileOrReply() {
-    const profile = await resolveProfileByPhoneJid(senderPn)
-    if (!profile) await reply(NOT_FOUND_MSG)
-    return profile
-  }
-
-  // Same check as resolveProfileOrReply, but for a profile already resolved
+  // Same check a plain resolveProfileByPhoneJid result needs before use
   // (e.g. fetched in parallel with getOpenMixes below) — avoids a redundant query.
   async function requireProfile(profile) {
     if (!profile) await reply(NOT_FOUND_MSG)
     return profile
+  }
+
+  // Only called on an actual join attempt (not "out", not disambiguation) —
+  // a WhatsApp-only person becomes a real (is_guest) profile+membership right
+  // then, so they can play without registering first, while still being
+  // nudged to sign up for their history/friends/rewards (Trello #19).
+  async function requireProfileOrCreateGuest(profile, senderPnForGuest) {
+    if (profile) return { profile, isNewGuest: false }
+    try {
+      const created = await createGuestProfile(senderPnForGuest, message?.pushName)
+      return { profile: created, isNewGuest: true }
+    } catch (err) {
+      console.error('Failed to create guest profile:', err)
+      await reply(NOT_FOUND_MSG)
+      return { profile: null, isNewGuest: false }
+    }
   }
 
   if (pending) {
@@ -126,7 +136,8 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message }, 
         return
       }
 
-      const profile = await resolveProfileOrReply()
+      const resolved = await resolveProfileByPhoneJid(senderPn)
+      const { profile, isNewGuest } = await requireProfileOrCreateGuest(resolved, senderPn)
       if (!profile) return
 
       const { error: insertError } = await supabase
@@ -140,7 +151,11 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message }, 
         }
         throw new Error(`Failed to insert waitlisted participant: ${insertError.message}`)
       }
-      await reply('🤖 Estás na lista de suplentes! Quando alguém sair, entras automaticamente. 🎾')
+      await reply(
+        isNewGuest
+          ? `🤖 Fixe, ${profile.name}! Ficas na lista de suplentes como convidado 🎾 Entras automaticamente quando alguém sair. Regista-te em ${config.appUrl} para veres o teu histórico e desbloquear recompensas.`
+          : '🤖 Estás na lista de suplentes! Quando alguém sair, entras automaticamente. 🎾'
+      )
       return
     }
 
@@ -192,7 +207,12 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message }, 
       return
     }
 
-    profile = await requireProfile(profile)
+    let isNewGuest = false
+    if (action === 'in') {
+      ;({ profile, isNewGuest } = await requireProfileOrCreateGuest(profile, senderPn))
+    } else {
+      profile = await requireProfile(profile)
+    }
     if (!profile) return
 
     const { data: existingRows, error: existingError } = await supabase
@@ -237,7 +257,16 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message }, 
         }
         throw new Error(`Failed to insert participant: ${insertError.message}`)
       }
-      // No reply — the participants INSERT triggers a roster repost via sync.js.
+      // A regular join gets no reply — the participants INSERT triggers a
+      // roster repost via sync.js, and that repost IS the confirmation. A
+      // brand-new guest still needs an explicit nudge, though: a bare
+      // roster repost wouldn't explain what just happened or that signing
+      // up unlocks their history/friends/rewards (Trello #19).
+      if (isNewGuest) {
+        await reply(
+          `🤖 Fixe, ${profile.name}! Inscrevi-te como convidado 🎾 Regista-te em ${config.appUrl} para veres o teu histórico, o dos teus amigos, e desbloquear recompensas.`
+        )
+      }
       return
     }
 
