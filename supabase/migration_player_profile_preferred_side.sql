@@ -6,7 +6,11 @@
 -- Run this whole file in Supabase → SQL Editor → New query → Run.
 -- ════════════════════════════════════════════════════════════════════════
 
-CREATE OR REPLACE FUNCTION get_player_profile(p_user_id UUID)
+-- CREATE OR REPLACE can't change a function's output row shape (adding
+-- preferred_side here) — Postgres requires dropping it first.
+DROP FUNCTION IF EXISTS get_player_profile(UUID);
+
+CREATE FUNCTION get_player_profile(p_user_id UUID)
 RETURNS TABLE (
   id UUID,
   name TEXT,
