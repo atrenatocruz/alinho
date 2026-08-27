@@ -410,6 +410,7 @@ export default function GerirClube() {
           recurrence:game_recurrences (
             id,
             is_active,
+            is_paused,
             frequency,
             ends_type,
             ends_on,
@@ -854,6 +855,25 @@ export default function GerirClube() {
       .eq('status', 'pending')
     if (cleanupError) {
       console.error('Error removing pending occurrence:', cleanupError)
+    }
+  }
+
+  // Pauses/resumes a recurring series without touching its configuration —
+  // unlike deactivateRecurrence, the pending occurrence is left alone
+  // (process_due_game_recurrences skips paused series entirely, so it
+  // simply never launches while paused instead of being deleted).
+  const handleTogglePauseRecurrence = async (recurrenceId, currentlyPaused) => {
+    try {
+      const { error } = await supabase
+        .from('game_recurrences')
+        .update({ is_paused: !currentlyPaused, updated_at: new Date().toISOString() })
+        .eq('id', recurrenceId)
+      if (error) throw error
+      setEditingGame((g) => ({ ...g, recurrence: { ...g.recurrence, is_paused: !currentlyPaused } }))
+      loadGames()
+    } catch (error) {
+      console.error('Error toggling recurrence pause:', error)
+      alert('Erro ao atualizar a recorrência: ' + error.message)
     }
   }
 
@@ -1523,6 +1543,27 @@ export default function GerirClube() {
                         section in Definições. */}
                     {!org?.self_serve && (!editingGame || !editingGame.recurrence || editingGame.recurrence.is_active) && (
                       <div className="border-t border-line pt-4 space-y-4">
+                        {editingGame?.recurrence?.is_active && (
+                          <div className="flex items-center justify-between gap-3 p-3 rounded-ctrl bg-ink-50">
+                            <div>
+                              <p className="text-sm font-extrabold text-ink-900">
+                                {editingGame.recurrence.is_paused ? 'Recorrência em pausa' : 'Recorrência ativa'}
+                              </p>
+                              <p className="text-[11px] text-muted">
+                                {editingGame.recurrence.is_paused
+                                  ? 'Nenhum novo mix é lançado enquanto estiver em pausa.'
+                                  : 'Pausar para férias ou obras, sem perder a configuração.'}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleTogglePauseRecurrence(editingGame.recurrence.id, editingGame.recurrence.is_paused)}
+                              className="shrink-0 text-xs font-extrabold px-3.5 py-2 min-h-[44px] rounded-full bg-ink-900 text-lime-400"
+                            >
+                              {editingGame.recurrence.is_paused ? 'Retomar' : 'Pausar'}
+                            </button>
+                          </div>
+                        )}
                         <label className="flex items-center gap-3 cursor-pointer">
                           <input
                             type="checkbox"
