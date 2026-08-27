@@ -187,7 +187,7 @@ CREATE POLICY "Org admins can create games"
         num_courts <= 4
         AND (SELECT COUNT(*) FROM games g2
              WHERE g2.organization_id = games.organization_id
-               AND g2.status NOT IN ('finished', 'cancelled')) < 3
+               AND COALESCE(g2.status, 'open') NOT IN ('finished', 'cancelled')) < 3
       )
     )
   );
@@ -224,8 +224,8 @@ CREATE POLICY "Org admins can update games"
           (SELECT COUNT(*) FROM games g2
            WHERE g2.organization_id = games.organization_id
              AND g2.id <> games.id
-             AND g2.status NOT IN ('finished', 'cancelled'))
-          + (CASE WHEN games.status NOT IN ('finished', 'cancelled') THEN 1 ELSE 0 END)
+             AND COALESCE(g2.status, 'open') NOT IN ('finished', 'cancelled'))
+          + (CASE WHEN COALESCE(games.status, 'open') NOT IN ('finished', 'cancelled') THEN 1 ELSE 0 END)
         ) <= 3
       )
     )
