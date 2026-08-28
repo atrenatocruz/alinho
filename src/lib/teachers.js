@@ -19,7 +19,7 @@ export const DAY_LABEL = Object.fromEntries(DAYS.map((d) => [d.value, d.label]))
 export const listTeacherProfiles = async () => {
   const { data, error } = await supabase
     .from('teacher_profiles')
-    .select('*, user:profiles(name, avatar_url), organization:organizations(name, slug), availability:teacher_availability(*)')
+    .select('*, user:profiles!teacher_profiles_user_id_fkey(name, avatar_url), organization:organizations(name, slug), availability:teacher_availability(*)')
   if (error) throw error
   return data || []
 }
@@ -50,7 +50,7 @@ export const withdrawTeacherProfile = async (id) => {
 export const listPendingTeacherRequests = async (organizationId) => {
   const { data, error } = await supabase
     .from('teacher_profiles')
-    .select('id, contact, created_at, user:profiles(name, avatar_url), availability:teacher_availability(*)')
+    .select('id, contact, created_at, user:profiles!teacher_profiles_user_id_fkey(name, avatar_url), availability:teacher_availability(*)')
     .eq('organization_id', organizationId)
     .eq('status', 'pending')
   if (error) throw error
