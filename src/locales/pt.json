@@ -679,5 +679,18 @@
   "profile.position_of_total": "{{position}} de {{total}}",
   "profile.friendly_matches_heading": "Jogos entre amigos",
   "profile.no_friendly_matches_title": "Ainda não tens jogos entre amigos",
-  "profile.no_friendly_matches_subtitle": "Cria um jogo 2x2 fora do clube para começares o teu histórico."
+  "profile.no_friendly_matches_subtitle": "Cria um jogo 2x2 fora do clube para começares o teu histórico.",
+  "onboarding.heading": "Qual é o teu nível?",
+  "onboarding.subheading": "Define os teus pontos de entrada no ranking. Escolhe com honestidade — a partir daqui são os resultados que falam.",
+  "onboarding.level_iniciado_title": "Iniciado",
+  "onboarding.level_iniciado_description": "Estou a começar — jogo há pouco tempo ou ainda estou a aprender.",
+  "onboarding.level_regular_title": "Regular",
+  "onboarding.level_regular_description": "Jogo com alguma regularidade — domino o básico do jogo.",
+  "onboarding.level_avancado_title": "Avançado",
+  "onboarding.level_avancado_description": "Jogo há anos e a um nível competitivo.",
+  "onboarding.points": "pontos",
+  "onboarding.save_failed_retry": "Não foi possível guardar. Tenta novamente.",
+  "onboarding.saving": "A guardar…",
+  "onboarding.confirm": "Confirmar",
+  "onboarding.footnote": "Esta escolha define só o ponto de partida — o nível público (M6, M5…) evolui com os teus jogos."
 }

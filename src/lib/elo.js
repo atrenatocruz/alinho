@@ -46,20 +46,20 @@ export const formatRating = (rating) => (rating == null ? '—' : String(Math.ro
 export const ONBOARDING_LEVELS = [
   {
     key: 'iniciado',
-    title: 'Iniciado',
+    titleKey: 'onboarding.level_iniciado_title',
     points: 700,
-    description: 'Estou a começar — jogo há pouco tempo ou ainda estou a aprender.',
+    descriptionKey: 'onboarding.level_iniciado_description',
   },
   {
     key: 'regular',
-    title: 'Regular',
+    titleKey: 'onboarding.level_regular_title',
     points: 900,
-    description: 'Jogo com alguma regularidade — domino o básico do jogo.',
+    descriptionKey: 'onboarding.level_regular_description',
   },
   {
     key: 'avancado',
-    title: 'Avançado',
+    titleKey: 'onboarding.level_avancado_title',
     points: 1100,
-    description: 'Jogo há anos e a um nível competitivo.',
+    descriptionKey: 'onboarding.level_avancado_description',
   },
 ]

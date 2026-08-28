@@ -679,5 +679,18 @@
   "profile.position_of_total": "{{position}} of {{total}}",
   "profile.friendly_matches_heading": "Games with friends",
   "profile.no_friendly_matches_title": "You don't have any games with friends yet",
-  "profile.no_friendly_matches_subtitle": "Create a 2x2 game outside the club to start your history."
+  "profile.no_friendly_matches_subtitle": "Create a 2x2 game outside the club to start your history.",
+  "onboarding.heading": "What's your level?",
+  "onboarding.subheading": "Set your entry points on the ranking. Choose honestly — from here on, results do the talking.",
+  "onboarding.level_iniciado_title": "Beginner",
+  "onboarding.level_iniciado_description": "I'm just starting out — I've been playing a short time or I'm still learning.",
+  "onboarding.level_regular_title": "Regular",
+  "onboarding.level_regular_description": "I play fairly regularly — I've got the basics of the game down.",
+  "onboarding.level_avancado_title": "Advanced",
+  "onboarding.level_avancado_description": "I've been playing for years, at a competitive level.",
+  "onboarding.points": "points",
+  "onboarding.save_failed_retry": "Couldn't save. Please try again.",
+  "onboarding.saving": "Saving…",
+  "onboarding.confirm": "Confirm",
+  "onboarding.footnote": "This choice only sets your starting point — your public level (M6, M5…) evolves with your games."
 }
