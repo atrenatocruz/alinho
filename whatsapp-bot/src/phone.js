@@ -50,9 +50,23 @@ export async function createGuestProfile(phoneJid, displayName) {
     throw new Error(`Failed to create guest auth user: ${createError?.message}`)
   }
 
+  // A real signup picks a starting level on the "Escolher Nível" screen
+  // (Iniciado 700 / Regular 900 / Avançado 1100) before ever seeing the
+  // app; a WhatsApp guest never opens the app, so they'd otherwise sit at
+  // rating=NULL forever — showing as "sem ranking" and seeding as the
+  // weakest possible player in every dupla until their first result
+  // lands. complete_rating_onboarding's own fallback for "played before
+  // onboarding" is a 900 baseline (see migration_elo_rating.sql) — reuse
+  // that exact number here rather than inventing a new one.
   const { error: updateError } = await supabase
     .from('profiles')
-    .update({ phone_hash: hash, whatsapp_jid: phoneJid })
+    .update({
+      phone_hash: hash,
+      whatsapp_jid: phoneJid,
+      rating: 900,
+      rating_anchor: 900,
+      rating_onboarded_at: new Date().toISOString(),
+    })
     .eq('id', created.user.id)
   if (updateError) throw new Error(`Failed to set guest profile phone: ${updateError.message}`)
 
