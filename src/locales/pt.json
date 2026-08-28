@@ -861,5 +861,22 @@
   "sharecard.podium_badge": "🏆 Resultados do mix",
   "sharecard.duplas_badge": "🎾 Duplas",
   "sharecard.court_label": "Campo {{number}}",
-  "sharecard.vs": "vs"
+  "sharecard.vs": "vs",
+  "teachers.day_segunda": "Segunda",
+  "teachers.day_terca": "Terça",
+  "teachers.day_quarta": "Quarta",
+  "teachers.day_quinta": "Quinta",
+  "teachers.day_sexta": "Sexta",
+  "teachers.day_sabado": "Sábado",
+  "teachers.day_domingo": "Domingo",
+  "mixlogic.phase_group": "Fase de grupo",
+  "mixlogic.phase_quarter": "Quartos de final",
+  "mixlogic.phase_semi": "Meias-finais",
+  "mixlogic.phase_final": "Final",
+  "mixlogic.format_sobe_desce": "Sobe e desce",
+  "mixlogic.format_todos_contra_todos": "Todos contra todos",
+  "mixlogic.gender_masculino": "Só homens",
+  "mixlogic.gender_feminino": "Só mulheres",
+  "mixlogic.gender_misto": "Misto",
+  "mixlogic.gender_indiferente": "Indiferente"
 }

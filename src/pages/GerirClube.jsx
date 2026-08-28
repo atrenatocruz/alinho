@@ -11,12 +11,12 @@ import { listClubGroups } from '../lib/organizations'
 import { formatRating } from '../lib/elo'
 import { formatDate as formatDateLib } from '../lib/formatDate'
 import { DateField, DateTimeField, Avatar } from '../components/ui'
-import { totalRounds, FORMAT_LABEL } from '../lib/mixLogic'
+import { totalRounds, FORMAT_LABEL_KEY } from '../lib/mixLogic'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
 import PlayerSearch from '../components/PlayerSearch'
 import { searchPlayers } from '../lib/privateMatches'
 import { inviteToOrganization } from '../lib/orgInvites'
-import { DAY_LABEL, listPendingTeacherRequests, approveTeacherProfile, rejectTeacherProfile } from '../lib/teachers'
+import { DAY_LABEL_KEY, listPendingTeacherRequests, approveTeacherProfile, rejectTeacherProfile } from '../lib/teachers'
 
 const sanitizeSlug = (value) => value.toLowerCase().replace(/[^a-z0-9-]/g, '')
 
@@ -1753,7 +1753,7 @@ export default function GerirClube() {
                               👥 {t('gerirclube.players_ratio', { count: peopleCount, max: game.max_players || (game.num_courts || 1) * 4 })}
                             </p>
                             <p className="text-sm">
-                              {FORMAT_LABEL[game.format] || 'Sobe e desce'} • {t('gerirclube.courts_count', { count: game.num_courts || 1 })} • {t('gerirclube.rounds_count', { count: totalRounds(game) })}
+                              {(FORMAT_LABEL_KEY[game.format] ? t(FORMAT_LABEL_KEY[game.format]) : t('mixlogic.format_sobe_desce'))} • {t('gerirclube.courts_count', { count: game.num_courts || 1 })} • {t('gerirclube.rounds_count', { count: totalRounds(game) })}
                             </p>
                           </div>
                           {game.recurrence?.is_active && (
@@ -1945,7 +1945,7 @@ export default function GerirClube() {
                       {req.availability?.length > 0 && (
                         <p className="text-[11px] text-muted">
                           {req.availability
-                            .map((a) => `${DAY_LABEL[a.day_of_week]} ${a.start_time.slice(0, 5)}-${a.end_time.slice(0, 5)}`)
+                            .map((a) => `${t(DAY_LABEL_KEY[a.day_of_week])} ${a.start_time.slice(0, 5)}-${a.end_time.slice(0, 5)}`)
                             .join(' • ')}
                         </p>
                       )}

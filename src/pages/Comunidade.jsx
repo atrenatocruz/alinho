@@ -5,7 +5,7 @@ import { Search, Users, UserPlus, Clock, Heart, Plus, GraduationCap, X } from 'l
 import { searchPlayers, listPlayers } from '../lib/privateMatches'
 import { searchOrganizations, listGlobalOrganizations } from '../lib/organizations'
 import { createSelfServeGroup } from '../lib/platformAdmin'
-import { DAYS, DAY_LABEL, listTeacherProfiles, requestTeacherProfile, withdrawTeacherProfile } from '../lib/teachers'
+import { DAYS, DAY_LABEL_KEY, listTeacherProfiles, requestTeacherProfile, withdrawTeacherProfile } from '../lib/teachers'
 import { useAuth } from '../contexts/AuthContext'
 import { Avatar, EmptyState } from '../components/ui'
 
@@ -487,7 +487,7 @@ export default function Comunidade() {
                           className="input-field flex-1"
                         >
                           {DAYS.map((d) => (
-                            <option key={d.value} value={d.value}>{d.label}</option>
+                            <option key={d.value} value={d.value}>{t(d.labelKey)}</option>
                           ))}
                         </select>
                         <input
@@ -571,7 +571,7 @@ export default function Comunidade() {
                   {teacher.availability?.length > 0 && (
                     <p className="text-sm text-muted">
                       {teacher.availability
-                        .map((a) => `${DAY_LABEL[a.day_of_week]} ${a.start_time.slice(0, 5)}-${a.end_time.slice(0, 5)}`)
+                        .map((a) => `${t(DAY_LABEL_KEY[a.day_of_week])} ${a.start_time.slice(0, 5)}-${a.end_time.slice(0, 5)}`)
                         .join(' • ')}
                     </p>
                   )}

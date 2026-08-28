@@ -11,7 +11,7 @@ import { PrimaryButton, GuestBadge, PlayerAvatarRow, EmptyState, ShareModal, Rou
 import {
   countPeople, totalRounds, formDuplas, seedCourts, nextSobeDesce,
   roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches,
-  PHASE_LABEL, FORMAT_LABEL, GENDER_RESTRICTION_LABEL,
+  PHASE_LABEL_KEY, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY,
 } from '../lib/mixLogic'
 import { winRatePct } from '../lib/statsLogic'
 import { getGlobalRankings } from '../lib/privateMatches'
@@ -1139,9 +1139,9 @@ export default function GameDetails() {
           <div className="flex items-center gap-2.5">
             <Swords size={20} className="text-ink-700 shrink-0" />
             <span>
-              {FORMAT_LABEL[game.format] || t('gamedetails.sobe_desce_label')} • {t('gamedetails.court_count', { count: numCourts })} • {t('gamedetails.rounds_duration', { count: roundsTotal, minutes: game.game_time_minutes || 20 })}
+              {(FORMAT_LABEL_KEY[game.format] ? t(FORMAT_LABEL_KEY[game.format]) : t('gamedetails.sobe_desce_label'))} • {t('gamedetails.court_count', { count: numCourts })} • {t('gamedetails.rounds_duration', { count: roundsTotal, minutes: game.game_time_minutes || 20 })}
               {game.gender_restriction && game.gender_restriction !== 'indiferente' && (
-                <> • {GENDER_RESTRICTION_LABEL[game.gender_restriction]}</>
+                <> • {t(GENDER_RESTRICTION_LABEL_KEY[game.gender_restriction])}</>
               )}
             </span>
           </div>
@@ -1542,7 +1542,7 @@ export default function GameDetails() {
                     {t('gamedetails.round_number', { number: r })}
                     {phase !== 'group' && (
                       <span className="ml-2 text-xs font-extrabold uppercase tracking-wide bg-ink-900 text-lime-400 px-2.5 py-1 rounded-full">
-                        {PHASE_LABEL[phase]}
+                        {t(PHASE_LABEL_KEY[phase])}
                       </span>
                     )}
                   </h3>
@@ -1672,7 +1672,7 @@ export default function GameDetails() {
                             {t('gamedetails.round_number', { number: r })}
                             {phase !== 'group' && (
                               <span className="ml-2 text-xs font-extrabold uppercase tracking-wide bg-ink-900 text-lime-400 px-2.5 py-1 rounded-full">
-                                {PHASE_LABEL[phase]}
+                                {t(PHASE_LABEL_KEY[phase])}
                               </span>
                             )}
                           </h3>
@@ -1766,7 +1766,7 @@ export default function GameDetails() {
                   <ChevronRight size={20} />
                   {busy ? t('gamedetails.processing')
                     : inGroupPhase ? t('gamedetails.end_round', { number: maxRound })
-                    : t('gamedetails.end_round_and_draw', { number: maxRound, phase: PHASE_LABEL[nextPhase]?.toLowerCase() })}
+                    : t('gamedetails.end_round_and_draw', { number: maxRound, phase: PHASE_LABEL_KEY[nextPhase] ? t(PHASE_LABEL_KEY[nextPhase]).toLowerCase() : '' })}
                 </PrimaryButton>
               )}
               {canFinalize && (
@@ -1958,7 +1958,7 @@ export default function GameDetails() {
           {canJoin && !joinMode && (
             genderMismatch ? (
               <div className="bg-ink-50 text-muted px-4 py-3 rounded-ctrl text-sm font-extrabold text-center">
-                {t('gamedetails.gender_restricted_message', { restriction: GENDER_RESTRICTION_LABEL[game.gender_restriction].toLowerCase() })}
+                {t('gamedetails.gender_restricted_message', { restriction: t(GENDER_RESTRICTION_LABEL_KEY[game.gender_restriction]).toLowerCase() })}
               </div>
             ) : (
               <>
