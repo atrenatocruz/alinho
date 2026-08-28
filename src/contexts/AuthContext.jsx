@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import i18n from '../lib/i18n'
 
 const AuthContext = createContext({})
 
@@ -168,6 +169,7 @@ export const AuthProvider = ({ children }) => {
         // gateway rejection.
         if (fetchError) throw fetchError
         setProfile(profileData)
+        i18n.changeLanguage(profileData.language || 'pt')
 
         await consumePendingOrgSlug()
         await loadFeatureFlags()
@@ -292,6 +294,7 @@ export const AuthProvider = ({ children }) => {
       setProfile(null)
       setMemberships([])
       setCurrentOrganizationId(null)
+      i18n.changeLanguage('pt')
       return { error: null }
     }
 
@@ -301,6 +304,7 @@ export const AuthProvider = ({ children }) => {
       setProfile(null)
       setMemberships([])
       setCurrentOrganizationId(null)
+      i18n.changeLanguage('pt')
     }
     return { error }
   }
