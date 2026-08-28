@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { MapPin, CheckCircle2, ChevronRight, ChevronDown, ChevronLeft, Lock, Play, Calendar, X, Share2, MessageCircle, Link2, ImageDown, Trophy, Repeat } from 'lucide-react'
 import ShareCard, { CARD_W, CARD_H } from './ShareCard'
 import { ratingBand, groupRatingBand } from '../lib/elo'
+import { formatDate, formatTime } from '../lib/formatDate'
 
 /* ─── Date fields ────────────────────────────────────────────────────────
    Native <input type=date/datetime-local> pickers open reliably on iOS
@@ -14,14 +15,26 @@ import { ratingBand, groupRatingBand } from '../lib/elo'
    — a styled trigger box (unchanged look) opens our own portal'd bottom
    sheet with a month-grid calendar, so behavior is identical everywhere. */
 
-const WEEKDAY_LABELS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S']
+// Single-letter weekday headers for the calendar grid. Locale-specific
+// lookup rather than Intl.DateTimeFormat('narrow') because pt-PT's narrow
+// weekdays don't match the single-letter convention players expect here
+// (e.g. distinct Tue/Thu letters aren't needed — repeats are fine, same as
+// most calendar UIs), so an explicit table per language is clearer than
+// coaxing it out of Intl.
+const WEEKDAY_LABELS = {
+  pt: ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'],
+  en: ['S', 'M', 'T', 'W', 'T', 'F', 'S'],
+}
 
-// Portuguese month names for the quick month-jump Select, capitalized the
-// same way as the header label (JS, not CSS — see the note below).
-const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => {
-  const label = new Date(2000, i, 1).toLocaleDateString('pt-PT', { month: 'long' })
-  return { value: i, label: label.charAt(0).toUpperCase() + label.slice(1) }
-})
+// Month names for the quick month-jump Select, capitalized the same way as
+// the header label (JS, not CSS — see the note below). Built per-render
+// (not module scope) so it can pick up the active language.
+function monthOptionsFor(lang) {
+  return Array.from({ length: 12 }, (_, i) => {
+    const label = formatDate(new Date(2000, i, 1), lang, { month: 'long' })
+    return { value: i, label: label.charAt(0).toUpperCase() + label.slice(1) }
+  })
+}
 
 // Bounds the year-jump Select's option list. With both min and max (games
 // have neither, birthdays only have max) the range is exact; with only a
@@ -57,7 +70,8 @@ function toIsoDate(d) {
    (not just +/-1 arrows) — stepping one month at a time from today back to
    a decades-old birth year is a real, reported usability problem. */
 function MonthCalendar({ selected, viewDate, onNavigate, onJumpTo, onSelectDay, min, max }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const weekdayLabels = WEEKDAY_LABELS[i18n.language] || WEEKDAY_LABELS.pt
   const year = viewDate.getFullYear()
   const month = viewDate.getMonth()
   const firstWeekday = new Date(year, month, 1).getDay()
@@ -82,7 +96,7 @@ function MonthCalendar({ selected, viewDate, onNavigate, onJumpTo, onSelectDay, 
           <Select
             value={month}
             onChange={(m) => onJumpTo(year, Number(m))}
-            options={MONTH_OPTIONS}
+            options={monthOptionsFor(i18n.language)}
             className="flex-1 min-w-0 py-2"
           />
           <Select
@@ -102,7 +116,7 @@ function MonthCalendar({ selected, viewDate, onNavigate, onJumpTo, onSelectDay, 
         </button>
       </div>
       <div className="grid grid-cols-7 gap-1 mb-1">
-        {WEEKDAY_LABELS.map((w, i) => (
+        {weekdayLabels.map((w, i) => (
           <div key={i} className="text-center text-[11px] font-extrabold uppercase text-muted py-1">{w}</div>
         ))}
       </div>
@@ -135,7 +149,7 @@ function MonthCalendar({ selected, viewDate, onNavigate, onJumpTo, onSelectDay, 
 }
 
 export function DateField({ value, onChange, max, min, placeholder }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const resolvedPlaceholder = placeholder ?? t('ui.select_date_placeholder')
   const [open, setOpen] = useState(false)
   const selectedDate = value ? new Date(value + 'T00:00:00') : null
@@ -144,7 +158,7 @@ export function DateField({ value, onChange, max, min, placeholder }) {
   const [viewDate, setViewDate] = useState(selectedDate || new Date())
 
   const display = value
-    ? new Date(value + 'T00:00:00').toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' })
+    ? formatDate(value + 'T00:00:00', i18n.language, { day: '2-digit', month: 'long', year: 'numeric' })
     : resolvedPlaceholder
 
   const openPicker = () => {
@@ -213,7 +227,7 @@ export function DateField({ value, onChange, max, min, placeholder }) {
 }
 
 export function DateTimeField({ value, onChange, placeholder }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const resolvedPlaceholder = placeholder ?? t('ui.select_datetime_placeholder')
   const [open, setOpen] = useState(false)
   // Pending date (from the calendar) and time (from the native time input)
@@ -231,7 +245,7 @@ export function DateTimeField({ value, onChange, placeholder }) {
   const [viewDate, setViewDate] = useState(initialDate || new Date())
 
   const display = value
-    ? new Date(value).toLocaleString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    ? formatDate(value, i18n.language, { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     : resolvedPlaceholder
 
   const openPicker = () => {
@@ -541,7 +555,7 @@ export function EmptyState({ icon: Icon, title, subtitle, action }) {
    Scannable at a glance: when, where, levels, slots, my state.
    States: open | closed (court reservado) | completed | joined. */
 export function MixCard({ game, joined = false, showClub = false }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   // Every person in the game — a row with partner counts as 2 players
   const players = (game.participants || [])
     .filter(p => p.status === 'confirmed')
@@ -568,8 +582,8 @@ export function MixCard({ game, joined = false, showClub = false }) {
   const dayLabel =
     d.toDateString() === today.toDateString() ? t('ui.today')
     : d.toDateString() === tomorrow.toDateString() ? t('ui.tomorrow')
-    : d.toLocaleDateString('pt-PT', { weekday: 'short', day: 'numeric', month: 'short' })
-  const time = d.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
+    : formatDate(d, i18n.language, { weekday: 'short', day: 'numeric', month: 'short' })
+  const time = formatTime(d, i18n.language, { hour: '2-digit', minute: '2-digit' })
 
   return (
     <Link

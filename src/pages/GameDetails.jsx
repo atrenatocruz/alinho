@@ -906,7 +906,7 @@ export default function GameDetails() {
         </p>
         <div className="flex items-center gap-1.5">
           {team.id === game.winner_team_id && <span>🏆</span>}
-          {(team.player1?.is_guest || team.player2?.is_guest) && <GuestBadge />}
+          {(team.player1?.is_guest || team.player2?.is_guest) && <GuestBadge isTest={team.player1?.is_test || team.player2?.is_test} />}
         </div>
       </div>
       <div className="space-y-1.5">
@@ -1391,7 +1391,7 @@ export default function GameDetails() {
                             </p>
                             <div className="flex items-center gap-1.5">
                               {team.id === game.winner_team_id && <span>🏆</span>}
-                              {(team.player1?.is_guest || team.player2?.is_guest) && <GuestBadge />}
+                              {(team.player1?.is_guest || team.player2?.is_guest) && <GuestBadge isTest={team.player1?.is_test || team.player2?.is_test} />}
                             </div>
                           </div>
                           <div className="space-y-1.5">
