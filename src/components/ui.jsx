@@ -382,18 +382,20 @@ function BadgePill({ text, title, me = false, size = 'sm' }) {
    Banda pública do Elo (M6, F4, INI…), derivada do rating do jogador. Não renderiza nada
    para contas ainda sem rating. */
 export function RatingBadge({ rating, gender, me = false, size = 'sm' }) {
+  const { t } = useTranslation()
   const band = ratingBand(rating, gender)
   if (!band) return null
-  return <BadgePill text={band.label} title={band.full} me={me} size={size} />
+  return <BadgePill text={band.label} title={t(band.fullKey, band.fullVars)} me={me} size={size} />
 }
 
 /* ─── GroupLevelBadge ────────────────────────────────────────────────────
    Mesmo visual do RatingBadge, mas para a média de um clube/grupo (prefixo
    N em vez de M/F — ver groupRatingBand). Não renderiza nada sem rating. */
 export function GroupLevelBadge({ rating, size = 'sm' }) {
+  const { t } = useTranslation()
   const band = groupRatingBand(rating)
   if (!band) return null
-  return <BadgePill text={band.label} title={band.full} size={size} />
+  return <BadgePill text={band.label} title={t(band.fullKey, band.fullVars)} size={size} />
 }
 
 /* ─── PrimaryButton ──────────────────────────────────────────────────────

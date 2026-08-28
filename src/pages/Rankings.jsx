@@ -22,7 +22,7 @@ const TABS = [
 ]
 
 export default function Rankings() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { currentOrganizationId, currentOrganization, memberships, switchOrganization } = useAuth()
   const [section, setSection] = useState('players')
   const [tab, setTab] = useState('global')
@@ -56,7 +56,8 @@ export default function Rankings() {
     }
     loadRankings()
     loadMonthly()
-  }, [currentOrganizationId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentOrganizationId, i18n.language])
 
   // level/is_guest live on `memberships` now — this org's membership list,
   // reused across every load* function below.
@@ -117,7 +118,7 @@ export default function Rankings() {
         .eq('organization_id', currentOrganizationId)
 
       if (error) throw error
-      const built = buildMonthlyLeaderboard(data || [])
+      const built = buildMonthlyLeaderboard(data || [], i18n.language)
       setMonthly(built)
       setSelectedMonth(prev => prev || built.months[0]?.key || null)
     } catch (error) {

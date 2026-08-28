@@ -138,9 +138,22 @@ export default function Layout({ children }) {
   const { t } = useTranslation()
 
   const handleToggleLanguage = () => {
-    const next = profile?.language === 'en' ? 'pt' : 'en'
+    // Derived from i18n.language, not profile?.language: if the
+    // updateProfile call below fails (e.g. the language column migration
+    // hasn't been run yet), profile.language never changes, and deriving
+    // `next` from it would leave the toggle stuck unable to switch back.
+    // i18n.language is reactive here via useTranslation()'s re-render on
+    // i18next's languageChanged event, so this stays correct either way.
+    const next = i18n.language === 'en' ? 'pt' : 'en'
     i18n.changeLanguage(next) // instant UI flip
-    updateProfile({ language: next }) // persisted in the background, fire-and-forget like toggleFavoriteOrganization elsewhere in this file
+    try {
+      localStorage.setItem('preferredLanguage', next)
+    } catch {
+      // ignore — best-effort persistence for pre-auth pages
+    }
+    updateProfile({ language: next }).then(({ error }) => {
+      if (error) console.error('Failed to persist language preference:', error)
+    })
   }
 
   const today = new Date().toISOString().slice(0, 10)
@@ -358,7 +371,7 @@ export default function Layout({ children }) {
               title={t('layout.toggle_language')}
               className="w-11 h-11 flex items-center justify-center rounded-full text-ink-200 hover:text-white hover:bg-white/10 transition-colors duration-fast text-xs font-extrabold"
             >
-              {profile?.language === 'en' ? 'PT' : 'EN'}
+              {i18n.language === 'en' ? 'PT' : 'EN'}
             </button>
             <Link
               to="/instrucoes"

@@ -11,7 +11,7 @@ import { listClubGroups } from '../lib/organizations'
 import { formatRating } from '../lib/elo'
 import { formatDate as formatDateLib } from '../lib/formatDate'
 import { DateField, DateTimeField, Avatar } from '../components/ui'
-import { totalRounds, FORMAT_LABEL_KEY } from '../lib/mixLogic'
+import { totalRounds, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY } from '../lib/mixLogic'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
 import PlayerSearch from '../components/PlayerSearch'
 import { searchPlayers } from '../lib/privateMatches'
@@ -39,15 +39,19 @@ const GAME_TIMES = [
   { value: 20, label: '20min' },
   { value: 30, label: '30min' },
 ]
+// Labels resolve via mixLogic's FORMAT_LABEL_KEY/GENDER_RESTRICTION_LABEL_KEY
+// — the same keys the games list (below) and GameDetails.jsx use for these
+// same enum values, so a format/restriction reads identically everywhere
+// instead of drifting into two different English labels for one value.
 const FORMATS = [
-  { value: 'sobe_desce', labelKey: 'gerirclube.format_sobe_desce' },
-  { value: 'todos_contra_todos', labelKey: 'gerirclube.format_todos_contra_todos' },
+  { value: 'sobe_desce', labelKey: FORMAT_LABEL_KEY.sobe_desce },
+  { value: 'todos_contra_todos', labelKey: FORMAT_LABEL_KEY.todos_contra_todos },
 ]
 const GENDER_RESTRICTIONS = [
-  { value: 'indiferente', labelKey: 'gerirclube.gender_indiferente' },
-  { value: 'misto', labelKey: 'gerirclube.gender_misto' },
-  { value: 'masculino', labelKey: 'gerirclube.gender_masculino' },
-  { value: 'feminino', labelKey: 'gerirclube.gender_feminino' },
+  { value: 'indiferente', labelKey: GENDER_RESTRICTION_LABEL_KEY.indiferente },
+  { value: 'misto', labelKey: GENDER_RESTRICTION_LABEL_KEY.misto },
+  { value: 'masculino', labelKey: GENDER_RESTRICTION_LABEL_KEY.masculino },
+  { value: 'feminino', labelKey: GENDER_RESTRICTION_LABEL_KEY.feminino },
 ]
 const RECURRENCE_FREQUENCIES = [
   { value: 'daily', labelKey: 'gerirclube.freq_daily' },

@@ -1,5 +1,5 @@
 -- ════════════════════════════════════════════════════════════════════════
--- English translation (RANKING... no, i18n v1): profiles.language, the
+-- English translation (i18n v1): profiles.language, the
 -- account-level UI language preference. Default 'pt' for every account,
 -- new or existing — no auto-detection, matches this app's Portuguese-first
 -- principle (CLAUDE.md). Set explicitly via the header toggle only.

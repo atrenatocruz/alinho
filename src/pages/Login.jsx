@@ -6,6 +6,22 @@ import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton, DateField, Select } from '../components/ui'
 import { Wordmark } from '../components/Layout'
 import { hashPhone } from '../lib/hashPhone'
+import i18n from '../lib/i18n'
+
+// Same pattern as Layout.jsx's header toggle, minus the profile persistence
+// (there's no profile yet pre-auth) — just the instant UI flip plus a
+// localStorage write so the choice survives a reload and carries forward
+// into the account once the visitor signs in (see AuthContext's loadProfile
+// reconciliation).
+function toggleLanguage() {
+  const next = i18n.language === 'en' ? 'pt' : 'en'
+  i18n.changeLanguage(next)
+  try {
+    localStorage.setItem('preferredLanguage', next)
+  } catch {
+    // ignore — best-effort persistence
+  }
+}
 
 // Module scope, not nested in Login: an inline component would be recreated
 // (and remounted — dropping focus and its own `visible` state) on every
@@ -197,6 +213,14 @@ export default function Login() {
     <div className="min-h-screen bg-ink-900 flex flex-col">
       {/* Hero — court lines + lime ball */}
       <div className="relative px-6 pt-14 pb-10 text-center overflow-hidden shrink-0">
+        <button
+          type="button"
+          onClick={toggleLanguage}
+          title={t('layout.toggle_language')}
+          className="absolute top-4 right-4 z-10 inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-full text-white/80 hover:text-white hover:bg-white/10 font-extrabold text-xs transition-colors duration-fast"
+        >
+          {i18n.language === 'en' ? 'PT' : 'EN'}
+        </button>
         <svg
           viewBox="0 0 400 200"
           className="absolute inset-0 w-full h-full text-white/[0.06]"

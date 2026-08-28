@@ -4,6 +4,8 @@
    written by the finalize_mix() RPC) joined with the parent game's date.
    ════════════════════════════════════════════════════════════════════════ */
 
+import { formatDate } from './formatDate'
+
 export const winRatePct = (won, played) =>
   played > 0 ? Math.round((won / played) * 100) : 0
 
@@ -12,9 +14,9 @@ export const monthKey = (dateString) => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
-export const monthLabel = (key) => {
+export const monthLabel = (key, lang) => {
   const [year, month] = key.split('-').map(Number)
-  const label = new Date(year, month - 1, 1).toLocaleDateString('pt-PT', { month: 'long', year: 'numeric' })
+  const label = formatDate(new Date(year, month - 1, 1), lang, { month: 'long', year: 'numeric' })
   return label.charAt(0).toUpperCase() + label.slice(1)
 }
 
@@ -26,7 +28,7 @@ export const monthLabel = (key) => {
  * the old assiduidade points_earned it replaced.
  * Returns { months: [{key, label}] (newest first), byMonth: { [key]: [{...player, points, victories, played, participations, mixesWon, winRate}] } }
  */
-export function buildMonthlyLeaderboard(rows) {
+export function buildMonthlyLeaderboard(rows, lang) {
   const byMonth = {}
   for (const row of rows) {
     if (!row.game?.date) continue
@@ -45,7 +47,7 @@ export function buildMonthlyLeaderboard(rows) {
     entry.mixesWon += row.mix_won ? 1 : 0
   }
 
-  const months = Object.keys(byMonth).sort().reverse().map(key => ({ key, label: monthLabel(key) }))
+  const months = Object.keys(byMonth).sort().reverse().map(key => ({ key, label: monthLabel(key, lang) }))
   const leaderboard = Object.fromEntries(
     Object.entries(byMonth).map(([key, players]) => [
       key,

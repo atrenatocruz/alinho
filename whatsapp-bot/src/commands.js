@@ -106,8 +106,8 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message }, 
   // back to /help, except the help listing itself.
   const reply = (key, vars) => sendText(groupJid, `${t(key, lang, vars)}${helpFooter(lang)}`, { quoted: message })
 
-  // Same check a plain resolveProfileByPhoneJid result needs before use
-  // (e.g. fetched in parallel with getOpenMixes below) — avoids a redundant query.
+  // Same check a plain resolveProfileByPhoneJid result needs before use —
+  // avoids a redundant query.
   async function requireProfile(profile) {
     if (!profile) await reply('not_found', { appUrl: config.appUrl })
     return profile

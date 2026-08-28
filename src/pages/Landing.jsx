@@ -4,6 +4,36 @@ import { useTranslation } from 'react-i18next'
 import { CheckCircle2, MapPin, Lock, Calendar, Trophy, Users, MessageCircle } from 'lucide-react'
 import { Wordmark } from '../components/Layout'
 import PadelIcon from '../components/icons/PadelIcon'
+import i18n from '../lib/i18n'
+
+// Same pattern as Layout.jsx's header toggle, minus the profile persistence
+// (there's no profile yet on this pre-auth page) — just the instant UI flip
+// plus a localStorage write so the choice survives a reload and carries
+// forward into the account once the visitor signs in (see AuthContext's
+// loadProfile reconciliation).
+function toggleLanguage() {
+  const next = i18n.language === 'en' ? 'pt' : 'en'
+  i18n.changeLanguage(next)
+  try {
+    localStorage.setItem('preferredLanguage', next)
+  } catch {
+    // ignore — best-effort persistence
+  }
+}
+
+function LanguageToggle({ className = '' }) {
+  const { t } = useTranslation()
+  return (
+    <button
+      type="button"
+      onClick={toggleLanguage}
+      title={t('layout.toggle_language')}
+      className={`inline-flex items-center justify-center min-h-[44px] min-w-[44px] font-extrabold text-xs transition-colors duration-fast ${className}`}
+    >
+      {i18n.language === 'en' ? 'PT' : 'EN'}
+    </button>
+  )
+}
 
 // Fires once, the first time the ref'd element enters the viewport — drives
 // the .reveal / .reveal-visible transition (src/index.css) instead of a
@@ -94,6 +124,7 @@ function Nav() {
           <Wordmark />
         </Link>
         <div className="flex items-center gap-4">
+          <LanguageToggle className="text-white/80 hover:text-white" />
           <Link
             to={loginHref()}
             className="inline-flex items-center min-h-[44px] px-1 text-white/80 hover:text-white font-extrabold text-sm transition-colors duration-fast"
