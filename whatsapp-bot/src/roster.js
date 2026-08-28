@@ -1,6 +1,7 @@
 import { supabase } from './supabase.js'
 import { config } from './config.js'
-import { HELP_FOOTER } from './messages.js'
+import { helpFooter } from './messages.js'
+import { t } from './locales.js'
 
 /** Loads a game plus its confirmed participants (flattened to one entry per person, partners included — mirrors GameDetails.jsx's `people` derivation). */
 export async function loadGame(gameId) {
@@ -43,9 +44,16 @@ export async function loadGame(gameId) {
 
   let profilesById = new Map()
   if (profileIds.size > 0) {
+    // `language` is selected here for consistency with every other
+    // `.from('profiles')` call in this bot (see Task 19), even though this
+    // particular file has no per-participant message to localize — the
+    // roster block below is one shared broadcast to the whole WhatsApp
+    // group, not a message addressed to any single participant, so it can't
+    // sensibly pick one person's language. It always renders in 'pt' (see
+    // buildCombinedRosterMessage below).
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
-      .select('id, name')
+      .select('id, name, language')
       .in('id', Array.from(profileIds))
 
     if (profilesError) throw new Error(`Failed to load profiles: ${profilesError.message}`)
@@ -178,11 +186,21 @@ export function buildCombinedRosterMessage(mixStates, { promotedNames = [] } = {
   if (mixStates.length === 0) return null
 
   const showCode = mixStates.length > 1
+  // Each promoted entry is { name, lang } — the one piece of this broadcast
+  // that IS about one specific person, so it's localized to that person's
+  // own profiles.language (see sync.js, which fetches it alongside the
+  // promoted participant's name).
   const promoBlock = promotedNames.length > 0
-    ? `${promotedNames.map((name) => `🎉 ${firstNameLastInitial(name)} subiu da lista de suplentes!`).join('\n')}\n\n`
+    ? `${promotedNames
+        .map(({ name, lang }) => t('promoted_to_confirmed', lang ?? 'pt', { name: firstNameLastInitial(name) }))
+        .join('\n')}\n\n`
     : ''
   const header = showCode ? `📋 *Mixes abertos (${mixStates.length})*\n\n` : ''
   const blocks = mixStates.map((state) => buildMixBlock(state, { showCode })).join(MIX_SEPARATOR)
 
-  return promoBlock + header + blocks + HELP_FOOTER
+  // The roster block itself is a shared broadcast to the whole group, not a
+  // message for any one profile — stays 'pt', matching buildMixBlock's own
+  // hardcoded pt labels above (vagas, campos fechados, etc.), which are
+  // intentionally out of scope for this task for the same reason.
+  return promoBlock + header + blocks + helpFooter('pt')
 }
