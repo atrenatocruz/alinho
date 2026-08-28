@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Plus, Trophy, Copy, Check, Trash2 } from 'lucide-react'
 import { getMyPrivateMatches, submitPrivateMatchScore, confirmPrivateMatch, deletePrivateMatch } from '../lib/privateMatches'
 import { PrimaryButton, EmptyState } from '../components/ui'
@@ -13,6 +14,7 @@ const OPEN_SLOTS = [
 // initialScore* prefill the fields when the form is reopened to correct an
 // already-submitted score; onCancel is only passed in that same case.
 function ScoreForm({ match, onSubmit, initialScoreA = '', initialScoreB = '', onCancel }) {
+  const { t } = useTranslation()
   const [scoreA, setScoreA] = useState(initialScoreA)
   const [scoreB, setScoreB] = useState(initialScoreB)
   const [saving, setSaving] = useState(false)
@@ -34,7 +36,7 @@ function ScoreForm({ match, onSubmit, initialScoreA = '', initialScoreB = '', on
         <span className="text-muted font-extrabold">-</span>
         <input type="number" min="0" value={scoreB} onChange={(e) => setScoreB(e.target.value)} className="input-field w-16 text-center" placeholder="0" required />
         <PrimaryButton type="submit" disabled={saving} className="flex-1">
-          {saving ? 'A guardar…' : 'Registar resultado'}
+          {saving ? t('privatematches.saving') : t('privatematches.submit_score')}
         </PrimaryButton>
       </div>
       {onCancel && (
@@ -43,7 +45,7 @@ function ScoreForm({ match, onSubmit, initialScoreA = '', initialScoreB = '', on
           onClick={onCancel}
           className="mt-2 text-xs font-extrabold text-muted hover:text-ink-900"
         >
-          Cancelar
+          {t('privatematches.cancel')}
         </button>
       )}
     </form>
@@ -51,6 +53,7 @@ function ScoreForm({ match, onSubmit, initialScoreA = '', initialScoreB = '', on
 }
 
 function InviteLinks({ match }) {
+  const { t } = useTranslation()
   const [copied, setCopied] = useState('')
   const openSlots = OPEN_SLOTS.filter((s) => !match[s.idField])
   if (openSlots.length === 0) return null
@@ -64,7 +67,7 @@ function InviteLinks({ match }) {
 
   return (
     <div className="mt-3 space-y-2">
-      <p className="text-xs text-muted">Faltam {openSlots.length} jogador(es):</p>
+      <p className="text-xs text-muted">{t('privatematches.missing_players', { count: openSlots.length })}</p>
       {openSlots.map((s) => (
         <button
           key={s.key}
@@ -73,20 +76,21 @@ function InviteLinks({ match }) {
           className="flex items-center gap-2 text-xs font-extrabold text-ink-700 hover:text-ink-900"
         >
           {copied === s.key ? <Check size={14} className="text-ok" /> : <Copy size={14} />}
-          {copied === s.key ? 'Link copiado!' : 'Copiar link de convite'}
+          {copied === s.key ? t('privatematches.link_copied') : t('privatematches.copy_invite_link')}
         </button>
       ))}
     </div>
   )
 }
 
-const teamLabel = (m, prefix) => {
+const teamLabel = (m, prefix, t) => {
   const p1 = m[`${prefix}_player1_name`]
   const p2 = m[`${prefix}_player2_name`]
-  return [p1, p2].filter(Boolean).join(' + ') || 'Por convidar'
+  return [p1, p2].filter(Boolean).join(' + ') || t('privatematches.to_be_invited')
 }
 
 export default function PrivateMatches() {
+  const { t } = useTranslation()
   const [matches, setMatches] = useState([])
   const [loading, setLoading] = useState(true)
   // Pending matches whose already-submitted score is being corrected.
@@ -131,7 +135,7 @@ export default function PrivateMatches() {
       await load()
     } catch (error) {
       console.error('Error submitting score:', error)
-      alert('Não foi possível registar o resultado.')
+      alert(t('privatematches.error_submit_score'))
     }
   }
 
@@ -141,18 +145,18 @@ export default function PrivateMatches() {
       await load()
     } catch (error) {
       console.error('Error confirming match:', error)
-      alert('Não foi possível confirmar o jogo.')
+      alert(t('privatematches.error_confirm'))
     }
   }
 
   const handleDelete = async (matchId) => {
-    if (!confirm('Eliminar este jogo? Esta ação não pode ser desfeita.')) return
+    if (!confirm(t('privatematches.confirm_delete'))) return
     try {
       await deletePrivateMatch(matchId)
       await load()
     } catch (error) {
       console.error('Error deleting match:', error)
-      alert('Não foi possível eliminar o jogo.')
+      alert(t('privatematches.error_delete'))
     }
   }
 
@@ -170,17 +174,17 @@ export default function PrivateMatches() {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-3xl text-ink-900">Jogos entre amigos</h2>
+        <h2 className="text-3xl text-ink-900">{t('privatematches.title')}</h2>
         <Link to="/jogos-privados/novo">
           <PrimaryButton>
-            <Plus size={18} /> Novo
+            <Plus size={18} /> {t('privatematches.new_button')}
           </PrimaryButton>
         </Link>
       </div>
 
       {pending.length > 0 && (
         <div>
-          <h3 className="text-lg text-ink-900 mb-3">Por confirmar</h3>
+          <h3 className="text-lg text-ink-900 mb-3">{t('privatematches.pending_confirmation')}</h3>
           <div className="space-y-3">
             {pending.map((m) => {
               const canConfirm = m.is_creator && m.score_a !== null && m.team_a_player2_id && m.team_b_player1_id && m.team_b_player2_id
@@ -189,12 +193,12 @@ export default function PrivateMatches() {
               return (
                 <div key={m.id} className="card">
                   <div className="flex items-start justify-between gap-2">
-                    <p className="font-extrabold text-ink-900 text-sm">{teamLabel(m, 'team_a')} vs {teamLabel(m, 'team_b')}</p>
+                    <p className="font-extrabold text-ink-900 text-sm">{teamLabel(m, 'team_a', t)} vs {teamLabel(m, 'team_b', t)}</p>
                     {m.is_creator && (
                       <button
                         type="button"
                         onClick={() => handleDelete(m.id)}
-                        aria-label="Eliminar jogo"
+                        aria-label={t('privatematches.delete_game_aria')}
                         className="shrink-0 text-muted hover:text-danger"
                       >
                         <Trash2 size={16} />
@@ -204,15 +208,15 @@ export default function PrivateMatches() {
                   {hasScore && !isEditingScore ? (
                     <>
                       <p className="text-sm text-muted mt-1">
-                        Resultado: {m.score_a} - {m.score_b}
-                        {!m.is_creator ? ' · aguarda confirmação de quem criou o jogo' : ''}
+                        {t('privatematches.result_label', { scoreA: m.score_a, scoreB: m.score_b })}
+                        {!m.is_creator ? t('privatematches.awaiting_creator_confirmation') : ''}
                       </p>
                       <button
                         type="button"
                         onClick={() => toggleEditScore(m.id)}
                         className="mt-1 text-xs font-extrabold text-ink-700 hover:text-ink-900"
                       >
-                        Editar resultado
+                        {t('privatematches.edit_score')}
                       </button>
                     </>
                   ) : (
@@ -228,7 +232,7 @@ export default function PrivateMatches() {
                       stored score while a correction sits unsubmitted. */}
                   {canConfirm && !isEditingScore && (
                     <PrimaryButton onClick={() => handleConfirm(m.id)} className="w-full mt-3">
-                      Confirmar resultado
+                      {t('privatematches.confirm_score')}
                     </PrimaryButton>
                   )}
                   <InviteLinks match={m} />
@@ -240,20 +244,20 @@ export default function PrivateMatches() {
       )}
 
       <div>
-        <h3 className="text-lg text-ink-900 mb-3">Histórico</h3>
+        <h3 className="text-lg text-ink-900 mb-3">{t('privatematches.history')}</h3>
         {confirmed.length === 0 ? (
           <EmptyState
             icon={Trophy}
-            title="Ainda não tens jogos confirmados"
-            subtitle="Cria o teu primeiro jogo entre amigos."
+            title={t('privatematches.empty_title')}
+            subtitle={t('privatematches.empty_subtitle')}
           />
         ) : (
           <div className="space-y-2.5">
             {confirmed.map((m) => (
               <div key={m.id} className="card">
-                <p className="font-extrabold text-ink-900 text-sm">{teamLabel(m, 'team_a')} vs {teamLabel(m, 'team_b')}</p>
+                <p className="font-extrabold text-ink-900 text-sm">{teamLabel(m, 'team_a', t)} vs {teamLabel(m, 'team_b', t)}</p>
                 <p className="text-[11px] text-muted mt-0.5">
-                  {m.score_a} - {m.score_b} · {m.my_points} pontos
+                  {t('privatematches.history_score_points', { scoreA: m.score_a, scoreB: m.score_b, points: m.my_points })}
                 </p>
               </div>
             ))}
