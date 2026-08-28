@@ -1004,6 +1004,11 @@ export default function GerirClube() {
   }
 
   const handleToggleAdmin = async (userId, currentStatus) => {
+    const confirmMessage = currentStatus
+      ? 'Retirar as permissões de admin a este membro?'
+      : 'Tornar este membro admin? Vai passar a poder gerir o clube.'
+    if (!confirm(confirmMessage)) return
+
     try {
       const { error } = await supabase.rpc('admin_set_membership_admin', {
         p_organization_id: currentOrganizationId,
@@ -1944,18 +1949,20 @@ export default function GerirClube() {
               {members.map(member => (
                 <div key={member.id} className="card">
                   <div className="flex items-center gap-3.5">
-                    <Avatar name={member.name} url={member.avatar_url} size="w-11 h-11 text-sm" />
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-extrabold text-ink-900 truncate flex items-center gap-1.5">
-                        <span className="truncate">{member.name}</span>
-                        {member.is_admin && (
-                          <span className="w-2 h-2 rounded-full bg-lime-600 shrink-0" title="Admin" />
-                        )}
-                      </h3>
-                      <p className="text-sm text-muted truncate">
-                        Nível: {member.level}
-                      </p>
-                    </div>
+                    <Link to={`/jogador/${member.id}`} className="flex items-center gap-3.5 flex-1 min-w-0">
+                      <Avatar name={member.name} url={member.avatar_url} size="w-11 h-11 text-sm" />
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-extrabold text-ink-900 truncate flex items-center gap-1.5">
+                          <span className="truncate">{member.name}</span>
+                          {member.is_admin && (
+                            <span className="w-2 h-2 rounded-full bg-lime-600 shrink-0" title="Admin" />
+                          )}
+                        </h3>
+                        <p className="text-sm text-muted truncate">
+                          Nível: {member.level}
+                        </p>
+                      </div>
+                    </Link>
 
                     <div className="flex items-center gap-1.5 shrink-0">
                       <button

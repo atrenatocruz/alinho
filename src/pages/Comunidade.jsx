@@ -391,8 +391,9 @@ export default function Comunidade() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
             placeholder="Procurar jogador ou clube..."
-            className="flex-1 bg-transparent outline-none text-sm"
+            className="flex-1 bg-transparent outline-none text-base"
           />
         </div>
       )}
