@@ -1833,7 +1833,7 @@ export default function GameDetails() {
                           )}
                         </p>
                         <div className="mt-1">
-                          <GuestBadge label={person.is_test ? t('gamedetails.test_badge') : t('gamedetails.guest_badge')} />
+                          <GuestBadge label={person.is_test ? t('gamedetails.test_badge') : t('gamedetails.guest_badge')} isTest={person.is_test} />
                         </div>
                       </div>
                     </>
@@ -1894,7 +1894,7 @@ export default function GameDetails() {
                         )}
                       </p>
                       <div className="mt-1">
-                        <GuestBadge label={person.is_test ? t('gamedetails.test_badge') : t('gamedetails.guest_badge')} />
+                        <GuestBadge label={person.is_test ? t('gamedetails.test_badge') : t('gamedetails.guest_badge')} isTest={person.is_test} />
                       </div>
                     </div>
                   </>

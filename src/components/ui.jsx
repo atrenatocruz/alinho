@@ -439,7 +439,7 @@ export function RankBadge({ rank, size = 'md' }) {
 
 /* ─── GuestBadge ─────────────────────────────────────────────────────────
    Marks non-regular players inside game participant lists. */
-export function GuestBadge({ size = 'sm', label }) {
+export function GuestBadge({ size = 'sm', label, isTest = false }) {
   const { t } = useTranslation()
   const resolvedLabel = label ?? t('ui.guest_badge_default_label')
   const sizes = {
@@ -448,7 +448,7 @@ export function GuestBadge({ size = 'sm', label }) {
   }
   return (
     <span
-      title={resolvedLabel === 'Teste' ? t('ui.test_player_admin') : t('ui.guest_player')}
+      title={isTest ? t('ui.test_player_admin') : t('ui.guest_player')}
       className={`inline-flex items-center rounded-full font-mono font-extrabold tracking-wide uppercase
                   border border-dashed border-ink-200 bg-canvas text-muted ${sizes[size]}`}
     >
