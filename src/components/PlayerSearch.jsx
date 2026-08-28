@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { Search, X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { searchPlayers } from '../lib/privateMatches'
 import { Avatar } from './ui'
 
 export default function PlayerSearch({ label, selected, onSelect, onClear, excludeIds = [], searchFn = searchPlayers }) {
+  const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [open, setOpen] = useState(false)
@@ -35,7 +37,7 @@ export default function PlayerSearch({ label, selected, onSelect, onClear, exclu
       <div className="flex items-center gap-3 p-3 rounded-ctrl border border-line bg-canvas">
         <Avatar name={selected.name} url={selected.avatar_url} size="w-9 h-9 text-sm" />
         <p className="flex-1 font-extrabold text-ink-900 text-sm truncate">{selected.name}</p>
-        <button type="button" onClick={onClear} aria-label="Remover" className="text-muted hover:text-ink-900">
+        <button type="button" onClick={onClear} aria-label={t('playersearch.remove')} className="text-muted hover:text-ink-900">
           <X size={18} />
         </button>
       </div>
@@ -63,7 +65,7 @@ export default function PlayerSearch({ label, selected, onSelect, onClear, exclu
       {open && (visibleResults.length > 0 || showEmptyState) && (
         <div className="absolute z-10 mt-1 w-full bg-surface rounded-ctrl border border-line shadow-lift divide-y divide-line max-h-64 overflow-y-auto">
           {showEmptyState ? (
-            <p className="p-3 text-sm text-muted text-center">Nenhum jogador encontrado</p>
+            <p className="p-3 text-sm text-muted text-center">{t('playersearch.no_players_found')}</p>
           ) : (
             visibleResults.map((player) => (
               <button

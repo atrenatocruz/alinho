@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { MapPin, CheckCircle2, ChevronRight, ChevronDown, ChevronLeft, Lock, Play, Calendar, X, Share2, MessageCircle, Link2, ImageDown, Trophy, Repeat } from 'lucide-react'
 import ShareCard, { CARD_W, CARD_H } from './ShareCard'
 import { ratingBand, groupRatingBand } from '../lib/elo'
@@ -56,6 +57,7 @@ function toIsoDate(d) {
    (not just +/-1 arrows) — stepping one month at a time from today back to
    a decades-old birth year is a real, reported usability problem. */
 function MonthCalendar({ selected, viewDate, onNavigate, onJumpTo, onSelectDay, min, max }) {
+  const { t } = useTranslation()
   const year = viewDate.getFullYear()
   const month = viewDate.getMonth()
   const firstWeekday = new Date(year, month, 1).getDay()
@@ -71,7 +73,7 @@ function MonthCalendar({ selected, viewDate, onNavigate, onJumpTo, onSelectDay, 
         <button
           type="button"
           onClick={() => onNavigate(-1)}
-          aria-label="Mês anterior"
+          aria-label={t('ui.previous_month')}
           className="w-9 h-9 shrink-0 flex items-center justify-center rounded-full text-ink-700 hover:bg-ink-50 transition-colors duration-fast"
         >
           <ChevronLeft size={20} />
@@ -93,7 +95,7 @@ function MonthCalendar({ selected, viewDate, onNavigate, onJumpTo, onSelectDay, 
         <button
           type="button"
           onClick={() => onNavigate(1)}
-          aria-label="Mês seguinte"
+          aria-label={t('ui.next_month')}
           className="w-9 h-9 shrink-0 flex items-center justify-center rounded-full text-ink-700 hover:bg-ink-50 transition-colors duration-fast"
         >
           <ChevronRight size={20} />
@@ -132,7 +134,9 @@ function MonthCalendar({ selected, viewDate, onNavigate, onJumpTo, onSelectDay, 
   )
 }
 
-export function DateField({ value, onChange, max, min, placeholder = 'Seleciona a data' }) {
+export function DateField({ value, onChange, max, min, placeholder }) {
+  const { t } = useTranslation()
+  const resolvedPlaceholder = placeholder ?? t('ui.select_date_placeholder')
   const [open, setOpen] = useState(false)
   const selectedDate = value ? new Date(value + 'T00:00:00') : null
   const minDate = min ? new Date(min + 'T00:00:00') : null
@@ -141,7 +145,7 @@ export function DateField({ value, onChange, max, min, placeholder = 'Seleciona 
 
   const display = value
     ? new Date(value + 'T00:00:00').toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' })
-    : placeholder
+    : resolvedPlaceholder
 
   const openPicker = () => {
     setViewDate(selectedDate || new Date())
@@ -182,10 +186,10 @@ export function DateField({ value, onChange, max, min, placeholder = 'Seleciona 
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg text-ink-900">{placeholder}</h3>
+              <h3 className="text-lg text-ink-900">{resolvedPlaceholder}</h3>
               <button
                 onClick={() => setOpen(false)}
-                aria-label="Fechar"
+                aria-label={t('ui.close')}
                 className="w-9 h-9 flex items-center justify-center rounded-full text-muted hover:bg-ink-50 hover:text-ink-900 transition-colors duration-fast"
               >
                 <X size={20} />
@@ -208,7 +212,9 @@ export function DateField({ value, onChange, max, min, placeholder = 'Seleciona 
   )
 }
 
-export function DateTimeField({ value, onChange, placeholder = 'Seleciona data e hora' }) {
+export function DateTimeField({ value, onChange, placeholder }) {
+  const { t } = useTranslation()
+  const resolvedPlaceholder = placeholder ?? t('ui.select_datetime_placeholder')
   const [open, setOpen] = useState(false)
   // Pending date (from the calendar) and time (from the native time input)
   // are held separately while the sheet is open, and only combined into
@@ -226,7 +232,7 @@ export function DateTimeField({ value, onChange, placeholder = 'Seleciona data e
 
   const display = value
     ? new Date(value).toLocaleString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-    : placeholder
+    : resolvedPlaceholder
 
   const openPicker = () => {
     const current = value ? new Date(value) : null
@@ -282,10 +288,10 @@ export function DateTimeField({ value, onChange, placeholder = 'Seleciona data e
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg text-ink-900">{placeholder}</h3>
+              <h3 className="text-lg text-ink-900">{resolvedPlaceholder}</h3>
               <button
                 onClick={() => setOpen(false)}
-                aria-label="Fechar"
+                aria-label={t('ui.close')}
                 className="w-9 h-9 flex items-center justify-center rounded-full text-muted hover:bg-ink-50 hover:text-ink-900 transition-colors duration-fast"
               >
                 <X size={20} />
@@ -301,7 +307,7 @@ export function DateTimeField({ value, onChange, placeholder = 'Seleciona data e
               max={null}
             />
             <div className="mt-4 min-w-0">
-              <label className="block text-sm font-extrabold text-ink-900 mb-2">Hora</label>
+              <label className="block text-sm font-extrabold text-ink-900 mb-2">{t('ui.hour_label')}</label>
               {/* iOS Safari's native time-picker control can ignore `width:
                   100%` and render at its own internal width instead,
                   pushing past the card's right edge — `min-w-0` overrides
@@ -312,7 +318,7 @@ export function DateTimeField({ value, onChange, placeholder = 'Seleciona data e
                 value={pendingTime}
                 onChange={(e) => setPendingTime(e.target.value)}
                 className="input-field w-full min-w-0 box-border"
-                aria-label="Hora"
+                aria-label={t('ui.hour_label')}
               />
             </div>
             <button
@@ -321,7 +327,7 @@ export function DateTimeField({ value, onChange, placeholder = 'Seleciona data e
               disabled={!pendingDate}
               className="btn-primary w-full mt-4 disabled:opacity-40 disabled:pointer-events-none"
             >
-              Confirmar
+              {t('ui.confirm')}
             </button>
           </div>
         </div>,
@@ -409,6 +415,7 @@ export function PrimaryButton({ variant = 'lime', className = '', children, ...p
    is rating-desc (Elo), NOT total_points-desc; any number shown next to
    this badge should be the rating, not the points. */
 export function RankBadge({ rank, size = 'md' }) {
+  const { t } = useTranslation()
   if (!rank) return null
   const sizes = {
     sm: 'text-[11px] px-2 py-0.5 gap-1',
@@ -421,7 +428,7 @@ export function RankBadge({ rank, size = 'md' }) {
     : 'bg-ink-50 text-ink-700'
   return (
     <span
-      title="Posição no ranking global"
+      title={t('ui.global_ranking_position')}
       className={`inline-flex items-center rounded-full font-extrabold tabular-nums ${sizes[size]} ${style}`}
     >
       <Trophy size={size === 'sm' ? 12 : 14} />
@@ -432,18 +439,20 @@ export function RankBadge({ rank, size = 'md' }) {
 
 /* ─── GuestBadge ─────────────────────────────────────────────────────────
    Marks non-regular players inside game participant lists. */
-export function GuestBadge({ size = 'sm', label = 'Convidado' }) {
+export function GuestBadge({ size = 'sm', label }) {
+  const { t } = useTranslation()
+  const resolvedLabel = label ?? t('ui.guest_badge_default_label')
   const sizes = {
     sm: 'text-[11px] px-2 py-0.5',
     md: 'text-sm px-3 py-1',
   }
   return (
     <span
-      title={label === 'Teste' ? 'Jogador de teste (admin)' : 'Jogador convidado'}
+      title={resolvedLabel === 'Teste' ? t('ui.test_player_admin') : t('ui.guest_player')}
       className={`inline-flex items-center rounded-full font-mono font-extrabold tracking-wide uppercase
                   border border-dashed border-ink-200 bg-canvas text-muted ${sizes[size]}`}
     >
-      {label}
+      {resolvedLabel}
     </span>
   )
 }
@@ -532,6 +541,7 @@ export function EmptyState({ icon: Icon, title, subtitle, action }) {
    Scannable at a glance: when, where, levels, slots, my state.
    States: open | closed (court reservado) | completed | joined. */
 export function MixCard({ game, joined = false, showClub = false }) {
+  const { t } = useTranslation()
   // Every person in the game — a row with partner counts as 2 players
   const players = (game.participants || [])
     .filter(p => p.status === 'confirmed')
@@ -556,8 +566,8 @@ export function MixCard({ game, joined = false, showClub = false }) {
   const today = new Date(); const tomorrow = new Date(today)
   tomorrow.setDate(today.getDate() + 1)
   const dayLabel =
-    d.toDateString() === today.toDateString() ? 'Hoje'
-    : d.toDateString() === tomorrow.toDateString() ? 'Amanhã'
+    d.toDateString() === today.toDateString() ? t('ui.today')
+    : d.toDateString() === tomorrow.toDateString() ? t('ui.tomorrow')
     : d.toLocaleDateString('pt-PT', { weekday: 'short', day: 'numeric', month: 'short' })
   const time = d.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
 
@@ -580,15 +590,15 @@ export function MixCard({ game, joined = false, showClub = false }) {
         {/* State — color + icon, never text alone */}
         {isLive ? (
           <span className="inline-flex items-center gap-1.5 bg-lime-400 text-ink-900 text-xs font-extrabold px-3 py-1.5 rounded-full">
-            <Play size={14} /> A decorrer
+            <Play size={14} /> {t('ui.status_live')}
           </span>
         ) : isDone ? (
           <span className="inline-flex items-center gap-1.5 bg-ink-50 text-ink-700 text-xs font-extrabold px-3 py-1.5 rounded-full">
-            <CheckCircle2 size={14} /> Mix terminado
+            <CheckCircle2 size={14} /> {t('ui.status_finished')}
           </span>
         ) : joined ? (
           <span className="inline-flex items-center gap-1.5 bg-lime-400 text-ink-900 text-xs font-extrabold px-3 py-1.5 rounded-full">
-            <CheckCircle2 size={14} /> Inscrito
+            <CheckCircle2 size={14} /> {t('ui.status_joined')}
           </span>
         ) : null}
       </div>
@@ -600,7 +610,7 @@ export function MixCard({ game, joined = false, showClub = false }) {
       )}
       {game.recurrence_id && (
         <p className="flex items-center gap-1 text-[11px] font-extrabold uppercase tracking-widest text-lime-700 mb-1">
-          <Repeat size={12} /> Recorrente
+          <Repeat size={12} /> {t('ui.recurring')}
         </p>
       )}
       <h3 className="text-lg text-ink-900 leading-snug mb-1">{game.title}</h3>
@@ -617,12 +627,12 @@ export function MixCard({ game, joined = false, showClub = false }) {
         </div>
         {game.status === 'open' && !joined && !isFull && (
           <span className="ml-auto inline-flex items-center gap-0.5 text-ink-700 text-sm font-extrabold">
-            Jogar <ChevronRight size={16} />
+            {t('ui.play_cta')} <ChevronRight size={16} />
           </span>
         )}
         {isClosed && !isLive && !isDone && (
           <span className="ml-auto inline-flex items-center gap-1.5 bg-ok/10 text-ok text-[11px] font-extrabold px-2.5 py-1 rounded-full">
-            <Lock size={13} className="shrink-0" /> Mix fechado — campo reservado
+            <Lock size={13} className="shrink-0" /> {t('ui.court_reserved')}
           </span>
         )}
       </div>
@@ -633,7 +643,9 @@ export function MixCard({ game, joined = false, showClub = false }) {
 /* ─── ShareModal ─────────────────────────────────────────────────────────
    Share sheet used for mixes: editable caption + link, WhatsApp + native
    share (when the device supports it) + copy-link fallback. */
-export function ShareModal({ title = 'Partilhar', message, url, onClose, imageCard }) {
+export function ShareModal({ title, message, url, onClose, imageCard }) {
+  const { t } = useTranslation()
+  const resolvedTitle = title ?? t('ui.share_default_title')
   const [caption, setCaption] = useState(message)
   const [editingCaption, setEditingCaption] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -671,7 +683,7 @@ export function ShareModal({ title = 'Partilhar', message, url, onClose, imageCa
       const file = new File([blob], 'alinho-mix.png', { type: 'image/png' })
       if (typeof navigator !== 'undefined' && navigator.canShare?.({ files: [file] })) {
         try {
-          await navigator.share({ files: [file], title, text: caption })
+          await navigator.share({ files: [file], title: resolvedTitle, text: caption })
         } catch {
           // user cancelled the OS share sheet — nothing to do
         }
@@ -688,7 +700,7 @@ export function ShareModal({ title = 'Partilhar', message, url, onClose, imageCa
       }
     } catch (error) {
       console.error('Error generating share image:', error)
-      setImageError('Não foi possível gerar a imagem. Tenta novamente.')
+      setImageError(t('ui.image_generation_error'))
     } finally {
       setGeneratingImage(false)
     }
@@ -711,7 +723,7 @@ export function ShareModal({ title = 'Partilhar', message, url, onClose, imageCa
 
   const handleNativeShare = async () => {
     try {
-      await navigator.share({ title, text: caption, url })
+      await navigator.share({ title: resolvedTitle, text: caption, url })
     } catch {
       // user cancelled the OS share sheet — nothing to do
     }
@@ -735,11 +747,11 @@ export function ShareModal({ title = 'Partilhar', message, url, onClose, imageCa
         <div className="flex items-center justify-between px-5 pt-5 pb-3">
           <div className="flex items-center gap-2">
             <Share2 size={20} className="text-ink-700" />
-            <h3 className="text-lg text-ink-900">{title}</h3>
+            <h3 className="text-lg text-ink-900">{resolvedTitle}</h3>
           </div>
           <button
             onClick={onClose}
-            aria-label="Fechar"
+            aria-label={t('ui.close')}
             className="w-9 h-9 flex items-center justify-center rounded-full text-muted hover:bg-ink-50 hover:text-ink-900 transition-colors duration-fast"
           >
             <X size={20} />
@@ -767,13 +779,13 @@ export function ShareModal({ title = 'Partilhar', message, url, onClose, imageCa
               )}
               {imageSavedHint && (
                 <p className="text-ok text-sm font-extrabold text-center">
-                  Imagem guardada — abre o Instagram e escolhe-a nos teus stories.
+                  {t('ui.image_saved_hint')}
                 </p>
               )}
 
               <PrimaryButton onClick={handleShareImage} disabled={generatingImage} className="w-full">
                 <ImageDown size={20} />
-                {generatingImage ? 'A gerar imagem…' : 'Partilhar imagem'}
+                {generatingImage ? t('ui.generating_image') : t('ui.share_image')}
               </PrimaryButton>
             </div>
           )}
@@ -785,21 +797,21 @@ export function ShareModal({ title = 'Partilhar', message, url, onClose, imageCa
           {editingCaption ? (
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-sm font-extrabold text-ink-900">Legenda</label>
+                <label className="text-sm font-extrabold text-ink-900">{t('ui.caption_label')}</label>
                 <div className="flex items-center gap-3">
                   {caption !== message && (
                     <button
                       onClick={() => setCaption(message)}
                       className="text-ink-700 text-xs font-extrabold"
                     >
-                      Repor
+                      {t('ui.reset')}
                     </button>
                   )}
                   <button
                     onClick={() => setEditingCaption(false)}
                     className="text-ink-700 text-xs font-extrabold"
                   >
-                    Concluído
+                    {t('ui.done')}
                   </button>
                 </div>
               </div>
@@ -814,14 +826,14 @@ export function ShareModal({ title = 'Partilhar', message, url, onClose, imageCa
           ) : (
             <div className="flex items-center justify-between gap-3">
               <p className="flex-1 min-w-0 truncate text-sm text-muted">
-                <span className="font-extrabold text-ink-900">Legenda: </span>
+                <span className="font-extrabold text-ink-900">{t('ui.caption_prefix')}</span>
                 {caption}
               </p>
               <button
                 onClick={() => setEditingCaption(true)}
                 className="text-ink-700 text-xs font-extrabold shrink-0"
               >
-                Editar
+                {t('ui.edit')}
               </button>
             </div>
           )}
@@ -833,18 +845,18 @@ export function ShareModal({ title = 'Partilhar', message, url, onClose, imageCa
           >
             <Link2 size={16} className="text-ink-700 shrink-0" />
             <span className="flex-1 min-w-0 text-left truncate text-muted font-normal">{url}</span>
-            <span className="text-ink-700 shrink-0">{copied ? 'Copiado!' : 'Copiar'}</span>
+            <span className="text-ink-700 shrink-0">{copied ? t('ui.copied') : t('ui.copy')}</span>
           </button>
 
           <PrimaryButton variant="whatsapp" onClick={handleWhatsApp} className="w-full">
             <MessageCircle size={20} />
-            Partilhar via WhatsApp
+            {t('ui.share_via_whatsapp')}
           </PrimaryButton>
 
           {typeof navigator !== 'undefined' && navigator.share && (
             <PrimaryButton variant="ghost" onClick={handleNativeShare} className="w-full">
               <Share2 size={20} />
-              Mais opções
+              {t('ui.more_options')}
             </PrimaryButton>
           )}
         </div>
@@ -904,6 +916,7 @@ function playRoundEndBeep() {
    live via the existing Realtime subscription on games UPDATE — no new
    sync mechanism needed here. */
 export function RoundTimer({ startedAt, durationMinutes, isAdmin, onAdjust }) {
+  const { t } = useTranslation()
   const [now, setNow] = useState(Date.now())
   const alertedRef = useRef(false)
 
@@ -976,7 +989,7 @@ export function RoundTimer({ startedAt, durationMinutes, isAdmin, onAdjust }) {
           <button
             type="button"
             onClick={() => onAdjust(-5)}
-            aria-label="Menos 5 minutos"
+            aria-label={t('ui.decrease_5_minutes')}
             className="w-6 h-6 flex items-center justify-center rounded-full bg-ink-50 text-ink-700 text-xs font-extrabold hover:bg-ink-200 transition-colors duration-fast"
           >
             −5
@@ -984,7 +997,7 @@ export function RoundTimer({ startedAt, durationMinutes, isAdmin, onAdjust }) {
           <button
             type="button"
             onClick={() => onAdjust(5)}
-            aria-label="Mais 5 minutos"
+            aria-label={t('ui.increase_5_minutes')}
             className="w-6 h-6 flex items-center justify-center rounded-full bg-ink-50 text-ink-700 text-xs font-extrabold hover:bg-ink-200 transition-colors duration-fast"
           >
             +5
@@ -1002,7 +1015,9 @@ export function RoundTimer({ startedAt, durationMinutes, isAdmin, onAdjust }) {
    `options` is [{ value, label }]. Trades away one thing a native <select>
    gets for free — typing a letter to jump to a matching option — but none
    of this app's option lists are long enough for that to matter. */
-export function Select({ value, onChange, options, placeholder = 'Seleciona…', className = '' }) {
+export function Select({ value, onChange, options, placeholder, className = '' }) {
+  const { t } = useTranslation()
+  const resolvedPlaceholder = placeholder ?? t('ui.select_placeholder')
   const [open, setOpen] = useState(false)
   const selected = options.find((o) => o.value === value)
 
@@ -1013,7 +1028,7 @@ export function Select({ value, onChange, options, placeholder = 'Seleciona…',
         onClick={() => setOpen(true)}
         className={`input-field flex items-center justify-between text-left ${selected ? 'text-ink-900' : 'text-muted'} ${className}`}
       >
-        <span className="truncate">{selected ? selected.label : placeholder}</span>
+        <span className="truncate">{selected ? selected.label : resolvedPlaceholder}</span>
         <ChevronDown size={20} className="text-ink-700 shrink-0 ml-2" />
       </button>
 
@@ -1027,10 +1042,10 @@ export function Select({ value, onChange, options, placeholder = 'Seleciona…',
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-5 pt-5 pb-3">
-              <h3 className="text-lg text-ink-900">{placeholder}</h3>
+              <h3 className="text-lg text-ink-900">{resolvedPlaceholder}</h3>
               <button
                 onClick={() => setOpen(false)}
-                aria-label="Fechar"
+                aria-label={t('ui.close')}
                 className="w-9 h-9 flex items-center justify-center rounded-full text-muted hover:bg-ink-50 hover:text-ink-900 transition-colors duration-fast"
               >
                 <X size={20} />
