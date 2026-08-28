@@ -56,7 +56,7 @@ async function sendGameDayReminder(game, { sendText }) {
   const profiles = await loadConfirmedParticipantProfiles(game.id)
   const hoursLeft = Math.max(1, Math.round((new Date(game.date).getTime() - Date.now()) / 3_600_000))
   const locationLine = game.location ? `\n📍 ${game.location}` : ''
-  const when = formatDateTime(game.date)
+  const whenGroup = formatDateTime(game.date)
 
   const rosterMentions = []
   const rosterNames = profiles.map((p) => {
@@ -75,7 +75,7 @@ async function sendGameDayReminder(game, { sendText }) {
     const groupLang = 'pt'
     const rosterLine = rosterNames.length > 0 ? t('reminder_roster_line', groupLang, { names: rosterNames.join(' ') }) : ''
     const groupText =
-      t('reminder_group', groupLang, { title: game.title, hours: hoursLeft, when, location: locationLine, roster: rosterLine }) +
+      t('reminder_group', groupLang, { title: game.title, hours: hoursLeft, when: whenGroup, location: locationLine, roster: rosterLine }) +
       helpFooter(groupLang)
     await sendText(settings.whatsapp_group_jid, groupText, { mentions: rosterMentions })
   }
@@ -83,7 +83,8 @@ async function sendGameDayReminder(game, { sendText }) {
   for (const profile of profiles) {
     if (!profile.whatsapp_jid) continue
     const lang = profile.language ?? 'pt'
-    const dmText = t('reminder_dm', lang, { title: game.title, hours: hoursLeft, when, location: locationLine })
+    const whenForProfile = formatDateTime(game.date, lang)
+    const dmText = t('reminder_dm', lang, { title: game.title, hours: hoursLeft, when: whenForProfile, location: locationLine })
     try {
       await sendText(profile.whatsapp_jid, dmText)
     } catch (err) {

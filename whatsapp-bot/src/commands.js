@@ -62,9 +62,9 @@ function parseCommand(text) {
 
 const OPEN_STATUSES = new Set(['open', 'closed'])
 
-function formatMixLine(mix) {
+function formatMixLine(mix, lang) {
   const location = mix.location ? `, ${mix.location}` : ''
-  return `🆔 *${mix.short_code}* — ${mix.title}, ${formatDateTime(mix.date)}${location}`
+  return `🆔 *${mix.short_code}* — ${mix.title}, ${formatDateTime(mix.date, lang)}${location}`
 }
 
 /**
@@ -309,7 +309,7 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message }, 
 
   // 2+ open mixes, no code given — disambiguate.
   if (action === 'in') {
-    const list = openMixes.map(formatMixLine).join('\n')
+    const list = openMixes.map((mix) => formatMixLine(mix, lang)).join('\n')
     await reply('disambiguate_in', { list, code: openMixes[0].short_code })
     return
   }
@@ -337,7 +337,7 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message }, 
     return
   }
   if (memberMixes.length > 1) {
-    const list = memberMixes.map(formatMixLine).join('\n')
+    const list = memberMixes.map((mix) => formatMixLine(mix, lang)).join('\n')
     await reply('disambiguate_out', { list, code: memberMixes[0].short_code })
     return
   }

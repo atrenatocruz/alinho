@@ -107,15 +107,21 @@ function firstNameLastInitial(fullName) {
   return `${parts[0]} ${parts[parts.length - 1][0]}.`
 }
 
-export function formatDateTime(isoDate) {
+// 'en' maps to en-GB (not en-US) — same day/month ordering players are
+// already used to from pt-PT, just in English. Same convention as the web
+// app's src/lib/formatDate.js.
+const LOCALE_MAP = { pt: 'pt-PT', en: 'en-GB' }
+
+export function formatDateTime(isoDate, lang = 'pt') {
+  const locale = LOCALE_MAP[lang] || 'pt-PT'
   const d = new Date(isoDate)
-  const datePart = d.toLocaleDateString('pt-PT', {
+  const datePart = d.toLocaleDateString(locale, {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
     timeZone: 'Europe/Lisbon',
   })
-  const timePart = d.toLocaleTimeString('pt-PT', {
+  const timePart = d.toLocaleTimeString(locale, {
     hour: '2-digit',
     minute: '2-digit',
     timeZone: 'Europe/Lisbon',
