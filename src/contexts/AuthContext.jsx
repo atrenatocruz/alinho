@@ -313,6 +313,11 @@ export const AuthProvider = ({ children }) => {
       setMemberships([])
       setCurrentOrganizationId(null)
       i18n.changeLanguage('pt')
+      try {
+        localStorage.removeItem('preferredLanguage')
+      } catch {
+        // ignore — localStorage can throw in some contexts
+      }
       return { error: null }
     }
 
@@ -323,6 +328,11 @@ export const AuthProvider = ({ children }) => {
       setMemberships([])
       setCurrentOrganizationId(null)
       i18n.changeLanguage('pt')
+      try {
+        localStorage.removeItem('preferredLanguage')
+      } catch {
+        // ignore — localStorage can throw in some contexts
+      }
     }
     return { error }
   }
