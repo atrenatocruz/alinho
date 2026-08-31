@@ -46,6 +46,7 @@ export default function Profile() {
   const [preferredSide, setPreferredSide] = useState(profile?.preferred_side || 'both')
   const [birthday, setBirthday] = useState(profile?.birthday || '')
   const [gender, setGender] = useState(profile?.gender || '')
+  const [language, setLanguage] = useState(profile?.language || 'pt')
   const [activityVisibility, setActivityVisibility] = useState(profile?.activity_visibility || 'public')
   const [resultsVisibility, setResultsVisibility] = useState(profile?.results_visibility || 'public')
   const [clubsVisibility, setClubsVisibility] = useState(profile?.clubs_visibility || 'public')
@@ -79,6 +80,7 @@ export default function Profile() {
       setPreferredSide(profile.preferred_side || 'both')
       setBirthday(profile.birthday || '')
       setGender(profile.gender || '')
+      setLanguage(profile.language || 'pt')
       // player_stats/mix_player_stats are org-scoped, so those two genuinely
       // need a current organization. Private matches are org-independent by
       // design — gating them on an org left club-less users stuck on a
@@ -360,6 +362,7 @@ export default function Profile() {
         preferred_side: preferredSide,
         birthday: birthday || null,
         gender,
+        language,
         activity_visibility: activityVisibility,
         results_visibility: resultsVisibility,
         clubs_visibility: clubsVisibility,
@@ -369,6 +372,14 @@ export default function Profile() {
       }
       const { error: profileError } = await updateProfile(updates)
       if (profileError) throw profileError
+      // Instant UI flip, same as the old header toggle — updateProfile only
+      // writes the DB row, it doesn't touch the live i18next instance.
+      i18n.changeLanguage(language)
+      try {
+        localStorage.setItem('preferredLanguage', language)
+      } catch {
+        // ignore — best-effort, mirrors Layout.jsx's old toggle
+      }
       setPhone('')
       setEditing(false)
       setSaved(true)
@@ -657,6 +668,18 @@ export default function Profile() {
                 <p className="text-xs text-muted mt-1.5">{t('profile.preferred_side_hint')}</p>
               </div>
 
+              <div>
+                <label className={inputLabel}>{t('profile.language_label')}</label>
+                <Select
+                  value={language}
+                  onChange={setLanguage}
+                  options={[
+                    { value: 'pt', label: t('profile.language_portuguese') },
+                    { value: 'en', label: t('profile.language_english') },
+                  ]}
+                />
+              </div>
+
               <div className="pt-2 border-t border-line">
                 <h4 className="text-sm font-extrabold text-ink-900 mt-4 mb-1">{t('profile.privacy_heading')}</h4>
                 <p className="text-xs text-muted mb-3">
@@ -690,6 +713,7 @@ export default function Profile() {
                     setName(profile.name)
                     setBirthday(profile.birthday || '')
                     setGender(profile.gender || '')
+                    setLanguage(profile.language || 'pt')
                     setActivityVisibility(profile.activity_visibility || 'public')
                     setResultsVisibility(profile.results_visibility || 'public')
                     setClubsVisibility(profile.clubs_visibility || 'public')
@@ -749,6 +773,13 @@ export default function Profile() {
                 <p className={fieldLabel}>{t('profile.preferred_side_label')}</p>
                 <p className={fieldValue}>
                   {t(SIDE_LABEL_KEY[profile?.preferred_side] || SIDE_LABEL_KEY.both)}
+                </p>
+              </div>
+
+              <div>
+                <p className={fieldLabel}>{t('profile.language_label')}</p>
+                <p className={fieldValue}>
+                  {profile?.language === 'en' ? t('profile.language_english') : t('profile.language_portuguese')}
                 </p>
               </div>
             </div>
