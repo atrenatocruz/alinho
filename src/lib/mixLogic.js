@@ -2,14 +2,15 @@
    Mix engine — pure tournament logic (no I/O, fully testable).
 
    Documented decisions:
-   - Solo pairing ignores preferred_side entirely (superseded former
-     decision #4 and its side-preference successor): every solo is sorted
-     by global club points (pointsById) descending. Each player takes the
-     closest-points remaining partner, except one already ruled out by
-     repeatPairKeys (same two players paired last mix) — that candidate is
-     skipped in favor of the next-closest below, cascading further down if
-     that's also a repeat, so a repeat is only ever accepted as a last
-     resort (nobody left unpaired).
+   - Solo pairing (Trello #162, reinstating part of former decision #4):
+     every solo is sorted by global club points (pointsById) descending.
+     Each player takes the closest-points remaining partner that is both
+     side-compatible (opposite preferred_side, or either side is 'both')
+     and not a repeat of last mix's pairing (repeatPairKeys). Side
+     preference is soft — never blocks a pairing — so it's relaxed first
+     (falling back to the closest-points non-repeat candidate regardless of
+     side) and repeat-avoidance is relaxed last (a repeat is only ever
+     accepted when nobody left is both non-repeat and unpaired).
    - Dupla seed = Σ pointsById per player (same points used to pair them),
      so seedCourts (below) puts the highest-points duplas on court 1 down
      to the lowest-points duplas on the last court.
@@ -45,9 +46,10 @@ export const totalRounds = (game) =>
 /**
  * Form duplas from confirmed participant rows.
  * Rows with partner keep their dupla; solos are sorted by global points
- * (pointsById) and paired closest-rank-first, skipping a candidate whose
- * pairing is in repeatPairKeys (same two players paired last mix) in favor
- * of the next-closest below — see the file-header note.
+ * (pointsById) and paired closest-rank-first, preferring a candidate that's
+ * both side-compatible and not a repeat of last mix's pairing
+ * (repeatPairKeys) — side preference is relaxed first, repeat-avoidance
+ * last, so neither ever leaves a player unpaired — see the file-header note.
  * Returns [{ player1, player2, seed }], seed = Σ points.
  */
 export function formDuplas(participants, pointsById = {}, repeatPairKeys = new Set()) {
@@ -63,10 +65,13 @@ export function formDuplas(participants, pointsById = {}, repeatPairKeys = new S
   solos.sort((a, b) => pointsOf(b) - pointsOf(a))
 
   const pairKey = (a, b) => [a?.id, b?.id].sort().join('|')
+  const sideOf = u => (u?.preferred_side === 'left' || u?.preferred_side === 'right') ? u.preferred_side : 'both'
+  const sidesCompatible = (a, b) => sideOf(a) === 'both' || sideOf(b) === 'both' || sideOf(a) !== sideOf(b)
 
   while (solos.length >= 2) {
     const a = solos.shift()
-    let idx = solos.findIndex(candidate => !repeatPairKeys.has(pairKey(a, candidate)))
+    let idx = solos.findIndex(candidate => !repeatPairKeys.has(pairKey(a, candidate)) && sidesCompatible(a, candidate))
+    if (idx === -1) idx = solos.findIndex(candidate => !repeatPairKeys.has(pairKey(a, candidate))) // side preference relaxed
     if (idx === -1) idx = 0 // everyone left is a repeat — accept the closest rather than leave a gap
     const b = solos.splice(idx, 1)[0]
     duplas.push([a, b])

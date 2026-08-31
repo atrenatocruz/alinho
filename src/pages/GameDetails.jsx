@@ -1981,6 +1981,7 @@ export default function GameDetails() {
    One player row inside "Editar duplas": draggable AND droppable on the
    same id, so dropping one chip onto another swaps the two players. */
 function SwapChip({ id, player, disabled, justSwapped }) {
+  const { t } = useTranslation()
   const draggable = useDraggable({ id, disabled })
   const droppable = useDroppable({ id })
 
@@ -2002,6 +2003,9 @@ function SwapChip({ id, player, disabled, justSwapped }) {
       <GripVertical size={16} className="text-muted shrink-0" />
       <Avatar name={player?.name} url={player?.avatar_url} size="w-7 h-7 text-xs" />
       <span className="flex-1 min-w-0 text-sm font-extrabold text-ink-900 truncate">{player?.name || '?'}</span>
+      <span className="text-xs font-extrabold text-muted shrink-0">
+        {t(SIDE_LABEL_KEY[player?.preferred_side] || SIDE_LABEL_KEY.both)}
+      </span>
       {justSwapped && (
         <span className="absolute inset-0 rounded-ctrl bg-lime-400/20 pointer-events-none animate-swap-confirm" />
       )}
