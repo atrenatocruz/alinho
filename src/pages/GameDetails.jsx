@@ -19,16 +19,6 @@ import { formatDate as formatDateLib } from '../lib/formatDate'
 
 const SIDE_LABEL_KEY = { left: 'gamedetails.side_left', right: 'gamedetails.side_right', both: 'gamedetails.side_both' }
 
-const HISTORY_STATUS_KEY = {
-  open: 'gamedetails.status_open',
-  closed: 'gamedetails.status_closed',
-  in_progress: 'gamedetails.status_in_progress',
-  pending: 'gamedetails.status_pending',
-  finished: 'gamedetails.status_finished',
-  completed: 'gamedetails.status_finished',
-  cancelled: 'gamedetails.status_cancelled',
-}
-
 export default function GameDetails() {
   const { t, i18n } = useTranslation()
   const { id } = useParams()
@@ -69,8 +59,6 @@ export default function GameDetails() {
   const [mixStats, setMixStats] = useState([])
   const [addingTestUser, setAddingTestUser] = useState(false)
   const [pointsById, setPointsById] = useState({})
-  const [recurrenceHistory, setRecurrenceHistory] = useState([])
-  const [historyExpanded, setHistoryExpanded] = useState(false)
   const [finishedTab, setFinishedTab] = useState('stats') // 'stats' | 'duplas' | 'rondas' — tabs for a finished mix's results
 
   useEffect(() => {
@@ -98,7 +86,6 @@ export default function GameDetails() {
 
   const loadGameDetails = async () => {
     try {
-      setRecurrenceHistory([])
       const { data: gameData, error: gameError } = await supabase
         .from('games')
         .select('*')
@@ -107,22 +94,6 @@ export default function GameDetails() {
 
       if (gameError) throw gameError
       setGame(gameData)
-
-      if (gameData.recurrence_id) {
-        const { data: historyData, error: historyError } = await supabase
-          .from('games')
-          .select('id, date, status, winner_team_id')
-          .eq('recurrence_id', gameData.recurrence_id)
-          .neq('id', gameData.id)
-          .order('date', { ascending: false })
-        if (historyError) {
-          console.error('Error loading recurrence history:', historyError)
-        } else {
-          setRecurrenceHistory(historyData || [])
-        }
-      } else {
-        setRecurrenceHistory([])
-      }
 
       // level/is_guest live on `memberships` now (per-org) — fetch this
       // org's memberships once and merge onto every nested profile object
@@ -1179,49 +1150,11 @@ export default function GameDetails() {
           )}
           {game.status === 'in_progress' && (
             <span className="ml-auto inline-flex items-center gap-1.5 bg-lime-400 text-ink-900 text-xs font-extrabold px-3 py-1.5 rounded-full">
-              <Play size={14} className="shrink-0" /> {t(HISTORY_STATUS_KEY.in_progress)}
+              <Play size={14} className="shrink-0" /> {t('gamedetails.status_in_progress')}
             </span>
           )}
         </div>
       </div>
-
-      {/* Histórico — other occurrences of the same recurring mix */}
-      {recurrenceHistory.length > 0 && (
-        <div className="card p-0 overflow-hidden">
-          <button
-            onClick={() => setHistoryExpanded((v) => !v)}
-            aria-expanded={historyExpanded}
-            className="w-full flex items-center gap-3 px-4 py-3.5 min-h-[56px] transition-colors duration-fast hover:bg-ink-50"
-          >
-            <Repeat size={18} className="text-ink-700 shrink-0" />
-            <p className="flex-1 min-w-0 text-left font-extrabold text-ink-900">{t('gamedetails.history')}</p>
-            <span className="text-sm text-muted">{recurrenceHistory.length}</span>
-            <ChevronDown
-              size={20}
-              className={`text-muted transition-transform duration-base shrink-0 ${historyExpanded ? 'rotate-180' : ''}`}
-            />
-          </button>
-
-          {historyExpanded && (
-            <div className="border-t border-line divide-y divide-line animate-fade-up">
-              {recurrenceHistory.map((h) => (
-                <Link
-                  key={h.id}
-                  to={`/jogo/${h.id}`}
-                  className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-ink-50 transition-colors duration-fast"
-                >
-                  <span className="text-sm text-ink-900 capitalize">
-                    {formatDateLib(h.date, i18n.language, { weekday: 'short', day: 'numeric', month: 'short' })}
-                  </span>
-                  <span className="text-xs font-extrabold text-muted">
-                    {HISTORY_STATUS_KEY[h.status] ? t(HISTORY_STATUS_KEY[h.status]) : h.status}
-                  </span>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Winner (mix finalizado) */}
       {game.status === 'finished' && game.winner_team_id && (

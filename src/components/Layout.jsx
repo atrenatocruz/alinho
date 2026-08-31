@@ -308,7 +308,7 @@ export default function Layout({ children }) {
                         {joinRequestsByOrg.map((org) => (
                           <Link
                             key={org.organizationId}
-                            to="/gerir"
+                            to={org.slug ? `/gerir/${org.slug}?tab=members` : '/gerir'}
                             onClick={() => setShowNotifications(false)}
                             className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50"
                           >

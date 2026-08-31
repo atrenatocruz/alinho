@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase'
 import { Avatar, EmptyState, PrimaryButton } from '../components/ui'
 import PlayerSearch from '../components/PlayerSearch'
 import { searchAnyPlayer, createOrganization, createGroup } from '../lib/platformAdmin'
+import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
 
 const sanitizeSlug = (value) => value.toLowerCase().replace(/[^a-z0-9-]/g, '')
 
@@ -29,6 +30,21 @@ export default function Gerir() {
   // migration_platform_admin_full_access.sql); membership itself is only
   // granted on-demand, when they actually open a specific club's Gerir page.
   const [allOrganizations, setAllOrganizations] = useState([])
+
+  // Pending join-request counts per club, keyed by organization id — shown
+  // as a badge on each card below so an admin managing several clubs can
+  // tell which one has requests waiting without opening each in turn (same
+  // badge style as the "Membros" tab inside GerirClube.jsx).
+  const [joinRequestsByOrg, setJoinRequestsByOrg] = useState(new Map())
+
+  useEffect(() => {
+    if (!profile?.id) return
+    listPendingMembershipRequestsForAdmin(profile.id)
+      .then((data) => {
+        setJoinRequestsByOrg(new Map(data.map((org) => [org.organizationId, org.count])))
+      })
+      .catch((error) => console.error('Error loading membership join requests:', error))
+  }, [profile?.id])
 
   useEffect(() => {
     if (!isPlatformAdmin) return
@@ -215,12 +231,24 @@ export default function Gerir() {
       {createClubPanel}
 
       <div className="space-y-3">
-        {clubsToShow.map((org) => (
-          <Link key={org.id} to={`/gerir/${org.slug}`} className="card press flex items-center gap-3.5 hover:shadow-lift">
-            <Avatar name={org.name} url={org.group_logo_url} size="w-11 h-11 text-sm" />
-            <h3 className="font-extrabold text-ink-900 truncate">{org.name}</h3>
-          </Link>
-        ))}
+        {clubsToShow.map((org) => {
+          const pendingCount = joinRequestsByOrg.get(org.id) || 0
+          return (
+            <Link
+              key={org.id}
+              to={pendingCount > 0 ? `/gerir/${org.slug}?tab=members` : `/gerir/${org.slug}`}
+              className="card press flex items-center gap-3.5 hover:shadow-lift"
+            >
+              <Avatar name={org.name} url={org.group_logo_url} size="w-11 h-11 text-sm" />
+              <h3 className="flex-1 min-w-0 font-extrabold text-ink-900 truncate">{org.name}</h3>
+              {pendingCount > 0 && (
+                <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-lime-400 text-ink-900 text-[11px] font-extrabold tabular-nums shrink-0">
+                  {pendingCount}
+                </span>
+              )}
+            </Link>
+          )
+        })}
       </div>
     </div>
   )

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Plus, Calendar, Users, Trash2, Edit2, Check, X, UserX, Repeat, Clock, ArrowLeft, Camera, Settings, Copy } from 'lucide-react'
 import { supabase } from '../lib/supabase'
@@ -121,10 +121,14 @@ function Segmented({ options, value, onChange }) {
 export default function GerirClube() {
   const { t, i18n } = useTranslation()
   const { slug } = useParams()
+  const [searchParams] = useSearchParams()
   const { profile: currentUser, memberships, adminOrganizations, isPrivateMatchesEnabled, refreshFeatureFlags, ensureOrgAdminAccess, refreshMemberships, followOrganization } = useAuth()
   const [org, setOrg] = useState(null)
   const [orgLoading, setOrgLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('games') // 'games', 'members', 'settings'
+  // Deep-linked via ?tab=members — e.g. the join-request notification in
+  // Layout.jsx sends admins straight to the tab that has the pending
+  // request, instead of dropping them on the hub to hunt for it.
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') === 'members' ? 'members' : 'games')
   const [games, setGames] = useState([])
   const [members, setMembers] = useState([])
   const [linkCopied, setLinkCopied] = useState(false)
