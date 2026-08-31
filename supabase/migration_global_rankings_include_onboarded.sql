@@ -15,12 +15,18 @@
 --
 -- Fix: include any profile with a rating at all (rating IS NOT NULL —
 -- i.e. has completed onboarding), regardless of whether they've played.
--- They show up with their real anchor rating and 0 club/private points,
--- which is accurate — same shape Rankings.jsx already renders for anyone
--- with COALESCE(total_points, 0).
+-- They show up with their real anchor rating, 0 club/private points and
+-- 0/0 mixes — same shape Rankings.jsx already renders via COALESCE(..., 0).
+--
+-- Return shape must match the LIVE function exactly (mix_wins/mixes_played
+-- were added later by migration_global_rankings_mix_stats.sql) — Postgres
+-- refuses a bare CREATE OR REPLACE across a return-type change, hence the
+-- DROP FUNCTION first, same as that migration did.
 --
 -- Run this whole file in Supabase → SQL Editor → New query → Run.
 -- ════════════════════════════════════════════════════════════════════════
+
+DROP FUNCTION IF EXISTS get_global_rankings();
 
 CREATE OR REPLACE FUNCTION get_global_rankings()
 RETURNS TABLE (
@@ -31,14 +37,20 @@ RETURNS TABLE (
   gender TEXT,
   club_points BIGINT,
   private_points BIGINT,
-  total_points BIGINT
+  total_points BIGINT,
+  mix_wins BIGINT,
+  mixes_played BIGINT
 )
 LANGUAGE sql
 SECURITY DEFINER
 SET search_path = public
 AS $$
   WITH club AS (
-    SELECT ps.user_id, SUM(ps.total_points) AS club_points
+    SELECT
+      ps.user_id,
+      SUM(ps.total_points) AS club_points,
+      SUM(ps.mix_wins) AS mix_wins,
+      SUM(ps.mixes_played) AS mixes_played
     FROM player_stats ps
     JOIN organizations o ON o.id = ps.organization_id
     WHERE o.is_global = TRUE
@@ -57,10 +69,15 @@ AS $$
     p.gender,
     COALESCE(club.club_points, 0) AS club_points,
     COALESCE(private.private_points, 0) AS private_points,
-    COALESCE(club.club_points, 0) + COALESCE(private.private_points, 0) AS total_points
+    COALESCE(club.club_points, 0) + COALESCE(private.private_points, 0) AS total_points,
+    COALESCE(club.mix_wins, 0) AS mix_wins,
+    COALESCE(club.mixes_played, 0) AS mixes_played
   FROM profiles p
   LEFT JOIN club ON club.user_id = p.id
   LEFT JOIN private ON private.user_id = p.id
   WHERE club.user_id IS NOT NULL OR private.user_id IS NOT NULL OR p.rating IS NOT NULL
   ORDER BY p.rating DESC NULLS LAST, total_points DESC, p.name ASC;
 $$;
+
+REVOKE ALL ON FUNCTION get_global_rankings() FROM public, anon;
+GRANT EXECUTE ON FUNCTION get_global_rankings() TO authenticated;
