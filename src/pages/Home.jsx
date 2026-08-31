@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { CalendarX2, Trophy, Users, UserPlus } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -7,12 +8,12 @@ import { MixCard, EmptyState, PrimaryButton, Avatar } from '../components/ui'
 import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
 
-const TABS = [
-  { key: 'ativos', label: 'Mixs Ativos' },
-  { key: 'terminados', label: 'Mixs Terminados' },
-]
-
 export default function Home() {
+  const { t } = useTranslation()
+  const TABS = [
+    { key: 'ativos', label: t('home.active_mixes_tab') },
+    { key: 'terminados', label: t('home.finished_mixes_tab') },
+  ]
   const [games, setGames] = useState([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('ativos')
@@ -33,7 +34,7 @@ export default function Home() {
       if (error) throw error
     } catch (error) {
       console.error('Error joining organization:', error)
-      setJoinError('Não foi possível juntar-te a esse clube. Confirma o nome com o admin.')
+      setJoinError(t('home.join_club_error'))
     } finally {
       setJoining(false)
     }
@@ -233,9 +234,9 @@ export default function Home() {
     <div className="space-y-5">
       <div>
         {firstName && (
-          <p className="text-muted text-sm mb-0.5">Olá, {firstName} 👋</p>
+          <p className="text-muted text-sm mb-0.5">{t('home.greeting', { name: firstName })}</p>
         )}
-        <h2 className="text-3xl text-ink-900">Próximos jogos</h2>
+        <h2 className="text-3xl text-ink-900">{t('home.upcoming_games')}</h2>
       </div>
 
       {joinRequestsTotal > 0 && (
@@ -244,7 +245,7 @@ export default function Home() {
             <UserPlus size={18} />
           </div>
           <p className="text-sm text-amber-800 font-semibold">
-            {joinRequestsTotal} {joinRequestsTotal === 1 ? 'pedido pendente' : 'pedidos pendentes'} de entrada num grupo/clube
+            {t('home.pending_join_requests', { count: joinRequestsTotal })}
           </p>
         </Link>
       )}
@@ -255,8 +256,8 @@ export default function Home() {
             <Users size={18} />
           </div>
           <div>
-            <p className="font-extrabold text-ink-900 text-sm">Jogo entre amigos</p>
-            <p className="text-[11px] text-muted">Regista um 2x2 fora do clube</p>
+            <p className="font-extrabold text-ink-900 text-sm">{t('home.friendly_match')}</p>
+            <p className="text-[11px] text-muted">{t('home.friendly_match_subtitle')}</p>
           </div>
         </Link>
       )}
@@ -264,18 +265,18 @@ export default function Home() {
       {memberships.length === 0 ? (
         <EmptyState
           icon={Users}
-          title="Ainda não segues nenhum clube"
+          title={t('home.no_clubs_followed_title')}
           subtitle={
             joining
-              ? 'A juntar-te ao clube…'
-              : 'Descobre clubes e grupos na Comunidade, ou usa um link de convite direto.'
+              ? t('home.joining_club')
+              : t('home.no_clubs_followed_subtitle')
           }
           action={
             !joining && (
               <div className="space-y-4 max-w-xs mx-auto">
                 <Link to="/comunidade">
                   <PrimaryButton type="button" className="w-full">
-                    Ver Comunidade
+                    {t('home.view_community')}
                   </PrimaryButton>
                 </Link>
                 <form
@@ -286,11 +287,11 @@ export default function Home() {
                     type="text"
                     value={joinSlug}
                     onChange={(e) => setJoinSlug(e.target.value)}
-                    placeholder="ou introduz o código de um clube privado"
+                    placeholder={t('home.private_club_code_placeholder')}
                     className="input-field text-center text-sm"
                   />
                   <PrimaryButton type="submit" variant="ghost" disabled={!joinSlug.trim()} className="w-full">
-                    Entrar no clube
+                    {t('home.join_club')}
                   </PrimaryButton>
                   {joinError && <p className="text-xs text-danger">{joinError}</p>}
                 </form>
@@ -301,15 +302,15 @@ export default function Home() {
       ) : (
         <>
           <div className="flex gap-1 p-1 bg-ink-50 rounded-ctrl">
-            {TABS.map(t => (
+            {TABS.map(tabDef => (
               <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
+                key={tabDef.key}
+                onClick={() => setTab(tabDef.key)}
                 className={`flex-1 py-2.5 rounded-ctrl text-sm font-extrabold transition-all duration-fast ${
-                  tab === t.key ? 'bg-canvas text-ink-900 shadow-lift border border-line' : 'text-muted hover:text-ink-900'
+                  tab === tabDef.key ? 'bg-canvas text-ink-900 shadow-lift border border-line' : 'text-muted hover:text-ink-900'
                 }`}
               >
-                {t.label}
+                {tabDef.label}
               </button>
             ))}
           </div>
@@ -318,14 +319,14 @@ export default function Home() {
             tab === 'ativos' ? (
               <EmptyState
                 icon={CalendarX2}
-                title="Campo livre… por agora"
-                subtitle="Ainda não há jogos marcados. Volta em breve — ou dá um toque ao admin."
+                title={t('home.no_active_games_title')}
+                subtitle={t('home.no_active_games_subtitle')}
               />
             ) : (
               <EmptyState
                 icon={Trophy}
-                title="Ainda não há mixs terminados"
-                subtitle="O histórico de mixs aparece aqui assim que houver um terminado."
+                title={t('home.no_finished_mixes_title')}
+                subtitle={t('home.no_finished_mixes_subtitle')}
               />
             )
           ) : memberships.length > 1 ? (

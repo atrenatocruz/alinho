@@ -2,7 +2,8 @@ import { supabase } from './supabase.js'
 import { config } from './config.js'
 import { getSettings } from './settings.js'
 import { getOpenMixes, loadGame, formatDateTime } from './roster.js'
-import { HELP_FOOTER } from './messages.js'
+import { helpFooter } from './messages.js'
+import { t } from './locales.js'
 
 const GAME_DAY_CHECK_INTERVAL_MS = 10 * 60 * 1000 // 10 min — fine grain relative to reminderHoursBefore
 const DIGEST_CHECK_INTERVAL_MS = 5 * 60 * 1000 // just needs to land inside the target hour once a day
@@ -37,7 +38,7 @@ async function loadConfirmedParticipantProfiles(gameId) {
 
   const { data: profiles, error: profilesError } = await supabase
     .from('profiles')
-    .select('id, name, whatsapp_jid')
+    .select('id, name, whatsapp_jid, language')
     .in('id', Array.from(ids))
   if (profilesError) throw new Error(`Failed to load participant profiles for reminder: ${profilesError.message}`)
   return profiles
@@ -55,6 +56,7 @@ async function sendGameDayReminder(game, { sendText }) {
   const profiles = await loadConfirmedParticipantProfiles(game.id)
   const hoursLeft = Math.max(1, Math.round((new Date(game.date).getTime() - Date.now()) / 3_600_000))
   const locationLine = game.location ? `\n📍 ${game.location}` : ''
+  const whenGroup = formatDateTime(game.date)
 
   const rosterMentions = []
   const rosterNames = profiles.map((p) => {
@@ -67,20 +69,22 @@ async function sendGameDayReminder(game, { sendText }) {
 
   const settings = await getSettings()
   if (settings.whatsapp_group_jid) {
+    // Group post — addressed to everyone at once, not one profile, so it
+    // stays 'pt' (see locales.js scope note). The individual DM below is
+    // the one that respects each participant's own language.
+    const groupLang = 'pt'
+    const rosterLine = rosterNames.length > 0 ? t('reminder_roster_line', groupLang, { names: rosterNames.join(' ') }) : ''
     const groupText =
-      `🤖 ⏰ *Lembrete!* O mix *${game.title}* começa daqui a ${hoursLeft}h.\n` +
-      `📅 ${formatDateTime(game.date)}${locationLine}\n\n` +
-      (rosterNames.length > 0 ? `Inscritos: ${rosterNames.join(' ')}\n\n` : '') +
-      `Não faltes! 🎾${HELP_FOOTER}`
+      t('reminder_group', groupLang, { title: game.title, hours: hoursLeft, when: whenGroup, location: locationLine, roster: rosterLine }) +
+      helpFooter(groupLang)
     await sendText(settings.whatsapp_group_jid, groupText, { mentions: rosterMentions })
   }
 
-  const dmText =
-    `🤖 ⏰ *Lembrete!* O teu mix *${game.title}* começa daqui a ${hoursLeft}h.\n` +
-    `📅 ${formatDateTime(game.date)}${locationLine}\n\n` +
-    `Não faltes! 🎾`
   for (const profile of profiles) {
     if (!profile.whatsapp_jid) continue
+    const lang = profile.language ?? 'pt'
+    const whenForProfile = formatDateTime(game.date, lang)
+    const dmText = t('reminder_dm', lang, { title: game.title, hours: hoursLeft, when: whenForProfile, location: locationLine })
     try {
       await sendText(profile.whatsapp_jid, dmText)
     } catch (err) {
@@ -127,16 +131,24 @@ async function sendOpenMixesDigest({ sendText, getGroupMentions }) {
   const incomplete = mixStates.filter(({ people, capacity }) => people.length < capacity)
   if (incomplete.length === 0) return
 
+  // Group broadcast, not addressed to one profile — stays 'pt', same
+  // reasoning as sendGameDayReminder's group post above.
+  const lang = 'pt'
   const lines = incomplete.map(({ game, people, capacity }) => {
     const vagas = capacity - people.length
     const locationLine = game.location ? `, ${game.location}` : ''
-    return `🎾 *${game.title}* — ${formatDateTime(game.date)}${locationLine}\n👥 ${people.length}/${capacity} (faltam ${vagas})`
+    return t('digest_mix_line', lang, {
+      title: game.title,
+      when: formatDateTime(game.date),
+      location: locationLine,
+      filled: people.length,
+      capacity,
+      vagas,
+    })
   })
 
   const mentions = await getGroupMentions(settings.whatsapp_group_jid)
-  const text =
-    `🤖 📢 @all *Mixes ainda em aberto!*\n\n${lines.join('\n\n')}\n\n` +
-    `Ainda há vagas — inscrevam-se antes que feche! 🎾${HELP_FOOTER}`
+  const text = t('digest_text', lang, { lines: lines.join('\n\n') }) + helpFooter(lang)
   await sendText(settings.whatsapp_group_jid, text, { mentions })
 }
 

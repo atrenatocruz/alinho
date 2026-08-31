@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { CheckCircle2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -17,6 +18,7 @@ import { ONBOARDING_LEVELS } from '../lib/elo'
    Contas antigas nunca passam por aqui (marcadas na migração).
    ════════════════════════════════════════════════════════════════════════ */
 export default function EscolherNivel() {
+  const { t } = useTranslation()
   const { user, refreshMemberships } = useAuth()
   const [selected, setSelected] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -36,7 +38,7 @@ export default function EscolherNivel() {
       await refreshMemberships()
     } catch (err) {
       console.error('Error completing rating onboarding:', err)
-      setError('Não foi possível guardar. Tenta novamente.')
+      setError(t('onboarding.save_failed_retry'))
       setSaving(false)
     }
   }
@@ -48,10 +50,9 @@ export default function EscolherNivel() {
       <div className="w-full max-w-md">
         <Wordmark variant="light" className="h-7 mx-auto mb-8" />
 
-        <h1 className="text-2xl text-ink-900 text-center mb-1.5">Qual é o teu nível?</h1>
+        <h1 className="text-2xl text-ink-900 text-center mb-1.5">{t('onboarding.heading')}</h1>
         <p className="text-muted text-sm text-center mb-7">
-          Define os teus pontos de entrada no ranking. Escolhe com honestidade —
-          a partir daqui são os resultados que falam.
+          {t('onboarding.subheading')}
         </p>
 
         <div className="space-y-3 mb-7">
@@ -68,13 +69,13 @@ export default function EscolherNivel() {
               >
                 <div className="flex items-center gap-3.5">
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-base text-ink-900">{level.title}</h3>
-                    <p className="text-[13px] text-muted mt-0.5">{level.description}</p>
+                    <h3 className="text-base text-ink-900">{t(level.titleKey)}</h3>
+                    <p className="text-[13px] text-muted mt-0.5">{t(level.descriptionKey)}</p>
                   </div>
                   <div className="text-right shrink-0 flex items-center gap-2.5">
                     <div>
                       <p className="text-xl font-extrabold text-ink-900 tabular-nums">{level.points}</p>
-                      <p className="text-[11px] text-muted">pontos</p>
+                      <p className="text-[11px] text-muted">{t('onboarding.points')}</p>
                     </div>
                     {isSelected && <CheckCircle2 size={22} className="text-lime-600" />}
                   </div>
@@ -91,11 +92,10 @@ export default function EscolherNivel() {
           disabled={!selected || saving}
           className="w-full"
         >
-          {saving ? 'A guardar…' : 'Confirmar'}
+          {saving ? t('onboarding.saving') : t('onboarding.confirm')}
         </PrimaryButton>
         <p className="text-[11px] text-muted text-center mt-3">
-          Esta escolha define só o ponto de partida — o nível público (M6, M5…)
-          evolui com os teus jogos.
+          {t('onboarding.footnote')}
         </p>
       </div>
     </div>

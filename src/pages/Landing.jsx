@@ -1,8 +1,39 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { CheckCircle2, MapPin, Lock, Calendar, Trophy, Users, MessageCircle } from 'lucide-react'
 import { Wordmark } from '../components/Layout'
 import PadelIcon from '../components/icons/PadelIcon'
+import i18n from '../lib/i18n'
+
+// Same pattern as Layout.jsx's header toggle, minus the profile persistence
+// (there's no profile yet on this pre-auth page) — just the instant UI flip
+// plus a localStorage write so the choice survives a reload and carries
+// forward into the account once the visitor signs in (see AuthContext's
+// loadProfile reconciliation).
+function toggleLanguage() {
+  const next = i18n.language === 'en' ? 'pt' : 'en'
+  i18n.changeLanguage(next)
+  try {
+    localStorage.setItem('preferredLanguage', next)
+  } catch {
+    // ignore — best-effort persistence
+  }
+}
+
+function LanguageToggle({ className = '' }) {
+  const { t } = useTranslation()
+  return (
+    <button
+      type="button"
+      onClick={toggleLanguage}
+      title={t('layout.toggle_language')}
+      className={`inline-flex items-center justify-center min-h-[44px] min-w-[44px] font-extrabold text-xs transition-colors duration-fast ${className}`}
+    >
+      {i18n.language === 'en' ? 'PT' : 'EN'}
+    </button>
+  )
+}
 
 // Fires once, the first time the ref'd element enters the viewport — drives
 // the .reveal / .reveal-visible transition (src/index.css) instead of a
@@ -69,6 +100,7 @@ function useLoginHref() {
 // Fixed nav — floats transparently over the hero, solidifies once scrolled
 // past it, matching Layout.jsx's header treatment for logged-in pages.
 function Nav() {
+  const { t } = useTranslation()
   const [scrolled, setScrolled] = useState(false)
   const loginHref = useLoginHref()
 
@@ -92,11 +124,12 @@ function Nav() {
           <Wordmark />
         </Link>
         <div className="flex items-center gap-4">
+          <LanguageToggle className="text-white/80 hover:text-white" />
           <Link
             to={loginHref()}
             className="inline-flex items-center min-h-[44px] px-1 text-white/80 hover:text-white font-extrabold text-sm transition-colors duration-fast"
           >
-            Entrar
+            {t('landing.login_link')}
           </Link>
           {/* Hidden on narrow mobile to avoid crowding — the hero below
               already carries a full-size "Criar conta" CTA. */}
@@ -110,7 +143,7 @@ function Nav() {
             to={loginHref('signup')}
             className="btn-primary hidden sm:inline-flex items-center justify-center"
           >
-            Criar conta
+            {t('landing.signup_link')}
           </Link>
         </div>
       </div>
@@ -122,22 +155,23 @@ function Nav() {
 // MixCard in src/components/ui.jsx) — hardcoded content, no live data,
 // no screenshot asset needed.
 function HeroMockCard() {
+  const { t } = useTranslation()
   const players = useCountUp(8, 5)
   return (
     <div className="card w-full max-w-sm shadow-lift" style={{ transform: 'rotate(-3deg)' }}>
       <div className="flex items-start justify-between gap-3 mb-3">
         <div>
-          <p className="text-xs font-extrabold uppercase tracking-widest text-ink-700">Sábado</p>
+          <p className="text-xs font-extrabold uppercase tracking-widest text-ink-700">{t('landing.saturday')}</p>
           <p className="text-2xl text-ink-900 leading-tight">18:00</p>
         </div>
         <span className="inline-flex items-center gap-1.5 bg-lime-400 text-ink-900 text-xs font-extrabold px-3 py-1.5 rounded-full">
-          <CheckCircle2 size={14} /> Inscrito
+          <CheckCircle2 size={14} /> {t('landing.joined_badge')}
         </span>
       </div>
 
-      <h3 className="text-lg text-ink-900 leading-snug mb-1">Mix de sábado</h3>
+      <h3 className="text-lg text-ink-900 leading-snug mb-1">{t('landing.hero_card_title')}</h3>
       <p className="flex items-center gap-1.5 text-muted text-sm mb-4">
-        <MapPin size={15} className="shrink-0" /> Alinho Padel Club
+        <MapPin size={15} className="shrink-0" /> {t('landing.hero_card_location')}
       </p>
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pt-3 border-t border-line">
@@ -156,11 +190,11 @@ function HeroMockCard() {
             ))}
           </div>
           <span className="text-sm font-extrabold text-ink-900 tabular-nums">
-            {players}<span className="text-muted font-normal">/8</span>
+            {players}<span className="text-muted font-normal">{t('landing.hero_card_players')}</span>
           </span>
         </div>
         <span className="ml-auto inline-flex items-center gap-1.5 bg-ok/10 text-ok text-[11px] font-extrabold px-2.5 py-1 rounded-full">
-          <Lock size={13} className="shrink-0" /> Mix fechado, campo reservado
+          <Lock size={13} className="shrink-0" /> {t('landing.hero_card_status')}
         </span>
       </div>
     </div>
@@ -168,6 +202,7 @@ function HeroMockCard() {
 }
 
 function Hero() {
+  const { t } = useTranslation()
   const loginHref = useLoginHref()
   return (
     <section className="relative bg-ink-900 overflow-hidden">
@@ -186,11 +221,10 @@ function Hero() {
       <div className="relative max-w-5xl mx-auto px-5 pt-20 pb-24 lg:pt-28 lg:pb-32 lg:flex lg:items-center lg:gap-12">
         <div className="lg:flex-1 animate-fade-up">
           <h1 className="text-4xl sm:text-5xl lg:text-6xl text-white leading-tight max-w-xl">
-            Os teus jogos de padel, finalmente organizados.
+            {t('landing.hero_title')}
           </h1>
           <p className="text-ink-200 text-lg mt-5 max-w-md">
-            Sem mais folhas de cálculo ou resultados perdidos. Cria jogos,
-            junta-te a mixs e acompanha o ranking.
+            {t('landing.hero_description')}
           </p>
           <div className="flex flex-col sm:flex-row gap-3 mt-8">
             {/* Both CTAs need inline-flex + centering utilities explicitly —
@@ -200,7 +234,7 @@ function Hero() {
               to={loginHref('signup')}
               className="btn-primary inline-flex items-center justify-center"
             >
-              Criar conta
+              {t('landing.signup_link')}
             </Link>
             <Link
               to={loginHref()}
@@ -208,7 +242,7 @@ function Hero() {
                          border border-white/20 text-white hover:bg-white/10
                          transition-all duration-fast active:scale-[0.98]"
             >
-              Já tenho conta
+              {t('landing.already_account_link')}
             </Link>
           </div>
         </div>
@@ -224,31 +258,32 @@ function Hero() {
 // WhatsApp bot gets its own spotlighted tile below (see Features) — it's
 // alinho's real differentiator per PRODUCT.md's Positioning (meet players in
 // the chat thread they already use), not just another item in a grid.
+// Translation keys are resolved in Features component, not here
 const OTHER_FEATURES = [
   {
     icon: Calendar,
-    title: 'Jogos',
-    description: 'Cria jogos com data, hora e local. Entra sozinho ou com o teu parceiro. O resto fica com o grupo.',
+    titleKey: 'landing.feature_games_title',
+    descriptionKey: 'landing.feature_games_description',
   },
   {
     icon: Trophy,
-    title: 'Rankings',
-    description: 'Vitórias, taxa de vitória e pontos calculados automaticamente a cada resultado submetido.',
+    titleKey: 'landing.feature_rankings_title',
+    descriptionKey: 'landing.feature_rankings_description',
   },
   {
     icon: Users,
-    title: 'Comunidade',
-    description: 'Vê quem está no grupo, o nível de cada jogador e quem já jogaste antes.',
+    titleKey: 'landing.feature_community_title',
+    descriptionKey: 'landing.feature_community_description',
   },
   {
     icon: PadelIcon,
-    title: 'Clubes',
-    description: 'Informação dos clubes onde o grupo costuma jogar, tudo num só lugar.',
+    titleKey: 'landing.feature_clubs_title',
+    descriptionKey: 'landing.feature_clubs_description',
   },
   {
     icon: Lock,
-    title: 'Jogos privados',
-    description: 'Cria um jogo só por convite, para quando não é preciso o grupo todo.',
+    titleKey: 'landing.feature_private_games_title',
+    descriptionKey: 'landing.feature_private_games_description',
   },
 ]
 
@@ -256,6 +291,7 @@ const OTHER_FEATURES = [
 // one-word reply that's alinho's real differentiator (PRODUCT.md Positioning).
 // Plays once, staggered, the first time the tile scrolls into view.
 function WhatsAppDemo({ visible }) {
+  const { t } = useTranslation()
   const reveal = (delayMs) => ({
     transitionDelay: `${delayMs}ms`,
   })
@@ -265,33 +301,34 @@ function WhatsAppDemo({ visible }) {
         className={`reveal ${visible ? 'reveal-visible' : ''} max-w-[85%] rounded-ctrl rounded-bl-sm bg-white/10 text-ink-200 text-xs px-3 py-2`}
         style={reveal(0)}
       >
-        Sábado, 18:00. Mix de sábado, quem entra?
+        {t('landing.whatsapp_demo_prompt')}
       </div>
       <div
         className={`reveal ${visible ? 'reveal-visible' : ''} max-w-[45%] ml-auto rounded-ctrl rounded-br-sm bg-[#25D366] text-ink-900 text-xs font-extrabold px-3 py-2 text-center`}
         style={reveal(500)}
       >
-        In
+        {t('landing.whatsapp_demo_reply')}
       </div>
       <div
         className={`reveal ${visible ? 'reveal-visible' : ''} flex items-center gap-1.5 text-[11px] text-lime-400 font-extrabold pt-1`}
         style={reveal(950)}
       >
-        <CheckCircle2 size={12} /> Confirmado no mix
+        <CheckCircle2 size={12} /> {t('landing.whatsapp_demo_confirmation')}
       </div>
     </div>
   )
 }
 
-function FeatureRow({ icon: Icon, title, description }) {
+function FeatureRow({ icon: Icon, titleKey, descriptionKey }) {
+  const { t } = useTranslation()
   return (
     <div className="flex items-start gap-4 py-5 first:pt-0">
       <div className="w-10 h-10 shrink-0 rounded-full bg-lime-400/15 text-lime-600 flex items-center justify-center">
         <Icon size={18} />
       </div>
       <div>
-        <h3 className="text-base font-semibold text-ink-900 mb-0.5">{title}</h3>
-        <p className="text-sm text-muted">{description}</p>
+        <h3 className="text-base font-semibold text-ink-900 mb-0.5">{t(titleKey)}</h3>
+        <p className="text-sm text-muted">{t(descriptionKey)}</p>
       </div>
     </div>
   )
@@ -300,27 +337,28 @@ function FeatureRow({ icon: Icon, title, description }) {
 // One spotlighted tile (the real differentiator, per PRODUCT.md) beside a
 // plain divided list for the rest — deliberately not six identical cards.
 function Features() {
+  const { t } = useTranslation()
   const [whatsappRef, whatsappVisible] = useReveal()
   return (
     <section className="bg-canvas py-20 px-5">
       <div className="max-w-5xl mx-auto">
-        <h2 className="text-3xl text-ink-900 max-w-lg mb-12">Tudo o que um grupo precisa, numa só app</h2>
+        <h2 className="text-3xl text-ink-900 max-w-lg mb-12">{t('landing.features_heading')}</h2>
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-x-10 gap-y-8">
           <div ref={whatsappRef} className="lg:col-span-2 rounded-card bg-ink-900 p-7 flex flex-col justify-between min-h-[240px]">
             <div>
               <div className="w-11 h-11 rounded-full bg-[#25D366]/15 text-[#25D366] flex items-center justify-center mb-5">
                 <MessageCircle size={20} />
               </div>
-              <h3 className="text-xl text-white mb-2">Bot do WhatsApp</h3>
+              <h3 className="text-xl text-white mb-2">{t('landing.whatsapp_bot_title')}</h3>
               <p className="text-ink-200 text-sm leading-relaxed">
-                Responde "In" ou "Out" no grupo do WhatsApp e o alinho trata do resto do mix.
+                {t('landing.whatsapp_bot_description')}
               </p>
               <WhatsAppDemo visible={whatsappVisible} />
             </div>
           </div>
           <div className="lg:col-span-3 divide-y divide-line border-t border-line lg:border-t-0">
             {OTHER_FEATURES.map((f) => (
-              <FeatureRow key={f.title} {...f} />
+              <FeatureRow key={f.titleKey} {...f} />
             ))}
           </div>
         </div>
@@ -332,27 +370,28 @@ function Features() {
 const STEPS = [
   {
     number: '1',
-    title: 'Cria a tua conta',
-    description: 'Regista-te com o Google ou com o teu email. Leva menos de um minuto.',
+    titleKey: 'landing.step_1_title',
+    descriptionKey: 'landing.step_1_description',
   },
   {
     number: '2',
-    title: 'Junta-te a um mix',
-    description: 'Entra num jogo aberto sozinho ou com parceiro. Ou cria um, se fores admin do grupo.',
+    titleKey: 'landing.step_2_title',
+    descriptionKey: 'landing.step_2_description',
   },
   {
     number: '3',
-    title: 'Acompanha os resultados',
-    description: 'Submete o resultado no fim e vê o ranking do grupo atualizar-se na hora.',
+    titleKey: 'landing.step_3_title',
+    descriptionKey: 'landing.step_3_description',
   },
 ]
 
 function HowItWorks() {
+  const { t } = useTranslation()
   return (
     <section className="bg-surface py-20 px-5">
       <div className="max-w-5xl mx-auto">
         <div className="text-center max-w-lg mx-auto mb-12">
-          <h2 className="text-3xl text-ink-900">Três passos e estás em jogo</h2>
+          <h2 className="text-3xl text-ink-900">{t('landing.steps_heading')}</h2>
         </div>
         <div className="relative grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-5">
           {/* One dashed line spanning from the first circle's center to the
@@ -371,8 +410,8 @@ function HowItWorks() {
               <div className="relative w-12 h-12 rounded-full bg-ink-900 text-lime-400 font-mono font-extrabold text-lg flex items-center justify-center mb-4 mx-auto">
                 {step.number}
               </div>
-              <h3 className="text-lg text-ink-900 mb-1.5 text-center">{step.title}</h3>
-              <p className="text-sm text-muted text-center">{step.description}</p>
+              <h3 className="text-lg text-ink-900 mb-1.5 text-center">{t(step.titleKey)}</h3>
+              <p className="text-sm text-muted text-center">{t(step.descriptionKey)}</p>
             </div>
           ))}
         </div>
@@ -382,16 +421,17 @@ function HowItWorks() {
 }
 
 function ClosingCta() {
+  const { t } = useTranslation()
   const loginHref = useLoginHref()
   return (
     <section className="bg-ink-900 py-16 px-5 text-center">
       <div className="max-w-lg mx-auto">
-        <h2 className="text-3xl text-white mb-6">Pronto para alinhar no próximo mix?</h2>
+        <h2 className="text-3xl text-white mb-6">{t('landing.closing_cta_heading')}</h2>
         <Link
           to={loginHref('signup')}
           className="btn-primary inline-flex items-center justify-center"
         >
-          Criar conta
+          {t('landing.signup_link')}
         </Link>
       </div>
     </section>
@@ -399,6 +439,7 @@ function ClosingCta() {
 }
 
 function Footer() {
+  const { t } = useTranslation()
   const year = new Date().getFullYear()
   const loginHref = useLoginHref()
   return (
@@ -407,10 +448,10 @@ function Footer() {
         <Wordmark variant="light" />
         <div className="flex items-center gap-6">
           <Link to={loginHref()} className="inline-flex items-center min-h-[44px] px-1 text-ink-700 font-extrabold text-sm hover:underline">
-            Entrar
+            {t('landing.login_link')}
           </Link>
           <Link to="/instrucoes" className="inline-flex items-center min-h-[44px] px-1 text-ink-700 font-extrabold text-sm hover:underline">
-            Instruções
+            {t('landing.instructions_link')}
           </Link>
         </div>
         <p className="text-muted text-xs">&copy; {year} alinho</p>

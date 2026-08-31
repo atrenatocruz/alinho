@@ -1,7 +1,8 @@
 import { supabase } from './supabase.js'
 import { config } from './config.js'
 import { getSettings } from './settings.js'
-import { HELP_FOOTER } from './messages.js'
+import { helpFooter } from './messages.js'
+import { t } from './locales.js'
 
 const CHECK_INTERVAL_MS = 5 * 60 * 1000
 
@@ -83,7 +84,7 @@ async function autoStartMix(game, { sendText }) {
       .from('teams')
       .select('player1_id, player2_id')
       .eq('game_id', previousGames[0].id)
-    repeatPairKeys = new Set((previousTeams || []).map((t) => pairKey(t.player1_id, t.player2_id)))
+    repeatPairKeys = new Set((previousTeams || []).map((team) => pairKey(team.player1_id, team.player2_id)))
   }
 
   const duplas = formDuplas(participants || [], pointsById, repeatPairKeys)
@@ -105,8 +106,12 @@ async function autoStartMix(game, { sendText }) {
   const settings = await getSettings()
   if (!settings.whatsapp_group_jid) return
 
-  const profileIds = insertedTeams.flatMap((t) => [t.player1_id, t.player2_id])
-  const { data: profiles } = await supabase.from('profiles').select('id, name, whatsapp_jid').in('id', profileIds)
+  // `language` selected for consistency with every other `.from('profiles')`
+  // call in this bot (see Task 19) — unused below since the pairings
+  // announcement is one shared broadcast to the whole group, not a message
+  // for any single player, so it stays 'pt' (see locales.js scope note).
+  const profileIds = insertedTeams.flatMap((team) => [team.player1_id, team.player2_id])
+  const { data: profiles } = await supabase.from('profiles').select('id, name, whatsapp_jid, language').in('id', profileIds)
   const profileById = new Map((profiles || []).map((p) => [p.id, p]))
 
   const mentions = []
@@ -119,10 +124,13 @@ async function autoStartMix(game, { sendText }) {
   }
 
   const lines = insertedTeams.map(
-    (t, i) => `${i + 1}. ${label(profileById.get(t.player1_id))} 🤝 ${label(profileById.get(t.player2_id))}`
+    (team, i) => `${i + 1}. ${label(profileById.get(team.player1_id))} 🤝 ${label(profileById.get(team.player2_id))}`
   )
 
-  const text = `🤖 🎾 *Duplas formadas para o mix ${game.title}!*\n\n${lines.join('\n')}\n\nBoa sorte! 🏆${HELP_FOOTER}`
+  // Pairings announcement — a shared broadcast to the whole group, stays
+  // 'pt' (see locales.js scope note).
+  const announceLang = 'pt'
+  const text = t('duplas_formed', announceLang, { title: game.title, lines: lines.join('\n') }) + helpFooter(announceLang)
   await sendText(settings.whatsapp_group_jid, text, { mentions })
 }
 

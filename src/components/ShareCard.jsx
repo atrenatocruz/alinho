@@ -1,5 +1,6 @@
 import { forwardRef, useImperativeHandle, useRef, useState, useEffect } from 'react'
 import { toPng } from 'html-to-image'
+import { useTranslation } from 'react-i18next'
 import logoWordmark from '../logo/primary-dark-card.svg'
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -146,24 +147,27 @@ function CardShell({ children, autoHeight = false }) {
   )
 }
 
-function LogoFooter({ tagline = 'E tu, alinhas?' }) {
+function LogoFooter({ tagline }) {
+  const { t } = useTranslation()
+  const resolvedTagline = tagline ?? t('sharecard.tagline')
   return (
     <div className="mt-auto flex flex-col items-center gap-2.5 pt-8">
       <img src={logoWordmark} alt="alinho" style={{ height: 24 }} />
       <p className="text-[11px] font-mono font-extrabold tracking-[0.2em] uppercase text-ink-200">
-        {tagline}
+        {resolvedTagline}
       </p>
     </div>
   )
 }
 
 function InviteCard({ game, people, capacity, formattedDate }) {
+  const { t } = useTranslation()
   const shown = people.slice(0, 6)
   const overflow = people.length - shown.length
   return (
     <CardShell>
       <p className="text-[13px] font-mono font-extrabold tracking-[0.2em] uppercase text-lime-400 mb-3">
-        🎾 Vem jogar
+        {t('sharecard.invite_badge')}
       </p>
       <h1 className="text-[32px] leading-[1.15] font-bold text-white font-display mb-6">
         {game.title}
@@ -181,7 +185,7 @@ function InviteCard({ game, people, capacity, formattedDate }) {
         )}
       </div>
       <p className="text-sm font-extrabold text-lime-400 tabular-nums">
-        {people.length}/{capacity} jogadores
+        {people.length}/{capacity} {t('sharecard.players_suffix')}
       </p>
       <LogoFooter />
     </CardShell>
@@ -189,12 +193,13 @@ function InviteCard({ game, people, capacity, formattedDate }) {
 }
 
 function PodiumCard({ game, duplas }) {
+  const { t } = useTranslation()
   const top = duplas.slice(0, 3)
   const rest = duplas.slice(3)
   return (
     <CardShell autoHeight>
       <p className="text-[13px] font-mono font-extrabold tracking-[0.2em] uppercase text-lime-400 mb-3">
-        🏆 Resultados do mix
+        {t('sharecard.podium_badge')}
       </p>
       <h1 className="text-[26px] leading-[1.2] font-bold text-white font-display mb-2">
         {game.title}
@@ -287,6 +292,7 @@ function DuplaPlayers({ team, compact, avatarSize, align = 'start' }) {
 // view, which pairs the same way. A leftover unpaired dupla (odd count) is
 // dropped, since the card can't show a dupla with no opponent.
 function DuplasCard({ game, duplas }) {
+  const { t } = useTranslation()
   const compact = duplas.length >= DUPLAS_COMPACT_THRESHOLD
   const avatarSize = compact ? 22 : 34
   const numCourts = game.num_courts || Math.ceil(duplas.length / 2)
@@ -301,7 +307,7 @@ function DuplasCard({ game, duplas }) {
   return (
     <CardShell autoHeight>
       <p className="text-[13px] font-mono font-extrabold tracking-[0.2em] uppercase text-lime-400 mb-3">
-        🎾 Duplas
+        {t('sharecard.duplas_badge')}
       </p>
       <h1 className={`${compact ? 'text-[22px] mb-1' : 'text-[26px] mb-2'} leading-[1.2] font-bold text-white font-display`}>
         {game.title}
@@ -316,13 +322,13 @@ function DuplasCard({ game, duplas }) {
           return (
             <div key={m.court_number} className={`rounded-2xl bg-white/5 ${compact ? 'px-3 py-2.5' : 'px-4 py-3.5'}`}>
               <p className={`font-mono font-extrabold uppercase tracking-wide text-lime-400 ${compact ? 'text-[9px] mb-1.5' : 'text-[11px] mb-2'}`}>
-                Campo {m.court_number}
+                {t('sharecard.court_label', { number: m.court_number })}
               </p>
               <div className="flex items-center">
                 <div className="flex-1 min-w-0">
                   <DuplaPlayers team={a} compact={compact} avatarSize={avatarSize} align="end" />
                 </div>
-                <p className={`shrink-0 font-extrabold text-ink-200 ${compact ? 'text-[10px] px-1.5' : 'text-xs px-2'}`}>vs</p>
+                <p className={`shrink-0 font-extrabold text-ink-200 ${compact ? 'text-[10px] px-1.5' : 'text-xs px-2'}`}>{t('sharecard.vs')}</p>
                 <div className="flex-1 min-w-0">
                   <DuplaPlayers team={b} compact={compact} avatarSize={avatarSize} />
                 </div>

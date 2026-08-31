@@ -195,21 +195,21 @@ export function nextElimMatches(prevMatches) {
   return next
 }
 
-export const PHASE_LABEL = {
-  group: 'Fase de grupo',
-  quarter: 'Quartos de final',
-  semi: 'Meias-finais',
-  final: 'Final',
+export const PHASE_LABEL_KEY = {
+  group: 'mixlogic.phase_group',
+  quarter: 'mixlogic.phase_quarter',
+  semi: 'mixlogic.phase_semi',
+  final: 'mixlogic.phase_final',
 }
 
-export const FORMAT_LABEL = {
-  sobe_desce: 'Sobe e desce',
-  todos_contra_todos: 'Todos contra todos',
+export const FORMAT_LABEL_KEY = {
+  sobe_desce: 'mixlogic.format_sobe_desce',
+  todos_contra_todos: 'mixlogic.format_todos_contra_todos',
 }
 
-export const GENDER_RESTRICTION_LABEL = {
-  masculino: 'Só homens',
-  feminino: 'Só mulheres',
-  misto: 'Misto',
-  indiferente: 'Indiferente',
+export const GENDER_RESTRICTION_LABEL_KEY = {
+  masculino: 'mixlogic.gender_masculino',
+  feminino: 'mixlogic.gender_feminino',
+  misto: 'mixlogic.gender_misto',
+  indiferente: 'mixlogic.gender_indiferente',
 }

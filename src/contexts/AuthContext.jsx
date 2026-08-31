@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import i18n from '../lib/i18n'
 
 const AuthContext = createContext({})
 
@@ -168,6 +169,25 @@ export const AuthProvider = ({ children }) => {
         // gateway rejection.
         if (fetchError) throw fetchError
         setProfile(profileData)
+        i18n.changeLanguage(profileData.language || 'pt')
+
+        // Carry a pre-auth language choice (Landing/Login's toggle, stashed
+        // in localStorage since there's no profile yet to persist it on)
+        // forward into the account now that one exists — covers both a
+        // brand-new signup (profiles.language defaults to 'pt' server-side
+        // regardless of what was picked pre-auth) and a returning user
+        // logging in on a browser where they'd earlier switched language.
+        // Fire-and-forget, matching this function's other best-effort
+        // side calls (consumePendingOrgSlug, loadFeatureFlags) — never
+        // await/block the profile load on it.
+        try {
+          const storedLanguagePref = localStorage.getItem('preferredLanguage')
+          if (storedLanguagePref && storedLanguagePref !== profileData.language) {
+            updateProfile({ language: storedLanguagePref })
+          }
+        } catch {
+          // ignore — localStorage can throw in some contexts
+        }
 
         await consumePendingOrgSlug()
         await loadFeatureFlags()
@@ -292,6 +312,12 @@ export const AuthProvider = ({ children }) => {
       setProfile(null)
       setMemberships([])
       setCurrentOrganizationId(null)
+      i18n.changeLanguage('pt')
+      try {
+        localStorage.removeItem('preferredLanguage')
+      } catch {
+        // ignore — localStorage can throw in some contexts
+      }
       return { error: null }
     }
 
@@ -301,6 +327,12 @@ export const AuthProvider = ({ children }) => {
       setProfile(null)
       setMemberships([])
       setCurrentOrganizationId(null)
+      i18n.changeLanguage('pt')
+      try {
+        localStorage.removeItem('preferredLanguage')
+      } catch {
+        // ignore — localStorage can throw in some contexts
+      }
     }
     return { error }
   }

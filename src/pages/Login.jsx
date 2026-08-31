@@ -1,15 +1,33 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Eye, EyeOff, Lock } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton, DateField, Select } from '../components/ui'
 import { Wordmark } from '../components/Layout'
 import { hashPhone } from '../lib/hashPhone'
+import i18n from '../lib/i18n'
+
+// Same pattern as Layout.jsx's header toggle, minus the profile persistence
+// (there's no profile yet pre-auth) — just the instant UI flip plus a
+// localStorage write so the choice survives a reload and carries forward
+// into the account once the visitor signs in (see AuthContext's loadProfile
+// reconciliation).
+function toggleLanguage() {
+  const next = i18n.language === 'en' ? 'pt' : 'en'
+  i18n.changeLanguage(next)
+  try {
+    localStorage.setItem('preferredLanguage', next)
+  } catch {
+    // ignore — best-effort persistence
+  }
+}
 
 // Module scope, not nested in Login: an inline component would be recreated
 // (and remounted — dropping focus and its own `visible` state) on every
 // keystroke in any field, since every keystroke re-renders the parent.
 function PasswordField({ value, onChange, placeholder, autoComplete, minLength, required }) {
+  const { t } = useTranslation()
   const [visible, setVisible] = useState(false)
   return (
     <div className="relative">
@@ -26,7 +44,7 @@ function PasswordField({ value, onChange, placeholder, autoComplete, minLength, 
       <button
         type="button"
         onClick={() => setVisible((v) => !v)}
-        aria-label={visible ? 'Ocultar password' : 'Mostrar password'}
+        aria-label={visible ? t('login.hide_password') : t('login.show_password')}
         className="absolute right-1 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center rounded-full text-muted hover:text-ink-900 hover:bg-ink-50 transition-colors duration-fast"
       >
         {visible ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -36,6 +54,7 @@ function PasswordField({ value, onChange, placeholder, autoComplete, minLength, 
 }
 
 export default function Login() {
+  const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   // Landing page's "Criar conta" CTA links to /login?mode=signup so it
   // lands directly on the signup tab instead of the login tab.
@@ -81,7 +100,7 @@ export default function Login() {
       if (error) throw error
     } catch (err) {
       console.error('Google sign-in error:', err)
-      setGoogleError('Não foi possível entrar com o Google. Tenta novamente.')
+      setGoogleError(t('login.google_error'))
       setGoogleLoading(false)
     }
   }
@@ -109,7 +128,7 @@ export default function Login() {
       if (error) throw error
       navigate(redirectTo)
     } catch (err) {
-      setError(err.message || 'Email ou password incorretos')
+      setError(err.message || t('login.error_invalid_email_password'))
     } finally {
       setLoading(false)
     }
@@ -124,27 +143,27 @@ export default function Login() {
     // `required` attribute — DateField/Select are custom components now,
     // so the checks have to happen here instead.
     if (!signupBirthday) {
-      setError('Introduz a tua data de nascimento')
+      setError(t('login.error_missing_birthday'))
       setLoading(false)
       return
     }
 
     if (!signupGender) {
-      setError('Seleciona o teu género')
+      setError(t('login.error_missing_gender'))
       setLoading(false)
       return
     }
 
     // Validate password match
     if (signupPassword !== signupConfirmPassword) {
-      setError('As passwords não coincidem')
+      setError(t('login.error_password_mismatch'))
       setLoading(false)
       return
     }
 
     // Validate password length
     if (signupPassword.length < 6) {
-      setError('A password deve ter pelo menos 6 caracteres')
+      setError(t('login.error_password_too_short'))
       setLoading(false)
       return
     }
@@ -152,7 +171,7 @@ export default function Login() {
     // Phone is optional — only validate if the person actually entered one
     // (tolerant of spaces/dashes/country code, just needs a real number in there)
     if (signupPhone && signupPhone.replace(/\D/g, '').length < 9) {
-      setError('Introduz um número de telemóvel válido, ou deixa em branco')
+      setError(t('login.error_invalid_phone'))
       setLoading(false)
       return
     }
@@ -182,7 +201,7 @@ export default function Login() {
 
       navigate(redirectTo)
     } catch (err) {
-      setError(err.message || 'Erro ao criar conta')
+      setError(err.message || t('login.error_signup_failed'))
     } finally {
       setLoading(false)
     }
@@ -194,6 +213,14 @@ export default function Login() {
     <div className="min-h-screen bg-ink-900 flex flex-col">
       {/* Hero — court lines + lime ball */}
       <div className="relative px-6 pt-14 pb-10 text-center overflow-hidden shrink-0">
+        <button
+          type="button"
+          onClick={toggleLanguage}
+          title={t('layout.toggle_language')}
+          className="absolute top-4 right-4 z-10 inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-full text-white/80 hover:text-white hover:bg-white/10 font-extrabold text-xs transition-colors duration-fast"
+        >
+          {i18n.language === 'en' ? 'PT' : 'EN'}
+        </button>
         <svg
           viewBox="0 0 400 200"
           className="absolute inset-0 w-full h-full text-white/[0.06]"
@@ -209,7 +236,7 @@ export default function Login() {
             <Wordmark />
           </h1>
           <p className="text-ink-200 mt-3">
-            {mode === 'login' ? 'Bem-vindo de volta' : 'Cria a tua conta'}
+            {mode === 'login' ? t('login.welcome_back') : t('login.create_account')}
           </p>
         </div>
       </div>
@@ -232,7 +259,7 @@ export default function Login() {
               <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/>
               <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/>
             </svg>
-            {googleLoading ? 'A entrar…' : 'Continuar com Google'}
+            {googleLoading ? t('login.signing_in') : t('login.continue_with_google')}
           </button>
 
           {googleError && (
@@ -243,7 +270,7 @@ export default function Login() {
 
           <div className="flex items-center gap-3 my-6">
             <div className="flex-1 h-px bg-line" />
-            <span className="text-muted text-xs font-extrabold uppercase tracking-widest">ou</span>
+            <span className="text-muted text-xs font-extrabold uppercase tracking-widest">{t('login.or_divider')}</span>
             <div className="flex-1 h-px bg-line" />
           </div>
 
@@ -260,7 +287,7 @@ export default function Login() {
                   : 'text-muted hover:text-ink-900'
               }`}
             >
-              Entrar
+              {t('login.tab_login')}
             </button>
             <button
               onClick={() => {
@@ -273,7 +300,7 @@ export default function Login() {
                   : 'text-muted hover:text-ink-900'
               }`}
             >
-              Criar Conta
+              {t('login.tab_signup')}
             </button>
           </div>
 
@@ -281,24 +308,24 @@ export default function Login() {
           {mode === 'login' && (
             <form onSubmit={handleLogin} className="space-y-4 animate-fade-up">
               <div>
-                <label className={inputLabel}>Email</label>
+                <label className={inputLabel}>{t('login.email_label')}</label>
                 <input
                   type="email"
                   value={loginEmail}
                   onChange={(e) => setLoginEmail(e.target.value)}
                   className="input-field"
-                  placeholder="nome@exemplo.pt"
+                  placeholder={t('login.email_placeholder')}
                   autoComplete="email"
                   required
                 />
               </div>
 
               <div>
-                <label className={inputLabel}>Password</label>
+                <label className={inputLabel}>{t('login.password_label')}</label>
                 <PasswordField
                   value={loginPassword}
                   onChange={(e) => setLoginPassword(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder={t('login.password_placeholder')}
                   autoComplete="current-password"
                   required
                 />
@@ -311,7 +338,7 @@ export default function Login() {
               )}
 
               <PrimaryButton type="submit" disabled={loading} className="w-full">
-                {loading ? 'A entrar…' : 'Entrar'}
+                {loading ? t('login.signing_in') : t('login.login_button')}
               </PrimaryButton>
             </form>
           )}
@@ -320,46 +347,46 @@ export default function Login() {
           {mode === 'signup' && (
             <form onSubmit={handleSignup} className="space-y-4 animate-fade-up">
               <div>
-                <label className={inputLabel}>Nome completo</label>
+                <label className={inputLabel}>{t('login.fullname_label')}</label>
                 <input
                   type="text"
                   value={signupName}
                   onChange={(e) => setSignupName(e.target.value)}
                   className="input-field"
-                  placeholder="João Silva"
+                  placeholder={t('login.fullname_placeholder')}
                   autoComplete="name"
                   required
                 />
               </div>
 
               <div>
-                <label className={inputLabel}>Email</label>
+                <label className={inputLabel}>{t('login.email_label')}</label>
                 <input
                   type="email"
                   value={signupEmail}
                   onChange={(e) => setSignupEmail(e.target.value)}
                   className="input-field"
-                  placeholder="nome@exemplo.pt"
+                  placeholder={t('login.email_placeholder')}
                   autoComplete="email"
                   required
                 />
               </div>
 
               <div>
-                <label className={inputLabel}>Nº de telemóvel (opcional)</label>
+                <label className={inputLabel}>{t('login.phone_label')}</label>
                 <input
                   type="tel"
                   value={signupPhone}
                   onChange={(e) => setSignupPhone(e.target.value)}
                   className="input-field"
-                  placeholder="912 345 678"
+                  placeholder={t('login.phone_placeholder')}
                   autoComplete="tel"
                 />
-                <p className="text-xs text-muted mt-1.5">Só é preciso se quiseres usar o bot do WhatsApp. Podes adicionar mais tarde no Perfil.</p>
+                <p className="text-xs text-muted mt-1.5">{t('login.phone_help')}</p>
               </div>
 
               <div>
-                <label className={inputLabel}>Data de nascimento</label>
+                <label className={inputLabel}>{t('login.birthday_label')}</label>
                 <DateField
                   value={signupBirthday}
                   onChange={setSignupBirthday}
@@ -369,37 +396,37 @@ export default function Login() {
               </div>
 
               <div>
-                <label className={inputLabel}>Género</label>
+                <label className={inputLabel}>{t('login.gender_label')}</label>
                 <Select
                   value={signupGender}
                   onChange={setSignupGender}
-                  placeholder="Seleciona…"
+                  placeholder={t('login.gender_placeholder')}
                   options={[
-                    { value: 'masculino', label: 'Masculino' },
-                    { value: 'feminino', label: 'Feminino' },
+                    { value: 'masculino', label: t('login.gender_male') },
+                    { value: 'feminino', label: t('login.gender_female') },
                   ]}
                 />
               </div>
 
               <div>
-                <label className={inputLabel}>Password</label>
+                <label className={inputLabel}>{t('login.password_label')}</label>
                 <PasswordField
                   value={signupPassword}
                   onChange={(e) => setSignupPassword(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder={t('login.password_placeholder')}
                   autoComplete="new-password"
                   minLength={6}
                   required
                 />
-                <p className="text-xs text-muted mt-1.5">Mínimo 6 caracteres</p>
+                <p className="text-xs text-muted mt-1.5">{t('login.password_help')}</p>
               </div>
 
               <div>
-                <label className={inputLabel}>Confirmar password</label>
+                <label className={inputLabel}>{t('login.confirm_password_label')}</label>
                 <PasswordField
                   value={signupConfirmPassword}
                   onChange={(e) => setSignupConfirmPassword(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder={t('login.password_placeholder')}
                   autoComplete="new-password"
                   minLength={6}
                   required
@@ -413,7 +440,7 @@ export default function Login() {
               )}
 
               <PrimaryButton type="submit" disabled={loading} className="w-full">
-                {loading ? 'A criar conta…' : 'Criar conta'}
+                {loading ? t('login.creating_account') : t('login.signup_button')}
               </PrimaryButton>
             </form>
           )}
@@ -423,13 +450,13 @@ export default function Login() {
               onClick={handleAdminBypass}
               className="w-full mt-4 flex items-center justify-center gap-2 py-3 px-4 rounded-ctrl font-extrabold text-sm border border-dashed border-ink-500 text-ink-700 hover:bg-ink-50 transition-all duration-fast min-h-[48px]"
             >
-              <Lock size={16} /> Entrar como Admin (dev)
+              <Lock size={16} /> {t('login.admin_bypass')}
             </button>
           )}
 
           <div className="mt-8 text-center">
             <Link to="/instrucoes" className="text-ink-700 font-extrabold text-sm hover:underline">
-              Ver instruções de utilização
+              {t('login.instructions_link')}
             </Link>
           </div>
         </div>

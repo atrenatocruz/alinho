@@ -34,6 +34,7 @@ CREATE TABLE profiles (
   phone_hash TEXT,
   avatar_url TEXT,
   preferred_side TEXT NOT NULL DEFAULT 'both' CHECK (preferred_side IN ('left', 'right', 'both')),
+  language TEXT NOT NULL DEFAULT 'pt' CHECK (language IN ('pt', 'en')),
   created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW())
 );
 

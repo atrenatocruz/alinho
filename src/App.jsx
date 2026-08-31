@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { WifiOff } from 'lucide-react'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { PrimaryButton } from './components/ui'
@@ -50,6 +51,7 @@ const PLAN_B_TAP_TARGET = 5
 const PLAN_B_TAP_WINDOW_MS = 2000
 
 const LoadErrorScreen = ({ onRetry }) => {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const tapCountRef = useRef(0)
   const lastTapAtRef = useRef(0)
@@ -70,9 +72,9 @@ const LoadErrorScreen = ({ onRetry }) => {
       <div className="text-center max-w-xs">
         <Wordmark variant="light" className="h-8 mx-auto mb-8" />
         <WifiOff size={40} className="mx-auto mb-4 text-ink-700" />
-        <h1 className="text-lg text-ink-900 mb-1">Não foi possível carregar os teus dados</h1>
-        <p className="text-muted text-sm mb-6">Pode ser um problema temporário de ligação. Tenta novamente.</p>
-        <PrimaryButton onClick={onRetry} className="w-full">Tentar novamente</PrimaryButton>
+        <h1 className="text-lg text-ink-900 mb-1">{t('app.load_error_title')}</h1>
+        <p className="text-muted text-sm mb-6">{t('app.load_error_body')}</p>
+        <PrimaryButton onClick={onRetry} className="w-full">{t('app.load_error_retry')}</PrimaryButton>
       </div>
     </div>
   )
