@@ -256,9 +256,20 @@ export default function Layout({ children }) {
   }
 
   return (
-    <div className="min-h-screen bg-canvas pb-32">
+    // iOS standalone-PWA (WKWebView, not just Safari-in-a-tab) detaches a
+    // `fixed` + `backdrop-filter` element from the viewport during momentum
+    // scroll — the bottom nav used to be `position: fixed` over a
+    // document-that-scrolls, and two rounds of GPU-layer-promotion hacks on
+    // it (ec40839, c0c0407) didn't stop it recurring specifically in the
+    // installed app. Fix is structural, not another compositing hack: the
+    // document itself never scrolls (h-[100dvh] + overflow-hidden) — only
+    // `main` does. Nav stays a floating overlay (`absolute`, not `fixed`)
+    // anchored to this non-scrolling shell instead of the viewport, so it
+    // still hovers over the tail end of scrolled content like before, but
+    // there's no document-level momentum scroll left to detach it from.
+    <div className="relative flex flex-col h-screen bg-canvas overflow-hidden" style={{ height: '100dvh' }}>
       {/* Header — dark liquid glass */}
-      <header className="sticky top-0 z-10 bg-ink-900/95 backdrop-blur-xl border-b border-white/5 supports-[backdrop-filter]:bg-ink-900/85">
+      <header className="shrink-0 z-10 bg-ink-900/95 backdrop-blur-xl border-b border-white/5 supports-[backdrop-filter]:bg-ink-900/85">
         <div className="max-w-2xl mx-auto px-4 h-16 flex items-center justify-between">
           <Link to="/" className="leading-none">
             <Wordmark />
@@ -391,27 +402,23 @@ export default function Layout({ children }) {
         </div>
       </header>
 
-      {/* Main */}
-      <main className="max-w-2xl mx-auto px-4 py-6 animate-fade-up">
-        {children}
+      {/* Main — the only scrolling region in the shell (see the app-shell
+          comment above the root div). pb-28 keeps the last bit of content
+          from hiding behind the nav overlay below. */}
+      <main className="flex-1 overflow-y-auto">
+        <div className="max-w-2xl mx-auto px-4 pt-6 pb-28 animate-fade-up">
+          {children}
+        </div>
       </main>
 
-      {/* Nav — floating dynamic island, liquid glass */}
-      {/* iOS Safari has a known bug where a `fixed` element containing a
-          `backdrop-filter` descendant detaches from the viewport during
-          momentum scrolling and drifts up the page with the content instead
-          of staying pinned. Promoting just this `nav` wrapper to its own
-          GPU layer (translateZ(0) below) wasn't enough to stop it recurring
-          — the backdrop-blur itself lives one level down, on the pill, so
-          that's the layer that actually needs forcing onto the GPU. Both
-          elements carry the hack now. */}
+      {/* Nav — floating dynamic island, liquid glass. `absolute` against the
+          non-scrolling shell (not `position: fixed` against the viewport)
+          — see the app-shell comment above — so it still overlaps the
+          bottom of the scrolled content instead of sitting in a blank strip
+          below it. */}
       <nav
-        className="fixed inset-x-0 z-20 flex justify-center pointer-events-none px-4"
-        style={{
-          bottom: 'calc(1rem + env(safe-area-inset-bottom))',
-          transform: 'translateZ(0)',
-          willChange: 'transform',
-        }}
+        className="absolute inset-x-0 bottom-0 z-20 flex justify-center pointer-events-none px-4 pt-2"
+        style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
       >
         <div
           className="pointer-events-auto flex items-center gap-0.5 p-1 rounded-full
@@ -419,11 +426,6 @@ export default function Layout({ children }) {
                         bg-ink-900/95 supports-[backdrop-filter]:bg-ink-900/90 backdrop-blur-xl
                         shadow-[0_8px_32px_rgba(11,37,69,0.35)]
                         ring-1 ring-white/10"
-          style={{
-            transform: 'translateZ(0)',
-            willChange: 'transform',
-            WebkitBackfaceVisibility: 'hidden',
-          }}
         >
           {navItems.map(({ path, icon: Icon, label }) => {
             const isActive = location.pathname === path
