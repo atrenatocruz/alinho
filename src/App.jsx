@@ -96,6 +96,17 @@ const Guard = ({ require, showSplash, children }) => {
     return <LoadErrorScreen onRetry={retryProfile} />
   }
 
+  // Consent gate (Trello #154): brand-new accounts (email/password or
+  // Google) must accept the Privacy Policy/Terms once before reaching the
+  // app — checked BEFORE rating-onboarding so no profile data (like a
+  // self-selected rating) gets written before consent is on file. Existing
+  // pilot accounts are grandfathered — the migration backfills
+  // consent_accepted_at = NOW() for every profile that existed before this
+  // shipped, so only genuinely new signups see this screen.
+  if (user && profile && profile.consent_accepted_at === null) {
+    return <ConsentGate />
+  }
+
   // Auto-classificação do primeiro registo (Elo v1): contas novas escolhem
   // o nível de entrada antes de usar a app. Comparação estrita com null —
   // contas de antes da migração têm o carimbo preenchido, e um cliente a
@@ -103,15 +114,6 @@ const Guard = ({ require, showSplash, children }) => {
   // pode ficar preso aqui.
   if (user && profile && profile.rating_onboarded_at === null) {
     return <EscolherNivel />
-  }
-
-  // Consent gate (Trello #154): brand-new accounts (email/password or
-  // Google) must accept the Privacy Policy/Terms once before reaching the
-  // app. Existing pilot accounts are grandfathered — the migration
-  // backfills consent_accepted_at = NOW() for every profile that existed
-  // before this shipped, so only genuinely new signups see this screen.
-  if (user && profile && profile.consent_accepted_at === null) {
-    return <ConsentGate />
   }
 
   // "/" is the one public route: signed-out visitors see the Landing page

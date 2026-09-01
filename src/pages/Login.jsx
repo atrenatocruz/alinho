@@ -444,16 +444,13 @@ export default function Login() {
               </PrimaryButton>
 
               <p className="text-[11px] text-muted text-center">
-                <Trans i18nKey="login.signup_consent_notice">
-                  Ao criar conta, aceitas os{' '}
-                  <Link to="/termos" className="underline font-extrabold text-ink-700">
-                    Termos de Serviço
-                  </Link>{' '}
-                  e a{' '}
-                  <Link to="/privacidade" className="underline font-extrabold text-ink-700">
-                    Política de Privacidade
-                  </Link>.
-                </Trans>
+                <Trans
+                  i18nKey="login.signup_consent_notice"
+                  components={[
+                    <Link to="/termos" className="underline font-extrabold text-ink-700" />,
+                    <Link to="/privacidade" className="underline font-extrabold text-ink-700" />,
+                  ]}
+                />
               </p>
             </form>
           )}
