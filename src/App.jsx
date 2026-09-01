@@ -22,6 +22,7 @@ import Gerir from './pages/Gerir'
 import GerirClube from './pages/GerirClube'
 import Instructions from './pages/Instructions'
 import PrivacyPolicy from './pages/PrivacyPolicy'
+import TermsOfService from './pages/TermsOfService'
 import MixOffline from './pages/MixOffline'
 import EscolherNivel from './pages/EscolherNivel'
 
@@ -153,6 +154,7 @@ function AppRoutes() {
       <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
       <Route path="/instrucoes" element={<Instructions />} />
       <Route path="/privacidade" element={<PrivacyPolicy />} />
+      <Route path="/termos" element={<TermsOfService />} />
       <Route path="/mix-offline" element={<MixOffline />} />
       <Route
         path="/"
