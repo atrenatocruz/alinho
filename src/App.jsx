@@ -21,6 +21,7 @@ import JoinPrivateMatch from './pages/JoinPrivateMatch'
 import Gerir from './pages/Gerir'
 import GerirClube from './pages/GerirClube'
 import Instructions from './pages/Instructions'
+import PrivacyPolicy from './pages/PrivacyPolicy'
 import MixOffline from './pages/MixOffline'
 import EscolherNivel from './pages/EscolherNivel'
 
@@ -151,6 +152,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
       <Route path="/instrucoes" element={<Instructions />} />
+      <Route path="/privacidade" element={<PrivacyPolicy />} />
       <Route path="/mix-offline" element={<MixOffline />} />
       <Route
         path="/"
