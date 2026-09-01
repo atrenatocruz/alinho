@@ -19,24 +19,31 @@ const BANDS = [
   { min: 700, num: 6 },
 ]
 
-/** Banda pública de um rating, e.g. { label: 'M6', full: 'Nível M6' }.
+/** Banda pública de um rating, e.g. { label: 'M6', fullKey: 'ui.level_band',
+    fullVars: { label: 'M6' } } — this is a plain module with no `t()`
+    access, so it hands back a translation key + interpolation vars instead
+    of a pre-formatted string (same constraint ONBOARDING_LEVELS solves
+    below); callers resolve it via t(band.fullKey, band.fullVars).
     Devolve null quando não há rating (conta ainda sem Elo). */
 export function ratingBand(rating, gender) {
   if (rating == null) return null
   const prefix = gender === 'feminino' ? 'F' : 'M'
   const band = BANDS.find((b) => rating >= b.min)
-  if (!band) return { label: 'INI', full: 'Iniciante' }
-  return { label: `${prefix}${band.num}`, full: `Nível ${prefix}${band.num}` }
+  if (!band) return { label: 'INI', fullKey: 'ui.level_beginner' }
+  const label = `${prefix}${band.num}`
+  return { label, fullKey: 'ui.level_band', fullVars: { label } }
 }
 
 /** Banda de um clube/grupo (média do Elo dos membros) — mesmas bandas que
     ratingBand, mas com prefixo 'N' fixo em vez de M/F: não faz sentido
-    atribuir um género a uma média de clube. */
+    atribuir um género a uma média de clube. Same fullKey/fullVars shape as
+    ratingBand above. */
 export function groupRatingBand(rating) {
   if (rating == null) return null
   const band = BANDS.find((b) => rating >= b.min)
-  if (!band) return { label: 'NINI', full: 'Nível Iniciante' }
-  return { label: `N${band.num}`, full: `Nível N${band.num}` }
+  if (!band) return { label: 'NINI', fullKey: 'ui.group_level_beginner' }
+  const label = `N${band.num}`
+  return { label, fullKey: 'ui.level_band', fullVars: { label } }
 }
 
 export const formatRating = (rating) => (rating == null ? '—' : String(Math.round(rating)))
@@ -46,20 +53,20 @@ export const formatRating = (rating) => (rating == null ? '—' : String(Math.ro
 export const ONBOARDING_LEVELS = [
   {
     key: 'iniciado',
-    title: 'Iniciado',
+    titleKey: 'onboarding.level_iniciado_title',
     points: 700,
-    description: 'Estou a começar — jogo há pouco tempo ou ainda estou a aprender.',
+    descriptionKey: 'onboarding.level_iniciado_description',
   },
   {
     key: 'regular',
-    title: 'Regular',
+    titleKey: 'onboarding.level_regular_title',
     points: 900,
-    description: 'Jogo com alguma regularidade — domino o básico do jogo.',
+    descriptionKey: 'onboarding.level_regular_description',
   },
   {
     key: 'avancado',
-    title: 'Avançado',
+    titleKey: 'onboarding.level_avancado_title',
     points: 1100,
-    description: 'Jogo há anos e a um nível competitivo.',
+    descriptionKey: 'onboarding.level_avancado_description',
   },
 ]

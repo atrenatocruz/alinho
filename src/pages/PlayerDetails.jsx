@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Trophy, Target, Award, Swords, ChevronDown, UserPlus, UserCheck, Clock, Lock, ShieldCheck } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { PrimaryButton, EmptyState, Avatar, RankBadge, RatingBadge } from '../components/ui'
@@ -7,14 +8,16 @@ import { formatRating } from '../lib/elo'
 import { winRatePct } from '../lib/statsLogic'
 import { sendFriendRequest, acceptFriendRequest, removeFriendRequest } from '../lib/friends'
 import { getGlobalRankings } from '../lib/privateMatches'
+import { formatDate } from '../lib/formatDate'
 
-const SIDE_LABEL = { left: 'Esquerda', right: 'Direita', both: 'Ambos' }
+const SIDE_LABEL_KEY = { left: 'gamedetails.side_left', right: 'gamedetails.side_right', both: 'gamedetails.side_both' }
 
 // Aggregated across every club the player belongs to (not scoped to the
 // viewer's currentOrganizationId) via get_player_profile/get_head_to_head_*
 // — this page works for any player in the app, not just someone who
 // shares a club with the viewer.
 export default function PlayerDetails() {
+  const { t, i18n } = useTranslation()
   const { id } = useParams()
   const navigate = useNavigate()
   const [player, setPlayer] = useState(null)
@@ -87,7 +90,7 @@ export default function PlayerDetails() {
       }))
     } catch (error) {
       console.error('Error sending friend request:', error)
-      alert('Não foi possível enviar o pedido. Tenta novamente.')
+      alert(t('playerdetails.friend_request_failed'))
     } finally {
       setFriendActing(false)
     }
@@ -100,7 +103,7 @@ export default function PlayerDetails() {
       setPlayer((p) => ({ ...p, friendship_status: 'friends', friends_count: (p.friends_count ?? 0) + 1 }))
     } catch (error) {
       console.error('Error accepting friend request:', error)
-      alert('Não foi possível aceitar o pedido. Tenta novamente.')
+      alert(t('playerdetails.accept_request_failed'))
     } finally {
       setFriendActing(false)
     }
@@ -119,7 +122,7 @@ export default function PlayerDetails() {
       }))
     } catch (error) {
       console.error('Error removing friend request:', error)
-      alert('Não foi possível atualizar. Tenta novamente.')
+      alert(t('playerdetails.update_failed'))
     } finally {
       setFriendActing(false)
     }
@@ -172,7 +175,7 @@ export default function PlayerDetails() {
   }
 
   const formatMatchDate = (dateString) =>
-    new Date(dateString).toLocaleDateString('pt-PT', { day: '2-digit', month: 'short', year: 'numeric' })
+    formatDate(dateString, i18n.language, { day: '2-digit', month: 'short', year: 'numeric' })
 
   if (loading) {
     return (
@@ -186,11 +189,11 @@ export default function PlayerDetails() {
     return (
       <EmptyState
         icon={Award}
-        title="Não foi possível carregar este perfil"
-        subtitle="Pode já não estar disponível."
+        title={t('playerdetails.load_error_title')}
+        subtitle={t('playerdetails.load_error_subtitle')}
         action={
           <PrimaryButton variant="navy" onClick={() => navigate('/rankings')}>
-            Voltar à classificação
+            {t('playerdetails.back_to_rankings')}
           </PrimaryButton>
         }
       />
@@ -213,10 +216,10 @@ export default function PlayerDetails() {
   const winRate = winRatePct(player.game_wins || 0, played)
 
   const statTiles = [
-    { icon: Trophy, value: formatRating(globalEntry?.rating), label: 'Pontos', cls: 'text-lime-600' },
-    { icon: Award, value: `${player.mix_wins || 0}/${player.mixes_played || 0}`, label: 'Mixes ganhos', cls: 'text-ink-700' },
-    { icon: Target, value: played, label: 'Jogos', cls: 'text-ink-700' },
-    { icon: Award, value: `${winRate}%`, label: 'Taxa de vitória', cls: 'text-ok' },
+    { icon: Trophy, value: formatRating(globalEntry?.rating), label: t('playerdetails.stat_points'), cls: 'text-lime-600' },
+    { icon: Award, value: `${player.mix_wins || 0}/${player.mixes_played || 0}`, label: t('playerdetails.stat_mixes_won'), cls: 'text-ink-700' },
+    { icon: Target, value: played, label: t('playerdetails.stat_games'), cls: 'text-ink-700' },
+    { icon: Award, value: `${winRate}%`, label: t('playerdetails.stat_win_rate'), cls: 'text-ok' },
   ]
 
   // A mix with several rounds ("todos contra todos") returns one row per
@@ -247,7 +250,7 @@ export default function PlayerDetails() {
         className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm min-h-[44px] pr-3"
       >
         <ArrowLeft size={20} />
-        Voltar
+        {t('playerdetails.back')}
       </button>
 
       {/* Hero */}
@@ -269,7 +272,7 @@ export default function PlayerDetails() {
           {/* Not gated by results_visibility — playing side isn't a result,
               and knowing it is the whole point when inviting a stranger. */}
           <p className="text-white/60 text-xs mt-1">
-            Joga do lado: {SIDE_LABEL[player.preferred_side] || 'Ambos'}
+            {t('playerdetails.preferred_side', { side: t(SIDE_LABEL_KEY[player.preferred_side] || SIDE_LABEL_KEY.both) })}
           </p>
           {/* Same privacy gate as the stat tiles below — results_visibility
               controls both, so no point showing a rank derived from hidden
@@ -282,7 +285,7 @@ export default function PlayerDetails() {
             </div>
           )}
           <p className="text-white/60 text-xs mt-2.5">
-            {player.friends_count} {player.friends_count === 1 ? 'amigo' : 'amigos'}
+            {t('playerdetails.friends_count', { count: player.friends_count })}
           </p>
           {!player.my_profile && (
             player.friendship_status === 'friends' ? (
@@ -290,19 +293,19 @@ export default function PlayerDetails() {
               // sharing that word with the "amigos" count right above it read
               // as one navigable element ("view friends list") instead of two.
               <button
-                onClick={() => handleRemoveFriendship(`Deixar de seguir ${player.name}? Se mudares de ideias, vais ter de enviar um novo pedido de amizade.`)}
+                onClick={() => handleRemoveFriendship(t('playerdetails.unfollow_confirm', { name: player.name }))}
                 disabled={friendActing}
                 className="mt-3 inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors duration-fast disabled:opacity-40"
               >
-                <UserCheck size={14} /> Deixar de seguir
+                <UserCheck size={14} /> {t('playerdetails.unfollow_button')}
               </button>
             ) : player.friendship_status === 'pending_sent' ? (
               <button
-                onClick={() => handleRemoveFriendship('Cancelar o pedido de amizade?')}
+                onClick={() => handleRemoveFriendship(t('playerdetails.cancel_request_confirm'))}
                 disabled={friendActing}
                 className="mt-3 inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full bg-white/10 text-white/70 hover:bg-white/20 transition-colors duration-fast disabled:opacity-40"
               >
-                <Clock size={14} /> Pedido enviado
+                <Clock size={14} /> {t('playerdetails.request_sent')}
               </button>
             ) : player.friendship_status === 'pending_received' ? (
               <button
@@ -310,7 +313,7 @@ export default function PlayerDetails() {
                 disabled={friendActing}
                 className="mt-3 inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full bg-lime-400 text-ink-900 hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
               >
-                <UserCheck size={14} /> Aceitar pedido
+                <UserCheck size={14} /> {t('playerdetails.accept_request')}
               </button>
             ) : (
               <button
@@ -318,7 +321,7 @@ export default function PlayerDetails() {
                 disabled={friendActing}
                 className="mt-3 inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full bg-lime-400 text-ink-900 hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
               >
-                <UserPlus size={14} /> Adicionar amigo
+                <UserPlus size={14} /> {t('playerdetails.add_friend')}
               </button>
             )
           )}
@@ -329,7 +332,7 @@ export default function PlayerDetails() {
       {resultsHidden ? (
         <div className="card text-center py-6 text-muted">
           <Lock size={18} className="mx-auto mb-1.5" />
-          <p className="text-sm">Este jogador mantém os resultados privados.</p>
+          <p className="text-sm">{t('playerdetails.results_private')}</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3">
@@ -345,17 +348,17 @@ export default function PlayerDetails() {
 
       {/* Clubes & Grupos */}
       <div>
-        <h3 className="text-lg text-ink-900 mb-3">Clubes & Grupos</h3>
+        <h3 className="text-lg text-ink-900 mb-3">{t('playerdetails.clubs_groups_heading')}</h3>
         {clubsHidden ? (
           <div className="card text-center py-6 text-muted">
             <Lock size={18} className="mx-auto mb-1.5" />
-            <p className="text-sm">Este jogador mantém os clubes privados.</p>
+            <p className="text-sm">{t('playerdetails.clubs_private')}</p>
           </div>
         ) : !player.clubs || player.clubs.length === 0 ? (
           <EmptyState
             icon={ShieldCheck}
-            title="Sem clubes"
-            subtitle="Este jogador ainda não pertence a nenhum clube ou grupo."
+            title={t('playerdetails.no_clubs_title')}
+            subtitle={t('playerdetails.no_clubs_subtitle')}
           />
         ) : (
           <div className="space-y-3">
@@ -364,7 +367,7 @@ export default function PlayerDetails() {
                 <Avatar name={c.name} size="w-10 h-10 text-sm" />
                 <div className="flex-1 min-w-0">
                   <h4 className="font-extrabold text-ink-900 truncate">{c.name}</h4>
-                  {c.kind === 'group' && <p className="text-[11px] font-extrabold uppercase tracking-widest text-lime-700">Grupo</p>}
+                  {c.kind === 'group' && <p className="text-[11px] font-extrabold uppercase tracking-widest text-lime-700">{t('playerdetails.group_badge')}</p>}
                 </div>
               </Link>
             ))}
@@ -377,7 +380,7 @@ export default function PlayerDetails() {
           expands to the combined mix + private-match list, instead of a
           list of every opponent the viewer has ever faced. */}
       <div>
-        <h3 className="text-lg text-ink-900 mb-3">Confrontos diretos</h3>
+        <h3 className="text-lg text-ink-900 mb-3">{t('playerdetails.head_to_head')}</h3>
 
         {h2hLoading ? (
           <div className="flex items-center justify-center py-10">
@@ -386,13 +389,13 @@ export default function PlayerDetails() {
         ) : activityHidden ? (
           <div className="card text-center py-6 text-muted">
             <Lock size={18} className="mx-auto mb-1.5" />
-            <p className="text-sm">Este jogador mantém a atividade privada.</p>
+            <p className="text-sm">{t('playerdetails.activity_private')}</p>
           </div>
         ) : !h2h || h2h.matches_played === 0 ? (
           <EmptyState
             icon={Swords}
-            title="Sem confrontos registados"
-            subtitle="Ainda não há jogos com resultado entre ti e este jogador."
+            title={t('playerdetails.no_h2h_title')}
+            subtitle={t('playerdetails.no_h2h_subtitle')}
           />
         ) : (
           <div className="card p-0 overflow-hidden">
@@ -406,11 +409,11 @@ export default function PlayerDetails() {
                   compares auth.uid() vs this player) — labelling the row with
                   just this player's name made it read as his record against
                   himself instead of the viewer's record against him. */}
-              <p className="flex-1 min-w-0 text-left font-extrabold text-ink-900 truncate">Tu vs. {player.name}</p>
+              <p className="flex-1 min-w-0 text-left font-extrabold text-ink-900 truncate">{t('playerdetails.you_vs', { name: player.name })}</p>
               <span className="text-sm font-extrabold tabular-nums shrink-0">
-                <span className="text-ok">{h2h.wins}V</span>
+                <span className="text-ok">{h2h.wins}{t('playerdetails.win_abbr')}</span>
                 <span className="text-muted"> – </span>
-                <span className="text-danger">{h2h.losses}D</span>
+                <span className="text-danger">{h2h.losses}{t('playerdetails.loss_abbr')}</span>
               </span>
               <ChevronDown
                 size={20}
@@ -421,7 +424,7 @@ export default function PlayerDetails() {
             {expanded && (
               <div className="border-t border-line divide-y divide-line animate-fade-up">
                 {matchesLoading ? (
-                  <p className="text-muted text-sm text-center py-4">A carregar…</p>
+                  <p className="text-muted text-sm text-center py-4">{t('common.loading')}</p>
                 ) : (
                   h2hMatches.map(m => (
                     <div key={m.match_id} className="flex items-center gap-3 px-4 py-3">
@@ -435,7 +438,7 @@ export default function PlayerDetails() {
                       <span className={`text-[11px] font-extrabold uppercase px-2 py-1 rounded-full shrink-0 ${
                         m.won ? 'bg-ok/10 text-ok' : 'bg-danger/10 text-danger'
                       }`}>
-                        {m.won ? 'V' : 'D'}
+                        {m.won ? t('playerdetails.win_abbr') : t('playerdetails.loss_abbr')}
                       </span>
                     </div>
                   ))
@@ -449,7 +452,7 @@ export default function PlayerDetails() {
       {/* Histórico de jogos — this player's own matches (mixes + confirmed
           private matches), independent of who's viewing. */}
       <div>
-        <h3 className="text-lg text-ink-900 mb-3">Histórico de jogos</h3>
+        <h3 className="text-lg text-ink-900 mb-3">{t('playerdetails.match_history')}</h3>
 
         {matchHistoryLoading ? (
           <div className="flex items-center justify-center py-10">
@@ -458,13 +461,13 @@ export default function PlayerDetails() {
         ) : activityHidden ? (
           <div className="card text-center py-6 text-muted">
             <Lock size={18} className="mx-auto mb-1.5" />
-            <p className="text-sm">Este jogador mantém a atividade privada.</p>
+            <p className="text-sm">{t('playerdetails.activity_private')}</p>
           </div>
         ) : matchHistory.length === 0 ? (
           <EmptyState
             icon={Swords}
-            title="Sem jogos registados"
-            subtitle="Este jogador ainda não tem jogos com resultado."
+            title={t('playerdetails.no_matches_title')}
+            subtitle={t('playerdetails.no_matches_subtitle')}
           />
         ) : (
           <div className="space-y-3">
@@ -481,7 +484,7 @@ export default function PlayerDetails() {
                   <span className={`text-[11px] font-extrabold uppercase px-2 py-1 rounded-full shrink-0 ${
                     group.match.won ? 'bg-ok/10 text-ok' : 'bg-danger/10 text-danger'
                   }`}>
-                    {group.match.won ? 'V' : 'D'}
+                    {group.match.won ? t('playerdetails.win_abbr') : t('playerdetails.loss_abbr')}
                   </span>
                 </div>
               ) : (
@@ -496,9 +499,9 @@ export default function PlayerDetails() {
                       <p className="text-[11px] text-muted">{formatMatchDate(group.date)}</p>
                     </div>
                     <span className="text-sm font-extrabold tabular-nums shrink-0">
-                      <span className="text-ok">{group.matches.filter((m) => m.won).length}V</span>
+                      <span className="text-ok">{group.matches.filter((m) => m.won).length}{t('playerdetails.win_abbr')}</span>
                       <span className="text-muted"> – </span>
-                      <span className="text-danger">{group.matches.filter((m) => !m.won).length}D</span>
+                      <span className="text-danger">{group.matches.filter((m) => !m.won).length}{t('playerdetails.loss_abbr')}</span>
                     </span>
                     <ChevronDown
                       size={20}
@@ -510,14 +513,14 @@ export default function PlayerDetails() {
                     <div className="border-t border-line divide-y divide-line animate-fade-up">
                       {group.matches.map((m, i) => (
                         <div key={m.match_id} className="flex items-center gap-3 px-4 py-3">
-                          <p className="flex-1 min-w-0 text-sm text-muted">Jogo {i + 1}</p>
+                          <p className="flex-1 min-w-0 text-sm text-muted">{t('playerdetails.match_number', { number: i + 1 })}</p>
                           <span className="text-base font-extrabold tabular-nums shrink-0">
                             {m.player_score}–{m.opponent_score}
                           </span>
                           <span className={`text-[11px] font-extrabold uppercase px-2 py-1 rounded-full shrink-0 ${
                             m.won ? 'bg-ok/10 text-ok' : 'bg-danger/10 text-danger'
                           }`}>
-                            {m.won ? 'V' : 'D'}
+                            {m.won ? t('playerdetails.win_abbr') : t('playerdetails.loss_abbr')}
                           </span>
                         </div>
                       ))}

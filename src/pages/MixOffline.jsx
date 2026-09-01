@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Trophy, RotateCcw, Share2, Download } from 'lucide-react'
 import { Wordmark } from '../components/Layout'
 import { PrimaryButton, ShareModal } from '../components/ui'
@@ -51,6 +52,7 @@ function slugify(text) {
    itself is failing. State is persisted to localStorage so an accidental
    refresh mid-game doesn't lose the draw. */
 export default function MixOffline() {
+  const { t } = useTranslation()
   const saved = loadSaved()
   const [namesText, setNamesText] = useState(saved?.namesText ?? '')
   const [numCourts, setNumCourts] = useState(saved?.numCourts ?? 1)
@@ -108,10 +110,10 @@ export default function MixOffline() {
 
   const currentRound = rounds[rounds.length - 1] || []
   const currentRoundDone = currentRound.length > 0 && currentRound.every((m) => m.winner_team_id)
-  const teamById = Object.fromEntries((teams || []).map((t) => [t.id, t]))
+  const teamById = Object.fromEntries((teams || []).map((team) => [team.id, team]))
   const teamLabel = (id) => {
-    const t = teamById[id]
-    return t ? `${t.player1.name} / ${t.player2.name}` : '—'
+    const team = teamById[id]
+    return team ? `${team.player1.name} / ${team.player2.name}` : '—'
   }
 
   const handleSaveScore = (matchIndex) => {
@@ -120,7 +122,7 @@ export default function MixOffline() {
     const b = parseInt(s.b, 10)
     if (Number.isNaN(a) || Number.isNaN(b) || a < 0 || b < 0) return
     if (a === b) {
-      setScoreError('Não existem empates — o resultado tem de ter um vencedor.')
+      setScoreError(t('mixoffline.no_ties_error'))
       return
     }
     setScoreError('')
@@ -144,15 +146,13 @@ export default function MixOffline() {
 
   const handleFinalize = () => {
     const early = !currentRoundDone
-    const msg = early
-      ? 'Terminar o mix agora, sem terminar esta ronda, e calcular a classificação com os resultados que já tens?'
-      : 'Finalizar o mix e ver a classificação final?'
+    const msg = early ? t('mixoffline.finalize_confirm_early') : t('mixoffline.finalize_confirm')
     if (!confirm(msg)) return
     setFinished(true)
   }
 
   const handleReset = () => {
-    if (teams && !confirm('Recomeçar do zero? Perdes as duplas e rondas atuais.')) return
+    if (teams && !confirm(t('mixoffline.reset_confirm'))) return
     setTeams(null)
     setRounds([])
     setFinished(false)
@@ -171,7 +171,7 @@ export default function MixOffline() {
       exportedAt: new Date().toISOString(),
       title: gameTitle,
       numCourts,
-      duplas: teams.map((t) => ({ player1: t.player1.name, player2: t.player2.name, seed: t.seed_ranking })),
+      duplas: teams.map((team) => ({ player1: team.player1.name, player2: team.player2.name, seed: team.seed_ranking })),
       rounds: rounds.map((round) =>
         round.map((m) => ({
           court_number: m.court_number,
@@ -208,21 +208,25 @@ export default function MixOffline() {
   const shareUrl = typeof window !== 'undefined' ? window.location.href : ''
 
   const buildDuplasShareText = () => {
-    const lines = [`🎾 Duplas — ${gameTitle}`, '']
+    const lines = [t('mixoffline.share_duplas_header', { title: gameTitle }), '']
     for (let c = 1; c <= numCourts; c++) {
       const a = teams[(c - 1) * 2]
       const b = teams[(c - 1) * 2 + 1]
       if (a && b) {
-        lines.push(`Campo ${c}: ${a.player1.name} / ${a.player2.name} vs ${b.player1.name} / ${b.player2.name}`)
+        lines.push(t('mixoffline.share_court_line', {
+          court: c,
+          teamA: `${a.player1.name} / ${a.player2.name}`,
+          teamB: `${b.player1.name} / ${b.player2.name}`,
+        }))
       }
     }
-    teams.slice(numCourts * 2).forEach((t) => lines.push(`${t.player1.name} / ${t.player2.name}`))
+    teams.slice(numCourts * 2).forEach((team) => lines.push(`${team.player1.name} / ${team.player2.name}`))
     return lines.join('\n')
   }
 
   const buildFinalShareText = () => {
-    const lines = [`🎾 ${gameTitle}`]
-    if (finalStandings[0]) lines.push('', `🏆 Vencedores: ${teamLabel(finalStandings[0].team.id)}`)
+    const lines = [t('mixoffline.share_final_header', { title: gameTitle })]
+    if (finalStandings[0]) lines.push('', t('mixoffline.share_winners_line', { name: teamLabel(finalStandings[0].team.id) }))
     return lines.join('\n')
   }
 
@@ -239,27 +243,26 @@ export default function MixOffline() {
       <div className="max-w-md mx-auto">
         <div className="flex items-center justify-between mb-6">
           <Wordmark variant="light" className="h-7" />
-          <span className="text-[11px] font-extrabold uppercase tracking-widest text-muted">Plano B — sem conta</span>
+          <span className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('mixoffline.plan_b_badge')}</span>
         </div>
 
         <div className="card mb-4">
-          <h1 className="text-lg text-ink-900 mb-1">Mix sem app</h1>
+          <h1 className="text-lg text-ink-900 mb-1">{t('mixoffline.title')}</h1>
           <p className="text-muted text-sm">
-            Forma duplas e sorteia campos sem precisar de conta nem de ligação ao servidor —
-            tudo corre neste ecrã. Continua a funcionar mesmo se o alinho estiver em baixo.
+            {t('mixoffline.subtitle')}
           </p>
         </div>
 
         {!teams ? (
           <div className="card">
             <label className="block text-sm font-extrabold text-ink-900 mb-1.5">
-              Colar mensagem do bot (opcional)
+              {t('mixoffline.paste_bot_message_label')}
             </label>
             <textarea
               value={pasteText}
               onChange={(e) => setPasteText(e.target.value)}
               rows={4}
-              placeholder={'Cola aqui a mensagem "Mix completo!" do bot do WhatsApp…'}
+              placeholder={t('mixoffline.paste_bot_placeholder')}
               className="input-field resize-none mb-2 text-xs"
             />
             <button
@@ -268,22 +271,25 @@ export default function MixOffline() {
               disabled={!pasteText.trim()}
               className="text-sm font-extrabold text-ink-700 hover:text-ink-900 disabled:opacity-40 disabled:pointer-events-none mb-1.5"
             >
-              Extrair jogadores e campos ↓
+              {t('mixoffline.extract_button')}
             </button>
             {parseResult === 'empty' && (
               <p className="text-danger text-xs font-extrabold mb-4">
-                Não encontrei jogadores nessa mensagem — confirma que colaste o texto completo.
+                {t('mixoffline.extract_empty_error')}
               </p>
             )}
             {parseResult && parseResult !== 'empty' && (
               <p className="text-ok text-xs font-extrabold mb-4">
-                {parseResult.title ? `"${parseResult.title}" — ` : ''}
-                {parseResult.names.length} jogadores{parseResult.numCourts ? `, ${parseResult.numCourts} campos` : ''} extraídos.
-                A ordem em baixo vem da inscrição, não da força — reordena se quiseres duplas mais equilibradas.
+                {parseResult.title ? t('mixoffline.parsed_title_prefix', { title: parseResult.title }) : ''}
+                {parseResult.numCourts
+                  ? t('mixoffline.parsed_summary_with_courts', { count: parseResult.names.length, courts: parseResult.numCourts })
+                  : t('mixoffline.parsed_summary', { count: parseResult.names.length })}
+                {' '}
+                {t('mixoffline.parsed_order_note')}
               </p>
             )}
 
-            <label className="block text-sm font-extrabold text-ink-900 mb-1.5 mt-4">Nome do mix</label>
+            <label className="block text-sm font-extrabold text-ink-900 mb-1.5 mt-4">{t('mixoffline.mix_name_label')}</label>
             <input
               type="text"
               value={gameTitle}
@@ -292,16 +298,16 @@ export default function MixOffline() {
             />
 
             <label className="block text-sm font-extrabold text-ink-900 mb-1.5">
-              Jogadores confirmados (um por linha, do mais forte para o mais fraco)
+              {t('mixoffline.players_label')}
             </label>
             <textarea
               value={namesText}
               onChange={(e) => setNamesText(e.target.value)}
               rows={8}
-              placeholder={'Renato\nJoão\nMaria\nAna\n…'}
+              placeholder={t('mixoffline.players_placeholder')}
               className="input-field resize-none mb-4"
             />
-            <label className="block text-sm font-extrabold text-ink-900 mb-1.5">Nº de campos</label>
+            <label className="block text-sm font-extrabold text-ink-900 mb-1.5">{t('mixoffline.num_courts_label')}</label>
             <input
               type="number"
               min={1}
@@ -310,20 +316,20 @@ export default function MixOffline() {
               className="input-field mb-4 w-24"
             />
             <p className="text-xs text-muted mb-4">
-              {names.length} jogador{names.length === 1 ? '' : 'es'} — precisas de {minPeople}
-              {names.length % 2 !== 0 ? ' (número par)' : ''} para {numCourts} campo{numCourts === 1 ? '' : 's'}.
+              {t('mixoffline.player_count', { count: names.length })} — {t('mixoffline.need_min_people', { min: minPeople })}
+              {names.length % 2 !== 0 ? t('mixoffline.odd_number_note') : ''} {t('mixoffline.for_court_count', { count: numCourts })}
             </p>
             <PrimaryButton onClick={handleFormTeams} disabled={!canFormTeams} className="w-full">
-              Formar duplas e sortear Ronda 1
+              {t('mixoffline.form_teams_button')}
             </PrimaryButton>
           </div>
         ) : finished ? (
           <div className="card">
             <div className="text-center mb-5">
               <Trophy size={32} className="mx-auto mb-2 text-lime-600" />
-              <h2 className="text-lg text-ink-900">Mix terminado!</h2>
+              <h2 className="text-lg text-ink-900">{t('mixoffline.finished_title')}</h2>
               {finalStandings[0] && (
-                <p className="text-muted text-sm">🏆 {teamLabel(finalStandings[0].team.id)} venceu</p>
+                <p className="text-muted text-sm">{t('mixoffline.winner_announcement', { name: teamLabel(finalStandings[0].team.id) })}</p>
               )}
             </div>
             <div className="space-y-2 mb-5">
@@ -339,37 +345,37 @@ export default function MixOffline() {
                     <span className="text-sm font-extrabold text-ink-900 truncate">{teamLabel(s.team.id)}</span>
                   </div>
                   <span className="text-xs font-extrabold text-muted shrink-0 tabular-nums">
-                    {s.wins}V · saldo {s.diff >= 0 ? '+' : ''}{s.diff}
+                    {t('mixoffline.standings_line', { wins: s.wins, diff: `${s.diff >= 0 ? '+' : ''}${s.diff}` })}
                   </span>
                 </div>
               ))}
             </div>
             <div className="grid grid-cols-2 gap-3 mb-3">
               <PrimaryButton variant="ghost" onClick={() => setShareMode('final')} className="flex items-center justify-center gap-1.5">
-                <Share2 size={16} /> Partilhar
+                <Share2 size={16} /> {t('mixoffline.share_button')}
               </PrimaryButton>
               <PrimaryButton variant="ghost" onClick={handleDownloadFile} className="flex items-center justify-center gap-1.5">
-                <Download size={16} /> Guardar ficheiro
+                <Download size={16} /> {t('mixoffline.save_file_button')}
               </PrimaryButton>
             </div>
             <PrimaryButton variant="ghost" onClick={handleReset} className="w-full flex items-center justify-center gap-1.5">
-              <RotateCcw size={16} /> Novo mix
+              <RotateCcw size={16} /> {t('mixoffline.new_mix_button')}
             </PrimaryButton>
           </div>
         ) : (
           <>
             <div className="card mb-4">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-base text-ink-900">Ronda {rounds.length}</h2>
+                <h2 className="text-base text-ink-900">{t('mixoffline.round_title', { round: rounds.length })}</h2>
                 <div className="flex items-center gap-3">
                   <button onClick={() => setShareMode('duplas')} className="text-xs font-extrabold text-ink-700 flex items-center gap-1">
-                    <Share2 size={14} /> Duplas
+                    <Share2 size={14} /> {t('mixoffline.duplas_button')}
                   </button>
                   <button onClick={handleDownloadFile} className="text-xs font-extrabold text-ink-700 flex items-center gap-1">
-                    <Download size={14} /> Guardar
+                    <Download size={14} /> {t('mixoffline.save_button')}
                   </button>
                   <button onClick={handleReset} className="text-xs font-extrabold text-danger flex items-center gap-1">
-                    <RotateCcw size={14} /> Recomeçar
+                    <RotateCcw size={14} /> {t('mixoffline.restart_button')}
                   </button>
                 </div>
               </div>
@@ -378,7 +384,7 @@ export default function MixOffline() {
                 {currentRound.map((m, i) => (
                   <div key={i} className="border border-line rounded-ctrl p-3">
                     <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mb-2">
-                      Campo {m.court_number}
+                      {t('mixoffline.court_number_label', { court: m.court_number })}
                     </p>
                     {m.winner_team_id ? (
                       <div className="space-y-1">
@@ -420,7 +426,7 @@ export default function MixOffline() {
                           </div>
                         ))}
                         <PrimaryButton variant="ghost" onClick={() => handleSaveScore(i)} className="w-full">
-                          Guardar resultado
+                          {t('mixoffline.save_score_button')}
                         </PrimaryButton>
                       </div>
                     )}
@@ -431,19 +437,19 @@ export default function MixOffline() {
 
             {currentRoundDone && (
               <PrimaryButton onClick={handleNextRound} className="w-full mb-3">
-                Ronda seguinte
+                {t('mixoffline.next_round_button')}
               </PrimaryButton>
             )}
 
             <PrimaryButton variant="ghost" onClick={handleFinalize} className="w-full">
-              Terminar mix
+              {t('mixoffline.finish_mix_button')}
             </PrimaryButton>
           </>
         )}
 
         {shareMode === 'duplas' && teams && (
           <ShareModal
-            title="Partilhar Duplas"
+            title={t('mixoffline.share_duplas_title')}
             message={buildDuplasShareText()}
             url={shareUrl}
             onClose={() => setShareMode(null)}
@@ -452,7 +458,7 @@ export default function MixOffline() {
         )}
         {shareMode === 'final' && teams && (
           <ShareModal
-            title="Partilhar Mix"
+            title={t('mixoffline.share_mix_title')}
             message={buildFinalShareText()}
             url={shareUrl}
             onClose={() => setShareMode(null)}

@@ -1,7 +1,8 @@
 import { getSettings } from './settings.js'
 import { supabase } from './supabase.js'
 import { loadGame, getOpenMixes, buildCombinedRosterMessage } from './roster.js'
-import { HELP_FOOTER } from './messages.js'
+import { helpFooter } from './messages.js'
+import { t } from './locales.js'
 
 const DEBOUNCE_MS = 4000
 const RECONCILE_INTERVAL_MS = 60 * 1000
@@ -88,9 +89,11 @@ export function startSync({ sendText, getGroupMentions }) {
       const justCancelled = payload.new.status === 'cancelled' && !wasCancelled
       if (justCancelled) {
         const mentions = await getGroupMentions(settings.whatsapp_group_jid)
+        // Broadcast to the whole group — no single recipient, stays 'pt'
+        // like the rest of the group-facing roster text (see roster.js).
         await sendText(
           settings.whatsapp_group_jid,
-          `📢 @all\n\n🤖 O mix "${payload.new.title}" foi cancelado ❌${HELP_FOOTER}`,
+          `${t('mix_cancelled', 'pt', { title: payload.new.title })}${helpFooter('pt')}`,
           { mentions }
         )
       }
@@ -124,11 +127,13 @@ export function startSync({ sendText, getGroupMentions }) {
 
       const { data: promotedProfile } = await supabase
         .from('profiles')
-        .select('name')
+        .select('name, language')
         .eq('id', payload.new.user_id)
         .single()
 
-      scheduleRepost(sendText, getGroupMentions, { promotedNames: [promotedProfile?.name || 'Jogador'] })
+      scheduleRepost(sendText, getGroupMentions, {
+        promotedNames: [{ name: promotedProfile?.name || 'Jogador', lang: promotedProfile?.language ?? 'pt' }],
+      })
     })
     .subscribe()
 

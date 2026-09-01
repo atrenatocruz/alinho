@@ -3,7 +3,8 @@ import { getSettings } from './settings.js'
 import { loadGame, getOpenMixes, formatDateTime } from './roster.js'
 import { resolveProfileByPhoneJid, createGuestProfile } from './phone.js'
 import { config } from './config.js'
-import { HELP_TEXT, HELP_FOOTER } from './messages.js'
+import { helpText, helpFooter } from './messages.js'
+import { t } from './locales.js'
 
 function stripAccents(str) {
   return str.normalize('NFD').replace(/[̀-ͯ]/g, '')
@@ -61,9 +62,9 @@ function parseCommand(text) {
 
 const OPEN_STATUSES = new Set(['open', 'closed'])
 
-function formatMixLine(mix) {
+function formatMixLine(mix, lang) {
   const location = mix.location ? `, ${mix.location}` : ''
-  return `🆔 *${mix.short_code}* — ${mix.title}, ${formatDateTime(mix.date)}${location}`
+  return `🆔 *${mix.short_code}* — ${mix.title}, ${formatDateTime(mix.date, lang)}${location}`
 }
 
 /**
@@ -92,17 +93,23 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message }, 
   const settings = await getSettings()
   if (!settings.whatsapp_group_jid || groupJid !== settings.whatsapp_group_jid) return
 
+  // Resolved once, up front, and reused for the rest of this handler — every
+  // reply below is addressed to this one sender specifically (unlike the
+  // group broadcasts in roster.js/sync.js/reminders.js/autostart.js), so it
+  // always uses their own profiles.language. An unresolved sender (not
+  // found, or a fresh guest about to be created) falls back to 'pt'.
+  const resolvedProfile = await resolveProfileByPhoneJid(senderPn)
+  const lang = resolvedProfile?.language ?? 'pt'
+
   // Quote the sender's own message so a reply is unambiguous even when
   // several people send commands close together. Every reply also points
   // back to /help, except the help listing itself.
-  const reply = (msg) => sendText(groupJid, `${msg}${HELP_FOOTER}`, { quoted: message })
+  const reply = (key, vars) => sendText(groupJid, `${t(key, lang, vars)}${helpFooter(lang)}`, { quoted: message })
 
-  const NOT_FOUND_MSG = `🤖 Não te encontrei na app 😅 Regista-te primeiro em ${config.appUrl} e confirma o teu número de telemóvel no perfil.`
-
-  // Same check a plain resolveProfileByPhoneJid result needs before use
-  // (e.g. fetched in parallel with getOpenMixes below) — avoids a redundant query.
+  // Same check a plain resolveProfileByPhoneJid result needs before use —
+  // avoids a redundant query.
   async function requireProfile(profile) {
-    if (!profile) await reply(NOT_FOUND_MSG)
+    if (!profile) await reply('not_found', { appUrl: config.appUrl })
     return profile
   }
 
@@ -117,7 +124,7 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message }, 
       return { profile: created, isNewGuest: true }
     } catch (err) {
       console.error('Failed to create guest profile:', err)
-      await reply(NOT_FOUND_MSG)
+      await reply('not_found', { appUrl: config.appUrl })
       return { profile: null, isNewGuest: false }
     }
   }
@@ -132,12 +139,11 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message }, 
       const { game } = await loadGame(pending.gameId)
       const gameIsFuture = new Date(game.date).getTime() > Date.now()
       if (!OPEN_STATUSES.has(game.status) || !gameIsFuture) {
-        await reply('🤖 Este mix já não está disponível para inscrições.')
+        await reply('mix_no_longer_available')
         return
       }
 
-      const resolved = await resolveProfileByPhoneJid(senderPn)
-      const { profile, isNewGuest } = await requireProfileOrCreateGuest(resolved, senderPn)
+      const { profile, isNewGuest } = await requireProfileOrCreateGuest(resolvedProfile, senderPn)
       if (!profile) return
 
       const { error: insertError } = await supabase
@@ -146,28 +152,28 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message }, 
 
       if (insertError) {
         if (insertError.code === '23505') {
-          await reply('🤖 Já estás na lista de suplentes deste mix! 🎾')
+          await reply('already_waitlisted')
           return
         }
         throw new Error(`Failed to insert waitlisted participant: ${insertError.message}`)
       }
-      await reply(
-        isNewGuest
-          ? `🤖 Fixe, ${profile.name}! Ficas na lista de suplentes como convidado 🎾 Entras automaticamente quando alguém sair. Regista-te em ${config.appUrl} para veres o teu histórico e desbloquear recompensas.`
-          : '🤖 Estás na lista de suplentes! Quando alguém sair, entras automaticamente. 🎾'
-      )
+      if (isNewGuest) {
+        await reply('guest_waitlisted', { name: profile.name, appUrl: config.appUrl })
+      } else {
+        await reply('waitlisted')
+      }
       return
     }
 
     if (normalized === 'nao') {
       pendingSuplenteConfirmations.delete(key)
-      await reply('🤖 Sem problema, não entraste na lista de suplentes. Inscreve-te para o próximo mix! 🎾')
+      await reply('waitlist_declined')
       return
     }
 
     if (!pending.reprompted) {
       pending.reprompted = true
-      await reply('🤖 Não percebi 🤔 Responde só com *Sim* ou *Não*.')
+      await reply('did_not_understand_yes_no')
       return
     }
     // Already reprompted once for this pending question — stop nagging
@@ -179,15 +185,14 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message }, 
   const { action, code } = parsed
 
   if (action === 'help') {
-    await sendText(groupJid, HELP_TEXT, { quoted: message })
+    await sendText(groupJid, helpText(lang), { quoted: message })
     return
   }
 
-  // Both actions always end up needing the sender's profile, so resolve it
-  // alongside getOpenMixes instead of waiting for that query to finish first.
-  const [openMixes, resolvedProfile] = await Promise.all([getOpenMixes(), resolveProfileByPhoneJid(senderPn)])
+  // resolvedProfile was already fetched once, up front, alongside lang.
+  const openMixes = await getOpenMixes()
   if (openMixes.length === 0) {
-    await reply('🤖 Não há nenhum mix com inscrições abertas neste momento.')
+    await reply('no_open_mixes')
     return
   }
 
@@ -200,9 +205,9 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message }, 
 
     if (!OPEN_STATUSES.has(game.status) || !gameIsFuture) {
       if (action === 'in') {
-        await reply('🤖 Não há nenhum mix com inscrições abertas neste momento.')
+        await reply('no_open_mixes')
       } else {
-        await reply('🤖 Este mix já começou/terminou — já não é possível sair por aqui.')
+        await reply('mix_already_started_out')
       }
       return
     }
@@ -229,11 +234,11 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message }, 
 
     if (action === 'in') {
       if (ownConfirmedRow || asPartnerRow) {
-        await reply('🤖 Já estás inscrito neste mix! 🎾')
+        await reply('already_joined')
         return
       }
       if (ownWaitlistRow) {
-        await reply('🤖 Já estás na lista de suplentes deste mix! 🎾')
+        await reply('already_waitlisted')
         return
       }
       if (people.length >= capacity) {
@@ -242,7 +247,7 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message }, 
           expiresAt: Date.now() + SUPLENTE_CONFIRM_TTL_MS,
           reprompted: false,
         })
-        await reply('🤖 Mix cheio! Queres entrar como suplente? Responde com *Sim* ou *Não*.')
+        await reply('mix_full_offer_waitlist')
         return
       }
 
@@ -252,7 +257,7 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message }, 
 
       if (insertError) {
         if (insertError.code === '23505') {
-          await reply('🤖 Já estás inscrito neste mix! 🎾')
+          await reply('already_joined')
           return
         }
         throw new Error(`Failed to insert participant: ${insertError.message}`)
@@ -263,24 +268,22 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message }, 
       // roster repost wouldn't explain what just happened or that signing
       // up unlocks their history/friends/rewards (Trello #19).
       if (isNewGuest) {
-        await reply(
-          `🤖 Fixe, ${profile.name}! Inscrevi-te como convidado 🎾 Regista-te em ${config.appUrl} para veres o teu histórico, o dos teus amigos, e desbloquear recompensas.`
-        )
+        await reply('guest_joined', { name: profile.name, appUrl: config.appUrl })
       }
       return
     }
 
     // action === 'out'
     if (asPartnerRow) {
-      await reply('🤖 Inscreveste-te em dupla pela app — para sair, usa a app 📱')
+      await reply('partner_joined_use_app')
       return
     }
     if (ownWaitlistRow) {
-      await reply('🤖 Estás na lista de suplentes — para sair, usa a app 📱')
+      await reply('waitlisted_use_app')
       return
     }
     if (!ownConfirmedRow) {
-      await reply('🤖 Não estás inscrito neste mix.')
+      await reply('not_joined')
       return
     }
 
@@ -292,7 +295,7 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message }, 
   if (code) {
     const game = openMixes.find((m) => m.short_code === code)
     if (!game) {
-      await reply(`🤖 Não encontrei nenhum mix aberto com o código ${code}.`)
+      await reply('mix_code_not_found', { code })
       return
     }
     await actOnGame(game, resolvedProfile)
@@ -306,10 +309,8 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message }, 
 
   // 2+ open mixes, no code given — disambiguate.
   if (action === 'in') {
-    const list = openMixes.map(formatMixLine).join('\n')
-    await reply(
-      `🤖 Há vários mixes abertos! Qual deles?\n\n${list}\n\nEscreve *In ${openMixes[0].short_code}* (com o código do mix que queres).`
-    )
+    const list = openMixes.map((mix) => formatMixLine(mix, lang)).join('\n')
+    await reply('disambiguate_in', { list, code: openMixes[0].short_code })
     return
   }
 
@@ -332,14 +333,12 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message }, 
   const memberMixes = openMixes.filter((m) => memberGameIds.has(m.id))
 
   if (memberMixes.length === 0) {
-    await reply('🤖 Não estás inscrito em nenhum mix aberto.')
+    await reply('not_in_any_open_mix')
     return
   }
   if (memberMixes.length > 1) {
-    const list = memberMixes.map(formatMixLine).join('\n')
-    await reply(
-      `🤖 Estás inscrito em vários mixes! De qual queres sair?\n\n${list}\n\nEscreve *Out ${memberMixes[0].short_code}* (com o código do mix).`
-    )
+    const list = memberMixes.map((mix) => formatMixLine(mix, lang)).join('\n')
+    await reply('disambiguate_out', { list, code: memberMixes[0].short_code })
     return
   }
 

@@ -93,7 +93,7 @@ export async function resolveProfileByPhoneJid(phoneJid) {
   // different club shouldn't resolve here).
   const { data, error } = await supabase
     .from('memberships')
-    .select('user_id, profile:profiles!inner(id, name, phone_hash, whatsapp_jid)')
+    .select('user_id, profile:profiles!inner(id, name, phone_hash, whatsapp_jid, language)')
     .eq('organization_id', config.organizationId)
     .eq('profile.phone_hash', hash)
     .maybeSingle()
@@ -119,5 +119,5 @@ export async function resolveProfileByPhoneJid(phoneJid) {
       })
   }
 
-  return { id: data.user_id, name: data.profile.name }
+  return { id: data.user_id, name: data.profile.name, language: data.profile.language }
 }

@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Users, UserPlus, Clock, Heart, MapPin, Phone, Instagram, Globe, Calendar, Building2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { getClubProfile, listOrganizationMembers } from '../lib/clubProfile'
 import { listClubGroups } from '../lib/organizations'
 import { Avatar, EmptyState, PrimaryButton } from '../components/ui'
 import PadelIcon from '../components/icons/PadelIcon'
+import { formatDate } from '../lib/formatDate'
 
 const asWebsiteUrl = (value) => (/^https?:\/\//i.test(value) ? value : `https://${value}`)
 const asInstagramUrl = (value) => {
@@ -14,6 +16,7 @@ const asInstagramUrl = (value) => {
 }
 
 export default function ClubProfile() {
+  const { t, i18n } = useTranslation()
   const { slug } = useParams()
   const { memberships, followOrganization, leaveOrganization, toggleFavoriteOrganization } = useAuth()
   const [club, setClub] = useState(null)
@@ -104,7 +107,7 @@ export default function ClubProfile() {
       setGroups(data)
     } catch (error) {
       console.error('Error requesting to join group:', error)
-      alert(error.message || 'Não foi possível pedir para entrar. Tenta novamente.')
+      alert(error.message || t('clubprofile.error_request_join_group'))
     } finally {
       setGroupActingOn(null)
     }
@@ -118,14 +121,14 @@ export default function ClubProfile() {
       await load()
     } catch (error) {
       console.error('Error following club:', error)
-      alert('Não foi possível seguir este clube. Tenta novamente.')
+      alert(t('clubprofile.error_follow'))
     } finally {
       setActing(false)
     }
   }
 
   const handleUnfollow = async () => {
-    if (!confirm(`Deixar de seguir ${club.name}? Deixas de ver os mixs deste clube.`)) return
+    if (!confirm(t('clubprofile.confirm_unfollow', { name: club.name }))) return
     setActing(true)
     try {
       const { error } = await leaveOrganization(club.id)
@@ -133,7 +136,7 @@ export default function ClubProfile() {
       await load()
     } catch (error) {
       console.error('Error leaving club:', error)
-      alert(error.message || 'Não foi possível deixar de seguir este clube.')
+      alert(error.message || t('clubprofile.error_unfollow'))
     } finally {
       setActing(false)
     }
@@ -148,7 +151,7 @@ export default function ClubProfile() {
       if (error) throw error
     } catch (error) {
       console.error('Error toggling favorite club:', error)
-      alert('Não foi possível atualizar o favorito. Tenta novamente.')
+      alert(t('clubprofile.error_toggle_favorite'))
     } finally {
       setFavoriting(false)
     }
@@ -166,12 +169,12 @@ export default function ClubProfile() {
     return (
       <div className="space-y-5">
         <Link to="/comunidade" className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline">
-          <ArrowLeft size={16} /> Voltar à Comunidade
+          <ArrowLeft size={16} /> {t('clubprofile.back_to_community')}
         </Link>
         <EmptyState
           icon={PadelIcon}
-          title="Clube não encontrado"
-          subtitle="Este clube não existe ou não é público."
+          title={t('clubprofile.not_found_title')}
+          subtitle={t('clubprofile.not_found_subtitle')}
         />
       </div>
     )
@@ -180,7 +183,7 @@ export default function ClubProfile() {
   return (
     <div className="space-y-5">
       <Link to="/comunidade" className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline">
-        <ArrowLeft size={16} /> Voltar à Comunidade
+        <ArrowLeft size={16} /> {t('clubprofile.back_to_community')}
       </Link>
 
       {club.kind === 'group' && club.parent_slug && (
@@ -188,7 +191,7 @@ export default function ClubProfile() {
           to={`/clube/${club.parent_slug}`}
           className="inline-flex items-center gap-1.5 text-sm font-extrabold text-lime-700 hover:underline"
         >
-          <Building2 size={14} /> Grupo dentro de {club.parent_name}
+          <Building2 size={14} /> {t('clubprofile.group_within', { name: club.parent_name })}
         </Link>
       )}
 
@@ -202,11 +205,11 @@ export default function ClubProfile() {
               onClick={handleToggleMembers}
               className="text-sm text-muted flex items-center gap-1.5 hover:underline"
             >
-              <Users size={13} /> {club.member_count} {club.member_count === 1 ? 'membro' : 'membros'}
+              <Users size={13} /> {t('clubprofile.member_count', { count: club.member_count })}
             </button>
           ) : (
             <p className="text-sm text-muted flex items-center gap-1.5">
-              <Users size={13} /> {club.member_count} membros
+              <Users size={13} /> {t('clubprofile.member_count', { count: club.member_count })}
             </p>
           )}
         </div>
@@ -215,20 +218,20 @@ export default function ClubProfile() {
           <button
             onClick={handleToggleFavorite}
             disabled={favoriting}
-            aria-label={isFavorite ? 'Remover dos favoritos' : 'Marcar como favorito'}
-            title={isFavorite ? 'Remover dos favoritos' : 'Marcar como favorito — os mixs deste clube aparecem primeiro em Próximos jogos'}
+            aria-label={isFavorite ? t('clubprofile.remove_favorite') : t('clubprofile.mark_favorite')}
+            title={isFavorite ? t('clubprofile.remove_favorite') : t('clubprofile.mark_favorite_title')}
             className="shrink-0 w-11 h-11 min-h-[44px] rounded-full flex items-center justify-center transition-colors duration-fast disabled:opacity-40 hover:bg-ink-50"
           >
             <Heart size={20} className={isFavorite ? 'fill-lime-400 text-lime-400' : 'text-ink-200'} />
           </button>
         ) : club.my_status === 'pending' ? (
           <span className="whitespace-nowrap inline-flex items-center gap-1.5 text-xs font-extrabold px-3 py-2 rounded-full bg-ink-50 text-muted">
-            <Clock size={14} /> Pedido enviado
+            <Clock size={14} /> {t('clubprofile.request_sent')}
           </span>
         ) : (
           <PrimaryButton onClick={handleFollow} disabled={acting} className="shrink-0">
             <UserPlus size={16} />
-            {club.open_join ? 'Seguir' : 'Pedir para entrar'}
+            {club.open_join ? t('clubprofile.follow_button') : t('clubprofile.request_join_button')}
           </PrimaryButton>
         )}
       </div>
@@ -240,7 +243,7 @@ export default function ClubProfile() {
               <div className="animate-spin rounded-full h-8 w-8 border-[3px] border-ink-50 border-t-ink-700"></div>
             </div>
           ) : members.length === 0 ? (
-            <p className="text-muted text-sm text-center py-6">Sem membros visíveis.</p>
+            <p className="text-muted text-sm text-center py-6">{t('clubprofile.no_members_visible')}</p>
           ) : (
             <div className="divide-y divide-line">
               {members.map((m) => (
@@ -264,13 +267,13 @@ export default function ClubProfile() {
           disabled={acting}
           className="text-danger text-sm font-extrabold hover:underline disabled:opacity-40"
         >
-          Deixar de seguir
+          {t('clubprofile.unfollow_button')}
         </button>
       )}
 
       {club.description && (
         <div className="card">
-          <h3 className="text-sm font-extrabold text-ink-900 uppercase tracking-wide mb-2">Sobre</h3>
+          <h3 className="text-sm font-extrabold text-ink-900 uppercase tracking-wide mb-2">{t('clubprofile.about')}</h3>
           <p className="text-ink-900 whitespace-pre-line">{club.description}</p>
         </div>
       )}
@@ -278,7 +281,7 @@ export default function ClubProfile() {
       {club.kind === 'club' && club.location && (
         <div className="card">
           <h3 className="text-sm font-extrabold text-ink-900 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-            <MapPin size={15} /> Localização
+            <MapPin size={15} /> {t('clubprofile.location')}
           </h3>
           <p className="text-ink-900">{club.location}</p>
         </div>
@@ -286,7 +289,7 @@ export default function ClubProfile() {
 
       {club.kind === 'club' && (club.phone || club.instagram || club.website) && (
         <div className="card space-y-2">
-          <h3 className="text-sm font-extrabold text-ink-900 uppercase tracking-wide mb-2">Contactos</h3>
+          <h3 className="text-sm font-extrabold text-ink-900 uppercase tracking-wide mb-2">{t('clubprofile.contacts')}</h3>
           {club.phone && (
             <a href={`tel:${club.phone}`} className="flex items-center gap-2 text-ink-900 hover:underline">
               <Phone size={15} className="shrink-0" /> {club.phone}
@@ -307,7 +310,7 @@ export default function ClubProfile() {
 
       {groups.length > 0 && (
         <div>
-          <h3 className="text-lg text-ink-900 mb-3">Grupos</h3>
+          <h3 className="text-lg text-ink-900 mb-3">{t('clubprofile.groups_heading')}</h3>
           <div className="space-y-3">
             {groups.map((group) => {
               const isMemberish = group.can_manage || group.my_status === 'member' || group.my_status === 'admin'
@@ -318,11 +321,11 @@ export default function ClubProfile() {
                     <h4 className="font-extrabold text-ink-900 truncate">{group.name}</h4>
                     {isMemberish ? (
                       <p className="text-sm text-muted">
-                        {group.member_count} {group.member_count === 1 ? 'membro' : 'membros'}
+                        {t('clubprofile.member_count', { count: group.member_count })}
                       </p>
                     ) : (
                       <p className="text-sm text-muted">
-                        {group.my_status === 'pending' ? 'Pedido enviado' : 'Grupo dentro deste clube'}
+                        {group.my_status === 'pending' ? t('clubprofile.request_sent') : t('clubprofile.group_within_club')}
                       </p>
                     )}
                   </div>
@@ -331,11 +334,11 @@ export default function ClubProfile() {
                       to={`/clube/${group.slug}`}
                       className="shrink-0 whitespace-nowrap text-xs font-extrabold px-3.5 py-2 min-h-[44px] rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast inline-flex items-center"
                     >
-                      Ver grupo
+                      {t('clubprofile.view_group')}
                     </Link>
                   ) : group.my_status === 'pending' ? (
                     <span className="shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 text-xs font-extrabold px-3 py-2 rounded-full bg-ink-50 text-muted">
-                      <Clock size={14} /> Pedido enviado
+                      <Clock size={14} /> {t('clubprofile.request_sent')}
                     </span>
                   ) : (
                     <button
@@ -344,7 +347,7 @@ export default function ClubProfile() {
                       disabled={groupActingOn === group.id}
                       className="shrink-0 whitespace-nowrap text-xs font-extrabold px-3.5 py-2 min-h-[44px] rounded-full bg-lime-400 text-ink-900 hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
                     >
-                      Pedir para entrar
+                      {t('clubprofile.request_join_button')}
                     </button>
                   )}
                 </div>
@@ -355,12 +358,12 @@ export default function ClubProfile() {
       )}
 
       <div>
-        <h3 className="text-lg text-ink-900 mb-3">Mixs em aberto</h3>
+        <h3 className="text-lg text-ink-900 mb-3">{t('clubprofile.open_mixes_heading')}</h3>
         {club.open_games.length === 0 ? (
           <EmptyState
             icon={Calendar}
-            title="Sem mixs em aberto"
-            subtitle="Este clube não tem mixs agendados neste momento."
+            title={t('clubprofile.no_open_mixes_title')}
+            subtitle={t('clubprofile.no_open_mixes_subtitle')}
           />
         ) : (
           <div className="space-y-3">
@@ -368,7 +371,7 @@ export default function ClubProfile() {
               <div key={game.id} className="card">
                 <h4 className="font-extrabold text-ink-900">{game.title}</h4>
                 <p className="text-sm text-muted">
-                  {new Date(game.date).toLocaleString('pt-PT', { day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' })}
+                  {formatDate(game.date, i18n.language, { day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' })}
                 </p>
                 {game.location && (
                   <p className="flex items-center gap-1.5 text-sm text-muted mt-1">
@@ -376,7 +379,7 @@ export default function ClubProfile() {
                   </p>
                 )}
                 <p className="flex items-center gap-1.5 text-sm text-muted mt-1">
-                  <Users size={13} /> {game.confirmed_count}/{game.max_players} jogadores
+                  <Users size={13} /> {t('clubprofile.players_ratio', { count: game.confirmed_count, max: game.max_players })}
                 </p>
               </div>
             ))}

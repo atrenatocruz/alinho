@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Home, Users, Trophy, Settings, LogOut, HelpCircle, Phone, X, Bell } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton, Avatar, RatingBadge } from './ui'
 import { hashPhone } from '../lib/hashPhone'
@@ -18,6 +19,7 @@ const PHONE_PROMPT_DISMISSED_KEY = 'phonePromptDismissedDate'
    using the app, it's just a reminder that can always be skipped and the
    number added later from the Profile page. */
 function PhoneRequiredModal({ onSave, onDismiss }) {
+  const { t } = useTranslation()
   const [phone, setPhone] = useState('')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -25,7 +27,7 @@ function PhoneRequiredModal({ onSave, onDismiss }) {
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (phone.replace(/\D/g, '').length < 9) {
-      setError('Introduz um número de telemóvel válido')
+      setError(t('layout.invalid_phone_number'))
       return
     }
     setSaving(true)
@@ -36,7 +38,7 @@ function PhoneRequiredModal({ onSave, onDismiss }) {
       if (saveError) throw saveError
       // on success the parent's `profile.phone_hash` updates and this modal unmounts
     } catch {
-      setError('Não foi possível guardar. Tenta novamente.')
+      setError(t('layout.save_failed_retry'))
       setSaving(false)
     }
   }
@@ -46,7 +48,7 @@ function PhoneRequiredModal({ onSave, onDismiss }) {
       <div className="bg-surface rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-md p-6 animate-pop relative" onClick={(e) => e.stopPropagation()}>
         <button
           onClick={onDismiss}
-          aria-label="Fechar"
+          aria-label={t('layout.close')}
           className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full text-muted hover:bg-ink-50 hover:text-ink-900 transition-colors duration-fast"
         >
           <X size={18} />
@@ -54,9 +56,9 @@ function PhoneRequiredModal({ onSave, onDismiss }) {
         <div className="w-11 h-11 rounded-full bg-lime-400/15 text-lime-600 flex items-center justify-center mb-4">
           <Phone size={20} />
         </div>
-        <h3 className="text-lg text-ink-900 mb-1.5 pr-8">Queres adicionar o teu nº de telemóvel?</h3>
+        <h3 className="text-lg text-ink-900 mb-1.5 pr-8">{t('layout.phone_prompt_title')}</h3>
         <p className="text-sm text-muted mb-5">
-          É opcional — só é preciso se quiseres usar o bot do WhatsApp (para poderes escrever "In"/"Out" nos mixes). Podes sempre adicionar mais tarde no teu Perfil.
+          {t('layout.phone_prompt_body')}
         </p>
         <form onSubmit={handleSubmit} className="space-y-3">
           <input
@@ -64,7 +66,7 @@ function PhoneRequiredModal({ onSave, onDismiss }) {
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             className="input-field"
-            placeholder="912 345 678"
+            placeholder={t('layout.phone_placeholder')}
             autoFocus
           />
           {error && (
@@ -73,14 +75,14 @@ function PhoneRequiredModal({ onSave, onDismiss }) {
             </div>
           )}
           <PrimaryButton type="submit" disabled={saving} className="w-full">
-            {saving ? 'A guardar…' : 'Guardar'}
+            {saving ? t('layout.saving') : t('layout.save')}
           </PrimaryButton>
           <button
             type="button"
             onClick={onDismiss}
             className="w-full text-center text-ink-700 font-extrabold text-sm py-2"
           >
-            Agora não
+            {t('layout.not_now')}
           </button>
         </form>
       </div>
@@ -132,6 +134,7 @@ export default function Layout({ children }) {
   const location = useLocation()
   const navigate = useNavigate()
   const { signOut, profile, updateProfile, isAdminOfAny, isGuest } = useAuth()
+  const { t } = useTranslation()
 
   const today = new Date().toISOString().slice(0, 10)
   const [phonePromptDismissed, setPhonePromptDismissed] = useState(
@@ -218,24 +221,35 @@ export default function Layout({ children }) {
   // Avatar there instead of an icon (see isPerfil below).
   const navItems = isGuest
     ? [
-        { path: '/', icon: Home, label: 'Jogos' },
-        { path: '/perfil', label: 'Perfil' },
+        { path: '/', icon: Home, label: t('layout.nav_games') },
+        { path: '/perfil', label: t('layout.nav_profile') },
       ]
     : [
-        { path: '/', icon: Home, label: 'Jogos' },
-        { path: '/comunidade', icon: Users, label: 'Comunidade' },
-        { path: '/rankings', icon: Trophy, label: 'Rankings' },
-        { path: '/perfil', label: 'Perfil' },
+        { path: '/', icon: Home, label: t('layout.nav_games') },
+        { path: '/comunidade', icon: Users, label: t('layout.nav_community') },
+        { path: '/rankings', icon: Trophy, label: t('layout.nav_rankings') },
+        { path: '/perfil', label: t('layout.nav_profile') },
       ]
 
   if (isAdminOfAny || profile?.is_platform_admin) {
-    navItems.push({ path: '/gerir', icon: Settings, label: 'Gerir' })
+    navItems.push({ path: '/gerir', icon: Settings, label: t('layout.nav_manage') })
   }
 
   return (
-    <div className="min-h-screen bg-canvas pb-32">
+    // iOS standalone-PWA (WKWebView, not just Safari-in-a-tab) detaches a
+    // `fixed` + `backdrop-filter` element from the viewport during momentum
+    // scroll — the bottom nav used to be `position: fixed` over a
+    // document-that-scrolls, and two rounds of GPU-layer-promotion hacks on
+    // it (ec40839, c0c0407) didn't stop it recurring specifically in the
+    // installed app. Fix is structural, not another compositing hack: the
+    // document itself never scrolls (h-[100dvh] + overflow-hidden) — only
+    // `main` does. Nav stays a floating overlay (`absolute`, not `fixed`)
+    // anchored to this non-scrolling shell instead of the viewport, so it
+    // still hovers over the tail end of scrolled content like before, but
+    // there's no document-level momentum scroll left to detach it from.
+    <div className="relative flex flex-col h-screen bg-canvas overflow-hidden" style={{ height: '100dvh' }}>
       {/* Header — dark liquid glass */}
-      <header className="sticky top-0 z-10 bg-ink-900/95 backdrop-blur-xl border-b border-white/5 supports-[backdrop-filter]:bg-ink-900/85">
+      <header className="shrink-0 z-10 bg-ink-900/95 backdrop-blur-xl border-b border-white/5 supports-[backdrop-filter]:bg-ink-900/85">
         <div className="max-w-2xl mx-auto px-4 h-16 flex items-center justify-between">
           <Link to="/" className="leading-none">
             <Wordmark />
@@ -243,14 +257,14 @@ export default function Layout({ children }) {
 
           <div className="flex items-center gap-1">
             {profile?.rating != null && (
-              <Link to="/perfil" title="O teu nível" className="mr-2">
+              <Link to="/perfil" title={t('layout.your_level')} className="mr-2">
                 <RatingBadge rating={profile.rating} gender={profile.gender} me />
               </Link>
             )}
             <div className="relative">
               <button
                 onClick={() => setShowNotifications((v) => !v)}
-                title="Notificações"
+                title={t('layout.notifications')}
                 aria-expanded={showNotifications}
                 className="relative w-11 h-11 flex items-center justify-center rounded-full text-ink-200 hover:text-white hover:bg-white/10 transition-colors duration-fast"
               >
@@ -276,17 +290,17 @@ export default function Layout({ children }) {
                   <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
                   <div className="fixed top-[4.5rem] right-4 w-80 max-w-[85vw] bg-surface rounded-card shadow-lift ring-1 ring-line z-50 overflow-hidden animate-pop text-left">
                     <div className="px-4 py-3 border-b border-line">
-                      <p className="font-extrabold text-ink-900">Notificações</p>
+                      <p className="font-extrabold text-ink-900">{t('layout.notifications')}</p>
                     </div>
                     {notificationsTotal === 0 ? (
                       <div className="p-4 text-center">
-                        <p className="text-sm text-muted mb-3">Sem notificações novas</p>
+                        <p className="text-sm text-muted mb-3">{t('layout.no_new_notifications')}</p>
                         <Link
                           to="/perfil?tab=amigos"
                           onClick={() => setShowNotifications(false)}
                           className="inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast"
                         >
-                          Ver amigos
+                          {t('layout.view_friends')}
                         </Link>
                       </div>
                     ) : (
@@ -294,7 +308,7 @@ export default function Layout({ children }) {
                         {joinRequestsByOrg.map((org) => (
                           <Link
                             key={org.organizationId}
-                            to="/gerir"
+                            to={org.slug ? `/gerir/${org.slug}?tab=members` : '/gerir'}
                             onClick={() => setShowNotifications(false)}
                             className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50"
                           >
@@ -302,8 +316,7 @@ export default function Layout({ children }) {
                               <Users size={16} />
                             </div>
                             <p className="flex-1 min-w-0 text-sm text-ink-900">
-                              <span className="font-extrabold">{org.count}</span>{' '}
-                              {org.count === 1 ? 'pedido de entrada em' : 'pedidos de entrada em'}{' '}
+                              {t('layout.join_request_count', { count: org.count })}{' '}
                               <span className="font-extrabold">{org.name}</span>
                             </p>
                             <span aria-hidden="true" className="w-2 h-2 rounded-full bg-lime-400 shrink-0" />
@@ -318,7 +331,7 @@ export default function Layout({ children }) {
                           >
                             <Avatar name={inv.organization_name} url={inv.organization_logo_url} size="w-9 h-9 text-sm" />
                             <p className="flex-1 min-w-0 text-sm text-ink-900">
-                              Convite para entrar em <span className="font-extrabold">{inv.organization_name}</span>
+                              {t('layout.invited_to_join')} <span className="font-extrabold">{inv.organization_name}</span>
                             </p>
                             <span aria-hidden="true" className="w-2 h-2 rounded-full bg-lime-400 shrink-0" />
                           </Link>
@@ -332,7 +345,7 @@ export default function Layout({ children }) {
                           >
                             <Avatar name={req.requester_name} url={req.requester_avatar_url} size="w-9 h-9 text-sm" />
                             <p className="flex-1 min-w-0 text-sm text-ink-900">
-                              <span className="font-extrabold">{req.requester_name}</span> quer ser teu amigo
+                              <span className="font-extrabold">{req.requester_name}</span> {t('layout.wants_to_be_friends')}
                             </p>
                             <span aria-hidden="true" className="w-2 h-2 rounded-full bg-lime-400 shrink-0" />
                           </Link>
@@ -346,14 +359,14 @@ export default function Layout({ children }) {
             </div>
             <Link
               to="/instrucoes"
-              title="Instruções"
+              title={t('layout.instructions')}
               className="w-11 h-11 flex items-center justify-center rounded-full text-ink-200 hover:text-white hover:bg-white/10 transition-colors duration-fast"
             >
               <HelpCircle size={21} />
             </Link>
             <button
               onClick={handleSignOut}
-              title="Sair"
+              title={t('layout.sign_out')}
               className="w-11 h-11 flex items-center justify-center rounded-full text-ink-200 hover:text-white hover:bg-white/10 transition-colors duration-fast"
             >
               <LogOut size={21} />
@@ -362,27 +375,23 @@ export default function Layout({ children }) {
         </div>
       </header>
 
-      {/* Main */}
-      <main className="max-w-2xl mx-auto px-4 py-6 animate-fade-up">
-        {children}
+      {/* Main — the only scrolling region in the shell (see the app-shell
+          comment above the root div). pb-28 keeps the last bit of content
+          from hiding behind the nav overlay below. */}
+      <main className="flex-1 overflow-y-auto">
+        <div className="max-w-2xl mx-auto px-4 pt-6 pb-28 animate-fade-up">
+          {children}
+        </div>
       </main>
 
-      {/* Nav — floating dynamic island, liquid glass */}
-      {/* iOS Safari has a known bug where a `fixed` element containing a
-          `backdrop-filter` descendant detaches from the viewport during
-          momentum scrolling and drifts up the page with the content instead
-          of staying pinned. Promoting just this `nav` wrapper to its own
-          GPU layer (translateZ(0) below) wasn't enough to stop it recurring
-          — the backdrop-blur itself lives one level down, on the pill, so
-          that's the layer that actually needs forcing onto the GPU. Both
-          elements carry the hack now. */}
+      {/* Nav — floating dynamic island, liquid glass. `absolute` against the
+          non-scrolling shell (not `position: fixed` against the viewport)
+          — see the app-shell comment above — so it still overlaps the
+          bottom of the scrolled content instead of sitting in a blank strip
+          below it. */}
       <nav
-        className="fixed inset-x-0 z-20 flex justify-center pointer-events-none px-4"
-        style={{
-          bottom: 'calc(1rem + env(safe-area-inset-bottom))',
-          transform: 'translateZ(0)',
-          willChange: 'transform',
-        }}
+        className="absolute inset-x-0 bottom-0 z-20 flex justify-center pointer-events-none px-4 pt-2"
+        style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
       >
         <div
           className="pointer-events-auto flex items-center gap-0.5 p-1 rounded-full
@@ -390,11 +399,6 @@ export default function Layout({ children }) {
                         bg-ink-900/95 supports-[backdrop-filter]:bg-ink-900/90 backdrop-blur-xl
                         shadow-[0_8px_32px_rgba(11,37,69,0.35)]
                         ring-1 ring-white/10"
-          style={{
-            transform: 'translateZ(0)',
-            willChange: 'transform',
-            WebkitBackfaceVisibility: 'hidden',
-          }}
         >
           {navItems.map(({ path, icon: Icon, label }) => {
             const isActive = location.pathname === path

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Trophy, Award, Calendar } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -10,17 +11,18 @@ import { getGlobalRankings } from '../lib/privateMatches'
 import { getOrganizationRankings } from '../lib/organizations'
 
 const SECTIONS = [
-  { key: 'players', label: 'Jogadores' },
-  { key: 'orgs', label: 'Clubes' },
+  { key: 'players', labelKey: 'rankings.section_players' },
+  { key: 'orgs', labelKey: 'rankings.section_clubs' },
 ]
 
 const TABS = [
-  { key: 'global', label: 'Geral' },
-  { key: 'geral', label: 'Por Clube' },
-  { key: 'mensal', label: 'Mensal' },
+  { key: 'global', labelKey: 'rankings.tab_global' },
+  { key: 'geral', labelKey: 'rankings.tab_by_club' },
+  { key: 'mensal', labelKey: 'rankings.tab_monthly' },
 ]
 
 export default function Rankings() {
+  const { t, i18n } = useTranslation()
   const { currentOrganizationId, currentOrganization, memberships, switchOrganization } = useAuth()
   const [section, setSection] = useState('players')
   const [tab, setTab] = useState('global')
@@ -54,7 +56,8 @@ export default function Rankings() {
     }
     loadRankings()
     loadMonthly()
-  }, [currentOrganizationId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentOrganizationId, i18n.language])
 
   // level/is_guest live on `memberships` now — this org's membership list,
   // reused across every load* function below.
@@ -115,7 +118,7 @@ export default function Rankings() {
         .eq('organization_id', currentOrganizationId)
 
       if (error) throw error
-      const built = buildMonthlyLeaderboard(data || [])
+      const built = buildMonthlyLeaderboard(data || [], i18n.language)
       setMonthly(built)
       setSelectedMonth(prev => prev || built.months[0]?.key || null)
     } catch (error) {
@@ -168,7 +171,7 @@ export default function Rankings() {
         {tab === 'geral' && memberships.length <= 1 && (
           <p className="text-muted text-sm mb-0.5">{currentOrganization?.name}</p>
         )}
-        <h2 className="text-3xl text-ink-900">Classificação</h2>
+        <h2 className="text-3xl text-ink-900">{t('rankings.title')}</h2>
       </div>
 
       {/* Sections — Jogadores vs Clubes & Grupos */}
@@ -181,7 +184,7 @@ export default function Rankings() {
               section === s.key ? 'bg-canvas text-ink-900 shadow-lift border border-line' : 'text-muted hover:text-ink-900'
             }`}
           >
-            {s.label}
+            {t(s.labelKey)}
           </button>
         ))}
       </div>
@@ -192,12 +195,11 @@ export default function Rankings() {
           <details> keeps this tap-friendly on mobile with zero extra JS. */}
       <details className="card group">
         <summary className="text-sm font-extrabold text-ink-900 cursor-pointer select-none list-none flex items-center justify-between">
-          Como funcionam os níveis?
+          {t('rankings.levels_explainer_title')}
           <span className="text-muted transition-transform duration-fast group-open:rotate-180">⌄</span>
         </summary>
         <p className="text-sm text-muted mt-2">
-          O nível vai de 1 (mais alto) a 6 (mais baixo); abaixo disso aparece "INI" (iniciante). A letra indica o género
-          (M ou F) ou, num clube ou grupo, a média dos membros (N).
+          {t('rankings.levels_explainer_body')}
         </p>
       </details>
 
@@ -205,15 +207,15 @@ export default function Rankings() {
       <>
       {/* Tabs */}
       <div className="flex gap-1 p-1 bg-ink-50 rounded-ctrl">
-        {TABS.map(t => (
+        {TABS.map(tabDef => (
           <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
+            key={tabDef.key}
+            onClick={() => setTab(tabDef.key)}
             className={`flex-1 py-2.5 rounded-ctrl text-sm font-extrabold transition-all duration-fast ${
-              tab === t.key ? 'bg-canvas text-ink-900 shadow-lift border border-line' : 'text-muted hover:text-ink-900'
+              tab === tabDef.key ? 'bg-canvas text-ink-900 shadow-lift border border-line' : 'text-muted hover:text-ink-900'
             }`}
           >
-            {t.label}
+            {t(tabDef.labelKey)}
           </button>
         ))}
       </div>
@@ -235,8 +237,8 @@ export default function Rankings() {
           {rankings.length === 0 ? (
             <EmptyState
               icon={Award}
-              title="Ranking em branco"
-              subtitle="Joga uns quantos jogos e o teu nome aparece aqui."
+              title={t('rankings.empty_general_title')}
+              subtitle={t('rankings.empty_general_subtitle')}
             />
           ) : (
             <div className="space-y-3">
@@ -260,7 +262,7 @@ export default function Rankings() {
                       <div className="mt-0.5 flex items-center gap-2">
                         <RatingBadge rating={player.rating} gender={player.gender} />
                         <span className="text-[11px] text-muted">
-                          🏆 {player.mix_wins || 0}/{player.mixes_played || 0} mixes
+                          🏆 {t('rankings.mix_wins_ratio', { wins: player.mix_wins || 0, played: player.mixes_played || 0 })}
                         </span>
                       </div>
                     </div>
@@ -272,22 +274,22 @@ export default function Rankings() {
                           {formatRating(player.rating)}
                         </span>
                       </div>
-                      <p className="text-[11px] text-muted">pontos</p>
+                      <p className="text-[11px] text-muted">{t('rankings.points_label')}</p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-3 gap-3 mt-4 pt-3.5 border-t border-line text-center">
                     <div>
                       <p className="text-lg font-extrabold text-ok tabular-nums">{player.game_wins || 0}</p>
-                      <p className="text-[11px] text-muted">jogos ganhos</p>
+                      <p className="text-[11px] text-muted">{t('rankings.wins_label')}</p>
                     </div>
                     <div>
                       <p className="text-lg font-extrabold text-danger tabular-nums">{player.game_losses || 0}</p>
-                      <p className="text-[11px] text-muted">jogos perdidos</p>
+                      <p className="text-[11px] text-muted">{t('rankings.losses_label')}</p>
                     </div>
                     <div>
                       <p className="text-lg font-extrabold text-ink-700 tabular-nums">{player.winRate}%</p>
-                      <p className="text-[11px] text-muted">taxa vitória</p>
+                      <p className="text-[11px] text-muted">{t('rankings.win_rate_label')}</p>
                     </div>
                   </div>
                 </Link>
@@ -303,8 +305,8 @@ export default function Rankings() {
           {monthly.months.length === 0 ? (
             <EmptyState
               icon={Calendar}
-              title="Sem dados mensais"
-              subtitle="Assim que um mix terminar, o mês aparece aqui."
+              title={t('rankings.empty_monthly_title')}
+              subtitle={t('rankings.empty_monthly_subtitle')}
             />
           ) : (
             <>
@@ -335,26 +337,26 @@ export default function Rankings() {
                       <div className="flex-1 min-w-0">
                         <h3 className="text-base text-ink-900 truncate">{p.user?.name || '—'}</h3>
                         <p className="text-[11px] text-muted mt-0.5">
-                          {p.participations} {p.participations === 1 ? 'mix' : 'mixes'} • 🏆 {p.mixesWon} ganho{p.mixesWon === 1 ? '' : 's'}
+                          {t('rankings.mix_count', { count: p.participations })} • 🏆 {t('rankings.mixes_won_count', { count: p.mixesWon })}
                         </p>
                       </div>
                       <div className="text-right shrink-0">
                         <p className="text-2xl font-extrabold text-ink-900 tabular-nums">{p.points > 0 ? `+${p.points}` : p.points}</p>
-                        <p className="text-[11px] text-muted">pontos</p>
+                        <p className="text-[11px] text-muted">{t('rankings.points_label')}</p>
                       </div>
                     </div>
                     <div className="grid grid-cols-3 gap-3 mt-4 pt-3.5 border-t border-line text-center">
                       <div>
                         <p className="text-lg font-extrabold text-ok tabular-nums">{p.victories}</p>
-                        <p className="text-[11px] text-muted">vitórias</p>
+                        <p className="text-[11px] text-muted">{t('rankings.victories_label')}</p>
                       </div>
                       <div>
                         <p className="text-lg font-extrabold text-ink-700 tabular-nums">{p.played}</p>
-                        <p className="text-[11px] text-muted">jogos</p>
+                        <p className="text-[11px] text-muted">{t('rankings.games_played_label')}</p>
                       </div>
                       <div>
                         <p className="text-lg font-extrabold text-ink-700 tabular-nums">{p.winRate}%</p>
-                        <p className="text-[11px] text-muted">taxa vitória</p>
+                        <p className="text-[11px] text-muted">{t('rankings.win_rate_label')}</p>
                       </div>
                     </div>
                   </Link>
@@ -374,8 +376,8 @@ export default function Rankings() {
         ) : globalRankings.length === 0 ? (
           <EmptyState
             icon={Trophy}
-            title="Ranking global em branco"
-            subtitle="Joga mixes ou jogos entre amigos para apareceres aqui."
+            title={t('rankings.empty_global_title')}
+            subtitle={t('rankings.empty_global_subtitle')}
           />
         ) : (
           <div className="space-y-3">
@@ -394,13 +396,13 @@ export default function Rankings() {
                     <div className="mt-0.5 flex items-center gap-2">
                       <RatingBadge rating={player.rating} gender={player.gender} />
                       <span className="text-[11px] text-muted truncate">
-                        🏆 {player.mix_wins || 0}/{player.mixes_played || 0} mixes
+                        🏆 {t('rankings.mix_wins_ratio', { wins: player.mix_wins || 0, played: player.mixes_played || 0 })}
                       </span>
                     </div>
                   </div>
                   <div className="text-right shrink-0">
                     <span className="text-2xl font-extrabold text-ink-900 tabular-nums">{formatRating(player.rating)}</span>
-                    <p className="text-[11px] text-muted">pontos</p>
+                    <p className="text-[11px] text-muted">{t('rankings.points_label')}</p>
                   </div>
                 </div>
               </Link>
@@ -420,8 +422,8 @@ export default function Rankings() {
         ) : orgRankings.length === 0 ? (
           <EmptyState
             icon={Trophy}
-            title="Ranking em branco"
-            subtitle="Assim que um clube público tiver jogos, aparece aqui."
+            title={t('rankings.empty_general_title')}
+            subtitle={t('rankings.empty_clubs_subtitle')}
           />
         ) : (
           <div className="space-y-3">
@@ -439,11 +441,11 @@ export default function Rankings() {
                   <div className="flex-1 min-w-0">
                     <h3 className="text-base text-ink-900 truncate">{org.name}</h3>
                     <p className="text-[11px] text-muted mt-0.5">
-                      Clube · {org.member_count} {org.member_count === 1 ? 'membro' : 'membros'}
+                      {t('rankings.club_member_count', { count: org.member_count })}
                     </p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-[11px] text-muted mb-1">Nível do Clube</p>
+                    <p className="text-[11px] text-muted mb-1">{t('rankings.club_level_label')}</p>
                     <GroupLevelBadge rating={org.avg_rating} size="md" />
                   </div>
                 </div>

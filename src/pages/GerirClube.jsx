@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, useSearchParams, Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Plus, Calendar, Users, Trash2, Edit2, Check, X, UserX, Repeat, Clock, ArrowLeft, Camera, Settings, Copy } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -8,13 +9,14 @@ import { uploadClubLogo, removeClubLogo } from '../lib/clubLogoStorage'
 import { createGroup } from '../lib/platformAdmin'
 import { listClubGroups } from '../lib/organizations'
 import { formatRating } from '../lib/elo'
+import { formatDate as formatDateLib } from '../lib/formatDate'
 import { DateField, DateTimeField, Avatar } from '../components/ui'
-import { totalRounds, FORMAT_LABEL } from '../lib/mixLogic'
+import { totalRounds, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY } from '../lib/mixLogic'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
 import PlayerSearch from '../components/PlayerSearch'
 import { searchPlayers } from '../lib/privateMatches'
 import { inviteToOrganization } from '../lib/orgInvites'
-import { DAY_LABEL, listPendingTeacherRequests, approveTeacherProfile, rejectTeacherProfile } from '../lib/teachers'
+import { DAY_LABEL_KEY, listPendingTeacherRequests, approveTeacherProfile, rejectTeacherProfile } from '../lib/teachers'
 
 const sanitizeSlug = (value) => value.toLowerCase().replace(/[^a-z0-9-]/g, '')
 
@@ -37,32 +39,36 @@ const GAME_TIMES = [
   { value: 20, label: '20min' },
   { value: 30, label: '30min' },
 ]
+// Labels resolve via mixLogic's FORMAT_LABEL_KEY/GENDER_RESTRICTION_LABEL_KEY
+// — the same keys the games list (below) and GameDetails.jsx use for these
+// same enum values, so a format/restriction reads identically everywhere
+// instead of drifting into two different English labels for one value.
 const FORMATS = [
-  { value: 'sobe_desce', label: 'Sobe e desce' },
-  { value: 'todos_contra_todos', label: 'Todos contra todos' },
+  { value: 'sobe_desce', labelKey: FORMAT_LABEL_KEY.sobe_desce },
+  { value: 'todos_contra_todos', labelKey: FORMAT_LABEL_KEY.todos_contra_todos },
 ]
 const GENDER_RESTRICTIONS = [
-  { value: 'indiferente', label: 'Indiferente' },
-  { value: 'misto', label: 'Misto' },
-  { value: 'masculino', label: 'Só homens' },
-  { value: 'feminino', label: 'Só mulheres' },
+  { value: 'indiferente', labelKey: GENDER_RESTRICTION_LABEL_KEY.indiferente },
+  { value: 'misto', labelKey: GENDER_RESTRICTION_LABEL_KEY.misto },
+  { value: 'masculino', labelKey: GENDER_RESTRICTION_LABEL_KEY.masculino },
+  { value: 'feminino', labelKey: GENDER_RESTRICTION_LABEL_KEY.feminino },
 ]
 const RECURRENCE_FREQUENCIES = [
-  { value: 'daily', label: 'Diariamente' },
-  { value: 'weekly', label: 'Semanalmente' },
-  { value: 'monthly', label: 'Mensalmente' },
-  { value: 'yearly', label: 'Anualmente' },
+  { value: 'daily', labelKey: 'gerirclube.freq_daily' },
+  { value: 'weekly', labelKey: 'gerirclube.freq_weekly' },
+  { value: 'monthly', labelKey: 'gerirclube.freq_monthly' },
+  { value: 'yearly', labelKey: 'gerirclube.freq_yearly' },
 ]
 const RECURRENCE_ENDS = [
-  { value: 'never', label: 'Nunca' },
-  { value: 'on_date', label: 'Até uma data' },
-  { value: 'after_occurrences', label: 'Após X ocorrências' },
+  { value: 'never', labelKey: 'gerirclube.ends_never' },
+  { value: 'on_date', labelKey: 'gerirclube.ends_on_date' },
+  { value: 'after_occurrences', labelKey: 'gerirclube.ends_after_occurrences' },
 ]
 
 const DONE_STATUSES = ['finished', 'completed', 'cancelled']
 const GAME_FILTERS = [
-  { value: 'upcoming', label: 'A decorrer / Futuros' },
-  { value: 'finished', label: 'Terminados' },
+  { value: 'upcoming', labelKey: 'gerirclube.filter_upcoming' },
+  { value: 'finished', labelKey: 'gerirclube.filter_finished' },
 ]
 
 const EMPTY_RECURRENCE = {
@@ -113,11 +119,16 @@ function Segmented({ options, value, onChange }) {
 }
 
 export default function GerirClube() {
+  const { t, i18n } = useTranslation()
   const { slug } = useParams()
+  const [searchParams] = useSearchParams()
   const { profile: currentUser, memberships, adminOrganizations, isPrivateMatchesEnabled, refreshFeatureFlags, ensureOrgAdminAccess, refreshMemberships, followOrganization } = useAuth()
   const [org, setOrg] = useState(null)
   const [orgLoading, setOrgLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('games') // 'games', 'members', 'settings'
+  // Deep-linked via ?tab=members — e.g. the join-request notification in
+  // Layout.jsx sends admins straight to the tab that has the pending
+  // request, instead of dropping them on the hub to hunt for it.
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') === 'members' ? 'members' : 'games')
   const [games, setGames] = useState([])
   const [members, setMembers] = useState([])
   const [linkCopied, setLinkCopied] = useState(false)
@@ -155,6 +166,15 @@ export default function GerirClube() {
   const [expandedGroupRequests, setExpandedGroupRequests] = useState([])
   const [expandedGroupLoading, setExpandedGroupLoading] = useState(false)
   const [groupActingOn, setGroupActingOn] = useState(null)
+
+  // Translated versions of the module-level option lists above — built here
+  // (inside the component, where `t` is in scope) rather than at module
+  // scope, so a language switch re-renders them with the new labels.
+  const translatedFormats = FORMATS.map((f) => ({ value: f.value, label: t(f.labelKey) }))
+  const translatedGenderRestrictions = GENDER_RESTRICTIONS.map((g) => ({ value: g.value, label: t(g.labelKey) }))
+  const translatedRecurrenceFrequencies = RECURRENCE_FREQUENCIES.map((f) => ({ value: f.value, label: t(f.labelKey) }))
+  const translatedRecurrenceEnds = RECURRENCE_ENDS.map((e) => ({ value: e.value, label: t(e.labelKey) }))
+  const translatedGameFilters = GAME_FILTERS.map((f) => ({ value: f.value, label: t(f.labelKey) }))
 
   useGooglePlacesAutocomplete(
     locationInputRef,
@@ -257,7 +277,7 @@ export default function GerirClube() {
       await loadTeacherRequests()
     } catch (error) {
       console.error('Error approving teacher request:', error)
-      alert('Erro ao aprovar pedido de professor: ' + error.message)
+      alert(t('gerirclube.error_approve_teacher_request') + error.message)
     }
   }
 
@@ -267,7 +287,7 @@ export default function GerirClube() {
       await loadTeacherRequests()
     } catch (error) {
       console.error('Error rejecting teacher request:', error)
-      alert('Erro ao rejeitar pedido de professor: ' + error.message)
+      alert(t('gerirclube.error_reject_teacher_request') + error.message)
     }
   }
 
@@ -316,7 +336,7 @@ export default function GerirClube() {
       const merged = (membersRes.data || [])
         .map((m) => ({
           id: m.user_id,
-          name: m.profile?.name || 'Jogador',
+          name: m.profile?.name || t('gerirclube.fallback_player_name'),
           is_admin: m.is_admin,
           level: m.level,
           avatar_url: m.profile?.avatar_url,
@@ -327,7 +347,7 @@ export default function GerirClube() {
       setExpandedGroupRequests(requestsRes.data || [])
     } catch (error) {
       console.error('Error loading group details:', error)
-      alert('Erro ao carregar detalhes do grupo: ' + error.message)
+      alert(t('gerirclube.error_load_group_details') + error.message)
     } finally {
       setExpandedGroupLoading(false)
     }
@@ -351,7 +371,7 @@ export default function GerirClube() {
       await Promise.all([loadClubGroups(), loadExpandedGroupDetails(groupId)])
     } catch (error) {
       console.error('Error approving group request:', error)
-      alert('Erro ao aprovar pedido: ' + error.message)
+      alert(t('gerirclube.error_approve_request') + error.message)
     }
   }
 
@@ -362,7 +382,7 @@ export default function GerirClube() {
       await loadExpandedGroupDetails(groupId)
     } catch (error) {
       console.error('Error rejecting group request:', error)
-      alert('Erro ao rejeitar pedido: ' + error.message)
+      alert(t('gerirclube.error_reject_request') + error.message)
     }
   }
 
@@ -374,7 +394,7 @@ export default function GerirClube() {
       await loadClubGroups()
     } catch (error) {
       console.error('Error requesting to join group:', error)
-      alert(error.message || 'Não foi possível pedir para entrar. Tenta novamente.')
+      alert(error.message || t('gerirclube.error_join_group_fallback'))
     } finally {
       setGroupActingOn(null)
     }
@@ -430,7 +450,7 @@ export default function GerirClube() {
       setGames(data || [])
     } catch (error) {
       console.error('Error in loadGames:', error)
-      alert('Erro ao carregar jogos: ' + error.message)
+      alert(t('gerirclube.error_load_games') + error.message)
     }
   }
 
@@ -452,7 +472,7 @@ export default function GerirClube() {
     const merged = (data || [])
       .map((m) => ({
         id: m.user_id,
-        name: m.profile?.name || 'Jogador',
+        name: m.profile?.name || t('gerirclube.fallback_player_name'),
         is_admin: m.is_admin,
         is_guest: m.is_guest,
         level: m.level,
@@ -482,7 +502,7 @@ export default function GerirClube() {
       await Promise.all([loadMembers(), loadRequests()])
     } catch (error) {
       console.error('Error approving request:', error)
-      alert('Erro ao aprovar pedido: ' + error.message)
+      alert(t('gerirclube.error_approve_request') + error.message)
     }
   }
 
@@ -493,17 +513,17 @@ export default function GerirClube() {
       await loadRequests()
     } catch (error) {
       console.error('Error rejecting request:', error)
-      alert('Erro ao rejeitar pedido: ' + error.message)
+      alert(t('gerirclube.error_reject_request') + error.message)
     }
   }
 
   const handleInvitePlayer = async (player) => {
     try {
       const status = await inviteToOrganization(org.id, player.id)
-      alert(status === 'pending' ? `Convite enviado a ${player.name}.` : `${player.name} já tinha um convite pendente.`)
+      alert(status === 'pending' ? t('gerirclube.invite_sent', { name: player.name }) : t('gerirclube.invite_already_pending', { name: player.name }))
     } catch (error) {
       console.error('Error inviting player:', error)
-      alert(error.message?.includes('já é membro') ? `${player.name} já é membro deste clube.` : 'Não foi possível enviar o convite.')
+      alert(error.message?.includes('já é membro') ? t('gerirclube.already_member', { name: player.name }) : t('gerirclube.error_invite_failed'))
     }
   }
 
@@ -515,7 +535,7 @@ export default function GerirClube() {
       setTimeout(() => setLinkCopied(false), 2000)
     } catch (error) {
       console.error('Error copying invite link:', error)
-      alert('Não foi possível copiar o link.')
+      alert(t('gerirclube.error_copy_invite_link'))
     }
   }
 
@@ -596,12 +616,12 @@ export default function GerirClube() {
   const validateRecurrence = (recurrence) => {
     if (!recurrence.enabled) return null
     if (!recurrence.launchDaysBefore || parseInt(recurrence.launchDaysBefore, 10) < 1) {
-      return 'Indica quantos dias antes o mix deve ser lançado'
+      return t('gerirclube.validate_launch_days_before')
     }
-    if (!recurrence.launchTime) return 'Escolhe a que horas o mix deve ser lançado'
-    if (recurrence.endsType === 'on_date' && !recurrence.endsOn) return 'Escolhe a data em que a recorrência termina'
+    if (!recurrence.launchTime) return t('gerirclube.validate_launch_time')
+    if (recurrence.endsType === 'on_date' && !recurrence.endsOn) return t('gerirclube.validate_end_date')
     if (recurrence.endsType === 'after_occurrences' && (!recurrence.endsAfterOccurrences || parseInt(recurrence.endsAfterOccurrences, 10) < 1)) {
-      return 'Indica um número de ocorrências válido'
+      return t('gerirclube.validate_occurrences_count')
     }
     return null
   }
@@ -626,7 +646,7 @@ export default function GerirClube() {
 
     if (recurrenceError) {
       console.error('Error creating recurrence:', recurrenceError)
-      alert('O Mix foi criado, mas não foi possível ativar a recorrência: ' + recurrenceError.message)
+      alert(t('gerirclube.error_recurrence_activate_failed') + recurrenceError.message)
       return
     }
 
@@ -637,7 +657,7 @@ export default function GerirClube() {
 
     if (linkError) {
       console.error('Error linking game to recurrence:', linkError)
-      alert('O Mix foi criado, mas não foi possível ligá-lo à recorrência: ' + linkError.message)
+      alert(t('gerirclube.error_recurrence_link_failed') + linkError.message)
       return
     }
 
@@ -689,7 +709,7 @@ export default function GerirClube() {
 
     if (pendingError) {
       console.error('Error pre-creating next occurrence:', pendingError)
-      alert('O Mix e a recorrência foram criados, mas não foi possível pré-criar o próximo Mix: ' + pendingError.message)
+      alert(t('gerirclube.error_recurrence_precreate_failed') + pendingError.message)
       return
     }
 
@@ -711,7 +731,7 @@ export default function GerirClube() {
     // Date used to be enforced by DateTimeField's underlying native
     // input's `required` attribute — it's a fully custom component now.
     if (!gameForm.date) {
-      alert('Escolhe uma data e hora para o jogo')
+      alert(t('gerirclube.validate_date_required'))
       return
     }
 
@@ -780,9 +800,9 @@ export default function GerirClube() {
       // is one combined message covering both caps rather than a guess.
       const message = error?.message || ''
       if (org?.self_serve && message.toLowerCase().includes('row-level security policy')) {
-        alert('Este mix excede os limites do grupo self-serve (máx. 3 mixes ativos em simultâneo, 4 campos por mix).')
+        alert(t('gerirclube.error_self_serve_limit'))
       } else {
-        alert('Erro ao criar jogo: ' + error.message)
+        alert(t('gerirclube.error_create_game') + error.message)
       }
     }
   }
@@ -804,7 +824,7 @@ export default function GerirClube() {
 
     if (error) {
       console.error('Error updating recurrence:', error)
-      alert('O Mix foi atualizado, mas não foi possível atualizar a recorrência: ' + error.message)
+      alert(t('gerirclube.error_recurrence_update_failed') + error.message)
       return
     }
 
@@ -831,7 +851,7 @@ export default function GerirClube() {
 
     if (launchUpdateError) {
       console.error('Error updating pending occurrence launch time:', launchUpdateError)
-      alert('A recorrência foi atualizada, mas não foi possível atualizar a hora de lançamento do próximo Mix: ' + launchUpdateError.message)
+      alert(t('gerirclube.error_recurrence_launch_update_failed') + launchUpdateError.message)
     }
   }
 
@@ -873,7 +893,7 @@ export default function GerirClube() {
       loadGames()
     } catch (error) {
       console.error('Error toggling recurrence pause:', error)
-      alert('Erro ao atualizar a recorrência: ' + error.message)
+      alert(t('gerirclube.error_update_recurrence') + error.message)
     }
   }
 
@@ -881,7 +901,7 @@ export default function GerirClube() {
     e.preventDefault()
 
     if (!gameForm.date) {
-      alert('Escolhe uma data e hora para o jogo')
+      alert(t('gerirclube.validate_date_required'))
       return
     }
 
@@ -937,7 +957,7 @@ export default function GerirClube() {
         // already pre-created pending occurrence. Confirmed explicitly —
         // this is destructive and easy to trigger by accident (e.g. a stray
         // click on the checkbox before an unrelated edit).
-        if (confirm('Desativar a recorrência deste Mix? O próximo Mix pendente (ainda não lançado) será removido.')) {
+        if (confirm(t('gerirclube.confirm_deactivate_recurrence'))) {
           await deactivateRecurrence(editingGame.recurrence.id)
         }
       } else if (!hadActiveRecurrence && recurrence.enabled) {
@@ -956,15 +976,15 @@ export default function GerirClube() {
       // bare "Erro ao atualizar jogo" the admin can't act on.
       const message = error?.message || ''
       if (org?.self_serve && message.toLowerCase().includes('row-level security policy')) {
-        alert('Este mix excede os limites do grupo self-serve (máx. 3 mixes ativos em simultâneo, 4 campos por mix).')
+        alert(t('gerirclube.error_self_serve_limit'))
       } else {
-        alert('Erro ao atualizar jogo')
+        alert(t('gerirclube.error_update_game'))
       }
     }
   }
 
   const handleDeleteGame = async (gameId) => {
-    if (!confirm('Tens a certeza que queres eliminar este jogo?')) return
+    if (!confirm(t('gerirclube.confirm_delete_game'))) return
 
     try {
       const gameToDelete = games.find(g => g.id === gameId)
@@ -983,30 +1003,30 @@ export default function GerirClube() {
         await deactivateRecurrence(gameToDelete.recurrence_id)
       }
 
-      alert('Jogo eliminado com sucesso!')
+      alert(t('gerirclube.game_deleted_success'))
       loadGames()
     } catch (error) {
       console.error('Error deleting game:', error)
-      alert('Erro ao eliminar jogo')
+      alert(t('gerirclube.error_delete_game'))
     }
   }
 
   const handleStopRecurrence = async (recurrenceId) => {
-    if (!confirm('Parar esta recorrência? Os Mixes já criados mantêm-se; o próximo Mix pendente (ainda não lançado) será removido; não serão criados mais Mixes automaticamente.')) return
+    if (!confirm(t('gerirclube.confirm_stop_recurrence'))) return
 
     try {
       await deactivateRecurrence(recurrenceId)
       loadGames()
     } catch (error) {
       console.error('Error stopping recurrence:', error)
-      alert('Erro ao parar a recorrência: ' + error.message)
+      alert(t('gerirclube.error_stop_recurrence') + error.message)
     }
   }
 
   const handleToggleAdmin = async (userId, currentStatus) => {
     const confirmMessage = currentStatus
-      ? 'Retirar as permissões de admin a este membro?'
-      : 'Tornar este membro admin? Vai passar a poder gerir o clube.'
+      ? t('gerirclube.confirm_revoke_admin')
+      : t('gerirclube.confirm_grant_admin')
     if (!confirm(confirmMessage)) return
 
     try {
@@ -1018,19 +1038,16 @@ export default function GerirClube() {
 
       if (error) throw error
 
-      alert('Permissões atualizadas com sucesso!')
+      alert(t('gerirclube.admin_permissions_updated'))
       loadMembers()
     } catch (error) {
       console.error('Error updating admin status:', error)
-      alert('Erro ao atualizar permissões: ' + error.message)
+      alert(t('gerirclube.error_update_permissions') + error.message)
     }
   }
 
   const handleDeleteUser = async (member) => {
-    if (!confirm(
-      `Remover ${member.name} deste clube?\n\n` +
-      `A conta e as inscrições/estatísticas noutros clubes (se os houver) mantêm-se — isto só remove a ligação a este clube.`
-    )) return
+    if (!confirm(t('gerirclube.confirm_remove_member', { name: member.name }))) return
 
     try {
       const { error } = await supabase.rpc('admin_remove_member', {
@@ -1041,7 +1058,7 @@ export default function GerirClube() {
       loadMembers()
     } catch (error) {
       console.error('Error removing member:', error)
-      alert('Erro ao remover membro: ' + error.message)
+      alert(t('gerirclube.error_remove_member') + error.message)
     }
   }
 
@@ -1058,7 +1075,7 @@ export default function GerirClube() {
       setSettings((s) => ({ ...s, group_logo_url }))
     } catch (error) {
       console.error('Error uploading club logo:', error)
-      setLogoError('Não foi possível enviar o logo. Tenta novamente.')
+      setLogoError(t('gerirclube.error_logo_upload'))
     } finally {
       setUploadingLogo(false)
     }
@@ -1074,7 +1091,7 @@ export default function GerirClube() {
       setSettings((s) => ({ ...s, group_logo_url: null }))
     } catch (error) {
       console.error('Error removing club logo:', error)
-      setLogoError('Não foi possível remover o logo. Tenta novamente.')
+      setLogoError(t('gerirclube.error_logo_remove'))
     } finally {
       setUploadingLogo(false)
     }
@@ -1103,10 +1120,10 @@ export default function GerirClube() {
       if (error) throw error
 
       setOrg((o) => ({ ...o, name: settings.name }))
-      alert('Definições atualizadas com sucesso!')
+      alert(t('gerirclube.settings_updated_success'))
     } catch (error) {
       console.error('Error updating settings:', error)
-      alert('Erro ao atualizar definições')
+      alert(t('gerirclube.error_update_settings'))
     }
   }
 
@@ -1129,7 +1146,7 @@ export default function GerirClube() {
       setEditingName(false)
     } catch (error) {
       console.error('Error renaming organization:', error)
-      alert('Não foi possível atualizar o nome. Tenta novamente.')
+      alert(t('gerirclube.error_rename_org'))
     } finally {
       setRenamingOrg(false)
     }
@@ -1146,7 +1163,7 @@ export default function GerirClube() {
       await refreshFeatureFlags()
     } catch (error) {
       console.error('Error toggling private matches flag:', error)
-      alert('Erro ao atualizar funcionalidade: ' + error.message)
+      alert(t('gerirclube.error_toggle_feature') + error.message)
     } finally {
       setSavingFlag(false)
     }
@@ -1171,27 +1188,26 @@ export default function GerirClube() {
       console.error('Error creating group:', error)
       const message = error?.message || ''
       if (message.toLowerCase().includes('duplicate key value violates unique constraint') || message.toLowerCase().includes('slug')) {
-        setGroupError('Já existe um clube ou grupo com este identificador — escolhe outro')
+        setGroupError(t('gerirclube.error_duplicate_group_slug'))
       } else {
         // The RPC's own RAISE EXCEPTION messages are already pt-PT, so show
         // them verbatim rather than hiding the real reason behind a generic
         // "tenta novamente" the admin can't act on.
-        setGroupError(message || 'Não foi possível criar o grupo. Tenta novamente.')
+        setGroupError(message || t('gerirclube.error_create_group_fallback'))
       }
     } finally {
       setCreatingGroup(false)
     }
   }
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleString('pt-PT', {
+  const formatDate = (dateString) =>
+    formatDateLib(dateString, i18n.language, {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
     })
-  }
 
   const startEditGame = (game) => {
     setEditingGame(game)
@@ -1236,12 +1252,12 @@ export default function GerirClube() {
   if (!org) {
     return (
       <div className="card text-center py-12 px-6">
-        <h2 className="text-xl text-ink-900 mb-2">Sem acesso</h2>
+        <h2 className="text-xl text-ink-900 mb-2">{t('gerirclube.no_access_title')}</h2>
         <p className="text-muted text-sm mb-6">
-          Ou este clube não existe, ou não és admin dele.
+          {t('gerirclube.no_access_subtitle')}
         </p>
         <Link to="/gerir" className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline">
-          <ArrowLeft size={16} /> Voltar aos clubes que geres
+          <ArrowLeft size={16} /> {t('gerirclube.back_to_managed_clubs')}
         </Link>
       </div>
     )
@@ -1252,14 +1268,14 @@ export default function GerirClube() {
       <div>
         {(adminOrganizations.length > 1 || currentUser?.is_platform_admin) && (
           <Link to="/gerir" className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline mb-2">
-            <ArrowLeft size={16} /> Voltar aos clubes que geres
+            <ArrowLeft size={16} /> {t('gerirclube.back_to_managed_clubs')}
           </Link>
         )}
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             {editingName ? (
               <div className="flex items-center gap-2">
-                <span className="text-3xl font-bold text-ink-900 shrink-0">Gerir:</span>
+                <span className="text-3xl font-bold text-ink-900 shrink-0">{t('gerirclube.manage_prefix')}</span>
                 <input
                   type="text"
                   value={nameInput}
@@ -1276,24 +1292,24 @@ export default function GerirClube() {
               </div>
             ) : (
               <h2 className="text-3xl font-bold text-ink-900 flex items-center gap-2 min-w-0">
-                <span className="truncate">Gerir: {org.name}</span>
+                <span className="truncate">{t('gerirclube.manage_prefix')} {org.name}</span>
                 <button
                   type="button"
                   onClick={() => { setNameInput(org.name); setEditingName(true) }}
-                  aria-label="Editar nome"
+                  aria-label={t('gerirclube.edit_name_aria')}
                   className="shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-muted hover:text-ink-900 hover:bg-ink-50 transition-colors duration-fast"
                 >
                   <Edit2 size={16} />
                 </button>
               </h2>
             )}
-            <p className="text-gray-600 mt-1">Jogos, membros e definições deste clube</p>
+            <p className="text-gray-600 mt-1">{t('gerirclube.subtitle')}</p>
           </div>
           <button
             type="button"
             onClick={() => setActiveTab('settings')}
-            title="Definições"
-            aria-label="Definições"
+            title={t('gerirclube.settings_label')}
+            aria-label={t('gerirclube.settings_label')}
             className="shrink-0 w-11 h-11 flex items-center justify-center rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast"
           >
             <Settings size={20} />
@@ -1314,7 +1330,7 @@ export default function GerirClube() {
             }`}
           >
             <Calendar size={16} />
-            Jogos
+            {t('gerirclube.tab_games')}
           </button>
           <button
             onClick={() => setActiveTab('members')}
@@ -1325,7 +1341,7 @@ export default function GerirClube() {
             }`}
           >
             <Users size={16} />
-            Membros
+            {t('gerirclube.tab_members')}
             {requests.length > 0 && (
               <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-lime-400 text-ink-900 text-[11px] font-extrabold tabular-nums">
                 {requests.length}
@@ -1349,19 +1365,19 @@ export default function GerirClube() {
                 className="btn-primary w-full flex items-center justify-center gap-2"
               >
                 <Plus size={20} />
-                Criar novo jogo
+                {t('gerirclube.create_game')}
               </button>
 
               {createdMixScope && (
                 <div className="card bg-lime-50 border border-lime-200 flex items-center justify-between gap-3">
                   <p className="text-sm text-ink-900">
-                    Mix criado no grupo <strong>{createdMixScope.name}</strong>.
+                    {t('gerirclube.mix_created_in_group')} <strong>{createdMixScope.name}</strong>.
                   </p>
                   <Link
                     to={`/gerir/${createdMixScope.slug}`}
                     className="text-xs font-extrabold text-lime-700 hover:underline whitespace-nowrap shrink-0"
                   >
-                    Ver mix →
+                    {t('gerirclube.view_mix_link')}
                   </Link>
                 </div>
               )}
@@ -1370,20 +1386,20 @@ export default function GerirClube() {
               {(showCreateGame || editingGame) && (
                 <div className="card bg-blue-50 border-2 border-blue-200">
                   <h3 className="text-xl font-semibold text-ink-900 mb-4">
-                    {editingGame ? 'Editar jogo' : 'Criar novo jogo'}
+                    {editingGame ? t('gerirclube.edit_game_title') : t('gerirclube.create_game')}
                   </h3>
                   <form onSubmit={editingGame ? handleUpdateGame : handleCreateGame} className="space-y-4">
                     {!editingGame && clubGroups.some((g) => g.can_manage) && (
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Âmbito
+                          {t('gerirclube.scope_label')}
                         </label>
                         <select
                           value={mixScopeId}
                           onChange={(e) => setMixScopeId(e.target.value)}
                           className="input-field"
                         >
-                          <option value="">Todo o clube</option>
+                          <option value="">{t('gerirclube.scope_whole_club')}</option>
                           {clubGroups.filter((g) => g.can_manage).map((g) => (
                             <option key={g.id} value={g.id}>{g.name}</option>
                           ))}
@@ -1393,21 +1409,21 @@ export default function GerirClube() {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Título
+                        {t('gerirclube.title_label')}
                       </label>
                       <input
                         type="text"
                         value={gameForm.title}
                         onChange={(e) => setGameForm({ ...gameForm, title: e.target.value })}
                         className="input-field"
-                        placeholder="Mix de domingo"
+                        placeholder={t('gerirclube.title_placeholder')}
                         required
                       />
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Data e hora
+                        {t('gerirclube.date_time_label')}
                       </label>
                       <DateTimeField
                         value={gameForm.date}
@@ -1418,7 +1434,7 @@ export default function GerirClube() {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Local
+                        {t('gerirclube.location_label')}
                       </label>
                       <input
                         ref={locationInputRef}
@@ -1426,13 +1442,13 @@ export default function GerirClube() {
                         value={gameForm.location}
                         onChange={(e) => setGameForm({ ...gameForm, location: e.target.value })}
                         className="input-field"
-                        placeholder="Clube de Padel"
+                        placeholder={t('gerirclube.location_placeholder')}
                       />
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Preço por jogador (€)
+                        {t('gerirclube.price_label')}
                       </label>
                       <input
                         type="number"
@@ -1441,26 +1457,26 @@ export default function GerirClube() {
                         value={gameForm.price_per_player}
                         onChange={(e) => setGameForm({ ...gameForm, price_per_player: e.target.value })}
                         className="input-field"
-                        placeholder="ex: 5"
+                        placeholder={t('gerirclube.price_placeholder')}
                       />
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Prémio
+                        {t('gerirclube.prize_label')}
                       </label>
                       <input
                         type="text"
                         value={gameForm.prize}
                         onChange={(e) => setGameForm({ ...gameForm, prize: e.target.value })}
                         className="input-field"
-                        placeholder="ex: Vouchers para os vencedores"
+                        placeholder={t('gerirclube.prize_placeholder')}
                       />
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Número de campos
+                        {t('gerirclube.num_courts_label')}
                       </label>
                       <input
                         type="number"
@@ -1472,13 +1488,13 @@ export default function GerirClube() {
                         required
                       />
                       <p className="text-sm text-muted mt-1.5">
-                        = <strong className="text-ink-900">{(gameForm.num_courts || 1) * 4} jogadores</strong> ({gameForm.num_courts || 1} {gameForm.num_courts === 1 ? 'campo' : 'campos'} × 4)
+                        = <strong className="text-ink-900">{t('gerirclube.players_count', { count: (gameForm.num_courts || 1) * 4 })}</strong> ({t('gerirclube.courts_count', { count: gameForm.num_courts || 1 })} × 4)
                       </p>
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Tempo do court
+                        {t('gerirclube.court_time_label')}
                       </label>
                       <Segmented
                         options={COURT_TIMES}
@@ -1489,7 +1505,7 @@ export default function GerirClube() {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Tempo de jogo
+                        {t('gerirclube.game_time_label')}
                       </label>
                       <Segmented
                         options={GAME_TIMES}
@@ -1497,16 +1513,16 @@ export default function GerirClube() {
                         onChange={(v) => setGameForm({ ...gameForm, game_time_minutes: v })}
                       />
                       <p className="text-sm text-muted mt-1.5">
-                        = <strong className="text-ink-900">{totalRounds(gameForm)} rondas</strong> ({gameForm.court_time_minutes}min ÷ {gameForm.game_time_minutes}min)
+                        = <strong className="text-ink-900">{t('gerirclube.rounds_count', { count: totalRounds(gameForm) })}</strong> ({gameForm.court_time_minutes}min ÷ {gameForm.game_time_minutes}min)
                       </p>
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Formato
+                        {t('gerirclube.format_label')}
                       </label>
                       <Segmented
-                        options={FORMATS}
+                        options={translatedFormats}
                         value={gameForm.format}
                         onChange={(v) => setGameForm({ ...gameForm, format: v })}
                       />
@@ -1514,10 +1530,10 @@ export default function GerirClube() {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Género
+                        {t('gerirclube.gender_label')}
                       </label>
                       <Segmented
-                        options={GENDER_RESTRICTIONS}
+                        options={translatedGenderRestrictions}
                         value={gameForm.gender_restriction}
                         onChange={(v) => setGameForm({ ...gameForm, gender_restriction: v })}
                       />
@@ -1525,7 +1541,7 @@ export default function GerirClube() {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Começar automaticamente (opcional)
+                        {t('gerirclube.auto_start_label')}
                       </label>
                       <input
                         type="number"
@@ -1533,10 +1549,10 @@ export default function GerirClube() {
                         value={gameForm.auto_start_hours_before}
                         onChange={(e) => setGameForm({ ...gameForm, auto_start_hours_before: e.target.value })}
                         className="input-field"
-                        placeholder="ex: 2 (horas antes do jogo)"
+                        placeholder={t('gerirclube.auto_start_placeholder')}
                       />
                       <p className="text-sm text-muted mt-1.5">
-                        As duplas são formadas e o mix começa sozinho, com aviso no WhatsApp. Deixa em branco para começar manualmente.
+                        {t('gerirclube.auto_start_help')}
                       </p>
                     </div>
 
@@ -1552,12 +1568,12 @@ export default function GerirClube() {
                           <div className="flex items-center justify-between gap-3 p-3 rounded-ctrl bg-ink-50">
                             <div>
                               <p className="text-sm font-extrabold text-ink-900">
-                                {editingGame.recurrence.is_paused ? 'Recorrência em pausa' : 'Recorrência ativa'}
+                                {editingGame.recurrence.is_paused ? t('gerirclube.recurrence_paused_label') : t('gerirclube.recurrence_active_label')}
                               </p>
                               <p className="text-[11px] text-muted">
                                 {editingGame.recurrence.is_paused
-                                  ? 'Nenhum novo mix é lançado enquanto estiver em pausa.'
-                                  : 'Pausar para férias ou obras, sem perder a configuração.'}
+                                  ? t('gerirclube.recurrence_paused_help')
+                                  : t('gerirclube.recurrence_active_help')}
                               </p>
                             </div>
                             <button
@@ -1565,7 +1581,7 @@ export default function GerirClube() {
                               onClick={() => handleTogglePauseRecurrence(editingGame.recurrence.id, editingGame.recurrence.is_paused)}
                               className="shrink-0 text-xs font-extrabold px-3.5 py-2 min-h-[44px] rounded-full bg-ink-900 text-lime-400"
                             >
-                              {editingGame.recurrence.is_paused ? 'Retomar' : 'Pausar'}
+                              {editingGame.recurrence.is_paused ? t('gerirclube.resume_button') : t('gerirclube.pause_button')}
                             </button>
                           </div>
                         )}
@@ -1579,17 +1595,17 @@ export default function GerirClube() {
                             })}
                             className="w-5 h-5"
                           />
-                          <span className="text-sm font-medium text-gray-700">Mix recorrente</span>
+                          <span className="text-sm font-medium text-gray-700">{t('gerirclube.recurring_mix_label')}</span>
                         </label>
 
                         {gameForm.recurrence.enabled && (
                           <>
                             <div>
                               <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Frequência
+                                {t('gerirclube.frequency_label')}
                               </label>
                               <Segmented
-                                options={RECURRENCE_FREQUENCIES}
+                                options={translatedRecurrenceFrequencies}
                                 value={gameForm.recurrence.frequency}
                                 onChange={(v) => setGameForm({
                                   ...gameForm,
@@ -1600,10 +1616,10 @@ export default function GerirClube() {
 
                             <div>
                               <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Termina
+                                {t('gerirclube.ends_label')}
                               </label>
                               <Segmented
-                                options={RECURRENCE_ENDS}
+                                options={translatedRecurrenceEnds}
                                 value={gameForm.recurrence.endsType}
                                 onChange={(v) => setGameForm({
                                   ...gameForm,
@@ -1618,7 +1634,7 @@ export default function GerirClube() {
                                       ...gameForm,
                                       recurrence: { ...gameForm.recurrence, endsOn: v }
                                     })}
-                                    placeholder="Seleciona a data final"
+                                    placeholder={t('gerirclube.end_date_placeholder')}
                                   />
                                 </div>
                               )}
@@ -1632,7 +1648,7 @@ export default function GerirClube() {
                                     recurrence: { ...gameForm.recurrence, endsAfterOccurrences: e.target.value }
                                   })}
                                   className="input-field mt-2"
-                                  placeholder="ex: 10"
+                                  placeholder={t('gerirclube.occurrences_placeholder')}
                                   required
                                 />
                               )}
@@ -1640,7 +1656,7 @@ export default function GerirClube() {
 
                             <div>
                               <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Lançar quantos dias antes
+                                {t('gerirclube.launch_days_before_label')}
                               </label>
                               <input
                                 type="number"
@@ -1651,13 +1667,13 @@ export default function GerirClube() {
                                   recurrence: { ...gameForm.recurrence, launchDaysBefore: e.target.value }
                                 })}
                                 className="input-field"
-                                placeholder="ex: 3"
+                                placeholder={t('gerirclube.launch_days_placeholder')}
                                 required
                               />
                             </div>
                             <div>
                               <label className="block text-sm font-medium text-gray-700 mb-2">
-                                A que horas
+                                {t('gerirclube.launch_time_label')}
                               </label>
                               <input
                                 type="time"
@@ -1670,7 +1686,7 @@ export default function GerirClube() {
                                 required
                               />
                               <p className="text-sm text-muted mt-1.5">
-                                O próximo Mix fica visível e disponível para inscrições nesta altura — a mesma distância é reaplicada em cada Mix seguinte.
+                                {t('gerirclube.launch_time_help')}
                               </p>
                             </div>
                           </>
@@ -1680,7 +1696,7 @@ export default function GerirClube() {
 
                     <div className="flex gap-3">
                       <button type="submit" className="btn-primary flex-1">
-                        {editingGame ? 'Atualizar' : 'Criar'}
+                        {editingGame ? t('gerirclube.update_button') : t('gerirclube.create_button')}
                       </button>
                       <button
                         type="button"
@@ -1692,7 +1708,7 @@ export default function GerirClube() {
                         }}
                         className="btn-secondary flex-1"
                       >
-                        Cancelar
+                        {t('gerirclube.cancel_button')}
                       </button>
                     </div>
                   </form>
@@ -1704,7 +1720,7 @@ export default function GerirClube() {
                   above a loose stack of cards. */}
               <div className="card space-y-4">
               <div className="flex gap-1 p-1 bg-ink-50 rounded-ctrl overflow-x-auto">
-                {GAME_FILTERS.map(opt => (
+                {translatedGameFilters.map(opt => (
                   <button
                     key={opt.value}
                     type="button"
@@ -1742,17 +1758,17 @@ export default function GerirClube() {
                             <p>{formatDate(game.date)}</p>
                             {game.location && <p>📍 {game.location}</p>}
                             <p>
-                              👥 {peopleCount}/{game.max_players || (game.num_courts || 1) * 4} jogadores
+                              👥 {t('gerirclube.players_ratio', { count: peopleCount, max: game.max_players || (game.num_courts || 1) * 4 })}
                             </p>
                             <p className="text-sm">
-                              {FORMAT_LABEL[game.format] || 'Sobe e desce'} • {game.num_courts || 1} {(game.num_courts || 1) === 1 ? 'campo' : 'campos'} • {totalRounds(game)} rondas
+                              {(FORMAT_LABEL_KEY[game.format] ? t(FORMAT_LABEL_KEY[game.format]) : t('mixlogic.format_sobe_desce'))} • {t('gerirclube.courts_count', { count: game.num_courts || 1 })} • {t('gerirclube.rounds_count', { count: totalRounds(game) })}
                             </p>
                           </div>
                           {game.recurrence?.is_active && (
                             <div className="mt-2 flex items-center gap-2 flex-wrap">
                               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-lime-100 text-lime-800 text-xs font-bold">
                                 <Repeat size={12} />
-                                Recorrente
+                                {t('gerirclube.recurring_badge')}
                               </span>
                               {!game.is_recurrence_origin && (
                                 <button
@@ -1760,25 +1776,25 @@ export default function GerirClube() {
                                   onClick={() => handleStopRecurrence(game.recurrence.id)}
                                   className="text-xs font-semibold text-red-600 hover:underline"
                                 >
-                                  Parar recorrência
+                                  {t('gerirclube.stop_recurrence_button')}
                                 </button>
                               )}
                             </div>
                           )}
                         </div>
-                        
+
                         <div className="flex gap-2">
                           <button
                             onClick={() => startEditGame(game)}
                             className="p-2 text-ink-700 hover:bg-blue-50 rounded-lg transition-colors"
-                            title="Editar"
+                            title={t('gerirclube.edit_action')}
                           >
                             <Edit2 size={20} />
                           </button>
                           <button
                             onClick={() => handleDeleteGame(game.id)}
                             className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Eliminar"
+                            title={t('gerirclube.delete_action')}
                           >
                             <Trash2 size={20} />
                           </button>
@@ -1793,44 +1809,44 @@ export default function GerirClube() {
                         game.status === 'completed' || game.status === 'finished' ? 'bg-gray-100 text-gray-700' :
                         'bg-red-100 text-red-700'
                       }`}>
-                        {game.status === 'open' && 'Aberto'}
-                        {game.status === 'closed' && 'Mix fechado — campo reservado'}
-                        {game.status === 'in_progress' && 'A decorrer'}
-                        {game.status === 'pending' && `Pendente — lança a ${formatDate(game.launch_at)}`}
-                        {(game.status === 'completed' || game.status === 'finished') && 'Terminado'}
-                        {game.status === 'cancelled' && 'Cancelado'}
+                        {game.status === 'open' && t('gerirclube.status_open')}
+                        {game.status === 'closed' && t('gerirclube.status_closed')}
+                        {game.status === 'in_progress' && t('gerirclube.status_in_progress')}
+                        {game.status === 'pending' && t('gerirclube.status_pending_launch', { date: formatDate(game.launch_at) })}
+                        {(game.status === 'completed' || game.status === 'finished') && t('gerirclube.status_finished')}
+                        {game.status === 'cancelled' && t('gerirclube.status_cancelled')}
                       </div>
 
                       {entry.history.length > 0 && (
                         <div className="mt-3 pt-3 border-t border-line space-y-2">
                           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                            Outras datas desta recorrência
+                            {t('gerirclube.other_dates_heading')}
                           </p>
                           {entry.history.map((h) => (
                             <div key={h.id} className="flex items-center justify-between gap-2 bg-canvas rounded-lg px-3 py-2 border border-line">
                               <div className="min-w-0">
                                 <p className="text-sm text-ink-900 truncate">{formatDate(h.date)}</p>
                                 <p className="text-xs text-gray-500">
-                                  {h.status === 'open' && 'Aberto'}
-                                  {h.status === 'closed' && 'Fechado'}
-                                  {h.status === 'in_progress' && 'A decorrer'}
-                                  {h.status === 'pending' && 'Pendente'}
-                                  {(h.status === 'completed' || h.status === 'finished') && 'Terminado'}
-                                  {h.status === 'cancelled' && 'Cancelado'}
+                                  {h.status === 'open' && t('gerirclube.status_open')}
+                                  {h.status === 'closed' && t('gerirclube.status_closed_short')}
+                                  {h.status === 'in_progress' && t('gerirclube.status_in_progress')}
+                                  {h.status === 'pending' && t('gerirclube.status_pending')}
+                                  {(h.status === 'completed' || h.status === 'finished') && t('gerirclube.status_finished')}
+                                  {h.status === 'cancelled' && t('gerirclube.status_cancelled')}
                                 </p>
                               </div>
                               <div className="flex gap-1 shrink-0">
                                 <button
                                   onClick={() => startEditGame(h)}
                                   className="p-1.5 text-ink-700 hover:bg-blue-50 rounded-lg transition-colors"
-                                  title="Editar"
+                                  title={t('gerirclube.edit_action')}
                                 >
                                   <Edit2 size={16} />
                                 </button>
                                 <button
                                   onClick={() => handleDeleteGame(h.id)}
                                   className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                  title="Eliminar"
+                                  title={t('gerirclube.delete_action')}
                                 >
                                   <Trash2 size={16} />
                                 </button>
@@ -1852,9 +1868,9 @@ export default function GerirClube() {
             <div className="space-y-3">
               <div className="card space-y-4">
                 <div>
-                  <h3 className="text-sm font-extrabold text-ink-900 mb-2">Convidar jogador</h3>
+                  <h3 className="text-sm font-extrabold text-ink-900 mb-2">{t('gerirclube.invite_player_heading')}</h3>
                   <PlayerSearch
-                    label="Pesquisar por nome..."
+                    label={t('gerirclube.search_by_name_placeholder')}
                     searchFn={searchPlayers}
                     excludeIds={members.map((m) => m.id)}
                     onSelect={handleInvitePlayer}
@@ -1867,37 +1883,37 @@ export default function GerirClube() {
                     className="w-full flex items-center justify-center gap-2 text-sm font-extrabold px-4 py-2.5 rounded-ctrl bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast"
                   >
                     <Copy size={16} />
-                    {linkCopied ? 'Link copiado!' : 'Copiar link de convite'}
+                    {linkCopied ? t('gerirclube.link_copied') : t('gerirclube.copy_invite_link')}
                   </button>
                 </div>
               </div>
 
               <div className="card bg-blue-50">
                 <p className="text-gray-700">
-                  <strong>Total de membros:</strong> {members.length}
+                  <strong>{t('gerirclube.total_members_label')}</strong> {members.length}
                 </p>
               </div>
 
               {requests.length > 0 && (
                 <div className="space-y-2">
                   <h3 className="text-sm font-extrabold text-ink-900 flex items-center gap-1.5">
-                    <Clock size={14} /> Pedidos de entrada ({requests.length})
+                    <Clock size={14} /> {t('gerirclube.join_requests_heading', { count: requests.length })}
                   </h3>
                   {requests.map((req) => (
                     <div key={req.id} className="card flex items-center gap-3">
                       <Avatar name={req.name} url={req.avatar_url} size="w-9 h-9 text-sm" />
-                      <p className="flex-1 min-w-0 font-extrabold text-ink-900 truncate">{req.name || 'Jogador'}</p>
+                      <p className="flex-1 min-w-0 font-extrabold text-ink-900 truncate">{req.name || t('gerirclube.fallback_player_name')}</p>
                       <button
                         onClick={() => handleApproveRequest(req.id)}
                         className="w-9 h-9 flex items-center justify-center rounded-full bg-ok/10 text-ok hover:bg-ok/20 transition-colors duration-fast"
-                        title="Aprovar"
+                        title={t('gerirclube.approve_action')}
                       >
                         <Check size={18} />
                       </button>
                       <button
                         onClick={() => handleRejectRequest(req.id)}
                         className="w-9 h-9 flex items-center justify-center rounded-full text-danger hover:bg-danger/10 transition-colors duration-fast"
-                        title="Rejeitar"
+                        title={t('gerirclube.reject_action')}
                       >
                         <X size={18} />
                       </button>
@@ -1909,27 +1925,27 @@ export default function GerirClube() {
               {teacherRequests.length > 0 && (
                 <div className="space-y-2">
                   <h3 className="text-sm font-extrabold text-ink-900 flex items-center gap-1.5">
-                    <Clock size={14} /> Pedidos de professor ({teacherRequests.length})
+                    <Clock size={14} /> {t('gerirclube.teacher_requests_heading', { count: teacherRequests.length })}
                   </h3>
                   {teacherRequests.map((req) => (
                     <div key={req.id} className="card space-y-2">
                       <div className="flex items-center gap-3">
                         <Avatar name={req.user?.name} url={req.user?.avatar_url} size="w-9 h-9 text-sm" />
                         <div className="flex-1 min-w-0">
-                          <p className="font-extrabold text-ink-900 truncate">{req.user?.name || 'Jogador'}</p>
+                          <p className="font-extrabold text-ink-900 truncate">{req.user?.name || t('gerirclube.fallback_player_name')}</p>
                           <p className="text-sm text-muted truncate">{req.contact}</p>
                         </div>
                         <button
                           onClick={() => handleApproveTeacherRequest(req.id)}
                           className="w-9 h-9 flex items-center justify-center rounded-full bg-ok/10 text-ok hover:bg-ok/20 transition-colors duration-fast"
-                          title="Aprovar"
+                          title={t('gerirclube.approve_action')}
                         >
                           <Check size={18} />
                         </button>
                         <button
                           onClick={() => handleRejectTeacherRequest(req.id)}
                           className="w-9 h-9 flex items-center justify-center rounded-full text-danger hover:bg-danger/10 transition-colors duration-fast"
-                          title="Rejeitar"
+                          title={t('gerirclube.reject_action')}
                         >
                           <X size={18} />
                         </button>
@@ -1937,7 +1953,7 @@ export default function GerirClube() {
                       {req.availability?.length > 0 && (
                         <p className="text-[11px] text-muted">
                           {req.availability
-                            .map((a) => `${DAY_LABEL[a.day_of_week]} ${a.start_time.slice(0, 5)}-${a.end_time.slice(0, 5)}`)
+                            .map((a) => `${t(DAY_LABEL_KEY[a.day_of_week])} ${a.start_time.slice(0, 5)}-${a.end_time.slice(0, 5)}`)
                             .join(' • ')}
                         </p>
                       )}
@@ -1955,11 +1971,11 @@ export default function GerirClube() {
                         <h3 className="font-extrabold text-ink-900 truncate flex items-center gap-1.5">
                           <span className="truncate">{member.name}</span>
                           {member.is_admin && (
-                            <span className="w-2 h-2 rounded-full bg-lime-600 shrink-0" title="Admin" />
+                            <span className="w-2 h-2 rounded-full bg-lime-600 shrink-0" title={t('gerirclube.admin_badge_title')} />
                           )}
                         </h3>
                         <p className="text-sm text-muted truncate">
-                          Nível: {member.level}
+                          {t('gerirclube.level_label', { level: member.level })}
                         </p>
                       </div>
                     </Link>
@@ -1969,12 +1985,12 @@ export default function GerirClube() {
                         onClick={() => handleToggleAdmin(member.id, member.is_admin)}
                         className="whitespace-nowrap text-xs font-extrabold px-3 py-2 min-h-[44px] rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast"
                       >
-                        {member.is_admin ? 'Retirar admin' : 'Tornar admin'}
+                        {member.is_admin ? t('gerirclube.revoke_admin_button') : t('gerirclube.grant_admin_button')}
                       </button>
                       {member.id !== currentUser?.id && (
                         <button
                           onClick={() => handleDeleteUser(member)}
-                          title={`Eliminar ${member.name}`}
+                          title={t('gerirclube.delete_member_title', { name: member.name })}
                           className="w-10 h-10 flex items-center justify-center rounded-full text-danger hover:bg-danger/10 transition-colors duration-fast"
                         >
                           <UserX size={20} />
@@ -1998,16 +2014,16 @@ export default function GerirClube() {
                 onClick={() => setActiveTab('games')}
                 className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline mb-4"
               >
-                <ArrowLeft size={16} /> Voltar
+                <ArrowLeft size={16} /> {t('gerirclube.back_button')}
               </button>
               <h3 className="text-xl font-semibold text-ink-900 mb-6">
-                Definições do Grupo
+                {t('gerirclube.settings_heading')}
               </h3>
 
               <form onSubmit={handleUpdateSettings} className="space-y-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Nome do grupo
+                    {t('gerirclube.group_name_label')}
                   </label>
                   <input
                     type="text"
@@ -2020,23 +2036,23 @@ export default function GerirClube() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Contacto do Robot
+                    {t('gerirclube.robot_contact_label')}
                   </label>
                   <input
                     type="text"
                     value={settings.robot_contact}
                     onChange={(e) => setSettings({ ...settings, robot_contact: e.target.value })}
                     className="input-field"
-                    placeholder="+351 XXX XXX XXX"
+                    placeholder={t('gerirclube.phone_placeholder')}
                   />
                   <p className="text-sm text-gray-500 mt-2">
-                    Número de contacto para notificações futuras (não ativo)
+                    {t('gerirclube.robot_contact_help')}
                   </p>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Logo do clube
+                    {t('gerirclube.club_logo_label')}
                   </label>
                   <div className="flex items-center gap-4">
                     <div className="relative w-16 h-16 shrink-0">
@@ -2045,7 +2061,7 @@ export default function GerirClube() {
                         type="button"
                         onClick={() => clubLogoInputRef.current?.click()}
                         disabled={uploadingLogo}
-                        aria-label="Alterar logo do clube"
+                        aria-label={t('gerirclube.change_logo_aria')}
                         className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-ink-900 text-white flex items-center justify-center
                                    ring-2 ring-canvas hover:bg-ink-700 transition-colors duration-fast disabled:opacity-50"
                       >
@@ -2070,7 +2086,7 @@ export default function GerirClube() {
                         disabled={uploadingLogo}
                         className="text-danger text-sm font-extrabold hover:underline disabled:opacity-50"
                       >
-                        Remover logo
+                        {t('gerirclube.remove_logo_button')}
                       </button>
                     )}
                   </div>
@@ -2081,14 +2097,14 @@ export default function GerirClube() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Descrição
+                    {t('gerirclube.description_label')}
                   </label>
                   <textarea
                     value={settings.description || ''}
                     onChange={(e) => setSettings({ ...settings, description: e.target.value })}
                     className="input-field resize-none"
                     rows={4}
-                    placeholder="Uma breve descrição do clube, visível no perfil público"
+                    placeholder={t('gerirclube.description_placeholder')}
                   />
                 </div>
 
@@ -2099,7 +2115,7 @@ export default function GerirClube() {
                   <>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Localização
+                        {t('gerirclube.location_field_label')}
                       </label>
                       <input
                         ref={clubLocationInputRef}
@@ -2107,45 +2123,45 @@ export default function GerirClube() {
                         value={settings.location || ''}
                         onChange={(e) => setSettings({ ...settings, location: e.target.value })}
                         className="input-field"
-                        placeholder="Morada ou nome do clube"
+                        placeholder={t('gerirclube.address_placeholder')}
                       />
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Telefone
+                          {t('gerirclube.phone_label')}
                         </label>
                         <input
                           type="text"
                           value={settings.phone || ''}
                           onChange={(e) => setSettings({ ...settings, phone: e.target.value })}
                           className="input-field"
-                          placeholder="+351 XXX XXX XXX"
+                          placeholder={t('gerirclube.phone_placeholder')}
                         />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Instagram
+                          {t('gerirclube.instagram_label')}
                         </label>
                         <input
                           type="text"
                           value={settings.instagram || ''}
                           onChange={(e) => setSettings({ ...settings, instagram: e.target.value })}
                           className="input-field"
-                          placeholder="@oclube"
+                          placeholder={t('gerirclube.instagram_placeholder')}
                         />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Website
+                          {t('gerirclube.website_label')}
                         </label>
                         <input
                           type="text"
                           value={settings.website || ''}
                           onChange={(e) => setSettings({ ...settings, website: e.target.value })}
                           className="input-field"
-                          placeholder="oclube.pt"
+                          placeholder={t('gerirclube.website_placeholder')}
                         />
                       </div>
                     </div>
@@ -2155,15 +2171,15 @@ export default function GerirClube() {
                 {!org?.self_serve && (
                   <div className="pt-2 border-t border-gray-200">
                     <h4 className="text-base font-semibold text-ink-900 mt-6 mb-1">
-                      Visibilidade pública
+                      {t('gerirclube.public_visibility_heading')}
                     </h4>
                     <p className="text-sm text-gray-500 mb-4">
-                      Um clube público aparece na Comunidade, conta para o ranking geral, e os seus membros ficam pesquisáveis por qualquer jogador.
+                      {t('gerirclube.public_visibility_description')}
                     </p>
                     <label className="flex items-center justify-between gap-4 p-3 rounded-ctrl border border-line mb-3">
                       <div>
-                        <p className="font-extrabold text-ink-900 text-sm">Clube público</p>
-                        <p className="text-[11px] text-muted">Aparece na Comunidade</p>
+                        <p className="font-extrabold text-ink-900 text-sm">{t('gerirclube.public_club_label')}</p>
+                        <p className="text-[11px] text-muted">{t('gerirclube.appears_in_community_hint')}</p>
                       </div>
                       <input
                         type="checkbox"
@@ -2175,8 +2191,8 @@ export default function GerirClube() {
                     {settings.is_global && (
                       <label className="flex items-center justify-between gap-4 p-3 rounded-ctrl border border-line">
                         <div>
-                          <p className="font-extrabold text-ink-900 text-sm">Entrada livre</p>
-                          <p className="text-[11px] text-muted">Sem isto, pedidos de entrada precisam da tua aprovação</p>
+                          <p className="font-extrabold text-ink-900 text-sm">{t('gerirclube.open_join_label')}</p>
+                          <p className="text-[11px] text-muted">{t('gerirclube.open_join_hint')}</p>
                         </div>
                         <input
                           type="checkbox"
@@ -2190,7 +2206,7 @@ export default function GerirClube() {
                 )}
 
                 <button type="submit" className="btn-primary w-full">
-                  Guardar definições
+                  {t('gerirclube.save_settings_button')}
                 </button>
               </form>
 
@@ -2200,10 +2216,10 @@ export default function GerirClube() {
               {org?.kind !== 'group' && (
                 <div className="mt-6 pt-6 border-t border-gray-200">
                   <h4 className="text-base font-semibold text-ink-900 mb-1">
-                    Grupos dentro deste clube
+                    {t('gerirclube.groups_heading')}
                   </h4>
                   <p className="text-sm text-gray-500 mb-4">
-                    Um grupo tem os seus próprios mixes e membros, mas vive dentro deste clube — útil para uma equipa, torneio, ou turma específica.
+                    {t('gerirclube.groups_description')}
                   </p>
 
                   {groupsLoading ? (
@@ -2226,12 +2242,12 @@ export default function GerirClube() {
                                 <h5 className="font-extrabold text-ink-900 truncate">{group.name}</h5>
                                 {isMemberish ? (
                                   <p className="text-[11px] text-muted mt-0.5">
-                                    {group.member_count} {group.member_count === 1 ? 'membro' : 'membros'}
-                                    {group.avg_rating != null && ` · Nível médio ${formatRating(group.avg_rating)}`}
+                                    {t('gerirclube.member_count', { count: group.member_count })}
+                                    {group.avg_rating != null && t('gerirclube.avg_level_suffix', { rating: formatRating(group.avg_rating) })}
                                   </p>
                                 ) : (
                                   <p className="text-[11px] text-muted mt-0.5">
-                                    {group.my_status === 'pending' ? 'Pedido pendente' : 'Não és membro'}
+                                    {group.my_status === 'pending' ? t('gerirclube.pending_request_label') : t('gerirclube.not_a_member_label')}
                                   </p>
                                 )}
                               </div>
@@ -2242,7 +2258,7 @@ export default function GerirClube() {
                                   onClick={(e) => { e.stopPropagation(); handleRequestJoinGroup(group) }}
                                   className={`shrink-0 whitespace-nowrap text-xs font-extrabold px-3.5 py-2 min-h-[44px] rounded-full bg-lime-400 text-ink-900 hover:bg-lime-600 transition-colors duration-fast inline-flex items-center ${groupActingOn === group.id ? 'opacity-40 pointer-events-none' : ''}`}
                                 >
-                                  Pedir para entrar
+                                  {t('gerirclube.request_to_join_button')}
                                 </span>
                               )}
                             </button>
@@ -2259,29 +2275,29 @@ export default function GerirClube() {
                                       to={`/gerir/${group.slug}`}
                                       className="inline-flex items-center gap-1.5 text-xs font-extrabold text-lime-700 hover:underline"
                                     >
-                                      Gerir grupo completo →
+                                      {t('gerirclube.manage_full_group_link')}
                                     </Link>
 
                                     {expandedGroupRequests.length > 0 && (
                                       <div className="space-y-2">
                                         <h6 className="text-xs font-extrabold text-ink-900 flex items-center gap-1.5">
-                                          <Clock size={12} /> Pedidos de entrada ({expandedGroupRequests.length})
+                                          <Clock size={12} /> {t('gerirclube.join_requests_heading', { count: expandedGroupRequests.length })}
                                         </h6>
                                         {expandedGroupRequests.map((req) => (
                                           <div key={req.id} className="flex items-center gap-2">
                                             <Avatar name={req.name} url={req.avatar_url} size="w-7 h-7 text-xs" />
-                                            <p className="flex-1 min-w-0 text-sm font-extrabold text-ink-900 truncate">{req.name || 'Jogador'}</p>
+                                            <p className="flex-1 min-w-0 text-sm font-extrabold text-ink-900 truncate">{req.name || t('gerirclube.fallback_player_name')}</p>
                                             <button
                                               onClick={() => handleApproveGroupRequest(req.id, group.id)}
                                               className="w-8 h-8 flex items-center justify-center rounded-full bg-ok/10 text-ok hover:bg-ok/20 transition-colors duration-fast"
-                                              title="Aprovar"
+                                              title={t('gerirclube.approve_action')}
                                             >
                                               <Check size={16} />
                                             </button>
                                             <button
                                               onClick={() => handleRejectGroupRequest(req.id, group.id)}
                                               className="w-8 h-8 flex items-center justify-center rounded-full text-danger hover:bg-danger/10 transition-colors duration-fast"
-                                              title="Rejeitar"
+                                              title={t('gerirclube.reject_action')}
                                             >
                                               <X size={16} />
                                             </button>
@@ -2295,7 +2311,7 @@ export default function GerirClube() {
                                         <div key={member.id} className="flex items-center gap-2">
                                           <Avatar name={member.name} url={member.avatar_url} size="w-7 h-7 text-xs" />
                                           <p className="flex-1 min-w-0 text-sm text-ink-900 truncate">{member.name}</p>
-                                          {member.is_admin && <span className="w-2 h-2 rounded-full bg-lime-600 shrink-0" title="Admin" />}
+                                          {member.is_admin && <span className="w-2 h-2 rounded-full bg-lime-600 shrink-0" title={t('gerirclube.admin_badge_title')} />}
                                         </div>
                                       ))}
                                     </div>
@@ -2311,7 +2327,7 @@ export default function GerirClube() {
 
                   {!showCreateGroup ? (
                     <button type="button" onClick={() => setShowCreateGroup(true)} className="btn-secondary w-full">
-                      Criar grupo dentro deste clube
+                      {t('gerirclube.create_group_button')}
                     </button>
                   ) : (
                     <div className="space-y-3">
@@ -2320,14 +2336,14 @@ export default function GerirClube() {
                         value={groupName}
                         onChange={(e) => setGroupName(e.target.value)}
                         className="input-field"
-                        placeholder="Nome do grupo"
+                        placeholder={t('gerirclube.group_name_placeholder')}
                       />
                       <input
                         type="text"
                         value={groupSlug}
                         onChange={(e) => setGroupSlug(sanitizeSlug(e.target.value))}
                         className="input-field"
-                        placeholder="slug-do-grupo"
+                        placeholder={t('gerirclube.group_slug_placeholder')}
                       />
                       {groupError && (
                         <p className="text-danger text-sm font-extrabold">{groupError}</p>
@@ -2339,7 +2355,7 @@ export default function GerirClube() {
                           disabled={!groupName.trim() || !groupSlug.trim() || creatingGroup}
                           className="btn-primary flex-1"
                         >
-                          {creatingGroup ? 'A criar…' : 'Criar grupo'}
+                          {creatingGroup ? t('gerirclube.creating_group_label') : t('gerirclube.create_group_submit')}
                         </button>
                         <button
                           type="button"
@@ -2347,13 +2363,13 @@ export default function GerirClube() {
                           disabled={creatingGroup}
                           className="btn-secondary flex-1"
                         >
-                          Cancelar
+                          {t('gerirclube.cancel_button')}
                         </button>
                       </div>
                     </div>
                   )}
                   {createdGroupName && (
-                    <p className="text-sm text-ok font-extrabold mt-3">Grupo "{createdGroupName}" criado com sucesso!</p>
+                    <p className="text-sm text-ok font-extrabold mt-3">{t('gerirclube.group_created_success', { name: createdGroupName })}</p>
                   )}
                 </div>
               )}
@@ -2361,15 +2377,15 @@ export default function GerirClube() {
               {currentUser?.is_platform_admin && (
                 <div className="mt-6 pt-6 border-t border-gray-200">
                   <h4 className="text-base font-semibold text-ink-900 mb-1">
-                    Funcionalidades da app
+                    {t('gerirclube.app_features_heading')}
                   </h4>
                   <p className="text-sm text-gray-500 mb-4">
-                    Afeta todos os clubes — não é específico deste grupo.
+                    {t('gerirclube.app_features_description')}
                   </p>
                   <label className="flex items-center justify-between gap-4 p-3 rounded-ctrl border border-line">
                     <div>
-                      <p className="font-extrabold text-ink-900 text-sm">Jogo entre amigos</p>
-                      <p className="text-[11px] text-muted">Permite criar jogos 2x2 fora do clube</p>
+                      <p className="font-extrabold text-ink-900 text-sm">{t('gerirclube.private_matches_label')}</p>
+                      <p className="text-[11px] text-muted">{t('gerirclube.private_matches_hint')}</p>
                     </div>
                     <input
                       type="checkbox"

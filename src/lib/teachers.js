@@ -1,16 +1,16 @@
 import { supabase } from './supabase'
 
 export const DAYS = [
-  { value: 'segunda', label: 'Segunda' },
-  { value: 'terca', label: 'Terça' },
-  { value: 'quarta', label: 'Quarta' },
-  { value: 'quinta', label: 'Quinta' },
-  { value: 'sexta', label: 'Sexta' },
-  { value: 'sabado', label: 'Sábado' },
-  { value: 'domingo', label: 'Domingo' },
+  { value: 'segunda', labelKey: 'teachers.day_segunda' },
+  { value: 'terca', labelKey: 'teachers.day_terca' },
+  { value: 'quarta', labelKey: 'teachers.day_quarta' },
+  { value: 'quinta', labelKey: 'teachers.day_quinta' },
+  { value: 'sexta', labelKey: 'teachers.day_sexta' },
+  { value: 'sabado', labelKey: 'teachers.day_sabado' },
+  { value: 'domingo', labelKey: 'teachers.day_domingo' },
 ]
 
-export const DAY_LABEL = Object.fromEntries(DAYS.map((d) => [d.value, d.label]))
+export const DAY_LABEL_KEY = Object.fromEntries(DAYS.map((d) => [d.value, d.labelKey]))
 
 // RLS already scopes visibility: approved rows for orgs the caller belongs
 // to, plus the caller's own row in any status, plus every row for an org

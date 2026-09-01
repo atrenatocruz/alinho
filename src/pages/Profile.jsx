@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { User, Award, Trophy, Target, Flame, LogOut, Camera, UserCheck, X, Users } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -10,36 +11,42 @@ import { listIncomingFriendRequests, acceptFriendRequest, removeFriendRequest, l
 import { listIncomingOrganizationInvites, acceptOrganizationInvite, declineOrganizationInvite } from '../lib/orgInvites'
 import { PrimaryButton, GuestBadge, DateField, Avatar, Select, EmptyState, RankBadge, RatingBadge } from '../components/ui'
 import { formatRating } from '../lib/elo'
+import { formatDate as formatDateLib } from '../lib/formatDate'
 
 const TABS = [
-  { key: 'perfil', label: 'Perfil' },
-  { key: 'amigos', label: 'Amigos' },
-  { key: 'convites', label: 'Convites' },
-  { key: 'historico', label: 'Histórico' },
+  { key: 'perfil', labelKey: 'profile.tab_profile' },
+  { key: 'amigos', labelKey: 'profile.tab_friends' },
+  { key: 'convites', labelKey: 'profile.tab_invites' },
+  { key: 'historico', labelKey: 'profile.tab_history' },
 ]
 
-const VISIBILITY_OPTIONS = [
-  { value: 'public', label: 'Público' },
-  { value: 'friends', label: 'Amigos' },
-  { value: 'private', label: 'Privado' },
-]
+const SIDE_LABEL_KEY = { left: 'gamedetails.side_left', right: 'gamedetails.side_right', both: 'gamedetails.side_both' }
+const GENDER_LABEL_KEY = { masculino: 'login.gender_male', feminino: 'login.gender_female' }
 
 export default function Profile() {
+  const { t, i18n } = useTranslation()
   const { profile, updateProfile, currentOrganizationId, isGuest, signOut, refreshMemberships } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const [tab, setTab] = useState(() => (TABS.some((t) => t.key === searchParams.get('tab')) ? searchParams.get('tab') : 'perfil'))
+  const [tab, setTab] = useState(() => (TABS.some((tb) => tb.key === searchParams.get('tab')) ? searchParams.get('tab') : 'perfil'))
   // Re-applies whenever ?tab= changes without a full remount — the bell
   // dropdown links here from an already-mounted Profile (same route).
   useEffect(() => {
     const requested = searchParams.get('tab')
-    if (requested && TABS.some((t) => t.key === requested)) setTab(requested)
+    if (requested && TABS.some((tb) => tb.key === requested)) setTab(requested)
   }, [searchParams])
+
+  const VISIBILITY_OPTIONS = [
+    { value: 'public', label: t('profile.visibility_public') },
+    { value: 'friends', label: t('profile.friends_label') },
+    { value: 'private', label: t('profile.visibility_private') },
+  ]
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(profile?.name || '')
   const [preferredSide, setPreferredSide] = useState(profile?.preferred_side || 'both')
   const [birthday, setBirthday] = useState(profile?.birthday || '')
   const [gender, setGender] = useState(profile?.gender || '')
+  const [language, setLanguage] = useState(profile?.language || 'pt')
   const [activityVisibility, setActivityVisibility] = useState(profile?.activity_visibility || 'public')
   const [resultsVisibility, setResultsVisibility] = useState(profile?.results_visibility || 'public')
   const [clubsVisibility, setClubsVisibility] = useState(profile?.clubs_visibility || 'public')
@@ -73,6 +80,7 @@ export default function Profile() {
       setPreferredSide(profile.preferred_side || 'both')
       setBirthday(profile.birthday || '')
       setGender(profile.gender || '')
+      setLanguage(profile.language || 'pt')
       // player_stats/mix_player_stats are org-scoped, so those two genuinely
       // need a current organization. Private matches are org-independent by
       // design — gating them on an org left club-less users stuck on a
@@ -115,7 +123,7 @@ export default function Profile() {
       setOutgoingRequests((reqs) => reqs.filter((r) => r.id !== requestId))
     } catch (error) {
       console.error('Error cancelling friend request:', error)
-      alert('Não foi possível cancelar o pedido. Tenta novamente.')
+      alert(t('profile.error_cancel_friend_request'))
     } finally {
       setOutgoingRequestActing(null)
     }
@@ -140,7 +148,7 @@ export default function Profile() {
       loadFriends()
     } catch (error) {
       console.error('Error accepting friend request:', error)
-      alert('Não foi possível aceitar o pedido. Tenta novamente.')
+      alert(t('profile.error_accept_friend_request'))
     } finally {
       setFriendRequestActing(null)
     }
@@ -153,7 +161,7 @@ export default function Profile() {
       setFriendRequests((reqs) => reqs.filter((r) => r.id !== requestId))
     } catch (error) {
       console.error('Error declining friend request:', error)
-      alert('Não foi possível recusar o pedido. Tenta novamente.')
+      alert(t('profile.error_decline_friend_request'))
     } finally {
       setFriendRequestActing(null)
     }
@@ -178,7 +186,7 @@ export default function Profile() {
       await refreshMemberships()
     } catch (error) {
       console.error('Error accepting organization invite:', error)
-      alert('Não foi possível aceitar o convite. Tenta novamente.')
+      alert(t('profile.error_accept_org_invite'))
     } finally {
       setOrgInviteActing(null)
     }
@@ -191,7 +199,7 @@ export default function Profile() {
       setOrgInvites((invs) => invs.filter((i) => i.id !== inviteId))
     } catch (error) {
       console.error('Error declining organization invite:', error)
-      alert('Não foi possível recusar o convite. Tenta novamente.')
+      alert(t('profile.error_decline_org_invite'))
     } finally {
       setOrgInviteActing(null)
     }
@@ -244,9 +252,9 @@ export default function Profile() {
         (allStatsData || []).map((s) => [`${s.game_id}:${s.user_id}`, s.points_earned || 0])
       )
       const teamsByGame = new Map()
-      ;(teamsData || []).forEach((t) => {
-        if (!teamsByGame.has(t.game_id)) teamsByGame.set(t.game_id, [])
-        teamsByGame.get(t.game_id).push(t)
+      ;(teamsData || []).forEach((team) => {
+        if (!teamsByGame.has(team.game_id)) teamsByGame.set(team.game_id, [])
+        teamsByGame.get(team.game_id).push(team)
       })
 
       const history = (statsRows || [])
@@ -254,13 +262,13 @@ export default function Profile() {
         .map((row) => {
           const teams = teamsByGame.get(row.game_id) || []
           const ranked = teams
-            .map((t) => ({
-              isMine: t.player1_id === profile.id || t.player2_id === profile.id,
-              points: (pointsByGameUser.get(`${row.game_id}:${t.player1_id}`) || 0) +
-                      (pointsByGameUser.get(`${row.game_id}:${t.player2_id}`) || 0),
+            .map((team) => ({
+              isMine: team.player1_id === profile.id || team.player2_id === profile.id,
+              points: (pointsByGameUser.get(`${row.game_id}:${team.player1_id}`) || 0) +
+                      (pointsByGameUser.get(`${row.game_id}:${team.player2_id}`) || 0),
             }))
             .sort((a, b) => b.points - a.points)
-          const position = ranked.findIndex((t) => t.isMine) + 1
+          const position = ranked.findIndex((team) => team.isMine) + 1
           return {
             gameId: row.game_id,
             title: row.game.title,
@@ -315,7 +323,7 @@ export default function Profile() {
       if (error) throw error
     } catch (error) {
       console.error('Error uploading photo:', error)
-      setPhotoError('Não foi possível carregar a foto. Tenta novamente.')
+      setPhotoError(t('profile.error_upload_photo'))
     } finally {
       setUploadingPhoto(false)
     }
@@ -330,7 +338,7 @@ export default function Profile() {
       if (error) throw error
     } catch (error) {
       console.error('Error removing photo:', error)
-      setPhotoError('Não foi possível remover a foto. Tenta novamente.')
+      setPhotoError(t('profile.error_remove_photo'))
     } finally {
       setUploadingPhoto(false)
     }
@@ -342,7 +350,7 @@ export default function Profile() {
 
     // Phone is optional — only validate/hash it if the person typed one in.
     if (phone && phone.replace(/\D/g, '').length < 9) {
-      setPhoneError('Introduz um número de telemóvel válido, ou deixa em branco')
+      setPhoneError(t('login.error_invalid_phone'))
       return
     }
 
@@ -354,6 +362,7 @@ export default function Profile() {
         preferred_side: preferredSide,
         birthday: birthday || null,
         gender,
+        language,
         activity_visibility: activityVisibility,
         results_visibility: resultsVisibility,
         clubs_visibility: clubsVisibility,
@@ -363,20 +372,37 @@ export default function Profile() {
       }
       const { error: profileError } = await updateProfile(updates)
       if (profileError) throw profileError
+      // Instant UI flip, same as the old header toggle — updateProfile only
+      // writes the DB row, it doesn't touch the live i18next instance.
+      i18n.changeLanguage(language)
+      try {
+        localStorage.setItem('preferredLanguage', language)
+      } catch {
+        // ignore — best-effort, mirrors Layout.jsx's old toggle
+      }
       setPhone('')
       setEditing(false)
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch (error) {
       console.error('Error updating profile:', error)
-      alert('Erro ao atualizar perfil')
+      alert(t('profile.error_update_profile'))
     } finally {
       setLoading(false)
     }
   }
 
   const formatMixDate = (dateString) =>
-    new Date(dateString).toLocaleDateString('pt-PT', { day: '2-digit', month: 'short', year: 'numeric' })
+    formatDateLib(dateString, i18n.language, { day: '2-digit', month: 'short', year: 'numeric' })
+
+  // Mirrors GameDetails.jsx's ordinal() — pt-PT always uses "º" (1º, 2º…);
+  // English needs the st/nd/rd/th suffix instead.
+  const ordinal = (n) => {
+    if (i18n.language !== 'en') return `${n}º`
+    const suffixes = ['th', 'st', 'nd', 'rd']
+    const v = n % 100
+    return `${n}${suffixes[(v - 20) % 10] || suffixes[v] || suffixes[0]}`
+  }
 
   const gamesPlayed = (stats?.game_wins || 0) + (stats?.game_losses || 0)
   const winRate = gamesPlayed > 0
@@ -406,7 +432,7 @@ export default function Profile() {
               <Avatar name={profile?.name} url={profile?.avatar_url} size="w-20 h-20 text-3xl" colorClass="bg-lime-400 text-ink-900" />
             </div>
             <h2 className="text-2xl text-white">
-              {profile?.name} <span className="text-ink-200 font-normal">(Convidado)</span>
+              {profile?.name} <span className="text-ink-200 font-normal">{t('profile.guest_suffix')}</span>
             </h2>
             <div className="mt-2.5">
               <GuestBadge size="md" />
@@ -423,17 +449,17 @@ export default function Profile() {
           className="w-full"
         >
           <LogOut size={20} />
-          Sair
+          {t('layout.sign_out')}
         </PrimaryButton>
       </div>
     )
   }
 
   const statTiles = stats && (gamesPlayed > 0 || (stats.mix_wins || 0) > 0) ? [
-    { icon: Trophy, value: stats.mix_wins || 0, label: 'Mixes ganhos', cls: 'text-lime-600' },
-    { icon: Target, value: gamesPlayed, label: 'Jogos', cls: 'text-ink-700' },
-    { icon: Flame, value: stats.game_wins || 0, label: 'Jogos ganhos', cls: 'text-ok' },
-    { icon: Award, value: `${winRate}%`, label: 'Taxa de vitória', cls: 'text-ink-700' },
+    { icon: Trophy, value: stats.mix_wins || 0, label: t('playerdetails.stat_mixes_won'), cls: 'text-lime-600' },
+    { icon: Target, value: gamesPlayed, label: t('playerdetails.stat_games'), cls: 'text-ink-700' },
+    { icon: Flame, value: stats.game_wins || 0, label: t('profile.stat_game_wins'), cls: 'text-ok' },
+    { icon: Award, value: `${winRate}%`, label: t('playerdetails.stat_win_rate'), cls: 'text-ink-700' },
   ] : null
 
   return (
@@ -456,7 +482,7 @@ export default function Profile() {
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadingPhoto}
-              aria-label="Alterar foto de perfil"
+              aria-label={t('profile.change_photo_aria')}
               className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-ink-900 text-white flex items-center justify-center
                          ring-2 ring-ink-900 hover:bg-ink-700 transition-colors duration-fast disabled:opacity-50"
             >
@@ -477,7 +503,7 @@ export default function Profile() {
           <h2 className="text-2xl text-white">{profile?.name}</h2>
           <div className="mt-2.5">
             <span className="inline-flex items-center rounded-full font-mono font-extrabold tracking-wide bg-lime-400 text-ink-900 text-sm px-3 py-1 tabular-nums">
-              {formatRating(profile?.rating)} pts
+              {formatRating(profile?.rating)} {t('gamedetails.points_suffix')}
             </span>
           </div>
           {globalRank && (
@@ -492,7 +518,7 @@ export default function Profile() {
               disabled={uploadingPhoto}
               className="mt-2 text-ink-200 text-xs font-extrabold hover:text-white transition-colors duration-fast disabled:opacity-50"
             >
-              Remover foto
+              {t('profile.remove_photo')}
             </button>
           )}
         </div>
@@ -506,21 +532,21 @@ export default function Profile() {
 
       {saved && (
         <div className="bg-ok/10 text-ok px-4 py-3 rounded-ctrl text-sm font-extrabold animate-fade-up">
-          ✓ Perfil atualizado
+          {t('profile.updated_success')}
         </div>
       )}
 
       {/* Tabs */}
       <div className="flex gap-1 p-1 bg-ink-50 rounded-ctrl">
-        {TABS.map(t => (
+        {TABS.map(tabDef => (
           <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
+            key={tabDef.key}
+            onClick={() => setTab(tabDef.key)}
             className={`flex-1 py-2.5 rounded-ctrl text-sm font-extrabold transition-all duration-fast ${
-              tab === t.key ? 'bg-canvas text-ink-900 shadow-lift border border-line' : 'text-muted hover:text-ink-900'
+              tab === tabDef.key ? 'bg-canvas text-ink-900 shadow-lift border border-line' : 'text-muted hover:text-ink-900'
             }`}
           >
-            {t.label}
+            {t(tabDef.labelKey)}
           </button>
         ))}
       </div>
@@ -548,13 +574,13 @@ export default function Profile() {
           <div className="card">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <p className="text-sm font-extrabold text-ink-900">Ranking global</p>
+                <p className="text-sm font-extrabold text-ink-900">{t('profile.global_ranking')}</p>
                 <RatingBadge rating={profile?.rating} gender={profile?.gender} />
               </div>
               <span className="text-2xl font-extrabold text-ink-900 tabular-nums">{formatRating(profile?.rating)}</span>
             </div>
             <p className="text-[11px] text-muted mt-1">
-              🎾 {globalPoints.mix_wins || 0} mixes ganhos em {globalPoints.mixes_played || 0} jogados
+              🎾 {t('profile.mix_wins_played_summary', { wins: globalPoints.mix_wins || 0, played: globalPoints.mixes_played || 0 })}
             </p>
           </div>
         )}
@@ -564,14 +590,14 @@ export default function Profile() {
           <div className="flex items-center justify-between mb-5">
             <h3 className="text-lg text-ink-900 flex items-center gap-2">
               <User size={20} className="text-ink-700" />
-              Informação pessoal
+              {t('profile.personal_info_heading')}
             </h3>
             {!editing && (
               <button
                 onClick={() => setEditing(true)}
                 className="text-ink-700 font-extrabold text-sm min-h-[44px] px-2"
               >
-                Editar
+                {t('profile.edit_button')}
               </button>
             )}
           </div>
@@ -579,7 +605,7 @@ export default function Profile() {
           {editing ? (
             <form onSubmit={handleSave} className="space-y-4 animate-fade-up">
               <div>
-                <label className={inputLabel}>Nome</label>
+                <label className={inputLabel}>{t('profile.name_label')}</label>
                 <input
                   type="text"
                   value={name}
@@ -590,7 +616,7 @@ export default function Profile() {
               </div>
 
               <div>
-                <label className={inputLabel}>Data de nascimento</label>
+                <label className={inputLabel}>{t('profile.birthday_label')}</label>
                 <DateField
                   value={birthday}
                   onChange={setBirthday}
@@ -599,65 +625,77 @@ export default function Profile() {
               </div>
 
               <div>
-                <label className={inputLabel}>Género</label>
+                <label className={inputLabel}>{t('profile.gender_label')}</label>
                 <Select
                   value={gender}
                   onChange={setGender}
-                  placeholder="Não especificado"
+                  placeholder={t('profile.gender_unspecified')}
                   options={[
-                    { value: 'masculino', label: 'Masculino' },
-                    { value: 'feminino', label: 'Feminino' },
+                    { value: 'masculino', label: t('login.gender_male') },
+                    { value: 'feminino', label: t('login.gender_female') },
                   ]}
                 />
               </div>
 
               <div>
-                <label className={inputLabel}>Nº de telemóvel</label>
+                <label className={inputLabel}>{t('profile.phone_label')}</label>
                 <input
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   className="input-field"
-                  placeholder={profile?.phone_hash ? 'Já associado — escreve para substituir' : '912 345 678'}
+                  placeholder={profile?.phone_hash ? t('profile.phone_placeholder_existing') : t('login.phone_placeholder')}
                 />
                 {phoneError && <p className="text-xs text-danger mt-1.5">{phoneError}</p>}
                 <p className="text-xs text-muted mt-1.5">
                   {profile?.phone_hash
-                    ? 'Deixa em branco para manter o número atual.'
-                    : 'Opcional — só é preciso se quiseres usar o bot do WhatsApp.'}
+                    ? t('profile.phone_hint_existing')
+                    : t('profile.phone_hint_new')}
                 </p>
               </div>
 
               <div>
-                <label className={inputLabel}>Lado preferido</label>
+                <label className={inputLabel}>{t('profile.preferred_side_label')}</label>
                 <Select
                   value={preferredSide}
                   onChange={setPreferredSide}
                   options={[
-                    { value: 'left', label: 'Esquerda' },
-                    { value: 'right', label: 'Direita' },
-                    { value: 'both', label: 'Ambos' },
+                    { value: 'left', label: t('gamedetails.side_left') },
+                    { value: 'right', label: t('gamedetails.side_right') },
+                    { value: 'both', label: t('gamedetails.side_both') },
                   ]}
                 />
-                <p className="text-xs text-muted mt-1.5">Usado na formação de duplas dos mixes</p>
+                <p className="text-xs text-muted mt-1.5">{t('profile.preferred_side_hint')}</p>
+              </div>
+
+              <div>
+                <label className={inputLabel}>{t('profile.language_label')}</label>
+                <Select
+                  value={language}
+                  onChange={setLanguage}
+                  options={[
+                    { value: 'pt', label: t('profile.language_portuguese') },
+                    { value: 'en', label: t('profile.language_english') },
+                  ]}
+                />
               </div>
 
               <div className="pt-2 border-t border-line">
-                <h4 className="text-sm font-extrabold text-ink-900 mt-4 mb-1">Privacidade</h4>
+                <h4 className="text-sm font-extrabold text-ink-900 mt-4 mb-1">{t('profile.privacy_heading')}</h4>
                 <p className="text-xs text-muted mb-3">
-                  Escolhe quem vê cada secção do teu perfil. "Amigos" = jogadores que se seguem mutuamente.
+                  {t('profile.privacy_description')}
                 </p>
                 <div className="space-y-3">
                   <div>
-                    <label className={inputLabel}>Atividade (confrontos diretos)</label>
+                    <label className={inputLabel}>{t('profile.visibility_activity_label')}</label>
                     <Select value={activityVisibility} onChange={setActivityVisibility} options={VISIBILITY_OPTIONS} />
                   </div>
                   <div>
-                    <label className={inputLabel}>Resultados (pontos e estatísticas)</label>
+                    <label className={inputLabel}>{t('profile.visibility_results_label')}</label>
                     <Select value={resultsVisibility} onChange={setResultsVisibility} options={VISIBILITY_OPTIONS} />
                   </div>
                   <div>
-                    <label className={inputLabel}>Clubes (a que pertences)</label>
+                    <label className={inputLabel}>{t('profile.visibility_clubs_label')}</label>
                     <Select value={clubsVisibility} onChange={setClubsVisibility} options={VISIBILITY_OPTIONS} />
                   </div>
                 </div>
@@ -665,7 +703,7 @@ export default function Profile() {
 
               <div className="flex gap-3 pt-2">
                 <PrimaryButton type="submit" disabled={loading} className="flex-1">
-                  {loading ? 'A guardar…' : 'Guardar'}
+                  {loading ? t('layout.saving') : t('layout.save')}
                 </PrimaryButton>
                 <PrimaryButton
                   type="button"
@@ -675,6 +713,7 @@ export default function Profile() {
                     setName(profile.name)
                     setBirthday(profile.birthday || '')
                     setGender(profile.gender || '')
+                    setLanguage(profile.language || 'pt')
                     setActivityVisibility(profile.activity_visibility || 'public')
                     setResultsVisibility(profile.results_visibility || 'public')
                     setClubsVisibility(profile.clubs_visibility || 'public')
@@ -683,55 +722,64 @@ export default function Profile() {
                   }}
                   className="flex-1"
                 >
-                  Cancelar
+                  {t('gamedetails.cancel')}
                 </PrimaryButton>
               </div>
             </form>
           ) : (
             <div className="space-y-4">
               <div>
-                <p className={fieldLabel}>Nome</p>
+                <p className={fieldLabel}>{t('profile.name_label')}</p>
                 <p className={fieldValue}>{profile?.name}</p>
               </div>
 
               <div>
-                <p className={fieldLabel}>Email</p>
+                <p className={fieldLabel}>{t('profile.email_label')}</p>
                 <p className={fieldValue}>{profile?.email}</p>
               </div>
 
               <div>
-                <p className={fieldLabel}>Data de nascimento</p>
+                <p className={fieldLabel}>{t('profile.birthday_label')}</p>
                 <p className={fieldValue}>
-                  {profile?.birthday ? new Date(profile.birthday).toLocaleDateString('pt-PT') : 'Não definido'}
+                  {profile?.birthday ? formatDateLib(profile.birthday, i18n.language) : t('profile.not_set')}
                 </p>
               </div>
 
               <div>
-                <p className={fieldLabel}>Género</p>
+                <p className={fieldLabel}>{t('profile.gender_label')}</p>
                 <p className={fieldValue}>
-                  {profile?.gender ? profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1) : 'Não definido'}
+                  {profile?.gender
+                    ? (GENDER_LABEL_KEY[profile.gender] ? t(GENDER_LABEL_KEY[profile.gender]) : profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1))
+                    : t('profile.not_set')}
                 </p>
               </div>
 
               <div>
-                <p className={fieldLabel}>Nº de telemóvel</p>
-                <p className={fieldValue}>{profile?.phone_hash ? 'Associado ✓' : 'Não associado'}</p>
+                <p className={fieldLabel}>{t('profile.phone_label')}</p>
+                <p className={fieldValue}>{profile?.phone_hash ? t('profile.phone_linked') : t('profile.phone_not_linked')}</p>
               </div>
 
               <div>
-                <p className={fieldLabel}>Ranking (calculado dos resultados)</p>
+                <p className={fieldLabel}>{t('profile.rating_label')}</p>
                 <div className="flex items-center gap-2">
                   <p className={fieldValue}>
-                    {profile?.rating != null ? `${formatRating(profile.rating)} pontos` : 'Ainda sem ranking'}
+                    {profile?.rating != null ? `${formatRating(profile.rating)} ${t('rankings.points_label')}` : t('profile.no_rating_yet')}
                   </p>
                   <RatingBadge rating={profile?.rating} gender={profile?.gender} />
                 </div>
               </div>
 
               <div>
-                <p className={fieldLabel}>Lado preferido</p>
+                <p className={fieldLabel}>{t('profile.preferred_side_label')}</p>
                 <p className={fieldValue}>
-                  {{ left: 'Esquerda', right: 'Direita', both: 'Ambos' }[profile?.preferred_side] || 'Ambos'}
+                  {t(SIDE_LABEL_KEY[profile?.preferred_side] || SIDE_LABEL_KEY.both)}
+                </p>
+              </div>
+
+              <div>
+                <p className={fieldLabel}>{t('profile.language_label')}</p>
+                <p className={fieldValue}>
+                  {profile?.language === 'en' ? t('profile.language_english') : t('profile.language_portuguese')}
                 </p>
               </div>
             </div>
@@ -745,7 +793,7 @@ export default function Profile() {
         {/* Pedidos de amizade */}
         {friendRequests.length > 0 && (
           <div className="card space-y-3">
-            <p className="text-sm font-extrabold text-ink-900">Pedidos de amizade</p>
+            <p className="text-sm font-extrabold text-ink-900">{t('profile.friend_requests_heading')}</p>
             {friendRequests.map((req) => (
               <div key={req.id} className="flex items-center gap-3">
                 <Avatar name={req.requester_name} url={req.requester_avatar_url} size="w-10 h-10 text-sm" />
@@ -753,7 +801,7 @@ export default function Profile() {
                 <button
                   onClick={() => handleAcceptFriendRequest(req.id)}
                   disabled={friendRequestActing === req.id}
-                  aria-label="Aceitar pedido"
+                  aria-label={t('profile.accept_request_aria')}
                   className="w-9 h-9 shrink-0 rounded-full bg-lime-400 text-ink-900 flex items-center justify-center hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
                 >
                   <UserCheck size={16} />
@@ -761,7 +809,7 @@ export default function Profile() {
                 <button
                   onClick={() => handleDeclineFriendRequest(req.id)}
                   disabled={friendRequestActing === req.id}
-                  aria-label="Recusar pedido"
+                  aria-label={t('profile.decline_request_aria')}
                   className="w-9 h-9 shrink-0 rounded-full bg-ink-50 text-ink-700 flex items-center justify-center hover:bg-ink-200 transition-colors duration-fast disabled:opacity-40"
                 >
                   <X size={16} />
@@ -775,16 +823,16 @@ export default function Profile() {
             anywhere on the profile until the other person acted on them. */}
         {outgoingRequests.length > 0 && (
           <div className="card space-y-3">
-            <p className="text-sm font-extrabold text-ink-900">Pedidos enviados</p>
+            <p className="text-sm font-extrabold text-ink-900">{t('profile.sent_requests_heading')}</p>
             {outgoingRequests.map((req) => (
               <div key={req.id} className="flex items-center gap-3">
                 <Avatar name={req.addressee_name} url={req.addressee_avatar_url} size="w-10 h-10 text-sm" />
                 <p className="flex-1 min-w-0 font-extrabold text-ink-900 text-sm truncate">{req.addressee_name}</p>
-                <span className="text-[11px] font-extrabold uppercase tracking-wide text-muted shrink-0">Pendente</span>
+                <span className="text-[11px] font-extrabold uppercase tracking-wide text-muted shrink-0">{t('profile.pending_badge')}</span>
                 <button
                   onClick={() => handleCancelOutgoingRequest(req.id)}
                   disabled={outgoingRequestActing === req.id}
-                  aria-label="Cancelar pedido"
+                  aria-label={t('profile.cancel_request_aria')}
                   className="w-9 h-9 shrink-0 rounded-full bg-ink-50 text-ink-700 flex items-center justify-center hover:bg-ink-200 transition-colors duration-fast disabled:opacity-40"
                 >
                   <X size={16} />
@@ -801,8 +849,8 @@ export default function Profile() {
         ) : friends.length === 0 ? (
           <EmptyState
             icon={Users}
-            title="Ainda não tens amigos"
-            subtitle="Envia um pedido de amizade a partir do perfil de outro jogador."
+            title={t('profile.no_friends_title')}
+            subtitle={t('profile.no_friends_subtitle')}
           />
         ) : (
           <div className="card p-0 overflow-hidden divide-y divide-line">
@@ -829,8 +877,8 @@ export default function Profile() {
         ) : orgInvites.length === 0 ? (
           <EmptyState
             icon={Users}
-            title="Sem convites pendentes"
-            subtitle="Convites de admins de clube para te juntares aparecem aqui."
+            title={t('profile.no_invites_title')}
+            subtitle={t('profile.no_invites_subtitle')}
           />
         ) : (
           <div className="card space-y-3">
@@ -839,12 +887,12 @@ export default function Profile() {
                 <Avatar name={inv.organization_name} url={inv.organization_logo_url} size="w-10 h-10 text-sm" />
                 <div className="flex-1 min-w-0">
                   <p className="font-extrabold text-ink-900 text-sm truncate">{inv.organization_name}</p>
-                  <p className="text-xs text-muted truncate">Convidado por {inv.invited_by_name}</p>
+                  <p className="text-xs text-muted truncate">{t('profile.invited_by', { name: inv.invited_by_name })}</p>
                 </div>
                 <button
                   onClick={() => handleAcceptOrgInvite(inv.id)}
                   disabled={orgInviteActing === inv.id}
-                  aria-label="Aceitar convite"
+                  aria-label={t('profile.accept_invite_aria')}
                   className="w-9 h-9 shrink-0 rounded-full bg-lime-400 text-ink-900 flex items-center justify-center hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
                 >
                   <UserCheck size={16} />
@@ -852,7 +900,7 @@ export default function Profile() {
                 <button
                   onClick={() => handleDeclineOrgInvite(inv.id)}
                   disabled={orgInviteActing === inv.id}
-                  aria-label="Recusar convite"
+                  aria-label={t('profile.decline_invite_aria')}
                   className="w-9 h-9 shrink-0 rounded-full bg-ink-50 text-ink-700 flex items-center justify-center hover:bg-ink-200 transition-colors duration-fast disabled:opacity-40"
                 >
                   <X size={16} />
@@ -869,8 +917,8 @@ export default function Profile() {
           mixHistory.length === 0 ? (
             <EmptyState
               icon={Trophy}
-              title="Ainda não tens mixes terminados"
-              subtitle="Quando terminares o teu primeiro mix, o histórico aparece aqui."
+              title={t('profile.no_mix_history_title')}
+              subtitle={t('profile.no_mix_history_subtitle')}
             />
           ) : (
             <div className="space-y-2.5">
@@ -890,7 +938,7 @@ export default function Profile() {
                     <span className={`text-xs font-extrabold px-2.5 py-1.5 rounded-full shrink-0 tabular-nums ${
                       m.position === 1 ? 'bg-lime-400 text-ink-900' : 'bg-ink-50 text-ink-700'
                     }`}>
-                      {m.position}º de {m.totalDuplas}
+                      {t('profile.position_of_total', { position: ordinal(m.position), total: m.totalDuplas })}
                     </span>
                   )}
                 </Link>
@@ -902,13 +950,13 @@ export default function Profile() {
         {/* Private match history */}
         {!privateMatchHistoryLoading && (
           <div>
-            <h3 className="text-lg text-ink-900 mb-3 mt-4">Jogos entre amigos</h3>
+            <h3 className="text-lg text-ink-900 mb-3 mt-4">{t('profile.friendly_matches_heading')}</h3>
 
             {privateMatchHistory.length === 0 ? (
               <EmptyState
                 icon={Trophy}
-                title="Ainda não tens jogos entre amigos"
-                subtitle="Cria um jogo 2x2 fora do clube para começares o teu histórico."
+                title={t('profile.no_friendly_matches_title')}
+                subtitle={t('profile.no_friendly_matches_subtitle')}
               />
             ) : (
               <div className="space-y-2.5">
@@ -919,12 +967,12 @@ export default function Profile() {
                     <Link key={m.id} to="/jogos-privados" className="card press flex items-center justify-between hover:shadow-lift">
                       <div className="min-w-0">
                         <p className="font-extrabold text-ink-900 text-sm truncate">
-                          {teamLabel('team_a')} vs {teamLabel('team_b')}
+                          {teamLabel('team_a')} {t('gamedetails.vs')} {teamLabel('team_b')}
                         </p>
                         <p className="text-[11px] text-muted mt-0.5">{m.score_a} - {m.score_b}</p>
                       </div>
                       <span className="text-xs font-extrabold px-2.5 py-1.5 rounded-full shrink-0 tabular-nums bg-ink-50 text-ink-700">
-                        {m.my_points} pts
+                        {m.my_points} {t('gamedetails.points_suffix')}
                       </span>
                     </Link>
                   )
