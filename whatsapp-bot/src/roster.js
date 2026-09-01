@@ -10,7 +10,17 @@ export async function loadGame(gameId) {
   // of awaiting one at a time.
   const [gameResult, participantsResult, waitlistedResult] = await Promise.all([
     supabase.from('games').select('*').eq('id', gameId).single(),
-    supabase.from('participants').select('user_id, partner_id').eq('game_id', gameId).eq('status', 'confirmed'),
+    // Join order, matching GameDetails.jsx's roster. Without an ORDER BY,
+    // Postgres returns heap order — which reshuffles whenever a row is
+    // UPDATEd in place (e.g. a suplente promotion flips status on the
+    // existing row), scrambling the numbered list in the group.
+    supabase
+      .from('participants')
+      .select('user_id, partner_id')
+      .eq('game_id', gameId)
+      .eq('status', 'confirmed')
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true }),
     // FIFO queue order, matching the promotion order in check_game_promote().
     supabase
       .from('participants')
