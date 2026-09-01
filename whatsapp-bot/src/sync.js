@@ -11,6 +11,9 @@ const RECONCILE_INTERVAL_MS = 60 * 1000
 // message covering every open mix at once, not one message per mix.
 let debounceTimer = null
 let lastPostedHash = null
+// When the last repost was fired (leading or trailing). Drives the leading
+// edge below: a change after a quiet window posts immediately.
+let lastPostAt = 0
 // Sticky across debounce coalescing: if ANY change folded into the next
 // repost was a create/edit, the eventual send tags @all — a rapid
 // create+edit within the debounce window doesn't lose the tag.
@@ -56,19 +59,39 @@ async function postCombinedRoster(sendText, getGroupMentions, { tagAll = false, 
   lastPostedHash = nextHash
 }
 
+function flushRepost(sendText, getGroupMentions) {
+  const shouldTagAll = pendingTagAll
+  const namesToAnnounce = pendingPromotedNames
+  pendingTagAll = false
+  pendingPromotedNames = []
+  postCombinedRoster(sendText, getGroupMentions, { tagAll: shouldTagAll, promotedNames: namesToAnnounce }).catch((err) =>
+    console.error('Failed to repost combined roster:', err)
+  )
+}
+
+// Leading + trailing debounce. A join has no direct reply — the roster
+// repost IS the confirmation (see commands.js) — so a pure trailing
+// debounce made every single "In" feel DEBOUNCE_MS slow. Now the first
+// change after a quiet window posts immediately (the common case: one
+// person joining), and only changes landing inside the window coalesce
+// into one trailing repost. A burst of N joins costs at most 2 messages
+// (the immediate one + the coalesced final), and the hash dedupe in
+// postCombinedRoster still swallows no-op sends.
 function scheduleRepost(sendText, getGroupMentions, { tagAll = false, promotedNames = [] } = {}) {
   pendingTagAll = pendingTagAll || tagAll
   pendingPromotedNames = pendingPromotedNames.concat(promotedNames)
+
+  if (!debounceTimer && Date.now() - lastPostAt >= DEBOUNCE_MS) {
+    lastPostAt = Date.now()
+    flushRepost(sendText, getGroupMentions)
+    return
+  }
+
   if (debounceTimer) clearTimeout(debounceTimer)
   debounceTimer = setTimeout(() => {
     debounceTimer = null
-    const shouldTagAll = pendingTagAll
-    const namesToAnnounce = pendingPromotedNames
-    pendingTagAll = false
-    pendingPromotedNames = []
-    postCombinedRoster(sendText, getGroupMentions, { tagAll: shouldTagAll, promotedNames: namesToAnnounce }).catch((err) =>
-      console.error('Failed to repost combined roster:', err)
-    )
+    lastPostAt = Date.now()
+    flushRepost(sendText, getGroupMentions)
   }, DEBOUNCE_MS)
 }
 

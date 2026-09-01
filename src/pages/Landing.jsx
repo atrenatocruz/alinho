@@ -453,6 +453,12 @@ function Footer() {
           <Link to="/instrucoes" className="inline-flex items-center min-h-[44px] px-1 text-ink-700 font-extrabold text-sm hover:underline">
             {t('landing.instructions_link')}
           </Link>
+          <Link to="/termos" className="inline-flex items-center min-h-[44px] px-1 text-ink-700 font-extrabold text-sm hover:underline">
+            {t('landing.terms_link')}
+          </Link>
+          <Link to="/privacidade" className="inline-flex items-center min-h-[44px] px-1 text-ink-700 font-extrabold text-sm hover:underline">
+            {t('landing.privacy_link')}
+          </Link>
         </div>
         <p className="text-muted text-xs">&copy; {year} alinho</p>
       </div>

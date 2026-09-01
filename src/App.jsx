@@ -21,8 +21,12 @@ import JoinPrivateMatch from './pages/JoinPrivateMatch'
 import Gerir from './pages/Gerir'
 import GerirClube from './pages/GerirClube'
 import Instructions from './pages/Instructions'
+import PrivacyPolicy from './pages/PrivacyPolicy'
+import TermsOfService from './pages/TermsOfService'
+import CookieConsentBanner from './components/CookieConsentBanner'
 import MixOffline from './pages/MixOffline'
 import EscolherNivel from './pages/EscolherNivel'
+import ConsentGate from './pages/ConsentGate'
 
 // showSplash covers both the auth check and the splash's minimum display
 // duration (see AppRoutes) — while true, Guard shows the splash instead of
@@ -92,6 +96,17 @@ const Guard = ({ require, showSplash, children }) => {
     return <LoadErrorScreen onRetry={retryProfile} />
   }
 
+  // Consent gate (Trello #154): brand-new accounts (email/password or
+  // Google) must accept the Privacy Policy/Terms once before reaching the
+  // app — checked BEFORE rating-onboarding so no profile data (like a
+  // self-selected rating) gets written before consent is on file. Existing
+  // pilot accounts are grandfathered — the migration backfills
+  // consent_accepted_at = NOW() for every profile that existed before this
+  // shipped, so only genuinely new signups see this screen.
+  if (user && profile && profile.consent_accepted_at === null) {
+    return <ConsentGate />
+  }
+
   // Auto-classificação do primeiro registo (Elo v1): contas novas escolhem
   // o nível de entrada antes de usar a app. Comparação estrita com null —
   // contas de antes da migração têm o carimbo preenchido, e um cliente a
@@ -151,6 +166,8 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
       <Route path="/instrucoes" element={<Instructions />} />
+      <Route path="/privacidade" element={<PrivacyPolicy />} />
+      <Route path="/termos" element={<TermsOfService />} />
       <Route path="/mix-offline" element={<MixOffline />} />
       <Route
         path="/"
@@ -257,6 +274,7 @@ function App() {
     <AuthProvider>
       <Router>
         <AppRoutes />
+        <CookieConsentBanner />
       </Router>
     </AuthProvider>
   )
