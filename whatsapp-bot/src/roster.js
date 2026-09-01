@@ -2,6 +2,7 @@ import { supabase } from './supabase.js'
 import { config } from './config.js'
 import { helpFooter } from './messages.js'
 import { t } from './locales.js'
+import { nameWithBand } from './elo.js'
 
 /** Loads a game plus its confirmed participants (flattened to one entry per person, partners included — mirrors GameDetails.jsx's `people` derivation). */
 export async function loadGame(gameId) {
@@ -61,24 +62,35 @@ export async function loadGame(gameId) {
     // group, not a message addressed to any single participant, so it can't
     // sensibly pick one person's language. It always renders in 'pt' (see
     // buildCombinedRosterMessage below).
-    const { data: profiles, error: profilesError } = await supabase
+    let { data: profiles, error: profilesError } = await supabase
       .from('profiles')
-      .select('id, name, language')
+      .select('id, name, language, rating, gender')
       .in('id', Array.from(profileIds))
 
+    // 42703 = undefined_column: a migração do Elo ainda não correu nesta
+    // base de dados — degrada para nomes sem banda em vez de partir o
+    // roster inteiro.
+    if (profilesError && profilesError.code === '42703') {
+      ;({ data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, name, language')
+        .in('id', Array.from(profileIds)))
+    }
+
     if (profilesError) throw new Error(`Failed to load profiles: ${profilesError.message}`)
-    profilesById = new Map(profiles.map((p) => [p.id, p.name]))
+    profilesById = new Map(profiles.map((p) => [p.id, p]))
   }
 
+  const FALLBACK_PERSON = { name: 'Jogador', rating: null, gender: null }
   const people = []
   for (const row of participants) {
-    people.push(profilesById.get(row.user_id) || 'Jogador')
+    people.push(profilesById.get(row.user_id) || FALLBACK_PERSON)
     if (row.partner_id) {
-      people.push(profilesById.get(row.partner_id) || 'Jogador')
+      people.push(profilesById.get(row.partner_id) || FALLBACK_PERSON)
     }
   }
 
-  const suplentes = waitlisted.map((row) => profilesById.get(row.user_id) || 'Jogador')
+  const suplentes = waitlisted.map((row) => profilesById.get(row.user_id) || FALLBACK_PERSON)
 
   const capacity = game.max_players || game.num_courts * 4
   return { game, people, capacity, suplentes }
@@ -109,12 +121,6 @@ export async function getOpenMixes() {
   openMixesCache = data
   openMixesCachedAt = Date.now()
   return openMixesCache
-}
-
-function firstNameLastInitial(fullName) {
-  const parts = fullName.trim().split(/\s+/)
-  if (parts.length === 1) return parts[0]
-  return `${parts[0]} ${parts[parts.length - 1][0]}.`
 }
 
 // 'en' maps to en-GB (not en-US) — same day/month ordering players are
@@ -169,8 +175,10 @@ function buildMixBlock({ game, people, capacity, suplentes = [] }, { showCode })
       // Blank line every 4 slots — one court's worth of players — so the
       // list reads as courts, not one long undifferentiated list.
       if (i > 0 && i % 4 === 0) lines.push('')
-      const name = people[i]
-      lines.push(name ? `${i + 1}. 🎾 ${firstNameLastInitial(name)}` : `${i + 1}. 🎾 (vaga livre)`)
+      // Nome completo + banda Elo — abreviar deixava "Ruben M." ambíguo
+      // num grupo com dois Rubens M.
+      const person = people[i]
+      lines.push(person ? `${i + 1}. 🎾 ${nameWithBand(person)}` : `${i + 1}. 🎾 (vaga livre)`)
     }
     lines.push('')
     if (people.length >= capacity) {
@@ -181,7 +189,7 @@ function buildMixBlock({ game, people, capacity, suplentes = [] }, { showCode })
       lines.push(`🙋 Escreve *In* ou *Alinho* para entrares, *Out* ou *Fora* para saíres`)
     }
     if (suplentes.length > 0) {
-      lines.push(`👥 *Suplentes:* ${suplentes.map(firstNameLastInitial).join(', ')}`)
+      lines.push(`👥 *Suplentes:* ${suplentes.map(nameWithBand).join(', ')}`)
     }
   }
 
@@ -208,7 +216,7 @@ export function buildCombinedRosterMessage(mixStates, { promotedNames = [] } = {
   // promoted participant's name).
   const promoBlock = promotedNames.length > 0
     ? `${promotedNames
-        .map(({ name, lang }) => t('promoted_to_confirmed', lang ?? 'pt', { name: firstNameLastInitial(name) }))
+        .map(({ name, lang }) => t('promoted_to_confirmed', lang ?? 'pt', { name }))
         .join('\n')}\n\n`
     : ''
   const header = showCode ? `📋 *Mixes abertos (${mixStates.length})*\n\n` : ''
