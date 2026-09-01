@@ -9,6 +9,15 @@ import { formatDate } from './formatDate'
 export const winRatePct = (won, played) =>
   played > 0 ? Math.round((won / played) * 100) : 0
 
+// First + last name only — drops middle names so a legal name like "Rui
+// Manuel Oliveira Gomes" stays compact in duplas rows, stats lists and the
+// share-card image. Falls back to the single word when the name has just one.
+export const firstLastName = (name) => {
+  if (!name) return '?'
+  const parts = name.trim().split(/\s+/)
+  return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1]}` : parts[0]
+}
+
 export const monthKey = (dateString) => {
   const d = new Date(dateString)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`

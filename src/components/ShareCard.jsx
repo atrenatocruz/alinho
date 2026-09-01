@@ -192,10 +192,19 @@ function InviteCard({ game, people, capacity, formattedDate }) {
   )
 }
 
-function PodiumCard({ game, duplas }) {
+function PodiumCard({ game, duplas, winnerTeamId }) {
   const { t } = useTranslation()
-  const top = duplas.slice(0, 3)
-  const rest = duplas.slice(3)
+  // Highlight the mix's actual declared winner (winner_team_id), not just
+  // whichever dupla has the highest combined player points — those diverge
+  // in elimination-format mixes, where the final match decides the winner
+  // regardless of aggregate points. Falls back to points-sort order when no
+  // winner is known (shouldn't happen for a finished mix, but keeps the
+  // card from crashing if it ever is).
+  const ordered = winnerTeamId
+    ? [...duplas].sort((a, b) => (a.id === winnerTeamId ? -1 : b.id === winnerTeamId ? 1 : b.points - a.points))
+    : duplas
+  const top = ordered.slice(0, 3)
+  const rest = ordered.slice(3)
   return (
     <CardShell autoHeight>
       <p className="text-[13px] font-mono font-extrabold tracking-[0.2em] uppercase text-lime-400 mb-3">
@@ -345,7 +354,7 @@ function DuplasCard({ game, duplas }) {
 /* Imperative `exportPng()` is the only thing consumers need — ShareModal
    calls it on tap, not on every render, since rasterizing is not free. */
 const ShareCard = forwardRef(function ShareCard(props, ref) {
-  const { variant, game, people = [], capacity, duplas = [], formattedDate } = props
+  const { variant, game, people = [], capacity, duplas = [], formattedDate, winnerTeamId } = props
   const nodeRef = useRef(null)
 
   useImperativeHandle(ref, () => ({
@@ -372,7 +381,7 @@ const ShareCard = forwardRef(function ShareCard(props, ref) {
   return (
     <div ref={nodeRef}>
       {variant === 'podium'
-        ? <PodiumCard game={game} duplas={duplas} />
+        ? <PodiumCard game={game} duplas={duplas} winnerTeamId={winnerTeamId} />
         : variant === 'duplas'
         ? <DuplasCard game={game} duplas={duplas} />
         : <InviteCard game={game} people={people} capacity={capacity} formattedDate={formattedDate} />}

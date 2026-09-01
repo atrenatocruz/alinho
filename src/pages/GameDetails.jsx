@@ -13,7 +13,7 @@ import {
   roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches,
   PHASE_LABEL_KEY, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY,
 } from '../lib/mixLogic'
-import { winRatePct } from '../lib/statsLogic'
+import { winRatePct, firstLastName } from '../lib/statsLogic'
 import { getGlobalRankings } from '../lib/privateMatches'
 import { formatDate as formatDateLib } from '../lib/formatDate'
 
@@ -864,8 +864,7 @@ export default function GameDetails() {
   const teamName = (teamId) => {
     const team = teamById[teamId]
     if (!team) return '—'
-    const first = (p) => p?.name?.split(' ')[0] || '?'
-    return `${first(team.player1)} / ${first(team.player2)}`
+    return `${firstLastName(team.player1?.name)} / ${firstLastName(team.player2?.name)}`
   }
 
   // Read-only "Duplas" display: one team's points/badges + its two player rows.
@@ -1074,6 +1073,7 @@ export default function GameDetails() {
             capacity,
             duplas: duplaStats,
             formattedDate: formatDate(game.date),
+            winnerTeamId: game.winner_team_id,
           }}
         />
       )}
@@ -1196,7 +1196,7 @@ export default function GameDetails() {
               const nameBlock = (
                 <div className="flex-1 min-w-0">
                   <p className="font-extrabold text-ink-900 truncate">
-                    {s.user?.name || '—'}
+                    {firstLastName(s.user?.name)}
                     {s.mix_won && <span className="ml-1.5">🏆</span>}
                   </p>
                   <p className="text-[11px] text-muted">
@@ -1204,6 +1204,10 @@ export default function GameDetails() {
                   </p>
                 </div>
               )
+              // rating_delta/rating_after only exist from the Elo rollout
+              // (2026-08-25) onward — older finished mixes fall back to the
+              // legacy points_earned they were actually finalized with.
+              const hasRating = s.rating_delta != null
               return (
                 <div key={s.id} className="flex items-center gap-3 py-2 border-b border-line last:border-0">
                   <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-extrabold tabular-nums shrink-0 ${
@@ -1217,8 +1221,21 @@ export default function GameDetails() {
                     </Link>
                   )}
                   <div className="text-right shrink-0">
-                    <p className="text-lg font-extrabold text-ink-900 tabular-nums">{s.points_earned}</p>
-                    <p className="text-[11px] text-muted">{t('gamedetails.points_label')}</p>
+                    {hasRating ? (
+                      <p className="text-lg font-extrabold tabular-nums flex items-center justify-end gap-1.5">
+                        <span className={s.rating_delta >= 0 ? 'text-ok' : 'text-danger'}>
+                          {s.rating_delta >= 0 ? '+' : ''}{Math.round(s.rating_delta)}
+                        </span>
+                        {s.rating_after != null && (
+                          <span className="text-ink-900">{Math.round(s.rating_after)}</span>
+                        )}
+                      </p>
+                    ) : (
+                      <p className="text-lg font-extrabold text-ink-900 tabular-nums">{s.points_earned}</p>
+                    )}
+                    <p className="text-[11px] text-muted">
+                      {hasRating ? t('gamedetails.rating_label') : t('gamedetails.points_label')}
+                    </p>
                   </div>
                 </div>
               )
