@@ -916,5 +916,8 @@
   "cookieconsent.message": "Usamos apenas cookies essenciais para a app funcionar. Não usamos cookies de publicidade ou analytics de terceiros.",
   "cookieconsent.privacy_link": "Saber mais",
   "cookieconsent.accept": "Aceitar",
-  "cookieconsent.decline": "Recusar"
+  "cookieconsent.decline": "Recusar",
+  "landing.privacy_link": "Privacidade",
+  "landing.terms_link": "Termos",
+  "login.signup_consent_notice": "Ao criar conta, aceitas os <0>Termos de Serviço</0> e a <1>Política de Privacidade</1>."
 }

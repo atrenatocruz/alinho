@@ -916,5 +916,8 @@
   "cookieconsent.message": "We only use essential cookies to make the app work. We don't use third-party advertising or analytics cookies.",
   "cookieconsent.privacy_link": "Learn more",
   "cookieconsent.accept": "Accept",
-  "cookieconsent.decline": "Decline"
+  "cookieconsent.decline": "Decline",
+  "landing.privacy_link": "Privacy",
+  "landing.terms_link": "Terms",
+  "login.signup_consent_notice": "By creating an account, you agree to our <0>Terms of Service</0> and <1>Privacy Policy</1>."
 }

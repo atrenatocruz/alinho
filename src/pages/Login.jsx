@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { useTranslation } from 'react-i18next'
+import { useTranslation, Trans } from 'react-i18next'
 import { Eye, EyeOff, Lock } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton, DateField, Select } from '../components/ui'
@@ -442,6 +442,19 @@ export default function Login() {
               <PrimaryButton type="submit" disabled={loading} className="w-full">
                 {loading ? t('login.creating_account') : t('login.signup_button')}
               </PrimaryButton>
+
+              <p className="text-[11px] text-muted text-center">
+                <Trans i18nKey="login.signup_consent_notice">
+                  Ao criar conta, aceitas os{' '}
+                  <Link to="/termos" className="underline font-extrabold text-ink-700">
+                    Termos de Serviço
+                  </Link>{' '}
+                  e a{' '}
+                  <Link to="/privacidade" className="underline font-extrabold text-ink-700">
+                    Política de Privacidade
+                  </Link>.
+                </Trans>
+              </p>
             </form>
           )}
 
