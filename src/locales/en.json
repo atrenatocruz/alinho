@@ -919,5 +919,13 @@
   "cookieconsent.decline": "Decline",
   "landing.privacy_link": "Privacy",
   "landing.terms_link": "Terms",
-  "login.signup_consent_notice": "By creating an account, you agree to our <0>Terms of Service</0> and <1>Privacy Policy</1>."
+  "login.signup_consent_notice": "By creating an account, you agree to our <0>Terms of Service</0> and <1>Privacy Policy</1>.",
+  "consentgate.heading": "Before you continue",
+  "consentgate.body": "To use alinho, we need you to accept our",
+  "consentgate.and": "and",
+  "consentgate.terms_link": "Terms of Service",
+  "consentgate.privacy_link": "Privacy Policy",
+  "consentgate.accept": "I accept",
+  "consentgate.accepting": "Saving...",
+  "consentgate.error_retry": "Couldn't save. Try again."
 }

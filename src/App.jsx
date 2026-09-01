@@ -26,6 +26,7 @@ import TermsOfService from './pages/TermsOfService'
 import CookieConsentBanner from './components/CookieConsentBanner'
 import MixOffline from './pages/MixOffline'
 import EscolherNivel from './pages/EscolherNivel'
+import ConsentGate from './pages/ConsentGate'
 
 // showSplash covers both the auth check and the splash's minimum display
 // duration (see AppRoutes) — while true, Guard shows the splash instead of
@@ -102,6 +103,15 @@ const Guard = ({ require, showSplash, children }) => {
   // pode ficar preso aqui.
   if (user && profile && profile.rating_onboarded_at === null) {
     return <EscolherNivel />
+  }
+
+  // Consent gate (Trello #154): brand-new accounts (email/password or
+  // Google) must accept the Privacy Policy/Terms once before reaching the
+  // app. Existing pilot accounts are grandfathered — the migration
+  // backfills consent_accepted_at = NOW() for every profile that existed
+  // before this shipped, so only genuinely new signups see this screen.
+  if (user && profile && profile.consent_accepted_at === null) {
+    return <ConsentGate />
   }
 
   // "/" is the one public route: signed-out visitors see the Landing page

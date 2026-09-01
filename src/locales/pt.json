@@ -919,5 +919,13 @@
   "cookieconsent.decline": "Recusar",
   "landing.privacy_link": "Privacidade",
   "landing.terms_link": "Termos",
-  "login.signup_consent_notice": "Ao criar conta, aceitas os <0>Termos de Serviço</0> e a <1>Política de Privacidade</1>."
+  "login.signup_consent_notice": "Ao criar conta, aceitas os <0>Termos de Serviço</0> e a <1>Política de Privacidade</1>.",
+  "consentgate.heading": "Antes de continuar",
+  "consentgate.body": "Para usar o alinho, precisamos que aceites os nossos",
+  "consentgate.and": "e a",
+  "consentgate.terms_link": "Termos de Serviço",
+  "consentgate.privacy_link": "Política de Privacidade",
+  "consentgate.accept": "Aceito",
+  "consentgate.accepting": "A guardar...",
+  "consentgate.error_retry": "Não foi possível guardar. Tenta novamente."
 }
