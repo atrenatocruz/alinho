@@ -1222,12 +1222,12 @@ export default function GameDetails() {
                   )}
                   <div className="text-right shrink-0">
                     {hasRating ? (
-                      <p className="text-lg font-extrabold tabular-nums flex items-center justify-end gap-1.5">
-                        <span className={s.rating_delta >= 0 ? 'text-ok' : 'text-danger'}>
+                      <p className="flex items-center justify-end gap-1.5">
+                        <span className={`text-xs font-extrabold tabular-nums ${s.rating_delta >= 0 ? 'text-ok' : 'text-danger'}`}>
                           {s.rating_delta >= 0 ? '+' : ''}{Math.round(s.rating_delta)}
                         </span>
                         {s.rating_after != null && (
-                          <span className="text-ink-900">{Math.round(s.rating_after)}</span>
+                          <span className="text-lg font-extrabold text-ink-900 tabular-nums">{Math.round(s.rating_after)}</span>
                         )}
                       </p>
                     ) : (
