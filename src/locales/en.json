@@ -912,5 +912,9 @@
   "terms.section_law_title": "Governing law",
   "terms.section_law_body": "These terms are governed by Portuguese law.",
   "terms.section_contact_title": "Contact",
-  "terms.section_contact_body": "For any question about these terms, contact us at alinhopt@gmail.com."
+  "terms.section_contact_body": "For any question about these terms, contact us at alinhopt@gmail.com.",
+  "cookieconsent.message": "We only use essential cookies to make the app work. We don't use third-party advertising or analytics cookies.",
+  "cookieconsent.privacy_link": "Learn more",
+  "cookieconsent.accept": "Accept",
+  "cookieconsent.decline": "Decline"
 }

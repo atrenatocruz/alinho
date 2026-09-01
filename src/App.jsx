@@ -23,6 +23,7 @@ import GerirClube from './pages/GerirClube'
 import Instructions from './pages/Instructions'
 import PrivacyPolicy from './pages/PrivacyPolicy'
 import TermsOfService from './pages/TermsOfService'
+import CookieConsentBanner from './components/CookieConsentBanner'
 import MixOffline from './pages/MixOffline'
 import EscolherNivel from './pages/EscolherNivel'
 
@@ -261,6 +262,7 @@ function App() {
     <AuthProvider>
       <Router>
         <AppRoutes />
+        <CookieConsentBanner />
       </Router>
     </AuthProvider>
   )

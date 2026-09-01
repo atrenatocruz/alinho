@@ -912,5 +912,9 @@
   "terms.section_law_title": "Lei aplicável",
   "terms.section_law_body": "Estes termos regem-se pela lei portuguesa.",
   "terms.section_contact_title": "Contacto",
-  "terms.section_contact_body": "Para qualquer questão sobre estes termos, contacta-nos em alinhopt@gmail.com."
+  "terms.section_contact_body": "Para qualquer questão sobre estes termos, contacta-nos em alinhopt@gmail.com.",
+  "cookieconsent.message": "Usamos apenas cookies essenciais para a app funcionar. Não usamos cookies de publicidade ou analytics de terceiros.",
+  "cookieconsent.privacy_link": "Saber mais",
+  "cookieconsent.accept": "Aceitar",
+  "cookieconsent.decline": "Recusar"
 }
