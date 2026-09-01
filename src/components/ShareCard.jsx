@@ -230,9 +230,6 @@ function PodiumCard({ game, duplas, winnerTeamId }) {
             <span className="flex-1 min-w-0 text-white font-extrabold text-base leading-tight">
               {d.name}
             </span>
-            <span className="text-lime-400 font-extrabold text-xl tabular-nums shrink-0">
-              {d.points}
-            </span>
           </div>
         ))}
       </div>
@@ -245,9 +242,6 @@ function PodiumCard({ game, duplas, winnerTeamId }) {
               </span>
               <span className="flex-1 min-w-0 text-white font-semibold text-[13px] leading-tight">
                 {d.name}
-              </span>
-              <span className="text-lime-400 font-extrabold text-sm tabular-nums shrink-0">
-                {d.points}
               </span>
             </div>
           ))}
