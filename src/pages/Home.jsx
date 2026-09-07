@@ -192,14 +192,26 @@ export default function Home() {
   // reverse, for finished) is preserved within each of the two groups.
   const byFavoriteFirst = (a, b) =>
     Number(favoriteOrgIds.has(b.organization_id)) - Number(favoriteOrgIds.has(a.organization_id))
-  // One entry per recurring series (its representative occurrence) plus
-  // one per one-off mix — see src/lib/recurrenceGrouping.js. Bucketed into
-  // active/finished by the REPRESENTATIVE's own status, so a series with
-  // a currently active occurrence shows under Ativos even if older
-  // occurrences in the same series already finished.
+  // Ativos: one card per recurring series (its representative occurrence)
+  // plus one per one-off mix — see src/lib/recurrenceGrouping.js. A series
+  // with a currently active occurrence shows here even if older occurrences
+  // in the same series already finished (that's what the grouping is for:
+  // avoid two simultaneously-open cards with the same title confusing
+  // players — see docs/superpowers/specs/2026-08-25-recurring-mix-series-grouping-design.md).
+  //
+  // Terminados: NOT grouped — every individual finished game gets its own
+  // card, series or not. Grouping here would hide a just-finished occurrence
+  // behind whichever occurrence the series currently represents (e.g. it'd
+  // vanish the moment next week's occurrence goes active), reachable only
+  // by drilling into that other occurrence's "Histórico" section. Surfacing
+  // it directly was requested after that confused a user 2026-09-07.
   const seriesEntries = groupGamesBySeries(games)
   const activeEntries = seriesEntries.filter((entry) => !isFinished(entry.game)).sort((a, b) => byFavoriteFirst(a.game, b.game))
-  const finishedEntries = [...seriesEntries.filter((entry) => isFinished(entry.game))].reverse().sort((a, b) => byFavoriteFirst(a.game, b.game))
+  const finishedEntries = games
+    .filter((game) => isFinished(game))
+    .map((game) => ({ game, history: [] }))
+    .reverse()
+    .sort((a, b) => byFavoriteFirst(a.game, b.game))
   const visibleEntries = tab === 'ativos' ? activeEntries : finishedEntries
 
   // Grouped by club/group when the player belongs to more than one — makes
