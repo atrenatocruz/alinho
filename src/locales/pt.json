@@ -262,6 +262,7 @@
   "gamedetails.missing_to_close_court_other": "Faltam {{count}} para fechar o próximo campo",
   "gamedetails.status_mix_closed": "Mix fechado — campo reservado",
   "gamedetails.mix_winners_label": "🏆 Vencedores do mix",
+  "gamedetails.series_history_title": "Histórico",
   "gamedetails.tab_stats": "Estatísticas",
   "gamedetails.tab_duplas": "Duplas",
   "gamedetails.tab_rondas": "Rondas",

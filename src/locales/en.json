@@ -262,6 +262,7 @@
   "gamedetails.missing_to_close_court_other": "{{count}} more needed to close the next court",
   "gamedetails.status_mix_closed": "Mix closed — court reserved",
   "gamedetails.mix_winners_label": "🏆 Mix winners",
+  "gamedetails.series_history_title": "History",
   "gamedetails.tab_stats": "Stats",
   "gamedetails.tab_duplas": "Duplas",
   "gamedetails.tab_rondas": "Rounds",
