@@ -8,11 +8,6 @@ import { t } from './locales.js'
 const GAME_DAY_CHECK_INTERVAL_MS = 10 * 60 * 1000 // 10 min — fine grain relative to reminderHoursBefore
 const DIGEST_CHECK_INTERVAL_MS = 5 * 60 * 1000 // just needs to land inside the target hour once a day
 
-function firstNameLastInitial(fullName) {
-  const parts = fullName.trim().split(/\s+/)
-  if (parts.length === 1) return parts[0]
-  return `${parts[0]} ${parts[parts.length - 1][0]}.`
-}
 
 // A WhatsApp mention token is "@<digits>" inline in the text, matched up
 // against the real JID passed in `options.mentions` — WhatsApp then renders
@@ -64,7 +59,7 @@ async function sendGameDayReminder(game, { sendText }) {
       rosterMentions.push(p.whatsapp_jid)
       return mentionToken(p.whatsapp_jid)
     }
-    return firstNameLastInitial(p.name)
+    return p.name
   })
 
   const settings = await getSettings()

@@ -9,11 +9,6 @@ const CHECK_INTERVAL_MS = 5 * 60 * 1000
 // Duplicated from roster.js/reminders.js rather than shared — this
 // codebase already accepts that small duplication over a shared-utils
 // file for a one-line helper (see the identical copy in both of those).
-function firstNameLastInitial(fullName) {
-  const parts = fullName.trim().split(/\s+/)
-  if (parts.length === 1) return parts[0]
-  return `${parts[0]} ${parts[parts.length - 1][0]}.`
-}
 
 function mentionToken(jid) {
   return `@${jid.split('@')[0]}`
@@ -120,7 +115,7 @@ async function autoStartMix(game, { sendText }) {
       mentions.push(profile.whatsapp_jid)
       return mentionToken(profile.whatsapp_jid)
     }
-    return firstNameLastInitial(profile?.name || 'Jogador')
+    return profile?.name || 'Jogador'
   }
 
   const lines = insertedTeams.map(
