@@ -48,6 +48,17 @@ export function groupRatingBand(rating) {
 
 export const formatRating = (rating) => (rating == null ? '—' : String(Math.round(rating)))
 
+// Provisório: menos de 8 jogos contados (2 mixes) — o rating ainda é uma
+// aproximação. Espelha o limiar do escudo de parceiro no Postgres
+// (migration_elo_provisional_8.sql); mudar lá → mudar aqui. Distinto do
+// K de calibração (40/30/20), que mede outra coisa.
+export const PROVISIONAL_GAMES = 8
+export const isProvisional = (ratingGames) => ratingGames != null && ratingGames < PROVISIONAL_GAMES
+
+/** "~902" para provisórios, "902" para estabelecidos. */
+export const formatRatingMaybeProvisional = (rating, ratingGames) =>
+  `${isProvisional(ratingGames) ? '~' : ''}${formatRating(rating)}`
+
 // Níveis do ecrã de auto-classificação (primeiro registo). As keys são o
 // contrato com o RPC complete_rating_onboarding — não mudar sem migração.
 export const ONBOARDING_LEVELS = [

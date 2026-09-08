@@ -10,7 +10,7 @@ import { getMyPrivateMatches, getGlobalRankings } from '../lib/privateMatches'
 import { listIncomingFriendRequests, acceptFriendRequest, removeFriendRequest, listFriends, listOutgoingFriendRequests } from '../lib/friends'
 import { listIncomingOrganizationInvites, acceptOrganizationInvite, declineOrganizationInvite } from '../lib/orgInvites'
 import { PrimaryButton, GuestBadge, DateField, Avatar, Select, EmptyState, RankBadge, RatingBadge, PhotoViewerModal } from '../components/ui'
-import { formatRating } from '../lib/elo'
+import { formatRating, formatRatingMaybeProvisional, isProvisional } from '../lib/elo'
 import { tierFromXp, preTierProgress, formatXp } from '../lib/xp'
 import { formatDate as formatDateLib } from '../lib/formatDate'
 
@@ -515,10 +515,13 @@ export default function Profile() {
           <h2 className="text-2xl text-white">{profile?.name}</h2>
           <div className="mt-2.5 flex items-center justify-center gap-1.5">
             <span className="inline-flex items-center rounded-full font-mono font-extrabold tracking-wide bg-lime-400 text-ink-900 text-sm px-3 py-1 tabular-nums">
-              {formatRating(profile?.rating)} {t('gamedetails.points_suffix')}
+              {formatRatingMaybeProvisional(profile?.rating, profile?.rating_games)} {t('gamedetails.points_suffix')}
             </span>
             <RatingBadge rating={profile?.rating} gender={profile?.gender} />
           </div>
+          {isProvisional(profile?.rating_games) && (
+            <p className="mt-1.5 text-[11px] font-extrabold text-lime-400/90">{t('profile.provisional_note')}</p>
+          )}
           {globalRank && (
             <div className="mt-2">
               <RankBadge rank={globalRank} size="md" />
