@@ -27,6 +27,19 @@ Non-trivial features go through the `superpowers` skill: brainstorm → write a 
 
 Branch off `main`, not `dev` — `dev` has drifted stale in the past (was 31 commits behind `main` as of 2026-07-30) and isn't the integration branch in practice, whatever its name suggests.
 
+## Trello + Slack workflow rule
+
+Board: **Alinho** (https://trello.com/b/mG5oDWNM/alinho). Lists: Backlog, Design, Selected/Ready, Bugs, Watching, In Development, Dev Done, Testing - QA, Done.
+
+When working a task that comes from Trello, at the end of the task:
+
+- Update the Trello card (create one first if none exists for this task).
+- If the feature/fix is done but **not yet pushed to `main`**, move the card to **Dev Done**.
+- Only move the card to **Testing - QA** once the change is actually pushed to `main` — prod auto-deploys from `main` on push (see "Architecture at a glance" above and `DEPLOYMENT.md`). Don't move straight to Testing - QA on the strength of a local/uncommitted change, or of a push to `dev`.
+- Send a message to the Slack **#dev-updates** channel with: the card number, the card link, and a summary of what was done in development terms.
+
+Skip this whole rule (Trello + Slack updates) when the user says they're low on tokens — in that case focus purely on development and skip the bookkeeping.
+
 ## Things that have bitten people before
 
 - **New git worktree needs its own `.env`** — copy it in manually, it's gitignored and worktrees don't inherit it.
@@ -39,3 +52,13 @@ Branch off `main`, not `dev` — `dev` has drifted stale in the past (was 31 com
 
 - Skip "does this look right?" confirmation loops on straightforward implementation — only pause to ask when a choice is genuinely ambiguous or hard to reverse (e.g., a schema/RLS design decision, deleting files, force-pushing).
 - When something is ambiguous enough to need a real decision from the person you're working with, ask concisely rather than guessing and redoing the work.
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+Rules:
+- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
