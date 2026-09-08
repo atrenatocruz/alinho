@@ -194,6 +194,9 @@ function buildMixBlock({ game, people, capacity, suplentes = [] }, { showCode })
   }
 
   lines.push(`🔗 ${config.appUrl}/jogo/${game.id}`)
+  if (!isCancelled) {
+    lines.push(`📆 Adicionar ao calendário: ${config.supabaseUrl}/functions/v1/game-ics?id=${game.id}`)
+  }
 
   return lines.join('\n')
 }
