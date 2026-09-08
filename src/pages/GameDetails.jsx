@@ -123,7 +123,10 @@ export default function GameDetails() {
       await loadKudos()
     } catch (error) {
       console.error('Error giving kudos:', error)
-      alert(t('gamedetails.kudos_error'))
+      // As RAISE EXCEPTION do RPC já vêm em português e explicam a causa
+      // ("Já deste o teu kudos…", "Só quem jogou…") — mostrar isso em vez
+      // de um genérico que esconde o problema.
+      alert(error?.message || t('gamedetails.kudos_error'))
     } finally {
       setKudosGiving(false)
     }
