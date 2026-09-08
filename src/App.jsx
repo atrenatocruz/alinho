@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Suspense, lazy } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { WifiOff } from 'lucide-react'
@@ -15,18 +15,33 @@ import PlayerDetails from './pages/PlayerDetails'
 import Profile from './pages/Profile'
 import Comunidade from './pages/Comunidade'
 import ClubProfile from './pages/ClubProfile'
-import PrivateMatches from './pages/PrivateMatches'
-import CreatePrivateMatch from './pages/CreatePrivateMatch'
-import JoinPrivateMatch from './pages/JoinPrivateMatch'
-import Gerir from './pages/Gerir'
-import GerirClube from './pages/GerirClube'
-import Instructions from './pages/Instructions'
-import PrivacyPolicy from './pages/PrivacyPolicy'
-import TermsOfService from './pages/TermsOfService'
 import CookieConsentBanner from './components/CookieConsentBanner'
-import MixOffline from './pages/MixOffline'
-import EscolherNivel from './pages/EscolherNivel'
-import ConsentGate from './pages/ConsentGate'
+
+// Route-level splitting (impeccable audit, P3 perf finding): these are all
+// low-traffic relative to the routes above — admin-only, feature-flagged,
+// first-run-only, or reference pages — so deferring them keeps the initial
+// bundle lighter without adding a loading flash to any of the app's
+// everyday screens. GerirClube alone pulls in @dnd-kit, only used there.
+const PrivateMatches = lazy(() => import('./pages/PrivateMatches'))
+const CreatePrivateMatch = lazy(() => import('./pages/CreatePrivateMatch'))
+const JoinPrivateMatch = lazy(() => import('./pages/JoinPrivateMatch'))
+const Gerir = lazy(() => import('./pages/Gerir'))
+const GerirClube = lazy(() => import('./pages/GerirClube'))
+const Instructions = lazy(() => import('./pages/Instructions'))
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'))
+const TermsOfService = lazy(() => import('./pages/TermsOfService'))
+const MixOffline = lazy(() => import('./pages/MixOffline'))
+const EscolherNivel = lazy(() => import('./pages/EscolherNivel'))
+const ConsentGate = lazy(() => import('./pages/ConsentGate'))
+
+// Same spinner used for every other in-app loading state (Home, Rankings,
+// etc.) — a lazy chunk on a fast connection resolves before this is even
+// visible; on a slow one it matches what players already see elsewhere.
+const RouteFallback = () => (
+  <div className="flex items-center justify-center py-16">
+    <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
+  </div>
+)
 
 // showSplash covers both the auth check and the splash's minimum display
 // duration (see AppRoutes) — while true, Guard shows the splash instead of
@@ -163,6 +178,7 @@ function AppRoutes() {
   const showSplash = authLoading || !minDurationElapsed
 
   return (
+    <Suspense fallback={<RouteFallback />}>
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
       <Route path="/instrucoes" element={<Instructions />} />
@@ -266,6 +282,7 @@ function AppRoutes() {
         }
       />
     </Routes>
+    </Suspense>
   )
 }
 
