@@ -219,6 +219,7 @@
   "xp.tier_lenda": "Legend",
   "xp.tier_world_class": "World Class",
   "trophies.shelf_title": "Trophy shelf",
+  "trophies.progress": "{{earned}} of {{total}} earned",
   "trophies.view_all": "View all ({{earned}}/{{total}})",
   "trophies.collapse": "Close",
   "trophies.empty_own": "No trophies yet — play the next mix and start the shelf.",

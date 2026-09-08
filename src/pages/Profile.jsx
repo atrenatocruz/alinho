@@ -681,14 +681,32 @@ export default function Profile() {
               )
             ) : (
               <div className="space-y-4">
+                {/* Progresso global da estante */}
+                <div>
+                  <div className="h-1.5 rounded-full bg-ink-50 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-lime-400"
+                      style={{ width: `${Math.round((myTrophies.length / Math.max(trophyCatalog.length, 1)) * 100)}%` }}
+                    />
+                  </div>
+                  <p className="mt-1 text-[11px] text-muted text-right tabular-nums">
+                    {t('trophies.progress', { earned: myTrophies.length, total: trophyCatalog.length })}
+                  </p>
+                </div>
                 {CATEGORY_ORDER.map((cat) => {
-                  const inCat = trophyCatalog.filter((c) => c.category === cat)
-                  if (inCat.length === 0) return null
                   const earnedByKey = new Map(myTrophies.map((tr) => [tr.trophy_key, tr]))
+                  // Ganhos primeiro dentro da categoria — a colheita à
+                  // frente, o "por conquistar" a seguir.
+                  const inCat = trophyCatalog
+                    .filter((c) => c.category === cat)
+                    .sort((a, b) => (earnedByKey.has(b.key) ? 1 : 0) - (earnedByKey.has(a.key) ? 1 : 0) || a.sort - b.sort)
+                  if (inCat.length === 0) return null
+                  const earnedInCat = inCat.filter((c) => earnedByKey.has(c.key)).length
                   return (
                     <div key={cat}>
                       <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mb-2">
                         {t(`trophies.cat_${cat}`)}
+                        <span className="ml-1.5 normal-case tracking-normal font-mono">{earnedInCat}/{inCat.length}</span>
                       </p>
                       <div className="grid grid-cols-2 gap-2">
                         {inCat.map((c) => {

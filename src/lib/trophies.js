@@ -75,12 +75,33 @@ export const trophyIcon = (key, category) =>
   ICONS[key] || (category === 'evento' ? Ticket : Award)
 
 // Linguagem universal de raridade. Literais completos — o scanner do
-// Tailwind não vê classes construídas.
+// Tailwind não vê classes construídas. `medal` é o medalhão preenchido do
+// troféu ganho; `glow` acende nos tiers altos para os ganhos gritarem na
+// grelha ao lado dos bloqueados (feedback do Ruben: não se percebia bem
+// quais estavam ganhos).
 export const RARITY_META = {
-  comum:    { labelKey: 'trophies.rarity_comum',    frame: 'border-stone-300',  icon: 'text-stone-500',  pill: 'bg-stone-100 text-stone-600' },
-  raro:     { labelKey: 'trophies.rarity_raro',     frame: 'border-sky-400',    icon: 'text-sky-500',    pill: 'bg-sky-100 text-sky-700' },
-  epico:    { labelKey: 'trophies.rarity_epico',    frame: 'border-violet-400', icon: 'text-violet-500', pill: 'bg-violet-100 text-violet-700' },
-  lendario: { labelKey: 'trophies.rarity_lendario', frame: 'border-amber-400',  icon: 'text-amber-500',  pill: 'bg-amber-100 text-amber-700' },
+  comum: {
+    labelKey: 'trophies.rarity_comum',
+    frame: 'border-stone-400', icon: 'text-stone-600',
+    medal: 'bg-stone-200', pill: 'bg-stone-100 text-stone-600', glow: '',
+  },
+  raro: {
+    labelKey: 'trophies.rarity_raro',
+    frame: 'border-sky-400', icon: 'text-sky-600',
+    medal: 'bg-sky-100', pill: 'bg-sky-100 text-sky-700', glow: '',
+  },
+  epico: {
+    labelKey: 'trophies.rarity_epico',
+    frame: 'border-violet-400', icon: 'text-violet-600',
+    medal: 'bg-violet-100', pill: 'bg-violet-100 text-violet-700',
+    glow: 'shadow-[0_0_14px_-2px] shadow-violet-400/60',
+  },
+  lendario: {
+    labelKey: 'trophies.rarity_lendario',
+    frame: 'border-amber-400', icon: 'text-amber-600',
+    medal: 'bg-amber-100', pill: 'bg-amber-100 text-amber-700',
+    glow: 'shadow-[0_0_14px_-2px] shadow-amber-400/70',
+  },
 }
 
 export const CATEGORY_ORDER = ['jogo', 'elo', 'xp', 'kudos', 'antiguidade', 'evento']
