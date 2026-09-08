@@ -49,9 +49,9 @@ export function groupRatingBand(rating) {
 export const formatRating = (rating) => (rating == null ? '—' : String(Math.round(rating)))
 
 // Provisório: menos de 8 jogos contados (2 mixes) — o rating ainda é uma
-// aproximação. Espelha o limiar do escudo de parceiro no Postgres
-// (migration_elo_provisional_8.sql); mudar lá → mudar aqui. Distinto do
-// K de calibração (40/30/20), que mede outra coisa.
+// aproximação. Espelha o limiar único de "novo" no Postgres
+// (migration_elo_provisional_8.sql): rótulo NOVO, escudo de parceiro e
+// K=40 estão todos alinhados nos 8 jogos; mudar lá → mudar aqui.
 export const PROVISIONAL_GAMES = 8
 export const isProvisional = (ratingGames) => ratingGames != null && ratingGames < PROVISIONAL_GAMES
 
