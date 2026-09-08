@@ -162,7 +162,8 @@ export default function GameDetails() {
         `)
         .eq('game_id', id)
         .in('status', ['confirmed', 'waitlisted'])
-        .order('created_at')
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true })
 
       if (participantsError) throw participantsError
 
