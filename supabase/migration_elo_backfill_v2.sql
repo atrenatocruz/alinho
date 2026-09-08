@@ -1,8 +1,8 @@
 -- ════════════════════════════════════════════════════════════════════════
--- Elo — recalibração total v2 (correr DEPOIS de migration_elo_doubles_fix.sql)
+-- Elo — recalibração total v2 (correr DEPOIS de migration_elo_partner_shield.sql)
 --
--- Re-replay do histórico COMPLETO com as regras novas (amortecedor de
--- novatos + derrotas 50/50), agora a intercalar os DOIS fluxos por ordem
+-- Re-replay do histórico COMPLETO com as regras novas (escudo de parceiro
+-- provisório nos mixes, amortecedor nos amigáveis, derrotas 50/50), agora a intercalar os DOIS fluxos por ordem
 -- cronológica — mixes finished e amigáveis confirmados (o backfill v1 só
 -- reproduzia mixes; era o gap anotado na spec do private-match-elo).
 --

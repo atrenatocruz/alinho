@@ -25,6 +25,17 @@ Data: 2026-09-08. Caso que motivou: Diogo Alexandre (bom jogador) preso em ~800 
 | Derrota entre estabelecidos (1000/800) | −11,1/−8,9 | −10,0/−10,0 |
 | Vitória entre estabelecidos | inalterada | inalterada |
 
+## 2ª iteração (mesmo dia): escudo por contexto
+
+Debate com o Ruben após a 1ª versão: o amortecedor simétrico ainda deixava o veterano perder pontos por parceiros mal auto-avaliados nos mixes; e um safeguard total teria o exploit inverso (novato fortíssimo sub-avaliado = free Elo nas vitórias; e nos amigáveis, onde o parceiro é ESCOLHIDO, seria uma máquina de farmar sem risco). Regra final, com parceiro provisório (<5 jogos), para o estabelecido (≥5):
+
+| Contexto | Derrota | Vitória |
+|---|---|---|
+| **Mix** (parceiro atribuído) | **0** (escudo) | ×0.5 |
+| **Amigável** (parceiro escolhido) | ×0.5 | ×0.5 |
+
+Implementado via parâmetro `p_partner_chosen` no núcleo (`migration_elo_partner_shield.sql`, que **substitui** `migration_elo_doubles_fix.sql`). Números (Diogo 850 + novato 900 vs 900/900): mix derrota 0 / vitória +5,5; amigável −4,6 / +5,5; novato corrige normal (−18,6); estabelecidos entre si inalterados. Custo aceite: mixes ligeiramente inflacionários com novatos — medível, revisível (vitória pode descer para ×0.75… ×0.25 se a deriva incomodar).
+
 ## Implementação
 
 Tudo em `apply_elo_pairing` (fonte única — mixes e amigáveis herdam): `migration_elo_doubles_fix.sql`. Recalibração: `migration_elo_backfill_v2.sql` (re-corrível; imprime top-30 com o Diogo marcado). Sem frontend (a explicação pública em /instrucoes é qualitativa e continua válida). Atualizar o RANKING.md (fora do repo) com a revisão: derrotas 50/50 + amortecedor de provisórios.

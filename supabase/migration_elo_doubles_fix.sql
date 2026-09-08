@@ -1,4 +1,7 @@
 -- ════════════════════════════════════════════════════════════════════════
+-- [SUBSTITUÍDO no mesmo dia por migration_elo_partner_shield.sql — correr
+--  esse em vez deste. Fica como registo da 1ª iteração.]
+--
 -- Fix do Elo de duplas (spec 2026-09-08): amortecedor de novatos +
 -- derrotas 50/50.
 --
