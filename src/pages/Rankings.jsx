@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Trophy, Award, Calendar, ChevronDown } from 'lucide-react'
+import { Trophy, Award, Calendar, ChevronDown, HelpCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { RatingBadge, GroupLevelBadge, EmptyState, Avatar, Select } from '../components/ui'
@@ -208,7 +208,12 @@ export default function Rankings() {
         {tab === 'geral' && memberships.length <= 1 && (
           <p className="text-muted text-sm mb-0.5">{currentOrganization?.name}</p>
         )}
-        <h2 className="text-3xl text-ink-900">{t('rankings.title')}</h2>
+        <h2 className="text-3xl text-ink-900 inline-flex items-center gap-2">
+          {t('rankings.title')}
+          <Link to="/instrucoes#ranking" aria-label={t('rankings.help_aria')} className="text-muted hover:text-ink-900">
+            <HelpCircle size={18} />
+          </Link>
+        </h2>
       </div>
 
       {/* Sections — Jogadores vs Clubes & Grupos */}

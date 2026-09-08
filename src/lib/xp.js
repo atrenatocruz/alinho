@@ -15,16 +15,16 @@
 // Descendente, como BANDS em elo.js. ringClass são literais completos —
 // o scanner do Tailwind não vê classes construídas dinamicamente.
 export const XP_TIERS = [
-  { key: 'world_class', min: 20000, level: 10, labelKey: 'xp.tier_world_class', ringClass: 'ring-2 ring-lime-400' },
-  { key: 'lenda',       min: 12000, level: 9,  labelKey: 'xp.tier_lenda',       ringClass: 'ring-2 ring-violet-400' },
-  { key: 'diamante',    min: 7500,  level: 8,  labelKey: 'xp.tier_diamante',    ringClass: 'ring-2 ring-sky-400' },
-  { key: 'rubi',        min: 4500,  level: 7,  labelKey: 'xp.tier_rubi',        ringClass: 'ring-2 ring-rose-500' },
-  { key: 'esmeralda',   min: 2500,  level: 6,  labelKey: 'xp.tier_esmeralda',   ringClass: 'ring-2 ring-emerald-400' },
-  { key: 'platina',     min: 1300,  level: 5,  labelKey: 'xp.tier_platina',     ringClass: 'ring-2 ring-cyan-300' },
-  { key: 'ouro',        min: 700,   level: 4,  labelKey: 'xp.tier_ouro',        ringClass: 'ring-2 ring-yellow-400' },
-  { key: 'prata',       min: 350,   level: 3,  labelKey: 'xp.tier_prata',       ringClass: 'ring-2 ring-slate-300' },
-  { key: 'bronze',      min: 150,   level: 2,  labelKey: 'xp.tier_bronze',      ringClass: 'ring-2 ring-amber-600' },
-  { key: 'iniciado',    min: 50,    level: 1,  labelKey: 'xp.tier_iniciado',    ringClass: 'ring-2 ring-stone-400' },
+  { key: 'world_class', min: 20000, level: 10, labelKey: 'xp.tier_world_class', ringClass: 'ring-2 ring-lime-400', dotClass: 'bg-lime-400' },
+  { key: 'lenda',       min: 12000, level: 9,  labelKey: 'xp.tier_lenda',       ringClass: 'ring-2 ring-violet-400', dotClass: 'bg-violet-400' },
+  { key: 'diamante',    min: 7500,  level: 8,  labelKey: 'xp.tier_diamante',    ringClass: 'ring-2 ring-sky-400', dotClass: 'bg-sky-400' },
+  { key: 'rubi',        min: 4500,  level: 7,  labelKey: 'xp.tier_rubi',        ringClass: 'ring-2 ring-rose-500', dotClass: 'bg-rose-500' },
+  { key: 'esmeralda',   min: 2500,  level: 6,  labelKey: 'xp.tier_esmeralda',   ringClass: 'ring-2 ring-emerald-400', dotClass: 'bg-emerald-400' },
+  { key: 'platina',     min: 1300,  level: 5,  labelKey: 'xp.tier_platina',     ringClass: 'ring-2 ring-cyan-300', dotClass: 'bg-cyan-300' },
+  { key: 'ouro',        min: 700,   level: 4,  labelKey: 'xp.tier_ouro',        ringClass: 'ring-2 ring-yellow-400', dotClass: 'bg-yellow-400' },
+  { key: 'prata',       min: 350,   level: 3,  labelKey: 'xp.tier_prata',       ringClass: 'ring-2 ring-slate-300', dotClass: 'bg-slate-300' },
+  { key: 'bronze',      min: 150,   level: 2,  labelKey: 'xp.tier_bronze',      ringClass: 'ring-2 ring-amber-600', dotClass: 'bg-amber-600' },
+  { key: 'iniciado',    min: 50,    level: 1,  labelKey: 'xp.tier_iniciado',    ringClass: 'ring-2 ring-stone-400', dotClass: 'bg-stone-400' },
 ]
 
 /** Nível atual de um XP, ou null abaixo do primeiro escudo (<50).
