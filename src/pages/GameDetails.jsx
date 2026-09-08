@@ -19,33 +19,8 @@ import { formatDate as formatDateLib } from '../lib/formatDate'
 
 const SIDE_LABEL_KEY = { left: 'gamedetails.side_left', right: 'gamedetails.side_right', both: 'gamedetails.side_both' }
 
-// Same status vocabulary/colors as GerirClube.jsx's admin "other dates" list
-// (Phase 3 recurring-mix-series-grouping design) — kept identical so a
-// status reads the same whether an admin or a player sees it.
-const SERIES_STATUS_LABEL_KEY = {
-  open: 'gerirclube.status_open',
-  closed: 'gerirclube.status_closed_short',
-  in_progress: 'gerirclube.status_in_progress',
-  pending: 'gerirclube.status_pending',
-  completed: 'gerirclube.status_finished',
-  finished: 'gerirclube.status_finished',
-  cancelled: 'gerirclube.status_cancelled',
-}
-const SERIES_STATUS_PILL_CLASS = {
-  open: 'bg-blue-100 text-blue-700',
-  closed: 'bg-green-100 text-green-700',
-  in_progress: 'bg-lime-400 text-ink-900',
-  pending: 'bg-amber-100 text-amber-700',
-  completed: 'bg-ink-50 text-ink-700',
-  finished: 'bg-ink-50 text-ink-700',
-  cancelled: 'bg-danger/10 text-danger',
-}
-
-
-// Histórico de entradas e saídas (Trello #171). Mesmo vocabulário de pills
-// tonais usado em SERIES_STATUS_PILL_CLASS acima, para o log ler como o
-// resto da página — verde = entrou, vermelho tingido = saiu, âmbar =
-// suplente, cinzento = alteração de parceiro.
+// Histórico de entradas e saídas (Trello #171) — verde = entrou, vermelho
+// tingido = saiu, âmbar = suplente, cinzento = alteração de parceiro.
 const HISTORY_ACTION_LABEL_KEY = {
   in: 'gamedetails.history_action_in',
   waitlisted: 'gamedetails.history_action_waitlisted',
@@ -114,8 +89,6 @@ export default function GameDetails() {
   const [ratingInfoById, setRatingInfoById] = useState({})
   const [finishedTab, setFinishedTab] = useState('stats') // 'stats' | 'duplas' | 'rondas' — tabs for a finished mix's results
   const [editingMatchId, setEditingMatchId] = useState(null) // a scored match being corrected — re-opens its inputs (Trello #184)
-  const [seriesHistory, setSeriesHistory] = useState([]) // sibling occurrences of this game's recurring series, newest first
-  const [seriesHistoryExpanded, setSeriesHistoryExpanded] = useState(false)
   // Histórico IN/OUT (Trello #171) — só admins, e carregado apenas quando o
   // painel é aberto: é uma ferramenta de diagnóstico, não vale outra query
   // em cada abertura da página de um mix.
@@ -157,24 +130,6 @@ export default function GameDetails() {
 
       if (gameError) throw gameError
       setGame(gameData)
-
-      // Other occurrences of the same recurring series (Phase 3 grouping
-      // collapses them into one card on Home/GerirClube, so this is the
-      // only player-facing place a past/other occurrence is reachable).
-      // RLS on `games` already scopes this to org members, same as every
-      // other games query here — no new policy needed.
-      if (gameData.recurrence_id) {
-        const { data: historyData, error: historyError } = await supabase
-          .from('games')
-          .select('id, date, status')
-          .eq('recurrence_id', gameData.recurrence_id)
-          .neq('id', gameData.id)
-          .order('date', { ascending: false })
-        if (historyError) throw historyError
-        setSeriesHistory(historyData || [])
-      } else {
-        setSeriesHistory([])
-      }
 
       // level/is_guest live on `memberships` now (per-org) — fetch this
       // org's memberships once and merge onto every nested profile object
@@ -1317,45 +1272,6 @@ export default function GameDetails() {
           )}
         </div>
       </div>
-
-      {/* Histórico — other occurrences of this recurring series (Phase 3
-          design: collapsed by default, only rendered when there's at least
-          one sibling occurrence — see docs/superpowers/specs/2026-08-25-recurring-mix-series-grouping-design.md). */}
-      {game.recurrence_id && seriesHistory.length > 0 && (
-        <div className="card p-0 overflow-hidden">
-          <button
-            onClick={() => setSeriesHistoryExpanded((v) => !v)}
-            aria-expanded={seriesHistoryExpanded}
-            className="w-full flex items-center gap-3 px-4 py-3.5 min-h-[56px] transition-colors duration-fast hover:bg-ink-50"
-          >
-            <Repeat size={20} className="text-ink-700 shrink-0" />
-            <p className="flex-1 min-w-0 text-left font-extrabold text-ink-900">{t('gamedetails.series_history_title')}</p>
-            <span className="text-sm font-extrabold text-muted tabular-nums shrink-0">{seriesHistory.length}</span>
-            <ChevronDown
-              size={20}
-              className={`text-muted transition-transform duration-base shrink-0 ${seriesHistoryExpanded ? 'rotate-180' : ''}`}
-            />
-          </button>
-
-          {seriesHistoryExpanded && (
-            <div className="border-t border-line divide-y divide-line animate-fade-up">
-              {seriesHistory.map((h) => (
-                <Link
-                  key={h.id}
-                  to={`/jogo/${h.id}`}
-                  className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50"
-                >
-                  <p className="flex-1 min-w-0 font-extrabold text-ink-900 text-sm capitalize truncate">{formatDate(h.date)}</p>
-                  <span className={`text-[11px] font-extrabold uppercase px-2 py-1 rounded-full shrink-0 ${SERIES_STATUS_PILL_CLASS[h.status] || 'bg-ink-50 text-ink-700'}`}>
-                    {t(SERIES_STATUS_LABEL_KEY[h.status] || 'gerirclube.status_finished')}
-                  </span>
-                  <ChevronRight size={16} className="text-muted shrink-0" />
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Winner (mix finalizado) */}
       {game.status === 'finished' && game.winner_team_id && (
