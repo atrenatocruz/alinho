@@ -15,7 +15,7 @@ import {
 } from '../lib/mixLogic'
 import { winRatePct, firstLastName } from '../lib/statsLogic'
 import { getGlobalRankings } from '../lib/privateMatches'
-import { formatDate as formatDateLib } from '../lib/formatDate'
+import { formatDate as formatDateLib, formatCurrency } from '../lib/formatDate'
 
 const SIDE_LABEL_KEY = { left: 'gamedetails.side_left', right: 'gamedetails.side_right', both: 'gamedetails.side_both' }
 
@@ -1236,7 +1236,7 @@ export default function GameDetails() {
           {game.price_per_player > 0 && (
             <div className="flex items-center gap-2.5">
               <Euro size={20} className="text-ink-700 shrink-0" />
-              <span>{t('gamedetails.price_per_player', { price: game.price_per_player })}</span>
+              <span>{t('gamedetails.price_per_player', { price: formatCurrency(game.price_per_player, i18n.language) })}</span>
             </div>
           )}
           {game.prize && (

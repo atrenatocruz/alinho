@@ -8,3 +8,16 @@ export const formatDate = (date, lang, options) =>
 
 export const formatTime = (date, lang, options) =>
   new Date(date).toLocaleTimeString(LOCALE_MAP[lang] || 'pt-PT', options)
+
+// Valores monetários. Intl trata do símbolo, da posição e do separador
+// decimal por locale: pt-PT dá "7,50 €", en-GB dá "€7.50". Antes disto o
+// preço era interpolado em cru na frase traduzida, o que mostrava "7.5€"
+// em português — ponto decimal e sem cêntimos.
+//
+// (O ficheiro chama-se formatDate mas é, na prática, a formatação sensível
+// ao locale toda; o LOCALE_MAP acima é partilhado.)
+export const formatCurrency = (value, lang) =>
+  new Intl.NumberFormat(LOCALE_MAP[lang] || 'pt-PT', {
+    style: 'currency',
+    currency: 'EUR',
+  }).format(value ?? 0)

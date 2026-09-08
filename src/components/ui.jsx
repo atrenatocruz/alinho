@@ -2,10 +2,11 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { MapPin, CheckCircle2, ChevronRight, ChevronDown, ChevronLeft, Lock, Play, Calendar, X, Share2, MessageCircle, Link2, ImageDown, Trophy, Repeat } from 'lucide-react'
+import { MapPin, CheckCircle2, ChevronRight, ChevronDown, ChevronLeft, Lock, Play, Calendar, X, Share2, MessageCircle, Link2, ImageDown, Trophy, Repeat, Euro, Swords, Users } from 'lucide-react'
 import ShareCard, { CARD_W, CARD_H } from './ShareCard'
 import { ratingBand, groupRatingBand } from '../lib/elo'
-import { formatDate, formatTime } from '../lib/formatDate'
+import { formatDate, formatTime, formatCurrency } from '../lib/formatDate'
+import { FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY } from '../lib/mixLogic'
 
 /* ─── Date fields ────────────────────────────────────────────────────────
    Native <input type=date/datetime-local> pickers open reliably on iOS
@@ -584,9 +585,11 @@ export function EmptyState({ icon: Icon, title, subtitle, action }) {
 }
 
 /* ─── MixCard ────────────────────────────────────────────────────────────
-   Scannable at a glance: when, where, levels, slots, my state.
+   Scannable at a glance: when, where, format/courts, price, prize, levels,
+   slots, whether a friend is already in, and my own state — the card is
+   meant to carry enough to decide without opening it (Trello #51).
    States: open | closed (court reservado) | completed | joined. */
-export function MixCard({ game, joined = false, showClub = false }) {
+export function MixCard({ game, joined = false, showClub = false, friendIds = null }) {
   const { t, i18n } = useTranslation()
   // Every person in the game — a row with partner counts as 2 players
   const players = (game.participants || [])
@@ -607,6 +610,19 @@ export function MixCard({ game, joined = false, showClub = false }) {
   const isClosed = game.status === 'closed' || (game.status === 'open' && isFull)
   const isLive = game.status === 'in_progress'
   const isDone = game.status === 'completed' || game.status === 'finished'
+
+  // Amigos já inscritos neste mix (Trello #51) — a função do cartão é dar
+  // uma razão para o abrir, e "alguém que eu conheço vai jogar" é a mais
+  // forte. friendIds vem da página que lista os mixs, para isto ficar numa
+  // query para a lista toda em vez de uma por cartão; ausente (null)
+  // significa "quem chamou ainda não sabe", e rende sem destaque em vez de
+  // afirmar que não há amigos.
+  const friendsInMix = friendIds ? players.filter(p => p.id && friendIds.has(p.id)) : []
+  const numCourts = game.num_courts || 1
+  // Mesmo vocabulário que a página de detalhe usa, para um mix não se
+  // descrever de uma forma na lista e de outra depois de aberto.
+  const formatLabel = t(FORMAT_LABEL_KEY[game.format] || FORMAT_LABEL_KEY.sobe_desce)
+  const genderRestricted = game.gender_restriction && !['indiferente', 'misto'].includes(game.gender_restriction)
 
   const d = new Date(game.date)
   const today = new Date(); const tomorrow = new Date(today)
@@ -661,8 +677,56 @@ export function MixCard({ game, joined = false, showClub = false }) {
       )}
       <h3 className="text-lg text-ink-900 leading-snug mb-1">{game.title}</h3>
       {game.location && (
-        <p className="flex items-center gap-1.5 text-muted text-sm mb-4">
+        <p className="flex items-center gap-1.5 text-muted text-sm mb-2">
           <MapPin size={15} className="shrink-0" /> {game.location}
+        </p>
+      )}
+
+      {/* Factos que decidem se vale a pena abrir o mix (Trello #51) — os
+          mesmos que o cartão-herói da página de detalhe mostra, sem a
+          decomposição das rondas, que é detalhe. Isto inverte de propósito
+          a nota de âmbito da spec de 2026-08-06 (mix-price-prize-gps), que
+          mantinha preço e prémio fora do cartão compacto: o #51 pede
+          exactamente o contrário, e é o card mais recente. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-muted text-sm mb-3">
+        <span className="inline-flex items-center gap-1.5">
+          <Swords size={15} className="shrink-0" />
+          {formatLabel} · {t('gamedetails.court_count', { count: numCourts })}
+        </span>
+        {game.price_per_player > 0 && (
+          <span className="inline-flex items-center gap-1.5">
+            <Euro size={15} className="shrink-0" />
+            {t('gamedetails.price_per_player', { price: formatCurrency(game.price_per_player, i18n.language) })}
+          </span>
+        )}
+        {game.prize && (
+          <span className="inline-flex items-center gap-1.5 min-w-0">
+            <Trophy size={15} className="shrink-0" />
+            <span className="truncate">{game.prize}</span>
+          </span>
+        )}
+        {genderRestricted && (
+          <span className="font-extrabold text-ink-700">
+            {t(GENDER_RESTRICTION_LABEL_KEY[game.gender_restriction])}
+          </span>
+        )}
+      </div>
+
+      {/* Destaque de amigos. Nomes completos de propósito — "Mostrar sempre
+          nome completo dos jogadores" é regra assente em todo o produto, por
+          isso nada aqui abrevia. Usa o tom suave lime-100, não o lime cheio:
+          pela One Ball Rule do DESIGN.md o acento forte do cartão já está
+          gasto na barra de "inscrito" e nos chips de estado. */}
+      {friendsInMix.length > 0 && (
+        <p className="inline-flex items-center gap-1.5 bg-lime-100 text-ink-900 rounded-full pl-2 pr-2.5 py-1 mb-3 max-w-full">
+          <Users size={13} className="text-lime-600 shrink-0" />
+          <span className="font-extrabold text-[11px] uppercase tracking-wider truncate">
+            {friendsInMix.length === 1
+              ? t('ui.friend_in_mix_one', { name: friendsInMix[0].name })
+              : friendsInMix.length === 2
+                ? t('ui.friend_in_mix_two', { first: friendsInMix[0].name, second: friendsInMix[1].name })
+                : t('ui.friend_in_mix_many', { name: friendsInMix[0].name, count: friendsInMix.length - 1 })}
+          </span>
         </p>
       )}
 

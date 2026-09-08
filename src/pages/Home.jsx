@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { MixCard, EmptyState, PrimaryButton, Avatar } from '../components/ui'
 import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
+import { listFriends } from '../lib/friends'
 
 export default function Home() {
   const { t } = useTranslation()
@@ -15,6 +16,12 @@ export default function Home() {
     { key: 'terminados', label: t('home.finished_mixes_tab') },
   ]
   const [games, setGames] = useState([])
+  // Ids dos amigos, para o MixCard destacar quem já está inscrito num mix
+  // (Trello #51). Carregado uma vez, num effect próprio e não dentro do
+  // loadGames — esse volta a correr a cada alteração de games/participants
+  // via Realtime, e a lista de amigos não muda a esse ritmo. null = ainda
+  // não sabemos, o que o cartão trata como "sem destaque".
+  const [friendIds, setFriendIds] = useState(null)
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('ativos')
   const { user, profile, memberships, joinOrganization, isPrivateMatchesEnabled, isAdminOfAny } = useAuth()
@@ -81,6 +88,22 @@ export default function Home() {
 
   const orgIds = memberships.map((m) => m.organization_id)
   const orgIdsKey = orgIds.slice().sort().join(',')
+
+  useEffect(() => {
+    if (!user) return
+    let cancelled = false
+    listFriends()
+      .then((friends) => {
+        if (!cancelled) setFriendIds(new Set(friends.map((f) => f.id)))
+      })
+      .catch((error) => {
+        // Falhar aqui só custa o destaque de amigos nos cartões, por isso
+        // fica no console e não chega ao ecrã — não vale partir a lista de
+        // mixs por causa de um adorno.
+        console.error('Error loading friends for mix cards:', error)
+      })
+    return () => { cancelled = true }
+  }, [user])
 
   useEffect(() => {
     // No memberships yet — nothing to load. Without this, `loading` would
@@ -353,7 +376,7 @@ export default function Home() {
                   </div>
                   <div className="space-y-3.5">
                     {group.entries.map((entry) => (
-                      <MixCard key={entry.game.id} game={entry.game} joined={isUserJoined(entry.game)} showClub={false} />
+                      <MixCard key={entry.game.id} game={entry.game} joined={isUserJoined(entry.game)} showClub={false} friendIds={friendIds} />
                     ))}
                   </div>
                 </div>
@@ -362,7 +385,7 @@ export default function Home() {
           ) : (
             <div className="space-y-3.5">
               {visibleEntries.map((entry) => (
-                <MixCard key={entry.game.id} game={entry.game} joined={isUserJoined(entry.game)} showClub={false} />
+                <MixCard key={entry.game.id} game={entry.game} joined={isUserJoined(entry.game)} showClub={false} friendIds={friendIds} />
               ))}
             </div>
           )}
