@@ -146,8 +146,34 @@ async function orgIdForGame(gameId) {
   return data.organization_id
 }
 
+/**
+ * Aquece o hash de cada grupo em silêncio no arranque: calcula o roster
+ * atual e guarda o hash SEM enviar nada. Sem isto, o hash começa vazio em
+ * cada processo novo e o primeiro tick de reconciliação repostava o
+ * roster inteiro a cada restart — spam no grupo sempre que o bot
+ * reiniciava, sem qualquer mudança real. Custo aceite: uma mudança
+ * ocorrida enquanto o bot esteve em baixo só é anunciada quando algo
+ * voltar a mexer (o conteúdo em si nunca se perde — cada repost é
+ * recalculado da BD).
+ */
+async function primeGroupHashes() {
+  const groups = await getGroups()
+  for (const group of groups) {
+    try {
+      const openMixes = (await getOpenMixes(group.organizationId)).filter((mix) => mixVisibleToGroup(mix, group))
+      const mixStates = await Promise.all(openMixes.map((mix) => loadGame(mix.id)))
+      const baseText = buildCombinedRosterMessage(mixStates)
+      stateFor(group.groupJid).lastPostedHash = baseText ? hash(baseText) : null
+    } catch (err) {
+      console.error(`Failed to prime roster hash for ${group.groupJid}:`, err)
+    }
+  }
+}
+
 /** Wires Supabase Realtime so any game/participant change — from the app OR from the bot's own WhatsApp-driven writes, for ANY currently open mix of ANY served club — results in a fresh roster repost to every group that can see it. */
 export function startSync({ sendText, getGroupMentions }) {
+  primeGroupHashes().catch((err) => console.error('Failed to prime roster hashes:', err))
+
   supabase
     .channel('whatsapp-bot-games')
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'games' }, async (payload) => {
