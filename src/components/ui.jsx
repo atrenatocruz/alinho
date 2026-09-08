@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { MapPin, CheckCircle2, ChevronRight, ChevronDown, ChevronLeft, Lock, Play, Calendar, X, Share2, MessageCircle, Link2, ImageDown, Trophy, Repeat } from 'lucide-react'
 import ShareCard, { CARD_W, CARD_H } from './ShareCard'
 import { ratingBand, groupRatingBand } from '../lib/elo'
+import { tierFromXp, isGlowing, GLOW_CLASS } from '../lib/xp'
 import { formatDate, formatTime } from '../lib/formatDate'
 
 /* ─── Date fields ────────────────────────────────────────────────────────
@@ -478,9 +479,22 @@ export function GuestBadge({ size = 'sm', label, isTest = false }) {
    colored-circle-with-initial. `size` carries width/height/text-size (and
    any extra utility classes a call site needs, e.g. a ring); `colorClass`
    is the fallback bg/text pair — each call site keeps its own current
-   look for people with no photo yet. */
-export function Avatar({ name, url, size = 'w-10 h-10 text-sm', colorClass = 'bg-ink-700 text-white' }) {
-  const base = `${size} rounded-full flex items-center justify-center shrink-0 font-extrabold overflow-hidden`
+   look for people with no photo yet.
+
+   Escudo de assiduidade (XP): passa `xp` (e `lastPlayedAt`) e o avatar
+   ganha o anel do nível + brilho se a pessoa jogou nos últimos 7 dias.
+   Default null = sem escudo, todos os call sites existentes intactos.
+   Call sites que já passam um ring próprio no `size` (PlayerAvatarRow)
+   não devem passar `xp` — dois rings sobrepõem-se. */
+export function Avatar({ name, url, size = 'w-10 h-10 text-sm', colorClass = 'bg-ink-700 text-white', xp = null, lastPlayedAt = null }) {
+  let shield = ''
+  if (xp != null) {
+    const tier = tierFromXp(xp)
+    if (tier) {
+      shield = ` ${tier.ringClass}${isGlowing(lastPlayedAt) ? ` ${GLOW_CLASS}` : ''}`
+    }
+  }
+  const base = `${size} rounded-full flex items-center justify-center shrink-0 font-extrabold overflow-hidden${shield}`
   if (url) {
     return <img src={url} alt={name || ''} className={`${base} object-cover`} />
   }

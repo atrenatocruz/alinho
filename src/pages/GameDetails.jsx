@@ -151,8 +151,8 @@ export default function GameDetails() {
         .from('participants')
         .select(`
           *,
-          user:profiles!participants_user_id_fkey (id, name, preferred_side, avatar_url),
-          partner:profiles!participants_partner_id_fkey (id, name, preferred_side, avatar_url)
+          user:profiles!participants_user_id_fkey (id, name, preferred_side, avatar_url, xp, last_played_at),
+          partner:profiles!participants_partner_id_fkey (id, name, preferred_side, avatar_url, xp, last_played_at)
         `)
         .eq('game_id', id)
         .in('status', ['confirmed', 'waitlisted'])
@@ -1918,7 +1918,7 @@ export default function GameDetails() {
                 >
                   {person.is_guest ? (
                     <>
-                      <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" />
+                      <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" xp={person.xp} lastPlayedAt={person.last_played_at} />
                       <div className="flex-1 min-w-0">
                         <p className="font-extrabold text-ink-900 truncate">
                           {person.name}
@@ -1933,7 +1933,7 @@ export default function GameDetails() {
                     </>
                   ) : (
                     <Link to={`/jogador/${person.id}`} className="flex items-center gap-3 flex-1 min-w-0">
-                      <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" />
+                      <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" xp={person.xp} lastPlayedAt={person.last_played_at} />
                       <div className="flex-1 min-w-0">
                         <p className="font-extrabold text-ink-900 truncate">
                           {person.name}
@@ -1980,7 +1980,7 @@ export default function GameDetails() {
                 <span className="w-6 text-center font-extrabold text-muted text-sm shrink-0">{ordinal(idx + 1)}</span>
                 {person.is_guest ? (
                   <>
-                    <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" />
+                    <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" xp={person.xp} lastPlayedAt={person.last_played_at} />
                     <div className="flex-1 min-w-0">
                       <p className="font-extrabold text-ink-900 truncate">
                         {person.name}
@@ -1995,7 +1995,7 @@ export default function GameDetails() {
                   </>
                 ) : (
                   <Link to={`/jogador/${person.id}`} className="flex items-center gap-3 flex-1 min-w-0">
-                    <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" />
+                    <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" xp={person.xp} lastPlayedAt={person.last_played_at} />
                     <div className="flex-1 min-w-0">
                       <p className="font-extrabold text-ink-900 truncate">
                         {person.name}

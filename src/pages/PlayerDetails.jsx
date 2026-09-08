@@ -36,6 +36,7 @@ export default function PlayerDetails() {
   const [expandedMixes, setExpandedMixes] = useState(new Set())
   const [globalRank, setGlobalRank] = useState(null)
   const [globalEntry, setGlobalEntry] = useState(null)
+  const [playerXp, setPlayerXp] = useState(null)
 
   const toggleMix = (gameId) => {
     setExpandedMixes((prev) => {
@@ -51,7 +52,20 @@ export default function PlayerDetails() {
     loadH2h()
     loadMatchHistory()
     loadGlobalRank()
+    loadXp()
   }, [id])
+
+  // RPC dedicado em vez de estender get_player_profile (7 versões no repo)
+  // — o escudo de assiduidade é público por design.
+  const loadXp = async () => {
+    try {
+      const { data, error } = await supabase.rpc('get_player_xp', { p_user_id: id })
+      if (error) throw error
+      setPlayerXp(data?.[0] || null)
+    } catch (error) {
+      console.error('Error loading player xp:', error)
+    }
+  }
 
   const loadGlobalRank = async () => {
     try {
@@ -272,7 +286,7 @@ export default function PlayerDetails() {
             aria-label={player.avatar_url ? t('playerdetails.view_photo_aria') : undefined}
             className="w-20 h-20 mx-auto mb-3 block"
           >
-            <Avatar name={player.name} url={player.avatar_url} size="w-20 h-20 text-3xl" colorClass="bg-lime-400 text-ink-900" />
+            <Avatar name={player.name} url={player.avatar_url} size="w-20 h-20 text-3xl" colorClass="bg-lime-400 text-ink-900" xp={playerXp?.xp} lastPlayedAt={playerXp?.last_played_at} />
           </button>
           {showPhoto && (
             <PhotoViewerModal url={player.avatar_url} alt={player.name} onClose={() => setShowPhoto(false)} />

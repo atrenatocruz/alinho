@@ -431,6 +431,8 @@ export default function Layout({ children }) {
                     url={profile?.avatar_url}
                     size="w-6 h-6 text-[10px]"
                     colorClass="bg-ink-700 text-white"
+                    xp={profile?.xp}
+                    lastPlayedAt={profile?.last_played_at}
                   />
                 ) : (
                   <Icon size={19} strokeWidth={2} className="shrink-0" />
