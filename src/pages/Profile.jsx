@@ -571,7 +571,11 @@ export default function Profile() {
             historial de mixes em vez da antiga soma de pontos de
             clube/amigos. */}
         {globalPoints && (
-          <div className="card">
+          <Link
+            to="/rankings"
+            state={{ tab: 'global', scrollToMe: true }}
+            className="card press block hover:shadow-lift"
+          >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <p className="text-sm font-extrabold text-ink-900">{t('profile.global_ranking')}</p>
@@ -582,7 +586,7 @@ export default function Profile() {
             <p className="text-[11px] text-muted mt-1">
               🎾 {t('profile.mix_wins_played_summary', { wins: globalPoints.mix_wins || 0, played: globalPoints.mixes_played || 0 })}
             </p>
-          </div>
+          </Link>
         )}
 
         {/* Personal info */}

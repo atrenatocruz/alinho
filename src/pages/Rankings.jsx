@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Trophy, Award, Calendar } from 'lucide-react'
 import { supabase } from '../lib/supabase'
@@ -23,9 +23,15 @@ const TABS = [
 
 export default function Rankings() {
   const { t, i18n } = useTranslation()
-  const { currentOrganizationId, currentOrganization, memberships, switchOrganization } = useAuth()
+  const { user, currentOrganizationId, currentOrganization, memberships, switchOrganization } = useAuth()
+  const location = useLocation()
+  // Arriving from the Profile page's "Ranking Global" card (state.scrollToMe)
+  // — jumps straight to the Global tab and, once it's loaded, scrolls to and
+  // briefly highlights the viewer's own row (Trello #185). A plain nav-bar
+  // visit to /rankings carries no state, so it opens on the default tab and
+  // scrolls nowhere, same as before.
   const [section, setSection] = useState('players')
-  const [tab, setTab] = useState('global')
+  const [tab, setTab] = useState(location.state?.tab || 'global')
   const [loading, setLoading] = useState(true)
 
   // Geral
@@ -136,6 +142,15 @@ export default function Rankings() {
       setGlobalLoading(false)
     }
   }
+
+  // Runs once the Global tab's own row can actually exist in the DOM —
+  // after its data has loaded, and only when that's the tab being shown.
+  useEffect(() => {
+    if (!location.state?.scrollToMe || tab !== 'global' || globalLoading) return
+    const el = document.getElementById(`ranking-player-${user.id}`)
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, globalLoading, globalRankings])
 
   const loadOrgRankings = async () => {
     try {
@@ -381,32 +396,44 @@ export default function Rankings() {
           />
         ) : (
           <div className="space-y-3">
-            {globalRankings.map((player, index) => (
-              <Link
-                key={player.user_id}
-                to={`/jogador/${player.user_id}`}
-                className={`card press block hover:shadow-lift ${index === 0 ? 'ring-2 ring-lime-400' : ''}`}
-              >
-                <div className="flex items-center gap-3.5">
-                  <div className={`w-11 h-11 rounded-ctrl flex items-center justify-center font-extrabold text-lg shrink-0 tabular-nums ${positionStyle(index)}`}>
-                    {index + 1}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-base text-ink-900 truncate">{player.name}</h3>
-                    <div className="mt-0.5 flex items-center gap-2">
-                      <RatingBadge rating={player.rating} gender={player.gender} />
-                      <span className="text-[11px] text-muted truncate">
-                        🏆 {t('rankings.mix_wins_ratio', { wins: player.mix_wins || 0, played: player.mixes_played || 0 })}
-                      </span>
+            {globalRankings.map((player, index) => {
+              const isMe = player.user_id === user.id
+              return (
+                <Link
+                  key={player.user_id}
+                  id={`ranking-player-${player.user_id}`}
+                  to={`/jogador/${player.user_id}`}
+                  className={`card press block hover:shadow-lift relative overflow-hidden ${index === 0 ? 'ring-2 ring-lime-400' : ''}`}
+                >
+                  {isMe && <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-lime-400" />}
+                  <div className="flex items-center gap-3.5">
+                    <div className={`w-11 h-11 rounded-ctrl flex items-center justify-center font-extrabold text-lg shrink-0 tabular-nums ${positionStyle(index)}`}>
+                      {index + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-base text-ink-900 truncate">
+                        {player.name}
+                        {isMe && (
+                          <span className="ml-1.5 text-[11px] font-extrabold uppercase tracking-wide text-lime-600">
+                            {t('rankings.you_badge')}
+                          </span>
+                        )}
+                      </h3>
+                      <div className="mt-0.5 flex items-center gap-2">
+                        <RatingBadge rating={player.rating} gender={player.gender} />
+                        <span className="text-[11px] text-muted truncate">
+                          🏆 {t('rankings.mix_wins_ratio', { wins: player.mix_wins || 0, played: player.mixes_played || 0 })}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="text-2xl font-extrabold text-ink-900 tabular-nums">{formatRating(player.rating)}</span>
+                      <p className="text-[11px] text-muted">{t('rankings.points_label')}</p>
                     </div>
                   </div>
-                  <div className="text-right shrink-0">
-                    <span className="text-2xl font-extrabold text-ink-900 tabular-nums">{formatRating(player.rating)}</span>
-                    <p className="text-[11px] text-muted">{t('rankings.points_label')}</p>
-                  </div>
-                </div>
-              </Link>
-            ))}
+                </Link>
+              )
+            })}
           </div>
         )
       )}
