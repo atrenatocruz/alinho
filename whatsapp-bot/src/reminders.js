@@ -1,6 +1,6 @@
 import { supabase } from './supabase.js'
 import { config } from './config.js'
-import { getSettings } from './settings.js'
+import { getGroups, getGroupsForOrg, getServedOrgIds, mixVisibleToGroup } from './groups.js'
 import { getOpenMixes, loadGame, formatDateTime } from './roster.js'
 import { helpFooter } from './messages.js'
 import { t } from './locales.js'
@@ -62,17 +62,22 @@ async function sendGameDayReminder(game, { sendText }) {
     return p.name
   })
 
-  const settings = await getSettings()
-  if (settings.whatsapp_group_jid) {
-    // Group post — addressed to everyone at once, not one profile, so it
-    // stays 'pt' (see locales.js scope note). The individual DM below is
-    // the one that respects each participant's own language.
-    const groupLang = 'pt'
-    const rosterLine = rosterNames.length > 0 ? t('reminder_roster_line', groupLang, { names: rosterNames.join(' ') }) : ''
-    const groupText =
-      t('reminder_group', groupLang, { title: game.title, hours: hoursLeft, when: whenGroup, location: locationLine, roster: rosterLine }) +
-      helpFooter(groupLang)
-    await sendText(settings.whatsapp_group_jid, groupText, { mentions: rosterMentions })
+  // Group post — aos grupos do clube deste mix que o conseguem ver
+  // (filtro de nível). Addressed to everyone at once, not one profile, so
+  // it stays 'pt' (see locales.js scope note). The individual DM below is
+  // the one that respects each participant's own language.
+  const groups = (await getGroupsForOrg(game.organization_id)).filter((g) => mixVisibleToGroup(game, g))
+  const groupLang = 'pt'
+  const rosterLine = rosterNames.length > 0 ? t('reminder_roster_line', groupLang, { names: rosterNames.join(' ') }) : ''
+  const groupText =
+    t('reminder_group', groupLang, { title: game.title, hours: hoursLeft, when: whenGroup, location: locationLine, roster: rosterLine }) +
+    helpFooter(groupLang)
+  for (const group of groups) {
+    try {
+      await sendText(group.groupJid, groupText, { mentions: rosterMentions })
+    } catch (err) {
+      console.error(`Failed to post game-day reminder to ${group.groupJid}:`, err)
+    }
   }
 
   for (const profile of profiles) {
@@ -94,11 +99,14 @@ async function sendGameDayReminder(game, { sendText }) {
 }
 
 async function checkGameDayReminders({ sendText }) {
+  const orgIds = await getServedOrgIds()
+  if (orgIds.length === 0) return
+
   const windowEnd = new Date(Date.now() + config.reminderHoursBefore * 3_600_000).toISOString()
   const { data: games, error } = await supabase
     .from('games')
     .select('*')
-    .eq('organization_id', config.organizationId)
+    .in('organization_id', orgIds)
     .in('status', ['open', 'closed'])
     .is('reminder_sent_at', null)
     .gt('date', new Date().toISOString())
@@ -116,35 +124,42 @@ async function checkGameDayReminders({ sendText }) {
   }
 }
 
-/** Once a day, nudges the group about every mix that's open but not yet full. */
+/** Once a day, nudges each group about every mix IT can see that's open but not yet full. */
 async function sendOpenMixesDigest({ sendText, getGroupMentions }) {
-  const settings = await getSettings()
-  if (!settings.whatsapp_group_jid) return
+  const groups = await getGroups()
 
-  const openMixes = await getOpenMixes()
-  const mixStates = await Promise.all(openMixes.map((mix) => loadGame(mix.id)))
-  const incomplete = mixStates.filter(({ people, capacity }) => people.length < capacity)
-  if (incomplete.length === 0) return
+  for (const group of groups) {
+    try {
+      const openMixes = (await getOpenMixes(group.organizationId)).filter((mix) => mixVisibleToGroup(mix, group))
+      const mixStates = await Promise.all(openMixes.map((mix) => loadGame(mix.id)))
+      const incomplete = mixStates.filter(({ people, capacity }) => people.length < capacity)
+      if (incomplete.length === 0) continue
 
-  // Group broadcast, not addressed to one profile — stays 'pt', same
-  // reasoning as sendGameDayReminder's group post above.
-  const lang = 'pt'
-  const lines = incomplete.map(({ game, people, capacity }) => {
-    const vagas = capacity - people.length
-    const locationLine = game.location ? `, ${game.location}` : ''
-    return t('digest_mix_line', lang, {
-      title: game.title,
-      when: formatDateTime(game.date),
-      location: locationLine,
-      filled: people.length,
-      capacity,
-      vagas,
-    })
-  })
+      // Group broadcast, not addressed to one profile — stays 'pt', same
+      // reasoning as sendGameDayReminder's group post above.
+      const lang = 'pt'
+      const lines = incomplete.map(({ game, people, capacity }) => {
+        const vagas = capacity - people.length
+        const locationLine = game.location ? `, ${game.location}` : ''
+        return t('digest_mix_line', lang, {
+          title: game.title,
+          when: formatDateTime(game.date),
+          location: locationLine,
+          filled: people.length,
+          capacity,
+          vagas,
+        })
+      })
 
-  const mentions = await getGroupMentions(settings.whatsapp_group_jid)
-  const text = t('digest_text', lang, { lines: lines.join('\n\n') }) + helpFooter(lang)
-  await sendText(settings.whatsapp_group_jid, text, { mentions })
+      const mentions = await getGroupMentions(group.groupJid)
+      const text = t('digest_text', lang, { lines: lines.join('\n\n') }) + helpFooter(lang)
+      await sendText(group.groupJid, text, { mentions })
+    } catch (err) {
+      // Um grupo com problemas (JID inválido, expulso do grupo…) nunca
+      // impede o digest dos restantes.
+      console.error(`Failed to send daily digest to ${group.groupJid}:`, err)
+    }
+  }
 }
 
 // No date library in this project — reading the current wall-clock hour in

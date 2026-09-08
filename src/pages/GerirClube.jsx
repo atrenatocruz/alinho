@@ -92,9 +92,16 @@ const EMPTY_GAME_FORM = {
   game_time_minutes: 20,
   format: 'sobe_desce',
   gender_restriction: 'indiferente',
+  level: '',
   auto_start_hours_before: '',
   recurrence: EMPTY_RECURRENCE,
 }
+
+// Bandas do ranking (RANKING.md) — o nível opcional de um mix decide que
+// grupos WhatsApp o veem (whatsapp_groups.levels; ver
+// migration_whatsapp_groups.sql). '' = sem nível → visível em todos os
+// grupos do clube. Escalas F/MX entram quando houver grupos dessas escalas.
+const MIX_LEVELS = ['M6', 'M5', 'M4', 'M3', 'M2', 'M1']
 
 /* Segmented tab selector for form options */
 function Segmented({ options, value, onChange }) {
@@ -572,6 +579,7 @@ export default function GerirClube() {
     game_time_minutes: game.game_time_minutes,
     format: game.format,
     gender_restriction: game.gender_restriction,
+    level: game.level,
     auto_start_hours_before: game.auto_start_hours_before,
   })
 
@@ -699,6 +707,7 @@ export default function GerirClube() {
         game_time_minutes: game.game_time_minutes,
         format: game.format,
         gender_restriction: game.gender_restriction,
+        level: game.level,
         auto_start_hours_before: game.auto_start_hours_before,
         status: 'pending',
         created_by: userId,
@@ -768,6 +777,7 @@ export default function GerirClube() {
             max_players: numCourts * 4, // derived
             price_per_player: gameForm.price_per_player === '' ? null : parseFloat(gameForm.price_per_player),
             auto_start_hours_before: gameForm.auto_start_hours_before === '' ? null : parseInt(gameForm.auto_start_hours_before, 10),
+            level: gameForm.level || null,
             created_by: user.id,
             status: 'open'
           }
@@ -941,6 +951,7 @@ export default function GerirClube() {
           num_courts: numCourts,
           max_players: numCourts * 4,
           price_per_player: gameForm.price_per_player === '' ? null : parseFloat(gameForm.price_per_player),
+          level: gameForm.level || null,
           ...pendingLaunchUpdate,
         })
         .eq('id', editingGame.id)
@@ -1226,6 +1237,7 @@ export default function GerirClube() {
       game_time_minutes: game.game_time_minutes || 20,
       format: game.format || 'sobe_desce',
       gender_restriction: game.gender_restriction || 'indiferente',
+      level: game.level || '',
       auto_start_hours_before: game.auto_start_hours_before ?? '',
       recurrence: hasActiveRecurrence
         ? {
@@ -1535,6 +1547,21 @@ export default function GerirClube() {
                         value={gameForm.gender_restriction}
                         onChange={(v) => setGameForm({ ...gameForm, gender_restriction: v })}
                       />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {t('gerirclube.level_label')}
+                      </label>
+                      <Segmented
+                        options={[
+                          { value: '', label: t('gerirclube.level_any') },
+                          ...MIX_LEVELS.map((l) => ({ value: l, label: l })),
+                        ]}
+                        value={gameForm.level}
+                        onChange={(v) => setGameForm({ ...gameForm, level: v })}
+                      />
+                      <p className="text-sm text-muted mt-1.5">{t('gerirclube.level_help')}</p>
                     </div>
 
                     <div>
