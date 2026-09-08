@@ -219,6 +219,7 @@
   "xp.tier_lenda": "Lenda",
   "xp.tier_world_class": "World Class",
   "trophies.shelf_title": "Estante de troféus",
+  "trophies.progress": "{{earned}} de {{total}} conquistados",
   "trophies.view_all": "Ver todos ({{earned}}/{{total}})",
   "trophies.collapse": "Fechar",
   "trophies.empty_own": "Ainda sem troféus — joga o próximo mix e estreia a estante.",

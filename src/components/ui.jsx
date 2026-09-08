@@ -524,19 +524,40 @@ export function TrophyCard({ trophyKey, category, rarity, earned = false, rarity
   const { t } = useTranslation()
   const Icon = trophyIcon(trophyKey, category)
   const meta = RARITY_META[rarity] || RARITY_META.comum
-  return (
-    <div className={`rounded-ctrl border-2 p-3 text-center ${earned ? `${meta.frame} bg-surface` : 'border-line bg-ink-50 opacity-70'}`}>
-      <div className="relative inline-flex">
-        <Icon size={26} className={earned ? meta.icon : 'text-ink-200'} />
-        {!earned && <Lock size={11} className="absolute -right-2 -bottom-1 text-muted" />}
+
+  // GANHO grita, BLOQUEADO sussurra: o ganho tem medalhão preenchido da
+  // cor da raridade, borda sólida e brilho nos tiers altos; o bloqueado é
+  // tracejado, tudo cinza, com o cadeado dentro do medalhão — ninguém
+  // confunde os dois numa grelha mista.
+  if (!earned) {
+    return (
+      <div className="rounded-ctrl border border-dashed border-ink-200 bg-canvas p-3 text-center">
+        <span className="inline-flex w-11 h-11 rounded-full bg-ink-50 items-center justify-center">
+          <Lock size={16} className="text-ink-200" />
+        </span>
+        <p className="mt-1.5 text-[12px] font-extrabold text-muted leading-tight">{t(`trophies.${trophyKey}_name`)}</p>
+        <p className="mt-0.5 text-[10px] text-ink-200 leading-tight">{t(`trophies.${trophyKey}_desc`)}</p>
+        <div className="mt-1.5">
+          <span className="px-1.5 py-px rounded-full text-[9px] font-mono font-extrabold uppercase tracking-wide bg-ink-50 text-muted">
+            {t(meta.labelKey)}
+          </span>
+        </div>
       </div>
+    )
+  }
+
+  return (
+    <div className={`rounded-ctrl border-2 p-3 text-center bg-surface ${meta.frame} ${meta.glow}`}>
+      <span className={`inline-flex w-11 h-11 rounded-full items-center justify-center ${meta.medal}`}>
+        <Icon size={22} className={meta.icon} />
+      </span>
       <p className="mt-1.5 text-[12px] font-extrabold text-ink-900 leading-tight">{t(`trophies.${trophyKey}_name`)}</p>
       <p className="mt-0.5 text-[10px] text-muted leading-tight">{t(`trophies.${trophyKey}_desc`)}</p>
       <div className="mt-1.5 flex items-center justify-center gap-1.5">
         <span className={`px-1.5 py-px rounded-full text-[9px] font-mono font-extrabold uppercase tracking-wide ${meta.pill}`}>
           {t(meta.labelKey)}
         </span>
-        {earned && rarityPct != null && (
+        {rarityPct != null && (
           <span className="text-[9px] text-muted tabular-nums">{t('trophies.rarity_pct', { pct: rarityPct })}</span>
         )}
       </div>
