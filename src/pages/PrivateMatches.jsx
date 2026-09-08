@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Plus, Trophy, Copy, Check, Trash2 } from 'lucide-react'
 import { getMyPrivateMatches, submitPrivateMatchScore, confirmPrivateMatch, deletePrivateMatch } from '../lib/privateMatches'
+import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton, EmptyState } from '../components/ui'
 
 const OPEN_SLOTS = [
@@ -91,6 +92,7 @@ const teamLabel = (m, prefix, t) => {
 
 export default function PrivateMatches() {
   const { t } = useTranslation()
+  const { profile } = useAuth()
   const [matches, setMatches] = useState([])
   const [loading, setLoading] = useState(true)
   // Pending matches whose already-submitted score is being corrected.
@@ -187,9 +189,18 @@ export default function PrivateMatches() {
           <h3 className="text-lg text-ink-900 mb-3">{t('privatematches.pending_confirmation')}</h3>
           <div className="space-y-3">
             {pending.map((m) => {
-              const canConfirm = m.is_creator && m.score_a !== null && m.team_a_player2_id && m.team_b_player1_id && m.team_b_player2_id
               const hasScore = m.score_a !== null && m.score_b !== null
               const isEditingScore = editingScoreIds.has(m.id)
+              // Confirmação cruzada: quem submeteu o resultado define a
+              // equipa que NÃO pode confirmar — só a adversária valida e
+              // fecha o jogo (regra imposta também no RPC).
+              const teamA = [m.team_a_player1_id, m.team_a_player2_id]
+              const myTeam = teamA.includes(profile?.id) ? 'a' : 'b'
+              const submitterTeam = m.score_submitted_by
+                ? (teamA.includes(m.score_submitted_by) ? 'a' : 'b')
+                : null
+              const allFilled = m.team_a_player2_id && m.team_b_player1_id && m.team_b_player2_id
+              const canConfirm = hasScore && allFilled && submitterTeam !== null && submitterTeam !== myTeam
               return (
                 <div key={m.id} className="card">
                   <div className="flex items-start justify-between gap-2">
@@ -208,8 +219,16 @@ export default function PrivateMatches() {
                   {hasScore && !isEditingScore ? (
                     <>
                       <p className="text-sm text-muted mt-1">
-                        {t('privatematches.result_label', { scoreA: m.score_a, scoreB: m.score_b })}
-                        {!m.is_creator ? t('privatematches.awaiting_creator_confirmation') : ''}
+                        {m.score_submitted_by_name
+                          ? t('privatematches.result_label_by', { name: m.score_submitted_by_name, scoreA: m.score_a, scoreB: m.score_b })
+                          : t('privatematches.result_label', { scoreA: m.score_a, scoreB: m.score_b })}
+                        {/* Sem submitter = resultado anterior à confirmação
+                            cruzada — a ação certa é re-inserir, não esperar. */}
+                        {!canConfirm
+                          ? (m.score_submitted_by
+                              ? t('privatematches.awaiting_opponent_confirmation')
+                              : t('privatematches.resubmit_needed'))
+                          : ''}
                       </p>
                       <button
                         type="button"
@@ -219,7 +238,7 @@ export default function PrivateMatches() {
                         {t('privatematches.edit_score')}
                       </button>
                     </>
-                  ) : (
+                  ) : allFilled ? (
                     <ScoreForm
                       match={m}
                       onSubmit={handleSubmitScore}
@@ -227,9 +246,13 @@ export default function PrivateMatches() {
                       initialScoreB={hasScore ? m.score_b : ''}
                       onCancel={isEditingScore ? () => toggleEditScore(m.id) : undefined}
                     />
+                  ) : (
+                    // O RPC recusa resultados com equipas incompletas — não
+                    // mostrar um formulário que só daria erro.
+                    <p className="text-sm text-muted mt-1">{t('privatematches.score_needs_full_teams')}</p>
                   )}
-                  {/* Hidden mid-edit so the creator can't confirm the old
-                      stored score while a correction sits unsubmitted. */}
+                  {/* Hidden mid-edit so nobody can confirm the old stored
+                      score while a correction sits unsubmitted. */}
                   {canConfirm && !isEditingScore && (
                     <PrimaryButton onClick={() => handleConfirm(m.id)} className="w-full mt-3">
                       {t('privatematches.confirm_score')}
@@ -254,11 +277,19 @@ export default function PrivateMatches() {
         ) : (
           <div className="space-y-2.5">
             {confirmed.map((m) => (
-              <div key={m.id} className="card">
-                <p className="font-extrabold text-ink-900 text-sm">{teamLabel(m, 'team_a', t)} vs {teamLabel(m, 'team_b', t)}</p>
-                <p className="text-[11px] text-muted mt-0.5">
-                  {t('privatematches.history_score_points', { scoreA: m.score_a, scoreB: m.score_b, points: m.my_points })}
-                </p>
+              <div key={m.id} className="card flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-extrabold text-ink-900 text-sm truncate">{teamLabel(m, 'team_a', t)} vs {teamLabel(m, 'team_b', t)}</p>
+                  <p className="text-[11px] text-muted mt-0.5">
+                    {t('privatematches.history_score_points', { scoreA: m.score_a, scoreB: m.score_b, points: m.my_points })}
+                  </p>
+                </div>
+                {/* Delta Elo do jogo (jogos confirmados antes do Elo não têm) */}
+                {m.my_rating_delta != null && (
+                  <span className={`shrink-0 text-sm font-extrabold tabular-nums ${m.my_rating_delta >= 0 ? 'text-ok' : 'text-danger'}`}>
+                    {m.my_rating_delta >= 0 ? '+' : ''}{Math.round(m.my_rating_delta)} Elo
+                  </span>
+                )}
               </div>
             ))}
           </div>

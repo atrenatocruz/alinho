@@ -55,7 +55,8 @@ What alinho actually does today, and what's explicitly not built yet. Kept in sy
 ## Private matches
 
 - 2x2 games outside any club, created and joined via a shareable link (`/jogos-privados`), gated behind a feature flag any club admin can toggle for the whole app. Changing global feature flags requires platform admin.
-- Contributes to a separate "private" ranking track, combined with club points into a global total.
+- **Count toward the global Elo rating** (same math as mixes via the shared `apply_elo_pairing` core, no merit bonus) — the per-game delta shows in the match history. Results require **cross-team confirmation**: any player submits the score, a player from the opposing team confirms, and that confirmation closes the game and applies the points. Games confirmed before this shipped keep their old flat points only.
+- Also contributes flat points to a separate "private" track, combined with club points into a global total.
 
 ## Rankings & stats
 
