@@ -134,6 +134,15 @@ export async function connectWhatsApp({ onGroupMessage }) {
 
   await start()
 
+  // Cache dos grupos em que ESTA conta está — define que subconjunto da
+  // tabela whatsapp_groups este processo serve (groups.js): com vários
+  // bots (números) a partilhar a mesma base de dados, cada processo só
+  // posta/lembra/auto-arranca nos grupos da sua própria conta. TTL curto
+  // para apanhar entradas/saídas de grupos sem reiniciar.
+  const PARTICIPATING_CACHE_TTL_MS = 5 * 60 * 1000
+  let participatingJids = null
+  let participatingAt = 0
+
   return {
     sendText: async (groupJid, text, options = {}) => {
       if (!sock) throw new Error('WhatsApp socket not connected yet')
@@ -147,6 +156,24 @@ export async function connectWhatsApp({ onGroupMessage }) {
       if (!sock) throw new Error('WhatsApp socket not connected yet')
       const metadata = await sock.groupMetadata(groupJid)
       return metadata.participants.map((p) => p.id)
+    },
+    // Set dos JIDs de grupo em que esta conta participa, ou null se ainda
+    // não for possível saber (socket em reconexão) — null significa
+    // "não filtrar", fail-open, para uma reconexão nunca silenciar o bot.
+    getParticipatingGroupJids: async () => {
+      if (participatingJids && Date.now() - participatingAt < PARTICIPATING_CACHE_TTL_MS) {
+        return participatingJids
+      }
+      if (!sock) return participatingJids // stale-if-error > nada
+      try {
+        const groups = await sock.groupFetchAllParticipating()
+        participatingJids = new Set(Object.keys(groups))
+        participatingAt = Date.now()
+        return participatingJids
+      } catch (err) {
+        console.error('Failed to list participating groups:', err)
+        return participatingJids
+      }
     },
   }
 }

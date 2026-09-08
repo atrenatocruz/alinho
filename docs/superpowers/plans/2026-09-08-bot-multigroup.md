@@ -20,6 +20,10 @@ Spec: `docs/superpowers/specs/2026-09-08-bot-multigroup-design.md`. Branch: `fea
 2. Merge para `main` (web deploya sozinha).
 3. Redeploy manual do bot; adicionar a conta WhatsApp ao grupo do Pedro; capturar o JID no log de arranque; INSERT em `whatsapp_groups` com a org do Pedro (exemplo na migração).
 
+## Multi-processo (vários bots, uma BD)
+
+Cada processo só serve a interseção de `whatsapp_groups` com os grupos em que a **sua** conta WhatsApp está (wa.js `getParticipatingGroupJids` → groups.js) — vários bots/números partilham a tabela sem competir. Regra operacional: **não dividir os grupos de um mesmo clube por contas/bots diferentes** — os reminders e o auto-start são por clube, e dois processos a servirem o mesmo clube competiam nesses timers.
+
 ## Limitações conhecidas (aceites na v1)
 
 - A gestão de grupos é SQL manual; a UI não valida se o nível escolhido num mix está coberto por algum grupo do clube — um mix com nível sem grupo correspondente não aparece em nenhum grupo WhatsApp (In/Out via app continuam a funcionar). O CHECK nas colunas trava typos/case.

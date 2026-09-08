@@ -17,6 +17,34 @@ import { config } from './config.js'
 const CACHE_TTL_MS = 60_000
 let cached = null
 let cachedAt = 0
+
+// Injetado por index.js a partir de wa.js: devolve o Set de JIDs de grupo
+// em que a conta WhatsApp DESTE processo está (ou null = desconhecido →
+// não filtrar). Com vários bots (números diferentes) sobre a mesma BD,
+// cada processo só serve a interseção da tabela com os grupos da sua
+// conta — sem isto, todos tentariam postar/lembrar/auto-arrancar em
+// todos os grupos da tabela.
+let participatingJidsProvider = null
+let warnedSkippedGroups = false
+
+export function setParticipatingJidsProvider(fn) {
+  participatingJidsProvider = fn
+}
+
+async function filterToParticipating(groups) {
+  if (!participatingJidsProvider || groups.length === 0) return groups
+  const jids = await participatingJidsProvider()
+  if (!jids) return groups // desconhecido (reconexão) — fail-open
+  const served = groups.filter((g) => jids.has(g.groupJid))
+  if (!warnedSkippedGroups && served.length < groups.length) {
+    warnedSkippedGroups = true
+    const skipped = groups.filter((g) => !jids.has(g.groupJid)).map((g) => g.groupJid)
+    console.warn(
+      `A ignorar ${skipped.length} grupo(s) de whatsapp_groups em que esta conta não está (${skipped.join(', ')}) — servidos por outro bot, ou JID errado.`
+    )
+  }
+  return served
+}
 // Avisar UMA vez por estado problemático — sem isto, um bot mal
 // configurado arranca, liga ao WhatsApp e não faz rigorosamente nada,
 // com zero pistas nos logs (o ORGANIZATION_ID deixou de ser obrigatório
@@ -72,10 +100,11 @@ async function loadGroups() {
   }))
 }
 
-/** Todos os grupos servidos por este processo (cache 60 s). */
+/** Todos os grupos servidos por este processo (cache 60 s): as linhas de
+    whatsapp_groups cuja conta WhatsApp deste processo está mesmo no grupo. */
 export async function getGroups() {
   if (cached && Date.now() - cachedAt < CACHE_TTL_MS) return cached
-  cached = await loadGroups()
+  cached = await filterToParticipating(await loadGroups())
   cachedAt = Date.now()
   return cached
 }
