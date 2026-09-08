@@ -16,7 +16,7 @@ alinho is a multi-tenant padel game management app: club admins create games ("m
 
 ## Architecture at a glance
 
-- **Web app** (`src/`): Vite + React + React Router + Tailwind, deployed to Vercel, auto-deploy on push to `main`.
+- **Web app** (`src/`): Vite + React + React Router + Tailwind, deployed to Vercel. Auto-deploy fires on push to **either** `dev` or `main` (Renato, 2026-09-08); `main` is what serves `alinho.pt`.
 - **Backend**: Supabase (Postgres + Auth + Realtime). No ORM, no migration runner — `supabase/schema.sql` is the base schema, `supabase/migration_*.sql` is a dated, sequential stack of hand-run changes. **A migration file existing in the repo does not mean it's live** — someone has to paste it into the Supabase SQL Editor. Always say so explicitly when you add one, and check whether it needs running before assuming a schema change is in effect.
 - **Multi-tenancy**: `organizations` (clubs) + `memberships` (per-user, per-org: `is_admin`, `is_guest`, `level`). `profiles` holds only identity that's global across clubs. `profiles.is_platform_admin` (manually granted) is a separate, higher tier — can create new clubs and manage any club, not just ones they're a member of.
 - **WhatsApp bot** (`whatsapp-bot/`): separate Node/Baileys process, one per club, uses the Supabase **service-role** key (bypasses RLS) — kept as its own process rather than folded into the web app for exactly that reason. Deployed on AWS EC2 (free tier) — see `DEPLOYMENT.md`. Unlike the web app, it has no CI/auto-deploy — a code change needs a manual redeploy to the instance.
@@ -25,7 +25,13 @@ alinho is a multi-tenant padel game management app: club admins create games ("m
 
 Non-trivial features go through the `superpowers` skill: brainstorm → write a design spec (`docs/superpowers/specs/YYYY-MM-DD-<slug>-design.md`) → write an implementation plan (`docs/superpowers/plans/YYYY-MM-DD-<slug>.md`) → implement → review. Larger multi-step efforts additionally get task briefs/reports under `.superpowers/sdd/`. **These are historical records, not living docs — don't rewrite old specs/plans to match current state; they document a decision at the time it was made.** If you're planning new work, check whether a spec for it already exists before starting from scratch.
 
-Branch off `main`, not `dev` — `dev` has drifted stale in the past (was 31 commits behind `main` as of 2026-07-30) and isn't the integration branch in practice, whatever its name suggests.
+**Work on `dev`. Never push to `main` — that is Renato's call and Renato's hand.** Francisco, 2026-09-08, correcting an earlier version of this same paragraph: `dev` is where you commit and push; promoting `dev` to `main` is done by Renato, not by whoever wrote the code. The two branches are still meant to stay close — the point is that closing the gap is his decision, not yours.
+
+If your work is ready and `main` is behind, say so and stop there. Do not `git push origin main`, do not `git push origin dev:main`, and do not merge `dev` into a local `main` and push it.
+
+This supersedes the note that used to live here telling you to branch off `main` because `dev` had gone stale. That was true at the time (`dev` was 31 commits behind on 2026-07-30, and still 10 behind on 2026-09-08) but it has since been realigned: as of 2026-09-08 `main` holds nothing that `dev` does not.
+
+Why it matters that this is his call: `main` publishes to `alinho.pt`. If a change depends on a migration, that migration has to have been run before the code lands there — and a migration file sitting in the repo is not a migration that has run (see "Architecture at a glance" above). Renato is the one who knows whether it has.
 
 ## Trello + Slack workflow rule
 
@@ -35,7 +41,7 @@ When working a task that comes from Trello, at the end of the task:
 
 - Update the Trello card (create one first if none exists for this task).
 - If the feature/fix is done but **not yet pushed to `main`**, move the card to **Dev Done**.
-- Only move the card to **Testing - QA** once the change is actually pushed to `main` — prod auto-deploys from `main` on push (see "Architecture at a glance" above and `DEPLOYMENT.md`). Don't move straight to Testing - QA on the strength of a local/uncommitted change, or of a push to `dev`.
+- Only move the card to **Testing - QA** once the change is actually on `main` — that is what serves `alinho.pt`, so that is when there is something for QA to test. Under the keep-in-sync rule above the two pushes normally happen together, so this is usually the same moment; what it rules out is moving a card on the strength of a local or uncommitted change, or of a `dev` push you have not mirrored to `main` yet (e.g. because a migration still has to be run first).
 - Send a message to the Slack **#dev-updates** channel with: the card number, the card link, and a summary of what was done in development terms.
 
 Skip this whole rule (Trello + Slack updates) when the user says they're low on tokens — in that case focus purely on development and skip the bookkeeping.
