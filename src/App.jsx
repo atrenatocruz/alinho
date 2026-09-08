@@ -179,109 +179,109 @@ function AppRoutes() {
 
   return (
     <Suspense fallback={<RouteFallback />}>
-    <Routes>
-      <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
-      <Route path="/instrucoes" element={<Instructions />} />
-      <Route path="/privacidade" element={<PrivacyPolicy />} />
-      <Route path="/termos" element={<TermsOfService />} />
-      <Route path="/mix-offline" element={<MixOffline />} />
-      <Route
-        path="/"
-        element={
-          <Guard require="home" showSplash={showSplash}>
-            <Home />
-          </Guard>
-        }
-      />
-      <Route
-        path="/jogo/:id"
-        element={
-          <Guard require="protected" showSplash={showSplash}>
-            <GameDetails />
-          </Guard>
-        }
-      />
-      <Route
-        path="/rankings"
-        element={
-          <Guard require="member" showSplash={showSplash}>
-            <Rankings />
-          </Guard>
-        }
-      />
-      <Route
-        path="/comunidade"
-        element={
-          <Guard require="member" showSplash={showSplash}>
-            <Comunidade />
-          </Guard>
-        }
-      />
-      <Route
-        path="/clube/:slug"
-        element={
-          <Guard require="member" showSplash={showSplash}>
-            <ClubProfile />
-          </Guard>
-        }
-      />
-      <Route
-        path="/jogador/:id"
-        element={
-          <Guard require="member" showSplash={showSplash}>
-            <PlayerDetails />
-          </Guard>
-        }
-      />
-      <Route
-        path="/perfil"
-        element={
-          <Guard require="protected" showSplash={showSplash}>
-            <Profile />
-          </Guard>
-        }
-      />
-      <Route
-        path="/jogos-privados"
-        element={
-          <Guard require="privateMatches" showSplash={showSplash}>
-            <PrivateMatches />
-          </Guard>
-        }
-      />
-      <Route
-        path="/jogos-privados/novo"
-        element={
-          <Guard require="privateMatches" showSplash={showSplash}>
-            <CreatePrivateMatch />
-          </Guard>
-        }
-      />
-      <Route
-        path="/jogos-privados/:id/entrar"
-        element={
-          <Guard require="privateMatches" showSplash={showSplash}>
-            <JoinPrivateMatch />
-          </Guard>
-        }
-      />
-      <Route
-        path="/gerir"
-        element={
-          <Guard require="protected" showSplash={showSplash}>
-            <Gerir />
-          </Guard>
-        }
-      />
-      <Route
-        path="/gerir/:slug"
-        element={
-          <Guard require="protected" showSplash={showSplash}>
-            <GerirClube />
-          </Guard>
-        }
-      />
-    </Routes>
+      <Routes>
+        <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
+        <Route path="/instrucoes" element={<Instructions />} />
+        <Route path="/privacidade" element={<PrivacyPolicy />} />
+        <Route path="/termos" element={<TermsOfService />} />
+        <Route path="/mix-offline" element={<MixOffline />} />
+        <Route
+          path="/"
+          element={
+            <Guard require="home" showSplash={showSplash}>
+              <Home />
+            </Guard>
+          }
+        />
+        <Route
+          path="/jogo/:id"
+          element={
+            <Guard require="protected" showSplash={showSplash}>
+              <GameDetails />
+            </Guard>
+          }
+        />
+        <Route
+          path="/rankings"
+          element={
+            <Guard require="member" showSplash={showSplash}>
+              <Rankings />
+            </Guard>
+          }
+        />
+        <Route
+          path="/comunidade"
+          element={
+            <Guard require="member" showSplash={showSplash}>
+              <Comunidade />
+            </Guard>
+          }
+        />
+        <Route
+          path="/clube/:slug"
+          element={
+            <Guard require="member" showSplash={showSplash}>
+              <ClubProfile />
+            </Guard>
+          }
+        />
+        <Route
+          path="/jogador/:id"
+          element={
+            <Guard require="member" showSplash={showSplash}>
+              <PlayerDetails />
+            </Guard>
+          }
+        />
+        <Route
+          path="/perfil"
+          element={
+            <Guard require="protected" showSplash={showSplash}>
+              <Profile />
+            </Guard>
+          }
+        />
+        <Route
+          path="/jogos-privados"
+          element={
+            <Guard require="privateMatches" showSplash={showSplash}>
+              <PrivateMatches />
+            </Guard>
+          }
+        />
+        <Route
+          path="/jogos-privados/novo"
+          element={
+            <Guard require="privateMatches" showSplash={showSplash}>
+              <CreatePrivateMatch />
+            </Guard>
+          }
+        />
+        <Route
+          path="/jogos-privados/:id/entrar"
+          element={
+            <Guard require="privateMatches" showSplash={showSplash}>
+              <JoinPrivateMatch />
+            </Guard>
+          }
+        />
+        <Route
+          path="/gerir"
+          element={
+            <Guard require="protected" showSplash={showSplash}>
+              <Gerir />
+            </Guard>
+          }
+        />
+        <Route
+          path="/gerir/:slug"
+          element={
+            <Guard require="protected" showSplash={showSplash}>
+              <GerirClube />
+            </Guard>
+          }
+        />
+      </Routes>
     </Suspense>
   )
 }
