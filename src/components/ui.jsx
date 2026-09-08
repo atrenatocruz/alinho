@@ -487,6 +487,36 @@ export function Avatar({ name, url, size = 'w-10 h-10 text-sm', colorClass = 'bg
   return <div className={`${base} ${colorClass}`}>{(name || '?').charAt(0).toUpperCase()}</div>
 }
 
+/* ─── PhotoViewerModal ───────────────────────────────────────────────────
+   Full-screen tap-to-zoom viewer for a profile photo, Instagram-style —
+   dark backdrop, image scaled to fit, tap anywhere or the X to close.
+   Renders nothing without a url, so callers can mount it unconditionally. */
+export function PhotoViewerModal({ url, alt = '', onClose }) {
+  const { t } = useTranslation()
+  if (!url) return null
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 animate-fade-in"
+      onClick={onClose}
+    >
+      <button
+        onClick={onClose}
+        aria-label={t('ui.close')}
+        className="absolute top-4 right-4 w-11 h-11 flex items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors duration-fast"
+      >
+        <X size={22} />
+      </button>
+      <img
+        src={url}
+        alt={alt}
+        className="max-w-full max-h-full object-contain animate-pop"
+        onClick={(e) => e.stopPropagation()}
+      />
+    </div>,
+    document.body
+  )
+}
+
 /* ─── PlayerAvatarRow ────────────────────────────────────────────────────
    Filled initials + dashed empty slots + count. Slots visible at a glance.
    Caps visible avatars (cap) with a +N chip so wide games stay compact. */

@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Trophy, Target, Award, Swords, ChevronDown, UserPlus, UserCheck, Clock, Lock, ShieldCheck } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { PrimaryButton, EmptyState, Avatar, RankBadge, RatingBadge } from '../components/ui'
+import { PrimaryButton, EmptyState, Avatar, RankBadge, RatingBadge, PhotoViewerModal } from '../components/ui'
 import { formatRating } from '../lib/elo'
 import { winRatePct } from '../lib/statsLogic'
 import { sendFriendRequest, acceptFriendRequest, removeFriendRequest } from '../lib/friends'
@@ -23,6 +23,7 @@ export default function PlayerDetails() {
   const [player, setPlayer] = useState(null)
   const [loading, setLoading] = useState(true)
   const [friendActing, setFriendActing] = useState(false)
+  const [showPhoto, setShowPhoto] = useState(false)
 
   const [h2h, setH2h] = useState(null)
   const [h2hLoading, setH2hLoading] = useState(true)
@@ -265,9 +266,17 @@ export default function PlayerDetails() {
           <line x1="200" y1="-60" x2="200" y2="200" stroke="currentColor" strokeWidth="3" />
         </svg>
         <div className="relative py-2">
-          <div className="w-20 h-20 mx-auto mb-3">
+          <button
+            type="button"
+            onClick={() => player.avatar_url && setShowPhoto(true)}
+            aria-label={player.avatar_url ? t('playerdetails.view_photo_aria') : undefined}
+            className="w-20 h-20 mx-auto mb-3 block"
+          >
             <Avatar name={player.name} url={player.avatar_url} size="w-20 h-20 text-3xl" colorClass="bg-lime-400 text-ink-900" />
-          </div>
+          </button>
+          {showPhoto && (
+            <PhotoViewerModal url={player.avatar_url} alt={player.name} onClose={() => setShowPhoto(false)} />
+          )}
           <h2 className="text-2xl text-white">{player.name}</h2>
           {/* Not gated by results_visibility — playing side isn't a result,
               and knowing it is the whole point when inviting a stranger. */}

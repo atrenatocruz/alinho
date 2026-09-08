@@ -9,7 +9,7 @@ import { uploadAvatar, removeAvatar } from '../lib/avatarStorage'
 import { getMyPrivateMatches, getGlobalRankings } from '../lib/privateMatches'
 import { listIncomingFriendRequests, acceptFriendRequest, removeFriendRequest, listFriends, listOutgoingFriendRequests } from '../lib/friends'
 import { listIncomingOrganizationInvites, acceptOrganizationInvite, declineOrganizationInvite } from '../lib/orgInvites'
-import { PrimaryButton, GuestBadge, DateField, Avatar, Select, EmptyState, RankBadge, RatingBadge } from '../components/ui'
+import { PrimaryButton, GuestBadge, DateField, Avatar, Select, EmptyState, RankBadge, RatingBadge, PhotoViewerModal } from '../components/ui'
 import { formatRating } from '../lib/elo'
 import { formatDate as formatDateLib } from '../lib/formatDate'
 
@@ -62,6 +62,7 @@ export default function Profile() {
   const [loading, setLoading] = useState(false)
   const [saved, setSaved] = useState(false)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [showPhoto, setShowPhoto] = useState(false)
   const [photoError, setPhotoError] = useState('')
   const [friendRequests, setFriendRequests] = useState([])
   const [friendRequestActing, setFriendRequestActing] = useState(null)
@@ -477,7 +478,17 @@ export default function Profile() {
         </svg>
         <div className="relative py-2">
           <div className="relative w-20 h-20 mx-auto mb-3">
-            <Avatar name={profile?.name} url={profile?.avatar_url} size="w-20 h-20 text-3xl" colorClass="bg-lime-400 text-ink-900" />
+            <button
+              type="button"
+              onClick={() => profile?.avatar_url && setShowPhoto(true)}
+              aria-label={profile?.avatar_url ? t('profile.view_photo_aria') : undefined}
+              className="block w-20 h-20"
+            >
+              <Avatar name={profile?.name} url={profile?.avatar_url} size="w-20 h-20 text-3xl" colorClass="bg-lime-400 text-ink-900" />
+            </button>
+            {showPhoto && (
+              <PhotoViewerModal url={profile?.avatar_url} alt={profile?.name} onClose={() => setShowPhoto(false)} />
+            )}
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
