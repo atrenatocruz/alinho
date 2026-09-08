@@ -501,10 +501,11 @@ export default function Profile() {
             />
           </div>
           <h2 className="text-2xl text-white">{profile?.name}</h2>
-          <div className="mt-2.5">
+          <div className="mt-2.5 flex items-center gap-1.5">
             <span className="inline-flex items-center rounded-full font-mono font-extrabold tracking-wide bg-lime-400 text-ink-900 text-sm px-3 py-1 tabular-nums">
               {formatRating(profile?.rating)} {t('gamedetails.points_suffix')}
             </span>
+            <RatingBadge rating={profile?.rating} gender={profile?.gender} />
           </div>
           {globalRank && (
             <div className="mt-2">
@@ -571,7 +572,11 @@ export default function Profile() {
             historial de mixes em vez da antiga soma de pontos de
             clube/amigos. */}
         {globalPoints && (
-          <div className="card">
+          <Link
+            to="/rankings"
+            state={{ tab: 'global', scrollToMe: true }}
+            className="card press block hover:shadow-lift"
+          >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <p className="text-sm font-extrabold text-ink-900">{t('profile.global_ranking')}</p>
@@ -582,7 +587,7 @@ export default function Profile() {
             <p className="text-[11px] text-muted mt-1">
               🎾 {t('profile.mix_wins_played_summary', { wins: globalPoints.mix_wins || 0, played: globalPoints.mixes_played || 0 })}
             </p>
-          </div>
+          </Link>
         )}
 
         {/* Personal info */}

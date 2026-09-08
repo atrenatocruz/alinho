@@ -2,12 +2,12 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useTranslation, Trans } from 'react-i18next'
-import { Calendar, MapPin, ArrowLeft, UserPlus, User, Check, Lock, Trophy, Play, ChevronRight, Swords, X, Repeat, Share2, ChevronDown, RotateCcw, Euro, GripVertical } from 'lucide-react'
+import { Calendar, MapPin, ArrowLeft, UserPlus, User, Check, Lock, Trophy, Play, ChevronRight, Swords, X, Repeat, Share2, ChevronDown, RotateCcw, Euro, GripVertical, Pencil } from 'lucide-react'
 import { DndContext, useDraggable, useDroppable, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { PrimaryButton, GuestBadge, PlayerAvatarRow, EmptyState, ShareModal, RoundTimer, Avatar, Select } from '../components/ui'
+import { PrimaryButton, GuestBadge, PlayerAvatarRow, EmptyState, ShareModal, RoundTimer, Avatar, Select, RatingBadge } from '../components/ui'
 import {
   countPeople, totalRounds, formDuplas, seedCourts, nextSobeDesce,
   roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches,
@@ -18,6 +18,28 @@ import { getGlobalRankings } from '../lib/privateMatches'
 import { formatDate as formatDateLib } from '../lib/formatDate'
 
 const SIDE_LABEL_KEY = { left: 'gamedetails.side_left', right: 'gamedetails.side_right', both: 'gamedetails.side_both' }
+
+// Same status vocabulary/colors as GerirClube.jsx's admin "other dates" list
+// (Phase 3 recurring-mix-series-grouping design) — kept identical so a
+// status reads the same whether an admin or a player sees it.
+const SERIES_STATUS_LABEL_KEY = {
+  open: 'gerirclube.status_open',
+  closed: 'gerirclube.status_closed_short',
+  in_progress: 'gerirclube.status_in_progress',
+  pending: 'gerirclube.status_pending',
+  completed: 'gerirclube.status_finished',
+  finished: 'gerirclube.status_finished',
+  cancelled: 'gerirclube.status_cancelled',
+}
+const SERIES_STATUS_PILL_CLASS = {
+  open: 'bg-blue-100 text-blue-700',
+  closed: 'bg-green-100 text-green-700',
+  in_progress: 'bg-lime-400 text-ink-900',
+  pending: 'bg-amber-100 text-amber-700',
+  completed: 'bg-ink-50 text-ink-700',
+  finished: 'bg-ink-50 text-ink-700',
+  cancelled: 'bg-danger/10 text-danger',
+}
 
 export default function GameDetails() {
   const { t, i18n } = useTranslation()
@@ -59,7 +81,14 @@ export default function GameDetails() {
   const [mixStats, setMixStats] = useState([])
   const [addingTestUser, setAddingTestUser] = useState(false)
   const [pointsById, setPointsById] = useState({})
+  // Raw {rating, gender} per user (unlike pointsById, which rounds AND
+  // defaults a missing rating to 0 — RatingBadge needs the real null to
+  // correctly render nothing for someone with no rating yet, Trello #176).
+  const [ratingInfoById, setRatingInfoById] = useState({})
   const [finishedTab, setFinishedTab] = useState('stats') // 'stats' | 'duplas' | 'rondas' — tabs for a finished mix's results
+  const [editingMatchId, setEditingMatchId] = useState(null) // a scored match being corrected — re-opens its inputs (Trello #184)
+  const [seriesHistory, setSeriesHistory] = useState([]) // sibling occurrences of this game's recurring series, newest first
+  const [seriesHistoryExpanded, setSeriesHistoryExpanded] = useState(false)
 
   useEffect(() => {
     loadGameDetails()
@@ -95,6 +124,24 @@ export default function GameDetails() {
       if (gameError) throw gameError
       setGame(gameData)
 
+      // Other occurrences of the same recurring series (Phase 3 grouping
+      // collapses them into one card on Home/GerirClube, so this is the
+      // only player-facing place a past/other occurrence is reachable).
+      // RLS on `games` already scopes this to org members, same as every
+      // other games query here — no new policy needed.
+      if (gameData.recurrence_id) {
+        const { data: historyData, error: historyError } = await supabase
+          .from('games')
+          .select('id, date, status')
+          .eq('recurrence_id', gameData.recurrence_id)
+          .neq('id', gameData.id)
+          .order('date', { ascending: false })
+        if (historyError) throw historyError
+        setSeriesHistory(historyData || [])
+      } else {
+        setSeriesHistory([])
+      }
+
       // level/is_guest live on `memberships` now (per-org) — fetch this
       // org's memberships once and merge onto every nested profile object
       // below, so the rest of this component's shape (person.level,
@@ -120,7 +167,8 @@ export default function GameDetails() {
         `)
         .eq('game_id', id)
         .in('status', ['confirmed', 'waitlisted'])
-        .order('created_at')
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true })
 
       if (participantsError) throw participantsError
 
@@ -168,6 +216,7 @@ export default function GameDetails() {
       try {
         const globalRankings = await getGlobalRankings()
         setPointsById(Object.fromEntries(globalRankings.map((r) => [r.user_id, Math.round(r.rating || 0)])))
+        setRatingInfoById(Object.fromEntries(globalRankings.map((r) => [r.user_id, { rating: r.rating, gender: r.gender }])))
       } catch (error) {
         console.error('Error loading global points:', error)
       }
@@ -691,11 +740,26 @@ export default function GameDetails() {
         .eq('id', match.id)
       if (error) throw error
       setScores(prev => ({ ...prev, [match.id]: undefined }))
+      setEditingMatchId(current => (current === match.id ? null : current))
       loadGameDetails()
     } catch (error) {
       console.error('Error saving score:', error)
       setMixError(t('gamedetails.error_save_score'))
     }
+  }
+
+  // Re-opens a saved score's inputs, pre-filled with its current values, so
+  // a wrong result can be corrected in place instead of tearing down and
+  // reforming the whole mix (Trello #184).
+  const startEditingScore = (match) => {
+    setMixError('')
+    setEditingMatchId(match.id)
+    setScores(prev => ({ ...prev, [match.id]: { a: String(match.score_a), b: String(match.score_b) } }))
+  }
+
+  const cancelEditingScore = (matchId) => {
+    setEditingMatchId(null)
+    setScores(prev => ({ ...prev, [matchId]: undefined }))
   }
 
   // Delegates (or revokes) score-entry for THIS mix only, while it's
@@ -893,7 +957,8 @@ export default function GameDetails() {
                 <span className="flex-1 min-w-0 text-sm font-extrabold text-ink-900 truncate">{player?.name || '?'}</span>
               </>
             )}
-            <span className="text-xs font-extrabold text-muted tabular-nums shrink-0">
+            <span className="flex items-center gap-1.5 text-xs font-extrabold text-muted tabular-nums shrink-0">
+              <RatingBadge rating={ratingInfoById[player?.id]?.rating} gender={ratingInfoById[player?.id]?.gender} />
               {pointsById[player?.id] ?? 0} {t('gamedetails.points_suffix')} · {sideLabel(player?.preferred_side)}
             </span>
           </div>
@@ -1156,6 +1221,45 @@ export default function GameDetails() {
         </div>
       </div>
 
+      {/* Histórico — other occurrences of this recurring series (Phase 3
+          design: collapsed by default, only rendered when there's at least
+          one sibling occurrence — see docs/superpowers/specs/2026-08-25-recurring-mix-series-grouping-design.md). */}
+      {game.recurrence_id && seriesHistory.length > 0 && (
+        <div className="card p-0 overflow-hidden">
+          <button
+            onClick={() => setSeriesHistoryExpanded((v) => !v)}
+            aria-expanded={seriesHistoryExpanded}
+            className="w-full flex items-center gap-3 px-4 py-3.5 min-h-[56px] transition-colors duration-fast hover:bg-ink-50"
+          >
+            <Repeat size={20} className="text-ink-700 shrink-0" />
+            <p className="flex-1 min-w-0 text-left font-extrabold text-ink-900">{t('gamedetails.series_history_title')}</p>
+            <span className="text-sm font-extrabold text-muted tabular-nums shrink-0">{seriesHistory.length}</span>
+            <ChevronDown
+              size={20}
+              className={`text-muted transition-transform duration-base shrink-0 ${seriesHistoryExpanded ? 'rotate-180' : ''}`}
+            />
+          </button>
+
+          {seriesHistoryExpanded && (
+            <div className="border-t border-line divide-y divide-line animate-fade-up">
+              {seriesHistory.map((h) => (
+                <Link
+                  key={h.id}
+                  to={`/jogo/${h.id}`}
+                  className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50"
+                >
+                  <p className="flex-1 min-w-0 font-extrabold text-ink-900 text-sm capitalize truncate">{formatDate(h.date)}</p>
+                  <span className={`text-[11px] font-extrabold uppercase px-2 py-1 rounded-full shrink-0 ${SERIES_STATUS_PILL_CLASS[h.status] || 'bg-ink-50 text-ink-700'}`}>
+                    {t(SERIES_STATUS_LABEL_KEY[h.status] || 'gerirclube.status_finished')}
+                  </span>
+                  <ChevronRight size={16} className="text-muted shrink-0" />
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Winner (mix finalizado) */}
       {game.status === 'finished' && game.winner_team_id && (
         <div className="card bg-ink-900 text-center">
@@ -1193,10 +1297,18 @@ export default function GameDetails() {
           <h3 className="text-lg text-ink-900 mb-3">{t('gamedetails.mix_stats_title')}</h3>
           <div className="space-y-1.5">
             {mixStats.map((s, i) => {
+              // rating_delta/rating_after only exist from the Elo rollout
+              // (2026-08-25) onward — older finished mixes fall back to the
+              // legacy points_earned they were actually finalized with.
+              const hasRating = s.rating_delta != null
               const nameBlock = (
                 <div className="flex-1 min-w-0">
-                  <p className="font-extrabold text-ink-900 truncate">
+                  <p className="font-extrabold text-ink-900 truncate flex items-center gap-1.5">
                     {firstLastName(s.user?.name)}
+                    <RatingBadge
+                      rating={hasRating ? s.rating_after : ratingInfoById[s.user_id]?.rating}
+                      gender={ratingInfoById[s.user_id]?.gender}
+                    />
                     {s.mix_won && <span className="ml-1.5">🏆</span>}
                   </p>
                   <p className="text-[11px] text-muted">
@@ -1204,10 +1316,6 @@ export default function GameDetails() {
                   </p>
                 </div>
               )
-              // rating_delta/rating_after only exist from the Elo rollout
-              // (2026-08-25) onward — older finished mixes fall back to the
-              // legacy points_earned they were actually finalized with.
-              const hasRating = s.rating_delta != null
               return (
                 <div key={s.id} className="flex items-center gap-3 py-2 border-b border-line last:border-0">
                   <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-extrabold tabular-nums shrink-0 ${
@@ -1509,8 +1617,10 @@ export default function GameDetails() {
                 <div className="space-y-2.5">
                   {ms.map(m => {
                     const done = !!m.winner_team_id
+                    const isCorrecting = editingMatchId === m.id
                     const s = scores[m.id] || { a: '', b: '' }
-                    const editable = !done && (isAdmin || isScorekeeper) && game.status === 'in_progress'
+                    const canEditScores = (isAdmin || isScorekeeper) && game.status === 'in_progress'
+                    const editable = canEditScores && (!done || isCorrecting)
                     // one row per dupla — full-width names, no truncation
                     const teamRow = (teamId, scoreVal, scoreKey) => {
                       const isWinner = done && m.winner_team_id === teamId
@@ -1524,13 +1634,7 @@ export default function GameDetails() {
                             {teamName(teamId)}
                             {isWinner && <span className="ml-1.5 text-lime-600">🏆</span>}
                           </span>
-                          {done ? (
-                            <span className={`text-xl font-extrabold tabular-nums shrink-0 ${
-                              isWinner ? 'text-ink-900' : 'text-muted'
-                            }`}>
-                              {scoreVal}
-                            </span>
-                          ) : editable ? (
+                          {editable ? (
                             <input
                               type="number" min="0" inputMode="numeric"
                               value={s[scoreKey]}
@@ -1538,27 +1642,54 @@ export default function GameDetails() {
                               className="w-16 px-2 py-2 text-center text-lg font-extrabold rounded-ctrl border border-line bg-surface shrink-0"
                               placeholder="0"
                             />
-                          ) : null}
+                          ) : (
+                            <span className={`text-xl font-extrabold tabular-nums shrink-0 ${
+                              isWinner ? 'text-ink-900' : 'text-muted'
+                            }`}>
+                              {scoreVal}
+                            </span>
+                          )}
                         </div>
                       )
                     }
                     return (
                       <div key={m.id} className="rounded-ctrl bg-canvas p-2.5">
-                        <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mb-2 px-1">
-                          {t('gamedetails.court_number', { number: m.court_number })}
-                        </p>
+                        <div className="flex items-center justify-between mb-2 px-1">
+                          <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">
+                            {t('gamedetails.court_number', { number: m.court_number })}
+                          </p>
+                          {canEditScores && done && !isCorrecting && (
+                            <button
+                              onClick={() => startEditingScore(m)}
+                              className="inline-flex items-center gap-1 text-[11px] font-extrabold text-muted hover:text-ink-900 min-h-[28px] px-1"
+                            >
+                              <Pencil size={12} />
+                              {t('gamedetails.edit_score')}
+                            </button>
+                          )}
+                        </div>
                         <div className="space-y-1.5">
                           {teamRow(m.team_a_id, m.score_a, 'a')}
                           {teamRow(m.team_b_id, m.score_b, 'b')}
                         </div>
 
                         {editable && s.a !== '' && s.b !== '' && (
-                          <button
-                            onClick={() => handleSaveScore(m)}
-                            className="mt-2.5 w-full py-2.5 rounded-ctrl bg-ink-900 text-lime-400 text-sm font-extrabold transition-all duration-fast active:scale-[0.98]"
-                          >
-                            {t('gamedetails.save_score')}
-                          </button>
+                          <div className="flex gap-2 mt-2.5">
+                            {isCorrecting && (
+                              <button
+                                onClick={() => cancelEditingScore(m.id)}
+                                className="flex-1 py-2.5 rounded-ctrl bg-ink-50 text-ink-700 text-sm font-extrabold transition-all duration-fast active:scale-[0.98]"
+                              >
+                                {t('gamedetails.cancel')}
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleSaveScore(m)}
+                              className="flex-1 py-2.5 rounded-ctrl bg-ink-900 text-lime-400 text-sm font-extrabold transition-all duration-fast active:scale-[0.98]"
+                            >
+                              {t('gamedetails.save_score')}
+                            </button>
+                          </div>
                         )}
                       </div>
                     )
@@ -1797,7 +1928,8 @@ export default function GameDetails() {
                             <span className="text-muted font-normal text-sm">{t('gamedetails.you_suffix')}</span>
                           )}
                         </p>
-                        <p className="text-xs text-muted truncate">
+                        <p className="text-xs text-muted truncate flex items-center gap-1.5">
+                          <RatingBadge rating={ratingInfoById[person.id]?.rating} gender={ratingInfoById[person.id]?.gender} />
                           <span className="font-extrabold text-ink-900">{pointsById[person.id] ?? 0} {t('gamedetails.points_suffix')}</span> · {sideLabel(person.preferred_side)}
                         </p>
                       </div>

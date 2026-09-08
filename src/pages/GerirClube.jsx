@@ -9,7 +9,7 @@ import { uploadClubLogo, removeClubLogo } from '../lib/clubLogoStorage'
 import { createGroup } from '../lib/platformAdmin'
 import { listClubGroups } from '../lib/organizations'
 import { formatRating } from '../lib/elo'
-import { formatDate as formatDateLib } from '../lib/formatDate'
+import { formatDate as formatDateLib, formatTime as formatTimeLib } from '../lib/formatDate'
 import { DateField, DateTimeField, Avatar } from '../components/ui'
 import { totalRounds, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY } from '../lib/mixLogic'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
@@ -1554,6 +1554,26 @@ export default function GerirClube() {
                       <p className="text-sm text-muted mt-1.5">
                         {t('gerirclube.auto_start_help')}
                       </p>
+                      {(() => {
+                        // Live "abre às HH:mm" preview so the admin doesn't have
+                        // to do the subtraction from the mix's own time by hand
+                        // (Trello #182) — mixDate/openDate stay in the browser's
+                        // local time, same as gameForm.date's own DateTimeField.
+                        const hours = parseInt(gameForm.auto_start_hours_before, 10)
+                        const mixDate = gameForm.date ? new Date(gameForm.date) : null
+                        if (!hours || hours <= 0 || !mixDate || Number.isNaN(mixDate.getTime())) return null
+                        const openDate = new Date(mixDate.getTime() - hours * 3_600_000)
+                        const sameDay = openDate.toDateString() === mixDate.toDateString()
+                        const dateLabel = sameDay ? '' : `${formatDateLib(openDate, i18n.language, { day: 'numeric', month: 'long' })} `
+                        return (
+                          <p className="text-sm text-ink-900 mt-1.5">
+                            {t('gerirclube.auto_start_preview', {
+                              date: dateLabel,
+                              time: formatTimeLib(openDate, i18n.language, { hour: '2-digit', minute: '2-digit' }),
+                            })}
+                          </p>
+                        )
+                      })()}
                     </div>
 
                     {/* Recurring Mixes are not available to self-serve groups:
