@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { User, Award, Trophy, Target, Flame, LogOut, Camera, UserCheck, X, Users } from 'lucide-react'
+import { User, Award, Trophy, Target, Flame, LogOut, Camera, UserCheck, X, Users, HelpCircle } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { hashPhone } from '../lib/hashPhone'
@@ -537,10 +537,13 @@ export default function Profile() {
                       ? `${t('profile.xp_level', { level: tier.level })} · ${t(tier.labelKey)}`
                       : t('profile.xp_no_shield')}
                   </span>
-                  <span className="tabular-nums">
+                  <span className="tabular-nums inline-flex items-center gap-1">
                     {progress.nextMin != null
                       ? t('profile.xp_progress', { current: formatXp(profile?.xp), next: formatXp(progress.nextMin) })
                       : `${formatXp(profile?.xp)} XP`}
+                    <Link to="/instrucoes#xp" aria-label={t('profile.xp_help_aria')} className="text-white/50 hover:text-white">
+                      <HelpCircle size={12} />
+                    </Link>
                   </span>
                 </div>
                 <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
