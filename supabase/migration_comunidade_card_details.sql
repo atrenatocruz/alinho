@@ -6,6 +6,13 @@
 -- file existing in the repo does not mean it's live.
 
 -- ── Players ──────────────────────────────────────────────────────────────
+-- Postgres won't let CREATE OR REPLACE change a function's OUT-parameter
+-- row type (adding columns counts as changing it) — drop first.
+DROP FUNCTION IF EXISTS search_players(TEXT);
+DROP FUNCTION IF EXISTS list_players(INTEGER);
+DROP FUNCTION IF EXISTS search_organizations(TEXT);
+DROP FUNCTION IF EXISTS list_global_organizations();
+
 CREATE OR REPLACE FUNCTION search_players(p_query TEXT)
 RETURNS TABLE (id UUID, name TEXT, avatar_url TEXT, club_names TEXT, rating NUMERIC, gender TEXT, preferred_side TEXT)
 LANGUAGE sql
