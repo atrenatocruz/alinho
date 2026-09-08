@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { User, Award, Trophy, Target, Flame, LogOut, Camera, UserCheck, X, Users, HelpCircle } from 'lucide-react'
+import { User, Award, Trophy, Target, Flame, LogOut, Camera, UserCheck, X, Users, HelpCircle, ThumbsUp } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { hashPhone } from '../lib/hashPhone'
@@ -60,6 +60,7 @@ export default function Profile() {
   const [privateMatchHistoryLoading, setPrivateMatchHistoryLoading] = useState(true)
   const [globalPoints, setGlobalPoints] = useState(null)
   const [globalRank, setGlobalRank] = useState(null)
+  const [kudosTotal, setKudosTotal] = useState(0)
   const [loading, setLoading] = useState(false)
   const [saved, setSaved] = useState(false)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
@@ -98,9 +99,22 @@ export default function Profile() {
         loadOutgoingRequests()
         loadFriends()
         loadOrgInvites()
+        loadKudos()
       }
     }
   }, [profile, currentOrganizationId])
+
+  // Total de kudos recebidos (à Strava) — via get_player_xp, que agrega o
+  // kind 'kudos' do ledger.
+  const loadKudos = async () => {
+    try {
+      const { data, error } = await supabase.rpc('get_player_xp', { p_user_id: profile.id })
+      if (error) throw error
+      setKudosTotal(data?.[0]?.kudos ?? 0)
+    } catch (error) {
+      console.error('Error loading kudos total:', error)
+    }
+  }
 
   const loadFriendRequests = async () => {
     try {
@@ -462,6 +476,9 @@ export default function Profile() {
     { icon: Target, value: gamesPlayed, label: t('playerdetails.stat_games'), cls: 'text-ink-700' },
     { icon: Flame, value: stats.game_wins || 0, label: t('profile.stat_game_wins'), cls: 'text-ok' },
     { icon: Award, value: `${winRate}%`, label: t('playerdetails.stat_win_rate'), cls: 'text-ink-700' },
+    // Kudos recebidos (à Strava) — reconhecimento dos colegas, o 3º eixo
+    // ao lado do Elo (nível) e do XP (assiduidade).
+    ...(kudosTotal > 0 ? [{ icon: ThumbsUp, value: kudosTotal, label: t('profile.stat_kudos'), cls: 'text-lime-600' }] : []),
   ] : null
 
   return (

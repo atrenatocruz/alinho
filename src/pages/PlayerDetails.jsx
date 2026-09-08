@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, Trophy, Target, Award, Swords, ChevronDown, UserPlus, UserCheck, Clock, Lock, ShieldCheck } from 'lucide-react'
+import { ArrowLeft, Trophy, Target, Award, Swords, ChevronDown, UserPlus, UserCheck, Clock, Lock, ShieldCheck, ThumbsUp } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { PrimaryButton, EmptyState, Avatar, RankBadge, RatingBadge, PhotoViewerModal } from '../components/ui'
 import { formatRating, isProvisional } from '../lib/elo'
@@ -309,6 +309,11 @@ export default function PlayerDetails() {
           )}
           <p className="text-white/60 text-xs mt-2.5">
             {t('playerdetails.friends_count', { count: player.friends_count })}
+            {(playerXp?.kudos ?? 0) > 0 && (
+              <span className="inline-flex items-center gap-1 ml-2.5 align-middle">
+                <ThumbsUp size={11} className="text-lime-400" /> {playerXp.kudos}
+              </span>
+            )}
           </p>
           {!player.my_profile && (
             player.friendship_status === 'friends' ? (
