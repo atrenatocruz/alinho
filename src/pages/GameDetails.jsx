@@ -273,10 +273,22 @@ export default function GameDetails() {
 
       // Per-mix leaderboard — only exists once the mix has been finalized
       if (gameData.status === 'finished') {
+        // rating_delta (this mix's Elo swing — the +53/-5/etc. column shown)
+        // is the real ranking signal since the Elo rollout; points_earned
+        // is the pre-Elo leftover it replaced. Ordering by the legacy
+        // column alone left every same-win-rate group tied on both
+        // points_earned AND matches_won, with nothing left to break the
+        // tie — Postgres returned them in arbitrary order, which looked
+        // unrelated to any number actually shown on screen. rating_after
+        // (final rating) breaks ties within a mix's Elo rows; points_earned
+        // /matches_won remain the sort for mixes finalized before the
+        // rollout, where every row's rating_delta is null.
         const { data: statsData } = await supabase
           .from('mix_player_stats')
           .select('*, user:profiles!mix_player_stats_user_id_fkey (name)')
           .eq('game_id', id)
+          .order('rating_delta', { ascending: false, nullsFirst: false })
+          .order('rating_after', { ascending: false, nullsFirst: false })
           .order('points_earned', { ascending: false })
           .order('matches_won', { ascending: false })
         setMixStats(statsData || [])
