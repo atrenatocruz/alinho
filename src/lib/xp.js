@@ -28,7 +28,11 @@ export const XP_TIERS = [
 ]
 
 /** Nível atual de um XP, ou null abaixo do primeiro escudo (<50).
-    Devolve { key, level, labelKey, ringClass, min, nextMin, progressPct }. */
+    Devolve { key, level, labelKey, ringClass, min, nextMin, progressPct }.
+    progressPct é ABSOLUTO rumo ao próximo threshold (xp/nextMin) — tem de
+    bater certo com o texto "150 / 350 XP" mostrado ao lado da barra; a
+    versão "progresso dentro do nível" mostrava 0% no momento da subida,
+    contradizendo os números. */
 export function tierFromXp(xp) {
   const value = xp ?? 0
   const tier = XP_TIERS.find((t) => value >= t.min)
@@ -37,7 +41,7 @@ export function tierFromXp(xp) {
   const nextMin = idx > 0 ? XP_TIERS[idx - 1].min : null
   const progressPct = nextMin == null
     ? 100
-    : Math.min(100, Math.round(((value - tier.min) / (nextMin - tier.min)) * 100))
+    : Math.min(100, Math.round((value / nextMin) * 100))
   return { ...tier, nextMin, progressPct }
 }
 
