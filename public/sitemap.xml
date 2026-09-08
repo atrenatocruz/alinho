@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Só as páginas públicas: tudo o resto é app autenticada (a shell SPA
+     sem conteúdo) e está desindexado via robots.txt. Host canónico é
+     www.alinho.pt — o apex faz 308 para lá (config de domínio Vercel). -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://www.alinho.pt/</loc>
+  </url>
+  <url>
+    <loc>https://www.alinho.pt/instrucoes</loc>
+  </url>
+</urlset>
