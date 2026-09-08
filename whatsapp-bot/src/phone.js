@@ -35,7 +35,7 @@ function hashPhone(digits) {
  * resolveProfileByPhoneJid on their very next message, exactly like a real
  * signup would.
  */
-export async function createGuestProfile(phoneJid, displayName) {
+export async function createGuestProfile(phoneJid, displayName, organizationId) {
   const digits = phoneJid.split('@')[0]
   const hash = hashPhone(digits)
   const name = displayName?.trim() || 'Jogador'
@@ -72,7 +72,7 @@ export async function createGuestProfile(phoneJid, displayName) {
 
   const { error: membershipError } = await supabase
     .from('memberships')
-    .insert({ user_id: created.user.id, organization_id: config.organizationId, is_guest: true })
+    .insert({ user_id: created.user.id, organization_id: organizationId, is_guest: true })
   if (membershipError) throw new Error(`Failed to create guest membership: ${membershipError.message}`)
 
   return { id: created.user.id, name }
@@ -80,9 +80,10 @@ export async function createGuestProfile(phoneJid, displayName) {
 
 /**
  * Resolves a WhatsApp phone-number JID (e.g. "351916376443@s.whatsapp.net")
- * to a profile that's actually a member of THIS bot's organization.
+ * to a profile that's actually a member of the given organization — the
+ * club mapped to the group the message came from (multi-grupo, groups.js).
  */
-export async function resolveProfileByPhoneJid(phoneJid) {
+export async function resolveProfileByPhoneJid(phoneJid, organizationId) {
   if (!phoneJid) return null
 
   const digits = phoneJid.split('@')[0]
@@ -94,7 +95,7 @@ export async function resolveProfileByPhoneJid(phoneJid) {
   const { data, error } = await supabase
     .from('memberships')
     .select('user_id, profile:profiles!inner(id, name, phone_hash, whatsapp_jid, language)')
-    .eq('organization_id', config.organizationId)
+    .eq('organization_id', organizationId)
     .eq('profile.phone_hash', hash)
     .maybeSingle()
 

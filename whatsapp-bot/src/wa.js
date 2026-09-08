@@ -65,7 +65,7 @@ export async function connectWhatsApp({ onGroupMessage }) {
         logger.info('WhatsApp connection established.')
         try {
           const groups = await sock.groupFetchAllParticipating()
-          logger.info('Groups this account participates in (copy the target JID into settings.whatsapp_group_jid):')
+          logger.info('Groups this account participates in (register each served group in the whatsapp_groups table — see supabase/migration_whatsapp_groups.sql):')
           for (const g of Object.values(groups)) {
             logger.info(`  ${g.subject}  ->  ${g.id}`)
           }

@@ -15,8 +15,10 @@ export const config = {
   // supabase/functions/hash-phone) — this bot now hashes phone numbers
   // in-process instead of calling that function.
   phoneHashSecret: required('PHONE_HASH_SECRET'),
-  // Multi-tenant: each bot deployment serves exactly one club/organization.
-  organizationId: required('ORGANIZATION_ID'),
+  // Legacy (pré multi-grupo): usado apenas como fallback quando a tabela
+  // whatsapp_groups ainda não existe/está vazia — ver groups.js. Um bot
+  // novo serve os clubes que a tabela mapear, não precisa disto.
+  organizationId: process.env.ORGANIZATION_ID || null,
   authDir: process.env.AUTH_DIR || './baileys-auth',
   port: Number(process.env.PORT) || 8080,
   pairingPhone: process.env.PAIRING_PHONE || null,
