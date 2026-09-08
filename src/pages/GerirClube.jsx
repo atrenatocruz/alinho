@@ -1287,7 +1287,7 @@ export default function GerirClube() {
                   }}
                   disabled={renamingOrg}
                   autoFocus
-                  className="text-3xl font-bold text-ink-900 bg-transparent border-b-2 border-lime-400 outline-none min-w-0 flex-1 disabled:opacity-50"
+                  className="text-3xl font-bold text-ink-900 bg-transparent border-b-2 border-lime-400 outline-none focus:ring-2 focus:ring-ink-50 min-w-0 flex-1 disabled:opacity-50"
                 />
               </div>
             ) : (

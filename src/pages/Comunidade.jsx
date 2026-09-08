@@ -401,7 +401,7 @@ export default function Comunidade() {
       )}
 
       {tab !== 'teachers' && (
-        <div className="flex items-center gap-2 input-field">
+        <div className="flex items-center gap-2 input-field focus-within:border-ink-500 focus-within:ring-2 focus-within:ring-ink-50">
           <Search size={16} className="text-muted shrink-0" />
           <input
             type="text"
