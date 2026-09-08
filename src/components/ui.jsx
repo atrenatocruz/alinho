@@ -6,6 +6,7 @@ import { MapPin, CheckCircle2, ChevronRight, ChevronDown, ChevronLeft, Lock, Pla
 import ShareCard, { CARD_W, CARD_H } from './ShareCard'
 import { ratingBand, groupRatingBand } from '../lib/elo'
 import { tierFromXp, isGlowing, GLOW_CLASS } from '../lib/xp'
+import { trophyIcon, RARITY_META } from '../lib/trophies'
 import { formatDate, formatTime } from '../lib/formatDate'
 
 /* ─── Date fields ────────────────────────────────────────────────────────
@@ -511,6 +512,35 @@ export function Avatar({ name, url, size = 'w-10 h-10 text-sm', colorClass = 'bg
         {t('elo.provisional_short')}
       </span>
     </span>
+  )
+}
+
+/* ─── TrophyCard ─────────────────────────────────────────────────────────
+   Um troféu da estante: moldura e cores pela raridade (RARITY_META),
+   ícone por key (trophyIcon), nome/descrição dos locales. Bloqueado =
+   silhueta com cadeado e o critério visível (a descrição É o critério) —
+   o "para onde subir". rarityPct = % de jogadores que o têm (PSN-style). */
+export function TrophyCard({ trophyKey, category, rarity, earned = false, rarityPct = null }) {
+  const { t } = useTranslation()
+  const Icon = trophyIcon(trophyKey, category)
+  const meta = RARITY_META[rarity] || RARITY_META.comum
+  return (
+    <div className={`rounded-ctrl border-2 p-3 text-center ${earned ? `${meta.frame} bg-surface` : 'border-line bg-ink-50 opacity-70'}`}>
+      <div className="relative inline-flex">
+        <Icon size={26} className={earned ? meta.icon : 'text-ink-200'} />
+        {!earned && <Lock size={11} className="absolute -right-2 -bottom-1 text-muted" />}
+      </div>
+      <p className="mt-1.5 text-[12px] font-extrabold text-ink-900 leading-tight">{t(`trophies.${trophyKey}_name`)}</p>
+      <p className="mt-0.5 text-[10px] text-muted leading-tight">{t(`trophies.${trophyKey}_desc`)}</p>
+      <div className="mt-1.5 flex items-center justify-center gap-1.5">
+        <span className={`px-1.5 py-px rounded-full text-[9px] font-mono font-extrabold uppercase tracking-wide ${meta.pill}`}>
+          {t(meta.labelKey)}
+        </span>
+        {earned && rarityPct != null && (
+          <span className="text-[9px] text-muted tabular-nums">{t('trophies.rarity_pct', { pct: rarityPct })}</span>
+        )}
+      </div>
+    </div>
   )
 }
 

@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Trophy, Target, Award, Swords, ChevronDown, UserPlus, UserCheck, Clock, Lock, ShieldCheck, ThumbsUp } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { PrimaryButton, EmptyState, Avatar, RankBadge, RatingBadge, PhotoViewerModal } from '../components/ui'
+import { PrimaryButton, EmptyState, Avatar, RankBadge, RatingBadge, PhotoViewerModal, TrophyCard } from '../components/ui'
 import { formatRating, isProvisional } from '../lib/elo'
 import { winRatePct } from '../lib/statsLogic'
 import { sendFriendRequest, acceptFriendRequest, removeFriendRequest } from '../lib/friends'
@@ -37,6 +37,7 @@ export default function PlayerDetails() {
   const [globalRank, setGlobalRank] = useState(null)
   const [globalEntry, setGlobalEntry] = useState(null)
   const [playerXp, setPlayerXp] = useState(null)
+  const [playerTrophies, setPlayerTrophies] = useState([])
 
   const toggleMix = (gameId) => {
     setExpandedMixes((prev) => {
@@ -64,6 +65,14 @@ export default function PlayerDetails() {
       setPlayerXp(data?.[0] || null)
     } catch (error) {
       console.error('Error loading player xp:', error)
+    }
+    try {
+      const { data, error } = await supabase.rpc('get_player_trophies', { p_user_id: id })
+      if (error) throw error
+      setPlayerTrophies(data || [])
+    } catch (error) {
+      // Fail-soft: sem migração, a estante não aparece.
+      console.error('Error loading player trophies:', error)
     }
   }
 
@@ -371,6 +380,21 @@ export default function PlayerDetails() {
               <p className="text-xs text-muted">{label}</p>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Estante de troféus — só os ganhos, com a mesma gate de
+          privacidade das stats (resultsHidden). */}
+      {!resultsHidden && playerTrophies.length > 0 && (
+        <div className="card">
+          <h3 className="text-lg text-ink-900 mb-3 flex items-center gap-2">
+            <Trophy size={20} className="text-lime-600" /> {t('trophies.shelf_title')}
+          </h3>
+          <div className="grid grid-cols-2 gap-2">
+            {playerTrophies.map((tr) => (
+              <TrophyCard key={tr.trophy_key} trophyKey={tr.trophy_key} category={tr.category} rarity={tr.rarity} earned rarityPct={tr.rarity_pct} />
+            ))}
+          </div>
         </div>
       )}
 
