@@ -1,13 +1,18 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Search, Users, UserPlus, Clock, Heart, Plus, GraduationCap, X } from 'lucide-react'
+import { Search, Users, UserPlus, Clock, Heart, Plus, GraduationCap, X, MapPin } from 'lucide-react'
 import { searchPlayers, listPlayers } from '../lib/privateMatches'
 import { searchOrganizations, listGlobalOrganizations } from '../lib/organizations'
 import { createSelfServeGroup } from '../lib/platformAdmin'
 import { DAYS, DAY_LABEL_KEY, listTeacherProfiles, requestTeacherProfile, withdrawTeacherProfile } from '../lib/teachers'
 import { useAuth } from '../contexts/AuthContext'
-import { Avatar, EmptyState } from '../components/ui'
+import { Avatar, EmptyState, RatingBadge, GroupLevelBadge } from '../components/ui'
+
+// Same key set as GameDetails.jsx/Profile.jsx's own SIDE_LABEL_KEY — small
+// enough that this codebase already accepts the duplication over a shared
+// util (see roster.js's mentionToken for the established precedent).
+const SIDE_LABEL_KEY = { left: 'gamedetails.side_left', right: 'gamedetails.side_right', both: 'gamedetails.side_both' }
 
 // High enough that for these pilot clubs the browse list is, in practice,
 // the whole community — not just a truncated preview.
@@ -25,6 +30,7 @@ const sanitizeSlug = (value) => value.toLowerCase().replace(/[^a-z0-9-]/g, '')
 
 export default function Comunidade() {
   const { t } = useTranslation()
+  const sideLabel = (side) => t(SIDE_LABEL_KEY[side] || SIDE_LABEL_KEY.both)
   const { user, memberships, followOrganization, leaveOrganization, toggleFavoriteOrganization, adminOrganizations, refreshMemberships } = useAuth()
   const navigate = useNavigate()
   const [teachers, setTeachers] = useState([])
@@ -254,9 +260,17 @@ export default function Comunidade() {
         <Avatar name={org.name} url={org.group_logo_url} size="w-11 h-11 text-sm" />
         <div className="flex-1 min-w-0">
           <h3 className="font-extrabold text-ink-900 truncate">{org.name}</h3>
-          <p className="text-sm text-muted flex items-center gap-1.5">
-            <Users size={13} /> {t('comunidade.member_count', { count: org.member_count })}
-          </p>
+          <div className="flex items-center gap-2.5 flex-wrap mt-0.5">
+            <p className="text-sm text-muted flex items-center gap-1.5">
+              <Users size={13} /> {t('comunidade.member_count', { count: org.member_count })}
+            </p>
+            {org.location && (
+              <p className="text-sm text-muted flex items-center gap-1.5 truncate">
+                <MapPin size={13} className="shrink-0" /> <span className="truncate">{org.location}</span>
+              </p>
+            )}
+            <GroupLevelBadge rating={org.avg_rating} />
+          </div>
         </div>
 
         {org.my_status === 'member' ? (
@@ -601,12 +615,18 @@ export default function Comunidade() {
               >
                 <Avatar name={player.name} url={player.avatar_url} size="w-10 h-10 text-sm" />
                 <div className="flex-1 min-w-0">
-                  <p className="font-extrabold text-ink-900 text-sm truncate">{player.name}</p>
-                  {player.club_names && (
-                    <p className="text-[11px] font-extrabold uppercase tracking-widest text-lime-700 truncate mt-0.5">
-                      {player.club_names}
-                    </p>
-                  )}
+                  <p className="font-extrabold text-ink-900 text-sm truncate flex items-center gap-1.5">
+                    {player.name}
+                    <RatingBadge rating={player.rating} gender={player.gender} />
+                  </p>
+                  <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                    {player.club_names && (
+                      <p className="text-[11px] font-extrabold uppercase tracking-widest text-lime-700 truncate">
+                        {player.club_names}
+                      </p>
+                    )}
+                    <p className="text-[11px] text-muted">{sideLabel(player.preferred_side)}</p>
+                  </div>
                 </div>
               </Link>
             ))}
