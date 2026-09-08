@@ -67,6 +67,7 @@ What alinho actually does today, and what's explicitly not built yet. Kept in sy
 - The **Clubes & Grupos** ranking shows and orders by a club's **average Elo level**, not its hidden points total.
 - Per-mix leaderboard orders by that mix's Elo swing (`rating_delta`), falling back to points/wins for mixes finalized before the Elo rollout.
 - Per-player stats: matches played/won, points, mix wins — configurable points-per-action per club (`organizations.points_rules`).
+- **XP / assiduidade**: global per-player XP (`profiles.xp` + `xp_events` ledger) rewarding dedication — mix participation 20, 5 per game, mix win 30, friendly 10 (+5 win) — written only inside `finalize_mix`/`confirm_private_match` with idempotent constraints. 10 shield levels from Iniciado (50 XP) to World Class (20,000 XP ≈ 3 years at 5x/week), shown as a colored ring on avatars (glowing when the player played in the last 7 days), an XP bar on the profile, and an "Assiduidade" leaderboard tab (global or per-club via the ledger). Historical games were backfilled — XP is additive, unlike Elo.
 - Unified player profile page (`/jogador/:id`) — one identity across every club a person plays in, showing preferred playing side. A Ranking Global card in Profile jumps to the player's own position.
 
 ## WhatsApp bot

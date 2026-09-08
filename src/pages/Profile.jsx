@@ -11,6 +11,7 @@ import { listIncomingFriendRequests, acceptFriendRequest, removeFriendRequest, l
 import { listIncomingOrganizationInvites, acceptOrganizationInvite, declineOrganizationInvite } from '../lib/orgInvites'
 import { PrimaryButton, GuestBadge, DateField, Avatar, Select, EmptyState, RankBadge, RatingBadge, PhotoViewerModal } from '../components/ui'
 import { formatRating } from '../lib/elo'
+import { tierFromXp, preTierProgress, formatXp } from '../lib/xp'
 import { formatDate as formatDateLib } from '../lib/formatDate'
 
 const TABS = [
@@ -430,7 +431,7 @@ export default function Profile() {
           </svg>
           <div className="relative py-2">
             <div className="w-20 h-20 mx-auto mb-3">
-              <Avatar name={profile?.name} url={profile?.avatar_url} size="w-20 h-20 text-3xl" colorClass="bg-lime-400 text-ink-900" />
+              <Avatar name={profile?.name} url={profile?.avatar_url} size="w-20 h-20 text-3xl" colorClass="bg-lime-400 text-ink-900" xp={profile?.xp} lastPlayedAt={profile?.last_played_at} />
             </div>
             <h2 className="text-2xl text-white">
               {profile?.name} <span className="text-ink-200 font-normal">{t('profile.guest_suffix')}</span>
@@ -484,7 +485,7 @@ export default function Profile() {
               aria-label={profile?.avatar_url ? t('profile.view_photo_aria') : undefined}
               className="block w-20 h-20"
             >
-              <Avatar name={profile?.name} url={profile?.avatar_url} size="w-20 h-20 text-3xl" colorClass="bg-lime-400 text-ink-900" />
+              <Avatar name={profile?.name} url={profile?.avatar_url} size="w-20 h-20 text-3xl" colorClass="bg-lime-400 text-ink-900" xp={profile?.xp} lastPlayedAt={profile?.last_played_at} />
             </button>
             {showPhoto && (
               <PhotoViewerModal url={profile?.avatar_url} alt={profile?.name} onClose={() => setShowPhoto(false)} />
@@ -523,6 +524,31 @@ export default function Profile() {
               <RankBadge rank={globalRank} size="md" />
             </div>
           )}
+          {/* Barra de XP/assiduidade — nível 1-10 (escudo) e progresso para
+              o próximo. Separado do Elo: isto mede dedicação, só sobe. */}
+          {(() => {
+            const tier = tierFromXp(profile?.xp)
+            const progress = tier ?? preTierProgress(profile?.xp)
+            return (
+              <div className="mt-3 mx-auto max-w-[240px]">
+                <div className="flex items-center justify-between text-[11px] font-extrabold text-white/70 mb-1">
+                  <span>
+                    {tier
+                      ? `${t('profile.xp_level', { level: tier.level })} · ${t(tier.labelKey)}`
+                      : t('profile.xp_no_shield')}
+                  </span>
+                  <span className="tabular-nums">
+                    {progress.nextMin != null
+                      ? t('profile.xp_progress', { current: formatXp(profile?.xp), next: formatXp(progress.nextMin) })
+                      : `${formatXp(profile?.xp)} XP`}
+                  </span>
+                </div>
+                <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+                  <div className="h-full rounded-full bg-lime-400" style={{ width: `${progress.progressPct}%` }} />
+                </div>
+              </div>
+            )
+          })()}
           {profile?.avatar_url && (
             <button
               type="button"
