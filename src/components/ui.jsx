@@ -584,12 +584,31 @@ export function EmptyState({ icon: Icon, title, subtitle, action }) {
   )
 }
 
+// Ação direta no cartão (Trello #51, parte 2). O MixCard continua sem falar
+// com a base de dados: recebe em `action` uma decisão já tomada — qual é a
+// ação, se está em curso, e o que fazer no clique. Quem decide se ela
+// existe (estado do mix, lotação, restrição de género, se a inscrição é
+// minha ou de quem me levou como parceiro) é a página que lista os mixs,
+// onde estão os dados e o contexto de autenticação.
+const ACTION_LABEL_KEY = {
+  join: 'ui.action_join',
+  waitlist: 'ui.action_waitlist',
+  leave: 'ui.action_leave',
+  leave_waitlist: 'ui.action_leave_waitlist',
+}
+const ACTION_VARIANT = {
+  join: 'lime',
+  waitlist: 'ghost',
+  leave: 'danger',
+  leave_waitlist: 'danger',
+}
+
 /* ─── MixCard ────────────────────────────────────────────────────────────
    Scannable at a glance: when, where, format/courts, price, prize, levels,
    slots, whether a friend is already in, and my own state — the card is
    meant to carry enough to decide without opening it (Trello #51).
    States: open | closed (court reservado) | completed | joined. */
-export function MixCard({ game, joined = false, showClub = false, friendIds = null }) {
+export function MixCard({ game, joined = false, showClub = false, friendIds = null, action = null }) {
   const { t, i18n } = useTranslation()
   // Every person in the game — a row with partner counts as 2 players
   const players = (game.participants || [])
@@ -735,11 +754,28 @@ export function MixCard({ game, joined = false, showClub = false, friendIds = nu
           <PlayerAvatarRow players={players} max={game.max_players} size="sm" />
           <GroupLevelBadge rating={avgRating} />
         </div>
-        {game.status === 'open' && !joined && !isFull && (
+        {/* preventDefault/stopPropagation porque o cartao inteiro e um
+            <Link>: sem isto, tocar em "Entrar" inscrevia E navegava para a
+            pagina do mix. Sem `action`, mantem-se o "Jogar >" de antes, que
+            e so um rotulo dentro do link. */}
+        {action ? (
+          <PrimaryButton
+            variant={ACTION_VARIANT[action.kind]}
+            disabled={action.busy}
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              action.onAction()
+            }}
+            className="ml-auto"
+          >
+            {t(ACTION_LABEL_KEY[action.kind])}
+          </PrimaryButton>
+        ) : game.status === 'open' && !joined && !isFull ? (
           <span className="ml-auto inline-flex items-center gap-0.5 text-ink-700 text-sm font-extrabold">
             {t('ui.play_cta')} <ChevronRight size={16} />
           </span>
-        )}
+        ) : null}
         {isClosed && !isLive && !isDone && (
           <span className="ml-auto inline-flex items-center gap-1.5 bg-ok/10 text-ok text-[11px] font-extrabold px-2.5 py-1 rounded-full">
             <Lock size={13} className="shrink-0" /> {t('ui.court_reserved')}

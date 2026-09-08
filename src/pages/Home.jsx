@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { MixCard, EmptyState, PrimaryButton, Avatar } from '../components/ui'
 import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
+import { countPeople } from '../lib/mixLogic'
 import { listFriends } from '../lib/friends'
 
 export default function Home() {
@@ -22,6 +23,10 @@ export default function Home() {
   // via Realtime, e a lista de amigos não muda a esse ritmo. null = ainda
   // não sabemos, o que o cartão trata como "sem destaque".
   const [friendIds, setFriendIds] = useState(null)
+  // Inscricao/saida directa a partir do cartao (Trello #51, parte 2).
+  // pendingGameId desactiva o botao so do mix em curso, nao a lista toda.
+  const [pendingGameId, setPendingGameId] = useState(null)
+  const [cardError, setCardError] = useState('')
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('ativos')
   const { user, profile, memberships, joinOrganization, isPrivateMatchesEnabled, isAdminOfAny } = useAuth()
@@ -206,6 +211,81 @@ export default function Home() {
     return game.participants?.some(p => p.user_id === user.id || p.partner_id === user.id)
   }
 
+  /* --- Inscricao/saida a partir do cartao (Trello #51, parte 2) --------
+     As regras sao deliberadamente as mesmas que GameDetails.jsx aplica aos
+     seus botoes; o que decide de verdade e a RLS de `participants`, isto so
+     evita mostrar um botao que ia dar erro. Devolve null quando a accao nao
+     e possivel ou nao e simples, e nesse caso o cartao volta a ser so um
+     link para a pagina do mix, onde ha espaco para explicar porque. */
+  const cardAction = (game) => {
+    if (!user) return null
+    const rows = game.participants || []
+    const myRow = rows.find((p) => p.user_id === user.id)
+    const iAmSomeonesPartner = rows.some((p) => p.partner_id === user.id)
+
+    if (myRow?.status === 'confirmed') {
+      // Sair so e oferecido aqui quando a inscricao e so minha. Com parceiro
+      // na mesma linha, sair leva os dois — decisao que merece o ecra do
+      // mix, onde se ve quem vai abaixo junto.
+      if (myRow.partner_id) return null
+      // Mesma janela que o botao da pagina de detalhe: aberto ou fechado,
+      // nunca depois de o mix arrancar.
+      if (game.status !== 'open' && game.status !== 'closed') return null
+      return { kind: 'leave' }
+    }
+    if (myRow?.status === 'waitlisted') return { kind: 'leave_waitlist' }
+    // Fui inscrito como parceiro de outra pessoa: a linha e dela, e um
+    // delete filtrado pelo meu user_id nao apagaria nada — o botao ficaria a
+    // nao fazer nada. Fica para a pagina do mix.
+    if (iAmSomeonesPartner) return null
+
+    if (game.status !== 'open') return null
+    const genderRestricted =
+      game.gender_restriction && !['indiferente', 'misto'].includes(game.gender_restriction)
+    if (genderRestricted && profile?.gender !== game.gender_restriction) return null
+
+    const capacity = game.max_players || (game.num_courts || 1) * 4
+    return countPeople(rows) < capacity ? { kind: 'join' } : { kind: 'waitlist' }
+  }
+
+  const handleCardAction = async (game, kind) => {
+    if (kind === 'leave' && !confirm(t('gamedetails.confirm_leave_game'))) return
+    setPendingGameId(game.id)
+    setCardError('')
+    try {
+      if (kind === 'join' || kind === 'waitlist') {
+        const { error } = await supabase.from('participants').insert([{
+          game_id: game.id,
+          user_id: user.id,
+          status: kind === 'join' ? 'confirmed' : 'waitlisted',
+          joined_alone: true,
+        }])
+        if (error) throw error
+      } else {
+        // leave_waitlist filtra tambem por status para nao apagar por engano
+        // uma inscricao confirmada entretanto promovida pelo trigger dos
+        // suplentes, entre o render e o clique.
+        let q = supabase.from('participants').delete()
+          .eq('game_id', game.id).eq('user_id', user.id)
+        if (kind === 'leave_waitlist') q = q.eq('status', 'waitlisted')
+        const { error } = await q
+        if (error) throw error
+      }
+      await loadGames()
+    } catch (error) {
+      console.error('Error updating participation from the mix card:', error)
+      setCardError(t('home.card_action_error'))
+    } finally {
+      setPendingGameId(null)
+    }
+  }
+
+  const actionFor = (game) => {
+    const a = cardAction(game)
+    if (!a) return null
+    return { ...a, busy: pendingGameId === game.id, onAction: () => handleCardAction(game, a.kind) }
+  }
+
   const isFinished = (game) => game.status === 'completed' || game.status === 'finished'
   // games is already sorted ascending by date from the query, so finished
   // just needs reversing to show the most recent one first.
@@ -350,6 +430,12 @@ export default function Home() {
             ))}
           </div>
 
+          {cardError && (
+            <div className="bg-danger/10 text-danger px-4 py-3 rounded-ctrl text-sm font-extrabold animate-fade-up">
+              {cardError}
+            </div>
+          )}
+
           {visibleEntries.length === 0 ? (
             tab === 'ativos' ? (
               <EmptyState
@@ -376,7 +462,7 @@ export default function Home() {
                   </div>
                   <div className="space-y-3.5">
                     {group.entries.map((entry) => (
-                      <MixCard key={entry.game.id} game={entry.game} joined={isUserJoined(entry.game)} showClub={false} friendIds={friendIds} />
+                      <MixCard key={entry.game.id} game={entry.game} joined={isUserJoined(entry.game)} showClub={false} friendIds={friendIds} action={actionFor(entry.game)} />
                     ))}
                   </div>
                 </div>
@@ -385,7 +471,7 @@ export default function Home() {
           ) : (
             <div className="space-y-3.5">
               {visibleEntries.map((entry) => (
-                <MixCard key={entry.game.id} game={entry.game} joined={isUserJoined(entry.game)} showClub={false} friendIds={friendIds} />
+                <MixCard key={entry.game.id} game={entry.game} joined={isUserJoined(entry.game)} showClub={false} friendIds={friendIds} action={actionFor(entry.game)} />
               ))}
             </div>
           )}
