@@ -4,11 +4,11 @@
 -- suficiente para perceber se o jogador é bom ou mau").
 --
 -- 1. O limiar de PROVISÓRIO (escudo/amortecedor de parceiro — ver
---    migration_elo_partner_shield.sql) sobe para 8 jogos contados.
---    O K de calibração (40 nos jogos 1-5, 30 até 20, 20 depois) NÃO
---    muda — são conceitos distintos: o K é a velocidade de correção do
---    próprio; o provisório é a confiança que terceiros podem depositar
---    no rating dele (e o rótulo "NOVO"/"provisório" na UI).
+--    migration_elo_partner_shield.sql) sobe para 8 jogos contados, e o
+--    K de calibração ALINHA com ele (revisão do Ruben, mesma sessão):
+--    K=40 nos jogos 1-8 ("enquanto és NOVO, o teu rating mexe a
+--    dobrar"), K=30 do 9º ao 20º, K=20 depois. Um só conceito de
+--    "novo" em todo o sistema — rótulo, escudo de parceiro e K.
 -- 2. get_global_rankings ganha rating_games, para a UI marcar
 --    provisórios (~902 · "provisório" · pill NOVO no avatar).
 --
@@ -62,7 +62,9 @@ BEGIN
       v_share := COALESCE(v_w, 0.5);
     END IF;
 
-    v_k := CASE WHEN pl.rating_games < 5 THEN 40
+    -- K alinhado com o limiar de provisório: 40 enquanto NOVO (<8),
+    -- 30 até ao 20º jogo, 20 depois.
+    v_k := CASE WHEN pl.rating_games < 8 THEN 40
                 WHEN pl.rating_games < 20 THEN 30
                 ELSE 20 END;
 
