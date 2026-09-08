@@ -7,7 +7,7 @@ import { searchOrganizations, listGlobalOrganizations } from '../lib/organizatio
 import { createSelfServeGroup } from '../lib/platformAdmin'
 import { DAYS, DAY_LABEL_KEY, listTeacherProfiles, requestTeacherProfile, withdrawTeacherProfile } from '../lib/teachers'
 import { useAuth } from '../contexts/AuthContext'
-import { Avatar, EmptyState, RatingBadge, GroupLevelBadge } from '../components/ui'
+import { Avatar, EmptyState, RatingBadge, GroupLevelBadge, Select } from '../components/ui'
 
 // Same key set as GameDetails.jsx/Profile.jsx's own SIDE_LABEL_KEY — small
 // enough that this codebase already accepts the duplication over a shared
@@ -469,16 +469,12 @@ export default function Comunidade() {
                 <h3 className="font-extrabold text-ink-900">{t('comunidade.become_teacher_cta')}</h3>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">{t('comunidade.club_label')}</label>
-                  <select
+                  <Select
                     value={teacherOrgId}
-                    onChange={(e) => setTeacherOrgId(e.target.value)}
-                    className="input-field"
-                  >
-                    <option value="">{t('comunidade.select_club_placeholder')}</option>
-                    {teachableOrgs.map((o) => (
-                      <option key={o.id} value={o.id}>{o.name}</option>
-                    ))}
-                  </select>
+                    onChange={setTeacherOrgId}
+                    placeholder={t('comunidade.select_club_placeholder')}
+                    options={teachableOrgs.map((o) => ({ value: o.id, label: o.name }))}
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">{t('comunidade.contact_label')}</label>
@@ -495,15 +491,12 @@ export default function Comunidade() {
                   <div className="space-y-2">
                     {teacherSlots.map((slot, i) => (
                       <div key={i} className="flex items-center gap-2">
-                        <select
+                        <Select
                           value={slot.day}
-                          onChange={(e) => handleSlotChange(i, 'day', e.target.value)}
-                          className="input-field flex-1"
-                        >
-                          {DAYS.map((d) => (
-                            <option key={d.value} value={d.value}>{t(d.labelKey)}</option>
-                          ))}
-                        </select>
+                          onChange={(v) => handleSlotChange(i, 'day', v)}
+                          className="flex-1"
+                          options={DAYS.map((d) => ({ value: d.value, label: t(d.labelKey) }))}
+                        />
                         <input
                           type="time"
                           value={slot.start}

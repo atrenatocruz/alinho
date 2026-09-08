@@ -10,7 +10,7 @@ import { createGroup } from '../lib/platformAdmin'
 import { listClubGroups } from '../lib/organizations'
 import { formatRating } from '../lib/elo'
 import { formatDate as formatDateLib, formatTime as formatTimeLib } from '../lib/formatDate'
-import { DateField, DateTimeField, Avatar } from '../components/ui'
+import { DateField, DateTimeField, Avatar, Select } from '../components/ui'
 import { totalRounds, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY } from '../lib/mixLogic'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
 import PlayerSearch from '../components/PlayerSearch'
@@ -1394,16 +1394,14 @@ export default function GerirClube() {
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           {t('gerirclube.scope_label')}
                         </label>
-                        <select
+                        <Select
                           value={mixScopeId}
-                          onChange={(e) => setMixScopeId(e.target.value)}
-                          className="input-field"
-                        >
-                          <option value="">{t('gerirclube.scope_whole_club')}</option>
-                          {clubGroups.filter((g) => g.can_manage).map((g) => (
-                            <option key={g.id} value={g.id}>{g.name}</option>
-                          ))}
-                        </select>
+                          onChange={setMixScopeId}
+                          options={[
+                            { value: '', label: t('gerirclube.scope_whole_club') },
+                            ...clubGroups.filter((g) => g.can_manage).map((g) => ({ value: g.id, label: g.name })),
+                          ]}
+                        />
                       </div>
                     )}
 
