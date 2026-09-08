@@ -365,6 +365,7 @@
   "gerirclube.appears_in_community_hint": "Appears in Community",
   "gerirclube.approve_action": "Approve",
   "gerirclube.auto_start_help": "Pairs are formed and the mix starts on its own, with a WhatsApp notice. Leave blank to start manually.",
+  "gerirclube.auto_start_preview": "🕐 Opens at {{date}}{{time}}",
   "gerirclube.auto_start_label": "Start automatically (optional)",
   "gerirclube.auto_start_placeholder": "e.g. 2 (hours before the game)",
   "gerirclube.avg_level_suffix": " · Average level {{rating}}",

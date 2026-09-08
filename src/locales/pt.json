@@ -365,6 +365,7 @@
   "gerirclube.appears_in_community_hint": "Aparece na Comunidade",
   "gerirclube.approve_action": "Aprovar",
   "gerirclube.auto_start_help": "As duplas são formadas e o mix começa sozinho, com aviso no WhatsApp. Deixa em branco para começar manualmente.",
+  "gerirclube.auto_start_preview": "🕐 Abre às {{date}}{{time}}",
   "gerirclube.auto_start_label": "Começar automaticamente (opcional)",
   "gerirclube.auto_start_placeholder": "ex: 2 (horas antes do jogo)",
   "gerirclube.avg_level_suffix": " · Nível médio {{rating}}",
