@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useTranslation, Trans } from 'react-i18next'
-import { Calendar, MapPin, ArrowLeft, UserPlus, User, Check, Lock, Trophy, Play, ChevronRight, Swords, X, Repeat, Share2, ChevronDown, RotateCcw, Euro, GripVertical } from 'lucide-react'
+import { Calendar, MapPin, ArrowLeft, UserPlus, User, Check, Lock, Trophy, Play, ChevronRight, Swords, X, Repeat, Share2, ChevronDown, RotateCcw, Euro, GripVertical, Pencil } from 'lucide-react'
 import { DndContext, useDraggable, useDroppable, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { supabase } from '../lib/supabase'
@@ -82,6 +82,7 @@ export default function GameDetails() {
   const [addingTestUser, setAddingTestUser] = useState(false)
   const [pointsById, setPointsById] = useState({})
   const [finishedTab, setFinishedTab] = useState('stats') // 'stats' | 'duplas' | 'rondas' — tabs for a finished mix's results
+  const [editingMatchId, setEditingMatchId] = useState(null) // a scored match being corrected — re-opens its inputs (Trello #184)
   const [seriesHistory, setSeriesHistory] = useState([]) // sibling occurrences of this game's recurring series, newest first
   const [seriesHistoryExpanded, setSeriesHistoryExpanded] = useState(false)
 
@@ -734,11 +735,26 @@ export default function GameDetails() {
         .eq('id', match.id)
       if (error) throw error
       setScores(prev => ({ ...prev, [match.id]: undefined }))
+      setEditingMatchId(current => (current === match.id ? null : current))
       loadGameDetails()
     } catch (error) {
       console.error('Error saving score:', error)
       setMixError(t('gamedetails.error_save_score'))
     }
+  }
+
+  // Re-opens a saved score's inputs, pre-filled with its current values, so
+  // a wrong result can be corrected in place instead of tearing down and
+  // reforming the whole mix (Trello #184).
+  const startEditingScore = (match) => {
+    setMixError('')
+    setEditingMatchId(match.id)
+    setScores(prev => ({ ...prev, [match.id]: { a: String(match.score_a), b: String(match.score_b) } }))
+  }
+
+  const cancelEditingScore = (matchId) => {
+    setEditingMatchId(null)
+    setScores(prev => ({ ...prev, [matchId]: undefined }))
   }
 
   // Delegates (or revokes) score-entry for THIS mix only, while it's
@@ -1591,8 +1607,10 @@ export default function GameDetails() {
                 <div className="space-y-2.5">
                   {ms.map(m => {
                     const done = !!m.winner_team_id
+                    const isCorrecting = editingMatchId === m.id
                     const s = scores[m.id] || { a: '', b: '' }
-                    const editable = !done && (isAdmin || isScorekeeper) && game.status === 'in_progress'
+                    const canEditScores = (isAdmin || isScorekeeper) && game.status === 'in_progress'
+                    const editable = canEditScores && (!done || isCorrecting)
                     // one row per dupla — full-width names, no truncation
                     const teamRow = (teamId, scoreVal, scoreKey) => {
                       const isWinner = done && m.winner_team_id === teamId
@@ -1606,13 +1624,7 @@ export default function GameDetails() {
                             {teamName(teamId)}
                             {isWinner && <span className="ml-1.5 text-lime-600">🏆</span>}
                           </span>
-                          {done ? (
-                            <span className={`text-xl font-extrabold tabular-nums shrink-0 ${
-                              isWinner ? 'text-ink-900' : 'text-muted'
-                            }`}>
-                              {scoreVal}
-                            </span>
-                          ) : editable ? (
+                          {editable ? (
                             <input
                               type="number" min="0" inputMode="numeric"
                               value={s[scoreKey]}
@@ -1620,27 +1632,54 @@ export default function GameDetails() {
                               className="w-16 px-2 py-2 text-center text-lg font-extrabold rounded-ctrl border border-line bg-surface shrink-0"
                               placeholder="0"
                             />
-                          ) : null}
+                          ) : (
+                            <span className={`text-xl font-extrabold tabular-nums shrink-0 ${
+                              isWinner ? 'text-ink-900' : 'text-muted'
+                            }`}>
+                              {scoreVal}
+                            </span>
+                          )}
                         </div>
                       )
                     }
                     return (
                       <div key={m.id} className="rounded-ctrl bg-canvas p-2.5">
-                        <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mb-2 px-1">
-                          {t('gamedetails.court_number', { number: m.court_number })}
-                        </p>
+                        <div className="flex items-center justify-between mb-2 px-1">
+                          <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">
+                            {t('gamedetails.court_number', { number: m.court_number })}
+                          </p>
+                          {canEditScores && done && !isCorrecting && (
+                            <button
+                              onClick={() => startEditingScore(m)}
+                              className="inline-flex items-center gap-1 text-[11px] font-extrabold text-muted hover:text-ink-900 min-h-[28px] px-1"
+                            >
+                              <Pencil size={12} />
+                              {t('gamedetails.edit_score')}
+                            </button>
+                          )}
+                        </div>
                         <div className="space-y-1.5">
                           {teamRow(m.team_a_id, m.score_a, 'a')}
                           {teamRow(m.team_b_id, m.score_b, 'b')}
                         </div>
 
                         {editable && s.a !== '' && s.b !== '' && (
-                          <button
-                            onClick={() => handleSaveScore(m)}
-                            className="mt-2.5 w-full py-2.5 rounded-ctrl bg-ink-900 text-lime-400 text-sm font-extrabold transition-all duration-fast active:scale-[0.98]"
-                          >
-                            {t('gamedetails.save_score')}
-                          </button>
+                          <div className="flex gap-2 mt-2.5">
+                            {isCorrecting && (
+                              <button
+                                onClick={() => cancelEditingScore(m.id)}
+                                className="flex-1 py-2.5 rounded-ctrl bg-ink-50 text-ink-700 text-sm font-extrabold transition-all duration-fast active:scale-[0.98]"
+                              >
+                                {t('gamedetails.cancel')}
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleSaveScore(m)}
+                              className="flex-1 py-2.5 rounded-ctrl bg-ink-900 text-lime-400 text-sm font-extrabold transition-all duration-fast active:scale-[0.98]"
+                            >
+                              {t('gamedetails.save_score')}
+                            </button>
+                          </div>
                         )}
                       </div>
                     )

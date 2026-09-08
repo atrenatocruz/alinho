@@ -294,6 +294,7 @@
   "gamedetails.make_scorekeeper": "Tornar marcador",
   "gamedetails.round_number": "Ronda {{number}}",
   "gamedetails.save_score": "Guardar resultado",
+  "gamedetails.edit_score": "Editar resultado",
   "gamedetails.drawing": "A sortear…",
   "gamedetails.start_round1": "Iniciar Ronda 1",
   "gamedetails.processing": "A processar…",

@@ -294,6 +294,7 @@
   "gamedetails.make_scorekeeper": "Make scorekeeper",
   "gamedetails.round_number": "Round {{number}}",
   "gamedetails.save_score": "Save result",
+  "gamedetails.edit_score": "Edit result",
   "gamedetails.drawing": "Drawing…",
   "gamedetails.start_round1": "Start Round 1",
   "gamedetails.processing": "Processing…",
