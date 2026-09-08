@@ -501,10 +501,11 @@ export default function Profile() {
             />
           </div>
           <h2 className="text-2xl text-white">{profile?.name}</h2>
-          <div className="mt-2.5">
+          <div className="mt-2.5 flex items-center gap-1.5">
             <span className="inline-flex items-center rounded-full font-mono font-extrabold tracking-wide bg-lime-400 text-ink-900 text-sm px-3 py-1 tabular-nums">
               {formatRating(profile?.rating)} {t('gamedetails.points_suffix')}
             </span>
+            <RatingBadge rating={profile?.rating} gender={profile?.gender} />
           </div>
           {globalRank && (
             <div className="mt-2">

@@ -7,7 +7,7 @@ import { DndContext, useDraggable, useDroppable, PointerSensor, TouchSensor, use
 import { CSS } from '@dnd-kit/utilities'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { PrimaryButton, GuestBadge, PlayerAvatarRow, EmptyState, ShareModal, RoundTimer, Avatar, Select } from '../components/ui'
+import { PrimaryButton, GuestBadge, PlayerAvatarRow, EmptyState, ShareModal, RoundTimer, Avatar, Select, RatingBadge } from '../components/ui'
 import {
   countPeople, totalRounds, formDuplas, seedCourts, nextSobeDesce,
   roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches,
@@ -81,6 +81,10 @@ export default function GameDetails() {
   const [mixStats, setMixStats] = useState([])
   const [addingTestUser, setAddingTestUser] = useState(false)
   const [pointsById, setPointsById] = useState({})
+  // Raw {rating, gender} per user (unlike pointsById, which rounds AND
+  // defaults a missing rating to 0 — RatingBadge needs the real null to
+  // correctly render nothing for someone with no rating yet, Trello #176).
+  const [ratingInfoById, setRatingInfoById] = useState({})
   const [finishedTab, setFinishedTab] = useState('stats') // 'stats' | 'duplas' | 'rondas' — tabs for a finished mix's results
   const [editingMatchId, setEditingMatchId] = useState(null) // a scored match being corrected — re-opens its inputs (Trello #184)
   const [seriesHistory, setSeriesHistory] = useState([]) // sibling occurrences of this game's recurring series, newest first
@@ -212,6 +216,7 @@ export default function GameDetails() {
       try {
         const globalRankings = await getGlobalRankings()
         setPointsById(Object.fromEntries(globalRankings.map((r) => [r.user_id, Math.round(r.rating || 0)])))
+        setRatingInfoById(Object.fromEntries(globalRankings.map((r) => [r.user_id, { rating: r.rating, gender: r.gender }])))
       } catch (error) {
         console.error('Error loading global points:', error)
       }
@@ -952,7 +957,8 @@ export default function GameDetails() {
                 <span className="flex-1 min-w-0 text-sm font-extrabold text-ink-900 truncate">{player?.name || '?'}</span>
               </>
             )}
-            <span className="text-xs font-extrabold text-muted tabular-nums shrink-0">
+            <span className="flex items-center gap-1.5 text-xs font-extrabold text-muted tabular-nums shrink-0">
+              <RatingBadge rating={ratingInfoById[player?.id]?.rating} gender={ratingInfoById[player?.id]?.gender} />
               {pointsById[player?.id] ?? 0} {t('gamedetails.points_suffix')} · {sideLabel(player?.preferred_side)}
             </span>
           </div>
@@ -1291,10 +1297,18 @@ export default function GameDetails() {
           <h3 className="text-lg text-ink-900 mb-3">{t('gamedetails.mix_stats_title')}</h3>
           <div className="space-y-1.5">
             {mixStats.map((s, i) => {
+              // rating_delta/rating_after only exist from the Elo rollout
+              // (2026-08-25) onward — older finished mixes fall back to the
+              // legacy points_earned they were actually finalized with.
+              const hasRating = s.rating_delta != null
               const nameBlock = (
                 <div className="flex-1 min-w-0">
-                  <p className="font-extrabold text-ink-900 truncate">
+                  <p className="font-extrabold text-ink-900 truncate flex items-center gap-1.5">
                     {firstLastName(s.user?.name)}
+                    <RatingBadge
+                      rating={hasRating ? s.rating_after : ratingInfoById[s.user_id]?.rating}
+                      gender={ratingInfoById[s.user_id]?.gender}
+                    />
                     {s.mix_won && <span className="ml-1.5">🏆</span>}
                   </p>
                   <p className="text-[11px] text-muted">
@@ -1302,10 +1316,6 @@ export default function GameDetails() {
                   </p>
                 </div>
               )
-              // rating_delta/rating_after only exist from the Elo rollout
-              // (2026-08-25) onward — older finished mixes fall back to the
-              // legacy points_earned they were actually finalized with.
-              const hasRating = s.rating_delta != null
               return (
                 <div key={s.id} className="flex items-center gap-3 py-2 border-b border-line last:border-0">
                   <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-extrabold tabular-nums shrink-0 ${
@@ -1918,7 +1928,8 @@ export default function GameDetails() {
                             <span className="text-muted font-normal text-sm">{t('gamedetails.you_suffix')}</span>
                           )}
                         </p>
-                        <p className="text-xs text-muted truncate">
+                        <p className="text-xs text-muted truncate flex items-center gap-1.5">
+                          <RatingBadge rating={ratingInfoById[person.id]?.rating} gender={ratingInfoById[person.id]?.gender} />
                           <span className="font-extrabold text-ink-900">{pointsById[person.id] ?? 0} {t('gamedetails.points_suffix')}</span> · {sideLabel(person.preferred_side)}
                         </p>
                       </div>
