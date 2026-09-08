@@ -486,7 +486,8 @@ export function GuestBadge({ size = 'sm', label, isTest = false }) {
    Default null = sem escudo, todos os call sites existentes intactos.
    Call sites que já passam um ring próprio no `size` (PlayerAvatarRow)
    não devem passar `xp` — dois rings sobrepõem-se. */
-export function Avatar({ name, url, size = 'w-10 h-10 text-sm', colorClass = 'bg-ink-700 text-white', xp = null, lastPlayedAt = null }) {
+export function Avatar({ name, url, size = 'w-10 h-10 text-sm', colorClass = 'bg-ink-700 text-white', xp = null, lastPlayedAt = null, provisional = false }) {
+  const { t } = useTranslation()
   let shield = ''
   if (xp != null) {
     const tier = tierFromXp(xp)
@@ -495,10 +496,22 @@ export function Avatar({ name, url, size = 'w-10 h-10 text-sm', colorClass = 'bg
     }
   }
   const base = `${size} rounded-full flex items-center justify-center shrink-0 font-extrabold overflow-hidden${shield}`
-  if (url) {
-    return <img src={url} alt={name || ''} className={`${base} object-cover`} />
-  }
-  return <div className={`${base} ${colorClass}`}>{(name || '?').charAt(0).toUpperCase()}</div>
+  const core = url
+    ? <img src={url} alt={name || ''} className={`${base} object-cover`} />
+    : <div className={`${base} ${colorClass}`}>{(name || '?').charAt(0).toUpperCase()}</div>
+
+  // Jogador provisório (<8 jogos de Elo): mini-pill "NOVO" sobre a borda
+  // inferior — só quando pedido, para não mudar o layout dos ~40 call
+  // sites existentes.
+  if (!provisional) return core
+  return (
+    <span className="relative inline-flex shrink-0">
+      {core}
+      <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-px rounded-full bg-lime-400 text-ink-900 text-[8px] leading-tight font-mono font-extrabold tracking-wide uppercase whitespace-nowrap ring-1 ring-surface">
+        {t('elo.provisional_short')}
+      </span>
+    </span>
+  )
 }
 
 /* ─── PhotoViewerModal ───────────────────────────────────────────────────

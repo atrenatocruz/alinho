@@ -13,6 +13,7 @@ import {
   roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches,
   PHASE_LABEL_KEY, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY,
 } from '../lib/mixLogic'
+import { isProvisional } from '../lib/elo'
 import { winRatePct, firstLastName } from '../lib/statsLogic'
 import { getGlobalRankings } from '../lib/privateMatches'
 import { formatDate as formatDateLib } from '../lib/formatDate'
@@ -151,8 +152,8 @@ export default function GameDetails() {
         .from('participants')
         .select(`
           *,
-          user:profiles!participants_user_id_fkey (id, name, preferred_side, avatar_url, xp, last_played_at),
-          partner:profiles!participants_partner_id_fkey (id, name, preferred_side, avatar_url, xp, last_played_at)
+          user:profiles!participants_user_id_fkey (id, name, preferred_side, avatar_url, xp, last_played_at, rating_games),
+          partner:profiles!participants_partner_id_fkey (id, name, preferred_side, avatar_url, xp, last_played_at, rating_games)
         `)
         .eq('game_id', id)
         .in('status', ['confirmed', 'waitlisted'])
@@ -1918,7 +1919,7 @@ export default function GameDetails() {
                 >
                   {person.is_guest ? (
                     <>
-                      <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" xp={person.xp} lastPlayedAt={person.last_played_at} />
+                      <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" xp={person.xp} lastPlayedAt={person.last_played_at} provisional={isProvisional(person.rating_games)} />
                       <div className="flex-1 min-w-0">
                         <p className="font-extrabold text-ink-900 truncate">
                           {person.name}
@@ -1933,7 +1934,7 @@ export default function GameDetails() {
                     </>
                   ) : (
                     <Link to={`/jogador/${person.id}`} className="flex items-center gap-3 flex-1 min-w-0">
-                      <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" xp={person.xp} lastPlayedAt={person.last_played_at} />
+                      <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" xp={person.xp} lastPlayedAt={person.last_played_at} provisional={isProvisional(person.rating_games)} />
                       <div className="flex-1 min-w-0">
                         <p className="font-extrabold text-ink-900 truncate">
                           {person.name}
@@ -1980,7 +1981,7 @@ export default function GameDetails() {
                 <span className="w-6 text-center font-extrabold text-muted text-sm shrink-0">{ordinal(idx + 1)}</span>
                 {person.is_guest ? (
                   <>
-                    <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" xp={person.xp} lastPlayedAt={person.last_played_at} />
+                    <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" xp={person.xp} lastPlayedAt={person.last_played_at} provisional={isProvisional(person.rating_games)} />
                     <div className="flex-1 min-w-0">
                       <p className="font-extrabold text-ink-900 truncate">
                         {person.name}
@@ -1995,7 +1996,7 @@ export default function GameDetails() {
                   </>
                 ) : (
                   <Link to={`/jogador/${person.id}`} className="flex items-center gap-3 flex-1 min-w-0">
-                    <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" xp={person.xp} lastPlayedAt={person.last_played_at} />
+                    <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" xp={person.xp} lastPlayedAt={person.last_played_at} provisional={isProvisional(person.rating_games)} />
                     <div className="flex-1 min-w-0">
                       <p className="font-extrabold text-ink-900 truncate">
                         {person.name}

@@ -5,7 +5,7 @@ import { Trophy, Award, Calendar, ChevronDown, HelpCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { RatingBadge, GroupLevelBadge, EmptyState, Avatar, Select } from '../components/ui'
-import { formatRating } from '../lib/elo'
+import { formatRating, formatRatingMaybeProvisional, isProvisional } from '../lib/elo'
 import { tierFromXp, formatXp } from '../lib/xp'
 import { winRatePct, buildMonthlyLeaderboard } from '../lib/statsLogic'
 import { getGlobalRankings } from '../lib/privateMatches'
@@ -92,7 +92,7 @@ export default function Rankings() {
   const loadMembershipMap = async () => {
     const { data, error } = await supabase
       .from('memberships')
-      .select('user_id, is_guest, level, profile:profiles(name, avatar_url, rating, gender)')
+      .select('user_id, is_guest, level, profile:profiles(name, avatar_url, rating, gender, rating_games)')
       .eq('organization_id', currentOrganizationId)
     if (error) throw error
     return new Map((data || []).map((m) => [m.user_id, m]))
@@ -117,6 +117,7 @@ export default function Rankings() {
             ...stat,
             user: { name: m.profile?.name, level: m.level },
             rating: m.profile?.rating ?? null,
+            rating_games: m.profile?.rating_games,
             gender: m.profile?.gender,
             gamesPlayed: played,
             winRate: winRatePct(stat.game_wins || 0, played),
@@ -313,10 +314,12 @@ export default function Rankings() {
                       <div className="flex items-center gap-1.5 justify-end">
                         <Trophy size={16} className="text-lime-600" />
                         <span className="text-2xl font-extrabold text-ink-900 tabular-nums">
-                          {formatRating(player.rating)}
+                          {formatRatingMaybeProvisional(player.rating, player.rating_games)}
                         </span>
                       </div>
-                      <p className="text-[11px] text-muted">{t('rankings.points_label')}</p>
+                      <p className={`text-[11px] ${isProvisional(player.rating_games) ? 'text-lime-600 font-extrabold' : 'text-muted'}`}>
+                        {isProvisional(player.rating_games) ? t('rankings.provisional_label') : t('rankings.points_label')}
+                      </p>
                     </div>
                   </div>
 
@@ -454,8 +457,10 @@ export default function Rankings() {
                       </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <span className="text-2xl font-extrabold text-ink-900 tabular-nums">{formatRating(player.rating)}</span>
-                      <p className="text-[11px] text-muted">{t('rankings.points_label')}</p>
+                      <span className="text-2xl font-extrabold text-ink-900 tabular-nums">{formatRatingMaybeProvisional(player.rating, player.rating_games)}</span>
+                      <p className={`text-[11px] ${isProvisional(player.rating_games) ? 'text-lime-600 font-extrabold' : 'text-muted'}`}>
+                        {isProvisional(player.rating_games) ? t('rankings.provisional_label') : t('rankings.points_label')}
+                      </p>
                     </div>
                   </div>
                 </Link>
