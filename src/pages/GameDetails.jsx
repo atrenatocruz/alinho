@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useTranslation, Trans } from 'react-i18next'
-import { Calendar, MapPin, ArrowLeft, UserPlus, User, Check, Lock, Trophy, Play, ChevronRight, Swords, X, Repeat, Share2, ChevronDown, RotateCcw, Euro, GripVertical, Pencil } from 'lucide-react'
+import { Calendar, MapPin, ArrowLeft, UserPlus, User, Check, Lock, Trophy, Play, ChevronRight, Swords, X, Repeat, Share2, ChevronDown, RotateCcw, Euro, GripVertical, Pencil, History } from 'lucide-react'
 import { DndContext, useDraggable, useDroppable, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { supabase } from '../lib/supabase'
@@ -39,6 +39,33 @@ const SERIES_STATUS_PILL_CLASS = {
   completed: 'bg-ink-50 text-ink-700',
   finished: 'bg-ink-50 text-ink-700',
   cancelled: 'bg-danger/10 text-danger',
+}
+
+
+// Histórico de entradas e saídas (Trello #171). Mesmo vocabulário de pills
+// tonais usado em SERIES_STATUS_PILL_CLASS acima, para o log ler como o
+// resto da página — verde = entrou, vermelho tingido = saiu, âmbar =
+// suplente, cinzento = alteração de parceiro.
+const HISTORY_ACTION_LABEL_KEY = {
+  in: 'gamedetails.history_action_in',
+  waitlisted: 'gamedetails.history_action_waitlisted',
+  out: 'gamedetails.history_action_out',
+  promoted: 'gamedetails.history_action_promoted',
+  partner_added: 'gamedetails.history_action_partner_added',
+  partner_removed: 'gamedetails.history_action_partner_removed',
+}
+const HISTORY_ACTION_PILL_CLASS = {
+  in: 'bg-green-100 text-green-700',
+  waitlisted: 'bg-amber-100 text-amber-700',
+  out: 'bg-danger/10 text-danger',
+  promoted: 'bg-green-100 text-green-700',
+  partner_added: 'bg-ink-50 text-ink-700',
+  partner_removed: 'bg-ink-50 text-ink-700',
+}
+const HISTORY_SOURCE_LABEL_KEY = {
+  app: 'gamedetails.history_source_app',
+  bot: 'gamedetails.history_source_bot',
+  system: 'gamedetails.history_source_system',
 }
 
 export default function GameDetails() {
@@ -89,6 +116,13 @@ export default function GameDetails() {
   const [editingMatchId, setEditingMatchId] = useState(null) // a scored match being corrected — re-opens its inputs (Trello #184)
   const [seriesHistory, setSeriesHistory] = useState([]) // sibling occurrences of this game's recurring series, newest first
   const [seriesHistoryExpanded, setSeriesHistoryExpanded] = useState(false)
+  // Histórico IN/OUT (Trello #171) — só admins, e carregado apenas quando o
+  // painel é aberto: é uma ferramenta de diagnóstico, não vale outra query
+  // em cada abertura da página de um mix.
+  const [history, setHistory] = useState([])
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState(false)
 
   useEffect(() => {
     loadGameDetails()
@@ -902,6 +936,44 @@ export default function GameDetails() {
     }
   }
 
+  /* ─── Histórico IN/OUT (Trello #171) ──────────────────────────────── */
+
+  // Lazy: a primeira abertura carrega, as seguintes só alternam. A RLS de
+  // participant_events já limita a leitura a admins do clube do mix, por
+  // isso um não-admin que chame isto à mão recebe uma lista vazia, não um
+  // erro — o botão nem sequer é renderizado para ele.
+  const toggleHistory = async () => {
+    if (historyOpen) {
+      setHistoryOpen(false)
+      return
+    }
+    setHistoryOpen(true)
+    if (history.length > 0 || historyLoading) return
+
+    setHistoryLoading(true)
+    setHistoryError(false)
+    try {
+      const { data, error } = await supabase
+        .from('participant_events')
+        .select(`
+          id, action, source, partner_id, created_at,
+          user:profiles!participant_events_user_id_fkey (id, name),
+          actor:profiles!participant_events_actor_id_fkey (id, name),
+          partner:profiles!participant_events_partner_id_fkey (id, name)
+        `)
+        .eq('game_id', id)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      setHistory(data || [])
+    } catch (error) {
+      console.error('Error loading participant history:', error)
+      setHistoryError(true)
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
   /* ─── Render helpers ──────────────────────────────────────────────── */
 
   const formatDate = (dateString) =>
@@ -909,6 +981,19 @@ export default function GameDetails() {
       weekday: 'long',
       day: 'numeric',
       month: 'long',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+
+
+  // Carimbo do histórico IN/OUT: dia + hora curtos. Mais denso do que
+  // formatDate acima, que é para a data do próprio mix (weekday por
+  // extenso) — aqui há uma linha por evento e o dia da semana só ocuparia
+  // espaço.
+  const formatHistoryTime = (dateString) =>
+    formatDateLib(dateString, i18n.language, {
+      day: 'numeric',
+      month: 'short',
       hour: '2-digit',
       minute: '2-digit',
     })
@@ -2009,6 +2094,74 @@ export default function GameDetails() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Histórico de entradas e saídas — Trello #171. Só admins (a RLS
+          de participant_events diz o mesmo, isto é só a UI a condizer).
+          Nomes SEMPRE completos, por decisão explícita do card: um log com
+          nomes ambíguos não resolve o problema que o motivou, por isso
+          nada aqui passa por shortName()/firstLastName(). */}
+      {isAdmin && (
+        <div className="card">
+          <button
+            onClick={toggleHistory}
+            className="w-full flex items-center justify-between gap-3 text-left"
+          >
+            <h3 className="text-lg text-ink-900 flex items-center gap-2">
+              <History size={18} className="text-muted shrink-0" />
+              {t('gamedetails.history_title')}
+            </h3>
+            <ChevronDown
+              size={20}
+              className={`text-muted shrink-0 transition-transform duration-base ${historyOpen ? 'rotate-180' : ''}`}
+            />
+          </button>
+
+          {historyOpen && (
+            <div className="mt-4">
+              {historyLoading ? (
+                <p className="text-sm text-muted">{t('common.loading')}</p>
+              ) : historyError ? (
+                <p className="text-sm text-danger font-extrabold">{t('gamedetails.history_load_error')}</p>
+              ) : history.length === 0 ? (
+                <p className="text-sm text-muted">{t('gamedetails.history_empty')}</p>
+              ) : (
+                <ul className="space-y-2.5">
+                  {history.map((event) => (
+                    <li key={event.id} className="bg-canvas rounded-ctrl p-3.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span
+                          className={`px-2 py-0.5 rounded-full font-mono text-[11px] font-extrabold uppercase tracking-wider ${
+                            HISTORY_ACTION_PILL_CLASS[event.action] || 'bg-ink-50 text-ink-700'
+                          }`}
+                        >
+                          {t(HISTORY_ACTION_LABEL_KEY[event.action] || event.action)}
+                        </span>
+                        <span className="font-extrabold text-ink-900">{event.user?.name || '—'}</span>
+                        {event.partner?.name && (
+                          <span className="text-sm text-muted">
+                            {t('gamedetails.history_with_partner', { name: event.partner.name })}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted mt-1.5">
+                        {formatHistoryTime(event.created_at)}
+                        {' · '}
+                        {t(HISTORY_SOURCE_LABEL_KEY[event.source] || event.source)}
+                        {/* Só vale a pena dizer "por X" quando o autor não é
+                            o próprio jogador — ou seja, quando um admin
+                            mexeu na inscrição de outra pessoa. */}
+                        {event.actor?.name && event.actor.id !== event.user?.id && (
+                          <> · {t('gamedetails.history_by_actor', { name: event.actor.name })}</>
+                        )}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </div>
       )}
 

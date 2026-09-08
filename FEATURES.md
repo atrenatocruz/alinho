@@ -22,6 +22,7 @@ What alinho actually does today, and what's explicitly not built yet. Kept in sy
 - Recurring mixes: a game can spawn future occurrences automatically on a schedule (daily/weekly/monthly/yearly), with a configurable "launch N days before, at HH:MM" that controls when the next occurrence becomes visible/joinable. Occurrences are pre-created as `pending` and flip to `open` at their launch time.
 - A game closes automatically once enough players confirm for its court count (4 per court).
 - Suplentes (waitlist): once a game is full, further joins go to a waitlist and are promoted automatically as spots free up.
+- **Histórico de entradas e saídas (IN/OUT)**: every join, leave, waitlist entry, automatic suplente promotion and partner change on a mix is recorded in an append-only `participant_events` log, written by a database trigger on `participants` so it captures all three writers — the web app, the WhatsApp bot, and Postgres' own promotion trigger. Visible to club admins on the mix page, with full player names, the source (App / WhatsApp / automatic), and who acted when an admin removed somebody else. Exists because leaving is a hard DELETE everywhere, so before this a player who vanished from a roster left no trace at all.
 
 ## Player participation
 
