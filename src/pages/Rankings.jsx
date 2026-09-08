@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Trophy, Award, Calendar } from 'lucide-react'
+import { Trophy, Award, Calendar, ChevronDown } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { RatingBadge, GroupLevelBadge, EmptyState, Avatar, Select } from '../components/ui'
@@ -211,7 +211,7 @@ export default function Rankings() {
       <details className="card group">
         <summary className="text-sm font-extrabold text-ink-900 cursor-pointer select-none list-none flex items-center justify-between">
           {t('rankings.levels_explainer_title')}
-          <span className="text-muted transition-transform duration-fast group-open:rotate-180">⌄</span>
+          <ChevronDown size={18} className="text-muted shrink-0 transition-transform duration-fast group-open:rotate-180" />
         </summary>
         <p className="text-sm text-muted mt-2">
           {t('rankings.levels_explainer_body')}
