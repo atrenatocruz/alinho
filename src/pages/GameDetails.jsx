@@ -22,6 +22,12 @@ import { formatDate as formatDateLib, formatCurrency } from '../lib/formatDate'
 
 const SIDE_LABEL_KEY = { left: 'gamedetails.side_left', right: 'gamedetails.side_right', both: 'gamedetails.side_both' }
 
+// Bulk import (300-person tournament onboarding): the edge function paces
+// itself at ~500ms per person to avoid Supabase Auth rate limits, so one
+// invocation must stay well under the Edge Function wall-clock limit.
+// 50 names ≈ 25s per call.
+const BULK_IMPORT_CHUNK_SIZE = 50
+
 // Histórico de entradas e saídas (Trello #171) — verde = entrou, vermelho
 // tingido = saiu, âmbar = suplente, cinzento = alteração de parceiro.
 const HISTORY_ACTION_LABEL_KEY = {
@@ -417,20 +423,42 @@ export default function GameDetails() {
 
     setBulkImporting(true)
     setBulkImportResult(null)
+    const created = []
+    const skipped = []
+    const failed = []
     try {
-      const { data, error } = await supabase.functions.invoke('admin-bulk-create-participants', {
-        body: {
-          organization_id: gameOrganizationId,
-          entries: names.map((name) => ({ name, game_id: id })),
-        },
-      })
-      if (error) throw error
-      setBulkImportResult(data)
-      setBulkImportText('')
+      // Send the list in small chunks rather than one all-or-nothing call:
+      // the edge function paces itself (~500ms/person) so a 300-name paste
+      // in a single invocation would run for ~150s, at or past the Edge
+      // Function wall-clock limit — and a timeout there used to be reported
+      // to the admin as "0 created" even though most people had been made.
+      // Chunking bounds each call to ~25s, and a chunk that does fail only
+      // marks ITS OWN names as failed; earlier chunks keep their confirmed
+      // results. Re-running is safe because the function dedups by
+      // (game_id, name) server-side.
+      for (let i = 0; i < names.length; i += BULK_IMPORT_CHUNK_SIZE) {
+        const chunk = names.slice(i, i + BULK_IMPORT_CHUNK_SIZE)
+        try {
+          const { data, error } = await supabase.functions.invoke('admin-bulk-create-participants', {
+            body: {
+              organization_id: gameOrganizationId,
+              entries: chunk.map((name) => ({ name, game_id: id })),
+            },
+          })
+          if (error) throw error
+          created.push(...(data?.created || []))
+          skipped.push(...(data?.skipped || []))
+          failed.push(...(data?.failed || []))
+        } catch (error) {
+          console.error('Error bulk-importing participants (chunk):', error)
+          failed.push(...chunk.map((name) => ({ name, game_id: id, error: error.message })))
+        }
+      }
+      setBulkImportResult({ created, skipped, failed })
+      // Leave only the names that didn't land in the box, so a retry is one
+      // click; an empty box means everything is accounted for.
+      setBulkImportText(failed.map((f) => f.name).join('\n'))
       loadGameDetails()
-    } catch (error) {
-      console.error('Error bulk-importing participants:', error)
-      setBulkImportResult({ created: [], failed: names.map((name) => ({ name, game_id: id, error: error.message })) })
     } finally {
       setBulkImporting(false)
     }
@@ -705,17 +733,38 @@ export default function GameDetails() {
       // patch pool_number afterwards).
       const isGruposEliminatorias = game.format === 'grupos_eliminatorias'
       const poolSize = game.pool_size || 4
-      // firstElimMatches/eliminationPhases (existing, unmodified — shared
-      // with todos_contra_todos) only support exactly 2, 4, or 8 teams
-      // advancing to the knockout phase. With advancePerPool fixed at 2,
-      // that means the pool count itself must be exactly 1, 2, or 4 — any
-      // other count would silently drop teams from the bracket later.
-      // This is the last point before teams are locked in where pool_size
-      // can still be adjusted, so it's caught here, not later.
+      // Two independent constraints, both checked here because this is the
+      // last point before teams are locked in where pool_size can still be
+      // adjusted:
+      //  (a) firstElimMatches/eliminationPhases (existing, unmodified —
+      //      shared with todos_contra_todos) only support exactly 2, 4, or 8
+      //      teams advancing. With advancePerPool fixed at 2, the pool count
+      //      itself must be exactly 1, 2, or 4 — any other count would
+      //      silently drop teams from the bracket later.
+      //  (b) pools must come out equal-sized AND even-sized: splitIntoPools
+      //      happily makes a short/odd remainder pool, and roundRobinRound
+      //      has no bye handling, so an odd pool leaves one dupla out every
+      //      round and never plays all its pairings — yet standings() would
+      //      still rank that incomplete table and advance its top 2.
       if (isGruposEliminatorias) {
         const numPools = Math.max(1, Math.ceil(duplas.length / poolSize))
-        if (![1, 2, 4].includes(numPools)) {
-          throw new Error(t('gamedetails.error_invalid_pool_count', { count: numPools }))
+        const poolSizeWorks = (ps) => {
+          const np = Math.max(1, Math.ceil(duplas.length / ps))
+          return [1, 2, 4].includes(np) && duplas.length % np === 0 && (duplas.length / np) % 2 === 0
+        }
+        if (!poolSizeWorks(poolSize)) {
+          // The form only allows 3-8. If nothing in that range can work for
+          // this many duplas, telling the admin to "adjust the group size"
+          // is telling them to do something impossible — say so instead.
+          const workable = [3, 4, 5, 6, 7, 8].filter(poolSizeWorks)
+          if (workable.length === 0) {
+            throw new Error(t('gamedetails.error_no_valid_pool_size', { duplas: duplas.length }))
+          }
+          throw new Error(t('gamedetails.error_invalid_pool_count', {
+            count: numPools,
+            duplas: duplas.length,
+            options: workable.join(', '),
+          }))
         }
       }
       const pooledDuplas = isGruposEliminatorias
@@ -1800,6 +1849,7 @@ export default function GameDetails() {
               matches={matches.filter((m) => m.phase === 'group')}
               numCourts={numCourts}
               busy={busy}
+              teamName={teamName}
               onDrawRound={handleDrawPoolRound}
               onAllPoolsComplete={handleAllPoolsComplete}
             />
@@ -1996,6 +2046,7 @@ export default function GameDetails() {
                       matches={matches.filter((m) => m.phase === 'group')}
                       numCourts={numCourts}
                       busy={busy}
+                      teamName={teamName}
                       onDrawRound={handleDrawPoolRound}
                       onAllPoolsComplete={handleAllPoolsComplete}
                     />
@@ -2398,6 +2449,7 @@ export default function GameDetails() {
                 <p className="text-sm text-muted">
                   {t('gamedetails.bulk_import_summary', {
                     created: bulkImportResult.created.length,
+                    skipped: (bulkImportResult.skipped || []).length,
                     failed: bulkImportResult.failed.length,
                   })}
                 </p>

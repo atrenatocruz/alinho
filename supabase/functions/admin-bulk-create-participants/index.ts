@@ -8,6 +8,16 @@
 // Access control mirrors admin-create-test-user: rejects the anon key,
 // verifies the caller is an admin of organization_id — required here (not
 // left to RLS) because this uses the service-role key, which bypasses RLS.
+//
+// Contract: POST { organization_id, entries: [{ name, game_id }] }
+//        -> { created: [{name,user_id,game_id}],
+//             skipped: [{name,game_id,reason}],   // already in that game
+//             failed:  [{name,game_id,error}] }
+// Idempotent per (game_id, name): re-sending the same list only creates the
+// people that aren't in the game yet, so a client retry after a gateway
+// timeout is safe. The client sends the list in small chunks (~50) to stay
+// well inside the Edge Function wall-clock limit; the 500 cap below is a
+// backstop, not the expected batch size.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
@@ -115,7 +125,42 @@ Deno.serve(async (req) => {
   }
   const validGameIds = new Set((orgGames || []).map((g) => g.id))
 
+  // ── Idempotency ────────────────────────────────────────────────────────
+  // The client chunks a large paste into several sequential invocations, and
+  // a chunk can time out at the gateway after the server already created
+  // people. Re-pasting the same list must therefore be safe: snapshot the
+  // names already on each target game and skip any entry that matches one.
+  // Names are compared case-insensitively with collapsed whitespace — the
+  // only identity these bulk-created guests have is their name.
+  const normalizeName = (n: unknown): string =>
+    typeof n === 'string' ? n.trim().toLowerCase().replace(/\s+/g, ' ') : ''
+
+  const batchGameIds = [...new Set(entries.map((e) => e?.game_id).filter((g): g is string => !!g))]
+    .filter((g) => validGameIds.has(g))
+  const existingNamesByGame = new Map<string, Set<string>>()
+  if (batchGameIds.length > 0) {
+    const { data: existingParticipants, error: existingError } = await admin
+      .from('participants')
+      .select('game_id, user:profiles!participants_user_id_fkey (name)')
+      .in('game_id', batchGameIds)
+    if (existingError) {
+      console.error('Failed to load existing participants:', existingError)
+      return jsonResponse({ error: 'Server error' }, 500)
+    }
+    for (const row of existingParticipants || []) {
+      // supabase-js may return a to-one embed as an object or a 1-element array.
+      const embedded = (row as { user?: unknown }).user
+      const profile = Array.isArray(embedded) ? embedded[0] : embedded
+      const key = normalizeName((profile as { name?: unknown } | undefined)?.name)
+      if (!key) continue
+      const gameId = (row as { game_id: string }).game_id
+      if (!existingNamesByGame.has(gameId)) existingNamesByGame.set(gameId, new Set())
+      existingNamesByGame.get(gameId)!.add(key)
+    }
+  }
+
   const created: Array<{ name: string; user_id: string; game_id: string }> = []
+  const skipped: Array<{ name: string; game_id: string; reason: string }> = []
   const failed: Array<{ name: string; game_id: string; error: string }> = []
 
   for (const entry of entries) {
@@ -130,6 +175,15 @@ Deno.serve(async (req) => {
       // Must happen before any createUser call, since service-role bypasses RLS.
       if (!validGameIds.has(entry.game_id)) {
         failed.push({ name, game_id: entry.game_id, error: 'game_id does not belong to this organization' })
+        continue
+      }
+
+      // Already in this game (from a previous run, an earlier chunk, or a
+      // duplicated line in the same paste) — neither created nor an error.
+      if (!existingNamesByGame.has(entry.game_id)) existingNamesByGame.set(entry.game_id, new Set())
+      const namesInGame = existingNamesByGame.get(entry.game_id)!
+      if (namesInGame.has(normalizeName(name))) {
+        skipped.push({ name, game_id: entry.game_id, reason: 'already_exists' })
         continue
       }
 
@@ -175,10 +229,13 @@ Deno.serve(async (req) => {
       }
 
       created.push({ name, user_id: authUser.user.id, game_id: entry.game_id })
+      // Keep the in-memory snapshot current so a name repeated later in the
+      // SAME payload is skipped rather than created twice.
+      namesInGame.add(normalizeName(name))
     } catch (err) {
       failed.push({ name: entry.name ?? '', game_id: entry.game_id ?? '', error: err instanceof Error ? err.message : 'Unknown error' })
     }
   }
 
-  return jsonResponse({ created, failed })
+  return jsonResponse({ created, skipped, failed })
 })
