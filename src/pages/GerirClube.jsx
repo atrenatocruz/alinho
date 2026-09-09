@@ -779,7 +779,11 @@ export default function GerirClube() {
             max_players: numCourts * 4, // derived
             price_per_player: gameForm.price_per_player === '' ? null : parseFloat(gameForm.price_per_player),
             auto_start_hours_before: gameForm.auto_start_hours_before === '' ? null : parseInt(gameForm.auto_start_hours_before, 10),
-            pool_size: gameForm.format === 'grupos_eliminatorias' ? (parseInt(gameForm.pool_size, 10) || 4) : null,
+            // The KEY itself is conditional, not just its value: PostgREST
+            // rejects any insert naming a column that doesn't exist yet, so
+            // sending pool_size: null unconditionally would break mix
+            // creation for EVERY format until the migration has been run.
+            ...(gameForm.format === 'grupos_eliminatorias' ? { pool_size: parseInt(gameForm.pool_size, 10) || 4 } : {}),
             level: gameForm.level || null,
             created_by: user.id,
             status: 'open'
@@ -954,7 +958,10 @@ export default function GerirClube() {
           num_courts: numCourts,
           max_players: numCourts * 4,
           price_per_player: gameForm.price_per_player === '' ? null : parseFloat(gameForm.price_per_player),
-          pool_size: gameForm.format === 'grupos_eliminatorias' ? (parseInt(gameForm.pool_size, 10) || 4) : null,
+          // Conditional KEY, not just conditional value — see handleCreateGame
+          // above: naming a not-yet-migrated column breaks the update for
+          // every format, not only this one.
+          ...(gameForm.format === 'grupos_eliminatorias' ? { pool_size: parseInt(gameForm.pool_size, 10) || 4 } : {}),
           level: gameForm.level || null,
           ...pendingLaunchUpdate,
         })
