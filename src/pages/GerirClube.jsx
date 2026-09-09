@@ -746,7 +746,10 @@ export default function GerirClube() {
       return
     }
 
-    const { recurrence, ...gameFields } = gameForm
+    // pool_size is pulled out here for the same reason recurrence is: it must
+    // never ride into the games payload via ...gameFields. It is re-added
+    // below, but ONLY for grupos_eliminatorias — see the insert object.
+    const { recurrence, pool_size: _poolSize, ...gameFields } = gameForm
 
     const recurrenceError = validateRecurrence(recurrence)
     if (recurrenceError) {
@@ -779,10 +782,13 @@ export default function GerirClube() {
             max_players: numCourts * 4, // derived
             price_per_player: gameForm.price_per_player === '' ? null : parseFloat(gameForm.price_per_player),
             auto_start_hours_before: gameForm.auto_start_hours_before === '' ? null : parseInt(gameForm.auto_start_hours_before, 10),
-            // The KEY itself is conditional, not just its value: PostgREST
-            // rejects any insert naming a column that doesn't exist yet, so
-            // sending pool_size: null unconditionally would break mix
-            // creation for EVERY format until the migration has been run.
+            // The only place pool_size enters this payload — it was excluded
+            // from ...gameFields above precisely so this spread is the sole
+            // source of the key. Both halves are needed: a spread can add a
+            // key but never remove one already present. PostgREST rejects an
+            // insert naming a column that doesn't exist, so sending pool_size
+            // for other formats would break mix creation for EVERY format
+            // until the migration has been run.
             ...(gameForm.format === 'grupos_eliminatorias' ? { pool_size: parseInt(gameForm.pool_size, 10) || 4 } : {}),
             level: gameForm.level || null,
             created_by: user.id,
@@ -922,8 +928,10 @@ export default function GerirClube() {
       return
     }
 
-    // Destructure recurrence so it's never spread into the games table update
-    const { recurrence, ...gameFields } = gameForm
+    // Destructure recurrence so it's never spread into the games table update.
+    // pool_size comes out for the same reason — it is re-added below, but ONLY
+    // for grupos_eliminatorias (see the update object).
+    const { recurrence, pool_size: _poolSize, ...gameFields } = gameForm
     // Any mix in an active recurring series shares the same underlying
     // game_recurrences row (via recurrence_id) — not just the origin — so
     // recurrence management works from any of them, not only the one that
@@ -958,9 +966,10 @@ export default function GerirClube() {
           num_courts: numCourts,
           max_players: numCourts * 4,
           price_per_player: gameForm.price_per_player === '' ? null : parseFloat(gameForm.price_per_player),
-          // Conditional KEY, not just conditional value — see handleCreateGame
-          // above: naming a not-yet-migrated column breaks the update for
-          // every format, not only this one.
+          // The only place pool_size enters this payload — see handleCreateGame
+          // above. It is excluded from ...gameFields so this spread is the sole
+          // source of the key; naming a not-yet-migrated column would break the
+          // update for every format, not only this one.
           ...(gameForm.format === 'grupos_eliminatorias' ? { pool_size: parseInt(gameForm.pool_size, 10) || 4 } : {}),
           level: gameForm.level || null,
           ...pendingLaunchUpdate,
