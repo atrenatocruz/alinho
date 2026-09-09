@@ -154,8 +154,12 @@ Deno.serve(async (req) => {
       const key = normalizeName((profile as { name?: unknown } | undefined)?.name)
       if (!key) continue
       const gameId = (row as { game_id: string }).game_id
-      if (!existingNamesByGame.has(gameId)) existingNamesByGame.set(gameId, new Set())
-      existingNamesByGame.get(gameId)!.add(key)
+      let names = existingNamesByGame.get(gameId)
+      if (!names) {
+        names = new Set<string>()
+        existingNamesByGame.set(gameId, names)
+      }
+      names.add(key)
     }
   }
 
@@ -180,8 +184,11 @@ Deno.serve(async (req) => {
 
       // Already in this game (from a previous run, an earlier chunk, or a
       // duplicated line in the same paste) — neither created nor an error.
-      if (!existingNamesByGame.has(entry.game_id)) existingNamesByGame.set(entry.game_id, new Set())
-      const namesInGame = existingNamesByGame.get(entry.game_id)!
+      let namesInGame = existingNamesByGame.get(entry.game_id)
+      if (!namesInGame) {
+        namesInGame = new Set<string>()
+        existingNamesByGame.set(entry.game_id, namesInGame)
+      }
       if (namesInGame.has(normalizeName(name))) {
         skipped.push({ name, game_id: entry.game_id, reason: 'already_exists' })
         continue
