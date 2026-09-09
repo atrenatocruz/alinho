@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { User, Award, Trophy, Target, Flame, LogOut, Camera, UserCheck, X, Users, HelpCircle, ThumbsUp } from 'lucide-react'
+import { User, Award, Trophy, Target, Flame, LogOut, Camera, UserCheck, X, Users, HelpCircle, ThumbsUp, Trash2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { hashPhone } from '../lib/hashPhone'
@@ -11,7 +11,7 @@ import { listIncomingFriendRequests, acceptFriendRequest, removeFriendRequest, l
 import { listIncomingOrganizationInvites, acceptOrganizationInvite, declineOrganizationInvite } from '../lib/orgInvites'
 import { PrimaryButton, GuestBadge, DateField, Avatar, Select, EmptyState, RankBadge, RatingBadge, PhotoViewerModal, TrophyCard } from '../components/ui'
 import { CATEGORY_ORDER } from '../lib/trophies'
-import { formatRating, formatRatingMaybeProvisional, isProvisional } from '../lib/elo'
+import { formatRating, formatRatingMaybeProvisional, isProvisional, ratingBand } from '../lib/elo'
 import { tierFromXp, preTierProgress, formatXp } from '../lib/xp'
 import { formatDate as formatDateLib } from '../lib/formatDate'
 
@@ -552,56 +552,94 @@ export default function Profile() {
             />
           </div>
           <h2 className="text-2xl text-white">{profile?.name}</h2>
-          <div className="mt-2.5 flex items-center justify-center gap-1.5">
-            <span className="inline-flex items-center rounded-full font-mono font-extrabold tracking-wide bg-lime-400 text-ink-900 text-sm px-3 py-1 tabular-nums">
-              {formatRatingMaybeProvisional(profile?.rating, profile?.rating_games)} {t('gamedetails.points_suffix')}
-            </span>
-            <RatingBadge rating={profile?.rating} gender={profile?.gender} />
-          </div>
-          {isProvisional(profile?.rating_games) && (
-            <p className="mt-1.5 text-[11px] font-extrabold text-lime-400/90">{t('profile.provisional_note')}</p>
-          )}
-          {globalRank && (
-            <div className="mt-2">
-              <RankBadge rank={globalRank} size="md" />
+
+          {/* Bloco 1 — RANKING (sistema competitivo: pontos, banda e
+              posição global pertencem todos ao mesmo sistema). Painel com
+              fundo ligeiramente distinto, 3 colunas iguais com divisórias
+              finas; só os pontos usam o accent. */}
+          <div className="mt-4 rounded-ctrl bg-white/5 p-4 text-left">
+            <p className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-[0.18em] text-white/50">
+              <Trophy size={12} /> {t('profile.card_ranking_heading')}
+            </p>
+            <div className="mt-3 grid grid-cols-3 divide-x divide-white/10 text-center">
+              <div className="px-1">
+                <p className="text-2xl font-extrabold text-lime-400 tabular-nums leading-none">
+                  {formatRatingMaybeProvisional(profile?.rating, profile?.rating_games)} <span className="text-sm">pts</span>
+                </p>
+                <p className="mt-1.5 text-[10px] text-white/50">{t('profile.card_points_label')}</p>
+              </div>
+              <div className="px-1">
+                <p className="text-2xl font-extrabold text-white leading-none">
+                  {ratingBand(profile?.rating, profile?.gender)?.label ?? '—'}
+                </p>
+                <p className="mt-1.5 text-[10px] text-white/50">{t('profile.card_band_label')}</p>
+              </div>
+              <div className="px-1">
+                <p className="text-2xl font-extrabold text-white tabular-nums leading-none">
+                  {globalRank ? `#${globalRank}` : '—'}
+                </p>
+                <p className="mt-1.5 text-[10px] text-white/50">{t('profile.card_position_label')}</p>
+              </div>
             </div>
-          )}
-          {/* Barra de XP/assiduidade — nível 1-10 (escudo) e progresso para
-              o próximo. Separado do Elo: isto mede dedicação, só sobe. */}
+            {isProvisional(profile?.rating_games) && (
+              <p className="mt-2.5 text-[10px] text-white/40 text-center">{t('profile.provisional_note')}</p>
+            )}
+          </div>
+
+          {/* Bloco 2 — XP DE ATIVIDADE. Deliberadamente sem iconografia de
+              ranking/troféus: isto é progressão de envolvimento, não uma
+              extensão do competitivo. */}
           {(() => {
             const tier = tierFromXp(profile?.xp)
             const progress = tier ?? preTierProgress(profile?.xp)
+            const missing = progress.nextMin != null ? progress.nextMin - (profile?.xp ?? 0) : null
             return (
-              <div className="mt-3 mx-auto max-w-[240px]">
-                <div className="flex items-center justify-between text-[11px] font-extrabold text-white/70 mb-1">
-                  <span>
-                    {tier
-                      ? `${t('profile.xp_level', { level: tier.level })} · ${t(tier.labelKey)}`
-                      : t('profile.xp_no_shield')}
-                  </span>
-                  <span className="tabular-nums inline-flex items-center gap-1">
-                    {progress.nextMin != null
-                      ? t('profile.xp_progress', { current: formatXp(profile?.xp), next: formatXp(progress.nextMin) })
-                      : `${formatXp(profile?.xp)} XP`}
-                    <Link to="/instrucoes#xp" aria-label={t('profile.xp_help_aria')} className="text-white/50 hover:text-white">
-                      <HelpCircle size={12} />
-                    </Link>
-                  </span>
-                </div>
-                <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
-                  <div className="h-full rounded-full bg-lime-400" style={{ width: `${progress.progressPct}%` }} />
+              <div className="mt-3 rounded-ctrl bg-white/5 p-4 text-left">
+                <p className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-[0.18em] text-white/50">
+                  {t('profile.card_xp_heading')}
+                  <Link to="/instrucoes#xp" aria-label={t('profile.xp_help_aria')} className="text-white/40 hover:text-white">
+                    <HelpCircle size={11} />
+                  </Link>
+                </p>
+                <p className="mt-0.5 text-[10px] text-white/40">{t('profile.card_xp_sub')}</p>
+                <div className="mt-3 border-t border-white/10 pt-3">
+                  <div className="flex items-center justify-between text-[12px] font-extrabold text-white">
+                    <span>
+                      {tier
+                        ? `${t('profile.xp_level', { level: tier.level })} · ${t(tier.labelKey)}`
+                        : t('profile.xp_no_shield')}
+                    </span>
+                    <span className="tabular-nums">
+                      {progress.nextMin != null
+                        ? t('profile.xp_progress', { current: formatXp(profile?.xp), next: formatXp(progress.nextMin) })
+                        : `${formatXp(profile?.xp)} XP`}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <div className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
+                      <div className="h-full rounded-full bg-lime-400/80" style={{ width: `${progress.progressPct}%` }} />
+                    </div>
+                    <span className="text-[11px] text-white/50 tabular-nums shrink-0">{progress.progressPct}%</span>
+                  </div>
+                  {missing != null && missing > 0 && (
+                    <p className="mt-1.5 text-[10px] text-white/40">
+                      {t('profile.card_xp_missing', { missing: formatXp(missing) })}
+                    </p>
+                  )}
                 </div>
               </div>
             )
           })()}
+
+          {/* Ação terciária, sem competir com o conteúdo. */}
           {profile?.avatar_url && (
             <button
               type="button"
               onClick={handleRemovePhoto}
               disabled={uploadingPhoto}
-              className="mt-2 text-ink-200 text-xs font-extrabold hover:text-white transition-colors duration-fast disabled:opacity-50"
+              className="mt-3 inline-flex items-center gap-1.5 text-white/40 text-xs hover:text-white/70 transition-colors duration-fast disabled:opacity-50"
             >
-              {t('profile.remove_photo')}
+              <Trash2 size={12} /> {t('profile.remove_photo')}
             </button>
           )}
         </div>
