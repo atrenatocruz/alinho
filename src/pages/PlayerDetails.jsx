@@ -295,7 +295,7 @@ export default function PlayerDetails() {
             aria-label={player.avatar_url ? t('playerdetails.view_photo_aria') : undefined}
             className="w-20 h-20 mx-auto mb-3 block"
           >
-            <Avatar name={player.name} url={player.avatar_url} size="w-20 h-20 text-3xl" colorClass="bg-lime-400 text-ink-900" xp={playerXp?.xp} lastPlayedAt={playerXp?.last_played_at} provisional={isProvisional(globalEntry?.rating_games)} />
+            <Avatar name={player.name} url={player.avatar_url} size="w-20 h-20 text-3xl" colorClass="bg-lime-400 text-ink-900" provisional={isProvisional(globalEntry?.rating_games)} />
           </button>
           {showPhoto && (
             <PhotoViewerModal url={player.avatar_url} alt={player.name} onClose={() => setShowPhoto(false)} />

@@ -467,7 +467,7 @@ export default function Profile() {
           </svg>
           <div className="relative py-2">
             <div className="w-20 h-20 mx-auto mb-3">
-              <Avatar name={profile?.name} url={profile?.avatar_url} size="w-20 h-20 text-3xl" colorClass="bg-lime-400 text-ink-900" xp={profile?.xp} lastPlayedAt={profile?.last_played_at} />
+              <Avatar name={profile?.name} url={profile?.avatar_url} size="w-20 h-20 text-3xl" colorClass="bg-lime-400 text-ink-900" />
             </div>
             <h2 className="text-2xl text-white">
               {profile?.name} <span className="text-ink-200 font-normal">{t('profile.guest_suffix')}</span>
@@ -524,7 +524,7 @@ export default function Profile() {
               aria-label={profile?.avatar_url ? t('profile.view_photo_aria') : undefined}
               className="block w-20 h-20"
             >
-              <Avatar name={profile?.name} url={profile?.avatar_url} size="w-20 h-20 text-3xl" colorClass="bg-lime-400 text-ink-900" xp={profile?.xp} lastPlayedAt={profile?.last_played_at} />
+              <Avatar name={profile?.name} url={profile?.avatar_url} size="w-20 h-20 text-3xl" colorClass="bg-lime-400 text-ink-900" />
             </button>
             {showPhoto && (
               <PhotoViewerModal url={profile?.avatar_url} alt={profile?.name} onClose={() => setShowPhoto(false)} />
