@@ -3,8 +3,9 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Trophy, Target, Award, Swords, ChevronDown, UserPlus, UserCheck, Clock, Lock, ShieldCheck, ThumbsUp } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { PrimaryButton, EmptyState, Avatar, RankBadge, RatingBadge, PhotoViewerModal, TrophyCard } from '../components/ui'
-import { formatRating, isProvisional } from '../lib/elo'
+import { PrimaryButton, EmptyState, Avatar, PhotoViewerModal, TrophyCard } from '../components/ui'
+import { formatRating, formatRatingMaybeProvisional, isProvisional, ratingBand } from '../lib/elo'
+import { tierFromXp, preTierProgress, formatXp } from '../lib/xp'
 import { winRatePct } from '../lib/statsLogic'
 import { sendFriendRequest, acceptFriendRequest, removeFriendRequest } from '../lib/friends'
 import { getGlobalRankings } from '../lib/privateMatches'
@@ -306,16 +307,59 @@ export default function PlayerDetails() {
           <p className="text-white/60 text-xs mt-1">
             {t('playerdetails.preferred_side', { side: t(SIDE_LABEL_KEY[player.preferred_side] || SIDE_LABEL_KEY.both) })}
           </p>
-          {/* Same privacy gate as the stat tiles below — results_visibility
-              controls both, so no point showing a rank derived from hidden
-              points. globalRank is null when the player has no ranked
-              points yet, not just when it's hidden. */}
-          {!resultsHidden && globalRank && (
-            <div className="mt-2.5 flex items-center justify-center gap-2">
-              <RankBadge rank={globalRank} size="md" />
-              <RatingBadge rating={globalEntry?.rating} gender={globalEntry?.gender} size="md" />
+          {/* Painéis Ranking/XP — mesmo layout do perfil próprio
+              (Profile.jsx). O painel de ranking respeita a mesma gate de
+              privacidade das stats (results_visibility); o de atividade é
+              público como o tab Assiduidade. */}
+          {!resultsHidden && globalEntry && (
+            <div className="mt-3 rounded-ctrl bg-white/10 border border-white/10 p-3 text-left">
+              <p className="flex items-center gap-1.5 text-[9px] font-extrabold uppercase tracking-[0.18em] text-white/50">
+                <Trophy size={11} /> {t('profile.card_ranking_heading')}
+              </p>
+              <div className="mt-2 grid grid-cols-3 divide-x divide-white/10 text-center">
+                <div className="px-1">
+                  <p className="text-lg font-extrabold text-lime-400 tabular-nums leading-none">
+                    {formatRatingMaybeProvisional(globalEntry?.rating, globalEntry?.rating_games)} <span className="text-[11px]">pts</span>
+                  </p>
+                  <p className="mt-1 text-[9px] text-white/50">{t('profile.card_points_label')}</p>
+                </div>
+                <div className="px-1">
+                  <p className="text-lg font-extrabold text-white leading-none">
+                    {ratingBand(globalEntry?.rating, globalEntry?.gender)?.label ?? '—'}
+                  </p>
+                  <p className="mt-1 text-[9px] text-white/50">{t('profile.card_band_label')}</p>
+                </div>
+                <div className="px-1">
+                  <p className="text-lg font-extrabold text-white tabular-nums leading-none">
+                    {globalRank ? `#${globalRank}` : '—'}
+                  </p>
+                  <p className="mt-1 text-[9px] text-white/50">{t('profile.card_position_label')}</p>
+                </div>
+              </div>
             </div>
           )}
+          {playerXp && (() => {
+            const tier = tierFromXp(playerXp.xp)
+            const progress = tier ?? preTierProgress(playerXp.xp)
+            return (
+              <div className="mt-2 rounded-ctrl bg-white/10 border border-white/10 p-3 text-left">
+                <p className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-white/50">
+                  {t('profile.card_xp_heading')}
+                </p>
+                <div className="mt-2 border-t border-white/10 pt-2 flex items-center justify-between text-[11px] font-extrabold text-white">
+                  <span>
+                    {tier
+                      ? `${t('profile.xp_level', { level: tier.level })} · ${t(tier.labelKey)}`
+                      : t('profile.xp_no_shield')}
+                  </span>
+                  <span className="tabular-nums text-white/70">{formatXp(playerXp.xp)} XP</span>
+                </div>
+                <div className="mt-1.5 h-1.5 rounded-full bg-ink-900/60 overflow-hidden">
+                  <div className="h-full rounded-full bg-lime-400/80" style={{ width: `${progress.progressPct}%` }} />
+                </div>
+              </div>
+            )
+          })()}
           <p className="text-white/60 text-xs mt-2.5">
             {t('playerdetails.friends_count', { count: player.friends_count })}
             {(playerXp?.kudos ?? 0) > 0 && (
