@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Trophy, Target, Award, Swords, ChevronDown, UserPlus, UserCheck, Clock, Lock, ShieldCheck, ThumbsUp } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { PrimaryButton, EmptyState, Avatar, RankBadge, RatingBadge, PhotoViewerModal, TrophyCard } from '../components/ui'
+import { countryName } from '../lib/countries'
 import { formatRating, isProvisional } from '../lib/elo'
 import { winRatePct } from '../lib/statsLogic'
 import { sendFriendRequest, acceptFriendRequest, removeFriendRequest } from '../lib/friends'
@@ -11,6 +12,9 @@ import { getGlobalRankings } from '../lib/privateMatches'
 import { formatDate } from '../lib/formatDate'
 
 const SIDE_LABEL_KEY = { left: 'gamedetails.side_left', right: 'gamedetails.side_right', both: 'gamedetails.side_both' }
+// Mesmas chaves que o Profile.jsx usa, para o genero ler igual nos dois
+// perfis (Trello #202).
+const GENDER_LABEL_KEY = { masculino: 'login.gender_male', feminino: 'login.gender_female' }
 
 // Aggregated across every club the player belongs to (not scoped to the
 // viewer's currentOrganizationId) via get_player_profile/get_head_to_head_*
@@ -38,6 +42,9 @@ export default function PlayerDetails() {
   const [globalEntry, setGlobalEntry] = useState(null)
   const [playerXp, setPlayerXp] = useState(null)
   const [playerTrophies, setPlayerTrophies] = useState([])
+  // Nacionalidade e genero do jogador visitado (Trello #191/#202). RPC
+  // dedicado, pelo mesmo motivo do get_player_xp logo abaixo.
+  const [playerExtras, setPlayerExtras] = useState(null)
 
   const toggleMix = (gameId) => {
     setExpandedMixes((prev) => {
@@ -70,6 +77,13 @@ export default function PlayerDetails() {
       const { data, error } = await supabase.rpc('get_player_trophies', { p_user_id: id })
       if (error) throw error
       setPlayerTrophies(data || [])
+    } catch (error) {
+      console.error('Error loading player trophies:', error)
+    }
+    try {
+      const { data, error } = await supabase.rpc('get_player_public_extras', { p_user_id: id })
+      if (error) throw error
+      setPlayerExtras(data?.[0] || null)
     } catch (error) {
       // Fail-soft: sem migração, a estante não aparece.
       console.error('Error loading player trophies:', error)
@@ -305,6 +319,12 @@ export default function PlayerDetails() {
               and knowing it is the whole point when inviting a stranger. */}
           <p className="text-white/60 text-xs mt-1">
             {t('playerdetails.preferred_side', { side: t(SIDE_LABEL_KEY[player.preferred_side] || SIDE_LABEL_KEY.both) })}
+            {/* Pais e genero ao lado da posicao. So texto, sem bandeiras
+                (decisao do Francisco, 9 set). Cada um so aparece se estiver
+                preenchido — nunca se mostra "nao indicado" no perfil de
+                outra pessoa. */}
+            {playerExtras?.nationality && <> · {countryName(playerExtras.nationality, i18n.language)}</>}
+            {GENDER_LABEL_KEY[playerExtras?.gender] && <> · {t(GENDER_LABEL_KEY[playerExtras.gender])}</>}
           </p>
           {/* Same privacy gate as the stat tiles below — results_visibility
               controls both, so no point showing a rank derived from hidden
@@ -313,7 +333,11 @@ export default function PlayerDetails() {
           {!resultsHidden && globalRank && (
             <div className="mt-2.5 flex items-center justify-center gap-2">
               <RankBadge rank={globalRank} size="md" />
-              <RatingBadge rating={globalEntry?.rating} gender={globalEntry?.gender} size="md" />
+              {/* onDark: mesmo motivo do heroi do Perfil — pilula preta sobre fundo preto. */}
+              {/* Genero do RPC dedicado primeiro: e a fonte fiavel. O globalEntry vem
+                  do ranking e pode nao o trazer — e sem genero a banda deixa de
+                  ter prefixo, em vez de assumir M (ver lib/elo.js). */}
+              <RatingBadge rating={globalEntry?.rating} gender={playerExtras?.gender ?? globalEntry?.gender} size="md" onDark />
             </div>
           )}
           <p className="text-white/60 text-xs mt-2.5">

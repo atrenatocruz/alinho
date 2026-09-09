@@ -12,6 +12,7 @@ import { listIncomingOrganizationInvites, acceptOrganizationInvite, declineOrgan
 import { PrimaryButton, GuestBadge, DateField, Avatar, Select, EmptyState, RankBadge, RatingBadge, PhotoViewerModal, TrophyCard } from '../components/ui'
 import { CATEGORY_ORDER } from '../lib/trophies'
 import { formatRating, formatRatingMaybeProvisional, isProvisional } from '../lib/elo'
+import { countryOptions, countryName } from '../lib/countries'
 import { tierFromXp, preTierProgress, formatXp } from '../lib/xp'
 import { formatDate as formatDateLib } from '../lib/formatDate'
 
@@ -46,6 +47,9 @@ export default function Profile() {
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(profile?.name || '')
   const [preferredSide, setPreferredSide] = useState(profile?.preferred_side || 'both')
+  // Nacionalidade (Trello #191). Opcional: '' significa nao indicada, e e
+  // gravada como null.
+  const [nationality, setNationality] = useState(profile?.nationality || '')
   const [birthday, setBirthday] = useState(profile?.birthday || '')
   const [gender, setGender] = useState(profile?.gender || '')
   const [language, setLanguage] = useState(profile?.language || 'pt')
@@ -85,6 +89,7 @@ export default function Profile() {
     if (profile) {
       setName(profile.name)
       setPreferredSide(profile.preferred_side || 'both')
+      setNationality(profile.nationality || '')
       setBirthday(profile.birthday || '')
       setGender(profile.gender || '')
       setLanguage(profile.language || 'pt')
@@ -398,6 +403,7 @@ export default function Profile() {
       const updates = {
         name,
         preferred_side: preferredSide,
+        nationality: nationality || null,
         birthday: birthday || null,
         gender,
         language,
@@ -556,7 +562,9 @@ export default function Profile() {
             <span className="inline-flex items-center rounded-full font-mono font-extrabold tracking-wide bg-lime-400 text-ink-900 text-sm px-3 py-1 tabular-nums">
               {formatRatingMaybeProvisional(profile?.rating, profile?.rating_games)} {t('gamedetails.points_suffix')}
             </span>
-            <RatingBadge rating={profile?.rating} gender={profile?.gender} />
+            {/* onDark: o heroi e bg-ink-900 e o badge normal tambem — sem
+                isto a pilula fica preta sobre preta e desaparece. */}
+            <RatingBadge rating={profile?.rating} gender={profile?.gender} onDark />
           </div>
           {isProvisional(profile?.rating_games) && (
             <p className="mt-1.5 text-[11px] font-extrabold text-lime-400/90">{t('profile.provisional_note')}</p>
@@ -830,6 +838,22 @@ export default function Profile() {
                 <p className="text-xs text-muted mt-1.5">{t('profile.preferred_side_hint')}</p>
               </div>
 
+              {/* Nacionalidade (Trello #191) — opcional, nunca obrigatoria.
+                  A primeira opcao vazia e o que permite voltar atras depois
+                  de ter escolhido; sem ela nao havia forma de a limpar. */}
+              <div>
+                <label className={inputLabel}>{t('profile.nationality_label')}</label>
+                <Select
+                  value={nationality}
+                  onChange={setNationality}
+                  placeholder={t('profile.nationality_placeholder')}
+                  options={[
+                    { value: '', label: t('profile.nationality_none') },
+                    ...countryOptions(i18n.language),
+                  ]}
+                />
+              </div>
+
               <div>
                 <label className={inputLabel}>{t('profile.language_label')}</label>
                 <Select
@@ -935,6 +959,15 @@ export default function Profile() {
                 <p className={fieldLabel}>{t('profile.preferred_side_label')}</p>
                 <p className={fieldValue}>
                   {t(SIDE_LABEL_KEY[profile?.preferred_side] || SIDE_LABEL_KEY.both)}
+                </p>
+              </div>
+
+              <div>
+                <p className={fieldLabel}>{t('profile.nationality_label')}</p>
+                <p className={fieldValue}>
+                  {profile?.nationality
+                    ? countryName(profile.nationality, i18n.language)
+                    : t('profile.nationality_none')}
                 </p>
               </div>
 

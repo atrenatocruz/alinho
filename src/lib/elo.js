@@ -27,11 +27,23 @@ const BANDS = [
     Devolve null quando não há rating (conta ainda sem Elo). */
 export function ratingBand(rating, gender) {
   if (rating == null) return null
-  const prefix = gender === 'feminino' ? 'F' : 'M'
   const band = BANDS.find((b) => rating >= b.min)
   if (!band) return { label: 'INI', fullKey: 'ui.level_beginner' }
+
+  // Regra do Francisco (9 set 2026): M = masculino, F = feminino,
+  // N = nivel, para quem nao preencheu o genero.
+  //
+  // A versao anterior fazia `gender === 'feminino' ? 'F' : 'M'`, o que
+  // rotulava de M toda a gente sem genero preenchido — incluindo mulheres.
+  // `profiles.gender` e opcional e fica a null por omissao, portanto isto
+  // acontecia a serio (Trello #202).
+  const prefix = gender === 'feminino' ? 'F' : gender === 'masculino' ? 'M' : 'N'
   const label = `${prefix}${band.num}`
-  return { label, fullKey: 'ui.level_band', fullVars: { label } }
+  return {
+    label,
+    fullKey: prefix === 'N' ? 'ui.level_band_no_gender' : 'ui.level_band',
+    fullVars: { label, num: band.num },
+  }
 }
 
 /** Banda de um clube/grupo (média do Elo dos membros) — mesmas bandas que

@@ -3,9 +3,10 @@ import { useTranslation } from 'react-i18next'
 import { CheckCircle2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { PrimaryButton } from '../components/ui'
+import { PrimaryButton, Select } from '../components/ui'
 import { Wordmark } from '../components/Layout'
 import { ONBOARDING_LEVELS } from '../lib/elo'
+import { countryOptions } from '../lib/countries'
 
 /* ════════════════════════════════════════════════════════════════════════
    Auto-classificação no primeiro registo (Elo v1, RANKING.md).
@@ -18,9 +19,12 @@ import { ONBOARDING_LEVELS } from '../lib/elo'
    Contas antigas nunca passam por aqui (marcadas na migração).
    ════════════════════════════════════════════════════════════════════════ */
 export default function EscolherNivel() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { user, refreshMemberships } = useAuth()
   const [selected, setSelected] = useState(null)
+  // Nacionalidade (Trello #191): oferecida aqui, na criacao do perfil, mas
+  // NUNCA obrigatoria — o botao de confirmar so depende do nivel.
+  const [nationality, setNationality] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -33,6 +37,18 @@ export default function EscolherNivel() {
         p_level: selected,
       })
       if (rpcError) throw rpcError
+      // Gravada a parte, com um update normal ao proprio perfil, em vez de
+      // estender complete_rating_onboarding — a RLS ja permite a cada um
+      // escrever o seu perfil, e assim nao ha migracao de funcao nenhuma.
+      // Falhar aqui nao pode prender o utilizador fora da app: o nivel ja
+      // ficou gravado e a nacionalidade e opcional.
+      if (nationality) {
+        const { error: natError } = await supabase
+          .from('profiles')
+          .update({ nationality })
+          .eq('id', user.id)
+        if (natError) console.error('Error saving nationality on onboarding:', natError)
+      }
       // Re-lê o perfil — rating_onboarded_at deixa de ser null e o Guard
       // deixa-nos entrar na app.
       await refreshMemberships()
@@ -83,6 +99,24 @@ export default function EscolherNivel() {
               </button>
             )
           })}
+        </div>
+
+        {/* Nacionalidade — opcional. Fica depois da escolha de nivel para
+            nao competir com ela, que e o que desbloqueia o botao. */}
+        <div className="mb-5">
+          <label className="block text-sm font-extrabold text-ink-900 mb-2">
+            {t('profile.nationality_label')}
+          </label>
+          <Select
+            value={nationality}
+            onChange={setNationality}
+            placeholder={t('profile.nationality_placeholder')}
+            options={[
+              { value: '', label: t('profile.nationality_none') },
+              ...countryOptions(i18n.language),
+            ]}
+          />
+          <p className="text-xs text-muted mt-1.5">{t('profile.nationality_optional_hint')}</p>
         </div>
 
         {error && <p className="text-danger text-sm text-center mb-4">{error}</p>}
