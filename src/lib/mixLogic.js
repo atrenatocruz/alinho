@@ -39,6 +39,21 @@ export const countPeople = (participants = []) =>
     .filter(p => p.status === 'confirmed')
     .reduce((n, p) => n + 1 + (p.partner_id ? 1 : 0), 0)
 
+/** Capacidade de um mix: max_players explicito, senao 4 por campo. Era
+    calculado in-line em duplicado (ui.jsx, Home.jsx, GameDetails.jsx) —
+    ver achado #5 da code review do Trello #51. */
+export const mixCapacity = (game) => game?.max_players || (game?.num_courts || 1) * 4
+
+/** Se o genero do jogador impede a entrada num mix com gender_restriction
+    definido — so 'masculino'/'feminino' restringem, 'misto'/'indiferente'
+    nao. So decide se se mostra o botao de entrar ou uma explicacao; a
+    aplicacao real e a RLS de INSERT em participants. Mesma duplicacao do
+    achado #5 acima. */
+export const isGenderMismatch = (game, profile) => {
+  const restricted = game?.gender_restriction && !['indiferente', 'misto'].includes(game.gender_restriction)
+  return Boolean(restricted) && profile?.gender !== game.gender_restriction
+}
+
 /** Rondas disponíveis no court. */
 export const totalRounds = (game) =>
   Math.max(1, Math.floor((game.court_time_minutes || 90) / (game.game_time_minutes || 20)))

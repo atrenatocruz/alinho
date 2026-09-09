@@ -12,6 +12,7 @@ import {
   countPeople, totalRounds, formDuplas, seedCourts, nextSobeDesce,
   roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches,
   PHASE_LABEL_KEY, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY,
+  mixCapacity, isGenderMismatch,
 } from '../lib/mixLogic'
 import { isProvisional } from '../lib/elo'
 import { winRatePct, firstLastName } from '../lib/statsLogic'
@@ -1112,18 +1113,15 @@ export default function GameDetails() {
   ]).filter(x => x?.id)
 
   const peopleCount = countPeople(participants)
-  const capacity = game?.max_players || numCourts * 4
+  const capacity = mixCapacity(game)
   const isUserJoined = participants.some(p => p.user_id === user.id || p.partner_id === user.id)
   const waitlistPeople = waitlist.map(w => ({ ...w.user, rowOwner: true, rowId: w.id, hasPartner: false }))
   const isUserWaitlisted = waitlist.some(w => w.user_id === user.id)
   const canJoin = game?.status === 'open' && peopleCount < capacity && !isUserJoined
-  // 'misto'/'indiferente' impose no eligibility restriction — only
-  // 'masculino'/'feminino' require the joining player's own profile to
-  // match. The real enforcement is the participants INSERT RLS policy
+  // The real enforcement is the participants INSERT RLS policy
   // (migration_mix_gender_restriction.sql) — this only decides whether to
   // show the join button or a friendly explanation instead of a raw error.
-  const genderRestricted = game?.gender_restriction && !['indiferente', 'misto'].includes(game.gender_restriction)
-  const genderMismatch = genderRestricted && profile?.gender !== game.gender_restriction
+  const genderMismatch = isGenderMismatch(game, profile)
   const mixStarted = game?.status === 'in_progress' || game?.status === 'finished'
   // A full game counts as closed even if the stored status lagged behind
   // (e.g. players who joined before the auto-close trigger existed)

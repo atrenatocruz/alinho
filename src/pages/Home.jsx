@@ -7,7 +7,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { MixCard, EmptyState, PrimaryButton, Avatar } from '../components/ui'
 import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
-import { countPeople } from '../lib/mixLogic'
+import { countPeople, mixCapacity, isGenderMismatch } from '../lib/mixLogic'
 import { listFriends } from '../lib/friends'
 
 export default function Home() {
@@ -24,8 +24,10 @@ export default function Home() {
   // não sabemos, o que o cartão trata como "sem destaque".
   const [friendIds, setFriendIds] = useState(null)
   // Inscricao/saida directa a partir do cartao (Trello #51, parte 2).
-  // pendingGameId desactiva o botao so do mix em curso, nao a lista toda.
-  const [pendingGameId, setPendingGameId] = useState(null)
+  // pendingGameIds desactiva o botao so dos mixes em curso, nao a lista
+  // toda — e um Set (nao um id unico) para que accionar o cartao B nao
+  // reactive o botao do cartao A enquanto o pedido de A ainda esta no ar.
+  const [pendingGameIds, setPendingGameIds] = useState(() => new Set())
   const [cardError, setCardError] = useState('')
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('ativos')
@@ -233,24 +235,28 @@ export default function Home() {
       if (game.status !== 'open' && game.status !== 'closed') return null
       return { kind: 'leave' }
     }
-    if (myRow?.status === 'waitlisted') return { kind: 'leave_waitlist' }
+    if (myRow?.status === 'waitlisted') {
+      // Mesma janela que GameDetails.jsx aplica ao seu botao "Sair da
+      // waitlist" (`!mixStarted`) — sem isto ficava um botao acionavel numa
+      // linha waitlisted de um mix ja em curso ou terminado (ex.: tab
+      // "Terminados").
+      if (game.status === 'in_progress' || game.status === 'finished') return null
+      return { kind: 'leave_waitlist' }
+    }
     // Fui inscrito como parceiro de outra pessoa: a linha e dela, e um
     // delete filtrado pelo meu user_id nao apagaria nada — o botao ficaria a
     // nao fazer nada. Fica para a pagina do mix.
     if (iAmSomeonesPartner) return null
 
     if (game.status !== 'open') return null
-    const genderRestricted =
-      game.gender_restriction && !['indiferente', 'misto'].includes(game.gender_restriction)
-    if (genderRestricted && profile?.gender !== game.gender_restriction) return null
+    if (isGenderMismatch(game, profile)) return null
 
-    const capacity = game.max_players || (game.num_courts || 1) * 4
-    return countPeople(rows) < capacity ? { kind: 'join' } : { kind: 'waitlist' }
+    return countPeople(rows) < mixCapacity(game) ? { kind: 'join' } : { kind: 'waitlist' }
   }
 
   const handleCardAction = async (game, kind) => {
     if (kind === 'leave' && !confirm(t('gamedetails.confirm_leave_game'))) return
-    setPendingGameId(game.id)
+    setPendingGameIds((prev) => new Set(prev).add(game.id))
     setCardError('')
     try {
       if (kind === 'join' || kind === 'waitlist') {
@@ -276,14 +282,18 @@ export default function Home() {
       console.error('Error updating participation from the mix card:', error)
       setCardError(t('home.card_action_error'))
     } finally {
-      setPendingGameId(null)
+      setPendingGameIds((prev) => {
+        const next = new Set(prev)
+        next.delete(game.id)
+        return next
+      })
     }
   }
 
   const actionFor = (game) => {
     const a = cardAction(game)
     if (!a) return null
-    return { ...a, busy: pendingGameId === game.id, onAction: () => handleCardAction(game, a.kind) }
+    return { ...a, busy: pendingGameIds.has(game.id), onAction: () => handleCardAction(game, a.kind) }
   }
 
   const isFinished = (game) => game.status === 'completed' || game.status === 'finished'

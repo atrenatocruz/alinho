@@ -8,7 +8,7 @@ import { ratingBand, groupRatingBand } from '../lib/elo'
 import { tierFromXp, isGlowing, GLOW_CLASS } from '../lib/xp'
 import { trophyIcon, RARITY_META } from '../lib/trophies'
 import { formatDate, formatTime, formatCurrency } from '../lib/formatDate'
-import { FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY } from '../lib/mixLogic'
+import { FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, mixCapacity } from '../lib/mixLogic'
 
 /* ─── Date fields ────────────────────────────────────────────────────────
    Native <input type=date/datetime-local> pickers open reliably on iOS
@@ -702,7 +702,7 @@ export function MixCard({ game, joined = false, showClub = false, friendIds = nu
     ? ratedPlayers.reduce((sum, p) => sum + p.rating, 0) / ratedPlayers.length
     : null
   // A full game reads as closed even if the stored status lagged behind
-  const capacity = game.max_players || (game.num_courts || 1) * 4
+  const capacity = mixCapacity(game)
   const isFull = players.length >= capacity
   const isClosed = game.status === 'closed' || (game.status === 'open' && isFull)
   const isLive = game.status === 'in_progress'
@@ -731,11 +731,19 @@ export function MixCard({ game, joined = false, showClub = false, friendIds = nu
   const time = formatTime(d, i18n.language, { hour: '2-digit', minute: '2-digit' })
 
   return (
-    <Link
-      to={`/jogo/${game.id}`}
-      className={`card press block hover:shadow-lift relative overflow-hidden
+    <div
+      className={`card press hover:shadow-lift relative overflow-hidden
                   ${isDone ? 'opacity-60' : ''}`}
     >
+      {/* "Stretched link" pattern: the whole card navigates via this
+          invisible full-cover Link, instead of the old approach of making
+          the entire card an <a> with a <button> nested inside it (invalid
+          HTML — a <button> inside an <a> — flagged by code review of Trello
+          #51). The action button below gets `relative` so it paints above
+          this overlay and captures its own clicks natively, no
+          preventDefault/stopPropagation needed. */}
+      <Link to={`/jogo/${game.id}`} className="absolute inset-0" aria-label={`${game.title} — ${dayLabel} ${time}`} />
+
       {/* joined = lime accent bar, instantly distinct */}
       {joined && <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-lime-400" />}
 
@@ -832,20 +840,15 @@ export function MixCard({ game, joined = false, showClub = false, friendIds = nu
           <PlayerAvatarRow players={players} max={game.max_players} size="sm" />
           <GroupLevelBadge rating={avgRating} />
         </div>
-        {/* preventDefault/stopPropagation porque o cartao inteiro e um
-            <Link>: sem isto, tocar em "Entrar" inscrevia E navegava para a
-            pagina do mix. Sem `action`, mantem-se o "Jogar >" de antes, que
-            e so um rotulo dentro do link. */}
+        {/* `relative` sobe o botao acima do Link que cobre o cartao inteiro
+            (ver comentario junto a esse Link) — sem `action`, mantem-se o
+            "Jogar >" de antes, que e so um rotulo dentro do overlay. */}
         {action ? (
           <PrimaryButton
             variant={ACTION_VARIANT[action.kind]}
             disabled={action.busy}
-            onClick={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              action.onAction()
-            }}
-            className="ml-auto"
+            onClick={() => action.onAction()}
+            className="ml-auto relative"
           >
             {t(ACTION_LABEL_KEY[action.kind])}
           </PrimaryButton>
@@ -854,13 +857,17 @@ export function MixCard({ game, joined = false, showClub = false, friendIds = nu
             {t('ui.play_cta')} <ChevronRight size={16} />
           </span>
         ) : null}
-        {isClosed && !isLive && !isDone && (
+        {/* Suprimido quando a accao e "waitlist": o botao ja oferece uma
+            forma de entrar (suplente), e o badge "fechado" ao lado dele
+            lia-se como contraditorio — ver achado #1 da code review do
+            Trello #51. */}
+        {isClosed && !isLive && !isDone && action?.kind !== 'waitlist' && (
           <span className="ml-auto inline-flex items-center gap-1.5 bg-ok/10 text-ok text-[11px] font-extrabold px-2.5 py-1 rounded-full">
             <Lock size={13} className="shrink-0" /> {t('ui.court_reserved')}
           </span>
         )}
       </div>
-    </Link>
+    </div>
   )
 }
 
