@@ -550,6 +550,21 @@ export default function Profile() {
               onChange={handlePhotoSelect}
               className="hidden"
             />
+            {/* Remover foto: espelho do botão da câmara, no canto oposto —
+                só quando há foto. Substitui a antiga ação de texto no
+                fundo do card. */}
+            {profile?.avatar_url && (
+              <button
+                type="button"
+                onClick={handleRemovePhoto}
+                disabled={uploadingPhoto}
+                aria-label={t('profile.remove_photo')}
+                className="absolute -bottom-1 -left-1 w-7 h-7 rounded-full bg-ink-900 text-white/60 flex items-center justify-center
+                           ring-2 ring-ink-900 hover:text-danger transition-colors duration-fast disabled:opacity-50"
+              >
+                <Trash2 size={13} />
+              </button>
+            )}
           </div>
           <h2 className="text-2xl text-white">{profile?.name}</h2>
 
@@ -557,32 +572,32 @@ export default function Profile() {
               posição global pertencem todos ao mesmo sistema). Painel com
               fundo ligeiramente distinto, 3 colunas iguais com divisórias
               finas; só os pontos usam o accent. */}
-          <div className="mt-4 rounded-ctrl bg-white/5 p-4 text-left">
-            <p className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-[0.18em] text-white/50">
-              <Trophy size={12} /> {t('profile.card_ranking_heading')}
+          <div className="mt-3 rounded-ctrl bg-white/10 border border-white/10 p-3 text-left">
+            <p className="flex items-center gap-1.5 text-[9px] font-extrabold uppercase tracking-[0.18em] text-white/50">
+              <Trophy size={11} /> {t('profile.card_ranking_heading')}
             </p>
-            <div className="mt-3 grid grid-cols-3 divide-x divide-white/10 text-center">
+            <div className="mt-2 grid grid-cols-3 divide-x divide-white/10 text-center">
               <div className="px-1">
-                <p className="text-2xl font-extrabold text-lime-400 tabular-nums leading-none">
-                  {formatRatingMaybeProvisional(profile?.rating, profile?.rating_games)} <span className="text-sm">pts</span>
+                <p className="text-lg font-extrabold text-lime-400 tabular-nums leading-none">
+                  {formatRatingMaybeProvisional(profile?.rating, profile?.rating_games)} <span className="text-[11px]">pts</span>
                 </p>
-                <p className="mt-1.5 text-[10px] text-white/50">{t('profile.card_points_label')}</p>
+                <p className="mt-1 text-[9px] text-white/50">{t('profile.card_points_label')}</p>
               </div>
               <div className="px-1">
-                <p className="text-2xl font-extrabold text-white leading-none">
+                <p className="text-lg font-extrabold text-white leading-none">
                   {ratingBand(profile?.rating, profile?.gender)?.label ?? '—'}
                 </p>
-                <p className="mt-1.5 text-[10px] text-white/50">{t('profile.card_band_label')}</p>
+                <p className="mt-1 text-[9px] text-white/50">{t('profile.card_band_label')}</p>
               </div>
               <div className="px-1">
-                <p className="text-2xl font-extrabold text-white tabular-nums leading-none">
+                <p className="text-lg font-extrabold text-white tabular-nums leading-none">
                   {globalRank ? `#${globalRank}` : '—'}
                 </p>
-                <p className="mt-1.5 text-[10px] text-white/50">{t('profile.card_position_label')}</p>
+                <p className="mt-1 text-[9px] text-white/50">{t('profile.card_position_label')}</p>
               </div>
             </div>
             {isProvisional(profile?.rating_games) && (
-              <p className="mt-2.5 text-[10px] text-white/40 text-center">{t('profile.provisional_note')}</p>
+              <p className="mt-2 text-[9px] text-white/40 text-center">{t('profile.provisional_note')}</p>
             )}
           </div>
 
@@ -594,16 +609,16 @@ export default function Profile() {
             const progress = tier ?? preTierProgress(profile?.xp)
             const missing = progress.nextMin != null ? progress.nextMin - (profile?.xp ?? 0) : null
             return (
-              <div className="mt-3 rounded-ctrl bg-white/5 p-4 text-left">
-                <p className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-[0.18em] text-white/50">
+              <div className="mt-2 rounded-ctrl bg-white/10 border border-white/10 p-3 text-left">
+                <p className="flex items-center gap-1.5 text-[9px] font-extrabold uppercase tracking-[0.18em] text-white/50">
                   {t('profile.card_xp_heading')}
                   <Link to="/instrucoes#xp" aria-label={t('profile.xp_help_aria')} className="text-white/40 hover:text-white">
-                    <HelpCircle size={11} />
+                    <HelpCircle size={10} />
                   </Link>
                 </p>
-                <p className="mt-0.5 text-[10px] text-white/40">{t('profile.card_xp_sub')}</p>
-                <div className="mt-3 border-t border-white/10 pt-3">
-                  <div className="flex items-center justify-between text-[12px] font-extrabold text-white">
+                <p className="mt-0.5 text-[9px] text-white/40">{t('profile.card_xp_sub')}</p>
+                <div className="mt-2 border-t border-white/10 pt-2">
+                  <div className="flex items-center justify-between text-[11px] font-extrabold text-white">
                     <span>
                       {tier
                         ? `${t('profile.xp_level', { level: tier.level })} · ${t(tier.labelKey)}`
@@ -615,14 +630,14 @@ export default function Profile() {
                         : `${formatXp(profile?.xp)} XP`}
                     </span>
                   </div>
-                  <div className="mt-2 flex items-center gap-2">
-                    <div className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
+                  <div className="mt-1.5 flex items-center gap-2">
+                    <div className="flex-1 h-1.5 rounded-full bg-ink-900/60 overflow-hidden">
                       <div className="h-full rounded-full bg-lime-400/80" style={{ width: `${progress.progressPct}%` }} />
                     </div>
-                    <span className="text-[11px] text-white/50 tabular-nums shrink-0">{progress.progressPct}%</span>
+                    <span className="text-[10px] text-white/50 tabular-nums shrink-0">{progress.progressPct}%</span>
                   </div>
                   {missing != null && missing > 0 && (
-                    <p className="mt-1.5 text-[10px] text-white/40">
+                    <p className="mt-1 text-[9px] text-white/40">
                       {t('profile.card_xp_missing', { missing: formatXp(missing) })}
                     </p>
                   )}
@@ -631,17 +646,6 @@ export default function Profile() {
             )
           })()}
 
-          {/* Ação terciária, sem competir com o conteúdo. */}
-          {profile?.avatar_url && (
-            <button
-              type="button"
-              onClick={handleRemovePhoto}
-              disabled={uploadingPhoto}
-              className="mt-3 inline-flex items-center gap-1.5 text-white/40 text-xs hover:text-white/70 transition-colors duration-fast disabled:opacity-50"
-            >
-              <Trash2 size={12} /> {t('profile.remove_photo')}
-            </button>
-          )}
         </div>
       </div>
 
