@@ -111,6 +111,22 @@ export function seedCourts(teams, numCourts) {
   return matches
 }
 
+/** Snake-seeds items into `ceil(items.length / poolSize)` pools, spreading
+    strength evenly (pool 1,2,...,N, then N,...,2,1, repeating) — same
+    balancing principle seedCourts uses for court 1. Returns a NEW array
+    (sorted by seed desc, not input order), each item spread with an added
+    `pool_number` (1-based). */
+export function splitIntoPools(items, poolSize) {
+  const numPools = Math.max(1, Math.ceil(items.length / poolSize))
+  const sorted = [...items].sort((a, b) => (b.seed ?? 0) - (a.seed ?? 0))
+  return sorted.map((item, i) => {
+    const lap = Math.floor(i / numPools)
+    const posInLap = i % numPools
+    const pool_number = lap % 2 === 0 ? posInLap + 1 : numPools - posInLap
+    return { ...item, pool_number }
+  })
+}
+
 /** Sobe e desce: próxima ronda a partir dos resultados da atual.
     Vencedor sobe um campo (campo 1 mantém), perdedor desce (último mantém). */
 export function nextSobeDesce(roundMatches, numCourts) {
@@ -151,6 +167,34 @@ export function roundRobinRound(teamIds, numCourts, roundIndex) {
   return ms
 }
 
+/** Distinct round numbers a single pool has actually played, ascending.
+    A match belongs to the pool when BOTH its teams are in `poolTeamIds`.
+
+    Why this exists: pool-round matches are stamped with a GLOBAL, game-wide
+    `round_number` (unique/increasing across all pools combined, so the
+    generic round rendering in GameDetails.jsx keeps working). That global
+    number is NOT a per-pool ordinal — with 2+ pools interleaving draws,
+    pool 2's first round can land at global round_number 4. Anything that
+    needs "how many rounds has THIS pool played" (the round-robin rotation
+    index, and the completion check) must count this pool's own distinct
+    round numbers instead. */
+export function poolRoundNumbers(matches, poolTeamIds) {
+  const ids = new Set(poolTeamIds)
+  const rounds = new Set()
+  for (const m of matches) {
+    if (ids.has(m.team_a_id) && ids.has(m.team_b_id)) rounds.add(m.round_number)
+  }
+  return [...rounds].sort((a, b) => a - b)
+}
+
+/** How many rounds this pool has actually played (per-pool ordinal count) —
+    also the 0-based `roundIndex` to pass to roundRobinRound for its NEXT
+    round. See poolRoundNumbers above for why the global round_number can't
+    be used for this. */
+export function poolRoundsPlayed(matches, poolTeamIds) {
+  return poolRoundNumbers(matches, poolTeamIds).length
+}
+
 /** Classificação da fase de grupos: vitórias → diferença de pontos → pontos. */
 export function standings(teams, matches) {
   const table = Object.fromEntries(
@@ -170,6 +214,33 @@ export function standings(teams, matches) {
   return Object.values(table).sort(
     (x, y) => y.wins - x.wins || y.diff - x.diff || y.scored - x.scored
   )
+}
+
+/** Cross-pool seeding for the knockout phase: takes each pool's final
+    standings (already-computed standings() results, one per pool, in pool
+    order) and the number that advance per pool, and returns a flat ordered
+    team-id list ready for the EXISTING firstElimMatches(phase, orderedIds)
+    — which pairs position i against position (N-1-i). To avoid a
+    same-pool rematch in the first knockout round, ranks are interleaved
+    (1st-of-pool-1, 1st-of-pool-2, ..., 2nd-of-pool-1, 2nd-of-pool-2, ...)
+    rather than grouped by rank tier.
+
+    PRECONDITION: this only guarantees no same-pool rematch when
+    poolStandingsArrays.length * advancePerPool is exactly 2, 4, or 8 — the
+    only sizes firstElimMatches supports at all (an odd pool count, e.g. 3,
+    self-pairs one pool's own two seeds, and any size firstElimMatches
+    doesn't have a branch for silently drops teams regardless of ordering).
+    Callers must ensure the pool count is 1, 2, or 4 before calling this —
+    see Task 6, which validates pool count before teams are locked in. */
+export function seedKnockoutFromPools(poolStandingsArrays, advancePerPool = 2) {
+  const seeded = []
+  for (let rank = 0; rank < advancePerPool; rank++) {
+    for (const poolStandings of poolStandingsArrays) {
+      const entry = poolStandings[rank]
+      if (entry) seeded.push(entry.team.id)
+    }
+  }
+  return seeded
 }
 
 /** Fases eliminatórias que cabem nas rondas extra. */
@@ -225,6 +296,7 @@ export const PHASE_LABEL_KEY = {
 export const FORMAT_LABEL_KEY = {
   sobe_desce: 'mixlogic.format_sobe_desce',
   todos_contra_todos: 'mixlogic.format_todos_contra_todos',
+  grupos_eliminatorias: 'mixlogic.format_grupos_eliminatorias',
 }
 
 export const GENDER_RESTRICTION_LABEL_KEY = {

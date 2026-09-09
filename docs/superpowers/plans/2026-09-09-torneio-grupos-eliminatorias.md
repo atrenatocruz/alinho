@@ -383,7 +383,8 @@ And in the `"gamedetails"` object (sibling to `"group_standings_title"`):
 "bulk_import_placeholder": "Um nome por linha",
 "bulk_import_button": "Importar",
 "bulk_import_importing": "A importar...",
-"bulk_import_summary": "{{created}} criados, {{failed}} falharam"
+"bulk_import_summary": "{{created}} criados, {{failed}} falharam",
+"error_invalid_pool_count": "Número de grupos inválido ({{count}}). Com o tamanho de grupo atual, ajusta o tamanho para que o número de grupos seja 1, 2 ou 4."
 ```
 
 - [ ] **Step 3: Add the matching English strings**
@@ -408,7 +409,8 @@ In `src/locales/en.json`, mirror Step 2's keys with English text:
 "bulk_import_placeholder": "One name per line",
 "bulk_import_button": "Import",
 "bulk_import_importing": "Importing...",
-"bulk_import_summary": "{{created}} created, {{failed}} failed"
+"bulk_import_summary": "{{created}} created, {{failed}} failed",
+"error_invalid_pool_count": "Invalid group count ({{count}}). With the current group size, adjust it so the number of groups is 1, 2, or 4."
 ```
 
 - [ ] **Step 4: Verify the app still builds**
@@ -601,6 +603,18 @@ git commit -m "feat: mix-creation form support for grupos+eliminatórias format 
   `game.format === 'grupos_eliminatorias'` — consumed by Task 8
   (`PoolGroupStage`).
 
+**Ruling from Task 2's review (recorded in the SDD ledger):**
+`seedKnockoutFromPools` (Task 2) and the *existing, unmodified*
+`firstElimMatches`/`eliminationPhases` only support exactly 2, 4, or 8
+teams advancing to the knockout phase — that's a pre-existing constraint
+of `firstElimMatches`'s hardcoded branches, shared with
+`todos_contra_todos`, not something Task 2 introduced. With
+`advancePerPool` fixed at 2, that means **the pool count must be exactly
+1, 2, or 4** — any other pool count (e.g. 3 pools = 6 advancing) would
+silently drop teams from the bracket. This task is where that must be
+caught, since it's the last point before teams are locked in and
+`pool_size` can still be adjusted. Step 2 below includes this guard.
+
 - [ ] **Step 1: Import `splitIntoPools`**
 
 Find the `mixLogic` import block (starts `import { countPeople, ...`) and
@@ -637,8 +651,22 @@ Change to:
       // insert (there's no separate round trip to fetch ids back and
       // patch pool_number afterwards).
       const isGruposEliminatorias = game.format === 'grupos_eliminatorias'
+      const poolSize = game.pool_size || 4
+      // firstElimMatches/eliminationPhases (existing, unmodified — shared
+      // with todos_contra_todos) only support exactly 2, 4, or 8 teams
+      // advancing to the knockout phase. With advancePerPool fixed at 2,
+      // that means the pool count itself must be exactly 1, 2, or 4 — any
+      // other count would silently drop teams from the bracket later.
+      // This is the last point before teams are locked in where pool_size
+      // can still be adjusted, so it's caught here, not later.
+      if (isGruposEliminatorias) {
+        const numPools = Math.max(1, Math.ceil(duplas.length / poolSize))
+        if (![1, 2, 4].includes(numPools)) {
+          throw new Error(t('gamedetails.error_invalid_pool_count', { count: numPools }))
+        }
+      }
       const pooledDuplas = isGruposEliminatorias
-        ? splitIntoPools(duplas, game.pool_size || 4)
+        ? splitIntoPools(duplas, poolSize)
         : duplas
 
       const { error: teamsError } = await supabase
@@ -658,7 +686,15 @@ Change to:
 Run: `npm run build`
 Expected: builds successfully.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 4: Manual verification of the new guard**
+
+Confirm by reading the code (no running app needed for this step): with
+`pool_size = 4` and, say, 12 duplas, `numPools = ceil(12/4) = 3` — the
+guard must throw before any `teams` insert happens. With 8 duplas and
+`pool_size = 4`, `numPools = 2` — must proceed normally. Note both cases
+in your report.
+
+- [ ] **Step 5: Commit**
 
 ```bash
 git add src/pages/GameDetails.jsx
@@ -842,7 +878,29 @@ git commit -m "feat: PoolGroupStage component for per-pool round drawing (Task 7
   `format === 'grupos_eliminatorias'`, with `sobe_desce`/`todos_contra_todos`
   completely untouched.
 
-- [ ] **Step 1: Import `PoolGroupStage`**
+- [ ] **Step 1: Add the missing `gamedetails.advance_round` locale key**
+
+Task 7's `PoolGroupStage` component references
+`t('gamedetails.advance_round')`, but that key was never added to the
+locale files (a gap in this plan discovered during Task 7's review —
+`PoolGroupStage.jsx` itself is correct, it was this plan's Task 4 that
+missed it). It's the label shown for most of a pool's in-progress
+lifetime, so it must exist before this component ever renders.
+
+In `src/locales/pt.json`, in the `"gamedetails"` object (sibling to
+`"pool_advance_to_knockout"`), add:
+
+```json
+"advance_round": "Ronda seguinte"
+```
+
+In `src/locales/en.json`, same object, add:
+
+```json
+"advance_round": "Next round"
+```
+
+- [ ] **Step 2: Import `PoolGroupStage`**
 
 Add near the other component imports:
 
@@ -850,7 +908,7 @@ Add near the other component imports:
 import PoolGroupStage from '../components/PoolGroupStage'
 ```
 
-- [ ] **Step 2: Add the `isGruposEliminatorias` flag and advancing-team count**
+- [ ] **Step 3: Add the `isGruposEliminatorias` flag and advancing-team count**
 
 Find:
 
@@ -888,7 +946,7 @@ Change to:
       : eliminationPhases(teams.length, roundsTotal - groupRounds)
 ```
 
-- [ ] **Step 3: Track whether the knockout bracket has been seeded yet**
+- [ ] **Step 4: Track whether the knockout bracket has been seeded yet**
 
 The existing `matches` list is the only source of truth for phase
 progression elsewhere in this file, but for `grupos_eliminatorias` there's
@@ -905,7 +963,7 @@ Leave this unchanged — it already works for `grupos_eliminatorias` too
 elimination-phase matches in Step 5 below, at which point this file's
 *existing* elim-phase rendering takes over unmodified).
 
-- [ ] **Step 4: Branch `handleStartRound1`/render — show `PoolGroupStage` instead, while pools aren't seeded into the bracket yet**
+- [ ] **Step 5: Branch `handleStartRound1`/render — show `PoolGroupStage` instead, while pools aren't seeded into the bracket yet**
 
 Find:
 
@@ -926,7 +984,7 @@ Change to:
   const inPoolStage = isGruposEliminatorias && existingElim.length === 0
 ```
 
-- [ ] **Step 5: Add the pool-stage handlers**
+- [ ] **Step 6: Add the pool-stage handlers**
 
 Find `handleAdvance` (the function containing
 `rows = firstElimMatches(phase, orderedIds)`), and add two new handlers
@@ -978,7 +1036,7 @@ change that rendering), they don't need to mean "this is pool A's Nth
 round" on their own; `PoolGroupStage` already scopes everything else by
 team-id membership, not by round number.
 
-- [ ] **Step 6: Render `PoolGroupStage` in place of the flat group-phase UI, for this format only**
+- [ ] **Step 7: Render `PoolGroupStage` in place of the flat group-phase UI, for this format only**
 
 Find the "Classificação (todos contra todos)" block (it appears **twice**,
 character-identical, once for the live view and once for the finished/
@@ -1040,12 +1098,12 @@ character-identical) with:
           )}
 ```
 
-- [ ] **Step 7: Verify the build**
+- [ ] **Step 8: Verify the build**
 
 Run: `npm run build`
 Expected: builds successfully.
 
-- [ ] **Step 8: Manual verification**
+- [ ] **Step 9: Manual verification**
 
 This is the task where the actual tournament flow becomes testable
 end-to-end. Requires the Task 3 migration to have been run in Supabase
@@ -1072,10 +1130,10 @@ If any step fails, do not silently patch around it — stop and report
 exactly what broke, since this is the core mechanism the tournament
 depends on.
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 10: Commit**
 
 ```bash
-git add src/pages/GameDetails.jsx
+git add src/pages/GameDetails.jsx src/locales/pt.json src/locales/en.json
 git commit -m "feat: wire PoolGroupStage into GameDetails.jsx for grupos+eliminatórias (Task 8)"
 ```
 
