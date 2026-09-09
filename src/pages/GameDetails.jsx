@@ -12,7 +12,7 @@ import {
   countPeople, totalRounds, formDuplas, seedCourts, nextSobeDesce,
   roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches,
   PHASE_LABEL_KEY, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY,
-  mixCapacity, isGenderMismatch,
+  mixCapacity, isGenderMismatch, splitIntoPools,
 } from '../lib/mixLogic'
 import { isProvisional } from '../lib/elo'
 import { winRatePct, firstLastName } from '../lib/statsLogic'
@@ -668,13 +668,36 @@ export default function GameDetails() {
       const duplas = formDuplas(participants, pointsById, repeatPairKeys)
       if (duplas.length < 2) throw new Error(t('gamedetails.error_need_two_duplas'))
 
+      // Grupos+eliminatórias needs each dupla's pool assigned before
+      // insert (there's no separate round trip to fetch ids back and
+      // patch pool_number afterwards).
+      const isGruposEliminatorias = game.format === 'grupos_eliminatorias'
+      const poolSize = game.pool_size || 4
+      // firstElimMatches/eliminationPhases (existing, unmodified — shared
+      // with todos_contra_todos) only support exactly 2, 4, or 8 teams
+      // advancing to the knockout phase. With advancePerPool fixed at 2,
+      // that means the pool count itself must be exactly 1, 2, or 4 — any
+      // other count would silently drop teams from the bracket later.
+      // This is the last point before teams are locked in where pool_size
+      // can still be adjusted, so it's caught here, not later.
+      if (isGruposEliminatorias) {
+        const numPools = Math.max(1, Math.ceil(duplas.length / poolSize))
+        if (![1, 2, 4].includes(numPools)) {
+          throw new Error(t('gamedetails.error_invalid_pool_count', { count: numPools }))
+        }
+      }
+      const pooledDuplas = isGruposEliminatorias
+        ? splitIntoPools(duplas, poolSize)
+        : duplas
+
       const { error: teamsError } = await supabase
         .from('teams')
-        .insert(duplas.map(d => ({
+        .insert(pooledDuplas.map(d => ({
           game_id: id,
           player1_id: d.player1.id,
           player2_id: d.player2.id,
           seed_ranking: d.seed,
+          ...(isGruposEliminatorias ? { pool_number: d.pool_number } : {}),
         })))
       if (teamsError) throw teamsError
 
