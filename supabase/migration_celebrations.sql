@@ -34,7 +34,11 @@ AS $$
     SELECT id, COALESCE(celebrations_seen_at, '-infinity'::timestamptz) AS seen
     FROM profiles WHERE id = auth.uid()
   )
-  SELECT 'trophy'::text, pt.trophy_key, t.rarity, NULL::bigint, NULL::text, pt.awarded_at
+  -- O alias happened_at no 1º ramo é obrigatório: num UNION, o ORDER BY
+  -- final resolve pelos nomes de coluna do primeiro SELECT.
+  SELECT 'trophy'::text AS kind, pt.trophy_key, t.rarity,
+         NULL::bigint AS kudos_count, NULL::text AS game_title,
+         pt.awarded_at AS happened_at
   FROM player_trophies pt
   JOIN trophies t ON t.key = pt.trophy_key AND t.active
   JOIN me ON pt.user_id = me.id AND pt.awarded_at > me.seen
