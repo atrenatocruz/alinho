@@ -434,6 +434,7 @@
   "gamedetails.pool_label": "Grupo {{number}}",
   "gamedetails.pool_standings_title": "Classificação — Grupo {{number}}",
   "gamedetails.pool_advance_to_knockout": "Avançar para as eliminatórias",
+  "gamedetails.advance_round": "Ronda seguinte",
   "gamedetails.pool_all_complete_hint": "Todos os grupos terminaram — pronto para gerar as eliminatórias.",
   "gamedetails.bulk_import_title": "Importar jogadores em massa",
   "gamedetails.bulk_import_placeholder": "Um nome por linha",

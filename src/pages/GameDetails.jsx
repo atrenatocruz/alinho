@@ -8,6 +8,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton, GuestBadge, PlayerAvatarRow, EmptyState, ShareModal, RoundTimer, Avatar, Select, RatingBadge } from '../components/ui'
+import PoolGroupStage from '../components/PoolGroupStage'
 import {
   countPeople, totalRounds, formDuplas, seedCourts, nextSobeDesce,
   roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches,
@@ -853,9 +854,32 @@ export default function GameDetails() {
   const currentRoundDone = currentRoundMatches.length > 0 && currentRoundMatches.every(m => m.winner_team_id)
   const allDone = matches.length > 0 && matches.every(m => m.winner_team_id)
   const isSobeDesce = (game?.format || 'sobe_desce') === 'sobe_desce'
+  const isGruposEliminatorias = game?.format === 'grupos_eliminatorias'
   const groupRounds = isSobeDesce ? roundsTotal : Math.min(Math.max(teams.length - 1, 1), roundsTotal)
-  const inGroupPhase = maxRound < groupRounds
-  const elimPhases = isSobeDesce ? [] : eliminationPhases(teams.length, roundsTotal - groupRounds)
+  // grupos_eliminatorias never uses this flat single-group derivation —
+  // its group phase is entirely owned by PoolGroupStage (rendered instead
+  // of this block below). Forced to false (rather than left to the
+  // teams.length-based formula below, which canAdvance/handleAdvance DO
+  // still read for every format): with >2 pools, maxRound < groupRounds
+  // can still evaluate true after the knockout bracket has already been
+  // seeded (groupRounds is sized off total team count, which overshoots
+  // how many global rounds the pool stage actually consumed once there
+  // are more than 2 pools), which would wrongly send handleAdvance back
+  // into its flat round-robin branch instead of progressing the bracket.
+  const inGroupPhase = isGruposEliminatorias ? false : maxRound < groupRounds
+  // For grupos_eliminatorias, the bracket size is decided by how many
+  // teams actually ADVANCE out of the pools (poolCount * advancePerPool),
+  // not the category's total team count — and there's no time-based round
+  // cap (a 3-day event has no single "session length"), so pass a large
+  // sentinel instead of `roundsTotal - groupRounds`.
+  const advancingTeamCount = isGruposEliminatorias
+    ? [...new Set(teams.map((tm) => tm.pool_number))].filter((n) => n != null).length * 2
+    : teams.length
+  const elimPhases = isSobeDesce
+    ? []
+    : isGruposEliminatorias
+      ? eliminationPhases(advancingTeamCount, Number.MAX_SAFE_INTEGER)
+      : eliminationPhases(teams.length, roundsTotal - groupRounds)
   const existingElim = [...new Set(matches.filter(m => m.phase !== 'group').map(m => m.phase))]
   const nextPhase = elimPhases.find(ph => !existingElim.includes(ph))
 
@@ -863,6 +887,11 @@ export default function GameDetails() {
   // Ending a round also draws the next one (group round or elim phase) in the same tap.
   const canAdvance = currentRoundDone && (inGroupPhase || !!nextPhase)
   const canFinalize = roundsStarted && allDone && !canAdvance
+  // grupos_eliminatorias is still in its pool stage exactly until the
+  // first elimination-phase match exists — PoolGroupStage owns everything
+  // before that point, this file's existing round/elim rendering owns
+  // everything after.
+  const inPoolStage = isGruposEliminatorias && existingElim.length === 0
 
   // Current leader — used both when the mix ends naturally (all rounds
   // played) and when the admin cuts it short early with "Terminar Mix".
@@ -918,6 +947,42 @@ export default function GameDetails() {
     } catch (error) {
       console.error('Error ending round:', error)
       setMixError(error.message || t('gamedetails.error_end_round'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleDrawPoolRound = async (rows) => {
+    setBusy(true)
+    setMixError('')
+    try {
+      const { error } = await supabase.from('matches').insert(
+        rows.map((m) => ({ ...m, game_id: id, round_number: maxRound + 1, phase: 'group' }))
+      )
+      if (error) throw error
+      loadGameDetails()
+    } catch (error) {
+      console.error('Error drawing pool round:', error)
+      setMixError(error.message || t('gamedetails.error_start_round1'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleAllPoolsComplete = async (seededTeamIds) => {
+    setBusy(true)
+    setMixError('')
+    try {
+      const phase = elimPhases[0]
+      const rows = firstElimMatches(phase, seededTeamIds)
+      const { error } = await supabase.from('matches').insert(
+        rows.map((m) => ({ ...m, game_id: id, round_number: maxRound + 1, phase }))
+      )
+      if (error) throw error
+      loadGameDetails()
+    } catch (error) {
+      console.error('Error seeding knockout bracket:', error)
+      setMixError(error.message || t('gamedetails.error_start_round1'))
     } finally {
       setBusy(false)
     }
@@ -1679,8 +1744,8 @@ export default function GameDetails() {
             />
           )}
 
-          {/* Classificação (todos contra todos) */}
-          {!isSobeDesce && roundsStarted && tctStandings.length > 0 && (
+          {/* Classificação (todos contra todos) — never for grupos_eliminatorias, which gets its own per-pool standings from PoolGroupStage below */}
+          {!isSobeDesce && !isGruposEliminatorias && roundsStarted && tctStandings.length > 0 && (
             <div className="card">
               <h3 className="text-lg text-ink-900 mb-3">{t('gamedetails.group_standings_title')}</h3>
               <div className="space-y-1.5">
@@ -1696,6 +1761,17 @@ export default function GameDetails() {
                 ))}
               </div>
             </div>
+          )}
+
+          {inPoolStage && (
+            <PoolGroupStage
+              teams={teams}
+              matches={matches.filter((m) => m.phase === 'group')}
+              numCourts={numCourts}
+              busy={busy}
+              onDrawRound={handleDrawPoolRound}
+              onAllPoolsComplete={handleAllPoolsComplete}
+            />
           )}
 
           {/* Marcadores de resultado — admin delegates score entry for this
@@ -1864,8 +1940,8 @@ export default function GameDetails() {
 
               {finishedTab === 'rondas' && (
                 <>
-                  {/* Classificação (todos contra todos) */}
-                  {!isSobeDesce && roundsStarted && tctStandings.length > 0 && (
+                  {/* Classificação (todos contra todos) — never for grupos_eliminatorias, which gets its own per-pool standings from PoolGroupStage below */}
+                  {!isSobeDesce && !isGruposEliminatorias && roundsStarted && tctStandings.length > 0 && (
                     <div className="card">
                       <h3 className="text-lg text-ink-900 mb-3">{t('gamedetails.group_standings_title')}</h3>
                       <div className="space-y-1.5">
@@ -1881,6 +1957,17 @@ export default function GameDetails() {
                         ))}
                       </div>
                     </div>
+                  )}
+
+                  {inPoolStage && (
+                    <PoolGroupStage
+                      teams={teams}
+                      matches={matches.filter((m) => m.phase === 'group')}
+                      numCourts={numCourts}
+                      busy={busy}
+                      onDrawRound={handleDrawPoolRound}
+                      onAllPoolsComplete={handleAllPoolsComplete}
+                    />
                   )}
 
                   {/* Rondas */}
@@ -1975,40 +2062,52 @@ export default function GameDetails() {
             </>
           )}
 
-          {/* Controlo de rondas (admin) — tudo manual, sem temporizador */}
+          {/* Controlo de rondas (admin) — tudo manual, sem temporizador.
+              The round-progression controls below are hidden during
+              grupos_eliminatorias' pool stage: PoolGroupStage owns
+              round-drawing there (per-pool round-robin) — handleStartRound1/
+              handleAdvance ignore pool_number entirely and would corrupt
+              the pool structure if used during that window. They reappear
+              once the bracket is seeded, to run the existing, unmodified
+              elimination-phase progression. "Abortar mix" stays available
+              throughout since it doesn't depend on any of that logic. */}
           {isAdmin && game.status === 'in_progress' && (
             <div className="space-y-3">
-              {!roundsStarted && (
-                <PrimaryButton onClick={handleStartRound1} disabled={busy} className="w-full">
-                  <Play size={20} />
-                  {busy ? t('gamedetails.drawing') : t('gamedetails.start_round1')}
-                </PrimaryButton>
-              )}
-              {roundsStarted && canAdvance && (
-                <PrimaryButton onClick={handleAdvance} disabled={busy} className="w-full">
-                  <ChevronRight size={20} />
-                  {busy ? t('gamedetails.processing')
-                    : inGroupPhase ? t('gamedetails.end_round', { number: maxRound })
-                    : t('gamedetails.end_round_and_draw', { number: maxRound, phase: PHASE_LABEL_KEY[nextPhase] ? t(PHASE_LABEL_KEY[nextPhase]).toLowerCase() : '' })}
-                </PrimaryButton>
-              )}
-              {canFinalize && (
-                <PrimaryButton variant="navy" onClick={() => handleFinalize(false)} disabled={busy} className="w-full">
-                  <Trophy size={20} />
-                  {busy ? t('gamedetails.finalizing') : t('gamedetails.finalize_mix')}
-                </PrimaryButton>
-              )}
-              {roundsStarted && !canAdvance && !canFinalize && (
-                <p className="text-muted text-sm text-center">
-                  {t('gamedetails.register_round_results', { number: maxRound })}
-                </p>
-              )}
-              {/* Sair mais cedo — disponível assim que houver pelo menos um resultado guardado */}
-              {roundsStarted && !canFinalize && anyScoreSaved && (
-                <PrimaryButton variant="danger" onClick={() => handleFinalize(true)} disabled={busy} className="w-full">
-                  <Trophy size={20} />
-                  {busy ? t('gamedetails.finalizing') : t('gamedetails.end_mix')}
-                </PrimaryButton>
+              {!inPoolStage && (
+                <>
+                  {!roundsStarted && (
+                    <PrimaryButton onClick={handleStartRound1} disabled={busy} className="w-full">
+                      <Play size={20} />
+                      {busy ? t('gamedetails.drawing') : t('gamedetails.start_round1')}
+                    </PrimaryButton>
+                  )}
+                  {roundsStarted && canAdvance && (
+                    <PrimaryButton onClick={handleAdvance} disabled={busy} className="w-full">
+                      <ChevronRight size={20} />
+                      {busy ? t('gamedetails.processing')
+                        : inGroupPhase ? t('gamedetails.end_round', { number: maxRound })
+                        : t('gamedetails.end_round_and_draw', { number: maxRound, phase: PHASE_LABEL_KEY[nextPhase] ? t(PHASE_LABEL_KEY[nextPhase]).toLowerCase() : '' })}
+                    </PrimaryButton>
+                  )}
+                  {canFinalize && (
+                    <PrimaryButton variant="navy" onClick={() => handleFinalize(false)} disabled={busy} className="w-full">
+                      <Trophy size={20} />
+                      {busy ? t('gamedetails.finalizing') : t('gamedetails.finalize_mix')}
+                    </PrimaryButton>
+                  )}
+                  {roundsStarted && !canAdvance && !canFinalize && (
+                    <p className="text-muted text-sm text-center">
+                      {t('gamedetails.register_round_results', { number: maxRound })}
+                    </p>
+                  )}
+                  {/* Sair mais cedo — disponível assim que houver pelo menos um resultado guardado */}
+                  {roundsStarted && !canFinalize && anyScoreSaved && (
+                    <PrimaryButton variant="danger" onClick={() => handleFinalize(true)} disabled={busy} className="w-full">
+                      <Trophy size={20} />
+                      {busy ? t('gamedetails.finalizing') : t('gamedetails.end_mix')}
+                    </PrimaryButton>
+                  )}
+                </>
               )}
 
               {/* Aborta o mix todo (apaga duplas + resultados) para recomeçar

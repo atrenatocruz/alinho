@@ -434,6 +434,7 @@
   "gamedetails.pool_label": "Group {{number}}",
   "gamedetails.pool_standings_title": "Standings — Group {{number}}",
   "gamedetails.pool_advance_to_knockout": "Advance to knockout stage",
+  "gamedetails.advance_round": "Next round",
   "gamedetails.pool_all_complete_hint": "All groups finished — ready to generate the knockout bracket.",
   "gamedetails.bulk_import_title": "Bulk import players",
   "gamedetails.bulk_import_placeholder": "One name per line",
