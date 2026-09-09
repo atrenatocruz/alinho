@@ -195,7 +195,15 @@ export function standings(teams, matches) {
     — which pairs position i against position (N-1-i). To avoid a
     same-pool rematch in the first knockout round, ranks are interleaved
     (1st-of-pool-1, 1st-of-pool-2, ..., 2nd-of-pool-1, 2nd-of-pool-2, ...)
-    rather than grouped by rank tier. */
+    rather than grouped by rank tier.
+
+    PRECONDITION: this only guarantees no same-pool rematch when
+    poolStandingsArrays.length * advancePerPool is exactly 2, 4, or 8 — the
+    only sizes firstElimMatches supports at all (an odd pool count, e.g. 3,
+    self-pairs one pool's own two seeds, and any size firstElimMatches
+    doesn't have a branch for silently drops teams regardless of ordering).
+    Callers must ensure the pool count is 1, 2, or 4 before calling this —
+    see Task 6, which validates pool count before teams are locked in. */
 export function seedKnockoutFromPools(poolStandingsArrays, advancePerPool = 2) {
   const seeded = []
   for (let rank = 0; rank < advancePerPool; rank++) {
