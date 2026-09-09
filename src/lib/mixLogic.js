@@ -188,6 +188,25 @@ export function standings(teams, matches) {
   )
 }
 
+/** Cross-pool seeding for the knockout phase: takes each pool's final
+    standings (already-computed standings() results, one per pool, in pool
+    order) and the number that advance per pool, and returns a flat ordered
+    team-id list ready for the EXISTING firstElimMatches(phase, orderedIds)
+    — which pairs position i against position (N-1-i). To avoid a
+    same-pool rematch in the first knockout round, ranks are interleaved
+    (1st-of-pool-1, 1st-of-pool-2, ..., 2nd-of-pool-1, 2nd-of-pool-2, ...)
+    rather than grouped by rank tier. */
+export function seedKnockoutFromPools(poolStandingsArrays, advancePerPool = 2) {
+  const seeded = []
+  for (let rank = 0; rank < advancePerPool; rank++) {
+    for (const poolStandings of poolStandingsArrays) {
+      const entry = poolStandings[rank]
+      if (entry) seeded.push(entry.team.id)
+    }
+  }
+  return seeded
+}
+
 /** Fases eliminatórias que cabem nas rondas extra. */
 export function eliminationPhases(nTeams, remainingRounds) {
   const maxDepth = nTeams >= 8 ? 3 : nTeams >= 4 ? 2 : nTeams >= 2 ? 1 : 0
