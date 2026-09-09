@@ -167,6 +167,34 @@ export function roundRobinRound(teamIds, numCourts, roundIndex) {
   return ms
 }
 
+/** Distinct round numbers a single pool has actually played, ascending.
+    A match belongs to the pool when BOTH its teams are in `poolTeamIds`.
+
+    Why this exists: pool-round matches are stamped with a GLOBAL, game-wide
+    `round_number` (unique/increasing across all pools combined, so the
+    generic round rendering in GameDetails.jsx keeps working). That global
+    number is NOT a per-pool ordinal — with 2+ pools interleaving draws,
+    pool 2's first round can land at global round_number 4. Anything that
+    needs "how many rounds has THIS pool played" (the round-robin rotation
+    index, and the completion check) must count this pool's own distinct
+    round numbers instead. */
+export function poolRoundNumbers(matches, poolTeamIds) {
+  const ids = new Set(poolTeamIds)
+  const rounds = new Set()
+  for (const m of matches) {
+    if (ids.has(m.team_a_id) && ids.has(m.team_b_id)) rounds.add(m.round_number)
+  }
+  return [...rounds].sort((a, b) => a - b)
+}
+
+/** How many rounds this pool has actually played (per-pool ordinal count) —
+    also the 0-based `roundIndex` to pass to roundRobinRound for its NEXT
+    round. See poolRoundNumbers above for why the global round_number can't
+    be used for this. */
+export function poolRoundsPlayed(matches, poolTeamIds) {
+  return poolRoundNumbers(matches, poolTeamIds).length
+}
+
 /** Classificação da fase de grupos: vitórias → diferença de pontos → pontos. */
 export function standings(teams, matches) {
   const table = Object.fromEntries(
