@@ -85,6 +85,11 @@ const EMPTY_GAME_FORM = {
   title: '',
   date: '',
   location: '',
+  // Coordenadas do local, preenchidas pelo autocompletar do Google (Trello
+  // #203). Ficam a null quando a morada e escrita a mao — sao espalhadas
+  // para a BD junto com o resto do gameForm, via `...gameFields`.
+  latitude: null,
+  longitude: null,
   price_per_player: '',
   prize: '',
   num_courts: 1,
@@ -186,13 +191,15 @@ export default function GerirClube() {
   useGooglePlacesAutocomplete(
     locationInputRef,
     showCreateGame || editingGame,
-    (value) => setGameForm((form) => ({ ...form, location: value }))
+    ({ value, latitude, longitude }) =>
+      setGameForm((form) => ({ ...form, location: value, latitude, longitude }))
   )
 
   useGooglePlacesAutocomplete(
     clubLocationInputRef,
     activeTab === 'settings' && !loading && !!settings,
-    (value) => setSettings((s) => ({ ...s, location: value }))
+    ({ value, latitude, longitude }) =>
+      setSettings((s) => ({ ...s, location: value, latitude, longitude }))
   )
 
   // Resolve the org from the URL slug. `Guard` (App.jsx) only checks
@@ -1119,6 +1126,8 @@ export default function GerirClube() {
           name: settings.name,
           description: settings.description,
           location: settings.location,
+          latitude: settings.latitude ?? null,
+          longitude: settings.longitude ?? null,
           phone: settings.phone,
           instagram: settings.instagram,
           website: settings.website,
@@ -1230,6 +1239,8 @@ export default function GerirClube() {
       title: game.title,
       date: toLocalInput(game.date),
       location: game.location || '',
+      latitude: game.latitude ?? null,
+      longitude: game.longitude ?? null,
       price_per_player: game.price_per_player ?? '',
       prize: game.prize || '',
       num_courts: game.num_courts || 1,
@@ -1450,7 +1461,9 @@ export default function GerirClube() {
                         ref={locationInputRef}
                         type="text"
                         value={gameForm.location}
-                        onChange={(e) => setGameForm({ ...gameForm, location: e.target.value })}
+                        // Escrever a morada a mao invalida as coordenadas: ficariam
+                        // a apontar para o sitio escolhido antes (Trello #203).
+                        onChange={(e) => setGameForm({ ...gameForm, location: e.target.value, latitude: null, longitude: null })}
                         className="input-field"
                         placeholder={t('gerirclube.location_placeholder')}
                       />
@@ -2166,7 +2179,8 @@ export default function GerirClube() {
                         ref={clubLocationInputRef}
                         type="text"
                         value={settings.location || ''}
-                        onChange={(e) => setSettings({ ...settings, location: e.target.value })}
+                        // Ver a nota no campo equivalente do mix.
+                        onChange={(e) => setSettings({ ...settings, location: e.target.value, latitude: null, longitude: null })}
                         className="input-field"
                         placeholder={t('gerirclube.address_placeholder')}
                       />

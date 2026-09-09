@@ -12,6 +12,13 @@ if (GOOGLE_PLACES_API_KEY) setOptions({ key: GOOGLE_PLACES_API_KEY, v: 'weekly' 
 /**
  * Wires Google Places Autocomplete onto a plain text <input>, active only
  * while `active` is true. No-ops when VITE_GOOGLE_PLACES_API_KEY isn't set.
+ *
+ * `onPlaceSelected` recebe `{ value, latitude, longitude }` — o texto
+ * formatado da morada mais as coordenadas do sitio, para o mapa por
+ * proximidade (Trello #203/#205). As coordenadas vem a null quando o
+ * utilizador escreve a morada sem escolher da lista de sugestoes; quem
+ * grava tem de tratar esse caso, e tem de as limpar se a morada for
+ * depois editada a mao, senao ficam a apontar para o sitio antigo.
  * Keeps the .pac-container dropdown's width synced to the input's actual
  * rendered width (styling lives in src/index.css) — Google sizes it once
  * at creation time and never re-syncs it on its own.
@@ -34,7 +41,7 @@ export function useGooglePlacesAutocomplete(inputRef, active, onPlaceSelected) {
     importLibrary('places').then(({ Autocomplete }) => {
       if (cancelled || !inputRef.current) return
       autocomplete = new Autocomplete(inputRef.current, {
-        fields: ['name', 'formatted_address'],
+        fields: ['name', 'formatted_address', 'geometry.location'],
         types: ['establishment'],
         componentRestrictions: { country: 'pt' },
       })
@@ -43,7 +50,18 @@ export function useGooglePlacesAutocomplete(inputRef, active, onPlaceSelected) {
         const value = place.name && place.formatted_address
           ? `${place.name} - ${place.formatted_address}`
           : place.formatted_address || place.name || ''
-        if (value) onPlaceSelectedRef.current(value)
+        // place.geometry.location e um LatLng do Google: lat/lng sao
+        // METODOS, nao propriedades. Vem ausente quando o utilizador carrega
+        // Enter sem escolher uma sugestao da lista — ai o Google devolve so
+        // o texto escrito, e as coordenadas ficam a null de proposito.
+        const loc = place.geometry?.location
+        if (value) {
+          onPlaceSelectedRef.current({
+            value,
+            latitude: loc ? loc.lat() : null,
+            longitude: loc ? loc.lng() : null,
+          })
+        }
       })
 
       // Google sets .pac-container's width inline, once, from the input's
