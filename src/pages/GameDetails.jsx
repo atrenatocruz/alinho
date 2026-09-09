@@ -88,6 +88,9 @@ export default function GameDetails() {
   const [showDuplasShare, setShowDuplasShare] = useState(false)
   const [mixStats, setMixStats] = useState([])
   const [addingTestUser, setAddingTestUser] = useState(false)
+  const [bulkImportText, setBulkImportText] = useState('')
+  const [bulkImporting, setBulkImporting] = useState(false)
+  const [bulkImportResult, setBulkImportResult] = useState(null)
   const [pointsById, setPointsById] = useState({})
   // Raw {rating, gender} per user (unlike pointsById, which rounds AND
   // defaults a missing rating to 0 — RatingBadge needs the real null to
@@ -402,6 +405,34 @@ export default function GameDetails() {
       setJoinError(t('gamedetails.error_add_test_user'))
     } finally {
       setAddingTestUser(false)
+    }
+  }
+
+  const handleBulkImport = async () => {
+    const names = bulkImportText
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+    if (names.length === 0) return
+
+    setBulkImporting(true)
+    setBulkImportResult(null)
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-bulk-create-participants', {
+        body: {
+          organization_id: gameOrganizationId,
+          entries: names.map((name) => ({ name, game_id: id })),
+        },
+      })
+      if (error) throw error
+      setBulkImportResult(data)
+      setBulkImportText('')
+      loadGameDetails()
+    } catch (error) {
+      console.error('Error bulk-importing participants:', error)
+      setBulkImportResult({ created: [], failed: names.map((name) => ({ name, game_id: id, error: error.message })) })
+    } finally {
+      setBulkImporting(false)
     }
   }
 
@@ -2344,6 +2375,34 @@ export default function GameDetails() {
                   ? t('gamedetails.add_test_player')
                   : t('gamedetails.add_test_player_waitlist')}
             </PrimaryButton>
+          )}
+
+          {isAdmin && (
+            <div className="card space-y-3">
+              <h3 className="text-lg text-ink-900">{t('gamedetails.bulk_import_title')}</h3>
+              <textarea
+                value={bulkImportText}
+                onChange={(e) => setBulkImportText(e.target.value)}
+                placeholder={t('gamedetails.bulk_import_placeholder')}
+                className="input-field min-h-[120px]"
+              />
+              <PrimaryButton
+                variant="ghost"
+                onClick={handleBulkImport}
+                disabled={bulkImporting || !bulkImportText.trim()}
+                className="w-full"
+              >
+                {bulkImporting ? t('gamedetails.bulk_import_importing') : t('gamedetails.bulk_import_button')}
+              </PrimaryButton>
+              {bulkImportResult && (
+                <p className="text-sm text-muted">
+                  {t('gamedetails.bulk_import_summary', {
+                    created: bulkImportResult.created.length,
+                    failed: bulkImportResult.failed.length,
+                  })}
+                </p>
+              )}
+            </div>
           )}
 
           {canJoin && !joinMode && (
