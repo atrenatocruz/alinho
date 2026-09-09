@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next'
 import { MapPin, CheckCircle2, ChevronRight, ChevronDown, ChevronLeft, Lock, Play, Calendar, X, Share2, MessageCircle, Link2, ImageDown, Trophy, Repeat, Euro, Swords, Users } from 'lucide-react'
 import ShareCard, { CARD_W, CARD_H } from './ShareCard'
 import { ratingBand, groupRatingBand } from '../lib/elo'
-import { tierFromXp, isGlowing, GLOW_CLASS } from '../lib/xp'
 import { trophyIcon, RARITY_META } from '../lib/trophies'
 import { formatDate, formatTime, formatCurrency } from '../lib/formatDate'
 import { FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, mixCapacity } from '../lib/mixLogic'
@@ -488,16 +487,13 @@ export function GuestBadge({ size = 'sm', label, isTest = false }) {
    Default null = sem escudo, todos os call sites existentes intactos.
    Call sites que já passam um ring próprio no `size` (PlayerAvatarRow)
    não devem passar `xp` — dois rings sobrepõem-se. */
-export function Avatar({ name, url, size = 'w-10 h-10 text-sm', colorClass = 'bg-ink-700 text-white', xp = null, lastPlayedAt = null, provisional = false }) {
+export function Avatar({ name, url, size = 'w-10 h-10 text-sm', colorClass = 'bg-ink-700 text-white', provisional = false }) {
+  // Nota: o aro de XP que aqui viveu foi removido a pedido do Ruben —
+  // criava confusão com o ranking. O nível de XP mostra-se no painel do
+  // perfil, no tab Assiduidade e nos troféus; no avatar só fica a pill
+  // NOVO (provisório do ranking).
   const { t } = useTranslation()
-  let shield = ''
-  if (xp != null) {
-    const tier = tierFromXp(xp)
-    if (tier) {
-      shield = ` ${tier.ringClass}${isGlowing(lastPlayedAt) ? ` ${GLOW_CLASS}` : ''}`
-    }
-  }
-  const base = `${size} rounded-full flex items-center justify-center shrink-0 font-extrabold overflow-hidden${shield}`
+  const base = `${size} rounded-full flex items-center justify-center shrink-0 font-extrabold overflow-hidden`
   const core = url
     ? <img src={url} alt={name || ''} className={`${base} object-cover`} />
     : <div className={`${base} ${colorClass}`}>{(name || '?').charAt(0).toUpperCase()}</div>

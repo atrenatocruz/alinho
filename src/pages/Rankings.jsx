@@ -510,7 +510,7 @@ export default function Rankings() {
                       <div className={`w-11 h-11 rounded-ctrl flex items-center justify-center font-extrabold text-lg shrink-0 tabular-nums ${positionStyle(index)}`}>
                         {index + 1}
                       </div>
-                      <Avatar name={player.name} url={player.avatar_url} size="w-10 h-10 text-sm" xp={player.xp} lastPlayedAt={player.last_played_at} />
+                      <Avatar name={player.name} url={player.avatar_url} size="w-10 h-10 text-sm" />
                       <div className="flex-1 min-w-0">
                         <h3 className="text-base text-ink-900 truncate">
                           {player.name}
