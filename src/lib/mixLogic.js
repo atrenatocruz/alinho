@@ -111,6 +111,22 @@ export function seedCourts(teams, numCourts) {
   return matches
 }
 
+/** Snake-seeds items into `ceil(items.length / poolSize)` pools, spreading
+    strength evenly (pool 1,2,...,N, then N,...,2,1, repeating) — same
+    balancing principle seedCourts uses for court 1. Returns a NEW array
+    (sorted by seed desc, not input order), each item spread with an added
+    `pool_number` (1-based). */
+export function splitIntoPools(items, poolSize) {
+  const numPools = Math.max(1, Math.ceil(items.length / poolSize))
+  const sorted = [...items].sort((a, b) => (b.seed ?? 0) - (a.seed ?? 0))
+  return sorted.map((item, i) => {
+    const lap = Math.floor(i / numPools)
+    const posInLap = i % numPools
+    const pool_number = lap % 2 === 0 ? posInLap + 1 : numPools - posInLap
+    return { ...item, pool_number }
+  })
+}
+
 /** Sobe e desce: próxima ronda a partir dos resultados da atual.
     Vencedor sobe um campo (campo 1 mantém), perdedor desce (último mantém). */
 export function nextSobeDesce(roundMatches, numCourts) {
