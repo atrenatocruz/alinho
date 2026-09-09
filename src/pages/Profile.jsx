@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { User, Award, Trophy, Target, Flame, LogOut, Camera, UserCheck, X, Users } from 'lucide-react'
+import { User, Award, Trophy, Target, Flame, LogOut, Camera, UserCheck, X, Users, HelpCircle, ThumbsUp } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { hashPhone } from '../lib/hashPhone'
@@ -9,8 +9,10 @@ import { uploadAvatar, removeAvatar } from '../lib/avatarStorage'
 import { getMyPrivateMatches, getGlobalRankings } from '../lib/privateMatches'
 import { listIncomingFriendRequests, acceptFriendRequest, removeFriendRequest, listFriends, listOutgoingFriendRequests } from '../lib/friends'
 import { listIncomingOrganizationInvites, acceptOrganizationInvite, declineOrganizationInvite } from '../lib/orgInvites'
-import { PrimaryButton, GuestBadge, DateField, Avatar, Select, EmptyState, RankBadge, RatingBadge, PhotoViewerModal } from '../components/ui'
-import { formatRating } from '../lib/elo'
+import { PrimaryButton, GuestBadge, DateField, Avatar, Select, EmptyState, RankBadge, RatingBadge, PhotoViewerModal, TrophyCard } from '../components/ui'
+import { CATEGORY_ORDER } from '../lib/trophies'
+import { formatRating, formatRatingMaybeProvisional, isProvisional } from '../lib/elo'
+import { tierFromXp, preTierProgress, formatXp } from '../lib/xp'
 import { formatDate as formatDateLib } from '../lib/formatDate'
 
 const TABS = [
@@ -59,6 +61,10 @@ export default function Profile() {
   const [privateMatchHistoryLoading, setPrivateMatchHistoryLoading] = useState(true)
   const [globalPoints, setGlobalPoints] = useState(null)
   const [globalRank, setGlobalRank] = useState(null)
+  const [kudosTotal, setKudosTotal] = useState(0)
+  const [trophyCatalog, setTrophyCatalog] = useState([])
+  const [myTrophies, setMyTrophies] = useState([])
+  const [trophiesExpanded, setTrophiesExpanded] = useState(false)
   const [loading, setLoading] = useState(false)
   const [saved, setSaved] = useState(false)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
@@ -97,9 +103,40 @@ export default function Profile() {
         loadOutgoingRequests()
         loadFriends()
         loadOrgInvites()
+        loadKudos()
+        loadTrophies()
       }
     }
   }, [profile, currentOrganizationId])
+
+  // Estante de troféus: catálogo (para mostrar os bloqueados) + os meus.
+  const loadTrophies = async () => {
+    try {
+      const [{ data: catalog, error: catErr }, { data: mine, error: mineErr }] = await Promise.all([
+        supabase.from('trophies').select('key, category, rarity, sort').eq('active', true).order('sort'),
+        supabase.rpc('get_player_trophies', { p_user_id: profile.id }),
+      ])
+      if (catErr) throw catErr
+      if (mineErr) throw mineErr
+      setTrophyCatalog(catalog || [])
+      setMyTrophies(mine || [])
+    } catch (error) {
+      // Fail-soft: sem migração/tabela, a estante simplesmente não aparece.
+      console.error('Error loading trophies:', error)
+    }
+  }
+
+  // Total de kudos recebidos (à Strava) — via get_player_xp, que agrega o
+  // kind 'kudos' do ledger.
+  const loadKudos = async () => {
+    try {
+      const { data, error } = await supabase.rpc('get_player_xp', { p_user_id: profile.id })
+      if (error) throw error
+      setKudosTotal(data?.[0]?.kudos ?? 0)
+    } catch (error) {
+      console.error('Error loading kudos total:', error)
+    }
+  }
 
   const loadFriendRequests = async () => {
     try {
@@ -430,7 +467,7 @@ export default function Profile() {
           </svg>
           <div className="relative py-2">
             <div className="w-20 h-20 mx-auto mb-3">
-              <Avatar name={profile?.name} url={profile?.avatar_url} size="w-20 h-20 text-3xl" colorClass="bg-lime-400 text-ink-900" />
+              <Avatar name={profile?.name} url={profile?.avatar_url} size="w-20 h-20 text-3xl" colorClass="bg-lime-400 text-ink-900" xp={profile?.xp} lastPlayedAt={profile?.last_played_at} />
             </div>
             <h2 className="text-2xl text-white">
               {profile?.name} <span className="text-ink-200 font-normal">{t('profile.guest_suffix')}</span>
@@ -461,6 +498,9 @@ export default function Profile() {
     { icon: Target, value: gamesPlayed, label: t('playerdetails.stat_games'), cls: 'text-ink-700' },
     { icon: Flame, value: stats.game_wins || 0, label: t('profile.stat_game_wins'), cls: 'text-ok' },
     { icon: Award, value: `${winRate}%`, label: t('playerdetails.stat_win_rate'), cls: 'text-ink-700' },
+    // Kudos recebidos (à Strava) — reconhecimento dos colegas, o 3º eixo
+    // ao lado do Elo (nível) e do XP (assiduidade).
+    ...(kudosTotal > 0 ? [{ icon: ThumbsUp, value: kudosTotal, label: t('profile.stat_kudos'), cls: 'text-lime-600' }] : []),
   ] : null
 
   return (
@@ -484,7 +524,7 @@ export default function Profile() {
               aria-label={profile?.avatar_url ? t('profile.view_photo_aria') : undefined}
               className="block w-20 h-20"
             >
-              <Avatar name={profile?.name} url={profile?.avatar_url} size="w-20 h-20 text-3xl" colorClass="bg-lime-400 text-ink-900" />
+              <Avatar name={profile?.name} url={profile?.avatar_url} size="w-20 h-20 text-3xl" colorClass="bg-lime-400 text-ink-900" xp={profile?.xp} lastPlayedAt={profile?.last_played_at} />
             </button>
             {showPhoto && (
               <PhotoViewerModal url={profile?.avatar_url} alt={profile?.name} onClose={() => setShowPhoto(false)} />
@@ -514,15 +554,46 @@ export default function Profile() {
           <h2 className="text-2xl text-white">{profile?.name}</h2>
           <div className="mt-2.5 flex items-center justify-center gap-1.5">
             <span className="inline-flex items-center rounded-full font-mono font-extrabold tracking-wide bg-lime-400 text-ink-900 text-sm px-3 py-1 tabular-nums">
-              {formatRating(profile?.rating)} {t('gamedetails.points_suffix')}
+              {formatRatingMaybeProvisional(profile?.rating, profile?.rating_games)} {t('gamedetails.points_suffix')}
             </span>
             <RatingBadge rating={profile?.rating} gender={profile?.gender} />
           </div>
+          {isProvisional(profile?.rating_games) && (
+            <p className="mt-1.5 text-[11px] font-extrabold text-lime-400/90">{t('profile.provisional_note')}</p>
+          )}
           {globalRank && (
             <div className="mt-2">
               <RankBadge rank={globalRank} size="md" />
             </div>
           )}
+          {/* Barra de XP/assiduidade — nível 1-10 (escudo) e progresso para
+              o próximo. Separado do Elo: isto mede dedicação, só sobe. */}
+          {(() => {
+            const tier = tierFromXp(profile?.xp)
+            const progress = tier ?? preTierProgress(profile?.xp)
+            return (
+              <div className="mt-3 mx-auto max-w-[240px]">
+                <div className="flex items-center justify-between text-[11px] font-extrabold text-white/70 mb-1">
+                  <span>
+                    {tier
+                      ? `${t('profile.xp_level', { level: tier.level })} · ${t(tier.labelKey)}`
+                      : t('profile.xp_no_shield')}
+                  </span>
+                  <span className="tabular-nums inline-flex items-center gap-1">
+                    {progress.nextMin != null
+                      ? t('profile.xp_progress', { current: formatXp(profile?.xp), next: formatXp(progress.nextMin) })
+                      : `${formatXp(profile?.xp)} XP`}
+                    <Link to="/instrucoes#xp" aria-label={t('profile.xp_help_aria')} className="text-white/50 hover:text-white">
+                      <HelpCircle size={12} />
+                    </Link>
+                  </span>
+                </div>
+                <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+                  <div className="h-full rounded-full bg-lime-400" style={{ width: `${progress.progressPct}%` }} />
+                </div>
+              </div>
+            )
+          })()}
           {profile?.avatar_url && (
             <button
               type="button"
@@ -575,6 +646,81 @@ export default function Profile() {
                 <p className="text-xs text-muted">{label}</p>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Estante de troféus — 4 recentes à Strava; expandir mostra a
+            grelha completa por categoria, incluindo bloqueados (o critério
+            fica visível — é o "para onde subir"). Fail-soft: sem dados
+            (migração por correr), sem secção. */}
+        {trophyCatalog.length > 0 && (
+          <div className="card">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg text-ink-900 flex items-center gap-2">
+                <Trophy size={20} className="text-lime-600" /> {t('trophies.shelf_title')}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setTrophiesExpanded((v) => !v)}
+                className="text-xs font-extrabold text-ink-700 hover:text-ink-900"
+              >
+                {trophiesExpanded
+                  ? t('trophies.collapse')
+                  : t('trophies.view_all', { earned: myTrophies.length, total: trophyCatalog.length })}
+              </button>
+            </div>
+            {!trophiesExpanded ? (
+              myTrophies.length === 0 ? (
+                <p className="text-sm text-muted">{t('trophies.empty_own')}</p>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  {myTrophies.slice(0, 4).map((tr) => (
+                    <TrophyCard key={tr.trophy_key} trophyKey={tr.trophy_key} category={tr.category} rarity={tr.rarity} earned rarityPct={tr.rarity_pct} />
+                  ))}
+                </div>
+              )
+            ) : (
+              <div className="space-y-4">
+                {/* Progresso global da estante */}
+                <div>
+                  <div className="h-1.5 rounded-full bg-ink-50 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-lime-400"
+                      style={{ width: `${Math.round((myTrophies.length / Math.max(trophyCatalog.length, 1)) * 100)}%` }}
+                    />
+                  </div>
+                  <p className="mt-1 text-[11px] text-muted text-right tabular-nums">
+                    {t('trophies.progress', { earned: myTrophies.length, total: trophyCatalog.length })}
+                  </p>
+                </div>
+                {CATEGORY_ORDER.map((cat) => {
+                  const earnedByKey = new Map(myTrophies.map((tr) => [tr.trophy_key, tr]))
+                  // Ganhos primeiro dentro da categoria — a colheita à
+                  // frente, o "por conquistar" a seguir.
+                  const inCat = trophyCatalog
+                    .filter((c) => c.category === cat)
+                    .sort((a, b) => (earnedByKey.has(b.key) ? 1 : 0) - (earnedByKey.has(a.key) ? 1 : 0) || a.sort - b.sort)
+                  if (inCat.length === 0) return null
+                  const earnedInCat = inCat.filter((c) => earnedByKey.has(c.key)).length
+                  return (
+                    <div key={cat}>
+                      <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mb-2">
+                        {t(`trophies.cat_${cat}`)}
+                        <span className="ml-1.5 normal-case tracking-normal font-mono">{earnedInCat}/{inCat.length}</span>
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {inCat.map((c) => {
+                          const mine = earnedByKey.get(c.key)
+                          return (
+                            <TrophyCard key={c.key} trophyKey={c.key} category={c.category} rarity={c.rarity} earned={!!mine} rarityPct={mine?.rarity_pct} />
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         )}
 

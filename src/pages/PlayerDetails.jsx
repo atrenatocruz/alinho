@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, Trophy, Target, Award, Swords, ChevronDown, UserPlus, UserCheck, Clock, Lock, ShieldCheck } from 'lucide-react'
+import { ArrowLeft, Trophy, Target, Award, Swords, ChevronDown, UserPlus, UserCheck, Clock, Lock, ShieldCheck, ThumbsUp } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { PrimaryButton, EmptyState, Avatar, RankBadge, RatingBadge, PhotoViewerModal } from '../components/ui'
-import { formatRating } from '../lib/elo'
+import { PrimaryButton, EmptyState, Avatar, RankBadge, RatingBadge, PhotoViewerModal, TrophyCard } from '../components/ui'
+import { formatRating, isProvisional } from '../lib/elo'
 import { winRatePct } from '../lib/statsLogic'
 import { sendFriendRequest, acceptFriendRequest, removeFriendRequest } from '../lib/friends'
 import { getGlobalRankings } from '../lib/privateMatches'
@@ -36,6 +36,8 @@ export default function PlayerDetails() {
   const [expandedMixes, setExpandedMixes] = useState(new Set())
   const [globalRank, setGlobalRank] = useState(null)
   const [globalEntry, setGlobalEntry] = useState(null)
+  const [playerXp, setPlayerXp] = useState(null)
+  const [playerTrophies, setPlayerTrophies] = useState([])
 
   const toggleMix = (gameId) => {
     setExpandedMixes((prev) => {
@@ -51,7 +53,28 @@ export default function PlayerDetails() {
     loadH2h()
     loadMatchHistory()
     loadGlobalRank()
+    loadXp()
   }, [id])
+
+  // RPC dedicado em vez de estender get_player_profile (7 versões no repo)
+  // — o escudo de assiduidade é público por design.
+  const loadXp = async () => {
+    try {
+      const { data, error } = await supabase.rpc('get_player_xp', { p_user_id: id })
+      if (error) throw error
+      setPlayerXp(data?.[0] || null)
+    } catch (error) {
+      console.error('Error loading player xp:', error)
+    }
+    try {
+      const { data, error } = await supabase.rpc('get_player_trophies', { p_user_id: id })
+      if (error) throw error
+      setPlayerTrophies(data || [])
+    } catch (error) {
+      // Fail-soft: sem migração, a estante não aparece.
+      console.error('Error loading player trophies:', error)
+    }
+  }
 
   const loadGlobalRank = async () => {
     try {
@@ -272,7 +295,7 @@ export default function PlayerDetails() {
             aria-label={player.avatar_url ? t('playerdetails.view_photo_aria') : undefined}
             className="w-20 h-20 mx-auto mb-3 block"
           >
-            <Avatar name={player.name} url={player.avatar_url} size="w-20 h-20 text-3xl" colorClass="bg-lime-400 text-ink-900" />
+            <Avatar name={player.name} url={player.avatar_url} size="w-20 h-20 text-3xl" colorClass="bg-lime-400 text-ink-900" xp={playerXp?.xp} lastPlayedAt={playerXp?.last_played_at} provisional={isProvisional(globalEntry?.rating_games)} />
           </button>
           {showPhoto && (
             <PhotoViewerModal url={player.avatar_url} alt={player.name} onClose={() => setShowPhoto(false)} />
@@ -295,6 +318,11 @@ export default function PlayerDetails() {
           )}
           <p className="text-white/60 text-xs mt-2.5">
             {t('playerdetails.friends_count', { count: player.friends_count })}
+            {(playerXp?.kudos ?? 0) > 0 && (
+              <span className="inline-flex items-center gap-1 ml-2.5 align-middle">
+                <ThumbsUp size={11} className="text-lime-400" /> {playerXp.kudos}
+              </span>
+            )}
           </p>
           {!player.my_profile && (
             player.friendship_status === 'friends' ? (
@@ -352,6 +380,21 @@ export default function PlayerDetails() {
               <p className="text-xs text-muted">{label}</p>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Estante de troféus — só os ganhos, com a mesma gate de
+          privacidade das stats (resultsHidden). */}
+      {!resultsHidden && playerTrophies.length > 0 && (
+        <div className="card">
+          <h3 className="text-lg text-ink-900 mb-3 flex items-center gap-2">
+            <Trophy size={20} className="text-lime-600" /> {t('trophies.shelf_title')}
+          </h3>
+          <div className="grid grid-cols-2 gap-2">
+            {playerTrophies.map((tr) => (
+              <TrophyCard key={tr.trophy_key} trophyKey={tr.trophy_key} category={tr.category} rarity={tr.rarity} earned rarityPct={tr.rarity_pct} />
+            ))}
+          </div>
         </div>
       )}
 

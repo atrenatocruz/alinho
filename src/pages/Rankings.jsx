@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Trophy, Award, Calendar, ChevronDown } from 'lucide-react'
+import { Trophy, Award, Calendar, ChevronDown, HelpCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { RatingBadge, GroupLevelBadge, EmptyState, Avatar, Select } from '../components/ui'
-import { formatRating } from '../lib/elo'
+import { formatRating, formatRatingMaybeProvisional, isProvisional } from '../lib/elo'
+import { tierFromXp, formatXp } from '../lib/xp'
 import { winRatePct, buildMonthlyLeaderboard } from '../lib/statsLogic'
 import { getGlobalRankings } from '../lib/privateMatches'
 import { getOrganizationRankings } from '../lib/organizations'
@@ -19,6 +20,7 @@ const TABS = [
   { key: 'global', labelKey: 'rankings.tab_global' },
   { key: 'geral', labelKey: 'rankings.tab_by_club' },
   { key: 'mensal', labelKey: 'rankings.tab_monthly' },
+  { key: 'assiduidade', labelKey: 'rankings.tab_assiduity' },
 ]
 
 export default function Rankings() {
@@ -49,6 +51,26 @@ export default function Rankings() {
   const [orgRankings, setOrgRankings] = useState([])
   const [orgRankingsLoading, setOrgRankingsLoading] = useState(true)
 
+  // Assiduidade (XP) — 'global' ou um organization_id
+  const [xpScope, setXpScope] = useState('global')
+  const [xpRankings, setXpRankings] = useState([])
+  const [xpLoading, setXpLoading] = useState(false)
+
+  useEffect(() => {
+    if (tab !== 'assiduidade') return
+    let cancelled = false
+    setXpLoading(true)
+    supabase
+      .rpc('get_xp_rankings', { p_organization_id: xpScope === 'global' ? null : xpScope })
+      .then(({ data, error }) => {
+        if (cancelled) return
+        if (error) console.error('Error loading xp rankings:', error)
+        setXpRankings(data || [])
+        setXpLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [tab, xpScope])
+
   useEffect(() => {
     // The global ranking and the club/group ranking are both org-independent
     // — they have to load even for a user who isn't in any club, and
@@ -70,7 +92,7 @@ export default function Rankings() {
   const loadMembershipMap = async () => {
     const { data, error } = await supabase
       .from('memberships')
-      .select('user_id, is_guest, level, profile:profiles(name, avatar_url, rating, gender)')
+      .select('user_id, is_guest, level, profile:profiles(name, avatar_url, rating, gender, rating_games)')
       .eq('organization_id', currentOrganizationId)
     if (error) throw error
     return new Map((data || []).map((m) => [m.user_id, m]))
@@ -95,6 +117,7 @@ export default function Rankings() {
             ...stat,
             user: { name: m.profile?.name, level: m.level },
             rating: m.profile?.rating ?? null,
+            rating_games: m.profile?.rating_games,
             gender: m.profile?.gender,
             gamesPlayed: played,
             winRate: winRatePct(stat.game_wins || 0, played),
@@ -186,7 +209,12 @@ export default function Rankings() {
         {tab === 'geral' && memberships.length <= 1 && (
           <p className="text-muted text-sm mb-0.5">{currentOrganization?.name}</p>
         )}
-        <h2 className="text-3xl text-ink-900">{t('rankings.title')}</h2>
+        <h2 className="text-3xl text-ink-900 inline-flex items-center gap-2">
+          {t('rankings.title')}
+          <Link to="/instrucoes#ranking" aria-label={t('rankings.help_aria')} className="text-muted hover:text-ink-900">
+            <HelpCircle size={18} />
+          </Link>
+        </h2>
       </div>
 
       {/* Sections — Jogadores vs Clubes & Grupos */}
@@ -286,10 +314,12 @@ export default function Rankings() {
                       <div className="flex items-center gap-1.5 justify-end">
                         <Trophy size={16} className="text-lime-600" />
                         <span className="text-2xl font-extrabold text-ink-900 tabular-nums">
-                          {formatRating(player.rating)}
+                          {formatRatingMaybeProvisional(player.rating, player.rating_games)}
                         </span>
                       </div>
-                      <p className="text-[11px] text-muted">{t('rankings.points_label')}</p>
+                      <p className={`text-[11px] ${isProvisional(player.rating_games) ? 'text-lime-600 font-extrabold' : 'text-muted'}`}>
+                        {isProvisional(player.rating_games) ? t('rankings.provisional_label') : t('rankings.points_label')}
+                      </p>
                     </div>
                   </div>
 
@@ -427,8 +457,10 @@ export default function Rankings() {
                       </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <span className="text-2xl font-extrabold text-ink-900 tabular-nums">{formatRating(player.rating)}</span>
-                      <p className="text-[11px] text-muted">{t('rankings.points_label')}</p>
+                      <span className="text-2xl font-extrabold text-ink-900 tabular-nums">{formatRatingMaybeProvisional(player.rating, player.rating_games)}</span>
+                      <p className={`text-[11px] ${isProvisional(player.rating_games) ? 'text-lime-600 font-extrabold' : 'text-muted'}`}>
+                        {isProvisional(player.rating_games) ? t('rankings.provisional_label') : t('rankings.points_label')}
+                      </p>
                     </div>
                   </div>
                 </Link>
@@ -436,6 +468,75 @@ export default function Rankings() {
             })}
           </div>
         )
+      )}
+
+      {/* ─── Assiduidade (XP) ───────────────────────────────────────────── */}
+      {tab === 'assiduidade' && (
+        <>
+          {/* Âmbito: Global ou um dos clubes do utilizador (soma do ledger
+              dessa organização). O escudo/nível mostrado é sempre o global
+              — o âmbito só muda a ordenação/valores da lista. */}
+          <Select
+            value={xpScope}
+            onChange={setXpScope}
+            options={[
+              { value: 'global', label: t('rankings.assiduity_scope_global') },
+              ...memberships.map((m) => ({ value: m.organization_id, label: m.organization?.name || '' })),
+            ]}
+          />
+          {xpLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
+            </div>
+          ) : xpRankings.length === 0 ? (
+            <EmptyState
+              icon={Award}
+              title={t('rankings.empty_assiduity_title')}
+              subtitle={t('rankings.empty_assiduity_subtitle')}
+            />
+          ) : (
+            <div className="space-y-3">
+              {xpRankings.map((player, index) => {
+                const isMe = player.user_id === user.id
+                const tier = tierFromXp(player.xp)
+                return (
+                  <Link
+                    key={player.user_id}
+                    to={`/jogador/${player.user_id}`}
+                    className={`card press block hover:shadow-lift relative overflow-hidden ${index === 0 ? 'ring-2 ring-lime-400' : ''}`}
+                  >
+                    {isMe && <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-lime-400" />}
+                    <div className="flex items-center gap-3.5">
+                      <div className={`w-11 h-11 rounded-ctrl flex items-center justify-center font-extrabold text-lg shrink-0 tabular-nums ${positionStyle(index)}`}>
+                        {index + 1}
+                      </div>
+                      <Avatar name={player.name} url={player.avatar_url} size="w-10 h-10 text-sm" xp={player.xp} lastPlayedAt={player.last_played_at} />
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-base text-ink-900 truncate">
+                          {player.name}
+                          {isMe && (
+                            <span className="ml-1.5 text-[11px] font-extrabold uppercase tracking-wide text-lime-600">
+                              {t('rankings.you_badge')}
+                            </span>
+                          )}
+                        </h3>
+                        {tier && (
+                          <p className="text-[11px] text-muted mt-0.5">
+                            {t('profile.xp_level', { level: tier.level })} · {t(tier.labelKey)}
+                          </p>
+                        )}
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="text-2xl font-extrabold text-ink-900 tabular-nums">{formatXp(player.xp)}</span>
+                        <p className="text-[11px] text-muted">{t('rankings.xp_label')}</p>
+                      </div>
+                    </div>
+                  </Link>
+                )
+              })}
+            </div>
+          )}
+        </>
       )}
       </>
       )}

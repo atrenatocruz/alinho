@@ -17,7 +17,7 @@ npm start
 
 On first run it prints a QR code in the terminal — scan it with the bot's WhatsApp (Linked devices). The session is saved to `./baileys-auth/` (gitignored) so you don't need to rescan on every restart.
 
-Once connected, it logs every group the account is in, with its JID — copy the target group's JID into `settings.whatsapp_group_jid` in Supabase.
+Once connected, it logs every group the account is in, with its JID. Register each group the bot should serve in the `whatsapp_groups` table (see `supabase/migration_whatsapp_groups.sql` for INSERT examples) — one bot account can serve **several groups, each mapped to its own club or standalone friend group** (any `organizations` row) and optionally to a level filter (`levels`, e.g. `ARRAY['M6','M5']`). Several bot processes (different WhatsApp numbers) can share the same table: each process only serves the rows whose group its own account is actually in. Just don't split one club's groups across different bot accounts — reminders/auto-start are per club and the processes would race. The old single-group `organizations.whatsapp_group_jid` column still works as a fallback (with `ORGANIZATION_ID` set) when the table is empty, but new setups should use `whatsapp_groups`.
 
 ## Deploying to Fly.io
 

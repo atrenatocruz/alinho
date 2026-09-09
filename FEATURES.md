@@ -55,7 +55,8 @@ What alinho actually does today, and what's explicitly not built yet. Kept in sy
 ## Private matches
 
 - 2x2 games outside any club, created and joined via a shareable link (`/jogos-privados`), gated behind a feature flag any club admin can toggle for the whole app. Changing global feature flags requires platform admin.
-- Contributes to a separate "private" ranking track, combined with club points into a global total.
+- **Count toward the global Elo rating** (same math as mixes via the shared `apply_elo_pairing` core, no merit bonus) — the per-game delta shows in the match history. Results require **cross-team confirmation**: any player submits the score, a player from the opposing team confirms, and that confirmation closes the game and applies the points. Games confirmed before this shipped keep their old flat points only.
+- Also contributes flat points to a separate "private" track, combined with club points into a global total.
 
 ## Rankings & stats
 
@@ -65,7 +66,10 @@ What alinho actually does today, and what's explicitly not built yet. Kept in sy
 - The **Geral** (global) and **Por Clube** ranking tabs order by Elo rating; `total_points` (attendance-flavored) still accumulates and drives the Mensal tab. The global tab only counts `is_global` clubs' points, so a private club's numbers don't leak into a ranking non-members can see.
 - The **Clubes & Grupos** ranking shows and orders by a club's **average Elo level**, not its hidden points total.
 - Per-mix leaderboard orders by that mix's Elo swing (`rating_delta`), falling back to points/wins for mixes finalized before the Elo rollout.
+- **Kudos ("👍 da noite")**: after a mix ends, each participant can give one thumbs-up to a teammate of choice (48h window, all guards in Postgres — one vote per mix, no self-votes, participants only). Each kudos received = +1 XP (symbolic; the visible recognition is the point). Podium shows on the finished mix, and received-kudos totals show on profiles, Strava-style.
+- **Trophy shelf**: 47 achievements (pt-PT padel-flavored names) across play, wins, friendlies, Elo/XP progression, kudos and tenure, with 4 rarity tiers (comum/raro/épico/lendário) and a live "% of players have this" stat (PSN-style). Awarding is a pure function of existing state (`check_and_award_trophies`, idempotent, hooked into finalize/confirm/kudos RPCs; history backfilled). Shelf on own profile (4 most recent + full grid with locked criteria visible) and earned-only grid on public profiles. `evento` category exists for sponsored trophies, hand-awarded via platform-admin RPC.
 - Per-player stats: matches played/won, points, mix wins — configurable points-per-action per club (`organizations.points_rules`).
+- **XP / assiduidade**: global per-player XP (`profiles.xp` + `xp_events` ledger) rewarding dedication — mix participation 20, 5 per game, mix win 30, friendly 10 (+5 win) — written only inside `finalize_mix`/`confirm_private_match` with idempotent constraints. 10 shield levels from Iniciado (50 XP) to World Class (20,000 XP ≈ 3 years at 5x/week), shown as a colored ring on avatars (glowing when the player played in the last 7 days), an XP bar on the profile, and an "Assiduidade" leaderboard tab (global or per-club via the ledger). Historical games were backfilled — XP is additive, unlike Elo.
 - Unified player profile page (`/jogador/:id`) — one identity across every club a person plays in, showing preferred playing side. A Ranking Global card in Profile jumps to the player's own position.
 
 ## WhatsApp bot

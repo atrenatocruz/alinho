@@ -5,6 +5,8 @@ import { useTranslation } from 'react-i18next'
 import { MapPin, CheckCircle2, ChevronRight, ChevronDown, ChevronLeft, Lock, Play, Calendar, X, Share2, MessageCircle, Link2, ImageDown, Trophy, Repeat, Euro, Swords, Users } from 'lucide-react'
 import ShareCard, { CARD_W, CARD_H } from './ShareCard'
 import { ratingBand, groupRatingBand } from '../lib/elo'
+import { tierFromXp, isGlowing, GLOW_CLASS } from '../lib/xp'
+import { trophyIcon, RARITY_META } from '../lib/trophies'
 import { formatDate, formatTime, formatCurrency } from '../lib/formatDate'
 import { FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY } from '../lib/mixLogic'
 
@@ -479,13 +481,89 @@ export function GuestBadge({ size = 'sm', label, isTest = false }) {
    colored-circle-with-initial. `size` carries width/height/text-size (and
    any extra utility classes a call site needs, e.g. a ring); `colorClass`
    is the fallback bg/text pair — each call site keeps its own current
-   look for people with no photo yet. */
-export function Avatar({ name, url, size = 'w-10 h-10 text-sm', colorClass = 'bg-ink-700 text-white' }) {
-  const base = `${size} rounded-full flex items-center justify-center shrink-0 font-extrabold overflow-hidden`
-  if (url) {
-    return <img src={url} alt={name || ''} className={`${base} object-cover`} />
+   look for people with no photo yet.
+
+   Escudo de assiduidade (XP): passa `xp` (e `lastPlayedAt`) e o avatar
+   ganha o anel do nível + brilho se a pessoa jogou nos últimos 7 dias.
+   Default null = sem escudo, todos os call sites existentes intactos.
+   Call sites que já passam um ring próprio no `size` (PlayerAvatarRow)
+   não devem passar `xp` — dois rings sobrepõem-se. */
+export function Avatar({ name, url, size = 'w-10 h-10 text-sm', colorClass = 'bg-ink-700 text-white', xp = null, lastPlayedAt = null, provisional = false }) {
+  const { t } = useTranslation()
+  let shield = ''
+  if (xp != null) {
+    const tier = tierFromXp(xp)
+    if (tier) {
+      shield = ` ${tier.ringClass}${isGlowing(lastPlayedAt) ? ` ${GLOW_CLASS}` : ''}`
+    }
   }
-  return <div className={`${base} ${colorClass}`}>{(name || '?').charAt(0).toUpperCase()}</div>
+  const base = `${size} rounded-full flex items-center justify-center shrink-0 font-extrabold overflow-hidden${shield}`
+  const core = url
+    ? <img src={url} alt={name || ''} className={`${base} object-cover`} />
+    : <div className={`${base} ${colorClass}`}>{(name || '?').charAt(0).toUpperCase()}</div>
+
+  // Jogador provisório (<8 jogos de Elo): mini-pill "NOVO" sobre a borda
+  // inferior — só quando pedido, para não mudar o layout dos ~40 call
+  // sites existentes.
+  if (!provisional) return core
+  return (
+    <span className="relative inline-flex shrink-0">
+      {core}
+      <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-px rounded-full bg-lime-400 text-ink-900 text-[8px] leading-tight font-mono font-extrabold tracking-wide uppercase whitespace-nowrap ring-1 ring-surface">
+        {t('elo.provisional_short')}
+      </span>
+    </span>
+  )
+}
+
+/* ─── TrophyCard ─────────────────────────────────────────────────────────
+   Um troféu da estante: moldura e cores pela raridade (RARITY_META),
+   ícone por key (trophyIcon), nome/descrição dos locales. Bloqueado =
+   silhueta com cadeado e o critério visível (a descrição É o critério) —
+   o "para onde subir". rarityPct = % de jogadores que o têm (PSN-style). */
+export function TrophyCard({ trophyKey, category, rarity, earned = false, rarityPct = null }) {
+  const { t } = useTranslation()
+  const Icon = trophyIcon(trophyKey, category)
+  const meta = RARITY_META[rarity] || RARITY_META.comum
+
+  // GANHO grita, BLOQUEADO sussurra: o ganho tem medalhão preenchido da
+  // cor da raridade, borda sólida e brilho nos tiers altos; o bloqueado é
+  // tracejado, tudo cinza, com o cadeado dentro do medalhão — ninguém
+  // confunde os dois numa grelha mista.
+  if (!earned) {
+    return (
+      <div className="rounded-ctrl border border-dashed border-ink-200 bg-canvas p-3 text-center">
+        <span className="inline-flex w-11 h-11 rounded-full bg-ink-50 items-center justify-center">
+          <Lock size={16} className="text-ink-200" />
+        </span>
+        <p className="mt-1.5 text-[12px] font-extrabold text-muted leading-tight">{t(`trophies.${trophyKey}_name`)}</p>
+        <p className="mt-0.5 text-[10px] text-ink-200 leading-tight">{t(`trophies.${trophyKey}_desc`)}</p>
+        <div className="mt-1.5">
+          <span className="px-1.5 py-px rounded-full text-[9px] font-mono font-extrabold uppercase tracking-wide bg-ink-50 text-muted">
+            {t(meta.labelKey)}
+          </span>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className={`rounded-ctrl border-2 p-3 text-center bg-surface ${meta.frame} ${meta.glow}`}>
+      <span className={`inline-flex w-11 h-11 rounded-full items-center justify-center ${meta.medal}`}>
+        <Icon size={22} className={meta.icon} />
+      </span>
+      <p className="mt-1.5 text-[12px] font-extrabold text-ink-900 leading-tight">{t(`trophies.${trophyKey}_name`)}</p>
+      <p className="mt-0.5 text-[10px] text-muted leading-tight">{t(`trophies.${trophyKey}_desc`)}</p>
+      <div className="mt-1.5 flex items-center justify-center gap-1.5">
+        <span className={`px-1.5 py-px rounded-full text-[9px] font-mono font-extrabold uppercase tracking-wide ${meta.pill}`}>
+          {t(meta.labelKey)}
+        </span>
+        {rarityPct != null && (
+          <span className="text-[9px] text-muted tabular-nums">{t('trophies.rarity_pct', { pct: rarityPct })}</span>
+        )}
+      </div>
+    </div>
+  )
 }
 
 /* ─── PhotoViewerModal ───────────────────────────────────────────────────

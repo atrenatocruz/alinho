@@ -1,5 +1,5 @@
 import { supabase } from './supabase.js'
-import { getSettings } from './settings.js'
+import { getGroupByJid, mixVisibleToGroup } from './groups.js'
 import { loadGame, getOpenMixes, formatDateTime } from './roster.js'
 import { resolveProfileByPhoneJid, createGuestProfile } from './phone.js'
 import { config } from './config.js'
@@ -84,21 +84,25 @@ function formatMixLine(mix, lang) {
  */
 export async function handleGroupMessage({ groupJid, senderPn, text, message }, { sendText }) {
   // Gate on hardcoded, in-memory checks first — normal group chatter never
-  // matches either of these, so it never touches the DB (getSettings used
-  // to run unconditionally here, costing every message a query).
+  // matches either of these, so it never touches the DB (the group lookup
+  // used to run unconditionally here, costing every message a query).
   const pending = getPendingConfirmation(senderPn, groupJid)
   const parsed = parseCommand(text)
   if (!pending && !parsed) return
 
-  const settings = await getSettings()
-  if (!settings.whatsapp_group_jid || groupJid !== settings.whatsapp_group_jid) return
+  // Multi-grupo: o grupo de onde a mensagem veio determina o clube (e o
+  // filtro de nível) de TUDO o resto deste handler. Grupo não mapeado em
+  // whatsapp_groups → silêncio, como o gate antigo de JID único.
+  const group = await getGroupByJid(groupJid)
+  if (!group) return
+  const organizationId = group.organizationId
 
   // Resolved once, up front, and reused for the rest of this handler — every
   // reply below is addressed to this one sender specifically (unlike the
   // group broadcasts in roster.js/sync.js/reminders.js/autostart.js), so it
   // always uses their own profiles.language. An unresolved sender (not
   // found, or a fresh guest about to be created) falls back to 'pt'.
-  const resolvedProfile = await resolveProfileByPhoneJid(senderPn)
+  const resolvedProfile = await resolveProfileByPhoneJid(senderPn, organizationId)
   const lang = resolvedProfile?.language ?? 'pt'
 
   // Quote the sender's own message so a reply is unambiguous even when
@@ -120,7 +124,7 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message }, 
   async function requireProfileOrCreateGuest(profile, senderPnForGuest) {
     if (profile) return { profile, isNewGuest: false }
     try {
-      const created = await createGuestProfile(senderPnForGuest, message?.pushName)
+      const created = await createGuestProfile(senderPnForGuest, message?.pushName, organizationId)
       return { profile: created, isNewGuest: true }
     } catch (err) {
       console.error('Failed to create guest profile:', err)
@@ -190,7 +194,9 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message }, 
   }
 
   // resolvedProfile was already fetched once, up front, alongside lang.
-  const openMixes = await getOpenMixes()
+  // Só os mixes do clube deste grupo, filtrados pelo nível do grupo — um
+  // "In" aqui nunca pode inscrever alguém num mix que o grupo não vê.
+  const openMixes = (await getOpenMixes(organizationId)).filter((mix) => mixVisibleToGroup(mix, group))
   if (openMixes.length === 0) {
     await reply('no_open_mixes')
     return

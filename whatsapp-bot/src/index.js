@@ -1,6 +1,7 @@
 import http from 'node:http'
 import { config } from './config.js'
 import { connectWhatsApp } from './wa.js'
+import { setParticipatingJidsProvider } from './groups.js'
 import { handleGroupMessage } from './commands.js'
 import { startSync } from './sync.js'
 import { startReminders } from './reminders.js'
@@ -16,7 +17,7 @@ async function main() {
   // capacidade. O .catch dentro da cadeia mantém a fila viva após um erro.
   let messageQueue = Promise.resolve()
 
-  const { sendText, getGroupMentions } = await connectWhatsApp({
+  const { sendText, getGroupMentions, getParticipatingGroupJids } = await connectWhatsApp({
     onGroupMessage: (payload) => {
       messageQueue = messageQueue.then(() =>
         handleGroupMessage(payload, { sendText }).catch((err) => {
@@ -25,6 +26,11 @@ async function main() {
       )
     },
   })
+
+  // Este processo só serve os grupos da tabela whatsapp_groups em que a
+  // SUA conta WhatsApp está — permite vários bots (números) sobre a mesma
+  // base de dados sem pisarem os grupos uns dos outros (ver groups.js).
+  setParticipatingJidsProvider(getParticipatingGroupJids)
 
   startSync({ sendText, getGroupMentions })
   startReminders({ sendText, getGroupMentions })

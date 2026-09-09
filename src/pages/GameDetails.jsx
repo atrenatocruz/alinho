@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useTranslation, Trans } from 'react-i18next'
-import { Calendar, MapPin, ArrowLeft, UserPlus, User, Check, Lock, Trophy, Play, ChevronRight, Swords, X, Repeat, Share2, ChevronDown, RotateCcw, Euro, GripVertical, Pencil, History } from 'lucide-react'
+import { Calendar, MapPin, ArrowLeft, UserPlus, User, Check, Lock, Trophy, Play, ChevronRight, Swords, X, Repeat, Share2, ChevronDown, RotateCcw, Euro, GripVertical, Pencil, History, ThumbsUp } from 'lucide-react'
 import { DndContext, useDraggable, useDroppable, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { supabase } from '../lib/supabase'
@@ -13,6 +13,7 @@ import {
   roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches,
   PHASE_LABEL_KEY, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY,
 } from '../lib/mixLogic'
+import { isProvisional } from '../lib/elo'
 import { winRatePct, firstLastName } from '../lib/statsLogic'
 import { getGlobalRankings } from '../lib/privateMatches'
 import { formatDate as formatDateLib, formatCurrency } from '../lib/formatDate'
@@ -73,6 +74,9 @@ export default function GameDetails() {
   const [mixError, setMixError] = useState('')
   const [busy, setBusy] = useState(false)
   const [scores, setScores] = useState({}) // matchId -> {a, b}
+  // 👍 da noite (kudos) — pódio do mix + o meu voto, lidos por RPC.
+  const [kudos, setKudos] = useState([])
+  const [kudosGiving, setKudosGiving] = useState(false)
   const [editingPairs, setEditingPairs] = useState(false)
   const [editedTeams, setEditedTeams] = useState([]) // staged copy of `teams`, only written to DB on Concluir
   const [activeDragChip, setActiveDragChip] = useState(null) // { teamId, slot, player } — for the drag overlay
@@ -96,6 +100,37 @@ export default function GameDetails() {
   const [historyOpen, setHistoryOpen] = useState(false)
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyError, setHistoryError] = useState(false)
+
+  const loadKudos = async () => {
+    const { data, error } = await supabase.rpc('get_mix_kudos', { p_game_id: id })
+    if (error) {
+      console.error('Error loading kudos:', error)
+      return
+    }
+    setKudos(data || [])
+  }
+
+  useEffect(() => {
+    if (game?.status === 'finished') loadKudos()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game?.status, id])
+
+  const handleGiveKudos = async (recipientId) => {
+    setKudosGiving(true)
+    try {
+      const { error } = await supabase.rpc('give_mix_kudos', { p_game_id: id, p_recipient_id: recipientId })
+      if (error) throw error
+      await loadKudos()
+    } catch (error) {
+      console.error('Error giving kudos:', error)
+      // As RAISE EXCEPTION do RPC já vêm em português e explicam a causa
+      // ("Já deste o teu kudos…", "Só quem jogou…") — mostrar isso em vez
+      // de um genérico que esconde o problema.
+      alert(error?.message || t('gamedetails.kudos_error'))
+    } finally {
+      setKudosGiving(false)
+    }
+  }
 
   useEffect(() => {
     loadGameDetails()
@@ -151,8 +186,8 @@ export default function GameDetails() {
         .from('participants')
         .select(`
           *,
-          user:profiles!participants_user_id_fkey (id, name, preferred_side, avatar_url),
-          partner:profiles!participants_partner_id_fkey (id, name, preferred_side, avatar_url)
+          user:profiles!participants_user_id_fkey (id, name, preferred_side, avatar_url, xp, last_played_at, rating_games),
+          partner:profiles!participants_partner_id_fkey (id, name, preferred_side, avatar_url, xp, last_played_at, rating_games)
         `)
         .eq('game_id', id)
         .in('status', ['confirmed', 'waitlisted'])
@@ -1281,6 +1316,79 @@ export default function GameDetails() {
         </div>
       )}
 
+      {/* 👍 da noite — cada participante dá 1 kudos a um colega do mix
+          (+1 XP para quem recebe; guardas todas no RPC). Janela: 48h após
+          a data do mix. Visível como pódio depois disso. */}
+      {game.status === 'finished' && (() => {
+        const seen = new Set()
+        const people = []
+        for (const p of participants) {
+          if (p.status !== 'confirmed') continue
+          for (const [pid, person] of [[p.user_id, p.user], [p.partner_id, p.partner]]) {
+            if (pid && person && !seen.has(pid)) {
+              seen.add(pid)
+              people.push({ id: pid, name: person.name, avatar_url: person.avatar_url })
+            }
+          }
+        }
+        const iPlayed = seen.has(profile?.id)
+        const windowOpen = new Date(game.date).getTime() + 48 * 3600 * 1000 > Date.now()
+        const iVoted = kudos.some((r) => r.my_vote)
+        const canVote = iPlayed && windowOpen && !iVoted
+        const byId = new Map(kudos.map((r) => [r.recipient_id, r]))
+        const rows = canVote
+          ? people
+              .filter((x) => x.id !== profile?.id)
+              .sort((a, b) => (byId.get(b.id)?.kudos_count || 0) - (byId.get(a.id)?.kudos_count || 0))
+          : kudos.map((r) => ({ id: r.recipient_id, name: r.name, avatar_url: r.avatar_url }))
+        if (rows.length === 0) return null
+        return (
+          <div className="card">
+            <div className="flex items-center gap-2 mb-1">
+              <ThumbsUp size={18} className="text-lime-600" />
+              <h3 className="text-lg text-ink-900">{t('gamedetails.kudos_title')}</h3>
+            </div>
+            <p className="text-[11px] text-muted mb-3">
+              {canVote ? t('gamedetails.kudos_hint') : t('gamedetails.kudos_podium_hint')}
+            </p>
+            <div className="space-y-2">
+              {rows.map((person) => {
+                const entry = byId.get(person.id)
+                return (
+                  <div key={person.id} className="flex items-center gap-3">
+                    <Avatar name={person.name} url={person.avatar_url} size="w-9 h-9 text-xs" />
+                    <p className="flex-1 min-w-0 text-sm font-extrabold text-ink-900 truncate">
+                      {person.name}
+                      {entry?.my_vote && (
+                        <span className="ml-1.5 text-[10px] font-extrabold uppercase tracking-wide text-lime-600">
+                          {t('gamedetails.kudos_your_vote')}
+                        </span>
+                      )}
+                    </p>
+                    {(entry?.kudos_count || 0) > 0 && (
+                      <span className="shrink-0 inline-flex items-center gap-1 text-sm font-extrabold text-ink-900 tabular-nums">
+                        <ThumbsUp size={13} className="text-lime-600" /> {entry.kudos_count}
+                      </span>
+                    )}
+                    {canVote && (
+                      <button
+                        type="button"
+                        onClick={() => handleGiveKudos(person.id)}
+                        disabled={kudosGiving}
+                        aria-label={t('gamedetails.kudos_button_aria', { name: person.name })}
+                        className="shrink-0 w-9 h-9 rounded-full bg-ink-50 text-ink-700 hover:bg-lime-400 hover:text-ink-900 flex items-center justify-center transition-colors duration-fast disabled:opacity-40"
+                      >
+                        <ThumbsUp size={16} />
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Tabs — a finished mix's results (stats, duplas, rounds) are shown
           one section at a time instead of stacked in a continuous scroll.
           Matches the tab-bar pattern from Comunidade.jsx. */}
@@ -1918,7 +2026,7 @@ export default function GameDetails() {
                 >
                   {person.is_guest ? (
                     <>
-                      <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" />
+                      <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" xp={person.xp} lastPlayedAt={person.last_played_at} provisional={isProvisional(person.rating_games)} />
                       <div className="flex-1 min-w-0">
                         <p className="font-extrabold text-ink-900 truncate">
                           {person.name}
@@ -1933,7 +2041,7 @@ export default function GameDetails() {
                     </>
                   ) : (
                     <Link to={`/jogador/${person.id}`} className="flex items-center gap-3 flex-1 min-w-0">
-                      <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" />
+                      <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" xp={person.xp} lastPlayedAt={person.last_played_at} provisional={isProvisional(person.rating_games)} />
                       <div className="flex-1 min-w-0">
                         <p className="font-extrabold text-ink-900 truncate">
                           {person.name}
@@ -1980,7 +2088,7 @@ export default function GameDetails() {
                 <span className="w-6 text-center font-extrabold text-muted text-sm shrink-0">{ordinal(idx + 1)}</span>
                 {person.is_guest ? (
                   <>
-                    <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" />
+                    <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" xp={person.xp} lastPlayedAt={person.last_played_at} provisional={isProvisional(person.rating_games)} />
                     <div className="flex-1 min-w-0">
                       <p className="font-extrabold text-ink-900 truncate">
                         {person.name}
@@ -1995,7 +2103,7 @@ export default function GameDetails() {
                   </>
                 ) : (
                   <Link to={`/jogador/${person.id}`} className="flex items-center gap-3 flex-1 min-w-0">
-                    <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" />
+                    <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" xp={person.xp} lastPlayedAt={person.last_played_at} provisional={isProvisional(person.rating_games)} />
                     <div className="flex-1 min-w-0">
                       <p className="font-extrabold text-ink-900 truncate">
                         {person.name}

@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom'
 import { useTranslation, Trans } from 'react-i18next'
-import { ArrowLeft, HelpCircle, Users, Calendar, Trophy, Settings } from 'lucide-react'
+import { ArrowLeft, HelpCircle, Users, Calendar, Trophy, Settings, TrendingUp, Shield } from 'lucide-react'
 import { Wordmark } from '../components/Layout'
+import { XP_TIERS, formatXp } from '../lib/xp'
 
 export default function Instructions() {
   const { t } = useTranslation()
@@ -228,6 +229,57 @@ export default function Instructions() {
               {t('instructions.card_edit_profile_body')}
             </p>
           </div>
+        </div>
+
+        {/* Como funciona o ranking (Elo) — explicação qualitativa, de
+            propósito sem os parâmetros da fórmula (K, divisor, etc.): são
+            afináveis pela equipa e publicá-los convidava a rule-lawyering. */}
+        <div id="ranking" className="card scroll-mt-20">
+          <TrendingUp size={32} className="text-ink-700 mb-3" />
+          <h3 className="text-xl font-bold text-ink-900 mb-2">{t('instructions.elo_title')}</h3>
+          <p className="text-gray-700 leading-relaxed mb-3">{t('instructions.elo_intro')}</p>
+          <ul className="space-y-2 text-gray-600">
+            <li>• {t('instructions.elo_b1')}</li>
+            <li>• {t('instructions.elo_b2')}</li>
+            <li>• {t('instructions.elo_b3')}</li>
+            <li>• {t('instructions.elo_b4')}</li>
+            <li>• {t('instructions.elo_b5')}</li>
+            <li>• {t('instructions.elo_b6')}</li>
+          </ul>
+          <p className="text-gray-500 text-sm mt-3">{t('instructions.elo_note')}</p>
+        </div>
+
+        {/* XP e escudos — aqui SIM com a tabela completa: um sistema de
+            incentivo só funciona com as regras à vista. Fonte única da
+            curva: XP_TIERS (lib/xp.js). */}
+        <div id="xp" className="card scroll-mt-20">
+          <Shield size={32} className="text-ink-700 mb-3" />
+          <h3 className="text-xl font-bold text-ink-900 mb-2">{t('instructions.xp_title')}</h3>
+          <p className="text-gray-700 leading-relaxed mb-3">{t('instructions.xp_intro')}</p>
+          <ul className="space-y-1 text-gray-600 mb-4">
+            <li>• {t('instructions.xp_v1')}</li>
+            <li>• {t('instructions.xp_v2')}</li>
+            <li>• {t('instructions.xp_v3')}</li>
+            <li>• {t('instructions.xp_v4')}</li>
+          </ul>
+          <p className="text-gray-700 leading-relaxed mb-2">{t('instructions.xp_shields_intro')}</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <tbody>
+                {[...XP_TIERS].reverse().map((tier) => (
+                  <tr key={tier.key} className="border-b border-gray-100 last:border-0">
+                    <td className="py-1.5 text-gray-500 w-16 tabular-nums">{tier.level}</td>
+                    <td className="py-1.5 font-semibold text-ink-900">
+                      <span className={`inline-block w-3 h-3 rounded-full mr-2 align-middle ${tier.dotClass}`} />
+                      {t(tier.labelKey)}
+                    </td>
+                    <td className="py-1.5 text-right text-gray-600 tabular-nums">{formatXp(tier.min)} XP</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-gray-500 text-sm mt-3">{t('instructions.xp_glow')}</p>
         </div>
 
         {/* Admin Guide */}

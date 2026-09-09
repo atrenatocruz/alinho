@@ -1,6 +1,17 @@
+# Público: landing (/) e /instrucoes. O resto é app autenticada — para um
+# crawler é só a shell SPA vazia (soft-404s); desindexar poupa crawl budget
+# e evita lixo no índice.
 User-agent: *
 Allow: /
+Disallow: /login
+Disallow: /perfil
+Disallow: /rankings
+Disallow: /comunidade
+Disallow: /gerir
+Disallow: /jogo/
+Disallow: /jogador/
+Disallow: /clube/
+Disallow: /jogos-privados
+Disallow: /mix-offline
 
-Sitemap: https://alinho.pt/sitemap.xml
-
-
+Sitemap: https://www.alinho.pt/sitemap.xml

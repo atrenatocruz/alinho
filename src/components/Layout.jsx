@@ -4,7 +4,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Home, Users, Trophy, Settings, LogOut, HelpCircle, Phone, X, Bell } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
-import { PrimaryButton, Avatar, RatingBadge } from './ui'
+import { PrimaryButton, Avatar, RatingBadge, TrophyCard } from './ui'
+import { supabase } from '../lib/supabase'
 import { hashPhone } from '../lib/hashPhone'
 import { listIncomingFriendRequests } from '../lib/friends'
 import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
@@ -12,6 +13,68 @@ import { listIncomingOrganizationInvites } from '../lib/orgInvites'
 
 // Re-prompt at most once per day once dismissed — a nudge, not a gate.
 const PHONE_PROMPT_DISMISSED_KEY = 'phonePromptDismissedDate'
+
+// Celebrações — verificar uma vez por sessão de browser, não a cada
+// navegação (o modal reaparece de qualquer forma na próxima sessão se
+// ainda houver novidades por marcar como vistas).
+const CELEBRATIONS_CHECKED_KEY = 'celebrationsChecked'
+
+/* Modal de celebração: troféus novos e kudos recebidos desde a última
+   visita (RPC get_unseen_celebrations; "visto" via mark_celebrations_seen).
+   Fail-soft — qualquer erro e simplesmente não aparece. */
+function CelebrationModal({ items, onClose }) {
+  const { t } = useTranslation()
+  const trophies = items.filter((i) => i.kind === 'trophy')
+  const kudos = items.filter((i) => i.kind === 'kudos')
+  const shownTrophies = trophies.slice(0, 6)
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-ink-900/70 animate-fade-in" onClick={onClose}>
+      <div className="bg-surface rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-md p-6 animate-pop relative max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-xl font-extrabold text-ink-900 text-center mb-1">🎉 {t('layout.celebrations_title')}</h2>
+        <p className="text-sm text-muted text-center mb-4">{t('layout.celebrations_subtitle')}</p>
+
+        {trophies.length > 0 && (
+          <div className="mb-4">
+            <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mb-2">
+              {t('layout.celebrations_trophies', { count: trophies.length })}
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {shownTrophies.map((tr) => (
+                <TrophyCard key={tr.trophy_key} trophyKey={tr.trophy_key} rarity={tr.rarity} earned />
+              ))}
+            </div>
+            {trophies.length > shownTrophies.length && (
+              <p className="mt-2 text-[11px] text-muted text-center">
+                {t('layout.celebrations_more_trophies', { count: trophies.length - shownTrophies.length })}
+              </p>
+            )}
+          </div>
+        )}
+
+        {kudos.length > 0 && (
+          <div className="mb-4 space-y-2">
+            <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mb-1">
+              {t('layout.celebrations_kudos_heading')}
+            </p>
+            {kudos.map((k, i) => (
+              <div key={i} className="flex items-center gap-2.5 rounded-ctrl bg-lime-400/10 px-3 py-2">
+                <span className="text-lg">👍</span>
+                <p className="text-sm text-ink-900 font-semibold">
+                  {t('layout.celebrations_kudos_line', { count: Number(k.kudos_count), title: k.game_title })}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <PrimaryButton onClick={onClose} className="w-full">
+          {t('layout.celebrations_close')}
+        </PrimaryButton>
+      </div>
+    </div>
+  )
+}
 
 /* Dismissible nudge (X button or "Agora não") shown whenever a real
    (non-guest) member has no phone hash yet, since the WhatsApp bot needs
@@ -140,6 +203,29 @@ export default function Layout({ children }) {
   const [phonePromptDismissed, setPhonePromptDismissed] = useState(
     () => typeof window !== 'undefined' && localStorage.getItem(PHONE_PROMPT_DISMISSED_KEY) === today
   )
+
+  // Celebrações: troféus novos + kudos recebidos desde a última visita.
+  // Uma verificação por sessão de browser; fail-soft em qualquer erro.
+  const [celebrations, setCelebrations] = useState([])
+  useEffect(() => {
+    if (!profile?.id) return
+    if (sessionStorage.getItem(CELEBRATIONS_CHECKED_KEY)) return
+    sessionStorage.setItem(CELEBRATIONS_CHECKED_KEY, '1')
+    supabase.rpc('get_unseen_celebrations').then(({ data, error }) => {
+      if (error) {
+        console.error('Error loading celebrations:', error)
+        return
+      }
+      if (data?.length) setCelebrations(data)
+    })
+  }, [profile?.id])
+
+  const closeCelebrations = () => {
+    setCelebrations([])
+    supabase.rpc('mark_celebrations_seen').then(({ error }) => {
+      if (error) console.error('Error marking celebrations seen:', error)
+    })
+  }
 
   // Refetched on every route change too (not just profile/isGuest), so the
   // dropdown clears shortly after accepting/declining on /perfil without a
@@ -431,6 +517,8 @@ export default function Layout({ children }) {
                     url={profile?.avatar_url}
                     size="w-6 h-6 text-[10px]"
                     colorClass="bg-ink-700 text-white"
+                    xp={profile?.xp}
+                    lastPlayedAt={profile?.last_played_at}
                   />
                 ) : (
                   <Icon size={19} strokeWidth={2} className="shrink-0" />
@@ -454,6 +542,12 @@ export default function Layout({ children }) {
           onSave={(phone_hash) => updateProfile({ phone_hash })}
           onDismiss={dismissPhonePrompt}
         />
+      )}
+
+      {/* Celebrações depois do phone-prompt na ordem de render, mas só uma
+          aparece de cada vez na prática (o phone-prompt é dispensável). */}
+      {celebrations.length > 0 && !needsPhone && (
+        <CelebrationModal items={celebrations} onClose={closeCelebrations} />
       )}
     </div>
   )

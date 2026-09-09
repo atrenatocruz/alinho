@@ -99,28 +99,28 @@ export async function loadGame(gameId) {
 // Re-fetched on every single "in"/"out" (often several times a minute in a
 // busy group); a few seconds of staleness on "which mixes are open" is a
 // good trade for skipping the query — capacity/roster state itself is
-// never cached, only this list.
+// never cached, only this list. Cache por clube (multi-grupo: um processo
+// serve vários organizationIds — ver groups.js).
 const OPEN_MIXES_CACHE_TTL_MS = 5_000
-let openMixesCache = null
-let openMixesCachedAt = 0
+const openMixesCache = new Map() // organizationId -> { data, at }
 
-/** All mixes currently open for signups — the source of truth for "which mixes exist right now" (replaces the old single active-game pointer, since several can be open at once). */
-export async function getOpenMixes() {
-  if (openMixesCache && Date.now() - openMixesCachedAt < OPEN_MIXES_CACHE_TTL_MS) return openMixesCache
+/** All mixes currently open for signups in ONE club — the source of truth for "which mixes exist right now" (replaces the old single active-game pointer, since several can be open at once). */
+export async function getOpenMixes(organizationId) {
+  const entry = openMixesCache.get(organizationId)
+  if (entry && Date.now() - entry.at < OPEN_MIXES_CACHE_TTL_MS) return entry.data
 
   const { data, error } = await supabase
     .from('games')
     .select('*')
-    .eq('organization_id', config.organizationId)
+    .eq('organization_id', organizationId)
     .in('status', ['open', 'closed'])
     .gt('date', new Date().toISOString())
     .order('date', { ascending: true })
 
   if (error) throw new Error(`Failed to load open mixes: ${error.message}`)
 
-  openMixesCache = data
-  openMixesCachedAt = Date.now()
-  return openMixesCache
+  openMixesCache.set(organizationId, { data, at: Date.now() })
+  return data
 }
 
 // 'en' maps to en-GB (not en-US) — same day/month ordering players are

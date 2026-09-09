@@ -1,6 +1,5 @@
 import { supabase } from './supabase.js'
-import { config } from './config.js'
-import { getSettings } from './settings.js'
+import { getGroupsForOrg, getServedOrgIds, mixVisibleToGroup } from './groups.js'
 import { helpFooter } from './messages.js'
 import { t } from './locales.js'
 
@@ -98,8 +97,9 @@ async function autoStartMix(game, { sendText }) {
   const { error: statusError } = await supabase.from('games').update({ status: 'in_progress' }).eq('id', game.id)
   if (statusError) throw new Error(`Failed to flip game to in_progress for auto-start: ${statusError.message}`)
 
-  const settings = await getSettings()
-  if (!settings.whatsapp_group_jid) return
+  // Aos grupos do clube deste mix que o conseguem ver (filtro de nível).
+  const groups = (await getGroupsForOrg(game.organization_id)).filter((g) => mixVisibleToGroup(game, g))
+  if (groups.length === 0) return
 
   // `language` selected for consistency with every other `.from('profiles')`
   // call in this bot (see Task 19) — unused below since the pairings
@@ -126,14 +126,23 @@ async function autoStartMix(game, { sendText }) {
   // 'pt' (see locales.js scope note).
   const announceLang = 'pt'
   const text = t('duplas_formed', announceLang, { title: game.title, lines: lines.join('\n') }) + helpFooter(announceLang)
-  await sendText(settings.whatsapp_group_jid, text, { mentions })
+  for (const group of groups) {
+    try {
+      await sendText(group.groupJid, text, { mentions })
+    } catch (err) {
+      console.error(`Failed to announce pairings to ${group.groupJid}:`, err)
+    }
+  }
 }
 
 async function checkAutoStartMixes({ sendText }) {
+  const orgIds = await getServedOrgIds()
+  if (orgIds.length === 0) return
+
   const { data: games, error } = await supabase
     .from('games')
     .select('*')
-    .eq('organization_id', config.organizationId)
+    .in('organization_id', orgIds)
     .in('status', ['open', 'closed'])
     .not('auto_start_hours_before', 'is', null)
     .gt('date', new Date().toISOString())
