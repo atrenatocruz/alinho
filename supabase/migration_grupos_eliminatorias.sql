@@ -6,6 +6,14 @@
 -- ════════════════════════════════════════════════════════════════════════
 
 -- ── 1. New format value ─────────────────────────────────────────────────
+-- ⚠️  IMPORTANT: Before running this migration, verify the actual name of the
+--     format CHECK constraint. If it differs from 'games_format_check', update
+--     the DROP CONSTRAINT line below to match. Query to find the real name:
+--
+--     SELECT conname FROM pg_constraint
+--     WHERE conrelid = 'games'::regclass AND contype = 'c'
+--       AND pg_get_constraintdef(oid) ILIKE '%format%';
+--
 ALTER TABLE games DROP CONSTRAINT IF EXISTS games_format_check;
 ALTER TABLE games ADD CONSTRAINT games_format_check
   CHECK (format IN ('sobe_desce', 'todos_contra_todos', 'grupos_eliminatorias'));
