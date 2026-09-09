@@ -307,6 +307,52 @@ export default function PlayerDetails() {
           <p className="text-white/60 text-xs mt-1">
             {t('playerdetails.preferred_side', { side: t(SIDE_LABEL_KEY[player.preferred_side] || SIDE_LABEL_KEY.both) })}
           </p>
+          <p className="text-white/60 text-xs mt-2.5">
+            {t('playerdetails.friends_count', { count: player.friends_count })}
+            {(playerXp?.kudos ?? 0) > 0 && (
+              <span className="inline-flex items-center gap-1 ml-2.5 align-middle">
+                <ThumbsUp size={11} className="text-lime-400" /> {playerXp.kudos}
+              </span>
+            )}
+          </p>
+          {!player.my_profile && (
+            player.friendship_status === 'friends' ? (
+              // Label reads as an action ("Deixar de seguir"), not "Amigos" —
+              // sharing that word with the "amigos" count right above it read
+              // as one navigable element ("view friends list") instead of two.
+              <button
+                onClick={() => handleRemoveFriendship(t('playerdetails.unfollow_confirm', { name: player.name }))}
+                disabled={friendActing}
+                className="mt-3 inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors duration-fast disabled:opacity-40"
+              >
+                <UserCheck size={14} /> {t('playerdetails.unfollow_button')}
+              </button>
+            ) : player.friendship_status === 'pending_sent' ? (
+              <button
+                onClick={() => handleRemoveFriendship(t('playerdetails.cancel_request_confirm'))}
+                disabled={friendActing}
+                className="mt-3 inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full bg-white/10 text-white/70 hover:bg-white/20 transition-colors duration-fast disabled:opacity-40"
+              >
+                <Clock size={14} /> {t('playerdetails.request_sent')}
+              </button>
+            ) : player.friendship_status === 'pending_received' ? (
+              <button
+                onClick={handleAcceptRequest}
+                disabled={friendActing}
+                className="mt-3 inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full bg-lime-400 text-ink-900 hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
+              >
+                <UserCheck size={14} /> {t('playerdetails.accept_request')}
+              </button>
+            ) : (
+              <button
+                onClick={handleSendRequest}
+                disabled={friendActing}
+                className="mt-3 inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full bg-lime-400 text-ink-900 hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
+              >
+                <UserPlus size={14} /> {t('playerdetails.add_friend')}
+              </button>
+            )
+          )}
           {/* Painéis Ranking/XP — mesmo layout do perfil próprio
               (Profile.jsx). O painel de ranking respeita a mesma gate de
               privacidade das stats (results_visibility); o de atividade é
@@ -360,52 +406,6 @@ export default function PlayerDetails() {
               </div>
             )
           })()}
-          <p className="text-white/60 text-xs mt-2.5">
-            {t('playerdetails.friends_count', { count: player.friends_count })}
-            {(playerXp?.kudos ?? 0) > 0 && (
-              <span className="inline-flex items-center gap-1 ml-2.5 align-middle">
-                <ThumbsUp size={11} className="text-lime-400" /> {playerXp.kudos}
-              </span>
-            )}
-          </p>
-          {!player.my_profile && (
-            player.friendship_status === 'friends' ? (
-              // Label reads as an action ("Deixar de seguir"), not "Amigos" —
-              // sharing that word with the "amigos" count right above it read
-              // as one navigable element ("view friends list") instead of two.
-              <button
-                onClick={() => handleRemoveFriendship(t('playerdetails.unfollow_confirm', { name: player.name }))}
-                disabled={friendActing}
-                className="mt-3 inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors duration-fast disabled:opacity-40"
-              >
-                <UserCheck size={14} /> {t('playerdetails.unfollow_button')}
-              </button>
-            ) : player.friendship_status === 'pending_sent' ? (
-              <button
-                onClick={() => handleRemoveFriendship(t('playerdetails.cancel_request_confirm'))}
-                disabled={friendActing}
-                className="mt-3 inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full bg-white/10 text-white/70 hover:bg-white/20 transition-colors duration-fast disabled:opacity-40"
-              >
-                <Clock size={14} /> {t('playerdetails.request_sent')}
-              </button>
-            ) : player.friendship_status === 'pending_received' ? (
-              <button
-                onClick={handleAcceptRequest}
-                disabled={friendActing}
-                className="mt-3 inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full bg-lime-400 text-ink-900 hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
-              >
-                <UserCheck size={14} /> {t('playerdetails.accept_request')}
-              </button>
-            ) : (
-              <button
-                onClick={handleSendRequest}
-                disabled={friendActing}
-                className="mt-3 inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full bg-lime-400 text-ink-900 hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
-              >
-                <UserPlus size={14} /> {t('playerdetails.add_friend')}
-              </button>
-            )
-          )}
         </div>
       </div>
 
