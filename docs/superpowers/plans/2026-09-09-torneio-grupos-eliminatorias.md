@@ -383,7 +383,8 @@ And in the `"gamedetails"` object (sibling to `"group_standings_title"`):
 "bulk_import_placeholder": "Um nome por linha",
 "bulk_import_button": "Importar",
 "bulk_import_importing": "A importar...",
-"bulk_import_summary": "{{created}} criados, {{failed}} falharam"
+"bulk_import_summary": "{{created}} criados, {{failed}} falharam",
+"error_invalid_pool_count": "Número de grupos inválido ({{count}}). Com o tamanho de grupo atual, ajusta o tamanho para que o número de grupos seja 1, 2 ou 4."
 ```
 
 - [ ] **Step 3: Add the matching English strings**
@@ -408,7 +409,8 @@ In `src/locales/en.json`, mirror Step 2's keys with English text:
 "bulk_import_placeholder": "One name per line",
 "bulk_import_button": "Import",
 "bulk_import_importing": "Importing...",
-"bulk_import_summary": "{{created}} created, {{failed}} failed"
+"bulk_import_summary": "{{created}} created, {{failed}} failed",
+"error_invalid_pool_count": "Invalid group count ({{count}}). With the current group size, adjust it so the number of groups is 1, 2, or 4."
 ```
 
 - [ ] **Step 4: Verify the app still builds**
@@ -601,6 +603,18 @@ git commit -m "feat: mix-creation form support for grupos+eliminatórias format 
   `game.format === 'grupos_eliminatorias'` — consumed by Task 8
   (`PoolGroupStage`).
 
+**Ruling from Task 2's review (recorded in the SDD ledger):**
+`seedKnockoutFromPools` (Task 2) and the *existing, unmodified*
+`firstElimMatches`/`eliminationPhases` only support exactly 2, 4, or 8
+teams advancing to the knockout phase — that's a pre-existing constraint
+of `firstElimMatches`'s hardcoded branches, shared with
+`todos_contra_todos`, not something Task 2 introduced. With
+`advancePerPool` fixed at 2, that means **the pool count must be exactly
+1, 2, or 4** — any other pool count (e.g. 3 pools = 6 advancing) would
+silently drop teams from the bracket. This task is where that must be
+caught, since it's the last point before teams are locked in and
+`pool_size` can still be adjusted. Step 2 below includes this guard.
+
 - [ ] **Step 1: Import `splitIntoPools`**
 
 Find the `mixLogic` import block (starts `import { countPeople, ...`) and
@@ -637,8 +651,22 @@ Change to:
       // insert (there's no separate round trip to fetch ids back and
       // patch pool_number afterwards).
       const isGruposEliminatorias = game.format === 'grupos_eliminatorias'
+      const poolSize = game.pool_size || 4
+      // firstElimMatches/eliminationPhases (existing, unmodified — shared
+      // with todos_contra_todos) only support exactly 2, 4, or 8 teams
+      // advancing to the knockout phase. With advancePerPool fixed at 2,
+      // that means the pool count itself must be exactly 1, 2, or 4 — any
+      // other count would silently drop teams from the bracket later.
+      // This is the last point before teams are locked in where pool_size
+      // can still be adjusted, so it's caught here, not later.
+      if (isGruposEliminatorias) {
+        const numPools = Math.max(1, Math.ceil(duplas.length / poolSize))
+        if (![1, 2, 4].includes(numPools)) {
+          throw new Error(t('gamedetails.error_invalid_pool_count', { count: numPools }))
+        }
+      }
       const pooledDuplas = isGruposEliminatorias
-        ? splitIntoPools(duplas, game.pool_size || 4)
+        ? splitIntoPools(duplas, poolSize)
         : duplas
 
       const { error: teamsError } = await supabase
@@ -658,7 +686,15 @@ Change to:
 Run: `npm run build`
 Expected: builds successfully.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 4: Manual verification of the new guard**
+
+Confirm by reading the code (no running app needed for this step): with
+`pool_size = 4` and, say, 12 duplas, `numPools = ceil(12/4) = 3` — the
+guard must throw before any `teams` insert happens. With 8 duplas and
+`pool_size = 4`, `numPools = 2` — must proceed normally. Note both cases
+in your report.
+
+- [ ] **Step 5: Commit**
 
 ```bash
 git add src/pages/GameDetails.jsx
