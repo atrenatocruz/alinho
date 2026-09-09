@@ -2,10 +2,10 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useTranslation, Trans } from 'react-i18next'
-import { Calendar, MapPin, ArrowLeft, UserPlus, User, Check, Lock, Trophy, Play, ChevronRight, Swords, X, Repeat, Share2, ChevronDown, RotateCcw, Euro, GripVertical, Pencil, History, ThumbsUp } from 'lucide-react'
+import { Calendar, MapPin, ArrowLeft, UserPlus, User, Check, Lock, Trophy, Play, ChevronRight, Swords, X, Repeat, Share2, ChevronDown, RotateCcw, Euro, GripVertical, Pencil, History, ThumbsUp, CalendarPlus } from 'lucide-react'
 import { DndContext, useDraggable, useDroppable, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
-import { supabase } from '../lib/supabase'
+import { supabase, supabaseUrl } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton, GuestBadge, PlayerAvatarRow, EmptyState, ShareModal, RoundTimer, Avatar, Select, RatingBadge } from '../components/ui'
 import {
@@ -18,6 +18,7 @@ import { isProvisional } from '../lib/elo'
 import { winRatePct, firstLastName } from '../lib/statsLogic'
 import { getGlobalRankings } from '../lib/privateMatches'
 import { formatDate as formatDateLib, formatCurrency } from '../lib/formatDate'
+import { NAVIGATORS, getPreferredNavigator, setPreferredNavigator, navigatorUrl } from '../lib/navigators'
 
 const SIDE_LABEL_KEY = { left: 'gamedetails.side_left', right: 'gamedetails.side_right', both: 'gamedetails.side_both' }
 
@@ -99,6 +100,10 @@ export default function GameDetails() {
   // em cada abertura da página de um mix.
   const [history, setHistory] = useState([])
   const [historyOpen, setHistoryOpen] = useState(false)
+  // Escolha de app de navegacao (Trello #34). Fica no dispositivo e nao no
+  // perfil — ver a nota em lib/navigators.js.
+  const [navPickerOpen, setNavPickerOpen] = useState(false)
+  const [preferredNav, setPreferredNav] = useState(getPreferredNavigator)
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyError, setHistoryError] = useState(false)
 
@@ -1247,14 +1252,78 @@ export default function GameDetails() {
             <span className="capitalize">{formatDate(game.date)}</span>
           </div>
           {game.location && (
+            <div>
+              {/* O chip continua a abrir com um toque, como sempre abriu —
+                  agora na app preferida em vez de sempre no Google (Trello
+                  #34). Quem nunca escolher nada nao ve diferenca nenhuma.
+                  A escolha vive no "Abrir com..." ao lado, para nao roubar
+                  um toque a quem so quer chegar la. */}
+              <a
+                href={navigatorUrl(preferredNav, {
+                  location: game.location,
+                  latitude: game.latitude,
+                  longitude: game.longitude,
+                })}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 bg-lime-100 text-ink-900 rounded-full pl-2.5 pr-3 py-1.5 -ml-1 hover:bg-lime-400/40 transition-colors"
+              >
+                <MapPin size={18} className="text-lime-600 shrink-0" />
+                <span className="font-medium">{game.location}</span>
+              </a>
+
+              <button
+                onClick={() => setNavPickerOpen((open) => !open)}
+                className="ml-2 text-sm font-extrabold text-ink-700 underline underline-offset-2 min-h-[44px] px-1"
+              >
+                {t('gamedetails.open_with')}
+              </button>
+
+              {navPickerOpen && (
+                <div className="flex flex-wrap gap-2 mt-2 animate-fade-up">
+                  {NAVIGATORS.map((nav) => (
+                    <a
+                      key={nav.key}
+                      href={nav.url({
+                        location: game.location,
+                        latitude: game.latitude,
+                        longitude: game.longitude,
+                      })}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => {
+                        setPreferredNavigator(nav.key)
+                        setPreferredNav(nav.key)
+                        setNavPickerOpen(false)
+                      }}
+                      className={`inline-flex items-center gap-1.5 rounded-ctrl px-3 min-h-[44px] text-sm font-extrabold border transition-colors duration-fast ${
+                        nav.key === preferredNav
+                          ? 'bg-lime-100 border-lime-600 text-ink-900'
+                          : 'bg-surface border-line text-ink-900 hover:bg-ink-50'
+                      }`}
+                    >
+                      {nav.key === preferredNav && <Check size={14} className="text-lime-600 shrink-0" />}
+                      {t(nav.labelKey)}
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Adicionar ao calendario (Trello #206). Reaproveita a edge
+              function game-ics que o bot ja publica no WhatsApp — sem
+              backend novo. Escondido depois de o mix acabar: por um mix de
+              ontem no calendario nao serve para nada. */}
+          {!['finished', 'completed', 'cancelled'].includes(game.status) && (
             <a
-              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(game.location)}`}
+              href={`${supabaseUrl}/functions/v1/game-ics?id=${game.id}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 bg-lime-100 text-ink-900 rounded-full pl-2.5 pr-3 py-1.5 -ml-1 hover:bg-lime-400/40 transition-colors"
+              className="inline-flex items-center gap-2 text-ink-700 font-extrabold text-sm min-h-[44px] -ml-0.5"
             >
-              <MapPin size={18} className="text-lime-600 shrink-0" />
-              <span className="font-medium">{game.location}</span>
+              <CalendarPlus size={18} className="text-ink-700 shrink-0" />
+              {t('gamedetails.add_to_calendar')}
             </a>
           )}
           <div className="flex items-center gap-2.5">
