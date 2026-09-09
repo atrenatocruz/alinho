@@ -101,6 +101,20 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: 'Only org admins can bulk-import participants' }, 403)
   }
 
+  // Verify that all game_ids belong to this organization before proceeding.
+  // This is critical: the service-role client bypasses RLS, so we must
+  // independently verify each game_id belongs to the target organization
+  // to prevent cross-tenant mutations.
+  const { data: orgGames, error: gamesError } = await admin
+    .from('games')
+    .select('id')
+    .eq('organization_id', organizationId)
+  if (gamesError) {
+    console.error('Failed to load organization games:', gamesError)
+    return jsonResponse({ error: 'Server error' }, 500)
+  }
+  const validGameIds = new Set((orgGames || []).map((g) => g.id))
+
   const created: Array<{ name: string; user_id: string; game_id: string }> = []
   const failed: Array<{ name: string; game_id: string; error: string }> = []
 
@@ -112,12 +126,26 @@ Deno.serve(async (req) => {
         continue
       }
 
+      // Validate game_id belongs to this organization (security boundary check).
+      // Must happen before any createUser call, since service-role bypasses RLS.
+      if (!validGameIds.has(entry.game_id)) {
+        failed.push({ name, game_id: entry.game_id, error: 'game_id does not belong to this organization' })
+        continue
+      }
+
       const { data: authUser, error: createError } = await admin.auth.admin.createUser({
         email: `bulk-${crypto.randomUUID()}@padelapp.test`,
         email_confirm: true,
         password: crypto.randomUUID(),
         user_metadata: { name },
       })
+
+      // Rate-limit pause must run after createUser regardless of success or failure.
+      // This prevents hammering the auth service if createUser errors under load.
+      // We pause here (not after all inserts) because admin.createUser is what can
+      // rate-limit, and we want to space out requests even across failures.
+      await new Promise((resolve) => setTimeout(resolve, 150))
+
       if (createError || !authUser?.user) {
         failed.push({ name, game_id: entry.game_id, error: createError?.message || 'Failed to create auth user' })
         continue
@@ -147,11 +175,6 @@ Deno.serve(async (req) => {
       }
 
       created.push({ name, user_id: authUser.user.id, game_id: entry.game_id })
-
-      // Supabase Auth's admin.createUser can rate-limit under a tight
-      // loop at this volume — a small pause between creates trades a
-      // little time for not failing halfway through a 300-person import.
-      await new Promise((resolve) => setTimeout(resolve, 150))
     } catch (err) {
       failed.push({ name: entry.name ?? '', game_id: entry.game_id ?? '', error: err instanceof Error ? err.message : 'Unknown error' })
     }
