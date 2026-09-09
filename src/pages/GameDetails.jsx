@@ -7,15 +7,16 @@ import { DndContext, useDraggable, useDroppable, PointerSensor, TouchSensor, use
 import { CSS } from '@dnd-kit/utilities'
 import { supabase, supabaseUrl } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { PrimaryButton, GuestBadge, PlayerAvatarRow, EmptyState, ShareModal, RoundTimer, Avatar, Select, RatingBadge } from '../components/ui'
+import { PrimaryButton, GuestBadge, PlayerAvatarRow, EmptyState, ShareModal, RoundTimer, Avatar, Select, RatingBadge, DateField } from '../components/ui'
 import PoolGroupStage from '../components/PoolGroupStage'
 import {
   countPeople, totalRounds, formDuplas, seedCourts, nextSobeDesce,
   roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches,
   PHASE_LABEL_KEY, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY,
-  mixCapacity, isGenderMismatch, splitIntoPools,
+  mixCapacity, isGenderMismatch, isMissingBirthday, isAgeIneligible, splitIntoPools,
 } from '../lib/mixLogic'
 import { isProvisional } from '../lib/elo'
+import { AGE_LABEL_KEY, meetsAgeRestriction } from '../lib/ageCategories'
 import { winRatePct, firstLastName } from '../lib/statsLogic'
 import { getGlobalRankings } from '../lib/privateMatches'
 import { formatDate as formatDateLib, formatCurrency } from '../lib/formatDate'
@@ -57,7 +58,7 @@ export default function GameDetails() {
   const { t, i18n } = useTranslation()
   const { id } = useParams()
   const navigate = useNavigate()
-  const { user, profile, isGuest, memberships } = useAuth()
+  const { user, profile, isGuest, memberships, updateProfile } = useAuth()
   const [game, setGame] = useState(null)
   // isAdmin/gameOrganizationId are derived from the specific mix being
   // viewed, not the app-wide "current organization" — Home now links to
@@ -79,6 +80,13 @@ export default function GameDetails() {
   const [selectedPartner, setSelectedPartner] = useState('')
   const [allUsers, setAllUsers] = useState([])
   const [joinError, setJoinError] = useState('')
+  // Data de nascimento pedida no momento (Trello #212): quem nunca a
+  // preencheu bate na restricao de escalao sem perceber porque. Em vez de o
+  // mandar ao perfil e de volta, pede-se aqui e continua-se a inscricao.
+  const [birthdayPrompt, setBirthdayPrompt] = useState(false)
+  const [birthdayValue, setBirthdayValue] = useState('')
+  const [savingBirthday, setSavingBirthday] = useState(false)
+  const [birthdayError, setBirthdayError] = useState('')
   const [justBooked, setJustBooked] = useState(false)
   const [mixError, setMixError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -335,6 +343,25 @@ export default function GameDetails() {
   }
 
   // One tap, no redundant confirmation — booking should feel instant.
+  // Guarda a data e, se ela chegar para o escalao deste mix, continua a
+  // inscricao sem obrigar a um segundo clique. Se nao chegar, o modal fecha
+  // e a pagina passa a mostrar a explicacao — o perfil no contexto ja foi
+  // actualizado pelo updateProfile.
+  const handleSaveBirthday = async () => {
+    if (!birthdayValue) return
+    setSavingBirthday(true)
+    setBirthdayError('')
+    const { error } = await updateProfile({ birthday: birthdayValue })
+    setSavingBirthday(false)
+    if (error) {
+      console.error('Error saving birthday from the mix screen:', error)
+      setBirthdayError(t('gamedetails.age_birthday_error'))
+      return
+    }
+    setBirthdayPrompt(false)
+    if (meetsAgeRestriction(birthdayValue, game?.age_restriction)) handleJoinAlone()
+  }
+
   const handleJoinAlone = async () => {
     setJoining(true)
     setJoinError('')
@@ -1295,6 +1322,12 @@ export default function GameDetails() {
   // (migration_mix_gender_restriction.sql) — this only decides whether to
   // show the join button or a friendly explanation instead of a raw error.
   const genderMismatch = isGenderMismatch(game, profile)
+  // Escalao etario (Trello #212). Duas situacoes diferentes de proposito:
+  // sem data de nascimento resolve-se aqui mesmo (modal), fora do escalao
+  // nao ha nada a fazer. Quem aplica de verdade e a policy de INSERT em
+  // participants (migration_mix_age_restriction.sql).
+  const missingBirthday = isMissingBirthday(game, profile)
+  const ageIneligible = isAgeIneligible(game, profile)
   const mixStarted = game?.status === 'in_progress' || game?.status === 'finished'
   // A full game counts as closed even if the stored status lagged behind
   // (e.g. players who joined before the auto-close trigger existed)
@@ -1500,6 +1533,9 @@ export default function GameDetails() {
               {(FORMAT_LABEL_KEY[game.format] ? t(FORMAT_LABEL_KEY[game.format]) : t('gamedetails.sobe_desce_label'))} • {t('gamedetails.court_count', { count: numCourts })} • {t('gamedetails.rounds_duration', { count: roundsTotal, minutes: game.game_time_minutes || 20 })}
               {game.gender_restriction && game.gender_restriction !== 'indiferente' && (
                 <> • {t(GENDER_RESTRICTION_LABEL_KEY[game.gender_restriction])}</>
+              )}
+              {game.age_restriction && AGE_LABEL_KEY[game.age_restriction] && (
+                <> • {t(AGE_LABEL_KEY[game.age_restriction])}</>
               )}
             </span>
           </div>
@@ -2526,7 +2562,33 @@ export default function GameDetails() {
             </div>
           )}
 
-          {canJoin && !joinMode && (
+          {/* Escalao etario (Trello #212). Um so bloco para os dois caminhos
+              — inscricao normal e lista de suplentes — porque a policy de
+              INSERT em participants nao distingue os dois: qualquer linha
+              nova passa pela mesma verificacao. */}
+          {(canJoin || (isFull && !isUserJoined && !isUserWaitlisted)) && !joinMode && !genderMismatch
+            && (ageIneligible || missingBirthday) && (
+            ageIneligible ? (
+              <div className="bg-ink-50 text-muted px-4 py-3 rounded-ctrl text-sm font-extrabold text-center">
+                {t('gamedetails.age_restricted_message', { restriction: t(AGE_LABEL_KEY[game.age_restriction]) })}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-muted text-sm text-center">
+                  {t('gamedetails.age_needs_birthday', { restriction: t(AGE_LABEL_KEY[game.age_restriction]) })}
+                </p>
+                <PrimaryButton
+                  onClick={() => { setBirthdayValue(''); setBirthdayError(''); setBirthdayPrompt(true) }}
+                  className="w-full"
+                >
+                  <Calendar size={20} />
+                  {t('gamedetails.age_add_birthday')}
+                </PrimaryButton>
+              </div>
+            )
+          )}
+
+          {canJoin && !joinMode && !ageIneligible && !missingBirthday && (
             genderMismatch ? (
               <div className="bg-ink-50 text-muted px-4 py-3 rounded-ctrl text-sm font-extrabold text-center">
                 {t('gamedetails.gender_restricted_message', { restriction: t(GENDER_RESTRICTION_LABEL_KEY[game.gender_restriction]).toLowerCase() })}
@@ -2549,7 +2611,7 @@ export default function GameDetails() {
             )
           )}
 
-          {isFull && !isUserJoined && !isUserWaitlisted && !genderMismatch && (
+          {isFull && !isUserJoined && !isUserWaitlisted && !genderMismatch && !ageIneligible && !missingBirthday && (
             <PrimaryButton
               variant="ghost"
               onClick={handleJoinAsSuplente}
@@ -2559,6 +2621,50 @@ export default function GameDetails() {
               <UserPlus size={20} />
               {joining ? t('gamedetails.joining') : t('gamedetails.join_as_waitlist')}
             </PrimaryButton>
+          )}
+
+          {/* Modal da data de nascimento (Trello #212). Mesma folha que o
+              DateField ja usa — sobe de baixo no telemovel, centrada no
+              ecra grande. */}
+          {birthdayPrompt && createPortal(
+            <div
+              className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-ink-900/50 animate-fade-in"
+              onClick={() => setBirthdayPrompt(false)}
+            >
+              <div
+                className="bg-surface rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-md p-5 animate-pop space-y-4"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg text-ink-900">{t('gamedetails.age_birthday_title')}</h3>
+                  <button
+                    onClick={() => setBirthdayPrompt(false)}
+                    aria-label={t('ui.close')}
+                    className="w-9 h-9 flex items-center justify-center rounded-full text-muted hover:bg-ink-50 hover:text-ink-900 transition-colors duration-fast"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+                <p className="text-sm text-muted">
+                  {t('gamedetails.age_birthday_help', { restriction: t(AGE_LABEL_KEY[game.age_restriction]) })}
+                </p>
+                <DateField
+                  value={birthdayValue}
+                  onChange={setBirthdayValue}
+                  max={new Date().toISOString().slice(0, 10)}
+                  placeholder={t('profile.birthday_label')}
+                />
+                {birthdayError && <p className="text-sm text-red-600 font-extrabold">{birthdayError}</p>}
+                <PrimaryButton
+                  onClick={handleSaveBirthday}
+                  disabled={!birthdayValue || savingBirthday}
+                  className="w-full"
+                >
+                  {savingBirthday ? t('gamedetails.joining') : t('gamedetails.age_birthday_save')}
+                </PrimaryButton>
+              </div>
+            </div>,
+            document.body
           )}
 
           {joinMode === 'partner' && (

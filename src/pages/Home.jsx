@@ -7,7 +7,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { MixCard, EmptyState, PrimaryButton, Avatar } from '../components/ui'
 import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
-import { countPeople, mixCapacity, isGenderMismatch } from '../lib/mixLogic'
+import { countPeople, mixCapacity, isGenderMismatch, isAgeIneligible, isMissingBirthday } from '../lib/mixLogic'
 import { listFriends } from '../lib/friends'
 
 export default function Home() {
@@ -250,6 +250,10 @@ export default function Home() {
 
     if (game.status !== 'open') return null
     if (isGenderMismatch(game, profile)) return null
+    // Escalao etario (Trello #212): sem idade valida nao ha atalho no
+    // cartao. Quem nao tem data de nascimento tambem cai aqui de proposito —
+    // pedi-la exige um modal, e esse ecra e o do mix, nao a lista.
+    if (isAgeIneligible(game, profile) || isMissingBirthday(game, profile)) return null
 
     return countPeople(rows) < mixCapacity(game) ? { kind: 'join' } : { kind: 'waitlist' }
   }

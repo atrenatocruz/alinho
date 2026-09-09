@@ -23,6 +23,8 @@
      quarters). Standings tie-break: wins → point diff → points scored (#5).
    ════════════════════════════════════════════════════════════════════════ */
 
+import { meetsAgeRestriction } from './ageCategories'
+
 /** Abbreviate a long name to "First L." (first name + last initial).
     Short names (<= maxLen) are kept in full. "Renato Pereira da Cruz" -> "Renato C." */
 export function shortName(name, maxLen = 16) {
@@ -53,6 +55,21 @@ export const isGenderMismatch = (game, profile) => {
   const restricted = game?.gender_restriction && !['indiferente', 'misto'].includes(game.gender_restriction)
   return Boolean(restricted) && profile?.gender !== game.gender_restriction
 }
+
+/** Se o mix exige escalao etario e o jogador ainda nao indicou a data de
+    nascimento. Distinto de `isAgeIneligible` de proposito: isto resolve-se
+    ali mesmo (a app abre um modal para preencher), aquilo nao. */
+export const isMissingBirthday = (game, profile) =>
+  Boolean(game?.age_restriction) && !profile?.birthday
+
+/** Se a idade do jogador o impede de entrar. Os "plus" sao minimos, nao
+    gavetas: um mix +35 aceita quem tenha 50. Mesma regra espelhada em SQL na
+    funcao meets_age_restriction — quem aplica de verdade e a RLS de INSERT
+    em participants; isto so decide o que se mostra. */
+export const isAgeIneligible = (game, profile) =>
+  Boolean(game?.age_restriction)
+  && Boolean(profile?.birthday)
+  && !meetsAgeRestriction(profile.birthday, game.age_restriction)
 
 /** Rondas disponíveis no court. */
 export const totalRounds = (game) =>

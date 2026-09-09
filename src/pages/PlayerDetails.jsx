@@ -5,6 +5,7 @@ import { ArrowLeft, Trophy, Target, Award, Swords, ChevronDown, UserPlus, UserCh
 import { supabase } from '../lib/supabase'
 import { PrimaryButton, EmptyState, Avatar, RankBadge, RatingBadge, PhotoViewerModal, TrophyCard } from '../components/ui'
 import { countryName } from '../lib/countries'
+import { AGE_LABEL_KEY } from '../lib/ageCategories'
 import { formatRating, isProvisional } from '../lib/elo'
 import { winRatePct } from '../lib/statsLogic'
 import { sendFriendRequest, acceptFriendRequest, removeFriendRequest } from '../lib/friends'
@@ -325,6 +326,7 @@ export default function PlayerDetails() {
                 outra pessoa. */}
             {playerExtras?.nationality && <> · {countryName(playerExtras.nationality, i18n.language)}</>}
             {GENDER_LABEL_KEY[playerExtras?.gender] && <> · {t(GENDER_LABEL_KEY[playerExtras.gender])}</>}
+            {AGE_LABEL_KEY[playerExtras?.age_category] && <> · {t(AGE_LABEL_KEY[playerExtras.age_category])}</>}
           </p>
           {/* Same privacy gate as the stat tiles below — results_visibility
               controls both, so no point showing a rank derived from hidden

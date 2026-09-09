@@ -13,6 +13,7 @@ import { PrimaryButton, GuestBadge, DateField, Avatar, Select, EmptyState, RankB
 import { CATEGORY_ORDER } from '../lib/trophies'
 import { formatRating, formatRatingMaybeProvisional, isProvisional } from '../lib/elo'
 import { countryOptions, countryName } from '../lib/countries'
+import { AGE_LABEL_KEY, ageCategory } from '../lib/ageCategories'
 import { tierFromXp, preTierProgress, formatXp } from '../lib/xp'
 import { formatDate as formatDateLib } from '../lib/formatDate'
 
@@ -928,6 +929,11 @@ export default function Profile() {
                 <p className={fieldLabel}>{t('profile.birthday_label')}</p>
                 <p className={fieldValue}>
                   {profile?.birthday ? formatDateLib(profile.birthday, i18n.language) : t('profile.not_set')}
+                  {/* Escalao (Trello #212). Aqui e uma gaveta exclusiva: e
+                      uma etiqueta, nao um criterio de entrada. */}
+                  {AGE_LABEL_KEY[ageCategory(profile?.birthday)] && (
+                    <span className="text-muted"> · {t(AGE_LABEL_KEY[ageCategory(profile.birthday)])}</span>
+                  )}
                 </p>
               </div>
 

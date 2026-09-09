@@ -9,6 +9,7 @@ import { tierFromXp, isGlowing, GLOW_CLASS } from '../lib/xp'
 import { trophyIcon, RARITY_META } from '../lib/trophies'
 import { formatDate, formatTime, formatCurrency } from '../lib/formatDate'
 import { FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, mixCapacity } from '../lib/mixLogic'
+import { AGE_LABEL_KEY } from '../lib/ageCategories'
 
 /* ─── Date fields ────────────────────────────────────────────────────────
    Native <input type=date/datetime-local> pickers open reliably on iOS
@@ -822,6 +823,14 @@ export function MixCard({ game, joined = false, showClub = false, friendIds = nu
         {genderRestricted && (
           <span className="font-extrabold text-ink-700">
             {t(GENDER_RESTRICTION_LABEL_KEY[game.gender_restriction])}
+          </span>
+        )}
+        {/* Escalao etario (Trello #212). Mesmo peso visual da restricao de
+            genero: sao a mesma coisa do ponto de vista de quem le o cartao —
+            "posso entrar neste mix?". */}
+        {game.age_restriction && AGE_LABEL_KEY[game.age_restriction] && (
+          <span className="font-extrabold text-ink-700">
+            {t(AGE_LABEL_KEY[game.age_restriction])}
           </span>
         )}
       </div>

@@ -13,6 +13,7 @@ import { formatDate as formatDateLib, formatTime as formatTimeLib } from '../lib
 import { DateField, DateTimeField, Avatar, Select } from '../components/ui'
 import { totalRounds, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY } from '../lib/mixLogic'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
+import { AGE_RESTRICTIONS } from '../lib/ageCategories'
 import PlayerSearch from '../components/PlayerSearch'
 import { searchPlayers } from '../lib/privateMatches'
 import { inviteToOrganization } from '../lib/orgInvites'
@@ -99,6 +100,9 @@ const EMPTY_GAME_FORM = {
   format: 'sobe_desce',
   pool_size: 4,
   gender_restriction: 'indiferente',
+  // Escalao etario (Trello #212). null = sem restricao, entra toda a gente
+  // com ou sem data de nascimento preenchida.
+  age_restriction: null,
   level: '',
   auto_start_hours_before: '',
   recurrence: EMPTY_RECURRENCE,
@@ -588,6 +592,7 @@ export default function GerirClube() {
     game_time_minutes: game.game_time_minutes,
     format: game.format,
     gender_restriction: game.gender_restriction,
+    age_restriction: game.age_restriction ?? null,
     level: game.level,
     auto_start_hours_before: game.auto_start_hours_before,
   })
@@ -716,6 +721,7 @@ export default function GerirClube() {
         game_time_minutes: game.game_time_minutes,
         format: game.format,
         gender_restriction: game.gender_restriction,
+        age_restriction: game.age_restriction ?? null,
         level: game.level,
         auto_start_hours_before: game.auto_start_hours_before,
         status: 'pending',
@@ -1269,6 +1275,7 @@ export default function GerirClube() {
       format: game.format || 'sobe_desce',
       pool_size: game.pool_size || 4,
       gender_restriction: game.gender_restriction || 'indiferente',
+      age_restriction: game.age_restriction ?? null,
       level: game.level || '',
       auto_start_hours_before: game.auto_start_hours_before ?? '',
       recurrence: hasActiveRecurrence
@@ -1597,6 +1604,24 @@ export default function GerirClube() {
                         options={translatedGenderRestrictions}
                         value={gameForm.gender_restriction}
                         onChange={(v) => setGameForm({ ...gameForm, gender_restriction: v })}
+                      />
+                    </div>
+
+                    {/* Escalao etario (Trello #212). "Indiferente" e null, e e
+                        o valor por omissao — a esmagadora maioria dos mixes nao
+                        tem restricao de idade, e obrigar a escolher um escalao
+                        em cada mix seria atrito por nada. */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {t('gerirclube.age_label')}
+                      </label>
+                      <Segmented
+                        options={[
+                          { value: '', label: t('gerirclube.age_any') },
+                          ...AGE_RESTRICTIONS.map((a) => ({ value: a.value, label: t(a.labelKey) })),
+                        ]}
+                        value={gameForm.age_restriction || ''}
+                        onChange={(v) => setGameForm({ ...gameForm, age_restriction: v || null })}
                       />
                     </div>
 
