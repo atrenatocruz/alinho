@@ -743,6 +743,19 @@ export default function Profile() {
 
       {tab === 'perfil' && (
         <>
+        {/* Entrada para jogos entre amigos — mudou-se para cá a partir da
+            Home (Trello #234): a Home passou a mostrar só eventos activos,
+            e esta ação/navegação não é um "evento activo". */}
+        <Link to="/jogos-privados" className="card press flex items-center gap-3 hover:shadow-lift">
+          <div className="w-10 h-10 rounded-ctrl bg-lime-400/15 text-lime-600 flex items-center justify-center shrink-0">
+            <Users size={18} />
+          </div>
+          <div>
+            <p className="font-extrabold text-ink-900 text-sm">{t('home.friendly_match')}</p>
+            <p className="text-[11px] text-muted">{t('home.friendly_match_subtitle')}</p>
+          </div>
+        </Link>
+
         {/* Estante de troféus — 4 recentes à Strava; expandir mostra a
             grelha completa por categoria, incluindo bloqueados (o critério
             fica visível — é o "para onde subir"). Fail-soft: sem dados
