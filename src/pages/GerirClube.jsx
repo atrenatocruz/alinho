@@ -48,6 +48,7 @@ const FORMATS = [
   { value: 'sobe_desce', labelKey: FORMAT_LABEL_KEY.sobe_desce },
   { value: 'todos_contra_todos', labelKey: FORMAT_LABEL_KEY.todos_contra_todos },
   { value: 'grupos_eliminatorias', labelKey: FORMAT_LABEL_KEY.grupos_eliminatorias },
+  { value: 'americano', labelKey: FORMAT_LABEL_KEY.americano },
 ]
 const SCORING_FORMATS = [
   { value: 'pontos_simples', labelKey: SCORING_FORMAT_LABEL_KEY.pontos_simples },
@@ -1584,7 +1585,11 @@ export default function GerirClube() {
                       <Segmented
                         options={translatedFormats}
                         value={gameForm.format}
-                        onChange={(v) => setGameForm({ ...gameForm, format: v })}
+                        onChange={(v) => setGameForm({
+                          ...gameForm,
+                          format: v,
+                          ...(v === 'americano' ? { scoring_format: 'pontos_simples' } : {}),
+                        })}
                       />
                     </div>
 
@@ -1605,16 +1610,18 @@ export default function GerirClube() {
                       </div>
                     )}
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        {t('gerirclube.scoring_label')}
-                      </label>
-                      <Segmented
-                        options={translatedScoringFormats}
-                        value={gameForm.scoring_format}
-                        onChange={(v) => setGameForm({ ...gameForm, scoring_format: v })}
-                      />
-                    </div>
+                    {gameForm.format !== 'americano' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          {t('gerirclube.scoring_label')}
+                        </label>
+                        <Segmented
+                          options={translatedScoringFormats}
+                          value={gameForm.scoring_format}
+                          onChange={(v) => setGameForm({ ...gameForm, scoring_format: v })}
+                        />
+                      </div>
+                    )}
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
