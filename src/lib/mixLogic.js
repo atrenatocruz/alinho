@@ -423,6 +423,7 @@ export const FORMAT_LABEL_KEY = {
   sobe_desce: 'mixlogic.format_sobe_desce',
   todos_contra_todos: 'mixlogic.format_todos_contra_todos',
   grupos_eliminatorias: 'mixlogic.format_grupos_eliminatorias',
+  americano: 'mixlogic.format_americano',
 }
 
 export const SCORING_FORMAT_LABEL_KEY = {
