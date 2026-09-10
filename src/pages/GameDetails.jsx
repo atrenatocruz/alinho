@@ -15,6 +15,7 @@ import {
   roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches,
   PHASE_LABEL_KEY, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY,
   mixCapacity, isGenderMismatch, isMissingBirthday, isAgeIneligible, splitIntoPools,
+  generateAmericanoSchedule,
 } from '../lib/mixLogic'
 import { isProvisional } from '../lib/elo'
 import { AGE_LABEL_KEY, meetsAgeRestriction } from '../lib/ageCategories'
@@ -736,6 +737,82 @@ export default function GameDetails() {
       // on court 1 down to the weakest on the last court (see seedCourts).
       const globalRankings = await getGlobalRankings()
       const pointsById = Object.fromEntries(globalRankings.map(r => [r.user_id, Math.round(r.rating || 0)]))
+
+      // Americano has no "one fixed dupla per player" concept — partners
+      // rotate every round — so it skips formDuplas/repeatPairKeys
+      // entirely and generates its own whole-mix schedule upfront (see
+      // generateAmericanoSchedule's doc comment for why that's safe to
+      // do before any result exists, unlike sobe_desce/todos_contra_todos).
+      if (game.format === 'americano') {
+        const players = participants.filter((p) => p.status === 'confirmed').map((p) => p.user).filter(Boolean)
+        if (players.length < 4 || players.length % 4 !== 0) {
+          throw new Error(t('gamedetails.error_americano_needs_multiple_of_4', { count: players.length }))
+        }
+        const numCourts = players.length / 4
+        const numRounds = totalRounds(game)
+        const schedule = generateAmericanoSchedule(players, numCourts, numRounds, pointsById)
+
+        // Flatten every round's duplas into one teams-insert payload,
+        // tracking which (round, court, side) each row belongs to so the
+        // ids Supabase hands back (in the same order — guaranteed by a
+        // single multi-row INSERT ... RETURNING) can be re-attached to
+        // build the matches rows next.
+        const teamRows = []
+        const slots = []
+        schedule.forEach((round, roundIdx) => {
+          round.forEach((m) => {
+            for (const side of ['duplaA', 'duplaB']) {
+              const dupla = m[side]
+              teamRows.push({
+                game_id: id,
+                player1_id: dupla.player1.id,
+                player2_id: dupla.player2.id,
+                seed_ranking: dupla.seed,
+              })
+              slots.push({ roundIdx, court_number: m.court_number, side })
+            }
+          })
+        })
+
+        const { data: insertedTeams, error: teamsError } = await supabase.from('teams').insert(teamRows).select()
+        if (teamsError) throw teamsError
+
+        const teamIdBySlot = {}
+        insertedTeams.forEach((team, i) => {
+          const { roundIdx, court_number, side } = slots[i]
+          teamIdBySlot[`${roundIdx}|${court_number}|${side}`] = team.id
+        })
+
+        const matchRows = []
+        schedule.forEach((round, roundIdx) => {
+          round.forEach((m) => {
+            matchRows.push({
+              game_id: id,
+              round_number: roundIdx + 1,
+              court_number: m.court_number,
+              team_a_id: teamIdBySlot[`${roundIdx}|${m.court_number}|duplaA`],
+              team_b_id: teamIdBySlot[`${roundIdx}|${m.court_number}|duplaB`],
+              phase: 'group',
+            })
+          })
+        })
+
+        const { error: matchesError } = await supabase.from('matches').insert(matchRows)
+        if (matchesError) throw matchesError
+
+        const { error: statusError } = await supabase
+          .from('games')
+          .update({
+            status: 'in_progress',
+            round_started_at: new Date().toISOString(),
+            round_duration_minutes: game.game_time_minutes,
+          })
+          .eq('id', id)
+        if (statusError) throw statusError
+
+        loadGameDetails()
+        return
+      }
 
       // Duplas from the most recent previous mix at this club — solos
       // whose points-based pairing would recreate one of these get
