@@ -534,6 +534,7 @@
   "gamedetails.set_saved": "Set {{number}}: {{a}}-{{b}}",
   "gamedetails.save_set": "Save set",
   "gamedetails.error_americano_needs_multiple_of_4": "Americano needs a multiple of 4 confirmed players (currently: {{count}}).",
+  "gamedetails.error_americano_too_many_players": "Americano needs at most {{courts}} courts for {{count}} confirmed players — adjust the mix's court count or reduce sign-ups.",
   "gamedetails.americano_ranking_title": "Individual ranking",
   "gamedetails.register_americano_results": "Register every match's result.",
   "gerir.title": "Manage",

@@ -752,6 +752,9 @@ export default function GameDetails() {
           throw new Error(t('gamedetails.error_americano_needs_multiple_of_4', { count: players.length }))
         }
         const numCourts = players.length / 4
+        if (numCourts > (game.num_courts || 1)) {
+          throw new Error(t('gamedetails.error_americano_too_many_players', { count: players.length, courts: game.num_courts || 1 }))
+        }
         const numRounds = totalRounds(game)
         const schedule = generateAmericanoSchedule(players, numCourts, numRounds, pointsById)
 
@@ -1532,7 +1535,7 @@ export default function GameDetails() {
           url={shareUrl}
           onClose={() => setShowShare(false)}
           imageCard={{
-            variant: game.status === 'finished' && duplaStats.length > 0 ? 'podium' : 'invite',
+            variant: !isAmericano && game.status === 'finished' && duplaStats.length > 0 ? 'podium' : 'invite',
             game,
             people,
             capacity,
@@ -1778,7 +1781,7 @@ export default function GameDetails() {
             { key: 'stats', label: t('gamedetails.tab_stats') },
             { key: 'duplas', label: t('gamedetails.tab_duplas') },
             { key: 'rondas', label: t('gamedetails.tab_rondas') },
-          ].map((tab) => (
+          ].filter((tab) => !(isAmericano && tab.key === 'duplas')).map((tab) => (
             <button
               key={tab.key}
               onClick={() => setFinishedTab(tab.key)}

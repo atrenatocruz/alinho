@@ -58,8 +58,8 @@ BEGIN
     RAISE EXCEPTION 'O mix não está a decorrer ou não é Americano';
   END IF;
 
-  IF EXISTS (SELECT 1 FROM matches WHERE game_id = p_game_id AND winner_team_id IS NULL) THEN
-    RAISE EXCEPTION 'Há jogos sem resultado registado';
+  IF NOT EXISTS (SELECT 1 FROM matches WHERE game_id = p_game_id AND winner_team_id IS NOT NULL) THEN
+    RAISE EXCEPTION 'Não há resultados registados';
   END IF;
 
   SELECT points_rules INTO rules FROM organizations WHERE id = v_org_id;
@@ -74,7 +74,7 @@ BEGIN
     FROM matches m
     JOIN teams ta ON ta.id = m.team_a_id
     JOIN teams tb ON tb.id = m.team_b_id
-    WHERE m.game_id = p_game_id
+    WHERE m.game_id = p_game_id AND m.winner_team_id IS NOT NULL
   ),
   pp AS (
     SELECT a1 AS pid, score_a AS scored, (win_id = team_a_id) AS won FROM mt
@@ -171,7 +171,7 @@ BEGIN
 
   -- Troféus: estado já todo escrito (stats, XP, Elo) — verificar todos os
   -- jogadores do mix.
-  PERFORM check_and_award_trophies(mps.user_id)
+  PERFORM check_and_award_achievements(mps.user_id)
   FROM mix_player_stats mps WHERE mps.game_id = p_game_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;

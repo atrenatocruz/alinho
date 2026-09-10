@@ -534,6 +534,7 @@
   "gamedetails.set_saved": "Set {{number}}: {{a}}-{{b}}",
   "gamedetails.save_set": "Guardar set",
   "gamedetails.error_americano_needs_multiple_of_4": "O Americano precisa de um múltiplo de 4 jogadores confirmados (agora: {{count}}).",
+  "gamedetails.error_americano_too_many_players": "O Americano precisa de no máximo {{courts}} campos para {{count}} jogadores confirmados — ajusta o número de campos do mix ou reduz os inscritos.",
   "gamedetails.americano_ranking_title": "Classificação individual",
   "gamedetails.register_americano_results": "Regista os resultados de todos os jogos.",
   "gerir.title": "Gerir",
