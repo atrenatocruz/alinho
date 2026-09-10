@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   splitIntoPools, seedKnockoutFromPools,
   poolRoundNumbers, poolRoundsPlayed, roundRobinRound,
-  generateAmericanoSchedule,
+  generateAmericanoSchedule, americanoStandings,
 } from './mixLogic'
 
 describe('splitIntoPools', () => {
@@ -229,5 +229,61 @@ describe('generateAmericanoSchedule', () => {
     const m = schedule[0][0]
     expect(m.duplaA.seed).toBe((pointsById[m.duplaA.player1.id] ?? 0) + (pointsById[m.duplaA.player2.id] ?? 0))
     expect(m.duplaB.seed).toBe((pointsById[m.duplaB.player1.id] ?? 0) + (pointsById[m.duplaB.player2.id] ?? 0))
+  })
+})
+
+describe('americanoStandings', () => {
+  const p1 = { id: 'p1', name: 'A' }
+  const p2 = { id: 'p2', name: 'B' }
+  const p3 = { id: 'p3', name: 'C' }
+  const p4 = { id: 'p4', name: 'D' }
+  const teamAB = { id: 't-ab', player1: p1, player2: p2 }
+  const teamCD = { id: 't-cd', player1: p3, player2: p4 }
+  const teamAC = { id: 't-ac', player1: p1, player2: p3 }
+  const teamBD = { id: 't-bd', player1: p2, player2: p4 }
+
+  it('sums the match score onto both players of each side, ranked by total points', () => {
+    const teams = [teamAB, teamCD]
+    const matches = [
+      { team_a_id: 't-ab', team_b_id: 't-cd', score_a: 21, score_b: 15, winner_team_id: 't-ab' },
+    ]
+    const result = americanoStandings(matches, teams)
+    const byId = Object.fromEntries(result.map((r) => [r.player.id, r]))
+    expect(byId.p1.points).toBe(21)
+    expect(byId.p1.wins).toBe(1)
+    expect(byId.p1.played).toBe(1)
+    expect(byId.p2.points).toBe(21)
+    expect(byId.p3.points).toBe(15)
+    expect(byId.p3.wins).toBe(0)
+    expect(byId.p4.points).toBe(15)
+    expect(result[0].points).toBe(21)
+  })
+
+  it('accumulates points across multiple matches with different partners', () => {
+    const teams = [teamAB, teamCD, teamAC, teamBD]
+    const matches = [
+      { team_a_id: 't-ab', team_b_id: 't-cd', score_a: 21, score_b: 10, winner_team_id: 't-ab' },
+      { team_a_id: 't-ac', team_b_id: 't-bd', score_a: 15, score_b: 20, winner_team_id: 't-bd' },
+    ]
+    const result = americanoStandings(matches, teams)
+    const byId = Object.fromEntries(result.map((r) => [r.player.id, r]))
+    expect(byId.p1.points).toBe(36) // 21 (round 1, with p2) + 15 (round 2, with p3)
+    expect(byId.p1.wins).toBe(1)
+    expect(byId.p2.points).toBe(41) // 21 (round 1, with p1) + 20 (round 2, with p4)
+    expect(byId.p2.wins).toBe(2)
+    expect(byId.p3.points).toBe(25) // 10 (round 1, with p4) + 15 (round 2, with p1)
+    expect(byId.p3.wins).toBe(0)
+    expect(byId.p4.points).toBe(30) // 10 (round 1, with p3) + 20 (round 2, with p2)
+    expect(byId.p4.wins).toBe(1)
+    expect(result.map((r) => r.player.id)).toEqual(['p2', 'p1', 'p4', 'p3'])
+  })
+
+  it('ignores matches with no winner_team_id yet', () => {
+    const teams = [teamAB, teamCD]
+    const matches = [
+      { team_a_id: 't-ab', team_b_id: 't-cd', score_a: null, score_b: null, winner_team_id: null },
+    ]
+    const result = americanoStandings(matches, teams)
+    expect(result.every((r) => r.points === 0 && r.played === 0)).toBe(true)
   })
 })

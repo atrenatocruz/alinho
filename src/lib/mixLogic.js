@@ -372,6 +372,46 @@ export function generateAmericanoSchedule(players, numCourts, numRounds, pointsB
   return rounds
 }
 
+/** Americano's individual ranking: each player's points are the sum of
+    the score their side got in every match they took part in (across
+    whichever different teams row they were on each round) — not the
+    team's win/loss. wins is a secondary sort key (breaks a points tie),
+    never the primary one — see the design spec's "Ranking" decision.
+    `teams` must have embedded player1/player2 profile objects (same
+    shape GameDetails.jsx's `teams` state already carries). */
+export function americanoStandings(matches, teams) {
+  const teamById = Object.fromEntries(teams.map((t) => [t.id, t]))
+  const table = {}
+  const rowFor = (player) => {
+    if (!player) return null
+    if (!table[player.id]) table[player.id] = { player, points: 0, wins: 0, played: 0 }
+    return table[player.id]
+  }
+
+  for (const m of matches) {
+    if (!m.winner_team_id) continue
+    const teamA = teamById[m.team_a_id]
+    const teamB = teamById[m.team_b_id]
+    if (!teamA || !teamB) continue
+    for (const player of [teamA.player1, teamA.player2]) {
+      const row = rowFor(player)
+      if (!row) continue
+      row.played += 1
+      row.points += m.score_a ?? 0
+      if (m.winner_team_id === teamA.id) row.wins += 1
+    }
+    for (const player of [teamB.player1, teamB.player2]) {
+      const row = rowFor(player)
+      if (!row) continue
+      row.played += 1
+      row.points += m.score_b ?? 0
+      if (m.winner_team_id === teamB.id) row.wins += 1
+    }
+  }
+
+  return Object.values(table).sort((x, y) => y.points - x.points || y.wins - x.wins)
+}
+
 export const PHASE_LABEL_KEY = {
   group: 'mixlogic.phase_group',
   quarter: 'mixlogic.phase_quarter',
