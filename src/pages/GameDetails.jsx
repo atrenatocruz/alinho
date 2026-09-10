@@ -2058,6 +2058,7 @@ export default function GameDetails() {
                           )}
                         </div>
                         <ScoreEntry
+                          key={`${m.id}-${isCorrecting}`}
                           match={m}
                           scoringFormat={game.scoring_format || 'pontos_simples'}
                           editable={editable}

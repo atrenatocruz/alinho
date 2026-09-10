@@ -14,6 +14,11 @@ export default function ScoreEntry({
   initialScores, onScoreChange, onSave, saving,
 }) {
   const { t } = useTranslation()
+  // Must be called unconditionally on every render (rules-of-hooks) — even
+  // though it's only read by the pontos_simples/pro_set_9 branch below, the
+  // early return for melhor_2_sets/melhor_3_sets sits after this in the
+  // function body, so this can't move any lower without becoming conditional.
+  const [breakerScore, setBreakerScore] = useState({ a: '', b: '' })
 
   if (scoringFormat === 'melhor_2_sets' || scoringFormat === 'melhor_3_sets') {
     return (
@@ -35,7 +40,6 @@ export default function ScoreEntry({
   // pontos_simples and pro_set_9 share the same single-pair input shape —
   // only validation and the optional 8-8 breaker prompt differ.
   const s = initialScores || { a: '', b: '' }
-  const [breakerScore, setBreakerScore] = useState({ a: '', b: '' })
   const aNum = parseInt(s.a, 10)
   const bNum = parseInt(s.b, 10)
   const bothEntered = s.a !== '' && s.b !== '' && !Number.isNaN(aNum) && !Number.isNaN(bNum)
