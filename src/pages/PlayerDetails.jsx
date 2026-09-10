@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, Trophy, Award, Swords, ChevronDown, UserPlus, UserCheck, Clock, Lock, ShieldCheck, ThumbsUp } from 'lucide-react'
+import { ArrowLeft, Award, Swords, ChevronDown, UserPlus, UserCheck, Clock, Lock, ShieldCheck, ThumbsUp } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { PrimaryButton, EmptyState, Avatar, RatingBadge, PhotoViewerModal, TrophyCard } from '../components/ui'
+import { PrimaryButton, EmptyState, Avatar, RatingBadge, PhotoViewerModal, AchievementCard } from '../components/ui'
 import { countryName } from '../lib/countries'
 import { AGE_LABEL_KEY } from '../lib/ageCategories'
 import { formatRatingMaybeProvisional, isProvisional, bandProgress } from '../lib/elo'
@@ -76,7 +76,7 @@ export default function PlayerDetails() {
       console.error('Error loading player xp:', error)
     }
     try {
-      const { data, error } = await supabase.rpc('get_player_trophies', { p_user_id: id })
+      const { data, error } = await supabase.rpc('get_player_achievements', { p_user_id: id })
       if (error) throw error
       setPlayerTrophies(data || [])
     } catch (error) {
@@ -472,11 +472,11 @@ export default function PlayerDetails() {
       {!resultsHidden && playerTrophies.length > 0 && (
         <div className="card">
           <h3 className="text-lg text-ink-900 mb-3 flex items-center gap-2">
-            <Trophy size={20} className="text-lime-600" /> {t('trophies.shelf_title')}
+            <Award size={20} className="text-lime-600" /> {t('achievements.shelf_title')}
           </h3>
           <div className="grid grid-cols-2 gap-2">
             {playerTrophies.map((tr) => (
-              <TrophyCard key={tr.trophy_key} trophyKey={tr.trophy_key} category={tr.category} rarity={tr.rarity} earned rarityPct={tr.rarity_pct} />
+              <AchievementCard key={tr.achievement_key} achievementKey={tr.achievement_key} category={tr.category} rarity={tr.rarity} earned rarityPct={tr.rarity_pct} />
             ))}
           </div>
         </div>

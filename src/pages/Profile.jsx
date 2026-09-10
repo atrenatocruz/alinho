@@ -9,8 +9,8 @@ import { uploadAvatar, removeAvatar } from '../lib/avatarStorage'
 import { getMyPrivateMatches, getGlobalRankings } from '../lib/privateMatches'
 import { listIncomingFriendRequests, acceptFriendRequest, removeFriendRequest, listFriends, listOutgoingFriendRequests } from '../lib/friends'
 import { listIncomingOrganizationInvites, acceptOrganizationInvite, declineOrganizationInvite } from '../lib/orgInvites'
-import { PrimaryButton, GuestBadge, DateField, Avatar, Select, EmptyState, RatingBadge, PhotoViewerModal, TrophyCard } from '../components/ui'
-import { CATEGORY_ORDER } from '../lib/trophies'
+import { PrimaryButton, GuestBadge, DateField, Avatar, Select, EmptyState, RatingBadge, PhotoViewerModal, AchievementCard } from '../components/ui'
+import { CATEGORY_ORDER } from '../lib/achievements'
 import { formatRating, formatRatingMaybeProvisional, isProvisional, bandProgress } from '../lib/elo'
 import { countryOptions, countryName } from '../lib/countries'
 import { AGE_LABEL_KEY, ageCategory } from '../lib/ageCategories'
@@ -131,8 +131,8 @@ export default function Profile() {
   const loadTrophies = async () => {
     try {
       const [{ data: catalog, error: catErr }, { data: mine, error: mineErr }] = await Promise.all([
-        supabase.from('trophies').select('key, category, rarity, sort').eq('active', true).order('sort'),
-        supabase.rpc('get_player_trophies', { p_user_id: profile.id }),
+        supabase.from('achievements').select('key, category, rarity, sort').eq('active', true).order('sort'),
+        supabase.rpc('get_player_achievements', { p_user_id: profile.id }),
       ])
       if (catErr) throw catErr
       if (mineErr) throw mineErr
@@ -751,7 +751,7 @@ export default function Profile() {
           <div className="card">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-lg text-ink-900 flex items-center gap-2">
-                <Trophy size={20} className="text-lime-600" /> {t('trophies.shelf_title')}
+                <Award size={20} className="text-lime-600" /> {t('achievements.shelf_title')}
               </h3>
               <button
                 type="button"
@@ -759,17 +759,17 @@ export default function Profile() {
                 className="text-xs font-extrabold text-ink-700 hover:text-ink-900"
               >
                 {trophiesExpanded
-                  ? t('trophies.collapse')
-                  : t('trophies.view_all', { earned: myTrophies.length, total: trophyCatalog.length })}
+                  ? t('achievements.collapse')
+                  : t('achievements.view_all', { earned: myTrophies.length, total: trophyCatalog.length })}
               </button>
             </div>
             {!trophiesExpanded ? (
               myTrophies.length === 0 ? (
-                <p className="text-sm text-muted">{t('trophies.empty_own')}</p>
+                <p className="text-sm text-muted">{t('achievements.empty_own')}</p>
               ) : (
                 <div className="grid grid-cols-2 gap-2">
                   {myTrophies.slice(0, 4).map((tr) => (
-                    <TrophyCard key={tr.trophy_key} trophyKey={tr.trophy_key} category={tr.category} rarity={tr.rarity} earned rarityPct={tr.rarity_pct} />
+                    <AchievementCard key={tr.achievement_key} achievementKey={tr.achievement_key} category={tr.category} rarity={tr.rarity} earned rarityPct={tr.rarity_pct} />
                   ))}
                 </div>
               )
@@ -784,11 +784,11 @@ export default function Profile() {
                     />
                   </div>
                   <p className="mt-1 text-[11px] text-muted text-right tabular-nums">
-                    {t('trophies.progress', { earned: myTrophies.length, total: trophyCatalog.length })}
+                    {t('achievements.progress', { earned: myTrophies.length, total: trophyCatalog.length })}
                   </p>
                 </div>
                 {CATEGORY_ORDER.map((cat) => {
-                  const earnedByKey = new Map(myTrophies.map((tr) => [tr.trophy_key, tr]))
+                  const earnedByKey = new Map(myTrophies.map((tr) => [tr.achievement_key, tr]))
                   // Ganhos primeiro dentro da categoria — a colheita à
                   // frente, o "por conquistar" a seguir.
                   const inCat = trophyCatalog
@@ -799,14 +799,14 @@ export default function Profile() {
                   return (
                     <div key={cat}>
                       <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mb-2">
-                        {t(`trophies.cat_${cat}`)}
+                        {t(`achievements.cat_${cat}`)}
                         <span className="ml-1.5 normal-case tracking-normal font-mono">{earnedInCat}/{inCat.length}</span>
                       </p>
                       <div className="grid grid-cols-2 gap-2">
                         {inCat.map((c) => {
                           const mine = earnedByKey.get(c.key)
                           return (
-                            <TrophyCard key={c.key} trophyKey={c.key} category={c.category} rarity={c.rarity} earned={!!mine} rarityPct={mine?.rarity_pct} />
+                            <AchievementCard key={c.key} achievementKey={c.key} category={c.category} rarity={c.rarity} earned={!!mine} rarityPct={mine?.rarity_pct} />
                           )
                         })}
                       </div>
