@@ -744,7 +744,10 @@ export default function GameDetails() {
       // generateAmericanoSchedule's doc comment for why that's safe to
       // do before any result exists, unlike sobe_desce/todos_contra_todos).
       if (game.format === 'americano') {
-        const players = participants.filter((p) => p.status === 'confirmed').map((p) => p.user).filter(Boolean)
+        const players = participants
+          .filter((p) => p.status === 'confirmed')
+          .flatMap((p) => [p.user, p.partner])
+          .filter(Boolean)
         if (players.length < 4 || players.length % 4 !== 0) {
           throw new Error(t('gamedetails.error_americano_needs_multiple_of_4', { count: players.length }))
         }
@@ -798,7 +801,14 @@ export default function GameDetails() {
         })
 
         const { error: matchesError } = await supabase.from('matches').insert(matchRows)
-        if (matchesError) throw matchesError
+        if (matchesError) {
+          // Roll back the teams already inserted above so a retry of
+          // "Começar Mix" doesn't double-insert them — games.status never
+          // got updated, so without this the mix is left in a state where
+          // teams exist but the mix never actually started.
+          await supabase.from('teams').delete().eq('game_id', id)
+          throw matchesError
+        }
 
         const { error: statusError } = await supabase
           .from('games')
