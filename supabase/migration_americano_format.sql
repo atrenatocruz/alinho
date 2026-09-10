@@ -41,8 +41,9 @@ RETURNS void AS $$
 DECLARE
   rules JSONB;
   v_org_id UUID;
+  v_game_date TIMESTAMPTZ;
 BEGIN
-  SELECT organization_id INTO v_org_id FROM games WHERE id = p_game_id;
+  SELECT organization_id, date INTO v_org_id, v_game_date FROM games WHERE id = p_game_id;
 
   IF NOT EXISTS (
     SELECT 1 FROM memberships
@@ -89,7 +90,7 @@ BEGIN
            COUNT(*) AS played,
            COUNT(*) FILTER (WHERE won) AS wins,
            COUNT(*) FILTER (WHERE NOT won) AS losses,
-           SUM(scored) AS total_scored
+           COALESCE(SUM(scored), 0) AS total_scored
     FROM pp
     WHERE pid IS NOT NULL
     GROUP BY pid
@@ -124,15 +125,37 @@ BEGIN
         total_points = player_stats.total_points + EXCLUDED.total_points,
         updated_at   = NOW()
     RETURNING 1
+  ),
+  ins_mix_stats AS (
+    INSERT INTO mix_player_stats (game_id, user_id, organization_id, matches_played, matches_won, points_earned, mix_won)
+    SELECT p_game_id, pid, v_org_id, played, wins, pts, won_mix
+    FROM pcalc
+    ON CONFLICT (game_id, user_id) DO UPDATE
+    SET matches_played = EXCLUDED.matches_played,
+        matches_won    = EXCLUDED.matches_won,
+        points_earned  = EXCLUDED.points_earned,
+        mix_won        = EXCLUDED.mix_won
+    RETURNING 1
+  ),
+  xp_rows AS (
+    SELECT pid, 'mix_participation'::text AS kind, 20 AS amount FROM pcalc
+    UNION ALL
+    SELECT pid, 'mix_games', played * 5 FROM pcalc WHERE played > 0
+    UNION ALL
+    SELECT pid, 'mix_win', 30 FROM pcalc WHERE won_mix
+  ),
+  ins_xp AS (
+    INSERT INTO xp_events (user_id, organization_id, kind, source_game_id, amount, occurred_at)
+    SELECT pid, v_org_id, kind, p_game_id, amount, v_game_date
+    FROM xp_rows
+    ON CONFLICT (user_id, kind, source_game_id) WHERE source_game_id IS NOT NULL DO NOTHING
+    RETURNING user_id, amount
   )
-  INSERT INTO mix_player_stats (game_id, user_id, organization_id, matches_played, matches_won, points_earned, mix_won)
-  SELECT p_game_id, pid, v_org_id, played, wins, pts, won_mix
-  FROM pcalc
-  ON CONFLICT (game_id, user_id) DO UPDATE
-  SET matches_played = EXCLUDED.matches_played,
-      matches_won    = EXCLUDED.matches_won,
-      points_earned  = EXCLUDED.points_earned,
-      mix_won        = EXCLUDED.mix_won;
+  UPDATE profiles p
+  SET xp = p.xp + s.total,
+      last_played_at = GREATEST(COALESCE(p.last_played_at, v_game_date), v_game_date)
+  FROM (SELECT user_id, SUM(amount) AS total FROM ins_xp GROUP BY user_id) s
+  WHERE p.id = s.user_id;
 
   -- Per-match Elo (unaffected by format — reads matches/teams directly,
   -- never assumes a player kept one partner for the whole mix). The
@@ -145,6 +168,11 @@ BEGIN
   UPDATE games
   SET status = 'finished', winner_team_id = NULL, updated_at = NOW()
   WHERE id = p_game_id;
+
+  -- Troféus: estado já todo escrito (stats, XP, Elo) — verificar todos os
+  -- jogadores do mix.
+  PERFORM check_and_award_trophies(mps.user_id)
+  FROM mix_player_stats mps WHERE mps.game_id = p_game_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
