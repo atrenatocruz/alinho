@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, Trophy, Target, Award, Swords, ChevronDown, UserPlus, UserCheck, Clock, Lock, ShieldCheck, ThumbsUp } from 'lucide-react'
+import { ArrowLeft, Trophy, Award, Flame, Swords, ChevronDown, UserPlus, UserCheck, Clock, Lock, ShieldCheck, ThumbsUp } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { PrimaryButton, EmptyState, Avatar, PhotoViewerModal, TrophyCard } from '../components/ui'
-import { formatRating, formatRatingMaybeProvisional, isProvisional, ratingBand } from '../lib/elo'
+import { PrimaryButton, EmptyState, Avatar, PhotoViewerModal, TrophyCard, RatingBadge } from '../components/ui'
+import { formatRatingMaybeProvisional, isProvisional, bandProgress } from '../lib/elo'
 import { tierFromXp, preTierProgress, formatXp } from '../lib/xp'
 import { winRatePct } from '../lib/statsLogic'
 import { sendFriendRequest, acceptFriendRequest, removeFriendRequest } from '../lib/friends'
@@ -240,11 +240,11 @@ export default function PlayerDetails() {
   const played = (player.game_wins || 0) + (player.game_losses || 0)
   const winRate = winRatePct(player.game_wins || 0, played)
 
+  // Jogos, % vitórias e títulos vivem agora no cartão do hero — aqui só
+  // ficam as métricas que ele não absorveu (espelha Profile.jsx).
   const statTiles = [
-    { icon: Trophy, value: formatRating(globalEntry?.rating), label: t('playerdetails.stat_points'), cls: 'text-lime-600' },
-    { icon: Award, value: `${player.mix_wins || 0}/${player.mixes_played || 0}`, label: t('playerdetails.stat_mixes_won'), cls: 'text-ink-700' },
-    { icon: Target, value: played, label: t('playerdetails.stat_games'), cls: 'text-ink-700' },
-    { icon: Award, value: `${winRate}%`, label: t('playerdetails.stat_win_rate'), cls: 'text-ok' },
+    { icon: Flame, value: player.game_wins || 0, label: t('profile.stat_game_wins'), cls: 'text-ok' },
+    ...((playerXp?.kudos ?? 0) > 0 ? [{ icon: ThumbsUp, value: playerXp.kudos, label: t('profile.stat_kudos'), cls: 'text-lime-600' }] : []),
   ]
 
   // A mix with several rounds ("todos contra todos") returns one row per
@@ -279,51 +279,48 @@ export default function PlayerDetails() {
       </button>
 
       {/* Hero */}
-      <div className="card bg-ink-900 text-center relative overflow-hidden">
-        <svg
-          viewBox="0 0 400 160"
-          className="absolute inset-0 w-full h-full text-white/[0.05]"
-          preserveAspectRatio="xMidYMid slice"
-          aria-hidden="true"
-        >
-          <rect x="60" y="-60" width="280" height="260" rx="16" stroke="currentColor" strokeWidth="3" fill="none" />
-          <line x1="200" y1="-60" x2="200" y2="200" stroke="currentColor" strokeWidth="3" />
-        </svg>
-        <div className="relative py-2">
+      {/* Hero — cartão claro, igual ao do perfil próprio (Profile.jsx). */}
+      <div className="card">
+        <div className="flex items-start gap-4">
           <button
             type="button"
             onClick={() => player.avatar_url && setShowPhoto(true)}
             aria-label={player.avatar_url ? t('playerdetails.view_photo_aria') : undefined}
-            className="w-20 h-20 mx-auto mb-3 block"
+            className="relative w-20 h-20 shrink-0 block"
           >
             <Avatar name={player.name} url={player.avatar_url} size="w-20 h-20 text-3xl" colorClass="bg-lime-400 text-ink-900" provisional={isProvisional(globalEntry?.rating_games)} />
           </button>
           {showPhoto && (
             <PhotoViewerModal url={player.avatar_url} alt={player.name} onClose={() => setShowPhoto(false)} />
           )}
-          <h2 className="text-2xl text-white">{player.name}</h2>
-          {/* Not gated by results_visibility — playing side isn't a result,
-              and knowing it is the whole point when inviting a stranger. */}
-          <p className="text-white/60 text-xs mt-1">
-            {t('playerdetails.preferred_side', { side: t(SIDE_LABEL_KEY[player.preferred_side] || SIDE_LABEL_KEY.both) })}
-          </p>
-          <p className="text-white/60 text-xs mt-2.5">
-            {t('playerdetails.friends_count', { count: player.friends_count })}
-            {(playerXp?.kudos ?? 0) > 0 && (
-              <span className="inline-flex items-center gap-1 ml-2.5 align-middle">
-                <ThumbsUp size={11} className="text-lime-400" /> {playerXp.kudos}
-              </span>
-            )}
-          </p>
-          {!player.my_profile && (
-            player.friendship_status === 'friends' ? (
-              // Label reads as an action ("Deixar de seguir"), not "Amigos" —
-              // sharing that word with the "amigos" count right above it read
-              // as one navigable element ("view friends list") instead of two.
+          <div className="flex-1 min-w-0 pt-1">
+            <h2 className="text-xl text-ink-900 truncate">{player.name}</h2>
+            {/* Not gated by results_visibility — playing side isn't a
+                result, and knowing it is the whole point when inviting. */}
+            <p className="text-xs text-muted mt-0.5">
+              {t('playerdetails.preferred_side', { side: t(SIDE_LABEL_KEY[player.preferred_side] || SIDE_LABEL_KEY.both) })}
+            </p>
+            <p className="text-xs text-muted mt-0.5">
+              {t('playerdetails.friends_count', { count: player.friends_count })}
+            </p>
+          </div>
+          {!resultsHidden && globalRank && (
+            <div className="text-right shrink-0 pt-1">
+              <p className="text-2xl font-extrabold text-ink-900 tabular-nums leading-none">#{globalRank}</p>
+              <p className="mt-1 text-[9px] font-extrabold uppercase tracking-[0.15em] text-muted">
+                {t('profile.card_global_ranking')}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {!player.my_profile && (
+          <div className="mt-3">
+            {player.friendship_status === 'friends' ? (
               <button
                 onClick={() => handleRemoveFriendship(t('playerdetails.unfollow_confirm', { name: player.name }))}
                 disabled={friendActing}
-                className="mt-3 inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors duration-fast disabled:opacity-40"
+                className="inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full bg-ink-50 text-ink-900 hover:bg-ink-200/60 transition-colors duration-fast disabled:opacity-40"
               >
                 <UserCheck size={14} /> {t('playerdetails.unfollow_button')}
               </button>
@@ -331,7 +328,7 @@ export default function PlayerDetails() {
               <button
                 onClick={() => handleRemoveFriendship(t('playerdetails.cancel_request_confirm'))}
                 disabled={friendActing}
-                className="mt-3 inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full bg-white/10 text-white/70 hover:bg-white/20 transition-colors duration-fast disabled:opacity-40"
+                className="inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full bg-ink-50 text-muted hover:bg-ink-200/60 transition-colors duration-fast disabled:opacity-40"
               >
                 <Clock size={14} /> {t('playerdetails.request_sent')}
               </button>
@@ -339,7 +336,7 @@ export default function PlayerDetails() {
               <button
                 onClick={handleAcceptRequest}
                 disabled={friendActing}
-                className="mt-3 inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full bg-lime-400 text-ink-900 hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
+                className="inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full bg-lime-400 text-ink-900 hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
               >
                 <UserCheck size={14} /> {t('playerdetails.accept_request')}
               </button>
@@ -347,67 +344,82 @@ export default function PlayerDetails() {
               <button
                 onClick={handleSendRequest}
                 disabled={friendActing}
-                className="mt-3 inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full bg-lime-400 text-ink-900 hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
+                className="inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full bg-lime-400 text-ink-900 hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
               >
                 <UserPlus size={14} /> {t('playerdetails.add_friend')}
               </button>
-            )
-          )}
-          {/* Painéis Ranking/XP — mesmo layout do perfil próprio
-              (Profile.jsx). O painel de ranking respeita a mesma gate de
-              privacidade das stats (results_visibility); o de atividade é
-              público como o tab Assiduidade. */}
-          {!resultsHidden && globalEntry && (
-            <div className="mt-3 rounded-ctrl bg-white/10 border border-white/10 p-3 text-left">
-              <p className="flex items-center gap-1.5 text-[9px] font-extrabold uppercase tracking-[0.18em] text-white/50">
-                <Trophy size={11} /> {t('profile.card_ranking_heading')}
-              </p>
-              <div className="mt-2 grid grid-cols-3 divide-x divide-white/10 text-center">
-                <div className="px-1">
-                  <p className="text-lg font-extrabold text-lime-400 tabular-nums leading-none">
-                    {formatRatingMaybeProvisional(globalEntry?.rating, globalEntry?.rating_games)} <span className="text-[11px]">pts</span>
-                  </p>
-                  <p className="mt-1 text-[9px] text-white/50">{t('profile.card_points_label')}</p>
-                </div>
-                <div className="px-1">
-                  <p className="text-lg font-extrabold text-white leading-none">
-                    {ratingBand(globalEntry?.rating, globalEntry?.gender)?.label ?? '—'}
-                  </p>
-                  <p className="mt-1 text-[9px] text-white/50">{t('profile.card_band_label')}</p>
-                </div>
-                <div className="px-1">
-                  <p className="text-lg font-extrabold text-white tabular-nums leading-none">
-                    {globalRank ? `#${globalRank}` : '—'}
-                  </p>
-                  <p className="mt-1 text-[9px] text-white/50">{t('profile.card_position_label')}</p>
-                </div>
+            )}
+          </div>
+        )}
+
+        {/* Banda + pontos + progresso até à próxima banda — gated pela
+            privacidade dos resultados, como as stats. */}
+        {!resultsHidden && globalEntry && (() => {
+          const bp = bandProgress(globalEntry?.rating)
+          return (
+            <div className="mt-4">
+              <div className="flex items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-2">
+                  <RatingBadge rating={globalEntry?.rating} gender={globalEntry?.gender} />
+                  <span className="text-sm font-extrabold text-ink-900 tabular-nums">
+                    {formatRatingMaybeProvisional(globalEntry?.rating, globalEntry?.rating_games)} {t('profile.card_points_word')}
+                  </span>
+                </span>
+                {bp?.nextMin != null && (
+                  <span className="text-[11px] text-muted tabular-nums">
+                    {t('profile.card_next_level')} <span className="font-extrabold text-ink-700">{bp.nextMin}</span>
+                  </span>
+                )}
+              </div>
+              <div className="mt-2 h-1.5 rounded-full bg-ink-50 overflow-hidden">
+                <div className="h-full rounded-full bg-lime-400" style={{ width: `${bp?.pct ?? 0}%` }} />
               </div>
             </div>
-          )}
-          {playerXp && (() => {
-            const tier = tierFromXp(playerXp.xp)
-            const progress = tier ?? preTierProgress(playerXp.xp)
-            return (
-              <div className="mt-2 rounded-ctrl bg-white/10 border border-white/10 p-3 text-left">
-                <p className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-white/50">
-                  {t('profile.card_xp_heading')}
-                </p>
-                <div className="mt-2 border-t border-white/10 pt-2 flex items-center justify-between text-[11px] font-extrabold text-white">
-                  <span>
-                    {tier
-                      ? `${t('profile.xp_level', { level: tier.level })} · ${t(tier.labelKey)}`
-                      : t('profile.xp_no_shield')}
-                  </span>
-                  <span className="tabular-nums text-white/70">{formatXp(playerXp.xp)} XP</span>
-                </div>
-                <div className="mt-1.5 h-1.5 rounded-full bg-ink-900/60 overflow-hidden">
-                  <div className="h-full rounded-full bg-lime-400/80" style={{ width: `${progress.progressPct}%` }} />
-                </div>
-              </div>
-            )
-          })()}
-        </div>
+          )
+        })()}
+
+        {!resultsHidden && (
+          <div className="mt-4 pt-3.5 border-t border-line grid grid-cols-3 divide-x divide-line text-center">
+            <div className="px-1">
+              <p className="text-xl font-extrabold text-ink-900 tabular-nums leading-none">{played}</p>
+              <p className="mt-1 text-[11px] text-muted">{t('profile.card_games')}</p>
+            </div>
+            <div className="px-1">
+              <p className="text-xl font-extrabold text-ink-900 tabular-nums leading-none">{winRate}%</p>
+              <p className="mt-1 text-[11px] text-muted">{t('profile.card_winrate')}</p>
+            </div>
+            <div className="px-1">
+              <p className="text-xl font-extrabold text-ink-900 tabular-nums leading-none">{player.mix_wins || 0}</p>
+              <p className="mt-1 text-[11px] text-muted">{t('profile.card_titles')}</p>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* XP DE ATIVIDADE — painel claro separado (público, como o tab
+          Assiduidade). */}
+      {playerXp && (() => {
+        const tier = tierFromXp(playerXp.xp)
+        const progress = tier ?? preTierProgress(playerXp.xp)
+        return (
+          <div className="rounded-ctrl bg-ink-50 border border-line p-3">
+            <p className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-muted">
+              {t('profile.card_xp_heading')}
+            </p>
+            <div className="mt-2 flex items-center justify-between text-[11px] font-extrabold text-ink-900">
+              <span>
+                {tier
+                  ? `${t('profile.xp_level', { level: tier.level })} · ${t(tier.labelKey)}`
+                  : t('profile.xp_no_shield')}
+              </span>
+              <span className="tabular-nums text-muted">{formatXp(playerXp.xp)} XP</span>
+            </div>
+            <div className="mt-1.5 h-1.5 rounded-full bg-ink-200/50 overflow-hidden">
+              <div className="h-full rounded-full bg-lime-400" style={{ width: `${progress.progressPct}%` }} />
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Stats */}
       {resultsHidden ? (

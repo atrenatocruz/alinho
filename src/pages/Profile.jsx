@@ -11,7 +11,7 @@ import { listIncomingFriendRequests, acceptFriendRequest, removeFriendRequest, l
 import { listIncomingOrganizationInvites, acceptOrganizationInvite, declineOrganizationInvite } from '../lib/orgInvites'
 import { PrimaryButton, GuestBadge, DateField, Avatar, Select, EmptyState, RankBadge, RatingBadge, PhotoViewerModal, TrophyCard } from '../components/ui'
 import { CATEGORY_ORDER } from '../lib/trophies'
-import { formatRating, formatRatingMaybeProvisional, isProvisional, ratingBand } from '../lib/elo'
+import { formatRating, formatRatingMaybeProvisional, isProvisional, ratingBand, bandProgress } from '../lib/elo'
 import { tierFromXp, preTierProgress, formatXp } from '../lib/xp'
 import { formatDate as formatDateLib } from '../lib/formatDate'
 
@@ -27,7 +27,7 @@ const GENDER_LABEL_KEY = { masculino: 'login.gender_male', feminino: 'login.gend
 
 export default function Profile() {
   const { t, i18n } = useTranslation()
-  const { profile, updateProfile, currentOrganizationId, isGuest, signOut, refreshMemberships } = useAuth()
+  const { profile, updateProfile, currentOrganizationId, currentOrganization, isGuest, signOut, refreshMemberships } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [tab, setTab] = useState(() => (TABS.some((tb) => tb.key === searchParams.get('tab')) ? searchParams.get('tab') : 'perfil'))
@@ -493,31 +493,20 @@ export default function Profile() {
     )
   }
 
+  // Jogos, % vitórias e títulos vivem agora no cartão do hero — aqui só
+  // ficam as métricas que ele não absorveu.
   const statTiles = stats && (gamesPlayed > 0 || (stats.mix_wins || 0) > 0) ? [
-    { icon: Trophy, value: stats.mix_wins || 0, label: t('playerdetails.stat_mixes_won'), cls: 'text-lime-600' },
-    { icon: Target, value: gamesPlayed, label: t('playerdetails.stat_games'), cls: 'text-ink-700' },
     { icon: Flame, value: stats.game_wins || 0, label: t('profile.stat_game_wins'), cls: 'text-ok' },
-    { icon: Award, value: `${winRate}%`, label: t('playerdetails.stat_win_rate'), cls: 'text-ink-700' },
-    // Kudos recebidos (à Strava) — reconhecimento dos colegas, o 3º eixo
-    // ao lado do Elo (nível) e do XP (assiduidade).
     ...(kudosTotal > 0 ? [{ icon: ThumbsUp, value: kudosTotal, label: t('profile.stat_kudos'), cls: 'text-lime-600' }] : []),
   ] : null
 
   return (
     <div className="space-y-4">
-      {/* Hero */}
-      <div className="card bg-ink-900 text-center relative overflow-hidden">
-        <svg
-          viewBox="0 0 400 160"
-          className="absolute inset-0 w-full h-full text-white/[0.05]"
-          preserveAspectRatio="xMidYMid slice"
-          aria-hidden="true"
-        >
-          <rect x="60" y="-60" width="280" height="260" rx="16" stroke="currentColor" strokeWidth="3" fill="none" />
-          <line x1="200" y1="-60" x2="200" y2="200" stroke="currentColor" strokeWidth="3" />
-        </svg>
-        <div className="relative py-2">
-          <div className="relative w-20 h-20 mx-auto mb-3">
+      {/* Hero — cartão claro, sóbrio e ranking-puro (mock "João Silva").
+          O XP vive num painel separado por baixo; sem aro no avatar. */}
+      <div className="card">
+        <div className="flex items-start gap-4">
+          <div className="relative w-20 h-20 shrink-0">
             <button
               type="button"
               onClick={() => profile?.avatar_url && setShowPhoto(true)}
@@ -535,7 +524,7 @@ export default function Profile() {
               disabled={uploadingPhoto}
               aria-label={t('profile.change_photo_aria')}
               className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-ink-900 text-white flex items-center justify-center
-                         ring-2 ring-ink-900 hover:bg-ink-700 transition-colors duration-fast disabled:opacity-50"
+                         ring-2 ring-surface hover:bg-ink-700 transition-colors duration-fast disabled:opacity-50"
             >
               {uploadingPhoto ? (
                 <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
@@ -550,104 +539,120 @@ export default function Profile() {
               onChange={handlePhotoSelect}
               className="hidden"
             />
-            {/* Remover foto: espelho do botão da câmara, no canto oposto —
-                só quando há foto. Substitui a antiga ação de texto no
-                fundo do card. */}
             {profile?.avatar_url && (
               <button
                 type="button"
                 onClick={handleRemovePhoto}
                 disabled={uploadingPhoto}
                 aria-label={t('profile.remove_photo')}
-                className="absolute -bottom-1 -left-1 w-7 h-7 rounded-full bg-ink-900 text-white/60 flex items-center justify-center
-                           ring-2 ring-ink-900 hover:text-danger transition-colors duration-fast disabled:opacity-50"
+                className="absolute -bottom-1 -left-1 w-7 h-7 rounded-full bg-ink-50 text-muted flex items-center justify-center
+                           ring-2 ring-surface hover:text-danger transition-colors duration-fast disabled:opacity-50"
               >
                 <Trash2 size={13} />
               </button>
             )}
           </div>
-          <h2 className="text-2xl text-white">{profile?.name}</h2>
-
-          {/* Bloco 1 — RANKING (sistema competitivo: pontos, banda e
-              posição global pertencem todos ao mesmo sistema). Painel com
-              fundo ligeiramente distinto, 3 colunas iguais com divisórias
-              finas; só os pontos usam o accent. */}
-          <div className="mt-3 rounded-ctrl bg-white/10 border border-white/10 p-3 text-left">
-            <p className="flex items-center gap-1.5 text-[9px] font-extrabold uppercase tracking-[0.18em] text-white/50">
-              <Trophy size={11} /> {t('profile.card_ranking_heading')}
-            </p>
-            <div className="mt-2 grid grid-cols-3 divide-x divide-white/10 text-center">
-              <div className="px-1">
-                <p className="text-lg font-extrabold text-lime-400 tabular-nums leading-none">
-                  {formatRatingMaybeProvisional(profile?.rating, profile?.rating_games)} <span className="text-[11px]">pts</span>
-                </p>
-                <p className="mt-1 text-[9px] text-white/50">{t('profile.card_points_label')}</p>
-              </div>
-              <div className="px-1">
-                <p className="text-lg font-extrabold text-white leading-none">
-                  {ratingBand(profile?.rating, profile?.gender)?.label ?? '—'}
-                </p>
-                <p className="mt-1 text-[9px] text-white/50">{t('profile.card_band_label')}</p>
-              </div>
-              <div className="px-1">
-                <p className="text-lg font-extrabold text-white tabular-nums leading-none">
-                  {globalRank ? `#${globalRank}` : '—'}
-                </p>
-                <p className="mt-1 text-[9px] text-white/50">{t('profile.card_position_label')}</p>
-              </div>
-            </div>
-            {isProvisional(profile?.rating_games) && (
-              <p className="mt-2 text-[9px] text-white/40 text-center">{t('profile.provisional_note')}</p>
+          <div className="flex-1 min-w-0 pt-1">
+            <h2 className="text-xl text-ink-900 truncate">{profile?.name}</h2>
+            {currentOrganization?.name && (
+              <p className="text-xs text-muted mt-0.5 truncate">{currentOrganization.name}</p>
             )}
           </div>
+          {globalRank && (
+            <div className="text-right shrink-0 pt-1">
+              <p className="text-2xl font-extrabold text-ink-900 tabular-nums leading-none">#{globalRank}</p>
+              <p className="mt-1 text-[9px] font-extrabold uppercase tracking-[0.15em] text-muted">
+                {t('profile.card_global_ranking')}
+              </p>
+            </div>
+          )}
+        </div>
 
-          {/* Bloco 2 — XP DE ATIVIDADE. Deliberadamente sem iconografia de
-              ranking/troféus: isto é progressão de envolvimento, não uma
-              extensão do competitivo. */}
-          {(() => {
-            const tier = tierFromXp(profile?.xp)
-            const progress = tier ?? preTierProgress(profile?.xp)
-            const missing = progress.nextMin != null ? progress.nextMin - (profile?.xp ?? 0) : null
-            return (
-              <div className="mt-2 rounded-ctrl bg-white/10 border border-white/10 p-3 text-left">
-                <p className="flex items-center gap-1.5 text-[9px] font-extrabold uppercase tracking-[0.18em] text-white/50">
-                  {t('profile.card_xp_heading')}
-                  <Link to="/instrucoes#xp" aria-label={t('profile.xp_help_aria')} className="text-white/40 hover:text-white">
-                    <HelpCircle size={10} />
-                  </Link>
-                </p>
-                <p className="mt-0.5 text-[9px] text-white/40">{t('profile.card_xp_sub')}</p>
-                <div className="mt-2 border-t border-white/10 pt-2">
-                  <div className="flex items-center justify-between text-[11px] font-extrabold text-white">
-                    <span>
-                      {tier
-                        ? `${t('profile.xp_level', { level: tier.level })} · ${t(tier.labelKey)}`
-                        : t('profile.xp_no_shield')}
-                    </span>
-                    <span className="tabular-nums">
-                      {progress.nextMin != null
-                        ? t('profile.xp_progress', { current: formatXp(profile?.xp), next: formatXp(progress.nextMin) })
-                        : `${formatXp(profile?.xp)} XP`}
-                    </span>
-                  </div>
-                  <div className="mt-1.5 flex items-center gap-2">
-                    <div className="flex-1 h-1.5 rounded-full bg-ink-900/60 overflow-hidden">
-                      <div className="h-full rounded-full bg-lime-400/80" style={{ width: `${progress.progressPct}%` }} />
-                    </div>
-                    <span className="text-[10px] text-white/50 tabular-nums shrink-0">{progress.progressPct}%</span>
-                  </div>
-                  {missing != null && missing > 0 && (
-                    <p className="mt-1 text-[9px] text-white/40">
-                      {t('profile.card_xp_missing', { missing: formatXp(missing) })}
-                    </p>
-                  )}
-                </div>
+        {/* Banda + pontos + progresso até à próxima banda (rating, não XP) */}
+        {(() => {
+          const bp = bandProgress(profile?.rating)
+          return (
+            <div className="mt-4">
+              <div className="flex items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-2">
+                  <RatingBadge rating={profile?.rating} gender={profile?.gender} />
+                  <span className="text-sm font-extrabold text-ink-900 tabular-nums">
+                    {formatRatingMaybeProvisional(profile?.rating, profile?.rating_games)} {t('profile.card_points_word')}
+                  </span>
+                </span>
+                {bp?.nextMin != null && (
+                  <span className="text-[11px] text-muted tabular-nums">
+                    {t('profile.card_next_level')} <span className="font-extrabold text-ink-700">{bp.nextMin}</span>
+                  </span>
+                )}
               </div>
-            )
-          })()}
+              <div className="mt-2 h-1.5 rounded-full bg-ink-50 overflow-hidden">
+                <div className="h-full rounded-full bg-lime-400" style={{ width: `${bp?.pct ?? 0}%` }} />
+              </div>
+              {isProvisional(profile?.rating_games) && (
+                <p className="mt-1.5 text-[10px] text-muted">{t('profile.provisional_note')}</p>
+              )}
+            </div>
+          )
+        })()}
 
+        {/* Jogos · % Vitórias · Títulos */}
+        <div className="mt-4 pt-3.5 border-t border-line grid grid-cols-3 divide-x divide-line text-center">
+          <div className="px-1">
+            <p className="text-xl font-extrabold text-ink-900 tabular-nums leading-none">{gamesPlayed}</p>
+            <p className="mt-1 text-[11px] text-muted">{t('profile.card_games')}</p>
+          </div>
+          <div className="px-1">
+            <p className="text-xl font-extrabold text-ink-900 tabular-nums leading-none">{winRate}%</p>
+            <p className="mt-1 text-[11px] text-muted">{t('profile.card_winrate')}</p>
+          </div>
+          <div className="px-1">
+            <p className="text-xl font-extrabold text-ink-900 tabular-nums leading-none">{stats?.mix_wins || 0}</p>
+            <p className="mt-1 text-[11px] text-muted">{t('profile.card_titles')}</p>
+          </div>
         </div>
       </div>
+
+      {/* XP DE ATIVIDADE — painel separado, claro, sem iconografia de
+          ranking: envolvimento, não competição. */}
+      {(() => {
+        const tier = tierFromXp(profile?.xp)
+        const progress = tier ?? preTierProgress(profile?.xp)
+        const missing = progress.nextMin != null ? progress.nextMin - (profile?.xp ?? 0) : null
+        return (
+          <div className="rounded-ctrl bg-ink-50 border border-line p-3">
+            <p className="flex items-center gap-1.5 text-[9px] font-extrabold uppercase tracking-[0.18em] text-muted">
+              {t('profile.card_xp_heading')}
+              <Link to="/instrucoes#xp" aria-label={t('profile.xp_help_aria')} className="text-muted/60 hover:text-ink-900">
+                <HelpCircle size={10} />
+              </Link>
+            </p>
+            <div className="mt-2 flex items-center justify-between text-[11px] font-extrabold text-ink-900">
+              <span>
+                {tier
+                  ? `${t('profile.xp_level', { level: tier.level })} · ${t(tier.labelKey)}`
+                  : t('profile.xp_no_shield')}
+              </span>
+              <span className="tabular-nums">
+                {progress.nextMin != null
+                  ? t('profile.xp_progress', { current: formatXp(profile?.xp), next: formatXp(progress.nextMin) })
+                  : `${formatXp(profile?.xp)} XP`}
+              </span>
+            </div>
+            <div className="mt-1.5 flex items-center gap-2">
+              <div className="flex-1 h-1.5 rounded-full bg-ink-200/50 overflow-hidden">
+                <div className="h-full rounded-full bg-lime-400" style={{ width: `${progress.progressPct}%` }} />
+              </div>
+              <span className="text-[10px] text-muted tabular-nums shrink-0">{progress.progressPct}%</span>
+            </div>
+            {missing != null && missing > 0 && (
+              <p className="mt-1 text-[10px] text-muted">
+                {t('profile.card_xp_missing', { missing: formatXp(missing) })}
+              </p>
+            )}
+          </div>
+        )
+      })()}
 
       {photoError && (
         <div className="bg-danger/10 text-danger px-4 py-3 rounded-ctrl text-sm font-extrabold animate-fade-up">
