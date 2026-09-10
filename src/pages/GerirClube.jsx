@@ -11,7 +11,7 @@ import { listClubGroups } from '../lib/organizations'
 import { formatRating } from '../lib/elo'
 import { formatDate as formatDateLib, formatTime as formatTimeLib } from '../lib/formatDate'
 import { DateField, DateTimeField, Avatar, Select } from '../components/ui'
-import { totalRounds, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY } from '../lib/mixLogic'
+import { totalRounds, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, SCORING_FORMAT_LABEL_KEY } from '../lib/mixLogic'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
 import { AGE_RESTRICTIONS } from '../lib/ageCategories'
 import PlayerSearch from '../components/PlayerSearch'
@@ -48,6 +48,12 @@ const FORMATS = [
   { value: 'sobe_desce', labelKey: FORMAT_LABEL_KEY.sobe_desce },
   { value: 'todos_contra_todos', labelKey: FORMAT_LABEL_KEY.todos_contra_todos },
   { value: 'grupos_eliminatorias', labelKey: FORMAT_LABEL_KEY.grupos_eliminatorias },
+]
+const SCORING_FORMATS = [
+  { value: 'pontos_simples', labelKey: SCORING_FORMAT_LABEL_KEY.pontos_simples },
+  { value: 'pro_set_9', labelKey: SCORING_FORMAT_LABEL_KEY.pro_set_9 },
+  { value: 'melhor_2_sets', labelKey: SCORING_FORMAT_LABEL_KEY.melhor_2_sets },
+  { value: 'melhor_3_sets', labelKey: SCORING_FORMAT_LABEL_KEY.melhor_3_sets },
 ]
 const GENDER_RESTRICTIONS = [
   { value: 'indiferente', labelKey: GENDER_RESTRICTION_LABEL_KEY.indiferente },
@@ -99,6 +105,7 @@ const EMPTY_GAME_FORM = {
   game_time_minutes: 20,
   format: 'sobe_desce',
   pool_size: 4,
+  scoring_format: 'pontos_simples',
   gender_restriction: 'indiferente',
   // Escalao etario (Trello #212). null = sem restricao, entra toda a gente
   // com ou sem data de nascimento preenchida.
@@ -189,6 +196,7 @@ export default function GerirClube() {
   // (inside the component, where `t` is in scope) rather than at module
   // scope, so a language switch re-renders them with the new labels.
   const translatedFormats = FORMATS.map((f) => ({ value: f.value, label: t(f.labelKey) }))
+  const translatedScoringFormats = SCORING_FORMATS.map((s) => ({ value: s.value, label: t(s.labelKey) }))
   const translatedGenderRestrictions = GENDER_RESTRICTIONS.map((g) => ({ value: g.value, label: t(g.labelKey) }))
   const translatedRecurrenceFrequencies = RECURRENCE_FREQUENCIES.map((f) => ({ value: f.value, label: t(f.labelKey) }))
   const translatedRecurrenceEnds = RECURRENCE_ENDS.map((e) => ({ value: e.value, label: t(e.labelKey) }))
@@ -1274,6 +1282,7 @@ export default function GerirClube() {
       game_time_minutes: game.game_time_minutes || 20,
       format: game.format || 'sobe_desce',
       pool_size: game.pool_size || 4,
+      scoring_format: game.scoring_format || 'pontos_simples',
       gender_restriction: game.gender_restriction || 'indiferente',
       age_restriction: game.age_restriction ?? null,
       level: game.level || '',
@@ -1595,6 +1604,17 @@ export default function GerirClube() {
                         <p className="text-sm text-muted mt-1.5">{t('gerirclube.pool_size_help')}</p>
                       </div>
                     )}
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {t('gerirclube.scoring_label')}
+                      </label>
+                      <Segmented
+                        options={translatedScoringFormats}
+                        value={gameForm.scoring_format}
+                        onChange={(v) => setGameForm({ ...gameForm, scoring_format: v })}
+                      />
+                    </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
