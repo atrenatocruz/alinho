@@ -80,6 +80,18 @@ export default function Profile() {
   const [orgInvitesLoading, setOrgInvitesLoading] = useState(true)
   const [orgInviteActing, setOrgInviteActing] = useState(null)
   const fileInputRef = useRef(null)
+  // Popover de ajuda do XP: em touch não há hover, por isso o (?) abre ao
+  // toque e fecha ao tocar fora.
+  const [xpHelpOpen, setXpHelpOpen] = useState(false)
+  const xpHelpRef = useRef(null)
+  useEffect(() => {
+    if (!xpHelpOpen) return
+    const close = (e) => {
+      if (!xpHelpRef.current?.contains(e.target)) setXpHelpOpen(false)
+    }
+    document.addEventListener('click', close)
+    return () => document.removeEventListener('click', close)
+  }, [xpHelpOpen])
 
   useEffect(() => {
     if (profile) {
@@ -623,14 +635,20 @@ export default function Profile() {
             <div className="flex items-center justify-between gap-2">
               <p className="flex items-center gap-1.5 text-[9px] font-extrabold uppercase tracking-[0.18em] text-muted">
                 {t('profile.card_xp_heading')}
-                {/* Hover/focus mostra o texto das FAQs (Instructions.jsx
-                    #xp) aqui mesmo; o clique continua a levar lá — é o
-                    fallback em touch, onde não há hover. */}
-                <span className="relative group">
-                  <Link to="/instrucoes#xp" aria-label={t('profile.xp_help_aria')} className="text-muted/60 hover:text-ink-900">
+                {/* Hover (desktop) ou toque no (?) (mobile) mostram o texto
+                    das FAQs (Instructions.jsx #xp) aqui mesmo; o link para
+                    as instruções completas vive dentro do popover. */}
+                <span ref={xpHelpRef} className="relative group">
+                  <button
+                    type="button"
+                    onClick={() => setXpHelpOpen((o) => !o)}
+                    aria-label={t('profile.xp_help_aria')}
+                    aria-expanded={xpHelpOpen}
+                    className="text-muted/60 hover:text-ink-900"
+                  >
                     <HelpCircle size={10} />
-                  </Link>
-                  <span className="hidden group-hover:block group-focus-within:block absolute left-0 top-full mt-1.5 z-20 w-72 rounded-ctrl border border-line bg-canvas p-3 shadow-lift normal-case tracking-normal font-normal text-left">
+                  </button>
+                  <span className={`${xpHelpOpen ? 'block' : 'hidden group-hover:block'} absolute left-0 top-full mt-1.5 z-20 w-72 rounded-ctrl border border-line bg-canvas p-3 shadow-lift normal-case tracking-normal font-normal text-left`}>
                     <span className="block text-[11px] text-ink-700 font-extrabold">{t('instructions.xp_intro')}</span>
                     <span className="block mt-1.5 space-y-0.5 text-[11px] text-muted">
                       <span className="block">• {t('instructions.xp_v1')}</span>
@@ -648,6 +666,9 @@ export default function Profile() {
                         </span>
                       ))}
                     </span>
+                    <Link to="/instrucoes#xp" className="block mt-2 text-[11px] font-extrabold text-lime-600 hover:text-lime-700">
+                      {t('profile.xp_help_more')}
+                    </Link>
                   </span>
                 </span>
               </p>
