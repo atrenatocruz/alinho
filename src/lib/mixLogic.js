@@ -316,6 +316,13 @@ export const FORMAT_LABEL_KEY = {
   grupos_eliminatorias: 'mixlogic.format_grupos_eliminatorias',
 }
 
+export const SCORING_FORMAT_LABEL_KEY = {
+  pontos_simples: 'mixlogic.scoring_pontos_simples',
+  pro_set_9: 'mixlogic.scoring_pro_set_9',
+  melhor_2_sets: 'mixlogic.scoring_melhor_2_sets',
+  melhor_3_sets: 'mixlogic.scoring_melhor_3_sets',
+}
+
 export const GENDER_RESTRICTION_LABEL_KEY = {
   masculino: 'mixlogic.gender_masculino',
   feminino: 'mixlogic.gender_feminino',
