@@ -493,11 +493,6 @@ export default function Profile() {
     )
   }
 
-  // Jogos ganhos/jogados, % vitórias e títulos vivem no cartão do hero —
-  // aqui só ficam as métricas que ele não absorveu.
-  const statTiles = kudosTotal > 0 ? [
-    { icon: ThumbsUp, value: kudosTotal, label: t('profile.stat_kudos'), cls: 'text-lime-600' },
-  ] : null
 
   return (
     <div className="space-y-4">
@@ -625,12 +620,21 @@ export default function Profile() {
         const missing = progress.nextMin != null ? progress.nextMin - (profile?.xp ?? 0) : null
         return (
           <div className="rounded-ctrl bg-ink-50 border border-line p-3">
-            <p className="flex items-center gap-1.5 text-[9px] font-extrabold uppercase tracking-[0.18em] text-muted">
-              {t('profile.card_xp_heading')}
-              <Link to="/instrucoes#xp" aria-label={t('profile.xp_help_aria')} className="text-muted/60 hover:text-ink-900">
-                <HelpCircle size={10} />
-              </Link>
-            </p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="flex items-center gap-1.5 text-[9px] font-extrabold uppercase tracking-[0.18em] text-muted">
+                {t('profile.card_xp_heading')}
+                <Link to="/instrucoes#xp" aria-label={t('profile.xp_help_aria')} className="text-muted/60 hover:text-ink-900">
+                  <HelpCircle size={10} />
+                </Link>
+              </p>
+              {/* Kudos vivem aqui e não no cartão de ranking: alimentam o
+                  XP e são envolvimento, não resultado. */}
+              {kudosTotal > 0 && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-ink-700 tabular-nums">
+                  <ThumbsUp size={11} className="text-lime-600" /> {kudosTotal} {t('profile.stat_kudos')}
+                </span>
+              )}
+            </div>
             <div className="mt-2 flex items-center justify-between text-[11px] font-extrabold text-ink-900">
               <span>
                 {tier
@@ -687,19 +691,6 @@ export default function Profile() {
 
       {tab === 'perfil' && (
         <>
-        {/* Stats */}
-        {statTiles && (
-          <div className="grid grid-cols-2 gap-3">
-            {statTiles.map(({ icon: Icon, value, label, cls }) => (
-              <div key={label} className="card text-center py-5">
-                <Icon size={20} className={`mx-auto mb-1.5 ${cls}`} />
-                <p className="text-2xl font-extrabold text-ink-900 tabular-nums">{value}</p>
-                <p className="text-xs text-muted">{label}</p>
-              </div>
-            ))}
-          </div>
-        )}
-
         {/* Estante de troféus — 4 recentes à Strava; expandir mostra a
             grelha completa por categoria, incluindo bloqueados (o critério
             fica visível — é o "para onde subir"). Fail-soft: sem dados

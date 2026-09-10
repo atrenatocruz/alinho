@@ -240,11 +240,6 @@ export default function PlayerDetails() {
   const played = (player.game_wins || 0) + (player.game_losses || 0)
   const winRate = winRatePct(player.game_wins || 0, played)
 
-  // Jogos ganhos/jogados, % vitórias e títulos vivem no cartão do hero —
-  // aqui só ficam as métricas que ele não absorveu (espelha Profile.jsx).
-  const statTiles = (playerXp?.kudos ?? 0) > 0
-    ? [{ icon: ThumbsUp, value: playerXp.kudos, label: t('profile.stat_kudos'), cls: 'text-lime-600' }]
-    : []
 
   // A mix with several rounds ("todos contra todos") returns one row per
   // round, all sharing the same game_id — grouped here into one
@@ -407,9 +402,18 @@ export default function PlayerDetails() {
         const progress = tier ?? preTierProgress(playerXp.xp)
         return (
           <div className="rounded-ctrl bg-ink-50 border border-line p-3">
-            <p className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-muted">
-              {t('profile.card_xp_heading')}
-            </p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-muted">
+                {t('profile.card_xp_heading')}
+              </p>
+              {/* Kudos vivem aqui e não no cartão de ranking: alimentam o
+                  XP e são envolvimento, não resultado. */}
+              {(playerXp.kudos ?? 0) > 0 && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-ink-700 tabular-nums">
+                  <ThumbsUp size={11} className="text-lime-600" /> {playerXp.kudos} {t('profile.stat_kudos')}
+                </span>
+              )}
+            </div>
             <div className="mt-2 flex items-center justify-between text-[11px] font-extrabold text-ink-900">
               <span>
                 {tier
@@ -425,23 +429,14 @@ export default function PlayerDetails() {
         )
       })()}
 
-      {/* Stats */}
-      {resultsHidden ? (
+      {/* Aviso de resultados privados — o cartão do hero esconde as
+          secções de ranking, isto explica porquê. */}
+      {resultsHidden && (
         <div className="card text-center py-6 text-muted">
           <Lock size={18} className="mx-auto mb-1.5" />
           <p className="text-sm">{t('playerdetails.results_private')}</p>
         </div>
-      ) : statTiles.length > 0 ? (
-        <div className="grid grid-cols-2 gap-3">
-          {statTiles.map(({ icon: Icon, value, label, cls }) => (
-            <div key={label} className="card text-center py-5">
-              <Icon size={20} className={`mx-auto mb-1.5 ${cls}`} />
-              <p className="text-2xl font-extrabold text-ink-900 tabular-nums">{value}</p>
-              <p className="text-xs text-muted">{label}</p>
-            </div>
-          ))}
-        </div>
-      ) : null}
+      )}
 
       {/* Estante de troféus — só os ganhos, com a mesma gate de
           privacidade das stats (resultsHidden). */}
