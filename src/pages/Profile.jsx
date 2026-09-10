@@ -64,7 +64,6 @@ export default function Profile() {
   const [mixHistoryLoading, setMixHistoryLoading] = useState(true)
   const [privateMatchHistory, setPrivateMatchHistory] = useState([])
   const [privateMatchHistoryLoading, setPrivateMatchHistoryLoading] = useState(true)
-  const [globalPoints, setGlobalPoints] = useState(null)
   const [globalRank, setGlobalRank] = useState(null)
   const [kudosTotal, setKudosTotal] = useState(0)
   const [trophyCatalog, setTrophyCatalog] = useState([])
@@ -356,11 +355,12 @@ export default function Profile() {
     }
   }
 
+  // Só o #N do cartão do hero — o antigo cartão "Ranking global" saiu por
+  // duplicar a informação que o hero já mostra.
   const loadGlobalPoints = async () => {
     try {
       const data = await getGlobalRankings()
       const index = data.findIndex((p) => p.user_id === profile.id)
-      setGlobalPoints(index === -1 ? null : data[index])
       setGlobalRank(index === -1 ? null : index + 1)
     } catch (error) {
       console.error('Error loading global points:', error)
@@ -816,29 +816,6 @@ export default function Profile() {
               </div>
             )}
           </div>
-        )}
-
-        {/* Global ranking — o número grande é o rating (Elo), a mesma
-            métrica que ordena o #N do RankBadge; a legenda mostra o
-            historial de mixes em vez da antiga soma de pontos de
-            clube/amigos. */}
-        {globalPoints && (
-          <Link
-            to="/rankings"
-            state={{ tab: 'global', scrollToMe: true }}
-            className="card press block hover:shadow-lift"
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-extrabold text-ink-900">{t('profile.global_ranking')}</p>
-                <RatingBadge rating={profile?.rating} gender={profile?.gender} />
-              </div>
-              <span className="text-2xl font-extrabold text-ink-900 tabular-nums">{formatRating(profile?.rating)}</span>
-            </div>
-            <p className="text-[11px] text-muted mt-1">
-              🎾 {t('profile.mix_wins_played_summary', { wins: globalPoints.mix_wins || 0, played: globalPoints.mixes_played || 0 })}
-            </p>
-          </Link>
         )}
 
         {/* Personal info */}
