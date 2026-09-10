@@ -400,8 +400,13 @@ export default function PlayerDetails() {
                   </span>
                 )}
               </div>
-              <div className="mt-2 h-1.5 rounded-full bg-ink-50 overflow-hidden">
-                <div className="h-full rounded-full bg-lime-400" style={{ width: `${bp?.pct ?? 0}%` }} />
+              {/* bg-ink-200/50 e não bg-ink-50: sobre o cartão branco o
+                  ink-50 desaparecia e a barra parecia só o troço verde. */}
+              <div className="mt-2 flex items-center gap-2">
+                <div className="flex-1 h-1.5 rounded-full bg-ink-200/50 overflow-hidden">
+                  <div className="h-full rounded-full bg-lime-400" style={{ width: `${bp?.pct ?? 0}%` }} />
+                </div>
+                <span className="text-[10px] text-muted tabular-nums shrink-0">{bp?.pct ?? 0}%</span>
               </div>
             </div>
           )
