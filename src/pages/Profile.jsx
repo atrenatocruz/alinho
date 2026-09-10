@@ -14,7 +14,7 @@ import { CATEGORY_ORDER } from '../lib/trophies'
 import { formatRating, formatRatingMaybeProvisional, isProvisional, bandProgress } from '../lib/elo'
 import { countryOptions, countryName } from '../lib/countries'
 import { AGE_LABEL_KEY, ageCategory } from '../lib/ageCategories'
-import { tierFromXp, preTierProgress, formatXp } from '../lib/xp'
+import { XP_TIERS, tierFromXp, preTierProgress, formatXp } from '../lib/xp'
 import { formatDate as formatDateLib } from '../lib/formatDate'
 
 const TABS = [
@@ -630,9 +630,33 @@ export default function Profile() {
             <div className="flex items-center justify-between gap-2">
               <p className="flex items-center gap-1.5 text-[9px] font-extrabold uppercase tracking-[0.18em] text-muted">
                 {t('profile.card_xp_heading')}
-                <Link to="/instrucoes#xp" aria-label={t('profile.xp_help_aria')} className="text-muted/60 hover:text-ink-900">
-                  <HelpCircle size={10} />
-                </Link>
+                {/* Hover/focus mostra o texto das FAQs (Instructions.jsx
+                    #xp) aqui mesmo; o clique continua a levar lá — é o
+                    fallback em touch, onde não há hover. */}
+                <span className="relative group">
+                  <Link to="/instrucoes#xp" aria-label={t('profile.xp_help_aria')} className="text-muted/60 hover:text-ink-900">
+                    <HelpCircle size={10} />
+                  </Link>
+                  <span className="hidden group-hover:block group-focus-within:block absolute left-0 top-full mt-1.5 z-20 w-72 rounded-ctrl border border-line bg-canvas p-3 shadow-lift normal-case tracking-normal font-normal text-left">
+                    <span className="block text-[11px] text-ink-700 font-extrabold">{t('instructions.xp_intro')}</span>
+                    <span className="block mt-1.5 space-y-0.5 text-[11px] text-muted">
+                      <span className="block">• {t('instructions.xp_v1')}</span>
+                      <span className="block">• {t('instructions.xp_v2')}</span>
+                      <span className="block">• {t('instructions.xp_v3')}</span>
+                      <span className="block">• {t('instructions.xp_v4')}</span>
+                    </span>
+                    <span className="block mt-2 text-[11px] text-ink-700 font-extrabold">{t('instructions.xp_shields_intro')}</span>
+                    <span className="block mt-1 space-y-0.5">
+                      {[...XP_TIERS].reverse().map((tierRow) => (
+                        <span key={tierRow.key} className="flex items-center gap-1.5 text-[11px] text-muted tabular-nums">
+                          <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${tierRow.dotClass}`} />
+                          <span className="text-ink-700 font-extrabold">{tierRow.level}</span> {t(tierRow.labelKey)}
+                          <span className="ml-auto">{formatXp(tierRow.min)} XP</span>
+                        </span>
+                      ))}
+                    </span>
+                  </span>
+                </span>
               </p>
               {/* Kudos vivem aqui e não no cartão de ranking: alimentam o
                   XP e são envolvimento, não resultado. */}
