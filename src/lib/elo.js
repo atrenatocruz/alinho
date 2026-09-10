@@ -71,6 +71,25 @@ export const isProvisional = (ratingGames) => ratingGames != null && ratingGames
 export const formatRatingMaybeProvisional = (rating, ratingGames) =>
   `${isProvisional(ratingGames) ? '~' : ''}${formatRating(rating)}`
 
+/** Progresso dentro da banda atual, para a barra do cartão de perfil.
+    Devolve { nextMin, pct } — nextMin null no topo (M1/F1, barra cheia);
+    abaixo de 700 (Iniciante) o alvo é a entrada na banda 6. */
+export function bandProgress(rating) {
+  if (rating == null) return null
+  const idx = BANDS.findIndex((b) => rating >= b.min)
+  if (idx === 0) return { nextMin: null, pct: 100 }
+  if (idx === -1) {
+    const first = BANDS[BANDS.length - 1].min
+    return { nextMin: first, pct: Math.min(100, Math.round((rating / first) * 100)) }
+  }
+  const cur = BANDS[idx]
+  const next = BANDS[idx - 1]
+  return {
+    nextMin: next.min,
+    pct: Math.min(100, Math.round(((rating - cur.min) / (next.min - cur.min)) * 100)),
+  }
+}
+
 // Níveis do ecrã de auto-classificação (primeiro registo). As keys são o
 // contrato com o RPC complete_rating_onboarding — não mudar sem migração.
 export const ONBOARDING_LEVELS = [
