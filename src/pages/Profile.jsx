@@ -29,7 +29,7 @@ const GENDER_LABEL_KEY = { masculino: 'login.gender_male', feminino: 'login.gend
 
 export default function Profile() {
   const { t, i18n } = useTranslation()
-  const { profile, updateProfile, currentOrganizationId, currentOrganization, isGuest, signOut, refreshMemberships } = useAuth()
+  const { profile, updateProfile, currentOrganizationId, isGuest, signOut, refreshMemberships } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [tab, setTab] = useState(() => (TABS.some((tb) => tb.key === searchParams.get('tab')) ? searchParams.get('tab') : 'perfil'))
@@ -561,9 +561,9 @@ export default function Profile() {
           </div>
           <div className="flex-1 min-w-0 pt-1">
             <h2 className="text-xl text-ink-900 truncate">{profile?.name}</h2>
-            {currentOrganization?.name && (
-              <p className="text-xs text-muted mt-0.5 truncate">{currentOrganization.name}</p>
-            )}
+            <p className="text-xs text-muted mt-0.5 truncate">
+              {t('playerdetails.preferred_side', { side: t(SIDE_LABEL_KEY[profile?.preferred_side] || SIDE_LABEL_KEY.both) })}
+            </p>
           </div>
           {globalRank && (
             <div className="text-right shrink-0 pt-1">
