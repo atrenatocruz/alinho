@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { User, Award, Trophy, Target, Flame, LogOut, Camera, UserCheck, X, Users, HelpCircle, ThumbsUp, Trash2 } from 'lucide-react'
+import { User, Award, Trophy, Target, LogOut, Camera, UserCheck, X, Users, HelpCircle, ThumbsUp, Trash2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { hashPhone } from '../lib/hashPhone'
@@ -500,11 +500,10 @@ export default function Profile() {
     )
   }
 
-  // Jogos, % vitórias e títulos vivem agora no cartão do hero — aqui só
-  // ficam as métricas que ele não absorveu.
-  const statTiles = stats && (gamesPlayed > 0 || (stats.mix_wins || 0) > 0) ? [
-    { icon: Flame, value: stats.game_wins || 0, label: t('profile.stat_game_wins'), cls: 'text-ok' },
-    ...(kudosTotal > 0 ? [{ icon: ThumbsUp, value: kudosTotal, label: t('profile.stat_kudos'), cls: 'text-lime-600' }] : []),
+  // Jogos ganhos/jogados, % vitórias e títulos vivem no cartão do hero —
+  // aqui só ficam as métricas que ele não absorveu.
+  const statTiles = kudosTotal > 0 ? [
+    { icon: ThumbsUp, value: kudosTotal, label: t('profile.stat_kudos'), cls: 'text-lime-600' },
   ] : null
 
   return (
@@ -611,8 +610,8 @@ export default function Profile() {
         {/* Jogos · % Vitórias · Títulos */}
         <div className="mt-4 pt-3.5 border-t border-line grid grid-cols-3 divide-x divide-line text-center">
           <div className="px-1">
-            <p className="text-xl font-extrabold text-ink-900 tabular-nums leading-none">{gamesPlayed}</p>
-            <p className="mt-1 text-[11px] text-muted">{t('profile.card_games')}</p>
+            <p className="text-xl font-extrabold text-ink-900 tabular-nums leading-none">{stats?.game_wins || 0}/{gamesPlayed}</p>
+            <p className="mt-1 text-[11px] text-muted">{t('profile.stat_game_wins')}</p>
           </div>
           <div className="px-1">
             <p className="text-xl font-extrabold text-ink-900 tabular-nums leading-none">{winRate}%</p>
