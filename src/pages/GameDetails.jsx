@@ -9,6 +9,7 @@ import { supabase, supabaseUrl } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton, GuestBadge, PlayerAvatarRow, EmptyState, ShareModal, RoundTimer, Avatar, Select, RatingBadge, DateField } from '../components/ui'
 import PoolGroupStage from '../components/PoolGroupStage'
+import ScoreEntry from '../components/ScoreEntry'
 import {
   countPeople, totalRounds, formDuplas, seedCourts, nextSobeDesce,
   roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches,
@@ -892,15 +893,13 @@ export default function GameDetails() {
     }
   }
 
-  const handleSaveScore = async (match) => {
-    const s = scores[match.id] || {}
-    const a = parseInt(s.a, 10)
-    const b = parseInt(s.b, 10)
-    if (Number.isNaN(a) || Number.isNaN(b) || a < 0 || b < 0) return
-    if (a === b) {
-      setMixError(t('gamedetails.error_no_ties'))
-      return
-    }
+  // finalScore is { score_a, score_b } for pontos_simples/pro_set_9 (from
+  // ScoreEntry's own validated computation — this function no longer
+  // re-derives or re-validates it), or { score_a, score_b, sets } for
+  // melhor_2_sets/melhor_3_sets, where `sets` is the full per-set array to
+  // persist into match_sets alongside the match's own sets-won score_a/score_b.
+  const handleSaveScore = async (match, finalScore) => {
+    const { score_a: a, score_b: b, sets } = finalScore
     setMixError('')
     try {
       const { error } = await supabase
@@ -912,6 +911,24 @@ export default function GameDetails() {
         })
         .eq('id', match.id)
       if (error) throw error
+
+      if (sets) {
+        // Corrections re-save all sets — delete-then-insert keeps this
+        // idempotent rather than needing per-set upsert logic.
+        const { error: deleteError } = await supabase.from('match_sets').delete().eq('match_id', match.id)
+        if (deleteError) throw deleteError
+        const { error: setsError } = await supabase.from('match_sets').insert(
+          sets.map((s, i) => ({
+            match_id: match.id,
+            set_number: i + 1,
+            score_a: s.score_a,
+            score_b: s.score_b,
+            is_super_tiebreak: !!s.is_super_tiebreak,
+          }))
+        )
+        if (setsError) throw setsError
+      }
+
       setScores(prev => ({ ...prev, [match.id]: undefined }))
       setEditingMatchId(current => (current === match.id ? null : current))
       loadGameDetails()
@@ -2022,40 +2039,8 @@ export default function GameDetails() {
                   {ms.map(m => {
                     const done = !!m.winner_team_id
                     const isCorrecting = editingMatchId === m.id
-                    const s = scores[m.id] || { a: '', b: '' }
                     const canEditScores = (isAdmin || isScorekeeper) && game.status === 'in_progress'
                     const editable = canEditScores && (!done || isCorrecting)
-                    // one row per dupla — full-width names, no truncation
-                    const teamRow = (teamId, scoreVal, scoreKey) => {
-                      const isWinner = done && m.winner_team_id === teamId
-                      return (
-                        <div className={`flex items-center gap-3 rounded-ctrl px-3 py-2.5 ${
-                          isWinner ? 'bg-lime-400/25' : 'bg-surface'
-                        }`}>
-                          <span className={`flex-1 min-w-0 text-sm font-extrabold ${
-                            done && !isWinner ? 'text-muted' : 'text-ink-900'
-                          }`}>
-                            {teamName(teamId)}
-                            {isWinner && <span className="ml-1.5 text-lime-600">🏆</span>}
-                          </span>
-                          {editable ? (
-                            <input
-                              type="number" min="0" inputMode="numeric"
-                              value={s[scoreKey]}
-                              onChange={e => setScores(prev => ({ ...prev, [m.id]: { ...s, [scoreKey]: e.target.value } }))}
-                              className="w-16 px-2 py-2 text-center text-lg font-extrabold rounded-ctrl border border-line bg-surface shrink-0"
-                              placeholder="0"
-                            />
-                          ) : (
-                            <span className={`text-xl font-extrabold tabular-nums shrink-0 ${
-                              isWinner ? 'text-ink-900' : 'text-muted'
-                            }`}>
-                              {scoreVal}
-                            </span>
-                          )}
-                        </div>
-                      )
-                    }
                     return (
                       <div key={m.id} className="rounded-ctrl bg-canvas p-2.5">
                         <div className="flex items-center justify-between mb-2 px-1">
@@ -2072,28 +2057,24 @@ export default function GameDetails() {
                             </button>
                           )}
                         </div>
-                        <div className="space-y-1.5">
-                          {teamRow(m.team_a_id, m.score_a, 'a')}
-                          {teamRow(m.team_b_id, m.score_b, 'b')}
-                        </div>
-
-                        {editable && s.a !== '' && s.b !== '' && (
-                          <div className="flex gap-2 mt-2.5">
-                            {isCorrecting && (
-                              <button
-                                onClick={() => cancelEditingScore(m.id)}
-                                className="flex-1 py-2.5 rounded-ctrl bg-ink-50 text-ink-700 text-sm font-extrabold transition-all duration-fast active:scale-[0.98]"
-                              >
-                                {t('gamedetails.cancel')}
-                              </button>
-                            )}
-                            <button
-                              onClick={() => handleSaveScore(m)}
-                              className="flex-1 py-2.5 rounded-ctrl bg-ink-900 text-lime-400 text-sm font-extrabold transition-all duration-fast active:scale-[0.98]"
-                            >
-                              {t('gamedetails.save_score')}
-                            </button>
-                          </div>
+                        <ScoreEntry
+                          match={m}
+                          scoringFormat={game.scoring_format || 'pontos_simples'}
+                          editable={editable}
+                          teamAName={teamName(m.team_a_id)}
+                          teamBName={teamName(m.team_b_id)}
+                          initialScores={scores[m.id] || { a: '', b: '' }}
+                          onScoreChange={(matchId, next) => setScores(prev => ({ ...prev, [matchId]: next }))}
+                          onSave={(finalScore) => handleSaveScore(m, finalScore)}
+                          saving={false}
+                        />
+                        {isCorrecting && (
+                          <button
+                            onClick={() => cancelEditingScore(m.id)}
+                            className="w-full mt-2 py-2.5 rounded-ctrl bg-ink-50 text-ink-700 text-sm font-extrabold transition-all duration-fast active:scale-[0.98]"
+                          >
+                            {t('gamedetails.cancel')}
+                          </button>
                         )}
                       </div>
                     )
@@ -2186,57 +2167,23 @@ export default function GameDetails() {
                         <div className="space-y-2.5">
                           {ms.map(m => {
                             const done = !!m.winner_team_id
-                            const s = scores[m.id] || { a: '', b: '' }
                             const editable = !done && (isAdmin || isScorekeeper) && game.status === 'in_progress'
-                            // one row per dupla — full-width names, no truncation
-                            const teamRow = (teamId, scoreVal, scoreKey) => {
-                              const isWinner = done && m.winner_team_id === teamId
-                              return (
-                                <div className={`flex items-center gap-3 rounded-ctrl px-3 py-2.5 ${
-                                  isWinner ? 'bg-lime-400/25' : 'bg-surface'
-                                }`}>
-                                  <span className={`flex-1 min-w-0 text-sm font-extrabold ${
-                                    done && !isWinner ? 'text-muted' : 'text-ink-900'
-                                  }`}>
-                                    {teamName(teamId)}
-                                    {isWinner && <span className="ml-1.5 text-lime-600">🏆</span>}
-                                  </span>
-                                  {done ? (
-                                    <span className={`text-xl font-extrabold tabular-nums shrink-0 ${
-                                      isWinner ? 'text-ink-900' : 'text-muted'
-                                    }`}>
-                                      {scoreVal}
-                                    </span>
-                                  ) : editable ? (
-                                    <input
-                                      type="number" min="0" inputMode="numeric"
-                                      value={s[scoreKey]}
-                                      onChange={e => setScores(prev => ({ ...prev, [m.id]: { ...s, [scoreKey]: e.target.value } }))}
-                                      className="w-16 px-2 py-2 text-center text-lg font-extrabold rounded-ctrl border border-line bg-surface shrink-0"
-                                      placeholder="0"
-                                    />
-                                  ) : null}
-                                </div>
-                              )
-                            }
                             return (
                               <div key={m.id} className="rounded-ctrl bg-canvas p-2.5">
                                 <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mb-2 px-1">
                                   {t('gamedetails.court_number', { number: m.court_number })}
                                 </p>
-                                <div className="space-y-1.5">
-                                  {teamRow(m.team_a_id, m.score_a, 'a')}
-                                  {teamRow(m.team_b_id, m.score_b, 'b')}
-                                </div>
-
-                                {editable && s.a !== '' && s.b !== '' && (
-                                  <button
-                                    onClick={() => handleSaveScore(m)}
-                                    className="mt-2.5 w-full py-2.5 rounded-ctrl bg-ink-900 text-lime-400 text-sm font-extrabold transition-all duration-fast active:scale-[0.98]"
-                                  >
-                                    {t('gamedetails.save_score')}
-                                  </button>
-                                )}
+                                <ScoreEntry
+                                  match={m}
+                                  scoringFormat={game.scoring_format || 'pontos_simples'}
+                                  editable={editable}
+                                  teamAName={teamName(m.team_a_id)}
+                                  teamBName={teamName(m.team_b_id)}
+                                  initialScores={scores[m.id] || { a: '', b: '' }}
+                                  onScoreChange={(matchId, next) => setScores(prev => ({ ...prev, [matchId]: next }))}
+                                  onSave={(finalScore) => handleSaveScore(m, finalScore)}
+                                  saving={false}
+                                />
                               </div>
                             )
                           })}
