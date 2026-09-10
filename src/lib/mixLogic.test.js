@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   splitIntoPools, seedKnockoutFromPools,
   poolRoundNumbers, poolRoundsPlayed, roundRobinRound,
+  generateAmericanoSchedule,
 } from './mixLogic'
 
 describe('splitIntoPools', () => {
@@ -172,5 +173,61 @@ describe('per-pool round scheduling (integration with roundRobinRound)', () => {
 
   it('1 pool of 4 (the single-pool config a smoke test would use)', () => {
     expectFullRoundRobin(1, 4, [1])
+  })
+})
+
+describe('generateAmericanoSchedule', () => {
+  const mkPlayer = (id) => ({ id, name: `P${id}` })
+  const eightPlayers = Array.from({ length: 8 }, (_, i) => mkPlayer(i + 1))
+  const fourPlayers = eightPlayers.slice(0, 4)
+
+  it('returns numRounds rounds, each with numCourts matches covering every player exactly once', () => {
+    const schedule = generateAmericanoSchedule(eightPlayers, 2, 3, {})
+    expect(schedule).toHaveLength(3)
+    for (const round of schedule) {
+      expect(round).toHaveLength(2)
+      const usedIds = round.flatMap(m => [m.duplaA.player1.id, m.duplaA.player2.id, m.duplaB.player1.id, m.duplaB.player2.id])
+      expect(usedIds).toHaveLength(8)
+      expect(new Set(usedIds).size).toBe(8)
+    }
+  })
+
+  it('assigns court numbers 1..numCourts within each round', () => {
+    const schedule = generateAmericanoSchedule(eightPlayers, 2, 1, {})
+    expect(schedule[0].map(m => m.court_number).sort()).toEqual([1, 2])
+  })
+
+  it('never repeats a partnership while unique partners remain (n-1 rounds for n players)', () => {
+    const schedule = generateAmericanoSchedule(eightPlayers, 2, 7, {}) // 8 players -> 7 possible unique partners each
+    const seenPairs = new Set()
+    let repeats = 0
+    for (const round of schedule) {
+      for (const m of round) {
+        for (const dupla of [m.duplaA, m.duplaB]) {
+          const key = [dupla.player1.id, dupla.player2.id].sort().join('|')
+          if (seenPairs.has(key)) repeats++
+          seenPairs.add(key)
+        }
+      }
+    }
+    expect(repeats).toBe(0)
+  })
+
+  it('handles the minimum case: 4 players, 1 court', () => {
+    const schedule = generateAmericanoSchedule(fourPlayers, 1, 2, {})
+    expect(schedule).toHaveLength(2)
+    for (const round of schedule) {
+      expect(round).toHaveLength(1)
+      const usedIds = [round[0].duplaA.player1.id, round[0].duplaA.player2.id, round[0].duplaB.player1.id, round[0].duplaB.player2.id]
+      expect(new Set(usedIds).size).toBe(4)
+    }
+  })
+
+  it('carries a seed (sum of pointsById) on each dupla', () => {
+    const pointsById = { 1: 100, 2: 200, 3: 300, 4: 400 }
+    const schedule = generateAmericanoSchedule(fourPlayers, 1, 1, pointsById)
+    const m = schedule[0][0]
+    expect(m.duplaA.seed).toBe((pointsById[m.duplaA.player1.id] ?? 0) + (pointsById[m.duplaA.player2.id] ?? 0))
+    expect(m.duplaB.seed).toBe((pointsById[m.duplaB.player1.id] ?? 0) + (pointsById[m.duplaB.player2.id] ?? 0))
   })
 })

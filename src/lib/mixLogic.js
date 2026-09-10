@@ -303,6 +303,75 @@ export function nextElimMatches(prevMatches) {
   return next
 }
 
+/** Americano: builds every round's partner-rotated duplas and court
+    pairings in one pass — unlike sobe_desce/todos_contra_todos, no round
+    depends on a previous round's result (only on who has already
+    partnered/faced whom), so the whole schedule can be generated upfront
+    at mix-start rather than drawn round by round.
+
+    Greedy, not a perfect combinatorial design (mirrors formDuplas's own
+    style): each round, players are sorted by points (desc) and paired
+    with the closest candidate that hasn't been their partner yet — once
+    no non-repeat candidate remains for a player, the closest available
+    repeat is accepted rather than leaving anyone unpaired. The resulting
+    duplas are then paired into courts the same way, softly preferring an
+    opponent-dupla that hasn't been faced before (also relaxed once
+    exhausted). Opponent-repeat avoidance is a secondary preference,
+    never a hard constraint — partner variety is the point of the
+    format, opponent variety is a nice-to-have.
+
+    Returns: numRounds entries, each an array of numCourts
+    { court_number, duplaA: {player1, player2, seed}, duplaB: {...} }. */
+export function generateAmericanoSchedule(players, numCourts, numRounds, pointsById = {}) {
+  const pairKey = (a, b) => [a.id, b.id].sort().join('|')
+  const pointsOf = (p) => pointsById[p?.id] ?? 0
+
+  const partnerHistory = new Set()
+  const opponentHistory = new Set()
+  const rounds = []
+
+  for (let r = 0; r < numRounds; r++) {
+    // ── Form this round's duplas ──────────────────────────────────────
+    const pool = [...players].sort((a, b) => pointsOf(b) - pointsOf(a))
+    const duplas = []
+    while (pool.length >= 2) {
+      const a = pool.shift()
+      let idx = pool.findIndex((cand) => !partnerHistory.has(pairKey(a, cand)))
+      if (idx === -1) idx = 0 // everyone left is a repeat partner — accept the closest rather than leave a gap
+      const b = pool.splice(idx, 1)[0]
+      partnerHistory.add(pairKey(a, b))
+      duplas.push({ player1: a, player2: b, seed: pointsOf(a) + pointsOf(b) })
+    }
+
+    // ── Pair duplas into courts, softly avoiding repeat opponents ──────
+    const sorted = [...duplas].sort((a, b) => b.seed - a.seed)
+    const used = new Array(sorted.length).fill(false)
+    const courtDuplas = []
+    for (let i = 0; i < sorted.length; i++) {
+      if (used[i]) continue
+      const dA = sorted[i]
+      const facedBefore = (dB) =>
+        [dA.player1, dA.player2].some((pa) =>
+          [dB.player1, dB.player2].some((pb) => opponentHistory.has(pairKey(pa, pb)))
+        )
+      let j = sorted.findIndex((dB, idx) => idx > i && !used[idx] && !facedBefore(dB))
+      if (j === -1) j = sorted.findIndex((dB, idx) => idx > i && !used[idx])
+      if (j === -1) break // no partner dupla left (shouldn't happen — caller validates player count is a multiple of 4)
+      const dB = sorted[j]
+      used[i] = true
+      used[j] = true
+      for (const pa of [dA.player1, dA.player2]) {
+        for (const pb of [dB.player1, dB.player2]) opponentHistory.add(pairKey(pa, pb))
+      }
+      courtDuplas.push({ duplaA: dA, duplaB: dB })
+    }
+
+    rounds.push(courtDuplas.slice(0, numCourts).map((cm, idx) => ({ court_number: idx + 1, ...cm })))
+  }
+
+  return rounds
+}
+
 export const PHASE_LABEL_KEY = {
   group: 'mixlogic.phase_group',
   quarter: 'mixlogic.phase_quarter',
