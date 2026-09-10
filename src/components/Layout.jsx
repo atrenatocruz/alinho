@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Home, Users, Trophy, Settings, LogOut, HelpCircle, Phone, X, Bell } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
-import { PrimaryButton, Avatar, RatingBadge, TrophyCard } from './ui'
+import { PrimaryButton, Avatar, RatingBadge, AchievementCard } from './ui'
 import { supabase } from '../lib/supabase'
 import { hashPhone } from '../lib/hashPhone'
 import { listIncomingFriendRequests } from '../lib/friends'
@@ -41,7 +41,7 @@ function CelebrationModal({ items, onClose }) {
             </p>
             <div className="grid grid-cols-2 gap-2">
               {shownTrophies.map((tr) => (
-                <TrophyCard key={tr.trophy_key} trophyKey={tr.trophy_key} rarity={tr.rarity} earned />
+                <AchievementCard key={tr.trophy_key} achievementKey={tr.trophy_key} rarity={tr.rarity} earned />
               ))}
             </div>
             {trophies.length > shownTrophies.length && (

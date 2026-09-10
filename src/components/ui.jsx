@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { MapPin, CheckCircle2, ChevronRight, ChevronDown, ChevronLeft, Lock, Play, Calendar, X, Share2, MessageCircle, Link2, ImageDown, Trophy, Repeat, Euro, Swords, Users } from 'lucide-react'
 import ShareCard, { CARD_W, CARD_H } from './ShareCard'
 import { ratingBand, groupRatingBand } from '../lib/elo'
-import { trophyIcon, RARITY_META } from '../lib/trophies'
+import { achievementIcon, RARITY_META } from '../lib/achievements'
 import { formatDate, formatTime, formatCurrency } from '../lib/formatDate'
 import { FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, mixCapacity } from '../lib/mixLogic'
 
@@ -512,14 +512,14 @@ export function Avatar({ name, url, size = 'w-10 h-10 text-sm', colorClass = 'bg
   )
 }
 
-/* ─── TrophyCard ─────────────────────────────────────────────────────────
+/* ─── AchievementCard ─────────────────────────────────────────────────────────
    Um troféu da estante: moldura e cores pela raridade (RARITY_META),
-   ícone por key (trophyIcon), nome/descrição dos locales. Bloqueado =
+   ícone por key (achievementIcon), nome/descrição dos locales. Bloqueado =
    silhueta com cadeado e o critério visível (a descrição É o critério) —
    o "para onde subir". rarityPct = % de jogadores que o têm (PSN-style). */
-export function TrophyCard({ trophyKey, category, rarity, earned = false, rarityPct = null }) {
+export function AchievementCard({ achievementKey, category, rarity, earned = false, rarityPct = null }) {
   const { t } = useTranslation()
-  const Icon = trophyIcon(trophyKey, category)
+  const Icon = achievementIcon(achievementKey, category)
   const meta = RARITY_META[rarity] || RARITY_META.comum
 
   // GANHO grita, BLOQUEADO sussurra: o ganho tem medalhão preenchido da
@@ -532,8 +532,8 @@ export function TrophyCard({ trophyKey, category, rarity, earned = false, rarity
         <span className="inline-flex w-11 h-11 rounded-full bg-ink-50 items-center justify-center">
           <Lock size={16} className="text-ink-200" />
         </span>
-        <p className="mt-1.5 text-[12px] font-extrabold text-muted leading-tight">{t(`trophies.${trophyKey}_name`)}</p>
-        <p className="mt-0.5 text-[10px] text-ink-200 leading-tight">{t(`trophies.${trophyKey}_desc`)}</p>
+        <p className="mt-1.5 text-[12px] font-extrabold text-muted leading-tight">{t(`achievements.${achievementKey}_name`)}</p>
+        <p className="mt-0.5 text-[10px] text-ink-200 leading-tight">{t(`achievements.${achievementKey}_desc`)}</p>
         <div className="mt-1.5">
           <span className="px-1.5 py-px rounded-full text-[9px] font-mono font-extrabold uppercase tracking-wide bg-ink-50 text-muted">
             {t(meta.labelKey)}
@@ -548,14 +548,14 @@ export function TrophyCard({ trophyKey, category, rarity, earned = false, rarity
       <span className={`inline-flex w-11 h-11 rounded-full items-center justify-center ${meta.medal}`}>
         <Icon size={22} className={meta.icon} />
       </span>
-      <p className="mt-1.5 text-[12px] font-extrabold text-ink-900 leading-tight">{t(`trophies.${trophyKey}_name`)}</p>
-      <p className="mt-0.5 text-[10px] text-muted leading-tight">{t(`trophies.${trophyKey}_desc`)}</p>
+      <p className="mt-1.5 text-[12px] font-extrabold text-ink-900 leading-tight">{t(`achievements.${achievementKey}_name`)}</p>
+      <p className="mt-0.5 text-[10px] text-muted leading-tight">{t(`achievements.${achievementKey}_desc`)}</p>
       <div className="mt-1.5 flex items-center justify-center gap-1.5">
         <span className={`px-1.5 py-px rounded-full text-[9px] font-mono font-extrabold uppercase tracking-wide ${meta.pill}`}>
           {t(meta.labelKey)}
         </span>
         {rarityPct != null && (
-          <span className="text-[9px] text-muted tabular-nums">{t('trophies.rarity_pct', { pct: rarityPct })}</span>
+          <span className="text-[9px] text-muted tabular-nums">{t('achievements.rarity_pct', { pct: rarityPct })}</span>
         )}
       </div>
     </div>

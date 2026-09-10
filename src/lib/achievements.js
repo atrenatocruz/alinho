@@ -1,14 +1,18 @@
 /* ════════════════════════════════════════════════════════════════════════
-   Estante de troféus — display puro.
+   Conquistas — display puro.
 
-   A autoridade é o Postgres: o catálogo vive na tabela `trophies` (a UI
-   lê-a para mostrar também os bloqueados) e a atribuição é 100%
-   server-side (check_and_award_trophies). Aqui só existe o vestuário:
-   ícone por troféu, cores por raridade (linguagem universal de gaming:
+   ("Achievements" à Steam/Xbox/Strava. O nome "troféus" está reservado
+   para a futura estante real de troféus de torneio com prémios — ver
+   migration_achievements_rename.sql.)
+
+   A autoridade é o Postgres: o catálogo vive na tabela `achievements` (a
+   UI lê-a para mostrar também os bloqueados) e a atribuição é 100%
+   server-side (check_and_award_achievements). Aqui só existe o vestuário:
+   ícone por conquista, cores por raridade (linguagem universal de gaming:
    cinza/azul/roxo/dourado) e ordenação de categorias.
 
-   Nomes/descrições: locales `trophies.<key>_name` / `trophies.<key>_desc`.
-   Troféu novo = 1 bloco SQL no verificador + 1 linha no seed + ícone
+   Nomes/descrições: locales `achievements.<key>_name` / `_desc`.
+   Conquista nova = 1 bloco SQL no verificador + 1 linha no seed + ícone
    aqui (com fallback) + 2 chaves de tradução.
    ════════════════════════════════════════════════════════════════════════ */
 import {
@@ -71,7 +75,7 @@ const ICONS = {
 }
 
 // Troféus de evento (ou futuros) sem ícone dedicado caem aqui.
-export const trophyIcon = (key, category) =>
+export const achievementIcon = (key, category) =>
   ICONS[key] || (category === 'evento' ? Ticket : Award)
 
 // Linguagem universal de raridade. Literais completos — o scanner do
@@ -81,23 +85,23 @@ export const trophyIcon = (key, category) =>
 // quais estavam ganhos).
 export const RARITY_META = {
   comum: {
-    labelKey: 'trophies.rarity_comum',
+    labelKey: 'achievements.rarity_comum',
     frame: 'border-stone-400', icon: 'text-stone-600',
     medal: 'bg-stone-200', pill: 'bg-stone-100 text-stone-600', glow: '',
   },
   raro: {
-    labelKey: 'trophies.rarity_raro',
+    labelKey: 'achievements.rarity_raro',
     frame: 'border-sky-400', icon: 'text-sky-600',
     medal: 'bg-sky-100', pill: 'bg-sky-100 text-sky-700', glow: '',
   },
   epico: {
-    labelKey: 'trophies.rarity_epico',
+    labelKey: 'achievements.rarity_epico',
     frame: 'border-violet-400', icon: 'text-violet-600',
     medal: 'bg-violet-100', pill: 'bg-violet-100 text-violet-700',
     glow: 'shadow-[0_0_14px_-2px] shadow-violet-400/60',
   },
   lendario: {
-    labelKey: 'trophies.rarity_lendario',
+    labelKey: 'achievements.rarity_lendario',
     frame: 'border-amber-400', icon: 'text-amber-600',
     medal: 'bg-amber-100', pill: 'bg-amber-100 text-amber-700',
     glow: 'shadow-[0_0_14px_-2px] shadow-amber-400/70',
