@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, Trophy, Award, Flame, Swords, ChevronDown, UserPlus, UserCheck, Clock, Lock, ShieldCheck, ThumbsUp } from 'lucide-react'
+import { ArrowLeft, Trophy, Award, Swords, ChevronDown, UserPlus, UserCheck, Clock, Lock, ShieldCheck, ThumbsUp } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { PrimaryButton, EmptyState, Avatar, PhotoViewerModal, TrophyCard, RatingBadge } from '../components/ui'
 import { formatRatingMaybeProvisional, isProvisional, bandProgress } from '../lib/elo'
@@ -240,12 +240,11 @@ export default function PlayerDetails() {
   const played = (player.game_wins || 0) + (player.game_losses || 0)
   const winRate = winRatePct(player.game_wins || 0, played)
 
-  // Jogos, % vitórias e títulos vivem agora no cartão do hero — aqui só
-  // ficam as métricas que ele não absorveu (espelha Profile.jsx).
-  const statTiles = [
-    { icon: Flame, value: player.game_wins || 0, label: t('profile.stat_game_wins'), cls: 'text-ok' },
-    ...((playerXp?.kudos ?? 0) > 0 ? [{ icon: ThumbsUp, value: playerXp.kudos, label: t('profile.stat_kudos'), cls: 'text-lime-600' }] : []),
-  ]
+  // Jogos ganhos/jogados, % vitórias e títulos vivem no cartão do hero —
+  // aqui só ficam as métricas que ele não absorveu (espelha Profile.jsx).
+  const statTiles = (playerXp?.kudos ?? 0) > 0
+    ? [{ icon: ThumbsUp, value: playerXp.kudos, label: t('profile.stat_kudos'), cls: 'text-lime-600' }]
+    : []
 
   // A mix with several rounds ("todos contra todos") returns one row per
   // round, all sharing the same game_id — grouped here into one
@@ -386,8 +385,8 @@ export default function PlayerDetails() {
         {!resultsHidden && (
           <div className="mt-4 pt-3.5 border-t border-line grid grid-cols-3 divide-x divide-line text-center">
             <div className="px-1">
-              <p className="text-xl font-extrabold text-ink-900 tabular-nums leading-none">{played}</p>
-              <p className="mt-1 text-[11px] text-muted">{t('profile.card_games')}</p>
+              <p className="text-xl font-extrabold text-ink-900 tabular-nums leading-none">{player.game_wins || 0}/{played}</p>
+              <p className="mt-1 text-[11px] text-muted">{t('profile.stat_game_wins')}</p>
             </div>
             <div className="px-1">
               <p className="text-xl font-extrabold text-ink-900 tabular-nums leading-none">{winRate}%</p>
@@ -432,7 +431,7 @@ export default function PlayerDetails() {
           <Lock size={18} className="mx-auto mb-1.5" />
           <p className="text-sm">{t('playerdetails.results_private')}</p>
         </div>
-      ) : (
+      ) : statTiles.length > 0 ? (
         <div className="grid grid-cols-2 gap-3">
           {statTiles.map(({ icon: Icon, value, label, cls }) => (
             <div key={label} className="card text-center py-5">
@@ -442,7 +441,7 @@ export default function PlayerDetails() {
             </div>
           ))}
         </div>
-      )}
+      ) : null}
 
       {/* Estante de troféus — só os ganhos, com a mesma gate de
           privacidade das stats (resultsHidden). */}
