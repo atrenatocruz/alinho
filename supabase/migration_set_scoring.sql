@@ -32,6 +32,7 @@ ALTER TABLE match_sets ENABLE ROW LEVEL SECURITY;
 -- Same shape as "Org members can view matches" / "Org admins manage
 -- matches" (schema.sql) — match_sets inherits matches' org scoping via
 -- match_id -> matches.game_id -> games.organization_id.
+DROP POLICY IF EXISTS "Org members can view match sets" ON match_sets;
 CREATE POLICY "Org members can view match sets"
   ON match_sets FOR SELECT
   USING (EXISTS (
@@ -41,6 +42,7 @@ CREATE POLICY "Org members can view match sets"
     WHERE matches.id = match_sets.match_id AND memberships.user_id = auth.uid()
   ));
 
+DROP POLICY IF EXISTS "Org admins manage match sets" ON match_sets;
 CREATE POLICY "Org admins manage match sets"
   ON match_sets FOR ALL
   USING (EXISTS (
@@ -60,6 +62,7 @@ CREATE POLICY "Org admins manage match sets"
 -- (migration_game_scorekeepers.sql) — but match_sets rows are INSERTed
 -- fresh (matches rows already exist by the time a scorekeeper acts, set
 -- rows don't), so this needs INSERT, not just UPDATE.
+DROP POLICY IF EXISTS "Scorekeepers can submit match sets while in progress" ON match_sets;
 CREATE POLICY "Scorekeepers can submit match sets while in progress"
   ON match_sets FOR INSERT
   WITH CHECK (EXISTS (
@@ -69,6 +72,7 @@ CREATE POLICY "Scorekeepers can submit match sets while in progress"
       AND EXISTS (SELECT 1 FROM game_scorekeepers gs WHERE gs.game_id = games.id AND gs.user_id = auth.uid())
   ));
 
+DROP POLICY IF EXISTS "Scorekeepers can correct match sets while in progress" ON match_sets;
 CREATE POLICY "Scorekeepers can correct match sets while in progress"
   ON match_sets FOR UPDATE
   USING (EXISTS (
@@ -78,6 +82,22 @@ CREATE POLICY "Scorekeepers can correct match sets while in progress"
       AND EXISTS (SELECT 1 FROM game_scorekeepers gs WHERE gs.game_id = games.id AND gs.user_id = auth.uid())
   ))
   WITH CHECK (EXISTS (
+    SELECT 1 FROM matches
+    JOIN games ON games.id = matches.game_id
+    WHERE matches.id = match_sets.match_id AND games.status = 'in_progress'
+      AND EXISTS (SELECT 1 FROM game_scorekeepers gs WHERE gs.game_id = games.id AND gs.user_id = auth.uid())
+  ));
+
+-- Mirrors the UPDATE policy above exactly (same USING clause) — without
+-- this, a scorekeeper's delete-then-insert correction of a sets-format
+-- match (GameDetails.jsx handleSaveScore) silently deletes 0 rows under
+-- RLS, then the re-insert hits the UNIQUE (match_id, set_number)
+-- constraint and throws, leaving stale set rows under an already-updated
+-- matches row.
+DROP POLICY IF EXISTS "Scorekeepers can delete match sets while in progress" ON match_sets;
+CREATE POLICY "Scorekeepers can delete match sets while in progress"
+  ON match_sets FOR DELETE
+  USING (EXISTS (
     SELECT 1 FROM matches
     JOIN games ON games.id = matches.game_id
     WHERE matches.id = match_sets.match_id AND games.status = 'in_progress'

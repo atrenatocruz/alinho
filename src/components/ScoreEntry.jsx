@@ -50,7 +50,16 @@ export default function ScoreEntry({
 
   if (scoringFormat === 'pro_set_9') {
     if (bothEntered) {
-      const check = validateProSetScore(aNum, bNum)
+      // 9-8/8-9 is only ever PRODUCED by a super tie-break, never entered
+      // directly — validateProSetScore correctly rejects it as direct
+      // input. But startEditingScore (GameDetails.jsx) prefills correction
+      // inputs straight from the saved score_a/score_b, so re-opening an
+      // already-decided 9-8/8-9 match lands exactly here. Treat that pair
+      // the same as an 8-8 entry (needs a breaker re-entry) instead of
+      // running it through validateProSetScore, which would otherwise
+      // report it invalid with no breaker prompt — a dead end.
+      const isBreakerProducedPair = (aNum === 9 && bNum === 8) || (aNum === 8 && bNum === 9)
+      const check = isBreakerProducedPair ? { valid: false, needsBreaker: true } : validateProSetScore(aNum, bNum)
       needsBreaker = check.needsBreaker
       if (check.valid) {
         readyToSave = true

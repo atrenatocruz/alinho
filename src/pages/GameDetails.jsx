@@ -114,6 +114,7 @@ export default function GameDetails() {
   const [ratingInfoById, setRatingInfoById] = useState({})
   const [finishedTab, setFinishedTab] = useState('stats') // 'stats' | 'duplas' | 'rondas' — tabs for a finished mix's results
   const [editingMatchId, setEditingMatchId] = useState(null) // a scored match being corrected — re-opens its inputs (Trello #184)
+  const [savingMatchId, setSavingMatchId] = useState(null) // match id currently being persisted by handleSaveScore — guards ScoreEntry's save button against a double-tap double-submit
   // Histórico IN/OUT (Trello #171) — só admins, e carregado apenas quando o
   // painel é aberto: é uma ferramenta de diagnóstico, não vale outra query
   // em cada abertura da página de um mix.
@@ -901,6 +902,7 @@ export default function GameDetails() {
   const handleSaveScore = async (match, finalScore) => {
     const { score_a: a, score_b: b, sets } = finalScore
     setMixError('')
+    setSavingMatchId(match.id)
     try {
       const { error } = await supabase
         .from('matches')
@@ -935,6 +937,8 @@ export default function GameDetails() {
     } catch (error) {
       console.error('Error saving score:', error)
       setMixError(t('gamedetails.error_save_score'))
+    } finally {
+      setSavingMatchId(current => (current === match.id ? null : current))
     }
   }
 
@@ -2067,7 +2071,7 @@ export default function GameDetails() {
                           initialScores={scores[m.id] || { a: '', b: '' }}
                           onScoreChange={(matchId, next) => setScores(prev => ({ ...prev, [matchId]: next }))}
                           onSave={(finalScore) => handleSaveScore(m, finalScore)}
-                          saving={false}
+                          saving={savingMatchId === m.id}
                         />
                         {isCorrecting && (
                           <button
@@ -2183,7 +2187,7 @@ export default function GameDetails() {
                                   initialScores={scores[m.id] || { a: '', b: '' }}
                                   onScoreChange={(matchId, next) => setScores(prev => ({ ...prev, [matchId]: next }))}
                                   onSave={(finalScore) => handleSaveScore(m, finalScore)}
-                                  saving={false}
+                                  saving={savingMatchId === m.id}
                                 />
                               </div>
                             )
