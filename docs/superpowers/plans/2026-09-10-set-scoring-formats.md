@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add two new match-scoring styles — **melhor de 3 sets** and **pro-set a 9** — as a per-mix choice (`games.scoring_format`) independent of match-structure format (`sobe_desce`/`todos_contra_todos`/`grupos_eliminatorias`), so any format can use any scoring style.
+**Goal:** Add three new match-scoring styles — **melhor de 2 sets**, **melhor de 3 sets**, and **pro-set a 9** — as a per-mix choice (`games.scoring_format`) independent of match-structure format (`sobe_desce`/`todos_contra_todos`/`grupos_eliminatorias`), so any format can use any scoring style. `melhor_2_sets` and `melhor_3_sets` differ only in what decides a 1-1 split: a super tie-break (first to 10) for `melhor_2_sets`, a normal 3rd set for `melhor_3_sets`.
 
-**Architecture:** A new pure logic module (`src/lib/scoringLogic.js`) implements the two new formats' validation/decision rules, tested with vitest (already set up in this repo). A new `ScoreEntry` component replaces the inline score-input JSX currently duplicated at two render sites in `GameDetails.jsx`, branching on `scoring_format` to show the right input shape. `matches.score_a`/`score_b` keeps meaning "the number that decides the match" for every format (points today, sets won for `melhor_3_sets`, games for `pro_set_9`) — every existing consumer (`standings()`, `finalize_mix`, ELO calc, which only reads win/loss/tie — never the magnitude — confirmed in `migration_elo_rating.sql:147-151`) needs zero changes.
+**Architecture:** A new pure logic module (`src/lib/scoringLogic.js`) implements the new formats' validation/decision rules, tested with vitest (already set up in this repo). A new `ScoreEntry` component replaces the inline score-input JSX currently duplicated at two render sites in `GameDetails.jsx`, branching on `scoring_format` to show the right input shape. `matches.score_a`/`score_b` keeps meaning "the number that decides the match" for every format (points today, sets won for either sets format, games for `pro_set_9`) — every existing consumer (`standings()`, `finalize_mix`, ELO calc, which only reads win/loss/tie — never the magnitude — confirmed in `migration_elo_rating.sql:147-151`) needs zero changes.
 
 **Tech Stack:** React + Vite + Supabase (Postgres + Edge Functions). Vitest already set up (`vitest.config.js`, `src/lib/mixLogic.test.js`).
 
@@ -107,13 +107,17 @@ Expected: FAIL — module `./scoringLogic` doesn't exist.
 
 ```js
 /* ════════════════════════════════════════════════════════════════════════
-   Scoring logic — pure functions for the two set-based scoring formats
-   (pro_set_9, melhor_3_sets). No I/O, fully testable — mirrors mixLogic.js's
-   style. matches.score_a/score_b keeps meaning "the number that decides
-   the match" for every scoring format (points today, sets won for
-   melhor_3_sets, games for pro_set_9) — every existing consumer
-   (standings(), finalize_mix, ELO) only ever reads win/loss/tie from these
-   two numbers, never their magnitude, so none of that code needs to change.
+   Scoring logic — pure functions for the set-based scoring formats
+   (pro_set_9, melhor_2_sets, melhor_3_sets). No I/O, fully testable —
+   mirrors mixLogic.js's style. matches.score_a/score_b keeps meaning "the
+   number that decides the match" for every scoring format (points today,
+   sets won for either sets format, games for pro_set_9) — every existing
+   consumer (standings(), finalize_mix, ELO) only ever reads win/loss/tie
+   from these two numbers, never their magnitude, so none of that code
+   needs to change. computeSetsResult below serves BOTH sets formats — they
+   only differ in what the UI presents as the 1-1 decider and whether that
+   entry is flagged is_super_tiebreak (see ScoreEntry, Tasks 5-6), not in
+   how sets get tallied.
    ════════════════════════════════════════════════════════════════════════ */
 
 /** Judges a pro-set games score the UI is about to submit as final.
@@ -174,13 +178,13 @@ git commit -m "feat: pure logic for pro-set and melhor-de-3-sets scoring (Task 1
 - Create: `supabase/migration_set_scoring.sql`
 
 **Interfaces:**
-- Produces: `games.scoring_format` (`'pontos_simples' | 'pro_set_9' | 'melhor_3_sets'`, default `'pontos_simples'`); `match_sets` table (`match_id`, `set_number`, `score_a`, `score_b`, `is_super_tiebreak`), RLS mirroring `matches`. Consumed by Task 4 (form), Task 7 (persistence).
+- Produces: `games.scoring_format` (`'pontos_simples' | 'pro_set_9' | 'melhor_2_sets' | 'melhor_3_sets'`, default `'pontos_simples'`); `match_sets` table (`match_id`, `set_number`, `score_a`, `score_b`, `is_super_tiebreak`), RLS mirroring `matches`. Consumed by Task 4 (form), Task 7 (persistence).
 
 - [ ] **Step 1: Write the migration**
 
 ```sql
 -- ════════════════════════════════════════════════════════════════════════
--- Migration: Set scoring formats (melhor de 3 sets / pro-set a 9)
+-- Migration: Set scoring formats (melhor de 2/3 sets / pro-set a 9)
 -- Run this whole file in Supabase → SQL Editor → New query → Run.
 -- NOT LIVE until run there — this file existing in the repo changes
 -- nothing on its own. Every existing mix defaults to 'pontos_simples',
@@ -191,9 +195,13 @@ git commit -m "feat: pure logic for pro-set and melhor-de-3-sets scoring (Task 1
 ALTER TABLE games ADD COLUMN IF NOT EXISTS scoring_format TEXT NOT NULL DEFAULT 'pontos_simples';
 ALTER TABLE games DROP CONSTRAINT IF EXISTS games_scoring_format_check;
 ALTER TABLE games ADD CONSTRAINT games_scoring_format_check
-  CHECK (scoring_format IN ('pontos_simples', 'pro_set_9', 'melhor_3_sets'));
+  CHECK (scoring_format IN ('pontos_simples', 'pro_set_9', 'melhor_2_sets', 'melhor_3_sets'));
 
--- ── 2. Per-set scores, only populated for melhor_3_sets matches ────────
+-- ── 2. Per-set scores, populated for melhor_2_sets and melhor_3_sets
+--      matches — they share this table, differing only in whether the 1-1
+--      decider (set_number 3) is a super tie-break (melhor_2_sets,
+--      is_super_tiebreak = true) or a normal 3rd set (melhor_3_sets,
+--      is_super_tiebreak = false). ───────────────────────────────────────
 CREATE TABLE IF NOT EXISTS match_sets (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   match_id UUID NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
@@ -293,6 +301,7 @@ In `src/lib/mixLogic.js`, right after `FORMAT_LABEL_KEY`'s closing brace:
 export const SCORING_FORMAT_LABEL_KEY = {
   pontos_simples: 'mixlogic.scoring_pontos_simples',
   pro_set_9: 'mixlogic.scoring_pro_set_9',
+  melhor_2_sets: 'mixlogic.scoring_melhor_2_sets',
   melhor_3_sets: 'mixlogic.scoring_melhor_3_sets',
 }
 ```
@@ -304,6 +313,7 @@ In `src/locales/pt.json`, in the `"mixlogic"` object (sibling to `format_grupos_
 ```json
 "scoring_pontos_simples": "Pontos simples",
 "scoring_pro_set_9": "Pro set a 9",
+"scoring_melhor_2_sets": "Melhor de 2 sets",
 "scoring_melhor_3_sets": "Melhor de 3 sets"
 ```
 
@@ -331,6 +341,7 @@ In `src/locales/en.json`, mirror Step 2's keys:
 ```json
 "scoring_pontos_simples": "Simple points",
 "scoring_pro_set_9": "Pro set to 9",
+"scoring_melhor_2_sets": "Best of 2 sets",
 "scoring_melhor_3_sets": "Best of 3 sets"
 ```
 
@@ -390,6 +401,7 @@ Add right after it:
 const SCORING_FORMATS = [
   { value: 'pontos_simples', labelKey: SCORING_FORMAT_LABEL_KEY.pontos_simples },
   { value: 'pro_set_9', labelKey: SCORING_FORMAT_LABEL_KEY.pro_set_9 },
+  { value: 'melhor_2_sets', labelKey: SCORING_FORMAT_LABEL_KEY.melhor_2_sets },
   { value: 'melhor_3_sets', labelKey: SCORING_FORMAT_LABEL_KEY.melhor_3_sets },
 ]
 ```
@@ -518,7 +530,7 @@ Expected: builds successfully.
 
 - [ ] **Step 7: Manual verification**
 
-Start the dev server, open "Criar Mix", confirm the "Pontuação" selector appears with 3 options and defaults to "Pontos simples".
+Start the dev server, open "Criar Mix", confirm the "Pontuação" selector appears with 4 options and defaults to "Pontos simples".
 
 - [ ] **Step 8: Commit**
 
@@ -538,14 +550,14 @@ git commit -m "feat: scoring format selector in mix-creation form (Task 4)"
 - Consumes: `validateProSetScore`, `computeProSetFinalScore` (Task 1).
 - Produces: default-exported component with props `{ match, scoringFormat, editable, teamAName, teamBName, initialScores, onScoreChange, onSave, saving }`:
   - `match`: the match row (`id`, `score_a`, `score_b`, `winner_team_id`, `team_a_id`, `team_b_id`).
-  - `scoringFormat`: `'pontos_simples' | 'pro_set_9' | 'melhor_3_sets'`.
+  - `scoringFormat`: `'pontos_simples' | 'pro_set_9' | 'melhor_2_sets' | 'melhor_3_sets'`.
   - `editable`: boolean — whether inputs render at all (mirrors the existing `editable` computation in `GameDetails.jsx`).
   - `teamAName`/`teamBName`: strings (already-resolved via the existing `teamName()` helper — this component does no name lookups itself).
-  - `initialScores`: `{ a, b }` strings (mirrors the existing `scores[m.id]` shape) — used to pre-fill when correcting a saved `pontos_simples`/`pro_set_9` score. `melhor_3_sets` (Task 6) doesn't use this prop; it manages its own multi-step local state.
+  - `initialScores`: `{ a, b }` strings (mirrors the existing `scores[m.id]` shape) — used to pre-fill when correcting a saved `pontos_simples`/`pro_set_9` score. `melhor_2_sets`/`melhor_3_sets` (Task 6) don't use this prop; they manage their own multi-step local state.
   - `onScoreChange(matchId, { a, b })`: called on every keystroke for `pontos_simples`/`pro_set_9` inputs — the parent keeps owning the `scores` state exactly as today, this component doesn't introduce a second source of truth for those two formats.
-  - `onSave({ score_a, score_b })`: called once a final, valid score is ready to persist — for `pontos_simples`/`pro_set_9` this fires on a save button click; Task 6 wires `melhor_3_sets`'s own multi-step flow to call the same prop once all sets are decided.
+  - `onSave({ score_a, score_b })`: called once a final, valid score is ready to persist — for `pontos_simples`/`pro_set_9` this fires on a save button click; Task 6 wires the sets formats' own multi-step flow to call the same prop once all sets are decided.
   - `saving`: boolean — disables the save control while a save is in flight.
-  - This task only implements the `pontos_simples` and `melhor_3_sets` branches' *shared scaffold* plus the `pro_set_9` branch in full. Task 6 fills in the `melhor_3_sets` branch (a placeholder that renders nothing beyond a "not yet implemented" comment is NOT acceptable — see Task 6, which must land before this component is wired into `GameDetails.jsx` in Task 7; these two tasks together produce the finished component).
+  - This task only implements the `pontos_simples`/`pro_set_9` branches in full, plus a placeholder scaffold for `melhor_2_sets`/`melhor_3_sets`. Task 6 fills that branch in (a placeholder that renders nothing beyond a "not yet implemented" comment is NOT acceptable in the finished component — see Task 6, which must land before this component is wired into `GameDetails.jsx` in Task 7; these two tasks together produce the finished component).
 
 - [ ] **Step 1: Write the component's `pontos_simples` and `pro_set_9` branches**
 
@@ -557,20 +569,24 @@ import { validateProSetScore, computeProSetFinalScore } from '../lib/scoringLogi
 /** Renders the score-input UI for one match, branching on the mix's
     scoring_format. pontos_simples/pro_set_9 are a single {a, b} input pair
     (the parent owns that state, same as before this component existed);
-    melhor_3_sets manages its own multi-set flow internally (see the
-    sibling task that adds that branch — this file is incomplete without
-    it, the two land together before GameDetails.jsx is wired to use
-    either). */
+    melhor_2_sets/melhor_3_sets share one multi-set flow internally (see
+    the sibling task that adds that branch — this file is incomplete
+    without it, the two land together before GameDetails.jsx is wired to
+    use either). */
 export default function ScoreEntry({
   match, scoringFormat, editable, teamAName, teamBName,
   initialScores, onScoreChange, onSave, saving,
 }) {
   const { t } = useTranslation()
 
-  if (scoringFormat === 'melhor_3_sets') {
+  if (scoringFormat === 'melhor_2_sets' || scoringFormat === 'melhor_3_sets') {
     return (
       <SetsScoreEntry
         match={match}
+        // Only difference between the two: what decides a 1-1 split —
+        // SetsScoreEntry (Task 6) uses this to pick the decider's label
+        // and whether it's flagged is_super_tiebreak.
+        deciderIsSuperTiebreak={scoringFormat === 'melhor_2_sets'}
         editable={editable}
         teamAName={teamAName}
         teamBName={teamBName}
@@ -710,7 +726,7 @@ export default function ScoreEntry({
 // Placeholder signature for Task 6 to fill in — Task 6 replaces this whole
 // function body (and only this function), the pontos_simples/pro_set_9
 // code above is untouched by that task.
-function SetsScoreEntry({ match, editable, teamAName, teamBName, onSave, saving }) {
+function SetsScoreEntry({ match, deciderIsSuperTiebreak, editable, teamAName, teamBName, onSave, saving }) {
   return null
 }
 ```
@@ -729,14 +745,14 @@ git commit -m "feat: ScoreEntry component, pontos_simples + pro_set_9 branches (
 
 ---
 
-## Task 6: `ScoreEntry` component — melhor_3_sets branch
+## Task 6: `ScoreEntry` component — melhor_2_sets + melhor_3_sets branch
 
 **Files:**
 - Modify: `src/components/ScoreEntry.jsx` (replace the `SetsScoreEntry` placeholder from Task 5)
 
 **Interfaces:**
 - Consumes: `computeSetsResult` (Task 1).
-- Produces: a working `SetsScoreEntry` — same `onSave({ score_a, score_b })` contract as the other two branches (Task 5), called once the match is decided (2 sets won by one side).
+- Produces: a working `SetsScoreEntry` — same `onSave({ score_a, score_b, sets })` contract as the other branches (Task 5), called once the match is decided (2 sets won by one side). Serves both `melhor_2_sets` and `melhor_3_sets` via the `deciderIsSuperTiebreak` prop Task 5 already wires from `scoringFormat` — the only place that prop is read is where the 1-1 decider's label and `is_super_tiebreak` flag are decided (see Step 1).
 
 - [ ] **Step 1: Replace the placeholder**
 
@@ -746,7 +762,7 @@ Find (the entire placeholder function from Task 5):
 // Placeholder signature for Task 6 to fill in — Task 6 replaces this whole
 // function body (and only this function), the pontos_simples/pro_set_9
 // code above is untouched by that task.
-function SetsScoreEntry({ match, editable, teamAName, teamBName, onSave, saving }) {
+function SetsScoreEntry({ match, deciderIsSuperTiebreak, editable, teamAName, teamBName, onSave, saving }) {
   return null
 }
 ```
@@ -755,17 +771,20 @@ Replace with:
 
 ```jsx
 // Collects one set at a time. sets[i] = {score_a, score_b} once entered;
-// a 3rd entry (index 2) only ever appears after the first two split 1-1,
-// and is a super tie-break rather than a normal set. Local-only state —
-// nothing is persisted until the whole match is decided (onSave fires
-// once), matching the plan's "no partial match_sets rows" design.
-function SetsScoreEntry({ match, editable, teamAName, teamBName, onSave, saving }) {
+// a 3rd entry (index 2) only ever appears after the first two split 1-1.
+// deciderIsSuperTiebreak (melhor_2_sets: true, melhor_3_sets: false) is the
+// ONLY thing that differs between the two formats here — it picks the
+// decider's label and whether that entry is flagged is_super_tiebreak.
+// Local-only state — nothing is persisted until the whole match is
+// decided (onSave fires once), matching the plan's "no partial match_sets
+// rows" design.
+function SetsScoreEntry({ match, deciderIsSuperTiebreak, editable, teamAName, teamBName, onSave, saving }) {
   const { t } = useTranslation()
   const [sets, setSets] = useState([])
   const [current, setCurrent] = useState({ a: '', b: '' })
 
   const result = computeSetsResult(sets)
-  const isDecider = sets.length === 2 && !result.decided // 1-1 split -> next entry is the super tie-break
+  const isDecider = sets.length === 2 && !result.decided // 1-1 split -> next entry is the decider
   const currentSetNumber = sets.length + 1
 
   const aNum = parseInt(current.a, 10)
@@ -774,7 +793,7 @@ function SetsScoreEntry({ match, editable, teamAName, teamBName, onSave, saving 
 
   const handleAddSet = () => {
     if (!currentValid) return
-    const nextSets = [...sets, { score_a: aNum, score_b: bNum, is_super_tiebreak: isDecider }]
+    const nextSets = [...sets, { score_a: aNum, score_b: bNum, is_super_tiebreak: isDecider && deciderIsSuperTiebreak }]
     setSets(nextSets)
     setCurrent({ a: '', b: '' })
     const nextResult = computeSetsResult(nextSets)
@@ -824,7 +843,11 @@ function SetsScoreEntry({ match, editable, teamAName, teamBName, onSave, saving 
       {!result.decided && (
         <>
           {isDecider && (
-            <p className="text-xs font-extrabold text-muted">{t('gamedetails.super_tiebreak')}</p>
+            <p className="text-xs font-extrabold text-muted">
+              {deciderIsSuperTiebreak
+                ? t('gamedetails.super_tiebreak')
+                : t('gamedetails.set_number', { number: 3 })}
+            </p>
           )}
           <div className="flex items-center gap-3 rounded-ctrl px-3 py-2.5 bg-surface">
             <span className="flex-1 min-w-0 text-sm font-extrabold text-ink-900">{teamAName}</span>
@@ -883,13 +906,13 @@ Expected: builds successfully.
 
 - [ ] **Step 4: Manual verification**
 
-This component still isn't wired into the app (Task 7 does that) — verify by reading the code: trace a 2-0 finish (sets `[{6,4},{6,2}]` → `onSave` fires with `score_a:2, score_b:0`) and a 2-1 finish via decider (`[{6,4},{3,6},{10,7}]` → `onSave` fires with `score_a:2, score_b:1`, third entry has `is_super_tiebreak:true`). Note both in your report.
+This component still isn't wired into the app (Task 7 does that) — verify by reading the code: trace a 2-0 finish (sets `[{6,4},{6,2}]` → `onSave` fires with `score_a:2, score_b:0`, regardless of `deciderIsSuperTiebreak` since no decider was needed); a `melhor_2_sets` 2-1 finish via decider (`deciderIsSuperTiebreak=true`, sets `[{6,4},{3,6},{10,7}]` → `onSave` fires with `score_a:2, score_b:1`, third entry has `is_super_tiebreak:true`); and a `melhor_3_sets` 2-1 finish via a normal 3rd set (`deciderIsSuperTiebreak=false`, same sets array → `onSave` fires identically except the third entry's `is_super_tiebreak` is `false`). Note all three in your report.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add src/components/ScoreEntry.jsx
-git commit -m "feat: ScoreEntry melhor_3_sets branch (Task 6)"
+git commit -m "feat: ScoreEntry melhor_2_sets + melhor_3_sets branch (Task 6)"
 ```
 
 ---
@@ -901,7 +924,7 @@ git commit -m "feat: ScoreEntry melhor_3_sets branch (Task 6)"
 
 **Interfaces:**
 - Consumes: `ScoreEntry` (Tasks 5+6 combined).
-- Produces: both score-entry render sites (live view ~line 2021-2101, history/finished view ~line 2186-2243) use `ScoreEntry` instead of their current inline input JSX; `handleSaveScore` persists `match_sets` rows when the mix's `scoring_format` is `melhor_3_sets`.
+- Produces: both score-entry render sites (live view ~line 2021-2101, history/finished view ~line 2186-2243) use `ScoreEntry` instead of their current inline input JSX; `handleSaveScore` persists `match_sets` rows when the mix's `scoring_format` is `melhor_2_sets` or `melhor_3_sets`.
 
 - [ ] **Step 1: Import `ScoreEntry`**
 
@@ -952,8 +975,8 @@ Change to:
   // finalScore is { score_a, score_b } for pontos_simples/pro_set_9 (from
   // ScoreEntry's own validated computation — this function no longer
   // re-derives or re-validates it), or { score_a, score_b, sets } for
-  // melhor_3_sets, where `sets` is the full per-set array to persist into
-  // match_sets alongside the match's own sets-won score_a/score_b.
+  // melhor_2_sets/melhor_3_sets, where `sets` is the full per-set array to
+  // persist into match_sets alongside the match's own sets-won score_a/score_b.
   const handleSaveScore = async (match, finalScore) => {
     const { score_a: a, score_b: b, sets } = finalScore
     setMixError('')
@@ -1224,7 +1247,7 @@ Expected: builds successfully.
 
 - [ ] **Step 6: Manual verification**
 
-Requires Task 2's migration to have been run (ask the user to confirm, don't assume). In the dev server: create a mix with `scoring_format = 'pro_set_9'`, confirm entering `8-8` prompts a super tie-break and the saved result is `9-8`/`8-9`; create one with `melhor_3_sets`, confirm entering 2 sets that split 1-1 prompts a 3rd super-tie-break entry, and the match's `score_a`/`score_b` end up as sets won (e.g. `2-1`) with 3 rows in `match_sets`. Confirm a `pontos_simples` mix still behaves exactly as before (regression check — this task touched its render path even though its logic didn't change).
+Requires Task 2's migration to have been run (ask the user to confirm, don't assume). In the dev server: create a mix with `scoring_format = 'pro_set_9'`, confirm entering `8-8` prompts a super tie-break and the saved result is `9-8`/`8-9`; create one with `melhor_2_sets`, confirm entering 2 sets that split 1-1 prompts a "Super tie-break" 3rd entry, and the match's `score_a`/`score_b` end up as sets won (e.g. `2-1`) with 3 rows in `match_sets`, the 3rd flagged `is_super_tiebreak: true`; create one with `melhor_3_sets`, confirm the same 1-1 split instead prompts a "Set 3" entry (not labeled as a tie-break) and the 3rd `match_sets` row has `is_super_tiebreak: false`. Confirm a `pontos_simples` mix still behaves exactly as before (regression check — this task touched its render path even though its logic didn't change).
 
 - [ ] **Step 7: Commit**
 
