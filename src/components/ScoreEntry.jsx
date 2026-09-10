@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { validateProSetScore, computeProSetFinalScore } from '../lib/scoringLogic'
+import { validateProSetScore, computeProSetFinalScore, computeSetsResult } from '../lib/scoringLogic'
 
 /** Renders the score-input UI for one match, branching on the mix's
     scoring_format. pontos_simples/pro_set_9 are a single {a, b} input pair
@@ -159,9 +159,116 @@ export default function ScoreEntry({
   )
 }
 
-// Placeholder signature for Task 6 to fill in — Task 6 replaces this whole
-// function body (and only this function), the pontos_simples/pro_set_9
-// code above is untouched by that task.
+// Collects one set at a time. sets[i] = {score_a, score_b} once entered;
+// a 3rd entry (index 2) only ever appears after the first two split 1-1.
+// deciderIsSuperTiebreak (melhor_2_sets: true, melhor_3_sets: false) is the
+// ONLY thing that differs between the two formats here — it picks the
+// decider's label and whether that entry is flagged is_super_tiebreak.
+// Local-only state — nothing is persisted until the whole match is
+// decided (onSave fires once), matching the plan's "no partial match_sets
+// rows" design.
 function SetsScoreEntry({ match, deciderIsSuperTiebreak, editable, teamAName, teamBName, onSave, saving }) {
-  return null
+  const { t } = useTranslation()
+  const [sets, setSets] = useState([])
+  const [current, setCurrent] = useState({ a: '', b: '' })
+
+  const result = computeSetsResult(sets)
+  const isDecider = sets.length === 2 && !result.decided // 1-1 split -> next entry is the decider
+  const currentSetNumber = sets.length + 1
+
+  const aNum = parseInt(current.a, 10)
+  const bNum = parseInt(current.b, 10)
+  const currentValid = current.a !== '' && current.b !== '' && !Number.isNaN(aNum) && !Number.isNaN(bNum) && aNum !== bNum
+
+  const handleAddSet = () => {
+    if (!currentValid) return
+    const nextSets = [...sets, { score_a: aNum, score_b: bNum, is_super_tiebreak: isDecider && deciderIsSuperTiebreak }]
+    setSets(nextSets)
+    setCurrent({ a: '', b: '' })
+    const nextResult = computeSetsResult(nextSets)
+    if (nextResult.decided) {
+      onSave({ score_a: nextResult.setsA, score_b: nextResult.setsB, sets: nextSets })
+    }
+  }
+
+  // Same read-only row shape as the pontos_simples/pro_set_9 branch above
+  // (winner highlight via match.winner_team_id) — shows the sets-won
+  // summary (e.g. 2-1), not a per-set breakdown; the per-set detail is
+  // still in match_sets for a future history view, just not surfaced here.
+  const readOnlyRow = (teamLabel, teamId, scoreVal) => {
+    const isWinner = !!match.winner_team_id && match.winner_team_id === teamId
+    return (
+      <div className={`flex items-center gap-3 rounded-ctrl px-3 py-2.5 ${isWinner ? 'bg-lime-400/25' : 'bg-surface'}`}>
+        <span className={`flex-1 min-w-0 text-sm font-extrabold ${
+          match.winner_team_id && !isWinner ? 'text-muted' : 'text-ink-900'
+        }`}>
+          {teamLabel}
+          {isWinner && <span className="ml-1.5 text-lime-600">🏆</span>}
+        </span>
+        <span className={`text-xl font-extrabold tabular-nums shrink-0 ${isWinner ? 'text-ink-900' : 'text-muted'}`}>
+          {scoreVal}
+        </span>
+      </div>
+    )
+  }
+
+  if (!editable) {
+    return (
+      <div className="space-y-1.5">
+        {readOnlyRow(teamAName, match.team_a_id, match.score_a)}
+        {readOnlyRow(teamBName, match.team_b_id, match.score_b)}
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-2">
+      {sets.map((s, i) => (
+        <p key={i} className="text-xs font-extrabold text-muted">
+          {t('gamedetails.set_saved', { number: i + 1, a: s.score_a, b: s.score_b })}
+        </p>
+      ))}
+
+      {!result.decided && (
+        <>
+          {isDecider && (
+            <p className="text-xs font-extrabold text-muted">
+              {deciderIsSuperTiebreak
+                ? t('gamedetails.super_tiebreak')
+                : t('gamedetails.set_number', { number: 3 })}
+            </p>
+          )}
+          <div className="flex items-center gap-3 rounded-ctrl px-3 py-2.5 bg-surface">
+            <span className="flex-1 min-w-0 text-sm font-extrabold text-ink-900">{teamAName}</span>
+            <input
+              type="number" min="0" inputMode="numeric"
+              value={current.a}
+              onChange={(e) => setCurrent((prev) => ({ ...prev, a: e.target.value }))}
+              className="w-16 px-2 py-2 text-center text-lg font-extrabold rounded-ctrl border border-line bg-surface shrink-0"
+              placeholder="0"
+            />
+          </div>
+          <div className="flex items-center gap-3 rounded-ctrl px-3 py-2.5 bg-surface">
+            <span className="flex-1 min-w-0 text-sm font-extrabold text-ink-900">{teamBName}</span>
+            <input
+              type="number" min="0" inputMode="numeric"
+              value={current.b}
+              onChange={(e) => setCurrent((prev) => ({ ...prev, b: e.target.value }))}
+              className="w-16 px-2 py-2 text-center text-lg font-extrabold rounded-ctrl border border-line bg-surface shrink-0"
+              placeholder="0"
+            />
+          </div>
+          {currentValid && (
+            <button
+              onClick={handleAddSet}
+              disabled={saving}
+              className="w-full py-2.5 rounded-ctrl bg-ink-900 text-lime-400 text-sm font-extrabold transition-all duration-fast active:scale-[0.98] disabled:opacity-40"
+            >
+              {t('gamedetails.save_set', { number: currentSetNumber })}
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  )
 }
