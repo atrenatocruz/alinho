@@ -15,7 +15,7 @@ import {
   roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches,
   PHASE_LABEL_KEY, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY,
   mixCapacity, isGenderMismatch, isMissingBirthday, isAgeIneligible, splitIntoPools,
-  generateAmericanoSchedule,
+  generateAmericanoSchedule, americanoStandings,
 } from '../lib/mixLogic'
 import { isProvisional } from '../lib/elo'
 import { AGE_LABEL_KEY, meetsAgeRestriction } from '../lib/ageCategories'
@@ -1075,6 +1075,7 @@ export default function GameDetails() {
   const allDone = matches.length > 0 && matches.every(m => m.winner_team_id)
   const isSobeDesce = (game?.format || 'sobe_desce') === 'sobe_desce'
   const isGruposEliminatorias = game?.format === 'grupos_eliminatorias'
+  const isAmericano = game?.format === 'americano'
   const groupRounds = isSobeDesce ? roundsTotal : Math.min(Math.max(teams.length - 1, 1), roundsTotal)
   // grupos_eliminatorias never uses this flat single-group derivation —
   // its group phase is entirely owned by PoolGroupStage (rendered instead
@@ -1086,7 +1087,7 @@ export default function GameDetails() {
   // how many global rounds the pool stage actually consumed once there
   // are more than 2 pools), which would wrongly send handleAdvance back
   // into its flat round-robin branch instead of progressing the bracket.
-  const inGroupPhase = isGruposEliminatorias ? false : maxRound < groupRounds
+  const inGroupPhase = (isGruposEliminatorias || isAmericano) ? false : maxRound < groupRounds
   // For grupos_eliminatorias, the bracket size is decided by how many
   // teams actually ADVANCE out of the pools (poolCount * advancePerPool),
   // not the category's total team count — and there's no time-based round
@@ -1095,7 +1096,7 @@ export default function GameDetails() {
   const advancingTeamCount = isGruposEliminatorias
     ? [...new Set(teams.map((tm) => tm.pool_number))].filter((n) => n != null).length * 2
     : teams.length
-  const elimPhases = isSobeDesce
+  const elimPhases = (isSobeDesce || isAmericano)
     ? []
     : isGruposEliminatorias
       ? eliminationPhases(advancingTeamCount, Number.MAX_SAFE_INTEGER)
@@ -1115,7 +1116,7 @@ export default function GameDetails() {
 
   // Current leader — used both when the mix ends naturally (all rounds
   // played) and when the admin cuts it short early with "Terminar Mix".
-  const currentWinnerTeamId = (() => {
+  const currentWinnerTeamId = isAmericano ? null : (() => {
     if (!matches.some(m => m.winner_team_id)) return null
     if (isSobeDesce) {
       // most recent round with a completed court-1 match; falls back to the
@@ -1209,7 +1210,7 @@ export default function GameDetails() {
   }
 
   const handleFinalize = async (early = false) => {
-    if (!currentWinnerTeamId) return
+    if (!isAmericano && !currentWinnerTeamId) return
     const msg = early
       ? t('gamedetails.confirm_finalize_early')
       : t('gamedetails.confirm_finalize')
@@ -1217,10 +1218,9 @@ export default function GameDetails() {
     setBusy(true)
     setMixError('')
     try {
-      const { error } = await supabase.rpc('finalize_mix', {
-        p_game_id: id,
-        p_winner_team_id: currentWinnerTeamId,
-      })
+      const { error } = isAmericano
+        ? await supabase.rpc('finalize_americano_mix', { p_game_id: id })
+        : await supabase.rpc('finalize_mix', { p_game_id: id, p_winner_team_id: currentWinnerTeamId })
       if (error) throw error
 
       await supabase.from('games').update({ round_started_at: null }).eq('id', id)
@@ -1445,6 +1445,7 @@ export default function GameDetails() {
   const canStart = isAdmin && !mixStarted && showClosed
   const rounds = [...new Set(matches.map(m => m.round_number))].sort((a, b) => a - b)
   const tctStandings = !isSobeDesce && teams.length ? standings(teams, matches) : []
+  const americanoStandingsResult = isAmericano && teams.length ? americanoStandings(matches, teams) : []
 
   // Top duplas for the results share card — combined points of both players
   // in the pair, from the same per-player mixStats the leaderboard above
@@ -1874,6 +1875,7 @@ export default function GameDetails() {
           {game.status === 'in_progress' && (
             <>
           {/* Duplas */}
+          {!isAmericano && (
           <div id="mix-duplas" className="card scroll-mt-24">
             <div
               className="flex items-center justify-between mb-3 cursor-pointer"
@@ -2021,6 +2023,7 @@ export default function GameDetails() {
               </>
             )}
           </div>
+          )}
 
           {showDuplasShare && (
             <ShareModal
@@ -2038,7 +2041,7 @@ export default function GameDetails() {
           )}
 
           {/* Classificação (todos contra todos) — never for grupos_eliminatorias, which gets its own per-pool standings from PoolGroupStage below */}
-          {!isSobeDesce && !isGruposEliminatorias && roundsStarted && tctStandings.length > 0 && (
+          {!isSobeDesce && !isGruposEliminatorias && !isAmericano && roundsStarted && tctStandings.length > 0 && (
             <div className="card">
               <h3 className="text-lg text-ink-900 mb-3">{t('gamedetails.group_standings_title')}</h3>
               <div className="space-y-1.5">
@@ -2066,6 +2069,22 @@ export default function GameDetails() {
               onDrawRound={handleDrawPoolRound}
               onAllPoolsComplete={handleAllPoolsComplete}
             />
+          )}
+
+          {isAmericano && americanoStandingsResult.length > 0 && (
+            <div className="card">
+              <h3 className="text-lg text-ink-900 mb-3">{t('gamedetails.americano_ranking_title')}</h3>
+              <div className="space-y-1.5">
+                {americanoStandingsResult.map((s, i) => (
+                  <div key={s.player.id} className="flex items-center gap-3 text-sm py-1.5 border-b border-line last:border-0">
+                    <span className="w-6 font-extrabold text-ink-900 tabular-nums">{i + 1}</span>
+                    <span className="flex-1 font-extrabold text-ink-900 truncate">{s.player.name}</span>
+                    <span className="text-muted tabular-nums" title={t('gamedetails.wins_title')}>{s.wins}{t('gamedetails.wins_abbrev')}</span>
+                    <span className="text-muted tabular-nums w-12 text-right">{s.points} {t('gamedetails.points_suffix')}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
 
           {/* Marcadores de resultado — admin delegates score entry for this
@@ -2184,7 +2203,7 @@ export default function GameDetails() {
               court assignment stopped mattering once the mix ended. */}
           {game.status === 'finished' && (
             <>
-              {finishedTab === 'duplas' && teams.length > 0 && (
+              {finishedTab === 'duplas' && !isAmericano && teams.length > 0 && (
                 <div className="card">
                   <h3 className="text-lg text-ink-900 mb-3">{t('gamedetails.duplas')}</h3>
                   <div className="space-y-2">
@@ -2200,7 +2219,7 @@ export default function GameDetails() {
               {finishedTab === 'rondas' && (
                 <>
                   {/* Classificação (todos contra todos) — never for grupos_eliminatorias, which gets its own per-pool standings from PoolGroupStage below */}
-                  {!isSobeDesce && !isGruposEliminatorias && roundsStarted && tctStandings.length > 0 && (
+                  {!isSobeDesce && !isGruposEliminatorias && !isAmericano && roundsStarted && tctStandings.length > 0 && (
                     <div className="card">
                       <h3 className="text-lg text-ink-900 mb-3">{t('gamedetails.group_standings_title')}</h3>
                       <div className="space-y-1.5">
@@ -2228,6 +2247,22 @@ export default function GameDetails() {
                       onDrawRound={handleDrawPoolRound}
                       onAllPoolsComplete={handleAllPoolsComplete}
                     />
+                  )}
+
+                  {isAmericano && americanoStandingsResult.length > 0 && (
+                    <div className="card">
+                      <h3 className="text-lg text-ink-900 mb-3">{t('gamedetails.americano_ranking_title')}</h3>
+                      <div className="space-y-1.5">
+                        {americanoStandingsResult.map((s, i) => (
+                          <div key={s.player.id} className="flex items-center gap-3 text-sm py-1.5 border-b border-line last:border-0">
+                            <span className="w-6 font-extrabold text-ink-900 tabular-nums">{i + 1}</span>
+                            <span className="flex-1 font-extrabold text-ink-900 truncate">{s.player.name}</span>
+                            <span className="text-muted tabular-nums" title={t('gamedetails.wins_title')}>{s.wins}{t('gamedetails.wins_abbrev')}</span>
+                            <span className="text-muted tabular-nums w-12 text-right">{s.points} {t('gamedetails.points_suffix')}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
 
                   {/* Rondas */}
@@ -2301,7 +2336,7 @@ export default function GameDetails() {
             <div className="space-y-3">
               {!inPoolStage && (
                 <>
-                  {!roundsStarted && (
+                  {!roundsStarted && !isAmericano && (
                     <PrimaryButton onClick={handleStartRound1} disabled={busy} className="w-full">
                       <Play size={20} />
                       {busy ? t('gamedetails.drawing') : t('gamedetails.start_round1')}
@@ -2323,7 +2358,9 @@ export default function GameDetails() {
                   )}
                   {roundsStarted && !canAdvance && !canFinalize && (
                     <p className="text-muted text-sm text-center">
-                      {t('gamedetails.register_round_results', { number: maxRound })}
+                      {isAmericano
+                        ? t('gamedetails.register_americano_results')
+                        : t('gamedetails.register_round_results', { number: maxRound })}
                     </p>
                   )}
                   {/* Sair mais cedo — disponível assim que houver pelo menos um resultado guardado */}
