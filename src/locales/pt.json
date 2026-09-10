@@ -222,6 +222,7 @@
   "profile.xp_level": "Nível {{level}}",
   "profile.xp_no_shield": "A caminho do nível 1",
   "profile.xp_progress": "{{current}} / {{next}} XP",
+  "profile.xp_help_more": "Ver instruções completas →",
   "xp.tier_iniciado": "Iniciado",
   "xp.tier_bronze": "Bronze",
   "xp.tier_prata": "Prata",
