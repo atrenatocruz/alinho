@@ -87,15 +87,23 @@ export default function Profile() {
       setBirthday(profile.birthday || '')
       setGender(profile.gender || '')
       setLanguage(profile.language || 'pt')
-      // player_stats/mix_player_stats are org-scoped, so those two genuinely
-      // need a current organization. Private matches are org-independent by
-      // design — gating them on an org left club-less users stuck on a
-      // never-resolving privateMatchHistoryLoading.
+      // player_stats (o cartão de stats do hero) é mesmo por clube, por
+      // isso continua a precisar de uma organização atual. loadMixHistory
+      // NÃO — currentOrganizationId vive só em memória (AuthContext.jsx),
+      // volta a "o primeiro membership da lista" em qualquer reload da
+      // página, e antes disto o histórico de mixes ficava preso a esse
+      // clube só. Para quem está em mais do que um clube/grupo, isso
+      // apagava (visualmente) o histórico dos outros a cada reload — bug
+      // reportado pelo Francisco, 11 set 2026 ("perdi todo o meu
+      // histórico"), reproduzido ao limpar a cache no telemóvel (o reload
+      // aterra num clube diferente do que estava "lembrado" na sessão
+      // anterior). O histórico é pessoal, não do clube atual — mostra-se
+      // sempre inteiro, tal como os jogos entre amigos já fazem.
       if (!isGuest && currentOrganizationId) {
         loadStats()
-        loadMixHistory()
       }
       if (!isGuest) {
+        loadMixHistory()
         loadPrivateMatchHistory()
         loadGlobalPoints()
         loadFollowCounts()
@@ -165,11 +173,14 @@ export default function Profile() {
   const loadMixHistory = async () => {
     setMixHistoryLoading(true)
     try {
+      // Sem filtro de organização — histórico pessoal mostra os mixes de
+      // TODOS os clubes/grupos onde já jogou, não só o clube atualmente
+      // selecionado (ver nota no useEffect que chama esta função). RLS já
+      // garante que só vêm linhas de organizações onde o próprio é membro.
       const { data: statsRows, error: statsError } = await supabase
         .from('mix_player_stats')
         .select('game_id, game:games (id, title, date, location)')
         .eq('user_id', profile.id)
-        .eq('organization_id', currentOrganizationId)
       if (statsError) throw statsError
 
       const gameIds = (statsRows || []).map((r) => r.game_id)
