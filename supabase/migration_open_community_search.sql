@@ -26,13 +26,20 @@
 -- Correr este ficheiro inteiro no Supabase → SQL Editor.
 -- ════════════════════════════════════════════════════════════════════════
 
+-- Postgres won't let CREATE OR REPLACE change a function's OUT-parameter
+-- row type — drop first (same reason migration_comunidade_card_details.sql
+-- had to, when it added rating/gender/preferred_side to these same two
+-- functions).
+DROP FUNCTION IF EXISTS search_players(TEXT);
+DROP FUNCTION IF EXISTS list_players(INTEGER);
+
 CREATE OR REPLACE FUNCTION search_players(p_query TEXT)
-RETURNS TABLE (id UUID, name TEXT, avatar_url TEXT, club_names TEXT)
+RETURNS TABLE (id UUID, name TEXT, avatar_url TEXT, club_names TEXT, rating NUMERIC, gender TEXT, preferred_side TEXT)
 LANGUAGE sql
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT p.id, p.name, p.avatar_url, clubs.club_names
+  SELECT p.id, p.name, p.avatar_url, clubs.club_names, p.rating, p.gender, p.preferred_side
   FROM profiles p
   LEFT JOIN LATERAL (
     SELECT string_agg(DISTINCT o.name, ', ' ORDER BY o.name) AS club_names
@@ -54,12 +61,12 @@ REVOKE ALL ON FUNCTION search_players(TEXT) FROM public;
 GRANT EXECUTE ON FUNCTION search_players(TEXT) TO authenticated;
 
 CREATE OR REPLACE FUNCTION list_players(p_limit INTEGER DEFAULT 20)
-RETURNS TABLE (id UUID, name TEXT, avatar_url TEXT, club_names TEXT)
+RETURNS TABLE (id UUID, name TEXT, avatar_url TEXT, club_names TEXT, rating NUMERIC, gender TEXT, preferred_side TEXT)
 LANGUAGE sql
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT p.id, p.name, p.avatar_url, clubs.club_names
+  SELECT p.id, p.name, p.avatar_url, clubs.club_names, p.rating, p.gender, p.preferred_side
   FROM profiles p
   LEFT JOIN LATERAL (
     SELECT string_agg(DISTINCT o.name, ', ' ORDER BY o.name) AS club_names
