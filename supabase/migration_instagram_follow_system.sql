@@ -28,6 +28,8 @@
 
 -- Step 2: profiles.is_private column
 ALTER TABLE profiles ADD COLUMN is_private BOOLEAN NOT NULL DEFAULT false;
+GRANT UPDATE (is_private) ON profiles TO authenticated;
+COMMENT ON COLUMN profiles.is_private IS 'Whether this profile requires approval before someone can follow it (Instagram-style private account). Defaults to false — follows stay instant unless a user opts in.';
 
 -- Step 3: follows table + RLS
 CREATE TABLE follows (
@@ -58,6 +60,8 @@ CREATE POLICY "Accepted follows are publicly visible, pending only to the two pa
 CREATE POLICY "Follower can always leave; followed party can only decline while pending"
   ON follows FOR DELETE TO authenticated
   USING (auth.uid() = follower_id OR (auth.uid() = followed_id AND status = 'pending'));
+
+CREATE INDEX idx_follows_followed_id ON follows (followed_id, status);
 
 -- Step 4: is_mutual_follow — replaces are_friends
 CREATE FUNCTION is_mutual_follow(a UUID, b UUID)

@@ -131,7 +131,7 @@ export default function PlayerDetails() {
       }))
     } catch (error) {
       console.error('Error following player:', error)
-      alert(t('playerdetails.friend_request_failed'))
+      alert(t('playerdetails.update_failed'))
     } finally {
       setFriendActing(false)
     }

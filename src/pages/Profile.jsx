@@ -527,10 +527,10 @@ export default function Profile() {
             aqui (só o de PlayerDetails.jsx tinha friends_count). */}
         <div className="mt-3.5 pt-3.5 border-t border-line flex items-center justify-center gap-4 text-sm">
           <button type="button" onClick={() => setFollowListTab('followers')} className="font-extrabold text-ink-900">
-            {followCounts.followers_count} <span className="font-normal text-muted">{t('profile.followers_count_other', { count: followCounts.followers_count })}</span>
+            {t('profile.followers_count', { count: followCounts.followers_count })}
           </button>
           <button type="button" onClick={() => setFollowListTab('following')} className="font-extrabold text-ink-900">
-            {followCounts.following_count} <span className="font-normal text-muted">{t('profile.following_count')}</span>
+            {t('profile.following_count', { count: followCounts.following_count })}
           </button>
         </div>
       </div>

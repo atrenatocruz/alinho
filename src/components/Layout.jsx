@@ -256,6 +256,7 @@ export default function Layout({ children }) {
       setFollowRequests((reqs) => reqs.filter((r) => r.id !== requestId))
     } catch (error) {
       console.error('Error accepting follow request:', error)
+      alert(t('layout.action_failed'))
     } finally {
       setFollowRequestActing(null)
     }
@@ -268,6 +269,7 @@ export default function Layout({ children }) {
       setFollowRequests((reqs) => reqs.filter((r) => r.id !== requestId))
     } catch (error) {
       console.error('Error declining follow request:', error)
+      alert(t('layout.action_failed'))
     } finally {
       setFollowRequestActing(null)
     }
@@ -300,6 +302,7 @@ export default function Layout({ children }) {
       await refreshMemberships()
     } catch (error) {
       console.error('Error accepting organization invite:', error)
+      alert(t('layout.action_failed'))
     } finally {
       setOrgInviteActing(null)
     }
@@ -312,12 +315,13 @@ export default function Layout({ children }) {
       setOrgInvites((invs) => invs.filter((i) => i.id !== inviteId))
     } catch (error) {
       console.error('Error declining organization invite:', error)
+      alert(t('layout.action_failed'))
     } finally {
       setOrgInviteActing(null)
     }
   }
 
-  // Same refetch-on-route-change pattern as friend requests above. Only
+  // Same refetch-on-route-change pattern as follow requests above. Only
   // fetched for org admins — matches the isAdminOfAny gate on the "Gerir"
   // nav item below, since a non-admin has no membership_requests visible
   // to them via RLS anyway.

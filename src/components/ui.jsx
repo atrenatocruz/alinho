@@ -625,7 +625,13 @@ export function FollowListModal({ userId, initialTab = 'followers', onClose }) {
         setFollowers(followersData)
         setFollowing(followingData)
       })
-      .catch((error) => console.error('Error loading follow list:', error))
+      .catch((error) => {
+        console.error('Error loading follow list:', error)
+        if (!cancelled) {
+          setFollowers([])
+          setFollowing([])
+        }
+      })
     return () => { cancelled = true }
   }, [userId])
 
