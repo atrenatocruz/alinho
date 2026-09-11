@@ -271,6 +271,16 @@ export default function ClubProfile() {
         </button>
       )}
 
+      {/* Jogo dentro do grupo/clube (Trello #239) — qualquer membro pode
+          criar/ver, ao contrário dos Mixs (admin-only, GerirClube.jsx).
+          Sistema à parte do "jogo entre amigos" do perfil (#233). */}
+      {club.my_status === 'member' && (
+        <Link to={`/clube/${slug}/jogos`} className="card press flex items-center justify-between gap-3">
+          <h3 className="font-extrabold text-ink-900">{t('clubprofile.jogos_heading')}</h3>
+          <span className="text-ink-700 text-sm font-extrabold shrink-0">{t('clubprofile.jogos_link')}</span>
+        </Link>
+      )}
+
       {club.description && (
         <div className="card">
           <h3 className="text-sm font-extrabold text-ink-900 uppercase tracking-wide mb-2">{t('clubprofile.about')}</h3>

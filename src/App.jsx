@@ -25,6 +25,8 @@ import CookieConsentBanner from './components/CookieConsentBanner'
 const PrivateMatches = lazy(() => import('./pages/PrivateMatches'))
 const CreatePrivateMatch = lazy(() => import('./pages/CreatePrivateMatch'))
 const JoinPrivateMatch = lazy(() => import('./pages/JoinPrivateMatch'))
+const GroupMatches = lazy(() => import('./pages/GroupMatches'))
+const CreateGroupMatch = lazy(() => import('./pages/CreateGroupMatch'))
 const Gerir = lazy(() => import('./pages/Gerir'))
 const GerirClube = lazy(() => import('./pages/GerirClube'))
 const Instructions = lazy(() => import('./pages/Instructions'))
@@ -222,6 +224,22 @@ function AppRoutes() {
           element={
             <Guard require="member" showSplash={showSplash}>
               <ClubProfile />
+            </Guard>
+          }
+        />
+        <Route
+          path="/clube/:slug/jogos"
+          element={
+            <Guard require="member" showSplash={showSplash}>
+              <GroupMatches />
+            </Guard>
+          }
+        />
+        <Route
+          path="/clube/:slug/jogos/novo"
+          element={
+            <Guard require="member" showSplash={showSplash}>
+              <CreateGroupMatch />
             </Guard>
           }
         />
