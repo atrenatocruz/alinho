@@ -3,13 +3,13 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Award, Swords, ChevronDown, UserPlus, UserCheck, Clock, Lock, ShieldCheck, ThumbsUp } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { PrimaryButton, EmptyState, Avatar, RatingBadge, PhotoViewerModal, AchievementCard } from '../components/ui'
+import { PrimaryButton, EmptyState, Avatar, RatingBadge, PhotoViewerModal, FollowListModal, AchievementCard } from '../components/ui'
 import { countryName } from '../lib/countries'
 import { AGE_LABEL_KEY } from '../lib/ageCategories'
 import { formatRatingMaybeProvisional, isProvisional, bandProgress } from '../lib/elo'
 import { tierFromXp, preTierProgress, formatXp } from '../lib/xp'
 import { winRatePct } from '../lib/statsLogic'
-import { sendFriendRequest, acceptFriendRequest, removeFriendRequest } from '../lib/friends'
+import { followPlayer, removeFollow } from '../lib/follows'
 import { getGlobalRankings } from '../lib/privateMatches'
 import { formatDate } from '../lib/formatDate'
 
@@ -30,6 +30,7 @@ export default function PlayerDetails() {
   const [loading, setLoading] = useState(true)
   const [friendActing, setFriendActing] = useState(false)
   const [showPhoto, setShowPhoto] = useState(false)
+  const [followListTab, setFollowListTab] = useState(null) // null = closed, else 'followers'|'following'
 
   const [h2h, setH2h] = useState(null)
   const [h2hLoading, setH2hLoading] = useState(true)
@@ -119,49 +120,39 @@ export default function PlayerDetails() {
   // Patches local state instead of calling loadPlayer() — that sets
   // loading=true, which the top-level render guard turns into replacing
   // the whole page with a spinner just to flip one button.
-  const handleSendRequest = async () => {
+  const handleFollow = async () => {
     setFriendActing(true)
     try {
-      const status = await sendFriendRequest(id)
+      const status = await followPlayer(id)
       setPlayer((p) => ({
         ...p,
-        friendship_status: status === 'accepted' ? 'friends' : 'pending_sent',
-        friends_count: status === 'accepted' ? (p.friends_count ?? 0) + 1 : p.friends_count,
+        follow_status: status === 'accepted' ? 'following' : 'pending',
+        followers_count: status === 'accepted' ? (p.followers_count ?? 0) + 1 : p.followers_count,
       }))
     } catch (error) {
-      console.error('Error sending friend request:', error)
-      alert(t('playerdetails.friend_request_failed'))
+      console.error('Error following player:', error)
+      alert(t('playerdetails.update_failed'))
     } finally {
       setFriendActing(false)
     }
   }
 
-  const handleAcceptRequest = async () => {
+  // Covers both unfollowing an accepted follow and cancelling your own
+  // pending request — same row (player.follow_request_id) either way,
+  // see get_player_profile's doc comment on that column.
+  const handleRemoveFollow = async (confirmMessage) => {
+    if (confirmMessage && !confirm(confirmMessage)) return
     setFriendActing(true)
     try {
-      await acceptFriendRequest(player.friendship_request_id)
-      setPlayer((p) => ({ ...p, friendship_status: 'friends', friends_count: (p.friends_count ?? 0) + 1 }))
-    } catch (error) {
-      console.error('Error accepting friend request:', error)
-      alert(t('playerdetails.accept_request_failed'))
-    } finally {
-      setFriendActing(false)
-    }
-  }
-
-  const handleRemoveFriendship = async (confirmMessage) => {
-    if (!confirm(confirmMessage)) return
-    setFriendActing(true)
-    try {
-      await removeFriendRequest(player.friendship_request_id)
+      await removeFollow(player.follow_request_id)
       setPlayer((p) => ({
         ...p,
-        friendship_status: 'none',
-        friendship_request_id: null,
-        friends_count: p.friendship_status === 'friends' ? Math.max(0, (p.friends_count ?? 0) - 1) : p.friends_count,
+        follow_status: 'none',
+        follow_request_id: null,
+        followers_count: p.follow_status === 'following' ? Math.max(0, (p.followers_count ?? 0) - 1) : p.followers_count,
       }))
     } catch (error) {
-      console.error('Error removing friend request:', error)
+      console.error('Error removing follow:', error)
       alert(t('playerdetails.update_failed'))
     } finally {
       setFriendActing(false)
@@ -247,9 +238,9 @@ export default function PlayerDetails() {
   // activity/clubs are never nulled for the owner, so this only ever fires
   // for someone else's profile — matches the same can_view_section rule
   // the backend enforces (public always visible; friends only if the
-  // backend's own friendship_status says 'friends'; private never).
+  // backend's own is_mutual_follow says true; private never).
   const isHidden = (visibility) =>
-    !player.my_profile && (visibility === 'private' || (visibility === 'friends' && player.friendship_status !== 'friends'))
+    !player.my_profile && (visibility === 'private' || (visibility === 'friends' && !player.is_mutual_follow))
   const activityHidden = isHidden(player.activity_visibility)
   const clubsHidden = isHidden(player.clubs_visibility)
   const played = (player.game_wins || 0) + (player.game_losses || 0)
@@ -301,6 +292,9 @@ export default function PlayerDetails() {
           {showPhoto && (
             <PhotoViewerModal url={player.avatar_url} alt={player.name} onClose={() => setShowPhoto(false)} />
           )}
+          {followListTab && (
+            <FollowListModal userId={player.id} initialTab={followListTab} onClose={() => setFollowListTab(null)} />
+          )}
           <div className="flex-1 min-w-0 pt-1">
             <h2 className="text-xl text-ink-900 truncate">{player.name}</h2>
             {/* Not gated by results_visibility — playing side isn't a
@@ -315,8 +309,13 @@ export default function PlayerDetails() {
               {GENDER_LABEL_KEY[playerExtras?.gender] && <> · {t(GENDER_LABEL_KEY[playerExtras.gender])}</>}
               {AGE_LABEL_KEY[playerExtras?.age_category] && <> · {t(AGE_LABEL_KEY[playerExtras.age_category])}</>}
             </p>
-            <p className="text-xs text-muted mt-0.5">
-              {t('playerdetails.friends_count', { count: player.friends_count })}
+            <p className="text-xs text-muted mt-0.5 flex gap-3">
+              <button type="button" onClick={() => setFollowListTab('followers')} className="hover:text-ink-700">
+                {t('playerdetails.followers_count', { count: player.followers_count })}
+              </button>
+              <button type="button" onClick={() => setFollowListTab('following')} className="hover:text-ink-700">
+                {t('playerdetails.following_count', { count: player.following_count })}
+              </button>
             </p>
           </div>
           {/* Same privacy gate as the stat tiles below — results_visibility
@@ -335,37 +334,29 @@ export default function PlayerDetails() {
 
         {!player.my_profile && (
           <div className="mt-3">
-            {player.friendship_status === 'friends' ? (
+            {player.follow_status === 'following' ? (
               <button
-                onClick={() => handleRemoveFriendship(t('playerdetails.unfollow_confirm', { name: player.name }))}
+                onClick={() => handleRemoveFollow(t('playerdetails.unfollow_confirm', { name: player.name }))}
                 disabled={friendActing}
                 className="inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full bg-ink-50 text-ink-900 hover:bg-ink-200/60 transition-colors duration-fast disabled:opacity-40"
               >
-                <UserCheck size={14} /> {t('playerdetails.unfollow_button')}
+                <UserCheck size={14} /> {t('playerdetails.following_button')}
               </button>
-            ) : player.friendship_status === 'pending_sent' ? (
+            ) : player.follow_status === 'pending' ? (
               <button
-                onClick={() => handleRemoveFriendship(t('playerdetails.cancel_request_confirm'))}
+                onClick={() => handleRemoveFollow()}
                 disabled={friendActing}
                 className="inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full bg-ink-50 text-muted hover:bg-ink-200/60 transition-colors duration-fast disabled:opacity-40"
               >
-                <Clock size={14} /> {t('playerdetails.request_sent')}
-              </button>
-            ) : player.friendship_status === 'pending_received' ? (
-              <button
-                onClick={handleAcceptRequest}
-                disabled={friendActing}
-                className="inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full bg-lime-400 text-ink-900 hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
-              >
-                <UserCheck size={14} /> {t('playerdetails.accept_request')}
+                <Clock size={14} /> {t('playerdetails.requested_button')}
               </button>
             ) : (
               <button
-                onClick={handleSendRequest}
+                onClick={handleFollow}
                 disabled={friendActing}
                 className="inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full bg-lime-400 text-ink-900 hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
               >
-                <UserPlus size={14} /> {t('playerdetails.add_friend')}
+                <UserPlus size={14} /> {t('playerdetails.follow_button')}
               </button>
             )}
           </div>

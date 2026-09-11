@@ -14,7 +14,7 @@ export const acceptOrganizationInvite = async (inviteId) => {
   if (error) throw error
 }
 
-// Same DELETE-covers-both-cases trick as removeFriendRequest (src/lib/friends.js):
+// Same DELETE-covers-both-cases trick as removeFollow (src/lib/follows.js):
 // RLS lets either the invitee or the org admin delete a row, so this one
 // function covers both "decline" and "admin cancels a sent invite".
 export const declineOrganizationInvite = async (inviteId) => {

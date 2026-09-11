@@ -8,7 +8,7 @@ import { MixCard, EmptyState, PrimaryButton, Avatar } from '../components/ui'
 import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
 import { countPeople, mixCapacity, isGenderMismatch, isAgeIneligible, isMissingBirthday } from '../lib/mixLogic'
-import { listFriends } from '../lib/friends'
+import { listFollowing } from '../lib/follows'
 
 export default function Home() {
   const { t } = useTranslation()
@@ -99,15 +99,15 @@ export default function Home() {
   useEffect(() => {
     if (!user) return
     let cancelled = false
-    listFriends()
-      .then((friends) => {
-        if (!cancelled) setFriendIds(new Set(friends.map((f) => f.id)))
+    listFollowing(user.id)
+      .then((following) => {
+        if (!cancelled) setFriendIds(new Set(following.map((f) => f.id)))
       })
       .catch((error) => {
-        // Falhar aqui só custa o destaque de amigos nos cartões, por isso
-        // fica no console e não chega ao ecrã — não vale partir a lista de
-        // mixs por causa de um adorno.
-        console.error('Error loading friends for mix cards:', error)
+        // Falhar aqui só custa o destaque nos cartões, por isso fica no
+        // console e não chega ao ecrã — não vale partir a lista de mixs
+        // por causa de um adorno.
+        console.error('Error loading following list for mix cards:', error)
       })
     return () => { cancelled = true }
   }, [user])

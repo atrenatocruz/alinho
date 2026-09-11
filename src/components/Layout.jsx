@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Home, Users, Trophy, Settings, LogOut, HelpCircle, Phone, X, Bell } from 'lucide-react'
+import { Home, Users, Trophy, Settings, LogOut, HelpCircle, Phone, X, Bell, UserCheck } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton, Avatar, RatingBadge, AchievementCard } from './ui'
 import { supabase } from '../lib/supabase'
 import { hashPhone } from '../lib/hashPhone'
-import { listIncomingFriendRequests } from '../lib/friends'
+import { listIncomingFollowRequests, acceptFollowRequest, removeFollow } from '../lib/follows'
 import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
-import { listIncomingOrganizationInvites } from '../lib/orgInvites'
+import { listIncomingOrganizationInvites, acceptOrganizationInvite, declineOrganizationInvite } from '../lib/orgInvites'
 
 // Re-prompt at most once per day once dismissed — a nudge, not a gate.
 const PHONE_PROMPT_DISMISSED_KEY = 'phonePromptDismissedDate'
@@ -196,7 +196,7 @@ export function Wordmark({ className = '', variant = 'dark' }) {
 export default function Layout({ children }) {
   const location = useLocation()
   const navigate = useNavigate()
-  const { signOut, profile, updateProfile, isAdminOfAny, isGuest } = useAuth()
+  const { signOut, profile, updateProfile, isAdminOfAny, isGuest, refreshMemberships } = useAuth()
   const { t } = useTranslation()
 
   const today = new Date().toISOString().slice(0, 10)
@@ -230,26 +230,54 @@ export default function Layout({ children }) {
   // Refetched on every route change too (not just profile/isGuest), so the
   // dropdown clears shortly after accepting/declining on /perfil without a
   // full reload — cheap since it's just a small pending-requests list.
-  const [friendRequests, setFriendRequests] = useState([])
+  const [followRequests, setFollowRequests] = useState([])
+  const [followRequestActing, setFollowRequestActing] = useState(null)
   const [showNotifications, setShowNotifications] = useState(false)
   useEffect(() => {
     if (!profile?.id || isGuest) {
-      setFriendRequests([])
+      setFollowRequests([])
       return
     }
     let cancelled = false
-    listIncomingFriendRequests()
+    listIncomingFollowRequests()
       .then((data) => {
-        if (!cancelled) setFriendRequests(data)
+        if (!cancelled) setFollowRequests(data)
       })
-      .catch((error) => console.error('Error loading friend requests:', error))
+      .catch((error) => console.error('Error loading follow requests:', error))
     return () => {
       cancelled = true
     }
   }, [profile?.id, isGuest, location.pathname])
 
-  // Same refetch-on-route-change pattern as friendRequests above.
+  const handleAcceptFollowRequest = async (requestId) => {
+    setFollowRequestActing(requestId)
+    try {
+      await acceptFollowRequest(requestId)
+      setFollowRequests((reqs) => reqs.filter((r) => r.id !== requestId))
+    } catch (error) {
+      console.error('Error accepting follow request:', error)
+      alert(t('layout.action_failed'))
+    } finally {
+      setFollowRequestActing(null)
+    }
+  }
+
+  const handleDeclineFollowRequest = async (requestId) => {
+    setFollowRequestActing(requestId)
+    try {
+      await removeFollow(requestId)
+      setFollowRequests((reqs) => reqs.filter((r) => r.id !== requestId))
+    } catch (error) {
+      console.error('Error declining follow request:', error)
+      alert(t('layout.action_failed'))
+    } finally {
+      setFollowRequestActing(null)
+    }
+  }
+
+  // Same refetch-on-route-change pattern as followRequests above.
   const [orgInvites, setOrgInvites] = useState([])
+  const [orgInviteActing, setOrgInviteActing] = useState(null)
   useEffect(() => {
     if (!profile?.id || isGuest) {
       setOrgInvites([])
@@ -266,7 +294,34 @@ export default function Layout({ children }) {
     }
   }, [profile?.id, isGuest, location.pathname])
 
-  // Same refetch-on-route-change pattern as friend requests above. Only
+  const handleAcceptOrgInvite = async (inviteId) => {
+    setOrgInviteActing(inviteId)
+    try {
+      await acceptOrganizationInvite(inviteId)
+      setOrgInvites((invs) => invs.filter((i) => i.id !== inviteId))
+      await refreshMemberships()
+    } catch (error) {
+      console.error('Error accepting organization invite:', error)
+      alert(t('layout.action_failed'))
+    } finally {
+      setOrgInviteActing(null)
+    }
+  }
+
+  const handleDeclineOrgInvite = async (inviteId) => {
+    setOrgInviteActing(inviteId)
+    try {
+      await declineOrganizationInvite(inviteId)
+      setOrgInvites((invs) => invs.filter((i) => i.id !== inviteId))
+    } catch (error) {
+      console.error('Error declining organization invite:', error)
+      alert(t('layout.action_failed'))
+    } finally {
+      setOrgInviteActing(null)
+    }
+  }
+
+  // Same refetch-on-route-change pattern as follow requests above. Only
   // fetched for org admins — matches the isAdminOfAny gate on the "Gerir"
   // nav item below, since a non-admin has no membership_requests visible
   // to them via RLS anyway.
@@ -288,7 +343,7 @@ export default function Layout({ children }) {
   }, [profile?.id, isGuest, isAdminOfAny, location.pathname])
 
   const joinRequestsTotal = joinRequestsByOrg.reduce((sum, org) => sum + org.count, 0)
-  const notificationsTotal = friendRequests.length + joinRequestsTotal + orgInvites.length
+  const notificationsTotal = followRequests.length + joinRequestsTotal + orgInvites.length
 
   const needsPhone = profile && !isGuest && !profile.phone_hash && !phonePromptDismissed
 
@@ -380,14 +435,7 @@ export default function Layout({ children }) {
                     </div>
                     {notificationsTotal === 0 ? (
                       <div className="p-4 text-center">
-                        <p className="text-sm text-muted mb-3">{t('layout.no_new_notifications')}</p>
-                        <Link
-                          to="/perfil?tab=amigos"
-                          onClick={() => setShowNotifications(false)}
-                          className="inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast"
-                        >
-                          {t('layout.view_friends')}
-                        </Link>
+                        <p className="text-sm text-muted">{t('layout.no_new_notifications')}</p>
                       </div>
                     ) : (
                       <div className="max-h-80 overflow-y-auto divide-y divide-line">
@@ -409,32 +457,52 @@ export default function Layout({ children }) {
                           </Link>
                         ))}
                         {orgInvites.map((inv) => (
-                          <Link
-                            key={inv.id}
-                            to="/perfil?tab=convites"
-                            onClick={() => setShowNotifications(false)}
-                            className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50"
-                          >
+                          <div key={inv.id} className="flex items-center gap-3 px-4 py-3">
                             <Avatar name={inv.organization_name} url={inv.organization_logo_url} size="w-9 h-9 text-sm" />
                             <p className="flex-1 min-w-0 text-sm text-ink-900">
                               {t('layout.invited_to_join')} <span className="font-extrabold">{inv.organization_name}</span>
                             </p>
-                            <span aria-hidden="true" className="w-2 h-2 rounded-full bg-lime-400 shrink-0" />
-                          </Link>
+                            <button
+                              onClick={() => handleAcceptOrgInvite(inv.id)}
+                              disabled={orgInviteActing === inv.id}
+                              aria-label={t('layout.accept_invite_aria')}
+                              className="w-8 h-8 shrink-0 rounded-full bg-lime-400 text-ink-900 flex items-center justify-center hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
+                            >
+                              <UserCheck size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleDeclineOrgInvite(inv.id)}
+                              disabled={orgInviteActing === inv.id}
+                              aria-label={t('layout.decline_invite_aria')}
+                              className="w-8 h-8 shrink-0 rounded-full bg-ink-50 text-ink-700 flex items-center justify-center hover:bg-ink-200 transition-colors duration-fast disabled:opacity-40"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
                         ))}
-                        {friendRequests.map((req) => (
-                          <Link
-                            key={req.id}
-                            to="/perfil?tab=amigos"
-                            onClick={() => setShowNotifications(false)}
-                            className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50"
-                          >
-                            <Avatar name={req.requester_name} url={req.requester_avatar_url} size="w-9 h-9 text-sm" />
+                        {followRequests.map((req) => (
+                          <div key={req.id} className="flex items-center gap-3 px-4 py-3">
+                            <Avatar name={req.follower_name} url={req.follower_avatar_url} size="w-9 h-9 text-sm" />
                             <p className="flex-1 min-w-0 text-sm text-ink-900">
-                              <span className="font-extrabold">{req.requester_name}</span> {t('layout.wants_to_be_friends')}
+                              <span className="font-extrabold">{req.follower_name}</span> {t('layout.follow_wants_to_follow')}
                             </p>
-                            <span aria-hidden="true" className="w-2 h-2 rounded-full bg-lime-400 shrink-0" />
-                          </Link>
+                            <button
+                              onClick={() => handleAcceptFollowRequest(req.id)}
+                              disabled={followRequestActing === req.id}
+                              aria-label={t('layout.accept_follow_aria')}
+                              className="w-8 h-8 shrink-0 rounded-full bg-lime-400 text-ink-900 flex items-center justify-center hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
+                            >
+                              <UserCheck size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleDeclineFollowRequest(req.id)}
+                              disabled={followRequestActing === req.id}
+                              aria-label={t('layout.decline_follow_aria')}
+                              className="w-8 h-8 shrink-0 rounded-full bg-ink-50 text-ink-700 flex items-center justify-center hover:bg-ink-200 transition-colors duration-fast disabled:opacity-40"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
                         ))}
                       </div>
                     )}
