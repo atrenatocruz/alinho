@@ -212,6 +212,7 @@ RETURNS TABLE (
   id UUID,
   name TEXT,
   avatar_url TEXT,
+  preferred_side TEXT,
   level TEXT,
   game_wins BIGINT,
   game_losses BIGINT,
@@ -225,7 +226,7 @@ RETURNS TABLE (
   follow_status TEXT,
   follow_request_id UUID,
   my_profile BOOLEAN,
-  club_names TEXT,
+  clubs JSONB,
   activity_visibility TEXT,
   results_visibility TEXT,
   clubs_visibility TEXT,
@@ -273,10 +274,13 @@ AS $$
     WHERE follower_id = auth.uid() AND followed_id = p_user_id
   ),
   clubs AS (
-    SELECT string_agg(DISTINCT o.name, ', ' ORDER BY o.name) AS names
+    SELECT COALESCE(
+      json_agg(json_build_object('id', o.id, 'name', o.name, 'slug', o.slug, 'kind', o.kind) ORDER BY o.name),
+      '[]'::json
+    ) AS list
     FROM memberships m
     JOIN organizations o ON o.id = m.organization_id
-    WHERE m.user_id = p_user_id
+    WHERE m.user_id = p_user_id AND o.kind = 'club'
   ),
   vis AS (
     SELECT activity_visibility, results_visibility, clubs_visibility, is_private
@@ -286,6 +290,7 @@ AS $$
     p.id,
     p.name,
     p.avatar_url,
+    p.preferred_side,
     (SELECT level FROM shared_level),
     CASE WHEN can_view_section(p_user_id, (SELECT results_visibility FROM vis)) THEN club_stats.game_wins END,
     CASE WHEN can_view_section(p_user_id, (SELECT results_visibility FROM vis)) THEN club_stats.game_losses END,
@@ -304,7 +309,7 @@ AS $$
     END,
     (SELECT id FROM my_follow),
     p_user_id = auth.uid(),
-    CASE WHEN can_view_section(p_user_id, (SELECT clubs_visibility FROM vis)) THEN (SELECT names FROM clubs) END,
+    CASE WHEN can_view_section(p_user_id, (SELECT clubs_visibility FROM vis)) THEN (SELECT list FROM clubs) END::jsonb,
     (SELECT activity_visibility FROM vis),
     (SELECT results_visibility FROM vis),
     (SELECT clubs_visibility FROM vis),
