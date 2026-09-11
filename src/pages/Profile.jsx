@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { User, Award, Trophy, Target, LogOut, Camera, HelpCircle, ThumbsUp, Trash2, Users } from 'lucide-react'
+import { User, Award, Trophy, Target, LogOut, Camera, HelpCircle, ThumbsUp, Trash2, Users, ChevronRight } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { hashPhone } from '../lib/hashPhone'
@@ -10,7 +10,7 @@ import { getMyPrivateMatches, getGlobalRankings } from '../lib/privateMatches'
 import { getFollowCounts } from '../lib/follows'
 import { PrimaryButton, GuestBadge, DateField, Avatar, Select, EmptyState, RatingBadge, PhotoViewerModal, FollowListModal, AchievementCard } from '../components/ui'
 import { CATEGORY_ORDER } from '../lib/achievements'
-import { formatRating, formatRatingMaybeProvisional, isProvisional, bandProgress } from '../lib/elo'
+import { formatRating, formatRatingMaybeProvisional, isProvisional, bandProgress, ratingBand } from '../lib/elo'
 import { countryOptions, countryName } from '../lib/countries'
 import { AGE_LABEL_KEY, ageCategory } from '../lib/ageCategories'
 import { XP_TIERS, tierFromXp, preTierProgress, formatXp } from '../lib/xp'
@@ -407,104 +407,102 @@ export default function Profile() {
 
   return (
     <div className="space-y-4">
-      {/* Hero — cartão claro, sóbrio e ranking-puro (mock "João Silva").
-          O XP vive num painel separado por baixo; sem aro no avatar. */}
+      {/* Hero — cartão claro. Aro de progresso à volta da foto (ideia do
+          Renato, Trello, 11 set 2026) substitui a antiga barra horizontal de
+          rating: as duas barras (rating + XP) competiam pela mesma atenção
+          quando ficavam empilhadas — agora só a de XP fica no painel de
+          baixo, sozinha. O nível (M4/F4/N4) sobe para um crachá no topo do
+          aro em vez de ficar em linha com os pontos. */}
       <div className="card">
         <div className="flex items-start gap-4">
-          <div className="relative w-20 h-20 shrink-0">
-            <button
-              type="button"
-              onClick={() => profile?.avatar_url && setShowPhoto(true)}
-              aria-label={profile?.avatar_url ? t('profile.view_photo_aria') : undefined}
-              className="block w-20 h-20"
-            >
-              <Avatar name={profile?.name} url={profile?.avatar_url} size="w-20 h-20 text-3xl" colorClass="bg-lime-400 text-ink-900" />
-            </button>
-            {showPhoto && (
-              <PhotoViewerModal url={profile?.avatar_url} alt={profile?.name} onClose={() => setShowPhoto(false)} />
-            )}
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploadingPhoto}
-              aria-label={t('profile.change_photo_aria')}
-              className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-ink-900 text-white flex items-center justify-center
-                         ring-2 ring-surface hover:bg-ink-700 transition-colors duration-fast disabled:opacity-50"
-            >
-              {uploadingPhoto ? (
-                <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-              ) : (
-                <Camera size={14} />
-              )}
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handlePhotoSelect}
-              className="hidden"
-            />
-            {profile?.avatar_url && (
-              <button
-                type="button"
-                onClick={handleRemovePhoto}
-                disabled={uploadingPhoto}
-                aria-label={t('profile.remove_photo')}
-                className="absolute -bottom-1 -left-1 w-7 h-7 rounded-full bg-ink-50 text-muted flex items-center justify-center
-                           ring-2 ring-surface hover:text-danger transition-colors duration-fast disabled:opacity-50"
-              >
-                <Trash2 size={13} />
-              </button>
-            )}
-          </div>
-          <div className="flex-1 min-w-0 pt-1">
-            <h2 className="text-xl text-ink-900 truncate">{profile?.name}</h2>
-            <p className="text-xs text-muted mt-0.5 truncate">
-              {t('playerdetails.preferred_side', { side: t(SIDE_LABEL_KEY[profile?.preferred_side] || SIDE_LABEL_KEY.both) })}
-            </p>
-          </div>
-          {globalRank && (
-            <div className="text-right shrink-0 pt-1">
-              <p className="text-2xl font-extrabold text-ink-900 tabular-nums leading-none">#{globalRank}</p>
-              <p className="mt-1 text-[9px] font-extrabold uppercase tracking-[0.15em] text-muted">
-                {t('profile.card_global_ranking')}
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Banda + pontos + progresso até à próxima banda (rating, não XP) */}
-        {(() => {
-          const bp = bandProgress(profile?.rating)
-          return (
-            <div className="mt-4">
-              <div className="flex items-center justify-between gap-2">
-                <span className="inline-flex items-center gap-2">
-                  <RatingBadge rating={profile?.rating} gender={profile?.gender} />
-                  <span className="text-sm font-extrabold text-ink-900 tabular-nums">
-                    {formatRatingMaybeProvisional(profile?.rating, profile?.rating_games)} {t('profile.card_points_word')}
-                  </span>
-                </span>
-                {bp?.nextMin != null && (
-                  <span className="text-[11px] text-muted tabular-nums">
-                    {t('profile.card_next_level')} <span className="font-extrabold text-ink-700">{bp.nextMin}</span>
+          {(() => {
+            const bp = bandProgress(profile?.rating)
+            const pct = bp?.pct ?? 0
+            const r = 35
+            const circumference = 2 * Math.PI * r
+            return (
+              <div className="relative w-20 h-20 shrink-0">
+                <svg viewBox="0 0 80 80" width="80" height="80" className="absolute inset-0 -rotate-90">
+                  <circle cx="40" cy="40" r={r} fill="none" strokeWidth="4" className="stroke-ink-200/50" />
+                  <circle
+                    cx="40" cy="40" r={r} fill="none" strokeWidth="4" strokeLinecap="round"
+                    className="stroke-lime-400"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={circumference * (1 - pct / 100)}
+                  />
+                </svg>
+                <button
+                  type="button"
+                  onClick={() => profile?.avatar_url && setShowPhoto(true)}
+                  aria-label={profile?.avatar_url ? t('profile.view_photo_aria') : undefined}
+                  className="absolute inset-2 block"
+                >
+                  <Avatar name={profile?.name} url={profile?.avatar_url} size="w-16 h-16 text-2xl" colorClass="bg-lime-400 text-ink-900" />
+                </button>
+                {showPhoto && (
+                  <PhotoViewerModal url={profile?.avatar_url} alt={profile?.name} onClose={() => setShowPhoto(false)} />
+                )}
+                {profile?.rating != null && (
+                  <span className="absolute -top-2 left-1/2 -translate-x-1/2 z-10">
+                    <RatingBadge rating={profile?.rating} gender={profile?.gender} />
                   </span>
                 )}
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingPhoto}
+                  aria-label={t('profile.change_photo_aria')}
+                  className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-ink-900 text-white flex items-center justify-center
+                             ring-2 ring-surface hover:bg-ink-700 transition-colors duration-fast disabled:opacity-50"
+                >
+                  {uploadingPhoto ? (
+                    <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <Camera size={14} />
+                  )}
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoSelect}
+                  className="hidden"
+                />
+                {profile?.avatar_url && (
+                  <button
+                    type="button"
+                    onClick={handleRemovePhoto}
+                    disabled={uploadingPhoto}
+                    aria-label={t('profile.remove_photo')}
+                    className="absolute -bottom-1 -left-1 w-7 h-7 rounded-full bg-ink-50 text-muted flex items-center justify-center
+                               ring-2 ring-surface hover:text-danger transition-colors duration-fast disabled:opacity-50"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                )}
               </div>
-              {/* bg-ink-200/50 e não bg-ink-50: sobre o cartão branco o
-                  ink-50 desaparecia e a barra parecia só o troço verde. */}
-              <div className="mt-2 flex items-center gap-2">
-                <div className="flex-1 h-1.5 rounded-full bg-ink-200/50 overflow-hidden">
-                  <div className="h-full rounded-full bg-lime-400" style={{ width: `${bp?.pct ?? 0}%` }} />
-                </div>
-                <span className="text-[10px] text-muted tabular-nums shrink-0">{bp?.pct ?? 0}%</span>
-              </div>
-              {isProvisional(profile?.rating_games) && (
-                <p className="mt-1.5 text-[10px] text-muted">{t('profile.provisional_note')}</p>
-              )}
-            </div>
-          )
-        })()}
+            )
+          })()}
+          <div className="flex-1 min-w-0 pt-1">
+            <h2 className="text-xl text-ink-900 truncate">{profile?.name}</h2>
+            {(() => {
+              const bp = bandProgress(profile?.rating)
+              const nextLabel = bp?.nextMin != null ? ratingBand(bp.nextMin, profile?.gender)?.label : null
+              const remaining = bp?.nextMin != null ? Math.max(0, bp.nextMin - Math.round(profile?.rating ?? 0)) : null
+              return (
+                <p className="text-xs text-muted mt-0.5 truncate tabular-nums">
+                  {formatRatingMaybeProvisional(profile?.rating, profile?.rating_games)} {t('profile.card_points_word')}
+                  {remaining != null && nextLabel && (
+                    <> · {t('profile.points_to_next_level', { points: remaining, level: nextLabel })}</>
+                  )}
+                </p>
+              )
+            })()}
+            {isProvisional(profile?.rating_games) && (
+              <p className="mt-1 text-[10px] text-muted">{t('profile.provisional_note')}</p>
+            )}
+          </div>
+        </div>
 
         {/* Jogos · % Vitórias · Títulos */}
         <div className="mt-4 pt-3.5 border-t border-line grid grid-cols-3 divide-x divide-line text-center">
@@ -533,6 +531,37 @@ export default function Profile() {
             {t('profile.following_count', { count: followCounts.following_count })}
           </button>
         </div>
+      </div>
+
+      {/* Registar jogo + Ranking global — os dois cartões que Francisco
+          pediu com destaque desde o início desta iteração ("os cards não
+          estão iguais... o registar jogo tem de ter destaque e o ranking
+          global tb"). Ranking global reabre aqui (tinha saído por duplicar
+          o nº que ficava no canto do hero — agora esse nº mudou de sítio
+          para dentro deste cartão, já não há duplicação) e abre os
+          Rankings já na posição do próprio jogador. */}
+      <div className="grid grid-cols-2 gap-2.5">
+        <Link to="/jogos-privados" className="card press flex flex-col justify-between gap-2 min-h-[92px] bg-ink-900 text-white">
+          <Users size={20} className="text-lime-400" />
+          <div>
+            <p className="font-extrabold text-sm leading-tight">{t('home.friendly_match')}</p>
+            <p className="text-[10.5px] opacity-80 mt-0.5">{t('home.friendly_match_subtitle')}</p>
+          </div>
+        </Link>
+        <Link
+          to="/rankings"
+          state={{ tab: 'global', scrollToMe: true }}
+          className="card press flex flex-col justify-between gap-2 min-h-[92px] bg-lime-400 text-ink-900"
+        >
+          <Target size={20} />
+          <div>
+            <p className="font-extrabold text-sm leading-tight">{t('profile.ranking_cta_title')}</p>
+            <p className="text-[10.5px] font-bold mt-0.5 flex items-center gap-0.5">
+              {globalRank ? t('profile.ranking_cta_position', { position: globalRank }) : t('profile.ranking_cta_no_position')}
+              <ChevronRight size={12} />
+            </p>
+          </div>
+        </Link>
       </div>
 
       {followListTab && (
@@ -651,18 +680,8 @@ export default function Profile() {
 
       {tab === 'perfil' && (
         <>
-        {/* Entrada para jogos entre amigos — mudou-se para cá a partir da
-            Home (Trello #234): a Home passou a mostrar só eventos activos,
-            e esta ação/navegação não é um "evento activo". */}
-        <Link to="/jogos-privados" className="card press flex items-center gap-3 hover:shadow-lift">
-          <div className="w-10 h-10 rounded-ctrl bg-lime-400/15 text-lime-600 flex items-center justify-center shrink-0">
-            <Users size={18} />
-          </div>
-          <div>
-            <p className="font-extrabold text-ink-900 text-sm">{t('home.friendly_match')}</p>
-            <p className="text-[11px] text-muted">{t('home.friendly_match_subtitle')}</p>
-          </div>
-        </Link>
+        {/* Entrada para jogos entre amigos: agora um dos dois cards em
+            destaque logo abaixo do hero (ver acima) — não repetir aqui. */}
 
         {/* Estante de troféus — 4 recentes à Strava; expandir mostra a
             grelha completa por categoria, incluindo bloqueados (o critério
