@@ -1,15 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { User, Award, Trophy, Target, LogOut, Camera, UserCheck, X, Users, HelpCircle, ThumbsUp, Trash2 } from 'lucide-react'
+import { User, Award, Trophy, Target, LogOut, Camera, HelpCircle, ThumbsUp, Trash2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { hashPhone } from '../lib/hashPhone'
 import { uploadAvatar, removeAvatar } from '../lib/avatarStorage'
 import { getMyPrivateMatches, getGlobalRankings } from '../lib/privateMatches'
-import { listIncomingFriendRequests, acceptFriendRequest, removeFriendRequest, listFriends, listOutgoingFriendRequests } from '../lib/friends'
-import { listIncomingOrganizationInvites, acceptOrganizationInvite, declineOrganizationInvite } from '../lib/orgInvites'
-import { PrimaryButton, GuestBadge, DateField, Avatar, Select, EmptyState, RatingBadge, PhotoViewerModal, AchievementCard } from '../components/ui'
+import { getFollowCounts } from '../lib/follows'
+import { PrimaryButton, GuestBadge, DateField, Avatar, Select, EmptyState, RatingBadge, PhotoViewerModal, FollowListModal, AchievementCard } from '../components/ui'
 import { CATEGORY_ORDER } from '../lib/achievements'
 import { formatRating, formatRatingMaybeProvisional, isProvisional, bandProgress } from '../lib/elo'
 import { countryOptions, countryName } from '../lib/countries'
@@ -19,8 +18,6 @@ import { formatDate as formatDateLib } from '../lib/formatDate'
 
 const TABS = [
   { key: 'perfil', labelKey: 'profile.tab_profile' },
-  { key: 'amigos', labelKey: 'profile.tab_friends' },
-  { key: 'convites', labelKey: 'profile.tab_invites' },
   { key: 'historico', labelKey: 'profile.tab_history' },
 ]
 
@@ -57,6 +54,7 @@ export default function Profile() {
   const [activityVisibility, setActivityVisibility] = useState(profile?.activity_visibility || 'public')
   const [resultsVisibility, setResultsVisibility] = useState(profile?.results_visibility || 'public')
   const [clubsVisibility, setClubsVisibility] = useState(profile?.clubs_visibility || 'public')
+  const [isPrivate, setIsPrivate] = useState(profile?.is_private || false)
   const [phone, setPhone] = useState('')
   const [phoneError, setPhoneError] = useState('')
   const [stats, setStats] = useState(null)
@@ -74,15 +72,8 @@ export default function Profile() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [showPhoto, setShowPhoto] = useState(false)
   const [photoError, setPhotoError] = useState('')
-  const [friendRequests, setFriendRequests] = useState([])
-  const [friendRequestActing, setFriendRequestActing] = useState(null)
-  const [outgoingRequests, setOutgoingRequests] = useState([])
-  const [outgoingRequestActing, setOutgoingRequestActing] = useState(null)
-  const [friends, setFriends] = useState([])
-  const [friendsLoading, setFriendsLoading] = useState(true)
-  const [orgInvites, setOrgInvites] = useState([])
-  const [orgInvitesLoading, setOrgInvitesLoading] = useState(true)
-  const [orgInviteActing, setOrgInviteActing] = useState(null)
+  const [followCounts, setFollowCounts] = useState({ followers_count: 0, following_count: 0 })
+  const [followListTab, setFollowListTab] = useState(null) // null = closed, else 'followers'|'following'
   const fileInputRef = useRef(null)
   // Popover de ajuda do XP: em touch não há hover, por isso o (?) abre ao
   // toque e fecha ao tocar fora.
@@ -116,10 +107,7 @@ export default function Profile() {
       if (!isGuest) {
         loadPrivateMatchHistory()
         loadGlobalPoints()
-        loadFriendRequests()
-        loadOutgoingRequests()
-        loadFriends()
-        loadOrgInvites()
+        loadFollowCounts()
         loadKudos()
         loadTrophies()
       }
@@ -155,108 +143,11 @@ export default function Profile() {
     }
   }
 
-  const loadFriendRequests = async () => {
+  const loadFollowCounts = async () => {
     try {
-      setFriendRequests(await listIncomingFriendRequests())
+      setFollowCounts(await getFollowCounts(profile.id))
     } catch (error) {
-      console.error('Error loading friend requests:', error)
-    }
-  }
-
-  const loadOutgoingRequests = async () => {
-    try {
-      setOutgoingRequests(await listOutgoingFriendRequests())
-    } catch (error) {
-      console.error('Error loading outgoing friend requests:', error)
-    }
-  }
-
-  const handleCancelOutgoingRequest = async (requestId) => {
-    setOutgoingRequestActing(requestId)
-    try {
-      await removeFriendRequest(requestId)
-      setOutgoingRequests((reqs) => reqs.filter((r) => r.id !== requestId))
-    } catch (error) {
-      console.error('Error cancelling friend request:', error)
-      alert(t('profile.error_cancel_friend_request'))
-    } finally {
-      setOutgoingRequestActing(null)
-    }
-  }
-
-  const loadFriends = async () => {
-    setFriendsLoading(true)
-    try {
-      setFriends(await listFriends())
-    } catch (error) {
-      console.error('Error loading friends:', error)
-    } finally {
-      setFriendsLoading(false)
-    }
-  }
-
-  const handleAcceptFriendRequest = async (requestId) => {
-    setFriendRequestActing(requestId)
-    try {
-      await acceptFriendRequest(requestId)
-      setFriendRequests((reqs) => reqs.filter((r) => r.id !== requestId))
-      loadFriends()
-    } catch (error) {
-      console.error('Error accepting friend request:', error)
-      alert(t('profile.error_accept_friend_request'))
-    } finally {
-      setFriendRequestActing(null)
-    }
-  }
-
-  const handleDeclineFriendRequest = async (requestId) => {
-    setFriendRequestActing(requestId)
-    try {
-      await removeFriendRequest(requestId)
-      setFriendRequests((reqs) => reqs.filter((r) => r.id !== requestId))
-    } catch (error) {
-      console.error('Error declining friend request:', error)
-      alert(t('profile.error_decline_friend_request'))
-    } finally {
-      setFriendRequestActing(null)
-    }
-  }
-
-  const loadOrgInvites = async () => {
-    setOrgInvitesLoading(true)
-    try {
-      setOrgInvites(await listIncomingOrganizationInvites())
-    } catch (error) {
-      console.error('Error loading organization invites:', error)
-    } finally {
-      setOrgInvitesLoading(false)
-    }
-  }
-
-  const handleAcceptOrgInvite = async (inviteId) => {
-    setOrgInviteActing(inviteId)
-    try {
-      await acceptOrganizationInvite(inviteId)
-      setOrgInvites((invs) => invs.filter((i) => i.id !== inviteId))
-      await refreshMemberships()
-    } catch (error) {
-      console.error('Error accepting organization invite:', error)
-      alert(t('profile.error_accept_org_invite'))
-    } finally {
-      setOrgInviteActing(null)
-    }
-  }
-
-  const handleDeclineOrgInvite = async (inviteId) => {
-    setOrgInviteActing(inviteId)
-    try {
-      await declineOrganizationInvite(inviteId)
-      setOrgInvites((invs) => invs.filter((i) => i.id !== inviteId))
-    } catch (error) {
-      console.error('Error declining organization invite:', error)
-      alert(t('profile.error_decline_org_invite'))
-    } finally {
-      setOrgInviteActing(null)
+      console.error('Error loading follow counts:', error)
     }
   }
 
@@ -423,6 +314,7 @@ export default function Profile() {
         activity_visibility: activityVisibility,
         results_visibility: resultsVisibility,
         clubs_visibility: clubsVisibility,
+        is_private: isPrivate,
       }
       if (phone) {
         updates.phone_hash = await hashPhone(phone)
@@ -629,7 +521,23 @@ export default function Profile() {
             <p className="mt-1 text-[11px] text-muted">{t('profile.card_titles')}</p>
           </div>
         </div>
+
+        {/* Seguidores/A seguir — tapável, abre o FollowListModal. Novo:
+            o cartão do próprio perfil não mostrava nenhuma contagem até
+            aqui (só o de PlayerDetails.jsx tinha friends_count). */}
+        <div className="mt-3.5 pt-3.5 border-t border-line flex items-center justify-center gap-4 text-sm">
+          <button type="button" onClick={() => setFollowListTab('followers')} className="font-extrabold text-ink-900">
+            {followCounts.followers_count} <span className="font-normal text-muted">{t('profile.followers_count_other', { count: followCounts.followers_count })}</span>
+          </button>
+          <button type="button" onClick={() => setFollowListTab('following')} className="font-extrabold text-ink-900">
+            {followCounts.following_count} <span className="font-normal text-muted">{t('profile.following_count')}</span>
+          </button>
+        </div>
       </div>
+
+      {followListTab && (
+        <FollowListModal userId={profile.id} initialTab={followListTab} onClose={() => setFollowListTab(null)} />
+      )}
 
       {/* XP DE ATIVIDADE — painel separado, claro, sem iconografia de
           ranking: envolvimento, não competição. */}
@@ -934,6 +842,23 @@ export default function Profile() {
                 <p className="text-xs text-muted mb-3">
                   {t('profile.privacy_description')}
                 </p>
+                <div className="mb-4">
+                  <label className="flex items-center justify-between gap-3">
+                    <span>
+                      <span className={inputLabel}>{t('profile.privacy_is_private_label')}</span>
+                      <span className="block text-xs text-muted -mt-1">{t('profile.privacy_is_private_hint')}</span>
+                    </span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={isPrivate}
+                      onClick={() => setIsPrivate((v) => !v)}
+                      className={`shrink-0 w-11 h-6 rounded-full transition-colors duration-fast relative ${isPrivate ? 'bg-lime-400' : 'bg-ink-200'}`}
+                    >
+                      <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform duration-fast ${isPrivate ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                    </button>
+                  </label>
+                </div>
                 <div className="space-y-3">
                   <div>
                     <label className={inputLabel}>{t('profile.visibility_activity_label')}</label>
@@ -966,6 +891,7 @@ export default function Profile() {
                     setActivityVisibility(profile.activity_visibility || 'public')
                     setResultsVisibility(profile.results_visibility || 'public')
                     setClubsVisibility(profile.clubs_visibility || 'public')
+                    setIsPrivate(profile.is_private || false)
                     setPhone('')
                     setPhoneError('')
                   }}
@@ -1049,129 +975,6 @@ export default function Profile() {
           )}
         </div>
         </>
-      )}
-
-      {tab === 'amigos' && (
-        <>
-        {/* Pedidos de amizade */}
-        {friendRequests.length > 0 && (
-          <div className="card space-y-3">
-            <p className="text-sm font-extrabold text-ink-900">{t('profile.friend_requests_heading')}</p>
-            {friendRequests.map((req) => (
-              <div key={req.id} className="flex items-center gap-3">
-                <Avatar name={req.requester_name} url={req.requester_avatar_url} size="w-10 h-10 text-sm" />
-                <p className="flex-1 min-w-0 font-extrabold text-ink-900 text-sm truncate">{req.requester_name}</p>
-                <button
-                  onClick={() => handleAcceptFriendRequest(req.id)}
-                  disabled={friendRequestActing === req.id}
-                  aria-label={t('profile.accept_request_aria')}
-                  className="w-9 h-9 shrink-0 rounded-full bg-lime-400 text-ink-900 flex items-center justify-center hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
-                >
-                  <UserCheck size={16} />
-                </button>
-                <button
-                  onClick={() => handleDeclineFriendRequest(req.id)}
-                  disabled={friendRequestActing === req.id}
-                  aria-label={t('profile.decline_request_aria')}
-                  className="w-9 h-9 shrink-0 rounded-full bg-ink-50 text-ink-700 flex items-center justify-center hover:bg-ink-200 transition-colors duration-fast disabled:opacity-40"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Pedidos enviados — sent requests were previously invisible
-            anywhere on the profile until the other person acted on them. */}
-        {outgoingRequests.length > 0 && (
-          <div className="card space-y-3">
-            <p className="text-sm font-extrabold text-ink-900">{t('profile.sent_requests_heading')}</p>
-            {outgoingRequests.map((req) => (
-              <div key={req.id} className="flex items-center gap-3">
-                <Avatar name={req.addressee_name} url={req.addressee_avatar_url} size="w-10 h-10 text-sm" />
-                <p className="flex-1 min-w-0 font-extrabold text-ink-900 text-sm truncate">{req.addressee_name}</p>
-                <span className="text-[11px] font-extrabold uppercase tracking-wide text-muted shrink-0">{t('profile.pending_badge')}</span>
-                <button
-                  onClick={() => handleCancelOutgoingRequest(req.id)}
-                  disabled={outgoingRequestActing === req.id}
-                  aria-label={t('profile.cancel_request_aria')}
-                  className="w-9 h-9 shrink-0 rounded-full bg-ink-50 text-ink-700 flex items-center justify-center hover:bg-ink-200 transition-colors duration-fast disabled:opacity-40"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {friendsLoading ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
-          </div>
-        ) : friends.length === 0 ? (
-          <EmptyState
-            icon={Users}
-            title={t('profile.no_friends_title')}
-            subtitle={t('profile.no_friends_subtitle')}
-          />
-        ) : (
-          <div className="card p-0 overflow-hidden divide-y divide-line">
-            {friends.map((f) => (
-              <Link
-                key={f.id}
-                to={`/jogador/${f.id}`}
-                className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50"
-              >
-                <Avatar name={f.name} url={f.avatar_url} size="w-11 h-11 text-sm" />
-                <p className="flex-1 min-w-0 font-extrabold text-ink-900 text-sm truncate">{f.name}</p>
-              </Link>
-            ))}
-          </div>
-        )}
-        </>
-      )}
-
-      {tab === 'convites' && (
-        orgInvitesLoading ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
-          </div>
-        ) : orgInvites.length === 0 ? (
-          <EmptyState
-            icon={Users}
-            title={t('profile.no_invites_title')}
-            subtitle={t('profile.no_invites_subtitle')}
-          />
-        ) : (
-          <div className="card space-y-3">
-            {orgInvites.map((inv) => (
-              <div key={inv.id} className="flex items-center gap-3">
-                <Avatar name={inv.organization_name} url={inv.organization_logo_url} size="w-10 h-10 text-sm" />
-                <div className="flex-1 min-w-0">
-                  <p className="font-extrabold text-ink-900 text-sm truncate">{inv.organization_name}</p>
-                  <p className="text-xs text-muted truncate">{t('profile.invited_by', { name: inv.invited_by_name })}</p>
-                </div>
-                <button
-                  onClick={() => handleAcceptOrgInvite(inv.id)}
-                  disabled={orgInviteActing === inv.id}
-                  aria-label={t('profile.accept_invite_aria')}
-                  className="w-9 h-9 shrink-0 rounded-full bg-lime-400 text-ink-900 flex items-center justify-center hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
-                >
-                  <UserCheck size={16} />
-                </button>
-                <button
-                  onClick={() => handleDeclineOrgInvite(inv.id)}
-                  disabled={orgInviteActing === inv.id}
-                  aria-label={t('profile.decline_invite_aria')}
-                  className="w-9 h-9 shrink-0 rounded-full bg-ink-50 text-ink-700 flex items-center justify-center hover:bg-ink-200 transition-colors duration-fast disabled:opacity-40"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )
       )}
 
       {tab === 'historico' && (
