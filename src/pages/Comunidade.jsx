@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Search, Users, UserPlus, Clock, Heart, Plus, GraduationCap, X, MapPin } from 'lucide-react'
@@ -8,6 +8,7 @@ import { createSelfServeGroup } from '../lib/platformAdmin'
 import { DAYS, DAY_LABEL_KEY, listTeacherProfiles, requestTeacherProfile, withdrawTeacherProfile } from '../lib/teachers'
 import { useAuth } from '../contexts/AuthContext'
 import { Avatar, EmptyState, RatingBadge, GroupLevelBadge, Select } from '../components/ui'
+import { ratingBand } from '../lib/elo'
 
 // Same key set as GameDetails.jsx/Profile.jsx's own SIDE_LABEL_KEY — small
 // enough that this codebase already accepts the duplication over a shared
@@ -51,6 +52,10 @@ export default function Comunidade() {
   const [query, setQuery] = useState('')
   const [players, setPlayers] = useState([])
   const [organizations, setOrganizations] = useState([])
+  // Filtro por nível (pedido do Francisco, 11 set 2026) — '' = todos. As
+  // opções vêm de quem já está na lista carregada, não de uma lista fixa,
+  // para nunca mostrar um nível sem ninguém lá dentro.
+  const [levelFilter, setLevelFilter] = useState('')
   const [loading, setLoading] = useState(true)
   const [actingOn, setActingOn] = useState(null)
   const [favoritingOn, setFavoritingOn] = useState(null)
@@ -252,6 +257,32 @@ export default function Comunidade() {
 
   const clubs = organizations.filter((o) => o.kind === 'club')
 
+  // Ordem alfabética + filtro por nível (pedido do Francisco, 11 set 2026).
+  // BROWSE_LIMIT já traz a comunidade inteira para estes clubes-piloto, por
+  // isso ordenar/filtrar do lado do cliente chega — não há paginação a
+  // preservar.
+  const levelOptions = useMemo(() => {
+    const labels = new Set(
+      players.map((p) => ratingBand(p.rating, p.gender)?.label).filter(Boolean)
+    )
+    return [
+      { value: '', label: t('comunidade.level_filter_all') },
+      ...Array.from(labels).sort().map((label) => ({ value: label, label })),
+    ]
+  }, [players, t])
+
+  // Uma pesquisa nova pode deixar o nível escolhido sem ninguém — evita
+  // ficar preso num filtro que já não devolve nada.
+  useEffect(() => {
+    if (levelFilter && !levelOptions.some((o) => o.value === levelFilter)) {
+      setLevelFilter('')
+    }
+  }, [levelOptions, levelFilter])
+
+  const visiblePlayers = players
+    .filter((p) => !levelFilter || ratingBand(p.rating, p.gender)?.label === levelFilter)
+    .sort((a, b) => a.name.localeCompare(b.name, 'pt'))
+
   const renderOrgRow = (org) => {
     const membership = memberships.find((m) => m.organization_id === org.id)
     const isFavorite = membership?.is_favorite === true
@@ -322,7 +353,7 @@ export default function Comunidade() {
             : loading
             ? t('common.loading')
             : tab === 'players'
-            ? t('comunidade.player_count', { count: players.length })
+            ? t('comunidade.player_count', { count: visiblePlayers.length })
             : t('comunidade.club_count', { count: organizations.length })}
         </p>
       </div>
@@ -412,6 +443,16 @@ export default function Comunidade() {
             className="flex-1 bg-transparent outline-none text-base"
           />
         </div>
+      )}
+
+      {tab === 'players' && levelOptions.length > 1 && (
+        <Select
+          value={levelFilter}
+          onChange={setLevelFilter}
+          options={levelOptions}
+          placeholder={t('comunidade.level_filter_all')}
+          className="w-full sm:w-40"
+        />
       )}
 
       {/* Tabs */}
@@ -592,15 +633,15 @@ export default function Comunidade() {
           <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
         </div>
       ) : tab === 'players' ? (
-        players.length === 0 ? (
+        visiblePlayers.length === 0 ? (
           <EmptyState
             icon={Users}
             title={t('comunidade.no_players_title')}
-            subtitle={query.trim() ? t('comunidade.try_another_name') : t('comunidade.no_players_subtitle')}
+            subtitle={query.trim() || levelFilter ? t('comunidade.try_another_name') : t('comunidade.no_players_subtitle')}
           />
         ) : (
           <div className="card p-0 overflow-hidden divide-y divide-line">
-            {players.map((player) => (
+            {visiblePlayers.map((player) => (
               <Link
                 key={player.id}
                 to={`/jogador/${player.id}`}
