@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { User, Award, Trophy, Target, LogOut, Camera, HelpCircle, ThumbsUp, Trash2, Users, ChevronRight, ArrowLeft } from 'lucide-react'
+import { User, Award, Trophy, LineChart, LogOut, Camera, HelpCircle, ThumbsUp, Trash2, Users, ChevronRight, ArrowLeft, Eye, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { hashPhone } from '../lib/hashPhone'
@@ -71,6 +72,12 @@ export default function Profile() {
   const [saved, setSaved] = useState(false)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [showPhoto, setShowPhoto] = useState(false)
+  // Menu de ações da foto (ver/mudar/eliminar) — substitui os botões de
+  // câmara/eliminar sempre visíveis à volta do aro: o crachá do nível volta
+  // a viver ali (pedido do Francisco, 11 set 2026 — a equipa gostou mais
+  // assim), por isso deixa de haver espaço para dois ícones fixos no
+  // círculo. Um único toque na foto abre as opções em vez disso.
+  const [photoMenuOpen, setPhotoMenuOpen] = useState(false)
   const [photoError, setPhotoError] = useState('')
   const [followCounts, setFollowCounts] = useState({ followers_count: 0, following_count: 0 })
   const [followListTab, setFollowListTab] = useState(null) // null = closed, else 'followers'|'following'
@@ -435,41 +442,27 @@ export default function Profile() {
                 </svg>
                 <button
                   type="button"
-                  onClick={() => profile?.avatar_url && setShowPhoto(true)}
-                  aria-label={profile?.avatar_url ? t('profile.view_photo_aria') : undefined}
-                  className="absolute inset-2 block"
+                  onClick={() => setPhotoMenuOpen(true)}
+                  disabled={uploadingPhoto}
+                  aria-label={t('profile.photo_menu_aria')}
+                  className="absolute inset-2 block disabled:opacity-50"
                 >
-                  <Avatar name={profile?.name} url={profile?.avatar_url} size="w-16 h-16 text-2xl" colorClass="bg-lime-400 text-ink-900" />
+                  {uploadingPhoto ? (
+                    <span className="w-16 h-16 rounded-full flex items-center justify-center bg-ink-50">
+                      <span className="w-5 h-5 border-2 border-ink-200 border-t-ink-700 rounded-full animate-spin" />
+                    </span>
+                  ) : (
+                    <Avatar name={profile?.name} url={profile?.avatar_url} size="w-16 h-16 text-2xl" colorClass="bg-lime-400 text-ink-900" />
+                  )}
                 </button>
-                {showPhoto && (
-                  <PhotoViewerModal url={profile?.avatar_url} alt={profile?.name} onClose={() => setShowPhoto(false)} />
-                )}
                 {profile?.rating != null && (
                   <span className="absolute -top-2 left-1/2 -translate-x-1/2 z-10">
                     <RatingBadge rating={profile?.rating} gender={profile?.gender} />
                   </span>
                 )}
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploadingPhoto}
-                  aria-label={t('profile.change_photo_aria')}
-                  // bottom-0/right-0 (não -bottom-1/-right-1): um botão à
-                  // volta do aro tem de se sobrepor à própria curva do
-                  // círculo, senão fica a flutuar no canto morto fora do
-                  // aro — o corte de 45º do centro só bate certo com a
-                  // borda do círculo quando o botão fica rente à caixa,
-                  // não deslocado para fora dela (feedback do Francisco,
-                  // 11 set 2026: "aparece perdido").
-                  className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-ink-900 text-white flex items-center justify-center
-                             ring-2 ring-surface hover:bg-ink-700 transition-colors duration-fast disabled:opacity-50"
-                >
-                  {uploadingPhoto ? (
-                    <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    <Camera size={14} />
-                  )}
-                </button>
+                {showPhoto && (
+                  <PhotoViewerModal url={profile?.avatar_url} alt={profile?.name} onClose={() => setShowPhoto(false)} />
+                )}
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -477,17 +470,54 @@ export default function Profile() {
                   onChange={handlePhotoSelect}
                   className="hidden"
                 />
-                {profile?.avatar_url && (
-                  <button
-                    type="button"
-                    onClick={handleRemovePhoto}
-                    disabled={uploadingPhoto}
-                    aria-label={t('profile.remove_photo')}
-                    className="absolute bottom-0 left-0 w-7 h-7 rounded-full bg-ink-50 text-muted flex items-center justify-center
-                               ring-2 ring-surface hover:text-danger transition-colors duration-fast disabled:opacity-50"
+                {photoMenuOpen && createPortal(
+                  <div
+                    className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-ink-900/50 animate-fade-in"
+                    onClick={() => setPhotoMenuOpen(false)}
                   >
-                    <Trash2 size={13} />
-                  </button>
+                    <div
+                      className="bg-surface rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-xs p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] animate-pop"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-center justify-between px-3 py-2.5">
+                        <h3 className="text-sm font-extrabold text-ink-900">{t('profile.photo_menu_heading')}</h3>
+                        <button
+                          onClick={() => setPhotoMenuOpen(false)}
+                          aria-label={t('ui.close')}
+                          className="w-8 h-8 flex items-center justify-center rounded-full text-muted hover:bg-ink-50"
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
+                      {profile?.avatar_url && (
+                        <button
+                          type="button"
+                          onClick={() => { setPhotoMenuOpen(false); setShowPhoto(true) }}
+                          className="w-full flex items-center gap-3 px-3 py-3 rounded-ctrl text-left font-extrabold text-ink-900 hover:bg-ink-50"
+                        >
+                          <Eye size={18} className="text-ink-700" /> {t('profile.view_photo_aria')}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => { setPhotoMenuOpen(false); fileInputRef.current?.click() }}
+                        className="w-full flex items-center gap-3 px-3 py-3 rounded-ctrl text-left font-extrabold text-ink-900 hover:bg-ink-50"
+                      >
+                        <Camera size={18} className="text-ink-700" />
+                        {profile?.avatar_url ? t('profile.change_photo_aria') : t('profile.add_photo_action')}
+                      </button>
+                      {profile?.avatar_url && (
+                        <button
+                          type="button"
+                          onClick={() => { setPhotoMenuOpen(false); handleRemovePhoto() }}
+                          className="w-full flex items-center gap-3 px-3 py-3 rounded-ctrl text-left font-extrabold text-danger hover:bg-danger/10"
+                        >
+                          <Trash2 size={18} /> {t('profile.remove_photo')}
+                        </button>
+                      )}
+                    </div>
+                  </div>,
+                  document.body
                 )}
               </div>
             )
@@ -499,12 +529,22 @@ export default function Profile() {
               const nextLabel = bp?.nextMin != null ? ratingBand(bp.nextMin, profile?.gender)?.label : null
               const remaining = bp?.nextMin != null ? Math.max(0, bp.nextMin - Math.round(profile?.rating ?? 0)) : null
               return (
-                <p className="text-xs text-muted mt-0.5 truncate tabular-nums">
-                  {formatRatingMaybeProvisional(profile?.rating, profile?.rating_games)} {t('profile.card_points_word')}
+                <>
+                  {/* Pontos em destaque — o crachá do nível voltou para cima
+                      do aro (a equipa gostava mais assim, 11 set 2026), por
+                      isso não se repete aqui. */}
+                  <div className="mt-0.5 flex items-center gap-2">
+                    <span className="text-2xl font-extrabold text-ink-900 tabular-nums leading-none">
+                      {formatRatingMaybeProvisional(profile?.rating, profile?.rating_games)}
+                    </span>
+                    <span className="text-xs font-extrabold text-muted">{t('profile.card_points_word')}</span>
+                  </div>
                   {remaining != null && nextLabel && (
-                    <> · {t('profile.points_to_next_level', { points: remaining, level: nextLabel })}</>
+                    <p className="mt-0.5 text-xs text-muted tabular-nums">
+                      {t('profile.points_missing_to_level', { points: remaining, level: nextLabel })}
+                    </p>
                   )}
-                </p>
+                </>
               )
             })()}
             {isProvisional(profile?.rating_games) && (
@@ -552,8 +592,12 @@ export default function Profile() {
       <div className="grid grid-cols-2 gap-2.5">
         <Link to="/jogos-privados" className="card press flex flex-col justify-between gap-2 min-h-[92px] bg-ink-900 text-white">
           <Users size={20} className="text-lime-400" />
+          {/* min-h no título — "Jogo entre amigos" quebra para 2 linhas,
+              "Ranking global" cabe numa só; sem isto o subtítulo de cada
+              cartão começava a alturas diferentes (feedback do Francisco,
+              11 set 2026). */}
           <div>
-            <p className="font-extrabold text-sm leading-tight">{t('home.friendly_match')}</p>
+            <p className="font-extrabold text-sm leading-tight min-h-[2.2em]">{t('home.friendly_match')}</p>
             <p className="text-[10.5px] opacity-80 mt-0.5">{t('home.friendly_match_subtitle')}</p>
           </div>
         </Link>
@@ -562,10 +606,10 @@ export default function Profile() {
           state={{ tab: 'global', scrollToMe: true }}
           className="card press flex flex-col justify-between gap-2 min-h-[92px] bg-lime-400 text-ink-900"
         >
-          <Target size={20} />
+          <LineChart size={20} />
           <div>
-            <p className="font-extrabold text-sm leading-tight">{t('profile.ranking_cta_title')}</p>
-            <p className="text-[10.5px] font-bold mt-0.5 flex items-center gap-0.5">
+            <p className="font-extrabold text-sm leading-tight min-h-[2.2em]">{t('profile.ranking_cta_title')}</p>
+            <p className="text-[10.5px] opacity-80 mt-0.5 flex items-center gap-0.5">
               {globalRank ? t('profile.ranking_cta_position', { position: globalRank }) : t('profile.ranking_cta_no_position')}
               <ChevronRight size={12} />
             </p>

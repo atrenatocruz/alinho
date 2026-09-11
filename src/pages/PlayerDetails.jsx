@@ -287,38 +287,44 @@ export default function PlayerDetails() {
           nº do ranking global entra na mesma linha de texto em vez disso. */}
       <div className="card">
         <div className="flex items-start gap-4">
-          {(() => {
-            const bp = !resultsHidden ? bandProgress(globalEntry?.rating) : null
-            const pct = bp?.pct ?? 0
-            const r = 35
-            const circumference = 2 * Math.PI * r
-            return (
-              <div className="relative w-20 h-20 shrink-0">
-                <svg viewBox="0 0 80 80" width="80" height="80" className="absolute inset-0 -rotate-90">
-                  <circle cx="40" cy="40" r={r} fill="none" strokeWidth="4" className="stroke-ink-200/50" />
-                  <circle
-                    cx="40" cy="40" r={r} fill="none" strokeWidth="4" strokeLinecap="round"
-                    className="stroke-lime-400"
-                    strokeDasharray={circumference}
-                    strokeDashoffset={circumference * (1 - pct / 100)}
-                  />
-                </svg>
-                <button
-                  type="button"
-                  onClick={() => player.avatar_url && setShowPhoto(true)}
-                  aria-label={player.avatar_url ? t('playerdetails.view_photo_aria') : undefined}
-                  className="absolute inset-2 block"
-                >
-                  <Avatar name={player.name} url={player.avatar_url} size="w-16 h-16 text-2xl" colorClass="bg-lime-400 text-ink-900" provisional={isProvisional(globalEntry?.rating_games)} />
-                </button>
-                {!resultsHidden && globalEntry?.rating != null && (
-                  <span className="absolute -top-2 left-1/2 -translate-x-1/2 z-10">
-                    <RatingBadge rating={globalEntry?.rating} gender={playerExtras?.gender ?? globalEntry?.gender} />
-                  </span>
-                )}
-              </div>
-            )
-          })()}
+          {/* Aro + foto + crachá — o botão de Seguir vive agora na linha
+              de baixo, ao lado do ranking global, para os dois ficarem
+              alinhados (pedido do Francisco, 11 set 2026) em vez de
+              dependerem de margens adivinhadas para bater certo. */}
+          <div className="shrink-0">
+            {(() => {
+              const bp = !resultsHidden ? bandProgress(globalEntry?.rating) : null
+              const pct = bp?.pct ?? 0
+              const r = 35
+              const circumference = 2 * Math.PI * r
+              return (
+                <div className="relative w-20 h-20 shrink-0">
+                  <svg viewBox="0 0 80 80" width="80" height="80" className="absolute inset-0 -rotate-90">
+                    <circle cx="40" cy="40" r={r} fill="none" strokeWidth="4" className="stroke-ink-200/50" />
+                    <circle
+                      cx="40" cy="40" r={r} fill="none" strokeWidth="4" strokeLinecap="round"
+                      className="stroke-lime-400"
+                      strokeDasharray={circumference}
+                      strokeDashoffset={circumference * (1 - pct / 100)}
+                    />
+                  </svg>
+                  <button
+                    type="button"
+                    onClick={() => player.avatar_url && setShowPhoto(true)}
+                    aria-label={player.avatar_url ? t('playerdetails.view_photo_aria') : undefined}
+                    className="absolute inset-2 block"
+                  >
+                    <Avatar name={player.name} url={player.avatar_url} size="w-16 h-16 text-2xl" colorClass="bg-lime-400 text-ink-900" provisional={isProvisional(globalEntry?.rating_games)} />
+                  </button>
+                  {!resultsHidden && globalEntry?.rating != null && (
+                    <span className="absolute -top-2 left-1/2 -translate-x-1/2 z-10">
+                      <RatingBadge rating={globalEntry?.rating} gender={playerExtras?.gender ?? globalEntry?.gender} />
+                    </span>
+                  )}
+                </div>
+              )
+            })()}
+          </div>
           {showPhoto && (
             <PhotoViewerModal url={player.avatar_url} alt={player.name} onClose={() => setShowPhoto(false)} />
           )}
@@ -327,54 +333,69 @@ export default function PlayerDetails() {
           )}
           <div className="flex-1 min-w-0 pt-1">
             <h2 className="text-xl text-ink-900 truncate">{player.name}</h2>
+            {/* Pontos em destaque, igual ao Perfil próprio (11 set 2026) —
+                antes ia tudo espremido numa linha pequena só; agora os
+                pontos ganham o mesmo peso visual, com o resto (próximo
+                nível, ranking) em linhas próprias por baixo. */}
             {!resultsHidden && globalEntry && (() => {
               const bp = bandProgress(globalEntry?.rating)
               const nextLabel = bp?.nextMin != null ? ratingBand(bp.nextMin, playerExtras?.gender ?? globalEntry?.gender)?.label : null
               const remaining = bp?.nextMin != null ? Math.max(0, bp.nextMin - Math.round(globalEntry?.rating ?? 0)) : null
               return (
-                // Sem truncate — ao contrário do Profile.jsx (só pontos +
-                // próximo nível, cabe numa linha), aqui ainda entra o
-                // ranking global a seguir, e cortava a meio ("...") em vez
-                // de quebrar para a linha seguinte (visto no preview, 11
-                // set 2026).
-                <p className="text-xs text-muted mt-0.5 tabular-nums">
-                  {formatRatingMaybeProvisional(globalEntry?.rating, globalEntry?.rating_games)} {t('profile.card_points_word')}
+                <>
+                  <div className="mt-0.5 flex items-center gap-2">
+                    <span className="text-2xl font-extrabold text-ink-900 tabular-nums leading-none">
+                      {formatRatingMaybeProvisional(globalEntry?.rating, globalEntry?.rating_games)}
+                    </span>
+                    <span className="text-xs font-extrabold text-muted">{t('profile.card_points_word')}</span>
+                  </div>
                   {remaining != null && nextLabel && (
-                    <> · {t('profile.points_to_next_level', { points: remaining, level: nextLabel })}</>
+                    <p className="mt-0.5 text-xs text-muted tabular-nums">
+                      {t('profile.points_missing_to_level', { points: remaining, level: nextLabel })}
+                    </p>
                   )}
-                  {globalRank && <> · {t('profile.card_global_ranking')} #{globalRank}</>}
-                </p>
+                </>
               )
             })()}
           </div>
         </div>
 
-        {!player.my_profile && (
-          <div className="mt-3">
-            {player.follow_status === 'following' ? (
-              <button
-                onClick={() => handleRemoveFollow(t('playerdetails.unfollow_confirm', { name: player.name }))}
-                disabled={friendActing}
-                className="inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full bg-ink-50 text-ink-900 hover:bg-ink-200/60 transition-colors duration-fast disabled:opacity-40"
-              >
-                <UserCheck size={14} /> {t('playerdetails.following_button')}
-              </button>
-            ) : player.follow_status === 'pending' ? (
-              <button
-                onClick={() => handleRemoveFollow()}
-                disabled={friendActing}
-                className="inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full bg-ink-50 text-muted hover:bg-ink-200/60 transition-colors duration-fast disabled:opacity-40"
-              >
-                <Clock size={14} /> {t('playerdetails.requested_button')}
-              </button>
-            ) : (
-              <button
-                onClick={handleFollow}
-                disabled={friendActing}
-                className="inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full bg-lime-400 text-ink-900 hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
-              >
-                <UserPlus size={14} /> {t('playerdetails.follow_button')}
-              </button>
+        {/* Seguir + ranking global, lado a lado — mesma linha flex garante
+            que ficam alinhados um com o outro sem depender de margens
+            adivinhadas (pedido do Francisco, 11 set 2026). */}
+        {(!player.my_profile || globalRank) && (
+          <div className="mt-3 flex items-center gap-3">
+            {!player.my_profile && (
+              player.follow_status === 'following' ? (
+                <button
+                  onClick={() => handleRemoveFollow(t('playerdetails.unfollow_confirm', { name: player.name }))}
+                  disabled={friendActing}
+                  className="inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full bg-ink-50 text-ink-900 hover:bg-ink-200/60 transition-colors duration-fast disabled:opacity-40 whitespace-nowrap"
+                >
+                  <UserCheck size={14} /> {t('playerdetails.following_button')}
+                </button>
+              ) : player.follow_status === 'pending' ? (
+                <button
+                  onClick={() => handleRemoveFollow()}
+                  disabled={friendActing}
+                  className="inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full bg-ink-50 text-muted hover:bg-ink-200/60 transition-colors duration-fast disabled:opacity-40 whitespace-nowrap"
+                >
+                  <Clock size={14} /> {t('playerdetails.requested_button')}
+                </button>
+              ) : (
+                <button
+                  onClick={handleFollow}
+                  disabled={friendActing}
+                  className="inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full bg-lime-400 text-ink-900 hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40 whitespace-nowrap"
+                >
+                  <UserPlus size={14} /> {t('playerdetails.follow_button')}
+                </button>
+              )
+            )}
+            {!resultsHidden && globalRank && (
+              <p className="text-xs text-muted tabular-nums">
+                {t('profile.card_global_ranking')} #{globalRank}
+              </p>
             )}
           </div>
         )}

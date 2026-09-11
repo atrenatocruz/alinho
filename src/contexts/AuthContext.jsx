@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import i18n from '../lib/i18n'
+import { installDevMockNetwork } from '../lib/devMockNetwork'
 
 const AuthContext = createContext({})
 
@@ -16,6 +17,14 @@ const MOCK_ADMIN_PROFILE = {
   name: 'Admin (Dev)',
   gender: 'masculino',
   phone_hash: 'dev-bypass', // dummy — skips the mandatory-phone modal for the dev bypass
+  // Rating fictício (11 set 2026) — sem isto o aro de progresso do Perfil
+  // fica sempre vazio ("— pontos") em localhost. Ver devMockNetwork.js
+  // para o resto dos dados fictícios (troféus, XP, ranking, etc.).
+  rating: 1450,
+  rating_games: 30,
+  // Foto fictícia (SVG local, sem pedido de rede) — sem isto o botão de
+  // eliminar foto nunca aparece em localhost (só existe quando já há foto).
+  avatar_url: 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="#1F2937"/></svg>'),
 }
 const MOCK_ADMIN_ORG_ID = '00000000-0000-0000-0000-0000000000aa'
 const MOCK_ADMIN_MEMBERSHIP = {
@@ -297,6 +306,7 @@ export const AuthProvider = ({ children }) => {
 
   const signInAsAdmin = () => {
     localStorage.setItem(MOCK_ADMIN_KEY, 'true')
+    installDevMockNetwork()
     setUser(MOCK_ADMIN_USER)
     setProfile(MOCK_ADMIN_PROFILE)
     setMemberships([MOCK_ADMIN_MEMBERSHIP])
