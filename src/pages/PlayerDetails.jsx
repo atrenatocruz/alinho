@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabase'
 import { PrimaryButton, EmptyState, Avatar, RatingBadge, PhotoViewerModal, FollowListModal, AchievementCard } from '../components/ui'
 import { countryName } from '../lib/countries'
 import { AGE_LABEL_KEY } from '../lib/ageCategories'
-import { formatRatingMaybeProvisional, isProvisional, bandProgress } from '../lib/elo'
+import { formatRatingMaybeProvisional, isProvisional, bandProgress, ratingBand } from '../lib/elo'
 import { tierFromXp, preTierProgress, formatXp } from '../lib/xp'
 import { winRatePct } from '../lib/statsLogic'
 import { followPlayer, removeFollow } from '../lib/follows'
@@ -278,17 +278,47 @@ export default function PlayerDetails() {
         {t('playerdetails.back')}
       </button>
 
-      {/* Hero — cartão claro, igual ao do perfil próprio (Profile.jsx). */}
+      {/* Hero — cartão claro, mesmo tratamento do cabeçalho do perfil
+          próprio (Profile.jsx, 11 set 2026): aro de progresso à volta da
+          foto em vez da barra horizontal, crachá do nível no topo do aro,
+          pontos + "quanto falta para o próximo nível" em texto ao lado do
+          nome. Sem cartões de Registar jogo/Ranking global aqui — são
+          ações pessoais, não fazem sentido no perfil de outra pessoa; o
+          nº do ranking global entra na mesma linha de texto em vez disso. */}
       <div className="card">
         <div className="flex items-start gap-4">
-          <button
-            type="button"
-            onClick={() => player.avatar_url && setShowPhoto(true)}
-            aria-label={player.avatar_url ? t('playerdetails.view_photo_aria') : undefined}
-            className="relative w-20 h-20 shrink-0 block"
-          >
-            <Avatar name={player.name} url={player.avatar_url} size="w-20 h-20 text-3xl" colorClass="bg-lime-400 text-ink-900" provisional={isProvisional(globalEntry?.rating_games)} />
-          </button>
+          {(() => {
+            const bp = !resultsHidden ? bandProgress(globalEntry?.rating) : null
+            const pct = bp?.pct ?? 0
+            const r = 35
+            const circumference = 2 * Math.PI * r
+            return (
+              <div className="relative w-20 h-20 shrink-0">
+                <svg viewBox="0 0 80 80" width="80" height="80" className="absolute inset-0 -rotate-90">
+                  <circle cx="40" cy="40" r={r} fill="none" strokeWidth="4" className="stroke-ink-200/50" />
+                  <circle
+                    cx="40" cy="40" r={r} fill="none" strokeWidth="4" strokeLinecap="round"
+                    className="stroke-lime-400"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={circumference * (1 - pct / 100)}
+                  />
+                </svg>
+                <button
+                  type="button"
+                  onClick={() => player.avatar_url && setShowPhoto(true)}
+                  aria-label={player.avatar_url ? t('playerdetails.view_photo_aria') : undefined}
+                  className="absolute inset-2 block"
+                >
+                  <Avatar name={player.name} url={player.avatar_url} size="w-16 h-16 text-2xl" colorClass="bg-lime-400 text-ink-900" provisional={isProvisional(globalEntry?.rating_games)} />
+                </button>
+                {!resultsHidden && globalEntry?.rating != null && (
+                  <span className="absolute -top-2 left-1/2 -translate-x-1/2 z-10">
+                    <RatingBadge rating={globalEntry?.rating} gender={playerExtras?.gender ?? globalEntry?.gender} />
+                  </span>
+                )}
+              </div>
+            )
+          })()}
           {showPhoto && (
             <PhotoViewerModal url={player.avatar_url} alt={player.name} onClose={() => setShowPhoto(false)} />
           )}
@@ -297,6 +327,20 @@ export default function PlayerDetails() {
           )}
           <div className="flex-1 min-w-0 pt-1">
             <h2 className="text-xl text-ink-900 truncate">{player.name}</h2>
+            {!resultsHidden && globalEntry && (() => {
+              const bp = bandProgress(globalEntry?.rating)
+              const nextLabel = bp?.nextMin != null ? ratingBand(bp.nextMin, playerExtras?.gender ?? globalEntry?.gender)?.label : null
+              const remaining = bp?.nextMin != null ? Math.max(0, bp.nextMin - Math.round(globalEntry?.rating ?? 0)) : null
+              return (
+                <p className="text-xs text-muted mt-0.5 truncate tabular-nums">
+                  {formatRatingMaybeProvisional(globalEntry?.rating, globalEntry?.rating_games)} {t('profile.card_points_word')}
+                  {remaining != null && nextLabel && (
+                    <> · {t('profile.points_to_next_level', { points: remaining, level: nextLabel })}</>
+                  )}
+                  {globalRank && <> · {t('profile.card_global_ranking')} #{globalRank}</>}
+                </p>
+              )
+            })()}
             {/* Not gated by results_visibility — playing side isn't a
                 result, and knowing it is the whole point when inviting. */}
             <p className="text-xs text-muted mt-0.5">
@@ -318,18 +362,6 @@ export default function PlayerDetails() {
               </button>
             </p>
           </div>
-          {/* Same privacy gate as the stat tiles below — results_visibility
-              controls both, so no point showing a rank derived from hidden
-              points. globalRank is null when the player has no ranked
-              points yet, not just when it's hidden. */}
-          {!resultsHidden && globalRank && (
-            <div className="text-right shrink-0 pt-1">
-              <p className="text-2xl font-extrabold text-ink-900 tabular-nums leading-none">#{globalRank}</p>
-              <p className="mt-1 text-[9px] font-extrabold uppercase tracking-[0.15em] text-muted">
-                {t('profile.card_global_ranking')}
-              </p>
-            </div>
-          )}
         </div>
 
         {!player.my_profile && (
@@ -361,41 +393,6 @@ export default function PlayerDetails() {
             )}
           </div>
         )}
-
-        {/* Banda + pontos + progresso até à próxima banda — gated pela
-            privacidade dos resultados, como as stats. */}
-        {!resultsHidden && globalEntry && (() => {
-          const bp = bandProgress(globalEntry?.rating)
-          return (
-            <div className="mt-4">
-              <div className="flex items-center justify-between gap-2">
-                <span className="inline-flex items-center gap-2">
-                  {/* Genero do RPC dedicado primeiro: e a fonte fiavel. O
-                      globalEntry vem do ranking e pode nao o trazer — e sem
-                      genero a banda deixa de ter prefixo, em vez de assumir
-                      M (ver lib/elo.js). */}
-                  <RatingBadge rating={globalEntry?.rating} gender={playerExtras?.gender ?? globalEntry?.gender} />
-                  <span className="text-sm font-extrabold text-ink-900 tabular-nums">
-                    {formatRatingMaybeProvisional(globalEntry?.rating, globalEntry?.rating_games)} {t('profile.card_points_word')}
-                  </span>
-                </span>
-                {bp?.nextMin != null && (
-                  <span className="text-[11px] text-muted tabular-nums">
-                    {t('profile.card_next_level')} <span className="font-extrabold text-ink-700">{bp.nextMin}</span>
-                  </span>
-                )}
-              </div>
-              {/* bg-ink-200/50 e não bg-ink-50: sobre o cartão branco o
-                  ink-50 desaparecia e a barra parecia só o troço verde. */}
-              <div className="mt-2 flex items-center gap-2">
-                <div className="flex-1 h-1.5 rounded-full bg-ink-200/50 overflow-hidden">
-                  <div className="h-full rounded-full bg-lime-400" style={{ width: `${bp?.pct ?? 0}%` }} />
-                </div>
-                <span className="text-[10px] text-muted tabular-nums shrink-0">{bp?.pct ?? 0}%</span>
-              </div>
-            </div>
-          )
-        })()}
 
         {!resultsHidden && (
           <div className="mt-4 pt-3.5 border-t border-line grid grid-cols-3 divide-x divide-line text-center">
