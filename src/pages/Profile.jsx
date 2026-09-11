@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { User, Award, Trophy, Target, LogOut, Camera, HelpCircle, ThumbsUp, Trash2 } from 'lucide-react'
+import { User, Award, Trophy, Target, LogOut, Camera, HelpCircle, ThumbsUp, Trash2, Users } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { hashPhone } from '../lib/hashPhone'
