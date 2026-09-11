@@ -332,7 +332,12 @@ export default function PlayerDetails() {
               const nextLabel = bp?.nextMin != null ? ratingBand(bp.nextMin, playerExtras?.gender ?? globalEntry?.gender)?.label : null
               const remaining = bp?.nextMin != null ? Math.max(0, bp.nextMin - Math.round(globalEntry?.rating ?? 0)) : null
               return (
-                <p className="text-xs text-muted mt-0.5 truncate tabular-nums">
+                // Sem truncate — ao contrário do Profile.jsx (só pontos +
+                // próximo nível, cabe numa linha), aqui ainda entra o
+                // ranking global a seguir, e cortava a meio ("...") em vez
+                // de quebrar para a linha seguinte (visto no preview, 11
+                // set 2026).
+                <p className="text-xs text-muted mt-0.5 tabular-nums">
                   {formatRatingMaybeProvisional(globalEntry?.rating, globalEntry?.rating_games)} {t('profile.card_points_word')}
                   {remaining != null && nextLabel && (
                     <> · {t('profile.points_to_next_level', { points: remaining, level: nextLabel })}</>
