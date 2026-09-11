@@ -855,6 +855,8 @@
   "playerdetails.stat_games": "Jogos",
   "playerdetails.stat_win_rate": "Taxa de vitória",
   "playerdetails.preferred_side": "Joga do lado: {{side}}",
+  "playerdetails.about_heading": "Sobre",
+  "playerdetails.age_category_label": "Escalão etário",
   "playerdetails.unfollow_confirm": "Deixar de seguir {{name}}?",
   "playerdetails.follow_button": "Seguir",
   "playerdetails.following_button": "A seguir",

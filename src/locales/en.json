@@ -855,6 +855,8 @@
   "playerdetails.stat_games": "Games",
   "playerdetails.stat_win_rate": "Win rate",
   "playerdetails.preferred_side": "Preferred side: {{side}}",
+  "playerdetails.about_heading": "About",
+  "playerdetails.age_category_label": "Age category",
   "playerdetails.unfollow_confirm": "Unfollow {{name}}?",
   "playerdetails.follow_button": "Follow",
   "playerdetails.following_button": "Following",

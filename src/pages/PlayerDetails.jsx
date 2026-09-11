@@ -346,26 +346,6 @@ export default function PlayerDetails() {
                 </p>
               )
             })()}
-            {/* Not gated by results_visibility — playing side isn't a
-                result, and knowing it is the whole point when inviting. */}
-            <p className="text-xs text-muted mt-0.5">
-              {t('playerdetails.preferred_side', { side: t(SIDE_LABEL_KEY[player.preferred_side] || SIDE_LABEL_KEY.both) })}
-              {/* Pais e genero ao lado da posicao. So texto, sem bandeiras
-                  (decisao do Francisco, 9 set). Cada um so aparece se estiver
-                  preenchido — nunca se mostra "nao indicado" no perfil de
-                  outra pessoa. */}
-              {playerExtras?.nationality && <> · {countryName(playerExtras.nationality, i18n.language)}</>}
-              {GENDER_LABEL_KEY[playerExtras?.gender] && <> · {t(GENDER_LABEL_KEY[playerExtras.gender])}</>}
-              {AGE_LABEL_KEY[playerExtras?.age_category] && <> · {t(AGE_LABEL_KEY[playerExtras.age_category])}</>}
-            </p>
-            <p className="text-xs text-muted mt-0.5 flex gap-3">
-              <button type="button" onClick={() => setFollowListTab('followers')} className="hover:text-ink-700">
-                {t('playerdetails.followers_count', { count: player.followers_count })}
-              </button>
-              <button type="button" onClick={() => setFollowListTab('following')} className="hover:text-ink-700">
-                {t('playerdetails.following_count', { count: player.following_count })}
-              </button>
-            </p>
           </div>
         </div>
 
@@ -415,7 +395,57 @@ export default function PlayerDetails() {
             </div>
           </div>
         )}
+
+        {/* Seguidores/A seguir — mesma posição do Perfil próprio (depois
+            das stats, não junto ao nome): o cabeçalho fica só nome + pontos,
+            como no Profile.jsx (11 set 2026). */}
+        <div className="mt-3.5 pt-3.5 border-t border-line flex items-center justify-center gap-4 text-sm">
+          <button type="button" onClick={() => setFollowListTab('followers')} className="font-extrabold text-ink-900">
+            {t('playerdetails.followers_count', { count: player.followers_count })}
+          </button>
+          <button type="button" onClick={() => setFollowListTab('following')} className="font-extrabold text-ink-900">
+            {t('playerdetails.following_count', { count: player.following_count })}
+          </button>
+        </div>
       </div>
+
+      {/* Sobre — lado preferido, país, género. Antes vivia no cabeçalho;
+          saiu de lá para bater certo com o cabeçalho limpo do Perfil
+          próprio (só nome + pontos). Não gated por results_visibility nem
+          activity_visibility — lado preferido nunca foi um resultado, e
+          saber isso é o motivo principal de visitar o perfil de alguém
+          antes de o convidar (decisão original, 9 set 2026, mantida). */}
+      {(player.preferred_side || playerExtras?.nationality || GENDER_LABEL_KEY[playerExtras?.gender] || AGE_LABEL_KEY[playerExtras?.age_category]) && (
+        <div className="card">
+          <h3 className="text-lg text-ink-900 mb-3">{t('playerdetails.about_heading')}</h3>
+          <div className="space-y-3">
+            <div>
+              <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('profile.preferred_side_label')}</p>
+              <p className="text-base text-ink-900 mt-0.5">
+                {t(SIDE_LABEL_KEY[player.preferred_side] || SIDE_LABEL_KEY.both)}
+              </p>
+            </div>
+            {playerExtras?.nationality && (
+              <div>
+                <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('profile.nationality_label')}</p>
+                <p className="text-base text-ink-900 mt-0.5">{countryName(playerExtras.nationality, i18n.language)}</p>
+              </div>
+            )}
+            {GENDER_LABEL_KEY[playerExtras?.gender] && (
+              <div>
+                <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('profile.gender_label')}</p>
+                <p className="text-base text-ink-900 mt-0.5">{t(GENDER_LABEL_KEY[playerExtras.gender])}</p>
+              </div>
+            )}
+            {AGE_LABEL_KEY[playerExtras?.age_category] && (
+              <div>
+                <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('playerdetails.age_category_label')}</p>
+                <p className="text-base text-ink-900 mt-0.5">{t(AGE_LABEL_KEY[playerExtras.age_category])}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* XP DE ATIVIDADE — painel claro separado (público, como o tab
           Assiduidade). */}
