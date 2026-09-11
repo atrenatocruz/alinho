@@ -31,7 +31,7 @@ export default function Home() {
   const [cardError, setCardError] = useState('')
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('ativos')
-  const { user, profile, memberships, joinOrganization, isPrivateMatchesEnabled, isAdminOfAny } = useAuth()
+  const { user, profile, memberships, joinOrganization, isAdminOfAny } = useAuth()
   const [joinRequestsTotal, setJoinRequestsTotal] = useState(0)
   const [searchParams, setSearchParams] = useSearchParams()
   const [joinSlug, setJoinSlug] = useState('')
@@ -376,18 +376,6 @@ export default function Home() {
           <p className="text-sm text-amber-800 font-semibold">
             {t('home.pending_join_requests', { count: joinRequestsTotal })}
           </p>
-        </Link>
-      )}
-
-      {isPrivateMatchesEnabled && (
-        <Link to="/jogos-privados" className="card press flex items-center gap-3 hover:shadow-lift">
-          <div className="w-10 h-10 rounded-ctrl bg-lime-400/15 text-lime-600 flex items-center justify-center shrink-0">
-            <Users size={18} />
-          </div>
-          <div>
-            <p className="font-extrabold text-ink-900 text-sm">{t('home.friendly_match')}</p>
-            <p className="text-[11px] text-muted">{t('home.friendly_match_subtitle')}</p>
-          </div>
         </Link>
       )}
 
