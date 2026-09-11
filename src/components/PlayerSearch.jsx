@@ -59,7 +59,11 @@ export default function PlayerSearch({ label, selected, onSelect, onClear, exclu
           onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
           placeholder={label}
-          className="flex-1 bg-transparent outline-none text-sm"
+          // text-base (16px), não text-sm: abaixo de 16px o Safari iOS
+          // interpreta o foco no campo como pedido de zoom da página — e o
+          // zoom fica preso mesmo depois de fechar a pesquisa (bug já
+          // reportado noutras pesquisas da app).
+          className="flex-1 bg-transparent outline-none text-base"
         />
       </div>
       {open && (visibleResults.length > 0 || showEmptyState) && (

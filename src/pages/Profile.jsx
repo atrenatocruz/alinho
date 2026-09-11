@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { User, Award, Trophy, Target, LogOut, Camera, HelpCircle, ThumbsUp, Trash2, Users, ChevronRight } from 'lucide-react'
+import { User, Award, Trophy, Target, LogOut, Camera, HelpCircle, ThumbsUp, Trash2, Users, ChevronRight, ArrowLeft } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { hashPhone } from '../lib/hashPhone'
@@ -75,18 +75,9 @@ export default function Profile() {
   const [followCounts, setFollowCounts] = useState({ followers_count: 0, following_count: 0 })
   const [followListTab, setFollowListTab] = useState(null) // null = closed, else 'followers'|'following'
   const fileInputRef = useRef(null)
-  // Popover de ajuda do XP: em touch não há hover, por isso o (?) abre ao
-  // toque e fecha ao tocar fora.
+  // Explicação do XP: ecrã cheio (ver render mais abaixo) em vez de popover
+  // pequeno — esse ficava cortado em ecrãs estreitos.
   const [xpHelpOpen, setXpHelpOpen] = useState(false)
-  const xpHelpRef = useRef(null)
-  useEffect(() => {
-    if (!xpHelpOpen) return
-    const close = (e) => {
-      if (!xpHelpRef.current?.contains(e.target)) setXpHelpOpen(false)
-    }
-    document.addEventListener('click', close)
-    return () => document.removeEventListener('click', close)
-  }, [xpHelpOpen])
 
   useEffect(() => {
     if (profile) {
@@ -452,7 +443,14 @@ export default function Profile() {
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploadingPhoto}
                   aria-label={t('profile.change_photo_aria')}
-                  className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-ink-900 text-white flex items-center justify-center
+                  // bottom-0/right-0 (não -bottom-1/-right-1): um botão à
+                  // volta do aro tem de se sobrepor à própria curva do
+                  // círculo, senão fica a flutuar no canto morto fora do
+                  // aro — o corte de 45º do centro só bate certo com a
+                  // borda do círculo quando o botão fica rente à caixa,
+                  // não deslocado para fora dela (feedback do Francisco,
+                  // 11 set 2026: "aparece perdido").
+                  className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-ink-900 text-white flex items-center justify-center
                              ring-2 ring-surface hover:bg-ink-700 transition-colors duration-fast disabled:opacity-50"
                 >
                   {uploadingPhoto ? (
@@ -474,7 +472,7 @@ export default function Profile() {
                     onClick={handleRemovePhoto}
                     disabled={uploadingPhoto}
                     aria-label={t('profile.remove_photo')}
-                    className="absolute -bottom-1 -left-1 w-7 h-7 rounded-full bg-ink-50 text-muted flex items-center justify-center
+                    className="absolute bottom-0 left-0 w-7 h-7 rounded-full bg-ink-50 text-muted flex items-center justify-center
                                ring-2 ring-surface hover:text-danger transition-colors duration-fast disabled:opacity-50"
                   >
                     <Trash2 size={13} />
@@ -569,52 +567,25 @@ export default function Profile() {
       )}
 
       {/* XP DE ATIVIDADE — painel separado, claro, sem iconografia de
-          ranking: envolvimento, não competição. */}
+          ranking: envolvimento, não competição. O cartão inteiro abre a
+          explicação (antes era só o ícone (?), cujo popover ficava cortado
+          em ecrãs estreitos — feedback do Francisco, 11 set 2026). Abre
+          como um ecrã cheio com "Voltar" em vez de um popover pequeno. */}
       {(() => {
         const tier = tierFromXp(profile?.xp)
         const progress = tier ?? preTierProgress(profile?.xp)
         const missing = progress.nextMin != null ? progress.nextMin - (profile?.xp ?? 0) : null
         return (
-          <div className="rounded-ctrl bg-ink-50 border border-line p-3">
+          <button
+            type="button"
+            onClick={() => setXpHelpOpen(true)}
+            aria-label={t('profile.xp_help_aria')}
+            className="w-full text-left rounded-ctrl bg-ink-50 border border-line p-3"
+          >
             <div className="flex items-center justify-between gap-2">
               <p className="flex items-center gap-1.5 text-[9px] font-extrabold uppercase tracking-[0.18em] text-muted">
                 {t('profile.card_xp_heading')}
-                {/* Hover (desktop) ou toque no (?) (mobile) mostram o texto
-                    das FAQs (Instructions.jsx #xp) aqui mesmo; o link para
-                    as instruções completas vive dentro do popover. */}
-                <span ref={xpHelpRef} className="relative group">
-                  <button
-                    type="button"
-                    onClick={() => setXpHelpOpen((o) => !o)}
-                    aria-label={t('profile.xp_help_aria')}
-                    aria-expanded={xpHelpOpen}
-                    className="text-muted/60 hover:text-ink-900"
-                  >
-                    <HelpCircle size={10} />
-                  </button>
-                  <span className={`${xpHelpOpen ? 'block' : 'hidden group-hover:block'} absolute left-0 top-full mt-1.5 z-20 w-72 rounded-ctrl border border-line bg-canvas p-3 shadow-lift normal-case tracking-normal font-normal text-left`}>
-                    <span className="block text-[11px] text-ink-700 font-extrabold">{t('instructions.xp_intro')}</span>
-                    <span className="block mt-1.5 space-y-0.5 text-[11px] text-muted">
-                      <span className="block">• {t('instructions.xp_v1')}</span>
-                      <span className="block">• {t('instructions.xp_v2')}</span>
-                      <span className="block">• {t('instructions.xp_v3')}</span>
-                      <span className="block">• {t('instructions.xp_v4')}</span>
-                    </span>
-                    <span className="block mt-2 text-[11px] text-ink-700 font-extrabold">{t('instructions.xp_shields_intro')}</span>
-                    <span className="block mt-1 space-y-0.5">
-                      {[...XP_TIERS].reverse().map((tierRow) => (
-                        <span key={tierRow.key} className="flex items-center gap-1.5 text-[11px] text-muted tabular-nums">
-                          <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${tierRow.dotClass}`} />
-                          <span className="text-ink-700 font-extrabold">{tierRow.level}</span> {t(tierRow.labelKey)}
-                          <span className="ml-auto">{formatXp(tierRow.min)} XP</span>
-                        </span>
-                      ))}
-                    </span>
-                    <Link to="/instrucoes#xp" className="block mt-2 text-[11px] font-extrabold text-lime-600 hover:text-lime-700">
-                      {t('profile.xp_help_more')}
-                    </Link>
-                  </span>
-                </span>
+                <HelpCircle size={10} className="text-muted/60" />
               </p>
               {/* Kudos vivem aqui e não no cartão de ranking: alimentam o
                   XP e são envolvimento, não resultado. */}
@@ -647,9 +618,50 @@ export default function Profile() {
                 {t('profile.card_xp_missing', { missing: formatXp(missing) })}
               </p>
             )}
-          </div>
+          </button>
         )
       })()}
+
+      {/* Ecrã cheio da explicação de XP — substitui o antigo popover do (?),
+          que ficava cortado nas larguras estreitas. Mesmo conteúdo de
+          sempre (instructions.xp_*), só que sem limite de largura/altura e
+          com "Voltar" em vez de fechar ao tocar fora. */}
+      {xpHelpOpen && (
+        <div className="fixed inset-0 z-50 bg-canvas overflow-y-auto animate-fade-in">
+          <div className="sticky top-0 bg-canvas border-b border-line flex items-center gap-3 px-4 py-3.5">
+            <button
+              type="button"
+              onClick={() => setXpHelpOpen(false)}
+              aria-label={t('profile.xp_back')}
+              className="w-9 h-9 -ml-1.5 flex items-center justify-center rounded-full text-ink-900 hover:bg-ink-50"
+            >
+              <ArrowLeft size={20} />
+            </button>
+            <h2 className="text-lg text-ink-900 font-extrabold">{t('profile.card_xp_heading')}</h2>
+          </div>
+          <div className="max-w-lg mx-auto p-4 space-y-4">
+            <p className="text-sm text-ink-700 leading-relaxed">{t('instructions.xp_intro')}</p>
+            <ul className="space-y-1.5 text-sm text-muted">
+              <li>• {t('instructions.xp_v1')}</li>
+              <li>• {t('instructions.xp_v2')}</li>
+              <li>• {t('instructions.xp_v3')}</li>
+              <li>• {t('instructions.xp_v4')}</li>
+            </ul>
+            <div className="pt-2 border-t border-line">
+              <p className="text-sm font-extrabold text-ink-900 mb-2">{t('instructions.xp_shields_intro')}</p>
+              <div className="space-y-2">
+                {[...XP_TIERS].reverse().map((tierRow) => (
+                  <div key={tierRow.key} className="flex items-center gap-2.5 text-sm text-muted tabular-nums card py-2.5">
+                    <span className={`inline-block w-2.5 h-2.5 rounded-full shrink-0 ${tierRow.dotClass}`} />
+                    <span className="text-ink-900 font-extrabold">{tierRow.level}</span> {t(tierRow.labelKey)}
+                    <span className="ml-auto">{formatXp(tierRow.min)} XP</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {photoError && (
         <div className="bg-danger/10 text-danger px-4 py-3 rounded-ctrl text-sm font-extrabold animate-fade-up">

@@ -405,7 +405,10 @@ export default function Home() {
                     value={joinSlug}
                     onChange={(e) => setJoinSlug(e.target.value)}
                     placeholder={t('home.private_club_code_placeholder')}
-                    className="input-field text-center text-sm"
+                    // text-base, não text-sm — abaixo de 16px o Safari iOS
+                    // faz zoom da página ao focar o campo (mesmo bug do
+                    // PlayerSearch).
+                    className="input-field text-center text-base"
                   />
                   <PrimaryButton type="submit" variant="ghost" disabled={!joinSlug.trim()} className="w-full">
                     {t('home.join_club')}
