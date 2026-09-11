@@ -9,6 +9,7 @@ import { achievementIcon, RARITY_META } from '../lib/achievements'
 import { formatDate, formatTime, formatCurrency } from '../lib/formatDate'
 import { FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, mixCapacity } from '../lib/mixLogic'
 import { AGE_LABEL_KEY } from '../lib/ageCategories'
+import { listFollowers, listFollowing } from '../lib/follows'
 
 /* ─── Date fields ────────────────────────────────────────────────────────
    Native <input type=date/datetime-local> pickers open reliably on iOS
@@ -597,6 +598,101 @@ export function PhotoViewerModal({ url, alt = '', onClose }) {
         className="max-w-full max-h-full object-contain animate-pop"
         onClick={(e) => e.stopPropagation()}
       />
+    </div>,
+    document.body
+  )
+}
+
+/* ─── FollowListModal ────────────────────────────────────────────────────
+   Followers/following for any player — public, tappable from that
+   player's hero card on both Profile.jsx (own profile) and
+   PlayerDetails.jsx (anyone else's). Same portal-to-body pattern as
+   PhotoViewerModal, for the same reason (escapes Layout.jsx header's
+   backdrop-blur containing block for fixed descendants). */
+export function FollowListModal({ userId, initialTab = 'followers', onClose }) {
+  const { t } = useTranslation()
+  const [tab, setTab] = useState(initialTab)
+  const [followers, setFollowers] = useState(null)
+  const [following, setFollowing] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    setFollowers(null)
+    setFollowing(null)
+    Promise.all([listFollowers(userId), listFollowing(userId)])
+      .then(([followersData, followingData]) => {
+        if (cancelled) return
+        setFollowers(followersData)
+        setFollowing(followingData)
+      })
+      .catch((error) => console.error('Error loading follow list:', error))
+    return () => { cancelled = true }
+  }, [userId])
+
+  const rows = tab === 'followers' ? followers : following
+  const emptyText = tab === 'followers' ? t('followlist.empty_followers') : t('followlist.empty_following')
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-ink-900/70 animate-fade-in"
+      onClick={onClose}
+    >
+      <div
+        className="bg-surface rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-sm max-h-[75vh] flex flex-col animate-pop"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-4 py-3 border-b border-line shrink-0">
+          <div className="flex gap-1 p-1 bg-ink-50 rounded-ctrl">
+            <button
+              onClick={() => setTab('followers')}
+              className={`px-3.5 py-1.5 rounded-ctrl text-sm font-extrabold transition-colors duration-fast ${
+                tab === 'followers' ? 'bg-canvas text-ink-900 shadow-lift' : 'text-muted'
+              }`}
+            >
+              {t('followlist.tab_followers')}
+            </button>
+            <button
+              onClick={() => setTab('following')}
+              className={`px-3.5 py-1.5 rounded-ctrl text-sm font-extrabold transition-colors duration-fast ${
+                tab === 'following' ? 'bg-canvas text-ink-900 shadow-lift' : 'text-muted'
+              }`}
+            >
+              {t('followlist.tab_following')}
+            </button>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label={t('ui.close')}
+            className="w-9 h-9 flex items-center justify-center rounded-full text-muted hover:bg-ink-50"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto">
+          {rows === null ? (
+            <div className="flex items-center justify-center py-10">
+              <div className="animate-spin rounded-full h-8 w-8 border-[3px] border-ink-50 border-t-ink-700"></div>
+            </div>
+          ) : rows.length === 0 ? (
+            <p className="text-sm text-muted text-center py-10">{emptyText}</p>
+          ) : (
+            <div className="divide-y divide-line">
+              {rows.map((p) => (
+                <Link
+                  key={p.id}
+                  to={`/jogador/${p.id}`}
+                  onClick={onClose}
+                  className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50"
+                >
+                  <Avatar name={p.name} url={p.avatar_url} size="w-10 h-10 text-sm" />
+                  <p className="flex-1 min-w-0 font-extrabold text-ink-900 text-sm truncate">{p.name}</p>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>,
     document.body
   )
