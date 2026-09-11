@@ -137,7 +137,7 @@ function MatchCard({ match, org, currentUser, isOrgAdmin, onChanged, t, i18n }) 
     }
   })
 
-  const canDelete = isCreator || isOrgAdmin
+  const canDelete = (isCreator || isOrgAdmin) && !hasResult
   const canCorrect = isParticipant || isOrgAdmin
   const acceptedCount = (match.pending_correction_accepted_by || []).length
 

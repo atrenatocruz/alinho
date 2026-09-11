@@ -125,14 +125,26 @@ CREATE POLICY "Org members can view group matches"
 -- Eliminar o jogo inteiro fica reservado a quem o criou ou a um admin do
 -- grupo (regra 5) — via RLS direta, como o resto do app já faz para
 -- `games`, em vez de mais uma RPC só para isto.
+--
+-- locked_at IS NULL é obrigatório aqui: uma vez inserido o resultado,
+-- apply_group_match_ranking já escreveu em player_stats e no rating global
+-- (profiles.rating via apply_elo_pairing) — um DELETE simples não reverte
+-- isso, deixava pontos/rating "presos" para sempre. Mesma cautela que
+-- delete_private_match (migration_private_matches_delete_rpc.sql) já toma
+-- para o jogo entre amigos ("só quem criou... e só enquanto pending").
+-- Corrigir um resultado errado passa por propose/accept_group_match_
+-- correction (secção 5), nunca por apagar e recriar o jogo.
 DROP POLICY IF EXISTS "Creator or org admin can delete group match" ON group_matches;
 CREATE POLICY "Creator or org admin can delete group match"
   ON group_matches FOR DELETE
   USING (
-    created_by = auth.uid()
-    OR EXISTS (
-      SELECT 1 FROM memberships m
-      WHERE m.organization_id = group_matches.organization_id AND m.user_id = auth.uid() AND m.is_admin
+    locked_at IS NULL
+    AND (
+      created_by = auth.uid()
+      OR EXISTS (
+        SELECT 1 FROM memberships m
+        WHERE m.organization_id = group_matches.organization_id AND m.user_id = auth.uid() AND m.is_admin
+      )
     )
   );
 
