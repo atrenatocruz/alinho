@@ -547,6 +547,19 @@ export default function Profile() {
                 </>
               )
             })()}
+            {/* Seguidores/A seguir — subiu para junto do nome (pedido do
+                Renato, 11 set 2026: tinha a própria secção com divisória
+                lá em baixo, "muita poluição visual"). Tapável, mais
+                pequeno, sem ser mais um bloco cheio à parte. */}
+            <div className="mt-1 flex items-center gap-2 text-[11px]">
+              <button type="button" onClick={() => setFollowListTab('followers')} className="font-extrabold text-ink-900">
+                {t('profile.followers_count', { count: followCounts.followers_count })}
+              </button>
+              <span className="text-ink-200">·</span>
+              <button type="button" onClick={() => setFollowListTab('following')} className="font-extrabold text-ink-900">
+                {t('profile.following_count', { count: followCounts.following_count })}
+              </button>
+            </div>
             {isProvisional(profile?.rating_games) && (
               <p className="mt-1 text-[10px] text-muted">{t('profile.provisional_note')}</p>
             )}
@@ -567,18 +580,6 @@ export default function Profile() {
             <p className="text-xl font-extrabold text-ink-900 tabular-nums leading-none">{stats?.mix_wins || 0}</p>
             <p className="mt-1 text-[11px] text-muted">{t('profile.card_titles')}</p>
           </div>
-        </div>
-
-        {/* Seguidores/A seguir — tapável, abre o FollowListModal. Novo:
-            o cartão do próprio perfil não mostrava nenhuma contagem até
-            aqui (só o de PlayerDetails.jsx tinha friends_count). */}
-        <div className="mt-3.5 pt-3.5 border-t border-line flex items-center justify-center gap-4 text-sm">
-          <button type="button" onClick={() => setFollowListTab('followers')} className="font-extrabold text-ink-900">
-            {t('profile.followers_count', { count: followCounts.followers_count })}
-          </button>
-          <button type="button" onClick={() => setFollowListTab('following')} className="font-extrabold text-ink-900">
-            {t('profile.following_count', { count: followCounts.following_count })}
-          </button>
         </div>
       </div>
 
