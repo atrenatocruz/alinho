@@ -1,0 +1,50 @@
+{
+  "_comment": [
+    "Configuração do fluxo de equipa. Suporta vários boards Trello.",
+    "Cada board tem o seu prefixo de commit: '(Trello #51)' → board 'alinho'.",
+    "Para adicionar um board: copia um bloco, põe os ids reais, escolhe um prefixo",
+    "que não colida, e (opcional) 'paths' para o Claude adivinhar o board certo."
+  ],
+  "defaultBoard": "alinho",
+  "boards": {
+    "alinho": {
+      "label": "Alinho — app web",
+      "commitPrefix": "Trello",
+      "boardId": "6a5f6308e97105ba780040f3",
+      "boardShortLink": "mG5oDWNM",
+      "boardUrl": "https://trello.com/b/mG5oDWNM/alinho",
+      "slackChannel": "devUpdates",
+      "paths": ["src/", "supabase/", "public/"],
+      "lists": {
+        "Backlog": "6a7598dd6671d3a2bef95c2e",
+        "Design": "6a759ede8d231fa884cfc956",
+        "Selected/Ready": "6a5f64cdc6e8b7bc2e4b6856",
+        "Bugs": "6a75a170e37d33c288012783",
+        "Watching": "6a8821771c8b2856f7e131bc",
+        "In Development": "6a5f65011883a1cc02483f6c",
+        "Code Review": "6aa03bf0328977eaf925d538",
+        "Dev Done": "6a5f652b4038631103253490",
+        "Testing - QA": "6a759e8c923462a9eb3915cc",
+        "Done": "6a759f0689901e9aaf364f15"
+      }
+    }
+  },
+  "slack": {
+    "devUpdates": "C0BT8GXF62H",
+    "bugs": "C0BU6RUG9R6",
+    "allAlinho": "C0BU6RMTU64",
+    "discussion": "C0BTCFK6MD0"
+  },
+  "git": {
+    "workBranch": "dev",
+    "releaseBranch": "main",
+    "promoter": "Renato"
+  },
+  "flow": {
+    "_comment": "Ordem do fluxo. Um cartão só avança nesta ordem, nunca recua.",
+    "order": ["Backlog", "Design", "Selected/Ready", "Bugs", "Watching",
+              "In Development", "Code Review", "Dev Done", "Testing - QA", "Done"],
+    "onPushToWorkBranch": "Code Review",
+    "onPushToReleaseBranch": "Testing - QA"
+  }
+}

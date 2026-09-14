@@ -1,0 +1,53 @@
+name: Sincronizar board Alinho
+
+# Move os cartões conforme o código chega de facto a cada branch, e avisa o
+# #dev-updates. Corre no GitHub, por isso funciona mesmo que ninguém se lembre
+# de actualizar o Trello à mão.
+on:
+  push:
+    branches: [dev, main]
+  workflow_dispatch:
+    inputs:
+      range:
+        description: 'Range de commits a reprocessar (ex.: abc123..def456)'
+        required: false
+        default: ''
+
+concurrency:
+  group: trello-sync-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Determinar o range de commits
+        id: range
+        run: |
+          if [ -n "${{ github.event.inputs.range }}" ]; then
+            echo "range=${{ github.event.inputs.range }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ] || \
+               ! git cat-file -e "${{ github.event.before }}^{commit}" 2>/dev/null; then
+            # branch nova, ou o commit anterior já não existe (force-push)
+            echo "range=${{ github.sha }}~1..${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "range=${{ github.event.before }}..${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Sincronizar Trello + Slack
+        env:
+          TRELLO_API_KEY: ${{ secrets.TRELLO_API_KEY }}
+          TRELLO_TOKEN: ${{ secrets.TRELLO_TOKEN }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          BRANCH: ${{ github.ref_name }}
+          COMMIT_RANGE: ${{ steps.range.outputs.range }}
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: node .github/scripts/trello-sync.mjs
