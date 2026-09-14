@@ -162,17 +162,21 @@ export default function Profile() {
     }
   }
 
+  // Aggregated across every club, not scoped to currentOrganizationId — same
+  // bug class loadMixHistory had (Francisco, 11 set 2026, "perdi todo o meu
+  // histórico"): currentOrganizationId lives only in memory and resets to
+  // "first membership in the list" on reload, so a straight player_stats
+  // lookup pinned to it silently showed 0/0 whenever that wasn't the club
+  // the points were actually earned in. get_player_profile already does
+  // this aggregation correctly for PlayerDetails.jsx (any other player's
+  // profile) — reused here instead of duplicating the SUM-across-clubs
+  // logic client-side.
   const loadStats = async () => {
     try {
-      const { data, error } = await supabase
-        .from('player_stats')
-        .select('*')
-        .eq('user_id', profile.id)
-        .eq('organization_id', currentOrganizationId)
-        .single()
-
-      if (error && error.code !== 'PGRST116') throw error
-      setStats(data)
+      const { data, error } = await supabase.rpc('get_player_profile', { p_user_id: profile.id })
+      if (error) throw error
+      const row = data?.[0]
+      setStats(row ? { game_wins: row.game_wins, game_losses: row.game_losses, mix_wins: row.mix_wins } : null)
     } catch (error) {
       console.error('Error loading stats:', error)
     }
