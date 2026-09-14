@@ -25,13 +25,11 @@ alinho is a multi-tenant padel game management app: club admins create games ("m
 
 Non-trivial features go through the `superpowers` skill: brainstorm → write a design spec (`docs/superpowers/specs/YYYY-MM-DD-<slug>-design.md`) → write an implementation plan (`docs/superpowers/plans/YYYY-MM-DD-<slug>.md`) → implement → review. Larger multi-step efforts additionally get task briefs/reports under `.superpowers/sdd/`. **These are historical records, not living docs — don't rewrite old specs/plans to match current state; they document a decision at the time it was made.** If you're planning new work, check whether a spec for it already exists before starting from scratch.
 
-**Work on `dev`. Never push to `main` — that is Renato's call and Renato's hand.** Francisco, 2026-09-08, correcting an earlier version of this same paragraph: `dev` is where you commit and push; promoting `dev` to `main` is done by Renato, not by whoever wrote the code. The two branches are still meant to stay close — the point is that closing the gap is his decision, not yours.
-
-If your work is ready and `main` is behind, say so and stop there. Do not `git push origin main`, do not `git push origin dev:main`, and do not merge `dev` into a local `main` and push it.
+**Work on `dev`. Promoting `dev` to `main` is Renato's call — but as of 2026-09-14, he can make that call in chat.** Renato, 2026-09-14, amending the paragraph below: default behavior is still to commit/push to `dev` and stop there, saying so if `main` is behind. But when Renato explicitly says to push to `main` in the conversation (not implied by "ship it" or approving a plan — an explicit instruction naming `main`), go ahead: `git push origin dev:main` (or equivalent) is authorized at that point. Don't infer this consent from silence or from an earlier, unrelated approval.
 
 This supersedes the note that used to live here telling you to branch off `main` because `dev` had gone stale. That was true at the time (`dev` was 31 commits behind on 2026-07-30, and still 10 behind on 2026-09-08) but it has since been realigned: as of 2026-09-08 `main` holds nothing that `dev` does not.
 
-Why it matters that this is his call: `main` publishes to `alinho.pt`. If a change depends on a migration, that migration has to have been run before the code lands there — and a migration file sitting in the repo is not a migration that has run (see "Architecture at a glance" above). Renato is the one who knows whether it has.
+Why this still deserves care: `main` publishes to `alinho.pt`. If a change depends on a migration, that migration has to have been run before the code lands there — and a migration file sitting in the repo is not a migration that has run (see "Architecture at a glance" above). Before pushing to `main` on Renato's instruction, confirm any migration the changes depend on has actually been run — ask if it's unclear rather than assuming.
 
 ## Trello + Slack workflow rule
 
