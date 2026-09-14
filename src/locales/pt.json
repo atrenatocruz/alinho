@@ -900,7 +900,7 @@
   "profile.vouchers_empty_subtitle": "Vouchers ganhos ao vencer mixes com prémio aparecem aqui.",
   "profile.voucher_status_por_usar": "Por usar",
   "profile.voucher_status_usado": "Usado",
-  "profile.voucher_mark_used_action": "Marcar como usado",
+  "profile.voucher_mark_used_action": "Usar",
   "profile.voucher_mark_used_confirm": "Marcar este voucher como usado? Não é possível desfazer.",
   "profile.voucher_used_at": "Usado a {{date}}",
   "profile.voucher_error_mark_used": "Não foi possível marcar o voucher como usado.",
