@@ -991,6 +991,7 @@ export default function GerirClube() {
           num_courts: numCourts,
           max_players: numCourts * 4,
           price_per_player: gameForm.price_per_player === '' ? null : parseFloat(gameForm.price_per_player),
+          auto_start_hours_before: gameForm.auto_start_hours_before === '' ? null : parseInt(gameForm.auto_start_hours_before, 10),
           // The only place pool_size enters this payload — see handleCreateGame
           // above. It is excluded from ...gameFields so this spread is the sole
           // source of the key; naming a not-yet-migrated column would break the
