@@ -664,12 +664,17 @@ contents-style walk-through doesn't skip it).
 Extend `GameDetails.jsx`'s existing correction affordance rather than
 building a new one:
 
-- `canEditScores` (line ~2155) becomes
-  `(isAdmin && (game.status === 'in_progress' || game.status === 'finished')) || (isScorekeeper && game.status === 'in_progress')`
-  — scorekeeper stays `in_progress`-only (it's a UI convenience role,
-  not a security boundary, so it shouldn't gain post-close power the
-  RLS/RPC layer doesn't grant it either); admin gains the finished
-  case.
+- `GameDetails.jsx` renders rounds in two mutually-exclusive places: an
+  `in_progress`-only block (wrapped in `{game.status === 'in_progress'
+  && (...)}`, opened around line 1878) containing the `canEditScores`
+  at line ~2155 (`(isAdmin || isScorekeeper) && game.status ===
+  'in_progress'`), and a separate `finishedTab === 'rondas'`-only block
+  (line ~2297-2320) inside `{game.status === 'finished' && (...)}`.
+  Because the first block never renders once the mix is finished, its
+  `canEditScores` needs **no change** — only the second block needs new
+  gating (admin-only, no scorekeeper — a UI convenience role, not a
+  security boundary, so it shouldn't gain post-close power the
+  RLS/RPC layer doesn't grant it either).
 - The "rondas" tab's finished-mix match list (line ~2297-2320,
   currently hardcoded `editable = false` in practice since it only
   ever renders once `game.status === 'finished'`) gets the same
