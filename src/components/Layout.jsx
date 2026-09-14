@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Home, Users, Trophy, Settings, LogOut, HelpCircle, Phone, X, Bell, UserCheck } from 'lucide-react'
@@ -345,6 +345,17 @@ export default function Layout({ children }) {
   const joinRequestsTotal = joinRequestsByOrg.reduce((sum, org) => sum + org.count, 0)
   const notificationsTotal = followRequests.length + joinRequestsTotal + orgInvites.length
 
+  // `main` below is the app's only scrolling region (see the app-shell
+  // comment on the root div) — the document itself never scrolls, so a
+  // route change doesn't naturally reset scroll position the way it would
+  // in a normal multi-page site. Without this, navigating via the bottom
+  // nav (or any Link) while scrolled down leaves the next page opening
+  // mid-way down instead of at its top (Trello #242).
+  const mainRef = useRef(null)
+  useEffect(() => {
+    mainRef.current?.scrollTo(0, 0)
+  }, [location.pathname])
+
   const needsPhone = profile && !isGuest && !profile.phone_hash && !phonePromptDismissed
 
   const dismissPhonePrompt = () => {
@@ -532,7 +543,7 @@ export default function Layout({ children }) {
       {/* Main — the only scrolling region in the shell (see the app-shell
           comment above the root div). pb-28 keeps the last bit of content
           from hiding behind the nav overlay below. */}
-      <main className="flex-1 overflow-y-auto">
+      <main ref={mainRef} className="flex-1 overflow-y-auto">
         <div className="max-w-2xl mx-auto px-4 pt-6 pb-28 animate-fade-up">
           {children}
         </div>
