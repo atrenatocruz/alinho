@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { MapPin, CheckCircle2, ChevronRight, ChevronDown, ChevronLeft, Lock, Play, Calendar, X, Share2, MessageCircle, Link2, ImageDown, Trophy, Repeat, Euro, Swords, Users, Ticket } from 'lucide-react'
 import ShareCard, { CARD_W, CARD_H } from './ShareCard'
+import QRCode from 'qrcode'
 import { ratingBand, groupRatingBand } from '../lib/elo'
 import { achievementIcon, RARITY_META } from '../lib/achievements'
 import { formatDate, formatTime, formatCurrency } from '../lib/formatDate'
@@ -589,11 +590,16 @@ export function AchievementCard({ achievementKey, category, rarity, earned = fal
    on the actual call to action — not repeated across a border, a bar and
    a pill, which would just be the same "this is actionable" fact said
    three times. */
-export function VoucherCard({ prizeText, gameTitle, gameDate, organizationName, status, usedAtLabel, onMarkUsed }) {
+export function VoucherCard({ prizeText, gameTitle, gameDate, organizationName, status, usedAtLabel, onMarkUsed, onShowQR }) {
   const { t } = useTranslation()
   const used = status === 'usado'
   return (
-    <div className={`card relative overflow-hidden ${used ? 'shadow-none' : 'shadow-lift'}`}>
+    <div
+      className={`card relative overflow-hidden ${used ? 'shadow-none' : 'shadow-lift cursor-pointer'}`}
+      onClick={!used ? onShowQR : undefined}
+      role={!used ? 'button' : undefined}
+      tabIndex={!used ? 0 : undefined}
+    >
       <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${used ? 'bg-ink-100' : 'bg-ink-900'}`} />
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -616,13 +622,59 @@ export function VoucherCard({ prizeText, gameTitle, gameDate, organizationName, 
       )}
 
       {!used ? (
-        <PrimaryButton onClick={onMarkUsed} className="mt-3 w-full">
+        <PrimaryButton onClick={(e) => { e.stopPropagation(); onMarkUsed() }} className="mt-3 w-full">
           {t('profile.voucher_mark_used_action')}
         </PrimaryButton>
       ) : (
         <p className="mt-3 text-[10px] text-ink-200">{t('profile.voucher_used_at', { date: usedAtLabel })}</p>
       )}
     </div>
+  )
+}
+
+/* ─── VoucherQRModal ─────────────────────────────────────────────────────
+   Shown when a player taps a por_usar VoucherCard. Purely presentational
+   beyond generating the QR image itself — the caller (Profile.jsx) passes
+   a small { id, gameTitle, organizationName } object built from the row
+   it already has, not something this modal re-fetches. Renders nothing
+   without a voucher, matching PhotoViewerModal's own "always mounted,
+   inert without its subject" convention. The QR encodes the bare voucher
+   id string — no signed token, no wrapping URL (see the design spec's Key
+   Decisions for why: this is a convenience carrier, not a security
+   boundary — the real authorization check happens server-side in
+   admin_redeem_voucher when an admin's scan reaches the redeem RPC). */
+export function VoucherQRModal({ voucher, onClose }) {
+  const { t } = useTranslation()
+  const [qrDataUrl, setQrDataUrl] = useState(null)
+
+  useEffect(() => {
+    if (!voucher) return
+    let cancelled = false
+    setQrDataUrl(null)
+    QRCode.toDataURL(voucher.id, { margin: 1, width: 256 })
+      .then((url) => { if (!cancelled) setQrDataUrl(url) })
+      .catch((err) => console.error('Error generating voucher QR code:', err))
+    return () => { cancelled = true }
+  }, [voucher])
+
+  if (!voucher) return null
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 animate-fade-in p-4" onClick={onClose}>
+      <div className="card max-w-xs w-full text-center relative" onClick={(e) => e.stopPropagation()}>
+        <button
+          onClick={onClose}
+          aria-label={t('ui.close')}
+          className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full text-muted hover:text-ink-900 hover:bg-ink-50 transition-colors duration-fast"
+        >
+          <X size={18} />
+        </button>
+        {qrDataUrl && <img src={qrDataUrl} alt="" className="mx-auto rounded-lg" width={256} height={256} />}
+        <p className="mt-3 text-sm font-extrabold text-ink-900">{voucher.gameTitle}</p>
+        <p className="text-[11px] text-muted">{voucher.organizationName}</p>
+        <p className="mt-2 text-xs text-muted">{t('profile.voucher_qr_hint')}</p>
+      </div>
+    </div>,
+    document.body
   )
 }
 
