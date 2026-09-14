@@ -1032,6 +1032,64 @@ export default function GameDetails() {
     }
   }
 
+  // Post-close mix correction (Trello #257): same shape as
+  // handleSaveScore, but calls correct_finished_mix_match instead of a
+  // plain `matches` update, gated by confirm() since this recomputes
+  // points/XP/Elo/vouchers — genuinely consequential, not just a display
+  // change. finalScore.sets is forwarded to p_sets exactly like
+  // handleSaveScore already forwards it to the match_sets delete/insert.
+  const handleCorrectFinishedScore = async (match, finalScore) => {
+    const { score_a: a, score_b: b, sets } = finalScore
+    const patchedMatches = matches.map(m => (
+      m.id === match.id
+        ? { ...m, score_a: a, score_b: b, winner_team_id: a > b ? match.team_a_id : match.team_b_id }
+        : m
+    ))
+    const newWinnerTeamId = computeMixWinnerTeamId(game, teams, patchedMatches)
+    if (!newWinnerTeamId) return
+
+    if (!confirm(t('gamedetails.confirm_correct_finished_score', {
+      team: teamName(match.team_a_id), a, other: teamName(match.team_b_id), b,
+    }))) return
+
+    setMixError('')
+    setSavingMatchId(match.id)
+    try {
+      const { data, error } = await supabase.rpc('correct_finished_mix_match', {
+        p_match_id: match.id,
+        p_new_score_a: a,
+        p_new_score_b: b,
+        p_new_winner_team_id: newWinnerTeamId,
+        p_sets: sets || null,
+      })
+      if (error) throw error
+
+      setScores(prev => ({ ...prev, [match.id]: undefined }))
+      setEditingMatchId(current => (current === match.id ? null : current))
+      await loadGameDetails()
+
+      const parts = [
+        data.winner_changed
+          ? t('gamedetails.correction_result_winner_changed', { team: teamName(data.new_winner_team_id) })
+          : t('gamedetails.correction_result_winner_unchanged'),
+      ]
+      if (!data.elo_applied) {
+        parts.push(data.elo_skip_reason === 'untracked_participant'
+          ? t('gamedetails.correction_elo_skipped_untracked')
+          : t('gamedetails.correction_elo_skipped_later_event'))
+      }
+      if (data.voucher_not_reverted) {
+        parts.push(t('gamedetails.correction_voucher_not_reverted'))
+      }
+      alert(parts.join(' '))
+    } catch (error) {
+      console.error('Error correcting finished mix score:', error)
+      setMixError(error.message || t('gamedetails.error_correct_finished_score'))
+    } finally {
+      setSavingMatchId(current => (current === match.id ? null : current))
+    }
+  }
+
   // Re-opens a saved score's inputs, pre-filled with its current values, so
   // a wrong result can be corrected in place instead of tearing down and
   // reforming the whole mix (Trello #184).
@@ -2285,13 +2343,27 @@ export default function GameDetails() {
                         <div className="space-y-2.5">
                           {ms.map(m => {
                             const done = !!m.winner_team_id
-                            const editable = !done && (isAdmin || isScorekeeper) && game.status === 'in_progress'
+                            const isCorrecting = editingMatchId === m.id
+                            const canEditScores = isAdmin && game.status === 'finished'
+                            const editable = canEditScores && (!done || isCorrecting)
                             return (
                               <div key={m.id} className="rounded-ctrl bg-canvas p-2.5">
-                                <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mb-2 px-1">
-                                  {t('gamedetails.court_number', { number: m.court_number })}
-                                </p>
+                                <div className="flex items-center justify-between mb-2 px-1">
+                                  <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">
+                                    {t('gamedetails.court_number', { number: m.court_number })}
+                                  </p>
+                                  {canEditScores && done && !isCorrecting && (
+                                    <button
+                                      onClick={() => startEditingScore(m)}
+                                      className="inline-flex items-center gap-1 text-[11px] font-extrabold text-muted hover:text-ink-900 min-h-[28px] px-1"
+                                    >
+                                      <Pencil size={12} />
+                                      {t('gamedetails.correct_finished_score')}
+                                    </button>
+                                  )}
+                                </div>
                                 <ScoreEntry
+                                  key={`${m.id}-${isCorrecting}`}
                                   match={m}
                                   scoringFormat={game.scoring_format || 'pontos_simples'}
                                   editable={editable}
@@ -2299,9 +2371,17 @@ export default function GameDetails() {
                                   teamBName={teamName(m.team_b_id)}
                                   initialScores={scores[m.id] || { a: '', b: '' }}
                                   onScoreChange={(matchId, next) => setScores(prev => ({ ...prev, [matchId]: next }))}
-                                  onSave={(finalScore) => handleSaveScore(m, finalScore)}
+                                  onSave={(finalScore) => handleCorrectFinishedScore(m, finalScore)}
                                   saving={savingMatchId === m.id}
                                 />
+                                {isCorrecting && (
+                                  <button
+                                    onClick={() => cancelEditingScore(m.id)}
+                                    className="w-full mt-2 py-2.5 rounded-ctrl bg-ink-50 text-ink-700 text-sm font-extrabold transition-all duration-fast active:scale-[0.98]"
+                                  >
+                                    {t('gamedetails.cancel')}
+                                  </button>
+                                )}
                               </div>
                             )
                           })}
