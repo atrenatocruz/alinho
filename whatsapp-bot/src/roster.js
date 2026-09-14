@@ -61,7 +61,7 @@ export async function loadGame(gameId) {
     // roster block below is one shared broadcast to the whole WhatsApp
     // group, not a message addressed to any single participant, so it can't
     // sensibly pick one person's language. It always renders in 'pt' (see
-    // buildCombinedRosterMessage below).
+    // buildMixMessage below).
     let { data: profiles, error: profilesError } = await supabase
       .from('profiles')
       .select('id, name, language, rating, gender')
@@ -145,13 +145,50 @@ export function formatDateTime(isoDate, lang = 'pt') {
   return `${datePart} · ${timePart}`
 }
 
-/** Builds one mix's block of text (no footer — footer is added once for the whole combined message). `showCode` is false when this is the only open mix — nothing to disambiguate, so the code and the join/leave instructions drop it. */
-function buildMixBlock({ game, people, capacity, suplentes = [] }, { showCode }) {
+// pt-PT weekday long names come back as "segunda-feira", "terça-feira"...
+// — strip accents and the "-feira" suffix so commands.js can compare a
+// player's typed "segunda"/"terca" straight against this. Always computed
+// from the mix's actual date (Europe/Lisbon), never from its title text —
+// a mix titled "Torneio de verão" that happens to fall on a Monday still
+// matches "segunda" (Francisco, 2026-09-14).
+export function weekdayKeyPt(isoDate) {
+  const long = new Date(isoDate).toLocaleDateString('pt-PT', { weekday: 'long', timeZone: 'Europe/Lisbon' })
+  return long
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace('-feira', '')
+}
+
+/** Hour/minute/day/month of a mix's date in Europe/Lisbon, as numbers — for matching "19h"/"21"/"14/09" identifiers in commands.js. */
+export function mixLocalParts(isoDate) {
+  const parts = new Intl.DateTimeFormat('pt-PT', {
+    timeZone: 'Europe/Lisbon',
+    hour: '2-digit',
+    minute: '2-digit',
+    day: '2-digit',
+    month: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date(isoDate))
+  const get = (type) => Number(parts.find((p) => p.type === type)?.value)
+  return { hour: get('hour'), minute: get('minute'), day: get('day'), month: get('month') }
+}
+
+/**
+ * Builds one mix's own WhatsApp message — each open mix is now its own
+ * message (2026-09-14 redesign; used to be one giant message with every
+ * open mix pasted together, see git history) so WhatsApp's native
+ * reply-to-message can identify which mix a bare "In"/"Out" refers to.
+ * `label` is the short "01"/"02" identifier assigned by the caller from
+ * the open-mixes list order — null when this is the only mix open (nothing
+ * to disambiguate, so the label and the identifier hint drop out).
+ */
+export function buildMixMessage({ game, people, capacity, suplentes = [] }, { label = null } = {}) {
   const isCancelled = game.status === 'cancelled'
   const lines = []
 
   lines.push(`🎾 *${game.title}*`)
-  if (showCode) lines.push(`🆔 Código: ${game.short_code}`)
+  if (label) lines.push(`🔢 Nº: ${label}`)
   lines.push(`📅 ${formatDateTime(game.date)}`)
   if (game.location) lines.push(`📍 ${game.location}`)
   if (game.price_per_player > 0) lines.push(`💶 ${game.price_per_player}€/jogador`)
@@ -183,8 +220,10 @@ function buildMixBlock({ game, people, capacity, suplentes = [] }, { showCode })
     lines.push('')
     if (people.length >= capacity) {
       lines.push('✅ *Mix completo!*')
-    } else if (showCode) {
-      lines.push(`🙋 Escreve *In ${game.short_code}* para entrares, *Out ${game.short_code}* para saíres`)
+    } else if (label) {
+      lines.push(
+        `🙋 Escreve *In ${label}* para entrares, *Out ${label}* para saíres — ou responde a esta mensagem com *In*/*Out*.`
+      )
     } else {
       lines.push(`🙋 Escreve *In* ou *Alinho* para entrares, *Out* ou *Fora* para saíres`)
     }
@@ -198,36 +237,28 @@ function buildMixBlock({ game, people, capacity, suplentes = [] }, { showCode })
     lines.push(`📆 Adicionar ao calendário: ${config.supabaseUrl}/functions/v1/game-ics?id=${game.id}`)
   }
 
-  return lines.join('\n')
+  // Each mix is its own WhatsApp message now, so each carries its own
+  // footer (used to be added once for the whole combined message).
+  return lines.join('\n') + helpFooter('pt')
 }
 
-const MIX_SEPARATOR = '\n\n➖➖➖➖➖➖➖➖➖➖\n\n'
+// messageId (WhatsApp stanzaId of a mix message this bot sent) -> gameId.
+// Lets commands.js resolve "someone replied to this specific mix's roster
+// message" without a DB round-trip. In-memory, capped, lost on restart —
+// same trade-off as pendingSuplenteConfirmations in commands.js: a reply
+// to a pre-restart message just falls back to text-based matching instead
+// of failing.
+const MESSAGE_GAME_MAP_MAX = 1000
+const messageIdToGameId = new Map()
 
-/**
- * Builds ONE message covering every currently open mix — a new message
- * every time, never an edit, matching the reference bot's behavior. Each
- * mix gets its own block (see buildMixBlock); returns null when there's
- * nothing to show (caller should skip sending in that case).
- */
-export function buildCombinedRosterMessage(mixStates, { promotedNames = [] } = {}) {
-  if (mixStates.length === 0) return null
+export function recordMixMessage(messageId, gameId) {
+  if (!messageId) return
+  if (messageIdToGameId.size >= MESSAGE_GAME_MAP_MAX) {
+    messageIdToGameId.delete(messageIdToGameId.keys().next().value)
+  }
+  messageIdToGameId.set(messageId, gameId)
+}
 
-  const showCode = mixStates.length > 1
-  // Each promoted entry is { name, lang } — the one piece of this broadcast
-  // that IS about one specific person, so it's localized to that person's
-  // own profiles.language (see sync.js, which fetches it alongside the
-  // promoted participant's name).
-  const promoBlock = promotedNames.length > 0
-    ? `${promotedNames
-        .map(({ name, lang }) => t('promoted_to_confirmed', lang ?? 'pt', { name }))
-        .join('\n')}\n\n`
-    : ''
-  const header = showCode ? `📋 *Mixes abertos (${mixStates.length})*\n\n` : ''
-  const blocks = mixStates.map((state) => buildMixBlock(state, { showCode })).join(MIX_SEPARATOR)
-
-  // The roster block itself is a shared broadcast to the whole group, not a
-  // message for any one profile — stays 'pt', matching buildMixBlock's own
-  // hardcoded pt labels above (vagas, campos fechados, etc.), which are
-  // intentionally out of scope for this task for the same reason.
-  return promoBlock + header + blocks + helpFooter('pt')
+export function gameIdForMessage(messageId) {
+  return messageIdToGameId.get(messageId) ?? null
 }

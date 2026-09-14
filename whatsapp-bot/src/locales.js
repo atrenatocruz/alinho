@@ -24,9 +24,11 @@ Para entrares num mix:
 Para saíres de um mix:
 • *Out* / *Fora* / *Estou fora* / *Saio*
 
-Se houver mais do que um mix aberto ao mesmo tempo, o bot diz-te o código (🆔) de cada um — escreve o comando seguido do código, por exemplo:
-• *In 1234*
-• *Out 1234*
+Se houver mais do que um mix aberto ao mesmo tempo, cada um tem a sua própria mensagem e um número (🔢 01, 02...). Para dizer a qual te referes:
+• Responde à mensagem desse mix com *In* ou *Out*
+• Ou escreve *In 01*, *In segunda*, *In m4* — dá para combinar, ex.: *In segunda m4*
+
+Escreve *mix* para ver a lista dos mixes abertos sem entrar em nenhum.
 
 Se o mix estiver cheio, o bot pergunta se queres entrar como suplente — responde *Sim* ou *Não*. Quando alguém sair, o primeiro suplente entra automaticamente.
 
@@ -65,10 +67,11 @@ Para veres esta lista:
   partner_joined_use_app: '🤖 Inscreveste-te em dupla pela app — para sair, usa a app 📱',
   waitlisted_use_app: '🤖 Estás na lista de suplentes — para sair, usa a app 📱',
   not_joined: '🤖 Não estás inscrito neste mix.',
-  mix_code_not_found: '🤖 Não encontrei nenhum mix aberto com o código {{code}}.',
-  disambiguate_in: '🤖 Há vários mixes abertos! Qual deles?\n\n{{list}}\n\nEscreve *In {{code}}* (com o código do mix que queres).',
+  mix_identifier_not_found: '🤖 Não encontrei nenhum mix aberto com isso. Escreve *mix* para veres a lista dos mixes abertos.',
+  mix_list: '🤖 Há {{count}} mixes abertos:\n\n{{list}}\n\nEscreve *In* seguido do número, dia, hora ou nível para entrares num deles (ex.: *In 01*, *In segunda*).',
+  disambiguate_in: '🤖 Há vários mixes abertos! Qual deles?\n\n{{list}}\n\nResponde à mensagem do mix que queres com *In*, ou escreve *In* seguido do número, dia, hora ou nível (ex.: *In 01*, *In segunda m4*).',
   not_in_any_open_mix: '🤖 Não estás inscrito em nenhum mix aberto.',
-  disambiguate_out: '🤖 Estás inscrito em vários mixes! De qual queres sair?\n\n{{list}}\n\nEscreve *Out {{code}}* (com o código do mix).',
+  disambiguate_out: '🤖 Estás inscrito em vários mixes! De qual queres sair?\n\n{{list}}\n\nResponde à mensagem do mix que queres com *Out*, ou escreve *Out* seguido do número, dia, hora ou nível (ex.: *Out 01*).',
 }
 
 const en = {
@@ -81,9 +84,11 @@ To join a mix:
 To leave a mix:
 • *Out* / *Fora* / *Estou fora* / *Saio*
 
-If more than one mix is open at the same time, the bot tells you each one's code (🆔) — type the command followed by the code, e.g.:
-• *In 1234*
-• *Out 1234*
+If more than one mix is open at the same time, each one gets its own message and a number (🔢 01, 02...). To say which one you mean:
+• Reply to that mix's message with *In* or *Out*
+• Or type *In 01*, *In segunda* (weekday), *In m4* (level) — you can combine them, e.g. *In segunda m4*
+
+Type *mix* to see the list of open mixes without joining any of them.
 
 If the mix is full, the bot asks if you want to join as a substitute — reply *Sim* or *Não*. When someone leaves, the first substitute joins automatically.
 
@@ -122,10 +127,11 @@ To see this list:
   partner_joined_use_app: '🤖 You joined as a pair through the app — to leave, use the app 📱',
   waitlisted_use_app: "🤖 You're on the waitlist — to leave, use the app 📱",
   not_joined: "🤖 You're not signed up for this mix.",
-  mix_code_not_found: "🤖 I couldn't find any open mix with code {{code}}.",
-  disambiguate_in: '🤖 There are several mixes open! Which one?\n\n{{list}}\n\nType *In {{code}}* (with the code of the mix you want).',
+  mix_identifier_not_found: "🤖 I couldn't find any open mix matching that. Type *mix* to see the list of open mixes.",
+  mix_list: '🤖 There are {{count}} mixes open:\n\n{{list}}\n\nType *In* followed by the number, weekday, time or level to join one (e.g. *In 01*, *In segunda*).',
+  disambiguate_in: '🤖 There are several mixes open! Which one?\n\n{{list}}\n\nReply to the mix you want with *In*, or type *In* followed by the number, weekday, time or level (e.g. *In 01*, *In segunda m4*).',
   not_in_any_open_mix: "🤖 You're not signed up for any open mix.",
-  disambiguate_out: "🤖 You're signed up for several mixes! Which one do you want to leave?\n\n{{list}}\n\nType *Out {{code}}* (with the mix code).",
+  disambiguate_out: "🤖 You're signed up for several mixes! Which one do you want to leave?\n\n{{list}}\n\nReply to the mix you want with *Out*, or type *Out* followed by the number, weekday, time or level (e.g. *Out 01*).",
 }
 
 const DICTS = { pt, en }

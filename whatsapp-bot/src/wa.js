@@ -12,10 +12,14 @@ const logger = pino({ level: 'info' })
  * ANY group the bot is a participant of — filtering to the configured
  * target group happens in the caller, since that's a Supabase-backed
  * setting the caller already loads.
- *   payload: { groupJid, senderJid, senderPn, text, key, message }
+ *   payload: { groupJid, senderJid, senderPn, text, key, message, quotedStanzaId }
  * `message` is the raw WAMessage — pass it as `quoted` when replying so
  * the reply shows as an in-thread quote of the sender's own message,
  * unambiguous even if several people send "In" close together.
+ * `quotedStanzaId` is the WhatsApp message id the sender replied TO (not
+ * the sender's own message id), or null if this message isn't a reply —
+ * this is how commands.js resolves "In"/"Out" sent as a native reply to
+ * one specific mix's roster message (2026-09-14 disambiguation redesign).
  */
 export async function connectWhatsApp({ onGroupMessage }) {
   // `sock` is reassigned by `start()` on every (re)connect. `sendText`
@@ -127,7 +131,12 @@ export async function connectWhatsApp({ onGroupMessage }) {
         const senderJid = msg.key.participant || msg.key.remoteJid
         const senderPn = msg.key.participantPn || (senderJid?.endsWith('@s.whatsapp.net') ? senderJid : null)
 
-        onGroupMessage({ groupJid, senderJid, senderPn, text, key: msg.key, message: msg })
+        // contextInfo.stanzaId is WhatsApp's own "this message replies to
+        // that one" pointer — core protocol metadata Baileys exposes even
+        // though it isn't the official Business API.
+        const quotedStanzaId = msg.message.extendedTextMessage?.contextInfo?.stanzaId ?? null
+
+        onGroupMessage({ groupJid, senderJid, senderPn, text, key: msg.key, message: msg, quotedStanzaId })
       }
     })
   }
@@ -144,10 +153,14 @@ export async function connectWhatsApp({ onGroupMessage }) {
   let participatingAt = 0
 
   return {
+    // Returns the sent message's WhatsApp id (or null if unavailable) —
+    // sync.js records it against the mix it just posted so a later reply
+    // to that exact message can be resolved back to that mix.
     sendText: async (groupJid, text, options = {}) => {
       if (!sock) throw new Error('WhatsApp socket not connected yet')
       const content = { text, ...(options.mentions ? { mentions: options.mentions } : {}) }
-      await sock.sendMessage(groupJid, content, options.quoted ? { quoted: options.quoted } : undefined)
+      const sent = await sock.sendMessage(groupJid, content, options.quoted ? { quoted: options.quoted } : undefined)
+      return sent?.key?.id ?? null
     },
     // Participant JIDs for the group, used to build a silent "@all" tag
     // (mentioning everyone pings them even though the visible text just
