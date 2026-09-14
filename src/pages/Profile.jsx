@@ -2,24 +2,26 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { User, Award, Trophy, LineChart, LogOut, Camera, HelpCircle, ThumbsUp, Trash2, Users, ChevronRight, ArrowLeft, Eye, X } from 'lucide-react'
+import { User, Award, Trophy, LineChart, LogOut, Camera, HelpCircle, ThumbsUp, Trash2, Users, ChevronRight, ArrowLeft, Eye, X, Ticket } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { hashPhone } from '../lib/hashPhone'
 import { uploadAvatar, removeAvatar } from '../lib/avatarStorage'
 import { getMyPrivateMatches, getGlobalRankings } from '../lib/privateMatches'
 import { getFollowCounts } from '../lib/follows'
-import { PrimaryButton, GuestBadge, DateField, Avatar, Select, EmptyState, RatingBadge, PhotoViewerModal, FollowListModal, AchievementCard } from '../components/ui'
+import { PrimaryButton, GuestBadge, DateField, Avatar, Select, EmptyState, RatingBadge, PhotoViewerModal, FollowListModal, AchievementCard, VoucherCard } from '../components/ui'
 import { CATEGORY_ORDER } from '../lib/achievements'
 import { formatRating, formatRatingMaybeProvisional, isProvisional, bandProgress, ratingBand } from '../lib/elo'
 import { countryOptions, countryName } from '../lib/countries'
 import { AGE_LABEL_KEY, ageCategory } from '../lib/ageCategories'
 import { XP_TIERS, tierFromXp, preTierProgress, formatXp } from '../lib/xp'
 import { formatDate as formatDateLib } from '../lib/formatDate'
+import { sortVouchersForWallet } from '../lib/vouchers'
 
 const TABS = [
   { key: 'perfil', labelKey: 'profile.tab_profile' },
   { key: 'historico', labelKey: 'profile.tab_history' },
+  { key: 'vouchers', labelKey: 'profile.tab_vouchers' },
 ]
 
 const SIDE_LABEL_KEY = { left: 'gamedetails.side_left', right: 'gamedetails.side_right', both: 'gamedetails.side_both' }
@@ -61,6 +63,8 @@ export default function Profile() {
   const [stats, setStats] = useState(null)
   const [mixHistory, setMixHistory] = useState([])
   const [mixHistoryLoading, setMixHistoryLoading] = useState(true)
+  const [vouchers, setVouchers] = useState([])
+  const [vouchersLoading, setVouchersLoading] = useState(true)
   const [privateMatchHistory, setPrivateMatchHistory] = useState([])
   const [privateMatchHistoryLoading, setPrivateMatchHistoryLoading] = useState(true)
   const [globalRank, setGlobalRank] = useState(null)
@@ -116,6 +120,7 @@ export default function Profile() {
         loadFollowCounts()
         loadKudos()
         loadTrophies()
+        loadVouchers()
       }
     }
   }, [profile, currentOrganizationId])
@@ -177,6 +182,41 @@ export default function Profile() {
   // points_earned/mix_won — so it's derived the same way GameDetails.jsx's
   // results share card does: group teams by combined points_earned and
   // rank descending, then find where this player's dupla landed.
+  const loadVouchers = async () => {
+    setVouchersLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from('vouchers')
+        .select('id, status, used_at, created_at, game:games (id, title, date, prize, organization:organizations (name))')
+        .eq('user_id', profile.id)
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      setVouchers(data || [])
+    } catch (error) {
+      // Treated the same as "no vouchers" — covers both a genuinely empty
+      // wallet and migration_vouchers.sql not having been run yet in this
+      // environment (relation "vouchers" does not exist), matching how
+      // player_trophies already fails soft when its own migration is missing.
+      console.error('Error loading vouchers:', error)
+      setVouchers([])
+    } finally {
+      setVouchersLoading(false)
+    }
+  }
+
+  const handleMarkVoucherUsed = async (voucherId) => {
+    if (!confirm(t('profile.voucher_mark_used_confirm'))) return
+    const { error } = await supabase.rpc('mark_voucher_used', { p_voucher_id: voucherId })
+    if (error) {
+      console.error('Error marking voucher used:', error)
+      alert(t('profile.voucher_error_mark_used'))
+      return
+    }
+    setVouchers((prev) => prev.map((v) => (
+      v.id === voucherId ? { ...v, status: 'usado', used_at: new Date().toISOString() } : v
+    )))
+  }
+
   const loadMixHistory = async () => {
     setMixHistoryLoading(true)
     try {
@@ -1148,6 +1188,37 @@ export default function Profile() {
           </div>
         )}
         </>
+      )}
+
+      {tab === 'vouchers' && (
+        !vouchersLoading && (
+          vouchers.length === 0 ? (
+            <EmptyState
+              icon={Ticket}
+              title={t('profile.vouchers_empty_title')}
+              subtitle={t('profile.vouchers_empty_subtitle')}
+            />
+          ) : (
+            <div className="pt-1">
+              {sortVouchersForWallet(vouchers).map((v, i, arr) => (
+                <div
+                  key={v.id}
+                  style={{ marginTop: i === 0 ? 0 : -16, zIndex: arr.length - i, position: 'relative' }}
+                >
+                  <VoucherCard
+                    prizeText={v.game?.prize || ''}
+                    gameTitle={v.game?.title || ''}
+                    gameDate={v.game?.date ? formatDateLib(v.game.date, i18n.language, { day: '2-digit', month: 'short', year: 'numeric' }) : ''}
+                    organizationName={v.game?.organization?.name || ''}
+                    status={v.status}
+                    usedAtLabel={v.used_at ? formatDateLib(v.used_at, i18n.language, { day: '2-digit', month: 'short', year: 'numeric' }) : ''}
+                    onMarkUsed={() => handleMarkVoucherUsed(v.id)}
+                  />
+                </div>
+              ))}
+            </div>
+          )
+        )
       )}
     </div>
   )
