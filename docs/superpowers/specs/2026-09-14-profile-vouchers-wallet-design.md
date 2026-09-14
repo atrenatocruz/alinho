@@ -168,7 +168,7 @@ As described under Data Model, `has_voucher` joins the `INSERT INTO games (...)`
 
 - `TABS` (~line 20) gains a third entry: `{ key: 'vouchers', labelKey: 'profile.tab_vouchers' }`, after `historico`.
 - New state: `vouchers` (array), `vouchersLoading` (bool, default `true`) — same naming/shape convention as `mixHistory`/`mixHistoryLoading`.
-- New loader, called once when `tab === 'vouchers'` becomes active for the first time (same lazy-load-on-first-visit pattern the `historico`/trophy sections already use), querying directly against Supabase with the RLS policy above doing the authorization:
+- New loader, called eagerly once on mount from inside the existing `if (!isGuest) { loadMixHistory(); loadPrivateMatchHistory(); loadGlobalPoints() }` block (`src/pages/Profile.jsx` ~line 111-115) — not gated on which tab is active, matching how `mixHistory`/`privateMatchHistory` already load regardless of the active tab (the tab only controls what's *shown*). Querying directly against Supabase with the RLS policy above doing the authorization:
   ```js
   const { data, error } = await supabase
     .from('vouchers')
