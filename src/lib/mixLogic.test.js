@@ -3,6 +3,7 @@ import {
   splitIntoPools, seedKnockoutFromPools,
   poolRoundNumbers, poolRoundsPlayed, roundRobinRound,
   generateAmericanoSchedule, americanoStandings,
+  computeMixWinnerTeamId,
 } from './mixLogic'
 
 describe('splitIntoPools', () => {
@@ -285,5 +286,64 @@ describe('americanoStandings', () => {
     ]
     const result = americanoStandings(matches, teams)
     expect(result.every((r) => r.points === 0 && r.played === 0)).toBe(true)
+  })
+})
+
+describe('computeMixWinnerTeamId', () => {
+  it('returns null for americano regardless of matches', () => {
+    const game = { format: 'americano' }
+    const teams = [{ id: 't1' }, { id: 't2' }]
+    const matches = [{ winner_team_id: 't1', round_number: 1, court_number: 1, phase: 'group', team_a_id: 't1', team_b_id: 't2' }]
+    expect(computeMixWinnerTeamId(game, teams, matches)).toBeNull()
+  })
+
+  it('returns null when no match has a winner yet', () => {
+    const game = { format: 'sobe_desce' }
+    const teams = [{ id: 't1' }, { id: 't2' }]
+    const matches = [{ winner_team_id: null, round_number: 1, court_number: 1, phase: 'group', team_a_id: 't1', team_b_id: 't2' }]
+    expect(computeMixWinnerTeamId(game, teams, matches)).toBeNull()
+  })
+
+  it('sobe_desce: returns the most recent round\'s completed court-1 winner', () => {
+    const game = { format: 'sobe_desce' }
+    const teams = [{ id: 't1' }, { id: 't2' }, { id: 't3' }, { id: 't4' }]
+    const matches = [
+      { winner_team_id: 't1', round_number: 1, court_number: 1, phase: 'group', team_a_id: 't1', team_b_id: 't2', score_a: 6, score_b: 2 },
+      { winner_team_id: 't3', round_number: 2, court_number: 1, phase: 'group', team_a_id: 't3', team_b_id: 't1', score_a: 6, score_b: 3 },
+    ]
+    expect(computeMixWinnerTeamId(game, teams, matches)).toBe('t3')
+  })
+
+  it('sobe_desce: walks back to an earlier round when the latest round\'s court-1 match is not yet decided', () => {
+    const game = { format: 'sobe_desce' }
+    const teams = [{ id: 't1' }, { id: 't2' }, { id: 't3' }, { id: 't4' }]
+    const matches = [
+      { winner_team_id: 't1', round_number: 1, court_number: 1, phase: 'group', team_a_id: 't1', team_b_id: 't2', score_a: 6, score_b: 2 },
+      { winner_team_id: null, round_number: 2, court_number: 1, phase: 'group', team_a_id: 't3', team_b_id: 't1', score_a: null, score_b: null },
+      { winner_team_id: 't4', round_number: 2, court_number: 2, phase: 'group', team_a_id: 't4', team_b_id: 't2', score_a: 6, score_b: 1 },
+    ]
+    expect(computeMixWinnerTeamId(game, teams, matches)).toBe('t1')
+  })
+
+  it('non-sobe_desce: prefers a decided final-phase match over standings()', () => {
+    const game = { format: 'todos_contra_todos' }
+    const teams = [{ id: 't1' }, { id: 't2' }, { id: 't3' }, { id: 't4' }]
+    const matches = [
+      { winner_team_id: 't1', round_number: 1, court_number: 1, phase: 'group', team_a_id: 't1', team_b_id: 't2', score_a: 6, score_b: 2 },
+      { winner_team_id: 't2', round_number: 2, court_number: 1, phase: 'final', team_a_id: 't1', team_b_id: 't2', score_a: 3, score_b: 6 },
+    ]
+    // standings() would put t1 first (1 win), but a decided final overrides it
+    expect(computeMixWinnerTeamId(game, teams, matches)).toBe('t2')
+  })
+
+  it('non-sobe_desce: falls back to standings() when there is no final-phase match yet', () => {
+    const game = { format: 'todos_contra_todos' }
+    const teams = [{ id: 't1' }, { id: 't2' }, { id: 't3' }, { id: 't4' }]
+    const matches = [
+      { winner_team_id: 't1', round_number: 1, court_number: 1, phase: 'group', team_a_id: 't1', team_b_id: 't2', score_a: 6, score_b: 2 },
+      { winner_team_id: 't3', round_number: 1, court_number: 2, phase: 'group', team_a_id: 't3', team_b_id: 't4', score_a: 6, score_b: 1 },
+    ]
+    // both t1 and t3 have 1 win; standings() tie-breaks on diff — t3's is bigger (+5 vs +4)
+    expect(computeMixWinnerTeamId(game, teams, matches)).toBe('t3')
   })
 })

@@ -233,6 +233,36 @@ export function standings(teams, matches) {
   )
 }
 
+/** Derives the mix's current/implied winning team id from its matches —
+    used both while a mix is still open (GameDetails.jsx's own
+    `currentWinnerTeamId`, to preview who finalize_mix would crown) and
+    by the post-close correction flow (Trello #257) to compute the new
+    winner after a match's score is edited, before calling
+    correct_finished_mix_match. Format-aware, NOT a bare call to
+    standings(): sobe_desce walks rounds backwards for the most recent
+    completed court-1 match before falling back to standings(); other
+    formats prefer a decided `phase === 'final'` match before the same
+    fallback. Americano has no single winning team (individual scoring
+    across rotating partners) and always returns null. */
+export function computeMixWinnerTeamId(game, teams, matches) {
+  if (game?.format === 'americano') return null
+  if (!matches.some(m => m.winner_team_id)) return null
+
+  const isSobeDesce = (game?.format || 'sobe_desce') === 'sobe_desce'
+  if (isSobeDesce) {
+    const maxRound = matches.length ? Math.max(...matches.map(m => m.round_number)) : 0
+    for (let r = maxRound; r >= 1; r--) {
+      const m = matches.find(mm => mm.round_number === r && mm.court_number === 1 && mm.winner_team_id)
+      if (m) return m.winner_team_id
+    }
+    return standings(teams, matches)[0]?.team?.id || null
+  }
+
+  const finalMatch = matches.find(m => m.phase === 'final' && m.winner_team_id)
+  if (finalMatch) return finalMatch.winner_team_id
+  return standings(teams, matches)[0]?.team?.id || null
+}
+
 /** Cross-pool seeding for the knockout phase: takes each pool's final
     standings (already-computed standings() results, one per pool, in pool
     order) and the number that advance per pool, and returns a flat ordered

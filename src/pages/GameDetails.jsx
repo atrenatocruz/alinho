@@ -15,7 +15,7 @@ import {
   roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches,
   PHASE_LABEL_KEY, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY,
   mixCapacity, isGenderMismatch, isMissingBirthday, isAgeIneligible, splitIntoPools,
-  generateAmericanoSchedule, americanoStandings,
+  generateAmericanoSchedule, americanoStandings, computeMixWinnerTeamId,
 } from '../lib/mixLogic'
 import { isProvisional } from '../lib/elo'
 import { AGE_LABEL_KEY, meetsAgeRestriction } from '../lib/ageCategories'
@@ -1119,21 +1119,9 @@ export default function GameDetails() {
 
   // Current leader — used both when the mix ends naturally (all rounds
   // played) and when the admin cuts it short early with "Terminar Mix".
-  const currentWinnerTeamId = isAmericano ? null : (() => {
-    if (!matches.some(m => m.winner_team_id)) return null
-    if (isSobeDesce) {
-      // most recent round with a completed court-1 match; falls back to the
-      // overall leader if the current round is still only partly scored
-      for (let r = maxRound; r >= 1; r--) {
-        const m = matches.find(mm => mm.round_number === r && mm.court_number === 1 && mm.winner_team_id)
-        if (m) return m.winner_team_id
-      }
-      return standings(teams, matches)[0]?.team?.id || null
-    }
-    const finalMatch = matches.find(m => m.phase === 'final' && m.winner_team_id)
-    if (finalMatch) return finalMatch.winner_team_id
-    return standings(teams, matches)[0]?.team?.id || null
-  })()
+  // Format-aware winner derivation, shared with the post-close correction
+  // flow (Trello #257) — see computeMixWinnerTeamId in mixLogic.js.
+  const currentWinnerTeamId = computeMixWinnerTeamId(game, teams, matches)
   const anyScoreSaved = matches.some(m => m.winner_team_id)
 
   const handleAdvance = async () => {
