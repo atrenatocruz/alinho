@@ -101,6 +101,7 @@ const EMPTY_GAME_FORM = {
   longitude: null,
   price_per_player: '',
   prize: '',
+  has_voucher: false,
   num_courts: 1,
   court_time_minutes: 90,
   game_time_minutes: 20,
@@ -596,6 +597,7 @@ export default function GerirClube() {
     location: game.location,
     price_per_player: game.price_per_player,
     prize: game.prize,
+    has_voucher: game.has_voucher,
     num_courts: game.num_courts,
     court_time_minutes: game.court_time_minutes,
     game_time_minutes: game.game_time_minutes,
@@ -724,6 +726,7 @@ export default function GerirClube() {
         location: game.location,
         price_per_player: game.price_per_player,
         prize: game.prize,
+        has_voucher: game.has_voucher,
         num_courts: game.num_courts,
         max_players: (game.num_courts || 1) * 4,
         court_time_minutes: game.court_time_minutes,
@@ -1278,6 +1281,7 @@ export default function GerirClube() {
       longitude: game.longitude ?? null,
       price_per_player: game.price_per_player ?? '',
       prize: game.prize || '',
+      has_voucher: game.has_voucher || false,
       num_courts: game.num_courts || 1,
       court_time_minutes: game.court_time_minutes || 90,
       game_time_minutes: game.game_time_minutes || 20,
@@ -1533,6 +1537,18 @@ export default function GerirClube() {
                         className="input-field"
                         placeholder={t('gerirclube.prize_placeholder')}
                       />
+                      <label className="flex items-center gap-3 cursor-pointer mt-3">
+                        <input
+                          type="checkbox"
+                          checked={gameForm.has_voucher}
+                          onChange={(e) => setGameForm({ ...gameForm, has_voucher: e.target.checked })}
+                          className="w-5 h-5"
+                        />
+                        <span className="text-sm text-ink-900">{t('gerirclube.has_voucher_label')}</span>
+                      </label>
+                      {gameForm.has_voucher && (
+                        <p className="text-[11px] text-muted mt-1">{t('gerirclube.has_voucher_hint')}</p>
+                      )}
                     </div>
 
                     <div>
