@@ -1,6 +1,6 @@
 # Desambiguação de mixes no WhatsApp (2+ mixes abertos ao mesmo tempo) — design
 
-Data: 2026-09-14. Decisão de Francisco, a partir de um caso real vivido por ele próprio (print da mensagem colada na conversa).
+Data: 2026-09-14. Decisão de Francisco, a partir de um caso real vivido por ele próprio (print da mensagem colada na conversa). Contributo do Ruben: comando de listagem à parte, combinar identificadores na mesma frase, e usar o nível do mix como identificador.
 
 ## O problema
 
@@ -38,12 +38,19 @@ Além do reply (ponto 2) e do número (ponto 3), o bot também aceita, tudo no m
 - A data
 - A hora
 - Um pedaço do local
+- **O nível do mix** (`m4`, `m5`...) — campo `games.level`, já usado hoje em `MIX_LEVELS` (GerirClube.jsx) (ideia do Ruben, 14 set 2026).
 
 O bot testa o texto a seguir a `in`/`out`/`alinho` contra estes campos de cada mix aberto. Se bater certo com **exatamente um**, resolve direto. Se bater com **dois ou mais** (ex.: dois mixes à segunda-feira, horas diferentes, e a pessoa só escreveu "segunda"), o bot não adivinha — volta a perguntar, mostrando a lista outra vez para a pessoa ser mais específica.
+
+**Combinar vários identificadores na mesma frase** (Ruben, 14 set 2026 — "a semântica é melhor"): não é só um identificador de cada vez. `in terça 19h`, `in segunda 21`, `in segunda m4` são todos válidos — o bot procura, no texto a seguir à palavra de ação, todos os identificadores reconhecíveis (dia, hora, nível, pedaço do local, etc.) e filtra os mixes abertos por TODOS os que encontrar em conjunto, não só o primeiro. Isto resolve por si só casos que um identificador sozinho não resolve — ex.: dois mixes à segunda-feira, um M4 e outro M5, ficam ambíguos com só "segunda" mas resolvem-se com "segunda m4".
 
 ### 4a. Funciona com ou sem espaço entre a palavra e o identificador
 
 O `parseCommand` atual (ver "O problema", ponto 3) só reconhece o identificador com um espaço a separar (`in 7291`). A correção cobre as duas formas — `in 01` e `in01`, `alinho segunda` e `alinhosegunda` — em vez de depender de as pessoas acertarem no espaço.
+
+### 4b. Comando `mix` — só para ver a lista, sem tentar entrar em nada
+
+Ideia do Ruben, 14 set 2026: um comando novo, à parte de `in`/`out`, só para consultar. Escreves `mix` e o bot responde com quantos mixes há abertos e uma lista curta (dia + identificador de cada um), sem inscrever em nada — só para saberes o que existe antes de decidires. Útil quando nem sabes ao certo quantos mixes estão abertos naquele momento.
 
 ### 5. `in` sozinho, sem mais nada, com 2+ mixes abertos
 
