@@ -9,7 +9,7 @@ import { hashPhone } from '../lib/hashPhone'
 import { uploadAvatar, removeAvatar } from '../lib/avatarStorage'
 import { getMyPrivateMatches, getGlobalRankings } from '../lib/privateMatches'
 import { getFollowCounts } from '../lib/follows'
-import { PrimaryButton, GuestBadge, DateField, Avatar, Select, EmptyState, RatingBadge, PhotoViewerModal, FollowListModal, AchievementCard, VoucherCard } from '../components/ui'
+import { PrimaryButton, GuestBadge, DateField, Avatar, Select, EmptyState, RatingBadge, PhotoViewerModal, FollowListModal, AchievementCard, VoucherCard, VoucherQRModal } from '../components/ui'
 import { CATEGORY_ORDER } from '../lib/achievements'
 import { formatRating, formatRatingMaybeProvisional, isProvisional, bandProgress, ratingBand } from '../lib/elo'
 import { countryOptions, countryName } from '../lib/countries'
@@ -65,6 +65,7 @@ export default function Profile() {
   const [mixHistoryLoading, setMixHistoryLoading] = useState(true)
   const [vouchers, setVouchers] = useState([])
   const [vouchersLoading, setVouchersLoading] = useState(true)
+  const [qrVoucher, setQrVoucher] = useState(null)
   const [privateMatchHistory, setPrivateMatchHistory] = useState([])
   const [privateMatchHistoryLoading, setPrivateMatchHistoryLoading] = useState(true)
   const [globalRank, setGlobalRank] = useState(null)
@@ -219,6 +220,15 @@ export default function Profile() {
     setVouchers((prev) => prev.map((v) => (
       v.id === voucherId ? { ...v, status: 'usado', used_at: new Date().toISOString() } : v
     )))
+  }
+
+  // Only a por_usar voucher ever has a QR to show — VoucherCard itself
+  // never calls this for a usado one (its onClick is undefined in that
+  // state), but this stays honest about the precondition rather than
+  // relying solely on the caller.
+  const handleShowVoucherQR = (v) => {
+    if (v.status !== 'por_usar') return
+    setQrVoucher({ id: v.id, gameTitle: v.game?.title || '', organizationName: v.game?.organization?.name || '' })
   }
 
   const loadMixHistory = async () => {
@@ -1216,11 +1226,16 @@ export default function Profile() {
                   status={v.status}
                   usedAtLabel={v.used_at ? formatDateLib(v.used_at, i18n.language, { day: '2-digit', month: 'short', year: 'numeric' }) : ''}
                   onMarkUsed={() => handleMarkVoucherUsed(v.id)}
+                  onShowQR={() => handleShowVoucherQR(v)}
                 />
               ))}
             </div>
           )
         )
+      )}
+
+      {qrVoucher && (
+        <VoucherQRModal voucher={qrVoucher} onClose={() => setQrVoucher(null)} />
       )}
     </div>
   )
