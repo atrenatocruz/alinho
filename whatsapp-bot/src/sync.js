@@ -57,6 +57,13 @@ async function postGroupRoster(sendText, getGroupMentions, group, { tagAll = fal
   const total = mixStates.length
   const seenGameIds = new Set()
   const mentions = tagAll && total > 0 ? await getGroupMentions(group.groupJid) : null
+  // At most one @all per flush, however many mixes' messages end up
+  // resent in it — without this, a mix inserted earlier than others
+  // shifts every later mix's positional label (01/02...), which changes
+  // their hash and resends them too, and each resend would otherwise
+  // carry its own @all ping for what should read as one "new mix"
+  // notification (Trello #253 review).
+  let taggedThisFlush = false
 
   for (let i = 0; i < mixStates.length; i++) {
     const state = mixStates[i]
@@ -76,9 +83,11 @@ async function postGroupRoster(sendText, getGroupMentions, group, { tagAll = fal
     const promo = promotedByGameId.get(gameId)
     const promoText = promo ? `${t('promoted_to_confirmed', promo.lang ?? 'pt', { name: promo.name })}\n\n` : ''
     const text = promoText + baseText
-    const fullText = tagAll ? `📢 @all\n\n${text}` : text
+    const shouldTagThis = tagAll && !taggedThisFlush
+    const fullText = shouldTagThis ? `📢 @all\n\n${text}` : text
 
-    const messageId = await sendText(group.groupJid, fullText, tagAll ? { mentions } : {})
+    const messageId = await sendText(group.groupJid, fullText, shouldTagThis ? { mentions } : {})
+    if (shouldTagThis) taggedThisFlush = true
     st.mixes.set(gameId, { hash: nextHash, messageId })
     if (messageId) recordMixMessage(messageId, gameId)
   }

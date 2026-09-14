@@ -160,6 +160,7 @@ function mixMatchesToken(mix, token, label) {
   }
 
   if (mix.location && token.length >= 3 && stripAccents(mix.location.toLowerCase()).includes(token)) return true
+  if (mix.title && token.length >= 3 && stripAccents(mix.title.toLowerCase()).includes(token)) return true
 
   return false
 }
@@ -469,7 +470,11 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message, qu
     // something else entirely) — degrade to normal text parsing below.
   }
 
-  if (openMixes.length === 1) {
+  // Only take this shortcut when no identifier was typed — otherwise a
+  // sender naming a specific (possibly already-closed) mix while exactly
+  // one happens to be open would get silently redirected to it instead of
+  // the "not found" reply step 2 below would give (Trello #253 review).
+  if (openMixes.length === 1 && !rest) {
     await actOnGame(openMixes[0], resolvedProfile)
     return
   }
