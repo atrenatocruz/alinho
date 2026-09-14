@@ -573,6 +573,39 @@ export function AchievementCard({ achievementKey, category, rarity, earned = fal
   )
 }
 
+/* ─── VoucherCard ─────────────────────────────────────────────────────────
+   A voucher won for finishing a has_voucher mix as the winning team.
+   Presentational only — gameDate/usedAtLabel arrive pre-formatted from the
+   caller (Profile.jsx already has a formatMixDate-style helper for mix
+   dates; reuse it, and the same formatting for usedAt), so this component
+   needs i18n only for its own status/action labels. Visual grammar
+   mirrors AchievementCard: rounded card, border/fill driven by state, a
+   status pill — 'por_usar' gets the brand lime accent and an action;
+   'usado' is grayed out and inert. */
+export function VoucherCard({ prizeText, gameTitle, gameDate, organizationName, status, usedAtLabel, onMarkUsed }) {
+  const { t } = useTranslation()
+  const used = status === 'usado'
+  return (
+    <div className={`rounded-2xl border-2 p-4 bg-surface ${used ? 'border-ink-100 opacity-70' : 'border-lime-400 shadow-card'}`}>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] font-mono font-extrabold uppercase tracking-wide text-muted truncate">{organizationName}</p>
+        <span className={`px-1.5 py-px rounded-full text-[9px] font-mono font-extrabold uppercase tracking-wide ${used ? 'bg-ink-50 text-muted' : 'bg-lime-100 text-lime-700'}`}>
+          {t(`profile.voucher_status_${status}`)}
+        </span>
+      </div>
+      <p className="mt-1 text-sm font-extrabold text-ink-900">{gameTitle}</p>
+      <p className="text-[11px] text-muted">{gameDate}</p>
+      <p className="mt-2 text-sm text-ink-900 leading-snug">{prizeText}</p>
+      {!used && (
+        <button onClick={onMarkUsed} className="mt-3 text-[12px] font-extrabold text-lime-700 press">
+          {t('profile.voucher_mark_used_action')}
+        </button>
+      )}
+      {used && <p className="mt-3 text-[10px] text-ink-200">{t('profile.voucher_used_at', { date: usedAtLabel })}</p>}
+    </div>
+  )
+}
+
 /* ─── PhotoViewerModal ───────────────────────────────────────────────────
    Full-screen tap-to-zoom viewer for a profile photo, Instagram-style —
    dark backdrop, image scaled to fit, tap anywhere or the X to close.
