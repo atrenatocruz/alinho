@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { MapPin, CheckCircle2, ChevronRight, ChevronDown, ChevronLeft, Lock, Play, Calendar, X, Share2, MessageCircle, Link2, ImageDown, Trophy, Repeat, Euro, Swords, Users } from 'lucide-react'
+import { MapPin, CheckCircle2, ChevronRight, ChevronDown, ChevronLeft, Lock, Play, Calendar, X, Share2, MessageCircle, Link2, ImageDown, Trophy, Repeat, Euro, Swords, Users, Ticket } from 'lucide-react'
 import ShareCard, { CARD_W, CARD_H } from './ShareCard'
 import { ratingBand, groupRatingBand } from '../lib/elo'
 import { achievementIcon, RARITY_META } from '../lib/achievements'
@@ -578,30 +578,50 @@ export function AchievementCard({ achievementKey, category, rarity, earned = fal
    Presentational only — gameDate/usedAtLabel arrive pre-formatted from the
    caller (Profile.jsx already has a formatMixDate-style helper for mix
    dates; reuse it, and the same formatting for usedAt), so this component
-   needs i18n only for its own status/action labels. Visual grammar
-   mirrors AchievementCard: rounded card, border/fill driven by state, a
-   status pill — 'por_usar' gets the brand lime accent and an action;
-   'usado' is grayed out and inert. */
+   needs i18n only for its own status/action labels.
+
+   Visual grammar borrows two things already established elsewhere rather
+   than inventing new ones: MixCard's left-edge accent bar for "this one
+   needs you" (here: near-black, not lime — see below), and .card's own
+   header/body divider convention (a plain `line` hairline, not a dashed
+   one — dashed is reserved system-wide for empty/provisional/guest, and a
+   won voucher is never that). One Ball Rule: lime is spent once per card,
+   on the actual call to action — not repeated across a border, a bar and
+   a pill, which would just be the same "this is actionable" fact said
+   three times. */
 export function VoucherCard({ prizeText, gameTitle, gameDate, organizationName, status, usedAtLabel, onMarkUsed }) {
   const { t } = useTranslation()
   const used = status === 'usado'
   return (
-    <div className={`rounded-2xl border-2 p-4 bg-surface ${used ? 'border-ink-100 opacity-70' : 'border-lime-400 shadow-card'}`}>
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-[11px] font-mono font-extrabold uppercase tracking-wide text-muted truncate">{organizationName}</p>
-        <span className={`px-1.5 py-px rounded-full text-[9px] font-mono font-extrabold uppercase tracking-wide ${used ? 'bg-ink-50 text-muted' : 'bg-lime-100 text-lime-700'}`}>
+    <div className={`card relative overflow-hidden ${used ? 'shadow-none' : 'shadow-lift'}`}>
+      <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${used ? 'bg-ink-100' : 'bg-ink-900'}`} />
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className={`flex items-center gap-1.5 text-[11px] font-mono font-extrabold uppercase tracking-wide truncate ${used ? 'text-ink-200' : 'text-muted'}`}>
+            <Ticket size={12} className="shrink-0" />
+            {organizationName}
+          </p>
+          <p className={`mt-1 text-base font-extrabold truncate ${used ? 'text-ink-200' : 'text-ink-900'}`}>{gameTitle}</p>
+          <p className={`text-[11px] ${used ? 'text-ink-200' : 'text-muted'}`}>{gameDate}</p>
+        </div>
+        <span className={`shrink-0 px-2 py-1 rounded-full text-[9px] font-mono font-extrabold uppercase tracking-wide ${used ? 'bg-ink-50 text-ink-200' : 'bg-ink-900 text-canvas'}`}>
           {t(`profile.voucher_status_${status}`)}
         </span>
       </div>
-      <p className="mt-1 text-sm font-extrabold text-ink-900">{gameTitle}</p>
-      <p className="text-[11px] text-muted">{gameDate}</p>
-      <p className="mt-2 text-sm text-ink-900 leading-snug">{prizeText}</p>
-      {!used && (
-        <button onClick={onMarkUsed} className="mt-3 text-[12px] font-extrabold text-lime-700 press">
-          {t('profile.voucher_mark_used_action')}
-        </button>
+
+      {prizeText && (
+        <p className={`mt-3 pt-3 border-t border-line text-sm leading-snug ${used ? 'text-ink-200' : 'text-ink-900 font-semibold'}`}>
+          {prizeText}
+        </p>
       )}
-      {used && <p className="mt-3 text-[10px] text-ink-200">{t('profile.voucher_used_at', { date: usedAtLabel })}</p>}
+
+      {!used ? (
+        <PrimaryButton onClick={onMarkUsed} className="mt-3 w-full">
+          {t('profile.voucher_mark_used_action')}
+        </PrimaryButton>
+      ) : (
+        <p className="mt-3 text-[10px] text-ink-200">{t('profile.voucher_used_at', { date: usedAtLabel })}</p>
+      )}
     </div>
   )
 }
