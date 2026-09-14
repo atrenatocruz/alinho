@@ -435,38 +435,42 @@ export default function PlayerDetails() {
           próprio (só nome + pontos). Não gated por results_visibility nem
           activity_visibility — lado preferido nunca foi um resultado, e
           saber isso é o motivo principal de visitar o perfil de alguém
-          antes de o convidar (decisão original, 9 set 2026, mantida). */}
-      {(player.preferred_side || playerExtras?.nationality || GENDER_LABEL_KEY[playerExtras?.gender] || AGE_LABEL_KEY[playerExtras?.age_category]) && (
-        <div className="card">
-          <h3 className="text-lg text-ink-900 mb-3">{t('playerdetails.about_heading')}</h3>
-          <div className="space-y-3">
-            <div>
-              <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('profile.preferred_side_label')}</p>
-              <p className="text-base text-ink-900 mt-0.5">
-                {t(SIDE_LABEL_KEY[player.preferred_side] || SIDE_LABEL_KEY.both)}
-              </p>
-            </div>
-            {playerExtras?.nationality && (
-              <div>
-                <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('profile.nationality_label')}</p>
-                <p className="text-base text-ink-900 mt-0.5">{countryName(playerExtras.nationality, i18n.language)}</p>
-              </div>
-            )}
-            {GENDER_LABEL_KEY[playerExtras?.gender] && (
-              <div>
-                <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('profile.gender_label')}</p>
-                <p className="text-base text-ink-900 mt-0.5">{t(GENDER_LABEL_KEY[playerExtras.gender])}</p>
-              </div>
-            )}
-            {AGE_LABEL_KEY[playerExtras?.age_category] && (
-              <div>
-                <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('playerdetails.age_category_label')}</p>
-                <p className="text-base text-ink-900 mt-0.5">{t(AGE_LABEL_KEY[playerExtras.age_category])}</p>
-              </div>
-            )}
+          antes de o convidar (decisão original, 9 set 2026, mantida).
+          Sempre visível (sem condição no card): lado preferido tem sempre
+          um valor a mostrar, com fallback "Ambos" — gatear o card inteiro
+          por ele fazia-o desaparecer por completo nos perfis sem
+          nacionalidade/género/escalão preenchidos, perdendo precisamente
+          o campo que motivou o card existir (achado de code review, 14
+          set 2026). */}
+      <div className="card">
+        <h3 className="text-lg text-ink-900 mb-3">{t('playerdetails.about_heading')}</h3>
+        <div className="space-y-3">
+          <div>
+            <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('profile.preferred_side_label')}</p>
+            <p className="text-base text-ink-900 mt-0.5">
+              {t(SIDE_LABEL_KEY[player.preferred_side] || SIDE_LABEL_KEY.both)}
+            </p>
           </div>
+          {playerExtras?.nationality && (
+            <div>
+              <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('profile.nationality_label')}</p>
+              <p className="text-base text-ink-900 mt-0.5">{countryName(playerExtras.nationality, i18n.language)}</p>
+            </div>
+          )}
+          {GENDER_LABEL_KEY[playerExtras?.gender] && (
+            <div>
+              <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('profile.gender_label')}</p>
+              <p className="text-base text-ink-900 mt-0.5">{t(GENDER_LABEL_KEY[playerExtras.gender])}</p>
+            </div>
+          )}
+          {AGE_LABEL_KEY[playerExtras?.age_category] && (
+            <div>
+              <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('playerdetails.age_category_label')}</p>
+              <p className="text-base text-ink-900 mt-0.5">{t(AGE_LABEL_KEY[playerExtras.age_category])}</p>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {/* XP DE ATIVIDADE — painel claro separado (público, como o tab
           Assiduidade). */}

@@ -1025,6 +1025,8 @@ export default function Profile() {
                   onClick={() => {
                     setEditing(false)
                     setName(profile.name)
+                    setPreferredSide(profile.preferred_side || 'both')
+                    setNationality(profile.nationality || '')
                     setBirthday(profile.birthday || '')
                     setGender(profile.gender || '')
                     setLanguage(profile.language || 'pt')
