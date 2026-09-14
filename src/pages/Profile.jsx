@@ -1205,22 +1205,18 @@ export default function Profile() {
               subtitle={t('profile.vouchers_empty_subtitle')}
             />
           ) : (
-            <div className="pt-1">
-              {sortVouchersForWallet(vouchers).map((v, i, arr) => (
-                <div
+            <div className="space-y-3">
+              {sortVouchersForWallet(vouchers).map((v) => (
+                <VoucherCard
                   key={v.id}
-                  style={{ marginTop: i === 0 ? 0 : -16, zIndex: arr.length - i, position: 'relative' }}
-                >
-                  <VoucherCard
-                    prizeText={v.game?.prize || ''}
-                    gameTitle={v.game?.title || ''}
-                    gameDate={v.game?.date ? formatDateLib(v.game.date, i18n.language, { day: '2-digit', month: 'short', year: 'numeric' }) : ''}
-                    organizationName={v.game?.organization?.name || ''}
-                    status={v.status}
-                    usedAtLabel={v.used_at ? formatDateLib(v.used_at, i18n.language, { day: '2-digit', month: 'short', year: 'numeric' }) : ''}
-                    onMarkUsed={() => handleMarkVoucherUsed(v.id)}
-                  />
-                </div>
+                  prizeText={v.game?.prize || ''}
+                  gameTitle={v.game?.title || ''}
+                  gameDate={v.game?.date ? formatDateLib(v.game.date, i18n.language, { day: '2-digit', month: 'short', year: 'numeric' }) : ''}
+                  organizationName={v.game?.organization?.name || ''}
+                  status={v.status}
+                  usedAtLabel={v.used_at ? formatDateLib(v.used_at, i18n.language, { day: '2-digit', month: 'short', year: 'numeric' }) : ''}
+                  onMarkUsed={() => handleMarkVoucherUsed(v.id)}
+                />
               ))}
             </div>
           )
