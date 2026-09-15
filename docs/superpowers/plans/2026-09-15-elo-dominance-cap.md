@@ -6,6 +6,8 @@
 
 **Architecture:** Tudo continua no núcleo único já existente em Postgres (`apply_elo_pairing` / `apply_mix_elo`, `supabase/migration_elo_partner_shield.sql`). `apply_elo_pairing` **não muda** — o Elo por-jogo já desconta corretamente pela força do adversário. `apply_mix_elo` tira um snapshot do rating de cada jogador no início do mix (antes de qualquer delta desse mix) e usa-o, dos DOIS lados (o próprio e os adversários), para (a) taxar as derrotas específicas contra os premiados pelo seu `E` nesse jogo, em vez de pelo rating geral do pagador, e (b) aplicar um teto ao ganho total do mix quando a diferença média para os adversários é grande — a média de adversários é calculada diretamente em `apply_mix_elo`, a partir de `_elo_night.rating_before`, dentro do próprio loop de jogos (a mesma técnica já usada no passo de financiamento), não a partir de nada devolvido por `apply_elo_pairing`. Fecha com uma recalibração total do histórico (mesmo padrão de `migration_elo_backfill_v2.sql`).
 
+**Correção 2 de 2026-09-15 (revisão final de todo o branch):** o financiamento (secção B) tal como implementado normalizava sempre para financiar 100% do bónus (`- v_bonus_total * surprise_weight / v_weight_sum`), e corria DEPOIS do cap — dois problemas: (1) uma derrota "esperada" (surprise_weight baixo) só paga pouco em termos *relativos* ao grupo de pagadores, não em termos *absolutos*, por isso quando o grupo de pagadores é pequeno (ex.: só o Ruben perdeu contra o premiado) essa pessoa acaba a pagar o financiamento inteiro, podendo ficar pior do que no sistema antigo; (2) financiar o valor *antes* do cap tirar pontos ao grupo para pagar um bónus que depois é cortado para 5 sem esse excedente ser devolvido a ninguém. Correção: o cap passa a correr ANTES do financiamento (financia-se o bónus já cortado, não o bruto), e a fórmula de financiamento deixa de normalizar para financiar sempre 100% — usa a mesma escala do prémio (1% do próprio rating), pesada pelo `E`, e só é escalada para baixo (nunca para cima) se a soma ultrapassar o que é preciso financiar: `raw_tax_i = surprise_weight_i × 0.01 × rating_before_i`; `tax_i = -raw_tax_i × LEAST(1, v_bonus_total / SUM(raw_tax))`. Uma derrota totalmente esperada (surprise_weight ≈ 0) passa a pagar ~0 em absoluto, independentemente de quantos outros pagadores existem. O SQL abaixo já reflete as duas correções.
+
 **Correção de 2026-09-15 (ronda de fix 1/5, Task 1):** a primeira versão deste plano tinha `apply_elo_pairing` a devolver uma coluna extra (`opp_r`) calculada a partir do rating AO VIVO (`v_r_a`/`v_r_b`, que mudam ronda a ronda dentro do próprio mix), para `apply_mix_elo` usar na média de adversários do cap — violando a própria Global Constraint deste plano ("rating no início do mix, não o que vai mudando ronda a ronda"). O implementador que transcreveu a Task 1 apanhou a inconsistência ao comparar com a Global Constraint e reportou DONE_WITH_CONCERNS em vez de "corrigir" por conta própria. Ruling do controlador: remover a mudança a `apply_elo_pairing` por completo (fica exatamente como em `migration_elo_partner_shield.sql`, sem DROP/CREATE) e calcular a média de adversários do cap dentro de `apply_mix_elo`, a partir de `_elo_night.rating_before` — a mesma fonte já usada (corretamente) no passo de financiamento. Isto simplifica a migração (menos uma função a redefinir) e elimina o risco sobre `confirm_private_match`/`migration_elo_backfill_v2.sql` que a mudança de assinatura teria introduzido. O SQL abaixo já reflete a correção.
 
 **Tech Stack:** PL/pgSQL (Postgres/Supabase). Sem ORM nem migration runner neste repo — estes ficheiros só ficam ativos depois de alguém os colar manualmente no SQL Editor do Supabase, por esta ordem: `migration_elo_dominance_cap.sql` primeiro, `migration_elo_backfill_v3.sql` depois.
@@ -86,7 +88,7 @@ DECLARE
   v_s_a NUMERIC;
   v_had_matches BOOLEAN := FALSE;
   v_bonus_total NUMERIC;
-  v_weight_sum NUMERIC;
+  v_raw_tax_total NUMERIC;
   v_a_rating_before NUMERIC;
   v_b_rating_before NUMERIC;
   v_e_a_before NUMERIC;
@@ -167,10 +169,28 @@ BEGIN
                  + CASE WHEN n.played > 0 AND n.won = n.played THEN 0.005 ELSE 0 END)
                 * COALESCE((SELECT pr.rating FROM profiles pr WHERE pr.id = n.pid), 900)
       WHERE TRUE;
+    END IF;
 
-      -- Financiamento novo: paga quem perdeu ESPECIFICAMENTE contra um
-      -- premiado, pesado pelo E que já tinha nesse jogo (ratings de início
-      -- de mix) — não mais "quem tem mais rating no grupo".
+    -- Cap de dominância — corre ANTES do financiamento (2ª correção, ver
+    -- cabeçalho): só do lado de quem ganhou por ter, em média, adversários
+    -- muito mais fracos nesse mix — nunca no lado do azarão nem de quem
+    -- está a perder. Correndo aqui primeiro, o financiamento a seguir paga
+    -- o bónus já cortado, não o bruto.
+    UPDATE _elo_night n
+    SET bonus = bonus + LEAST(0,
+          (CASE WHEN g.gap >= 300 THEN 5 WHEN g.gap >= 150 THEN 15 END) - (n.delta + n.bonus))
+    FROM (
+      SELECT pid, (rating_before - opp_r_sum / NULLIF(played, 0)) AS gap
+      FROM _elo_night WHERE played > 0
+    ) g
+    WHERE g.pid = n.pid
+      AND g.gap >= 150
+      AND (n.delta + n.bonus) > 0;
+
+    IF p_winner_team_id IS NOT NULL THEN
+      -- Financiamento: paga quem perdeu ESPECIFICAMENTE contra um premiado,
+      -- pesado pelo E que já tinha nesse jogo (ratings de início de mix) —
+      -- não mais "quem tem mais rating no grupo".
       FOR m IN
         SELECT mt.winner_team_id, mt.team_a_id, mt.team_b_id,
                ta.player1_id AS a1, ta.player2_id AS a2,
@@ -202,31 +222,25 @@ BEGIN
         END IF;
       END LOOP;
 
+      -- v_bonus_total já reflete o cap (correu antes). A taxa de cada
+      -- pagador é absoluta (mesma escala do prémio, 1% do próprio rating,
+      -- pesada pelo E) e só é escalada para BAIXO se a soma ultrapassar o
+      -- que é preciso financiar — nunca para cima. Uma derrota totalmente
+      -- esperada (surprise_weight ≈ 0) paga ~0 em absoluto, seja qual for
+      -- o tamanho do grupo de pagadores (2ª correção, ver cabeçalho).
       SELECT COALESCE(SUM(bonus), 0) INTO v_bonus_total FROM _elo_night WHERE bonus > 0;
-      SELECT COALESCE(SUM(surprise_weight), 0) INTO v_weight_sum FROM _elo_night WHERE bonus = 0;
+      SELECT COALESCE(SUM(surprise_weight * 0.01 * rating_before), 0) INTO v_raw_tax_total
+      FROM _elo_night WHERE bonus = 0 AND surprise_weight > 0;
 
-      IF v_bonus_total > 0 AND v_weight_sum > 0 THEN
+      IF v_bonus_total > 0 AND v_raw_tax_total > 0 THEN
         UPDATE _elo_night
-        SET bonus = - v_bonus_total * surprise_weight / v_weight_sum
+        SET bonus = - (surprise_weight * 0.01 * rating_before) * LEAST(1, v_bonus_total / v_raw_tax_total)
         WHERE bonus = 0 AND surprise_weight > 0;
       END IF;
-      -- Se v_weight_sum = 0 (ninguém perdeu de forma surpreendente contra
-      -- os premiados), o bónus fica por financiar — aceite, ver cabeçalho.
+      -- Se v_raw_tax_total = 0 (ninguém perdeu de forma surpreendente
+      -- contra os premiados) ou ficar abaixo de v_bonus_total, o que sobra
+      -- fica por financiar — aceite, ver cabeçalho.
     END IF;
-
-    -- Cap de dominância: só do lado de quem ganhou por ter, em média,
-    -- adversários muito mais fracos nesse mix — nunca no lado do azarão
-    -- nem de quem está a perder.
-    UPDATE _elo_night n
-    SET bonus = bonus + LEAST(0,
-          (CASE WHEN g.gap >= 300 THEN 5 WHEN g.gap >= 150 THEN 15 END) - (n.delta + n.bonus))
-    FROM (
-      SELECT pid, (rating_before - opp_r_sum / NULLIF(played, 0)) AS gap
-      FROM _elo_night WHERE played > 0
-    ) g
-    WHERE g.pid = n.pid
-      AND g.gap >= 150
-      AND (n.delta + n.bonus) > 0;
 
     UPDATE _elo_night SET delta = delta + bonus WHERE bonus <> 0;
 
