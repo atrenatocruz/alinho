@@ -2,15 +2,14 @@
    Mix engine — pure tournament logic (no I/O, fully testable).
 
    Documented decisions:
-   - Solo pairing (Trello #162, reinstating part of former decision #4):
-     every solo is sorted by global club points (pointsById) descending.
-     Each player takes the closest-points remaining partner that is both
-     side-compatible (opposite preferred_side, or either side is 'both')
-     and not a repeat of last mix's pairing (repeatPairKeys). Side
-     preference is soft — never blocks a pairing — so it's relaxed first
-     (falling back to the closest-points non-repeat candidate regardless of
-     side) and repeat-avoidance is relaxed last (a repeat is only ever
-     accepted when nobody left is both non-repeat and unpaired).
+   - Solo pairing (Trello #162, revisto 2026-09-15 — repeat-avoidance passa
+     a ser uma busca com backtracking, não um greedy simples):
+     every solo is sorted by global club points (pointsById). A full
+     repeat-free matching is searched first (matchWithoutRepeats) — closest
+     points first, side preference as a soft secondary order — and only
+     when no such matching exists at all does formDuplas fall back to the
+     old closest-points greedy, which now records which pairs it was
+     forced to repeat (forcedRepeats) instead of doing so silently.
    - Dupla seed = Σ pointsById per player (same points used to pair them),
      so seedCourts (below) puts the highest-points duplas on court 1 down
      to the lowest-points duplas on the last court.
@@ -76,13 +75,48 @@ export const totalRounds = (game) =>
   Math.max(1, Math.floor((game.court_time_minutes || 90) / (game.game_time_minutes || 20)))
 
 /**
+ * Perfect-matching search over solos: tries to pair everyone without
+ * repeating a past partnership. At each step, tries candidates for the
+ * current player closest-points-first, side-compatible first then any
+ * side, and recurses; a candidate is only accepted once the rest of the
+ * list is proven completable without any repeat (recursive call returns
+ * non-null). Returns null when no fully repeat-free assignment exists for
+ * this list — the only signal formDuplas needs to fall back to the old
+ * greedy below.
+ */
+function matchWithoutRepeats(remaining, repeatPairKeys, sidesCompatible) {
+  if (remaining.length <= 1) return []
+  const [a, ...rest] = remaining
+  const pairKey = (x, y) => [x?.id, y?.id].sort().join('|')
+  const tiers = [
+    (b) => !repeatPairKeys.has(pairKey(a, b)) && sidesCompatible(a, b),
+    (b) => !repeatPairKeys.has(pairKey(a, b)),
+  ]
+  for (const passes of tiers) {
+    for (let i = 0; i < rest.length; i++) {
+      if (!passes(rest[i])) continue
+      const b = rest[i]
+      const others = [...rest.slice(0, i), ...rest.slice(i + 1)]
+      const completion = matchWithoutRepeats(others, repeatPairKeys, sidesCompatible)
+      if (completion) return [[a, b], ...completion]
+    }
+  }
+  return null
+}
+
+/**
  * Form duplas from confirmed participant rows.
- * Rows with partner keep their dupla; solos are sorted by global points
- * (pointsById) and paired closest-rank-first, preferring a candidate that's
- * both side-compatible and not a repeat of last mix's pairing
- * (repeatPairKeys) — side preference is relaxed first, repeat-avoidance
- * last, so neither ever leaves a player unpaired — see the file-header note.
- * Returns [{ player1, player2, seed }], seed = Σ points.
+ * Rows with partner keep their dupla; solos are sorted by global club points
+ * (pointsById) and matchWithoutRepeats above tries to pair everyone without
+ * ever repeating a partnership in repeatPairKeys — closest points first,
+ * side preference as a soft secondary order, backtracking whenever a choice
+ * would dead-end the rest of the list.
+ * Only when a fully repeat-free assignment is proven impossible for this
+ * group does it fall back to the old closest-points greedy (side
+ * preference relaxed first, repeat-avoidance last), recording exactly which
+ * pairs were forced to repeat so the caller can warn before locking teams
+ * in — see the file-header note.
+ * Returns { duplas: [{ player1, player2, seed }], forcedRepeats: [{ player1, player2 }] }.
  */
 export function formDuplas(participants, pointsById = {}, repeatPairKeys = new Set()) {
   const duplas = []
@@ -100,20 +134,33 @@ export function formDuplas(participants, pointsById = {}, repeatPairKeys = new S
   const sideOf = u => (u?.preferred_side === 'left' || u?.preferred_side === 'right') ? u.preferred_side : 'both'
   const sidesCompatible = (a, b) => sideOf(a) === 'both' || sideOf(b) === 'both' || sideOf(a) !== sideOf(b)
 
-  while (solos.length >= 2) {
-    const a = solos.shift()
-    let idx = solos.findIndex(candidate => !repeatPairKeys.has(pairKey(a, candidate)) && sidesCompatible(a, candidate))
-    if (idx === -1) idx = solos.findIndex(candidate => !repeatPairKeys.has(pairKey(a, candidate))) // side preference relaxed
-    if (idx === -1) idx = 0 // everyone left is a repeat — accept the closest rather than leave a gap
-    const b = solos.splice(idx, 1)[0]
-    duplas.push([a, b])
+  const forcedRepeats = []
+  let soloPairs = matchWithoutRepeats(solos, repeatPairKeys, sidesCompatible)
+
+  if (!soloPairs) {
+    soloPairs = []
+    const remaining = [...solos]
+    while (remaining.length >= 2) {
+      const a = remaining.shift()
+      let idx = remaining.findIndex(candidate => !repeatPairKeys.has(pairKey(a, candidate)) && sidesCompatible(a, candidate))
+      if (idx === -1) idx = remaining.findIndex(candidate => !repeatPairKeys.has(pairKey(a, candidate)))
+      if (idx === -1) idx = 0
+      const b = remaining.splice(idx, 1)[0]
+      if (repeatPairKeys.has(pairKey(a, b))) forcedRepeats.push([a, b])
+      soloPairs.push([a, b])
+    }
   }
 
-  return duplas.map(([p1, p2]) => ({
-    player1: p1,
-    player2: p2,
-    seed: pointsOf(p1) + pointsOf(p2),
-  }))
+  for (const pair of soloPairs) duplas.push(pair)
+
+  return {
+    duplas: duplas.map(([p1, p2]) => ({
+      player1: p1,
+      player2: p2,
+      seed: pointsOf(p1) + pointsOf(p2),
+    })),
+    forcedRepeats: forcedRepeats.map(([p1, p2]) => ({ player1: p1, player2: p2 })),
+  }
 }
 
 /** Sobe e desce ronda 1: melhores duplas no campo 1. */
