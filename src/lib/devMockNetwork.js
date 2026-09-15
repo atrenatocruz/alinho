@@ -100,6 +100,7 @@ const RPC_MOCKS = {
   // Vários admins (Trello #261). localStorage.mockAdminInvite = 'true' faz
   // aparecer no sino um convite para admin, para validar o texto.
   transfer_organization_ownership: () => null,
+  admin_set_organization_plan: () => null,
   invite_to_organization: () => 'pending',
   list_incoming_organization_invites: () => (localStorage.getItem('mockAdminInvite') === 'true'
     ? [{
@@ -116,7 +117,7 @@ const TABLE_MOCKS = {
   organizations: () => [{
     id: MOCK_ADMIN_ORG_ID, name: 'Dev Org', slug: 'dev-org', kind: 'group', self_serve: true,
     is_global: false, open_join: false, group_logo_url: null, description: '', location: '',
-    owner_id: MOCK_ADMIN_USER_ID,
+    owner_id: MOCK_ADMIN_USER_ID, plan_tier: localStorage.getItem('mockPlanTier') || 'pro',
   }],
   achievements: () => [
     { key: 'primeira_bola', category: 'jogo', rarity: 'comum', sort: 1 },

@@ -233,7 +233,11 @@ export default function Login() {
         </svg>
         <div className="relative">
           <h1 className="text-5xl text-white">
-            <Wordmark />
+            {/* Logo leva à página inicial, como no resto da app — sem sessão
+                o Login não tinha outra saída (Francisco, 15 set 2026). */}
+            <Link to="/" className="inline-block leading-none">
+              <Wordmark />
+            </Link>
           </h1>
           <p className="text-ink-200 mt-3">
             {mode === 'login' ? t('login.welcome_back') : t('login.create_account')}

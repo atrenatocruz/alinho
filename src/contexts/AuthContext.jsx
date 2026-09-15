@@ -17,6 +17,8 @@ const MOCK_ADMIN_PROFILE = {
   name: 'Admin (Dev)',
   gender: 'masculino',
   phone_hash: 'dev-bypass', // dummy — skips the mandatory-phone modal for the dev bypass
+  // localStorage.mockPlatformAdmin = 'true' → vê o seletor de plano no Gerir.
+  is_platform_admin: typeof localStorage !== 'undefined' && localStorage.getItem('mockPlatformAdmin') === 'true',
   // Rating fictício (11 set 2026) — sem isto o aro de progresso do Perfil
   // fica sempre vazio ("— pontos") em localhost. Ver devMockNetwork.js
   // para o resto dos dados fictícios (troféus, XP, ranking, etc.).
@@ -40,6 +42,8 @@ const MOCK_ADMIN_MEMBERSHIP = {
   organization: {
     id: MOCK_ADMIN_ORG_ID, name: 'Dev Org', slug: 'dev-org',
     kind: 'group', self_serve: true, owner_id: MOCK_ADMIN_USER.id,
+    // localStorage.mockPlanTier (free/plus/pro/club) para ver os 4 planos.
+    plan_tier: localStorage.getItem('mockPlanTier') || 'pro',
   },
 }
 
@@ -55,7 +59,7 @@ const MOCK_ADMIN_CLUB_MEMBERSHIP = {
   level: 'avançado',
   organization: {
     id: '00000000-0000-0000-0000-0000000000dd', name: 'Smash Padel Almada', slug: 'smash-padel',
-    kind: 'club', self_serve: false, owner_id: MOCK_ADMIN_USER.id,
+    kind: 'club', self_serve: false, owner_id: MOCK_ADMIN_USER.id, plan_tier: 'club',
   },
 }
 const mockAdminMemberships = () => (
@@ -485,6 +489,10 @@ export const AuthProvider = ({ children }) => {
   // stays stale until a full page reload.
   const refreshMemberships = async () => {
     if (!user) return
+    // Dev bypass: the fake admin has no profiles row, so reloading it ended
+    // on "Não foi possível carregar os teus dados" after any admin action
+    // (passar a posse, mudar plano). Keep the mock data instead.
+    if (import.meta.env.DEV && localStorage.getItem(MOCK_ADMIN_KEY) === 'true') return
     await loadProfile(user.id)
   }
 

@@ -539,14 +539,36 @@ export function OrgKindBadge({ kind, className = '' }) {
   const Icon = isGroup ? Users : Building2
   const look = isGroup ? 'bg-surface text-ink-700 border border-line' : 'bg-ink-900 text-white border border-ink-900'
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] leading-none font-extrabold uppercase tracking-widest shrink-0 ${look} ${className}`}>
-      <Icon size={11} strokeWidth={2.5} aria-hidden="true" />
+    <span className={`inline-flex items-center gap-1 rounded-full pl-2 pr-[7px] py-0.5 text-[10px] leading-[11px] font-extrabold uppercase tracking-widest shrink-0 ${look} ${className}`}>
+      <Icon size={11} strokeWidth={2.5} className="block shrink-0" aria-hidden="true" />
       {isGroup ? t('ui.org_kind_group') : t('ui.org_kind_club')}
     </span>
   )
 }
 
 export const orgAvatarShape = (kind) => (kind === 'group' ? 'round' : 'square')
+
+/* ─── PlanBadge ───────────────────────────────────────────────────────────
+   O plano do clube/grupo (organizations.plan_tier). Os nomes são nomes de
+   produto e não se traduzem (fechados 15 set 2026); as chaves internas não
+   mudam. Free fica discreto; os pagos no lime suave — nunca o lime cheio,
+   que é a cor dos botões. Sem maiúsculas, para não se confundir com a
+   etiqueta CLUBE/GRUPO ao lado. O plano não muda o tipo: um grupo pode
+   subscrever o Club e continua a ser grupo. */
+export const PLAN_TIERS = ['free', 'plus', 'pro', 'club']
+export const PLAN_NAMES = { free: 'Free', plus: 'Squad', pro: 'Community', club: 'Club' }
+export const planName = (tier) => PLAN_NAMES[tier] || PLAN_NAMES.free
+
+export function PlanBadge({ tier, className = '' }) {
+  const { t } = useTranslation()
+  const isFree = !tier || tier === 'free'
+  const look = isFree ? 'bg-canvas text-muted border border-line' : 'bg-lime-100 text-ink-900 border border-lime-400'
+  return (
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] leading-none font-extrabold shrink-0 normal-case tracking-normal ${look} ${className}`}>
+      {t('ui.plan_label', { name: planName(tier) })}
+    </span>
+  )
+}
 
 /* ─── AchievementCard ─────────────────────────────────────────────────────────
    Um troféu da estante: moldura e cores pela raridade (RARITY_META),

@@ -1369,5 +1369,16 @@
   "gerirclube.address_placeholder_group": "Morada ou nome do clube onde jogam",
   "gerirclube.instagram_placeholder_group": "@ogrupo",
   "gerirclube.website_placeholder_group": "ogrupo.pt",
-  "gerirclube.level_optional_label": "Nível (opcional)"
+  "gerirclube.level_optional_label": "Nível (opcional)",
+  "ui.plan_label": "Plano {{name}}",
+  "gerirclube.plan_heading": "Plano",
+  "gerirclube.plan_desc_free": "Para começar: grupo privado, jogos e mixes pequenos.",
+  "gerirclube.plan_desc_plus": "Para um grupo de amigos que organiza mixes com regularidade.",
+  "gerirclube.plan_desc_pro": "Para comunidades grandes: bot de WhatsApp, vários grupos de WhatsApp, vários admins, torneios e liga.",
+  "gerirclube.plan_desc_club": "Tudo do Community e, em breve, aulas, professores, reservas e pagamentos.",
+  "gerirclube.plan_contact_hint": "Para mudar de plano, fala connosco.",
+  "gerirclube.plan_change_label": "Mudar plano (admin da plataforma)",
+  "gerirclube.plan_change_hint": "Os grupos dentro deste clube mudam também.",
+  "gerirclube.plan_saved": "Plano mudado para {{name}}.",
+  "gerirclube.plan_save_error": "Não foi possível mudar o plano. Tenta outra vez."
 }

@@ -8,10 +8,10 @@ import { useAuth } from '../contexts/AuthContext'
 import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
 import { uploadClubLogo, removeClubLogo } from '../lib/clubLogoStorage'
 import { createGroup } from '../lib/platformAdmin'
-import { listClubGroups, getOrganizationDeleteBlocker, deleteSelfServeGroup, transferOrganizationOwnership } from '../lib/organizations'
+import { listClubGroups, getOrganizationDeleteBlocker, deleteSelfServeGroup, transferOrganizationOwnership, setOrganizationPlan } from '../lib/organizations'
 import { formatRating } from '../lib/elo'
 import { formatDate as formatDateLib, formatTime as formatTimeLib } from '../lib/formatDate'
-import { DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal, OrgKindBadge } from '../components/ui'
+import { DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal, OrgKindBadge, PlanBadge, PLAN_TIERS, planName } from '../components/ui'
 import { totalRounds, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, SCORING_FORMAT_LABEL_KEY } from '../lib/mixLogic'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
 import { AGE_RESTRICTIONS } from '../lib/ageCategories'
@@ -171,6 +171,8 @@ export default function GerirClube() {
   const [editingGame, setEditingGame] = useState(null)
   const [gameFilter, setGameFilter] = useState('upcoming')
   const [savingFlag, setSavingFlag] = useState(false)
+  const [savingPlan, setSavingPlan] = useState(false)
+  const [planMessage, setPlanMessage] = useState(null)
   const [editingName, setEditingName] = useState(false)
   const [nameInput, setNameInput] = useState('')
   const [renamingOrg, setRenamingOrg] = useState(false)
@@ -1370,6 +1372,27 @@ export default function GerirClube() {
     setRedeemSuccess(false)
   }
 
+  // Só admin da plataforma (a regra está no RPC, não só aqui). Muda o
+  // plano deste clube/grupo e dos grupos lá dentro; a etiqueta do topo e a
+  // lista do Gerir leem o mesmo campo, por isso atualizam-se as duas.
+  const handleSetPlan = async (planTier) => {
+    if (!settings || planTier === settings.plan_tier || savingPlan) return
+    setSavingPlan(true)
+    setPlanMessage(null)
+    try {
+      await setOrganizationPlan(settings.id, planTier)
+      setSettings((s) => ({ ...s, plan_tier: planTier }))
+      setOrg((o) => (o ? { ...o, plan_tier: planTier } : o))
+      setPlanMessage({ ok: true, text: t('gerirclube.plan_saved', { name: planName(planTier) }) })
+      refreshMemberships?.()
+    } catch (error) {
+      console.error('Error setting organization plan:', error)
+      setPlanMessage({ ok: false, text: t('gerirclube.plan_save_error') })
+    } finally {
+      setSavingPlan(false)
+    }
+  }
+
   const handleTogglePrivateMatches = async () => {
     setSavingFlag(true)
     try {
@@ -1491,11 +1514,19 @@ export default function GerirClube() {
   return (
     <div className="space-y-6">
       <div>
-        {/* Hidden inside settings/redeem: those screens have their own "Voltar"
-            (back to the games tab), and two stacked "Voltar" going to different
-            places read as the same button. */}
-        {(adminOrganizations.length > 1 || currentUser?.is_platform_admin) && activeTab !== 'settings' && activeTab !== 'redeem' && (
-          <button type="button" onClick={goBack} className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline mb-2">
+        {/* Um só "Voltar", sempre no topo (Francisco, 15 set 2026). Nas
+            Definições e no Validar voucher volta aos Jogos; nos Jogos/Membros
+            volta à página anterior (só quem tem mais de um clube/grupo). */}
+        {(activeTab === 'settings' || activeTab === 'redeem') ? (
+          <button
+            type="button"
+            onClick={() => { if (activeTab === 'redeem') handleResetRedeem(); setActiveTab('games') }}
+            className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline mb-6"
+          >
+            <ArrowLeft size={16} /> {t('gerirclube.back_button')}
+          </button>
+        ) : (adminOrganizations.length > 1 || currentUser?.is_platform_admin) && (
+          <button type="button" onClick={goBack} className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline mb-6">
             <ArrowLeft size={16} /> {t('common.back')}
           </button>
         )}
@@ -1504,10 +1535,7 @@ export default function GerirClube() {
             {/* "Gerir" as a small label above, so the title is the group's name
                 alone — as "Gerir: <nome>" it truncated to "Gerir: Grup…" on a
                 phone (Francisco, 15 set 2026). */}
-            <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted flex items-center gap-2">
-              {t('gerirclube.manage_label')}
-              {org?.kind && <OrgKindBadge kind={org.kind} />}
-            </p>
+            <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('gerirclube.manage_label')}</p>
             {editingName ? (
               <div className="flex items-center gap-2">
                 <input
@@ -1539,7 +1567,15 @@ export default function GerirClube() {
                 </button>
               </h2>
             )}
-            <p className="text-gray-600 mt-1">{t(kk('gerirclube.subtitle'))}</p>
+            {/* Etiqueta clube/grupo por baixo do nome, plano por baixo da frase —
+                tudo na mesma linha do GERIR ficava apertado (Francisco, 15 set 2026). */}
+            {org?.kind && (
+              <div className="mt-2"><OrgKindBadge kind={org.kind} /></div>
+            )}
+            <p className="text-gray-600 mt-2">{t(kk('gerirclube.subtitle'))}</p>
+            {org && (
+              <div className="mt-2"><PlanBadge tier={org.plan_tier} /></div>
+            )}
           </div>
           <button
             type="button"
@@ -2400,16 +2436,36 @@ export default function GerirClube() {
               instead of closing an overlay. */}
           {activeTab === 'settings' && settings && (
             <div>
-              <button
-                type="button"
-                onClick={() => setActiveTab('games')}
-                className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline mb-4"
-              >
-                <ArrowLeft size={16} /> {t('gerirclube.back_button')}
-              </button>
               <h3 className="text-xl font-semibold text-ink-900 mb-6">
                 {t(kk('gerirclube.settings_heading'))}
               </h3>
+
+              {/* Plano — primeiro das Definições, para o admin saber o que
+                  tem. Sem pagamentos ainda: quem não é admin da plataforma
+                  só vê o plano e como pedir para mudar. */}
+              <div className="mb-6 p-4 rounded-card border border-line bg-surface">
+                <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('gerirclube.plan_heading')}</p>
+                <p className="mt-1 text-2xl font-extrabold text-ink-900">{planName(settings.plan_tier)}</p>
+                <p className="mt-1 text-sm text-ink-700">{t(`gerirclube.plan_desc_${PLAN_TIERS.includes(settings.plan_tier) ? settings.plan_tier : 'free'}`)}</p>
+                {currentUser?.is_platform_admin ? (
+                  <div className="mt-4">
+                    <p className="text-sm font-medium text-gray-700 mb-2">{t('gerirclube.plan_change_label')}</p>
+                    <Segmented
+                      options={PLAN_TIERS.map((tier) => ({ value: tier, label: planName(tier) }))}
+                      value={settings.plan_tier || 'free'}
+                      onChange={handleSetPlan}
+                    />
+                    {settings.parent_organization_id == null && settings.kind !== 'group' && (
+                      <p className="mt-2 text-[11px] text-muted">{t('gerirclube.plan_change_hint')}</p>
+                    )}
+                    {planMessage && (
+                      <p className={`mt-2 text-sm font-extrabold ${planMessage.ok ? 'text-ok' : 'text-danger'}`}>{planMessage.text}</p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-[11px] text-muted">{t('gerirclube.plan_contact_hint')}</p>
+                )}
+              </div>
 
               <form onSubmit={handleUpdateSettings} className="space-y-6">
                 <div>
@@ -2847,13 +2903,6 @@ export default function GerirClube() {
               Key Decisions). */}
           {activeTab === 'redeem' && (
             <div>
-              <button
-                type="button"
-                onClick={() => { setActiveTab('games'); handleResetRedeem() }}
-                className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline mb-4"
-              >
-                <ArrowLeft size={16} /> {t('gerirclube.back_button')}
-              </button>
               <h3 className="text-xl font-semibold text-ink-900 mb-6">{t('gerirclube.redeem_heading')}</h3>
 
               {scanLookupState !== 'found' && (

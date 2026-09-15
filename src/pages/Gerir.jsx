@@ -4,7 +4,7 @@ import { Settings, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { Avatar, EmptyState, PrimaryButton, OrgKindBadge, orgAvatarShape } from '../components/ui'
+import { Avatar, EmptyState, PrimaryButton, OrgKindBadge, PlanBadge, orgAvatarShape } from '../components/ui'
 import PlayerSearch from '../components/PlayerSearch'
 import { searchAnyPlayer, createOrganization, createGroup } from '../lib/platformAdmin'
 import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
@@ -250,8 +250,9 @@ export default function Gerir() {
                 <Avatar name={org.name} url={org.group_logo_url} size="w-11 h-11 text-sm" shape={orgAvatarShape(org.kind)} />
                 <div className="flex-1 min-w-0">
                   <h3 className="font-extrabold text-ink-900 truncate">{org.name}</h3>
-                  <div className="mt-1">
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
                     <OrgKindBadge kind={org.kind} />
+                    <PlanBadge tier={org.plan_tier} />
                   </div>
                 </div>
                 {pendingCount > 0 && (
