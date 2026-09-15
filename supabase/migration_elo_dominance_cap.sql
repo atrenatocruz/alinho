@@ -10,7 +10,7 @@
 -- perdido de forma surpreendente contra alguém.
 --
 -- Duas mudanças, ambas dentro de apply_mix_elo (o Elo por-jogo em
--- apply_elo_pairing não muda — já desconta corretamente pela força do
+-- apply_elo_pairing NÃO MUDA — já desconta corretamente pela força do
 -- adversário via E_a; só o bónus fixo por cima é que não descontava):
 --
 --   A. CAP no ganho total do mix (Elo + bónus somados), só do lado de quem
@@ -19,10 +19,14 @@
 --        diferença média para os adversários < 150  -> sem teto
 --        150-300                                    -> teto de 15 pontos
 --        >= 300                                      -> teto de 5 pontos
---      "diferença média" usa o rating de CADA jogador no INÍCIO do mix
---      (antes de qualquer delta desse mix), não o que vai mudando ronda a
---      ronda -- para isso, apply_mix_elo tira agora um snapshot logo à
---      entrada.
+--      "diferença média" usa o rating de CADA jogador (o próprio E os
+--      adversários) no INÍCIO do mix (antes de qualquer delta desse mix),
+--      não o que vai mudando ronda a ronda -- por isso apply_mix_elo tira
+--      um snapshot logo à entrada (rating_before) e usa-o dos dois lados;
+--      a média de adversários é calculada dentro do próprio loop de jogos,
+--      a partir desse snapshot, não a partir de nada devolvido por
+--      apply_elo_pairing (que continua a usar rating AO VIVO para o Elo em
+--      si — correto para o Elo, errado se fosse usado para o cap).
 --
 --   B. Financiamento do bónus deixa de ser proporcional ao rating do
 --      pagador. Passa a ser proporcional a quão inesperada foi a derrota
@@ -33,95 +37,10 @@
 --      perdeu de forma surpreendente contra os premiados, o bónus fica por
 --      financiar -- o cap A já limita esse cenário a valores pequenos.
 --
--- apply_elo_pairing precisa de devolver também a força média da equipa
--- adversária de cada jogador (opp_r), para apply_mix_elo poder calcular a
--- média de adversários do cap sem reconsultar profiles jogo a jogo. Muda
--- a forma da tabela devolvida -> DROP primeiro (mesmo padrão já usado em
--- migration_elo_partner_shield.sql); colunas extra são inofensivas para
--- confirm_private_match e para o backfill, que só leem campos por nome.
+-- apply_elo_pairing não precisa de mudar nada para isto: fica exatamente
+-- como em migration_elo_partner_shield.sql, sem DROP/CREATE, sem risco
+-- para confirm_private_match nem para migration_elo_backfill_v2.sql.
 -- ════════════════════════════════════════════════════════════════════════
-
-DROP FUNCTION IF EXISTS apply_elo_pairing(UUID, UUID, UUID, UUID, NUMERIC, BOOLEAN);
-
-CREATE OR REPLACE FUNCTION apply_elo_pairing(
-  p_a1 UUID, p_a2 UUID, p_b1 UUID, p_b2 UUID, p_s_a NUMERIC,
-  p_partner_chosen BOOLEAN DEFAULT TRUE
-)
-RETURNS TABLE (pid UUID, delta NUMERIC, s NUMERIC, opp_r NUMERIC) AS $$
-DECLARE
-  pl RECORD;
-  v_r_a NUMERIC;
-  v_r_b NUMERIC;
-  v_e_a NUMERIC;
-  v_w NUMERIC;
-  v_share NUMERIC;
-  v_k INTEGER;
-  v_delta NUMERIC;
-BEGIN
-  SELECT AVG(COALESCE(pr.rating, 900)) INTO v_r_a
-  FROM unnest(ARRAY[p_a1, p_a2]) AS u(player_id)
-  JOIN profiles pr ON pr.id = u.player_id;
-  SELECT AVG(COALESCE(pr.rating, 900)) INTO v_r_b
-  FROM unnest(ARRAY[p_b1, p_b2]) AS u(player_id)
-  JOIN profiles pr ON pr.id = u.player_id;
-  IF v_r_a IS NULL OR v_r_b IS NULL THEN
-    RETURN;
-  END IF;
-
-  v_e_a := 1 / (1 + power(10::numeric, (v_r_b - v_r_a) / 400));
-
-  FOR pl IN
-    SELECT t.player_id,
-           CASE WHEN t.is_a THEN p_s_a ELSE 1 - p_s_a END AS side_s,
-           CASE WHEN t.is_a THEN v_e_a ELSE 1 - v_e_a END AS side_e,
-           CASE WHEN t.is_a THEN v_r_b ELSE v_r_a END AS side_opp_r,
-           COALESCE(pr.rating, 900) AS r,
-           pr.rating_games,
-           (SELECT COALESCE(pr2.rating, 900) FROM profiles pr2 WHERE pr2.id = t.partner) AS partner_r,
-           (SELECT pr2.rating_games FROM profiles pr2 WHERE pr2.id = t.partner) AS partner_games
-    FROM (VALUES (p_a1, p_a2, TRUE), (p_a2, p_a1, TRUE),
-                 (p_b1, p_b2, FALSE), (p_b2, p_b1, FALSE)) AS t(player_id, partner, is_a)
-    JOIN profiles pr ON pr.id = t.player_id
-  LOOP
-    IF pl.partner_r IS NULL OR pl.side_s <> 1 THEN
-      v_share := 0.5;
-    ELSE
-      v_w := LEAST(0.65, GREATEST(0.35, pl.partner_r / NULLIF(pl.r + pl.partner_r, 0)));
-      v_share := COALESCE(v_w, 0.5);
-    END IF;
-
-    v_k := CASE WHEN pl.rating_games < 5 THEN 40
-                WHEN pl.rating_games < 20 THEN 30
-                ELSE 20 END;
-
-    v_delta := v_k * (pl.side_s - pl.side_e) * v_share * 2;
-
-    IF pl.rating_games >= 5 AND pl.partner_games IS NOT NULL AND pl.partner_games < 5 THEN
-      IF p_partner_chosen THEN
-        v_delta := v_delta * 0.5;
-      ELSE
-        v_delta := CASE WHEN v_delta < 0 THEN 0
-                        ELSE v_delta * 0.5 END;
-      END IF;
-    END IF;
-
-    UPDATE profiles
-    SET rating = GREATEST(0, COALESCE(rating, 900) + v_delta),
-        rating_games = rating_games + 1
-    WHERE id = pl.player_id;
-
-    pid := pl.player_id;
-    delta := v_delta;
-    s := pl.side_s;
-    opp_r := pl.side_opp_r;
-    RETURN NEXT;
-  END LOOP;
-END;
-$$ LANGUAGE plpgsql SET search_path = public;
-
-REVOKE ALL ON FUNCTION apply_elo_pairing(UUID, UUID, UUID, UUID, NUMERIC, BOOLEAN) FROM public, anon, authenticated;
-
--- ── apply_mix_elo: snapshot de início de mix + cap + novo financiamento ──
 
 CREATE OR REPLACE FUNCTION apply_mix_elo(p_game_id UUID, p_winner_team_id UUID)
 RETURNS void AS $$
@@ -181,11 +100,18 @@ BEGIN
       ELSE 0
     END;
 
+    -- Ratings de início de mix das duas duplas deste jogo — a régua do cap
+    -- (média de adversários), não o rating ao vivo que apply_elo_pairing já
+    -- vai ter mexido para outros jogadores nesta mesma ronda.
+    SELECT AVG(rating_before) INTO v_a_rating_before FROM _elo_night WHERE pid IN (m.a1, m.a2);
+    SELECT AVG(rating_before) INTO v_b_rating_before FROM _elo_night WHERE pid IN (m.b1, m.b2);
+
     FOR pl IN
       SELECT * FROM apply_elo_pairing(m.a1, m.a2, m.b1, m.b2, v_s_a, p_partner_chosen => FALSE)
     LOOP
       INSERT INTO _elo_night (pid, delta, played, won, opp_r_sum)
-      VALUES (pl.pid, pl.delta, 1, CASE WHEN pl.s = 1 THEN 1 ELSE 0 END, pl.opp_r)
+      VALUES (pl.pid, pl.delta, 1, CASE WHEN pl.s = 1 THEN 1 ELSE 0 END,
+              CASE WHEN pl.pid IN (m.a1, m.a2) THEN v_b_rating_before ELSE v_a_rating_before END)
       ON CONFLICT (pid) DO UPDATE
       SET delta = _elo_night.delta + EXCLUDED.delta,
           played = _elo_night.played + 1,
