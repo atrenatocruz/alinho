@@ -8,10 +8,10 @@ import { useAuth } from '../contexts/AuthContext'
 import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
 import { uploadClubLogo, removeClubLogo } from '../lib/clubLogoStorage'
 import { createGroup } from '../lib/platformAdmin'
-import { listClubGroups, getOrganizationDeleteBlocker, deleteSelfServeGroup } from '../lib/organizations'
+import { listClubGroups, getOrganizationDeleteBlocker, deleteSelfServeGroup, transferOrganizationOwnership } from '../lib/organizations'
 import { formatRating } from '../lib/elo'
 import { formatDate as formatDateLib, formatTime as formatTimeLib } from '../lib/formatDate'
-import { DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal } from '../components/ui'
+import { DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal, OrgKindBadge } from '../components/ui'
 import { totalRounds, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, SCORING_FORMAT_LABEL_KEY } from '../lib/mixLogic'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
 import { AGE_RESTRICTIONS } from '../lib/ageCategories'
@@ -198,6 +198,12 @@ export default function GerirClube() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deletingGroup, setDeletingGroup] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  // Vários admins com dono protegido (Trello #261).
+  const [inviteAsAdmin, setInviteAsAdmin] = useState(false)
+  const [orgOwnerId, setOrgOwnerId] = useState(null)
+  const [transferTarget, setTransferTarget] = useState(null)
+  const [transferring, setTransferring] = useState(false)
+  const [transferError, setTransferError] = useState('')
   const [showCreateGroup, setShowCreateGroup] = useState(false)
   const [groupName, setGroupName] = useState('')
   const [groupSlug, setGroupSlug] = useState('')
@@ -506,11 +512,22 @@ export default function GerirClube() {
   // joined with `profiles` for the display name — player_stats isn't shown
   // here so it isn't fetched.
   const loadMembers = async () => {
-    const { data, error } = await supabase
-      .from('memberships')
-      .select('id, is_admin, is_guest, level, user_id, profile:profiles(*)')
-      .eq('organization_id', currentOrganizationId)
-      .eq('is_guest', false)
+    // The owner is read alongside the members, not from `settings` — settings
+    // only loads on the Definições tab, and this list needs to know who the
+    // owner is to hide their demote/remove buttons (Trello #261).
+    const [{ data, error }, { data: ownerRow }] = await Promise.all([
+      supabase
+        .from('memberships')
+        .select('id, is_admin, is_guest, level, user_id, profile:profiles(*)')
+        .eq('organization_id', currentOrganizationId)
+        .eq('is_guest', false),
+      supabase
+        .from('organizations')
+        .select('owner_id')
+        .eq('id', currentOrganizationId)
+        .maybeSingle(),
+    ])
+    setOrgOwnerId(ownerRow?.owner_id ?? null)
 
     if (error) {
       console.error('Error loading members:', error)
@@ -567,11 +584,13 @@ export default function GerirClube() {
 
   const handleInvitePlayer = async (player) => {
     try {
-      const status = await inviteToOrganization(org.id, player.id)
-      alert(status === 'pending' ? t('gerirclube.invite_sent', { name: player.name }) : t('gerirclube.invite_already_pending', { name: player.name }))
+      const status = await inviteToOrganization(org.id, player.id, inviteAsAdmin)
+      alert(status === 'pending'
+        ? t(inviteAsAdmin ? 'gerirclube.invite_sent_admin' : 'gerirclube.invite_sent', { name: player.name })
+        : t('gerirclube.invite_already_pending', { name: player.name }))
     } catch (error) {
       console.error('Error inviting player:', error)
-      alert(error.message?.includes('já é membro') ? t('gerirclube.already_member', { name: player.name }) : t('gerirclube.error_invite_failed'))
+      alert(error.message?.includes('já é membro') ? t(kk('gerirclube.already_member'), { name: player.name }) : t('gerirclube.error_invite_failed'))
     }
   }
 
@@ -1101,7 +1120,7 @@ export default function GerirClube() {
   const handleToggleAdmin = async (userId, currentStatus) => {
     const confirmMessage = currentStatus
       ? t('gerirclube.confirm_revoke_admin')
-      : t('gerirclube.confirm_grant_admin')
+      : t(kk('gerirclube.confirm_grant_admin'))
     if (!confirm(confirmMessage)) return
 
     try {
@@ -1122,7 +1141,7 @@ export default function GerirClube() {
   }
 
   const handleDeleteUser = async (member) => {
-    if (!confirm(t('gerirclube.confirm_remove_member', { name: member.name }))) return
+    if (!confirm(t(kk('gerirclube.confirm_remove_member'), { name: member.name }))) return
 
     try {
       const { error } = await supabase.rpc('admin_remove_member', {
@@ -1193,6 +1212,7 @@ export default function GerirClube() {
   const deleteBlockerMessage = (code) => {
     if (code === 'has_activity') return t('gerirclube.delete_group_blocked_activity')
     if (code === 'has_subgroups') return t('gerirclube.delete_group_blocked_subgroups')
+    if (code === 'not_owner') return t('gerirclube.delete_group_blocked_not_owner')
     return t('gerirclube.delete_group_blocked_generic')
   }
 
@@ -1211,6 +1231,36 @@ export default function GerirClube() {
       // since the page asked (e.g. someone created a mix in the meantime).
       setDeleteError(deleteBlockerMessage(error?.message))
       setDeletingGroup(false)
+    }
+  }
+
+  // The owner cannot be demoted or removed, and only they (or a platform
+  // admin) can hand ownership to another admin: same rules as a WhatsApp group
+  // creator / community owner (Trello #261). The server enforces all of it;
+  // this only decides which buttons to show.
+  const ownerId = orgOwnerId ?? settings?.owner_id ?? org?.owner_id ?? null
+
+  // Texts that name the entity use a "_group" twin key when this is a group,
+  // so a group never reads "deste clube" / "Logo do clube" (Trello #177).
+  // Explicit keys rather than i18next's context feature, so both wordings are
+  // visible side by side in the locale files.
+  const isGroupOrg = org?.kind === 'group'
+  const kk = (key) => (isGroupOrg ? `${key}_group` : key)
+  const canTransferOwnership = (!!ownerId && ownerId === currentUser?.id) || !!currentUser?.is_platform_admin
+
+  const handleTransferOwnership = async () => {
+    if (!transferTarget) return
+    setTransferError('')
+    setTransferring(true)
+    try {
+      await transferOrganizationOwnership(org.id, transferTarget.id)
+      setTransferTarget(null)
+      await Promise.all([loadSettings(), loadMembers(), refreshMemberships()])
+    } catch (error) {
+      console.error('Error transferring ownership:', error)
+      setTransferError(t('gerirclube.transfer_owner_error'))
+    } finally {
+      setTransferring(false)
     }
   }
 
@@ -1454,7 +1504,10 @@ export default function GerirClube() {
             {/* "Gerir" as a small label above, so the title is the group's name
                 alone — as "Gerir: <nome>" it truncated to "Gerir: Grup…" on a
                 phone (Francisco, 15 set 2026). */}
-            <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('gerirclube.manage_label')}</p>
+            <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted flex items-center gap-2">
+              {t('gerirclube.manage_label')}
+              {org?.kind && <OrgKindBadge kind={org.kind} />}
+            </p>
             {editingName ? (
               <div className="flex items-center gap-2">
                 <input
@@ -1472,19 +1525,21 @@ export default function GerirClube() {
                 />
               </div>
             ) : (
-              <h2 className="text-3xl font-bold text-ink-900 flex items-center gap-2 min-w-0">
-                <span className="truncate">{org.name}</span>
+              <h2 className="text-3xl font-bold text-ink-900 flex items-start gap-2 min-w-0">
+                {/* Wraps instead of truncating: "Smash Padel Almada" was cut to
+                    "Smash Padel …" next to the two round buttons. */}
+                <span className="min-w-0 break-words">{org.name}</span>
                 <button
                   type="button"
                   onClick={() => { setNameInput(org.name); setEditingName(true) }}
                   aria-label={t('gerirclube.edit_name_aria')}
-                  className="shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-muted hover:text-ink-900 hover:bg-ink-50 transition-colors duration-fast"
+                  className="shrink-0 mt-0.5 w-8 h-8 flex items-center justify-center rounded-full text-muted hover:text-ink-900 hover:bg-ink-50 transition-colors duration-fast"
                 >
                   <Edit2 size={16} />
                 </button>
               </h2>
             )}
-            <p className="text-gray-600 mt-1">{t('gerirclube.subtitle')}</p>
+            <p className="text-gray-600 mt-1">{t(kk('gerirclube.subtitle'))}</p>
           </div>
           <button
             type="button"
@@ -1589,7 +1644,7 @@ export default function GerirClube() {
                           value={mixScopeId}
                           onChange={setMixScopeId}
                           options={[
-                            { value: '', label: t('gerirclube.scope_whole_club') },
+                            { value: '', label: t(kk('gerirclube.scope_whole_club')) },
                             ...clubGroups.filter((g) => g.can_manage).map((g) => ({ value: g.id, label: g.name })),
                           ]}
                         />
@@ -1796,7 +1851,7 @@ export default function GerirClube() {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        {t('gerirclube.level_label')}
+                        {t('gerirclube.level_optional_label')}
                       </label>
                       <Segmented
                         options={[
@@ -1806,7 +1861,7 @@ export default function GerirClube() {
                         value={gameForm.level}
                         onChange={(v) => setGameForm({ ...gameForm, level: v })}
                       />
-                      <p className="text-sm text-muted mt-1.5">{t('gerirclube.level_help')}</p>
+                      <p className="text-sm text-muted mt-1.5">{t(kk('gerirclube.level_help'))}</p>
                     </div>
 
                     <div>
@@ -2159,6 +2214,19 @@ export default function GerirClube() {
               <div className="card space-y-4">
                 <div>
                   <h3 className="text-sm font-extrabold text-ink-900 mb-2">{t('gerirclube.invite_player_heading')}</h3>
+                  <div className="mb-3">
+                    <Segmented
+                      options={[
+                        { value: 'member', label: t('gerirclube.invite_as_member') },
+                        { value: 'admin', label: t('gerirclube.invite_as_admin') },
+                      ]}
+                      value={inviteAsAdmin ? 'admin' : 'member'}
+                      onChange={(value) => setInviteAsAdmin(value === 'admin')}
+                    />
+                    {inviteAsAdmin && (
+                      <p className="mt-2 text-[11px] text-muted">{t('gerirclube.invite_as_admin_hint')}</p>
+                    )}
+                  </div>
                   <PlayerSearch
                     label={t('gerirclube.search_by_name_placeholder')}
                     searchFn={searchPlayers}
@@ -2263,6 +2331,11 @@ export default function GerirClube() {
                           {member.is_admin && (
                             <span className="w-2 h-2 rounded-full bg-lime-600 shrink-0" title={t('gerirclube.admin_badge_title')} />
                           )}
+                          {member.id === ownerId && (
+                            <span className="shrink-0 text-[10px] font-extrabold uppercase tracking-widest px-1.5 py-0.5 rounded-full bg-ink-900 text-white">
+                              {t('gerirclube.owner_badge')}
+                            </span>
+                          )}
                         </h3>
                         <p className="text-sm text-muted truncate">
                           {t('gerirclube.level_label', { level: member.level })}
@@ -2270,14 +2343,18 @@ export default function GerirClube() {
                       </div>
                     </Link>
 
+                    {/* The owner row has no admin toggle and no remove
+                        button: nobody can demote or remove the owner. */}
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        onClick={() => handleToggleAdmin(member.id, member.is_admin)}
-                        className="whitespace-nowrap text-xs font-extrabold px-3 py-2 min-h-[44px] rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast"
-                      >
-                        {member.is_admin ? t('gerirclube.revoke_admin_button') : t('gerirclube.grant_admin_button')}
-                      </button>
-                      {member.id !== currentUser?.id && (
+                      {member.id !== ownerId && (
+                        <button
+                          onClick={() => handleToggleAdmin(member.id, member.is_admin)}
+                          className="whitespace-nowrap text-xs font-extrabold px-3 py-2 min-h-[44px] rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast"
+                        >
+                          {member.is_admin ? t('gerirclube.revoke_admin_button') : t('gerirclube.grant_admin_button')}
+                        </button>
+                      )}
+                      {member.id !== currentUser?.id && member.id !== ownerId && (
                         <button
                           onClick={() => handleDeleteUser(member)}
                           title={t('gerirclube.delete_member_title', { name: member.name })}
@@ -2288,8 +2365,32 @@ export default function GerirClube() {
                       )}
                     </div>
                   </div>
+                  {canTransferOwnership && member.is_admin && member.id !== ownerId && (
+                    <div className="mt-3 pt-3 border-t border-line flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => { setTransferError(''); setTransferTarget(member) }}
+                        className="text-xs font-extrabold text-ink-700 hover:underline"
+                      >
+                        {t('gerirclube.transfer_owner_button')}
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
+
+              <DangerConfirmModal
+                open={!!transferTarget}
+                title={t('gerirclube.transfer_owner_confirm_title', { name: transferTarget?.name || '' })}
+                message={t('gerirclube.transfer_owner_confirm_message', { name: transferTarget?.name || '' })}
+                emphasis={t('gerirclube.transfer_owner_confirm_emphasis')}
+                confirmLabel={transferring ? t('gerirclube.transfer_owner_transferring') : t('gerirclube.transfer_owner_confirm_button')}
+                cancelLabel={t('gerirclube.delete_group_cancel')}
+                busy={transferring}
+                error={transferError}
+                onConfirm={handleTransferOwnership}
+                onClose={() => setTransferTarget(null)}
+              />
             </div>
           )}
 
@@ -2307,7 +2408,7 @@ export default function GerirClube() {
                 <ArrowLeft size={16} /> {t('gerirclube.back_button')}
               </button>
               <h3 className="text-xl font-semibold text-ink-900 mb-6">
-                {t('gerirclube.settings_heading')}
+                {t(kk('gerirclube.settings_heading'))}
               </h3>
 
               <form onSubmit={handleUpdateSettings} className="space-y-6">
@@ -2342,7 +2443,7 @@ export default function GerirClube() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {t('gerirclube.club_logo_label')}
+                    {t(kk('gerirclube.club_logo_label'))}
                   </label>
                   <div className="flex items-center gap-4">
                     <div className="relative w-16 h-16 shrink-0">
@@ -2351,7 +2452,7 @@ export default function GerirClube() {
                         type="button"
                         onClick={() => clubLogoInputRef.current?.click()}
                         disabled={uploadingLogo}
-                        aria-label={t('gerirclube.change_logo_aria')}
+                        aria-label={t(kk('gerirclube.change_logo_aria'))}
                         className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-ink-900 text-white flex items-center justify-center
                                    ring-2 ring-canvas hover:bg-ink-700 transition-colors duration-fast disabled:opacity-50"
                       >
@@ -2394,7 +2495,7 @@ export default function GerirClube() {
                     onChange={(e) => setSettings({ ...settings, description: e.target.value })}
                     className="input-field resize-none"
                     rows={4}
-                    placeholder={t('gerirclube.description_placeholder')}
+                    placeholder={t(kk('gerirclube.description_placeholder'))}
                   />
                 </div>
 
@@ -2414,7 +2515,7 @@ export default function GerirClube() {
                         // Ver a nota no campo equivalente do mix.
                         onChange={(e) => setSettings({ ...settings, location: e.target.value, latitude: null, longitude: null })}
                         className="input-field"
-                        placeholder={t('gerirclube.address_placeholder')}
+                        placeholder={t(kk('gerirclube.address_placeholder'))}
                       />
                     </div>
 
@@ -2440,7 +2541,7 @@ export default function GerirClube() {
                           value={settings.instagram || ''}
                           onChange={(e) => setSettings({ ...settings, instagram: e.target.value })}
                           className="input-field"
-                          placeholder={t('gerirclube.instagram_placeholder')}
+                          placeholder={t(kk('gerirclube.instagram_placeholder'))}
                         />
                       </div>
                       <div>
@@ -2452,7 +2553,7 @@ export default function GerirClube() {
                           value={settings.website || ''}
                           onChange={(e) => setSettings({ ...settings, website: e.target.value })}
                           className="input-field"
-                          placeholder={t('gerirclube.website_placeholder')}
+                          placeholder={t(kk('gerirclube.website_placeholder'))}
                         />
                       </div>
                     </div>
@@ -2465,11 +2566,11 @@ export default function GerirClube() {
                       {t('gerirclube.public_visibility_heading')}
                     </h4>
                     <p className="text-sm text-gray-500 mb-4">
-                      {t('gerirclube.public_visibility_description')}
+                      {t(kk('gerirclube.public_visibility_description'))}
                     </p>
                     <label className="flex items-center justify-between gap-4 p-3 rounded-ctrl border border-line mb-3">
                       <div>
-                        <p className="font-extrabold text-ink-900 text-sm">{t('gerirclube.public_club_label')}</p>
+                        <p className="font-extrabold text-ink-900 text-sm">{t(kk('gerirclube.public_club_label'))}</p>
                         <p className="text-[11px] text-muted">{t('gerirclube.appears_in_community_hint')}</p>
                       </div>
                       <input
@@ -2676,7 +2777,7 @@ export default function GerirClube() {
                   <label className="flex items-center justify-between gap-4 p-3 rounded-ctrl border border-line">
                     <div>
                       <p className="font-extrabold text-ink-900 text-sm">{t('gerirclube.private_matches_label')}</p>
-                      <p className="text-[11px] text-muted">{t('gerirclube.private_matches_hint')}</p>
+                      <p className="text-[11px] text-muted">{t(kk('gerirclube.private_matches_hint'))}</p>
                     </div>
                     <input
                       type="checkbox"

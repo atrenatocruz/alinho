@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { MapPin, CheckCircle2, ChevronRight, ChevronDown, ChevronLeft, Lock, Play, Calendar, X, Share2, MessageCircle, Link2, ImageDown, Trophy, Repeat, Euro, Swords, Users, Ticket } from 'lucide-react'
+import { MapPin, CheckCircle2, ChevronRight, ChevronDown, ChevronLeft, Lock, Play, Calendar, X, Share2, MessageCircle, Link2, ImageDown, Trophy, Repeat, Euro, Swords, Users, Ticket, Building2 } from 'lucide-react'
 import ShareCard, { CARD_W, CARD_H } from './ShareCard'
 import QRCode from 'qrcode'
 import { ratingBand, groupRatingBand } from '../lib/elo'
@@ -499,13 +499,16 @@ export function GuestBadge({ size = 'sm', label, isTest = false }) {
    Default null = sem escudo, todos os call sites existentes intactos.
    Call sites que já passam um ring próprio no `size` (PlayerAvatarRow)
    não devem passar `xp` — dois rings sobrepõem-se. */
-export function Avatar({ name, url, size = 'w-10 h-10 text-sm', colorClass = 'bg-ink-700 text-white', provisional = false }) {
+export function Avatar({ name, url, size = 'w-10 h-10 text-sm', colorClass = 'bg-ink-700 text-white', provisional = false, shape = 'round' }) {
   // Nota: o aro de XP que aqui viveu foi removido a pedido do Ruben —
   // criava confusão com o ranking. O nível de XP mostra-se no painel do
   // perfil, no tab Assiduidade e nos troféus; no avatar só fica a pill
   // NOVO (provisório do ranking).
   const { t } = useTranslation()
-  const base = `${size} rounded-full flex items-center justify-center shrink-0 font-extrabold overflow-hidden`
+  // shape='square' is for a club's logo: a physical club reads as a business,
+  // a group as people, so the two never look alike at a glance (Trello #177).
+  const radius = shape === 'square' ? 'rounded-xl' : 'rounded-full'
+  const base = `${size} ${radius} flex items-center justify-center shrink-0 font-extrabold overflow-hidden`
   const core = url
     ? <img src={url} alt={name || ''} className={`${base} object-cover`} />
     : <div className={`${base} ${colorClass}`}>{(name || '?').charAt(0).toUpperCase()}</div>
@@ -523,6 +526,27 @@ export function Avatar({ name, url, size = 'w-10 h-10 text-sm', colorClass = 'bg
     </span>
   )
 }
+
+/* ─── OrgKindBadge ────────────────────────────────────────────────────────
+   Clube vs Grupo, the same mark everywhere (Trello #177). A club is the
+   physical venue (solid black, building icon, and a square logo via
+   Avatar shape="square"); a group is a community of players (light outline,
+   people icon, round logo). Plan level is a separate thing and does not
+   change which one it is: a Community-plan group is still a group. */
+export function OrgKindBadge({ kind, className = '' }) {
+  const { t } = useTranslation()
+  const isGroup = kind === 'group'
+  const Icon = isGroup ? Users : Building2
+  const look = isGroup ? 'bg-surface text-ink-700 border border-line' : 'bg-ink-900 text-white border border-ink-900'
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] leading-none font-extrabold uppercase tracking-widest shrink-0 ${look} ${className}`}>
+      <Icon size={11} strokeWidth={2.5} aria-hidden="true" />
+      {isGroup ? t('ui.org_kind_group') : t('ui.org_kind_club')}
+    </span>
+  )
+}
+
+export const orgAvatarShape = (kind) => (kind === 'group' ? 'round' : 'square')
 
 /* ─── AchievementCard ─────────────────────────────────────────────────────────
    Um troféu da estante: moldura e cores pela raridade (RARITY_META),

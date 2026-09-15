@@ -4,7 +4,7 @@ import { Settings, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { Avatar, EmptyState, PrimaryButton } from '../components/ui'
+import { Avatar, EmptyState, PrimaryButton, OrgKindBadge, orgAvatarShape } from '../components/ui'
 import PlayerSearch from '../components/PlayerSearch'
 import { searchAnyPlayer, createOrganization, createGroup } from '../lib/platformAdmin'
 import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
@@ -230,26 +230,40 @@ export default function Gerir() {
 
       {createClubPanel}
 
-      <div className="space-y-3">
-        {clubsToShow.map((org) => {
-          const pendingCount = joinRequestsByOrg.get(org.id) || 0
-          return (
-            <Link
-              key={org.id}
-              to={pendingCount > 0 ? `/gerir/${org.slug}?tab=members` : `/gerir/${org.slug}`}
-              className="card press flex items-center gap-3.5 hover:shadow-lift"
-            >
-              <Avatar name={org.name} url={org.group_logo_url} size="w-11 h-11 text-sm" />
-              <h3 className="flex-1 min-w-0 font-extrabold text-ink-900 truncate">{org.name}</h3>
-              {pendingCount > 0 && (
-                <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-lime-400 text-ink-900 text-[11px] font-extrabold tabular-nums shrink-0">
-                  {pendingCount}
-                </span>
-              )}
-            </Link>
-          )
-        })}
-      </div>
+      {/* Clubes and Grupos never share a list: someone who manages a friends
+          group and a club at the same time has to see at a glance which is
+          which (Francisco, 15 set 2026 — Trello #177). */}
+      {[
+        { key: 'clubs', label: t('gerir.section_clubs'), orgs: clubsToShow.filter((o) => o.kind !== 'group') },
+        { key: 'groups', label: t('gerir.section_groups'), orgs: clubsToShow.filter((o) => o.kind === 'group') },
+      ].filter((section) => section.orgs.length > 0).map((section) => (
+        <div key={section.key} className="space-y-3">
+          <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{section.label}</p>
+          {section.orgs.map((org) => {
+            const pendingCount = joinRequestsByOrg.get(org.id) || 0
+            return (
+              <Link
+                key={org.id}
+                to={pendingCount > 0 ? `/gerir/${org.slug}?tab=members` : `/gerir/${org.slug}`}
+                className="card press flex items-center gap-3.5 hover:shadow-lift"
+              >
+                <Avatar name={org.name} url={org.group_logo_url} size="w-11 h-11 text-sm" shape={orgAvatarShape(org.kind)} />
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-extrabold text-ink-900 truncate">{org.name}</h3>
+                  <div className="mt-1">
+                    <OrgKindBadge kind={org.kind} />
+                  </div>
+                </div>
+                {pendingCount > 0 && (
+                  <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-lime-400 text-ink-900 text-[11px] font-extrabold tabular-nums shrink-0">
+                    {pendingCount}
+                  </span>
+                )}
+              </Link>
+            )
+          })}
+        </div>
+      ))}
     </div>
   )
 }

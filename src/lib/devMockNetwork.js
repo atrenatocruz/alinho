@@ -12,6 +12,7 @@
 // já está ativo — uma sessão real (login a sério) nunca passa por aqui.
 const MOCK_ADMIN_KEY = 'mockAdminSession' // mesmo valor de AuthContext.jsx
 const MOCK_ADMIN_ORG_ID = '00000000-0000-0000-0000-0000000000aa' // idem
+const MOCK_ADMIN_USER_ID = '00000000-0000-0000-0000-000000000000' // mesmo valor de AuthContext.jsx
 const FAKE_PLAYER_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
 const FAKE_MEMBER_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
 const FAKE_PARTNER_ID = 'cccccccc-cccc-cccc-cccc-cccccccccccc'
@@ -96,6 +97,16 @@ const RPC_MOCKS = {
   // localStorage.mockDeleteBlocker = 'has_activity' mostra o estado bloqueado.
   get_organization_delete_blocker: () => localStorage.getItem('mockDeleteBlocker') || null,
   delete_self_serve_group: () => null,
+  // Vários admins (Trello #261). localStorage.mockAdminInvite = 'true' faz
+  // aparecer no sino um convite para admin, para validar o texto.
+  transfer_organization_ownership: () => null,
+  invite_to_organization: () => 'pending',
+  list_incoming_organization_invites: () => (localStorage.getItem('mockAdminInvite') === 'true'
+    ? [{
+        id: 'mock-invite-admin', organization_id: 'mock-org-tercas', organization_name: 'Grupo das Terças',
+        organization_logo_url: null, invited_by_name: 'Marta Costa', created_at: new Date().toISOString(), as_admin: true,
+      }]
+    : []),
 }
 
 const TABLE_MOCKS = {
@@ -105,6 +116,7 @@ const TABLE_MOCKS = {
   organizations: () => [{
     id: MOCK_ADMIN_ORG_ID, name: 'Dev Org', slug: 'dev-org', kind: 'group', self_serve: true,
     is_global: false, open_join: false, group_logo_url: null, description: '', location: '',
+    owner_id: MOCK_ADMIN_USER_ID,
   }],
   achievements: () => [
     { key: 'primeira_bola', category: 'jogo', rarity: 'comum', sort: 1 },
@@ -139,9 +151,12 @@ const TABLE_MOCKS = {
       partner: { name: 'Tiago Ferreira', avatar_url: null, rating: 1420 },
     }],
   }],
+  // Gerir > Membros: o Admin(Dev) é o dono, a Marta é um segundo admin e o
+  // Tiago é membro — os três casos da regra do dono (Trello #261).
   memberships: () => [
-    { user_id: FAKE_MEMBER_ID, organization_id: MOCK_ADMIN_ORG_ID, level: 'avançado', is_guest: false },
-    { user_id: FAKE_PARTNER_ID, organization_id: MOCK_ADMIN_ORG_ID, level: 'avançado', is_guest: false },
+    { user_id: MOCK_ADMIN_USER_ID, organization_id: MOCK_ADMIN_ORG_ID, level: 'avançado', is_guest: false, is_admin: true, profile: { name: 'Admin (Dev)', avatar_url: null } },
+    { user_id: FAKE_MEMBER_ID, organization_id: MOCK_ADMIN_ORG_ID, level: 'avançado', is_guest: false, is_admin: true, profile: { name: FAKE_PEOPLE[FAKE_MEMBER_ID].name, avatar_url: FAKE_PEOPLE[FAKE_MEMBER_ID].avatar_url } },
+    { user_id: FAKE_PARTNER_ID, organization_id: MOCK_ADMIN_ORG_ID, level: 'avançado', is_guest: false, is_admin: false, profile: { name: FAKE_PEOPLE[FAKE_PARTNER_ID].name, avatar_url: FAKE_PEOPLE[FAKE_PARTNER_ID].avatar_url } },
   ],
 }
 
