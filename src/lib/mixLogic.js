@@ -386,8 +386,11 @@ export function nextElimMatches(prevMatches) {
     partnered/faced whom), so the whole schedule can be generated upfront
     at mix-start rather than drawn round by round.
 
-    Greedy, not a perfect combinatorial design (mirrors formDuplas's own
-    style): each round, players are sorted by points (desc) and paired
+    Greedy, not a perfect combinatorial design (formDuplas now tries a
+    repeat-free backtracking search first — this scheduler doesn't, since
+    partners rotate every round by design and "repeat" isn't the axis
+    that matters here): each round, players are sorted by points (desc)
+    and paired
     with the closest candidate that hasn't been their partner yet — once
     no non-repeat candidate remains for a player, the closest available
     repeat is accepted rather than leaving anyone unpaired. The resulting

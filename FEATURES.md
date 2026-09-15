@@ -44,7 +44,7 @@ What alinho actually does today, and what's explicitly not built yet. Kept in sy
 
 ## Player participation
 
-- Join a game solo (auto-partner matching) or with a specific partner. Solo pairing is closest-points-first, with a soft preference for side-compatible partners and for avoiding a repeat of last mix's pairing.
+- Join a game solo (auto-partner matching) or with a specific partner. Solo pairing is closest-points-first, with a soft preference for side-compatible partners; repeat-partnership avoidance looks back over the last 4 mixes and searches (with backtracking) for a fully repeat-free assignment before ever accepting a repeat, and an admin has to confirm explicitly on the rare case a repeat is unavoidable.
 - Leave a game before it closes.
 - Round-robin match generation and score entry once a game is under way; a round timer helps admins keep courts moving.
 - **Score correction**: an already-saved match score can be corrected mid-mix rather than being final on first entry.

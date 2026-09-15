@@ -26,16 +26,23 @@
 --      a média de adversários é calculada dentro do próprio loop de jogos,
 --      a partir desse snapshot, não a partir de nada devolvido por
 --      apply_elo_pairing (que continua a usar rating AO VIVO para o Elo em
---      si — correto para o Elo, errado se fosse usado para o cap).
+--      si — correto para o Elo, errado se fosse usado para o cap). O cap
+--      corre ANTES do financiamento (ver B) para que este financie o
+--      bónus já cortado, não o bruto.
 --
 --   B. Financiamento do bónus deixa de ser proporcional ao rating do
---      pagador. Passa a ser proporcional a quão inesperada foi a derrota
---      ESPECIFICAMENTE contra os premiados: usa o E que o perdedor já
---      tinha nesse jogo (com os ratings de início de mix, a mesma régua
---      do cap). Perder contra alguém claramente mais forte financia ~0;
---      perder contra alguém a um nível parecido financia mais. Se ninguém
---      perdeu de forma surpreendente contra os premiados, o bónus fica por
---      financiar -- o cap A já limita esse cenário a valores pequenos.
+--      pagador, e deixa de normalizar para financiar sempre 100% do
+--      bónus. Passa a ser uma taxa ABSOLUTA por pagador, na mesma escala
+--      do próprio prémio (1% do rating, pesado pelo E que o perdedor já
+--      tinha nesse jogo específico, com os ratings de início de mix) —
+--      só escalada para BAIXO (nunca para cima) se a soma ultrapassar o
+--      que é preciso financiar. Perder contra alguém claramente mais
+--      forte (E baixo) financia ~0 em absoluto, seja qual for o tamanho
+--      do grupo de pagadores — não só relativamente aos outros pagadores,
+--      que era o problema da normalização antiga. Se ninguém perdeu de
+--      forma surpreendente contra os premiados, ou a soma ficar abaixo do
+--      necessário, o que sobra fica por financiar -- aceite, o cap A já
+--      limita o cenário de campo muito mais fraco a valores pequenos.
 --
 -- apply_elo_pairing não precisa de mudar nada para isto: fica exatamente
 -- como em migration_elo_partner_shield.sql, sem DROP/CREATE, sem risco
@@ -50,7 +57,7 @@ DECLARE
   v_s_a NUMERIC;
   v_had_matches BOOLEAN := FALSE;
   v_bonus_total NUMERIC;
-  v_weight_sum NUMERIC;
+  v_raw_tax_total NUMERIC;
   v_a_rating_before NUMERIC;
   v_b_rating_before NUMERIC;
   v_e_a_before NUMERIC;
@@ -131,10 +138,28 @@ BEGIN
                  + CASE WHEN n.played > 0 AND n.won = n.played THEN 0.005 ELSE 0 END)
                 * COALESCE((SELECT pr.rating FROM profiles pr WHERE pr.id = n.pid), 900)
       WHERE TRUE;
+    END IF;
 
-      -- Financiamento novo: paga quem perdeu ESPECIFICAMENTE contra um
-      -- premiado, pesado pelo E que já tinha nesse jogo (ratings de início
-      -- de mix) — não mais "quem tem mais rating no grupo".
+    -- Cap de dominância — corre ANTES do financiamento: só do lado de
+    -- quem ganhou por ter, em média, adversários muito mais fracos nesse
+    -- mix — nunca no lado do azarão nem de quem está a perder. Correndo
+    -- aqui primeiro, o financiamento a seguir paga o bónus já cortado,
+    -- não o bruto.
+    UPDATE _elo_night n
+    SET bonus = bonus + LEAST(0,
+          (CASE WHEN g.gap >= 300 THEN 5 WHEN g.gap >= 150 THEN 15 END) - (n.delta + n.bonus))
+    FROM (
+      SELECT pid, (rating_before - opp_r_sum / NULLIF(played, 0)) AS gap
+      FROM _elo_night WHERE played > 0
+    ) g
+    WHERE g.pid = n.pid
+      AND g.gap >= 150
+      AND (n.delta + n.bonus) > 0;
+
+    IF p_winner_team_id IS NOT NULL THEN
+      -- Financiamento: paga quem perdeu ESPECIFICAMENTE contra um premiado,
+      -- pesado pelo E que já tinha nesse jogo (ratings de início de mix) —
+      -- não mais "quem tem mais rating no grupo".
       FOR m IN
         SELECT mt.winner_team_id, mt.team_a_id, mt.team_b_id,
                ta.player1_id AS a1, ta.player2_id AS a2,
@@ -166,31 +191,25 @@ BEGIN
         END IF;
       END LOOP;
 
+      -- v_bonus_total já reflete o cap (correu antes). A taxa de cada
+      -- pagador é absoluta (mesma escala do prémio, 1% do próprio rating,
+      -- pesada pelo E) e só é escalada para BAIXO se a soma ultrapassar o
+      -- que é preciso financiar — nunca para cima. Uma derrota totalmente
+      -- esperada (surprise_weight ≈ 0) paga ~0 em absoluto, seja qual for
+      -- o tamanho do grupo de pagadores.
       SELECT COALESCE(SUM(bonus), 0) INTO v_bonus_total FROM _elo_night WHERE bonus > 0;
-      SELECT COALESCE(SUM(surprise_weight), 0) INTO v_weight_sum FROM _elo_night WHERE bonus = 0;
+      SELECT COALESCE(SUM(surprise_weight * 0.01 * rating_before), 0) INTO v_raw_tax_total
+      FROM _elo_night WHERE bonus = 0 AND surprise_weight > 0;
 
-      IF v_bonus_total > 0 AND v_weight_sum > 0 THEN
+      IF v_bonus_total > 0 AND v_raw_tax_total > 0 THEN
         UPDATE _elo_night
-        SET bonus = - v_bonus_total * surprise_weight / v_weight_sum
+        SET bonus = - (surprise_weight * 0.01 * rating_before) * LEAST(1, v_bonus_total / v_raw_tax_total)
         WHERE bonus = 0 AND surprise_weight > 0;
       END IF;
-      -- Se v_weight_sum = 0 (ninguém perdeu de forma surpreendente contra
-      -- os premiados), o bónus fica por financiar — aceite, ver cabeçalho.
+      -- Se v_raw_tax_total = 0 (ninguém perdeu de forma surpreendente
+      -- contra os premiados) ou ficar abaixo de v_bonus_total, o que sobra
+      -- fica por financiar — aceite, ver cabeçalho.
     END IF;
-
-    -- Cap de dominância: só do lado de quem ganhou por ter, em média,
-    -- adversários muito mais fracos nesse mix — nunca no lado do azarão
-    -- nem de quem está a perder.
-    UPDATE _elo_night n
-    SET bonus = bonus + LEAST(0,
-          (CASE WHEN g.gap >= 300 THEN 5 WHEN g.gap >= 150 THEN 15 END) - (n.delta + n.bonus))
-    FROM (
-      SELECT pid, (rating_before - opp_r_sum / NULLIF(played, 0)) AS gap
-      FROM _elo_night WHERE played > 0
-    ) g
-    WHERE g.pid = n.pid
-      AND g.gap >= 150
-      AND (n.delta + n.bonus) > 0;
 
     UPDATE _elo_night SET delta = delta + bonus WHERE bonus <> 0;
 
