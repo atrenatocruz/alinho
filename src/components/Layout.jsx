@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useNavigationType } from 'react-router-dom'
 import { Home, Users, Trophy, Settings, LogOut, HelpCircle, Phone, X, Bell, UserCheck } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
@@ -345,16 +345,66 @@ export default function Layout({ children }) {
   const joinRequestsTotal = joinRequestsByOrg.reduce((sum, org) => sum + org.count, 0)
   const notificationsTotal = followRequests.length + joinRequestsTotal + orgInvites.length
 
-  // `main` below is the app's only scrolling region (see the app-shell
-  // comment on the root div) — the document itself never scrolls, so a
-  // route change doesn't naturally reset scroll position the way it would
-  // in a normal multi-page site. Without this, navigating via the bottom
-  // nav (or any Link) while scrolled down leaves the next page opening
-  // mid-way down instead of at its top (Trello #242).
+  // `main` below is the app's only scrolling region (see the app-shell comment
+  // on the root div) — the document itself never scrolls, so neither the browser
+  // nor a route change moves scroll position on its own. Both halves below have
+  // to be done by hand.
+  //
+  // Going forward (nav bar, any Link) opens the next page at its top, otherwise
+  // it opens mid-way down wherever the previous page happened to be (Trello #242).
+  // Going *back* does the opposite: it returns to the exact spot you left, rather
+  // than dumping you at the top of a list you had scrolled halfway through
+  // (Trello #245). React Router's navigation type is what separates the two —
+  // 'POP' is a back/forward step through history, anything else is a new entry.
+  //
+  // Positions are keyed by `location.key`, which is unique and stable per history
+  // entry, so visiting the same path twice keeps two independent positions.
   const mainRef = useRef(null)
+  const navigationType = useNavigationType()
+  const scrollPositions = useRef(new Map())
+  const locationKey = location.key
+
+  // Recorded two ways on purpose. The scroll listener covers the normal case —
+  // a person scrolling with finger or wheel. The cleanup covers scrolling done
+  // in code (`el.scrollTop = n`, `scrollIntoView`), which does not always emit
+  // a scroll event, so the listener alone can miss the last position entirely.
   useEffect(() => {
-    mainRef.current?.scrollTo(0, 0)
-  }, [location.pathname])
+    const el = mainRef.current
+    if (!el) return
+    const remember = () => scrollPositions.current.set(locationKey, el.scrollTop)
+    el.addEventListener('scroll', remember, { passive: true })
+    return () => {
+      el.removeEventListener('scroll', remember)
+      // Only overwrite with a real offset: by now React may have swapped in the
+      // next page and collapsed the height, which would otherwise store a 0 over
+      // the position the listener correctly captured.
+      if (el.scrollTop > 0) scrollPositions.current.set(locationKey, el.scrollTop)
+    }
+  }, [locationKey])
+
+  useLayoutEffect(() => {
+    const el = mainRef.current
+    if (!el) return
+
+    const target = navigationType === 'POP' ? (scrollPositions.current.get(locationKey) ?? 0) : 0
+    if (target === 0) {
+      el.scrollTo(0, 0)
+      return
+    }
+
+    // The page we are returning to usually re-fetches its data, so at this point
+    // it is still short and cannot be scrolled down yet. Keep asking until the
+    // content is tall enough to honour the offset, then stop. The cap keeps a
+    // page that legitimately got shorter from retrying forever.
+    let frames = 0
+    let raf = 0
+    const restore = () => {
+      el.scrollTo(0, target)
+      if (el.scrollTop < target && frames++ < 40) raf = requestAnimationFrame(restore)
+    }
+    raf = requestAnimationFrame(restore)
+    return () => cancelAnimationFrame(raf)
+  }, [locationKey, navigationType])
 
   const needsPhone = profile && !isGuest && !profile.phone_hash && !phonePromptDismissed
 

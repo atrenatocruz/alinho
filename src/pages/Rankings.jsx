@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigationType } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Trophy, Award, Calendar, ChevronDown, HelpCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
@@ -27,6 +27,7 @@ export default function Rankings() {
   const { t, i18n } = useTranslation()
   const { user, currentOrganizationId, currentOrganization, memberships, switchOrganization } = useAuth()
   const location = useLocation()
+  const navigationType = useNavigationType()
   // Arriving from the Profile page's "Ranking Global" card (state.scrollToMe)
   // — jumps straight to the Global tab and, once it's loaded, scrolls to and
   // briefly highlights the viewer's own row (Trello #185). A plain nav-bar
@@ -168,7 +169,13 @@ export default function Rankings() {
 
   // Runs once the Global tab's own row can actually exist in the DOM —
   // after its data has loaded, and only when that's the tab being shown.
+  //
+  // Skipped on a back/forward step: the state that asked for this jump stays on
+  // the history entry, so returning here from a player's profile would yank the
+  // list back to your own row instead of the spot you left. Layout restores that
+  // spot on 'POP' and should win (Trello #245).
   useEffect(() => {
+    if (navigationType === 'POP') return
     if (!location.state?.scrollToMe || tab !== 'global' || globalLoading) return
     const el = document.getElementById(`ranking-player-${user.id}`)
     el?.scrollIntoView({ behavior: 'smooth', block: 'center' })

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Users, UserPlus, Clock, Heart, MapPin, Phone, Instagram, Globe, Calendar, Building2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -18,6 +19,7 @@ const asInstagramUrl = (value) => {
 export default function ClubProfile() {
   const { t, i18n } = useTranslation()
   const { slug } = useParams()
+  const goBack = useGoBack('/comunidade')
   const { memberships, followOrganization, leaveOrganization, toggleFavoriteOrganization } = useAuth()
   const [club, setClub] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -168,9 +170,9 @@ export default function ClubProfile() {
   if (notFound || !club) {
     return (
       <div className="space-y-5">
-        <Link to="/comunidade" className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline">
-          <ArrowLeft size={16} /> {t('clubprofile.back_to_community')}
-        </Link>
+        <button type="button" onClick={goBack} className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline">
+          <ArrowLeft size={16} /> {t('common.back')}
+        </button>
         <EmptyState
           icon={PadelIcon}
           title={t('clubprofile.not_found_title')}
@@ -182,9 +184,9 @@ export default function ClubProfile() {
 
   return (
     <div className="space-y-5">
-      <Link to="/comunidade" className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline">
-        <ArrowLeft size={16} /> {t('clubprofile.back_to_community')}
-      </Link>
+      <button type="button" onClick={goBack} className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline">
+        <ArrowLeft size={16} /> {t('common.back')}
+      </button>
 
       {club.kind === 'group' && club.parent_slug && (
         <Link

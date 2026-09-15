@@ -24,6 +24,22 @@ export const listClubGroups = async (clubId) => {
   return data || []
 }
 
+// Why the current user can't delete this group, or null if they can — see
+// supabase/migration_delete_self_serve_group.sql for what each code means
+// (Trello #241). Codes, not messages: the page translates them.
+export const getOrganizationDeleteBlocker = async (orgId) => {
+  const { data, error } = await supabase.rpc('get_organization_delete_blocker', { p_org_id: orgId })
+  if (error) throw error
+  return data ?? null
+}
+
+// Re-checks the blocker server-side under a row lock and raises with the same
+// code as its message if anything changed since the page asked.
+export const deleteSelfServeGroup = async (orgId) => {
+  const { error } = await supabase.rpc('delete_self_serve_group', { p_org_id: orgId })
+  if (error) throw error
+}
+
 // RLS on membership_requests already scopes SELECT to: rows the caller owns
 // (user_id = auth.uid()) OR rows for an org the caller admins (is_org_admin).
 // Excluding the caller's own outgoing requests leaves exactly the incoming

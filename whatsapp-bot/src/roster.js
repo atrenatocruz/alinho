@@ -128,6 +128,17 @@ export async function getOpenMixes(organizationId) {
 // app's src/lib/formatDate.js.
 const LOCALE_MAP = { pt: 'pt-PT', en: 'en-GB' }
 
+/**
+ * Money, the same way the web app shows it (src/lib/formatDate.js
+ * formatCurrency): pt-PT gives "7,50 €". The price used to be interpolated
+ * raw, which wrote "7.5€" to the group — decimal point and no cents
+ * (Trello #194). node:20-slim ships full ICU, so the server formats it the
+ * same as a local run.
+ */
+export function formatCurrency(value, lang = 'pt') {
+  return new Intl.NumberFormat(LOCALE_MAP[lang] || 'pt-PT', { style: 'currency', currency: 'EUR' }).format(value ?? 0)
+}
+
 export function formatDateTime(isoDate, lang = 'pt') {
   const locale = LOCALE_MAP[lang] || 'pt-PT'
   const d = new Date(isoDate)
@@ -191,7 +202,7 @@ export function buildMixMessage({ game, people, capacity, suplentes = [] }, { la
   if (label) lines.push(`🔢 Nº: ${label}`)
   lines.push(`📅 ${formatDateTime(game.date)}`)
   if (game.location) lines.push(`📍 ${game.location}`)
-  if (game.price_per_player > 0) lines.push(`💶 ${game.price_per_player}€/jogador`)
+  if (game.price_per_player > 0) lines.push(`💶 ${formatCurrency(game.price_per_player)}/jogador`)
   if (game.prize) lines.push(`🏆 Prémio: ${game.prize}`)
   lines.push(`🏟️ ${game.num_courts} campo(s) · ${capacity} vagas`)
   if (!isCancelled) {

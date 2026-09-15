@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useGoBack } from '../lib/useGoBack'
 import { useTranslation, Trans } from 'react-i18next'
 import { Calendar, MapPin, ArrowLeft, UserPlus, User, Check, Lock, Trophy, Play, ChevronRight, Swords, X, Repeat, Share2, ChevronDown, RotateCcw, Euro, GripVertical, Pencil, History, ThumbsUp, CalendarPlus } from 'lucide-react'
 import { DndContext, useDraggable, useDroppable, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core'
@@ -59,6 +60,7 @@ const HISTORY_SOURCE_LABEL_KEY = {
 export default function GameDetails() {
   const { t, i18n } = useTranslation()
   const { id } = useParams()
+  const goBack = useGoBack('/')
   const navigate = useNavigate()
   const { user, profile, isGuest, memberships, updateProfile } = useAuth()
   const [game, setGame] = useState(null)
@@ -1559,7 +1561,8 @@ export default function GameDetails() {
 
       <div className="flex items-center justify-between">
         <button
-          onClick={() => navigate(-1)}
+          type="button"
+          onClick={goBack}
           className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm min-h-[44px] pr-3"
         >
           <ArrowLeft size={20} />

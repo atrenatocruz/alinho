@@ -92,9 +92,20 @@ const RPC_MOCKS = {
     gender: 'feminino', preferred_side: 'left', club_names: 'Dev Org',
   }],
   get_my_private_matches: () => [],
+  // Eliminar grupo (Trello #241). Por omissão o grupo pode ser eliminado;
+  // localStorage.mockDeleteBlocker = 'has_activity' mostra o estado bloqueado.
+  get_organization_delete_blocker: () => localStorage.getItem('mockDeleteBlocker') || null,
+  delete_self_serve_group: () => null,
 }
 
 const TABLE_MOCKS = {
+  // A organização do Admin(Dev). Sem esta linha o separador Definições do
+  // Gerir ficava em branco (loadSettings nunca recebia nada). Marcada como
+  // grupo criado na Comunidade para se poder validar o "Eliminar grupo".
+  organizations: () => [{
+    id: MOCK_ADMIN_ORG_ID, name: 'Dev Org', slug: 'dev-org', kind: 'group', self_serve: true,
+    is_global: false, open_join: false, group_logo_url: null, description: '', location: '',
+  }],
   achievements: () => [
     { key: 'primeira_bola', category: 'jogo', rarity: 'comum', sort: 1 },
     { key: 'mes_cheio', category: 'jogo', rarity: 'epico', sort: 2 },

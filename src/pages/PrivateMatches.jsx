@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
+import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Plus, Trophy, Copy, Check, Trash2, Calendar, MapPin } from 'lucide-react'
 import {
@@ -207,6 +208,7 @@ const teamLabel = (m, prefix, t) => {
 }
 
 export default function PrivateMatches() {
+  const goBack = useGoBack('/perfil')
   const { t, i18n } = useTranslation()
   const { profile } = useAuth()
   const [matches, setMatches] = useState([])
@@ -314,10 +316,10 @@ export default function PrivateMatches() {
 
   return (
     <div className="space-y-5">
-      <Link to="/perfil" className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm min-h-[44px]">
+      <button type="button" onClick={goBack} className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm min-h-[44px]">
         <ArrowLeft size={20} />
         {t('privatematches.back')}
-      </Link>
+      </button>
 
       <div className="flex items-center justify-between">
         <h2 className="text-3xl text-ink-900">{t('privatematches.title')}</h2>
