@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { sortVouchersForWallet } from './vouchers'
+import { sortVouchersForWallet, isValidVoucherId, normalizeScannedVoucherId } from './vouchers'
 
 describe('sortVouchersForWallet', () => {
   it('sorts por_usar vouchers before usado ones', () => {
@@ -43,5 +43,55 @@ describe('sortVouchersForWallet', () => {
 
   it('returns an empty array for empty input', () => {
     expect(sortVouchersForWallet([])).toEqual([])
+  })
+})
+
+describe('isValidVoucherId', () => {
+  it('accepts a well-formed UUID', () => {
+    expect(isValidVoucherId('550e8400-e29b-41d4-a716-446655440000')).toBe(true)
+  })
+
+  it('is case-insensitive', () => {
+    expect(isValidVoucherId('550E8400-E29B-41D4-A716-446655440000')).toBe(true)
+  })
+
+  it('accepts a UUID with surrounding whitespace', () => {
+    expect(isValidVoucherId('  550e8400-e29b-41d4-a716-446655440000  ')).toBe(true)
+  })
+
+  it('rejects an empty string', () => {
+    expect(isValidVoucherId('')).toBe(false)
+  })
+
+  it('rejects non-UUID text', () => {
+    expect(isValidVoucherId('not-a-voucher-id')).toBe(false)
+  })
+
+  it('rejects a UUID missing a segment', () => {
+    expect(isValidVoucherId('550e8400-e29b-41d4-a716')).toBe(false)
+  })
+
+  it('rejects null and undefined', () => {
+    expect(isValidVoucherId(null)).toBe(false)
+    expect(isValidVoucherId(undefined)).toBe(false)
+  })
+})
+
+describe('normalizeScannedVoucherId', () => {
+  it('trims surrounding whitespace', () => {
+    expect(normalizeScannedVoucherId('  550e8400-e29b-41d4-a716-446655440000  ')).toBe('550e8400-e29b-41d4-a716-446655440000')
+  })
+
+  it('passes a bare id through unchanged (aside from trimming)', () => {
+    expect(normalizeScannedVoucherId('550e8400-e29b-41d4-a716-446655440000')).toBe('550e8400-e29b-41d4-a716-446655440000')
+  })
+
+  it('strips a URL-style wrapper down to its last path segment', () => {
+    expect(normalizeScannedVoucherId('https://alinho.pt/v/550e8400-e29b-41d4-a716-446655440000')).toBe('550e8400-e29b-41d4-a716-446655440000')
+  })
+
+  it('returns an empty string for non-string input', () => {
+    expect(normalizeScannedVoucherId(null)).toBe('')
+    expect(normalizeScannedVoucherId(undefined)).toBe('')
   })
 })

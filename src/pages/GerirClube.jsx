@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
-import { Plus, Calendar, Users, Trash2, Edit2, Check, X, UserX, Repeat, Clock, ArrowLeft, Camera, Settings, Copy } from 'lucide-react'
+import { Plus, Calendar, Users, Trash2, Edit2, Check, X, UserX, Repeat, Clock, ArrowLeft, Camera, Settings, Copy, QrCode } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
@@ -11,7 +11,7 @@ import { createGroup } from '../lib/platformAdmin'
 import { listClubGroups } from '../lib/organizations'
 import { formatRating } from '../lib/elo'
 import { formatDate as formatDateLib, formatTime as formatTimeLib } from '../lib/formatDate'
-import { DateField, DateTimeField, Avatar, Select } from '../components/ui'
+import { DateField, DateTimeField, Avatar, Select, PrimaryButton } from '../components/ui'
 import { totalRounds, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, SCORING_FORMAT_LABEL_KEY } from '../lib/mixLogic'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
 import { AGE_RESTRICTIONS } from '../lib/ageCategories'
@@ -19,6 +19,8 @@ import PlayerSearch from '../components/PlayerSearch'
 import { searchPlayers } from '../lib/privateMatches'
 import { inviteToOrganization } from '../lib/orgInvites'
 import { DAY_LABEL_KEY, listPendingTeacherRequests, approveTeacherProfile, rejectTeacherProfile } from '../lib/teachers'
+import VoucherScanner from '../components/VoucherScanner'
+import { isValidVoucherId, normalizeScannedVoucherId } from '../lib/vouchers'
 
 const sanitizeSlug = (value) => value.toLowerCase().replace(/[^a-z0-9-]/g, '')
 
@@ -172,6 +174,13 @@ export default function GerirClube() {
   const [editingName, setEditingName] = useState(false)
   const [nameInput, setNameInput] = useState('')
   const [renamingOrg, setRenamingOrg] = useState(false)
+  const [scanInput, setScanInput] = useState('')
+  const [scanLookupState, setScanLookupState] = useState('idle') // 'idle' | 'loading' | 'not_found' | 'found'
+  const [scannedVoucher, setScannedVoucher] = useState(null)
+  const [cameraActive, setCameraActive] = useState(false)
+  const [redeeming, setRedeeming] = useState(false)
+  const [redeemError, setRedeemError] = useState('')
+  const [redeemSuccess, setRedeemSuccess] = useState(false)
 
   // Form states
   const [gameForm, setGameForm] = useState(EMPTY_GAME_FORM)
@@ -1213,6 +1222,55 @@ export default function GerirClube() {
     }
   }
 
+  const handleLookupVoucher = async (rawId) => {
+    const id = normalizeScannedVoucherId(rawId)
+    if (!isValidVoucherId(id)) {
+      setScanLookupState('not_found')
+      return
+    }
+    setScanLookupState('loading')
+    setRedeemError('')
+    setRedeemSuccess(false)
+    const { data, error } = await supabase
+      .from('vouchers')
+      .select('id, status, used_at, created_at, game:games (id, title, date, prize, organization:organizations (name)), user:profiles!vouchers_user_id_fkey (name)')
+      .eq('id', id)
+      .maybeSingle()
+    if (error || !data) {
+      console.error('Error looking up voucher:', error)
+      setScanLookupState('not_found')
+      return
+    }
+    setScannedVoucher(data)
+    setScanLookupState('found')
+  }
+
+  const handleConfirmRedeem = async () => {
+    setRedeeming(true)
+    setRedeemError('')
+    const { error } = await supabase.rpc('admin_redeem_voucher', { p_voucher_id: scannedVoucher.id })
+    setRedeeming(false)
+    if (error) {
+      console.error('Error redeeming voucher:', error)
+      setRedeemError(t('gerirclube.redeem_confirm_error'))
+      // Re-fetch so the detail view reflects reality (e.g. someone else —
+      // the player's own "Usar" tap, or a different admin — redeemed it
+      // in the gap between lookup and this confirm tap).
+      handleLookupVoucher(scannedVoucher.id)
+      return
+    }
+    setScannedVoucher((v) => ({ ...v, status: 'usado', used_at: new Date().toISOString() }))
+    setRedeemSuccess(true)
+  }
+
+  const handleResetRedeem = () => {
+    setScanInput('')
+    setScanLookupState('idle')
+    setScannedVoucher(null)
+    setRedeemError('')
+    setRedeemSuccess(false)
+  }
+
   const handleTogglePrivateMatches = async () => {
     setSavingFlag(true)
     try {
@@ -1375,6 +1433,15 @@ export default function GerirClube() {
           </div>
           <button
             type="button"
+            onClick={() => setActiveTab('redeem')}
+            title={t('gerirclube.redeem_voucher_label')}
+            aria-label={t('gerirclube.redeem_voucher_label')}
+            className="shrink-0 w-11 h-11 flex items-center justify-center rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast"
+          >
+            <QrCode size={20} />
+          </button>
+          <button
+            type="button"
             onClick={() => setActiveTab('settings')}
             title={t('gerirclube.settings_label')}
             aria-label={t('gerirclube.settings_label')}
@@ -1386,8 +1453,9 @@ export default function GerirClube() {
       </div>
 
       {/* Tabs — same pill style as Home.jsx/Rankings.jsx's tab rows.
-          Hidden while the settings page is open (it isn't one of the tabs). */}
-      {activeTab !== 'settings' && (
+          Hidden while the settings page or the voucher redeem screen is
+          open (neither is one of the tabs). */}
+      {activeTab !== 'settings' && activeTab !== 'redeem' && (
         <div className="flex gap-1 p-1 bg-ink-50 rounded-ctrl overflow-x-auto">
           <button
             onClick={() => setActiveTab('games')}
@@ -2563,6 +2631,105 @@ export default function GerirClube() {
                       className="w-5 h-5 shrink-0"
                     />
                   </label>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Voucher redeem screen — same "own screen, entered via a
+              header icon, hidden from the pill row" pattern as Settings
+              above, not a pill tab and not a button inside Members (see
+              docs/superpowers/specs/2026-09-14-voucher-qr-redemption-design.md,
+              Key Decisions). */}
+          {activeTab === 'redeem' && (
+            <div>
+              <button
+                type="button"
+                onClick={() => { setActiveTab('games'); handleResetRedeem() }}
+                className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline mb-4"
+              >
+                <ArrowLeft size={16} /> {t('gerirclube.back_button')}
+              </button>
+              <h3 className="text-xl font-semibold text-ink-900 mb-6">{t('gerirclube.redeem_heading')}</h3>
+
+              {scanLookupState !== 'found' && (
+                <div className="space-y-4">
+                  <VoucherScanner
+                    active={cameraActive}
+                    onToggle={() => setCameraActive((a) => !a)}
+                    onDecode={(text) => { setCameraActive(false); handleLookupVoucher(text) }}
+                  />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      {t('gerirclube.redeem_manual_label')}
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={scanInput}
+                        onChange={(e) => setScanInput(e.target.value)}
+                        placeholder={t('gerirclube.redeem_manual_placeholder')}
+                        className="input-field flex-1"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleLookupVoucher(scanInput)}
+                        disabled={!scanInput.trim() || scanLookupState === 'loading'}
+                        className="px-4 py-2.5 rounded-ctrl bg-ink-900 text-white font-extrabold text-sm disabled:opacity-50 hover:bg-ink-700 transition-colors duration-fast"
+                      >
+                        {t('gerirclube.redeem_lookup_button')}
+                      </button>
+                    </div>
+                    {scanLookupState === 'not_found' && (
+                      <p className="text-sm text-danger mt-2">{t('gerirclube.redeem_not_found')}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {scanLookupState === 'found' && scannedVoucher && (
+                <div className="card space-y-3">
+                  <div>
+                    <p className="text-[11px] font-mono font-extrabold uppercase tracking-wide text-muted">{t('gerirclube.redeem_detail_owner_label')}</p>
+                    <p className="text-base font-extrabold text-ink-900">{scannedVoucher.user?.name || '—'}</p>
+                  </div>
+                  <div className="pt-3 border-t border-line">
+                    <p className="text-[11px] font-mono font-extrabold uppercase tracking-wide text-muted">{t('gerirclube.redeem_detail_mix_label')}</p>
+                    <p className="text-sm font-extrabold text-ink-900">{scannedVoucher.game?.title}</p>
+                    <p className="text-[11px] text-muted">
+                      {scannedVoucher.game?.organization?.name}
+                      {scannedVoucher.game?.date && ` · ${formatDateLib(scannedVoucher.game.date, i18n.language, { day: '2-digit', month: 'short', year: 'numeric' })}`}
+                    </p>
+                  </div>
+                  {scannedVoucher.game?.prize && (
+                    <div className="pt-3 border-t border-line">
+                      <p className="text-[11px] font-mono font-extrabold uppercase tracking-wide text-muted">{t('gerirclube.redeem_detail_prize_label')}</p>
+                      <p className="text-sm text-ink-900">{scannedVoucher.game.prize}</p>
+                    </div>
+                  )}
+
+                  {scannedVoucher.status === 'usado' ? (
+                    <p className="pt-3 border-t border-line text-sm text-ink-200">
+                      {t('gerirclube.redeem_already_used', {
+                        date: scannedVoucher.used_at
+                          ? formatDateLib(scannedVoucher.used_at, i18n.language, { day: '2-digit', month: 'short', year: 'numeric' })
+                          : '',
+                      })}
+                    </p>
+                  ) : redeemSuccess ? (
+                    <p className="pt-3 border-t border-line text-sm text-ok font-extrabold">{t('gerirclube.redeem_confirm_success')}</p>
+                  ) : (
+                    <div className="pt-3 border-t border-line">
+                      {redeemError && <p className="text-sm text-danger mb-2">{redeemError}</p>}
+                      <PrimaryButton onClick={handleConfirmRedeem} disabled={redeeming} className="w-full">
+                        {t('gerirclube.redeem_confirm_button')}
+                      </PrimaryButton>
+                    </div>
+                  )}
+
+                  <button type="button" onClick={handleResetRedeem} className="text-sm font-extrabold text-ink-700 hover:underline">
+                    {t('gerirclube.redeem_search_another')}
+                  </button>
                 </div>
               )}
             </div>
