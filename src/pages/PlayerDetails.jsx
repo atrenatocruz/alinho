@@ -360,6 +360,21 @@ export default function PlayerDetails() {
                 </>
               )
             })()}
+            {/* Seguidores/A seguir — junto ao nome, igual ao Perfil próprio.
+                Profile.jsx subiu esta linha para aqui a pedido do Renato
+                (11 set 2026: a secção própria lá em baixo era "muita poluição
+                visual"); este ecrã tinha ficado com a versão antiga (Francisco,
+                15 set 2026). Fora do bloco dos pontos de propósito: os
+                seguidores mostram-se mesmo quando os resultados estão ocultos. */}
+            <div className="mt-1 flex items-center gap-2 text-[11px]">
+              <button type="button" onClick={() => setFollowListTab('followers')} className="font-extrabold text-ink-900">
+                {t('playerdetails.followers_count', { count: player.followers_count })}
+              </button>
+              <span className="text-ink-200">·</span>
+              <button type="button" onClick={() => setFollowListTab('following')} className="font-extrabold text-ink-900">
+                {t('playerdetails.following_count', { count: player.following_count })}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -373,7 +388,7 @@ export default function PlayerDetails() {
                 <button
                   onClick={() => handleRemoveFollow(t('playerdetails.unfollow_confirm', { name: player.name }))}
                   disabled={friendActing}
-                  className="inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full bg-ink-50 text-ink-900 hover:bg-ink-200/60 transition-colors duration-fast disabled:opacity-40 whitespace-nowrap"
+                  className="inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full border border-line bg-ink-50 text-ink-900 hover:bg-ink-200/60 transition-colors duration-fast disabled:opacity-40 whitespace-nowrap"
                 >
                   <UserCheck size={14} /> {t('playerdetails.following_button')}
                 </button>
@@ -381,7 +396,7 @@ export default function PlayerDetails() {
                 <button
                   onClick={() => handleRemoveFollow()}
                   disabled={friendActing}
-                  className="inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full bg-ink-50 text-muted hover:bg-ink-200/60 transition-colors duration-fast disabled:opacity-40 whitespace-nowrap"
+                  className="inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full border border-line bg-ink-50 text-muted hover:bg-ink-200/60 transition-colors duration-fast disabled:opacity-40 whitespace-nowrap"
                 >
                   <Clock size={14} /> {t('playerdetails.requested_button')}
                 </button>
@@ -420,17 +435,6 @@ export default function PlayerDetails() {
           </div>
         )}
 
-        {/* Seguidores/A seguir — mesma posição do Perfil próprio (depois
-            das stats, não junto ao nome): o cabeçalho fica só nome + pontos,
-            como no Profile.jsx (11 set 2026). */}
-        <div className="mt-3.5 pt-3.5 border-t border-line flex items-center justify-center gap-4 text-sm">
-          <button type="button" onClick={() => setFollowListTab('followers')} className="font-extrabold text-ink-900">
-            {t('playerdetails.followers_count', { count: player.followers_count })}
-          </button>
-          <button type="button" onClick={() => setFollowListTab('following')} className="font-extrabold text-ink-900">
-            {t('playerdetails.following_count', { count: player.following_count })}
-          </button>
-        </div>
       </div>
 
       {/* Sobre — lado preferido, país, género. Antes vivia no cabeçalho;
