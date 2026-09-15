@@ -827,30 +827,40 @@ export default function GameDetails() {
         return
       }
 
-      // Duplas from the most recent previous mix at this club — solos
-      // whose points-based pairing would recreate one of these get
-      // reshuffled with the next-closest points instead (see formDuplas).
+      // Duplas dos últimos 4 mixes deste clube — solos cujo pareamento por
+      // pontos recriaria um destes pares são reshuffled com o próximo mais
+      // próximo em pontos em vez disso; só se aceita a repetição quando
+      // for matematicamente impossível evitá-la (ver formDuplas).
       const { data: previousGames } = await supabase
         .from('games')
         .select('id')
         .eq('organization_id', gameOrganizationId)
         .lt('date', game.date)
         .order('date', { ascending: false })
-        .limit(1)
+        .limit(4)
       let repeatPairKeys = new Set()
-      if (previousGames?.[0]) {
+      if (previousGames?.length) {
         const { data: previousTeams } = await supabase
           .from('teams')
           .select('player1_id, player2_id')
-          .eq('game_id', previousGames[0].id)
+          .in('game_id', previousGames.map(g => g.id))
         repeatPairKeys = new Set(
           (previousTeams || []).map(team => [team.player1_id, team.player2_id].sort().join('|'))
         )
       }
 
       // 4.1 formação de duplas
-      const duplas = formDuplas(participants, pointsById, repeatPairKeys)
+      const { duplas, forcedRepeats } = formDuplas(participants, pointsById, repeatPairKeys)
       if (duplas.length < 2) throw new Error(t('gamedetails.error_need_two_duplas'))
+      if (forcedRepeats.length > 0) {
+        const pairsList = forcedRepeats
+          .map(({ player1, player2 }) => `${firstLastName(player1?.name)} + ${firstLastName(player2?.name)}`)
+          .join(', ')
+        if (!confirm(t('gamedetails.confirm_repeat_pairing', { pairs: pairsList }))) {
+          setBusy(false)
+          return
+        }
+      }
 
       // Grupos+eliminatórias needs each dupla's pool assigned before
       // insert (there's no separate round trip to fetch ids back and

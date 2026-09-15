@@ -401,6 +401,7 @@
   "gamedetails.error_start_mix": "Erro ao começar o mix",
   "gamedetails.confirm_stop_mix_with_results": "Isto apaga as duplas e todos os resultados registados neste mix, para poderes recomeçar. Tens a certeza?",
   "gamedetails.confirm_stop_mix_no_results": "Isto apaga as duplas formadas, para poderes recomeçar. Tens a certeza?",
+  "gamedetails.confirm_repeat_pairing": "Sem alternativa possível, estas duplas repetem parceria de um dos últimos 4 mixes: {{pairs}}. Continuar mesmo assim?",
   "gamedetails.error_stop_mix": "Erro ao parar o mix",
   "gamedetails.error_start_round1": "Erro ao iniciar a ronda 1",
   "gamedetails.error_save_score": "Erro ao guardar o resultado",
