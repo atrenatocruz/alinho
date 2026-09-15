@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Award, Swords, ChevronDown, UserPlus, UserCheck, Clock, Lock, ShieldCheck, ThumbsUp } from 'lucide-react'
 import { supabase } from '../lib/supabase'
@@ -25,6 +26,7 @@ const GENDER_LABEL_KEY = { masculino: 'login.gender_male', feminino: 'login.gend
 export default function PlayerDetails() {
   const { t, i18n } = useTranslation()
   const { id } = useParams()
+  const goBack = useGoBack('/comunidade')
   const navigate = useNavigate()
   const [player, setPlayer] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -271,7 +273,8 @@ export default function PlayerDetails() {
   return (
     <div className="space-y-4">
       <button
-        onClick={() => navigate(-1)}
+        type="button"
+        onClick={goBack}
         className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm min-h-[44px] pr-3"
       >
         <ArrowLeft size={20} />

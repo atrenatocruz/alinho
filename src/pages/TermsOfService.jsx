@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, FileText } from 'lucide-react'
 import { Wordmark } from '../components/Layout'
@@ -11,14 +12,15 @@ const SECTIONS = [
 ]
 
 export default function TermsOfService() {
+  const goBack = useGoBack('/')
   const { t } = useTranslation()
   return (
     <div className="min-h-screen bg-canvas">
       <header className="bg-surface border-b border-line sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center gap-4">
-          <Link to="/" className="text-ink-700">
+          <button type="button" onClick={goBack} aria-label={t('common.back')} className="text-ink-700">
             <ArrowLeft size={24} />
-          </Link>
+          </button>
           <h1 className="text-2xl text-ink-900">{t('terms.title')}</h1>
         </div>
       </header>

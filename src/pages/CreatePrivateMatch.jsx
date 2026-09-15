@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Users, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -63,6 +64,7 @@ function PlayerOrGuestSlot({ label, selected, onSelect, onClear, guestName, onGu
 }
 
 export default function CreatePrivateMatch() {
+  const goBack = useGoBack('/jogos-privados')
   const { t } = useTranslation()
   const { profile } = useAuth()
   const navigate = useNavigate()
@@ -131,10 +133,10 @@ export default function CreatePrivateMatch() {
 
   return (
     <div className="space-y-5">
-      <Link to="/jogos-privados" className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm min-h-[44px]">
+      <button type="button" onClick={goBack} className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm min-h-[44px]">
         <ArrowLeft size={20} />
         {t('createprivatematch.back')}
-      </Link>
+      </button>
 
       <div>
         <h2 className="text-3xl text-ink-900">{t('createprivatematch.title')}</h2>

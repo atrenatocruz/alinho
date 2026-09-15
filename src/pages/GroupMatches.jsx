@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
+import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Plus, MapPin, Clock, Trash2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -244,6 +245,7 @@ function MatchCard({ match, org, currentUser, isOrgAdmin, onChanged, t, i18n }) 
 export default function GroupMatches() {
   const { t, i18n } = useTranslation()
   const { slug } = useParams()
+  const goBack = useGoBack(`/clube/${slug}`)
   const { profile: currentUser, memberships } = useAuth()
   const [org, setOrg] = useState(null)
   const [matches, setMatches] = useState([])
@@ -271,9 +273,9 @@ export default function GroupMatches() {
 
   return (
     <div className="space-y-5 max-w-lg mx-auto">
-      <Link to={`/clube/${slug}`} className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline">
-        <ArrowLeft size={16} /> {t('groupmatches.back_to_club', { name: org?.name || '' })}
-      </Link>
+      <button type="button" onClick={goBack} className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline">
+        <ArrowLeft size={16} /> {t('common.back')}
+      </button>
 
       <div className="flex items-start justify-between gap-3">
         <div>

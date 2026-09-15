@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
+import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
 import { Plus, Calendar, Users, Trash2, Edit2, Check, X, UserX, Repeat, Clock, ArrowLeft, Camera, Settings, Copy } from 'lucide-react'
 import { supabase } from '../lib/supabase'
@@ -148,6 +149,7 @@ function Segmented({ options, value, onChange }) {
 export default function GerirClube() {
   const { t, i18n } = useTranslation()
   const { slug } = useParams()
+  const goBack = useGoBack('/gerir')
   const [searchParams] = useSearchParams()
   const { profile: currentUser, memberships, adminOrganizations, isPrivateMatchesEnabled, refreshFeatureFlags, ensureOrgAdminAccess, refreshMemberships, followOrganization } = useAuth()
   const [org, setOrg] = useState(null)
@@ -1322,9 +1324,9 @@ export default function GerirClube() {
         <p className="text-muted text-sm mb-6">
           {t('gerirclube.no_access_subtitle')}
         </p>
-        <Link to="/gerir" className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline">
-          <ArrowLeft size={16} /> {t('gerirclube.back_to_managed_clubs')}
-        </Link>
+        <button type="button" onClick={goBack} className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline">
+          <ArrowLeft size={16} /> {t('common.back')}
+        </button>
       </div>
     )
   }
@@ -1333,9 +1335,9 @@ export default function GerirClube() {
     <div className="space-y-6">
       <div>
         {(adminOrganizations.length > 1 || currentUser?.is_platform_admin) && (
-          <Link to="/gerir" className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline mb-2">
-            <ArrowLeft size={16} /> {t('gerirclube.back_to_managed_clubs')}
-          </Link>
+          <button type="button" onClick={goBack} className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline mb-2">
+            <ArrowLeft size={16} /> {t('common.back')}
+          </button>
         )}
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -34,6 +35,7 @@ function Segmented({ options, value, onChange }) {
 export default function CreateGroupMatch() {
   const { t } = useTranslation()
   const { slug } = useParams()
+  const goBack = useGoBack(`/clube/${slug}/jogos`)
   const navigate = useNavigate()
   const { profile: currentUser } = useAuth()
 
@@ -109,9 +111,9 @@ export default function CreateGroupMatch() {
 
   return (
     <div className="space-y-5 max-w-lg mx-auto">
-      <Link to={`/clube/${slug}/jogos`} className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline">
-        <ArrowLeft size={16} /> {t('creategroupmatch.back_to_group_matches')}
-      </Link>
+      <button type="button" onClick={goBack} className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline">
+        <ArrowLeft size={16} /> {t('common.back')}
+      </button>
 
       <div>
         <h2 className="text-3xl text-ink-900">{t('creategroupmatch.title')}</h2>

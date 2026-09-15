@@ -1,19 +1,21 @@
 import { Link } from 'react-router-dom'
+import { useGoBack } from '../lib/useGoBack'
 import { useTranslation, Trans } from 'react-i18next'
 import { ArrowLeft, HelpCircle, Users, Calendar, Trophy, Settings, TrendingUp, Shield } from 'lucide-react'
 import { Wordmark } from '../components/Layout'
 import { XP_TIERS, formatXp } from '../lib/xp'
 
 export default function Instructions() {
+  const goBack = useGoBack('/')
   const { t } = useTranslation()
   return (
     <div className="min-h-screen bg-canvas">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center gap-4">
-          <Link to="/" className="text-ink-700">
+          <button type="button" onClick={goBack} aria-label={t('common.back')} className="text-ink-700">
             <ArrowLeft size={24} />
-          </Link>
+          </button>
           <h1 className="text-2xl font-bold text-ink-900">{t('instructions.title')}</h1>
         </div>
       </header>
