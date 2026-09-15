@@ -402,6 +402,7 @@
   "gamedetails.error_start_mix": "Error starting the mix",
   "gamedetails.confirm_stop_mix_with_results": "This deletes the duplas and all results recorded in this mix, so you can start over. Are you sure?",
   "gamedetails.confirm_stop_mix_no_results": "This deletes the formed duplas, so you can start over. Are you sure?",
+  "gamedetails.confirm_repeat_pairing": "No alternative was possible — these pairs repeat a partnership from one of the last 4 mixes: {{pairs}}. Continue anyway?",
   "gamedetails.error_stop_mix": "Error stopping the mix",
   "gamedetails.error_start_round1": "Error starting round 1",
   "gamedetails.error_save_score": "Error saving the result",

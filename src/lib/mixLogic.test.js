@@ -3,7 +3,7 @@ import {
   splitIntoPools, seedKnockoutFromPools,
   poolRoundNumbers, poolRoundsPlayed, roundRobinRound,
   generateAmericanoSchedule, americanoStandings,
-  computeMixWinnerTeamId,
+  computeMixWinnerTeamId, formDuplas,
 } from './mixLogic'
 
 describe('splitIntoPools', () => {
@@ -345,5 +345,72 @@ describe('computeMixWinnerTeamId', () => {
     ]
     // both t1 and t3 have 1 win; standings() tie-breaks on diff — t3's is bigger (+5 vs +4)
     expect(computeMixWinnerTeamId(game, teams, matches)).toBe('t3')
+  })
+})
+
+describe('formDuplas', () => {
+  // Helper: jogador solo confirmado, com pontos e side opcional.
+  const withPoints = (id, pts, side = 'both') => ({
+    status: 'confirmed',
+    user: { id, name: id, preferred_side: side, _points: pts },
+  })
+  const pointsById = (rows) => Object.fromEntries(rows.map((r) => [r.user.id, r.user._points]))
+  const pairKey = (a, b) => [a, b].sort().join('|')
+
+  it('sem histórico de repetição, pareia por pontos mais próximos (comportamento existente)', () => {
+    const rows = [withPoints('a', 100), withPoints('b', 90), withPoints('c', 80), withPoints('d', 70)]
+    const { duplas, forcedRepeats } = formDuplas(rows, pointsById(rows), new Set())
+    expect(duplas.map((d) => [d.player1.id, d.player2.id])).toEqual([['a', 'b'], ['c', 'd']])
+    expect(forcedRepeats).toEqual([])
+  })
+
+  it('evita uma repetição simples saltando para o próximo candidato em pontos', () => {
+    const rows = [withPoints('a', 100), withPoints('b', 90), withPoints('c', 80), withPoints('d', 70)]
+    const repeatPairKeys = new Set([pairKey('a', 'b')])
+    const { duplas, forcedRepeats } = formDuplas(rows, pointsById(rows), repeatPairKeys)
+    expect(duplas.map((d) => [d.player1.id, d.player2.id]).map((p) => p.sort())).toContainEqual(['a', 'c'])
+    expect(forcedRepeats).toEqual([])
+  })
+
+  it('usa backtracking quando a escolha mais óbvia levaria a uma repetição evitável mais à frente', () => {
+    // Pontos desc: a=100 b=99 c=98 d=97 e=96 f=95.
+    // Proibidos: a-b, c-d, e-f (repetiram no mix anterior) e a-c (repetiram há 2 mixes).
+    // O greedy antigo (mais próximo em pontos, sem olhar para a frente) dava:
+    // a-d (b e c já eram proibidos para a), depois b-c (mais próximo dos que sobram),
+    // o que obriga e-f no fim — uma repetição evitável.
+    // Uma solução sem NENHUMA repetição existe: a-d, b-e, c-f.
+    const rows = ['a', 'b', 'c', 'd', 'e', 'f'].map((id, i) => withPoints(id, 100 - i))
+    const repeatPairKeys = new Set([pairKey('a', 'b'), pairKey('c', 'd'), pairKey('e', 'f'), pairKey('a', 'c')])
+    const { duplas, forcedRepeats } = formDuplas(rows, pointsById(rows), repeatPairKeys)
+    expect(forcedRepeats).toEqual([])
+    for (const d of duplas) {
+      expect(repeatPairKeys.has(pairKey(d.player1.id, d.player2.id))).toBe(false)
+    }
+  })
+
+  it('quando é matematicamente impossível evitar, forma as duplas mesmo assim e sinaliza a repetição', () => {
+    // Só há 2 solos e já jogaram juntos — não há alternativa nenhuma.
+    const rows = [withPoints('a', 100), withPoints('b', 90)]
+    const repeatPairKeys = new Set([pairKey('a', 'b')])
+    const { duplas, forcedRepeats } = formDuplas(rows, pointsById(rows), repeatPairKeys)
+    expect(duplas).toHaveLength(1)
+    expect(duplas[0].player1.id).toBe('a')
+    expect(duplas[0].player2.id).toBe('b')
+    expect(forcedRepeats).toHaveLength(1)
+    expect([forcedRepeats[0].player1.id, forcedRepeats[0].player2.id].sort()).toEqual(['a', 'b'])
+  })
+
+  it('duplas já formadas (com parceiro fixo) continuam a passar direto, sem entrar na busca', () => {
+    const fixedPartner = {
+      status: 'confirmed',
+      user: { id: 'x', name: 'x' },
+      partner_id: 'y',
+      partner: { id: 'y', name: 'y' },
+    }
+    const solos = [withPoints('a', 100), withPoints('b', 90)]
+    const { duplas, forcedRepeats } = formDuplas([fixedPartner, ...solos], pointsById(solos), new Set())
+    expect(duplas).toHaveLength(2)
+    expect(duplas.some((d) => d.player1.id === 'x' && d.player2.id === 'y')).toBe(true)
+    expect(forcedRepeats).toEqual([])
   })
 })
