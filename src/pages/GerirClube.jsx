@@ -1530,12 +1530,13 @@ export default function GerirClube() {
             <ArrowLeft size={16} /> {t('common.back')}
           </button>
         )}
+        {/* "Gerir" as a small label above, so the title is the group's name
+            alone — as "Gerir: <nome>" it truncated to "Gerir: Grup…" on a
+            phone (Francisco, 15 set 2026). Kept outside the row below so the
+            QR/settings buttons line up with the title, not with this label. */}
+        <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('gerirclube.manage_label')}</p>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            {/* "Gerir" as a small label above, so the title is the group's name
-                alone — as "Gerir: <nome>" it truncated to "Gerir: Grup…" on a
-                phone (Francisco, 15 set 2026). */}
-            <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('gerirclube.manage_label')}</p>
             {editingName ? (
               <div className="flex items-center gap-2">
                 <input
@@ -1553,15 +1554,16 @@ export default function GerirClube() {
                 />
               </div>
             ) : (
-              <h2 className="text-3xl font-bold text-ink-900 flex items-start gap-2 min-w-0">
-                {/* Wraps instead of truncating: "Smash Padel Almada" was cut to
-                    "Smash Padel …" next to the two round buttons. */}
-                <span className="min-w-0 break-words">{org.name}</span>
+              <h2 className="text-3xl font-bold text-ink-900 min-w-0 break-words">
+                {/* Wraps instead of truncating ("Smash Padel …"), and the pencil
+                    sits inline right after the last word — as a flex item it
+                    floated far right of a wrapped name (Francisco, 15 set 2026). */}
+                {org.name}
                 <button
                   type="button"
                   onClick={() => { setNameInput(org.name); setEditingName(true) }}
                   aria-label={t('gerirclube.edit_name_aria')}
-                  className="shrink-0 mt-0.5 w-8 h-8 flex items-center justify-center rounded-full text-muted hover:text-ink-900 hover:bg-ink-50 transition-colors duration-fast"
+                  className="ml-1.5 inline-flex align-middle -mt-1 w-8 h-8 items-center justify-center rounded-full text-muted hover:text-ink-900 hover:bg-ink-50 transition-colors duration-fast"
                 >
                   <Edit2 size={16} />
                 </button>
@@ -1582,7 +1584,7 @@ export default function GerirClube() {
             onClick={() => setActiveTab('redeem')}
             title={t('gerirclube.redeem_voucher_label')}
             aria-label={t('gerirclube.redeem_voucher_label')}
-            className="shrink-0 w-11 h-11 flex items-center justify-center rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast"
+            className="shrink-0 -mt-1 w-11 h-11 flex items-center justify-center rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast"
           >
             <QrCode size={20} />
           </button>
@@ -1591,7 +1593,7 @@ export default function GerirClube() {
             onClick={() => setActiveTab('settings')}
             title={t('gerirclube.settings_label')}
             aria-label={t('gerirclube.settings_label')}
-            className="shrink-0 w-11 h-11 flex items-center justify-center rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast"
+            className="shrink-0 -mt-1 w-11 h-11 flex items-center justify-center rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast"
           >
             <Settings size={20} />
           </button>
