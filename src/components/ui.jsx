@@ -678,6 +678,59 @@ export function VoucherQRModal({ voucher, onClose }) {
   )
 }
 
+/* ─── DangerConfirmModal ─────────────────────────────────────────────────
+   Confirmation for an action that destroys data and can't be undone.
+   The rest of the app confirms destructive actions with the browser's
+   native confirm() — fine for "delete this mix", but on a phone it's a small
+   grey system box that's easy to tap through. Deleting a whole group gets a
+   window that names what's being lost (Trello #241, Francisco 15 set 2026).
+
+   Tapping the backdrop does NOT confirm, and is ignored while `busy` so a
+   slow request can't be abandoned half-way with the page in an odd state. */
+export function DangerConfirmModal({ open, title, message, emphasis, confirmLabel, cancelLabel, busy = false, error = '', onConfirm, onClose }) {
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e) => { if (e.key === 'Escape' && !busy) onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, busy, onClose])
+
+  if (!open) return null
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 animate-fade-in p-4"
+      onClick={() => { if (!busy) onClose() }}
+    >
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="danger-confirm-title"
+        className="card bg-white max-w-xs w-full"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p id="danger-confirm-title" className="text-lg font-extrabold text-ink-900">{title}</p>
+        <p className="mt-2 text-sm text-muted leading-relaxed">{message}</p>
+        {emphasis && <p className="mt-2 text-sm font-extrabold text-ink-900">{emphasis}</p>}
+        {error && <p className="mt-3 bg-danger/10 text-danger px-4 py-3 rounded-ctrl text-sm font-extrabold">{error}</p>}
+        <div className="mt-5 grid grid-cols-2 gap-2">
+          <button type="button" onClick={onClose} disabled={busy} className="btn-secondary w-full disabled:opacity-40">
+            {cancelLabel}
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={busy}
+            className="w-full bg-danger text-white px-4 py-3 rounded-ctrl text-sm font-extrabold hover:opacity-90 transition-opacity duration-fast disabled:opacity-40"
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
 /* ─── PhotoViewerModal ───────────────────────────────────────────────────
    Full-screen tap-to-zoom viewer for a profile photo, Instagram-style —
    dark backdrop, image scaled to fit, tap anywhere or the X to close.

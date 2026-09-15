@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, useSearchParams, Link } from 'react-router-dom'
+import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
 import { Plus, Calendar, Users, Trash2, Edit2, Check, X, UserX, Repeat, Clock, ArrowLeft, Camera, Settings, Copy, QrCode } from 'lucide-react'
@@ -8,10 +8,10 @@ import { useAuth } from '../contexts/AuthContext'
 import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
 import { uploadClubLogo, removeClubLogo } from '../lib/clubLogoStorage'
 import { createGroup } from '../lib/platformAdmin'
-import { listClubGroups } from '../lib/organizations'
+import { listClubGroups, getOrganizationDeleteBlocker, deleteSelfServeGroup } from '../lib/organizations'
 import { formatRating } from '../lib/elo'
 import { formatDate as formatDateLib, formatTime as formatTimeLib } from '../lib/formatDate'
-import { DateField, DateTimeField, Avatar, Select, PrimaryButton } from '../components/ui'
+import { DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal } from '../components/ui'
 import { totalRounds, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, SCORING_FORMAT_LABEL_KEY } from '../lib/mixLogic'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
 import { AGE_RESTRICTIONS } from '../lib/ageCategories'
@@ -191,6 +191,13 @@ export default function GerirClube() {
   const clubLogoInputRef = useRef(null)
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [logoError, setLogoError] = useState('')
+  // Eliminar grupo (Trello #241). deleteBlocker: undefined = still asking the
+  // server, null = can delete, string = the reason code it can't.
+  const navigate = useNavigate()
+  const [deleteBlocker, setDeleteBlocker] = useState(undefined)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deletingGroup, setDeletingGroup] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
   const [showCreateGroup, setShowCreateGroup] = useState(false)
   const [groupName, setGroupName] = useState('')
   const [groupSlug, setGroupSlug] = useState('')
@@ -1165,6 +1172,48 @@ export default function GerirClube() {
     }
   }
 
+  // Only groups created in Comunidade can be deleted, so only ask the server
+  // for those. Asking up front lets the section show the "já tem mixes" state
+  // before anyone taps the button, rather than failing after they confirm.
+  useEffect(() => {
+    if (activeTab !== 'settings' || !settings?.self_serve) return
+    let cancelled = false
+    setDeleteBlocker(undefined)
+    getOrganizationDeleteBlocker(settings.id)
+      .then((reason) => { if (!cancelled) setDeleteBlocker(reason) })
+      .catch((error) => {
+        console.error('Error checking whether the group can be deleted:', error)
+        // Most likely the migration hasn't been run yet. Don't offer a button
+        // that will certainly fail.
+        if (!cancelled) setDeleteBlocker('unavailable')
+      })
+    return () => { cancelled = true }
+  }, [activeTab, settings?.id, settings?.self_serve])
+
+  const deleteBlockerMessage = (code) => {
+    if (code === 'has_activity') return t('gerirclube.delete_group_blocked_activity')
+    if (code === 'has_subgroups') return t('gerirclube.delete_group_blocked_subgroups')
+    return t('gerirclube.delete_group_blocked_generic')
+  }
+
+  const handleDeleteGroup = async () => {
+    setDeleteError('')
+    setDeletingGroup(true)
+    try {
+      await deleteSelfServeGroup(settings.id)
+      // Same path as leaving a group: reload memberships, and AuthContext
+      // falls back to another org if this was the current one.
+      await refreshMemberships()
+      navigate('/gerir', { replace: true })
+    } catch (error) {
+      console.error('Error deleting group:', error)
+      // The server re-checks under a lock, so something may have changed
+      // since the page asked (e.g. someone created a mix in the meantime).
+      setDeleteError(deleteBlockerMessage(error?.message))
+      setDeletingGroup(false)
+    }
+  }
+
   const handleUpdateSettings = async (e) => {
     e.preventDefault()
 
@@ -1392,16 +1441,22 @@ export default function GerirClube() {
   return (
     <div className="space-y-6">
       <div>
-        {(adminOrganizations.length > 1 || currentUser?.is_platform_admin) && (
+        {/* Hidden inside settings/redeem: those screens have their own "Voltar"
+            (back to the games tab), and two stacked "Voltar" going to different
+            places read as the same button. */}
+        {(adminOrganizations.length > 1 || currentUser?.is_platform_admin) && activeTab !== 'settings' && activeTab !== 'redeem' && (
           <button type="button" onClick={goBack} className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline mb-2">
             <ArrowLeft size={16} /> {t('common.back')}
           </button>
         )}
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
+            {/* "Gerir" as a small label above, so the title is the group's name
+                alone — as "Gerir: <nome>" it truncated to "Gerir: Grup…" on a
+                phone (Francisco, 15 set 2026). */}
+            <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('gerirclube.manage_label')}</p>
             {editingName ? (
               <div className="flex items-center gap-2">
-                <span className="text-3xl font-bold text-ink-900 shrink-0">{t('gerirclube.manage_prefix')}</span>
                 <input
                   type="text"
                   value={nameInput}
@@ -1418,7 +1473,7 @@ export default function GerirClube() {
               </div>
             ) : (
               <h2 className="text-3xl font-bold text-ink-900 flex items-center gap-2 min-w-0">
-                <span className="truncate">{t('gerirclube.manage_prefix')} {org.name}</span>
+                <span className="truncate">{org.name}</span>
                 <button
                   type="button"
                   onClick={() => { setNameInput(org.name); setEditingName(true) }}
@@ -2633,6 +2688,54 @@ export default function GerirClube() {
                   </label>
                 </div>
               )}
+
+              {/* Eliminar grupo — last thing on the page, below a divider, and
+                  only for groups created in Comunidade (Trello #241). Clubs
+                  never see it. While the server check is still out, nothing
+                  renders rather than a button that might flip to "blocked". */}
+              {settings.self_serve && deleteBlocker !== undefined && deleteBlocker !== 'unavailable' && (
+                <div className="mt-6 pt-6 border-t border-line">
+                  <h4 className="text-base font-extrabold text-ink-900 mb-1">{t('gerirclube.delete_group_heading')}</h4>
+                  {deleteBlocker === null ? (
+                    <>
+                      <p className="text-sm text-muted mb-3">{t('gerirclube.delete_group_hint')}</p>
+                      <button
+                        type="button"
+                        onClick={() => { setDeleteError(''); setShowDeleteConfirm(true) }}
+                        className="w-full bg-danger/10 text-danger px-4 py-3 rounded-ctrl text-sm font-extrabold hover:bg-danger/20 transition-colors duration-fast"
+                      >
+                        {t('gerirclube.delete_group_button')}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="bg-danger/10 text-danger px-4 py-3 rounded-ctrl text-sm font-extrabold">
+                        {deleteBlockerMessage(deleteBlocker)}
+                      </p>
+                      <button
+                        type="button"
+                        disabled
+                        className="mt-3 w-full bg-ink-50 text-ink-200 px-4 py-3 rounded-ctrl text-sm font-extrabold cursor-not-allowed"
+                      >
+                        {t('gerirclube.delete_group_button')}
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+
+              <DangerConfirmModal
+                open={showDeleteConfirm}
+                title={t('gerirclube.delete_group_confirm_title', { name: settings.name })}
+                message={t('gerirclube.delete_group_confirm_message')}
+                emphasis={t('gerirclube.delete_group_confirm_emphasis')}
+                confirmLabel={deletingGroup ? t('gerirclube.delete_group_deleting') : t('gerirclube.delete_group_confirm_button')}
+                cancelLabel={t('gerirclube.delete_group_cancel')}
+                busy={deletingGroup}
+                error={deleteError}
+                onConfirm={handleDeleteGroup}
+                onClose={() => setShowDeleteConfirm(false)}
+              />
             </div>
           )}
 
