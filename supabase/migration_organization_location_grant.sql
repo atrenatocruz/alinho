@@ -1,0 +1,23 @@
+-- ════════════════════════════════════════════════════════════════════════
+-- Migration: extend organizations column-level UPDATE grant to latitude/
+-- longitude — fixes "permission denied for table organizations" when
+-- saving club/group settings.
+--
+-- Root cause: migration_self_serve_groups.sql §7 locked down organizations
+-- to a column-level GRANT UPDATE (name, description, location, phone,
+-- instagram, website, group_logo_url, robot_contact, is_global, open_join)
+-- so a group admin can't write self_serve/kind/plan_tier/etc. via a direct
+-- UPDATE. migration_place_coordinates.sql later added latitude/longitude
+-- columns and claimed (wrongly) that no column-level GRANTs needed
+-- extending. GerirClube.jsx's handleUpdateSettings writes latitude/
+-- longitude alongside location (Google Places picker filling coordinates),
+-- so any settings save now includes an ungranted column and Postgres
+-- rejects the whole UPDATE.
+--
+-- Column-level GRANTs are additive, so this only needs to add the two
+-- missing columns — no REVOKE/re-GRANT of the full list required.
+--
+-- Run this whole file in Supabase → SQL Editor → New query → Run.
+-- ════════════════════════════════════════════════════════════════════════
+
+GRANT UPDATE (latitude, longitude) ON organizations TO authenticated;
