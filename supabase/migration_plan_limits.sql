@@ -39,7 +39,7 @@ RETURNS TABLE (max_members INTEGER, max_active_mixes INTEGER, max_courts INTEGER
 LANGUAGE sql
 IMMUTABLE
 AS $$
-  SELECT *
+  SELECT t.max_members, t.max_active_mixes, t.max_courts
   FROM (VALUES
     ('free', 30,   1,    2),
     ('plus', 300,  2,    4),
