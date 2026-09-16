@@ -1155,14 +1155,16 @@ Immediately after the closing of the `{activeTab === 'games' && (...)}` block (w
 
 - [ ] **Step 5: Add the tab label i18n key**
 
-In `src/locales/pt.json`, inside the existing `gerirclube` object (alongside `"tab_games"`, `"tab_members"`), add:
+Correction found during Task 7 (2026-09-16): `src/locales/pt.json` and `src/locales/en.json` are NOT nested objects — every key in both files is a flat dotted string (e.g. `"gerirclube.tab_games": "Jogos"`). There is no `gerirclube` object to nest inside. Add a flat key instead, alongside the existing `"gerirclube.tab_games"`/`"gerirclube.tab_members"` lines:
+
+In `src/locales/pt.json`:
 ```json
-"tab_open_slots": "Jogos Abertos",
+"gerirclube.tab_open_slots": "Jogos Abertos",
 ```
 
-In `src/locales/en.json`, inside the existing `gerirclube` object:
+In `src/locales/en.json`:
 ```json
-"tab_open_slots": "Open Games",
+"gerirclube.tab_open_slots": "Open Games",
 ```
 
 - [ ] **Step 6: Remove Task 7's temporary inline render, if still present**
