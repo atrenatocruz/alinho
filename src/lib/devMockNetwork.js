@@ -63,11 +63,16 @@ const RPC_MOCKS = {
       clubs: [{ id: 'c1', name: 'Smash Padel Almada', slug: 'smash-padel', kind: 'club' }],
     }]
   },
+  // O próprio Admin(Dev) entra a meio da lista, e a lista vem ordenada como a
+  // RPC real — sem isto o cartão "Ranking global" do Perfil não tinha linha
+  // nenhuma para onde saltar, e o salto não se conseguia testar localmente.
   get_global_rankings: () => Object.entries(FAKE_PEOPLE).map(([id, p], i) => ({
     user_id: id, rating: p.rating, rating_games: 30, gender: p.gender,
   })).concat(Array.from({ length: 55 }, (_, i) => ({
     user_id: `fake-${i}`, rating: 2000 - i * 10, rating_games: 30, gender: 'masculino',
-  }))),
+  }))).concat([{
+    user_id: MOCK_ADMIN_USER_ID, rating: 1605, rating_games: 30, gender: 'masculino',
+  }]).sort((a, b) => b.rating - a.rating),
   get_player_xp: () => [{ xp: 320, kudos: 12 }],
   get_player_achievements: () => [
     { achievement_key: 'primeira_bola', category: 'jogo', rarity: 'comum', rarity_pct: 66.7 },
