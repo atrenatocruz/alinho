@@ -6,6 +6,7 @@ import { MapPin, CheckCircle2, ChevronRight, ChevronDown, ChevronLeft, Lock, Pla
 import ShareCard, { CARD_W, CARD_H } from './ShareCard'
 import QRCode from 'qrcode'
 import { ratingBand, groupRatingBand } from '../lib/elo'
+import { planName } from '../lib/plans'
 import { achievementIcon, RARITY_META } from '../lib/achievements'
 import { formatDate, formatTime, formatCurrency } from '../lib/formatDate'
 import { FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, mixCapacity } from '../lib/mixLogic'
@@ -555,9 +556,7 @@ export const orgAvatarShape = (kind) => (kind === 'group' ? 'round' : 'square')
    que é a cor dos botões. Sem maiúsculas, para não se confundir com a
    etiqueta CLUBE/GRUPO ao lado. O plano não muda o tipo: um grupo pode
    subscrever o Club e continua a ser grupo. */
-export const PLAN_TIERS = ['free', 'plus', 'pro', 'club']
-export const PLAN_NAMES = { free: 'Free', plus: 'Squad', pro: 'Community', club: 'Club' }
-export const planName = (tier) => PLAN_NAMES[tier] || PLAN_NAMES.free
+export { PLAN_TIERS, PLAN_NAMES, planName } from '../lib/plans'
 
 export function PlanBadge({ tier, className = '' }) {
   const { t } = useTranslation()

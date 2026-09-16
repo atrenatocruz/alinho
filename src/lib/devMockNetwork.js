@@ -1,3 +1,5 @@
+import { supabase } from './supabase'
+
 // Dev-only: quando a sessão é o atalho "Entrar como Admin (Dev)"
 // (AuthContext.jsx, MOCK_ADMIN_KEY), essa sessão nunca teve um auth.uid()
 // real — todas as RPCs/tabelas autenticadas já falhavam sempre (permission
@@ -179,10 +181,21 @@ export function installDevMockNetwork() {
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
   if (!supabaseUrl) return
+
+  // supabase.auth.getUser() nem sequer chega a fazer pedido sem sessão real
+  // — devolve logo "Auth session missing". handleCreateGame lê user.id a
+  // seguir, por isso criar um mix rebentava sempre em localhost, antes de
+  // chegar à base de dados. Aqui devolve o Admin(Dev).
+  supabase.auth.getUser = async () => ({
+    data: { user: { id: MOCK_ADMIN_USER_ID, email: 'admin@dev.local', aud: 'authenticated', role: 'authenticated' } },
+    error: null,
+  })
+
   const originalFetch = window.fetch.bind(window)
 
   window.fetch = async (input, init) => {
     const url = typeof input === 'string' ? input : input?.url
+
     if (!url || !url.startsWith(supabaseUrl) || !url.includes('/rest/v1/')) {
       return originalFetch(input, init)
     }
@@ -194,6 +207,18 @@ export function installDevMockNetwork() {
       let params = {}
       try { params = init?.body ? JSON.parse(init.body) : {} } catch { /* not JSON — ignore */ }
       return jsonResponse(mock(params))
+    }
+
+    // localStorage.mockLimitError = 'true' faz qualquer criação/edição de
+    // mix falhar como falha quando um limite bate na base de dados, para se
+    // poder ver a mensagem de limite do plano em localhost (Trello #265).
+    if (localStorage.getItem('mockLimitError') === 'true'
+        && /\/rest\/v1\/games\?/.test(url)
+        && ['POST', 'PATCH'].includes((init?.method || input?.method || 'GET').toUpperCase())) {
+      return jsonResponse({
+        message: 'new row violates row-level security policy for table "games"',
+        code: '42501',
+      }, 403)
     }
 
     const tableMatch = url.match(/\/rest\/v1\/([a-zA-Z_]+)\?/)

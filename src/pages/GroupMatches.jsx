@@ -279,11 +279,11 @@ export default function GroupMatches() {
 
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-3xl text-ink-900">{t('groupmatches.title')}</h2>
+          <h2 className="text-3xl text-ink-900">{t(org?.kind === 'group' ? 'groupmatches.title_group' : 'groupmatches.title')}</h2>
           {org && <p className="text-muted text-sm mt-0.5">{t('groupmatches.subtitle', { group: org.name })}</p>}
         </div>
         <Link to={`/clube/${slug}/jogos/novo`}>
-          <PrimaryButton type="button"><Plus size={18} /> {t('groupmatches.create_button')}</PrimaryButton>
+          <PrimaryButton type="button"><Plus size={18} /> {t(org?.kind === 'group' ? 'groupmatches.create_button_group' : 'groupmatches.create_button')}</PrimaryButton>
         </Link>
       </div>
 
