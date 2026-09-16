@@ -96,7 +96,7 @@ const RPC_MOCKS = {
     gender: 'feminino', preferred_side: 'left', club_names: 'Dev Org',
   }],
   list_players: () => [{
-    id: FAKE_MEMBER_ID, name: 'Marta Costa', avatar_url: null, rating: 1380,
+    id: FAKE_MEMBER_ID, name: longNames() ? 'Marta Sofia Costa de Vasconcelos Rodrigues' : 'Marta Costa', avatar_url: null, rating: 1380,
     gender: 'feminino', preferred_side: 'left', club_names: 'Dev Org',
   }],
   get_my_private_matches: () => [],
@@ -137,6 +137,15 @@ const ROT_MATCHES = [
 ]
 const rotating = () => localStorage.getItem('mockRotatingMix') === 'true'
 
+// localStorage.mockLongNames = 'true' — mix terminado e Comunidade com nomes
+// muito grandes, para ver o corte do nome ao lado do nível e do troféu.
+const longNames = () => localStorage.getItem('mockLongNames') === 'true'
+const LONG_STATS = [
+  { id: 'ls1', game_id: 'fake-game-1', user_id: FAKE_PLAYER_ID, matches_played: 4, matches_won: 4, points_earned: 20, mix_won: true, rating_delta: 45, rating_after: 994, user: { name: 'Francisco Maria Barros de Albuquerque' } },
+  { id: 'ls2', game_id: 'fake-game-1', user_id: FAKE_MEMBER_ID, matches_played: 4, matches_won: 2, points_earned: 12, mix_won: false, rating_delta: 32, rating_after: 723, user: { name: 'Paulo Granja' } },
+  { id: 'ls3', game_id: 'fake-game-1', user_id: FAKE_PARTNER_ID, matches_played: 4, matches_won: 4, points_earned: 20, mix_won: true, rating_delta: 15, rating_after: 1164, user: { name: 'Renato Cruz' } },
+]
+
 const TABLE_MOCKS = {
   // A organização do Admin(Dev). Sem esta linha o separador Definições do
   // Gerir ficava em branco (loadSettings nunca recebia nada). Marcada como
@@ -151,7 +160,7 @@ const TABLE_MOCKS = {
     { key: 'mes_cheio', category: 'jogo', rarity: 'epico', sort: 2 },
   ],
   player_stats: () => [{ game_wins: 24, game_losses: 16, mix_wins: 3, mixes_played: 8, total_points: 120 }],
-  mix_player_stats: () => [],
+  mix_player_stats: () => (longNames() ? LONG_STATS : []),
   teams: () => (rotating() ? ROT_TEAMS : []),
   matches: () => (rotating() ? ROT_MATCHES : []),
   // Mix em aberto — 1 dupla já confirmada, a segunda por preencher (2 de 4
@@ -159,6 +168,7 @@ const TABLE_MOCKS = {
   games: () => [{
     // localStorage.mockFriendlyMix = 'true' — mix amigável, sem ranking (Trello #267).
     ...(localStorage.getItem('mockFriendlyMix') === 'true' ? { ranked: false } : {}),
+    ...(longNames() ? { status: 'finished' } : {}),
     ...(rotating() ? {
       status: 'in_progress', rotate_partners: true, pairing_mode: 'aleatorio',
       game_time_minutes: 20, court_time_minutes: 60, scoring_format: 'pontos_simples',
@@ -169,7 +179,7 @@ const TABLE_MOCKS = {
     title: 'Mix de Quinta-feira',
     date: tomorrow8pm.toISOString(),
     location: 'Smash Padel Almada',
-    status: rotating() ? 'in_progress' : 'open',
+    status: longNames() ? 'finished' : rotating() ? 'in_progress' : 'open',
     format: 'sobe_desce',
     num_courts: 2,
     price_per_player: 8,

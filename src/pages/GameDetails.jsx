@@ -1920,13 +1920,18 @@ export default function GameDetails() {
               const hasRating = s.rating_delta != null
               const nameBlock = (
                 <div className="flex-1 min-w-0">
-                  <p className="font-extrabold text-ink-900 truncate flex items-center gap-1.5">
-                    {firstLastName(s.user?.name)}
-                    <RatingBadge
-                      rating={hasRating ? s.rating_after : ratingInfoById[s.user_id]?.rating}
-                      gender={ratingInfoById[s.user_id]?.gender}
-                    />
-                    {s.mix_won && <span className="ml-1.5">🏆</span>}
+                  {/* Só o nome encolhe (reticências); nível e troféu ficam
+                      sempre visíveis — com o truncate na linha toda, um nome
+                      grande empurrava o 🏆 para fora (Francisco, 16 set 2026). */}
+                  <p className="font-extrabold text-ink-900 flex items-center gap-1.5 min-w-0">
+                    <span className="truncate min-w-0">{firstLastName(s.user?.name)}</span>
+                    <span className="shrink-0 flex">
+                      <RatingBadge
+                        rating={hasRating ? s.rating_after : ratingInfoById[s.user_id]?.rating}
+                        gender={ratingInfoById[s.user_id]?.gender}
+                      />
+                    </span>
+                    {s.mix_won && <span className="shrink-0">🏆</span>}
                   </p>
                   <p className="text-[11px] text-muted">
                     {s.matches_won}/{s.matches_played} {t('gamedetails.games_suffix')} • {winRatePct(s.matches_won, s.matches_played)}% {t('gamedetails.win_rate_suffix')}
