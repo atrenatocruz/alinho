@@ -9,6 +9,7 @@ import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
 import { countPeople, mixCapacity, isGenderMismatch, isAgeIneligible, isMissingBirthday } from '../lib/mixLogic'
 import { listFollowing } from '../lib/follows'
+import { isMemberLimitError } from '../lib/plans'
 
 export default function Home() {
   const { t } = useTranslation()
@@ -48,7 +49,10 @@ export default function Home() {
       if (error) throw error
     } catch (error) {
       console.error('Error joining organization:', error)
-      setJoinError(t('home.join_club_error'))
+      // Um grupo cheio é diferente de um nome errado. Quem tenta entrar não
+      // gere o grupo, por isso não se fala de planos nem de preços aqui.
+      const message = error?.message || ''
+      setJoinError(isMemberLimitError(message) ? t('home.join_club_full') : t('home.join_club_error'))
     } finally {
       setJoining(false)
     }

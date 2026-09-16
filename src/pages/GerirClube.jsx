@@ -12,6 +12,7 @@ import { listClubGroups, getOrganizationDeleteBlocker, deleteSelfServeGroup, tra
 import { formatRating } from '../lib/elo'
 import { formatDate as formatDateLib, formatTime as formatTimeLib } from '../lib/formatDate'
 import { DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal, OrgKindBadge, PlanBadge, PLAN_TIERS, planName } from '../components/ui'
+import { planLimitMessage, isMixLimitError, isMemberLimitError } from '../lib/plans'
 import { totalRounds, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, SCORING_FORMAT_LABEL_KEY } from '../lib/mixLogic'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
 import { AGE_RESTRICTIONS } from '../lib/ageCategories'
@@ -211,6 +212,10 @@ export default function GerirClube() {
   const [groupSlug, setGroupSlug] = useState('')
   const [creatingGroup, setCreatingGroup] = useState(false)
   const [groupError, setGroupError] = useState('')
+  // Limites do plano: a mensagem fica no ecrã, junto do que falhou, em vez
+  // de um alert do browser que não diz em que plano estamos (Trello #265).
+  const [gameError, setGameError] = useState('')
+  const [membersError, setMembersError] = useState('')
   const [createdGroupName, setCreatedGroupName] = useState(null)
   const [clubGroups, setClubGroups] = useState([])
   const [groupsLoading, setGroupsLoading] = useState(false)
@@ -421,13 +426,16 @@ export default function GerirClube() {
   }
 
   const handleApproveGroupRequest = async (requestId, groupId) => {
+    setMembersError('')
     try {
       const { error } = await supabase.rpc('approve_membership_request', { p_request_id: requestId })
       if (error) throw error
       await Promise.all([loadClubGroups(), loadExpandedGroupDetails(groupId)])
     } catch (error) {
       console.error('Error approving group request:', error)
-      alert(t('gerirclube.error_approve_request') + error.message)
+      setMembersError(isMemberLimitError(error?.message || '')
+        ? planLimitMessage(t, 'members', org?.plan_tier)
+        : t('gerirclube.error_approve_request') + error.message)
     }
   }
 
@@ -563,13 +571,16 @@ export default function GerirClube() {
   }
 
   const handleApproveRequest = async (requestId) => {
+    setMembersError('')
     try {
       const { error } = await supabase.rpc('approve_membership_request', { p_request_id: requestId })
       if (error) throw error
       await Promise.all([loadMembers(), loadRequests()])
     } catch (error) {
       console.error('Error approving request:', error)
-      alert(t('gerirclube.error_approve_request') + error.message)
+      setMembersError(isMemberLimitError(error?.message || '')
+        ? planLimitMessage(t, 'members', org?.plan_tier)
+        : t('gerirclube.error_approve_request') + error.message)
     }
   }
 
@@ -802,6 +813,7 @@ export default function GerirClube() {
 
   const handleCreateGame = async (e) => {
     e.preventDefault()
+    setGameError('')
 
     // Date used to be enforced by DateTimeField's underlying native
     // input's `required` attribute — it's a fully custom component now.
@@ -886,10 +898,10 @@ export default function GerirClube() {
       // Postgres doesn't say *which* clause of the policy failed, so this
       // is one combined message covering both caps rather than a guess.
       const message = error?.message || ''
-      if (org?.self_serve && message.toLowerCase().includes('row-level security policy')) {
-        alert(t('gerirclube.error_self_serve_limit'))
+      if (org?.self_serve && isMixLimitError(message)) {
+        setGameError(planLimitMessage(t, 'mix', org?.plan_tier))
       } else {
-        alert(t('gerirclube.error_create_game') + error.message)
+        setGameError(t('gerirclube.error_create_game') + error.message)
       }
     }
   }
@@ -986,6 +998,7 @@ export default function GerirClube() {
 
   const handleUpdateGame = async (e) => {
     e.preventDefault()
+    setGameError('')
 
     if (!gameForm.date) {
       alert(t('gerirclube.validate_date_required'))
@@ -1071,10 +1084,10 @@ export default function GerirClube() {
       // INSERT one, so an edit can now trip them too — say so instead of a
       // bare "Erro ao atualizar jogo" the admin can't act on.
       const message = error?.message || ''
-      if (org?.self_serve && message.toLowerCase().includes('row-level security policy')) {
-        alert(t('gerirclube.error_self_serve_limit'))
+      if (org?.self_serve && isMixLimitError(message)) {
+        setGameError(planLimitMessage(t, 'mix', org?.plan_tier))
       } else {
-        alert(t('gerirclube.error_update_game'))
+        setGameError(t('gerirclube.error_update_game'))
       }
     }
   }
@@ -2077,6 +2090,10 @@ export default function GerirClube() {
                       </div>
                     )}
 
+                    {gameError && (
+                      <p className="rounded-ctrl bg-danger/10 text-danger text-sm font-extrabold p-3">{gameError}</p>
+                    )}
+
                     <div className="flex gap-3">
                       <button type="submit" className="btn-primary flex-1">
                         {editingGame ? t('gerirclube.update_button') : t('gerirclube.create_button')}
@@ -2088,6 +2105,7 @@ export default function GerirClube() {
                           setEditingGame(null)
                           setGameForm(EMPTY_GAME_FORM)
                           setMixScopeId('')
+                          setGameError('')
                         }}
                         className="btn-secondary flex-1"
                       >
@@ -2289,6 +2307,10 @@ export default function GerirClube() {
                   <strong>{t('gerirclube.total_members_label')}</strong> {members.length}
                 </p>
               </div>
+
+              {membersError && (
+                <p className="rounded-ctrl bg-danger/10 text-danger text-sm font-extrabold p-3">{membersError}</p>
+              )}
 
               {requests.length > 0 && (
                 <div className="space-y-2">

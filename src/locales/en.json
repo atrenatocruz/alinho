@@ -660,7 +660,6 @@
   "gerirclube.error_reject_teacher_request": "Error rejecting teacher request: ",
   "gerirclube.error_remove_member": "Error removing member: ",
   "gerirclube.error_rename_org": "Could not update the name. Try again.",
-  "gerirclube.error_self_serve_limit": "This mix exceeds the self-serve group's limits (max. 3 concurrent active mixes, 4 courts per mix).",
   "gerirclube.error_stop_recurrence": "Error stopping the recurrence: ",
   "gerirclube.error_toggle_feature": "Error updating feature: ",
   "gerirclube.error_update_game": "Error updating game",
@@ -1411,5 +1410,10 @@
   "landing.plan_club_f1": "Everything in Community",
   "landing.plan_club_f2": "Lessons and coaches",
   "landing.plan_club_f3": "Court bookings",
-  "landing.plan_club_f4": "In-app payments"
+  "landing.plan_club_f4": "In-app payments",
+  "plans.limit_mix": "You've reached the {{plan}} plan limit: {{mixes}} open mixes at a time and {{courts}} courts per mix.",
+  "plans.limit_members": "You've reached the {{plan}} plan limit: {{members}} members.",
+  "plans.next_plan_mix": "The {{next}} plan allows more mixes at a time and more courts.",
+  "plans.next_plan_members": "The {{next}} plan allows more members.",
+  "home.join_club_full": "This group is full. Talk to whoever manages it."
 }
