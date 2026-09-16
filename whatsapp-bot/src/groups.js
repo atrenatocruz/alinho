@@ -129,9 +129,14 @@ export async function getServedOrgIds() {
 /**
  * Regra de visibilidade grupo→nível: grupo sem filtro vê tudo; mix sem
  * nível aparece em todos os grupos do clube; caso contrário o nível do
- * mix tem de estar no filtro do grupo.
+ * mix tem de estar no filtro do grupo. Jogos em aberto (origin ===
+ * 'open_slot') ignoram sempre o filtro de nível — o nível que lá aparece
+ * é só informativo (ver design 2026-09-16), nunca deve fazer a mensagem
+ * desaparecer de um grupo por o primeiro jogador ter travado um nível
+ * fora do filtro desse grupo.
  */
 export function mixVisibleToGroup(game, group) {
+  if (game.origin === 'open_slot') return true
   if (!group.levels || group.levels.length === 0) return true
   if (!game.level) return true
   return group.levels.includes(game.level)
