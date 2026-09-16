@@ -1,6 +1,6 @@
 import { supabase } from './supabase.js'
 import { getGroupByJid, mixVisibleToGroup } from './groups.js'
-import { loadGame, getOpenMixes, formatDateTime, weekdayKeyPt, mixLocalParts, gameIdForMessage } from './roster.js'
+import { loadGame, getOpenMixes, formatDateTime, weekdayKeyPt, mixLocalParts, gameIdForMessage, labelableMixes, mixLabel } from './roster.js'
 import { resolveProfileByPhoneJid, createGuestProfile } from './phone.js'
 import { config } from './config.js'
 import { helpText, helpFooter } from './messages.js'
@@ -111,16 +111,10 @@ function formatMixLine(mix, lang, label) {
   return `${idPart} — ${mix.title}, ${formatDateTime(mix.date, lang)}${location}`
 }
 
-/** Formats `matches` (a subset of `allOpenMixes`) for a disambiguation reply — labels come from each mix's position in the FULL open list, not the filtered subset, so they match what's printed on that mix's own WhatsApp message. */
+/** Formats `matches` (a subset of `allOpenMixes`) for a disambiguation reply — labels come from each mix's position in the FULL open list (excluding jogos em aberto, which are never numbered — see mixLabel), so they match what's printed on that mix's own WhatsApp message. */
 function formatMixListForReply(matches, allOpenMixes, lang) {
-  const total = allOpenMixes.length
-  return matches
-    .map((mix) => {
-      const idx = allOpenMixes.findIndex((m) => m.id === mix.id)
-      const label = total > 1 ? String(idx + 1).padStart(2, '0') : null
-      return formatMixLine(mix, lang, label)
-    })
-    .join('\n')
+  const labelable = labelableMixes(allOpenMixes)
+  return matches.map((mix) => formatMixLine(mix, lang, mixLabel(mix, labelable))).join('\n')
 }
 
 /** Does this one identifier token single out `mix`? `label` is that mix's own "01"/"02" (null when it's the only mix open — nothing to number). Independent checks, not mutually exclusive — a token can validly hit more than one field of the same mix. */
@@ -179,10 +173,11 @@ function mixMatchesToken(mix, token, label) {
  */
 function matchOpenMixesByText(openMixes, rest, { glued }) {
   const tokens = rest.split(' ').filter(Boolean)
+  const labelable = labelableMixes(openMixes)
   let anyStructuredHit = false
 
-  const matched = openMixes.filter((mix, i) => {
-    const label = openMixes.length > 1 ? String(i + 1).padStart(2, '0') : null
+  const matched = openMixes.filter((mix) => {
+    const label = mixLabel(mix, labelable)
     return tokens.every((token) => {
       const hit = mixMatchesToken(mix, token, label)
       if (hit) anyStructuredHit = true

@@ -123,6 +123,18 @@ export async function getOpenMixes(organizationId) {
   return data
 }
 
+/** Mixes eligible for a sequential "01"/"02" number — jogos em aberto (origin === 'open_slot') are never individually numbered, since they're rendered as one combined message (see openSlots.js), not one message per mix. Order matters: callers pass `openMixes` already sorted by date (getOpenMixes does this). */
+export function labelableMixes(openMixes) {
+  return openMixes.filter((m) => m.origin !== 'open_slot')
+}
+
+/** `mix`'s own "01"/"02" label, or null when there's nothing to disambiguate (0 or 1 labelable mixes) or when `mix` itself isn't labelable (a jogo em aberto). */
+export function mixLabel(mix, labelable) {
+  if (labelable.length <= 1) return null
+  const idx = labelable.findIndex((m) => m.id === mix.id)
+  return idx === -1 ? null : String(idx + 1).padStart(2, '0')
+}
+
 // 'en' maps to en-GB (not en-US) — same day/month ordering players are
 // already used to from pt-PT, just in English. Same convention as the web
 // app's src/lib/formatDate.js.
