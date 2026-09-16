@@ -1500,5 +1500,13 @@
   "gamedetails.rotating_partners_short": "parceiros trocam",
   "gamedetails.placar_title": "Placar do mix",
   "gamedetails.placar_hint": "Ganha o mix quem vencer o campo 1 na última ronda. Não conta para o ranking — é só deste mix.",
-  "gamedetails.placar_court": "Campo {{number}}"
+  "gamedetails.placar_court": "Campo {{number}}",
+  "gerirclube.ranked_label": "Este mix conta para o ranking?",
+  "gerirclube.ranked_yes": "Sim",
+  "gerirclube.ranked_no": "Não, só amigável",
+  "gerirclube.ranked_yes_help": "Os resultados contam para o ranking Geral, Por Clube e Mensal.",
+  "gerirclube.ranked_no_help": "Fica registado e visível, mas não mexe no ranking de ninguém. A presença conta na Assiduidade.",
+  "gerirclube.ranked_locked_yes": "Conta para o ranking. Já não dá para mudar — o mix já começou.",
+  "gerirclube.ranked_locked_no": "Amigável, não conta para o ranking. Já não dá para mudar — o mix já começou.",
+  "gamedetails.badge_friendly": "Amigável"
 }

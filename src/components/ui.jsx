@@ -1108,6 +1108,7 @@ export function MixCard({ game, joined = false, showClub = false, friendIds = nu
         <span className="inline-flex items-center gap-1.5">
           <Swords size={15} className="shrink-0" />
           {formatLabel} · {t('gamedetails.court_count', { count: numCourts })}
+          {game.ranked === false && <> · {t('gamedetails.badge_friendly')}</>}
         </span>
         {game.price_per_player > 0 && (
           <span className="inline-flex items-center gap-1.5">

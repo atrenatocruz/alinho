@@ -38,6 +38,10 @@ BEGIN
       SELECT MIN(created_at) AS finalized_at FROM mix_player_stats WHERE game_id = g.id
     ) f ON TRUE
     WHERE g.status = 'finished'
+      -- Mixes amigáveis (Trello #267) não entram no ranking. to_jsonb para
+      -- este ficheiro continuar a correr mesmo antes de
+      -- migration_mix_ranked.sql criar a coluna.
+      AND COALESCE((to_jsonb(g)->>'ranked')::boolean, TRUE)
     UNION ALL
     SELECT 'friendly', p.id, NULL::uuid, p.confirmed_at, p.confirmed_at
     FROM private_matches p

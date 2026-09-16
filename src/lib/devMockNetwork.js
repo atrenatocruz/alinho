@@ -152,6 +152,8 @@ const TABLE_MOCKS = {
   // Mix em aberto — 1 dupla já confirmada, a segunda por preencher (2 de 4
   // lugares), para se ver o cartão no estado "aberto/junto-te" na Home.
   games: () => [{
+    // localStorage.mockFriendlyMix = 'true' — mix amigável, sem ranking (Trello #267).
+    ...(localStorage.getItem('mockFriendlyMix') === 'true' ? { ranked: false } : {}),
     ...(rotating() ? {
       status: 'in_progress', rotate_partners: true, pairing_mode: 'aleatorio',
       game_time_minutes: 20, court_time_minutes: 60, scoring_format: 'pontos_simples',

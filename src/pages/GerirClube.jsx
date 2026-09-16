@@ -123,6 +123,8 @@ const EMPTY_GAME_FORM = {
   scoring_format: 'pontos_simples',
   pairing_mode: 'por_nivel',
   rotate_partners: false,
+  // Conta para o ranking (Trello #267). Por omissão sim.
+  ranked: true,
   gender_restriction: 'indiferente',
   // Escalao etario (Trello #212). null = sem restricao, entra toda a gente
   // com ou sem data de nascimento preenchida.
@@ -669,6 +671,7 @@ export default function GerirClube() {
     // Só quando não é o valor por omissão — ver handleCreateGame.
     ...(game.pairing_mode && game.pairing_mode !== 'por_nivel' ? { pairing_mode: game.pairing_mode } : {}),
     ...(game.rotate_partners ? { rotate_partners: true } : {}),
+    ...(game.ranked === false ? { ranked: false } : {}),
   })
 
   // Computes the date one frequency step after `date` — used to pre-create
@@ -841,7 +844,7 @@ export default function GerirClube() {
     // pairing_mode sai pelo mesmo motivo: só é enviado quando não é o valor
     // por omissão, para criar/editar mixes não rebentar antes de
     // migration_mix_pairing_mode.sql correr.
-    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, ...gameFields } = gameForm
+    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, ranked: _ranked, ...gameFields } = gameForm
 
     const recurrenceError = validateRecurrence(recurrence)
     if (recurrenceError) {
@@ -885,6 +888,9 @@ export default function GerirClube() {
             ...(gameForm.pairing_mode !== 'por_nivel' ? { pairing_mode: gameForm.pairing_mode } : {}),
             // Mesmo truque: só vai quando está ligado (e só no Sobe e desce).
             ...(gameForm.rotate_partners && gameForm.format === 'sobe_desce' ? { rotate_partners: true } : {}),
+            // Só vai quando é amigável — antes de migration_mix_ranked.sql
+            // correr, a coluna não existe.
+            ...(gameForm.ranked === false ? { ranked: false } : {}),
             level: gameForm.level || null,
             created_by: user.id,
             status: 'open'
@@ -1027,7 +1033,7 @@ export default function GerirClube() {
     // pairing_mode sai pelo mesmo motivo: só é enviado quando não é o valor
     // por omissão, para criar/editar mixes não rebentar antes de
     // migration_mix_pairing_mode.sql correr.
-    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, ...gameFields } = gameForm
+    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, ranked: _ranked, ...gameFields } = gameForm
     // Any mix in an active recurring series shares the same underlying
     // game_recurrences row (via recurrence_id) — not just the origin — so
     // recurrence management works from any of them, not only the one that
@@ -1070,6 +1076,7 @@ export default function GerirClube() {
           ...(gameForm.format === 'grupos_eliminatorias' ? { pool_size: parseInt(gameForm.pool_size, 10) || 4 } : {}),
           ...((gameForm.pairing_mode !== 'por_nivel' || editingGame.pairing_mode) ? { pairing_mode: gameForm.pairing_mode } : {}),
           ...((gameForm.rotate_partners || editingGame.rotate_partners) ? { rotate_partners: !!gameForm.rotate_partners && gameForm.format === 'sobe_desce' } : {}),
+          ...((gameForm.ranked === false || editingGame.ranked === false) ? { ranked: gameForm.ranked !== false } : {}),
           level: gameForm.level || null,
           ...pendingLaunchUpdate,
         })
@@ -1508,6 +1515,7 @@ export default function GerirClube() {
       scoring_format: game.scoring_format || 'pontos_simples',
       pairing_mode: game.pairing_mode || 'por_nivel',
       rotate_partners: !!game.rotate_partners,
+      ranked: game.ranked !== false,
       gender_restriction: game.gender_restriction || 'indiferente',
       age_restriction: game.age_restriction ?? null,
       level: game.level || '',
@@ -1890,6 +1898,34 @@ export default function GerirClube() {
                           ...(v !== 'sobe_desce' ? { rotate_partners: false } : {}),
                         })}
                       />
+                    </div>
+
+                    {/* Conta para o ranking (Trello #267) — mesmas palavras do
+                        jogo entre amigos. Só se muda antes de o mix começar
+                        (a base de dados também o impede). */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {t('gerirclube.ranked_label')}
+                      </label>
+                      {editingGame && ['in_progress', 'finished'].includes(editingGame.status) ? (
+                        <p className="text-sm text-muted">
+                          {t(gameForm.ranked ? 'gerirclube.ranked_locked_yes' : 'gerirclube.ranked_locked_no')}
+                        </p>
+                      ) : (
+                        <>
+                          <Segmented
+                            options={[
+                              { value: 'yes', label: t('gerirclube.ranked_yes') },
+                              { value: 'no', label: t('gerirclube.ranked_no') },
+                            ]}
+                            value={gameForm.ranked ? 'yes' : 'no'}
+                            onChange={(v) => setGameForm({ ...gameForm, ranked: v === 'yes' })}
+                          />
+                          <p className="text-sm text-muted mt-1.5">
+                            {t(gameForm.ranked ? 'gerirclube.ranked_yes_help' : 'gerirclube.ranked_no_help')}
+                          </p>
+                        </>
+                      )}
                     </div>
 
                     {/* Sobe e desce com parceiros que trocam (Trello #262,

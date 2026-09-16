@@ -1100,7 +1100,7 @@ export default function GameDetails() {
           ? t('gamedetails.correction_result_winner_changed', { team: teamName(data.new_winner_team_id) })
           : t('gamedetails.correction_result_winner_unchanged'),
       ]
-      if (!data.elo_applied) {
+      if (!data.elo_applied && data.elo_skip_reason !== 'sem_ranking') {
         parts.push(data.elo_skip_reason === 'untracked_participant'
           ? t('gamedetails.correction_elo_skipped_untracked')
           : t('gamedetails.correction_elo_skipped_later_event'))
@@ -1756,6 +1756,11 @@ export default function GameDetails() {
               )}
               {game.age_restriction && AGE_LABEL_KEY[game.age_restriction] && (
                 <> • {t(AGE_LABEL_KEY[game.age_restriction])}</>
+              )}
+              {game.ranked === false && (
+                <span className="ml-2 inline-block align-middle text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-canvas border border-line text-ink-700">
+                  {t('gamedetails.badge_friendly')}
+                </span>
               )}
             </span>
           </div>

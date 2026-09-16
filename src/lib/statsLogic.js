@@ -41,6 +41,8 @@ export function buildMonthlyLeaderboard(rows, lang) {
   const byMonth = {}
   for (const row of rows) {
     if (!row.game?.date) continue
+    // Mix amigável (Trello #267): fica no histórico, mas não no Mensal.
+    if (row.game.ranked === false) continue
     const key = monthKey(row.game.date)
     ;(byMonth[key] ||= {})
     const bucket = byMonth[key]

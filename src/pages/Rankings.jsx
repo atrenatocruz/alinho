@@ -144,7 +144,9 @@ export default function Rankings() {
     try {
       const { data, error } = await supabase
         .from('mix_player_stats')
-        .select('*, user:profiles!mix_player_stats_user_id_fkey (name), game:games (date)')
+        // games(*) e não games(date, ranked): assim não rebenta antes de
+        // migration_mix_ranked.sql criar a coluna.
+        .select('*, user:profiles!mix_player_stats_user_id_fkey (name), game:games (*)')
         .eq('organization_id', currentOrganizationId)
 
       if (error) throw error

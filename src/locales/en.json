@@ -1500,5 +1500,13 @@
   "gamedetails.rotating_partners_short": "rotating partners",
   "gamedetails.placar_title": "Mix scoreboard",
   "gamedetails.placar_hint": "Whoever wins court 1 in the last round wins the mix. Not a ranking — it only covers this mix.",
-  "gamedetails.placar_court": "Court {{number}}"
+  "gamedetails.placar_court": "Court {{number}}",
+  "gerirclube.ranked_label": "Does this mix count for the ranking?",
+  "gerirclube.ranked_yes": "Yes",
+  "gerirclube.ranked_no": "No, friendly only",
+  "gerirclube.ranked_yes_help": "Results count for the Overall, By club and Monthly rankings.",
+  "gerirclube.ranked_no_help": "It's recorded and visible, but doesn't change anyone's ranking. Attendance still counts.",
+  "gerirclube.ranked_locked_yes": "Counts for the ranking. Can't be changed — the mix has started.",
+  "gerirclube.ranked_locked_no": "Friendly, doesn't count for the ranking. Can't be changed — the mix has started.",
+  "gamedetails.badge_friendly": "Friendly"
 }
