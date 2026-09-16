@@ -1242,7 +1242,7 @@ export default function GerirClube() {
   // section show the "já tem mixes" state before anyone taps the button,
   // rather than failing after they confirm.
   useEffect(() => {
-    if (activeTab !== 'settings' || !(settings?.self_serve || currentUser?.is_platform_admin)) return
+    if (activeTab !== 'settings' || !settings?.id || !(settings.self_serve || currentUser?.is_platform_admin)) return
     let cancelled = false
     setDeleteBlocker(undefined)
     getOrganizationDeleteBlocker(settings.id)
