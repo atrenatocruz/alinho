@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   toDayKey, fromDayKey, addDays, eventFromGame, eventFromGroupMatch, eventFromPrivateMatch,
   applyFilters, eventsForDay, countByDay, nextMineDay, monthGrid, isAgendaGame,
-  DEFAULT_FILTERS, isDefaultFilters,
+  DEFAULT_FILTERS, isDefaultFilters, eventFromExplore, distanceKm, eventDistance, withinReach,
 } from './agenda'
 
 const ME = 'me'
@@ -111,6 +111,48 @@ describe('filters and days', () => {
   it('knows when filters are back to default', () => {
     expect(isDefaultFilters(DEFAULT_FILTERS)).toBe(true)
     expect(isDefaultFilters({ ...DEFAULT_FILTERS, onlyMine: false })).toBe(false)
+  })
+})
+
+describe('explore (Fase 2)', () => {
+  const row = (over = {}) => ({
+    game: { id: 'x1', date: new Date(2026, 8, 16, 21, 0).toISOString(), origin: 'admin', latitude: null, longitude: null, ...over.game },
+    organization: { id: 'org-z', name: '+1 Padel', kind: 'group', open_join: false, latitude: '38.7223', longitude: '-9.1393', ...over.organization },
+    people_count: 11, avg_rating: '1450.5', friends_in_org: ['Rui Costa'], my_request_status: null, ...over.row,
+  })
+  const lisboa = { latitude: 38.7223, longitude: -9.1393, radiusKm: 15 }
+  const porto = { latitude: 41.1579, longitude: -8.6291, radiusKm: 15 }
+
+  it('is never mine and carries counts, not names', () => {
+    const e = eventFromExplore(row())
+    expect(e.mine).toBe(false)
+    expect(e.source).toBe('explore')
+    expect(e.explore.peopleCount).toBe(11)
+    expect(e.explore.avgRating).toBe(1450.5)
+    expect(e.explore.friendsInOrg).toEqual(['Rui Costa'])
+  })
+  it('falls back to the club coordinates when the event has none', () => {
+    const e = eventFromExplore(row())
+    expect(e.latitude).toBeCloseTo(38.7223)
+    const own = eventFromExplore(row({ game: { latitude: 41.1, longitude: -8.6 } }))
+    expect(own.latitude).toBeCloseTo(41.1)
+  })
+  it('measures distance in km', () => {
+    expect(distanceKm(lisboa, porto)).toBeGreaterThan(270)
+    expect(distanceKm(lisboa, porto)).toBeLessThan(290)
+  })
+  it('filters explore events by radius, but never my own clubs', () => {
+    const near = eventFromExplore(row())
+    const noCoords = eventFromExplore(row({ organization: { latitude: null, longitude: null } }))
+    const ownClub = eventFromGame(game({ id: 'own' }), ME)
+    expect(withinReach(near, lisboa)).toBe(true)
+    expect(withinReach(near, porto)).toBe(false)
+    expect(withinReach(noCoords, lisboa)).toBe(false)
+    expect(withinReach(noCoords, null)).toBe(true)
+    expect(withinReach(ownClub, porto)).toBe(true)
+    const all = { ...DEFAULT_FILTERS, onlyMine: false }
+    expect(applyFilters([near, ownClub], all, porto).map((e) => e.id)).toEqual(['own'])
+    expect(eventDistance(near, null)).toBe(null)
   })
 })
 

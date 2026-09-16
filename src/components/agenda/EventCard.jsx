@@ -102,7 +102,49 @@ function cardFrame(event, past) {
 
 /* ─── Mix e jogo em aberto ──────────────────────────────────────────────── */
 
-export function GameEventCard({ event, profile, friendIds = null, action = null, result = null, past = false }) {
+/** Local (+ distância) e a linha de factos — igual nos cartões de mix dos
+    meus clubes e nos de explorar, para um mix não se descrever de duas formas. */
+function GameFacts({ game, distance }) {
+  const { t, i18n } = useTranslation()
+  const genderRestricted = game.gender_restriction && !['indiferente', 'misto'].includes(game.gender_restriction)
+  return (
+    <>
+      {(game.location || distance != null) && (
+        <p className="flex items-center gap-1.5 text-ink-700 text-[13px] mt-1.5 min-w-0">
+          <MapPin size={14} className="shrink-0" />
+          <span className="truncate">{game.location}</span>
+          {distance != null && (
+            <span className="shrink-0 font-extrabold text-ink-900">{game.location ? '· ' : ''}{t('agenda.distance_km', { km: distance < 10 ? distance.toFixed(1).replace('.0', '') : Math.round(distance) })}</span>
+          )}
+        </p>
+      )}
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-ink-700 text-[13px] mt-1.5">
+        <span className="inline-flex items-center gap-1">
+          <Swords size={14} className="shrink-0" />
+          {t(FORMAT_LABEL_KEY[game.format] || FORMAT_LABEL_KEY.sobe_desce)} · {t('gamedetails.court_count', { count: game.num_courts || 1 })}
+          {game.ranked === false && <> · {t('gamedetails.badge_friendly')}</>}
+        </span>
+        {game.price_per_player > 0 && (
+          <span className="inline-flex items-center gap-1">
+            <Euro size={14} className="shrink-0" />
+            {t('gamedetails.price_per_player', { price: formatCurrency(game.price_per_player, i18n.language) })}
+          </span>
+        )}
+        {game.prize && (
+          <span className="inline-flex items-center gap-1 min-w-0">
+            <Trophy size={14} className="shrink-0" /> <span className="truncate">{game.prize}</span>
+          </span>
+        )}
+        {genderRestricted && <span className="font-extrabold text-ink-900">{t(GENDER_RESTRICTION_LABEL_KEY[game.gender_restriction])}</span>}
+        {game.age_restriction && AGE_LABEL_KEY[game.age_restriction] && (
+          <span className="font-extrabold text-ink-900">{t(AGE_LABEL_KEY[game.age_restriction])}</span>
+        )}
+      </div>
+    </>
+  )
+}
+
+export function GameEventCard({ event, profile, friendIds = null, action = null, result = null, past = false, distance = null }) {
   const { t, i18n } = useTranslation()
   const game = event.raw
   const players = (game.participants || [])
@@ -119,7 +161,6 @@ export function GameEventCard({ event, profile, friendIds = null, action = null,
   const isClosed = game.status === 'closed' || (game.status === 'open' && isFull)
   const isLive = game.status === 'in_progress'
   const friendsIn = friendIds ? players.filter((p) => p.id && friendIds.has(p.id)) : []
-  const genderRestricted = game.gender_restriction && !['indiferente', 'misto'].includes(game.gender_restriction)
   const time = formatTime(event.startsAt, i18n.language, { hour: '2-digit', minute: '2-digit' })
 
   // "Outro nível, género ou idade: aparece, marcado" (Francisco, 16 set).
@@ -163,34 +204,7 @@ export function GameEventCard({ event, profile, friendIds = null, action = null,
       <h3 className={`text-base leading-snug mt-1.5 ${past ? 'text-muted' : 'text-ink-900'}`}>{game.title}</h3>
       <div className="mt-1"><Owner event={event} fallbackKey="agenda.owner_none" /></div>
 
-      {game.location && (
-        <p className="flex items-center gap-1.5 text-ink-700 text-[13px] mt-1.5">
-          <MapPin size={14} className="shrink-0" /> <span className="truncate">{game.location}</span>
-        </p>
-      )}
-
-      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-ink-700 text-[13px] mt-1.5">
-        <span className="inline-flex items-center gap-1">
-          <Swords size={14} className="shrink-0" />
-          {t(FORMAT_LABEL_KEY[game.format] || FORMAT_LABEL_KEY.sobe_desce)} · {t('gamedetails.court_count', { count: game.num_courts || 1 })}
-          {game.ranked === false && <> · {t('gamedetails.badge_friendly')}</>}
-        </span>
-        {game.price_per_player > 0 && (
-          <span className="inline-flex items-center gap-1">
-            <Euro size={14} className="shrink-0" />
-            {t('gamedetails.price_per_player', { price: formatCurrency(game.price_per_player, i18n.language) })}
-          </span>
-        )}
-        {game.prize && (
-          <span className="inline-flex items-center gap-1 min-w-0">
-            <Trophy size={14} className="shrink-0" /> <span className="truncate">{game.prize}</span>
-          </span>
-        )}
-        {genderRestricted && <span className="font-extrabold text-ink-900">{t(GENDER_RESTRICTION_LABEL_KEY[game.gender_restriction])}</span>}
-        {game.age_restriction && AGE_LABEL_KEY[game.age_restriction] && (
-          <span className="font-extrabold text-ink-900">{t(AGE_LABEL_KEY[game.age_restriction])}</span>
-        )}
-      </div>
+      <GameFacts game={game} distance={distance} />
 
       {/* Nomes completos de propósito — regra assente no produto. */}
       {friendsIn.length > 0 && (
@@ -235,6 +249,85 @@ export function GameEventCard({ event, profile, friendIds = null, action = null,
             <Lock size={13} className="shrink-0" /> {t('ui.court_reserved')}
           </span>
         ) : null}
+      </div>
+    </div>
+  )
+}
+
+/* ─── Evento de um clube da Comunidade onde ainda não estou (Fase 2) ───────
+   Sem nomes de jogadores (decisão do Francisco, 16 set): só quantos vão, o
+   nível médio e que um amigo que sigo é membro do clube. Não abre página —
+   a página do mix e a do clube são só para membros — por isso tudo o que
+   ajuda a decidir está aqui, e o botão é entrar no clube ou pedir para entrar. */
+
+export function ExploreEventCard({ event, profile, distance = null, onJoin = null, busy = false }) {
+  const { t, i18n } = useTranslation()
+  const game = event.raw
+  const { openJoin, requestStatus, peopleCount, avgRating, friendsInOrg } = event.explore
+  const capacity = mixCapacity(game)
+  const time = formatTime(event.startsAt, i18n.language, { hour: '2-digit', minute: '2-digit' })
+  const pending = requestStatus === 'pending'
+
+  let mismatchKey = null
+  if (profile && !pending) {
+    if (isGenderMismatch(game, profile) || isAgeIneligible(game, profile)) {
+      mismatchKey = 'agenda.state_not_for_you'
+    } else if (game.level) {
+      const mine = ratingBand(profile.rating, profile.gender)
+      if (mine?.fullVars?.num != null && String(mine.fullVars.num) !== game.level.slice(1)) mismatchKey = 'agenda.state_other_level'
+    }
+  }
+
+  return (
+    <div className={`relative overflow-hidden rounded-card p-3.5 border ${KIND_STYLE[event.kind].card}`}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex flex-wrap gap-1">
+          <KindTag kind={event.kind} />
+          {!openJoin && (
+            <span className="inline-flex items-center gap-1 bg-white/80 text-[11px] font-extrabold px-2 py-1 rounded-full text-muted">
+              <Lock size={12} /> {t('agenda.explore_private')}
+            </span>
+          )}
+        </div>
+        {pending
+          ? <StateTag tone="grey" icon={Clock}>{t('agenda.state_request_sent')}</StateTag>
+          : mismatchKey && <StateTag tone="grey">{t(mismatchKey)}</StateTag>}
+      </div>
+
+      <p className="text-[22px] font-extrabold leading-none mt-2.5 text-ink-900">{time}</p>
+      <h3 className="text-base leading-snug mt-1.5 text-ink-900">{game.title}</h3>
+      <div className="mt-1"><Owner event={event} fallbackKey="agenda.owner_none" /></div>
+
+      <GameFacts game={game} distance={distance} />
+
+      {friendsInOrg.length > 0 && (
+        <p className="inline-flex items-center gap-1.5 bg-lime-100 text-ink-900 rounded-full pl-2 pr-2.5 py-1 mt-2 max-w-full">
+          <Users size={13} className="text-lime-600 shrink-0" />
+          <span className="font-extrabold text-[11px] uppercase tracking-wider truncate">
+            {friendsInOrg.length === 1
+              ? t('agenda.friend_member_one', { name: friendsInOrg[0] })
+              : t('agenda.friend_member_many', { name: friendsInOrg[0], count: friendsInOrg.length - 1 })}
+          </span>
+        </p>
+      )}
+
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2 pt-2.5 mt-2.5 border-t border-ink-900/10">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="inline-flex items-center gap-1 text-sm text-ink-700 tabular-nums">
+            <Users size={14} /> <span className="font-extrabold text-ink-900">{peopleCount}</span>/{capacity}
+          </span>
+          <GroupLevelBadge rating={avgRating} />
+        </div>
+        {!pending && onJoin && (
+          <PrimaryButton
+            variant={openJoin ? 'lime' : 'ghost'}
+            disabled={busy}
+            onClick={onJoin}
+            className="ml-auto relative !py-2 !px-4 !text-sm"
+          >
+            {openJoin ? t('agenda.explore_join_club') : t('agenda.explore_request', { name: event.orgName })}
+          </PrimaryButton>
+        )}
       </div>
     </div>
   )

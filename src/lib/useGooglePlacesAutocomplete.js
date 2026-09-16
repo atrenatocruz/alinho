@@ -23,7 +23,11 @@ if (GOOGLE_PLACES_API_KEY) setOptions({ key: GOOGLE_PLACES_API_KEY, v: 'weekly' 
  * rendered width (styling lives in src/index.css) — Google sizes it once
  * at creation time and never re-syncs it on its own.
  */
-export function useGooglePlacesAutocomplete(inputRef, active, onPlaceSelected) {
+export function useGooglePlacesAutocomplete(inputRef, active, onPlaceSelected, options = {}) {
+  // `options.types` — por omissão só estabelecimentos (moradas de clubes e
+  // mixes). A localização da Home procura cidades: passa ['(cities)'].
+  const types = options.types || ['establishment']
+  const typesKey = types.join(',')
   const onPlaceSelectedRef = useRef(onPlaceSelected)
   useEffect(() => {
     onPlaceSelectedRef.current = onPlaceSelected
@@ -42,7 +46,7 @@ export function useGooglePlacesAutocomplete(inputRef, active, onPlaceSelected) {
       if (cancelled || !inputRef.current) return
       autocomplete = new Autocomplete(inputRef.current, {
         fields: ['name', 'formatted_address', 'geometry.location'],
-        types: ['establishment'],
+        types,
         componentRestrictions: { country: 'pt' },
       })
       autocomplete.addListener('place_changed', () => {
@@ -58,6 +62,7 @@ export function useGooglePlacesAutocomplete(inputRef, active, onPlaceSelected) {
         if (value) {
           onPlaceSelectedRef.current({
             value,
+            name: place.name || null,
             latitude: loc ? loc.lat() : null,
             longitude: loc ? loc.lng() : null,
           })
@@ -94,5 +99,6 @@ export function useGooglePlacesAutocomplete(inputRef, active, onPlaceSelected) {
       if (syncPacWidth) window.removeEventListener('resize', syncPacWidth)
       if (autocomplete) window.google?.maps?.event?.clearInstanceListeners(autocomplete)
     }
-  }, [active])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, typesKey])
 }

@@ -5,8 +5,9 @@ import { Users, UserPlus, CalendarX2, ArrowRight } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { EmptyState, PrimaryButton } from '../components/ui'
-import { GameEventCard, FriendsEventCard } from '../components/agenda/EventCard'
-import { DayHeader, MonthSheet, FilterSheet, FilterChips, dayLabel } from '../components/agenda/AgendaControls'
+import { GameEventCard, FriendsEventCard, ExploreEventCard } from '../components/agenda/EventCard'
+import { DayHeader, MonthSheet, FilterSheet, FilterChips, LocationChip, LocationSheet, dayLabel } from '../components/agenda/AgendaControls'
+import { listExploreEvents, getSavedLocation, saveLocation } from '../lib/explore'
 import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
 import { countPeople, mixCapacity, isGenderMismatch, isAgeIneligible, isMissingBirthday } from '../lib/mixLogic'
 import { listFollowing } from '../lib/follows'
@@ -15,8 +16,8 @@ import { describeError } from '../lib/errors'
 import { getGroupMatches } from '../lib/groupMatches'
 import { getMyPrivateMatches, respondToPrivateMatch } from '../lib/privateMatches'
 import {
-  toDayKey, addDays, eventFromGame, eventFromGroupMatch, eventFromPrivateMatch, isAgendaGame,
-  applyFilters, eventsForDay, countByDay, nextMineDay, DEFAULT_FILTERS,
+  toDayKey, addDays, eventFromGame, eventFromGroupMatch, eventFromPrivateMatch, eventFromExplore, isAgendaGame,
+  applyFilters, eventsForDay, countByDay, nextMineDay, eventDistance, DEFAULT_FILTERS,
 } from '../lib/agenda'
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -27,8 +28,9 @@ import {
    jogos entre amigos no mesmo sítio. Substitui as abas Ativos/Terminados:
    um evento passado fica no dia dele, apagado e com o resultado.
 
-   Só mostra eventos a que o jogador já tinha acesso (os dos seus clubes e
-   grupos, e os seus jogos entre amigos). Explorar fora deles é a Fase 2.
+   Com "Só os meus" desligado aparecem também os eventos dos clubes da
+   Comunidade onde o jogador ainda não está (Fase 2), sem nomes de jogadores,
+   com entrar/pedir para entrar no cartão e filtro por distância.
 
    O dia e os filtros vivem no sessionStorage: sobrevivem a abrir um mix e
    voltar atrás, e limpam-se quando a sessão acaba ("filtros limpos a cada
@@ -52,7 +54,7 @@ const writeSession = (key, value) => {
 
 export default function Home() {
   const { t, i18n } = useTranslation()
-  const { user, profile, memberships, joinOrganization, isAdminOfAny, isPrivateMatchesEnabled } = useAuth()
+  const { user, profile, memberships, joinOrganization, followOrganization, isAdminOfAny, isPrivateMatchesEnabled } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
 
   const [games, setGames] = useState([])
@@ -71,6 +73,10 @@ export default function Home() {
   const [dayKey, setDayKey] = useState(() => readSession(DAY_KEY, toDayKey(new Date())))
   const [filters, setFilters] = useState(() => readSession(FILTERS_KEY, DEFAULT_FILTERS))
   const [monthOpen, setMonthOpen] = useState(false)
+  // Explorar (Fase 2): eventos de clubes da Comunidade onde ainda não estou.
+  const [exploreRows, setExploreRows] = useState([])
+  const [location, setLocation] = useState(getSavedLocation)
+  const [locationOpen, setLocationOpen] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
 
   useEffect(() => { writeSession(DAY_KEY, dayKey) }, [dayKey])
@@ -253,16 +259,37 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, orgIdsKey, isPrivateMatchesEnabled])
 
+  // Só se pede quando "Só os meus" está desligado: é o único momento em que
+  // estes eventos podem aparecer. Sem a migração, a função não existe e a
+  // agenda continua só com os eventos dos meus clubes.
+  const loadExplore = async () => {
+    const from = new Date()
+    from.setHours(0, 0, 0, 0)
+    try {
+      setExploreRows(await listExploreEvents(from))
+    } catch (error) {
+      console.error('Error loading explore events:', error)
+      setExploreRows([])
+    }
+  }
+
+  useEffect(() => {
+    if (!user || filters.onlyMine) return
+    loadExplore()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, filters.onlyMine, orgIdsKey])
+
   const events = useMemo(() => {
     if (!user) return []
     return [
       ...games.map((g) => eventFromGame(g, user.id)),
       ...groupMatches.map(({ match, org }) => eventFromGroupMatch(match, user.id, org)),
       ...privateMatches.map((m) => eventFromPrivateMatch(m, user.id)).filter(Boolean),
+      ...exploreRows.map(eventFromExplore),
     ]
-  }, [games, groupMatches, privateMatches, user])
+  }, [games, groupMatches, privateMatches, exploreRows, user])
 
-  const visible = useMemo(() => applyFilters(events, filters), [events, filters])
+  const visible = useMemo(() => applyFilters(events, filters, location), [events, filters, location])
   const counts = useMemo(() => countByDay(visible), [visible])
   const today = toDayKey(new Date())
   const dayEvents = eventsForDay(visible, dayKey)
@@ -350,6 +377,29 @@ export default function Home() {
     }
   }
 
+  // Entrar no clube (entrada livre) ou pedir para entrar (com aprovação), a
+  // partir de um evento de explorar. Usa a follow_organization de sempre —
+  // a mesma porta da Comunidade. Ao entrar, as memberships recarregam e o
+  // evento passa a ser do meu clube, já com o botão de inscrição.
+  const handleExploreJoin = async (event) => {
+    markPending(event.key, true)
+    setCardError('')
+    try {
+      const { data, error } = await followOrganization(event.orgId)
+      if (error) throw error
+      if (data === 'pending') {
+        setExploreRows((rows) => rows.map((r) => (r.organization?.id === event.orgId ? { ...r, my_request_status: 'pending' } : r)))
+      } else {
+        await loadExplore()
+      }
+    } catch (error) {
+      console.error('Error joining organization from explore:', error)
+      setCardError(describeError(t, error, 'agenda.explore_join_error'))
+    } finally {
+      markPending(event.key, false)
+    }
+  }
+
   // Deslizar muda de dia; as setas continuam sempre visíveis (um gesto
   // escondido pouca gente descobre, e no iPhone confunde-se com voltar).
   const touch = useRef(null)
@@ -378,7 +428,7 @@ export default function Home() {
   const hasAnyEvents = events.length > 0
   const nextMine = nextMineDay(events, dayKey)
   const othersToday = filters.onlyMine
-    ? eventsForDay(applyFilters(events, { ...filters, onlyMine: false }), dayKey).length
+    ? eventsForDay(applyFilters(events, { ...filters, onlyMine: false }, location), dayKey).length
     : 0
 
   // Sem clubes nem jogos entre amigos: o ecrã de entrar num clube de sempre
@@ -425,6 +475,7 @@ export default function Home() {
         </Link>
       )}
 
+      <LocationChip location={location} onOpen={() => setLocationOpen(true)} />
       <DayHeader dayKey={dayKey} onChange={setDayKey} onOpenMonth={() => setMonthOpen(true)} />
       <FilterChips
         filters={filters}
@@ -478,6 +529,19 @@ export default function Home() {
         <div className="space-y-2.5">
           {dayEvents.map((event) => {
             const past = event.finished || event.dayKey < today
+            const distance = eventDistance(event, location)
+            if (event.source === 'explore') {
+              return (
+                <ExploreEventCard
+                  key={event.key}
+                  event={event}
+                  profile={profile}
+                  distance={distance}
+                  busy={pendingKeys.has(event.key)}
+                  onJoin={() => handleExploreJoin(event)}
+                />
+              )
+            }
             if (event.source === 'game') {
               const a = past ? null : cardAction(event.raw)
               return (
@@ -488,6 +552,7 @@ export default function Home() {
                   friendIds={friendIds}
                   past={past}
                   result={myMixResults.get(event.id) || null}
+                  distance={distance}
                   action={a && { ...a, busy: pendingKeys.has(event.key), onAction: () => handleGameAction(event, a.kind) }}
                 />
               )
@@ -518,11 +583,18 @@ export default function Home() {
           onClose={() => setMonthOpen(false)}
         />
       )}
+      {locationOpen && (
+        <LocationSheet
+          location={location}
+          onSave={(loc) => { saveLocation(loc); setLocation(loc); setLocationOpen(false) }}
+          onClose={() => setLocationOpen(false)}
+        />
+      )}
       {filtersOpen && (
         <FilterSheet
           filters={filters}
           orgs={orgs}
-          countFor={(f) => eventsForDay(applyFilters(events, f), dayKey).length}
+          countFor={(f) => eventsForDay(applyFilters(events, f, location), dayKey).length}
           onApply={(f) => { setFilters(f); setFiltersOpen(false) }}
           onClose={() => setFiltersOpen(false)}
         />

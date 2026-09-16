@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
-import { ChevronLeft, ChevronRight, ChevronDown, Calendar, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronDown, Calendar, X, MapPin, LocateFixed } from 'lucide-react'
+import { useGooglePlacesAutocomplete } from '../../lib/useGooglePlacesAutocomplete'
+import { RADIUS_OPTIONS } from '../../lib/explore'
 import { formatDate } from '../../lib/formatDate'
 import { toDayKey, fromDayKey, addDays, monthGrid, EVENT_KINDS, DEFAULT_FILTERS } from '../../lib/agenda'
 import { KIND_STYLE } from './EventCard'
@@ -182,6 +184,106 @@ export function FilterSheet({ filters, orgs, countFor, onApply, onClose }) {
       <button type="button" onClick={() => setDraft(DEFAULT_FILTERS)} className="w-full mt-2 py-2.5 text-sm font-extrabold text-muted">
         {t('agenda.filters_reset')}
       </button>
+    </Sheet>
+  )
+}
+
+/* ─── Localização (Fase 2) ──────────────────────────────────────────────────
+   Escrever vem primeiro, o GPS é alternativa: muita gente recusa a
+   permissão, e numa app instalada no iPhone nem sempre funciona. */
+
+export function LocationChip({ location, onOpen }) {
+  const { t } = useTranslation()
+  return (
+    <button type="button" onClick={onOpen} className="inline-flex items-center gap-1.5 min-h-[40px] text-sm font-extrabold text-ink-700 max-w-full">
+      <MapPin size={15} className="shrink-0" />
+      <span className="truncate">
+        {location ? t('agenda.location_chip', { place: location.label, km: location.radiusKm }) : t('agenda.location_choose')}
+      </span>
+      <ChevronDown size={14} className="shrink-0" />
+    </button>
+  )
+}
+
+export function LocationSheet({ location, onSave, onClose }) {
+  const { t } = useTranslation()
+  const inputRef = useRef(null)
+  const [draft, setDraft] = useState(location || null)
+  const [text, setText] = useState(location?.label || '')
+  const [radiusKm, setRadiusKm] = useState(location?.radiusKm || 15)
+  const [gpsState, setGpsState] = useState('idle') // idle | locating | denied
+
+  useGooglePlacesAutocomplete(inputRef, true, ({ name, value, latitude, longitude }) => {
+    if (latitude == null || longitude == null) return
+    const label = name || value
+    setText(label)
+    setDraft({ label, latitude, longitude })
+  }, { types: ['(cities)'] })
+
+  const useGps = () => {
+    if (!navigator.geolocation) {
+      setGpsState('denied')
+      return
+    }
+    setGpsState('locating')
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const label = t('agenda.location_here')
+        setText(label)
+        setDraft({ label, latitude: pos.coords.latitude, longitude: pos.coords.longitude })
+        setGpsState('idle')
+      },
+      () => setGpsState('denied'),
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 5 * 60 * 1000 }
+    )
+  }
+
+  const chip = (on) => `inline-flex items-center px-3.5 min-h-[40px] rounded-full text-sm font-extrabold border ${
+    on ? 'bg-ink-900 text-white border-ink-900' : 'bg-canvas text-ink-700 border-line'
+  }`
+
+  return (
+    <Sheet title={t('agenda.location_title')} onClose={onClose}>
+      <div className="relative">
+        <MapPin size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+        <input
+          ref={inputRef}
+          type="text"
+          value={text}
+          onChange={(e) => { setText(e.target.value); setDraft(null) }}
+          placeholder={t('agenda.location_placeholder')}
+          // text-base: abaixo de 16px o Safari iOS faz zoom ao focar.
+          className="input-field text-base pl-10"
+        />
+      </div>
+      <button type="button" onClick={useGps} className="w-full flex items-center justify-between py-3 border-b border-line text-sm font-extrabold text-ink-900 min-h-[48px]">
+        <span className="inline-flex items-center gap-2"><LocateFixed size={16} /> {t('agenda.location_gps')}</span>
+        {gpsState === 'locating' ? <span className="text-xs text-muted">{t('agenda.location_gps_locating')}</span> : <ChevronRight size={16} className="text-muted" />}
+      </button>
+      {gpsState === 'denied' && <p className="text-xs text-danger mt-2">{t('agenda.location_gps_denied')}</p>}
+
+      <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mt-4 mb-2">{t('agenda.location_radius')}</p>
+      <div className="flex flex-wrap gap-2">
+        {RADIUS_OPTIONS.map((km) => (
+          <button key={km} type="button" onClick={() => setRadiusKm(km)} className={chip(radiusKm === km)}>
+            {t('agenda.location_km', { km })}
+          </button>
+        ))}
+      </div>
+
+      <button
+        type="button"
+        disabled={!draft}
+        onClick={() => onSave({ ...draft, radiusKm })}
+        className="w-full mt-5 py-3 rounded-ctrl bg-lime-400 text-ink-900 text-sm font-extrabold disabled:opacity-40"
+      >
+        {t('agenda.location_save')}
+      </button>
+      {location && (
+        <button type="button" onClick={() => onSave(null)} className="w-full mt-2 py-2.5 text-sm font-extrabold text-muted">
+          {t('agenda.location_clear')}
+        </button>
+      )}
     </Sheet>
   )
 }

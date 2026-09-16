@@ -92,6 +92,10 @@ const RPC_MOCKS = {
   list_followers: () => [],
   // Na agenda de teste, a Marta é seguida — para o cartão mostrar "vai jogar".
   list_following: () => (agenda() ? [{ id: FAKE_MEMBER_ID, name: FAKE_PEOPLE[FAKE_MEMBER_ID].name }] : []),
+  // Explorar (Fase 2): um clube de entrada livre, um grupo com aprovação e
+  // um pedido já enviado. follow_organization responde como a real.
+  list_explore_events: () => (agenda() ? AGENDA_EXPLORE() : []),
+  follow_organization: (params) => (params?.p_organization_id === 'ag-org-open' ? 'joined' : 'pending'),
   get_group_matches: (params) => (agenda() && params?.p_organization_id === MOCK_ADMIN_ORG_ID ? AGENDA_GROUP_MATCHES() : []),
   search_players: () => [{
     id: FAKE_MEMBER_ID, name: 'Marta Costa', avatar_url: null, rating: 1380,
@@ -231,6 +235,33 @@ const AGENDA_GROUP_MATCHES = () => [{
   team_b_player1_id: FAKE_PLAYER_ID, team_b_player1_name: FAKE_PEOPLE[FAKE_PLAYER_ID].name,
   team_b_player2_id: FAKE_PARTNER_ID, team_b_player2_name: FAKE_PEOPLE[FAKE_PARTNER_ID].name,
 }]
+const exploreGame = (over) => ({
+  date: atDay(0, 20).toISOString(), status: 'open', origin: 'admin', format: 'sobe_desce', num_courts: 2,
+  max_players: 8, price_per_player: 7, prize: null, gender_restriction: 'indiferente', level: null, recurrence_id: null,
+  latitude: null, longitude: null, ...over,
+})
+const AGENDA_EXPLORE = () => [
+  {
+    game: exploreGame({ id: 'ag-explore-open', title: 'Mix aberto de quarta', location: 'Padel Parque, Oeiras', latitude: 38.6979, longitude: -9.3106 }),
+    organization: { id: 'ag-org-open', name: 'Padel Parque', slug: 'padel-parque', kind: 'club', open_join: true, latitude: 38.6979, longitude: -9.3106 },
+    people_count: 5, avg_rating: 1420, friends_in_org: [FAKE_PEOPLE[FAKE_PLAYER_ID].name], my_request_status: null,
+  },
+  {
+    game: exploreGame({ id: 'ag-explore-private', title: 'Mix do +1', date: atDay(0, 21, 30).toISOString(), location: 'Clube VII, Lisboa', format: 'todos_contra_todos', num_courts: 3, max_players: 12, price_per_player: 10, gender_restriction: 'misto' }),
+    organization: { id: 'ag-org-private', name: '+1 Padel', slug: 'mais-um', kind: 'group', open_join: false, latitude: 38.7351, longitude: -9.1500 },
+    people_count: 11, avg_rating: 1510, friends_in_org: [FAKE_PEOPLE[FAKE_MEMBER_ID].name, FAKE_PEOPLE[FAKE_PARTNER_ID].name], my_request_status: null,
+  },
+  {
+    game: exploreGame({ id: 'ag-explore-pending', title: 'Mix de sexta', date: atDay(0, 22).toISOString(), location: 'Racket Club, Cascais' }),
+    organization: { id: 'ag-org-pending', name: 'Racket Club', slug: 'racket', kind: 'club', open_join: false, latitude: 38.6979, longitude: -9.4215 },
+    people_count: 6, avg_rating: 1300, friends_in_org: [], my_request_status: 'pending',
+  },
+  {
+    game: exploreGame({ id: 'ag-explore-porto', title: 'Mix do Porto', date: atDay(0, 19).toISOString(), location: 'Porto Padel, Porto' }),
+    organization: { id: 'ag-org-porto', name: 'Porto Padel', slug: 'porto-padel', kind: 'club', open_join: true, latitude: 41.1579, longitude: -8.6291 },
+    people_count: 3, avg_rating: 1200, friends_in_org: [], my_request_status: null,
+  },
+]
 // Edições anteriores de "Mix de terça" (a página do mix pede-as com
 // recurrence_id=eq.… e status finished/completed).
 const AGENDA_PREVIOUS_EDITIONS = () => [7, 14].map((daysAgo, i) => ({

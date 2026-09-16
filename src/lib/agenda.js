@@ -1,16 +1,16 @@
 /* ════════════════════════════════════════════════════════════════════════
    Agenda da Home — lógica pura (Homepage unificada, Fase 1, Trello #258).
 
-   Junta as três fontes de eventos a que o jogador JÁ tem acesso numa só
-   lista, e decide o que se vê em cada dia:
+   Junta as fontes de eventos numa só lista e decide o que se vê em cada dia:
 
    - games               → mixes e jogos em aberto dos clubes/grupos onde é
                            membro (a RLS de games já só devolve esses)
    - get_group_matches   → jogos entre amigos dentro de um grupo/clube
    - get_my_private_matches → jogos entre amigos fora de clubes (só os seus)
+   - list_explore_events → Fase 2: eventos de clubes da Comunidade onde ainda
+                           não é membro, sem nomes de jogadores
 
-   Nada aqui vai à base de dados nem muda quem vê o quê. Explorar eventos
-   fora dos próprios clubes é a Fase 2 e precisa de outra fonte.
+   Nada aqui vai à base de dados.
    ════════════════════════════════════════════════════════════════════════ */
 
 export const EVENT_KINDS = ['mix', 'open', 'friends']
@@ -61,6 +61,10 @@ export function eventFromGame(game, userId) {
     mine: myState != null,
     myState,
     finished: FINISHED_GAME.includes(game.status),
+    // Só as do próprio evento: pedir as do clube na query dos jogos partia a
+    // Home inteira enquanto a migração das coordenadas não corresse.
+    latitude: num(game.latitude),
+    longitude: num(game.longitude),
     raw: game,
   }
 }
@@ -138,6 +142,78 @@ export function eventFromPrivateMatch(match, userId) {
   }
 }
 
+const num = (v) => (v == null || v === '' ? null : Number(v))
+
+/**
+ * Evento de um clube/grupo da Comunidade onde o jogador ainda não está
+ * (list_explore_events — Fase 2). Nunca é "meu". Sem nomes de participantes:
+ * só quantos são, o nível médio e os amigos seguidos que são membros do clube.
+ * As coordenadas são as do evento, ou as do clube quando o evento não as tem.
+ */
+export function eventFromExplore(row) {
+  const game = row.game
+  const org = row.organization || {}
+  const startsAt = new Date(game.date)
+  const latitude = num(game.latitude) ?? num(org.latitude)
+  const longitude = num(game.longitude) ?? num(org.longitude)
+  return {
+    key: `explore:${game.id}`,
+    source: 'explore',
+    kind: game.origin === 'open_slot' ? 'open' : 'mix',
+    id: game.id,
+    startsAt,
+    hasTime: true,
+    dayKey: toDayKey(startsAt),
+    orgId: org.id,
+    orgName: org.name || null,
+    orgKind: org.kind || null,
+    orgLogo: org.group_logo_url || null,
+    mine: false,
+    myState: null,
+    finished: false,
+    explore: {
+      openJoin: Boolean(org.open_join),
+      requestStatus: row.my_request_status || null,
+      peopleCount: row.people_count || 0,
+      avgRating: row.avg_rating == null ? null : Number(row.avg_rating),
+      friendsInOrg: row.friends_in_org || [],
+    },
+    latitude,
+    longitude,
+    raw: game,
+  }
+}
+
+/** Distância em km entre dois pontos (fórmula de haversine). */
+export function distanceKm(a, b) {
+  const R = 6371
+  const rad = (d) => (d * Math.PI) / 180
+  const dLat = rad(b.latitude - a.latitude)
+  const dLng = rad(b.longitude - a.longitude)
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.latitude)) * Math.cos(rad(b.latitude)) * Math.sin(dLng / 2) ** 2
+  return 2 * R * Math.asin(Math.sqrt(h))
+}
+
+/**
+ * Distância do evento ao sítio escolhido, ou null (sem sítio escolhido, ou
+ * evento sem coordenadas).
+ */
+export function eventDistance(event, location) {
+  if (!location || event.latitude == null || event.longitude == null) return null
+  return distanceKm(location, { latitude: event.latitude, longitude: event.longitude })
+}
+
+/**
+ * O raio só filtra os eventos de explorar: os dos próprios clubes aparecem
+ * sempre, estejam onde estiverem. Um evento de explorar sem coordenadas só
+ * aparece enquanto não há sítio escolhido — não há como saber se está perto.
+ */
+export function withinReach(event, location) {
+  if (event.source !== 'explore' || !location) return true
+  const d = eventDistance(event, location)
+  return d != null && d <= location.radiusKm
+}
+
 /** Mixes/jogos em aberto visíveis na agenda — os mesmos que a Home já escondia. */
 export const isAgendaGame = (game) => !HIDDEN_GAME.includes(game.status)
 
@@ -148,13 +224,14 @@ export const DEFAULT_FILTERS = { onlyMine: true, kinds: EVENT_KINDS, orgIds: nul
  * amigos fora de clubes não pertence a nenhum, por isso só aparece quando
  * não há filtro de clube — escolher um clube é pedir só os eventos dele.
  */
-export function applyFilters(events, filters = DEFAULT_FILTERS) {
+export function applyFilters(events, filters = DEFAULT_FILTERS, location = null) {
   const kinds = new Set(filters.kinds)
   const orgIds = filters.orgIds ? new Set(filters.orgIds) : null
   return events.filter((e) =>
     (!filters.onlyMine || e.mine)
     && kinds.has(e.kind)
     && (!orgIds || (e.orgId != null && orgIds.has(e.orgId)))
+    && withinReach(e, location)
   )
 }
 
