@@ -69,6 +69,29 @@
 }
 
 @layer base {
+  /* iPhone (Safari): as caixas de data/hora têm largura própria e ignoram a
+     do cartão, saindo pela direita; e vazias ficam sem altura de texto.
+     Isto obriga-as a caber e a manter a altura, em toda a app. */
+  input[type="date"],
+  input[type="time"],
+  input[type="datetime-local"] {
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  input[type="date"]::-webkit-date-and-time-value,
+  input[type="time"]::-webkit-date-and-time-value,
+  input[type="datetime-local"]::-webkit-date-and-time-value {
+    text-align: left;
+    min-height: 1.5em;
+  }
+  /* PickerInput vazio: esconde o "dd/mm/aaaa" do computador para não
+     aparecer por cima da dica (no iPhone não aparece nada). */
+  input.picker-empty::-webkit-datetime-edit {
+    color: transparent;
+  }
   body {
     @apply font-sans antialiased bg-canvas text-ink-900;
   }

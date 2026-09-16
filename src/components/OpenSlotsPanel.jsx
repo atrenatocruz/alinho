@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Plus, Trash2, Clock } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { PrimaryButton } from './ui'
+import { PrimaryButton, PickerInput } from './ui'
 import { buildOpenSlotRows } from '../lib/openSlots'
 import { formatDate, formatTime } from '../lib/formatDate'
 import { describeError } from '../lib/errors'
@@ -100,11 +100,13 @@ export default function OpenSlotsPanel({ organizationId }) {
         <h3 className="font-extrabold text-ink-900">{t('open_slots.publish_title')}</h3>
         <div>
           <label className="text-sm font-bold text-ink-700">{t('open_slots.date_label')}</label>
-          <input
+          <PickerInput
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="input-field w-full mt-1"
+            hint={t('open_slots.date_hint')}
+            aria-label={t('open_slots.date_label')}
+            className="mt-1"
           />
         </div>
         <div>
@@ -123,18 +125,22 @@ export default function OpenSlotsPanel({ organizationId }) {
           <label className="text-sm font-bold text-ink-700">{t('open_slots.ranges_label')}</label>
           {ranges.map((range, i) => (
             <div key={i} className="flex items-center gap-2">
-              <input
+              <PickerInput
                 type="time"
                 value={range.start}
                 onChange={(e) => updateRange(i, 'start', e.target.value)}
-                className="input-field flex-1"
+                hint={t('open_slots.start_hint')}
+                aria-label={t('open_slots.start_hint')}
+                className="flex-1"
               />
               <span className="text-muted">–</span>
-              <input
+              <PickerInput
                 type="time"
                 value={range.end}
                 onChange={(e) => updateRange(i, 'end', e.target.value)}
-                className="input-field flex-1"
+                hint={t('open_slots.end_hint')}
+                aria-label={t('open_slots.end_hint')}
+                className="flex-1"
               />
               {ranges.length > 1 && (
                 <button onClick={() => removeRange(i)} className="text-danger p-2" aria-label={t('open_slots.remove_range')}>

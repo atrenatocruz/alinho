@@ -414,6 +414,28 @@ export function GroupLevelBadge({ rating, size = 'sm' }) {
 
 /* ─── PrimaryButton ──────────────────────────────────────────────────────
    variant: "lime" (main CTA) | "navy" | "ghost" | "danger" | "whatsapp" */
+/* Caixa de data/hora com dica quando está vazia. No iPhone a caixa nativa
+   vazia não mostra nada (nem "dd/mm/aaaa"), e não aceita placeholder —
+   quem abre o formulário não percebe que tem de tocar ali. */
+export function PickerInput({ type = 'date', value, hint, className = '', ...props }) {
+  const empty = !value
+  return (
+    <div className={`relative min-w-0 ${className}`}>
+      <input
+        type={type}
+        value={value}
+        className={`input-field w-full min-w-0 ${empty ? 'picker-empty' : ''}`}
+        {...props}
+      />
+      {empty && hint && (
+        <span aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-base text-muted/60">
+          {hint}
+        </span>
+      )}
+    </div>
+  )
+}
+
 export function PrimaryButton({ variant = 'lime', className = '', children, ...props }) {
   const variants = {
     lime:     'bg-lime-400 text-ink-900 hover:bg-lime-600 shadow-card',
