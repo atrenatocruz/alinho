@@ -303,7 +303,8 @@ export function FilterChips({ filters, onOpenFilters }) {
   }`
   return (
     <div className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-1 px-1">
-      <button type="button" onClick={onOpenFilters} className={chip(true)}>
+      {/* "Todos" é o normal: só fica escuro quando se escolhe outra opção. */}
+      <button type="button" onClick={onOpenFilters} className={chip(filters.show !== 'all')}>
         {t(SHOW_LABEL_KEY[filters.show] || SHOW_LABEL_KEY.all)} <ChevronDown size={14} />
       </button>
       <button type="button" onClick={onOpenFilters} className={chip(kindsOn)}>
