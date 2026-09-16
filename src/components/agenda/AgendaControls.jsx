@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight, ChevronDown, Calendar, X, MapPin, LocateFixe
 import { useGooglePlacesAutocomplete } from '../../lib/useGooglePlacesAutocomplete'
 import { RADIUS_OPTIONS } from '../../lib/explore'
 import { formatDate } from '../../lib/formatDate'
-import { toDayKey, fromDayKey, addDays, monthGrid, EVENT_KINDS, DEFAULT_FILTERS } from '../../lib/agenda'
+import { toDayKey, fromDayKey, addDays, monthGrid, EVENT_KINDS, SHOW_OPTIONS, DEFAULT_FILTERS } from '../../lib/agenda'
 import { KIND_STYLE } from './EventCard'
 
 /* Controlos da agenda da Home (Trello #258, Fase 1): o dia em cima com setas,
@@ -27,20 +27,15 @@ export function dayLabel(dayKey, t, lang) {
   return capitalize(short)
 }
 
-export function DayHeader({ dayKey, onChange, onOpenMonth }) {
+/* Sem setas (Francisco, 16 set): muda-se de dia a fazer scroll, e a data
+   acompanha o dia que está no topo da lista. Tocar abre o mês. */
+export function DayHeader({ dayKey, onOpenMonth }) {
   const { t, i18n } = useTranslation()
-  const arrow = 'w-10 h-10 rounded-full border border-line bg-canvas flex items-center justify-center text-ink-900 hover:bg-ink-50 transition-colors duration-fast shrink-0'
   return (
-    <div className="flex items-center justify-between gap-2">
-      <button type="button" onClick={() => onChange(addDays(dayKey, -1))} aria-label={t('agenda.previous_day')} className={arrow}>
-        <ChevronLeft size={20} />
-      </button>
+    <div className="flex items-center justify-center">
       <button type="button" onClick={onOpenMonth} className="flex items-center gap-1.5 min-h-[44px] px-2 text-xl font-extrabold text-ink-900 font-display">
         {dayLabel(dayKey, t, i18n.language)}
         <Calendar size={16} className="text-muted" />
-      </button>
-      <button type="button" onClick={() => onChange(addDays(dayKey, 1))} aria-label={t('agenda.next_day')} className={arrow}>
-        <ChevronRight size={20} />
       </button>
     </div>
   )
@@ -122,6 +117,8 @@ export function MonthSheet({ dayKey, counts, onPick, onClose }) {
   )
 }
 
+export const SHOW_LABEL_KEY = { all: 'agenda.show_all', enrolled: 'agenda.show_enrolled', open: 'agenda.show_open' }
+
 const KIND_FILTER_KEY = { mix: 'agenda.filter_kind_mix', open: 'agenda.filter_kind_open', friends: 'agenda.filter_kind_friends' }
 
 export function FilterSheet({ filters, orgs, countFor, onApply, onClose }) {
@@ -145,10 +142,19 @@ export function FilterSheet({ filters, orgs, countFor, onApply, onClose }) {
 
   return (
     <Sheet title={t('agenda.filters_title')} onClose={onClose}>
-      <label className="flex items-center justify-between py-3 border-b border-line text-sm font-extrabold text-ink-900">
-        {t('agenda.only_mine')}
-        <input type="checkbox" checked={draft.onlyMine} onChange={(e) => setDraft((d) => ({ ...d, onlyMine: e.target.checked }))} className="w-5 h-5 accent-[#040404]" />
-      </label>
+      <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mb-2">{t('agenda.filter_show')}</p>
+      <div className="grid grid-cols-3 gap-1 p-1 bg-ink-50 rounded-ctrl">
+        {SHOW_OPTIONS.map((opt) => (
+          <button
+            key={opt}
+            type="button"
+            onClick={() => setDraft((d) => ({ ...d, show: opt }))}
+            className={`min-h-[40px] rounded-ctrl text-sm font-extrabold ${draft.show === opt ? 'bg-canvas text-ink-900 shadow-lift border border-line' : 'text-muted'}`}
+          >
+            {t(SHOW_LABEL_KEY[opt])}
+          </button>
+        ))}
+      </div>
 
       <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mt-4 mb-2">{t('agenda.filter_kind')}</p>
       <div className="flex flex-wrap gap-2">
@@ -288,7 +294,7 @@ export function LocationSheet({ location, onSave, onClose }) {
   )
 }
 
-export function FilterChips({ filters, onToggleMine, onOpenFilters }) {
+export function FilterChips({ filters, onOpenFilters }) {
   const { t } = useTranslation()
   const kindsOn = filters.kinds.length < EVENT_KINDS.length
   const orgsOn = filters.orgIds != null
@@ -297,8 +303,8 @@ export function FilterChips({ filters, onToggleMine, onOpenFilters }) {
   }`
   return (
     <div className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-1 px-1">
-      <button type="button" onClick={onToggleMine} className={chip(filters.onlyMine)} aria-pressed={filters.onlyMine}>
-        {t('agenda.only_mine')}
+      <button type="button" onClick={onOpenFilters} className={chip(true)}>
+        {t(SHOW_LABEL_KEY[filters.show] || SHOW_LABEL_KEY.all)} <ChevronDown size={14} />
       </button>
       <button type="button" onClick={onOpenFilters} className={chip(kindsOn)}>
         {t('agenda.filter_kind')} <ChevronDown size={14} />

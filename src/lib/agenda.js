@@ -217,29 +217,69 @@ export function withinReach(event, location) {
 /** Mixes/jogos em aberto visíveis na agenda — os mesmos que a Home já escondia. */
 export const isAgendaGame = (game) => !HIDDEN_GAME.includes(game.status)
 
-export const DEFAULT_FILTERS = { onlyMine: true, kinds: EVENT_KINDS, orgIds: null }
+/**
+ * O que mostrar (Francisco, 16 set — substitui o "Só os meus"):
+ * - 'all'      tudo onde estou + tudo o que ainda está em aberto (por omissão)
+ * - 'enrolled' só onde estou dentro, em espera ou convidado
+ * - 'open'     só o que ainda está em aberto e onde não estou
+ */
+export const SHOW_OPTIONS = ['all', 'enrolled', 'open']
+export const DEFAULT_FILTERS = { show: 'all', kinds: EVENT_KINDS, orgIds: null }
+
+/** Filtros guardados antes da mudança (com onlyMine) voltam ao início. */
+export const normalizeFilters = (f) =>
+  f && SHOW_OPTIONS.includes(f.show) && Array.isArray(f.kinds) && f.kinds.length ? f : DEFAULT_FILTERS
+
+/** Já passou: terminou, ou o dia dele é antes de hoje. */
+export const isPastEvent = (e, todayKey) => e.finished || e.dayKey < todayKey
 
 /**
  * Aplica os filtros. `orgIds` null = todos os clubes/grupos. Um jogo entre
  * amigos fora de clubes não pertence a nenhum, por isso só aparece quando
  * não há filtro de clube — escolher um clube é pedir só os eventos dele.
+ *
+ * O passado só mostra os meus: um mix de ontem onde não joguei não serve a
+ * ninguém, e "em aberto" já não pode estar.
  */
-export function applyFilters(events, filters = DEFAULT_FILTERS, location = null) {
+export function applyFilters(events, filters = DEFAULT_FILTERS, location = null, todayKey = toDayKey(new Date())) {
   const kinds = new Set(filters.kinds)
   const orgIds = filters.orgIds ? new Set(filters.orgIds) : null
-  return events.filter((e) =>
-    (!filters.onlyMine || e.mine)
-    && kinds.has(e.kind)
-    && (!orgIds || (e.orgId != null && orgIds.has(e.orgId)))
-    && withinReach(e, location)
-  )
+  const show = filters.show || 'all'
+  return events.filter((e) => {
+    const past = isPastEvent(e, todayKey)
+    const openForMe = !e.mine && !past
+    const byShow = past
+      ? e.mine && show !== 'open'
+      : show === 'all' ? (e.mine || openForMe)
+        : show === 'enrolled' ? e.mine
+          : openForMe
+    return byShow
+      && kinds.has(e.kind)
+      && (!orgIds || (e.orgId != null && orgIds.has(e.orgId)))
+      && withinReach(e, location)
+  })
 }
 
 export const isDefaultFilters = (f) =>
-  f.onlyMine === true
+  f.show === 'all'
   && f.orgIds == null
   && f.kinds.length === EVENT_KINDS.length
   && EVENT_KINDS.every((k) => f.kinds.includes(k))
+
+/**
+ * A lista contínua da Home: um bloco por dia com eventos, por ordem. Hoje
+ * aparece sempre, mesmo vazio — é o ponto onde a lista abre e o que diz ao
+ * jogador onde está.
+ */
+export function groupByDay(events, todayKey) {
+  const byDay = new Map()
+  for (const e of events) {
+    if (!byDay.has(e.dayKey)) byDay.set(e.dayKey, [])
+    byDay.get(e.dayKey).push(e)
+  }
+  if (todayKey && !byDay.has(todayKey)) byDay.set(todayKey, [])
+  return [...byDay.keys()].sort().map((dayKey) => ({ dayKey, events: eventsForDay(byDay.get(dayKey), dayKey) }))
+}
 
 /** Eventos de um dia, por hora; os sem hora no fim. */
 export function eventsForDay(events, dayKey) {

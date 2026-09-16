@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { Link, useSearchParams, useNavigationType } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Users, UserPlus, CalendarX2, ArrowRight } from 'lucide-react'
+import { Users, UserPlus } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { EmptyState, PrimaryButton } from '../components/ui'
@@ -16,29 +16,30 @@ import { describeError } from '../lib/errors'
 import { getGroupMatches } from '../lib/groupMatches'
 import { getMyPrivateMatches, respondToPrivateMatch } from '../lib/privateMatches'
 import {
-  toDayKey, addDays, eventFromGame, eventFromGroupMatch, eventFromPrivateMatch, eventFromExplore, isAgendaGame,
-  applyFilters, eventsForDay, countByDay, nextMineDay, eventDistance, DEFAULT_FILTERS,
+  toDayKey, eventFromGame, eventFromGroupMatch, eventFromPrivateMatch, eventFromExplore, isAgendaGame,
+  applyFilters, groupByDay, countByDay, eventDistance, normalizeFilters,
 } from '../lib/agenda'
 
 /* ════════════════════════════════════════════════════════════════════════
    Home — agenda por dia (Homepage unificada, Fase 1, Trello #258).
    Wireframes: https://claude.ai/artifact/JsYuipCSsUv4sLMnzAZtoU
 
-   Um dia de cada vez, com o que é meu à frente. Mixes, jogos em aberto e
-   jogos entre amigos no mesmo sítio. Substitui as abas Ativos/Terminados:
-   um evento passado fica no dia dele, apagado e com o resultado.
+   Uma lista contínua (Francisco, 16 set — substitui a página por dia com
+   setas): para cima o passado, para baixo o futuro, e a app abre em hoje. O
+   cabeçalho (localização, data, filtros) fica fixo, e a data acompanha o dia
+   que está no topo da lista. Tocar na data abre o mês e salta para esse dia.
 
-   Com "Só os meus" desligado aparecem também os eventos dos clubes da
-   Comunidade onde o jogador ainda não está (Fase 2), sem nomes de jogadores,
-   com entrar/pedir para entrar no cartão e filtro por distância.
+   Mixes, jogos em aberto e jogos entre amigos no mesmo sítio, dos meus
+   clubes e — em "Todos" e "Em aberto" — dos clubes da Comunidade onde ainda
+   não estou (Fase 2), sem nomes de jogadores.
 
-   O dia e os filtros vivem no sessionStorage: sobrevivem a abrir um mix e
-   voltar atrás, e limpam-se quando a sessão acaba ("filtros limpos a cada
-   sessão", Francisco, 16 set).
+   Os filtros vivem no sessionStorage: sobrevivem a abrir um mix e voltar
+   atrás, e limpam-se quando a sessão acaba. A posição do scroll ao voltar
+   atrás é reposta pelo Layout (Trello #245).
    ════════════════════════════════════════════════════════════════════════ */
 
-const DAY_KEY = 'home.agenda.day'
 const FILTERS_KEY = 'home.agenda.filters'
+let homeShownBefore = false
 
 const readSession = (key, fallback) => {
   try {
@@ -70,8 +71,10 @@ export default function Home() {
   const [joining, setJoining] = useState(false)
   const [joinError, setJoinError] = useState('')
 
-  const [dayKey, setDayKey] = useState(() => readSession(DAY_KEY, toDayKey(new Date())))
-  const [filters, setFilters] = useState(() => readSession(FILTERS_KEY, DEFAULT_FILTERS))
+  const [filters, setFilters] = useState(() => normalizeFilters(readSession(FILTERS_KEY, null)))
+  // O dia que está no topo da lista — é o que a data do cabeçalho mostra.
+  const [visibleDay, setVisibleDay] = useState(() => toDayKey(new Date()))
+  const navigationType = useNavigationType()
   const [monthOpen, setMonthOpen] = useState(false)
   // Explorar (Fase 2): eventos de clubes da Comunidade onde ainda não estou.
   const [exploreRows, setExploreRows] = useState([])
@@ -79,7 +82,6 @@ export default function Home() {
   const [locationOpen, setLocationOpen] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
 
-  useEffect(() => { writeSession(DAY_KEY, dayKey) }, [dayKey])
   useEffect(() => { writeSession(FILTERS_KEY, filters) }, [filters])
 
   const handleJoin = async (slugOverride) => {
@@ -274,10 +276,10 @@ export default function Home() {
   }
 
   useEffect(() => {
-    if (!user || filters.onlyMine) return
+    if (!user || filters.show === 'enrolled') return
     loadExplore()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, filters.onlyMine, orgIdsKey])
+  }, [user?.id, filters.show, orgIdsKey])
 
   const events = useMemo(() => {
     if (!user) return []
@@ -292,7 +294,7 @@ export default function Home() {
   const visible = useMemo(() => applyFilters(events, filters, location), [events, filters, location])
   const counts = useMemo(() => countByDay(visible), [visible])
   const today = toDayKey(new Date())
-  const dayEvents = eventsForDay(visible, dayKey)
+  const days = useMemo(() => groupByDay(visible, today), [visible, today])
 
   /* --- Ação direta num mix (Trello #51). As regras são as mesmas dos botões
      da página do mix; quem decide de verdade é a RLS de `participants`. Sem
@@ -400,21 +402,80 @@ export default function Home() {
     }
   }
 
-  // Deslizar muda de dia; as setas continuam sempre visíveis (um gesto
-  // escondido pouca gente descobre, e no iPhone confunde-se com voltar).
-  const touch = useRef(null)
-  const onTouchStart = (e) => {
-    const p = e.touches[0]
-    touch.current = { x: p.clientX, y: p.clientY }
+  /* --- Lista contínua ------------------------------------------------------
+     A data do cabeçalho é o último dia cujo título já passou por baixo do
+     cabeçalho fixo. O contentor que faz scroll é o <main> do Layout. */
+  const headerRef = useRef(null)
+  const dayRefs = useRef(new Map())
+  const scroller = () => document.querySelector('main')
+
+  const updateVisibleDay = () => {
+    const header = headerRef.current
+    if (!header) return
+    const line = header.getBoundingClientRect().bottom + 12
+    let current = null
+    for (const { dayKey } of days) {
+      const el = dayRefs.current.get(dayKey)
+      if (!el) continue
+      if (el.getBoundingClientRect().top <= line) current = dayKey
+      else break
+    }
+    setVisibleDay(current || days[0]?.dayKey || today)
   }
-  const onTouchEnd = (e) => {
-    if (!touch.current) return
-    const p = e.changedTouches[0]
-    const dx = p.clientX - touch.current.x
-    const dy = p.clientY - touch.current.y
-    touch.current = null
-    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) setDayKey((k) => addDays(k, dx < 0 ? 1 : -1))
+
+  const scrollToDay = (dayKey) => {
+    const main = scroller()
+    const header = headerRef.current
+    const target = days.find((d) => d.dayKey >= dayKey) || days[days.length - 1]
+    const el = target && dayRefs.current.get(target.dayKey)
+    if (!main || !header || !el) return
+    main.scrollTop += el.getBoundingClientRect().top - header.getBoundingClientRect().bottom - 8
+    updateVisibleDay()
   }
+
+  useEffect(() => {
+    const main = scroller()
+    if (!main) return
+    main.addEventListener('scroll', updateVisibleDay, { passive: true })
+    return () => main.removeEventListener('scroll', updateVisibleDay)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [days])
+
+  // Abre no dia do próximo evento, com o passado por cima. Os eventos chegam
+  // aos bocados (clubes, grupos, Comunidade), por isso volta a encostar a cada
+  // chegada até o jogador mexer na lista. Ao voltar atrás não: aí o Layout
+  // repõe onde o jogador estava.
+  // O primeiro carregamento da app também conta como 'POP' para o router,
+  // por isso só é "voltar atrás" se a Home já tiver aparecido nesta sessão.
+  const returning = useRef(navigationType === 'POP' && homeShownBefore)
+  useEffect(() => { homeShownBefore = true }, [])
+  const touchedList = useRef(false)
+  useEffect(() => {
+    const main = scroller()
+    if (!main) return
+    const touched = () => { touchedList.current = true }
+    const opts = { passive: true }
+    main.addEventListener('touchstart', touched, opts)
+    main.addEventListener('wheel', touched, opts)
+    main.addEventListener('keydown', touched)
+    return () => {
+      main.removeEventListener('touchstart', touched, opts)
+      main.removeEventListener('wheel', touched, opts)
+      main.removeEventListener('keydown', touched)
+    }
+  }, [])
+  useLayoutEffect(() => {
+    if (loading) return
+    if (returning.current || touchedList.current) {
+      updateVisibleDay()
+      return
+    }
+    // O próximo evento que ainda não acabou, com o filtro que estiver
+    // escolhido (em "Todos", inscrito ou não) — a Home nunca abre em branco.
+    const next = days.find((d) => d.dayKey >= today && d.events.some((e) => !e.finished))
+    scrollToDay(next ? next.dayKey : today)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, days])
 
   if (loading) {
     return (
@@ -426,10 +487,6 @@ export default function Home() {
 
   const orgSlugById = new Map(orgs.map((o) => [o.id, o.slug]))
   const hasAnyEvents = events.length > 0
-  const nextMine = nextMineDay(events, dayKey)
-  const othersToday = filters.onlyMine
-    ? eventsForDay(applyFilters(events, { ...filters, onlyMine: false }, location), dayKey).length
-    : 0
 
   // Sem clubes nem jogos entre amigos: o ecrã de entrar num clube de sempre
   // (o que vê quem ainda não tem clube está em aberto no épico).
@@ -464,10 +521,56 @@ export default function Home() {
     )
   }
 
+  const renderEvent = (event) => {
+    const past = event.finished || event.dayKey < today
+    const distance = eventDistance(event, location)
+    if (event.source === 'explore') {
+      return (
+        <ExploreEventCard
+          key={event.key}
+          event={event}
+          profile={profile}
+          distance={distance}
+          busy={pendingKeys.has(event.key)}
+          onJoin={() => handleExploreJoin(event)}
+        />
+      )
+    }
+    if (event.source === 'game') {
+      const a = past ? null : cardAction(event.raw)
+      return (
+        <GameEventCard
+          key={event.key}
+          event={event}
+          profile={profile}
+          friendIds={friendIds}
+          past={past}
+          result={myMixResults.get(event.id) || null}
+          distance={distance}
+          action={a && { ...a, busy: pendingKeys.has(event.key), onAction: () => handleGameAction(event, a.kind) }}
+        />
+      )
+    }
+    return (
+      <FriendsEventCard
+        key={event.key}
+        event={event}
+        userId={user.id}
+        past={past}
+        orgSlug={event.orgId ? orgSlugById.get(event.orgId) : null}
+        invite={event.myState === 'invited' && !past ? {
+          busy: pendingKeys.has(event.key),
+          onAccept: () => handleInvite(event, 'accept_all'),
+          onReject: () => handleInvite(event, 'reject'),
+        } : null}
+      />
+    )
+  }
+
   return (
-    <div className="space-y-3" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+    <div>
       {joinRequestsTotal > 0 && (
-        <Link to="/gerir" className="card press flex items-center gap-3 bg-amber-50 hover:shadow-lift">
+        <Link to="/gerir" className="card press flex items-center gap-3 bg-amber-50 hover:shadow-lift mb-3">
           <div className="w-10 h-10 rounded-ctrl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
             <UserPlus size={18} />
           </div>
@@ -475,111 +578,41 @@ export default function Home() {
         </Link>
       )}
 
-      <LocationChip location={location} onOpen={() => setLocationOpen(true)} />
-      <DayHeader dayKey={dayKey} onChange={setDayKey} onOpenMonth={() => setMonthOpen(true)} />
-      <FilterChips
-        filters={filters}
-        onToggleMine={() => setFilters((f) => ({ ...f, onlyMine: !f.onlyMine }))}
-        onOpenFilters={() => setFiltersOpen(true)}
-      />
+      {/* Cabeçalho fixo: fica em cima enquanto a lista passa por baixo. */}
+      <div ref={headerRef} className="sticky top-0 z-10 -mx-4 px-4 -mt-6 pt-4 pb-2.5 bg-canvas space-y-1.5 border-b border-line/70">
+        <LocationChip location={location} onOpen={() => setLocationOpen(true)} />
+        <DayHeader dayKey={visibleDay} onOpenMonth={() => setMonthOpen(true)} />
+        <FilterChips filters={filters} onOpenFilters={() => setFiltersOpen(true)} />
+      </div>
 
       {cardError && (
-        <div className="bg-danger/10 text-danger px-4 py-3 rounded-ctrl text-sm font-extrabold animate-fade-up">{cardError}</div>
+        <div className="bg-danger/10 text-danger px-4 py-3 rounded-ctrl text-sm font-extrabold animate-fade-up mt-3">{cardError}</div>
       )}
 
-      {dayEvents.length === 0 ? (
-        <div className="text-center py-10 px-4">
-          <CalendarX2 size={28} className="mx-auto text-ink-200" />
-          <h3 className="text-lg text-ink-900 mt-3">
-            {filters.onlyMine ? t('agenda.empty_mine_title') : t('agenda.empty_title')}
-          </h3>
-          {othersToday > 0 && (
-            <>
-              <p className="text-sm text-muted mt-1">{t('agenda.empty_others_count', { count: othersToday })}</p>
-              <button
-                type="button"
-                onClick={() => setFilters((f) => ({ ...f, onlyMine: false }))}
-                className="mt-4 inline-flex items-center justify-center min-h-[44px] px-5 rounded-full bg-ink-900 text-white text-sm font-extrabold"
-              >
-                {t('agenda.empty_show_all')}
-              </button>
-            </>
-          )}
-          {nextMine && (
-            <div>
-              <button
-                type="button"
-                onClick={() => setDayKey(nextMine)}
-                className="mt-3 inline-flex items-center gap-1.5 min-h-[40px] px-4 rounded-full border border-line bg-canvas text-sm font-extrabold text-ink-900"
-              >
-                {/* A meio da frase: "Próximo jogo teu: sábado 19 set". */}
-                {t('agenda.next_mine', { day: (() => { const l = dayLabel(nextMine, t, i18n.language); return l.charAt(0).toLowerCase() + l.slice(1) })() })} <ArrowRight size={14} />
-              </button>
-            </div>
-          )}
-          {dayKey !== today && (
-            <div>
-              <button type="button" onClick={() => setDayKey(today)} className="mt-2 text-sm font-extrabold text-muted min-h-[40px]">
-                {t('agenda.back_to_today')}
-              </button>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="space-y-2.5">
-          {dayEvents.map((event) => {
-            const past = event.finished || event.dayKey < today
-            const distance = eventDistance(event, location)
-            if (event.source === 'explore') {
-              return (
-                <ExploreEventCard
-                  key={event.key}
-                  event={event}
-                  profile={profile}
-                  distance={distance}
-                  busy={pendingKeys.has(event.key)}
-                  onJoin={() => handleExploreJoin(event)}
-                />
-              )
-            }
-            if (event.source === 'game') {
-              const a = past ? null : cardAction(event.raw)
-              return (
-                <GameEventCard
-                  key={event.key}
-                  event={event}
-                  profile={profile}
-                  friendIds={friendIds}
-                  past={past}
-                  result={myMixResults.get(event.id) || null}
-                  distance={distance}
-                  action={a && { ...a, busy: pendingKeys.has(event.key), onAction: () => handleGameAction(event, a.kind) }}
-                />
-              )
-            }
-            return (
-              <FriendsEventCard
-                key={event.key}
-                event={event}
-                userId={user.id}
-                past={past}
-                orgSlug={event.orgId ? orgSlugById.get(event.orgId) : null}
-                invite={event.myState === 'invited' && !past ? {
-                  busy: pendingKeys.has(event.key),
-                  onAccept: () => handleInvite(event, 'accept_all'),
-                  onReject: () => handleInvite(event, 'reject'),
-                } : null}
-              />
-            )
-          })}
-        </div>
-      )}
+      <div className="mt-3 space-y-5">
+        {days.map(({ dayKey, events: dayEvents }) => (
+          <section
+            key={dayKey}
+            ref={(el) => { if (el) dayRefs.current.set(dayKey, el); else dayRefs.current.delete(dayKey) }}
+            className="space-y-2.5"
+          >
+            <p className={`text-[11px] font-extrabold uppercase tracking-widest ${dayKey === today ? 'text-ink-900' : 'text-muted'}`}>
+              {dayLabel(dayKey, t, i18n.language)}
+            </p>
+            {dayEvents.length === 0
+              ? <p className="text-sm text-muted py-3 px-3 rounded-card border border-dashed border-line">{t('agenda.today_empty')}</p>
+              : dayEvents.map(renderEvent)}
+          </section>
+        ))}
+        {/* Espaço no fim para o último dia poder subir até ao cabeçalho. */}
+        <div className="h-[40vh]" aria-hidden="true" />
+      </div>
 
       {monthOpen && (
         <MonthSheet
-          dayKey={dayKey}
+          dayKey={visibleDay}
           counts={counts}
-          onPick={(k) => { setDayKey(k); setMonthOpen(false) }}
+          onPick={(k) => { setMonthOpen(false); requestAnimationFrame(() => scrollToDay(k)) }}
           onClose={() => setMonthOpen(false)}
         />
       )}
@@ -594,7 +627,7 @@ export default function Home() {
         <FilterSheet
           filters={filters}
           orgs={orgs}
-          countFor={(f) => eventsForDay(applyFilters(events, f, location), dayKey).length}
+          countFor={(f) => applyFilters(events, f, location).length}
           onApply={(f) => { setFilters(f); setFiltersOpen(false) }}
           onClose={() => setFiltersOpen(false)}
         />

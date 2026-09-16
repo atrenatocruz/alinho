@@ -242,7 +242,7 @@ const exploreGame = (over) => ({
 })
 const AGENDA_EXPLORE = () => [
   {
-    game: exploreGame({ id: 'ag-explore-open', title: 'Mix aberto de quarta', location: 'Padel Parque, Oeiras', latitude: 38.6979, longitude: -9.3106 }),
+    game: exploreGame({ id: 'ag-explore-open', title: 'Mix aberto de quarta', date: atDay(2, 20).toISOString(), location: 'Padel Parque, Oeiras', latitude: 38.6979, longitude: -9.3106 }),
     organization: { id: 'ag-org-open', name: 'Padel Parque', slug: 'padel-parque', kind: 'club', open_join: true, latitude: 38.6979, longitude: -9.3106 },
     people_count: 5, avg_rating: 1420, friends_in_org: [FAKE_PEOPLE[FAKE_PLAYER_ID].name], my_request_status: null,
   },
@@ -252,7 +252,7 @@ const AGENDA_EXPLORE = () => [
     people_count: 11, avg_rating: 1510, friends_in_org: [FAKE_PEOPLE[FAKE_MEMBER_ID].name, FAKE_PEOPLE[FAKE_PARTNER_ID].name], my_request_status: null,
   },
   {
-    game: exploreGame({ id: 'ag-explore-pending', title: 'Mix de sexta', date: atDay(0, 22).toISOString(), location: 'Racket Club, Cascais' }),
+    game: exploreGame({ id: 'ag-explore-pending', title: 'Mix de sexta', date: atDay(4, 21).toISOString(), location: 'Racket Club, Cascais' }),
     organization: { id: 'ag-org-pending', name: 'Racket Club', slug: 'racket', kind: 'club', open_join: false, latitude: 38.6979, longitude: -9.4215 },
     people_count: 6, avg_rating: 1300, friends_in_org: [], my_request_status: 'pending',
   },

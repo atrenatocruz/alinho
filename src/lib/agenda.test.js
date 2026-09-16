@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   toDayKey, fromDayKey, addDays, eventFromGame, eventFromGroupMatch, eventFromPrivateMatch,
   applyFilters, eventsForDay, countByDay, nextMineDay, monthGrid, isAgendaGame,
-  DEFAULT_FILTERS, isDefaultFilters, eventFromExplore, distanceKm, eventDistance, withinReach,
+  DEFAULT_FILTERS, isDefaultFilters, normalizeFilters, groupByDay, eventFromExplore, distanceKm, eventDistance, withinReach,
 } from './agenda'
 
 const ME = 'me'
@@ -92,13 +92,34 @@ describe('filters and days', () => {
     eventFromPrivateMatch({ id: 'pm', status: 'confirmed', is_creator: true, scheduled_date: '2026-09-22', team_a_player1_id: ME, team_a_player1_status: 'accepted_all' }, ME),
   ]
 
-  it('opens on "only mine"', () => {
-    expect(applyFilters(events, DEFAULT_FILTERS).map((e) => e.id)).toEqual(['mine', 'pm'])
+  const TODAY = '2026-09-16'
+  it('shows everything I am in plus what is still open, by default', () => {
+    expect(applyFilters(events, DEFAULT_FILTERS, null, TODAY).map((e) => e.id).sort()).toEqual(['mine', 'open', 'other', 'pm'])
+  })
+  it('can show only where I am in, or only what is still open', () => {
+    expect(applyFilters(events, { ...DEFAULT_FILTERS, show: 'enrolled' }, null, TODAY).map((e) => e.id)).toEqual(['mine', 'pm'])
+    expect(applyFilters(events, { ...DEFAULT_FILTERS, show: 'open' }, null, TODAY).map((e) => e.id).sort()).toEqual(['open', 'other'])
+  })
+  it('keeps only my own events in the past', () => {
+    // No dia 21: o meu mix de 16 fica, o jogo de outro clube de 16 e o jogo
+    // em aberto de 20 (que não eram meus) desaparecem.
+    expect(applyFilters(events, DEFAULT_FILTERS, null, '2026-09-21').map((e) => e.id)).toEqual(['mine', 'pm'])
+    expect(applyFilters(events, { ...DEFAULT_FILTERS, show: 'open' }, null, '2026-09-23')).toEqual([])
   })
   it('filters by kind and by club, and a club filter leaves out games outside clubs', () => {
-    const all = { ...DEFAULT_FILTERS, onlyMine: false }
-    expect(applyFilters(events, { ...all, kinds: ['open'] }).map((e) => e.id)).toEqual(['open'])
-    expect(applyFilters(events, { ...all, orgIds: ['org-b'] }).map((e) => e.id)).toEqual(['other'])
+    expect(applyFilters(events, { ...DEFAULT_FILTERS, kinds: ['open'] }, null, TODAY).map((e) => e.id)).toEqual(['open'])
+    expect(applyFilters(events, { ...DEFAULT_FILTERS, orgIds: ['org-b'] }, null, TODAY).map((e) => e.id)).toEqual(['other'])
+  })
+  it('groups by day in order, always including today', () => {
+    const days = groupByDay(applyFilters(events, DEFAULT_FILTERS, null, TODAY), '2026-09-18')
+    expect(days.map((d) => d.dayKey)).toEqual(['2026-09-16', '2026-09-18', '2026-09-20', '2026-09-22'])
+    expect(days[1].events).toEqual([])
+    expect(days[0].events.map((e) => e.id)).toEqual(['other', 'mine'])
+  })
+  it('drops filters saved in the old "only mine" shape', () => {
+    expect(normalizeFilters({ onlyMine: true, kinds: ['mix'], orgIds: null })).toBe(DEFAULT_FILTERS)
+    const ok = { show: 'open', kinds: ['mix'], orgIds: null }
+    expect(normalizeFilters(ok)).toBe(ok)
   })
   it('sorts a day by time', () => {
     expect(eventsForDay(events, '2026-09-16').map((e) => e.id)).toEqual(['other', 'mine'])
@@ -110,7 +131,7 @@ describe('filters and days', () => {
   })
   it('knows when filters are back to default', () => {
     expect(isDefaultFilters(DEFAULT_FILTERS)).toBe(true)
-    expect(isDefaultFilters({ ...DEFAULT_FILTERS, onlyMine: false })).toBe(false)
+    expect(isDefaultFilters({ ...DEFAULT_FILTERS, show: 'enrolled' })).toBe(false)
   })
 })
 
@@ -150,8 +171,7 @@ describe('explore (Fase 2)', () => {
     expect(withinReach(noCoords, lisboa)).toBe(false)
     expect(withinReach(noCoords, null)).toBe(true)
     expect(withinReach(ownClub, porto)).toBe(true)
-    const all = { ...DEFAULT_FILTERS, onlyMine: false }
-    expect(applyFilters([near, ownClub], all, porto).map((e) => e.id)).toEqual(['own'])
+    expect(applyFilters([near, ownClub], DEFAULT_FILTERS, porto, '2026-09-01').map((e) => e.id)).toEqual(['own'])
     expect(eventDistance(near, null)).toBe(null)
   })
 })
