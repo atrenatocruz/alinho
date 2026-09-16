@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton } from './ui'
 import { buildOpenSlotRows } from '../lib/openSlots'
 import { formatDate, formatTime } from '../lib/formatDate'
+import { describeError } from '../lib/errors'
 
 const EMPTY_RANGE = () => ({ start: '', end: '' })
 
@@ -62,14 +63,14 @@ export default function OpenSlotsPanel({ organizationId }) {
         createdBy: user.id,
       }))
     } catch (err) {
-      alert(err.message)
+      alert(describeError(t, err))
       return
     }
 
     const { error } = await supabase.from('games').insert(rows)
     if (error) {
       console.error('Error publishing open slots:', error)
-      alert(t('open_slots.error_publish') + error.message)
+      alert(describeError(t, error, 'open_slots.error_publish'))
       return
     }
 
@@ -84,7 +85,7 @@ export default function OpenSlotsPanel({ organizationId }) {
     const { error } = await supabase.from('games').update({ status: 'cancelled' }).eq('id', slotId)
     if (error) {
       console.error('Error cancelling open slot:', error)
-      alert(t('open_slots.error_cancel'))
+      alert(describeError(t, error, 'open_slots.error_cancel'))
       return
     }
     loadOpenSlots()

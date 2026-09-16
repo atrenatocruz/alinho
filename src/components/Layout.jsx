@@ -11,6 +11,7 @@ import { listIncomingFollowRequests, acceptFollowRequest, removeFollow } from '.
 import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
 import { listIncomingOrganizationInvites, acceptOrganizationInvite, declineOrganizationInvite } from '../lib/orgInvites'
 import { getMyPrivateMatches, privateMatchActions } from '../lib/privateMatches'
+import { describeError } from '../lib/errors'
 
 // Re-prompt at most once per day once dismissed — a nudge, not a gate.
 const PHONE_PROMPT_DISMISSED_KEY = 'phonePromptDismissedDate'
@@ -257,7 +258,7 @@ export default function Layout({ children }) {
       setFollowRequests((reqs) => reqs.filter((r) => r.id !== requestId))
     } catch (error) {
       console.error('Error accepting follow request:', error)
-      alert(t('layout.action_failed'))
+      alert(describeError(t, error, 'layout.action_failed'))
     } finally {
       setFollowRequestActing(null)
     }
@@ -270,7 +271,7 @@ export default function Layout({ children }) {
       setFollowRequests((reqs) => reqs.filter((r) => r.id !== requestId))
     } catch (error) {
       console.error('Error declining follow request:', error)
-      alert(t('layout.action_failed'))
+      alert(describeError(t, error, 'layout.action_failed'))
     } finally {
       setFollowRequestActing(null)
     }
@@ -303,7 +304,7 @@ export default function Layout({ children }) {
       await refreshMemberships()
     } catch (error) {
       console.error('Error accepting organization invite:', error)
-      alert(t('layout.action_failed'))
+      alert(describeError(t, error, 'layout.action_failed'))
     } finally {
       setOrgInviteActing(null)
     }
@@ -316,7 +317,7 @@ export default function Layout({ children }) {
       setOrgInvites((invs) => invs.filter((i) => i.id !== inviteId))
     } catch (error) {
       console.error('Error declining organization invite:', error)
-      alert(t('layout.action_failed'))
+      alert(describeError(t, error, 'layout.action_failed'))
     } finally {
       setOrgInviteActing(null)
     }

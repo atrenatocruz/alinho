@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { MessageCircle, Pencil, Check, X } from 'lucide-react'
 import { BadgePill } from './ui'
 import { listWhatsappGroups, renameWhatsappGroup, WHATSAPP_GROUP_LABEL_MAX } from '../lib/whatsappGroups'
+import { describeError } from '../lib/errors'
 
 // PostgREST quando a função não existe — a migração ainda não correu.
 const FUNCTION_NOT_FOUND = 'PGRST202'
@@ -56,7 +57,7 @@ function WhatsappGroupRow({ group, onRenamed }) {
       setEditing(!saved)
     } catch (err) {
       console.error('Error renaming WhatsApp group:', err)
-      setError(t('gerirclube.whatsapp_groups_save_error'))
+      setError(describeError(t, err, 'gerirclube.whatsapp_groups_save_error'))
     } finally {
       setSaving(false)
     }

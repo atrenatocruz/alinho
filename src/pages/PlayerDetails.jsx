@@ -13,6 +13,7 @@ import { winRatePct } from '../lib/statsLogic'
 import { followPlayer, removeFollow } from '../lib/follows'
 import { getGlobalRankings } from '../lib/privateMatches'
 import { formatDate } from '../lib/formatDate'
+import { describeError } from '../lib/errors'
 
 const SIDE_LABEL_KEY = { left: 'gamedetails.side_left', right: 'gamedetails.side_right', both: 'gamedetails.side_both' }
 // Mesmas chaves que o Profile.jsx usa, para o genero ler igual nos dois
@@ -133,7 +134,7 @@ export default function PlayerDetails() {
       }))
     } catch (error) {
       console.error('Error following player:', error)
-      alert(t('playerdetails.update_failed'))
+      alert(describeError(t, error, 'playerdetails.update_failed'))
     } finally {
       setFriendActing(false)
     }
@@ -155,7 +156,7 @@ export default function PlayerDetails() {
       }))
     } catch (error) {
       console.error('Error removing follow:', error)
-      alert(t('playerdetails.update_failed'))
+      alert(describeError(t, error, 'playerdetails.update_failed'))
     } finally {
       setFriendActing(false)
     }

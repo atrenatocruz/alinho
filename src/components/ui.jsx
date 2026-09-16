@@ -10,6 +10,7 @@ import { planName } from '../lib/plans'
 import { achievementIcon, RARITY_META } from '../lib/achievements'
 import { formatDate } from '../lib/formatDate'
 import { listFollowers, listFollowing } from '../lib/follows'
+import { describeError } from '../lib/errors'
 
 /* ─── Date fields ────────────────────────────────────────────────────────
    Native <input type=date/datetime-local> pickers open reliably on iOS
@@ -1031,7 +1032,7 @@ export function ShareModal({ title, message, url, onClose, imageCard }) {
       }
     } catch (error) {
       console.error('Error generating share image:', error)
-      setImageError(t('ui.image_generation_error'))
+      setImageError(describeError(t, error, 'ui.image_generation_error'))
     } finally {
       setGeneratingImage(false)
     }

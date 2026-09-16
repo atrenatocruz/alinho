@@ -11,6 +11,7 @@ import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
 import { countPeople, mixCapacity, isGenderMismatch, isAgeIneligible, isMissingBirthday } from '../lib/mixLogic'
 import { listFollowing } from '../lib/follows'
 import { isMemberLimitError } from '../lib/plans'
+import { describeError } from '../lib/errors'
 import { getGroupMatches } from '../lib/groupMatches'
 import { getMyPrivateMatches, respondToPrivateMatch } from '../lib/privateMatches'
 import {
@@ -326,7 +327,7 @@ export default function Home() {
       await loadGames()
     } catch (error) {
       console.error('Error updating participation from the agenda card:', error)
-      setCardError(t('home.card_action_error'))
+      setCardError(describeError(t, error, 'home.card_action_error'))
     } finally {
       markPending(event.key, false)
     }
@@ -343,7 +344,7 @@ export default function Home() {
       await loadPrivateMatches()
     } catch (error) {
       console.error('Error answering match invite:', error)
-      setCardError(t('agenda.invite_error'))
+      setCardError(describeError(t, error, 'agenda.invite_error'))
     } finally {
       markPending(event.key, false)
     }

@@ -8,6 +8,7 @@ import {
 import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton, EmptyState } from '../components/ui'
 import { formatDate } from '../lib/formatDate'
+import { describeError } from '../lib/errors'
 
 // The 3 slots that can be empty, filled by an app player, or filled by a
 // name-only guest — team_a_player1 is always the creator, always a real
@@ -262,7 +263,7 @@ export default function PrivateMatches() {
       await load()
     } catch (error) {
       console.error('Error submitting score:', error)
-      alert(t('privatematches.error_submit_score'))
+      alert(describeError(t, error, 'privatematches.error_submit_score'))
     } finally {
       setSubmittingId(null)
     }
@@ -274,7 +275,7 @@ export default function PrivateMatches() {
       await load()
     } catch (error) {
       console.error('Error confirming match:', error)
-      alert(t('privatematches.error_confirm'))
+      alert(describeError(t, error, 'privatematches.error_confirm'))
     }
   }
 
@@ -285,7 +286,7 @@ export default function PrivateMatches() {
       await load()
     } catch (error) {
       console.error('Error responding to private match:', error)
-      alert(t('privatematches.error_respond'))
+      alert(describeError(t, error, 'privatematches.error_respond'))
     } finally {
       setRespondingId(null)
     }
@@ -298,7 +299,7 @@ export default function PrivateMatches() {
       await load()
     } catch (error) {
       console.error('Error deleting match:', error)
-      alert(t('privatematches.error_delete'))
+      alert(describeError(t, error, 'privatematches.error_delete'))
     }
   }
 

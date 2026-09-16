@@ -9,6 +9,7 @@ import { DAYS, DAY_LABEL_KEY, listTeacherProfiles, requestTeacherProfile, withdr
 import { useAuth } from '../contexts/AuthContext'
 import { Avatar, EmptyState, RatingBadge, GroupLevelBadge, Select, OrgKindBadge, orgAvatarShape } from '../components/ui'
 import { ratingBand } from '../lib/elo'
+import { describeError } from '../lib/errors'
 
 // Same key set as GameDetails.jsx/Profile.jsx's own SIDE_LABEL_KEY — small
 // enough that this codebase already accepts the duplication over a shared
@@ -162,7 +163,7 @@ export default function Comunidade() {
       await loadTeachers()
     } catch (error) {
       console.error('Error requesting teacher profile:', error)
-      setTeacherError(t('comunidade.teacher_error_submit_failed'))
+      setTeacherError(describeError(t, error, 'comunidade.teacher_error_submit_failed'))
     } finally {
       setSubmittingTeacher(false)
     }
@@ -176,7 +177,7 @@ export default function Comunidade() {
       await loadTeachers()
     } catch (error) {
       console.error('Error withdrawing teacher profile:', error)
-      alert(t('comunidade.withdraw_teacher_failed'))
+      alert(describeError(t, error, 'comunidade.withdraw_teacher_failed'))
     } finally {
       setWithdrawingTeacherId(null)
     }
@@ -190,7 +191,7 @@ export default function Comunidade() {
       await reloadOrganizations(query.trim())
     } catch (error) {
       console.error('Error following organization:', error)
-      alert(t('comunidade.follow_failed'))
+      alert(describeError(t, error, 'comunidade.follow_failed'))
     } finally {
       setActingOn(null)
     }
@@ -205,7 +206,7 @@ export default function Comunidade() {
       await reloadOrganizations(query.trim())
     } catch (error) {
       console.error('Error leaving organization:', error)
-      alert(error.message || t('comunidade.unfollow_failed'))
+      alert(describeError(t, error, 'comunidade.unfollow_failed'))
     } finally {
       setActingOn(null)
     }
@@ -218,7 +219,7 @@ export default function Comunidade() {
       if (error) throw error
     } catch (error) {
       console.error('Error toggling favorite:', error)
-      alert(t('comunidade.favorite_failed'))
+      alert(describeError(t, error, 'comunidade.favorite_failed'))
     } finally {
       setFavoritingOn(null)
     }
@@ -242,13 +243,13 @@ export default function Comunidade() {
       console.error('Error creating self-serve group:', err)
       const message = err?.message || ''
       if (message.includes('Já és admin de um grupo self-serve')) {
-        setCreateGroupError(t('comunidade.create_group_error_already_admin'))
+        setCreateGroupError(describeError(t, err, 'comunidade.create_group_error_already_admin'))
       } else if (message.toLowerCase().includes('duplicate key value violates unique constraint') || message.toLowerCase().includes('slug')) {
         // organizations.slug is globally unique across clubs and groups, so
         // the collision can be with either — same wording GerirClube.jsx uses.
-        setCreateGroupError(t('comunidade.create_group_error_duplicate_slug'))
+        setCreateGroupError(describeError(t, err, 'comunidade.create_group_error_duplicate_slug'))
       } else {
-        setCreateGroupError(t('comunidade.create_group_error_generic'))
+        setCreateGroupError(describeError(t, err, 'comunidade.create_group_error_generic'))
       }
     } finally {
       setCreatingGroup(false)

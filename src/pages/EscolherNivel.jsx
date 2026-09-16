@@ -7,6 +7,7 @@ import { PrimaryButton, Select } from '../components/ui'
 import { Wordmark } from '../components/Layout'
 import { ONBOARDING_LEVELS } from '../lib/elo'
 import { countryOptions } from '../lib/countries'
+import { describeError } from '../lib/errors'
 
 /* ════════════════════════════════════════════════════════════════════════
    Auto-classificação no primeiro registo (Elo v1, RANKING.md).
@@ -54,7 +55,7 @@ export default function EscolherNivel() {
       await refreshMemberships()
     } catch (err) {
       console.error('Error completing rating onboarding:', err)
-      setError(t('onboarding.save_failed_retry'))
+      setError(describeError(t, err, 'onboarding.save_failed_retry'))
       setSaving(false)
     }
   }

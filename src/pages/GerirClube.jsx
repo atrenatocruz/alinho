@@ -24,6 +24,7 @@ import { DAY_LABEL_KEY, listPendingTeacherRequests, approveTeacherProfile, rejec
 import VoucherScanner from '../components/VoucherScanner'
 import { isValidVoucherId, normalizeScannedVoucherId } from '../lib/vouchers'
 import OpenSlotsPanel from '../components/OpenSlotsPanel'
+import { describeError } from '../lib/errors'
 
 const sanitizeSlug = (value) => value.toLowerCase().replace(/[^a-z0-9-]/g, '')
 
@@ -351,7 +352,7 @@ export default function GerirClube() {
       await loadTeacherRequests()
     } catch (error) {
       console.error('Error approving teacher request:', error)
-      alert(t('gerirclube.error_approve_teacher_request') + error.message)
+      alert(describeError(t, error, 'gerirclube.error_approve_teacher_request'))
     }
   }
 
@@ -361,7 +362,7 @@ export default function GerirClube() {
       await loadTeacherRequests()
     } catch (error) {
       console.error('Error rejecting teacher request:', error)
-      alert(t('gerirclube.error_reject_teacher_request') + error.message)
+      alert(describeError(t, error, 'gerirclube.error_reject_teacher_request'))
     }
   }
 
@@ -421,7 +422,7 @@ export default function GerirClube() {
       setExpandedGroupRequests(requestsRes.data || [])
     } catch (error) {
       console.error('Error loading group details:', error)
-      alert(t('gerirclube.error_load_group_details') + error.message)
+      alert(describeError(t, error, 'gerirclube.error_load_group_details'))
     } finally {
       setExpandedGroupLoading(false)
     }
@@ -447,7 +448,7 @@ export default function GerirClube() {
     } catch (error) {
       console.error('Error approving group request:', error)
       setMembersError((isMemberLimitError(error?.message || '') && planLimitMessage(t, 'members', org?.plan_tier))
-        || t('gerirclube.error_approve_request') + error.message)
+        || describeError(t, error, 'gerirclube.error_approve_request'))
     }
   }
 
@@ -458,7 +459,7 @@ export default function GerirClube() {
       await loadExpandedGroupDetails(groupId)
     } catch (error) {
       console.error('Error rejecting group request:', error)
-      alert(t('gerirclube.error_reject_request') + error.message)
+      alert(describeError(t, error, 'gerirclube.error_reject_request'))
     }
   }
 
@@ -470,7 +471,7 @@ export default function GerirClube() {
       await loadClubGroups()
     } catch (error) {
       console.error('Error requesting to join group:', error)
-      alert(error.message || t('gerirclube.error_join_group_fallback'))
+      alert(describeError(t, error, 'gerirclube.error_join_group_fallback'))
     } finally {
       setGroupActingOn(null)
     }
@@ -527,7 +528,7 @@ export default function GerirClube() {
       setGames(data || [])
     } catch (error) {
       console.error('Error in loadGames:', error)
-      alert(t('gerirclube.error_load_games') + error.message)
+      alert(describeError(t, error, 'gerirclube.error_load_games'))
     }
   }
 
@@ -592,7 +593,7 @@ export default function GerirClube() {
     } catch (error) {
       console.error('Error approving request:', error)
       setMembersError((isMemberLimitError(error?.message || '') && planLimitMessage(t, 'members', org?.plan_tier))
-        || t('gerirclube.error_approve_request') + error.message)
+        || describeError(t, error, 'gerirclube.error_approve_request'))
     }
   }
 
@@ -603,7 +604,7 @@ export default function GerirClube() {
       await loadRequests()
     } catch (error) {
       console.error('Error rejecting request:', error)
-      alert(t('gerirclube.error_reject_request') + error.message)
+      alert(describeError(t, error, 'gerirclube.error_reject_request'))
     }
   }
 
@@ -615,7 +616,7 @@ export default function GerirClube() {
         : t('gerirclube.invite_already_pending', { name: player.name }))
     } catch (error) {
       console.error('Error inviting player:', error)
-      alert(error.message?.includes('já é membro') ? t(kk('gerirclube.already_member'), { name: player.name }) : t('gerirclube.error_invite_failed'))
+      alert(error.message?.includes('já é membro') ? t(kk('gerirclube.already_member'), { name: player.name }) : describeError(t, error, 'gerirclube.error_invite_failed'))
     }
   }
 
@@ -627,7 +628,7 @@ export default function GerirClube() {
       setTimeout(() => setLinkCopied(false), 2000)
     } catch (error) {
       console.error('Error copying invite link:', error)
-      alert(t('gerirclube.error_copy_invite_link'))
+      alert(describeError(t, error, 'gerirclube.error_copy_invite_link'))
     }
   }
 
@@ -745,7 +746,7 @@ export default function GerirClube() {
 
     if (recurrenceError) {
       console.error('Error creating recurrence:', recurrenceError)
-      alert(t('gerirclube.error_recurrence_activate_failed') + recurrenceError.message)
+      alert(describeError(t, recurrenceError, 'gerirclube.error_recurrence_activate_failed'))
       return
     }
 
@@ -756,7 +757,7 @@ export default function GerirClube() {
 
     if (linkError) {
       console.error('Error linking game to recurrence:', linkError)
-      alert(t('gerirclube.error_recurrence_link_failed') + linkError.message)
+      alert(describeError(t, linkError, 'gerirclube.error_recurrence_link_failed'))
       return
     }
 
@@ -816,7 +817,7 @@ export default function GerirClube() {
 
     if (pendingError) {
       console.error('Error pre-creating next occurrence:', pendingError)
-      alert(t('gerirclube.error_recurrence_precreate_failed') + pendingError.message)
+      alert(describeError(t, pendingError, 'gerirclube.error_recurrence_precreate_failed'))
       return
     }
 
@@ -929,7 +930,7 @@ export default function GerirClube() {
       // is one combined message covering both caps rather than a guess.
       const message = error?.message || ''
       const limitMessage = isMixLimitError(message) ? planLimitMessage(t, 'mix', org?.plan_tier) : null
-      setGameError(limitMessage || t('gerirclube.error_create_game') + error.message)
+      setGameError(limitMessage || describeError(t, error, 'gerirclube.error_create_game'))
     }
   }
 
@@ -950,7 +951,7 @@ export default function GerirClube() {
 
     if (error) {
       console.error('Error updating recurrence:', error)
-      alert(t('gerirclube.error_recurrence_update_failed') + error.message)
+      alert(describeError(t, error, 'gerirclube.error_recurrence_update_failed'))
       return
     }
 
@@ -977,7 +978,7 @@ export default function GerirClube() {
 
     if (launchUpdateError) {
       console.error('Error updating pending occurrence launch time:', launchUpdateError)
-      alert(t('gerirclube.error_recurrence_launch_update_failed') + launchUpdateError.message)
+      alert(describeError(t, launchUpdateError, 'gerirclube.error_recurrence_launch_update_failed'))
     }
   }
 
@@ -1019,7 +1020,7 @@ export default function GerirClube() {
       loadGames()
     } catch (error) {
       console.error('Error toggling recurrence pause:', error)
-      alert(t('gerirclube.error_update_recurrence') + error.message)
+      alert(describeError(t, error, 'gerirclube.error_update_recurrence'))
     }
   }
 
@@ -1146,7 +1147,7 @@ export default function GerirClube() {
       loadGames()
     } catch (error) {
       console.error('Error deleting game:', error)
-      alert(t('gerirclube.error_delete_game'))
+      alert(describeError(t, error, 'gerirclube.error_delete_game'))
     }
   }
 
@@ -1158,7 +1159,7 @@ export default function GerirClube() {
       loadGames()
     } catch (error) {
       console.error('Error stopping recurrence:', error)
-      alert(t('gerirclube.error_stop_recurrence') + error.message)
+      alert(describeError(t, error, 'gerirclube.error_stop_recurrence'))
     }
   }
 
@@ -1181,7 +1182,7 @@ export default function GerirClube() {
       loadMembers()
     } catch (error) {
       console.error('Error updating admin status:', error)
-      alert(t('gerirclube.error_update_permissions') + error.message)
+      alert(describeError(t, error, 'gerirclube.error_update_permissions'))
     }
   }
 
@@ -1197,7 +1198,7 @@ export default function GerirClube() {
       loadMembers()
     } catch (error) {
       console.error('Error removing member:', error)
-      alert(t('gerirclube.error_remove_member') + error.message)
+      alert(describeError(t, error, 'gerirclube.error_remove_member'))
     }
   }
 
@@ -1214,7 +1215,7 @@ export default function GerirClube() {
       setSettings((s) => ({ ...s, group_logo_url }))
     } catch (error) {
       console.error('Error uploading club logo:', error)
-      setLogoError(t('gerirclube.error_logo_upload'))
+      setLogoError(describeError(t, error, 'gerirclube.error_logo_upload'))
     } finally {
       setUploadingLogo(false)
     }
@@ -1230,7 +1231,7 @@ export default function GerirClube() {
       setSettings((s) => ({ ...s, group_logo_url: null }))
     } catch (error) {
       console.error('Error removing club logo:', error)
-      setLogoError(t('gerirclube.error_logo_remove'))
+      setLogoError(describeError(t, error, 'gerirclube.error_logo_remove'))
     } finally {
       setUploadingLogo(false)
     }
@@ -1305,7 +1306,7 @@ export default function GerirClube() {
       await Promise.all([loadSettings(), loadMembers(), refreshMemberships()])
     } catch (error) {
       console.error('Error transferring ownership:', error)
-      setTransferError(t('gerirclube.transfer_owner_error'))
+      setTransferError(describeError(t, error, 'gerirclube.transfer_owner_error'))
     } finally {
       setTransferring(false)
     }
@@ -1339,7 +1340,7 @@ export default function GerirClube() {
       alert(t('gerirclube.settings_updated_success'))
     } catch (error) {
       console.error('Error updating settings:', error)
-      alert(t('gerirclube.error_update_settings'))
+      alert(describeError(t, error, 'gerirclube.error_update_settings'))
     }
   }
 
@@ -1362,7 +1363,7 @@ export default function GerirClube() {
       setEditingName(false)
     } catch (error) {
       console.error('Error renaming organization:', error)
-      alert(t('gerirclube.error_rename_org'))
+      alert(describeError(t, error, 'gerirclube.error_rename_org'))
     } finally {
       setRenamingOrg(false)
     }
@@ -1398,7 +1399,7 @@ export default function GerirClube() {
     setRedeeming(false)
     if (error) {
       console.error('Error redeeming voucher:', error)
-      setRedeemError(t('gerirclube.redeem_confirm_error'))
+      setRedeemError(describeError(t, error, 'gerirclube.redeem_confirm_error'))
       // Re-fetch so the detail view reflects reality (e.g. someone else —
       // the player's own "Usar" tap, or a different admin — redeemed it
       // in the gap between lookup and this confirm tap).
@@ -1453,7 +1454,7 @@ export default function GerirClube() {
       await refreshFeatureFlags()
     } catch (error) {
       console.error('Error toggling private matches flag:', error)
-      alert(t('gerirclube.error_toggle_feature') + error.message)
+      alert(describeError(t, error, 'gerirclube.error_toggle_feature'))
     } finally {
       setSavingFlag(false)
     }
@@ -1478,7 +1479,7 @@ export default function GerirClube() {
       console.error('Error creating group:', error)
       const message = error?.message || ''
       if (message.toLowerCase().includes('duplicate key value violates unique constraint') || message.toLowerCase().includes('slug')) {
-        setGroupError(t('gerirclube.error_duplicate_group_slug'))
+        setGroupError(describeError(t, error, 'gerirclube.error_duplicate_group_slug'))
       } else {
         // The RPC's own RAISE EXCEPTION messages are already pt-PT, so show
         // them verbatim rather than hiding the real reason behind a generic

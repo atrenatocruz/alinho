@@ -11,6 +11,7 @@ import {
 } from '../lib/groupMatches'
 import { formatDate as formatDateLib } from '../lib/formatDate'
 import { Avatar, EmptyState, PrimaryButton } from '../components/ui'
+import { describeError } from '../lib/errors'
 
 const SLOTS = ['team_a_player1', 'team_a_player2', 'team_b_player1', 'team_b_player2']
 
@@ -82,7 +83,7 @@ function MatchCard({ match, org, currentUser, isOrgAdmin, onChanged, t, i18n }) 
     try {
       await claimGroupMatchSlot(match.id, slot)
     } catch (err) {
-      alert(t('groupmatches.error_join') + (err.message || ''))
+      alert(describeError(t, err, 'groupmatches.error_join'))
     }
   })
 
@@ -91,7 +92,7 @@ function MatchCard({ match, org, currentUser, isOrgAdmin, onChanged, t, i18n }) 
     try {
       await leaveGroupMatchSlot(match.id)
     } catch (err) {
-      alert(t('groupmatches.error_leave') + (err.message || ''))
+      alert(describeError(t, err, 'groupmatches.error_leave'))
     }
   })
 
@@ -102,7 +103,7 @@ function MatchCard({ match, org, currentUser, isOrgAdmin, onChanged, t, i18n }) 
       setEnteringResult(false)
       await onChanged()
     } catch (err) {
-      alert(t('groupmatches.error_result') + (err.message || ''))
+      alert(describeError(t, err, 'groupmatches.error_result'))
     } finally {
       setBusy(false)
     }
@@ -115,7 +116,7 @@ function MatchCard({ match, org, currentUser, isOrgAdmin, onChanged, t, i18n }) 
       setCorrecting(false)
       await onChanged()
     } catch (err) {
-      alert(t('groupmatches.error_correction') + (err.message || ''))
+      alert(describeError(t, err, 'groupmatches.error_correction'))
     } finally {
       setBusy(false)
     }
@@ -125,7 +126,7 @@ function MatchCard({ match, org, currentUser, isOrgAdmin, onChanged, t, i18n }) 
     try {
       await acceptGroupMatchCorrection(match.id)
     } catch (err) {
-      alert(t('groupmatches.error_accept_correction') + (err.message || ''))
+      alert(describeError(t, err, 'groupmatches.error_accept_correction'))
     }
   })
 
@@ -134,7 +135,7 @@ function MatchCard({ match, org, currentUser, isOrgAdmin, onChanged, t, i18n }) 
     try {
       await deleteGroupMatch(match.id)
     } catch (err) {
-      alert(t('groupmatches.error_delete') + (err.message || ''))
+      alert(describeError(t, err, 'groupmatches.error_delete'))
     }
   })
 
@@ -263,7 +264,7 @@ export default function GroupMatches() {
       }
     } catch (err) {
       console.error('Error loading group matches:', err)
-      alert(t('groupmatches.error_load') + (err.message || ''))
+      alert(describeError(t, err, 'groupmatches.error_load'))
     } finally {
       setLoading(false)
     }

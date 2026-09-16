@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton } from '../components/ui'
 import { Wordmark } from '../components/Layout'
 import { PasswordField } from './Login'
+import { describeError } from '../lib/errors'
 
 // Reached only from the link in the reset-password email. Supabase's client
 // parses the recovery token in the URL on load and establishes a session
@@ -40,7 +41,7 @@ export default function ResetPassword() {
       if (error) throw error
       navigate('/')
     } catch (err) {
-      setError(err.message || t('login.reset_password_error'))
+      setError(describeError(t, err, 'login.reset_password_error'))
     } finally {
       setLoading(false)
     }

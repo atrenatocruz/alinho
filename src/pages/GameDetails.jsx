@@ -26,6 +26,7 @@ import { winRatePct, firstLastName } from '../lib/statsLogic'
 import { getGlobalRankings } from '../lib/privateMatches'
 import { formatDate as formatDateLib, formatCurrency } from '../lib/formatDate'
 import { NAVIGATORS, getPreferredNavigator, setPreferredNavigator, navigatorUrl } from '../lib/navigators'
+import { describeError } from '../lib/errors'
 
 const SIDE_LABEL_KEY = { left: 'gamedetails.side_left', right: 'gamedetails.side_right', both: 'gamedetails.side_both' }
 
@@ -157,7 +158,7 @@ export default function GameDetails() {
       // As RAISE EXCEPTION do RPC já vêm em português e explicam a causa
       // ("Já deste o teu kudos…", "Só quem jogou…") — mostrar isso em vez
       // de um genérico que esconde o problema.
-      alert(error?.message || t('gamedetails.kudos_error'))
+      alert(describeError(t, error, 'gamedetails.kudos_error'))
     } finally {
       setKudosGiving(false)
     }
@@ -362,7 +363,7 @@ export default function GameDetails() {
     setSavingBirthday(false)
     if (error) {
       console.error('Error saving birthday from the mix screen:', error)
-      setBirthdayError(t('gamedetails.age_birthday_error'))
+      setBirthdayError(describeError(t, error, 'gamedetails.age_birthday_error'))
       return
     }
     setBirthdayPrompt(false)
@@ -389,7 +390,7 @@ export default function GameDetails() {
       loadGameDetails()
     } catch (error) {
       console.error('Error joining game:', error)
-      setJoinError(t('gamedetails.error_join_generic'))
+      setJoinError(describeError(t, error, 'gamedetails.error_join_generic'))
     } finally {
       setJoining(false)
     }
@@ -419,7 +420,7 @@ export default function GameDetails() {
       loadGameDetails()
     } catch (error) {
       console.error('Error joining game:', error)
-      setJoinError(t('gamedetails.error_join_generic'))
+      setJoinError(describeError(t, error, 'gamedetails.error_join_generic'))
     } finally {
       setJoining(false)
     }
@@ -447,7 +448,7 @@ export default function GameDetails() {
       loadGameDetails()
     } catch (error) {
       console.error('Error adding test user:', error)
-      setJoinError(t('gamedetails.error_add_test_user'))
+      setJoinError(describeError(t, error, 'gamedetails.error_add_test_user'))
     } finally {
       setAddingTestUser(false)
     }
@@ -519,7 +520,7 @@ export default function GameDetails() {
       loadGameDetails()
     } catch (error) {
       console.error('Error leaving game:', error)
-      alert(t('gamedetails.error_leave_game'))
+      alert(describeError(t, error, 'gamedetails.error_leave_game'))
     }
   }
 
@@ -535,7 +536,7 @@ export default function GameDetails() {
       loadGameDetails()
     } catch (error) {
       console.error('Error joining waitlist:', error)
-      setJoinError(t('gamedetails.error_join_waitlist'))
+      setJoinError(describeError(t, error, 'gamedetails.error_join_waitlist'))
     } finally {
       setJoining(false)
     }
@@ -554,7 +555,7 @@ export default function GameDetails() {
       loadGameDetails()
     } catch (error) {
       console.error('Error leaving waitlist:', error)
-      alert(t('gamedetails.error_leave_waitlist'))
+      alert(describeError(t, error, 'gamedetails.error_leave_waitlist'))
     }
   }
 
@@ -592,7 +593,7 @@ export default function GameDetails() {
       loadGameDetails()
     } catch (error) {
       console.error('Error removing player:', error)
-      setMixError(t('gamedetails.error_remove_player'))
+      setMixError(describeError(t, error, 'gamedetails.error_remove_player'))
     } finally {
       setBusy(false)
     }
@@ -722,7 +723,7 @@ export default function GameDetails() {
       loadGameDetails()
     } catch (error) {
       console.error('Error swapping players:', error)
-      setMixError(t('gamedetails.error_swap_players'))
+      setMixError(describeError(t, error, 'gamedetails.error_swap_players'))
     } finally {
       setBusy(false)
     }
@@ -943,7 +944,7 @@ export default function GameDetails() {
       loadGameDetails()
     } catch (error) {
       console.error('Error starting mix:', error)
-      setMixError(error.message || t('gamedetails.error_start_mix'))
+      setMixError(describeError(t, error, 'gamedetails.error_start_mix'))
     } finally {
       setBusy(false)
     }
@@ -974,7 +975,7 @@ export default function GameDetails() {
       loadGameDetails()
     } catch (error) {
       console.error('Error stopping mix:', error)
-      setMixError(t('gamedetails.error_stop_mix'))
+      setMixError(describeError(t, error, 'gamedetails.error_stop_mix'))
     } finally {
       setBusy(false)
     }
@@ -1006,7 +1007,7 @@ export default function GameDetails() {
       loadGameDetails()
     } catch (error) {
       console.error('Error starting round 1:', error)
-      setMixError(error.message || t('gamedetails.error_start_round1'))
+      setMixError(describeError(t, error, 'gamedetails.error_start_round1'))
     } finally {
       setBusy(false)
     }
@@ -1054,7 +1055,7 @@ export default function GameDetails() {
       loadGameDetails()
     } catch (error) {
       console.error('Error saving score:', error)
-      setMixError(t('gamedetails.error_save_score'))
+      setMixError(describeError(t, error, 'gamedetails.error_save_score'))
     } finally {
       setSavingMatchId(current => (current === match.id ? null : current))
     }
@@ -1112,7 +1113,7 @@ export default function GameDetails() {
       alert(parts.join(' '))
     } catch (error) {
       console.error('Error correcting finished mix score:', error)
-      setMixError(error.message || t('gamedetails.error_correct_finished_score'))
+      setMixError(describeError(t, error, 'gamedetails.error_correct_finished_score'))
     } finally {
       setSavingMatchId(current => (current === match.id ? null : current))
     }
@@ -1148,7 +1149,7 @@ export default function GameDetails() {
       await loadGameDetails()
     } catch (error) {
       console.error('Error toggling scorekeeper:', error)
-      alert(t('gamedetails.error_update_generic'))
+      alert(describeError(t, error, 'gamedetails.error_update_generic'))
     } finally {
       setScorekeeperBusy(null)
     }
@@ -1277,7 +1278,7 @@ export default function GameDetails() {
       loadGameDetails()
     } catch (error) {
       console.error('Error ending round:', error)
-      setMixError(error.message || t('gamedetails.error_end_round'))
+      setMixError(describeError(t, error, 'gamedetails.error_end_round'))
     } finally {
       setBusy(false)
     }
@@ -1294,7 +1295,7 @@ export default function GameDetails() {
       loadGameDetails()
     } catch (error) {
       console.error('Error drawing pool round:', error)
-      setMixError(error.message || t('gamedetails.error_start_round1'))
+      setMixError(describeError(t, error, 'gamedetails.error_start_round1'))
     } finally {
       setBusy(false)
     }
@@ -1313,7 +1314,7 @@ export default function GameDetails() {
       loadGameDetails()
     } catch (error) {
       console.error('Error seeding knockout bracket:', error)
-      setMixError(error.message || t('gamedetails.error_start_round1'))
+      setMixError(describeError(t, error, 'gamedetails.error_start_round1'))
     } finally {
       setBusy(false)
     }
@@ -1338,7 +1339,7 @@ export default function GameDetails() {
       loadGameDetails()
     } catch (error) {
       console.error('Error finalizing mix:', error)
-      setMixError(error.message || t('gamedetails.error_finalize_mix'))
+      setMixError(describeError(t, error, 'gamedetails.error_finalize_mix'))
     } finally {
       setBusy(false)
     }
@@ -1353,7 +1354,7 @@ export default function GameDetails() {
       loadGameDetails()
     } catch (error) {
       console.error('Error adjusting round duration:', error)
-      setMixError(t('gamedetails.error_adjust_round_time'))
+      setMixError(describeError(t, error, 'gamedetails.error_adjust_round_time'))
     }
   }
 

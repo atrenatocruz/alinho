@@ -374,6 +374,21 @@ export function installDevMockNetwork() {
     // localStorage.mockLimitError = 'true' faz qualquer criação/edição de
     // mix falhar como falha quando um limite bate na base de dados, para se
     // poder ver a mensagem de limite do plano em localhost (Trello #265).
+    // localStorage.mockErrorCase = 'fk' | 'business' | 'offline' | 'notready' —
+    // criar/editar mix falha com esse tipo de erro, para ver as mensagens de
+    // erro com contexto em localhost (Trello #247).
+    const errorCase = localStorage.getItem('mockErrorCase')
+    if (errorCase && /\/rest\/v1\/games\?/.test(url)
+        && ['POST', 'PATCH'].includes((init?.method || input?.method || 'GET').toUpperCase())) {
+      if (errorCase === 'offline') throw new TypeError('Failed to fetch')
+      const body = {
+        fk: { code: '23503', message: 'insert or update on table "games" violates foreign key constraint "games_created_by_fkey"' },
+        business: { code: 'P0001', message: 'Já existe um mix neste local a esta hora' },
+        notready: { code: 'PGRST204', message: "Could not find the 'pairing_mode' column of 'games' in the schema cache" },
+      }[errorCase]
+      if (body) return jsonResponse(body, 400)
+    }
+
     if (localStorage.getItem('mockLimitError') === 'true'
         && /\/rest\/v1\/games\?/.test(url)
         && ['POST', 'PATCH'].includes((init?.method || input?.method || 'GET').toUpperCase())) {

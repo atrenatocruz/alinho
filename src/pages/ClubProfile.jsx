@@ -9,6 +9,7 @@ import { listClubGroups } from '../lib/organizations'
 import { Avatar, EmptyState, PrimaryButton } from '../components/ui'
 import PadelIcon from '../components/icons/PadelIcon'
 import { formatDate } from '../lib/formatDate'
+import { describeError } from '../lib/errors'
 
 const asWebsiteUrl = (value) => (/^https?:\/\//i.test(value) ? value : `https://${value}`)
 const asInstagramUrl = (value) => {
@@ -109,7 +110,7 @@ export default function ClubProfile() {
       setGroups(data)
     } catch (error) {
       console.error('Error requesting to join group:', error)
-      alert(error.message || t('clubprofile.error_request_join_group'))
+      alert(describeError(t, error, 'clubprofile.error_request_join_group'))
     } finally {
       setGroupActingOn(null)
     }
@@ -123,7 +124,7 @@ export default function ClubProfile() {
       await load()
     } catch (error) {
       console.error('Error following club:', error)
-      alert(t('clubprofile.error_follow'))
+      alert(describeError(t, error, 'clubprofile.error_follow'))
     } finally {
       setActing(false)
     }
@@ -138,7 +139,7 @@ export default function ClubProfile() {
       await load()
     } catch (error) {
       console.error('Error leaving club:', error)
-      alert(error.message || t('clubprofile.error_unfollow'))
+      alert(describeError(t, error, 'clubprofile.error_unfollow'))
     } finally {
       setActing(false)
     }
@@ -153,7 +154,7 @@ export default function ClubProfile() {
       if (error) throw error
     } catch (error) {
       console.error('Error toggling favorite club:', error)
-      alert(t('clubprofile.error_toggle_favorite'))
+      alert(describeError(t, error, 'clubprofile.error_toggle_favorite'))
     } finally {
       setFavoriting(false)
     }

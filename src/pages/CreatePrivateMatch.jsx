@@ -8,6 +8,7 @@ import { createPrivateMatch } from '../lib/privateMatches'
 import { PrimaryButton, Avatar, DateField, Select } from '../components/ui'
 import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
 import PlayerSearch from '../components/PlayerSearch'
+import { describeError } from '../lib/errors'
 
 const NUM_SETS_OPTIONS = Array.from({ length: 8 }, (_, i) => i + 2) // 2..9
 
@@ -125,7 +126,7 @@ export default function CreatePrivateMatch() {
       navigate('/jogos-privados')
     } catch (err) {
       console.error('Error creating private match:', err)
-      setError(t('createprivatematch.error_create'))
+      setError(describeError(t, err, 'createprivatematch.error_create'))
     } finally {
       setSaving(false)
     }
