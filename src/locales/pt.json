@@ -1516,5 +1516,8 @@
   "gerirclube.ranked_no_help": "Fica registado e visível, mas não mexe no ranking de ninguém. A presença conta na Assiduidade.",
   "gerirclube.ranked_locked_yes": "Conta para o ranking. Já não dá para mudar — o mix já começou.",
   "gerirclube.ranked_locked_no": "Amigável, não conta para o ranking. Já não dá para mudar — o mix já começou.",
-  "gamedetails.badge_friendly": "Amigável"
+  "gamedetails.badge_friendly": "Amigável",
+  "layout.private_match_invited": "convidou-te para um jogo entre amigos. Responde.",
+  "layout.private_match_confirm_score": "Confirma o resultado do teu jogo entre amigos:",
+  "layout.someone": "Alguém"
 }

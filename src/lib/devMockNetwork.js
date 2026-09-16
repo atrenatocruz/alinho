@@ -99,7 +99,26 @@ const RPC_MOCKS = {
     id: FAKE_MEMBER_ID, name: longNames() ? 'Marta Sofia Costa de Vasconcelos Rodrigues' : 'Marta Costa', avatar_url: null, rating: 1380,
     gender: 'feminino', preferred_side: 'left', club_names: 'Dev Org',
   }],
-  get_my_private_matches: () => [],
+  // localStorage.mockPrivateInvite = 'true' — um convite por responder e um
+  // resultado por confirmar, para ver os avisos no sino (Trello #248/#249).
+  get_my_private_matches: () => (localStorage.getItem('mockPrivateInvite') === 'true' ? [
+    {
+      id: 'pm-invite', status: 'pending', ranked_intent: true, scheduled_date: '2026-09-20', scheduled_time: '19:00:00', location: 'Smash Padel Almada',
+      score_a: null, score_b: null, score_submitted_by: null, is_creator: false,
+      team_a_player1_id: FAKE_MEMBER_ID, team_a_player1_name: 'Marta Costa', team_a_player1_status: 'accepted_all',
+      team_a_player2_id: FAKE_PARTNER_ID, team_a_player2_name: 'Tiago Ferreira', team_a_player2_status: 'accepted_all',
+      team_b_player1_id: MOCK_ADMIN_USER_ID, team_b_player1_name: 'Admin (Dev)', team_b_player1_status: 'pending',
+      team_b_player2_id: FAKE_PLAYER_ID, team_b_player2_name: 'Rui Oliveira Gomes', team_b_player2_status: 'accepted_all',
+    },
+    {
+      id: 'pm-confirm', status: 'pending', ranked_intent: false, scheduled_date: '2026-09-14', scheduled_time: null, location: null,
+      score_a: 6, score_b: 4, score_submitted_by: FAKE_MEMBER_ID, score_submitted_by_name: 'Marta Costa', is_creator: false,
+      team_a_player1_id: FAKE_MEMBER_ID, team_a_player1_name: 'Marta Costa', team_a_player1_status: 'accepted_all',
+      team_a_player2_id: FAKE_PARTNER_ID, team_a_player2_name: 'Tiago Ferreira', team_a_player2_status: 'accepted_all',
+      team_b_player1_id: MOCK_ADMIN_USER_ID, team_b_player1_name: 'Admin (Dev)', team_b_player1_status: 'accepted_no_ranking',
+      team_b_player2_id: FAKE_PLAYER_ID, team_b_player2_name: 'Rui Oliveira Gomes', team_b_player2_status: 'accepted_all',
+    },
+  ] : []),
   // Eliminar grupo (Trello #241). Por omissão o grupo pode ser eliminado;
   // localStorage.mockDeleteBlocker = 'has_activity' mostra o estado bloqueado.
   get_organization_delete_blocker: () => localStorage.getItem('mockDeleteBlocker') || null,

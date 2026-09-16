@@ -1516,5 +1516,8 @@
   "gerirclube.ranked_no_help": "It's recorded and visible, but doesn't change anyone's ranking. Attendance still counts.",
   "gerirclube.ranked_locked_yes": "Counts for the ranking. Can't be changed — the mix has started.",
   "gerirclube.ranked_locked_no": "Friendly, doesn't count for the ranking. Can't be changed — the mix has started.",
-  "gamedetails.badge_friendly": "Friendly"
+  "gamedetails.badge_friendly": "Friendly",
+  "layout.private_match_invited": "invited you to a game with friends. Reply.",
+  "layout.private_match_confirm_score": "Confirm the result of your game with friends:",
+  "layout.someone": "Someone"
 }

@@ -80,6 +80,45 @@ export const getMyPrivateMatches = async () => {
   return data || []
 }
 
+/* Jogos entre amigos à espera de uma ação minha (Trello #248/#249).
+   Mesmas regras do ecrã "Jogos entre amigos" (PrivateMatches.jsx), num só
+   sítio, para o sino e a página não divergirem:
+   - 'respond': fui convidado e ainda não respondi (o meu lugar está 'pending').
+   - 'confirm': já há resultado e sou eu quem o pode confirmar — confirmação
+     cruzada: só a equipa que NÃO submeteu confirma, exceto quando a equipa
+     adversária é só convidados sem conta (aí confirma quem submeteu).
+   Só olha para jogos ainda 'pending'. */
+const PM_SLOTS = ['team_a_player1', 'team_a_player2', 'team_b_player1', 'team_b_player2']
+const pmSlotFilled = (m, key) => !!(m[`${key}_id`] || m[`${key}_guest_name`])
+
+export function privateMatchCanConfirm(m, myId) {
+  const hasScore = m.score_a !== null && m.score_a !== undefined && m.score_b !== null && m.score_b !== undefined
+  const teamAIds = [m.team_a_player1_id, m.team_a_player2_id]
+  const myTeam = teamAIds.includes(myId) ? 'a' : 'b'
+  const submitterTeam = m.score_submitted_by ? (teamAIds.includes(m.score_submitted_by) ? 'a' : 'b') : null
+  const allFilled = pmSlotFilled(m, 'team_a_player2') && pmSlotFilled(m, 'team_b_player1') && pmSlotFilled(m, 'team_b_player2')
+  const opponentTeamHasRealPlayer = myTeam === 'a'
+    ? (!!m.team_b_player1_id || !!m.team_b_player2_id)
+    : (!!m.team_a_player1_id || !!m.team_a_player2_id)
+  return hasScore && allFilled && submitterTeam !== null && (submitterTeam !== myTeam || !opponentTeamHasRealPlayer)
+}
+
+export function privateMatchActions(matches = [], myId) {
+  if (!myId) return []
+  const actions = []
+  for (const m of matches) {
+    if (m.status !== 'pending') continue
+    const mySlot = PM_SLOTS.find((key) => m[`${key}_id`] === myId)
+    if (!mySlot) continue
+    if (m[`${mySlot}_status`] === 'pending') {
+      actions.push({ kind: 'respond', match: m })
+    } else if (privateMatchCanConfirm(m, myId)) {
+      actions.push({ kind: 'confirm', match: m })
+    }
+  }
+  return actions
+}
+
 export const getGlobalRankings = async () => {
   const { data, error } = await supabase.rpc('get_global_rankings')
   if (error) throw error

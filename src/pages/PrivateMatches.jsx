@@ -4,8 +4,7 @@ import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Plus, Trophy, Copy, Check, Trash2, Calendar, MapPin } from 'lucide-react'
 import {
-  getMyPrivateMatches, submitPrivateMatchScore, confirmPrivateMatch, deletePrivateMatch, respondToPrivateMatch,
-} from '../lib/privateMatches'
+  getMyPrivateMatches, submitPrivateMatchScore, confirmPrivateMatch, deletePrivateMatch, respondToPrivateMatch, privateMatchCanConfirm } from '../lib/privateMatches'
 import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton, EmptyState } from '../components/ui'
 import { formatDate } from '../lib/formatDate'
@@ -337,21 +336,11 @@ export default function PrivateMatches() {
             {pending.map((m) => {
               const hasScore = m.score_a !== null && m.score_b !== null
               const isEditingScore = editingScoreIds.has(m.id)
-              // Confirmação cruzada: quem submeteu o resultado define a
-              // equipa que NÃO pode confirmar — só a adversária valida e
-              // fecha o jogo (o RPC impõe o mesmo, incluindo a exceção para
-              // quando essa equipa é só convidados sem conta).
-              const teamAIds = [m.team_a_player1_id, m.team_a_player2_id]
-              const myTeam = teamAIds.includes(profile?.id) ? 'a' : 'b'
-              const submitterTeam = m.score_submitted_by
-                ? (teamAIds.includes(m.score_submitted_by) ? 'a' : 'b')
-                : null
               const allFilled = isSlotFilled(m, 'team_a_player2') && isSlotFilled(m, 'team_b_player1') && isSlotFilled(m, 'team_b_player2')
-              const opponentTeamHasRealPlayer = myTeam === 'a'
-                ? (!!m.team_b_player1_id || !!m.team_b_player2_id)
-                : (!!m.team_a_player1_id || !!m.team_a_player2_id)
-              const canConfirm = hasScore && allFilled && submitterTeam !== null
-                && (submitterTeam !== myTeam || !opponentTeamHasRealPlayer)
+              // Confirmação cruzada (só a equipa que não submeteu confirma,
+              // salvo quando a adversária é só convidados) — a regra vive em
+              // privateMatchCanConfirm, a mesma que o sino usa.
+              const canConfirm = privateMatchCanConfirm(m, profile?.id)
 
               const mySlot = ALL_SLOTS.find((s) => m[`${s.key}_id`] === profile?.id)
               const myStatus = mySlot ? m[`${mySlot.key}_status`] : null

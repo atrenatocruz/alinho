@@ -1,7 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useLocation, useNavigate, useNavigationType } from 'react-router-dom'
-import { Home, Users, Trophy, Settings, LogOut, HelpCircle, Phone, X, Bell, UserCheck } from 'lucide-react'
+import { Home, Users, Trophy, Settings, LogOut, HelpCircle, Phone, X, Bell, UserCheck, Swords } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton, Avatar, RatingBadge, AchievementCard } from './ui'
@@ -10,6 +10,7 @@ import { hashPhone } from '../lib/hashPhone'
 import { listIncomingFollowRequests, acceptFollowRequest, removeFollow } from '../lib/follows'
 import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
 import { listIncomingOrganizationInvites, acceptOrganizationInvite, declineOrganizationInvite } from '../lib/orgInvites'
+import { getMyPrivateMatches, privateMatchActions } from '../lib/privateMatches'
 
 // Re-prompt at most once per day once dismissed — a nudge, not a gate.
 const PHONE_PROMPT_DISMISSED_KEY = 'phonePromptDismissedDate'
@@ -196,7 +197,7 @@ export function Wordmark({ className = '', variant = 'dark' }) {
 export default function Layout({ children }) {
   const location = useLocation()
   const navigate = useNavigate()
-  const { signOut, profile, updateProfile, isAdminOfAny, isGuest, refreshMemberships } = useAuth()
+  const { signOut, profile, updateProfile, isAdminOfAny, isGuest, refreshMemberships, isPrivateMatchesEnabled } = useAuth()
   const { t } = useTranslation()
 
   const today = new Date().toISOString().slice(0, 10)
@@ -342,8 +343,28 @@ export default function Layout({ children }) {
     }
   }, [profile?.id, isGuest, isAdminOfAny, location.pathname])
 
+  // Jogos entre amigos à espera de mim — convite por responder ou resultado
+  // por confirmar (Trello #248/#249). Antes não havia aviso nenhum: o convite
+  // só se via indo à página "Jogos entre amigos" pelo Perfil.
+  const [privateMatchTodos, setPrivateMatchTodos] = useState([])
+  useEffect(() => {
+    if (!profile?.id || isGuest || !isPrivateMatchesEnabled) {
+      setPrivateMatchTodos([])
+      return
+    }
+    let cancelled = false
+    getMyPrivateMatches()
+      .then((data) => {
+        if (!cancelled) setPrivateMatchTodos(privateMatchActions(data, profile.id))
+      })
+      .catch((error) => console.error('Error loading private matches for notifications:', error))
+    return () => {
+      cancelled = true
+    }
+  }, [profile?.id, isGuest, isPrivateMatchesEnabled, location.pathname])
+
   const joinRequestsTotal = joinRequestsByOrg.reduce((sum, org) => sum + org.count, 0)
-  const notificationsTotal = followRequests.length + joinRequestsTotal + orgInvites.length
+  const notificationsTotal = followRequests.length + joinRequestsTotal + orgInvites.length + privateMatchTodos.length
 
   // `main` below is the app's only scrolling region (see the app-shell comment
   // on the root div) — the document itself never scrolls, so neither the browser
@@ -500,6 +521,32 @@ export default function Layout({ children }) {
                       </div>
                     ) : (
                       <div className="max-h-80 overflow-y-auto divide-y divide-line">
+                        {privateMatchTodos.map(({ kind, match }) => (
+                          <Link
+                            key={`${kind}-${match.id}`}
+                            to="/jogos-privados"
+                            onClick={() => setShowNotifications(false)}
+                            className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50"
+                          >
+                            <div className="w-9 h-9 rounded-full bg-lime-400/20 text-ink-900 flex items-center justify-center shrink-0">
+                              <Swords size={16} />
+                            </div>
+                            <p className="flex-1 min-w-0 text-sm text-ink-900">
+                              {kind === 'respond' ? (
+                                <>
+                                  <span className="font-extrabold">{match.team_a_player1_name || t('layout.someone')}</span>{' '}
+                                  {t('layout.private_match_invited')}
+                                </>
+                              ) : (
+                                <>
+                                  {t('layout.private_match_confirm_score')}{' '}
+                                  <span className="font-extrabold tabular-nums">{match.score_a}-{match.score_b}</span>
+                                </>
+                              )}
+                            </p>
+                            <span aria-hidden="true" className="w-2 h-2 rounded-full bg-lime-400 shrink-0" />
+                          </Link>
+                        ))}
                         {joinRequestsByOrg.map((org) => (
                           <Link
                             key={org.organizationId}
