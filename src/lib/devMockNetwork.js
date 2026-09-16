@@ -39,6 +39,18 @@ const FAKE_PEOPLE = {
   [FAKE_PARTNER_ID]: { name: 'Tiago Ferreira', rating: 1420, gender: 'masculino', preferred_side: 'right', avatar_url: fakeAvatar('#4B5563') },
 }
 
+const community = () => localStorage.getItem('mockCommunity') === 'true'
+const MOCK_NAMES = ['Diogo Alexandre', 'Renato Cruz', 'João Jesus', 'Ana Moreira', 'André Sousa', 'Beatriz Faria', 'Rui Costa', 'Pedro Lima', 'Inês Rocha', 'Miguel Santos', 'Rui Santos']
+const communityOrg = (o) => ({ group_logo_url: null, parent_organization_id: null, parent_name: null, location: null, my_status: 'none', open_join: false, ...o })
+const COMMUNITY_ORGS = [
+  communityOrg({ id: 'co-1', name: 'Smash Padel', slug: 'smash-padel', kind: 'club', member_count: 340, avg_rating: 1180, my_status: 'member', open_join: true, location: 'Parque das Nações, Lisboa' }),
+  communityOrg({ id: 'co-2', name: 'Padel Parque', slug: 'padel-parque', kind: 'club', member_count: 212, avg_rating: 1040, open_join: true, location: 'Oeiras' }),
+  communityOrg({ id: 'co-3', name: 'Lobos de Carcavelos', slug: 'lobos', kind: 'group', member_count: 24, avg_rating: 1260 }),
+  communityOrg({ id: 'co-4', name: 'Smash Manhãs', slug: 'smash-manhas', kind: 'group', parent_organization_id: 'co-1', parent_name: 'Smash Padel', member_count: null, avg_rating: null, open_join: true }),
+  communityOrg({ id: 'co-5', name: 'Racket Club', slug: 'racket', kind: 'club', member_count: 88, avg_rating: 980, my_status: 'pending' }),
+  communityOrg({ id: 'co-6', name: 'Terças à Noite', slug: 'tercas', kind: 'group', member_count: 9, avg_rating: null, open_join: true }),
+]
+
 const RPC_MOCKS = {
   get_player_profile: (params) => {
     const id = params?.p_user_id || FAKE_PLAYER_ID
@@ -67,12 +79,18 @@ const RPC_MOCKS = {
   // RPC real — sem isto o cartão "Ranking global" do Perfil não tinha linha
   // nenhuma para onde saltar, e o salto não se conseguia testar localmente.
   get_global_rankings: () => Object.entries(FAKE_PEOPLE).map(([id, p], i) => ({
-    user_id: id, rating: p.rating, rating_games: 30, gender: p.gender,
+    user_id: id, name: p.name, avatar_url: p.avatar_url, rating: p.rating, rating_games: 30, gender: p.gender, mix_wins: 3, mixes_played: 8,
   })).concat(Array.from({ length: 55 }, (_, i) => ({
-    user_id: `fake-${i}`, rating: 2000 - i * 10, rating_games: 30, gender: 'masculino',
+    user_id: `fake-${i}`, name: MOCK_NAMES[i % MOCK_NAMES.length], rating: 2000 - i * 10, rating_games: i === 2 ? 4 : 30,
+    gender: i % 3 ? 'masculino' : 'feminino', mix_wins: (55 - i) % 7, mixes_played: 10,
   }))).concat([{
-    user_id: MOCK_ADMIN_USER_ID, rating: 1605, rating_games: 30, gender: 'masculino',
-  }]).sort((a, b) => b.rating - a.rating),
+    user_id: MOCK_ADMIN_USER_ID, name: 'Admin (Dev)', rating: 1605, rating_games: 30, gender: 'masculino', mix_wins: 4, mixes_played: 9,
+  }]).sort((a, b) => b.rating - a.rating)
+    // localStorage.mockCommunity — quem ainda não tem nível fica no fim.
+    .concat(community() ? [
+      { user_id: 'fake-nolevel-1', name: 'Rui Pinto', rating: null, rating_games: 0, gender: null, mix_wins: 0, mixes_played: 0 },
+      { user_id: 'fake-nolevel-2', name: 'Bruno Nunes', rating: null, rating_games: 0, gender: 'masculino', mix_wins: 0, mixes_played: 0 },
+    ] : []),
   get_player_xp: () => [{ xp: 320, kudos: 12 }],
   get_player_achievements: () => [
     { achievement_key: 'primeira_bola', category: 'jogo', rarity: 'comum', rarity_pct: 66.7 },
@@ -95,6 +113,14 @@ const RPC_MOCKS = {
   // Explorar (Fase 2): um clube de entrada livre, um grupo com aprovação e
   // um pedido já enviado. follow_organization responde como a real.
   list_explore_events: () => (agenda() ? AGENDA_EXPLORE() : []),
+  // localStorage.mockCommunity = 'true' — clubes e grupos na pesquisa da
+  // Comunidade (Trello #272): clube aberto, clube fechado, grupo de amigos
+  // fechado, grupo dentro de um clube (sem nº de membros para quem não é do
+  // grupo) e um pedido pendente.
+  list_global_organizations: () => (community() ? COMMUNITY_ORGS : []),
+  search_organizations: (params) => (community()
+    ? COMMUNITY_ORGS.filter((o) => o.name.toLowerCase().includes(String(params?.p_query || '').trim().toLowerCase()))
+    : []),
   follow_organization: (params) => (params?.p_organization_id === 'ag-org-open' ? 'joined' : 'pending'),
   get_group_matches: (params) => (agenda() && params?.p_organization_id === MOCK_ADMIN_ORG_ID ? AGENDA_GROUP_MATCHES() : []),
   search_players: () => [{
@@ -300,8 +326,23 @@ const TABLE_MOCKS = {
   organizations: () => [{
     id: MOCK_ADMIN_ORG_ID, name: 'Dev Org', slug: 'dev-org', kind: 'group', self_serve: true,
     is_global: false, open_join: false, group_logo_url: null, description: '', location: '',
+    ...(community() ? { searchable: true } : {}),
     owner_id: MOCK_ADMIN_USER_ID, plan_tier: localStorage.getItem('mockPlanTier') || 'pro',
   }],
+  // localStorage.mockCommunity — um professor com clube e um sem clube.
+  teacher_profiles: () => (community() ? [
+    // localStorage.mockTeacherState = 'pending' | 'approved' — o meu pedido.
+    ...(localStorage.getItem('mockTeacherState') ? [{
+      id: 'tp-me', user_id: MOCK_ADMIN_USER_ID, organization_id: null, status: localStorage.getItem('mockTeacherState'),
+      contact: '912 000 111', zone: 'Cascais', created_at: '2026-09-16T10:00:00Z', user: { name: 'Admin (Dev)' }, organization: null, availability: [],
+    }] : []),
+    { id: 'tp-1', user_id: 'fake-t1', organization_id: 'co-1', status: 'approved', contact: '912 345 678',
+      user: { name: 'Ana Moreira' }, organization: { name: 'Smash Padel', slug: 'smash-padel' },
+      availability: [{ day_of_week: 'segunda', start_time: '18:00:00', end_time: '21:00:00' }, { day_of_week: 'quarta', start_time: '18:00:00', end_time: '21:00:00' }] },
+    { id: 'tp-2', user_id: 'fake-t2', organization_id: null, status: 'approved', contact: 'tiago.lopes@mail.pt',
+      zone: 'Cascais', user: { name: 'Tiago Lopes' }, organization: null,
+      availability: [{ day_of_week: 'sabado', start_time: '09:00:00', end_time: '13:00:00' }] },
+  ] : []),
   achievements: () => [
     { key: 'primeira_bola', category: 'jogo', rarity: 'comum', sort: 1 },
     { key: 'mes_cheio', category: 'jogo', rarity: 'epico', sort: 2 },

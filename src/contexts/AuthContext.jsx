@@ -62,7 +62,10 @@ const MOCK_ADMIN_CLUB_MEMBERSHIP = {
     kind: 'club', self_serve: false, owner_id: MOCK_ADMIN_USER.id, plan_tier: 'club',
   },
 }
+// localStorage.mockNoOrgs = 'true' — jogador que não é membro de nada, para
+// ver o Gerir de quem ainda não gere nada ("Criar grupo", Trello #279).
 const mockAdminMemberships = () => (
+  localStorage.getItem('mockNoOrgs') === 'true' ? [] :
   localStorage.getItem('mockTwoOrgs') === 'true'
     ? [MOCK_ADMIN_MEMBERSHIP, MOCK_ADMIN_CLUB_MEMBERSHIP]
     : [MOCK_ADMIN_MEMBERSHIP]

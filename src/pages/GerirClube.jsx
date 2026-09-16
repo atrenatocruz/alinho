@@ -1331,6 +1331,8 @@ export default function GerirClube() {
           group_logo_url: settings.group_logo_url,
           is_global: settings.is_global,
           open_join: settings.open_join,
+          // Só existe depois de migration_searchable_orgs.sql — não enviar antes.
+          ...(settings.searchable !== undefined ? { searchable: settings.searchable } : {}),
         })
         .eq('id', settings.id)
 
@@ -2784,42 +2786,59 @@ export default function GerirClube() {
                   </>
                 )}
 
-                {!org?.self_serve && (
-                  <div className="pt-2 border-t border-gray-200">
-                    <h4 className="text-base font-semibold text-ink-900 mt-6 mb-1">
-                      {t('gerirclube.public_visibility_heading')}
-                    </h4>
-                    <p className="text-sm text-gray-500 mb-4">
-                      {t(kk('gerirclube.public_visibility_description'))}
-                    </p>
+                {/* Visibilidade (Trello #272). Dois interruptores, decisão do
+                    Francisco (16 set): ser encontrado na pesquisa não obriga a
+                    mostrar a agenda a desconhecidos. Agora também para grupos
+                    criados na Comunidade: cada grupo escolhe. `searchable` só
+                    existe depois de correr migration_searchable_orgs.sql. */}
+                <div className="pt-2 border-t border-gray-200">
+                  <h4 className="text-base font-semibold text-ink-900 mt-6 mb-1">
+                    {t('gerirclube.public_visibility_heading')}
+                  </h4>
+                  <p className="text-sm text-gray-500 mb-4">
+                    {t(kk('gerirclube.public_visibility_description'))}
+                  </p>
+                  {settings.searchable !== undefined && (
                     <label className="flex items-center justify-between gap-4 p-3 rounded-ctrl border border-line mb-3">
                       <div>
-                        <p className="font-extrabold text-ink-900 text-sm">{t(kk('gerirclube.public_club_label'))}</p>
-                        <p className="text-[11px] text-muted">{t('gerirclube.appears_in_community_hint')}</p>
+                        <p className="font-extrabold text-ink-900 text-sm">{t('gerirclube.searchable_label')}</p>
+                        <p className="text-[11px] text-muted">{t(kk('gerirclube.searchable_hint'))}</p>
                       </div>
                       <input
                         type="checkbox"
-                        checked={settings.is_global}
-                        onChange={(e) => setSettings({ ...settings, is_global: e.target.checked })}
+                        checked={settings.searchable}
+                        onChange={(e) => setSettings({ ...settings, searchable: e.target.checked })}
                         className="w-5 h-5 shrink-0"
                       />
                     </label>
-                    {settings.is_global && (
-                      <label className="flex items-center justify-between gap-4 p-3 rounded-ctrl border border-line">
-                        <div>
-                          <p className="font-extrabold text-ink-900 text-sm">{t('gerirclube.open_join_label')}</p>
-                          <p className="text-[11px] text-muted">{t('gerirclube.open_join_hint')}</p>
-                        </div>
-                        <input
-                          type="checkbox"
-                          checked={settings.open_join}
-                          onChange={(e) => setSettings({ ...settings, open_join: e.target.checked })}
-                          className="w-5 h-5 shrink-0"
-                        />
-                      </label>
-                    )}
-                  </div>
-                )}
+                  )}
+                  <label className="flex items-center justify-between gap-4 p-3 rounded-ctrl border border-line mb-3">
+                    <div>
+                      <p className="font-extrabold text-ink-900 text-sm">{t('gerirclube.public_club_label')}</p>
+                      <p className="text-[11px] text-muted">{t('gerirclube.appears_in_community_hint')}</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={settings.is_global}
+                      onChange={(e) => setSettings({ ...settings, is_global: e.target.checked })}
+                      className="w-5 h-5 shrink-0"
+                    />
+                  </label>
+                  {(settings.is_global || settings.searchable) && (
+                    <label className="flex items-center justify-between gap-4 p-3 rounded-ctrl border border-line">
+                      <div>
+                        <p className="font-extrabold text-ink-900 text-sm">{t('gerirclube.open_join_label')}</p>
+                        <p className="text-[11px] text-muted">{t('gerirclube.open_join_hint')}</p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={settings.open_join}
+                        onChange={(e) => setSettings({ ...settings, open_join: e.target.checked })}
+                        className="w-5 h-5 shrink-0"
+                      />
+                    </label>
+                  )}
+                </div>
 
                 <button type="submit" className="btn-primary w-full">
                   {t('gerirclube.save_settings_button')}

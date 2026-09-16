@@ -13,6 +13,7 @@ import { KindTag } from '../components/agenda/EventCard'
 import { getFollowCounts } from '../lib/follows'
 import { PrimaryButton, GuestBadge, DateField, Avatar, Select, EmptyState, RatingBadge, PhotoViewerModal, FollowListModal, AchievementCard, VoucherCard, VoucherQRModal } from '../components/ui'
 import { CATEGORY_ORDER } from '../lib/achievements'
+import TeacherSection from '../components/TeacherSection'
 import { formatRating, formatRatingMaybeProvisional, isProvisional, bandProgress, ratingBand } from '../lib/elo'
 import { countryOptions, countryName } from '../lib/countries'
 import { AGE_LABEL_KEY, ageCategory } from '../lib/ageCategories'
@@ -351,7 +352,8 @@ export default function Profile() {
     try {
       const data = await getGlobalRankings()
       const index = data.findIndex((p) => p.user_id === profile.id)
-      setGlobalRank(index === -1 ? null : index + 1)
+      // Sem nível não tem posição (a lista traz toda a gente, esses no fim).
+      setGlobalRank(index === -1 || data[index].rating == null ? null : index + 1)
     } catch (error) {
       console.error('Error loading global points:', error)
     }
@@ -1208,6 +1210,9 @@ export default function Profile() {
             </div>
           )}
         </div>
+
+        {/* Professor (Trello #283): o pedido saiu da Comunidade. */}
+        <TeacherSection />
         </>
       )}
 

@@ -1,107 +1,74 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Search, Users, UserPlus, Clock, Heart, Plus, GraduationCap, X, MapPin } from 'lucide-react'
-import { searchPlayers, listPlayers } from '../lib/privateMatches'
+import { Search, Users, Clock, GraduationCap, X, MapPin, Lock, Check, Building2 } from 'lucide-react'
 import { searchOrganizations, listGlobalOrganizations } from '../lib/organizations'
-import { createSelfServeGroup } from '../lib/platformAdmin'
-import { DAYS, DAY_LABEL_KEY, listTeacherProfiles, requestTeacherProfile, withdrawTeacherProfile } from '../lib/teachers'
+import { DAY_LABEL_KEY, listTeacherProfiles } from '../lib/teachers'
 import { useAuth } from '../contexts/AuthContext'
-import { Avatar, EmptyState, RatingBadge, GroupLevelBadge, Select, OrgKindBadge, orgAvatarShape } from '../components/ui'
-import { ratingBand } from '../lib/elo'
+import { Avatar, EmptyState, GroupLevelBadge, OrgKindBadge, orgAvatarShape } from '../components/ui'
 import { describeError } from '../lib/errors'
 
-// Same key set as GameDetails.jsx/Profile.jsx's own SIDE_LABEL_KEY — small
-// enough that this codebase already accepts the duplication over a shared
-// util (see roster.js's mentionToken for the established precedent).
-const SIDE_LABEL_KEY = { left: 'gamedetails.side_left', right: 'gamedetails.side_right', both: 'gamedetails.side_both' }
+/* ─── Comunidade (épico «Comunidade vs. Rankings», Trello #271/#273) ─────────
+   Encontrar clubes, grupos e professores — e só isso. Desenho:
+   https://claude.ai/artifact/LmwwNPxxnNRttG1RbHdDCt
+   - Sem abas: uma pesquisa + filtros em pastilhas (mesma lógica da Home).
+   - Os teus primeiro. Jogadores saíram daqui: procuram-se nos Rankings.
+   - Um cartão por clube/grupo: logótipo em cima (quadrado = clube, redondo =
+     grupo), dados, e um só botão em baixo. Sair e favorito vivem na página
+     do clube.
+   - "O meu grupo" e "Criar grupo" estão no Gerir; "Quero dar aulas" no
+     Perfil.
+   - Ainda não: "Perto de mim" (depende da localização da Home) e seguir sem
+     ser membro (#277) — até lá "Que sigo" = onde és membro ou pediste para
+     entrar. */
 
-// High enough that for these pilot clubs the browse list is, in practice,
-// the whole community — not just a truncated preview.
-const BROWSE_LIMIT = 100
-
-const TABS = [
-  { key: 'players', labelKey: 'comunidade.tab_players' },
-  { key: 'orgs', labelKey: 'comunidade.tab_clubs' },
-  { key: 'teachers', labelKey: 'comunidade.tab_teachers' },
+const FILTERS = [
+  { key: 'all', labelKey: 'comunidade.filter_all' },
+  { key: 'club', labelKey: 'comunidade.filter_clubs' },
+  { key: 'group', labelKey: 'comunidade.filter_groups' },
+  { key: 'teachers', labelKey: 'comunidade.filter_teachers' },
+  { key: 'mine', labelKey: 'comunidade.filter_mine' },
 ]
 
-const EMPTY_SLOT = { day: 'segunda', start: '18:00', end: '20:00' }
-
-const sanitizeSlug = (value) => value.toLowerCase().replace(/[^a-z0-9-]/g, '')
+const norm = (s) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+const byName = (a, b) => (a.name || '').localeCompare(b.name || '', 'pt')
 
 export default function Comunidade() {
   const { t } = useTranslation()
-  const sideLabel = (side) => t(SIDE_LABEL_KEY[side] || SIDE_LABEL_KEY.both)
-  const { user, memberships, followOrganization, leaveOrganization, toggleFavoriteOrganization, adminOrganizations, refreshMemberships } = useAuth()
-  const navigate = useNavigate()
-  const [teachers, setTeachers] = useState([])
-  const [teachersLoading, setTeachersLoading] = useState(true)
-  const [showTeacherForm, setShowTeacherForm] = useState(false)
-  const [teacherOrgId, setTeacherOrgId] = useState('')
-  const [teacherContact, setTeacherContact] = useState('')
-  const [teacherSlots, setTeacherSlots] = useState([{ ...EMPTY_SLOT }])
-  const [submittingTeacher, setSubmittingTeacher] = useState(false)
-  const [teacherError, setTeacherError] = useState('')
-  const [withdrawingTeacherId, setWithdrawingTeacherId] = useState(null)
-  const [showCreateGroupForm, setShowCreateGroupForm] = useState(false)
-  const [groupName, setGroupName] = useState('')
-  const [groupSlug, setGroupSlug] = useState('')
-  const [creatingGroup, setCreatingGroup] = useState(false)
-  const [createGroupError, setCreateGroupError] = useState('')
-  const [tab, setTab] = useState('players')
+  const { user, memberships, followOrganization } = useAuth()
+  const [filter, setFilter] = useState('all')
   const [query, setQuery] = useState('')
-  const [players, setPlayers] = useState([])
   const [organizations, setOrganizations] = useState([])
-  // Filtro por nível (pedido do Francisco, 11 set 2026) — '' = todos. As
-  // opções vêm de quem já está na lista carregada, não de uma lista fixa,
-  // para nunca mostrar um nível sem ninguém lá dentro.
-  const [levelFilter, setLevelFilter] = useState('')
   const [loading, setLoading] = useState(true)
   const [actingOn, setActingOn] = useState(null)
-  const [favoritingOn, setFavoritingOn] = useState(null)
   const timeoutRef = useRef(null)
 
-  // Re-fetches just the organizations half of the list — used after
-  // follow/unfollow/favorite actions so my_status/member_count refresh
-  // without re-running the (debounced) player search too.
-  const reloadOrganizations = async (trimmedQuery) => {
+  const [teachers, setTeachers] = useState([])
+  const [teachersLoading, setTeachersLoading] = useState(true)
+  const trimmed = query.trim()
+
+  const reloadOrganizations = async () => {
     try {
-      const data = trimmedQuery ? await searchOrganizations(trimmedQuery) : await listGlobalOrganizations()
-      setOrganizations(data)
+      setOrganizations(trimmed.length > 1 ? await searchOrganizations(trimmed) : await listGlobalOrganizations())
     } catch (error) {
       console.error('Error reloading organizations:', error)
     }
   }
 
   useEffect(() => {
-    const trimmed = query.trim()
-
-    // 1 character: neither a real search nor empty — leave the current
-    // list on screen instead of flashing a spinner for a query we won't run.
+    // 1 letra: nem pesquisa nem lista vazia — deixa ficar o que está.
     if (trimmed.length === 1) return
-
     setLoading(true)
-
     if (trimmed.length === 0) {
-      Promise.all([listPlayers(BROWSE_LIMIT), listGlobalOrganizations()])
-        .then(([playersData, orgsData]) => {
-          setPlayers(playersData)
-          setOrganizations(orgsData)
-        })
+      listGlobalOrganizations()
+        .then(setOrganizations)
         .catch((error) => console.error('Error loading comunidade:', error))
         .finally(() => setLoading(false))
       return
     }
-
     timeoutRef.current = setTimeout(async () => {
       try {
-        const [playersData, orgsData] = await Promise.all([
-          searchPlayers(query),
-          searchOrganizations(query),
-        ])
-        setPlayers(playersData)
-        setOrganizations(orgsData)
+        setOrganizations(await searchOrganizations(trimmed))
       } catch (error) {
         console.error('Error searching comunidade:', error)
       } finally {
@@ -109,7 +76,7 @@ export default function Comunidade() {
       }
     }, 300)
     return () => clearTimeout(timeoutRef.current)
-  }, [query])
+  }, [trimmed])
 
   const loadTeachers = async () => {
     setTeachersLoading(true)
@@ -126,69 +93,48 @@ export default function Comunidade() {
     loadTeachers()
   }, [])
 
-  const myTeacherProfile = teachers.find((teacher) => teacher.user_id === user.id)
-  const otherTeachers = teachers.filter((teacher) => teacher.user_id !== user.id && teacher.status === 'approved')
-  // Only clubs the caller isn't already listed as a teacher in — one
-  // profile per (user, org), enforced server-side by a UNIQUE constraint.
-  const teachableOrgs = memberships
+  // ── Clubes e grupos ────────────────────────────────────────────────────
+  // Os meus vêm das memberships (incluem os que não aparecem na pesquisa);
+  // quando o diretório os traz, usa-se essa linha, que tem nº de membros e
+  // nível médio.
+  const directoryById = useMemo(() => new Map(organizations.map((o) => [o.id, o])), [organizations])
+  const myOrgs = useMemo(() => memberships
     .map((m) => m.organization)
-    .filter((o) => !teachers.some((teacher) => teacher.organization_id === o.id && teacher.user_id === user.id))
+    .filter(Boolean)
+    .map((o) => directoryById.get(o.id) || { ...o, my_status: 'member' })
+    .sort(byName), [memberships, directoryById])
+  const myOrgIds = new Set(myOrgs.map((o) => o.id))
+  const pendingOrgs = organizations.filter((o) => o.my_status === 'pending')
 
-  const handleAddSlot = () => setTeacherSlots((slots) => [...slots, { ...EMPTY_SLOT }])
-  const handleRemoveSlot = (index) => setTeacherSlots((slots) => slots.filter((_, i) => i !== index))
-  const handleSlotChange = (index, field, value) =>
-    setTeacherSlots((slots) => slots.map((s, i) => (i === index ? { ...s, [field]: value } : s)))
+  const matchesQuery = (o) => trimmed.length < 2 || norm(o.name).includes(norm(trimmed))
+  const kindFilter = (o) => filter === 'all' || filter === 'mine' || o.kind === filter
 
-  const handleRequestTeacher = async () => {
-    setTeacherError('')
-    if (!teacherOrgId) {
-      setTeacherError(t('comunidade.teacher_error_choose_club'))
-      return
-    }
-    if (!teacherContact.trim()) {
-      setTeacherError(t('comunidade.teacher_error_missing_contact'))
-      return
-    }
-    if (teacherSlots.some((s) => s.start >= s.end)) {
-      setTeacherError(t('comunidade.teacher_error_invalid_time_range'))
-      return
-    }
-    setSubmittingTeacher(true)
-    try {
-      await requestTeacherProfile(teacherOrgId, user.id, teacherContact.trim(), teacherSlots)
-      setShowTeacherForm(false)
-      setTeacherOrgId('')
-      setTeacherContact('')
-      setTeacherSlots([{ ...EMPTY_SLOT }])
-      await loadTeachers()
-    } catch (error) {
-      console.error('Error requesting teacher profile:', error)
-      setTeacherError(describeError(t, error, 'comunidade.teacher_error_submit_failed'))
-    } finally {
-      setSubmittingTeacher(false)
-    }
-  }
+  // Com pesquisa ou filtro de tipo: os teus primeiro, depois os outros, tudo
+  // na mesma grelha. Sem pesquisa em "Tudo": os teus numa fila em cima.
+  const listedOrgs = (() => {
+    if (filter === 'teachers') return []
+    if (filter === 'mine') return [...myOrgs, ...pendingOrgs.filter((o) => !myOrgIds.has(o.id))].filter(matchesQuery)
+    const mine = myOrgs.filter(kindFilter).filter(matchesQuery)
+    const others = organizations.filter((o) => !myOrgIds.has(o.id)).filter(kindFilter)
+    if (filter === 'all' && trimmed.length < 2) return others
+    return [...mine, ...others]
+  })()
+  const showMineRow = filter === 'all' && trimmed.length < 2 && myOrgs.length > 0
 
-  const handleWithdrawTeacher = async (id) => {
-    if (!confirm(t('comunidade.confirm_withdraw_teacher'))) return
-    setWithdrawingTeacherId(id)
-    try {
-      await withdrawTeacherProfile(id)
-      await loadTeachers()
-    } catch (error) {
-      console.error('Error withdrawing teacher profile:', error)
-      alert(describeError(t, error, 'comunidade.withdraw_teacher_failed'))
-    } finally {
-      setWithdrawingTeacherId(null)
-    }
-  }
-
+  // ── Professores ────────────────────────────────────────────────────────
+  const approvedTeachers = teachers
+    .filter((teacher) => teacher.user_id !== user.id && teacher.status === 'approved')
+    .filter((teacher) => trimmed.length < 2
+      || norm(teacher.user?.name).includes(norm(trimmed))
+      || norm(teacher.organization?.name).includes(norm(trimmed))
+      || norm(teacher.zone).includes(norm(trimmed)))
+  const showTeachers = filter === 'all' || filter === 'teachers'
   const handleFollow = async (org) => {
     setActingOn(org.id)
     try {
       const { error } = await followOrganization(org.id)
       if (error) throw error
-      await reloadOrganizations(query.trim())
+      await reloadOrganizations()
     } catch (error) {
       console.error('Error following organization:', error)
       alert(describeError(t, error, 'comunidade.follow_failed'))
@@ -197,511 +143,191 @@ export default function Comunidade() {
     }
   }
 
-  const handleUnfollow = async (org) => {
-    if (!confirm(t('comunidade.confirm_unfollow', { name: org.name }))) return
-    setActingOn(org.id)
-    try {
-      const { error } = await leaveOrganization(org.id)
-      if (error) throw error
-      await reloadOrganizations(query.trim())
-    } catch (error) {
-      console.error('Error leaving organization:', error)
-      alert(describeError(t, error, 'comunidade.unfollow_failed'))
-    } finally {
-      setActingOn(null)
-    }
-  }
-
-  const handleToggleFavorite = async (org, currentlyFavorite) => {
-    setFavoritingOn(org.id)
-    try {
-      const { error } = await toggleFavoriteOrganization(org.id, !currentlyFavorite)
-      if (error) throw error
-    } catch (error) {
-      console.error('Error toggling favorite:', error)
-      alert(describeError(t, error, 'comunidade.favorite_failed'))
-    } finally {
-      setFavoritingOn(null)
-    }
-  }
-
-  const mySelfServeGroup = adminOrganizations.find((o) => o.self_serve)
-
-  const handleCreateGroup = async () => {
-    setCreateGroupError('')
-    setCreatingGroup(true)
-    try {
-      await createSelfServeGroup(groupName.trim(), groupSlug.trim())
-      // create_self_serve_group inserts the caller's admin membership
-      // server-side — pull it into the client before navigating, otherwise
-      // GerirClube's org resolver reads a stale memberships array and
-      // bounces the brand-new creator to "Sem acesso" until a manual
-      // reload. Same reason handleCreateGroup in GerirClube.jsx does this.
-      await refreshMemberships()
-      navigate(`/gerir/${groupSlug.trim()}`)
-    } catch (err) {
-      console.error('Error creating self-serve group:', err)
-      const message = err?.message || ''
-      if (message.includes('Já és admin de um grupo self-serve')) {
-        setCreateGroupError(describeError(t, err, 'comunidade.create_group_error_already_admin'))
-      } else if (message.toLowerCase().includes('duplicate key value violates unique constraint') || message.toLowerCase().includes('slug')) {
-        // organizations.slug is globally unique across clubs and groups, so
-        // the collision can be with either — same wording GerirClube.jsx uses.
-        setCreateGroupError(describeError(t, err, 'comunidade.create_group_error_duplicate_slug'))
-      } else {
-        setCreateGroupError(describeError(t, err, 'comunidade.create_group_error_generic'))
-      }
-    } finally {
-      setCreatingGroup(false)
-    }
-  }
-
-  const clubs = organizations.filter((o) => o.kind === 'club')
-
-  // Ordem alfabética + filtro por nível (pedido do Francisco, 11 set 2026).
-  // BROWSE_LIMIT já traz a comunidade inteira para estes clubes-piloto, por
-  // isso ordenar/filtrar do lado do cliente chega — não há paginação a
-  // preservar.
-  const levelOptions = useMemo(() => {
-    const labels = new Set(
-      players.map((p) => ratingBand(p.rating, p.gender)?.label).filter(Boolean)
-    )
-    return [
-      { value: '', label: t('comunidade.level_filter_all') },
-      ...Array.from(labels).sort().map((label) => ({ value: label, label })),
-    ]
-  }, [players, t])
-
-  // Uma pesquisa nova pode deixar o nível escolhido sem ninguém — evita
-  // ficar preso num filtro que já não devolve nada.
-  useEffect(() => {
-    if (levelFilter && !levelOptions.some((o) => o.value === levelFilter)) {
-      setLevelFilter('')
-    }
-  }, [levelOptions, levelFilter])
-
-  // Grupos/clubes de que já sou membro — os privados não vêm no diretório.
-  const listedIds = new Set(clubs.map((c) => c.id))
-  const myOrgs = memberships
-    .map((m) => m.organization)
-    .filter((o) => o && !listedIds.has(o.id) && o.id !== mySelfServeGroup?.id)
-    .sort((a, b) => a.name.localeCompare(b.name, 'pt'))
-
-  const visiblePlayers = players
-    .filter((p) => !levelFilter || ratingBand(p.rating, p.gender)?.label === levelFilter)
-    .sort((a, b) => a.name.localeCompare(b.name, 'pt'))
-
-  const renderOrgRow = (org) => {
-    const membership = memberships.find((m) => m.organization_id === org.id)
-    const isFavorite = membership?.is_favorite === true
+  // ── Cartão de clube/grupo ──────────────────────────────────────────────
+  const renderOrgCard = (org) => {
+    const status = myOrgIds.has(org.id) ? 'member' : org.my_status
+    // Grupo dentro de um clube: entra-se sempre por pedido (follow_organization).
+    const joinsDirectly = org.open_join && !org.parent_organization_id
     return (
-      <Link key={org.id} to={`/clube/${org.slug}`} className="card press flex items-center gap-3.5 hover:shadow-lift">
-        <Avatar name={org.name} url={org.group_logo_url} size="w-11 h-11 text-sm" />
-        <div className="flex-1 min-w-0">
-          <h3 className="font-extrabold text-ink-900 truncate">{org.name}</h3>
-          <div className="flex items-center gap-2.5 flex-wrap mt-0.5">
-            <p className="text-sm text-muted flex items-center gap-1.5">
-              <Users size={13} /> {t('comunidade.member_count', { count: org.member_count })}
+      <Link
+        key={org.id}
+        to={`/clube/${org.slug}`}
+        className="card press p-3.5 flex flex-col gap-2 min-w-0 hover:shadow-lift"
+      >
+        <div className="flex items-start justify-between gap-2">
+          <Avatar name={org.name} url={org.group_logo_url} size="w-12 h-12 text-base" shape={orgAvatarShape(org.kind)} />
+          {org.open_join === false && (
+            <span className="w-7 h-7 rounded-full bg-ink-50 text-muted flex items-center justify-center shrink-0" title={t('comunidade.closed_aria')}>
+              <Lock size={13} aria-label={t('comunidade.closed_aria')} />
+            </span>
+          )}
+        </div>
+        <div className="min-w-0">
+          <h3 className="font-extrabold text-ink-900 text-[15px] leading-tight line-clamp-2 break-words">{org.name}</h3>
+          <div className="mt-1.5"><OrgKindBadge kind={org.kind} /></div>
+        </div>
+        <div className="space-y-1 text-xs text-muted min-w-0">
+          {org.parent_name && (
+            <p className="flex items-center gap-1.5 min-w-0">
+              <Building2 size={12} className="shrink-0" />
+              <span className="truncate">{t('comunidade.group_of', { club: org.parent_name })}</span>
             </p>
-            {org.location && (
-              <p className="text-sm text-muted flex items-center gap-1.5 truncate">
-                <MapPin size={13} className="shrink-0" /> <span className="truncate">{org.location}</span>
-              </p>
-            )}
-            <GroupLevelBadge rating={org.avg_rating} />
-          </div>
+          )}
+          {org.member_count != null && (
+            <p className="flex items-center gap-1.5">
+              <Users size={12} className="shrink-0" /> {t('comunidade.member_count', { count: org.member_count })}
+            </p>
+          )}
+          {org.location && (
+            <p className="flex items-center gap-1.5 min-w-0">
+              <MapPin size={12} className="shrink-0" /> <span className="truncate">{org.location}</span>
+            </p>
+          )}
+          {org.avg_rating != null && (
+            <p className="flex items-center gap-1.5">
+              {t('comunidade.avg_level')} <GroupLevelBadge rating={org.avg_rating} />
+            </p>
+          )}
         </div>
 
-        {org.my_status === 'member' ? (
-          <>
+        <div className="mt-auto pt-1">
+          {status === 'member' ? (
+            <span className="w-full inline-flex items-center justify-center gap-1.5 min-h-[40px] rounded-full bg-ok/10 text-ok text-xs font-extrabold">
+              <Check size={14} /> {t('comunidade.member_label')}
+            </span>
+          ) : status === 'pending' ? (
+            <span className="w-full inline-flex items-center justify-center gap-1.5 min-h-[40px] rounded-full bg-ink-50 text-muted text-xs font-extrabold">
+              <Clock size={14} /> {t('comunidade.request_sent')}
+            </span>
+          ) : (
             <button
-              onClick={(e) => { e.preventDefault(); handleToggleFavorite(org, isFavorite) }}
-              disabled={favoritingOn === org.id}
-              aria-label={isFavorite ? t('comunidade.favorite_remove_aria') : t('comunidade.favorite_add_aria')}
-              title={isFavorite ? t('comunidade.favorite_remove_aria') : t('comunidade.favorite_add_title')}
-              className="shrink-0 w-11 h-11 min-h-[44px] rounded-full flex items-center justify-center transition-colors duration-fast disabled:opacity-40 hover:bg-ink-50"
-            >
-              <Heart size={20} className={isFavorite ? 'fill-lime-400 text-lime-400' : 'text-ink-200'} />
-            </button>
-            <button
-              onClick={(e) => { e.preventDefault(); handleUnfollow(org) }}
+              onClick={(e) => { e.preventDefault(); handleFollow(org) }}
               disabled={actingOn === org.id}
-              className="whitespace-nowrap text-xs font-extrabold px-3 py-2 min-h-[44px] rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast disabled:opacity-40"
+              className={`w-full inline-flex items-center justify-center min-h-[40px] rounded-full text-xs font-extrabold transition-colors duration-fast disabled:opacity-40 ${
+                joinsDirectly
+                  ? 'bg-lime-400 text-ink-900 hover:bg-lime-600'
+                  : 'bg-canvas text-ink-900 border border-ink-900 hover:bg-ink-50'
+              }`}
             >
-              {t('comunidade.following_label')}
+              {joinsDirectly ? t('comunidade.join_action') : t('comunidade.request_entry_action')}
             </button>
-          </>
-        ) : org.my_status === 'pending' ? (
-          <span className="whitespace-nowrap inline-flex items-center gap-1.5 text-xs font-extrabold px-3 py-2 rounded-full bg-ink-50 text-muted">
-            <Clock size={14} /> {t('comunidade.request_sent')}
-          </span>
-        ) : (
-          <button
-            onClick={(e) => { e.preventDefault(); handleFollow(org) }}
-            disabled={actingOn === org.id}
-            className="whitespace-nowrap inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[44px] rounded-full bg-lime-400 text-ink-900 hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
-          >
-            <UserPlus size={14} />
-            {org.open_join ? t('comunidade.follow_action') : t('comunidade.request_join_action')}
-          </button>
-        )}
+          )}
+        </div>
       </Link>
     )
   }
 
-  return (
-    <div className="space-y-5">
-      <div>
-        <h2 className="text-3xl text-ink-900">{t('comunidade.title')}</h2>
-        <p className="text-muted text-sm mt-0.5">
-          {tab === 'teachers'
-            ? teachersLoading
-              ? t('common.loading')
-              : t('comunidade.teacher_count', { count: otherTeachers.length })
-            : loading
-            ? t('common.loading')
-            : tab === 'players'
-            ? t('comunidade.player_count', { count: visiblePlayers.length })
-            : t('comunidade.club_count', { count: organizations.length })}
+  const renderTeacher = (teacher) => (
+    <div key={teacher.id} className="card p-3.5 space-y-2">
+      <div className="flex items-center gap-3">
+        <span className="w-11 h-11 rounded-full bg-ink-50 text-ink-700 flex items-center justify-center shrink-0">
+          <GraduationCap size={18} />
+        </span>
+        <div className="flex-1 min-w-0">
+          <h3 className="font-extrabold text-ink-900 truncate">{teacher.user?.name}</h3>
+          <p className="text-xs text-muted truncate">
+            {t('comunidade.teacher_label')} · {teacher.organization?.name || t('comunidade.teacher_no_club')}{teacher.zone ? ` · ${teacher.zone}` : ''}
+          </p>
+        </div>
+      </div>
+      {teacher.availability?.length > 0 && (
+        <p className="text-xs text-muted">
+          {teacher.availability
+            .map((a) => `${t(DAY_LABEL_KEY[a.day_of_week])} ${a.start_time.slice(0, 5)}–${a.end_time.slice(0, 5)}`)
+            .join(' · ')}
         </p>
+      )}
+      <p className="text-sm text-ink-900">{teacher.contact}</p>
+    </div>
+  )
+
+  const busy = loading || (filter === 'teachers' && teachersLoading)
+  const nothing = !busy && listedOrgs.length === 0 && !showMineRow && (!showTeachers || approvedTeachers.length === 0)
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-3xl text-ink-900">{t('comunidade.title')}</h2>
+
+      <div className="flex items-center gap-2 input-field focus-within:border-ink-500 focus-within:ring-2 focus-within:ring-ink-50">
+        <Search size={16} className="text-muted shrink-0" />
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+          placeholder={t('comunidade.search_placeholder_orgs')}
+          className="flex-1 min-w-0 bg-transparent outline-none text-base"
+        />
+        {query && (
+          <button type="button" onClick={() => setQuery('')} aria-label={t('ui.close')} className="text-muted shrink-0">
+            <X size={16} />
+          </button>
+        )}
       </div>
 
-      {mySelfServeGroup ? (
-        <Link to={`/gerir/${mySelfServeGroup.slug}`} className="card press flex items-center gap-3.5 hover:shadow-lift">
-          <Avatar name={mySelfServeGroup.name} url={mySelfServeGroup.group_logo_url} size="w-11 h-11 text-sm" />
-          <div className="flex-1 min-w-0">
-            <h3 className="font-extrabold text-ink-900 truncate">{mySelfServeGroup.name}</h3>
-            <p className="text-sm text-muted">{t('comunidade.my_group_label')}</p>
-          </div>
-        </Link>
-      ) : (
-        <div className="card space-y-4">
-          {!showCreateGroupForm ? (
-            <button
-              type="button"
-              onClick={() => setShowCreateGroupForm(true)}
-              className="btn-primary w-full flex items-center justify-center gap-2"
-            >
-              <Plus size={18} />
-              {t('comunidade.create_group_cta')}
-            </button>
-          ) : (
-            <>
-              <h3 className="font-extrabold text-ink-900">{t('comunidade.create_group_cta')}</h3>
-              <p className="text-sm text-gray-500">
-                {t('comunidade.create_group_description')}
-              </p>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">{t('comunidade.name_label')}</label>
-                <input
-                  type="text"
-                  value={groupName}
-                  onChange={(e) => setGroupName(e.target.value)}
-                  className="input-field"
-                  placeholder={t('comunidade.group_name_placeholder')}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">{t('comunidade.slug_label')}</label>
-                <input
-                  type="text"
-                  value={groupSlug}
-                  onChange={(e) => setGroupSlug(sanitizeSlug(e.target.value))}
-                  className="input-field"
-                  placeholder={t('comunidade.group_slug_placeholder')}
-                />
-              </div>
-
-              {createGroupError && (
-                <div className="bg-danger/10 text-danger px-4 py-3 rounded-ctrl text-sm font-extrabold">{createGroupError}</div>
-              )}
-
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={handleCreateGroup}
-                  disabled={!groupName.trim() || !groupSlug.trim() || creatingGroup}
-                  className="btn-primary flex-1 disabled:opacity-40"
-                >
-                  {creatingGroup ? t('comunidade.creating_group') : t('comunidade.create_group_submit')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setShowCreateGroupForm(false); setGroupName(''); setGroupSlug(''); setCreateGroupError('') }}
-                  disabled={creatingGroup}
-                  className="flex-1 text-sm font-extrabold px-3 py-2 min-h-[44px] rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast disabled:opacity-40"
-                >
-                  {t('comunidade.cancel')}
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
-      {tab !== 'teachers' && (
-        <div className="flex items-center gap-2 input-field focus-within:border-ink-500 focus-within:ring-2 focus-within:ring-ink-50">
-          <Search size={16} className="text-muted shrink-0" />
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
-            placeholder={t('comunidade.search_placeholder')}
-            className="flex-1 bg-transparent outline-none text-base"
-          />
-        </div>
-      )}
-
-      {tab === 'players' && levelOptions.length > 1 && (
-        <Select
-          value={levelFilter}
-          onChange={setLevelFilter}
-          options={levelOptions}
-          placeholder={t('comunidade.level_filter_all')}
-          className="w-full sm:w-40"
-        />
-      )}
-
-      {/* Tabs */}
-      <div className="flex gap-1 p-1 bg-ink-50 rounded-ctrl">
-        {TABS.map((tabDef) => (
+      {/* Todas à vista, sem deslizar: passam para a linha de baixo. */}
+      <div className="flex gap-1.5 flex-wrap">
+        {FILTERS.map((f) => (
           <button
-            key={tabDef.key}
-            onClick={() => setTab(tabDef.key)}
-            className={`flex-1 py-2.5 rounded-ctrl text-sm font-extrabold transition-all duration-fast ${
-              tab === tabDef.key ? 'bg-canvas text-ink-900 shadow-lift border border-line' : 'text-muted hover:text-ink-900'
+            key={f.key}
+            type="button"
+            onClick={() => setFilter(f.key)}
+            className={`inline-flex items-center px-3 min-h-[36px] rounded-full text-[13px] font-extrabold border whitespace-nowrap transition-colors duration-fast ${
+              filter === f.key ? 'bg-ink-900 text-white border-ink-900' : 'bg-canvas text-ink-700 border-line'
             }`}
           >
-            {t(tabDef.labelKey)}
+            {t(f.labelKey)}
           </button>
         ))}
       </div>
 
-      {tab === 'teachers' ? (
-        teachersLoading ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {myTeacherProfile ? (
-              <div className="card space-y-2">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <h3 className="font-extrabold text-ink-900">{myTeacherProfile.organization?.name}</h3>
-                    <p className="text-sm text-muted">
-                      {myTeacherProfile.status === 'pending' ? t('comunidade.teacher_status_pending') : t('comunidade.teacher_status_approved')}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => handleWithdrawTeacher(myTeacherProfile.id)}
-                    disabled={withdrawingTeacherId === myTeacherProfile.id}
-                    className="text-sm font-extrabold px-3 py-2 min-h-[44px] rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast disabled:opacity-40"
-                  >
-                    {t('comunidade.withdraw_button')}
-                  </button>
-                </div>
-              </div>
-            ) : !showTeacherForm ? (
-              <button
-                type="button"
-                onClick={() => setShowTeacherForm(true)}
-                disabled={teachableOrgs.length === 0}
-                className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-40"
-              >
-                <GraduationCap size={18} />
-                {t('comunidade.become_teacher_cta')}
-              </button>
-            ) : (
-              <div className="card space-y-4">
-                <h3 className="font-extrabold text-ink-900">{t('comunidade.become_teacher_cta')}</h3>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">{t('comunidade.club_label')}</label>
-                  <Select
-                    value={teacherOrgId}
-                    onChange={setTeacherOrgId}
-                    placeholder={t('comunidade.select_club_placeholder')}
-                    options={teachableOrgs.map((o) => ({ value: o.id, label: o.name }))}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">{t('comunidade.contact_label')}</label>
-                  <input
-                    type="text"
-                    value={teacherContact}
-                    onChange={(e) => setTeacherContact(e.target.value)}
-                    className="input-field"
-                    placeholder={t('comunidade.contact_placeholder')}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">{t('comunidade.availability_label')}</label>
-                  <div className="space-y-2">
-                    {teacherSlots.map((slot, i) => (
-                      <div key={i} className="flex items-center gap-2">
-                        <Select
-                          value={slot.day}
-                          onChange={(v) => handleSlotChange(i, 'day', v)}
-                          className="flex-1"
-                          options={DAYS.map((d) => ({ value: d.value, label: t(d.labelKey) }))}
-                        />
-                        <input
-                          type="time"
-                          value={slot.start}
-                          onChange={(e) => handleSlotChange(i, 'start', e.target.value)}
-                          className="input-field w-28"
-                        />
-                        <input
-                          type="time"
-                          value={slot.end}
-                          onChange={(e) => handleSlotChange(i, 'end', e.target.value)}
-                          className="input-field w-28"
-                        />
-                        {teacherSlots.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveSlot(i)}
-                            aria-label={t('comunidade.remove_slot_aria')}
-                            className="shrink-0 w-9 h-9 flex items-center justify-center rounded-full text-muted hover:bg-ink-50"
-                          >
-                            <X size={16} />
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={handleAddSlot}
-                      className="text-sm font-extrabold text-ink-700 hover:text-ink-900"
-                    >
-                      {t('comunidade.add_slot_button')}
-                    </button>
-                  </div>
-                </div>
-
-                {teacherError && (
-                  <div className="bg-danger/10 text-danger px-4 py-3 rounded-ctrl text-sm font-extrabold">{teacherError}</div>
-                )}
-
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={handleRequestTeacher}
-                    disabled={submittingTeacher}
-                    className="btn-primary flex-1 disabled:opacity-40"
-                  >
-                    {submittingTeacher ? t('comunidade.sending') : t('comunidade.send_request')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setShowTeacherForm(false); setTeacherError('') }}
-                    disabled={submittingTeacher}
-                    className="flex-1 text-sm font-extrabold px-3 py-2 min-h-[44px] rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast disabled:opacity-40"
-                  >
-                    {t('comunidade.cancel')}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {otherTeachers.length === 0 ? (
-              <EmptyState
-                icon={GraduationCap}
-                title={t('comunidade.no_teachers_title')}
-                subtitle={t('comunidade.no_teachers_subtitle')}
-              />
-            ) : (
-              otherTeachers.map((teacher) => (
-                <div key={teacher.id} className="card space-y-2">
-                  <div className="flex items-center gap-3">
-                    <Avatar name={teacher.user?.name} url={teacher.user?.avatar_url} size="w-11 h-11 text-sm" />
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-extrabold text-ink-900 truncate">{teacher.user?.name}</h3>
-                      <p className="text-[11px] font-extrabold uppercase tracking-widest text-lime-700 truncate">
-                        {teacher.organization?.name}
-                      </p>
-                    </div>
-                  </div>
-                  <p className="text-sm text-ink-900">{teacher.contact}</p>
-                  {teacher.availability?.length > 0 && (
-                    <p className="text-sm text-muted">
-                      {teacher.availability
-                        .map((a) => `${t(DAY_LABEL_KEY[a.day_of_week])} ${a.start_time.slice(0, 5)}-${a.end_time.slice(0, 5)}`)
-                        .join(' • ')}
-                    </p>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
-        )
-      ) : loading ? (
+      {busy ? (
         <div className="flex items-center justify-center py-16">
           <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
         </div>
-      ) : tab === 'players' ? (
-        visiblePlayers.length === 0 ? (
-          <EmptyState
-            icon={Users}
-            title={t('comunidade.no_players_title')}
-            subtitle={query.trim() || levelFilter ? t('comunidade.try_another_name') : t('comunidade.no_players_subtitle')}
-          />
-        ) : (
-          <div className="card p-0 overflow-hidden divide-y divide-line">
-            {visiblePlayers.map((player) => (
-              <Link
-                key={player.id}
-                to={`/jogador/${player.id}`}
-                className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50"
-              >
-                <Avatar name={player.name} url={player.avatar_url} size="w-10 h-10 text-sm" />
-                <div className="flex-1 min-w-0">
-                  {/* Nome encolhe com reticências; o nível fica sempre visível. */}
-                  <p className="font-extrabold text-ink-900 text-sm flex items-center gap-1.5 min-w-0">
-                    <span className="truncate min-w-0">{player.name}</span>
-                    <span className="shrink-0 flex"><RatingBadge rating={player.rating} gender={player.gender} /></span>
-                  </p>
-                  <div className="flex items-center gap-2 flex-wrap mt-0.5">
-                    {player.club_names && (
-                      <p className="text-[11px] font-extrabold uppercase tracking-widest text-lime-700 truncate">
-                        {player.club_names}
-                      </p>
-                    )}
-                    <p className="text-[11px] text-muted">{sideLabel(player.preferred_side)}</p>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )
-      ) : clubs.length === 0 ? (
+      ) : nothing ? (
         <EmptyState
-          icon={Users}
+          icon={filter === 'teachers' ? GraduationCap : Users}
           title={t('comunidade.nothing_found_title')}
-          subtitle={query.trim() ? t('comunidade.try_another_name') : t('comunidade.no_clubs_subtitle')}
+          subtitle={trimmed ? t('comunidade.try_another_name') : filter === 'mine' ? t('comunidade.no_mine_subtitle') : t('comunidade.no_clubs_subtitle')}
         />
       ) : (
-        <div className="space-y-3">{clubs.map(renderOrgRow)}</div>
-      )}
-
-      {/* Os grupos criados na Comunidade são privados: não entram no
-          diretório acima, e sem isto quem é membro não tinha como abrir a
-          página do seu próprio grupo (nem os jogos entre amigos que lá
-          vivem) — Francisco, 16 set 2026. */}
-      {tab === 'orgs' && !query.trim() && myOrgs.length > 0 && (
-        <div className="space-y-3 mt-8">
-          <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('comunidade.my_orgs_heading')}</p>
-          {myOrgs.map((org) => (
-            <Link key={org.id} to={`/clube/${org.slug}`} className="card press flex items-center gap-3.5 hover:shadow-lift">
-              <Avatar name={org.name} url={org.group_logo_url} size="w-11 h-11 text-sm" shape={orgAvatarShape(org.kind)} />
-              <div className="flex-1 min-w-0">
-                <h3 className="font-extrabold text-ink-900 truncate">{org.name}</h3>
-                <div className="mt-1"><OrgKindBadge kind={org.kind} /></div>
+        <>
+          {showMineRow && (
+            <section>
+              <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mb-2">{t('comunidade.mine_heading')}</p>
+              <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-1 px-1 pb-1">
+                {myOrgs.map((org) => (
+                  <Link key={org.id} to={`/clube/${org.slug}`} className="w-[72px] shrink-0 flex flex-col items-center gap-1.5 text-center">
+                    <Avatar name={org.name} url={org.group_logo_url} size="w-14 h-14 text-lg" shape={orgAvatarShape(org.kind)} />
+                    <span className="text-[11px] font-extrabold text-ink-900 leading-tight line-clamp-2 break-words">{org.name}</span>
+                  </Link>
+                ))}
               </div>
-            </Link>
-          ))}
-        </div>
+            </section>
+          )}
+
+          {listedOrgs.length > 0 && (
+            <section>
+              <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mb-2">
+                {trimmed.length > 1
+                  ? t('comunidade.results_count', { count: listedOrgs.length + (showTeachers ? approvedTeachers.length : 0) })
+                  : filter === 'mine' ? t('comunidade.filter_mine')
+                  : filter === 'club' ? t('comunidade.filter_clubs')
+                  : filter === 'group' ? t('comunidade.filter_groups')
+                  : t('comunidade.others_heading')}
+              </p>
+              <div className="grid grid-cols-2 gap-3">{listedOrgs.map(renderOrgCard)}</div>
+            </section>
+          )}
+
+          {showTeachers && approvedTeachers.length > 0 && (
+            <section>
+              <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mb-2">{t('comunidade.filter_teachers')}</p>
+              <div className="space-y-3">{approvedTeachers.map(renderTeacher)}</div>
+            </section>
+          )}
+        </>
       )}
 
     </div>

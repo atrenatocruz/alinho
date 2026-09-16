@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { Avatar, EmptyState, PrimaryButton, OrgKindBadge, PlanBadge, orgAvatarShape } from '../components/ui'
 import PlayerSearch from '../components/PlayerSearch'
-import { searchAnyPlayer, createOrganization, createGroup } from '../lib/platformAdmin'
+import { searchAnyPlayer, createOrganization, createGroup, createSelfServeGroup } from '../lib/platformAdmin'
 import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
 import { describeError } from '../lib/errors'
 
@@ -14,7 +14,7 @@ const sanitizeSlug = (value) => value.toLowerCase().replace(/[^a-z0-9-]/g, '')
 
 export default function Gerir() {
   const { t } = useTranslation()
-  const { profile, adminOrganizations } = useAuth()
+  const { profile, adminOrganizations, refreshMemberships } = useAuth()
   const navigate = useNavigate()
   const isPlatformAdmin = !!profile?.is_platform_admin
 
@@ -64,9 +64,107 @@ export default function Gerir() {
 
   const clubsToShow = isPlatformAdmin ? allOrganizations : adminOrganizations
 
-  if (adminOrganizations.length === 1 && !isPlatformAdmin) {
+  // Criar grupo (Trello #279 — saiu da Comunidade). Uma pessoa cria um grupo
+  // seu; a regra "um grupo self-serve por pessoa" está em
+  // create_self_serve_group.
+  const mySelfServeGroup = adminOrganizations.find((o) => o.self_serve)
+  const [showGroupForm, setShowGroupForm] = useState(false)
+  const [groupName, setGroupName] = useState('')
+  const [groupSlug, setGroupSlug] = useState('')
+  const [creatingGroup, setCreatingGroup] = useState(false)
+  const [groupError, setGroupError] = useState('')
+
+  // Só salta direto para o clube quando não há mais nada a fazer aqui: gere
+  // um só e já tem o seu grupo (senão tinha de ver "Criar grupo").
+  if (adminOrganizations.length === 1 && !isPlatformAdmin && mySelfServeGroup) {
     return <Navigate to={`/gerir/${adminOrganizations[0].slug}`} replace />
   }
+
+  const handleCreateGroup = async () => {
+    setGroupError('')
+    setCreatingGroup(true)
+    try {
+      await createSelfServeGroup(groupName.trim(), groupSlug.trim())
+      // create_self_serve_group insere a membership de admin do lado do
+      // servidor — puxá-la antes de navegar, senão o GerirClube lê
+      // memberships antigas e mostra "Sem acesso" até recarregar.
+      await refreshMemberships()
+      navigate(`/gerir/${groupSlug.trim()}`)
+    } catch (err) {
+      console.error('Error creating self-serve group:', err)
+      const message = err?.message || ''
+      if (message.includes('Já és admin de um grupo self-serve')) {
+        setGroupError(describeError(t, err, 'comunidade.create_group_error_already_admin'))
+      } else if (message.toLowerCase().includes('duplicate key value violates unique constraint') || message.toLowerCase().includes('slug')) {
+        setGroupError(describeError(t, err, 'comunidade.create_group_error_duplicate_slug'))
+      } else {
+        setGroupError(describeError(t, err, 'comunidade.create_group_error_generic'))
+      }
+    } finally {
+      setCreatingGroup(false)
+    }
+  }
+
+  const createGroupPanel = !isPlatformAdmin && !mySelfServeGroup && (
+    <div className="card space-y-4">
+      {!showGroupForm ? (
+        <>
+          <div>
+            <h3 className="font-extrabold text-ink-900">{t('gerir.create_group_title')}</h3>
+            <p className="text-sm text-muted mt-1">{t('gerir.create_group_description')}</p>
+          </div>
+          <PrimaryButton onClick={() => setShowGroupForm(true)} className="w-full">
+            <Plus size={18} />
+            {t('comunidade.create_group_cta')}
+          </PrimaryButton>
+        </>
+      ) : (
+        <>
+          <h3 className="font-extrabold text-ink-900">{t('comunidade.create_group_cta')}</h3>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t('comunidade.name_label')}</label>
+            <input
+              type="text"
+              value={groupName}
+              onChange={(e) => setGroupName(e.target.value)}
+              className="input-field"
+              placeholder={t('comunidade.group_name_placeholder')}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t('comunidade.slug_label')}</label>
+            <input
+              type="text"
+              value={groupSlug}
+              onChange={(e) => setGroupSlug(sanitizeSlug(e.target.value))}
+              className="input-field"
+              placeholder={t('comunidade.group_slug_placeholder')}
+            />
+          </div>
+          {groupError && (
+            <div className="bg-danger/10 text-danger px-4 py-3 rounded-ctrl text-sm font-extrabold">{groupError}</div>
+          )}
+          <div className="flex gap-3">
+            <PrimaryButton
+              onClick={handleCreateGroup}
+              disabled={!groupName.trim() || !groupSlug.trim() || creatingGroup}
+              className="flex-1"
+            >
+              {creatingGroup ? t('comunidade.creating_group') : t('comunidade.create_group_submit')}
+            </PrimaryButton>
+            <PrimaryButton
+              variant="ghost"
+              onClick={() => { setShowGroupForm(false); setGroupName(''); setGroupSlug(''); setGroupError('') }}
+              disabled={creatingGroup}
+              className="flex-1"
+            >
+              {t('gerir.cancel')}
+            </PrimaryButton>
+          </div>
+        </>
+      )}
+    </div>
+  )
 
   const resetCreateForm = () => {
     setShowCreateForm(false)
@@ -207,11 +305,18 @@ export default function Gerir() {
   if (clubsToShow.length === 0) {
     return (
       <div className="space-y-5">
-        <EmptyState
-          icon={Settings}
-          title={t('gerir.empty_title')}
-          subtitle={t('gerir.empty_subtitle')}
-        />
+        <div>
+          <h2 className="text-3xl text-ink-900">{t('gerir.title')}</h2>
+          <p className="text-muted text-sm mt-0.5">{t('gerir.empty_subtitle')}</p>
+        </div>
+        {createGroupPanel}
+        {isPlatformAdmin && (
+          <EmptyState
+            icon={Settings}
+            title={t('gerir.empty_title')}
+            subtitle={t('gerir.empty_subtitle')}
+          />
+        )}
         {createdClubBanner}
         {createClubPanel}
       </div>
@@ -230,6 +335,8 @@ export default function Gerir() {
       {createdClubBanner}
 
       {createClubPanel}
+
+      {createGroupPanel}
 
       {/* Clubes and Grupos never share a list: someone who manages a friends
           group and a club at the same time has to see at a glance which is

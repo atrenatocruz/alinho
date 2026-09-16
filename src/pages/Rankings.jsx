@@ -1,610 +1,395 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { Link, useLocation, useNavigationType } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Trophy, Award, Calendar, ChevronDown, HelpCircle } from 'lucide-react'
+import { Trophy, Award, HelpCircle, Search, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { RatingBadge, GroupLevelBadge, EmptyState, Avatar, Select } from '../components/ui'
-import { formatRating, formatRatingMaybeProvisional, isProvisional } from '../lib/elo'
+import { RatingBadge, EmptyState, Avatar, Select } from '../components/ui'
+import { formatRatingMaybeProvisional, isProvisional } from '../lib/elo'
 import { tierFromXp, formatXp } from '../lib/xp'
 import { winRatePct, buildMonthlyLeaderboard } from '../lib/statsLogic'
 import { getGlobalRankings } from '../lib/privateMatches'
-import { getOrganizationRankings } from '../lib/organizations'
+import { errorKind } from '../lib/errors'
 
-const SECTIONS = [
-  { key: 'players', labelKey: 'rankings.section_players' },
-  { key: 'orgs', labelKey: 'rankings.section_clubs' },
-]
+/* ─── Rankings (épico «Comunidade vs. Rankings», Trello #271/#275) ───────────
+   Comparar jogadores — só jogadores. Desenho:
+   https://claude.ai/artifact/LmwwNPxxnNRttG1RbHdDCt
+   - Pesquisa de jogador em cima: filtra, mas cada um mantém a posição
+     verdadeira, com "Ver na lista" para saltar para a altura dele.
+   - Ranking · Assiduidade por cima da lista.
+   - "Por clube" e "Mensal" deixaram de ser abas: são o âmbito (Global / um
+     clube ou grupo) e o período (Sempre / um mês). O período por mês só
+     existe dentro de um clube ou grupo — é aí que há histórico por mix.
+   - Toda a gente aparece; quem não tem nível fica no fim, "Sem nível".
+   - A tua linha fica fixa em baixo.
+   - Saíram: a secção Clubes & Grupos (procuram-se na Comunidade) e a caixa
+     "Como funcionam os níveis?" (fica o "?").
+   - Escalas M/F/Misto: por acordar com Ruben e Renato — a lista continua
+     misturada, como antes. */
 
-const TABS = [
-  { key: 'global', labelKey: 'rankings.tab_global' },
-  { key: 'geral', labelKey: 'rankings.tab_by_club' },
-  { key: 'mensal', labelKey: 'rankings.tab_monthly' },
-  { key: 'assiduidade', labelKey: 'rankings.tab_assiduity' },
-]
+const ALWAYS = 'always'
 
 export default function Rankings() {
   const { t, i18n } = useTranslation()
-  const { user, currentOrganizationId, currentOrganization, memberships, switchOrganization } = useAuth()
+  const { user, currentOrganizationId, memberships } = useAuth()
   const location = useLocation()
   const navigationType = useNavigationType()
-  // Arriving from the Profile page's "Ranking Global" card (state.scrollToMe)
-  // — jumps straight to the Global tab and, once it's loaded, scrolls to and
-  // briefly highlights the viewer's own row (Trello #185). A plain nav-bar
-  // visit to /rankings carries no state, so it opens on the default tab and
-  // scrolls nowhere, same as before.
-  const [section, setSection] = useState('players')
-  const [tab, setTab] = useState(location.state?.tab || 'global')
+
+  // Quem chega com state.tab (Perfil → "Ranking global", links antigos)
+  // abre no sítio equivalente.
+  const initialTab = location.state?.tab
+  const [mode, setMode] = useState(initialTab === 'assiduidade' ? 'xp' : 'ranking')
+  const [scope, setScope] = useState(
+    (initialTab === 'geral' || initialTab === 'mensal') && currentOrganizationId ? currentOrganizationId : 'global'
+  )
+  const [period, setPeriod] = useState(ALWAYS)
+  const [query, setQuery] = useState('')
+  const [rows, setRows] = useState([])
+  const [months, setMonths] = useState([])
   const [loading, setLoading] = useState(true)
+  const [highlightId, setHighlightId] = useState(null)
+  const wantMonthly = useRef(initialTab === 'mensal')
 
-  // Geral
-  const [rankings, setRankings] = useState([])
+  const scopeOptions = useMemo(() => [
+    { value: 'global', label: t('rankings.scope_global') },
+    ...memberships
+      .filter((m) => m.organization)
+      .map((m) => ({ value: m.organization_id, label: m.organization.name }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'pt')),
+  ], [memberships, t])
 
-  // Mensal
-  const [monthly, setMonthly] = useState({ months: [], byMonth: {} })
-  const [selectedMonth, setSelectedMonth] = useState(null)
-
-  // Global
-  const [globalRankings, setGlobalRankings] = useState([])
-  const [globalLoading, setGlobalLoading] = useState(true)
-
-  // Clubes & Grupos
-  const [orgRankings, setOrgRankings] = useState([])
-  const [orgRankingsLoading, setOrgRankingsLoading] = useState(true)
-
-  // Assiduidade (XP) — 'global' ou um organization_id
-  const [xpScope, setXpScope] = useState('global')
-  const [xpRankings, setXpRankings] = useState([])
-  const [xpLoading, setXpLoading] = useState(false)
-
+  // Muda de âmbito → período volta a "Sempre" (os meses são de cada clube).
   useEffect(() => {
-    if (tab !== 'assiduidade') return
+    setPeriod(ALWAYS)
+    setMonths([])
+  }, [scope])
+
+  // ── Carregar ─────────────────────────────────────────────────────────
+  useEffect(() => {
     let cancelled = false
-    setXpLoading(true)
-    supabase
-      .rpc('get_xp_rankings', { p_organization_id: xpScope === 'global' ? null : xpScope })
-      .then(({ data, error }) => {
-        if (cancelled) return
-        if (error) console.error('Error loading xp rankings:', error)
-        setXpRankings(data || [])
-        setXpLoading(false)
-      })
-    return () => { cancelled = true }
-  }, [tab, xpScope])
+    setLoading(true)
 
-  useEffect(() => {
-    // The global ranking and the club/group ranking are both org-independent
-    // — they have to load even for a user who isn't in any club, and
-    // `loading` has to resolve for them too (only loadRankings clears it,
-    // and that one needs an org).
-    loadGlobalRankings()
-    loadOrgRankings()
-    if (!currentOrganizationId) {
-      setLoading(false)
-      return
-    }
-    loadRankings()
-    loadMonthly()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentOrganizationId, i18n.language])
-
-  // level/is_guest live on `memberships` now — this org's membership list,
-  // reused across every load* function below.
-  const loadMembershipMap = async () => {
-    const { data, error } = await supabase
-      .from('memberships')
-      .select('user_id, is_guest, level, profile:profiles(name, avatar_url, rating, gender, rating_games)')
-      .eq('organization_id', currentOrganizationId)
-    if (error) throw error
-    return new Map((data || []).map((m) => [m.user_id, m]))
-  }
-
-  const loadRankings = async () => {
-    try {
-      const [{ data: statsRows, error: statsError }, membershipByUser] = await Promise.all([
-        supabase.from('player_stats').select('*').eq('organization_id', currentOrganizationId),
-        loadMembershipMap(),
-      ])
-      if (statsError) throw statsError
-
-      // Ranking: Elo → mix wins → game wins → win rate. O total_points
-      // (assiduidade) saiu da ordenação principal — vive no tab Mensal.
-      const rankedData = (statsRows || [])
-        .map((stat) => {
-          const m = membershipByUser.get(stat.user_id)
-          if (!m || m.is_guest) return null
-          const played = (stat.game_wins || 0) + (stat.game_losses || 0)
+    const load = async () => {
+      if (mode === 'xp') {
+        const { data, error } = await supabase.rpc('get_xp_rankings', { p_organization_id: scope === 'global' ? null : scope })
+        if (error) throw error
+        return (data || []).map((p) => {
+          const tier = tierFromXp(p.xp)
           return {
-            ...stat,
-            user: { name: m.profile?.name, level: m.level },
-            rating: m.profile?.rating ?? null,
-            rating_games: m.profile?.rating_games,
-            gender: m.profile?.gender,
-            gamesPlayed: played,
-            winRate: winRatePct(stat.game_wins || 0, played),
+            user_id: p.user_id, name: p.name, avatar_url: p.avatar_url, ranked: true,
+            sub: tier ? `${t('profile.xp_level', { level: tier.level })} · ${t(tier.labelKey)}` : '',
+            value: formatXp(p.xp), valueLabel: t('rankings.xp_label'),
           }
         })
-        .filter(Boolean)
-        .sort((a, b) =>
-          (b.rating ?? -1) - (a.rating ?? -1) ||
-          (b.mix_wins || 0) - (a.mix_wins || 0) ||
-          (b.game_wins || 0) - (a.game_wins || 0) ||
-          b.winRate - a.winRate
-        )
+      }
 
-      setRankings(rankedData)
-    } catch (error) {
-      console.error('Error loading rankings:', error)
-    } finally {
-      setLoading(false)
+      if (scope === 'global') {
+        const data = await getGlobalRankings()
+        return data.map(toRatingRow)
+      }
+
+      // Um clube ou grupo: meses (para a pastilha de período) + lista.
+      const monthly = await loadMonthly(scope)
+      if (!cancelled) {
+        setMonths(monthly.months)
+        if (wantMonthly.current && monthly.months[0]) {
+          wantMonthly.current = false
+          setPeriod(monthly.months[0].key)
+        }
+      }
+      if (period !== ALWAYS) {
+        return (monthly.byMonth[period] || []).map((p) => ({
+          user_id: p.user_id, name: p.user?.name || '—', avatar_url: null, ranked: true,
+          sub: `${t('rankings.mix_count', { count: p.participations })} · 🏆 ${t('rankings.mixes_won_count', { count: p.mixesWon })}`,
+          value: p.points > 0 ? `+${p.points}` : String(p.points), valueLabel: t('rankings.points_label'),
+        }))
+      }
+      return (await loadOrganizationRanking(scope)).map(toRatingRow)
     }
+
+    load()
+      .then((data) => { if (!cancelled) setRows(data) })
+      .catch((error) => {
+        console.error('Error loading rankings:', error)
+        if (!cancelled) setRows([])
+      })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, scope, period, i18n.language])
+
+  const toRatingRow = (p) => ({
+    user_id: p.user_id,
+    name: p.name,
+    avatar_url: p.avatar_url,
+    rating: p.rating,
+    gender: p.gender,
+    // Sem nível = sem rating: vai para o fim, sem posição nem pontos.
+    ranked: p.rating != null,
+    sub: `🏆 ${t('rankings.mix_wins_ratio', { wins: p.mix_wins || 0, played: p.mixes_played || 0 })}`,
+    value: p.rating != null ? formatRatingMaybeProvisional(p.rating, p.rating_games) : null,
+    valueLabel: isProvisional(p.rating_games) ? t('rankings.provisional_label') : t('rankings.points_label'),
+    provisional: isProvisional(p.rating_games),
+  })
+
+  const loadMonthly = async (orgId) => {
+    const { data, error } = await supabase
+      .from('mix_player_stats')
+      // games(*) e não games(date, ranked): não rebenta antes de
+      // migration_mix_ranked.sql criar a coluna.
+      .select('*, user:profiles!mix_player_stats_user_id_fkey (name), game:games (*)')
+      .eq('organization_id', orgId)
+    if (error) throw error
+    return buildMonthlyLeaderboard(data || [], i18n.language)
   }
 
-  const loadMonthly = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('mix_player_stats')
-        // games(*) e não games(date, ranked): assim não rebenta antes de
-        // migration_mix_ranked.sql criar a coluna.
-        .select('*, user:profiles!mix_player_stats_user_id_fkey (name), game:games (*)')
-        .eq('organization_id', currentOrganizationId)
+  // Todos os membros, com ou sem jogos (migration_rankings_everyone.sql).
+  // Antes dessa migração correr: o cálculo antigo no ecrã.
+  const loadOrganizationRanking = async (orgId) => {
+    const { data, error } = await supabase.rpc('get_organization_player_rankings', { p_organization_id: orgId })
+    if (!error) return data || []
+    if (errorKind(error) !== 'not_ready') throw error
 
-      if (error) throw error
-      const built = buildMonthlyLeaderboard(data || [], i18n.language)
-      setMonthly(built)
-      setSelectedMonth(prev => prev || built.months[0]?.key || null)
-    } catch (error) {
-      console.error('Error loading monthly stats:', error)
-    }
+    const [{ data: statsRows, error: statsError }, { data: members, error: membersError }] = await Promise.all([
+      supabase.from('player_stats').select('*').eq('organization_id', orgId),
+      supabase
+        .from('memberships')
+        .select('user_id, is_guest, profile:profiles(name, avatar_url, rating, gender, rating_games)')
+        .eq('organization_id', orgId),
+    ])
+    if (statsError) throw statsError
+    if (membersError) throw membersError
+    const byUser = new Map((members || []).map((m) => [m.user_id, m]))
+    return (statsRows || [])
+      .map((stat) => {
+        const m = byUser.get(stat.user_id)
+        if (!m || m.is_guest) return null
+        const played = (stat.game_wins || 0) + (stat.game_losses || 0)
+        return {
+          user_id: stat.user_id, name: m.profile?.name, avatar_url: m.profile?.avatar_url,
+          rating: m.profile?.rating ?? null, gender: m.profile?.gender, rating_games: m.profile?.rating_games,
+          mix_wins: stat.mix_wins, mixes_played: stat.mixes_played, game_wins: stat.game_wins,
+          winRate: winRatePct(stat.game_wins || 0, played),
+        }
+      })
+      .filter(Boolean)
+      .sort((a, b) =>
+        (b.rating ?? -1) - (a.rating ?? -1) ||
+        (b.mix_wins || 0) - (a.mix_wins || 0) ||
+        (b.game_wins || 0) - (a.game_wins || 0) ||
+        b.winRate - a.winRate
+      )
   }
 
-  const loadGlobalRankings = async () => {
-    try {
-      const data = await getGlobalRankings()
-      setGlobalRankings(data)
-    } catch (error) {
-      console.error('Error loading global rankings:', error)
-    } finally {
-      setGlobalLoading(false)
-    }
+  // ── Posições ─────────────────────────────────────────────────────────
+  // Com nível primeiro, pela ordem que veio; sem nível no fim, A–Z.
+  const positioned = useMemo(() => {
+    const ranked = rows.filter((r) => r.ranked).map((r, i) => ({ ...r, position: i + 1 }))
+    const unranked = rows
+      .filter((r) => !r.ranked)
+      .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pt'))
+      .map((r) => ({ ...r, position: null }))
+    return [...ranked, ...unranked]
+  }, [rows])
+
+  const norm = (s) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+  const trimmed = query.trim()
+  const visible = trimmed ? positioned.filter((r) => norm(r.name).includes(norm(trimmed))) : positioned
+  const me = positioned.find((r) => r.user_id === user.id)
+  const firstUnrankedIndex = visible.findIndex((r) => !r.ranked)
+
+  const scrollToPlayer = (userId) => {
+    setQuery('')
+    setHighlightId(userId)
+    // Espera a lista completa voltar a estar no DOM.
+    setTimeout(() => {
+      document.getElementById(`ranking-player-${userId}`)?.scrollIntoView({ block: 'center' })
+    }, 50)
+    setTimeout(() => setHighlightId(null), 2200)
   }
 
-  // Runs once the Global tab's own row can actually exist in the DOM —
-  // after its data has loaded, and only when that's the tab being shown.
-  //
-  // Skipped on a back/forward step: the state that asked for this jump stays on
-  // the history entry, so returning here from a player's profile would yank the
-  // list back to your own row instead of the spot you left. Layout restores that
-  // spot on 'POP' and should win (Trello #245).
-  //
-  // Waits for `loading` too, not just `globalLoading`: the Global list only
-  // renders once BOTH are false (see the `loading || globalLoading` spinner
-  // below). The global RPC usually finishes first, so waiting on it alone ran
-  // this while the spinner was still up — no row to find, and with `loading`
-  // missing from the deps it never ran again, leaving the page at the top.
-  //
-  // Once only: a later reload of the same data (e.g. switching language) must
-  // not yank the list back to your row after you have scrolled away.
+  // Perfil → "Ranking global": salta para a própria linha, uma vez. Não num
+  // voltar atrás (Layout repõe o scroll — Trello #245).
   const scrolledToMe = useRef(false)
   useEffect(() => {
     if (navigationType === 'POP' || scrolledToMe.current) return
-    if (!location.state?.scrollToMe || tab !== 'global' || loading || globalLoading) return
+    if (!location.state?.scrollToMe || loading) return
     const el = document.getElementById(`ranking-player-${user.id}`)
     if (!el) return
     scrolledToMe.current = true
-    // Salto direto, sem animação: é um efeito, corre depois de a lista estar
-    // no DOM, por isso não precisa de esperar. Uma animação 'smooth' de
-    // milhares de píxeis não acrescenta nada e pode ficar a meio.
     el.scrollIntoView({ block: 'center' })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, loading, globalLoading, globalRankings])
+  }, [loading, rows])
 
-  const loadOrgRankings = async () => {
-    try {
-      setOrgRankings(await getOrganizationRankings())
-    } catch (error) {
-      console.error('Error loading organization rankings:', error)
-    } finally {
-      setOrgRankingsLoading(false)
-    }
-  }
-
-  // Position chip: 1st gets the lime, 2nd/3rd get ink tones, rest neutral
-  const positionStyle = (i) => {
-    if (i === 0) return 'bg-lime-400 text-ink-900'
-    if (i === 1) return 'bg-ink-900 text-white'
-    if (i === 2) return 'bg-ink-700 text-white'
+  const positionStyle = (position) => {
+    if (position === 1) return 'bg-lime-400 text-ink-900'
+    if (position === 2) return 'bg-ink-900 text-white'
+    if (position === 3) return 'bg-ink-700 text-white'
     return 'bg-ink-50 text-ink-700'
   }
 
-  if (loading) {
+  const renderValue = (row, onDark = false) => row.ranked ? (
+    <div className="text-right shrink-0">
+      <p className={`text-lg font-extrabold tabular-nums leading-tight ${onDark ? 'text-white' : 'text-ink-900'}`}>{row.value}</p>
+      <p className={`text-[10px] ${row.provisional ? 'text-lime-600 font-extrabold' : onDark ? 'text-white/60' : 'text-muted'}`}>{row.valueLabel}</p>
+    </div>
+  ) : (
+    <span className={`shrink-0 text-[11px] font-extrabold px-2 py-1 rounded-full ${onDark ? 'bg-white/10 text-white/80' : 'bg-ink-50 text-muted'}`}>
+      {t('rankings.no_level')}
+    </span>
+  )
+
+  const renderRow = (row, index) => {
+    const isMe = row.user_id === user.id
     return (
-      <div className="flex items-center justify-center py-16">
-        <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
+      <div key={row.user_id}>
+        {index === firstUnrankedIndex && index > 0 && (
+          <p className="px-4 pt-4 pb-1 text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('rankings.end_of_list')}</p>
+        )}
+        <Link
+          id={`ranking-player-${row.user_id}`}
+          to={`/jogador/${row.user_id}`}
+          className={`flex items-center gap-3 px-3.5 py-2.5 transition-colors duration-fast hover:bg-ink-50 ${
+            highlightId === row.user_id ? 'bg-lime-400/25' : isMe ? 'bg-lime-400/10' : ''
+          }`}
+        >
+          <span className={`w-8 h-8 rounded-ctrl flex items-center justify-center text-sm font-extrabold tabular-nums shrink-0 ${row.position ? positionStyle(row.position) : 'bg-ink-50 text-muted'}`}>
+            {row.position ?? '—'}
+          </span>
+          <Avatar name={row.name} url={row.avatar_url} size="w-9 h-9 text-xs" />
+          <div className="flex-1 min-w-0">
+            <p className="font-extrabold text-ink-900 text-sm flex items-center gap-1.5 min-w-0">
+              <span className="truncate min-w-0">{row.name}</span>
+              {isMe && <span className="shrink-0 text-[10px] font-extrabold uppercase tracking-wide text-lime-600">{t('rankings.you_badge')}</span>}
+            </p>
+            <div className="flex items-center gap-1.5 min-w-0 mt-0.5">
+              {row.rating != null && <span className="shrink-0 flex"><RatingBadge rating={row.rating} gender={row.gender} /></span>}
+              {!row.ranked && mode === 'ranking' && period === ALWAYS && (
+                <span className="text-[11px] text-muted truncate">{t('rankings.no_level_hint')}</span>
+              )}
+              {row.ranked && row.sub && <span className="text-[11px] text-muted truncate">{row.sub}</span>}
+            </div>
+            {trimmed && (
+              <button
+                type="button"
+                onClick={(e) => { e.preventDefault(); scrollToPlayer(row.user_id) }}
+                className="text-[11px] font-extrabold text-ink-700 underline underline-offset-2 mt-0.5"
+              >
+                {t('rankings.see_in_list')}
+              </button>
+            )}
+          </div>
+          {renderValue(row)}
+        </Link>
       </div>
     )
   }
 
-  const monthPlayers = selectedMonth ? monthly.byMonth[selectedMonth] || [] : []
+  const monthOptions = [
+    { value: ALWAYS, label: t('rankings.period_always') },
+    ...months.map((m) => ({ value: m.key, label: m.label.charAt(0).toUpperCase() + m.label.slice(1) })),
+  ]
 
   return (
-    <div className="space-y-5">
-      <div>
-        {tab === 'geral' && memberships.length <= 1 && (
-          <p className="text-muted text-sm mb-0.5">{currentOrganization?.name}</p>
+    <div className="space-y-4">
+      <h2 className="text-3xl text-ink-900 inline-flex items-center gap-2">
+        {t('rankings.title')}
+        <Link to="/instrucoes#ranking" aria-label={t('rankings.help_aria')} className="text-muted hover:text-ink-900">
+          <HelpCircle size={18} />
+        </Link>
+      </h2>
+
+      <div className="flex items-center gap-2 input-field focus-within:border-ink-500 focus-within:ring-2 focus-within:ring-ink-50">
+        <Search size={16} className="text-muted shrink-0" />
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+          placeholder={t('rankings.search_placeholder')}
+          className="flex-1 min-w-0 bg-transparent outline-none text-base"
+        />
+        {query && (
+          <button type="button" onClick={() => setQuery('')} aria-label={t('ui.close')} className="text-muted shrink-0">
+            <X size={16} />
+          </button>
         )}
-        <h2 className="text-3xl text-ink-900 inline-flex items-center gap-2">
-          {t('rankings.title')}
-          <Link to="/instrucoes#ranking" aria-label={t('rankings.help_aria')} className="text-muted hover:text-ink-900">
-            <HelpCircle size={18} />
-          </Link>
-        </h2>
       </div>
 
-      {/* Sections — Jogadores vs Clubes & Grupos */}
-      <div className="flex gap-1 p-1 bg-ink-50 rounded-ctrl">
-        {SECTIONS.map((s) => (
+      <div className="grid grid-cols-2 gap-1 p-1 bg-ink-50 rounded-ctrl">
+        {[
+          { key: 'ranking', label: t('rankings.mode_ranking') },
+          { key: 'xp', label: t('rankings.tab_assiduity') },
+        ].map((m) => (
           <button
-            key={s.key}
-            onClick={() => setSection(s.key)}
-            className={`flex-1 py-2.5 rounded-ctrl text-sm font-extrabold transition-all duration-fast ${
-              section === s.key ? 'bg-canvas text-ink-900 shadow-lift border border-line' : 'text-muted hover:text-ink-900'
+            key={m.key}
+            type="button"
+            onClick={() => setMode(m.key)}
+            className={`py-2 rounded-ctrl text-sm font-extrabold transition-all duration-fast ${
+              mode === m.key ? 'bg-canvas text-ink-900 shadow-lift border border-line' : 'text-muted hover:text-ink-900'
             }`}
           >
-            {t(s.labelKey)}
+            {m.label}
           </button>
         ))}
       </div>
 
-      {/* Level badges (M6, N5, INI…) show up all over the app with no
-          explanation of what they mean — a native title="" tooltip exists
-          on the badge itself, but that's invisible on a touch screen.
-          <details> keeps this tap-friendly on mobile with zero extra JS. */}
-      <details className="card group">
-        <summary className="text-sm font-extrabold text-ink-900 cursor-pointer select-none list-none flex items-center justify-between">
-          {t('rankings.levels_explainer_title')}
-          <ChevronDown size={18} className="text-muted shrink-0 transition-transform duration-fast group-open:rotate-180" />
-        </summary>
-        <p className="text-sm text-muted mt-2">
-          {t('rankings.levels_explainer_body')}
-        </p>
-      </details>
-
-      {section === 'players' && (
-      <>
-      {/* Tabs */}
-      <div className="flex gap-1 p-1 bg-ink-50 rounded-ctrl">
-        {TABS.map(tabDef => (
-          <button
-            key={tabDef.key}
-            onClick={() => setTab(tabDef.key)}
-            className={`flex-1 py-2.5 rounded-ctrl text-sm font-extrabold transition-all duration-fast ${
-              tab === tabDef.key ? 'bg-canvas text-ink-900 shadow-lift border border-line' : 'text-muted hover:text-ink-900'
-            }`}
-          >
-            {t(tabDef.labelKey)}
-          </button>
-        ))}
-      </div>
-
-      {/* ─── Geral ──────────────────────────────────────────────────────── */}
-      {tab === 'geral' && (
-        <>
-          {/* No selector existed anywhere in the app to change which club's
-              ranking this shows — it silently mirrored whatever org happened
-              to be "current", with no visible way to switch. */}
-          {memberships.length > 1 && (
-            <Select
-              value={currentOrganizationId || ''}
-              onChange={switchOrganization}
-              options={memberships.map((m) => ({ value: m.organization_id, label: m.organization?.name }))}
-            />
-          )}
-
-          {rankings.length === 0 ? (
-            <EmptyState
-              icon={Award}
-              title={t('rankings.empty_general_title')}
-              subtitle={t('rankings.empty_general_subtitle')}
-            />
-          ) : (
-            <div className="space-y-3">
-              {rankings.map((player, index) => (
-                <Link
-                  key={player.id}
-                  to={`/jogador/${player.user_id}`}
-                  className={`card press block hover:shadow-lift ${index === 0 ? 'ring-2 ring-lime-400' : ''}`}
-                >
-                  <div className="flex items-center gap-3.5">
-                    <div
-                      className={`w-11 h-11 rounded-ctrl flex items-center justify-center font-extrabold text-lg shrink-0 tabular-nums ${positionStyle(index)}`}
-                    >
-                      {index + 1}
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-base text-ink-900 truncate">
-                        {player.user?.name}
-                      </h3>
-                      <div className="mt-0.5 flex items-center gap-2">
-                        <RatingBadge rating={player.rating} gender={player.gender} />
-                        <span className="text-[11px] text-muted">
-                          🏆 {t('rankings.mix_wins_ratio', { wins: player.mix_wins || 0, played: player.mixes_played || 0 })}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="text-right shrink-0">
-                      <div className="flex items-center gap-1.5 justify-end">
-                        <Trophy size={16} className="text-lime-600" />
-                        <span className="text-2xl font-extrabold text-ink-900 tabular-nums">
-                          {formatRatingMaybeProvisional(player.rating, player.rating_games)}
-                        </span>
-                      </div>
-                      <p className={`text-[11px] ${isProvisional(player.rating_games) ? 'text-lime-600 font-extrabold' : 'text-muted'}`}>
-                        {isProvisional(player.rating_games) ? t('rankings.provisional_label') : t('rankings.points_label')}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-3 mt-4 pt-3.5 border-t border-line text-center">
-                    <div>
-                      <p className="text-lg font-extrabold text-ok tabular-nums">{player.game_wins || 0}</p>
-                      <p className="text-[11px] text-muted">{t('rankings.wins_label')}</p>
-                    </div>
-                    <div>
-                      <p className="text-lg font-extrabold text-danger tabular-nums">{player.game_losses || 0}</p>
-                      <p className="text-[11px] text-muted">{t('rankings.losses_label')}</p>
-                    </div>
-                    <div>
-                      <p className="text-lg font-extrabold text-ink-700 tabular-nums">{player.winRate}%</p>
-                      <p className="text-[11px] text-muted">{t('rankings.win_rate_label')}</p>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </>
-      )}
-
-      {/* ─── Mensal ─────────────────────────────────────────────────────── */}
-      {tab === 'mensal' && (
-        <>
-          {monthly.months.length === 0 ? (
-            <EmptyState
-              icon={Calendar}
-              title={t('rankings.empty_monthly_title')}
-              subtitle={t('rankings.empty_monthly_subtitle')}
-            />
-          ) : (
-            <>
-              <Select
-                value={selectedMonth || ''}
-                onChange={setSelectedMonth}
-                options={monthly.months.map(m => ({
-                  value: m.key,
-                  // m.label comes lowercase from toLocaleDateString — Select
-                  // renders option rows as plain text with no CSS capitalize
-                  // hook (unlike the old native <option>), so capitalize it
-                  // here once instead of only on the closed trigger.
-                  label: m.label.charAt(0).toUpperCase() + m.label.slice(1),
-                }))}
-              />
-
-              <div className="space-y-3">
-                {monthPlayers.map((p, index) => (
-                  <Link
-                    key={p.user_id}
-                    to={`/jogador/${p.user_id}`}
-                    className={`card press block hover:shadow-lift ${index === 0 ? 'ring-2 ring-lime-400' : ''}`}
-                  >
-                    <div className="flex items-center gap-3.5">
-                      <div className={`w-11 h-11 rounded-ctrl flex items-center justify-center font-extrabold text-lg shrink-0 tabular-nums ${positionStyle(index)}`}>
-                        {index + 1}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-base text-ink-900 truncate">{p.user?.name || '—'}</h3>
-                        <p className="text-[11px] text-muted mt-0.5">
-                          {t('rankings.mix_count', { count: p.participations })} • 🏆 {t('rankings.mixes_won_count', { count: p.mixesWon })}
-                        </p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-2xl font-extrabold text-ink-900 tabular-nums">{p.points > 0 ? `+${p.points}` : p.points}</p>
-                        <p className="text-[11px] text-muted">{t('rankings.points_label')}</p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-3 mt-4 pt-3.5 border-t border-line text-center">
-                      <div>
-                        <p className="text-lg font-extrabold text-ok tabular-nums">{p.victories}</p>
-                        <p className="text-[11px] text-muted">{t('rankings.victories_label')}</p>
-                      </div>
-                      <div>
-                        <p className="text-lg font-extrabold text-ink-700 tabular-nums">{p.played}</p>
-                        <p className="text-[11px] text-muted">{t('rankings.games_played_label')}</p>
-                      </div>
-                      <div>
-                        <p className="text-lg font-extrabold text-ink-700 tabular-nums">{p.winRate}%</p>
-                        <p className="text-[11px] text-muted">{t('rankings.win_rate_label')}</p>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </>
-          )}
-        </>
-      )}
-
-      {/* ─── Global ─────────────────────────────────────────────────────── */}
-      {tab === 'global' && (
-        loading || globalLoading ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
-          </div>
-        ) : globalRankings.length === 0 ? (
-          <EmptyState
-            icon={Trophy}
-            title={t('rankings.empty_global_title')}
-            subtitle={t('rankings.empty_global_subtitle')}
-          />
-        ) : (
-          <div className="space-y-3">
-            {globalRankings.map((player, index) => {
-              const isMe = player.user_id === user.id
-              return (
-                <Link
-                  key={player.user_id}
-                  id={`ranking-player-${player.user_id}`}
-                  to={`/jogador/${player.user_id}`}
-                  className={`card press block hover:shadow-lift relative overflow-hidden ${index === 0 ? 'ring-2 ring-lime-400' : ''}`}
-                >
-                  {isMe && <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-lime-400" />}
-                  <div className="flex items-center gap-3.5">
-                    <div className={`w-11 h-11 rounded-ctrl flex items-center justify-center font-extrabold text-lg shrink-0 tabular-nums ${positionStyle(index)}`}>
-                      {index + 1}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-base text-ink-900 truncate">
-                        {player.name}
-                        {isMe && (
-                          <span className="ml-1.5 text-[11px] font-extrabold uppercase tracking-wide text-lime-600">
-                            {t('rankings.you_badge')}
-                          </span>
-                        )}
-                      </h3>
-                      <div className="mt-0.5 flex items-center gap-2">
-                        <RatingBadge rating={player.rating} gender={player.gender} />
-                        <span className="text-[11px] text-muted truncate">
-                          🏆 {t('rankings.mix_wins_ratio', { wins: player.mix_wins || 0, played: player.mixes_played || 0 })}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <span className="text-2xl font-extrabold text-ink-900 tabular-nums">{formatRatingMaybeProvisional(player.rating, player.rating_games)}</span>
-                      <p className={`text-[11px] ${isProvisional(player.rating_games) ? 'text-lime-600 font-extrabold' : 'text-muted'}`}>
-                        {isProvisional(player.rating_games) ? t('rankings.provisional_label') : t('rankings.points_label')}
-                      </p>
-                    </div>
-                  </div>
-                </Link>
-              )
-            })}
-          </div>
-        )
-      )}
-
-      {/* ─── Assiduidade (XP) ───────────────────────────────────────────── */}
-      {tab === 'assiduidade' && (
-        <>
-          {/* Âmbito: Global ou um dos clubes do utilizador (soma do ledger
-              dessa organização). O escudo/nível mostrado é sempre o global
-              — o âmbito só muda a ordenação/valores da lista. */}
+      <div className="flex gap-1.5 flex-wrap">
+        <Select variant="chip" value={scope} onChange={setScope} options={scopeOptions} placeholder={t('rankings.scope_title')} />
+        {mode === 'ranking' && scope !== 'global' && months.length > 0 && (
           <Select
-            value={xpScope}
-            onChange={setXpScope}
-            options={[
-              { value: 'global', label: t('rankings.assiduity_scope_global') },
-              ...memberships.map((m) => ({ value: m.organization_id, label: m.organization?.name || '' })),
-            ]}
+            variant="chip"
+            active={period !== ALWAYS}
+            value={period}
+            onChange={setPeriod}
+            options={monthOptions}
+            placeholder={t('rankings.period_title')}
           />
-          {xpLoading ? (
-            <div className="flex items-center justify-center py-16">
-              <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
-            </div>
-          ) : xpRankings.length === 0 ? (
-            <EmptyState
-              icon={Award}
-              title={t('rankings.empty_assiduity_title')}
-              subtitle={t('rankings.empty_assiduity_subtitle')}
-            />
-          ) : (
-            <div className="space-y-3">
-              {xpRankings.map((player, index) => {
-                const isMe = player.user_id === user.id
-                const tier = tierFromXp(player.xp)
-                return (
-                  <Link
-                    key={player.user_id}
-                    to={`/jogador/${player.user_id}`}
-                    className={`card press block hover:shadow-lift relative overflow-hidden ${index === 0 ? 'ring-2 ring-lime-400' : ''}`}
-                  >
-                    {isMe && <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-lime-400" />}
-                    <div className="flex items-center gap-3.5">
-                      <div className={`w-11 h-11 rounded-ctrl flex items-center justify-center font-extrabold text-lg shrink-0 tabular-nums ${positionStyle(index)}`}>
-                        {index + 1}
-                      </div>
-                      <Avatar name={player.name} url={player.avatar_url} size="w-10 h-10 text-sm" />
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-base text-ink-900 truncate">
-                          {player.name}
-                          {isMe && (
-                            <span className="ml-1.5 text-[11px] font-extrabold uppercase tracking-wide text-lime-600">
-                              {t('rankings.you_badge')}
-                            </span>
-                          )}
-                        </h3>
-                        {tier && (
-                          <p className="text-[11px] text-muted mt-0.5">
-                            {t('profile.xp_level', { level: tier.level })} · {t(tier.labelKey)}
-                          </p>
-                        )}
-                      </div>
-                      <div className="text-right shrink-0">
-                        <span className="text-2xl font-extrabold text-ink-900 tabular-nums">{formatXp(player.xp)}</span>
-                        <p className="text-[11px] text-muted">{t('rankings.xp_label')}</p>
-                      </div>
-                    </div>
-                  </Link>
-                )
-              })}
-            </div>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
+        </div>
+      ) : visible.length === 0 ? (
+        <EmptyState
+          icon={trimmed ? Search : mode === 'xp' ? Award : Trophy}
+          title={trimmed ? t('rankings.no_player_found_title') : t('rankings.empty_global_title')}
+          subtitle={trimmed ? t('comunidade.try_another_name') : mode === 'xp' ? t('rankings.empty_assiduity_subtitle') : t('rankings.empty_global_subtitle')}
+        />
+      ) : (
+        <>
+          {trimmed && (
+            <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">
+              {t('rankings.players_found', { count: visible.length })}
+            </p>
           )}
+          <div className="card p-0 overflow-hidden divide-y divide-line">
+            {visible.map(renderRow)}
+          </div>
         </>
       )}
-      </>
-      )}
 
-      {/* ─── Clubes ─────────────────────────────────────────────────────── */}
-      {section === 'orgs' && (
-        orgRankingsLoading ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
+      {/* A tua linha, sempre à vista por cima da barra de navegação. */}
+      {!loading && me && (
+        <button
+          type="button"
+          onClick={() => scrollToPlayer(me.user_id)}
+          className="sticky bottom-24 z-10 w-full flex items-center gap-3 px-3.5 py-2.5 rounded-card bg-ink-900 text-white shadow-lift text-left"
+        >
+          <span className={`w-8 h-8 rounded-ctrl flex items-center justify-center text-sm font-extrabold tabular-nums shrink-0 ${me.position ? 'bg-lime-400 text-ink-900' : 'bg-white/10 text-white'}`}>
+            {me.position ?? '—'}
+          </span>
+          <Avatar name={me.name} url={me.avatar_url} size="w-9 h-9 text-xs" />
+          <div className="flex-1 min-w-0">
+            <p className="font-extrabold text-sm truncate">{t('rankings.you_row')}</p>
+            <p className="text-[11px] text-white/60 truncate">
+              {me.position ? t('rankings.your_position', { position: me.position, total: positioned.filter((r) => r.ranked).length }) : t('rankings.no_level_hint')}
+            </p>
           </div>
-        ) : orgRankings.length === 0 ? (
-          <EmptyState
-            icon={Trophy}
-            title={t('rankings.empty_general_title')}
-            subtitle={t('rankings.empty_clubs_subtitle')}
-          />
-        ) : (
-          <div className="space-y-3">
-            {orgRankings.map((org, index) => (
-              <Link
-                key={org.id}
-                to={`/clube/${org.slug}`}
-                className={`card press block hover:shadow-lift ${index === 0 ? 'ring-2 ring-lime-400' : ''}`}
-              >
-                <div className="flex items-center gap-3.5">
-                  <div className={`w-11 h-11 rounded-ctrl flex items-center justify-center font-extrabold text-lg shrink-0 tabular-nums ${positionStyle(index)}`}>
-                    {index + 1}
-                  </div>
-                  <Avatar name={org.name} url={org.group_logo_url} size="w-11 h-11 text-sm" />
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-base text-ink-900 truncate">{org.name}</h3>
-                    <p className="text-[11px] text-muted mt-0.5">
-                      {t('rankings.club_member_count', { count: org.member_count })}
-                    </p>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-[11px] text-muted mb-1">{t('rankings.club_level_label')}</p>
-                    <GroupLevelBadge rating={org.avg_rating} size="md" />
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )
+          {renderValue(me, true)}
+        </button>
       )}
     </div>
   )

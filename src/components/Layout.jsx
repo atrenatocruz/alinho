@@ -455,7 +455,10 @@ export default function Layout({ children }) {
         { path: '/perfil', label: t('layout.nav_profile') },
       ]
 
-  if (isAdminOfAny || profile?.is_platform_admin) {
+  // Gerir aparece a toda a gente com conta («Área de gestão sempre visível
+  // para todos», Trello #279): quem não gere nada vê lá "Criar grupo". Cada
+  // um só vê o que administra — isso continua a ser a base de dados a decidir.
+  if (!isGuest || isAdminOfAny || profile?.is_platform_admin) {
     navItems.push({ path: '/gerir', icon: Settings, label: t('layout.nav_manage') })
   }
 

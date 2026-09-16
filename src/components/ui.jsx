@@ -1369,7 +1369,9 @@ export function RoundTimer({ startedAt, durationMinutes, isAdmin, onAdjust }) {
    `options` is [{ value, label }]. Trades away one thing a native <select>
    gets for free — typing a letter to jump to a matching option — but none
    of this app's option lists are long enough for that to matter. */
-export function Select({ value, onChange, options, placeholder, className = '' }) {
+// variant="chip": o mesmo seletor, mas o botão é uma pastilha (filtros da
+// Home, Comunidade e Rankings). `active` pinta-a de preto.
+export function Select({ value, onChange, options, placeholder, className = '', variant = 'field', active = true }) {
   const { t } = useTranslation()
   const resolvedPlaceholder = placeholder ?? t('ui.select_placeholder')
   const [open, setOpen] = useState(false)
@@ -1377,6 +1379,18 @@ export function Select({ value, onChange, options, placeholder, className = '' }
 
   return (
     <>
+      {variant === 'chip' ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className={`inline-flex items-center gap-1 px-3 min-h-[36px] max-w-full rounded-full text-[13px] font-extrabold border whitespace-nowrap ${
+            active ? 'bg-ink-900 text-white border-ink-900' : 'bg-canvas text-ink-700 border-line'
+          } ${className}`}
+        >
+          <span className="truncate">{selected ? selected.label : resolvedPlaceholder}</span>
+          <ChevronDown size={14} className="shrink-0" />
+        </button>
+      ) : (
       <button
         type="button"
         onClick={() => setOpen(true)}
@@ -1385,6 +1399,7 @@ export function Select({ value, onChange, options, placeholder, className = '' }
         <span className="truncate">{selected ? selected.label : resolvedPlaceholder}</span>
         <ChevronDown size={20} className="text-ink-700 shrink-0 ml-2" />
       </button>
+      )}
 
       {open && createPortal(
         <div

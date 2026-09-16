@@ -24,10 +24,13 @@ export const listTeacherProfiles = async () => {
   return data || []
 }
 
-export const requestTeacherProfile = async (organizationId, userId, contact, slots) => {
+// organizationId pode ser null (professor sem clube) e zone é opcional — as
+// duas precisam de migration_teacher_profiles_open.sql; sem zona não se envia
+// a coluna, para o pedido com clube continuar a funcionar antes disso.
+export const requestTeacherProfile = async (organizationId, userId, contact, slots = [], zone = '') => {
   const { data, error } = await supabase
     .from('teacher_profiles')
-    .insert([{ organization_id: organizationId, user_id: userId, contact }])
+    .insert([{ organization_id: organizationId, user_id: userId, contact, ...(zone ? { zone } : {}) }])
     .select()
     .single()
   if (error) throw error

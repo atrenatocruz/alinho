@@ -100,7 +100,8 @@ export default function PlayerDetails() {
     try {
       const rankings = await getGlobalRankings()
       const index = rankings.findIndex((p) => p.user_id === id)
-      setGlobalRank(index === -1 ? null : index + 1)
+      // Sem nível não tem posição (a lista traz toda a gente, esses no fim).
+      setGlobalRank(index === -1 || rankings[index].rating == null ? null : index + 1)
       setGlobalEntry(index === -1 ? null : rankings[index])
     } catch (error) {
       console.error('Error loading global rank:', error)

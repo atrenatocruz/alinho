@@ -202,7 +202,9 @@ export default function ClubProfile() {
         <Avatar name={club.name} url={club.group_logo_url} size="w-16 h-16 text-xl" />
         <div className="flex-1 min-w-0">
           <h2 className="text-2xl text-ink-900 truncate">{club.name}</h2>
-          {club.member_count > 0 ? (
+          {/* Vazio num grupo dentro de um clube para quem não é do grupo
+              (migration_searchable_orgs.sql). */}
+          {club.member_count == null ? null : club.member_count > 0 ? (
             <button
               type="button"
               onClick={handleToggleMembers}
