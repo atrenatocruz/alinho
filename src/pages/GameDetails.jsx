@@ -10,6 +10,7 @@ import { supabase, supabaseUrl } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton, GuestBadge, PlayerAvatarRow, EmptyState, ShareModal, RoundTimer, Avatar, Select, RatingBadge, DateField } from '../components/ui'
 import PoolGroupStage from '../components/PoolGroupStage'
+import PreviousEditions from '../components/agenda/PreviousEditions'
 import ScoreEntry from '../components/ScoreEntry'
 import {
   countPeople, totalRounds, formDuplas, seedCourts, nextSobeDesce,
@@ -2691,6 +2692,12 @@ export default function GameDetails() {
             ))}
           </div>
         </div>
+      )}
+
+      {/* Edições anteriores de um mix recorrente (Trello #258) — substitui,
+          com "Os meus jogos" no Perfil, a aba "Terminados" da Home. */}
+      {game.recurrence_id && (
+        <PreviousEditions gameId={game.id} recurrenceId={game.recurrence_id} userId={user?.id} />
       )}
 
       {/* Histórico de entradas e saídas — Trello #171. Só admins (a RLS

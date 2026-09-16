@@ -1,43 +1,79 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { CalendarX2, Trophy, Users, UserPlus } from 'lucide-react'
+import { Users, UserPlus, CalendarX2, ArrowRight } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { MixCard, EmptyState, PrimaryButton, Avatar } from '../components/ui'
+import { EmptyState, PrimaryButton } from '../components/ui'
+import { GameEventCard, FriendsEventCard } from '../components/agenda/EventCard'
+import { DayHeader, MonthSheet, FilterSheet, FilterChips, dayLabel } from '../components/agenda/AgendaControls'
 import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
-import { groupGamesBySeries } from '../lib/recurrenceGrouping'
 import { countPeople, mixCapacity, isGenderMismatch, isAgeIneligible, isMissingBirthday } from '../lib/mixLogic'
 import { listFollowing } from '../lib/follows'
 import { isMemberLimitError } from '../lib/plans'
+import { getGroupMatches } from '../lib/groupMatches'
+import { getMyPrivateMatches, respondToPrivateMatch } from '../lib/privateMatches'
+import {
+  toDayKey, addDays, eventFromGame, eventFromGroupMatch, eventFromPrivateMatch, isAgendaGame,
+  applyFilters, eventsForDay, countByDay, nextMineDay, DEFAULT_FILTERS,
+} from '../lib/agenda'
+
+/* ════════════════════════════════════════════════════════════════════════
+   Home — agenda por dia (Homepage unificada, Fase 1, Trello #258).
+   Wireframes: https://claude.ai/artifact/JsYuipCSsUv4sLMnzAZtoU
+
+   Um dia de cada vez, com o que é meu à frente. Mixes, jogos em aberto e
+   jogos entre amigos no mesmo sítio. Substitui as abas Ativos/Terminados:
+   um evento passado fica no dia dele, apagado e com o resultado.
+
+   Só mostra eventos a que o jogador já tinha acesso (os dos seus clubes e
+   grupos, e os seus jogos entre amigos). Explorar fora deles é a Fase 2.
+
+   O dia e os filtros vivem no sessionStorage: sobrevivem a abrir um mix e
+   voltar atrás, e limpam-se quando a sessão acaba ("filtros limpos a cada
+   sessão", Francisco, 16 set).
+   ════════════════════════════════════════════════════════════════════════ */
+
+const DAY_KEY = 'home.agenda.day'
+const FILTERS_KEY = 'home.agenda.filters'
+
+const readSession = (key, fallback) => {
+  try {
+    const raw = sessionStorage.getItem(key)
+    return raw ? JSON.parse(raw) : fallback
+  } catch {
+    return fallback
+  }
+}
+const writeSession = (key, value) => {
+  try { sessionStorage.setItem(key, JSON.stringify(value)) } catch { /* modo privado */ }
+}
 
 export default function Home() {
-  const { t } = useTranslation()
-  const TABS = [
-    { key: 'ativos', label: t('home.active_mixes_tab') },
-    { key: 'terminados', label: t('home.finished_mixes_tab') },
-  ]
-  const [games, setGames] = useState([])
-  // Ids dos amigos, para o MixCard destacar quem já está inscrito num mix
-  // (Trello #51). Carregado uma vez, num effect próprio e não dentro do
-  // loadGames — esse volta a correr a cada alteração de games/participants
-  // via Realtime, e a lista de amigos não muda a esse ritmo. null = ainda
-  // não sabemos, o que o cartão trata como "sem destaque".
-  const [friendIds, setFriendIds] = useState(null)
-  // Inscricao/saida directa a partir do cartao (Trello #51, parte 2).
-  // pendingGameIds desactiva o botao so dos mixes em curso, nao a lista
-  // toda — e um Set (nao um id unico) para que accionar o cartao B nao
-  // reactive o botao do cartao A enquanto o pedido de A ainda esta no ar.
-  const [pendingGameIds, setPendingGameIds] = useState(() => new Set())
-  const [cardError, setCardError] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState('ativos')
-  const { user, profile, memberships, joinOrganization, isAdminOfAny } = useAuth()
-  const [joinRequestsTotal, setJoinRequestsTotal] = useState(0)
+  const { t, i18n } = useTranslation()
+  const { user, profile, memberships, joinOrganization, isAdminOfAny, isPrivateMatchesEnabled } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
+
+  const [games, setGames] = useState([])
+  const [groupMatches, setGroupMatches] = useState([]) // [{ match, org }]
+  const [privateMatches, setPrivateMatches] = useState([])
+  const [myMixResults, setMyMixResults] = useState(new Map())
+  const [loading, setLoading] = useState(true)
+  const [friendIds, setFriendIds] = useState(null)
+  const [pendingKeys, setPendingKeys] = useState(() => new Set())
+  const [cardError, setCardError] = useState('')
+  const [joinRequestsTotal, setJoinRequestsTotal] = useState(0)
   const [joinSlug, setJoinSlug] = useState('')
   const [joining, setJoining] = useState(false)
   const [joinError, setJoinError] = useState('')
+
+  const [dayKey, setDayKey] = useState(() => readSession(DAY_KEY, toDayKey(new Date())))
+  const [filters, setFilters] = useState(() => readSession(FILTERS_KEY, DEFAULT_FILTERS))
+  const [monthOpen, setMonthOpen] = useState(false)
+  const [filtersOpen, setFiltersOpen] = useState(false)
+
+  useEffect(() => { writeSession(DAY_KEY, dayKey) }, [dayKey])
+  useEffect(() => { writeSession(FILTERS_KEY, filters) }, [filters])
 
   const handleJoin = async (slugOverride) => {
     const slug = (slugOverride ?? joinSlug).trim()
@@ -58,13 +94,8 @@ export default function Home() {
     }
   }
 
-  // Invite links carry ?org=<slug>, but that's normally only consumed by
-  // the /login page — someone who's already signed in gets redirected
-  // straight past /login to here without it ever being read. Pick it up
-  // here too, so an invite link works for any existing session, not just
-  // a fresh signup — join_organization is idempotent and doesn't change
-  // which club is currently selected, so it's safe even for someone
-  // who's already a member elsewhere.
+  // Links de convite trazem ?org=<slug>. Quem já tem sessão salta o /login e
+  // chega aqui direto, por isso o convite é lido também aqui.
   useEffect(() => {
     const orgSlug = searchParams.get('org')
     if (orgSlug) {
@@ -78,9 +109,8 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Discreet admin-only nudge — same underlying data as the header bell and
-  // Gerir nav badge, fetched independently since Home doesn't share Layout's
-  // component tree.
+  // Aviso discreto só para admins — continua na Home até o Francisco decidir
+  // (em aberto no épico).
   useEffect(() => {
     if (!profile?.id || !isAdminOfAny) {
       setJoinRequestsTotal(0)
@@ -92,179 +122,189 @@ export default function Home() {
         if (!cancelled) setJoinRequestsTotal(data.reduce((sum, org) => sum + org.count, 0))
       })
       .catch((error) => console.error('Error loading membership join requests:', error))
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [profile?.id, isAdminOfAny])
-
-  const orgIds = memberships.map((m) => m.organization_id)
-  const orgIdsKey = orgIds.slice().sort().join(',')
 
   useEffect(() => {
     if (!user) return
     let cancelled = false
     listFollowing(user.id)
-      .then((following) => {
-        if (!cancelled) setFriendIds(new Set(following.map((f) => f.id)))
-      })
-      .catch((error) => {
-        // Falhar aqui só custa o destaque nos cartões, por isso fica no
-        // console e não chega ao ecrã — não vale partir a lista de mixs
-        // por causa de um adorno.
-        console.error('Error loading following list for mix cards:', error)
-      })
+      .then((following) => { if (!cancelled) setFriendIds(new Set(following.map((f) => f.id))) })
+      // Só custa o destaque de amigos nos cartões — não vale partir a agenda.
+      .catch((error) => console.error('Error loading following list for agenda cards:', error))
     return () => { cancelled = true }
   }, [user])
 
-  useEffect(() => {
-    // No memberships yet — nothing to load. Without this, `loading` would
-    // stay true forever: loadGames never runs, so setLoading(false) never
-    // fires and the page spins indefinitely instead of showing the
-    // "no clubs followed" message.
-    if (orgIds.length === 0) {
-      setLoading(false)
-      return
-    }
-
-    loadGames()
-
-    // Subscribe to game updates
-    const subscription = supabase
-      .channel('games_channel')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'games' }, () => {
-        loadGames()
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'participants' }, () => {
-        loadGames()
-      })
-      .subscribe()
-
-    return () => {
-      subscription.unsubscribe()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orgIdsKey])
+  const orgs = memberships.map((m) => ({
+    id: m.organization_id,
+    name: m.organization?.name,
+    kind: m.organization?.kind,
+    slug: m.organization?.slug,
+    group_logo_url: m.organization?.group_logo_url,
+  }))
+  const orgIds = orgs.map((o) => o.id)
+  const orgIdsKey = orgIds.slice().sort().join(',')
 
   const loadGames = async () => {
+    if (orgIds.length === 0) {
+      setGames([])
+      return
+    }
+    const { data, error } = await supabase
+      .from('games')
+      .select(`
+        *,
+        organization:organizations (name, kind, group_logo_url),
+        participants (
+          id, user_id, partner_id, status,
+          user:profiles!participants_user_id_fkey (name, avatar_url, rating),
+          partner:profiles!participants_partner_id_fkey (name, avatar_url, rating)
+        )
+      `)
+      .in('organization_id', orgIds)
+      .order('date', { ascending: true })
+    if (error) throw error
+
+    // level/is_guest vivem em memberships (por clube) — uma query para
+    // todos os clubes, indexada por clube+jogador.
+    const { data: memberRows, error: memberError } = await supabase
+      .from('memberships')
+      .select('user_id, organization_id, level, is_guest')
+      .in('organization_id', orgIds)
+    if (memberError) throw memberError
+    const byKey = new Map((memberRows || []).map((m) => [`${m.organization_id}:${m.user_id}`, m]))
+    const attach = (person, userId, orgId) => {
+      if (!person) return person
+      const m = byKey.get(`${orgId}:${userId}`)
+      return { ...person, level: m?.level, is_guest: m?.is_guest ?? false }
+    }
+
+    setGames((data || []).filter(isAgendaGame).map((game) => ({
+      ...game,
+      participants: (game.participants || []).map((p) => ({
+        ...p,
+        user: attach(p.user, p.user_id, game.organization_id),
+        partner: attach(p.partner, p.partner_id, game.organization_id),
+      })),
+    })))
+  }
+
+  // O resultado do próprio em cada mix terminado (venceu? quanto ganhou ou
+  // perdeu no ranking?) — só as linhas dele, por isso é uma query pequena.
+  const loadMyMixResults = async () => {
+    if (!user) return
+    const { data, error } = await supabase
+      .from('mix_player_stats')
+      .select('game_id, mix_won, rating_delta')
+      .eq('user_id', user.id)
+    if (error) throw error
+    setMyMixResults(new Map((data || []).map((r) => [r.game_id, r])))
+  }
+
+  const loadGroupMatches = async () => {
+    const results = await Promise.all(orgs.map((org) =>
+      getGroupMatches(org.id)
+        .then((rows) => rows.map((match) => ({ match, org })))
+        // Um clube sem a migração dos jogos de grupo não pode esconder a agenda.
+        .catch((error) => {
+          console.error('Error loading group matches for', org.id, error)
+          return []
+        })
+    ))
+    setGroupMatches(results.flat())
+  }
+
+  const loadPrivateMatches = async () => {
+    if (!isPrivateMatchesEnabled) {
+      setPrivateMatches([])
+      return
+    }
     try {
-      if (orgIds.length === 0) {
-        setGames([])
-        return
-      }
-
-      const { data, error } = await supabase
-        .from('games')
-        .select(`
-          *,
-          organization:organizations (name, group_logo_url),
-          participants (
-            id,
-            user_id,
-            partner_id,
-            status,
-            user:profiles!participants_user_id_fkey (name, avatar_url, rating),
-            partner:profiles!participants_partner_id_fkey (name, avatar_url, rating)
-          )
-        `)
-        .in('organization_id', orgIds)
-        .order('date', { ascending: true })
-
-      if (error) {
-        console.error('Error loading games:', error)
-        throw error
-      }
-
-      // level/is_guest live on `memberships` (per-org) — fetch every org's
-      // membership rows once, keyed by org+user (the same person can have
-      // a different level in each club, and cards from different clubs
-      // are now mixed together in one list).
-      const { data: memberRows, error: memberError } = await supabase
-        .from('memberships')
-        .select('user_id, organization_id, level, is_guest')
-        .in('organization_id', orgIds)
-      if (memberError) throw memberError
-      const membershipByKey = new Map(
-        (memberRows || []).map((m) => [`${m.organization_id}:${m.user_id}`, m])
-      )
-
-      const attachMembership = (person, userId, organizationId) => {
-        if (!person) return person
-        const m = membershipByKey.get(`${organizationId}:${userId}`)
-        return { ...person, level: m?.level, is_guest: m?.is_guest ?? false }
-      }
-
-      // Show all games that are not cancelled
-      const filteredGames = (data || [])
-        .filter((game) => game.status !== 'cancelled' && game.status !== 'pending')
-        .map((game) => ({
-          ...game,
-          participants: (game.participants || []).map((p) => ({
-            ...p,
-            user: attachMembership(p.user, p.user_id, game.organization_id),
-            partner: attachMembership(p.partner, p.partner_id, game.organization_id),
-          })),
-        }))
-
-      setGames(filteredGames)
+      setPrivateMatches(await getMyPrivateMatches())
     } catch (error) {
-      console.error('Error in loadGames:', error)
+      console.error('Error loading private matches:', error)
+    }
+  }
+
+  const loadAll = async () => {
+    try {
+      await Promise.all([
+        loadGames().catch((error) => console.error('Error loading games:', error)),
+        loadMyMixResults().catch((error) => console.error('Error loading mix results:', error)),
+        loadGroupMatches(),
+        loadPrivateMatches(),
+      ])
     } finally {
       setLoading(false)
     }
   }
 
-  const isUserJoined = (game) => {
-    return game.participants?.some(p => p.user_id === user.id || p.partner_id === user.id)
-  }
+  useEffect(() => {
+    if (!user) return
+    loadAll()
+    if (orgIds.length === 0) return
+    const subscription = supabase
+      .channel('home_agenda')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'games' }, () => loadGames().catch(() => {}))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'participants' }, () => loadGames().catch(() => {}))
+      .subscribe()
+    return () => subscription.unsubscribe()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, orgIdsKey, isPrivateMatchesEnabled])
 
-  /* --- Inscricao/saida a partir do cartao (Trello #51, parte 2) --------
-     As regras sao deliberadamente as mesmas que GameDetails.jsx aplica aos
-     seus botoes; o que decide de verdade e a RLS de `participants`, isto so
-     evita mostrar um botao que ia dar erro. Devolve null quando a accao nao
-     e possivel ou nao e simples, e nesse caso o cartao volta a ser so um
-     link para a pagina do mix, onde ha espaco para explicar porque. */
+  const events = useMemo(() => {
+    if (!user) return []
+    return [
+      ...games.map((g) => eventFromGame(g, user.id)),
+      ...groupMatches.map(({ match, org }) => eventFromGroupMatch(match, user.id, org)),
+      ...privateMatches.map((m) => eventFromPrivateMatch(m, user.id)).filter(Boolean),
+    ]
+  }, [games, groupMatches, privateMatches, user])
+
+  const visible = useMemo(() => applyFilters(events, filters), [events, filters])
+  const counts = useMemo(() => countByDay(visible), [visible])
+  const today = toDayKey(new Date())
+  const dayEvents = eventsForDay(visible, dayKey)
+
+  /* --- Ação direta num mix (Trello #51). As regras são as mesmas dos botões
+     da página do mix; quem decide de verdade é a RLS de `participants`. Sem
+     ação possível ou simples, o cartão fica só como link para o mix. --- */
   const cardAction = (game) => {
-    if (!user) return null
     const rows = game.participants || []
     const myRow = rows.find((p) => p.user_id === user.id)
     const iAmSomeonesPartner = rows.some((p) => p.partner_id === user.id)
 
     if (myRow?.status === 'confirmed') {
-      // Sair so e oferecido aqui quando a inscricao e so minha. Com parceiro
-      // na mesma linha, sair leva os dois — decisao que merece o ecra do
-      // mix, onde se ve quem vai abaixo junto.
+      // Com parceiro na mesma linha, sair leva os dois — decisão para a
+      // página do mix, onde se vê quem vai abaixo junto.
       if (myRow.partner_id) return null
-      // Mesma janela que o botao da pagina de detalhe: aberto ou fechado,
-      // nunca depois de o mix arrancar.
       if (game.status !== 'open' && game.status !== 'closed') return null
       return { kind: 'leave' }
     }
     if (myRow?.status === 'waitlisted') {
-      // Mesma janela que GameDetails.jsx aplica ao seu botao "Sair da
-      // waitlist" (`!mixStarted`) — sem isto ficava um botao acionavel numa
-      // linha waitlisted de um mix ja em curso ou terminado (ex.: tab
-      // "Terminados").
       if (game.status === 'in_progress' || game.status === 'finished') return null
       return { kind: 'leave_waitlist' }
     }
-    // Fui inscrito como parceiro de outra pessoa: a linha e dela, e um
-    // delete filtrado pelo meu user_id nao apagaria nada — o botao ficaria a
-    // nao fazer nada. Fica para a pagina do mix.
+    // Inscrito como parceiro de outra pessoa: a linha é dela.
     if (iAmSomeonesPartner) return null
-
     if (game.status !== 'open') return null
     if (isGenderMismatch(game, profile)) return null
-    // Escalao etario (Trello #212): sem idade valida nao ha atalho no
-    // cartao. Quem nao tem data de nascimento tambem cai aqui de proposito —
-    // pedi-la exige um modal, e esse ecra e o do mix, nao a lista.
+    // Sem data de nascimento pede-se num modal — é trabalho da página do mix.
     if (isAgeIneligible(game, profile) || isMissingBirthday(game, profile)) return null
-
     return countPeople(rows) < mixCapacity(game) ? { kind: 'join' } : { kind: 'waitlist' }
   }
 
-  const handleCardAction = async (game, kind) => {
+  const markPending = (key, on) => setPendingKeys((prev) => {
+    const next = new Set(prev)
+    if (on) next.add(key)
+    else next.delete(key)
+    return next
+  })
+
+  const handleGameAction = async (event, kind) => {
     if (kind === 'leave' && !confirm(t('gamedetails.confirm_leave_game'))) return
-    setPendingGameIds((prev) => new Set(prev).add(game.id))
+    const game = event.raw
+    markPending(event.key, true)
     setCardError('')
     try {
       if (kind === 'join' || kind === 'waitlist') {
@@ -276,81 +316,53 @@ export default function Home() {
         }])
         if (error) throw error
       } else {
-        // leave_waitlist filtra tambem por status para nao apagar por engano
-        // uma inscricao confirmada entretanto promovida pelo trigger dos
-        // suplentes, entre o render e o clique.
-        let q = supabase.from('participants').delete()
-          .eq('game_id', game.id).eq('user_id', user.id)
+        // leave_waitlist filtra também pelo estado, para não apagar uma
+        // inscrição entretanto promovida pelo trigger dos suplentes.
+        let q = supabase.from('participants').delete().eq('game_id', game.id).eq('user_id', user.id)
         if (kind === 'leave_waitlist') q = q.eq('status', 'waitlisted')
         const { error } = await q
         if (error) throw error
       }
       await loadGames()
     } catch (error) {
-      console.error('Error updating participation from the mix card:', error)
+      console.error('Error updating participation from the agenda card:', error)
       setCardError(t('home.card_action_error'))
     } finally {
-      setPendingGameIds((prev) => {
-        const next = new Set(prev)
-        next.delete(game.id)
-        return next
-      })
+      markPending(event.key, false)
     }
   }
 
-  const actionFor = (game) => {
-    const a = cardAction(game)
-    if (!a) return null
-    return { ...a, busy: pendingGameIds.has(game.id), onAction: () => handleCardAction(game, a.kind) }
+  // Convite para jogo entre amigos: aceitar conta tudo (incluindo ranking,
+  // quando o criador o pediu); a escolha "sem ranking" fica na página dos
+  // jogos, onde há espaço para a explicar.
+  const handleInvite = async (event, response) => {
+    markPending(event.key, true)
+    setCardError('')
+    try {
+      await respondToPrivateMatch(event.id, response)
+      await loadPrivateMatches()
+    } catch (error) {
+      console.error('Error answering match invite:', error)
+      setCardError(t('agenda.invite_error'))
+    } finally {
+      markPending(event.key, false)
+    }
   }
 
-  const isFinished = (game) => game.status === 'completed' || game.status === 'finished'
-  // games is already sorted ascending by date from the query, so finished
-  // just needs reversing to show the most recent one first.
-  const favoriteOrgIds = new Set(memberships.filter((m) => m.is_favorite).map((m) => m.organization_id))
-  // Array.prototype.sort is stable, so this only moves favorited-club
-  // games ahead of the rest — the date order already in `games` (or its
-  // reverse, for finished) is preserved within each of the two groups.
-  const byFavoriteFirst = (a, b) =>
-    Number(favoriteOrgIds.has(b.organization_id)) - Number(favoriteOrgIds.has(a.organization_id))
-  // Ativos: one card per recurring series (its representative occurrence)
-  // plus one per one-off mix — see src/lib/recurrenceGrouping.js. A series
-  // with a currently active occurrence shows here even if older occurrences
-  // in the same series already finished (that's what the grouping is for:
-  // avoid two simultaneously-open cards with the same title confusing
-  // players — see docs/superpowers/specs/2026-08-25-recurring-mix-series-grouping-design.md).
-  //
-  // Terminados: NOT grouped — every individual finished game gets its own
-  // card, series or not. Grouping here would hide a just-finished occurrence
-  // behind whichever occurrence the series currently represents (e.g. it'd
-  // vanish the moment next week's occurrence goes active), reachable only
-  // by drilling into that other occurrence's "Histórico" section. Surfacing
-  // it directly was requested after that confused a user 2026-09-07.
-  const seriesEntries = groupGamesBySeries(games)
-  const activeEntries = seriesEntries.filter((entry) => !isFinished(entry.game)).sort((a, b) => byFavoriteFirst(a.game, b.game))
-  const finishedEntries = games
-    .filter((game) => isFinished(game))
-    .map((game) => ({ game, history: [] }))
-    .reverse()
-    .sort((a, b) => byFavoriteFirst(a.game, b.game))
-  const visibleEntries = tab === 'ativos' ? activeEntries : finishedEntries
-
-  // Grouped by club/group when the player belongs to more than one — makes
-  // it obvious at a glance whose mix each card belongs to, instead of a
-  // small per-card label buried in a flat list. Preserves visibleEntries'
-  // existing order (favorites first, then date) by grouping on first
-  // occurrence rather than re-sorting.
-  const groupedGames = []
-  const gamesByOrgId = new Map()
-  for (const entry of visibleEntries) {
-    const orgId = entry.game.organization_id
-    let group = gamesByOrgId.get(orgId)
-    if (!group) {
-      group = { organization_id: orgId, organization: entry.game.organization, entries: [] }
-      gamesByOrgId.set(orgId, group)
-      groupedGames.push(group)
-    }
-    group.entries.push(entry)
+  // Deslizar muda de dia; as setas continuam sempre visíveis (um gesto
+  // escondido pouca gente descobre, e no iPhone confunde-se com voltar).
+  const touch = useRef(null)
+  const onTouchStart = (e) => {
+    const p = e.touches[0]
+    touch.current = { x: p.clientX, y: p.clientY }
+  }
+  const onTouchEnd = (e) => {
+    if (!touch.current) return
+    const p = e.changedTouches[0]
+    const dx = p.clientX - touch.current.x
+    const dy = p.clientY - touch.current.y
+    touch.current = null
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) setDayKey((k) => addDays(k, dx < 0 ? 1 : -1))
   }
 
   if (loading) {
@@ -361,130 +373,158 @@ export default function Home() {
     )
   }
 
-  const firstName = profile?.name?.split(' ')[0]
+  const orgSlugById = new Map(orgs.map((o) => [o.id, o.slug]))
+  const hasAnyEvents = events.length > 0
+  const nextMine = nextMineDay(events, dayKey)
+  const othersToday = filters.onlyMine
+    ? eventsForDay(applyFilters(events, { ...filters, onlyMine: false }), dayKey).length
+    : 0
+
+  // Sem clubes nem jogos entre amigos: o ecrã de entrar num clube de sempre
+  // (o que vê quem ainda não tem clube está em aberto no épico).
+  if (memberships.length === 0 && !hasAnyEvents) {
+    return (
+      <EmptyState
+        icon={Users}
+        title={t('home.no_clubs_followed_title')}
+        subtitle={joining ? t('home.joining_club') : t('home.no_clubs_followed_subtitle')}
+        action={!joining && (
+          <div className="space-y-4 max-w-xs mx-auto">
+            <Link to="/comunidade">
+              <PrimaryButton type="button" className="w-full">{t('home.view_community')}</PrimaryButton>
+            </Link>
+            <form onSubmit={(e) => { e.preventDefault(); handleJoin() }} className="space-y-2">
+              <input
+                type="text"
+                value={joinSlug}
+                onChange={(e) => setJoinSlug(e.target.value)}
+                placeholder={t('home.private_club_code_placeholder')}
+                // text-base: abaixo de 16px o Safari iOS faz zoom ao focar.
+                className="input-field text-center text-base"
+              />
+              <PrimaryButton type="submit" variant="ghost" disabled={!joinSlug.trim()} className="w-full">
+                {t('home.join_club')}
+              </PrimaryButton>
+              {joinError && <p className="text-xs text-danger">{joinError}</p>}
+            </form>
+          </div>
+        )}
+      />
+    )
+  }
 
   return (
-    <div className="space-y-5">
-      <div>
-        {firstName && (
-          <p className="text-muted text-sm mb-0.5">{t('home.greeting', { name: firstName })}</p>
-        )}
-        <h2 className="text-3xl text-ink-900">{t('home.upcoming_games')}</h2>
-      </div>
-
+    <div className="space-y-3" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
       {joinRequestsTotal > 0 && (
         <Link to="/gerir" className="card press flex items-center gap-3 bg-amber-50 hover:shadow-lift">
           <div className="w-10 h-10 rounded-ctrl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
             <UserPlus size={18} />
           </div>
-          <p className="text-sm text-amber-800 font-semibold">
-            {t('home.pending_join_requests', { count: joinRequestsTotal })}
-          </p>
+          <p className="text-sm text-amber-800 font-semibold">{t('home.pending_join_requests', { count: joinRequestsTotal })}</p>
         </Link>
       )}
 
-      {memberships.length === 0 ? (
-        <EmptyState
-          icon={Users}
-          title={t('home.no_clubs_followed_title')}
-          subtitle={
-            joining
-              ? t('home.joining_club')
-              : t('home.no_clubs_followed_subtitle')
-          }
-          action={
-            !joining && (
-              <div className="space-y-4 max-w-xs mx-auto">
-                <Link to="/comunidade">
-                  <PrimaryButton type="button" className="w-full">
-                    {t('home.view_community')}
-                  </PrimaryButton>
-                </Link>
-                <form
-                  onSubmit={(e) => { e.preventDefault(); handleJoin() }}
-                  className="space-y-2"
-                >
-                  <input
-                    type="text"
-                    value={joinSlug}
-                    onChange={(e) => setJoinSlug(e.target.value)}
-                    placeholder={t('home.private_club_code_placeholder')}
-                    // text-base, não text-sm — abaixo de 16px o Safari iOS
-                    // faz zoom da página ao focar o campo (mesmo bug do
-                    // PlayerSearch).
-                    className="input-field text-center text-base"
-                  />
-                  <PrimaryButton type="submit" variant="ghost" disabled={!joinSlug.trim()} className="w-full">
-                    {t('home.join_club')}
-                  </PrimaryButton>
-                  {joinError && <p className="text-xs text-danger">{joinError}</p>}
-                </form>
-              </div>
-            )
-          }
-        />
-      ) : (
-        <>
-          <div className="flex gap-1 p-1 bg-ink-50 rounded-ctrl">
-            {TABS.map(tabDef => (
+      <DayHeader dayKey={dayKey} onChange={setDayKey} onOpenMonth={() => setMonthOpen(true)} />
+      <FilterChips
+        filters={filters}
+        onToggleMine={() => setFilters((f) => ({ ...f, onlyMine: !f.onlyMine }))}
+        onOpenFilters={() => setFiltersOpen(true)}
+      />
+
+      {cardError && (
+        <div className="bg-danger/10 text-danger px-4 py-3 rounded-ctrl text-sm font-extrabold animate-fade-up">{cardError}</div>
+      )}
+
+      {dayEvents.length === 0 ? (
+        <div className="text-center py-10 px-4">
+          <CalendarX2 size={28} className="mx-auto text-ink-200" />
+          <h3 className="text-lg text-ink-900 mt-3">
+            {filters.onlyMine ? t('agenda.empty_mine_title') : t('agenda.empty_title')}
+          </h3>
+          {othersToday > 0 && (
+            <>
+              <p className="text-sm text-muted mt-1">{t('agenda.empty_others_count', { count: othersToday })}</p>
               <button
-                key={tabDef.key}
-                onClick={() => setTab(tabDef.key)}
-                className={`flex-1 py-2.5 rounded-ctrl text-sm font-extrabold transition-all duration-fast ${
-                  tab === tabDef.key ? 'bg-canvas text-ink-900 shadow-lift border border-line' : 'text-muted hover:text-ink-900'
-                }`}
+                type="button"
+                onClick={() => setFilters((f) => ({ ...f, onlyMine: false }))}
+                className="mt-4 inline-flex items-center justify-center min-h-[44px] px-5 rounded-full bg-ink-900 text-white text-sm font-extrabold"
               >
-                {tabDef.label}
+                {t('agenda.empty_show_all')}
               </button>
-            ))}
-          </div>
-
-          {cardError && (
-            <div className="bg-danger/10 text-danger px-4 py-3 rounded-ctrl text-sm font-extrabold animate-fade-up">
-              {cardError}
+            </>
+          )}
+          {nextMine && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setDayKey(nextMine)}
+                className="mt-3 inline-flex items-center gap-1.5 min-h-[40px] px-4 rounded-full border border-line bg-canvas text-sm font-extrabold text-ink-900"
+              >
+                {/* A meio da frase: "Próximo jogo teu: sábado 19 set". */}
+                {t('agenda.next_mine', { day: (() => { const l = dayLabel(nextMine, t, i18n.language); return l.charAt(0).toLowerCase() + l.slice(1) })() })} <ArrowRight size={14} />
+              </button>
             </div>
           )}
-
-          {visibleEntries.length === 0 ? (
-            tab === 'ativos' ? (
-              <EmptyState
-                icon={CalendarX2}
-                title={t('home.no_active_games_title')}
-                subtitle={t('home.no_active_games_subtitle')}
-              />
-            ) : (
-              <EmptyState
-                icon={Trophy}
-                title={t('home.no_finished_mixes_title')}
-                subtitle={t('home.no_finished_mixes_subtitle')}
+          {dayKey !== today && (
+            <div>
+              <button type="button" onClick={() => setDayKey(today)} className="mt-2 text-sm font-extrabold text-muted min-h-[40px]">
+                {t('agenda.back_to_today')}
+              </button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-2.5">
+          {dayEvents.map((event) => {
+            const past = event.finished || event.dayKey < today
+            if (event.source === 'game') {
+              const a = past ? null : cardAction(event.raw)
+              return (
+                <GameEventCard
+                  key={event.key}
+                  event={event}
+                  profile={profile}
+                  friendIds={friendIds}
+                  past={past}
+                  result={myMixResults.get(event.id) || null}
+                  action={a && { ...a, busy: pendingKeys.has(event.key), onAction: () => handleGameAction(event, a.kind) }}
+                />
+              )
+            }
+            return (
+              <FriendsEventCard
+                key={event.key}
+                event={event}
+                userId={user.id}
+                past={past}
+                orgSlug={event.orgId ? orgSlugById.get(event.orgId) : null}
+                invite={event.myState === 'invited' && !past ? {
+                  busy: pendingKeys.has(event.key),
+                  onAccept: () => handleInvite(event, 'accept_all'),
+                  onReject: () => handleInvite(event, 'reject'),
+                } : null}
               />
             )
-          ) : memberships.length > 1 ? (
-            <div className="space-y-6">
-              {groupedGames.map((group) => (
-                <div key={group.organization_id} className="space-y-3">
-                  <div className="flex items-center gap-2.5">
-                    <Avatar name={group.organization?.name} url={group.organization?.group_logo_url} size="w-7 h-7 text-xs" />
-                    <h3 className="text-sm font-extrabold text-ink-900 uppercase tracking-wide truncate">
-                      {group.organization?.name}
-                    </h3>
-                  </div>
-                  <div className="space-y-3.5">
-                    {group.entries.map((entry) => (
-                      <MixCard key={entry.game.id} game={entry.game} joined={isUserJoined(entry.game)} showClub={false} friendIds={friendIds} action={actionFor(entry.game)} />
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="space-y-3.5">
-              {visibleEntries.map((entry) => (
-                <MixCard key={entry.game.id} game={entry.game} joined={isUserJoined(entry.game)} showClub={false} friendIds={friendIds} action={actionFor(entry.game)} />
-              ))}
-            </div>
-          )}
-        </>
+          })}
+        </div>
+      )}
+
+      {monthOpen && (
+        <MonthSheet
+          dayKey={dayKey}
+          counts={counts}
+          onPick={(k) => { setDayKey(k); setMonthOpen(false) }}
+          onClose={() => setMonthOpen(false)}
+        />
+      )}
+      {filtersOpen && (
+        <FilterSheet
+          filters={filters}
+          orgs={orgs}
+          countFor={(f) => eventsForDay(applyFilters(events, f), dayKey).length}
+          onApply={(f) => { setFilters(f); setFiltersOpen(false) }}
+          onClose={() => setFiltersOpen(false)}
+        />
       )}
     </div>
   )

@@ -90,7 +90,9 @@ const RPC_MOCKS = {
   get_player_match_history: () => [],
   get_follow_counts: () => [{ followers_count: 8, following_count: 5 }],
   list_followers: () => [],
-  list_following: () => [],
+  // Na agenda de teste, a Marta é seguida — para o cartão mostrar "vai jogar".
+  list_following: () => (agenda() ? [{ id: FAKE_MEMBER_ID, name: FAKE_PEOPLE[FAKE_MEMBER_ID].name }] : []),
+  get_group_matches: (params) => (agenda() && params?.p_organization_id === MOCK_ADMIN_ORG_ID ? AGENDA_GROUP_MATCHES() : []),
   search_players: () => [{
     id: FAKE_MEMBER_ID, name: 'Marta Costa', avatar_url: null, rating: 1380,
     gender: 'feminino', preferred_side: 'left', club_names: 'Dev Org',
@@ -101,7 +103,7 @@ const RPC_MOCKS = {
   }],
   // localStorage.mockPrivateInvite = 'true' — um convite por responder e um
   // resultado por confirmar, para ver os avisos no sino (Trello #248/#249).
-  get_my_private_matches: () => (localStorage.getItem('mockPrivateInvite') === 'true' ? [
+  get_my_private_matches: () => agenda() ? AGENDA_PRIVATE_MATCHES() : (localStorage.getItem('mockPrivateInvite') === 'true' ? [
     {
       id: 'pm-invite', status: 'pending', ranked_intent: true, scheduled_date: '2026-09-20', scheduled_time: '19:00:00', location: 'Smash Padel Almada',
       score_a: null, score_b: null, score_submitted_by: null, is_creator: false,
@@ -156,6 +158,101 @@ const ROT_MATCHES = [
 ]
 const rotating = () => localStorage.getItem('mockRotatingMix') === 'true'
 
+// localStorage.mockAgenda = 'true' (+ mockTwoOrgs = 'true') — a Home nova
+// com um pouco de tudo, sempre à volta do dia de hoje, para validar a agenda
+// em localhost (Homepage unificada, Trello #258): hoje um mix meu no clube,
+// um jogo em aberto que não é meu e um convite para jogo entre amigos;
+// amanhã um mix cheio de outro nível; ontem um mix meu terminado; daqui a
+// 3 dias um jogo entre amigos no grupo.
+const agenda = () => localStorage.getItem('mockAgenda') === 'true'
+const MOCK_CLUB_ID = '00000000-0000-0000-0000-0000000000dd' // mesmo valor de AuthContext.jsx
+const atDay = (offset, h, m = 0) => {
+  const d = new Date()
+  d.setDate(d.getDate() + offset)
+  d.setHours(h, m, 0, 0)
+  return d
+}
+const dayOnly = (offset) => {
+  const d = atDay(offset, 12)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+const person = (id) => ({ name: FAKE_PEOPLE[id].name, avatar_url: FAKE_PEOPLE[id].avatar_url, rating: FAKE_PEOPLE[id].rating })
+const ADMIN_PERSON = { name: 'Admin (Dev)', avatar_url: null, rating: 1450 }
+const extra = (i) => ({ name: ['Ana Ribeiro', 'Bruno Sá', 'Carla Nunes', 'Duarte Lopes', 'Eva Matos', 'Filipe Reis'][i], avatar_url: null, rating: 1300 + i * 40 })
+const AGENDA_GAMES = () => [
+  {
+    id: 'ag-mine-today', organization_id: MOCK_CLUB_ID, title: 'Mix de terça', date: atDay(0, 19).toISOString(),
+    location: 'Smash Padel, Parque das Nações', status: 'open', origin: 'admin', format: 'sobe_desce', num_courts: 4,
+    max_players: 16, price_per_player: 8, prize: 'Bolas Head', gender_restriction: 'masculino', age_restriction: 'plus35',
+    level: 'M3', recurrence_id: 'rec-1', organization: { name: 'Smash Padel Almada', kind: 'club', group_logo_url: null },
+    participants: [
+      { id: 'p1', user_id: MOCK_ADMIN_USER_ID, partner_id: null, status: 'confirmed', user: ADMIN_PERSON },
+      { id: 'p2', user_id: FAKE_MEMBER_ID, partner_id: FAKE_PARTNER_ID, status: 'confirmed', user: person(FAKE_MEMBER_ID), partner: person(FAKE_PARTNER_ID) },
+      ...[0, 1, 2, 3, 4].map((i) => ({ id: `px${i}`, user_id: `x${i}`, partner_id: null, status: 'confirmed', user: extra(i) })),
+    ],
+  },
+  {
+    id: 'ag-open-today', organization_id: MOCK_CLUB_ID, title: 'Falta 1 jogador', date: atDay(0, 20, 30).toISOString(),
+    location: 'Smash Padel, Parque das Nações', status: 'open', origin: 'open_slot', format: 'sobe_desce', num_courts: 1,
+    max_players: 4, price_per_player: 6, prize: null, gender_restriction: 'indiferente', level: 'M3', recurrence_id: null,
+    organization: { name: 'Smash Padel Almada', kind: 'club', group_logo_url: null },
+    participants: [0, 1, 2].map((i) => ({ id: `po${i}`, user_id: `o${i}`, partner_id: null, status: 'confirmed', user: extra(i + 2) })),
+  },
+  {
+    id: 'ag-full-tomorrow', organization_id: MOCK_ADMIN_ORG_ID, title: 'Mix do +1', date: atDay(1, 21).toISOString(),
+    location: 'Clube VII, Lisboa', status: 'closed', origin: 'admin', format: 'todos_contra_todos', num_courts: 1,
+    max_players: 4, price_per_player: 10, prize: null, gender_restriction: 'misto', level: 'M2', recurrence_id: null,
+    organization: { name: 'Dev Org', kind: 'group', group_logo_url: null },
+    participants: [0, 1, 2, 3].map((i) => ({ id: `pf${i}`, user_id: `f${i}`, partner_id: null, status: 'confirmed', user: extra(i) })),
+  },
+  {
+    id: 'ag-finished-yesterday', organization_id: MOCK_CLUB_ID, title: 'Mix de segunda', date: atDay(-1, 19).toISOString(),
+    location: 'Smash Padel, Parque das Nações', status: 'finished', origin: 'admin', format: 'sobe_desce', num_courts: 2,
+    max_players: 8, price_per_player: 8, prize: null, gender_restriction: 'indiferente', level: null, recurrence_id: 'rec-2',
+    organization: { name: 'Smash Padel Almada', kind: 'club', group_logo_url: null },
+    participants: [
+      { id: 'py0', user_id: MOCK_ADMIN_USER_ID, partner_id: FAKE_PLAYER_ID, status: 'confirmed', user: ADMIN_PERSON, partner: person(FAKE_PLAYER_ID) },
+      ...[0, 1, 2].map((i) => ({ id: `py${i + 1}`, user_id: `y${i}`, partner_id: `z${i}`, status: 'confirmed', user: extra(i), partner: extra(i + 3) })),
+    ],
+  },
+]
+const AGENDA_GROUP_MATCHES = () => [{
+  id: 'ag-group-match', ranked: true, scheduled_date: dayOnly(3), scheduled_time: '18:30:00', location: 'Clube VII, Lisboa',
+  score_a: null, score_b: null, winner_team: null, created_at: new Date().toISOString(),
+  team_a_player1_id: MOCK_ADMIN_USER_ID, team_a_player1_name: 'Admin (Dev)',
+  team_a_player2_id: FAKE_PLAYER_ID, team_a_player2_name: FAKE_PEOPLE[FAKE_PLAYER_ID].name,
+  team_b_player1_id: FAKE_MEMBER_ID, team_b_player1_name: FAKE_PEOPLE[FAKE_MEMBER_ID].name,
+  team_b_player2_id: null,
+}, {
+  id: 'ag-group-match-done', ranked: true, scheduled_date: dayOnly(-5), scheduled_time: '19:00:00', location: 'Clube VII, Lisboa',
+  score_a: 6, score_b: 4, winner_team: 'a', created_at: new Date().toISOString(),
+  team_a_player1_id: MOCK_ADMIN_USER_ID, team_a_player1_name: 'Admin (Dev)',
+  team_a_player2_id: FAKE_MEMBER_ID, team_a_player2_name: FAKE_PEOPLE[FAKE_MEMBER_ID].name,
+  team_b_player1_id: FAKE_PLAYER_ID, team_b_player1_name: FAKE_PEOPLE[FAKE_PLAYER_ID].name,
+  team_b_player2_id: FAKE_PARTNER_ID, team_b_player2_name: FAKE_PEOPLE[FAKE_PARTNER_ID].name,
+}]
+// Edições anteriores de "Mix de terça" (a página do mix pede-as com
+// recurrence_id=eq.… e status finished/completed).
+const AGENDA_PREVIOUS_EDITIONS = () => [7, 14].map((daysAgo, i) => ({
+  id: `ag-edition-${daysAgo}`, date: atDay(-daysAgo, 19).toISOString(), winner_team_id: `ag-winner-${i}`,
+  participants: [
+    ...(i === 0 ? [{ user_id: MOCK_ADMIN_USER_ID, partner_id: FAKE_PLAYER_ID, status: 'confirmed' }] : []),
+    ...[0, 1, 2, 3, 4, 5].map((k) => ({ user_id: `e${i}${k}`, partner_id: `f${i}${k}`, status: 'confirmed' })),
+  ],
+}))
+const AGENDA_WINNER_TEAMS = () => [
+  { id: 'ag-winner-0', player1: { name: 'Renato Cruz' }, player2: { name: 'Francisco Barros' } },
+  { id: 'ag-winner-1', player1: { name: FAKE_PEOPLE[FAKE_MEMBER_ID].name }, player2: { name: FAKE_PEOPLE[FAKE_PARTNER_ID].name } },
+]
+const AGENDA_PRIVATE_MATCHES = () => [{
+  id: 'ag-invite-today', status: 'pending', ranked_intent: false, is_creator: false,
+  scheduled_date: dayOnly(0), scheduled_time: '21:00:00', location: 'Smash Padel, Lisboa', played_at: atDay(0, 21).toISOString(),
+  team_a_player1_id: FAKE_PLAYER_ID, team_a_player1_name: FAKE_PEOPLE[FAKE_PLAYER_ID].name, team_a_player1_status: 'accepted_all',
+  team_a_player2_id: MOCK_ADMIN_USER_ID, team_a_player2_name: 'Admin (Dev)', team_a_player2_status: 'pending',
+  team_b_player1_id: FAKE_MEMBER_ID, team_b_player1_name: FAKE_PEOPLE[FAKE_MEMBER_ID].name, team_b_player1_status: 'accepted_all',
+  team_b_player2_id: null, team_b_player2_status: 'pending',
+}]
+
 // localStorage.mockLongNames = 'true' — mix terminado e Comunidade com nomes
 // muito grandes, para ver o corte do nome ao lado do nível e do troféu.
 const longNames = () => localStorage.getItem('mockLongNames') === 'true'
@@ -179,12 +276,15 @@ const TABLE_MOCKS = {
     { key: 'mes_cheio', category: 'jogo', rarity: 'epico', sort: 2 },
   ],
   player_stats: () => [{ game_wins: 24, game_losses: 16, mix_wins: 3, mixes_played: 8, total_points: 120 }],
-  mix_player_stats: () => (longNames() ? LONG_STATS : []),
-  teams: () => (rotating() ? ROT_TEAMS : []),
+  mix_player_stats: () => (agenda()
+    ? [{ game_id: 'ag-finished-yesterday', user_id: MOCK_ADMIN_USER_ID, mix_won: false, rating_delta: 18, points_earned: 14,
+        game: { id: 'ag-finished-yesterday', title: 'Mix de segunda', date: atDay(-1, 19).toISOString(), location: 'Smash Padel, Parque das Nações' } }]
+    : longNames() ? LONG_STATS : []),
+  teams: (url) => (agenda() && url.includes('ag-winner') ? AGENDA_WINNER_TEAMS() : rotating() ? ROT_TEAMS : []),
   matches: () => (rotating() ? ROT_MATCHES : []),
   // Mix em aberto — 1 dupla já confirmada, a segunda por preencher (2 de 4
   // lugares), para se ver o cartão no estado "aberto/junto-te" na Home.
-  games: () => [{
+  games: (url) => agenda() ? (url.includes('recurrence_id=eq.') ? AGENDA_PREVIOUS_EDITIONS() : AGENDA_GAMES()) : [{
     // localStorage.mockFriendlyMix = 'true' — mix amigável, sem ranking (Trello #267).
     ...(localStorage.getItem('mockFriendlyMix') === 'true' ? { ranked: false } : {}),
     ...(longNames() ? { status: 'finished' } : {}),
@@ -286,7 +386,7 @@ export function installDevMockNetwork() {
     const tableMatch = url.match(/\/rest\/v1\/([a-zA-Z_]+)\?/)
     if (tableMatch) {
       const mock = TABLE_MOCKS[tableMatch[1]]
-      const data = mock ? mock() : []
+      const data = mock ? mock(url) : []
       if (wantsSingle(init)) {
         return data[0] ? jsonResponse(data[0]) : jsonResponse({ message: 'no rows', code: 'PGRST116' }, 406)
       }

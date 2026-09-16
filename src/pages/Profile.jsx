@@ -8,6 +8,8 @@ import { supabase } from '../lib/supabase'
 import { hashPhone } from '../lib/hashPhone'
 import { uploadAvatar, removeAvatar } from '../lib/avatarStorage'
 import { getMyPrivateMatches, getGlobalRankings } from '../lib/privateMatches'
+import { getGroupMatches } from '../lib/groupMatches'
+import { KindTag } from '../components/agenda/EventCard'
 import { getFollowCounts } from '../lib/follows'
 import { PrimaryButton, GuestBadge, DateField, Avatar, Select, EmptyState, RatingBadge, PhotoViewerModal, FollowListModal, AchievementCard, VoucherCard, VoucherQRModal } from '../components/ui'
 import { CATEGORY_ORDER } from '../lib/achievements'
@@ -29,7 +31,7 @@ const GENDER_LABEL_KEY = { masculino: 'login.gender_male', feminino: 'login.gend
 
 export default function Profile() {
   const { t, i18n } = useTranslation()
-  const { profile, updateProfile, currentOrganizationId, isGuest, signOut, refreshMemberships } = useAuth()
+  const { profile, updateProfile, currentOrganizationId, isGuest, signOut, refreshMemberships, memberships } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [tab, setTab] = useState(() => (TABS.some((tb) => tb.key === searchParams.get('tab')) ? searchParams.get('tab') : 'perfil'))
@@ -68,6 +70,10 @@ export default function Profile() {
   const [qrVoucher, setQrVoucher] = useState(null)
   const [privateMatchHistory, setPrivateMatchHistory] = useState([])
   const [privateMatchHistoryLoading, setPrivateMatchHistoryLoading] = useState(true)
+  // Jogos entre amigos dentro dos grupos/clubes (Homepage unificada, Trello
+  // #258) — até aqui não apareciam em lado nenhum do histórico pessoal.
+  const [groupMatchHistory, setGroupMatchHistory] = useState([])
+  const [groupMatchHistoryLoading, setGroupMatchHistoryLoading] = useState(true)
   const [globalRank, setGlobalRank] = useState(null)
   const [kudosTotal, setKudosTotal] = useState(0)
   const [trophyCatalog, setTrophyCatalog] = useState([])
@@ -301,11 +307,40 @@ export default function Profile() {
     setPrivateMatchHistoryLoading(true)
     try {
       const data = await getMyPrivateMatches()
+      // Só jogos entre amigos fora de clubes, já confirmados.
       setPrivateMatchHistory(data.filter((m) => m.status === 'confirmed'))
     } catch (error) {
       console.error('Error loading private match history:', error)
     } finally {
       setPrivateMatchHistoryLoading(false)
+    }
+  }
+
+  // Efeito próprio: as memberships chegam depois do perfil, e esta lista
+  // depende delas (uma chamada por grupo/clube).
+  const membershipIdsKey = (memberships || []).map((m) => m.organization_id).sort().join(',')
+  useEffect(() => {
+    if (profile?.id && !isGuest) loadGroupMatchHistory()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.id, isGuest, membershipIdsKey])
+
+  const loadGroupMatchHistory = async () => {
+    setGroupMatchHistoryLoading(true)
+    try {
+      const slots = ['team_a_player1_id', 'team_a_player2_id', 'team_b_player1_id', 'team_b_player2_id']
+      const perOrg = await Promise.all((memberships || []).map((m) =>
+        getGroupMatches(m.organization_id)
+          .then((rows) => rows
+            .filter((gm) => gm.score_a != null && gm.score_b != null && slots.some((s) => gm[s] === profile.id))
+            .map((match) => ({ match, org: m.organization })))
+          // Um clube sem a migração dos jogos de grupo não esconde o resto.
+          .catch(() => [])
+      ))
+      setGroupMatchHistory(perOrg.flat())
+    } catch (error) {
+      console.error('Error loading group match history:', error)
+    } finally {
+      setGroupMatchHistoryLoading(false)
     }
   }
 
@@ -415,6 +450,48 @@ export default function Profile() {
     const v = n % 100
     return `${n}${suffixes[(v - 20) % 10] || suffixes[v] || suffixes[0]}`
   }
+
+  // "Os meus jogos": as três fontes numa lista só, do mais recente para trás.
+  const matchSummary = (m) => {
+    const name = (slot) => (m[`${slot}_id`] === profile?.id ? t('agenda.you') : m[`${slot}_name`] || m[`${slot}_guest_name`])
+    const team = (p) => [name(`${p}_player1`), name(`${p}_player2`)].filter(Boolean).join(' + ')
+    const myTeam = ['team_a', 'team_b'].find((p) => m[`${p}_player1_id`] === profile?.id || m[`${p}_player2_id`] === profile?.id)
+    const won = myTeam && m.winner_team ? m.winner_team === myTeam.slice(-1) : null
+    return {
+      title: `${team('team_a')} ${t('gamedetails.vs')} ${team('team_b')}`,
+      result: `${m.score_a}-${m.score_b}${won != null ? ` · ${t(won ? 'agenda.result_win' : 'agenda.result_loss')}` : ''}`,
+      highlight: won === true,
+    }
+  }
+  const matchDate = (m) => (m.scheduled_date ? new Date(`${m.scheduled_date}T12:00:00`) : new Date(m.played_at || m.created_at))
+  const myGames = [
+    ...mixHistory.map((m) => ({
+      key: `mix:${m.gameId}`,
+      kind: 'mix',
+      date: new Date(m.date),
+      title: m.title,
+      subtitle: m.location,
+      to: `/jogo/${m.gameId}`,
+      result: m.position ? t('profile.position_of_total', { position: ordinal(m.position), total: m.totalDuplas }) : null,
+      highlight: m.position === 1,
+    })),
+    ...privateMatchHistory.map((m) => ({
+      key: `pm:${m.id}`,
+      kind: 'friends',
+      date: matchDate(m),
+      subtitle: t('agenda.owner_friends'),
+      to: '/jogos-privados',
+      ...matchSummary(m),
+    })),
+    ...groupMatchHistory.map(({ match, org }) => ({
+      key: `gm:${match.id}`,
+      kind: 'friends',
+      date: matchDate(match),
+      subtitle: org?.name,
+      to: org?.slug ? `/clube/${org.slug}/jogos` : '/',
+      ...matchSummary(match),
+    })),
+  ].sort((a, b) => b.date - a.date)
 
   const gamesPlayed = (stats?.game_wins || 0) + (stats?.game_losses || 0)
   const winRate = gamesPlayed > 0
@@ -1133,77 +1210,49 @@ export default function Profile() {
         </>
       )}
 
+      {/* Os meus jogos (Homepage unificada, Trello #258): uma só lista, do
+          mais recente para o mais antigo, com todos os tipos — mixes, jogos
+          entre amigos fora de clubes e dentro de grupos. Substitui as duas
+          listas separadas e é o que fica no lugar da aba "Terminados" que
+          saiu da Home. */}
       {tab === 'historico' && (
-        <>
-        {!mixHistoryLoading && (
-          mixHistory.length === 0 ? (
-            <EmptyState
-              icon={Trophy}
-              title={t('profile.no_mix_history_title')}
-              subtitle={t('profile.no_mix_history_subtitle')}
-            />
-          ) : (
-            <div className="space-y-2.5">
-              {mixHistory.map((m) => (
-                <Link
-                  key={m.gameId}
-                  to={`/jogo/${m.gameId}`}
-                  className="card press flex items-center gap-3 hover:shadow-lift"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="font-extrabold text-ink-900 text-sm truncate">{m.title}</p>
-                    <p className="text-[11px] text-muted mt-0.5 truncate">
-                      {formatMixDate(m.date)}{m.location ? ` · ${m.location}` : ''}
-                    </p>
-                  </div>
-                  {m.position && (
-                    <span className={`text-xs font-extrabold px-2.5 py-1.5 rounded-full shrink-0 tabular-nums ${
-                      m.position === 1 ? 'bg-lime-400 text-ink-900' : 'bg-ink-50 text-ink-700'
-                    }`}>
-                      {t('profile.position_of_total', { position: ordinal(m.position), total: m.totalDuplas })}
-                    </span>
+        mixHistoryLoading || privateMatchHistoryLoading || groupMatchHistoryLoading ? null : myGames.length === 0 ? (
+          <EmptyState
+            icon={Trophy}
+            title={t('profile.my_games_empty_title')}
+            subtitle={t('profile.my_games_empty_subtitle')}
+          />
+        ) : (
+          <div className="space-y-2">
+            {myGames.map((g, i) => {
+              const month = formatDateLib(g.date, i18n.language, { month: 'long', year: 'numeric' })
+              const prevMonth = i > 0 ? formatDateLib(myGames[i - 1].date, i18n.language, { month: 'long', year: 'numeric' }) : null
+              return (
+                <div key={g.key}>
+                  {month !== prevMonth && (
+                    <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mt-4 mb-2 first:mt-0">{month}</p>
                   )}
-                </Link>
-              ))}
-            </div>
-          )
-        )}
-
-        {/* Private match history */}
-        {!privateMatchHistoryLoading && (
-          <div>
-            <h3 className="text-lg text-ink-900 mb-3 mt-4">{t('profile.friendly_matches_heading')}</h3>
-
-            {privateMatchHistory.length === 0 ? (
-              <EmptyState
-                icon={Trophy}
-                title={t('profile.no_friendly_matches_title')}
-                subtitle={t('profile.no_friendly_matches_subtitle')}
-              />
-            ) : (
-              <div className="space-y-2.5">
-                {privateMatchHistory.map((m) => {
-                  const teamLabel = (prefix) =>
-                    [m[`${prefix}_player1_name`], m[`${prefix}_player2_name`]].filter(Boolean).join(' + ')
-                  return (
-                    <Link key={m.id} to="/jogos-privados" className="card press flex items-center justify-between hover:shadow-lift">
-                      <div className="min-w-0">
-                        <p className="font-extrabold text-ink-900 text-sm truncate">
-                          {teamLabel('team_a')} {t('gamedetails.vs')} {teamLabel('team_b')}
-                        </p>
-                        <p className="text-[11px] text-muted mt-0.5">{m.score_a} - {m.score_b}</p>
-                      </div>
-                      <span className="text-xs font-extrabold px-2.5 py-1.5 rounded-full shrink-0 tabular-nums bg-ink-50 text-ink-700">
-                        {m.my_points} {t('gamedetails.points_suffix')}
+                  <Link to={g.to} className="card press flex items-center gap-3 hover:shadow-lift">
+                    <div className="flex-1 min-w-0">
+                      <KindTag kind={g.kind} />
+                      <p className="font-extrabold text-ink-900 text-sm truncate mt-1.5">{g.title}</p>
+                      <p className="text-[11px] text-muted mt-1 truncate">
+                        {formatMixDate(g.date)}{g.subtitle ? ` · ${g.subtitle}` : ''}
+                      </p>
+                    </div>
+                    {g.result && (
+                      <span className={`text-xs font-extrabold px-2.5 py-1.5 rounded-full shrink-0 tabular-nums ${
+                        g.highlight ? 'bg-lime-400 text-ink-900' : 'bg-ink-50 text-ink-700'
+                      }`}>
+                        {g.result}
                       </span>
-                    </Link>
-                  )
-                })}
-              </div>
-            )}
+                    )}
+                  </Link>
+                </div>
+              )
+            })}
           </div>
-        )}
-        </>
+        )
       )}
 
       {tab === 'vouchers' && (
