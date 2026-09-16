@@ -1236,11 +1236,13 @@ export default function GerirClube() {
     }
   }
 
-  // Only groups created in Comunidade can be deleted, so only ask the server
-  // for those. Asking up front lets the section show the "já tem mixes" state
-  // before anyone taps the button, rather than failing after they confirm.
+  // Self-serve groups can always be deleted (by their own admin); any other
+  // org (clubs included) only when the viewer is a platform admin — see
+  // migration_platform_admin_delete_any_org.sql. Asking up front lets the
+  // section show the "já tem mixes" state before anyone taps the button,
+  // rather than failing after they confirm.
   useEffect(() => {
-    if (activeTab !== 'settings' || !settings?.self_serve) return
+    if (activeTab !== 'settings' || !(settings?.self_serve || currentUser?.is_platform_admin)) return
     let cancelled = false
     setDeleteBlocker(undefined)
     getOrganizationDeleteBlocker(settings.id)
@@ -1252,13 +1254,13 @@ export default function GerirClube() {
         if (!cancelled) setDeleteBlocker('unavailable')
       })
     return () => { cancelled = true }
-  }, [activeTab, settings?.id, settings?.self_serve])
+  }, [activeTab, settings?.id, settings?.self_serve, currentUser?.is_platform_admin])
 
   const deleteBlockerMessage = (code) => {
-    if (code === 'has_activity') return t('gerirclube.delete_group_blocked_activity')
-    if (code === 'has_subgroups') return t('gerirclube.delete_group_blocked_subgroups')
-    if (code === 'not_owner') return t('gerirclube.delete_group_blocked_not_owner')
-    return t('gerirclube.delete_group_blocked_generic')
+    if (code === 'has_activity') return t(kk('gerirclube.delete_group_blocked_activity'))
+    if (code === 'has_subgroups') return t(kk('gerirclube.delete_group_blocked_subgroups'))
+    if (code === 'not_owner') return t(kk('gerirclube.delete_group_blocked_not_owner'))
+    return t(kk('gerirclube.delete_group_blocked_generic'))
   }
 
   const handleDeleteGroup = async () => {
@@ -3013,22 +3015,24 @@ export default function GerirClube() {
                 </div>
               )}
 
-              {/* Eliminar grupo — last thing on the page, below a divider, and
-                  only for groups created in Comunidade (Trello #241). Clubs
-                  never see it. While the server check is still out, nothing
-                  renders rather than a button that might flip to "blocked". */}
-              {settings.self_serve && deleteBlocker !== undefined && deleteBlocker !== 'unavailable' && (
+              {/* Eliminar grupo/clube — last thing on the page, below a
+                  divider. Self-serve groups (Trello #241) can always try;
+                  any other org, clubs included, only when the viewer is a
+                  platform admin (migration_platform_admin_delete_any_org.sql).
+                  While the server check is still out, nothing renders rather
+                  than a button that might flip to "blocked". */}
+              {(settings.self_serve || currentUser?.is_platform_admin) && deleteBlocker !== undefined && deleteBlocker !== 'unavailable' && (
                 <div className="mt-6 pt-6 border-t border-line">
-                  <h4 className="text-base font-extrabold text-ink-900 mb-1">{t('gerirclube.delete_group_heading')}</h4>
+                  <h4 className="text-base font-extrabold text-ink-900 mb-1">{t(kk('gerirclube.delete_group_heading'))}</h4>
                   {deleteBlocker === null ? (
                     <>
-                      <p className="text-sm text-muted mb-3">{t('gerirclube.delete_group_hint')}</p>
+                      <p className="text-sm text-muted mb-3">{t(kk('gerirclube.delete_group_hint'))}</p>
                       <button
                         type="button"
                         onClick={() => { setDeleteError(''); setShowDeleteConfirm(true) }}
                         className="w-full bg-danger/10 text-danger px-4 py-3 rounded-ctrl text-sm font-extrabold hover:bg-danger/20 transition-colors duration-fast"
                       >
-                        {t('gerirclube.delete_group_button')}
+                        {t(kk('gerirclube.delete_group_button'))}
                       </button>
                     </>
                   ) : (
@@ -3041,7 +3045,7 @@ export default function GerirClube() {
                         disabled
                         className="mt-3 w-full bg-ink-50 text-ink-200 px-4 py-3 rounded-ctrl text-sm font-extrabold cursor-not-allowed"
                       >
-                        {t('gerirclube.delete_group_button')}
+                        {t(kk('gerirclube.delete_group_button'))}
                       </button>
                     </>
                   )}
@@ -3051,7 +3055,7 @@ export default function GerirClube() {
               <DangerConfirmModal
                 open={showDeleteConfirm}
                 title={t('gerirclube.delete_group_confirm_title', { name: settings.name })}
-                message={t('gerirclube.delete_group_confirm_message')}
+                message={t(kk('gerirclube.delete_group_confirm_message'))}
                 emphasis={t('gerirclube.delete_group_confirm_emphasis')}
                 confirmLabel={deletingGroup ? t('gerirclube.delete_group_deleting') : t('gerirclube.delete_group_confirm_button')}
                 cancelLabel={t('gerirclube.delete_group_cancel')}
