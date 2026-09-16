@@ -758,7 +758,7 @@ export default function GameDetails() {
           throw new Error(t('gamedetails.error_americano_too_many_players', { count: players.length, courts: game.num_courts || 1 }))
         }
         const numRounds = totalRounds(game)
-        const schedule = generateAmericanoSchedule(players, numCourts, numRounds, pointsById)
+        const schedule = generateAmericanoSchedule(players, numCourts, numRounds, pointsById, { mode: game.pairing_mode || 'por_nivel' })
 
         // Flatten every round's duplas into one teams-insert payload,
         // tracking which (round, court, side) each row belongs to so the
@@ -852,7 +852,7 @@ export default function GameDetails() {
       }
 
       // 4.1 formação de duplas
-      const { duplas, forcedRepeats } = formDuplas(participants, pointsById, repeatPairKeys)
+      const { duplas, forcedRepeats } = formDuplas(participants, pointsById, repeatPairKeys, { mode: game.pairing_mode || 'por_nivel' })
       if (duplas.length < 2) throw new Error(t('gamedetails.error_need_two_duplas'))
       if (forcedRepeats.length > 0) {
         const pairsList = forcedRepeats

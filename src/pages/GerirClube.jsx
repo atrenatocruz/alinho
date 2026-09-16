@@ -62,6 +62,13 @@ const SCORING_FORMATS = [
   { value: 'melhor_2_sets', labelKey: SCORING_FORMAT_LABEL_KEY.melhor_2_sets },
   { value: 'melhor_3_sets', labelKey: SCORING_FORMAT_LABEL_KEY.melhor_3_sets },
 ]
+// Como se juntam as duplas de quem se inscreve sozinho (Trello #262).
+// Mesma ordem e valores que PAIRING_MODES em mixLogic.js.
+const PAIRING_MODE_OPTIONS = [
+  { value: 'por_nivel', labelKey: 'gerirclube.pairing_mode_por_nivel', helpKey: 'gerirclube.pairing_mode_por_nivel_help' },
+  { value: 'equilibrado', labelKey: 'gerirclube.pairing_mode_equilibrado', helpKey: 'gerirclube.pairing_mode_equilibrado_help' },
+  { value: 'aleatorio', labelKey: 'gerirclube.pairing_mode_aleatorio', helpKey: 'gerirclube.pairing_mode_aleatorio_help' },
+]
 const GENDER_RESTRICTIONS = [
   { value: 'indiferente', labelKey: GENDER_RESTRICTION_LABEL_KEY.indiferente },
   { value: 'misto', labelKey: GENDER_RESTRICTION_LABEL_KEY.misto },
@@ -114,6 +121,7 @@ const EMPTY_GAME_FORM = {
   format: 'sobe_desce',
   pool_size: 4,
   scoring_format: 'pontos_simples',
+  pairing_mode: 'por_nivel',
   gender_restriction: 'indiferente',
   // Escalao etario (Trello #212). null = sem restricao, entra toda a gente
   // com ou sem data de nascimento preenchida.
@@ -657,6 +665,8 @@ export default function GerirClube() {
     age_restriction: game.age_restriction ?? null,
     level: game.level,
     auto_start_hours_before: game.auto_start_hours_before,
+    // Só quando não é o valor por omissão — ver handleCreateGame.
+    ...(game.pairing_mode && game.pairing_mode !== 'por_nivel' ? { pairing_mode: game.pairing_mode } : {}),
   })
 
   // Computes the date one frequency step after `date` — used to pre-create
@@ -826,7 +836,10 @@ export default function GerirClube() {
     // pool_size is pulled out here for the same reason recurrence is: it must
     // never ride into the games payload via ...gameFields. It is re-added
     // below, but ONLY for grupos_eliminatorias — see the insert object.
-    const { recurrence, pool_size: _poolSize, ...gameFields } = gameForm
+    // pairing_mode sai pelo mesmo motivo: só é enviado quando não é o valor
+    // por omissão, para criar/editar mixes não rebentar antes de
+    // migration_mix_pairing_mode.sql correr.
+    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, ...gameFields } = gameForm
 
     const recurrenceError = validateRecurrence(recurrence)
     if (recurrenceError) {
@@ -867,6 +880,7 @@ export default function GerirClube() {
             // for other formats would break mix creation for EVERY format
             // until the migration has been run.
             ...(gameForm.format === 'grupos_eliminatorias' ? { pool_size: parseInt(gameForm.pool_size, 10) || 4 } : {}),
+            ...(gameForm.pairing_mode !== 'por_nivel' ? { pairing_mode: gameForm.pairing_mode } : {}),
             level: gameForm.level || null,
             created_by: user.id,
             status: 'open'
@@ -1006,7 +1020,10 @@ export default function GerirClube() {
     // Destructure recurrence so it's never spread into the games table update.
     // pool_size comes out for the same reason — it is re-added below, but ONLY
     // for grupos_eliminatorias (see the update object).
-    const { recurrence, pool_size: _poolSize, ...gameFields } = gameForm
+    // pairing_mode sai pelo mesmo motivo: só é enviado quando não é o valor
+    // por omissão, para criar/editar mixes não rebentar antes de
+    // migration_mix_pairing_mode.sql correr.
+    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, ...gameFields } = gameForm
     // Any mix in an active recurring series shares the same underlying
     // game_recurrences row (via recurrence_id) — not just the origin — so
     // recurrence management works from any of them, not only the one that
@@ -1047,6 +1064,7 @@ export default function GerirClube() {
           // source of the key; naming a not-yet-migrated column would break the
           // update for every format, not only this one.
           ...(gameForm.format === 'grupos_eliminatorias' ? { pool_size: parseInt(gameForm.pool_size, 10) || 4 } : {}),
+          ...((gameForm.pairing_mode !== 'por_nivel' || editingGame.pairing_mode) ? { pairing_mode: gameForm.pairing_mode } : {}),
           level: gameForm.level || null,
           ...pendingLaunchUpdate,
         })
@@ -1483,6 +1501,7 @@ export default function GerirClube() {
       format: game.format || 'sobe_desce',
       pool_size: game.pool_size || 4,
       scoring_format: game.scoring_format || 'pontos_simples',
+      pairing_mode: game.pairing_mode || 'por_nivel',
       gender_restriction: game.gender_restriction || 'indiferente',
       age_restriction: game.age_restriction ?? null,
       level: game.level || '',
@@ -1864,6 +1883,24 @@ export default function GerirClube() {
                           ...(v === 'americano' ? { scoring_format: 'pontos_simples' } : {}),
                         })}
                       />
+                    </div>
+
+                    {/* Como se juntam as duplas (Trello #262) — por omissão
+                        "Por nível", o comportamento de sempre. */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {t('gerirclube.pairing_mode_label')}
+                      </label>
+                      <Segmented
+                        options={PAIRING_MODE_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
+                        value={gameForm.pairing_mode}
+                        onChange={(v) => setGameForm({ ...gameForm, pairing_mode: v })}
+                      />
+                      <p className="text-sm text-muted mt-1.5">
+                        {t(PAIRING_MODE_OPTIONS.find((o) => o.value === gameForm.pairing_mode)?.helpKey || 'gerirclube.pairing_mode_por_nivel_help')}
+                        {' '}
+                        {gameForm.format === 'americano' ? t('gerirclube.pairing_mode_americano_note') : t('gerirclube.pairing_mode_fixed_note')}
+                      </p>
                     </div>
 
                     {gameForm.format === 'grupos_eliminatorias' && (

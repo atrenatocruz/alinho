@@ -1479,5 +1479,14 @@
   "clubprofile.jogos_link_group": "Ver jogos entre amigos",
   "groupmatches.title_group": "Jogos entre amigos",
   "groupmatches.create_button_group": "Criar ou registar jogo",
-  "plans.limit_mix_other": "Chegaste ao limite do plano {{plan}}: {{count}} mixes em aberto ao mesmo tempo e {{courts}} campos por mix."
+  "plans.limit_mix_other": "Chegaste ao limite do plano {{plan}}: {{count}} mixes em aberto ao mesmo tempo e {{courts}} campos por mix.",
+  "gerirclube.pairing_mode_label": "Como se juntam as duplas?",
+  "gerirclube.pairing_mode_por_nivel": "Por nível",
+  "gerirclube.pairing_mode_equilibrado": "Equilibrado",
+  "gerirclube.pairing_mode_aleatorio": "Aleatório",
+  "gerirclube.pairing_mode_por_nivel_help": "Quem se inscreve sozinho joga com alguém de nível parecido.",
+  "gerirclube.pairing_mode_equilibrado_help": "Um jogador mais forte com um mais fraco, sorteados a cada mix.",
+  "gerirclube.pairing_mode_aleatorio_help": "Duplas sorteadas, sem olhar ao nível.",
+  "gerirclube.pairing_mode_fixed_note": "Quem se inscreve com parceiro joga sempre junto.",
+  "gerirclube.pairing_mode_americano_note": "No Americano isto decide só a 1.ª ronda — depois os parceiros trocam."
 }

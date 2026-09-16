@@ -1479,5 +1479,14 @@
   "clubprofile.jogos_link_group": "See games with friends",
   "groupmatches.title_group": "Games with friends",
   "groupmatches.create_button_group": "Create or record a game",
-  "plans.limit_mix_other": "You've reached the {{plan}} plan limit: {{count}} open mixes at a time and {{courts}} courts per mix."
+  "plans.limit_mix_other": "You've reached the {{plan}} plan limit: {{count}} open mixes at a time and {{courts}} courts per mix.",
+  "gerirclube.pairing_mode_label": "How are pairs formed?",
+  "gerirclube.pairing_mode_por_nivel": "By level",
+  "gerirclube.pairing_mode_equilibrado": "Balanced",
+  "gerirclube.pairing_mode_aleatorio": "Random",
+  "gerirclube.pairing_mode_por_nivel_help": "Solo sign-ups play with someone of a similar level.",
+  "gerirclube.pairing_mode_equilibrado_help": "A stronger player with a weaker one, drawn each mix.",
+  "gerirclube.pairing_mode_aleatorio_help": "Pairs are drawn at random, ignoring level.",
+  "gerirclube.pairing_mode_fixed_note": "People who sign up with a partner always play together.",
+  "gerirclube.pairing_mode_americano_note": "In Americano this only sets round 1 — partners rotate after that."
 }

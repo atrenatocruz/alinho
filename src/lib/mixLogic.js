@@ -84,6 +84,45 @@ export const totalRounds = (game) =>
  * this list — the only signal formDuplas needs to fall back to the old
  * greedy below.
  */
+/** Como se juntam as duplas de quem se inscreve sozinho (Trello #262).
+    'por_nivel' é o comportamento de sempre e a pré-escolha. */
+export const PAIRING_MODES = ['por_nivel', 'equilibrado', 'aleatorio']
+
+/** Fisher–Yates. `random` injetável para os testes serem determinísticos. */
+function shuffled(items, random = Math.random) {
+  const a = [...items]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1))
+    ;[a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
+
+/** Equilibrado: cada jogador da metade mais forte leva um da metade mais
+    fraca. Mesma busca com recuo do matchWithoutRepeats (não repete pares de
+    repeatPairKeys enquanto houver alternativa; lado preferido é só
+    desempate). `bottom` chega já sorteado, por isso o parceiro escolhido
+    varia de semana para semana com o mesmo grupo. */
+function matchAcrossHalves(top, bottom, repeatPairKeys, sidesCompatible) {
+  if (top.length === 0 || bottom.length === 0) return []
+  const [a, ...restTop] = top
+  const pairKey = (x, y) => [x?.id, y?.id].sort().join('|')
+  const tiers = [
+    (b) => !repeatPairKeys.has(pairKey(a, b)) && sidesCompatible(a, b),
+    (b) => !repeatPairKeys.has(pairKey(a, b)),
+  ]
+  for (const passes of tiers) {
+    for (let i = 0; i < bottom.length; i++) {
+      if (!passes(bottom[i])) continue
+      const b = bottom[i]
+      const others = [...bottom.slice(0, i), ...bottom.slice(i + 1)]
+      const completion = matchAcrossHalves(restTop, others, repeatPairKeys, sidesCompatible)
+      if (completion) return [[a, b], ...completion]
+    }
+  }
+  return null
+}
+
 function matchWithoutRepeats(remaining, repeatPairKeys, sidesCompatible) {
   if (remaining.length <= 1) return []
   const [a, ...rest] = remaining
@@ -118,9 +157,9 @@ function matchWithoutRepeats(remaining, repeatPairKeys, sidesCompatible) {
  * in — see the file-header note.
  * Returns { duplas: [{ player1, player2, seed }], forcedRepeats: [{ player1, player2 }] }.
  */
-export function formDuplas(participants, pointsById = {}, repeatPairKeys = new Set()) {
+export function formDuplas(participants, pointsById = {}, repeatPairKeys = new Set(), { mode = 'por_nivel', random = Math.random } = {}) {
   const duplas = []
-  const solos = []
+  let solos = []
 
   for (const row of participants.filter(p => p.status === 'confirmed')) {
     if (row.partner_id && row.partner) duplas.push([row.user, row.partner])
@@ -135,7 +174,21 @@ export function formDuplas(participants, pointsById = {}, repeatPairKeys = new S
   const sidesCompatible = (a, b) => sideOf(a) === 'both' || sideOf(b) === 'both' || sideOf(a) !== sideOf(b)
 
   const forcedRepeats = []
-  let soloPairs = matchWithoutRepeats(solos, repeatPairKeys, sidesCompatible)
+  let soloPairs
+  if (mode === 'equilibrado') {
+    // Metade mais forte (arredonda para cima) × metade mais fraca sorteada.
+    const top = solos.slice(0, Math.ceil(solos.length / 2))
+    const bottom = shuffled(solos.slice(Math.ceil(solos.length / 2)), random)
+    soloPairs = matchAcrossHalves(top, bottom, repeatPairKeys, sidesCompatible)
+    // O greedy de recurso abaixo usa a ordem de `solos`: intercalar
+    // forte/fraco mantém "forte com fraco" mesmo quando há repetição forçada.
+    solos = top.flatMap((p, i) => (bottom[i] ? [p, bottom[i]] : [p]))
+  } else {
+    // Aleatório: a busca pega no primeiro candidato válido da lista, por
+    // isso sortear a ordem basta para sortear as duplas.
+    if (mode === 'aleatorio') solos = shuffled(solos, random)
+    soloPairs = matchWithoutRepeats(solos, repeatPairKeys, sidesCompatible)
+  }
 
   if (!soloPairs) {
     soloPairs = []
@@ -402,7 +455,7 @@ export function nextElimMatches(prevMatches) {
 
     Returns: numRounds entries, each an array of numCourts
     { court_number, duplaA: {player1, player2, seed}, duplaB: {...} }. */
-export function generateAmericanoSchedule(players, numCourts, numRounds, pointsById = {}) {
+export function generateAmericanoSchedule(players, numCourts, numRounds, pointsById = {}, { mode = 'por_nivel', random = Math.random } = {}) {
   const pairKey = (a, b) => [a.id, b.id].sort().join('|')
   const pointsOf = (p) => pointsById[p?.id] ?? 0
 
@@ -412,7 +465,15 @@ export function generateAmericanoSchedule(players, numCourts, numRounds, pointsB
 
   for (let r = 0; r < numRounds; r++) {
     // ── Form this round's duplas ──────────────────────────────────────
-    const pool = [...players].sort((a, b) => pointsOf(b) - pointsOf(a))
+    let pool = [...players].sort((a, b) => pointsOf(b) - pointsOf(a))
+    // O modo escolhido no mix só decide a 1.ª ronda (Trello #262) — a partir
+    // da 2.ª o Americano troca de parceiro por si, como sempre.
+    if (r === 0 && mode === 'aleatorio') pool = shuffled(pool, random)
+    if (r === 0 && mode === 'equilibrado') {
+      const top = pool.slice(0, Math.ceil(pool.length / 2))
+      const bottom = shuffled(pool.slice(Math.ceil(pool.length / 2)), random)
+      pool = top.flatMap((p, i) => (bottom[i] ? [p, bottom[i]] : [p]))
+    }
     const duplas = []
     while (pool.length >= 2) {
       const a = pool.shift()

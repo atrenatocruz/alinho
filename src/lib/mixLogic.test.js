@@ -400,6 +400,71 @@ describe('formDuplas', () => {
     expect([forcedRepeats[0].player1.id, forcedRepeats[0].player2.id].sort()).toEqual(['a', 'b'])
   })
 
+  // Sorteio determinístico para os testes dos modos (Trello #262).
+  const seeded = (seed) => () => {
+    seed = (seed * 16807) % 2147483647
+    return (seed - 1) / 2147483646
+  }
+  const eight = () => ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((id, i) => withPoints(id, 100 - i * 10))
+
+  it('por nível é o modo por omissão — igual a não passar modo nenhum', () => {
+    const rows = eight()
+    const semModo = formDuplas(rows, pointsById(rows), new Set())
+    const porNivel = formDuplas(rows, pointsById(rows), new Set(), { mode: 'por_nivel' })
+    expect(porNivel.duplas.map((d) => [d.player1.id, d.player2.id])).toEqual(semModo.duplas.map((d) => [d.player1.id, d.player2.id]))
+  })
+
+  it('equilibrado junta sempre um da metade mais forte com um da metade mais fraca', () => {
+    const rows = eight()
+    const fortes = new Set(['a', 'b', 'c', 'd'])
+    for (const seed of [1, 7, 42, 99, 12345]) {
+      const { duplas, forcedRepeats } = formDuplas(rows, pointsById(rows), new Set(), { mode: 'equilibrado', random: seeded(seed) })
+      expect(duplas).toHaveLength(4)
+      expect(forcedRepeats).toEqual([])
+      for (const d of duplas) {
+        expect(fortes.has(d.player1.id)).not.toBe(fortes.has(d.player2.id))
+      }
+    }
+  })
+
+  it('equilibrado varia o parceiro conforme o sorteio', () => {
+    const rows = eight()
+    const pares = new Set()
+    for (let seed = 1; seed <= 30; seed++) {
+      const { duplas } = formDuplas(rows, pointsById(rows), new Set(), { mode: 'equilibrado', random: seeded(seed) })
+      pares.add(duplas.map((d) => pairKey(d.player1.id, d.player2.id)).sort().join(','))
+    }
+    expect(pares.size).toBeGreaterThan(1)
+  })
+
+  it('equilibrado continua a evitar pares repetidos dos últimos mixes', () => {
+    const rows = eight()
+    // a (mais forte) já jogou com e, f e g: só pode ficar com h.
+    const repeatPairKeys = new Set([pairKey('a', 'e'), pairKey('a', 'f'), pairKey('a', 'g')])
+    for (const seed of [3, 8, 21]) {
+      const { duplas, forcedRepeats } = formDuplas(rows, pointsById(rows), repeatPairKeys, { mode: 'equilibrado', random: seeded(seed) })
+      expect(forcedRepeats).toEqual([])
+      expect(duplas.some((d) => pairKey(d.player1.id, d.player2.id) === pairKey('a', 'h'))).toBe(true)
+    }
+  })
+
+  it('aleatório não fica preso ao "forte com forte" e também não repete pares evitáveis', () => {
+    const rows = eight()
+    const porNivel = formDuplas(rows, pointsById(rows), new Set()).duplas.map((d) => pairKey(d.player1.id, d.player2.id)).sort().join(',')
+    const diferentes = new Set()
+    for (let seed = 1; seed <= 30; seed++) {
+      const { duplas } = formDuplas(rows, pointsById(rows), new Set(), { mode: 'aleatorio', random: seeded(seed) })
+      diferentes.add(duplas.map((d) => pairKey(d.player1.id, d.player2.id)).sort().join(','))
+    }
+    diferentes.delete(porNivel)
+    expect(diferentes.size).toBeGreaterThan(0)
+
+    const repeatPairKeys = new Set([pairKey('a', 'b'), pairKey('c', 'd')])
+    const { duplas, forcedRepeats } = formDuplas(rows, pointsById(rows), repeatPairKeys, { mode: 'aleatorio', random: seeded(5) })
+    expect(forcedRepeats).toEqual([])
+    for (const d of duplas) expect(repeatPairKeys.has(pairKey(d.player1.id, d.player2.id))).toBe(false)
+  })
+
   it('duplas já formadas (com parceiro fixo) continuam a passar direto, sem entrar na busca', () => {
     const fixedPartner = {
       status: 'confirmed',
