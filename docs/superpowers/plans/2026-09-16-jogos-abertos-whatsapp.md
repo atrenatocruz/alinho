@@ -159,7 +159,7 @@ console.assert(mixVisibleToGroup(regularMixWithLevel, groupWithFilter) === false
 console.log('OK')
 ```
 
-Run: `node whatsapp-bot/scratch_verify_visibility.mjs`
+Run (from inside `whatsapp-bot/`, not the repo root — `groups.js` transitively imports `config.js`, which does `import 'dotenv/config'` and only finds `whatsapp-bot/.env` when the process's working directory is `whatsapp-bot/`): `node scratch_verify_visibility.mjs`
 Expected: the first assertion currently FAILS (prints "FAIL: open slot hidden by level filter") because the function doesn't know about `origin` yet.
 
 - [ ] **Step 2: Implement**
@@ -184,7 +184,7 @@ export function mixVisibleToGroup(game, group) {
 
 - [ ] **Step 3: Re-run the verification script**
 
-Run: `node whatsapp-bot/scratch_verify_visibility.mjs`
+Run (from inside `whatsapp-bot/`, not the repo root — `groups.js` transitively imports `config.js`, which does `import 'dotenv/config'` and only finds `whatsapp-bot/.env` when the process's working directory is `whatsapp-bot/`): `node scratch_verify_visibility.mjs`
 Expected: `OK` printed, no assertion failures.
 
 - [ ] **Step 4: Delete the throwaway script and commit**
@@ -229,7 +229,7 @@ console.assert(mixLabel(mixes[2], labelable) === '02', `FAIL: expected 02, got $
 console.log('OK')
 ```
 
-Run: `node whatsapp-bot/scratch_verify_labels.mjs`
+Run (from inside `whatsapp-bot/`, not the repo root — same reason as Task 2's Step 1): `node scratch_verify_labels.mjs`
 Expected: FAILS — `labelableMixes`/`mixLabel` don't exist yet (`TypeError: labelableMixes is not a function`).
 
 - [ ] **Step 2: Add the helpers to `roster.js`**
@@ -252,7 +252,7 @@ export function mixLabel(mix, labelable) {
 
 - [ ] **Step 3: Re-run the verification script, expect it to pass now**
 
-Run: `node whatsapp-bot/scratch_verify_labels.mjs`
+Run (from inside `whatsapp-bot/`, not the repo root — same reason as Task 2's Step 1): `node scratch_verify_labels.mjs`
 Expected: `OK`.
 
 - [ ] **Step 4: Wire the helpers into `commands.js`**
@@ -318,7 +318,7 @@ function matchOpenMixesByText(openMixes, rest, { glued }) {
 
 - [ ] **Step 5: Manual smoke check**
 
-Run: `node -e "import('./whatsapp-bot/src/commands.js').then(() => console.log('module loads OK'))"` from the repo root.
+Run, from inside `whatsapp-bot/` (not the repo root — `config.js` does `import 'dotenv/config'`, which loads `.env` relative to the current working directory, and `whatsapp-bot/.env` won't be found from anywhere else): `node -e "import('./src/commands.js').then(() => console.log('module loads OK'))"`.
 Expected: `module loads OK`, no import/syntax errors (this file isn't unit-testable in isolation without a Supabase connection, so a load-check is the practical ceiling here — full behavior is covered by Task 6's manual WhatsApp test).
 
 - [ ] **Step 6: Delete the throwaway script and commit**
@@ -371,7 +371,7 @@ console.log(text)
 console.log('OK')
 ```
 
-Run: `node whatsapp-bot/scratch_verify_openslots_message.mjs`
+Run (from inside `whatsapp-bot/`, not the repo root — same reason as Task 2's Step 1): `node scratch_verify_openslots_message.mjs`
 Expected: FAILS — `openSlots.js` doesn't exist yet.
 
 - [ ] **Step 2: Implement `whatsapp-bot/src/openSlots.js`**
@@ -485,7 +485,7 @@ export function buildOpenSlotsMessage(batch) {
 
 - [ ] **Step 3: Re-run the verification script**
 
-Run: `node whatsapp-bot/scratch_verify_openslots_message.mjs`
+Run (from inside `whatsapp-bot/`, not the repo root — same reason as Task 2's Step 1): `node scratch_verify_openslots_message.mjs`
 Expected: `OK`, printed message shows the expected header/time-range/level/name lines and never a "vaga livre"-style placeholder.
 
 - [ ] **Step 4: Delete the throwaway script and commit**
@@ -674,7 +674,7 @@ async function primeGroupHashes() {
 
 - [ ] **Step 4: Manual smoke check**
 
-Run: `node -e "import('./whatsapp-bot/src/sync.js').then(() => console.log('module loads OK'))"` from the repo root.
+Run, from inside `whatsapp-bot/` (not the repo root — see Task 3 Step 5's note on why): `node -e "import('./src/sync.js').then(() => console.log('module loads OK'))"`.
 Expected: `module loads OK`, no import/syntax errors.
 
 - [ ] **Step 5: Manual end-to-end check against a real (dev) WhatsApp group**
@@ -1155,14 +1155,16 @@ Immediately after the closing of the `{activeTab === 'games' && (...)}` block (w
 
 - [ ] **Step 5: Add the tab label i18n key**
 
-In `src/locales/pt.json`, inside the existing `gerirclube` object (alongside `"tab_games"`, `"tab_members"`), add:
+Correction found during Task 7 (2026-09-16): `src/locales/pt.json` and `src/locales/en.json` are NOT nested objects — every key in both files is a flat dotted string (e.g. `"gerirclube.tab_games": "Jogos"`). There is no `gerirclube` object to nest inside. Add a flat key instead, alongside the existing `"gerirclube.tab_games"`/`"gerirclube.tab_members"` lines:
+
+In `src/locales/pt.json`:
 ```json
-"tab_open_slots": "Jogos Abertos",
+"gerirclube.tab_open_slots": "Jogos Abertos",
 ```
 
-In `src/locales/en.json`, inside the existing `gerirclube` object:
+In `src/locales/en.json`:
 ```json
-"tab_open_slots": "Open Games",
+"gerirclube.tab_open_slots": "Open Games",
 ```
 
 - [ ] **Step 6: Remove Task 7's temporary inline render, if still present**

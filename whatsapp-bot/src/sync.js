@@ -1,5 +1,6 @@
 import { supabase } from './supabase.js'
 import { loadGame, getOpenMixes, buildMixMessage, recordMixMessage } from './roster.js'
+import { loadOpenSlotBatch, buildOpenSlotsMessage } from './openSlots.js'
 import { getGroups, getGroupsForOrg, mixVisibleToGroup } from './groups.js'
 import { helpFooter } from './messages.js'
 import { t } from './locales.js'
@@ -25,6 +26,7 @@ function stateFor(groupJid) {
       debounceTimer: null,
       lastPostAt: 0,
       mixes: new Map(), // gameId -> { hash, messageId }
+      openSlotBatches: new Map(), // batchId -> { hash, messageId }
       pendingTagAll: false,
       pendingPromotedByGame: new Map(), // gameId -> { name, lang }
     }
@@ -51,18 +53,18 @@ function hash(str) {
  * since-closed mix's message — commands.js handles that at reply time).
  */
 async function postGroupRoster(sendText, getGroupMentions, group, { tagAll = false, promotedByGameId = new Map() } = {}) {
-  const openMixes = (await getOpenMixes(group.organizationId)).filter((mix) => mixVisibleToGroup(mix, group))
+  const visibleMixes = (await getOpenMixes(group.organizationId)).filter((mix) => mixVisibleToGroup(mix, group))
+  const openMixes = visibleMixes.filter((mix) => mix.origin !== 'open_slot')
+  const openSlotMixes = visibleMixes.filter((mix) => mix.origin === 'open_slot')
   const mixStates = await Promise.all(openMixes.map((mix) => loadGame(mix.id)))
   const st = stateFor(group.groupJid)
   const total = mixStates.length
   const seenGameIds = new Set()
-  const mentions = tagAll && total > 0 ? await getGroupMentions(group.groupJid) : null
-  // At most one @all per flush, however many mixes' messages end up
-  // resent in it — without this, a mix inserted earlier than others
-  // shifts every later mix's positional label (01/02...), which changes
-  // their hash and resends them too, and each resend would otherwise
-  // carry its own @all ping for what should read as one "new mix"
-  // notification (Trello #253 review).
+  const mentions = tagAll && (total > 0 || openSlotMixes.length > 0) ? await getGroupMentions(group.groupJid) : null
+  // At most one @all per flush, however many mixes' messages (or the open-
+  // slot batch message) end up resent in it — shared across both loops
+  // below so a brand-new mix and a brand-new open-slot batch in the same
+  // flush don't each carry their own @all.
   let taggedThisFlush = false
 
   for (let i = 0; i < mixStates.length; i++) {
@@ -97,6 +99,30 @@ async function postGroupRoster(sendText, getGroupMentions, group, { tagAll = fal
   // "same as last post".
   for (const gameId of st.mixes.keys()) {
     if (!seenGameIds.has(gameId)) st.mixes.delete(gameId)
+  }
+
+  // Jogos em aberto: uma mensagem combinada por open_batch_id, nunca uma
+  // por slot (ver openSlots.js).
+  const batchIds = new Set(openSlotMixes.map((m) => m.open_batch_id).filter(Boolean))
+  const seenBatchIds = new Set()
+  for (const batchId of batchIds) {
+    seenBatchIds.add(batchId)
+    const batch = await loadOpenSlotBatch(batchId)
+    if (batch.games.length === 0) continue
+    const baseText = buildOpenSlotsMessage(batch)
+    const nextHash = hash(baseText)
+    const prev = st.openSlotBatches.get(batchId)
+    if (prev && prev.hash === nextHash) continue
+
+    const shouldTagThis = tagAll && !taggedThisFlush
+    const fullText = shouldTagThis ? `📢 @all\n\n${baseText}` : baseText
+    const messageId = await sendText(group.groupJid, fullText, shouldTagThis ? { mentions } : {})
+    if (shouldTagThis) taggedThisFlush = true
+    st.openSlotBatches.set(batchId, { hash: nextHash, messageId })
+  }
+
+  for (const batchId of st.openSlotBatches.keys()) {
+    if (!seenBatchIds.has(batchId)) st.openSlotBatches.delete(batchId)
   }
 }
 
@@ -188,7 +214,9 @@ async function primeGroupHashes() {
   const groups = await getGroups()
   for (const group of groups) {
     try {
-      const openMixes = (await getOpenMixes(group.organizationId)).filter((mix) => mixVisibleToGroup(mix, group))
+      const visibleMixes = (await getOpenMixes(group.organizationId)).filter((mix) => mixVisibleToGroup(mix, group))
+      const openMixes = visibleMixes.filter((mix) => mix.origin !== 'open_slot')
+      const openSlotMixes = visibleMixes.filter((mix) => mix.origin === 'open_slot')
       const mixStates = await Promise.all(openMixes.map((mix) => loadGame(mix.id)))
       const total = mixStates.length
       const st = stateFor(group.groupJid)
@@ -199,6 +227,13 @@ async function primeGroupHashes() {
         // can't be resolved via roster.js's map; it just falls back to
         // text-based matching in commands.js, same as an unknown stanzaId.
         st.mixes.set(state.game.id, { hash: hash(buildMixMessage(state, { label })), messageId: null })
+      }
+
+      const batchIds = new Set(openSlotMixes.map((m) => m.open_batch_id).filter(Boolean))
+      for (const batchId of batchIds) {
+        const batch = await loadOpenSlotBatch(batchId)
+        if (batch.games.length === 0) continue
+        st.openSlotBatches.set(batchId, { hash: hash(buildOpenSlotsMessage(batch)), messageId: null })
       }
     } catch (err) {
       console.error(`Failed to prime roster hash for ${group.groupJid}:`, err)
@@ -224,8 +259,12 @@ export function startSync({ sendText, getGroupMentions }) {
 
       const wasCancelled = payload.old.status === 'cancelled'
       const justCancelled = payload.new.status === 'cancelled' && !wasCancelled
-      if (justCancelled) {
-        // Broadcast — só aos grupos que viam este mix (filtro de nível).
+      const shouldAnnounceCancellation = justCancelled && payload.new.origin !== 'open_slot'
+      if (shouldAnnounceCancellation) {
+        // Broadcast — só aos grupos que viam este mix (filtro de nível). Jogos
+        // em aberto ficam de fora: a mensagem combinada re-renderizada (abaixo)
+        // já comunica a mudança de forma precisa, e este aviso genérico não diz
+        // sequer qual horário foi cancelado (título é sempre "Jogo em Aberto").
         for (const group of groups) {
           if (!mixVisibleToGroup(payload.new, group)) continue
           try {

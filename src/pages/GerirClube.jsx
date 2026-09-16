@@ -22,6 +22,7 @@ import { inviteToOrganization } from '../lib/orgInvites'
 import { DAY_LABEL_KEY, listPendingTeacherRequests, approveTeacherProfile, rejectTeacherProfile } from '../lib/teachers'
 import VoucherScanner from '../components/VoucherScanner'
 import { isValidVoucherId, normalizeScannedVoucherId } from '../lib/vouchers'
+import OpenSlotsPanel from '../components/OpenSlotsPanel'
 
 const sanitizeSlug = (value) => value.toLowerCase().replace(/[^a-z0-9-]/g, '')
 
@@ -502,6 +503,7 @@ export default function GerirClube() {
           )
         `)
         .eq('organization_id', currentOrganizationId)
+        .eq('origin', 'admin')
         .order('date', { ascending: false })
 
       if (error) {
@@ -1641,6 +1643,17 @@ export default function GerirClube() {
               </span>
             )}
           </button>
+          <button
+            onClick={() => setActiveTab('open_slots')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-ctrl text-sm font-extrabold whitespace-nowrap transition-all duration-fast ${
+              activeTab === 'open_slots'
+                ? 'bg-canvas text-ink-900 shadow-lift border border-line'
+                : 'text-muted hover:text-ink-900'
+            }`}
+          >
+            <Clock size={16} />
+            {t('gerirclube.tab_open_slots')}
+          </button>
         </div>
       )}
 
@@ -2275,6 +2288,10 @@ export default function GerirClube() {
               </div>
               </div>
             </div>
+          )}
+
+          {activeTab === 'open_slots' && (
+            <OpenSlotsPanel organizationId={currentOrganizationId} />
           )}
 
           {/* Members Tab */}
