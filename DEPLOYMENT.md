@@ -7,6 +7,27 @@
 - **Backend**: Supabase, project ref `subiamucdrhxsxuippmy`. Uses the browser-safe publishable key (`sb_publishable_...`) in Vercel env vars `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`. Auth: email OTP (confirm-email off) + Google OAuth.
 - **WhatsApp bot** (`whatsapp-bot/`): deployed on an **AWS EC2 free-tier instance** (see `whatsapp-bot/README.md` for the EC2 deploy steps — Docker, `--restart unless-stopped`). A code change there needs a manual redeploy to that instance; there's no CI/auto-deploy step for it the way there is for the Vercel app. **Check with the team for current access/redeploy steps before assuming this file is exhaustive** — it won't update itself.
 
+## Auth dashboard config (not in code)
+
+Supabase → Authentication settings live in the dashboard, not the repo, so a code change that depends on them does nothing until someone updates them by hand.
+
+**URL Configuration → Redirect URLs.** The app builds every auth redirect from wherever the visitor is standing, never from a fixed domain:
+
+- password reset: `${window.location.origin}/redefinir-password` (`src/contexts/AuthContext.jsx`)
+- Google sign-in and email signup: `window.location.href` — any path
+
+So the allow-list has to cover **every origin people actually use**, not just `alinho.pt`. Checklist:
+
+- [ ] `https://alinho.pt/**`
+- [ ] `https://www.alinho.pt/**` — `www` resolves too and `vercel.json` does not redirect it to the bare domain, so someone on `www` sends `https://www.alinho.pt/redefinir-password`
+- [ ] the Vercel URL `dev` deploys to, if anyone tests auth there
+- [ ] `http://localhost:5173/**` for local testing
+- [ ] **Site URL** = `https://alinho.pt`
+
+If a redirect is not on the list, Supabase does not error: it silently falls back to the Site URL. For password reset that means the link **signs the person in on the home page and never shows the "new password" screen** — it looks like it worked while the password was never changed. Google sign-in already relies on `window.location.href`, so if it works on a given origin, a wildcard for that origin is probably already there; confirm rather than assume.
+
+**Email Templates → Reset Password.** The default is generic English. The Portuguese version, with its subject line, is versioned in `supabase/templates/reset-password.pt.html` — paste it by hand; this project does not use the Supabase CLI, so nothing loads it automatically. Supabase keeps one text per email, not one per language.
+
 ## Database changes
 
 There's no migration runner. `supabase/schema.sql` is the base schema (for a fresh project); every `supabase/migration_*.sql` file is an incremental change, meant to be pasted into Supabase → SQL Editor → New query → Run, by hand, in date order. A migration file existing in the repo does not mean it's live — check with whoever has SQL Editor access, or diff against the live schema, before assuming a migration ran.
