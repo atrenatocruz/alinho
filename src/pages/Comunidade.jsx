@@ -656,9 +656,10 @@ export default function Comunidade() {
               >
                 <Avatar name={player.name} url={player.avatar_url} size="w-10 h-10 text-sm" />
                 <div className="flex-1 min-w-0">
-                  <p className="font-extrabold text-ink-900 text-sm truncate flex items-center gap-1.5">
-                    {player.name}
-                    <RatingBadge rating={player.rating} gender={player.gender} />
+                  {/* Nome encolhe com reticências; o nível fica sempre visível. */}
+                  <p className="font-extrabold text-ink-900 text-sm flex items-center gap-1.5 min-w-0">
+                    <span className="truncate min-w-0">{player.name}</span>
+                    <span className="shrink-0 flex"><RatingBadge rating={player.rating} gender={player.gender} /></span>
                   </p>
                   <div className="flex items-center gap-2 flex-wrap mt-0.5">
                     {player.club_names && (

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link, useLocation, useNavigationType } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Trophy, Award, Calendar, ChevronDown, HelpCircle } from 'lucide-react'
@@ -176,13 +176,28 @@ export default function Rankings() {
   // the history entry, so returning here from a player's profile would yank the
   // list back to your own row instead of the spot you left. Layout restores that
   // spot on 'POP' and should win (Trello #245).
+  //
+  // Waits for `loading` too, not just `globalLoading`: the Global list only
+  // renders once BOTH are false (see the `loading || globalLoading` spinner
+  // below). The global RPC usually finishes first, so waiting on it alone ran
+  // this while the spinner was still up — no row to find, and with `loading`
+  // missing from the deps it never ran again, leaving the page at the top.
+  //
+  // Once only: a later reload of the same data (e.g. switching language) must
+  // not yank the list back to your row after you have scrolled away.
+  const scrolledToMe = useRef(false)
   useEffect(() => {
-    if (navigationType === 'POP') return
-    if (!location.state?.scrollToMe || tab !== 'global' || globalLoading) return
+    if (navigationType === 'POP' || scrolledToMe.current) return
+    if (!location.state?.scrollToMe || tab !== 'global' || loading || globalLoading) return
     const el = document.getElementById(`ranking-player-${user.id}`)
-    el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    if (!el) return
+    scrolledToMe.current = true
+    // Salto direto, sem animação: é um efeito, corre depois de a lista estar
+    // no DOM, por isso não precisa de esperar. Uma animação 'smooth' de
+    // milhares de píxeis não acrescenta nada e pode ficar a meio.
+    el.scrollIntoView({ block: 'center' })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, globalLoading, globalRankings])
+  }, [tab, loading, globalLoading, globalRankings])
 
   const loadOrgRankings = async () => {
     try {
