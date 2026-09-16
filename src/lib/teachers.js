@@ -30,7 +30,12 @@ export const listTeacherProfiles = async () => {
 export const requestTeacherProfile = async (organizationId, userId, contact, slots = [], zone = '') => {
   const { data, error } = await supabase
     .from('teacher_profiles')
-    .insert([{ organization_id: organizationId, user_id: userId, contact, ...(zone ? { zone } : {}) }])
+    .insert([{
+      organization_id: organizationId, user_id: userId, contact,
+      ...(zone ? { zone } : {}),
+      // Com clube fica à espera do clube (só depois da migração ter a coluna).
+      ...(organizationId && zone !== undefined ? { club_status: 'pending' } : {}),
+    }])
     .select()
     .single()
   if (error) throw error
@@ -50,12 +55,40 @@ export const withdrawTeacherProfile = async (id) => {
   if (error) throw error
 }
 
-export const listPendingTeacherRequests = async (organizationId) => {
+// Professores à espera de o clube os aceitar (club_status, Francisco 16 set:
+// a equipa Alinho confirma que é professor, o clube aceita-o no clube — só
+// clubes, nunca grupos). Precisa de migration_teacher_profiles_open.sql.
+export const listPendingClubTeachers = async (organizationId) => {
   const { data, error } = await supabase
     .from('teacher_profiles')
-    .select('id, contact, created_at, user:profiles!teacher_profiles_user_id_fkey(name, avatar_url), availability:teacher_availability(*)')
+    .select('id, contact, zone, status, created_at, user:profiles!teacher_profiles_user_id_fkey(name, avatar_url)')
     .eq('organization_id', organizationId)
+    .eq('club_status', 'pending')
+  if (error) throw error
+  return data || []
+}
+
+export const resolveTeacherClub = async (id, accept) => {
+  const { error } = await supabase.rpc('resolve_teacher_club', { p_id: id, p_accept: accept })
+  if (error) throw error
+}
+
+// O clube só aparece ao lado do professor depois de o clube o aceitar. Antes
+// da migração (club_status ainda não existe) mantém-se como era.
+export const teacherClubName = (teacher) =>
+  teacher?.organization && (teacher.club_status === undefined || teacher.club_status === 'accepted')
+    ? teacher.organization.name
+    : null
+
+// Todos os pedidos pendentes, com ou sem clube — para o super admin no Gerir
+// (quem aprova professores é sempre a equipa Alinho, Francisco 16 set). O RLS
+// deixa um admin da plataforma ler todos (migration_teacher_profiles_open.sql).
+export const listAllPendingTeacherRequests = async () => {
+  const { data, error } = await supabase
+    .from('teacher_profiles')
+    .select('*, user:profiles!teacher_profiles_user_id_fkey(name, avatar_url), organization:organizations(name, slug)')
     .eq('status', 'pending')
+    .order('created_at', { ascending: true })
   if (error) throw error
   return data || []
 }

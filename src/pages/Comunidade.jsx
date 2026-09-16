@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Search, Users, Clock, GraduationCap, X, MapPin, Lock, Check, Building2 } from 'lucide-react'
 import { searchOrganizations, listGlobalOrganizations } from '../lib/organizations'
-import { DAY_LABEL_KEY, listTeacherProfiles } from '../lib/teachers'
+import { DAY_LABEL_KEY, listTeacherProfiles, teacherClubName } from '../lib/teachers'
 import { useAuth } from '../contexts/AuthContext'
 import { Avatar, EmptyState, GroupLevelBadge, OrgKindBadge, orgAvatarShape } from '../components/ui'
 import { describeError } from '../lib/errors'
@@ -126,7 +126,7 @@ export default function Comunidade() {
     .filter((teacher) => teacher.user_id !== user.id && teacher.status === 'approved')
     .filter((teacher) => trimmed.length < 2
       || norm(teacher.user?.name).includes(norm(trimmed))
-      || norm(teacher.organization?.name).includes(norm(trimmed))
+      || norm(teacherClubName(teacher)).includes(norm(trimmed))
       || norm(teacher.zone).includes(norm(trimmed)))
   const showTeachers = filter === 'all' || filter === 'teachers'
   const handleFollow = async (org) => {
@@ -226,7 +226,7 @@ export default function Comunidade() {
         <div className="flex-1 min-w-0">
           <h3 className="font-extrabold text-ink-900 truncate">{teacher.user?.name}</h3>
           <p className="text-xs text-muted truncate">
-            {t('comunidade.teacher_label')} · {teacher.organization?.name || t('comunidade.teacher_no_club')}{teacher.zone ? ` · ${teacher.zone}` : ''}
+            {t('comunidade.teacher_label')} · {teacherClubName(teacher) || t('comunidade.teacher_no_club')}{teacher.zone ? ` · ${teacher.zone}` : ''}
           </p>
         </div>
       </div>

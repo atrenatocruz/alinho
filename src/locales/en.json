@@ -1638,7 +1638,7 @@
   "teacher.intro": "Do you teach padel? Ask to appear as a coach in Community.",
   "teacher.cta": "I want to coach",
   "teacher.no_club_option": "No club",
-  "teacher.club_optional_label": "Club (optional)",
+  "teacher.club_optional_label": "Club where you teach (optional)",
   "teacher.club_label": "Club",
   "teacher.zone_label": "Area",
   "teacher.zone_placeholder": "E.g. Cascais",
@@ -1648,7 +1648,15 @@
   "teacher.status_pending": "Under review",
   "teacher.status_approved": "Approved",
   "teacher.status_rejected": "Declined",
-  "teacher.pending_hint": "We'll let you know once it's approved.",
+  "teacher.pending_hint": "The Alinho team will review your request.",
   "teacher.stop_button": "Stop appearing as a coach",
-  "gerir.create_group_description": "Organise mixes and games with your friends. The group starts on the Free plan and you can upgrade whenever you need."
+  "gerir.create_group_description": "Organise mixes and games with your friends. The group starts on the Free plan and you can upgrade whenever you need.",
+  "gerir.teacher_requests_heading": "Coach requests ({{count}})",
+  "gerirclube.club_teachers_heading": "Coaches who want to teach at the club ({{count}})",
+  "gerirclube.teacher_verified": "Coach confirmed by the Alinho team",
+  "gerirclube.teacher_being_verified": "Being checked by the Alinho team",
+  "gerirclube.accept_teacher": "Accept at the club",
+  "gerir.teacher_wants_club": "Wants to teach at {{club}}",
+  "teacher.club_status_pending": "Waiting for the club to accept",
+  "teacher.club_status_rejected": "The club didn't accept"
 }

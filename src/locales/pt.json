@@ -1638,7 +1638,7 @@
   "teacher.intro": "Dás aulas de padel? Pede para aparecer como professor na Comunidade.",
   "teacher.cta": "Quero dar aulas",
   "teacher.no_club_option": "Sem clube",
-  "teacher.club_optional_label": "Clube (opcional)",
+  "teacher.club_optional_label": "Clube onde dás aulas (opcional)",
   "teacher.club_label": "Clube",
   "teacher.zone_label": "Zona",
   "teacher.zone_placeholder": "Ex: Cascais",
@@ -1648,7 +1648,15 @@
   "teacher.status_pending": "Em análise",
   "teacher.status_approved": "Aprovado",
   "teacher.status_rejected": "Recusado",
-  "teacher.pending_hint": "Avisamos quando o pedido for aprovado.",
+  "teacher.pending_hint": "A equipa Alinho vai rever o teu pedido.",
   "teacher.stop_button": "Deixar de aparecer como professor",
-  "gerir.create_group_description": "Organiza mixes e jogos com os teus amigos. O grupo começa no plano Free e podes subir de plano quando precisares."
+  "gerir.create_group_description": "Organiza mixes e jogos com os teus amigos. O grupo começa no plano Free e podes subir de plano quando precisares.",
+  "gerir.teacher_requests_heading": "Pedidos para dar aulas ({{count}})",
+  "gerirclube.club_teachers_heading": "Professores que querem dar aulas no clube ({{count}})",
+  "gerirclube.teacher_verified": "Professor confirmado pela equipa Alinho",
+  "gerirclube.teacher_being_verified": "Em verificação pela equipa Alinho",
+  "gerirclube.accept_teacher": "Aceitar no clube",
+  "gerir.teacher_wants_club": "Quer dar aulas no {{club}}",
+  "teacher.club_status_pending": "À espera de o clube aceitar",
+  "teacher.club_status_rejected": "O clube não aceitou"
 }

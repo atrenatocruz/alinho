@@ -53,8 +53,9 @@ export default function TeacherSection() {
 
   const clubOptions = [
     { value: NO_CLUB, label: t('teacher.no_club_option') },
+    // Só clubes: um grupo nunca tem professores (Francisco, 16 set).
     ...memberships
-      .filter((m) => m.organization)
+      .filter((m) => m.organization?.kind === 'club')
       .map((m) => ({ value: m.organization_id, label: m.organization.name })),
   ]
 
@@ -116,7 +117,12 @@ export default function TeacherSection() {
               </span>
             </span>
             <span className="text-muted">{t('teacher.club_label')}</span>
-            <span className="text-ink-900 font-extrabold">{mine.organization?.name || t('comunidade.teacher_no_club')}</span>
+            <span className="text-ink-900 font-extrabold">
+              {mine.organization?.name || t('comunidade.teacher_no_club')}
+              {mine.organization && mine.club_status && mine.club_status !== 'accepted' && (
+                <span className="block text-xs font-normal text-muted">{t(`teacher.club_status_${mine.club_status}`)}</span>
+              )}
+            </span>
             {mine.zone && (
               <>
                 <span className="text-muted">{t('teacher.zone_label')}</span>

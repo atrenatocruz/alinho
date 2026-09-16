@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Navigate, Link, useNavigate } from 'react-router-dom'
-import { Settings, Plus } from 'lucide-react'
+import { Settings, Plus, Check, X, GraduationCap } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -8,6 +8,7 @@ import { Avatar, EmptyState, PrimaryButton, OrgKindBadge, PlanBadge, orgAvatarSh
 import PlayerSearch from '../components/PlayerSearch'
 import { searchAnyPlayer, createOrganization, createGroup, createSelfServeGroup } from '../lib/platformAdmin'
 import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
+import { listAllPendingTeacherRequests, approveTeacherProfile, rejectTeacherProfile } from '../lib/teachers'
 import { describeError } from '../lib/errors'
 
 const sanitizeSlug = (value) => value.toLowerCase().replace(/[^a-z0-9-]/g, '')
@@ -61,6 +62,29 @@ export default function Gerir() {
         setAllOrganizations(data || [])
       })
   }, [isPlatformAdmin])
+
+  // Pedidos para dar aulas — só o super admin aprova (Francisco, 16 set).
+  const [teacherRequests, setTeacherRequests] = useState([])
+  const [actingTeacherId, setActingTeacherId] = useState(null)
+  const loadTeacherRequests = () => listAllPendingTeacherRequests()
+    .then(setTeacherRequests)
+    .catch((err) => console.error('Error loading teacher requests:', err))
+  useEffect(() => {
+    if (isPlatformAdmin) loadTeacherRequests()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPlatformAdmin])
+  const handleTeacherRequest = async (id, approve) => {
+    setActingTeacherId(id)
+    try {
+      await (approve ? approveTeacherProfile(id) : rejectTeacherProfile(id))
+      await loadTeacherRequests()
+    } catch (err) {
+      console.error('Error resolving teacher request:', err)
+      alert(describeError(t, err, approve ? 'gerirclube.error_approve_teacher_request' : 'gerirclube.error_reject_teacher_request'))
+    } finally {
+      setActingTeacherId(null)
+    }
+  }
 
   const clubsToShow = isPlatformAdmin ? allOrganizations : adminOrganizations
 
@@ -295,6 +319,46 @@ export default function Gerir() {
     </div>
   )
 
+  const teacherRequestsPanel = isPlatformAdmin && teacherRequests.length > 0 && (
+    <div className="space-y-3">
+      <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted flex items-center gap-1.5">
+        <GraduationCap size={13} /> {t('gerir.teacher_requests_heading', { count: teacherRequests.length })}
+      </p>
+      {teacherRequests.map((req) => (
+        <div key={req.id} className="card space-y-3">
+          <div className="flex items-center gap-3">
+            <Avatar name={req.user?.name} url={req.user?.avatar_url} size="w-11 h-11 text-sm" />
+            <div className="flex-1 min-w-0">
+              <p className="font-extrabold text-ink-900 truncate">{req.user?.name}</p>
+              <p className="text-xs text-muted truncate">
+                {req.organization ? t('gerir.teacher_wants_club', { club: req.organization.name }) : t('comunidade.teacher_no_club')}{req.zone ? ` · ${req.zone}` : ''}
+              </p>
+            </div>
+          </div>
+          <p className="text-sm text-ink-900 break-words">{req.contact}</p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => handleTeacherRequest(req.id, true)}
+              disabled={actingTeacherId === req.id}
+              className="flex-1 inline-flex items-center justify-center gap-1.5 min-h-[44px] rounded-full bg-lime-400 text-ink-900 text-sm font-extrabold disabled:opacity-40"
+            >
+              <Check size={16} /> {t('gerirclube.approve_action')}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleTeacherRequest(req.id, false)}
+              disabled={actingTeacherId === req.id}
+              className="flex-1 inline-flex items-center justify-center gap-1.5 min-h-[44px] rounded-full bg-ink-50 text-ink-700 text-sm font-extrabold disabled:opacity-40"
+            >
+              <X size={16} /> {t('gerirclube.reject_action')}
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+
   const createdClubBanner = createdClub && (
     <div className="card bg-lime-50 border border-lime-200 space-y-1">
       <p className="font-extrabold text-ink-900">{t('gerir.club_created_success', { name: createdClub.name })}</p>
@@ -318,6 +382,7 @@ export default function Gerir() {
           />
         )}
         {createdClubBanner}
+        {teacherRequestsPanel}
         {createClubPanel}
       </div>
     )
@@ -333,6 +398,8 @@ export default function Gerir() {
       </div>
 
       {createdClubBanner}
+
+      {teacherRequestsPanel}
 
       {createClubPanel}
 

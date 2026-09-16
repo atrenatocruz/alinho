@@ -20,7 +20,7 @@ import PlayerSearch from '../components/PlayerSearch'
 import WhatsappGroupsSection from '../components/WhatsappGroupsSection'
 import { searchPlayers } from '../lib/privateMatches'
 import { inviteToOrganization } from '../lib/orgInvites'
-import { DAY_LABEL_KEY, listPendingTeacherRequests, approveTeacherProfile, rejectTeacherProfile } from '../lib/teachers'
+import { listPendingClubTeachers, resolveTeacherClub } from '../lib/teachers'
 import VoucherScanner from '../components/VoucherScanner'
 import { isValidVoucherId, normalizeScannedVoucherId } from '../lib/vouchers'
 import OpenSlotsPanel from '../components/OpenSlotsPanel'
@@ -179,7 +179,7 @@ export default function GerirClube() {
   const [members, setMembers] = useState([])
   const [linkCopied, setLinkCopied] = useState(false)
   const [requests, setRequests] = useState([])
-  const [teacherRequests, setTeacherRequests] = useState([])
+  const [clubTeachers, setClubTeachers] = useState([])
   const [settings, setSettings] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showCreateGame, setShowCreateGame] = useState(false)
@@ -334,37 +334,34 @@ export default function GerirClube() {
     if (currentOrganizationId) loadRequests()
   }, [currentOrganizationId])
 
-  const loadTeacherRequests = async () => {
+  // Professores que pediram para dar aulas NESTE clube. A equipa Alinho
+  // confirma que são professores; o clube decide se os aceita. Grupos não
+  // têm professores (Francisco, 16 set).
+  const loadClubTeachers = async () => {
     try {
-      setTeacherRequests(await listPendingTeacherRequests(currentOrganizationId))
+      setClubTeachers(await listPendingClubTeachers(currentOrganizationId))
     } catch (error) {
-      console.error('Error loading teacher requests:', error)
+      // Antes de migration_teacher_profiles_open.sql a coluna não existe.
+      console.error('Error loading club teacher requests:', error)
+      setClubTeachers([])
     }
   }
 
   useEffect(() => {
-    if (currentOrganizationId) loadTeacherRequests()
-  }, [currentOrganizationId])
+    if (currentOrganizationId && org?.kind === 'club') loadClubTeachers()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentOrganizationId, org?.kind])
 
-  const handleApproveTeacherRequest = async (id) => {
+  const handleClubTeacher = async (id, accept) => {
     try {
-      await approveTeacherProfile(id)
-      await loadTeacherRequests()
+      await resolveTeacherClub(id, accept)
+      await loadClubTeachers()
     } catch (error) {
-      console.error('Error approving teacher request:', error)
-      alert(describeError(t, error, 'gerirclube.error_approve_teacher_request'))
+      console.error('Error resolving club teacher:', error)
+      alert(describeError(t, error, accept ? 'gerirclube.error_approve_teacher_request' : 'gerirclube.error_reject_teacher_request'))
     }
   }
 
-  const handleRejectTeacherRequest = async (id) => {
-    try {
-      await rejectTeacherProfile(id)
-      await loadTeacherRequests()
-    } catch (error) {
-      console.error('Error rejecting teacher request:', error)
-      alert(describeError(t, error, 'gerirclube.error_reject_teacher_request'))
-    }
-  }
 
   // Only clubs contain groups — a group's own Gerir page has none of its
   // own (create_group rejects a group as a parent), so this stays empty
@@ -2486,41 +2483,38 @@ export default function GerirClube() {
                 </div>
               )}
 
-              {teacherRequests.length > 0 && (
+              {!isGroupOrg && clubTeachers.length > 0 && (
                 <div className="space-y-2">
                   <h3 className="text-sm font-extrabold text-ink-900 flex items-center gap-1.5">
-                    <Clock size={14} /> {t('gerirclube.teacher_requests_heading', { count: teacherRequests.length })}
+                    <Clock size={14} /> {t('gerirclube.club_teachers_heading', { count: clubTeachers.length })}
                   </h3>
-                  {teacherRequests.map((req) => (
-                    <div key={req.id} className="card space-y-2">
+                  {clubTeachers.map((req) => (
+                    <div key={req.id} className="card space-y-3">
                       <div className="flex items-center gap-3">
-                        <Avatar name={req.user?.name} url={req.user?.avatar_url} size="w-9 h-9 text-sm" />
+                        <Avatar name={req.user?.name} url={req.user?.avatar_url} size="w-10 h-10 text-sm" />
                         <div className="flex-1 min-w-0">
                           <p className="font-extrabold text-ink-900 truncate">{req.user?.name || t('gerirclube.fallback_player_name')}</p>
-                          <p className="text-sm text-muted truncate">{req.contact}</p>
+                          <p className="text-xs text-muted truncate">
+                            {req.status === 'approved' ? t('gerirclube.teacher_verified') : t('gerirclube.teacher_being_verified')}
+                            {req.zone ? ` · ${req.zone}` : ''}
+                          </p>
                         </div>
+                      </div>
+                      <p className="text-sm text-ink-900 break-words">{req.contact}</p>
+                      <div className="flex gap-2">
                         <button
-                          onClick={() => handleApproveTeacherRequest(req.id)}
-                          className="w-9 h-9 flex items-center justify-center rounded-full bg-ok/10 text-ok hover:bg-ok/20 transition-colors duration-fast"
-                          title={t('gerirclube.approve_action')}
+                          onClick={() => handleClubTeacher(req.id, true)}
+                          className="flex-1 inline-flex items-center justify-center gap-1.5 min-h-[44px] rounded-full bg-lime-400 text-ink-900 text-sm font-extrabold"
                         >
-                          <Check size={18} />
+                          <Check size={16} /> {t('gerirclube.accept_teacher')}
                         </button>
                         <button
-                          onClick={() => handleRejectTeacherRequest(req.id)}
-                          className="w-9 h-9 flex items-center justify-center rounded-full text-danger hover:bg-danger/10 transition-colors duration-fast"
-                          title={t('gerirclube.reject_action')}
+                          onClick={() => handleClubTeacher(req.id, false)}
+                          className="flex-1 inline-flex items-center justify-center gap-1.5 min-h-[44px] rounded-full bg-ink-50 text-ink-700 text-sm font-extrabold"
                         >
-                          <X size={18} />
+                          <X size={16} /> {t('gerirclube.reject_action')}
                         </button>
                       </div>
-                      {req.availability?.length > 0 && (
-                        <p className="text-[11px] text-muted">
-                          {req.availability
-                            .map((a) => `${t(DAY_LABEL_KEY[a.day_of_week])} ${a.start_time.slice(0, 5)}-${a.end_time.slice(0, 5)}`)
-                            .join(' • ')}
-                        </p>
-                      )}
                     </div>
                   ))}
                 </div>

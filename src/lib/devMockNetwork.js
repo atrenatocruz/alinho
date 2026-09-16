@@ -330,7 +330,15 @@ const TABLE_MOCKS = {
     owner_id: MOCK_ADMIN_USER_ID, plan_tier: localStorage.getItem('mockPlanTier') || 'pro',
   }],
   // localStorage.mockCommunity — um professor com clube e um sem clube.
-  teacher_profiles: () => (community() ? [
+  teacher_profiles: (url) => (community() && url.includes('club_status=eq.pending') ? [
+    { id: 'tp-c1', status: 'approved', contact: '914 555 666', zone: 'Almada', created_at: '2026-09-16T08:00:00Z', user: { name: 'Sofia Ramos' } },
+    { id: 'tp-c2', status: 'pending', contact: '@miguel.coach', zone: null, created_at: '2026-09-16T12:00:00Z', user: { name: 'Miguel Tavares' } },
+  ] : community() && url.includes('status=eq.pending') ? [
+    { id: 'tp-p1', user_id: 'fake-t3', organization_id: null, status: 'pending', contact: '913 222 444', zone: 'Oeiras', created_at: '2026-09-16T09:00:00Z',
+      user: { name: 'Carla Mendes' }, organization: null },
+    { id: 'tp-p2', user_id: 'fake-t4', organization_id: 'co-2', status: 'pending', contact: '@joao.padel', zone: null, created_at: '2026-09-16T11:00:00Z',
+      user: { name: 'João Rebelo' }, organization: { name: 'Padel Parque', slug: 'padel-parque' } },
+  ] : community() ? [
     // localStorage.mockTeacherState = 'pending' | 'approved' — o meu pedido.
     ...(localStorage.getItem('mockTeacherState') ? [{
       id: 'tp-me', user_id: MOCK_ADMIN_USER_ID, organization_id: null, status: localStorage.getItem('mockTeacherState'),
