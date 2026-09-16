@@ -367,7 +367,7 @@ export function DateTimeField({ value, onChange, placeholder }) {
    Pill partilhado por RatingBadge e GroupLevelBadge — as várias famílias
    de badge têm de se manter visualmente idênticas, por isso o markup vive
    uma vez. */
-function BadgePill({ text, title, me = false, size = 'sm', onDark = false }) {
+export function BadgePill({ text, title, me = false, size = 'sm', onDark = false }) {
   const sizes = {
     sm: 'text-[11px] px-2 py-0.5',
     md: 'text-sm px-3 py-1',

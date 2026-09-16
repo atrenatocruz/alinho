@@ -17,6 +17,7 @@ import { totalRounds, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, SCORING_FO
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
 import { AGE_RESTRICTIONS } from '../lib/ageCategories'
 import PlayerSearch from '../components/PlayerSearch'
+import WhatsappGroupsSection from '../components/WhatsappGroupsSection'
 import { searchPlayers } from '../lib/privateMatches'
 import { inviteToOrganization } from '../lib/orgInvites'
 import { DAY_LABEL_KEY, listPendingTeacherRequests, approveTeacherProfile, rejectTeacherProfile } from '../lib/teachers'
@@ -2694,6 +2695,8 @@ export default function GerirClube() {
                   {t('gerirclube.save_settings_button')}
                 </button>
               </form>
+
+              <WhatsappGroupsSection organizationId={currentOrganizationId} />
 
               {/* Only clubs can contain groups — create_group rejects a group
                   as a parent server-side, so don't offer it on a group's own
