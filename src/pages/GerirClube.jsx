@@ -802,6 +802,11 @@ export default function GerirClube() {
         age_restriction: game.age_restriction ?? null,
         level: game.level,
         auto_start_hours_before: game.auto_start_hours_before,
+        // Mesmas escolhas do mix de origem; só vão quando não são o valor por
+        // omissão, para não rebentar antes das migrações que criam as colunas.
+        ...(game.pairing_mode && game.pairing_mode !== 'por_nivel' ? { pairing_mode: game.pairing_mode } : {}),
+        ...(game.rotate_partners ? { rotate_partners: true } : {}),
+        ...(game.ranked === false ? { ranked: false } : {}),
         status: 'pending',
         created_by: userId,
         recurrence_id: newRecurrence.id,
@@ -2082,13 +2087,13 @@ export default function GerirClube() {
                       })()}
                     </div>
 
-                    {/* Recurring Mixes are not available to self-serve groups:
-                        process_due_game_recurrences() creates occurrences
-                        server-side, bypassing the 3-concurrent-active-mix cap
-                        the games RLS policy enforces on direct inserts. Same
-                        !org?.self_serve gating as the "Visibilidade pública"
-                        section in Definições. */}
-                    {!org?.self_serve && (!editingGame || !editingGame.recurrence || editingGame.recurrence.is_active) && (
+                    {/* Mix recorrente em qualquer grupo ou clube (Francisco,
+                        16 set 2026 — "não tem a ver com planos"). Antes estava
+                        escondido nos grupos da Comunidade porque o mix seguinte
+                        da série ('pending') contava para o limite de mixes em
+                        aberto; migration_recurring_mix_everywhere.sql deixa de
+                        o contar. */}
+                    {(!editingGame || !editingGame.recurrence || editingGame.recurrence.is_active) && (
                       <div className="border-t border-line pt-4 space-y-4">
                         {editingGame?.recurrence?.is_active && (
                           <div className="flex items-center justify-between gap-3 p-3 rounded-ctrl bg-ink-50">
