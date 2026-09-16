@@ -40,6 +40,28 @@ export const deleteSelfServeGroup = async (orgId) => {
   if (error) throw error
 }
 
+// Only the current owner (or a platform admin) can call this, and only to
+// someone who is already an admin — see
+// supabase/migration_organization_owner_and_admin_invites.sql (Trello #261).
+export const transferOrganizationOwnership = async (orgId, newOwnerId) => {
+  const { error } = await supabase.rpc('transfer_organization_ownership', {
+    p_organization_id: orgId,
+    p_new_owner_id: newOwnerId,
+  })
+  if (error) throw error
+}
+
+// Plano do clube/grupo (free/plus/pro/club). Só um admin da plataforma pode
+// mudar, enquanto não há subscrições — e muda também os grupos dentro de um
+// clube. Ver supabase/migration_organization_plan_tier.sql.
+export const setOrganizationPlan = async (orgId, planTier) => {
+  const { error } = await supabase.rpc('admin_set_organization_plan', {
+    p_organization_id: orgId,
+    p_plan_tier: planTier,
+  })
+  if (error) throw error
+}
+
 // RLS on membership_requests already scopes SELECT to: rows the caller owns
 // (user_id = auth.uid()) OR rows for an org the caller admins (is_org_admin).
 // Excluding the caller's own outgoing requests leaves exactly the incoming

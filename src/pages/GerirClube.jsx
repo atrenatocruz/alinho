@@ -8,10 +8,10 @@ import { useAuth } from '../contexts/AuthContext'
 import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
 import { uploadClubLogo, removeClubLogo } from '../lib/clubLogoStorage'
 import { createGroup } from '../lib/platformAdmin'
-import { listClubGroups, getOrganizationDeleteBlocker, deleteSelfServeGroup } from '../lib/organizations'
+import { listClubGroups, getOrganizationDeleteBlocker, deleteSelfServeGroup, transferOrganizationOwnership, setOrganizationPlan } from '../lib/organizations'
 import { formatRating } from '../lib/elo'
 import { formatDate as formatDateLib, formatTime as formatTimeLib } from '../lib/formatDate'
-import { DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal } from '../components/ui'
+import { DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal, OrgKindBadge, PlanBadge, PLAN_TIERS, planName } from '../components/ui'
 import { totalRounds, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, SCORING_FORMAT_LABEL_KEY } from '../lib/mixLogic'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
 import { AGE_RESTRICTIONS } from '../lib/ageCategories'
@@ -171,6 +171,8 @@ export default function GerirClube() {
   const [editingGame, setEditingGame] = useState(null)
   const [gameFilter, setGameFilter] = useState('upcoming')
   const [savingFlag, setSavingFlag] = useState(false)
+  const [savingPlan, setSavingPlan] = useState(false)
+  const [planMessage, setPlanMessage] = useState(null)
   const [editingName, setEditingName] = useState(false)
   const [nameInput, setNameInput] = useState('')
   const [renamingOrg, setRenamingOrg] = useState(false)
@@ -198,6 +200,12 @@ export default function GerirClube() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deletingGroup, setDeletingGroup] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  // Vários admins com dono protegido (Trello #261).
+  const [inviteAsAdmin, setInviteAsAdmin] = useState(false)
+  const [orgOwnerId, setOrgOwnerId] = useState(null)
+  const [transferTarget, setTransferTarget] = useState(null)
+  const [transferring, setTransferring] = useState(false)
+  const [transferError, setTransferError] = useState('')
   const [showCreateGroup, setShowCreateGroup] = useState(false)
   const [groupName, setGroupName] = useState('')
   const [groupSlug, setGroupSlug] = useState('')
@@ -506,11 +514,22 @@ export default function GerirClube() {
   // joined with `profiles` for the display name — player_stats isn't shown
   // here so it isn't fetched.
   const loadMembers = async () => {
-    const { data, error } = await supabase
-      .from('memberships')
-      .select('id, is_admin, is_guest, level, user_id, profile:profiles(*)')
-      .eq('organization_id', currentOrganizationId)
-      .eq('is_guest', false)
+    // The owner is read alongside the members, not from `settings` — settings
+    // only loads on the Definições tab, and this list needs to know who the
+    // owner is to hide their demote/remove buttons (Trello #261).
+    const [{ data, error }, { data: ownerRow }] = await Promise.all([
+      supabase
+        .from('memberships')
+        .select('id, is_admin, is_guest, level, user_id, profile:profiles(*)')
+        .eq('organization_id', currentOrganizationId)
+        .eq('is_guest', false),
+      supabase
+        .from('organizations')
+        .select('owner_id')
+        .eq('id', currentOrganizationId)
+        .maybeSingle(),
+    ])
+    setOrgOwnerId(ownerRow?.owner_id ?? null)
 
     if (error) {
       console.error('Error loading members:', error)
@@ -567,11 +586,13 @@ export default function GerirClube() {
 
   const handleInvitePlayer = async (player) => {
     try {
-      const status = await inviteToOrganization(org.id, player.id)
-      alert(status === 'pending' ? t('gerirclube.invite_sent', { name: player.name }) : t('gerirclube.invite_already_pending', { name: player.name }))
+      const status = await inviteToOrganization(org.id, player.id, inviteAsAdmin)
+      alert(status === 'pending'
+        ? t(inviteAsAdmin ? 'gerirclube.invite_sent_admin' : 'gerirclube.invite_sent', { name: player.name })
+        : t('gerirclube.invite_already_pending', { name: player.name }))
     } catch (error) {
       console.error('Error inviting player:', error)
-      alert(error.message?.includes('já é membro') ? t('gerirclube.already_member', { name: player.name }) : t('gerirclube.error_invite_failed'))
+      alert(error.message?.includes('já é membro') ? t(kk('gerirclube.already_member'), { name: player.name }) : t('gerirclube.error_invite_failed'))
     }
   }
 
@@ -1101,7 +1122,7 @@ export default function GerirClube() {
   const handleToggleAdmin = async (userId, currentStatus) => {
     const confirmMessage = currentStatus
       ? t('gerirclube.confirm_revoke_admin')
-      : t('gerirclube.confirm_grant_admin')
+      : t(kk('gerirclube.confirm_grant_admin'))
     if (!confirm(confirmMessage)) return
 
     try {
@@ -1122,7 +1143,7 @@ export default function GerirClube() {
   }
 
   const handleDeleteUser = async (member) => {
-    if (!confirm(t('gerirclube.confirm_remove_member', { name: member.name }))) return
+    if (!confirm(t(kk('gerirclube.confirm_remove_member'), { name: member.name }))) return
 
     try {
       const { error } = await supabase.rpc('admin_remove_member', {
@@ -1193,6 +1214,7 @@ export default function GerirClube() {
   const deleteBlockerMessage = (code) => {
     if (code === 'has_activity') return t('gerirclube.delete_group_blocked_activity')
     if (code === 'has_subgroups') return t('gerirclube.delete_group_blocked_subgroups')
+    if (code === 'not_owner') return t('gerirclube.delete_group_blocked_not_owner')
     return t('gerirclube.delete_group_blocked_generic')
   }
 
@@ -1211,6 +1233,36 @@ export default function GerirClube() {
       // since the page asked (e.g. someone created a mix in the meantime).
       setDeleteError(deleteBlockerMessage(error?.message))
       setDeletingGroup(false)
+    }
+  }
+
+  // The owner cannot be demoted or removed, and only they (or a platform
+  // admin) can hand ownership to another admin: same rules as a WhatsApp group
+  // creator / community owner (Trello #261). The server enforces all of it;
+  // this only decides which buttons to show.
+  const ownerId = orgOwnerId ?? settings?.owner_id ?? org?.owner_id ?? null
+
+  // Texts that name the entity use a "_group" twin key when this is a group,
+  // so a group never reads "deste clube" / "Logo do clube" (Trello #177).
+  // Explicit keys rather than i18next's context feature, so both wordings are
+  // visible side by side in the locale files.
+  const isGroupOrg = org?.kind === 'group'
+  const kk = (key) => (isGroupOrg ? `${key}_group` : key)
+  const canTransferOwnership = (!!ownerId && ownerId === currentUser?.id) || !!currentUser?.is_platform_admin
+
+  const handleTransferOwnership = async () => {
+    if (!transferTarget) return
+    setTransferError('')
+    setTransferring(true)
+    try {
+      await transferOrganizationOwnership(org.id, transferTarget.id)
+      setTransferTarget(null)
+      await Promise.all([loadSettings(), loadMembers(), refreshMemberships()])
+    } catch (error) {
+      console.error('Error transferring ownership:', error)
+      setTransferError(t('gerirclube.transfer_owner_error'))
+    } finally {
+      setTransferring(false)
     }
   }
 
@@ -1318,6 +1370,27 @@ export default function GerirClube() {
     setScannedVoucher(null)
     setRedeemError('')
     setRedeemSuccess(false)
+  }
+
+  // Só admin da plataforma (a regra está no RPC, não só aqui). Muda o
+  // plano deste clube/grupo e dos grupos lá dentro; a etiqueta do topo e a
+  // lista do Gerir leem o mesmo campo, por isso atualizam-se as duas.
+  const handleSetPlan = async (planTier) => {
+    if (!settings || planTier === settings.plan_tier || savingPlan) return
+    setSavingPlan(true)
+    setPlanMessage(null)
+    try {
+      await setOrganizationPlan(settings.id, planTier)
+      setSettings((s) => ({ ...s, plan_tier: planTier }))
+      setOrg((o) => (o ? { ...o, plan_tier: planTier } : o))
+      setPlanMessage({ ok: true, text: t('gerirclube.plan_saved', { name: planName(planTier) }) })
+      refreshMemberships?.()
+    } catch (error) {
+      console.error('Error setting organization plan:', error)
+      setPlanMessage({ ok: false, text: t('gerirclube.plan_save_error') })
+    } finally {
+      setSavingPlan(false)
+    }
   }
 
   const handleTogglePrivateMatches = async () => {
@@ -1441,20 +1514,29 @@ export default function GerirClube() {
   return (
     <div className="space-y-6">
       <div>
-        {/* Hidden inside settings/redeem: those screens have their own "Voltar"
-            (back to the games tab), and two stacked "Voltar" going to different
-            places read as the same button. */}
-        {(adminOrganizations.length > 1 || currentUser?.is_platform_admin) && activeTab !== 'settings' && activeTab !== 'redeem' && (
-          <button type="button" onClick={goBack} className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline mb-2">
+        {/* Um só "Voltar", sempre no topo (Francisco, 15 set 2026). Nas
+            Definições e no Validar voucher volta aos Jogos; nos Jogos/Membros
+            volta à página anterior (só quem tem mais de um clube/grupo). */}
+        {(activeTab === 'settings' || activeTab === 'redeem') ? (
+          <button
+            type="button"
+            onClick={() => { if (activeTab === 'redeem') handleResetRedeem(); setActiveTab('games') }}
+            className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline mb-6"
+          >
+            <ArrowLeft size={16} /> {t('gerirclube.back_button')}
+          </button>
+        ) : (adminOrganizations.length > 1 || currentUser?.is_platform_admin) && (
+          <button type="button" onClick={goBack} className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline mb-6">
             <ArrowLeft size={16} /> {t('common.back')}
           </button>
         )}
+        {/* "Gerir" as a small label above, so the title is the group's name
+            alone — as "Gerir: <nome>" it truncated to "Gerir: Grup…" on a
+            phone (Francisco, 15 set 2026). Kept outside the row below so the
+            QR/settings buttons line up with the title, not with this label. */}
+        <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('gerirclube.manage_label')}</p>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            {/* "Gerir" as a small label above, so the title is the group's name
-                alone — as "Gerir: <nome>" it truncated to "Gerir: Grup…" on a
-                phone (Francisco, 15 set 2026). */}
-            <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('gerirclube.manage_label')}</p>
             {editingName ? (
               <div className="flex items-center gap-2">
                 <input
@@ -1472,26 +1554,37 @@ export default function GerirClube() {
                 />
               </div>
             ) : (
-              <h2 className="text-3xl font-bold text-ink-900 flex items-center gap-2 min-w-0">
-                <span className="truncate">{org.name}</span>
+              <h2 className="text-3xl font-bold text-ink-900 min-w-0 break-words">
+                {/* Wraps instead of truncating ("Smash Padel …"), and the pencil
+                    sits inline right after the last word — as a flex item it
+                    floated far right of a wrapped name (Francisco, 15 set 2026). */}
+                {org.name}
                 <button
                   type="button"
                   onClick={() => { setNameInput(org.name); setEditingName(true) }}
                   aria-label={t('gerirclube.edit_name_aria')}
-                  className="shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-muted hover:text-ink-900 hover:bg-ink-50 transition-colors duration-fast"
+                  className="ml-1.5 inline-flex align-middle -mt-1 w-8 h-8 items-center justify-center rounded-full text-muted hover:text-ink-900 hover:bg-ink-50 transition-colors duration-fast"
                 >
                   <Edit2 size={16} />
                 </button>
               </h2>
             )}
-            <p className="text-gray-600 mt-1">{t('gerirclube.subtitle')}</p>
+            {/* Etiqueta clube/grupo por baixo do nome, plano por baixo da frase —
+                tudo na mesma linha do GERIR ficava apertado (Francisco, 15 set 2026). */}
+            {org?.kind && (
+              <div className="mt-2"><OrgKindBadge kind={org.kind} /></div>
+            )}
+            <p className="text-gray-600 mt-2">{t(kk('gerirclube.subtitle'))}</p>
+            {org && (
+              <div className="mt-2"><PlanBadge tier={org.plan_tier} /></div>
+            )}
           </div>
           <button
             type="button"
             onClick={() => setActiveTab('redeem')}
             title={t('gerirclube.redeem_voucher_label')}
             aria-label={t('gerirclube.redeem_voucher_label')}
-            className="shrink-0 w-11 h-11 flex items-center justify-center rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast"
+            className="shrink-0 -mt-1 w-11 h-11 flex items-center justify-center rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast"
           >
             <QrCode size={20} />
           </button>
@@ -1500,7 +1593,7 @@ export default function GerirClube() {
             onClick={() => setActiveTab('settings')}
             title={t('gerirclube.settings_label')}
             aria-label={t('gerirclube.settings_label')}
-            className="shrink-0 w-11 h-11 flex items-center justify-center rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast"
+            className="shrink-0 -mt-1 w-11 h-11 flex items-center justify-center rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast"
           >
             <Settings size={20} />
           </button>
@@ -1589,7 +1682,7 @@ export default function GerirClube() {
                           value={mixScopeId}
                           onChange={setMixScopeId}
                           options={[
-                            { value: '', label: t('gerirclube.scope_whole_club') },
+                            { value: '', label: t(kk('gerirclube.scope_whole_club')) },
                             ...clubGroups.filter((g) => g.can_manage).map((g) => ({ value: g.id, label: g.name })),
                           ]}
                         />
@@ -1796,7 +1889,7 @@ export default function GerirClube() {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        {t('gerirclube.level_label')}
+                        {t('gerirclube.level_optional_label')}
                       </label>
                       <Segmented
                         options={[
@@ -1806,7 +1899,7 @@ export default function GerirClube() {
                         value={gameForm.level}
                         onChange={(v) => setGameForm({ ...gameForm, level: v })}
                       />
-                      <p className="text-sm text-muted mt-1.5">{t('gerirclube.level_help')}</p>
+                      <p className="text-sm text-muted mt-1.5">{t(kk('gerirclube.level_help'))}</p>
                     </div>
 
                     <div>
@@ -2159,6 +2252,19 @@ export default function GerirClube() {
               <div className="card space-y-4">
                 <div>
                   <h3 className="text-sm font-extrabold text-ink-900 mb-2">{t('gerirclube.invite_player_heading')}</h3>
+                  <div className="mb-3">
+                    <Segmented
+                      options={[
+                        { value: 'member', label: t('gerirclube.invite_as_member') },
+                        { value: 'admin', label: t('gerirclube.invite_as_admin') },
+                      ]}
+                      value={inviteAsAdmin ? 'admin' : 'member'}
+                      onChange={(value) => setInviteAsAdmin(value === 'admin')}
+                    />
+                    {inviteAsAdmin && (
+                      <p className="mt-2 text-[11px] text-muted">{t('gerirclube.invite_as_admin_hint')}</p>
+                    )}
+                  </div>
                   <PlayerSearch
                     label={t('gerirclube.search_by_name_placeholder')}
                     searchFn={searchPlayers}
@@ -2263,6 +2369,11 @@ export default function GerirClube() {
                           {member.is_admin && (
                             <span className="w-2 h-2 rounded-full bg-lime-600 shrink-0" title={t('gerirclube.admin_badge_title')} />
                           )}
+                          {member.id === ownerId && (
+                            <span className="shrink-0 text-[10px] font-extrabold uppercase tracking-widest px-1.5 py-0.5 rounded-full bg-ink-900 text-white">
+                              {t('gerirclube.owner_badge')}
+                            </span>
+                          )}
                         </h3>
                         <p className="text-sm text-muted truncate">
                           {t('gerirclube.level_label', { level: member.level })}
@@ -2270,14 +2381,18 @@ export default function GerirClube() {
                       </div>
                     </Link>
 
+                    {/* The owner row has no admin toggle and no remove
+                        button: nobody can demote or remove the owner. */}
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        onClick={() => handleToggleAdmin(member.id, member.is_admin)}
-                        className="whitespace-nowrap text-xs font-extrabold px-3 py-2 min-h-[44px] rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast"
-                      >
-                        {member.is_admin ? t('gerirclube.revoke_admin_button') : t('gerirclube.grant_admin_button')}
-                      </button>
-                      {member.id !== currentUser?.id && (
+                      {member.id !== ownerId && (
+                        <button
+                          onClick={() => handleToggleAdmin(member.id, member.is_admin)}
+                          className="whitespace-nowrap text-xs font-extrabold px-3 py-2 min-h-[44px] rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast"
+                        >
+                          {member.is_admin ? t('gerirclube.revoke_admin_button') : t('gerirclube.grant_admin_button')}
+                        </button>
+                      )}
+                      {member.id !== currentUser?.id && member.id !== ownerId && (
                         <button
                           onClick={() => handleDeleteUser(member)}
                           title={t('gerirclube.delete_member_title', { name: member.name })}
@@ -2288,8 +2403,32 @@ export default function GerirClube() {
                       )}
                     </div>
                   </div>
+                  {canTransferOwnership && member.is_admin && member.id !== ownerId && (
+                    <div className="mt-3 pt-3 border-t border-line flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => { setTransferError(''); setTransferTarget(member) }}
+                        className="text-xs font-extrabold text-ink-700 hover:underline"
+                      >
+                        {t('gerirclube.transfer_owner_button')}
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
+
+              <DangerConfirmModal
+                open={!!transferTarget}
+                title={t('gerirclube.transfer_owner_confirm_title', { name: transferTarget?.name || '' })}
+                message={t('gerirclube.transfer_owner_confirm_message', { name: transferTarget?.name || '' })}
+                emphasis={t('gerirclube.transfer_owner_confirm_emphasis')}
+                confirmLabel={transferring ? t('gerirclube.transfer_owner_transferring') : t('gerirclube.transfer_owner_confirm_button')}
+                cancelLabel={t('gerirclube.delete_group_cancel')}
+                busy={transferring}
+                error={transferError}
+                onConfirm={handleTransferOwnership}
+                onClose={() => setTransferTarget(null)}
+              />
             </div>
           )}
 
@@ -2299,16 +2438,36 @@ export default function GerirClube() {
               instead of closing an overlay. */}
           {activeTab === 'settings' && settings && (
             <div>
-              <button
-                type="button"
-                onClick={() => setActiveTab('games')}
-                className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline mb-4"
-              >
-                <ArrowLeft size={16} /> {t('gerirclube.back_button')}
-              </button>
               <h3 className="text-xl font-semibold text-ink-900 mb-6">
-                {t('gerirclube.settings_heading')}
+                {t(kk('gerirclube.settings_heading'))}
               </h3>
+
+              {/* Plano — primeiro das Definições, para o admin saber o que
+                  tem. Sem pagamentos ainda: quem não é admin da plataforma
+                  só vê o plano e como pedir para mudar. */}
+              <div className="mb-6 p-4 rounded-card border border-line bg-surface">
+                <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('gerirclube.plan_heading')}</p>
+                <p className="mt-1 text-2xl font-extrabold text-ink-900">{planName(settings.plan_tier)}</p>
+                <p className="mt-1 text-sm text-ink-700">{t(`gerirclube.plan_desc_${PLAN_TIERS.includes(settings.plan_tier) ? settings.plan_tier : 'free'}`)}</p>
+                {currentUser?.is_platform_admin ? (
+                  <div className="mt-4">
+                    <p className="text-sm font-medium text-gray-700 mb-2">{t('gerirclube.plan_change_label')}</p>
+                    <Segmented
+                      options={PLAN_TIERS.map((tier) => ({ value: tier, label: planName(tier) }))}
+                      value={settings.plan_tier || 'free'}
+                      onChange={handleSetPlan}
+                    />
+                    {settings.parent_organization_id == null && settings.kind !== 'group' && (
+                      <p className="mt-2 text-[11px] text-muted">{t('gerirclube.plan_change_hint')}</p>
+                    )}
+                    {planMessage && (
+                      <p className={`mt-2 text-sm font-extrabold ${planMessage.ok ? 'text-ok' : 'text-danger'}`}>{planMessage.text}</p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-[11px] text-muted">{t('gerirclube.plan_contact_hint')}</p>
+                )}
+              </div>
 
               <form onSubmit={handleUpdateSettings} className="space-y-6">
                 <div>
@@ -2342,7 +2501,7 @@ export default function GerirClube() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {t('gerirclube.club_logo_label')}
+                    {t(kk('gerirclube.club_logo_label'))}
                   </label>
                   <div className="flex items-center gap-4">
                     <div className="relative w-16 h-16 shrink-0">
@@ -2351,7 +2510,7 @@ export default function GerirClube() {
                         type="button"
                         onClick={() => clubLogoInputRef.current?.click()}
                         disabled={uploadingLogo}
-                        aria-label={t('gerirclube.change_logo_aria')}
+                        aria-label={t(kk('gerirclube.change_logo_aria'))}
                         className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-ink-900 text-white flex items-center justify-center
                                    ring-2 ring-canvas hover:bg-ink-700 transition-colors duration-fast disabled:opacity-50"
                       >
@@ -2394,7 +2553,7 @@ export default function GerirClube() {
                     onChange={(e) => setSettings({ ...settings, description: e.target.value })}
                     className="input-field resize-none"
                     rows={4}
-                    placeholder={t('gerirclube.description_placeholder')}
+                    placeholder={t(kk('gerirclube.description_placeholder'))}
                   />
                 </div>
 
@@ -2414,7 +2573,7 @@ export default function GerirClube() {
                         // Ver a nota no campo equivalente do mix.
                         onChange={(e) => setSettings({ ...settings, location: e.target.value, latitude: null, longitude: null })}
                         className="input-field"
-                        placeholder={t('gerirclube.address_placeholder')}
+                        placeholder={t(kk('gerirclube.address_placeholder'))}
                       />
                     </div>
 
@@ -2440,7 +2599,7 @@ export default function GerirClube() {
                           value={settings.instagram || ''}
                           onChange={(e) => setSettings({ ...settings, instagram: e.target.value })}
                           className="input-field"
-                          placeholder={t('gerirclube.instagram_placeholder')}
+                          placeholder={t(kk('gerirclube.instagram_placeholder'))}
                         />
                       </div>
                       <div>
@@ -2452,7 +2611,7 @@ export default function GerirClube() {
                           value={settings.website || ''}
                           onChange={(e) => setSettings({ ...settings, website: e.target.value })}
                           className="input-field"
-                          placeholder={t('gerirclube.website_placeholder')}
+                          placeholder={t(kk('gerirclube.website_placeholder'))}
                         />
                       </div>
                     </div>
@@ -2465,11 +2624,11 @@ export default function GerirClube() {
                       {t('gerirclube.public_visibility_heading')}
                     </h4>
                     <p className="text-sm text-gray-500 mb-4">
-                      {t('gerirclube.public_visibility_description')}
+                      {t(kk('gerirclube.public_visibility_description'))}
                     </p>
                     <label className="flex items-center justify-between gap-4 p-3 rounded-ctrl border border-line mb-3">
                       <div>
-                        <p className="font-extrabold text-ink-900 text-sm">{t('gerirclube.public_club_label')}</p>
+                        <p className="font-extrabold text-ink-900 text-sm">{t(kk('gerirclube.public_club_label'))}</p>
                         <p className="text-[11px] text-muted">{t('gerirclube.appears_in_community_hint')}</p>
                       </div>
                       <input
@@ -2676,7 +2835,7 @@ export default function GerirClube() {
                   <label className="flex items-center justify-between gap-4 p-3 rounded-ctrl border border-line">
                     <div>
                       <p className="font-extrabold text-ink-900 text-sm">{t('gerirclube.private_matches_label')}</p>
-                      <p className="text-[11px] text-muted">{t('gerirclube.private_matches_hint')}</p>
+                      <p className="text-[11px] text-muted">{t(kk('gerirclube.private_matches_hint'))}</p>
                     </div>
                     <input
                       type="checkbox"
@@ -2746,13 +2905,6 @@ export default function GerirClube() {
               Key Decisions). */}
           {activeTab === 'redeem' && (
             <div>
-              <button
-                type="button"
-                onClick={() => { setActiveTab('games'); handleResetRedeem() }}
-                className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline mb-4"
-              >
-                <ArrowLeft size={16} /> {t('gerirclube.back_button')}
-              </button>
               <h3 className="text-xl font-semibold text-ink-900 mb-6">{t('gerirclube.redeem_heading')}</h3>
 
               {scanLookupState !== 'found' && (

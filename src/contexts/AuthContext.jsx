@@ -17,6 +17,8 @@ const MOCK_ADMIN_PROFILE = {
   name: 'Admin (Dev)',
   gender: 'masculino',
   phone_hash: 'dev-bypass', // dummy — skips the mandatory-phone modal for the dev bypass
+  // localStorage.mockPlatformAdmin = 'true' → vê o seletor de plano no Gerir.
+  is_platform_admin: typeof localStorage !== 'undefined' && localStorage.getItem('mockPlatformAdmin') === 'true',
   // Rating fictício (11 set 2026) — sem isto o aro de progresso do Perfil
   // fica sempre vazio ("— pontos") em localhost. Ver devMockNetwork.js
   // para o resto dos dados fictícios (troféus, XP, ranking, etc.).
@@ -34,8 +36,37 @@ const MOCK_ADMIN_MEMBERSHIP = {
   is_admin: true,
   is_guest: false,
   level: 'avançado',
-  organization: { id: MOCK_ADMIN_ORG_ID, name: 'Dev Org', slug: 'dev-org' },
+  // Same shape as the organizations row devMockNetwork.js serves for this id —
+  // a group created in Comunidade, owned by the dev admin — so the Gerir
+  // header shows the GRUPO mark in localhost (Trello #177, #261).
+  organization: {
+    id: MOCK_ADMIN_ORG_ID, name: 'Dev Org', slug: 'dev-org',
+    kind: 'group', self_serve: true, owner_id: MOCK_ADMIN_USER.id,
+    // localStorage.mockPlanTier (free/plus/pro/club) para ver os 4 planos.
+    plan_tier: localStorage.getItem('mockPlanTier') || 'pro',
+  },
 }
+
+// localStorage.mockTwoOrgs = 'true' adds a club the dev admin also manages,
+// so the Gerir list (which only shows with 2+ organizations) can be checked
+// with its Clubes and Grupos sections side by side.
+const MOCK_ADMIN_CLUB_MEMBERSHIP = {
+  id: '00000000-0000-0000-0000-0000000000cc',
+  user_id: MOCK_ADMIN_USER.id,
+  organization_id: '00000000-0000-0000-0000-0000000000dd',
+  is_admin: true,
+  is_guest: false,
+  level: 'avançado',
+  organization: {
+    id: '00000000-0000-0000-0000-0000000000dd', name: 'Smash Padel Almada', slug: 'smash-padel',
+    kind: 'club', self_serve: false, owner_id: MOCK_ADMIN_USER.id, plan_tier: 'club',
+  },
+}
+const mockAdminMemberships = () => (
+  localStorage.getItem('mockTwoOrgs') === 'true'
+    ? [MOCK_ADMIN_MEMBERSHIP, MOCK_ADMIN_CLUB_MEMBERSHIP]
+    : [MOCK_ADMIN_MEMBERSHIP]
+)
 
 export const useAuth = () => {
   const context = useContext(AuthContext)
@@ -63,7 +94,7 @@ export const AuthProvider = ({ children }) => {
     if (import.meta.env.DEV && localStorage.getItem(MOCK_ADMIN_KEY) === 'true') {
       setUser(MOCK_ADMIN_USER)
       setProfile(MOCK_ADMIN_PROFILE)
-      setMemberships([MOCK_ADMIN_MEMBERSHIP])
+      setMemberships(mockAdminMemberships())
       setCurrentOrganizationId(MOCK_ADMIN_ORG_ID)
       setLoading(false)
       return
@@ -309,7 +340,7 @@ export const AuthProvider = ({ children }) => {
     installDevMockNetwork()
     setUser(MOCK_ADMIN_USER)
     setProfile(MOCK_ADMIN_PROFILE)
-    setMemberships([MOCK_ADMIN_MEMBERSHIP])
+    setMemberships(mockAdminMemberships())
     setCurrentOrganizationId(MOCK_ADMIN_ORG_ID)
     setLoading(false)
   }
@@ -458,6 +489,10 @@ export const AuthProvider = ({ children }) => {
   // stays stale until a full page reload.
   const refreshMemberships = async () => {
     if (!user) return
+    // Dev bypass: the fake admin has no profiles row, so reloading it ended
+    // on "Não foi possível carregar os teus dados" after any admin action
+    // (passar a posse, mudar plano). Keep the mock data instead.
+    if (import.meta.env.DEV && localStorage.getItem(MOCK_ADMIN_KEY) === 'true') return
     await loadProfile(user.id)
   }
 

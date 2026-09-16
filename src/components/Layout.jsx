@@ -521,7 +521,7 @@ export default function Layout({ children }) {
                           <div key={inv.id} className="flex items-center gap-3 px-4 py-3">
                             <Avatar name={inv.organization_name} url={inv.organization_logo_url} size="w-9 h-9 text-sm" />
                             <p className="flex-1 min-w-0 text-sm text-ink-900">
-                              {t('layout.invited_to_join')} <span className="font-extrabold">{inv.organization_name}</span>
+                              {inv.as_admin ? t('layout.invited_to_admin') : t('layout.invited_to_join')} <span className="font-extrabold">{inv.organization_name}</span>
                             </p>
                             <button
                               onClick={() => handleAcceptOrgInvite(inv.id)}

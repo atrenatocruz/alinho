@@ -125,6 +125,12 @@ function Nav() {
         </Link>
         <div className="flex items-center gap-4">
           <LanguageToggle className="text-white/80 hover:text-white" />
+          <a
+            href="#planos"
+            className="inline-flex items-center min-h-[44px] px-1 text-white/80 hover:text-white font-extrabold text-sm transition-colors duration-fast"
+          >
+            {t('landing.pricing_nav_link')}
+          </a>
           <Link
             to={loginHref()}
             className="inline-flex items-center min-h-[44px] px-1 text-white/80 hover:text-white font-extrabold text-sm transition-colors duration-fast"
@@ -420,6 +426,80 @@ function HowItWorks() {
   )
 }
 
+// Planos (nomes fechados 15 set 2026 — Free/Squad/Community/Club; chaves
+// internas free/plus/pro/club, as mesmas de organizations.plan_tier). Ainda
+// não há subscrições: só o Free tem botão, os pagos dizem "em breve". O que
+// não existe no produto vai marcado "em breve" — nada de "mais escolhido" ou
+// outros sinais inventados (PRODUCT.md). Preços de lançamento, por validar.
+const PLANS = [
+  { key: 'free', name: 'Free', features: [['f1'], ['f2'], ['f3']] },
+  { key: 'plus', name: 'Squad', features: [['f1'], ['f2'], ['f3']] },
+  { key: 'pro', name: 'Community', highlight: true, features: [['f1'], ['f2'], ['f3'], ['f4'], ['f5', 'soon']] },
+  { key: 'club', name: 'Club', features: [['f1'], ['f2', 'soon'], ['f3', 'soon'], ['f4', 'soon']] },
+]
+
+function PlanCard({ plan }) {
+  const { t } = useTranslation()
+  const loginHref = useLoginHref()
+  const dark = plan.highlight
+  return (
+    <div className={`rounded-card p-6 flex flex-col ${dark ? 'bg-ink-900 text-white' : 'bg-surface border border-line'}`}>
+      <h3 className={`text-xl ${dark ? 'text-white' : 'text-ink-900'}`}>{plan.name}</h3>
+      <p className={`text-sm mt-1 ${dark ? 'text-ink-200' : 'text-muted'}`}>{t(`landing.plan_${plan.key}_for`)}</p>
+      <p className="mt-5 flex items-baseline gap-1">
+        <span className={`text-3xl font-extrabold tabular-nums ${dark ? 'text-white' : 'text-ink-900'}`}>{t(`landing.plan_${plan.key}_price`)}</span>
+        {plan.key !== 'free' && (
+          <span className={`text-sm ${dark ? 'text-ink-200' : 'text-muted'}`}>{t('landing.pricing_per_month')}</span>
+        )}
+      </p>
+      <ul className="mt-5 space-y-2.5 flex-1">
+        {plan.features.map(([f, soon]) => (
+          <li key={f} className={`flex items-start gap-2 text-sm ${soon ? (dark ? 'text-ink-200' : 'text-muted') : (dark ? 'text-white' : 'text-ink-900')}`}>
+            <CheckCircle2 size={16} className={`shrink-0 mt-0.5 ${soon ? 'opacity-40' : (dark ? 'text-lime-400' : 'text-lime-600')}`} />
+            <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+              {t(`landing.plan_${plan.key}_${f}`)}
+              {soon && (
+                <span className={`rounded-full px-1.5 py-px text-[10px] leading-[14px] font-extrabold ${dark ? 'bg-white/10 text-ink-200' : 'bg-canvas border border-line text-ink-700'}`}>
+                  {t('landing.pricing_soon')}
+                </span>
+              )}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-6">
+        {plan.key === 'free' ? (
+          <Link to={loginHref('signup')} className="btn-primary w-full inline-flex items-center justify-center">
+            {t('landing.plan_free_cta')}
+          </Link>
+        ) : (
+          <p className={`min-h-[48px] flex items-center justify-center rounded-ctrl text-sm font-extrabold border border-dashed ${dark ? 'border-white/20 text-ink-200' : 'border-line text-muted'}`}>
+            {t('landing.pricing_paid_soon')}
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function Pricing() {
+  const { t } = useTranslation()
+  return (
+    <section id="planos" className="bg-canvas py-20 px-5 scroll-mt-16">
+      <div className="max-w-5xl mx-auto">
+        <div className="text-center max-w-lg mx-auto mb-12">
+          <h2 className="text-3xl text-ink-900">{t('landing.pricing_heading')}</h2>
+          <p className="text-muted mt-3">{t('landing.pricing_intro')}</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {PLANS.map((plan) => <PlanCard key={plan.key} plan={plan} />)}
+        </div>
+        <p className="text-xs text-muted text-center mt-8 max-w-lg mx-auto">{t('landing.pricing_footnote')}</p>
+      </div>
+    </section>
+  )
+}
+
 function ClosingCta() {
   const { t } = useTranslation()
   const loginHref = useLoginHref()
@@ -473,6 +553,7 @@ export default function Landing() {
       <Hero />
       <Features />
       <HowItWorks />
+      <Pricing />
       <ClosingCta />
       <Footer />
     </div>

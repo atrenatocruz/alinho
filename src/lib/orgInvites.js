@@ -1,9 +1,12 @@
 import { supabase } from './supabase'
 
-export const inviteToOrganization = async (organizationId, userId) => {
+// asAdmin: on accept the person joins straight in as an admin, skipping the
+// approval request member invites get in Comunidade groups (Trello #261).
+export const inviteToOrganization = async (organizationId, userId, asAdmin = false) => {
   const { data, error } = await supabase.rpc('invite_to_organization', {
     p_organization_id: organizationId,
     p_user_id: userId,
+    p_as_admin: asAdmin,
   })
   if (error) throw error
   return data
