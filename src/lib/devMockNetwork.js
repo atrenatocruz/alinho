@@ -112,6 +112,26 @@ const RPC_MOCKS = {
     : []),
 }
 
+// localStorage.mockRotatingMix = 'true' — um Sobe e desce com parceiros
+// que trocam, a meio da ronda 2, para se ver o ecrã do mix em localhost
+// (Trello #262, parte B). 8 jogadores, 2 campos: na ronda 1 ganharam a+b
+// (campo 1) e e+f (campo 2); na ronda 2 as duplas já são outras.
+const ROT_PEOPLE = ['Ana Ribeiro', 'Bruno Sá', 'Carla Nunes', 'Duarte Lopes', 'Eva Matos', 'Filipe Reis', 'Gil Pinto', 'Helena Cruz']
+  .map((name, i) => ({ id: `rot-${i}`, name, avatar_url: null, preferred_side: 'both' }))
+const [ra, rb, rc, rd, re, rf, rg, rh] = ROT_PEOPLE
+const rotTeam = (id, p1, p2, seed) => ({ id, game_id: 'fake-game-1', player1_id: p1.id, player2_id: p2.id, player1: p1, player2: p2, seed_ranking: seed, created_at: new Date().toISOString() })
+const ROT_TEAMS = [
+  rotTeam('rt1', ra, rb, 2800), rotTeam('rt2', rc, rd, 2700), rotTeam('rt3', re, rf, 2600), rotTeam('rt4', rg, rh, 2500),
+  rotTeam('rt5', ra, re, 2700), rotTeam('rt6', rb, rf, 2700), rotTeam('rt7', rc, rg, 2600), rotTeam('rt8', rd, rh, 2600),
+]
+const ROT_MATCHES = [
+  { id: 'rm1', game_id: 'fake-game-1', round_number: 1, court_number: 1, phase: 'group', team_a_id: 'rt1', team_b_id: 'rt2', score_a: 6, score_b: 3, winner_team_id: 'rt1' },
+  { id: 'rm2', game_id: 'fake-game-1', round_number: 1, court_number: 2, phase: 'group', team_a_id: 'rt3', team_b_id: 'rt4', score_a: 6, score_b: 4, winner_team_id: 'rt3' },
+  { id: 'rm3', game_id: 'fake-game-1', round_number: 2, court_number: 1, phase: 'group', team_a_id: 'rt5', team_b_id: 'rt6', score_a: null, score_b: null, winner_team_id: null },
+  { id: 'rm4', game_id: 'fake-game-1', round_number: 2, court_number: 2, phase: 'group', team_a_id: 'rt7', team_b_id: 'rt8', score_a: null, score_b: null, winner_team_id: null },
+]
+const rotating = () => localStorage.getItem('mockRotatingMix') === 'true'
+
 const TABLE_MOCKS = {
   // A organização do Admin(Dev). Sem esta linha o separador Definições do
   // Gerir ficava em branco (loadSettings nunca recebia nada). Marcada como
@@ -127,16 +147,22 @@ const TABLE_MOCKS = {
   ],
   player_stats: () => [{ game_wins: 24, game_losses: 16, mix_wins: 3, mixes_played: 8, total_points: 120 }],
   mix_player_stats: () => [],
-  teams: () => [],
+  teams: () => (rotating() ? ROT_TEAMS : []),
+  matches: () => (rotating() ? ROT_MATCHES : []),
   // Mix em aberto — 1 dupla já confirmada, a segunda por preencher (2 de 4
   // lugares), para se ver o cartão no estado "aberto/junto-te" na Home.
   games: () => [{
+    ...(rotating() ? {
+      status: 'in_progress', rotate_partners: true, pairing_mode: 'aleatorio',
+      game_time_minutes: 20, court_time_minutes: 60, scoring_format: 'pontos_simples',
+      round_started_at: new Date().toISOString(), round_duration_minutes: 20,
+    } : {}),
     id: 'fake-game-1',
     organization_id: MOCK_ADMIN_ORG_ID,
     title: 'Mix de Quinta-feira',
     date: tomorrow8pm.toISOString(),
     location: 'Smash Padel Almada',
-    status: 'open',
+    status: rotating() ? 'in_progress' : 'open',
     format: 'sobe_desce',
     num_courts: 2,
     price_per_player: 8,

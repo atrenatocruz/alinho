@@ -261,6 +261,114 @@ export function nextSobeDesce(roundMatches, numCourts) {
     .sort((a, b) => a.court_number - b.court_number)
 }
 
+/** Sobe e desce com parceiros que trocam a cada ronda (Trello #262, parte B).
+    Decisões do Francisco, 16 set 2026:
+    - Cada um joga por si: quem ganha sobe um campo, quem perde desce um —
+      a pessoa, não a dupla (mesmas regras de campo do nextSobeDesce).
+    - Em cada campo, os 4 que lá chegam formam duplas novas. Das 3 formas
+      possíveis de os juntar, escolhe-se ao sorte uma em que ninguém repete
+      parceiro deste mix.
+    - Quando isso já não é possível (já jogaram todos com todos), junta-se
+      pela posição no mix: 1.º com 2.º, 3.º com 4.º.
+    O vencedor do mix continua a ser a dupla que ganha o campo 1 na última
+    ronda (computeMixWinnerTeamId) — aqui, os 2 jogadores dessa dupla.
+
+    roundMatches: jogos da ronda que acabou, com winner_team_id.
+    teamsById: equipas deste mix, com player1/player2.
+    partnerPairs: Set de "idA|idB" de todas as duplas já formadas no mix.
+    rankOf(player): posição atual no mix (0 = primeiro).
+    Devolve [{ court_number, duplaA: [p, p], duplaB: [p, p] }]. */
+export function nextSobeDesceRotating(roundMatches, teamsById, numCourts, { partnerPairs = new Set(), rankOf = () => 0, random = Math.random } = {}) {
+  const pairKey = (a, b) => [a?.id, b?.id].sort().join('|')
+  const byCourt = {}
+  for (const m of roundMatches) {
+    const winner = teamsById[m.winner_team_id]
+    const loserId = m.team_a_id === m.winner_team_id ? m.team_b_id : m.team_a_id
+    const loser = teamsById[loserId]
+    if (!winner || !loser) continue
+    const winnerCourt = Math.max(1, m.court_number - 1)
+    const loserCourt = Math.min(numCourts, m.court_number + 1)
+    ;(byCourt[winnerCourt] ||= []).push(winner.player1, winner.player2)
+    ;(byCourt[loserCourt] ||= []).push(loser.player1, loser.player2)
+  }
+
+  return Object.entries(byCourt)
+    .map(([court, players]) => {
+      const [a, b, c, d] = players
+      const options = [
+        [[a, b], [c, d]],
+        [[a, c], [b, d]],
+        [[a, d], [b, c]],
+      ]
+      const repeats = (opt) => opt.filter(([x, y]) => partnerPairs.has(pairKey(x, y))).length
+      const fresh = options.filter((opt) => repeats(opt) === 0)
+      let chosen
+      if (fresh.length > 0) {
+        chosen = fresh[Math.floor(random() * fresh.length)]
+      } else {
+        const byPosition = [...players].sort((x, y) => rankOf(x) - rankOf(y))
+        chosen = [[byPosition[0], byPosition[1]], [byPosition[2], byPosition[3]]]
+      }
+      return { court_number: Number(court), duplaA: chosen[0], duplaB: chosen[1] }
+    })
+    .sort((x, y) => x.court_number - y.court_number)
+}
+
+/** Placar do mix no Sobe e desce com parceiros que trocam (Francisco,
+    16 set 2026). Não é um ranking — não mexe em pontos de ninguém — é só a
+    ordem de quem está mais perto de ganhar, por isso segue a mesma lógica
+    do vencedor (campo 1 na última ronda):
+    1. campo do jogo mais recente de cada um (campo 1 primeiro);
+    2. dentro do campo, quem ganhou esse jogo (se já tem resultado);
+    3. vitórias no mix; 4. pontos de jogo marcados (só desempate, não se mostra).
+    Devolve [{ player, court, wins, played, points }]. */
+export function rotatingPlacar(matches, teams) {
+  const teamById = Object.fromEntries(teams.map((t) => [t.id, t]))
+  const table = {}
+  const rowFor = (player) => {
+    if (!player) return null
+    if (!table[player.id]) table[player.id] = { player, court: Infinity, lastRound: 0, wonLast: false, wins: 0, played: 0, points: 0 }
+    return table[player.id]
+  }
+  for (const m of matches) {
+    for (const [teamId, score] of [[m.team_a_id, m.score_a], [m.team_b_id, m.score_b]]) {
+      const team = teamById[teamId]
+      if (!team) continue
+      for (const player of [team.player1, team.player2]) {
+        const row = rowFor(player)
+        if (!row) continue
+        if (m.round_number > row.lastRound) {
+          row.lastRound = m.round_number
+          row.court = m.court_number
+          row.wonLast = !!m.winner_team_id && m.winner_team_id === teamId
+        }
+        if (m.winner_team_id) {
+          row.played += 1
+          row.points += score ?? 0
+          if (m.winner_team_id === teamId) row.wins += 1
+        }
+      }
+    }
+  }
+  return Object.values(table).sort((x, y) =>
+    x.court - y.court
+    || Number(y.wonLast) - Number(x.wonLast)
+    || y.wins - x.wins
+    || y.points - x.points)
+}
+
+/** Separa quem se inscreveu a dois: cada pessoa passa a contar como solo
+    confirmado (Sobe e desce com parceiros que trocam). */
+export function splitPartnerRows(participants = []) {
+  return participants
+    .filter((p) => p.status === 'confirmed')
+    .flatMap((p) => [
+      p.user ? { status: 'confirmed', user: p.user } : null,
+      p.partner ? { status: 'confirmed', user: p.partner } : null,
+    ])
+    .filter(Boolean)
+}
+
 /** Round-robin (circle method), one round at a time — the admin draws each
     round explicitly rather than the whole schedule being pre-generated.
     roundIndex is 0-based (0 = round 1). n teams = 2×courts, so every round

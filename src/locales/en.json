@@ -1488,5 +1488,17 @@
   "gerirclube.pairing_mode_equilibrado_help": "A stronger player with a weaker one, drawn each mix.",
   "gerirclube.pairing_mode_aleatorio_help": "Pairs are drawn at random, ignoring level.",
   "gerirclube.pairing_mode_fixed_note": "People who sign up with a partner always play together.",
-  "gerirclube.pairing_mode_americano_note": "In Americano this only sets round 1 — partners rotate after that."
+  "gerirclube.pairing_mode_americano_note": "In Americano this only sets round 1 — partners rotate after that.",
+  "gerirclube.rotate_partners_label": "Pairs during the mix",
+  "gerirclube.rotate_partners_fixed": "Fixed",
+  "gerirclube.rotate_partners_rotate": "Change every round",
+  "gerirclube.rotate_partners_fixed_help": "The pair moves up and down courts together for the whole mix.",
+  "gerirclube.rotate_partners_rotate_help": "Everyone plays for themselves: winners go up, losers go down, and each court forms new pairs without repeating a partner until everyone has played with everyone.",
+  "gerirclube.pairing_mode_rotate_note": "This sets round 1. People who sign up together are split up.",
+  "gamedetails.error_rotate_needs_multiple_of_4": "With rotating partners the mix needs a multiple of 4 confirmed players (now: {{count}}).",
+  "gamedetails.error_rotate_too_many_players": "With rotating partners, {{count}} players need more than {{courts}} courts — adjust the number of courts or reduce sign-ups.",
+  "gamedetails.rotating_partners_short": "rotating partners",
+  "gamedetails.placar_title": "Mix scoreboard",
+  "gamedetails.placar_hint": "Whoever wins court 1 in the last round wins the mix. Not a ranking — it only covers this mix.",
+  "gamedetails.placar_court": "Court {{number}}"
 }

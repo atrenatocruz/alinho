@@ -13,6 +13,7 @@ import PoolGroupStage from '../components/PoolGroupStage'
 import ScoreEntry from '../components/ScoreEntry'
 import {
   countPeople, totalRounds, formDuplas, seedCourts, nextSobeDesce,
+  nextSobeDesceRotating, splitPartnerRows, rotatingPlacar,
   roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches,
   PHASE_LABEL_KEY, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY,
   mixCapacity, isGenderMismatch, isMissingBirthday, isAgeIneligible, splitIntoPools,
@@ -851,8 +852,22 @@ export default function GameDetails() {
         )
       }
 
+      // Sobe e desce com parceiros que trocam (Trello #262, parte B): quem
+      // se inscreveu a dois é separado e cada um joga por si, por isso o nº
+      // de pessoas tem de fechar campos completos — como no Americano.
+      const rotating = game.format === 'sobe_desce' && !!game.rotate_partners
+      const pairingRows = rotating ? splitPartnerRows(participants) : participants
+      if (rotating) {
+        if (pairingRows.length < 4 || pairingRows.length % 4 !== 0) {
+          throw new Error(t('gamedetails.error_rotate_needs_multiple_of_4', { count: pairingRows.length }))
+        }
+        if (pairingRows.length / 4 > (game.num_courts || 1)) {
+          throw new Error(t('gamedetails.error_rotate_too_many_players', { count: pairingRows.length, courts: game.num_courts || 1 }))
+        }
+      }
+
       // 4.1 formação de duplas
-      const { duplas, forcedRepeats } = formDuplas(participants, pointsById, repeatPairKeys, { mode: game.pairing_mode || 'por_nivel' })
+      const { duplas, forcedRepeats } = formDuplas(pairingRows, pointsById, repeatPairKeys, { mode: game.pairing_mode || 'por_nivel' })
       if (duplas.length < 2) throw new Error(t('gamedetails.error_need_two_duplas'))
       if (forcedRepeats.length > 0) {
         const pairsList = forcedRepeats
@@ -1149,6 +1164,10 @@ export default function GameDetails() {
   const isSobeDesce = (game?.format || 'sobe_desce') === 'sobe_desce'
   const isGruposEliminatorias = game?.format === 'grupos_eliminatorias'
   const isAmericano = game?.format === 'americano'
+  // Sobe e desce com parceiros que trocam: ecrã como o do Americano
+  // (classificação por jogador, sem lista fixa de duplas).
+  const isRotating = isSobeDesce && !!game?.rotate_partners
+  const showIndividualStandings = isAmericano || isRotating
   const groupRounds = isSobeDesce ? roundsTotal : Math.min(Math.max(teams.length - 1, 1), roundsTotal)
   // grupos_eliminatorias never uses this flat single-group derivation —
   // its group phase is entirely owned by PoolGroupStage (rendered instead
@@ -1199,7 +1218,36 @@ export default function GameDetails() {
     setMixError('')
     try {
       let rows, phase
-      if (inGroupPhase) {
+      if (inGroupPhase && isRotating) {
+        // Duplas novas em cada campo — nextSobeDesceRotating decide quem
+        // sobe/desce e com quem joga; aqui só se gravam as equipas desta
+        // ronda e os jogos que as usam.
+        phase = 'group'
+        const teamsById = Object.fromEntries(teams.map((team) => [team.id, team]))
+        const partnerPairs = new Set(teams.map((team) => [team.player1_id, team.player2_id].sort().join('|')))
+        // "Posição no mix" = a mesma ordem do Placar do mix.
+        const positions = rotatingPlacar(matches, teams).map((s) => s.player.id)
+        const rankOf = (player) => {
+          const i = positions.indexOf(player?.id)
+          return i === -1 ? positions.length : i
+        }
+        const globalRankings = await getGlobalRankings()
+        const pointsById = Object.fromEntries(globalRankings.map(r => [r.user_id, Math.round(r.rating || 0)]))
+        const courts = nextSobeDesceRotating(currentRoundMatches, teamsById, numCourts, { partnerPairs, rankOf })
+        const teamRows = courts.flatMap((c) => [c.duplaA, c.duplaB]).map(([p1, p2]) => ({
+          game_id: id,
+          player1_id: p1.id,
+          player2_id: p2.id,
+          seed_ranking: (pointsById[p1.id] ?? 0) + (pointsById[p2.id] ?? 0),
+        }))
+        const { data: insertedTeams, error: teamsError } = await supabase.from('teams').insert(teamRows).select()
+        if (teamsError) throw teamsError
+        rows = courts.map((c, i) => ({
+          court_number: c.court_number,
+          team_a_id: insertedTeams[i * 2].id,
+          team_b_id: insertedTeams[i * 2 + 1].id,
+        }))
+      } else if (inGroupPhase) {
         phase = 'group'
         rows = isSobeDesce
           ? nextSobeDesce(currentRoundMatches, numCourts)
@@ -1507,6 +1555,7 @@ export default function GameDetails() {
   const rounds = [...new Set(matches.map(m => m.round_number))].sort((a, b) => a - b)
   const tctStandings = !isSobeDesce && teams.length ? standings(teams, matches) : []
   const americanoStandingsResult = isAmericano && teams.length ? americanoStandings(matches, teams) : []
+  const placarResult = isRotating && teams.length ? rotatingPlacar(matches, teams) : []
 
   // Top duplas for the results share card — combined points of both players
   // in the pair, from the same per-player mixStats the leaderboard above
@@ -1701,7 +1750,7 @@ export default function GameDetails() {
           <div className="flex items-center gap-2.5">
             <Swords size={20} className="text-ink-700 shrink-0" />
             <span>
-              {(FORMAT_LABEL_KEY[game.format] ? t(FORMAT_LABEL_KEY[game.format]) : t('gamedetails.sobe_desce_label'))} • {t('gamedetails.court_count', { count: numCourts })} • {t('gamedetails.rounds_duration', { count: roundsTotal, minutes: game.game_time_minutes || 20 })}
+              {(FORMAT_LABEL_KEY[game.format] ? t(FORMAT_LABEL_KEY[game.format]) : t('gamedetails.sobe_desce_label'))}{isRotating ? ` (${t('gamedetails.rotating_partners_short')})` : ''} • {t('gamedetails.court_count', { count: numCourts })} • {t('gamedetails.rounds_duration', { count: roundsTotal, minutes: game.game_time_minutes || 20 })}
               {game.gender_restriction && game.gender_restriction !== 'indiferente' && (
                 <> • {t(GENDER_RESTRICTION_LABEL_KEY[game.gender_restriction])}</>
               )}
@@ -1840,7 +1889,7 @@ export default function GameDetails() {
             { key: 'stats', label: t('gamedetails.tab_stats') },
             { key: 'duplas', label: t('gamedetails.tab_duplas') },
             { key: 'rondas', label: t('gamedetails.tab_rondas') },
-          ].filter((tab) => !(isAmericano && tab.key === 'duplas')).map((tab) => (
+          ].filter((tab) => !(showIndividualStandings && tab.key === 'duplas')).map((tab) => (
             <button
               key={tab.key}
               onClick={() => setFinishedTab(tab.key)}
@@ -1937,7 +1986,7 @@ export default function GameDetails() {
           {game.status === 'in_progress' && (
             <>
           {/* Duplas */}
-          {!isAmericano && (
+          {!showIndividualStandings && (
           <div id="mix-duplas" className="card scroll-mt-24">
             <div
               className="flex items-center justify-between mb-3 cursor-pointer"
@@ -2133,6 +2182,23 @@ export default function GameDetails() {
             />
           )}
 
+          {isRotating && placarResult.length > 0 && (
+            <div className="card">
+              <h3 className="text-lg text-ink-900">{t('gamedetails.placar_title')}</h3>
+              <p className="text-sm text-muted mb-3">{t('gamedetails.placar_hint')}</p>
+              <div className="space-y-1.5">
+                {placarResult.map((s, i) => (
+                  <div key={s.player.id} className="flex items-center gap-3 text-sm py-1.5 border-b border-line last:border-0">
+                    <span className="w-6 font-extrabold text-ink-900 tabular-nums">{i + 1}</span>
+                    <span className="flex-1 font-extrabold text-ink-900 truncate">{s.player.name}</span>
+                    <span className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('gamedetails.placar_court', { number: s.court })}</span>
+                    <span className="text-muted tabular-nums w-10 text-right" title={t('gamedetails.wins_title')}>{s.wins}{t('gamedetails.wins_abbrev')}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {isAmericano && americanoStandingsResult.length > 0 && (
             <div className="card">
               <h3 className="text-lg text-ink-900 mb-3">{t('gamedetails.americano_ranking_title')}</h3>
@@ -2265,7 +2331,7 @@ export default function GameDetails() {
               court assignment stopped mattering once the mix ended. */}
           {game.status === 'finished' && (
             <>
-              {finishedTab === 'duplas' && !isAmericano && teams.length > 0 && (
+              {finishedTab === 'duplas' && !showIndividualStandings && teams.length > 0 && (
                 <div className="card">
                   <h3 className="text-lg text-ink-900 mb-3">{t('gamedetails.duplas')}</h3>
                   <div className="space-y-2">
@@ -2310,6 +2376,23 @@ export default function GameDetails() {
                       onAllPoolsComplete={handleAllPoolsComplete}
                     />
                   )}
+
+                  {isRotating && placarResult.length > 0 && (
+                        <div className="card">
+                          <h3 className="text-lg text-ink-900">{t('gamedetails.placar_title')}</h3>
+                          <p className="text-sm text-muted mb-3">{t('gamedetails.placar_hint')}</p>
+                          <div className="space-y-1.5">
+                            {placarResult.map((s, i) => (
+                              <div key={s.player.id} className="flex items-center gap-3 text-sm py-1.5 border-b border-line last:border-0">
+                                <span className="w-6 font-extrabold text-ink-900 tabular-nums">{i + 1}</span>
+                                <span className="flex-1 font-extrabold text-ink-900 truncate">{s.player.name}</span>
+                                <span className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('gamedetails.placar_court', { number: s.court })}</span>
+                                <span className="text-muted tabular-nums w-10 text-right" title={t('gamedetails.wins_title')}>{s.wins}{t('gamedetails.wins_abbrev')}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
                   {isAmericano && americanoStandingsResult.length > 0 && (
                     <div className="card">

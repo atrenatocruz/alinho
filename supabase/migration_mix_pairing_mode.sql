@@ -1,5 +1,5 @@
 -- ════════════════════════════════════════════════════════════════════════
--- Migration: como se juntam as duplas de um mix (Trello #262, parte A)
+-- Migration: como se juntam as duplas de um mix (Trello #262, partes A e B)
 --
 -- Decisão do Francisco, 15–16 set 2026: quem cria o mix escolhe como se
 -- juntam as duplas de quem se inscreve sozinho:
@@ -9,6 +9,12 @@
 --   aleatorio   — sorteio
 -- A lógica vive em src/lib/mixLogic.js (formDuplas). A regra do Renato de
 -- não repetir pares dos últimos 4 mixes vale nos três modos.
+--
+-- Parte B (16 set): no Sobe e desce, os parceiros podem trocar a cada
+-- ronda — games.rotate_partners. Cada um joga por si e sobe/desce de campo
+-- sozinho; a lógica vive em nextSobeDesceRotating (mixLogic.js). Não precisa
+-- de mudanças em finalize_mix nem no Elo: ambos já contam por jogador, jogo
+-- a jogo, e aceitam várias equipas por jogador (como o Americano).
 --
 -- Sem dependências de outras migrações por correr. Mixes que já existem
 -- ficam em 'por_nivel' — nada muda para ninguém até alguém escolher outro.
@@ -33,8 +39,19 @@ ALTER TABLE game_recurrences DROP CONSTRAINT IF EXISTS game_recurrences_pairing_
 ALTER TABLE game_recurrences ADD CONSTRAINT game_recurrences_pairing_mode_check
   CHECK (pairing_mode IN ('por_nivel', 'equilibrado', 'aleatorio'));
 
+-- ── 1b. Parceiros que trocam a cada ronda — só existe no Sobe e desce ─────
+ALTER TABLE games
+  ADD COLUMN IF NOT EXISTS rotate_partners BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE games DROP CONSTRAINT IF EXISTS games_rotate_partners_format_check;
+ALTER TABLE games ADD CONSTRAINT games_rotate_partners_format_check
+  CHECK (NOT rotate_partners OR format = 'sobe_desce');
+
+ALTER TABLE game_recurrences
+  ADD COLUMN IF NOT EXISTS rotate_partners BOOLEAN NOT NULL DEFAULT FALSE;
+
 -- ── 2. process_due_game_recurrences — a versão mais recente é a de
---       migration_vouchers.sql. Igual, mais pairing_mode copiado do molde,
+--       migration_vouchers.sql. Igual, mais pairing_mode e rotate_partners
+--       copiados do molde,
 --       para os mixes seguintes de uma série manterem o modo escolhido. ──
 CREATE OR REPLACE FUNCTION process_due_game_recurrences()
 RETURNS void
@@ -80,13 +97,13 @@ BEGIN
     INSERT INTO games (
       organization_id, title, date, location, price_per_player, prize, has_voucher,
       num_courts, max_players, court_time_minutes, game_time_minutes, format,
-      gender_restriction, auto_start_hours_before, level, pairing_mode,
+      gender_restriction, auto_start_hours_before, level, pairing_mode, rotate_partners,
       status, created_by, recurrence_id, is_recurrence_origin, launch_at
     )
     VALUES (
       rec.organization_id, rec.title, v_new_date, rec.location, rec.price_per_player, rec.prize, rec.has_voucher,
       rec.num_courts, rec.num_courts * 4, rec.court_time_minutes, rec.game_time_minutes, rec.format,
-      rec.gender_restriction, rec.auto_start_hours_before, rec.level, rec.pairing_mode,
+      rec.gender_restriction, rec.auto_start_hours_before, rec.level, rec.pairing_mode, rec.rotate_partners,
       'pending', rec.created_by, rec.id, false,
       v_new_date - make_interval(secs => rec.mix_offset_seconds)
     )

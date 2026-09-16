@@ -1488,5 +1488,17 @@
   "gerirclube.pairing_mode_equilibrado_help": "Um jogador mais forte com um mais fraco, sorteados a cada mix.",
   "gerirclube.pairing_mode_aleatorio_help": "Duplas sorteadas, sem olhar ao nível.",
   "gerirclube.pairing_mode_fixed_note": "Quem se inscreve com parceiro joga sempre junto.",
-  "gerirclube.pairing_mode_americano_note": "No Americano isto decide só a 1.ª ronda — depois os parceiros trocam."
+  "gerirclube.pairing_mode_americano_note": "No Americano isto decide só a 1.ª ronda — depois os parceiros trocam.",
+  "gerirclube.rotate_partners_label": "Duplas durante o mix",
+  "gerirclube.rotate_partners_fixed": "Fixas",
+  "gerirclube.rotate_partners_rotate": "Trocam a cada ronda",
+  "gerirclube.rotate_partners_fixed_help": "A dupla sobe e desce de campo junta o mix todo.",
+  "gerirclube.rotate_partners_rotate_help": "Cada um joga por si: quem ganha sobe, quem perde desce, e em cada campo formam-se duplas novas sem repetir parceiro até todos terem jogado com todos.",
+  "gerirclube.pairing_mode_rotate_note": "Isto decide a 1.ª ronda. Quem se inscreve a dois é separado.",
+  "gamedetails.error_rotate_needs_multiple_of_4": "Com parceiros que trocam, o mix precisa de um múltiplo de 4 jogadores confirmados (agora: {{count}}).",
+  "gamedetails.error_rotate_too_many_players": "Com parceiros que trocam, {{count}} jogadores precisam de mais do que {{courts}} campos — ajusta o número de campos ou reduz os inscritos.",
+  "gamedetails.rotating_partners_short": "parceiros trocam",
+  "gamedetails.placar_title": "Placar do mix",
+  "gamedetails.placar_hint": "Ganha o mix quem vencer o campo 1 na última ronda. Não conta para o ranking — é só deste mix.",
+  "gamedetails.placar_court": "Campo {{number}}"
 }

@@ -4,6 +4,7 @@ import {
   poolRoundNumbers, poolRoundsPlayed, roundRobinRound,
   generateAmericanoSchedule, americanoStandings,
   computeMixWinnerTeamId, formDuplas,
+  nextSobeDesceRotating, splitPartnerRows, rotatingPlacar,
 } from './mixLogic'
 
 describe('splitIntoPools', () => {
@@ -477,5 +478,127 @@ describe('formDuplas', () => {
     expect(duplas).toHaveLength(2)
     expect(duplas.some((d) => d.player1.id === 'x' && d.player2.id === 'y')).toBe(true)
     expect(forcedRepeats).toEqual([])
+  })
+})
+
+
+describe('nextSobeDesceRotating', () => {
+  const p = (id) => ({ id, name: id })
+  const key = (a, b) => [a, b].sort().join('|')
+  const seeded = (seed) => () => {
+    seed = (seed * 16807) % 2147483647
+    return (seed - 1) / 2147483646
+  }
+  // 2 campos, 8 jogadores. Campo 1: (a,b) vence (c,d). Campo 2: (e,f) vence (g,h).
+  const teams = {
+    t1: { id: 't1', player1: p('a'), player2: p('b') },
+    t2: { id: 't2', player1: p('c'), player2: p('d') },
+    t3: { id: 't3', player1: p('e'), player2: p('f') },
+    t4: { id: 't4', player1: p('g'), player2: p('h') },
+  }
+  const round1 = [
+    { court_number: 1, team_a_id: 't1', team_b_id: 't2', winner_team_id: 't1' },
+    { court_number: 2, team_a_id: 't3', team_b_id: 't4', winner_team_id: 't3' },
+  ]
+  const playedPairs = new Set([key('a', 'b'), key('c', 'd'), key('e', 'f'), key('g', 'h')])
+  const idsOn = (court) => [...court.duplaA, ...court.duplaB].map((x) => x.id).sort()
+
+  it('sobe e desce por pessoa: vencedores do campo 2 sobem, vencidos do campo 1 descem', () => {
+    const [c1, c2] = nextSobeDesceRotating(round1, teams, 2, { partnerPairs: playedPairs, random: seeded(1) })
+    expect(c1.court_number).toBe(1)
+    expect(idsOn(c1)).toEqual(['a', 'b', 'e', 'f'])
+    expect(c2.court_number).toBe(2)
+    expect(idsOn(c2)).toEqual(['c', 'd', 'g', 'h'])
+  })
+
+  it('forma duplas novas sem repetir parceiros deste mix', () => {
+    for (const seed of [1, 2, 3, 10, 77]) {
+      const courts = nextSobeDesceRotating(round1, teams, 2, { partnerPairs: playedPairs, random: seeded(seed) })
+      for (const court of courts) {
+        for (const [x, y] of [court.duplaA, court.duplaB]) {
+          expect(playedPairs.has(key(x.id, y.id))).toBe(false)
+        }
+      }
+    }
+  })
+
+  it('escolhe ao sorte entre as formas sem repetição', () => {
+    const vistas = new Set()
+    // Valores de sorteio espalhados de 0 a 1 — cobre as duas formas possíveis.
+    for (const r of [0.05, 0.3, 0.55, 0.8, 0.95]) {
+      const [c1] = nextSobeDesceRotating(round1, teams, 2, { partnerPairs: playedPairs, random: () => r })
+      vistas.add([c1.duplaA, c1.duplaB].map(([x, y]) => key(x.id, y.id)).sort().join(','))
+    }
+    expect(vistas.size).toBe(2)
+  })
+
+  it('quando todos já jogaram com todos, junta pela posição no mix (1.º com 2.º)', () => {
+    const everyone = new Set([key('a', 'b'), key('a', 'e'), key('a', 'f'), key('b', 'e'), key('b', 'f'), key('e', 'f'),
+      key('c', 'd'), key('c', 'g'), key('c', 'h'), key('d', 'g'), key('d', 'h'), key('g', 'h')])
+    const order = ['f', 'a', 'e', 'b', 'h', 'c', 'g', 'd']
+    const rankOf = (x) => order.indexOf(x.id)
+    const [c1, c2] = nextSobeDesceRotating(round1, teams, 2, { partnerPairs: everyone, rankOf, random: seeded(4) })
+    expect(c1.duplaA.map((x) => x.id)).toEqual(['f', 'a'])
+    expect(c1.duplaB.map((x) => x.id)).toEqual(['e', 'b'])
+    expect(c2.duplaA.map((x) => x.id)).toEqual(['h', 'c'])
+    expect(c2.duplaB.map((x) => x.id)).toEqual(['g', 'd'])
+  })
+
+  it('com 1 campo, os 4 ficam e trocam de parceiro', () => {
+    const single = { t1: teams.t1, t2: teams.t2 }
+    const [c1] = nextSobeDesceRotating([round1[0]], single, 1, { partnerPairs: new Set([key('a', 'b'), key('c', 'd')]), random: seeded(9) })
+    expect(idsOn(c1)).toEqual(['a', 'b', 'c', 'd'])
+    for (const [x, y] of [c1.duplaA, c1.duplaB]) {
+      expect([key('a', 'b'), key('c', 'd')]).not.toContain(key(x.id, y.id))
+    }
+  })
+})
+
+describe('splitPartnerRows', () => {
+  it('quem se inscreveu a dois passa a contar como dois solos', () => {
+    const rows = [
+      { status: 'confirmed', user: { id: 'x' }, partner_id: 'y', partner: { id: 'y' } },
+      { status: 'confirmed', user: { id: 'z' } },
+      { status: 'waitlist', user: { id: 'w' } },
+    ]
+    const out = splitPartnerRows(rows)
+    expect(out.map((r) => r.user.id)).toEqual(['x', 'y', 'z'])
+    expect(out.every((r) => r.status === 'confirmed' && !r.partner)).toBe(true)
+  })
+})
+
+
+describe('rotatingPlacar', () => {
+  const p = (id) => ({ id, name: id })
+  const team = (id, a, b) => ({ id, player1: p(a), player2: p(b) })
+  const teams = [
+    team('r1a', 'a', 'b'), team('r1b', 'c', 'd'), team('r1c', 'e', 'f'), team('r1d', 'g', 'h'),
+    team('r2a', 'a', 'e'), team('r2b', 'b', 'f'), team('r2c', 'c', 'g'), team('r2d', 'd', 'h'),
+  ]
+  const round1 = [
+    // no campo 2 marcam-se mais pontos (6-0) do que no campo 1 (6-5)
+    { round_number: 1, court_number: 1, team_a_id: 'r1a', team_b_id: 'r1b', score_a: 6, score_b: 5, winner_team_id: 'r1a' },
+    { round_number: 1, court_number: 2, team_a_id: 'r1c', team_b_id: 'r1d', score_a: 6, score_b: 0, winner_team_id: 'r1c' },
+  ]
+  const round2Pending = [
+    { round_number: 2, court_number: 1, team_a_id: 'r2a', team_b_id: 'r2b', score_a: null, score_b: null, winner_team_id: null },
+    { round_number: 2, court_number: 2, team_a_id: 'r2c', team_b_id: 'r2d', score_a: null, score_b: null, winner_team_id: null },
+  ]
+
+  it('quem está no campo 1 vem primeiro, mesmo tendo marcado menos pontos', () => {
+    const placar = rotatingPlacar([...round1, ...round2Pending], teams)
+    expect(placar.slice(0, 4).map((r) => r.court)).toEqual([1, 1, 1, 1])
+    expect(placar.slice(0, 4).map((r) => r.player.id).sort()).toEqual(['a', 'b', 'e', 'f'])
+    expect(placar.slice(4).map((r) => r.player.id).sort()).toEqual(['c', 'd', 'g', 'h'])
+  })
+
+  it('no fim, os 2 que ganharam o campo 1 na última ronda ficam em 1.º e 2.º', () => {
+    const round2Done = [
+      { ...round2Pending[0], score_a: 4, score_b: 6, winner_team_id: 'r2b' },
+      { ...round2Pending[1], score_a: 6, score_b: 1, winner_team_id: 'r2c' },
+    ]
+    const placar = rotatingPlacar([...round1, ...round2Done], teams)
+    expect(placar.slice(0, 2).map((r) => r.player.id).sort()).toEqual(['b', 'f'])
+    expect(placar.find((r) => r.player.id === 'b').wins).toBe(2)
   })
 })
