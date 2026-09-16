@@ -8,6 +8,7 @@ import { Avatar, EmptyState, PrimaryButton, OrgKindBadge, PlanBadge, orgAvatarSh
 import PlayerSearch from '../components/PlayerSearch'
 import { searchAnyPlayer, createOrganization, createGroup } from '../lib/platformAdmin'
 import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
+import { describeError } from '../lib/errors'
 
 const sanitizeSlug = (value) => value.toLowerCase().replace(/[^a-z0-9-]/g, '')
 
@@ -105,9 +106,9 @@ export default function Gerir() {
       console.error('Error creating organization:', err)
       const message = err?.message || ''
       if (message.toLowerCase().includes('duplicate key value violates unique constraint') || message.toLowerCase().includes('slug')) {
-        setError(t('gerir.error_duplicate_slug'))
+        setError(describeError(t, err, 'gerir.error_duplicate_slug'))
       } else {
-        setError(t('gerir.error_create_club'))
+        setError(describeError(t, err, 'gerir.error_create_club'))
       }
     } finally {
       setSaving(false)

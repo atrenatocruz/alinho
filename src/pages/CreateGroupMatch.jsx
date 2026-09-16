@@ -9,6 +9,7 @@ import { listOrganizationMembers } from '../lib/clubProfile'
 import { createGroupMatch } from '../lib/groupMatches'
 import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
 import { DateField, Select, PrimaryButton } from '../components/ui'
+import { describeError } from '../lib/errors'
 
 /* Segmented tab selector — same pattern as GerirClube.jsx's own Segmented,
    duplicated locally rather than shared since it's a few lines and this
@@ -103,7 +104,7 @@ export default function CreateGroupMatch() {
       navigate(`/clube/${slug}/jogos`, { state: { createdMatchId: matchId } })
     } catch (err) {
       console.error('Error creating group match:', err)
-      setError(t('creategroupmatch.error_create') + (err.message || ''))
+      setError(describeError(t, err, 'creategroupmatch.error_create'))
     } finally {
       setSaving(false)
     }

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton } from '../components/ui'
 import { Wordmark } from '../components/Layout'
+import { describeError } from '../lib/errors'
 
 export default function ForgotPassword() {
   const { t } = useTranslation()
@@ -26,7 +27,7 @@ export default function ForgotPassword() {
       if (error) throw error
       setSent(true)
     } catch (err) {
-      setError(err.message || t('login.forgot_password_error'))
+      setError(describeError(t, err, 'login.forgot_password_error'))
     } finally {
       setLoading(false)
     }

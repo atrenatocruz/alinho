@@ -17,6 +17,7 @@ import { AGE_LABEL_KEY, ageCategory } from '../lib/ageCategories'
 import { XP_TIERS, tierFromXp, preTierProgress, formatXp } from '../lib/xp'
 import { formatDate as formatDateLib } from '../lib/formatDate'
 import { sortVouchersForWallet } from '../lib/vouchers'
+import { describeError } from '../lib/errors'
 
 const TABS = [
   { key: 'perfil', labelKey: 'profile.tab_profile' },
@@ -214,7 +215,7 @@ export default function Profile() {
     const { error } = await supabase.rpc('mark_voucher_used', { p_voucher_id: voucherId })
     if (error) {
       console.error('Error marking voucher used:', error)
-      alert(t('profile.voucher_error_mark_used'))
+      alert(describeError(t, error, 'profile.voucher_error_mark_used'))
       return
     }
     setVouchers((prev) => prev.map((v) => (
@@ -333,7 +334,7 @@ export default function Profile() {
       if (error) throw error
     } catch (error) {
       console.error('Error uploading photo:', error)
-      setPhotoError(t('profile.error_upload_photo'))
+      setPhotoError(describeError(t, error, 'profile.error_upload_photo'))
     } finally {
       setUploadingPhoto(false)
     }
@@ -348,7 +349,7 @@ export default function Profile() {
       if (error) throw error
     } catch (error) {
       console.error('Error removing photo:', error)
-      setPhotoError(t('profile.error_remove_photo'))
+      setPhotoError(describeError(t, error, 'profile.error_remove_photo'))
     } finally {
       setUploadingPhoto(false)
     }
@@ -398,7 +399,7 @@ export default function Profile() {
       setTimeout(() => setSaved(false), 2000)
     } catch (error) {
       console.error('Error updating profile:', error)
-      alert(t('profile.error_update_profile'))
+      alert(describeError(t, error, 'profile.error_update_profile'))
     } finally {
       setLoading(false)
     }

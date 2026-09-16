@@ -7,6 +7,7 @@ import { PrimaryButton, DateField, Select } from '../components/ui'
 import { Wordmark } from '../components/Layout'
 import { hashPhone } from '../lib/hashPhone'
 import i18n from '../lib/i18n'
+import { describeError } from '../lib/errors'
 
 // Same pattern as Layout.jsx's header toggle, minus the profile persistence
 // (there's no profile yet pre-auth) — just the instant UI flip plus a
@@ -100,7 +101,7 @@ export default function Login() {
       if (error) throw error
     } catch (err) {
       console.error('Google sign-in error:', err)
-      setGoogleError(t('login.google_error'))
+      setGoogleError(describeError(t, err, 'login.google_error'))
       setGoogleLoading(false)
     }
   }
@@ -128,7 +129,7 @@ export default function Login() {
       if (error) throw error
       navigate(redirectTo)
     } catch (err) {
-      setError(err.message || t('login.error_invalid_email_password'))
+      setError(describeError(t, err, 'login.error_invalid_email_password'))
     } finally {
       setLoading(false)
     }
@@ -201,7 +202,7 @@ export default function Login() {
 
       navigate(redirectTo)
     } catch (err) {
-      setError(err.message || t('login.error_signup_failed'))
+      setError(describeError(t, err, 'login.error_signup_failed'))
     } finally {
       setLoading(false)
     }

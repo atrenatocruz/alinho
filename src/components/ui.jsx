@@ -12,6 +12,7 @@ import { formatDate, formatTime, formatCurrency } from '../lib/formatDate'
 import { FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, mixCapacity } from '../lib/mixLogic'
 import { AGE_LABEL_KEY } from '../lib/ageCategories'
 import { listFollowers, listFollowing } from '../lib/follows'
+import { describeError } from '../lib/errors'
 
 /* ─── Date fields ────────────────────────────────────────────────────────
    Native <input type=date/datetime-local> pickers open reliably on iOS
@@ -1251,7 +1252,7 @@ export function ShareModal({ title, message, url, onClose, imageCard }) {
       }
     } catch (error) {
       console.error('Error generating share image:', error)
-      setImageError(t('ui.image_generation_error'))
+      setImageError(describeError(t, error, 'ui.image_generation_error'))
     } finally {
       setGeneratingImage(false)
     }

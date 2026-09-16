@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton } from '../components/ui'
 import { Wordmark } from '../components/Layout'
+import { describeError } from '../lib/errors'
 
 // Bumping this later (an actual policy change) would need a matching
 // re-consent flow — out of scope for this initial version (see spec).
@@ -38,7 +39,7 @@ export default function ConsentGate() {
       await refreshMemberships()
     } catch (err) {
       console.error('Error completing privacy consent:', err)
-      setError(t('consentgate.error_retry'))
+      setError(describeError(t, err, 'consentgate.error_retry'))
       setSaving(false)
     }
   }
