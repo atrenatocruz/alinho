@@ -1412,7 +1412,7 @@
   "landing.plan_club_f2": "Aulas e professores",
   "landing.plan_club_f3": "Reservas de campos",
   "landing.plan_club_f4": "Pagamentos na app",
-  "plans.limit_mix": "Chegaste ao limite do plano {{plan}}: {{mixes}} mixes em aberto ao mesmo tempo e {{courts}} campos por mix.",
+  "plans.limit_mix": "Chegaste ao limite do plano {{plan}}: {{count}} mix em aberto de cada vez e {{courts}} campos por mix.",
   "plans.limit_members": "Chegaste ao limite do plano {{plan}}: {{members}} membros.",
   "plans.next_plan_mix": "O plano {{next}} dá mais mixes ao mesmo tempo e mais campos.",
   "plans.next_plan_members": "O plano {{next}} permite mais membros.",
@@ -1425,5 +1425,6 @@
   "clubprofile.jogos_heading_group": "Jogos entre amigos",
   "clubprofile.jogos_link_group": "Ver jogos entre amigos",
   "groupmatches.title_group": "Jogos entre amigos",
-  "groupmatches.create_button_group": "Criar ou registar jogo"
+  "groupmatches.create_button_group": "Criar ou registar jogo",
+  "plans.limit_mix_other": "Chegaste ao limite do plano {{plan}}: {{count}} mixes em aberto ao mesmo tempo e {{courts}} campos por mix."
 }

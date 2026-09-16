@@ -6,17 +6,15 @@
    internas (free/plus/pro/club) são as de `organizations.plan_tier` e não
    mudam. Os nomes são nomes de produto e não se traduzem.
 
-   IMPORTANTE — dois conjuntos de limites, de propósito:
-   • PLAN_LIMITS é o que ficou DECIDIDO (Trello #264) e ainda NÃO está
-     aplicado na base de dados.
-   • ENFORCED_LIMITS é o que a base de dados aplica hoje a qualquer grupo
-     criado na Comunidade, seja qual for o plano: caps fixos das políticas
-     RLS (migration_self_serve_groups.sql + migration_fix_games_policy_
-     recursion.sql).
-   As mensagens usam ENFORCED_LIMITS, para nunca dizerem um número
-   diferente daquele que a app está mesmo a aplicar. Quando os limites por
-   plano entrarem, passa-se `limitsFor()` a ler PLAN_LIMITS e as mensagens
-   acompanham sem se lhes tocar.                                          */
+   Os limites vivem em PLAN_LIMITS e são os mesmos que a base de dados
+   aplica em supabase/migration_plan_limits.sql (plan_limits()) — se um
+   mudar, o outro tem de mudar com ele. null = sem limite.
+
+   ENFORCED_LIMITS fica como registo do que era aplicado antes dos limites
+   por plano (caps fixos dos grupos criados na Comunidade: 30 membros, 3
+   mixes, 4 campos) e serve de recurso enquanto a migração não estiver
+   corrida — sem plan_tier na base de dados, `plan_tier` chega vazio e
+   limitsFor() devolve o Free.                                            */
 
 export const PLAN_TIERS = ['free', 'plus', 'pro', 'club']
 export const PLAN_NAMES = { free: 'Free', plus: 'Squad', pro: 'Community', club: 'Club' }
@@ -28,7 +26,7 @@ export const nextPlanTier = (tier) => {
   return i >= 0 && i < PLAN_TIERS.length - 1 ? PLAN_TIERS[i + 1] : null
 }
 
-/** Decidido (Trello #264) — ainda não aplicado. null = sem limite. */
+/** Espelho de plan_limits() em migration_plan_limits.sql. null = sem limite. */
 export const PLAN_LIMITS = {
   free: { members: 30, activeMixes: 1, courts: 2 },
   plus: { members: 300, activeMixes: 2, courts: 4 },
@@ -36,19 +34,23 @@ export const PLAN_LIMITS = {
   club: { members: null, activeMixes: null, courts: null },
 }
 
-/** O que as políticas RLS aplicam hoje aos grupos criados na Comunidade. */
+/** O que se aplicava antes dos limites por plano (registo histórico). */
 export const ENFORCED_LIMITS = { members: 30, activeMixes: 3, courts: 4 }
 
-export const limitsFor = () => ENFORCED_LIMITS
+export const limitsFor = (planTier) => PLAN_LIMITS[planTier] || PLAN_LIMITS.free
 
 /** Mensagem para quem gere o grupo: onde bateu, em que plano está e o que o
     plano seguinte dá. `kind` é 'mix' ou 'members'. */
 export function planLimitMessage(t, kind, planTier) {
   const limits = limitsFor(planTier)
   const next = nextPlanTier(planTier)
+  // Plano sem limites: o erro veio de outra coisa qualquer — quem chama
+  // mostra a mensagem de erro normal em vez de inventar um limite.
+  if (kind === 'members' ? limits.members == null : limits.activeMixes == null) return null
   const main = kind === 'members'
     ? t('plans.limit_members', { plan: planName(planTier), members: limits.members })
-    : t('plans.limit_mix', { plan: planName(planTier), mixes: limits.activeMixes, courts: limits.courts })
+    // count pluraliza "mix/mixes" (convenção _other do resto dos locales).
+    : t('plans.limit_mix', { count: limits.activeMixes, plan: planName(planTier), courts: limits.courts })
   if (!next) return main
   const hint = kind === 'members'
     ? t('plans.next_plan_members', { next: planName(next) })

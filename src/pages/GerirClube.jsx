@@ -12,7 +12,7 @@ import { listClubGroups, getOrganizationDeleteBlocker, deleteSelfServeGroup, tra
 import { formatRating } from '../lib/elo'
 import { formatDate as formatDateLib, formatTime as formatTimeLib } from '../lib/formatDate'
 import { DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal, OrgKindBadge, PlanBadge, PLAN_TIERS, planName } from '../components/ui'
-import { planLimitMessage, isMixLimitError, isMemberLimitError } from '../lib/plans'
+import { planLimitMessage, isMixLimitError, isMemberLimitError, limitsFor } from '../lib/plans'
 import { totalRounds, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, SCORING_FORMAT_LABEL_KEY } from '../lib/mixLogic'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
 import { AGE_RESTRICTIONS } from '../lib/ageCategories'
@@ -433,9 +433,8 @@ export default function GerirClube() {
       await Promise.all([loadClubGroups(), loadExpandedGroupDetails(groupId)])
     } catch (error) {
       console.error('Error approving group request:', error)
-      setMembersError(isMemberLimitError(error?.message || '')
-        ? planLimitMessage(t, 'members', org?.plan_tier)
-        : t('gerirclube.error_approve_request') + error.message)
+      setMembersError((isMemberLimitError(error?.message || '') && planLimitMessage(t, 'members', org?.plan_tier))
+        || t('gerirclube.error_approve_request') + error.message)
     }
   }
 
@@ -578,9 +577,8 @@ export default function GerirClube() {
       await Promise.all([loadMembers(), loadRequests()])
     } catch (error) {
       console.error('Error approving request:', error)
-      setMembersError(isMemberLimitError(error?.message || '')
-        ? planLimitMessage(t, 'members', org?.plan_tier)
-        : t('gerirclube.error_approve_request') + error.message)
+      setMembersError((isMemberLimitError(error?.message || '') && planLimitMessage(t, 'members', org?.plan_tier))
+        || t('gerirclube.error_approve_request') + error.message)
     }
   }
 
@@ -838,7 +836,7 @@ export default function GerirClube() {
       // num_courts is kept as a raw string in gameForm while the admin is
       // typing (see the input's onChange) — clamp it to a valid 1-6 count
       // here, at submit time, rather than on every keystroke.
-      const numCourts = Math.min(6, Math.max(1, parseInt(gameForm.num_courts, 10) || 1))
+      const numCourts = Math.min(maxCourts, Math.max(1, parseInt(gameForm.num_courts, 10) || 1))
 
       console.log('Creating game with data:', {
         ...gameFields,
@@ -898,11 +896,8 @@ export default function GerirClube() {
       // Postgres doesn't say *which* clause of the policy failed, so this
       // is one combined message covering both caps rather than a guess.
       const message = error?.message || ''
-      if (org?.self_serve && isMixLimitError(message)) {
-        setGameError(planLimitMessage(t, 'mix', org?.plan_tier))
-      } else {
-        setGameError(t('gerirclube.error_create_game') + error.message)
-      }
+      const limitMessage = isMixLimitError(message) ? planLimitMessage(t, 'mix', org?.plan_tier) : null
+      setGameError(limitMessage || t('gerirclube.error_create_game') + error.message)
     }
   }
 
@@ -1024,7 +1019,7 @@ export default function GerirClube() {
     try {
       // See handleCreateGame — num_courts is a raw string while typing,
       // clamped to a valid 1-6 count here at submit time.
-      const numCourts = Math.min(6, Math.max(1, parseInt(gameForm.num_courts, 10) || 1))
+      const numCourts = Math.min(maxCourts, Math.max(1, parseInt(gameForm.num_courts, 10) || 1))
 
       const newDate = new Date(gameForm.date)
       // A `pending` row is a normal editable mix — if its own date moves,
@@ -1084,11 +1079,8 @@ export default function GerirClube() {
       // INSERT one, so an edit can now trip them too — say so instead of a
       // bare "Erro ao atualizar jogo" the admin can't act on.
       const message = error?.message || ''
-      if (org?.self_serve && isMixLimitError(message)) {
-        setGameError(planLimitMessage(t, 'mix', org?.plan_tier))
-      } else {
-        setGameError(t('gerirclube.error_update_game'))
-      }
+      const limitMessage = isMixLimitError(message) ? planLimitMessage(t, 'mix', org?.plan_tier) : null
+      setGameError(limitMessage || t('gerirclube.error_update_game'))
     }
   }
 
@@ -1405,6 +1397,10 @@ export default function GerirClube() {
       setSavingPlan(false)
     }
   }
+
+  // O nº de campos que o formulário deixa pedir segue o plano (6 é o máximo
+  // do produto). A regra a sério está nas policies de games.
+  const maxCourts = Math.min(6, limitsFor(org?.plan_tier).courts ?? 6)
 
   const handleTogglePrivateMatches = async () => {
     setSavingFlag(true)
@@ -1808,7 +1804,7 @@ export default function GerirClube() {
                         onChange={(e) => setGameForm({ ...gameForm, num_courts: e.target.value })}
                         className="input-field"
                         min="1"
-                        max="6"
+                        max={maxCourts}
                         required
                       />
                       <p className="text-sm text-muted mt-1.5">

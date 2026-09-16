@@ -1412,7 +1412,7 @@
   "landing.plan_club_f2": "Lessons and coaches",
   "landing.plan_club_f3": "Court bookings",
   "landing.plan_club_f4": "In-app payments",
-  "plans.limit_mix": "You've reached the {{plan}} plan limit: {{mixes}} open mixes at a time and {{courts}} courts per mix.",
+  "plans.limit_mix": "You've reached the {{plan}} plan limit: {{count}} open mix at a time and {{courts}} courts per mix.",
   "plans.limit_members": "You've reached the {{plan}} plan limit: {{members}} members.",
   "plans.next_plan_mix": "The {{next}} plan allows more mixes at a time and more courts.",
   "plans.next_plan_members": "The {{next}} plan allows more members.",
@@ -1425,5 +1425,6 @@
   "clubprofile.jogos_heading_group": "Games with friends",
   "clubprofile.jogos_link_group": "See games with friends",
   "groupmatches.title_group": "Games with friends",
-  "groupmatches.create_button_group": "Create or record a game"
+  "groupmatches.create_button_group": "Create or record a game",
+  "plans.limit_mix_other": "You've reached the {{plan}} plan limit: {{count}} open mixes at a time and {{courts}} courts per mix."
 }
