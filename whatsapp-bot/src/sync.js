@@ -259,8 +259,12 @@ export function startSync({ sendText, getGroupMentions }) {
 
       const wasCancelled = payload.old.status === 'cancelled'
       const justCancelled = payload.new.status === 'cancelled' && !wasCancelled
-      if (justCancelled) {
-        // Broadcast — só aos grupos que viam este mix (filtro de nível).
+      const shouldAnnounceCancellation = justCancelled && payload.new.origin !== 'open_slot'
+      if (shouldAnnounceCancellation) {
+        // Broadcast — só aos grupos que viam este mix (filtro de nível). Jogos
+        // em aberto ficam de fora: a mensagem combinada re-renderizada (abaixo)
+        // já comunica a mudança de forma precisa, e este aviso genérico não diz
+        // sequer qual horário foi cancelado (título é sempre "Jogo em Aberto").
         for (const group of groups) {
           if (!mixVisibleToGroup(payload.new, group)) continue
           try {

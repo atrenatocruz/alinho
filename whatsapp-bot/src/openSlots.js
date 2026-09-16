@@ -9,6 +9,8 @@ export async function loadOpenSlotBatch(batchId) {
     .from('games')
     .select('*')
     .eq('open_batch_id', batchId)
+    .in('status', ['open', 'closed'])
+    .gt('date', new Date().toISOString())
     .order('date', { ascending: true })
   if (gamesError) throw new Error(`Failed to load open-slot batch ${batchId}: ${gamesError.message}`)
 

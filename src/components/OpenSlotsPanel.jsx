@@ -5,11 +5,12 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton } from './ui'
 import { buildOpenSlotRows } from '../lib/openSlots'
+import { formatDate, formatTime } from '../lib/formatDate'
 
 const EMPTY_RANGE = () => ({ start: '', end: '' })
 
 export default function OpenSlotsPanel({ organizationId }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { user } = useAuth()
   const [slots, setSlots] = useState([])
   const [loading, setLoading] = useState(true)
@@ -162,7 +163,13 @@ export default function OpenSlotsPanel({ organizationId }) {
               <div className="flex items-center gap-2">
                 <Clock size={16} className="text-muted" />
                 <span className="font-bold">
-                  {new Date(slot.date).toLocaleString('pt-PT', { dateStyle: 'short', timeStyle: 'short' })}
+                  {formatDate(slot.date, i18n.language, { day: '2-digit', month: '2-digit', year: 'numeric' })} ·{' '}
+                  {formatTime(slot.date, i18n.language, { hour: '2-digit', minute: '2-digit' })}–
+                  {formatTime(
+                    new Date(new Date(slot.date).getTime() + (slot.court_time_minutes || 0) * 60_000),
+                    i18n.language,
+                    { hour: '2-digit', minute: '2-digit' }
+                  )}
                 </span>
                 <span className="text-muted text-sm">
                   {confirmedCount(slot)}/{capacity(slot)} · {t(`open_slots.status_${slot.status}`)}

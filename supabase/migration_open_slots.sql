@@ -19,15 +19,27 @@ CREATE INDEX IF NOT EXISTS games_open_batch_id_idx ON games(open_batch_id)
 -- mesmo motivo do check_game_full existente (schema.sql:452-454): quem
 -- entra não é admin do clube, e sem isto a UPDATE seria bloqueada por
 -- "Org admins can update games".
+-- Bandas e prefixo de género espelham src/lib/elo.js's BANDS/ratingBand()
+-- exatamente (ler esse ficheiro antes de mexer aqui): 1800→1, 1600→2,
+-- 1400→3, 1200→4, 1000→5, 700→6; abaixo de 700, ou rating NULL, não há
+-- banda derivável (o equivalente a "Iniciante", que games.level's CHECK
+-- não aceita). Prefixo: 'feminino'→F, 'masculino'→M, qualquer outro valor
+-- (incluindo NULL — profiles.gender é opcional) não tem prefixo válido —
+-- ratingBand() usa 'N' aí, mas games.level's CHECK só aceita M1-M6/F1-F6,
+-- por isso um género por preencher também deixa games.level por definir.
 CREATE OR REPLACE FUNCTION lock_open_slot_level()
 RETURNS TRIGGER AS $$
 DECLARE
   v_org_id UUID;
   v_origin TEXT;
   v_current_level TEXT;
-  v_member_level TEXT;
+  v_rating NUMERIC;
+  v_gender TEXT;
+  v_band_num INT;
+  v_prefix TEXT;
+  v_computed_level TEXT;
 BEGIN
-  IF NEW.status != 'confirmed' THEN
+  IF NEW.status IS DISTINCT FROM 'confirmed' THEN
     RETURN NEW;
   END IF;
 
@@ -38,16 +50,45 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  SELECT level INTO v_member_level
-  FROM memberships
-  WHERE user_id = NEW.user_id AND organization_id = v_org_id;
+  SELECT rating, gender INTO v_rating, v_gender
+  FROM profiles
+  WHERE id = NEW.user_id;
 
-  -- memberships.level é um campo legado que ainda pode conter valores fora
-  -- da escala M1-M6/F1-F6 que games.level aceita (ex: 'iniciante' de contas
-  -- antigas) — ignora silenciosamente em vez de rebentar a inserção do
-  -- participante com uma violação de CHECK.
-  IF v_member_level ~ '^[MF][1-6]$' THEN
-    UPDATE games SET level = v_member_level, updated_at = NOW()
+  IF v_rating IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  v_band_num := CASE
+    WHEN v_rating >= 1800 THEN 1
+    WHEN v_rating >= 1600 THEN 2
+    WHEN v_rating >= 1400 THEN 3
+    WHEN v_rating >= 1200 THEN 4
+    WHEN v_rating >= 1000 THEN 5
+    WHEN v_rating >= 700 THEN 6
+    ELSE NULL
+  END;
+
+  IF v_band_num IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  v_prefix := CASE
+    WHEN v_gender = 'feminino' THEN 'F'
+    WHEN v_gender = 'masculino' THEN 'M'
+    ELSE NULL
+  END;
+
+  IF v_prefix IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  v_computed_level := v_prefix || v_band_num;
+
+  -- Belt-and-braces: por construção isto já devia respeitar a escala, mas
+  -- guarda-se contra uma futura mudança à lógica das bandas que viole o
+  -- CHECK de games.level.
+  IF v_computed_level ~ '^[MF][1-6]$' THEN
+    UPDATE games SET level = v_computed_level, updated_at = NOW()
     WHERE id = NEW.game_id AND level IS NULL;
   END IF;
 
