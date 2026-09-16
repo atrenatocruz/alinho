@@ -1666,7 +1666,7 @@ export default function GerirClube() {
                 : 'text-muted hover:text-ink-900'
             }`}
           >
-            <Calendar size={16} />
+            <Calendar size={16} className="shrink-0" />
             {t('gerirclube.tab_games')}
           </button>
           <button
@@ -1677,7 +1677,7 @@ export default function GerirClube() {
                 : 'text-muted hover:text-ink-900'
             }`}
           >
-            <Users size={16} />
+            <Users size={16} className="shrink-0" />
             {t('gerirclube.tab_members')}
             {requests.length > 0 && (
               <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-lime-400 text-ink-900 text-[11px] font-extrabold tabular-nums">
@@ -1693,7 +1693,7 @@ export default function GerirClube() {
                 : 'text-muted hover:text-ink-900'
             }`}
           >
-            <Clock size={16} />
+            <Clock size={16} className="shrink-0" />
             {t('gerirclube.tab_open_slots')}
           </button>
         </div>

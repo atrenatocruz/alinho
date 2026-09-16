@@ -278,13 +278,15 @@ export default function GroupMatches() {
         <ArrowLeft size={16} /> {t('common.back')}
       </button>
 
-      <div className="flex items-start justify-between gap-3">
+      {/* Botão por baixo do subtítulo, a toda a largura: ao lado do título ficava
+          espremido em três linhas e o ícone encolhia. */}
+      <div className="space-y-3">
         <div>
           <h2 className="text-3xl text-ink-900">{t(org?.kind === 'group' ? 'groupmatches.title_group' : 'groupmatches.title')}</h2>
           {org && <p className="text-muted text-sm mt-0.5">{t('groupmatches.subtitle', { group: org.name })}</p>}
         </div>
-        <Link to={`/clube/${slug}/jogos/novo`}>
-          <PrimaryButton type="button"><Plus size={18} /> {t(org?.kind === 'group' ? 'groupmatches.create_button_group' : 'groupmatches.create_button')}</PrimaryButton>
+        <Link to={`/clube/${slug}/jogos/novo`} className="block">
+          <PrimaryButton type="button" className="w-full"><Plus size={18} className="shrink-0" /> {t(org?.kind === 'group' ? 'groupmatches.create_button_group' : 'groupmatches.create_button')}</PrimaryButton>
         </Link>
       </div>
 
