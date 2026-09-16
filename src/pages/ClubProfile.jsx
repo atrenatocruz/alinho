@@ -278,8 +278,8 @@ export default function ClubProfile() {
           Sistema à parte do "jogo entre amigos" do perfil (#233). */}
       {club.my_status === 'member' && (
         <Link to={`/clube/${slug}/jogos`} className="card press flex items-center justify-between gap-3">
-          <h3 className="font-extrabold text-ink-900">{t('clubprofile.jogos_heading')}</h3>
-          <span className="text-ink-700 text-sm font-extrabold shrink-0">{t('clubprofile.jogos_link')}</span>
+          <h3 className="font-extrabold text-ink-900">{t(club.kind === 'group' ? 'clubprofile.jogos_heading_group' : 'clubprofile.jogos_heading')}</h3>
+          <span className="text-ink-700 text-sm font-extrabold shrink-0">{t(club.kind === 'group' ? 'clubprofile.jogos_link_group' : 'clubprofile.jogos_link')}</span>
         </Link>
       )}
 

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
-import { Plus, Calendar, Users, Trash2, Edit2, Check, X, UserX, Repeat, Clock, ArrowLeft, Camera, Settings, Copy, QrCode } from 'lucide-react'
+import { Plus, Calendar, Users, Trash2, Edit2, Check, X, UserX, Repeat, Clock, ArrowLeft, Camera, Settings, Copy, QrCode, ChevronRight } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
@@ -1665,6 +1665,21 @@ export default function GerirClube() {
                 {t('gerirclube.create_game')}
               </button>
 
+              {/* Os jogos entre amigos vivem na página do grupo/clube
+                  (/clube/:slug/jogos) e qualquer membro pode criar um. Quem
+                  gere um grupo criado na Comunidade não tinha por onde lá
+                  chegar — o grupo é privado, não aparece na Comunidade, e o
+                  Gerir não ligava para lá (Francisco, 16 set 2026). */}
+              {org?.slug && (
+                <Link to={`/clube/${org.slug}/jogos`} className="card press flex items-center justify-between gap-3 hover:shadow-lift">
+                  <div className="min-w-0">
+                    <h3 className="font-extrabold text-ink-900">{t(kk('gerirclube.group_matches_heading'))}</h3>
+                    <p className="text-sm text-muted">{t(kk('gerirclube.group_matches_hint'))}</p>
+                  </div>
+                  <ChevronRight size={18} className="text-muted shrink-0" />
+                </Link>
+              )}
+
               {createdMixScope && (
                 <div className="card bg-lime-50 border border-lime-200 flex items-center justify-between gap-3">
                   <p className="text-sm text-ink-900">
@@ -2091,7 +2106,9 @@ export default function GerirClube() {
                     )}
 
                     {gameError && (
-                      <p className="rounded-ctrl bg-danger/10 text-danger text-sm font-extrabold p-3">{gameError}</p>
+                      // mb-2 sobre o space-y-4 do formulário: colado aos botões
+                      // lia-se como parte deles (Francisco, 16 set 2026).
+                      <p className="rounded-ctrl bg-danger/10 text-danger text-sm font-extrabold p-3.5 mb-2">{gameError}</p>
                     )}
 
                     <div className="flex gap-3">

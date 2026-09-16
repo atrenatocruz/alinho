@@ -7,7 +7,7 @@ import { searchOrganizations, listGlobalOrganizations } from '../lib/organizatio
 import { createSelfServeGroup } from '../lib/platformAdmin'
 import { DAYS, DAY_LABEL_KEY, listTeacherProfiles, requestTeacherProfile, withdrawTeacherProfile } from '../lib/teachers'
 import { useAuth } from '../contexts/AuthContext'
-import { Avatar, EmptyState, RatingBadge, GroupLevelBadge, Select } from '../components/ui'
+import { Avatar, EmptyState, RatingBadge, GroupLevelBadge, Select, OrgKindBadge, orgAvatarShape } from '../components/ui'
 import { ratingBand } from '../lib/elo'
 
 // Same key set as GameDetails.jsx/Profile.jsx's own SIDE_LABEL_KEY — small
@@ -278,6 +278,13 @@ export default function Comunidade() {
       setLevelFilter('')
     }
   }, [levelOptions, levelFilter])
+
+  // Grupos/clubes de que já sou membro — os privados não vêm no diretório.
+  const listedIds = new Set(clubs.map((c) => c.id))
+  const myOrgs = memberships
+    .map((m) => m.organization)
+    .filter((o) => o && !listedIds.has(o.id) && o.id !== mySelfServeGroup?.id)
+    .sort((a, b) => a.name.localeCompare(b.name, 'pt'))
 
   const visiblePlayers = players
     .filter((p) => !levelFilter || ratingBand(p.rating, p.gender)?.label === levelFilter)
@@ -675,6 +682,26 @@ export default function Comunidade() {
       ) : (
         <div className="space-y-3">{clubs.map(renderOrgRow)}</div>
       )}
+
+      {/* Os grupos criados na Comunidade são privados: não entram no
+          diretório acima, e sem isto quem é membro não tinha como abrir a
+          página do seu próprio grupo (nem os jogos entre amigos que lá
+          vivem) — Francisco, 16 set 2026. */}
+      {tab === 'orgs' && !query.trim() && myOrgs.length > 0 && (
+        <div className="space-y-3 mt-8">
+          <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('comunidade.my_orgs_heading')}</p>
+          {myOrgs.map((org) => (
+            <Link key={org.id} to={`/clube/${org.slug}`} className="card press flex items-center gap-3.5 hover:shadow-lift">
+              <Avatar name={org.name} url={org.group_logo_url} size="w-11 h-11 text-sm" shape={orgAvatarShape(org.kind)} />
+              <div className="flex-1 min-w-0">
+                <h3 className="font-extrabold text-ink-900 truncate">{org.name}</h3>
+                <div className="mt-1"><OrgKindBadge kind={org.kind} /></div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+
     </div>
   )
 }
