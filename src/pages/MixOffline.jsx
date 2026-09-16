@@ -99,7 +99,7 @@ export default function MixOffline() {
     // as typed, strongest first, drives the pairing via descending points.
     const participants = names.map((name, i) => ({ status: 'confirmed', user: { id: String(i), name } }))
     const pointsById = Object.fromEntries(names.map((_, i) => [String(i), names.length - i]))
-    const duplas = formDuplas(participants, pointsById, new Set())
+    const { duplas } = formDuplas(participants, pointsById, new Set())
     const withIds = duplas.map((d, i) => ({ ...d, id: `t${i}`, seed_ranking: d.seed }))
     setTeams(withIds)
     // seedCourts rows carry no phase — standings() (used at the end) only
