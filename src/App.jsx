@@ -22,6 +22,8 @@ import CookieConsentBanner from './components/CookieConsentBanner'
 // first-run-only, or reference pages — so deferring them keeps the initial
 // bundle lighter without adding a loading flash to any of the app's
 // everyday screens. GerirClube alone pulls in @dnd-kit, only used there.
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))
+const ResetPassword = lazy(() => import('./pages/ResetPassword'))
 const PrivateMatches = lazy(() => import('./pages/PrivateMatches'))
 const CreatePrivateMatch = lazy(() => import('./pages/CreatePrivateMatch'))
 const JoinPrivateMatch = lazy(() => import('./pages/JoinPrivateMatch'))
@@ -183,6 +185,13 @@ function AppRoutes() {
     <Suspense fallback={<RouteFallback />}>
       <Routes>
         <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
+        <Route path="/esqueci-password" element={user ? <Navigate to="/" /> : <ForgotPassword />} />
+        {/* Not guarded like /login above — Supabase establishes a
+            (recovery-only) session as soon as the visitor lands here via
+            the email link, so `user` is already set by the time this
+            renders; redirecting on that would bounce them straight past
+            the form they came here to fill in. */}
+        <Route path="/redefinir-password" element={<ResetPassword />} />
         <Route path="/instrucoes" element={<Instructions />} />
         <Route path="/privacidade" element={<PrivacyPolicy />} />
         <Route path="/termos" element={<TermsOfService />} />

@@ -26,7 +26,7 @@ function toggleLanguage() {
 // Module scope, not nested in Login: an inline component would be recreated
 // (and remounted — dropping focus and its own `visible` state) on every
 // keystroke in any field, since every keystroke re-renders the parent.
-function PasswordField({ value, onChange, placeholder, autoComplete, minLength, required }) {
+export function PasswordField({ value, onChange, placeholder, autoComplete, minLength, required }) {
   const { t } = useTranslation()
   const [visible, setVisible] = useState(false)
   return (
@@ -333,6 +333,11 @@ export default function Login() {
                   autoComplete="current-password"
                   required
                 />
+                <div className="text-right mt-1.5">
+                  <Link to="/esqueci-password" className="text-xs text-ink-700 font-extrabold hover:underline">
+                    {t('login.forgot_password_link')}
+                  </Link>
+                </div>
               </div>
 
               {error && (

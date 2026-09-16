@@ -321,6 +321,24 @@ export const AuthProvider = ({ children }) => {
     return { data, error }
   }
 
+  // Sends the reset-password email. `redirectTo` must be on Supabase's
+  // allow-list (Authentication → URL Configuration, dashboard config, not
+  // code — see the domain-redirects note in CLAUDE.md) or the link in the
+  // email silently fails to sign the visitor in on the other end.
+  const resetPassword = async (email) => {
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/redefinir-password`,
+    })
+    return { data, error }
+  }
+
+  // Only valid inside the recovery session Supabase establishes when the
+  // visitor follows the email link — ResetPassword.jsx is the only caller.
+  const updatePassword = async (newPassword) => {
+    const { data, error } = await supabase.auth.updateUser({ password: newPassword })
+    return { data, error }
+  }
+
   const signInWithGoogle = async () => {
     // Preserve the current URL (including ?org=<slug>, if present) through
     // the OAuth round-trip — signInWithOAuth can't carry custom fields
@@ -520,6 +538,8 @@ export const AuthProvider = ({ children }) => {
     refreshFeatureFlags: loadFeatureFlags,
     signUp,
     signIn,
+    resetPassword,
+    updatePassword,
     signInWithGoogle,
     signInAsAdmin,
     signOut,
