@@ -9,7 +9,7 @@ import { ratingBand, groupRatingBand } from '../lib/elo'
 import { planName } from '../lib/plans'
 import { achievementIcon, RARITY_META } from '../lib/achievements'
 import { formatDate } from '../lib/formatDate'
-import { listFollowers, listFollowing } from '../lib/follows'
+import { listFollowers, listFollowing, removeFollower, unfollowPlayer } from '../lib/follows'
 import { describeError } from '../lib/errors'
 
 /* ─── Date fields ────────────────────────────────────────────────────────
@@ -833,11 +833,13 @@ export function PhotoViewerModal({ url, alt = '', onClose }) {
    PlayerDetails.jsx (anyone else's). Same portal-to-body pattern as
    PhotoViewerModal, for the same reason (escapes Layout.jsx header's
    backdrop-blur containing block for fixed descendants). */
-export function FollowListModal({ userId, initialTab = 'followers', onClose }) {
+export function FollowListModal({ userId, initialTab = 'followers', onClose, manageable = false }) {
   const { t } = useTranslation()
   const [tab, setTab] = useState(initialTab)
   const [followers, setFollowers] = useState(null)
   const [following, setFollowing] = useState(null)
+  // id da pessoa cuja linha está a ser apagada, para travar duplo-toque.
+  const [removingId, setRemovingId] = useState(null)
 
   useEffect(() => {
     let cancelled = false
@@ -861,6 +863,29 @@ export function FollowListModal({ userId, initialTab = 'followers', onClose }) {
 
   const rows = tab === 'followers' ? followers : following
   const emptyText = tab === 'followers' ? t('followlist.empty_followers') : t('followlist.empty_following')
+
+  // Só no próprio perfil (manageable). Confirmação deliberada: apagar um
+  // follow não tem volta pela app — quem foi removido tem de voltar a
+  // seguir (e a pedir, se a conta for privada).
+  const endFollow = async (person) => {
+    const isFollower = tab === 'followers'
+    const question = isFollower
+      ? t('followlist.confirm_remove_follower', { name: person.name })
+      : t('followlist.confirm_unfollow', { name: person.name })
+    if (!window.confirm(question)) return
+    setRemovingId(person.id)
+    try {
+      if (isFollower) await removeFollower(person.id, userId)
+      else await unfollowPlayer(person.id, userId)
+      if (isFollower) setFollowers((prev) => prev.filter((p) => p.id !== person.id))
+      else setFollowing((prev) => prev.filter((p) => p.id !== person.id))
+    } catch (error) {
+      console.error('Error ending follow:', error)
+      window.alert(describeError(error))
+    } finally {
+      setRemovingId(null)
+    }
+  }
 
   return createPortal(
     <div
@@ -909,15 +934,23 @@ export function FollowListModal({ userId, initialTab = 'followers', onClose }) {
           ) : (
             <div className="divide-y divide-line">
               {rows.map((p) => (
-                <Link
-                  key={p.id}
-                  to={`/jogador/${p.id}`}
-                  onClick={onClose}
-                  className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50"
-                >
-                  <Avatar name={p.name} url={p.avatar_url} size="w-10 h-10 text-sm" />
-                  <p className="flex-1 min-w-0 font-extrabold text-ink-900 text-sm truncate">{p.name}</p>
-                </Link>
+                <div key={p.id} className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50">
+                  <Link to={`/jogador/${p.id}`} onClick={onClose} className="flex items-center gap-3 flex-1 min-w-0">
+                    <Avatar name={p.name} url={p.avatar_url} size="w-10 h-10 text-sm" />
+                    <p className="flex-1 min-w-0 font-extrabold text-ink-900 text-sm truncate">{p.name}</p>
+                  </Link>
+                  {manageable && (
+                    <button
+                      type="button"
+                      onClick={() => endFollow(p)}
+                      disabled={removingId === p.id}
+                      className="shrink-0 text-xs font-extrabold px-3 py-1.5 rounded-full border border-line text-ink-900
+                                 hover:bg-ink-50 disabled:opacity-50"
+                    >
+                      {tab === 'followers' ? t('followlist.remove_follower') : t('followlist.unfollow')}
+                    </button>
+                  )}
+                </div>
               ))}
             </div>
           )}

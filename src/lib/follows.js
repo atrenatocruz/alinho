@@ -22,6 +22,27 @@ export const removeFollow = async (followRowId) => {
   if (error) throw error
 }
 
+// Remover um seguidor (quem é seguido apaga a linha) e deixar de seguir
+// alguém (o seguidor apaga a sua). As listas só devolvem o perfil, não o id
+// da linha de follow, por isso apaga-se pelo par de ids — que é único.
+// O "remover seguidor" precisa de migration_remove_follower.sql; sem ela a
+// política de RLS deixa a linha por apagar, sem dar erro. Por isso
+// verificamos o que foi apagado em vez de assumir.
+const deleteFollowPair = async (followerId, followedId) => {
+  const { data, error } = await supabase
+    .from('follows')
+    .delete()
+    .eq('follower_id', followerId)
+    .eq('followed_id', followedId)
+    .select('id')
+  if (error) throw error
+  if (!data?.length) throw new Error('Follow row not deleted (RLS?)')
+}
+
+export const removeFollower = async (followerId, myId) => deleteFollowPair(followerId, myId)
+
+export const unfollowPlayer = async (targetId, myId) => deleteFollowPair(myId, targetId)
+
 export const listFollowers = async (userId) => {
   const { data, error } = await supabase.rpc('list_followers', { p_user_id: userId })
   if (error) throw error

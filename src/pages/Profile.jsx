@@ -767,7 +767,7 @@ export default function Profile() {
       </div>
 
       {followListTab && (
-        <FollowListModal userId={profile.id} initialTab={followListTab} onClose={() => setFollowListTab(null)} />
+        <FollowListModal userId={profile.id} initialTab={followListTab} onClose={() => setFollowListTab(null)} manageable />
       )}
 
       {/* XP DE ATIVIDADE — painel separado, claro, sem iconografia de
