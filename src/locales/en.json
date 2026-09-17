@@ -1662,5 +1662,14 @@
   "gerirclube.accept_teacher": "Accept at the club",
   "gerir.teacher_wants_club": "Wants to teach at {{club}}",
   "teacher.club_status_pending": "Waiting for the club to accept",
-  "teacher.club_status_rejected": "The club didn't accept"
+  "teacher.club_status_rejected": "The club didn't accept",
+  "rankings.scale_title": "Scale",
+  "rankings.scale_masculino": "Men",
+  "rankings.scale_feminino": "Women",
+  "rankings.scale_none": "No gender",
+  "rankings.scale_all": "Everyone",
+  "rankings.scale_short_masculino": "M",
+  "rankings.scale_short_feminino": "W",
+  "rankings.scale_short_none": "N/G",
+  "rankings.all_scales_hint": "Everyone A–Z, each with their position in their own scale."
 }
