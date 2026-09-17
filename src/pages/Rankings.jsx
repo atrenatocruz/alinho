@@ -10,6 +10,7 @@ import { tierFromXp, formatXp } from '../lib/xp'
 import { winRatePct, buildMonthlyLeaderboard } from '../lib/statsLogic'
 import { getGlobalRankings } from '../lib/privateMatches'
 import { errorKind } from '../lib/errors'
+import { applyScale, defaultScale, rankedCount } from '../lib/rankingScales'
 
 /* ─── Rankings (épico «Comunidade vs. Rankings», Trello #271/#275) ───────────
    Comparar jogadores — só jogadores. Desenho:
@@ -24,14 +25,16 @@ import { errorKind } from '../lib/errors'
    - A tua linha fica fixa em baixo.
    - Saíram: a secção Clubes & Grupos (procuram-se na Comunidade) e a caixa
      "Como funcionam os níveis?" (fica o "?").
-   - Escalas M/F/Misto: por acordar com Ruben e Renato — a lista continua
-     misturada, como antes. */
+   - Escala (Francisco, 17 set): Masculino · Feminino · Sem género · Todos,
+     abre na do próprio jogador. Só separa a lista e as posições — os pontos
+     são os mesmos (ver lib/rankingScales.js). Pontos calculados à parte por
+     escala: por acordar com Ruben e Renato. */
 
 const ALWAYS = 'always'
 
 export default function Rankings() {
   const { t, i18n } = useTranslation()
-  const { user, currentOrganizationId, memberships } = useAuth()
+  const { user, currentOrganizationId, memberships, profile } = useAuth()
   const location = useLocation()
   const navigationType = useNavigationType()
 
@@ -49,6 +52,10 @@ export default function Rankings() {
   const [loading, setLoading] = useState(true)
   const [highlightId, setHighlightId] = useState(null)
   const wantMonthly = useRef(initialTab === 'mensal')
+  // null = ainda não escolheu → a escala do próprio (o perfil pode chegar
+  // depois do primeiro render).
+  const [scaleChoice, setScaleChoice] = useState(null)
+  const scale = scaleChoice ?? defaultScale(profile?.gender)
 
   const scopeOptions = useMemo(() => [
     { value: 'global', label: t('rankings.scope_global') },
@@ -99,7 +106,7 @@ export default function Rankings() {
       }
       if (period !== ALWAYS) {
         return (monthly.byMonth[period] || []).map((p) => ({
-          user_id: p.user_id, name: p.user?.name || '—', avatar_url: null, ranked: true,
+          user_id: p.user_id, name: p.user?.name || '—', avatar_url: null, gender: p.user?.gender, ranked: true,
           sub: `${t('rankings.mix_count', { count: p.participations })} · 🏆 ${t('rankings.mixes_won_count', { count: p.mixesWon })}`,
           value: p.points > 0 ? `+${p.points}` : String(p.points), valueLabel: t('rankings.points_label'),
         }))
@@ -137,7 +144,7 @@ export default function Rankings() {
       .from('mix_player_stats')
       // games(*) e não games(date, ranked): não rebenta antes de
       // migration_mix_ranked.sql criar a coluna.
-      .select('*, user:profiles!mix_player_stats_user_id_fkey (name), game:games (*)')
+      .select('*, user:profiles!mix_player_stats_user_id_fkey (name, gender), game:games (*)')
       .eq('organization_id', orgId)
     if (error) throw error
     return buildMonthlyLeaderboard(data || [], i18n.language)
@@ -183,20 +190,28 @@ export default function Rankings() {
 
   // ── Posições ─────────────────────────────────────────────────────────
   // Com nível primeiro, pela ordem que veio; sem nível no fim, A–Z.
+  // Ranking: por escala (lib/rankingScales). Assiduidade: lista única.
+  const byScale = mode === 'ranking'
   const positioned = useMemo(() => {
+    if (byScale) return applyScale(rows, scale)
     const ranked = rows.filter((r) => r.ranked).map((r, i) => ({ ...r, position: i + 1 }))
     const unranked = rows
       .filter((r) => !r.ranked)
       .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pt'))
       .map((r) => ({ ...r, position: null }))
     return [...ranked, ...unranked]
-  }, [rows])
+  }, [rows, scale, byScale])
+  const allScales = byScale && scale === 'all'
 
   const norm = (s) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
   const trimmed = query.trim()
   const visible = trimmed ? positioned.filter((r) => norm(r.name).includes(norm(trimmed))) : positioned
-  const me = positioned.find((r) => r.user_id === user.id)
-  const firstUnrankedIndex = visible.findIndex((r) => !r.ranked)
+  // A tua linha: a tua posição na tua escala, mesmo quando se vê outra.
+  const me = byScale
+    ? applyScale(rows, 'all').find((r) => r.user_id === user.id)
+    : positioned.find((r) => r.user_id === user.id)
+  const myTotal = byScale && me ? rankedCount(rows, me.scale) : positioned.filter((r) => r.ranked).length
+  const firstUnrankedIndex = allScales ? -1 : visible.findIndex((r) => !r.ranked)
 
   const scrollToPlayer = (userId) => {
     setQuery('')
@@ -228,7 +243,12 @@ export default function Rankings() {
     return 'bg-ink-50 text-ink-700'
   }
 
-  const renderValue = (row, onDark = false) => row.ranked ? (
+  const renderValue = (row, onDark = false) => allScales && !onDark ? (
+    // "Todos": a posição de cada um na sua escala, não os pontos lado a lado.
+    <span className={`shrink-0 text-[11px] font-extrabold px-2 py-1 rounded-full tabular-nums ${row.position ? 'bg-ink-50 text-ink-900' : 'bg-ink-50 text-muted'}`}>
+      {row.position ? `${row.position} · ${t(`rankings.scale_short_${row.scale}`)}` : t('rankings.no_level')}
+    </span>
+  ) : row.ranked ? (
     <div className="text-right shrink-0">
       <p className={`text-lg font-extrabold tabular-nums leading-tight ${onDark ? 'text-white' : 'text-ink-900'}`}>{row.value}</p>
       <p className={`text-[10px] ${row.provisional ? 'text-lime-600 font-extrabold' : onDark ? 'text-white/60' : 'text-muted'}`}>{row.valueLabel}</p>
@@ -253,9 +273,11 @@ export default function Rankings() {
             highlightId === row.user_id ? 'bg-lime-400/25' : isMe ? 'bg-lime-400/10' : ''
           }`}
         >
-          <span className={`w-8 h-8 rounded-ctrl flex items-center justify-center text-sm font-extrabold tabular-nums shrink-0 ${row.position ? positionStyle(row.position) : 'bg-ink-50 text-muted'}`}>
-            {row.position ?? '—'}
-          </span>
+          {!allScales && (
+            <span className={`w-8 h-8 rounded-ctrl flex items-center justify-center text-sm font-extrabold tabular-nums shrink-0 ${row.position ? positionStyle(row.position) : 'bg-ink-50 text-muted'}`}>
+              {row.position ?? '—'}
+            </span>
+          )}
           <Avatar name={row.name} url={row.avatar_url} size="w-9 h-9 text-xs" />
           <div className="flex-1 min-w-0">
             <p className="font-extrabold text-ink-900 text-sm flex items-center gap-1.5 min-w-0">
@@ -335,7 +357,16 @@ export default function Rankings() {
       </div>
 
       <div className="flex gap-1.5 flex-wrap">
-        <Select variant="chip" value={scope} onChange={setScope} options={scopeOptions} placeholder={t('rankings.scope_title')} />
+        {byScale && (
+          <Select
+            variant="chip"
+            value={scale}
+            onChange={setScaleChoice}
+            options={['masculino', 'feminino', 'none', 'all'].map((s) => ({ value: s, label: t(`rankings.scale_${s}`) }))}
+            placeholder={t('rankings.scale_title')}
+          />
+        )}
+        <Select variant="chip" active={scope !== 'global'} value={scope} onChange={setScope} options={scopeOptions} placeholder={t('rankings.scope_title')} />
         {mode === 'ranking' && scope !== 'global' && months.length > 0 && (
           <Select
             variant="chip"
@@ -365,6 +396,9 @@ export default function Rankings() {
               {t('rankings.players_found', { count: visible.length })}
             </p>
           )}
+          {allScales && !trimmed && (
+            <p className="text-xs text-muted">{t('rankings.all_scales_hint')}</p>
+          )}
           <div className="card p-0 overflow-hidden divide-y divide-line">
             {visible.map(renderRow)}
           </div>
@@ -389,7 +423,9 @@ export default function Rankings() {
             <div className="flex items-center gap-1.5 min-w-0 mt-0.5">
               {me.rating != null && <span className="shrink-0 flex"><RatingBadge rating={me.rating} gender={me.gender} onDark /></span>}
               <p className="text-[11px] text-white/60 truncate">
-                {me.position ? t('rankings.your_position', { position: me.position, total: positioned.filter((r) => r.ranked).length }) : t('rankings.no_level_hint')}
+                {me.position
+                  ? `${t('rankings.your_position', { position: me.position, total: myTotal })}${byScale ? ` · ${t(`rankings.scale_${me.scale}`)}` : ''}`
+                  : t('rankings.no_level_hint')}
               </p>
             </div>
           </div>

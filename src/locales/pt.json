@@ -1662,5 +1662,14 @@
   "gerirclube.accept_teacher": "Aceitar no clube",
   "gerir.teacher_wants_club": "Quer dar aulas no {{club}}",
   "teacher.club_status_pending": "À espera de o clube aceitar",
-  "teacher.club_status_rejected": "O clube não aceitou"
+  "teacher.club_status_rejected": "O clube não aceitou",
+  "rankings.scale_title": "Escala",
+  "rankings.scale_masculino": "Masculino",
+  "rankings.scale_feminino": "Feminino",
+  "rankings.scale_none": "Sem género",
+  "rankings.scale_all": "Todos",
+  "rankings.scale_short_masculino": "M",
+  "rankings.scale_short_feminino": "F",
+  "rankings.scale_short_none": "S/G",
+  "rankings.all_scales_hint": "Todos por ordem alfabética, cada um com a posição na sua escala."
 }
