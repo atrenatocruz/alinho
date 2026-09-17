@@ -490,6 +490,24 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, days])
 
+  // Alternar de mapa para lista, ou tocar outra vez no separador "Jogos" da
+  // barra de baixo (aviso do Layout — ver home:reset-scroll), volta sempre
+  // a Hoje — ao contrário do primeiro carregamento acima, que pode abrir no
+  // próximo dia com jogos. Não corre no mount (loading ainda true nesse
+  // momento, e viewMode/resetTick só mudam depois de a Home já existir), por
+  // isso nunca disputa com o efeito de cima.
+  const [resetTick, setResetTick] = useState(0)
+  useEffect(() => {
+    const reset = () => { setViewMode('list'); setResetTick((n) => n + 1) }
+    window.addEventListener('home:reset-scroll', reset)
+    return () => window.removeEventListener('home:reset-scroll', reset)
+  }, [])
+  useLayoutEffect(() => {
+    if (loading || viewMode !== 'list') return
+    scrollToDay(today)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode, resetTick])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
