@@ -120,6 +120,14 @@ const RPC_MOCKS = {
   // fechado, grupo dentro de um clube (sem nº de membros para quem não é do
   // grupo) e um pedido pendente.
   list_global_organizations: () => (community() ? COMMUNITY_ORGS : []),
+  // Página de um grupo/clube onde ainda não estou (bug do botão, 17 set).
+  get_club_profile: (params) => (community() ? [{
+    ...(COMMUNITY_ORGS.find((o) => o.slug === params?.p_slug) || COMMUNITY_ORGS[2]),
+    description: 'Grupo de amigos para teste do Alinho 😎', phone: null, instagram: null, website: null,
+    parent_slug: null, open_games: [],
+  }] : []),
+  list_organization_members: () => [],
+  list_club_groups: () => [],
   search_organizations: (params) => (community()
     ? COMMUNITY_ORGS.filter((o) => o.name.toLowerCase().includes(String(params?.p_query || '').trim().toLowerCase()))
     : []),

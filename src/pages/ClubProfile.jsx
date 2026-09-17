@@ -198,7 +198,9 @@ export default function ClubProfile() {
         </Link>
       )}
 
-      <div className="card flex items-center gap-3.5">
+      {/* Nome e botão em linhas separadas: "Pedir para entrar" é largo e, ao
+          lado do nome, tapava-o (bug do Francisco, 17 set). */}
+      <div className="card flex flex-wrap items-center gap-3.5">
         <Avatar name={club.name} url={club.group_logo_url} size="w-16 h-16 text-xl" />
         <div className="flex-1 min-w-0">
           <h2 className="text-2xl text-ink-900 truncate">{club.name}</h2>
@@ -234,7 +236,7 @@ export default function ClubProfile() {
             <Clock size={14} /> {t('clubprofile.request_sent')}
           </span>
         ) : (
-          <PrimaryButton onClick={handleFollow} disabled={acting} className="shrink-0">
+          <PrimaryButton onClick={handleFollow} disabled={acting} className="w-full basis-full">
             <UserPlus size={16} />
             {club.open_join ? t('clubprofile.follow_button') : t('clubprofile.request_join_button')}
           </PrimaryButton>
