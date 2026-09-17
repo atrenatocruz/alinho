@@ -44,6 +44,13 @@ Para veres esta lista:
   // reminders.js
   reminder_roster_line: 'Inscritos: {{names}}\n\n',
   reminder_group: '🤖 ⏰ *Lembrete!* O mix *{{title}}* começa daqui a {{hours}}h.\n📅 {{when}}{{location}}\n\n{{roster}}Não faltes! 🎾',
+  // mixNotices.js — o admin mexeu num mix já começado (Trello #292).
+  mix_notice_joined: '🤖 🎾 *Entraste no {{title}}!*\n📅 {{when}}\n{{partner}}',
+  mix_notice_removed: '🤖 Saíste do *{{title}}*.\n📅 {{when}}',
+  mix_notice_partner_changed: '🤖 🔄 *A tua dupla mudou* no *{{title}}*.\n📅 {{when}}\n{{partner}}',
+  mix_notice_partner: '🤝 Jogas com *{{name}}*.',
+  mix_notice_no_partner: 'Ainda estás sem par — o admin vai completar a dupla.',
+  duplas_updated: '🤖 🔄 *Duplas atualizadas — {{title}}*\n\n{{lines}}',
   reminder_dm: '🤖 ⏰ *Lembrete!* O teu mix *{{title}}* começa daqui a {{hours}}h.\n📅 {{when}}{{location}}\n\nNão faltes! 🎾',
   digest_mix_line: '🎾 *{{title}}* — {{when}}{{location}}\n👥 {{filled}}/{{capacity}} (faltam {{vagas}})',
   digest_text: '🤖 📢 @all *Mixes ainda em aberto!*\n\n{{lines}}\n\nAinda há vagas — inscrevam-se antes que feche! 🎾',
@@ -104,6 +111,13 @@ To see this list:
   // reminders.js
   reminder_roster_line: 'Signed up: {{names}}\n\n',
   reminder_group: "🤖 ⏰ *Reminder!* *{{title}}* starts in {{hours}}h.\n📅 {{when}}{{location}}\n\n{{roster}}Don't miss it! 🎾",
+  // mixNotices.js — the admin changed a mix that already started (Trello #292).
+  mix_notice_joined: "🤖 🎾 *You're in {{title}}!*\n📅 {{when}}\n{{partner}}",
+  mix_notice_removed: "🤖 You're out of *{{title}}*.\n📅 {{when}}",
+  mix_notice_partner_changed: '🤖 🔄 *Your pair changed* in *{{title}}*.\n📅 {{when}}\n{{partner}}',
+  mix_notice_partner: '🤝 You play with *{{name}}*.',
+  mix_notice_no_partner: "You don't have a partner yet — the admin will complete the pair.",
+  duplas_updated: '🤖 🔄 *Pairs updated — {{title}}*\n\n{{lines}}',
   reminder_dm: "🤖 ⏰ *Reminder!* Your mix *{{title}}* starts in {{hours}}h.\n📅 {{when}}{{location}}\n\nDon't miss it! 🎾",
   digest_mix_line: '🎾 *{{title}}* — {{when}}{{location}}\n👥 {{filled}}/{{capacity}} ({{vagas}} spot(s) left)',
   digest_text: '🤖 📢 @all *Mixes still open!*\n\n{{lines}}\n\nStill spots open — sign up before it closes! 🎾',

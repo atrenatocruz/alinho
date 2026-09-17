@@ -1,7 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useLocation, useNavigate, useNavigationType } from 'react-router-dom'
-import { Home, Users, Trophy, Settings, LogOut, Phone, X, Bell, UserCheck, Swords } from 'lucide-react'
+import { Home, Users, Trophy, Settings, LogOut, Phone, X, Bell, UserCheck, Swords, Shuffle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
 import { HeaderActionsProvider } from '../contexts/HeaderActionsContext'
@@ -13,6 +13,8 @@ import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
 import { listIncomingOrganizationInvites, acceptOrganizationInvite, declineOrganizationInvite } from '../lib/orgInvites'
 import { getMyPrivateMatches, privateMatchActions } from '../lib/privateMatches'
 import { describeError } from '../lib/errors'
+import { listMyUnreadNotifications, markNotificationsRead, MIX_NOTICE_KINDS } from '../lib/notifications'
+import { formatDate } from '../lib/formatDate'
 
 // Re-prompt at most once per day once dismissed — a nudge, not a gate.
 const PHONE_PROMPT_DISMISSED_KEY = 'phonePromptDismissedDate'
@@ -200,7 +202,7 @@ export default function Layout({ children }) {
   const location = useLocation()
   const navigate = useNavigate()
   const { signOut, profile, updateProfile, isAdminOfAny, isGuest, refreshMemberships, isPrivateMatchesEnabled } = useAuth()
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
 
   const today = new Date().toISOString().slice(0, 10)
   const [phonePromptDismissed, setPhonePromptDismissed] = useState(
@@ -365,8 +367,48 @@ export default function Layout({ children }) {
     }
   }, [profile?.id, isGuest, isPrivateMatchesEnabled, location.pathname])
 
+  // Avisos de mix — o admin mexeu num mix já começado e eu entrei, saí ou
+  // mudei de parceiro (Trello #292, migration_mix_notices.sql). Os mesmos
+  // avisos seguem por WhatsApp pelo bot. Sem a migração, lista vazia.
+  const [mixNotices, setMixNotices] = useState([])
+  useEffect(() => {
+    if (!profile?.id || isGuest) {
+      setMixNotices([])
+      return
+    }
+    let cancelled = false
+    listMyUnreadNotifications()
+      .then((data) => {
+        if (!cancelled) setMixNotices(data.filter((n) => MIX_NOTICE_KINDS.includes(n.kind)))
+      })
+      .catch((error) => console.error('Error loading mix notices:', error))
+    return () => {
+      cancelled = true
+    }
+  }, [profile?.id, isGuest, location.pathname])
+
+  const openMixNotice = (notice) => {
+    setShowNotifications(false)
+    setMixNotices((list) => list.filter((n) => n.id !== notice.id))
+    markNotificationsRead([notice.id]).catch((error) => console.error('Error marking notice as read:', error))
+  }
+
+  const mixNoticeText = (notice) => {
+    const d = notice.data || {}
+    const vars = {
+      title: d.game_title || t('layout.mix_notice_fallback_title'),
+      when: d.game_date ? formatDate(d.game_date, i18n.language, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '',
+      partner: d.partner_name,
+    }
+    if (notice.kind === 'mix_removed') return t('layout.mix_notice_removed', vars)
+    const partnerLine = d.partner_name ? t('layout.mix_notice_partner', vars) : t('layout.mix_notice_no_partner')
+    return notice.kind === 'mix_joined'
+      ? `${t('layout.mix_notice_joined', vars)} ${partnerLine}`
+      : `${t('layout.mix_notice_partner_changed', vars)} ${partnerLine}`
+  }
+
   const joinRequestsTotal = joinRequestsByOrg.reduce((sum, org) => sum + org.count, 0)
-  const notificationsTotal = followRequests.length + joinRequestsTotal + orgInvites.length + privateMatchTodos.length
+  const notificationsTotal = followRequests.length + joinRequestsTotal + orgInvites.length + privateMatchTodos.length + mixNotices.length
 
   // `main` below is the app's only scrolling region (see the app-shell comment
   // on the root div) — the document itself never scrolls, so neither the browser
@@ -501,6 +543,20 @@ export default function Layout({ children }) {
                 </div>
               ) : (
                 <div className="max-h-80 overflow-y-auto divide-y divide-line">
+                  {mixNotices.map((notice) => (
+                    <Link
+                      key={notice.id}
+                      to={notice.game_id ? `/jogo/${notice.game_id}` : '/'}
+                      onClick={() => openMixNotice(notice)}
+                      className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50"
+                    >
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${notice.kind === 'mix_removed' ? 'bg-danger/10 text-danger' : 'bg-lime-400/20 text-ink-900'}`}>
+                        <Shuffle size={16} />
+                      </div>
+                      <p className="flex-1 min-w-0 text-sm text-ink-900">{mixNoticeText(notice)}</p>
+                      <span aria-hidden="true" className="w-2 h-2 rounded-full bg-lime-400 shrink-0" />
+                    </Link>
+                  ))}
                   {privateMatchTodos.map(({ kind, match }) => (
                     <Link
                       key={`${kind}-${match.id}`}

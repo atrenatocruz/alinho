@@ -28,6 +28,10 @@ import { getGlobalRankings } from '../lib/privateMatches'
 import { formatDate as formatDateLib, formatTime, formatCurrency } from '../lib/formatDate'
 import { NAVIGATORS, getPreferredNavigator, setPreferredNavigator, navigatorUrl } from '../lib/navigators'
 import { describeError } from '../lib/errors'
+import { limitsFor } from '../lib/plans'
+import { canEditBeforeRound1, unpairedPeople, changedPairKeys, teamPairKey, mixChanges } from '../lib/mixEdit'
+import { notifyMixChanges } from '../lib/notifications'
+import AddPlayerSheet from '../components/mix/AddPlayerSheet'
 
 const SIDE_LABEL_KEY = { left: 'gamedetails.side_left', right: 'gamedetails.side_right', both: 'gamedetails.side_both' }
 
@@ -103,6 +107,10 @@ export default function GameDetails() {
   const [kudos, setKudos] = useState([])
   const [kudosGiving, setKudosGiving] = useState(false)
   const [editingPairs, setEditingPairs] = useState(false)
+  // Mix à última da hora (Trello #292): adicionar/tirar antes da Ronda 1.
+  const [addPlayerOpen, setAddPlayerOpen] = useState(false)
+  const [changedKeys, setChangedKeys] = useState(() => new Set())
+  const [editNotice, setEditNotice] = useState('')
   const [editedTeams, setEditedTeams] = useState([]) // staged copy of `teams`, only written to DB on Concluir
   const [activeDragChip, setActiveDragChip] = useState(null) // { teamId, slot, player } — for the drag overlay
   const [justSwappedId, setJustSwappedId] = useState(null) // chip id that just received a dragged player — brief lime confirmation
@@ -732,6 +740,106 @@ export default function GameDetails() {
 
   /* ─── Mix engine actions (admin) ──────────────────────────────────── */
 
+  // Duplas dos últimos 4 mixes deste clube — solos cujo pareamento por
+  // pontos recriaria um destes pares são reshuffled com o próximo mais
+  // próximo em pontos em vez disso; só se aceita a repetição quando
+  // for matematicamente impossível evitá-la (ver formDuplas).
+  const loadRepeatPairKeys = async () => {
+    const { data: previousGames } = await supabase
+      .from('games')
+      .select('id')
+      .eq('organization_id', gameOrganizationId)
+      .lt('date', game.date)
+      .order('date', { ascending: false })
+      .limit(4)
+    if (!previousGames?.length) return new Set()
+    const { data: previousTeams } = await supabase
+      .from('teams')
+      .select('player1_id, player2_id')
+      .in('game_id', previousGames.map(g => g.id))
+    return new Set(
+      (previousTeams || []).map(team => [team.player1_id, team.player2_id].sort().join('|'))
+    )
+  }
+
+  // Forma as duplas e devolve as linhas de `teams` prontas a inserir, sem
+  // gravar nada. Partilhado por «Começar o Mix» e por refazer as duplas à
+  // última da hora (Trello #292) — a mesma regra nos dois casos. Lança erro
+  // (com a explicação para o admin) quando o formato não fecha.
+  const buildTeamRows = (rows, repeatPairKeys, points, g) => {
+    // Sobe e desce com parceiros que trocam (Trello #262, parte B): quem
+    // se inscreveu a dois é separado e cada um joga por si, por isso o nº
+    // de pessoas tem de fechar campos completos — como no Americano.
+    const rotating = g.format === 'sobe_desce' && !!g.rotate_partners
+    const pairingRows = rotating ? splitPartnerRows(rows) : rows
+    if (rotating) {
+      if (pairingRows.length < 4 || pairingRows.length % 4 !== 0) {
+        throw new Error(t('gamedetails.error_rotate_needs_multiple_of_4', { count: pairingRows.length }))
+      }
+      if (pairingRows.length / 4 > (g.num_courts || 1)) {
+        throw new Error(t('gamedetails.error_rotate_too_many_players', { count: pairingRows.length, courts: g.num_courts || 1 }))
+      }
+    }
+
+    // 4.1 formação de duplas
+    const { duplas, forcedRepeats } = formDuplas(pairingRows, points, repeatPairKeys, { mode: g.pairing_mode || 'por_nivel' })
+    if (duplas.length < 2) throw new Error(t('gamedetails.error_need_two_duplas'))
+
+    // Grupos+eliminatórias needs each dupla's pool assigned before
+    // insert (there's no separate round trip to fetch ids back and
+    // patch pool_number afterwards).
+    const isGruposEliminatorias = g.format === 'grupos_eliminatorias'
+    const poolSize = g.pool_size || 4
+    // Two independent constraints, both checked here because this is the
+    // last point before teams are locked in where pool_size can still be
+    // adjusted:
+    //  (a) firstElimMatches/eliminationPhases (existing, unmodified —
+    //      shared with todos_contra_todos) only support exactly 2, 4, or 8
+    //      teams advancing. With advancePerPool fixed at 2, the pool count
+    //      itself must be exactly 1, 2, or 4 — any other count would
+    //      silently drop teams from the bracket later.
+    //  (b) pools must come out equal-sized AND even-sized: splitIntoPools
+    //      happily makes a short/odd remainder pool, and roundRobinRound
+    //      has no bye handling, so an odd pool leaves one dupla out every
+    //      round and never plays all its pairings — yet standings() would
+    //      still rank that incomplete table and advance its top 2.
+    if (isGruposEliminatorias) {
+      const numPools = Math.max(1, Math.ceil(duplas.length / poolSize))
+      const poolSizeWorks = (ps) => {
+        const np = Math.max(1, Math.ceil(duplas.length / ps))
+        return [1, 2, 4].includes(np) && duplas.length % np === 0 && (duplas.length / np) % 2 === 0
+      }
+      if (!poolSizeWorks(poolSize)) {
+        // The form only allows 3-8. If nothing in that range can work for
+        // this many duplas, telling the admin to "adjust the group size"
+        // is telling them to do something impossible — say so instead.
+        const workable = [3, 4, 5, 6, 7, 8].filter(poolSizeWorks)
+        if (workable.length === 0) {
+          throw new Error(t('gamedetails.error_no_valid_pool_size', { duplas: duplas.length }))
+        }
+        throw new Error(t('gamedetails.error_invalid_pool_count', {
+          count: numPools,
+          duplas: duplas.length,
+          options: workable.join(', '),
+        }))
+      }
+    }
+    const pooledDuplas = isGruposEliminatorias
+      ? splitIntoPools(duplas, poolSize)
+      : duplas
+
+    return {
+      forcedRepeats,
+      teamRows: pooledDuplas.map(d => ({
+        game_id: id,
+        player1_id: d.player1.id,
+        player2_id: d.player2.id,
+        seed_ranking: d.seed,
+        ...(isGruposEliminatorias ? { pool_number: d.pool_number } : {}),
+      })),
+    }
+  }
+
   // Só forma as duplas — as rondas arrancam depois, uma a uma, por decisão do admin.
   const handleStartMix = async () => {
     setBusy(true)
@@ -833,45 +941,8 @@ export default function GameDetails() {
         return
       }
 
-      // Duplas dos últimos 4 mixes deste clube — solos cujo pareamento por
-      // pontos recriaria um destes pares são reshuffled com o próximo mais
-      // próximo em pontos em vez disso; só se aceita a repetição quando
-      // for matematicamente impossível evitá-la (ver formDuplas).
-      const { data: previousGames } = await supabase
-        .from('games')
-        .select('id')
-        .eq('organization_id', gameOrganizationId)
-        .lt('date', game.date)
-        .order('date', { ascending: false })
-        .limit(4)
-      let repeatPairKeys = new Set()
-      if (previousGames?.length) {
-        const { data: previousTeams } = await supabase
-          .from('teams')
-          .select('player1_id, player2_id')
-          .in('game_id', previousGames.map(g => g.id))
-        repeatPairKeys = new Set(
-          (previousTeams || []).map(team => [team.player1_id, team.player2_id].sort().join('|'))
-        )
-      }
-
-      // Sobe e desce com parceiros que trocam (Trello #262, parte B): quem
-      // se inscreveu a dois é separado e cada um joga por si, por isso o nº
-      // de pessoas tem de fechar campos completos — como no Americano.
-      const rotating = game.format === 'sobe_desce' && !!game.rotate_partners
-      const pairingRows = rotating ? splitPartnerRows(participants) : participants
-      if (rotating) {
-        if (pairingRows.length < 4 || pairingRows.length % 4 !== 0) {
-          throw new Error(t('gamedetails.error_rotate_needs_multiple_of_4', { count: pairingRows.length }))
-        }
-        if (pairingRows.length / 4 > (game.num_courts || 1)) {
-          throw new Error(t('gamedetails.error_rotate_too_many_players', { count: pairingRows.length, courts: game.num_courts || 1 }))
-        }
-      }
-
-      // 4.1 formação de duplas
-      const { duplas, forcedRepeats } = formDuplas(pairingRows, pointsById, repeatPairKeys, { mode: game.pairing_mode || 'por_nivel' })
-      if (duplas.length < 2) throw new Error(t('gamedetails.error_need_two_duplas'))
+      const repeatPairKeys = await loadRepeatPairKeys()
+      const { teamRows, forcedRepeats } = buildTeamRows(participants, repeatPairKeys, pointsById, game)
       if (forcedRepeats.length > 0) {
         const pairsList = forcedRepeats
           .map(({ player1, player2 }) => `${firstLastName(player1?.name)} + ${firstLastName(player2?.name)}`)
@@ -882,58 +953,9 @@ export default function GameDetails() {
         }
       }
 
-      // Grupos+eliminatórias needs each dupla's pool assigned before
-      // insert (there's no separate round trip to fetch ids back and
-      // patch pool_number afterwards).
-      const isGruposEliminatorias = game.format === 'grupos_eliminatorias'
-      const poolSize = game.pool_size || 4
-      // Two independent constraints, both checked here because this is the
-      // last point before teams are locked in where pool_size can still be
-      // adjusted:
-      //  (a) firstElimMatches/eliminationPhases (existing, unmodified —
-      //      shared with todos_contra_todos) only support exactly 2, 4, or 8
-      //      teams advancing. With advancePerPool fixed at 2, the pool count
-      //      itself must be exactly 1, 2, or 4 — any other count would
-      //      silently drop teams from the bracket later.
-      //  (b) pools must come out equal-sized AND even-sized: splitIntoPools
-      //      happily makes a short/odd remainder pool, and roundRobinRound
-      //      has no bye handling, so an odd pool leaves one dupla out every
-      //      round and never plays all its pairings — yet standings() would
-      //      still rank that incomplete table and advance its top 2.
-      if (isGruposEliminatorias) {
-        const numPools = Math.max(1, Math.ceil(duplas.length / poolSize))
-        const poolSizeWorks = (ps) => {
-          const np = Math.max(1, Math.ceil(duplas.length / ps))
-          return [1, 2, 4].includes(np) && duplas.length % np === 0 && (duplas.length / np) % 2 === 0
-        }
-        if (!poolSizeWorks(poolSize)) {
-          // The form only allows 3-8. If nothing in that range can work for
-          // this many duplas, telling the admin to "adjust the group size"
-          // is telling them to do something impossible — say so instead.
-          const workable = [3, 4, 5, 6, 7, 8].filter(poolSizeWorks)
-          if (workable.length === 0) {
-            throw new Error(t('gamedetails.error_no_valid_pool_size', { duplas: duplas.length }))
-          }
-          throw new Error(t('gamedetails.error_invalid_pool_count', {
-            count: numPools,
-            duplas: duplas.length,
-            options: workable.join(', '),
-          }))
-        }
-      }
-      const pooledDuplas = isGruposEliminatorias
-        ? splitIntoPools(duplas, poolSize)
-        : duplas
-
       const { error: teamsError } = await supabase
         .from('teams')
-        .insert(pooledDuplas.map(d => ({
-          game_id: id,
-          player1_id: d.player1.id,
-          player2_id: d.player2.id,
-          seed_ranking: d.seed,
-          ...(isGruposEliminatorias ? { pool_number: d.pool_number } : {}),
-        })))
+        .insert(teamRows)
       if (teamsError) throw teamsError
 
       const { error: statusError } = await supabase
@@ -946,6 +968,208 @@ export default function GameDetails() {
     } catch (error) {
       console.error('Error starting mix:', error)
       setMixError(describeError(t, error, 'gamedetails.error_start_mix'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /* ─── Mix à última da hora (Trello #292) ──────────────────────────────
+     Entre «Começar o Mix» e «Iniciar Ronda 1» ainda não há resultados, por
+     isso adicionar ou tirar alguém refaz as duplas com a mesma regra, sem
+     apagar nada. Depois da Ronda 1 os botões desaparecem (Francisco, 17 set).
+     Desenho: https://claude.ai/artifact/Kkm4WTP6CUUTu9SNwCA1C5 */
+
+  const confirmedPeopleNow = async () => {
+    const { data, error } = await supabase
+      .from('participants')
+      .select('partner_id')
+      .eq('game_id', id)
+      .eq('status', 'confirmed')
+    if (error) throw error
+    return (data || []).reduce((n, row) => n + 1 + (row.partner_id ? 1 : 0), 0)
+  }
+
+  // Lê tudo fresco (quem está, campos, pontos), calcula as duplas novas e só
+  // depois troca — se o formato não fechar, as duplas antigas ficam. Devolve
+  // quantas duplas mudaram. `beforeIds` = quem estava confirmado antes da
+  // mudança, para avisar quem entrou, saiu ou mudou de parceiro.
+  const reformDuplas = async (beforeIds) => {
+    const [{ data: freshGame, error: gameError }, { data: rows, error: rowsError }, { data: oldTeams, error: oldError }] = await Promise.all([
+      supabase.from('games').select('*').eq('id', id).single(),
+      supabase
+        .from('participants')
+        .select(`
+          *,
+          user:profiles!participants_user_id_fkey (id, name, preferred_side, avatar_url),
+          partner:profiles!participants_partner_id_fkey (id, name, preferred_side, avatar_url)
+        `)
+        .eq('game_id', id)
+        .eq('status', 'confirmed')
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true }),
+      supabase.from('teams').select('player1_id, player2_id, seed_ranking, pool_number').eq('game_id', id),
+    ])
+    if (gameError) throw gameError
+    if (rowsError) throw rowsError
+    if (oldError) throw oldError
+
+    const globalRankings = await getGlobalRankings()
+    const points = Object.fromEntries(globalRankings.map(r => [r.user_id, Math.round(r.rating || 0)]))
+    // À última da hora não se pergunta pelas repetições: aceita-se a melhor
+    // formação possível, como o formDuplas já garante.
+    const { teamRows } = buildTeamRows(rows || [], await loadRepeatPairKeys(), points, freshGame)
+
+    const { error: deleteError } = await supabase.from('teams').delete().eq('game_id', id)
+    if (deleteError) throw deleteError
+    const { error: insertError } = await supabase.from('teams').insert(teamRows)
+    if (insertError) {
+      // Repõe as duplas que estavam, para o mix não ficar sem nenhuma.
+      if (oldTeams?.length) {
+        await supabase.from('teams').insert(oldTeams.map((team) => ({
+          game_id: id,
+          player1_id: team.player1_id,
+          player2_id: team.player2_id,
+          seed_ranking: team.seed_ranking,
+          ...(team.pool_number != null ? { pool_number: team.pool_number } : {}),
+        })))
+      }
+      throw insertError
+    }
+    const changed = changedPairKeys(oldTeams || [], teamRows)
+    setChangedKeys(changed)
+
+    // Avisos no sino e no WhatsApp (migration_mix_notices.sql). Um aviso que
+    // falha não desfaz a mudança nem a esconde ao admin — fica só no log.
+    try {
+      await notifyMixChanges(id, mixChanges({
+        beforeIds,
+        afterIds: (rows || []).flatMap((r) => [r.user_id, r.partner_id]).filter(Boolean),
+        beforeTeams: oldTeams || [],
+        afterTeams: teamRows,
+      }))
+    } catch (error) {
+      console.error('Error notifying players about mix changes:', error)
+    }
+    return changed.size
+  }
+
+  const handleLastMinuteAdd = async ({ playerId, partnerId, choice, plan }) => {
+    const beforeIds = people.map((p) => p.id)
+    setBusy(true)
+    setMixError('')
+    setEditNotice('')
+    const needed = partnerId ? 2 : 1
+    try {
+      if (choice === 'court') {
+        const update = { num_courts: plan.nextCourts }
+        if (plan.nextMaxPlayers) update.max_players = plan.nextMaxPlayers
+        const { error } = await supabase.from('games').update(update).eq('id', id)
+        if (error) throw error
+      }
+
+      // Abrir um campo promove primeiro quem já estava em lista de espera
+      // (trigger da base de dados), por isso volta-se a contar.
+      let status = choice === 'waitlist' ? 'waitlisted' : 'confirmed'
+      if (choice === 'court') {
+        const nowPeople = await confirmedPeopleNow()
+        if (nowPeople + needed > plan.nextCapacity) status = 'waitlisted'
+      }
+
+      const { error: insertError } = await supabase.from('participants').insert([{
+        game_id: id,
+        user_id: playerId,
+        partner_id: partnerId || null,
+        status,
+        joined_alone: !partnerId,
+      }])
+      if (insertError) throw insertError
+      setAddPlayerOpen(false)
+
+      if (status === 'confirmed' || choice === 'court') {
+        try {
+          const changed = await reformDuplas(beforeIds)
+          setEditNotice(status === 'confirmed'
+            ? t('mixedit.notice_added', { count: changed })
+            : t('mixedit.notice_added_waitlist_court', { count: changed }))
+        } catch (error) {
+          console.error('Error reforming duplas after adding a player:', error)
+          setMixError(t('mixedit.added_not_reformed', { reason: describeError(t, error, 'gamedetails.error_start_mix') }))
+        }
+      } else {
+        setEditNotice(t('mixedit.notice_waitlist'))
+      }
+      loadGameDetails()
+    } catch (error) {
+      console.error('Error adding a player at the last minute:', error)
+      setMixError(describeError(t, error, 'mixedit.error_add'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleLastMinuteRemove = async (player) => {
+    const person = people.find((p) => p.id === player?.id)
+    if (!person) return
+    const suplente = waitlist[0]
+    const suplenteSize = suplente ? 1 + (suplente.partner_id ? 1 : 0) : 0
+    const suplenteFits = suplente && peopleCount - 1 + suplenteSize <= capacity
+    const msg = [
+      t('mixedit.confirm_remove', { name: person.name }),
+      suplenteFits ? t('mixedit.confirm_remove_suplente', { name: suplente.user?.name || '?' }) : '',
+    ].filter(Boolean).join(' ')
+    if (!confirm(msg)) return
+
+    const beforeIds = people.map((p) => p.id)
+    setBusy(true)
+    setMixError('')
+    setEditNotice('')
+    try {
+      if (person.rowOwner && !person.hasPartner) {
+        // Apagar a linha: o trigger da base de dados promove o 1.º suplente.
+        const { error } = await supabase.from('participants').delete().eq('id', person.rowId)
+        if (error) throw error
+      } else if (person.rowOwner) {
+        // Sai quem inscreveu a dupla; o parceiro fica, sozinho. Primeiro
+        // entra a linha dele e só depois sai a original — assim o histórico
+        // de entradas e saídas (Trello #171) regista "entrou"/"saiu" a
+        // quem de facto entrou e saiu, e o apagar promove o suplente só se
+        // ainda houver lugar.
+        const row = participants.find((r) => r.id === person.rowId)
+        const { error: insertError } = await supabase.from('participants').insert([{
+          game_id: id, user_id: row.partner_id, partner_id: null, status: 'confirmed', joined_alone: true,
+        }])
+        if (insertError) throw insertError
+        const { error } = await supabase.from('participants').delete().eq('id', person.rowId)
+        if (error) throw error
+      } else {
+        // Sai só o parceiro; quem inscreveu fica, agora sozinho.
+        const { error } = await supabase
+          .from('participants')
+          .update({ partner_id: null, joined_alone: true })
+          .eq('id', person.rowId)
+        if (error) throw error
+        // Uma atualização não dispara a promoção automática (só o apagar).
+        if (suplenteFits) {
+          const { error: promoteError } = await supabase
+            .from('participants')
+            .update({ status: 'confirmed' })
+            .eq('id', suplente.id)
+            .eq('status', 'waitlisted')
+          if (promoteError) throw promoteError
+        }
+      }
+
+      try {
+        const changed = await reformDuplas(beforeIds)
+        setEditNotice(t('mixedit.notice_removed', { count: changed }))
+      } catch (error) {
+        console.error('Error reforming duplas after removing a player:', error)
+        setMixError(t('mixedit.removed_not_reformed', { reason: describeError(t, error, 'gamedetails.error_start_mix') }))
+      }
+      loadGameDetails()
+    } catch (error) {
+      console.error('Error removing a player at the last minute:', error)
+      setMixError(describeError(t, error, 'gamedetails.error_remove_player'))
     } finally {
       setBusy(false)
     }
@@ -1463,7 +1687,15 @@ export default function GameDetails() {
     const isMine = team?.player1?.id === user.id || team?.player2?.id === user.id
     const hasGuest = team?.player1?.is_guest || team?.player2?.is_guest
     return (
-      <div key={team.id} className={isMine ? `${KIND_STYLE.mix.bg} rounded-xl px-2 py-1.5 -mx-2` : ''}>
+      <div
+        key={team.id}
+        className={[
+          isMine ? `${KIND_STYLE.mix.bg} rounded-xl px-2 py-1.5 -mx-2` : '',
+          // Duplas que mudaram à última da hora (Trello #292): contorno azul-escuro
+          // do tipo, não lima — lima fica só no botão principal (Francisco, 17 set).
+          changedKeys.has(teamPairKey(team)) && lastMinuteEditable ? 'rounded-ctrl ring-2 ring-[#075985] ring-offset-4 ring-offset-canvas' : '',
+        ].join(' ')}
+      >
         {(showPoints || team.id === game.winner_team_id || hasGuest) && (
           <div className="flex items-center justify-between mb-1.5">
             <p className="text-[11px] font-extrabold text-muted uppercase tracking-wide">
@@ -1498,8 +1730,21 @@ export default function GameDetails() {
                 )}
                 <span className="flex items-center gap-1.5 text-xs text-muted shrink-0">
                   <RatingBadge rating={ratingInfoById[player?.id]?.rating} gender={ratingInfoById[player?.id]?.gender} />
-                  {sideLabel(player?.preferred_side)}
+                  {/* A editar à última da hora, o ✕ precisa do espaço do lado. */}
+                  {!lastMinuteEditable && sideLabel(player?.preferred_side)}
                 </span>
+                {lastMinuteEditable && player?.id && (
+                  <button
+                    type="button"
+                    onClick={() => handleLastMinuteRemove(player)}
+                    disabled={busy}
+                    title={t('gamedetails.remove_person_title', { name: player.name })}
+                    aria-label={t('gamedetails.remove_person_title', { name: player.name })}
+                    className="w-8 h-8 flex items-center justify-center rounded-full text-muted hover:text-danger hover:bg-danger/10 shrink-0"
+                  >
+                    <X size={15} />
+                  </button>
+                )}
               </div>
             )
           })}
@@ -1584,6 +1829,9 @@ export default function GameDetails() {
   const missingBirthday = isMissingBirthday(game, profile)
   const ageIneligible = isAgeIneligible(game, profile)
   const mixStarted = game?.status === 'in_progress' || game?.status === 'finished'
+  const lastMinuteEditable = isAdmin && canEditBeforeRound1(game, matches.length)
+  const unpaired = lastMinuteEditable ? unpairedPeople(people, teams) : []
+  const planMaxCourts = limitsFor(gameMembership?.organization?.plan_tier).courts
   // A full game counts as closed even if the stored status lagged behind
   // (e.g. players who joined before the auto-close trigger existed)
   const isFull = peopleCount >= capacity
@@ -2229,6 +2477,66 @@ export default function GameDetails() {
           </div>
           )}
 
+          {/* Mix à última da hora (Trello #292) — só admin, só antes da Ronda 1. */}
+          {lastMinuteEditable && (
+            <div className="space-y-2.5">
+              {editNotice && (
+                <div className="bg-ink-900 text-white px-4 py-3 rounded-ctrl text-sm font-extrabold flex items-center gap-2 animate-fade-up">
+                  <Check size={16} className="text-lime-400 shrink-0" />
+                  {editNotice}
+                </div>
+              )}
+              {unpaired.length > 0 && (
+                <div className="rounded-card bg-[#E0F2FE] text-[#075985] ring-1 ring-[#075985]/30 px-4 py-3 text-sm space-y-2">
+                  {/* Azul-escuro do mix (Francisco, 17 set): o âmbar fica só para a lista de espera. */}
+                  <p>
+                    <span className="font-extrabold">{t('mixedit.unpaired_title', { count: unpaired.length })}</span>{' '}
+                    {t('mixedit.unpaired_text', { names: unpaired.map((p) => p.name).join(', '), count: unpaired.length })}
+                  </p>
+                  <div className="space-y-1.5">
+                    {unpaired.map((p) => (
+                      <div key={p.id} className="flex items-center gap-2 bg-canvas/70 rounded-ctrl px-2.5 py-2">
+                        <Avatar name={p.name} url={p.avatar_url} size="w-8 h-8 text-xs" />
+                        <span className="flex-1 min-w-0 text-sm font-extrabold text-ink-900 truncate">
+                          {p.name} <span className="font-normal text-[#075985]">· {t('mixedit.no_partner')}</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleLastMinuteRemove(p)}
+                          disabled={busy}
+                          aria-label={t('gamedetails.remove_person_title', { name: p.name })}
+                          className="w-8 h-8 flex items-center justify-center rounded-full text-[#075985] hover:bg-danger/10 hover:text-danger shrink-0"
+                        >
+                          <X size={15} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <PrimaryButton variant="ghost" onClick={() => setAddPlayerOpen(true)} disabled={busy} className="w-full">
+                <UserPlus size={18} />
+                {t('mixedit.add_player')}
+              </PrimaryButton>
+              <p className="text-xs text-muted text-center">
+                {t('mixedit.window_hint', { people: peopleCount, capacity, courts: numCourts })}
+              </p>
+            </div>
+          )}
+          {addPlayerOpen && (
+            <AddPlayerSheet
+              game={game}
+              excludeIds={new Set([...people.map((p) => p.id), ...waitlist.flatMap((w) => [w.user_id, w.partner_id]).filter(Boolean)])}
+              peopleCount={peopleCount}
+              capacity={capacity}
+              maxCourts={planMaxCourts}
+              ratingInfoById={ratingInfoById}
+              busy={busy}
+              onConfirm={handleLastMinuteAdd}
+              onClose={() => setAddPlayerOpen(false)}
+            />
+          )}
+
           {showDuplasShare && (
             <ShareModal
               title={t('gamedetails.share_duplas_title')}
@@ -2597,7 +2905,7 @@ export default function GameDetails() {
               {!inPoolStage && (
                 <>
                   {!roundsStarted && !isAmericano && (
-                    <PrimaryButton onClick={handleStartRound1} disabled={busy} className="w-full">
+                    <PrimaryButton onClick={handleStartRound1} disabled={busy || unpaired.length > 0} className="w-full">
                       <Play size={20} />
                       {busy ? t('gamedetails.drawing') : t('gamedetails.start_round1')}
                     </PrimaryButton>

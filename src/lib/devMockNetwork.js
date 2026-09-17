@@ -85,7 +85,9 @@ const RPC_MOCKS = {
     gender: i % 3 ? 'masculino' : 'feminino', mix_wins: (55 - i) % 7, mixes_played: 10,
   }))).concat([{
     user_id: MOCK_ADMIN_USER_ID, name: 'Admin (Dev)', rating: 1605, rating_games: 30, gender: 'masculino', mix_wins: 4, mixes_played: 9,
-  }]).sort((a, b) => b.rating - a.rating)
+  }]).concat(lastMinute() ? LM_PEOPLE.map((p) => ({
+    user_id: p.id, name: p.name, rating: p.rating, rating_games: 30, gender: 'masculino', mix_wins: 1, mixes_played: 5,
+  })) : []).sort((a, b) => b.rating - a.rating)
     // localStorage.mockCommunity — quem ainda não tem nível fica no fim.
     .concat(community() ? [
       { user_id: 'fake-nolevel-1', name: 'Rui Pinto', rating: null, rating_games: 0, gender: null, mix_wins: 0, mixes_played: 0 },
@@ -159,6 +161,9 @@ const RPC_MOCKS = {
   // aparecer no sino um convite para admin, para validar o texto.
   transfer_organization_ownership: () => null,
   admin_set_organization_plan: () => null,
+  // Avisos de mix (Trello #292) — a app regista, o sino lê.
+  notify_mix_changes: (params) => (params?.p_changes || []).length,
+  mark_notifications_read: () => null,
   invite_to_organization: () => 'pending',
   list_incoming_organization_invites: () => (localStorage.getItem('mockAdminInvite') === 'true'
     ? [{
@@ -349,7 +354,119 @@ const LONG_STATS = [
   { id: 'ls3', game_id: 'fake-game-1', user_id: FAKE_PARTNER_ID, matches_played: 4, matches_won: 4, points_earned: 20, mix_won: true, rating_delta: 15, rating_after: 1164, user: { name: 'Renato Cruz' } },
 ]
 
+// localStorage.mockLastMinute = 'full' | 'odd' — mix já começado, antes da
+// Ronda 1, para testar adicionar/tirar jogadores e abrir campos (Trello #292).
+// Ao contrário do resto destes mocks, este guarda o que se escreve (inserir,
+// apagar, atualizar) enquanto a página estiver aberta, para o fluxo inteiro
+// correr em localhost. 'full' = 8 de 8 com 1 suplente; 'odd' = 7 de 8.
+const lastMinute = () => localStorage.getItem('mockLastMinute')
+const LM_GAME_ID = 'fake-game-1'
+const LM_PEOPLE = [
+  ['lm-1', 'Renato Cruz', 1664], ['lm-2', 'Bernardo Ramos', 1610], ['lm-3', 'Carlos Costa', 1580],
+  ['lm-4', 'Gonçalo Andrade', 1545], ['lm-5', 'Nuno Matos', 1510], ['lm-6', 'Francisco Barros', 1480],
+  ['lm-7', 'Tiago Ferreira', 1450], ['lm-8', 'Duarte Lopes', 1420], ['lm-9', 'Ana Moreira', 1400],
+  ['lm-10', 'Rui Oliveira Gomes', 1470], ['lm-11', 'Rúben Silva', 1390], ['lm-12', 'Bruno Sá', 1350],
+].map(([id, name, rating]) => ({ id, name, rating, avatar_url: null, preferred_side: 'both', xp: 100, rating_games: 30 }))
+const lmPerson = (id) => LM_PEOPLE.find((p) => p.id === id) || null
+let lmStore = null
+const lmState = () => {
+  if (lmStore) return lmStore
+  const odd = lastMinute() === 'odd'
+  const confirmed = LM_PEOPLE.slice(0, odd ? 7 : 8)
+  lmStore = {
+    game: {
+      id: LM_GAME_ID, organization_id: MOCK_ADMIN_ORG_ID, title: 'Mix de Quinta-feira', date: tomorrow8pm.toISOString(),
+      location: 'Smash Padel Almada', status: 'in_progress', format: 'sobe_desce', num_courts: 2, max_players: null,
+      price_per_player: 8, prize: null, gender_restriction: 'indiferente', level: null, recurrence_id: null, pairing_mode: 'por_nivel',
+    },
+    participants: [
+      ...confirmed.map((p, i) => ({ id: `lmp-${i}`, game_id: LM_GAME_ID, user_id: p.id, partner_id: null, status: 'confirmed', joined_alone: true, created_at: `2026-09-10T10:0${i}:00Z` })),
+      ...(odd ? [] : [{ id: 'lmp-w', game_id: LM_GAME_ID, user_id: 'lm-9', partner_id: null, status: 'waitlisted', joined_alone: true, created_at: '2026-09-10T11:00:00Z' }]),
+    ],
+    teams: [[0, 1], [2, 3], [4, 5], ...(odd ? [] : [[6, 7]])].map(([a, b], i) => ({
+      id: `lmt-${i}`, game_id: LM_GAME_ID, player1_id: confirmed[a].id, player2_id: confirmed[b].id, seed_ranking: 3000 - i * 100, created_at: '2026-09-17T18:00:00Z',
+    })),
+  }
+  return lmStore
+}
+const lmPeopleCount = () => lmState().participants.filter((r) => r.status === 'confirmed').reduce((n, r) => n + 1 + (r.partner_id ? 1 : 0), 0)
+const lmPromote = () => {
+  const st = lmState()
+  const cap = st.game.max_players || st.game.num_courts * 4
+  for (const row of st.participants.filter((r) => r.status === 'waitlisted')) {
+    const size = 1 + (row.partner_id ? 1 : 0)
+    if (lmPeopleCount() + size > cap) break
+    row.status = 'confirmed'
+  }
+}
+const lmParam = (url, key) => {
+  const m = url.match(new RegExp(`[?&]${key}=eq\.([^&]+)`))
+  return m ? decodeURIComponent(m[1]) : null
+}
+let lmSeq = 0
+function lastMinuteRequest(table, url, method, body) {
+  const st = lmState()
+  if (table === 'participants') {
+    if (method === 'POST') {
+      for (const row of [].concat(body)) st.participants.push({ id: `lmp-new-${lmSeq++}`, created_at: new Date().toISOString(), ...row })
+      return []
+    }
+    if (method === 'PATCH') {
+      const id = lmParam(url, 'id')
+      const status = lmParam(url, 'status')
+      st.participants.filter((r) => r.id === id && (!status || r.status === status)).forEach((r) => Object.assign(r, body))
+      return []
+    }
+    if (method === 'DELETE') {
+      st.participants = st.participants.filter((r) => r.id !== lmParam(url, 'id'))
+      lmPromote()
+      return []
+    }
+    const wanted = url.includes('status=eq.confirmed') ? ['confirmed'] : ['confirmed', 'waitlisted']
+    return st.participants
+      .filter((r) => wanted.includes(r.status))
+      .map((r) => ({ ...r, user: lmPerson(r.user_id), partner: r.partner_id ? lmPerson(r.partner_id) : null }))
+  }
+  if (table === 'teams') {
+    if (method === 'DELETE') { st.teams = []; return [] }
+    if (method === 'POST') {
+      st.teams = [].concat(body).map((row) => ({ id: `lmt-new-${lmSeq++}`, created_at: new Date().toISOString(), ...row }))
+      return []
+    }
+    if (url.includes('game_id=in.')) return []
+    return st.teams.map((team) => ({ ...team, player1: lmPerson(team.player1_id), player2: lmPerson(team.player2_id) }))
+  }
+  if (table === 'matches') return []
+  if (table === 'games') {
+    if (method === 'PATCH') {
+      const before = st.game.max_players || st.game.num_courts * 4
+      Object.assign(st.game, body)
+      if ((st.game.max_players || st.game.num_courts * 4) > before) lmPromote()
+      return []
+    }
+    // Mixes anteriores (repetição de duplas): nenhum neste teste.
+    if (url.includes('date=lt.')) return []
+    return [st.game]
+  }
+  if (table === 'memberships') {
+    return [
+      { user_id: MOCK_ADMIN_USER_ID, organization_id: MOCK_ADMIN_ORG_ID, level: null, is_guest: false, is_test: false, is_admin: true, profile: { id: MOCK_ADMIN_USER_ID, name: 'Admin (Dev)', avatar_url: null } },
+      ...LM_PEOPLE.map((p) => ({ user_id: p.id, organization_id: MOCK_ADMIN_ORG_ID, level: null, is_guest: false, is_test: false, is_admin: false, profile: { id: p.id, name: p.name, avatar_url: null } })),
+    ]
+  }
+  return undefined
+}
+
 const TABLE_MOCKS = {
+  // localStorage.mockNotices = 'true' — três avisos de mix no sino (Trello #292).
+  notifications: () => (localStorage.getItem('mockNotices') === 'true' ? [
+    { id: 'n1', kind: 'mix_partner_changed', game_id: 'fake-game-1', created_at: new Date().toISOString(),
+      data: { game_title: 'Mix de Quinta-feira', game_date: tomorrow8pm.toISOString(), partner_name: 'Ana Moreira' } },
+    { id: 'n2', kind: 'mix_joined', game_id: 'fake-game-1', created_at: new Date().toISOString(),
+      data: { game_title: 'Mix de Quinta-feira', game_date: tomorrow8pm.toISOString(), partner_name: null } },
+    { id: 'n3', kind: 'mix_removed', game_id: 'fake-game-1', created_at: new Date().toISOString(),
+      data: { game_title: 'Mix de Terça', game_date: tomorrow8pm.toISOString() } },
+  ] : []),
   // A organização do Admin(Dev). Sem esta linha o separador Definições do
   // Gerir ficava em branco (loadSettings nunca recebia nada). Marcada como
   // grupo criado na Comunidade para se poder validar o "Eliminar grupo".
@@ -517,6 +634,18 @@ export function installDevMockNetwork() {
     }
 
     const tableMatch = url.match(/\/rest\/v1\/([a-zA-Z_]+)\?/)
+    if (tableMatch && lastMinute()) {
+      const method = (init?.method || input?.method || 'GET').toUpperCase()
+      let body = null
+      try { body = init?.body ? JSON.parse(init.body) : null } catch { /* not JSON — ignore */ }
+      const data = lastMinuteRequest(tableMatch[1], url, method, body)
+      if (data !== undefined) {
+        if (method === 'GET' && wantsSingle(init)) {
+          return data[0] ? jsonResponse(data[0]) : jsonResponse({ message: 'no rows', code: 'PGRST116' }, 406)
+        }
+        return jsonResponse(data)
+      }
+    }
     if (tableMatch) {
       const mock = TABLE_MOCKS[tableMatch[1]]
       const data = mock ? mock(url) : []
