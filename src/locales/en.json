@@ -1348,6 +1348,8 @@
   "ui.decrease_5_minutes": "Minus 5 minutes",
   "ui.increase_5_minutes": "Plus 5 minutes",
   "ui.select_placeholder": "Select…",
+  "ui.select_search_placeholder": "Search…",
+  "ui.select_search_empty": "No results.",
   "ui.action_join": "Join",
   "ui.action_waitlist": "Waitlist",
   "ui.action_leave": "Leave",

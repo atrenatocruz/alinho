@@ -112,6 +112,7 @@ export default function EscolherNivel() {
             value={nationality}
             onChange={setNationality}
             placeholder={t('profile.nationality_placeholder')}
+            searchable
             options={[
               { value: '', label: t('profile.nationality_none') },
               ...countryOptions(i18n.language),
