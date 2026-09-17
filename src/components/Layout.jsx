@@ -674,6 +674,15 @@ export default function Layout({ children }) {
               <Link
                 key={path}
                 to={path}
+                onClick={(e) => {
+                  // Tocar na Home já lá estando não deve empilhar mais uma
+                  // entrada no histórico só para o scroll ficar onde estava —
+                  // a Home trata disto sozinha, a partir deste aviso.
+                  if (isActive && path === '/') {
+                    e.preventDefault()
+                    window.dispatchEvent(new Event('home:reset-scroll'))
+                  }
+                }}
                 aria-current={isActive ? 'page' : undefined}
                 aria-label={label}
                 className={`relative flex flex-col items-center justify-center h-11 rounded-full shrink-0
