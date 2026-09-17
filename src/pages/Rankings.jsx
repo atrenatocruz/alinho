@@ -399,11 +399,10 @@ export default function Rankings() {
         />
       ) : (
         <>
-          {trimmed && (
-            <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">
-              {t('rankings.players_found', { count: visible.length })}
-            </p>
-          )}
+          {/* Quantas pessoas há na lista — com pesquisa, quantas a pesquisa encontrou. */}
+          <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">
+            {t('rankings.players_found', { count: visible.length })}
+          </p>
           {allScales && !trimmed && (
             <p className="text-xs text-muted">{t('rankings.all_scales_hint')}</p>
           )}
