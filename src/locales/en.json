@@ -679,7 +679,7 @@
   "gerirclube.app_features_heading": "App features",
   "gerirclube.appears_in_community_hint": "Mixes show up for people exploring on Home, without player names, and points count toward the general ranking.",
   "gerirclube.approve_action": "Approve",
-  "gerirclube.auto_start_help": "Pairs are formed and the mix starts on its own, with a WhatsApp notice. Leave blank to start manually.",
+  "gerirclube.auto_start_help": "From this point on, as soon as every court is full the pairs are formed and the mix starts on its own, with a WhatsApp notice. If it doesn't fill up, it won't start on its own. Leave blank to start manually.",
   "gerirclube.auto_start_preview": "🕐 Opens at {{date}}{{time}}",
   "gerirclube.auto_start_label": "Start automatically (optional)",
   "gerirclube.auto_start_placeholder": "e.g. 2 (hours before the game)",

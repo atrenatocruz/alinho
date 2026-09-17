@@ -679,7 +679,7 @@
   "gerirclube.app_features_heading": "Funcionalidades da app",
   "gerirclube.appears_in_community_hint": "Os mixes aparecem a quem explora na Home, sem nomes de jogadores, e os pontos contam para o ranking geral.",
   "gerirclube.approve_action": "Aprovar",
-  "gerirclube.auto_start_help": "As duplas são formadas e o mix começa sozinho, com aviso no WhatsApp. Deixa em branco para começar manualmente.",
+  "gerirclube.auto_start_help": "A partir desta altura, assim que todos os campos estiverem preenchidos as duplas são formadas e o mix começa sozinho, com aviso no WhatsApp. Se não encher, não começa sozinho. Deixa em branco para começar manualmente.",
   "gerirclube.auto_start_preview": "🕐 Abre às {{date}}{{time}}",
   "gerirclube.auto_start_label": "Começar automaticamente (opcional)",
   "gerirclube.auto_start_placeholder": "ex: 2 (horas antes do jogo)",
