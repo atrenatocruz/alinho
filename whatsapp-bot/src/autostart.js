@@ -61,6 +61,16 @@ async function autoStartMix(game, { sendText }) {
     .eq('status', 'confirmed')
   if (pErr) throw new Error(`Failed to load participants for auto-start: ${pErr.message}`)
 
+  // Only auto-start once every court is actually full — auto_start_hours_before
+  // is the earliest the bot starts checking, not a guarantee to start
+  // regardless of headcount. Firing on time alone left a mix with free
+  // slots stuck in_progress, with no way for late sign-ups to join and no
+  // way to cleanly undo it short of an admin "Parar Mix" (Trello #293).
+  // Leave status alone and retry on the next poll.
+  const capacity = game.max_players || (game.num_courts || 1) * 4
+  const peopleCount = (participants || []).reduce((n, p) => n + 1 + (p.partner_id ? 1 : 0), 0)
+  if (peopleCount < capacity) return
+
   const { data: rankings, error: rErr } = await supabase.rpc('get_global_rankings')
   if (rErr) throw new Error(`Failed to load rankings for auto-start: ${rErr.message}`)
   const pointsById = Object.fromEntries((rankings || []).map((r) => [r.user_id, Math.round(r.rating || 0)]))

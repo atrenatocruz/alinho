@@ -953,12 +953,26 @@ export default function GameDetails() {
 
   // Aborts an in-progress mix so the admin can reform duplas and start over
   // — deletes the teams (cascades to their matches) and reopens the game
-  // for "Começar Mix". Only reachable before finalize_mix runs, so no
-  // player_stats/mix_player_stats rows exist yet to roll back.
+  // for "Começar Mix" (or for fresh sign-ups, see below). Only reachable
+  // before finalize_mix runs, so no player_stats/mix_player_stats rows
+  // exist yet to roll back.
+  // Also clears auto_start_hours_before on this game row (never on the
+  // recurrence) so the bot's autostart.js poll doesn't immediately re-form
+  // duplas and flip the mix back to in_progress behind the admin's back —
+  // this event drops to manual start; the next occurrence still inherits
+  // the recurrence's auto-start setting via process_due_game_recurrences.
+  // If the mix still has room (e.g. it auto-started before filling up),
+  // reopen straight to 'open' so the app's join button (canJoin requires
+  // status === 'open') works immediately — trade-off: "Começar o Mix"
+  // (canStart requires showClosed) won't reappear until the mix is full
+  // again, same as any other open-and-not-full mix.
   const handleStopMix = async () => {
-    const msg = matches.length > 0
+    const hasRoom = countPeople(participants) < mixCapacity(game)
+    let msg = matches.length > 0
       ? t('gamedetails.confirm_stop_mix_with_results')
       : t('gamedetails.confirm_stop_mix_no_results')
+    if (game?.auto_start_hours_before) msg += '\n\n' + t('gamedetails.confirm_stop_mix_disables_autostart')
+    if (hasRoom) msg += '\n\n' + t('gamedetails.confirm_stop_mix_reopens_for_signups')
     if (!confirm(msg)) return
 
     setBusy(true)
@@ -969,7 +983,7 @@ export default function GameDetails() {
 
       const { error: statusError } = await supabase
         .from('games')
-        .update({ status: 'closed', winner_team_id: null })
+        .update({ status: hasRoom ? 'open' : 'closed', winner_team_id: null, auto_start_hours_before: null })
         .eq('id', id)
       if (statusError) throw statusError
 

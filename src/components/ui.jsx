@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ChevronRight, ChevronDown, ChevronLeft, Lock, Calendar, X, Share2, MessageCircle, Link2, ImageDown, Trophy, Users, Ticket, Building2 } from 'lucide-react'
+import { ChevronRight, ChevronDown, ChevronLeft, Lock, Calendar, X, Share2, MessageCircle, Link2, ImageDown, Trophy, Users, Ticket, Building2, Search } from 'lucide-react'
 import ShareCard, { CARD_W, CARD_H } from './ShareCard'
 import QRCode from 'qrcode'
 import { ratingBand, groupRatingBand } from '../lib/elo'
@@ -1387,11 +1387,20 @@ export function RoundTimer({ startedAt, durationMinutes, isAdmin, onAdjust }) {
    of this app's option lists are long enough for that to matter. */
 // variant="chip": o mesmo seletor, mas o botão é uma pastilha (filtros da
 // Home, Comunidade e Rankings). `active` pinta-a de preto.
-export function Select({ value, onChange, options, placeholder, className = '', variant = 'field', active = true }) {
+// Accent-insensitive so "africa" still matches "África do Sul" — country
+// names are the main searchable list and Portuguese names are full of them.
+const stripAccents = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '')
+
+export function Select({ value, onChange, options, placeholder, className = '', variant = 'field', active = true, searchable = false }) {
   const { t } = useTranslation()
   const resolvedPlaceholder = placeholder ?? t('ui.select_placeholder')
   const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
   const selected = options.find((o) => o.value === value)
+  const visibleOptions = searchable && query.trim()
+    ? options.filter((o) => stripAccents(o.label).toLowerCase().includes(stripAccents(query).toLowerCase()))
+    : options
+  const closeSheet = () => { setOpen(false); setQuery('') }
 
   return (
     <>
@@ -1420,7 +1429,7 @@ export function Select({ value, onChange, options, placeholder, className = '', 
       {open && createPortal(
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-ink-900/50 animate-fade-in"
-          onClick={() => setOpen(false)}
+          onClick={closeSheet}
         >
           <div
             className="bg-surface rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-md max-h-[70vh] overflow-y-auto animate-pop"
@@ -1429,19 +1438,36 @@ export function Select({ value, onChange, options, placeholder, className = '', 
             <div className="flex items-center justify-between px-5 pt-5 pb-3">
               <h3 className="text-lg text-ink-900">{resolvedPlaceholder}</h3>
               <button
-                onClick={() => setOpen(false)}
+                onClick={closeSheet}
                 aria-label={t('ui.close')}
                 className="w-9 h-9 flex items-center justify-center rounded-full text-muted hover:bg-ink-50 hover:text-ink-900 transition-colors duration-fast"
               >
                 <X size={20} />
               </button>
             </div>
+            {searchable && (
+              <div className="px-5 pb-3">
+                <div className="flex items-center gap-2 input-field focus-within:border-ink-500 focus-within:ring-2 focus-within:ring-ink-50">
+                  <Search size={16} className="text-muted shrink-0" />
+                  <input
+                    type="text"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder={t('ui.select_search_placeholder')}
+                    autoFocus
+                    className="flex-1 min-w-0 bg-transparent outline-none text-base"
+                  />
+                </div>
+              </div>
+            )}
             <div className="px-2 pb-5">
-              {options.map((o) => (
+              {visibleOptions.length === 0 ? (
+                <p className="px-3.5 py-3 text-sm text-muted">{t('ui.select_search_empty')}</p>
+              ) : visibleOptions.map((o) => (
                 <button
                   key={o.value}
                   type="button"
-                  onClick={() => { onChange(o.value); setOpen(false) }}
+                  onClick={() => { onChange(o.value); closeSheet() }}
                   className={`w-full text-left px-3.5 py-3 rounded-ctrl text-base font-extrabold transition-colors duration-fast ${
                     o.value === value ? 'bg-lime-400/20 text-ink-900' : 'text-ink-900 hover:bg-ink-50'
                   }`}
