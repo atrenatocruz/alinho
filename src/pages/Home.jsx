@@ -6,7 +6,8 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { EmptyState, PrimaryButton } from '../components/ui'
 import { GameEventCard, FriendsEventCard, ExploreEventCard } from '../components/agenda/EventCard'
-import { DayHeader, MonthSheet, FilterSheet, FilterChips, LocationChip, LocationSheet, dayLabel } from '../components/agenda/AgendaControls'
+import { DayHeader, MonthSheet, FilterSheet, FilterChips, LocationChip, LocationSheet, ViewToggle, Sheet, dayLabel } from '../components/agenda/AgendaControls'
+import { MapView } from '../components/agenda/MapView'
 import { listExploreEvents, getSavedLocation, saveLocation } from '../lib/explore'
 import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
 import { countPeople, mixCapacity, isGenderMismatch, isAgeIneligible, isMissingBirthday } from '../lib/mixLogic'
@@ -15,9 +16,10 @@ import { isMemberLimitError } from '../lib/plans'
 import { describeError } from '../lib/errors'
 import { getGroupMatches } from '../lib/groupMatches'
 import { getMyPrivateMatches, respondToPrivateMatch } from '../lib/privateMatches'
+import { GOOGLE_MAPS_API_KEY } from '../lib/googleMaps'
 import {
   toDayKey, eventFromGame, eventFromGroupMatch, eventFromPrivateMatch, eventFromExplore, isAgendaGame,
-  applyFilters, groupByDay, countByDay, eventDistance, normalizeFilters,
+  applyFilters, groupByDay, countByDay, eventDistance, normalizeFilters, isPastEvent, eventsToPins,
 } from '../lib/agenda'
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -39,6 +41,7 @@ import {
    ════════════════════════════════════════════════════════════════════════ */
 
 const FILTERS_KEY = 'home.agenda.filters'
+const VIEW_MODE_KEY = 'home.agenda.view'
 let homeShownBefore = false
 
 const readSession = (key, fallback) => {
@@ -81,8 +84,15 @@ export default function Home() {
   const [location, setLocation] = useState(getSavedLocation)
   const [locationOpen, setLocationOpen] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
+  // Vista de mapa (Fase 2 do épico, Trello #258) — alternativa à lista, não
+  // um filtro: persiste como os filtros, para sobreviver a abrir um mix e
+  // voltar atrás. Sem chave da Google não há mapa para mostrar (ver
+  // lib/googleMaps.js), por isso nunca sai de 'list' nesse caso.
+  const [viewMode, setViewMode] = useState(() => (GOOGLE_MAPS_API_KEY ? readSession(VIEW_MODE_KEY, 'list') : 'list'))
+  const [selectedPin, setSelectedPin] = useState(null)
 
   useEffect(() => { writeSession(FILTERS_KEY, filters) }, [filters])
+  useEffect(() => { writeSession(VIEW_MODE_KEY, viewMode) }, [viewMode])
 
   const handleJoin = async (slugOverride) => {
     const slug = (slugOverride ?? joinSlug).trim()
@@ -295,6 +305,9 @@ export default function Home() {
   const counts = useMemo(() => countByDay(visible), [visible])
   const today = toDayKey(new Date())
   const days = useMemo(() => groupByDay(visible, today), [visible, today])
+  // O mapa só mostra o que ainda vem à frente — pins de eventos passados não
+  // ajudam a decidir onde jogar a seguir.
+  const pins = useMemo(() => eventsToPins(visible.filter((e) => !isPastEvent(e, today))), [visible, today])
 
   /* --- Ação direta num mix (Trello #51). As regras são as mesmas dos botões
      da página do mix; quem decide de verdade é a RLS de `participants`. Sem
@@ -578,10 +591,16 @@ export default function Home() {
         </Link>
       )}
 
-      {/* Cabeçalho fixo: fica em cima enquanto a lista passa por baixo. */}
+      {/* Cabeçalho fixo: fica em cima enquanto a lista passa por baixo. Sem
+          data nem calendário na vista de mapa — não há "dia no topo" lá. */}
       <div ref={headerRef} className="sticky top-0 z-10 -mx-4 px-4 -mt-6 pt-4 pb-2.5 bg-canvas space-y-1.5 border-b border-line/70">
-        <LocationChip location={location} onOpen={() => setLocationOpen(true)} />
-        <DayHeader dayKey={visibleDay} onOpenMonth={() => setMonthOpen(true)} />
+        <div className="flex items-center justify-between gap-2">
+          <LocationChip location={location} onOpen={() => setLocationOpen(true)} />
+          {GOOGLE_MAPS_API_KEY && (
+            <ViewToggle mode={viewMode} onToggle={() => setViewMode((m) => (m === 'list' ? 'map' : 'list'))} />
+          )}
+        </div>
+        {viewMode === 'list' && <DayHeader dayKey={visibleDay} onOpenMonth={() => setMonthOpen(true)} />}
         <FilterChips filters={filters} onOpenFilters={() => setFiltersOpen(true)} />
       </div>
 
@@ -589,24 +608,39 @@ export default function Home() {
         <div className="bg-danger/10 text-danger px-4 py-3 rounded-ctrl text-sm font-extrabold animate-fade-up mt-3">{cardError}</div>
       )}
 
-      <div className="mt-3 space-y-5">
-        {days.map(({ dayKey, events: dayEvents }) => (
-          <section
-            key={dayKey}
-            ref={(el) => { if (el) dayRefs.current.set(dayKey, el); else dayRefs.current.delete(dayKey) }}
-            className="space-y-2.5"
-          >
-            <p className={`text-[11px] font-extrabold uppercase tracking-widest ${dayKey === today ? 'text-ink-900' : 'text-muted'}`}>
-              {dayLabel(dayKey, t, i18n.language)}
-            </p>
-            {dayEvents.length === 0
-              ? <p className="text-sm text-muted py-3 px-3 rounded-card border border-dashed border-line">{t('agenda.today_empty')}</p>
-              : dayEvents.map(renderEvent)}
-          </section>
-        ))}
-        {/* Espaço no fim para o último dia poder subir até ao cabeçalho. */}
-        <div className="h-[40vh]" aria-hidden="true" />
-      </div>
+      {viewMode === 'map' ? (
+        <MapView pins={pins} location={location} onSelectPin={setSelectedPin} />
+      ) : (
+        <div className="mt-3 space-y-5">
+          {days.map(({ dayKey, events: dayEvents }) => (
+            <section
+              key={dayKey}
+              ref={(el) => { if (el) dayRefs.current.set(dayKey, el); else dayRefs.current.delete(dayKey) }}
+              className="space-y-2.5"
+            >
+              <p className={`text-[11px] font-extrabold uppercase tracking-widest ${dayKey === today ? 'text-ink-900' : 'text-muted'}`}>
+                {dayLabel(dayKey, t, i18n.language)}
+              </p>
+              {dayEvents.length === 0
+                ? <p className="text-sm text-muted py-3 px-3 rounded-card border border-dashed border-line">{t('agenda.today_empty')}</p>
+                : dayEvents.map(renderEvent)}
+            </section>
+          ))}
+          {/* Espaço no fim para o último dia poder subir até ao cabeçalho. */}
+          <div className="h-[40vh]" aria-hidden="true" />
+        </div>
+      )}
+
+      {selectedPin && (
+        <Sheet
+          title={selectedPin.events[0]?.orgName || t('agenda.map_pin_title')}
+          onClose={() => setSelectedPin(null)}
+        >
+          <div className="space-y-2.5">
+            {selectedPin.events.map(renderEvent)}
+          </div>
+        </Sheet>
+      )}
 
       {monthOpen && (
         <MonthSheet

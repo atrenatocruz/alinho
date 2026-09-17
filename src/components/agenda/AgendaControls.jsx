@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
-import { ChevronLeft, ChevronRight, ChevronDown, Calendar, X, MapPin, LocateFixed } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronDown, Calendar, X, MapPin, LocateFixed, Map, List } from 'lucide-react'
 import { useGooglePlacesAutocomplete } from '../../lib/useGooglePlacesAutocomplete'
 import { RADIUS_OPTIONS } from '../../lib/explore'
 import { formatDate } from '../../lib/formatDate'
@@ -41,7 +41,7 @@ export function DayHeader({ dayKey, onOpenMonth }) {
   )
 }
 
-function Sheet({ title, onClose, children }) {
+export function Sheet({ title, onClose, children }) {
   const { t } = useTranslation()
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-ink-900/50 animate-fade-in" onClick={onClose}>
@@ -207,6 +207,25 @@ export function LocationChip({ location, onOpen }) {
         {location ? t('agenda.location_chip', { place: location.label, km: location.radiusKm }) : t('agenda.location_choose')}
       </span>
       <ChevronDown size={14} className="shrink-0" />
+    </button>
+  )
+}
+
+/* Alterna lista/mapa (Home, vista de mapa, Trello #258). O ícone mostra o
+   destino do toque, não o estado atual — igual à convenção do próprio
+   Google Maps/Instagram para este tipo de par de vistas. */
+export function ViewToggle({ mode, onToggle }) {
+  const { t } = useTranslation()
+  const Icon = mode === 'list' ? Map : List
+  const label = mode === 'list' ? t('agenda.view_map') : t('agenda.view_list')
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-label={label}
+      className="w-9 h-9 shrink-0 rounded-full border border-line bg-canvas flex items-center justify-center text-ink-700"
+    >
+      <Icon size={16} />
     </button>
   )
 }

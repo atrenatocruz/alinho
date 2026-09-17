@@ -3,6 +3,7 @@ import {
   toDayKey, fromDayKey, addDays, eventFromGame, eventFromGroupMatch, eventFromPrivateMatch,
   applyFilters, eventsForDay, countByDay, nextMineDay, monthGrid, isAgendaGame,
   DEFAULT_FILTERS, isDefaultFilters, normalizeFilters, groupByDay, eventFromExplore, distanceKm, eventDistance, withinReach,
+  eventsToPins,
 } from './agenda'
 
 const ME = 'me'
@@ -173,6 +174,25 @@ describe('explore (Fase 2)', () => {
     expect(withinReach(ownClub, porto)).toBe(true)
     expect(applyFilters([near, ownClub], DEFAULT_FILTERS, porto, '2026-09-01').map((e) => e.id)).toEqual(['own'])
     expect(eventDistance(near, null)).toBe(null)
+  })
+})
+
+describe('eventsToPins', () => {
+  it('drops events without coordinates', () => {
+    const e = eventFromGame(game({ latitude: null, longitude: null }), ME)
+    expect(eventsToPins([e])).toEqual([])
+  })
+  it('groups events at the same spot into one pin', () => {
+    const a = eventFromGame(game({ id: 'a', latitude: 38.7223, longitude: -9.1393 }), ME)
+    const b = eventFromGame(game({ id: 'b', latitude: 38.7223, longitude: -9.1393 }), ME)
+    const pins = eventsToPins([a, b])
+    expect(pins).toHaveLength(1)
+    expect(pins[0].events.map((e) => e.id)).toEqual(['a', 'b'])
+  })
+  it('keeps events at different spots in separate pins', () => {
+    const a = eventFromGame(game({ id: 'a', latitude: 38.7223, longitude: -9.1393 }), ME)
+    const b = eventFromGame(game({ id: 'b', latitude: 41.1579, longitude: -8.6291 }), ME)
+    expect(eventsToPins([a, b])).toHaveLength(2)
   })
 })
 
