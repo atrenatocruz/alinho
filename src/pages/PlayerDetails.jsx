@@ -19,6 +19,7 @@ const SIDE_LABEL_KEY = { left: 'gamedetails.side_left', right: 'gamedetails.side
 // Mesmas chaves que o Profile.jsx usa, para o genero ler igual nos dois
 // perfis (Trello #202).
 const GENDER_LABEL_KEY = { masculino: 'login.gender_male', feminino: 'login.gender_female' }
+const HAND_LABEL_KEY = { right: 'profile.dominant_hand_right', left: 'profile.dominant_hand_left' }
 
 // Aggregated across every club the player belongs to (not scoped to the
 // viewer's currentOrganizationId) via get_player_profile/get_head_to_head_*
@@ -460,6 +461,13 @@ export default function PlayerDetails() {
               {t(SIDE_LABEL_KEY[player.preferred_side] || SIDE_LABEL_KEY.both)}
             </p>
           </div>
+          {/* Só aparece se a pessoa a indicou (e a migração já correu). */}
+          {HAND_LABEL_KEY[playerExtras?.dominant_hand] && (
+            <div>
+              <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('profile.dominant_hand_label')}</p>
+              <p className="text-base text-ink-900 mt-0.5">{t(HAND_LABEL_KEY[playerExtras.dominant_hand])}</p>
+            </div>
+          )}
           {playerExtras?.nationality && (
             <div>
               <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('profile.nationality_label')}</p>

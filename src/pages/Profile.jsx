@@ -31,6 +31,7 @@ const TABS = [
 
 const SIDE_LABEL_KEY = { left: 'gamedetails.side_left', right: 'gamedetails.side_right', both: 'gamedetails.side_both' }
 const GENDER_LABEL_KEY = { masculino: 'login.gender_male', feminino: 'login.gender_female' }
+const HAND_LABEL_KEY = { right: 'profile.dominant_hand_right', left: 'profile.dominant_hand_left' }
 
 export default function Profile() {
   const { t, i18n } = useTranslation()
@@ -57,6 +58,8 @@ export default function Profile() {
   // Nacionalidade (Trello #191). Opcional: '' significa nao indicada, e e
   // gravada como null.
   const [nationality, setNationality] = useState(profile?.nationality || '')
+  // Mão dominante (destro/esquerdino). Opcional: '' = não indicada → null.
+  const [dominantHand, setDominantHand] = useState(profile?.dominant_hand || '')
   const [birthday, setBirthday] = useState(profile?.birthday || '')
   const [gender, setGender] = useState(profile?.gender || '')
   const [language, setLanguage] = useState(profile?.language || 'pt')
@@ -106,6 +109,7 @@ export default function Profile() {
       setName(profile.name)
       setPreferredSide(profile.preferred_side || 'both')
       setNationality(profile.nationality || '')
+      setDominantHand(profile.dominant_hand || '')
       setBirthday(profile.birthday || '')
       setGender(profile.gender || '')
       setLanguage(profile.language || 'pt')
@@ -418,6 +422,12 @@ export default function Profile() {
         results_visibility: resultsVisibility,
         clubs_visibility: clubsVisibility,
         is_private: isPrivate,
+      }
+      // Só entra no UPDATE quando muda: quem não mexe no campo continua a
+      // conseguir gravar o perfil mesmo que a migração
+      // (migration_profile_dominant_hand.sql) ainda não tenha sido corrida.
+      if ((dominantHand || null) !== (profile?.dominant_hand || null)) {
+        updates.dominant_hand = dominantHand || null
       }
       if (phone) {
         updates.phone_hash = await hashPhone(phone)
@@ -1047,6 +1057,21 @@ export default function Profile() {
                 <p className="text-xs text-muted mt-1.5">{t('profile.preferred_side_hint')}</p>
               </div>
 
+              {/* Mão dominante — opcional; a opção vazia permite voltar atrás. */}
+              <div>
+                <label className={inputLabel}>{t('profile.dominant_hand_label')}</label>
+                <Select
+                  value={dominantHand}
+                  onChange={setDominantHand}
+                  placeholder={t('profile.dominant_hand_label')}
+                  options={[
+                    { value: '', label: t('profile.not_set') },
+                    { value: 'right', label: t('profile.dominant_hand_right') },
+                    { value: 'left', label: t('profile.dominant_hand_left') },
+                  ]}
+                />
+              </div>
+
               {/* Nacionalidade (Trello #191) — opcional, nunca obrigatoria.
                   A primeira opcao vazia e o que permite voltar atras depois
                   de ter escolhido; sem ela nao havia forma de a limpar. */}
@@ -1126,6 +1151,7 @@ export default function Profile() {
                     setName(profile.name)
                     setPreferredSide(profile.preferred_side || 'both')
                     setNationality(profile.nationality || '')
+                    setDominantHand(profile.dominant_hand || '')
                     setBirthday(profile.birthday || '')
                     setGender(profile.gender || '')
                     setLanguage(profile.language || 'pt')
@@ -1194,6 +1220,13 @@ export default function Profile() {
                 <p className={fieldLabel}>{t('profile.preferred_side_label')}</p>
                 <p className={fieldValue}>
                   {t(SIDE_LABEL_KEY[profile?.preferred_side] || SIDE_LABEL_KEY.both)}
+                </p>
+              </div>
+
+              <div>
+                <p className={fieldLabel}>{t('profile.dominant_hand_label')}</p>
+                <p className={fieldValue}>
+                  {HAND_LABEL_KEY[profile?.dominant_hand] ? t(HAND_LABEL_KEY[profile.dominant_hand]) : t('profile.not_set')}
                 </p>
               </div>
 
