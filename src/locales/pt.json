@@ -490,6 +490,7 @@
   "gamedetails.error_start_mix": "Não foi possível começar o mix.",
   "gamedetails.confirm_stop_mix_with_results": "Isto apaga as duplas e todos os resultados registados neste mix, para poderes recomeçar. Tens a certeza?",
   "gamedetails.confirm_stop_mix_no_results": "Isto apaga as duplas formadas, para poderes recomeçar. Tens a certeza?",
+  "gamedetails.confirm_stop_mix_disables_autostart": "Este mix estava em modo automático — depois de parares, este evento passa a exigir início manual (\"Começar o Mix\"). O modo automático volta a aplicar-se apenas no mix seguinte.",
   "gamedetails.confirm_repeat_pairing": "Sem alternativa possível, estas duplas repetem parceria de um dos últimos 4 mixes: {{pairs}}. Continuar mesmo assim?",
   "gamedetails.error_stop_mix": "Não foi possível parar o mix.",
   "gamedetails.error_start_round1": "Não foi possível iniciar a ronda 1.",
