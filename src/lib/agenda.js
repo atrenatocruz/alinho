@@ -204,6 +204,24 @@ export function eventDistance(event, location) {
 }
 
 /**
+ * Agrupa eventos com coordenadas em pins do mapa (Home, vista de mapa,
+ * Trello #258) — vários no mesmo sítio (o mesmo clube) partilham um só pin.
+ * Sem coordenadas (morada escrita à mão, ou jogo entre amigos, que nunca as
+ * tem) não há como desenhar o pin, por isso ficam de fora — o mesmo silêncio
+ * que eventDistance já usa.
+ */
+export function eventsToPins(events) {
+  const byKey = new Map()
+  for (const e of events) {
+    if (e.latitude == null || e.longitude == null) continue
+    const key = `${e.latitude.toFixed(5)},${e.longitude.toFixed(5)}`
+    if (!byKey.has(key)) byKey.set(key, { latitude: e.latitude, longitude: e.longitude, events: [] })
+    byKey.get(key).events.push(e)
+  }
+  return [...byKey.values()]
+}
+
+/**
  * O raio só filtra os eventos de explorar: os dos próprios clubes aparecem
  * sempre, estejam onde estiverem. Um evento de explorar sem coordenadas só
  * aparece enquanto não há sítio escolhido — não há como saber se está perto.

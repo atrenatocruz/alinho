@@ -1,13 +1,6 @@
 import { useEffect, useRef } from 'react'
-import { setOptions, importLibrary } from '@googlemaps/js-api-loader'
-
-// Undefined (not just falsy-empty-string) when the env var is unset, so
-// callers fall back to a plain text input rather than throwing on a missing
-// key — see .env.example. setOptions() only records config (must run
-// before the first importLibrary() call) — it doesn't fetch anything
-// itself, so it's safe to call at module scope even if Places is never used.
-const GOOGLE_PLACES_API_KEY = import.meta.env.VITE_GOOGLE_PLACES_API_KEY || null
-if (GOOGLE_PLACES_API_KEY) setOptions({ key: GOOGLE_PLACES_API_KEY, v: 'weekly' })
+import { importLibrary } from '@googlemaps/js-api-loader'
+import { GOOGLE_MAPS_API_KEY as GOOGLE_PLACES_API_KEY } from './googleMaps'
 
 /**
  * Wires Google Places Autocomplete onto a plain text <input>, active only
