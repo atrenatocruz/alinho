@@ -1,0 +1,22 @@
+-- ════════════════════════════════════════════════════════════════════════
+-- Fix: profiles.nationality was never added to the column-grant allowlist.
+--
+-- migration_fix_profiles_column_grants.sql REVOKEd blanket UPDATE on
+-- profiles and only re-grants specific columns; migration_profile_
+-- nationality.sql added the nationality column afterwards but (wrongly)
+-- assumed RLS alone covered it — it never granted column-level UPDATE.
+--
+-- Profile.jsx saves the whole form in one UPDATE statement (name,
+-- preferred_side, nationality, birthday, ...), and Postgres rejects the
+-- entire statement if the caller lacks UPDATE on ANY targeted column — so
+-- this didn't just silently drop nationality, it blocked every field in
+-- the same save (reported: "não me deixa alterar esses 2 valores",
+-- Trello — two players hit this on 2026-09-17).
+--
+-- Same pattern as migration_add_profile_language.sql's identical fix for
+-- the `language` column.
+--
+-- Run this whole file in Supabase → SQL Editor → New query → Run.
+-- ════════════════════════════════════════════════════════════════════════
+
+GRANT UPDATE (nationality) ON profiles TO authenticated;
