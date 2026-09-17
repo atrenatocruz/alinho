@@ -966,6 +966,22 @@ export function PlayerAvatarRow({ players = [], max = 4, size = 'md', cap = 6 })
   )
 }
 
+/* ─── PageHeader ──────────────────────────────────────────────────────────
+   Título fixo de uma página principal (Comunidade, Rankings, Gerir,
+   Perfil) — substitui o antigo header escuro global. Fica preso ao
+   fazer scroll, como a Home já fazia com a sua própria linha de filtros,
+   para as notificações/logout (passados como `children`, vindos de
+   HeaderActionsContext) continuarem sempre alcançáveis. `-mx-4 px-4 -mt-6`
+   cancela o padding do <main> do Layout para chegar à borda do ecrã. */
+export function PageHeader({ title, children }) {
+  return (
+    <div className="sticky top-0 z-10 -mx-4 px-4 -mt-6 pt-4 pb-3 bg-canvas flex items-center justify-between gap-2 border-b border-line/70">
+      <h2 className="text-3xl text-ink-900 min-w-0 truncate">{title}</h2>
+      {children && <div className="flex items-center gap-1 shrink-0">{children}</div>}
+    </div>
+  )
+}
+
 /* ─── EmptyState ─────────────────────────────────────────────────────────
    Friendly copy + court-line motif (now with a small lime ball-ring accent,
    a nod to the logo) + always one clear action. */

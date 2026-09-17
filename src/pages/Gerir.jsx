@@ -4,17 +4,19 @@ import { Settings, Plus, Check, X, GraduationCap } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { Avatar, EmptyState, PrimaryButton, OrgKindBadge, PlanBadge, orgAvatarShape } from '../components/ui'
+import { Avatar, EmptyState, PrimaryButton, OrgKindBadge, PlanBadge, orgAvatarShape, PageHeader } from '../components/ui'
 import PlayerSearch from '../components/PlayerSearch'
 import { searchAnyPlayer, createOrganization, createGroup, createSelfServeGroup } from '../lib/platformAdmin'
 import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
 import { listAllPendingTeacherRequests, approveTeacherProfile, rejectTeacherProfile } from '../lib/teachers'
 import { describeError } from '../lib/errors'
+import { useHeaderActions } from '../contexts/HeaderActionsContext'
 
 const sanitizeSlug = (value) => value.toLowerCase().replace(/[^a-z0-9-]/g, '')
 
 export default function Gerir() {
   const { t } = useTranslation()
+  const headerActions = useHeaderActions()
   const { profile, adminOrganizations, refreshMemberships } = useAuth()
   const navigate = useNavigate()
   const isPlatformAdmin = !!profile?.is_platform_admin
@@ -370,8 +372,8 @@ export default function Gerir() {
     return (
       <div className="space-y-5">
         <div>
-          <h2 className="text-3xl text-ink-900">{t('gerir.title')}</h2>
-          <p className="text-muted text-sm mt-0.5">{t('gerir.empty_subtitle')}</p>
+          <PageHeader title={t('gerir.title')}>{headerActions}</PageHeader>
+          <p className="text-muted text-sm pt-1">{t('gerir.empty_subtitle')}</p>
         </div>
         {createGroupPanel}
         {isPlatformAdmin && (
@@ -391,8 +393,8 @@ export default function Gerir() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-3xl text-ink-900">{t('gerir.title')}</h2>
-        <p className="text-muted text-sm mt-0.5">
+        <PageHeader title={t('gerir.title')}>{headerActions}</PageHeader>
+        <p className="text-muted text-sm pt-1">
           {isPlatformAdmin ? t('gerir.subtitle_platform_admin') : t('gerir.subtitle')}
         </p>
       </div>

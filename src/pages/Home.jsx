@@ -17,6 +17,7 @@ import { describeError } from '../lib/errors'
 import { getGroupMatches } from '../lib/groupMatches'
 import { getMyPrivateMatches, respondToPrivateMatch } from '../lib/privateMatches'
 import { GOOGLE_MAPS_API_KEY } from '../lib/googleMaps'
+import { useHeaderActions } from '../contexts/HeaderActionsContext'
 import {
   toDayKey, eventFromGame, eventFromGroupMatch, eventFromPrivateMatch, eventFromExplore, isAgendaGame,
   applyFilters, groupByDay, countByDay, eventDistance, normalizeFilters, isPastEvent, eventsToPins,
@@ -59,6 +60,7 @@ const writeSession = (key, value) => {
 export default function Home() {
   const { t, i18n } = useTranslation()
   const { user, profile, memberships, joinOrganization, followOrganization, isAdminOfAny, isPrivateMatchesEnabled } = useAuth()
+  const headerActions = useHeaderActions()
   const [searchParams, setSearchParams] = useSearchParams()
 
   const [games, setGames] = useState([])
@@ -614,9 +616,12 @@ export default function Home() {
       <div ref={headerRef} className="sticky top-0 z-10 -mx-4 px-4 -mt-6 pt-4 pb-2.5 bg-canvas space-y-1.5 border-b border-line/70">
         <div className="flex items-center justify-between gap-2">
           <LocationChip location={location} onOpen={() => setLocationOpen(true)} />
-          {GOOGLE_MAPS_API_KEY && (
-            <ViewToggle mode={viewMode} onToggle={() => setViewMode((m) => (m === 'list' ? 'map' : 'list'))} />
-          )}
+          <div className="flex items-center gap-1 shrink-0">
+            {GOOGLE_MAPS_API_KEY && (
+              <ViewToggle mode={viewMode} onToggle={() => setViewMode((m) => (m === 'list' ? 'map' : 'list'))} />
+            )}
+            {headerActions}
+          </div>
         </div>
         {viewMode === 'list' && <DayHeader dayKey={visibleDay} onOpenMonth={() => setMonthOpen(true)} />}
         <FilterChips filters={filters} onOpenFilters={() => setFiltersOpen(true)} />

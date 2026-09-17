@@ -11,7 +11,8 @@ import { getMyPrivateMatches, getGlobalRankings } from '../lib/privateMatches'
 import { getGroupMatches } from '../lib/groupMatches'
 import { KindTag } from '../components/agenda/EventCard'
 import { getFollowCounts } from '../lib/follows'
-import { PrimaryButton, GuestBadge, DateField, Avatar, Select, EmptyState, RatingBadge, PhotoViewerModal, FollowListModal, AchievementCard, VoucherCard, VoucherQRModal } from '../components/ui'
+import { PrimaryButton, GuestBadge, DateField, Avatar, Select, EmptyState, RatingBadge, PhotoViewerModal, FollowListModal, AchievementCard, VoucherCard, VoucherQRModal, PageHeader } from '../components/ui'
+import { useHeaderActions } from '../contexts/HeaderActionsContext'
 import { CATEGORY_ORDER } from '../lib/achievements'
 import TeacherSection from '../components/TeacherSection'
 import { formatRating, formatRatingMaybeProvisional, isProvisional, bandProgress, ratingBand } from '../lib/elo'
@@ -34,6 +35,7 @@ const GENDER_LABEL_KEY = { masculino: 'login.gender_male', feminino: 'login.gend
 export default function Profile() {
   const { t, i18n } = useTranslation()
   const { profile, updateProfile, currentOrganizationId, isGuest, signOut, refreshMemberships, memberships } = useAuth()
+  const headerActions = useHeaderActions()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [tab, setTab] = useState(() => (TABS.some((tb) => tb.key === searchParams.get('tab')) ? searchParams.get('tab') : 'perfil'))
@@ -550,6 +552,8 @@ export default function Profile() {
 
   return (
     <div className="space-y-4">
+      <PageHeader title={t('layout.nav_profile')}>{headerActions}</PageHeader>
+
       {/* Hero — cartão claro. Aro de progresso à volta da foto (ideia do
           Renato, Trello, 11 set 2026) substitui a antiga barra horizontal de
           rating: as duas barras (rating + XP) competiam pela mesma atenção

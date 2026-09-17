@@ -4,12 +4,13 @@ import { useTranslation } from 'react-i18next'
 import { Trophy, Award, HelpCircle, Search, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { RatingBadge, EmptyState, Avatar, Select } from '../components/ui'
+import { RatingBadge, EmptyState, Avatar, Select, PageHeader } from '../components/ui'
 import { formatRatingMaybeProvisional, isProvisional } from '../lib/elo'
 import { tierFromXp, formatXp } from '../lib/xp'
 import { winRatePct, buildMonthlyLeaderboard } from '../lib/statsLogic'
 import { getGlobalRankings } from '../lib/privateMatches'
 import { errorKind } from '../lib/errors'
+import { useHeaderActions } from '../contexts/HeaderActionsContext'
 
 /* ─── Rankings (épico «Comunidade vs. Rankings», Trello #271/#275) ───────────
    Comparar jogadores — só jogadores. Desenho:
@@ -31,6 +32,7 @@ const ALWAYS = 'always'
 
 export default function Rankings() {
   const { t, i18n } = useTranslation()
+  const headerActions = useHeaderActions()
   const { user, currentOrganizationId, memberships } = useAuth()
   const location = useLocation()
   const navigationType = useNavigationType()
@@ -292,12 +294,18 @@ export default function Rankings() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-3xl text-ink-900 inline-flex items-center gap-2">
-        {t('rankings.title')}
-        <Link to="/instrucoes#ranking" aria-label={t('rankings.help_aria')} className="text-muted hover:text-ink-900">
-          <HelpCircle size={18} />
-        </Link>
-      </h2>
+      <PageHeader
+        title={(
+          <span className="inline-flex items-center gap-2">
+            {t('rankings.title')}
+            <Link to="/instrucoes#ranking" aria-label={t('rankings.help_aria')} className="text-muted hover:text-ink-900">
+              <HelpCircle size={18} />
+            </Link>
+          </span>
+        )}
+      >
+        {headerActions}
+      </PageHeader>
 
       <div className="flex items-center gap-2 input-field focus-within:border-ink-500 focus-within:ring-2 focus-within:ring-ink-50">
         <Search size={16} className="text-muted shrink-0" />

@@ -1,10 +1,11 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useLocation, useNavigate, useNavigationType } from 'react-router-dom'
-import { Home, Users, Trophy, Settings, LogOut, HelpCircle, Phone, X, Bell, UserCheck, Swords } from 'lucide-react'
+import { Home, Users, Trophy, Settings, LogOut, Phone, X, Bell, UserCheck, Swords } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
-import { PrimaryButton, Avatar, RatingBadge, AchievementCard } from './ui'
+import { HeaderActionsProvider } from '../contexts/HeaderActionsContext'
+import { PrimaryButton, Avatar, AchievementCard } from './ui'
 import { supabase } from '../lib/supabase'
 import { hashPhone } from '../lib/hashPhone'
 import { listIncomingFollowRequests, acceptFollowRequest, removeFollow } from '../lib/follows'
@@ -462,6 +463,152 @@ export default function Layout({ children }) {
     navItems.push({ path: '/gerir', icon: Settings, label: t('layout.nav_manage') })
   }
 
+  // Notificações + logout — só o que sobra do antigo header escuro (o
+  // logótipo, o nível e a ajuda saíram de vez). Definidos aqui porque é onde
+  // vive toda a lógica (pedidos, convites…), mas mostrados dentro do título
+  // fixo de cada página principal via HeaderActionsContext — já não há uma
+  // barra global onde os pôr.
+  const headerActions = (
+    <>
+      <div className="relative">
+        <button
+          onClick={() => setShowNotifications((v) => !v)}
+          title={t('layout.notifications')}
+          aria-expanded={showNotifications}
+          className="relative w-10 h-10 flex items-center justify-center rounded-full text-ink-700 hover:text-ink-900 hover:bg-ink-50 transition-colors duration-fast"
+        >
+          <Bell size={20} />
+          {notificationsTotal > 0 && (
+            <span
+              aria-hidden="true"
+              className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-lime-400 text-ink-900 ring-2 ring-canvas text-[11px] font-extrabold flex items-center justify-center tabular-nums"
+            >
+              {notificationsTotal}
+            </span>
+          )}
+        </button>
+
+        {showNotifications && createPortal(
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
+            <div className="fixed top-[4.5rem] right-4 w-80 max-w-[85vw] bg-surface rounded-card shadow-lift ring-1 ring-line z-50 overflow-hidden animate-pop text-left">
+              <div className="px-4 py-3 border-b border-line">
+                <p className="font-extrabold text-ink-900">{t('layout.notifications')}</p>
+              </div>
+              {notificationsTotal === 0 ? (
+                <div className="p-4 text-center">
+                  <p className="text-sm text-muted">{t('layout.no_new_notifications')}</p>
+                </div>
+              ) : (
+                <div className="max-h-80 overflow-y-auto divide-y divide-line">
+                  {privateMatchTodos.map(({ kind, match }) => (
+                    <Link
+                      key={`${kind}-${match.id}`}
+                      to="/jogos-privados"
+                      onClick={() => setShowNotifications(false)}
+                      className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50"
+                    >
+                      <div className="w-9 h-9 rounded-full bg-lime-400/20 text-ink-900 flex items-center justify-center shrink-0">
+                        <Swords size={16} />
+                      </div>
+                      <p className="flex-1 min-w-0 text-sm text-ink-900">
+                        {kind === 'respond' ? (
+                          <>
+                            <span className="font-extrabold">{match.team_a_player1_name || t('layout.someone')}</span>{' '}
+                            {t('layout.private_match_invited')}
+                          </>
+                        ) : (
+                          <>
+                            {t('layout.private_match_confirm_score')}{' '}
+                            <span className="font-extrabold tabular-nums">{match.score_a}-{match.score_b}</span>
+                          </>
+                        )}
+                      </p>
+                      <span aria-hidden="true" className="w-2 h-2 rounded-full bg-lime-400 shrink-0" />
+                    </Link>
+                  ))}
+                  {joinRequestsByOrg.map((org) => (
+                    <Link
+                      key={org.organizationId}
+                      to={org.slug ? `/gerir/${org.slug}?tab=members` : '/gerir'}
+                      onClick={() => setShowNotifications(false)}
+                      className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50"
+                    >
+                      <div className="w-9 h-9 rounded-full bg-ink-50 text-ink-700 flex items-center justify-center shrink-0">
+                        <Users size={16} />
+                      </div>
+                      <p className="flex-1 min-w-0 text-sm text-ink-900">
+                        {t('layout.join_request_count', { count: org.count })}{' '}
+                        <span className="font-extrabold">{org.name}</span>
+                      </p>
+                      <span aria-hidden="true" className="w-2 h-2 rounded-full bg-lime-400 shrink-0" />
+                    </Link>
+                  ))}
+                  {orgInvites.map((inv) => (
+                    <div key={inv.id} className="flex items-center gap-3 px-4 py-3">
+                      <Avatar name={inv.organization_name} url={inv.organization_logo_url} size="w-9 h-9 text-sm" />
+                      <p className="flex-1 min-w-0 text-sm text-ink-900">
+                        {inv.as_admin ? t('layout.invited_to_admin') : t('layout.invited_to_join')} <span className="font-extrabold">{inv.organization_name}</span>
+                      </p>
+                      <button
+                        onClick={() => handleAcceptOrgInvite(inv.id)}
+                        disabled={orgInviteActing === inv.id}
+                        aria-label={t('layout.accept_invite_aria')}
+                        className="w-8 h-8 shrink-0 rounded-full bg-lime-400 text-ink-900 flex items-center justify-center hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
+                      >
+                        <UserCheck size={14} />
+                      </button>
+                      <button
+                        onClick={() => handleDeclineOrgInvite(inv.id)}
+                        disabled={orgInviteActing === inv.id}
+                        aria-label={t('layout.decline_invite_aria')}
+                        className="w-8 h-8 shrink-0 rounded-full bg-ink-50 text-ink-700 flex items-center justify-center hover:bg-ink-200 transition-colors duration-fast disabled:opacity-40"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                  {followRequests.map((req) => (
+                    <div key={req.id} className="flex items-center gap-3 px-4 py-3">
+                      <Avatar name={req.follower_name} url={req.follower_avatar_url} size="w-9 h-9 text-sm" />
+                      <p className="flex-1 min-w-0 text-sm text-ink-900">
+                        <span className="font-extrabold">{req.follower_name}</span> {t('layout.follow_wants_to_follow')}
+                      </p>
+                      <button
+                        onClick={() => handleAcceptFollowRequest(req.id)}
+                        disabled={followRequestActing === req.id}
+                        aria-label={t('layout.accept_follow_aria')}
+                        className="w-8 h-8 shrink-0 rounded-full bg-lime-400 text-ink-900 flex items-center justify-center hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
+                      >
+                        <UserCheck size={14} />
+                      </button>
+                      <button
+                        onClick={() => handleDeclineFollowRequest(req.id)}
+                        disabled={followRequestActing === req.id}
+                        aria-label={t('layout.decline_follow_aria')}
+                        className="w-8 h-8 shrink-0 rounded-full bg-ink-50 text-ink-700 flex items-center justify-center hover:bg-ink-200 transition-colors duration-fast disabled:opacity-40"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>,
+          document.body
+        )}
+      </div>
+      <button
+        onClick={handleSignOut}
+        title={t('layout.sign_out')}
+        className="w-10 h-10 flex items-center justify-center rounded-full text-ink-700 hover:text-ink-900 hover:bg-ink-50 transition-colors duration-fast"
+      >
+        <LogOut size={20} />
+      </button>
+    </>
+  )
+
   return (
     // iOS standalone-PWA (WKWebView, not just Safari-in-a-tab) detaches a
     // `fixed` + `backdrop-filter` element from the viewport during momentum
@@ -475,178 +622,17 @@ export default function Layout({ children }) {
     // still hovers over the tail end of scrolled content like before, but
     // there's no document-level momentum scroll left to detach it from.
     <div className="relative flex flex-col h-screen bg-canvas overflow-hidden" style={{ height: '100dvh' }}>
-      {/* Header — dark liquid glass */}
-      <header className="shrink-0 z-10 bg-ink-900/95 backdrop-blur-xl border-b border-white/5 supports-[backdrop-filter]:bg-ink-900/85">
-        <div className="max-w-2xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Link to="/" className="leading-none">
-            <Wordmark />
-          </Link>
-
-          <div className="flex items-center gap-1">
-            {profile?.rating != null && (
-              <Link to="/perfil" title={t('layout.your_level')} className="mr-2">
-                <RatingBadge rating={profile.rating} gender={profile.gender} me />
-              </Link>
-            )}
-            <div className="relative">
-              <button
-                onClick={() => setShowNotifications((v) => !v)}
-                title={t('layout.notifications')}
-                aria-expanded={showNotifications}
-                className="relative w-11 h-11 flex items-center justify-center rounded-full text-ink-200 hover:text-white hover:bg-white/10 transition-colors duration-fast"
-              >
-                <Bell size={21} />
-                {notificationsTotal > 0 && (
-                  <span
-                    aria-hidden="true"
-                    className="absolute top-1.5 right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-lime-400 text-ink-900 ring-2 ring-ink-900 text-[11px] font-extrabold flex items-center justify-center tabular-nums"
-                  >
-                    {notificationsTotal}
-                  </span>
-                )}
-              </button>
-
-              {showNotifications && createPortal(
-                <>
-                  {/* header has backdrop-blur-xl, which makes it the
-                      containing block for `fixed` descendants — a fixed
-                      backdrop rendered inside it only ever covers the
-                      header strip, not the page, so outside-tap-to-close
-                      silently no-ops. Portaling to body escapes that,
-                      same fix as the Definições modal (GerirClube.jsx). */}
-                  <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
-                  <div className="fixed top-[4.5rem] right-4 w-80 max-w-[85vw] bg-surface rounded-card shadow-lift ring-1 ring-line z-50 overflow-hidden animate-pop text-left">
-                    <div className="px-4 py-3 border-b border-line">
-                      <p className="font-extrabold text-ink-900">{t('layout.notifications')}</p>
-                    </div>
-                    {notificationsTotal === 0 ? (
-                      <div className="p-4 text-center">
-                        <p className="text-sm text-muted">{t('layout.no_new_notifications')}</p>
-                      </div>
-                    ) : (
-                      <div className="max-h-80 overflow-y-auto divide-y divide-line">
-                        {privateMatchTodos.map(({ kind, match }) => (
-                          <Link
-                            key={`${kind}-${match.id}`}
-                            to="/jogos-privados"
-                            onClick={() => setShowNotifications(false)}
-                            className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50"
-                          >
-                            <div className="w-9 h-9 rounded-full bg-lime-400/20 text-ink-900 flex items-center justify-center shrink-0">
-                              <Swords size={16} />
-                            </div>
-                            <p className="flex-1 min-w-0 text-sm text-ink-900">
-                              {kind === 'respond' ? (
-                                <>
-                                  <span className="font-extrabold">{match.team_a_player1_name || t('layout.someone')}</span>{' '}
-                                  {t('layout.private_match_invited')}
-                                </>
-                              ) : (
-                                <>
-                                  {t('layout.private_match_confirm_score')}{' '}
-                                  <span className="font-extrabold tabular-nums">{match.score_a}-{match.score_b}</span>
-                                </>
-                              )}
-                            </p>
-                            <span aria-hidden="true" className="w-2 h-2 rounded-full bg-lime-400 shrink-0" />
-                          </Link>
-                        ))}
-                        {joinRequestsByOrg.map((org) => (
-                          <Link
-                            key={org.organizationId}
-                            to={org.slug ? `/gerir/${org.slug}?tab=members` : '/gerir'}
-                            onClick={() => setShowNotifications(false)}
-                            className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50"
-                          >
-                            <div className="w-9 h-9 rounded-full bg-ink-50 text-ink-700 flex items-center justify-center shrink-0">
-                              <Users size={16} />
-                            </div>
-                            <p className="flex-1 min-w-0 text-sm text-ink-900">
-                              {t('layout.join_request_count', { count: org.count })}{' '}
-                              <span className="font-extrabold">{org.name}</span>
-                            </p>
-                            <span aria-hidden="true" className="w-2 h-2 rounded-full bg-lime-400 shrink-0" />
-                          </Link>
-                        ))}
-                        {orgInvites.map((inv) => (
-                          <div key={inv.id} className="flex items-center gap-3 px-4 py-3">
-                            <Avatar name={inv.organization_name} url={inv.organization_logo_url} size="w-9 h-9 text-sm" />
-                            <p className="flex-1 min-w-0 text-sm text-ink-900">
-                              {inv.as_admin ? t('layout.invited_to_admin') : t('layout.invited_to_join')} <span className="font-extrabold">{inv.organization_name}</span>
-                            </p>
-                            <button
-                              onClick={() => handleAcceptOrgInvite(inv.id)}
-                              disabled={orgInviteActing === inv.id}
-                              aria-label={t('layout.accept_invite_aria')}
-                              className="w-8 h-8 shrink-0 rounded-full bg-lime-400 text-ink-900 flex items-center justify-center hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
-                            >
-                              <UserCheck size={14} />
-                            </button>
-                            <button
-                              onClick={() => handleDeclineOrgInvite(inv.id)}
-                              disabled={orgInviteActing === inv.id}
-                              aria-label={t('layout.decline_invite_aria')}
-                              className="w-8 h-8 shrink-0 rounded-full bg-ink-50 text-ink-700 flex items-center justify-center hover:bg-ink-200 transition-colors duration-fast disabled:opacity-40"
-                            >
-                              <X size={14} />
-                            </button>
-                          </div>
-                        ))}
-                        {followRequests.map((req) => (
-                          <div key={req.id} className="flex items-center gap-3 px-4 py-3">
-                            <Avatar name={req.follower_name} url={req.follower_avatar_url} size="w-9 h-9 text-sm" />
-                            <p className="flex-1 min-w-0 text-sm text-ink-900">
-                              <span className="font-extrabold">{req.follower_name}</span> {t('layout.follow_wants_to_follow')}
-                            </p>
-                            <button
-                              onClick={() => handleAcceptFollowRequest(req.id)}
-                              disabled={followRequestActing === req.id}
-                              aria-label={t('layout.accept_follow_aria')}
-                              className="w-8 h-8 shrink-0 rounded-full bg-lime-400 text-ink-900 flex items-center justify-center hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
-                            >
-                              <UserCheck size={14} />
-                            </button>
-                            <button
-                              onClick={() => handleDeclineFollowRequest(req.id)}
-                              disabled={followRequestActing === req.id}
-                              aria-label={t('layout.decline_follow_aria')}
-                              className="w-8 h-8 shrink-0 rounded-full bg-ink-50 text-ink-700 flex items-center justify-center hover:bg-ink-200 transition-colors duration-fast disabled:opacity-40"
-                            >
-                              <X size={14} />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </>,
-                document.body
-              )}
-            </div>
-            <Link
-              to="/instrucoes"
-              title={t('layout.instructions')}
-              className="w-11 h-11 flex items-center justify-center rounded-full text-ink-200 hover:text-white hover:bg-white/10 transition-colors duration-fast"
-            >
-              <HelpCircle size={21} />
-            </Link>
-            <button
-              onClick={handleSignOut}
-              title={t('layout.sign_out')}
-              className="w-11 h-11 flex items-center justify-center rounded-full text-ink-200 hover:text-white hover:bg-white/10 transition-colors duration-fast"
-            >
-              <LogOut size={21} />
-            </button>
-          </div>
-        </div>
-      </header>
-
       {/* Main — the only scrolling region in the shell (see the app-shell
           comment above the root div). pb-28 keeps the last bit of content
-          from hiding behind the nav overlay below. */}
+          from hiding behind the nav overlay below. No dark header above it
+          any more — each main page (Home, Comunidade, Rankings, Gerir,
+          Perfil) shows notifications/logout in its own sticky title
+          (PageHeader in components/ui.jsx), read via HeaderActionsContext. */}
       <main ref={mainRef} className="flex-1 overflow-y-auto">
         <div className="max-w-2xl mx-auto px-4 pt-6 pb-28 animate-fade-up">
-          {children}
+          <HeaderActionsProvider value={headerActions}>
+            {children}
+          </HeaderActionsProvider>
         </div>
       </main>
 

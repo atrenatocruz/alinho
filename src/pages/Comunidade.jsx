@@ -5,8 +5,9 @@ import { Search, Users, Clock, GraduationCap, X, MapPin, Lock, Check, Building2 
 import { searchOrganizations, listGlobalOrganizations } from '../lib/organizations'
 import { DAY_LABEL_KEY, listTeacherProfiles, teacherClubName } from '../lib/teachers'
 import { useAuth } from '../contexts/AuthContext'
-import { Avatar, EmptyState, GroupLevelBadge, OrgKindBadge, orgAvatarShape } from '../components/ui'
+import { Avatar, EmptyState, GroupLevelBadge, OrgKindBadge, orgAvatarShape, PageHeader } from '../components/ui'
 import { describeError } from '../lib/errors'
+import { useHeaderActions } from '../contexts/HeaderActionsContext'
 
 /* ─── Comunidade (épico «Comunidade vs. Rankings», Trello #271/#273) ─────────
    Encontrar clubes, grupos e professores — e só isso. Desenho:
@@ -35,6 +36,7 @@ const byName = (a, b) => (a.name || '').localeCompare(b.name || '', 'pt')
 
 export default function Comunidade() {
   const { t } = useTranslation()
+  const headerActions = useHeaderActions()
   const { user, memberships, followOrganization } = useAuth()
   const [filter, setFilter] = useState('all')
   const [query, setQuery] = useState('')
@@ -246,7 +248,7 @@ export default function Comunidade() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-3xl text-ink-900">{t('comunidade.title')}</h2>
+      <PageHeader title={t('comunidade.title')}>{headerActions}</PageHeader>
 
       <div className="flex items-center gap-2 input-field focus-within:border-ink-500 focus-within:ring-2 focus-within:ring-ink-50">
         <Search size={16} className="text-muted shrink-0" />
