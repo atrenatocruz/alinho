@@ -188,6 +188,33 @@ const ROT_MATCHES = [
 ]
 const rotating = () => localStorage.getItem('mockRotatingMix') === 'true'
 
+// localStorage.mockEventState = 'open' | 'joined' | 'live' | 'finished' — a
+// página do mix nos quatro estados do desenho aprovado a 17 set (cores e
+// página do evento): não inscrito, inscrito antes de começar, inscrito a
+// decorrer (com duplas e o meu par) e terminado. 8 jogadores, 2 campos.
+const eventState = () => localStorage.getItem('mockEventState')
+const EV_NAMES = ['Diogo Alexandre', 'Renato Cruz', 'João Jesus', 'Ana Moreira', 'André Sousa', 'Beatriz Faria', 'Rui Costa']
+const EV_PEOPLE = [
+  { id: MOCK_ADMIN_USER_ID, name: 'Francisco Barros', avatar_url: null, preferred_side: 'left' },
+  ...EV_NAMES.map((name, i) => ({ id: `fake-${i}`, name, avatar_url: null, preferred_side: i % 2 ? 'both' : 'right' })),
+]
+const evPeople = () => (eventState() === 'open' ? EV_PEOPLE.slice(1) : EV_PEOPLE)
+const EV_PARTICIPANTS = () => evPeople().map((u, i) => ({
+  id: `ev-p${i}`, game_id: 'fake-game-1', user_id: u.id, partner_id: null, status: 'confirmed',
+  created_at: new Date(Date.now() - (10 - i) * 60000).toISOString(), user: u, partner: null,
+}))
+const evTeam = (id, a, b, seed) => ({ id, game_id: 'fake-game-1', player1_id: a.id, player2_id: b.id, player1: a, player2: b, seed_ranking: seed, created_at: new Date().toISOString() })
+const [e0, e1, e2, e3, e4, e5, e6, e7] = EV_PEOPLE
+const EV_TEAMS = [evTeam('et1', e1, e0, 4), evTeam('et2', e2, e3, 3), evTeam('et3', e4, e5, 2), evTeam('et4', e6, e7, 1)]
+const EV_MATCHES = () => [
+  { id: 'em1', game_id: 'fake-game-1', round_number: 1, court_number: 1, phase: 'group', team_a_id: 'et1', team_b_id: 'et2', score_a: 6, score_b: 4, winner_team_id: 'et1' },
+  { id: 'em2', game_id: 'fake-game-1', round_number: 1, court_number: 2, phase: 'group', team_a_id: 'et3', team_b_id: 'et4', score_a: 6, score_b: 2, winner_team_id: 'et3' },
+  ...(eventState() === 'finished' ? [] : [
+    { id: 'em3', game_id: 'fake-game-1', round_number: 2, court_number: 1, phase: 'group', team_a_id: 'et1', team_b_id: 'et3', score_a: null, score_b: null, winner_team_id: null },
+    { id: 'em4', game_id: 'fake-game-1', round_number: 2, court_number: 2, phase: 'group', team_a_id: 'et2', team_b_id: 'et4', score_a: null, score_b: null, winner_team_id: null },
+  ]),
+]
+
 // localStorage.mockAgenda = 'true' (+ mockTwoOrgs = 'true') — a Home nova
 // com um pouco de tudo, sempre à volta do dia de hoje, para validar a agenda
 // em localhost (Homepage unificada, Trello #258): hoje um mix meu no clube,
@@ -233,7 +260,10 @@ const AGENDA_GAMES = () => [
     location: 'Clube VII, Lisboa', status: 'closed', origin: 'admin', format: 'todos_contra_todos', num_courts: 1,
     max_players: 4, price_per_player: 10, prize: null, gender_restriction: 'misto', level: 'M2', recurrence_id: null,
     organization: { name: 'Dev Org', kind: 'group', group_logo_url: null },
-    participants: [0, 1, 2, 3].map((i) => ({ id: `pf${i}`, user_id: `f${i}`, partner_id: null, status: 'confirmed', user: extra(i) })),
+    participants: [
+      ...[0, 1, 2, 3].map((i) => ({ id: `pf${i}`, user_id: `f${i}`, partner_id: null, status: 'confirmed', user: extra(i) })),
+      { id: 'pfw', user_id: MOCK_ADMIN_USER_ID, partner_id: null, status: 'waitlisted', user: ADMIN_PERSON },
+    ],
   },
   {
     id: 'ag-finished-yesterday', organization_id: MOCK_CLUB_ID, title: 'Mix de segunda', date: atDay(-1, 19).toISOString(),
@@ -360,8 +390,9 @@ const TABLE_MOCKS = {
     ? [{ game_id: 'ag-finished-yesterday', user_id: MOCK_ADMIN_USER_ID, mix_won: false, rating_delta: 18, points_earned: 14,
         game: { id: 'ag-finished-yesterday', title: 'Mix de segunda', date: atDay(-1, 19).toISOString(), location: 'Smash Padel, Parque das Nações' } }]
     : longNames() ? LONG_STATS : []),
-  teams: (url) => (agenda() && url.includes('ag-winner') ? AGENDA_WINNER_TEAMS() : rotating() ? ROT_TEAMS : []),
-  matches: () => (rotating() ? ROT_MATCHES : []),
+  teams: (url) => (agenda() && url.includes('ag-winner') ? AGENDA_WINNER_TEAMS() : ['live', 'finished'].includes(eventState()) ? EV_TEAMS : rotating() ? ROT_TEAMS : []),
+  participants: () => (eventState() ? EV_PARTICIPANTS() : []),
+  matches: () => (['live', 'finished'].includes(eventState()) ? EV_MATCHES() : rotating() ? ROT_MATCHES : []),
   // Mix em aberto — 1 dupla já confirmada, a segunda por preencher (2 de 4
   // lugares), para se ver o cartão no estado "aberto/junto-te" na Home.
   games: (url) => agenda() ? (url.includes('recurrence_id=eq.') ? AGENDA_PREVIOUS_EDITIONS() : AGENDA_GAMES()) : [{
@@ -378,7 +409,7 @@ const TABLE_MOCKS = {
     title: 'Mix de Quinta-feira',
     date: tomorrow8pm.toISOString(),
     location: 'Smash Padel Almada',
-    status: longNames() ? 'finished' : rotating() ? 'in_progress' : 'open',
+    ...(eventState() ? {} : { status: longNames() ? 'finished' : rotating() ? 'in_progress' : 'open' }),
     format: 'sobe_desce',
     num_courts: 2,
     price_per_player: 8,
@@ -386,6 +417,13 @@ const TABLE_MOCKS = {
     gender_restriction: 'indiferente',
     level: null,
     recurrence_id: null,
+    ...(eventState() ? {
+      title: '+1 Mix de Quinta-feira', recurrence_id: 'rec-ev', num_courts: 2, max_players: 8, price_per_player: 11.5,
+      prize: 'Voucher 1h30 para a dupla vencedora', location: 'Smash Padel Almada, Av. do Cristo Rei', game_time_minutes: 20,
+      status: { open: 'open', joined: 'closed', live: 'in_progress', finished: 'finished' }[eventState()],
+      ...(eventState() === 'finished' ? { winner_team_id: 'et1' } : {}),
+      ...(eventState() === 'live' ? { round_started_at: new Date().toISOString(), round_duration_minutes: 20 } : {}),
+    } : {}),
     organization: { name: 'Dev Org', group_logo_url: null },
     participants: [{
       id: 'fake-participant-1',

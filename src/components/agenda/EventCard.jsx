@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { MapPin, CheckCircle2, Lock, Play, Trophy, Repeat, Euro, Swords, Users, Shuffle, CircleDot, Clock } from 'lucide-react'
+import { MapPin, CheckCircle2, Lock, Play, Trophy, Repeat, Euro, Swords, Users, Shuffle, CircleDot, Clock, ListOrdered } from 'lucide-react'
 import { PlayerAvatarRow, GroupLevelBadge, PrimaryButton } from '../ui'
 import { formatTime, formatCurrency } from '../../lib/formatDate'
 import { FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, mixCapacity, isGenderMismatch, isAgeIneligible } from '../../lib/mixLogic'
@@ -17,15 +17,24 @@ import { ratingBand } from '../../lib/elo'
    estado sempre no canto superior direito. O dia sai do cartão: já está no
    topo da página.
 
-   Cores por tipo: as dos wireframes (provisórias, ver o artefacto). O lima
-   continua reservado ao botão principal (One Ball Rule, DESIGN.md). As
-   classes são literais completos — o Tailwind não vê classes montadas.
+   Cores (aprovadas pelo Francisco a 17 set — design-handoff/
+   2026-09-17-cores-e-pagina-do-evento/SPEC.md): o TIPO pinta o cartão
+   (fundo claro + etiqueta branca com texto na cor); o ESTADO nunca pinta o
+   cartão — é uma pastilha cheia e, quando estás inscrito, contorno verde.
+   Nenhum tipo usa verde, âmbar, lima ou preto. Lima só no botão principal e
+   em "A decorrer". As classes são literais completos — o Tailwind não vê
+   classes montadas.
    ════════════════════════════════════════════════════════════════════════ */
 
+// `color` = cor do texto da etiqueta, também usada nos pinos do mapa
+// (MapView.jsx, opção A escolhida pelo Francisco a 17 set).
 export const KIND_STYLE = {
-  mix:     { card: 'bg-[#DDF2EC] border-[#A9DCCD]', text: 'text-[#0E6B58]', icon: Shuffle,   labelKey: 'agenda.kind_mix' },
-  open:    { card: 'bg-[#FBE7DE] border-[#F2BFA8]', text: 'text-[#9A3A17]', icon: CircleDot, labelKey: 'agenda.kind_open' },
-  friends: { card: 'bg-[#ECECEE] border-[#D4D4D8]', text: 'text-[#3F3F46]', icon: Users,     labelKey: 'agenda.kind_friends' },
+  mix:        { card: 'bg-[#E0F2FE] border-[#A5D8F5]', bg: 'bg-[#E0F2FE]', text: 'text-[#075985]', color: '#075985', icon: Shuffle,     labelKey: 'agenda.kind_mix' },
+  open:       { card: 'bg-[#FBE7DE] border-[#F2BFA8]', bg: 'bg-[#FBE7DE]', text: 'text-[#9A3A17]', color: '#9A3A17', icon: CircleDot,   labelKey: 'agenda.kind_open' },
+  friends:    { card: 'bg-[#F2EDE4] border-[#DCD1BF]', bg: 'bg-[#F2EDE4]', text: 'text-[#6B5B45]', color: '#6B5B45', icon: Users,       labelKey: 'agenda.kind_friends' },
+  // Ainda não existem na app — só preparados para a cor (fora de âmbito).
+  tournament: { card: 'bg-[#E9E7FB] border-[#C9C3F3]', bg: 'bg-[#E9E7FB]', text: 'text-[#4338A8]', color: '#4338A8', icon: Trophy,      labelKey: 'agenda.kind_tournament' },
+  league:     { card: 'bg-[#FAE3EC] border-[#F0BCD1]', bg: 'bg-[#FAE3EC]', text: 'text-[#8C2350]', color: '#8C2350', icon: ListOrdered, labelKey: 'agenda.kind_league' },
 }
 
 const ACTION_LABEL_KEY = {
@@ -37,30 +46,31 @@ const ACTION_LABEL_KEY = {
 const ACTION_VARIANT = {
   join: 'lime',
   waitlist: 'ghost',
-  leave: 'danger',
-  leave_waitlist: 'danger',
+  // Sair: contorno preto, como no desenho aprovado (cores.png).
+  leave: 'ghost',
+  leave_waitlist: 'ghost',
 }
 
 const initials = (name) => (name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase()
 
-export function KindTag({ kind, past }) {
+export function KindTag({ kind, past, suffix = null }) {
   const { t } = useTranslation()
   const style = KIND_STYLE[kind]
   const Icon = style.icon
   return (
-    <span className={`inline-flex items-center gap-1 bg-white/80 text-[11px] font-extrabold px-2 py-1 rounded-full ${style.text} ${past ? 'opacity-70' : ''}`}>
-      <Icon size={12} /> {t(style.labelKey)}
+    <span className={`inline-flex items-center gap-1 bg-white text-[11px] font-extrabold px-2 py-1 rounded-full ${style.text} ${past ? 'opacity-70' : ''}`}>
+      <Icon size={12} /> {t(style.labelKey)}{suffix && <> · {suffix}</>}
     </span>
   )
 }
 
-function StateTag({ tone, icon: Icon, children }) {
+export function StateTag({ tone, icon: Icon, children }) {
   const tones = {
     in: 'bg-ok text-white',
     live: 'bg-lime-400 text-ink-900',
-    wait: 'bg-[#FDF1DC] text-[#9A5B00]',
-    invited: 'bg-[#E6EEFB] text-[#1E4FA8]',
-    grey: 'bg-white/80 text-ink-700',
+    wait: 'bg-[#B86E00] text-white',
+    invited: 'bg-ink-900 text-white',
+    grey: 'bg-surface text-ink-700',
   }
   return (
     <span className={`inline-flex items-center gap-1 text-[11px] font-extrabold px-2 py-1 rounded-full whitespace-nowrap ${tones[tone]}`}>
@@ -70,7 +80,7 @@ function StateTag({ tone, icon: Icon, children }) {
 }
 
 /** Linha do dono: logótipo (quadrado = clube, redondo = grupo) + nome + tipo. */
-function Owner({ event, fallbackKey }) {
+export function Owner({ event, fallbackKey }) {
   const { t } = useTranslation()
   if (!event.orgName) {
     return (
@@ -96,7 +106,9 @@ function cardFrame(event, past) {
   if (past) return 'bg-surface border border-line'
   // Contorno verde só quando estou mesmo dentro (ou em espera) — um convite
   // por responder ainda não é "meu" nesse sentido.
-  if (event.myState === 'in' || event.myState === 'waitlist') return `${KIND_STYLE[event.kind].card.split(' ')[0]} border-2 border-ok`
+  // Lista de espera: âmbar tracejado — nunca verde (SPEC §3).
+  if (event.myState === 'in') return `${KIND_STYLE[event.kind].bg} border-2 border-ok`
+  if (event.myState === 'waitlist') return `${KIND_STYLE[event.kind].bg} border-2 border-dashed border-[#B86E00]`
   return `${KIND_STYLE[event.kind].card} border`
 }
 
@@ -240,7 +252,7 @@ export function GameEventCard({ event, profile, friendIds = null, action = null,
             variant={ACTION_VARIANT[action.kind]}
             disabled={action.busy}
             onClick={() => action.onAction()}
-            className="ml-auto relative !py-2 !px-4 !text-sm"
+            className={`ml-auto relative !py-2 !px-4 !text-sm ${action.kind.startsWith('leave') ? '!bg-white !border-ink-900' : ''}`}
           >
             {t(ACTION_LABEL_KEY[action.kind])}
           </PrimaryButton>

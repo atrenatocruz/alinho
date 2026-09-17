@@ -2,14 +2,16 @@ import { useEffect, useRef, useState } from 'react'
 import { importLibrary } from '@googlemaps/js-api-loader'
 import { useTranslation } from 'react-i18next'
 import { GOOGLE_MAPS_API_KEY } from '../../lib/googleMaps'
+import { KIND_STYLE } from './EventCard'
 
 // Centro por omissão sem GPS nem localização escolhida — Lisboa, onde a
 // maioria dos clubes do piloto está.
 const DEFAULT_CENTER = { lat: 38.7223, lng: -9.1393 }
 
-// Cor por tipo, igual às dos cartões (KIND_STYLE em EventCard.jsx) — um mix
-// e um jogo em aberto no mesmo sítio partilham pin com a cor "ambos".
-const KIND_COLOR = { mix: '#0E6B58', open: '#9A3A17' }
+// Cor por tipo = cor do texto da etiqueta dos cartões (KIND_STYLE em
+// EventCard.jsx; opção A escolhida pelo Francisco a 17 set) — um mix e um
+// jogo em aberto no mesmo sítio partilham pin com a cor "ambos".
+const KIND_COLOR = Object.fromEntries(Object.entries(KIND_STYLE).map(([k, s]) => [k, s.color]))
 const MIXED_COLOR = '#1F2937'
 
 // Estilo minimalista a condizer com o resto da app (DESIGN.md: quase-preto

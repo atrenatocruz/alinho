@@ -168,7 +168,7 @@
   "agenda.owner_group": "Grupo",
   "agenda.owner_none": "Sem clube",
   "agenda.owner_friends": "Entre amigos",
-  "agenda.state_in": "In",
+  "agenda.state_in": "Inscrito",
   "agenda.state_waitlist": "Lista de espera",
   "agenda.state_invited": "Convidado",
   "agenda.state_finished": "Terminado",
@@ -503,7 +503,7 @@
   "gamedetails.not_found_title": "Jogo não encontrado",
   "gamedetails.not_found_subtitle": "Este jogo já não existe ou foi removido.",
   "gamedetails.back_to_games": "Voltar aos jogos",
-  "gamedetails.joined_confirmation_title": "Estás dentro!",
+  "gamedetails.joined_confirmation_title": "Estás inscrito!",
   "gamedetails.joined_confirmation_subtitle": "Bola ao ar 🎾",
   "gamedetails.back": "Voltar",
   "gamedetails.share": "Partilhar",
@@ -1325,7 +1325,6 @@
   "ui.tomorrow": "Amanhã",
   "ui.status_live": "A decorrer",
   "ui.status_finished": "Mix terminado",
-  "ui.status_joined": "Inscrito",
   "ui.recurring": "Recorrente",
   "ui.play_cta": "Jogar",
   "ui.court_reserved": "Mix fechado — campo reservado",
@@ -1671,5 +1670,11 @@
   "rankings.scale_short_masculino": "M",
   "rankings.scale_short_feminino": "F",
   "rankings.scale_short_none": "S/G",
-  "rankings.all_scales_hint": "Todos por ordem alfabética, cada um com a posição na sua escala."
+  "rankings.all_scales_hint": "Todos por ordem alfabética, cada um com a posição na sua escala.",
+  "agenda.kind_tournament": "Torneio",
+  "agenda.kind_league": "Liga",
+  "gamedetails.join_mix": "Entrar no mix",
+  "gamedetails.leave_mix": "Sair do mix",
+  "gamedetails.live_see_round": "A decorrer · ver ronda",
+  "gamedetails.court_points_vs": "{{a}} vs {{b}} pts"
 }

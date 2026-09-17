@@ -168,7 +168,7 @@
   "agenda.owner_group": "Group",
   "agenda.owner_none": "No club",
   "agenda.owner_friends": "With friends",
-  "agenda.state_in": "In",
+  "agenda.state_in": "Joined",
   "agenda.state_waitlist": "Waiting list",
   "agenda.state_invited": "Invited",
   "agenda.state_finished": "Finished",
@@ -503,7 +503,7 @@
   "gamedetails.not_found_title": "Game not found",
   "gamedetails.not_found_subtitle": "This game no longer exists or was removed.",
   "gamedetails.back_to_games": "Back to games",
-  "gamedetails.joined_confirmation_title": "You're in!",
+  "gamedetails.joined_confirmation_title": "You've joined!",
   "gamedetails.joined_confirmation_subtitle": "Game on 🎾",
   "gamedetails.back": "Back",
   "gamedetails.share": "Share",
@@ -1325,7 +1325,6 @@
   "ui.tomorrow": "Tomorrow",
   "ui.status_live": "In progress",
   "ui.status_finished": "Mix finished",
-  "ui.status_joined": "Joined",
   "ui.recurring": "Recurring",
   "ui.play_cta": "Play",
   "ui.court_reserved": "Mix closed — court reserved",
@@ -1671,5 +1670,11 @@
   "rankings.scale_short_masculino": "M",
   "rankings.scale_short_feminino": "W",
   "rankings.scale_short_none": "N/G",
-  "rankings.all_scales_hint": "Everyone A–Z, each with their position in their own scale."
+  "rankings.all_scales_hint": "Everyone A–Z, each with their position in their own scale.",
+  "agenda.kind_tournament": "Tournament",
+  "agenda.kind_league": "League",
+  "gamedetails.join_mix": "Join the mix",
+  "gamedetails.leave_mix": "Leave the mix",
+  "gamedetails.live_see_round": "Live · see round",
+  "gamedetails.court_points_vs": "{{a}} vs {{b}} pts"
 }

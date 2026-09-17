@@ -3,12 +3,13 @@ import { createPortal } from 'react-dom'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation, Trans } from 'react-i18next'
-import { Calendar, MapPin, ArrowLeft, UserPlus, User, Check, Lock, Trophy, Play, ChevronRight, Swords, X, Repeat, Share2, ChevronDown, RotateCcw, Euro, GripVertical, Pencil, History, ThumbsUp, CalendarPlus } from 'lucide-react'
+import { Calendar, MapPin, ArrowLeft, UserPlus, Check, Trophy, Play, ChevronRight, Swords, X, Repeat, Share2, ChevronDown, RotateCcw, Euro, GripVertical, Pencil, History, ThumbsUp } from 'lucide-react'
 import { DndContext, useDraggable, useDroppable, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { supabase, supabaseUrl } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { PrimaryButton, GuestBadge, PlayerAvatarRow, EmptyState, ShareModal, RoundTimer, Avatar, Select, RatingBadge, DateField } from '../components/ui'
+import { PrimaryButton, GuestBadge, PlayerAvatarRow, EmptyState, ShareModal, RoundTimer, Avatar, Select, RatingBadge, DateField, GroupLevelBadge } from '../components/ui'
+import { KIND_STYLE, KindTag, StateTag, Owner } from '../components/agenda/EventCard'
 import PoolGroupStage from '../components/PoolGroupStage'
 import PreviousEditions from '../components/agenda/PreviousEditions'
 import ScoreEntry from '../components/ScoreEntry'
@@ -24,7 +25,7 @@ import { isProvisional } from '../lib/elo'
 import { AGE_LABEL_KEY, meetsAgeRestriction } from '../lib/ageCategories'
 import { winRatePct, firstLastName } from '../lib/statsLogic'
 import { getGlobalRankings } from '../lib/privateMatches'
-import { formatDate as formatDateLib, formatCurrency } from '../lib/formatDate'
+import { formatDate as formatDateLib, formatTime, formatCurrency } from '../lib/formatDate'
 import { NAVIGATORS, getPreferredNavigator, setPreferredNavigator, navigatorUrl } from '../lib/navigators'
 import { describeError } from '../lib/errors'
 
@@ -1439,40 +1440,59 @@ export default function GameDetails() {
   }
 
   // Read-only "Duplas" display: one team's points/badges + its two player rows.
-  const renderDuplaBlock = (team) => (
-    <div key={team.id}>
-      <div className="flex items-center justify-between mb-1.5">
-        <p className="text-[11px] font-extrabold text-muted uppercase tracking-wide">
-          {(pointsById[team.player1?.id] ?? 0) + (pointsById[team.player2?.id] ?? 0)} {t('gamedetails.points_suffix')}
-        </p>
-        <div className="flex items-center gap-1.5">
-          {team.id === game.winner_team_id && <span>🏆</span>}
-          {(team.player1?.is_guest || team.player2?.is_guest) && <GuestBadge isTest={team.player1?.is_test || team.player2?.is_test} />}
+  // Dupla (SPEC 17 set, "Duplas / campos"): os pontos são da dupla — no
+  // cabeçalho do campo quando há campo (showPoints=false), aqui só nas duplas
+  // soltas. Sem pontos individuais na linha do jogador. O teu par fica
+  // destacado na cor do tipo, com "· tu".
+  const teamPoints = (team) => (pointsById[team?.player1?.id] ?? 0) + (pointsById[team?.player2?.id] ?? 0)
+  const renderDuplaBlock = (team, { showPoints = true } = {}) => {
+    const isMine = team?.player1?.id === user.id || team?.player2?.id === user.id
+    const hasGuest = team?.player1?.is_guest || team?.player2?.is_guest
+    return (
+      <div key={team.id} className={isMine ? `${KIND_STYLE.mix.bg} rounded-xl px-2 py-1.5 -mx-2` : ''}>
+        {(showPoints || team.id === game.winner_team_id || hasGuest) && (
+          <div className="flex items-center justify-between mb-1.5">
+            <p className="text-[11px] font-extrabold text-muted uppercase tracking-wide">
+              {showPoints && <>{teamPoints(team)} {t('gamedetails.points_suffix')}</>}
+            </p>
+            <div className="flex items-center gap-1.5">
+              {team.id === game.winner_team_id && <span>🏆</span>}
+              {hasGuest && <GuestBadge isTest={team.player1?.is_test || team.player2?.is_test} />}
+            </div>
+          </div>
+        )}
+        <div className="space-y-1.5">
+          {[team.player1, team.player2].map((player, idx) => {
+            const name = (
+              <span className="flex-1 min-w-0 text-sm font-extrabold text-ink-900 truncate">
+                {player?.name || '?'}
+                {player?.id === user.id && <span className="font-normal text-muted"> · {t('agenda.you').toLowerCase()}</span>}
+              </span>
+            )
+            return (
+              <div key={player?.id || idx} className="flex items-center gap-2">
+                {player?.id && !player.is_guest ? (
+                  <Link to={`/jogador/${player.id}`} className="flex items-center gap-2 flex-1 min-w-0">
+                    <Avatar name={player?.name} url={player?.avatar_url} size="w-8 h-8 text-xs" />
+                    {name}
+                  </Link>
+                ) : (
+                  <>
+                    <Avatar name={player?.name} url={player?.avatar_url} size="w-8 h-8 text-xs" />
+                    {name}
+                  </>
+                )}
+                <span className="flex items-center gap-1.5 text-xs text-muted shrink-0">
+                  <RatingBadge rating={ratingInfoById[player?.id]?.rating} gender={ratingInfoById[player?.id]?.gender} />
+                  {sideLabel(player?.preferred_side)}
+                </span>
+              </div>
+            )
+          })}
         </div>
       </div>
-      <div className="space-y-1.5">
-        {[team.player1, team.player2].map((player, idx) => (
-          <div key={player?.id || idx} className="flex items-center gap-2">
-            {player?.id && !player.is_guest ? (
-              <Link to={`/jogador/${player.id}`} className="flex items-center gap-2 flex-1 min-w-0">
-                <Avatar name={player?.name} url={player?.avatar_url} size="w-8 h-8 text-xs" />
-                <span className="flex-1 min-w-0 text-sm font-extrabold text-ink-900 truncate">{player?.name || '?'}</span>
-              </Link>
-            ) : (
-              <>
-                <Avatar name={player?.name} url={player?.avatar_url} size="w-8 h-8 text-xs" />
-                <span className="flex-1 min-w-0 text-sm font-extrabold text-ink-900 truncate">{player?.name || '?'}</span>
-              </>
-            )}
-            <span className="flex items-center gap-1.5 text-xs font-extrabold text-muted tabular-nums shrink-0">
-              <RatingBadge rating={ratingInfoById[player?.id]?.rating} gender={ratingInfoById[player?.id]?.gender} />
-              {pointsById[player?.id] ?? 0} {t('gamedetails.points_suffix')} · {sideLabel(player?.preferred_side)}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
+    )
+  }
 
   const shareUrl = typeof window !== 'undefined' ? window.location.href : ''
   const buildShareMessage = () => {
@@ -1534,6 +1554,8 @@ export default function GameDetails() {
   const peopleCount = countPeople(participants)
   const capacity = mixCapacity(game)
   const isUserJoined = participants.some(p => p.user_id === user.id || p.partner_id === user.id)
+  const heroRated = people.filter((p) => !p.is_guest && ratingInfoById[p.id]?.rating != null)
+  const heroAvgRating = heroRated.length ? heroRated.reduce((sum, p) => sum + ratingInfoById[p.id].rating, 0) / heroRated.length : null
   const waitlistPeople = waitlist.map(w => ({ ...w.user, rowOwner: true, rowId: w.id, hasPartner: false }))
   const isUserWaitlisted = waitlist.some(w => w.user_id === user.id)
   const canJoin = game?.status === 'open' && peopleCount < capacity && !isUserJoined
@@ -1610,8 +1632,9 @@ export default function GameDetails() {
       {justBooked && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/50 animate-fade-in" aria-hidden="true">
           <div className="bg-surface rounded-card shadow-lift px-10 py-8 text-center animate-pop">
-            <div className="w-16 h-16 rounded-full bg-lime-400 flex items-center justify-center mx-auto mb-3">
-              <Check size={32} strokeWidth={2} className="text-ink-900" />
+            {/* Verde = inscrito, como a pastilha e o contorno (SPEC 17 set). */}
+            <div className="w-16 h-16 rounded-full bg-ok flex items-center justify-center mx-auto mb-3">
+              <Check size={32} strokeWidth={2} className="text-white" />
             </div>
             <p className="font-extrabold text-lg text-ink-900">{t('gamedetails.joined_confirmation_title')}</p>
             <p className="text-muted text-sm">{t('gamedetails.joined_confirmation_subtitle')}</p>
@@ -1656,31 +1679,73 @@ export default function GameDetails() {
         />
       )}
 
-      {/* Hero card */}
-      <div className="card relative overflow-hidden">
-        {isUserJoined && <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-lime-400" />}
-
-        <div className="flex items-start justify-between gap-3 mb-1">
-          <h1 className="text-2xl text-ink-900 leading-tight">{game.title}</h1>
-          {isUserJoined && (
-            <span className="inline-flex items-center gap-1.5 bg-lime-400 text-ink-900 text-xs font-extrabold px-3 py-1.5 rounded-full shrink-0">
-              <Check size={14} strokeWidth={2} /> {t('gamedetails.joined_badge')}
-            </span>
-          )}
+      {/* Topo = o cartão da Home em grande (SPEC 17 set, design-handoff/
+          2026-09-17-cores-e-pagina-do-evento): cor e etiqueta do tipo, dono,
+          hora grande, data em minúsculas, morada com "Abrir com…" na mesma
+          caixa. Inscrito = contorno verde + pastilha "Inscrito"; lista de
+          espera = âmbar tracejado. Saiu a barra lima. */}
+      <div className={`rounded-card p-4 ${
+        game.status === 'finished'
+          ? 'bg-surface border border-line'
+          : isUserJoined
+          ? `${KIND_STYLE.mix.bg} border-2 border-ok`
+          : isUserWaitlisted
+            ? `${KIND_STYLE.mix.bg} border-2 border-dashed border-[#B86E00]`
+            : `${KIND_STYLE.mix.card} border`
+      }`}>
+        <div className="flex items-start justify-between gap-2">
+          <KindTag kind="mix" suffix={game.recurrence_id ? t('ui.recurring') : null} />
+          {/* Terminado: cinza, como o cartão passado na Home. */}
+          {game.status === 'finished' ? (
+            <StateTag tone="grey" icon={Check}>{t('agenda.state_finished')}</StateTag>
+          ) : isUserJoined ? (
+            <StateTag tone="in" icon={Check}>{t('gamedetails.joined_badge')}</StateTag>
+          ) : isUserWaitlisted ? (
+            <StateTag tone="wait">{t('agenda.state_waitlist')}</StateTag>
+          ) : null}
         </div>
 
-        <div className="space-y-2 text-muted mt-4">
-          <div className="flex items-center gap-2.5">
-            <Calendar size={20} className="text-ink-700 shrink-0" />
-            <span className="capitalize">{formatDate(game.date)}</span>
+        <h1 className="font-display text-2xl text-ink-900 leading-tight mt-2.5">{game.title}</h1>
+        {gameMembership?.organization && (
+          <div className="mt-1">
+            <Owner
+              event={{
+                orgName: gameMembership.organization.name,
+                orgKind: gameMembership.organization.kind,
+                orgLogo: gameMembership.organization.group_logo_url,
+              }}
+              fallbackKey="agenda.owner_none"
+            />
           </div>
-          {game.location && (
-            <div>
-              {/* O chip continua a abrir com um toque, como sempre abriu —
-                  agora na app preferida em vez de sempre no Google (Trello
-                  #34). Quem nunca escolher nada nao ve diferenca nenhuma.
-                  A escolha vive no "Abrir com..." ao lado, para nao roubar
-                  um toque a quem so quer chegar la. */}
+        )}
+
+        <p className="font-display text-[28px] font-extrabold text-ink-900 leading-none mt-3">
+          {formatTime(game.date, i18n.language, { hour: '2-digit', minute: '2-digit' })}
+        </p>
+        <p className="text-[13px] text-ink-700 mt-1.5">
+          {formatDateLib(game.date, i18n.language, { weekday: 'long', day: 'numeric', month: 'long' }).toLocaleLowerCase(i18n.language)}
+          {/* Adicionar ao calendário (Trello #206) — escondido depois de o
+              mix acabar. */}
+          {!['finished', 'completed', 'cancelled'].includes(game.status) && (
+            <>
+              {' · '}
+              <a
+                href={`${supabaseUrl}/functions/v1/game-ics?id=${game.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-extrabold text-ink-900 underline underline-offset-2"
+              >
+                {t('gamedetails.add_to_calendar')}
+              </a>
+            </>
+          )}
+        </p>
+
+        {game.location && (
+          <div className="mt-3 bg-white/75 rounded-xl px-3 py-2">
+            <div className="flex items-center justify-between gap-2">
+              {/* Abre com um toque na app preferida (Trello #34); a escolha
+                  vive no "Abrir com…" ao lado. */}
               <a
                 href={navigatorUrl(preferredNav, {
                   location: game.location,
@@ -1689,122 +1754,119 @@ export default function GameDetails() {
                 })}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 bg-lime-100 text-ink-900 rounded-full pl-2.5 pr-3 py-1.5 -ml-1 hover:bg-lime-400/40 transition-colors"
+                className="flex items-start gap-1.5 min-w-0 text-[13px] text-ink-900"
               >
-                <MapPin size={18} className="text-lime-600 shrink-0" />
-                <span className="font-medium">{game.location}</span>
+                <MapPin size={15} className="text-ink-700 shrink-0 mt-0.5" />
+                <span>{game.location}</span>
               </a>
-
               <button
                 onClick={() => setNavPickerOpen((open) => !open)}
-                className="ml-2 text-sm font-extrabold text-ink-700 underline underline-offset-2 min-h-[44px] px-1"
+                className="shrink-0 text-[13px] font-extrabold text-ink-900 underline underline-offset-2 min-h-[36px]"
               >
                 {t('gamedetails.open_with')}
               </button>
-
+            </div>
               {navPickerOpen && (
-                <div className="flex flex-wrap gap-2 mt-2 animate-fade-up">
-                  {NAVIGATORS.map((nav) => (
-                    <a
-                      key={nav.key}
-                      href={nav.url({
-                        location: game.location,
-                        latitude: game.latitude,
-                        longitude: game.longitude,
-                      })}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={() => {
-                        setPreferredNavigator(nav.key)
-                        setPreferredNav(nav.key)
-                        setNavPickerOpen(false)
-                      }}
-                      className={`inline-flex items-center gap-1.5 rounded-ctrl px-3 min-h-[44px] text-sm font-extrabold border transition-colors duration-fast ${
-                        nav.key === preferredNav
-                          ? 'bg-lime-100 border-lime-600 text-ink-900'
-                          : 'bg-surface border-line text-ink-900 hover:bg-ink-50'
-                      }`}
-                    >
-                      {nav.key === preferredNav && <Check size={14} className="text-lime-600 shrink-0" />}
-                      {t(nav.labelKey)}
-                    </a>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Adicionar ao calendario (Trello #206). Reaproveita a edge
-              function game-ics que o bot ja publica no WhatsApp — sem
-              backend novo. Escondido depois de o mix acabar: por um mix de
-              ontem no calendario nao serve para nada. */}
-          {!['finished', 'completed', 'cancelled'].includes(game.status) && (
-            <a
-              href={`${supabaseUrl}/functions/v1/game-ics?id=${game.id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 text-ink-700 font-extrabold text-sm min-h-[44px] -ml-0.5"
-            >
-              <CalendarPlus size={18} className="text-ink-700 shrink-0" />
-              {t('gamedetails.add_to_calendar')}
-            </a>
-          )}
-          <div className="flex items-center gap-2.5">
-            <Swords size={20} className="text-ink-700 shrink-0" />
-            <span>
-              {(FORMAT_LABEL_KEY[game.format] ? t(FORMAT_LABEL_KEY[game.format]) : t('gamedetails.sobe_desce_label'))}{isRotating ? ` (${t('gamedetails.rotating_partners_short')})` : ''} • {t('gamedetails.court_count', { count: numCourts })} • {t('gamedetails.rounds_duration', { count: roundsTotal, minutes: game.game_time_minutes || 20 })}
-              {game.gender_restriction && game.gender_restriction !== 'indiferente' && (
-                <> • {t(GENDER_RESTRICTION_LABEL_KEY[game.gender_restriction])}</>
-              )}
-              {game.age_restriction && AGE_LABEL_KEY[game.age_restriction] && (
-                <> • {t(AGE_LABEL_KEY[game.age_restriction])}</>
-              )}
-              {game.ranked === false && (
-                <span className="ml-2 inline-block align-middle text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-canvas border border-line text-ink-700">
-                  {t('gamedetails.badge_friendly')}
-                </span>
-              )}
-            </span>
+              <div className="flex flex-wrap gap-2 mt-2 animate-fade-up">
+                {NAVIGATORS.map((nav) => (
+                  <a
+                    key={nav.key}
+                    href={nav.url({
+                      location: game.location,
+                      latitude: game.latitude,
+                      longitude: game.longitude,
+                    })}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => {
+                      setPreferredNavigator(nav.key)
+                      setPreferredNav(nav.key)
+                      setNavPickerOpen(false)
+                    }}
+                    className={`inline-flex items-center gap-1.5 rounded-ctrl px-3 min-h-[44px] text-sm font-extrabold border transition-colors duration-fast ${
+                      nav.key === preferredNav
+                        ? 'bg-lime-100 border-lime-600 text-ink-900'
+                        : 'bg-surface border-line text-ink-900 hover:bg-ink-50'
+                    }`}
+                  >
+                    {nav.key === preferredNav && <Check size={14} className="text-lime-600 shrink-0" />}
+                    {t(nav.labelKey)}
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
+        )}
+
+        <div className="mt-3 space-y-1.5 text-[13px] text-ink-700">
+          <p className="flex items-start gap-1.5">
+            <Swords size={15} className="shrink-0 mt-0.5" />
+            <span>
+              {(FORMAT_LABEL_KEY[game.format] ? t(FORMAT_LABEL_KEY[game.format]) : t('gamedetails.sobe_desce_label'))}{isRotating ? ` (${t('gamedetails.rotating_partners_short')})` : ''} · {t('gamedetails.court_count', { count: numCourts })} · {t('gamedetails.rounds_duration', { count: roundsTotal, minutes: game.game_time_minutes || 20 })}
+              {game.ranked === false && <> · {t('gamedetails.badge_friendly')}</>}
+            </span>
+          </p>
           {game.price_per_player > 0 && (
-            <div className="flex items-center gap-2.5">
-              <Euro size={20} className="text-ink-700 shrink-0" />
-              <span>{t('gamedetails.price_per_player', { price: formatCurrency(game.price_per_player, i18n.language) })}</span>
-            </div>
+            <p className="flex items-center gap-1.5">
+              <Euro size={15} className="shrink-0" />
+              {t('gamedetails.price_per_player', { price: formatCurrency(game.price_per_player, i18n.language) })}
+            </p>
           )}
           {game.prize && (
-            <div className="flex items-center gap-2.5">
-              <Trophy size={20} className="text-ink-700 shrink-0" />
-              <span>{t('gamedetails.prize_label', { prize: game.prize })}</span>
-            </div>
+            <p className="flex items-center gap-1.5">
+              <Trophy size={15} className="shrink-0" />
+              {t('gamedetails.prize_label', { prize: game.prize })}
+            </p>
+          )}
+          {((game.gender_restriction && game.gender_restriction !== 'indiferente') || (game.age_restriction && AGE_LABEL_KEY[game.age_restriction])) && (
+            <p className="font-extrabold text-ink-900">
+              {[
+                game.gender_restriction && game.gender_restriction !== 'indiferente' ? t(GENDER_RESTRICTION_LABEL_KEY[game.gender_restriction]) : null,
+                game.age_restriction && AGE_LABEL_KEY[game.age_restriction] ? t(AGE_LABEL_KEY[game.age_restriction]) : null,
+              ].filter(Boolean).join(' · ')}
+            </p>
           )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mt-5 pt-4 border-t border-line">
+        <div className="flex items-center gap-2.5 mt-3 pt-3 border-t border-ink-900/10">
           <PlayerAvatarRow
             players={people.map(p => ({ id: p.id, name: p.name, avatar_url: p.avatar_url }))}
             max={capacity}
+            size="sm"
           />
-          {game.status === 'open' && (
-            <span className="text-xs text-muted w-full">
-              🔒 {Math.floor(peopleCount / 4)}/{numCourts} {t('gamedetails.courts_locked_suffix')}
-              {peopleCount < capacity && (
-                <> · {t('gamedetails.missing_to_close_court', { count: (4 - (peopleCount % 4)) % 4 || 4 })}</>
-              )}
-            </span>
-          )}
-          {showClosed && (
-            <span className="ml-auto inline-flex items-center gap-1.5 bg-ok/10 text-ok text-xs font-extrabold px-3 py-1.5 rounded-full">
-              <Lock size={14} className="shrink-0" /> {t('gamedetails.status_mix_closed')}
-            </span>
-          )}
-          {game.status === 'in_progress' && (
-            <span className="ml-auto inline-flex items-center gap-1.5 bg-lime-400 text-ink-900 text-xs font-extrabold px-3 py-1.5 rounded-full">
-              <Play size={14} className="shrink-0" /> {t('gamedetails.status_in_progress')}
-            </span>
-          )}
+          <span className="ml-auto"><GroupLevelBadge rating={heroAvgRating} /></span>
         </div>
+        {game.status === 'open' && (
+          <p className="text-xs text-muted mt-2">
+            🔒 {Math.floor(peopleCount / 4)}/{numCourts} {t('gamedetails.courts_locked_suffix')}
+            {peopleCount < capacity && (
+              <> · {t('gamedetails.missing_to_close_court', { count: (4 - (peopleCount % 4)) % 4 || 4 })}</>
+            )}
+          </p>
+        )}
       </div>
+
+      {/* Botão principal por baixo do topo (SPEC §5.9). Sem sino: seguir
+          ainda não existe. Os outros caminhos (suplente, escalão etário,
+          admin) continuam em "Ações de inscrição" mais abaixo. */}
+      {game.status === 'in_progress' ? (
+        <PrimaryButton
+          // Antes da Ronda 1 (mix começado, ainda sem jogos) não há ronda: leva
+          // às duplas — é aí que o admin mexe à última da hora (Trello #292).
+          onClick={() => document.getElementById(maxRound > 0 ? `mix-ronda-${maxRound}` : 'mix-duplas')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+          className="w-full"
+        >
+          <Play size={18} /> {t('gamedetails.live_see_round')}
+        </PrimaryButton>
+      ) : !mixStarted && canJoin && !joinMode && !genderMismatch && !ageIneligible && !missingBirthday ? (
+        <PrimaryButton onClick={handleJoinAlone} disabled={joining} className="w-full">
+          {joining ? t('gamedetails.joining') : t('gamedetails.join_mix')}
+        </PrimaryButton>
+      ) : isUserJoined && (game.status === 'open' || game.status === 'closed') ? (
+        <PrimaryButton variant="ghost" onClick={handleLeaveGame} className="w-full !bg-white !border-ink-900">
+          {t('gamedetails.leave_mix')}
+        </PrimaryButton>
+      ) : null}
 
       {/* Winner (mix finalizado) */}
       {game.status === 'finished' && game.winner_team_id && (
@@ -2120,16 +2182,21 @@ export default function GameDetails() {
                             const b = teamById[m.team_b_id]
                             return (
                               <div key={m.court_number} className="rounded-ctrl p-3 bg-canvas">
-                                <p className="text-[11px] font-extrabold text-lime-600 uppercase tracking-wide mb-2">
-                                  {t('gamedetails.court_number', { number: m.court_number })}
-                                </p>
-                                {renderDuplaBlock(a)}
+                                <div className="flex items-center justify-between gap-2 mb-2 font-mono text-[11px] font-extrabold uppercase tracking-widest text-ink-500">
+                                  <span>{t('gamedetails.court_number', { number: m.court_number })}</span>
+                                  {a && b && (
+                                    <span className="tabular-nums normal-case tracking-normal">
+                                      {t('gamedetails.court_points_vs', { a: teamPoints(a), b: teamPoints(b) })}
+                                    </span>
+                                  )}
+                                </div>
+                                {renderDuplaBlock(a, { showPoints: false })}
                                 <div className="flex items-center gap-2 py-2">
                                   <div className="flex-1 h-px bg-line" />
                                   <span className="text-[11px] font-extrabold text-muted uppercase tracking-wide">{t('gamedetails.vs')}</span>
                                   <div className="flex-1 h-px bg-line" />
                                 </div>
-                                {renderDuplaBlock(b)}
+                                {renderDuplaBlock(b, { showPoints: false })}
                               </div>
                             )
                           })}
@@ -2294,7 +2361,7 @@ export default function GameDetails() {
                     return (
                       <div key={m.id} className="rounded-ctrl bg-canvas p-2.5">
                         <div className="flex items-center justify-between mb-2 px-1">
-                          <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">
+                          <p className="font-mono text-[11px] font-extrabold uppercase tracking-widest text-ink-500">
                             {t('gamedetails.court_number', { number: m.court_number })}
                           </p>
                           {canEditScores && done && !isCorrecting && (
@@ -2457,7 +2524,7 @@ export default function GameDetails() {
                             return (
                               <div key={m.id} className="rounded-ctrl bg-canvas p-2.5">
                                 <div className="flex items-center justify-between mb-2 px-1">
-                                  <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">
+                                  <p className="font-mono text-[11px] font-extrabold uppercase tracking-widest text-ink-500">
                                     {t('gamedetails.court_number', { number: m.court_number })}
                                   </p>
                                   {canEditScores && done && !isCorrecting && (
@@ -2856,18 +2923,9 @@ export default function GameDetails() {
               </div>
             ) : (
               <>
-                <PrimaryButton
-                  onClick={handleJoinAlone}
-                  disabled={joining}
-                  className="w-full"
-                >
-                  <User size={20} />
-                  {joining ? t('gamedetails.joining') : t('gamedetails.join')}
-                </PrimaryButton>
-                {/* "Entrar com parceiro" button hidden for now (not deleted —
-                    setJoinMode('partner') and the partner-picker block below
-                    still work, this is the only entry point removed) —
-                    planned for reintroduction later. */}
+                {/* "Entrar no mix" passou para por baixo do topo (SPEC 17 set).
+                    "Entrar com parceiro" continua escondido (setJoinMode
+                    ('partner') e o seletor abaixo ainda funcionam). */}
               </>
             )
           )}
@@ -2963,12 +3021,6 @@ export default function GameDetails() {
                 </PrimaryButton>
               </div>
             </div>
-          )}
-
-          {isUserJoined && (game.status === 'open' || game.status === 'closed') && (
-            <PrimaryButton variant="danger" onClick={handleLeaveGame} className="w-full">
-              {t('gamedetails.leave_game')}
-            </PrimaryButton>
           )}
 
           {isUserWaitlisted && (
