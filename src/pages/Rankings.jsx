@@ -384,9 +384,14 @@ export default function Rankings() {
           <Avatar name={me.name} url={me.avatar_url} size="w-9 h-9 text-xs" />
           <div className="flex-1 min-w-0">
             <p className="font-extrabold text-sm truncate">{t('rankings.you_row')}</p>
-            <p className="text-[11px] text-white/60 truncate">
-              {me.position ? t('rankings.your_position', { position: me.position, total: positioned.filter((r) => r.ranked).length }) : t('rankings.no_level_hint')}
-            </p>
+            {/* O nível ao lado da posição: os pontos sozinhos não dizem se
+                se é M4 ou M5 (pedido do Francisco, 17 set). */}
+            <div className="flex items-center gap-1.5 min-w-0 mt-0.5">
+              {me.rating != null && <span className="shrink-0 flex"><RatingBadge rating={me.rating} gender={me.gender} onDark /></span>}
+              <p className="text-[11px] text-white/60 truncate">
+                {me.position ? t('rankings.your_position', { position: me.position, total: positioned.filter((r) => r.ranked).length }) : t('rankings.no_level_hint')}
+              </p>
+            </div>
           </div>
           {renderValue(me, true)}
         </button>
