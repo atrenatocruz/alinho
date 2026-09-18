@@ -1716,7 +1716,7 @@
   "gamedetails.error_rotate_too_many_players": "With rotating partners, {{count}} players need more than {{courts}} courts — adjust the number of courts or reduce sign-ups.",
   "gamedetails.rotating_partners_short": "rotating partners",
   "gamedetails.placar_title": "Mix scoreboard",
-  "gamedetails.placar_hint": "Ordered by wins; with the same wins, whoever is on a better court comes first. The mix is won by whoever wins court 1 in the last round, even if they're not first on this list. Not a ranking.",
+  "gamedetails.placar_hint": "Follows the last round played: first whoever won on court 1, then whoever lost on court 1, then court 2, and so on. The mix is won by whoever wins court 1 in the last round. Not a ranking.",
   "gamedetails.placar_court": "Court {{number}}",
   "gerirclube.ranked_label": "Does this mix count for the ranking?",
   "gerirclube.ranked_yes": "Yes",

@@ -316,24 +316,33 @@ export function nextSobeDesceRotating(roundMatches, teamsById, numCourts, { part
 
 /** Placar do mix no Sobe e desce com parceiros que trocam (Francisco,
     16 set 2026). Não é um ranking — não mexe em pontos de ninguém.
-    Ordem (Francisco, 18 set 2026 — proposta por acordar com Renato/Ruben):
-    1. vitórias no mix (mais vitórias à frente);
-    2. com as mesmas vitórias, o campo do jogo mais recente (campo 1 primeiro);
-    3. dentro do campo, quem ganhou esse jogo (se já tem resultado);
-    4. pontos de jogo marcados (só desempate, não se mostra).
-    Ex.: quem perdeu no campo 1 fica à frente de quem ganhou no campo 2 com as
-    mesmas vitórias; com mais vitórias, o do campo 2 passa à frente.
-    O vencedor do mix NÃO muda: continua a ser quem ganha o campo 1 na última
-    ronda (computeMixWinnerTeamId), mesmo que não seja o 1.º desta lista.
+    Ordem (Francisco, 18 set 2026 — substitui a de "vitórias primeiro"):
+    segue o resultado da ÚLTIMA RONDA JOGADA —
+      1.º quem ganhou no campo 1, 2.º quem perdeu no campo 1,
+      3.º quem ganhou no campo 2, 4.º quem perdeu no campo 2, e assim por diante.
+    Para cada pessoa conta o jogo mais recente que JÁ TEM RESULTADO; a ronda
+    seguinte, já criada mas por jogar, não conta (antes contava, e o vencedor
+    do campo 2 aparecia como "campo 1" à frente do perdedor do campo 1).
+    Só quem ainda não tem nenhum resultado usa o campo da ronda em curso (mix
+    acabado de começar). Vitórias e pontos já não decidem a ordem: só
+    desempatam no fim (ex. os dois parceiros da mesma dupla).
+    O vencedor do mix não muda: quem ganha o campo 1 na última ronda
+    (computeMixWinnerTeamId) — no fim do mix, é o 1.º desta lista.
     Esta ordem é também a "posição no mix" que nextSobeDesceRotating usa para
     juntar parceiros quando já não há duplas novas possíveis num campo.
-    Devolve [{ player, court, wins, played, points }]. */
+    Devolve [{ player, court, wonLast, wins, played, points }]. */
 export function rotatingPlacar(matches, teams) {
   const teamById = Object.fromEntries(teams.map((t) => [t.id, t]))
   const table = {}
   const rowFor = (player) => {
     if (!player) return null
-    if (!table[player.id]) table[player.id] = { player, court: Infinity, lastRound: 0, wonLast: false, wins: 0, played: 0, points: 0 }
+    if (!table[player.id]) {
+      table[player.id] = {
+        player, wins: 0, played: 0, points: 0,
+        playedRound: 0, playedCourt: Infinity, wonLast: false, // último jogo com resultado
+        currentRound: 0, currentCourt: Infinity, // ronda mais recente, jogada ou não
+      }
+    }
     return table[player.id]
   }
   for (const m of matches) {
@@ -343,24 +352,33 @@ export function rotatingPlacar(matches, teams) {
       for (const player of [team.player1, team.player2]) {
         const row = rowFor(player)
         if (!row) continue
-        if (m.round_number > row.lastRound) {
-          row.lastRound = m.round_number
-          row.court = m.court_number
-          row.wonLast = !!m.winner_team_id && m.winner_team_id === teamId
+        if (m.round_number > row.currentRound) {
+          row.currentRound = m.round_number
+          row.currentCourt = m.court_number
         }
         if (m.winner_team_id) {
           row.played += 1
           row.points += score ?? 0
           if (m.winner_team_id === teamId) row.wins += 1
+          if (m.round_number > row.playedRound) {
+            row.playedRound = m.round_number
+            row.playedCourt = m.court_number
+            row.wonLast = m.winner_team_id === teamId
+          }
         }
       }
     }
   }
-  return Object.values(table).sort((x, y) =>
-    y.wins - x.wins
-    || x.court - y.court
-    || Number(y.wonLast) - Number(x.wonLast)
-    || y.points - x.points)
+  return Object.values(table)
+    .map(({ player, wins, played, points, playedRound, playedCourt, currentCourt, wonLast }) => ({
+      player, wins, played, points, wonLast,
+      court: playedRound > 0 ? playedCourt : currentCourt,
+    }))
+    .sort((x, y) =>
+      x.court - y.court
+      || Number(y.wonLast) - Number(x.wonLast)
+      || y.wins - x.wins
+      || y.points - x.points)
 }
 
 /** Separa quem se inscreveu a dois: cada pessoa passa a contar como solo
