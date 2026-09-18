@@ -23,6 +23,9 @@ export default function ClubProfile() {
   const goBack = useGoBack('/comunidade')
   const { memberships, followOrganization, leaveOrganization, toggleFavoriteOrganization } = useAuth()
   const [club, setClub] = useState(null)
+  // Textos que nomeiam a entidade têm um gémeo "_group" — um grupo nunca
+  // lê "deste clube" (mesma regra do GerirClube).
+  const kk = (key) => (club?.kind === 'group' ? `${key}_group` : key)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [acting, setActing] = useState(false)
@@ -124,14 +127,14 @@ export default function ClubProfile() {
       await load()
     } catch (error) {
       console.error('Error following club:', error)
-      alert(describeError(t, error, 'clubprofile.error_follow'))
+      alert(describeError(t, error, kk('clubprofile.error_follow')))
     } finally {
       setActing(false)
     }
   }
 
   const handleUnfollow = async () => {
-    if (!confirm(t('clubprofile.confirm_unfollow', { name: club.name }))) return
+    if (!confirm(t(kk('clubprofile.confirm_unfollow'), { name: club.name }))) return
     setActing(true)
     try {
       const { error } = await leaveOrganization(club.id)
@@ -139,7 +142,7 @@ export default function ClubProfile() {
       await load()
     } catch (error) {
       console.error('Error leaving club:', error)
-      alert(describeError(t, error, 'clubprofile.error_unfollow'))
+      alert(describeError(t, error, kk('clubprofile.error_unfollow')))
     } finally {
       setActing(false)
     }
@@ -226,7 +229,7 @@ export default function ClubProfile() {
             onClick={handleToggleFavorite}
             disabled={favoriting}
             aria-label={isFavorite ? t('clubprofile.remove_favorite') : t('clubprofile.mark_favorite')}
-            title={isFavorite ? t('clubprofile.remove_favorite') : t('clubprofile.mark_favorite_title')}
+            title={isFavorite ? t('clubprofile.remove_favorite') : t(kk('clubprofile.mark_favorite_title'))}
             className="shrink-0 w-11 h-11 min-h-[44px] rounded-full flex items-center justify-center transition-colors duration-fast disabled:opacity-40 hover:bg-ink-50"
           >
             <Heart size={20} className={isFavorite ? 'fill-lime-400 text-lime-400' : 'text-ink-200'} />
@@ -380,7 +383,7 @@ export default function ClubProfile() {
           <EmptyState
             icon={Calendar}
             title={t('clubprofile.no_open_mixes_title')}
-            subtitle={t('clubprofile.no_open_mixes_subtitle')}
+            subtitle={t(kk('clubprofile.no_open_mixes_subtitle'))}
           />
         ) : (
           <div className="space-y-3">

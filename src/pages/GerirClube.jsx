@@ -1684,6 +1684,9 @@ export default function GerirClube() {
               </span>
             )}
           </button>
+          {/* Jogo em aberto só nos clubes: só o clube tem campos para gerir
+              (Francisco, 18 set 2026). */}
+          {!isGroupOrg && (
           <button
             onClick={() => setActiveTab('open_slots')}
             className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-ctrl text-sm font-extrabold whitespace-nowrap transition-all duration-fast ${
@@ -1695,6 +1698,7 @@ export default function GerirClube() {
             <Clock size={16} className="shrink-0" />
             {t('gerirclube.tab_open_slots')}
           </button>
+          )}
         </div>
       )}
 
@@ -2403,7 +2407,7 @@ export default function GerirClube() {
             </div>
           )}
 
-          {activeTab === 'open_slots' && (
+          {activeTab === 'open_slots' && !isGroupOrg && (
             <OpenSlotsPanel organizationId={currentOrganizationId} />
           )}
 

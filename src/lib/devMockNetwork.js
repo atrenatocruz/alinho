@@ -479,7 +479,7 @@ const TABLE_MOCKS = {
   // Gerir ficava em branco (loadSettings nunca recebia nada). Marcada como
   // grupo criado na Comunidade para se poder validar o "Eliminar grupo".
   organizations: () => [{
-    id: MOCK_ADMIN_ORG_ID, name: 'Dev Org', slug: 'dev-org', kind: 'group', self_serve: true,
+    id: MOCK_ADMIN_ORG_ID, name: 'Dev Org', slug: 'dev-org', kind: localStorage.getItem('mockOrgKind') || 'group', self_serve: true,
     is_global: false, open_join: false, group_logo_url: null, description: '', location: '',
     ...(community() ? { searchable: true } : {}),
     owner_id: MOCK_ADMIN_USER_ID, plan_tier: localStorage.getItem('mockPlanTier') || 'pro',
