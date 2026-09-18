@@ -200,14 +200,15 @@ const rotMatch = (id, round, court, a, b, sa, sb) => ({
   id, game_id: 'fake-game-1', round_number: round, court_number: court, phase: 'group', team_a_id: a, team_b_id: b,
   score_a: sa, score_b: sb, winner_team_id: sa == null ? null : sa > sb ? a : b,
 })
-// localStorage.mockRotatingPlacar = 'equal' | 'more' — o Placar do mix em
-// mais estados (Francisco, 18 set: vitórias primeiro, depois o campo).
-// 'equal': ronda 2 jogada — Ana e Eva perderam no campo 1 e ficam à frente
-// de Carla e Gil, que ganharam no campo 2 com as mesmas vitórias.
-// 'more': ronda 3 jogada — Ana ganhou no campo 2 e tem mais vitórias do que
-// Gil, que perdeu no campo 1: Ana passa à frente.
+// localStorage.mockRotatingPlacar = 'none' | 'equal' | 'more' — o Placar do
+// mix em mais estados (Francisco, 18 set: segue a última ronda jogada).
+// 'none': só a ronda 1, sem resultados. Sem nada: ronda 1 jogada e ronda 2
+// já criada. 'equal': duas rondas jogadas. 'more': três rondas jogadas.
 const rotPlacar = () => localStorage.getItem('mockRotatingPlacar')
-const ROT_MATCHES_FN = () => [
+const ROT_MATCHES_FN = () => rotPlacar() === 'none' ? [
+  rotMatch('rm1', 1, 1, 'rt1', 'rt2', null, null),
+  rotMatch('rm2', 1, 2, 'rt3', 'rt4', null, null),
+] : [
   rotMatch('rm1', 1, 1, 'rt1', 'rt2', 6, 3),
   rotMatch('rm2', 1, 2, 'rt3', 'rt4', 6, 4),
   ...(rotPlacar()
