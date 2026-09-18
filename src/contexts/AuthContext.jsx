@@ -99,6 +99,9 @@ export const AuthProvider = ({ children }) => {
       setProfile(MOCK_ADMIN_PROFILE)
       setMemberships(mockAdminMemberships())
       setCurrentOrganizationId(MOCK_ADMIN_ORG_ID)
+      // localStorage.mockPrivateMatchesOff = 'true' — ver a app com o
+      // interruptor "Jogo entre amigos" desligado no Gerir.
+      setIsPrivateMatchesEnabled(localStorage.getItem('mockPrivateMatchesOff') !== 'true')
       setLoading(false)
       return
     }

@@ -506,6 +506,9 @@ const TABLE_MOCKS = {
       zone: 'Cascais', user: { name: 'Tiago Lopes' }, organization: null,
       availability: [{ day_of_week: 'sabado', start_time: '09:00:00', end_time: '13:00:00' }] },
   ] : []),
+  // localStorage.mockPrivateMatchesOff = 'true' — o interruptor "Jogo entre
+  // amigos" desligado no Gerir, para ver a app sem essa funcionalidade.
+  feature_flags: () => [{ key: 'private_matches', enabled: localStorage.getItem('mockPrivateMatchesOff') !== 'true' }],
   achievements: () => [
     { key: 'primeira_bola', category: 'jogo', rarity: 'comum', sort: 1 },
     { key: 'mes_cheio', category: 'jogo', rarity: 'epico', sort: 2 },

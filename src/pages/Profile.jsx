@@ -35,7 +35,7 @@ const HAND_LABEL_KEY = { right: 'profile.dominant_hand_right', left: 'profile.do
 
 export default function Profile() {
   const { t, i18n } = useTranslation()
-  const { profile, updateProfile, currentOrganizationId, isGuest, signOut, refreshMemberships, memberships } = useAuth()
+  const { profile, updateProfile, currentOrganizationId, isGuest, signOut, refreshMemberships, memberships, isPrivateMatchesEnabled } = useAuth()
   const headerActions = useHeaderActions()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -738,7 +738,11 @@ export default function Profile() {
           o nº que ficava no canto do hero — agora esse nº mudou de sítio
           para dentro deste cartão, já não há duplicação) e abre os
           Rankings já na posição do próprio jogador. */}
-      <div className="grid grid-cols-2 gap-2.5">
+      {/* Com os jogos entre amigos desligados (interruptor no Gerir), a
+          página redireciona para a Home — por isso o cartão desaparece aqui
+          também, como já desaparecia na Home (bug do Francisco, 17 set). */}
+      <div className={`grid gap-2.5 ${isPrivateMatchesEnabled ? 'grid-cols-2' : 'grid-cols-1'}`}>
+        {isPrivateMatchesEnabled && (
         <Link to="/jogos-privados" className="card press flex flex-col justify-between gap-2 min-h-[92px] bg-ink-900 text-white">
           <Users size={20} className="text-lime-400" />
           {/* min-h no título — "Jogo entre amigos" quebra para 2 linhas,
@@ -750,6 +754,7 @@ export default function Profile() {
             <p className="text-[10.5px] opacity-80 mt-0.5">{t('home.friendly_match_subtitle')}</p>
           </div>
         </Link>
+        )}
         <Link
           to="/rankings"
           state={{ tab: 'global', scrollToMe: true }}
