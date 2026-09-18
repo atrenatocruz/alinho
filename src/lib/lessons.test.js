@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   isoWeekday, weekdayDatesInMonth, firstMonthAmount, enrolmentEndDate,
-  peakStatus, priceRowFor, durationsWithPrice, lowestLessonPrice,
+  peakStatus, priceRowFor, durationsWithPrice, lowestLessonPrice, weekdayCountBetween,
 } from './lessons'
 
 describe('isoWeekday / weekdayDatesInMonth', () => {
@@ -103,5 +103,17 @@ describe('priceRowFor / durationsWithPrice / lowestLessonPrice (SPEC §7)', () =
   it('"desde" = preço por aula mais baixo', () => {
     expect(lowestLessonPrice(prices, { onIso: '2026-10-01' })).toBe(18)
     expect(lowestLessonPrice([], { onIso: '2026-10-01' })).toBe(null)
+  })
+})
+
+describe('weekdayCountBetween (cancelar um período)', () => {
+  it('conta as terças entre duas datas, inclusive', () => {
+    expect(weekdayCountBetween('2026-08-03', '2026-08-17', 2)).toBe(2) // 4 e 11 ago
+    expect(weekdayCountBetween('2026-09-01', '2026-09-29', 2)).toBe(5)
+    expect(weekdayCountBetween('2026-09-02', '2026-09-07', 2)).toBe(0)
+  })
+  it('intervalo vazio ou ao contrário → 0', () => {
+    expect(weekdayCountBetween('2026-09-10', '2026-09-01', 2)).toBe(0)
+    expect(weekdayCountBetween('', '2026-09-01', 2)).toBe(0)
   })
 })

@@ -14,6 +14,7 @@ import { listIncomingOrganizationInvites, acceptOrganizationInvite, declineOrgan
 import { getMyPrivateMatches, privateMatchActions } from '../lib/privateMatches'
 import { describeError } from '../lib/errors'
 import { listMyUnreadNotifications, markNotificationsRead, MIX_NOTICE_KINDS } from '../lib/notifications'
+import LessonNoticeRow, { LESSON_NOTICE_KINDS } from './lessons/LessonNoticeRow'
 import { formatDate } from '../lib/formatDate'
 
 // Re-prompt at most once per day once dismissed — a nudge, not a gate.
@@ -371,15 +372,20 @@ export default function Layout({ children }) {
   // mudei de parceiro (Trello #292, migration_mix_notices.sql). Os mesmos
   // avisos seguem por WhatsApp pelo bot. Sem a migração, lista vazia.
   const [mixNotices, setMixNotices] = useState([])
+  // Avisos das aulas (Trello #49) — mesma tabela, outros kinds.
+  const [lessonNotices, setLessonNotices] = useState([])
   useEffect(() => {
     if (!profile?.id || isGuest) {
       setMixNotices([])
+      setLessonNotices([])
       return
     }
     let cancelled = false
     listMyUnreadNotifications()
       .then((data) => {
-        if (!cancelled) setMixNotices(data.filter((n) => MIX_NOTICE_KINDS.includes(n.kind)))
+        if (cancelled) return
+        setMixNotices(data.filter((n) => MIX_NOTICE_KINDS.includes(n.kind)))
+        setLessonNotices(data.filter((n) => LESSON_NOTICE_KINDS.includes(n.kind)))
       })
       .catch((error) => console.error('Error loading mix notices:', error))
     return () => {
@@ -390,6 +396,12 @@ export default function Layout({ children }) {
   const openMixNotice = (notice) => {
     setShowNotifications(false)
     setMixNotices((list) => list.filter((n) => n.id !== notice.id))
+    markNotificationsRead([notice.id]).catch((error) => console.error('Error marking notice as read:', error))
+  }
+
+  const openLessonNotice = (notice) => {
+    setShowNotifications(false)
+    setLessonNotices((list) => list.filter((n) => n.id !== notice.id))
     markNotificationsRead([notice.id]).catch((error) => console.error('Error marking notice as read:', error))
   }
 
@@ -408,7 +420,7 @@ export default function Layout({ children }) {
   }
 
   const joinRequestsTotal = joinRequestsByOrg.reduce((sum, org) => sum + org.count, 0)
-  const notificationsTotal = followRequests.length + joinRequestsTotal + orgInvites.length + privateMatchTodos.length + mixNotices.length
+  const notificationsTotal = followRequests.length + joinRequestsTotal + orgInvites.length + privateMatchTodos.length + mixNotices.length + lessonNotices.length
 
   // `main` below is the app's only scrolling region (see the app-shell comment
   // on the root div) — the document itself never scrolls, so neither the browser
@@ -543,6 +555,9 @@ export default function Layout({ children }) {
                 </div>
               ) : (
                 <div className="max-h-80 overflow-y-auto divide-y divide-line">
+                  {lessonNotices.map((notice) => (
+                    <LessonNoticeRow key={notice.id} notice={notice} onOpen={openLessonNotice} />
+                  ))}
                   {mixNotices.map((notice) => (
                     <Link
                       key={notice.id}

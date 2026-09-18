@@ -4,8 +4,8 @@
 Fonte de verdade do produto: `SPEC.md` + `prints/` nesta pasta. Cópia deste ficheiro na app:
 `docs/superpowers/specs/2026-09-18-aulas-fase0-modelo-design.md`.
 
-**Estado: PROPOSTA para o Renato validar. Sem o "sim" dele não há migração nem código de base de dados.**
-Nada disto foi corrido nem escrito como migração ainda.
+**Estado: PROPOSTA para o Renato validar.** A migração da Fase 1 está escrita como proposta (não corrida): `supabase/migration_lessons_1_base.sql`.
+Nada disto foi corrido na base de dados.
 
 ---
 
@@ -19,6 +19,11 @@ Nada disto foi corrido nem escrito como migração ainda.
 | d | Promoção **sem data de fim** por agora (coluna `promo_until` nullable, sem ecrã). | Coluna opcional. |
 | e | Área do próprio professor no Gerir: entrada **«As minhas aulas»** para quem tem perfil de professor aprovado. | Só ecrã. |
 | f | Tabela de preços com **todas** as combinações (tipo × duração × ponta/fora × mês/aula). | O modelo cobre qualquer ecrã. |
+
+**Decidido pelo Francisco (18 set, noite):** (a) **"Professor"** nos textos. (f) **Tabela completa**: o preço
+depende do tipo (privada, a 2, a 3, a 4) e da duração (1h, 1h30, 2h), com mês e aula, ponta e fora de ponta.
+(d) **Promoção**: preço fixo que pode ser **mensal** (turma) ou **por aula** (avulsa); data de fim continua em
+aberto. Autorizou escrever `migration_lessons_1_base.sql` **como proposta, sem correr**, antes do sim do Renato.
 
 **Confirmado pelo Francisco (18 set):** plano da Fase 1 aprovado (entrega em 1a professores e preços · 1b turmas e
 inscrição · 1c dia a dia); o ecrã «Nova turma» faz-se **por passos** (1.º professor, quando, tipo e preço; 2.º nível,

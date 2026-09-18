@@ -1,6 +1,6 @@
 // Gerir → clube → «Aulas» (Trello #49, Fase 1a). Professores (ordem na
 // página do clube) e Preços (tabela ponta / fora de ponta + horas de ponta,
-// print 08, 1.º telemóvel). Turmas e Pedidos entram nas fases seguintes.
+// print 08, 1.º telemóvel) e Turmas (Fase 1b). Pedidos entram na Fase 3.
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowDown, ArrowUp, GraduationCap } from 'lucide-react'
@@ -11,6 +11,7 @@ import {
 import { priceRowFor, LESSON_CAPACITY, LESSON_DURATIONS } from '../../lib/lessons'
 import { describeError } from '../../lib/errors'
 import { MonoLabel, levelsText, euros } from './LessonBits'
+import ClubSeriesPanel from './ClubSeriesPanel'
 
 const pad = (n) => String(n).padStart(2, '0')
 const todayIso = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` }
@@ -24,9 +25,13 @@ export default function ClubLessonsPanel({ organizationId, orgName }) {
   const [section, setSection] = useState('teachers')
   const [teachers, setTeachers] = useState([])
   const [loading, setLoading] = useState(true)
+  const [settings, setSettings] = useState({ prices: [], peakHours: [] })
 
   useEffect(() => {
     let alive = true
+    getClubLessonSettings(organizationId)
+      .then((res) => { if (alive) setSettings(res) })
+      .catch((error) => console.error('Error loading lesson settings:', error))
     listClubTeachers(organizationId)
       .then((rows) => { if (alive) setTeachers(rows) })
       .catch((error) => console.error('Error loading club teachers:', error))
@@ -39,6 +44,7 @@ export default function ClubLessonsPanel({ organizationId, orgName }) {
       <div className="flex gap-1.5 flex-wrap">
         {[
           ['teachers', t('lessons.gerir_tab_teachers', { count: teachers.length })],
+          ['series', t('lessons.gerir_tab_series')],
           ['prices', t('lessons.gerir_tab_prices')],
         ].map(([key, label]) => (
           <button key={key} type="button" onClick={() => setSection(key)}
@@ -49,9 +55,9 @@ export default function ClubLessonsPanel({ organizationId, orgName }) {
           </button>
         ))}
       </div>
-      {section === 'teachers'
-        ? <TeachersOrder organizationId={organizationId} teachers={teachers} setTeachers={setTeachers} loading={loading} />
-        : <Prices organizationId={organizationId} orgName={orgName} />}
+      {section === 'teachers' && <TeachersOrder organizationId={organizationId} teachers={teachers} setTeachers={setTeachers} loading={loading} />}
+      {section === 'series' && <ClubSeriesPanel organizationId={organizationId} teachers={teachers} prices={settings.prices} peakHours={settings.peakHours} />}
+      {section === 'prices' && <Prices organizationId={organizationId} orgName={orgName} />}
     </div>
   )
 }

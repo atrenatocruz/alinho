@@ -69,3 +69,51 @@ export const lessonTypeLabel = (t, type, { series = false } = {}) =>
   t(`lessons.${series ? 'series' : 'lesson'}_type_${type}`)
 
 export const euros = (v) => (v == null ? null : `${Number(v) % 1 === 0 ? Number(v) : Number(v).toFixed(2)} €`)
+
+/** Chips de escolha única (os "chips" pretos dos wireframes). */
+export function ChipGroup({ options, value, onChange, className = '' }) {
+  return (
+    <div className={`flex flex-wrap gap-1.5 ${className}`}>
+      {options.map((o) => (
+        <button
+          key={String(o.value)}
+          type="button"
+          disabled={o.disabled}
+          onClick={() => onChange(o.value)}
+          className={`min-h-[36px] px-3 rounded-full border text-[13px] font-semibold transition-colors duration-fast disabled:opacity-40 ${
+            value === o.value ? 'bg-ink-900 text-white border-ink-900' : 'bg-canvas text-ink-700 border-line hover:bg-ink-50'
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/** Interruptor preto com bola lima (como nos wireframes). */
+export function Toggle({ label, checked, onChange, disabled = false }) {
+  return (
+    <label className={`flex items-center justify-between gap-3 py-2.5 border-b border-line text-sm text-ink-900 ${disabled ? 'opacity-40' : 'cursor-pointer'}`}>
+      <span>{label}</span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        disabled={disabled}
+        onClick={() => onChange(!checked)}
+        className={`relative w-10 h-6 rounded-full shrink-0 transition-colors duration-fast ${checked ? 'bg-ink-900' : 'bg-ink-200'}`}
+      >
+        <span className={`absolute top-1 w-4 h-4 rounded-full transition-all duration-fast ${checked ? 'right-1 bg-lime-400' : 'left-1 bg-white'}`} />
+      </button>
+    </label>
+  )
+}
+
+/** Dia da semana + hora ("Terças 19:00–20:30"). */
+export const seriesWhen = (t, s) => {
+  const [h, m] = s.start_time.split(':').map(Number)
+  const endMin = h * 60 + m + s.duration_minutes
+  const end = `${pad(Math.floor(endMin / 60) % 24)}:${pad(endMin % 60)}`
+  return { day: t(`lessons.wd_plural_${s.weekday}`), start: `${pad(h)}:${pad(m)}`, end }
+}

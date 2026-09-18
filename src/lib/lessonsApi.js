@@ -70,3 +70,115 @@ export async function lessonsAvailable() {
   const { error } = await supabase.from('lesson_prices').select('id').limit(1)
   return !error
 }
+
+// ── Fase 1b: turmas e inscrição ─────────────────────────────────────────
+
+/** Turmas do clube (Gerir → Aulas → Turmas). Cada linha: series_id,
+    teacher_profile_id, teacher_name, weekday (1..7), start_time 'HH:MM',
+    duration_minutes, lesson_type, taken, capacity, price_month, level_from,
+    level_to, gender_restriction, visibility, status, pending_requests. */
+export async function listClubSeries(organizationId) {
+  const { data, error } = await supabase.rpc('list_club_series', { p_organization_id: organizationId })
+  if (error) throw error
+  return data || []
+}
+
+/** Turma + alunos visíveis a quem pede (a privacidade é do servidor) +
+    pedidos para entrar (só para quem gere). Devolve { series, students,
+    hidden_count, avg_rating, requests }. */
+export async function getSeriesRoster(seriesId) {
+  const { data, error } = await supabase.rpc('get_series_roster', { p_series_id: seriesId })
+  if (error) throw error
+  return data
+}
+
+/** Cria uma turma. fields: teacher_profile_id, day_of_week, start_time,
+    duration_minutes, lesson_type, price_peak, starts_on, level_from,
+    level_to, gender_restriction, visibility, close_hours_before,
+    accepts_trial, trial_free, announce_whatsapp. Devolve o id. */
+export async function createLessonSeries(fields) {
+  const { data, error } = await supabase.rpc('create_lesson_series', { p_fields: fields })
+  if (error) throw error
+  return data
+}
+
+/** Professor/clube aceita ou recusa um pedido para entrar na turma. */
+export async function resolveEnrolment(enrolmentId, accept) {
+  const { error } = await supabase.rpc('resolve_enrolment', { p_enrolment_id: enrolmentId, p_accept: accept })
+  if (error) throw error
+}
+
+/** Aluno pede para entrar numa turma. */
+export async function requestEnrolment(seriesId) {
+  const { data, error } = await supabase.rpc('request_enrolment', { p_series_id: seriesId })
+  if (error) throw error
+  return data
+}
+
+/** Aluno retira o pedido ou cancela a inscrição (neste caso só conta no fim
+    do mês — é o servidor que põe ends_on). */
+export async function cancelEnrolment(enrolmentId) {
+  const { error } = await supabase.rpc('cancel_enrolment', { p_enrolment_id: enrolmentId })
+  if (error) throw error
+}
+
+/** Depois de o professor aceitar, o aluno confirma (ou desiste). */
+export async function confirmEnrolment(enrolmentId, accept) {
+  const { error } = await supabase.rpc(accept ? 'confirm_enrolment' : 'decline_enrolment', { p_enrolment_id: enrolmentId })
+  if (error) throw error
+}
+
+// ── Fase 1c: dia a dia ──────────────────────────────────────────────────
+
+/** As minhas aulas entre duas datas (uma por semana na turma), com o meu
+    estado em cada uma. Linha: lesson_id, series_id, starts_at, ends_at,
+    lesson_type, form, status, cancel_reason, cancel_note, teacher_name,
+    teacher_profile_id, organization, price_month, price_per_person, taken,
+    capacity, avg_rating, avg_gender, my_status, marked_by_name. */
+export async function listMyLessons(fromIso, toIso) {
+  const { data, error } = await supabase.rpc('list_my_lessons', { p_from: fromIso, p_to: toIso })
+  if (error) throw error
+  return data || []
+}
+
+/** Aulas em aberto que posso ver (visibilidade na base de dados), sem nomes
+    de alunos e sem as completas. A distância filtra-se na Home. */
+export async function listLessonEvents(fromIso, toIso) {
+  const { data, error } = await supabase.rpc('list_lesson_events', { p_from: fromIso, p_to: toIso })
+  if (error) throw error
+  return data || []
+}
+
+/** "Não posso ir" (going = false) / "Afinal vou" (going = true), só nesse dia. */
+export async function setLessonAttendance(lessonId, going) {
+  const { error } = await supabase.rpc('set_lesson_attendance', { p_lesson_id: lessonId, p_going: going })
+  if (error) throw error
+}
+
+/** Página da aula: { lesson, teacher, students (só os que posso ver),
+    hidden_count, avg_rating, my_status, my_enrolment }. */
+export async function getLesson(lessonId) {
+  const { data, error } = await supabase.rpc('get_lesson', { p_lesson_id: lessonId })
+  if (error) throw error
+  return data
+}
+
+/** Professor/clube marca a falta de um aluno nessa aula ("ligou"). */
+export async function markLessonAbsence(lessonId, userId, note) {
+  const { error } = await supabase.rpc('mark_lesson_absence', { p_lesson_id: lessonId, p_user_id: userId, p_note: note || null })
+  if (error) throw error
+}
+
+/** Cancelar só uma aula, com a razão (illness | holiday | other). */
+export async function cancelLesson(lessonId, reason, note) {
+  const { error } = await supabase.rpc('cancel_lesson', { p_lesson_id: lessonId, p_reason: reason, p_note: note || null })
+  if (error) throw error
+}
+
+/** Cancelar um período (férias…) de uma turma. */
+export async function cancelLessonPeriod(seriesId, fromIso, toIso, reason, note) {
+  const { error } = await supabase.rpc('cancel_lesson_period', {
+    p_series_id: seriesId, p_from: fromIso, p_to: toIso, p_reason: reason, p_note: note || null,
+  })
+  if (error) throw error
+}
