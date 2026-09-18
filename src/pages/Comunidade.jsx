@@ -219,8 +219,9 @@ export default function Comunidade() {
     )
   }
 
+  // Abre o perfil do professor (aulas, Trello #49).
   const renderTeacher = (teacher) => (
-    <div key={teacher.id} className="card p-3.5 space-y-2">
+    <Link key={teacher.id} to={`/professor/${teacher.id}`} className="card press block p-3.5 space-y-2">
       <div className="flex items-center gap-3">
         <span className="w-11 h-11 rounded-full bg-ink-50 text-ink-700 flex items-center justify-center shrink-0">
           <GraduationCap size={18} />
@@ -240,7 +241,7 @@ export default function Comunidade() {
         </p>
       )}
       <p className="text-sm text-ink-900">{teacher.contact}</p>
-    </div>
+    </Link>
   )
 
   const busy = loading || (filter === 'teachers' && teachersLoading)

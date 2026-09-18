@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { LESSON_RPC_MOCKS, LESSON_TABLE_MOCKS } from './devMockLessons'
 
 // Dev-only: quando a sessão é o atalho "Entrar como Admin (Dev)"
 // (AuthContext.jsx, MOCK_ADMIN_KEY), essa sessão nunca teve um auth.uid()
@@ -52,6 +53,7 @@ const COMMUNITY_ORGS = [
 ]
 
 const RPC_MOCKS = {
+  ...LESSON_RPC_MOCKS,
   get_player_profile: (params) => {
     const id = params?.p_user_id || FAKE_PLAYER_ID
     const person = FAKE_PEOPLE[id] || FAKE_PEOPLE[FAKE_PLAYER_ID]
@@ -482,6 +484,7 @@ function lastMinuteRequest(table, url, method, body) {
 }
 
 const TABLE_MOCKS = {
+  ...LESSON_TABLE_MOCKS,
   // localStorage.mockNotices = 'true' — três avisos de mix no sino (Trello #292).
   notifications: () => (localStorage.getItem('mockNotices') === 'true' ? [
     { id: 'n1', kind: 'mix_partner_changed', game_id: 'fake-game-1', created_at: new Date().toISOString(),
