@@ -1103,8 +1103,15 @@ export default function Profile() {
 
               <div className="pt-2 border-t border-line">
                 <h4 className="text-sm font-extrabold text-ink-900 mt-4 mb-1">{t('profile.privacy_heading')}</h4>
-                <p className="text-xs text-muted mb-3">
+                <p className="text-xs text-muted mb-2">
                   {t('profile.privacy_description')}
+                </p>
+                {/* O que estas definições NÃO escondem (Trello #211): na lista de
+                    jogadores e nos Rankings, foto, nome, nível e lado aparecem
+                    sempre — decisão do Francisco, 9 set. Dizê-lo aqui evita que
+                    alguém pense que escondeu o nível ao pôr "Resultados" privado. */}
+                <p className="text-xs text-ink-700 bg-ink-50 rounded-ctrl px-3 py-2 mb-3">
+                  {t('profile.privacy_always_public')}
                 </p>
                 <div className="mb-4">
                   <label className="flex items-center justify-between gap-3">
@@ -1125,15 +1132,24 @@ export default function Profile() {
                 </div>
                 <div className="space-y-3">
                   <div>
-                    <label className={inputLabel}>{t('profile.visibility_activity_label')}</label>
+                    <label className={inputLabel}>
+                      {t('profile.visibility_activity_label')}
+                      <span className="block text-xs font-normal text-muted mt-0.5">{t('profile.visibility_activity_hint')}</span>
+                    </label>
                     <Select value={activityVisibility} onChange={setActivityVisibility} options={VISIBILITY_OPTIONS} />
                   </div>
                   <div>
-                    <label className={inputLabel}>{t('profile.visibility_results_label')}</label>
+                    <label className={inputLabel}>
+                      {t('profile.visibility_results_label')}
+                      <span className="block text-xs font-normal text-muted mt-0.5">{t('profile.visibility_results_hint')}</span>
+                    </label>
                     <Select value={resultsVisibility} onChange={setResultsVisibility} options={VISIBILITY_OPTIONS} />
                   </div>
                   <div>
-                    <label className={inputLabel}>{t('profile.visibility_clubs_label')}</label>
+                    <label className={inputLabel}>
+                      {t('profile.visibility_clubs_label')}
+                      <span className="block text-xs font-normal text-muted mt-0.5">{t('profile.visibility_clubs_hint')}</span>
+                    </label>
                     <Select value={clubsVisibility} onChange={setClubsVisibility} options={VISIBILITY_OPTIONS} />
                   </div>
                 </div>
