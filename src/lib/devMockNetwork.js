@@ -192,12 +192,28 @@ const rotTeam = (id, p1, p2, seed) => ({ id, game_id: 'fake-game-1', player1_id:
 const ROT_TEAMS = [
   rotTeam('rt1', ra, rb, 2800), rotTeam('rt2', rc, rd, 2700), rotTeam('rt3', re, rf, 2600), rotTeam('rt4', rg, rh, 2500),
   rotTeam('rt5', ra, re, 2700), rotTeam('rt6', rb, rf, 2700), rotTeam('rt7', rc, rg, 2600), rotTeam('rt8', rd, rh, 2600),
+  rotTeam('rt9', rb, rc, 2700), rotTeam('rt10', rf, rg, 2600), rotTeam('rt11', ra, rd, 2600), rotTeam('rt12', re, rh, 2500),
 ]
-const ROT_MATCHES = [
-  { id: 'rm1', game_id: 'fake-game-1', round_number: 1, court_number: 1, phase: 'group', team_a_id: 'rt1', team_b_id: 'rt2', score_a: 6, score_b: 3, winner_team_id: 'rt1' },
-  { id: 'rm2', game_id: 'fake-game-1', round_number: 1, court_number: 2, phase: 'group', team_a_id: 'rt3', team_b_id: 'rt4', score_a: 6, score_b: 4, winner_team_id: 'rt3' },
-  { id: 'rm3', game_id: 'fake-game-1', round_number: 2, court_number: 1, phase: 'group', team_a_id: 'rt5', team_b_id: 'rt6', score_a: null, score_b: null, winner_team_id: null },
-  { id: 'rm4', game_id: 'fake-game-1', round_number: 2, court_number: 2, phase: 'group', team_a_id: 'rt7', team_b_id: 'rt8', score_a: null, score_b: null, winner_team_id: null },
+const rotMatch = (id, round, court, a, b, sa, sb) => ({
+  id, game_id: 'fake-game-1', round_number: round, court_number: court, phase: 'group', team_a_id: a, team_b_id: b,
+  score_a: sa, score_b: sb, winner_team_id: sa == null ? null : sa > sb ? a : b,
+})
+// localStorage.mockRotatingPlacar = 'equal' | 'more' — o Placar do mix em
+// mais estados (Francisco, 18 set: vitórias primeiro, depois o campo).
+// 'equal': ronda 2 jogada — Ana e Eva perderam no campo 1 e ficam à frente
+// de Carla e Gil, que ganharam no campo 2 com as mesmas vitórias.
+// 'more': ronda 3 jogada — Ana ganhou no campo 2 e tem mais vitórias do que
+// Gil, que perdeu no campo 1: Ana passa à frente.
+const rotPlacar = () => localStorage.getItem('mockRotatingPlacar')
+const ROT_MATCHES_FN = () => [
+  rotMatch('rm1', 1, 1, 'rt1', 'rt2', 6, 3),
+  rotMatch('rm2', 1, 2, 'rt3', 'rt4', 6, 4),
+  ...(rotPlacar()
+    ? [rotMatch('rm3', 2, 1, 'rt5', 'rt6', 4, 6), rotMatch('rm4', 2, 2, 'rt7', 'rt8', 6, 2)]
+    : [rotMatch('rm3', 2, 1, 'rt5', 'rt6', null, null), rotMatch('rm4', 2, 2, 'rt7', 'rt8', null, null)]),
+  ...(rotPlacar() === 'more'
+    ? [rotMatch('rm5', 3, 1, 'rt9', 'rt10', 6, 5), rotMatch('rm6', 3, 2, 'rt11', 'rt12', 6, 1)]
+    : []),
 ]
 const rotating = () => localStorage.getItem('mockRotatingMix') === 'true'
 
@@ -520,7 +536,7 @@ const TABLE_MOCKS = {
     : longNames() ? LONG_STATS : []),
   teams: (url) => (agenda() && url.includes('ag-winner') ? AGENDA_WINNER_TEAMS() : ['live', 'finished'].includes(eventState()) ? EV_TEAMS : rotating() ? ROT_TEAMS : []),
   participants: () => (eventState() ? EV_PARTICIPANTS() : []),
-  matches: () => (['live', 'finished'].includes(eventState()) ? EV_MATCHES() : rotating() ? ROT_MATCHES : []),
+  matches: () => (['live', 'finished'].includes(eventState()) ? EV_MATCHES() : rotating() ? ROT_MATCHES_FN() : []),
   // Mix em aberto — 1 dupla já confirmada, a segunda por preencher (2 de 4
   // lugares), para se ver o cartão no estado "aberto/junto-te" na Home.
   games: (url) => agenda() ? (url.includes('recurrence_id=eq.') ? AGENDA_PREVIOUS_EDITIONS() : AGENDA_GAMES()) : [{

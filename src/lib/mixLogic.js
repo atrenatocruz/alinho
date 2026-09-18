@@ -315,12 +315,18 @@ export function nextSobeDesceRotating(roundMatches, teamsById, numCourts, { part
 }
 
 /** Placar do mix no Sobe e desce com parceiros que trocam (Francisco,
-    16 set 2026). Não é um ranking — não mexe em pontos de ninguém — é só a
-    ordem de quem está mais perto de ganhar, por isso segue a mesma lógica
-    do vencedor (campo 1 na última ronda):
-    1. campo do jogo mais recente de cada um (campo 1 primeiro);
-    2. dentro do campo, quem ganhou esse jogo (se já tem resultado);
-    3. vitórias no mix; 4. pontos de jogo marcados (só desempate, não se mostra).
+    16 set 2026). Não é um ranking — não mexe em pontos de ninguém.
+    Ordem (Francisco, 18 set 2026 — proposta por acordar com Renato/Ruben):
+    1. vitórias no mix (mais vitórias à frente);
+    2. com as mesmas vitórias, o campo do jogo mais recente (campo 1 primeiro);
+    3. dentro do campo, quem ganhou esse jogo (se já tem resultado);
+    4. pontos de jogo marcados (só desempate, não se mostra).
+    Ex.: quem perdeu no campo 1 fica à frente de quem ganhou no campo 2 com as
+    mesmas vitórias; com mais vitórias, o do campo 2 passa à frente.
+    O vencedor do mix NÃO muda: continua a ser quem ganha o campo 1 na última
+    ronda (computeMixWinnerTeamId), mesmo que não seja o 1.º desta lista.
+    Esta ordem é também a "posição no mix" que nextSobeDesceRotating usa para
+    juntar parceiros quando já não há duplas novas possíveis num campo.
     Devolve [{ player, court, wins, played, points }]. */
 export function rotatingPlacar(matches, teams) {
   const teamById = Object.fromEntries(teams.map((t) => [t.id, t]))
@@ -351,9 +357,9 @@ export function rotatingPlacar(matches, teams) {
     }
   }
   return Object.values(table).sort((x, y) =>
-    x.court - y.court
+    y.wins - x.wins
+    || x.court - y.court
     || Number(y.wonLast) - Number(x.wonLast)
-    || y.wins - x.wins
     || y.points - x.points)
 }
 
