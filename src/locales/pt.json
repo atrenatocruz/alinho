@@ -1594,7 +1594,7 @@
   "gamedetails.error_rotate_too_many_players": "Com parceiros que trocam, {{count}} jogadores precisam de mais do que {{courts}} campos — ajusta o número de campos ou reduz os inscritos.",
   "gamedetails.rotating_partners_short": "parceiros trocam",
   "gamedetails.placar_title": "Placar do mix",
-  "gamedetails.placar_hint": "Ganha o mix quem vencer o campo 1 na última ronda. Não conta para o ranking — é só deste mix.",
+  "gamedetails.placar_hint": "Por ordem de vitórias; com as mesmas vitórias, fica à frente quem está num campo melhor. Ganha o mix quem vencer o campo 1 na última ronda, mesmo que não seja o primeiro da lista. Não conta para o ranking.",
   "gamedetails.placar_court": "Campo {{number}}",
   "gerirclube.ranked_label": "Este mix conta para o ranking?",
   "gerirclube.ranked_yes": "Sim",

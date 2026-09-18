@@ -585,7 +585,7 @@ describe('rotatingPlacar', () => {
     { round_number: 2, court_number: 2, team_a_id: 'r2c', team_b_id: 'r2d', score_a: null, score_b: null, winner_team_id: null },
   ]
 
-  it('quem está no campo 1 vem primeiro, mesmo tendo marcado menos pontos', () => {
+  it('quem tem mais vitórias vem primeiro, mesmo tendo marcado menos pontos', () => {
     const placar = rotatingPlacar([...round1, ...round2Pending], teams)
     expect(placar.slice(0, 4).map((r) => r.court)).toEqual([1, 1, 1, 1])
     expect(placar.slice(0, 4).map((r) => r.player.id).sort()).toEqual(['a', 'b', 'e', 'f'])
@@ -600,5 +600,67 @@ describe('rotatingPlacar', () => {
     const placar = rotatingPlacar([...round1, ...round2Done], teams)
     expect(placar.slice(0, 2).map((r) => r.player.id).sort()).toEqual(['b', 'f'])
     expect(placar.find((r) => r.player.id === 'b').wins).toBe(2)
+  })
+})
+
+describe('rotatingPlacar — vitórias primeiro, depois o campo (Francisco, 18 set)', () => {
+  const p = (id) => ({ id, name: id })
+  const team = (id, a, b) => ({ id, player1: p(a), player2: p(b) })
+  const match = (round, court, a, b, sa, sb) => ({
+    round_number: round, court_number: court, team_a_id: a, team_b_id: b,
+    score_a: sa, score_b: sb, winner_team_id: sa > sb ? a : b,
+  })
+  const pos = (placar, id) => placar.findIndex((r) => r.player.id === id)
+
+  it('quem perdeu no campo 1 fica à frente de quem ganhou no campo 2 com as mesmas vitórias', () => {
+    // a: ganhou r1 no campo 1, perdeu r2 no campo 1 → 1 vitória, campo 1.
+    // c: perdeu r1 no campo 1, ganhou r2 no campo 2 → 1 vitória, campo 2.
+    const teams = [
+      team('t1', 'a', 'b'), team('t2', 'c', 'd'), team('t3', 'e', 'f'), team('t4', 'g', 'h'),
+      team('t5', 'a', 'e'), team('t6', 'b', 'f'), team('t7', 'c', 'g'), team('t8', 'd', 'h'),
+    ]
+    const placar = rotatingPlacar([
+      match(1, 1, 't1', 't2', 6, 3), match(1, 2, 't3', 't4', 6, 2),
+      match(2, 1, 't5', 't6', 4, 6), match(2, 2, 't7', 't8', 6, 1),
+    ], teams)
+    expect(placar.find((r) => r.player.id === 'a')).toMatchObject({ wins: 1, court: 1 })
+    expect(placar.find((r) => r.player.id === 'c')).toMatchObject({ wins: 1, court: 2 })
+    expect(pos(placar, 'a')).toBeLessThan(pos(placar, 'c'))
+  })
+
+  it('quem ganhou no campo 2 com mais vitórias passa à frente de quem perdeu no campo 1', () => {
+    // x: 1 vitória, perdeu o último no campo 1. y: 2 vitórias, ganhou o último no campo 2.
+    const teams = [
+      team('t1', 'x', 'x2'), team('t2', 'q', 'r'), team('t3', 'y', 'y2'), team('t4', 's', 'u'),
+      team('t5', 'x', 'q'), team('t6', 'x2', 'r'), team('t7', 'y', 's'), team('t8', 'y2', 'u'),
+    ]
+    const placar = rotatingPlacar([
+      match(1, 1, 't1', 't2', 6, 4), match(1, 2, 't3', 't4', 6, 3),
+      match(2, 1, 't5', 't6', 2, 6), match(2, 2, 't7', 't8', 6, 5),
+    ], teams)
+    expect(placar.find((r) => r.player.id === 'x')).toMatchObject({ wins: 1, court: 1 })
+    expect(placar.find((r) => r.player.id === 'y')).toMatchObject({ wins: 2, court: 2 })
+    expect(pos(placar, 'y')).toBeLessThan(pos(placar, 'x'))
+  })
+
+  it('mesmas vitórias e mesmo campo: primeiro quem ganhou o último jogo, depois os pontos', () => {
+    // m: ganhou r1, perdeu r2 no campo 1. n: perdeu r1, ganhou r2 no campo 1.
+    // Os dois com 1 vitória e no campo 1 → n à frente (ganhou o último).
+    // v e w: parceiros no último jogo (perderam no campo 2), 1 vitória cada, mas w marcou
+    // mais pontos na ronda 1 (7 contra 6) → w à frente.
+    const teams = [
+      team('t1', 'm', 'v'), team('t2', 'n', 'o'), team('t3', 'w', 'k'), team('t4', 'z', 'j'),
+      team('t5', 'n', 'k'), team('t6', 'm', 'z'), team('t7', 'v', 'w'), team('t8', 'o', 'j'),
+    ]
+    const placar = rotatingPlacar([
+      match(1, 1, 't1', 't2', 6, 2), match(1, 2, 't3', 't4', 7, 5),
+      match(2, 1, 't5', 't6', 6, 4), match(2, 2, 't7', 't8', 3, 6),
+    ], teams)
+    expect(placar.find((r) => r.player.id === 'm')).toMatchObject({ wins: 1, court: 1 })
+    expect(placar.find((r) => r.player.id === 'n')).toMatchObject({ wins: 1, court: 1 })
+    expect(pos(placar, 'n')).toBeLessThan(pos(placar, 'm'))
+    expect(placar.find((r) => r.player.id === 'v')).toMatchObject({ wins: 1, court: 2, points: 9 })
+    expect(placar.find((r) => r.player.id === 'w')).toMatchObject({ wins: 1, court: 2, points: 10 })
+    expect(pos(placar, 'w')).toBeLessThan(pos(placar, 'v'))
   })
 })
