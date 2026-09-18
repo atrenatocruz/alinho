@@ -17,9 +17,11 @@ import { describeError } from '../lib/errors'
 import { getGroupMatches } from '../lib/groupMatches'
 import { getMyPrivateMatches, respondToPrivateMatch } from '../lib/privateMatches'
 import { GOOGLE_MAPS_API_KEY } from '../lib/googleMaps'
+import { listMyLessons, listLessonEvents, setLessonAttendance } from '../lib/lessonsApi'
+import LessonEventCard from '../components/lessons/LessonEventCard'
 import { useHeaderActions } from '../contexts/HeaderActionsContext'
 import {
-  toDayKey, eventFromGame, eventFromGroupMatch, eventFromPrivateMatch, eventFromExplore, isAgendaGame,
+  toDayKey, eventFromGame, eventFromGroupMatch, eventFromPrivateMatch, eventFromExplore, eventFromLesson, isAgendaGame,
   applyFilters, groupByDay, countByDay, eventDistance, normalizeFilters, isPastEvent, eventsToPins,
 } from '../lib/agenda'
 
@@ -83,6 +85,9 @@ export default function Home() {
   const [monthOpen, setMonthOpen] = useState(false)
   // Explorar (Fase 2): eventos de clubes da Comunidade onde ainda não estou.
   const [exploreRows, setExploreRows] = useState([])
+  // Aulas com professores (Trello #49): as minhas e as em aberto. Sem a
+  // migração das aulas as RPCs não existem e isto fica vazio.
+  const [lessonRows, setLessonRows] = useState([])
   const [location, setLocation] = useState(getSavedLocation)
   const [locationOpen, setLocationOpen] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
@@ -247,9 +252,23 @@ export default function Home() {
     }
   }
 
+  const loadLessons = async () => {
+    const from = new Date()
+    from.setDate(from.getDate() - 30)
+    const to = new Date()
+    to.setDate(to.getDate() + 60)
+    const [mine, open] = await Promise.all([
+      listMyLessons(toDayKey(from), toDayKey(to)).catch(() => []),
+      listLessonEvents(toDayKey(new Date()), toDayKey(to)).catch(() => []),
+    ])
+    const mineIds = new Set(mine.map((l) => l.lesson_id))
+    setLessonRows([...mine, ...open.filter((l) => !mineIds.has(l.lesson_id))])
+  }
+
   const loadAll = async () => {
     try {
       await Promise.all([
+        loadLessons(),
         loadGames().catch((error) => console.error('Error loading games:', error)),
         loadMyMixResults().catch((error) => console.error('Error loading mix results:', error)),
         loadGroupMatches(),
@@ -300,8 +319,9 @@ export default function Home() {
       ...groupMatches.map(({ match, org }) => eventFromGroupMatch(match, user.id, org)),
       ...privateMatches.map((m) => eventFromPrivateMatch(m, user.id)).filter(Boolean),
       ...exploreRows.map(eventFromExplore),
+      ...lessonRows.map(eventFromLesson),
     ]
-  }, [games, groupMatches, privateMatches, exploreRows, user])
+  }, [games, groupMatches, privateMatches, exploreRows, lessonRows, user])
 
   const visible = useMemo(() => applyFilters(events, filters, location), [events, filters, location])
   const counts = useMemo(() => countByDay(visible), [visible])
@@ -554,6 +574,21 @@ export default function Home() {
     )
   }
 
+  // "Não posso ir" / "Afinal vou" (Trello #49): só esse dia, a mensalidade
+  // não muda.
+  const handleLessonAttendance = async (event, going) => {
+    markPending(event.key, true)
+    setCardError('')
+    try {
+      await setLessonAttendance(event.id, going)
+      setLessonRows((rows) => rows.map((l) => (l.lesson_id === event.id ? { ...l, my_status: going ? 'confirmed' : 'not_going' } : l)))
+    } catch (error) {
+      setCardError(describeError(t, error, 'lessons.error_attendance'))
+    } finally {
+      markPending(event.key, false)
+    }
+  }
+
   const renderEvent = (event) => {
     const past = event.finished || event.dayKey < today
     const distance = eventDistance(event, location)
@@ -566,6 +601,17 @@ export default function Home() {
           distance={distance}
           busy={pendingKeys.has(event.key)}
           onJoin={() => handleExploreJoin(event)}
+        />
+      )
+    }
+    if (event.source === 'lesson') {
+      return (
+        <LessonEventCard
+          key={event.key}
+          event={event}
+          past={past}
+          busy={pendingKeys.has(event.key)}
+          onAttendance={(going) => handleLessonAttendance(event, going)}
         />
       )
     }

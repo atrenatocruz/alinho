@@ -5,10 +5,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, ChevronLeft, Clock, GraduationCap, Phone, Repeat } from 'lucide-react'
+import { ArrowLeft, Check, ChevronLeft, Clock, GraduationCap, Phone, Repeat } from 'lucide-react'
 import { useGoBack } from '../lib/useGoBack'
-import { getTeacherPage } from '../lib/lessonsApi'
-import { errorKind } from '../lib/errors'
+import { cancelEnrolment, confirmEnrolment, getTeacherPage } from '../lib/lessonsApi'
+import EnrolSheet from '../components/lessons/EnrolSheet'
+import { describeError, errorKind } from '../lib/errors'
 import { priceRowFor, LESSON_CAPACITY, LESSON_DURATIONS } from '../lib/lessons'
 import { Avatar, EmptyState, PrimaryButton } from '../components/ui'
 import {
@@ -195,6 +196,24 @@ function WeekBlock({ item }) {
 
 function Availability({ teacher, prices, items, day, setDay, goBack, today }) {
   const { t } = useTranslation()
+  // Estado do aluno em cada turma depois de agir aqui (pedido enviado,
+  // confirmado…), por cima do que veio do servidor.
+  const [mine, setMine] = useState({})
+  const [enrolItem, setEnrolItem] = useState(null)
+  const [acting, setActing] = useState(null)
+  const statusOf = (it) => (it.series_id in mine ? mine[it.series_id] : { status: it.my_status, id: it.my_enrolment_id })
+  const act = async (it, fn, next) => {
+    const { id } = statusOf(it)
+    setActing(it.series_id)
+    try {
+      await fn(id)
+      setMine((m) => ({ ...m, [it.series_id]: next === null ? { status: null, id: null } : { status: next, id } }))
+    } catch (error) {
+      alert(describeError(t, error, 'lessons.error_request'))
+    } finally {
+      setActing(null)
+    }
+  }
   // Dias com alguma coisa, até 5 chips (o print mostra Hoje, Sex, Sáb, Seg, Ter).
   const dayKeys = [...new Set(items.map((it) => localIso(new Date(it.starts_at))))].sort().slice(0, 5)
   const selected = day && dayKeys.includes(day) ? day : dayKeys[0]
@@ -257,27 +276,63 @@ function Availability({ teacher, prices, items, day, setDay, goBack, today }) {
           <div className="space-y-2">
             {dayItems.map((it, i) => {
               const full = it.kind === 'series' && it.taken >= it.capacity
-              if (it.kind === 'series' && !full) {
+              const my = it.kind === 'series' ? statusOf(it) : {}
+              if (it.kind === 'series' && (!full || my.status === 'confirmed')) {
                 const left = it.capacity - it.taken
+                const enrolled = my.status === 'confirmed'
+                const btn = 'rounded-full px-3 py-1.5 text-xs font-bold disabled:opacity-40'
                 return (
-                  <div key={i} className="rounded-2xl border p-3" style={{ background: TEAL.bg, borderColor: TEAL.border }}>
+                  <div key={i} className={`rounded-2xl p-3 ${enrolled ? 'border-2 border-ok' : 'border'}`} style={{ background: TEAL.bg, borderColor: enrolled ? undefined : TEAL.border }}>
                     <div className="flex items-center justify-between gap-2">
                       <span className="flex flex-wrap gap-1">
                         <TealTag icon={GraduationCap}>{lessonTypeLabel(t, it.lesson_type, { series: true })}</TealTag>
                         <TealTag icon={Repeat}>{t(`lessons.wd_plural_${it.weekday}`)}</TealTag>
                       </span>
-                      <span className="text-xs text-ink-500 shrink-0">{t('lessons.seats_left', { count: left })}</span>
+                      {enrolled ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-ok px-2 py-[3px] text-[11px] font-semibold text-white"><Check size={12} />{t('lessons.state_enrolled')}</span>
+                      ) : my.status === 'requested' ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-[3px] text-[11px] font-semibold text-ink-700"><Clock size={12} />{t('lessons.state_requested')}</span>
+                      ) : my.status === 'accepted' ? (
+                        <span className="rounded-full bg-ink-900 px-2 py-[3px] text-[11px] font-semibold text-white">{t('lessons.state_confirm')}</span>
+                      ) : (
+                        <span className="text-xs text-ink-500 shrink-0">{t('lessons.seats_left', { count: left })}</span>
+                      )}
                     </div>
                     <p className="font-display font-extrabold text-lg text-ink-900 mt-2 leading-none">
                       {hhmm(it.starts_at)}<span className="text-sm text-ink-500 font-bold">–{hhmm(it.ends_at)}</span>
                     </p>
+                    {my.status === 'accepted' && (
+                      <p className="text-xs text-ink-700 mt-1.5">{t('lessons.accepted_line', { name: teacher.name.split(' ')[0] })}</p>
+                    )}
                     <div className="flex flex-wrap items-center gap-2 mt-2.5 pt-2 border-t border-ink-900/10">
-                      <span className="text-xs text-ink-500 inline-flex items-center gap-1">
-                        {it.taken}/{it.capacity} · {t('lessons.average')} <LevelPill label={bandLabel(it.avg_rating, it.avg_gender)} /> · {t('lessons.per_month', { price: euros(it.price_month) })}
-                      </span>
-                      <button type="button" className="ml-auto rounded-full bg-lime-400 px-3 py-1.5 text-xs font-bold text-ink-900 hover:bg-lime-600">
-                        {t('lessons.ask_to_join')}
-                      </button>
+                      {my.status === 'requested' ? (
+                        <>
+                          <span className="text-xs text-ink-500">{t('lessons.waiting_teacher', { name: teacher.name.split(' ')[0] })}</span>
+                          <button type="button" disabled={acting === it.series_id} onClick={() => act(it, cancelEnrolment, null)}
+                            className={`ml-auto border border-ink-900 bg-white text-ink-900 hover:bg-ink-50 ${btn}`}>{t('lessons.cancel_request')}</button>
+                        </>
+                      ) : my.status === 'accepted' ? (
+                        <>
+                          <span className="text-xs text-ink-500">{t('lessons.do_you_confirm')}</span>
+                          <span className="ml-auto flex gap-1.5">
+                            <button type="button" disabled={acting === it.series_id} onClick={() => act(it, (id) => confirmEnrolment(id, false), null)}
+                              className={`border border-ink-900 bg-white text-ink-900 hover:bg-ink-50 ${btn}`}>{t('lessons.give_up')}</button>
+                            <button type="button" disabled={acting === it.series_id} onClick={() => act(it, (id) => confirmEnrolment(id, true), 'confirmed')}
+                              className={`bg-lime-400 text-ink-900 hover:bg-lime-600 ${btn}`}>{t('lessons.confirm')}</button>
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-xs text-ink-500 inline-flex items-center gap-1">
+                            {it.taken}/{it.capacity} · {t('lessons.average')} <LevelPill label={bandLabel(it.avg_rating, it.avg_gender)} /> · {t('lessons.per_month', { price: euros(it.price_month) })}
+                          </span>
+                          {!enrolled && (
+                            <button type="button" onClick={() => setEnrolItem(it)} className={`ml-auto bg-lime-400 text-ink-900 hover:bg-lime-600 ${btn}`}>
+                              {t('lessons.ask_to_join')}
+                            </button>
+                          )}
+                        </>
+                      )}
                     </div>
                   </div>
                 )
@@ -313,6 +368,10 @@ function Availability({ teacher, prices, items, day, setDay, goBack, today }) {
             })}
           </div>
         </>
+      )}
+      {enrolItem && (
+        <EnrolSheet item={enrolItem} teacher={teacher} onClose={() => setEnrolItem(null)}
+          onSent={(id) => { setMine((m) => ({ ...m, [enrolItem.series_id]: { status: 'requested', id } })); setEnrolItem(null) }} />
       )}
     </div>
   )

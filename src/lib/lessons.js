@@ -111,3 +111,17 @@ export function lowestLessonPrice(prices, { teacherProfileId = null, onIso }) {
   }
   return min
 }
+
+/** Quantas aulas de uma turma (dia da semana) caem entre duas datas,
+    inclusive — para "3 ago – 17 ago · 6 aulas" ao cancelar um período. */
+export function weekdayCountBetween(fromIso, toIso, weekday) {
+  if (!fromIso || !toIso || toIso < fromIso) return 0
+  let n = 0
+  const d = parseIso(fromIso)
+  const end = parseIso(toIso)
+  while (d <= end) {
+    if (isoWeekday(d) === weekday) n++
+    d.setDate(d.getDate() + 1)
+  }
+  return n
+}

@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { MapPin, CheckCircle2, Lock, Play, Trophy, Repeat, Euro, Swords, Users, Shuffle, CircleDot, Clock, ListOrdered } from 'lucide-react'
+import { MapPin, CheckCircle2, Lock, Play, Trophy, Repeat, Euro, Swords, Users, Shuffle, CircleDot, Clock, ListOrdered, GraduationCap } from 'lucide-react'
 import { PlayerAvatarRow, GroupLevelBadge, PrimaryButton } from '../ui'
 import { formatTime, formatCurrency } from '../../lib/formatDate'
 import { FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, mixCapacity, isGenderMismatch, isAgeIneligible } from '../../lib/mixLogic'
@@ -32,6 +32,8 @@ export const KIND_STYLE = {
   mix:        { card: 'bg-[#E0F2FE] border-[#A5D8F5]', bg: 'bg-[#E0F2FE]', text: 'text-[#075985]', color: '#075985', icon: Shuffle,     labelKey: 'agenda.kind_mix' },
   open:       { card: 'bg-[#FBE7DE] border-[#F2BFA8]', bg: 'bg-[#FBE7DE]', text: 'text-[#9A3A17]', color: '#9A3A17', icon: CircleDot,   labelKey: 'agenda.kind_open' },
   friends:    { card: 'bg-[#F2EDE4] border-[#DCD1BF]', bg: 'bg-[#F2EDE4]', text: 'text-[#6B5B45]', color: '#6B5B45', icon: Users,       labelKey: 'agenda.kind_friends' },
+  // Aulas com professores (Trello #49) — turquesa, SPEC das aulas §9.
+  lesson:     { card: 'bg-[#CCFBF1] border-[#8FE3D6]', bg: 'bg-[#CCFBF1]', text: 'text-[#0F766E]', color: '#0F766E', icon: GraduationCap, labelKey: 'agenda.kind_lesson' },
   // Ainda não existem na app — só preparados para a cor (fora de âmbito).
   tournament: { card: 'bg-[#E9E7FB] border-[#C9C3F3]', bg: 'bg-[#E9E7FB]', text: 'text-[#4338A8]', color: '#4338A8', icon: Trophy,      labelKey: 'agenda.kind_tournament' },
   league:     { card: 'bg-[#FAE3EC] border-[#F0BCD1]', bg: 'bg-[#FAE3EC]', text: 'text-[#8C2350]', color: '#8C2350', icon: ListOrdered, labelKey: 'agenda.kind_league' },
