@@ -1842,6 +1842,11 @@ export default function GameDetails() {
   const tctStandings = !isSobeDesce && teams.length ? standings(teams, matches) : []
   const americanoStandingsResult = isAmericano && teams.length ? americanoStandings(matches, teams) : []
   const placarResult = isRotating && teams.length ? rotatingPlacar(matches, teams) : []
+  // "Ganhou no campo 1" / "Perdeu no campo 1" — o resultado que decide a
+  // ordem do Placar (Francisco, 18 set). Sem jogos com resultado: "Campo 1".
+  const placarCourtLabel = (s) => !s.hasResult
+    ? t('gamedetails.placar_court', { number: s.court })
+    : t(s.wonLast ? 'gamedetails.placar_won_court' : 'gamedetails.placar_lost_court', { number: s.court })
 
   // Top duplas for the results share card — combined points of both players
   // in the pair, from the same per-player mixStats the leaderboard above
@@ -2592,7 +2597,7 @@ export default function GameDetails() {
                   <div key={s.player.id} className="flex items-center gap-3 text-sm py-1.5 border-b border-line last:border-0">
                     <span className="w-6 font-extrabold text-ink-900 tabular-nums">{i + 1}</span>
                     <span className="flex-1 font-extrabold text-ink-900 truncate">{s.player.name}</span>
-                    <span className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('gamedetails.placar_court', { number: s.court })}</span>
+                    <span className={`text-xs font-extrabold whitespace-nowrap ${s.hasResult && s.wonLast ? 'text-ok' : 'text-muted'}`}>{placarCourtLabel(s)}</span>
                     <span className="text-muted tabular-nums w-10 text-right" title={t('gamedetails.wins_title')}>{s.wins}{t('gamedetails.wins_abbrev')}</span>
                   </div>
                 ))}
@@ -2787,7 +2792,7 @@ export default function GameDetails() {
                               <div key={s.player.id} className="flex items-center gap-3 text-sm py-1.5 border-b border-line last:border-0">
                                 <span className="w-6 font-extrabold text-ink-900 tabular-nums">{i + 1}</span>
                                 <span className="flex-1 font-extrabold text-ink-900 truncate">{s.player.name}</span>
-                                <span className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('gamedetails.placar_court', { number: s.court })}</span>
+                                <span className={`text-xs font-extrabold whitespace-nowrap ${s.hasResult && s.wonLast ? 'text-ok' : 'text-muted'}`}>{placarCourtLabel(s)}</span>
                                 <span className="text-muted tabular-nums w-10 text-right" title={t('gamedetails.wins_title')}>{s.wins}{t('gamedetails.wins_abbrev')}</span>
                               </div>
                             ))}

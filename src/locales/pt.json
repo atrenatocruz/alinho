@@ -1717,6 +1717,8 @@
   "gamedetails.rotating_partners_short": "parceiros trocam",
   "gamedetails.placar_title": "Placar do mix",
   "gamedetails.placar_hint": "Segue a última ronda jogada: primeiro quem ganhou no campo 1, depois quem perdeu no campo 1, depois o campo 2, e assim por diante. Ganha o mix quem vencer o campo 1 na última ronda. Não conta para o ranking.",
+  "gamedetails.placar_won_court": "Ganhou no campo {{number}}",
+  "gamedetails.placar_lost_court": "Perdeu no campo {{number}}",
   "gamedetails.placar_court": "Campo {{number}}",
   "gerirclube.ranked_label": "Este mix conta para o ranking?",
   "gerirclube.ranked_yes": "Sim",

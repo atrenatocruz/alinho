@@ -330,7 +330,7 @@ export function nextSobeDesceRotating(roundMatches, teamsById, numCourts, { part
     (computeMixWinnerTeamId) — no fim do mix, é o 1.º desta lista.
     Esta ordem é também a "posição no mix" que nextSobeDesceRotating usa para
     juntar parceiros quando já não há duplas novas possíveis num campo.
-    Devolve [{ player, court, wonLast, wins, played, points }]. */
+    Devolve [{ player, court, hasResult, wonLast, wins, played, points }]. */
 export function rotatingPlacar(matches, teams) {
   const teamById = Object.fromEntries(teams.map((t) => [t.id, t]))
   const table = {}
@@ -372,6 +372,9 @@ export function rotatingPlacar(matches, teams) {
   return Object.values(table)
     .map(({ player, wins, played, points, playedRound, playedCourt, currentCourt, wonLast }) => ({
       player, wins, played, points, wonLast,
+      // hasResult: o campo é o de um jogo já jogado (o ecrã diz "Ganhou/Perdeu
+      // no campo X"); sem resultado ainda, é o campo da ronda em curso.
+      hasResult: playedRound > 0,
       court: playedRound > 0 ? playedCourt : currentCourt,
     }))
     .sort((x, y) =>
