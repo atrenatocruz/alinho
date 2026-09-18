@@ -1426,8 +1426,12 @@ export default function GerirClube() {
     setPlanMessage(null)
     try {
       await setOrganizationPlan(settings.id, planTier)
-      setSettings((s) => ({ ...s, plan_tier: planTier }))
-      setOrg((o) => (o ? { ...o, plan_tier: planTier } : o))
+      // O tipo segue o plano (migration_kind_follows_plan.sql): Club → clube,
+      // qualquer outro → grupo; um grupo dentro de um clube é sempre grupo.
+      // Mesma regra da base de dados, só para a etiqueta mudar já.
+      const kindFor = (x) => (planTier === 'club' && !x.parent_organization_id ? 'club' : 'group')
+      setSettings((s) => ({ ...s, plan_tier: planTier, kind: kindFor(s) }))
+      setOrg((o) => (o ? { ...o, plan_tier: planTier, kind: kindFor(o) } : o))
       setPlanMessage({ ok: true, text: t('gerirclube.plan_saved', { name: planName(planTier) }) })
       refreshMemberships?.()
     } catch (error) {
@@ -2619,6 +2623,9 @@ export default function GerirClube() {
                       value={settings.plan_tier || 'free'}
                       onChange={handleSetPlan}
                     />
+                    {settings.parent_organization_id == null && (
+                      <p className="mt-2 text-[11px] text-muted">{t('gerirclube.plan_kind_hint')}</p>
+                    )}
                     {settings.parent_organization_id == null && settings.kind !== 'group' && (
                       <p className="mt-2 text-[11px] text-muted">{t('gerirclube.plan_change_hint')}</p>
                     )}

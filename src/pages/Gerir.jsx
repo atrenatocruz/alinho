@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { Avatar, EmptyState, PrimaryButton, OrgKindBadge, PlanBadge, orgAvatarShape, PageHeader } from '../components/ui'
 import PlayerSearch from '../components/PlayerSearch'
-import { searchAnyPlayer, createOrganization, createGroup, createSelfServeGroup } from '../lib/platformAdmin'
+import { searchAnyPlayer, createOrganization, createSelfServeGroup } from '../lib/platformAdmin'
 import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
 import { listAllPendingTeacherRequests, approveTeacherProfile, rejectTeacherProfile } from '../lib/teachers'
 import { describeError } from '../lib/errors'
@@ -22,7 +22,6 @@ export default function Gerir() {
   const isPlatformAdmin = !!profile?.is_platform_admin
 
   const [showCreateForm, setShowCreateForm] = useState(false)
-  const [kind, setKind] = useState('club')
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
   const [selectedAdmin, setSelectedAdmin] = useState(null)
@@ -194,7 +193,6 @@ export default function Gerir() {
 
   const resetCreateForm = () => {
     setShowCreateForm(false)
-    setKind('club')
     setName('')
     setSlug('')
     setSelectedAdmin(null)
@@ -206,11 +204,10 @@ export default function Gerir() {
     setSaving(true)
     try {
       const newSlug = slug.trim()
-      if (kind === 'club') {
-        await createOrganization(name.trim(), newSlug, selectedAdmin.id)
-      } else {
-        await createGroup(name.trim(), newSlug, null, selectedAdmin.id)
-      }
+      // Nasce sempre grupo, em Free: o tipo segue o plano e é a base de
+      // dados que o decide (migration_kind_follows_plan.sql). Passa a
+      // clube quando o plano mudar para Club, nas Definições.
+      await createOrganization(name.trim(), newSlug, selectedAdmin.id)
       // The appointed admin gets the only membership create_organization
       // creates (see migration_platform_admin_create_organization.sql) — if
       // that's someone else, the platform admin has no membership to land
@@ -244,30 +241,13 @@ export default function Gerir() {
       {!showCreateForm ? (
         <PrimaryButton onClick={() => setShowCreateForm(true)} className="w-full">
           <Plus size={18} />
-          {t('gerir.create_new_club')}
+          {t('gerir.create_new_group')}
         </PrimaryButton>
       ) : (
         <>
-          <h3 className="font-extrabold text-ink-900">{t('gerir.create_new_club_or_group')}</h3>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setKind('club')}
-              className={`flex-1 text-sm font-extrabold py-2.5 rounded-ctrl border transition-colors duration-fast ${
-                kind === 'club' ? 'bg-ink-900 text-white border-ink-900' : 'bg-surface text-ink-700 border-line'
-              }`}
-            >
-              {t('gerir.kind_club')}
-            </button>
-            <button
-              type="button"
-              onClick={() => setKind('group')}
-              className={`flex-1 text-sm font-extrabold py-2.5 rounded-ctrl border transition-colors duration-fast ${
-                kind === 'group' ? 'bg-ink-900 text-white border-ink-900' : 'bg-surface text-ink-700 border-line'
-              }`}
-            >
-              {t('gerir.kind_group')}
-            </button>
+          <div>
+            <h3 className="font-extrabold text-ink-900">{t('gerir.create_new_group')}</h3>
+            <p className="text-xs text-muted mt-1">{t('gerir.create_starts_as_group_hint')}</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">{t('gerir.name_label')}</label>
@@ -276,7 +256,7 @@ export default function Gerir() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="input-field"
-              placeholder={kind === 'club' ? t('gerir.name_placeholder_club') : t('gerir.name_placeholder_group')}
+              placeholder={t('comunidade.group_name_placeholder')}
             />
           </div>
           <div>
@@ -286,7 +266,7 @@ export default function Gerir() {
               value={slug}
               onChange={(e) => setSlug(sanitizeSlug(e.target.value))}
               className="input-field"
-              placeholder={kind === 'club' ? t('gerir.slug_placeholder_club') : t('gerir.slug_placeholder_group')}
+              placeholder={t('comunidade.group_slug_placeholder')}
             />
           </div>
           <div>
@@ -310,7 +290,7 @@ export default function Gerir() {
               disabled={!name.trim() || !slug.trim() || !selectedAdmin || saving}
               className="flex-1"
             >
-              {saving ? t('gerir.creating') : kind === 'club' ? t('gerir.create_club_button') : t('gerir.create_group_button')}
+              {saving ? t('gerir.creating') : t('gerir.create_group_button')}
             </PrimaryButton>
             <PrimaryButton variant="ghost" onClick={resetCreateForm} disabled={saving} className="flex-1">
               {t('gerir.cancel')}
