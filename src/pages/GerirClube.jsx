@@ -12,7 +12,7 @@ import { listClubGroups, getOrganizationDeleteBlocker, deleteSelfServeGroup, tra
 import { formatRating } from '../lib/elo'
 import { formatDate as formatDateLib, formatTime as formatTimeLib } from '../lib/formatDate'
 import { DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal, OrgKindBadge, PlanBadge, PLAN_TIERS, planName } from '../components/ui'
-import { planLimitMessage, isMixLimitError, isMemberLimitError, limitsFor } from '../lib/plans'
+import { planLimitMessage, isMixLimitError, isMemberLimitError, limitsFor, nextPlanTier } from '../lib/plans'
 import { totalRounds, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, SCORING_FORMAT_LABEL_KEY } from '../lib/mixLogic'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
 import { AGE_RESTRICTIONS } from '../lib/ageCategories'
@@ -1895,12 +1895,36 @@ export default function GerirClube() {
                         onChange={(e) => setGameForm({ ...gameForm, num_courts: e.target.value })}
                         className="input-field"
                         min="1"
-                        max={maxCourts}
+                        // Um mix antigo pode ter mais campos do que o plano deixa hoje:
+                        // o browser não pode travar a gravação por isso (o aviso
+                        // abaixo explica, e ao guardar fica no limite).
+                        max={Math.max(maxCourts, parseInt(gameForm.num_courts, 10) || 1)}
                         required
                       />
                       <p className="text-sm text-muted mt-1.5">
-                        = <strong className="text-ink-900">{t('gerirclube.players_count', { count: (gameForm.num_courts || 1) * 4 })}</strong> ({t('gerirclube.courts_count', { count: gameForm.num_courts || 1 })} × 4)
+                        = <strong className="text-ink-900">{t('gerirclube.players_count', { count: (gameForm.num_courts || 1) * 4 })}</strong> ({t('gerirclube.courts_count', { count: parseInt(gameForm.num_courts, 10) || 1 })} × 4)
                       </p>
+                      {/* Antes baixava para o limite do plano sem dizer nada (#307).
+                          Vale ao criar e ao editar, e diz o que o plano seguinte dá
+                          (Francisco, 19 set) — as subscrições ainda não se fazem na
+                          app, por isso o caminho é falar connosco. */}
+                      {(parseInt(gameForm.num_courts, 10) || 1) > maxCourts && (() => {
+                        const next = nextPlanTier(org?.plan_tier)
+                        const nextCourts = next ? limitsFor(next).courts : null
+                        return (
+                          <div className="mt-2 rounded-ctrl bg-[#E0F2FE] text-[#075985] text-sm px-3 py-2 space-y-1">
+                            <p>{t('gerirclube.courts_over_plan', { plan: planName(org?.plan_tier), max: maxCourts, players: maxCourts * 4 })}</p>
+                            {next && (
+                              <p className="font-extrabold">
+                                {nextCourts == null
+                                  ? t('gerirclube.courts_next_plan_unlimited', { next: planName(next) })
+                                  : t('gerirclube.courts_next_plan', { next: planName(next), courts: nextCourts })}
+                                {' '}{t('gerirclube.plan_contact_hint')}
+                              </p>
+                            )}
+                          </div>
+                        )
+                      })()}
                     </div>
 
                     <div>
