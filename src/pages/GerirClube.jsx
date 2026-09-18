@@ -727,6 +727,12 @@ export default function GerirClube() {
   // links `game` back to it. Used both when recurrence is turned on at
   // creation time (handleCreateGame) and when it's turned on while editing
   // a Mix that wasn't recurring yet (handleUpdateGame, Task 3).
+  // Erros da série: se foi um limite do plano, diz-se isso (Trello #307) —
+  // o "não tens permissão" genérico confundia quem já é admin.
+  const recurrenceErrorText = (error, fallbackKey) =>
+    (isMixLimitError(error?.message || '') && planLimitMessage(t, 'mix', org?.plan_tier))
+    || describeError(t, error, fallbackKey)
+
   const createRecurrence = async (game, recurrence, userId) => {
     const mixOffsetSeconds = computeLaunchOffsetSeconds(game.date, recurrence.launchDaysBefore, recurrence.launchTime)
 
@@ -743,7 +749,7 @@ export default function GerirClube() {
 
     if (recurrenceError) {
       console.error('Error creating recurrence:', recurrenceError)
-      alert(describeError(t, recurrenceError, 'gerirclube.error_recurrence_activate_failed'))
+      alert(recurrenceErrorText(recurrenceError, 'gerirclube.error_recurrence_activate_failed'))
       return
     }
 
@@ -754,7 +760,7 @@ export default function GerirClube() {
 
     if (linkError) {
       console.error('Error linking game to recurrence:', linkError)
-      alert(describeError(t, linkError, 'gerirclube.error_recurrence_link_failed'))
+      alert(recurrenceErrorText(linkError, 'gerirclube.error_recurrence_link_failed'))
       return
     }
 
@@ -814,7 +820,7 @@ export default function GerirClube() {
 
     if (pendingError) {
       console.error('Error pre-creating next occurrence:', pendingError)
-      alert(describeError(t, pendingError, 'gerirclube.error_recurrence_precreate_failed'))
+      alert(recurrenceErrorText(pendingError, 'gerirclube.error_recurrence_precreate_failed'))
       return
     }
 
