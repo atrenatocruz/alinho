@@ -15,6 +15,7 @@ import { PrimaryButton, GuestBadge, DateField, Avatar, Select, EmptyState, Ratin
 import { useHeaderActions } from '../contexts/HeaderActionsContext'
 import { CATEGORY_ORDER } from '../lib/achievements'
 import TeacherSection from '../components/TeacherSection'
+import DeleteAccountSection from '../components/DeleteAccountSection'
 import { formatRating, formatRatingMaybeProvisional, isProvisional, bandProgress, ratingBand } from '../lib/elo'
 import { countryOptions, countryName } from '../lib/countries'
 import { AGE_LABEL_KEY, ageCategory } from '../lib/ageCategories'
@@ -1272,6 +1273,9 @@ export default function Profile() {
 
         {/* Professor (Trello #283): o pedido saiu da Comunidade. */}
         <TeacherSection />
+
+        {/* Apagar conta (Trello #306) — sempre o último do Perfil. */}
+        <DeleteAccountSection />
         </>
       )}
 

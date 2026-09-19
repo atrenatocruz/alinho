@@ -15,6 +15,7 @@ import { getMyPrivateMatches, privateMatchActions } from '../lib/privateMatches'
 import { describeError } from '../lib/errors'
 import { listMyUnreadNotifications, markNotificationsRead, MIX_NOTICE_KINDS } from '../lib/notifications'
 import { formatDate } from '../lib/formatDate'
+import AccountDeletionPending from './AccountDeletionPending'
 
 // Re-prompt at most once per day once dismissed — a nudge, not a gate.
 const PHONE_PROMPT_DISMISSED_KEY = 'phonePromptDismissedDate'
@@ -203,6 +204,11 @@ export default function Layout({ children }) {
   const navigate = useNavigate()
   const { signOut, profile, updateProfile, isAdminOfAny, isGuest, refreshMemberships, isPrivateMatchesEnabled } = useAuth()
   const { t, i18n } = useTranslation()
+
+  // Conta com pedido de apagar (Trello #306): em vez da app, o ecrã de
+  // recuperar. `recovered` esconde-o logo ao recuperar, sem esperar pelo
+  // perfil recarregado.
+  const [deletionRecovered, setDeletionRecovered] = useState(false)
 
   const today = new Date().toISOString().slice(0, 10)
   const [phonePromptDismissed, setPhonePromptDismissed] = useState(
@@ -664,6 +670,10 @@ export default function Layout({ children }) {
       </button>
     </>
   )
+
+  if (profile?.deletion_requested_at && !deletionRecovered) {
+    return <AccountDeletionPending onRecovered={() => setDeletionRecovered(true)} />
+  }
 
   return (
     // iOS standalone-PWA (WKWebView, not just Safari-in-a-tab) detaches a

@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { Avatar, EmptyState, PrimaryButton, OrgKindBadge, PlanBadge, orgAvatarShape, PageHeader } from '../components/ui'
 import PlayerSearch from '../components/PlayerSearch'
+import AdminDeleteAccountPanel from '../components/AdminDeleteAccountPanel'
 import { searchAnyPlayer, createOrganization, createSelfServeGroup } from '../lib/platformAdmin'
 import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
 import { listAllPendingTeacherRequests, approveTeacherProfile, rejectTeacherProfile } from '../lib/teachers'
@@ -381,6 +382,7 @@ export default function Gerir() {
         {createdClubBanner}
         {teacherRequestsPanel}
         {createClubPanel}
+        {isPlatformAdmin && <AdminDeleteAccountPanel />}
       </div>
     )
   }
@@ -399,6 +401,7 @@ export default function Gerir() {
       {teacherRequestsPanel}
 
       {createClubPanel}
+      {isPlatformAdmin && <AdminDeleteAccountPanel />}
 
       {createGroupPanel}
 

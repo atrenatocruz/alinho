@@ -752,14 +752,24 @@ export function VoucherQRModal({ voucher, onClose }) {
    window that names what's being lost (Trello #241, Francisco 15 set 2026).
 
    Tapping the backdrop does NOT confirm, and is ignored while `busy` so a
-   slow request can't be abandoned half-way with the page in an odd state. */
-export function DangerConfirmModal({ open, title, message, emphasis, confirmLabel, cancelLabel, busy = false, error = '', onConfirm, onClose }) {
+   slow request can't be abandoned half-way with the page in an odd state.
+
+   `requireText` (opcional): o botão só fica ativo depois de a pessoa
+   escrever exatamente este texto (sem contar maiúsculas nem espaços à
+   volta) — para apagar uma conta, onde um toque a mais não pode chegar.
+   `children` entra entre a mensagem e a ênfase (ex.: o que se perde). */
+export function DangerConfirmModal({ open, title, message, emphasis, confirmLabel, cancelLabel, busy = false, error = '', onConfirm, onClose, requireText = '', requireTextLabel = '', children }) {
+  const [typed, setTyped] = useState('')
   useEffect(() => {
     if (!open) return
     const onKey = (e) => { if (e.key === 'Escape' && !busy) onClose() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [open, busy, onClose])
+  useEffect(() => { if (!open) setTyped('') }, [open])
+
+  const norm = (s) => (s || '').trim().toLocaleLowerCase()
+  const textOk = !requireText || norm(typed) === norm(requireText)
 
   if (!open) return null
   return createPortal(
@@ -776,7 +786,22 @@ export function DangerConfirmModal({ open, title, message, emphasis, confirmLabe
       >
         <p id="danger-confirm-title" className="text-lg font-extrabold text-ink-900">{title}</p>
         <p className="mt-2 text-sm text-muted leading-relaxed">{message}</p>
+        {children}
         {emphasis && <p className="mt-2 text-sm font-extrabold text-ink-900">{emphasis}</p>}
+        {requireText && (
+          <label className="block mt-4">
+            <span className="block text-xs font-extrabold text-ink-900 mb-1.5">{requireTextLabel}</span>
+            <input
+              type="text"
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              disabled={busy}
+              autoComplete="off"
+              className="input-field"
+              placeholder={requireText}
+            />
+          </label>
+        )}
         {error && <p className="mt-3 bg-danger/10 text-danger px-4 py-3 rounded-ctrl text-sm font-extrabold">{error}</p>}
         <div className="mt-5 grid grid-cols-2 gap-2">
           <button type="button" onClick={onClose} disabled={busy} className="btn-secondary w-full disabled:opacity-40">
@@ -785,7 +810,7 @@ export function DangerConfirmModal({ open, title, message, emphasis, confirmLabe
           <button
             type="button"
             onClick={onConfirm}
-            disabled={busy}
+            disabled={busy || !textOk}
             className="w-full bg-danger text-white px-4 py-3 rounded-ctrl text-sm font-extrabold hover:opacity-90 transition-opacity duration-fast disabled:opacity-40"
           >
             {confirmLabel}
