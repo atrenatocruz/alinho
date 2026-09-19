@@ -170,7 +170,7 @@ export default function GerirClube() {
   const { slug } = useParams()
   const goBack = useGoBack('/gerir')
   const [searchParams] = useSearchParams()
-  const { profile: currentUser, memberships, adminOrganizations, isPrivateMatchesEnabled, refreshFeatureFlags, ensureOrgAdminAccess, refreshMemberships, followOrganization } = useAuth()
+  const { profile: currentUser, memberships, adminOrganizations, ensureOrgAdminAccess, refreshMemberships, followOrganization } = useAuth()
   const [org, setOrg] = useState(null)
   const [orgLoading, setOrgLoading] = useState(true)
   // Deep-linked via ?tab=members — e.g. the join-request notification in
@@ -187,7 +187,6 @@ export default function GerirClube() {
   const [showCreateGame, setShowCreateGame] = useState(false)
   const [editingGame, setEditingGame] = useState(null)
   const [gameFilter, setGameFilter] = useState('upcoming')
-  const [savingFlag, setSavingFlag] = useState(false)
   const [savingPlan, setSavingPlan] = useState(false)
   const [planMessage, setPlanMessage] = useState(null)
   const [editingName, setEditingName] = useState(false)
@@ -1461,23 +1460,6 @@ export default function GerirClube() {
   // O nº de campos que o formulário deixa pedir segue o plano (6 é o máximo
   // do produto). A regra a sério está nas policies de games.
   const maxCourts = Math.min(6, limitsFor(org?.plan_tier).courts ?? 6)
-
-  const handleTogglePrivateMatches = async () => {
-    setSavingFlag(true)
-    try {
-      const { error } = await supabase.rpc('admin_set_feature_flag', {
-        p_key: 'private_matches',
-        p_enabled: !isPrivateMatchesEnabled,
-      })
-      if (error) throw error
-      await refreshFeatureFlags()
-    } catch (error) {
-      console.error('Error toggling private matches flag:', error)
-      alert(describeError(t, error, 'gerirclube.error_toggle_feature'))
-    } finally {
-      setSavingFlag(false)
-    }
-  }
 
   const handleCreateGroup = async () => {
     setGroupError('')
@@ -3067,30 +3049,6 @@ export default function GerirClube() {
                   {createdGroupName && (
                     <p className="text-sm text-ok font-extrabold mt-3">{t('gerirclube.group_created_success', { name: createdGroupName })}</p>
                   )}
-                </div>
-              )}
-
-              {currentUser?.is_platform_admin && (
-                <div className="mt-6 pt-6 border-t border-gray-200">
-                  <h4 className="text-base font-semibold text-ink-900 mb-1">
-                    {t('gerirclube.app_features_heading')}
-                  </h4>
-                  <p className="text-sm text-gray-500 mb-4">
-                    {t('gerirclube.app_features_description')}
-                  </p>
-                  <label className="flex items-center justify-between gap-4 p-3 rounded-ctrl border border-line">
-                    <div>
-                      <p className="font-extrabold text-ink-900 text-sm">{t('gerirclube.private_matches_label')}</p>
-                      <p className="text-[11px] text-muted">{t(kk('gerirclube.private_matches_hint'))}</p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={isPrivateMatchesEnabled}
-                      disabled={savingFlag}
-                      onChange={handleTogglePrivateMatches}
-                      className="w-5 h-5 shrink-0"
-                    />
-                  </label>
                 </div>
               )}
 
