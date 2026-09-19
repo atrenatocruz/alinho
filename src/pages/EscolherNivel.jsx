@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { CheckCircle2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { PrimaryButton, Select } from '../components/ui'
+import { PrimaryButton, RatingBadge, Select } from '../components/ui'
 import { Wordmark } from '../components/Layout'
 import { ONBOARDING_LEVELS } from '../lib/elo'
 import { countryOptions } from '../lib/countries'
@@ -14,14 +14,14 @@ import { describeError } from '../lib/errors'
 
    Ecrã bloqueante mostrado UMA vez, apenas a contas novas
    (profiles.rating_onboarded_at === null — ver Guard em App.jsx). Define
-   os pontos de entrada no ranking: Iniciado 700 · Regular 900 · Avançado
-   1100. A âncora é a peça que calibra o grupo na escala do desporto — o
+   os pontos de entrada no ranking, do nível 1 (1900) a Iniciante (600) —
+   Trello #288, migration_elo_entry_levels.sql. A âncora é a peça que calibra o grupo na escala do desporto — o
    Elo só ordena — por isso a escolha é explícita e não tem default.
    Contas antigas nunca passam por aqui (marcadas na migração).
    ════════════════════════════════════════════════════════════════════════ */
 export default function EscolherNivel() {
   const { t, i18n } = useTranslation()
-  const { user, refreshMemberships } = useAuth()
+  const { user, profile, refreshMemberships } = useAuth()
   const [selected, setSelected] = useState(null)
   // Nacionalidade (Trello #191): oferecida aqui, na criacao do perfil, mas
   // NUNCA obrigatoria — o botao de confirmar so depende do nivel.
@@ -86,7 +86,10 @@ export default function EscolherNivel() {
               >
                 <div className="flex items-center gap-3.5">
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-base text-ink-900">{t(level.titleKey)}</h3>
+                    <h3 className="text-base text-ink-900 flex items-center gap-2">
+                      {level.num ? t('onboarding.level_title', { num: level.num }) : t('onboarding.level_iniciante_title')}
+                      <RatingBadge rating={level.points} gender={profile?.gender} />
+                    </h3>
                     <p className="text-[13px] text-muted mt-0.5">{t(level.descriptionKey)}</p>
                   </div>
                   <div className="text-right shrink-0 flex items-center gap-2.5">
