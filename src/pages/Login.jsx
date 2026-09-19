@@ -8,6 +8,7 @@ import { Wordmark } from '../components/Layout'
 import { hashPhone } from '../lib/hashPhone'
 import i18n from '../lib/i18n'
 import { describeError } from '../lib/errors'
+import { ACCOUNT_DELETION_GRACE_DAYS } from '../lib/account'
 
 // Same pattern as Layout.jsx's header toggle, minus the profile persistence
 // (there's no profile yet pre-auth) — just the instant UI flip plus a
@@ -249,6 +250,13 @@ export default function Login() {
       {/* Sheet */}
       <div className="flex-1 bg-canvas rounded-t-[28px] px-5 py-8">
         <div className="w-full max-w-md mx-auto">
+          {/* Acabou de pedir para apagar a conta (Trello #306). */}
+          {searchParams.get('conta') === 'apagada' && (
+            <div className="mb-5 p-4 rounded-card border border-line bg-surface">
+              <p className="font-extrabold text-ink-900">{t('deleteaccount.login_notice_title')}</p>
+              <p className="text-sm text-muted mt-1">{t('deleteaccount.login_notice_body', { days: ACCOUNT_DELETION_GRACE_DAYS })}</p>
+            </div>
+          )}
           {/* Google — primary entry point */}
           <button
             onClick={handleGoogleLogin}

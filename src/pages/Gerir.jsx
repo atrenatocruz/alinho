@@ -6,10 +6,12 @@ import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { Avatar, EmptyState, PrimaryButton, OrgKindBadge, PlanBadge, orgAvatarShape, PageHeader } from '../components/ui'
 import PlayerSearch from '../components/PlayerSearch'
-import { searchAnyPlayer, createOrganization, createGroup, createSelfServeGroup } from '../lib/platformAdmin'
+import AdminDeleteAccountPanel from '../components/AdminDeleteAccountPanel'
+import { searchAnyPlayer, createOrganization, createSelfServeGroup } from '../lib/platformAdmin'
 import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
 import { listAllPendingTeacherRequests, approveTeacherProfile, rejectTeacherProfile } from '../lib/teachers'
 import { describeError } from '../lib/errors'
+import { planName } from '../lib/plans'
 import { useHeaderActions } from '../contexts/HeaderActionsContext'
 import AppFeaturesPanel from '../components/AppFeaturesPanel'
 
@@ -23,7 +25,6 @@ export default function Gerir() {
   const isPlatformAdmin = !!profile?.is_platform_admin
 
   const [showCreateForm, setShowCreateForm] = useState(false)
-  const [kind, setKind] = useState('club')
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
   const [selectedAdmin, setSelectedAdmin] = useState(null)
@@ -91,10 +92,17 @@ export default function Gerir() {
 
   const clubsToShow = isPlatformAdmin ? allOrganizations : adminOrganizations
 
-  // Criar grupo (Trello #279 — saiu da Comunidade). Uma pessoa cria um grupo
-  // seu; a regra "um grupo self-serve por pessoa" está em
-  // create_self_serve_group.
-  const mySelfServeGroup = adminOrganizations.find((o) => o.self_serve)
+  // Criar grupo (Trello #279 — saiu da Comunidade). Só pode criar um grupo
+  // novo quem não é DONO de nenhum grupo em Free ou Squad; ser admin dos
+  // grupos de outros não conta (Francisco, 18 set). A regra a sério está em
+  // create_self_serve_group (migration_one_free_group_per_owner.sql) — aqui
+  // é só para mostrar a explicação em vez do botão.
+  const blockingGroup = adminOrganizations.find((o) =>
+    o.owner_id === profile?.id
+    && !o.parent_organization_id
+    && ['free', 'plus'].includes(o.plan_tier || 'free'))
+  // Já tem grupos seus, todos em Community/Club → pode criar mais um.
+  const ownsAGroup = adminOrganizations.some((o) => o.owner_id === profile?.id && !o.parent_organization_id)
   const [showGroupForm, setShowGroupForm] = useState(false)
   const [groupName, setGroupName] = useState('')
   const [groupSlug, setGroupSlug] = useState('')
@@ -103,7 +111,7 @@ export default function Gerir() {
 
   // Só salta direto para o clube quando não há mais nada a fazer aqui: gere
   // um só e já tem o seu grupo (senão tinha de ver "Criar grupo").
-  if (adminOrganizations.length === 1 && !isPlatformAdmin && mySelfServeGroup) {
+  if (adminOrganizations.length === 1 && !isPlatformAdmin && blockingGroup) {
     return <Navigate to={`/gerir/${adminOrganizations[0].slug}`} replace />
   }
 
@@ -120,8 +128,8 @@ export default function Gerir() {
     } catch (err) {
       console.error('Error creating self-serve group:', err)
       const message = err?.message || ''
-      if (message.includes('Já és admin de um grupo self-serve')) {
-        setGroupError(describeError(t, err, 'comunidade.create_group_error_already_admin'))
+      if (message.includes('Já tens um grupo')) {
+        setGroupError(describeError(t, err, 'gerir.create_group_error_has_cheap_group'))
       } else if (message.toLowerCase().includes('duplicate key value violates unique constraint') || message.toLowerCase().includes('slug')) {
         setGroupError(describeError(t, err, 'comunidade.create_group_error_duplicate_slug'))
       } else {
@@ -132,22 +140,29 @@ export default function Gerir() {
     }
   }
 
-  const createGroupPanel = !isPlatformAdmin && !mySelfServeGroup && (
+  const createGroupPanel = !isPlatformAdmin && (
     <div className="card space-y-4">
-      {!showGroupForm ? (
+      {blockingGroup ? (
+        <div>
+          <h3 className="font-extrabold text-ink-900">{t('gerir.create_another_group_title')}</h3>
+          <p className="text-sm text-muted mt-1">
+            {t('gerir.create_group_blocked', { name: blockingGroup.name, plan: planName(blockingGroup.plan_tier) })}
+          </p>
+        </div>
+      ) : !showGroupForm ? (
         <>
           <div>
-            <h3 className="font-extrabold text-ink-900">{t('gerir.create_group_title')}</h3>
-            <p className="text-sm text-muted mt-1">{t('gerir.create_group_description')}</p>
+            <h3 className="font-extrabold text-ink-900">{t(ownsAGroup ? 'gerir.create_another_group_title' : 'gerir.create_group_title')}</h3>
+            <p className="text-sm text-muted mt-1">{t(ownsAGroup ? 'gerir.create_another_group_description' : 'gerir.create_group_description')}</p>
           </div>
           <PrimaryButton onClick={() => setShowGroupForm(true)} className="w-full">
             <Plus size={18} />
-            {t('comunidade.create_group_cta')}
+            {t(ownsAGroup ? 'gerir.create_group_button' : 'comunidade.create_group_cta')}
           </PrimaryButton>
         </>
       ) : (
         <>
-          <h3 className="font-extrabold text-ink-900">{t('comunidade.create_group_cta')}</h3>
+          <h3 className="font-extrabold text-ink-900">{t(ownsAGroup ? 'gerir.create_another_group_title' : 'comunidade.create_group_cta')}</h3>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">{t('comunidade.name_label')}</label>
             <input
@@ -195,7 +210,6 @@ export default function Gerir() {
 
   const resetCreateForm = () => {
     setShowCreateForm(false)
-    setKind('club')
     setName('')
     setSlug('')
     setSelectedAdmin(null)
@@ -207,11 +221,10 @@ export default function Gerir() {
     setSaving(true)
     try {
       const newSlug = slug.trim()
-      if (kind === 'club') {
-        await createOrganization(name.trim(), newSlug, selectedAdmin.id)
-      } else {
-        await createGroup(name.trim(), newSlug, null, selectedAdmin.id)
-      }
+      // Nasce sempre grupo, em Free: o tipo segue o plano e é a base de
+      // dados que o decide (migration_kind_follows_plan.sql). Passa a
+      // clube quando o plano mudar para Club, nas Definições.
+      await createOrganization(name.trim(), newSlug, selectedAdmin.id)
       // The appointed admin gets the only membership create_organization
       // creates (see migration_platform_admin_create_organization.sql) — if
       // that's someone else, the platform admin has no membership to land
@@ -245,30 +258,13 @@ export default function Gerir() {
       {!showCreateForm ? (
         <PrimaryButton onClick={() => setShowCreateForm(true)} className="w-full">
           <Plus size={18} />
-          {t('gerir.create_new_club')}
+          {t('gerir.create_new_group')}
         </PrimaryButton>
       ) : (
         <>
-          <h3 className="font-extrabold text-ink-900">{t('gerir.create_new_club_or_group')}</h3>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setKind('club')}
-              className={`flex-1 text-sm font-extrabold py-2.5 rounded-ctrl border transition-colors duration-fast ${
-                kind === 'club' ? 'bg-ink-900 text-white border-ink-900' : 'bg-surface text-ink-700 border-line'
-              }`}
-            >
-              {t('gerir.kind_club')}
-            </button>
-            <button
-              type="button"
-              onClick={() => setKind('group')}
-              className={`flex-1 text-sm font-extrabold py-2.5 rounded-ctrl border transition-colors duration-fast ${
-                kind === 'group' ? 'bg-ink-900 text-white border-ink-900' : 'bg-surface text-ink-700 border-line'
-              }`}
-            >
-              {t('gerir.kind_group')}
-            </button>
+          <div>
+            <h3 className="font-extrabold text-ink-900">{t('gerir.create_new_group')}</h3>
+            <p className="text-xs text-muted mt-1">{t('gerir.create_starts_as_group_hint')}</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">{t('gerir.name_label')}</label>
@@ -277,7 +273,7 @@ export default function Gerir() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="input-field"
-              placeholder={kind === 'club' ? t('gerir.name_placeholder_club') : t('gerir.name_placeholder_group')}
+              placeholder={t('comunidade.group_name_placeholder')}
             />
           </div>
           <div>
@@ -287,7 +283,7 @@ export default function Gerir() {
               value={slug}
               onChange={(e) => setSlug(sanitizeSlug(e.target.value))}
               className="input-field"
-              placeholder={kind === 'club' ? t('gerir.slug_placeholder_club') : t('gerir.slug_placeholder_group')}
+              placeholder={t('comunidade.group_slug_placeholder')}
             />
           </div>
           <div>
@@ -311,7 +307,7 @@ export default function Gerir() {
               disabled={!name.trim() || !slug.trim() || !selectedAdmin || saving}
               className="flex-1"
             >
-              {saving ? t('gerir.creating') : kind === 'club' ? t('gerir.create_club_button') : t('gerir.create_group_button')}
+              {saving ? t('gerir.creating') : t('gerir.create_group_button')}
             </PrimaryButton>
             <PrimaryButton variant="ghost" onClick={resetCreateForm} disabled={saving} className="flex-1">
               {t('gerir.cancel')}
@@ -388,6 +384,7 @@ export default function Gerir() {
         {createdClubBanner}
         {teacherRequestsPanel}
         {createClubPanel}
+        {isPlatformAdmin && <AdminDeleteAccountPanel />}
       </div>
     )
   }
@@ -406,6 +403,7 @@ export default function Gerir() {
       {teacherRequestsPanel}
 
       {createClubPanel}
+      {isPlatformAdmin && <AdminDeleteAccountPanel />}
 
       {createGroupPanel}
 
