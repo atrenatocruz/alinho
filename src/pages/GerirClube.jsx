@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
-import { Plus, Calendar, Users, Trash2, Edit2, Check, X, UserX, Repeat, Clock, ArrowLeft, Camera, Settings, Copy, QrCode, ChevronRight } from 'lucide-react'
+import { Plus, Calendar, Users, Trash2, Edit2, Check, X, UserX, Repeat, Clock, ArrowLeft, Camera, Settings, Copy, QrCode, ChevronRight, GraduationCap } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
@@ -12,7 +12,7 @@ import { listClubGroups, getOrganizationDeleteBlocker, deleteSelfServeGroup, tra
 import { formatRating } from '../lib/elo'
 import { formatDate as formatDateLib, formatTime as formatTimeLib } from '../lib/formatDate'
 import { DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal, OrgKindBadge, PlanBadge, PLAN_TIERS, planName } from '../components/ui'
-import { planLimitMessage, isMixLimitError, isMemberLimitError, limitsFor } from '../lib/plans'
+import { planLimitMessage, isMixLimitError, isMemberLimitError, limitsFor, nextPlanTier } from '../lib/plans'
 import { totalRounds, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, SCORING_FORMAT_LABEL_KEY } from '../lib/mixLogic'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
 import { AGE_RESTRICTIONS } from '../lib/ageCategories'
@@ -24,6 +24,8 @@ import { listPendingClubTeachers, resolveTeacherClub } from '../lib/teachers'
 import VoucherScanner from '../components/VoucherScanner'
 import { isValidVoucherId, normalizeScannedVoucherId } from '../lib/vouchers'
 import OpenSlotsPanel from '../components/OpenSlotsPanel'
+import ClubLessonsPanel from '../components/lessons/ClubLessonsPanel'
+import { lessonsAvailable } from '../lib/lessonsApi'
 import { describeError } from '../lib/errors'
 
 const sanitizeSlug = (value) => value.toLowerCase().replace(/[^a-z0-9-]/g, '')
@@ -321,6 +323,18 @@ export default function GerirClube() {
   }, [slug, memberships, currentUser?.is_platform_admin, ensureOrgAdminAccess])
 
   const currentOrganizationId = org?.id
+
+  // Separador «Aulas» (Trello #49): só em clubes e só depois de a migração
+  // das aulas correr — até lá a tabela não existe e o separador não aparece.
+  const [lessonsReady, setLessonsReady] = useState(false)
+  // Com o 4.º separador não cabem os ícones a 390px — ficam só os nomes.
+  const fourTabs = lessonsReady && org?.kind === 'club'
+  useEffect(() => {
+    if (!currentOrganizationId || org?.kind !== 'club') { setLessonsReady(false); return }
+    let alive = true
+    lessonsAvailable().then((ok) => { if (alive) setLessonsReady(ok) })
+    return () => { alive = false }
+  }, [currentOrganizationId, org?.kind])
 
   useEffect(() => {
     if (currentOrganizationId) loadData()
@@ -727,6 +741,12 @@ export default function GerirClube() {
   // links `game` back to it. Used both when recurrence is turned on at
   // creation time (handleCreateGame) and when it's turned on while editing
   // a Mix that wasn't recurring yet (handleUpdateGame, Task 3).
+  // Erros da série: se foi um limite do plano, diz-se isso (Trello #307) —
+  // o "não tens permissão" genérico confundia quem já é admin.
+  const recurrenceErrorText = (error, fallbackKey) =>
+    (isMixLimitError(error?.message || '') && planLimitMessage(t, 'mix', org?.plan_tier))
+    || describeError(t, error, fallbackKey)
+
   const createRecurrence = async (game, recurrence, userId) => {
     const mixOffsetSeconds = computeLaunchOffsetSeconds(game.date, recurrence.launchDaysBefore, recurrence.launchTime)
 
@@ -743,7 +763,7 @@ export default function GerirClube() {
 
     if (recurrenceError) {
       console.error('Error creating recurrence:', recurrenceError)
-      alert(describeError(t, recurrenceError, 'gerirclube.error_recurrence_activate_failed'))
+      alert(recurrenceErrorText(recurrenceError, 'gerirclube.error_recurrence_activate_failed'))
       return
     }
 
@@ -754,7 +774,7 @@ export default function GerirClube() {
 
     if (linkError) {
       console.error('Error linking game to recurrence:', linkError)
-      alert(describeError(t, linkError, 'gerirclube.error_recurrence_link_failed'))
+      alert(recurrenceErrorText(linkError, 'gerirclube.error_recurrence_link_failed'))
       return
     }
 
@@ -814,7 +834,7 @@ export default function GerirClube() {
 
     if (pendingError) {
       console.error('Error pre-creating next occurrence:', pendingError)
-      alert(describeError(t, pendingError, 'gerirclube.error_recurrence_precreate_failed'))
+      alert(recurrenceErrorText(pendingError, 'gerirclube.error_recurrence_precreate_failed'))
       return
     }
 
@@ -1663,24 +1683,24 @@ export default function GerirClube() {
         <div className="flex gap-1 p-1 bg-ink-50 rounded-ctrl overflow-x-auto">
           <button
             onClick={() => setActiveTab('games')}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-ctrl text-sm font-extrabold whitespace-nowrap transition-all duration-fast ${
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 ${fourTabs ? 'px-2' : 'px-3'} rounded-ctrl text-sm font-extrabold whitespace-nowrap transition-all duration-fast ${
               activeTab === 'games'
                 ? 'bg-canvas text-ink-900 shadow-lift border border-line'
                 : 'text-muted hover:text-ink-900'
             }`}
           >
-            <Calendar size={16} className="shrink-0" />
+            {!fourTabs && <Calendar size={16} className="shrink-0" />}
             {t('gerirclube.tab_games')}
           </button>
           <button
             onClick={() => setActiveTab('members')}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-ctrl text-sm font-extrabold whitespace-nowrap transition-all duration-fast ${
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 ${fourTabs ? 'px-2' : 'px-3'} rounded-ctrl text-sm font-extrabold whitespace-nowrap transition-all duration-fast ${
               activeTab === 'members'
                 ? 'bg-canvas text-ink-900 shadow-lift border border-line'
                 : 'text-muted hover:text-ink-900'
             }`}
           >
-            <Users size={16} className="shrink-0" />
+            {!fourTabs && <Users size={16} className="shrink-0" />}
             {t('gerirclube.tab_members')}
             {requests.length > 0 && (
               <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-lime-400 text-ink-900 text-[11px] font-extrabold tabular-nums">
@@ -1688,17 +1708,34 @@ export default function GerirClube() {
               </span>
             )}
           </button>
+          {/* Jogo em aberto só nos clubes: só o clube tem campos para gerir
+              (Francisco, 18 set 2026). */}
+          {!isGroupOrg && (
           <button
             onClick={() => setActiveTab('open_slots')}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-ctrl text-sm font-extrabold whitespace-nowrap transition-all duration-fast ${
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 ${fourTabs ? 'px-2' : 'px-3'} rounded-ctrl text-sm font-extrabold whitespace-nowrap transition-all duration-fast ${
               activeTab === 'open_slots'
                 ? 'bg-canvas text-ink-900 shadow-lift border border-line'
                 : 'text-muted hover:text-ink-900'
             }`}
           >
-            <Clock size={16} className="shrink-0" />
+            {!fourTabs && <Clock size={16} className="shrink-0" />}
             {t('gerirclube.tab_open_slots')}
           </button>
+          )}
+          {!isGroupOrg && lessonsReady && (
+          <button
+            onClick={() => setActiveTab('lessons')}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 ${fourTabs ? 'px-2' : 'px-3'} rounded-ctrl text-sm font-extrabold whitespace-nowrap transition-all duration-fast ${
+              activeTab === 'lessons'
+                ? 'bg-canvas text-ink-900 shadow-lift border border-line'
+                : 'text-muted hover:text-ink-900'
+            }`}
+          >
+            {!fourTabs && <GraduationCap size={16} className="shrink-0" />}
+            {t('gerirclube.tab_lessons')}
+          </button>
+          )}
         </div>
       )}
 
@@ -1862,12 +1899,36 @@ export default function GerirClube() {
                         onChange={(e) => setGameForm({ ...gameForm, num_courts: e.target.value })}
                         className="input-field"
                         min="1"
-                        max={maxCourts}
+                        // Um mix antigo pode ter mais campos do que o plano deixa hoje:
+                        // o browser não pode travar a gravação por isso (o aviso
+                        // abaixo explica, e ao guardar fica no limite).
+                        max={Math.max(maxCourts, parseInt(gameForm.num_courts, 10) || 1)}
                         required
                       />
                       <p className="text-sm text-muted mt-1.5">
-                        = <strong className="text-ink-900">{t('gerirclube.players_count', { count: (gameForm.num_courts || 1) * 4 })}</strong> ({t('gerirclube.courts_count', { count: gameForm.num_courts || 1 })} × 4)
+                        = <strong className="text-ink-900">{t('gerirclube.players_count', { count: (gameForm.num_courts || 1) * 4 })}</strong> ({t('gerirclube.courts_count', { count: parseInt(gameForm.num_courts, 10) || 1 })} × 4)
                       </p>
+                      {/* Antes baixava para o limite do plano sem dizer nada (#307).
+                          Vale ao criar e ao editar, e diz o que o plano seguinte dá
+                          (Francisco, 19 set) — as subscrições ainda não se fazem na
+                          app, por isso o caminho é falar connosco. */}
+                      {(parseInt(gameForm.num_courts, 10) || 1) > maxCourts && (() => {
+                        const next = nextPlanTier(org?.plan_tier)
+                        const nextCourts = next ? limitsFor(next).courts : null
+                        return (
+                          <div className="mt-2 rounded-ctrl bg-[#E0F2FE] text-[#075985] text-sm px-3 py-2 space-y-1">
+                            <p>{t('gerirclube.courts_over_plan', { plan: planName(org?.plan_tier), max: maxCourts, players: maxCourts * 4 })}</p>
+                            {next && (
+                              <p className="font-extrabold">
+                                {nextCourts == null
+                                  ? t('gerirclube.courts_next_plan_unlimited', { next: planName(next) })
+                                  : t('gerirclube.courts_next_plan', { next: planName(next), courts: nextCourts })}
+                                {' '}{t('gerirclube.plan_contact_hint')}
+                              </p>
+                            )}
+                          </div>
+                        )
+                      })()}
                     </div>
 
                     <div>
@@ -2407,7 +2468,11 @@ export default function GerirClube() {
             </div>
           )}
 
-          {activeTab === 'open_slots' && (
+          {activeTab === 'lessons' && !isGroupOrg && lessonsReady && (
+            <ClubLessonsPanel organizationId={currentOrganizationId} orgName={org?.name} />
+          )}
+
+          {activeTab === 'open_slots' && !isGroupOrg && (
             <OpenSlotsPanel organizationId={currentOrganizationId} />
           )}
 

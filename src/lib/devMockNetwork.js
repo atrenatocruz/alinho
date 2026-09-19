@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { LESSON_RPC_MOCKS, LESSON_TABLE_MOCKS, LESSON_NOTICES } from './devMockLessons'
 
 // Dev-only: quando a sessão é o atalho "Entrar como Admin (Dev)"
 // (AuthContext.jsx, MOCK_ADMIN_KEY), essa sessão nunca teve um auth.uid()
@@ -52,6 +53,7 @@ const COMMUNITY_ORGS = [
 ]
 
 const RPC_MOCKS = {
+  ...LESSON_RPC_MOCKS,
   get_player_profile: (params) => {
     const id = params?.p_user_id || FAKE_PLAYER_ID
     const person = FAKE_PEOPLE[id] || FAKE_PEOPLE[FAKE_PLAYER_ID]
@@ -201,12 +203,29 @@ const rotTeam = (id, p1, p2, seed) => ({ id, game_id: 'fake-game-1', player1_id:
 const ROT_TEAMS = [
   rotTeam('rt1', ra, rb, 2800), rotTeam('rt2', rc, rd, 2700), rotTeam('rt3', re, rf, 2600), rotTeam('rt4', rg, rh, 2500),
   rotTeam('rt5', ra, re, 2700), rotTeam('rt6', rb, rf, 2700), rotTeam('rt7', rc, rg, 2600), rotTeam('rt8', rd, rh, 2600),
+  rotTeam('rt9', rb, rc, 2700), rotTeam('rt10', rf, rg, 2600), rotTeam('rt11', ra, rd, 2600), rotTeam('rt12', re, rh, 2500),
 ]
-const ROT_MATCHES = [
-  { id: 'rm1', game_id: 'fake-game-1', round_number: 1, court_number: 1, phase: 'group', team_a_id: 'rt1', team_b_id: 'rt2', score_a: 6, score_b: 3, winner_team_id: 'rt1' },
-  { id: 'rm2', game_id: 'fake-game-1', round_number: 1, court_number: 2, phase: 'group', team_a_id: 'rt3', team_b_id: 'rt4', score_a: 6, score_b: 4, winner_team_id: 'rt3' },
-  { id: 'rm3', game_id: 'fake-game-1', round_number: 2, court_number: 1, phase: 'group', team_a_id: 'rt5', team_b_id: 'rt6', score_a: null, score_b: null, winner_team_id: null },
-  { id: 'rm4', game_id: 'fake-game-1', round_number: 2, court_number: 2, phase: 'group', team_a_id: 'rt7', team_b_id: 'rt8', score_a: null, score_b: null, winner_team_id: null },
+const rotMatch = (id, round, court, a, b, sa, sb) => ({
+  id, game_id: 'fake-game-1', round_number: round, court_number: court, phase: 'group', team_a_id: a, team_b_id: b,
+  score_a: sa, score_b: sb, winner_team_id: sa == null ? null : sa > sb ? a : b,
+})
+// localStorage.mockRotatingPlacar = 'none' | 'equal' | 'more' — o Placar do
+// mix em mais estados (Francisco, 18 set: segue a última ronda jogada).
+// 'none': só a ronda 1, sem resultados. Sem nada: ronda 1 jogada e ronda 2
+// já criada. 'equal': duas rondas jogadas. 'more': três rondas jogadas.
+const rotPlacar = () => localStorage.getItem('mockRotatingPlacar')
+const ROT_MATCHES_FN = () => rotPlacar() === 'none' ? [
+  rotMatch('rm1', 1, 1, 'rt1', 'rt2', null, null),
+  rotMatch('rm2', 1, 2, 'rt3', 'rt4', null, null),
+] : [
+  rotMatch('rm1', 1, 1, 'rt1', 'rt2', 6, 3),
+  rotMatch('rm2', 1, 2, 'rt3', 'rt4', 6, 4),
+  ...(rotPlacar()
+    ? [rotMatch('rm3', 2, 1, 'rt5', 'rt6', 4, 6), rotMatch('rm4', 2, 2, 'rt7', 'rt8', 6, 2)]
+    : [rotMatch('rm3', 2, 1, 'rt5', 'rt6', null, null), rotMatch('rm4', 2, 2, 'rt7', 'rt8', null, null)]),
+  ...(rotPlacar() === 'more'
+    ? [rotMatch('rm5', 3, 1, 'rt9', 'rt10', 6, 5), rotMatch('rm6', 3, 2, 'rt11', 'rt12', 6, 1)]
+    : []),
 ]
 const rotating = () => localStorage.getItem('mockRotatingMix') === 'true'
 
@@ -475,6 +494,7 @@ function lastMinuteRequest(table, url, method, body) {
 }
 
 const TABLE_MOCKS = {
+  ...LESSON_TABLE_MOCKS,
   // localStorage.mockNotices = 'true' — três avisos de mix no sino (Trello #292).
   notifications: () => (localStorage.getItem('mockNotices') === 'true' ? [
     { id: 'n1', kind: 'mix_partner_changed', game_id: 'fake-game-1', created_at: new Date().toISOString(),
@@ -483,12 +503,12 @@ const TABLE_MOCKS = {
       data: { game_title: 'Mix de Quinta-feira', game_date: tomorrow8pm.toISOString(), partner_name: null } },
     { id: 'n3', kind: 'mix_removed', game_id: 'fake-game-1', created_at: new Date().toISOString(),
       data: { game_title: 'Mix de Terça', game_date: tomorrow8pm.toISOString() } },
-  ] : []),
+  ] : []).concat(LESSON_NOTICES()),
   // A organização do Admin(Dev). Sem esta linha o separador Definições do
   // Gerir ficava em branco (loadSettings nunca recebia nada). Marcada como
   // grupo criado na Comunidade para se poder validar o "Eliminar grupo".
   organizations: () => [{
-    id: MOCK_ADMIN_ORG_ID, name: 'Dev Org', slug: 'dev-org', kind: 'group', self_serve: true,
+    id: MOCK_ADMIN_ORG_ID, name: 'Dev Org', slug: 'dev-org', kind: localStorage.getItem('mockOrgKind') || 'group', self_serve: true,
     is_global: false, open_join: false, group_logo_url: null, description: '', location: '',
     ...(community() ? { searchable: true } : {}),
     owner_id: MOCK_ADMIN_USER_ID, plan_tier: localStorage.getItem('mockPlanTier') || 'pro',
@@ -529,7 +549,7 @@ const TABLE_MOCKS = {
     : longNames() ? LONG_STATS : []),
   teams: (url) => (agenda() && url.includes('ag-winner') ? AGENDA_WINNER_TEAMS() : ['live', 'finished'].includes(eventState()) ? EV_TEAMS : rotating() ? ROT_TEAMS : []),
   participants: () => (eventState() ? EV_PARTICIPANTS() : []),
-  matches: () => (['live', 'finished'].includes(eventState()) ? EV_MATCHES() : rotating() ? ROT_MATCHES : []),
+  matches: () => (['live', 'finished'].includes(eventState()) ? EV_MATCHES() : rotating() ? ROT_MATCHES_FN() : []),
   // Mix em aberto — 1 dupla já confirmada, a segunda por preencher (2 de 4
   // lugares), para se ver o cartão no estado "aberto/junto-te" na Home.
   games: (url) => agenda() ? (url.includes('recurrence_id=eq.') ? AGENDA_PREVIOUS_EDITIONS() : AGENDA_GAMES()) : [{

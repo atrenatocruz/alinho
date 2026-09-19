@@ -7,7 +7,7 @@ import { Wordmark } from '../components/Layout'
 // Order here is the order sections render in — matches
 // privacy.section_<key>_title / privacy.section_<key>_body in pt.json/en.json.
 const SECTIONS = [
-  'intro', 'data_collected', 'purpose', 'sharing',
+  'intro', 'data_collected', 'purpose', 'visibility', 'sharing',
   'cookies', 'retention', 'rights', 'changes', 'contact',
 ]
 

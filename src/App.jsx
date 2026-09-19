@@ -15,6 +15,8 @@ import PlayerDetails from './pages/PlayerDetails'
 import Profile from './pages/Profile'
 import Comunidade from './pages/Comunidade'
 import ClubProfile from './pages/ClubProfile'
+import TeacherPage from './pages/TeacherPage'
+import LessonPage from './pages/LessonPage'
 import CookieConsentBanner from './components/CookieConsentBanner'
 
 // Route-level splitting (impeccable audit, P3 perf finding): these are all
@@ -249,6 +251,31 @@ function AppRoutes() {
           element={
             <Guard require="member" showSplash={showSplash}>
               <CreateGroupMatch />
+            </Guard>
+          }
+        />
+        {/* Aulas com professores (Trello #49) */}
+        <Route
+          path="/professor/:id"
+          element={
+            <Guard require="member" showSplash={showSplash}>
+              <TeacherPage view="profile" />
+            </Guard>
+          }
+        />
+        <Route
+          path="/aula/:id"
+          element={
+            <Guard require="member" showSplash={showSplash}>
+              <LessonPage />
+            </Guard>
+          }
+        />
+        <Route
+          path="/professor/:id/disponibilidade"
+          element={
+            <Guard require="member" showSplash={showSplash}>
+              <TeacherPage view="availability" />
             </Guard>
           }
         />

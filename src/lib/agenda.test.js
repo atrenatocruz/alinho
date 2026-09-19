@@ -3,7 +3,7 @@ import {
   toDayKey, fromDayKey, addDays, eventFromGame, eventFromGroupMatch, eventFromPrivateMatch,
   applyFilters, eventsForDay, countByDay, nextMineDay, monthGrid, isAgendaGame,
   DEFAULT_FILTERS, isDefaultFilters, normalizeFilters, groupByDay, eventFromExplore, distanceKm, eventDistance, withinReach,
-  eventsToPins,
+  eventsToPins, eventFromLesson,
 } from './agenda'
 
 const ME = 'me'
@@ -202,5 +202,39 @@ describe('monthGrid', () => {
     expect(cells[0]).toBe(null)
     expect(cells[1]).toBe('2026-09-01')
     expect(cells.length % 7).toBe(0)
+  })
+})
+
+describe('eventFromLesson (aulas, Trello #49)', () => {
+  const lesson = (over = {}) => ({
+    lesson_id: 'l1', series_id: 's1', starts_at: new Date(2026, 8, 22, 19, 0).toISOString(),
+    ends_at: new Date(2026, 8, 22, 20, 30).toISOString(), lesson_type: 'quad', form: 'class', status: 'open',
+    organization: { id: 'org-a', name: 'Smash', kind: 'club', latitude: '38.7223', longitude: '-9.1393' },
+    my_status: 'confirmed', ...over,
+  })
+  const lisboa = { latitude: 38.7223, longitude: -9.1393, radiusKm: 15 }
+  const porto = { latitude: 41.1579, longitude: -8.6291, radiusKm: 15 }
+
+  it('is mine with the green frame only when enrolled', () => {
+    const e = eventFromLesson(lesson())
+    expect(e.kind).toBe('lesson')
+    expect(e.dayKey).toBe('2026-09-22')
+    expect(e.mine).toBe(true)
+    expect(e.myState).toBe('in')
+    expect(eventFromLesson(lesson({ my_status: 'not_going' })).myState).toBe('not_going')
+    expect(eventFromLesson(lesson({ my_status: null })).mine).toBe(false)
+  })
+  it('open lessons respect the distance, mine never do', () => {
+    const open = eventFromLesson(lesson({ my_status: null }))
+    const mine = eventFromLesson(lesson())
+    expect(withinReach(open, lisboa)).toBe(true)
+    expect(withinReach(open, porto)).toBe(false)
+    expect(withinReach(mine, porto)).toBe(true)
+  })
+  it('shows up under the default kinds', () => {
+    expect(DEFAULT_FILTERS.kinds).toContain('lesson')
+    const e = eventFromLesson(lesson())
+    expect(applyFilters([e], DEFAULT_FILTERS, null, '2026-09-01')).toHaveLength(1)
+    expect(applyFilters([e], { ...DEFAULT_FILTERS, kinds: ['mix'] }, null, '2026-09-01')).toHaveLength(0)
   })
 })

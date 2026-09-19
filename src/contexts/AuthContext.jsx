@@ -44,7 +44,8 @@ const MOCK_ADMIN_MEMBERSHIP = {
   // header shows the GRUPO mark in localhost (Trello #177, #261).
   organization: {
     id: MOCK_ADMIN_ORG_ID, name: 'Dev Org', slug: 'dev-org',
-    kind: 'group', self_serve: true, owner_id: MOCK_ADMIN_USER.id,
+    // localStorage.mockOrgKind = 'club' para ver o Gerir de um clube.
+    kind: localStorage.getItem('mockOrgKind') || 'group', self_serve: true, owner_id: MOCK_ADMIN_USER.id,
     // localStorage.mockPlanTier (free/plus/pro/club) para ver os 4 planos.
     plan_tier: localStorage.getItem('mockPlanTier') || 'pro',
   },

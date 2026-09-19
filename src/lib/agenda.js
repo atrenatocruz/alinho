@@ -9,11 +9,14 @@
    - get_my_private_matches → jogos entre amigos fora de clubes (só os seus)
    - list_explore_events → Fase 2: eventos de clubes da Comunidade onde ainda
                            não é membro, sem nomes de jogadores
+   - list_my_lessons / list_lesson_events → aulas com professores (Trello
+                           #49): as minhas (uma por semana na turma) e as em
+                           aberto perto de mim, sem nomes de alunos
 
    Nada aqui vai à base de dados.
    ════════════════════════════════════════════════════════════════════════ */
 
-export const EVENT_KINDS = ['mix', 'open', 'friends']
+export const EVENT_KINDS = ['mix', 'open', 'friends', 'lesson']
 
 // Dia local 'AAAA-MM-DD'. Local de propósito: um mix às 00:30 de sábado em
 // Lisboa pertence a sábado, não à sexta-feira em UTC.
@@ -227,9 +230,44 @@ export function eventsToPins(events) {
  * aparece enquanto não há sítio escolhido — não há como saber se está perto.
  */
 export function withinReach(event, location) {
-  if (event.source !== 'explore' || !location) return true
+  // Só o que não é meu se filtra pela distância: explorar e aulas em aberto.
+  const outside = event.source === 'explore' || (event.source === 'lesson' && !event.mine)
+  if (!outside || !location) return true
   const d = eventDistance(event, location)
   return d != null && d <= location.radiusKm
+}
+
+// Estado do aluno na aula → estado do cartão. 'in' dá o contorno verde.
+const LESSON_MY_STATE = { confirmed: 'in', not_going: 'not_going', requested: 'requested', invited: 'invited', accepted: 'confirm' }
+
+/**
+ * Aula (Trello #49): uma linha de list_my_lessons (as minhas — a turma dá
+ * uma por semana) ou de list_lesson_events (em aberto, sem nomes). A forma
+ * (turma, avulsa, experimental, convite) é do aluno, não da aula.
+ */
+export function eventFromLesson(row) {
+  const startsAt = new Date(row.starts_at)
+  const org = row.organization || null
+  const myState = LESSON_MY_STATE[row.my_status] || null
+  return {
+    key: `lesson:${row.lesson_id}`,
+    source: 'lesson',
+    kind: 'lesson',
+    id: row.lesson_id,
+    startsAt,
+    hasTime: true,
+    dayKey: toDayKey(startsAt),
+    orgId: org?.id || null,
+    orgName: org?.name || null,
+    orgKind: org?.kind || null,
+    orgLogo: org?.group_logo_url || null,
+    mine: myState != null,
+    myState,
+    finished: new Date(row.ends_at) < new Date() && row.status !== 'cancelled',
+    latitude: num(row.latitude) ?? num(org?.latitude),
+    longitude: num(row.longitude) ?? num(org?.longitude),
+    raw: row,
+  }
 }
 
 /** Mixes/jogos em aberto visíveis na agenda — os mesmos que a Home já escondia. */

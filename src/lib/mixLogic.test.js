@@ -585,11 +585,24 @@ describe('rotatingPlacar', () => {
     { round_number: 2, court_number: 2, team_a_id: 'r2c', team_b_id: 'r2d', score_a: null, score_b: null, winner_team_id: null },
   ]
 
-  it('quem está no campo 1 vem primeiro, mesmo tendo marcado menos pontos', () => {
+  it('ronda 1 jogada e ronda 2 já criada: ganhou-campo-1, perdeu-campo-1, ganhou-campo-2, perdeu-campo-2', () => {
+    // A ronda 2 pendente não conta: quem ganhou no campo 2 (e, f) já lá está
+    // no campo 1, mas fica atrás de quem perdeu no campo 1 (c, d).
     const placar = rotatingPlacar([...round1, ...round2Pending], teams)
-    expect(placar.slice(0, 4).map((r) => r.court)).toEqual([1, 1, 1, 1])
-    expect(placar.slice(0, 4).map((r) => r.player.id).sort()).toEqual(['a', 'b', 'e', 'f'])
-    expect(placar.slice(4).map((r) => r.player.id).sort()).toEqual(['c', 'd', 'g', 'h'])
+    const ids = placar.map((r) => r.player.id)
+    expect(ids.slice(0, 2).sort()).toEqual(['a', 'b'])
+    expect(ids.slice(2, 4).sort()).toEqual(['c', 'd'])
+    expect(ids.slice(4, 6).sort()).toEqual(['e', 'f'])
+    expect(ids.slice(6, 8).sort()).toEqual(['g', 'h'])
+    expect(placar.map((r) => r.court)).toEqual([1, 1, 1, 1, 2, 2, 2, 2])
+  })
+
+  it('só a ronda 1, ainda sem resultados: usa o campo dessa ronda', () => {
+    const round1Pending = round1.map((m) => ({ ...m, score_a: null, score_b: null, winner_team_id: null }))
+    const placar = rotatingPlacar(round1Pending, teams)
+    expect(placar.slice(0, 4).map((r) => r.player.id).sort()).toEqual(['a', 'b', 'c', 'd'])
+    expect(placar.map((r) => r.court)).toEqual([1, 1, 1, 1, 2, 2, 2, 2])
+    expect(placar.every((r) => r.wins === 0 && r.played === 0)).toBe(true)
   })
 
   it('no fim, os 2 que ganharam o campo 1 na última ronda ficam em 1.º e 2.º', () => {
@@ -600,5 +613,60 @@ describe('rotatingPlacar', () => {
     const placar = rotatingPlacar([...round1, ...round2Done], teams)
     expect(placar.slice(0, 2).map((r) => r.player.id).sort()).toEqual(['b', 'f'])
     expect(placar.find((r) => r.player.id === 'b').wins).toBe(2)
+  })
+
+  it('duas rondas jogadas: conta a mais recente, não as vitórias totais', () => {
+    // Ronda 2: campo 1 ganham b+f (perdem a+e); campo 2 ganham c+g (perdem d+h).
+    // a e e têm 1 vitória, como c e g, mas perderam no campo 1 → ficam à frente.
+    const round2Done = [
+      { ...round2Pending[0], score_a: 4, score_b: 6, winner_team_id: 'r2b' },
+      { ...round2Pending[1], score_a: 6, score_b: 1, winner_team_id: 'r2c' },
+    ]
+    const ids = rotatingPlacar([...round1, ...round2Done], teams).map((r) => r.player.id)
+    expect(ids.slice(0, 2).sort()).toEqual(['b', 'f'])
+    expect(ids.slice(2, 4).sort()).toEqual(['a', 'e'])
+    expect(ids.slice(4, 6).sort()).toEqual(['c', 'g'])
+    expect(ids.slice(6, 8).sort()).toEqual(['d', 'h'])
+  })
+})
+
+describe('rotatingPlacar — última ronda jogada, vitórias só desempatam (Francisco, 18 set)', () => {
+  const p = (id) => ({ id, name: id })
+  const team = (id, a, b) => ({ id, player1: p(a), player2: p(b) })
+  const match = (round, court, a, b, sa, sb) => ({
+    round_number: round, court_number: court, team_a_id: a, team_b_id: b,
+    score_a: sa, score_b: sb, winner_team_id: sa == null ? null : sa > sb ? a : b,
+  })
+  const pos = (placar, id) => placar.findIndex((r) => r.player.id === id)
+
+  it('quem perdeu no campo 1 fica à frente de quem ganhou no campo 2, mesmo com menos vitórias', () => {
+    // x: 1 vitória, perdeu o último no campo 1. y: 2 vitórias, ganhou o último no campo 2.
+    const teams = [
+      team('t1', 'x', 'x2'), team('t2', 'q', 'r'), team('t3', 'y', 'y2'), team('t4', 's', 'u'),
+      team('t5', 'x', 'q'), team('t6', 'x2', 'r'), team('t7', 'y', 's'), team('t8', 'y2', 'u'),
+    ]
+    const placar = rotatingPlacar([
+      match(1, 1, 't1', 't2', 6, 4), match(1, 2, 't3', 't4', 6, 3),
+      match(2, 1, 't5', 't6', 2, 6), match(2, 2, 't7', 't8', 6, 5),
+    ], teams)
+    expect(placar.find((r) => r.player.id === 'x')).toMatchObject({ wins: 1, court: 1 })
+    expect(placar.find((r) => r.player.id === 'y')).toMatchObject({ wins: 2, court: 2 })
+    expect(pos(placar, 'x')).toBeLessThan(pos(placar, 'y'))
+  })
+
+  it('mesmo campo e mesmo resultado: desempata pelas vitórias e depois pelos pontos', () => {
+    // v e w perderam juntos no campo 2 da ronda 2, 1 vitória cada, mas w
+    // marcou mais pontos na ronda 1 (7 contra 6) → w à frente.
+    const teams = [
+      team('t1', 'm', 'v'), team('t2', 'n', 'o'), team('t3', 'w', 'k'), team('t4', 'z', 'j'),
+      team('t5', 'n', 'k'), team('t6', 'm', 'z'), team('t7', 'v', 'w'), team('t8', 'o', 'j'),
+    ]
+    const placar = rotatingPlacar([
+      match(1, 1, 't1', 't2', 6, 2), match(1, 2, 't3', 't4', 7, 5),
+      match(2, 1, 't5', 't6', 6, 4), match(2, 2, 't7', 't8', 3, 6),
+    ], teams)
+    expect(placar.find((r) => r.player.id === 'v')).toMatchObject({ wins: 1, court: 2, points: 9 })
+    expect(placar.find((r) => r.player.id === 'w')).toMatchObject({ wins: 1, court: 2, points: 10 })
+    expect(pos(placar, 'w')).toBeLessThan(pos(placar, 'v'))
   })
 })
