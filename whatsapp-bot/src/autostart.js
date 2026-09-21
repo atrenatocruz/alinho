@@ -75,19 +75,24 @@ async function autoStartMix(game, { sendText }) {
   if (rErr) throw new Error(`Failed to load rankings for auto-start: ${rErr.message}`)
   const pointsById = Object.fromEntries((rankings || []).map((r) => [r.user_id, Math.round(r.rating || 0)]))
 
+  // Os últimos QUATRO mixes, como em GameDetails.jsx (loadRepeatPairKeys) —
+  // a regra do Francisco é não repetir pares durante pelo menos 4 mixes.
+  // Este bloco olhava só para o mix anterior, por isso um mix começado pelo
+  // bot repetia pares que o mesmo mix começado na app teria evitado: no mix
+  // de 21 set, 3 das 6 duplas já tinham jogado juntas nos 4 anteriores.
   const { data: previousGames } = await supabase
     .from('games')
     .select('id')
     .eq('organization_id', game.organization_id)
     .lt('date', game.date)
     .order('date', { ascending: false })
-    .limit(1)
+    .limit(4)
   let repeatPairKeys = new Set()
-  if (previousGames?.[0]) {
+  if (previousGames?.length) {
     const { data: previousTeams } = await supabase
       .from('teams')
       .select('player1_id, player2_id')
-      .eq('game_id', previousGames[0].id)
+      .in('game_id', previousGames.map((g) => g.id))
     repeatPairKeys = new Set((previousTeams || []).map((team) => pairKey(team.player1_id, team.player2_id)))
   }
 
