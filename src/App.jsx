@@ -13,6 +13,7 @@ import GameDetails from './pages/GameDetails'
 import Rankings from './pages/Rankings'
 import PlayerDetails from './pages/PlayerDetails'
 import Profile from './pages/Profile'
+import PersonalInfo from './pages/PersonalInfo'
 import Comunidade from './pages/Comunidade'
 import ClubProfile from './pages/ClubProfile'
 import TeacherPage from './pages/TeacherPage'
@@ -328,6 +329,16 @@ function AppRoutes() {
           element={
             <Guard require="protected" showSplash={showSplash}>
               <Profile />
+            </Guard>
+          }
+        />
+        {/* Informação pessoal em página própria (Francisco, 21 set 2026) —
+            com a alteração de password lá dentro. */}
+        <Route
+          path="/perfil/informacao"
+          element={
+            <Guard require="protected" showSplash={showSplash}>
+              <PersonalInfo />
             </Guard>
           }
         />
