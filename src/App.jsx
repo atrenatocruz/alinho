@@ -12,6 +12,7 @@ import Home from './pages/Home'
 import GameDetails from './pages/GameDetails'
 import Rankings from './pages/Rankings'
 import PlayerDetails from './pages/PlayerDetails'
+import ClaimInvite from './pages/ClaimInvite'
 import Profile from './pages/Profile'
 import PersonalInfo from './pages/PersonalInfo'
 import Comunidade from './pages/Comunidade'
@@ -280,6 +281,16 @@ function AppRoutes() {
           element={
             <Guard require="member" showSplash={showSplash}>
               <CreateGroupMatch />
+            </Guard>
+          }
+        />
+        {/* Convite do parceiro sem conta (Trello #339) — abre sem conta:
+            quem chega pelo link vê o convite e o caminho para se registar. */}
+        <Route
+          path="/convite/:token"
+          element={
+            <Guard require="public" showSplash={showSplash}>
+              <ClaimInvite />
             </Guard>
           }
         />

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation, Trans } from 'react-i18next'
-import { Calendar, MapPin, ArrowLeft, UserPlus, Check, Trophy, Play, ChevronRight, Swords, X, Repeat, Share2, ChevronDown, RotateCcw, Euro, GripVertical, Pencil, History, ThumbsUp } from 'lucide-react'
+import { Calendar, MapPin, ArrowLeft, UserPlus, Check, Trophy, Play, ChevronRight, Swords, X, Repeat, Share2, ChevronDown, RotateCcw, Euro, GripVertical, Pencil, History, ThumbsUp, Users, Copy } from 'lucide-react'
 import { DndContext, useDraggable, useDroppable, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { supabase, supabaseUrl } from '../lib/supabase'
@@ -32,6 +32,9 @@ import { limitsFor } from '../lib/plans'
 import { canEditBeforeRound1, unpairedPeople, changedPairKeys, teamPairKey, mixChanges } from '../lib/mixEdit'
 import { notifyMixChanges } from '../lib/notifications'
 import AddPlayerSheet from '../components/mix/AddPlayerSheet'
+import JoinPartnerSheet from '../components/mix/JoinPartnerSheet'
+import { Sheet } from '../components/agenda/AgendaControls'
+import { joinWithNamedPartner, listGameInvites, inviteLink, whatsappShare } from '../lib/partnerInvite'
 
 const SIDE_LABEL_KEY = { left: 'gamedetails.side_left', right: 'gamedetails.side_right', both: 'gamedetails.side_both' }
 
@@ -90,6 +93,12 @@ export default function GameDetails() {
   const [joining, setJoining] = useState(false)
   const [joinMode, setJoinMode] = useState(null) // null | 'partner'
   const [selectedPartner, setSelectedPartner] = useState('')
+  // Entrar com parceiro (Trello #339): a folha nova, os convites por
+  // reclamar deste mix, e o link para mandar a quem acabou de ser posto
+  // na dupla sem ter conta.
+  const [partnerSheet, setPartnerSheet] = useState(false)
+  const [invites, setInvites] = useState([])
+  const [freshInvite, setFreshInvite] = useState(null)
   const [allUsers, setAllUsers] = useState([])
   const [joinError, setJoinError] = useState('')
   // Data de nascimento pedida no momento (Trello #212): quem nunca a
@@ -400,6 +409,48 @@ export default function GameDetails() {
     } catch (error) {
       console.error('Error joining game:', error)
       setJoinError(describeError(t, error, 'gamedetails.error_join_generic'))
+    } finally {
+      setJoining(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!id) return
+    let cancelled = false
+    listGameInvites(id)
+      .then((rows) => { if (!cancelled) setInvites(rows) })
+      // Sem a migração a tabela não existe — o mix funciona à mesma.
+      .catch((error) => console.error('Error loading partner invites:', error))
+    return () => { cancelled = true }
+  }, [id, participants.length])
+
+  // Quem está no mix sem ter conta ainda (conta por reclamar).
+  const pendingInviteFor = (userId) => invites.find((i) => i.placeholder_id === userId)
+
+  // A folha nova: ou escolho alguém do grupo, ou escrevo o nome de quem não
+  // está na app. O segundo caminho passa pela edge function, porque criar a
+  // conta por reclamar precisa da service-role.
+  const handleJoinPartner = async (choice) => {
+    setJoining(true)
+    setJoinError('')
+    try {
+      if (choice.kind === 'member') {
+        const { error } = await supabase.from('participants').insert([{
+          game_id: id, user_id: user.id, partner_id: choice.partnerId,
+          status: 'confirmed', joined_alone: false,
+        }])
+        if (error) throw error
+      } else {
+        const result = await joinWithNamedPartner({ gameId: id, name: choice.name, email: choice.email })
+        setFreshInvite({ name: choice.name, email: choice.email, token: result.token })
+      }
+      setPartnerSheet(false)
+      celebrate()
+      loadGameDetails()
+    } catch (error) {
+      console.error('Error joining game with a partner:', error)
+      const key = `gamedetails.partner_error_${error.message}`
+      setJoinError(t(key) === key ? describeError(t, error, 'gamedetails.error_join_generic') : t(key))
     } finally {
       setJoining(false)
     }
@@ -2126,9 +2177,19 @@ export default function GameDetails() {
           <Play size={18} /> {t('gamedetails.live_see_round')}
         </PrimaryButton>
       ) : !mixStarted && canJoin && !joinMode && !genderMismatch && !ageIneligible && !missingBirthday ? (
-        <PrimaryButton onClick={handleJoinAlone} disabled={joining} className="w-full">
-          {joining ? t('gamedetails.joining') : t('gamedetails.join_mix')}
-        </PrimaryButton>
+        <div className="space-y-2">
+          <PrimaryButton onClick={handleJoinAlone} disabled={joining} className="w-full">
+            {joining ? t('gamedetails.joining') : t('gamedetails.join_mix')}
+          </PrimaryButton>
+          {/* Duplas fixas: entrar já com o parceiro combinado — tenha ele
+              conta ou não (Trello #339). Num mix que roda parceiros a dupla
+              desfazia-se na ronda seguinte, por isso não aparece lá. */}
+          {!game.rotate_partners && (
+            <PrimaryButton variant="ghost" onClick={() => setPartnerSheet(true)} disabled={joining} className="w-full !bg-white !border-ink-900">
+              <Users size={20} /> {t('gamedetails.join_with_partner')}
+            </PrimaryButton>
+          )}
+        </div>
       ) : isUserJoined && (game.status === 'open' || game.status === 'closed') ? (
         <PrimaryButton variant="ghost" onClick={handleLeaveGame} className="w-full !bg-white !border-ink-900">
           {t('gamedetails.leave_mix')}
@@ -2541,6 +2602,7 @@ export default function GameDetails() {
               onClose={() => setAddPlayerOpen(false)}
             />
           )}
+
 
           {showDuplasShare && (
             <ShareModal
@@ -2991,7 +3053,14 @@ export default function GameDetails() {
                           )}
                         </p>
                         <div className="mt-1">
-                          <GuestBadge label={person.is_test ? t('gamedetails.test_badge') : t('gamedetails.guest_badge')} isTest={person.is_test} />
+                          {/* Quem foi posto na dupla pelo nome ainda não tem
+                              conta: diz-se isso, não "convidado" (#339). */}
+                          <GuestBadge
+                            label={pendingInviteFor(person.id)
+                              ? t('partner.no_account_tag')
+                              : person.is_test ? t('gamedetails.test_badge') : t('gamedetails.guest_badge')}
+                            isTest={person.is_test}
+                          />
                         </div>
                       </div>
                     </>
@@ -3311,6 +3380,56 @@ export default function GameDetails() {
               </div>
             </div>,
             document.body
+          )}
+
+          {/* Entrar com parceiro (Trello #339) — da lista do grupo, ou pelo
+              nome de quem ainda não está na app. */}
+          {partnerSheet && (
+            <JoinPartnerSheet
+              game={game}
+              excludeIds={new Set([user.id, ...people.map((p) => p.id)])}
+              busy={joining}
+              error={joinError}
+              onConfirm={handleJoinPartner}
+              onClose={() => { setPartnerSheet(false); setJoinError('') }}
+            />
+          )}
+
+          {/* Acabou de inscrever alguém sem conta: o link é a única forma
+              de ele saber, enquanto o envio de emails não existir. */}
+          {freshInvite && (
+            <Sheet title={t('partner.invite_ready_title')} onClose={() => setFreshInvite(null)}>
+              <div className="space-y-3">
+                <p className="text-sm text-ink-900">
+                  {t('partner.invite_ready_body', { name: freshInvite.name })}
+                </p>
+                <p className="text-sm text-muted">
+                  {freshInvite.email
+                    ? t('partner.invite_ready_email', { email: freshInvite.email })
+                    : t('partner.invite_ready_no_email')}
+                </p>
+                <div className="rounded-ctrl bg-ink-50 px-3 py-2 text-xs text-ink-900 break-all">
+                  {inviteLink(freshInvite.token, window.location.origin)}
+                </div>
+                <PrimaryButton
+                  onClick={() => window.open(whatsappShare(t('partner.invite_whatsapp_text', {
+                    name: freshInvite.name,
+                    title: game.title,
+                    link: inviteLink(freshInvite.token, window.location.origin),
+                  })), '_blank')}
+                  className="w-full"
+                >
+                  {t('partner.invite_send_whatsapp')}
+                </PrimaryButton>
+                <PrimaryButton
+                  variant="ghost"
+                  onClick={() => navigator.clipboard?.writeText(inviteLink(freshInvite.token, window.location.origin))}
+                  className="w-full !bg-white !border-ink-900"
+                >
+                  <Copy size={18} /> {t('partner.invite_copy_link')}
+                </PrimaryButton>
+              </div>
+            </Sheet>
           )}
 
           {joinMode === 'partner' && (
