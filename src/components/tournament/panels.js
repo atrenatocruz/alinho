@@ -16,12 +16,14 @@ import { lazy } from 'react'
 export const TOURNAMENT_PANELS = {
   // Aviso do organizador — fica acima de tudo, e só existe quando há aviso
   // (SPEC §4.11). Sem aviso não fica espaço reservado.
-  top: null, //                                        Dev 2 · «Torneio 6/6» → NoticesSlot.jsx
+  // O «Inscrever a minha dupla» vive aqui (o desenho põe-no logo debaixo
+  // do cartaz); os avisos do organizador entram no mesmo ficheiro no 6/6.
+  top: lazy(() => import('./SignupSlot')), //          Dev 2 · «Torneio 2/6» e «6/6»
   my_games: lazy(() => import('./MyGamesPanel')), //    Dev 1 · «Torneio 1/6»
   groups: null, //                                     Dev 3 · «Torneio 4/6» → GroupsPanel.jsx
   draw: null, //                                       Dev 3 · «Torneio 4/6» → DrawPanel.jsx
   calendar: null, //                                   Dev 3 · «Torneio 4/6» → CalendarPanel.jsx
-  entries: null, //                                    Dev 2 · «Torneio 2/6» → EntriesPanel.jsx
+  entries: lazy(() => import('./EntriesPanel')), //     Dev 2 · «Torneio 2/6»
 }
 
 /** A ordem dos separadores é a do desenho (print 05) e não se mexe:

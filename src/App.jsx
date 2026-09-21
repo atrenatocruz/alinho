@@ -286,6 +286,14 @@ function AppRoutes() {
         {/* Convite do parceiro sem conta (Trello #339) — abre sem conta:
             quem chega pelo link vê o convite e o caminho para se registar. */}
         <Route
+          path="/convite-torneio/:token"
+          element={
+            <Guard require="public" showSplash={showSplash}>
+              <ClaimInvite />
+            </Guard>
+          }
+        />
+        <Route
           path="/convite/:token"
           element={
             <Guard require="public" showSplash={showSplash}>
