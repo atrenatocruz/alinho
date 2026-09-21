@@ -89,7 +89,48 @@ const categories = () => CATEGORIES.map((c) => ({
   my_state: !empty() && c.code === 'M5' ? 'inscrito' : null,
 }))
 
+// O que o admin criar em localhost fica aqui até recarregar a página — é o
+// que basta para ver a lista cheia, o torneio novo e os botões de estado.
+let created = []
+
 export const TOURNAMENT_RPC_MOCKS = {
+  list_club_tournaments: () => {
+    if (!on()) return []
+    const base = empty() ? [] : [{
+      ...TOURNAMENT(),
+      entry_count: 84,
+      category_count: 5,
+    }]
+    return [...created, ...base]
+  },
+  create_tournament: (params) => {
+    const d = params?.p_draft || {}
+    const days = d.days || []
+    created = [{
+      id: `tour-${created.length + 1}`,
+      slug: null,
+      name: d.name || 'Torneio',
+      club_name: 'Smash Padel',
+      club_logo_url: null,
+      location: d.location || null,
+      starts_on: days[0]?.date || null,
+      ends_on: days[days.length - 1]?.date || null,
+      status: d.status || 'rascunho',
+      category_count: (d.categories || []).length,
+      entry_count: 0,
+      day_count: days.length,
+      match_count: 0,
+    }, ...created]
+    return created[0].id
+  },
+  set_tournament_status: (params) => {
+    created = created.map((x) => (x.id === params?.p_tournament_id ? { ...x, status: params.p_status } : x))
+    return null
+  },
+  delete_tournament: (params) => {
+    created = created.filter((x) => x.id !== params?.p_tournament_id)
+    return null
+  },
   get_tournament_page: () => {
     if (!on()) return null
     return {

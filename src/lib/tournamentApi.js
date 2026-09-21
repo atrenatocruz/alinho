@@ -41,11 +41,51 @@ export async function tournamentsAvailable() {
 
 /** Torneios de um clube, para o Gerir (cartão «Torneio 1/6»). */
 export async function listClubTournaments(organizationId) {
-  const { data, error } = await supabase
-    .from('tournaments')
-    .select('*')
-    .eq('organization_id', organizationId)
-    .order('starts_on', { ascending: false })
+  const { data, error } = await supabase.rpc('list_club_tournaments', { p_organization_id: organizationId })
   if (error) throw error
   return data || []
+}
+
+/** Cria o torneio, os dias, os campos e as categorias de uma vez — é uma
+ *  coisa só do ponto de vista do organizador, e meio torneio criado não
+ *  serve a ninguém. Assinatura combinada com o plano técnico do Dev 3
+ *  (tabelas tournaments / tournament_days / tournament_courts /
+ *  tournament_categories), ainda por validar com o Renato.
+ *
+ *  draft: { name, location, poster_url, entries_close_at, draw_at,
+ *           is_public, organizer_text, rules, days: [{ date, starts_at,
+ *           ends_at, courts }], courts: ['Campo 1', …],
+ *           categories: [{ code, name, gender, level, age_group, day,
+ *           start_time, slots, price }] }
+ *
+ *  `rules` é o passo 4 inteiro (pontuação, duração mín./máx., chegar antes,
+ *  aviso para antecipar, tolerância, máx. seguidos, máx. categorias por
+ *  pessoa, como se escolhe quem entra) — guardado em jsonb, para não serem
+ *  dez colunas que ninguém consulta. */
+export async function createTournament(organizationId, draft) {
+  const { data, error } = await supabase.rpc('create_tournament', {
+    p_organization_id: organizationId, p_draft: draft,
+  })
+  if (error) throw error
+  return data
+}
+
+/** Editar um torneio. Enquanto não há inscrições muda-se tudo; depois, só o
+ *  que não estraga inscrições feitas (nome, local, cartaz, texto). */
+export async function updateTournament(tournamentId, draft) {
+  const { error } = await supabase.rpc('update_tournament', { p_tournament_id: tournamentId, p_draft: draft })
+  if (error) throw error
+}
+
+/** Abrir/fechar inscrições e voltar atrás (rascunho ↔ inscrições ↔
+ *  fechado). Do sorteio em diante o estado muda sozinho. */
+export async function setTournamentStatus(tournamentId, status) {
+  const { error } = await supabase.rpc('set_tournament_status', { p_tournament_id: tournamentId, p_status: status })
+  if (error) throw error
+}
+
+/** Só enquanto for rascunho e ninguém se tiver inscrito (cartão #361). */
+export async function deleteTournament(tournamentId) {
+  const { error } = await supabase.rpc('delete_tournament', { p_tournament_id: tournamentId })
+  if (error) throw error
 }
