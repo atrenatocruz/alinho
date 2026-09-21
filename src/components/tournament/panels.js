@@ -17,6 +17,10 @@ export const TOURNAMENT_PANELS = {
   // Aviso do organizador — fica acima de tudo, e só existe quando há aviso
   // (SPEC §4.11). Sem aviso não fica espaço reservado.
   top: null, //                                        Dev 2 · «Torneio 6/6» → NoticesSlot.jsx
+  // Logo por baixo do cartão do topo, antes da categoria e dos separadores:
+  // é a ordem do desenho «Quem chega de fora» — cartaz, depois «Inscrever a
+  // minha dupla», depois as categorias.
+  under_header: null, //                               Dev 2 · «Torneio 3/6» → SignupSlot.jsx
   my_games: lazy(() => import('./MyGamesPanel')), //    Dev 1 · «Torneio 1/6»
   groups: null, //                                     Dev 3 · «Torneio 4/6» → GroupsPanel.jsx
   draw: null, //                                       Dev 3 · «Torneio 4/6» → DrawPanel.jsx
