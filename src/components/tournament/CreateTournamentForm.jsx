@@ -3,12 +3,14 @@
 //   1 quando e onde · 2 campos e horas · 3 categorias · 4 regras
 // O formato só se escolhe depois de fechadas as inscrições (outro cartão) —
 // aqui não aparece, porque nesta altura ainda não se sabe quantas duplas há.
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, Plus, Trash2, X } from 'lucide-react'
+import { ArrowLeft, ImagePlus, Plus, Trash2, X } from 'lucide-react'
 import { DateField, PrimaryButton } from '../ui'
 import { categoryCode, categoryName, stepProblem, totalCourtHours, totalSlots } from '../../lib/tournaments'
 import { MonoLabel } from './TournamentBits'
+import { removeTournamentPoster, uploadTournamentPoster } from '../../lib/tournamentPosterStorage'
+import { describeError } from '../../lib/errors'
 
 const DEFAULT_RULES = {
   entry_mode: 'dupla',        // dupla | sozinho | as_duas
@@ -83,10 +85,13 @@ export default function CreateTournamentForm({ club, onCancel, onCreate, saving,
   // O aviso do que falta só aparece depois de se tentar avançar — antes
   // disso seria um ecrã a dizer que está errado ainda antes de se escrever.
   const [tried, setTried] = useState(false)
+  const fileInput = useRef(null)
+  const [poster, setPoster] = useState({ busy: false, error: '' })
   const [editing, setEditing] = useState(null) // índice da categoria aberta, ou 'new'
   const [draft, setDraft] = useState({
     name: '',
     location: club?.location || club?.name || '',
+    poster_url: null,
     entries_close_at: '',
     draw_at: '',
     days: [],
@@ -123,6 +128,27 @@ export default function CreateTournamentForm({ club, onCancel, onCreate, saving,
     else list[editing] = cat
     set({ categories: list })
     setEditing(null)
+  }
+
+  const pickPoster = async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setPoster({ busy: true, error: '' })
+    try {
+      const url = await uploadTournamentPoster(club?.id, file)
+      set({ poster_url: url })
+      setPoster({ busy: false, error: '' })
+    } catch (err) {
+      setPoster({ busy: false, error: describeError(t, err, 'tournament.create.poster_error') })
+    }
+  }
+
+  const removePoster = async () => {
+    const url = draft.poster_url
+    set({ poster_url: null })
+    setPoster({ busy: false, error: '' })
+    try { await removeTournamentPoster(url) } catch { /* ficheiro órfão não estraga o ecrã */ }
   }
 
   const publish = (status) => onCreate({
@@ -190,6 +216,33 @@ export default function CreateTournamentForm({ club, onCancel, onCreate, saving,
           </Field>
           <Field label={t('tournament.create.draw')} hint={t('tournament.create.draw_hint')}>
             <DateField value={draft.draw_at} max={firstDay || undefined} onChange={(v) => set({ draw_at: v })} />
+          </Field>
+          <Field label={t('tournament.create.poster')} hint={draft.poster_url ? null : t('tournament.create.poster_hint')}>
+            {draft.poster_url ? (
+              <div className="relative overflow-hidden rounded-ctrl border border-line">
+                <img src={draft.poster_url} alt={t('tournament.create.poster')} className="block max-h-60 w-full object-cover" />
+                <button
+                  type="button"
+                  onClick={removePoster}
+                  aria-label={t('tournament.create.poster_remove')}
+                  className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-ink-900/80 text-white"
+                >
+                  <X size={15} />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                disabled={poster.busy}
+                onClick={() => fileInput.current?.click()}
+                className={`${inputClass} flex items-center gap-2 text-left text-ink-500 disabled:opacity-60`}
+              >
+                <ImagePlus size={18} />
+                {poster.busy ? t('tournament.create.poster_uploading') : t('tournament.create.poster_pick')}
+              </button>
+            )}
+            <input ref={fileInput} type="file" accept="image/*" className="hidden" onChange={pickPoster} />
+            {poster.error && <p className="mt-1 text-[12px] text-danger">{poster.error}</p>}
           </Field>
         </>
       )}

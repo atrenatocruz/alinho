@@ -101,6 +101,7 @@ export default function TournamentPage() {
   const tour = data.tournament
   const Panel = TOURNAMENT_PANELS[tab]
   const TopSlot = TOURNAMENT_PANELS.top
+  const UnderHeader = TOURNAMENT_PANELS.under_header
   const panelProps = {
     tournament: tour,
     categories,
@@ -117,8 +118,14 @@ export default function TournamentPage() {
       {/* Aviso do organizador — acima de tudo, e só quando há aviso. */}
       {TopSlot && <Suspense fallback={null}><TopSlot {...panelProps} /></Suspense>}
 
-      {/* Topo = cartão em grande, como nos mixes. */}
-      <div className="rounded-card border p-3.5" style={{ background: LILAC.bg, borderColor: LILAC.border }}>
+      {/* Topo = cartão em grande, como nos mixes. O cartaz, quando o clube
+          o carrega, entra por cima — é a primeira coisa de quem chega pelo
+          WhatsApp (print 07, passo 1). */}
+      <div className="overflow-hidden rounded-card border" style={{ background: LILAC.bg, borderColor: LILAC.border }}>
+        {tour.poster_url && (
+          <img src={tour.poster_url} alt={tour.name} className="block max-h-56 w-full object-cover" />
+        )}
+        <div className="p-3.5">
         <div className="flex items-center justify-between gap-2">
           <TourTag>{t('tournament.label')}</TourTag>
           {['validada', 'selecionada'].includes(data.my?.state)
@@ -146,7 +153,10 @@ export default function TournamentPage() {
             </div>
           ))}
         </div>
+        </div>
       </div>
+
+      {UnderHeader && <Suspense fallback={null}><UnderHeader {...panelProps} /></Suspense>}
 
       {categories.length > 0 && (
         <CategorySelect

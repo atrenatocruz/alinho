@@ -2369,5 +2369,11 @@
   "tournament.score.keeper_some": "só {{list}}",
   "tournament.score.keeper_remove": "remover",
   "tournament.score.keeper_add": "Acrescentar",
-  "tournament.score.keepers_note": "Também podes abrir a tua conta noutro telemóvel ou num computador na receção — funciona ao mesmo tempo."
+  "tournament.score.keepers_note": "Também podes abrir a tua conta noutro telemóvel ou num computador na receção — funciona ao mesmo tempo.",
+  "tournament.create.poster": "Cartaz (opcional)",
+  "tournament.create.poster_hint": "Aparece no topo da página do torneio, inclusive para quem não tem conta.",
+  "tournament.create.poster_pick": "Carregar imagem",
+  "tournament.create.poster_uploading": "A carregar…",
+  "tournament.create.poster_remove": "Tirar o cartaz",
+  "tournament.create.poster_error": "Não foi possível carregar a imagem."
 }

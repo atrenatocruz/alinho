@@ -2369,5 +2369,11 @@
   "tournament.score.keeper_some": "only {{list}}",
   "tournament.score.keeper_remove": "remove",
   "tournament.score.keeper_add": "Add",
-  "tournament.score.keepers_note": "You can also open your account on another phone or on a computer at reception — it works at the same time."
+  "tournament.score.keepers_note": "You can also open your account on another phone or on a computer at reception — it works at the same time.",
+  "tournament.create.poster": "Poster (optional)",
+  "tournament.create.poster_hint": "Shows at the top of the tournament page, including for visitors without an account.",
+  "tournament.create.poster_pick": "Upload image",
+  "tournament.create.poster_uploading": "Uploading…",
+  "tournament.create.poster_remove": "Remove poster",
+  "tournament.create.poster_error": "Couldn't upload the image."
 }
