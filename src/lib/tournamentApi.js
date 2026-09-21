@@ -89,3 +89,64 @@ export async function deleteTournament(tournamentId) {
   const { error } = await supabase.rpc('delete_tournament', { p_tournament_id: tournamentId })
   if (error) throw error
 }
+
+// ── Marcadores e resultados (Trello #365, «Torneio 5/6») ─────────────────
+// Mesma ideia do game_scorekeepers dos mixes, mas por torneio E categoria
+// (CODIGO-EXISTENTE.md §3). Quem marca é o admin ou uma pessoa que ele
+// escolhe; a mesma conta pode estar aberta noutro telemóvel ao mesmo tempo.
+
+/** Quem pode marcar resultados neste torneio, com as categorias de cada um. */
+export async function listScorekeepers(tournamentId) {
+  const { data, error } = await supabase.rpc('list_tournament_scorekeepers', { p_tournament_id: tournamentId })
+  if (error) throw error
+  return data || []
+}
+
+/** categoryIds vazio = todas as categorias. */
+export async function addScorekeeper(tournamentId, userId, categoryIds = []) {
+  const { error } = await supabase.rpc('add_tournament_scorekeeper', {
+    p_tournament_id: tournamentId, p_user_id: userId, p_category_ids: categoryIds,
+  })
+  if (error) throw error
+}
+
+export async function removeScorekeeper(tournamentId, userId) {
+  const { error } = await supabase.rpc('remove_tournament_scorekeeper', {
+    p_tournament_id: tournamentId, p_user_id: userId,
+  })
+  if (error) throw error
+}
+
+/** Os jogos de um dia que interessam a quem marca: o que está a decorrer e
+ *  o que vem a seguir, em todos os campos e só nas categorias que a pessoa
+ *  pode marcar. Cada linha: match_id, category_code, group_label,
+ *  round_label, court, scheduled_at, status, team_a, team_b (nome e
+ *  jogadores), score_a, score_b, sets, corrected_by_name, corrected_at. */
+export async function listMatchesToScore(tournamentId, dateIso) {
+  const { data, error } = await supabase.rpc('list_tournament_matches_to_score', {
+    p_tournament_id: tournamentId, p_date: dateIso,
+  })
+  if (error) throw error
+  return data || []
+}
+
+/** Guarda (ou corrige) o resultado. O servidor é que recalcula a
+ *  classificação, preenche a fase seguinte e dá os pontos de ranking — o
+ *  ecrã só manda o resultado. Uma correção fica registada com quem a fez
+ *  (critério 3 do cartão #365). */
+export async function saveMatchResult(matchId, { score_a, score_b, sets = null }) {
+  const { error } = await supabase.rpc('save_match_result', {
+    p_match_id: matchId, p_score_a: score_a, p_score_b: score_b, p_sets: sets,
+  })
+  if (error) throw error
+}
+
+/** Falta ou desistência. `loser` é 'a' ou 'b' — quem faltou ou desistiu;
+ *  `justified` só conta nas faltas (justificada / sem justificação), e a
+ *  sem justificação fica no histórico visível aos admins (SPEC §7). */
+export async function markWalkover(matchId, { kind, loser, justified = null }) {
+  const { error } = await supabase.rpc('mark_walkover', {
+    p_match_id: matchId, p_kind: kind, p_loser: loser, p_justified: justified,
+  })
+  if (error) throw error
+}

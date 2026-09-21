@@ -142,6 +142,63 @@ export const TOURNAMENT_RPC_MOCKS = {
   },
 }
 
+// ── Marcadores e resultados (#365) ──────────────────────────────────────
+// Guardar um resultado em localhost muda mesmo o cartão, para se poder ver
+// o ecrã antes e depois — e o «corrigir».
+const team = (name, players) => ({ name, players })
+let MATCHES = null
+const resetMatches = () => {
+  const today = new Date()
+  const at = (hhmm) => `${iso(today)}T${hhmm}`
+  MATCHES = [
+    { match_id: 'm-c1', category_code: 'M5', group_label: 'Grupo A', round_label: null, court: 'Campo 1', scheduled_at: at('14:00'), status: 'a_decorrer', team_a: team('Barros / Costa', 'Francisco Barros · Rui Costa'), team_b: team('Santos / Santos', 'José Santos · Rafael Santos'), score_a: null, score_b: null, corrected_by_name: null },
+    { match_id: 'm-c2', category_code: 'MX4', group_label: 'Grupo B', round_label: null, court: 'Campo 2', scheduled_at: at('13:55'), status: 'a_decorrer', team_a: team('Silva / Lopes', 'Marta Silva · Tiago Lopes'), team_b: team('Reis / Ana', 'Nuno Reis · Ana Moreira'), score_a: null, score_b: null, corrected_by_name: null },
+    { match_id: 'm-n1', category_code: 'M5', group_label: 'Grupo A', round_label: null, court: 'Campo 1', scheduled_at: at('15:00'), status: 'marcado', team_a: team('Barros / Costa', 'Francisco Barros · Rui Costa'), team_b: team('Costa / Pinto', 'Hugo Costa · Dinis Pinto'), score_a: null, score_b: null, corrected_by_name: null },
+    { match_id: 'm-n2', category_code: 'F4', group_label: 'Grupo A', round_label: null, court: 'Campo 2', scheduled_at: at('15:00'), status: 'marcado', team_a: team('Tapia Girls', 'Inês Rocha · Beatriz Faria'), team_b: team('Barão / Néu', 'Sofia Barão · Rita Néu'), score_a: null, score_b: null, corrected_by_name: null },
+    { match_id: 'm-d1', category_code: 'M5', group_label: 'Grupo B', round_label: null, court: 'Campo 3', scheduled_at: at('13:00'), status: 'terminado', team_a: team('Lima / Reis', 'Pedro Lima · Nuno Reis'), team_b: team('Gomes / Pais', 'André Gomes · Vasco Pais'), score_a: 9, score_b: 6, corrected_by_name: null },
+  ]
+}
+
+const SCOREKEEPERS = [
+  { user_id: 'u-ana', name: 'Ana Moreira', avatar_url: null, category_codes: [] },
+  { user_id: 'u-tiago', name: 'Tiago Lopes', avatar_url: null, category_codes: ['M5', 'MX4'] },
+]
+
+export const TOURNAMENT_SCORE_RPC_MOCKS = {
+  list_tournament_scorekeepers: () => (on() && !empty() ? SCOREKEEPERS : []),
+  add_tournament_scorekeeper: () => null,
+  remove_tournament_scorekeeper: () => null,
+  list_tournament_matches_to_score: () => {
+    if (!on()) return []
+    if (!MATCHES) resetMatches()
+    return empty() ? [] : MATCHES
+  },
+  save_match_result: (params) => {
+    if (!MATCHES) resetMatches()
+    MATCHES = MATCHES.map((m) => (m.match_id === params?.p_match_id ? {
+      ...m,
+      status: 'terminado',
+      score_a: params.p_score_a,
+      score_b: params.p_score_b,
+      // Corrigir um resultado já gravado fica registado (cartão #365).
+      corrected_by_name: m.status === 'terminado' ? 'Admin (Dev)' : null,
+    } : m))
+    return null
+  },
+  mark_walkover: (params) => {
+    if (!MATCHES) resetMatches()
+    MATCHES = MATCHES.map((m) => (m.match_id === params?.p_match_id ? {
+      ...m,
+      status: params.p_kind === 'falta' ? 'falta' : 'desistencia',
+      score_a: params.p_loser === 'a' ? 0 : 9,
+      score_b: params.p_loser === 'a' ? 9 : 0,
+    } : m))
+    return null
+  },
+}
+
+Object.assign(TOURNAMENT_RPC_MOCKS, TOURNAMENT_SCORE_RPC_MOCKS)
+
 export const TOURNAMENT_TABLE_MOCKS = {
   tournaments: () => (on() ? [TOURNAMENT()] : []),
 }

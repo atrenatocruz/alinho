@@ -14,6 +14,7 @@ import { describeError, errorKind } from '../../lib/errors'
 import { DangerConfirmModal, EmptyState, PrimaryButton } from '../ui'
 import { MonoLabel, StatePill } from './TournamentBits'
 import CreateTournamentForm from './CreateTournamentForm'
+import ScorekeepersPanel from './ScorekeepersPanel'
 
 const STATE_TONE = { rascunho: 'grey', inscricoes: 'in', fechado: 'grey', sorteado: 'dark', a_decorrer: 'live', terminado: 'grey' }
 
@@ -24,6 +25,7 @@ export default function ClubTournamentsPanel({ organizationId, club }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [toDelete, setToDelete] = useState(null)
+  const [keepersOf, setKeepersOf] = useState(null)
 
   const load = useCallback(() => {
     listClubTournaments(organizationId)
@@ -73,6 +75,10 @@ export default function ClubTournamentsPanel({ organizationId, club }) {
     return <CreateTournamentForm club={club} saving={saving} error={error} onCancel={() => setCreating(false)} onCreate={create} />
   }
 
+  if (keepersOf) {
+    return <ScorekeepersPanel tournament={keepersOf} onBack={() => setKeepersOf(null)} />
+  }
+
   const dates = (row) => {
     if (!row.starts_on) return ''
     const a = new Date(`${row.starts_on}T12:00`)
@@ -117,7 +123,7 @@ export default function ClubTournamentsPanel({ organizationId, club }) {
 
               {/* Sem nada para fazer (um torneio já sorteado), não fica uma
                   linha vazia a ocupar espaço. */}
-              {(forward || back || canDelete(row)) && (
+              {(forward || back || canDelete(row) || ['sorteado', 'a_decorrer', 'terminado'].includes(row.status)) && (
               <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3">
                 {forward && (
                   <button type="button" onClick={() => move(row, forward)} className="rounded-full bg-ink-900 px-3 py-1.5 text-[12px] font-bold text-white">
@@ -128,6 +134,16 @@ export default function ClubTournamentsPanel({ organizationId, club }) {
                   <button type="button" onClick={() => move(row, back)} className="rounded-full border border-line px-3 py-1.5 text-[12px] font-semibold text-ink-700 hover:bg-ink-50">
                     {t(`tournament.admin.back_to_${back}`)}
                   </button>
+                )}
+                {['sorteado', 'a_decorrer', 'terminado'].includes(row.status) && (
+                  <>
+                    <Link to={`/torneio/${row.id}/marcar`} className="rounded-full bg-ink-900 px-3 py-1.5 text-[12px] font-bold text-white">
+                      {t('tournament.score.open')}
+                    </Link>
+                    <button type="button" onClick={() => setKeepersOf(row)} className="rounded-full border border-line px-3 py-1.5 text-[12px] font-semibold text-ink-700 hover:bg-ink-50">
+                      {t('tournament.score.keepers_title')}
+                    </button>
+                  </>
                 )}
                 {canDelete(row) && (
                   <button type="button" onClick={() => setToDelete(row)} aria-label={t('tournament.admin.delete')} className="ml-auto text-ink-300 hover:text-danger">
