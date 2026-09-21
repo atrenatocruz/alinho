@@ -180,6 +180,35 @@ const RPC_MOCKS = {
   // aparecer no sino um convite para admin, para validar o texto.
   transfer_organization_ownership: () => null,
   admin_set_organization_plan: () => null,
+  // Kudos com nome (Trello #340). localStorage.mockKudos:
+  //   'one'     — um jogador deu o kudo
+  //   'two'     — dois
+  //   'many'    — cinco (mostra "e mais 2")
+  //   'removed' — quem deu apagou a conta
+  //   'old'     — base de dados sem a migração: só o número, como hoje
+  get_unseen_celebrations: () => {
+    const mode = localStorage.getItem('mockKudos')
+    if (!mode) return []
+    const voter = (id, name, avatar_url = null) => ({ id, name, avatar_url })
+    const rows = {
+      one: [voter(FAKE_PLAYER_ID, 'Rui Oliveira Gomes')],
+      two: [voter(FAKE_PLAYER_ID, 'Rui Oliveira Gomes'), voter(FAKE_MEMBER_ID, 'Marta Costa')],
+      many: [
+        voter(FAKE_PLAYER_ID, 'Rui Oliveira Gomes'), voter(FAKE_MEMBER_ID, 'Marta Costa'),
+        voter(FAKE_PARTNER_ID, 'Tiago Ferreira'), voter('v4', 'Nuno Alves'), voter('v5', 'Zé Pinto'),
+      ],
+      removed: [voter(FAKE_PLAYER_ID, 'Rui Oliveira Gomes'), voter('v9', null)],
+      old: null,
+    }[mode]
+    return [{
+      kind: 'kudos', trophy_key: null, rarity: null,
+      kudos_count: rows ? rows.length : 2,
+      game_title: 'Mix de quinta',
+      voters: rows,
+      happened_at: new Date().toISOString(),
+    }]
+  },
+  mark_celebrations_seen: () => null,
   // Avisos de mix (Trello #292) — a app regista, o sino lê.
   notify_mix_changes: (params) => (params?.p_changes || []).length,
   mark_notifications_read: () => null,
