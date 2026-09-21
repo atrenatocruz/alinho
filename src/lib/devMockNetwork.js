@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { LESSON_RPC_MOCKS, LESSON_TABLE_MOCKS, LESSON_NOTICES } from './devMockLessons'
+import { TOURNAMENT_RPC_MOCKS, TOURNAMENT_TABLE_MOCKS } from './devMockTournament'
 
 // Dev-only: quando a sessão é o atalho "Entrar como Admin (Dev)"
 // (AuthContext.jsx, MOCK_ADMIN_KEY), essa sessão nunca teve um auth.uid()
@@ -54,6 +55,7 @@ const COMMUNITY_ORGS = [
 
 const RPC_MOCKS = {
   ...LESSON_RPC_MOCKS,
+  ...TOURNAMENT_RPC_MOCKS,
   get_player_profile: (params) => {
     const id = params?.p_user_id || FAKE_PLAYER_ID
     const person = FAKE_PEOPLE[id] || FAKE_PEOPLE[FAKE_PLAYER_ID]
@@ -494,7 +496,14 @@ function lastMinuteRequest(table, url, method, body) {
 }
 
 const TABLE_MOCKS = {
+  // localStorage.mockJoinRequests = 'true' — 2 pedidos para entrar no Dev Org,
+  // para ver o aviso no sino (Francisco, 19 set: já não há faixa na Home).
+  membership_requests: () => (localStorage.getItem('mockJoinRequests') === 'true' ? [
+    { id: 'jr1', organization_id: MOCK_ADMIN_ORG_ID, organizations: { name: 'Dev Org', slug: 'dev-org' } },
+    { id: 'jr2', organization_id: MOCK_ADMIN_ORG_ID, organizations: { name: 'Dev Org', slug: 'dev-org' } },
+  ] : []),
   ...LESSON_TABLE_MOCKS,
+  ...TOURNAMENT_TABLE_MOCKS,
   // localStorage.mockNotices = 'true' — três avisos de mix no sino (Trello #292).
   notifications: () => (localStorage.getItem('mockNotices') === 'true' ? [
     { id: 'n1', kind: 'mix_partner_changed', game_id: 'fake-game-1', created_at: new Date().toISOString(),

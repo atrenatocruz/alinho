@@ -1,0 +1,178 @@
+// Página do torneio (Trello #361, «Torneio 1/6») — print 05 do desenho
+// aprovado (design-handoff/2026-09-19-torneios). É o ESQUELETO onde os
+// outros ecrãs se penduram: topo em cartão grande (mesma regra dos mixes),
+// seletor de categoria — abre sempre na categoria de quem está a ver — e os
+// cinco separadores «Os meus jogos · Grupos · Quadro · Calendário ·
+// Inscritos». Cada separador vem de src/components/tournament/panels.js,
+// onde o Dev 2 e o Dev 3 registam os deles com uma linha.
+//
+// Abre sem conta (SPEC §4.9): o link do torneio anda no WhatsApp e em
+// cartazes. Sem sessão vê-se tudo menos o botão de inscrever.
+//
+// Enquanto a migração do torneio não correr, a RPC não existe: a página
+// mostra o estado vazio em vez de rebentar.
+import { Suspense, useEffect, useMemo, useState } from 'react'
+import { useParams, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
+import { ArrowLeft, Trophy } from 'lucide-react'
+import { useGoBack } from '../lib/useGoBack'
+import { getTournamentPage } from '../lib/tournamentApi'
+import { errorKind } from '../lib/errors'
+import { Avatar, EmptyState } from '../components/ui'
+import { CategorySelect, LILAC, MonoLabel, StatePill, TabStrip, TourTag } from '../components/tournament/TournamentBits'
+import { TOURNAMENT_PANELS, TOURNAMENT_TABS, TOURNAMENT_TAB_OWNER } from '../components/tournament/panels'
+
+/** "9–11 out" quando é tudo no mesmo mês, "30 set – 2 out" quando não é. */
+function dateRange(startIso, endIso, locale) {
+  if (!startIso) return ''
+  const a = new Date(`${startIso}T12:00`)
+  const b = endIso ? new Date(`${endIso}T12:00`) : a
+  const month = (d) => d.toLocaleDateString(locale, { month: 'short' }).replace('.', '')
+  if (a.getTime() === b.getTime()) return `${a.getDate()} ${month(a)}`
+  if (a.getMonth() === b.getMonth()) return `${a.getDate()}–${b.getDate()} ${month(b)}`
+  return `${a.getDate()} ${month(a)} – ${b.getDate()} ${month(b)}`
+}
+
+const STATE_PILL = {
+  inscricoes: 'grey',
+  fechado: 'grey',
+  sorteado: 'dark',
+  a_decorrer: 'live',
+  terminado: 'grey',
+}
+
+export default function TournamentPage() {
+  const { t, i18n } = useTranslation()
+  const { id } = useParams()
+  const goBack = useGoBack('/')
+  const [params, setParams] = useSearchParams()
+  const [data, setData] = useState(null)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    let alive = true
+    getTournamentPage(id)
+      .then((res) => { if (alive) (res?.tournament ? setData(res) : setFailed(true)) })
+      .catch((error) => {
+        if (errorKind(error) !== 'not_ready') console.error('Error loading tournament:', error)
+        if (alive) setFailed(true)
+      })
+    return () => { alive = false }
+  }, [id])
+
+  const categories = data?.categories || []
+  // A categoria e o separador vivem no endereço: o link que se partilha no
+  // WhatsApp tem de abrir no mesmo sítio para quem o recebe.
+  const catParam = params.get('cat')
+  const category = useMemo(() => {
+    const byCode = categories.find((c) => c.code?.toLowerCase() === catParam?.toLowerCase())
+    if (byCode) return byCode
+    const mine = categories.find((c) => c.id === data?.my?.category_id)
+    return mine || categories[0] || null
+  }, [categories, catParam, data])
+
+  const tabParam = params.get('tab')
+  const tab = TOURNAMENT_TABS.includes(tabParam) ? tabParam : 'my_games'
+
+  const setParam = (key, value) => {
+    const next = new URLSearchParams(params)
+    next.set(key, value)
+    setParams(next, { replace: true })
+  }
+
+  const back = (
+    <button type="button" onClick={goBack} className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline">
+      <ArrowLeft size={16} /> {t('common.back')}
+    </button>
+  )
+
+  if (failed) {
+    return (
+      <div className="space-y-5">
+        {back}
+        <EmptyState icon={Trophy} title={t('tournament.not_found_title')} subtitle={t('tournament.not_found_subtitle')} />
+      </div>
+    )
+  }
+  if (!data) {
+    return <div className="flex items-center justify-center py-16"><div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div></div>
+  }
+
+  const tour = data.tournament
+  const Panel = TOURNAMENT_PANELS[tab]
+  const TopSlot = TOURNAMENT_PANELS.top
+  const panelProps = {
+    tournament: tour,
+    categories,
+    category,
+    my: data.my || null,
+    myMatches: data.my_matches || [],
+  }
+  const spinner = <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-8 w-8 border-[3px] border-ink-50 border-t-ink-700" /></div>
+
+  return (
+    <div className="space-y-4">
+      {back}
+
+      {/* Aviso do organizador — acima de tudo, e só quando há aviso. */}
+      {TopSlot && <Suspense fallback={null}><TopSlot {...panelProps} /></Suspense>}
+
+      {/* Topo = cartão em grande, como nos mixes. */}
+      <div className="rounded-card border p-3.5" style={{ background: LILAC.bg, borderColor: LILAC.border }}>
+        <div className="flex items-center justify-between gap-2">
+          <TourTag>{t('tournament.label')}</TourTag>
+          {data.my?.state === 'inscrito'
+            ? <StatePill tone="in">{t('tournament.state_entered')}</StatePill>
+            : <StatePill tone={STATE_PILL[tour.status] || 'grey'}>{t(`tournament.status_${tour.status}`)}</StatePill>}
+        </div>
+        <h1 className="mt-2 font-display text-xl font-extrabold leading-tight text-ink-900">{tour.name}</h1>
+        <div className="mt-1 flex items-center gap-1.5 text-xs text-ink-500">
+          <Avatar name={tour.club_name} url={tour.club_logo_url} size="w-[18px] h-[18px] text-[8px]" />
+          <span className="min-w-0 truncate">
+            {[tour.club_name, dateRange(tour.starts_on, tour.ends_on, i18n.language), tour.courts ? t('tournament.courts', { count: tour.courts }) : null]
+              .filter(Boolean).join(' · ')}
+          </span>
+        </div>
+        <div className="mt-2.5 grid grid-cols-4 gap-1 text-center text-[10px] text-ink-500">
+          {[
+            [tour.category_count, t('tournament.kv_categories')],
+            [tour.entry_count, t('tournament.kv_teams')],
+            [tour.match_count, t('tournament.kv_matches')],
+            [tour.day_count, t('tournament.kv_days')],
+          ].map(([value, label]) => (
+            <div key={label}>
+              <b className="block font-display text-[17px] text-ink-900">{value ?? 0}</b>
+              {label}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {categories.length > 0 && (
+        <CategorySelect
+          categories={categories}
+          value={category?.id}
+          onChange={(nextId) => setParam('cat', categories.find((c) => c.id === nextId)?.code || '')}
+          label={t('tournament.category_select_label')}
+        />
+      )}
+
+      <TabStrip
+        tabs={TOURNAMENT_TABS.map((key) => [key, t(`tournament.tab_${key}`)])}
+        value={tab}
+        onChange={(next) => setParam('tab', next)}
+      />
+
+      <div>
+        {Panel ? (
+          <Suspense fallback={spinner}><Panel {...panelProps} /></Suspense>
+        ) : (
+          <div className="rounded-card border border-dashed border-line px-4 py-8 text-center">
+            <MonoLabel>{TOURNAMENT_TAB_OWNER[tab]}</MonoLabel>
+            <p className="mt-1.5 text-sm text-ink-500">{t('tournament.tab_not_built')}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

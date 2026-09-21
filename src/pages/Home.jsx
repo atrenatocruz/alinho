@@ -1,7 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { Link, useSearchParams, useNavigationType } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Users, UserPlus } from 'lucide-react'
+import { Users } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { EmptyState, PrimaryButton } from '../components/ui'
@@ -9,7 +9,6 @@ import { GameEventCard, FriendsEventCard, ExploreEventCard } from '../components
 import { DayHeader, MonthSheet, FilterSheet, FilterChips, LocationChip, LocationSheet, ViewToggle, Sheet, dayLabel } from '../components/agenda/AgendaControls'
 import { MapView } from '../components/agenda/MapView'
 import { listExploreEvents, getSavedLocation, saveLocation } from '../lib/explore'
-import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
 import { countPeople, mixCapacity, isGenderMismatch, isAgeIneligible, isMissingBirthday } from '../lib/mixLogic'
 import { listFollowing } from '../lib/follows'
 import { isMemberLimitError } from '../lib/plans'
@@ -61,7 +60,7 @@ const writeSession = (key, value) => {
 
 export default function Home() {
   const { t, i18n } = useTranslation()
-  const { user, profile, memberships, joinOrganization, followOrganization, isAdminOfAny, isPrivateMatchesEnabled } = useAuth()
+  const { user, profile, memberships, joinOrganization, followOrganization, isPrivateMatchesEnabled } = useAuth()
   const headerActions = useHeaderActions()
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -73,7 +72,6 @@ export default function Home() {
   const [friendIds, setFriendIds] = useState(null)
   const [pendingKeys, setPendingKeys] = useState(() => new Set())
   const [cardError, setCardError] = useState('')
-  const [joinRequestsTotal, setJoinRequestsTotal] = useState(0)
   const [joinSlug, setJoinSlug] = useState('')
   const [joining, setJoining] = useState(false)
   const [joinError, setJoinError] = useState('')
@@ -134,22 +132,6 @@ export default function Home() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  // Aviso discreto só para admins — continua na Home até o Francisco decidir
-  // (em aberto no épico).
-  useEffect(() => {
-    if (!profile?.id || !isAdminOfAny) {
-      setJoinRequestsTotal(0)
-      return
-    }
-    let cancelled = false
-    listPendingMembershipRequestsForAdmin(profile.id)
-      .then((data) => {
-        if (!cancelled) setJoinRequestsTotal(data.reduce((sum, org) => sum + org.count, 0))
-      })
-      .catch((error) => console.error('Error loading membership join requests:', error))
-    return () => { cancelled = true }
-  }, [profile?.id, isAdminOfAny])
 
   useEffect(() => {
     if (!user) return
@@ -648,15 +630,8 @@ export default function Home() {
 
   return (
     <div>
-      {joinRequestsTotal > 0 && (
-        <Link to="/gerir" className="card press flex items-center gap-3 bg-amber-50 hover:shadow-lift mb-3">
-          <div className="w-10 h-10 rounded-ctrl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
-            <UserPlus size={18} />
-          </div>
-          <p className="text-sm text-amber-800 font-semibold">{t('home.pending_join_requests', { count: joinRequestsTotal })}</p>
-        </Link>
-      )}
-
+      {/* Pedidos para entrar num grupo: só no sino, com link para os membros
+          desse grupo (Francisco, 19 set — a Home fica só com a agenda). */}
       {/* Cabeçalho fixo: fica em cima enquanto a lista passa por baixo. Sem
           data nem calendário na vista de mapa — não há "dia no topo" lá. */}
       <div ref={headerRef} className="sticky top-0 z-10 -mx-4 px-4 -mt-6 pt-4 pb-2.5 bg-canvas space-y-1.5 border-b border-line/70">

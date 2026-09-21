@@ -2052,11 +2052,11 @@ export default function GameDetails() {
                     }}
                     className={`inline-flex items-center gap-1.5 rounded-ctrl px-3 min-h-[44px] text-sm font-extrabold border transition-colors duration-fast ${
                       nav.key === preferredNav
-                        ? 'bg-lime-100 border-lime-600 text-ink-900'
+                        ? 'bg-ink-50 border-ink-900 text-ink-900'
                         : 'bg-surface border-line text-ink-900 hover:bg-ink-50'
                     }`}
                   >
-                    {nav.key === preferredNav && <Check size={14} className="text-lime-600 shrink-0" />}
+                    {nav.key === preferredNav && <Check size={14} className="text-ink-900 shrink-0" />}
                     {t(nav.labelKey)}
                   </a>
                 ))}
@@ -2139,7 +2139,7 @@ export default function GameDetails() {
       {game.status === 'finished' && game.winner_team_id && (
         <div className="card bg-ink-900 text-center">
           <p className="text-ink-200 text-xs font-extrabold uppercase tracking-widest mb-2">{t('gamedetails.mix_winners_label')}</p>
-          <p className="text-2xl font-extrabold text-lime-400">{teamName(game.winner_team_id)}</p>
+          <p className="text-2xl font-extrabold text-white">{teamName(game.winner_team_id)}</p>
         </div>
       )}
 
@@ -2172,7 +2172,7 @@ export default function GameDetails() {
         return (
           <div className="card">
             <div className="flex items-center gap-2 mb-1">
-              <ThumbsUp size={18} className="text-lime-600" />
+              <ThumbsUp size={18} className="text-ink-700" />
               <h3 className="text-lg text-ink-900">{t('gamedetails.kudos_title')}</h3>
             </div>
             <p className="text-[11px] text-muted mb-3">
@@ -2187,14 +2187,14 @@ export default function GameDetails() {
                     <p className="flex-1 min-w-0 text-sm font-extrabold text-ink-900 truncate">
                       {person.name}
                       {entry?.my_vote && (
-                        <span className="ml-1.5 text-[10px] font-extrabold uppercase tracking-wide text-lime-600">
+                        <span className="ml-1.5 text-[10px] font-extrabold uppercase tracking-wide text-ink-500">
                           {t('gamedetails.kudos_your_vote')}
                         </span>
                       )}
                     </p>
                     {(entry?.kudos_count || 0) > 0 && (
                       <span className="shrink-0 inline-flex items-center gap-1 text-sm font-extrabold text-ink-900 tabular-nums">
-                        <ThumbsUp size={13} className="text-lime-600" /> {entry.kudos_count}
+                        <ThumbsUp size={13} className="text-ink-700" /> {entry.kudos_count}
                       </span>
                     )}
                     {canVote && (
@@ -2272,7 +2272,7 @@ export default function GameDetails() {
               return (
                 <div key={s.id} className="flex items-center gap-3 py-2 border-b border-line last:border-0">
                   <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-extrabold tabular-nums shrink-0 ${
-                    i === 0 ? 'bg-lime-400 text-ink-900' : 'bg-ink-50 text-ink-700'
+                    i === 0 ? 'bg-ink-900 text-white' : 'bg-ink-50 text-ink-700'
                   }`}>
                     {i + 1}
                   </span>
@@ -2395,7 +2395,7 @@ export default function GameDetails() {
                     <div className="space-y-2">
                       {editedTeams.map((team, i) => (
                         <div key={team.id} className={`rounded-ctrl p-3 ${
-                          team.id === game.winner_team_id ? 'bg-lime-400/20' : 'bg-canvas'
+                          team.id === game.winner_team_id ? 'bg-ink-50' : 'bg-canvas'
                         }`}>
                           <div className="flex items-center justify-between mb-1.5">
                             <p className="text-[11px] font-extrabold text-muted uppercase tracking-wide">
@@ -2487,7 +2487,7 @@ export default function GameDetails() {
             <div className="space-y-2.5">
               {editNotice && (
                 <div className="bg-ink-900 text-white px-4 py-3 rounded-ctrl text-sm font-extrabold flex items-center gap-2 animate-fade-up">
-                  <Check size={16} className="text-lime-400 shrink-0" />
+                  <Check size={16} className="text-white shrink-0" />
                   {editNotice}
                 </div>
               )}
@@ -2642,7 +2642,7 @@ export default function GameDetails() {
                       onClick={() => handleToggleScorekeeper(p.id)}
                       disabled={scorekeeperBusy === p.id}
                       className={`text-xs font-extrabold px-3 py-2 min-h-[36px] rounded-full transition-colors duration-fast disabled:opacity-40 ${
-                        scorekeeperIds.includes(p.id) ? 'bg-lime-400 text-ink-900' : 'bg-ink-50 text-ink-700 hover:bg-ink-200'
+                        scorekeeperIds.includes(p.id) ? 'bg-ink-900 text-white' : 'bg-ink-50 text-ink-700 hover:bg-ink-200'
                       }`}
                     >
                       {scorekeeperIds.includes(p.id) ? t('gamedetails.scorekeeper_badge') : t('gamedetails.make_scorekeeper')}
@@ -2659,12 +2659,12 @@ export default function GameDetails() {
             const phase = ms[0]?.phase || 'group'
             const isCurrent = r === maxRound && game.status === 'in_progress'
             return (
-              <div key={r} id={`mix-ronda-${r}`} className={`card scroll-mt-24 ${isCurrent ? 'ring-2 ring-lime-400' : ''}`}>
+              <div key={r} id={`mix-ronda-${r}`} className={`card scroll-mt-24 ${isCurrent ? 'ring-2 ring-ink-900' : ''}`}>
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-lg text-ink-900">
                     {t('gamedetails.round_number', { number: r })}
                     {phase !== 'group' && (
-                      <span className="ml-2 text-xs font-extrabold uppercase tracking-wide bg-ink-900 text-lime-400 px-2.5 py-1 rounded-full">
+                      <span className="ml-2 text-xs font-extrabold uppercase tracking-wide bg-ink-900 text-white px-2.5 py-1 rounded-full">
                         {t(PHASE_LABEL_KEY[phase])}
                       </span>
                     )}
@@ -2822,12 +2822,12 @@ export default function GameDetails() {
                     const phase = ms[0]?.phase || 'group'
                     const isCurrent = r === maxRound && game.status === 'in_progress'
                     return (
-                      <div key={r} id={`mix-ronda-${r}`} className={`card ${isCurrent ? 'ring-2 ring-lime-400' : ''}`}>
+                      <div key={r} id={`mix-ronda-${r}`} className={`card ${isCurrent ? 'ring-2 ring-ink-900' : ''}`}>
                         <div className="flex items-center justify-between mb-3">
                           <h3 className="text-lg text-ink-900">
                             {t('gamedetails.round_number', { number: r })}
                             {phase !== 'group' && (
-                              <span className="ml-2 text-xs font-extrabold uppercase tracking-wide bg-ink-900 text-lime-400 px-2.5 py-1 rounded-full">
+                              <span className="ml-2 text-xs font-extrabold uppercase tracking-wide bg-ink-900 text-white px-2.5 py-1 rounded-full">
                                 {t(PHASE_LABEL_KEY[phase])}
                               </span>
                             )}
@@ -2977,7 +2977,7 @@ export default function GameDetails() {
                 <div
                   key={`${person.id}-${idx}`}
                   className={`rounded-ctrl p-3.5 flex items-center gap-3 ${
-                    person.id === user.id ? 'bg-lime-400/20' : 'bg-canvas'
+                    person.id === user.id ? 'bg-ink-50' : 'bg-canvas'
                   }`}
                 >
                   {person.is_guest ? (
@@ -3038,7 +3038,7 @@ export default function GameDetails() {
               <div
                 key={`${person.id}-${idx}`}
                 className={`rounded-ctrl p-3.5 flex items-center gap-3 ${
-                  person.id === user.id ? 'bg-lime-400/20' : 'bg-canvas'
+                  person.id === user.id ? 'bg-ink-50' : 'bg-canvas'
                 }`}
               >
                 <span className="w-6 text-center font-extrabold text-muted text-sm shrink-0">{ordinal(idx + 1)}</span>

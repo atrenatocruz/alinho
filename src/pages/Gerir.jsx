@@ -13,6 +13,7 @@ import { listAllPendingTeacherRequests, approveTeacherProfile, rejectTeacherProf
 import { describeError } from '../lib/errors'
 import { planName } from '../lib/plans'
 import { useHeaderActions } from '../contexts/HeaderActionsContext'
+import AppFeaturesPanel from '../components/AppFeaturesPanel'
 
 const sanitizeSlug = (value) => value.toLowerCase().replace(/[^a-z0-9-]/g, '')
 
@@ -372,6 +373,7 @@ export default function Gerir() {
           <p className="text-muted text-sm pt-1">{t('gerir.empty_subtitle')}</p>
         </div>
         {createGroupPanel}
+        {isPlatformAdmin && <AppFeaturesPanel />}
         {isPlatformAdmin && (
           <EmptyState
             icon={Settings}
@@ -440,6 +442,9 @@ export default function Gerir() {
           })}
         </div>
       ))}
+
+      {/* Interruptores da app toda — só a equipa Alinho (Francisco, 19 set). */}
+      {isPlatformAdmin && <AppFeaturesPanel />}
     </div>
   )
 }

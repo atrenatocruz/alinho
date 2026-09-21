@@ -84,13 +84,13 @@ export default function ScoreEntry({
 
   // Shared read-only row (both editable and non-editable states use it for
   // a team once that team's own score isn't being typed into right now) —
-  // preserves the winner highlight (lime background + 🏆) the old inline
+  // preserves the winner highlight (🏆; fundo neutro desde 19 set — lima só no botão principal) the old inline
   // teamRow() closure had, using match.winner_team_id directly since it's
   // already on the match prop.
   const readOnlyRow = (teamLabel, teamId, scoreVal) => {
     const isWinner = !!match.winner_team_id && match.winner_team_id === teamId
     return (
-      <div className={`flex items-center gap-3 rounded-ctrl px-3 py-2.5 ${isWinner ? 'bg-lime-400/25' : 'bg-surface'}`}>
+      <div className={`flex items-center gap-3 rounded-ctrl px-3 py-2.5 ${isWinner ? 'bg-ink-50' : 'bg-surface'}`}>
         <span className={`flex-1 min-w-0 text-sm font-extrabold ${
           match.winner_team_id && !isWinner ? 'text-muted' : 'text-ink-900'
         }`}>
@@ -211,7 +211,7 @@ function SetsScoreEntry({ match, deciderIsSuperTiebreak, editable, teamAName, te
   const readOnlyRow = (teamLabel, teamId, scoreVal) => {
     const isWinner = !!match.winner_team_id && match.winner_team_id === teamId
     return (
-      <div className={`flex items-center gap-3 rounded-ctrl px-3 py-2.5 ${isWinner ? 'bg-lime-400/25' : 'bg-surface'}`}>
+      <div className={`flex items-center gap-3 rounded-ctrl px-3 py-2.5 ${isWinner ? 'bg-ink-50' : 'bg-surface'}`}>
         <span className={`flex-1 min-w-0 text-sm font-extrabold ${
           match.winner_team_id && !isWinner ? 'text-muted' : 'text-ink-900'
         }`}>
