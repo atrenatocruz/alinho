@@ -170,12 +170,17 @@ As regras que a lógica aplica, todas verificadas por teste:
 
 ---
 
-## 4. O que falta na Fase 0 (a seguir a este documento)
+## 4. Estado (atualizado 21 set, fim do dia)
 
-- **`src/lib/tournamentSchedule.js`** com testes: marcar as horas no sorteio (ninguém em dois jogos à mesma hora,
-  nunca 3 seguidos, a fase seguinte só depois de acabada a anterior, hora prevista pela duração máxima) e as contas de
-  antecipar (aviso mínimo de 30 min, «começar já»). É a parte do horário que o Ruben também tem de validar.
-- Migração do torneio (tabelas, vistas públicas, RLS, RPCs) — **só depois do «sim» do Renato**.
+- ✅ **`src/lib/tournamentFormat.js`** — 32 testes.
+- ✅ **`src/lib/tournamentSchedule.js`** — 19 testes: marca as horas (ninguém em dois jogos à mesma hora, nunca 3
+  seguidos, a fase seguinte só depois de acabada a anterior, tudo pela duração máxima), encontra os choques para a
+  grelha do admin e faz as contas de antecipar (aviso mínimo de 30 min, «começar já»).
+- ✅ **`supabase/migration_tournaments_base.sql`** — tabelas, RLS, vistas públicas e `get_tournament_page`, testada na
+  alinho-dev (15 verificações, incluindo o que uma pessoa sem sessão consegue ou não ler).
+  *O Francisco decidiu a 21 set avançar sem esperar pela validação; o Renato continua a ser quem a corre em produção.*
+- ⏳ A seguir: RPCs de inscrição e validação · sorteio · resultados e ranking · avisos · origem de torneio em
+  `xp_events` e `vouchers` · proteger torneios do `cancel_stale_open_mixes`.
 
 **Ordem das migrações quando chegar a altura:** 1) tabelas + RLS + vistas públicas · 2) RPCs de inscrição e validação ·
 3) RPC do sorteio · 4) resultados e ranking (+ `xp_events` e `vouchers` com origem de torneio) · 5) avisos.
