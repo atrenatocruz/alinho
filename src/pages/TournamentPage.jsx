@@ -121,7 +121,7 @@ export default function TournamentPage() {
       <div className="rounded-card border p-3.5" style={{ background: LILAC.bg, borderColor: LILAC.border }}>
         <div className="flex items-center justify-between gap-2">
           <TourTag>{t('tournament.label')}</TourTag>
-          {data.my?.state === 'inscrito'
+          {['validada', 'selecionada'].includes(data.my?.state)
             ? <StatePill tone="in">{t('tournament.state_entered')}</StatePill>
             : <StatePill tone={STATE_PILL[tour.status] || 'grey'}>{t(`tournament.status_${tour.status}`)}</StatePill>}
         </div>
@@ -129,7 +129,7 @@ export default function TournamentPage() {
         <div className="mt-1 flex items-center gap-1.5 text-xs text-ink-500">
           <Avatar name={tour.club_name} url={tour.club_logo_url} size="w-[18px] h-[18px] text-[8px]" />
           <span className="min-w-0 truncate">
-            {[tour.club_name, dateRange(tour.starts_on, tour.ends_on, i18n.language), tour.courts ? t('tournament.courts', { count: tour.courts }) : null]
+            {[tour.club_name, dateRange(tour.starts_on, tour.ends_on, i18n.language), tour.court_count ? t('tournament.courts', { count: tour.court_count }) : null]
               .filter(Boolean).join(' · ')}
           </span>
         </div>
@@ -151,6 +151,7 @@ export default function TournamentPage() {
       {categories.length > 0 && (
         <CategorySelect
           categories={categories}
+          mineId={data.my?.category_id}
           value={category?.id}
           onChange={(nextId) => setParam('cat', categories.find((c) => c.id === nextId)?.code || '')}
           label={t('tournament.category_select_label')}
