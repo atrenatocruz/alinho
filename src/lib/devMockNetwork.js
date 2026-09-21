@@ -531,6 +531,14 @@ const TABLE_MOCKS = {
     { id: 'jr1', organization_id: MOCK_ADMIN_ORG_ID, organizations: { name: 'Dev Org', slug: 'dev-org' } },
     { id: 'jr2', organization_id: MOCK_ADMIN_ORG_ID, organizations: { name: 'Dev Org', slug: 'dev-org' } },
   ] : []),
+  // localStorage.mockPartnerInvite = 'true' — o parceiro que foi inscrito
+  // pelo nome está no mix com a marca "sem conta" (Trello #339).
+  partner_invites: () => (localStorage.getItem('mockPartnerInvite') === 'true' ? [
+    {
+      id: 'inv-1', placeholder_id: FAKE_PARTNER_ID, name: 'João Ferreira',
+      email: 'joao@exemplo.pt', token: 'convite-de-teste', status: 'pending', email_status: 'queued',
+    },
+  ] : []),
   ...LESSON_TABLE_MOCKS,
   ...TOURNAMENT_TABLE_MOCKS,
   // localStorage.mockNotices = 'true' — três avisos de mix no sino (Trello #292).
@@ -634,7 +642,9 @@ const TABLE_MOCKS = {
   memberships: () => [
     { user_id: MOCK_ADMIN_USER_ID, organization_id: MOCK_ADMIN_ORG_ID, level: 'avançado', is_guest: false, is_admin: true, profile: { name: 'Admin (Dev)', avatar_url: null } },
     { user_id: FAKE_MEMBER_ID, organization_id: MOCK_ADMIN_ORG_ID, level: 'avançado', is_guest: false, is_admin: true, profile: { name: FAKE_PEOPLE[FAKE_MEMBER_ID].name, avatar_url: FAKE_PEOPLE[FAKE_MEMBER_ID].avatar_url } },
-    { user_id: FAKE_PARTNER_ID, organization_id: MOCK_ADMIN_ORG_ID, level: 'avançado', is_guest: false, is_admin: false, profile: { name: FAKE_PEOPLE[FAKE_PARTNER_ID].name, avatar_url: FAKE_PEOPLE[FAKE_PARTNER_ID].avatar_url } },
+    // mockPartnerInvite: o Tiago passa a ser a conta por reclamar do parceiro
+    // inscrito pelo nome (Trello #339), para se ver a marca "sem conta".
+    { user_id: FAKE_PARTNER_ID, organization_id: MOCK_ADMIN_ORG_ID, level: 'avançado', is_guest: localStorage.getItem('mockPartnerInvite') === 'true', is_admin: false, profile: { name: FAKE_PEOPLE[FAKE_PARTNER_ID].name, avatar_url: FAKE_PEOPLE[FAKE_PARTNER_ID].avatar_url } },
   ],
 }
 
@@ -670,6 +680,16 @@ export function installDevMockNetwork() {
 
   window.fetch = async (input, init) => {
     const url = typeof input === 'string' ? input : input?.url
+
+    // Edge function do parceiro sem conta (Trello #339): em localhost não
+    // há service-role nem conta para criar, por isso devolve-se um código
+    // de convite fictício. localStorage.mockPartnerError = 'email_already_in_use'
+    // (ou outro) mostra a mensagem de erro em vez do sucesso.
+    if (url && url.includes('/functions/v1/join-with-named-partner')) {
+      const forced = localStorage.getItem('mockPartnerError')
+      if (forced) return jsonResponse({ error: forced }, 409)
+      return jsonResponse({ partner_id: 'dddddddd-dddd-dddd-dddd-dddddddddddd', invite_id: 'inv-1', token: 'convite-de-teste' })
+    }
 
     if (!url || !url.startsWith(supabaseUrl) || !url.includes('/rest/v1/')) {
       return originalFetch(input, init)
