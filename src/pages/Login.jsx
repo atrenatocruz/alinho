@@ -409,6 +409,7 @@ export default function Login() {
                   value={signupBirthday}
                   onChange={setSignupBirthday}
                   max={new Date().toISOString().slice(0, 10)}
+                  hideToday
                   required
                 />
               </div>

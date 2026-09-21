@@ -5,7 +5,7 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronLeft } from 'lucide-react'
-import { PrimaryButton, Select } from '../ui'
+import { PrimaryButton, Select, DateField } from '../ui'
 import { createLessonSeries } from '../../lib/lessonsApi'
 import { describeError } from '../../lib/errors'
 import { LESSON_CAPACITY, LESSON_DURATIONS, peakStatus, priceRowFor } from '../../lib/lessons'
@@ -104,8 +104,13 @@ export default function CreateSeriesForm({ teachers, prices, peakHours, onCancel
             </div>
             <div className="flex-1">
               <MonoLabel className="mb-2">{t('lessons.f_starts_on')}</MonoLabel>
-              <input type="date" min={today} value={f.starts_on || (f.day_of_week ? nextWeekdayIso(f.day_of_week) : '')}
-                onChange={(e) => set({ starts_on: e.target.value })} className={`${fieldCls} w-full`} />
+              {/* Calendário partilhado (Trello #357) — o campo do telemóvel
+                  não marcava o dia de hoje. */}
+              <DateField
+                value={f.starts_on || (f.day_of_week ? nextWeekdayIso(f.day_of_week) : '')}
+                onChange={(v) => set({ starts_on: v })}
+                min={today}
+              />
             </div>
           </div>
           <div>
