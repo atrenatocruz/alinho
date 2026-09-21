@@ -62,8 +62,9 @@ export const formatRating = (rating) => (rating == null ? '—' : String(Math.ro
 
 // Provisório: menos de 8 jogos contados (2 mixes) — o rating ainda é uma
 // aproximação. Espelha o limiar único de "novo" no Postgres
-// (migration_elo_provisional_8.sql): rótulo NOVO, escudo de parceiro e
-// K=40 estão todos alinhados nos 8 jogos; mudar lá → mudar aqui.
+// (migration_elo_provisional_8.sql): rótulo NOVO, escudo de parceiro e o
+// K mais alto (elo_k_factor, migration_elo_entry_levels.sql) estão todos
+// alinhados nos 8 jogos; mudar lá → mudar aqui.
 export const PROVISIONAL_GAMES = 8
 export const isProvisional = (ratingGames) => ratingGames != null && ratingGames < PROVISIONAL_GAMES
 
@@ -90,25 +91,16 @@ export function bandProgress(rating) {
   }
 }
 
-// Níveis do ecrã de auto-classificação (primeiro registo). As keys são o
-// contrato com o RPC complete_rating_onboarding — não mudar sem migração.
+// Níveis do ecrã de auto-classificação (primeiro registo) — do nível 1 a
+// Iniciante (Trello #288). As keys são o contrato com o RPC
+// complete_rating_onboarding (migration_elo_entry_levels.sql) — não mudar
+// sem migração. Cada ponto de entrada cai dentro da sua banda (ratingBand).
 export const ONBOARDING_LEVELS = [
-  {
-    key: 'iniciado',
-    titleKey: 'onboarding.level_iniciado_title',
-    points: 700,
-    descriptionKey: 'onboarding.level_iniciado_description',
-  },
-  {
-    key: 'regular',
-    titleKey: 'onboarding.level_regular_title',
-    points: 900,
-    descriptionKey: 'onboarding.level_regular_description',
-  },
-  {
-    key: 'avancado',
-    titleKey: 'onboarding.level_avancado_title',
-    points: 1100,
-    descriptionKey: 'onboarding.level_avancado_description',
-  },
+  { key: 'n1', num: 1, points: 1900, descriptionKey: 'onboarding.level_n1_description' },
+  { key: 'n2', num: 2, points: 1700, descriptionKey: 'onboarding.level_n2_description' },
+  { key: 'n3', num: 3, points: 1500, descriptionKey: 'onboarding.level_n3_description' },
+  { key: 'n4', num: 4, points: 1300, descriptionKey: 'onboarding.level_n4_description' },
+  { key: 'n5', num: 5, points: 1100, descriptionKey: 'onboarding.level_n5_description' },
+  { key: 'n6', num: 6, points: 850, descriptionKey: 'onboarding.level_n6_description' },
+  { key: 'iniciante', num: null, points: 600, descriptionKey: 'onboarding.level_iniciante_description' },
 ]

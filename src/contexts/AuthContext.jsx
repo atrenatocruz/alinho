@@ -23,7 +23,12 @@ const MOCK_ADMIN_PROFILE = {
   // fica sempre vazio ("— pontos") em localhost. Ver devMockNetwork.js
   // para o resto dos dados fictícios (troféus, XP, ranking, etc.).
   rating: 1450,
+  // localStorage.mockDeletionRequestedAt = '2026-09-18' → ecrã de recuperar
+  // a conta (apagar conta, Trello #306).
+  deletion_requested_at: typeof localStorage !== 'undefined' ? localStorage.getItem('mockDeletionRequestedAt') : null,
   rating_games: 30,
+  // localStorage.mockOnboarding = 'true' → ecrã "Qual é o teu nível?" (Trello #288).
+  ...(typeof localStorage !== 'undefined' && localStorage.getItem('mockOnboarding') === 'true' ? { rating_onboarded_at: null } : {}),
   // Foto fictícia (SVG local, sem pedido de rede) — sem isto o botão de
   // eliminar foto nunca aparece em localhost (só existe quando já há foto).
   avatar_url: 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="#1F2937"/></svg>'),

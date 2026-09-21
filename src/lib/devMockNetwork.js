@@ -167,6 +167,15 @@ const RPC_MOCKS = {
   // localStorage.mockDeleteBlocker = 'has_activity' mostra o estado bloqueado.
   get_organization_delete_blocker: () => localStorage.getItem('mockDeleteBlocker') || null,
   delete_self_serve_group: () => null,
+  // Apagar conta (Trello #306). localStorage.mockDeletionRequestedAt =
+  // '2026-09-18' mostra o ecrã de recuperar a conta.
+  request_account_deletion: () => new Date().toISOString(),
+  cancel_account_deletion: () => { localStorage.removeItem('mockDeletionRequestedAt'); return null },
+  admin_delete_account: () => null,
+  search_any_player: () => [
+    { id: FAKE_MEMBER_ID, name: FAKE_PEOPLE[FAKE_MEMBER_ID].name },
+    { id: FAKE_PARTNER_ID, name: FAKE_PEOPLE[FAKE_PARTNER_ID]?.name || 'Jogador de teste' },
+  ],
   // Vários admins (Trello #261). localStorage.mockAdminInvite = 'true' faz
   // aparecer no sino um convite para admin, para validar o texto.
   transfer_organization_ownership: () => null,
