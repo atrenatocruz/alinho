@@ -206,8 +206,6 @@
   "agenda.filters_apply_other": "Show {{count}} events",
   "agenda.filters_reset": "Reset filters",
   "home.join_club_error": "Couldn't join that club. Confirm the name with the admin.",
-  "home.pending_join_requests": "{{count}} pending join request for a group/club",
-  "home.pending_join_requests_other": "{{count}} pending join requests for a group/club",
   "home.friendly_match": "Game with friends",
   "home.friendly_match_subtitle": "Log a 2x2 outside the club",
   "home.no_clubs_followed_title": "You're not following any clubs yet",
