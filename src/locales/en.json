@@ -124,6 +124,8 @@
   "login.reset_password_error": "Couldn't save the password. Please try again.",
   "login.reset_password_invalid_title": "This link is no longer valid",
   "login.reset_password_invalid_body": "It may have already been used or expired. Request a new link to continue.",
+  "login.signup_confirm_sent_title": "Confirm your email",
+  "login.signup_confirm_sent_body": "We've sent a link to {{email}}. Tap it to activate your account — if you can't see it, check your spam folder.",
   "login.back_to_login": "Back to login",
   "agenda.and": "and",
   "agenda.previous_editions_title": "Previous editions",

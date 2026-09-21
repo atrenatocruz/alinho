@@ -94,7 +94,7 @@ What alinho actually does today, and what's explicitly not built yet. Kept in sy
 
 - **No self-serve "create your own club" flow.** Club creation is platform-admin-only. Note this is now narrower than it used to be: self-serve **group** creation does exist (see Multi-tenant clubs) — a group is not a club. Don't blur the two in copy.
 - No payments; nothing beyond the informational price-per-player field. No monetization or pricing model exists yet.
-- No push notifications, no email notifications beyond the OTP itself.
+- No push notifications. Email is limited to account emails (password reset, signup confirmation) and one email per club invite — reminders, rosters and waitlist changes are WhatsApp/in-app only, and stay that way until there are per-user notification preferences.
 - No game formats beyond `sobe e desce` and `todos contra todos`, and both assume a **fixed dupla for the whole mix**. Rotating-partner formats (Americano / "pares partidos"), group stages, and 3rd/4th-place playoffs do not exist. See `docs/superpowers/specs/2026-09-08-game-formats-design.md` for what adding them costs and what is still undecided.
 
 ## Roadmap

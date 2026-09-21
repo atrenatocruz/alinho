@@ -27,9 +27,11 @@ Non-trivial features go through the `superpowers` skill: brainstorm → write a 
 
 **Work on `dev`. Promoting `dev` to `main` is Renato's call — but as of 2026-09-14, he can make that call in chat.** Renato, 2026-09-14, amending the paragraph below: default behavior is still to commit/push to `dev` and stop there, saying so if `main` is behind. But when Renato explicitly says to push to `main` in the conversation (not implied by "ship it" or approving a plan — an explicit instruction naming `main`), go ahead: `git push origin dev:main` (or equivalent) is authorized at that point. Don't infer this consent from silence or from an earlier, unrelated approval.
 
+Ruben, 2026-09-21, adding to the paragraph above: Ruben states he also has permission to promote `dev` to `main`, and the same rule applies to him — an explicit instruction in the conversation that names `main`/production, never inferred. Everything else stands: default is still `dev` and stop, and the migration check below applies whoever gives the instruction.
+
 This supersedes the note that used to live here telling you to branch off `main` because `dev` had gone stale. That was true at the time (`dev` was 31 commits behind on 2026-07-30, and still 10 behind on 2026-09-08) but it has since been realigned: as of 2026-09-08 `main` holds nothing that `dev` does not.
 
-Why this still deserves care: `main` publishes to `alinho.pt`. If a change depends on a migration, that migration has to have been run before the code lands there — and a migration file sitting in the repo is not a migration that has run (see "Architecture at a glance" above). Before pushing to `main` on Renato's instruction, confirm any migration the changes depend on has actually been run — ask if it's unclear rather than assuming.
+Why this still deserves care: `main` publishes to `alinho.pt`. If a change depends on a migration, that migration has to have been run before the code lands there — and a migration file sitting in the repo is not a migration that has run (see "Architecture at a glance" above). Before pushing to `main` on Renato's or Ruben's instruction, confirm any migration the changes depend on has actually been run — ask if it's unclear rather than assuming.
 
 ## Trello + Slack workflow rule
 

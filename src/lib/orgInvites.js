@@ -9,6 +9,21 @@ export const inviteToOrganization = async (organizationId, userId, asAdmin = fal
     p_as_admin: asAdmin,
   })
   if (error) throw error
+
+  // Email on top of the in-app invite — fire-and-forget on purpose: the
+  // invite above already exists and shows up in the person's bell, so a
+  // failed or skipped email must never fail or delay the invite itself.
+  // The function sends at most one email per invite (see
+  // supabase/functions/send-email), so re-inviting doesn't spam.
+  supabase.functions
+    .invoke('send-email', {
+      body: { type: 'organization_invite', organization_id: organizationId, user_id: userId },
+    })
+    .then(({ error: emailError }) => {
+      if (emailError) console.error('Invite email not sent:', emailError)
+    })
+    .catch((emailError) => console.error('Invite email not sent:', emailError))
+
   return data
 }
 

@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import i18n from '../lib/i18n'
 import { installDevMockNetwork } from '../lib/devMockNetwork'
+import { hashPhone } from '../lib/hashPhone'
 
 const AuthContext = createContext({})
 
@@ -165,6 +166,31 @@ export const AuthProvider = ({ children }) => {
     if (error) console.error('Failed to join organization from pending slug:', error)
   }
 
+  // With "Confirm email" on, signUp returns no session, so Login.jsx can't
+  // hash the phone right away (hash-phone rejects the anon key). It stashes
+  // the number instead and this picks it up on the first real session —
+  // localStorage rather than sessionStorage because the confirmation link
+  // usually opens in a new tab. Best-effort: the phone is optional and can
+  // still be added later in Perfil.
+  const consumePendingSignupPhone = async (userId) => {
+    let phone = null
+    try {
+      phone = localStorage.getItem('pendingSignupPhone')
+      if (phone) localStorage.removeItem('pendingSignupPhone')
+    } catch {
+      return
+    }
+    if (!phone) return
+
+    try {
+      const hash = await hashPhone(phone)
+      const { error } = await supabase.from('profiles').update({ phone_hash: hash }).eq('id', userId)
+      if (error) throw error
+    } catch (error) {
+      console.error('Failed to save pending signup phone:', error)
+    }
+  }
+
   const loadFeatureFlags = async () => {
     const { data, error } = await supabase.from('feature_flags').select('key, enabled')
     if (error) {
@@ -242,6 +268,7 @@ export const AuthProvider = ({ children }) => {
         }
 
         await consumePendingOrgSlug()
+        await consumePendingSignupPhone(userId)
         await loadFeatureFlags()
 
         let { data: membershipData, error: membershipError } = await supabase
