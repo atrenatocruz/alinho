@@ -49,7 +49,7 @@ export function StatePill({ tone = 'grey', children }) {
 
 /** Seletor de categoria: pastilha com seta que abre a lista. Abre sempre na
  *  categoria de quem está a ver (print 05). */
-export function CategorySelect({ categories, value, onChange, label }) {
+export function CategorySelect({ categories, value, onChange, label, mineId = null }) {
   const [open, setOpen] = useState(false)
   const box = useRef(null)
 
@@ -85,7 +85,7 @@ export function CategorySelect({ categories, value, onChange, label }) {
               className={`flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-sm ${c.id === current.id ? 'bg-ink-50 font-bold text-ink-900' : 'text-ink-700 hover:bg-ink-50'}`}
             >
               <span>{c.code} · {c.name}</span>
-              {c.my_state && <span className="h-2 w-2 shrink-0 rounded-full bg-ok" />}
+              {c.id === mineId && <span className="h-2 w-2 shrink-0 rounded-full bg-ok" />}
             </button>
           ))}
         </div>

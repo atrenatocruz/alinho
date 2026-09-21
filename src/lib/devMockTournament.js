@@ -33,11 +33,11 @@ const dayAfter = (base, n) => {
 }
 
 const CATEGORIES = [
-  { id: 'cat-m3', code: 'M3', name: 'Masculinos 3', day: 0, start_time: '18:00', capacity: 16, entry_count: 16, price: 25, format_label: '4 grupos de 4 → quartos' },
-  { id: 'cat-m4', code: 'M4', name: 'Masculinos 4', day: 1, start_time: '12:00', capacity: 24, entry_count: 24, price: 25, format_label: '6 grupos de 4 → quartos' },
-  { id: 'cat-m5', code: 'M5', name: 'Masculinos 5', day: 1, start_time: '10:00', capacity: 16, entry_count: 16, price: 25, format_label: '4 grupos de 4 → quartos' },
-  { id: 'cat-f4', code: 'F4', name: 'Femininos 4', day: 2, start_time: '12:00', capacity: 12, entry_count: 12, price: 25, format_label: '3 grupos de 4 → meias' },
-  { id: 'cat-mx4', code: 'MX4', name: 'Mistos 4', day: 1, start_time: '12:00', capacity: 16, entry_count: 16, price: 30, format_label: '4 grupos de 4 → quartos' },
+  { id: 'cat-m3', code: 'M3', name: 'Masculinos 3', gender: 'masculino', level: 3, day_index: 0, start_time: '18:00', slots: 16, entry_count: 16, price_cents: 2500, status: 'inscricoes', position: 1 },
+  { id: 'cat-m4', code: 'M4', name: 'Masculinos 4', gender: 'masculino', level: 4, day_index: 1, start_time: '12:00', slots: 24, entry_count: 24, price_cents: 2500, status: 'inscricoes', position: 2 },
+  { id: 'cat-m5', code: 'M5', name: 'Masculinos 5', gender: 'masculino', level: 5, day_index: 1, start_time: '10:00', slots: 16, entry_count: 16, price_cents: 2500, status: 'sorteada', position: 3 },
+  { id: 'cat-f4', code: 'F4', name: 'Femininos 4', gender: 'feminino', level: 4, day_index: 2, start_time: '12:00', slots: 12, entry_count: 12, price_cents: 2500, status: 'inscricoes', position: 4 },
+  { id: 'cat-mx4', code: 'MX4', name: 'Mistos 4', gender: 'misto', level: 4, day_index: 1, start_time: '12:00', slots: 16, entry_count: 16, price_cents: 3000, status: 'inscricoes', position: 5 },
 ]
 
 // "Os meus jogos" do print 05, 1.º telemóvel: três jogos de grupo ganhos,
@@ -70,8 +70,8 @@ const TOURNAMENT = () => {
     ends_on: iso(dayAfter(fri, 2)),
     status: st,
     is_public: true,
-    courts: 4,
-    entry_fee: 25,
+    court_count: 4,
+    entry_fee_cents: 2500,
     entries_deadline: iso(dayAfter(fri, -4)),
     draw_on: iso(dayAfter(fri, -2)),
     organizer_text: 'Pagamento na receção ou por MB Way. A inscrição só fica válida quando o clube confirmar.',
@@ -83,11 +83,16 @@ const TOURNAMENT = () => {
   }
 }
 
-const categories = () => CATEGORIES.map((c) => ({
-  ...c,
-  entry_count: empty() ? 0 : c.entry_count,
-  my_state: !empty() && c.code === 'M5' ? 'inscrito' : null,
-}))
+// day_index é só dos dados de teste: na base de dados a categoria guarda
+// day_date (a data mesmo), como o Dev 3 escreveu na nota de 21 set.
+const categories = () => {
+  const fri = nextFriday()
+  return CATEGORIES.map(({ day_index, ...c }) => ({
+    ...c,
+    day_date: iso(dayAfter(fri, day_index)),
+    entry_count: empty() ? 0 : c.entry_count,
+  }))
+}
 
 // O que o admin criar em localhost fica aqui até recarregar a página — é o
 // que basta para ver a lista cheia, o torneio novo e os botões de estado.
@@ -136,7 +141,7 @@ export const TOURNAMENT_RPC_MOCKS = {
     return {
       tournament: TOURNAMENT(),
       categories: categories(),
-      my: empty() ? null : { category_id: 'cat-m5', state: 'inscrito' },
+      my: empty() ? null : { category_id: 'cat-m5', state: 'validada', entry_id: 'en-me' },
       my_matches: empty() || state() === 'inscricoes' ? [] : MY_MATCHES(),
     }
   },
