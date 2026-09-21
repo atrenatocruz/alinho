@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, Suspense, lazy } from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { WifiOff } from 'lucide-react'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
@@ -17,6 +17,7 @@ import Comunidade from './pages/Comunidade'
 import ClubProfile from './pages/ClubProfile'
 import TeacherPage from './pages/TeacherPage'
 import LessonPage from './pages/LessonPage'
+import TournamentPage from './pages/TournamentPage'
 import CookieConsentBanner from './components/CookieConsentBanner'
 
 // Route-level splitting (impeccable audit, P3 perf finding): these are all
@@ -105,6 +106,26 @@ const LoadErrorScreen = ({ onRetry }) => {
   )
 }
 
+// Moldura de quem chega sem conta (torneio, Trello #361): o link do torneio
+// anda no WhatsApp e em cartazes, por isso a página abre a toda a gente.
+// Sem sessão não há barra de navegação — só o logótipo e a porta de entrada.
+function PublicShell({ children }) {
+  const { t } = useTranslation()
+  return (
+    <div className="min-h-screen flex flex-col bg-canvas">
+      <header className="bg-ink-900">
+        <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
+          <Link to="/" className="leading-none"><Wordmark /></Link>
+          <Link to="/login" className="text-white font-extrabold text-sm hover:underline">{t('landing.login_link')}</Link>
+        </div>
+      </header>
+      <main className="flex-1">
+        <div className="max-w-2xl mx-auto px-4 pt-6 pb-16 animate-fade-up">{children}</div>
+      </main>
+    </div>
+  )
+}
+
 const Guard = ({ require, showSplash, children }) => {
   const { user, profile, isGuest, isAdmin, isPrivateMatchesEnabled, profileError, retryProfile } = useAuth()
   const location = useLocation()
@@ -141,6 +162,12 @@ const Guard = ({ require, showSplash, children }) => {
   // (no nav shell), signed-in ones see Home inside Layout.
   if (require === 'home') {
     return user ? <Layout>{children}</Layout> : <Landing />
+  }
+
+  // Abre com ou sem conta: com sessão vai dentro da app, sem sessão fica na
+  // moldura simples acima (não manda ninguém para o /login).
+  if (require === 'public') {
+    return user ? <Layout>{children}</Layout> : <PublicShell>{children}</PublicShell>
   }
 
   if (require === 'admin') {
@@ -251,6 +278,15 @@ function AppRoutes() {
           element={
             <Guard require="member" showSplash={showSplash}>
               <CreateGroupMatch />
+            </Guard>
+          }
+        />
+        {/* Torneios (Trello #361 a #366) — abre sem conta */}
+        <Route
+          path="/torneio/:id"
+          element={
+            <Guard require="public" showSplash={showSplash}>
+              <TournamentPage />
             </Guard>
           }
         />
