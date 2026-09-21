@@ -18,11 +18,12 @@ import { supabase } from './supabase'
  *    tournament: { id, slug, name, organization_id, club_name, club_logo_url,
  *      location, starts_on, ends_on, status ('rascunho' | 'inscricoes' |
  *      'fechado' | 'sorteado' | 'a_decorrer' | 'terminado'), is_public,
- *      courts, entry_fee, entries_deadline, draw_on, organizer_text,
+ *      court_count, entry_fee_cents, entries_deadline, draw_on, organizer_text,
  *      poster_url, day_count, category_count, entry_count, match_count }
- *    categories: [{ id, code, name, day, start_time, capacity, entry_count,
- *      price, format_label, my_state }]
- *    my: { category_id, state } | null   ← em que ponto está quem vê
+ *    categories: [{ id, code, name, gender, level, age_group, day_date,
+ *      start_time, slots, price_cents, entry_count, status, position }]
+ *    my: { category_id, state, entry_id } | null  ← UMA inscrição, a
+ *        primeira da pessoa neste torneio (não uma por categoria)
  *
  *  Abre sem sessão (SPEC §4.9): a política de leitura pública devolve o
  *  mesmo, menos o `my`. */
@@ -35,7 +36,10 @@ export async function getTournamentPage(idOrSlug) {
 /** Existe torneio nesta base de dados? Usado para esconder o ponto de
  *  entrada no Gerir enquanto a migração não correr. */
 export async function tournamentsAvailable() {
-  const { error } = await supabase.from('tournaments').select('id').limit(1)
+  // A vista pública, não a tabela: as tabelas do torneio não abrem ao
+  // browser (nota do Dev 3, 21 set). Sem a migração corrida, a vista não
+  // existe e isto devolve false — é o que esconde o separador no Gerir.
+  const { error } = await supabase.from('tournament_public').select('id').limit(1)
   return !error
 }
 
