@@ -496,6 +496,12 @@ function lastMinuteRequest(table, url, method, body) {
 }
 
 const TABLE_MOCKS = {
+  // localStorage.mockJoinRequests = 'true' — 2 pedidos para entrar no Dev Org,
+  // para ver o aviso no sino (Francisco, 19 set: já não há faixa na Home).
+  membership_requests: () => (localStorage.getItem('mockJoinRequests') === 'true' ? [
+    { id: 'jr1', organization_id: MOCK_ADMIN_ORG_ID, organizations: { name: 'Dev Org', slug: 'dev-org' } },
+    { id: 'jr2', organization_id: MOCK_ADMIN_ORG_ID, organizations: { name: 'Dev Org', slug: 'dev-org' } },
+  ] : []),
   ...LESSON_TABLE_MOCKS,
   ...TOURNAMENT_TABLE_MOCKS,
   // localStorage.mockNotices = 'true' — três avisos de mix no sino (Trello #292).
