@@ -37,16 +37,8 @@ export default function PublicInfo({ tournament, categories = [] }) {
         </button>
       </div>
 
-      {/* O cartaz, quando o clube o carregou: é o que a malta reconhece
-          do WhatsApp e dos cartazes no clube. */}
-      {tournament.poster_url && (
-        <img
-          src={tournament.poster_url}
-          alt={tournament.name}
-          className="w-full rounded-ctrl object-cover"
-          loading="lazy"
-        />
-      )}
+      {/* O cartaz não vem aqui: desde 22 set mora no cartão do topo,
+          por cima do nome do torneio (Dev 1). */}
 
       {/* Categorias: dia, hora e vagas — é o que decide se me inscrevo. */}
       <div className="space-y-1.5">
