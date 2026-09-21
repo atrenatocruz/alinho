@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
-import { Plus, Calendar, Users, Trash2, Edit2, Check, X, UserX, Repeat, Clock, ArrowLeft, Camera, Settings, Copy, QrCode, ChevronRight, GraduationCap } from 'lucide-react'
+import { Plus, Calendar, Users, Trash2, Edit2, Check, X, UserX, Repeat, Clock, ArrowLeft, Camera, Settings, Copy, QrCode, ChevronRight, GraduationCap, Trophy } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
@@ -26,6 +26,8 @@ import { isValidVoucherId, normalizeScannedVoucherId } from '../lib/vouchers'
 import OpenSlotsPanel from '../components/OpenSlotsPanel'
 import ClubLessonsPanel from '../components/lessons/ClubLessonsPanel'
 import { lessonsAvailable } from '../lib/lessonsApi'
+import ClubTournamentsPanel from '../components/tournament/ClubTournamentsPanel'
+import { tournamentsAvailable } from '../lib/tournamentApi'
 import { describeError } from '../lib/errors'
 
 const sanitizeSlug = (value) => value.toLowerCase().replace(/[^a-z0-9-]/g, '')
@@ -326,12 +328,13 @@ export default function GerirClube() {
   // Separador «Aulas» (Trello #49): só em clubes e só depois de a migração
   // das aulas correr — até lá a tabela não existe e o separador não aparece.
   const [lessonsReady, setLessonsReady] = useState(false)
+  const [tournamentsReady, setTournamentsReady] = useState(false)
   // Com o 4.º separador não cabem os ícones a 390px — ficam só os nomes.
-  const fourTabs = lessonsReady && org?.kind === 'club'
   useEffect(() => {
     if (!currentOrganizationId || org?.kind !== 'club') { setLessonsReady(false); return }
     let alive = true
     lessonsAvailable().then((ok) => { if (alive) setLessonsReady(ok) })
+    tournamentsAvailable().then((ok) => { if (alive) setTournamentsReady(ok) })
     return () => { alive = false }
   }, [currentOrganizationId, org?.kind])
 
@@ -1662,62 +1665,36 @@ export default function GerirClube() {
           Hidden while the settings page or the voucher redeem screen is
           open (neither is one of the tabs). */}
       {activeTab !== 'settings' && activeTab !== 'redeem' && (
-        <div className="flex gap-1 p-1 bg-ink-50 rounded-ctrl overflow-x-auto">
-          <button
-            onClick={() => setActiveTab('games')}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 ${fourTabs ? 'px-2' : 'px-3'} rounded-ctrl text-sm font-extrabold whitespace-nowrap transition-all duration-fast ${
-              activeTab === 'games'
-                ? 'bg-canvas text-ink-900 shadow-lift border border-line'
-                : 'text-muted hover:text-ink-900'
-            }`}
-          >
-            {!fourTabs && <Calendar size={16} className="shrink-0" />}
-            {t('gerirclube.tab_games')}
-          </button>
-          <button
-            onClick={() => setActiveTab('members')}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 ${fourTabs ? 'px-2' : 'px-3'} rounded-ctrl text-sm font-extrabold whitespace-nowrap transition-all duration-fast ${
-              activeTab === 'members'
-                ? 'bg-canvas text-ink-900 shadow-lift border border-line'
-                : 'text-muted hover:text-ink-900'
-            }`}
-          >
-            {!fourTabs && <Users size={16} className="shrink-0" />}
-            {t('gerirclube.tab_members')}
-            {requests.length > 0 && (
-              <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-lime-400 text-ink-900 text-[11px] font-extrabold tabular-nums">
-                {requests.length}
-              </span>
-            )}
-          </button>
-          {/* Jogo em aberto só nos clubes: só o clube tem campos para gerir
-              (Francisco, 18 set 2026). */}
-          {!isGroupOrg && (
-          <button
-            onClick={() => setActiveTab('open_slots')}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 ${fourTabs ? 'px-2' : 'px-3'} rounded-ctrl text-sm font-extrabold whitespace-nowrap transition-all duration-fast ${
-              activeTab === 'open_slots'
-                ? 'bg-canvas text-ink-900 shadow-lift border border-line'
-                : 'text-muted hover:text-ink-900'
-            }`}
-          >
-            {!fourTabs && <Clock size={16} className="shrink-0" />}
-            {t('gerirclube.tab_open_slots')}
-          </button>
-          )}
-          {!isGroupOrg && lessonsReady && (
-          <button
-            onClick={() => setActiveTab('lessons')}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 ${fourTabs ? 'px-2' : 'px-3'} rounded-ctrl text-sm font-extrabold whitespace-nowrap transition-all duration-fast ${
-              activeTab === 'lessons'
-                ? 'bg-canvas text-ink-900 shadow-lift border border-line'
-                : 'text-muted hover:text-ink-900'
-            }`}
-          >
-            {!fourTabs && <GraduationCap size={16} className="shrink-0" />}
-            {t('gerirclube.tab_lessons')}
-          </button>
-          )}
+        <div className="flex gap-1 p-1 bg-ink-50 rounded-ctrl overflow-x-auto no-scrollbar">
+          {/* A fila desliza para o lado: com o separador dos torneios são
+              cinco, e cinco não cabem num telemóvel sem cortar as palavras
+              (Francisco, 21 set). Os separadores que o clube não tem
+              simplesmente não aparecem. */}
+          {[
+            ['games', Calendar, t('gerirclube.tab_games'), true, 0],
+            ['members', Users, t('gerirclube.tab_members'), true, requests.length],
+            ['open_slots', Clock, t('gerirclube.tab_open_slots'), !isGroupOrg, 0],
+            ['lessons', GraduationCap, t('gerirclube.tab_lessons'), !isGroupOrg && lessonsReady, 0],
+            ['tournaments', Trophy, t('gerirclube.tab_tournaments'), !isGroupOrg && tournamentsReady, 0],
+          ].filter(([, , , show]) => show).map(([key, Icon, label, , badge]) => (
+            <button
+              key={key}
+              onClick={() => setActiveTab(key)}
+              className={`shrink-0 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-ctrl text-sm font-extrabold whitespace-nowrap transition-all duration-fast ${
+                activeTab === key
+                  ? 'bg-canvas text-ink-900 shadow-lift border border-line'
+                  : 'text-muted hover:text-ink-900'
+              }`}
+            >
+              <Icon size={16} className="shrink-0" />
+              {label}
+              {badge > 0 && (
+                <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-lime-400 text-ink-900 text-[11px] font-extrabold tabular-nums">
+                  {badge}
+                </span>
+              )}
+            </button>
+          ))}
         </div>
       )}
 
@@ -2452,6 +2429,12 @@ export default function GerirClube() {
 
           {activeTab === 'lessons' && !isGroupOrg && lessonsReady && (
             <ClubLessonsPanel organizationId={currentOrganizationId} orgName={org?.name} />
+          )}
+
+          {/* Torneios (Trello #361) — só nos clubes, e só depois de a
+              migração do torneio correr. */}
+          {activeTab === 'tournaments' && !isGroupOrg && tournamentsReady && (
+            <ClubTournamentsPanel organizationId={org.id} club={org} />
           )}
 
           {activeTab === 'open_slots' && !isGroupOrg && (

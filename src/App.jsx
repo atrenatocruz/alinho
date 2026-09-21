@@ -19,6 +19,7 @@ import ClubProfile from './pages/ClubProfile'
 import TeacherPage from './pages/TeacherPage'
 import LessonPage from './pages/LessonPage'
 import TournamentPage from './pages/TournamentPage'
+import TournamentScorePage from './pages/TournamentScorePage'
 import CookieConsentBanner from './components/CookieConsentBanner'
 
 // Route-level splitting (impeccable audit, P3 perf finding): these are all
@@ -279,6 +280,16 @@ function AppRoutes() {
           element={
             <Guard require="member" showSplash={showSplash}>
               <CreateGroupMatch />
+            </Guard>
+          }
+        />
+        {/* Ecrã do marcador (Trello #365) — precisa de conta: só o admin
+            e os marcadores do torneio marcam resultados. */}
+        <Route
+          path="/torneio/:id/marcar"
+          element={
+            <Guard require="protected" showSplash={showSplash}>
+              <TournamentScorePage />
             </Guard>
           }
         />
