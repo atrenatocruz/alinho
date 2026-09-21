@@ -14,6 +14,7 @@ import { listIncomingOrganizationInvites, acceptOrganizationInvite, declineOrgan
 import { getMyPrivateMatches, privateMatchActions } from '../lib/privateMatches'
 import { describeError } from '../lib/errors'
 import { listMyUnreadNotifications, markNotificationsRead, MIX_NOTICE_KINDS } from '../lib/notifications'
+import { kudosVoters, joinNames, MAX_KUDOS_VOTERS } from '../lib/kudos'
 import LessonNoticeRow, { LESSON_NOTICE_KINDS } from './lessons/LessonNoticeRow'
 import { formatDate } from '../lib/formatDate'
 import AccountDeletionPending from './AccountDeletionPending'
@@ -64,14 +65,38 @@ function CelebrationModal({ items, onClose }) {
             <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mb-1">
               {t('layout.celebrations_kudos_heading')}
             </p>
-            {kudos.map((k, i) => (
-              <div key={i} className="flex items-center gap-2.5 rounded-ctrl bg-lime-400/10 px-3 py-2">
-                <span className="text-lg">👍</span>
-                <p className="text-sm text-ink-900 font-semibold">
-                  {t('layout.celebrations_kudos_line', { count: Number(k.kudos_count), title: k.game_title })}
-                </p>
-              </div>
-            ))}
+            {kudos.map((k, i) => {
+              // Quem deu o kudo (Trello #340). A RPC antiga não traz
+              // `voters`: nesse caso fica a frase de sempre, só com o
+              // número — nunca um espaço vazio.
+              const voters = kudosVoters(k, t('layout.celebrations_kudos_removed'))
+              const names = joinNames(voters.map((v) => v.name), {
+                and: t('layout.celebrations_kudos_and'),
+                more: (n) => t('layout.celebrations_kudos_more', { count: n }),
+              })
+              return (
+                <div key={i} className="flex items-center gap-2.5 rounded-ctrl bg-lime-400/10 px-3 py-2">
+                  {voters.length > 0 ? (
+                    <div className="flex -space-x-2 shrink-0">
+                      {voters.slice(0, MAX_KUDOS_VOTERS).map((v) => (
+                        // A foto leva ao perfil de quem deu; fecha o modal
+                        // para não ficar por cima da página nova.
+                        <Link key={v.id} to={`/jogador/${v.id}`} onClick={onClose} className="press ring-2 ring-surface rounded-full">
+                          <Avatar name={v.name} url={v.avatarUrl} size="w-8 h-8 text-[11px]" />
+                        </Link>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-lg">👍</span>
+                  )}
+                  <p className="text-sm text-ink-900 font-semibold">
+                    {voters.length > 0
+                      ? t('layout.celebrations_kudos_named', { count: voters.length, names, title: k.game_title })
+                      : t('layout.celebrations_kudos_line', { count: Number(k.kudos_count), title: k.game_title })}
+                  </p>
+                </div>
+              )
+            })}
           </div>
         )}
 
