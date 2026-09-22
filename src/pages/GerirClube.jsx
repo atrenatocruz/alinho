@@ -1929,6 +1929,13 @@ export default function GerirClube() {
                           ...(v !== 'sobe_desce' ? { rotate_partners: false } : {}),
                         })}
                       />
+                      {/* Cada formato explica-se, com o foco em QUEM GANHA —
+                          era o que ninguém sabia (Francisco, 22 set 2026: o
+                          Americano dá a vitória a um jogador, não a uma
+                          dupla, e ele próprio não sabia). */}
+                      <p className="text-sm text-muted mt-1.5">
+                        {t(`mixlogic.format_help_${gameForm.format === 'sobe_desce' && gameForm.rotate_partners ? 'sobe_desce_rotate' : gameForm.format}`)}
+                      </p>
                     </div>
 
                     {/* Conta para o ranking (Trello #267) — mesmas palavras do
