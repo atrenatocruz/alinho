@@ -486,6 +486,8 @@
   "tagenda.categories_other": "{{count}} categorias",
   "tagenda.may_start_earlier": "Pode começar mais cedo · chega 20 min antes",
   "agenda.filter_kind_tournament": "Torneios",
+  "tsignup.error_entry_already_drawn": "Esta dupla já está no sorteio. Para a tirar a meio do torneio, marca falta no ecrã do marcador.",
+  "tsignup.claim_error_entries_closed": "As inscrições deste torneio já fecharam.",
   "layout.celebrations_close": "Boa! 🎾",
   "achievements.shelf_title": "Conquistas",
   "achievements.progress": "{{earned}} de {{total}} conquistados",
@@ -2532,5 +2534,10 @@
   "tournament.draw.undo": "Desfazer o sorteio",
   "tournament.admin.draw": "Sortear",
   "tournament.draw.opt_guaranteed_one": "1 jogo garantido",
-  "tournament.draw.opt_guaranteed_other": "{{count}} jogos garantidos"
+  "tournament.draw.opt_guaranteed_other": "{{count}} jogos garantidos",
+  "tournament.podium.title": "Vencedores",
+  "tournament.podium.my_xp": "+{{xp}} XP",
+  "tournament.podium.my_matches_one": "1 jogo",
+  "tournament.podium.my_matches_other": "{{count}} jogos",
+  "tournament.podium.my_rating": "ranking {{category}} {{points}} pontos"
 }

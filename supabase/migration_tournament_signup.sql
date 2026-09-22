@@ -232,7 +232,18 @@ DECLARE
 BEGIN
   SELECT * INTO v_entry FROM tournament_entries
    WHERE id = p_entry_id AND player2_id = v_me AND status = 'convite' FOR UPDATE;
-  IF NOT FOUND THEN RAISE EXCEPTION 'invite_not_found'; END IF;
+  IF NOT FOUND THEN
+    -- Se o convite existiu mas a categoria já fechou, dizer isso: um
+    -- "convite não encontrado" parecia um link errado, quando o que
+    -- aconteceu foi fecharem as inscrições (ensaio conjunto, 22 set).
+    IF EXISTS (SELECT 1 FROM tournament_entries e
+                 JOIN tournament_categories c ON c.id = e.category_id
+                WHERE e.id = p_entry_id AND e.player2_id = v_me
+                  AND c.status <> 'inscricoes') THEN
+      RAISE EXCEPTION 'entries_closed';
+    END IF;
+    RAISE EXCEPTION 'invite_not_found';
+  END IF;
   IF v_entry.respond_by IS NOT NULL AND v_entry.respond_by < NOW() THEN
     RAISE EXCEPTION 'invite_expired';
   END IF;
@@ -377,6 +388,7 @@ DECLARE
   v_me UUID := auth.uid();
   v_entry tournament_entries%ROWTYPE;
   v_tournament UUID;
+  v_cat_status TEXT;
 BEGIN
   IF v_me IS NULL THEN RAISE EXCEPTION 'not_signed_in'; END IF;
 
@@ -386,8 +398,16 @@ BEGIN
   IF v_entry.player2_id IS NOT NULL THEN RAISE EXCEPTION 'invite_already_claimed'; END IF;
   IF v_entry.player1_id = v_me THEN RAISE EXCEPTION 'invite_is_your_own'; END IF;
 
-  SELECT c.tournament_id INTO v_tournament
+  SELECT c.tournament_id, c.status INTO v_tournament, v_cat_status
     FROM tournament_categories c WHERE c.id = v_entry.category_id;
+
+  -- O link do convite morre quando as inscrições fecham. Sem isto, um
+  -- link antigo deixava um desconhecido ficar com o lugar de outra pessoa
+  -- DEPOIS do sorteio, já com jogos marcados e resultados — e a
+  -- organização não dava por nada. É a única destas portas que um
+  -- estranho conseguia abrir sozinho, de fora (ensaio conjunto com o
+  -- Dev 3, 22 set).
+  IF v_cat_status <> 'inscricoes' THEN RAISE EXCEPTION 'entries_closed'; END IF;
 
   -- Ficar com o lugar é entrar mesmo: valem as regras da inscrição
   -- (revisão do Dev 3, 22 set).
@@ -433,10 +453,22 @@ BEGIN
   END IF;
 
   IF p_paid THEN
+    -- Uma dupla já escolhida para o sorteio continua escolhida: marcar o
+    -- pagamento não a pode fazer recuar para 'validada', senão ela fica
+    -- nos grupos e nos jogos mas o sorteio deixa de a reconhecer — sem
+    -- erro nenhum, por um toque na lista (ensaio conjunto com o Dev 3,
+    -- 22 set).
     UPDATE tournament_entries
-       SET status = 'validada', validated_at = NOW(), validated_by = auth.uid()
+       SET status = CASE WHEN status = 'selecionada' THEN 'selecionada' ELSE 'validada' END,
+           validated_at = NOW(), validated_by = auth.uid()
      WHERE id = p_entry_id;
-    RETURN 'validada';
+    RETURN (SELECT status FROM tournament_entries WHERE id = p_entry_id);
+  END IF;
+
+  -- Desmarcar o pagamento só enquanto as inscrições estiverem abertas:
+  -- depois disso a dupla já foi escolhida ou já está a jogar.
+  IF (SELECT status FROM tournament_categories WHERE id = v_entry.category_id) <> 'inscricoes' THEN
+    RAISE EXCEPTION 'entries_closed';
   END IF;
 
   UPDATE tournament_entries
@@ -458,6 +490,17 @@ BEGIN
   IF NOT FOUND THEN RAISE EXCEPTION 'entry_not_found'; END IF;
   SELECT tournament_id INTO v_tournament FROM tournament_categories WHERE id = v_entry.category_id;
   IF NOT is_tournament_admin(v_tournament) THEN RAISE EXCEPTION 'not_admin'; END IF;
+
+  -- Já sorteada, uma dupla não se tira por aqui: ficava um jogo do quadro
+  -- com uma dupla de fora e SEM resultado, ao contrário da falta de
+  -- comparência, que dá o jogo ao adversário. Quem desiste a meio do
+  -- torneio marca-se no ecrã do marcador (ensaio conjunto com o Dev 3,
+  -- 22 set).
+  IF EXISTS (SELECT 1 FROM tournament_group_teams WHERE entry_id = p_entry_id)
+     OR EXISTS (SELECT 1 FROM tournament_matches
+                 WHERE entry_a_id = p_entry_id OR entry_b_id = p_entry_id) THEN
+    RAISE EXCEPTION 'entry_already_drawn';
+  END IF;
 
   UPDATE tournament_entries SET status = 'desistiu' WHERE id = p_entry_id;
   PERFORM tournament_promote_waitlist(v_entry.category_id);
