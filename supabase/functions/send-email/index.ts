@@ -255,7 +255,7 @@ const welcome: Handler = async ({ admin, callerId, appUrl }) => {
           ],
           ctaLabel: 'Open alinho',
           ctaUrl: appUrl,
-          footnote: `You're getting this email because you just created an alinho account. Questions or something wrong? Just reply to this email.`,
+          footnote: `You're getting this email because you just created an alinho account. This mailbox isn't monitored — there's no need to reply.`,
         }),
       }
     : {
@@ -269,7 +269,7 @@ const welcome: Handler = async ({ admin, callerId, appUrl }) => {
           ],
           ctaLabel: 'Abrir o alinho',
           ctaUrl: appUrl,
-          footnote: `Recebes este email porque acabaste de criar conta no alinho. Dúvidas ou algo que não bate certo? Responde a este email.`,
+          footnote: `Recebes este email porque acabaste de criar conta no alinho. Este endereço não é lido — não é preciso responder.`,
         }),
       }
 
