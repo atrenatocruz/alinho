@@ -533,6 +533,11 @@ $$;
 -- A lista do organizador, por categoria: quem se inscreveu, em que estado,
 -- e quem veio sozinho. O email do convidado só aqui — nunca na vista
 -- pública (a regra dos nomes de 19 set).
+-- O DROP é preciso para quem já correu a versão de 21 set: esta devolvia
+-- `invite_token` e agora devolve `has_invite`, e o Postgres não deixa um
+-- CREATE OR REPLACE mudar o tipo de retorno (42P13). Sem isto, voltar a
+-- correr o ficheiro parava aqui.
+DROP FUNCTION IF EXISTS list_tournament_entries(UUID);
 CREATE OR REPLACE FUNCTION list_tournament_entries(p_category_id UUID)
 RETURNS TABLE (
   entry_id UUID, status TEXT, team_name TEXT, waitlist_order INTEGER,
