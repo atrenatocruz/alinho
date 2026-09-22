@@ -57,3 +57,69 @@ export const TOURNAMENT_DRAW_TABLE_MOCKS = {
   tournament_public_groups: () => (on() ? GROUPS() : []),
   tournament_public_matches: () => (on() ? MATCHES() : []),
 }
+
+/* Os ecrãs do organizador (fechar inscrições, formato, sortear) leem por
+   RPC, não pelas vistas. Estes dados de teste deixam ver o caminho todo
+   sem base de dados: uma categoria com inscrições abertas (M4, 6 duplas
+   para 4 lugares), outra já fechada e à espera de formato (M5), e uma já
+   sorteada (M3). */
+const DUPLAS = () => [
+  { entry_id: 'e1', name: 'Rui Mendes / Pedro Silva', players: ['Rui Mendes', 'Pedro Silva'], points: 2140, points_incomplete: false, status: 'validada', seed_number: null, created_at: '2026-09-01T10:00:00Z' },
+  { entry_id: 'e2', name: 'Miguel Rosa / André Pinto', players: ['Miguel Rosa', 'André Pinto'], points: 2020, points_incomplete: false, status: 'validada', seed_number: null, created_at: '2026-09-01T11:00:00Z' },
+  { entry_id: 'e3', name: 'Sérgio Brito / Ivo Nunes', players: ['Sérgio Brito', 'Ivo Nunes'], points: 1890, points_incomplete: false, status: 'validada', seed_number: null, created_at: '2026-09-02T09:00:00Z' },
+  { entry_id: 'e4', name: 'Ricardo Lima / Nelson Sá', players: ['Ricardo Lima', 'Nelson Sá'], points: 1845, points_incomplete: false, status: 'validada', seed_number: null, created_at: '2026-09-02T10:00:00Z' },
+  { entry_id: 'e5', name: 'Gomes / Pais', players: ['Hugo Gomes', 'Nuno Pais'], points: 1080, points_incomplete: false, status: 'validada', seed_number: null, created_at: '2026-09-03T08:00:00Z' },
+  { entry_id: 'e6', name: 'Lima / Branco', players: ['Pedro Lima', 'João Branco'], points: 620, points_incomplete: true, status: 'por_validar', seed_number: null, created_at: '2026-09-03T12:00:00Z' },
+]
+
+const CATS = () => [
+  { id: 'cat-m4', code: 'M4', name: 'Masculinos 4', gender: 'masculino', level: '4', age_group: null,
+    slots: 4, price_cents: 2500, day_date: '2026-10-10', start_time: '12:00', third_place_match: false,
+    format: null, status: 'inscricoes', position: 1,
+    selected_count: 0, waiting_count: 6, waitlist_count: 0, incomplete_count: 1,
+    group_count: 0, match_count: 0, played_count: 0 },
+  { id: 'cat-m5', code: 'M5', name: 'Masculinos 5', gender: 'masculino', level: '5', age_group: null,
+    slots: 16, price_cents: 2500, day_date: '2026-10-11', start_time: '09:00', third_place_match: false,
+    format: null, status: 'fechada', position: 2,
+    selected_count: 16, waiting_count: 0, waitlist_count: 2, incomplete_count: 0,
+    group_count: 0, match_count: 0, played_count: 0 },
+  { id: 'cat-mx4', code: 'MX4', name: 'Mistos 4', gender: 'misto', level: '4', age_group: null,
+    slots: 16, price_cents: 3000, day_date: '2026-10-10', start_time: '12:00', third_place_match: true,
+    format: { key: 'grupos-4x4-passam2', groups: 4, qualifiers_per_group: 2, qualifiers: 8, third_place: true },
+    status: 'fechada', position: 3,
+    selected_count: 16, waiting_count: 0, waitlist_count: 0, incomplete_count: 0,
+    group_count: 0, match_count: 0, played_count: 0 },
+  { id: 'cat-m3', code: 'M3', name: 'Masculinos 3', gender: 'masculino', level: '3', age_group: null,
+    slots: 8, price_cents: 2500, day_date: '2026-10-09', start_time: '18:00', third_place_match: true,
+    format: { groups: 2, qualifiers_per_group: 2, third_place: true }, status: 'sorteada', position: 3,
+    selected_count: 8, waiting_count: 0, waitlist_count: 1, incomplete_count: 0,
+    group_count: 2, match_count: 15, played_count: 0 },
+]
+
+/** 16 duplas para a M5, para o assistente de formato ter números a sério. */
+const DEZASSEIS = () => Array.from({ length: 16 }, (_, i) => ({
+  entry_id: `m5-${i + 1}`,
+  name: `Dupla ${i + 1}`,
+  players: [`Jogador ${2 * i + 1}`, `Jogador ${2 * i + 2}`],
+  points: 2200 - i * 70,
+  points_incomplete: i === 15,
+  status: 'selecionada',
+  seed_number: null,
+  created_at: '2026-09-01T10:00:00Z',
+}))
+
+export const TOURNAMENT_DRAW_RPC_MOCKS = {
+  list_tournament_categories_admin: () => (on() ? {
+    rules: { duration_max: 60, duration_min: 30, scoring: 'pro_set_9' },
+    days: [
+      { id: 'd1', date: '2026-10-09', starts_at: '18:00:00', ends_at: '23:00:00', courts: 4 },
+      { id: 'd2', date: '2026-10-10', starts_at: '09:00:00', ends_at: '21:00:00', courts: 4 },
+      { id: 'd3', date: '2026-10-11', starts_at: '09:00:00', ends_at: '18:00:00', courts: 3 },
+    ],
+    categories: CATS(),
+  } : { rules: {}, days: [], categories: [] }),
+  list_category_seeding: (params) => {
+    if (!on()) return []
+    return ['cat-m5', 'cat-mx4'].includes(params?.p_category_id) ? DEZASSEIS() : DUPLAS()
+  },
+}
