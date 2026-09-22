@@ -1665,11 +1665,13 @@ export default function GerirClube() {
           Hidden while the settings page or the voucher redeem screen is
           open (neither is one of the tabs). */}
       {activeTab !== 'settings' && activeTab !== 'redeem' && (
-        <div className="flex gap-1 p-1 bg-ink-50 rounded-ctrl overflow-x-auto no-scrollbar">
-          {/* A fila desliza para o lado: com o separador dos torneios são
-              cinco, e cinco não cabem num telemóvel sem cortar as palavras
-              (Francisco, 21 set). Os separadores que o clube não tem
-              simplesmente não aparecem. */}
+        // A fila continua numa linha só e desliza para o lado (21 set), mas
+        // agora DIZ que há mais: o último separador visível esbate-se contra
+        // a direita. Sem isso, no telemóvel viam-se três e concluía-se que
+        // «Aulas» e «Torneios» não existiam (Francisco, 22 set). Duas linhas
+        // ficavam feias; o esbatido mantém o aspeto e resolve.
+        <div className="relative">
+        <div className="flex gap-1 p-1 bg-ink-50 rounded-ctrl overflow-x-auto no-scrollbar scroll-smooth">
           {[
             ['games', Calendar, t('gerirclube.tab_games'), true, 0],
             ['members', Users, t('gerirclube.tab_members'), true, requests.length],
@@ -1695,6 +1697,9 @@ export default function GerirClube() {
               )}
             </button>
           ))}
+        </div>
+        {/* Esbatido à direita — só aparece quando a fila não cabe toda. */}
+        <div className="pointer-events-none absolute inset-y-0 right-0 w-10 rounded-r-ctrl bg-gradient-to-l from-ink-50 to-transparent" />
         </div>
       )}
 
