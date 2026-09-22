@@ -15,6 +15,7 @@ import { DangerConfirmModal, EmptyState, PrimaryButton } from '../ui'
 import { MonoLabel, StatePill } from './TournamentBits'
 import CreateTournamentForm from './CreateTournamentForm'
 import ScorekeepersPanel from './ScorekeepersPanel'
+import TournamentCalendarGrid from './TournamentCalendarGrid'
 
 const STATE_TONE = { rascunho: 'grey', inscricoes: 'in', fechado: 'grey', sorteado: 'dark', a_decorrer: 'live', terminado: 'grey' }
 
@@ -27,6 +28,7 @@ export default function ClubTournamentsPanel({ organizationId, club }) {
   const [toDelete, setToDelete] = useState(null)
   const [keepersOf, setKeepersOf] = useState(null)
   const [editing, setEditing] = useState(null) // { row, data }
+  const [gridOf, setGridOf] = useState(null)
 
   const load = useCallback(() => {
     listClubTournaments(organizationId)
@@ -106,6 +108,10 @@ export default function ClubTournamentsPanel({ organizationId, club }) {
     return <ScorekeepersPanel tournament={keepersOf} onBack={() => setKeepersOf(null)} />
   }
 
+  if (gridOf) {
+    return <TournamentCalendarGrid tournament={gridOf} onBack={() => setGridOf(null)} />
+  }
+
   if (editing) {
     return (
       <CreateTournamentForm
@@ -182,6 +188,9 @@ export default function ClubTournamentsPanel({ organizationId, club }) {
                     </Link>
                     <button type="button" onClick={() => setKeepersOf(row)} className="rounded-full border border-line px-3 py-1.5 text-[12px] font-semibold text-ink-700 hover:bg-ink-50">
                       {t('tournament.score.keepers_title')}
+                    </button>
+                    <button type="button" onClick={() => setGridOf(row)} className="rounded-full border border-line px-3 py-1.5 text-[12px] font-semibold text-ink-700 hover:bg-ink-50">
+                      {t('tournament.grid.open')}
                     </button>
                   </>
                 )}
