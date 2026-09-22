@@ -19,7 +19,7 @@ export const TOURNAMENT_PANELS = {
   // O registo do Dev 2 fica onde ele o pôs — mexer nele era mexer no
   // trabalho dele. Quando quiser, move o SignupSlot para `under_header` e
   // o `top` fica livre para os avisos do organizador, que é o 6/6.
-  top: null, //                                        Dev 2 · «Torneio 6/6» → avisos do organizador
+  top: lazy(() => import('./NoticesSlot')), //          Dev 2 · «Torneio 6/6»
   // Logo por baixo do cartão do topo, antes da categoria e dos separadores:
   // é a ordem do desenho «Quem chega de fora» — cartaz, depois «Inscrever a
   // minha dupla», depois as categorias. Pedido do Dev 2 (22 set).
