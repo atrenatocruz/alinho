@@ -606,7 +606,14 @@ const TABLE_MOCKS = {
   ] : []),
   // A lista pública de inscritos do torneio (Trello #362) — nomes sim,
   // email e telemóvel nunca (regra de 19 set).
-  tournament_public_entries: () => (localStorage.getItem('mockTSignup') ? [
+  tournament_public_entries: () => (localStorage.getItem('mockTHome') ? [
+    { id: 'my-entry', category_id: 'cat-m4', team_name: null, status: 'validada', seed_number: null, waitlist_order: null,
+      player1_name: 'Admin (Dev)', player1_avatar: null, player2_name: 'Rui Oliveira Gomes', player2_avatar: null, player2_is_guest: false },
+    { id: 'rival-1', category_id: 'cat-m4', team_name: 'Dois não fazem um', status: 'validada', seed_number: null, waitlist_order: null,
+      player1_name: 'Diogo Alexandre', player1_avatar: null, player2_name: 'David Antunes', player2_avatar: null, player2_is_guest: false },
+    { id: 'rival-2', category_id: 'cat-m4', team_name: null, status: 'validada', seed_number: null, waitlist_order: null,
+      player1_name: 'Santos', player1_avatar: null, player2_name: 'Santos', player2_avatar: null, player2_is_guest: false },
+  ] : localStorage.getItem('mockTSignup') ? [
     { id: 'e1', category_id: 'cat-m4', team_name: 'Dois não fazem um', status: 'por_validar', seed_number: null, waitlist_order: null,
       player1_name: 'Rui Oliveira Gomes', player1_avatar: null, player2_name: 'Tiago Ferreira', player2_avatar: null, player2_is_guest: false },
     { id: 'e2', category_id: 'cat-m4', team_name: null, status: 'validada', seed_number: null, waitlist_order: null,
@@ -614,6 +621,39 @@ const TABLE_MOCKS = {
     { id: 'e5', category_id: 'cat-m4', team_name: null, status: 'suplente', seed_number: null, waitlist_order: 1,
       player1_name: 'Inês Rocha', player1_avatar: null, player2_name: 'Beatriz Faria', player2_avatar: null, player2_is_guest: false },
   ] : []),
+  // localStorage.mockTHome = 'signup' | 'matches' — o torneio na agenda da
+  // Home (Trello #363): o cartão de inscrição, ou os meus jogos depois do
+  // sorteio. Precisa de mockTournament = 'true' (os dados do Dev 1).
+  tournament_public: () => {
+    const mode = localStorage.getItem('mockTHome')
+    if (!mode) return []
+    const page = TOURNAMENT_RPC_MOCKS.get_tournament_page?.({ p_tournament: 'smash-open-2026' })
+    const tour = page?.tournament
+    if (!tour) return []
+    const day = (n) => {
+      const d = new Date(); d.setDate(d.getDate() + n)
+      return d.toISOString().slice(0, 10)
+    }
+    return [{ ...tour, starts_on: day(1), ends_on: day(3), status: 'inscricoes', category_count: 5 }]
+  },
+  tournament_entries: () => (localStorage.getItem('mockTHome')
+    ? [{ id: 'my-entry', category_id: 'cat-m4', status: 'validada' }] : []),
+  tournament_public_categories: () => (localStorage.getItem('mockTHome')
+    ? [{ id: 'cat-m4', tournament_id: 'tour-smash-open', code: 'M4', name: 'Masculinos 4' }] : []),
+  tournament_public_matches: () => {
+    if (localStorage.getItem('mockTHome') !== 'matches') return []
+    const at = (days, hour) => {
+      const d = new Date(); d.setDate(d.getDate() + days); d.setHours(hour, 0, 0, 0)
+      return d.toISOString()
+    }
+    const was = (days, hour) => at(days, hour)
+    return [
+      { id: 'tm1', category_id: 'cat-m4', stage: 'grupos', round: null, entry_a_id: 'my-entry', entry_b_id: 'rival-1',
+        scheduled_at: at(1, 10), previous_scheduled_at: null, court_name: 'Campo 2', status: 'marcado' },
+      { id: 'tm2', category_id: 'cat-m4', stage: 'quartos', round: 'QF', entry_a_id: 'rival-2', entry_b_id: 'my-entry',
+        scheduled_at: at(1, 16), previous_scheduled_at: was(1, 17), court_name: 'Campo 3', status: 'marcado' },
+    ]
+  },
   // localStorage.mockTNotices = 'one' | 'two' — avisos do organizador na
   // página do torneio (Trello #366).
   tournament_public_notices: () => {
