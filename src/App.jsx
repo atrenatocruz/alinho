@@ -22,27 +22,58 @@ import LessonPage from './pages/LessonPage'
 import TournamentPage from './pages/TournamentPage'
 import TournamentScorePage from './pages/TournamentScorePage'
 import CookieConsentBanner from './components/CookieConsentBanner'
+import ErrorBoundary from './components/ErrorBoundary'
 
 // Route-level splitting (impeccable audit, P3 perf finding): these are all
 // low-traffic relative to the routes above — admin-only, feature-flagged,
 // first-run-only, or reference pages — so deferring them keeps the initial
 // bundle lighter without adding a loading flash to any of the app's
 // everyday screens. GerirClube alone pulls in @dnd-kit, only used there.
-const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))
-const ResetPassword = lazy(() => import('./pages/ResetPassword'))
-const PrivateMatches = lazy(() => import('./pages/PrivateMatches'))
-const CreatePrivateMatch = lazy(() => import('./pages/CreatePrivateMatch'))
-const JoinPrivateMatch = lazy(() => import('./pages/JoinPrivateMatch'))
-const GroupMatches = lazy(() => import('./pages/GroupMatches'))
-const CreateGroupMatch = lazy(() => import('./pages/CreateGroupMatch'))
-const Gerir = lazy(() => import('./pages/Gerir'))
-const GerirClube = lazy(() => import('./pages/GerirClube'))
-const Instructions = lazy(() => import('./pages/Instructions'))
-const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'))
-const TermsOfService = lazy(() => import('./pages/TermsOfService'))
-const MixOffline = lazy(() => import('./pages/MixOffline'))
-const EscolherNivel = lazy(() => import('./pages/EscolherNivel'))
-const ConsentGate = lazy(() => import('./pages/ConsentGate'))
+// Uma versao nova da app muda o nome do ficheiro de cada uma destas paginas.
+// Quem tinha a app aberta continua a pedir o nome antigo, que ja nao existe
+// - e o servidor responde com a pagina inicial em vez de um erro, por isso o
+// import falha e o ecra fica em branco (medido no alinho.pt, 22 set 2026).
+// Recarregar vai buscar os nomes novos. Uma vez so: se a falha for outra, o
+// erro sobe para o ErrorBoundary em vez de ficar a recarregar em ciclo.
+const RELOAD_KEY = 'reloadedForChunk'
+const lazyPage = (importer) =>
+  lazy(() =>
+    importer().then(
+      (mod) => {
+        try { sessionStorage.removeItem(RELOAD_KEY) } catch { /* sem sessionStorage: segue */ }
+        return mod
+      },
+      (error) => {
+        let alreadyReloaded = true
+        try {
+          alreadyReloaded = sessionStorage.getItem(RELOAD_KEY) === '1'
+          if (!alreadyReloaded) sessionStorage.setItem(RELOAD_KEY, '1')
+        } catch {
+          // Sem sessionStorage nao ha como saber se ja se recarregou, e
+          // recarregar as cegas arrisca um ciclo: mostra-se o erro.
+        }
+        if (alreadyReloaded) throw error
+        window.location.reload()
+        return new Promise(() => {}) // a pagina esta a recarregar
+      }
+    )
+  )
+
+const ForgotPassword = lazyPage(() => import('./pages/ForgotPassword'))
+const ResetPassword = lazyPage(() => import('./pages/ResetPassword'))
+const PrivateMatches = lazyPage(() => import('./pages/PrivateMatches'))
+const CreatePrivateMatch = lazyPage(() => import('./pages/CreatePrivateMatch'))
+const JoinPrivateMatch = lazyPage(() => import('./pages/JoinPrivateMatch'))
+const GroupMatches = lazyPage(() => import('./pages/GroupMatches'))
+const CreateGroupMatch = lazyPage(() => import('./pages/CreateGroupMatch'))
+const Gerir = lazyPage(() => import('./pages/Gerir'))
+const GerirClube = lazyPage(() => import('./pages/GerirClube'))
+const Instructions = lazyPage(() => import('./pages/Instructions'))
+const PrivacyPolicy = lazyPage(() => import('./pages/PrivacyPolicy'))
+const TermsOfService = lazyPage(() => import('./pages/TermsOfService'))
+const MixOffline = lazyPage(() => import('./pages/MixOffline'))
+const EscolherNivel = lazyPage(() => import('./pages/EscolherNivel'))
+const ConsentGate = lazyPage(() => import('./pages/ConsentGate'))
 
 // Same spinner used for every other in-app loading state (Home, Rankings,
 // etc.) — a lazy chunk on a fast connection resolves before this is even
@@ -214,6 +245,8 @@ function AppRoutes() {
   const showSplash = authLoading || !minDurationElapsed
 
   return (
+    // Rede de seguranca: sem ela, um erro em qualquer pagina da ecra branco.
+    <ErrorBoundary>
     <Suspense fallback={<RouteFallback />}>
       <Routes>
         <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
@@ -414,6 +447,7 @@ function AppRoutes() {
         />
       </Routes>
     </Suspense>
+    </ErrorBoundary>
   )
 }
 
