@@ -615,6 +615,16 @@ const TABLE_MOCKS = {
     { id: 'e5', category_id: 'cat-m4', team_name: null, status: 'suplente', seed_number: null, waitlist_order: 1,
       player1_name: 'Inês Rocha', player1_avatar: null, player2_name: 'Beatriz Faria', player2_avatar: null, player2_is_guest: false },
   ] : []),
+  // localStorage.mockTNotices = 'one' | 'two' — avisos do organizador na
+  // página do torneio (Trello #366).
+  tournament_public_notices: () => {
+    const mode = localStorage.getItem('mockTNotices')
+    if (!mode) return []
+    const ago = (min) => new Date(Date.now() - min * 60000).toISOString()
+    const rows = [{ id: 'tn1', tournament_id: 'tour-smash-open', body: 'M4 atrasado cerca de 20 minutos', created_at: ago(6), author_name: 'Smash Padel' }]
+    if (mode === 'two') rows.push({ id: 'tn2', tournament_id: 'tour-smash-open', body: 'Campo 3 molhado, a secar', created_at: ago(65), author_name: 'Smash Padel' })
+    return rows
+  },
   ...LESSON_TABLE_MOCKS,
   ...TOURNAMENT_TABLE_MOCKS,
   ...TOURNAMENT_DRAW_TABLE_MOCKS,

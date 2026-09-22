@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { byCourt, countsForRanking, resultProblem, retirementScore, walkoverScore, winnerSide } from './tournamentScore'
+import { byCourt, countsForRanking, needsDecider, resultProblem, retirementScore, walkoverScore, winnerSide } from './tournamentScore'
 
 describe('falta e desistência (SPEC §7)', () => {
   it('a falta dá o jogo pelo máximo da pontuação', () => {
@@ -75,5 +75,22 @@ describe('os jogos arrumados por campo (print 11)', () => {
   it('os jogos já terminados saem do ecrã de marcar', () => {
     const ids = byCourt(matches).flatMap((c) => [c.live?.id, ...c.next.map((m) => m.id)])
     expect(ids).not.toContain(5)
+  })
+})
+
+describe('o terceiro set', () => {
+  const set = (a, b) => ({ score_a: a, score_b: b })
+  it('não se pede antes de haver dois sets', () => {
+    expect(needsDecider([])).toBe(false)
+    expect(needsDecider([set(6, 4)])).toBe(false)
+  })
+  it('pede-se quando os dois primeiros ficam 1-1', () => {
+    expect(needsDecider([set(6, 4), set(3, 6)])).toBe(true)
+  })
+  it('não se pede quando alguém ganhou os dois', () => {
+    expect(needsDecider([set(6, 4), set(6, 3)])).toBe(false)
+  })
+  it('com o terceiro já escrito, continua a fazer falta — senão a linha desaparecia por baixo dos dedos', () => {
+    expect(needsDecider([set(6, 4), set(3, 6), set(10, 8)])).toBe(true)
   })
 })

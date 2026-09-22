@@ -78,7 +78,11 @@ function Segmented({ options, value, onChange }) {
   )
 }
 
-export default function CreateTournamentForm({ club, onCancel, onCreate, saving, error }) {
+/** Serve para criar e para editar. A editar, `initial` traz o torneio como
+ *  o admin o escreveu; `locked` (há inscrições) deixa mudar só o que não
+ *  estraga inscrições feitas — é a mesma regra que o update_tournament
+ *  impõe do lado da base de dados. */
+export default function CreateTournamentForm({ club, initial = null, locked = false, onCancel, onCreate, saving, error }) {
   const { t, i18n } = useTranslation()
   const [step, setStep] = useState(1)
   const [addingDay, setAddingDay] = useState(false)
@@ -88,18 +92,25 @@ export default function CreateTournamentForm({ club, onCancel, onCreate, saving,
   const fileInput = useRef(null)
   const [poster, setPoster] = useState({ busy: false, error: '' })
   const [editing, setEditing] = useState(null) // índice da categoria aberta, ou 'new'
-  const [draft, setDraft] = useState({
-    name: '',
-    location: club?.location || club?.name || '',
-    poster_url: null,
-    entries_close_at: '',
-    draw_at: '',
-    days: [],
-    courts: [],
-    categories: [],
-    organizer_text: '',
-    rules: { ...DEFAULT_RULES },
-  })
+  const [draft, setDraft] = useState(() => ({
+    name: initial?.tournament?.name || '',
+    location: initial?.tournament?.location || club?.location || club?.name || '',
+    poster_url: initial?.tournament?.poster_url || null,
+    entries_close_at: (initial?.tournament?.entries_deadline || '').slice(0, 16),
+    draw_at: (initial?.tournament?.draw_on || '').slice(0, 10),
+    days: (initial?.days || []).map((d) => ({
+      date: d.date, starts_at: (d.starts_at || '').slice(0, 5), ends_at: (d.ends_at || '').slice(0, 5), courts: d.courts,
+    })),
+    courts: (initial?.courts || []).map((c) => c.name),
+    categories: (initial?.categories || []).map((c) => ({
+      code: c.code, name: c.name, gender: c.gender, level: c.level,
+      day: c.day_date, start_time: (c.start_time || '').slice(0, 5),
+      slots: c.slots, price: Math.round((c.price_cents || 0) / 100),
+    })),
+    organizer_text: initial?.tournament?.organizer_text || '',
+    rules: { ...DEFAULT_RULES, ...(initial?.tournament?.rules || {}) },
+  }))
+  const editing_existing = !!initial
 
   const set = (patch) => setDraft((d) => ({ ...d, ...patch }))
   const setRule = (key, value) => setDraft((d) => ({ ...d, rules: { ...d.rules, [key]: value } }))
@@ -172,16 +183,51 @@ export default function CreateTournamentForm({ club, onCancel, onCreate, saving,
         <ArrowLeft size={16} /> {step === 1 ? t('tournament.create.cancel') : t('common.back')}
       </button>
 
-      <h2 className="mt-3 font-display text-lg font-extrabold text-ink-900">{t('tournament.create.title')}</h2>
-      <div className="mt-1.5 flex gap-1">
-        {[1, 2, 3, 4].map((n) => (
-          <i key={n} className={`h-1 flex-1 rounded-sm ${n <= step ? 'bg-ink-900' : 'bg-ink-50'}`} />
-        ))}
-      </div>
-      <p className="mt-1.5 text-[11.5px] text-ink-500">{t(`tournament.create.step${step}`)}</p>
+      <h2 className="mt-3 font-display text-lg font-extrabold text-ink-900">
+        {editing_existing ? t('tournament.create.edit_title') : t('tournament.create.title')}
+      </h2>
+      {locked ? (
+        <p className="mt-1.5 text-[11.5px] text-ink-500">{t('tournament.create.edit_locked')}</p>
+      ) : (
+        <>
+          <div className="mt-1.5 flex gap-1">
+            {[1, 2, 3, 4].map((n) => (
+              <i key={n} className={`h-1 flex-1 rounded-sm ${n <= step ? 'bg-ink-900' : 'bg-ink-50'}`} />
+            ))}
+          </div>
+          <p className="mt-1.5 text-[11.5px] text-ink-500">{t(`tournament.create.step${step}`)}</p>
+        </>
+      )}
+
+      {/* Com inscrições feitas, só se mexe no que não as estraga — é a mesma
+          regra que o update_tournament impõe na base de dados. */}
+      {locked && (
+        <>
+          <Field label={t('tournament.create.name')}>
+            <input className={inputClass} value={draft.name} onChange={(e) => set({ name: e.target.value })} />
+          </Field>
+          <Field label={t('tournament.create.location')}>
+            <input className={inputClass} value={draft.location} onChange={(e) => set({ location: e.target.value })} />
+          </Field>
+          <Field label={t('tournament.create.entries_until')}>
+            <div className="flex gap-2">
+              <div className="min-w-0 flex-1">
+                <DateField value={draft.entries_close_at.slice(0, 10)} onChange={(v) => set({ entries_close_at: `${v}T${draft.entries_close_at.slice(11) || '23:59'}` })} />
+              </div>
+              <input type="time" className="w-[104px] rounded-ctrl border border-line bg-canvas px-2 py-2.5 text-sm" value={draft.entries_close_at.slice(11) || '23:59'} onChange={(e) => set({ entries_close_at: `${draft.entries_close_at.slice(0, 10)}T${e.target.value}` })} />
+            </div>
+          </Field>
+          <Field label={t('tournament.create.draw')} hint={t('tournament.create.draw_hint')}>
+            <DateField value={draft.draw_at} onChange={(v) => set({ draw_at: v })} />
+          </Field>
+          <Field label={t('tournament.create.organizer_text')}>
+            <textarea rows={3} className={inputClass} value={draft.organizer_text} onChange={(e) => set({ organizer_text: e.target.value })} />
+          </Field>
+        </>
+      )}
 
       {/* 1 · Quando e onde */}
-      {step === 1 && (
+      {!locked && step === 1 && (
         <>
           <Field label={t('tournament.create.name')}>
             <input className={inputClass} value={draft.name} onChange={(e) => set({ name: e.target.value })} placeholder={t('tournament.create.name_placeholder')} />
@@ -248,7 +294,7 @@ export default function CreateTournamentForm({ club, onCancel, onCreate, saving,
       )}
 
       {/* 2 · Campos e horas */}
-      {step === 2 && (
+      {!locked && step === 2 && (
         <>
           {draft.days.map((d, i) => (
             <div key={d.date} className="mt-2 rounded-card border border-line p-3">
@@ -285,7 +331,7 @@ export default function CreateTournamentForm({ club, onCancel, onCreate, saving,
       )}
 
       {/* 3 · Categorias */}
-      {step === 3 && (
+      {!locked && step === 3 && (
         <>
           {draft.categories.map((c, i) => (
             <div key={i} className="flex items-center gap-2.5 border-t border-line py-2">
@@ -307,6 +353,7 @@ export default function CreateTournamentForm({ club, onCancel, onCreate, saving,
           {editing !== null ? (
             <CategoryEditor
               value={editing === 'new' ? null : draft.categories[editing]}
+              taken={draft.categories.filter((_, k) => k !== editing).map((c) => c.code)}
               days={draft.days}
               dayLabel={dayLabel}
               onCancel={() => setEditing(null)}
@@ -335,7 +382,7 @@ export default function CreateTournamentForm({ club, onCancel, onCreate, saving,
       )}
 
       {/* 4 · Regras */}
-      {step === 4 && (
+      {!locked && step === 4 && (
         <>
           <Field label={t('tournament.create.entry_mode')}>
             <Segmented
@@ -391,14 +438,20 @@ export default function CreateTournamentForm({ club, onCancel, onCreate, saving,
       {error && <p className="mt-3 text-[12px] text-danger">{error}</p>}
 
       <div className="mt-5 space-y-2">
-        {step < 4 ? (
+        {locked ? (
+          <PrimaryButton className="w-full" disabled={saving} onClick={() => onCreate(draft)}>{t('tournament.create.save_changes')}</PrimaryButton>
+        ) : step < 4 ? (
           <PrimaryButton className="w-full" onClick={() => (problem ? setTried(true) : (setTried(false), setStep(step + 1)))}>{t('tournament.create.next')}</PrimaryButton>
         ) : (
           <>
-            <PrimaryButton className="w-full" disabled={saving} onClick={() => publish('inscricoes')}>{t('tournament.create.publish')}</PrimaryButton>
-            <button type="button" disabled={saving} onClick={() => publish('rascunho')} className="w-full rounded-ctrl border border-line py-2.5 text-sm font-semibold text-ink-700 hover:bg-ink-50">
-              {t('tournament.create.save_draft')}
-            </button>
+            <PrimaryButton className="w-full" disabled={saving} onClick={() => (editing_existing ? onCreate(draft) : publish('inscricoes'))}>
+              {editing_existing ? t('tournament.create.save_changes') : t('tournament.create.publish')}
+            </PrimaryButton>
+            {!editing_existing && (
+              <button type="button" disabled={saving} onClick={() => publish('rascunho')} className="w-full rounded-ctrl border border-line py-2.5 text-sm font-semibold text-ink-700 hover:bg-ink-50">
+                {t('tournament.create.save_draft')}
+              </button>
+            )}
           </>
         )}
       </div>
@@ -409,7 +462,7 @@ export default function CreateTournamentForm({ club, onCancel, onCreate, saving,
 /** A ficha de uma categoria: género e nível dão o código (M5, MX4), e o dia
  *  e a hora são os que aparecem a quem chega de fora («sábado, a partir das
  *  12h»). */
-function CategoryEditor({ value, days, dayLabel, onCancel, onSave }) {
+function CategoryEditor({ value, taken = [], days, dayLabel, onCancel, onSave }) {
   const { t } = useTranslation()
   const [cat, setCat] = useState(value || {
     gender: 'masculino', level: 5, name: '', day: days[0]?.date || '', start_time: days[0]?.starts_at || '', slots: 16, price: 25,
@@ -417,6 +470,10 @@ function CategoryEditor({ value, days, dayLabel, onCancel, onSave }) {
   const code = categoryCode(cat.gender, cat.level)
   const name = cat.name || categoryName(t, cat.gender, cat.level)
   const set = (patch) => setCat((c) => ({ ...c, ...patch }))
+  // Num torneio há uma categoria por nível, e só uma (decisão do Francisco,
+  // 22 set). Dois «M5» davam o mesmo código e a base de dados recusa-os —
+  // mais vale dizê-lo aqui, em português, do que deixar o admin sem saída.
+  const repeated = taken.includes(code)
 
   return (
     <div className="mt-3 rounded-card border border-line p-3">
@@ -459,7 +516,8 @@ function CategoryEditor({ value, days, dayLabel, onCancel, onSave }) {
           <input type="number" min="0" max="500" className={inputClass} value={cat.price} onChange={(e) => set({ price: e.target.value })} />
         </div>
       </div>
-      <PrimaryButton className="mt-3 w-full" disabled={!cat.slots || Number(cat.slots) < 2} onClick={() => onSave({ ...cat, code, name })}>
+      {repeated && <p className="mt-3 text-[12px] text-danger">{t('tournament.create.category_repeated', { name: categoryName(t, cat.gender, cat.level) })}</p>}
+      <PrimaryButton className="mt-3 w-full" disabled={repeated || !cat.slots || Number(cat.slots) < 2} onClick={() => onSave({ ...cat, code, name })}>
         {t('tournament.create.save')}
       </PrimaryButton>
     </div>

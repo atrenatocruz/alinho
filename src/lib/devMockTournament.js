@@ -87,6 +87,9 @@ const TOURNAMENT = () => {
     entries_deadline: iso(dayAfter(fri, -4)),
     draw_on: iso(dayAfter(fri, -2)),
     organizer_text: 'Pagamento na receção ou por MB Way. A inscrição só fica válida quando o clube confirmar.',
+    // mockTournamentScoring = 'melhor_2_sets' | 'melhor_3_sets' para ver o
+    // ecrã do marcador a pedir os sets um a um.
+    rules: { scoring: localStorage.getItem('mockTournamentScoring') || 'pro_set_9' },
     // Cartaz fictício, para se ver o topo da página com imagem. Em
     // localhost não há Storage: carregar um cartaz a sério precisa de
     // sessão verdadeira.
@@ -151,6 +154,24 @@ export const TOURNAMENT_RPC_MOCKS = {
     created = created.filter((x) => x.id !== params?.p_tournament_id)
     return null
   },
+  get_tournament_for_edit: (params) => {
+    if (!on()) return null
+    const fri = nextFriday()
+    const mine = created.find((x) => x.id === params?.p_tournament_id)
+    const t = mine ? { ...TOURNAMENT(), ...mine } : TOURNAMENT()
+    return {
+      tournament: { ...t, entries_deadline: `${t.entries_deadline}T23:59`, draw_on: t.draw_on, rules: {} },
+      days: [0, 1, 2].map((n) => ({
+        id: `d${n}`, date: iso(dayAfter(fri, n)), starts_at: n === 0 ? '18:00' : '09:00', ends_at: n === 2 ? '18:00' : '21:00', courts: n === 2 ? 3 : 4,
+      })),
+      courts: ['Campo 1', 'Campo 2', 'Campo 3 · KIA', 'Campo 4'].map((name, i) => ({ id: `c${i}`, name })),
+      categories: categories(),
+      // mockTournamentEntries = 'true' → já há inscrições, e então só se
+      // pode mudar o que não as estraga.
+      has_entries: localStorage.getItem('mockTournamentEntries') === 'true',
+    }
+  },
+  update_tournament: () => null,
   get_tournament_page: () => {
     if (!on()) return null
     return {
@@ -200,6 +221,7 @@ export const TOURNAMENT_SCORE_RPC_MOCKS = {
       status: 'terminado',
       score_a: params.p_score_a,
       score_b: params.p_score_b,
+      sets: params.p_sets || null,
       // Corrigir um resultado já gravado fica registado (cartão #365).
       corrected_by_name: m.status === 'terminado' ? 'Admin (Dev)' : null,
     } : m))
