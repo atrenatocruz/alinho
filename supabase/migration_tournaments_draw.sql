@@ -87,8 +87,12 @@ BEGIN
   IF p_waitlist_ids IS NOT NULL THEN
     FOREACH v_id IN ARRAY p_waitlist_ids LOOP
       v_order := v_order + 1;
+      -- Nem mesmo se o admin a mandar de propria mao: uma dupla por
+      -- responder nao pode ficar suplente, senao sobe da lista de espera
+      -- com um parceiro que nunca aceitou. Sai mais abaixo.
       UPDATE tournament_entries SET status = 'suplente', waitlist_order = v_order
-       WHERE id = v_id AND category_id = p_category_id AND status <> 'desistiu';
+       WHERE id = v_id AND category_id = p_category_id
+         AND status NOT IN ('desistiu','convite','sem_parceiro');
     END LOOP;
   END IF;
 
@@ -103,6 +107,18 @@ BEGIN
      SET status = 'suplente', waitlist_order = resto.n
     FROM resto
    WHERE e.id = resto.id;
+
+  -- Quem ficou por responder ao convite, ou sem parceiro, NAO entrou: sai
+  -- agora, em vez de ficar num estado que nunca mais muda. Com a categoria
+  -- fechada o parceiro ja nao pode aceitar e quem se inscreveu ja nao pode
+  -- desistir -- a inscricao ficava presa para sempre, e o cartao do jogador
+  -- dizia "a espera do teu parceiro aceitar" ate ao fim dos tempos.
+  -- Apanhado pelo Dev 2 a ensaiar a costura entre o fecho e as inscricoes.
+  UPDATE tournament_entries
+     SET status = 'desistiu', waitlist_order = NULL
+   WHERE category_id = p_category_id
+     AND NOT (id = ANY (p_entry_ids))
+     AND status IN ('convite','sem_parceiro');
 
   UPDATE tournament_categories SET status = 'fechada' WHERE id = p_category_id;
 
