@@ -256,3 +256,22 @@
 @media (prefers-reduced-motion: reduce) {
   .reveal { opacity: 1; transform: none; transition: none; }
 }
+
+/* ─── Sem zoom ao tocar num campo, no iPhone ──────────────────────────────
+   O Safari do iOS aproxima a página sempre que se toca num campo com letra
+   abaixo de 16px — e depois fica aproximada, com a pessoa a arrastar para
+   ler o resto do ecrã. Era o que acontecia nas caixas de pesquisa e nos
+   campos de nome (Francisco, 22 set). Muitos campos usam text-sm (14px),
+   espalhados por dezenas de ficheiros e por ecrãs que outros agentes estão
+   a construir — por isso a regra vive aqui, uma vez, em vez de andar a
+   perseguir cada campo.
+
+   Só no telemóvel: a partir de 768px a letra volta ao tamanho que o ecrã
+   pedir. Caixas e botões de escolha ficam de fora (não têm texto). */
+@media (max-width: 767px) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
