@@ -2415,5 +2415,8 @@
   "tournament.create.edit_locked": "There are entries already: only what doesn't break them can change.",
   "tournament.create.save_changes": "Save changes",
   "tournament.admin.edit": "Edit",
-  "tournament.admin.edit_error": "Couldn't open this tournament for editing."
+  "tournament.admin.edit_error": "Couldn't open this tournament for editing.",
+  "tournament.score.set_number": "Set {{number}}",
+  "tournament.score.super_tiebreak": "Super tie-break",
+  "tournament.score.sets_hint": "Enter the sets as they finished. The third only shows if they split one all."
 }

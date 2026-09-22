@@ -52,6 +52,17 @@ export function resultProblem(scoring, input) {
   return null
 }
 
+/** Faz falta um terceiro set? A conta é SÓ sobre os dois primeiros: com os
+ *  três já escritos o jogo está decidido, e perguntar sobre os três dava
+ *  "não é preciso" — que foi o que, no ecrã do marcador, fazia a linha do
+ *  super tie-break desaparecer no momento em que se acabava de a escrever.
+ *  `sets` são os sets já completos, na ordem em que se jogaram. */
+export function needsDecider(sets = []) {
+  const firstTwo = sets.slice(0, 2)
+  if (firstTwo.length < 2) return false
+  return !computeSetsResult(firstTwo).decided
+}
+
 /** Quem ganhou, a partir do resultado guardado. null se estiver empatado
  *  (não deve acontecer num torneio). */
 export const winnerSide = (scoreA, scoreB) => (scoreA > scoreB ? 'a' : scoreB > scoreA ? 'b' : null)

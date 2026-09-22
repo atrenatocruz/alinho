@@ -11,28 +11,102 @@ import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Trophy } from 'lucide-react'
 import { useGoBack } from '../lib/useGoBack'
 import { getTournamentPage, listMatchesToScore, markWalkover, saveMatchResult } from '../lib/tournamentApi'
-import { byCourt, resultProblem, retirementScore, walkoverScore } from '../lib/tournamentScore'
+import { byCourt, needsDecider, resultProblem, retirementScore, walkoverScore } from '../lib/tournamentScore'
+import { computeSetsResult } from '../lib/scoringLogic'
 import { describeError, errorKind } from '../lib/errors'
 import { EmptyState, PrimaryButton } from '../components/ui'
 import { MonoLabel, StatePill } from '../components/tournament/TournamentBits'
 
 const hhmm = (iso) => (iso ? String(iso).slice(11, 16) : '')
 
-/** O cartão de um campo: quem está a jogar, os dois números e os três
- *  botões. */
+const SETS_FORMATS = ['melhor_2_sets', 'melhor_3_sets']
+
+/** Nos formatos por sets, o jogo já acabou quando alguém marca: escrevem-se
+ *  os sets todos de uma vez, não um a um (é o contrário do mix, onde se
+ *  marca set a set ao longo do jogo). O 3.º só aparece quando os dois
+ *  primeiros ficam 1-1 — e no «2 sets + super tie-break» esse 3.º é o
+ *  super tie-break. */
+function SetRows({ sets, onChange, teamA, teamB, decider, t }) {
+  // Atualização em função do estado anterior: escrever nas duas caixas de
+  // um set uma logo a seguir à outra, sem o ecrã redesenhar pelo meio,
+  // perdia a primeira.
+  const setOne = (i, side, value) => {
+    onChange((prev) => prev.map((x, k) => (k === i ? { ...x, [side]: value } : x)))
+  }
+  return (
+    <div className="mt-2">
+      <div className="grid grid-cols-[minmax(0,1fr)_56px_56px] items-center gap-2 pb-1">
+        <span />
+        <span className="text-center text-[10.5px] font-semibold text-ink-500">{teamA}</span>
+        <span className="text-center text-[10.5px] font-semibold text-ink-500">{teamB}</span>
+      </div>
+      {sets.map((s, i) => (
+        <div key={i} className="grid grid-cols-[minmax(0,1fr)_56px_56px] items-center gap-2 py-1">
+          <span className="text-[12px] text-ink-700">
+            {i === 2 && decider ? t('tournament.score.super_tiebreak') : t('tournament.score.set_number', { number: i + 1 })}
+          </span>
+          {['a', 'b'].map((side) => (
+            <input
+              key={side}
+              type="number"
+              inputMode="numeric"
+              min="0"
+              max="99"
+              aria-label={`${t('tournament.score.set_number', { number: i + 1 })} · ${side === 'a' ? teamA : teamB}`}
+              value={s[side]}
+              onChange={(e) => setOne(i, side, e.target.value)}
+              className="w-full rounded-md border border-line px-2 py-1 text-center font-display text-[17px] font-extrabold text-ink-900"
+            />
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+const emptySets = (n) => Array.from({ length: n }, () => ({ a: '', b: '' }))
+/** Os sets escritos que já estão completos, na forma que o servidor espera. */
+const filledSets = (sets) => sets
+  .filter((s) => s.a !== '' && s.b !== '' && Number(s.a) !== Number(s.b))
+  .map((s) => ({ score_a: Number(s.a), score_b: Number(s.b) }))
+
+/** O cartão de um campo: quem está a jogar, o resultado e os três botões. */
 function CourtCard({ match, scoring, onSave, onWalkover, busy, t }) {
   const finished = ['terminado', 'falta', 'desistencia'].includes(match.status)
+  const bySets = SETS_FORMATS.includes(scoring)
   const [editing, setEditing] = useState(!finished)
   const [a, setA] = useState(match.score_a ?? '')
   const [b, setB] = useState(match.score_b ?? '')
+  const [sets, setSets] = useState(() => emptySets(2))
   const [problem, setProblem] = useState(null)
 
   useEffect(() => { setA(match.score_a ?? ''); setB(match.score_b ?? '') }, [match.score_a, match.score_b])
 
   const label = [match.category_code, match.group_label || match.round_label].filter(Boolean).join(' ')
 
+  // Um terceiro set só faz sentido depois de os DOIS PRIMEIROS ficarem 1-1
+  // — e a conta é só sobre esses dois. Com os três, o jogo já está decidido
+  // e a conta dava "não é preciso terceiro", o que fazia a linha do super
+  // tie-break desaparecer no momento em que se acabava de a escrever.
+  const done = filledSets(sets)
+  const needThird = needsDecider(done)
+  const thirdIsEmpty = sets.length === 3 && sets[2].a === '' && sets[2].b === ''
+  useEffect(() => {
+    if (!bySets) return
+    if (needThird && sets.length === 2) setSets((prev) => [...prev, { a: '', b: '' }])
+    // Só se tira a linha se ainda não tiver nada escrito: nunca se apaga o
+    // que o marcador já lá pôs.
+    if (!needThird && thirdIsEmpty) setSets((prev) => prev.slice(0, 2))
+  }, [bySets, needThird, thirdIsEmpty, sets.length])
+
   const save = () => {
-    const input = { score_a: Number(a), score_b: Number(b) }
+    const input = bySets
+      ? (() => {
+        const rows = filledSets(sets)
+        const { setsA, setsB } = computeSetsResult(rows)
+        return { score_a: setsA, score_b: setsB, sets: rows.map((r, i) => ({ ...r, is_super_tiebreak: i === 2 && scoring === 'melhor_2_sets' })) }
+      })()
+      : { score_a: Number(a), score_b: Number(b) }
     const p = resultProblem(scoring, input)
     setProblem(p)
     if (p) return
@@ -52,7 +126,16 @@ function CourtCard({ match, scoring, onSave, onWalkover, busy, t }) {
 
       {editing ? (
         <>
-          {[['a', match.team_a, a, setA], ['b', match.team_b, b, setB]].map(([side, team, value, set]) => (
+          {bySets ? (
+            <SetRows
+              sets={sets}
+              onChange={setSets}
+              teamA={match.team_a?.name}
+              teamB={match.team_b?.name}
+              decider={scoring === 'melhor_2_sets'}
+              t={t}
+            />
+          ) : [['a', match.team_a, a, setA], ['b', match.team_b, b, setB]].map(([side, team, value, set]) => (
             <div key={side} className="mt-1.5 flex items-center justify-between gap-2 rounded-ctrl border border-line px-3 py-1.5">
               <span className="min-w-0 truncate text-[12px] text-ink-900">{team?.name}</span>
               <input
@@ -67,6 +150,7 @@ function CourtCard({ match, scoring, onSave, onWalkover, busy, t }) {
               />
             </div>
           ))}
+          {bySets && <p className="mt-1 text-[11px] text-ink-500">{t('tournament.score.sets_hint')}</p>}
           {problem && <p className="mt-1.5 text-[11.5px] text-danger">{t(`tournament.score.problem_${problem}`)}</p>}
           <div className="mt-2 flex flex-wrap gap-1.5">
             <button type="button" disabled={busy} onClick={save} className="rounded-full bg-lime-400 px-3 py-1.5 text-[12px] font-bold text-ink-900 disabled:opacity-60">
@@ -88,7 +172,14 @@ function CourtCard({ match, scoring, onSave, onWalkover, busy, t }) {
         </>
       ) : (
         <div className="mt-2 flex items-center justify-between gap-2">
-          <span className="font-display text-[20px] font-extrabold text-ink-900">{match.score_a}-{match.score_b}</span>
+          <span className="min-w-0">
+            <b className="block font-display text-[20px] font-extrabold text-ink-900">{match.score_a}-{match.score_b}</b>
+            {match.sets?.length > 0 && (
+              <span className="block text-[11px] text-ink-500">
+                {match.sets.map((x) => `${x.score_a}-${x.score_b}`).join(' · ')}
+              </span>
+            )}
+          </span>
           <div className="flex items-center gap-2">
             {match.corrected_by_name && (
               <span className="text-[11px] text-ink-500">{t('tournament.score.corrected_by', { name: match.corrected_by_name })}</span>
