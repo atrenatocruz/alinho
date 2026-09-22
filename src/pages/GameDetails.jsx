@@ -74,6 +74,7 @@ export default function GameDetails() {
   const goBack = useGoBack('/')
   const navigate = useNavigate()
   const { user, profile, isGuest, memberships, updateProfile } = useAuth()
+  const isPlatformAdmin = !!profile?.is_platform_admin
   const [game, setGame] = useState(null)
   // isAdmin/gameOrganizationId are derived from the specific mix being
   // viewed, not the app-wide "current organization" — Home now links to
@@ -3256,7 +3257,13 @@ export default function GameDetails() {
             </div>
           )}
 
-          {isAdmin && (
+          {/* "Adicionar jogador de teste" e "Importar em massa" são
+              ferramentas de plataforma, não de clube: criam contas só com
+              nome. Apareciam a qualquer admin de grupo e confundiam — o Rui
+              pensou que era assim que se inscrevia a malta (Trello #344).
+              Ficam só para admins da plataforma até haver desenho próprio
+              para o admin inscrever jogadores. */}
+          {isPlatformAdmin && (
             <PrimaryButton
               variant="ghost"
               onClick={handleAddTestUser}
@@ -3272,7 +3279,7 @@ export default function GameDetails() {
             </PrimaryButton>
           )}
 
-          {isAdmin && (
+          {isPlatformAdmin && (
             <div className="card space-y-3">
               <h3 className="text-lg text-ink-900">{t('gamedetails.bulk_import_title')}</h3>
               <textarea

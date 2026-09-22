@@ -570,8 +570,12 @@ export function Avatar({ name, url, size = 'w-10 h-10 text-sm', colorClass = 'bg
   // a group as people, so the two never look alike at a glance (Trello #177).
   const radius = shape === 'square' ? 'rounded-xl' : 'rounded-full'
   const base = `${size} ${radius} flex items-center justify-center shrink-0 font-extrabold overflow-hidden`
+  // object-position a 30% da altura em vez do centro: nas fotos ao alto
+  // (a maioria das que as pessoas usam) o centro é o peito e a cabeça
+  // ficava cortada — Francisco, 22 set 2026, com a foto dele no cartão do
+  // mix. A 30% a cabeça fica enquadrada e ainda se vê o corpo.
   const core = url
-    ? <img src={url} alt={name || ''} className={`${base} object-cover`} />
+    ? <img src={url} alt={name || ''} className={`${base} object-cover object-[50%_30%]`} />
     : <div className={`${base} ${colorClass}`}>{(name || '?').charAt(0).toUpperCase()}</div>
 
   // Jogador provisório (<8 jogos de Elo): mini-pill "NOVO" sobre a borda
