@@ -621,8 +621,8 @@ const TABLE_MOCKS = {
     const mode = localStorage.getItem('mockTNotices')
     if (!mode) return []
     const ago = (min) => new Date(Date.now() - min * 60000).toISOString()
-    const rows = [{ id: 'tn1', tournament_id: 'tour-smash-open', body: 'M4 atrasado cerca de 20 minutos', created_at: ago(6), author_name: 'Smash Padel' }]
-    if (mode === 'two') rows.push({ id: 'tn2', tournament_id: 'tour-smash-open', body: 'Campo 3 molhado, a secar', created_at: ago(65), author_name: 'Smash Padel' })
+    const rows = [{ id: 'tn1', tournament_id: 'tour-smash-open', body: 'M4 atrasado cerca de 20 minutos', created_at: ago(6), author_name: 'Smash Padel', expires_at: null, updated_at: null }]
+    if (mode === 'two') rows.push({ id: 'tn2', tournament_id: 'tour-smash-open', body: 'Campo 3 molhado, a secar', created_at: ago(65), author_name: 'Smash Padel', expires_at: new Date(Date.now() + 3600000).toISOString(), updated_at: ago(12) })
     return rows
   },
   ...LESSON_TABLE_MOCKS,

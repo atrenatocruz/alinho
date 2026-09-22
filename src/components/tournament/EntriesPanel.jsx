@@ -6,7 +6,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { Sheet } from '../agenda/AgendaControls'
 import { Avatar, PrimaryButton, EmptyState } from '../ui'
 import { partnerNameError, partnerEmailError } from '../../lib/partnerInvite'
-import { listEntries, validateEntry, removeEntry, adminSignUp, tournamentInviteLink } from '../../lib/tournamentSignup'
+import { listEntries, validateEntry, removeEntry, adminSignUp, tournamentInviteLink, inviteToken } from '../../lib/tournamentSignup'
 import { whatsappShare } from '../../lib/partnerInvite'
 
 /* Separador «Inscritos» (Trello #362).
@@ -172,12 +172,20 @@ export default function EntriesPanel({ tournament, category }) {
   // "20 set" — curto, que a linha é estreita.
   const signedUpOn = (iso) => new Date(iso).toLocaleDateString('pt-PT', { day: 'numeric', month: 'short' })
 
-  // Reenviar o link de quem entrou pelo nome, para colar no WhatsApp.
-  const share = (e) => {
-    const link = tournamentInviteLink(e.invite_token, window.location.origin)
-    window.open(whatsappShare(t('tsignup.invite_whatsapp_text', {
-      name: e.guest_name || '', title: tournament.name, link,
-    })), '_blank')
+  // Reenviar o link de quem entrou pelo nome, para colar no WhatsApp. O
+  // código vai-se buscar agora, não vem na lista (revisão do Dev 3).
+  const share = async (e) => {
+    try {
+      const token = await inviteToken(e.entry_id)
+      if (!token) return
+      const link = tournamentInviteLink(token, window.location.origin)
+      window.open(whatsappShare(t('tsignup.invite_whatsapp_text', {
+        name: e.guest_name || '', title: tournament.name, link,
+      })), '_blank')
+    } catch (err) {
+      console.error('Error getting the invite token:', err)
+      setError(t('tsignup.error_generic'))
+    }
   }
 
   const act = async (fn) => {
@@ -244,7 +252,7 @@ export default function EntriesPanel({ tournament, category }) {
                 <div className="flex shrink-0 gap-1">
                   {/* Reenviar o convite de quem ainda não tem conta: o link
                       é a única forma de ele ficar com o lugar. */}
-                  {e.invite_token && !e.player2_id && (
+                  {e.has_invite && !e.player2_id && (
                     <button
                       onClick={() => share(e)}
                       disabled={busy}
