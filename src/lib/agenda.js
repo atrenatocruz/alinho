@@ -16,7 +16,7 @@
    Nada aqui vai à base de dados.
    ════════════════════════════════════════════════════════════════════════ */
 
-export const EVENT_KINDS = ['mix', 'open', 'friends', 'lesson']
+export const EVENT_KINDS = ['mix', 'open', 'friends', 'lesson', 'tournament']
 
 // Dia local 'AAAA-MM-DD'. Local de propósito: um mix às 00:30 de sábado em
 // Lisboa pertence a sábado, não à sexta-feira em UTC.
@@ -267,6 +267,68 @@ export function eventFromLesson(row) {
     latitude: num(row.latitude) ?? num(org?.latitude),
     longitude: num(row.longitude) ?? num(org?.longitude),
     raw: row,
+  }
+}
+
+/* ── Torneios (Trello #363) ──────────────────────────────────────────────
+   Dois cartões diferentes, conforme o momento (SPEC §3):
+   • antes do sorteio, UM cartão do torneio — categorias, prazo, inscrever;
+   • depois do sorteio, esse sai e entram os JOGOS daquela pessoa, cada um
+     no seu dia, com hora prevista, campo e adversário.
+   Um torneio dura dias: o cartão de inscrição fica no primeiro dia. */
+
+export function eventFromTournament(row, my = null) {
+  // Sem hora: o torneio é um dia inteiro até haver sorteio.
+  const startsAt = fromDayKey(row.starts_on)
+  return {
+    key: `tournament:${row.id}`,
+    source: 'tournament',
+    kind: 'tournament',
+    id: row.id,
+    slug: row.slug || null,
+    startsAt,
+    hasTime: false,
+    dayKey: toDayKey(startsAt),
+    endsOn: row.ends_on || null,
+    orgId: row.organization_id || null,
+    orgName: row.club_name || null,
+    orgKind: 'club',
+    orgLogo: row.club_logo_url || null,
+    mine: !!my,
+    myState: my?.state || null,
+    finished: row.status === 'terminado',
+    raw: row,
+  }
+}
+
+/** Um jogo do torneio, já com dia, hora e campo (print 04). */
+export function eventFromTournamentMatch(match, context = {}) {
+  const { tournament = {}, category = null, opponentName = null, myTeamName = null } = context
+  const startsAt = match.scheduled_at ? new Date(match.scheduled_at) : null
+  return {
+    key: `tmatch:${match.id}`,
+    source: 'tournament_match',
+    kind: 'tournament',
+    id: tournament.id || null,
+    slug: tournament.slug || null,
+    matchId: match.id,
+    startsAt,
+    hasTime: !!match.scheduled_at,
+    dayKey: startsAt ? toDayKey(startsAt) : null,
+    orgId: tournament.organization_id || null,
+    orgName: tournament.club_name || null,
+    orgKind: 'club',
+    orgLogo: tournament.club_logo_url || null,
+    mine: true,
+    myState: match.status === 'terminado' ? 'played' : 'playing',
+    categoryCode: category?.code || null,
+    courtName: match.court_name || null,
+    // "era 17:00" — a hora antiga quando o jogo foi antecipado (SPEC §6).
+    previousAt: match.previous_scheduled_at || null,
+    opponentName,
+    myTeamName,
+    finished: match.status === 'terminado',
+    raw: match,
   }
 }
 
