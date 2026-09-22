@@ -119,6 +119,9 @@ export default function Login() {
   const [signupGender, setSignupGender] = useState('')
   const [signupPassword, setSignupPassword] = useState('')
   const [signupConfirmPassword, setSignupConfirmPassword] = useState('')
+  // Set once signUp succeeds without a session — i.e. Supabase's "Confirm
+  // email" is on and the account only becomes usable from the emailed link.
+  const [confirmationSent, setConfirmationSent] = useState(false)
 
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -179,13 +182,28 @@ export default function Login() {
     }
 
     try {
-      const { error } = await signUp(signupEmail, signupPassword, {
+      const { data, error } = await signUp(signupEmail, signupPassword, {
         name: signupName,
         birthday: signupBirthday,
         gender: signupGender,
       })
 
       if (error) throw error
+
+      // No session means the address has to be confirmed first — signing in
+      // now would just fail with "email not confirmed". AuthContext hashes
+      // the stashed phone once the confirmation link produces a session.
+      if (!data?.session) {
+        if (signupPhone) {
+          try {
+            localStorage.setItem('pendingSignupPhone', signupPhone)
+          } catch {
+            // ignore — the phone is optional and can be added in Perfil
+          }
+        }
+        setConfirmationSent(true)
+        return
+      }
 
       // Auto-login after signup
       const { error: loginError } = await signIn(signupEmail, signupPassword)
@@ -362,7 +380,14 @@ export default function Login() {
           )}
 
           {/* Signup Form */}
-          {mode === 'signup' && (
+          {mode === 'signup' && confirmationSent && (
+            <div className="text-center animate-fade-up">
+              <p className="text-ink-900 font-extrabold text-lg mb-2">{t('login.signup_confirm_sent_title')}</p>
+              <p className="text-muted text-sm">{t('login.signup_confirm_sent_body', { email: signupEmail })}</p>
+            </div>
+          )}
+
+          {mode === 'signup' && !confirmationSent && (
             <form onSubmit={handleSignup} className="space-y-4 animate-fade-up">
               <div>
                 <label className={inputLabel}>{t('login.fullname_label')}</label>
