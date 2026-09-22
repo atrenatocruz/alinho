@@ -486,6 +486,8 @@
   "tagenda.categories_other": "{{count}} categorias",
   "tagenda.may_start_earlier": "Pode começar mais cedo · chega 20 min antes",
   "agenda.filter_kind_tournament": "Torneios",
+  "tsignup.error_entry_already_drawn": "Esta dupla já está no sorteio. Para a tirar a meio do torneio, marca falta no ecrã do marcador.",
+  "tsignup.claim_error_entries_closed": "As inscrições deste torneio já fecharam.",
   "layout.celebrations_close": "Boa! 🎾",
   "achievements.shelf_title": "Conquistas",
   "achievements.progress": "{{earned}} de {{total}} conquistados",
