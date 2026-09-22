@@ -327,7 +327,8 @@ const ROT_MATCHES_FN = () => rotPlacar() === 'none' ? [
 ]
 const rotating = () => localStorage.getItem('mockRotatingMix') === 'true'
 
-// localStorage.mockEventState = 'open' | 'joined' | 'live' | 'finished' — a
+// localStorage.mockEventState = 'open' | 'joined' | 'live' | 'finished'
+// | 'paused' | 'paused_no_results' — a
 // página do mix nos quatro estados do desenho aprovado a 17 set (cores e
 // página do evento): não inscrito, inscrito antes de começar, inscrito a
 // decorrer (com duplas e o meu par) e terminado. 8 jogadores, 2 campos.
@@ -721,9 +722,9 @@ const TABLE_MOCKS = {
     ? [{ game_id: 'ag-finished-yesterday', user_id: MOCK_ADMIN_USER_ID, mix_won: false, rating_delta: 18, points_earned: 14,
         game: { id: 'ag-finished-yesterday', title: 'Mix de segunda', date: atDay(-1, 19).toISOString(), location: 'Smash Padel, Parque das Nações' } }]
     : longNames() ? LONG_STATS : []),
-  teams: (url) => (agenda() && url.includes('ag-winner') ? AGENDA_WINNER_TEAMS() : ['live', 'finished'].includes(eventState()) ? EV_TEAMS : rotating() ? ROT_TEAMS : []),
+  teams: (url) => (agenda() && url.includes('ag-winner') ? AGENDA_WINNER_TEAMS() : ['live', 'finished', 'paused', 'paused_no_results'].includes(eventState()) ? EV_TEAMS : rotating() ? ROT_TEAMS : []),
   participants: () => (eventState() ? EV_PARTICIPANTS() : []),
-  matches: () => (['live', 'finished'].includes(eventState()) ? EV_MATCHES() : rotating() ? ROT_MATCHES_FN() : []),
+  matches: () => (['live', 'finished', 'paused'].includes(eventState()) ? EV_MATCHES() : rotating() ? ROT_MATCHES_FN() : []),
   // Mix em aberto — 1 dupla já confirmada, a segunda por preencher (2 de 4
   // lugares), para se ver o cartão no estado "aberto/junto-te" na Home.
   games: (url) => agenda() ? (url.includes('recurrence_id=eq.') ? AGENDA_PREVIOUS_EDITIONS() : AGENDA_GAMES()) : [{
@@ -751,7 +752,9 @@ const TABLE_MOCKS = {
     ...(eventState() ? {
       title: '+1 Mix de Quinta-feira', recurrence_id: 'rec-ev', num_courts: 2, max_players: 8, price_per_player: 11.5,
       prize: 'Voucher 1h30 para a dupla vencedora', location: 'Smash Padel Almada, Av. do Cristo Rei', game_time_minutes: 20,
-      status: { open: 'open', joined: 'closed', live: 'in_progress', finished: 'finished' }[eventState()],
+      // 'paused'/'paused_no_results': o mix parado do #416 — duplas guardadas,
+      // com e sem resultados já lançados.
+      status: { open: 'open', joined: 'closed', live: 'in_progress', finished: 'finished', paused: 'closed', paused_no_results: 'closed' }[eventState()],
       ...(eventState() === 'finished' ? { winner_team_id: 'et1' } : {}),
       ...(eventState() === 'live' ? { round_started_at: new Date().toISOString(), round_duration_minutes: 20 } : {}),
     } : {}),

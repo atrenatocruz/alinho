@@ -1242,24 +1242,26 @@ export default function GameDetails() {
   // status === 'open') works immediately — trade-off: "Começar o Mix"
   // (canStart requires showClosed) won't reappear until the mix is full
   // again, same as any other open-and-not-full mix.
+  // Parar NAO apaga nada (Trello #416). matches.team_a_id/team_b_id apagam
+  // em cascata com as teams, por isso apagar as duplas levava atras os jogos
+  // e os resultados - a noite inteira de quem organizou, sem volta. O mix
+  // fica 'closed' (nada a decorrer, inscricoes fechadas) e o admin retoma
+  // onde estava. Inscricoes fechadas de proposito: quem entrasse depois de
+  // parar ficava de fora das duplas ja formadas sem ninguem dar por isso.
+  // Desfazer tudo e o futuro "Cancelar", nao isto.
   const handleStopMix = async () => {
-    const hasRoom = countPeople(participants) < mixCapacity(game)
     let msg = matches.length > 0
       ? t('gamedetails.confirm_stop_mix_with_results')
       : t('gamedetails.confirm_stop_mix_no_results')
     if (game?.auto_start_hours_before) msg += '\n\n' + t('gamedetails.confirm_stop_mix_disables_autostart')
-    if (hasRoom) msg += '\n\n' + t('gamedetails.confirm_stop_mix_reopens_for_signups')
     if (!confirm(msg)) return
 
     setBusy(true)
     setMixError('')
     try {
-      const { error: teamsError } = await supabase.from('teams').delete().eq('game_id', id)
-      if (teamsError) throw teamsError
-
       const { error: statusError } = await supabase
         .from('games')
-        .update({ status: hasRoom ? 'open' : 'closed', winner_team_id: null, auto_start_hours_before: null })
+        .update({ status: 'closed', winner_team_id: null, auto_start_hours_before: null })
         .eq('id', id)
       if (statusError) throw statusError
 
@@ -1270,6 +1272,42 @@ export default function GameDetails() {
     } finally {
       setBusy(false)
     }
+  }
+
+  // Volta a ligar o mix parado, sem tocar em duplas nem resultados.
+  const handleResumeMix = async () => {
+    setBusy(true)
+    setMixError('')
+    try {
+      const { error } = await supabase.from('games').update({ status: 'in_progress' }).eq('id', id)
+      if (error) throw error
+      loadGameDetails()
+    } catch (error) {
+      console.error('Error resuming mix:', error)
+      setMixError(describeError(t, error, 'gamedetails.error_resume_mix'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // O que o "Parar" fazia de util e deixou de fazer: sortear as duplas outra
+  // vez quando sairam mal. So aparece enquanto nao houver nenhum jogo criado
+  // - assim nunca pode apagar um resultado.
+  const handleRedoDuplas = async () => {
+    if (!confirm(t('gamedetails.confirm_redo_duplas'))) return
+    setBusy(true)
+    setMixError('')
+    try {
+      const { error } = await supabase.from('teams').delete().eq('game_id', id)
+      if (error) throw error
+    } catch (error) {
+      console.error('Error clearing duplas:', error)
+      setMixError(describeError(t, error, 'gamedetails.error_start_mix'))
+      setBusy(false)
+      return
+    }
+    setBusy(false)
+    await handleStartMix()
   }
 
   const orderedTeamIds = () =>
@@ -1898,7 +1936,12 @@ export default function GameDetails() {
   const isFull = peopleCount >= capacity
   const showClosed = !mixStarted && game?.status !== 'completed' &&
     (game?.status === 'closed' || (game?.status === 'open' && isFull))
-  const canStart = isAdmin && !mixStarted && showClosed
+  // Parado com duplas guardadas: o botao nao pode ser o "Comecar o Mix", que
+  // forma duplas de novo (Trello #416).
+  const mixPaused = !mixStarted && teams.length > 0
+  const canStart = isAdmin && !mixStarted && showClosed && !mixPaused
+  const canResume = isAdmin && mixPaused
+  const canRedoDuplas = canResume && matches.length === 0
   const rounds = [...new Set(matches.map(m => m.round_number))].sort((a, b) => a - b)
   const tctStandings = !isSobeDesce && teams.length ? standings(teams, matches) : []
   const americanoStandingsResult = isAmericano && teams.length ? americanoStandings(matches, teams) : []
@@ -2206,7 +2249,10 @@ export default function GameDetails() {
             </PrimaryButton>
           )}
         </div>
-      ) : isUserJoined && (game.status === 'open' || game.status === 'closed') ? (
+      ) : isUserJoined && !mixPaused && (game.status === 'open' || game.status === 'closed') ? (
+        // Com o mix parado (Trello #416) as duplas ja estao formadas: sair
+        // deixaria uma dupla com quem ja nao esta no mix. Retoma-se ou
+        // refazem-se as duplas primeiro.
         <PrimaryButton variant="ghost" onClick={handleLeaveGame} className="w-full !bg-white !border-ink-900">
           {t('gamedetails.leave_mix')}
         </PrimaryButton>
@@ -2394,6 +2440,25 @@ export default function GameDetails() {
           <Play size={20} />
           {busy ? t('gamedetails.forming_duplas') : t('gamedetails.start_mix')}
         </PrimaryButton>
+      )}
+
+      {/* Mix parado (Trello #416): nada se apagou, retoma-se onde estava. */}
+      {canResume && (
+        <div className="space-y-2.5">
+          <div className="bg-ink-900 text-white px-4 py-3 rounded-ctrl text-sm font-extrabold">
+            {t(matches.length > 0 ? 'gamedetails.mix_paused' : 'gamedetails.mix_paused_no_results')}
+          </div>
+          <PrimaryButton onClick={handleResumeMix} disabled={busy} className="w-full">
+            <Play size={20} />
+            {t('gamedetails.resume_mix')}
+          </PrimaryButton>
+          {canRedoDuplas && (
+            <PrimaryButton variant="ghost" onClick={handleRedoDuplas} disabled={busy} className="w-full">
+              <Repeat size={18} />
+              {busy ? t('gamedetails.forming_duplas') : t('gamedetails.redo_duplas')}
+            </PrimaryButton>
+          )}
+        </div>
       )}
 
       {/* ─── Mix board ─────────────────────────────────────────────── */}
@@ -3097,7 +3162,8 @@ export default function GameDetails() {
                       </div>
                     </Link>
                   )}
-                  {isAdmin && (
+                  {/* Mix parado: mexer na lista partiria as duplas ja formadas (#416). */}
+                  {isAdmin && !mixPaused && (
                     <button
                       onClick={() => handleRemovePerson(person)}
                       disabled={busy}
