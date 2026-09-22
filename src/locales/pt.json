@@ -124,6 +124,8 @@
   "login.reset_password_error": "Não foi possível guardar a password. Tenta novamente.",
   "login.reset_password_invalid_title": "Este link já não é válido",
   "login.reset_password_invalid_body": "Pode já ter sido usado ou ter expirado. Pede um novo link para continuar.",
+  "login.signup_confirm_sent_title": "Confirma o teu email",
+  "login.signup_confirm_sent_body": "Enviámos um link para {{email}}. Carrega nele para ativares a conta — se não o vires, espreita a pasta de spam.",
   "login.back_to_login": "Voltar ao login",
   "agenda.and": "e",
   "agenda.previous_editions_title": "Edições anteriores",
