@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { noticeError, activeNotices, noticeAge, NOTICE_MAX } from './tournamentNotices'
+import { noticeError, activeNotices, noticeAge, expiryFrom, editedWords, NOTICE_MAX } from './tournamentNotices'
 
 describe('noticeError', () => {
   it('aceita um aviso normal', () => expect(noticeError('M4 atrasado 20 min')).toBe(null))
@@ -45,4 +45,30 @@ describe('noticeAge', () => {
   it('horas', () => expect(noticeAge('2026-10-10T13:00:00Z', now)).toEqual({ key: 'tnotices.age_hours', values: { count: 2 } }))
   it('dias', () => expect(noticeAge('2026-10-08T15:00:00Z', now)).toEqual({ key: 'tnotices.age_days', values: { count: 2 } }))
   it('sem data, nada', () => expect(noticeAge(null, now)).toBe(null))
+})
+
+describe('expiryFrom', () => {
+  const now = new Date('2026-10-10T14:00:00')
+  it('sem fim', () => expect(expiryFrom('none', now)).toBe(null))
+  it('uma hora', () => expect(new Date(expiryFrom('1h', now)).getHours()).toBe(15))
+  it('três horas', () => expect(new Date(expiryFrom('3h', now)).getHours()).toBe(17))
+  it('até ao fim do dia', () => {
+    const end = new Date(expiryFrom('day', now))
+    expect([end.getHours(), end.getMinutes()]).toEqual([23, 59])
+  })
+})
+
+describe('editedWords', () => {
+  const now = new Date('2026-10-10T18:00:00')
+  it('sem edição, nada', () => expect(editedWords(null, now)).toBe(null))
+  it('no mesmo dia, a hora', () => {
+    expect(editedWords(new Date('2026-10-10T14:20:00'), now))
+      .toEqual({ key: 'tnotices.edited_at', values: { time: '14h20' } })
+  })
+  it('hora certa sem minutos', () => {
+    expect(editedWords(new Date('2026-10-10T14:00:00'), now).values.time).toBe('14h')
+  })
+  it('noutro dia, a data', () => {
+    expect(editedWords(new Date('2026-10-09T14:20:00'), now).key).toBe('tnotices.edited_on')
+  })
 })

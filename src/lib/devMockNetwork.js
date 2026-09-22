@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import { LESSON_RPC_MOCKS, LESSON_TABLE_MOCKS, LESSON_NOTICES } from './devMockLessons'
 import { TOURNAMENT_RPC_MOCKS, TOURNAMENT_TABLE_MOCKS } from './devMockTournament'
+import { TOURNAMENT_DRAW_TABLE_MOCKS } from './devMockTournamentDraw'
 
 // Dev-only: quando a sessão é o atalho "Entrar como Admin (Dev)"
 // (AuthContext.jsx, MOCK_ADMIN_KEY), essa sessão nunca teve um auth.uid()
@@ -620,12 +621,13 @@ const TABLE_MOCKS = {
     const mode = localStorage.getItem('mockTNotices')
     if (!mode) return []
     const ago = (min) => new Date(Date.now() - min * 60000).toISOString()
-    const rows = [{ id: 'tn1', tournament_id: 'tour-smash-open', body: 'M4 atrasado cerca de 20 minutos', created_at: ago(6), author_name: 'Smash Padel' }]
-    if (mode === 'two') rows.push({ id: 'tn2', tournament_id: 'tour-smash-open', body: 'Campo 3 molhado, a secar', created_at: ago(65), author_name: 'Smash Padel' })
+    const rows = [{ id: 'tn1', tournament_id: 'tour-smash-open', body: 'M4 atrasado cerca de 20 minutos', created_at: ago(6), author_name: 'Smash Padel', expires_at: null, updated_at: null }]
+    if (mode === 'two') rows.push({ id: 'tn2', tournament_id: 'tour-smash-open', body: 'Campo 3 molhado, a secar', created_at: ago(65), author_name: 'Smash Padel', expires_at: new Date(Date.now() + 3600000).toISOString(), updated_at: ago(12) })
     return rows
   },
   ...LESSON_TABLE_MOCKS,
   ...TOURNAMENT_TABLE_MOCKS,
+  ...TOURNAMENT_DRAW_TABLE_MOCKS,
   // localStorage.mockNotices = 'true' — três avisos de mix no sino (Trello #292).
   notifications: () => (localStorage.getItem('mockNotices') === 'true' ? [
     { id: 'n1', kind: 'mix_partner_changed', game_id: 'fake-game-1', created_at: new Date().toISOString(),

@@ -124,6 +124,14 @@ export async function listEntries(categoryId) {
   return data || []
 }
 
+/* O código do convite já não vem na lista (qualquer admin com ele ficava
+   com o lugar do parceiro). Pede-se um de cada vez, na hora de reenviar. */
+export async function inviteToken(entryId) {
+  const { data, error } = await supabase.rpc('tournament_invite_token', { p_entry_id: entryId })
+  if (error) throw error
+  return data
+}
+
 export async function validateEntry(entryId, paid = true) {
   const { data, error } = await supabase.rpc('tournament_validate_entry', { p_entry_id: entryId, p_paid: paid })
   if (error) throw error

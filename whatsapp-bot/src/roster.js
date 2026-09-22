@@ -114,6 +114,9 @@ export async function getOpenMixes(organizationId) {
     .select('*')
     .eq('organization_id', organizationId)
     .in('status', ['open', 'closed'])
+    // Ver reminders.js: jogos em aberto não entram no resumo diário nem
+    // nos comandos de mixes — cada horário aparecia como um mix à parte.
+    .neq('origin', 'open_slot')
     .gt('date', new Date().toISOString())
     .order('date', { ascending: true })
 
