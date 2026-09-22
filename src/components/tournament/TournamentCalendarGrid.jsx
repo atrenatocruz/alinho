@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, CalendarDays } from 'lucide-react'
-import { listMatchesToScore } from '../../lib/tournamentApi'
+import { listMatchesToScore, rescheduleMatch } from '../../lib/tournamentApi'
 import { SCHEDULE_DEFAULTS, canPlace, findConflicts } from '../../lib/tournamentSchedule'
 import { describeError, errorKind } from '../../lib/errors'
 import { EmptyState } from '../ui'
@@ -29,7 +29,14 @@ const CATEGORY_COLORS = [
 
 const pad = (n) => String(n).padStart(2, '0')
 const hhmm = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}`
-const dayOf = (iso) => String(iso || '').slice(0, 10)
+// O dia tem de sair da DATA, não das dez primeiras letras do texto: as
+// horas vêm da base de dados com fuso (…T12:00:00+01:00, ou em UTC), e um
+// jogo à meia-noite e meia caía no dia anterior se se cortasse o texto.
+const dayOf = (iso) => {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
 
 export default function TournamentCalendarGrid({ tournament, onBack }) {
   const { t, i18n } = useTranslation()
@@ -37,6 +44,12 @@ export default function TournamentCalendarGrid({ tournament, onBack }) {
   const [day, setDay] = useState(null)
   const [categoryCode, setCategoryCode] = useState(null) // null = todas
   const [error, setError] = useState('')
+  // Mover é em dois toques, não a arrastar: no telemóvel, de pé no clube e
+  // com uma mão, arrastar um bloco de 130 px falha mais vezes do que
+  // acerta. Toca-se no jogo, os lugares onde ele cabe acendem-se, toca-se
+  // num deles.
+  const [moving, setMoving] = useState(null)
+  const [busy, setBusy] = useState(false)
 
   const load = useCallback(() => {
     // p_date a null traz o torneio todo: a grelha muda de dia sem voltar à
@@ -119,6 +132,44 @@ export default function TournamentCalendarGrid({ tournament, onBack }) {
     return null
   }, [ofDay, hours, courts, duration])
 
+  // Os lugares livres onde o jogo escolhido cabe sem partir nenhuma regra.
+  // Quem responde é o canPlace do Dev 3.
+  const landingSpots = useMemo(() => {
+    if (!moving) return new Set()
+    const rest = ofDay.filter((m) => m.id !== moving.id)
+    const ok = new Set()
+    for (const hour of hours) {
+      const [h, mi] = hour.split(':').map(Number)
+      const startsAt = new Date(moving.startsAt)
+      startsAt.setHours(h, mi, 0, 0)
+      for (const court of courts) {
+        if (rest.some((m) => m.court === court && hhmm(m.startsAt) === hour)) continue
+        const moved = { ...moving, court, startsAt, endsAt: new Date(startsAt.getTime() + duration * 60000) }
+        if (canPlace(moved, rest, { durationMaxMin: duration })) ok.add(`${hour}|${court}`)
+      }
+    }
+    return ok
+  }, [moving, ofDay, hours, courts, duration])
+
+  // Serve os dois caminhos: escolher o jogo e tocar num lugar livre, ou
+  // aceitar a sugestão do aviso de choque, que já traz jogo, hora e campo.
+  const moveTo = async (match, hour, court) => {
+    const [h, mi] = hour.split(':').map(Number)
+    const startsAt = new Date(match.startsAt)
+    startsAt.setHours(h, mi, 0, 0)
+    setBusy(true)
+    setError('')
+    try {
+      await rescheduleMatch(match.id, { scheduled_at: startsAt.toISOString(), court })
+      setMoving(null)
+      load()
+    } catch (err) {
+      setError(describeError(t, err, 'tournament.grid.move_error'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const shown = categoryCode ? ofDay.filter((m) => m.category_code === categoryCode) : ofDay
   const at = (hour, court) => shown.find((m) => hhmm(m.startsAt) === hour && m.court === court)
 
@@ -189,6 +240,19 @@ export default function TournamentCalendarGrid({ tournament, onBack }) {
             ))}
           </div>
 
+          {moving && (
+            <div className="mt-2 flex items-center justify-between gap-2 rounded-ctrl border border-ink-900 bg-ink-50 px-3 py-2 text-[11.5px]">
+              <span className="min-w-0">
+                {landingSpots.size > 0
+                  ? t('tournament.grid.moving', { match: [moving.category_code, moving.group_label || moving.round_label].filter(Boolean).join(' ') })
+                  : t('tournament.grid.moving_nowhere', { match: [moving.category_code, moving.group_label || moving.round_label].filter(Boolean).join(' ') })}
+              </span>
+              <button type="button" onClick={() => setMoving(null)} className="shrink-0 font-semibold text-ink-700 underline">
+                {t('tournament.create.cancel')}
+              </button>
+            </div>
+          )}
+
           {/* A grelha desliza para o lado: com quatro campos não cabem todos
               a 390 px, e encolher até não se ler é pior. A coluna das horas
               fica fixa, para não se perder a referência. */}
@@ -209,13 +273,33 @@ export default function TournamentCalendarGrid({ tournament, onBack }) {
                   </div>
                   {courts.map((court) => {
                     const m = at(hour, court)
-                    if (!m) return <div key={court} className="w-[132px] shrink-0" />
+                    if (!m) {
+                      const free = landingSpots.has(`${hour}|${court}`)
+                      return free ? (
+                        <button
+                          key={court}
+                          type="button"
+                          disabled={busy}
+                          onClick={() => moveTo(moving, hour, court)}
+                          className="w-[132px] shrink-0 rounded-lg border-2 border-dashed border-ok bg-[#F0FDF4] text-[9.5px] font-semibold text-ok"
+                        >
+                          {t('tournament.grid.drop_here')}
+                        </button>
+                      ) : <div key={court} className="w-[132px] shrink-0" />
+                    }
                     const color = colorOf(m.category_code)
                     const bad = inTrouble.has(m.match_id)
+                    const chosen = moving?.id === m.id
                     return (
-                      <div
+                      <button
                         key={court}
-                        className={`w-[132px] shrink-0 rounded-lg px-1.5 py-1 text-[9.5px] leading-[1.3] ${bad ? 'outline outline-2 -outline-offset-2 outline-[#B42318]' : ''}`}
+                        type="button"
+                        onClick={() => setMoving(chosen ? null : m)}
+                        aria-pressed={chosen}
+                        className={`w-[132px] shrink-0 rounded-lg px-1.5 py-1 text-left text-[9.5px] leading-[1.3] ${
+                          chosen ? 'outline outline-2 -outline-offset-2 outline-ink-900'
+                            : bad ? 'outline outline-2 -outline-offset-2 outline-[#B42318]' : ''
+                        } ${moving && !chosen ? 'opacity-45' : ''}`}
                         style={{ background: color.bg, color: color.text }}
                       >
                         <b className="block font-semibold">
@@ -223,7 +307,7 @@ export default function TournamentCalendarGrid({ tournament, onBack }) {
                         </b>
                         <span className="block truncate">{m.team_a?.name}</span>
                         <span className="block truncate">{m.team_b?.name}</span>
-                      </div>
+                      </button>
                     )
                   })}
                 </div>
@@ -241,13 +325,18 @@ export default function TournamentCalendarGrid({ tournament, onBack }) {
                     {c.kind === 'dois_jogos_a_mesma_hora' && t('tournament.grid.conflict_same_time', { players: (c.players || []).join(', ') })}
                     {c.kind === 'campo_ocupado' && t('tournament.grid.conflict_court', { court: c.court })}
                     {fix && (
-                      <span className="mt-1 block text-ink-700">
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => moveTo(fix.match, fix.hour, fix.court)}
+                        className="mt-1 block text-left text-ink-900 underline"
+                      >
                         {t('tournament.grid.conflict_fix', {
                           match: [fix.match.category_code, fix.match.group_label || fix.match.round_label].filter(Boolean).join(' '),
                           hour: fix.hour,
                           court: fix.court,
                         })}
-                      </span>
+                      </button>
                     )}
                   </div>
                 )

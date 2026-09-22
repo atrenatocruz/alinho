@@ -253,6 +253,17 @@ export const TOURNAMENT_SCORE_RPC_MOCKS = {
     } : m))
     return null
   },
+  reschedule_match: (params) => {
+    if (!MATCHES) resetMatches()
+    MATCHES = MATCHES.map((m) => (m.match_id === params?.p_match_id ? {
+      ...m,
+      previous_scheduled_at: m.scheduled_at,
+      // Guarda como a base de dados: com fuso, não texto cortado.
+      scheduled_at: new Date(params.p_scheduled_at).toISOString(),
+      court: params.p_court || m.court,
+    } : m))
+    return null
+  },
   mark_walkover: (params) => {
     if (!MATCHES) resetMatches()
     MATCHES = MATCHES.map((m) => (m.match_id === params?.p_match_id ? {

@@ -164,6 +164,23 @@ export async function saveMatchResult(matchId, { score_a, score_b, sets = null }
   if (error) throw error
 }
 
+/** Mudar um jogo de hora e/ou de campo, a partir da grelha do organizador.
+ *  O servidor é que manda: recusa se o lugar novo puser alguém em dois
+ *  jogos à mesma hora, der três seguidos à mesma pessoa, ocupar um campo já
+ *  ocupado, ou pôr uma fase antes da anterior — as mesmas regras do
+ *  tournamentSchedule.js. E avisa quem joga, se já estiver publicado.
+ *
+ *  ⚠️ FUNÇÃO POR ESCREVER (Dev 3). No plano técnico dele estava
+ *  `reschedule_matches(ids[], new_times[])`, pensada para o «antecipar»;
+ *  esta é a irmã para mover UM jogo à mão, e precisa também do campo.
+ *  Até existir, a grelha mostra a mensagem de erro e não muda nada. */
+export async function rescheduleMatch(matchId, { scheduled_at, court }) {
+  const { error } = await supabase.rpc('reschedule_match', {
+    p_match_id: matchId, p_scheduled_at: scheduled_at, p_court: court,
+  })
+  if (error) throw error
+}
+
 /** Falta ou desistência. `loser` é 'a' ou 'b' — quem faltou ou desistiu;
  *  `justified` só conta nas faltas (justificada / sem justificação), e a
  *  sem justificação fica no histórico visível aos admins (SPEC §7). */
