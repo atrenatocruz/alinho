@@ -486,6 +486,8 @@
   "tagenda.categories_other": "{{count}} categories",
   "tagenda.may_start_earlier": "May start earlier · arrive 20 min before",
   "agenda.filter_kind_tournament": "Tournaments",
+  "tsignup.error_entry_already_drawn": "This pair is already in the draw. To take them out mid-tournament, record a walkover on the scorer screen.",
+  "tsignup.claim_error_entries_closed": "Entries for this tournament are closed.",
   "layout.celebrations_close": "Nice! 🎾",
   "achievements.shelf_title": "Achievements",
   "achievements.progress": "{{earned}} of {{total}} earned",
