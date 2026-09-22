@@ -2389,5 +2389,8 @@
   "tournament.create.edit_locked": "Já há inscrições: só se muda o que não estraga as inscrições feitas.",
   "tournament.create.save_changes": "Guardar alterações",
   "tournament.admin.edit": "Editar",
-  "tournament.admin.edit_error": "Não foi possível abrir este torneio para editar."
+  "tournament.admin.edit_error": "Não foi possível abrir este torneio para editar.",
+  "tournament.score.set_number": "Set {{number}}",
+  "tournament.score.super_tiebreak": "Super tie-break",
+  "tournament.score.sets_hint": "Escreve os sets como acabaram. O terceiro só aparece se empatarem a um."
 }

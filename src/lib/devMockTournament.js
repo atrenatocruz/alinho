@@ -87,6 +87,9 @@ const TOURNAMENT = () => {
     entries_deadline: iso(dayAfter(fri, -4)),
     draw_on: iso(dayAfter(fri, -2)),
     organizer_text: 'Pagamento na receção ou por MB Way. A inscrição só fica válida quando o clube confirmar.',
+    // mockTournamentScoring = 'melhor_2_sets' | 'melhor_3_sets' para ver o
+    // ecrã do marcador a pedir os sets um a um.
+    rules: { scoring: localStorage.getItem('mockTournamentScoring') || 'pro_set_9' },
     // Cartaz fictício, para se ver o topo da página com imagem. Em
     // localhost não há Storage: carregar um cartaz a sério precisa de
     // sessão verdadeira.
@@ -218,6 +221,7 @@ export const TOURNAMENT_SCORE_RPC_MOCKS = {
       status: 'terminado',
       score_a: params.p_score_a,
       score_b: params.p_score_b,
+      sets: params.p_sets || null,
       // Corrigir um resultado já gravado fica registado (cartão #365).
       corrected_by_name: m.status === 'terminado' ? 'Admin (Dev)' : null,
     } : m))
