@@ -2429,7 +2429,7 @@
   "tournament.grid.conflict_same_time": "{{players}} ends up with two matches at the same time.",
   "tournament.grid.conflict_court": "Two matches at once on {{court}}.",
   "tournament.grid.legend": "In red",
-  "tournament.grid.move_later": "The marked matches need a different time or court. Moving them on the grid comes next.",
+  "tournament.grid.move_later": "Tap a marked match to move it to another time or court — the slots where it fits light up.",
   "tournament.grid.conflict_fix": "Move {{match}} to {{hour}}, on {{court}}.",
   "tournament.draw.groups_label": "Groups",
   "tournament.draw.played_of": "{{played}} of {{total}} matches",
@@ -2467,5 +2467,9 @@
   "tournament.draw.no_time_label": "No time set",
   "tournament.draw.calendar_empty_title": "No matches scheduled",
   "tournament.draw.calendar_empty_subtitle": "Times show up here after the draw.",
-  "tournament.draw.time_warning": "Times are estimates, not guarantees. Get there 20 minutes before your match."
+  "tournament.draw.time_warning": "Times are estimates, not guarantees. Get there 20 minutes before your match.",
+  "tournament.grid.drop_here": "Put here",
+  "tournament.grid.moving": "Moving {{match}}. Tap a free slot.",
+  "tournament.grid.moving_nowhere": "{{match}} doesn't fit anywhere else today.",
+  "tournament.grid.move_error": "Couldn't move this match."
 }

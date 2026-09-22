@@ -2429,7 +2429,7 @@
   "tournament.grid.conflict_same_time": "{{players}} fica com dois jogos à mesma hora.",
   "tournament.grid.conflict_court": "Dois jogos ao mesmo tempo no {{court}}.",
   "tournament.grid.legend": "A vermelho",
-  "tournament.grid.move_later": "Os jogos assinalados precisam de mudar de hora ou de campo. Mover na própria grelha vem a seguir.",
+  "tournament.grid.move_later": "Toca num jogo assinalado para o mudar de hora ou de campo — acendem-se os lugares onde ele cabe.",
   "tournament.grid.conflict_fix": "Passar o {{match}} para as {{hour}}, no {{court}}.",
   "tournament.draw.groups_label": "Grupos",
   "tournament.draw.played_of": "{{played}} de {{total}} jogos",
@@ -2467,5 +2467,9 @@
   "tournament.draw.no_time_label": "Sem hora marcada",
   "tournament.draw.calendar_empty_title": "Sem jogos marcados",
   "tournament.draw.calendar_empty_subtitle": "As horas aparecem aqui depois do sorteio.",
-  "tournament.draw.time_warning": "As horas são previstas, não garantidas. Chega 20 minutos antes do teu jogo."
+  "tournament.draw.time_warning": "As horas são previstas, não garantidas. Chega 20 minutos antes do teu jogo.",
+  "tournament.grid.drop_here": "Pôr aqui",
+  "tournament.grid.moving": "A mover {{match}}. Toca num lugar livre.",
+  "tournament.grid.moving_nowhere": "{{match}} não cabe em mais lado nenhum neste dia.",
+  "tournament.grid.move_error": "Não foi possível mudar este jogo de hora."
 }
