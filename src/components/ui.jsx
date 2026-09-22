@@ -74,7 +74,7 @@ function toIsoDate(d) {
    until a day is actually tapped). Month/year are also directly jumpable
    (not just +/-1 arrows) — stepping one month at a time from today back to
    a decades-old birth year is a real, reported usability problem. */
-function MonthCalendar({ selected, viewDate, onNavigate, onJumpTo, onSelectDay, min, max }) {
+function MonthCalendar({ selected, viewDate, onNavigate, onJumpTo, onSelectDay, min, max, showToday = true, onToday }) {
   const { t, i18n } = useTranslation()
   const weekdayLabels = WEEKDAY_LABELS[i18n.language] || WEEKDAY_LABELS.pt
   const year = viewDate.getFullYear()
@@ -85,6 +85,11 @@ function MonthCalendar({ selected, viewDate, onNavigate, onJumpTo, onSelectDay, 
   const cells = []
   for (let i = 0; i < firstWeekday; i++) cells.push(null)
   for (let d = 1; d <= daysInMonth; d++) cells.push(d)
+
+  const hoje = new Date()
+  // "Hoje" não aparece onde não faz sentido (data de nascimento) nem quando
+  // o dia de hoje está fora dos limites permitidos.
+  const hojeForaDosLimites = (min && hoje < min) || (max && hoje > max)
 
   return (
     <div>
@@ -131,6 +136,11 @@ function MonthCalendar({ selected, viewDate, onNavigate, onJumpTo, onSelectDay, 
           const cellDate = new Date(year, month, d)
           const isSelected = !!selected
             && selected.getFullYear() === year && selected.getMonth() === month && selected.getDate() === d
+          // O dia de hoje fica sempre marcado, com o mesmo aro do calendário
+          // da Home (AgendaControls/MonthSheet) — sem isto não havia
+          // referência nenhuma ao dia em que estamos (Trello #357).
+          const isToday = cellDate.getFullYear() === hoje.getFullYear()
+            && cellDate.getMonth() === hoje.getMonth() && cellDate.getDate() === hoje.getDate()
           const disabled = (min && cellDate < min) || (max && cellDate > max)
           return (
             <button
@@ -141,6 +151,7 @@ function MonthCalendar({ selected, viewDate, onNavigate, onJumpTo, onSelectDay, 
               className={`h-10 rounded-ctrl text-sm font-extrabold transition-colors duration-fast ${
                 isSelected ? 'bg-lime-400 text-ink-900'
                 : disabled ? 'text-muted/40 cursor-not-allowed'
+                : isToday ? 'text-ink-900 ring-1 ring-ink-900/20 hover:bg-ink-50'
                 : 'text-ink-900 hover:bg-ink-50'
               }`}
             >
@@ -149,11 +160,21 @@ function MonthCalendar({ selected, viewDate, onNavigate, onJumpTo, onSelectDay, 
           )
         })}
       </div>
+
+      {showToday && !hojeForaDosLimites && (
+        <button
+          type="button"
+          onClick={() => onToday(hoje)}
+          className="w-full mt-4 py-3 rounded-ctrl bg-canvas border border-line text-sm font-extrabold text-ink-900 hover:bg-ink-50 transition-colors duration-fast"
+        >
+          {t('ui.today')}
+        </button>
+      )}
     </div>
   )
 }
 
-export function DateField({ value, onChange, max, min, placeholder }) {
+export function DateField({ value, onChange, max, min, placeholder, hideToday = false }) {
   const { t, i18n } = useTranslation()
   const resolvedPlaceholder = placeholder ?? t('ui.select_date_placeholder')
   const [open, setOpen] = useState(false)
@@ -181,6 +202,14 @@ export function DateField({ value, onChange, max, min, placeholder }) {
 
   const selectDay = (day) => {
     onChange(toIsoDate(new Date(viewDate.getFullYear(), viewDate.getMonth(), day)))
+    setOpen(false)
+  }
+
+  // "Hoje" escolhe o dia de hoje e fecha, como se lhe tivessem tocado na
+  // grelha (Trello #357).
+  const selectToday = (hoje) => {
+    setViewDate(hoje)
+    onChange(toIsoDate(hoje))
     setOpen(false)
   }
 
@@ -222,6 +251,8 @@ export function DateField({ value, onChange, max, min, placeholder }) {
               onSelectDay={selectDay}
               min={minDate}
               max={maxDate}
+              showToday={!hideToday}
+              onToday={selectToday}
             />
           </div>
         </div>,
@@ -277,6 +308,12 @@ export function DateTimeField({ value, onChange, placeholder }) {
     setPendingDate(new Date(viewDate.getFullYear(), viewDate.getMonth(), day))
   }
 
+  // Aqui "Hoje" escolhe o dia mas não fecha: ainda falta a hora.
+  const selectToday = (hoje) => {
+    setViewDate(hoje)
+    setPendingDate(hoje)
+  }
+
   const confirm = () => {
     if (!pendingDate) return
     const [hours, minutes] = pendingTime.split(':').map(Number)
@@ -324,6 +361,8 @@ export function DateTimeField({ value, onChange, placeholder }) {
               onSelectDay={selectDay}
               min={null}
               max={null}
+              showToday
+              onToday={selectToday}
             />
             <div className="mt-4 min-w-0">
               <label className="block text-sm font-extrabold text-ink-900 mb-2">{t('ui.hour_label')}</label>

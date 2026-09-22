@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronLeft, GraduationCap, Plus, Repeat } from 'lucide-react'
-import { Avatar, EmptyState, PrimaryButton } from '../ui'
+import { Avatar, EmptyState, PrimaryButton, DateField } from '../ui'
 import { cancelLesson, cancelLessonPeriod, getSeriesRoster, listClubSeries, markLessonAbsence, resolveEnrolment } from '../../lib/lessonsApi'
 import { weekdayCountBetween } from '../../lib/lessons'
 import { describeError } from '../../lib/errors'
@@ -295,12 +295,17 @@ function NextLesson({ series, lesson }) {
         <div className="rounded-2xl border border-line bg-canvas p-3 space-y-2">
           <p className="font-semibold text-ink-900">{t('lessons.cancel_period_title')}</p>
           <ChipGroup value={period.reason} onChange={(v) => setPeriod((p) => ({ ...p, reason: v }))} options={['vacation', 'illness', 'other'].map((r) => ({ value: r, label: t(`lessons.reason_${r}`) }))} />
-          <div className="flex items-center gap-2">
-            <input type="date" min={isoOf(new Date())} value={period.from} onChange={(e) => setPeriod((p) => ({ ...p, from: e.target.value }))}
-              className="min-w-0 flex-1 rounded-lg border border-line bg-canvas px-2 py-2 text-sm" aria-label={t('lessons.period_from')} />
-            <span className="text-muted">–</span>
-            <input type="date" min={period.from || isoOf(new Date())} value={period.to} onChange={(e) => setPeriod((p) => ({ ...p, to: e.target.value }))}
-              className="min-w-0 flex-1 rounded-lg border border-line bg-canvas px-2 py-2 text-sm" aria-label={t('lessons.period_to')} />
+          {/* Calendário partilhado (Trello #357). Em coluna: dois
+              calendários lado a lado ficam apertados no telemóvel. */}
+          <div className="space-y-2">
+            <div>
+              <MonoLabel className="mb-1">{t('lessons.period_from')}</MonoLabel>
+              <DateField value={period.from} onChange={(v) => setPeriod((p) => ({ ...p, from: v }))} min={isoOf(new Date())} />
+            </div>
+            <div>
+              <MonoLabel className="mb-1">{t('lessons.period_to')}</MonoLabel>
+              <DateField value={period.to} onChange={(v) => setPeriod((p) => ({ ...p, to: v }))} min={period.from || isoOf(new Date())} />
+            </div>
           </div>
           {period.from && period.to && <p className="text-xs text-ink-700">{t('lessons.period_count', { count: periodCount })}</p>}
           <button type="button" disabled={busy || periodCount === 0} onClick={cancelPeriod}

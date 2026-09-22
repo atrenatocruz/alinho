@@ -172,6 +172,7 @@ export default function PersonalInfo() {
                 value={birthday}
                 onChange={setBirthday}
                 max={new Date().toISOString().slice(0, 10)}
+                hideToday
               />
             </div>
 
