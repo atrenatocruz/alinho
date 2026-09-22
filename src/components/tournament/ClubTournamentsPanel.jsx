@@ -16,6 +16,7 @@ import { MonoLabel, StatePill } from './TournamentBits'
 import CreateTournamentForm from './CreateTournamentForm'
 import ScorekeepersPanel from './ScorekeepersPanel'
 import DrawAdminPanel from './DrawAdminPanel'
+import TournamentCalendarGrid from './TournamentCalendarGrid'
 
 const STATE_TONE = { rascunho: 'grey', inscricoes: 'in', fechado: 'grey', sorteado: 'dark', a_decorrer: 'live', terminado: 'grey' }
 
@@ -31,6 +32,7 @@ export default function ClubTournamentsPanel({ organizationId, club }) {
   // escolher formato e sortear. Mesmo padrao do painel dos marcadores.
   const [drawOf, setDrawOf] = useState(null)
   const [editing, setEditing] = useState(null) // { row, data }
+  const [gridOf, setGridOf] = useState(null)
 
   const load = useCallback(() => {
     listClubTournaments(organizationId)
@@ -111,6 +113,10 @@ export default function ClubTournamentsPanel({ organizationId, club }) {
   }
   if (drawOf) {
     return <DrawAdminPanel tournament={drawOf} onBack={() => { setDrawOf(null); load() }} />
+  }
+
+  if (gridOf) {
+    return <TournamentCalendarGrid tournament={gridOf} onBack={() => setGridOf(null)} />
   }
 
   if (editing) {
@@ -194,6 +200,9 @@ export default function ClubTournamentsPanel({ organizationId, club }) {
                     </Link>
                     <button type="button" onClick={() => setKeepersOf(row)} className="rounded-full border border-line px-3 py-1.5 text-[12px] font-semibold text-ink-700 hover:bg-ink-50">
                       {t('tournament.score.keepers_title')}
+                    </button>
+                    <button type="button" onClick={() => setGridOf(row)} className="rounded-full border border-line px-3 py-1.5 text-[12px] font-semibold text-ink-700 hover:bg-ink-50">
+                      {t('tournament.grid.open')}
                     </button>
                   </>
                 )}

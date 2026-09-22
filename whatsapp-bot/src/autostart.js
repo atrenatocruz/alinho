@@ -47,6 +47,21 @@ function formDuplas(participants, pointsById, repeatPairKeys) {
   }))
 }
 
+// O bot só sabe conduzir o que consegue formar: duplas fixas em "Sobe e
+// desce" ou "Todos contra todos", por nível. Não sabe Americano (troca de
+// parceiro a cada ronda), Grupos + Eliminatórias (fase de grupos e quadro),
+// "Trocam a cada ronda", nem os modos Equilibrado/Aleatório — se começasse
+// um destes sozinho, formava duplas pelas regras erradas e o admin ficava
+// com um mix a decorrer que não pediu. Nestes casos não arranca: o mix
+// espera pelo admin, que o começa na app.
+function botConsegueComecar(game) {
+  const formato = game.format || 'sobe_desce'
+  if (!['sobe_desce', 'todos_contra_todos'].includes(formato)) return false
+  if (game.rotate_partners) return false
+  if (game.pairing_mode && game.pairing_mode !== 'por_nivel') return false
+  return true
+}
+
 /**
  * Forms duplas and starts one due mix — same DB writes as handleStartMix in
  * GameDetails.jsx (insert teams, flip status to in_progress), then
@@ -54,6 +69,11 @@ function formDuplas(participants, pointsById, repeatPairKeys) {
  * each dupla whose WhatsApp JID is already known.
  */
 async function autoStartMix(game, { sendText }) {
+  if (!botConsegueComecar(game)) {
+    console.log(`Auto-start ignorado (formato que o bot não conduz) para o mix ${game.id}`)
+    return
+  }
+
   const { data: participants, error: pErr } = await supabase
     .from('participants')
     .select('user_id, partner_id')
