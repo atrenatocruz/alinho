@@ -151,6 +151,24 @@ export const TOURNAMENT_RPC_MOCKS = {
     created = created.filter((x) => x.id !== params?.p_tournament_id)
     return null
   },
+  get_tournament_for_edit: (params) => {
+    if (!on()) return null
+    const fri = nextFriday()
+    const mine = created.find((x) => x.id === params?.p_tournament_id)
+    const t = mine ? { ...TOURNAMENT(), ...mine } : TOURNAMENT()
+    return {
+      tournament: { ...t, entries_deadline: `${t.entries_deadline}T23:59`, draw_on: t.draw_on, rules: {} },
+      days: [0, 1, 2].map((n) => ({
+        id: `d${n}`, date: iso(dayAfter(fri, n)), starts_at: n === 0 ? '18:00' : '09:00', ends_at: n === 2 ? '18:00' : '21:00', courts: n === 2 ? 3 : 4,
+      })),
+      courts: ['Campo 1', 'Campo 2', 'Campo 3 · KIA', 'Campo 4'].map((name, i) => ({ id: `c${i}`, name })),
+      categories: categories(),
+      // mockTournamentEntries = 'true' → já há inscrições, e então só se
+      // pode mudar o que não as estraga.
+      has_entries: localStorage.getItem('mockTournamentEntries') === 'true',
+    }
+  },
+  update_tournament: () => null,
   get_tournament_page: () => {
     if (!on()) return null
     return {

@@ -2364,5 +2364,11 @@
   "tournament.create.poster_pick": "Upload image",
   "tournament.create.poster_uploading": "Uploading…",
   "tournament.create.poster_remove": "Remove poster",
-  "tournament.create.poster_error": "Couldn't upload the image."
+  "tournament.create.poster_error": "Couldn't upload the image.",
+  "tournament.create.category_repeated": "You already have a {{name}} category in this tournament.",
+  "tournament.create.edit_title": "Edit tournament",
+  "tournament.create.edit_locked": "There are entries already: only what doesn't break them can change.",
+  "tournament.create.save_changes": "Save changes",
+  "tournament.admin.edit": "Edit",
+  "tournament.admin.edit_error": "Couldn't open this tournament for editing."
 }

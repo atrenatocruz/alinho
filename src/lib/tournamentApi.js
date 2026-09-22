@@ -74,8 +74,27 @@ export async function createTournament(organizationId, draft) {
   return data
 }
 
+/** O torneio inteiro para o ecrã de editar: ao contrário do
+ *  get_tournament_page, funciona com rascunhos e com torneios escondidos, e
+ *  devolve os campos e as categorias como o admin os escreveu.
+ *
+ *  Devolve { tournament, days, courts, categories, has_entries }.
+ *  `has_entries` é o que decide o que se pode mudar — é a mesma conta que o
+ *  update_tournament faz do lado de lá, para o ecrã não prometer o que o
+ *  servidor recusa. Só admin do clube.
+ *
+ *  ⚠️ FUNÇÃO POR ESCREVER (Dev 3). Até existir, o ecrã de editar mostra o
+ *  estado vazio, como tudo o resto do torneio. */
+export async function getTournamentForEdit(tournamentId) {
+  const { data, error } = await supabase.rpc('get_tournament_for_edit', { p_tournament_id: tournamentId })
+  if (error) throw error
+  return data || null
+}
+
 /** Editar um torneio. Enquanto não há inscrições muda-se tudo; depois, só o
- *  que não estraga inscrições feitas (nome, local, cartaz, texto). */
+ *  que não estraga inscrições feitas (nome, local, cartaz, texto do
+ *  organizador, prazo, data do sorteio e se é público) — é o próprio
+ *  update_tournament que ignora o resto. */
 export async function updateTournament(tournamentId, draft) {
   const { error } = await supabase.rpc('update_tournament', { p_tournament_id: tournamentId, p_draft: draft })
   if (error) throw error
