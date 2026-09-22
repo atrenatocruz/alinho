@@ -54,14 +54,17 @@ function decodeJwt(authHeader: string | null): { role: string | null; sub: strin
   }
 }
 
-// Test players (admin-create-test-user, admin-bulk-create-participants) and
-// WhatsApp guests (whatsapp-bot/src/phone.js) are real Auth users with
-// made-up addresses — nobody reads those inboxes, and sending to them only
-// earns bounces against the domain's reputation.
+// Test players (admin-create-test-user, admin-bulk-create-participants),
+// WhatsApp guests (whatsapp-bot/src/phone.js) and anonymized accounts
+// (migration_account_deletion.sql) are real Auth users with made-up
+// addresses — nobody reads those inboxes, and sending to them only earns
+// bounces against the domain's reputation.
 function isDeliverable(email: string | undefined): email is string {
   if (!email) return false
   const lower = email.toLowerCase()
-  return !lower.endsWith('@padelapp.test') && !lower.endsWith('@whatsapp.alinho.pt')
+  return !lower.endsWith('@padelapp.test')
+    && !lower.endsWith('@whatsapp.alinho.pt')
+    && !lower.endsWith('@alinho.invalid')
 }
 
 function escapeHtml(value: string): string {
