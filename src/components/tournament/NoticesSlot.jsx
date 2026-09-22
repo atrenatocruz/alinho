@@ -6,7 +6,8 @@ import { useAuth } from '../../contexts/AuthContext'
 import { PrimaryButton } from '../ui'
 import { Sheet } from '../agenda/AgendaControls'
 import {
-  activeNotices, noticeAge, noticeError, NOTICE_MAX,
+  activeNotices, noticeAge, noticeError, editedWords, expiryFrom,
+  EXPIRY_CHOICES, NOTICE_MAX,
   publishNotice, updateNotice, deleteNotice,
 } from '../../lib/tournamentNotices'
 
@@ -28,6 +29,8 @@ function NoticeComposer({ tournament, editing, busy, error, onSave, onClose }) {
   const { t } = useTranslation()
   const [body, setBody] = useState(editing?.body || '')
   const [alsoWhatsapp, setAlsoWhatsapp] = useState(false)
+  const [expiry, setExpiry] = useState('none')
+  const [clearExpiry, setClearExpiry] = useState(false)
   const [touched, setTouched] = useState(false)
   const problem = noticeError(body)
 
@@ -53,6 +56,41 @@ function NoticeComposer({ tournament, editing, busy, error, onSave, onClose }) {
           <p className="text-sm text-red-600 font-extrabold">{t(`tnotices.error_${problem}`)}</p>
         )}
 
+        {/* Quanto tempo dura. "Campo 3 molhado, a secar" não é para ficar
+            lá para sempre — e um aviso velho confunde mais do que ajuda. */}
+        {!editing ? (
+          <div>
+            <p className="mb-1.5 font-mono text-[11px] uppercase tracking-widest text-ink-500">
+              {t('tnotices.expiry_label')}
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {EXPIRY_CHOICES.map((choice) => (
+                <button
+                  key={choice}
+                  onClick={() => setExpiry(choice)}
+                  className={`press rounded-full px-3 py-1.5 text-sm font-semibold border-2 ${
+                    expiry === choice ? 'border-ink-900 bg-ink-900 text-white' : 'border-line text-ink-900'
+                  }`}
+                >
+                  {t(`tnotices.expiry_${choice}`)}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : editing.expires_at ? (
+          // Editar não mexe no fim, a não ser que se diga — senão corrigir
+          // uma gralha tornava o aviso permanente.
+          <label className="flex items-center gap-2.5 text-sm font-semibold text-ink-900">
+            <input
+              type="checkbox"
+              checked={clearExpiry}
+              onChange={(e) => setClearExpiry(e.target.checked)}
+              className="h-5 w-5 rounded"
+            />
+            {t('tnotices.expiry_clear')}
+          </label>
+        ) : null}
+
         {/* Pode ir também para o grupo de WhatsApp, onde ele exista. */}
         {!editing && (
           <label className="flex items-center gap-2.5 text-sm font-semibold text-ink-900">
@@ -69,7 +107,10 @@ function NoticeComposer({ tournament, editing, busy, error, onSave, onClose }) {
         {error && <p className="text-sm text-red-600 font-extrabold">{error}</p>}
 
         <PrimaryButton
-          onClick={() => { setTouched(true); if (!problem) onSave({ body, alsoWhatsapp }) }}
+          onClick={() => {
+            setTouched(true)
+            if (!problem) onSave({ body, alsoWhatsapp, expiresAt: expiryFrom(expiry), clearExpiry })
+          }}
           disabled={busy || !!problem}
           className="w-full"
         >
@@ -95,7 +136,7 @@ export default function NoticesSlot({ tournament }) {
   const load = useCallback(() => {
     supabase
       .from('tournament_public_notices')
-      .select('id, body, created_at, author_name')
+      .select('id, body, created_at, author_name, expires_at, updated_at')
       .eq('tournament_id', tournament.id)
       .then(({ data, error: err }) => {
         // Sem a vista (base de dados por migrar) fica simplesmente vazio.
@@ -113,11 +154,11 @@ export default function NoticesSlot({ tournament }) {
   const say = (err) => setError(t(err?.message === 'not_ready' ? 'tnotices.error_not_ready' : 'tnotices.error_generic'))
   const reload = () => { load(); window.dispatchEvent(new CustomEvent('tournament:reload')) }
 
-  const save = async ({ body, alsoWhatsapp }) => {
+  const save = async ({ body, alsoWhatsapp, expiresAt, clearExpiry }) => {
     setBusy(true); setError('')
     try {
-      if (composer === 'new') await publishNotice({ tournamentId: tournament.id, body, alsoWhatsapp })
-      else await updateNotice({ noticeId: composer.id, body })
+      if (composer === 'new') await publishNotice({ tournamentId: tournament.id, body, alsoWhatsapp, expiresAt })
+      else await updateNotice({ noticeId: composer.id, body, clearExpiry })
       setComposer(null)
       reload()
     } catch (err) { console.error('Error saving tournament notice:', err); say(err) }
@@ -138,6 +179,7 @@ export default function NoticesSlot({ tournament }) {
     <div className="space-y-2">
       {rows.map((notice) => {
         const age = noticeAge(notice.created_at)
+        const edited = editedWords(notice.updated_at)
         return (
           <div key={notice.id} className="rounded-card border-2 border-[#C9C3F3] bg-[#E9E7FB] px-3.5 py-3">
             <div className="flex gap-2.5">
@@ -145,8 +187,11 @@ export default function NoticesSlot({ tournament }) {
               <div className="min-w-0 flex-1">
                 <p className="font-extrabold text-ink-900">{notice.body}</p>
                 <p className="mt-0.5 text-xs text-[#4338A8]">
-                  {[notice.author_name || tournament.club_name, age ? t(age.key, age.values) : null]
-                    .filter(Boolean).join(' · ')}
+                  {[
+                    notice.author_name || tournament.club_name,
+                    age ? t(age.key, age.values) : null,
+                    edited ? t(edited.key, edited.values) : null,
+                  ].filter(Boolean).join(' · ')}
                 </p>
               </div>
               {isAdmin && (

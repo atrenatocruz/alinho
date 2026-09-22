@@ -20,7 +20,8 @@
 --     sobe se alguém sair — só até ao sorteio;
 --   • o pagamento é fora da app: o admin valida num toque.
 --
--- Dev 2, 21 set 2026
+-- Dev 2, 21 set 2026 · revisto pelo Dev 3 a 22 set (8 correções, todas
+-- aqui dentro: ver os comentários "revisão do Dev 3")
 -- ════════════════════════════════════════════════════════════════════════
 
 -- ── 1. O que faltava guardar ────────────────────────────────────────────
@@ -33,7 +34,11 @@ ALTER TABLE tournament_entries
   ADD COLUMN IF NOT EXISTS invite_email_status TEXT NOT NULL DEFAULT 'none'
       CHECK (invite_email_status IN ('none','queued','sent','failed')),
   -- Prazo para o parceiro com conta responder ("Responde até 3 out").
-  ADD COLUMN IF NOT EXISTS respond_by    TIMESTAMPTZ;
+  ADD COLUMN IF NOT EXISTS respond_by    TIMESTAMPTZ,
+  -- Quando o parceiro aceitou. Enquanto for NULL e houver player2_id, há
+  -- um convite por responder — mesmo que a inscrição esteja em suplente,
+  -- onde não se pergunta nada a ninguém até ela subir.
+  ADD COLUMN IF NOT EXISTS partner_accepted_at TIMESTAMPTZ;
 
 CREATE UNIQUE INDEX IF NOT EXISTS tournament_entries_invite_token_key
   ON tournament_entries(invite_token) WHERE invite_token IS NOT NULL;
@@ -44,9 +49,14 @@ COMMENT ON COLUMN tournament_entries.guest_email IS
   'Email do parceiro sem conta, se quem o inscreveu o deu. É para lá que vai o link do convite quando o envio de emails existir. Trello #362.';
 
 -- ── 2. Ajudantes ────────────────────────────────────────────────────────
+-- gen_random_bytes vive no esquema `extensions` (pgcrypto), e estas
+-- funções correm com SET search_path = public: não resolvia, e rebentava
+-- toda a inscrição com parceiro sem conta (apanhado pelo Dev 3 na
+-- revisão, 22 set, reproduzido no alinho-dev). gen_random_uuid() é do
+-- próprio Postgres desde a 13 e não precisa de extensão nenhuma.
 CREATE OR REPLACE FUNCTION tournament_new_invite_token()
 RETURNS TEXT LANGUAGE sql VOLATILE AS $$
-  SELECT encode(gen_random_bytes(18), 'hex');
+  SELECT md5(gen_random_uuid()::text || gen_random_uuid()::text);
 $$;
 
 -- Quantos lugares estão tomados numa categoria. Suplentes e desistências
@@ -77,9 +87,18 @@ BEGIN
      WHERE category_id = p_category_id AND status = 'suplente'
      ORDER BY waitlist_order NULLS LAST, created_at LIMIT 1;
     IF FOUND THEN
+      -- Se o parceiro nunca chegou a aceitar (a inscrição entrou logo em
+      -- suplente), ao subir é agora que se lhe pergunta — nunca fica
+      -- ninguém numa dupla sem ter dito que sim (regra do Francisco,
+      -- 21 set; revisão do Dev 3, 22 set).
       UPDATE tournament_entries
-         SET status = CASE WHEN player2_id IS NULL AND guest_name IS NULL
-                           THEN 'sem_parceiro' ELSE 'por_validar' END,
+         SET status = CASE
+               WHEN player2_id IS NOT NULL AND partner_accepted_at IS NULL THEN 'convite'
+               WHEN player2_id IS NULL AND guest_name IS NULL THEN 'sem_parceiro'
+               ELSE 'por_validar' END,
+             respond_by = CASE
+               WHEN player2_id IS NOT NULL AND partner_accepted_at IS NULL
+               THEN NOW() + INTERVAL '3 days' END,
              waitlist_order = NULL
        WHERE id = v_next.id;
       RETURN v_next.id;
@@ -87,6 +106,31 @@ BEGIN
   END IF;
   RETURN NULL;
 END;
+$$;
+
+-- Já está nesta categoria, em qualquer inscrição que não tenha desistido?
+-- Usa-se ao inscrever, ao aceitar um convite e ao reclamar um lugar: é
+-- quando se aceita que o lugar se torna real (revisão do Dev 3, 22 set).
+CREATE OR REPLACE FUNCTION tournament_person_in_category(p_category_id UUID, p_user UUID, p_except UUID DEFAULT NULL)
+RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM tournament_entries
+     WHERE category_id = p_category_id AND status <> 'desistiu'
+       AND (p_except IS NULL OR id <> p_except)
+       AND (player1_id = p_user OR player2_id = p_user)
+  );
+$$;
+
+-- Quantas categorias deste torneio já tem esta pessoa, e qual é o máximo.
+CREATE OR REPLACE FUNCTION tournament_categories_left(p_tournament_id UUID, p_user UUID)
+RETURNS INTEGER LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT GREATEST(
+    COALESCE((SELECT (rules->>'max_categories_per_person')::int FROM tournaments WHERE id = p_tournament_id), 2)
+    - (SELECT COUNT(*) FROM tournament_entries e
+         JOIN tournament_categories c ON c.id = e.category_id
+        WHERE c.tournament_id = p_tournament_id AND e.status <> 'desistiu'
+          AND (e.player1_id = p_user OR e.player2_id = p_user))::int,
+    0);
 $$;
 
 -- ── 3. Inscrever ────────────────────────────────────────────────────────
@@ -105,8 +149,6 @@ DECLARE
   v_me UUID := auth.uid();
   v_cat tournament_categories%ROWTYPE;
   v_tournament tournaments%ROWTYPE;
-  v_max INTEGER;
-  v_mine INTEGER;
   v_status TEXT;
   v_token TEXT;
   v_order INTEGER;
@@ -126,20 +168,17 @@ BEGIN
   END IF;
 
   -- Máximo de categorias por pessoa (2 por defeito, o admin muda ao criar).
-  v_max := COALESCE((v_tournament.rules->>'max_categories_per_person')::int, 2);
-  SELECT COUNT(*) INTO v_mine FROM tournament_entries e
-    JOIN tournament_categories c ON c.id = e.category_id
-   WHERE c.tournament_id = v_cat.tournament_id
-     AND e.status <> 'desistiu'
-     AND (e.player1_id = v_me OR e.player2_id = v_me);
-  IF v_mine >= v_max THEN RAISE EXCEPTION 'max_categories_reached'; END IF;
+  IF tournament_categories_left(v_cat.tournament_id, v_me) <= 0 THEN
+    RAISE EXCEPTION 'max_categories_reached';
+  END IF;
+  IF tournament_person_in_category(p_category_id, v_me) THEN
+    RAISE EXCEPTION 'already_in_category';
+  END IF;
 
   -- O parceiro não pode já estar nesta categoria.
   IF p_partner_id IS NOT NULL THEN
     IF p_partner_id = v_me THEN RAISE EXCEPTION 'partner_is_you'; END IF;
-    IF EXISTS (SELECT 1 FROM tournament_entries
-                WHERE category_id = p_category_id AND status <> 'desistiu'
-                  AND (player1_id = p_partner_id OR player2_id = p_partner_id)) THEN
+    IF tournament_person_in_category(p_category_id, p_partner_id) THEN
       RAISE EXCEPTION 'partner_already_in_category';
     END IF;
   END IF;
@@ -169,7 +208,9 @@ BEGIN
     NULLIF(TRIM(LOWER(p_guest_email)), ''), NULLIF(TRIM(p_team_name), ''),
     v_status, v_order, v_token,
     CASE WHEN NULLIF(TRIM(p_guest_email), '') IS NULL THEN 'none' ELSE 'queued' END,
-    CASE WHEN p_partner_id IS NULL THEN NULL
+    -- Em suplente não se pergunta nada a ninguém: o prazo só começa
+    -- quando a inscrição subir (ver tournament_promote_waitlist).
+    CASE WHEN p_partner_id IS NULL OR v_status = 'suplente' THEN NULL
          ELSE LEAST(COALESCE(v_tournament.entries_deadline, NOW() + INTERVAL '3 days'),
                     NOW() + INTERVAL '3 days') END
   )
@@ -186,6 +227,8 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   v_me UUID := auth.uid();
   v_entry tournament_entries%ROWTYPE;
+  v_tournament UUID;
+  v_cat_status TEXT;
 BEGIN
   SELECT * INTO v_entry FROM tournament_entries
    WHERE id = p_entry_id AND player2_id = v_me AND status = 'convite' FOR UPDATE;
@@ -194,16 +237,32 @@ BEGIN
     RAISE EXCEPTION 'invite_expired';
   END IF;
 
+  SELECT c.tournament_id, c.status INTO v_tournament, v_cat_status
+    FROM tournament_categories c WHERE c.id = v_entry.category_id;
+
   IF p_accept THEN
+    -- É ao aceitar que o lugar se torna real: as verificações que se fazem
+    -- na inscrição têm de se repetir aqui, senão a mesma pessoa acabava em
+    -- duas duplas da mesma categoria (revisão do Dev 3, 22 set).
+    IF v_cat_status <> 'inscricoes' THEN RAISE EXCEPTION 'entries_closed'; END IF;
+    IF tournament_person_in_category(v_entry.category_id, v_me, v_entry.id) THEN
+      RAISE EXCEPTION 'already_in_category';
+    END IF;
+    IF tournament_categories_left(v_tournament, v_me) <= 0 THEN
+      RAISE EXCEPTION 'max_categories_reached';
+    END IF;
+
     -- Aceite: fica à espera de o clube confirmar o pagamento.
-    UPDATE tournament_entries SET status = 'por_validar', respond_by = NULL
+    UPDATE tournament_entries
+       SET status = 'por_validar', respond_by = NULL, partner_accepted_at = NOW()
      WHERE id = p_entry_id;
     RETURN 'por_validar';
   END IF;
 
   -- Recusa: a inscrição não morre — quem convidou pode convidar outro.
   UPDATE tournament_entries
-     SET status = 'sem_parceiro', player2_id = NULL, respond_by = NULL
+     SET status = 'sem_parceiro', player2_id = NULL, respond_by = NULL,
+         partner_accepted_at = NULL
    WHERE id = p_entry_id;
   RETURN 'sem_parceiro';
 END;
@@ -251,11 +310,9 @@ BEGIN
   IF v_cat_status <> 'inscricoes' THEN RAISE EXCEPTION 'entries_closed'; END IF;
   IF v_entry.status = 'validada' THEN RAISE EXCEPTION 'entry_already_validated'; END IF;
 
+  IF p_partner_id = v_me THEN RAISE EXCEPTION 'partner_is_you'; END IF;
   IF p_partner_id IS NOT NULL
-     AND EXISTS (SELECT 1 FROM tournament_entries
-                  WHERE category_id = v_entry.category_id AND id <> p_entry_id
-                    AND status <> 'desistiu'
-                    AND (player1_id = p_partner_id OR player2_id = p_partner_id)) THEN
+     AND tournament_person_in_category(v_entry.category_id, p_partner_id, p_entry_id) THEN
     RAISE EXCEPTION 'partner_already_in_category';
   END IF;
 
@@ -267,6 +324,7 @@ BEGIN
          guest_email = NULLIF(TRIM(LOWER(p_guest_email)), ''),
          invite_token = v_token,
          invite_email_status = CASE WHEN NULLIF(TRIM(p_guest_email), '') IS NULL THEN 'none' ELSE 'queued' END,
+         partner_accepted_at = NULL,
          status = CASE WHEN v_entry.status = 'suplente' THEN 'suplente'
                        WHEN p_partner_id IS NOT NULL THEN 'convite'
                        WHEN p_guest_name IS NOT NULL THEN 'por_validar'
@@ -295,8 +353,19 @@ BEGIN
   SELECT status INTO v_cat_status FROM tournament_categories WHERE id = v_entry.category_id;
   IF v_cat_status <> 'inscricoes' THEN RAISE EXCEPTION 'entries_closed'; END IF;
 
-  UPDATE tournament_entries SET status = 'desistiu' WHERE id = p_entry_id;
-  PERFORM tournament_promote_waitlist(v_entry.category_id);
+  -- Quem inscreveu desiste da dupla toda. O parceiro sai só de si próprio
+  -- e a inscrição do outro fica de pé, à procura de parceiro — antes
+  -- bastava o parceiro sair para apagar a inscrição de quem o convidou
+  -- (revisão do Dev 3, 22 set).
+  IF v_entry.player1_id = v_me THEN
+    UPDATE tournament_entries SET status = 'desistiu' WHERE id = p_entry_id;
+    PERFORM tournament_promote_waitlist(v_entry.category_id);
+  ELSE
+    UPDATE tournament_entries
+       SET player2_id = NULL, partner_accepted_at = NULL, respond_by = NULL,
+           status = CASE WHEN status = 'suplente' THEN 'suplente' ELSE 'sem_parceiro' END
+     WHERE id = p_entry_id;
+  END IF;
 END;
 $$;
 
@@ -317,13 +386,24 @@ BEGIN
   IF v_entry.player2_id IS NOT NULL THEN RAISE EXCEPTION 'invite_already_claimed'; END IF;
   IF v_entry.player1_id = v_me THEN RAISE EXCEPTION 'invite_is_your_own'; END IF;
 
-  UPDATE tournament_entries
-     SET player2_id = v_me, guest_name = NULL, guest_email = NULL,
-         guest_phone_hash = NULL, invite_token = NULL, invite_email_status = 'none'
-   WHERE id = v_entry.id;
-
   SELECT c.tournament_id INTO v_tournament
     FROM tournament_categories c WHERE c.id = v_entry.category_id;
+
+  -- Ficar com o lugar é entrar mesmo: valem as regras da inscrição
+  -- (revisão do Dev 3, 22 set).
+  IF tournament_person_in_category(v_entry.category_id, v_me, v_entry.id) THEN
+    RAISE EXCEPTION 'already_in_category';
+  END IF;
+  IF tournament_categories_left(v_tournament, v_me) <= 0 THEN
+    RAISE EXCEPTION 'max_categories_reached';
+  END IF;
+
+  UPDATE tournament_entries
+     SET player2_id = v_me, guest_name = NULL, guest_email = NULL,
+         guest_phone_hash = NULL, invite_token = NULL, invite_email_status = 'none',
+         partner_accepted_at = NOW()
+   WHERE id = v_entry.id;
+
   RETURN v_tournament;
 END;
 $$;
@@ -341,6 +421,16 @@ BEGIN
   IF NOT FOUND THEN RAISE EXCEPTION 'entry_not_found'; END IF;
   SELECT tournament_id INTO v_tournament FROM tournament_categories WHERE id = v_entry.category_id;
   IF NOT is_tournament_admin(v_tournament) THEN RAISE EXCEPTION 'not_admin'; END IF;
+
+  -- Validar um suplente punha-o dentro à frente de quem estava na fila, e
+  -- podia passar a lotação da categoria. Primeiro sobe (alguém tem de
+  -- sair), depois valida-se (revisão do Dev 3, 22 set).
+  IF v_entry.status = 'suplente' THEN RAISE EXCEPTION 'entry_on_waitlist'; END IF;
+  -- Uma dupla por responder também não se valida: ainda não se sabe quem
+  -- ela é.
+  IF p_paid AND v_entry.status IN ('convite', 'sem_parceiro') THEN
+    RAISE EXCEPTION 'entry_not_complete';
+  END IF;
 
   IF p_paid THEN
     UPDATE tournament_entries
@@ -422,12 +512,15 @@ BEGIN
   INSERT INTO tournament_entries (
     category_id, player1_id, player2_id, guest_name, guest_email, team_name,
     status, waitlist_order, invite_token, invite_email_status,
-    validated_at, validated_by
+    partner_accepted_at, validated_at, validated_by
   ) VALUES (
     p_category_id, p_player1_id, p_partner_id, NULLIF(TRIM(p_guest_name), ''),
     NULLIF(TRIM(LOWER(p_guest_email)), ''), NULLIF(TRIM(p_team_name), ''),
     v_status, v_order, v_token,
     CASE WHEN NULLIF(TRIM(p_guest_email), '') IS NULL THEN 'none' ELSE 'queued' END,
+    -- Inscrita pelo organizador: a dupla veio já feita do formulário do
+    -- clube, não há convite por responder.
+    CASE WHEN p_partner_id IS NOT NULL THEN NOW() END,
     CASE WHEN v_status = 'validada' THEN NOW() END,
     CASE WHEN v_status = 'validada' THEN auth.uid() END
   )
@@ -446,7 +539,7 @@ RETURNS TABLE (
   created_at TIMESTAMPTZ, validated_at TIMESTAMPTZ,
   player1_id UUID, player1_name TEXT, player1_avatar TEXT,
   player2_id UUID, player2_name TEXT, player2_avatar TEXT,
-  guest_name TEXT, guest_email TEXT, invite_token TEXT, respond_by TIMESTAMPTZ
+  guest_name TEXT, guest_email TEXT, has_invite BOOLEAN, respond_by TIMESTAMPTZ
 )
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
 DECLARE v_tournament UUID;
@@ -459,12 +552,34 @@ BEGIN
     SELECT e.id, e.status, e.team_name, e.waitlist_order, e.created_at, e.validated_at,
            e.player1_id, p1.name, p1.avatar_url,
            e.player2_id, p2.name, p2.avatar_url,
-           e.guest_name, e.guest_email, e.invite_token, e.respond_by
+           -- O código do convite não vai para o ecrã: com ele qualquer
+           -- admin ficava com o lugar do parceiro. Quem o quiser mandar
+           -- outra vez pede-o à função de baixo (revisão do Dev 3).
+           e.guest_name, e.guest_email, (e.invite_token IS NOT NULL), e.respond_by
       FROM tournament_entries e
       LEFT JOIN profiles p1 ON p1.id = e.player1_id
       LEFT JOIN profiles p2 ON p2.id = e.player2_id
      WHERE e.category_id = p_category_id
      ORDER BY (e.status = 'suplente'), e.waitlist_order NULLS FIRST, e.created_at;
+END;
+$$;
+
+-- O código do convite, um de cada vez e só a pedido: para quem convidou
+-- ou para o organizador reenviarem o link.
+CREATE OR REPLACE FUNCTION tournament_invite_token(p_entry_id UUID)
+RETURNS TEXT
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  v_entry tournament_entries%ROWTYPE;
+  v_tournament UUID;
+BEGIN
+  SELECT * INTO v_entry FROM tournament_entries WHERE id = p_entry_id;
+  IF NOT FOUND THEN RAISE EXCEPTION 'entry_not_found'; END IF;
+  SELECT tournament_id INTO v_tournament FROM tournament_categories WHERE id = v_entry.category_id;
+  IF v_entry.player1_id <> auth.uid() AND NOT is_tournament_admin(v_tournament) THEN
+    RAISE EXCEPTION 'not_allowed';
+  END IF;
+  RETURN v_entry.invite_token;
 END;
 $$;
 
@@ -483,6 +598,9 @@ BEGIN
     'tournament_remove_entry(uuid)',
     'tournament_admin_signup(uuid,uuid,uuid,text,text,text,boolean)',
     'list_tournament_entries(uuid)',
+    'tournament_invite_token(uuid)',
+    'tournament_person_in_category(uuid,uuid,uuid)',
+    'tournament_categories_left(uuid,uuid)',
     'tournament_promote_waitlist(uuid)',
     'tournament_taken_slots(uuid)'
   ] LOOP
