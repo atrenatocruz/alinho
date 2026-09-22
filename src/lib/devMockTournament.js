@@ -186,17 +186,43 @@ export const TOURNAMENT_RPC_MOCKS = {
 // ── Marcadores e resultados (#365) ──────────────────────────────────────
 // Guardar um resultado em localhost muda mesmo o cartão, para se poder ver
 // o ecrã antes e depois — e o «corrigir».
-const team = (name, players) => ({ name, players })
+const team = (name, players) => ({ entry_id: name.toLowerCase().replace(/[^a-z]/g, ''), name, players })
 let MATCHES = null
 const resetMatches = () => {
   const today = new Date()
   const at = (hhmm) => `${iso(today)}T${hhmm}`
+  // O dia do print 10: quatro horas, dois campos, três categorias — e o
+  // Rui Costa a jogar às 10, às 11 e às 12, que é o choque que o desenho
+  // mostra assinalado a vermelho ("ficava com 3 jogos seguidos").
+  const m = (id, code, group, court, hhmm, status, a, b, score) => ({
+    match_id: id, category_code: code, group_label: group, round_label: null,
+    court, scheduled_at: at(hhmm), status,
+    team_a: a, team_b: b,
+    score_a: score ? score[0] : null, score_b: score ? score[1] : null,
+    sets: null, corrected_by_name: null,
+  })
+  const barros = team('Barros / Costa', ['Francisco Barros', 'Rui Costa'])
+  const santos = team('Santos / Santos', ['José Santos', 'Rafael Santos'])
+  const silva = team('Silva / Lopes', ['Marta Silva', 'Tiago Lopes'])
+  const reis = team('Reis / Ana', ['Nuno Reis', 'Ana Moreira'])
+  const tapia = team('Tapia Girls', ['Inês Rocha', 'Beatriz Faria'])
+  const barao = team('Barão / Néu', ['Sofia Barão', 'Rita Néu'])
+  const lima = team('Lima / Reis', ['Pedro Lima', 'Nuno Reis'])
+  const gomes = team('Gomes / Pais', ['André Gomes', 'Vasco Pais'])
+  const pinto = team('Costa / Pinto', ['Rui Costa', 'Dinis Pinto'])
+  const marta = team('Costa / Marta', ['Rui Costa', 'Marta Silva'])
+  const boss = team("Boss's", ['Zé Carlos', 'Vasco Tomás'])
+  const nunes = team('Nunes / Cruz', ['Ivo Nunes', 'António Cruz'])
+
   MATCHES = [
-    { match_id: 'm-c1', category_code: 'M5', group_label: 'Grupo A', round_label: null, court: 'Campo 1', scheduled_at: at('14:00'), status: 'a_decorrer', team_a: team('Barros / Costa', 'Francisco Barros · Rui Costa'), team_b: team('Santos / Santos', 'José Santos · Rafael Santos'), score_a: null, score_b: null, corrected_by_name: null },
-    { match_id: 'm-c2', category_code: 'MX4', group_label: 'Grupo B', round_label: null, court: 'Campo 2', scheduled_at: at('13:55'), status: 'a_decorrer', team_a: team('Silva / Lopes', 'Marta Silva · Tiago Lopes'), team_b: team('Reis / Ana', 'Nuno Reis · Ana Moreira'), score_a: null, score_b: null, corrected_by_name: null },
-    { match_id: 'm-n1', category_code: 'M5', group_label: 'Grupo A', round_label: null, court: 'Campo 1', scheduled_at: at('15:00'), status: 'marcado', team_a: team('Barros / Costa', 'Francisco Barros · Rui Costa'), team_b: team('Costa / Pinto', 'Hugo Costa · Dinis Pinto'), score_a: null, score_b: null, corrected_by_name: null },
-    { match_id: 'm-n2', category_code: 'F4', group_label: 'Grupo A', round_label: null, court: 'Campo 2', scheduled_at: at('15:00'), status: 'marcado', team_a: team('Tapia Girls', 'Inês Rocha · Beatriz Faria'), team_b: team('Barão / Néu', 'Sofia Barão · Rita Néu'), score_a: null, score_b: null, corrected_by_name: null },
-    { match_id: 'm-d1', category_code: 'M5', group_label: 'Grupo B', round_label: null, court: 'Campo 3', scheduled_at: at('13:00'), status: 'terminado', team_a: team('Lima / Reis', 'Pedro Lima · Nuno Reis'), team_b: team('Gomes / Pais', 'André Gomes · Vasco Pais'), score_a: 9, score_b: 6, corrected_by_name: null },
+    m('m-1', 'M5', 'Grupo A', 'Campo 1', '10:00', 'terminado', barros, santos, [9, 6]),
+    m('m-2', 'MX4', 'Grupo B', 'Campo 2', '10:00', 'terminado', silva, reis, [9, 7]),
+    m('m-3', 'F4', 'Grupo A', 'Campo 1', '11:00', 'a_decorrer', tapia, barao),
+    m('m-4', 'M5', 'Grupo B', 'Campo 2', '11:00', 'a_decorrer', lima, pinto),
+    m('m-5', 'MX4', 'Grupo A', 'Campo 1', '12:00', 'marcado', marta, gomes),
+    m('m-6', 'M5', 'Grupo C', 'Campo 3', '12:00', 'marcado', santos, boss),
+    m('m-7', 'M5', 'Grupo A', 'Campo 1', '13:00', 'marcado', nunes, boss),
+    m('m-8', 'F4', 'Grupo B', 'Campo 2', '13:00', 'marcado', tapia, barao),
   ]
 }
 

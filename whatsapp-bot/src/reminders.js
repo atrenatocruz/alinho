@@ -108,6 +108,10 @@ async function checkGameDayReminders({ sendText }) {
     .select('*')
     .in('organization_id', orgIds)
     .in('status', ['open', 'closed'])
+    // Jogos em aberto (origin='open_slot') não são mixes: são horários que
+    // alguém abriu à espera de gente. O bot anunciava-os ao grupo como
+    // "o mix Jogo em Aberto começa daqui a 3h", mesmo com 0 inscritos.
+    .neq('origin', 'open_slot')
     .is('reminder_sent_at', null)
     .gt('date', new Date().toISOString())
     .lte('date', windowEnd)

@@ -13,7 +13,11 @@ const BANDS = [
 /** Banda de um rating ('M6', 'F4', 'INI') ou null sem rating. */
 export function ratingBandLabel(rating, gender) {
   if (rating == null) return null
-  const prefix = gender === 'feminino' ? 'F' : 'M'
+  // M = masculino, F = feminino, N = nível para quem não preencheu o
+  // género (regra do Francisco, 9 set 2026, Trello #202). A app já faz
+  // isto em src/lib/elo.js; o bot tinha ficado com a versão antiga, que
+  // rotulava de M toda a gente sem género — incluindo mulheres.
+  const prefix = gender === 'feminino' ? 'F' : gender === 'masculino' ? 'M' : 'N'
   const band = BANDS.find((b) => rating >= b.min)
   if (!band) return 'INI'
   return `${prefix}${band.num}`
