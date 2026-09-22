@@ -4,6 +4,9 @@ import {
   applyFilters, eventsForDay, countByDay, nextMineDay, monthGrid, isAgendaGame,
   DEFAULT_FILTERS, isDefaultFilters, normalizeFilters, groupByDay, eventFromExplore, distanceKm, eventDistance, withinReach,
   eventsToPins, eventFromLesson,
+  eventFromTournament,
+  eventFromTournamentMatch,
+  EVENT_KINDS,
 } from './agenda'
 
 const ME = 'me'
@@ -236,5 +239,64 @@ describe('eventFromLesson (aulas, Trello #49)', () => {
     const e = eventFromLesson(lesson())
     expect(applyFilters([e], DEFAULT_FILTERS, null, '2026-09-01')).toHaveLength(1)
     expect(applyFilters([e], { ...DEFAULT_FILTERS, kinds: ['mix'] }, null, '2026-09-01')).toHaveLength(0)
+  })
+})
+
+describe('torneios na agenda (Trello #363)', () => {
+  const tour = {
+    id: 't1', slug: 'smash-cup', name: 'Smash Cup', organization_id: 'o1',
+    club_name: 'Smash Padel', club_logo_url: null,
+    starts_on: '2026-10-09', ends_on: '2026-10-11', status: 'inscricoes',
+  }
+
+  it('o cartão do torneio fica no primeiro dia, sem hora', () => {
+    const e = eventFromTournament(tour)
+    expect(e.kind).toBe('tournament')
+    expect(e.dayKey).toBe('2026-10-09')
+    expect(e.hasTime).toBe(false)
+    expect(e.endsOn).toBe('2026-10-11')
+    expect(e.mine).toBe(false)
+  })
+
+  it('quem está inscrito vê o estado dele', () => {
+    const e = eventFromTournament(tour, { state: 'validada', entry_id: 'e1' })
+    expect(e.mine).toBe(true)
+    expect(e.myState).toBe('validada')
+  })
+
+  it('um torneio terminado aparece como terminado', () => {
+    expect(eventFromTournament({ ...tour, status: 'terminado' }).finished).toBe(true)
+  })
+
+  it('um jogo do torneio tem dia, hora e campo', () => {
+    const e = eventFromTournamentMatch(
+      { id: 'm1', scheduled_at: '2026-10-10T13:00:00', court_name: 'Campo 1', status: 'marcado' },
+      { tournament: tour, category: { code: 'M5' }, opponentName: 'Santos / Santos' },
+    )
+    expect(e.kind).toBe('tournament')
+    expect(e.dayKey).toBe('2026-10-10')
+    expect(e.hasTime).toBe(true)
+    expect(e.courtName).toBe('Campo 1')
+    expect(e.categoryCode).toBe('M5')
+    expect(e.opponentName).toBe('Santos / Santos')
+    expect(e.mine).toBe(true)
+  })
+
+  it('guarda a hora antiga de um jogo antecipado', () => {
+    const e = eventFromTournamentMatch(
+      { id: 'm2', scheduled_at: '2026-10-10T16:20:00', previous_scheduled_at: '2026-10-10T17:00:00', status: 'marcado' },
+      { tournament: tour },
+    )
+    expect(e.previousAt).toBe('2026-10-10T17:00:00')
+  })
+
+  it('um jogo sem hora marcada não cai em dia nenhum', () => {
+    const e = eventFromTournamentMatch({ id: 'm3', scheduled_at: null, status: 'marcado' }, { tournament: tour })
+    expect(e.dayKey).toBe(null)
+    expect(e.hasTime).toBe(false)
+  })
+
+  it('o filtro Tipo passa a conhecer os torneios', () => {
+    expect(EVENT_KINDS).toContain('tournament')
   })
 })
