@@ -45,6 +45,39 @@ export function noticeAge(createdAt, now = new Date()) {
   return { key: 'tnotices.age_days', values: { count: Math.floor(hours / 24) } }
 }
 
+/* O fim do aviso, em escolhas de pessoa e não em datas: "campo 3 molhado,
+   a secar" dura umas horas, não para sempre. Devolve o momento em que
+   desaparece, ou null para ficar. */
+export const EXPIRY_CHOICES = ['none', '1h', '3h', 'day']
+
+export function expiryFrom(choice, now = new Date()) {
+  if (choice === '1h') return new Date(now.getTime() + 3600000).toISOString()
+  if (choice === '3h') return new Date(now.getTime() + 3 * 3600000).toISOString()
+  if (choice === 'day') {
+    const end = new Date(now)
+    end.setHours(23, 59, 0, 0)
+    return end.toISOString()
+  }
+  return null
+}
+
+/* "editado às 14h20" no mesmo dia, "editado a 9 out" noutro dia
+   (decisão do Francisco, 22 set). Nunca segundos. */
+export function editedWords(updatedAt, now = new Date()) {
+  if (!updatedAt) return null
+  const at = new Date(updatedAt)
+  const sameDay = at.toDateString() === now.toDateString()
+  if (sameDay) {
+    const hh = at.getHours()
+    const mm = String(at.getMinutes()).padStart(2, '0')
+    return { key: 'tnotices.edited_at', values: { time: mm === '00' ? `${hh}h` : `${hh}h${mm}` } }
+  }
+  return {
+    key: 'tnotices.edited_on',
+    values: { date: at.toLocaleDateString('pt-PT', { day: 'numeric', month: 'short' }) },
+  }
+}
+
 // ── Chamadas (funções pedidas ao Dev 3) ─────────────────────────────────
 
 const missing = (error) => error?.code === 'PGRST202'
@@ -60,11 +93,15 @@ export async function publishNotice({ tournamentId, body, alsoWhatsapp = false, 
   return data
 }
 
-export async function updateNotice({ noticeId, body, expiresAt = null }) {
+/* Editar. Sem `expiresAt` o fim fica como estava — foi o Dev 3 que o
+   apanhou: reenviar o campo vazio apagava o fim de um aviso que era para
+   desaparecer. Para o tirar é preciso dizê-lo (clearExpiry). */
+export async function updateNotice({ noticeId, body, expiresAt = null, clearExpiry = false }) {
   const { error } = await supabase.rpc('update_tournament_notice', {
     p_notice_id: noticeId,
     p_body: (body || '').trim(),
     p_expires_at: expiresAt,
+    p_clear_expiry: clearExpiry,
   })
   if (error) throw new Error(missing(error) ? 'not_ready' : error.message)
 }
