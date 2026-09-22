@@ -211,8 +211,74 @@ const organizationInvite: Handler = async ({ admin, callerId, appUrl, body }) =>
   return { email, release }
 }
 
+// Welcome email, once per account, fired by AuthContext on the first session
+// (after email confirmation for email+password signups, first login for
+// Google). Only ever goes to the caller themself — the body carries no ids.
+// claim_welcome_email (supabase/migration_welcome_email.sql) is the
+// once-only guard, and marks pre-existing accounts as already sent.
+const welcome: Handler = async ({ admin, callerId, appUrl }) => {
+  const { data, error } = await admin.rpc('claim_welcome_email', { p_user_id: callerId })
+  if (error) throw error
+  const profile = data?.[0]
+  if (!profile) return { skip: 'nothing_to_send' }
+
+  const release = async () => {
+    const { error: releaseError } = await admin
+      .from('profiles')
+      .update({ welcome_emailed_at: null })
+      .eq('id', callerId)
+    if (releaseError) console.error('Failed to release welcome email claim:', releaseError)
+  }
+
+  const { data: authUser, error: userError } = await admin.auth.admin.getUserById(callerId)
+  if (userError) {
+    await release()
+    throw userError
+  }
+  const to = authUser?.user?.email
+  if (!isDeliverable(to)) return { skip: 'no_deliverable_address' }
+
+  // First name only — "Olá Rui" reads better than the full name.
+  const firstName = escapeHtml((profile.name || '').trim().split(/\s+/)[0] || '')
+  const greeting = (hello: string) => (firstName ? `${hello} ${firstName}!` : `${hello}!`)
+  const en = profile.language === 'en'
+
+  const email: Outgoing = en
+    ? {
+        to,
+        subject: 'Welcome to alinho',
+        html: renderLayout({
+          heading: greeting('Hi'),
+          paragraphs: [
+            `Your alinho account is ready. This is where your club's games live: see what's coming up, join with one tap, and follow the results and rankings.`,
+            `If your club already uses alinho, ask an admin for the invite link — it puts you straight into the club. If you can't find a game yet, the games on the app tab <strong>Comunidade</strong> are open to everyone.`,
+          ],
+          ctaLabel: 'Open alinho',
+          ctaUrl: appUrl,
+          footnote: `You're getting this email because you just created an alinho account. Questions or something wrong? Just reply to this email.`,
+        }),
+      }
+    : {
+        to,
+        subject: 'Bem-vindo ao alinho',
+        html: renderLayout({
+          heading: greeting('Olá'),
+          paragraphs: [
+            `A tua conta no alinho está pronta. É aqui que vivem os jogos do teu clube: vês o que vem aí, entras com um toque e acompanhas os resultados e o ranking.`,
+            `Se o teu clube já usa o alinho, pede o link de convite a um admin — leva-te direto para o clube. Se ainda não encontras jogos, os da aba <strong>Comunidade</strong> estão abertos a toda a gente.`,
+          ],
+          ctaLabel: 'Abrir o alinho',
+          ctaUrl: appUrl,
+          footnote: `Recebes este email porque acabaste de criar conta no alinho. Dúvidas ou algo que não bate certo? Responde a este email.`,
+        }),
+      }
+
+  return { email, release }
+}
+
 const handlers: Record<string, Handler> = {
   organization_invite: organizationInvite,
+  welcome,
 }
 
 async function sendWithResend(apiKey: string, email: Outgoing): Promise<void> {

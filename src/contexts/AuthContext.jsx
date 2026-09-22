@@ -191,6 +191,22 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
+  // Welcome email on the first session. Strictly `=== null`: the column only
+  // exists once migration_welcome_email.sql has run (undefined before that,
+  // and in the dev mock), and that migration marks every existing account
+  // as already sent. The function refuses to send twice, so a retry after
+  // a dropped request is harmless. Fire-and-forget like the other side
+  // calls here — never blocks the profile load.
+  const sendWelcomeEmail = (profileData) => {
+    if (profileData?.welcome_emailed_at !== null) return
+    supabase.functions
+      .invoke('send-email', { body: { type: 'welcome' } })
+      .then(({ error }) => {
+        if (error) console.error('Welcome email not sent:', error)
+      })
+      .catch((error) => console.error('Welcome email not sent:', error))
+  }
+
   const loadFeatureFlags = async () => {
     const { data, error } = await supabase.from('feature_flags').select('key, enabled')
     if (error) {
@@ -269,6 +285,9 @@ export const AuthProvider = ({ children }) => {
 
         await consumePendingOrgSlug()
         await consumePendingSignupPhone(userId)
+        // After the language reconciliation above, so a pre-auth EN choice
+        // has usually landed by the time the function reads profiles.language.
+        sendWelcomeEmail(profileData)
         await loadFeatureFlags()
 
         let { data: membershipData, error: membershipError } = await supabase
