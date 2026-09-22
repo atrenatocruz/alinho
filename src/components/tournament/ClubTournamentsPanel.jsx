@@ -7,8 +7,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ChevronRight, Plus, Trash2, Trophy } from 'lucide-react'
-import { createTournament, deleteTournament, listClubTournaments, setTournamentStatus } from '../../lib/tournamentApi'
+import { ChevronRight, Pencil, Plus, Trash2, Trophy } from 'lucide-react'
+import { createTournament, deleteTournament, getTournamentForEdit, listClubTournaments, setTournamentStatus, updateTournament } from '../../lib/tournamentApi'
 import { canDelete, nextStatus, previousStatus } from '../../lib/tournaments'
 import { describeError, errorKind } from '../../lib/errors'
 import { DangerConfirmModal, EmptyState, PrimaryButton } from '../ui'
@@ -26,6 +26,7 @@ export default function ClubTournamentsPanel({ organizationId, club }) {
   const [error, setError] = useState('')
   const [toDelete, setToDelete] = useState(null)
   const [keepersOf, setKeepersOf] = useState(null)
+  const [editing, setEditing] = useState(null) // { row, data }
 
   const load = useCallback(() => {
     listClubTournaments(organizationId)
@@ -44,6 +45,32 @@ export default function ClubTournamentsPanel({ organizationId, club }) {
     try {
       await createTournament(organizationId, draft)
       setCreating(false)
+      load()
+    } catch (err) {
+      setError(describeError(t, err))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const openEdit = async (row) => {
+    setError('')
+    try {
+      const data = await getTournamentForEdit(row.id)
+      if (!data?.tournament) throw new Error('not ready')
+      setEditing({ row, data })
+    } catch (err) {
+      if (errorKind(err) !== 'not_ready') console.error('Error loading tournament:', err)
+      setError(describeError(t, err, 'tournament.admin.edit_error'))
+    }
+  }
+
+  const saveEdit = async (draft) => {
+    setSaving(true)
+    setError('')
+    try {
+      await updateTournament(editing.row.id, draft)
+      setEditing(null)
       load()
     } catch (err) {
       setError(describeError(t, err))
@@ -77,6 +104,20 @@ export default function ClubTournamentsPanel({ organizationId, club }) {
 
   if (keepersOf) {
     return <ScorekeepersPanel tournament={keepersOf} onBack={() => setKeepersOf(null)} />
+  }
+
+  if (editing) {
+    return (
+      <CreateTournamentForm
+        club={club}
+        initial={editing.data}
+        locked={!!editing.data.has_entries}
+        saving={saving}
+        error={error}
+        onCancel={() => setEditing(null)}
+        onCreate={saveEdit}
+      />
+    )
   }
 
   const dates = (row) => {
@@ -121,9 +162,8 @@ export default function ClubTournamentsPanel({ organizationId, club }) {
                 <StatePill tone={STATE_TONE[row.status] || 'grey'}>{t(`tournament.status_${row.status}`)}</StatePill>
               </div>
 
-              {/* Sem nada para fazer (um torneio já sorteado), não fica uma
-                  linha vazia a ocupar espaço. */}
-              {(forward || back || canDelete(row) || ['sorteado', 'a_decorrer', 'terminado'].includes(row.status)) && (
+              {/* Editar está sempre: mesmo um torneio a decorrer deixa
+                  mudar o nome, o local e o texto do organizador. */}
               <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3">
                 {forward && (
                   <button type="button" onClick={() => move(row, forward)} className="rounded-full bg-ink-900 px-3 py-1.5 text-[12px] font-bold text-white">
@@ -145,13 +185,15 @@ export default function ClubTournamentsPanel({ organizationId, club }) {
                     </button>
                   </>
                 )}
+                <button type="button" onClick={() => openEdit(row)} className="ml-auto inline-flex items-center gap-1 text-[12px] font-semibold text-ink-500 hover:text-ink-900">
+                  <Pencil size={14} /> {t('tournament.admin.edit')}
+                </button>
                 {canDelete(row) && (
-                  <button type="button" onClick={() => setToDelete(row)} aria-label={t('tournament.admin.delete')} className="ml-auto text-ink-300 hover:text-danger">
+                  <button type="button" onClick={() => setToDelete(row)} aria-label={t('tournament.admin.delete')} className="text-ink-300 hover:text-danger">
                     <Trash2 size={16} />
                   </button>
                 )}
               </div>
-              )}
             </div>
           )
         })

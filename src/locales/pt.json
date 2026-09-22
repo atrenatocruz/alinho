@@ -2401,5 +2401,11 @@
   "tournament.create.poster_pick": "Carregar imagem",
   "tournament.create.poster_uploading": "A carregar…",
   "tournament.create.poster_remove": "Tirar o cartaz",
-  "tournament.create.poster_error": "Não foi possível carregar a imagem."
+  "tournament.create.poster_error": "Não foi possível carregar a imagem.",
+  "tournament.create.category_repeated": "Já tens uma categoria {{name}} neste torneio.",
+  "tournament.create.edit_title": "Editar torneio",
+  "tournament.create.edit_locked": "Já há inscrições: só se muda o que não estraga as inscrições feitas.",
+  "tournament.create.save_changes": "Guardar alterações",
+  "tournament.admin.edit": "Editar",
+  "tournament.admin.edit_error": "Não foi possível abrir este torneio para editar."
 }
