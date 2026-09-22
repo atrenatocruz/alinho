@@ -73,9 +73,12 @@ DROP POLICY IF EXISTS partner_invites_owner_select ON partner_invites;
 CREATE POLICY partner_invites_owner_select ON partner_invites
   FOR SELECT USING (invited_by = auth.uid());
 
+-- Sem política de UPDATE de propósito: um UPDATE de cliente sobre esta
+-- tabela (mesmo restrito a invited_by = auth.uid()) deixa o placeholder_id
+-- aberto a ser reapontado para a conta de outra pessoa, e as RPCs de baixo
+-- (SECURITY DEFINER) confiam nesse valor. Cancelar/reclamar passam sempre
+-- pelas RPCs, nunca por um UPDATE direto do cliente.
 DROP POLICY IF EXISTS partner_invites_owner_cancel ON partner_invites;
-CREATE POLICY partner_invites_owner_cancel ON partner_invites
-  FOR UPDATE USING (invited_by = auth.uid()) WITH CHECK (invited_by = auth.uid());
 
 -- Sem política de INSERT de propósito: só a edge function (service-role)
 -- cria convites, porque só ela pode criar a conta por reclamar.
@@ -113,6 +116,12 @@ BEGIN
 
   IF v_me = v_invite.placeholder_id THEN
     RAISE EXCEPTION 'invite_is_your_own_placeholder';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM profiles WHERE id = v_invite.placeholder_id AND claim_pending
+  ) THEN
+    RAISE EXCEPTION 'invite_placeholder_invalid';
   END IF;
 
   SELECT organization_id INTO v_org FROM games WHERE id = v_invite.game_id;
@@ -167,6 +176,12 @@ BEGIN
    WHERE id = p_invite_id AND invited_by = auth.uid() AND status = 'pending';
   IF NOT FOUND THEN
     RAISE EXCEPTION 'invite_not_found';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM profiles WHERE id = v_invite.placeholder_id AND claim_pending
+  ) THEN
+    RAISE EXCEPTION 'invite_placeholder_invalid';
   END IF;
 
   UPDATE partner_invites SET status = 'cancelled' WHERE id = v_invite.id;

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Plus, Trash2, Clock } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { PrimaryButton, PickerInput } from './ui'
+import { PrimaryButton, PickerInput, DateField } from './ui'
 import { buildOpenSlotRows } from '../lib/openSlots'
 import { formatDate, formatTime } from '../lib/formatDate'
 import { describeError } from '../lib/errors'
@@ -100,14 +100,12 @@ export default function OpenSlotsPanel({ organizationId }) {
         <h3 className="font-extrabold text-ink-900">{t('open_slots.publish_title')}</h3>
         <div>
           <label className="text-sm font-bold text-ink-700">{t('open_slots.date_label')}</label>
-          <PickerInput
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            hint={t('open_slots.date_hint')}
-            aria-label={t('open_slots.date_label')}
-            className="mt-1"
-          />
+          {/* Calendário partilhado em vez do campo do telemóvel: mostra o
+              dia de hoje e tem o atalho "Hoje" (Trello #357). */}
+          <div className="mt-1">
+            <DateField value={date} onChange={setDate} min={new Date().toISOString().slice(0, 10)} />
+            <p className="text-xs text-muted mt-1.5">{t('open_slots.date_hint')}</p>
+          </div>
         </div>
         <div>
           <label className="text-sm font-bold text-ink-700">{t('open_slots.price_label')}</label>

@@ -6,6 +6,7 @@ import { PrimaryButton } from '../ui'
 import { Sheet } from '../agenda/AgendaControls'
 import { whatsappShare } from '../../lib/partnerInvite'
 import TournamentSignupSheet from './TournamentSignupSheet'
+import PublicInfo from './PublicInfo'
 import {
   signUp, respondToInvite, listMyInvites, withdrawEntry,
   entriesOpen, categoriesLeft, tournamentInviteLink,
@@ -131,6 +132,11 @@ export default function SignupSlot({ tournament, categories, category, my }) {
       ) : null}
 
       {error && !sheet && <p className="text-sm text-red-600 font-extrabold">{error}</p>}
+
+      {/* O cartaz: categorias com dia, hora e vagas, pagamento, mapa e
+          quem organiza. Enquanto houver inscrições é o que faz decidir;
+          depois do sorteio quem manda são os separadores (Trello #363). */}
+      {open && <PublicInfo tournament={tournament} categories={categories} />}
 
       {sheet && (
         <TournamentSignupSheet

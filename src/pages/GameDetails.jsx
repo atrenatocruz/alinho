@@ -1364,8 +1364,17 @@ export default function GameDetails() {
         ? { ...m, score_a: a, score_b: b, winner_team_id: a > b ? match.team_a_id : match.team_b_id }
         : m
     ))
-    const newWinnerTeamId = computeMixWinnerTeamId(game, teams, patchedMatches)
-    if (!newWinnerTeamId) return
+    // No Americano quem ganha o mix é um JOGADOR (o que soma mais pontos),
+    // não uma dupla — games.winner_team_id fica NULL, tal como o
+    // finalize_americano_mix o deixa. A base de dados recalcula quem ganhou
+    // a partir dos pontos (Trello #377).
+    const newWinnerTeamId = isAmericano ? null : computeMixWinnerTeamId(game, teams, patchedMatches)
+    // Nos formatos com dupla fixa, sem vencedor calculável não há correção
+    // possível — e antes disto o guardar não fazia nada e não dizia nada.
+    if (!isAmericano && !newWinnerTeamId) {
+      setMixError(t('gamedetails.error_correction_no_winner'))
+      return
+    }
 
     if (!confirm(t('gamedetails.confirm_correct_finished_score', {
       team: teamName(match.team_a_id), a, other: teamName(match.team_b_id), b,
@@ -2124,6 +2133,12 @@ export default function GameDetails() {
               {game.ranked === false && <> · {t('gamedetails.badge_friendly')}</>}
             </span>
           </p>
+            {/* Quem ganha, em cada formato — o Americano dá a vitória a um
+                jogador e não a uma dupla, e isso não estava escrito em lado
+                nenhum (Francisco, 22 set 2026). */}
+            <p className="text-sm text-muted mt-1">
+              {t(`mixlogic.format_help_${isRotating ? 'sobe_desce_rotate' : (game.format || 'sobe_desce')}`)}
+            </p>
           {game.price_per_player > 0 && (
             <p className="flex items-center gap-1.5">
               <Euro size={15} className="shrink-0" />

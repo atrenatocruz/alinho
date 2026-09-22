@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Search, Check, X, UserPlus } from 'lucide-react'
+import { Search, Check, X, UserPlus, Send } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { Sheet } from '../agenda/AgendaControls'
 import { Avatar, PrimaryButton, EmptyState } from '../ui'
 import { partnerNameError, partnerEmailError } from '../../lib/partnerInvite'
-import { listEntries, validateEntry, removeEntry, adminSignUp } from '../../lib/tournamentSignup'
+import { listEntries, validateEntry, removeEntry, adminSignUp, tournamentInviteLink } from '../../lib/tournamentSignup'
+import { whatsappShare } from '../../lib/partnerInvite'
 
 /* Separador «Inscritos» (Trello #362).
    Desenho: print 08 (lista por categoria, Validar a um toque) e a regra
@@ -168,6 +169,17 @@ export default function EntriesPanel({ tournament, category }) {
     [rows, filter],
   )
 
+  // "20 set" — curto, que a linha é estreita.
+  const signedUpOn = (iso) => new Date(iso).toLocaleDateString('pt-PT', { day: 'numeric', month: 'short' })
+
+  // Reenviar o link de quem entrou pelo nome, para colar no WhatsApp.
+  const share = (e) => {
+    const link = tournamentInviteLink(e.invite_token, window.location.origin)
+    window.open(whatsappShare(t('tsignup.invite_whatsapp_text', {
+      name: e.guest_name || '', title: tournament.name, link,
+    })), '_blank')
+  }
+
   const act = async (fn) => {
     setBusy(true); setError('')
     try { await fn(); load() }
@@ -217,6 +229,9 @@ export default function EntriesPanel({ tournament, category }) {
                     e.team_name ? pairName(e, t) : null,
                     e.status === 'suplente' && e.waitlist_order ? t('tentries.waitlist_n', { n: e.waitlist_order }) : null,
                     (e.player2_is_guest || (!e.player2_id && e.guest_name)) ? t('partner.no_account_tag') : null,
+                    // Quando se inscreveu — é por aqui que o organizador
+                    // percebe a ordem de chegada (print 08).
+                    e.created_at ? t('tentries.signed_up_on', { date: signedUpOn(e.created_at) }) : null,
                   ].filter(Boolean).join(' · ')}
                 </p>
               </div>
@@ -227,6 +242,18 @@ export default function EntriesPanel({ tournament, category }) {
 
               {isAdmin && e.status !== 'desistiu' && (
                 <div className="flex shrink-0 gap-1">
+                  {/* Reenviar o convite de quem ainda não tem conta: o link
+                      é a única forma de ele ficar com o lugar. */}
+                  {e.invite_token && !e.player2_id && (
+                    <button
+                      onClick={() => share(e)}
+                      disabled={busy}
+                      aria-label={t('tentries.invite_again')}
+                      className="press flex h-9 w-9 items-center justify-center rounded-full bg-ink-50 text-ink-900"
+                    >
+                      <Send size={16} />
+                    </button>
+                  )}
                   {e.status === 'por_validar' && (
                     <button
                       onClick={() => act(() => validateEntry(e.entry_id, true))}
