@@ -12,7 +12,10 @@
 // A classificação dos grupos NÃO se pede ao servidor: calcula-se aqui com
 // `tournamentFormat.js`, que é o único sítio onde o desempate vive.
 import { supabase } from './supabase'
-import { groupStandings, TIEBREAK_DEFAULT } from './tournamentFormat'
+import {
+  groupStandings, TIEBREAK_DEFAULT, nextPowerOfTwo, groupSizes,
+  drawGroups, groupRoundRobin, pickSeeds,
+} from './tournamentFormat'
 
 /** Tudo o que os separadores Grupos, Quadro e Calendário precisam de uma
  *  categoria, em três leituras. Devolve:
@@ -161,4 +164,155 @@ export async function saveMatchSchedule(tournamentId, slots) {
   })
   if (error) throw error
   return data
+}
+
+// ── O que se manda para o servidor quando o admin confirma ───────────────
+
+const ROUND_BY_SIZE = { 32: 'R32', 16: 'R16', 8: 'QF', 4: 'SF', 2: 'F' }
+
+/** Ordem clássica de um quadro: garante que o 1.º e o 2.º só se encontram
+    na final, o 3.º e o 4.º nas meias, e assim por diante. Para 4 dá
+    [1,4,3,2] — o 1.º em cima, o 2.º em baixo. */
+export function seedOrder(size) {
+  let order = [1, 2]
+  while (order.length < size) {
+    const next = order.length * 2
+    order = order.flatMap((n) => [n, next + 1 - n])
+  }
+  return order
+}
+
+/** Os lugares do quadro, em texto, pela ordem em que saem dos grupos:
+    primeiro todos os 1.os, depois todos os 2.os. É isto que aparece no
+    ecrã enquanto os grupos não acabam («2.º do Grupo B»). */
+export function qualifierLabels(groups, perGroup) {
+  const labels = []
+  for (let position = 1; position <= perGroup; position++) {
+    for (const g of groups) {
+      labels.push({ label: `${position}.º do ${g.name}`, group: g.number, position })
+    }
+  }
+  return labels
+}
+
+/** Como se lê «vencedor de» cada ronda, para o texto do quadro. */
+const ROUND_SOURCE = { R32: 'dos 16 avos', R16: 'dos oitavos', QF: 'dos quartos', SF: 'das meias' }
+
+/** O quadro vazio, em texto, para o momento do sorteio: os grupos ainda não
+    se jogaram, por isso não há duplas — há lugares («1.º do Grupo A») e
+    caminhos («Vencedor dos quartos 2»). É o que o jogador vê no separador
+    Quadro antes de os grupos acabarem, e é o que deixa cada um ver o
+    caminho dele até à final.
+
+    Com lugares a mais (ex.: 6 apurados num quadro de 8), os melhores ficam
+    ISENTOS: não têm jogo na 1.ª ronda e o nome deles aparece já na ronda
+    seguinte. */
+export function buildBracketSkeleton(groups, perGroup, { stage = 'principal' } = {}) {
+  const labels = qualifierLabels(groups, perGroup)
+  const q = labels.length
+  if (q < 2) return []
+
+  const size = nextPowerOfTwo(q)
+  const order = seedOrder(size)
+  const labelOf = (n) => (n <= q ? labels[n - 1].label : null)
+
+  const matches = []
+  const byes = new Map()
+  const firstCount = size / 2
+  const firstName = ROUND_BY_SIZE[size]
+
+  for (let i = 0; i < firstCount; i++) {
+    const slot = i + 1
+    const a = labelOf(order[2 * i])
+    const b = labelOf(order[2 * i + 1])
+    if (a && b) {
+      matches.push({ stage, round: firstName, slot, source_a: a, source_b: b })
+    } else {
+      byes.set(slot, a || b)
+    }
+  }
+
+  let prevCount = firstCount
+  let prevName = firstName
+  let prevByes = byes
+  while (prevCount > 1) {
+    const count = prevCount / 2
+    const name = ROUND_BY_SIZE[count * 2]
+    for (let i = 0; i < count; i++) {
+      const slot = i + 1
+      const fa = 2 * slot - 1
+      const fb = 2 * slot
+      matches.push({
+        stage,
+        round: name,
+        slot,
+        source_a: prevByes.get(fa) || `Vencedor ${ROUND_SOURCE[prevName]} ${fa}`,
+        source_b: prevByes.get(fb) || `Vencedor ${ROUND_SOURCE[prevName]} ${fb}`,
+      })
+    }
+    prevCount = count
+    prevName = name
+    prevByes = new Map()
+  }
+
+  return matches
+}
+
+/** Tudo o que o `draw_category` precisa, a partir das duplas e do formato
+    escolhido no assistente. O admin já viu isto no ecrã antes de confirmar.
+
+    `teams`: [{ id, name, points }] — as duplas selecionadas.
+    `seeds`: as cabeças de série, se o admin as trocou à mão. */
+export function buildDrawPayload(teams, {
+  groupCount, perGroup = 2, seeds = null, seed = 1, thirdPlace = false,
+} = {}) {
+  const sizes = groupSizes(teams.length, groupCount)
+  const drawn = drawGroups(teams, sizes, { seeds, seed })
+
+  const groups = drawn.map((g) => ({
+    number: g.number,
+    name: g.name,
+    teams: g.teams.map((t) => t.id),
+  }))
+
+  const groupMatches = drawn.flatMap((g) =>
+    groupRoundRobin(g.teams).map((m) => ({ group: g.number, a: m.a.id, b: m.b.id })))
+
+  const bracket = buildBracketSkeleton(groups, perGroup)
+
+  return {
+    seeds: (seeds || pickSeeds(teams, groupCount)).map((t) => t.id),
+    groups,
+    group_matches: groupMatches,
+    bracket: bracket.map((m) => ({
+      stage: m.stage, round: m.round, slot: m.slot,
+      source_a: m.source_a, source_b: m.source_b,
+    })),
+    third_place: Boolean(thirdPlace),
+  }
+}
+
+// ── Leituras do organizador (só admin; o servidor confirma) ──────────────
+
+/** O que o organizador precisa para preparar o sorteio: as categorias
+ *  (incluindo as de torneios em rascunho ou escondidos, que a vista pública
+ *  esconde), mais os dias e as regras do torneio — sem os dias não há como
+ *  dizer se o formato cabe no tempo de campo.
+ *  Devolve { rules, days, categories }. */
+export async function listCategoriesAdmin(tournamentId) {
+  const { data, error } = await supabase.rpc('list_tournament_categories_admin', {
+    p_tournament_id: tournamentId,
+  })
+  if (error) throw error
+  return data || { rules: {}, days: [], categories: [] }
+}
+
+/** As duplas de uma categoria com os pontos somados, para escolher quem
+ *  entra e para propor as cabeças de série. Vem ordenada por pontos. */
+export async function listCategorySeeding(categoryId) {
+  const { data, error } = await supabase.rpc('list_category_seeding', {
+    p_category_id: categoryId,
+  })
+  if (error) throw error
+  return data || []
 }
