@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import { LESSON_RPC_MOCKS, LESSON_TABLE_MOCKS, LESSON_NOTICES } from './devMockLessons'
 import { TOURNAMENT_RPC_MOCKS, TOURNAMENT_TABLE_MOCKS } from './devMockTournament'
+import { TOURNAMENT_DRAW_TABLE_MOCKS } from './devMockTournamentDraw'
 
 // Dev-only: quando a sessão é o atalho "Entrar como Admin (Dev)"
 // (AuthContext.jsx, MOCK_ADMIN_KEY), essa sessão nunca teve um auth.uid()
@@ -626,6 +627,7 @@ const TABLE_MOCKS = {
   },
   ...LESSON_TABLE_MOCKS,
   ...TOURNAMENT_TABLE_MOCKS,
+  ...TOURNAMENT_DRAW_TABLE_MOCKS,
   // localStorage.mockNotices = 'true' — três avisos de mix no sino (Trello #292).
   notifications: () => (localStorage.getItem('mockNotices') === 'true' ? [
     { id: 'n1', kind: 'mix_partner_changed', game_id: 'fake-game-1', created_at: new Date().toISOString(),
