@@ -154,6 +154,23 @@ export const TOURNAMENT_RPC_MOCKS = {
     created = created.filter((x) => x.id !== params?.p_tournament_id)
     return null
   },
+  get_tournament_results: () => {
+    if (!on()) return null
+    const t2 = (name, players) => ({ entry_id: name, name, players })
+    return {
+      categories: [
+        { id: 'cat-m5', code: 'M5', name: 'Masculinos 5',
+          champion: t2('Barros / Costa', ['Francisco Barros', 'Rui Costa']),
+          runner_up: t2('Lima / Reis', ['Pedro Lima', 'Nuno Reis']),
+          third: null, prize_first: '2 garrafas de bolas · voucher', prize_second: '1 garrafa de bolas' },
+        { id: 'cat-mx4', code: 'MX4', name: 'Mistos 4',
+          champion: t2('Silva / Lopes', ['Marta Silva', 'Tiago Lopes']),
+          runner_up: t2('Francisco Barros / Silva', ['Francisco Barros', 'Marta Silva']),
+          third: t2('Reis / Ana', ['Nuno Reis', 'Ana Moreira']), prize_first: null, prize_second: null },
+      ],
+      my: { xp: 60, matches: 4, rating_delta: 18, category_code: 'M5', player_name: 'Francisco Barros' },
+    }
+  },
   get_tournament_for_edit: (params) => {
     if (!on()) return null
     const fri = nextFriday()
@@ -250,6 +267,17 @@ export const TOURNAMENT_SCORE_RPC_MOCKS = {
       sets: params.p_sets || null,
       // Corrigir um resultado já gravado fica registado (cartão #365).
       corrected_by_name: m.status === 'terminado' ? 'Admin (Dev)' : null,
+    } : m))
+    return null
+  },
+  reschedule_match: (params) => {
+    if (!MATCHES) resetMatches()
+    MATCHES = MATCHES.map((m) => (m.match_id === params?.p_match_id ? {
+      ...m,
+      previous_scheduled_at: m.scheduled_at,
+      // Guarda como a base de dados: com fuso, não texto cortado.
+      scheduled_at: new Date(params.p_scheduled_at).toISOString(),
+      court: params.p_court || m.court,
     } : m))
     return null
   },

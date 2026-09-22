@@ -21,6 +21,7 @@ import TeacherPage from './pages/TeacherPage'
 import LessonPage from './pages/LessonPage'
 import TournamentPage from './pages/TournamentPage'
 import TournamentScorePage from './pages/TournamentScorePage'
+import TournamentPrint from './pages/TournamentPrint'
 import CookieConsentBanner from './components/CookieConsentBanner'
 
 // Route-level splitting (impeccable audit, P3 perf finding): these are all
@@ -309,6 +310,17 @@ function AppRoutes() {
           element={
             <Guard require="protected" showSplash={showSplash}>
               <TournamentScorePage />
+            </Guard>
+          }
+        />
+        {/* A folha para imprimir (Trello #364) — grupos, quadro e a grelha
+            de horas numa folha só. Abre sem conta: quem está ao balcao
+            pode nao ter sessao iniciada, e esta e a folha do plano B. */}
+        <Route
+          path="/torneio/:id/imprimir"
+          element={
+            <Guard require="public" showSplash={showSplash}>
+              <TournamentPrint />
             </Guard>
           }
         />

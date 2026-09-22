@@ -113,6 +113,22 @@ export async function deleteTournament(tournamentId) {
   if (error) throw error
 }
 
+/** O fim do torneio (print 12): quem ganhou cada categoria e o que a pessoa
+ *  que está a ver levou de lá.
+ *
+ *  Devolve { categories: [{ id, code, name, champion, runner_up, third,
+ *  prize }], my: { xp, matches, rating_delta, category_code } | null }.
+ *  `champion`/`runner_up`/`third` são a mesma forma das duplas dos jogos
+ *  ({ entry_id, name, players }); `third` só existe se a categoria tiver
+ *  jogo de 3.º e 4.º lugar. Abre sem conta — sem sessão vem sem o `my`.
+ *
+ *  ⚠️ FUNÇÃO POR ESCREVER (Dev 3). Até existir, o ecrã do fim não aparece. */
+export async function getTournamentResults(idOrSlug) {
+  const { data, error } = await supabase.rpc('get_tournament_results', { p_tournament: idOrSlug })
+  if (error) throw error
+  return data || null
+}
+
 // ── Marcadores e resultados (Trello #365, «Torneio 5/6») ─────────────────
 // Mesma ideia do game_scorekeepers dos mixes, mas por torneio E categoria
 // (CODIGO-EXISTENTE.md §3). Quem marca é o admin ou uma pessoa que ele
@@ -160,6 +176,23 @@ export async function listMatchesToScore(tournamentId, dateIso) {
 export async function saveMatchResult(matchId, { score_a, score_b, sets = null }) {
   const { error } = await supabase.rpc('save_match_result', {
     p_match_id: matchId, p_score_a: score_a, p_score_b: score_b, p_sets: sets,
+  })
+  if (error) throw error
+}
+
+/** Mudar um jogo de hora e/ou de campo, a partir da grelha do organizador.
+ *  O servidor é que manda: recusa se o lugar novo puser alguém em dois
+ *  jogos à mesma hora, der três seguidos à mesma pessoa, ocupar um campo já
+ *  ocupado, ou pôr uma fase antes da anterior — as mesmas regras do
+ *  tournamentSchedule.js. E avisa quem joga, se já estiver publicado.
+ *
+ *  ⚠️ FUNÇÃO POR ESCREVER (Dev 3). No plano técnico dele estava
+ *  `reschedule_matches(ids[], new_times[])`, pensada para o «antecipar»;
+ *  esta é a irmã para mover UM jogo à mão, e precisa também do campo.
+ *  Até existir, a grelha mostra a mensagem de erro e não muda nada. */
+export async function rescheduleMatch(matchId, { scheduled_at, court }) {
+  const { error } = await supabase.rpc('reschedule_match', {
+    p_match_id: matchId, p_scheduled_at: scheduled_at, p_court: court,
   })
   if (error) throw error
 }
