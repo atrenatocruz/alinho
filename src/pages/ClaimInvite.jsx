@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams, Link } from 'react-router-dom'
+import { useNavigate, useParams, useLocation, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton } from '../components/ui'
 import { claimPartnerInvite } from '../lib/partnerInvite'
+import { claimEntry } from '../lib/tournamentSignup'
 
 /* Ficar com o lugar que alguém guardou para mim num mix (Trello #339).
 
@@ -14,6 +15,9 @@ import { claimPartnerInvite } from '../lib/partnerInvite'
 
 export default function ClaimInvite() {
   const { token } = useParams()
+  // O mesmo ecrã serve os dois convites: o do mix (/convite) e o do
+  // torneio (/convite-torneio). Muda só a função e para onde se vai.
+  const isTournament = useLocation().pathname.startsWith('/convite-torneio')
   const { user } = useAuth()
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -24,28 +28,28 @@ export default function ClaimInvite() {
     if (!user || !token) return
     let cancelled = false
     setState('claiming')
-    claimPartnerInvite(token)
-      .then((gameId) => { if (!cancelled) navigate(`/jogo/${gameId}`, { replace: true }) })
+    ;(isTournament ? claimEntry(token) : claimPartnerInvite(token))
+      .then((id) => { if (!cancelled) navigate(isTournament ? `/torneio/${id}` : `/jogo/${id}`, { replace: true }) })
       .catch((err) => {
         if (cancelled) return
         console.error('Error claiming partner invite:', err)
-        const key = `partner.claim_error_${err.message}`
+        const key = `${isTournament ? 'tsignup' : 'partner'}.claim_error_${err.message}`
         setError(t(key) === key ? t('partner.claim_error_generic') : t(key))
         setState('error')
       })
     return () => { cancelled = true }
-  }, [user, token, navigate, t])
+  }, [user, token, navigate, t, isTournament])
 
   return (
     <div className="p-4 max-w-md mx-auto space-y-4">
       <div className="card space-y-3 text-center">
         <p className="text-2xl">🎾</p>
-        <h1 className="text-xl text-ink-900">{t('partner.claim_title')}</h1>
+        <h1 className="text-xl text-ink-900">{t(isTournament ? 'tsignup.claim_title' : 'partner.claim_title')}</h1>
 
         {state === 'signed_out' && (
           <>
             <p className="text-sm text-muted">{t('partner.claim_signed_out')}</p>
-            <PrimaryButton onClick={() => navigate('/login', { state: { next: `/convite/${token}` } })} className="w-full">
+            <PrimaryButton onClick={() => navigate('/login', { state: { next: isTournament ? `/convite-torneio/${token}` : `/convite/${token}` } })} className="w-full">
               {t('partner.claim_create_account')}
             </PrimaryButton>
           </>

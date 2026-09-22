@@ -15,6 +15,7 @@ import { getMyPrivateMatches, privateMatchActions } from '../lib/privateMatches'
 import { describeError } from '../lib/errors'
 import { listMyUnreadNotifications, markNotificationsRead, MIX_NOTICE_KINDS } from '../lib/notifications'
 import { kudosVoters, joinNames, MAX_KUDOS_VOTERS } from '../lib/kudos'
+import { listMyInvites as listMyTournamentInvites } from '../lib/tournamentSignup'
 import LessonNoticeRow, { LESSON_NOTICE_KINDS } from './lessons/LessonNoticeRow'
 import { formatDate } from '../lib/formatDate'
 import AccountDeletionPending from './AccountDeletionPending'
@@ -424,6 +425,21 @@ export default function Layout({ children }) {
     }
   }, [profile?.id, isGuest, location.pathname])
 
+  // Convites para dupla num torneio (Trello #362): sem isto só dava por
+  // eles quem abrisse a página do torneio. Sem a migração, lista vazia.
+  const [tournamentInvites, setTournamentInvites] = useState([])
+  useEffect(() => {
+    if (!profile?.id || isGuest) {
+      setTournamentInvites([])
+      return
+    }
+    let cancelled = false
+    listMyTournamentInvites()
+      .then((rows) => { if (!cancelled) setTournamentInvites(rows) })
+      .catch((error) => console.error('Error loading tournament invites:', error))
+    return () => { cancelled = true }
+  }, [profile?.id, isGuest, location.pathname])
+
   const openMixNotice = (notice) => {
     setShowNotifications(false)
     setMixNotices((list) => list.filter((n) => n.id !== notice.id))
@@ -451,7 +467,7 @@ export default function Layout({ children }) {
   }
 
   const joinRequestsTotal = joinRequestsByOrg.reduce((sum, org) => sum + org.count, 0)
-  const notificationsTotal = followRequests.length + joinRequestsTotal + orgInvites.length + privateMatchTodos.length + mixNotices.length + lessonNotices.length
+  const notificationsTotal = followRequests.length + joinRequestsTotal + orgInvites.length + privateMatchTodos.length + mixNotices.length + lessonNotices.length + tournamentInvites.length
 
   // `main` below is the app's only scrolling region (see the app-shell comment
   // on the root div) — the document itself never scrolls, so neither the browser
@@ -588,6 +604,23 @@ export default function Layout({ children }) {
                 <div className="max-h-80 overflow-y-auto divide-y divide-line">
                   {lessonNotices.map((notice) => (
                     <LessonNoticeRow key={notice.id} notice={notice} onOpen={openLessonNotice} />
+                  ))}
+                  {tournamentInvites.map((inv) => (
+                    <Link
+                      key={inv.entry_id}
+                      to={`/torneio/${inv.tournament_slug || inv.tournament_id}`}
+                      onClick={() => setShowNotifications(false)}
+                      className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50"
+                    >
+                      <div className="w-9 h-9 rounded-full bg-[#E9E7FB] text-[#4338A8] flex items-center justify-center shrink-0">
+                        <Trophy size={16} />
+                      </div>
+                      <p className="flex-1 min-w-0 text-sm text-ink-900">
+                        {t('tsignup.invite_title', { name: inv.inviter_name })}
+                        <span className="text-muted"> · {inv.category_code}</span>
+                      </p>
+                      <span aria-hidden="true" className="w-2 h-2 rounded-full bg-lime-400 shrink-0" />
+                    </Link>
                   ))}
                   {mixNotices.map((notice) => (
                     <Link

@@ -16,6 +16,18 @@ const on = () => localStorage.getItem('mockTournament') === 'true'
 const empty = () => localStorage.getItem('mockTournamentEmpty') === 'true'
 const state = () => localStorage.getItem('mockTournamentState') || 'sorteado'
 
+// Cartaz fictício: é a imagem que o CLUBE carrega, não um desenho nosso.
+// De propósito com cara de cartaz de clube (e não de ecrã da app), para
+// ninguém confundir os dois ao ver um print.
+const FAKE_POSTER = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="480">'
+  + '<rect width="1200" height="480" fill="#0E3B2E"/>'
+  + '<rect x="70" y="60" width="1060" height="360" fill="none" stroke="#7FB77E" stroke-width="4"/>'
+  + '<line x1="600" y1="60" x2="600" y2="420" stroke="#7FB77E" stroke-width="4"/>'
+  + '<text x="120" y="230" font-family="Georgia" font-size="64" fill="#FFFFFF">Smash Padel Almada</text>'
+  + '<text x="122" y="300" font-family="Georgia" font-size="34" fill="#BFE3C6">cartaz do clube · 9 a 11 de outubro</text></svg>'
+)
+
 const pad = (n) => String(n).padStart(2, '0')
 const iso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 // Sexta, sábado e domingo da semana que vem — para o torneio cair sempre
@@ -75,7 +87,10 @@ const TOURNAMENT = () => {
     entries_deadline: iso(dayAfter(fri, -4)),
     draw_on: iso(dayAfter(fri, -2)),
     organizer_text: 'Pagamento na receção ou por MB Way. A inscrição só fica válida quando o clube confirmar.',
-    poster_url: null,
+    // Cartaz fictício, para se ver o topo da página com imagem. Em
+    // localhost não há Storage: carregar um cartaz a sério precisa de
+    // sessão verdadeira.
+    poster_url: FAKE_POSTER,
     day_count: 3,
     category_count: empty() ? 5 : CATEGORIES.length,
     entry_count: empty() ? 0 : 84,

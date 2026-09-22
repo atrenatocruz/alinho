@@ -182,6 +182,71 @@ const RPC_MOCKS = {
   // aparecer no sino um convite para admin, para validar o texto.
   transfer_organization_ownership: () => null,
   admin_set_organization_plan: () => null,
+  // Inscrição da dupla no torneio (Trello #362).
+  //   localStorage.mockTSignup = 'open'    — inscrições abertas, sem nada meu
+  //                              'invite'  — um pedido de parceiro à espera
+  //                              'in'      — já inscrito, à espera da validação
+  //                              'waitlist'— fiquei suplente
+  // Precisa também de mockTournament = 'true' (os dados do Dev 1).
+  get_tournament_page: (params) => {
+    const page = TOURNAMENT_RPC_MOCKS.get_tournament_page?.(params)
+    const mode = localStorage.getItem('mockTSignup')
+    if (!page || !mode) return page
+    const soon = new Date(Date.now() + 7 * 86400000).toISOString()
+    return {
+      ...page,
+      // Os dados do Dev 1 têm todas as categorias cheias (é o torneio já a
+      // decorrer). Para se ver a inscrição, abrem-se vagas em todas menos
+      // uma — que fica cheia de propósito, para se ver esse estado também.
+      categories: (page.categories || []).map((c, i) => ({
+        ...c, status: 'inscricoes', entry_count: i === 1 ? c.slots : Math.max(0, (c.slots || 0) - 4 - i * 2),
+      })),
+      tournament: { ...page.tournament, status: 'inscricoes', entries_deadline: soon },
+      my: { in: { category_id: 'cat-m4', state: 'por_validar', entry_id: 'ent-me' },
+            waitlist: { category_id: 'cat-m4', state: 'suplente', entry_id: 'ent-me' } }[mode] || null,
+    }
+  },
+  list_my_tournament_invites: () => (localStorage.getItem('mockTSignup') === 'invite' ? [{
+    entry_id: 'ent-inv', category_id: 'cat-m4', category_code: 'M4', category_name: 'Masculinos 4',
+    tournament_id: 'tour-smash-open', tournament_name: 'Smash Open 2026', tournament_slug: 'smash-open-2026',
+    starts_on: null, ends_on: null, entry_fee_cents: 2500,
+    inviter_id: FAKE_PLAYER_ID, inviter_name: 'Rui Oliveira Gomes',
+    respond_by: new Date(Date.now() + 3 * 86400000).toISOString(),
+  }] : []),
+  tournament_signup: (params) => ({
+    entry_id: 'ent-nova', status: 'convite',
+    invite_token: params?.p_guest_name ? 'convite-torneio-de-teste' : null,
+  }),
+  tournament_respond_invite: () => 'por_validar',
+  tournament_withdraw_entry: () => null,
+  tournament_change_partner: () => ({ entry_id: 'ent-me', invite_token: null }),
+  tournament_claim_entry: () => 'tour-smash-open',
+  tournament_validate_entry: () => 'validada',
+  tournament_remove_entry: () => null,
+  tournament_admin_signup: () => ({ entry_id: 'ent-mao', status: 'validada', invite_token: null }),
+  // A lista do organizador: um de cada estado, para se ver tudo num print.
+  list_tournament_entries: () => (localStorage.getItem('mockTSignup') ? [
+    { entry_id: 'e1', status: 'por_validar', team_name: 'Dois não fazem um', waitlist_order: null, created_at: null, validated_at: null,
+      player1_id: FAKE_PLAYER_ID, player1_name: 'Rui Oliveira Gomes', player1_avatar: null,
+      player2_id: FAKE_PARTNER_ID, player2_name: 'Tiago Ferreira', player2_avatar: null,
+      guest_name: null, guest_email: null, invite_token: null, respond_by: null },
+    { entry_id: 'e2', status: 'validada', team_name: null, waitlist_order: null, created_at: null, validated_at: null,
+      player1_id: FAKE_MEMBER_ID, player1_name: 'Marta Costa', player1_avatar: null,
+      player2_id: null, player2_name: null, player2_avatar: null,
+      guest_name: 'João Ferreira', guest_email: 'joao@exemplo.pt', invite_token: 'tok', respond_by: null },
+    { entry_id: 'e3', status: 'convite', team_name: null, waitlist_order: null, created_at: null, validated_at: null,
+      player1_id: 'p3', player1_name: 'Pedro Lima', player1_avatar: null,
+      player2_id: 'p4', player2_name: 'Nuno Alves', player2_avatar: null,
+      guest_name: null, guest_email: null, invite_token: null, respond_by: null },
+    { entry_id: 'e4', status: 'sem_parceiro', team_name: null, waitlist_order: null, created_at: null, validated_at: null,
+      player1_id: 'p5', player1_name: 'Ana Moreira', player1_avatar: null,
+      player2_id: null, player2_name: null, player2_avatar: null,
+      guest_name: null, guest_email: null, invite_token: null, respond_by: null },
+    { entry_id: 'e5', status: 'suplente', team_name: null, waitlist_order: 1, created_at: null, validated_at: null,
+      player1_id: 'p6', player1_name: 'Inês Rocha', player1_avatar: null,
+      player2_id: 'p7', player2_name: 'Beatriz Faria', player2_avatar: null,
+      guest_name: null, guest_email: null, invite_token: null, respond_by: null },
+  ] : []),
   // Kudos com nome (Trello #340). localStorage.mockKudos:
   //   'one'     — um jogador deu o kudo
   //   'two'     — dois
@@ -538,6 +603,16 @@ const TABLE_MOCKS = {
       id: 'inv-1', placeholder_id: FAKE_PARTNER_ID, name: 'João Ferreira',
       email: 'joao@exemplo.pt', token: 'convite-de-teste', status: 'pending', email_status: 'queued',
     },
+  ] : []),
+  // A lista pública de inscritos do torneio (Trello #362) — nomes sim,
+  // email e telemóvel nunca (regra de 19 set).
+  tournament_public_entries: () => (localStorage.getItem('mockTSignup') ? [
+    { id: 'e1', category_id: 'cat-m4', team_name: 'Dois não fazem um', status: 'por_validar', seed_number: null, waitlist_order: null,
+      player1_name: 'Rui Oliveira Gomes', player1_avatar: null, player2_name: 'Tiago Ferreira', player2_avatar: null, player2_is_guest: false },
+    { id: 'e2', category_id: 'cat-m4', team_name: null, status: 'validada', seed_number: null, waitlist_order: null,
+      player1_name: 'Marta Costa', player1_avatar: null, player2_name: 'João Ferreira', player2_avatar: null, player2_is_guest: true },
+    { id: 'e5', category_id: 'cat-m4', team_name: null, status: 'suplente', seed_number: null, waitlist_order: 1,
+      player1_name: 'Inês Rocha', player1_avatar: null, player2_name: 'Beatriz Faria', player2_avatar: null, player2_is_guest: false },
   ] : []),
   ...LESSON_TABLE_MOCKS,
   ...TOURNAMENT_TABLE_MOCKS,
