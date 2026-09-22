@@ -113,6 +113,22 @@ export async function deleteTournament(tournamentId) {
   if (error) throw error
 }
 
+/** O fim do torneio (print 12): quem ganhou cada categoria e o que a pessoa
+ *  que está a ver levou de lá.
+ *
+ *  Devolve { categories: [{ id, code, name, champion, runner_up, third,
+ *  prize }], my: { xp, matches, rating_delta, category_code } | null }.
+ *  `champion`/`runner_up`/`third` são a mesma forma das duplas dos jogos
+ *  ({ entry_id, name, players }); `third` só existe se a categoria tiver
+ *  jogo de 3.º e 4.º lugar. Abre sem conta — sem sessão vem sem o `my`.
+ *
+ *  ⚠️ FUNÇÃO POR ESCREVER (Dev 3). Até existir, o ecrã do fim não aparece. */
+export async function getTournamentResults(idOrSlug) {
+  const { data, error } = await supabase.rpc('get_tournament_results', { p_tournament: idOrSlug })
+  if (error) throw error
+  return data || null
+}
+
 // ── Marcadores e resultados (Trello #365, «Torneio 5/6») ─────────────────
 // Mesma ideia do game_scorekeepers dos mixes, mas por torneio E categoria
 // (CODIGO-EXISTENTE.md §3). Quem marca é o admin ou uma pessoa que ele

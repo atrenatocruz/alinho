@@ -2524,5 +2524,10 @@
   "tournament.draw.undo": "Undo the draw",
   "tournament.admin.draw": "Draw",
   "tournament.draw.opt_guaranteed_one": "1 guaranteed match",
-  "tournament.draw.opt_guaranteed_other": "{{count}} guaranteed matches"
+  "tournament.draw.opt_guaranteed_other": "{{count}} guaranteed matches",
+  "tournament.podium.title": "Winners",
+  "tournament.podium.my_xp": "+{{xp}} XP",
+  "tournament.podium.my_matches_one": "1 match",
+  "tournament.podium.my_matches_other": "{{count}} matches",
+  "tournament.podium.my_rating": "{{category}} ranking {{points}} points"
 }

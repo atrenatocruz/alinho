@@ -102,6 +102,7 @@ export default function TournamentPage() {
   const Panel = TOURNAMENT_PANELS[tab]
   const TopSlot = TOURNAMENT_PANELS.top
   const UnderHeader = TOURNAMENT_PANELS.under_header
+  const Podium = TOURNAMENT_PANELS.podium
   const panelProps = {
     tournament: tour,
     categories,
@@ -157,6 +158,8 @@ export default function TournamentPage() {
       </div>
 
       {UnderHeader && <Suspense fallback={null}><UnderHeader {...panelProps} /></Suspense>}
+
+      {Podium && <Suspense fallback={null}><Podium {...panelProps} /></Suspense>}
 
       {categories.length > 0 && (
         <CategorySelect
