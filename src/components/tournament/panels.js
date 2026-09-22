@@ -25,9 +25,9 @@ export const TOURNAMENT_PANELS = {
   // minha dupla», depois as categorias. Pedido do Dev 2 (22 set).
   under_header: lazy(() => import('./SignupSlot')), //  Dev 2 · «Torneio 2/6» e «3/6»
   my_games: lazy(() => import('./MyGamesPanel')), //    Dev 1 · «Torneio 1/6»
-  groups: null, //                                     Dev 3 · «Torneio 4/6» → GroupsPanel.jsx
-  draw: null, //                                       Dev 3 · «Torneio 4/6» → DrawPanel.jsx
-  calendar: null, //                                   Dev 3 · «Torneio 4/6» → CalendarPanel.jsx
+  groups: lazy(() => import('./GroupsPanel')), //       Dev 3 · «Torneio 4/6»
+  draw: lazy(() => import('./DrawPanel')), //           Dev 3 · «Torneio 4/6»
+  calendar: lazy(() => import('./CalendarPanel')), //   Dev 3 · «Torneio 4/6»
   entries: lazy(() => import('./EntriesPanel')), //     Dev 2 · «Torneio 2/6»
 }
 
