@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ChevronRight, Pencil, Plus, Trash2, Trophy } from 'lucide-react'
+import { ChevronRight, Pencil, Plus, Trash2, Trophy, Shuffle } from 'lucide-react'
 import { createTournament, deleteTournament, getTournamentForEdit, listClubTournaments, setTournamentStatus, updateTournament } from '../../lib/tournamentApi'
 import { canDelete, nextStatus, previousStatus } from '../../lib/tournaments'
 import { describeError, errorKind } from '../../lib/errors'
@@ -15,6 +15,7 @@ import { DangerConfirmModal, EmptyState, PrimaryButton } from '../ui'
 import { MonoLabel, StatePill } from './TournamentBits'
 import CreateTournamentForm from './CreateTournamentForm'
 import ScorekeepersPanel from './ScorekeepersPanel'
+import DrawAdminPanel from './DrawAdminPanel'
 
 const STATE_TONE = { rascunho: 'grey', inscricoes: 'in', fechado: 'grey', sorteado: 'dark', a_decorrer: 'live', terminado: 'grey' }
 
@@ -26,6 +27,9 @@ export default function ClubTournamentsPanel({ organizationId, club }) {
   const [error, setError] = useState('')
   const [toDelete, setToDelete] = useState(null)
   const [keepersOf, setKeepersOf] = useState(null)
+  // O caminho do sorteio (Dev 3, «Torneio 4/6»): fechar inscricoes,
+  // escolher formato e sortear. Mesmo padrao do painel dos marcadores.
+  const [drawOf, setDrawOf] = useState(null)
   const [editing, setEditing] = useState(null) // { row, data }
 
   const load = useCallback(() => {
@@ -105,6 +109,9 @@ export default function ClubTournamentsPanel({ organizationId, club }) {
   if (keepersOf) {
     return <ScorekeepersPanel tournament={keepersOf} onBack={() => setKeepersOf(null)} />
   }
+  if (drawOf) {
+    return <DrawAdminPanel tournament={drawOf} onBack={() => { setDrawOf(null); load() }} />
+  }
 
   if (editing) {
     return (
@@ -173,6 +180,11 @@ export default function ClubTournamentsPanel({ organizationId, club }) {
                 {back && (
                   <button type="button" onClick={() => move(row, back)} className="rounded-full border border-line px-3 py-1.5 text-[12px] font-semibold text-ink-700 hover:bg-ink-50">
                     {t(`tournament.admin.back_to_${back}`)}
+                  </button>
+                )}
+                {['inscricoes', 'fechado', 'sorteado', 'a_decorrer'].includes(row.status) && (
+                  <button type="button" onClick={() => setDrawOf(row)} className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-[12px] font-semibold text-ink-700 hover:bg-ink-50">
+                    <Shuffle size={14} /> {t('tournament.admin.draw')}
                   </button>
                 )}
                 {['sorteado', 'a_decorrer', 'terminado'].includes(row.status) && (

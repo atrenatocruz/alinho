@@ -1,7 +1,7 @@
 import { supabase } from './supabase'
 import { LESSON_RPC_MOCKS, LESSON_TABLE_MOCKS, LESSON_NOTICES } from './devMockLessons'
 import { TOURNAMENT_RPC_MOCKS, TOURNAMENT_TABLE_MOCKS } from './devMockTournament'
-import { TOURNAMENT_DRAW_TABLE_MOCKS } from './devMockTournamentDraw'
+import { TOURNAMENT_DRAW_TABLE_MOCKS, TOURNAMENT_DRAW_RPC_MOCKS } from './devMockTournamentDraw'
 
 // Dev-only: quando a sessão é o atalho "Entrar como Admin (Dev)"
 // (AuthContext.jsx, MOCK_ADMIN_KEY), essa sessão nunca teve um auth.uid()
@@ -57,6 +57,7 @@ const COMMUNITY_ORGS = [
 const RPC_MOCKS = {
   ...LESSON_RPC_MOCKS,
   ...TOURNAMENT_RPC_MOCKS,
+  ...TOURNAMENT_DRAW_RPC_MOCKS,
   get_player_profile: (params) => {
     const id = params?.p_user_id || FAKE_PLAYER_ID
     const person = FAKE_PEOPLE[id] || FAKE_PEOPLE[FAKE_PLAYER_ID]
