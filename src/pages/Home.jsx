@@ -17,7 +17,9 @@ import { getGroupMatches } from '../lib/groupMatches'
 import { getMyPrivateMatches, respondToPrivateMatch } from '../lib/privateMatches'
 import { GOOGLE_MAPS_API_KEY } from '../lib/googleMaps'
 import { listMyLessons, listLessonEvents, setLessonAttendance } from '../lib/lessonsApi'
+import { loadTournamentEvents } from '../lib/tournamentAgenda'
 import LessonEventCard from '../components/lessons/LessonEventCard'
+import TournamentEventCard from '../components/agenda/TournamentEventCard'
 import { useHeaderActions } from '../contexts/HeaderActionsContext'
 import {
   toDayKey, eventFromGame, eventFromGroupMatch, eventFromPrivateMatch, eventFromExplore, eventFromLesson, isAgendaGame,
@@ -86,6 +88,9 @@ export default function Home() {
   // Aulas com professores (Trello #49): as minhas e as em aberto. Sem a
   // migração das aulas as RPCs não existem e isto fica vazio.
   const [lessonRows, setLessonRows] = useState([])
+  // Torneios (Trello #363): o cartão de inscrição antes do sorteio, e os
+  // meus jogos depois dele — é na Home que a malta vê a que horas joga.
+  const [tournamentEvents, setTournamentEvents] = useState([])
   const [location, setLocation] = useState(getSavedLocation)
   const [locationOpen, setLocationOpen] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
@@ -294,6 +299,20 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, filters.show, orgIdsKey])
 
+  useEffect(() => {
+    if (!user || orgIds.length === 0) {
+      setTournamentEvents([])
+      return
+    }
+    let cancelled = false
+    loadTournamentEvents({ userId: user.id, orgIds, today: toDayKey(new Date()) })
+      .then((rows) => { if (!cancelled) setTournamentEvents(rows) })
+      // Sem torneios a Home fica como estava — nunca é motivo para partir.
+      .catch((error) => console.error('Error loading tournaments for the agenda:', error))
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, orgIdsKey])
+
   const events = useMemo(() => {
     if (!user) return []
     return [
@@ -302,8 +321,10 @@ export default function Home() {
       ...privateMatches.map((m) => eventFromPrivateMatch(m, user.id)).filter(Boolean),
       ...exploreRows.map(eventFromExplore),
       ...lessonRows.map(eventFromLesson),
+      // Já vêm montados: um cartão do torneio, ou um por jogo meu.
+      ...tournamentEvents.filter((e) => e.dayKey),
     ]
-  }, [games, groupMatches, privateMatches, exploreRows, lessonRows, user])
+  }, [games, groupMatches, privateMatches, exploreRows, lessonRows, tournamentEvents, user])
 
   const visible = useMemo(() => applyFilters(events, filters, location), [events, filters, location])
   const counts = useMemo(() => countByDay(visible), [visible])
@@ -585,6 +606,9 @@ export default function Home() {
           onJoin={() => handleExploreJoin(event)}
         />
       )
+    }
+    if (event.kind === 'tournament') {
+      return <TournamentEventCard key={event.key} event={event} past={past} />
     }
     if (event.source === 'lesson') {
       return (
