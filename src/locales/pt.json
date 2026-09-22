@@ -2410,5 +2410,17 @@
   "tournament.admin.edit_error": "Não foi possível abrir este torneio para editar.",
   "tournament.score.set_number": "Set {{number}}",
   "tournament.score.super_tiebreak": "Super tie-break",
-  "tournament.score.sets_hint": "Escreve os sets como acabaram. O terceiro só aparece se empatarem a um."
+  "tournament.score.sets_hint": "Escreve os sets como acabaram. O terceiro só aparece se empatarem a um.",
+  "tournament.grid.open": "Calendário",
+  "tournament.grid.title": "Calendário · {{day}}",
+  "tournament.grid.title_empty": "Calendário",
+  "tournament.grid.all_categories": "Todas",
+  "tournament.grid.empty_title": "Ainda não há jogos marcados",
+  "tournament.grid.empty_subtitle": "A grelha enche-se quando o sorteio marcar as horas.",
+  "tournament.grid.conflict_run": "{{player}} fica com {{count}} jogos seguidos.",
+  "tournament.grid.conflict_same_time": "{{players}} fica com dois jogos à mesma hora.",
+  "tournament.grid.conflict_court": "Dois jogos ao mesmo tempo no {{court}}.",
+  "tournament.grid.legend": "A vermelho",
+  "tournament.grid.move_later": "Os jogos assinalados precisam de mudar de hora ou de campo. Mover na própria grelha vem a seguir.",
+  "tournament.grid.conflict_fix": "Passar o {{match}} para as {{hour}}, no {{court}}."
 }
