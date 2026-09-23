@@ -29,7 +29,7 @@ export default function AddPlayerSheet({ game, excludeIds, peopleCount, capacity
     let cancelled = false
     supabase
       .from('memberships')
-      .select('user_id, is_guest, profile:profiles(id, name, avatar_url, gender)')
+      .select('user_id, is_guest, profile:profiles(id, name, avatar_url, gender, is_platform_admin)')
       .eq('organization_id', game.organization_id)
       .then(({ data, error }) => {
         if (cancelled) return
@@ -39,7 +39,8 @@ export default function AddPlayerSheet({ game, excludeIds, peopleCount, capacity
           return
         }
         setMembers((data || [])
-          .filter((m) => m.profile)
+          // Super admins da plataforma não aparecem para escolher (Trello #466).
+          .filter((m) => m.profile && !m.profile.is_platform_admin)
           .map((m) => ({ id: m.user_id, name: m.profile.name || '?', avatar_url: m.profile.avatar_url, gender: m.profile.gender }))
           .sort((a, b) => a.name.localeCompare(b.name, 'pt')))
       })
