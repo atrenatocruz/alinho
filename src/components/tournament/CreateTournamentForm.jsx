@@ -605,10 +605,12 @@ function CategoryEditor({ value, taken = [], days, dayLabel, onCancel, onSave })
               parar para pensar escreve 25 e fica a cobrar metade. */}
           {Number(cat.price) > 0 && (
             <p className="mt-1 text-[11px] text-ink-500">
-              {t('tournament.create.price_each', {
-                pair: Number(cat.price),
-                each: pricePerPlayer(cat.price, i18n.language),
-              })}
+              {/* A parte da DUPLA vai a negrito porque é o número que se
+                  acabou de escrever: quem lê o cartaz («25 € por pessoa»)
+                  tem de ver ali, sem dúvida nenhuma, que o campo é outro. */}
+              <b className="text-ink-900">{t('tournament.create.price_pair', { pair: Number(cat.price) })}</b>
+              {' · '}
+              {t('tournament.create.price_person', { each: pricePerPlayer(cat.price, i18n.language) })}
             </p>
           )}
         </div>
