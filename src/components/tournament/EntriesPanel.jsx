@@ -36,8 +36,11 @@ function pairName(e, t) {
 
 /* Inscrever à mão — o Smash Cup ainda recebe inscrições pelo formulário
    do clube, e alguém tem de as passar para cá (ATUALIZACOES-21-SET, 6). */
-function AdminEntrySheet({ organizationId, categoryId, busy, error, onConfirm, onClose }) {
+function AdminEntrySheet({ organizationId, categories = [], categoryId: initialCategoryId, busy, error, onConfirm, onClose }) {
   const { t } = useTranslation()
+  // A categoria escolhe-se aqui, à vista — antes vinha calada do painel e
+  // dava para inscrever alguém na categoria errada sem dar por isso (Trello #453).
+  const [categoryId, setCategoryId] = useState(initialCategoryId)
   const [members, setMembers] = useState([])
   const [q1, setQ1] = useState('')
   const [q2, setQ2] = useState('')
@@ -100,6 +103,26 @@ function AdminEntrySheet({ organizationId, categoryId, busy, error, onConfirm, o
   return (
     <Sheet onClose={onClose} title={t('tentries.admin_add_title')}>
       <div className="space-y-4">
+        {categories.length > 1 && (
+          <div className="space-y-1.5">
+            <p className="font-mono text-[11px] uppercase tracking-widest text-ink-500">{t('tentries.admin_category')}</p>
+            <div className="flex flex-wrap gap-1.5">
+              {categories.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setCategoryId(c.id)}
+                  aria-pressed={c.id === categoryId}
+                  className={`press rounded-full border px-3 py-1.5 text-sm font-extrabold ${
+                    c.id === categoryId ? 'border-ink-900 bg-ink-900 text-white' : 'border-line bg-canvas text-ink-900'
+                  }`}
+                >
+                  {c.code || c.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <Picker label={t('tentries.admin_player1')} q={q1} setQ={setQ1} picked={player1} setPicked={setPlayer1} exclude={partner?.id} />
         <Picker label={t('tentries.admin_player2')} q={q2} setQ={setQ2} picked={partner} setPicked={setPartner} exclude={player1?.id} />
 
@@ -135,7 +158,7 @@ function AdminEntrySheet({ organizationId, categoryId, busy, error, onConfirm, o
   )
 }
 
-export default function EntriesPanel({ tournament, category }) {
+export default function EntriesPanel({ tournament, categories = [], category }) {
   const { t } = useTranslation()
   const { adminOrganizations } = useAuth()
   const isAdmin = (adminOrganizations || []).some?.((o) => (o.id || o) === tournament.organization_id)
@@ -303,6 +326,7 @@ export default function EntriesPanel({ tournament, category }) {
       {addOpen && (
         <AdminEntrySheet
           organizationId={tournament.organization_id}
+          categories={categories}
           categoryId={category.id}
           busy={busy}
           error={error}

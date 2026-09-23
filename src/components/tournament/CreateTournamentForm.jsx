@@ -506,7 +506,14 @@ function CategoryEditor({ value, taken = [], days, dayLabel, onCancel, onSave })
       <Field label={t('tournament.create.category_when')} hint={t('tournament.create.category_when_hint')}>
         <div className="flex flex-wrap items-center gap-1.5">
           {days.map((d) => (
-            <Chip key={d.date} on={cat.day === d.date} onClick={() => set({ day: d.date, start_time: cat.start_time || d.starts_at })}>{dayLabel(d.date)}</Chip>
+            // Mudar de dia leva a hora de início desse dia, a não ser que a
+            // hora já tenha sido mudada à mão (Trello #453: escolhia-se sábado
+            // e ficava a hora de sexta).
+            <Chip key={d.date} on={cat.day === d.date} onClick={() => {
+              const prevDefault = days.find((x) => x.date === cat.day)?.starts_at
+              const keep = cat.start_time && cat.start_time !== prevDefault
+              set({ day: d.date, start_time: keep ? cat.start_time : d.starts_at })
+            }}>{dayLabel(d.date)}</Chip>
           ))}
           <input type="time" className="w-[100px] rounded-ctrl border border-line bg-canvas px-2 py-2 text-sm" value={cat.start_time || ''} onChange={(e) => set({ start_time: e.target.value })} />
         </div>
