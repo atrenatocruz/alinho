@@ -29,22 +29,31 @@ export const TOURNAMENT_PANELS = {
   // não fica espaço reservado.
   podium: lazy(() => import('./PodiumPanel')), //       Dev 1 · print 12
   my_games: lazy(() => import('./MyGamesPanel')), //    Dev 1 · «Torneio 1/6»
+  // «Todos os jogos»: a moldura que empilha os três do Dev 3 em secções.
+  // Desde 23 set deixaram de ser separadores — ver TOURNAMENT_TABS.
+  all_games: lazy(() => import('./AllGamesPanel')), //  Dev 1 · «#436»
+  // Continuam registados aqui, com o mesmo nome e o mesmo dono: é daqui
+  // que o AllGamesPanel os vai buscar. O Dev 3 não tem de mexer em nada.
   groups: lazy(() => import('./GroupsPanel')), //       Dev 3 · «Torneio 4/6»
   draw: lazy(() => import('./DrawPanel')), //           Dev 3 · «Torneio 4/6»
   calendar: lazy(() => import('./CalendarPanel')), //   Dev 3 · «Torneio 4/6»
   entries: lazy(() => import('./EntriesPanel')), //     Dev 2 · «Torneio 2/6»
 }
 
-/** A ordem dos separadores é a do desenho (print 05) e não se mexe:
- *  Os meus jogos · Grupos · Quadro · Calendário · Inscritos. */
-export const TOURNAMENT_TABS = ['my_games', 'groups', 'draw', 'calendar', 'entries']
+/** TRÊS separadores, larguras iguais: «Os meus jogos · Todos os jogos ·
+ *  Inscritos» (desenho de 23 set, `pagina-do-torneio-3-separadores.html`).
+ *
+ *  Eram cinco até 23 set (print 05). Grupos, Quadro e Calendário são três
+ *  vistas dos mesmos jogos e passaram a secções dentro de «Todos os jogos»
+ *  — a regra do Francisco é nunca mais de três, larguras iguais, e nada
+ *  escondido. Com três cabem num telemóvel de 375 px sem cortar, e some
+ *  de caminho o «#430» (a fila que rolava e saltava para o início). */
+export const TOURNAMENT_TABS = ['my_games', 'all_games', 'entries']
 
 /** De que cartão vem cada separador — é o que aparece enquanto não está
  *  feito, para se perceber à vista quem falta entregar. */
 export const TOURNAMENT_TAB_OWNER = {
   my_games: 'Torneio 1/6',
-  groups: 'Torneio 4/6',
-  draw: 'Torneio 4/6',
-  calendar: 'Torneio 4/6',
+  all_games: 'Torneio 4/6',
   entries: 'Torneio 2/6',
 }

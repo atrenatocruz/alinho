@@ -71,8 +71,13 @@ export default function TournamentPage() {
     return mine || categories[0] || null
   }, [categories, catParam, data])
 
+  // Links antigos (?tab=grupos/quadro/calendario) continuam a abrir onde a
+  // pessoa esperava: esses três passaram a secções de «Todos os jogos» a 23
+  // set. O endereço do torneio anda no WhatsApp e em cartazes — não pode
+  // deixar de funcionar por causa de uma arrumação nossa.
   const tabParam = params.get('tab')
-  const tab = TOURNAMENT_TABS.includes(tabParam) ? tabParam : 'my_games'
+  const LEGACY_TABS = { groups: 'all_games', draw: 'all_games', calendar: 'all_games' }
+  const tab = TOURNAMENT_TABS.includes(tabParam) ? tabParam : (LEGACY_TABS[tabParam] || 'my_games')
 
   const setParam = (key, value) => {
     const next = new URLSearchParams(params)
@@ -159,8 +164,6 @@ export default function TournamentPage() {
 
       {UnderHeader && <Suspense fallback={null}><UnderHeader {...panelProps} /></Suspense>}
 
-      {Podium && <Suspense fallback={null}><Podium {...panelProps} /></Suspense>}
-
       {categories.length > 0 && (
         <CategorySelect
           categories={categories}
@@ -178,6 +181,12 @@ export default function TournamentPage() {
       />
 
       <div>
+        {/* O pódio vive DENTRO de «Os meus jogos», em cima — é onde o desenho
+            de 23 set o põe. Estava acima dos separadores desde ontem; foi
+            engano meu. Ele próprio só aparece com o torneio terminado. */}
+        {tab === 'my_games' && Podium && (
+          <div className="mb-4"><Suspense fallback={null}><Podium {...panelProps} /></Suspense></div>
+        )}
         {Panel ? (
           <Suspense fallback={spinner}><Panel {...panelProps} /></Suspense>
         ) : (
