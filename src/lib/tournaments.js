@@ -58,8 +58,18 @@ export const levelFromRating = (rating) => {
 /** O que falta preencher em cada passo, para o botão "Seguinte" saber se
  *  pode avançar. Devolve a chave do texto a mostrar, ou null se estiver bem. */
 export function stepProblem(step, draft) {
+  // A ordem dos passos mudou a 23 set («#342»): 1 Pessoas · 2 Quando ·
+  // 3 Onde joga · 4 Regras. As categorias passaram do 3.º para o 1.º, e o
+  // dia/hora de cada uma para o 3.º, ao lado das horas de cada dia.
   if (step === 1) {
+    // O nome vive no topo, fora dos passos, mas continua a ser obrigatório —
+    // e o primeiro passo é o sítio mais cedo onde se pode travar.
     if (!draft.name?.trim()) return 'name'
+    if (!draft.categories?.length) return 'categories'
+    if (draft.categories.some((c) => !c.slots || Number(c.slots) < 2)) return 'slots'
+    return null
+  }
+  if (step === 2) {
     if (!draft.days?.length) return 'days'
     if (!draft.entries_close_at) return 'deadline'
     // O prazo das inscrições e o sorteio têm de ser antes do primeiro dia.
@@ -68,14 +78,12 @@ export function stepProblem(step, draft) {
     if (draft.draw_at && first && draft.draw_at.slice(0, 10) > first) return 'draw_after_start'
     return null
   }
-  if (step === 2) {
+  if (step === 3) {
     if (!draft.days?.every((d) => d.starts_at && d.ends_at && Number(d.courts) > 0)) return 'hours'
     if (draft.days.some((d) => courtHours(d) <= 0)) return 'hours_order'
-    return null
-  }
-  if (step === 3) {
-    if (!draft.categories?.length) return 'categories'
-    if (draft.categories.some((c) => !c.slots || Number(c.slots) < 2)) return 'slots'
+    // Uma categoria sem dia não joga em lado nenhum, e o horário não a
+    // apanha: é aqui que se vê, porque é aqui que os dias existem.
+    if (draft.categories?.some((c) => !c.day)) return 'category_without_day'
     return null
   }
   return null

@@ -9,6 +9,7 @@ import { Avatar, PrimaryButton, EmptyState } from '../ui'
 import { partnerNameError, partnerEmailError } from '../../lib/partnerInvite'
 import { listEntries, validateEntry, removeEntry, adminSignUp, tournamentInviteLink, inviteToken } from '../../lib/tournamentSignup'
 import { whatsappShare } from '../../lib/partnerInvite'
+import { signupErrorMessage } from '../../lib/tournamentError'
 
 /* Separador «Inscritos» (Trello #362).
    Desenho: print 08 (lista por categoria, Validar a um toque) e a regra
@@ -274,6 +275,16 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
 
   // Reenviar o link de quem entrou pelo nome, para colar no WhatsApp. O
   // código vai-se buscar agora, não vem na lista (revisão do Dev 3).
+  /* Traduz o erro quando há tradução, e cai no genérico quando não há.
+     Até aqui o organizador lia «Não foi possível. Tenta outra vez.»
+     acontecesse o que acontecesse — validar uma dupla incompleta, um
+     suplente, ou fora de prazo davam todos a mesma frase. E é ele que está
+     no pavilhão no dia do torneio, com gente à frente (Trello #476).
+
+     A conta vive em lib/tournamentError.js: o padrão que andava copiado à
+     mão perdia o algarismo de «player1_gender_required». */
+  const say = (err) => setError(signupErrorMessage(t, err))
+
   const share = async (e) => {
     try {
       const token = await inviteToken(e.entry_id)
@@ -284,14 +295,14 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
       })), '_blank')
     } catch (err) {
       console.error('Error getting the invite token:', err)
-      setError(t('tsignup.error_generic'))
+      say(err)
     }
   }
 
   const act = async (fn) => {
     setBusy(true); setError('')
     try { await fn(); load() }
-    catch (err) { console.error('Error acting on a tournament entry:', err); setError(t('tsignup.error_generic')) }
+    catch (err) { console.error('Error acting on a tournament entry:', err); say(err) }
     finally { setBusy(false) }
   }
 

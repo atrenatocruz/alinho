@@ -82,6 +82,79 @@ function Segmented({ options, value, onChange }) {
  *  o admin o escreveu; `locked` (há inscrições) deixa mudar só o que não
  *  estraga inscrições feitas — é a mesma regra que o update_tournament
  *  impõe do lado da base de dados. */
+/** As categorias que jogam em cada dia, e a que horas — no passo «Onde joga»,
+ *  ao lado das horas de abertura desse dia (desenho de 23 set, «#342»).
+ *
+ *  Está aqui, e não na ficha da categoria, porque a hora de início de uma
+ *  categoria é «a que horas» e não «quem entra». E assim não se marca uma
+ *  categoria para as 12h num dia que só abre às 14h — antes só se descobria
+ *  com o horário já feito.
+ *
+ *  Uma categoria ainda sem dia aparece à parte, para não passar despercebida:
+ *  sem dia não entra no horário de ninguém. */
+function DayCategories({ draft, set, dayLabel }) {
+  const { t } = useTranslation()
+  if (draft.days.length === 0 || draft.categories.length === 0) return null
+
+  const patch = (code, change) => set({
+    categories: draft.categories.map((c) => (c.code === code ? { ...c, ...change } : c)),
+  })
+  const semDia = draft.categories.filter((c) => !c.day)
+
+  return (
+    <div className="mt-4">
+      <MonoLabel className="mb-1.5">{t('tournament.create.who_plays_when')}</MonoLabel>
+      {draft.days.map((d) => {
+        const doDia = draft.categories.filter((c) => c.day === d.date)
+        return (
+          <div key={d.date} className="mt-2 rounded-card border border-line p-3">
+            <b className="text-sm text-ink-900">{dayLabel(d.date)}</b>
+            <span className="ml-1.5 text-[11.5px] text-ink-500">
+              {t('tournament.create.day_open', { from: d.starts_at, to: d.ends_at, courts: Number(d.courts) || 0 })}
+            </span>
+            {doDia.length === 0 ? (
+              <p className="mt-1.5 text-[11.5px] text-ink-500">{t('tournament.create.day_no_categories')}</p>
+            ) : doDia.map((c) => (
+              <div key={c.code} className="mt-1.5 flex items-center gap-2">
+                <span className="rounded-md bg-ink-900 px-1.5 py-0.5 font-mono text-[10px] font-bold text-white">{c.code}</span>
+                <span className="min-w-0 flex-1 truncate text-[12.5px] text-ink-700">{c.name}</span>
+                <input
+                  type="time"
+                  aria-label={t('tournament.create.start_time')}
+                  className="w-[100px] shrink-0 rounded-ctrl border border-line bg-canvas px-2 py-2 text-sm"
+                  value={c.start_time || ''}
+                  onChange={(e) => patch(c.code, { start_time: e.target.value })}
+                />
+                <button type="button" onClick={() => patch(c.code, { day: '' })}
+                  aria-label={t('tournament.create.remove')} className="shrink-0 text-ink-300 hover:text-danger">
+                  <X size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )
+      })}
+
+      {semDia.length > 0 && (
+        <div className="mt-2 rounded-card border border-[#F5D6A8] bg-[#FFF7EC] p-3">
+          <b className="text-[12.5px] text-ink-900">{t('tournament.create.no_day_yet')}</b>
+          {semDia.map((c) => (
+            <div key={c.code} className="mt-1.5 flex flex-wrap items-center gap-1.5">
+              <span className="rounded-md bg-ink-900 px-1.5 py-0.5 font-mono text-[10px] font-bold text-white">{c.code}</span>
+              <span className="min-w-0 flex-1 truncate text-[12.5px] text-ink-700">{c.name}</span>
+              {draft.days.map((d) => (
+                <Chip key={d.date} onClick={() => patch(c.code, { day: d.date, start_time: c.start_time || d.starts_at })}>
+                  {dayLabel(d.date)}
+                </Chip>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 /** Uma secção trancada: continua à vista, na mesma ordem de quando se cria,
  *  e diz PORQUÊ. Um campo que desaparece deixa quem monta sem saber se não
  *  existe, se está noutro sítio, ou se está trancado — e isso é pior do que
@@ -212,85 +285,17 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
       <h2 className="mt-3 font-display text-lg font-extrabold text-ink-900">
         {editing_existing ? t('tournament.create.edit_title') : t('tournament.create.title')}
       </h2>
-      {locked ? (
-        <p className="mt-1.5 text-[11.5px] text-ink-500">{t('tournament.create.edit_locked')}</p>
-      ) : (
-        <>
-          <div className="mt-1.5 flex gap-1">
-            {[1, 2, 3, 4].map((n) => (
-              <i key={n} className={`h-1 flex-1 rounded-sm ${n <= step ? 'bg-ink-900' : 'bg-ink-50'}`} />
-            ))}
-          </div>
-          <p className="mt-1.5 text-[11.5px] text-ink-500">{t(`tournament.create.step${step}`)}</p>
-        </>
-      )}
+      {/* O nome e o cartaz são a IDENTIDADE do torneio, não um passo: ficam
+          por cima da barra de progresso, à vista do princípio ao fim, como o
+          título de um documento (desenho de 23 set, «#342»).
 
-      {/* Com inscrições feitas, só se mexe no que não as estraga — é a mesma
-          regra que o update_tournament impõe na base de dados. O que não se
-          pode mudar NÃO desaparece: fica à vista, trancado, com a razão
-          (desenho de 23 set, ponto 5). Antes sumia, e quem montava não sabia
-          se não existia, se estava noutro sítio, ou se estava trancado. */}
-      {locked && (
-        <>
-          <Field label={t('tournament.create.name')}>
-            <input className={inputClass} value={draft.name} onChange={(e) => set({ name: e.target.value })} />
-          </Field>
-          <Field label={t('tournament.create.location')}>
-            <input className={inputClass} value={draft.location} onChange={(e) => set({ location: e.target.value })} />
-          </Field>
-          <Field label={t('tournament.create.entries_until')}>
-            <div className="flex gap-2">
-              <div className="min-w-0 flex-1">
-                <DateField value={draft.entries_close_at.slice(0, 10)} onChange={(v) => set({ entries_close_at: `${v}T${draft.entries_close_at.slice(11) || '23:59'}` })} />
-              </div>
-              <input type="time" className="w-[104px] rounded-ctrl border border-line bg-canvas px-2 py-2.5 text-sm" value={draft.entries_close_at.slice(11) || '23:59'} onChange={(e) => set({ entries_close_at: `${draft.entries_close_at.slice(0, 10)}T${e.target.value}` })} />
-            </div>
-          </Field>
-          <Field label={t('tournament.create.draw')} hint={t('tournament.create.draw_hint')}>
-            <DateField value={draft.draw_at} onChange={(v) => set({ draw_at: v })} />
-          </Field>
-          <Field label={t('tournament.create.organizer_text')}>
-            <textarea rows={3} className={inputClass} value={draft.organizer_text} onChange={(e) => set({ organizer_text: e.target.value })} />
-          </Field>
-        </>
-      )}
-
-      {/* 1 · Quando e onde */}
-      {!locked && step === 1 && (
-        <>
+          Com «Pessoas» a abrir, meter o nome lá dentro obrigava a definir
+          categorias antes de dar nome ao torneio, o que ninguém faz. E um
+          quinto passo não se acrescenta: um fluxo pode SALTAR um passo,
+          nunca inventar um. */}
+      <div className="mt-3 space-y-0 rounded-card border border-line p-3">
           <Field label={t('tournament.create.name')}>
             <input className={inputClass} value={draft.name} onChange={(e) => set({ name: e.target.value })} placeholder={t('tournament.create.name_placeholder')} />
-          </Field>
-          <Field label={t('tournament.create.days')} hint={t('tournament.create.days_hint')}>
-            <div className="flex flex-wrap gap-1.5">
-              {draft.days.map((d) => (
-                <span key={d.date} className="inline-flex items-center gap-1.5 rounded-full bg-ink-900 px-3 py-1.5 text-[12.5px] font-semibold text-white">
-                  {dayLabel(d.date)}
-                  <button type="button" aria-label={t('tournament.create.remove')} onClick={() => set({ days: draft.days.filter((x) => x.date !== d.date) })}>
-                    <X size={13} />
-                  </button>
-                </span>
-              ))}
-              {addingDay ? (
-                <div className="w-full"><DateField value="" min={isoDate(new Date())} onChange={addDay} placeholder={t('tournament.create.pick_day')} /></div>
-              ) : (
-                <Chip onClick={() => setAddingDay(true)}><Plus size={13} /> {t('tournament.create.add_day')}</Chip>
-              )}
-            </div>
-          </Field>
-          <Field label={t('tournament.create.location')}>
-            <input className={inputClass} value={draft.location} onChange={(e) => set({ location: e.target.value })} />
-          </Field>
-          <Field label={t('tournament.create.entries_until')}>
-            <div className="flex gap-2">
-              <div className="min-w-0 flex-1">
-                <DateField value={draft.entries_close_at.slice(0, 10)} max={firstDay || undefined} onChange={(v) => set({ entries_close_at: `${v}T${draft.entries_close_at.slice(11) || '23:59'}` })} />
-              </div>
-              <input type="time" className="w-[104px] rounded-ctrl border border-line bg-canvas px-2 py-2.5 text-sm" value={draft.entries_close_at.slice(11) || '23:59'} onChange={(e) => set({ entries_close_at: `${draft.entries_close_at.slice(0, 10) || firstDay || ''}T${e.target.value}` })} />
-            </div>
-          </Field>
-          <Field label={t('tournament.create.draw')} hint={t('tournament.create.draw_hint')}>
-            <DateField value={draft.draw_at} max={firstDay || undefined} onChange={(v) => set({ draw_at: v })} />
           </Field>
           <Field label={t('tournament.create.poster')} hint={draft.poster_url ? null : t('tournament.create.poster_hint')}>
             {draft.poster_url ? (
@@ -319,52 +324,59 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
             <input ref={fileInput} type="file" accept="image/*" className="hidden" onChange={pickPoster} />
             {poster.error && <p className="mt-1 text-[12px] text-danger">{poster.error}</p>}
           </Field>
+      </div>
+
+      {locked ? (
+        <p className="mt-1.5 text-[11.5px] text-ink-500">{t('tournament.create.edit_locked')}</p>
+      ) : (
+        <>
+          {/* Barra de progresso, nunca pastilhas: passos não são separadores e
+              não podem parecer separadores (regra do Francisco, «#342»). */}
+          <div className="mt-1.5 h-1 overflow-hidden rounded-sm bg-ink-50">
+            <i className="block h-full rounded-sm bg-ink-900 transition-all duration-fast" style={{ width: `${(step / 4) * 100}%` }} />
+          </div>
+          <p className="mt-1.5 text-[11.5px] text-ink-500">
+            {t('tournament.create.step_of', { step, total: 4 })} · <b className="font-semibold text-ink-700">{t(`tournament.create.step${step}`)}</b>
+          </p>
         </>
       )}
 
-      {/* 2 · Campos e horas */}
+      {/* Com inscrições feitas, só se mexe no que não as estraga — é a mesma
+          regra que o update_tournament impõe na base de dados. O que não se
+          pode mudar NÃO desaparece: fica à vista, trancado, com a razão
+          (desenho de 23 set, ponto 5). Antes sumia, e quem montava não sabia
+          se não existia, se estava noutro sítio, ou se estava trancado. */}
       {locked && (
-        <Locked title={t('tournament.create.section2')} reason={t('tournament.create.locked_days')} />
-      )}
-      {!locked && step === 2 && (
         <>
-          {draft.days.map((d, i) => (
-            <div key={d.date} className="mt-2 rounded-card border border-line p-3">
-              <b className="text-sm text-ink-900">{dayLabel(d.date)}</b>
-              <div className="mt-2 flex items-center gap-2">
-                <input type="time" className="w-[100px] rounded-ctrl border border-line bg-canvas px-2 py-2 text-sm" value={d.starts_at} onChange={(e) => patchDay(i, { starts_at: e.target.value })} />
-                <span className="text-xs text-ink-500">{t('tournament.create.to')}</span>
-                <input type="time" className="w-[100px] rounded-ctrl border border-line bg-canvas px-2 py-2 text-sm" value={d.ends_at} onChange={(e) => patchDay(i, { ends_at: e.target.value })} />
+          <Field label={t('tournament.create.location')}>
+            <input className={inputClass} value={draft.location} onChange={(e) => set({ location: e.target.value })} />
+          </Field>
+          <Field label={t('tournament.create.entries_until')}>
+            <div className="flex gap-2">
+              <div className="min-w-0 flex-1">
+                <DateField value={draft.entries_close_at.slice(0, 10)} onChange={(v) => set({ entries_close_at: `${v}T${draft.entries_close_at.slice(11) || '23:59'}` })} />
               </div>
-              <div className="mt-2 flex items-center gap-2">
-                <input type="number" min="1" max="30" className="w-[72px] rounded-ctrl border border-line bg-canvas px-2 py-2 text-sm" value={d.courts} onChange={(e) => patchDay(i, { courts: e.target.value })} />
-                <span className="text-xs text-ink-500">{t('tournament.create.courts_label')}</span>
-              </div>
-            </div>
-          ))}
-          <Field label={t('tournament.create.court_names')} hint={t('tournament.create.court_names_hint')}>
-            <div className="flex flex-wrap gap-1.5">
-              {draft.courts.map((name, i) => (
-                <span key={i} className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-[12.5px]">
-                  {name}
-                  <button type="button" aria-label={t('tournament.create.remove')} onClick={() => set({ courts: draft.courts.filter((_, k) => k !== i) })}><X size={13} /></button>
-                </span>
-              ))}
-              <Chip onClick={() => set({ courts: [...draft.courts, t('tournament.create.court_n', { n: draft.courts.length + 1 })] })}>
-                <Plus size={13} /> {t('tournament.create.add_court')}
-              </Chip>
+              <input type="time" className="w-[104px] rounded-ctrl border border-line bg-canvas px-2 py-2.5 text-sm" value={draft.entries_close_at.slice(11) || '23:59'} onChange={(e) => set({ entries_close_at: `${draft.entries_close_at.slice(0, 10)}T${e.target.value}` })} />
             </div>
           </Field>
-          <div className="mt-4 flex items-center justify-between border-t border-line pt-3 text-[12.5px]">
-            <span className="text-ink-500">{t('tournament.create.court_time')}</span>
-            <b className="text-ink-900">{t('tournament.create.hours', { count: Math.round(hours) })}</b>
-          </div>
+          <Field label={t('tournament.create.draw')} hint={t('tournament.create.draw_hint')}>
+            <DateField value={draft.draw_at} onChange={(v) => set({ draw_at: v })} />
+          </Field>
+          <Field label={t('tournament.create.organizer_text')}>
+            <textarea rows={3} className={inputClass} value={draft.organizer_text} onChange={(e) => set({ organizer_text: e.target.value })} />
+          </Field>
         </>
       )}
 
-      {/* 3 · Categorias */}
+      {/* 1 · Pessoas — as categorias. Cada uma é «quem pode entrar», dito
+          uma vez: género, nível, vagas, preço e prémios.
+
+          O DIA e a HORA de cada categoria NÃO estão aqui: são «a que horas»,
+          e vivem no passo 3 ao lado das horas de abertura de cada dia. Assim
+          não se marca uma categoria para as 12h num dia que só abre às 14h —
+          antes só se descobria com o horário já feito. */}
       {locked && (
-        <Locked title={t('tournament.create.section3')} reason={t('tournament.create.locked_categories')}>
+        <Locked title={t('tournament.create.step1')} reason={t('tournament.create.locked_categories')}>
           {(initial?.categories || []).map((c) => (
             <div key={c.id || c.code} className="flex items-center gap-2 border-t border-line py-1.5 first:border-t-0">
               <span className="rounded-md bg-ink-500 px-1.5 py-0.5 font-mono text-[10px] font-bold text-white">{c.code}</span>
@@ -376,7 +388,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
           ))}
         </Locked>
       )}
-      {!locked && step === 3 && (
+      {!locked && step === 1 && (
         <>
           {draft.categories.map((c, i) => (
             <div key={i} className="flex items-center gap-2.5 border-t border-line py-2">
@@ -423,6 +435,86 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
               {t('tournament.create.slots_vs_hours', { teams: totalSlots(draft.categories), hours: Math.round(hours) })}
             </div>
           )}
+        </>
+      )}
+
+      {/* 2 · Quando — os dias do torneio e os prazos. */}
+      {locked && (
+        <Locked title={t('tournament.create.step2')} reason={t('tournament.create.locked_days')} />
+      )}
+      {!locked && step === 2 && (
+        <>
+          <Field label={t('tournament.create.days')} hint={t('tournament.create.days_hint')}>
+            <div className="flex flex-wrap gap-1.5">
+              {draft.days.map((d) => (
+                <span key={d.date} className="inline-flex items-center gap-1.5 rounded-full bg-ink-900 px-3 py-1.5 text-[12.5px] font-semibold text-white">
+                  {dayLabel(d.date)}
+                  <button type="button" aria-label={t('tournament.create.remove')} onClick={() => set({ days: draft.days.filter((x) => x.date !== d.date) })}>
+                    <X size={13} />
+                  </button>
+                </span>
+              ))}
+              {addingDay ? (
+                <div className="w-full"><DateField value="" min={isoDate(new Date())} onChange={addDay} placeholder={t('tournament.create.pick_day')} /></div>
+              ) : (
+                <Chip onClick={() => setAddingDay(true)}><Plus size={13} /> {t('tournament.create.add_day')}</Chip>
+              )}
+            </div>
+          </Field>
+          <Field label={t('tournament.create.entries_until')}>
+            <div className="flex gap-2">
+              <div className="min-w-0 flex-1">
+                <DateField value={draft.entries_close_at.slice(0, 10)} onChange={(v) => set({ entries_close_at: `${v}T${draft.entries_close_at.slice(11) || '23:59'}` })} />
+              </div>
+              <input type="time" className="w-[104px] rounded-ctrl border border-line bg-canvas px-2 py-2.5 text-sm" value={draft.entries_close_at.slice(11) || '23:59'} onChange={(e) => set({ entries_close_at: `${draft.entries_close_at.slice(0, 10)}T${e.target.value}` })} />
+            </div>
+          </Field>
+          <Field label={t('tournament.create.draw')} hint={t('tournament.create.draw_hint')}>
+            <DateField value={draft.draw_at} onChange={(v) => set({ draw_at: v })} />
+          </Field>
+        </>
+      )}
+
+      {/* 3 · Onde joga — o local, e um bloco por dia com os campos, as horas
+          de abertura e as categorias que jogam nesse dia. Vê-se de relance se
+          um dia está sobrecarregado, que é a pergunta de quem monta. */}
+      {!locked && step === 3 && (
+        <>
+          <Field label={t('tournament.create.location')}>
+            <input className={inputClass} value={draft.location} onChange={(e) => set({ location: e.target.value })} />
+          </Field>
+          {draft.days.map((d, i) => (
+            <div key={d.date} className="mt-2 rounded-card border border-line p-3">
+              <b className="text-sm text-ink-900">{dayLabel(d.date)}</b>
+              <div className="mt-2 flex items-center gap-2">
+                <input type="time" className="w-[100px] rounded-ctrl border border-line bg-canvas px-2 py-2 text-sm" value={d.starts_at} onChange={(e) => patchDay(i, { starts_at: e.target.value })} />
+                <span className="text-xs text-ink-500">{t('tournament.create.to')}</span>
+                <input type="time" className="w-[100px] rounded-ctrl border border-line bg-canvas px-2 py-2 text-sm" value={d.ends_at} onChange={(e) => patchDay(i, { ends_at: e.target.value })} />
+              </div>
+              <div className="mt-2 flex items-center gap-2">
+                <input type="number" min="1" max="30" className="w-[72px] rounded-ctrl border border-line bg-canvas px-2 py-2 text-sm" value={d.courts} onChange={(e) => patchDay(i, { courts: e.target.value })} />
+                <span className="text-xs text-ink-500">{t('tournament.create.courts_label')}</span>
+              </div>
+            </div>
+          ))}
+          <Field label={t('tournament.create.court_names')} hint={t('tournament.create.court_names_hint')}>
+            <div className="flex flex-wrap gap-1.5">
+              {draft.courts.map((name, i) => (
+                <span key={i} className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-[12.5px]">
+                  {name}
+                  <button type="button" aria-label={t('tournament.create.remove')} onClick={() => set({ courts: draft.courts.filter((_, k) => k !== i) })}><X size={13} /></button>
+                </span>
+              ))}
+              <Chip onClick={() => set({ courts: [...draft.courts, t('tournament.create.court_n', { n: draft.courts.length + 1 })] })}>
+                <Plus size={13} /> {t('tournament.create.add_court')}
+              </Chip>
+            </div>
+          </Field>
+          <div className="mt-4 flex items-center justify-between border-t border-line pt-3 text-[12.5px]">
+            <span className="text-ink-500">{t('tournament.create.court_time')}</span>
+            <b className="text-ink-900">{t('tournament.create.hours', { count: Math.round(hours) })}</b>
+          </div>
+          <DayCategories draft={draft} set={set} dayLabel={dayLabel} />
         </>
       )}
 
@@ -573,21 +665,6 @@ function CategoryEditor({ value, taken = [], days, dayLabel, onCancel, onSave })
       </Field>
       <Field label={t('tournament.create.category_custom_name')}>
         <input className={inputClass} value={cat.name} onChange={(e) => set({ name: e.target.value })} placeholder={categoryName(t, cat.gender, cat.level)} />
-      </Field>
-      <Field label={t('tournament.create.category_when')} hint={t('tournament.create.category_when_hint')}>
-        <div className="flex flex-wrap items-center gap-1.5">
-          {days.map((d) => (
-            // Mudar de dia leva a hora de início desse dia, a não ser que a
-            // hora já tenha sido mudada à mão (Trello #453: escolhia-se sábado
-            // e ficava a hora de sexta).
-            <Chip key={d.date} on={cat.day === d.date} onClick={() => {
-              const prevDefault = days.find((x) => x.date === cat.day)?.starts_at
-              const keep = cat.start_time && cat.start_time !== prevDefault
-              set({ day: d.date, start_time: keep ? cat.start_time : d.starts_at })
-            }}>{dayLabel(d.date)}</Chip>
-          ))}
-          <input type="time" className="w-[100px] rounded-ctrl border border-line bg-canvas px-2 py-2 text-sm" value={cat.start_time || ''} onChange={(e) => set({ start_time: e.target.value })} />
-        </div>
       </Field>
       <div className="mt-3 flex gap-3">
         <div className="flex-1">
