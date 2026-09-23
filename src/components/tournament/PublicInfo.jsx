@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { MapPin, Share2, Euro, Info } from 'lucide-react'
+import { Share2, Euro, Info } from 'lucide-react'
 import { PrimaryButton } from '../ui'
+import LocationOpenWith from '../LocationOpenWith'
 import { whatsappShare } from '../../lib/partnerInvite'
 import { formatWords, categoryWhen, slotsWords, tournamentUrl, shareMessage } from '../../lib/tournamentPublic'
 
@@ -23,10 +24,6 @@ export default function PublicInfo({ tournament, categories = [] }) {
     if (navigator.share) { navigator.share({ title: tournament.name, text, url }).catch(() => {}) ; return }
     window.open(whatsappShare(text), '_blank')
   }
-
-  const mapsUrl = tournament.location
-    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(tournament.location)}`
-    : null
 
   return (
     <div className="card space-y-3">
@@ -90,10 +87,7 @@ export default function PublicInfo({ tournament, categories = [] }) {
 
       {/* Onde é, e quem organiza. */}
       {tournament.location && (
-        <a href={mapsUrl} target="_blank" rel="noreferrer" className="press flex gap-2 text-sm text-ink-900">
-          <MapPin size={16} className="mt-0.5 shrink-0 text-muted" />
-          <span className="underline">{tournament.location}</span>
-        </a>
+        <LocationOpenWith location={tournament.location} />
       )}
       {tournament.club_name && (
         <div className="flex gap-2 text-sm">
