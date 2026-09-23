@@ -5,7 +5,7 @@
 // aqui não aparece, porque nesta altura ainda não se sabe quantas duplas há.
 import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, ImagePlus, Plus, Trash2, X } from 'lucide-react'
+import { ArrowLeft, ImagePlus, Lock, Plus, Trash2, X } from 'lucide-react'
 import { DateField, PrimaryButton } from '../ui'
 import { categoryCode, categoryName, stepProblem, totalCourtHours, totalSlots } from '../../lib/tournaments'
 import { MonoLabel } from './TournamentBits'
@@ -82,6 +82,27 @@ function Segmented({ options, value, onChange }) {
  *  o admin o escreveu; `locked` (há inscrições) deixa mudar só o que não
  *  estraga inscrições feitas — é a mesma regra que o update_tournament
  *  impõe do lado da base de dados. */
+/** Uma secção trancada: continua à vista, na mesma ordem de quando se cria,
+ *  e diz PORQUÊ. Um campo que desaparece deixa quem monta sem saber se não
+ *  existe, se está noutro sítio, ou se está trancado — e isso é pior do que
+ *  o «não podes». */
+function Locked({ title, reason, children }) {
+  const { t } = useTranslation()
+  return (
+    <div className="mt-4 rounded-card border border-line bg-ink-50/50 p-3">
+      <div className="flex items-center gap-1.5">
+        <Lock size={13} className="shrink-0 text-ink-500" />
+        <b className="text-[12.5px] text-ink-700">{title}</b>
+        <span className="ml-auto shrink-0 text-[10.5px] font-semibold uppercase tracking-wide text-ink-500">
+          {t('tournament.create.locked_tag')}
+        </span>
+      </div>
+      <p className="mt-1 text-[11.5px] text-ink-500">{reason}</p>
+      {children && <div className="mt-2">{children}</div>}
+    </div>
+  )
+}
+
 export default function CreateTournamentForm({ club, initial = null, locked = false, onCancel, onCreate, saving, error }) {
   const { t, i18n } = useTranslation()
   const [step, setStep] = useState(1)
@@ -205,7 +226,10 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
       )}
 
       {/* Com inscrições feitas, só se mexe no que não as estraga — é a mesma
-          regra que o update_tournament impõe na base de dados. */}
+          regra que o update_tournament impõe na base de dados. O que não se
+          pode mudar NÃO desaparece: fica à vista, trancado, com a razão
+          (desenho de 23 set, ponto 5). Antes sumia, e quem montava não sabia
+          se não existia, se estava noutro sítio, ou se estava trancado. */}
       {locked && (
         <>
           <Field label={t('tournament.create.name')}>
@@ -299,6 +323,9 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
       )}
 
       {/* 2 · Campos e horas */}
+      {locked && (
+        <Locked title={t('tournament.create.section2')} reason={t('tournament.create.locked_days')} />
+      )}
       {!locked && step === 2 && (
         <>
           {draft.days.map((d, i) => (
@@ -336,6 +363,19 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
       )}
 
       {/* 3 · Categorias */}
+      {locked && (
+        <Locked title={t('tournament.create.section3')} reason={t('tournament.create.locked_categories')}>
+          {(initial?.categories || []).map((c) => (
+            <div key={c.id || c.code} className="flex items-center gap-2 border-t border-line py-1.5 first:border-t-0">
+              <span className="rounded-md bg-ink-500 px-1.5 py-0.5 font-mono text-[10px] font-bold text-white">{c.code}</span>
+              <span className="min-w-0 flex-1 truncate text-[12.5px] text-ink-700">{c.name}</span>
+              <span className="shrink-0 text-[11.5px] text-ink-500">
+                {t('tournament.create.category_line', { slots: c.slots, price: Math.round((c.price_cents || 0) / 100) })}
+              </span>
+            </div>
+          ))}
+        </Locked>
+      )}
       {!locked && step === 3 && (
         <>
           {draft.categories.map((c, i) => (
@@ -386,8 +426,17 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
         </>
       )}
 
-      {/* 4 · Regras */}
-      {!locked && step === 4 && (
+      {/* 4 · Regras — NÃO trancadas: a duração dos jogos e o tipo de contagem
+          têm de se poder mexer no próprio dia, porque «é imprevisível, e os
+          jogos, paragens e assim podem mudar» (Francisco, 23 set). É também
+          o que o `editable` do get_tournament_for_edit deixa. */}
+      {locked && (
+        <div className="mt-4 flex items-center gap-1.5 border-t border-line pt-3">
+          <b className="text-[12.5px] text-ink-700">{t('tournament.create.section4')}</b>
+          <span className="text-[11.5px] text-ink-500">· {t('tournament.create.rules_editable')}</span>
+        </div>
+      )}
+      {(locked || step === 4) && (
         <>
           <Field label={t('tournament.create.entry_mode')}>
             <Segmented
