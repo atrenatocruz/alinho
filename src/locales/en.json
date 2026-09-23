@@ -1142,6 +1142,8 @@
   "clubprofile.not_found_subtitle": "This club or group doesn't exist or isn't public.",
   "clubprofile.not_found_title": "Club not found",
   "clubprofile.open_mixes_heading": "Open mixes",
+  "clubprofile.tournaments_heading": "Tournaments",
+  "clubprofile.tournament_draft_admin_only": "only admins can see it",
   "clubprofile.players_ratio": "{{count}}/{{max}} players",
   "clubprofile.remove_favorite": "Remove from favorites",
   "clubprofile.request_join_button": "Request to join",
