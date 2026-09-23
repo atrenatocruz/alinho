@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton } from '../components/ui'
 import { claimPartnerInvite } from '../lib/partnerInvite'
 import { claimEntry } from '../lib/tournamentSignup'
+import { signUpBackLink } from '../lib/loginLinks'
 
 /* Ficar com o lugar que alguém guardou para mim num mix (Trello #339).
 
@@ -18,6 +19,11 @@ export default function ClaimInvite() {
   // O mesmo ecrã serve os dois convites: o do mix (/convite) e o do
   // torneio (/convite-torneio). Muda só a função e para onde se vai.
   const isTournament = useLocation().pathname.startsWith('/convite-torneio')
+  // Para onde a pessoa tem de voltar depois de criar a conta. Ia por
+  // `state: { next }` do react-router, que o Login.jsx nunca leu — e que
+  // nem sobreviveria à ida ao email para confirmar a conta. Mesmo buraco
+  // do botao da pagina do torneio (Trello #454, ponto 3).
+  const claimPath = isTournament ? `/convite-torneio/${token}` : `/convite/${token}`
   const { user } = useAuth()
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -49,7 +55,7 @@ export default function ClaimInvite() {
         {state === 'signed_out' && (
           <>
             <p className="text-sm text-muted">{t('partner.claim_signed_out')}</p>
-            <PrimaryButton onClick={() => navigate('/login', { state: { next: isTournament ? `/convite-torneio/${token}` : `/convite/${token}` } })} className="w-full">
+            <PrimaryButton onClick={() => navigate(signUpBackLink({ pathname: claimPath }))} className="w-full">
               {t('partner.claim_create_account')}
             </PrimaryButton>
           </>
