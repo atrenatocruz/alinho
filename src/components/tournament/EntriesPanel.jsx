@@ -201,6 +201,12 @@ function AdminEntrySheet({ organizationId, categories = [], categoryId: initialC
             <p className="text-sm font-extrabold text-ink-900">{t('partner.not_in_app_title')}</p>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('partner.name_placeholder')} className="input-field" />
             <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder={t('partner.email_placeholder')} className="input-field" />
+            {/* Dizer a verdade a quem passa as inscricoes do formulario para a
+                app: o email fica guardado mas NAO sai daqui nenhum email — o
+                convite vai pelo link que se copia na lista (Trello #479). O
+                mix ja avisava disto; o torneio nao. Mesmo texto dos dois lados,
+                de proposito. */}
+            <p className="text-xs text-muted">{t('partner.email_hint')}</p>
           </div>
         )}
 
