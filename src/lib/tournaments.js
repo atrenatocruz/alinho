@@ -84,3 +84,20 @@ export function stepProblem(step, draft) {
 /** Um torneio só se apaga enquanto ninguém se inscreveu; com inscrições,
  *  arquiva-se (regra do cartão #361). */
 export const canDelete = (tournament) => (tournament?.entry_count || 0) === 0 && tournament?.status === 'rascunho'
+
+/** Metade do preço da dupla, escrito como se escreve no idioma de quem lê
+ *  («12,50 €» em português, «12.50» em inglês). Só leva casas decimais
+ *  quando precisa — «25 €», não «25,00 €».
+ *
+ *  A unidade do torneio é a DUPLA e não muda (vagas em duplas, inscritos em
+ *  duplas). Isto existe porque os cartazes anunciam por jogador: sem a conta
+ *  feita, quem lê «25 €» no cartaz escreve 25 no campo «por dupla» e fica a
+ *  cobrar metade. */
+export function pricePerPlayer(euros, locale = 'pt-PT') {
+  const value = Number(euros) / 2
+  if (!Number.isFinite(value)) return ''
+  return value.toLocaleString(locale, {
+    minimumFractionDigits: Number.isInteger(value) ? 0 : 2,
+    maximumFractionDigits: 2,
+  })
+}

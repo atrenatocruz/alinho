@@ -7,7 +7,7 @@ import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, ImagePlus, Lock, Plus, Trash2, X } from 'lucide-react'
 import { DateField, PrimaryButton } from '../ui'
-import { categoryCode, categoryName, stepProblem, totalCourtHours, totalSlots } from '../../lib/tournaments'
+import { categoryCode, categoryName, stepProblem, totalCourtHours, totalSlots, pricePerPlayer } from '../../lib/tournaments'
 import { MonoLabel } from './TournamentBits'
 import { removeTournamentPoster, uploadTournamentPoster } from '../../lib/tournamentPosterStorage'
 import { describeError } from '../../lib/errors'
@@ -539,7 +539,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
  *  e a hora são os que aparecem a quem chega de fora («sábado, a partir das
  *  12h»). */
 function CategoryEditor({ value, taken = [], days, dayLabel, onCancel, onSave }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [cat, setCat] = useState(value || {
     gender: 'masculino', level: 5, name: '', day: days[0]?.date || '', start_time: days[0]?.starts_at || '', slots: 16, price: 25, prize_first: '', prize_second: '',
   })
@@ -597,6 +597,20 @@ function CategoryEditor({ value, taken = [], days, dayLabel, onCancel, onSave })
         <div className="flex-1">
           <MonoLabel className="mb-1.5">{t('tournament.create.price')}</MonoLabel>
           <input type="number" min="0" max="500" className={inputClass} value={cat.price} onChange={(e) => set({ price: e.target.value })} />
+          {/* A conta feita, a acompanhar o que se escreve. A unidade NÃO muda
+              — tudo no torneio é em duplas (vagas em duplas, inscritos em
+              duplas), e mexer nela com um evento já aberto dobrava ou partia
+              ao meio um preço a sério. O que se tira é a adivinha: o cartaz
+              diz «25 € por jogador» e o campo pede «por dupla», e quem não
+              parar para pensar escreve 25 e fica a cobrar metade. */}
+          {Number(cat.price) > 0 && (
+            <p className="mt-1 text-[11px] text-ink-500">
+              {t('tournament.create.price_each', {
+                pair: Number(cat.price),
+                each: pricePerPlayer(cat.price, i18n.language),
+              })}
+            </p>
+          )}
         </div>
       </div>
       {/* Prémios: texto livre, porque nem sempre é dinheiro («2 garrafas de

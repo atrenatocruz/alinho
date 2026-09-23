@@ -1,8 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   TOURNAMENT_STATUS, canDelete, categoryCode, courtHours, levelFromRating,
-  nextStatus, previousStatus, stepProblem, totalCourtHours, totalSlots,
-} from './tournaments'
+  nextStatus, previousStatus, stepProblem, totalCourtHours, totalSlots, pricePerPlayer } from './tournaments'
 
 const day = (o) => ({ date: '2026-10-09', starts_at: '18:00', ends_at: '23:00', courts: 4, ...o })
 
@@ -90,5 +89,26 @@ describe('o que falta em cada passo', () => {
     expect(stepProblem(2, { ...draft, days: [day({ starts_at: '23:00', ends_at: '09:00' })] })).toBe('hours_order')
     expect(stepProblem(3, { ...draft, categories: [] })).toBe('categories')
     expect(stepProblem(3, { ...draft, categories: [{ code: 'M5', slots: 1 }] })).toBe('slots')
+  })
+})
+
+describe('pricePerPlayer', () => {
+  it('parte o preço da dupla ao meio', () => {
+    expect(pricePerPlayer(50, 'pt-PT')).toBe('25')
+  })
+
+  it('usa a vírgula em português e o ponto em inglês', () => {
+    // Era isto que saía errado: «12.50 €» num ecrã em português.
+    expect(pricePerPlayer(25, 'pt-PT')).toBe('12,50')
+    expect(pricePerPlayer(25, 'en-GB')).toBe('12.50')
+  })
+
+  it('não põe casas decimais quando não são precisas', () => {
+    expect(pricePerPlayer(30, 'pt-PT')).toBe('15')
+  })
+
+  it('aguenta o campo vazio sem escrever disparates', () => {
+    expect(pricePerPlayer('', 'pt-PT')).toBe('0')
+    expect(pricePerPlayer(undefined, 'pt-PT')).toBe('')
   })
 })
