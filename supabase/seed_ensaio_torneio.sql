@@ -15,6 +15,40 @@
 --     `v_confirmo_422_feito := TRUE` lá em baixo. É de propósito: a regra
 --     não fica só num comentário que se lê por cima.
 --
+-- ═════════════════════════════════════════════════════════════════════════
+-- O QUE O ENSAIO PROVA, E O QUE NÃO PROVA — LER ANTES DE CONFIAR NELE
+-- ═════════════════════════════════════════════════════════════════════════
+-- Isto é mais importante do que parece: **um ensaio que se acredita ter
+-- provado mais do que provou é pior do que não ensaiar.** Quem sai daqui a
+-- pensar que está tudo verificado deixa de olhar para o que falta.
+--
+-- PROVA:
+--   · que a app arranca com um torneio a sério lá dentro;
+--   · que os ecrãs carregam e aguentam o volume (o ensaio B);
+--   · que o sorteio, o quadro e o calendário se comportam com níveis
+--     espalhados e com as inscrições estranhas (sem parceiro, com convidado,
+--     desistida, por validar).
+--
+-- NÃO PROVA, e é aqui que se engana quem não ler isto:
+--
+--   1. **O COMPORTAMENTO DA INSCRIÇÃO.** Sete das funções de inscrição têm
+--      corpos DIFERENTES no dev e em produção (medido pelo System Integrator
+--      a 23 set 2026). Ensaiar a inscrição aqui diz como ela se porta no dev
+--      — não como se porta no dia, em produção. A estrutura das tabelas está
+--      alinhada; os corpos das funções não.
+--
+--   2. **NADA DO QUE CORRE SOZINHO.** Confirmei-o eu, a 23 set: o dev **não
+--      tem a extensão de agendamento instalada** (`pg_cron` não existe lá).
+--      Tudo o que devia acontecer a uma hora marcada sem ninguém carregar em
+--      nada — fechos automáticos, avisos, lembretes — **não corre no ensaio,
+--      e não corre por não existir, não por estar bem ou mal**. Se o dia do
+--      torneio depender de alguma dessas, isso tem de ser verificado noutro
+--      sítio.
+--
+-- Ou seja: o ensaio serve para ver a app a funcionar com gente e com volume.
+-- Para a inscrição e para o que corre sozinho, **não vale como garantia**.
+-- ═════════════════════════════════════════════════════════════════════════
+--
 -- ESTE FICHEIRO NÃO É UMA MIGRAÇÃO. Não entra na ordem de migrações, não
 -- cria nem altera funções. Só mete dados de ensaio. Corre-se à mão, quando
 -- se quer um ensaio, e corre-se outra vez sem estragar nada (cada vez cria
