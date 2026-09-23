@@ -215,6 +215,8 @@
   "home.friendly_match": "Game with friends",
   "home.friendly_match_subtitle": "Log a 2x2 outside the club",
   "home.no_clubs_followed_title": "You're not following any clubs yet",
+  "home.open_now": "Open now",
+  "home.open_now_hint": "You don't need to be a member of anything to sign up.",
   "home.joining_club": "Joining the club…",
   "home.no_clubs_followed_subtitle": "Discover clubs and groups in Community, or use a direct invite link.",
   "home.view_community": "View Community",

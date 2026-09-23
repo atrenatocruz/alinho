@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Search, Users, Clock, GraduationCap, X, MapPin, Lock, Check, Building2, Trophy, ChevronRight } from 'lucide-react'
+import { Search, Users, Clock, GraduationCap, X, MapPin, Lock, Check, Building2, Trophy } from 'lucide-react'
 import { searchOrganizations, listGlobalOrganizations } from '../lib/organizations'
 import { DAY_LABEL_KEY, listTeacherProfiles, teacherClubName } from '../lib/teachers'
 import { useAuth } from '../contexts/AuthContext'
 import { Avatar, EmptyState, GroupLevelBadge, OrgKindBadge, orgAvatarShape, PageHeader } from '../components/ui'
 import { describeError, errorKind } from '../lib/errors'
 import { listOpenTournaments } from '../lib/tournamentApi'
+import OpenTournamentRow from '../components/tournament/OpenTournamentRow'
 import { useHeaderActions } from '../contexts/HeaderActionsContext'
 
 /* ─── Comunidade (épico «Comunidade vs. Rankings», Trello #271/#273) ─────────
@@ -44,19 +45,6 @@ const TABS = [
   { key: 'orgs', labelKey: 'comunidade.tab_orgs' },
   { key: 'teachers', labelKey: 'comunidade.tab_teachers' },
 ]
-
-/** «9–11 out» quando é tudo no mesmo mês, «30 set – 2 out» quando não é.
- *  A mesma regra da página do torneio, para as datas se lerem igual nos dois
- *  sítios. */
-function tournamentWhen(x, t, locale) {
-  if (!x?.starts_on) return ''
-  const a = new Date(`${x.starts_on}T12:00`)
-  const b = x.ends_on ? new Date(`${x.ends_on}T12:00`) : a
-  const month = (d) => d.toLocaleDateString(locale, { month: 'short' }).replace('.', '')
-  if (a.getTime() === b.getTime()) return `${a.getDate()} ${month(a)}`
-  if (a.getMonth() === b.getMonth()) return `${a.getDate()}–${b.getDate()} ${month(b)}`
-  return `${a.getDate()} ${month(a)} – ${b.getDate()} ${month(b)}`
-}
 
 const norm = (s) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 const byName = (a, b) => (a.name || '').localeCompare(b.name || '', 'pt')
@@ -294,38 +282,7 @@ export default function Comunidade() {
     || norm(x.club_name).includes(norm(trimmed))
     || norm(x.location).includes(norm(trimmed)))
 
-  /* A linha de um torneio aberto. É a coisa mais importante que a app tem
-     para oferecer nas próximas semanas, por isso é a primeira do separador.
-
-     `spots_left` a null quer dizer SEM LIMITE de vagas, não zero — um
-     `if (!spots_left)` escondia torneios abertos. E `days_to_deadline` já
-     vem arredondado para cima: hoje ao fim do dia dá 1, e ninguém percebe
-     «fecha em 0 dias». */
-  const renderTournament = (x) => (
-    <Link key={x.id} to={`/torneio/${x.slug || x.id}`}
-      className="flex items-center gap-3 rounded-card border border-line bg-canvas p-3 hover:bg-ink-50/40">
-      <Avatar name={x.club_name} url={x.club_logo_url} size="w-11 h-11 text-sm" shape="rounded-xl" />
-      <span className="min-w-0 flex-1">
-        <b className="block truncate text-[14px] text-ink-900">{x.name}</b>
-        <span className="block truncate text-[12px] text-muted">
-          {[x.club_name || x.location, tournamentWhen(x, t, i18n.language)].filter(Boolean).join(' · ')}
-        </span>
-        <span className="mt-1 flex flex-wrap items-center gap-1.5">
-          <span className="rounded-full bg-ink-900 px-2 py-[2px] text-[10px] font-bold text-white">{t('comunidade.tournament_tag')}</span>
-          {x.categories_open > 0 && (
-            <span className="text-[11px] text-muted">{t('comunidade.tournament_categories', { count: x.categories_open })}</span>
-          )}
-          {Number.isFinite(x.days_to_deadline) && x.days_to_deadline >= 0 && (
-            <span className="text-[11px] font-semibold text-ink-700">{t('comunidade.tournament_deadline', { count: x.days_to_deadline })}</span>
-          )}
-          {x.spots_left != null && x.spots_left <= 6 && (
-            <span className="text-[11px] font-semibold text-ink-700">{t('comunidade.tournament_spots', { count: x.spots_left })}</span>
-          )}
-        </span>
-      </span>
-      <ChevronRight size={18} className="shrink-0 text-muted" />
-    </Link>
-  )
+  const renderTournament = (x) => <OpenTournamentRow key={x.id} tournament={x} />
 
   const busy = loading || ((tab === 'teachers' || searching) && teachersLoading) || ((tab === 'play' || searching) && tournamentsLoading)
   const nothing = !busy
