@@ -226,3 +226,30 @@ describe('buildKnockoutPayload — só eliminatória (Trello #455)', () => {
     expect(buildKnockoutPayload(duplas(1))).toBeNull()
   })
 })
+
+describe('o 3.º lugar não pode ficar pendurado', () => {
+  // Com 3 apurados há 3 duplas num quadro de 4: o melhor primeiro vai direto
+  // à final e joga-se UMA meia-final. Pedir o 3.º/4.º lugar aí deixava no
+  // quadro um jogo à espera do «perdedor da 1.ª meia-final» — uma meia que
+  // não existe — e que não havia como fechar. Acontece com 3 grupos a passar
+  // 1, que é uma opção real a partir de 9 duplas.
+  it('3 grupos a passar 1: uma só meia-final, logo sem jogo de 3.º lugar', () => {
+    expect(buildBracketSkeleton(grupos(3), 1).filter((m) => m.round === 'SF')).toHaveLength(1)
+    const p = buildDrawPayload(duplas(9), { groupCount: 3, perGroup: 1, thirdPlace: true })
+    expect(p.bracket.filter((m) => m.round === 'SF')).toHaveLength(1)
+    expect(p.third_place).toBe(false)
+  })
+
+  it('11 duplas em 3 grupos a passar 1 — o caso que a app oferece a sério', () => {
+    const p = buildDrawPayload(duplas(11), { groupCount: 3, perGroup: 1, thirdPlace: true })
+    expect(p.third_place).toBe(false)
+  })
+
+  it('com as duas meias-finais, o 3.º lugar continua a existir', () => {
+    // 4 grupos a passar 2 (o formato do desenho) e 4 grupos a passar 1.
+    expect(buildDrawPayload(duplas(16), { groupCount: 4, perGroup: 2, thirdPlace: true }).third_place).toBe(true)
+    expect(buildDrawPayload(duplas(16), { groupCount: 4, perGroup: 1, thirdPlace: true }).third_place).toBe(true)
+    // E continua a não aparecer quando o organizador não o pediu.
+    expect(buildDrawPayload(duplas(16), { groupCount: 4, perGroup: 2 }).third_place).toBe(false)
+  })
+})

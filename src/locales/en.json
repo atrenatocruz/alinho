@@ -1110,6 +1110,8 @@
   "gerirclube.status_pending_launch": "Pending — launches at {{date}}",
   "gerirclube.stop_recurrence_button": "Stop recurrence",
   "gerirclube.subtitle": "Games, members, and settings for this club",
+  "gerirclube.tabs_more": "See more tabs",
+  "gerirclube.tab_events": "Events",
   "gerirclube.tab_games": "Games",
   "gerirclube.tab_members": "Members",
   "gerirclube.tab_open_slots": "Open",
