@@ -582,6 +582,10 @@ export default function GerirClube() {
     }
 
     const merged = (data || [])
+      // Super admins da plataforma não aparecem na lista nem na contagem de
+      // membros (decisão do Renato, 23 set) — só outro super admin os vê.
+      // O limite do plano já não os conta (migration_platform_admins_invisible.sql).
+      .filter((m) => !m.profile?.is_platform_admin || currentUser?.is_platform_admin)
       .map((m) => ({
         id: m.user_id,
         name: m.profile?.name || t('gerirclube.fallback_player_name'),
