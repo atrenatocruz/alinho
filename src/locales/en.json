@@ -2333,6 +2333,10 @@
   "tournament.create.level": "Level",
   "tournament.create.slots": "Slots (teams)",
   "tournament.create.price": "Price per team (€)",
+  "tournament.create.prize_first": "1st prize",
+  "tournament.create.prize_second": "2nd prize",
+  "tournament.create.prize_placeholder": "e.g. €150 + trophy",
+  "tournament.create.prize_hint": "Shown on the tournament page and at the end, once there are winners. Leave blank for no prize.",
   "tournament.create.max_categories": "Max categories per person",
   "tournament.create.slots_vs_hours": "{{teams}} teams at most. Whether they fit in {{hours}} h of court time is shown at the format step, once entries close.",
   "tournament.create.entry_mode": "Entry",
@@ -2539,5 +2543,10 @@
   "tournament.podium.my_xp": "+{{xp}} XP",
   "tournament.podium.my_matches_one": "1 match",
   "tournament.podium.my_matches_other": "{{count}} matches",
-  "tournament.podium.my_rating": "{{category}} ranking {{points}} points"
+  "tournament.podium.my_rating": "{{category}} ranking {{points}} points",
+  "tournament.podium.my_won_one": "1 won",
+  "tournament.podium.my_won_other": "{{count}} won",
+  "tournament.podium.played_final": "played the final",
+  "tournament.podium.matches_one": "1 match",
+  "tournament.podium.matches_other": "{{count}} matches"
 }

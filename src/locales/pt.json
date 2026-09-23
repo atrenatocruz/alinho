@@ -2333,6 +2333,10 @@
   "tournament.create.level": "Nível",
   "tournament.create.slots": "Vagas (duplas)",
   "tournament.create.price": "Preço por dupla (€)",
+  "tournament.create.prize_first": "Prémio do 1.º",
+  "tournament.create.prize_second": "Prémio do 2.º",
+  "tournament.create.prize_placeholder": "ex.: 150 € + troféu",
+  "tournament.create.prize_hint": "Aparece na página do torneio e no fim, quando se sabe quem ganhou. Em branco, não aparece nada.",
   "tournament.create.max_categories": "Máximo de categorias por pessoa",
   "tournament.create.slots_vs_hours": "{{teams}} duplas no máximo. Se cabem nas {{hours}} h de campo, vês no passo do formato, depois de fechadas as inscrições.",
   "tournament.create.entry_mode": "Inscrição",
@@ -2539,5 +2543,10 @@
   "tournament.podium.my_xp": "+{{xp}} XP",
   "tournament.podium.my_matches_one": "1 jogo",
   "tournament.podium.my_matches_other": "{{count}} jogos",
-  "tournament.podium.my_rating": "ranking {{category}} {{points}} pontos"
+  "tournament.podium.my_rating": "ranking {{category}} {{points}} pontos",
+  "tournament.podium.my_won_one": "1 ganho",
+  "tournament.podium.my_won_other": "{{count}} ganhos",
+  "tournament.podium.played_final": "jogou a final",
+  "tournament.podium.matches_one": "1 jogo",
+  "tournament.podium.matches_other": "{{count}} jogos"
 }

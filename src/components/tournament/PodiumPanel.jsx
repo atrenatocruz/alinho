@@ -13,11 +13,24 @@ import { MonoLabel, Me } from './TournamentBits'
 
 const MEDALS = ['🥇', '🥈', '🥉']
 
-/** Uma linha do pódio. O nome de quem está a ver aparece destacado, como em
- *  todo o lado (SPEC §2: nunca "Tu"). */
-function PodiumRow({ place, team, prize, meName }) {
+/** Uma linha do pódio.
+ *
+ *  Dois níveis, de propósito: **a dupla** ganhou (o nome grande) e **as
+ *  pessoas** jogaram. Quando houve substituição a meio, a dupla campeã tem
+ *  três pessoas e o nome da dupla só cabe duas — por isso, nesse caso, as
+ *  pessoas aparecem por baixo, com quem jogou a final marcado (decisão do
+ *  Francisco, 23 set: ficam todas campeãs, e o ecrã mostra quem lá esteve).
+ *  Sem substituição não aparece nada disto: o nome da dupla já as diz.
+ *
+ *  O nome de quem está a ver aparece destacado, como em todo o lado
+ *  (SPEC §2: nunca "Tu"). */
+function PodiumRow({ place, team, prize, people, meName }) {
+  const { t } = useTranslation()
   if (!team) return null
   const parts = String(team.name || '').split(/\s*\/\s*/)
+  const mark = (name) => (meName && name === meName ? <Me>{name}</Me> : name)
+  // Só quando são mais do que as duas que cabem no nome da dupla.
+  const swapped = people.length > 2 ? people : []
   return (
     <div className="mt-1.5 grid grid-cols-[24px_minmax(0,1fr)] items-center gap-x-2 gap-y-0.5 rounded-ctrl border border-line px-2.5 py-2">
       <span className="row-span-2 text-[18px] leading-none">{MEDALS[place]}</span>
@@ -25,11 +38,24 @@ function PodiumRow({ place, team, prize, meName }) {
         {parts.map((part, i) => (
           <span key={i}>
             {i > 0 && ' / '}
-            {meName && part.trim() === meName ? <Me>{part.trim()}</Me> : part}
+            {mark(part.trim())}
           </span>
         ))}
       </b>
       {prize && <em className="not-italic text-[10.5px] text-ink-500">{prize}</em>}
+
+      {swapped.length > 0 && (
+        <ul className="col-start-2 mt-1 space-y-0.5 border-t border-line pt-1.5">
+          {swapped.map((p) => (
+            <li key={p.name} className="flex items-baseline justify-between gap-2 text-[11.5px] text-ink-700">
+              <span className="min-w-0 truncate">{mark(p.name)}</span>
+              <span className="shrink-0 text-[10px] text-ink-500">
+                {p.played_final ? t('tournament.podium.played_final') : t('tournament.podium.matches', { count: p.matches_played })}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }
@@ -63,22 +89,31 @@ export default function PodiumPanel({ tournament }) {
     <div className="rounded-card border border-line p-3.5">
       <MonoLabel>{t('tournament.podium.title')}</MonoLabel>
 
-      {data.categories.map((c) => (
-        <div key={c.id || c.code} className="mt-3 first:mt-2">
-          <MonoLabel>{c.code}{c.name ? ` · ${c.name}` : ''}</MonoLabel>
-          <PodiumRow place={0} team={c.champion} prize={c.prize_first} meName={meName} />
-          <PodiumRow place={1} team={c.runner_up} prize={c.prize_second} meName={meName} />
-          <PodiumRow place={2} team={c.third} prize={null} meName={meName} />
-        </div>
-      ))}
+      {data.categories.map((c) => {
+        // Uma pessoa pode estar no pódio sem estar no nome da dupla (entrou a
+        // meio). O `podium_players` é por PESSOA; agrupa-se por posição.
+        const at = (position) => (c.podium_players || []).filter((p) => p.final_position === position)
+        return (
+          <div key={c.id || c.code} className="mt-3 first:mt-2">
+            <MonoLabel>{c.code}{c.name ? ` · ${c.name}` : ''}</MonoLabel>
+            <PodiumRow place={0} team={c.champion} prize={c.prize_first} people={at(1)} meName={meName} />
+            <PodiumRow place={1} team={c.runner_up} prize={c.prize_second} people={at(2)} meName={meName} />
+            <PodiumRow place={2} team={c.third} prize={null} people={at(3)} meName={meName} />
+          </div>
+        )
+      })}
 
       {mine && (
         <div className="mt-4 flex items-start gap-2 rounded-ctrl border border-[#E3EE8F] bg-[#F8FCD4] p-2.5 text-[12px] text-ink-900">
           <Trophy size={16} className="mt-0.5 shrink-0" />
           <span>
-            <b>{t('tournament.podium.my_xp', { xp: mine.xp })}</b>
-            {' · '}
-            {t('tournament.podium.my_matches', { count: mine.matches })}
+            {/* Sem XP: não existe conta de XP nos torneios (procurado em
+                todas as migrações, 23 set). Não se mostra um número que não
+                tem de onde vir — a decisão de o criar ou não é do Francisco. */}
+            <b>{t('tournament.podium.my_matches', { count: mine.matches })}</b>
+            {Number.isFinite(mine.matches_won) && (
+              <>{' · '}{t('tournament.podium.my_won', { count: mine.matches_won })}</>
+            )}
             {Number.isFinite(mine.rating_delta) && mine.rating_delta !== 0 && (
               <>
                 {' · '}
