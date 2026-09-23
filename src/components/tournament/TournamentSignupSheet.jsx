@@ -170,6 +170,9 @@ export default function TournamentSignupSheet({ tournament, categories, category
                 {touched && emailError && (
                   <p className="text-sm text-red-600 font-extrabold">{t('partner.email_error_invalid')}</p>
                 )}
+                {/* O mesmo aviso do mix: o email guarda-se, o convite vai
+                    por link enquanto o envio de emails nao existir (#479). */}
+                <p className="text-xs text-muted">{t('partner.email_hint')}</p>
                 <p className="text-xs text-muted">{t('tsignup.guest_hint')}</p>
               </div>
             ) : (
