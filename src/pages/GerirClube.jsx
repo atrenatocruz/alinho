@@ -92,7 +92,19 @@ const RECURRENCE_ENDS = [
   { value: 'after_occurrences', labelKey: 'gerirclube.ends_after_occurrences' },
 ]
 
-const GERIR_TABS = ['games', 'members', 'open_slots', 'lessons', 'tournaments', 'settings', 'redeem']
+const GERIR_TABS = ['events', 'members', 'settings', 'redeem']
+
+// As seccoes de «Eventos», pela ordem em que aparecem. Eram separadores ate
+// 23 set: num clube eram cinco, no telemovel viam-se tres, e ninguem
+// encontrava as Aulas nem os Torneios (Trello #467). Agora sao uma pagina
+// que rola, com titulos -- a mesma viagem que a pagina do torneio fez no
+// #436.
+const EVENT_SECTIONS = ['games', 'open_slots', 'lessons', 'tournaments']
+
+// Links antigos continuam a abrir onde a pessoa espera: o endereco do Gerir
+// anda em conversas e em avisos da app. Cada um abre «Eventos» e salta para
+// a sua seccao.
+const LEGACY_TABS = { games: 'events', open_slots: 'events', lessons: 'events', tournaments: 'events' }
 const DONE_STATUSES = ['finished', 'completed', 'cancelled']
 const GAME_FILTERS = [
   { value: 'upcoming', labelKey: 'gerirclube.filter_upcoming' },
@@ -182,10 +194,10 @@ export default function GerirClube() {
   // Switching is a replace marked keepScroll, so the page doesn't jump to
   // the top (Trello #430).
   const tabParam = searchParams.get('tab')
-  const activeTab = GERIR_TABS.includes(tabParam) ? tabParam : 'games'
+  const activeTab = GERIR_TABS.includes(tabParam) ? tabParam : (LEGACY_TABS[tabParam] || 'events')
   const setActiveTab = (key) => setSearchParams((prev) => {
     const next = new URLSearchParams(prev)
-    if (key === 'games') next.delete('tab')
+    if (key === 'events') next.delete('tab')
     else next.set('tab', key)
     return next
   }, { replace: true, state: { keepScroll: true } })
@@ -337,9 +349,38 @@ export default function GerirClube() {
 
   // Separador «Aulas» (Trello #49): só em clubes e só depois de a migração
   // das aulas correr — até lá a tabela não existe e o separador não aparece.
+  // A fila de separadores nao cabe toda no telemovel num clube (cinco).
+  // Medido a 23 set: a 390px sobra um pedaco de 23px do seguinte, mas a
+  // 360px nao sobra nada -- por isso o sinal nao pode depender da sorte das
+  // larguras. Quando nao cabe, aparece uma seta a dizer que ha mais, FORA
+  // da fila, para nunca tapar o que ela devia mostrar (Trello #467).
+  const tabsRef = useRef(null)
+  const [tabsOverflow, setTabsOverflow] = useState(false)
   const [lessonsReady, setLessonsReady] = useState(false)
   const [tournamentsReady, setTournamentsReady] = useState(false)
-  // Com o 4.º separador não cabem os ícones a 390px — ficam só os nomes.
+
+  // ?tab=lessons e companhia: abre «Eventos» e salta para a seccao, sem
+  // roubar o scroll a quem chegou pelo caminho normal.
+  useEffect(() => {
+    if (!EVENT_SECTIONS.includes(tabParam) || loading) return undefined
+    // Tenta mais do que uma vez de proposito: os paineis das seccoes
+    // carregam sozinhos e vao crescendo, por isso um unico salto logo a
+    // seguir ao render deixava a seccao a 800px do topo. Medido a 23 set
+    // com ?tab=tournaments.
+    const tentar = () => document.getElementById(`seccao-${tabParam}`)?.scrollIntoView({ block: 'start' })
+    tentar()
+    const relogios = [400, 1200, 2400].map((ms) => setTimeout(tentar, ms))
+    return () => relogios.forEach(clearTimeout)
+  }, [tabParam, loading])
+
+  useEffect(() => {
+    const fila = tabsRef.current
+    if (!fila) return undefined
+    const medir = () => setTabsOverflow(fila.scrollWidth > fila.clientWidth + 1)
+    medir()
+    window.addEventListener('resize', medir)
+    return () => window.removeEventListener('resize', medir)
+  })
   useEffect(() => {
     if (!currentOrganizationId || org?.kind !== 'club') { setLessonsReady(false); return }
     let alive = true
@@ -503,7 +544,7 @@ export default function GerirClube() {
   const loadData = async () => {
     setLoading(true)
     try {
-      if (activeTab === 'games') {
+      if (activeTab === 'events') {
         await loadGames()
       } else if (activeTab === 'members') {
         await loadMembers()
@@ -1611,7 +1652,7 @@ export default function GerirClube() {
         {(activeTab === 'settings' || activeTab === 'redeem') ? (
           <button
             type="button"
-            onClick={() => { if (activeTab === 'redeem') handleResetRedeem(); setActiveTab('games') }}
+            onClick={() => { if (activeTab === 'redeem') handleResetRedeem(); setActiveTab('events') }}
             className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline mb-6"
           >
             <ArrowLeft size={16} /> {t('gerirclube.back_button')}
@@ -1695,19 +1736,24 @@ export default function GerirClube() {
           Hidden while the settings page or the voucher redeem screen is
           open (neither is one of the tabs). */}
       {activeTab !== 'settings' && activeTab !== 'redeem' && (
-        // A fila continua numa linha só e desliza para o lado (21 set), mas
-        // agora DIZ que há mais: o último separador visível esbate-se contra
-        // a direita. Sem isso, no telemóvel viam-se três e concluía-se que
-        // «Aulas» e «Torneios» não existiam (Francisco, 22 set). Duas linhas
-        // ficavam feias; o esbatido mantém o aspeto e resolve.
-        <div className="relative">
-        <div className="flex gap-1 p-1 bg-ink-50 rounded-ctrl overflow-x-auto no-scrollbar scroll-smooth">
+        // A fila numa linha só que desliza para o lado. O que diz que há
+        // mais é o separador seguinte cortado ao meio, à direita — é assim
+        // que se percebe à primeira que a fila continua.
+        //
+        // A 22 set tentou-se com um esbatido de 40px por cima da direita, e
+        // o Francisco reportou o MESMO problema no dia seguinte. Medido a
+        // 23 set num clube a 390px: «Aulas» tinha 23px à vista e o esbatido
+        // tapava exatamente esses 23 — o único sinal de que havia mais
+        // estava escondido por baixo do próprio remédio. Por isso saiu.
+        //
+        // Duas linhas foram recusadas (ficam feias) e encolher o texto até
+        // caberem cinco deixa de se ler. A arrumação a sério é a página
+        // passar a três separadores (#419); isto é o que segura até lá.
+        <div className="flex items-center gap-1.5">
+        <div ref={tabsRef} className="flex-1 min-w-0 flex gap-1 p-1 bg-ink-50 rounded-ctrl overflow-x-auto no-scrollbar scroll-smooth">
           {[
-            ['games', Calendar, t('gerirclube.tab_games'), true, 0],
+            ['events', Calendar, t('gerirclube.tab_events'), true, 0],
             ['members', Users, t('gerirclube.tab_members'), true, requests.length],
-            ['open_slots', Clock, t('gerirclube.tab_open_slots'), !isGroupOrg, 0],
-            ['lessons', GraduationCap, t('gerirclube.tab_lessons'), !isGroupOrg && lessonsReady, 0],
-            ['tournaments', Trophy, t('gerirclube.tab_tournaments'), !isGroupOrg && tournamentsReady, 0],
           ].filter(([, , , show]) => show).map(([key, Icon, label, , badge]) => (
             <button
               key={key}
@@ -1728,8 +1774,17 @@ export default function GerirClube() {
             </button>
           ))}
         </div>
-        {/* Esbatido à direita — só aparece quando a fila não cabe toda. */}
-        <div className="pointer-events-none absolute inset-y-0 right-0 w-10 rounded-r-ctrl bg-gradient-to-l from-ink-50 to-transparent" />
+        {tabsOverflow && (
+          <button
+            type="button"
+            onClick={() => tabsRef.current?.scrollBy({ left: Math.round(tabsRef.current.clientWidth * 0.6), behavior: 'smooth' })}
+            aria-label={t('gerirclube.tabs_more')}
+            title={t('gerirclube.tabs_more')}
+            className="shrink-0 w-9 h-9 flex items-center justify-center rounded-full bg-ink-50 text-ink-700"
+          >
+            <ChevronRight size={18} />
+          </button>
+        )}
         </div>
       )}
 
@@ -1739,9 +1794,44 @@ export default function GerirClube() {
         </div>
       ) : (
         <>
-          {/* Games Tab */}
-          {activeTab === 'games' && (
+          {/* «Eventos»: as quatro seccoes empilhadas, cada uma com o seu
+              titulo (Trello #467). Nenhum painel foi reescrito -- sao os
+              mesmos de quando eram separadores. */}
+          {activeTab === 'events' && (
             <div className="space-y-4">
+              {(() => {
+                const seccoes = [
+                  { key: 'games', label: t('gerirclube.tab_games'), count: games.length },
+                  ...(!isGroupOrg ? [{ key: 'open_slots', label: t('gerirclube.tab_open_slots'), count: null }] : []),
+                  ...(!isGroupOrg && lessonsReady ? [{ key: 'lessons', label: t('gerirclube.tab_lessons'), count: null }] : []),
+                  ...(!isGroupOrg && tournamentsReady ? [{ key: 'tournaments', label: t('gerirclube.tab_tournaments'), count: null }] : []),
+                ]
+                // Com uma seccao so (o caso do grupo) um indice nao indexa nada.
+                if (seccoes.length < 2) return null
+                return (
+                  <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
+                    {seccoes.map(({ key, label, count }) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => document.getElementById(`seccao-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                        className="shrink-0 inline-flex items-center gap-1.5 px-3 min-h-[36px] rounded-full bg-ink-50 text-ink-700 text-sm font-extrabold"
+                      >
+                        {label}
+                        {count != null && (
+                          <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-canvas text-ink-900 text-[11px] tabular-nums">
+                            {count}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )
+              })()}
+
+              <h2 id="seccao-games" className="scroll-mt-4 text-[11px] font-extrabold uppercase tracking-widest text-muted">
+                {t('gerirclube.tab_games')}
+              </h2>
               <button
                 onClick={() => { setShowCreateGame(true); setCreatedMixScope(null) }}
                 className="btn-primary w-full flex items-center justify-center gap-2"
@@ -2488,18 +2578,33 @@ export default function GerirClube() {
             </div>
           )}
 
-          {activeTab === 'lessons' && !isGroupOrg && lessonsReady && (
-            <ClubLessonsPanel organizationId={currentOrganizationId} orgName={org?.name} />
+          {activeTab === 'events' && !isGroupOrg && (
+            <section className="space-y-2">
+              <h2 id="seccao-open_slots" className="scroll-mt-4 text-[11px] font-extrabold uppercase tracking-widest text-muted">
+                {t('gerirclube.tab_open_slots')}
+              </h2>
+              <OpenSlotsPanel organizationId={currentOrganizationId} />
+            </section>
+          )}
+
+          {activeTab === 'events' && !isGroupOrg && lessonsReady && (
+            <section className="space-y-2">
+              <h2 id="seccao-lessons" className="scroll-mt-4 text-[11px] font-extrabold uppercase tracking-widest text-muted">
+                {t('gerirclube.tab_lessons')}
+              </h2>
+              <ClubLessonsPanel organizationId={currentOrganizationId} orgName={org?.name} />
+            </section>
           )}
 
           {/* Torneios (Trello #361) — só nos clubes, e só depois de a
               migração do torneio correr. */}
-          {activeTab === 'tournaments' && !isGroupOrg && tournamentsReady && (
-            <ClubTournamentsPanel organizationId={org.id} club={org} />
-          )}
-
-          {activeTab === 'open_slots' && !isGroupOrg && (
-            <OpenSlotsPanel organizationId={currentOrganizationId} />
+          {activeTab === 'events' && !isGroupOrg && tournamentsReady && (
+            <section className="space-y-2">
+              <h2 id="seccao-tournaments" className="scroll-mt-4 text-[11px] font-extrabold uppercase tracking-widest text-muted">
+                {t('gerirclube.tab_tournaments')}
+              </h2>
+              <ClubTournamentsPanel organizationId={org.id} club={org} />
+            </section>
           )}
 
           {/* Members Tab */}

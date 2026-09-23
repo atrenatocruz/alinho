@@ -1108,6 +1108,8 @@
   "gerirclube.status_pending_launch": "Pendente — lança a {{date}}",
   "gerirclube.stop_recurrence_button": "Parar recorrência",
   "gerirclube.subtitle": "Jogos, membros e definições deste clube",
+  "gerirclube.tabs_more": "Ver mais separadores",
+  "gerirclube.tab_events": "Eventos",
   "gerirclube.tab_games": "Jogos",
   "gerirclube.tab_members": "Membros",
   "gerirclube.tab_open_slots": "Em aberto",
