@@ -21,7 +21,17 @@ function pairKey(a, b) {
 // work off raw ids (user_id/partner_id) instead of hydrated profile
 // objects, since the bot doesn't need the extra fields the web app's
 // version carries through for display.
-function formDuplas(participants, pointsById, repeatPairKeys) {
+//
+// Lado preferido (Trello #404): o bot escolhia o parceiro só por pontos e
+// por pares repetidos, sem olhar ao lado — juntava dois esquerdinos à
+// vontade, e o mix começado pelo bot saía pior do que o mesmo mix começado
+// na app. Agora a escolha é: sem repetir E lados diferentes; depois sem
+// repetir; e só no fim o mais próximo em pontos.
+//
+// A app faz melhor: recua e experimenta outras combinações para chegar ao
+// mínimo possível de duplas do mesmo lado. Aqui a escolha é seguida, sem
+// recuar. Unificar as três implementações é o que o cartão #399 regista.
+function formDuplas(participants, pointsById, repeatPairKeys, sideById = {}) {
   const duplas = []
   const solos = []
   for (const row of participants) {
@@ -30,11 +40,14 @@ function formDuplas(participants, pointsById, repeatPairKeys) {
   }
 
   const pointsOf = (id) => pointsById[id] ?? 0
+  const sideOf = (id) => (sideById[id] === 'left' || sideById[id] === 'right' ? sideById[id] : 'both')
+  const sidesFit = (x, y) => sideOf(x) === 'both' || sideOf(y) === 'both' || sideOf(x) !== sideOf(y)
   solos.sort((a, b) => pointsOf(b) - pointsOf(a))
 
   while (solos.length >= 2) {
     const a = solos.shift()
-    let idx = solos.findIndex((candidate) => !repeatPairKeys.has(pairKey(a, candidate)))
+    let idx = solos.findIndex((candidate) => !repeatPairKeys.has(pairKey(a, candidate)) && sidesFit(a, candidate))
+    if (idx === -1) idx = solos.findIndex((candidate) => !repeatPairKeys.has(pairKey(a, candidate)))
     if (idx === -1) idx = 0 // everyone left is a repeat — accept the closest rather than leave a gap
     const b = solos.splice(idx, 1)[0]
     duplas.push([a, b])
@@ -116,7 +129,19 @@ async function autoStartMix(game, { sendText }) {
     repeatPairKeys = new Set((previousTeams || []).map((team) => pairKey(team.player1_id, team.player2_id)))
   }
 
-  const duplas = formDuplas(participants || [], pointsById, repeatPairKeys)
+  // O lado preferido de cada um, para não formar duplas do mesmo lado.
+  const soloIds = (participants || []).filter((p) => !p.partner_id).map((p) => p.user_id)
+  let sideById = {}
+  if (soloIds.length) {
+    const { data: sideRows, error: sideErr } = await supabase
+      .from('profiles')
+      .select('id, preferred_side')
+      .in('id', soloIds)
+    if (sideErr) throw new Error(`Failed to load preferred sides for auto-start: ${sideErr.message}`)
+    sideById = Object.fromEntries((sideRows || []).map((r) => [r.id, r.preferred_side || 'both']))
+  }
+
+  const duplas = formDuplas(participants || [], pointsById, repeatPairKeys, sideById)
   if (duplas.length < 2) {
     // Not enough confirmed players yet — leave status alone, try again
     // next tick (mirrors "São precisas pelo menos 2 duplas" client-side).
