@@ -192,6 +192,8 @@
   "agenda.show_open": "Open",
   "agenda.filter_show": "Show",
   "agenda.today_empty": "No events today",
+  "agenda.filters_empty": "No events match these filters",
+  "agenda.filters_clear": "Clear filters",
   "agenda.month_title": "Pick a day",
   "agenda.previous_month": "Previous month",
   "agenda.next_month": "Next month",

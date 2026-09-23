@@ -192,6 +192,8 @@
   "agenda.show_open": "Em aberto",
   "agenda.filter_show": "Mostrar",
   "agenda.today_empty": "Sem eventos hoje",
+  "agenda.filters_empty": "Nenhum evento com estes filtros",
+  "agenda.filters_clear": "Limpar filtros",
   "agenda.month_title": "Escolher dia",
   "agenda.previous_month": "Mês anterior",
   "agenda.next_month": "Mês seguinte",

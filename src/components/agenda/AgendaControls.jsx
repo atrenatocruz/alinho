@@ -216,10 +216,12 @@ export function FilterSheet({ filters, orgs, countFor, onApply, onClose }) {
         </>
       )}
 
-      <button type="button" onClick={() => onApply(draft)} className="w-full mt-5 py-3 rounded-ctrl bg-lime-400 text-ink-900 text-sm font-extrabold">
+      {/* Com zero resultados não se aplica às cegas; repor aplica logo, sem
+          segundo toque (Trello #415). */}
+      <button type="button" onClick={() => onApply(draft)} disabled={n === 0} className="w-full mt-5 py-3 rounded-ctrl bg-lime-400 text-ink-900 text-sm font-extrabold disabled:opacity-40">
         {t('agenda.filters_apply', { count: n })}
       </button>
-      <button type="button" onClick={() => setDraft(DEFAULT_FILTERS)} className="w-full mt-2 py-2.5 text-sm font-extrabold text-muted">
+      <button type="button" onClick={() => onApply(DEFAULT_FILTERS)} className="w-full mt-2 py-2.5 text-sm font-extrabold text-muted">
         {t('agenda.filters_reset')}
       </button>
     </Sheet>

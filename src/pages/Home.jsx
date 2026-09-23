@@ -23,7 +23,7 @@ import TournamentEventCard from '../components/agenda/TournamentEventCard'
 import { useHeaderActions } from '../contexts/HeaderActionsContext'
 import {
   toDayKey, eventFromGame, eventFromGroupMatch, eventFromPrivateMatch, eventFromExplore, eventFromLesson, isAgendaGame,
-  applyFilters, groupByDay, countByDay, eventDistance, normalizeFilters, isPastEvent, eventsToPins,
+  applyFilters, groupByDay, countByDay, eventDistance, normalizeFilters, isPastEvent, eventsToPins, DEFAULT_FILTERS, EVENT_KINDS,
 } from '../lib/agenda'
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -331,6 +331,12 @@ export default function Home() {
   const counts = useMemo(() => countByDay(visible), [visible])
   const today = toDayKey(new Date())
   const days = useMemo(() => groupByDay(visible, today), [visible, today])
+  // Lista vazia por causa dos filtros (não do dia): diz-se isso e limpa-se
+  // num toque (Trello #415).
+  const filtersActive = filters.show !== DEFAULT_FILTERS.show
+    || filters.orgIds != null
+    || EVENT_KINDS.some((k) => !filters.kinds.includes(k))
+  const emptyByFilters = filtersActive && visible.length === 0 && events.length > 0
   // O mapa só mostra o que ainda vem à frente — pins de eventos passados não
   // ajudam a decidir onde jogar a seguir.
   const pins = useMemo(() => eventsToPins(visible.filter((e) => !isPastEvent(e, today))), [visible, today])
@@ -692,7 +698,16 @@ export default function Home() {
               <p className={`text-[11px] font-extrabold uppercase tracking-widest ${dayKey === today ? 'text-ink-900' : 'text-muted'}`}>
                 {dayLabel(dayKey, t, i18n.language)}
               </p>
-              {dayEvents.length === 0
+              {dayEvents.length === 0 && emptyByFilters
+                ? (
+                  <div className="text-sm text-muted py-3 px-3 rounded-card border border-dashed border-line flex items-center justify-between gap-3">
+                    <span>{t('agenda.filters_empty')}</span>
+                    <button type="button" onClick={() => setFilters(DEFAULT_FILTERS)} className="shrink-0 font-extrabold text-ink-900 underline underline-offset-2 min-h-[36px]">
+                      {t('agenda.filters_clear')}
+                    </button>
+                  </div>
+                )
+                : dayEvents.length === 0
                 ? <p className="text-sm text-muted py-3 px-3 rounded-card border border-dashed border-line">{t('agenda.today_empty')}</p>
                 : dayEvents.map(renderEvent)}
             </section>
