@@ -31,11 +31,38 @@
 --
 -- NÃO PROVA, e é aqui que se engana quem não ler isto:
 --
---   1. **O COMPORTAMENTO DA INSCRIÇÃO.** Sete das funções de inscrição têm
---      corpos DIFERENTES no dev e em produção (medido pelo System Integrator
---      a 23 set 2026). Ensaiar a inscrição aqui diz como ela se porta no dev
---      — não como se porta no dia, em produção. A estrutura das tabelas está
---      alinhada; os corpos das funções não.
+--   1. **O COMPORTAMENTO DA INSCRIÇÃO, E DO FECHO E DO SORTEIO.** Estas oito
+--      funções NÃO são a mesma versão no dev e em produção (medido pelo PO a
+--      23 set 2026, `md5` do corpo com espaços normalizados):
+--
+--        tournament_signup          ← por aqui entra o jogador
+--        tournament_admin_signup    ← por aqui inscreve a organização
+--        tournament_claim_entry     ← por aqui entra quem vem do link do convite
+--        tournament_respond_invite
+--        tournament_validate_entry
+--        tournament_remove_entry
+--        close_category_entries     ← o fecho das inscrições
+--        draw_category              ← o sorteio
+--
+--      E cinco estão iguais ao caráter, para não se desconfiar delas sem
+--      razão: `list_my_tournament_invites`, `list_tournament_entries`,
+--      `tournament_change_partner`, `tournament_invite_token` e
+--      `tournament_withdraw_entry`.
+--
+--      **O QUE ISTO DIZ E O QUE NÃO DIZ:** diz que não são a mesma versão.
+--      NÃO diz que se portam de maneira diferente — um comentário mudado dá
+--      igualmente diferente. Quem decide isso é ler os corpos, e isso está
+--      com o System Integrator (já encontrou um caso a sério: no dev a
+--      `tournament_remove_entry` tem uma trava que impede remover uma dupla
+--      já sorteada, e em produção não tem).
+--
+--      A `tournament_admin_signup` nem tem a mesma assinatura: produção tem
+--      nove argumentos e o dev sete — **produção já tem o género (#433) e o
+--      dev ainda não.** Aqui é o dev que está atrasado, não o contrário.
+--
+--      Ou seja: ensaiar a inscrição, o fecho ou o sorteio aqui diz como eles
+--      se portam NO DEV. Não diz como se portam no dia 9, em produção. A
+--      estrutura das tabelas está alinhada; estas oito funções não.
 --
 --   2. **NADA DO QUE CORRE SOZINHO.** Confirmei-o eu, a 23 set: o dev **não
 --      tem a extensão de agendamento instalada** (`pg_cron` não existe lá).
