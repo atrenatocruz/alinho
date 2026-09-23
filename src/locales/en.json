@@ -1002,6 +1002,7 @@
   "gerirclube.launch_days_before_label": "Launch how many days before",
   "gerirclube.launch_days_placeholder": "e.g. 3",
   "gerirclube.launch_time_help": "The next Mix becomes visible and open for sign-ups at this time — the same lead time is reapplied to every following Mix.",
+  "gerirclube.next_launch_preview": "The next one goes out on {{launch}} at {{time}}, for the Mix on {{mix}}.",
   "gerirclube.launch_time_label": "At what time",
   "gerirclube.link_copied": "Link copied!",
   "gerirclube.location_field_label": "Location",

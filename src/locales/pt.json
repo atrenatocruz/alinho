@@ -1002,6 +1002,7 @@
   "gerirclube.launch_days_before_label": "Lançar quantos dias antes",
   "gerirclube.launch_days_placeholder": "ex: 3",
   "gerirclube.launch_time_help": "O próximo Mix fica visível e disponível para inscrições nesta altura — a mesma distância é reaplicada em cada Mix seguinte.",
+  "gerirclube.next_launch_preview": "O próximo sai {{launch}}, às {{time}}, para o Mix de {{mix}}.",
   "gerirclube.launch_time_label": "A que horas",
   "gerirclube.link_copied": "Link copiado!",
   "gerirclube.location_field_label": "Localização",

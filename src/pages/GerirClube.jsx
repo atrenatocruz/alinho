@@ -2283,6 +2283,25 @@ export default function GerirClube() {
                               <p className="text-sm text-muted mt-1.5">
                                 {t('gerirclube.launch_time_help')}
                               </p>
+                              {/* O próximo lançamento com data real, para o admin não
+                                  fazer contas de cabeça (Trello #396). */}
+                              {(() => {
+                                const r = gameForm.recurrence
+                                const days = parseInt(r.launchDaysBefore, 10)
+                                if (!gameForm.date || !r.launchTime || !(days >= 1)) return null
+                                const nextMix = advanceByFrequency(new Date(gameForm.date), r.frequency)
+                                if (Number.isNaN(nextMix.getTime())) return null
+                                const launch = new Date(nextMix)
+                                launch.setDate(launch.getDate() - days)
+                                const [hh, mm] = r.launchTime.split(':').map(Number)
+                                launch.setHours(hh, mm, 0, 0)
+                                const day = (d) => formatDateLib(d, i18n.language, { weekday: 'long', day: 'numeric', month: 'short' })
+                                return (
+                                  <p className="text-sm font-extrabold text-ink-900 mt-1.5">
+                                    {t('gerirclube.next_launch_preview', { launch: day(launch), time: r.launchTime, mix: day(nextMix) })}
+                                  </p>
+                                )
+                              })()}
                             </div>
                           </>
                         )}
