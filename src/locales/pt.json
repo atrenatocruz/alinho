@@ -2426,6 +2426,8 @@
   "tournament.admin.delete_title": "Apagar o torneio?",
   "tournament.admin.delete_message": "«{{name}}» é apagado de vez. Só dá enquanto é rascunho e ninguém se inscreveu.",
   "tournament.score.title": "Marcar · {{day}}",
+  "tournament.score.day_picker": "Dia do torneio",
+  "tournament.score.today": "hoje",
   "tournament.score.done_count": "{{done}} de {{total}} jogos feitos",
   "tournament.score.live": "A decorrer",
   "tournament.score.next": "A seguir",

@@ -14,6 +14,7 @@ import { getTournamentPage, listMatchesToScore, markWalkover, saveMatchResult } 
 import { byCourt, needsDecider, resultProblem, retirementScore, walkoverScore } from '../lib/tournamentScore'
 import { computeSetsResult } from '../lib/scoringLogic'
 import { describeError, errorKind } from '../lib/errors'
+import { toDayKey } from '../lib/agenda'
 import { EmptyState, PrimaryButton } from '../components/ui'
 import { MonoLabel, StatePill } from '../components/tournament/TournamentBits'
 
@@ -264,21 +265,35 @@ export default function TournamentScorePage() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
-  const today = new Date().toISOString().slice(0, 10)
+  // Dia em hora local (toISOString dava UTC: entre a meia-noite e a uma da
+  // manhã mostrava o dia anterior), e escolhido entre os dias do torneio —
+  // para ensaiar antes e para corrigir o resultado de ontem (Trello #460).
+  const [today] = useState(() => toDayKey(new Date()))
+  const [day, setDay] = useState(today)
+  const [days, setDays] = useState([])
 
   const load = useCallback(() => {
-    listMatchesToScore(id, today)
+    listMatchesToScore(id, day)
       .then(setMatches)
       .catch((err) => {
         if (errorKind(err) !== 'not_ready') console.error('Error loading matches:', err)
         setMatches([])
       })
-  }, [id, today])
+  }, [id, day])
 
   useEffect(() => {
-    getTournamentPage(id).then((res) => setTournament(res?.tournament || null)).catch(() => setTournament(null))
-    load()
-  }, [id, load])
+    getTournamentPage(id)
+      .then((res) => {
+        setTournament(res?.tournament || null)
+        const list = (res?.days || []).map((d) => d.date).filter(Boolean)
+        setDays(list)
+        // Hoje não é dia de torneio? Abre no primeiro dia, em vez de vazio.
+        if (list.length && !list.includes(today)) setDay(list[0])
+      })
+      .catch(() => setTournament(null))
+  }, [id, today])
+
+  useEffect(() => { load() }, [load])
 
   const scoring = tournament?.rules?.scoring || 'pro_set_9'
 
@@ -324,7 +339,8 @@ export default function TournamentScorePage() {
 
   const courts = byCourt(matches)
   const done = matches.filter((m) => ['terminado', 'falta', 'desistencia'].includes(m.status))
-  const dayLabel = new Date(`${today}T12:00`).toLocaleDateString(i18n.language, { weekday: 'short', day: 'numeric', month: 'short' }).replace(/\./g, '')
+  const labelFor = (iso) => new Date(`${iso}T12:00`).toLocaleDateString(i18n.language, { weekday: 'short', day: 'numeric', month: 'short' }).replace(/\./g, '')
+  const dayLabel = labelFor(day)
 
   return (
     <div className="space-y-4">
@@ -335,6 +351,25 @@ export default function TournamentScorePage() {
           {tournament?.name}{matches.length ? ` · ${t('tournament.score.done_count', { done: done.length, total: matches.length })}` : ''}
         </p>
       </div>
+
+      {days.length > 1 && (
+        <div className="flex flex-wrap gap-1.5" role="tablist" aria-label={t('tournament.score.day_picker')}>
+          {days.map((d) => (
+            <button
+              key={d}
+              type="button"
+              role="tab"
+              aria-selected={d === day}
+              onClick={() => setDay(d)}
+              className={`min-h-[36px] rounded-full border px-3 text-[12px] font-extrabold ${
+                d === day ? 'border-ink-900 bg-ink-900 text-white' : 'border-line bg-canvas text-ink-700'
+              }`}
+            >
+              {labelFor(d)}{d === today ? ` · ${t('tournament.score.today')}` : ''}
+            </button>
+          ))}
+        </div>
+      )}
 
       {error && <p className="text-[12px] text-danger">{error}</p>}
 

@@ -2426,6 +2426,8 @@
   "tournament.admin.delete_title": "Delete the tournament?",
   "tournament.admin.delete_message": "“{{name}}” is deleted for good. Only possible while it is a draft with no entries.",
   "tournament.score.title": "Scoring · {{day}}",
+  "tournament.score.day_picker": "Tournament day",
+  "tournament.score.today": "today",
   "tournament.score.done_count": "{{done}} of {{total}} matches done",
   "tournament.score.live": "In progress",
   "tournament.score.next": "Up next",
