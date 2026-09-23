@@ -53,6 +53,13 @@ export default function AdminBar({ tournament, onChanged }) {
 
   const status = tournament?.status
   const next = NEXT_STEP[status]
+  // `is_preview` vem da base de dados e quer dizer: este torneio NÃO abre a
+  // quem chega de fora — ou porque ainda é rascunho, ou porque está
+  // escondido. É o que fechava o «#437»: a seta do Gerir dava «Torneio não
+  // encontrado» e ninguém percebia se tinha perdido o torneio.
+  // Fica dentro desta barra, e não numa segunda caixa por cima: eram duas a
+  // dizer quase o mesmo, e o desenho pede o contrário — nada repetido.
+  const preview = !!tournament?.is_preview
   // Com inscrições feitas há coisas que deixam de se poder fazer. Quando
   // isso acontece, o lugar do botão fica com a RAZÃO escrita — nunca um
   // espaço vazio, que é o que deixa quem monta sem saber se a acção não
@@ -94,17 +101,29 @@ export default function AdminBar({ tournament, onChanged }) {
   return (
     <div className="rounded-card border border-line bg-ink-50/60 p-3">
       <div className="flex items-center justify-between gap-2">
-        <MonoLabel>{t('tournament.admin.label')}</MonoLabel>
+        <MonoLabel>{preview ? t('tournament.admin.preview_label') : t('tournament.admin.label')}</MonoLabel>
         <StatePill tone={STATE_PILL[status] || 'grey'}>{t(`tournament.status_${status}`)}</StatePill>
       </div>
 
       {/* A linha que explica o estado ACRESCENTA à pastilha, não a repete:
           a pastilha diz onde se está, a linha diz o que falta. É o ponto do
           desenho — sem ela o estado é decoração. */}
-      <p className="mt-1.5 text-[12px] text-ink-700">{t(`tournament.admin.state_${status}`, {
-        deadline: whenDeadline(tournament?.entries_deadline, i18n.language),
-        matches: tournament?.match_count ?? 0,
-      })}</p>
+      {preview && (
+        <p className="mt-1.5 text-[12px] text-ink-900">
+          <b>{t('tournament.admin.preview_nobody')}</b>
+          {status === 'rascunho' && ` ${t('tournament.admin.preview_how')}`}
+        </p>
+      )}
+
+      {/* Em rascunho a linha do estado diria outra vez «só tu o vês» — o que
+          a de cima já disse melhor. Duas linhas a dizer o mesmo é o que o
+          desenho manda evitar. */}
+      {!(preview && status === 'rascunho') && (
+        <p className="mt-1.5 text-[12px] text-ink-700">{t(`tournament.admin.state_${status}`, {
+          deadline: whenDeadline(tournament?.entries_deadline, i18n.language),
+          matches: tournament?.match_count ?? 0,
+        })}</p>
+      )}
 
       <div className="mt-2.5 flex flex-wrap gap-1.5">
         {next && (
@@ -121,7 +140,7 @@ export default function AdminBar({ tournament, onChanged }) {
         )}
         <button type="button" onClick={() => navigate(`/gerir?torneio=${tournament.id}&accao=editar`)}
           className="inline-flex items-center gap-1.5 rounded-ctrl border border-line bg-canvas px-3 py-2 text-[12px] font-bold text-ink-900">
-          <Pencil size={14} /> {t('tournament.admin.edit')}
+          <Pencil size={14} /> {preview ? t('tournament.admin.keep_editing') : t('tournament.admin.edit')}
         </button>
         <button type="button" onClick={() => {
           const url = new URL(window.location.href)

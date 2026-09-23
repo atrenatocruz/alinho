@@ -448,16 +448,38 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
         ) : step < 4 ? (
           <PrimaryButton className="w-full" onClick={() => (problem ? setTried(true) : (setTried(false), setStep(step + 1)))}>{t('tournament.create.next')}</PrimaryButton>
         ) : (
-          <>
-            <PrimaryButton className="w-full" disabled={saving} onClick={() => (editing_existing ? onCreate(draft) : publish('inscricoes'))}>
-              {editing_existing ? t('tournament.create.save_changes') : t('tournament.create.publish')}
+          editing_existing ? (
+            <PrimaryButton className="w-full" disabled={saving} onClick={() => onCreate(draft)}>
+              {t('tournament.create.save_changes')}
             </PrimaryButton>
-            {!editing_existing && (
-              <button type="button" disabled={saving} onClick={() => publish('rascunho')} className="w-full rounded-ctrl border border-line py-2.5 text-sm font-semibold text-ink-700 hover:bg-ink-50">
-                {t('tournament.create.save_draft')}
+          ) : (
+            /* Uma pergunta a sério, dois botões do mesmo tamanho, cada um com
+               a consequência escrita por baixo (desenho de 23 set, ponto 4).
+               Antes era um botão grande e verde em cima e um pequeno de
+               contorno por baixo: não é uma pergunta, é um caminho normal com
+               uma saída lateral — e foi assim que se criou um torneio sem dar
+               pela escolha.
+
+               ⚠️ «Abrir inscrições» substitui «Publicar e anunciar»: a função
+               só escreve o estado novo na tabela — não cria aviso, não manda
+               nada para o WhatsApp, não toca no sino de ninguém. O nome
+               antigo prometia o que o código não faz. É PROPOSTA, por acordar
+               com o Renato e o Ruben; se decidirem outro nome, muda-se a
+               palavra e os dois botões ficam na mesma. */
+            <>
+              <p className="text-sm font-extrabold text-ink-900">{t('tournament.create.open_now_question')}</p>
+              <button type="button" disabled={saving} onClick={() => publish('inscricoes')}
+                className="w-full rounded-ctrl border-2 border-ink-900 bg-canvas px-3 py-2.5 text-left disabled:opacity-50">
+                <b className="block text-sm text-ink-900">{t('tournament.create.publish')}</b>
+                <span className="mt-0.5 block text-[11.5px] text-ink-500">{t('tournament.create.publish_hint')}</span>
               </button>
-            )}
-          </>
+              <button type="button" disabled={saving} onClick={() => publish('rascunho')}
+                className="w-full rounded-ctrl border border-line bg-canvas px-3 py-2.5 text-left disabled:opacity-50">
+                <b className="block text-sm text-ink-900">{t('tournament.create.save_draft')}</b>
+                <span className="mt-0.5 block text-[11.5px] text-ink-500">{t('tournament.create.save_draft_hint')}</span>
+              </button>
+            </>
+          )
         )}
       </div>
     </div>

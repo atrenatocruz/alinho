@@ -86,6 +86,10 @@ const TOURNAMENT = () => {
     ends_on: iso(dayAfter(fri, 2)),
     status: st,
     is_public: true,
+    // A mesma conta que o `get_tournament_page` faz do lado de lá: é
+    // pré-visualização quando o torneio não abre a quem chega de fora —
+    // ainda rascunho, ou escondido.
+    is_preview: st === 'rascunho',
     court_count: 4,
     entry_fee_cents: 2500,
     entries_deadline: iso(dayAfter(fri, -4)),
