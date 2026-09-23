@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Search, Check, X, UserPlus, Send } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { searchPlayers } from '../../lib/privateMatches'
 import { useAuth } from '../../contexts/AuthContext'
 import { Sheet } from '../agenda/AgendaControls'
 import { Avatar, PrimaryButton, EmptyState } from '../ui'
@@ -65,15 +66,39 @@ function AdminEntrySheet({ organizationId, categories = [], categoryId: initialC
     return () => { cancelled = true }
   }, [organizationId])
 
-  const find = (q, exclude) => {
+  // Além dos membros do clube, qualquer pessoa com conta (Trello #457): num
+  // torneio aberto quem se inscreve quase nunca é membro do clube. O
+  // servidor (tournament_admin_signup) nunca exigiu ser membro — só o ecrã.
+  const [others, setOthers] = useState({ 1: [], 2: [] })
+  useEffect(() => {
+    const timers = [[1, q1], [2, q2]].map(([slot, q]) => setTimeout(() => {
+      if (q.trim().length < 2) { setOthers((o) => ({ ...o, [slot]: [] })); return }
+      searchPlayers(q.trim())
+        .then((rows) => setOthers((o) => ({ ...o, [slot]: rows })))
+        .catch((err) => console.error('Error searching players:', err))
+    }, 250))
+    return () => timers.forEach(clearTimeout)
+  }, [q1, q2])
+
+  const PAGE = 5
+  const find = (q, exclude, slot) => {
     const needle = q.trim().toLowerCase()
-    return members.filter((m) => m.id !== exclude && (!needle || m.name.toLowerCase().includes(needle))).slice(0, 5)
+    const mine = members.filter((m) => !needle || m.name.toLowerCase().includes(needle))
+    const seen = new Set(mine.map((m) => m.id))
+    const all = [...mine, ...(needle ? others[slot].filter((p) => !seen.has(p.id)) : [])]
+      .filter((m) => m.id !== exclude)
+    return { shown: all.slice(0, PAGE), more: all.length > PAGE }
   }
 
   const nameError = name ? partnerNameError(name) : null
   const ready = player1 && (partner || (name && !nameError && !partnerEmailError(email)))
 
-  const Picker = ({ label, q, setQ, picked, setPicked, exclude }) => (
+  // Chamado como função, não como <Picker/>: um componente definido aqui
+  // dentro era recriado a cada letra e a caixa perdia o foco.
+  const picker = ({ label, q, setQ, picked, setPicked, exclude, slot }) => {
+    const { shown, more } = find(q, exclude, slot)
+    return (
+
     <div className="space-y-1.5">
       <p className="font-mono text-[11px] uppercase tracking-widest text-ink-500">{label}</p>
       {picked ? (
@@ -88,17 +113,22 @@ function AdminEntrySheet({ organizationId, categories = [], categoryId: initialC
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('partner.search_placeholder')} className="input-field pl-9" />
           </div>
           <div className="space-y-1">
-            {find(q, exclude).map((m) => (
+            {shown.map((m) => (
               <button key={m.id} onClick={() => setPicked(m)} className="press flex w-full items-center gap-2.5 rounded-ctrl bg-ink-50 px-3 py-2 text-left">
                 <Avatar name={m.name} url={m.avatar_url} size="w-8 h-8 text-[11px]" />
                 <span className="text-sm font-semibold text-ink-900 truncate">{m.name}</span>
               </button>
             ))}
+            {q.trim() && shown.length === 0 && (
+              <p className="px-1 text-xs text-muted">{t('tentries.admin_search_empty')}</p>
+            )}
+            {more && <p className="px-1 text-xs text-muted">{t('tentries.admin_search_more')}</p>}
           </div>
         </>
       )}
     </div>
-  )
+    )
+  }
 
   return (
     <Sheet onClose={onClose} title={t('tentries.admin_add_title')}>
@@ -123,8 +153,8 @@ function AdminEntrySheet({ organizationId, categories = [], categoryId: initialC
             </div>
           </div>
         )}
-        <Picker label={t('tentries.admin_player1')} q={q1} setQ={setQ1} picked={player1} setPicked={setPlayer1} exclude={partner?.id} />
-        <Picker label={t('tentries.admin_player2')} q={q2} setQ={setQ2} picked={partner} setPicked={setPartner} exclude={player1?.id} />
+        {picker({ label: t('tentries.admin_player1'), q: q1, setQ: setQ1, picked: player1, setPicked: setPlayer1, exclude: partner?.id, slot: 1 })}
+        {picker({ label: t('tentries.admin_player2'), q: q2, setQ: setQ2, picked: partner, setPicked: setPartner, exclude: player1?.id, slot: 2 })}
 
         {!partner && (
           <div className="rounded-ctrl border-2 border-line p-3 space-y-2">

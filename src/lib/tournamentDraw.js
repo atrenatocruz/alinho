@@ -14,7 +14,7 @@
 import { supabase } from './supabase'
 import {
   groupStandings, TIEBREAK_DEFAULT, nextPowerOfTwo, groupSizes,
-  drawGroups, groupRoundRobin, pickSeeds, seededRandom,
+  drawGroups, groupRoundRobin, pickSeeds,
 } from './tournamentFormat'
 
 /** Tudo o que os separadores Grupos, Quadro e Calendário precisam de uma
@@ -258,138 +258,14 @@ export function buildBracketSkeleton(groups, perGroup, { stage = 'principal' } =
   return matches
 }
 
-/** As cabeças de série de uma categoria SEM grupos. Num quadro direto não há
-    "uma por grupo": o que conta é quem não pode sair à primeira por azar.
-    São as duplas que ficam ISENTAS (os lugares que faltam para encher o
-    quadro) e, no mínimo, as duas primeiras — as únicas que, pela ordem do
-    quadro, só se podem encontrar na final. */
-export function knockoutSeeds(teams) {
-  const byes = nextPowerOfTwo(teams.length) - teams.length
-  return [...teams]
-    .sort((a, b) => (b.points ?? 0) - (a.points ?? 0))
-    .slice(0, Math.min(teams.length, Math.max(2, byes)))
-}
-
-/** O quadro de uma categoria SEM grupos: as duplas entram direto na
-    eliminatória.
-
-    PORQUE EXISTE (Trello #455): categorias com 3, 4, 5 ou 7 duplas só podem
-    ser «só eliminatória» — dois grupos dariam grupos de 2, abaixo do mínimo
-    de 3. Mas o sorteio não sabia fazer um quadro sem grupos, por isso essas
-    categorias fechavam e ficavam encravadas. Três, quatro ou sete duplas é o
-    mais normal do mundo num feminino ou num misto.
-
-    Quem entra onde: as cabeças de série ocupam as posições clássicas do
-    quadro (`seedOrder`), para a 1.ª e a 2.ª só se poderem encontrar na
-    final; o resto entra à sorte, com a semente do sorteio. Quando o número
-    de duplas não enche a potência de 2 seguinte, os lugares que faltam são
-    ISENTOS e vão para as melhor classificadas — é o que evita que uma dupla
-    forte saia à primeira por azar.
-
-    A 1.ª ronda leva ids de duplas a sério (`a`/`b`); as rondas seguintes
-    levam texto («Vencedor dos quartos 2»), como no quadro dos grupos. Uma
-    dupla isenta aparece já com o id dela na ronda seguinte.
-
-    Devolve { matches, seeds } — as cabeças que colocou, para o sorteio
-    gravar exactamente as mesmas. */
-export function buildKnockoutBracket(teams, { seeds = null, seed = 1 } = {}) {
-  if (teams.length < 2) return { matches: [], seeds: [] }
-
-  const size = nextPowerOfTwo(teams.length)
-  const heads = seeds?.length ? seeds : knockoutSeeds(teams)
-  const headIds = new Set(heads.map((t) => t.id))
-
-  // O resto à sorte, com a semente — o mesmo sorteio dá sempre o mesmo
-  // quadro, que é o que deixa o admin voltar a sortear e comparar.
-  const rest = teams.filter((t) => !headIds.has(t.id))
-  const rnd = seededRandom(seed)
-  for (let i = rest.length - 1; i > 0; i--) {
-    const j = Math.floor(rnd() * (i + 1))
-    ;[rest[i], rest[j]] = [rest[j], rest[i]]
-  }
-
-  const ranked = [...heads, ...rest]
-  const order = seedOrder(size)
-  const teamAt = (rank) => (rank <= ranked.length ? ranked[rank - 1] : null)
-
-  const matches = []
-  const firstCount = size / 2
-  const firstName = ROUND_BY_SIZE[size]
-  const waiting = new Map() // lugar da 1.ª ronda → dupla isenta
-
-  for (let i = 0; i < firstCount; i++) {
-    const slot = i + 1
-    const a = teamAt(order[2 * i])
-    const b = teamAt(order[2 * i + 1])
-    if (a && b) {
-      matches.push({ stage: 'principal', round: firstName, slot, a: a.id, b: b.id })
-    } else if (a || b) {
-      waiting.set(slot, a || b)
-    }
-  }
-
-  let prevCount = firstCount
-  let prevName = firstName
-  let prevWaiting = waiting
-  while (prevCount > 1) {
-    const count = prevCount / 2
-    const name = ROUND_BY_SIZE[count * 2]
-    for (let i = 0; i < count; i++) {
-      const slot = i + 1
-      const fa = 2 * slot - 1
-      const fb = 2 * slot
-      const wa = prevWaiting.get(fa)
-      const wb = prevWaiting.get(fb)
-      matches.push({
-        stage: 'principal',
-        round: name,
-        slot,
-        a: wa?.id ?? null,
-        b: wb?.id ?? null,
-        source_a: wa ? null : `Vencedor ${ROUND_SOURCE[prevName]} ${fa}`,
-        source_b: wb ? null : `Vencedor ${ROUND_SOURCE[prevName]} ${fb}`,
-      })
-    }
-    prevCount = count
-    prevName = name
-    // Uma isenção salta uma ronda e mais nada: daqui para a frente chega-se
-    // por vitória.
-    prevWaiting = new Map()
-  }
-
-  return { matches, seeds: heads }
-}
-
 /** Tudo o que o `draw_category` precisa, a partir das duplas e do formato
     escolhido no assistente. O admin já viu isto no ecrã antes de confirmar.
 
     `teams`: [{ id, name, points }] — as duplas selecionadas.
-    `seeds`: as cabeças de série, se o admin as trocou à mão.
-    `groupCount` 0 (ou em falta) = sem grupos, quadro direto. */
+    `seeds`: as cabeças de série, se o admin as trocou à mão. */
 export function buildDrawPayload(teams, {
   groupCount, perGroup = 2, seeds = null, seed = 1, thirdPlace = false,
 } = {}) {
-  // Sem grupos: quadro direto, o caminho das categorias pequenas (#455).
-  if (!groupCount) {
-    const { matches, seeds: heads } = buildKnockoutBracket(teams, { seeds, seed })
-    return {
-      seeds: heads.map((t) => t.id),
-      groups: [],
-      group_matches: [],
-      bracket: matches.map((m) => ({
-        stage: m.stage, round: m.round, slot: m.slot,
-        a: m.a ?? null, b: m.b ?? null,
-        source_a: m.source_a ?? null, source_b: m.source_b ?? null,
-      })),
-      // O jogo do 3.º lugar é «perdedor da 1.ª meia» contra «perdedor da
-      // 2.ª»: só faz sentido se as DUAS meias-finais existirem. Num quadro
-      // de 2 duplas não há meias nenhumas; num de 3, a isenta come uma das
-      // meias e o jogo do 3.º lugar ficaria à espera de um perdedor que
-      // nunca aparece (aí o terceiro é quem perde a única meia, sem jogo).
-      third_place: Boolean(thirdPlace) && matches.filter((m) => m.round === 'SF').length === 2,
-    }
-  }
-
   const sizes = groupSizes(teams.length, groupCount)
   const drawn = drawGroups(teams, sizes, { seeds, seed })
 
@@ -413,6 +289,67 @@ export function buildDrawPayload(teams, {
       source_a: m.source_a, source_b: m.source_b,
     })),
     third_place: Boolean(thirdPlace),
+  }
+}
+
+/** Só eliminatória (Trello #455): não há grupos, o quadro sai direto das
+    cabeças de série — as duplas por pontos, a 1.ª contra a última. Quem não
+    enche a potência de 2 fica ISENTO e aparece já na ronda seguinte, com a
+    dupla lá escrita. O `draw_category` já aceita `a`/`b` no quadro; os
+    lugares vazios preenchem-se com o `tournament_advance_winner` de sempre.
+
+    `teams` vem ordenado por pontos (list_category_seeding). */
+export function buildKnockoutPayload(teams, { thirdPlace = false, stage = 'principal' } = {}) {
+  const ordered = [...teams].sort((x, y) => (y.points ?? 0) - (x.points ?? 0))
+  const q = ordered.length
+  if (q < 2) return null
+
+  const size = nextPowerOfTwo(q)
+  const order = seedOrder(size)
+  const idOf = (n) => (n <= q ? ordered[n - 1].id : null)
+
+  const bracket = []
+  const byes = new Map()
+  const firstCount = size / 2
+  const firstName = ROUND_BY_SIZE[size]
+  for (let i = 0; i < firstCount; i++) {
+    const slot = i + 1
+    const a = idOf(order[2 * i])
+    const b = idOf(order[2 * i + 1])
+    if (a && b) bracket.push({ stage, round: firstName, slot, a, b, source_a: null, source_b: null })
+    else byes.set(slot, a || b)
+  }
+
+  let prevCount = firstCount
+  let prevName = firstName
+  let prevByes = byes
+  while (prevCount > 1) {
+    const count = prevCount / 2
+    const name = ROUND_BY_SIZE[count * 2]
+    for (let i = 0; i < count; i++) {
+      const slot = i + 1
+      const fa = 2 * slot - 1
+      const fb = 2 * slot
+      bracket.push({
+        stage, round: name, slot,
+        a: prevByes.get(fa) || null,
+        b: prevByes.get(fb) || null,
+        source_a: prevByes.has(fa) ? null : `Vencedor ${ROUND_SOURCE[prevName]} ${fa}`,
+        source_b: prevByes.has(fb) ? null : `Vencedor ${ROUND_SOURCE[prevName]} ${fb}`,
+      })
+    }
+    prevCount = count
+    prevName = name
+    prevByes = new Map()
+  }
+
+  return {
+    seeds: ordered.map((t) => t.id),
+    groups: [],
+    group_matches: [],
+    bracket,
+    // O 3.º/4.º lugar só existe com meias-finais a sério (4 ou mais duplas).
+    third_place: Boolean(thirdPlace) && q >= 4,
   }
 }
 

@@ -1,8 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
-  seedOrder, qualifierLabels, buildBracketSkeleton, buildDrawPayload,
+  seedOrder, qualifierLabels, buildBracketSkeleton, buildDrawPayload, buildKnockoutPayload,
   bracketRounds, byDayAndTime, standingsOf, qualifiersPerGroup,
-  buildKnockoutBracket, knockoutSeeds,
 } from './tournamentDraw'
 
 const grupos = (n) => Array.from({ length: n }, (_, i) => ({
@@ -191,95 +190,39 @@ describe('peças dos separadores', () => {
   })
 })
 
-// ── Sorteio sem grupos (Trello #455) ─────────────────────────────────────
-// O caso que encravava: uma categoria com 3, 4, 5 ou 7 duplas só pode ser
-// «só eliminatória», e o sorteio não sabia fazer um quadro sem grupos. Duas
-// categorias do torneio de teste ficaram fechadas e insorteáveis.
-
-describe('quadro direto, sem grupos', () => {
-  it('4 duplas: duas meias e uma final, e nada de grupos', () => {
-    const p = buildDrawPayload(duplas(4), { groupCount: 0 })
+describe('buildKnockoutPayload — só eliminatória (Trello #455)', () => {
+  it('3 duplas: a 1.ª fica isenta e espera na final', () => {
+    const p = buildKnockoutPayload(duplas(3))
     expect(p.groups).toEqual([])
-    expect(p.group_matches).toEqual([])
-    expect(p.bracket.filter((m) => m.round === 'SF')).toHaveLength(2)
-    expect(p.bracket.filter((m) => m.round === 'F')).toHaveLength(1)
-  })
-
-  it('a 1.ª e a 2.ª de mais pontos só se podem encontrar na final', () => {
-    const p = buildDrawPayload(duplas(4), { groupCount: 0 })
-    const meias = p.bracket.filter((m) => m.round === 'SF')
-    const juntas = meias.some((m) => [m.a, m.b].includes('e1') && [m.a, m.b].includes('e2'))
-    expect(juntas).toBe(false)
-  })
-
-  it('a 1.ª ronda leva duplas a sério e as seguintes levam texto', () => {
-    const p = buildDrawPayload(duplas(4), { groupCount: 0 })
-    for (const m of p.bracket.filter((x) => x.round === 'SF')) {
-      expect(m.a).toBeTruthy()
-      expect(m.b).toBeTruthy()
-    }
+    const sf = p.bracket.filter((m) => m.round === 'SF')
+    expect(sf).toHaveLength(1)
+    expect([sf[0].a, sf[0].b].sort()).toEqual(['e2', 'e3'])
     const final = p.bracket.find((m) => m.round === 'F')
-    expect(final.source_a).toBe('Vencedor das meias 1')
-    expect(final.source_b).toBe('Vencedor das meias 2')
-  })
-
-  it('3 duplas: a melhor fica isenta e aparece já na final', () => {
-    const p = buildDrawPayload(duplas(3), { groupCount: 0 })
-    expect(p.bracket.filter((m) => m.round === 'SF')).toHaveLength(1)
-    const final = p.bracket.find((m) => m.round === 'F')
-    // A isenta entra na final com o id dela, não com «vencedor de».
     expect(final.a).toBe('e1')
-    expect(final.source_a).toBeNull()
-    expect(final.source_b).toBe('Vencedor das meias 2')
+    expect(final.b).toBeNull()
+    expect(final.source_b).toMatch(/Vencedor das meias/)
+    expect(p.third_place).toBe(false)
   })
 
-  it('de 2 a 16 duplas: sempre n−1 jogos e ninguém a faltar nem repetido', () => {
-    for (let n = 2; n <= 16; n++) {
-      const p = buildDrawPayload(duplas(n), { groupCount: 0 })
-      expect(p.bracket).toHaveLength(n - 1)
+  it('4 duplas: 1.ª contra 4.ª e 2.ª contra 3.ª, sem isentos', () => {
+    const p = buildKnockoutPayload(duplas(4), { thirdPlace: true })
+    const sf = p.bracket.filter((m) => m.round === 'SF')
+    expect(sf.map((m) => [m.a, m.b])).toEqual([['e1', 'e4'], ['e2', 'e3']])
+    expect(p.bracket.find((m) => m.round === 'F').a).toBeNull()
+    expect(p.third_place).toBe(true)
+  })
+
+  it('5 e 7 duplas: todas entram, cada uma uma só vez na 1.ª ronda ou isenta', () => {
+    for (const n of [5, 7]) {
+      const p = buildKnockoutPayload(duplas(n))
       const ids = p.bracket.flatMap((m) => [m.a, m.b]).filter(Boolean)
-      expect(new Set(ids).size).toBe(n)
+      expect(new Set(ids).size).toBe(ids.length)
+      expect(ids.sort()).toEqual(duplas(n).map((d) => d.id).sort())
+      expect(p.bracket.filter((m) => m.round === 'QF')).toHaveLength(n - 4)
     }
   })
 
-  it('as isentas são as de mais pontos — ninguém forte sai à primeira por azar', () => {
-    // 5 duplas num quadro de 8: faltam 3 lugares, logo 3 isentas.
-    const p = buildDrawPayload(duplas(5), { groupCount: 0 })
-    expect(p.seeds).toEqual(['e1', 'e2', 'e3'])
-    const primeiraRonda = p.bracket.filter((m) => m.round === 'QF')
-    const jogamLogo = primeiraRonda.flatMap((m) => [m.a, m.b]).filter(Boolean)
-    expect(jogamLogo).not.toContain('e1')
-  })
-
-  it('sem isentas, as cabeças são as duas que só se cruzam na final', () => {
-    expect(knockoutSeeds(duplas(8)).map((t) => t.id)).toEqual(['e1', 'e2'])
-  })
-
-  it('o admin pode trocar as cabeças de série à mão', () => {
-    const escolhidas = [duplas(5)[4], duplas(5)[3]]
-    const p = buildDrawPayload(duplas(5), { groupCount: 0, seeds: escolhidas })
-    expect(p.seeds).toEqual(['e5', 'e4'])
-  })
-
-  it('o mesmo número dá o mesmo quadro; outro número dá outro', () => {
-    const a = buildDrawPayload(duplas(7), { groupCount: 0, seed: 3 })
-    const b = buildDrawPayload(duplas(7), { groupCount: 0, seed: 3 })
-    const c = buildDrawPayload(duplas(7), { groupCount: 0, seed: 9 })
-    expect(a.bracket).toEqual(b.bracket)
-    expect(a.bracket).not.toEqual(c.bracket)
-  })
-
-  it('o 3.º lugar só existe se houver as duas meias-finais', () => {
-    // Duas duplas: não há meias nenhumas.
-    expect(buildDrawPayload(duplas(2), { groupCount: 0, thirdPlace: true }).third_place).toBe(false)
-    // Três: a isenta come uma das meias, e o jogo do 3.º lugar ficaria à
-    // espera de um perdedor que nunca aparece.
-    expect(buildDrawPayload(duplas(3), { groupCount: 0, thirdPlace: true }).third_place).toBe(false)
-    expect(buildDrawPayload(duplas(4), { groupCount: 0, thirdPlace: true }).third_place).toBe(true)
-    expect(buildDrawPayload(duplas(5), { groupCount: 0, thirdPlace: true }).third_place).toBe(true)
-  })
-
-  it('uma dupla só não faz quadro nenhum', () => {
-    expect(buildKnockoutBracket(duplas(1)).matches).toEqual([])
+  it('menos de 2 duplas não dá quadro', () => {
+    expect(buildKnockoutPayload(duplas(1))).toBeNull()
   })
 })

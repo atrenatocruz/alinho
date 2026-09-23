@@ -372,7 +372,9 @@ export function FriendsEventCard({ event, userId, orgSlug = null, invite = null,
   else if (event.myState === 'invited') state = <StateTag tone="invited">{t('agenda.state_invited')}</StateTag>
   else if (event.mine) state = <StateTag tone="in" icon={CheckCircle2}>{t('agenda.state_in')}</StateTag>
 
-  const won = event.finished && myTeam && m.winner_team ? m.winner_team === myTeam : null
+  // Empate (jogo entre amigos, #420): nem vitória nem derrota.
+  const draw = event.finished && m.winner_team === 'draw'
+  const won = event.finished && myTeam && m.winner_team && !draw ? m.winner_team === myTeam : null
 
   return (
     <div className={`relative overflow-hidden rounded-card p-3.5 ${to ? 'press' : ''} ${cardFrame(event, past)}`}>
@@ -408,7 +410,7 @@ export function FriendsEventCard({ event, userId, orgSlug = null, invite = null,
         </div>
         {event.finished && m.score_a != null ? (
           <span className="ml-auto text-xs font-extrabold text-ink-900 tabular-nums">
-            {m.score_a}-{m.score_b}{won != null && <> · {t(won ? 'agenda.result_win' : 'agenda.result_loss')}</>}
+            {m.score_a}-{m.score_b}{draw ? <> · {t('agenda.result_draw')}</> : won != null && <> · {t(won ? 'agenda.result_win' : 'agenda.result_loss')}</>}
           </span>
         ) : invite ? (
           <div className="ml-auto flex items-center gap-1.5 relative">

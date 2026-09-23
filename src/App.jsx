@@ -24,6 +24,7 @@ import TournamentScorePage from './pages/TournamentScorePage'
 import TournamentPrint from './pages/TournamentPrint'
 import CookieConsentBanner from './components/CookieConsentBanner'
 import ErrorBoundary from './components/ErrorBoundary'
+import { safeInternalPath } from './lib/loginLinks'
 
 // Route-level splitting (impeccable audit, P3 perf finding): these are all
 // low-traffic relative to the routes above — admin-only, feature-flagged,
@@ -210,9 +211,11 @@ const Guard = ({ require, showSplash, children }) => {
   }
 
   if (!user) {
-    if (require === 'member') {
-      return <Navigate to="/login" />
-    }
+    // Vale para TODAS as paginas fechadas, nao so para os convites (Trello
+    // #454): quem nao tem conta e abre uma pagina de membros perdia o
+    // destino e ficava na Home depois de criar a conta. O ?redirect= nao
+    // abre portas nenhumas — so devolve a pessoa DEPOIS de ela ter conta, e
+    // a partir dai e esta mesma funcao que decide se pode entrar.
     // Invite links (/jogos-privados/:id/entrar?slot=…) are by design opened
     // by people with no session yet — bouncing them to a bare /login lost
     // the match id and slot, so Login sends them back here after auth.
@@ -243,14 +246,12 @@ const Guard = ({ require, showSplash, children }) => {
    Importa para o torneio: quem abre o link e carrega em «Inscrever» tem de
    voltar a pagina do torneio.
 
-   So se aceita um caminho dentro da app: o ?redirect= vem do URL, e sem
-   esta trava bastava um link para levar alguem da pagina de entrada para
-   fora. `//` e `/\` sao URLs de outro site escritos como caminho. */
+   So se aceita um caminho dentro da app (safeInternalPath, loginLinks.js):
+   o ?redirect= vem do URL, e sem essa trava bastava um link para levar
+   alguem da pagina de entrada para fora, ja com sessao iniciada. */
 function AfterLogin() {
   const [searchParams] = useSearchParams()
-  const pedido = searchParams.get('redirect') || ''
-  const interno = pedido.startsWith('/') && !pedido.startsWith('//') && !pedido.startsWith('/\\')
-  return <Navigate to={interno ? pedido : '/'} replace />
+  return <Navigate to={safeInternalPath(searchParams.get('redirect'))} replace />
 }
 
 function AppRoutes() {
