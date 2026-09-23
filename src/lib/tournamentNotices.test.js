@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { noticeError, activeNotices, noticeAge, expiryFrom, editedWords, NOTICE_MAX } from './tournamentNotices'
+import { noticeError, activeNotices, noticeAge, expiryFrom, editedWords, latestNotice, NOTICE_MAX } from './tournamentNotices'
 
 describe('noticeError', () => {
   it('aceita um aviso normal', () => expect(noticeError('M4 atrasado 20 min')).toBe(null))
@@ -70,5 +70,21 @@ describe('editedWords', () => {
   })
   it('noutro dia, a data', () => {
     expect(editedWords(new Date('2026-10-09T14:20:00'), now).key).toBe('tnotices.edited_on')
+  })
+})
+
+describe('latestNotice', () => {
+  const now = new Date('2026-10-10T15:00:00Z')
+  const n = (id, created, expires) => ({ id, body: `aviso ${id}`, created_at: created, expires_at: expires })
+
+  it('o mais recente que ainda vale', () => {
+    expect(latestNotice([n(1, '2026-10-10T10:00:00Z'), n(2, '2026-10-10T14:00:00Z')], now).id).toBe(2)
+  })
+  it('salta o que já acabou', () => {
+    expect(latestNotice([n(1, '2026-10-10T14:30:00Z', '2026-10-10T14:45:00Z'), n(2, '2026-10-10T10:00:00Z')], now).id).toBe(2)
+  })
+  it('sem avisos, nada — e o cartão não reserva espaço', () => {
+    expect(latestNotice([], now)).toBe(null)
+    expect(latestNotice(null, now)).toBe(null)
   })
 })
