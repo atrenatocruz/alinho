@@ -134,13 +134,20 @@ function MyResponsePrompt({ match, onRespond, responding }) {
 
 // pontos_simples: um resultado só, dois números (qualquer valor — cobre
 // "muitos pontos num set só").
+// Empate permitido no jogo entre amigos (Francisco, 22 set — Trello #420):
+// grava-se, mas não conta para o ranking. Diz-se isso antes de gravar.
+function DrawNote() {
+  const { t } = useTranslation()
+  return <p className="text-xs font-extrabold text-ink-700" role="status">{t('privatematches.draw_note')}</p>
+}
+
 function ScoreEntrySimple({ initial, onSave, saving }) {
   const { t } = useTranslation()
   const [a, setA] = useState(initial?.a ?? '')
   const [b, setB] = useState(initial?.b ?? '')
   const aNum = parseInt(a, 10)
   const bNum = parseInt(b, 10)
-  const valid = a !== '' && b !== '' && !Number.isNaN(aNum) && !Number.isNaN(bNum) && aNum !== bNum && aNum >= 0 && bNum >= 0
+  const valid = a !== '' && b !== '' && !Number.isNaN(aNum) && !Number.isNaN(bNum) && aNum >= 0 && bNum >= 0
 
   return (
     <div className="space-y-2">
@@ -149,6 +156,7 @@ function ScoreEntrySimple({ initial, onSave, saving }) {
         <span className="text-muted font-extrabold">-</span>
         <input type="number" min="0" inputMode="numeric" value={b} onChange={(e) => setB(e.target.value)} className="input-field w-16 text-center" placeholder="0" />
       </div>
+      {valid && aNum === bNum && <DrawNote />}
       {valid && (
         <PrimaryButton onClick={() => onSave({ score_a: aNum, score_b: bNum })} disabled={saving} className="w-full">
           {saving ? t('privatematches.saving') : t('privatematches.submit_score')}
@@ -161,7 +169,7 @@ function ScoreEntrySimple({ initial, onSave, saving }) {
 // 'sets': a pessoa escolhe quantos sets ao criar o jogo (numSets) — aqui
 // registam-se todos de uma vez, sem regra de "quem fecha primeiro" (os
 // amigos nem sempre seguem as regras todas). O resultado final é quantos
-// sets cada lado ganhou; empate nos sets pede correção antes de gravar.
+// sets cada lado ganhou; empate nos sets é empate do jogo (#420).
 function ScoreEntrySets({ numSets, onSave, saving }) {
   const { t } = useTranslation()
   const [sets, setSets] = useState(() => Array.from({ length: numSets }, () => ({ a: '', b: '' })))
@@ -187,8 +195,8 @@ function ScoreEntrySets({ numSets, onSave, saving }) {
           <input type="number" min="0" inputMode="numeric" value={s.b} onChange={(e) => updateSet(i, 'b', e.target.value)} className="input-field w-16 text-center" placeholder="0" />
         </div>
       ))}
-      {tied && <p className="text-xs text-danger font-extrabold">{t('privatematches.sets_tied_error')}</p>}
-      {allFilled && !tied && (
+      {tied && <DrawNote />}
+      {allFilled && (
         <PrimaryButton
           onClick={() => onSave({ score_a: setsWonA, score_b: setsWonB, sets: parsed.map((s) => ({ score_a: s.a, score_b: s.b })) })}
           disabled={saving}
@@ -466,6 +474,7 @@ export default function PrivateMatches() {
                     {m.my_points != null
                       ? t('privatematches.history_score_points', { scoreA: m.score_a, scoreB: m.score_b, points: m.my_points })
                       : t('privatematches.history_score_friendly', { scoreA: m.score_a, scoreB: m.score_b })}
+                    {m.winner_team === 'draw' && <> · {t('privatematches.draw_label')}</>}
                   </p>
                 </div>
                 {m.my_rating_delta != null && (
