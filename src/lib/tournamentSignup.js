@@ -151,19 +151,3 @@ export async function adminSignUp({ categoryId, player1Id, partnerId = null, gue
   if (error) throw error
   return data
 }
-
-/* «Criar conta para me inscrever» (Trello #454).
-
-   Quem chega do WhatsApp à pagina do torneio sem conta tem de aterrar no
-   separador de CRIAR CONTA (?mode=signup) e voltar a ESTA categoria depois
-   (?redirect=). Sem os dois, via o formulario de quem ja tem conta e, feita
-   a conta, aterrava na Home — com o torneio desaparecido. O mecanismo é o
-   mesmo dos convites de jogo privado (App.jsx → AfterLogin). */
-export function signUpBackLink({ pathname, search = '', categoryCode = null } = {}) {
-  const qs = new URLSearchParams(search)
-  // A categoria que se esta a ver pode nao estar no endereco (é a primeira
-  // por omissao); fixa-se aqui para o regresso cair na mesma.
-  if (categoryCode) qs.set('cat', categoryCode)
-  const back = `${pathname}${qs.toString() ? `?${qs}` : ''}`
-  return `/login?mode=signup&redirect=${encodeURIComponent(back)}`
-}

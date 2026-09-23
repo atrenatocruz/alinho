@@ -9,6 +9,7 @@ import { hashPhone } from '../lib/hashPhone'
 import i18n from '../lib/i18n'
 import { describeError } from '../lib/errors'
 import { ACCOUNT_DELETION_GRACE_DAYS } from '../lib/account'
+import { safeInternalPath } from '../lib/loginLinks'
 
 // Same pattern as Layout.jsx's header toggle, minus the profile persistence
 // (there's no profile yet pre-auth) — just the instant UI flip plus a
@@ -70,7 +71,10 @@ export default function Login() {
   // when it bounces a logged-out visitor off a guarded URL (invite links
   // above all), so they resume where they were headed instead of at Home.
   // Separate mechanism from ?org=<slug> above, which Home.jsx consumes.
-  const redirectTo = searchParams.get('redirect') || '/'
+  // Passa pela mesma trava do AfterLogin: aqui o navigate() e feito a mao
+  // (entrar por email, criar conta), e sem isto um /login?redirect=//outro
+  // -site levava a pessoa para fora da app ja com sessao iniciada.
+  const redirectTo = safeInternalPath(searchParams.get('redirect'))
 
   // Capture ?org=<slug> into sessionStorage immediately on mount — it has
   // to survive both a full-page Google OAuth redirect and App.jsx's
