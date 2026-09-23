@@ -55,12 +55,11 @@ function AdminEntrySheet({ organizationId, categories = [], categoryId: initialC
     let cancelled = false
     supabase
       .from('memberships')
-      .select('user_id, profile:profiles(id, name, avatar_url, is_platform_admin)')
+      .select('user_id, profile:profiles(id, name, avatar_url)')
       .eq('organization_id', organizationId)
       .then(({ data, error: err }) => {
         if (cancelled || err) return
-        // Super admins da plataforma não aparecem para escolher (Trello #466).
-        setMembers((data || []).filter((m) => m.profile && !m.profile.is_platform_admin)
+        setMembers((data || []).filter((m) => m.profile)
           .map((m) => ({ id: m.user_id, name: m.profile.name || '?', avatar_url: m.profile.avatar_url }))
           .sort((a, b) => a.name.localeCompare(b.name, 'pt')))
       })
