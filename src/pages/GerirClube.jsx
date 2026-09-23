@@ -92,6 +92,7 @@ const RECURRENCE_ENDS = [
   { value: 'after_occurrences', labelKey: 'gerirclube.ends_after_occurrences' },
 ]
 
+const GERIR_TABS = ['games', 'members', 'open_slots', 'lessons', 'tournaments', 'settings', 'redeem']
 const DONE_STATUSES = ['finished', 'completed', 'cancelled']
 const GAME_FILTERS = [
   { value: 'upcoming', labelKey: 'gerirclube.filter_upcoming' },
@@ -171,14 +172,23 @@ export default function GerirClube() {
   const { t, i18n } = useTranslation()
   const { slug } = useParams()
   const goBack = useGoBack('/gerir')
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { profile: currentUser, memberships, adminOrganizations, ensureOrgAdminAccess, refreshMemberships, followOrganization } = useAuth()
   const [org, setOrg] = useState(null)
   const [orgLoading, setOrgLoading] = useState(true)
-  // Deep-linked via ?tab=members — e.g. the join-request notification in
-  // Layout.jsx sends admins straight to the tab that has the pending
-  // request, instead of dropping them on the hub to hunt for it.
-  const [activeTab, setActiveTab] = useState(searchParams.get('tab') === 'members' ? 'members' : 'games')
+  // The tab lives in the URL (?tab=…), so coming back from a tournament,
+  // reloading or sharing the link lands on the same tab (Trello #438) — and
+  // the join-request notification in Layout.jsx can deep-link ?tab=members.
+  // Switching is a replace marked keepScroll, so the page doesn't jump to
+  // the top (Trello #430).
+  const tabParam = searchParams.get('tab')
+  const activeTab = GERIR_TABS.includes(tabParam) ? tabParam : 'games'
+  const setActiveTab = (key) => setSearchParams((prev) => {
+    const next = new URLSearchParams(prev)
+    if (key === 'games') next.delete('tab')
+    else next.set('tab', key)
+    return next
+  }, { replace: true, state: { keepScroll: true } })
   const [games, setGames] = useState([])
   const [members, setMembers] = useState([])
   const [linkCopied, setLinkCopied] = useState(false)
@@ -1682,7 +1692,7 @@ export default function GerirClube() {
             <button
               key={key}
               onClick={() => setActiveTab(key)}
-              className={`shrink-0 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-ctrl text-sm font-extrabold whitespace-nowrap transition-all duration-fast ${
+              className={`flex-1 min-w-fit flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-ctrl text-sm font-extrabold whitespace-nowrap transition-all duration-fast ${
                 activeTab === key
                   ? 'bg-canvas text-ink-900 shadow-lift border border-line'
                   : 'text-muted hover:text-ink-900'

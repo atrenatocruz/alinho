@@ -154,21 +154,51 @@ export const TOURNAMENT_RPC_MOCKS = {
     created = created.filter((x) => x.id !== params?.p_tournament_id)
     return null
   },
+  // Espelha o get_tournament_results a sério (migration_tournaments_finish
+  // + _results_my, Dev 3): sem XP — não existe conta de XP nos torneios — e
+  // com `podium_players`, uma linha por PESSOA, que é o que resolve o caso
+  // da dupla que trocou de gente a meio. O `champion.name` continua a ser o
+  // nome da DUPLA; os dois níveis são de propósito.
   get_tournament_results: () => {
     if (!on()) return null
     const t2 = (name, players) => ({ entry_id: name, name, players })
+    const pp = (name, final_position, played_final, matches_played, matches_won) =>
+      ({ name, final_position, played_final, matches_played, matches_won })
     return {
       categories: [
         { id: 'cat-m5', code: 'M5', name: 'Masculinos 5',
-          champion: t2('Barros / Costa', ['Francisco Barros', 'Rui Costa']),
+          // O `champion` é o par ATUAL da inscrição (confirmado pelo Dev 3 no
+          // ensaio): quem saiu a meio não aparece no nome da dupla, só na
+          // lista de baixo. É de propósito — o nome da dupla é o que vai no
+          // cartaz e no WhatsApp.
+          champion: t2('Barros / Antunes', ['Francisco Barros', 'Hugo Antunes']),
           runner_up: t2('Lima / Reis', ['Pedro Lima', 'Nuno Reis']),
-          third: null, prize_first: '2 garrafas de bolas · voucher', prize_second: '1 garrafa de bolas' },
+          third: null, prize_first: '2 garrafas de bolas · voucher', prize_second: '1 garrafa de bolas',
+          // O Rui Costa torceu o tornozelo nos grupos; entrou o Hugo Antunes
+          // e jogou a final. Os três ficam campeões (Francisco, 23 set).
+          podium_players: [
+            pp('Francisco Barros', 1, true, 5, 4),
+            pp('Hugo Antunes', 1, true, 2, 2),
+            pp('Rui Costa', 1, false, 3, 2),
+            pp('Pedro Lima', 2, true, 5, 3),
+            pp('Nuno Reis', 2, true, 5, 3),
+          ] },
         { id: 'cat-mx4', code: 'MX4', name: 'Mistos 4',
           champion: t2('Silva / Lopes', ['Marta Silva', 'Tiago Lopes']),
           runner_up: t2('Francisco Barros / Silva', ['Francisco Barros', 'Marta Silva']),
-          third: t2('Reis / Ana', ['Nuno Reis', 'Ana Moreira']), prize_first: null, prize_second: null },
+          third: t2('Reis / Ana', ['Nuno Reis', 'Ana Moreira']), prize_first: null, prize_second: null,
+          podium_players: [
+            pp('Marta Silva', 1, true, 4, 4),
+            pp('Tiago Lopes', 1, true, 4, 4),
+            pp('Francisco Barros', 2, true, 4, 3),
+            pp('Ana Moreira', 3, true, 4, 2),
+            pp('Nuno Reis', 3, true, 4, 2),
+          ] },
       ],
-      my: { xp: 60, matches: 4, rating_delta: 18, category_code: 'M5', player_name: 'Francisco Barros' },
+      my: {
+        player_name: 'Francisco Barros', category_code: 'M5', category_name: 'Masculinos 5',
+        matches: 5, matches_won: 4, rating_delta: 18, final_position: 1,
+      },
     }
   },
   get_tournament_for_edit: (params) => {

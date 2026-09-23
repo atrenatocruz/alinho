@@ -48,7 +48,7 @@
                                 the separate --muted token was never assigned
                                 explicitly — left unfixed it would've been the
                                 one surviving old-brand color (#5C6B7A). */
-  --ok:      16 185 129;    /* #10B981 */
+  --ok:      14 143 99;     /* #0E8F63 — 4,1:1 com branco (Trello #408) */
   --danger:  239 68 68;     /* #EF4444 */
   --warning: 245 158 11;    /* #F59E0B — pending states, temporary notices (new, not yet consumed) */
 

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation, Trans } from 'react-i18next'
-import { Calendar, MapPin, ArrowLeft, UserPlus, Check, Trophy, Play, ChevronRight, Swords, X, Repeat, Share2, ChevronDown, RotateCcw, Euro, GripVertical, Pencil, History, ThumbsUp, Users, Copy } from 'lucide-react'
+import { Calendar, ArrowLeft, UserPlus, Check, Trophy, Play, ChevronRight, Swords, X, Repeat, Share2, ChevronDown, RotateCcw, Euro, GripVertical, Pencil, History, ThumbsUp, Users, Copy } from 'lucide-react'
 import { DndContext, useDraggable, useDroppable, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { supabase, supabaseUrl } from '../lib/supabase'
@@ -26,7 +26,7 @@ import { AGE_LABEL_KEY, meetsAgeRestriction } from '../lib/ageCategories'
 import { winRatePct, firstLastName } from '../lib/statsLogic'
 import { getGlobalRankings } from '../lib/privateMatches'
 import { formatDate as formatDateLib, formatTime, formatCurrency } from '../lib/formatDate'
-import { NAVIGATORS, getPreferredNavigator, setPreferredNavigator, navigatorUrl } from '../lib/navigators'
+import LocationOpenWith from '../components/LocationOpenWith'
 import { describeError } from '../lib/errors'
 import { limitsFor } from '../lib/plans'
 import { canEditBeforeRound1, unpairedPeople, changedPairKeys, teamPairKey, mixChanges } from '../lib/mixEdit'
@@ -35,6 +35,10 @@ import AddPlayerSheet from '../components/mix/AddPlayerSheet'
 import JoinPartnerSheet from '../components/mix/JoinPartnerSheet'
 import { Sheet } from '../components/agenda/AgendaControls'
 import { joinWithNamedPartner, listGameInvites, inviteLink, whatsappShare } from '../lib/partnerInvite'
+
+// Tipo do evento como na Home (src/lib/agenda.js): um jogo em aberto é
+// "open" (salmão), o resto é "mix" (azul) — Trello #409.
+const kindOf = (g) => (g?.origin === 'open_slot' ? 'open' : 'mix')
 
 const SIDE_LABEL_KEY = { left: 'gamedetails.side_left', right: 'gamedetails.side_right', both: 'gamedetails.side_both' }
 
@@ -147,8 +151,6 @@ export default function GameDetails() {
   const [historyOpen, setHistoryOpen] = useState(false)
   // Escolha de app de navegacao (Trello #34). Fica no dispositivo e nao no
   // perfil — ver a nota em lib/navigators.js.
-  const [navPickerOpen, setNavPickerOpen] = useState(false)
-  const [preferredNav, setPreferredNav] = useState(getPreferredNavigator)
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyError, setHistoryError] = useState(false)
 
@@ -1819,7 +1821,7 @@ export default function GameDetails() {
       <div
         key={team.id}
         className={[
-          isMine ? `${KIND_STYLE.mix.bg} rounded-xl px-2 py-1.5 -mx-2` : '',
+          isMine ? `${KIND_STYLE[kindOf(game)].bg} rounded-xl px-2 py-1.5 -mx-2` : '',
           // Duplas que mudaram à última da hora (Trello #292): contorno azul-escuro
           // do tipo, não lima — lima fica só no botão principal (Francisco, 17 set).
           changedKeys.has(teamPairKey(team)) && lastMinuteEditable ? 'rounded-ctrl ring-2 ring-[#075985] ring-offset-4 ring-offset-canvas' : '',
@@ -2089,13 +2091,13 @@ export default function GameDetails() {
         game.status === 'finished'
           ? 'bg-surface border border-line'
           : isUserJoined
-          ? `${KIND_STYLE.mix.bg} border-2 border-ok`
+          ? `${KIND_STYLE[kindOf(game)].bg} border-2 border-ok`
           : isUserWaitlisted
-            ? `${KIND_STYLE.mix.bg} border-2 border-dashed border-[#B86E00]`
-            : `${KIND_STYLE.mix.card} border`
+            ? `${KIND_STYLE[kindOf(game)].bg} border-2 border-dashed border-[#B86E00]`
+            : `${KIND_STYLE[kindOf(game)].card} border`
       }`}>
         <div className="flex items-start justify-between gap-2">
-          <KindTag kind="mix" suffix={game.recurrence_id ? t('ui.recurring') : null} />
+          <KindTag kind={kindOf(game)} suffix={game.recurrence_id ? t('ui.recurring') : null} />
           {/* Terminado: cinza, como o cartão passado na Home. */}
           {game.status === 'finished' ? (
             <StateTag tone="grey" icon={Check}>{t('agenda.state_finished')}</StateTag>
@@ -2143,60 +2145,12 @@ export default function GameDetails() {
         </p>
 
         {game.location && (
-          <div className="mt-3 bg-white/75 rounded-xl px-3 py-2">
-            <div className="flex items-center justify-between gap-2">
-              {/* Abre com um toque na app preferida (Trello #34); a escolha
-                  vive no "Abrir com…" ao lado. */}
-              <a
-                href={navigatorUrl(preferredNav, {
-                  location: game.location,
-                  latitude: game.latitude,
-                  longitude: game.longitude,
-                })}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-start gap-1.5 min-w-0 text-[13px] text-ink-900"
-              >
-                <MapPin size={15} className="text-ink-700 shrink-0 mt-0.5" />
-                <span>{game.location}</span>
-              </a>
-              <button
-                onClick={() => setNavPickerOpen((open) => !open)}
-                className="shrink-0 text-[13px] font-extrabold text-ink-900 underline underline-offset-2 min-h-[36px]"
-              >
-                {t('gamedetails.open_with')}
-              </button>
-            </div>
-              {navPickerOpen && (
-              <div className="flex flex-wrap gap-2 mt-2 animate-fade-up">
-                {NAVIGATORS.map((nav) => (
-                  <a
-                    key={nav.key}
-                    href={nav.url({
-                      location: game.location,
-                      latitude: game.latitude,
-                      longitude: game.longitude,
-                    })}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => {
-                      setPreferredNavigator(nav.key)
-                      setPreferredNav(nav.key)
-                      setNavPickerOpen(false)
-                    }}
-                    className={`inline-flex items-center gap-1.5 rounded-ctrl px-3 min-h-[44px] text-sm font-extrabold border transition-colors duration-fast ${
-                      nav.key === preferredNav
-                        ? 'bg-ink-50 border-ink-900 text-ink-900'
-                        : 'bg-surface border-line text-ink-900 hover:bg-ink-50'
-                    }`}
-                  >
-                    {nav.key === preferredNav && <Check size={14} className="text-ink-900 shrink-0" />}
-                    {t(nav.labelKey)}
-                  </a>
-                ))}
-              </div>
-            )}
-          </div>
+          <LocationOpenWith
+            location={game.location}
+            latitude={game.latitude}
+            longitude={game.longitude}
+            className="mt-3 bg-white/75 rounded-xl px-3 py-2"
+          />
         )}
 
         <div className="mt-3 space-y-1.5 text-[13px] text-ink-700">
@@ -2478,9 +2432,13 @@ export default function GameDetails() {
           <div className="bg-ink-900 text-white px-4 py-3 rounded-ctrl text-sm font-extrabold">
             {t('gamedetails.mix_paused')}
           </div>
+          {/* Mesmo nome do outro (Francisco, 23 set: «fica comecar o mix, ja
+              houve essa decisao»), mas NAO e a mesma funcao: handleStartMix
+              sorteia duplas do zero, e aqui as duplas ja existem e tem de
+              ficar. So se criam os jogos. */}
           <PrimaryButton onClick={handleStartGames} disabled={busy} className="w-full">
             <Play size={20} />
-            {t('gamedetails.start_games')}
+            {t('gamedetails.start_mix')}
           </PrimaryButton>
           {canRedoDuplas && (
             <PrimaryButton variant="ghost" onClick={handleRedoDuplas} disabled={busy} className="w-full">
@@ -3138,7 +3096,7 @@ export default function GameDetails() {
       {/* Jogadores (antes do sorteio) */}
       {!mixStarted && (
         <div className="card">
-          <h3 className="text-lg text-ink-900 mb-4">{t('gamedetails.players_title')}</h3>
+          <h3 className="text-lg text-ink-900 mb-4">{t('gamedetails.players_title', { count: people.length, max: capacity })}</h3>
 
           {people.length === 0 ? (
             <p className="text-muted text-sm text-center py-4">
@@ -3187,7 +3145,7 @@ export default function GameDetails() {
                         </p>
                         <p className="text-xs text-muted truncate flex items-center gap-1.5">
                           <RatingBadge rating={ratingInfoById[person.id]?.rating} gender={ratingInfoById[person.id]?.gender} />
-                          <span className="font-extrabold text-ink-900">{pointsById[person.id] ?? 0} {t('gamedetails.points_suffix')}</span> · {sideLabel(person.preferred_side)}
+                          {sideLabel(person.preferred_side)}
                         </p>
                       </div>
                     </Link>

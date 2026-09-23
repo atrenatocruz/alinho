@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { MapPin, CheckCircle2, Lock, Play, Trophy, Repeat, Euro, Swords, Users, Shuffle, CircleDot, Clock, ListOrdered, GraduationCap } from 'lucide-react'
+import { MapPin, CheckCircle2, Lock, Play, Trophy, Euro, Swords, Users, Shuffle, CircleDot, Clock, ListOrdered, GraduationCap } from 'lucide-react'
 import { PlayerAvatarRow, GroupLevelBadge, PrimaryButton } from '../ui'
 import { formatTime, formatCurrency } from '../../lib/formatDate'
 import { FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, mixCapacity, isGenderMismatch, isAgeIneligible } from '../../lib/mixLogic'
@@ -204,12 +204,8 @@ export function GameEventCard({ event, profile, friendIds = null, action = null,
 
       <div className="flex items-start justify-between gap-2">
         <div className="flex flex-wrap gap-1">
-          <KindTag kind={event.kind} past={past} />
-          {game.recurrence_id && (
-            <span className="inline-flex items-center gap-1 bg-white/80 text-[11px] font-extrabold px-2 py-1 rounded-full text-muted">
-              <Repeat size={12} /> {t('ui.recurring')}
-            </span>
-          )}
+          {/* Recorrência como sufixo da etiqueta, igual à página do evento (Trello #383). */}
+          <KindTag kind={event.kind} past={past} suffix={game.recurrence_id ? t('ui.recurring') : null} />
         </div>
         {state}
       </div>
@@ -236,7 +232,7 @@ export function GameEventCard({ event, profile, friendIds = null, action = null,
 
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2 pt-2.5 mt-2.5 border-t border-ink-900/10">
         <div className="flex items-center gap-2.5 min-w-0">
-          <PlayerAvatarRow players={players} max={game.max_players} size="sm" />
+          <PlayerAvatarRow players={players} max={capacity} size="sm" />
           <GroupLevelBadge rating={avgRating} />
         </div>
         {past ? (
@@ -258,8 +254,8 @@ export function GameEventCard({ event, profile, friendIds = null, action = null,
           >
             {t(ACTION_LABEL_KEY[action.kind])}
           </PrimaryButton>
-        ) : isClosed && !isLive && !event.finished ? (
-          <span className="ml-auto inline-flex items-center gap-1.5 bg-ok/10 text-ok text-[11px] font-extrabold px-2.5 py-1 rounded-full">
+        ) : isClosed && !isLive && !event.finished && !mismatchKey ? (
+          <span className="ml-auto inline-flex items-center gap-1.5 bg-surface text-ink-700 text-[11px] font-extrabold px-2.5 py-1 rounded-full">
             <Lock size={13} className="shrink-0" /> {t('ui.court_reserved')}
           </span>
         ) : null}
