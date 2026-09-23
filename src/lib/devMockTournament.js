@@ -69,7 +69,11 @@ const MY_MATCHES = () => {
 
 const TOURNAMENT = () => {
   const fri = nextFriday()
-  const st = empty() ? 'inscricoes' : state()
+  // `mockTournamentEmpty` = torneio acabado de criar. Se o estado for pedido
+  // à mão, manda ele — é a única forma de ver «rascunho sem inscritos», que
+  // é o único caso em que o botão de apagar aparece na barra do admin.
+  const asked = localStorage.getItem('mockTournamentState')
+  const st = empty() && !asked ? 'inscricoes' : state()
   return {
     id: 'tour-smash-open',
     slug: 'smash-open-2026',

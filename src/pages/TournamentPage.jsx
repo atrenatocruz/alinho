@@ -12,15 +12,17 @@
 // Enquanto a migração do torneio não correr, a RPC não existe: a página
 // mostra o estado vazio em vez de rebentar.
 import { Suspense, useEffect, useMemo, useState } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, Trophy } from 'lucide-react'
+import { ArrowLeft, Eye, Trophy } from 'lucide-react'
 import { useGoBack } from '../lib/useGoBack'
+import { useAuth } from '../contexts/AuthContext'
 import { getTournamentPage } from '../lib/tournamentApi'
 import { errorKind } from '../lib/errors'
 import { Avatar, EmptyState } from '../components/ui'
 import { CategorySelect, LILAC, MonoLabel, StatePill, TabStrip, TourTag } from '../components/tournament/TournamentBits'
 import { TOURNAMENT_PANELS, TOURNAMENT_TABS, TOURNAMENT_TAB_OWNER } from '../components/tournament/panels'
+import AdminBar from '../components/tournament/AdminBar'
 
 /** "9–11 out" quando é tudo no mesmo mês, "30 set – 2 out" quando não é. */
 function dateRange(startIso, endIso, locale) {
@@ -53,6 +55,8 @@ export default function TournamentPage() {
   const { t, i18n } = useTranslation()
   const { id } = useParams()
   const goBack = useGoBack('/')
+  const navigate = useNavigate()
+  const { memberships } = useAuth()
   const [params, setParams] = useSearchParams()
   const [data, setData] = useState(null)
   const [failed, setFailed] = useState(false)
@@ -118,6 +122,14 @@ export default function TournamentPage() {
   }
 
   const tour = data.tournament
+  // «Ver como quem chega de fora»: a MESMA página com `?ver=publico`, nunca
+  // outro separador do browser — quem usa isto está no clube, de telemóvel,
+  // a conferir como o link aparece a quem o recebe. Some a barra de admin e
+  // fica tudo o resto, INCLUSIVE o botão de inscrever: se estiver partido é
+  // isso mesmo que o admin precisa de ver.
+  const publicView = params.get('ver') === 'publico'
+  const canManage = !!memberships?.find((m) => m.organization_id === tour.organization_id)?.is_admin
+  const isAdmin = canManage && !publicView
   const Panel = TOURNAMENT_PANELS[tab]
   const TopSlot = TOURNAMENT_PANELS.top
   const UnderHeader = TOURNAMENT_PANELS.under_header
@@ -135,6 +147,27 @@ export default function TournamentPage() {
   return (
     <div className="space-y-4">
       {back}
+
+      {/* A faixa do modo público é a ÚNICA coisa que um visitante a sério não
+          vê. Em rascunho diz a verdade em vez de dar a entender que já está
+          no ar. Sai com um toque, e o botão de trás do telemóvel também sai
+          do modo em vez de sair da página. */}
+      {publicView && canManage && (
+        <div className="rounded-card border border-line bg-ink-50/60 p-3">
+          <p className="flex items-start gap-2 text-[12px] text-ink-700">
+            <Eye size={15} className="mt-0.5 shrink-0" />
+            {tour.status === 'rascunho'
+              ? t('tournament.admin.public_view_draft')
+              : t('tournament.admin.public_view')}
+          </p>
+          <button type="button" onClick={() => navigate(-1)}
+            className="mt-2 rounded-ctrl bg-ink-900 px-3 py-2 text-[12px] font-bold text-white">
+            {t('tournament.admin.back_to_admin')}
+          </button>
+        </div>
+      )}
+
+      {isAdmin && <AdminBar tournament={tour} onChanged={() => window.dispatchEvent(new Event('tournament:reload'))} />}
 
       {/* Aviso do organizador — acima de tudo, e só quando há aviso. */}
       {TopSlot && <Suspense fallback={null}><TopSlot {...panelProps} /></Suspense>}
