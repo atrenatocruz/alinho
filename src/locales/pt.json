@@ -645,7 +645,6 @@
   "errorboundary.title": "Alguma coisa correu mal",
   "errorboundary.text": "Não conseguimos mostrar esta página. Recarregar costuma resolver.",
   "errorboundary.reload": "Recarregar",
-  "gamedetails.start_games": "Começar os jogos",
   "gamedetails.error_start_games": "Não foi possível começar os jogos.",
   "gamedetails.redo_duplas": "Refazer as duplas",
   "gamedetails.confirm_redo_duplas": "Isto apaga as duplas formadas e sorteia-as de novo, com os mesmos jogadores. Tens a certeza?",
