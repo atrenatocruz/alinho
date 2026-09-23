@@ -34,6 +34,37 @@ describe('divisão em grupos', () => {
     expect(possibleGroupCounts(11)).toEqual([2, 3])
     expect(groupSizes(11, 3)).toEqual([4, 4, 3])
   })
+
+  it('um grupo só não tapa as divisões com mais grupos (Trello #455)', () => {
+    // 7 duplas: «1 grupo de 7» é uma divisão igual e apagava «2 grupos de
+    // 4+3», que é o que um torneio faz. A categoria ficava sem opção de
+    // grupos nenhuma e só lhe sobrava «só eliminatória».
+    expect(possibleGroupCounts(7)).toEqual([2, 1])
+    expect(groupSizes(7, 2)).toEqual([4, 3])
+    // Com 6 já havia divisão igual; o grupo único continua no fim.
+    expect(possibleGroupCounts(6)).toEqual([2, 1])
+    // 3, 4 e 5 duplas não dão dois grupos dentro de 3–7 (dariam grupos de 2):
+    // só o grupo único, e por isso a app oferece «só eliminatória».
+    expect(possibleGroupCounts(3)).toEqual([1])
+    expect(possibleGroupCounts(4)).toEqual([1])
+    expect(possibleGroupCounts(5)).toEqual([1])
+  })
+
+  it('7 duplas passam a ter uma opção com grupos', () => {
+    const opcoes = formatOptions(7)
+    const comGrupos = opcoes.filter((o) => o.kind === 'grupos')
+    expect(comGrupos.length).toBeGreaterThan(0)
+    expect(comGrupos[0].sizes).toEqual([4, 3])
+    // E a de sempre continua lá, para quem a preferir.
+    expect(opcoes.some((o) => o.kind === 'eliminatoria')).toBe(true)
+  })
+
+  it('3, 4 e 5 duplas só têm «só eliminatória» — e é por isso que ela tem de sortear', () => {
+    for (const n of [3, 4, 5]) {
+      const opcoes = formatOptions(n)
+      expect(opcoes.map((o) => o.kind)).toEqual(['eliminatoria'])
+    }
+  })
 })
 
 describe('contas de jogos e tempo', () => {
