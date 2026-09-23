@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { ChevronLeft, ChevronRight, ChevronDown, Calendar, X, MapPin, LocateFixed, Map, List } from 'lucide-react'
@@ -41,13 +41,45 @@ export function DayHeader({ dayKey, onOpenMonth }) {
   )
 }
 
+// No iPhone o teclado não encolhe o ecrã "fixo": a folha ficava por baixo
+// dele e não se via o que se escrevia (Trello #432). Segue-se a parte do ecrã
+// que fica visível (visualViewport) e, ao focar uma caixa, traz-se à vista.
+function useVisibleViewport() {
+  const [box, setBox] = useState(null)
+  useEffect(() => {
+    const vv = typeof window !== 'undefined' ? window.visualViewport : null
+    if (!vv) return
+    const update = () => setBox(
+      vv.height < window.innerHeight - 1 ? { top: vv.offsetTop, height: vv.height } : null,
+    )
+    update()
+    vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
+    return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update) }
+  }, [])
+  return box
+}
+
+const keepFocusedInView = (e) => {
+  const el = e.target
+  if (!el?.matches?.('input, textarea, [contenteditable="true"]')) return
+  // Espera o teclado acabar de subir antes de centrar a caixa.
+  setTimeout(() => el.scrollIntoView?.({ block: 'center', behavior: 'smooth' }), 300)
+}
+
 export function Sheet({ title, onClose, children }) {
   const { t } = useTranslation()
+  const box = useVisibleViewport()
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-ink-900/50 animate-fade-in" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-ink-900/50 animate-fade-in"
+      style={box ? { top: box.top, height: box.height, bottom: 'auto' } : undefined}
+      onClick={onClose}
+    >
       <div
-        className="bg-surface rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-md max-h-[90vh] overflow-y-auto p-5 animate-pop"
+        className="bg-surface rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-md max-h-[90%] overflow-y-auto p-5 animate-pop"
         onClick={(e) => e.stopPropagation()}
+        onFocus={keepFocusedInView}
       >
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-lg text-ink-900">{title}</h3>
