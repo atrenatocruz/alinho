@@ -9,7 +9,7 @@ import TournamentSignupSheet from './TournamentSignupSheet'
 import PublicInfo from './PublicInfo'
 import {
   signUp, respondToInvite, listMyInvites, withdrawEntry,
-  entriesOpen, categoriesLeft, tournamentInviteLink,
+  entriesOpen, categoriesLeft, tournamentInviteLink, signUpBackLink,
 } from '../../lib/tournamentSignup'
 
 /* O que fica por cima de tudo na página do torneio (Trello #362):
@@ -54,6 +54,19 @@ export default function SignupSlot({ tournament, categories, category, my: first
   // não posso, mostra-se a que tenho (Trello #451).
   const my = myEntries.find((e) => e.category_id === category?.id)
     || (left === 0 ? firstEntry : null)
+  // Quem chega do WhatsApp sem conta carrega em «Criar conta para me
+  // inscrever» e tem de aterrar no separador de CRIAR CONTA — e voltar a
+  // esta categoria depois de a criar (Trello #454). O mecanismo ja existe
+  // e é o mesmo dos convites de jogo privado: o Guard do App.jsx manda
+  // /login?redirect=<pagina> e o AfterLogin devolve a pessoa la. O botao
+  // é que ia para um /login pelado: abria em «Entrar» e, feita a conta,
+  // largava a pessoa na Home sem o torneio.
+  const signUpHref = () => signUpBackLink({
+    pathname: window.location.pathname,
+    search: window.location.search,
+    categoryCode: category?.code,
+  })
+
   const say = (err) => {
     const key = `tsignup.error_${err?.message?.replace(/^.*?([a-z_]+)$/, '$1')}`
     setError(t(key) === key ? t('tsignup.error_generic') : t(key))
@@ -152,7 +165,7 @@ export default function SignupSlot({ tournament, categories, category, my: first
         </PrimaryButton>
       ) : open && !user ? (
         // Sem conta vê-se tudo menos inscrever (SPEC §4.10).
-        <PrimaryButton onClick={() => { window.location.href = '/login' }} className="w-full">
+        <PrimaryButton onClick={() => { window.location.href = signUpHref() }} className="w-full">
           {t('tsignup.cta_signed_out')}
         </PrimaryButton>
       ) : null}
