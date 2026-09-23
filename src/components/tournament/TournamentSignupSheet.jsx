@@ -43,12 +43,13 @@ export default function TournamentSignupSheet({ tournament, categories, category
     let cancelled = false
     supabase
       .from('memberships')
-      .select('user_id, profile:profiles(id, name, avatar_url)')
+      .select('user_id, profile:profiles(id, name, avatar_url, is_platform_admin)')
       .eq('organization_id', tournament.organization_id)
       .then(({ data, error: loadErr }) => {
         if (cancelled || loadErr) return
         setMembers((data || [])
-          .filter((m) => m.profile)
+          // Super admins da plataforma não aparecem para escolher (Trello #466).
+          .filter((m) => m.profile && !m.profile.is_platform_admin)
           .map((m) => ({ id: m.user_id, name: m.profile.name || '?', avatar_url: m.profile.avatar_url }))
           .sort((a, b) => a.name.localeCompare(b.name, 'pt')))
       })
