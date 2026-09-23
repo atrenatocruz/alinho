@@ -211,3 +211,34 @@ export async function markWalkover(matchId, { kind, loser, justified = null, par
   const { error } = await supabase.rpc('mark_walkover', args)
   if (error) throw error
 }
+
+/** Os torneios com inscrições ABERTAS, para quem ainda não sabe que existem
+ *  (Trello #462). Até aqui todas as funções de listar torneios exigiam que
+ *  já se soubesse qual — não havia uma única que respondesse a «que torneios
+ *  têm inscrições abertas?». Era por isso que o Smash Cup só existia para
+ *  quem tinha o link do WhatsApp.
+ *
+ *  Abre sem conta: é a única coisa na app a que alguém de fora pode chegar
+ *  sem pedir licença a ninguém.
+ *
+ *  Cada linha traz o que o cartão precisa: id, slug, name, location,
+ *  poster_url, starts_on, ends_on, entries_deadline, entry_fee_cents,
+ *  status, organization_id, club_name, club_logo_url, day_count,
+ *  court_count, categories_total, categories_open, spots_left,
+ *  entries_confirmed, days_to_deadline.
+ *
+ *  Ordem: fecha primeiro à frente de joga primeiro. Ficam de fora os de
+ *  prazo passado, os cheios, os rascunhos e os escondidos.
+ *
+ *  ⚠️ DOIS CUIDADOS, que dão bug silencioso:
+ *  · `spots_left` a null é «sem limite de vagas», NÃO zero — um `if
+ *    (!spots_left)` esconde torneios abertos;
+ *  · `days_to_deadline` já vem arredondado para cima (hoje ao fim do dia dá
+ *    1, não 0) — não voltar a arredondar. */
+export async function listOpenTournaments({ limit = 20, organizationId = null, includeRunning = false } = {}) {
+  const { data, error } = await supabase.rpc('list_open_tournaments', {
+    p_limit: limit, p_organization_id: organizationId, p_include_running: includeRunning,
+  })
+  if (error) throw error
+  return data || []
+}

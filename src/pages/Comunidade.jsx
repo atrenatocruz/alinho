@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Search, Users, Clock, GraduationCap, X, MapPin, Lock, Check, Building2 } from 'lucide-react'
+import { Search, Users, Clock, GraduationCap, X, MapPin, Lock, Check, Building2, Trophy, ChevronRight } from 'lucide-react'
 import { searchOrganizations, listGlobalOrganizations } from '../lib/organizations'
 import { DAY_LABEL_KEY, listTeacherProfiles, teacherClubName } from '../lib/teachers'
 import { useAuth } from '../contexts/AuthContext'
 import { Avatar, EmptyState, GroupLevelBadge, OrgKindBadge, orgAvatarShape, PageHeader } from '../components/ui'
-import { describeError } from '../lib/errors'
+import { describeError, errorKind } from '../lib/errors'
+import { listOpenTournaments } from '../lib/tournamentApi'
 import { useHeaderActions } from '../contexts/HeaderActionsContext'
 
 /* ─── Comunidade (épico «Comunidade vs. Rankings», Trello #271/#273) ─────────
@@ -23,22 +24,50 @@ import { useHeaderActions } from '../contexts/HeaderActionsContext'
      ser membro (#277) — até lá "Que sigo" = onde és membro ou pediste para
      entrar. */
 
-const FILTERS = [
-  { key: 'all', labelKey: 'comunidade.filter_all' },
-  { key: 'club', labelKey: 'comunidade.filter_clubs' },
-  { key: 'group', labelKey: 'comunidade.filter_groups' },
-  { key: 'teachers', labelKey: 'comunidade.filter_teachers' },
-  { key: 'mine', labelKey: 'comunidade.filter_mine' },
+/* Três separadores, desde 23 set (desenho `design-handoff/2026-09-23-pagina-do-grupo/`).
+   Eram cinco pastilhas — Tudo · Clubes · Grupos · Professores · Os meus —
+   por cima de seis linhas. Um filtro que devolve uma linha é pior do que não
+   haver filtro: ensina à pessoa que a app está vazia.
+
+   E faltava o principal: a Comunidade respondia a «que organizações existem
+   na Alinho?», que não é a pergunta de ninguém. A pergunta é «onde é que eu
+   posso jogar?» — e um torneio aberto é a única coisa na app a que alguém de
+   fora chega sem pedir licença a ninguém.
+
+   «Os meus» deixa de ser filtro: onde a pessoa já está é o que ela quer ver
+   primeiro, não o que ela quer filtrar. Sobe na lista.
+
+   Os três existem SEMPRE, mesmo vazios — um separador que aparece e some
+   conforme os dados muda a navegação debaixo dos pés de quem a usa. */
+const TABS = [
+  { key: 'play', labelKey: 'comunidade.tab_play' },
+  { key: 'orgs', labelKey: 'comunidade.tab_orgs' },
+  { key: 'teachers', labelKey: 'comunidade.tab_teachers' },
 ]
+
+/** «9–11 out» quando é tudo no mesmo mês, «30 set – 2 out» quando não é.
+ *  A mesma regra da página do torneio, para as datas se lerem igual nos dois
+ *  sítios. */
+function tournamentWhen(x, t, locale) {
+  if (!x?.starts_on) return ''
+  const a = new Date(`${x.starts_on}T12:00`)
+  const b = x.ends_on ? new Date(`${x.ends_on}T12:00`) : a
+  const month = (d) => d.toLocaleDateString(locale, { month: 'short' }).replace('.', '')
+  if (a.getTime() === b.getTime()) return `${a.getDate()} ${month(a)}`
+  if (a.getMonth() === b.getMonth()) return `${a.getDate()}–${b.getDate()} ${month(b)}`
+  return `${a.getDate()} ${month(a)} – ${b.getDate()} ${month(b)}`
+}
 
 const norm = (s) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 const byName = (a, b) => (a.name || '').localeCompare(b.name || '', 'pt')
 
 export default function Comunidade() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const headerActions = useHeaderActions()
   const { user, memberships, followOrganization } = useAuth()
-  const [filter, setFilter] = useState('all')
+  const [tab, setTab] = useState('play')
+  const [tournaments, setTournaments] = useState([])
+  const [tournamentsLoading, setTournamentsLoading] = useState(true)
   const [query, setQuery] = useState('')
   const [organizations, setOrganizations] = useState([])
   const [loading, setLoading] = useState(true)
@@ -109,19 +138,15 @@ export default function Comunidade() {
   const pendingOrgs = organizations.filter((o) => o.my_status === 'pending')
 
   const matchesQuery = (o) => trimmed.length < 2 || norm(o.name).includes(norm(trimmed))
-  const kindFilter = (o) => filter === 'all' || filter === 'mine' || o.kind === filter
 
-  // Com pesquisa ou filtro de tipo: os teus primeiro, depois os outros, tudo
-  // na mesma grelha. Sem pesquisa em "Tudo": os teus numa fila em cima.
+  // Clubes e grupos numa lista só: com seis linhas, separar por tipo não
+  // ajuda ninguém a encontrar nada. Onde já estás vem primeiro.
   const listedOrgs = (() => {
-    if (filter === 'teachers') return []
-    if (filter === 'mine') return [...myOrgs, ...pendingOrgs.filter((o) => !myOrgIds.has(o.id))].filter(matchesQuery)
-    const mine = myOrgs.filter(kindFilter).filter(matchesQuery)
-    const others = organizations.filter((o) => !myOrgIds.has(o.id)).filter(kindFilter)
-    if (filter === 'all' && trimmed.length < 2) return others
+    const mine = [...myOrgs, ...pendingOrgs.filter((o) => !myOrgIds.has(o.id))].filter(matchesQuery)
+    const others = organizations.filter((o) => !myOrgIds.has(o.id) && !pendingOrgs.includes(o)).filter(matchesQuery)
     return [...mine, ...others]
   })()
-  const showMineRow = filter === 'all' && trimmed.length < 2 && myOrgs.length > 0
+  const showMineRow = false
 
   // ── Professores ────────────────────────────────────────────────────────
   const approvedTeachers = teachers
@@ -130,7 +155,12 @@ export default function Comunidade() {
       || norm(teacher.user?.name).includes(norm(trimmed))
       || norm(teacherClubName(teacher)).includes(norm(trimmed))
       || norm(teacher.zone).includes(norm(trimmed)))
-  const showTeachers = filter === 'all' || filter === 'teachers'
+  // A pesquisa procura nos três ao mesmo tempo: é ela que faz o trabalho
+  // que as cinco pastilhas estavam a tentar fazer.
+  const searching = trimmed.length > 1
+  const showTeachers = tab === 'teachers' || searching
+  const showOrgs = tab === 'orgs' || searching
+  const showPlay = tab === 'play' || searching
   const handleFollow = async (org) => {
     setActingOn(org.id)
     try {
@@ -244,8 +274,64 @@ export default function Comunidade() {
     </Link>
   )
 
-  const busy = loading || (filter === 'teachers' && teachersLoading)
-  const nothing = !busy && listedOrgs.length === 0 && !showMineRow && (!showTeachers || approvedTeachers.length === 0)
+  // Os torneios com inscrições abertas. Abre sem conta, por isso não espera
+  // por sessão nenhuma. Enquanto a migração do «#462» não correr, a função
+  // não existe e isto fica vazio — a página não rebenta nem mostra erro.
+  useEffect(() => {
+    let alive = true
+    listOpenTournaments({ limit: 20 })
+      .then((rows) => { if (alive) setTournaments(rows) })
+      .catch((error) => {
+        if (errorKind(error) !== 'not_ready') console.error('Error loading open tournaments:', error)
+        if (alive) setTournaments([])
+      })
+      .finally(() => { if (alive) setTournamentsLoading(false) })
+    return () => { alive = false }
+  }, [])
+
+  const listedTournaments = tournaments.filter((x) => trimmed.length < 2
+    || norm(x.name).includes(norm(trimmed))
+    || norm(x.club_name).includes(norm(trimmed))
+    || norm(x.location).includes(norm(trimmed)))
+
+  /* A linha de um torneio aberto. É a coisa mais importante que a app tem
+     para oferecer nas próximas semanas, por isso é a primeira do separador.
+
+     `spots_left` a null quer dizer SEM LIMITE de vagas, não zero — um
+     `if (!spots_left)` escondia torneios abertos. E `days_to_deadline` já
+     vem arredondado para cima: hoje ao fim do dia dá 1, e ninguém percebe
+     «fecha em 0 dias». */
+  const renderTournament = (x) => (
+    <Link key={x.id} to={`/torneio/${x.slug || x.id}`}
+      className="flex items-center gap-3 rounded-card border border-line bg-canvas p-3 hover:bg-ink-50/40">
+      <Avatar name={x.club_name} url={x.club_logo_url} size="w-11 h-11 text-sm" shape="rounded-xl" />
+      <span className="min-w-0 flex-1">
+        <b className="block truncate text-[14px] text-ink-900">{x.name}</b>
+        <span className="block truncate text-[12px] text-muted">
+          {[x.club_name || x.location, tournamentWhen(x, t, i18n.language)].filter(Boolean).join(' · ')}
+        </span>
+        <span className="mt-1 flex flex-wrap items-center gap-1.5">
+          <span className="rounded-full bg-ink-900 px-2 py-[2px] text-[10px] font-bold text-white">{t('comunidade.tournament_tag')}</span>
+          {x.categories_open > 0 && (
+            <span className="text-[11px] text-muted">{t('comunidade.tournament_categories', { count: x.categories_open })}</span>
+          )}
+          {Number.isFinite(x.days_to_deadline) && x.days_to_deadline >= 0 && (
+            <span className="text-[11px] font-semibold text-ink-700">{t('comunidade.tournament_deadline', { count: x.days_to_deadline })}</span>
+          )}
+          {x.spots_left != null && x.spots_left <= 6 && (
+            <span className="text-[11px] font-semibold text-ink-700">{t('comunidade.tournament_spots', { count: x.spots_left })}</span>
+          )}
+        </span>
+      </span>
+      <ChevronRight size={18} className="shrink-0 text-muted" />
+    </Link>
+  )
+
+  const busy = loading || ((tab === 'teachers' || searching) && teachersLoading) || ((tab === 'play' || searching) && tournamentsLoading)
+  const nothing = !busy
+    && (!showPlay || listedTournaments.length === 0)
+    && (!showOrgs || listedOrgs.length === 0)
+    && (!showTeachers || approvedTeachers.length === 0)
 
   return (
     <div className="space-y-4">
@@ -268,34 +354,54 @@ export default function Comunidade() {
         )}
       </div>
 
-      {/* Todas à vista, sem deslizar: passam para a linha de baixo. */}
-      <div className="flex gap-1.5 flex-wrap">
-        {FILTERS.map((f) => (
-          <button
-            key={f.key}
-            type="button"
-            onClick={() => setFilter(f.key)}
-            className={`inline-flex items-center px-3 min-h-[36px] rounded-full text-[13px] font-extrabold border whitespace-nowrap transition-colors duration-fast ${
-              filter === f.key ? 'bg-ink-900 text-white border-ink-900' : 'bg-canvas text-ink-700 border-line'
-            }`}
-          >
-            {t(f.labelKey)}
-          </button>
-        ))}
-      </div>
+      {/* Três, larguras iguais, e existem sempre — mesmo vazios. Com a
+          pesquisa a funcionar em cima, o separador escolhido deixa de mandar
+          e mostram-se os resultados dos três. */}
+      {!searching && (
+        <div className="grid grid-cols-3 gap-1.5">
+          {TABS.map((f) => (
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => setTab(f.key)}
+              className={`inline-flex items-center justify-center truncate px-3 min-h-[36px] rounded-full text-[13px] font-extrabold border transition-colors duration-fast ${
+                tab === f.key ? 'bg-ink-900 text-white border-ink-900' : 'bg-canvas text-ink-700 border-line'
+              }`}
+            >
+              {t(f.labelKey)}
+            </button>
+          ))}
+        </div>
+      )}
 
       {busy ? (
         <div className="flex items-center justify-center py-16">
           <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
         </div>
       ) : nothing ? (
+        /* O vazio fala do separador onde se está. Dizer «ainda não há clubes
+           ou grupos» a quem abriu «Para jogar» é responder a outra pergunta. */
         <EmptyState
-          icon={filter === 'teachers' ? GraduationCap : Users}
-          title={t('comunidade.nothing_found_title')}
-          subtitle={trimmed ? t('comunidade.try_another_name') : filter === 'mine' ? t('comunidade.no_mine_subtitle') : t('comunidade.no_clubs_subtitle')}
+          icon={tab === 'teachers' ? GraduationCap : tab === 'play' ? Trophy : Users}
+          title={searching || tab !== 'play' ? t('comunidade.nothing_found_title') : t('comunidade.play_empty_title')}
+          subtitle={searching ? t('comunidade.try_another_name')
+            : tab === 'play' ? t('comunidade.play_empty_subtitle')
+            : t('comunidade.no_clubs_subtitle')}
         />
       ) : (
         <>
+          {/* Para jogar: o que está aberto a quem quiser entrar. Vem primeiro
+              porque é a resposta à pergunta com que as pessoas entram aqui. */}
+          {showPlay && listedTournaments.length > 0 && (
+            <section>
+              <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mb-2">{t('comunidade.tab_play')}</p>
+              <div className="space-y-2">{listedTournaments.map(renderTournament)}</div>
+              {!searching && (
+                <p className="mt-2 text-[11.5px] text-muted">{t('comunidade.play_note')}</p>
+              )}
+            </section>
+          )}
+
           {showMineRow && (
             <section>
               <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mb-2">{t('comunidade.mine_heading')}</p>
@@ -310,15 +416,12 @@ export default function Comunidade() {
             </section>
           )}
 
-          {listedOrgs.length > 0 && (
+          {showOrgs && listedOrgs.length > 0 && (
             <section>
               <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mb-2">
-                {trimmed.length > 1
+                {searching
                   ? t('comunidade.results_count', { count: listedOrgs.length + (showTeachers ? approvedTeachers.length : 0) })
-                  : filter === 'mine' ? t('comunidade.filter_mine')
-                  : filter === 'club' ? t('comunidade.filter_clubs')
-                  : filter === 'group' ? t('comunidade.filter_groups')
-                  : t('comunidade.others_heading')}
+                  : t('comunidade.tab_orgs')}
               </p>
               <div className="grid grid-cols-2 gap-3">{listedOrgs.map(renderOrgCard)}</div>
             </section>
@@ -326,7 +429,7 @@ export default function Comunidade() {
 
           {showTeachers && approvedTeachers.length > 0 && (
             <section>
-              <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mb-2">{t('comunidade.filter_teachers')}</p>
+              <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mb-2">{t('comunidade.tab_teachers')}</p>
               <div className="space-y-3">{approvedTeachers.map(renderTeacher)}</div>
             </section>
           )}

@@ -209,6 +209,31 @@ export const TOURNAMENT_RPC_MOCKS = {
       },
     }
   },
+  // Os torneios abertos, para a Comunidade e a Home (Trello #462). Espelha
+  // a `list_open_tournaments`: fecha primeiro à frente de joga primeiro, e
+  // `spots_left` a null quer dizer «sem limite de vagas», não zero.
+  list_open_tournaments: (params) => {
+    if (!on()) return null
+    const t = TOURNAMENT()
+    const linha = {
+      id: t.id, slug: t.slug, name: 'Smash Cup by WFit', location: 'Smash Padel Almada',
+      poster_url: t.poster_url, starts_on: t.starts_on, ends_on: t.ends_on,
+      entries_deadline: t.entries_deadline, entry_fee_cents: 2500, status: 'inscricoes',
+      organization_id: t.organization_id, club_name: 'Smash Padel Almada', club_logo_url: null,
+      day_count: 3, court_count: 4, categories_total: 7, categories_open: 7,
+      spots_left: 12, entries_confirmed: 34, days_to_deadline: 5,
+    }
+    // Um segundo, sem limite de vagas, para se ver que o `null` não é zero.
+    const outro = {
+      ...linha, id: 'tour-liga-verao', slug: 'liga-de-verao', name: 'Liga de Verão',
+      location: 'Padel Parque', club_name: 'Padel Parque', categories_total: 2,
+      categories_open: 2, spots_left: null, entries_confirmed: 8, days_to_deadline: 12,
+      entry_fee_cents: 0, poster_url: null,
+    }
+    const todos = [linha, outro]
+    const so = params?.p_organization_id
+    return (so ? todos.filter((x) => x.organization_id === so) : todos).slice(0, params?.p_limit || 20)
+  },
   get_tournament_for_edit: (params) => {
     if (!on()) return null
     const fri = nextFriday()
