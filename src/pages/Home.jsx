@@ -74,7 +74,9 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
   const [friendIds, setFriendIds] = useState(null)
   const [pendingKeys, setPendingKeys] = useState(() => new Set())
-  const [cardError, setCardError] = useState('')
+  // O erro de uma ação num cartão aparece por baixo desse cartão, não no
+  // topo da página, onde ninguém o via (Trello #414). { key, message } | null
+  const [cardError, setCardError] = useState(null)
   const [joinSlug, setJoinSlug] = useState('')
   const [joining, setJoining] = useState(false)
   const [joinError, setJoinError] = useState('')
@@ -380,7 +382,7 @@ export default function Home() {
     if (kind === 'leave' && !confirm(t('gamedetails.confirm_leave_game'))) return
     const game = event.raw
     markPending(event.key, true)
-    setCardError('')
+    setCardError(null)
     try {
       if (kind === 'join' || kind === 'waitlist') {
         const { error } = await supabase.from('participants').insert([{
@@ -401,7 +403,7 @@ export default function Home() {
       await loadGames()
     } catch (error) {
       console.error('Error updating participation from the agenda card:', error)
-      setCardError(describeError(t, error, 'home.card_action_error'))
+      setCardError({ key: event.key, message: describeError(t, error, 'home.card_action_error') })
     } finally {
       markPending(event.key, false)
     }
@@ -412,13 +414,13 @@ export default function Home() {
   // (Trello #412).
   const handleInvite = async (event, response) => {
     markPending(event.key, true)
-    setCardError('')
+    setCardError(null)
     try {
       await respondToPrivateMatch(event.id, response)
       await loadPrivateMatches()
     } catch (error) {
       console.error('Error answering match invite:', error)
-      setCardError(describeError(t, error, 'agenda.invite_error'))
+      setCardError({ key: event.key, message: describeError(t, error, 'agenda.invite_error') })
     } finally {
       markPending(event.key, false)
     }
@@ -430,7 +432,7 @@ export default function Home() {
   // evento passa a ser do meu clube, já com o botão de inscrição.
   const handleExploreJoin = async (event) => {
     markPending(event.key, true)
-    setCardError('')
+    setCardError(null)
     try {
       const { data, error } = await followOrganization(event.orgId)
       if (error) throw error
@@ -441,7 +443,7 @@ export default function Home() {
       }
     } catch (error) {
       console.error('Error joining organization from explore:', error)
-      setCardError(describeError(t, error, 'agenda.explore_join_error'))
+      setCardError({ key: event.key, message: describeError(t, error, 'agenda.explore_join_error') })
     } finally {
       markPending(event.key, false)
     }
@@ -588,12 +590,12 @@ export default function Home() {
   // não muda.
   const handleLessonAttendance = async (event, going) => {
     markPending(event.key, true)
-    setCardError('')
+    setCardError(null)
     try {
       await setLessonAttendance(event.id, going)
       setLessonRows((rows) => rows.map((l) => (l.lesson_id === event.id ? { ...l, my_status: going ? 'confirmed' : 'not_going' } : l)))
     } catch (error) {
-      setCardError(describeError(t, error, 'lessons.error_attendance'))
+      setCardError({ key: event.key, message: describeError(t, error, 'lessons.error_attendance') })
     } finally {
       markPending(event.key, false)
     }
@@ -661,6 +663,15 @@ export default function Home() {
     )
   }
 
+  const renderEventWithError = (event) => (
+    cardError?.key === event.key ? (
+      <div key={event.key} className="space-y-1.5">
+        {renderEvent(event)}
+        <p role="alert" className="bg-danger/10 text-danger px-4 py-3 rounded-ctrl text-sm font-extrabold animate-fade-up">{cardError.message}</p>
+      </div>
+    ) : renderEvent(event)
+  )
+
   return (
     <div>
       {/* Pedidos para entrar num grupo: só no sino, com link para os membros
@@ -681,9 +692,6 @@ export default function Home() {
         <FilterChips filters={filters} onOpenFilters={() => setFiltersOpen(true)} />
       </div>
 
-      {cardError && (
-        <div className="bg-danger/10 text-danger px-4 py-3 rounded-ctrl text-sm font-extrabold animate-fade-up mt-3">{cardError}</div>
-      )}
 
       {viewMode === 'map' ? (
         <MapView pins={pins} location={location} onSelectPin={setSelectedPin} />
@@ -709,7 +717,7 @@ export default function Home() {
                 )
                 : dayEvents.length === 0
                 ? <p className="text-sm text-muted py-3 px-3 rounded-card border border-dashed border-line">{t('agenda.today_empty')}</p>
-                : dayEvents.map(renderEvent)}
+                : dayEvents.map(renderEventWithError)}
             </section>
           ))}
           {/* Espaço no fim para o último dia poder subir até ao cabeçalho. */}
@@ -723,7 +731,7 @@ export default function Home() {
           onClose={() => setSelectedPin(null)}
         >
           <div className="space-y-2.5">
-            {selectedPin.events.map(renderEvent)}
+            {selectedPin.events.map(renderEventWithError)}
           </div>
         </Sheet>
       )}
