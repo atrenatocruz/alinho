@@ -288,7 +288,14 @@ export function buildDrawPayload(teams, {
       stage: m.stage, round: m.round, slot: m.slot,
       source_a: m.source_a, source_b: m.source_b,
     })),
-    third_place: Boolean(thirdPlace),
+    // O jogo do 3.º/4.º lugar é «perdedor da 1.ª meia» contra «perdedor da
+    // 2.ª»: só existe se as DUAS meias-finais existirem. Com 3 apurados (3
+    // grupos a passar 1) há 3 duplas num quadro de 4 — o melhor primeiro vai
+    // direto à final e joga-se UMA meia. Pedir o 3.º lugar aí deixava no
+    // quadro um jogo à espera de um perdedor que nunca aparecia, e que não
+    // havia como fechar. O mesmo acontecia só em eliminatória, e está
+    // protegido no `buildKnockoutPayload` (Trello #455).
+    third_place: Boolean(thirdPlace) && bracket.filter((m) => m.round === 'SF').length === 2,
   }
 }
 
