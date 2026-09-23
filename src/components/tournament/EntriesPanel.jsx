@@ -164,10 +164,16 @@ export default function EntriesPanel({ tournament, category }) {
   }
   useEffect(load, [category?.id, isAdmin])
 
+  // Quem desistiu fica na lista, marcado — desaparecer a meio do torneio
+  // deixava o adversário em branco no quadro (vista do Dev 3, 22 set).
   const shown = useMemo(
-    () => (filter === 'all' ? rows.filter((r) => r.status !== 'desistiu') : rows.filter((r) => r.status === filter)),
+    () => (filter === 'all' ? rows : rows.filter((r) => r.status === filter)),
     [rows, filter],
   )
+
+  // Dois números que se liam mal juntos: o de cima contava as confirmadas e
+  // a lista mostrava tudo. Agora diz-se o que cada um é.
+  const confirmed = rows.filter((r) => ['validada', 'selecionada'].includes(r.status)).length
 
   // "20 set" — curto, que a linha é estreita.
   const signedUpOn = (iso) => new Date(iso).toLocaleDateString('pt-PT', { day: 'numeric', month: 'short' })
@@ -210,7 +216,7 @@ export default function EntriesPanel({ tournament, category }) {
                   filter === f ? 'border-ink-900 bg-ink-900 text-white' : 'border-line text-ink-900'
                 }`}
               >
-                {t(`tentries.filter_${f}`)} {f === 'all' ? rows.filter((r) => r.status !== 'desistiu').length : rows.filter((r) => r.status === f).length}
+                {t(`tentries.filter_${f}`)} {f === 'all' ? rows.length : rows.filter((r) => r.status === f).length}
               </button>
             ))}
           </div>
@@ -222,12 +228,18 @@ export default function EntriesPanel({ tournament, category }) {
 
       {error && <p className="text-sm text-red-600 font-extrabold">{error}</p>}
 
+      <p className="text-xs text-muted">
+        {t('tentries.count_line', { confirmed, total: rows.length })}
+        {category.slots ? ` · ${t('tentries.count_slots', { count: category.slots })}` : ''}
+      </p>
+
       {shown.length === 0 ? (
         <EmptyState icon={UserPlus} title={t('tentries.empty_title')} subtitle={t('tentries.empty_subtitle')} />
       ) : (
         <div className="space-y-1.5">
           {shown.map((e) => (
-            <div key={e.id || e.entry_id} className="card flex items-center gap-3 py-3">
+            <div key={e.id || e.entry_id} className={`card flex items-center gap-3 py-3 ${
+              (e.withdrawn || e.status === 'desistiu') ? 'opacity-60' : ''}`}>
               <div className="min-w-0 flex-1">
                 <p className="font-extrabold text-ink-900 truncate">
                   {e.team_name || pairName(e, t)}
@@ -237,6 +249,7 @@ export default function EntriesPanel({ tournament, category }) {
                     e.team_name ? pairName(e, t) : null,
                     e.status === 'suplente' && e.waitlist_order ? t('tentries.waitlist_n', { n: e.waitlist_order }) : null,
                     (e.player2_is_guest || (!e.player2_id && e.guest_name)) ? t('partner.no_account_tag') : null,
+                    (e.withdrawn || e.status === 'desistiu') ? t('tentries.state_desistiu') : null,
                     // Quando se inscreveu — é por aqui que o organizador
                     // percebe a ordem de chegada (print 08).
                     e.created_at ? t('tentries.signed_up_on', { date: signedUpOn(e.created_at) }) : null,

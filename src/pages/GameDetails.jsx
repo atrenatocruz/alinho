@@ -1242,26 +1242,55 @@ export default function GameDetails() {
   // status === 'open') works immediately — trade-off: "Começar o Mix"
   // (canStart requires showClosed) won't reappear until the mix is full
   // again, same as any other open-and-not-full mix.
-  // Parar NAO apaga nada (Trello #416). matches.team_a_id/team_b_id apagam
-  // em cascata com as teams, por isso apagar as duplas levava atras os jogos
-  // e os resultados - a noite inteira de quem organizou, sem volta. O mix
-  // fica 'closed' (nada a decorrer, inscricoes fechadas) e o admin retoma
-  // onde estava. Inscricoes fechadas de proposito: quem entrasse depois de
-  // parar ficava de fora das duplas ja formadas sem ninguem dar por isso.
-  // Desfazer tudo e o futuro "Cancelar", nao isto.
+  // Parar limpa os RESULTADOS e mantem as DUPLAS (Francisco, 23 set 2026,
+  // Trello #448 — corrige o #416, que tinha ficado ao contrario). O que
+  // nunca se pode perder sao as duplas: sortea-las de novo e o trabalho
+  // chato. Os jogos e os resultados apagam-se, e comeca-se outra vez com as
+  // mesmas pessoas. Desfazer tudo continua a ser o "Apagar" do Gerir.
+  //
+  // Apaga-se matches, nunca teams: matches aponta para teams, nao ao
+  // contrario, por isso as duplas ficam intactas (so match_sets cai em
+  // cascata com o jogo, que e o que se quer). Foi a cascata ao contrario
+  // -- apagar teams -- que causava o problema original.
+  //
+  // EXCECAO, os formatos sem duplas fixas: no Americano troca-se de
+  // parceiro a cada ronda, e no "Trocam a cada ronda" tambem -- as linhas
+  // de teams sao uma por ronda, presas ao calendario de jogos. Guardar
+  // duplas que nao existem deixaria o mix preso, sem calendario e sem
+  // forma de o refazer. Nesses, parar volta ao inicio, como antes.
+  //
+  // Pontos e XP nao entram nesta conta: so sao creditados por finalize_mix
+  // ("Terminar Mix"), e este botao so existe com o mix a decorrer.
   const handleStopMix = async () => {
-    let msg = matches.length > 0
-      ? t('gamedetails.confirm_stop_mix_with_results')
-      : t('gamedetails.confirm_stop_mix_no_results')
+    const duplasFixas = !isAmericano && !game?.rotate_partners
+    let msg = duplasFixas
+      ? (matches.length > 0
+          ? t('gamedetails.confirm_stop_mix_with_results')
+          : t('gamedetails.confirm_stop_mix_no_results'))
+      : t('gamedetails.confirm_stop_mix_no_fixed_duplas')
     if (game?.auto_start_hours_before) msg += '\n\n' + t('gamedetails.confirm_stop_mix_disables_autostart')
     if (!confirm(msg)) return
 
     setBusy(true)
     setMixError('')
     try {
+      const { error: matchesError } = await supabase.from('matches').delete().eq('game_id', id)
+      if (matchesError) throw matchesError
+
+      if (!duplasFixas) {
+        const { error: teamsError } = await supabase.from('teams').delete().eq('game_id', id)
+        if (teamsError) throw teamsError
+      }
+
       const { error: statusError } = await supabase
         .from('games')
-        .update({ status: 'closed', winner_team_id: null, auto_start_hours_before: null })
+        .update({
+          status: 'closed',
+          winner_team_id: null,
+          auto_start_hours_before: null,
+          round_started_at: null,
+          round_duration_minutes: null,
+        })
         .eq('id', id)
       if (statusError) throw statusError
 
@@ -1274,8 +1303,9 @@ export default function GameDetails() {
     }
   }
 
-  // Volta a ligar o mix parado, sem tocar em duplas nem resultados.
-  const handleResumeMix = async () => {
+  // Volta a por o mix a decorrer com as duplas que la estao. A seguir
+  // aparece o "Iniciar Ronda 1" normal — os jogos nascem de novo.
+  const handleStartGames = async () => {
     setBusy(true)
     setMixError('')
     try {
@@ -1283,8 +1313,8 @@ export default function GameDetails() {
       if (error) throw error
       loadGameDetails()
     } catch (error) {
-      console.error('Error resuming mix:', error)
-      setMixError(describeError(t, error, 'gamedetails.error_resume_mix'))
+      console.error('Error starting games:', error)
+      setMixError(describeError(t, error, 'gamedetails.error_start_games'))
     } finally {
       setBusy(false)
     }
@@ -1936,12 +1966,12 @@ export default function GameDetails() {
   const isFull = peopleCount >= capacity
   const showClosed = !mixStarted && game?.status !== 'completed' &&
     (game?.status === 'closed' || (game?.status === 'open' && isFull))
-  // Parado com duplas guardadas: o botao nao pode ser o "Comecar o Mix", que
-  // forma duplas de novo (Trello #416).
+  // Parado com as duplas guardadas: o botao nao pode ser o "Comecar o Mix",
+  // que sorteia duplas de novo (Trello #448).
   const mixPaused = !mixStarted && teams.length > 0
   const canStart = isAdmin && !mixStarted && showClosed && !mixPaused
-  const canResume = isAdmin && mixPaused
-  const canRedoDuplas = canResume && matches.length === 0
+  const canStartGames = isAdmin && mixPaused
+  const canRedoDuplas = canStartGames && matches.length === 0
   const rounds = [...new Set(matches.map(m => m.round_number))].sort((a, b) => a - b)
   const tctStandings = !isSobeDesce && teams.length ? standings(teams, matches) : []
   const americanoStandingsResult = isAmericano && teams.length ? americanoStandings(matches, teams) : []
@@ -2442,15 +2472,19 @@ export default function GameDetails() {
         </PrimaryButton>
       )}
 
-      {/* Mix parado (Trello #416): nada se apagou, retoma-se onde estava. */}
-      {canResume && (
+      {/* Mix parado (Trello #448): os resultados foram apagados, as duplas ficaram. */}
+      {canStartGames && (
         <div className="space-y-2.5">
           <div className="bg-ink-900 text-white px-4 py-3 rounded-ctrl text-sm font-extrabold">
-            {t(matches.length > 0 ? 'gamedetails.mix_paused' : 'gamedetails.mix_paused_no_results')}
+            {t('gamedetails.mix_paused')}
           </div>
-          <PrimaryButton onClick={handleResumeMix} disabled={busy} className="w-full">
+          {/* Mesmo nome do outro (Francisco, 23 set: «fica comecar o mix, ja
+              houve essa decisao»), mas NAO e a mesma funcao: handleStartMix
+              sorteia duplas do zero, e aqui as duplas ja existem e tem de
+              ficar. So se criam os jogos. */}
+          <PrimaryButton onClick={handleStartGames} disabled={busy} className="w-full">
             <Play size={20} />
-            {t('gamedetails.resume_mix')}
+            {t('gamedetails.start_mix')}
           </PrimaryButton>
           {canRedoDuplas && (
             <PrimaryButton variant="ghost" onClick={handleRedoDuplas} disabled={busy} className="w-full">

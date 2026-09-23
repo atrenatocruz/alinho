@@ -106,6 +106,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
       code: c.code, name: c.name, gender: c.gender, level: c.level,
       day: c.day_date, start_time: (c.start_time || '').slice(0, 5),
       slots: c.slots, price: Math.round((c.price_cents || 0) / 100),
+      prize_first: c.prize_first || '', prize_second: c.prize_second || '',
     })),
     organizer_text: initial?.tournament?.organizer_text || '',
     rules: { ...DEFAULT_RULES, ...(initial?.tournament?.rules || {}) },
@@ -166,7 +167,11 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
     ...draft,
     is_public: true,
     status,
-    categories: draft.categories.map((c) => ({ ...c, slots: Number(c.slots), price: Number(c.price) || 0 })),
+    categories: draft.categories.map((c) => ({
+      ...c, slots: Number(c.slots), price: Number(c.price) || 0,
+      prize_first: (c.prize_first || '').trim() || null,
+      prize_second: (c.prize_second || '').trim() || null,
+    })),
   })
 
   // "Sex 9 out" — dia curto, como nos chips do print 07.
@@ -465,7 +470,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
 function CategoryEditor({ value, taken = [], days, dayLabel, onCancel, onSave }) {
   const { t } = useTranslation()
   const [cat, setCat] = useState(value || {
-    gender: 'masculino', level: 5, name: '', day: days[0]?.date || '', start_time: days[0]?.starts_at || '', slots: 16, price: 25,
+    gender: 'masculino', level: 5, name: '', day: days[0]?.date || '', start_time: days[0]?.starts_at || '', slots: 16, price: 25, prize_first: '', prize_second: '',
   })
   const code = categoryCode(cat.gender, cat.level)
   const name = cat.name || categoryName(t, cat.gender, cat.level)
@@ -516,6 +521,24 @@ function CategoryEditor({ value, taken = [], days, dayLabel, onCancel, onSave })
           <input type="number" min="0" max="500" className={inputClass} value={cat.price} onChange={(e) => set({ price: e.target.value })} />
         </div>
       </div>
+      {/* Prémios: texto livre, porque nem sempre é dinheiro («2 garrafas de
+          bolas · voucher» no desenho, print 12). São por categoria — no Smash
+          Cup cada uma tem o seu. Aparecem no pódio quando o torneio acaba, e
+          na página de quem chega de fora. Deixar em branco = sem prémio, e
+          nada aparece. */}
+      {/* Um por linha, e não lado a lado: no telemóvel «100 € + 2 garrafas de
+          bolas» não cabe em meia largura e a pessoa escreve às cegas. */}
+      <div className="mt-3">
+        <MonoLabel className="mb-1.5">{t('tournament.create.prize_first')}</MonoLabel>
+        <input type="text" maxLength={80} className={inputClass} placeholder={t('tournament.create.prize_placeholder')}
+               value={cat.prize_first || ''} onChange={(e) => set({ prize_first: e.target.value })} />
+      </div>
+      <div className="mt-3">
+        <MonoLabel className="mb-1.5">{t('tournament.create.prize_second')}</MonoLabel>
+        <input type="text" maxLength={80} className={inputClass} placeholder={t('tournament.create.prize_placeholder')}
+               value={cat.prize_second || ''} onChange={(e) => set({ prize_second: e.target.value })} />
+      </div>
+      <p className="mt-1.5 text-[11px] text-ink-500">{t('tournament.create.prize_hint')}</p>
       {repeated && <p className="mt-3 text-[12px] text-danger">{t('tournament.create.category_repeated', { name: categoryName(t, cat.gender, cat.level) })}</p>}
       <PrimaryButton className="mt-3 w-full" disabled={repeated || !cat.slots || Number(cat.slots) < 2} onClick={() => onSave({ ...cat, code, name })}>
         {t('tournament.create.save')}
