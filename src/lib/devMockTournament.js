@@ -229,9 +229,17 @@ export const TOURNAMENT_RPC_MOCKS = {
   update_tournament: () => null,
   get_tournament_page: () => {
     if (!on()) return null
+    const fri = nextFriday()
     return {
       tournament: TOURNAMENT(),
       categories: categories(),
+      // Os dias do torneio vêm mesmo nesta resposta em produção (confirmado
+      // no tournament_page_json); faltavam aqui, e sem eles o seletor de dia
+      // do ecrã de marcar nunca aparecia em localhost (Trello #460).
+      days: [0, 1, 2].map((n) => ({
+        id: `d${n}`, date: iso(dayAfter(fri, n)),
+        starts_at: n === 0 ? '18:00' : '09:00', ends_at: n === 2 ? '18:00' : '21:00',
+      })),
       my: empty() ? null : { category_id: 'cat-m5', state: 'validada', entry_id: 'en-me' },
       my_matches: empty() || state() === 'inscricoes' ? [] : MY_MATCHES(),
     }

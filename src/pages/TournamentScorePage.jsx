@@ -14,7 +14,7 @@ import { getTournamentPage, listMatchesToScore, markWalkover, saveMatchResult } 
 import { byCourt, needsDecider, resultProblem } from '../lib/tournamentScore'
 import { computeSetsResult } from '../lib/scoringLogic'
 import { describeError, errorKind } from '../lib/errors'
-import { toDayKey } from '../lib/agenda'
+import { dayKeyInTz, msUntilNextDay } from '../lib/tournamentDay'
 import { EmptyState, PrimaryButton } from '../components/ui'
 import { MonoLabel, StatePill } from '../components/tournament/TournamentBits'
 
@@ -287,12 +287,21 @@ export default function TournamentScorePage() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
-  // Dia em hora local (toISOString dava UTC: entre a meia-noite e a uma da
-  // manhã mostrava o dia anterior), e escolhido entre os dias do torneio —
-  // para ensaiar antes e para corrigir o resultado de ontem (Trello #460).
-  const [today] = useState(() => toDayKey(new Date()))
+  // Dia em hora de Portugal, que é como o servidor conta o dia de um jogo
+  // (`scheduled_at AT TIME ZONE 'Europe/Lisbon'`), e escolhido entre os dias
+  // do torneio — para ensaiar antes e para corrigir o resultado de ontem
+  // (Trello #460). Não se usa a hora do aparelho: quem marca pode tê-lo
+  // noutro fuso, ou mal acertado, e via o dia trocado sem perceber porquê.
+  const [today, setToday] = useState(() => dayKeyInTz())
   const [day, setDay] = useState(today)
   const [days, setDays] = useState([])
+
+  // E o dia vira sozinho à meia-noite: num torneio atrasado é a hora a que
+  // ainda se está a marcar, com o ecrã aberto desde a tarde.
+  useEffect(() => {
+    const timer = setTimeout(() => setToday(dayKeyInTz()), msUntilNextDay())
+    return () => clearTimeout(timer)
+  }, [today])
 
   const load = useCallback(() => {
     listMatchesToScore(id, day)
@@ -310,6 +319,10 @@ export default function TournamentScorePage() {
         const list = (res?.days || []).map((d) => d.date).filter(Boolean)
         setDays(list)
         // Hoje não é dia de torneio? Abre no primeiro dia, em vez de vazio.
+        // À meia-noite isto volta a correr, mas de propósito NÃO muda o dia
+        // que está aberto: quem passa da meia-noite a marcar está a acabar
+        // os jogos de ontem, e o ecrã não lhe deve fugir debaixo dos dedos.
+        // Muda só a marca do «hoje», que passa para o dia seguinte.
         if (list.length && !list.includes(today)) setDay(list[0])
       })
       .catch(() => setTournament(null))
