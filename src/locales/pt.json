@@ -488,6 +488,8 @@
   "agenda.filter_kind_tournament": "Torneios",
   "tsignup.error_entry_already_drawn": "Esta dupla já está no sorteio. Para a tirar a meio do torneio, marca falta no ecrã do marcador.",
   "tsignup.claim_error_entries_closed": "As inscrições deste torneio já fecharam.",
+  "tentries.count_line": "{{confirmed}} confirmadas de {{total}} inscrições",
+  "tentries.count_slots": "{{count}} vagas",
   "layout.celebrations_close": "Boa! 🎾",
   "achievements.shelf_title": "Conquistas",
   "achievements.progress": "{{earned}} de {{total}} conquistados",
