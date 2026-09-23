@@ -768,7 +768,15 @@ export default function Layout({ children }) {
           Perfil) shows notifications/logout in its own sticky title
           (PageHeader in components/ui.jsx), read via HeaderActionsContext. */}
       <main ref={mainRef} className="flex-1 overflow-y-auto">
-        <div className="max-w-2xl mx-auto px-4 pt-6 pb-28 animate-fade-up">
+        {/* O espaço reservado no fim tem de crescer com a barra (Trello #407).
+            A nav acrescenta env(safe-area-inset-bottom) ao seu próprio fundo —
+            no iPhone com barra de gestos são ~34px — e o pb-28 fixo (7rem)
+            não crescia com ela, por isso o último item da lista ficava por
+            baixo. Aqui a mesma conta, com a mesma unidade. */}
+        <div
+          className="max-w-2xl mx-auto px-4 pt-6 animate-fade-up"
+          style={{ paddingBottom: 'calc(7rem + env(safe-area-inset-bottom))' }}
+        >
           <HeaderActionsProvider value={headerActions}>
             {children}
           </HeaderActionsProvider>
