@@ -31,7 +31,8 @@ const STATE_KEY = {
 
 export default function SignupSlot({ tournament, categories, category, my: firstEntry, myEntries = [] }) {
   const { t } = useTranslation()
-  const { user } = useAuth()
+  const { user, profile, updateProfile } = useAuth()
+  const [genderSheet, setGenderSheet] = useState(false)
   const [invites, setInvites] = useState([])
   const [sheet, setSheet] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -67,6 +68,22 @@ export default function SignupSlot({ tournament, categories, category, my: first
       window.dispatchEvent(new CustomEvent('tournament:reload'))
     } catch (err) { console.error('Error signing up for tournament:', err); say(err) }
     finally { setBusy(false) }
+  }
+
+  // Sem género definido não há inscrição (Francisco, 23 set — Trello #433):
+  // pergunta-se ali mesmo, e a seguir abre a inscrição.
+  const startSignUp = () => {
+    setError('')
+    if (!profile?.gender) setGenderSheet(true)
+    else setSheet(true)
+  }
+  const chooseGender = async (gender) => {
+    setBusy(true)
+    const { error: err } = await updateProfile({ gender })
+    setBusy(false)
+    if (err) { console.error('Error saving gender:', err); say(err); return }
+    setGenderSheet(false)
+    setSheet(true)
   }
 
   const answer = async (entryId, accept) => {
@@ -130,7 +147,7 @@ export default function SignupSlot({ tournament, categories, category, my: first
           )}
         </div>
       ) : open && user ? (
-        <PrimaryButton onClick={() => { setError(''); setSheet(true) }} disabled={left === 0} className="w-full">
+        <PrimaryButton onClick={startSignUp} disabled={left === 0} className="w-full">
           {left === 0 ? t('tsignup.max_categories') : t('tsignup.cta')}
         </PrimaryButton>
       ) : open && !user ? (
@@ -146,6 +163,23 @@ export default function SignupSlot({ tournament, categories, category, my: first
           quem organiza. Enquanto houver inscrições é o que faz decidir;
           depois do sorteio quem manda são os separadores (Trello #363). */}
       {open && <PublicInfo tournament={tournament} categories={categories} />}
+
+      {genderSheet && (
+        <Sheet title={t('tsignup.gender_title')} onClose={() => setGenderSheet(false)}>
+          <div className="space-y-3">
+            <p className="text-sm text-ink-900">{t('tsignup.gender_body')}</p>
+            <div className="flex gap-2">
+              <PrimaryButton onClick={() => chooseGender('masculino')} disabled={busy} className="flex-1">
+                {t('login.gender_male')}
+              </PrimaryButton>
+              <PrimaryButton onClick={() => chooseGender('feminino')} disabled={busy} className="flex-1">
+                {t('login.gender_female')}
+              </PrimaryButton>
+            </div>
+            {error && <p className="text-sm text-red-600 font-extrabold">{error}</p>}
+          </div>
+        </Sheet>
+      )}
 
       {sheet && (
         <TournamentSignupSheet
