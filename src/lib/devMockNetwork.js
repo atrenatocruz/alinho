@@ -664,7 +664,8 @@ const TABLE_MOCKS = {
   // localStorage.mockTNotices = 'one' | 'two' — avisos do organizador na
   // página do torneio (Trello #366).
   tournament_public_notices: () => {
-    const mode = localStorage.getItem('mockTNotices')
+    // Na Home, quem está inscrito vê o aviso no cartão (mockTHome).
+    const mode = localStorage.getItem('mockTNotices') || (localStorage.getItem('mockTHome') ? 'one' : null)
     if (!mode) return []
     const ago = (min) => new Date(Date.now() - min * 60000).toISOString()
     const rows = [{ id: 'tn1', tournament_id: 'tour-smash-open', body: 'M4 atrasado cerca de 20 minutos', created_at: ago(6), author_name: 'Smash Padel', expires_at: null, updated_at: null }]

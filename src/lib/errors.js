@@ -9,8 +9,8 @@
       expirada, sem permissão, nome repetido, funcionalidade por ativar…).
    2. Se é uma regra da app escrita em português numa função SQL (RAISE
       EXCEPTION → código P0001), mostra essa frase tal como está.
-   3. Senão, não adivinha a causa: diz o que falhou (a frase da ação), o que
-      fazer a seguir e, quando existe, o código técnico para enviar à equipa.
+   3. Senão, não adivinha a causa: diz o que falhou (a frase da ação) e o
+      que fazer a seguir. O código técnico vai só para a consola (#421).
    O texto técnico completo fica na consola (console.error já existe em cada
    catch) — o cartão «Registar automaticamente os erros da app» trata de o
    guardar para a equipa. */
@@ -83,9 +83,10 @@ export function describeError(t, error, fallbackKey = 'errors.generic') {
     default: {
       const base = sentence(t(fallbackKey))
       const retry = /tenta|try/i.test(base) ? '' : ` ${t('errors.try_again')}`
+      // O código técnico fica na consola, nunca no ecrã (Trello #421).
       const code = errorCode(error)
-      const tail = code ? ` ${t('errors.send_code', { code })}` : ''
-      return `${base}${retry}${tail}`
+      if (code) console.warn('[alinho] error code:', code)
+      return `${base}${retry}`
     }
   }
 }

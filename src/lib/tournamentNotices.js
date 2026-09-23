@@ -45,6 +45,13 @@ export function noticeAge(createdAt, now = new Date()) {
   return { key: 'tnotices.age_days', values: { count: Math.floor(hours / 24) } }
 }
 
+/* O aviso que conta agora: o mais recente que ainda está a valer. É o que
+   vai para a Home de quem está inscrito (cartão #366) — um só, porque a
+   Home é uma lista de eventos, não um mural. */
+export function latestNotice(notices, now = new Date()) {
+  return activeNotices(notices, now)[0] || null
+}
+
 /* O fim do aviso, em escolhas de pessoa e não em datas: "campo 3 molhado,
    a secar" dura umas horas, não para sempre. Devolve o momento em que
    desaparece, ou null para ficar. */

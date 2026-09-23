@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Trophy, MapPin, Clock } from 'lucide-react'
+import { Trophy, MapPin, Clock, Megaphone } from 'lucide-react'
 import { Avatar } from '../ui'
 
 /* O torneio na agenda da Home (Trello #363).
@@ -39,6 +39,16 @@ export default function TournamentEventCard({ event, past }) {
       className={`card press block hover:shadow-lift ${past ? 'opacity-60' : ''}`}
       style={{ background: LILAC.bg, borderColor: LILAC.border, borderWidth: 2 }}
     >
+      {/* O aviso do organizador vem com o cartão, em cima: quem está
+          inscrito vê-o na Home sem ter de ir procurar (cartão #366). */}
+      {event.notice && (
+        <p className="mb-2 flex items-start gap-1.5 rounded-ctrl bg-white/70 px-2.5 py-1.5 text-sm font-extrabold"
+           style={{ color: LILAC.ink }}>
+          <Megaphone size={15} className="mt-0.5 shrink-0" />
+          <span className="min-w-0">{event.notice}</span>
+        </p>
+      )}
+
       <div className="flex items-center justify-between gap-2">
         <span
           className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-extrabold"

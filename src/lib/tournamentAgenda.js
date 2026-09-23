@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { eventFromTournament, eventFromTournamentMatch } from './agenda'
+import { latestNotice } from './tournamentNotices'
 
 /* O torneio na Home (Trello #363, fronteira combinada com o Dev 1 a 22 set).
 
@@ -88,6 +89,22 @@ export async function loadTournamentEvents({ userId, orgIds = [], today }) {
     entryById = new Map((data || []).map((e) => [e.id, e]))
   }
 
+  // O aviso do organizador segue para a Home de quem está inscrito — é o
+  // que o cartão #366 pede: ver o «M4 atrasado 20 min» sem ter de ir
+  // procurar à página do torneio.
+  const noticeByTournament = new Map()
+  if (myByTournament.size) {
+    const { data } = await supabase
+      .from('tournament_public_notices')
+      .select('id, tournament_id, body, created_at, expires_at')
+      .in('tournament_id', [...myByTournament.keys()])
+    for (const id of myByTournament.keys()) {
+      const mineNotices = (data || []).filter((n) => n.tournament_id === id)
+      const newest = latestNotice(mineNotices)
+      if (newest) noticeByTournament.set(id, newest.body)
+    }
+  }
+
   const tourById = new Map(tournaments.map((t) => [t.id, t]))
   const withMatches = new Set()
   const events = []
@@ -101,6 +118,7 @@ export async function loadTournamentEvents({ userId, orgIds = [], today }) {
     events.push(eventFromTournamentMatch(match, {
       tournament: tour,
       category: cat,
+      notice: noticeByTournament.get(tour.id) || null,
       myTeamName: pairLabel(entryById.get(mineIsA ? match.entry_a_id : match.entry_b_id)),
       opponentName: pairLabel(entryById.get(mineIsA ? match.entry_b_id : match.entry_a_id)),
     }))
@@ -112,7 +130,9 @@ export async function loadTournamentEvents({ userId, orgIds = [], today }) {
     // Um torneio onde não estou só aparece enquanto der para entrar.
     const my = myByTournament.get(tour.id) || null
     if (!my && tour.status !== 'inscricoes') continue
-    events.push(eventFromTournament(tour, my))
+    const event = eventFromTournament(tour, my)
+    event.notice = noticeByTournament.get(tour.id) || null
+    events.push(event)
   }
 
   return events

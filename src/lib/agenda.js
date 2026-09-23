@@ -303,7 +303,7 @@ export function eventFromTournament(row, my = null) {
 
 /** Um jogo do torneio, já com dia, hora e campo (print 04). */
 export function eventFromTournamentMatch(match, context = {}) {
-  const { tournament = {}, category = null, opponentName = null, myTeamName = null } = context
+  const { tournament = {}, category = null, opponentName = null, myTeamName = null, notice = null } = context
   const startsAt = match.scheduled_at ? new Date(match.scheduled_at) : null
   return {
     key: `tmatch:${match.id}`,
@@ -327,6 +327,8 @@ export function eventFromTournamentMatch(match, context = {}) {
     previousAt: match.previous_scheduled_at || null,
     opponentName,
     myTeamName,
+    // Aviso do organizador, quando existe (cartão #366).
+    notice,
     finished: match.status === 'terminado',
     raw: match,
   }

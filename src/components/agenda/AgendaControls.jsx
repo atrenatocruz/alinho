@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { ChevronLeft, ChevronRight, ChevronDown, Calendar, X, MapPin, LocateFixed, Map, List } from 'lucide-react'
@@ -41,13 +41,45 @@ export function DayHeader({ dayKey, onOpenMonth }) {
   )
 }
 
+// No iPhone o teclado não encolhe o ecrã "fixo": a folha ficava por baixo
+// dele e não se via o que se escrevia (Trello #432). Segue-se a parte do ecrã
+// que fica visível (visualViewport) e, ao focar uma caixa, traz-se à vista.
+function useVisibleViewport() {
+  const [box, setBox] = useState(null)
+  useEffect(() => {
+    const vv = typeof window !== 'undefined' ? window.visualViewport : null
+    if (!vv) return
+    const update = () => setBox(
+      vv.height < window.innerHeight - 1 ? { top: vv.offsetTop, height: vv.height } : null,
+    )
+    update()
+    vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
+    return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update) }
+  }, [])
+  return box
+}
+
+const keepFocusedInView = (e) => {
+  const el = e.target
+  if (!el?.matches?.('input, textarea, [contenteditable="true"]')) return
+  // Espera o teclado acabar de subir antes de centrar a caixa.
+  setTimeout(() => el.scrollIntoView?.({ block: 'center', behavior: 'smooth' }), 300)
+}
+
 export function Sheet({ title, onClose, children }) {
   const { t } = useTranslation()
+  const box = useVisibleViewport()
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-ink-900/50 animate-fade-in" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-ink-900/50 animate-fade-in"
+      style={box ? { top: box.top, height: box.height, bottom: 'auto' } : undefined}
+      onClick={onClose}
+    >
       <div
-        className="bg-surface rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-md max-h-[90vh] overflow-y-auto p-5 animate-pop"
+        className="bg-surface rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-md max-h-[90%] overflow-y-auto p-5 animate-pop"
         onClick={(e) => e.stopPropagation()}
+        onFocus={keepFocusedInView}
       >
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-lg text-ink-900">{title}</h3>
@@ -184,10 +216,12 @@ export function FilterSheet({ filters, orgs, countFor, onApply, onClose }) {
         </>
       )}
 
-      <button type="button" onClick={() => onApply(draft)} className="w-full mt-5 py-3 rounded-ctrl bg-lime-400 text-ink-900 text-sm font-extrabold">
+      {/* Com zero resultados não se aplica às cegas; repor aplica logo, sem
+          segundo toque (Trello #415). */}
+      <button type="button" onClick={() => onApply(draft)} disabled={n === 0} className="w-full mt-5 py-3 rounded-ctrl bg-lime-400 text-ink-900 text-sm font-extrabold disabled:opacity-40">
         {t('agenda.filters_apply', { count: n })}
       </button>
-      <button type="button" onClick={() => setDraft(DEFAULT_FILTERS)} className="w-full mt-2 py-2.5 text-sm font-extrabold text-muted">
+      <button type="button" onClick={() => onApply(DEFAULT_FILTERS)} className="w-full mt-2 py-2.5 text-sm font-extrabold text-muted">
         {t('agenda.filters_reset')}
       </button>
     </Sheet>

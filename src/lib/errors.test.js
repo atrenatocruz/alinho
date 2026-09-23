@@ -40,9 +40,9 @@ describe('describeError', () => {
     expect(describeError(t, new TypeError('Failed to fetch'), 'x.error_create')).toBe('errors.offline')
   })
 
-  it('erro desconhecido: frase da ação sem ":" + tenta outra vez + código', () => {
+  it('erro desconhecido: frase da ação sem ":" + tenta outra vez, sem código à vista (#421)', () => {
     expect(describeError(t, { code: '23503', message: 'insert or update violates foreign key' }, 'x.error_create'))
-      .toBe('Erro ao criar jogo. Tenta outra vez. errors.send_code[23503]')
+      .toBe('Erro ao criar jogo. Tenta outra vez.')
   })
 
   it('não repete "tenta" quando a frase já o diz, e sem código não acrescenta nada', () => {

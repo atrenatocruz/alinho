@@ -3065,6 +3065,11 @@ export default function GameDetails() {
                       {isAmericano
                         ? t('gamedetails.register_americano_results')
                         : t('gamedetails.register_round_results', { number: maxRound })}
+                      {/* Diz o que falta para a ronda fechar — nunca um mix
+                          encravado sem explicação (Trello #420). */}
+                      {!isAmericano && currentRoundMatches.some((m) => !m.winner_team_id) && (
+                        <> {t('gamedetails.round_results_missing', { count: currentRoundMatches.filter((m) => !m.winner_team_id).length })}</>
+                      )}
                     </p>
                   )}
                   {/* Sair mais cedo — disponível assim que houver pelo menos um resultado guardado */}

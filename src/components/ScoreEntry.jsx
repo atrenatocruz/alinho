@@ -159,6 +159,12 @@ export default function ScoreEntry({
         </div>
       )}
 
+      {/* Empate: o botão de gravar não aparece, e antes não se dizia porquê —
+          um 5-5 encravou uma ronda a sério (Trello #420). Diz-se o que fazer. */}
+      {bothEntered && aNum === bNum && !needsBreaker && (
+        <p className="text-xs font-extrabold text-ink-700" role="status">{t('gamedetails.score_tie_not_allowed')}</p>
+      )}
+
       {readyToSave && (
         <button
           onClick={() => onSave(finalScore)}
@@ -271,6 +277,9 @@ function SetsScoreEntry({ match, deciderIsSuperTiebreak, editable, teamAName, te
               placeholder="0"
             />
           </div>
+          {current.a !== '' && current.b !== '' && aNum === bNum && (
+            <p className="text-xs font-extrabold text-ink-700" role="status">{t('gamedetails.set_tie_not_allowed')}</p>
+          )}
           {currentValid && (
             <button
               onClick={handleAddSet}
