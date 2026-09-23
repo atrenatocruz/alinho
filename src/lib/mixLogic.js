@@ -98,45 +98,80 @@ function shuffled(items, random = Math.random) {
   return a
 }
 
+/* ─── Duplas do mesmo lado (Trello #404) ──────────────────────────────────
+   As duas buscas abaixo recuavam só quando ficavam sem saída: aceitavam uma
+   dupla de dois esquerdinos assim que ela desse para completar a lista,
+   mesmo quando outra escolha mais atrás punha toda a gente com o lado certo.
+   Num mix de 22 set com 105 emparelhamentos possíveis, 60 eram bons e mesmo
+   assim saía um mau em cerca de 15% dos sorteios.
+
+   Agora o número de duplas do mesmo lado é um limite da própria busca:
+   tenta-se primeiro sem nenhuma, depois com uma, depois com duas. A primeira
+   que der é, por construção, a que tem menos duplas do mesmo lado possível.
+   Pares repetidos continuam proibidos aqui — quem trata da repetição
+   impossível é o recurso em formDuplas.
+
+   `budget` trava a procura em grupos grandes (o recuo é exponencial no pior
+   caso). Se estourar, esta volta falha e tenta-se com mais uma dupla do
+   mesmo lado — pior emparelhamento, nunca emparelhamento nenhum. */
+const SEARCH_STEPS = 200000
+
+/** Tenta 0 duplas do mesmo lado, depois 1, depois 2… e fica com a primeira
+    que completa a lista. null = nem com todas ao contrário dá (só acontece
+    quando as repetições não deixam). */
+function fewestSameSide(searchOnce, maxPairs) {
+  for (let allowance = 0; allowance <= maxPairs; allowance++) {
+    const budget = { steps: SEARCH_STEPS }
+    const result = searchOnce(allowance, budget)
+    if (result) return result
+  }
+  return null
+}
+
 /** Equilibrado: cada jogador da metade mais forte leva um da metade mais
-    fraca. Mesma busca com recuo do matchWithoutRepeats (não repete pares de
-    repeatPairKeys enquanto houver alternativa; lado preferido é só
-    desempate). `bottom` chega já sorteado, por isso o parceiro escolhido
-    varia de semana para semana com o mesmo grupo. */
-function matchAcrossHalves(top, bottom, repeatPairKeys, sidesCompatible) {
+    fraca. Mesma busca com recuo do matchWithoutRepeats. `bottom` chega já
+    sorteado, por isso o parceiro escolhido varia de semana para semana com
+    o mesmo grupo. */
+function matchAcrossHalves(top, bottom, repeatPairKeys, sidesCompatible, sameSideLeft, budget) {
   if (top.length === 0 || bottom.length === 0) return []
+  if (budget.steps-- <= 0) return null
   const [a, ...restTop] = top
   const pairKey = (x, y) => [x?.id, y?.id].sort().join('|')
-  const tiers = [
-    (b) => !repeatPairKeys.has(pairKey(a, b)) && sidesCompatible(a, b),
-    (b) => !repeatPairKeys.has(pairKey(a, b)),
-  ]
-  for (const passes of tiers) {
+  // Lado certo primeiro: entre parceiros igualmente válidos, mantém-se a
+  // ordem de pontos que a lista já traz.
+  const tiers = sameSideLeft > 0 ? [true, false] : [true]
+  for (const wantCompatible of tiers) {
     for (let i = 0; i < bottom.length; i++) {
-      if (!passes(bottom[i])) continue
       const b = bottom[i]
+      if (repeatPairKeys.has(pairKey(a, b))) continue
+      if (sidesCompatible(a, b) !== wantCompatible) continue
       const others = [...bottom.slice(0, i), ...bottom.slice(i + 1)]
-      const completion = matchAcrossHalves(restTop, others, repeatPairKeys, sidesCompatible)
+      const completion = matchAcrossHalves(
+        restTop, others, repeatPairKeys, sidesCompatible,
+        wantCompatible ? sameSideLeft : sameSideLeft - 1, budget
+      )
       if (completion) return [[a, b], ...completion]
     }
   }
   return null
 }
 
-function matchWithoutRepeats(remaining, repeatPairKeys, sidesCompatible) {
+function matchWithoutRepeats(remaining, repeatPairKeys, sidesCompatible, sameSideLeft, budget) {
   if (remaining.length <= 1) return []
+  if (budget.steps-- <= 0) return null
   const [a, ...rest] = remaining
   const pairKey = (x, y) => [x?.id, y?.id].sort().join('|')
-  const tiers = [
-    (b) => !repeatPairKeys.has(pairKey(a, b)) && sidesCompatible(a, b),
-    (b) => !repeatPairKeys.has(pairKey(a, b)),
-  ]
-  for (const passes of tiers) {
+  const tiers = sameSideLeft > 0 ? [true, false] : [true]
+  for (const wantCompatible of tiers) {
     for (let i = 0; i < rest.length; i++) {
-      if (!passes(rest[i])) continue
       const b = rest[i]
+      if (repeatPairKeys.has(pairKey(a, b))) continue
+      if (sidesCompatible(a, b) !== wantCompatible) continue
       const others = [...rest.slice(0, i), ...rest.slice(i + 1)]
-      const completion = matchWithoutRepeats(others, repeatPairKeys, sidesCompatible)
+      const completion = matchWithoutRepeats(
+        others, repeatPairKeys, sidesCompatible,
+        wantCompatible ? sameSideLeft : sameSideLeft - 1, budget
+      )
       if (completion) return [[a, b], ...completion]
     }
   }
@@ -179,7 +214,10 @@ export function formDuplas(participants, pointsById = {}, repeatPairKeys = new S
     // Metade mais forte (arredonda para cima) × metade mais fraca sorteada.
     const top = solos.slice(0, Math.ceil(solos.length / 2))
     const bottom = shuffled(solos.slice(Math.ceil(solos.length / 2)), random)
-    soloPairs = matchAcrossHalves(top, bottom, repeatPairKeys, sidesCompatible)
+    soloPairs = fewestSameSide(
+      (allowance, budget) => matchAcrossHalves(top, bottom, repeatPairKeys, sidesCompatible, allowance, budget),
+      Math.min(top.length, bottom.length)
+    )
     // O greedy de recurso abaixo usa a ordem de `solos`: intercalar
     // forte/fraco mantém "forte com fraco" mesmo quando há repetição forçada.
     solos = top.flatMap((p, i) => (bottom[i] ? [p, bottom[i]] : [p]))
@@ -187,7 +225,10 @@ export function formDuplas(participants, pointsById = {}, repeatPairKeys = new S
     // Aleatório: a busca pega no primeiro candidato válido da lista, por
     // isso sortear a ordem basta para sortear as duplas.
     if (mode === 'aleatorio') solos = shuffled(solos, random)
-    soloPairs = matchWithoutRepeats(solos, repeatPairKeys, sidesCompatible)
+    soloPairs = fewestSameSide(
+      (allowance, budget) => matchWithoutRepeats(solos, repeatPairKeys, sidesCompatible, allowance, budget),
+      Math.floor(solos.length / 2)
+    )
   }
 
   if (!soloPairs) {

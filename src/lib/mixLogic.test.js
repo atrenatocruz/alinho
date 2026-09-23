@@ -670,3 +670,65 @@ describe('rotatingPlacar — última ronda jogada, vitórias só desempatam (Fra
     expect(pos(placar, 'w')).toBeLessThan(pos(placar, 'v'))
   })
 })
+
+describe('formDuplas — duplas do mesmo lado (Trello #404)', () => {
+  const solo = (id, side) => ({ status: 'confirmed', user: { id, name: id, preferred_side: side } })
+  const porPontos = (rows) => Object.fromEntries(rows.map((r, i) => [r.user.id, 100 - i]))
+  const sideOf = (u) => (u.preferred_side === 'left' || u.preferred_side === 'right' ? u.preferred_side : 'both')
+  const mesmoLado = (d) =>
+    sideOf(d.player1) !== 'both' && sideOf(d.player2) !== 'both' && sideOf(d.player1) === sideOf(d.player2)
+
+  // Ordem por pontos: a(ambos) b(dir) c(esq) d(esq) e(esq) f(dir).
+  // Apanhar o primeiro parceiro válido dá a+b, e a partir daí sobram d e e,
+  // os dois esquerdinos — uma dupla má que era evitável: a+c, b+d, e+f não
+  // tem nenhuma. A busca tem de recuar por causa do lado, não só quando
+  // fica sem saída nenhuma.
+  const casoEvitavel = () => [
+    solo('a', 'both'), solo('b', 'right'), solo('c', 'left'),
+    solo('d', 'left'), solo('e', 'left'), solo('f', 'right'),
+  ]
+
+  it('recua para não formar uma dupla do mesmo lado que era evitável', () => {
+    const rows = casoEvitavel()
+    const { duplas } = formDuplas(rows, porPontos(rows), new Set())
+    expect(duplas.filter(mesmoLado)).toEqual([])
+  })
+
+  it('o mesmo no modo equilibrado', () => {
+    const rows = casoEvitavel()
+    const { duplas } = formDuplas(rows, porPontos(rows), new Set(), { mode: 'equilibrado', random: () => 0.5 })
+    expect(duplas.filter(mesmoLado)).toEqual([])
+  })
+
+  it('no modo aleatório, nenhum sorteio sai com dupla do mesmo lado quando há arranjo perfeito', () => {
+    const rows = casoEvitavel()
+    // Gerador com semente, para o teste ser sempre igual.
+    let seed = 1
+    const random = () => {
+      seed = (seed * 1103515245 + 12345) % 2147483648
+      return seed / 2147483648
+    }
+    for (let i = 0; i < 200; i++) {
+      const { duplas } = formDuplas(rows, porPontos(rows), new Set(), { mode: 'aleatorio', random })
+      expect(duplas.filter(mesmoLado)).toEqual([])
+    }
+  })
+
+  it('quando é impossível evitar, faz o mínimo de duplas do mesmo lado (uma, não duas)', () => {
+    // 3 esquerdinos e 1 direito: uma dupla do mesmo lado é inevitável.
+    const rows = [solo('a', 'left'), solo('b', 'left'), solo('c', 'left'), solo('d', 'right')]
+    const { duplas } = formDuplas(rows, porPontos(rows), new Set())
+    expect(duplas).toHaveLength(2)
+    expect(duplas.filter(mesmoLado)).toHaveLength(1)
+  })
+
+  it('não troca evitar o mesmo lado por repetir um par', () => {
+    // Evitar a repetição continua a mandar: a-c e a-d estão proibidos, por
+    // isso a fica com b (mesmo lado) em vez de repetir um par.
+    const rows = [solo('a', 'left'), solo('b', 'left'), solo('c', 'right'), solo('d', 'right')]
+    const proibidos = new Set(['a|c', 'a|d'])
+    const { duplas, forcedRepeats } = formDuplas(rows, porPontos(rows), proibidos)
+    expect(forcedRepeats).toEqual([])
+    expect(duplas.filter(mesmoLado)).toHaveLength(2)
+  })
+})
