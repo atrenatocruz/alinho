@@ -292,6 +292,67 @@ export function buildDrawPayload(teams, {
   }
 }
 
+/** Só eliminatória (Trello #455): não há grupos, o quadro sai direto das
+    cabeças de série — as duplas por pontos, a 1.ª contra a última. Quem não
+    enche a potência de 2 fica ISENTO e aparece já na ronda seguinte, com a
+    dupla lá escrita. O `draw_category` já aceita `a`/`b` no quadro; os
+    lugares vazios preenchem-se com o `tournament_advance_winner` de sempre.
+
+    `teams` vem ordenado por pontos (list_category_seeding). */
+export function buildKnockoutPayload(teams, { thirdPlace = false, stage = 'principal' } = {}) {
+  const ordered = [...teams].sort((x, y) => (y.points ?? 0) - (x.points ?? 0))
+  const q = ordered.length
+  if (q < 2) return null
+
+  const size = nextPowerOfTwo(q)
+  const order = seedOrder(size)
+  const idOf = (n) => (n <= q ? ordered[n - 1].id : null)
+
+  const bracket = []
+  const byes = new Map()
+  const firstCount = size / 2
+  const firstName = ROUND_BY_SIZE[size]
+  for (let i = 0; i < firstCount; i++) {
+    const slot = i + 1
+    const a = idOf(order[2 * i])
+    const b = idOf(order[2 * i + 1])
+    if (a && b) bracket.push({ stage, round: firstName, slot, a, b, source_a: null, source_b: null })
+    else byes.set(slot, a || b)
+  }
+
+  let prevCount = firstCount
+  let prevName = firstName
+  let prevByes = byes
+  while (prevCount > 1) {
+    const count = prevCount / 2
+    const name = ROUND_BY_SIZE[count * 2]
+    for (let i = 0; i < count; i++) {
+      const slot = i + 1
+      const fa = 2 * slot - 1
+      const fb = 2 * slot
+      bracket.push({
+        stage, round: name, slot,
+        a: prevByes.get(fa) || null,
+        b: prevByes.get(fb) || null,
+        source_a: prevByes.has(fa) ? null : `Vencedor ${ROUND_SOURCE[prevName]} ${fa}`,
+        source_b: prevByes.has(fb) ? null : `Vencedor ${ROUND_SOURCE[prevName]} ${fb}`,
+      })
+    }
+    prevCount = count
+    prevName = name
+    prevByes = new Map()
+  }
+
+  return {
+    seeds: ordered.map((t) => t.id),
+    groups: [],
+    group_matches: [],
+    bracket,
+    // O 3.º/4.º lugar só existe com meias-finais a sério (4 ou mais duplas).
+    third_place: Boolean(thirdPlace) && q >= 4,
+  }
+}
+
 // ── Leituras do organizador (só admin; o servidor confirma) ──────────────
 
 /** O que o organizador precisa para preparar o sorteio: as categorias

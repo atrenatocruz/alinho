@@ -12,6 +12,7 @@ import { formatDate } from '../lib/formatDate'
 import { describeError, errorKind } from '../lib/errors'
 import { listClubTeachers } from '../lib/lessonsApi'
 import ClubTeachersList from '../components/lessons/ClubTeachersList'
+import ClubTournamentsList from '../components/ClubTournamentsList'
 
 const asWebsiteUrl = (value) => (/^https?:\/\//i.test(value) ? value : `https://${value}`)
 const asInstagramUrl = (value) => {
@@ -166,6 +167,8 @@ export default function ClubProfile() {
   }
 
   const hasTeachers = club?.kind === 'club' && teachers.length > 0
+  // Admin do clube vê também os rascunhos dos torneios (#456).
+  const canManageTournaments = !!club && memberships.some((m) => m.organization_id === club.id && m.is_admin)
 
   const isFavorite = club ? memberships.find((m) => m.organization_id === club.id)?.is_favorite === true : false
 
@@ -384,6 +387,9 @@ export default function ClubProfile() {
         </div>
       )}
 
+      {/* Torneios do clube (Trello #456) — antes nunca apareciam aqui. */}
+      <ClubTournamentsList organizationId={club.id} canManage={canManageTournaments} />
+
       <div>
         <h3 className="text-lg text-ink-900 mb-3">{t('clubprofile.open_mixes_heading')}</h3>
         {club.open_games.length === 0 ? (
@@ -558,6 +564,9 @@ export default function ClubProfile() {
           </div>
         </div>
       )}
+
+      {/* Torneios do clube (Trello #456) — antes nunca apareciam aqui. */}
+      <ClubTournamentsList organizationId={club.id} canManage={canManageTournaments} />
 
       <div>
         <h3 className="text-lg text-ink-900 mb-3">{t('clubprofile.open_mixes_heading')}</h3>

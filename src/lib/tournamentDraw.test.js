@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  seedOrder, qualifierLabels, buildBracketSkeleton, buildDrawPayload,
+  seedOrder, qualifierLabels, buildBracketSkeleton, buildDrawPayload, buildKnockoutPayload,
   bracketRounds, byDayAndTime, standingsOf, qualifiersPerGroup,
 } from './tournamentDraw'
 
@@ -187,5 +187,42 @@ describe('peças dos separadores', () => {
   it('sem formato guardado, passam 2 por grupo', () => {
     expect(qualifiersPerGroup(null)).toBe(2)
     expect(qualifiersPerGroup({ format: { qualifiers_per_group: 1 } })).toBe(1)
+  })
+})
+
+describe('buildKnockoutPayload — só eliminatória (Trello #455)', () => {
+  it('3 duplas: a 1.ª fica isenta e espera na final', () => {
+    const p = buildKnockoutPayload(duplas(3))
+    expect(p.groups).toEqual([])
+    const sf = p.bracket.filter((m) => m.round === 'SF')
+    expect(sf).toHaveLength(1)
+    expect([sf[0].a, sf[0].b].sort()).toEqual(['e2', 'e3'])
+    const final = p.bracket.find((m) => m.round === 'F')
+    expect(final.a).toBe('e1')
+    expect(final.b).toBeNull()
+    expect(final.source_b).toMatch(/Vencedor das meias/)
+    expect(p.third_place).toBe(false)
+  })
+
+  it('4 duplas: 1.ª contra 4.ª e 2.ª contra 3.ª, sem isentos', () => {
+    const p = buildKnockoutPayload(duplas(4), { thirdPlace: true })
+    const sf = p.bracket.filter((m) => m.round === 'SF')
+    expect(sf.map((m) => [m.a, m.b])).toEqual([['e1', 'e4'], ['e2', 'e3']])
+    expect(p.bracket.find((m) => m.round === 'F').a).toBeNull()
+    expect(p.third_place).toBe(true)
+  })
+
+  it('5 e 7 duplas: todas entram, cada uma uma só vez na 1.ª ronda ou isenta', () => {
+    for (const n of [5, 7]) {
+      const p = buildKnockoutPayload(duplas(n))
+      const ids = p.bracket.flatMap((m) => [m.a, m.b]).filter(Boolean)
+      expect(new Set(ids).size).toBe(ids.length)
+      expect(ids.sort()).toEqual(duplas(n).map((d) => d.id).sort())
+      expect(p.bracket.filter((m) => m.round === 'QF')).toHaveLength(n - 4)
+    }
+  })
+
+  it('menos de 2 duplas não dá quadro', () => {
+    expect(buildKnockoutPayload(duplas(1))).toBeNull()
   })
 })

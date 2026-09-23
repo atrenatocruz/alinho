@@ -16,7 +16,7 @@ import { PrimaryButton, EmptyState } from '../ui'
 import { MonoLabel, StatePill } from './TournamentBits'
 import {
   listCategoriesAdmin, listCategorySeeding, closeCategoryEntries,
-  saveCategoryFormat, drawCategory, clearCategoryDraw, buildDrawPayload,
+  saveCategoryFormat, drawCategory, clearCategoryDraw, buildDrawPayload, buildKnockoutPayload,
 } from '../../lib/tournamentDraw'
 import { formatOptions, recommendFormat, availableCourtHours, pickSeeds } from '../../lib/tournamentFormat'
 
@@ -236,7 +236,7 @@ function FormatStep({ days: dayRows, rules, category, teamCount, onDone, t }) {
    Ver antes de confirmar. Nada é gravado enquanto o organizador não
    carregar em «Confirmar sorteio» — pode voltar a sortear as vezes que
    quiser, e as cabeças de série são trocáveis. */
-function DrawStep({ category, onDone, t }) {
+function DrawStep({ category, onDone, onChangeFormat, t }) {
   const [teams, setTeams] = useState(null)
   const [seedIds, setSeedIds] = useState(null)
   const [seed, setSeed] = useState(1)
@@ -245,6 +245,9 @@ function DrawStep({ category, onDone, t }) {
 
   const format = category.format || {}
   const groupCount = Number(format.groups) || 0
+  // Só eliminatória: sem grupos, o quadro sai direto das cabeças de série
+  // (Trello #455 — antes `!groupCount` matava o sorteio e não havia saída).
+  const knockoutOnly = groupCount === 0
   const perGroup = Number(format.qualifiers_per_group) || 2
 
   useEffect(() => {
@@ -266,11 +269,13 @@ function DrawStep({ category, onDone, t }) {
   }, [teams, groupCount, seedIds])
 
   const payload = useMemo(() => {
-    if (!teams || !groupCount || teams.length < groupCount) return null
+    if (!teams) return null
+    if (knockoutOnly) return buildKnockoutPayload(teams, { thirdPlace: Boolean(category.third_place_match) })
+    if (teams.length < groupCount) return null
     return buildDrawPayload(teams, {
       groupCount, perGroup, seeds, seed, thirdPlace: Boolean(category.third_place_match),
     })
-  }, [teams, groupCount, perGroup, seeds, seed, category.third_place_match])
+  }, [teams, knockoutOnly, groupCount, perGroup, seeds, seed, category.third_place_match])
 
   const byId = useMemo(() => Object.fromEntries((teams || []).map((x) => [x.id, x])), [teams])
 
@@ -290,8 +295,43 @@ function DrawStep({ category, onDone, t }) {
   if (error && !teams) return <p className="py-6 text-center text-[12px] text-danger">{error}</p>
   if (!teams) return <p className="py-6 text-center text-[12px] text-muted">{t('common.loading')}</p>
   if (!payload) {
-    return <EmptyState icon={AlertTriangle} title={t('tournament.draw.draw_short_title')}
-      subtitle={t('tournament.draw.draw_short_subtitle', { teams: teams.length, groups: groupCount })} />
+    return (
+      <div>
+        <EmptyState icon={AlertTriangle} title={t('tournament.draw.draw_short_title')}
+          subtitle={t('tournament.draw.draw_short_subtitle', { teams: teams.length, groups: groupCount })} />
+        {/* A mensagem manda mudar de formato — agora há mesmo por onde. */}
+        <PrimaryButton onClick={onChangeFormat} className="w-full">{t('tournament.draw.change_format')}</PrimaryButton>
+      </div>
+    )
+  }
+
+  if (knockoutOnly) {
+    const firstRound = payload.bracket.filter((m) => m.a && m.b && m.round === payload.bracket[0].round)
+    const byeIds = payload.bracket.filter((m) => m.round !== payload.bracket[0].round).flatMap((m) => [m.a, m.b]).filter(Boolean)
+    return (
+      <div>
+        <MonoLabel className="mb-1">{t('tournament.draw.preview_label')}</MonoLabel>
+        <p className="mb-1.5 text-[11.5px] text-muted">{t('tournament.draw.knockout_note')}</p>
+        {firstRound.map((m) => (
+          <div key={m.slot} className="mb-1.5 rounded-xl border border-ink-100 bg-white px-3 py-2 text-[12px] text-ink-900">
+            {byId[m.a]?.name || m.a} <span className="text-muted">×</span> {byId[m.b]?.name || m.b}
+          </div>
+        ))}
+        {byeIds.length > 0 && (
+          <p className="mb-2 text-[11.5px] text-muted">
+            {t('tournament.draw.knockout_byes', { names: byeIds.map((id) => byId[id]?.name || id).join(', ') })}
+          </p>
+        )}
+        {error && <p className="mb-2 text-[12px] text-danger">{error}</p>}
+        <div className="flex flex-wrap gap-2">
+          <PrimaryButton onClick={confirm} disabled={busy}>{t('tournament.draw.draw_confirm')}</PrimaryButton>
+          <button type="button" onClick={onChangeFormat} disabled={busy}
+            className="rounded-full border border-line px-3 py-2 text-[12px] font-semibold text-ink-700 hover:bg-ink-50">
+            {t('tournament.draw.change_format')}
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -411,6 +451,8 @@ export default function DrawAdminPanel({ tournament, onBack }) {
   const [pickedId, setPickedId] = useState(null)
   const [error, setError] = useState(null)
   const [reload, setReload] = useState(0)
+  // «Mudar formato» a partir do sorteio: volta ao passo 2 sem apagar nada.
+  const [reformatId, setReformatId] = useState(null)
 
   useEffect(() => {
     let cancelled = false
@@ -422,7 +464,7 @@ export default function DrawAdminPanel({ tournament, onBack }) {
 
   const categories = data?.categories || null
   const picked = (categories || []).find((c) => c.id === pickedId) || null
-  const done = () => { setReload((n) => n + 1) }
+  const done = () => { setReformatId(null); setReload((n) => n + 1) }
 
   const teamCount = picked?.selected_count || 0
 
@@ -468,10 +510,10 @@ export default function DrawAdminPanel({ tournament, onBack }) {
         )
       ) : picked.status === 'inscricoes' ? (
         <CloseEntriesStep category={picked} onDone={done} t={t} />
-      ) : picked.status === 'fechada' && !picked.format ? (
+      ) : picked.status === 'fechada' && (!picked.format || reformatId === picked.id) ? (
         <FormatStep days={data.days} rules={data.rules} category={picked} teamCount={teamCount} onDone={done} t={t} />
       ) : picked.status === 'fechada' ? (
-        <DrawStep category={picked} onDone={done} t={t} />
+        <DrawStep category={picked} onDone={done} onChangeFormat={() => setReformatId(picked.id)} t={t} />
       ) : (
         <DoneStep tournament={tournament} category={picked} onDone={done} t={t} />
       )}

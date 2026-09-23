@@ -384,10 +384,13 @@ export default function Profile() {
     const name = (slot) => (m[`${slot}_id`] === profile?.id ? t('agenda.you') : m[`${slot}_name`] || m[`${slot}_guest_name`])
     const team = (p) => [name(`${p}_player1`), name(`${p}_player2`)].filter(Boolean).join(' + ')
     const myTeam = ['team_a', 'team_b'].find((p) => m[`${p}_player1_id`] === profile?.id || m[`${p}_player2_id`] === profile?.id)
-    const won = myTeam && m.winner_team ? m.winner_team === myTeam.slice(-1) : null
+    // Empate (#420): nem vitória nem derrota.
+    const draw = m.winner_team === 'draw'
+    const won = myTeam && m.winner_team && !draw ? m.winner_team === myTeam.slice(-1) : null
+    const outcome = draw ? t('agenda.result_draw') : won != null ? t(won ? 'agenda.result_win' : 'agenda.result_loss') : null
     return {
       title: `${team('team_a')} ${t('gamedetails.vs')} ${team('team_b')}`,
-      result: `${m.score_a}-${m.score_b}${won != null ? ` · ${t(won ? 'agenda.result_win' : 'agenda.result_loss')}` : ''}`,
+      result: `${m.score_a}-${m.score_b}${outcome ? ` · ${outcome}` : ''}`,
       highlight: won === true,
     }
   }
