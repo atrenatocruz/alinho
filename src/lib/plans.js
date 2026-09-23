@@ -26,9 +26,10 @@ export const nextPlanTier = (tier) => {
   return i >= 0 && i < PLAN_TIERS.length - 1 ? PLAN_TIERS[i + 1] : null
 }
 
-/** Espelho de plan_limits() em migration_plan_limits.sql. null = sem limite. */
+/** Espelho de plan_limits() (migration_plan_limits_free_40.sql). null = sem limite.
+    Free passou de 30 para 40 membros a 23 set (Trello #424). */
 export const PLAN_LIMITS = {
-  free: { members: 30, activeMixes: 1, courts: 2 },
+  free: { members: 40, activeMixes: 1, courts: 2 },
   plus: { members: 300, activeMixes: 2, courts: 4 },
   pro: { members: null, activeMixes: null, courts: null },
   club: { members: null, activeMixes: null, courts: null },
