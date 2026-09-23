@@ -1,15 +1,27 @@
 import { supabase } from './supabase'
 
+// Super admins da plataforma não aparecem para escolher (Trello #466). As
+// RPCs não os tiram, por isso filtra-se aqui; se a leitura falhar, fica a
+// lista como veio — melhor mostrar um a mais do que não mostrar ninguém.
+const withoutPlatformAdmins = async (rows) => {
+  const ids = (rows || []).map((r) => r.id).filter(Boolean)
+  if (!ids.length) return rows || []
+  const { data, error } = await supabase.from('profiles').select('id').in('id', ids).eq('is_platform_admin', true)
+  if (error) { console.error('Error filtering platform admins:', error); return rows }
+  const hidden = new Set((data || []).map((r) => r.id))
+  return rows.filter((r) => !hidden.has(r.id))
+}
+
 export const searchPlayers = async (query) => {
   const { data, error } = await supabase.rpc('search_players', { p_query: query })
   if (error) throw error
-  return data || []
+  return withoutPlatformAdmins(data || [])
 }
 
 export const listPlayers = async (limit = 20) => {
   const { data, error } = await supabase.rpc('list_players', { p_limit: limit })
   if (error) throw error
-  return data || []
+  return withoutPlatformAdmins(data || [])
 }
 
 export const createPrivateMatch = async ({
