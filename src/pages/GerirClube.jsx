@@ -1158,6 +1158,19 @@ export default function GerirClube() {
     try {
       const gameToDelete = games.find(g => g.id === gameId)
 
+      // Um mix com resultados já conta para o ranking e para o XP, e a base
+      // de dados não o deixa apagar. Diz-se isso antes de tentar, em vez de
+      // deixar o Postgres rebentar com um código (Trello #421).
+      const { count: scored } = await supabase
+        .from('matches')
+        .select('id', { count: 'exact', head: true })
+        .eq('game_id', gameId)
+        .not('winner_team_id', 'is', null)
+      if (scored > 0) {
+        alert(t('gerirclube.delete_game_has_results'))
+        return
+      }
+
       const { error } = await supabase
         .from('games')
         .delete()
@@ -1176,7 +1189,10 @@ export default function GerirClube() {
       loadGames()
     } catch (error) {
       console.error('Error deleting game:', error)
-      alert(describeError(t, error, 'gerirclube.error_delete_game'))
+      // 23503/23514: o que ainda prende o mix são resultados (XP, vencedores).
+      alert(['23503', '23514'].includes(String(error?.code))
+        ? t('gerirclube.delete_game_has_results')
+        : describeError(t, error, 'gerirclube.error_delete_game'))
     }
   }
 

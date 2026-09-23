@@ -906,6 +906,7 @@
   "gerirclube.error_create_game": "Couldn't create the mix.",
   "gerirclube.error_create_group_fallback": "Could not create the group. Try again.",
   "gerirclube.error_delete_game": "Couldn't delete the mix.",
+  "gerirclube.delete_game_has_results": "This mix already has results recorded and counts towards the ranking, so it can't be deleted.",
   "gerirclube.error_duplicate_group_slug": "A club or group with this identifier already exists — choose another",
   "gerirclube.error_invite_failed": "Could not send the invite.",
   "gerirclube.error_join_group_fallback": "Could not request to join. Try again.",
