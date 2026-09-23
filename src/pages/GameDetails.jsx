@@ -2478,9 +2478,13 @@ export default function GameDetails() {
           <div className="bg-ink-900 text-white px-4 py-3 rounded-ctrl text-sm font-extrabold">
             {t('gamedetails.mix_paused')}
           </div>
+          {/* Mesmo nome do outro (Francisco, 23 set: «fica comecar o mix, ja
+              houve essa decisao»), mas NAO e a mesma funcao: handleStartMix
+              sorteia duplas do zero, e aqui as duplas ja existem e tem de
+              ficar. So se criam os jogos. */}
           <PrimaryButton onClick={handleStartGames} disabled={busy} className="w-full">
             <Play size={20} />
-            {t('gamedetails.start_games')}
+            {t('gamedetails.start_mix')}
           </PrimaryButton>
           {canRedoDuplas && (
             <PrimaryButton variant="ghost" onClick={handleRedoDuplas} disabled={busy} className="w-full">

@@ -649,7 +649,6 @@
   "errorboundary.title": "Something went wrong",
   "errorboundary.text": "We couldn't show this page. Reloading usually fixes it.",
   "errorboundary.reload": "Reload",
-  "gamedetails.start_games": "Start the games",
   "gamedetails.error_start_games": "Couldn't start the games.",
   "gamedetails.redo_duplas": "Redo the duplas",
   "gamedetails.confirm_redo_duplas": "This deletes the formed duplas and draws them again, with the same players. Are you sure?",
