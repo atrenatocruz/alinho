@@ -49,7 +49,13 @@ export function possibleGroupCounts(teamCount, { min = GROUP_SIZE_MIN, max = GRO
     if (Math.min(...sizes) < min || Math.max(...sizes) > max) continue
     (teamCount % g === 0 ? equal : uneven).push(g)
   }
-  return equal.length ? equal : uneven
+  // «1 grupo de n» conta como divisão igual, mas não leva eliminatória
+  // (formatOptions deita-o fora). Só vale quando não há outra hipótese —
+  // senão 7 duplas davam [1] e perdia-se «2 grupos de 4+3» (Trello #455).
+  const equalMulti = equal.filter((g) => g >= 2)
+  if (equalMulti.length) return equalMulti
+  if (uneven.length) return uneven
+  return equal
 }
 
 // ── Contas de jogos, garantidos e tempo ──────────────────────────────────
