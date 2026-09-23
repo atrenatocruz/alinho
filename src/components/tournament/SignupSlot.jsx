@@ -9,8 +9,9 @@ import TournamentSignupSheet from './TournamentSignupSheet'
 import PublicInfo from './PublicInfo'
 import {
   signUp, respondToInvite, listMyInvites, withdrawEntry,
-  entriesOpen, categoriesLeft, tournamentInviteLink, signUpBackLink,
+  entriesOpen, categoriesLeft, tournamentInviteLink,
 } from '../../lib/tournamentSignup'
+import { signUpBackLink } from '../../lib/loginLinks'
 
 /* O que fica por cima de tudo na página do torneio (Trello #362):
    inscrever a minha dupla, em que ponto está a minha inscrição, e o

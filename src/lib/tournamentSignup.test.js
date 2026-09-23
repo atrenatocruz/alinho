@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   takesSlot, slotsLeft, isCategoryFull, categoriesLeft,
-  entriesOpen, canWithdraw, inviteExpired, tournamentInviteLink, signUpBackLink,
+  entriesOpen, canWithdraw, inviteExpired, tournamentInviteLink,
 } from './tournamentSignup'
 
 const cat = (o = {}) => ({ id: 'c1', slots: 16, status: 'inscricoes', entry_count: 0, ...o })
@@ -79,41 +79,5 @@ describe('inviteExpired', () => {
 describe('tournamentInviteLink', () => {
   it('leva o código', () => {
     expect(tournamentInviteLink('abc', 'https://alinho.pt')).toBe('https://alinho.pt/convite-torneio/abc')
-  })
-})
-
-describe('signUpBackLink — quem chega do WhatsApp sem conta (#454)', () => {
-  const back = (link) => decodeURIComponent(new URLSearchParams(link.split('?').slice(1).join('?')).get('redirect'))
-
-  it('abre no separador de criar conta, nao no de entrar', () => {
-    expect(signUpBackLink({ pathname: '/torneio/smash-cup' })).toContain('mode=signup')
-  })
-
-  it('traz a pessoa de volta a pagina do torneio', () => {
-    expect(back(signUpBackLink({ pathname: '/torneio/smash-cup' }))).toBe('/torneio/smash-cup')
-  })
-
-  it('guarda a categoria que ela estava a ver, mesmo sem estar no endereco', () => {
-    expect(back(signUpBackLink({ pathname: '/torneio/smash-cup', categoryCode: 'M3' }))).toBe('/torneio/smash-cup?cat=M3')
-  })
-
-  it('substitui a categoria do endereco pela que esta a ver', () => {
-    expect(back(signUpBackLink({ pathname: '/torneio/smash-cup', search: '?cat=M1', categoryCode: 'F2' })))
-      .toBe('/torneio/smash-cup?cat=F2')
-  })
-
-  it('nao perde o resto do endereco (ex.: o separador)', () => {
-    expect(back(signUpBackLink({ pathname: '/torneio/smash-cup', search: '?tab=all_games', categoryCode: 'M3' })))
-      .toBe('/torneio/smash-cup?tab=all_games&cat=M3')
-  })
-
-  it('o redirect vai codificado — o ?cat= nao se solta para o /login', () => {
-    const link = signUpBackLink({ pathname: '/torneio/smash-cup', categoryCode: 'M3' })
-    expect(new URLSearchParams(link.split('?')[1]).get('cat')).toBe(null)
-  })
-
-  it('o caminho que sai é sempre interno (o AfterLogin so aceita esses)', () => {
-    const r = back(signUpBackLink({ pathname: '/torneio/smash-cup' }))
-    expect(r.startsWith('/') && !r.startsWith('//') && !r.startsWith('/' + String.fromCharCode(92))).toBe(true)
   })
 })

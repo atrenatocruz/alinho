@@ -1,11 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { pricePerPlayer } from '../../lib/tournaments'
 import { Search, UserPlus, Euro } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { Sheet } from '../agenda/AgendaControls'
 import { Avatar, PrimaryButton } from '../ui'
 import { partnerNameError, partnerEmailError, PARTNER_NAME_MAX } from '../../lib/partnerInvite'
 import { slotsLeft, isCategoryFull } from '../../lib/tournamentSignup'
+
+/** «25 €» e «12,50 €», nunca «25.00 €»: as casas decimais só aparecem
+ *  quando existem, e a vírgula é a do idioma de quem lê. */
+const euroWords = (v, locale) => Number(v).toLocaleString(locale, {
+  minimumFractionDigits: Number.isInteger(Number(v)) ? 0 : 2, maximumFractionDigits: 2,
+})
 
 /* Inscrever a dupla no torneio (Trello #362).
    Desenho: wireframes/inscricoes.html («Inscrever a dupla, não só a mim»)
@@ -20,7 +27,7 @@ import { slotsLeft, isCategoryFull } from '../../lib/tournamentSignup'
    (onConfirm). */
 
 export default function TournamentSignupSheet({ tournament, categories, category, categoriesLeft, busy, error, onConfirm, onClose }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [categoryId, setCategoryId] = useState(category?.id || categories[0]?.id || null)
   const [mode, setMode] = useState('partner') // 'partner' | 'named' | 'alone'
   const [members, setMembers] = useState([])
@@ -200,7 +207,7 @@ export default function TournamentSignupSheet({ tournament, categories, category
         <div className="rounded-ctrl bg-ink-50 px-3 py-2.5 text-sm text-ink-900 flex gap-2">
           <Euro size={16} className="mt-0.5 shrink-0 text-muted" />
           <div>
-            {price != null && <p className="font-extrabold">{t('tsignup.price', { price: (price / 100).toFixed(2) })}</p>}
+            {price != null && <p className="font-extrabold">{t('tsignup.price', { price: euroWords(price / 100, i18n.language), each: pricePerPlayer(price / 100, i18n.language) })}</p>}
             <p className="text-muted">{tournament.organizer_text || t('tsignup.payment_default')}</p>
           </div>
         </div>

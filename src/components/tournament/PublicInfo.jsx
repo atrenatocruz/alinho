@@ -5,6 +5,11 @@ import { PrimaryButton } from '../ui'
 import LocationOpenWith from '../LocationOpenWith'
 import { whatsappShare } from '../../lib/partnerInvite'
 import { formatWords, categoryWhen, slotsWords, tournamentUrl, shareMessage } from '../../lib/tournamentPublic'
+import { pricePerPlayer } from '../../lib/tournaments'
+
+/** Metade, para o preço dizer as duas coisas: o cartaz do clube anuncia por
+ *  jogador e o campo é por dupla (decisão de 23 set — a unidade não muda). */
+const eachOf = (cents, locale) => pricePerPlayer((cents || 0) / 100, locale)
 
 /* O cartaz do torneio (Trello #363) — o que vê quem chega de fora, sem
    conta: categorias com dia, hora e vagas, o formato em linguagem de
@@ -59,7 +64,7 @@ export default function PublicInfo({ tournament, categories = [] }) {
                 {[
                   when && (typeof when === 'string' ? when : t('tpublic.when', when)),
                   t(fmt.key, fmt.values),
-                  c.price_cents != null ? t('tsignup.price', { price: (c.price_cents / 100).toFixed(0) }) : null,
+                  c.price_cents != null ? t('tsignup.price', { price: (c.price_cents / 100).toFixed(0), each: eachOf(c.price_cents, i18n.language) }) : null,
                 ].filter(Boolean).join(' · ')}
               </p>
             </div>
@@ -78,7 +83,7 @@ export default function PublicInfo({ tournament, categories = [] }) {
           <Euro size={16} className="mt-0.5 shrink-0 text-muted" />
           <p className="text-ink-900">
             {tournament.entry_fee_cents != null && (
-              <b className="mr-1">{t('tsignup.price', { price: (tournament.entry_fee_cents / 100).toFixed(0) })}</b>
+              <b className="mr-1">{t('tsignup.price', { price: (tournament.entry_fee_cents / 100).toFixed(0), each: eachOf(tournament.entry_fee_cents, i18n.language) })}</b>
             )}
             <span className="text-muted">{tournament.organizer_text}</span>
           </p>
