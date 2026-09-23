@@ -90,8 +90,25 @@ function AdminEntrySheet({ organizationId, categories = [], categoryId: initialC
     return { shown: all.slice(0, PAGE), more: all.length > PAGE }
   }
 
+  // Género (#433): quem tem conta e ainda não o definiu não entra sem ele.
+  // O admin está a inscrever outra pessoa, por isso escolhe-o aqui e fica
+  // gravado no perfil dela (decisão do Renato, 23 set).
+  const [genders, setGenders] = useState({}) // { [userId]: 'masculino'|'feminino'|null }
+  const [chosenGender, setChosenGender] = useState({}) // { [userId]: escolha do admin }
+  useEffect(() => {
+    const ids = [player1?.id, partner?.id].filter((id) => id && !(id in genders))
+    if (!ids.length) return
+    supabase.from('profiles').select('id, gender').in('id', ids).then(({ data, error: err }) => {
+      if (err) { console.error('Error loading gender:', err); return }
+      setGenders((g) => ({ ...g, ...Object.fromEntries(ids.map((id) => [id, (data || []).find((r) => r.id === id)?.gender || null])) }))
+    })
+  }, [player1?.id, partner?.id, genders])
+  const needsGender = (p) => !!p && p.id in genders && !genders[p.id]
+  const genderOk = (p) => !needsGender(p) || !!chosenGender[p.id]
+
   const nameError = name ? partnerNameError(name) : null
-  const ready = player1 && (partner || (name && !nameError && !partnerEmailError(email)))
+  const ready = player1 && genderOk(player1) && genderOk(partner)
+    && (partner || (name && !nameError && !partnerEmailError(email)))
 
   // Chamado como função, não como <Picker/>: um componente definido aqui
   // dentro era recriado a cada letra e a caixa perdia o foco.
@@ -102,10 +119,32 @@ function AdminEntrySheet({ organizationId, categories = [], categoryId: initialC
     <div className="space-y-1.5">
       <p className="font-mono text-[11px] uppercase tracking-widest text-ink-500">{label}</p>
       {picked ? (
+        <>
         <button onClick={() => setPicked(null)} className="press flex w-full items-center gap-2.5 rounded-ctrl border-2 border-ok bg-ok/5 px-3 py-2">
           <Avatar name={picked.name} url={picked.avatar_url} size="w-8 h-8 text-[11px]" />
           <span className="text-sm font-semibold text-ink-900">{picked.name}</span>
         </button>
+        {needsGender(picked) && (
+          <div className="rounded-ctrl border border-line p-2.5 space-y-1.5">
+            <p className="text-xs text-ink-700">{t('tentries.admin_gender_missing', { name: picked.name })}</p>
+            <div className="flex gap-1.5">
+              {[['masculino', t('login.gender_male')], ['feminino', t('login.gender_female')]].map(([g, label]) => (
+                <button
+                  key={g}
+                  type="button"
+                  onClick={() => setChosenGender((c) => ({ ...c, [picked.id]: g }))}
+                  aria-pressed={chosenGender[picked.id] === g}
+                  className={`press flex-1 rounded-full border px-3 py-1.5 text-sm font-extrabold ${
+                    chosenGender[picked.id] === g ? 'border-ink-900 bg-ink-900 text-white' : 'border-line bg-canvas text-ink-900'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        </>
       ) : (
         <>
           <div className="relative">
@@ -174,6 +213,8 @@ function AdminEntrySheet({ organizationId, categories = [], categoryId: initialC
         <PrimaryButton
           onClick={() => ready && onConfirm({
             categoryId, player1Id: player1.id, partnerId: partner?.id || null,
+            player1Gender: needsGender(player1) ? chosenGender[player1.id] : null,
+            partnerGender: needsGender(partner) ? chosenGender[partner.id] : null,
             guestName: partner ? null : name.trim() || null,
             guestEmail: partner ? null : email.trim() || null,
             paid,

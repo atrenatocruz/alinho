@@ -450,6 +450,7 @@
   "tentries.admin_category": "Category",
   "tentries.admin_search_empty": "No one with that name in the app. Player 2 can be typed in; Player 1 needs an account.",
   "tentries.admin_search_more": "There are more results — type more of the name.",
+  "tentries.admin_gender_missing": "{{name}} has not set a gender yet. Choose it for the entry — it is saved to their profile.",
   "tentries.admin_player1": "Player 1",
   "tentries.admin_player2": "Player 2",
   "tentries.admin_paid": "Already paid",

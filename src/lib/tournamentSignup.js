@@ -143,11 +143,16 @@ export async function removeEntry(entryId) {
   if (error) throw error
 }
 
-export async function adminSignUp({ categoryId, player1Id, partnerId = null, guestName = null, guestEmail = null, teamName = null, paid = false }) {
-  const { data, error } = await supabase.rpc('tournament_admin_signup', {
+export async function adminSignUp({ categoryId, player1Id, partnerId = null, guestName = null, guestEmail = null, teamName = null, paid = false, player1Gender = null, partnerGender = null }) {
+  const args = {
     p_category_id: categoryId, p_player1_id: player1Id, p_partner_id: partnerId,
     p_guest_name: guestName, p_guest_email: guestEmail, p_team_name: teamName, p_paid: paid,
-  })
+  }
+  // Género escolhido pelo admin para quem ainda não o tem (#433). Só vai
+  // quando existe, para a chamada sem ele continuar igual.
+  if (player1Gender) args.p_player1_gender = player1Gender
+  if (partnerGender) args.p_partner_gender = partnerGender
+  const { data, error } = await supabase.rpc('tournament_admin_signup', args)
   if (error) throw error
   return data
 }
