@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, Suspense, lazy } from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation, useNavigate } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { WifiOff } from 'lucide-react'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
@@ -233,6 +233,25 @@ const Guard = ({ require, showSplash, children }) => {
   return <Layout>{children}</Layout>
 }
 
+/* Quem chega a /login ja com sessao volta para onde ia, nao para a Home
+   (Trello #378). Acontece sempre que o Guard mandou alguem para
+   /login?redirect=<pagina> e a sessao ja existe quando o /login desenha: com
+   o Google e assim por definicao (a volta do OAuth traz a sessao feita), e
+   com email ou conta nova ha a corrida entre o navigate(redirectTo) do
+   Login.jsx e este <Navigate> — que ganhava sempre, e mandava para a Home.
+   Importa para o torneio: quem abre o link e carrega em «Inscrever» tem de
+   voltar a pagina do torneio.
+
+   So se aceita um caminho dentro da app: o ?redirect= vem do URL, e sem
+   esta trava bastava um link para levar alguem da pagina de entrada para
+   fora. `//` e `/\` sao URLs de outro site escritos como caminho. */
+function AfterLogin() {
+  const [searchParams] = useSearchParams()
+  const pedido = searchParams.get('redirect') || ''
+  const interno = pedido.startsWith('/') && !pedido.startsWith('//') && !pedido.startsWith('/\\')
+  return <Navigate to={interno ? pedido : '/'} replace />
+}
+
 function AppRoutes() {
   const { user, loading: authLoading } = useAuth()
   const [minDurationElapsed, setMinDurationElapsed] = useState(false)
@@ -249,7 +268,7 @@ function AppRoutes() {
     <ErrorBoundary>
     <Suspense fallback={<RouteFallback />}>
       <Routes>
-        <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
+        <Route path="/login" element={user ? <AfterLogin /> : <Login />} />
         <Route path="/esqueci-password" element={user ? <Navigate to="/" /> : <ForgotPassword />} />
         {/* Not guarded like /login above — Supabase establishes a
             (recovery-only) session as soon as the visitor lands here via
