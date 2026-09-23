@@ -160,10 +160,16 @@ export function FilterSheet({ filters, orgs, countFor, onApply, onClose }) {
     on ? 'bg-ink-900 text-white border-ink-900' : 'bg-canvas text-ink-700 border-line'
   }`
 
+  // «Todos» e os cinco ligados sao o mesmo estado, por isso a fila do tipo
+  // passa a funcionar como a do clube/grupo aqui ao lado (Trello #428):
+  // com «Todos» ligado, tocar num tipo mostra SO esse -- um toque em vez de
+  // quatro. Desligar o ultimo volta a «Todos», para nunca ficar ecra vazio.
+  const todosOsTipos = draft.kinds.length === EVENT_KINDS.length
   const toggleKind = (k) => setDraft((d) => {
+    if (d.kinds.length === EVENT_KINDS.length) return { ...d, kinds: [k] }
     const has = d.kinds.includes(k)
     const kinds = has ? d.kinds.filter((x) => x !== k) : [...d.kinds, k]
-    return { ...d, kinds: kinds.length ? kinds : d.kinds } // nunca zero tipos
+    return { ...d, kinds: kinds.length ? kinds : [...EVENT_KINDS] }
   })
   const toggleOrg = (id) => setDraft((d) => {
     const cur = d.orgIds || []
@@ -190,10 +196,15 @@ export function FilterSheet({ filters, orgs, countFor, onApply, onClose }) {
 
       <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mt-4 mb-2">{t('agenda.filter_kind')}</p>
       <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={() => setDraft((d) => ({ ...d, kinds: [...EVENT_KINDS] }))} className={chip(todosOsTipos)}>
+          {t('agenda.filter_kind_all')}
+        </button>
         {EVENT_KINDS.map((k) => {
           const Icon = KIND_STYLE[k].icon
+          // Com «Todos» ligado nenhum tipo aparece aceso, como na fila do
+          // clube/grupo: dois sitios a dizer a mesma coisa confundem.
           return (
-            <button key={k} type="button" onClick={() => toggleKind(k)} className={chip(draft.kinds.includes(k))}>
+            <button key={k} type="button" onClick={() => toggleKind(k)} className={chip(!todosOsTipos && draft.kinds.includes(k))}>
               <Icon size={14} /> {t(KIND_FILTER_KEY[k])}
             </button>
           )
@@ -221,7 +232,10 @@ export function FilterSheet({ filters, orgs, countFor, onApply, onClose }) {
       <button type="button" onClick={() => onApply(draft)} disabled={n === 0} className="w-full mt-5 py-3 rounded-ctrl bg-lime-400 text-ink-900 text-sm font-extrabold disabled:opacity-40">
         {t('agenda.filters_apply', { count: n })}
       </button>
-      <button type="button" onClick={() => onApply(DEFAULT_FILTERS)} className="w-full mt-2 py-2.5 text-sm font-extrabold text-muted">
+      {/* Era texto cinzento por baixo do botao verde e o Francisco nem dava
+          por ele (Trello #428). Passa a botao a serio, e o nome diz o que
+          faz: repunha TUDO LIGADO, nao limpava nada. */}
+      <button type="button" onClick={() => onApply(DEFAULT_FILTERS)} className="w-full mt-2 py-3 rounded-ctrl bg-canvas border border-line text-sm font-extrabold text-ink-900">
         {t('agenda.filters_reset')}
       </button>
     </Sheet>
