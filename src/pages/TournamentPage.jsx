@@ -33,6 +33,14 @@ function dateRange(startIso, endIso, locale) {
   return `${a.getDate()} ${month(a)} – ${b.getDate()} ${month(b)}`
 }
 
+// As minhas inscrições ativas. Uma desistida não conta — nem antes de a
+// base de dados deixar de a devolver (migration_tournaments_withdraw_resignup,
+// Trello #451). Sem `my_entries` (migração por correr), vale o `my`.
+const activeEntries = (data) =>
+  (data?.my_entries || (data?.my ? [{ ...data.my, status: data.my.state }] : []))
+    .filter((e) => (e.status ?? e.state) !== 'desistiu')
+const activeMy = (data) => activeEntries(data)[0] || null
+
 const STATE_PILL = {
   inscricoes: 'grey',
   fechado: 'grey',
@@ -51,13 +59,19 @@ export default function TournamentPage() {
 
   useEffect(() => {
     let alive = true
-    getTournamentPage(id)
+    const load = () => getTournamentPage(id)
       .then((res) => { if (alive) (res?.tournament ? setData(res) : setFailed(true)) })
       .catch((error) => {
         if (errorKind(error) !== 'not_ready') console.error('Error loading tournament:', error)
         if (alive) setFailed(true)
       })
-    return () => { alive = false }
+    load()
+    // Os painéis avisam com `tournament:reload` depois de inscrever, desistir
+    // ou publicar um aviso. Sem este ouvinte a página ficava como estava —
+    // quem desistia continuava a ler «Estás inscrito» (Trello #429).
+    const reload = () => { load() }
+    window.addEventListener('tournament:reload', reload)
+    return () => { alive = false; window.removeEventListener('tournament:reload', reload) }
   }, [id])
 
   const categories = data?.categories || []
@@ -67,7 +81,7 @@ export default function TournamentPage() {
   const category = useMemo(() => {
     const byCode = categories.find((c) => c.code?.toLowerCase() === catParam?.toLowerCase())
     if (byCode) return byCode
-    const mine = categories.find((c) => c.id === data?.my?.category_id)
+    const mine = categories.find((c) => c.id === activeMy(data)?.category_id)
     return mine || categories[0] || null
   }, [categories, catParam, data])
 
@@ -82,7 +96,7 @@ export default function TournamentPage() {
   const setParam = (key, value) => {
     const next = new URLSearchParams(params)
     next.set(key, value)
-    setParams(next, { replace: true })
+    setParams(next, { replace: true, state: { keepScroll: true } })
   }
 
   const back = (
@@ -112,7 +126,8 @@ export default function TournamentPage() {
     tournament: tour,
     categories,
     category,
-    my: data.my || null,
+    my: activeMy(data),
+    myEntries: activeEntries(data),
     myMatches: data.my_matches || [],
   }
   const spinner = <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-8 w-8 border-[3px] border-ink-50 border-t-ink-700" /></div>
@@ -134,7 +149,7 @@ export default function TournamentPage() {
         <div className="p-3.5">
         <div className="flex items-center justify-between gap-2">
           <TourTag>{t('tournament.label')}</TourTag>
-          {['validada', 'selecionada'].includes(data.my?.state)
+          {['validada', 'selecionada'].includes(activeMy(data)?.state)
             ? <StatePill tone="in">{t('tournament.state_entered')}</StatePill>
             : <StatePill tone={STATE_PILL[tour.status] || 'grey'}>{t(`tournament.status_${tour.status}`)}</StatePill>}
         </div>
@@ -167,7 +182,7 @@ export default function TournamentPage() {
       {categories.length > 0 && (
         <CategorySelect
           categories={categories}
-          mineId={data.my?.category_id}
+          mineId={activeMy(data)?.category_id}
           value={category?.id}
           onChange={(nextId) => setParam('cat', categories.find((c) => c.id === nextId)?.code || '')}
           label={t('tournament.category_select_label')}

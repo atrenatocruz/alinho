@@ -29,7 +29,7 @@ const STATE_KEY = {
   suplente: 'tsignup.state_waitlist',
 }
 
-export default function SignupSlot({ tournament, categories, category, my }) {
+export default function SignupSlot({ tournament, categories, category, my: firstEntry, myEntries = [] }) {
   const { t } = useTranslation()
   const { user } = useAuth()
   const [invites, setInvites] = useState([])
@@ -47,7 +47,12 @@ export default function SignupSlot({ tournament, categories, category, my }) {
   useEffect(reloadInvites, [user, tournament.id])
 
   const open = entriesOpen(tournament, null)
-  const left = categoriesLeft(tournament, my ? [my] : [])
+  const left = categoriesLeft(tournament, myEntries)
+  // A inscrição que se mostra é a da categoria escolhida. Se não estou
+  // nela e ainda posso ir a mais uma, aparece o botão de inscrever; se já
+  // não posso, mostra-se a que tenho (Trello #451).
+  const my = myEntries.find((e) => e.category_id === category?.id)
+    || (left === 0 ? firstEntry : null)
   const say = (err) => {
     const key = `tsignup.error_${err?.message?.replace(/^.*?([a-z_]+)$/, '$1')}`
     setError(t(key) === key ? t('tsignup.error_generic') : t(key))
@@ -76,12 +81,16 @@ export default function SignupSlot({ tournament, categories, category, my }) {
 
   const leave = async () => {
     if (!window.confirm(t('tsignup.withdraw_confirm'))) return
-    setBusy(true)
+    setBusy(true); setError('')
     try {
       await withdrawEntry(my.entry_id)
-      window.dispatchEvent(new CustomEvent('tournament:reload'))
-    } catch (err) { console.error('Error withdrawing from tournament:', err); say(err) }
-    finally { setBusy(false) }
+    } catch (err) {
+      console.error('Error withdrawing from tournament:', err); say(err)
+      return
+    } finally { setBusy(false) }
+    // Fora do try: se recarregar a página falhar, isso não é "não conseguiste
+    // desistir" — a desistência já está gravada (Trello #429).
+    window.dispatchEvent(new CustomEvent('tournament:reload'))
   }
 
   const link = fresh ? tournamentInviteLink(fresh.token, window.location.origin) : ''

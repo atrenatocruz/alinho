@@ -93,6 +93,10 @@ export default function TeacherPage({ view = 'profile' }) {
   const priceFor = (type, dur) => priceRowFor(prices, {
     teacherProfileId: teacher.teacher_profile_id, lessonType: type, durationMinutes: dur, peak: true, onIso: today,
   })?.price_lesson
+  // Sem nenhum preço, a grelha seria só travessões: esconde-se o bloco
+  // inteiro (Francisco, 22 set — Trello #385). Com alguns, mostra-se e os
+  // que faltam ficam com travessão.
+  const hasPrices = Object.keys(LESSON_CAPACITY).some((type) => LESSON_DURATIONS.some((d) => priceFor(type, d) != null))
 
   // "Esta semana": seg–dom; domingo só aparece se tiver alguma coisa.
   const days = [1, 2, 3, 4, 5, 6, 7].filter((wd) => wd < 7 || items.some((it) => it.weekday === 7))
@@ -129,6 +133,7 @@ export default function TeacherPage({ view = 'profile' }) {
         )}
       </div>
 
+      {hasPrices && (
       <div>
         <MonoLabel>{t('lessons.prices_per_person')}</MonoLabel>
         <table className="w-full mt-1.5 text-sm tabular-nums border-collapse">
@@ -156,6 +161,7 @@ export default function TeacherPage({ view = 'profile' }) {
           {teacher.org_name ? t('lessons.prices_of', { name: teacher.org_name }) : t('lessons.prices_own')} · {t('lessons.peak_lower')}
         </p>
       </div>
+      )}
 
       <div>
         <MonoLabel>{t('lessons.this_week')}</MonoLabel>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
-import { Link, useSearchParams, useNavigationType } from 'react-router-dom'
+import { Link, useSearchParams, useNavigationType, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Users } from 'lucide-react'
 import { supabase } from '../lib/supabase'
@@ -63,6 +63,7 @@ const writeSession = (key, value) => {
 export default function Home() {
   const { t, i18n } = useTranslation()
   const { user, profile, memberships, joinOrganization, followOrganization, isPrivateMatchesEnabled } = useAuth()
+  const navigate = useNavigate()
   const headerActions = useHeaderActions()
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -400,9 +401,9 @@ export default function Home() {
     }
   }
 
-  // Convite para jogo entre amigos: aceitar conta tudo (incluindo ranking,
-  // quando o criador o pediu); a escolha "sem ranking" fica na página dos
-  // jogos, onde há espaço para a explicar.
+  // Convite para jogo entre amigos: daqui só se recusa. Aceitar leva à
+  // página dos jogos, onde está a escolha "com/sem ranking" e a explicação
+  // (Trello #412).
   const handleInvite = async (event, response) => {
     markPending(event.key, true)
     setCardError('')
@@ -645,7 +646,9 @@ export default function Home() {
         orgSlug={event.orgId ? orgSlugById.get(event.orgId) : null}
         invite={event.myState === 'invited' && !past ? {
           busy: pendingKeys.has(event.key),
-          onAccept: () => handleInvite(event, 'accept_all'),
+          // Aceitar abre a página dos jogos, onde se escolhe entre aceitar e
+          // aceitar sem ranking — nunca se entra no ranking sem escolher (Trello #412).
+          onAccept: () => navigate('/jogos-privados'),
           onReject: () => handleInvite(event, 'reject'),
         } : null}
       />

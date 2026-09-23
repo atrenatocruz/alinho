@@ -509,6 +509,10 @@ export default function Layout({ children }) {
   useLayoutEffect(() => {
     const el = mainRef.current
     if (!el) return
+    // Switching a tab that lives in the URL (?tab=…) is not a new page: the
+    // caller marks it with `state: { keepScroll: true }` and the page stays
+    // where it was (Trello #430, #438).
+    if (location.state?.keepScroll) return
 
     const target = navigationType === 'POP' ? (scrollPositions.current.get(locationKey) ?? 0) : 0
     if (target === 0) {
