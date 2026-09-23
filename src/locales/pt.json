@@ -406,7 +406,7 @@
   "tsignup.category_slots_other": "{{count}} vagas",
   "tsignup.category_full": "Cheia",
   "tsignup.partner_label": "Com quem jogas?",
-  "tsignup.guest_hint": "Ele entra pelo nome e recebe um link para ficar com o lugar. Só pontua depois de se registar.",
+  "tsignup.guest_hint": "Ele entra pelo nome. No fim ficas com um link para lhe mandares — é assim que ele fica com o lugar. Só pontua depois de se registar.",
   "tsignup.alone_title": "Procuro parceiro",
   "tsignup.alone_hint": "A organização junta-te a alguém.",
   "tsignup.team_name_label": "Nome da equipa (opcional)",
