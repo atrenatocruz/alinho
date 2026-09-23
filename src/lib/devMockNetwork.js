@@ -225,7 +225,14 @@ const RPC_MOCKS = {
   tournament_claim_entry: () => 'tour-smash-open',
   tournament_validate_entry: () => 'validada',
   tournament_remove_entry: () => null,
-  tournament_admin_signup: () => ({ entry_id: 'ent-mao', status: 'validada', invite_token: null }),
+  // Devolve o código do convite quando a dupla tem alguém sem conta, como a
+  // função a sério faz (`tournament_admin_signup` devolve `invite_token`).
+  // Estava sempre a null e, por isso, o link que o organizador tem de mandar
+  // nunca aparecia em localhost — só em produção (Trello #479).
+  tournament_admin_signup: (params) => ({
+    entry_id: 'ent-mao', status: 'validada',
+    invite_token: params?.p_guest_name ? 'convite-torneio-a-mao' : null,
+  }),
   // A lista do organizador: um de cada estado, para se ver tudo num print.
   list_tournament_entries: () => (localStorage.getItem('mockTSignup') ? [
     { entry_id: 'e1', status: 'por_validar', team_name: 'Dois não fazem um', waitlist_order: null, created_at: null, validated_at: null,

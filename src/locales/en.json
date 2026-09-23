@@ -406,7 +406,7 @@
   "tsignup.category_slots_other": "{{count}} spots",
   "tsignup.category_full": "Full",
   "tsignup.partner_label": "Who are you playing with?",
-  "tsignup.guest_hint": "They join by name and get a link to claim the spot. They only score once registered.",
+  "tsignup.guest_hint": "They join by name. At the end you get a link to send them — that is how they claim the spot. They only score once registered.",
   "tsignup.alone_title": "Looking for a partner",
   "tsignup.alone_hint": "The organisers will pair you up.",
   "tsignup.team_name_label": "Team name (optional)",

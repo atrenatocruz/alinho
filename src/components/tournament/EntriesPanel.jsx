@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Search, Check, X, UserPlus, Send } from 'lucide-react'
+import { Search, Check, X, UserPlus, Send, Copy } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { searchPlayers } from '../../lib/privateMatches'
 import { useAuth } from '../../contexts/AuthContext'
@@ -305,6 +305,15 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
     }
   }
 
+  // O convite acabado de criar, para o mostrar em vez de fechar a folha em
+  // silêncio (Trello #479, ponto 2). Quem passa as inscrições do formulário
+  // para a app fechava a folha a pensar que a pessoa tinha sido avisada —
+  // e o link, que é a única forma de ela ficar com o lugar, estava escondido
+  // atrás do avião de papel na lista. A `tournament_admin_signup` já devolve
+  // o `invite_token`, por isso não é preciso ir buscá-lo outra vez.
+  const [fresh, setFresh] = useState(null) // { token, name, email }
+  const freshLink = fresh ? tournamentInviteLink(fresh.token, window.location.origin) : ''
+
   const act = async (fn) => {
     setBusy(true); setError('')
     try { await fn(); load() }
@@ -418,9 +427,47 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
           categoryId={category.id}
           busy={busy}
           error={error}
-          onConfirm={async (choice) => { await act(() => adminSignUp(choice)); setAddOpen(false) }}
+          onConfirm={async (choice) => {
+            await act(async () => {
+              const res = await adminSignUp(choice)
+              // Só há link quando a dupla tem alguém sem conta.
+              if (res?.invite_token && choice.guestName) {
+                setFresh({ token: res.invite_token, name: choice.guestName, email: choice.guestEmail || null })
+              }
+            })
+            setAddOpen(false)
+          }}
           onClose={() => setAddOpen(false)}
         />
+      )}
+
+      {/* Inscreveu alguém sem conta: o link é como ele fica a saber. Mesma
+          folha que o jogador vê ao inscrever a dupla dele (SignupSlot). */}
+      {fresh && (
+        <Sheet title={t('tsignup.invite_ready_title')} onClose={() => setFresh(null)}>
+          <div className="space-y-3">
+            {/* Sem o «Tu e o {nome} ficam dupla» que o jogador vê: aqui quem
+                inscreve não faz parte da dupla, e a frase ficava errada. O
+                resto serve tal e qual. */}
+            <p className="text-sm text-ink-900">
+              {fresh.email ? t('partner.invite_ready_email', { email: fresh.email }) : t('partner.invite_ready_no_email')}
+            </p>
+            <div className="rounded-ctrl bg-ink-50 px-3 py-2 text-xs text-ink-900 break-all">{freshLink}</div>
+            <PrimaryButton
+              onClick={() => window.open(whatsappShare(t('tsignup.invite_whatsapp_text', { name: fresh.name, title: tournament.name, link: freshLink })), '_blank')}
+              className="w-full"
+            >
+              {t('partner.invite_send_whatsapp')}
+            </PrimaryButton>
+            <PrimaryButton
+              variant="ghost"
+              onClick={() => navigator.clipboard?.writeText(freshLink)}
+              className="w-full !bg-white !border-ink-900"
+            >
+              <Copy size={18} /> {t('partner.invite_copy_link')}
+            </PrimaryButton>
+          </div>
+        </Sheet>
       )}
     </div>
   )
