@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Trophy } from 'lucide-react'
 import { useGoBack } from '../lib/useGoBack'
 import { getTournamentPage, listMatchesToScore, markWalkover, saveMatchResult } from '../lib/tournamentApi'
-import { byCourt, needsDecider, resultProblem, retirementScore, walkoverScore } from '../lib/tournamentScore'
+import { byCourt, needsDecider, resultProblem } from '../lib/tournamentScore'
 import { computeSetsResult } from '../lib/scoringLogic'
 import { describeError, errorKind } from '../lib/errors'
 import { toDayKey } from '../lib/agenda'
@@ -201,6 +201,13 @@ function CourtCard({ match, scoring, onSave, onWalkover, busy, t }) {
 function WalkoverSheet({ match, kind, onClose, onConfirm, t }) {
   const [loser, setLoser] = useState(null)
   const [justified, setJustified] = useState(null)
+  // Desistência a meio: «como estava?» — o resultado até ali (Trello #458).
+  // Opcional: em branco conta como se ainda não houvesse resultado.
+  const [pa, setPa] = useState('')
+  const [pb, setPb] = useState('')
+  const partial = kind === 'desistencia' && pa !== '' && pb !== '' && !(Number(pa) === 0 && Number(pb) === 0)
+    ? { score_a: Math.max(0, parseInt(pa, 10) || 0), score_b: Math.max(0, parseInt(pb, 10) || 0) }
+    : null
   const ready = loser && (kind === 'desistencia' || justified !== null)
 
   return (
@@ -220,6 +227,21 @@ function WalkoverSheet({ match, kind, onClose, onConfirm, t }) {
             </button>
           ))}
         </div>
+
+        {kind === 'desistencia' && (
+          <>
+            <MonoLabel className="mt-3">{t('tournament.score.partial_label')}</MonoLabel>
+            <div className="mt-1.5 grid grid-cols-[minmax(0,1fr)_64px] items-center gap-x-2 gap-y-1.5 text-[12.5px] text-ink-900">
+              {[['a', match.team_a, pa, setPa], ['b', match.team_b, pb, setPb]].map(([side, team, value, set]) => (
+                <label key={side} className="contents">
+                  <span className="truncate">{team?.name}</span>
+                  <input type="number" min="0" inputMode="numeric" value={value} onChange={(e) => set(e.target.value)}
+                    className="w-16 rounded-ctrl border border-line bg-surface px-2 py-1.5 text-center font-extrabold" placeholder="0" />
+                </label>
+              ))}
+            </div>
+          </>
+        )}
 
         {kind === 'falta' && (
           <>
@@ -244,7 +266,7 @@ function WalkoverSheet({ match, kind, onClose, onConfirm, t }) {
           {t(`tournament.score.${kind}_effect`)}
         </div>
 
-        <PrimaryButton className="mt-4 w-full" disabled={!ready} onClick={() => onConfirm(loser, justified)}>
+        <PrimaryButton className="mt-4 w-full" disabled={!ready} onClick={() => onConfirm(loser, justified, partial)}>
           {t(`tournament.score.${kind}_confirm`)}
         </PrimaryButton>
         <button type="button" onClick={onClose} className="mt-2 w-full py-2 text-sm font-semibold text-ink-500">
@@ -310,14 +332,13 @@ export default function TournamentScorePage() {
     }
   }
 
-  const confirmWalkover = async (loser, justified) => {
+  const confirmWalkover = async (loser, justified, partial = null) => {
     const { match, kind } = sheet
     setBusy(true)
     setError('')
     try {
       // O ecrã mostra já o que fica marcado; o servidor guarda o mesmo.
-      const score = kind === 'falta' ? walkoverScore(scoring, loser) : retirementScore(scoring, loser, match)
-      await markWalkover(match.match_id, { kind, loser, justified, ...score })
+      await markWalkover(match.match_id, { kind, loser, justified, partial })
       setSheet(null)
       load()
     } catch (err) {
