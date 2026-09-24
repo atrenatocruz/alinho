@@ -156,3 +156,21 @@ export async function adminSignUp({ categoryId, player1Id, partnerId = null, gue
   if (error) throw error
   return data
 }
+
+/* Quem, dos jogadores escolhidos, já tem inscrição nesta categoria
+   (Trello #480). A `tournament_admin_signup` recusa com um só código,
+   `already_in_category`, seja qual for dos dois — e no «Inscrever à mão»
+   a frase «Essa dupla já está inscrita» estava errada: a dupla nova não
+   existe, é UM dos dois que já lá está, com outra pessoa. Com a lista da
+   categoria dá para dizer qual, e o organizador sabe o que mudar.
+
+   Quem desistiu não conta — pode voltar a inscrever-se (#450). Devolve o
+   nome, ou null se não se conseguir dizer. */
+export function whoIsAlreadyIn(entries = [], ids = []) {
+  const live = entries.filter((e) => e.status !== 'desistiu')
+  for (const id of ids.filter(Boolean)) {
+    const e = live.find((r) => r.player1_id === id || r.player2_id === id)
+    if (e) return (e.player1_id === id ? e.player1_name : e.player2_name) || null
+  }
+  return null
+}
