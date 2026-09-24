@@ -96,7 +96,7 @@ export default function SignupSlot({ tournament, categories, category, my: first
     try {
       const result = await signUp(choice)
       setSheet(false)
-      if (result?.invite_token) setFresh({ name: choice.guestName, email: choice.guestEmail, token: result.invite_token })
+      if (result?.invite_token) setFresh({ name: choice.guestName, email: choice.guestEmail, token: result.invite_token, waitlist: result.status === 'suplente' })
       window.dispatchEvent(new CustomEvent('tournament:reload'))
     } catch (err) { console.error('Error signing up for tournament:', err); say(err) }
     finally { setBusy(false) }
@@ -236,6 +236,7 @@ export default function SignupSlot({ tournament, categories, category, my: first
         <Sheet title={t('tsignup.invite_ready_title')} onClose={() => setFresh(null)}>
           <div className="space-y-3">
             <p className="text-sm text-ink-900">{t('tsignup.invite_ready_body', { name: fresh.name })}</p>
+            {fresh.waitlist && <p className="text-sm font-semibold text-ink-900">{t('tsignup.invite_ready_waitlist')}</p>}
             <p className="text-sm text-muted">
               {fresh.email ? t('partner.invite_ready_email', { email: fresh.email }) : t('partner.invite_ready_no_email')}
             </p>
