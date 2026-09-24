@@ -2,6 +2,7 @@ import { supabase } from './supabase.js'
 import { getGroupByJid, mixVisibleToGroup } from './groups.js'
 import { loadGame, getOpenMixes, formatDateTime, weekdayKeyPt, mixLocalParts, gameIdForMessage, labelableMixes, mixLabel } from './roster.js'
 import { resolveProfileByPhoneJid, createGuestProfile } from './phone.js'
+import { joinWithUnregisteredPartner } from './partnerInvite.js'
 import { config } from './config.js'
 import { helpText, helpFooter } from './messages.js'
 import { t } from './locales.js'
@@ -333,6 +334,17 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message, qu
     const normalized = stripAccents(text.trim().toLowerCase())
     const key = pendingKey(senderPn, groupJid)
 
+    if (normalized === 'sim' && pending.kind === 'pair_unregistered') {
+      pendingSuplenteConfirmations.delete(key)
+      await confirmPairWithUnregistered(pending)
+      return
+    }
+    if (normalized === 'nao' && pending.kind === 'pair_unregistered') {
+      pendingSuplenteConfirmations.delete(key)
+      await reply('partner_offer_declined')
+      return
+    }
+
     if (normalized === 'sim') {
       pendingSuplenteConfirmations.delete(key)
 
@@ -427,7 +439,7 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message, qu
    */
   const shownName = () => titleCase(partnerRequest.typedName || partnerRequest.name)
 
-  async function resolvePartner(profile) {
+  async function resolvePartner(profile, game = null) {
     if ((partnerRequest.mentionedPns || []).length > 1) {
       await reply('partner_one_mention')
       return null
@@ -464,12 +476,78 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message, qu
     const matches = exact.length === 1 ? exact : people.filter((x) => nameMatches(x.name, query))
     if (matches.length === 1) return { partner: matches[0], isNewGuest: false }
     if (matches.length === 0) {
-      await reply('partner_not_found', { name: shownName() })
+      // Pode ser alguém que não está na app nem no grupo (não dá para o
+      // mencionar). Em vez de parar aqui, pergunta-se — «Sim» faz o mesmo
+      // que o «Não está na app?» da app (partnerInvite.js). A pergunta
+      // evita criar uma pessoa nova por um nome mal escrito.
+      const name = shownName()
+      if (game && name.length >= 2 && name.length <= 60) {
+        pendingSuplenteConfirmations.set(pendingKey(senderPn, groupJid), {
+          kind: 'pair_unregistered',
+          gameId: game.id,
+          name,
+          expiresAt: Date.now() + SUPLENTE_CONFIRM_TTL_MS,
+          reprompted: false,
+        })
+        await reply('partner_offer_unregistered', { name })
+        return null
+      }
+      await reply('partner_not_found', { name })
       return null
     }
     const list = matches.slice(0, 6).map((x) => `• ${x.name}`).join('\n')
     await reply('partner_ambiguous', { name: shownName(), list, example: matches[0].name })
     return null
+  }
+
+  // «Sim» à pergunta «inscrever a dupla com quem não está na app?». Entre a
+  // pergunta e a resposta passaram até 10 minutos: volta-se a verificar o mix
+  // e as vagas antes de criar a conta por reclamar e o convite.
+  async function confirmPairWithUnregistered(pending) {
+    const { game, people, capacity } = await loadGame(pending.gameId)
+    if (!OPEN_STATUSES.has(game.status) || new Date(game.date).getTime() <= Date.now()) {
+      await reply('mix_no_longer_available')
+      return
+    }
+    if (game.rotate_partners) {
+      await reply('partner_not_fixed_pairs')
+      return
+    }
+    if (!game.allow_pair_signup) {
+      await reply('pair_signup_off')
+      return
+    }
+    if (capacity - people.length < 2) {
+      await reply(capacity - people.length <= 0 ? 'mix_full_pair' : 'mix_one_spot_pair')
+      return
+    }
+    const { profile, isNewGuest } = await requireProfileOrCreateGuest(resolvedProfile, senderPn)
+    if (!profile) return
+    const { data: rows, error } = await supabase
+      .from('participants')
+      .select('user_id, partner_id')
+      .eq('game_id', game.id)
+      .in('status', ['confirmed', 'waitlisted'])
+    if (error) throw new Error(`Failed to check existing participants: ${error.message}`)
+    if (rows.some((row) => row.user_id === profile.id || row.partner_id === profile.id)) {
+      await reply('already_joined')
+      return
+    }
+    let token
+    try {
+      token = await joinWithUnregisteredPartner({
+        gameId: game.id, organizationId, callerId: profile.id, name: pending.name,
+      })
+    } catch (err) {
+      console.error('Failed to join with unregistered partner:', err)
+      await reply('partner_not_found_app', { appUrl: config.appUrl })
+      return
+    }
+    await reply('pair_partner_invite_created', {
+      partner: pending.name,
+      link: `${config.appUrl}/convite/${token}`,
+    })
+    if (isNewGuest) await reply('guest_joined', { name: profile.name, appUrl: config.appUrl })
   }
 
   // Entrar em dupla: as mesmas regras da app (GameDetails, «Entrar com
@@ -494,7 +572,7 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message, qu
       await reply(left <= 0 ? 'mix_full_pair' : 'mix_one_spot_pair')
       return
     }
-    const resolved = await resolvePartner(profile)
+    const resolved = await resolvePartner(profile, game)
     if (!resolved) return
     const { partner, isNewGuest: partnerIsNewGuest } = resolved
     if (partner.id === profile.id) {

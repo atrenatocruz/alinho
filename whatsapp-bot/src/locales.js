@@ -24,7 +24,7 @@ Para entrares num mix:
 Para entrares já em dupla (nos mixes com «👥 Inscrição individual ou em dupla»):
 • *In com João Silva* — o nome como está na app
 • ou *In @João* — menciona o teu parceiro
-Se ele ainda não estiver na app, o bot inscreve-o como convidado (só com a menção @). A dupla aparece na lista com o mesmo número à frente dos dois nomes, ex.: *(1)*.
+Se ele ainda não estiver na app: com a menção @ o bot inscreve-o como convidado; pelo nome, o bot pergunta se queres inscrever a dupla na mesma e dá-te um link para lhe enviares. A dupla aparece na lista com o mesmo número à frente dos dois nomes, ex.: *(1)*.
 
 Para saíres de um mix:
 • *Out* / *Fora* / *Estou fora* / *Saio*
@@ -102,6 +102,9 @@ Para veres esta lista:
   partner_is_you: '🤖 Não podes ser o teu próprio parceiro 😄 Escolhe outra pessoa.',
   partner_already_in: '🤖 {{name}} já está inscrito neste mix.',
   partner_guest_default_name: 'Parceiro de {{name}}',
+  partner_offer_unregistered: '🤖 Não encontrei o *{{name}}* no clube. Queres inscrever a dupla com ele na mesma? Responde *Sim* ou *Não*.\n\n(Se ele já está na app com outro nome, responde *Não* e escreve o nome como aparece lá.)',
+  partner_offer_declined: '🤖 Ok, não inscrevi a dupla. Podes tentar *In com* e o nome como está na app, ou *In @parceiro* se ele estiver no grupo.',
+  pair_partner_invite_created: '🤖 🤝 Dupla inscrita com *{{partner}}*! Envia-lhe este link para ele ficar com o lugar e ter o histórico e o ranking:\n{{link}}',
   pair_partner_guest_created: '🤖 🤝 Dupla inscrita! Criei um perfil de convidado para *{{partner}}* — para ter o histórico e o ranking, pode registar-se em {{appUrl}} com este número.',
 }
 
@@ -115,7 +118,7 @@ To join a mix:
 To join straight away as a pair (mixes marked «👥 Inscrição individual ou em dupla»):
 • *In com João Silva* — the name as it appears in the app
 • or *In @João* — mention your partner
-If they're not on the app yet, the bot signs them up as a guest (only with the @ mention). The pair shows up on the list with the same number next to both names, e.g. *(1)*.
+If they're not on the app yet: with the @ mention the bot signs them up as a guest; by name, the bot asks whether to sign up the pair anyway and gives you a link to send them. The pair shows up on the list with the same number next to both names, e.g. *(1)*.
 
 To leave a mix:
 • *Out* / *Fora* / *Estou fora* / *Saio*
@@ -192,6 +195,9 @@ To see this list:
   partner_is_you: "🤖 You can't be your own partner 😄 Pick someone else.",
   partner_already_in: '🤖 {{name}} is already signed up for this mix.',
   partner_guest_default_name: "{{name}}'s partner",
+  partner_offer_unregistered: "🤖 I couldn't find *{{name}}* in the club. Do you want to sign up the pair anyway? Reply *Sim* or *Não*.\n\n(If they're already on the app under another name, reply *Não* and type the name as it appears there.)",
+  partner_offer_declined: "🤖 Ok, I didn't sign up the pair. Try *In com* and the name as it appears in the app, or *In @partner* if they're in the group.",
+  pair_partner_invite_created: '🤖 🤝 Pair signed up with *{{partner}}*! Send them this link so they claim the spot and keep their history and ranking:\n{{link}}',
   pair_partner_guest_created: '🤖 🤝 Pair signed up! I created a guest profile for *{{partner}}* — to keep their history and ranking, they can sign up at {{appUrl}} with this number.',
 }
 
