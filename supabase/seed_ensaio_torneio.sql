@@ -15,6 +15,13 @@
 --     `v_confirmo_422_feito := TRUE` lá em baixo. É de propósito: a regra
 --     não fica só num comentário que se lê por cima.
 --
+--     **NO `alinho-dev` PODE-SE ABRIR A TRAVA.** A razão dela é o ranking
+--     público de PRODUÇÃO; o do dev não é visto por ninguém de fora. Foi
+--     aberta lá a 24 set (Dev 3, a pedido do PO) para os agentes do Renato
+--     testarem grupos → eliminatória com dados. **Isso não vale para
+--     produção:** lá, a trava só abre depois de a
+--     `migration_rankings_visiveis.sql` (#422) ter corrido.
+--
 -- ═════════════════════════════════════════════════════════════════════════
 -- O QUE O ENSAIO PROVA, E O QUE NÃO PROVA — LER ANTES DE CONFIAR NELE
 -- ═════════════════════════════════════════════════════════════════════════
