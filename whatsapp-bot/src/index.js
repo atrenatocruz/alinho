@@ -3,6 +3,7 @@ import { config } from './config.js'
 import { connectWhatsApp } from './wa.js'
 import { setParticipatingJidsProvider } from './groups.js'
 import { handleGroupMessage } from './commands.js'
+import { createKeyedQueue } from './keyedQueue.js'
 import { startSync } from './sync.js'
 import { startReminders } from './reminders.js'
 import { startAutoStart } from './autostart.js'
@@ -16,15 +17,13 @@ async function main() {
   // das mensagens — o 2º podia ficar à frente do 1º, e na última vaga os
   // dois passavam a verificação de lotação e o mix enchia acima da
   // capacidade. O .catch dentro da cadeia mantém a fila viva após um erro.
-  let messageQueue = Promise.resolve()
+  // Uma fila por grupo (keyedQueue.js): por ordem dentro do grupo, em
+  // paralelo entre grupos.
+  const enqueue = createKeyedQueue()
 
   const { sendText, getGroupMentions, getParticipatingGroupJids } = await connectWhatsApp({
     onGroupMessage: (payload) => {
-      messageQueue = messageQueue.then(() =>
-        handleGroupMessage(payload, { sendText }).catch((err) => {
-          console.error('Failed to handle group message:', err)
-        })
-      )
+      enqueue(payload.groupJid, () => handleGroupMessage(payload, { sendText }))
     },
   })
 
