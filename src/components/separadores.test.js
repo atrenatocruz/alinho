@@ -27,10 +27,7 @@ const UI = 'src/components/ui.jsx'
 // Exceções conhecidas, cada uma com dono. Tira a linha quando estiver feita —
 // o teste avisa se uma exceção deixar de ser precisa.
 const EXCECOES = {
-  oldTrack: {
-    'src/components/tournament/CreateTournamentForm.jsx':
-      'Dev 1 — entrega 2 do #528 (é uma escolha de formulário → <Chips>)',
-  },
+  oldTrack: {},
   tablist: {
     'src/pages/TournamentScorePage.jsx':
       'Dev 2 — os dias do marcador são filtro (o desenho já cumpre); o papel de separador está a mais',

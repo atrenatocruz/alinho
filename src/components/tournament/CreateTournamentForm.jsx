@@ -6,7 +6,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, ImagePlus, Lock, Plus, Trash2, X } from 'lucide-react'
-import { DateField, PrimaryButton } from '../ui'
+import { Chips, DateField, PrimaryButton } from '../ui'
 import { categoryCode, categoryName, stepProblem, totalCourtHours, totalSlots, pricePerPlayer, localInputToIso, isoToLocalInput } from '../../lib/tournaments'
 import { MonoLabel } from './TournamentBits'
 import { removeTournamentPoster, uploadTournamentPoster } from '../../lib/tournamentPosterStorage'
@@ -44,37 +44,17 @@ function Field({ label, children, hint }) {
 
 const inputClass = 'w-full rounded-ctrl border border-line bg-canvas px-3 py-2.5 text-sm text-ink-900 placeholder:text-ink-300'
 
-function Chip({ on, onClick, children, muted }) {
+// Só para os botões de acrescentar (+ dia, + campo, + categoria). As
+// escolhas usam <Chips>, a pastilha única da app (Trello #528).
+function Chip({ onClick, children }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-3 py-1.5 text-[12.5px] transition-colors ${
-        on ? 'border-2 border-ok px-[11px] py-[5px] font-semibold text-ink-900'
-          : muted ? 'border border-line text-ink-300' : 'border border-line text-ink-700 hover:bg-ink-50'
-      }`}
+      className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-line px-3 py-1.5 text-[12.5px] text-ink-700 transition-colors hover:bg-ink-50"
     >
       {children}
     </button>
-  )
-}
-
-function Segmented({ options, value, onChange }) {
-  return (
-    <div className="flex rounded-ctrl bg-ink-50 p-[3px]">
-      {options.map(([key, label]) => (
-        <button
-          key={key}
-          type="button"
-          onClick={() => onChange(key)}
-          className={`flex-1 rounded-[10px] py-1.5 text-[12px] font-semibold transition-colors ${
-            value === key ? 'bg-canvas text-ink-900 shadow-lift' : 'text-ink-500'
-          }`}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
   )
 }
 
@@ -430,11 +410,9 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
           )}
 
           <Field label={t('tournament.create.max_categories')}>
-            <div className="flex gap-1.5">
-              {[1, 2, 3].map((n) => (
-                <Chip key={n} on={draft.rules.max_categories === n} onClick={() => setRule('max_categories', n)}>{n}</Chip>
-              ))}
-            </div>
+            <Chips value={draft.rules.max_categories} onChange={(n) => setRule('max_categories', n)}
+              label={t('tournament.create.max_categories')}
+              options={[1, 2, 3].map((n) => ({ value: n, label: String(n) }))} />
           </Field>
 
           {draft.categories.length > 0 && (
@@ -538,18 +516,22 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
       {(locked || step === 4) && (
         <>
           <Field label={t('tournament.create.entry_mode')}>
-            <Segmented
+            {/* Uma resposta num formulário → pastilhas soltas (Trello #528). */}
+            <Chips
               value={draft.rules.entry_mode}
               onChange={(v) => setRule('entry_mode', v)}
-              options={[['dupla', t('tournament.create.entry_pair')], ['sozinho', t('tournament.create.entry_solo')], ['as_duas', t('tournament.create.entry_both')]]}
+              label={t('tournament.create.entry_mode')}
+              options={[
+                { value: 'dupla', label: t('tournament.create.entry_pair') },
+                { value: 'sozinho', label: t('tournament.create.entry_solo') },
+                { value: 'as_duas', label: t('tournament.create.entry_both') },
+              ]}
             />
           </Field>
           <Field label={t('tournament.create.scoring')}>
-            <div className="flex flex-wrap gap-1.5">
-              {SCORINGS.map((s) => (
-                <Chip key={s} on={draft.rules.scoring === s} onClick={() => setRule('scoring', s)}>{t(`tournament.create.scoring_${s}`)}</Chip>
-              ))}
-            </div>
+            <Chips value={draft.rules.scoring} onChange={(v) => setRule('scoring', v)}
+              label={t('tournament.create.scoring')}
+              options={SCORINGS.map((s) => ({ value: s, label: t(`tournament.create.scoring_${s}`) }))} />
           </Field>
           <Field label={t('tournament.create.duration')} hint={t('tournament.create.duration_hint', { max: draft.rules.duration_max })}>
             <div className="flex items-center gap-2">
@@ -575,10 +557,14 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
             </div>
           </Field>
           <Field label={t('tournament.create.selection')}>
-            <Segmented
+            <Chips
               value={draft.rules.selection}
               onChange={(v) => setRule('selection', v)}
-              options={[['manual', t('tournament.create.selection_manual')], ['pontos', t('tournament.create.selection_points')]]}
+              label={t('tournament.create.selection')}
+              options={[
+                { value: 'manual', label: t('tournament.create.selection_manual') },
+                { value: 'pontos', label: t('tournament.create.selection_points') },
+              ]}
             />
           </Field>
           <Field label={t('tournament.create.organizer_text')}>
@@ -657,18 +643,14 @@ function CategoryEditor({ value, taken = [], days, dayLabel, onCancel, onSave })
         <button type="button" onClick={onCancel} aria-label={t('tournament.create.cancel')} className="text-ink-300 hover:text-ink-700"><X size={16} /></button>
       </div>
       <Field label={t('tournament.create.gender')}>
-        <div className="flex flex-wrap gap-1.5">
-          {GENDERS.map((g) => (
-            <Chip key={g} on={cat.gender === g} onClick={() => set({ gender: g, name: '' })}>{t(`tournament.create.gender_${g}`)}</Chip>
-          ))}
-        </div>
+        <Chips value={cat.gender} onChange={(g) => set({ gender: g, name: '' })}
+          label={t('tournament.create.gender')}
+          options={GENDERS.map((g) => ({ value: g, label: t(`tournament.create.gender_${g}`) }))} />
       </Field>
       <Field label={t('tournament.create.level')}>
-        <div className="flex flex-wrap gap-1.5">
-          {[1, 2, 3, 4, 5, 6].map((n) => (
-            <Chip key={n} on={cat.level === n} onClick={() => set({ level: n, name: '' })}>{n}</Chip>
-          ))}
-        </div>
+        <Chips value={cat.level} onChange={(n) => set({ level: n, name: '' })}
+          label={t('tournament.create.level')}
+          options={[1, 2, 3, 4, 5, 6].map((n) => ({ value: n, label: String(n) }))} />
       </Field>
       <Field label={t('tournament.create.category_custom_name')}>
         <input className={inputClass} value={cat.name} onChange={(e) => set({ name: e.target.value })} placeholder={categoryName(t, cat.gender, cat.level)} />

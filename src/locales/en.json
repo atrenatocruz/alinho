@@ -2400,6 +2400,7 @@
   "tournament.tab_draw": "Draw",
   "tournament.tab_calendar": "Schedule",
   "tournament.tab_entries": "Entries",
+  "tournament.tabs_label": "Tournament sections",
   "tournament.tab_not_built": "This tab isn't built yet.",
   "tournament.not_found_title": "Tournament not found",
   "tournament.not_found_subtitle": "The link may be wrong, or the tournament isn't published yet.",
