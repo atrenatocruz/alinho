@@ -910,7 +910,7 @@
   "gerirclube.change_logo_aria": "Alterar logo do clube",
   "gerirclube.club_logo_label": "Logo do clube",
   "gerirclube.confirm_deactivate_recurrence": "Desativar a recorrência deste Mix? O próximo Mix pendente (ainda não lançado) será removido.",
-  "gerirclube.confirm_delete_game": "Tens a certeza que queres eliminar este jogo?",
+  "gerirclube.confirm_delete_game": "Tens a certeza que queres eliminar este mix?",
   "gerirclube.confirm_grant_admin": "Tornar este membro admin? Vai passar a poder gerir o clube.",
   "gerirclube.confirm_remove_member": "Remover {{name}} deste clube?\n\nA conta e as inscrições/estatísticas noutros clubes (se os houver) mantêm-se — isto só remove a ligação a este clube.",
   "gerirclube.confirm_revoke_admin": "Retirar as permissões de admin a este membro?",
