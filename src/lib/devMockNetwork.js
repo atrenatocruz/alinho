@@ -549,6 +549,8 @@ const LONG_STATS = [
 // Ao contrário do resto destes mocks, este guarda o que se escreve (inserir,
 // apagar, atualizar) enquanto a página estiver aberta, para o fluxo inteiro
 // correr em localhost. 'full' = 8 de 8 com 1 suplente; 'odd' = 7 de 8.
+// Antes de começar (Trello #534): 'open' = mix aberto, 5 de 8, sem duplas;
+// 'closed' = mix cheio (8 de 8), ainda sem duplas.
 const lastMinute = () => localStorage.getItem('mockLastMinute')
 const LM_GAME_ID = 'fake-game-1'
 const LM_PEOPLE = [
@@ -561,19 +563,21 @@ const lmPerson = (id) => LM_PEOPLE.find((p) => p.id === id) || null
 let lmStore = null
 const lmState = () => {
   if (lmStore) return lmStore
-  const odd = lastMinute() === 'odd'
-  const confirmed = LM_PEOPLE.slice(0, odd ? 7 : 8)
+  const mode = lastMinute()
+  const odd = mode === 'odd'
+  const beforeStart = mode === 'open' || mode === 'closed'
+  const confirmed = LM_PEOPLE.slice(0, odd ? 7 : mode === 'open' ? 5 : 8)
   lmStore = {
     game: {
       id: LM_GAME_ID, organization_id: MOCK_ADMIN_ORG_ID, title: 'Mix de Quinta-feira', date: tomorrow8pm.toISOString(),
-      location: 'Smash Padel Almada', status: 'in_progress', format: 'sobe_desce', num_courts: 2, max_players: null,
+      location: 'Smash Padel Almada', status: beforeStart ? mode : 'in_progress', format: 'sobe_desce', num_courts: 2, max_players: null,
       price_per_player: 8, prize: null, gender_restriction: 'indiferente', level: null, recurrence_id: null, pairing_mode: 'por_nivel',
     },
     participants: [
       ...confirmed.map((p, i) => ({ id: `lmp-${i}`, game_id: LM_GAME_ID, user_id: p.id, partner_id: null, status: 'confirmed', joined_alone: true, created_at: `2026-09-10T10:0${i}:00Z` })),
-      ...(odd ? [] : [{ id: 'lmp-w', game_id: LM_GAME_ID, user_id: 'lm-9', partner_id: null, status: 'waitlisted', joined_alone: true, created_at: '2026-09-10T11:00:00Z' }]),
+      ...(odd || beforeStart ? [] : [{ id: 'lmp-w', game_id: LM_GAME_ID, user_id: 'lm-9', partner_id: null, status: 'waitlisted', joined_alone: true, created_at: '2026-09-10T11:00:00Z' }]),
     ],
-    teams: [[0, 1], [2, 3], [4, 5], ...(odd ? [] : [[6, 7]])].map(([a, b], i) => ({
+    teams: (beforeStart ? [] : [[0, 1], [2, 3], [4, 5], ...(odd ? [] : [[6, 7]])]).map(([a, b], i) => ({
       id: `lmt-${i}`, game_id: LM_GAME_ID, player1_id: confirmed[a].id, player2_id: confirmed[b].id, seed_ranking: 3000 - i * 100, created_at: '2026-09-17T18:00:00Z',
     })),
   }
@@ -732,6 +736,9 @@ const TABLE_MOCKS = {
       data: { game_title: 'Mix de Quinta-feira', game_date: tomorrow8pm.toISOString(), partner_name: 'Ana Moreira' } },
     { id: 'n2', kind: 'mix_joined', game_id: 'fake-game-1', created_at: new Date().toISOString(),
       data: { game_title: 'Mix de Quinta-feira', game_date: tomorrow8pm.toISOString(), partner_name: null } },
+    // Inscrito pelo admin com o mix aberto (Trello #534): o sino diz quem.
+    { id: 'n4', kind: 'mix_joined', game_id: 'fake-game-1', created_at: new Date().toISOString(),
+      data: { game_title: 'Mix de Sábado', game_date: tomorrow8pm.toISOString(), partner_name: 'Rui Oliveira Gomes', actor_name: 'Marta Costa' } },
     { id: 'n3', kind: 'mix_removed', game_id: 'fake-game-1', created_at: new Date().toISOString(),
       data: { game_title: 'Mix de Terça', game_date: tomorrow8pm.toISOString() } },
   ] : []).concat(LESSON_NOTICES()),

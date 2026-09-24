@@ -29,7 +29,7 @@ import { formatDate as formatDateLib, formatTime, formatCurrency } from '../lib/
 import LocationOpenWith from '../components/LocationOpenWith'
 import { describeError } from '../lib/errors'
 import { limitsFor } from '../lib/plans'
-import { canEditBeforeRound1, unpairedPeople, changedPairKeys, teamPairKey, mixChanges } from '../lib/mixEdit'
+import { canEditBeforeRound1, canAddBeforeStart, unpairedPeople, changedPairKeys, teamPairKey, mixChanges } from '../lib/mixEdit'
 import { notifyMixChanges } from '../lib/notifications'
 import AddPlayerSheet from '../components/mix/AddPlayerSheet'
 import JoinPartnerSheet from '../components/mix/JoinPartnerSheet'
@@ -1107,7 +1107,7 @@ export default function GameDetails() {
     return changed.size
   }
 
-  const handleLastMinuteAdd = async ({ playerId, partnerId, choice, plan }) => {
+  const handleLastMinuteAdd = async ({ playerId, partnerId, choice, plan, names }) => {
     const beforeIds = people.map((p) => p.id)
     setBusy(true)
     setMixError('')
@@ -1138,6 +1138,26 @@ export default function GameDetails() {
       }])
       if (insertError) throw insertError
       setAddPlayerOpen(false)
+
+      // Antes de começar (Trello #534) ainda não há duplas para refazer: só
+      // se avisa quem entrou. Suplente não recebe «entraste» (a base de dados
+      // confere o estado real e não avisaria).
+      if (!mixStarted) {
+        if (status === 'confirmed') {
+          try {
+            await notifyMixChanges(id, [playerId, partnerId]
+              .filter((pid) => pid && pid !== user.id)
+              .map((pid) => ({ user_id: pid, kind: 'mix_joined' })))
+          } catch (error) {
+            console.error('Error notifying players about being added:', error)
+          }
+        }
+        setEditNotice(status === 'confirmed'
+          ? t('mixedit.notice_added_open', { names })
+          : t('mixedit.notice_waitlist_open', { names }))
+        loadGameDetails()
+        return
+      }
 
       if (status === 'confirmed' || choice === 'court') {
         try {
@@ -1961,6 +1981,7 @@ export default function GameDetails() {
   const ageIneligible = isAgeIneligible(game, profile)
   const mixStarted = game?.status === 'in_progress' || game?.status === 'finished'
   const lastMinuteEditable = isAdmin && canEditBeforeRound1(game, matches.length)
+  const addBeforeStart = isAdmin && canAddBeforeStart(game, teams.length)
   const unpaired = lastMinuteEditable ? unpairedPeople(people, teams) : []
   const planMaxCourts = limitsFor(gameMembership?.organization?.plan_tier).courts
   // A full game counts as closed even if the stored status lagged behind
@@ -2650,19 +2671,6 @@ export default function GameDetails() {
               </p>
             </div>
           )}
-          {addPlayerOpen && (
-            <AddPlayerSheet
-              game={game}
-              excludeIds={new Set([...people.map((p) => p.id), ...waitlist.flatMap((w) => [w.user_id, w.partner_id]).filter(Boolean)])}
-              peopleCount={peopleCount}
-              capacity={capacity}
-              maxCourts={planMaxCourts}
-              ratingInfoById={ratingInfoById}
-              busy={busy}
-              onConfirm={handleLastMinuteAdd}
-              onClose={() => setAddPlayerOpen(false)}
-            />
-          )}
 
 
           {showDuplasShare && (
@@ -3162,6 +3170,23 @@ export default function GameDetails() {
               ))}
             </div>
           )}
+
+          {/* O admin inscreve alguém do grupo antes de o mix começar
+              (Trello #534) — a mesma folha do «Adicionar jogador» (#292). */}
+          {addBeforeStart && (
+            <div className="mt-4 space-y-2.5">
+              {editNotice && (
+                <div className="bg-ink-900 text-white px-4 py-3 rounded-ctrl text-sm font-extrabold flex items-center gap-2 animate-fade-up">
+                  <Check size={16} className="text-white shrink-0" />
+                  {editNotice}
+                </div>
+              )}
+              <PrimaryButton variant="ghost" onClick={() => setAddPlayerOpen(true)} disabled={busy} className="w-full">
+                <UserPlus size={18} />
+                {t('mixedit.add_player')}
+              </PrimaryButton>
+            </div>
+          )}
         </div>
       )}
 
@@ -3297,6 +3322,22 @@ export default function GameDetails() {
             </div>
           )}
         </div>
+      )}
+
+      {/* A folha do «Adicionar jogador» serve o mix a decorrer (#292) e antes de começar (#534). */}
+      {addPlayerOpen && (
+        <AddPlayerSheet
+          game={game}
+          excludeIds={new Set([...people.map((p) => p.id), ...waitlist.flatMap((w) => [w.user_id, w.partner_id]).filter(Boolean)])}
+          peopleCount={peopleCount}
+          capacity={capacity}
+          maxCourts={planMaxCourts}
+          ratingInfoById={ratingInfoById}
+          busy={busy}
+          onConfirm={handleLastMinuteAdd}
+          onClose={() => setAddPlayerOpen(false)}
+          beforeStart={!mixStarted}
+        />
       )}
 
       {/* Ações de inscrição */}
