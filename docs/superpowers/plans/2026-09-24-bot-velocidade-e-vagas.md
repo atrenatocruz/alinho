@@ -50,7 +50,7 @@
 
 ---
 
-### Tarefa 1: Trigger de vagas em `participants`
+### Task 1: Trigger de vagas em `participants`
 
 **Ficheiros:**
 - Criar: `supabase/migration_mix_capacity_guard.sql`
@@ -158,7 +158,7 @@ BEGIN
     INTO v_taken
     FROM participants
    WHERE game_id = NEW.game_id AND status = 'confirmed' AND id <> NEW.id;
-  IF v_taken + 1 + CASE WHEN NEW.partner_id IS NOT NULL THEN 1 ELSE 0 END > v_cap THEN
+  IF v_taken + (CASE WHEN NEW.partner_id IS NOT NULL THEN 2 ELSE 1 END) > v_cap THEN  -- ver ledger: na implementação é v_size
     RAISE EXCEPTION 'game_full';
   END IF;
   RETURN NEW;
@@ -199,7 +199,7 @@ git commit -m "fix(mix): trigger impede inscrições acima das vagas quando duas
 
 ---
 
-### Tarefa 2: A app diz «o mix acabou de encher»
+### Task 2: A app diz «o mix acabou de encher»
 
 **Ficheiros:**
 - Modificar: `src/pages/GameDetails.jsx` (`handleJoinAlone` ~l.395, `handleJoinPartner` ~l.436, `handleJoinWithPartner` ~l.458)
@@ -258,7 +258,7 @@ git commit -m "fix(mix): a app diz que o mix acabou de encher quando o trigger d
 
 ---
 
-### Tarefa 3: Testes no bot + o bot trata `game_full`
+### Task 3: Testes no bot + o bot trata `game_full`
 
 **Ficheiros:**
 - Modificar: `whatsapp-bot/package.json`
@@ -483,7 +483,7 @@ git commit -m "test(bot): testes com node:test e Supabase em memória; o bot tra
 
 ---
 
-### Tarefa 4: Medir — uma linha de log por comando e por repost
+### Task 4: Medir — uma linha de log por comando e por repost
 
 **Ficheiros:**
 - Criar: `whatsapp-bot/src/timing.js`, `whatsapp-bot/test/timing.test.js`
@@ -565,7 +565,7 @@ git commit -m "feat(bot): uma linha de log com o tempo de cada passo por comando
 
 ---
 
-### Tarefa 5: Uma fila por grupo em vez de uma fila global
+### Task 5: Uma fila por grupo em vez de uma fila global
 
 **Ficheiros:**
 - Criar: `whatsapp-bot/src/keyedQueue.js`, `whatsapp-bot/test/keyedQueue.test.js`
@@ -661,7 +661,7 @@ git commit -m "perf(bot): uma fila por grupo — grupos diferentes deixam de esp
 
 ---
 
-### Tarefa 6: Menos idas em série à BD + o «In» pede o repost logo
+### Task 6: Menos idas em série à BD + o «In» pede o repost logo
 
 **Ficheiros:**
 - Modificar: `whatsapp-bot/src/roster.js` (`loadGame`), `whatsapp-bot/src/commands.js`, `whatsapp-bot/src/sync.js`
@@ -854,7 +854,7 @@ git commit -m "perf(bot): loadGame numa ida à BD, perfil e mixes em paralelo, e
 
 ---
 
-### Tarefa 7: O repost só recarrega o mix que mudou
+### Task 7: O repost só recarrega o mix que mudou
 
 **Ficheiros:**
 - Modificar: `whatsapp-bot/src/sync.js` (`postGroupRoster`, `flushRepost`, o handler Realtime de `participants`)
@@ -953,7 +953,7 @@ git commit -m "perf(bot): o repost só recarrega o mix que mudou, a não ser que
 
 ---
 
-### Tarefa 8: Pôr no ar e comparar
+### Task 8: Pôr no ar e comparar
 
 - [ ] **Passo 1:** Renato corre `supabase/migration_mix_capacity_guard.sql` em produção (depois a consulta «PARA VER DEPOIS» do fim do ficheiro, para ver se há mixes abertos já acima das vagas).
 - [ ] **Passo 2:** push `dev` → `main` (só com a migração corrida — a app das Tarefas 2 não depende dela, mas o texto só aparece com ela).
