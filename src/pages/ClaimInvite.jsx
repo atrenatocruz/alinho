@@ -39,8 +39,14 @@ export default function ClaimInvite() {
       .catch((err) => {
         if (cancelled) return
         console.error('Error claiming partner invite:', err)
-        const key = `${isTournament ? 'tsignup' : 'partner'}.claim_error_${err.message}`
-        setError(t(key) === key ? t('partner.claim_error_generic') : t(key))
+        // Torneio: primeiro o texto próprio do convite, depois o da inscrição
+        // (tsignup.error_*: «esse convite é teu», máximo de categorias, …),
+        // e só no fim o genérico — antes quase tudo caía no «tenta outra vez».
+        const ns = isTournament ? 'tsignup' : 'partner'
+        const keys = [`${ns}.claim_error_${err.message}`]
+        if (isTournament) keys.push(`tsignup.error_${err.message}`)
+        const found = keys.find((k) => t(k) !== k)
+        setError(found ? t(found) : t('partner.claim_error_generic'))
         setState('error')
       })
     return () => { cancelled = true }
