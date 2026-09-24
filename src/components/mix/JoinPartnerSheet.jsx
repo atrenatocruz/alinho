@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase'
 import { Sheet } from '../agenda/AgendaControls'
 import { Avatar, PrimaryButton } from '../ui'
 import { partnerNameError, partnerEmailError, PARTNER_NAME_MAX } from '../../lib/partnerInvite'
+import { contemTexto } from '../../lib/semAcentos'
 
 /* Entrar num mix de duplas fixas com parceiro (Trello #339).
    Desenho: design-handoff/2026-09-19-torneios/wireframes/inscricoes.html,
@@ -49,9 +50,10 @@ export default function JoinPartnerSheet({ game, excludeIds, busy, error, onConf
     return () => { cancelled = true }
   }, [game.organization_id])
 
-  const q = query.trim().toLowerCase()
+  // Sem contar acentos: «goncalves» encontra «Gonçalves».
+  const q = query.trim()
   const available = useMemo(() => members.filter((m) => !excludeIds.has(m.id)), [members, excludeIds])
-  const shown = (q ? available.filter((m) => m.name.toLowerCase().includes(q)) : available).slice(0, 8)
+  const shown = (q ? available.filter((m) => contemTexto(m.name, q)) : available).slice(0, 8)
 
   const nameError = partnerNameError(name)
   const emailError = partnerEmailError(email)

@@ -10,6 +10,7 @@ import { followPlayer, removeFollow } from '../lib/follows'
 import { Avatar, EmptyState, GroupLevelBadge, OrgKindBadge, orgAvatarShape, PageHeader } from '../components/ui'
 import { describeError } from '../lib/errors'
 import { useHeaderActions } from '../contexts/HeaderActionsContext'
+import { semAcentos } from '../lib/semAcentos'
 
 /* ─── Comunidade (épico «Comunidade vs. Rankings», Trello #271/#273) ─────────
    Encontrar clubes, grupos e professores — e só isso. Desenho:
@@ -66,7 +67,8 @@ const contactHref = (contact) => {
   return null
 }
 
-const norm = (s) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+// A mesma regra de todas as pesquisas de nomes (src/lib/semAcentos.js).
+const norm = semAcentos
 const byName = (a, b) => (a.name || '').localeCompare(b.name || '', 'pt')
 
 export default function Comunidade() {

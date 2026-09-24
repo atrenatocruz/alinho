@@ -6,6 +6,7 @@ import { Sheet } from '../agenda/AgendaControls'
 import { Avatar, PrimaryButton, RatingBadge, Chips } from '../ui'
 import { addPlan } from '../../lib/mixEdit'
 import { isGenderMismatch } from '../../lib/mixLogic'
+import { contemTexto } from '../../lib/semAcentos'
 
 /* Adicionar jogador a um mix já começado, antes da Ronda 1 (Trello #292).
    Desenho: https://claude.ai/artifact/Kkm4WTP6CUUTu9SNwCA1C5 (ecrãs 2 e 3).
@@ -47,8 +48,9 @@ export default function AddPlayerSheet({ game, excludeIds, peopleCount, capacity
   }, [game.organization_id])
 
   const available = useMemo(() => members.filter((m) => !excludeIds.has(m.id)), [members, excludeIds])
-  const q = query.trim().toLowerCase()
-  const matches = (list) => (q ? list.filter((m) => m.name.toLowerCase().includes(q)) : list).slice(0, 8)
+  // Sem contar acentos: «goncalves» encontra «Gonçalves».
+  const q = query.trim()
+  const matches = (list) => (q ? list.filter((m) => contemTexto(m.name, q)) : list).slice(0, 8)
   const byId = (id) => members.find((m) => m.id === id)
 
   const needed = withPartner ? 2 : 1
