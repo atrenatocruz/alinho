@@ -2841,7 +2841,8 @@ export default function GerirClube() {
                   <PlayerSearch
                     label={t('gerirclube.search_by_name_placeholder')}
                     searchFn={searchPlayers}
-                    excludeIds={members.map((m) => m.id)}
+                    disabledIds={members.map((m) => m.id)}
+                    disabledLabel={t('comunidade.member_label')}
                     onSelect={handleInvitePlayer}
                   />
                 </div>
