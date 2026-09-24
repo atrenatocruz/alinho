@@ -36,6 +36,11 @@ function requestRepostForGame(organizationId, gameId) {
 // Num objeto (e não um export solto) para os testes o poderem simular.
 export const repostHooks = { requestRepostForGame }
 
+/** Só para testes: um pedido de repost SEM pista (como o de uma edição do mix). */
+export function scheduleRepostForOrgForTests(organizationId, opts = {}) {
+  return scheduleRepostForOrg(deps.sendText, deps.getGroupMentions, organizationId, opts)
+}
+
 /** Só para testes: liga os deps sem abrir o Realtime nem os intervalos, e
  *  esquece o estado por grupo (hashes, filas) do teste anterior. */
 export function startSyncForTests(d) {
@@ -55,6 +60,10 @@ function stateFor(groupJid) {
       pendingTagAll: false,
       pendingPromotedByGame: new Map(), // gameId -> { name, lang }
       pendingGameIds: new Set(), // mixes que mudaram desde o último repost (Tarefa 7)
+      // Houve um pedido SEM pista (edição de um mix, reconciliação…) desde o
+      // último repost: esse repost tem de recarregar tudo, mesmo que também
+      // haja pistas (revisão final, 4).
+      pendingAll: false,
     }
     groupState.set(groupJid, st)
   }
@@ -169,10 +178,12 @@ function flushRepost(sendText, getGroupMentions, group) {
   const st = stateFor(group.groupJid)
   const shouldTagAll = st.pendingTagAll
   const promotedByGameId = st.pendingPromotedByGame
-  const gameIds = st.pendingGameIds
+  // Com um pedido «de tudo» pelo meio, não se passa pista nenhuma.
+  const gameIds = st.pendingAll ? new Set() : st.pendingGameIds
   st.pendingTagAll = false
   st.pendingPromotedByGame = new Map()
   st.pendingGameIds = new Set()
+  st.pendingAll = false
   postGroupRoster(sendText, getGroupMentions, group, { tagAll: shouldTagAll, promotedByGameId, gameIds }).catch((err) =>
     console.error(`Failed to repost roster to ${group.groupJid}:`, err)
   )
@@ -185,7 +196,9 @@ function flushRepost(sendText, getGroupMentions, group) {
 // mensagens por grupo, e o hash-dedupe engole envios sem alterações.
 function scheduleGroupRepost(sendText, getGroupMentions, group, { tagAll = false, promotedNames = [], gameIds = [] } = {}) {
   const st = stateFor(group.groupJid)
-  for (const id of gameIds) if (id) st.pendingGameIds.add(id)
+  const hinted = gameIds.filter(Boolean)
+  if (hinted.length === 0) st.pendingAll = true
+  for (const id of hinted) st.pendingGameIds.add(id)
   st.pendingTagAll = st.pendingTagAll || tagAll
   // Each entry is { gameId, name, lang } — keyed by gameId so the callout
   // prefixes only that specific mix's message, not every open mix's.

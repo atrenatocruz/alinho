@@ -5,7 +5,7 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = 'x'
 process.env.PHONE_HASH_SECRET = 'x'
 const { supabase } = await import('../src/supabase.js')
 const { installFakeSupabase } = await import('./fakeSupabase.js')
-const { startSyncForTests, repostHooks } = await import('../src/sync.js')
+const { startSyncForTests, repostHooks, scheduleRepostForOrgForTests } = await import('../src/sync.js')
 
 test('rajada de 6 «In» em 1 s → no máximo 2 mensagens no grupo', async () => {
   const db = {
@@ -68,4 +68,20 @@ test('se a lista de mixes abertos mudou, recarrega todos (Review Focus 5)', asyn
   assert.ok(sent.some((m) => m.includes('*Mix m0*') && m.includes('🔢 Nº: 01')), 'o mix novo passa a ser o 01')
   assert.ok(sent.some((m) => m.includes('*Mix m1*') && m.includes('🔢 Nº: 02')), 'o m1 passa a 02')
   assert.ok(sent.length === 3, `devia reenviar os 3 (numeração nova), foram ${sent.length}`)
+})
+
+test('um repost de tudo (edição de um mix) junto com um «In» noutro mix não fica reduzido (revisão, 4)', async () => {
+  const { db, sent } = setup([mix('m1', 24), mix('m2', 48)])
+  repostHooks.requestRepostForGame('o', 'm1')          // fixa a lista
+  await wait(4500)
+  repostHooks.requestRepostForGame('o', 'm1')          // 1.º da janela: sai já
+  await wait(50)
+  db.games.find((g) => g.id === 'm2').title = 'Mix m2 editado'
+  _clearOpenMixesCacheForTests()
+  scheduleRepostForOrgForTests('o')                    // edição do admin: sem pista = tudo
+  db.participants.push({ id: 'p9', game_id: 'm1', user_id: 'u9', status: 'confirmed', created_at: new Date().toISOString() })
+  repostHooks.requestRepostForGame('o', 'm1')          // «In» na mesma janela
+  sent.length = 0
+  await wait(4500)
+  assert.ok(sent.some((m) => m.includes('Mix m2 editado')), 'a edição do m2 tem de sair no repost que juntou os dois pedidos')
 })
