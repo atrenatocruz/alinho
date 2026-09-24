@@ -7,7 +7,7 @@ import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, ImagePlus, Lock, Plus, Trash2, X } from 'lucide-react'
 import { DateField, PrimaryButton } from '../ui'
-import { categoryCode, categoryName, stepProblem, totalCourtHours, totalSlots, pricePerPlayer } from '../../lib/tournaments'
+import { categoryCode, categoryName, stepProblem, totalCourtHours, totalSlots, pricePerPlayer, localInputToIso, isoToLocalInput } from '../../lib/tournaments'
 import { MonoLabel } from './TournamentBits'
 import { removeTournamentPoster, uploadTournamentPoster } from '../../lib/tournamentPosterStorage'
 import { describeError } from '../../lib/errors'
@@ -190,7 +190,9 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
     name: initial?.tournament?.name || '',
     location: initial?.tournament?.location || club?.location || club?.name || '',
     poster_url: initial?.tournament?.poster_url || null,
-    entries_close_at: (initial?.tournament?.entries_deadline || '').slice(0, 16),
+    // Vem em UTC: mostra-se na hora local (Trello #487). Cortar o texto, como
+    // antes, mostrava a hora UTC como se fosse de Lisboa.
+    entries_close_at: isoToLocalInput(initial?.tournament?.entries_deadline),
     draw_at: (initial?.tournament?.draw_on || '').slice(0, 10),
     days: (initial?.days || []).map((d) => ({
       date: d.date, starts_at: (d.starts_at || '').slice(0, 5), ends_at: (d.ends_at || '').slice(0, 5), courts: d.courts,
@@ -257,8 +259,13 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
     try { await removeTournamentPoster(url) } catch { /* ficheiro órfão não estraga o ecrã */ }
   }
 
+  // Tudo o que sai deste formulário passa por aqui: o prazo vai com fuso
+  // (Trello #487). Antes seguia "2026-10-05T23:59" sem fuso, a base de dados
+  // lia-o como UTC, e em Lisboa as inscrições fechavam às 00:59.
+  const outgoing = (d) => ({ ...d, entries_close_at: localInputToIso(d.entries_close_at) })
+
   const publish = (status) => onCreate({
-    ...draft,
+    ...outgoing(draft),
     is_public: true,
     status,
     categories: draft.categories.map((c) => ({
@@ -585,12 +592,12 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
 
       <div className="mt-5 space-y-2">
         {locked ? (
-          <PrimaryButton className="w-full" disabled={saving} onClick={() => onCreate(draft)}>{t('tournament.create.save_changes')}</PrimaryButton>
+          <PrimaryButton className="w-full" disabled={saving} onClick={() => onCreate(outgoing(draft))}>{t('tournament.create.save_changes')}</PrimaryButton>
         ) : step < 4 ? (
           <PrimaryButton className="w-full" onClick={() => (problem ? setTried(true) : (setTried(false), setStep(step + 1)))}>{t('tournament.create.next')}</PrimaryButton>
         ) : (
           editing_existing ? (
-            <PrimaryButton className="w-full" disabled={saving} onClick={() => onCreate(draft)}>
+            <PrimaryButton className="w-full" disabled={saving} onClick={() => onCreate(outgoing(draft))}>
               {t('tournament.create.save_changes')}
             </PrimaryButton>
           ) : (

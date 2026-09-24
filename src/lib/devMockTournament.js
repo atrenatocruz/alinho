@@ -92,7 +92,9 @@ const TOURNAMENT = () => {
     is_preview: st === 'rascunho',
     court_count: 4,
     entry_fee_cents: 2500,
-    entries_deadline: iso(dayAfter(fri, -4)),
+    // Como a base de dados o guarda: um instante com fuso. 22:59 UTC é 23:59
+    // em Lisboa no horário de verão — é o que o ecrã tem de mostrar (#487).
+    entries_deadline: `${iso(dayAfter(fri, -4))}T22:59:00+00:00`,
     draw_on: iso(dayAfter(fri, -2)),
     organizer_text: 'Pagamento na receção ou por MB Way. A inscrição só fica válida quando o clube confirmar.',
     // mockTournamentScoring = 'melhor_2_sets' | 'melhor_3_sets' para ver o
@@ -240,7 +242,7 @@ export const TOURNAMENT_RPC_MOCKS = {
     const mine = created.find((x) => x.id === params?.p_tournament_id)
     const t = mine ? { ...TOURNAMENT(), ...mine } : TOURNAMENT()
     return {
-      tournament: { ...t, entries_deadline: `${t.entries_deadline}T23:59`, draw_on: t.draw_on, rules: {} },
+      tournament: { ...t, draw_on: t.draw_on, rules: {} },
       days: [0, 1, 2].map((n) => ({
         id: `d${n}`, date: iso(dayAfter(fri, n)), starts_at: n === 0 ? '18:00' : '09:00', ends_at: n === 2 ? '18:00' : '21:00', courts: n === 2 ? 3 : 4,
       })),
