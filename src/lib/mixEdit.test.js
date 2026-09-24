@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { canEditBeforeRound1, unpairedPeople, changedPairKeys, addPlan, mixChanges } from './mixEdit'
+import { canEditBeforeRound1, canAddBeforeStart, unpairedPeople, changedPairKeys, addPlan, mixChanges } from './mixEdit'
 
 describe('canEditBeforeRound1', () => {
   it('only while in progress and before any match is drawn', () => {
@@ -9,6 +9,20 @@ describe('canEditBeforeRound1', () => {
   })
   it('never for americano, whose rounds exist from the start', () => {
     expect(canEditBeforeRound1({ status: 'in_progress', format: 'americano' }, 0)).toBe(false)
+  })
+})
+
+describe('canAddBeforeStart (#534)', () => {
+  it('open or full (closed) mixes, before the duplas exist', () => {
+    expect(canAddBeforeStart({ status: 'open' }, 0)).toBe(true)
+    expect(canAddBeforeStart({ status: 'closed' }, 0)).toBe(true)
+    expect(canAddBeforeStart({ status: 'open', format: 'americano' }, 0)).toBe(true)
+  })
+  it('not once it started, finished, or is paused with duplas made', () => {
+    expect(canAddBeforeStart({ status: 'in_progress' }, 0)).toBe(false)
+    expect(canAddBeforeStart({ status: 'finished' }, 0)).toBe(false)
+    expect(canAddBeforeStart({ status: 'cancelled' }, 0)).toBe(false)
+    expect(canAddBeforeStart({ status: 'closed' }, 4)).toBe(false)
   })
 })
 

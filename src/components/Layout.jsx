@@ -461,8 +461,10 @@ export default function Layout({ children }) {
     }
     if (notice.kind === 'mix_removed') return t('layout.mix_notice_removed', vars)
     const partnerLine = d.partner_name ? t('layout.mix_notice_partner', vars) : t('layout.mix_notice_no_partner')
+    // Quem inscreveu (Trello #534): o aviso guarda o nome do admin.
+    const joinedKey = d.actor_name ? 'layout.mix_notice_added_by' : 'layout.mix_notice_joined'
     return notice.kind === 'mix_joined'
-      ? `${t('layout.mix_notice_joined', vars)} ${partnerLine}`
+      ? `${t(joinedKey, { ...vars, actor: d.actor_name })} ${partnerLine}`
       : `${t('layout.mix_notice_partner_changed', vars)} ${partnerLine}`
   }
 

@@ -30,7 +30,10 @@ export function slotsLeft(category, entries = []) {
   if (!category || category.slots == null) return null
   const taken = Array.isArray(entries) && entries.length
     ? entries.filter((e) => takesSlot(e.status)).length
-    : (category.entry_count || 0)
+    // `taken_count` é a conta do servidor (pendentes incluídas —
+    // tournament_taken_slots); `entry_count` só conta as validadas e ficou
+    // como reserva enquanto a migração da integridade não correr.
+    : (category.taken_count ?? category.entry_count ?? 0)
   return Math.max(0, category.slots - taken)
 }
 

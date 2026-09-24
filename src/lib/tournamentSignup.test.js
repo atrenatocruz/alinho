@@ -21,6 +21,10 @@ describe('takesSlot', () => {
 })
 
 describe('slotsLeft', () => {
+  it('conta pelo taken_count do servidor, que inclui as pendentes', () => {
+    expect(slotsLeft(cat({ slots: 16, entry_count: 2, taken_count: 10 }))).toBe(6)
+    expect(slotsLeft(cat({ slots: 4, entry_count: 0, taken_count: 4 }))).toBe(0)
+  })
   it('conta pelo entry_count quando não há lista', () => {
     expect(slotsLeft(cat({ slots: 16, entry_count: 10 }))).toBe(6)
   })

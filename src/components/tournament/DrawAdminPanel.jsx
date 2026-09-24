@@ -12,7 +12,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronLeft, Shuffle, Check, AlertTriangle, RefreshCw, Printer } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { PrimaryButton, EmptyState } from '../ui'
+import { PrimaryButton, EmptyState, ConfirmSheet } from '../ui'
 import { MonoLabel, StatePill } from './TournamentBits'
 import {
   listCategoriesAdmin, listCategorySeeding, closeCategoryEntries,
@@ -117,7 +117,7 @@ function CloseEntriesStep({ category, onDone, t }) {
       {error && <p className="mb-2 text-[12px] text-danger">{error}</p>}
 
       <PrimaryButton onClick={close} disabled={busy || over || !chosen.length}>
-        {t('tournament.draw.close_confirm', { n: chosen.length })}
+        {t('tournament.draw.close_confirm', { teams: t('tournament.n.teams', { count: chosen.length }) })}
       </PrimaryButton>
     </div>
   )
@@ -207,7 +207,9 @@ function FormatStep({ days: dayRows, rules, category, teamCount, onDone, t }) {
             <p className="mt-0.5 font-mono text-[10.5px] text-muted">
               {t('tournament.draw.opt_line', {
                 guaranteed: t('tournament.draw.opt_guaranteed', { count: o.guaranteed }),
-                matches: o.matches, hours: Math.round(o.hours), phases: o.phases,
+                matches: t('tournament.n.matches', { count: o.matches }),
+                hours: Math.round(o.hours),
+                phases: t('tournament.n.phases', { count: o.phases }),
               })}
             </p>
             {o.fits === false && (
@@ -300,7 +302,10 @@ function DrawStep({ category, onDone, onChangeFormat, t }) {
     return (
       <div>
         <EmptyState icon={AlertTriangle} title={t('tournament.draw.draw_short_title')}
-          subtitle={t('tournament.draw.draw_short_subtitle', { teams: teams.length, groups: groupCount })} />
+          subtitle={t('tournament.draw.draw_short_subtitle', {
+            teams: t('tournament.n.teams', { count: teams.length }),
+            groups: t('tournament.n.groups', { count: groupCount }),
+          })} />
         {/* A mensagem manda mudar de formato — agora há mesmo por onde. */}
         <PrimaryButton onClick={onChangeFormat} className="w-full">{t('tournament.draw.change_format')}</PrimaryButton>
       </div>
@@ -393,21 +398,14 @@ function DrawStep({ category, onDone, onChangeFormat, t }) {
 
 /* ── Depois de sorteado ─────────────────────────────────────────────── */
 function DoneStep({ tournament, category, onDone, t }) {
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState(null)
+  const [asking, setAsking] = useState(false)
   const locked = (category.played_count || 0) > 0
 
+  // Apaga grupos, jogos e horas da categoria: pergunta antes, como as outras
+  // ações que destroem trabalho (CLAUDE.md). O erro fica na própria folha.
   const undo = async () => {
-    setBusy(true)
-    setError(null)
-    try {
-      await clearCategoryDraw(category.id)
-      onDone()
-    } catch (e) {
-      setError(e.message)
-    } finally {
-      setBusy(false)
-    }
+    await clearCategoryDraw(category.id)
+    onDone()
   }
 
   return (
@@ -415,16 +413,18 @@ function DoneStep({ tournament, category, onDone, t }) {
       <div className="mb-2 rounded-xl border border-ink-100 bg-white px-3 py-2.5">
         <b className="text-[13px] font-extrabold text-ink-900">{t('tournament.draw.done_title')}</b>
         <p className="mt-0.5 text-[12px] text-ink-700">
-          {t('tournament.draw.done_line', {
-            groups: category.group_count, matches: category.match_count,
-          })}
+          {category.group_count
+            ? t('tournament.draw.done_line', {
+              groups: t('tournament.n.groups', { count: category.group_count }),
+              matches: t('tournament.n.matches', { count: category.match_count || 0 }),
+            })
+            : t('tournament.draw.done_line_ko', { matches: t('tournament.n.matches', { count: category.match_count || 0 }) })}
         </p>
         <p className="mt-1 text-[11.5px] text-muted">
           {locked ? t('tournament.draw.done_locked') : t('tournament.draw.done_can_undo')}
         </p>
       </div>
 
-      {error && <p className="mb-2 text-[12px] text-danger">{error}</p>}
       <div className="flex flex-wrap items-center gap-2">
         <Link
           to={`/torneio/${tournament.slug || tournament.id}/imprimir?categoria=${category.id}`}
@@ -435,14 +435,24 @@ function DoneStep({ tournament, category, onDone, t }) {
         {!locked && (
           <button
             type="button"
-            onClick={undo}
-            disabled={busy}
+            onClick={() => setAsking(true)}
             className="rounded-full border border-line px-3 py-2 text-[12px] font-semibold text-ink-700 hover:bg-ink-50"
           >
             {t('tournament.draw.undo')}
           </button>
         )}
       </div>
+
+      <ConfirmSheet
+        open={asking}
+        danger
+        title={t('tournament.draw.undo_confirm_title', { code: category.code })}
+        message={t('tournament.draw.undo_confirm_message')}
+        cancelLabel={t('tournament.draw.undo_confirm_keep')}
+        confirmLabel={t('tournament.draw.undo')}
+        onConfirm={undo}
+        onClose={() => setAsking(false)}
+      />
     </div>
   )
 }
@@ -498,8 +508,10 @@ export default function DrawAdminPanel({ tournament, onBack }) {
                 <b className="block truncate text-[13px] font-extrabold text-ink-900">{c.code} · {c.name}</b>
                 <span className="font-mono text-[10.5px] text-muted">
                   {t('tournament.draw.cat_counts', {
-                    selected: c.selected_count, waiting: c.waiting_count,
-                    waitlist: c.waitlist_count, slots: c.slots || 0,
+                    selected: t('tournament.n.selected', { count: c.selected_count || 0 }),
+                    waiting: c.waiting_count || 0,
+                    waitlist: t('tournament.n.reserves', { count: c.waitlist_count || 0 }),
+                    slots: t('tournament.n.slots', { count: c.slots || 0 }),
                   })}
                   {c.price_cents ? ` · ${euros(c.price_cents)}` : ''}
                 </span>
