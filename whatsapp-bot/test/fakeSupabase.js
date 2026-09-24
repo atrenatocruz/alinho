@@ -40,6 +40,9 @@ export function installFakeSupabase(supabase, db) {
       }
       if (q.op === 'delete') {
         db[table] = db[table].filter((row) => !q.filters.every((f) => f(row)))
+        // Os triggers da BD (ex.: promover o 1.º suplente ao sair) — o teste
+        // diz o que acontece com db.afterDelete(table).
+        db.afterDelete?.(table)
         return { data: null, error: null }
       }
       if (q.op === 'update') {

@@ -638,7 +638,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
   // regardless of how that mix got picked (explicit code, the only-one-open
   // shortcut, or being the one mix the sender is in for a bare "out").
   async function actOnGame(mixRow, profile) {
-    const { game, people, capacity, rows } = await loadGame(mixRow.id)
+    const { game, people, capacity, rows, suplentes } = await loadGame(mixRow.id)
     timer.mark('mix')
     const gameIsFuture = new Date(game.date).getTime() > Date.now()
 
@@ -738,7 +738,28 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     const { error: deleteError } = await supabase.from('participants').delete().eq('id', ownConfirmedRow.id)
     timer.mark('gravar')
     if (deleteError) throw new Error(`Failed to remove participant: ${deleteError.message}`)
-    // No reply — the participants DELETE triggers a roster repost via sync.js.
+    // Sem resposta: a lista publicada de novo é a confirmação — e pede-se já,
+    // sem esperar pelo Realtime (que às vezes chega tarde, e aí só a
+    // reconciliação de 60 s repostava). Para não perder o «🎉 X subiu da
+    // lista de suplentes», vê-se aqui mesmo quem o promote_waitlist promoveu:
+    // os suplentes de antes do DELETE que agora estão confirmados.
+    const waitlistedBefore = rows.filter((row) => row.status === 'waitlisted')
+    let promotedNames = []
+    if (waitlistedBefore.length > 0) {
+      const { data: after, error: afterError } = await supabase
+        .from('participants')
+        .select('id, status')
+        .in('id', waitlistedBefore.map((row) => row.id))
+      if (afterError) {
+        console.error('Failed to check promotions after leaving:', afterError)
+      } else {
+        const nowConfirmed = new Set(after.filter((row) => row.status === 'confirmed').map((row) => row.id))
+        promotedNames = waitlistedBefore
+          .map((row, i) => (nowConfirmed.has(row.id) ? { gameId: game.id, name: suplentes[i]?.name || 'Jogador', lang: suplentes[i]?.language ?? 'pt' } : null))
+          .filter(Boolean)
+      }
+    }
+    repostHooks.requestRepostForGame(organizationId, game.id, { promotedNames })
   }
 
   // 1) Replying to a specific mix's own message beats any identifier text

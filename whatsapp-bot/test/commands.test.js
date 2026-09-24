@@ -67,14 +67,34 @@ test('«In» faz no máximo 4 idas à BD', async () => {
   assert.ok(calls.length <= 4, `foram ${calls.length}: ${calls.join(', ')}`)
 })
 
-test('«In» pede o repost logo; «Out» não', async (t) => {
+test('«In» e «Out» pedem o repost logo', async (t) => {
   // Um namespace ESM não se pode simular; por isso o commands.js chama
   // através do objeto `repostHooks`, que se pode.
   const asked = []
-  t.mock.method(sync.repostHooks, 'requestRepostForGame', (org, gameId) => asked.push(gameId))
+  t.mock.method(sync.repostHooks, 'requestRepostForGame', (org, gameId, opts = {}) => asked.push([gameId, opts.promotedNames ?? []]))
   await say('in')
-  assert.deepEqual(asked, ['m'])
+  assert.deepEqual(asked, [['m', []]])
   asked.length = 0
   await say('out')
-  assert.deepEqual(asked, [])
+  assert.deepEqual(asked, [['m', []]])
+})
+
+test('«Out» com suplentes: o repost já leva quem subiu (sem esperar pelo Realtime)', async (t) => {
+  const asked = []
+  t.mock.method(sync.repostHooks, 'requestRepostForGame', (org, gameId, opts = {}) => asked.push([gameId, opts.promotedNames ?? []]))
+  db.profiles.push({ id: 's', name: 'Sofia Suplente', phone_hash: 'x', language: 'pt' })
+  db.participants.push(
+    { id: 'pa', game_id: 'm', user_id: 'a', status: 'confirmed', created_at: '2026-09-01T10:00:00Z' },
+    { id: 'ps', game_id: 'm', user_id: 's', status: 'waitlisted', created_at: '2026-09-01T11:00:00Z' },
+  )
+  // O trigger promote_waitlist: ao sair alguém, o 1.º suplente passa a confirmado.
+  db.afterDelete = (table) => {
+    if (table !== 'participants') return
+    const w = db.participants.find((p) => p.status === 'waitlisted')
+    if (w) w.status = 'confirmed'
+  }
+  await say('out')
+  assert.equal(asked.length, 1)
+  assert.equal(asked[0][0], 'm')
+  assert.deepEqual(asked[0][1].map((p) => [p.gameId, p.name]), [['m', 'Sofia Suplente']])
 })
