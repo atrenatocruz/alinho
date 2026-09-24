@@ -12,6 +12,7 @@ import { priceRowFor, LESSON_CAPACITY, LESSON_DURATIONS } from '../../lib/lesson
 import { describeError } from '../../lib/errors'
 import { MonoLabel, levelsText, euros } from './LessonBits'
 import ClubSeriesPanel from './ClubSeriesPanel'
+import CreateSeriesForm from './CreateSeriesForm'
 
 const pad = (n) => String(n).padStart(2, '0')
 const todayIso = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` }
@@ -57,6 +58,71 @@ export default function ClubLessonsPanel({ organizationId, orgName }) {
       {section === 'teachers' && <TeachersOrder organizationId={organizationId} teachers={teachers} setTeachers={setTeachers} loading={loading} />}
       {section === 'series' && <ClubSeriesPanel organizationId={organizationId} teachers={teachers} prices={settings.prices} peakHours={settings.peakHours} />}
     </div>
+  )
+}
+
+// Gerir → «Pessoas»: os professores sao pessoas, por isso vivem la
+// (desenho de 23 set). O mesmo bloco de ordenar que estava em «Aulas».
+export function ClubTeachers({ organizationId }) {
+  const [teachers, setTeachers] = useState([])
+  const [loading, setLoading] = useState(true)
+  useEffect(() => {
+    let alive = true
+    listClubTeachers(organizationId)
+      .then((rows) => { if (alive) setTeachers(rows) })
+      .catch((error) => console.error('Error loading club teachers:', error))
+      .finally(() => { if (alive) setLoading(false) })
+    return () => { alive = false }
+  }, [organizationId])
+  const { t } = useTranslation()
+  if (loading) return null
+  if (teachers.length === 0) {
+    return (
+      <p className="text-sm text-muted flex items-center gap-1.5 pt-2">
+        <GraduationCap size={14} /> {t('lessons.gerir_no_teachers_title')}
+      </p>
+    )
+  }
+  return (
+    <div className="space-y-2 pt-2">
+      <h3 className="text-sm font-extrabold text-ink-900 flex items-center gap-1.5">
+        <GraduationCap size={14} /> {t('lessons.gerir_tab_teachers', { count: teachers.length })}
+      </h3>
+      <TeachersOrder organizationId={organizationId} teachers={teachers} setTeachers={setTeachers} loading={loading} />
+    </div>
+  )
+}
+
+// Gerir → botao «+ Turma»: so o formulario de nova turma, o mesmo de antes.
+// onDone({ created, name }) diz ao Gerir quando fechar.
+export function NewSeries({ organizationId, onDone }) {
+  const { t } = useTranslation()
+  const [teachers, setTeachers] = useState(null)
+  const [settings, setSettings] = useState({ prices: [], peakHours: [] })
+  useEffect(() => {
+    let alive = true
+    Promise.all([listClubTeachers(organizationId), getClubLessonSettings(organizationId)])
+      .then(([rows, res]) => { if (alive) { setTeachers(rows); setSettings(res) } })
+      .catch((error) => { console.error('Error loading lessons data:', error); if (alive) setTeachers([]) })
+    return () => { alive = false }
+  }, [organizationId])
+
+  if (teachers === null) return null
+  if (teachers.length === 0) {
+    return (
+      <div className="card space-y-3">
+        <p className="text-sm text-muted">{t('lessons.need_teacher_first')}</p>
+        <button type="button" onClick={() => onDone?.({ created: false })}
+          className="w-full min-h-[44px] rounded-full text-sm font-extrabold text-ink-700 bg-ink-50">
+          {t('open_slots.cancel_button')}
+        </button>
+      </div>
+    )
+  }
+  return (
+    <CreateSeriesForm teachers={teachers} prices={settings.prices} peakHours={settings.peakHours}
+      onCancel={() => onDone?.({ created: false })}
+      onCreated={(name) => onDone?.({ created: true, name })} />
   )
 }
 
