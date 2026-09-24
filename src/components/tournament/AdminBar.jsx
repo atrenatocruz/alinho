@@ -17,7 +17,7 @@ import { useTranslation } from 'react-i18next'
 import { Eye, Pencil, Trash2 } from 'lucide-react'
 import { deleteTournament, setTournamentStatus } from '../../lib/tournamentApi'
 import { describeError } from '../../lib/errors'
-import { canDelete } from '../../lib/tournaments'
+import { canDelete, TOURNAMENT_TZ } from '../../lib/tournaments'
 import { MonoLabel, StatePill } from './TournamentBits'
 
 /** O passo seguinte de cada estado. Do sorteio em diante não se anda à mão:
@@ -29,14 +29,15 @@ const NEXT_STEP = {
   fechado: null, // o sorteio faz-se no ecrã do sorteio, não aqui
 }
 
-/** "5 out, 23:59" — a hora só aparece quando não é meia-noite, que é o caso
- *  normal de um prazo posto à mão. */
+/** "5 out, 23:59" — no relógio do torneio (Lisboa), não no do telemóvel:
+ *  é o mesmo prazo que o formulário grava e que as inscrições respeitam
+ *  (Trello #487). */
 function whenDeadline(iso, locale) {
   if (!iso) return ''
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
-  const day = d.toLocaleDateString(locale, { day: 'numeric', month: 'short' }).replace('.', '')
-  const time = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
+  const day = d.toLocaleDateString(locale, { day: 'numeric', month: 'short', timeZone: TOURNAMENT_TZ }).replace('.', '')
+  const time = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', timeZone: TOURNAMENT_TZ })
   return `${day}, ${time}`
 }
 
