@@ -26,6 +26,11 @@
 -- Decidido com o PO (23 set): o torneio está em `inscricoes` **E** o prazo
 -- ainda não passou **E** há pelo menos uma categoria a aceitar gente.
 --
+-- Acerto de 24 set (#521): «o torneio está em `inscricoes`» estava errado —
+-- sortear UMA categoria põe o torneio em `sorteado`, e as outras continuam
+-- abertas. A condição passou a ser: o torneio não está em rascunho nem
+-- terminado. Quem manda é a categoria.
+--
 -- Porque as três: um torneio que aparece na Comunidade e onde já não se
 -- entra é PIOR do que não aparecer. Quem clica, percebe que está cheio e
 -- fica com a ideia de que a app lhe mentiu — e isso custa mais do que o
@@ -112,8 +117,12 @@ AS $$
       FROM tournament_public t
      WHERE (p_organization_id IS NULL OR t.organization_id = p_organization_id)
        AND (
-         -- Inscrições abertas: as três condições.
-         (t.status = 'inscricoes'
+         -- Inscrições abertas: as três condições. Do torneio só interessa
+         -- que não esteja em rascunho nem terminado — quem manda é a
+         -- CATEGORIA (categories_open, lá em baixo). Sortear uma categoria põe
+         -- o torneio em `sorteado`, e as outras podem continuar abertas
+         -- (#521, corrigido em migration_fix_inscricoes_por_categoria.sql).
+         (t.status NOT IN ('rascunho', 'terminado')
           AND (t.entries_deadline IS NULL OR t.entries_deadline > now()))
          -- Ou, se se pedir, os que já estão a acontecer.
          OR (p_include_running AND t.status IN ('sorteado', 'a_decorrer'))
@@ -141,7 +150,7 @@ AS $$
              END AS days_to_deadline
         FROM abertos a
        WHERE a.categories_open > 0
-          OR a.status IN ('sorteado', 'a_decorrer')   -- estes entram sem vagas
+          OR (p_include_running AND a.status IN ('sorteado', 'a_decorrer'))   -- estes entram sem vagas, só se pedidos
        LIMIT GREATEST(COALESCE(p_limit, 20), 1)
     ) x;
 $$;

@@ -197,7 +197,7 @@ export default function GerirClube() {
   const { slug } = useParams()
   const goBack = useGoBack('/gerir')
   const [searchParams, setSearchParams] = useSearchParams()
-  const { profile: currentUser, memberships, adminOrganizations, ensureOrgAdminAccess, refreshMemberships, followOrganization } = useAuth()
+  const { profile: currentUser, memberships, adminOrganizations, ensureOrgAdminAccess, refreshMemberships, followOrganization, isLessonsEnabled } = useAuth()
   const [org, setOrg] = useState(null)
   const [orgLoading, setOrgLoading] = useState(true)
   // The tab lives in the URL (?tab=…), so coming back from a tournament,
@@ -456,10 +456,13 @@ export default function GerirClube() {
   useEffect(() => {
     if (!currentOrganizationId || org?.kind !== 'club') { setLessonsReady(false); return }
     let alive = true
-    lessonsAvailable().then((ok) => { if (alive) setLessonsReady(ok) })
+    // Aulas escondidas (flag 'lessons'): e aqui que tudo o que e das aulas
+    // no Gerir desaparece de uma vez.
+    if (isLessonsEnabled) lessonsAvailable().then((ok) => { if (alive) setLessonsReady(ok) })
+    else setLessonsReady(false)
     tournamentsAvailable().then((ok) => { if (alive) setTournamentsReady(ok) })
     return () => { alive = false }
-  }, [currentOrganizationId, org?.kind])
+  }, [currentOrganizationId, org?.kind, isLessonsEnabled])
 
   // Saber se ha torneios chega DEPOIS de o loadData ja ter corrido: sem
   // isto, a lista de eventos ficava sem torneios ate se mudar de separador.

@@ -123,22 +123,53 @@ export function pricePerPlayer(euros, locale = 'pt-PT') {
 
    Estas duas funções são as únicas portas entre um e outro. */
 
-/** "2026-10-05T23:59" (hora local, como o ecrã a mostra) → instante exacto
- *  em ISO com fuso, pronto para a base de dados. Vazio fica vazio. */
-export function localInputToIso(value) {
-  if (!value) return value || null
-  // Sem «Z» nem desvio, o JavaScript lê a data como hora LOCAL — é
-  // precisamente o que o ecrã quer dizer.
-  const d = new Date(value.length === 10 ? `${value}T00:00` : value)
-  return Number.isNaN(d.getTime()) ? null : d.toISOString()
+/** O relógio do torneio. Os torneios da Alinho jogam-se em Portugal, e a
+ *  hora de um torneio é a hora DO SÍTIO do torneio — não a do telemóvel de
+ *  quem o está a montar. Com a hora do aparelho, um organizador com o
+ *  telemóvel noutro fuso (ou mal acertado) escrevia «23:59» e gravava 23:59
+ *  do fuso dele. É a mesma regra do /marcar do Dev 2 (`tournamentDay.js`):
+ *  dia e hora vêm sempre do mesmo relógio, dos dois lados. */
+export const TOURNAMENT_TZ = 'Europe/Lisbon'
+
+/** As peças de um instante, lidas no relógio do torneio. */
+function partsInTz(date, tz = TOURNAMENT_TZ) {
+  const out = {}
+  for (const { type, value } of new Intl.DateTimeFormat('en-GB', {
+    timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(date)) out[type] = value
+  return out
 }
 
-/** O inverso: um instante vindo da base de dados → "YYYY-MM-DDTHH:MM" na
- *  hora local de quem está a ver, para o ecrã. */
-export function isoToLocalInput(iso) {
+/** Quantos minutos o relógio do torneio está à frente do UTC naquele
+ *  instante (60 no verão, 0 no inverno, em Lisboa). */
+function offsetMinutes(date, tz = TOURNAMENT_TZ) {
+  const p = partsInTz(date, tz)
+  const asUtc = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute)
+  return Math.round((asUtc - Math.floor(date.getTime() / 60000) * 60000) / 60000)
+}
+
+/** "2026-10-05T23:59" — hora de Lisboa, como o ecrã a mostra — → o instante
+ *  exacto em ISO (UTC), pronto para a base de dados. Vazio fica vazio. */
+export function localInputToIso(value, tz = TOURNAMENT_TZ) {
+  if (!value) return null
+  const m = String(value).match(/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?$/)
+  if (!m) return null
+  const [, y, mo, d, h = '00', mi = '00'] = m
+  const wall = Date.UTC(+y, +mo - 1, +d, +h, +mi)
+  // Primeiro palpite com o desvio desse momento; depois acerta-se com o
+  // desvio do instante encontrado, que é o que resolve a mudança de hora.
+  let t = wall - offsetMinutes(new Date(wall), tz) * 60000
+  t = wall - offsetMinutes(new Date(t), tz) * 60000
+  return new Date(t).toISOString()
+}
+
+/** O inverso: um instante vindo da base de dados → "YYYY-MM-DDTHH:MM" no
+ *  relógio do torneio, para o ecrã. */
+export function isoToLocalInput(iso, tz = TOURNAMENT_TZ) {
   if (!iso) return ''
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
-  const p = (n) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
+  const p = partsInTz(d, tz)
+  return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`
 }

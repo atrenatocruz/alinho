@@ -852,6 +852,8 @@
   "gerir.app_features_description": "Ligam e desligam para a app toda — todos os clubes e grupos, não só um.",
   "gerir.private_matches_on_hint": "Ligado: qualquer pessoa pode criar jogos entre amigos a partir do Perfil.",
   "gerir.private_matches_off_hint": "Desligado: ninguém vê nem cria jogos entre amigos.",
+  "gerir.lessons_on_hint": "Ligado: os clubes gerem aulas e turmas, e os jogadores veem-nas.",
+  "gerir.lessons_off_hint": "Desligado: só a equipa Alinho vê as aulas. Clubes e jogadores não as veem.",
   "gerir.private_matches_off_confirm": "Desligar o jogo entre amigos para a app toda? Ninguém o vai ver nem conseguir criar até voltares a ligar.",
   "gerir.subtitle": "Escolhe o clube ou grupo que queres gerir",
   "gerir.subtitle_platform_admin": "Escolhe o clube ou grupo que queres gerir (és super admin — vês todos)",

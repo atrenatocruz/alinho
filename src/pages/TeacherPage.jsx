@@ -7,6 +7,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Check, ChevronLeft, Clock, GraduationCap, Phone, Repeat } from 'lucide-react'
 import { useGoBack } from '../lib/useGoBack'
+import { useAuth } from '../contexts/AuthContext'
 import { cancelEnrolment, confirmEnrolment, getTeacherPage } from '../lib/lessonsApi'
 import EnrolSheet from '../components/lessons/EnrolSheet'
 import { describeError, errorKind } from '../lib/errors'
@@ -36,6 +37,9 @@ export default function TeacherPage({ view = 'profile' }) {
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
   const [day, setDay] = useState(null)
+  // Com as aulas escondidas a pagina fica so com quem e e o contacto:
+  // sem precos, sem «Pedir aula» e sem a semana das aulas.
+  const { isLessonsEnabled } = useAuth()
 
   // Semana corrente (perfil) ou as próximas duas semanas (disponibilidade).
   const range = useMemo(() => {
@@ -122,9 +126,11 @@ export default function TeacherPage({ view = 'profile' }) {
       </div>
 
       <div className="flex gap-2">
-        <PrimaryButton className="flex-1 !px-3" onClick={() => navigate(`/professor/${id}/disponibilidade`)}>
-          {t('lessons.request_lesson')}
-        </PrimaryButton>
+        {isLessonsEnabled && (
+          <PrimaryButton className="flex-1 !px-3" onClick={() => navigate(`/professor/${id}/disponibilidade`)}>
+            {t('lessons.request_lesson')}
+          </PrimaryButton>
+        )}
         {whatsapp && (
           <a href={whatsapp} target="_blank" rel="noopener noreferrer"
             className="flex-1 inline-flex items-center justify-center gap-2 rounded-ctrl min-h-[48px] bg-ink-50 text-ink-900 font-extrabold hover:bg-ink-200 transition-colors duration-fast">
@@ -133,7 +139,7 @@ export default function TeacherPage({ view = 'profile' }) {
         )}
       </div>
 
-      {hasPrices && (
+      {isLessonsEnabled && hasPrices && (
       <div>
         <MonoLabel>{t('lessons.prices_per_person')}</MonoLabel>
         <table className="w-full mt-1.5 text-sm tabular-nums border-collapse">
@@ -163,6 +169,7 @@ export default function TeacherPage({ view = 'profile' }) {
       </div>
       )}
 
+      {isLessonsEnabled && (
       <div>
         <MonoLabel>{t('lessons.this_week')}</MonoLabel>
         <div className="grid gap-1 mt-2" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))` }}>
@@ -179,6 +186,7 @@ export default function TeacherPage({ view = 'profile' }) {
           <span className="inline-flex items-center gap-1"><i className="inline-block w-3 h-[9px] rounded-[3px] bg-ink-50" />{t('lessons.legend_busy')}</span>
         </div>
       </div>
+      )}
     </div>
   )
 }

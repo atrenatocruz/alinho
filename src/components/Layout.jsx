@@ -229,7 +229,7 @@ export function Wordmark({ className = '', variant = 'dark' }) {
 export default function Layout({ children }) {
   const location = useLocation()
   const navigate = useNavigate()
-  const { signOut, profile, updateProfile, isAdminOfAny, isGuest, refreshMemberships, isPrivateMatchesEnabled } = useAuth()
+  const { signOut, profile, updateProfile, isAdminOfAny, isGuest, refreshMemberships, isPrivateMatchesEnabled, isLessonsEnabled } = useAuth()
   const { t, i18n } = useTranslation()
 
   // Conta com pedido de apagar (Trello #306): em vez da app, o ecrã de
@@ -417,7 +417,7 @@ export default function Layout({ children }) {
       .then((data) => {
         if (cancelled) return
         setMixNotices(data.filter((n) => MIX_NOTICE_KINDS.includes(n.kind)))
-        setLessonNotices(data.filter((n) => LESSON_NOTICE_KINDS.includes(n.kind)))
+        setLessonNotices(isLessonsEnabled ? data.filter((n) => LESSON_NOTICE_KINDS.includes(n.kind)) : [])
       })
       .catch((error) => console.error('Error loading mix notices:', error))
     return () => {

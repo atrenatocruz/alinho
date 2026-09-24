@@ -757,7 +757,12 @@ const TABLE_MOCKS = {
   ] : []),
   // localStorage.mockPrivateMatchesOff = 'true' — o interruptor "Jogo entre
   // amigos" desligado no Gerir, para ver a app sem essa funcionalidade.
-  feature_flags: () => [{ key: 'private_matches', enabled: localStorage.getItem('mockPrivateMatchesOff') !== 'true' }],
+  feature_flags: () => [
+    { key: 'private_matches', enabled: localStorage.getItem('mockPrivateMatchesOff') !== 'true' },
+    // localStorage.mockLessonsFlag = 'true' liga as aulas para todos; sem
+    // ele so a equipa Alinho (mockPlatformAdmin) as ve.
+    { key: 'lessons', enabled: localStorage.getItem('mockLessonsFlag') === 'true' },
+  ],
   achievements: () => [
     { key: 'primeira_bola', category: 'jogo', rarity: 'comum', sort: 1 },
     { key: 'mes_cheio', category: 'jogo', rarity: 'epico', sort: 2 },

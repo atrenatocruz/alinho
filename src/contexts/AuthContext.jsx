@@ -93,6 +93,10 @@ export const AuthProvider = ({ children }) => {
   const [currentOrganizationId, setCurrentOrganizationId] = useState(null)
   const [loading, setLoading] = useState(true)
   const [isPrivateMatchesEnabled, setIsPrivateMatchesEnabled] = useState(true)
+  // Aulas (Trello #49): escondidas ate depois do Smash Cup (Francisco,
+  // 24 set). Sem linha na tabela = desligado, por isso nao e preciso
+  // escrever nada em producao para as esconder.
+  const [isLessonsFlagOn, setIsLessonsFlagOn] = useState(false)
   // Set only once every retry in loadProfile has been exhausted — lets the
   // UI show a "couldn't load your data, try again" screen instead of
   // silently rendering as if the account had no profile/memberships (see
@@ -215,6 +219,7 @@ export const AuthProvider = ({ children }) => {
     }
     const privateMatchesFlag = data?.find((f) => f.key === 'private_matches')
     setIsPrivateMatchesEnabled(privateMatchesFlag?.enabled ?? true)
+    setIsLessonsFlagOn(data?.find((f) => f.key === 'lessons')?.enabled === true)
   }
 
   // getSession() and onAuthStateChange (below) both call loadProfile on
@@ -593,6 +598,10 @@ export const AuthProvider = ({ children }) => {
     profileError,
     retryProfile,
     isPrivateMatchesEnabled,
+    // O que o interruptor diz, e o que a pessoa ve: a equipa Alinho ve as
+    // aulas mesmo desligadas, para as poder testar (Francisco, 24 set).
+    isLessonsFlagOn,
+    isLessonsEnabled: isLessonsFlagOn || profile?.is_platform_admin === true,
     refreshFeatureFlags: loadFeatureFlags,
     signUp,
     signIn,
