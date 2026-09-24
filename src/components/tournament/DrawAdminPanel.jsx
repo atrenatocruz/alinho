@@ -219,8 +219,10 @@ function FormatStep({ days: dayRows, rules, category, teamCount, onDone, t }) {
         )
       })}
 
-      <label className="mb-2 mt-1 flex items-center gap-2 text-[12px] text-ink-700">
-        <input type="checkbox" checked={thirdPlace} onChange={(e) => setThirdPlace(e.target.checked)} />
+      {/* Linha inteira a 44 px e a caixa a 22 px: à beira do campo, com o
+          telemóvel numa mão, a caixa de 13 px não se acertava (#512). */}
+      <label className="mb-2 mt-1 flex min-h-[44px] cursor-pointer items-center gap-2.5 text-[13px] text-ink-700">
+        <input type="checkbox" checked={thirdPlace} onChange={(e) => setThirdPlace(e.target.checked)} className="h-[22px] w-[22px] shrink-0 accent-ink-900" />
         {t('tournament.draw.third_place')}
       </label>
 
@@ -471,7 +473,7 @@ export default function DrawAdminPanel({ tournament, onBack }) {
   return (
     <div>
       <button type="button" onClick={picked ? () => setPickedId(null) : onBack}
-        className="mb-2 inline-flex items-center gap-1 text-[12.5px] font-semibold text-ink-500 hover:text-ink-900">
+        className="mb-2 inline-flex min-h-[44px] items-center gap-1 text-[12.5px] font-semibold text-ink-500 hover:text-ink-900">
         <ChevronLeft size={16} /> {picked ? t('tournament.draw.back_categories') : t('common.back')}
       </button>
 

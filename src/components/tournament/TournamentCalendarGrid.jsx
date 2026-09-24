@@ -181,7 +181,7 @@ export default function TournamentCalendarGrid({ tournament, onBack }) {
   }
 
   const back = (
-    <button type="button" onClick={onBack} className="inline-flex items-center gap-1.5 text-sm font-extrabold text-ink-700 hover:underline">
+    <button type="button" onClick={onBack} className="inline-flex min-h-[44px] items-center gap-1.5 text-sm font-extrabold text-ink-700 hover:underline">
       <ArrowLeft size={16} /> {t('common.back')}
     </button>
   )

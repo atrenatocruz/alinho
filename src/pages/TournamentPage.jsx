@@ -113,7 +113,7 @@ export default function TournamentPage() {
   }
 
   const back = (
-    <button type="button" onClick={goBack} className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline">
+    <button type="button" onClick={goBack} className="inline-flex min-h-[44px] items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline">
       <ArrowLeft size={16} /> {t('common.back')}
     </button>
   )
@@ -229,7 +229,7 @@ export default function TournamentPage() {
               : t('tournament.admin.public_view')}
           </p>
           <button type="button" onClick={() => navigate(-1)}
-            className="mt-2 rounded-ctrl bg-ink-900 px-3 py-2 text-[12px] font-bold text-white">
+            className="mt-2 min-h-[44px] rounded-ctrl bg-ink-900 px-3 py-2 text-[12px] font-bold text-white">
             {t('tournament.admin.back_to_admin')}
           </button>
         </div>

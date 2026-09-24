@@ -44,7 +44,7 @@ export default function ScorekeepersPanel({ tournament, onBack }) {
 
   return (
     <div>
-      <button type="button" onClick={onBack} className="inline-flex items-center gap-1.5 text-sm font-extrabold text-ink-700 hover:underline">
+      <button type="button" onClick={onBack} className="inline-flex min-h-[44px] items-center gap-1.5 text-sm font-extrabold text-ink-700 hover:underline">
         <ArrowLeft size={16} /> {t('common.back')}
       </button>
       <h2 className="mt-3 font-display text-lg font-extrabold text-ink-900">{t('tournament.score.keepers_title')}</h2>

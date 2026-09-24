@@ -85,7 +85,7 @@ function PodiumPicker({ value, onChange, entries, t }) {
           <span className="w-7 font-bold">{t(`tournament.close.place_${place}`)}</span>
           <select value={value[i] || ''}
             onChange={(e) => onChange(value.map((v, j) => (j === i ? (e.target.value || null) : v)))}
-            className="min-w-0 flex-1 rounded-ctrl border border-line bg-canvas px-2 py-1.5 text-[12px]">
+            className="min-w-0 flex-1 min-h-[44px] rounded-ctrl border border-line bg-canvas px-2 py-1.5 text-[12px]">
             <option value="">{i === 2 ? t('tournament.close.nobody') : t('tournament.close.pick')}</option>
             {options.map((e) => (
               <option key={e.id} value={e.id} disabled={value.some((v, j) => j !== i && v === e.id)}>{e.name}</option>
@@ -133,7 +133,7 @@ function CategoryRow({ category, board, onClosed }) {
     final_unplayed: <span className="text-[11.5px] text-ink-500">{t('tournament.close.final_unplayed')}</span>,
     ready: !open && (
       <button type="button" onClick={() => setOpen(true)}
-        className="rounded-ctrl bg-ink-900 px-3 py-1.5 text-[12px] font-bold text-white">
+        className="min-h-[44px] rounded-ctrl bg-ink-900 px-3 py-1.5 text-[12px] font-bold text-white">
         {t('tournament.close.close')}
       </button>
     ),
@@ -157,11 +157,11 @@ function CategoryRow({ category, board, onClosed }) {
           <p className="mt-2 text-[11.5px] text-ink-700">{t('tournament.close.what_it_does')}</p>
           <div className="mt-2 flex flex-wrap gap-1.5">
             <button type="button" disabled={busy || !canConfirm} onClick={confirm}
-              className="rounded-ctrl bg-ink-900 px-3 py-2 text-[12px] font-bold text-white disabled:opacity-50">
+              className="min-h-[44px] rounded-ctrl bg-ink-900 px-3 py-2 text-[12px] font-bold text-white disabled:opacity-50">
               {t('tournament.close.confirm', { name: category.name })}
             </button>
             <button type="button" disabled={busy} onClick={() => { setOpen(false); setError(null) }}
-              className="rounded-ctrl border border-line bg-canvas px-3 py-2 text-[12px] font-bold text-ink-900">
+              className="min-h-[44px] rounded-ctrl border border-line bg-canvas px-3 py-2 text-[12px] font-bold text-ink-900">
               {t('tournament.close.cancel')}
             </button>
           </div>

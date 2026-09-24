@@ -349,7 +349,7 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
               <button
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`press rounded-full px-3 py-1.5 text-sm font-semibold border-2 ${
+                className={`press min-h-[44px] rounded-full px-3 py-1.5 text-sm font-semibold border-2 ${
                   filter === f ? 'border-ink-900 bg-ink-900 text-white' : 'border-line text-ink-900'
                 }`}
               >
@@ -407,7 +407,7 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
                       onClick={() => share(e)}
                       disabled={busy}
                       aria-label={t('tentries.invite_again')}
-                      className="press flex h-9 w-9 items-center justify-center rounded-full bg-ink-50 text-ink-900"
+                      className="press flex h-11 w-11 items-center justify-center rounded-full bg-ink-50 text-ink-900"
                     >
                       <Send size={16} />
                     </button>
@@ -417,7 +417,7 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
                       onClick={() => act(() => validateEntry(e.entry_id, true))}
                       disabled={busy}
                       aria-label={t('tentries.validate')}
-                      className="press flex h-9 w-9 items-center justify-center rounded-full bg-lime-400 text-ink-900"
+                      className="press flex h-11 w-11 items-center justify-center rounded-full bg-lime-400 text-ink-900"
                     >
                       <Check size={18} />
                     </button>
@@ -426,7 +426,7 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
                     onClick={() => { setError(''); setAskRemove(e) }}
                     disabled={busy}
                     aria-label={t('tentries.remove')}
-                    className="press flex h-9 w-9 items-center justify-center rounded-full bg-ink-50 text-muted"
+                    className="press flex h-11 w-11 items-center justify-center rounded-full bg-ink-50 text-muted"
                   >
                     <X size={18} />
                   </button>

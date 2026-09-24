@@ -34,7 +34,7 @@ export default function PublicInfo({ tournament, categories = [] }) {
     <div className="card space-y-3">
       <div className="flex items-center justify-between gap-2">
         <p className="font-mono text-[11px] uppercase tracking-widest text-ink-500">{t('tpublic.title')}</p>
-        <button onClick={share} className="press flex items-center gap-1.5 text-sm font-extrabold text-ink-900">
+        <button onClick={share} className="press flex min-h-[44px] items-center gap-1.5 text-sm font-extrabold text-ink-900">
           <Share2 size={16} /> {t('tpublic.share')}
         </button>
       </div>
@@ -71,7 +71,7 @@ export default function PublicInfo({ tournament, categories = [] }) {
           )
         })}
         {categories.length > 4 && (
-          <button onClick={() => setOpen((v) => !v)} className="press text-sm font-extrabold text-ink-900 underline">
+          <button onClick={() => setOpen((v) => !v)} className="press min-h-[44px] text-sm font-extrabold text-ink-900 underline">
             {open ? t('tpublic.show_less') : t('tpublic.show_more', { count: categories.length - 4 })}
           </button>
         )}

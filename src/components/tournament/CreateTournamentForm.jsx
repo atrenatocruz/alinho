@@ -266,7 +266,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
 
   return (
     <div>
-      <button type="button" onClick={step === 1 ? onCancel : () => setStep(step - 1)} className="inline-flex items-center gap-1.5 text-sm font-extrabold text-ink-700 hover:underline">
+      <button type="button" onClick={step === 1 ? onCancel : () => setStep(step - 1)} className="inline-flex min-h-[44px] items-center gap-1.5 text-sm font-extrabold text-ink-700 hover:underline">
         <ArrowLeft size={16} /> {step === 1 ? t('tournament.create.cancel') : t('common.back')}
       </button>
 
