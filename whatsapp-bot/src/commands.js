@@ -41,6 +41,11 @@ function looksLikeIdentifier(rest) {
 
 const SUPLENTE_CONFIRM_TTL_MS = 10 * 60 * 1000
 
+/** O trigger das vagas (migration_mix_capacity_guard.sql) recusa com a
+ *  mensagem exata `game_full` quando outra pessoa apanhou a última vaga
+ *  um instante antes. */
+const isGameFull = (error) => /(^|\W)game_full$/.test(String(error?.message || '').trim())
+
 // Tracks "we asked sender X whether they want to join mix Y as a
 // suplente" so their very next message is interpreted as that answer
 // instead of a fresh command. In-memory only, keyed by sender+group —
@@ -539,6 +544,10 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message, qu
         gameId: game.id, organizationId, callerId: profile.id, name: pending.name,
       })
     } catch (err) {
+      if (isGameFull(err)) {
+        await reply('mix_full_pair')
+        return
+      }
       console.error('Failed to join with unregistered partner:', err)
       await reply('partner_not_found_app', { appUrl: config.appUrl })
       return
@@ -589,6 +598,10 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message, qu
     if (insertError) {
       if (insertError.code === '23505') {
         await reply('already_joined')
+        return
+      }
+      if (isGameFull(insertError)) {
+        await reply('mix_full_pair')
         return
       }
       throw new Error(`Failed to insert pair participant: ${insertError.message}`)
@@ -668,6 +681,13 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message, qu
       if (insertError) {
         if (insertError.code === '23505') {
           await reply('already_joined')
+          return
+        }
+        if (isGameFull(insertError)) {
+          pendingSuplenteConfirmations.set(pendingKey(senderPn, groupJid), {
+            gameId: game.id, expiresAt: Date.now() + SUPLENTE_CONFIRM_TTL_MS, reprompted: false,
+          })
+          await reply('mix_full_offer_waitlist')
           return
         }
         throw new Error(`Failed to insert participant: ${insertError.message}`)

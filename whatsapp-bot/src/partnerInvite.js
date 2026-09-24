@@ -43,7 +43,9 @@ export async function joinWithUnregisteredPartner({ gameId, organizationId, call
       .insert({ game_id: gameId, user_id: callerId, partner_id: partnerId, status: 'confirmed', joined_alone: false })
       .select('id')
       .single()
-    if (joinError) throw new Error(`participant: ${joinError.message}`)
+    // A mensagem vai tal e qual: o commands.js reconhece o `game_full` do
+    // trigger das vagas pelo fim da mensagem.
+    if (joinError) throw new Error(joinError.message)
 
     const token = crypto.randomBytes(24).toString('hex')
     const { error: inviteError } = await supabase
