@@ -685,6 +685,7 @@
   "gamedetails.side_both": "Both",
   "gamedetails.status_in_progress": "In progress",
   "gamedetails.error_join_generic": "We couldn't sign you up. Try again.",
+  "gamedetails.error_game_full": "The mix just filled up — someone took the last spot. You can join as a substitute.",
   "gamedetails.error_add_test_user": "Couldn't add the test player.",
   "gamedetails.confirm_leave_game": "Are you sure you want to leave this game?",
   "gamedetails.error_leave_game": "Couldn't leave the game. Try again.",

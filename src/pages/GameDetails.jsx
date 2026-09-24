@@ -27,7 +27,7 @@ import { winRatePct, firstLastName } from '../lib/statsLogic'
 import { getGlobalRankings } from '../lib/privateMatches'
 import { formatDate as formatDateLib, formatTime, formatCurrency } from '../lib/formatDate'
 import LocationOpenWith from '../components/LocationOpenWith'
-import { describeError } from '../lib/errors'
+import { describeError, isGameFull } from '../lib/errors'
 import { limitsFor } from '../lib/plans'
 import { canEditBeforeRound1, canAddBeforeStart, unpairedPeople, changedPairKeys, teamPairKey, mixChanges } from '../lib/mixEdit'
 import { notifyMixChanges } from '../lib/notifications'
@@ -411,7 +411,12 @@ export default function GameDetails() {
       loadGameDetails()
     } catch (error) {
       console.error('Error joining game:', error)
-      setJoinError(describeError(t, error, 'gamedetails.error_join_generic'))
+      // O trigger das vagas (migration_mix_capacity_guard.sql) recusa quem
+      // chega à última vaga um instante depois de outra pessoa.
+      setJoinError(isGameFull(error)
+        ? t('gamedetails.error_game_full')
+        : describeError(t, error, 'gamedetails.error_join_generic'))
+      loadGameDetails()
     } finally {
       setJoining(false)
     }
@@ -483,7 +488,12 @@ export default function GameDetails() {
       loadGameDetails()
     } catch (error) {
       console.error('Error joining game:', error)
-      setJoinError(describeError(t, error, 'gamedetails.error_join_generic'))
+      // O trigger das vagas (migration_mix_capacity_guard.sql) recusa quem
+      // chega à última vaga um instante depois de outra pessoa.
+      setJoinError(isGameFull(error)
+        ? t('gamedetails.error_game_full')
+        : describeError(t, error, 'gamedetails.error_join_generic'))
+      loadGameDetails()
     } finally {
       setJoining(false)
     }

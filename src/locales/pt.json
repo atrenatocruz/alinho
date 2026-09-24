@@ -686,6 +686,7 @@
   "gamedetails.side_both": "Ambos",
   "gamedetails.status_in_progress": "A decorrer",
   "gamedetails.error_join_generic": "Não conseguimos inscrever-te. Tenta novamente.",
+  "gamedetails.error_game_full": "O mix acabou de encher — alguém apanhou a última vaga. Podes entrar como suplente.",
   "gamedetails.error_add_test_user": "Não foi possível adicionar o jogador de teste.",
   "gamedetails.confirm_leave_game": "Tens a certeza que queres sair deste jogo?",
   "gamedetails.error_leave_game": "Não foi possível sair do jogo. Tenta novamente.",

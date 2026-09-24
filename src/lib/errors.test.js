@@ -59,3 +59,13 @@ describe('describeError', () => {
     expect(errorCode({ status: 500 })).toBe('HTTP 500')
   })
 })
+
+describe('isGameFull', () => {
+  it('reconhece a recusa do trigger das vagas', async () => {
+    const { isGameFull } = await import('./errors')
+    expect(isGameFull({ code: 'P0001', message: 'game_full' })).toBe(true)
+    expect(isGameFull({ message: 'ERROR: game_full' })).toBe(true)
+    expect(isGameFull({ message: 'game_full_other' })).toBe(false)
+    expect(isGameFull(null)).toBe(false)
+  })
+})
