@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   TOURNAMENT_STATUS, canDelete, categoryCode, courtHours, levelFromRating,
-  nextStatus, previousStatus, stepProblem, totalCourtHours, totalSlots, pricePerPlayer } from './tournaments'
+  nextStatus, previousStatus, stepProblem, totalCourtHours, totalSlots, pricePerPlayer, localInputToIso, isoToLocalInput } from './tournaments'
 
 const day = (o) => ({ date: '2026-10-09', starts_at: '18:00', ends_at: '23:00', courts: 4, ...o })
 
@@ -128,5 +128,37 @@ describe('pricePerPlayer', () => {
   it('aguenta o campo vazio sem escrever disparates', () => {
     expect(pricePerPlayer('', 'pt-PT')).toBe('0')
     expect(pricePerPlayer(undefined, 'pt-PT')).toBe('')
+  })
+})
+
+describe('prazo das inscrições com fuso (#487)', () => {
+  it('a hora escrita no ecrã é hora local, não UTC', () => {
+    // O instante tem de ser o mesmo que 5 out 23:59 na hora de quem escreve,
+    // seja qual for o fuso da máquina onde o teste corre.
+    const esperado = new Date(2026, 9, 5, 23, 59).toISOString()
+    expect(localInputToIso('2026-10-05T23:59')).toBe(esperado)
+  })
+
+  it('não é o mesmo que tratar a hora como UTC — era esse o erro', () => {
+    const comoUtc = new Date('2026-10-05T23:59:00Z').toISOString()
+    const offsetMin = new Date(2026, 9, 5, 23, 59).getTimezoneOffset()
+    if (offsetMin !== 0) expect(localInputToIso('2026-10-05T23:59')).not.toBe(comoUtc)
+  })
+
+  it('ida e volta devolve o que se escreveu', () => {
+    expect(isoToLocalInput(localInputToIso('2026-10-05T23:59'))).toBe('2026-10-05T23:59')
+    // uma data de inverno (sem hora de verão), para cobrir o outro desvio
+    expect(isoToLocalInput(localInputToIso('2026-12-10T21:00'))).toBe('2026-12-10T21:00')
+  })
+
+  it('ao editar, mostra na hora local o que veio da base de dados', () => {
+    const guardado = new Date(2026, 9, 5, 23, 59).toISOString()
+    expect(isoToLocalInput(guardado)).toBe('2026-10-05T23:59')
+  })
+
+  it('vazio fica vazio', () => {
+    expect(localInputToIso('')).toBe(null)
+    expect(isoToLocalInput(null)).toBe('')
+    expect(isoToLocalInput('não é data')).toBe('')
   })
 })

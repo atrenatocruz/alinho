@@ -109,3 +109,36 @@ export function pricePerPlayer(euros, locale = 'pt-PT') {
     maximumFractionDigits: 2,
   })
 }
+
+/* O prazo das inscrições (Trello #487). No ecrã escreve-se «5 out, 23:59» —
+   hora de quem está a montar o torneio. Ia para a base de dados como
+   "2026-10-05T23:59", SEM FUSO, e a base de dados guardava-o como UTC: em
+   Lisboa ficava 00:59 do dia seguinte, e as inscrições fechavam uma hora
+   depois do anunciado (duas no inverno não, uma — mas errada na mesma).
+
+   E ao abrir para editar fazia-se o contrário do certo: cortavam-se os 16
+   primeiros caracteres do valor guardado, que vem em UTC, e mostrava-se
+   essa hora como se fosse de Lisboa. Por isso o ecrã de editar parecia
+   certo enquanto a base de dados estava errada.
+
+   Estas duas funções são as únicas portas entre um e outro. */
+
+/** "2026-10-05T23:59" (hora local, como o ecrã a mostra) → instante exacto
+ *  em ISO com fuso, pronto para a base de dados. Vazio fica vazio. */
+export function localInputToIso(value) {
+  if (!value) return value || null
+  // Sem «Z» nem desvio, o JavaScript lê a data como hora LOCAL — é
+  // precisamente o que o ecrã quer dizer.
+  const d = new Date(value.length === 10 ? `${value}T00:00` : value)
+  return Number.isNaN(d.getTime()) ? null : d.toISOString()
+}
+
+/** O inverso: um instante vindo da base de dados → "YYYY-MM-DDTHH:MM" na
+ *  hora local de quem está a ver, para o ecrã. */
+export function isoToLocalInput(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const p = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
+}
