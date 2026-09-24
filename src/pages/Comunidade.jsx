@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Search, Users, Clock, GraduationCap, X, MapPin, Lock, Check, Building2 } from 'lucide-react'
+import { Search, Users, Clock, GraduationCap, X, MapPin, Lock, Check, Building2, Plus } from 'lucide-react'
 import { searchOrganizations, listGlobalOrganizations } from '../lib/organizations'
-import { DAY_LABEL_KEY, listTeacherProfiles, teacherClubName } from '../lib/teachers'
+import { listTeacherProfiles, teacherClubName } from '../lib/teachers'
 import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../lib/supabase'
+import { followPlayer, removeFollow } from '../lib/follows'
 import { Avatar, EmptyState, GroupLevelBadge, OrgKindBadge, orgAvatarShape, PageHeader } from '../components/ui'
 import { describeError } from '../lib/errors'
 import { useHeaderActions } from '../contexts/HeaderActionsContext'
@@ -51,6 +53,18 @@ const TABS = [
   { key: 'groups', labelKey: 'comunidade.filter_groups' },
   { key: 'teachers', labelKey: 'comunidade.tab_teachers' },
 ]
+
+// «Contactar» liga ou escreve, conforme o contacto que o professor deixou:
+// email → escrever, @conta → Instagram, número → ligar.
+const contactHref = (contact) => {
+  const c = (contact || '').trim()
+  if (!c) return null
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c)) return `mailto:${c}`
+  if (/^@[\w.]+$/.test(c)) return `https://instagram.com/${c.slice(1)}`
+  const digits = c.replace(/\D/g, '')
+  if (digits.length >= 9) return `tel:+${digits.length === 9 ? `351${digits}` : digits}`
+  return null
+}
 
 const norm = (s) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 const byName = (a, b) => (a.name || '').localeCompare(b.name || '', 'pt')
@@ -155,6 +169,51 @@ export default function Comunidade() {
   const showOrgs = tab === 'clubs' || tab === 'groups' || verTudo
   // «Todos» e a pesquisa mostram os dois tipos; senão, só o do filtro.
   const shownOrgs = verTudo ? listedOrgs : listedOrgs.filter((o) => (o.kind === 'group') === (tab === 'groups'))
+  // Quem eu sigo (e pedidos meus por aceitar), para o botão de cada
+  // professor dizer o estado certo. As minhas linhas vejo-as sempre (RLS).
+  const [myFollows, setMyFollows] = useState({})
+  const [followActing, setFollowActing] = useState(null)
+  useEffect(() => {
+    if (!user?.id) return
+    supabase.from('follows').select('id, followed_id, status').eq('follower_id', user.id)
+      .then(({ data, error }) => {
+        if (error) { console.error('Error loading follows:', error); return }
+        setMyFollows(Object.fromEntries((data || []).map((f) => [f.followed_id, f])))
+      })
+  }, [user?.id])
+
+  const handleTeacherFollow = async (teacher) => {
+    setFollowActing(teacher.user_id)
+    try {
+      const status = await followPlayer(teacher.user_id)
+      const { data } = await supabase.from('follows').select('id, followed_id, status')
+        .eq('follower_id', user.id).eq('followed_id', teacher.user_id)
+      setMyFollows((m) => ({ ...m, [teacher.user_id]: data?.[0] || { status } }))
+    } catch (error) {
+      console.error('Error following teacher:', error)
+      alert(describeError(t, error))
+    } finally {
+      setFollowActing(null)
+    }
+  }
+
+  // Deixar de seguir pede confirmação, como no perfil; cancelar um pedido não.
+  const handleTeacherUnfollow = async (teacher, confirmar = true) => {
+    const follow = myFollows[teacher.user_id]
+    if (!follow?.id) return
+    if (confirmar && !confirm(t('playerdetails.unfollow_confirm', { name: teacher.user?.name || '' }))) return
+    setFollowActing(teacher.user_id)
+    try {
+      await removeFollow(follow.id)
+      setMyFollows((m) => { const n = { ...m }; delete n[teacher.user_id]; return n })
+    } catch (error) {
+      console.error('Error unfollowing teacher:', error)
+      alert(describeError(t, error))
+    } finally {
+      setFollowActing(null)
+    }
+  }
+
   const handleFollow = async (org) => {
     setActingOn(org.id)
     try {
@@ -244,29 +303,59 @@ export default function Comunidade() {
   }
 
   // Abre o perfil do professor (aulas, Trello #49).
-  const renderTeacher = (teacher) => (
-    <Link key={teacher.id} to={`/professor/${teacher.id}`} className="card press block p-3.5 space-y-2">
-      <div className="flex items-center gap-3">
-        <span className="w-11 h-11 rounded-full bg-ink-50 text-ink-700 flex items-center justify-center shrink-0">
-          <GraduationCap size={18} />
-        </span>
-        <div className="flex-1 min-w-0">
-          <h3 className="font-extrabold text-ink-900 truncate">{teacher.user?.name}</h3>
-          <p className="text-xs text-muted truncate">
-            {t('comunidade.teacher_label')} · {teacherClubName(teacher) || t('comunidade.teacher_no_club')}{teacher.zone ? ` · ${teacher.zone}` : ''}
-          </p>
+  // Cartão do professor (desenho aprovado a 24 set, pasta
+  // 2026-09-23-pagina-do-grupo, assunto 3): a foto da pessoa, «Professor ·
+  // clube» e a zona, e dois botões — «Seguir» (o seguir de pessoas que já
+  // existe) e «Contactar». Os horários saíram: são das aulas, escondidas
+  // até depois do Smash Cup. Tocar no nome abre o perfil do professor.
+  const renderTeacher = (teacher) => {
+    const follow = teacher.user_id ? myFollows[teacher.user_id] : null
+    const contacto = contactHref(teacher.contact)
+    const btn = 'flex-1 inline-flex items-center justify-center gap-1.5 min-h-[40px] px-3 rounded-full text-sm font-extrabold transition-colors duration-fast disabled:opacity-40'
+    return (
+      <div key={teacher.id} className="card p-3.5 space-y-3">
+        <Link to={`/professor/${teacher.id}`} className="flex items-center gap-3">
+          <Avatar name={teacher.user?.name} url={teacher.user?.avatar_url} size="w-12 h-12 text-base" />
+          <div className="flex-1 min-w-0">
+            <h3 className="font-extrabold text-ink-900 truncate">{teacher.user?.name}</h3>
+            <p className="text-xs text-muted truncate">
+              {t('comunidade.teacher_label')} · {teacherClubName(teacher) || t('comunidade.teacher_no_club')}
+            </p>
+            {teacher.zone && <p className="text-xs text-muted truncate">{teacher.zone}</p>}
+          </div>
+        </Link>
+        <div className="flex gap-2">
+          {teacher.user_id && (
+            follow?.status === 'accepted' ? (
+              <button type="button" disabled={followActing === teacher.user_id}
+                onClick={() => handleTeacherUnfollow(teacher)}
+                className={`${btn} border border-line bg-canvas text-ink-900`}>
+                <Check size={15} /> {t('playerdetails.following_button')}
+              </button>
+            ) : follow?.status === 'pending' ? (
+              <button type="button" disabled={followActing === teacher.user_id}
+                onClick={() => handleTeacherUnfollow(teacher, false)}
+                className={`${btn} border border-line bg-canvas text-muted`}>
+                <Clock size={15} /> {t('playerdetails.requested_button')}
+              </button>
+            ) : (
+              <button type="button" disabled={followActing === teacher.user_id}
+                onClick={() => handleTeacherFollow(teacher)}
+                className={`${btn} bg-ink-900 text-white`}>
+                <Plus size={15} /> {t('playerdetails.follow_button')}
+              </button>
+            )
+          )}
+          {contacto && (
+            <a href={contacto} target={contacto.startsWith('http') ? '_blank' : undefined} rel="noopener noreferrer"
+              className={`${btn} border border-line bg-canvas text-ink-900`}>
+              {t('comunidade.contact_button')}
+            </a>
+          )}
         </div>
       </div>
-      {teacher.availability?.length > 0 && (
-        <p className="text-xs text-muted">
-          {teacher.availability
-            .map((a) => `${t(DAY_LABEL_KEY[a.day_of_week])} ${a.start_time.slice(0, 5)}–${a.end_time.slice(0, 5)}`)
-            .join(' · ')}
-        </p>
-      )}
-      <p className="text-sm text-ink-900">{teacher.contact}</p>
-    </Link>
-  )
+    )
+  }
 
 
   const busy = loading || (showTeachers && teachersLoading)
