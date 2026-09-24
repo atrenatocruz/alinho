@@ -90,7 +90,8 @@ export default function ClubSeriesPanel({ organizationId, teachers, prices, peak
   )
 }
 
-function SeriesManage({ seriesId, onBack }) {
+// Tambem aberto pelo Gerir, ao tocar numa turma da lista de eventos.
+export function SeriesManage({ seriesId, onBack }) {
   const { t } = useTranslation()
   const [data, setData] = useState(null)
   const [acting, setActing] = useState(null)
