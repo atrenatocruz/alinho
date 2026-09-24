@@ -53,10 +53,22 @@ export default function ClubTournamentsPanel({ organizationId, club, startCreati
     setSaving(true)
     setError('')
     try {
-      await createTournament(organizationId, draft)
+      const id = await createTournament(organizationId, draft)
+      // O create_tournament grava sempre em rascunho e ignora o `status` do
+      // rascunho: «Abrir inscrições» tem de ser um segundo passo, senão o
+      // torneio fica escondido e o organizador pensa que já abriu.
+      // Se só este passo falhar, o torneio já existe: fecha-se o formulário na
+      // mesma (senão voltar a carregar criava um segundo) e mostra-se o erro.
+      let openError = null
+      if (draft.status === 'inscricoes' && id) {
+        try { await setTournamentStatus(id, 'inscricoes') } catch (err) { openError = err }
+      }
       setCreating(false)
       load()
-      onDone?.({ created: true })
+      // Com erro, o painel fica aberto (o onDone do Gerir fecha-o) para se ver
+      // a mensagem e o torneio em rascunho na lista.
+      if (openError) setError(describeError(t, openError))
+      else onDone?.({ created: true })
     } catch (err) {
       setError(describeError(t, err))
     } finally {
@@ -174,7 +186,10 @@ export default function ClubTournamentsPanel({ organizationId, club, startCreati
                     <ChevronRight size={16} className="shrink-0 text-ink-300" />
                   </Link>
                   <p className="mt-0.5 text-[11.5px] text-ink-500">
-                    {t('tournament.admin.counts', { categories: row.category_count || 0, teams: row.entry_count || 0 })}
+                    {t('tournament.admin.counts', {
+                      categories: t('tournament.n.categories', { count: row.category_count || 0 }),
+                      teams: t('tournament.n.teams_entered', { count: row.entry_count || 0 }),
+                    })}
                   </p>
                 </div>
                 <StatePill tone={STATE_TONE[row.status] || 'grey'}>{t(`tournament.status_${row.status}`)}</StatePill>

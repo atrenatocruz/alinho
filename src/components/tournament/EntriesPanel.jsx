@@ -366,7 +366,10 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
       {error && <p className="text-sm text-red-600 font-extrabold">{error}</p>}
 
       <p className="text-xs text-muted">
-        {t('tentries.count_line', { confirmed, total: rows.length })}
+        {t('tentries.count_line', {
+          confirmed: t('tournament.n.confirmed', { count: confirmed }),
+          total: t('tournament.n.entries', { count: rows.length }),
+        })}
         {category.slots ? ` · ${t('tentries.count_slots', { count: category.slots })}` : ''}
       </p>
 

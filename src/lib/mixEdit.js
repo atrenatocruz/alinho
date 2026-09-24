@@ -12,6 +12,12 @@
 export const canEditBeforeRound1 = (game, matchesCount) =>
   game?.status === 'in_progress' && matchesCount === 0 && game?.format !== 'americano'
 
+/** Inscrever alguém antes de o mix começar (Trello #534): aberto, ou fechado
+    por estar cheio. Vale também no Americano — as rondas só nascem ao
+    começar. Um mix parado (#448) tem duplas feitas: aí não se mexe. */
+export const canAddBeforeStart = (game, teamsCount) =>
+  ['open', 'closed'].includes(game?.status) && teamsCount === 0
+
 /** Quem está inscrito (confirmado) mas não ficou em nenhuma dupla — o caso
     do número ímpar. `people` é a lista plana de pessoas ({ id, name }). */
 export function unpairedPeople(people = [], teams = []) {
