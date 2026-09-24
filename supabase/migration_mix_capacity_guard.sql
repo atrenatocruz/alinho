@@ -10,7 +10,8 @@
 -- (FOR UPDATE — quem vier a seguir espera) e volta-se a contar. Não cabe →
 -- `game_full`. A app mostra «o mix acabou de encher»; o bot oferece suplente.
 --
--- Fica de fora: admins do clube (inscrever acima das vagas no Gerir é uma
+-- Fica de fora: a promoção de suplentes (corre dentro de outro trigger —
+-- ver pg_trigger_depth), inscrições que encolhem, admins do clube (inscrever acima das vagas no Gerir é uma
 -- decisão deles), mixes que já não estão `open`/`closed`, suplentes
 -- (`waitlisted` não ocupa vaga). O bot NÃO fica de fora (usa service-role,
 -- auth.uid() nulo) — é precisamente um dos lados da corrida.
@@ -28,12 +29,19 @@ DECLARE
   v_size   INTEGER := CASE WHEN NEW.partner_id IS NOT NULL THEN 2 ELSE 1 END;
 BEGIN
   IF NEW.status <> 'confirmed' THEN RETURN NEW; END IF;
-  -- Já confirmada e o tamanho não muda (mesmo parceiro, ou troca de um
-  -- parceiro por outro): não ocupa mais nada.
+  -- Já confirmada e não cresce (mesmo parceiro, troca de parceiro, ou tirar
+  -- o parceiro — o apagar-conta faz isto): não ocupa mais nada. Só se conta
+  -- quando uma inscrição passa a confirmada ou ganha um parceiro.
   IF TG_OP = 'UPDATE' AND OLD.status = 'confirmed'
-     AND (OLD.partner_id IS NULL) = (NEW.partner_id IS NULL) THEN
+     AND NOT (OLD.partner_id IS NULL AND NEW.partner_id IS NOT NULL) THEN
     RETURN NEW;
   END IF;
+  -- Chamado de dentro de OUTRO trigger — é a promoção de suplentes
+  -- (promote_waitlist, ao sair alguém ou ao aumentar os campos). Essa segue
+  -- as regras dela, como sempre: se o 1.º suplente for uma dupla e só houver
+  -- uma vaga, passa das vagas. Travá-la aqui desfazia a SAÍDA de quem saiu
+  -- (revisão final, 24 set) — ninguém conseguia sair desse mix.
+  IF pg_trigger_depth() > 1 THEN RETURN NEW; END IF;
 
   SELECT COALESCE(max_players, num_courts * 4), status, organization_id
     INTO v_cap, v_status, v_org
