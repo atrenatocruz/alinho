@@ -2248,7 +2248,7 @@ export default function GameDetails() {
           {/* Duplas fixas: entrar já com o parceiro combinado — tenha ele
               conta ou não (Trello #339). Num mix que roda parceiros a dupla
               desfazia-se na ronda seguinte, por isso não aparece lá. */}
-          {!game.rotate_partners && (
+          {!game.rotate_partners && game.allow_pair_signup && (
             <PrimaryButton variant="ghost" onClick={() => setPartnerSheet(true)} disabled={joining} className="w-full !bg-white !border-ink-900">
               <Users size={20} /> {t('gamedetails.join_with_partner')}
             </PrimaryButton>

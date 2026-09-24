@@ -225,6 +225,9 @@ export function buildMixMessage({ game, people, capacity, suplentes = [] }, { la
   if (game.price_per_player > 0) lines.push(`💶 ${formatCurrency(game.price_per_player)}/jogador`)
   if (game.prize) lines.push(`🏆 Prémio: ${game.prize}`)
   lines.push(`🏟️ ${game.num_courts} campo(s) · ${capacity} vagas`)
+  // A frase do formato dos clubes («Inscrição Individual ou Dupla»), só nos
+  // mixes com «Inscrição em dupla: Sim».
+  if (game.allow_pair_signup && !game.rotate_partners) lines.push('👥 Inscrição individual ou em dupla')
   if (!isCancelled) {
     const closedCourts = Math.floor(people.length / 4)
     let closedLine = `🔒 ${closedCourts}/${game.num_courts} campos fechados`
@@ -263,7 +266,7 @@ export function buildMixMessage({ game, people, capacity, suplentes = [] }, { la
       lines.push(`🙋 Escreve *In* ou *Alinho* para entrares, *Out* ou *Fora* para saíres`)
     }
     // Duplas fixas: dá para entrar já com o parceiro (commands.js, joinAsPair).
-    if (!game.rotate_partners && capacity - people.length >= 2) {
+    if (game.allow_pair_signup && !game.rotate_partners && capacity - people.length >= 2) {
       lines.push(`🤝 Em dupla: *In${label ? ` ${label}` : ''} com* e o nome do parceiro, ou *In @parceiro*`)
     }
     if (suplentes.length > 0) {

@@ -21,7 +21,7 @@ const pt = {
 Para entrares num mix:
 • *Alinho* / *In* / *Dentro* / *Estou dentro*
 
-Para entrares já em dupla (só nos mixes de duplas fixas):
+Para entrares já em dupla (nos mixes com «👥 Inscrição individual ou em dupla»):
 • *In com João Silva* — o nome como está na app
 • ou *In @João* — menciona o teu parceiro
 Se ele ainda não estiver na app, o bot inscreve-o como convidado (só com a menção @). A dupla aparece na lista com o mesmo número à frente dos dois nomes, ex.: *(1)*.
@@ -88,7 +88,8 @@ Para veres esta lista:
   disambiguate_out: '🤖 Estás inscrito em vários mixes! De qual queres sair?\n\n{{list}}\n\nResponde à mensagem do mix que queres com *Out*, ou escreve *Out* seguido do número, dia, hora ou nível (ex.: *Out 01*).',
   // commands.js — «/mix» e entrar em dupla (A2N, 24 set)
   mix_list_spots: '👥 {{filled}}/{{capacity}}',
-  mix_list_fixed_pairs: ' · duplas fixas 🤝',
+  mix_list_fixed_pairs: ' · aceita duplas 🤝',
+  pair_signup_off: '🤖 Este mix é só de inscrição individual — entra sozinho com *In* 🎾 As duplas são formadas no início.',
   disambiguate_in_pair: '🤖 Há vários mixes abertos! Em qual querem entrar?\n\n{{list}}\n\nEscreve o número e o parceiro outra vez (ex.: *In 01 com João* ou *In 01 @João*).',
   partner_not_fixed_pairs: '🤖 Neste mix os parceiros trocam a cada ronda — não há duplas fixas. Entra sozinho com *In* 🎾',
   mix_full_pair: '🤖 O mix está cheio — não há vagas para uma dupla. Podes entrar sozinho como suplente com *In*.',
@@ -111,7 +112,7 @@ const en = {
 To join a mix:
 • *Alinho* / *In* / *Dentro* / *Estou dentro*
 
-To join straight away as a pair (fixed-pair mixes only):
+To join straight away as a pair (mixes marked «👥 Inscrição individual ou em dupla»):
 • *In com João Silva* — the name as it appears in the app
 • or *In @João* — mention your partner
 If they're not on the app yet, the bot signs them up as a guest (only with the @ mention). The pair shows up on the list with the same number next to both names, e.g. *(1)*.
@@ -177,7 +178,8 @@ To see this list:
   not_in_any_open_mix: "🤖 You're not signed up for any open mix.",
   disambiguate_out: "🤖 You're signed up for several mixes! Which one do you want to leave?\n\n{{list}}\n\nReply to the mix you want with *Out*, or type *Out* followed by the number, weekday, time or level (e.g. *Out 01*).",
   mix_list_spots: '👥 {{filled}}/{{capacity}}',
-  mix_list_fixed_pairs: ' · fixed pairs 🤝',
+  mix_list_fixed_pairs: ' · pairs welcome 🤝',
+  pair_signup_off: '🤖 This mix is individual sign-up only — join on your own with *In* 🎾 Pairs are formed when it starts.',
   disambiguate_in_pair: '🤖 There are several mixes open! Which one do you both want to join?\n\n{{list}}\n\nType the number and your partner again (e.g. *In 01 com João* or *In 01 @João*).',
   partner_not_fixed_pairs: '🤖 In this mix partners rotate every round — there are no fixed pairs. Join on your own with *In* 🎾',
   mix_full_pair: "🤖 The mix is full — there's no room for a pair. You can join on your own as a substitute with *In*.",

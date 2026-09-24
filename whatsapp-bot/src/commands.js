@@ -168,7 +168,7 @@ async function formatMixListWithSpots(openMixes, lang) {
   return openMixes.map((mix) => {
     const capacity = mix.max_players || mix.num_courts * 4
     const spots = t('mix_list_spots', lang, { filled: taken.get(mix.id) || 0, capacity })
-    const pairs = mix.rotate_partners ? '' : t('mix_list_fixed_pairs', lang)
+    const pairs = mix.allow_pair_signup && !mix.rotate_partners ? t('mix_list_fixed_pairs', lang) : ''
     return `${formatMixLine(mix, lang, mixLabel(mix, labelable))}\n   ${spots}${pairs}`
   }).join('\n')
 }
@@ -479,6 +479,14 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message, qu
   async function joinAsPair({ game, people, capacity, profile, isNewGuest, existingRows }) {
     if (game.rotate_partners) {
       await reply('partner_not_fixed_pairs')
+      return
+    }
+    // «Inscrição em dupla» do mix (migration_mix_pair_signup.sql): sem «Sim»
+    // não se entra em dupla, como na app. Antes de a migração correr a coluna
+    // não existe — e aí também é «Não», que é o que se decidiu para os mixes
+    // de antes.
+    if (!game.allow_pair_signup) {
+      await reply('pair_signup_off')
       return
     }
     const left = capacity - people.length
