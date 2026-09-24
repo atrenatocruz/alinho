@@ -2448,7 +2448,7 @@
   "tournament.create.publish": "Open entries now",
   "tournament.create.publish_hint": "Visible to everyone, and teams can sign up straight away.",
   "tournament.create.save_draft": "Save as a draft",
-  "tournament.create.save_draft_hint": "Nobody outside can see it — not even with the link. You open entries whenever you want.",
+  "tournament.create.save_draft_hint": "Only you can see it; anyone with the link still can't open it.",
   "tournament.create.open_now_question": "Do you want to open entries now?",
   "tournament.create.problem_name": "The tournament needs a name.",
   "tournament.create.problem_days": "Pick at least one day.",

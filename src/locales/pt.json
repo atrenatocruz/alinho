@@ -2448,7 +2448,7 @@
   "tournament.create.publish": "Abrir inscrições já",
   "tournament.create.publish_hint": "Fica visível a toda a gente e já dá para inscrever duplas.",
   "tournament.create.save_draft": "Guardar como rascunho",
-  "tournament.create.save_draft_hint": "Ninguém de fora o vê — nem por link. Abres as inscrições quando quiseres.",
+  "tournament.create.save_draft_hint": "Só tu o vês; quem receber o link ainda não consegue abrir.",
   "tournament.create.open_now_question": "Queres abrir as inscrições já?",
   "tournament.create.problem_name": "Falta o nome do torneio.",
   "tournament.create.problem_days": "Escolhe pelo menos um dia.",
