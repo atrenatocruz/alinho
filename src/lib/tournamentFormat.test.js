@@ -288,6 +288,45 @@ describe('classificação do grupo', () => {
     const tabela = groupStandings(['t1', 't2'], porJogar)
     expect(tabela.every((r) => r.played === 0)).toBe(true)
   })
+
+  // Trello #484 — o caso do Renato. A, B e C com 2 vitórias em ciclo
+  // (A>C, C>B, B>A, todos 6-4) e todos ganham ao D; o A ganha ao D por mais.
+  // A diferença de jogos separa o A; B e C continuam empatados (+3 cada).
+  // Entre DUAS, volta-se ao confronto direto: C ganhou a B, logo C é 2.º.
+  it('empate a três: quando um critério separa uma dupla, as que ficam voltam ao confronto direto entre elas (#484)', () => {
+    const renato = [
+      { a: 't1', b: 't3', scoreA: 6, scoreB: 4 }, // A > C
+      { a: 't3', b: 't2', scoreA: 6, scoreB: 4 }, // C > B
+      { a: 't2', b: 't1', scoreA: 6, scoreB: 4 }, // B > A
+      { a: 't1', b: 't4', scoreA: 6, scoreB: 0 }, // A ganha ao D por mais
+      { a: 't2', b: 't4', scoreA: 6, scoreB: 3 },
+      { a: 't3', b: 't4', scoreA: 6, scoreB: 3 },
+    ]
+    // A ordem de entrada põe B antes de C — só o confronto direto os troca.
+    const tabela = groupStandings(['t1', 't2', 't3', 't4'], renato)
+    expect(tabela.map((r) => r.id)).toEqual(['t1', 't3', 't2', 't4'])
+  })
+
+  // Trello #484 — desistência a meio com o resultado empatado (3-3): quem
+  // ganha é quem ficou em campo, não «o B por defeito».
+  it('desistência com o resultado empatado: ganha quem ficou, pelo vencedor do jogo (#484)', () => {
+    const desistencia = [
+      { a: 't1', b: 't2', scoreA: 3, scoreB: 3, winner: 'a' },
+    ]
+    const tabela = groupStandings(['t1', 't2'], desistencia)
+    expect(tabela[0]).toMatchObject({ id: 't1', wins: 1, played: 1 })
+    expect(tabela[1]).toMatchObject({ id: 't2', wins: 0, losses: 1 })
+    // E o confronto direto também lê o vencedor, não o resultado.
+    expect(headToHeadWins('t1', ['t1', 't2'], desistencia)).toBe(1)
+    expect(headToHeadWins('t2', ['t1', 't2'], desistencia)).toBe(0)
+  })
+
+  it('falta de comparência sem resultado escrito conta como jogo jogado e ganho (#484)', () => {
+    const falta = [{ a: 't1', b: 't2', scoreA: null, scoreB: null, winner: 'b' }]
+    const tabela = groupStandings(['t1', 't2'], falta)
+    expect(tabela[0]).toMatchObject({ id: 't2', wins: 1, played: 1 })
+    expect(tabela[1]).toMatchObject({ id: 't1', losses: 1, played: 1 })
+  })
 })
 
 describe('melhores terceiros', () => {

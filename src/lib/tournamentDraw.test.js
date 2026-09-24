@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   seedOrder, qualifierLabels, buildBracketSkeleton, buildDrawPayload, buildKnockoutPayload,
-  bracketRounds, byDayAndTime, standingsOf, qualifiersPerGroup,
+  bracketRounds, byDayAndTime, standingsOf, qualifiersPerGroup, qualifiedFromGroups,
 } from './tournamentDraw'
 
 const grupos = (n) => Array.from({ length: n }, (_, i) => ({
@@ -98,6 +98,76 @@ describe('quadro vazio, em texto', () => {
   it('menos de duas duplas não faz quadro nenhum', () => {
     expect(buildBracketSkeleton(grupos(1), 1)).toEqual([])
   })
+
+  // Trello #484 — as duas regras do quadro, em todos os formatos com grupos
+  // que a app oferece (2 a 8 grupos, passam 1 ou 2).
+  const grupoDe = (texto) => texto.slice(texto.indexOf('Grupo'))
+  const primeiraRonda = (bracket) => {
+    const nome = bracket[0]?.round
+    return bracket.filter((m) => m.round === nome && m.source_a.includes('Grupo') && m.source_b.includes('Grupo'))
+  }
+  // Metade do quadro onde cai cada lugar: pela posição na 1.ª ronda, ou,
+  // para os isentos, pela posição na 2.ª.
+  // Quantos jogos tem cada ronda num quadro cheio — a 1.ª ronda pode ter
+  // menos (os isentos não jogam), mas os números dos jogos contam como se
+  // estivessem todos.
+  const jogosNaRonda = { R32: 16, R16: 8, QF: 4, SF: 2, F: 1 }
+  const metades = (bracket) => {
+    const onde = new Map()
+    const rondas = [...new Set(bracket.map((m) => m.round))]
+    for (const [r, nome] of rondas.entries()) {
+      const jogos = bracket.filter((m) => m.round === nome)
+      const total = jogosNaRonda[nome]
+      if (total < 2) break
+      for (const m of jogos) {
+        const metade = m.slot <= total / 2 ? 'cima' : 'baixo'
+        for (const s of [m.source_a, m.source_b]) {
+          if (s.includes('Grupo') && !onde.has(s)) onde.set(s, metade)
+        }
+      }
+      if (r > 1) break
+    }
+    return onde
+  }
+
+  it('3 grupos, passam 2: o 1.º e o 2.º do mesmo grupo nunca jogam na 1.ª ronda (#484)', () => {
+    const bracket = buildBracketSkeleton(grupos(3), 2)
+    for (const m of primeiraRonda(bracket)) {
+      expect(grupoDe(m.source_a)).not.toBe(grupoDe(m.source_b))
+    }
+  })
+
+  it('4 grupos, passam 2: o 1.º e o 2.º do mesmo grupo ficam em metades opostas (#484)', () => {
+    const onde = metades(buildBracketSkeleton(grupos(4), 2))
+    for (const g of ['A', 'B', 'C', 'D']) {
+      expect(onde.get(`1.º do Grupo ${g}`)).toBeDefined()
+      expect(onde.get(`1.º do Grupo ${g}`)).not.toBe(onde.get(`2.º do Grupo ${g}`))
+    }
+  })
+
+  it('em todos os formatos com grupos, as duas regras valem ao mesmo tempo (#484)', () => {
+    for (let n = 2; n <= 8; n++) {
+      for (const passam of [1, 2]) {
+        const bracket = buildBracketSkeleton(grupos(n), passam)
+        if (!bracket.length) continue
+        for (const m of primeiraRonda(bracket)) {
+          expect(grupoDe(m.source_a), `${n} grupos, passam ${passam}`).not.toBe(grupoDe(m.source_b))
+        }
+        if (passam === 2) {
+          const onde = metades(bracket)
+          for (let g = 0; g < n; g++) {
+            const letra = String.fromCharCode(65 + g)
+            expect(onde.get(`1.º do Grupo ${letra}`), `${n} grupos: metade do 1.º do ${letra}`)
+              .not.toBe(onde.get(`2.º do Grupo ${letra}`))
+          }
+        }
+        // Todos os apurados aparecem uma e uma só vez.
+        const lugares = bracket.flatMap((m) => [m.source_a, m.source_b]).filter((s) => s.includes('Grupo'))
+        expect(new Set(lugares).size, `${n} grupos, passam ${passam}`).toBe(n * passam)
+        expect(lugares).toHaveLength(n * passam)
+      }
+    }
+  })
 })
 
 describe('o que vai para o servidor', () => {
@@ -183,6 +253,66 @@ describe('peças dos separadores', () => {
     ]
     expect(standingsOf(group, matches).map((r) => r.id)).toEqual(['a', 'b', 'c'])
   })
+
+  it('um jogo a decorrer, com resultado já escrito, ainda não conta para a tabela (#484)', () => {
+    const group = { id: 'g1', teams: ['a', 'b'] }
+    const aDecorrer = [
+      { stage: 'grupo', group_id: 'g1', entry_a_id: 'a', entry_b_id: 'b', score_a: 3, score_b: 1, status: 'a_decorrer' },
+    ]
+    expect(standingsOf(group, aDecorrer).every((r) => r.played === 0)).toBe(true)
+  })
+
+  it('desistência com o resultado empatado: a tabela lê o vencedor gravado (#484)', () => {
+    const group = { id: 'g1', teams: ['a', 'b'] }
+    const desistencia = [
+      { stage: 'grupo', group_id: 'g1', entry_a_id: 'a', entry_b_id: 'b', score_a: 3, score_b: 3,
+        status: 'desistencia', winner_entry_id: 'a' },
+    ]
+    expect(standingsOf(group, desistencia)[0]).toMatchObject({ id: 'a', wins: 1 })
+  })
+})
+
+describe('quem passa dos grupos para o quadro (#484)', () => {
+  const gruposComJogos = () => {
+    const groups = [
+      { id: 'gA', number: 1, name: 'Grupo A', teams: ['a1', 'a2', 'a3'] },
+      { id: 'gB', number: 2, name: 'Grupo B', teams: ['b1', 'b2', 'b3'] },
+    ]
+    const jogo = (g, x, y, sx, sy) => ({
+      stage: 'grupo', group_id: g, entry_a_id: x, entry_b_id: y, score_a: sx, score_b: sy,
+      status: 'terminado', winner_entry_id: sx > sy ? x : y,
+    })
+    const matches = [
+      jogo('gA', 'a1', 'a2', 6, 2), jogo('gA', 'a1', 'a3', 6, 3), jogo('gA', 'a2', 'a3', 6, 4),
+      jogo('gB', 'b3', 'b1', 6, 1), jogo('gB', 'b3', 'b2', 6, 2), jogo('gB', 'b1', 'b2', 6, 5),
+    ]
+    return { groups, matches }
+  }
+
+  it('dá os lugares com o mesmo texto do sorteio e a dupla certa em cada um', () => {
+    const { groups, matches } = gruposComJogos()
+    const r = qualifiedFromGroups(groups, matches, 2)
+    expect(r.ready).toBe(true)
+    expect(r.pending).toBe(0)
+    expect(r.qualified.map((q) => [q.label, q.entry_id])).toEqual([
+      ['1.º do Grupo A', 'a1'], ['2.º do Grupo A', 'a2'],
+      ['1.º do Grupo B', 'b3'], ['2.º do Grupo B', 'b1'],
+    ])
+    // Os mesmos textos que o sorteio gravou no quadro.
+    const doSorteio = new Set(qualifierLabels(groups, 2).map((l) => l.label))
+    for (const q of r.qualified) expect(doSorteio.has(q.label)).toBe(true)
+  })
+
+  it('com jogos de grupo por acabar, não está pronto e diz quantos faltam', () => {
+    const { groups, matches } = gruposComJogos()
+    matches[5] = { ...matches[5], status: 'marcado', winner_entry_id: null, score_a: null, score_b: null }
+    const r = qualifiedFromGroups(groups, matches, 2)
+    expect(r.ready).toBe(false)
+    expect(r.pending).toBe(1)
+  })
+})
+
+describe('peças dos separadores (continuação)', () => {
 
   it('sem formato guardado, passam 2 por grupo', () => {
     expect(qualifiersPerGroup(null)).toBe(2)

@@ -260,8 +260,26 @@ export function groupRoundRobin(groupTeams) {
 
 // ── Classificação ────────────────────────────────────────────────────────
 
+/** Quem ganhou um jogo: 'a', 'b' ou null (por jogar, ou empatado sem
+    vencedor). O `winner` do jogo manda sempre que existe — numa desistência a
+    meio o resultado pode estar empatado (3-3) ou até favorecer quem desistiu,
+    e numa falta de comparência pode não haver resultado nenhum (Trello #484).
+    Sem `winner`, decide o resultado. */
+export function matchWinner(m) {
+  if (m.winner === 'a' || m.winner === 'b') return m.winner
+  if (m.scoreA == null || m.scoreB == null) return null
+  if (m.scoreA > m.scoreB) return 'a'
+  if (m.scoreB > m.scoreA) return 'b'
+  return null
+}
+
+/** Um jogo conta para a tabela quando tem vencedor ou resultado dos dois
+    lados. */
+const isPlayed = (m) => m.winner === 'a' || m.winner === 'b' || (m.scoreA != null && m.scoreB != null)
+
 /** Linhas da tabela de um grupo, já ordenadas.
-    `matches`: [{ a, b, scoreA, scoreB, walkover }] — a e b são ids.
+    `matches`: [{ a, b, scoreA, scoreB, winner? }] — a e b são ids; `winner`
+    é 'a' ou 'b' quando se sabe (ver `matchWinner`).
     Faltas e desistências contam para a classificação do grupo (o adversário
     ganha), mas não mexem no ranking da app: isso é decidido noutro sítio. */
 export function groupStandings(teamIds, matches, { tiebreak = TIEBREAK_DEFAULT } = {}) {
@@ -269,15 +287,18 @@ export function groupStandings(teamIds, matches, { tiebreak = TIEBREAK_DEFAULT }
     id, played: 0, wins: 0, losses: 0, gamesWon: 0, gamesLost: 0,
   })).map((r) => [r.id, r]))
 
-  const played = matches.filter((m) => m.scoreA != null && m.scoreB != null)
+  const played = matches.filter(isPlayed)
   for (const m of played) {
     const a = rows.get(m.a)
     const b = rows.get(m.b)
     if (!a || !b) continue
     a.played++; b.played++
-    a.gamesWon += m.scoreA; a.gamesLost += m.scoreB
-    b.gamesWon += m.scoreB; b.gamesLost += m.scoreA
-    if (m.scoreA > m.scoreB) { a.wins++; b.losses++ } else { b.wins++; a.losses++ }
+    const sa = m.scoreA ?? 0
+    const sb = m.scoreB ?? 0
+    a.gamesWon += sa; a.gamesLost += sb
+    b.gamesWon += sb; b.gamesLost += sa
+    const w = matchWinner(m)
+    if (w === 'a') { a.wins++; b.losses++ } else if (w === 'b') { b.wins++; a.losses++ }
   }
 
   const list = [...rows.values()].map((r) => ({ ...r, diff: r.gamesWon - r.gamesLost }))
@@ -286,7 +307,14 @@ export function groupStandings(teamIds, matches, { tiebreak = TIEBREAK_DEFAULT }
 
 /** Ordena aplicando os critérios por ordem. O confronto direto só se aplica
     entre as duplas empatadas nesse ponto (empate a três: mini-tabela só com
-    os jogos entre elas). */
+    os jogos entre elas).
+
+    Quando um critério SEPARA o grupo empatado, cada parte que continua
+    empatada recomeça do primeiro critério — e, com isso, o confronto direto
+    passa a contar só entre as que ficaram. Caso do Renato (Trello #484): três
+    em ciclo, a diferença de jogos tira uma; as outras duas decidem-se pelo
+    jogo entre elas, não pelos jogos ganhos. Só se passa ao critério seguinte
+    quando o atual não separa ninguém. */
 export function sortWithTiebreak(rows, matches, tiebreak = TIEBREAK_DEFAULT) {
   const value = (row, criterion, tiedIds) => {
     switch (criterion) {
@@ -308,9 +336,10 @@ export function sortWithTiebreak(rows, matches, tiebreak = TIEBREAK_DEFAULT) {
       if (!byValue.has(s.v)) byValue.set(s.v, [])
       byValue.get(s.v).push(s.row)
     }
+    if (byValue.size === 1) return compareWithin(group, depth + 1)
     return [...byValue.entries()]
       .sort((x, y) => y[0] - x[0])
-      .flatMap(([, sub]) => compareWithin(sub, depth + 1))
+      .flatMap(([, sub]) => compareWithin(sub, 0))
   }
 
   return compareWithin([...rows], 0).map((row, i) => ({ ...row, position: i + 1 }))
@@ -322,8 +351,9 @@ export function headToHeadWins(id, tiedIds, matches) {
   let wins = 0
   for (const m of matches) {
     if (!tied.has(m.a) || !tied.has(m.b)) continue
-    if (m.a === id && m.scoreA > m.scoreB) wins++
-    if (m.b === id && m.scoreB > m.scoreA) wins++
+    const w = matchWinner(m)
+    if (m.a === id && w === 'a') wins++
+    if (m.b === id && w === 'b') wins++
   }
   return wins
 }

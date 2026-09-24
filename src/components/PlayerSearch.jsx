@@ -1,10 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
-import { Search, X } from 'lucide-react'
+import { Search, X, Check } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { searchPlayers } from '../lib/privateMatches'
 import { Avatar } from './ui'
 
-export default function PlayerSearch({ label, selected, onSelect, onClear, excludeIds = [], searchFn = searchPlayers }) {
+// disabledIds: aparecem na lista, com disabledLabel, mas não se escolhem —
+// ex.: quem já é membro, na pesquisa de convidar do Gerir. Esconder em
+// silêncio fazia parecer que a pesquisa estava avariada (Francisco, 24 set).
+export default function PlayerSearch({ label, selected, onSelect, onClear, excludeIds = [], disabledIds = [], disabledLabel = '', searchFn = searchPlayers }) {
   const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
@@ -71,7 +74,17 @@ export default function PlayerSearch({ label, selected, onSelect, onClear, exclu
           {showEmptyState ? (
             <p className="p-3 text-sm text-muted text-center">{t('playersearch.no_players_found')}</p>
           ) : (
-            visibleResults.map((player) => (
+            visibleResults.map((player) => disabledIds.includes(player.id) ? (
+              <div key={player.id} className="w-full flex items-center gap-3 p-3 text-left">
+                <Avatar name={player.name} url={player.avatar_url} size="w-9 h-9 text-sm" />
+                <p className="flex-1 min-w-0 font-extrabold text-muted text-sm truncate">{player.name}</p>
+                {disabledLabel && (
+                  <span className="shrink-0 inline-flex items-center gap-1 text-xs font-extrabold text-muted">
+                    <Check size={13} /> {disabledLabel}
+                  </span>
+                )}
+              </div>
+            ) : (
               <button
                 key={player.id}
                 type="button"
