@@ -19,6 +19,7 @@ import { deleteTournament, setTournamentStatus } from '../../lib/tournamentApi'
 import { describeError } from '../../lib/errors'
 import { canDelete, TOURNAMENT_TZ } from '../../lib/tournaments'
 import { MonoLabel, StatePill } from './TournamentBits'
+import CloseCategories from './CloseCategories'
 
 /** O passo seguinte de cada estado. Do sorteio em diante não se anda à mão:
  *  é o que a `set_tournament_status` deixa fazer, e a barra não promete o
@@ -159,8 +160,14 @@ export default function AdminBar({ tournament, onChanged, onEdit, onDraw }) {
         </button>
       </div>
 
+      {/* Com o sorteio feito, o passo seguinte é fechar cada categoria — e
+          o torneio fecha sozinho com a última (Trello #485). */}
+      {(status === 'sorteado' || status === 'a_decorrer') && (
+        <CloseCategories tournament={tournament} onChanged={onChanged} />
+      )}
+
       {/* Um botão que sai deixa a razão no lugar dele, nunca um vazio. */}
-      {!next && status !== 'fechado' && (
+      {!next && status !== 'fechado' && status !== 'sorteado' && status !== 'a_decorrer' && (
         <p className="mt-2 text-[11.5px] text-ink-500">{t('tournament.admin.no_step')}</p>
       )}
       {deletable ? (
