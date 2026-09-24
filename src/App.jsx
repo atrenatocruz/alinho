@@ -163,7 +163,7 @@ function PublicShell({ children }) {
 }
 
 const Guard = ({ require, showSplash, children }) => {
-  const { user, profile, isGuest, isAdmin, isPrivateMatchesEnabled, profileError, retryProfile } = useAuth()
+  const { user, profile, isGuest, isAdmin, isPrivateMatchesEnabled, isLessonsEnabled, profileError, retryProfile } = useAuth()
   const location = useLocation()
 
   if (showSplash) {
@@ -231,6 +231,12 @@ const Guard = ({ require, showSplash, children }) => {
   // Redirects to Home when the private-matches feature flag is off — covers
   // direct navigation/bookmarks to a card that's already hidden on Home.
   if (require === 'privateMatches' && !isPrivateMatchesEnabled) {
+    return <Navigate to="/" />
+  }
+
+  // Aulas escondidas (feature flag 'lessons'): o link direto de uma aula ou
+  // da disponibilidade de um professor leva a Home.
+  if (require === 'lessons' && (isGuest || !isLessonsEnabled)) {
     return <Navigate to="/" />
   }
 
@@ -398,7 +404,7 @@ function AppRoutes() {
         <Route
           path="/aula/:id"
           element={
-            <Guard require="member" showSplash={showSplash}>
+            <Guard require="lessons" showSplash={showSplash}>
               <LessonPage />
             </Guard>
           }
@@ -406,7 +412,7 @@ function AppRoutes() {
         <Route
           path="/professor/:id/disponibilidade"
           element={
-            <Guard require="member" showSplash={showSplash}>
+            <Guard require="lessons" showSplash={showSplash}>
               <TeacherPage view="availability" />
             </Guard>
           }
