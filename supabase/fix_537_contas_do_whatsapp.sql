@@ -431,11 +431,13 @@ BEGIN
   END IF;
 
   -- ── 5. Confirmar: em cada clube, UMA conta com aquele telemóvel ─────────
+  -- (`mm` e não `m`: `m` é a variável do ciclo do passo 3, e o Postgres
+  -- recusava a consulta por não saber qual das duas era — 24 set.)
   IF EXISTS (
-    SELECT 1 FROM memberships m JOIN profiles p ON p.id = m.user_id
+    SELECT 1 FROM memberships mm JOIN profiles p ON p.id = mm.user_id
      WHERE p.phone_hash = COALESCE(v_para.phone_hash, v_de.phone_hash)
-       AND m.organization_id IN (SELECT organization_id FROM memberships WHERE user_id = c_registada)
-     GROUP BY m.organization_id HAVING count(*) <> 1) THEN
+       AND mm.organization_id IN (SELECT mb.organization_id FROM memberships mb WHERE mb.user_id = c_registada)
+     GROUP BY mm.organization_id HAVING count(*) <> 1) THEN
     RAISE EXCEPTION 'Caso A: há um clube com mais de uma conta com este telemóvel — o bot continuava a dar erro. Nada ficou gravado.';
   END IF;
 
