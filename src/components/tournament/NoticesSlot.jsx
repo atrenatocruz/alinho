@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Megaphone, Pencil, Trash2, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
-import { PrimaryButton } from '../ui'
+import { ConfirmSheet, PrimaryButton } from '../ui'
 import { Sheet } from '../agenda/AgendaControls'
 import {
   activeNotices, noticeAge, noticeError, editedWords, expiryFrom,
@@ -129,6 +129,7 @@ export default function NoticesSlot({ tournament }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notices, setNotices] = useState([])
+  const [askRemove, setAskRemove] = useState(null) // o aviso a apagar
 
   // Os avisos vêm da vista pública (abre sem conta), não das props: assim
   // este painel não obriga o esqueleto do Dev 1 a passar mais nada, e pode
@@ -165,15 +166,10 @@ export default function NoticesSlot({ tournament }) {
     finally { setBusy(false) }
   }
 
-  const remove = async (notice) => {
-    if (!window.confirm(t('tnotices.delete_confirm'))) return
-    setBusy(true); setError('')
-    try {
-      await deleteNotice(notice.id)
-      reload()
-    } catch (err) { console.error('Error deleting tournament notice:', err); say(err) }
-    finally { setBusy(false) }
-  }
+  // Apagar pergunta na folha da app (#435); o erro, se houver, fica lá.
+  const remove = (notice) => { setError(''); setAskRemove(notice) }
+  // O título nomeia o aviso pelo começo do texto — um aviso não tem nome.
+  const shortBody = (body = '') => (body.length > 40 ? `${body.slice(0, 40).trimEnd()}…` : body)
 
   return (
     <div className="space-y-2">
@@ -245,6 +241,18 @@ export default function NoticesSlot({ tournament }) {
           onClose={() => { setComposer(null); setError('') }}
         />
       )}
+
+      <ConfirmSheet
+        open={!!askRemove}
+        danger
+        title={t('tnotices.delete_title', { text: shortBody(askRemove?.body) })}
+        message={t('tnotices.delete_consequence')}
+        cancelLabel={t('tnotices.delete_keep')}
+        confirmLabel={t('tnotices.delete_yes')}
+        onConfirm={async () => { await deleteNotice(askRemove.id); reload() }}
+        onClose={() => setAskRemove(null)}
+        errorOf={(err) => t(err?.message === 'not_ready' ? 'tnotices.error_not_ready' : 'tnotices.error_generic')}
+      />
     </div>
   )
 }

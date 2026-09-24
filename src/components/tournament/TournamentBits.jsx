@@ -93,35 +93,3 @@ export function CategorySelect({ categories, value, onChange, label, mineId = nu
     </div>
   )
 }
-
-/** Os cinco separadores. Numa só linha que desliza — a 390 px não cabem
- *  todos, e encolher o texto até não se ler é pior (adenda do Smash Cup). */
-/** Até três separadores ficam em grelha, com a MESMA largura e sem rolar —
- *  é a regra do desenho de 23 set. Só acima de três é que a fila volta a
- *  rolar, e aí já não é esta página.
- *
- *  Era isto que fazia o «#430»: com cinco a fila rolava na horizontal e,
- *  ao mudar de separador, voltava ao princípio e escondia onde a pessoa
- *  estava. Sem rolagem não há para onde saltar. */
-export function TabStrip({ tabs, value, onChange }) {
-  const fits = tabs.length <= 3
-  return (
-    <div className={fits
-      ? 'grid gap-1.5'
-      : '-mx-1 flex gap-1.5 overflow-x-auto no-scrollbar px-1'}
-      style={fits ? { gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` } : undefined}>
-      {tabs.map(([key, label]) => (
-        <button
-          key={key}
-          type="button"
-          onClick={() => onChange(key)}
-          className={`truncate rounded-full px-3 py-1.5 text-[12px] font-bold transition-colors ${fits ? 'text-center' : 'whitespace-nowrap'} ${
-            value === key ? 'bg-ink-900 text-white' : 'bg-ink-50 text-ink-700 hover:bg-ink-100'
-          }`}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
-  )
-}

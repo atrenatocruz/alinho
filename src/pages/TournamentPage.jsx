@@ -19,8 +19,8 @@ import { useGoBack } from '../lib/useGoBack'
 import { useAuth } from '../contexts/AuthContext'
 import { getTournamentForEdit, getTournamentPage, updateTournament } from '../lib/tournamentApi'
 import { describeError, errorKind } from '../lib/errors'
-import { Avatar, EmptyState } from '../components/ui'
-import { CategorySelect, LILAC, MonoLabel, StatePill, TabStrip, TourTag } from '../components/tournament/TournamentBits'
+import { Avatar, EmptyState, Tabs } from '../components/ui'
+import { CategorySelect, LILAC, MonoLabel, StatePill, TourTag } from '../components/tournament/TournamentBits'
 import { TOURNAMENT_PANELS, TOURNAMENT_TABS, TOURNAMENT_TAB_OWNER } from '../components/tournament/panels'
 import AdminBar from '../components/tournament/AdminBar'
 import CreateTournamentForm from '../components/tournament/CreateTournamentForm'
@@ -300,10 +300,13 @@ export default function TournamentPage() {
         />
       )}
 
-      <TabStrip
-        tabs={TOURNAMENT_TABS.map((key) => [key, t(`tournament.tab_${key}`)])}
+      {/* O separador único da app (Trello #528): muda o que o ecrã mostra,
+          por isso é pílula cinzenta — não pastilhas pretas, que são filtro. */}
+      <Tabs
+        options={TOURNAMENT_TABS.map((key) => ({ value: key, label: t(`tournament.tab_${key}`) }))}
         value={tab}
         onChange={(next) => setParam('tab', next)}
+        label={t('tournament.tabs_label')}
       />
 
       <div>
