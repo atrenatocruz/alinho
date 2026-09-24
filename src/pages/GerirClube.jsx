@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
-import { Plus, Calendar, Users, Trash2, Edit2, Check, X, UserX, Repeat, Clock, ArrowLeft, Camera, Settings, Copy, QrCode, ChevronRight, GraduationCap, Trophy } from 'lucide-react'
+import { Plus, Calendar, Users, Trash2, Edit2, Check, X, UserX, Clock, ArrowLeft, Camera, Settings, Copy, QrCode, ChevronRight, GraduationCap, Trophy } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
@@ -24,10 +24,13 @@ import { listPendingClubTeachers, resolveTeacherClub } from '../lib/teachers'
 import VoucherScanner from '../components/VoucherScanner'
 import { isValidVoucherId, normalizeScannedVoucherId } from '../lib/vouchers'
 import OpenSlotsPanel from '../components/OpenSlotsPanel'
-import ClubLessonsPanel, { Prices as LessonPrices } from '../components/lessons/ClubLessonsPanel'
+import { Prices as LessonPrices, ClubTeachers, NewSeries } from '../components/lessons/ClubLessonsPanel'
+import { SeriesManage } from '../components/lessons/ClubSeriesPanel'
+import { lessonTypeLabel, seriesWhen } from '../components/lessons/LessonBits'
 import { listClubTournaments } from '../lib/tournamentApi'
-import { lessonsAvailable } from '../lib/lessonsApi'
+import { lessonsAvailable, listClubSeries } from '../lib/lessonsApi'
 import ClubTournamentsPanel from '../components/tournament/ClubTournamentsPanel'
+import { KIND_STYLE } from '../components/agenda/EventCard'
 import { tournamentsAvailable } from '../lib/tournamentApi'
 import { describeError } from '../lib/errors'
 
@@ -101,6 +104,20 @@ const GERIR_TABS = ['events', 'members', 'settings', 'redeem']
 // a sua seccao.
 const LEGACY_TABS = { games: 'events', open_slots: 'events', lessons: 'events', tournaments: 'events' }
 const DONE_STATUSES = ['finished', 'completed', 'cancelled']
+
+// Proxima vez que uma turma acontece. weekday: 1 = segunda ... 7 = domingo.
+// So serve para a por no sitio certo da lista: a linha mostra o dia da
+// semana, nao uma data, porque a turma pode ainda nao ter comecado.
+const proximaVez = (weekday, hhmm) => {
+  const [h, m] = String(hhmm || '00:00').split(':').map(Number)
+  const agora = new Date()
+  const d = new Date(agora)
+  d.setHours(h, m, 0, 0)
+  let dias = (weekday - (d.getDay() || 7) + 7) % 7
+  if (dias === 0 && d < agora) dias = 7
+  d.setDate(d.getDate() + dias)
+  return d.toISOString()
+}
 const GAME_FILTERS = [
   { value: 'upcoming', labelKey: 'gerirclube.filter_upcoming' },
   { value: 'finished', labelKey: 'gerirclube.filter_finished' },
@@ -206,7 +223,13 @@ export default function GerirClube() {
   // Qual das formas de marcar esta aberta: 'aberto' | 'aulas' | 'torneios'.
   // Os paineis que antes eram seccoes empilhadas passam a viver atras dos
   // botoes de marcar -- nenhum foi reescrito, so mudou quem os abre.
-  const [painelAberto, setPainelAberto] = useState(null)
+  // O formulario de criar que esta aberto: 'aberto' | 'torneio' | 'turma'.
+  // O do mix continua com o seu proprio estado (showCreateGame).
+  const [criar, setCriar] = useState(null)
+  const [avisoCriado, setAvisoCriado] = useState('')
+  // As turmas entram na lista de eventos; tocar numa abre a gestao dela.
+  const [turmas, setTurmas] = useState([])
+  const [turmaAberta, setTurmaAberta] = useState(null)
   const [tournaments, setTournaments] = useState([])
   const [members, setMembers] = useState([])
   const [linkCopied, setLinkCopied] = useState(false)
@@ -216,6 +239,12 @@ export default function GerirClube() {
   const [loading, setLoading] = useState(true)
   const [showCreateGame, setShowCreateGame] = useState(false)
   const [editingGame, setEditingGame] = useState(null)
+  // «Editar» esta em cada linha da lista, mas o formulario abre no topo do
+  // separador: sem isto, quem edita um mix la em baixo nao via nada mudar.
+  const formMixRef = useRef(null)
+  useEffect(() => {
+    if (editingGame) formMixRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [editingGame?.id])
   const [gameFilter, setGameFilter] = useState('upcoming')
   const [savingPlan, setSavingPlan] = useState(false)
   const [planMessage, setPlanMessage] = useState(null)
@@ -315,6 +344,14 @@ export default function GerirClube() {
         tipo: 'torneio', chave: `torneio-${torneio.id}`,
         quando: torneio.starts_on ? `${torneio.starts_on}T12:00` : null, row: torneio,
         terminado: torneio.status === 'finished' || (!!fim && new Date(`${fim}T23:59`) < new Date()),
+      })
+    }
+    // Uma turma repete-se todas as semanas: entra pela proxima vez que
+    // acontece, e nunca vai para «o que ja passou».
+    for (const turma of turmas) {
+      itens.push({
+        tipo: 'turma', chave: `turma-${turma.series_id}`,
+        quando: proximaVez(turma.weekday, turma.start_time), row: turma, terminado: false,
       })
     }
     const passados = gameFilter === 'finished'
@@ -418,8 +455,9 @@ export default function GerirClube() {
   // a respetiva forma de marcar ja aberta. O endereco do Gerir anda em
   // conversas e em avisos da app e nao pode deixar de levar onde levava.
   useEffect(() => {
-    const painel = { open_slots: 'aberto', lessons: 'aulas', tournaments: 'torneios' }[tabParam]
-    if (painel) setPainelAberto(painel)
+    // ?tab=open_slots abria o formulario de publicar: continua a abrir.
+    // Aulas e torneios estao agora na propria lista de eventos.
+    if (tabParam === 'open_slots') setCriar('aberto')
   }, [tabParam])
 
   useEffect(() => {
@@ -443,6 +481,10 @@ export default function GerirClube() {
   useEffect(() => {
     if (activeTab === 'events' && org?.kind === 'club' && tournamentsReady) loadTournaments()
   }, [tournamentsReady, activeTab, org?.kind, currentOrganizationId])
+
+  useEffect(() => {
+    if (activeTab === 'events' && org?.kind === 'club' && lessonsReady) loadTurmas()
+  }, [lessonsReady, activeTab, org?.kind, currentOrganizationId])
 
   useEffect(() => {
     if (currentOrganizationId) loadData()
@@ -686,6 +728,36 @@ export default function GerirClube() {
       .order('date', { ascending: false })
     if (error) { console.error('Error loading open games:', error); return }
     setOpenGames(data || [])
+  }
+
+  const loadTurmas = async () => {
+    try {
+      setTurmas(await listClubSeries(currentOrganizationId))
+    } catch (error) {
+      console.error('Error loading club series:', error)
+    }
+  }
+
+  // Cancelar um jogo em aberto so existia dentro do painel «Em aberto».
+  // Com o painel reduzido ao formulario, passa para a linha da lista --
+  // mesma regra de antes: so enquanto ninguem se inscreveu.
+  const handleCancelOpenGame = async (gameId) => {
+    if (!confirm(t('open_slots.confirm_cancel'))) return
+    const { error } = await supabase.from('games').update({ status: 'cancelled' }).eq('id', gameId)
+    if (error) {
+      console.error('Error cancelling open slot:', error)
+      alert(describeError(t, error, 'open_slots.error_cancel'))
+      return
+    }
+    loadOpenGames()
+  }
+
+  const abrirCriar = (tipo) => {
+    setAvisoCriado('')
+    setCreatedMixScope(null)
+    if (tipo === 'mix') { setCriar(null); setShowCreateGame(true); return }
+    setShowCreateGame(false)
+    setCriar(tipo)
   }
 
   const loadTournaments = async () => {
@@ -1332,6 +1404,7 @@ export default function GerirClube() {
 
       alert(t('gerirclube.game_deleted_success'))
       loadGames()
+      return true
     } catch (error) {
       console.error('Error deleting game:', error)
       // 23503/23514: o que ainda prende o mix são resultados (XP, vencedores).
@@ -1670,6 +1743,16 @@ export default function GerirClube() {
     }
   }
 
+  // «Qui 25 set · 20:00», a forma curta do resto da app (agenda). Os
+  // torneios so tem dias, por isso vao sem hora.
+  const quandoCurto = (iso, comHora = true) => {
+    const d = new Date(iso)
+    const parte = (o) => formatDateLib(d, i18n.language, o).replace('.', '')
+    const semana = parte({ weekday: 'short' })
+    const dia = `${semana.charAt(0).toUpperCase()}${semana.slice(1)} ${d.getDate()} ${parte({ month: 'short' })}`
+    return comHora ? `${dia} · ${formatTimeLib(d, i18n.language, { hour: '2-digit', minute: '2-digit' })}` : dia
+  }
+
   const formatDate = (dateString) =>
     formatDateLib(dateString, i18n.language, {
       day: '2-digit',
@@ -1889,68 +1972,39 @@ export default function GerirClube() {
           {/* «Eventos»: as quatro seccoes empilhadas, cada uma com o seu
               titulo (Trello #467). Nenhum painel foi reescrito -- sao os
               mesmos de quando eram separadores. */}
-          {activeTab === 'events' && (
-            <div className="space-y-4">
-              {/* Marcar: um botao por tipo, so os que este sitio permite.
-                  Cada um abre a forma que ja existia -- o «Criar mix» fica
-                  como estava, logo abaixo. */}
-              {!isGroupOrg && (
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setPainelAberto(painelAberto === 'aberto' ? null : 'aberto')}
-                    className={`inline-flex items-center gap-1.5 px-3 min-h-[40px] rounded-full text-sm font-extrabold border transition-colors duration-fast ${
-                      painelAberto === 'aberto' ? 'bg-ink-900 text-white border-ink-900' : 'bg-canvas text-ink-700 border-line'
-                    }`}
-                  >
-                    <Clock size={15} /> {t('gerirclube.tab_open_slots')}
-                  </button>
-                  {tournamentsReady && (
-                    <button
-                      type="button"
-                      onClick={() => setPainelAberto(painelAberto === 'torneios' ? null : 'torneios')}
-                      className={`inline-flex items-center gap-1.5 px-3 min-h-[40px] rounded-full text-sm font-extrabold border transition-colors duration-fast ${
-                        painelAberto === 'torneios' ? 'bg-ink-900 text-white border-ink-900' : 'bg-canvas text-ink-700 border-line'
-                      }`}
-                    >
-                      <Trophy size={15} /> {t('gerirclube.tab_tournaments')}
-                    </button>
-                  )}
-                  {lessonsReady && (
-                    <button
-                      type="button"
-                      onClick={() => setPainelAberto(painelAberto === 'aulas' ? null : 'aulas')}
-                      className={`inline-flex items-center gap-1.5 px-3 min-h-[40px] rounded-full text-sm font-extrabold border transition-colors duration-fast ${
-                        painelAberto === 'aulas' ? 'bg-ink-900 text-white border-ink-900' : 'bg-canvas text-ink-700 border-line'
-                      }`}
-                    >
-                      <GraduationCap size={15} /> {t('gerirclube.tab_lessons')}
-                    </button>
-                  )}
-                </div>
-              )}
-              <button
-                onClick={() => { setShowCreateGame(true); setCreatedMixScope(null) }}
-                className="btn-primary w-full flex items-center justify-center gap-2"
-              >
-                <Plus size={20} />
-                {t('gerirclube.create_game')}
-              </button>
+          {activeTab === 'events' && turmaAberta && (
+            <SeriesManage seriesId={turmaAberta} onBack={() => { setTurmaAberta(null); loadTurmas() }} />
+          )}
 
-              {/* Os jogos entre amigos vivem na página do grupo/clube
-                  (/clube/:slug/jogos) e qualquer membro pode criar um. Quem
-                  gere um grupo criado na Comunidade não tinha por onde lá
-                  chegar — o grupo é privado, não aparece na Comunidade, e o
-                  Gerir não ligava para lá (Francisco, 16 set 2026). */}
-              {org?.slug && (
-                <Link to={`/clube/${org.slug}/jogos`} className="card press flex items-center justify-between gap-3 hover:shadow-lift">
-                  <div className="min-w-0">
-                    <h3 className="font-extrabold text-ink-900">{t(kk('gerirclube.group_matches_heading'))}</h3>
-                    <p className="text-sm text-muted">{t(kk('gerirclube.group_matches_hint'))}</p>
-                  </div>
-                  <ChevronRight size={18} className="text-muted shrink-0" />
-                </Link>
-              )}
+          {activeTab === 'events' && !turmaAberta && (
+            <div className="space-y-4">
+              {/* Criar: um botao por tipo, todos iguais e sem ligado/desligado
+                  -- cada um so abre o formulario desse tipo (desenho de 23
+                  set). Num grupo so ha mixes. Secundarios: quatro blocos
+                  lima seguidos competiam uns com os outros (DESIGN.md). */}
+              <div className={`grid gap-2 ${isGroupOrg ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                {[
+                  ['mix', 'gerirclube.event_label_mix', true],
+                  ['aberto', 'gerirclube.tab_open_slots', !isGroupOrg],
+                  ['torneio', 'gerirclube.event_label_tournament', !isGroupOrg && tournamentsReady],
+                  ['turma', 'gerirclube.event_label_series', !isGroupOrg && lessonsReady],
+                ].filter(([, , mostra]) => mostra).map(([tipo, texto]) => (
+                  <button
+                    key={tipo}
+                    type="button"
+                    onClick={() => abrirCriar(tipo)}
+                    className="btn-secondary !px-3 !py-2 !text-sm inline-flex items-center justify-center gap-1.5"
+                  >
+                    <Plus size={17} /> {t(texto)}
+                  </button>
+                ))}
+              </div>
+
+              {/* O cartao para os jogos entre membros (/clube/:slug/jogos)
+                  saiu daqui (Francisco, 24 set: «temos o card e o botao, nao
+                  precisamos dos dois»). Continua na pagina do clube/grupo, e
+                  quem gere um grupo privado chega la pelos «Os meus» da
+                  Comunidade. */}
 
               {createdMixScope && (
                 <div className="card bg-lime-50 border border-lime-200 flex items-center justify-between gap-3">
@@ -1966,9 +2020,35 @@ export default function GerirClube() {
                 </div>
               )}
 
+              {criar === 'aberto' && (
+                <OpenSlotsPanel
+                  organizationId={currentOrganizationId}
+                  onlyForm
+                  onDone={({ created }) => { setCriar(null); if (created) loadOpenGames() }}
+                />
+              )}
+              {criar === 'torneio' && (
+                <ClubTournamentsPanel
+                  organizationId={org.id}
+                  club={org}
+                  startCreating
+                  onDone={({ created }) => { setCriar(null); if (created) loadTournaments() }}
+                />
+              )}
+              {criar === 'turma' && (
+                <NewSeries
+                  organizationId={currentOrganizationId}
+                  onDone={({ created, name }) => {
+                    setCriar(null)
+                    if (created) { setAvisoCriado(t('lessons.series_created_pending', { name })); loadTurmas() }
+                  }}
+                />
+              )}
+              {avisoCriado && <p className="text-sm font-semibold text-ok">{avisoCriado}</p>}
+
               {/* Create/Edit Game Form */}
               {(showCreateGame || editingGame) && (
-                <div className="card bg-blue-50 border-2 border-blue-200">
+                <div ref={formMixRef} className="card bg-blue-50 border-2 border-blue-200 scroll-mt-4">
                   <h3 className="text-xl font-semibold text-ink-900 mb-4">
                     {editingGame ? t('gerirclube.edit_game_title') : t('gerirclube.create_game')}
                   </h3>
@@ -2524,6 +2604,64 @@ export default function GerirClube() {
                       </button>
                     </div>
                   </form>
+
+                  {/* O que estava no cartao da lista e nao e editar: as outras
+                      datas da recorrencia, parar a recorrencia e eliminar.
+                      Eliminar fica no fim, isolado e a vermelho, como
+                      «Eliminar clube» -- aqui so chega quem abriu o mix de
+                      proposito (desenho de 24 set). */}
+                  {editingGame && (() => {
+                    const outrasDatas = editingGame.recurrence_id
+                      ? games
+                          .filter((g) => g.recurrence_id === editingGame.recurrence_id && g.id !== editingGame.id)
+                          .sort((a, b) => new Date(a.date) - new Date(b.date))
+                      : []
+                    const fechar = () => {
+                      setEditingGame(null)
+                      setGameForm(EMPTY_GAME_FORM)
+                      setMixScopeId('')
+                      setGameError('')
+                    }
+                    return (
+                      <div className="mt-6 pt-5 border-t border-blue-200 space-y-4">
+                        {outrasDatas.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                              {t('gerirclube.other_dates_heading')}
+                            </p>
+                            {outrasDatas.map((h) => (
+                              <div key={h.id} className="flex items-center justify-between gap-2 bg-canvas rounded-lg px-3 py-2 border border-line">
+                                <p className="text-sm text-ink-900 truncate">{quandoCurto(h.date)}</p>
+                                <button
+                                  type="button"
+                                  onClick={() => startEditGame(h)}
+                                  className="shrink-0 px-2 py-1 text-sm font-extrabold text-ink-900 hover:bg-ink-50 rounded-lg"
+                                >
+                                  {t('gerirclube.edit_action')}
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {editingGame.recurrence?.is_active && !editingGame.is_recurrence_origin && (
+                          <button
+                            type="button"
+                            onClick={() => handleStopRecurrence(editingGame.recurrence.id)}
+                            className="text-sm font-extrabold text-danger hover:underline"
+                          >
+                            {t('gerirclube.stop_recurrence_button')}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={async () => { if (await handleDeleteGame(editingGame.id)) fechar() }}
+                          className="w-full min-h-[44px] rounded-full border border-danger text-danger text-sm font-extrabold hover:bg-danger/10"
+                        >
+                          {t('gerirclube.delete_mix_button')}
+                        </button>
+                      </div>
+                    )
+                  })()}
                 </div>
               )}
 
@@ -2542,151 +2680,77 @@ export default function GerirClube() {
                   // Jogos em aberto e torneios: cartao simples, com a
                   // etiqueta do tipo. O mix continua com o cartao completo
                   // que ja tinha, logo a seguir.
-                  if (item.tipo !== 'mix') {
-                    const ehTorneio = item.tipo === 'torneio'
-                    const linha = ehTorneio ? item.row.name : item.row.title
-                    const pessoas = ehTorneio ? null : (item.row.participants || [])
+                  // Uma linha igual para todos os tipos (desenho de 24 set):
+                  // etiqueta, nome, dia e hora, lugares. Tocar abre a pagina do
+                  // evento; a direita, uma acao so, escrita por extenso.
+                  const tipo = item.tipo
+                  const row = tipo === 'mix' ? item.entry.game : item.row
+                  let etiqueta, Icone, linha, detalhe, abrir, marca = null, acao = null, sufixo = null
+                  if (tipo === 'turma') {
+                    const quando = seriesWhen(t, row)
+                    etiqueta = 'gerirclube.event_label_series'
+                    Icone = GraduationCap
+                    linha = `${quando.day} · ${quando.start}–${quando.end}`
+                    detalhe = [lessonTypeLabel(t, row.lesson_type, { series: true }), row.teacher_name, t('gerirclube.spots_of', { count: row.taken, max: row.capacity })]
+                      .filter(Boolean).join(' · ')
+                    abrir = () => setTurmaAberta(row.series_id)
+                    if (row.status === 'pending_teacher') marca = t('lessons.pending_teacher')
+                    else if (row.pending_requests > 0) marca = t('lessons.requests_count', { count: row.pending_requests })
+                  } else {
+                    const confirmados = (row.participants || [])
                       .filter((p) => p.status === 'confirmed')
                       .reduce((n, p) => n + 1 + (p.partner_id ? 1 : 0), 0)
-                    const vagas = ehTorneio || !item.row.max_players ? null : `${pessoas}/${item.row.max_players}`
-                    return (
-                      <button
-                        key={item.chave}
-                        type="button"
-                        onClick={() => (ehTorneio ? setPainelAberto('torneios') : navigate(`/jogo/${item.row.id}`))}
-                        className="w-full text-left bg-canvas rounded-ctrl border border-line p-4 hover:border-ink-300 transition-colors duration-fast"
-                      >
-                        <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-widest text-muted">
-                          {ehTorneio ? <Trophy size={13} /> : <Clock size={13} />}
-                          {t(ehTorneio ? 'gerirclube.event_label_tournament' : 'gerirclube.event_label_open')}
-                        </span>
-                        <p className="text-lg font-semibold text-ink-900 mt-1">{linha}</p>
-                        <p className="text-sm text-muted mt-0.5">
-                          {item.quando ? formatDate(item.quando) : ''}
-                          {vagas ? ` · ${vagas}` : ''}
-                        </p>
-                      </button>
-                    )
+                    const max = tipo === 'mix' ? (row.max_players || (row.num_courts || 1) * 4) : row.max_players
+                    const lugares = tipo === 'torneio' || !max ? null : t('gerirclube.spots_of', { count: confirmados, max })
+                    // Torneio: duplas e, enquanto esta aberto, ate quando.
+                    const prazo = tipo === 'torneio' && row.entries_deadline && new Date(`${row.entries_deadline}T23:59`) >= new Date()
+                      ? t('gerirclube.entries_until', { date: quandoCurto(`${row.entries_deadline}T12:00`, false) })
+                      : null
+                    const duplas = tipo === 'torneio' && row.entry_count != null ? t('gerirclube.tournament_teams', { count: Number(row.entry_count) }) : null
+                    const aDecorrer = tipo === 'mix' && row.status === 'in_progress' ? t('gerirclube.status_in_progress') : null
+                    etiqueta = { mix: 'gerirclube.event_label_mix', aberto: 'gerirclube.event_label_open', torneio: 'gerirclube.event_label_tournament' }[tipo]
+                    Icone = { mix: Calendar, aberto: Clock, torneio: Trophy }[tipo]
+                    linha = tipo === 'torneio' ? row.name : row.title
+                    detalhe = [item.quando ? quandoCurto(item.quando, tipo !== 'torneio') : null, aDecorrer, lugares, duplas, prazo].filter(Boolean).join(' · ')
+                    abrir = () => navigate(tipo === 'torneio' ? `/torneio/${row.slug || row.id}` : `/jogo/${row.id}`)
+                    if (tipo === 'mix') {
+                      // «MIX · RECORRENTE», colado a etiqueta como na pagina do
+                      // evento e na Home (#383) -- nunca numa etiqueta a parte.
+                      if (row.recurrence_id) sufixo = t('ui.recurring')
+                      acao = { texto: t('gerirclube.edit_action'), fazer: () => startEditGame(row), perigo: false }
+                    }
+                    if (tipo === 'aberto' && row.status !== 'cancelled' && !(row.participants || []).some((p) => p.status === 'confirmed')) {
+                      acao = { texto: t('open_slots.cancel_button'), fazer: () => handleCancelOpenGame(row.id), perigo: true }
+                    }
                   }
-                  const entry = item.entry
-                  const game = entry.game
-                  const peopleCount = (game.participants || [])
-                    .filter(p => p.status === 'confirmed')
-                    .reduce((n, p) => n + 1 + (p.partner_id ? 1 : 0), 0)
-
+                  // A cor do tipo, a mesma da Home e da pagina do evento
+                  // («Cores e pagina do evento», 17 set): fundo claro na linha,
+                  // etiqueta branca com o texto na cor.
+                  const cor = KIND_STYLE[{ mix: 'mix', aberto: 'open', torneio: 'tournament', turma: 'lesson' }[tipo]]
                   return (
-                    <div key={game.id} className="bg-canvas rounded-ctrl border border-line p-4">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex-1">
-                          {/* Cada linha da lista diz o que e: com tudo
-                              misturado por data, a etiqueta e o que
-                              distingue um mix de um torneio. */}
-                          <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-widest text-muted">
-                            <Calendar size={13} /> {t('gerirclube.event_label_mix')}
+                    <div key={item.chave} className={`flex items-stretch rounded-ctrl border transition-[filter] duration-fast hover:brightness-[0.98] ${cor.card}`}>
+                      <button type="button" onClick={abrir} className="flex-1 min-w-0 text-left p-4">
+                        <span className="flex items-center justify-between gap-2">
+                          <span className={`inline-flex items-center gap-1 bg-white text-[11px] font-extrabold px-2 py-1 rounded-full ${cor.text}`}>
+                            <Icone size={12} /> {t(etiqueta)}{sufixo && <> · {sufixo}</>}
                           </span>
-                          <h3 className="text-xl font-semibold text-ink-900 mb-2 mt-1">
-                            {game.title}
-                          </h3>
-                          <div className="space-y-1 text-gray-600">
-                            <p>{formatDate(game.date)}</p>
-                            {game.location && <p>📍 {game.location}</p>}
-                            <p>
-                              👥 {t('gerirclube.players_ratio', { count: peopleCount, max: game.max_players || (game.num_courts || 1) * 4 })}
-                            </p>
-                            <p className="text-sm">
-                              {(FORMAT_LABEL_KEY[game.format] ? t(FORMAT_LABEL_KEY[game.format]) : t('mixlogic.format_sobe_desce'))} • {t('gerirclube.courts_count', { count: game.num_courts || 1 })} • {t('gerirclube.rounds_count', { count: totalRounds(game) })}
-                            </p>
-                          </div>
-                          {game.recurrence?.is_active && (
-                            <div className="mt-2 flex items-center gap-2 flex-wrap">
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-lime-100 text-lime-800 text-xs font-bold">
-                                <Repeat size={12} />
-                                {t('gerirclube.recurring_badge')}
-                              </span>
-                              {!game.is_recurrence_origin && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleStopRecurrence(game.recurrence.id)}
-                                  className="text-xs font-semibold text-red-600 hover:underline"
-                                >
-                                  {t('gerirclube.stop_recurrence_button')}
-                                </button>
-                              )}
-                            </div>
+                          {marca && (
+                            <span className="rounded-full bg-ink-900 px-2 py-[3px] text-[11px] font-semibold text-white">{marca}</span>
                           )}
-                        </div>
-
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => startEditGame(game)}
-                            className="p-2 text-ink-700 hover:bg-blue-50 rounded-lg transition-colors"
-                            title={t('gerirclube.edit_action')}
-                          >
-                            <Edit2 size={20} />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteGame(game.id)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title={t('gerirclube.delete_action')}
-                          >
-                            <Trash2 size={20} />
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className={`inline-block px-4 py-2 rounded-xl font-medium ${
-                        game.status === 'open' ? 'bg-blue-100 text-blue-700' :
-                        game.status === 'closed' ? 'bg-green-100 text-green-700' :
-                        game.status === 'in_progress' ? 'bg-lime-400 text-ink-900' :
-                        game.status === 'pending' ? 'bg-amber-100 text-amber-700' :
-                        game.status === 'completed' || game.status === 'finished' ? 'bg-gray-100 text-gray-700' :
-                        'bg-red-100 text-red-700'
-                      }`}>
-                        {game.status === 'open' && t('gerirclube.status_open')}
-                        {game.status === 'closed' && t('gerirclube.status_closed')}
-                        {game.status === 'in_progress' && t('gerirclube.status_in_progress')}
-                        {game.status === 'pending' && t('gerirclube.status_pending_launch', { date: formatDate(game.launch_at) })}
-                        {(game.status === 'completed' || game.status === 'finished') && t('gerirclube.status_finished')}
-                        {game.status === 'cancelled' && t('gerirclube.status_cancelled')}
-                      </div>
-
-                      {entry.history.length > 0 && (
-                        <div className="mt-3 pt-3 border-t border-line space-y-2">
-                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                            {t('gerirclube.other_dates_heading')}
-                          </p>
-                          {entry.history.map((h) => (
-                            <div key={h.id} className="flex items-center justify-between gap-2 bg-canvas rounded-lg px-3 py-2 border border-line">
-                              <div className="min-w-0">
-                                <p className="text-sm text-ink-900 truncate">{formatDate(h.date)}</p>
-                                <p className="text-xs text-gray-500">
-                                  {h.status === 'open' && t('gerirclube.status_open')}
-                                  {h.status === 'closed' && t('gerirclube.status_closed_short')}
-                                  {h.status === 'in_progress' && t('gerirclube.status_in_progress')}
-                                  {h.status === 'pending' && t('gerirclube.status_pending')}
-                                  {(h.status === 'completed' || h.status === 'finished') && t('gerirclube.status_finished')}
-                                  {h.status === 'cancelled' && t('gerirclube.status_cancelled')}
-                                </p>
-                              </div>
-                              <div className="flex gap-1 shrink-0">
-                                <button
-                                  onClick={() => startEditGame(h)}
-                                  className="p-1.5 text-ink-700 hover:bg-blue-50 rounded-lg transition-colors"
-                                  title={t('gerirclube.edit_action')}
-                                >
-                                  <Edit2 size={16} />
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteGame(h.id)}
-                                  className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                  title={t('gerirclube.delete_action')}
-                                >
-                                  <Trash2 size={16} />
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+                        </span>
+                        <p className="text-lg font-semibold text-ink-900 mt-1 truncate">{linha}</p>
+                        <p className="text-sm text-muted mt-0.5">{detalhe}</p>
+                      </button>
+                      {acao && (
+                        <button
+                          type="button"
+                          onClick={acao.fazer}
+                          className={`shrink-0 px-4 text-sm font-extrabold rounded-r-ctrl transition-colors duration-fast ${
+                            acao.perigo ? 'text-danger hover:bg-white/60' : 'text-ink-900 hover:bg-white/60'
+                          }`}
+                        >
+                          {acao.texto}
+                        </button>
                       )}
                     </div>
                   )
@@ -2706,19 +2770,6 @@ export default function GerirClube() {
             </div>
           )}
 
-          {/* Os paineis de sempre, agora atras dos botoes de marcar.
-              Nenhum foi reescrito: mudou so quem os abre. */}
-          {activeTab === 'events' && !isGroupOrg && painelAberto === 'aberto' && (
-            <OpenSlotsPanel organizationId={currentOrganizationId} />
-          )}
-
-          {activeTab === 'events' && !isGroupOrg && lessonsReady && painelAberto === 'aulas' && (
-            <ClubLessonsPanel organizationId={currentOrganizationId} orgName={org?.name} />
-          )}
-
-          {activeTab === 'events' && !isGroupOrg && tournamentsReady && painelAberto === 'torneios' && (
-            <ClubTournamentsPanel organizationId={org.id} club={org} />
-          )}
 
           {/* Members Tab */}
           {activeTab === 'members' && (
@@ -2934,6 +2985,12 @@ export default function GerirClube() {
                 onConfirm={handleTransferOwnership}
                 onClose={() => setTransferTarget(null)}
               />
+
+              {/* Os professores do clube e a ordem em que aparecem: estavam
+                  em «Aulas», mas sao pessoas (desenho de 23 set). Vao depois
+                  dos membros -- o topo de «Pessoas» e so o que espera
+                  resposta. */}
+              {!isGroupOrg && lessonsReady && <ClubTeachers organizationId={currentOrganizationId} />}
             </div>
           )}
 
@@ -2947,40 +3004,10 @@ export default function GerirClube() {
                 {t(kk('gerirclube.settings_heading'))}
               </h3>
 
-              {/* Plano — primeiro das Definições, para o admin saber o que
-                  tem. Sem pagamentos ainda: quem não é admin da plataforma
-                  só vê o plano e como pedir para mudar. */}
-              <div className="mb-6 p-4 rounded-card border border-line bg-surface">
-                <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('gerirclube.plan_heading')}</p>
-                <p className="mt-1 text-2xl font-extrabold text-ink-900">{planName(settings.plan_tier)}</p>
-                <p className="mt-1 text-sm text-ink-700">{t(`gerirclube.plan_desc_${PLAN_TIERS.includes(settings.plan_tier) ? settings.plan_tier : 'free'}`)}</p>
-                {currentUser?.is_platform_admin ? (
-                  <div className="mt-4">
-                    <p className="text-sm font-medium text-gray-700 mb-2">{t('gerirclube.plan_change_label')}</p>
-                    <Segmented
-                      options={PLAN_TIERS.map((tier) => ({ value: tier, label: planName(tier) }))}
-                      value={settings.plan_tier || 'free'}
-                      onChange={handleSetPlan}
-                    />
-                    {settings.parent_organization_id == null && (
-                      <p className="mt-2 text-[11px] text-muted">{t('gerirclube.plan_kind_hint')}</p>
-                    )}
-                    {settings.parent_organization_id == null && settings.kind !== 'group' && (
-                      <p className="mt-2 text-[11px] text-muted">{t('gerirclube.plan_change_hint')}</p>
-                    )}
-                    {planMessage && (
-                      <p className={`mt-2 text-sm font-extrabold ${planMessage.ok ? 'text-ok' : 'text-danger'}`}>{planMessage.text}</p>
-                    )}
-                  </div>
-                ) : (
-                  <p className="mt-3 text-[11px] text-muted">{t('gerirclube.plan_contact_hint')}</p>
-                )}
-              </div>
-
               <form onSubmit={handleUpdateSettings} className="space-y-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {t('gerirclube.group_name_label')}
+                    {t(isGroupOrg ? 'gerirclube.group_name_label' : 'gerirclube.club_name_label')}
                   </label>
                   <input
                     type="text"
@@ -3184,6 +3211,37 @@ export default function GerirClube() {
                   {t('gerirclube.save_settings_button')}
                 </button>
               </form>
+
+              {/* Plano — depois da identidade e de quem ve (ordem do desenho
+                  de 23 set; antes vinha primeiro). O admin ve o que
+                  tem. Sem pagamentos ainda: quem não é admin da plataforma
+                  só vê o plano e como pedir para mudar. */}
+              <div className="mt-6 p-4 rounded-card border border-line bg-surface">
+                <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('gerirclube.plan_heading')}</p>
+                <p className="mt-1 text-2xl font-extrabold text-ink-900">{planName(settings.plan_tier)}</p>
+                <p className="mt-1 text-sm text-ink-700">{t(`gerirclube.plan_desc_${PLAN_TIERS.includes(settings.plan_tier) ? settings.plan_tier : 'free'}`)}</p>
+                {currentUser?.is_platform_admin ? (
+                  <div className="mt-4">
+                    <p className="text-sm font-medium text-gray-700 mb-2">{t('gerirclube.plan_change_label')}</p>
+                    <Segmented
+                      options={PLAN_TIERS.map((tier) => ({ value: tier, label: planName(tier) }))}
+                      value={settings.plan_tier || 'free'}
+                      onChange={handleSetPlan}
+                    />
+                    {settings.parent_organization_id == null && (
+                      <p className="mt-2 text-[11px] text-muted">{t('gerirclube.plan_kind_hint')}</p>
+                    )}
+                    {settings.parent_organization_id == null && settings.kind !== 'group' && (
+                      <p className="mt-2 text-[11px] text-muted">{t('gerirclube.plan_change_hint')}</p>
+                    )}
+                    {planMessage && (
+                      <p className={`mt-2 text-sm font-extrabold ${planMessage.ok ? 'text-ok' : 'text-danger'}`}>{planMessage.text}</p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-[11px] text-muted">{t('gerirclube.plan_contact_hint')}</p>
+                )}
+              </div>
 
               <WhatsappGroupsSection organizationId={currentOrganizationId} />
 

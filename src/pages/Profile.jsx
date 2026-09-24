@@ -6,7 +6,8 @@ import { User, Award, Trophy, LineChart, LogOut, Camera, HelpCircle, ThumbsUp, T
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { uploadAvatar, removeAvatar } from '../lib/avatarStorage'
-import { getMyPrivateMatches, getGlobalRankings } from '../lib/privateMatches'
+import { getMyPrivateMatches, getPublicRankings } from '../lib/privateMatches'
+import { positionOf } from '../lib/rankingScales'
 import { getGroupMatches } from '../lib/groupMatches'
 import { KindTag } from '../components/agenda/EventCard'
 import { getFollowCounts } from '../lib/follows'
@@ -325,10 +326,11 @@ export default function Profile() {
   // duplicar a informação que o hero já mostra.
   const loadGlobalPoints = async () => {
     try {
-      const data = await getGlobalRankings()
-      const index = data.findIndex((p) => p.user_id === profile.id)
-      // Sem nível não tem posição (a lista traz toda a gente, esses no fim).
-      setGlobalRank(index === -1 || data[index].rating == null ? null : index + 1)
+      // O lugar na escala da pessoa, pelas mesmas regras da página do
+      // ranking: só Masculino e Feminino, só depois do primeiro jogo, sem
+      // contas de teste (Trello #422). Sem lugar → null.
+      const data = await getPublicRankings()
+      setGlobalRank(positionOf(data.map((p) => ({ ...p, ranked: p.rating != null })), profile.id))
     } catch (error) {
       console.error('Error loading global points:', error)
     }

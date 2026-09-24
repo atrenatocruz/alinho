@@ -8,10 +8,10 @@ import { RatingBadge, EmptyState, Avatar, Select, PageHeader } from '../componen
 import { formatRatingMaybeProvisional, isProvisional } from '../lib/elo'
 import { tierFromXp, formatXp } from '../lib/xp'
 import { winRatePct, buildMonthlyLeaderboard } from '../lib/statsLogic'
-import { getGlobalRankings } from '../lib/privateMatches'
+import { getPublicRankings } from '../lib/privateMatches'
 import { errorKind } from '../lib/errors'
 import { useHeaderActions } from '../contexts/HeaderActionsContext'
-import { applyScale, defaultScale, rankedCount } from '../lib/rankingScales'
+import { applyScale, defaultScale, rankedCount, SCALES } from '../lib/rankingScales'
 
 /* ─── Rankings (épico «Comunidade vs. Rankings», Trello #271/#275) ───────────
    Comparar jogadores — só jogadores. Desenho:
@@ -26,10 +26,14 @@ import { applyScale, defaultScale, rankedCount } from '../lib/rankingScales'
    - A tua linha fica fixa em baixo.
    - Saíram: a secção Clubes & Grupos (procuram-se na Comunidade) e a caixa
      "Como funcionam os níveis?" (fica o "?").
-   - Escala (Francisco, 17 set): Masculino · Feminino · Sem género · Todos,
-     abre na do próprio jogador. Só separa a lista e as posições — os pontos
-     são os mesmos (ver lib/rankingScales.js). Pontos calculados à parte por
-     escala: por acordar com Ruben e Renato. */
+   - Escala (Francisco, 17 set): Masculino · Feminino · Todos, abre na do
+     próprio jogador. Só separa a lista e as posições — os pontos são os
+     mesmos (ver lib/rankingScales.js). Pontos calculados à parte por escala:
+     por acordar com Ruben e Renato.
+   - Francisco, 24 set (Trello #422): só há lugares em Masculino e Feminino,
+     e só para quem já jogou. Quem não tem género, quem nunca jogou e quem
+     não escolheu o nível aparecem em "Todos". A lista vem sem contas de
+     teste (getPublicRankings); a de formar duplas continua a ser a outra. */
 
 const ALWAYS = 'always'
 
@@ -80,7 +84,13 @@ export default function Rankings() {
 
     const load = async () => {
       if (mode === 'xp') {
-        const { data, error } = await supabase.rpc('get_xp_rankings', { p_organization_id: scope === 'global' ? null : scope })
+        // Sem contas de teste (migration_rankings_visiveis.sql). Se a
+        // migração ainda não correu, a antiga — o ecrã não pode partir.
+        const args = { p_organization_id: scope === 'global' ? null : scope }
+        let { data, error } = await supabase.rpc('get_public_xp_rankings', args)
+        if (error && errorKind(error) === 'not_ready') {
+          ({ data, error } = await supabase.rpc('get_xp_rankings', args))
+        }
         if (error) throw error
         return (data || []).map((p) => {
           const tier = tierFromXp(p.xp)
@@ -93,7 +103,7 @@ export default function Rankings() {
       }
 
       if (scope === 'global') {
-        const data = await getGlobalRankings()
+        const data = await getPublicRankings()
         return data.map(toRatingRow)
       }
 
@@ -108,7 +118,8 @@ export default function Rankings() {
       }
       if (period !== ALWAYS) {
         return (monthly.byMonth[period] || []).map((p) => ({
-          user_id: p.user_id, name: p.user?.name || '—', avatar_url: null, gender: p.user?.gender, ranked: true,
+          // Está na lista do mês porque jogou nesse mês.
+          user_id: p.user_id, name: p.user?.name || '—', avatar_url: null, gender: p.user?.gender, ranked: true, played: true,
           sub: `${t('rankings.mix_count', { count: p.participations })} · 🏆 ${t('rankings.mixes_won_count', { count: p.mixesWon })}`,
           value: p.points > 0 ? `+${p.points}` : String(p.points), valueLabel: t('rankings.points_label'),
         }))
@@ -133,6 +144,8 @@ export default function Rankings() {
     avatar_url: p.avatar_url,
     rating: p.rating,
     gender: p.gender,
+    rating_games: p.rating_games,
+    mixes_played: p.mixes_played,
     // Sem nível = sem rating: vai para o fim, sem posição nem pontos.
     ranked: p.rating != null,
     sub: `🏆 ${t('rankings.mix_wins_ratio', { wins: p.mix_wins || 0, played: p.mixes_played || 0 })}`,
@@ -248,7 +261,7 @@ export default function Rankings() {
   const renderValue = (row, onDark = false) => allScales && !onDark ? (
     // "Todos": a posição de cada um na sua escala, não os pontos lado a lado.
     <span className={`shrink-0 text-[11px] font-extrabold px-2 py-1 rounded-full tabular-nums ${row.position ? 'bg-ink-50 text-ink-900' : 'bg-ink-50 text-muted'}`}>
-      {row.position ? `${row.position} · ${t(`rankings.scale_short_${row.scale}`)}` : t('rankings.no_level')}
+      {row.position ? `${row.position} · ${t(`rankings.scale_short_${row.scale}`)}` : t(`rankings.reason_${row.reason || 'no_level'}`)}
     </span>
   ) : row.ranked ? (
     <div className="text-right shrink-0">
@@ -370,7 +383,7 @@ export default function Rankings() {
             variant="chip"
             value={scale}
             onChange={setScaleChoice}
-            options={['masculino', 'feminino', 'none', 'all'].map((s) => ({ value: s, label: t(`rankings.scale_${s}`) }))}
+            options={SCALES.map((s) => ({ value: s, label: t(`rankings.scale_${s}`) }))}
             placeholder={t('rankings.scale_title')}
           />
         )}
@@ -432,7 +445,7 @@ export default function Rankings() {
               <p className="text-[11px] text-white/60 truncate">
                 {me.position
                   ? `${t('rankings.your_position', { position: me.position, total: myTotal })}${byScale ? ` · ${t(`rankings.scale_${me.scale}`)}` : ''}`
-                  : t('rankings.no_level_hint')}
+                  : t(`rankings.reason_${me.reason || 'no_level'}_hint`)}
               </p>
             </div>
           </div>

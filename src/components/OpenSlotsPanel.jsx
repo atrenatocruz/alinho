@@ -10,7 +10,10 @@ import { describeError } from '../lib/errors'
 
 const EMPTY_RANGE = () => ({ start: '', end: '' })
 
-export default function OpenSlotsPanel({ organizationId }) {
+// onlyForm: o Gerir abre so o formulario, a partir do botao «+ Em aberto».
+// Os jogos publicados aparecem na lista unica do Gerir, por isso aqui nao
+// se repetem. onDone({ created }) diz ao Gerir quando fechar.
+export default function OpenSlotsPanel({ organizationId, onlyForm = false, onDone }) {
   const { t, i18n } = useTranslation()
   const { user } = useAuth()
   const [slots, setSlots] = useState([])
@@ -37,8 +40,8 @@ export default function OpenSlotsPanel({ organizationId }) {
   }
 
   useEffect(() => {
-    if (organizationId) loadOpenSlots()
-  }, [organizationId])
+    if (organizationId && !onlyForm) loadOpenSlots()
+  }, [organizationId, onlyForm])
 
   const addRange = () => setRanges([...ranges, EMPTY_RANGE()])
   const removeRange = (index) => setRanges(ranges.filter((_, i) => i !== index))
@@ -77,6 +80,7 @@ export default function OpenSlotsPanel({ organizationId }) {
     setDate('')
     setPrice('')
     setRanges([EMPTY_RANGE()])
+    if (onlyForm) { onDone?.({ created: true }); return }
     loadOpenSlots()
   }
 
@@ -154,9 +158,15 @@ export default function OpenSlotsPanel({ organizationId }) {
         <PrimaryButton onClick={handlePublish} className="w-full">
           {t('open_slots.publish_button')}
         </PrimaryButton>
+        {onlyForm && (
+          <button type="button" onClick={() => onDone?.({ created: false })}
+            className="w-full min-h-[44px] rounded-full text-sm font-extrabold text-ink-700 hover:bg-ink-50">
+            {t('open_slots.cancel_button')}
+          </button>
+        )}
       </div>
 
-      {loading ? (
+      {onlyForm ? null : loading ? (
         <div className="flex items-center justify-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-ink-700"></div>
         </div>

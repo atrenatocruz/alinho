@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { errorKind } from './errors'
 
 export const searchPlayers = async (query) => {
   const { data, error } = await supabase.rpc('search_players', { p_query: query })
@@ -119,8 +120,22 @@ export function privateMatchActions(matches = [], myId) {
   return actions
 }
 
+// A tabela de pontos de TODA a gente — é com ela que se formam as duplas nos
+// mixes (GameDetails.jsx, e o bot). Não tirar ninguém daqui: quem saísse
+// passava a valer 0 na formação das duplas.
 export const getGlobalRankings = async () => {
   const { data, error } = await supabase.rpc('get_global_rankings')
   if (error) throw error
   return data || []
+}
+
+// O ranking que se MOSTRA: o mesmo que getGlobalRankings, sem as contas de
+// teste (migration_rankings_visiveis.sql, Trello #422). Se a migração ainda
+// não tiver corrido, usa a antiga — o ecrã não pode partir por o código
+// chegar ao site antes da base de dados.
+export const getPublicRankings = async () => {
+  const { data, error } = await supabase.rpc('get_public_rankings')
+  if (!error) return data || []
+  if (errorKind(error) !== 'not_ready') throw error
+  return getGlobalRankings()
 }
