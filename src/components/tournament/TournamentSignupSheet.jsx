@@ -7,6 +7,7 @@ import { Sheet } from '../agenda/AgendaControls'
 import { Avatar, PrimaryButton } from '../ui'
 import { partnerNameError, partnerEmailError, PARTNER_NAME_MAX } from '../../lib/partnerInvite'
 import { slotsLeft, isCategoryFull } from '../../lib/tournamentSignup'
+import { contemTexto } from '../../lib/semAcentos'
 
 /** «25 €» e «12,50 €», nunca «25.00 €»: as casas decimais só aparecem
  *  quando existem, e a vírgula é a do idioma de quem lê. */
@@ -55,9 +56,10 @@ export default function TournamentSignupSheet({ tournament, categories, category
     return () => { cancelled = true }
   }, [tournament?.organization_id])
 
-  const q = query.trim().toLowerCase()
+  // Sem contar acentos: «goncalves» encontra «Gonçalves».
+  const q = query.trim()
   const shown = useMemo(
-    () => (q ? members.filter((m) => m.name.toLowerCase().includes(q)) : members).slice(0, 6),
+    () => (q ? members.filter((m) => contemTexto(m.name, q)) : members).slice(0, 6),
     [members, q],
   )
 

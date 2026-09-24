@@ -910,7 +910,7 @@
   "gerirclube.change_logo_aria": "Change club logo",
   "gerirclube.club_logo_label": "Club logo",
   "gerirclube.confirm_deactivate_recurrence": "Deactivate this Mix's recurrence? The next pending Mix (not yet launched) will be removed.",
-  "gerirclube.confirm_delete_game": "Are you sure you want to delete this game?",
+  "gerirclube.confirm_delete_game": "Are you sure you want to delete this mix?",
   "gerirclube.confirm_grant_admin": "Make this member an admin? They'll be able to manage the club.",
   "gerirclube.confirm_remove_member": "Remove {{name}} from this club?\n\nTheir account and registrations/stats in other clubs (if any) stay intact — this only removes the link to this club.",
   "gerirclube.confirm_revoke_admin": "Remove this member's admin permissions?",
