@@ -474,6 +474,8 @@
   "tentries.admin_category": "Categoria",
   "tentries.admin_search_empty": "Ninguém com esse nome na app. O Jogador 2 pode ser escrito à mão; o Jogador 1 precisa de ter conta.",
   "tentries.admin_search_more": "Há mais resultados — escreve mais letras do nome.",
+  "tentries.error_already_in_category_named": "{{name}} já está noutra dupla desta categoria. Escolhe outra pessoa.",
+  "tentries.error_already_in_category": "Um dos dois já está noutra dupla desta categoria.",
   "tentries.admin_gender_missing": "{{name}} ainda não definiu o género. Escolhe-o para a inscrição — fica guardado no perfil.",
   "tentries.admin_player1": "Jogador 1",
   "tentries.admin_player2": "Jogador 2",

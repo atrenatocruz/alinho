@@ -7,9 +7,9 @@ import { useAuth } from '../../contexts/AuthContext'
 import { Sheet } from '../agenda/AgendaControls'
 import { Avatar, PrimaryButton, EmptyState } from '../ui'
 import { partnerNameError, partnerEmailError } from '../../lib/partnerInvite'
-import { listEntries, validateEntry, removeEntry, adminSignUp, tournamentInviteLink, inviteToken } from '../../lib/tournamentSignup'
+import { listEntries, validateEntry, removeEntry, adminSignUp, tournamentInviteLink, inviteToken, whoIsAlreadyIn } from '../../lib/tournamentSignup'
 import { whatsappShare } from '../../lib/partnerInvite'
-import { signupErrorMessage } from '../../lib/tournamentError'
+import { signupErrorMessage, errorCode } from '../../lib/tournamentError'
 
 /* Separador «Inscritos» (Trello #362).
    Desenho: print 08 (lista por categoria, Validar a um toque) e a regra
@@ -291,6 +291,22 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
      mão perdia o algarismo de «player1_gender_required». */
   const say = (err) => setError(signupErrorMessage(t, err))
 
+  // «Inscrever à mão» recusado porque um dos dois já está nesta categoria
+  // (Trello #480). O servidor manda o mesmo código seja qual for dos dois,
+  // e a frase de sempre — «Essa dupla já está inscrita» — estava errada:
+  // a dupla nova não existe, é UM deles que já lá está, com outra pessoa.
+  // Vai-se ver à lista da categoria ESCOLHIDA (pode não ser a do painel),
+  // e diz-se o nome. Só neste caminho de erro, por isso não custa nada.
+  const adminSignupError = async (err, choice) => {
+    if (errorCode(err) !== 'already_in_category') return signupErrorMessage(t, err)
+    try {
+      const name = whoIsAlreadyIn(await listEntries(choice.categoryId), [choice.player1Id, choice.partnerId])
+      return name ? t('tentries.error_already_in_category_named', { name }) : t('tentries.error_already_in_category')
+    } catch {
+      return t('tentries.error_already_in_category')
+    }
+  }
+
   const share = async (e) => {
     try {
       const token = await inviteToken(e.entry_id)
@@ -340,7 +356,7 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
               </button>
             ))}
           </div>
-          <PrimaryButton variant="ghost" onClick={() => setAddOpen(true)} className="w-full !bg-white !border-ink-900">
+          <PrimaryButton variant="ghost" onClick={() => { setError(''); setAddOpen(true) }} className="w-full !bg-white !border-ink-900">
             <UserPlus size={18} /> {t('tentries.admin_add_title')}
           </PrimaryButton>
         </>
@@ -428,16 +444,29 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
           busy={busy}
           error={error}
           onConfirm={async (choice) => {
-            await act(async () => {
+            // A folha só fecha quando a inscrição ficou feita (Trello #480).
+            // Antes fechava sempre — o `act` apanha o erro e resolve na mesma
+            // — e o organizador perdia a categoria, os dois jogadores, o
+            // nome, o email e o «já pagou». No dia do Smash Cup, a passar
+            // dezenas de duplas, era voltar ao princípio a cada engano. Agora
+            // o erro aparece dentro da folha, ao lado do que escreveu.
+            setBusy(true); setError('')
+            try {
               const res = await adminSignUp(choice)
               // Só há link quando a dupla tem alguém sem conta.
               if (res?.invite_token && choice.guestName) {
                 setFresh({ token: res.invite_token, name: choice.guestName, email: choice.guestEmail || null })
               }
-            })
-            setAddOpen(false)
+              load()
+              setAddOpen(false)
+            } catch (err) {
+              console.error('Error signing up by hand:', err)
+              setError(await adminSignupError(err, choice))
+            } finally {
+              setBusy(false)
+            }
           }}
-          onClose={() => setAddOpen(false)}
+          onClose={() => { setAddOpen(false); setError('') }}
         />
       )}
 

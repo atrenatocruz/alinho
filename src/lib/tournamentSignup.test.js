@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   takesSlot, slotsLeft, isCategoryFull, categoriesLeft,
-  entriesOpen, canWithdraw, inviteExpired, tournamentInviteLink,
+  entriesOpen, canWithdraw, inviteExpired, tournamentInviteLink, whoIsAlreadyIn,
 } from './tournamentSignup'
 
 const cat = (o = {}) => ({ id: 'c1', slots: 16, status: 'inscricoes', entry_count: 0, ...o })
@@ -79,5 +79,34 @@ describe('inviteExpired', () => {
 describe('tournamentInviteLink', () => {
   it('leva o código', () => {
     expect(tournamentInviteLink('abc', 'https://alinho.pt')).toBe('https://alinho.pt/convite-torneio/abc')
+  })
+})
+
+describe('whoIsAlreadyIn — o nome de quem já está na categoria (#480)', () => {
+  const entries = [
+    { status: 'validada', player1_id: 'ana', player1_name: 'Ana Reis', player2_id: 'rui', player2_name: 'Rui Paz' },
+    { status: 'desistiu', player1_id: 'eva', player1_name: 'Eva Luz', player2_id: 'rita', player2_name: 'Rita Sá' },
+  ]
+
+  it('diz quem é, quando é o segundo jogador da outra dupla', () => {
+    expect(whoIsAlreadyIn(entries, ['novo', 'rui'])).toBe('Rui Paz')
+  })
+
+  it('diz quem é, quando é o primeiro', () => {
+    expect(whoIsAlreadyIn(entries, ['ana', 'novo'])).toBe('Ana Reis')
+  })
+
+  it('quem desistiu não conta — pode voltar a entrar', () => {
+    expect(whoIsAlreadyIn(entries, ['eva', 'novo'])).toBe(null)
+  })
+
+  it('sem parceiro com conta (entrou pelo nome), só olha para o primeiro', () => {
+    expect(whoIsAlreadyIn(entries, ['novo', null])).toBe(null)
+  })
+
+  it('lista vazia ou nada escolhido não rebenta', () => {
+    expect(whoIsAlreadyIn([], ['rui'])).toBe(null)
+    expect(whoIsAlreadyIn(entries, [])).toBe(null)
+    expect(whoIsAlreadyIn(undefined, undefined)).toBe(null)
   })
 })
