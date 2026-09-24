@@ -13,9 +13,13 @@ import { contemTexto } from '../../lib/semAcentos'
 
    Passo 1: quem entra (membro do clube/grupo), sozinho ou com parceiro.
    Passo 2, só se não houver lugar: abrir mais um campo (dentro do limite do
-   plano) ou ficar como suplente. Quem grava é o GameDetails (onConfirm). */
+   plano) ou ficar como suplente. Quem grava é o GameDetails (onConfirm).
 
-export default function AddPlayerSheet({ game, excludeIds, peopleCount, capacity, maxCourts, ratingInfoById, busy, onConfirm, onClose }) {
+   Desde o #534 (24 set) serve também antes de o mix começar (`beforeStart`):
+   a pessoa fica logo inscrita e não há duplas para refazer, por isso os
+   textos não falam delas. */
+
+export default function AddPlayerSheet({ game, excludeIds, peopleCount, capacity, maxCourts, ratingInfoById, busy, onConfirm, onClose, beforeStart = false }) {
   const { t } = useTranslation()
   const [members, setMembers] = useState([])
   const [loadError, setLoadError] = useState(false)
@@ -59,11 +63,12 @@ export default function AddPlayerSheet({ game, excludeIds, peopleCount, capacity
     numCourts: game.num_courts, maxPlayers: game.max_players, maxCourts,
   })
   const ready = playerId && (!withPartner || partnerId)
+  const names = [byId(playerId)?.name, withPartner ? byId(partnerId)?.name : null].filter(Boolean).join(' e ')
 
   const next = () => {
     if (!ready) return
     if (plan.fits) {
-      onConfirm({ playerId, partnerId: withPartner ? partnerId : null, choice: 'fits', plan })
+      onConfirm({ playerId, partnerId: withPartner ? partnerId : null, choice: 'fits', plan, names })
       return
     }
     setChoice(plan.canAddCourt ? 'court' : 'waitlist')
@@ -88,7 +93,6 @@ export default function AddPlayerSheet({ game, excludeIds, peopleCount, capacity
   )
 
   if (step === 'full') {
-    const names = [byId(playerId)?.name, withPartner ? byId(partnerId)?.name : null].filter(Boolean).join(' e ')
     const option = (value, title, text, disabled = false) => (
       <button
         type="button"
@@ -110,15 +114,15 @@ export default function AddPlayerSheet({ game, excludeIds, peopleCount, capacity
             'court',
             t('mixedit.add_court_title'),
             plan.canAddCourt
-              ? t('mixedit.add_court_text', { from: game.num_courts || 1, to: plan.nextCourts, capacity: plan.nextCapacity })
+              ? t(beforeStart ? 'mixedit.add_court_text_open' : 'mixedit.add_court_text', { from: game.num_courts || 1, to: plan.nextCourts, capacity: plan.nextCapacity })
               : t('mixedit.add_court_limit', { courts: maxCourts }),
             !plan.canAddCourt
           )}
-          {option('waitlist', t('mixedit.waitlist_title'), t('mixedit.waitlist_text'))}
+          {option('waitlist', t('mixedit.waitlist_title'), t(beforeStart ? 'mixedit.waitlist_text_open' : 'mixedit.waitlist_text'))}
           <PrimaryButton
             className="w-full"
             disabled={busy}
-            onClick={() => onConfirm({ playerId, partnerId: withPartner ? partnerId : null, choice, plan })}
+            onClick={() => onConfirm({ playerId, partnerId: withPartner ? partnerId : null, choice, plan, names })}
           >
             {busy ? t('mixedit.saving') : t('mixedit.confirm')}
           </PrimaryButton>
@@ -170,9 +174,9 @@ export default function AddPlayerSheet({ game, excludeIds, peopleCount, capacity
           </div>
         )}
 
-        <p className="text-xs text-muted">{t('mixedit.reform_hint')}</p>
+        <p className="text-xs text-muted">{t(beforeStart ? 'mixedit.add_hint_open' : 'mixedit.reform_hint')}</p>
         <PrimaryButton className="w-full" disabled={!ready || busy} onClick={next}>
-          {busy ? t('mixedit.saving') : plan.fits ? t('mixedit.add_and_reform') : t('mixedit.continue')}
+          {busy ? t('mixedit.saving') : plan.fits ? t(beforeStart ? 'mixedit.add_open' : 'mixedit.add_and_reform') : t('mixedit.continue')}
         </PrimaryButton>
       </div>
     </Sheet>

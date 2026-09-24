@@ -39,7 +39,9 @@ const MOCK_ADMIN_MEMBERSHIP = {
   id: '00000000-0000-0000-0000-0000000000bb',
   user_id: MOCK_ADMIN_USER.id,
   organization_id: MOCK_ADMIN_ORG_ID,
-  is_admin: true,
+  // localStorage.mockNotAdmin = 'true' → ver o Dev Org como membro normal
+  // (ex.: o mix sem o «Adicionar jogador», Trello #534).
+  is_admin: typeof localStorage === 'undefined' || localStorage.getItem('mockNotAdmin') !== 'true',
   is_guest: false,
   level: 'avançado',
   // Same shape as the organizations row devMockNetwork.js serves for this id —

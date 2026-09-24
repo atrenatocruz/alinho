@@ -242,7 +242,13 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
   // Tudo o que sai deste formulário passa por aqui: o prazo vai com fuso
   // (Trello #487). Antes seguia "2026-10-05T23:59" sem fuso, a base de dados
   // lia-o como UTC, e em Lisboa as inscrições fechavam às 00:59.
-  const outgoing = (d) => ({ ...d, entries_close_at: localInputToIso(d.entries_close_at) })
+  // A data do sorteio é opcional: vazia vai como null, porque "" rebenta no
+  // ::timestamptz do servidor (22007) e o organizador só via «Algo correu mal».
+  const outgoing = (d) => ({
+    ...d,
+    entries_close_at: localInputToIso(d.entries_close_at),
+    draw_at: d.draw_at || null,
+  })
 
   const publish = (status) => onCreate({
     ...outgoing(draft),
