@@ -7,6 +7,7 @@ import { RADIUS_OPTIONS } from '../../lib/explore'
 import { formatDate } from '../../lib/formatDate'
 import { toDayKey, fromDayKey, addDays, monthGrid, EVENT_KINDS, SHOW_OPTIONS, DEFAULT_FILTERS } from '../../lib/agenda'
 import { KIND_STYLE } from './EventCard'
+import { Chips } from '../ui'
 
 /* Controlos da agenda da Home (Trello #258, Fase 1): o dia em cima com setas,
    o mês numa folha que sobe de baixo, e os filtros noutra folha. Tudo
@@ -181,18 +182,11 @@ export function FilterSheet({ filters, orgs, countFor, onApply, onClose }) {
   return (
     <Sheet title={t('agenda.filters_title')} onClose={onClose}>
       <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mb-2">{t('agenda.filter_show')}</p>
-      <div className="grid grid-cols-3 gap-1 p-1 bg-ink-50 rounded-ctrl">
-        {SHOW_OPTIONS.map((opt) => (
-          <button
-            key={opt}
-            type="button"
-            onClick={() => setDraft((d) => ({ ...d, show: opt }))}
-            className={`min-h-[40px] rounded-ctrl text-sm font-extrabold ${draft.show === opt ? 'bg-canvas text-ink-900 shadow-lift border border-line' : 'text-muted'}`}
-          >
-            {t(SHOW_LABEL_KEY[opt])}
-          </button>
-        ))}
-      </div>
+      <Chips
+        value={draft.show}
+        onChange={(opt) => setDraft((d) => ({ ...d, show: opt }))}
+        options={SHOW_OPTIONS.map((opt) => ({ value: opt, label: t(SHOW_LABEL_KEY[opt]) }))}
+      />
 
       <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mt-4 mb-2">{t('agenda.filter_kind')}</p>
       <div className="flex flex-wrap gap-2">

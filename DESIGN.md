@@ -166,6 +166,18 @@ The recurring background signature is a low-opacity court motif: a rounded recta
 - **GuestBadge:** pill, dashed `ink-200` border, `canvas` background, muted text — the dashed treatment marks non-regular/provisional participants, consistent with the Shapes section's dashed-means-empty-or-provisional convention.
 - **Status chips** (live / joined / closed on `MixCard`): solid pill, icon + text, never text alone — color and icon both carry the state so it reads at a glance.
 
+### Tabs and Filters — one rule for the whole app (Trello #528)
+Approved by Francisco, 24 Sep 2026: *«Aprovado o separador. Mete em produção assim em todo lado. Certifica que fica assim e que toda a gente respeita a regra.»* Design: `Alinho/design-handoff/2026-09-24-separadores-e-filtros/` (`separadores-afinada.png`).
+
+**The question that decides — «Se eu mudar de opção, continuo a ver a mesma lista, só com menos coisas?»**
+- **Yes → filter** (or a choice inside a form). Use `<Chips>` from `components/ui.jsx`: loose pills, the chosen one black with white text — the Home filters. If they don't fit on one line they **slide sideways**, never wrap.
+- **No, I see something else → tab.** Use `<Tabs>` from `components/ui.jsx`: grey pill track `#E7E9ED`, fully rounded, 4px inset, options stuck together with equal widths, **text only** (no icons), 15px bold, the chosen one white with a soft shadow, ≥44px tall. **2 or 3 options** — with more than 3 it isn't a tab, the page needs rethinking. Tabs sit right above the content they switch; filters, if any, go **below** them. No lime.
+- **Never the other way round.** The grey pill exists only for tabs. A tab is never a loose black pill.
+
+**One source.** `Tabs` and `Chips` in `src/components/ui.jsx` are the only place these are drawn. Never copy their classes into a screen — import them. A small number next to a tab label (`badge`, e.g. pending join requests) uses the bottom-nav badge: lime with a black number.
+
+**The guard.** `src/components/separadores.test.js` fails `npm test` if the old square grey track (`bg-ink-50` + small padding) comes back, or if the tab track colour / `role="tablist"` appears outside `ui.jsx`. Known exceptions are listed in that test, each with its owner — remove the line when it's fixed.
+
 ### Cards / Containers
 - **Corner Style:** 16px radius (`rounded-card`).
 - **Background:** `surface` (recessed light gray) on the `canvas` (white) page background.

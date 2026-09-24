@@ -1160,7 +1160,7 @@
   "gerirclube.scoring_label": "Pontuação",
   "clubprofile.about": "Sobre",
   "clubprofile.tab_mixes": "Mixes",
-  "clubprofile.tab_teachers": "Professores · {{count}}",
+  "clubprofile.tab_teachers": "Professores",
   "clubprofile.tab_about": "Sobre",
   "clubprofile.about_empty": "Este clube ainda não escreveu nada sobre si.",
   "clubprofile.confirm_unfollow": "Deixar de seguir {{name}}? Deixas de ver os mixes deste clube.",

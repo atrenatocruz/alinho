@@ -475,6 +475,94 @@ export function PickerInput({ type = 'date', value, hint, className = '', ...pro
   )
 }
 
+/* ─── Separador e filtros: a regra única da app (Trello #528) ───────────────
+   Aprovado pelo Francisco a 24 set 2026: «Aprovado o separador. Mete em
+   produção assim em todo lado. Certifica que fica assim e que toda a gente
+   respeita a regra.» Desenho: Alinho/design-handoff/2026-09-24-separadores-
+   e-filtros/ (separadores-afinada.png). A regra está no DESIGN.md.
+
+   A pergunta que decide: *se eu mudar de opção, continuo a ver a mesma
+   lista, só com menos coisas?*
+     Sim → filtro   → <Chips>  (pastilhas soltas, a escolhida a preto)
+     Não → separador → <Tabs>  (pílula cinzenta, a escolhida a branco)
+   Nunca ao contrário.
+
+   ESTE É O ÚNICO SÍTIO onde o separador e as pastilhas são desenhados.
+   Não copies as classes para outro ecrã — importa daqui. O teste
+   `separadores.test.js` falha se a calha cinzenta antiga voltar a aparecer,
+   ou se a pílula do separador for desenhada fora deste ficheiro. */
+
+/** Separador — muda o que o ecrã mostra. 2 ou 3 opções, só texto.
+ *  `options`: [{ value, label, badge? }]. `badge` é um número pequeno ao
+ *  lado do texto (ex.: pedidos por responder); não é um ícone. */
+export function Tabs({ options, value, onChange, label, className = '' }) {
+  if (import.meta.env?.DEV && options.length > 3) {
+    // Com mais de 3 não é separador: a página tem de ser repensada (SPEC).
+    console.warn('[Tabs] mais de 3 separadores — a regra é 2 ou 3:', options.map((o) => o.label))
+  }
+  return (
+    <div
+      role="tablist"
+      aria-label={label}
+      className={`grid gap-1 rounded-full bg-[#E7E9ED] p-1 ${className}`}
+      style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}
+    >
+      {options.map((o) => {
+        const on = o.value === value
+        return (
+          <button
+            key={o.value}
+            type="button"
+            role="tab"
+            aria-selected={on}
+            onClick={() => onChange(o.value)}
+            className={`flex min-h-[44px] min-w-0 items-center justify-center gap-1.5 rounded-full px-2 text-[15px] leading-tight transition-colors duration-fast ${
+              on
+                ? 'bg-white font-extrabold text-[#040404] shadow-[0_1px_2px_rgba(0,0,0,0.10),0_2px_6px_rgba(0,0,0,0.08)]'
+                : 'font-bold text-[#4B5563] hover:text-[#040404]'
+            }`}
+          >
+            <span className="truncate">{o.label}</span>
+            {o.badge > 0 && (
+              // Igual à contagem da barra de baixo (Layout.jsx): lima com o
+              // número a preto. Proposta da designer, 24 set, por aprovar.
+              <span className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-lime-400 px-1 text-[11px] font-extrabold tabular-nums text-ink-900">{o.badge}</span>
+            )}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+/** Filtro, ou escolha dentro de um formulário — escolhe o que se vê na
+ *  mesma lista, ou uma resposta. As pastilhas da Home: soltas, a escolhida
+ *  a preto. Se não couberem numa linha, deslizam para o lado (nunca partem
+ *  para uma segunda linha).
+ *  `options`: [{ value, label }]. */
+export function Chips({ options, value, onChange, label, className = '' }) {
+  return (
+    <div role="group" aria-label={label} className={`-mx-1 flex gap-2 overflow-x-auto px-1 no-scrollbar ${className}`}>
+      {options.map((o) => {
+        const on = o.value === value
+        return (
+          <button
+            key={String(o.value)}
+            type="button"
+            aria-pressed={on}
+            onClick={() => onChange(o.value)}
+            className={`inline-flex min-h-[40px] flex-none items-center whitespace-nowrap rounded-full border px-3.5 text-sm font-extrabold transition-colors duration-fast ${
+              on ? 'border-ink-900 bg-ink-900 text-white' : 'border-line bg-canvas text-ink-700'
+            }`}
+          >
+            {o.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 export function PrimaryButton({ variant = 'lime', className = '', children, ...props }) {
   const variants = {
     lime:     'bg-lime-400 text-ink-900 hover:bg-lime-600 shadow-card',
@@ -965,24 +1053,15 @@ export function FollowListModal({ userId, initialTab = 'followers', onClose, man
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-line shrink-0">
-          <div className="flex gap-1 p-1 bg-ink-50 rounded-ctrl">
-            <button
-              onClick={() => setTab('followers')}
-              className={`px-3.5 py-1.5 rounded-ctrl text-sm font-extrabold transition-colors duration-fast ${
-                tab === 'followers' ? 'bg-canvas text-ink-900 shadow-lift' : 'text-muted'
-              }`}
-            >
-              {t('followlist.tab_followers')}
-            </button>
-            <button
-              onClick={() => setTab('following')}
-              className={`px-3.5 py-1.5 rounded-ctrl text-sm font-extrabold transition-colors duration-fast ${
-                tab === 'following' ? 'bg-canvas text-ink-900 shadow-lift' : 'text-muted'
-              }`}
-            >
-              {t('followlist.tab_following')}
-            </button>
-          </div>
+          <Tabs
+            className="mr-2 flex-1"
+            value={tab}
+            onChange={setTab}
+            options={[
+              { value: 'followers', label: t('followlist.tab_followers') },
+              { value: 'following', label: t('followlist.tab_following') },
+            ]}
+          />
           <button
             onClick={onClose}
             aria-label={t('ui.close')}

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
-import { Plus, Calendar, Users, Trash2, Edit2, Check, X, UserX, Clock, ArrowLeft, Camera, Settings, Copy, QrCode, ChevronRight, GraduationCap, Trophy } from 'lucide-react'
+import { Plus, Calendar, Trash2, Edit2, Check, X, UserX, Clock, ArrowLeft, Camera, Settings, Copy, QrCode, GraduationCap, Trophy } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
@@ -11,7 +11,7 @@ import { createGroup } from '../lib/platformAdmin'
 import { listClubGroups, getOrganizationDeleteBlocker, deleteSelfServeGroup, transferOrganizationOwnership, setOrganizationPlan } from '../lib/organizations'
 import { formatRating } from '../lib/elo'
 import { formatDate as formatDateLib, formatTime as formatTimeLib } from '../lib/formatDate'
-import { DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal, OrgKindBadge, PlanBadge, PLAN_TIERS, planName } from '../components/ui'
+import { DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal, OrgKindBadge, PlanBadge, PLAN_TIERS, planName, Tabs } from '../components/ui'
 import { planLimitMessage, isMixLimitError, isMemberLimitError, limitsFor, nextPlanTier } from '../lib/plans'
 import { totalRounds, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, SCORING_FORMAT_LABEL_KEY } from '../lib/mixLogic'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
@@ -439,13 +439,6 @@ export default function GerirClube() {
 
   // Separador «Aulas» (Trello #49): só em clubes e só depois de a migração
   // das aulas correr — até lá a tabela não existe e o separador não aparece.
-  // A fila de separadores nao cabe toda no telemovel num clube (cinco).
-  // Medido a 23 set: a 390px sobra um pedaco de 23px do seguinte, mas a
-  // 360px nao sobra nada -- por isso o sinal nao pode depender da sorte das
-  // larguras. Quando nao cabe, aparece uma seta a dizer que ha mais, FORA
-  // da fila, para nunca tapar o que ela devia mostrar (Trello #467).
-  const tabsRef = useRef(null)
-  const [tabsOverflow, setTabsOverflow] = useState(false)
   const [lessonsReady, setLessonsReady] = useState(false)
   const [tournamentsReady, setTournamentsReady] = useState(false)
 
@@ -460,14 +453,6 @@ export default function GerirClube() {
     if (tabParam === 'open_slots') setCriar('aberto')
   }, [tabParam])
 
-  useEffect(() => {
-    const fila = tabsRef.current
-    if (!fila) return undefined
-    const medir = () => setTabsOverflow(fila.scrollWidth > fila.clientWidth + 1)
-    medir()
-    window.addEventListener('resize', medir)
-    return () => window.removeEventListener('resize', medir)
-  })
   useEffect(() => {
     if (!currentOrganizationId || org?.kind !== 'club') { setLessonsReady(false); return }
     let alive = true
@@ -1910,57 +1895,18 @@ export default function GerirClube() {
           Hidden while the settings page or the voucher redeem screen is
           open (neither is one of the tabs). */}
       {activeTab !== 'redeem' && (
-        // A fila numa linha só que desliza para o lado. O que diz que há
-        // mais é o separador seguinte cortado ao meio, à direita — é assim
-        // que se percebe à primeira que a fila continua.
-        //
-        // A 22 set tentou-se com um esbatido de 40px por cima da direita, e
-        // o Francisco reportou o MESMO problema no dia seguinte. Medido a
-        // 23 set num clube a 390px: «Aulas» tinha 23px à vista e o esbatido
-        // tapava exatamente esses 23 — o único sinal de que havia mais
-        // estava escondido por baixo do próprio remédio. Por isso saiu.
-        //
-        // Duas linhas foram recusadas (ficam feias) e encolher o texto até
-        // caberem cinco deixa de se ler. A arrumação a sério é a página
-        // passar a três separadores (#419); isto é o que segura até lá.
-        <div className="flex items-center gap-1.5">
-        <div ref={tabsRef} className="flex-1 min-w-0 flex gap-1 p-1 bg-ink-50 rounded-ctrl overflow-x-auto no-scrollbar scroll-smooth">
-          {[
-            ['events', Calendar, t('gerirclube.tab_events'), true, 0],
-            ['members', Users, t('gerirclube.tab_members'), true, requests.length],
-            ['settings', Settings, t(isGroupOrg ? 'gerirclube.tab_group' : 'gerirclube.tab_club'), true, 0],
-          ].filter(([, , , show]) => show).map(([key, Icon, label, , badge]) => (
-            <button
-              key={key}
-              onClick={() => setActiveTab(key)}
-              className={`flex-1 min-w-fit flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-ctrl text-sm font-extrabold whitespace-nowrap transition-all duration-fast ${
-                activeTab === key
-                  ? 'bg-canvas text-ink-900 shadow-lift border border-line'
-                  : 'text-muted hover:text-ink-900'
-              }`}
-            >
-              <Icon size={16} className="shrink-0" />
-              {label}
-              {badge > 0 && (
-                <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-lime-400 text-ink-900 text-[11px] font-extrabold tabular-nums">
-                  {badge}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-        {tabsOverflow && (
-          <button
-            type="button"
-            onClick={() => tabsRef.current?.scrollBy({ left: Math.round(tabsRef.current.clientWidth * 0.6), behavior: 'smooth' })}
-            aria-label={t('gerirclube.tabs_more')}
-            title={t('gerirclube.tabs_more')}
-            className="shrink-0 w-9 h-9 flex items-center justify-center rounded-full bg-ink-50 text-ink-700"
-          >
-            <ChevronRight size={18} />
-          </button>
-        )}
-        </div>
+        // O separador único da app (Trello #528). Três, só texto — a fila de
+        // cinco que deslizava, com a seta a dizer que havia mais, acabou com
+        // a arrumação em Eventos · Pessoas · Clube (#419).
+        <Tabs
+          value={activeTab}
+          onChange={setActiveTab}
+          options={[
+            { value: 'events', label: t('gerirclube.tab_events') },
+            { value: 'members', label: t('gerirclube.tab_members'), badge: requests.length },
+            { value: 'settings', label: t(isGroupOrg ? 'gerirclube.tab_group' : 'gerirclube.tab_club') },
+          ]}
+        />
       )}
 
       {loading ? (

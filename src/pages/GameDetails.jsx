@@ -8,7 +8,7 @@ import { DndContext, useDraggable, useDroppable, PointerSensor, TouchSensor, use
 import { CSS } from '@dnd-kit/utilities'
 import { supabase, supabaseUrl } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { PrimaryButton, GuestBadge, PlayerAvatarRow, EmptyState, ShareModal, RoundTimer, Avatar, Select, RatingBadge, DateField, GroupLevelBadge } from '../components/ui'
+import { PrimaryButton, GuestBadge, PlayerAvatarRow, EmptyState, ShareModal, RoundTimer, Avatar, Select, RatingBadge, DateField, GroupLevelBadge, Tabs } from '../components/ui'
 import { KIND_STYLE, KindTag, StateTag, Owner } from '../components/agenda/EventCard'
 import PoolGroupStage from '../components/PoolGroupStage'
 import PreviousEditions from '../components/agenda/PreviousEditions'
@@ -2327,23 +2327,15 @@ export default function GameDetails() {
           one section at a time instead of stacked in a continuous scroll.
           Matches the tab-bar pattern from Comunidade.jsx. */}
       {game.status === 'finished' && rounds.length > 0 && (
-        <div className="flex gap-1 p-1 bg-ink-50 rounded-ctrl">
-          {[
-            { key: 'stats', label: t('gamedetails.tab_stats') },
-            { key: 'duplas', label: t('gamedetails.tab_duplas') },
-            { key: 'rondas', label: t('gamedetails.tab_rondas') },
-          ].filter((tab) => !(showIndividualStandings && tab.key === 'duplas')).map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setFinishedTab(tab.key)}
-              className={`flex-1 py-2.5 rounded-ctrl text-sm font-extrabold transition-all duration-fast ${
-                finishedTab === tab.key ? 'bg-canvas text-ink-900 shadow-lift border border-line' : 'text-muted hover:text-ink-900'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        <Tabs
+          value={finishedTab}
+          onChange={setFinishedTab}
+          options={[
+            { value: 'stats', label: t('gamedetails.tab_stats') },
+            { value: 'duplas', label: t('gamedetails.tab_duplas') },
+            { value: 'rondas', label: t('gamedetails.tab_rondas') },
+          ].filter((tab) => !(showIndividualStandings && tab.value === 'duplas'))}
+        />
       )}
 
       {/* Estatísticas do mix — classificação final por pontos */}
