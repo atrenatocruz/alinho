@@ -65,13 +65,66 @@ export async function getCategoryBoard(categoryId) {
 export function standingsOf(group, matches, tiebreak = TIEBREAK_DEFAULT) {
   const mine = matches
     .filter((m) => m.stage === 'grupo' && m.group_id === group.id)
-    .map((m) => ({
-      a: m.entry_a_id,
-      b: m.entry_b_id,
-      scoreA: m.score_a,
-      scoreB: m.score_b,
-    }))
+    .map((m) => {
+      // Um jogo ainda a decorrer pode já ter resultado escrito, mas não
+      // conta para a tabela até acabar.
+      const open = m.status && !FINISHED.has(m.status) && !m.winner_entry_id
+      return {
+        a: m.entry_a_id,
+        b: m.entry_b_id,
+        scoreA: open ? null : m.score_a,
+        scoreB: open ? null : m.score_b,
+        // O vencedor gravado manda: numa desistência o resultado pode estar
+        // empatado, e numa falta pode não haver resultado (Trello #484).
+        winner: m.winner_entry_id == null ? null
+          : m.winner_entry_id === m.entry_a_id ? 'a'
+            : m.winner_entry_id === m.entry_b_id ? 'b' : null,
+      }
+    })
   return groupStandings(group.teams, mine, { tiebreak })
+}
+
+/** Estados de um jogo em que ele já acabou (terminado normalmente, por falta
+    de comparência ou por desistência). */
+const FINISHED = new Set(['terminado', 'falta', 'desistencia'])
+
+/** Quem passa dos grupos e para que lugar do quadro — o que o organizador vê
+ *  e confirma antes de se gravar (`fill_bracket_from_groups`, Trello #484).
+ *  Devolve `{ ready, pending, qualified: [{ label, entry_id, group, position }] }`:
+ *  `ready` só é verdadeiro quando todos os jogos de grupo acabaram; até lá,
+ *  `pending` diz quantos faltam e a lista é a de «se acabasse agora».
+ *  Os `label` são exatamente os do sorteio (`qualifierLabels`), que é como a
+ *  base de dados encontra os lugares. */
+export function qualifiedFromGroups(groups, matches, perGroup) {
+  const groupMatches = matches.filter((m) => m.stage === 'grupo')
+  const pending = groupMatches.filter((m) => !FINISHED.has(m.status) && !m.winner_entry_id).length
+  const qualified = []
+  for (const g of groups) {
+    const table = standingsOf(g, matches)
+    for (let position = 1; position <= perGroup; position++) {
+      const row = table[position - 1]
+      if (!row) continue
+      qualified.push({ label: `${position}.º do ${g.name}`, entry_id: row.id, group: g.number, position })
+    }
+  }
+  return { ready: groupMatches.length > 0 && pending === 0, pending, qualified }
+}
+
+/** Passar os apurados para o quadro, depois de o organizador confirmar. Só
+ *  até ao primeiro resultado do quadro; depois troca-se à mão. */
+export async function fillBracketFromGroups(categoryId, qualified) {
+  const { data, error } = await supabase.rpc('fill_bracket_from_groups', {
+    p_category_id: categoryId,
+    p_qualified: qualified.map((q) => ({ label: q.label, entry_id: q.entry_id })),
+  })
+  if (error) throw error
+  return data
+}
+
+/** Desfazer: os lugares voltam a ter só o texto («1.º do Grupo A»). */
+export async function clearBracketFromGroups(categoryId) {
+  const { error } = await supabase.rpc('clear_bracket_from_groups', { p_category_id: categoryId })
+  if (error) throw error
 }
 
 /** Quantas duplas passam de cada grupo, pelo formato guardado na categoria.
@@ -195,6 +248,62 @@ export function qualifierLabels(groups, perGroup) {
   return labels
 }
 
+/** Onde fica cada apurado no quadro (índice = posição na 1.ª ronda, lida
+    dois a dois; `null` = lugar vazio, e o adversário fica isento).
+
+    Os 1.os entram pela ordem clássica (`seedOrder`): ficam espalhados e os
+    melhores apanham os lugares vazios. Os restantes (2.os, 3.os) escolhem
+    lugar entre os que sobram, com duas regras (Trello #484):
+      1. na 1.ª ronda nunca se joga contra alguém do mesmo grupo;
+      2. o 2.º de um grupo fica na metade do quadro OPOSTA à do 1.º desse
+         grupo — só se podem voltar a encontrar na final.
+    Procura-se a arrumação mais parecida com a ordem clássica que cumpra as
+    duas. Se nenhuma cumprir as duas (não acontece nos formatos que a app
+    oferece), cumpre-se pelo menos a 1.ª; em último caso, a ordem clássica. */
+export function placeQualifiers(labels, size) {
+  const order = seedOrder(size)
+  const posOfSeed = new Map(order.map((seed, pos) => [seed, pos]))
+  const slots = new Array(size).fill(null)
+
+  const firsts = labels.filter((l) => l.position === 1)
+  const others = labels.filter((l) => l.position !== 1)
+  firsts.forEach((l, i) => { slots[posOfSeed.get(i + 1)] = l })
+
+  const half = (pos) => (pos < size / 2 ? 0 : 1)
+  const firstHalf = new Map(firsts.map((l, i) => [l.group, half(posOfSeed.get(i + 1))]))
+  // Os lugares por ocupar, pela ordem clássica em que os outros entrariam.
+  const open = others.map((_, i) => posOfSeed.get(firsts.length + i + 1))
+
+  const fits = (l, pos, placed, strict) => {
+    const opponent = placed[pos ^ 1]
+    if (opponent && opponent.group === l.group) return false
+    if (strict && size >= 4 && firstHalf.get(l.group) === half(pos)) return false
+    return true
+  }
+
+  const tryPlace = (strict) => {
+    const placed = [...slots]
+    const used = new Set()
+    const go = (k) => {
+      if (k === others.length) return true
+      // Primeiro o lugar clássico deste apurado, depois os outros por ordem.
+      const candidates = [open[k], ...open.filter((p) => p !== open[k])]
+      for (const pos of candidates) {
+        if (used.has(pos) || !fits(others[k], pos, placed, strict)) continue
+        placed[pos] = others[k]; used.add(pos)
+        if (go(k + 1)) return true
+        placed[pos] = null; used.delete(pos)
+      }
+      return false
+    }
+    return go(0) ? placed : null
+  }
+
+  const classic = [...slots]
+  others.forEach((l, k) => { classic[open[k]] = l })
+  return tryPlace(true) || tryPlace(false) || classic
+}
+
 /** Como se lê «vencedor de» cada ronda, para o texto do quadro. */
 const ROUND_SOURCE = { R32: 'dos 16 avos', R16: 'dos oitavos', QF: 'dos quartos', SF: 'das meias' }
 
@@ -213,8 +322,7 @@ export function buildBracketSkeleton(groups, perGroup, { stage = 'principal' } =
   if (q < 2) return []
 
   const size = nextPowerOfTwo(q)
-  const order = seedOrder(size)
-  const labelOf = (n) => (n <= q ? labels[n - 1].label : null)
+  const slots = placeQualifiers(labels, size)
 
   const matches = []
   const byes = new Map()
@@ -223,8 +331,8 @@ export function buildBracketSkeleton(groups, perGroup, { stage = 'principal' } =
 
   for (let i = 0; i < firstCount; i++) {
     const slot = i + 1
-    const a = labelOf(order[2 * i])
-    const b = labelOf(order[2 * i + 1])
+    const a = slots[2 * i]?.label ?? null
+    const b = slots[2 * i + 1]?.label ?? null
     if (a && b) {
       matches.push({ stage, round: firstName, slot, source_a: a, source_b: b })
     } else {
