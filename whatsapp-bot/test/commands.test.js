@@ -13,7 +13,7 @@ const { handleGroupMessage } = await import('../src/commands.js')
 
 const hash = (d) => crypto.createHmac('sha256', 'segredo').update(d.slice(-9)).digest('hex')
 export let db
-beforeEach(() => {
+beforeEach(async () => {
   db = {
     whatsapp_groups: [{ organization_id: 'o', group_jid: 'g@g.us', label: 'x', levels: null }],
     profiles: [
@@ -27,6 +27,8 @@ beforeEach(() => {
       rotate_partners: false, allow_pair_signup: true }],
   }
   installFakeSupabase(supabase, db)
+  const { _clearOpenMixesCacheForTests } = await import('../src/roster.js')
+  _clearOpenMixesCacheForTests()
   calls.length = 0
 })
 
@@ -56,4 +58,23 @@ test('«In com» recusado pelo trigger das vagas → diz que não cabe a dupla',
   // (em memória, por remetente+grupo) para o Bernardo.
   const out = await say('in com bernardo', '351922222222')
   assert.match(out, /não há vagas para uma dupla|não cabe uma dupla/)
+})
+
+const sync = await import('../src/sync.js')
+
+test('«In» faz no máximo 4 idas à BD', async () => {
+  await say('in')
+  assert.ok(calls.length <= 4, `foram ${calls.length}: ${calls.join(', ')}`)
+})
+
+test('«In» pede o repost logo; «Out» não', async (t) => {
+  // Um namespace ESM não se pode simular; por isso o commands.js chama
+  // através do objeto `repostHooks`, que se pode.
+  const asked = []
+  t.mock.method(sync.repostHooks, 'requestRepostForGame', (org, gameId) => asked.push(gameId))
+  await say('in')
+  assert.deepEqual(asked, ['m'])
+  asked.length = 0
+  await say('out')
+  assert.deepEqual(asked, [])
 })

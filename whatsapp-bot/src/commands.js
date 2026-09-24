@@ -7,6 +7,7 @@ import { config } from './config.js'
 import { helpText, helpFooter } from './messages.js'
 import { t } from './locales.js'
 import { startTimer } from './timing.js'
+import { repostHooks } from './sync.js'
 
 function stripAccents(str) {
   return str.normalize('NFD').replace(/[̀-ͯ]/g, '')
@@ -319,6 +320,10 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
   // group broadcasts in roster.js/sync.js/reminders.js/autostart.js), so it
   // always uses their own profiles.language. An unresolved sender (not
   // found, or a fresh guest about to be created) falls back to 'pt'.
+  // Quem escreveu e que mixes estão abertos não dependem um do outro — em
+  // paralelo. Os mixes só se usam mais abaixo; o erro fica para lá.
+  const openMixesPromise = getOpenMixes(organizationId)
+  openMixesPromise.catch(() => {})
   const resolvedProfile = await resolveProfileByPhoneJid(senderPn, organizationId)
   timer.mark('perfil')
   const lang = resolvedProfile?.language ?? 'pt'
@@ -390,6 +395,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
         }
         throw new Error(`Failed to insert waitlisted participant: ${insertError.message}`)
       }
+      repostHooks.requestRepostForGame(organizationId, pending.gameId)
       if (isNewGuest) {
         await reply('guest_waitlisted', { name: profile.name, appUrl: config.appUrl })
       } else {
@@ -440,7 +446,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
   // resolvedProfile was already fetched once, up front, alongside lang.
   // Só os mixes do clube deste grupo, filtrados pelo nível do grupo — um
   // "In" aqui nunca pode inscrever alguém num mix que o grupo não vê.
-  const openMixes = (await getOpenMixes(organizationId)).filter((mix) => mixVisibleToGroup(mix, group))
+  const openMixes = (await openMixesPromise).filter((mix) => mixVisibleToGroup(mix, group))
   timer.mark('mixes')
   if (openMixes.length === 0) {
     await reply('no_open_mixes')
@@ -526,7 +532,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
   // pergunta e a resposta passaram até 10 minutos: volta-se a verificar o mix
   // e as vagas antes de criar a conta por reclamar e o convite.
   async function confirmPairWithUnregistered(pending) {
-    const { game, people, capacity } = await loadGame(pending.gameId)
+    const { game, people, capacity, rows } = await loadGame(pending.gameId)
     if (!OPEN_STATUSES.has(game.status) || new Date(game.date).getTime() <= Date.now()) {
       await reply('mix_no_longer_available')
       return
@@ -545,12 +551,6 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     }
     const { profile, isNewGuest } = await requireProfileOrCreateGuest(resolvedProfile, senderPn)
     if (!profile) return
-    const { data: rows, error } = await supabase
-      .from('participants')
-      .select('user_id, partner_id')
-      .eq('game_id', game.id)
-      .in('status', ['confirmed', 'waitlisted'])
-    if (error) throw new Error(`Failed to check existing participants: ${error.message}`)
     if (rows.some((row) => row.user_id === profile.id || row.partner_id === profile.id)) {
       await reply('already_joined')
       return
@@ -569,6 +569,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
       await reply('partner_not_found_app', { appUrl: config.appUrl })
       return
     }
+    repostHooks.requestRepostForGame(organizationId, game.id)
     await reply('pair_partner_invite_created', {
       partner: pending.name,
       link: `${config.appUrl}/convite/${token}`,
@@ -623,6 +624,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
       }
       throw new Error(`Failed to insert pair participant: ${insertError.message}`)
     }
+    repostHooks.requestRepostForGame(organizationId, game.id)
     // Como no «In» sozinho: a lista publicada de novo é a confirmação. Só se
     // responde quando alguém acabou de ganhar um perfil de convidado.
     if (partnerIsNewGuest) {
@@ -636,7 +638,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
   // regardless of how that mix got picked (explicit code, the only-one-open
   // shortcut, or being the one mix the sender is in for a bare "out").
   async function actOnGame(mixRow, profile) {
-    const { game, people, capacity } = await loadGame(mixRow.id)
+    const { game, people, capacity, rows } = await loadGame(mixRow.id)
     timer.mark('mix')
     const gameIsFuture = new Date(game.date).getTime() > Date.now()
 
@@ -657,13 +659,8 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     }
     if (!profile) return
 
-    const { data: existingRows, error: existingError } = await supabase
-      .from('participants')
-      .select('id, user_id, partner_id, status')
-      .eq('game_id', game.id)
-      .in('status', ['confirmed', 'waitlisted'])
-
-    if (existingError) throw new Error(`Failed to check existing participants: ${existingError.message}`)
+    // Os inscritos já vieram com o loadGame — sem outra ida à BD.
+    const existingRows = rows
 
     const ownConfirmedRow = existingRows.find((row) => row.user_id === profile.id && row.status === 'confirmed')
     const ownWaitlistRow = existingRows.find((row) => row.user_id === profile.id && row.status === 'waitlisted')
@@ -711,6 +708,8 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
         }
         throw new Error(`Failed to insert participant: ${insertError.message}`)
       }
+      // Pede o repost já, sem esperar pelo Realtime (sync.js, pela fila de 4 s).
+      repostHooks.requestRepostForGame(organizationId, game.id)
       // A regular join gets no reply — the participants INSERT triggers a
       // roster repost via sync.js, and that repost IS the confirmation. A
       // brand-new guest still needs an explicit nudge, though: a bare

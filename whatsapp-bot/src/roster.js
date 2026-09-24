@@ -4,101 +4,51 @@ import { helpFooter } from './messages.js'
 import { t } from './locales.js'
 import { nameWithBand } from './elo.js'
 
-/** Loads a game plus its confirmed participants (flattened to one entry per person, partners included — mirrors GameDetails.jsx's `people` derivation). */
+/** Loads a game plus its confirmed participants (flattened to one entry per person, partners included — mirrors GameDetails.jsx's `people` derivation), the suplentes, and the raw `rows` (confirmed + waitlisted) so callers don't re-query them. */
 export async function loadGame(gameId) {
-  // These three don't depend on each other's results (participants/waitlisted
-  // only need gameId, not the loaded game row) — fire them together instead
-  // of awaiting one at a time.
-  const [gameResult, participantsResult, waitlistedResult] = await Promise.all([
-    supabase.from('games').select('*').eq('id', gameId).single(),
-    // Join order, matching GameDetails.jsx's roster. Without an ORDER BY,
-    // Postgres returns heap order — which reshuffles whenever a row is
-    // UPDATEd in place (e.g. a suplente promotion flips status on the
-    // existing row), scrambling the numbered list in the group.
+  const PROFILE = 'id, name, language, rating, gender'
+  const participantsSelect = (profile) =>
+    `id, user_id, partner_id, status, created_at, user:profiles!participants_user_id_fkey(${profile}), partner:profiles!participants_partner_id_fkey(${profile})`
+  const fetchRows = (profile) =>
     supabase
       .from('participants')
-      .select('user_id, partner_id')
+      .select(participantsSelect(profile))
       .eq('game_id', gameId)
-      .eq('status', 'confirmed')
+      .in('status', ['confirmed', 'waitlisted'])
+      // Ordem de inscrição (como o GameDetails) — sem ORDER BY o Postgres
+      // devolve pela ordem física, que muda quando uma linha é atualizada.
       .order('created_at', { ascending: true })
-      .order('id', { ascending: true }),
-    // FIFO queue order, matching the promotion order in check_game_promote().
-    supabase
-      .from('participants')
-      .select('user_id')
-      .eq('game_id', gameId)
-      .eq('status', 'waitlisted')
-      .order('created_at', { ascending: true }),
+      .order('id', { ascending: true })
+
+  // Jogo e inscritos (já com os perfis, numa só consulta) em paralelo:
+  // uma ida à BD em vez de duas seguidas.
+  let [gameResult, rowsResult] = await Promise.all([
+    supabase.from('games').select('*').eq('id', gameId).single(),
+    fetchRows(PROFILE),
   ])
+  // 42703: a migração do Elo ainda não correu — nomes sem banda.
+  if (rowsResult.error?.code === '42703') rowsResult = await fetchRows('id, name, language')
 
   const { data: game, error: gameError } = gameResult
   if (gameError) throw new Error(`Failed to load game ${gameId}: ${gameError.message}`)
-
-  const { data: participants, error: participantsError } = participantsResult
-  if (participantsError) {
-    throw new Error(`Failed to load participants for game ${gameId}: ${participantsError.message}`)
-  }
-
-  const { data: waitlisted, error: waitlistedError } = waitlistedResult
-  if (waitlistedError) {
-    throw new Error(`Failed to load waitlisted participants for game ${gameId}: ${waitlistedError.message}`)
-  }
-
-  const profileIds = new Set()
-  for (const row of participants) {
-    profileIds.add(row.user_id)
-    if (row.partner_id) profileIds.add(row.partner_id)
-  }
-  for (const row of waitlisted) {
-    profileIds.add(row.user_id)
-  }
-
-  let profilesById = new Map()
-  if (profileIds.size > 0) {
-    // `language` is selected here for consistency with every other
-    // `.from('profiles')` call in this bot (see Task 19), even though this
-    // particular file has no per-participant message to localize — the
-    // roster block below is one shared broadcast to the whole WhatsApp
-    // group, not a message addressed to any single participant, so it can't
-    // sensibly pick one person's language. It always renders in 'pt' (see
-    // buildMixMessage below).
-    let { data: profiles, error: profilesError } = await supabase
-      .from('profiles')
-      .select('id, name, language, rating, gender')
-      .in('id', Array.from(profileIds))
-
-    // 42703 = undefined_column: a migração do Elo ainda não correu nesta
-    // base de dados — degrada para nomes sem banda em vez de partir o
-    // roster inteiro.
-    if (profilesError && profilesError.code === '42703') {
-      ;({ data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, name, language')
-        .in('id', Array.from(profileIds)))
-    }
-
-    if (profilesError) throw new Error(`Failed to load profiles: ${profilesError.message}`)
-    profilesById = new Map(profiles.map((p) => [p.id, p]))
-  }
+  const { data: all, error: rowsError } = rowsResult
+  if (rowsError) throw new Error(`Failed to load participants for game ${gameId}: ${rowsError.message}`)
 
   const FALLBACK_PERSON = { name: 'Jogador', rating: null, gender: null }
+  const confirmed = all.filter((r) => r.status === 'confirmed')
   const people = []
-  // Quem entrou em dupla leva o número da dupla (1, 2, …) — é o «(1)» à
-  // frente dos dois nomes que os clubes já escreviam à mão nas listas do
-  // WhatsApp (A2N, 24 set). Quem entrou sozinho não leva nada.
+  // Quem entrou em dupla leva o número da dupla (1, 2, …) — o «(1)» à frente
+  // dos dois nomes (A2N, 24 set). Quem entrou sozinho não leva nada.
   let pairNumber = 0
-  for (const row of participants) {
+  for (const row of confirmed) {
     const pair = row.partner_id ? ++pairNumber : null
-    people.push({ ...(profilesById.get(row.user_id) || FALLBACK_PERSON), pair })
-    if (row.partner_id) {
-      people.push({ ...(profilesById.get(row.partner_id) || FALLBACK_PERSON), pair })
-    }
+    people.push({ ...(row.user || FALLBACK_PERSON), pair })
+    if (row.partner_id) people.push({ ...(row.partner || FALLBACK_PERSON), pair })
   }
-
-  const suplentes = waitlisted.map((row) => profilesById.get(row.user_id) || FALLBACK_PERSON)
-
+  const suplentes = all.filter((r) => r.status === 'waitlisted').map((r) => r.user || FALLBACK_PERSON)
+  const rows = all.map(({ id, user_id, partner_id, status }) => ({ id, user_id, partner_id, status }))
   const capacity = game.max_players || game.num_courts * 4
-  return { game, people, capacity, suplentes }
+  return { game, people, capacity, suplentes, rows }
 }
 
 // Re-fetched on every single "in"/"out" (often several times a minute in a
@@ -108,6 +58,9 @@ export async function loadGame(gameId) {
 // serve vários organizationIds — ver groups.js).
 const OPEN_MIXES_CACHE_TTL_MS = 5_000
 const openMixesCache = new Map() // organizationId -> { data, at }
+
+/** Só para testes. */
+export function _clearOpenMixesCacheForTests() { openMixesCache.clear() }
 
 /** All mixes currently open for signups in ONE club — the source of truth for "which mixes exist right now" (replaces the old single active-game pointer, since several can be open at once). */
 export async function getOpenMixes(organizationId) {

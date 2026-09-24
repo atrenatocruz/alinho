@@ -20,6 +20,30 @@ const RECONCILE_INTERVAL_MS = 60 * 1000
 // pendingTagAll e pendingPromotedByGame (sticky através da coalescência).
 const groupState = new Map() // groupJid -> state
 
+// Guardados pelo startSync — o commands.js pede reposts por aqui.
+let deps = null
+
+/** O «In» acabou de gravar: pede o repost já, sem esperar pelo Realtime
+ *  (que também vai chegar — o hash engole o repetido). Passa SEMPRE pela
+ *  fila de 4 s por grupo, para uma rajada continuar a dar no máximo 2
+ *  mensagens. Não usar no «Out»: o Realtime é que sabe de promoções de
+ *  suplentes, e um repost antes dele perde o «🎉 X subiu…». */
+function requestRepostForGame(organizationId, gameId) {
+  if (!deps) return
+  scheduleRepostForOrg(deps.sendText, deps.getGroupMentions, organizationId, { gameIds: [gameId] })
+    .catch((err) => console.error('Failed to request repost:', err))
+}
+// Num objeto (e não um export solto) para os testes o poderem simular.
+export const repostHooks = { requestRepostForGame }
+
+/** Só para testes: liga os deps sem abrir o Realtime nem os intervalos, e
+ *  esquece o estado por grupo (hashes, filas) do teste anterior. */
+export function startSyncForTests(d) {
+  deps = d
+  for (const st of groupState.values()) if (st.debounceTimer) clearTimeout(st.debounceTimer)
+  groupState.clear()
+}
+
 function stateFor(groupJid) {
   let st = groupState.get(groupJid)
   if (!st) {
@@ -30,6 +54,7 @@ function stateFor(groupJid) {
       openSlotBatches: new Map(), // batchId -> { hash, messageId }
       pendingTagAll: false,
       pendingPromotedByGame: new Map(), // gameId -> { name, lang }
+      pendingGameIds: new Set(), // mixes que mudaram desde o último repost (Tarefa 7)
     }
     groupState.set(groupJid, st)
   }
@@ -150,8 +175,9 @@ function flushRepost(sendText, getGroupMentions, group) {
 // janela calma posta imediatamente; os que chegarem dentro da janela
 // coalescem num único repost final. Rajada de N joins custa no máximo 2
 // mensagens por grupo, e o hash-dedupe engole envios sem alterações.
-function scheduleGroupRepost(sendText, getGroupMentions, group, { tagAll = false, promotedNames = [] } = {}) {
+function scheduleGroupRepost(sendText, getGroupMentions, group, { tagAll = false, promotedNames = [], gameIds = [] } = {}) {
   const st = stateFor(group.groupJid)
+  for (const id of gameIds) if (id) st.pendingGameIds.add(id)
   st.pendingTagAll = st.pendingTagAll || tagAll
   // Each entry is { gameId, name, lang } — keyed by gameId so the callout
   // prefixes only that specific mix's message, not every open mix's.
@@ -251,6 +277,7 @@ async function primeGroupHashes() {
 
 /** Wires Supabase Realtime so any game/participant change — from the app OR from the bot's own WhatsApp-driven writes, for ANY currently open mix of ANY served club — results in a fresh roster repost to every group that can see it. */
 export function startSync({ sendText, getGroupMentions }) {
+  deps = { sendText, getGroupMentions }
   primeGroupHashes().catch((err) => console.error('Failed to prime roster hashes:', err))
 
   supabase
