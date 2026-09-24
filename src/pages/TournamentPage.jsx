@@ -17,12 +17,14 @@ import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Eye, Trophy } from 'lucide-react'
 import { useGoBack } from '../lib/useGoBack'
 import { useAuth } from '../contexts/AuthContext'
-import { getTournamentPage } from '../lib/tournamentApi'
-import { errorKind } from '../lib/errors'
+import { getTournamentForEdit, getTournamentPage, updateTournament } from '../lib/tournamentApi'
+import { describeError, errorKind } from '../lib/errors'
 import { Avatar, EmptyState } from '../components/ui'
 import { CategorySelect, LILAC, MonoLabel, StatePill, TabStrip, TourTag } from '../components/tournament/TournamentBits'
 import { TOURNAMENT_PANELS, TOURNAMENT_TABS, TOURNAMENT_TAB_OWNER } from '../components/tournament/panels'
 import AdminBar from '../components/tournament/AdminBar'
+import CreateTournamentForm from '../components/tournament/CreateTournamentForm'
+import DrawAdminPanel from '../components/tournament/DrawAdminPanel'
 
 /** "9–11 out" quando é tudo no mesmo mês, "30 set – 2 out" quando não é. */
 function dateRange(startIso, endIso, locale) {
@@ -60,6 +62,13 @@ export default function TournamentPage() {
   const [params, setParams] = useSearchParams()
   const [data, setData] = useState(null)
   const [failed, setFailed] = useState(false)
+  // Editar e sortear abrem AQUI. O formulário de editar não tem rota própria
+  // — vive em estado do painel do Gerir — por isso não havia para onde
+  // navegar, e a versão de hoje mandava para `/gerir`, que é o ecrã de
+  // escolher organização. Fica no endereço para o botão de trás funcionar.
+  const [editing, setEditing] = useState(null)
+  const [adminError, setAdminError] = useState('')
+  const [savingEdit, setSavingEdit] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -128,6 +137,7 @@ export default function TournamentPage() {
   // fica tudo o resto, INCLUSIVE o botão de inscrever: se estiver partido é
   // isso mesmo que o admin precisa de ver.
   const publicView = params.get('ver') === 'publico'
+  const adminMode = params.get('admin')   // 'editar' | 'sorteio'
   const canManage = !!memberships?.find((m) => m.organization_id === tour.organization_id)?.is_admin
   const isAdmin = canManage && !publicView
   const Panel = TOURNAMENT_PANELS[tab]
@@ -142,6 +152,64 @@ export default function TournamentPage() {
     myEntries: activeEntries(data),
     myMatches: data.my_matches || [],
   }
+  const clubForForm = { id: tour.organization_id, name: tour.club_name, location: tour.location }
+
+  const openAdmin = async (modo) => {
+    setAdminError('')
+    const next = new URLSearchParams(params); next.set('admin', modo); setParams(next)
+    if (modo !== 'editar') return
+    try {
+      const d = await getTournamentForEdit(tour.id)
+      if (!d?.tournament) throw new Error('not ready')
+      setEditing(d)
+    } catch (err) {
+      if (errorKind(err) !== 'not_ready') console.error('Error loading tournament:', err)
+      setAdminError(describeError(t, err, 'tournament.admin.edit_error'))
+    }
+  }
+
+  const closeAdmin = () => {
+    const next = new URLSearchParams(params); next.delete('admin'); setParams(next)
+    setEditing(null); setAdminError('')
+  }
+
+  const saveEdit = async (draft) => {
+    setSavingEdit(true); setAdminError('')
+    try {
+      await updateTournament(tour.id, draft)
+      closeAdmin()
+      window.dispatchEvent(new Event('tournament:reload'))
+    } catch (err) {
+      setAdminError(describeError(t, err))
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
+  // O sorteio e o editar ocupam a página inteira: são um trabalho, não um
+  // pedaço da página. Saem pelo «Voltar» deles e pelo botão de trás do
+  // telemóvel, porque o modo vive no endereço.
+  if (isAdmin && adminMode === 'sorteio') {
+    // Sem o «Voltar» da página: o ecrã do sorteio já traz o dele, e dois
+    // seguidos deixam quem organiza sem saber qual é qual.
+    return <div className="space-y-4"><DrawAdminPanel tournament={tour} onBack={closeAdmin} /></div>
+  }
+  if (isAdmin && adminMode === 'editar' && editing) {
+    return (
+      <div className="space-y-4">
+        <CreateTournamentForm
+          club={clubForForm}
+          initial={editing}
+          locked={!!editing.has_entries}
+          saving={savingEdit}
+          error={adminError}
+          onCancel={closeAdmin}
+          onCreate={saveEdit}
+        />
+      </div>
+    )
+  }
+
   const spinner = <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-8 w-8 border-[3px] border-ink-50 border-t-ink-700" /></div>
 
   return (
@@ -167,7 +235,17 @@ export default function TournamentPage() {
         </div>
       )}
 
-      {isAdmin && <AdminBar tournament={tour} onChanged={() => window.dispatchEvent(new Event('tournament:reload'))} />}
+      {isAdmin && (
+        <>
+          <AdminBar
+            tournament={tour}
+            onChanged={() => window.dispatchEvent(new Event('tournament:reload'))}
+            onEdit={() => openAdmin('editar')}
+            onDraw={() => openAdmin('sorteio')}
+          />
+          {adminError && <p className="text-[12px] text-danger">{adminError}</p>}
+        </>
+      )}
 
       {/* Aviso do organizador — acima de tudo, e só quando há aviso. */}
       {TopSlot && <Suspense fallback={null}><TopSlot {...panelProps} /></Suspense>}
