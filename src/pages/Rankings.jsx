@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Trophy, Award, HelpCircle, Search, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { RatingBadge, EmptyState, Avatar, Select, PageHeader } from '../components/ui'
+import { RatingBadge, EmptyState, Avatar, Select, PageHeader, Tabs } from '../components/ui'
 import { formatRatingMaybeProvisional, isProvisional } from '../lib/elo'
 import { tierFromXp, formatXp } from '../lib/xp'
 import { winRatePct, buildMonthlyLeaderboard } from '../lib/statsLogic'
@@ -359,23 +359,14 @@ export default function Rankings() {
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-1 p-1 bg-ink-50 rounded-ctrl">
-        {[
-          { key: 'ranking', label: t('rankings.mode_ranking') },
-          { key: 'xp', label: t('rankings.tab_assiduity') },
-        ].map((m) => (
-          <button
-            key={m.key}
-            type="button"
-            onClick={() => setMode(m.key)}
-            className={`py-2 rounded-ctrl text-sm font-extrabold transition-all duration-fast ${
-              mode === m.key ? 'bg-canvas text-ink-900 shadow-lift border border-line' : 'text-muted hover:text-ink-900'
-            }`}
-          >
-            {m.label}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        value={mode}
+        onChange={setMode}
+        options={[
+          { value: 'ranking', label: t('rankings.mode_ranking') },
+          { value: 'xp', label: t('rankings.tab_assiduity') },
+        ]}
+      />
 
       <div className="flex gap-1.5 flex-wrap">
         {byScale && (

@@ -1162,7 +1162,7 @@
   "gerirclube.scoring_label": "Scoring",
   "clubprofile.about": "About",
   "clubprofile.tab_mixes": "Mixes",
-  "clubprofile.tab_teachers": "Coaches · {{count}}",
+  "clubprofile.tab_teachers": "Coaches",
   "clubprofile.tab_about": "About",
   "clubprofile.about_empty": "This club hasn't written anything about itself yet.",
   "clubprofile.confirm_unfollow": "Unfollow {{name}}? You'll stop seeing this club's mixes.",

@@ -6,7 +6,7 @@ import { ArrowLeft, Users, UserPlus, Clock, Heart, MapPin, Phone, Instagram, Glo
 import { useAuth } from '../contexts/AuthContext'
 import { getClubProfile, listOrganizationMembers } from '../lib/clubProfile'
 import { listClubGroups } from '../lib/organizations'
-import { Avatar, EmptyState, PrimaryButton } from '../components/ui'
+import { Avatar, EmptyState, PrimaryButton, Tabs } from '../components/ui'
 import PadelIcon from '../components/icons/PadelIcon'
 import { formatDate } from '../lib/formatDate'
 import { describeError, errorKind } from '../lib/errors'
@@ -313,24 +313,19 @@ export default function ClubProfile() {
       )}
 
       {hasTeachers && (
-        <div className="flex gap-1.5 flex-wrap">
-          {[
-            ['mixes', t('clubprofile.tab_mixes')],
-            ['teachers', t('clubprofile.tab_teachers', { count: teachers.length })],
-            ['about', t('clubprofile.tab_about')],
-          ].map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setTab(key)}
-              className={`min-h-[40px] px-3.5 rounded-full border text-sm font-extrabold transition-colors duration-fast ${
-                tab === key ? 'bg-ink-900 text-white border-ink-900' : 'bg-canvas text-ink-700 border-line hover:bg-ink-50'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        // Mixes · Professores · Sobre mostram coisas diferentes: separador,
+        // não filtro (#528).
+        <Tabs
+          value={tab}
+          onChange={setTab}
+          options={[
+            { value: 'mixes', label: t('clubprofile.tab_mixes') },
+            // Sem a contagem: com ela, «Professores · 3» não cabia num terço e
+            // saía cortado. A lista de professores já diz quantos são.
+            { value: 'teachers', label: t('clubprofile.tab_teachers') },
+            { value: 'about', label: t('clubprofile.tab_about') },
+          ]}
+        />
       )}
 
       {hasTeachers ? (

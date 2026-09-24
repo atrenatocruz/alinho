@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowDown, ArrowUp, GraduationCap } from 'lucide-react'
-import { Avatar, EmptyState, PrimaryButton } from '../ui'
+import { Avatar, EmptyState, PrimaryButton, Tabs } from '../ui'
 import {
   listClubTeachers, getClubLessonSettings, saveClubLessonPrices, saveClubPeakHours, saveTeacherOrder,
 } from '../../lib/lessonsApi'
@@ -42,19 +42,18 @@ export default function ClubLessonsPanel({ organizationId, orgName }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-1.5 flex-wrap">
-        {[
-          ['teachers', t('lessons.gerir_tab_teachers', { count: teachers.length })],
-          ['series', t('lessons.gerir_tab_series')],
-        ].map(([key, label]) => (
-          <button key={key} type="button" onClick={() => setSection(key)}
-            className={`min-h-[40px] px-3.5 rounded-full border text-sm font-extrabold transition-colors duration-fast ${
-              section === key ? 'bg-ink-900 text-white border-ink-900' : 'bg-canvas text-ink-700 border-line hover:bg-ink-50'
-            }`}>
-            {label}
-          </button>
-        ))}
-      </div>
+      {/* Separador (#528). Nota: este painel inteiro já não é mostrado —
+          desde o #467 os professores vivem em «Pessoas» no Gerir. Fica
+          conforme a regra na mesma, para não ensinar a forma errada a quem
+          o reaproveitar. */}
+      <Tabs
+        value={section}
+        onChange={setSection}
+        options={[
+          { value: 'teachers', label: t('lessons.gerir_tab_teachers', { count: teachers.length }) },
+          { value: 'series', label: t('lessons.gerir_tab_series') },
+        ]}
+      />
       {section === 'teachers' && <TeachersOrder organizationId={organizationId} teachers={teachers} setTeachers={setTeachers} loading={loading} />}
       {section === 'series' && <ClubSeriesPanel organizationId={organizationId} teachers={teachers} prices={settings.prices} peakHours={settings.peakHours} />}
     </div>
@@ -292,14 +291,15 @@ export function Prices({ organizationId, orgName }) {
     <div className="space-y-3">
       <p className="text-sm text-muted">{t('lessons.prices_agreed', { name: orgName })}</p>
 
-      <div className="grid grid-cols-3 rounded-xl bg-ink-50 p-[3px] text-xs font-semibold text-center">
-        {[['peak', t('lessons.peak')], ['off', t('lessons.off_peak')], ['hours', t('lessons.peak_hours_tab')]].map(([key, label]) => (
-          <button key={key} type="button" onClick={() => { setView(key); setMessage(null) }}
-            className={`py-2 rounded-[9px] transition-colors duration-fast ${view === key ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-500'}`}>
-            {label}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        value={view}
+        onChange={(v) => { setView(v); setMessage(null) }}
+        options={[
+          { value: 'peak', label: t('lessons.peak') },
+          { value: 'off', label: t('lessons.off_peak') },
+          { value: 'hours', label: t('lessons.peak_hours_tab') },
+        ]}
+      />
 
       {view === 'hours' ? (
         <div className="card space-y-2">

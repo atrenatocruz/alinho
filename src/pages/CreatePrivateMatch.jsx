@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Users, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { createPrivateMatch } from '../lib/privateMatches'
-import { PrimaryButton, Avatar, DateField, Select } from '../components/ui'
+import { PrimaryButton, Avatar, DateField, Select, Chips } from '../components/ui'
 import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
 import PlayerSearch from '../components/PlayerSearch'
 import { describeError } from '../lib/errors'
@@ -208,26 +208,14 @@ export default function CreatePrivateMatch() {
         <div className="card space-y-4">
           <div>
             <p className="text-sm font-extrabold text-ink-900 mb-2">{t('createprivatematch.ranked_heading')}</p>
-            <div className="flex gap-1 p-1 bg-ink-50 rounded-ctrl">
-              <button
-                type="button"
-                onClick={() => setRankedIntent(true)}
-                className={`flex-1 py-2.5 rounded-ctrl text-sm font-extrabold transition-all duration-fast ${
-                  rankedIntent ? 'bg-canvas text-ink-900 shadow-lift border border-line' : 'text-muted hover:text-ink-900'
-                }`}
-              >
-                {t('createprivatematch.ranked_option')}
-              </button>
-              <button
-                type="button"
-                onClick={() => setRankedIntent(false)}
-                className={`flex-1 py-2.5 rounded-ctrl text-sm font-extrabold transition-all duration-fast ${
-                  !rankedIntent ? 'bg-canvas text-ink-900 shadow-lift border border-line' : 'text-muted hover:text-ink-900'
-                }`}
-              >
-                {t('createprivatematch.friendly_option')}
-              </button>
-            </div>
+            <Chips
+              value={rankedIntent}
+              onChange={setRankedIntent}
+              options={[
+                { value: true, label: t('createprivatematch.ranked_option') },
+                { value: false, label: t('createprivatematch.friendly_option') },
+              ]}
+            />
             <p className="text-xs text-muted mt-1.5">
               {rankedIntent
                 ? (hasGuest ? t('createprivatematch.ranked_hint_blocked_by_guest') : t('createprivatematch.ranked_hint'))
@@ -264,26 +252,14 @@ export default function CreatePrivateMatch() {
           </div>
           <div>
             <p className="text-sm font-extrabold text-ink-900 mb-2">{t('createprivatematch.scoring_format_label')}</p>
-            <div className="flex gap-1 p-1 bg-ink-50 rounded-ctrl">
-              <button
-                type="button"
-                onClick={() => setScoringFormat('pontos_simples')}
-                className={`flex-1 py-2.5 rounded-ctrl text-sm font-extrabold transition-all duration-fast ${
-                  scoringFormat === 'pontos_simples' ? 'bg-canvas text-ink-900 shadow-lift border border-line' : 'text-muted hover:text-ink-900'
-                }`}
-              >
-                {t('createprivatematch.format_points')}
-              </button>
-              <button
-                type="button"
-                onClick={() => setScoringFormat('sets')}
-                className={`flex-1 py-2.5 rounded-ctrl text-sm font-extrabold transition-all duration-fast ${
-                  scoringFormat === 'sets' ? 'bg-canvas text-ink-900 shadow-lift border border-line' : 'text-muted hover:text-ink-900'
-                }`}
-              >
-                {t('createprivatematch.format_sets')}
-              </button>
-            </div>
+            <Chips
+              value={scoringFormat}
+              onChange={setScoringFormat}
+              options={[
+                { value: 'pontos_simples', label: t('createprivatematch.format_points') },
+                { value: 'sets', label: t('createprivatematch.format_sets') },
+              ]}
+            />
             <p className="text-xs text-muted mt-1.5">
               {scoringFormat === 'pontos_simples' ? t('createprivatematch.format_points_hint') : t('createprivatematch.format_sets_hint')}
             </p>

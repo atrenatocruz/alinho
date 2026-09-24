@@ -16,9 +16,12 @@
 --
 -- Medido em produção pelo PO a 24 set: é pior — **nem é preciso conta**,
 -- `anon` também lê a tabela inteira. A regra de leitura (RLS) só deixa ver
--- inscrições de torneios públicos e fora de rascunho; nesse dia não havia
--- nenhum torneio público, por isso a falha não expunha nenhuma linha. Passa
--- a expor no minuto em que o Smash Cup a sério for criado como público.
+-- inscrições de torneios públicos e fora de rascunho, por isso **a
+-- exposição está aberta desde que exista um torneio público.** A 24 set
+-- havia um: o «TESTE — ignorar (organizador)», público e a decorrer, criado
+-- de manhã pelos agentes do Renato — as 7 inscrições dele liam-se sem conta
+-- (apanhado pelo System Integrator). Uma versão anterior deste cabeçalho
+-- dizia «zero linhas expostas»; estava errada.
 --
 -- ⚠️ NO `alinho-dev` A FALHA NÃO EXISTE: lá ninguém tem permissão de leitura
 -- nesta tabela. As duas bases estão diferentes. Não se pode confirmar a
@@ -53,9 +56,10 @@
 -- são partilhados pelos próprios jogadores, por WhatsApp. Quem convidou tem de
 -- voltar a partilhar o link novo.
 --
--- A 24 set, em produção, havia 21 convites com código — TODOS dos dois
--- torneios de teste, os únicos que existiam (medido pelo PO). Renovar não
--- matava nenhum convite real, por isso a parte 3 vai LIGADA. Se este ficheiro
+-- A 24 set, em produção, havia 21 convites com código, em quatro torneios —
+-- TODOS de ensaio, incluindo o Smash Cup da app (confirmado pelo
+-- Francisco). Renovar não matava nenhum convite real, por isso a parte 3 vai
+-- LIGADA. Se este ficheiro
 -- for corrido mais tarde, com torneios a sério, correr primeiro a consulta 3
 -- e decidir antes se se desliga a trava.
 -- ═════════════════════════════════════════════════════════════════════════

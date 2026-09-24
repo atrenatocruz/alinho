@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation, Trans } from 'react-i18next'
 import { Eye, EyeOff, Lock } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { PrimaryButton, DateField, Select } from '../components/ui'
+import { PrimaryButton, DateField, Select, Tabs } from '../components/ui'
 import { Wordmark } from '../components/Layout'
 import { hashPhone } from '../lib/hashPhone'
 import i18n from '../lib/i18n'
@@ -309,35 +309,16 @@ export default function Login() {
             <div className="flex-1 h-px bg-line" />
           </div>
 
-          {/* Tabs */}
-          <div className="flex gap-2 mb-6 bg-surface rounded-ctrl p-1.5 shadow-card">
-            <button
-              onClick={() => {
-                setMode('login')
-                setError('')
-              }}
-              className={`flex-1 py-2.5 px-4 rounded-[8px] font-extrabold text-sm min-h-[44px] transition-all duration-fast ${
-                mode === 'login'
-                  ? 'bg-ink-900 text-white'
-                  : 'text-muted hover:text-ink-900'
-              }`}
-            >
-              {t('login.tab_login')}
-            </button>
-            <button
-              onClick={() => {
-                setMode('signup')
-                setError('')
-              }}
-              className={`flex-1 py-2.5 px-4 rounded-[8px] font-extrabold text-sm min-h-[44px] transition-all duration-fast ${
-                mode === 'signup'
-                  ? 'bg-ink-900 text-white'
-                  : 'text-muted hover:text-ink-900'
-              }`}
-            >
-              {t('login.tab_signup')}
-            </button>
-          </div>
+          {/* Entrar · Criar conta: é separador — o formulário muda (#528). */}
+          <Tabs
+            className="mb-6"
+            value={mode}
+            onChange={(m) => { setMode(m); setError('') }}
+            options={[
+              { value: 'login', label: t('login.tab_login') },
+              { value: 'signup', label: t('login.tab_signup') },
+            ]}
+          />
 
           {/* Login Form */}
           {mode === 'login' && (

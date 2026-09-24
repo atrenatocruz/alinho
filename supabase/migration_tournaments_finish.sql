@@ -206,7 +206,7 @@ BEGIN
       FROM profiles pr
       WHERE pr.id = n.pid AND n.bonus = 0;
 
-      UPDATE _elo_torneio SET delta = delta + bonus;
+      UPDATE _elo_torneio SET delta = delta + bonus WHERE TRUE;  -- WHERE TRUE: o pg_safeupdate recusa UPDATE sem WHERE (ver migration_fix_tournament_elo_safeupdate.sql)
 
       UPDATE profiles pr
       SET rating = GREATEST(0, COALESCE(pr.rating, 900) + n.bonus)

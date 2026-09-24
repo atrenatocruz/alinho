@@ -11,7 +11,7 @@ import { positionOf } from '../lib/rankingScales'
 import { getGroupMatches } from '../lib/groupMatches'
 import { KindTag } from '../components/agenda/EventCard'
 import { getFollowCounts } from '../lib/follows'
-import { PrimaryButton, GuestBadge, Avatar, EmptyState, RatingBadge, PhotoViewerModal, FollowListModal, AchievementCard, VoucherCard, VoucherQRModal, PageHeader } from '../components/ui'
+import { PrimaryButton, GuestBadge, Avatar, EmptyState, RatingBadge, PhotoViewerModal, FollowListModal, AchievementCard, VoucherCard, VoucherQRModal, PageHeader, Tabs } from '../components/ui'
 import { useHeaderActions } from '../contexts/HeaderActionsContext'
 import { CATEGORY_ORDER } from '../lib/achievements'
 import TeacherSection from '../components/TeacherSection'
@@ -793,20 +793,7 @@ export default function Profile() {
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex gap-1 p-1 bg-ink-50 rounded-ctrl">
-        {TABS.map(tabDef => (
-          <button
-            key={tabDef.key}
-            onClick={() => setTab(tabDef.key)}
-            className={`flex-1 py-2.5 rounded-ctrl text-sm font-extrabold transition-all duration-fast ${
-              tab === tabDef.key ? 'bg-canvas text-ink-900 shadow-lift border border-line' : 'text-muted hover:text-ink-900'
-            }`}
-          >
-            {t(tabDef.labelKey)}
-          </button>
-        ))}
-      </div>
+      <Tabs value={tab} onChange={setTab} options={TABS.map((d) => ({ value: d.key, label: t(d.labelKey) }))} />
 
       {tab === 'perfil' && (
         <>

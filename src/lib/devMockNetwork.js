@@ -191,6 +191,13 @@ const RPC_MOCKS = {
   // Eliminar grupo (Trello #241). Por omissão o grupo pode ser eliminado;
   // localStorage.mockDeleteBlocker = 'has_activity' mostra o estado bloqueado.
   get_organization_delete_blocker: () => localStorage.getItem('mockDeleteBlocker') || null,
+  // Pedidos de entrada por responder, como o Gerir os lê (a RPC, não a
+  // tabela): localStorage.mockJoinRequests = 'true'. Mostra o número no
+  // separador «Pessoas» (Trello #528).
+  list_membership_requests: () => (localStorage.getItem('mockJoinRequests') === 'true' ? [
+    { id: 'jr1', user_id: 'fake-1', name: 'Marta Costa', avatar_url: null, created_at: new Date().toISOString() },
+    { id: 'jr2', user_id: 'fake-2', name: 'Tiago Ferreira', avatar_url: null, created_at: new Date().toISOString() },
+  ] : []),
   delete_self_serve_group: () => null,
   // Apagar conta (Trello #306). localStorage.mockDeletionRequestedAt =
   // '2026-09-18' mostra o ecrã de recuperar a conta.

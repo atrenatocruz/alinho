@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Search } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { Sheet } from '../agenda/AgendaControls'
-import { Avatar, PrimaryButton, RatingBadge } from '../ui'
+import { Avatar, PrimaryButton, RatingBadge, Chips } from '../ui'
 import { addPlan } from '../../lib/mixEdit'
 import { isGenderMismatch } from '../../lib/mixLogic'
 
@@ -142,18 +142,14 @@ export default function AddPlayerSheet({ game, excludeIds, peopleCount, capacity
 
         {loadError && <p className="text-sm text-danger font-extrabold">{t('mixedit.members_error')}</p>}
 
-        <div className="grid grid-cols-2 gap-1 p-1 bg-ink-50 rounded-ctrl">
-          {[false, true].map((v) => (
-            <button
-              key={String(v)}
-              type="button"
-              onClick={() => { setWithPartner(v); if (!v) setPartnerId(null) }}
-              className={`min-h-[38px] rounded-ctrl text-sm font-extrabold ${withPartner === v ? 'bg-canvas text-ink-900 shadow-lift border border-line' : 'text-muted'}`}
-            >
-              {v ? t('mixedit.with_partner') : t('mixedit.alone')}
-            </button>
-          ))}
-        </div>
+        <Chips
+          value={withPartner}
+          onChange={(v) => { setWithPartner(v); if (!v) setPartnerId(null) }}
+          options={[
+            { value: false, label: t('mixedit.alone') },
+            { value: true, label: t('mixedit.with_partner') },
+          ]}
+        />
 
         <div>
           <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mb-1.5">{t('mixedit.player_label')}</p>
