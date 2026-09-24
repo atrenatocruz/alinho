@@ -207,20 +207,35 @@ export default function Rankings() {
   // Com nível primeiro, pela ordem que veio; sem nível no fim, A–Z.
   // Ranking: por escala (lib/rankingScales). Assiduidade: lista única.
   const byScale = mode === 'ranking'
+
+  // Pesquisa sem acentos: «goncalves» encontra «Gonçalves».
+  const norm = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  const trimmed = query.trim()
+  const matchesQuery = (r) => norm(r.name).includes(norm(trimmed))
+
+  // Quem se procura aparece sempre (pedido do Francisco, 24 set). Se na
+  // escala aberta (Masculino / Feminino) não há ninguém com esse nome —
+  // porque a pessoa não tem sexo, não tem nível ou nunca jogou — mas em
+  // «Todos» há, a lista passa sozinha para «Todos» e o menu mostra-o. É só
+  // enquanto houver texto: ao limpar a pesquisa volta à escala que estava,
+  // porque a escolha da pessoa (`scaleChoice`) nunca é mexida.
+  const searchWidened = byScale && !!trimmed && scale !== 'all'
+    && !applyScale(rows, scale).some(matchesQuery)
+    && applyScale(rows, 'all').some(matchesQuery)
+  const shownScale = searchWidened ? 'all' : scale
+
   const positioned = useMemo(() => {
-    if (byScale) return applyScale(rows, scale)
+    if (byScale) return applyScale(rows, shownScale)
     const ranked = rows.filter((r) => r.ranked).map((r, i) => ({ ...r, position: i + 1 }))
     const unranked = rows
       .filter((r) => !r.ranked)
       .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pt'))
       .map((r) => ({ ...r, position: null }))
     return [...ranked, ...unranked]
-  }, [rows, scale, byScale])
-  const allScales = byScale && scale === 'all'
+  }, [rows, shownScale, byScale])
+  const allScales = byScale && shownScale === 'all'
 
-  const norm = (s) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
-  const trimmed = query.trim()
-  const visible = trimmed ? positioned.filter((r) => norm(r.name).includes(norm(trimmed))) : positioned
+  const visible = trimmed ? positioned.filter(matchesQuery) : positioned
   // A tua linha: a tua posição na tua escala, mesmo quando se vê outra.
   const me = byScale
     ? applyScale(rows, 'all').find((r) => r.user_id === user.id)
@@ -372,7 +387,7 @@ export default function Rankings() {
         {byScale && (
           <Select
             variant="chip"
-            value={scale}
+            value={shownScale}
             onChange={setScaleChoice}
             options={SCALES.map((s) => ({ value: s, label: t(`rankings.scale_${s}`) }))}
             placeholder={t('rankings.scale_title')}
