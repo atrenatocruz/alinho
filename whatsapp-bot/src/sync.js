@@ -4,6 +4,7 @@ import { loadOpenSlotBatch, buildOpenSlotsMessage } from './openSlots.js'
 import { getGroups, getGroupsForOrg, mixVisibleToGroup } from './groups.js'
 import { helpFooter } from './messages.js'
 import { t } from './locales.js'
+import { startTimer } from './timing.js'
 
 const DEBOUNCE_MS = 4000
 const RECONCILE_INTERVAL_MS = 60 * 1000
@@ -53,10 +54,13 @@ function hash(str) {
  * since-closed mix's message — commands.js handles that at reply time).
  */
 async function postGroupRoster(sendText, getGroupMentions, group, { tagAll = false, promotedByGameId = new Map() } = {}) {
+  const timer = startTimer('repost')
+  let sent = 0
   const visibleMixes = (await getOpenMixes(group.organizationId)).filter((mix) => mixVisibleToGroup(mix, group))
   const openMixes = visibleMixes.filter((mix) => mix.origin !== 'open_slot')
   const openSlotMixes = visibleMixes.filter((mix) => mix.origin === 'open_slot')
   const mixStates = await Promise.all(openMixes.map((mix) => loadGame(mix.id)))
+  timer.mark('carregar')
   const st = stateFor(group.groupJid)
   const total = mixStates.length
   const seenGameIds = new Set()
@@ -89,6 +93,7 @@ async function postGroupRoster(sendText, getGroupMentions, group, { tagAll = fal
     const fullText = shouldTagThis ? `📢 @all\n\n${text}` : text
 
     const messageId = await sendText(group.groupJid, fullText, shouldTagThis ? { mentions } : {})
+    sent++
     if (shouldTagThis) taggedThisFlush = true
     st.mixes.set(gameId, { hash: nextHash, messageId })
     if (messageId) recordMixMessage(messageId, gameId)
@@ -117,6 +122,7 @@ async function postGroupRoster(sendText, getGroupMentions, group, { tagAll = fal
     const shouldTagThis = tagAll && !taggedThisFlush
     const fullText = shouldTagThis ? `📢 @all\n\n${baseText}` : baseText
     const messageId = await sendText(group.groupJid, fullText, shouldTagThis ? { mentions } : {})
+    sent++
     if (shouldTagThis) taggedThisFlush = true
     st.openSlotBatches.set(batchId, { hash: nextHash, messageId })
   }
@@ -124,6 +130,8 @@ async function postGroupRoster(sendText, getGroupMentions, group, { tagAll = fal
   for (const batchId of st.openSlotBatches.keys()) {
     if (!seenBatchIds.has(batchId)) st.openSlotBatches.delete(batchId)
   }
+  timer.mark('enviar')
+  timer.end({ group: group.groupJid, mixes: total, sent })
 }
 
 function flushRepost(sendText, getGroupMentions, group) {

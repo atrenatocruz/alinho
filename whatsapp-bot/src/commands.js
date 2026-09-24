@@ -6,6 +6,7 @@ import { joinWithUnregisteredPartner } from './partnerInvite.js'
 import { config } from './config.js'
 import { helpText, helpFooter } from './messages.js'
 import { t } from './locales.js'
+import { startTimer } from './timing.js'
 
 function stripAccents(str) {
   return str.normalize('NFD').replace(/[̀-ͯ]/g, '')
@@ -284,18 +285,32 @@ function matchOpenMixesByText(openMixes, rest, { glued }) {
  * confirmation, matching the reference bot's behavior. Only rejections and
  * disambiguation prompts reply directly.
  */
-export async function handleGroupMessage({ groupJid, senderPn, text, message, quotedStanzaId, mentionedJids = [], mentionedPns = [] }, { sendText }) {
+// Mede cada comando (timing.js): uma linha de log por comando, só para os
+// que passaram o filtro (a conversa normal do grupo não escreve nada).
+export async function handleGroupMessage(payload, deps) {
+  const ctx = { timer: startTimer('cmd'), action: null }
+  try {
+    return await handleGroupMessageInner(payload, deps, ctx)
+  } finally {
+    if (ctx.action) ctx.timer.end({ action: ctx.action, group: payload.groupJid })
+  }
+}
+
+async function handleGroupMessageInner({ groupJid, senderPn, text, message, quotedStanzaId, mentionedJids = [], mentionedPns = [] }, { sendText }, ctx) {
+  const timer = ctx.timer
   // Gate on hardcoded, in-memory checks first — normal group chatter never
   // matches either of these, so it never touches the DB (the group lookup
   // used to run unconditionally here, costing every message a query).
   const pending = getPendingConfirmation(senderPn, groupJid)
   const parsed = parseCommand(text)
   if (!pending && !parsed) return
+  ctx.action = parsed?.action ?? 'pending'
 
   // Multi-grupo: o grupo de onde a mensagem veio determina o clube (e o
   // filtro de nível) de TUDO o resto deste handler. Grupo não mapeado em
   // whatsapp_groups → silêncio, como o gate antigo de JID único.
   const group = await getGroupByJid(groupJid)
+  timer.mark('grupo')
   if (!group) return
   const organizationId = group.organizationId
 
@@ -305,6 +320,7 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message, qu
   // always uses their own profiles.language. An unresolved sender (not
   // found, or a fresh guest about to be created) falls back to 'pt'.
   const resolvedProfile = await resolveProfileByPhoneJid(senderPn, organizationId)
+  timer.mark('perfil')
   const lang = resolvedProfile?.language ?? 'pt'
 
   // Quote the sender's own message so a reply is unambiguous even when
@@ -425,6 +441,7 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message, qu
   // Só os mixes do clube deste grupo, filtrados pelo nível do grupo — um
   // "In" aqui nunca pode inscrever alguém num mix que o grupo não vê.
   const openMixes = (await getOpenMixes(organizationId)).filter((mix) => mixVisibleToGroup(mix, group))
+  timer.mark('mixes')
   if (openMixes.length === 0) {
     await reply('no_open_mixes')
     return
@@ -620,6 +637,7 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message, qu
   // shortcut, or being the one mix the sender is in for a bare "out").
   async function actOnGame(mixRow, profile) {
     const { game, people, capacity } = await loadGame(mixRow.id)
+    timer.mark('mix')
     const gameIsFuture = new Date(game.date).getTime() > Date.now()
 
     if (!OPEN_STATUSES.has(game.status) || !gameIsFuture) {
@@ -677,6 +695,7 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message, qu
       const { error: insertError } = await supabase
         .from('participants')
         .insert([{ game_id: game.id, user_id: profile.id, status: 'confirmed', joined_alone: true }])
+      timer.mark('gravar')
 
       if (insertError) {
         if (insertError.code === '23505') {
@@ -718,6 +737,7 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message, qu
     }
 
     const { error: deleteError } = await supabase.from('participants').delete().eq('id', ownConfirmedRow.id)
+    timer.mark('gravar')
     if (deleteError) throw new Error(`Failed to remove participant: ${deleteError.message}`)
     // No reply — the participants DELETE triggers a roster repost via sync.js.
   }
