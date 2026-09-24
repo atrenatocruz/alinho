@@ -20,10 +20,14 @@ import TournamentCalendarGrid from './TournamentCalendarGrid'
 
 const STATE_TONE = { rascunho: 'grey', inscricoes: 'in', fechado: 'grey', sorteado: 'dark', a_decorrer: 'live', terminado: 'grey' }
 
-export default function ClubTournamentsPanel({ organizationId, club }) {
+/* `startCreating` abre o painel já no formulário de criar, e `onDone` avisa
+   quem o abriu quando se cria ou se cancela — é o botão «marcar torneio» do
+   Gerir, que abre SÓ o formulário e não a lista (pedido do agente de Bugs,
+   24 set, pelo desenho do Gerir). Sem as duas props, tudo como antes. */
+export default function ClubTournamentsPanel({ organizationId, club, startCreating = false, onDone }) {
   const { t, i18n } = useTranslation()
   const [list, setList] = useState(null)
-  const [creating, setCreating] = useState(false)
+  const [creating, setCreating] = useState(startCreating)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [toDelete, setToDelete] = useState(null)
@@ -52,6 +56,7 @@ export default function ClubTournamentsPanel({ organizationId, club }) {
       await createTournament(organizationId, draft)
       setCreating(false)
       load()
+      onDone?.({ created: true })
     } catch (err) {
       setError(describeError(t, err))
     } finally {
@@ -105,7 +110,7 @@ export default function ClubTournamentsPanel({ organizationId, club }) {
   }
 
   if (creating) {
-    return <CreateTournamentForm club={club} saving={saving} error={error} onCancel={() => setCreating(false)} onCreate={create} />
+    return <CreateTournamentForm club={club} saving={saving} error={error} onCancel={() => { setCreating(false); onDone?.({ created: false }) }} onCreate={create} />
   }
 
   if (keepersOf) {

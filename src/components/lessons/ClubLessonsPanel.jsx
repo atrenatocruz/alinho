@@ -45,7 +45,6 @@ export default function ClubLessonsPanel({ organizationId, orgName }) {
         {[
           ['teachers', t('lessons.gerir_tab_teachers', { count: teachers.length })],
           ['series', t('lessons.gerir_tab_series')],
-          ['prices', t('lessons.gerir_tab_prices')],
         ].map(([key, label]) => (
           <button key={key} type="button" onClick={() => setSection(key)}
             className={`min-h-[40px] px-3.5 rounded-full border text-sm font-extrabold transition-colors duration-fast ${
@@ -57,7 +56,6 @@ export default function ClubLessonsPanel({ organizationId, orgName }) {
       </div>
       {section === 'teachers' && <TeachersOrder organizationId={organizationId} teachers={teachers} setTeachers={setTeachers} loading={loading} />}
       {section === 'series' && <ClubSeriesPanel organizationId={organizationId} teachers={teachers} prices={settings.prices} peakHours={settings.peakHours} />}
-      {section === 'prices' && <Prices organizationId={organizationId} orgName={orgName} />}
     </div>
   )
 }
@@ -122,7 +120,9 @@ function TeachersOrder({ organizationId, teachers, setTeachers, loading }) {
   )
 }
 
-function Prices({ organizationId, orgName }) {
+// Usado tambem no separador «Clube» do Gerir, que e onde os precos vivem
+// desde 24 set: sao configuracao do clube, nao um evento.
+export function Prices({ organizationId, orgName }) {
   const { t } = useTranslation()
   const [view, setView] = useState('peak') // peak | off | hours
   const [loaded, setLoaded] = useState(null)

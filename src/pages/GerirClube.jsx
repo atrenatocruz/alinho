@@ -24,7 +24,7 @@ import { listPendingClubTeachers, resolveTeacherClub } from '../lib/teachers'
 import VoucherScanner from '../components/VoucherScanner'
 import { isValidVoucherId, normalizeScannedVoucherId } from '../lib/vouchers'
 import OpenSlotsPanel from '../components/OpenSlotsPanel'
-import ClubLessonsPanel from '../components/lessons/ClubLessonsPanel'
+import ClubLessonsPanel, { Prices as LessonPrices } from '../components/lessons/ClubLessonsPanel'
 import { listClubTournaments } from '../lib/tournamentApi'
 import { lessonsAvailable } from '../lib/lessonsApi'
 import ClubTournamentsPanel from '../components/tournament/ClubTournamentsPanel'
@@ -267,6 +267,10 @@ export default function GerirClube() {
   const [expandedGroupId, setExpandedGroupId] = useState(null)
   const [expandedGroupMembers, setExpandedGroupMembers] = useState([])
   const [expandedGroupRequests, setExpandedGroupRequests] = useState([])
+  // Os pedidos para entrar nos grupos deste clube so se carregavam ao abrir
+  // cada grupo, la no fundo das definicoes -- ninguem os via. Passam a vir
+  // todos juntos, ao topo de «Pessoas».
+  const [pedidosDosGrupos, setPedidosDosGrupos] = useState([])
   const [expandedGroupLoading, setExpandedGroupLoading] = useState(false)
   const [groupActingOn, setGroupActingOn] = useState(null)
 
@@ -553,6 +557,25 @@ export default function GerirClube() {
     setExpandedGroupRequests([])
     if (group.can_manage) loadExpandedGroupDetails(group.id)
   }
+
+  const loadPedidosDosGrupos = async () => {
+    const geridos = clubGroups.filter((g) => g.can_manage)
+    if (!geridos.length) { setPedidosDosGrupos([]); return }
+    const respostas = await Promise.all(
+      geridos.map((g) => supabase.rpc('list_membership_requests', { p_organization_id: g.id }))
+    )
+    setPedidosDosGrupos(
+      geridos
+        .map((group, i) => ({ group, requests: respostas[i].error ? [] : (respostas[i].data || []) }))
+        .filter((x) => x.requests.length > 0)
+    )
+  }
+
+  useEffect(() => {
+    // org?.kind e nao isGroupOrg: esse so e declarado mais abaixo, e usa-lo
+    // aqui partia a pagina inteira (aprendido a 23 set).
+    if (activeTab === 'members' && org?.kind !== 'group') loadPedidosDosGrupos()
+  }, [activeTab, clubGroups, org?.kind])
 
   const handleApproveGroupRequest = async (requestId, groupId) => {
     setMembersError('')
@@ -1726,10 +1749,10 @@ export default function GerirClube() {
         {/* Um só "Voltar", sempre no topo (Francisco, 15 set 2026). Nas
             Definições e no Validar voucher volta aos Jogos; nos Jogos/Membros
             volta à página anterior (só quem tem mais de um clube/grupo). */}
-        {(activeTab === 'settings' || activeTab === 'redeem') ? (
+        {activeTab === 'redeem' ? (
           <button
             type="button"
-            onClick={() => { if (activeTab === 'redeem') handleResetRedeem(); setActiveTab('events') }}
+            onClick={() => { handleResetRedeem(); setActiveTab('events') }}
             className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline mb-6"
           >
             <ArrowLeft size={16} /> {t('gerirclube.back_button')}
@@ -1797,22 +1820,13 @@ export default function GerirClube() {
           >
             <QrCode size={20} />
           </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('settings')}
-            title={t('gerirclube.settings_label')}
-            aria-label={t('gerirclube.settings_label')}
-            className="shrink-0 -mt-1 w-11 h-11 flex items-center justify-center rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast"
-          >
-            <Settings size={20} />
-          </button>
         </div>
       </div>
 
       {/* Tabs — same pill style as Home.jsx/Rankings.jsx's tab rows.
           Hidden while the settings page or the voucher redeem screen is
           open (neither is one of the tabs). */}
-      {activeTab !== 'settings' && activeTab !== 'redeem' && (
+      {activeTab !== 'redeem' && (
         // A fila numa linha só que desliza para o lado. O que diz que há
         // mais é o separador seguinte cortado ao meio, à direita — é assim
         // que se percebe à primeira que a fila continua.
@@ -1831,6 +1845,7 @@ export default function GerirClube() {
           {[
             ['events', Calendar, t('gerirclube.tab_events'), true, 0],
             ['members', Users, t('gerirclube.tab_members'), true, requests.length],
+            ['settings', Settings, t(isGroupOrg ? 'gerirclube.tab_group' : 'gerirclube.tab_club'), true, 0],
           ].filter(([, , , show]) => show).map(([key, Icon, label, , badge]) => (
             <button
               key={key}
@@ -2708,6 +2723,105 @@ export default function GerirClube() {
           {/* Members Tab */}
           {activeTab === 'members' && (
             <div className="space-y-3">
+
+              {membersError && (
+                <p className="rounded-ctrl bg-danger/10 text-danger text-sm font-extrabold p-3">{membersError}</p>
+              )}
+
+              {requests.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-extrabold text-ink-900 flex items-center gap-1.5">
+                    <Clock size={14} /> {t('gerirclube.join_requests_heading', { count: requests.length })}
+                  </h3>
+                  {requests.map((req) => (
+                    <div key={req.id} className="card flex items-center gap-3">
+                      <Avatar name={req.name} url={req.avatar_url} size="w-9 h-9 text-sm" />
+                      <p className="flex-1 min-w-0 font-extrabold text-ink-900 truncate">{req.name || t('gerirclube.fallback_player_name')}</p>
+                      <button
+                        onClick={() => handleApproveRequest(req.id)}
+                        className="w-9 h-9 flex items-center justify-center rounded-full bg-ok/10 text-ok hover:bg-ok/20 transition-colors duration-fast"
+                        title={t('gerirclube.approve_action')}
+                      >
+                        <Check size={18} />
+                      </button>
+                      <button
+                        onClick={() => handleRejectRequest(req.id)}
+                        className="w-9 h-9 flex items-center justify-center rounded-full text-danger hover:bg-danger/10 transition-colors duration-fast"
+                        title={t('gerirclube.reject_action')}
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {pedidosDosGrupos.map(({ group, requests: pedidos }) => (
+                <div key={group.id} className="space-y-2">
+                  <h3 className="text-sm font-extrabold text-ink-900 flex items-center gap-1.5">
+                    <Clock size={14} /> {t('gerirclube.join_requests_heading', { count: pedidos.length })}
+                    <span className="font-normal text-muted truncate">· {group.name}</span>
+                  </h3>
+                  {pedidos.map((req) => (
+                    <div key={req.id} className="card flex items-center gap-3">
+                      <Avatar name={req.name} url={req.avatar_url} size="w-9 h-9 text-sm" />
+                      <p className="flex-1 min-w-0 font-extrabold text-ink-900 truncate">{req.name || t('gerirclube.fallback_player_name')}</p>
+                      <button
+                        onClick={async () => { await handleApproveGroupRequest(req.id, group.id); loadPedidosDosGrupos() }}
+                        className="w-9 h-9 flex items-center justify-center rounded-full bg-ok/10 text-ok hover:bg-ok/20 transition-colors duration-fast"
+                        title={t('gerirclube.approve_action')}
+                      >
+                        <Check size={18} />
+                      </button>
+                      <button
+                        onClick={async () => { await handleRejectGroupRequest(req.id, group.id); loadPedidosDosGrupos() }}
+                        className="w-9 h-9 flex items-center justify-center rounded-full text-danger hover:bg-danger/10 transition-colors duration-fast"
+                        title={t('gerirclube.reject_action')}
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ))}
+
+              {!isGroupOrg && clubTeachers.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-extrabold text-ink-900 flex items-center gap-1.5">
+                    <Clock size={14} /> {t('gerirclube.club_teachers_heading', { count: clubTeachers.length })}
+                  </h3>
+                  {clubTeachers.map((req) => (
+                    <div key={req.id} className="card space-y-3">
+                      <div className="flex items-center gap-3">
+                        <Avatar name={req.user?.name} url={req.user?.avatar_url} size="w-10 h-10 text-sm" />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-extrabold text-ink-900 truncate">{req.user?.name || t('gerirclube.fallback_player_name')}</p>
+                          <p className="text-xs text-muted truncate">
+                            {req.status === 'approved' ? t('gerirclube.teacher_verified') : t('gerirclube.teacher_being_verified')}
+                            {req.zone ? ` · ${req.zone}` : ''}
+                          </p>
+                        </div>
+                      </div>
+                      <p className="text-sm text-ink-900 break-words">{req.contact}</p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleClubTeacher(req.id, true)}
+                          className="flex-1 inline-flex items-center justify-center gap-1.5 min-h-[44px] rounded-full bg-lime-400 text-ink-900 text-sm font-extrabold"
+                        >
+                          <Check size={16} /> {t('gerirclube.accept_teacher')}
+                        </button>
+                        <button
+                          onClick={() => handleClubTeacher(req.id, false)}
+                          className="flex-1 inline-flex items-center justify-center gap-1.5 min-h-[44px] rounded-full bg-ink-50 text-ink-700 text-sm font-extrabold"
+                        >
+                          <X size={16} /> {t('gerirclube.reject_action')}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div className="card space-y-4">
                 <div>
                   <h3 className="text-sm font-extrabold text-ink-900 mb-2">{t('gerirclube.invite_player_heading')}</h3>
@@ -2748,75 +2862,6 @@ export default function GerirClube() {
                   <strong>{t('gerirclube.total_members_label')}</strong> {members.length}
                 </p>
               </div>
-
-              {membersError && (
-                <p className="rounded-ctrl bg-danger/10 text-danger text-sm font-extrabold p-3">{membersError}</p>
-              )}
-
-              {requests.length > 0 && (
-                <div className="space-y-2">
-                  <h3 className="text-sm font-extrabold text-ink-900 flex items-center gap-1.5">
-                    <Clock size={14} /> {t('gerirclube.join_requests_heading', { count: requests.length })}
-                  </h3>
-                  {requests.map((req) => (
-                    <div key={req.id} className="card flex items-center gap-3">
-                      <Avatar name={req.name} url={req.avatar_url} size="w-9 h-9 text-sm" />
-                      <p className="flex-1 min-w-0 font-extrabold text-ink-900 truncate">{req.name || t('gerirclube.fallback_player_name')}</p>
-                      <button
-                        onClick={() => handleApproveRequest(req.id)}
-                        className="w-9 h-9 flex items-center justify-center rounded-full bg-ok/10 text-ok hover:bg-ok/20 transition-colors duration-fast"
-                        title={t('gerirclube.approve_action')}
-                      >
-                        <Check size={18} />
-                      </button>
-                      <button
-                        onClick={() => handleRejectRequest(req.id)}
-                        className="w-9 h-9 flex items-center justify-center rounded-full text-danger hover:bg-danger/10 transition-colors duration-fast"
-                        title={t('gerirclube.reject_action')}
-                      >
-                        <X size={18} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {!isGroupOrg && clubTeachers.length > 0 && (
-                <div className="space-y-2">
-                  <h3 className="text-sm font-extrabold text-ink-900 flex items-center gap-1.5">
-                    <Clock size={14} /> {t('gerirclube.club_teachers_heading', { count: clubTeachers.length })}
-                  </h3>
-                  {clubTeachers.map((req) => (
-                    <div key={req.id} className="card space-y-3">
-                      <div className="flex items-center gap-3">
-                        <Avatar name={req.user?.name} url={req.user?.avatar_url} size="w-10 h-10 text-sm" />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-extrabold text-ink-900 truncate">{req.user?.name || t('gerirclube.fallback_player_name')}</p>
-                          <p className="text-xs text-muted truncate">
-                            {req.status === 'approved' ? t('gerirclube.teacher_verified') : t('gerirclube.teacher_being_verified')}
-                            {req.zone ? ` · ${req.zone}` : ''}
-                          </p>
-                        </div>
-                      </div>
-                      <p className="text-sm text-ink-900 break-words">{req.contact}</p>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleClubTeacher(req.id, true)}
-                          className="flex-1 inline-flex items-center justify-center gap-1.5 min-h-[44px] rounded-full bg-lime-400 text-ink-900 text-sm font-extrabold"
-                        >
-                          <Check size={16} /> {t('gerirclube.accept_teacher')}
-                        </button>
-                        <button
-                          onClick={() => handleClubTeacher(req.id, false)}
-                          className="flex-1 inline-flex items-center justify-center gap-1.5 min-h-[44px] rounded-full bg-ink-50 text-ink-700 text-sm font-extrabold"
-                        >
-                          <X size={16} /> {t('gerirclube.reject_action')}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
 
               {members.map(member => (
                 <div key={member.id} className="card">
@@ -3141,6 +3186,18 @@ export default function GerirClube() {
               </form>
 
               <WhatsappGroupsSection organizationId={currentOrganizationId} />
+
+              {/* Precos das aulas e horas de maior procura: sao configuracao
+                  do clube, por isso vivem aqui e nao no meio dos eventos
+                  (desenho de 23 set). Mesmo componente de antes, sem mexer. */}
+              {org?.kind !== 'group' && lessonsReady && (
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <h4 className="text-base font-semibold text-ink-900 mb-3">
+                    {t('lessons.gerir_tab_prices')}
+                  </h4>
+                  <LessonPrices organizationId={currentOrganizationId} orgName={org?.name} />
+                </div>
+              )}
 
               {/* Only clubs can contain groups — create_group rejects a group
                   as a parent server-side, so don't offer it on a group's own

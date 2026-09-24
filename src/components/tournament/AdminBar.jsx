@@ -45,7 +45,7 @@ const STATE_PILL = {
   sorteado: 'dark', a_decorrer: 'live', terminado: 'grey',
 }
 
-export default function AdminBar({ tournament, onChanged }) {
+export default function AdminBar({ tournament, onChanged, onEdit, onDraw }) {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const [busy, setBusy] = useState(false)
@@ -95,7 +95,7 @@ export default function AdminBar({ tournament, onChanged }) {
     // O sorteio é a última porta, e tem de o dizer em português antes de se
     // atravessar: daqui para a frente não se reabrem inscrições.
     if (!window.confirm(t('tournament.admin.confirm_draw'))) return
-    navigate(`/gerir?torneio=${tournament.id}&accao=sorteio`)
+    onDraw?.()
   }
 
   return (
@@ -138,7 +138,13 @@ export default function AdminBar({ tournament, onChanged }) {
             {t('tournament.admin.do_draw')}
           </button>
         )}
-        <button type="button" onClick={() => navigate(`/gerir?torneio=${tournament.id}&accao=editar`)}
+        {/* Abre AQUI, onde a pessoa já está. Antes mandava para `/gerir` com
+            parâmetros que ninguém lê — e `/gerir` sem clube é o ecrã de
+            escolher organização, onde há um «Remover foto» que apaga a foto
+            de PERFIL. Quem ia editar o torneio podia apagá-la sem perceber.
+            O formulário de editar não tem rota própria, por isso não havia
+            para onde navegar: tem de abrir no sítio. */}
+        <button type="button" onClick={() => onEdit?.()}
           className="inline-flex items-center gap-1.5 rounded-ctrl border border-line bg-canvas px-3 py-2 text-[12px] font-bold text-ink-900">
           <Pencil size={14} /> {preview ? t('tournament.admin.keep_editing') : t('tournament.admin.edit')}
         </button>
