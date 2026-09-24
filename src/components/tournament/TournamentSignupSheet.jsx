@@ -97,16 +97,17 @@ export default function TournamentSignupSheet({ tournament, categories, category
               const full = isCategoryFull(c)
               const left = slotsLeft(c)
               return (
+                // Cheia não fecha a porta: o servidor põe quem chega depois
+                // como suplente, por ordem de chegada — o ecrã só o diz.
                 <button
                   key={c.id}
-                  disabled={full}
                   onClick={() => setCategoryId(c.id)}
                   className={`press rounded-full px-3 py-1.5 text-sm font-semibold border-2 ${
-                    full ? 'border-line text-ink-400 line-through'
-                      : categoryId === c.id ? 'border-ink-900 bg-ink-900 text-white' : 'border-line text-ink-900'
+                    categoryId === c.id ? 'border-ink-900 bg-ink-900 text-white'
+                      : full ? 'border-line text-ink-500' : 'border-line text-ink-900'
                   }`}
                 >
-                  {c.code} · {full ? t('tsignup.category_full') : left == null ? c.name : t('tsignup.category_slots', { count: left })}
+                  {c.code} · {full ? t('tsignup.category_full_waitlist') : left == null ? c.name : t('tsignup.category_slots', { count: left })}
                 </button>
               )
             })}
