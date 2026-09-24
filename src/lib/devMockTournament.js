@@ -371,3 +371,102 @@ Object.assign(TOURNAMENT_RPC_MOCKS, TOURNAMENT_SCORE_RPC_MOCKS)
 export const TOURNAMENT_TABLE_MOCKS = {
   tournaments: () => (on() ? [TOURNAMENT()] : []),
 }
+
+// ── Fechar categorias (Trello #485) ──────────────────────────────────────
+// localStorage.mockTClose = 'true' (com mockTournament e
+// mockTournamentState = 'a_decorrer'): as 7 categorias do Smash, uma em
+// cada ponto — já fechada, com jogos por jogar, pronta com final, pronta só
+// com um grupo, pronta com dois grupos e sem final (quem organiza escolhe),
+// com a final por jogar, e sem sorteio. Ganha aos dados do sorteio (Dev 3)
+// só enquanto estiver ligado.
+const closeOn = () => localStorage.getItem('mockTClose') === 'true'
+const closedNow = new Set()
+
+const CLOSE_CATS = [
+  { id: 'cc-m3', code: 'M3', name: 'Masculinos 3', status: 'terminada', position: 1 },
+  { id: 'cc-m4', code: 'M4', name: 'Masculinos 4', status: 'a_decorrer', position: 2 },
+  { id: 'cc-m5', code: 'M5', name: 'Masculinos 5', status: 'a_decorrer', position: 3 },
+  { id: 'cc-f4', code: 'F4', name: 'Femininos 4', status: 'a_decorrer', position: 4 },
+  { id: 'cc-f3', code: 'F3', name: 'Femininos 3', status: 'a_decorrer', position: 5 },
+  { id: 'cc-mx4', code: 'MX4', name: 'Mistos 4', status: 'sorteada', position: 6 },
+  { id: 'cc-f5', code: 'F5', name: 'Femininos 5', status: 'fechada', position: 7 },
+]
+const PAIRS = ['Barros / Antunes', 'Lima / Reis', 'Costa / Pinto', 'Santos / Santos', 'Mendes / Silva', 'Rosa / Pinto']
+const closeEntries = (cat) => PAIRS.map((name, i) => ({
+  id: `${cat}-e${i + 1}`, category_id: cat, team_name: name, status: 'selecionada', seed_number: null,
+}))
+const cm = (cat, n, over) => ({
+  id: `${cat}-m${n}`, category_id: cat, stage: 'grupo', group_id: `${cat}-g1`, round: null, bracket_slot: null,
+  entry_a_id: `${cat}-e1`, entry_b_id: `${cat}-e2`, status: 'terminado', score_a: 9, score_b: 5,
+  winner_entry_id: `${cat}-e1`, scheduled_at: null, court_name: null, ...over,
+})
+const e = (cat, i) => `${cat}-e${i}`
+const CLOSE_MATCHES = {
+  // 3 jogos de grupo ainda por jogar
+  'cc-m4': (c) => [
+    cm(c, 1),
+    cm(c, 2, { entry_a_id: e(c, 3), entry_b_id: e(c, 4), status: 'marcado', score_a: null, score_b: null, winner_entry_id: null }),
+    cm(c, 3, { entry_a_id: e(c, 1), entry_b_id: e(c, 3), status: 'a_decorrer', score_a: null, score_b: null, winner_entry_id: null }),
+    cm(c, 4, { entry_a_id: e(c, 2), entry_b_id: e(c, 4), status: 'marcado', score_a: null, score_b: null, winner_entry_id: null }),
+  ],
+  // com quadro: final e jogo de 3.º jogados
+  'cc-m5': (c) => [
+    cm(c, 1),
+    cm(c, 2, { stage: 'principal', group_id: null, round: 'F', bracket_slot: 1, entry_a_id: e(c, 1), entry_b_id: e(c, 2), winner_entry_id: e(c, 1) }),
+    cm(c, 3, { stage: '3lugar', group_id: null, entry_a_id: e(c, 3), entry_b_id: e(c, 4), winner_entry_id: e(c, 3) }),
+  ],
+  // só um grupo de 4, tudo jogado
+  'cc-f4': (c) => [
+    cm(c, 1, { entry_a_id: e(c, 1), entry_b_id: e(c, 2), score_a: 9, score_b: 4, winner_entry_id: e(c, 1) }),
+    cm(c, 2, { entry_a_id: e(c, 3), entry_b_id: e(c, 4), score_a: 9, score_b: 7, winner_entry_id: e(c, 3) }),
+    cm(c, 3, { entry_a_id: e(c, 1), entry_b_id: e(c, 3), score_a: 9, score_b: 8, winner_entry_id: e(c, 1) }),
+    cm(c, 4, { entry_a_id: e(c, 2), entry_b_id: e(c, 4), score_a: 9, score_b: 6, winner_entry_id: e(c, 2) }),
+    cm(c, 5, { entry_a_id: e(c, 1), entry_b_id: e(c, 4), score_a: 9, score_b: 2, winner_entry_id: e(c, 1) }),
+    cm(c, 6, { entry_a_id: e(c, 2), entry_b_id: e(c, 3), score_a: 5, score_b: 9, winner_entry_id: e(c, 3) }),
+  ],
+  // dois grupos, sem quadro
+  'cc-f3': (c) => [
+    cm(c, 1),
+    cm(c, 2, { group_id: `${c}-g2`, entry_a_id: e(c, 3), entry_b_id: e(c, 4), winner_entry_id: e(c, 3) }),
+  ],
+  // a final tem uma dupla e espera pela outra
+  'cc-mx4': (c) => [
+    cm(c, 1),
+    cm(c, 2, { stage: 'principal', group_id: null, round: 'F', bracket_slot: 1, entry_a_id: e(c, 1), entry_b_id: null, status: 'marcado', score_a: null, score_b: null, winner_entry_id: null }),
+  ],
+}
+const CLOSE_GROUPS = {
+  'cc-m4': [[1, 2, 3, 4]],
+  'cc-m5': [[1, 2, 3, 4]],
+  'cc-f4': [[1, 2, 3, 4]],
+  'cc-f3': [[1, 2], [3, 4]],
+  'cc-mx4': [[1, 2, 3]],
+}
+const catOf = (url) => decodeURIComponent(url).match(/category_id=eq\.([a-z0-9-]+)/)?.[1]
+
+export const TOURNAMENT_CLOSE_RPC_MOCKS = {
+  list_tournament_categories_admin: () => (closeOn() ? {
+    rules: {}, days: [],
+    categories: CLOSE_CATS.map((c) => (closedNow.has(c.id) ? { ...c, status: 'terminada' } : c)),
+  } : undefined),
+  finish_category: (params) => {
+    if (!closeOn()) return undefined
+    closedNow.add(params?.p_category_id)
+    return { champion: null, from_bracket: true, players_rated: 8 }
+  },
+}
+export const TOURNAMENT_CLOSE_TABLE_MOCKS = {
+  tournament_public_groups: (url) => {
+    if (!closeOn()) return undefined
+    const c = catOf(url)
+    return (CLOSE_GROUPS[c] || []).flatMap((teams, gi) => teams.map((n, pi) => ({
+      id: `${c}-g${gi + 1}`, category_id: c, number: gi + 1, name: `Grupo ${'AB'[gi]}`, entry_id: e(c, n), position: pi + 1,
+    })))
+  },
+  tournament_public_entries: (url) => (closeOn() ? closeEntries(catOf(url)) : undefined),
+  tournament_public_matches: (url) => {
+    if (!closeOn()) return undefined
+    const c = catOf(url)
+    return CLOSE_MATCHES[c] ? CLOSE_MATCHES[c](c) : []
+  },
+}

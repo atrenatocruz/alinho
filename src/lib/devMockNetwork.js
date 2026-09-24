@@ -1,6 +1,8 @@
 import { supabase } from './supabase'
 import { LESSON_RPC_MOCKS, LESSON_TABLE_MOCKS, LESSON_NOTICES } from './devMockLessons'
-import { TOURNAMENT_RPC_MOCKS, TOURNAMENT_TABLE_MOCKS } from './devMockTournament'
+import {
+  TOURNAMENT_RPC_MOCKS, TOURNAMENT_TABLE_MOCKS, TOURNAMENT_CLOSE_RPC_MOCKS, TOURNAMENT_CLOSE_TABLE_MOCKS,
+} from './devMockTournament'
 import { TOURNAMENT_DRAW_TABLE_MOCKS, TOURNAMENT_DRAW_RPC_MOCKS } from './devMockTournamentDraw'
 
 // Dev-only: quando a sessão é o atalho "Entrar como Admin (Dev)"
@@ -838,6 +840,18 @@ TABLE_MOCKS.games = (url) => {
   const rows = gamesSemFiltro(url)
   const origem = decodeURIComponent(url).match(/[?&]origin=eq\.([a-z_]+)/)
   return origem && Array.isArray(rows) ? rows.filter((g) => (g.origin || 'admin') === origem[1]) : rows
+}
+
+// Fechar categorias (#485, mockTClose): ganha aos outros mocks das mesmas
+// vistas só quando está ligado — devolve `undefined` quando não está, e
+// aí responde quem respondia antes.
+for (const [name, fn] of Object.entries(TOURNAMENT_CLOSE_RPC_MOCKS)) {
+  const before = RPC_MOCKS[name]
+  RPC_MOCKS[name] = (params) => fn(params) ?? before?.(params) ?? null
+}
+for (const [name, fn] of Object.entries(TOURNAMENT_CLOSE_TABLE_MOCKS)) {
+  const before = TABLE_MOCKS[name]
+  TABLE_MOCKS[name] = (url) => fn(url) ?? before?.(url) ?? []
 }
 
 const jsonResponse = (data, status = 200) =>
