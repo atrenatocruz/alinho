@@ -1612,7 +1612,7 @@
   "ui.select_search_placeholder": "Search…",
   "ui.select_search_empty": "No results.",
   "ui.action_join": "Join",
-  "ui.action_waitlist": "Waitlist",
+  "ui.action_waitlist": "Join waitlist",
   "ui.action_leave": "Leave",
   "ui.action_leave_waitlist": "Leave waitlist",
   "ui.friend_in_mix_one": "{{name}} is in",
