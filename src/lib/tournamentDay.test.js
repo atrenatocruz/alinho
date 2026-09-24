@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { dayKeyInTz, msUntilNextDay, TOURNAMENT_TZ } from './tournamentDay'
+import { dayKeyInTz, msUntilNextDay, hhmmInTz, TOURNAMENT_TZ } from './tournamentDay'
 
 describe('dayKeyInTz — o dia como o servidor o conta', () => {
   it('00h30 de sabado em Almada e sabado, nao sexta', () => {
@@ -47,5 +47,25 @@ describe('msUntilNextDay — o ecra vira o dia sozinho', () => {
     expect(minutos(msUntilNextDay(new Date('2026-10-24T22:00:00Z')))).toBe(60)
     // Ja no dia 25, a hora a mais nao faz o dia virar mais cedo.
     expect(dayKeyInTz(new Date('2026-10-25T01:30:00Z'))).toBe('2026-10-25')
+  })
+})
+
+describe('hhmmInTz — a hora como está no pavilhão (#487)', () => {
+  it('17:00 UTC em outubro são 18:00 em Lisboa', () => {
+    expect(hhmmInTz('2026-10-09T17:00:00+00:00')).toBe('18:00')
+  })
+
+  it('não corta texto: aceita qualquer forma de instante', () => {
+    expect(hhmmInTz('2026-10-09T18:00:00+01:00')).toBe('18:00')
+    expect(hhmmInTz('2026-10-09T17:00:00.000Z')).toBe('18:00')
+  })
+
+  it('no inverno, Lisboa é UTC', () => {
+    expect(hhmmInTz('2026-11-10T18:00:00Z')).toBe('18:00')
+  })
+
+  it('sem hora, ou hora estragada, não mostra nada', () => {
+    expect(hhmmInTz(null)).toBe('')
+    expect(hhmmInTz('não é hora')).toBe('')
   })
 })

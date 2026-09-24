@@ -37,3 +37,20 @@ export function msUntilNextDay(date = new Date(), timeZone = TOURNAMENT_TZ) {
   }
   return Math.max(1000, hi - d.getTime())
 }
+
+/** 'HH:MM' de um instante, em hora do torneio (Trello #487).
+
+    Nunca se corta o texto que vem da base de dados — `scheduled_at` chega
+    em UTC («2026-10-09T17:00:00+00:00»), e cortar a hora mostrava 17:00 em
+    vez das 18:00 de Lisboa. É a regra que o Dev 1 aplicou ao prazo das
+    inscrições (`tournaments.js`); aqui usa-se a hora de Portugal e não a do
+    aparelho, porque o dia desta página também é o de Portugal (é o que o
+    servidor conta) — hora e dia têm de vir do mesmo relógio. */
+export function hhmmInTz(iso, timeZone = TOURNAMENT_TZ) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return new Intl.DateTimeFormat('pt-PT', {
+    timeZone, hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(d)
+}

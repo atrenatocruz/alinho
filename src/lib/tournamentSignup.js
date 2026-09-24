@@ -174,3 +174,14 @@ export function whoIsAlreadyIn(entries = [], ids = []) {
   }
   return null
 }
+
+/* Pode esta pessoa marcar resultados neste torneio? (Trello #487)
+   Quem organiza pode sempre; quem foi posto como marcador também. Só o
+   Gerir tinha link para a página de marcar — e só para quem organiza. Um
+   marcador que não fosse da organização não tinha caminho nenhum. */
+export async function canScoreTournament(tournamentId) {
+  if (!tournamentId) return false
+  const { data, error } = await supabase.rpc('can_score_tournament', { p_tournament_id: tournamentId })
+  if (error) throw error
+  return !!data
+}

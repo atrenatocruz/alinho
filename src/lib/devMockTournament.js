@@ -279,8 +279,12 @@ export const TOURNAMENT_RPC_MOCKS = {
 const team = (name, players) => ({ entry_id: name.toLowerCase().replace(/[^a-z]/g, ''), name, players })
 let MATCHES = null
 const resetMatches = () => {
-  const today = new Date()
-  const at = (hhmm) => `${iso(today)}T${hhmm}`
+  // No 1.º dia do torneio de teste (sexta), e com fuso — como vêm da base de
+  // dados. Estavam em «hoje» e sem fuso: não batiam com os dias do próprio
+  // torneio de teste, e só apareciam porque o mock ignorava o dia pedido
+  // (Trello #487, a página de marcar passou a escolher o dia ela mesma).
+  const day1 = nextFriday()
+  const at = (hhmm) => new Date(`${iso(day1)}T${hhmm}`).toISOString()
   // O dia do print 10: quatro horas, dois campos, três categorias — e o
   // Rui Costa a jogar às 10, às 11 e às 12, que é o choque que o desenho
   // mostra assinalado a vermelho ("ficava com 3 jogos seguidos").
@@ -314,6 +318,21 @@ const resetMatches = () => {
     m('m-7', 'M5', 'Grupo A', 'Campo 1', '13:00', 'marcado', nunes, boss),
     m('m-8', 'F4', 'Grupo B', 'Campo 2', '13:00', 'marcado', tapia, barao),
   ]
+  // localStorage.mockTUnscheduled = 'true' — quatro jogos acabados de
+  // sortear, sem hora nem campo, como a draw_category os deixa (#487).
+  if (localStorage.getItem('mockTUnscheduled') === 'true') {
+    const semHora = (id, code, group, a, b) => ({
+      ...m(id, code, group, null, '10:00', 'marcado', a, b), scheduled_at: null, court: null,
+      category_id: `cat-${code.toLowerCase()}`, stage: 'grupo',
+    })
+    MATCHES = [
+      ...MATCHES,
+      semHora('u-1', 'M4', 'Grupo A', barros, lima),
+      semHora('u-2', 'M4', 'Grupo A', gomes, nunes),
+      semHora('u-3', 'M4', 'Grupo B', santos, boss),
+      semHora('u-4', 'F4', 'Grupo C', tapia, barao),
+    ]
+  }
 }
 
 const SCOREKEEPERS = [
@@ -342,6 +361,20 @@ export const TOURNAMENT_SCORE_RPC_MOCKS = {
       corrected_by_name: m.status === 'terminado' ? 'Admin (Dev)' : null,
     } : m))
     return null
+  },
+  // Quem está no ensaio de admin pode marcar (#487).
+  can_score_tournament: () => on(),
+  // Grava as horas propostas, como a save_match_schedule: hora com fuso e
+  // o campo pelo nome (#487).
+  save_match_schedule: (params) => {
+    if (!MATCHES) resetMatches()
+    const slots = new Map((params?.p_slots || []).map((sl) => [sl.match_id, sl]))
+    MATCHES = MATCHES.map((m) => (slots.has(m.match_id) ? {
+      ...m,
+      scheduled_at: new Date(slots.get(m.match_id).starts_at).toISOString(),
+      court: slots.get(m.match_id).court || m.court,
+    } : m))
+    return slots.size
   },
   reschedule_match: (params) => {
     if (!MATCHES) resetMatches()
