@@ -123,6 +123,14 @@ export default function ClubProfile() {
       })
   }, [club?.id, club?.kind, isLessonsEnabled])
 
+  // Os mixes da página abrem a página do mix, onde a pessoa se inscreve
+  // (Trello #535). Só para quem é membro: quem não é não consegue ler o mix
+  // (a regra da base de dados) e ia dar a «não encontrado» — o caminho dele
+  // é primeiro entrar no clube, com o botão desta página.
+  const MixCardBox = ({ game, children }) => (club?.my_status === 'member'
+    ? <Link to={`/jogo/${game.id}`} className="card press block hover:shadow-lift">{children}</Link>
+    : <div className="card">{children}</div>)
+
   const handleRequestJoinGroup = async (group) => {
     setGroupActingOn(group.id)
     try {
@@ -397,7 +405,7 @@ export default function ClubProfile() {
         ) : (
           <div className="space-y-3">
             {club.open_games.map((game) => (
-              <div key={game.id} className="card">
+              <MixCardBox key={game.id} game={game}>
                 <h4 className="font-extrabold text-ink-900">{game.title}</h4>
                 <p className="text-sm text-muted">
                   {formatDate(game.date, i18n.language, { day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' })}
@@ -410,7 +418,7 @@ export default function ClubProfile() {
                 <p className="flex items-center gap-1.5 text-sm text-muted mt-1">
                   <Users size={13} /> {t('clubprofile.players_ratio', { count: game.confirmed_count, max: game.max_players })}
                 </p>
-              </div>
+              </MixCardBox>
             ))}
           </div>
         )}
@@ -575,7 +583,7 @@ export default function ClubProfile() {
         ) : (
           <div className="space-y-3">
             {club.open_games.map((game) => (
-              <div key={game.id} className="card">
+              <MixCardBox key={game.id} game={game}>
                 <h4 className="font-extrabold text-ink-900">{game.title}</h4>
                 <p className="text-sm text-muted">
                   {formatDate(game.date, i18n.language, { day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' })}
@@ -588,7 +596,7 @@ export default function ClubProfile() {
                 <p className="flex items-center gap-1.5 text-sm text-muted mt-1">
                   <Users size={13} /> {t('clubprofile.players_ratio', { count: game.confirmed_count, max: game.max_players })}
                 </p>
-              </div>
+              </MixCardBox>
             ))}
           </div>
         )}
