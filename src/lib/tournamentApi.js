@@ -113,6 +113,22 @@ export async function deleteTournament(tournamentId) {
   if (error) throw error
 }
 
+/** Fecha uma categoria: dá os pontos de ranking e grava o pódio (Trello
+ *  #485). Quando a última categoria fecha, o torneio passa a terminado
+ *  sozinho — não há botão para isso. Com final, o pódio sai dos resultados
+ *  e o que vai aqui ignora-se; só grupos, é o ecrã que diz quem ficou em
+ *  cada lugar (o desempate vive em tournamentFormat.js). */
+export async function finishCategory(categoryId, { champion = null, runnerUp = null, third = null } = {}) {
+  const { data, error } = await supabase.rpc('finish_category', {
+    p_category_id: categoryId,
+    p_champion: champion,
+    p_runner_up: runnerUp,
+    p_third: third,
+  })
+  if (error) throw error
+  return data
+}
+
 /** O fim do torneio (print 12): quem ganhou cada categoria e o que a pessoa
  *  que está a ver levou de lá.
  *
