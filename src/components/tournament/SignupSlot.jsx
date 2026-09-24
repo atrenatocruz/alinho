@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Copy } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -9,7 +10,7 @@ import TournamentSignupSheet from './TournamentSignupSheet'
 import PublicInfo from './PublicInfo'
 import {
   signUp, respondToInvite, listMyInvites, withdrawEntry,
-  entriesOpen, categoriesLeft, tournamentInviteLink,
+  entriesOpen, categoriesLeft, tournamentInviteLink, canScoreTournament,
 } from '../../lib/tournamentSignup'
 import { signUpBackLink } from '../../lib/loginLinks'
 import { signupErrorMessage } from '../../lib/tournamentError'
@@ -49,6 +50,19 @@ export default function SignupSlot({ tournament, categories, category, my: first
       .catch((err) => console.error('Error loading tournament invites:', err))
   }
   useEffect(reloadInvites, [user, tournament.id])
+
+  // Quem marca resultados vê o caminho para a página de marcar, a partir do
+  // sorteio (Trello #487). Antes só havia link no Gerir, para quem organiza.
+  const scoringOpen = ['sorteado', 'a_decorrer'].includes(tournament.status)
+  const [canScore, setCanScore] = useState(false)
+  useEffect(() => {
+    if (!user || !scoringOpen) { setCanScore(false); return }
+    let cancelled = false
+    canScoreTournament(tournament.id)
+      .then((ok) => { if (!cancelled) setCanScore(ok) })
+      .catch(() => { if (!cancelled) setCanScore(false) })
+    return () => { cancelled = true }
+  }, [user, tournament.id, scoringOpen])
 
   const open = entriesOpen(tournament, null)
   const left = categoriesLeft(tournament, myEntries)
@@ -127,6 +141,16 @@ export default function SignupSlot({ tournament, categories, category, my: first
 
   return (
     <div className="space-y-2.5">
+      {canScore && (
+        <div className="card flex items-center justify-between gap-3">
+          <p className="min-w-0 text-sm font-semibold text-ink-900">{t('tournament.score.link_title')}</p>
+          <Link to={`/torneio/${tournament.slug || tournament.id}/marcar`}
+            className="inline-flex min-h-[44px] shrink-0 items-center rounded-full bg-ink-900 px-4 text-sm font-bold text-white">
+            {t('tournament.score.link_cta')}
+          </Link>
+        </div>
+      )}
+
       {/* Pedido do parceiro à minha espera — o mais urgente fica em cima. */}
       {invites.map((inv) => (
         <div key={inv.entry_id} className="card space-y-2">
