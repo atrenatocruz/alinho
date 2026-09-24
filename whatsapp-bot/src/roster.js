@@ -83,10 +83,15 @@ export async function loadGame(gameId) {
 
   const FALLBACK_PERSON = { name: 'Jogador', rating: null, gender: null }
   const people = []
+  // Quem entrou em dupla leva o número da dupla (1, 2, …) — é o «(1)» à
+  // frente dos dois nomes que os clubes já escreviam à mão nas listas do
+  // WhatsApp (A2N, 24 set). Quem entrou sozinho não leva nada.
+  let pairNumber = 0
   for (const row of participants) {
-    people.push(profilesById.get(row.user_id) || FALLBACK_PERSON)
+    const pair = row.partner_id ? ++pairNumber : null
+    people.push({ ...(profilesById.get(row.user_id) || FALLBACK_PERSON), pair })
     if (row.partner_id) {
-      people.push(profilesById.get(row.partner_id) || FALLBACK_PERSON)
+      people.push({ ...(profilesById.get(row.partner_id) || FALLBACK_PERSON), pair })
     }
   }
 
@@ -241,9 +246,13 @@ export function buildMixMessage({ game, people, capacity, suplentes = [] }, { la
       // Nome completo + banda Elo — abreviar deixava "Ruben M." ambíguo
       // num grupo com dois Rubens M.
       const person = people[i]
-      lines.push(person ? `${i + 1}. 🎾 ${nameWithBand(person)}` : `${i + 1}. 🎾 (vaga livre)`)
+      const pairTag = person?.pair ? ` (${person.pair})` : ''
+      lines.push(person ? `${i + 1}. 🎾 ${nameWithBand(person)}${pairTag}` : `${i + 1}. 🎾 (vaga livre)`)
     }
     lines.push('')
+    if (people.some((person) => person.pair)) {
+      lines.push('_(1), (2)… = inscritos em dupla_')
+    }
     if (people.length >= capacity) {
       lines.push('✅ *Mix completo!*')
     } else if (label) {
@@ -252,6 +261,10 @@ export function buildMixMessage({ game, people, capacity, suplentes = [] }, { la
       )
     } else {
       lines.push(`🙋 Escreve *In* ou *Alinho* para entrares, *Out* ou *Fora* para saíres`)
+    }
+    // Duplas fixas: dá para entrar já com o parceiro (commands.js, joinAsPair).
+    if (!game.rotate_partners && capacity - people.length >= 2) {
+      lines.push(`🤝 Em dupla: *In${label ? ` ${label}` : ''} com* e o nome do parceiro, ou *In @parceiro*`)
     }
     if (suplentes.length > 0) {
       lines.push(`👥 *Suplentes:* ${suplentes.map(nameWithBand).join(', ')}`)

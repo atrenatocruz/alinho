@@ -136,9 +136,50 @@ export async function connectWhatsApp({ onGroupMessage }) {
         // though it isn't the official Business API.
         const quotedStanzaId = msg.message.extendedTextMessage?.contextInfo?.stanzaId ?? null
 
-        onGroupMessage({ groupJid, senderJid, senderPn, text, key: msg.key, message: msg, quotedStanzaId })
+        // Quem foi mencionado (@) — é assim que se diz ao bot quem é o
+        // parceiro («In @João»). Só se procura o número quando há menções,
+        // para a conversa normal do grupo não custar nada.
+        const mentionedJids = msg.message.extendedTextMessage?.contextInfo?.mentionedJid ?? []
+        const deliver = (mentionedPns) =>
+          onGroupMessage({ groupJid, senderJid, senderPn, text, key: msg.key, message: msg, quotedStanzaId, mentionedJids, mentionedPns })
+        if (mentionedJids.length === 0) {
+          deliver([])
+        } else {
+          Promise.all(mentionedJids.map((jid) => resolveMentionPn(groupJid, jid)))
+            .then(deliver)
+            .catch((err) => {
+              logger.error({ err }, 'Failed to resolve mentions')
+              deliver(mentionedJids.map(() => null))
+            })
+        }
       }
     })
+  }
+
+  /**
+   * O número (JID @s.whatsapp.net) de quem foi mencionado, ou null se o
+   * WhatsApp não o deixar saber. Num grupo com números escondidos a menção
+   * chega como @lid: tenta-se o mapa LID→número do Baileys (versões novas) e
+   * depois a lista de participantes do grupo. Sem número não há como
+   * encontrar a pessoa (o perfil guarda o telemóvel, não o LID) — quem chama
+   * pede então o nome.
+   */
+  async function resolveMentionPn(groupJid, jid) {
+    if (!jid) return null
+    if (jid.endsWith('@s.whatsapp.net')) return jid
+    if (!jid.endsWith('@lid')) return null
+    try {
+      const mapped = await sock?.signalRepository?.lidMapping?.getPNForLID?.(jid)
+      if (typeof mapped === 'string' && mapped.endsWith('@s.whatsapp.net')) return mapped
+    } catch { /* versão do Baileys sem o mapa — segue para os participantes */ }
+    try {
+      const metadata = await sock.groupMetadata(groupJid)
+      const p = metadata.participants.find((x) => x.id === jid || x.lid === jid)
+      const pn = [p?.jid, p?.phoneNumber, p?.id].find((x) => typeof x === 'string' && x.endsWith('@s.whatsapp.net'))
+      return pn ?? null
+    } catch {
+      return null
+    }
   }
 
   await start()

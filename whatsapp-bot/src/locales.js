@@ -21,16 +21,23 @@ const pt = {
 Para entrares num mix:
 • *Alinho* / *In* / *Dentro* / *Estou dentro*
 
+Para entrares já em dupla (só nos mixes de duplas fixas):
+• *In com João Silva* — o nome como está na app
+• ou *In @João* — menciona o teu parceiro
+Se ele ainda não estiver na app, o bot inscreve-o como convidado (só com a menção @). A dupla aparece na lista com o mesmo número à frente dos dois nomes, ex.: *(1)*.
+
 Para saíres de um mix:
 • *Out* / *Fora* / *Estou fora* / *Saio*
+(Quem inscreveu a dupla sai com a dupla toda. Se foste inscrito por um parceiro, sai pela app 📱)
+
+Para veres os mixes abertos, com as vagas de cada um:
+• */mix*
 
 Se houver mais do que um mix aberto ao mesmo tempo, cada um tem a sua própria mensagem e um número (🔢 01, 02...). Para dizer a qual te referes:
 • Responde à mensagem desse mix com *In* ou *Out*
-• Ou escreve *In 01*, *In segunda*, *In m4* — dá para combinar, ex.: *In segunda m4*
+• Ou escreve *In 01*, *In segunda*, *In m4* — dá para combinar, ex.: *In segunda m4* ou *In 01 com João*
 
-Escreve *mix* para ver a lista dos mixes abertos sem entrar em nenhum.
-
-Se o mix estiver cheio, o bot pergunta se queres entrar como suplente — responde *Sim* ou *Não*. Quando alguém sair, o primeiro suplente entra automaticamente.
+Se o mix estiver cheio, o bot pergunta se queres entrar como suplente — responde *Sim* ou *Não*. Quando alguém sair, o primeiro suplente entra automaticamente. (Em dupla não há suplentes: a dupla precisa de duas vagas livres.)
 
 Para veres esta lista:
 • */help*`,
@@ -71,14 +78,30 @@ Para veres esta lista:
   already_joined: '🤖 Já estás inscrito neste mix! 🎾',
   mix_full_offer_waitlist: '🤖 Mix cheio! Queres entrar como suplente? Responde com *Sim* ou *Não*.',
   guest_joined: '🤖 Fixe, {{name}}! Inscrevi-te como convidado 🎾 Regista-te em {{appUrl}} para veres o teu histórico, o dos teus amigos, e desbloquear recompensas.',
-  partner_joined_use_app: '🤖 Inscreveste-te em dupla pela app — para sair, usa a app 📱',
+  partner_joined_use_app: '🤖 Estás inscrito em dupla por outra pessoa — quem inscreveu a dupla pode tirá-la com *Out*, ou sai tu pela app 📱',
   waitlisted_use_app: '🤖 Estás na lista de suplentes — para sair, usa a app 📱',
   not_joined: '🤖 Não estás inscrito neste mix.',
   mix_identifier_not_found: '🤖 Não encontrei nenhum mix aberto com isso. Escreve *mix* para veres a lista dos mixes abertos.',
-  mix_list: '🤖 Há {{count}} mixes abertos:\n\n{{list}}\n\nEscreve *In* seguido do número, dia, hora ou nível para entrares num deles (ex.: *In 01*, *In segunda*).',
+  mix_list: '🤖 Mixes abertos ({{count}}):\n\n{{list}}\n\nEscreve *In* seguido do número, dia, hora ou nível para entrares (ex.: *In 01*, *In segunda*). Em dupla: *In 01 com* e o nome, ou *In 01 @parceiro*.',
   disambiguate_in: '🤖 Há vários mixes abertos! Qual deles?\n\n{{list}}\n\nResponde à mensagem do mix que queres com *In*, ou escreve *In* seguido do número, dia, hora ou nível (ex.: *In 01*, *In segunda m4*).',
   not_in_any_open_mix: '🤖 Não estás inscrito em nenhum mix aberto.',
   disambiguate_out: '🤖 Estás inscrito em vários mixes! De qual queres sair?\n\n{{list}}\n\nResponde à mensagem do mix que queres com *Out*, ou escreve *Out* seguido do número, dia, hora ou nível (ex.: *Out 01*).',
+  // commands.js — «/mix» e entrar em dupla (A2N, 24 set)
+  mix_list_spots: '👥 {{filled}}/{{capacity}}',
+  mix_list_fixed_pairs: ' · duplas fixas 🤝',
+  disambiguate_in_pair: '🤖 Há vários mixes abertos! Em qual querem entrar?\n\n{{list}}\n\nEscreve o número e o parceiro outra vez (ex.: *In 01 com João* ou *In 01 @João*).',
+  partner_not_fixed_pairs: '🤖 Neste mix os parceiros trocam a cada ronda — não há duplas fixas. Entra sozinho com *In* 🎾',
+  mix_full_pair: '🤖 O mix está cheio — não há vagas para uma dupla. Podes entrar sozinho como suplente com *In*.',
+  mix_one_spot_pair: '🤖 Só há 1 vaga neste mix — não cabe uma dupla. Podes entrar sozinho com *In*.',
+  partner_one_mention: '🤖 Menciona só uma pessoa — o teu parceiro 🤝',
+  partner_mention_unreadable: '🤖 Não consegui saber quem mencionaste 😅 Escreve *In com* e o nome do teu parceiro como está na app (ex.: *In com João Silva*).',
+  partner_not_found: '🤖 Não encontrei ninguém no clube com o nome «{{name}}». Escreve o nome como está na app, ou menciona a pessoa com @.',
+  partner_not_found_app: '🤖 Não consegui inscrever o teu parceiro. Inscreve a dupla pela app: {{appUrl}}',
+  partner_ambiguous: '🤖 Há mais do que uma pessoa com «{{name}}»:\n{{list}}\n\nEscreve o nome completo (ex.: *In com {{example}}*) ou menciona a pessoa com @.',
+  partner_is_you: '🤖 Não podes ser o teu próprio parceiro 😄 Escolhe outra pessoa.',
+  partner_already_in: '🤖 {{name}} já está inscrito neste mix.',
+  partner_guest_default_name: 'Parceiro de {{name}}',
+  pair_partner_guest_created: '🤖 🤝 Dupla inscrita! Criei um perfil de convidado para *{{partner}}* — para ter o histórico e o ranking, pode registar-se em {{appUrl}} com este número.',
 }
 
 const en = {
@@ -88,16 +111,23 @@ const en = {
 To join a mix:
 • *Alinho* / *In* / *Dentro* / *Estou dentro*
 
+To join straight away as a pair (fixed-pair mixes only):
+• *In com João Silva* — the name as it appears in the app
+• or *In @João* — mention your partner
+If they're not on the app yet, the bot signs them up as a guest (only with the @ mention). The pair shows up on the list with the same number next to both names, e.g. *(1)*.
+
 To leave a mix:
 • *Out* / *Fora* / *Estou fora* / *Saio*
+(Whoever signed up the pair leaves with the whole pair. If a partner signed you up, leave through the app 📱)
+
+To see the open mixes and their free spots:
+• */mix*
 
 If more than one mix is open at the same time, each one gets its own message and a number (🔢 01, 02...). To say which one you mean:
 • Reply to that mix's message with *In* or *Out*
-• Or type *In 01*, *In segunda* (weekday), *In m4* (level) — you can combine them, e.g. *In segunda m4*
+• Or type *In 01*, *In segunda* (weekday), *In m4* (level) — you can combine them, e.g. *In segunda m4* or *In 01 com João*
 
-Type *mix* to see the list of open mixes without joining any of them.
-
-If the mix is full, the bot asks if you want to join as a substitute — reply *Sim* or *Não*. When someone leaves, the first substitute joins automatically.
+If the mix is full, the bot asks if you want to join as a substitute — reply *Sim* or *Não*. When someone leaves, the first substitute joins automatically. (Pairs have no substitute list: a pair needs two free spots.)
 
 To see this list:
 • */help*`,
@@ -138,14 +168,29 @@ To see this list:
   already_joined: "🤖 You're already signed up for this mix! 🎾",
   mix_full_offer_waitlist: '🤖 Mix is full! Want to join the waitlist? Reply *Sim* or *Não*.',
   guest_joined: "🤖 Nice one, {{name}}! You're in as a guest 🎾 Sign up at {{appUrl}} to see your history, your friends', and unlock rewards.",
-  partner_joined_use_app: '🤖 You joined as a pair through the app — to leave, use the app 📱',
+  partner_joined_use_app: '🤖 Someone else signed you up as a pair — whoever signed up the pair can take it off with *Out*, or leave through the app 📱',
   waitlisted_use_app: "🤖 You're on the waitlist — to leave, use the app 📱",
   not_joined: "🤖 You're not signed up for this mix.",
   mix_identifier_not_found: "🤖 I couldn't find any open mix matching that. Type *mix* to see the list of open mixes.",
-  mix_list: '🤖 There are {{count}} mixes open:\n\n{{list}}\n\nType *In* followed by the number, weekday, time or level to join one (e.g. *In 01*, *In segunda*).',
+  mix_list: '🤖 Open mixes ({{count}}):\n\n{{list}}\n\nType *In* followed by the number, weekday, time or level to join (e.g. *In 01*, *In segunda*). As a pair: *In 01 com* and the name, or *In 01 @partner*.',
   disambiguate_in: '🤖 There are several mixes open! Which one?\n\n{{list}}\n\nReply to the mix you want with *In*, or type *In* followed by the number, weekday, time or level (e.g. *In 01*, *In segunda m4*).',
   not_in_any_open_mix: "🤖 You're not signed up for any open mix.",
   disambiguate_out: "🤖 You're signed up for several mixes! Which one do you want to leave?\n\n{{list}}\n\nReply to the mix you want with *Out*, or type *Out* followed by the number, weekday, time or level (e.g. *Out 01*).",
+  mix_list_spots: '👥 {{filled}}/{{capacity}}',
+  mix_list_fixed_pairs: ' · fixed pairs 🤝',
+  disambiguate_in_pair: '🤖 There are several mixes open! Which one do you both want to join?\n\n{{list}}\n\nType the number and your partner again (e.g. *In 01 com João* or *In 01 @João*).',
+  partner_not_fixed_pairs: '🤖 In this mix partners rotate every round — there are no fixed pairs. Join on your own with *In* 🎾',
+  mix_full_pair: "🤖 The mix is full — there's no room for a pair. You can join on your own as a substitute with *In*.",
+  mix_one_spot_pair: "🤖 There's only 1 spot left — not enough for a pair. You can join on your own with *In*.",
+  partner_one_mention: '🤖 Mention just one person — your partner 🤝',
+  partner_mention_unreadable: "🤖 I couldn't tell who you mentioned 😅 Type *In com* and your partner's name as it appears in the app (e.g. *In com João Silva*).",
+  partner_not_found: "🤖 I couldn't find anyone in the club called «{{name}}». Type the name as it appears in the app, or mention them with @.",
+  partner_not_found_app: "🤖 I couldn't sign up your partner. Sign up the pair through the app: {{appUrl}}",
+  partner_ambiguous: '🤖 More than one person matches «{{name}}»:\n{{list}}\n\nType the full name (e.g. *In com {{example}}*) or mention them with @.',
+  partner_is_you: "🤖 You can't be your own partner 😄 Pick someone else.",
+  partner_already_in: '🤖 {{name}} is already signed up for this mix.',
+  partner_guest_default_name: "{{name}}'s partner",
+  pair_partner_guest_created: '🤖 🤝 Pair signed up! I created a guest profile for *{{partner}}* — to keep their history and ranking, they can sign up at {{appUrl}} with this number.',
 }
 
 const DICTS = { pt, en }
