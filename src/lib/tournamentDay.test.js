@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { dayKeyInTz, msUntilNextDay, hhmmInTz, TOURNAMENT_TZ } from './tournamentDay'
+import { dayKeyInTz, msUntilNextDay, hhmmInTz, TOURNAMENT_TZ, localInputToIso, isoToLocalInput } from './tournamentDay'
 
 describe('dayKeyInTz — o dia como o servidor o conta', () => {
   it('00h30 de sabado em Almada e sabado, nao sexta', () => {
@@ -67,5 +67,57 @@ describe('hhmmInTz — a hora como está no pavilhão (#487)', () => {
   it('sem hora, ou hora estragada, não mostra nada', () => {
     expect(hhmmInTz(null)).toBe('')
     expect(hhmmInTz('não é hora')).toBe('')
+  })
+})
+
+describe('prazo das inscrições com fuso (#487)', () => {
+  // Hora de LISBOA, seja qual for o fuso da máquina ou do telemóvel: a hora
+  // de um torneio é a do sítio do torneio. Por isso os valores são exactos.
+
+  it('23:59 de verão em Lisboa é 22:59 UTC', () => {
+    expect(localInputToIso('2026-10-05T23:59')).toBe('2026-10-05T22:59:00.000Z')
+  })
+
+  it('no inverno Lisboa está em UTC', () => {
+    expect(localInputToIso('2026-12-10T21:00')).toBe('2026-12-10T21:00:00.000Z')
+  })
+
+  it('era este o erro: tratar a hora escrita como se fosse UTC', () => {
+    expect(localInputToIso('2026-10-05T23:59')).not.toBe('2026-10-05T23:59:00.000Z')
+  })
+
+  it('ao editar mostra na hora de Lisboa o que veio da base de dados', () => {
+    expect(isoToLocalInput('2026-10-05T22:59:00+00:00')).toBe('2026-10-05T23:59')
+    // e o que a base de dados guardou mal antes da correção aparece como é:
+    // 00:59 do dia seguinte — que é o que o organizador tem de ver para o acertar
+    expect(isoToLocalInput('2026-10-05T23:59:00+00:00')).toBe('2026-10-06T00:59')
+  })
+
+  it('a mudança de hora: no dia em que os relógios atrasam, o fim do dia continua certo', () => {
+    // 25 out 2026 às 23:00 em Lisboa já é inverno (UTC+0)
+    expect(localInputToIso('2026-10-25T23:00')).toBe('2026-10-25T23:00:00.000Z')
+    // e às 10:00 do dia anterior ainda é verão (UTC+1)
+    expect(localInputToIso('2026-10-24T10:00')).toBe('2026-10-24T09:00:00.000Z')
+  })
+
+  it('ida e volta devolve o que se escreveu', () => {
+    for (const v of ['2026-10-05T23:59', '2026-12-10T21:00', '2026-10-25T23:00']) {
+      expect(isoToLocalInput(localInputToIso(v))).toBe(v)
+    }
+  })
+
+  it('não depende do fuso da máquina: o relógio é o que se lhe passa', () => {
+    // Se a conta usasse o fuso da máquina (Lisboa, onde estes testes correm),
+    // com Nova Iorque dava o mesmo que com Lisboa. Não dá.
+    expect(localInputToIso('2026-10-05T23:59', 'America/New_York')).toBe('2026-10-06T03:59:00.000Z')
+    expect(isoToLocalInput('2026-10-06T03:59:00Z', 'America/New_York')).toBe('2026-10-05T23:59')
+    expect(localInputToIso('2026-10-05T23:59', 'Asia/Tokyo')).toBe('2026-10-05T14:59:00.000Z')
+  })
+
+  it('vazio ou lixo fica vazio', () => {
+    expect(localInputToIso('')).toBe(null)
+    expect(localInputToIso('amanhã')).toBe(null)
+    expect(isoToLocalInput(null)).toBe('')
+    expect(isoToLocalInput('não é data')).toBe('')
   })
 })
