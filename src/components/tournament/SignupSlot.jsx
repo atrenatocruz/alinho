@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Copy } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
-import { PrimaryButton } from '../ui'
+import { ConfirmSheet, PrimaryButton } from '../ui'
 import { Sheet } from '../agenda/AgendaControls'
 import { whatsappShare } from '../../lib/partnerInvite'
 import TournamentSignupSheet from './TournamentSignupSheet'
@@ -40,6 +40,7 @@ export default function SignupSlot({ tournament, categories, category, my: first
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [fresh, setFresh] = useState(null) // convite acabado de criar
+  const [askLeave, setAskLeave] = useState(false)
 
   const reloadInvites = () => {
     if (!user) return
@@ -113,17 +114,12 @@ export default function SignupSlot({ tournament, categories, category, my: first
     finally { setBusy(false) }
   }
 
+  // Desistir pergunta na folha da app, não na caixa do telemóvel (#435).
+  // Se falhar, o erro fica na folha, junto ao botão que falhou.
   const leave = async () => {
-    if (!window.confirm(t('tsignup.withdraw_confirm'))) return
-    setBusy(true); setError('')
-    try {
-      await withdrawEntry(my.entry_id)
-    } catch (err) {
-      console.error('Error withdrawing from tournament:', err); say(err)
-      return
-    } finally { setBusy(false) }
-    // Fora do try: se recarregar a página falhar, isso não é "não conseguiste
-    // desistir" — a desistência já está gravada (Trello #429).
+    await withdrawEntry(my.entry_id)
+    // Depois de gravada: se recarregar a página falhar, isso não é «não
+    // conseguiste desistir» — a desistência já está feita (Trello #429).
     window.dispatchEvent(new CustomEvent('tournament:reload'))
   }
 
@@ -158,7 +154,7 @@ export default function SignupSlot({ tournament, categories, category, my: first
             {my.state === 'suplente' && <p className="text-sm text-muted">{t('tsignup.state_waitlist_hint')}</p>}
           </div>
           {open && (
-            <button onClick={leave} disabled={busy} className="press text-sm font-extrabold text-ink-900 underline shrink-0">
+            <button onClick={() => setAskLeave(true)} disabled={busy} className="press text-sm font-extrabold text-ink-900 underline shrink-0">
               {t('tsignup.withdraw')}
             </button>
           )}
@@ -236,6 +232,22 @@ export default function SignupSlot({ tournament, categories, category, my: first
           </div>
         </Sheet>
       )}
+      <ConfirmSheet
+        open={askLeave}
+        danger
+        title={t('tsignup.withdraw_title', { category: category?.name || '' })}
+        // Quem inscreveu a dupla leva-a toda; quem foi convidado sai sozinho.
+        // `registered_by_me` vem da migração do Dev 3 — enquanto não correr,
+        // não vem, e a frase diz os dois casos.
+        message={t(my?.registered_by_me === true ? 'tsignup.withdraw_consequence_mine'
+          : my?.registered_by_me === false ? 'tsignup.withdraw_consequence_invited'
+            : 'tsignup.withdraw_consequence')}
+        cancelLabel={t('tsignup.withdraw_keep')}
+        confirmLabel={t('tsignup.withdraw_yes')}
+        onConfirm={leave}
+        onClose={() => setAskLeave(false)}
+        errorOf={(err) => signupErrorMessage(t, err)}
+      />
     </div>
   )
 }

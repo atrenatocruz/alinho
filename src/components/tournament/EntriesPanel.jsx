@@ -5,7 +5,7 @@ import { supabase } from '../../lib/supabase'
 import { searchPlayers } from '../../lib/privateMatches'
 import { useAuth } from '../../contexts/AuthContext'
 import { Sheet } from '../agenda/AgendaControls'
-import { Avatar, PrimaryButton, EmptyState } from '../ui'
+import { Avatar, ConfirmSheet, PrimaryButton, EmptyState } from '../ui'
 import { partnerNameError, partnerEmailError } from '../../lib/partnerInvite'
 import { listEntries, validateEntry, removeEntry, adminSignUp, tournamentInviteLink, inviteToken, whoIsAlreadyIn } from '../../lib/tournamentSignup'
 import { whatsappShare } from '../../lib/partnerInvite'
@@ -244,6 +244,7 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
   const [filter, setFilter] = useState('all')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [askRemove, setAskRemove] = useState(null) // a inscrição a tirar
   const [addOpen, setAddOpen] = useState(false)
 
   const load = () => {
@@ -422,7 +423,7 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
                     </button>
                   )}
                   <button
-                    onClick={() => window.confirm(t('tentries.remove_confirm')) && act(() => removeEntry(e.entry_id))}
+                    onClick={() => { setError(''); setAskRemove(e) }}
                     disabled={busy}
                     aria-label={t('tentries.remove')}
                     className="press flex h-9 w-9 items-center justify-center rounded-full bg-ink-50 text-muted"
@@ -435,6 +436,19 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
           ))}
         </div>
       )}
+
+      {/* Tirar uma dupla pergunta na folha da app (#435). */}
+      <ConfirmSheet
+        open={!!askRemove}
+        danger
+        title={t('tentries.remove_title', { name: askRemove ? (askRemove.team_name || pairName(askRemove, t)) : '', category: category.name })}
+        message={t('tentries.remove_consequence')}
+        cancelLabel={t('tentries.remove_keep')}
+        confirmLabel={t('tentries.remove_yes')}
+        onConfirm={async () => { await removeEntry(askRemove.entry_id); load() }}
+        onClose={() => setAskRemove(null)}
+        errorOf={(err) => signupErrorMessage(t, err)}
+      />
 
       {addOpen && (
         <AdminEntrySheet

@@ -228,7 +228,10 @@ const RPC_MOCKS = {
         ...c, status: 'inscricoes', entry_count: i === 1 ? c.slots : Math.max(0, (c.slots || 0) - 4 - i * 2),
       })),
       tournament: { ...page.tournament, status: 'inscricoes', entries_deadline: soon },
-      my: { in: { category_id: 'cat-m4', state: 'por_validar', entry_id: 'ent-me' },
+      // mockTByMe = 'true' | 'false': quem inscreveu a dupla (registered_by_me,
+      // migração do Dev 3). Sem ele, o campo não vem — como antes de correr.
+      my: { in: { category_id: 'cat-m4', state: 'por_validar', entry_id: 'ent-me',
+                  ...(localStorage.getItem('mockTByMe') ? { registered_by_me: localStorage.getItem('mockTByMe') === 'true' } : {}) },
             waitlist: { category_id: 'cat-m4', state: 'suplente', entry_id: 'ent-me' } }[mode] || null,
     }
   },

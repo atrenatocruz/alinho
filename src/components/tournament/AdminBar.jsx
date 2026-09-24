@@ -20,6 +20,7 @@ import { describeError } from '../../lib/errors'
 import { canDelete, TOURNAMENT_TZ } from '../../lib/tournaments'
 import { MonoLabel, StatePill } from './TournamentBits'
 import CloseCategories from './CloseCategories'
+import { ConfirmSheet } from '../ui'
 
 /** O passo seguinte de cada estado. Do sorteio em diante não se anda à mão:
  *  é o que a `set_tournament_status` deixa fazer, e a barra não promete o
@@ -52,6 +53,8 @@ export default function AdminBar({ tournament, onChanged, onEdit, onDraw }) {
   const navigate = useNavigate()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
+  // Perguntas na folha da app, não na caixa do telemóvel (#435).
+  const [ask, setAsk] = useState(null) // null | 'delete'
 
   const status = tournament?.status
   const next = NEXT_STEP[status]
@@ -68,16 +71,10 @@ export default function AdminBar({ tournament, onChanged, onEdit, onDraw }) {
   // existe, se está noutro sítio, ou se está trancada.
   const deletable = canDelete(tournament)
 
+  // Se apagar falhar, o erro fica na folha (ConfirmSheet), junto ao botão.
   const remove = async () => {
-    if (!window.confirm(t('tournament.admin.delete_message', { name: tournament.name }))) return
-    setBusy(true); setError(null)
-    try {
-      await deleteTournament(tournament.id)
-      navigate('/gerir')
-    } catch (err) {
-      console.error('Error deleting tournament:', err)
-      setError(describeError(t, err)); setBusy(false)
-    }
+    await deleteTournament(tournament.id)
+    navigate('/gerir')
   }
 
   const go = async (to) => {
@@ -93,12 +90,10 @@ export default function AdminBar({ tournament, onChanged, onEdit, onDraw }) {
     }
   }
 
-  const draw = () => {
-    // O sorteio é a última porta, e tem de o dizer em português antes de se
-    // atravessar: daqui para a frente não se reabrem inscrições.
-    if (!window.confirm(t('tournament.admin.confirm_draw'))) return
-    onDraw?.()
-  }
+  // Sem pergunta (designer, 24 set — regra 1 do #435): este botão só abre o
+  // ecrã do sorteio, que mostra tudo e pede confirmação antes de gravar.
+  // Perguntar duas vezes ensina a carregar em «sim» sem ler.
+  const draw = () => onDraw?.()
 
   return (
     <div className="rounded-card border border-line bg-ink-50/60 p-3">
@@ -171,7 +166,7 @@ export default function AdminBar({ tournament, onChanged, onEdit, onDraw }) {
         <p className="mt-2 text-[11.5px] text-ink-500">{t('tournament.admin.no_step')}</p>
       )}
       {deletable ? (
-        <button type="button" disabled={busy} onClick={remove}
+        <button type="button" disabled={busy} onClick={() => setAsk('delete')}
           className="mt-2 inline-flex items-center gap-1.5 rounded-ctrl border border-line bg-canvas px-3 py-2 text-[12px] font-bold text-danger disabled:opacity-50">
           <Trash2 size={14} /> {t('tournament.admin.delete')}
         </button>
@@ -179,6 +174,18 @@ export default function AdminBar({ tournament, onChanged, onEdit, onDraw }) {
         <p className="mt-1.5 text-[11.5px] text-ink-500">{t('tournament.admin.cannot_delete')}</p>
       )}
       {error && <p className="mt-2 text-[12px] text-danger">{error}</p>}
+
+      <ConfirmSheet
+        open={ask === 'delete'}
+        danger
+        title={t('tournament.admin.delete_title_named', { name: tournament?.name })}
+        message={t('tournament.admin.delete_consequence')}
+        cancelLabel={t('tournament.admin.delete_keep')}
+        confirmLabel={t('tournament.admin.delete_yes')}
+        onConfirm={remove}
+        onClose={() => setAsk(null)}
+        errorOf={(err) => describeError(t, err)}
+      />
     </div>
   )
 }

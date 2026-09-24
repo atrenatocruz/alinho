@@ -953,6 +953,92 @@ export function DangerConfirmModal({ open, title, message, emphasis, confirmLabe
   )
 }
 
+/* ─── ConfirmSheet ───────────────────────────────────────────────────────
+   A pergunta da app, no lugar do confirm() do telemóvel (Trello #435,
+   desenho aprovado pelo Francisco a 24 set — design-handoff/2026-09-24-
+   janelas-perguntas-avisos). Folha que sobe de baixo, com a app escurecida.
+
+   Regras do desenho, que este componente guarda para quem o usa:
+     · só se pergunta quando a ação estraga ou não volta atrás;
+     · `title` é a pergunta COM o nome da coisa («Desistir de Masculinos 4?»),
+       `message` é UMA linha com a consequência real;
+     · os botões dizem a ação — nunca «OK», nunca «Tens a certeza?»;
+     · `danger` (estraga): o que NÃO estraga vem primeiro, a preto e a toda
+       a largura («Não desisto»), e o risco por baixo, a vermelho com
+       contorno («Sim, desisto»);
+     · sem `danger`: a ação a preto e, por baixo, «Agora não» em texto.
+
+   `onConfirm` pode ser assíncrono: enquanto corre, a folha não fecha; se
+   falhar, o erro aparece AQUI, junto ao que falhou (`errorOf(err)` diz o
+   texto), e a pessoa pode tentar outra vez. Se correr bem, fecha sozinha.
+
+   A DangerConfirmModal (acima) é a janela antiga: os sítios que a usam
+   passam para esta quando chegar a vez deles (mix, Gerir, resto). */
+export function ConfirmSheet({ open, title, message, confirmLabel, cancelLabel, danger = false, onConfirm, onClose, errorOf }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  useEffect(() => { if (!open) { setBusy(false); setError('') } }, [open])
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e) => { if (e.key === 'Escape' && !busy) onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, busy, onClose])
+
+  if (!open) return null
+
+  const confirm = async () => {
+    setBusy(true); setError('')
+    try {
+      await onConfirm()
+      setBusy(false)
+      onClose()
+    } catch (err) {
+      console.error('Error on confirmed action:', err)
+      setError(errorOf ? errorOf(err) : String(err?.message || err))
+      setBusy(false)
+    }
+  }
+
+  const safe = danger
+    ? <button type="button" onClick={onClose} disabled={busy}
+        className="w-full min-h-[52px] rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold text-white disabled:opacity-40">{cancelLabel}</button>
+    : <button type="button" onClick={confirm} disabled={busy}
+        className="w-full min-h-[52px] rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold text-white disabled:opacity-40">{confirmLabel}</button>
+  const second = danger
+    ? <button type="button" onClick={confirm} disabled={busy}
+        className="w-full min-h-[52px] rounded-ctrl border-2 border-danger bg-white px-4 text-[15px] font-extrabold text-danger disabled:opacity-40">{confirmLabel}</button>
+    : <button type="button" onClick={onClose} disabled={busy}
+        className="w-full min-h-[44px] px-4 text-[15px] font-extrabold text-ink-700 disabled:opacity-40">{cancelLabel}</button>
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 animate-fade-in sm:items-center sm:p-4"
+      onClick={() => { if (!busy) onClose() }}
+    >
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="confirm-sheet-title"
+        className="w-full max-w-md rounded-t-[24px] bg-white px-5 pt-2.5 pb-[calc(env(safe-area-inset-bottom)+20px)] shadow-lift sm:rounded-[24px]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mx-auto mb-4 h-1 w-9 rounded-full bg-ink-200" />
+        <p id="confirm-sheet-title" className="text-[20px] font-extrabold leading-tight text-ink-900">{title}</p>
+        {message && <p className="mt-2 text-[15px] leading-snug text-ink-500">{message}</p>}
+        {error && (
+          <p role="alert" className="mt-3 rounded-ctrl border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-sm font-bold text-danger">{error}</p>
+        )}
+        <div className="mt-5 space-y-2.5">
+          {safe}
+          {second}
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
 /* ─── PhotoViewerModal ───────────────────────────────────────────────────
    Full-screen tap-to-zoom viewer for a profile photo, Instagram-style —
    dark backdrop, image scaled to fit, tap anywhere or the X to close.
