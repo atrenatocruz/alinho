@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Search, Check, X, UserPlus, Send } from 'lucide-react'
+import { Search, Check, X, UserPlus, Send, Copy } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { searchPlayers } from '../../lib/privateMatches'
 import { useAuth } from '../../contexts/AuthContext'
 import { Sheet } from '../agenda/AgendaControls'
 import { Avatar, PrimaryButton, EmptyState } from '../ui'
 import { partnerNameError, partnerEmailError } from '../../lib/partnerInvite'
-import { listEntries, validateEntry, removeEntry, adminSignUp, tournamentInviteLink, inviteToken } from '../../lib/tournamentSignup'
+import { listEntries, validateEntry, removeEntry, adminSignUp, tournamentInviteLink, inviteToken, whoIsAlreadyIn } from '../../lib/tournamentSignup'
 import { whatsappShare } from '../../lib/partnerInvite'
+import { signupErrorMessage, errorCode } from '../../lib/tournamentError'
 
 /* Separador «Inscritos» (Trello #362).
    Desenho: print 08 (lista por categoria, Validar a um toque) e a regra
@@ -55,12 +56,11 @@ function AdminEntrySheet({ organizationId, categories = [], categoryId: initialC
     let cancelled = false
     supabase
       .from('memberships')
-      .select('user_id, profile:profiles(id, name, avatar_url, is_platform_admin)')
+      .select('user_id, profile:profiles(id, name, avatar_url)')
       .eq('organization_id', organizationId)
       .then(({ data, error: err }) => {
         if (cancelled || err) return
-        // Super admins da plataforma não aparecem para escolher (Trello #466).
-        setMembers((data || []).filter((m) => m.profile && !m.profile.is_platform_admin)
+        setMembers((data || []).filter((m) => m.profile)
           .map((m) => ({ id: m.user_id, name: m.profile.name || '?', avatar_url: m.profile.avatar_url }))
           .sort((a, b) => a.name.localeCompare(b.name, 'pt')))
       })
@@ -201,6 +201,12 @@ function AdminEntrySheet({ organizationId, categories = [], categoryId: initialC
             <p className="text-sm font-extrabold text-ink-900">{t('partner.not_in_app_title')}</p>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('partner.name_placeholder')} className="input-field" />
             <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder={t('partner.email_placeholder')} className="input-field" />
+            {/* Dizer a verdade a quem passa as inscricoes do formulario para a
+                app: o email fica guardado mas NAO sai daqui nenhum email — o
+                convite vai pelo link que se copia na lista (Trello #479). O
+                mix ja avisava disto; o torneio nao. Mesmo texto dos dois lados,
+                de proposito. */}
+            <p className="text-xs text-muted">{t('partner.email_hint')}</p>
           </div>
         )}
 
@@ -275,6 +281,32 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
 
   // Reenviar o link de quem entrou pelo nome, para colar no WhatsApp. O
   // código vai-se buscar agora, não vem na lista (revisão do Dev 3).
+  /* Traduz o erro quando há tradução, e cai no genérico quando não há.
+     Até aqui o organizador lia «Não foi possível. Tenta outra vez.»
+     acontecesse o que acontecesse — validar uma dupla incompleta, um
+     suplente, ou fora de prazo davam todos a mesma frase. E é ele que está
+     no pavilhão no dia do torneio, com gente à frente (Trello #476).
+
+     A conta vive em lib/tournamentError.js: o padrão que andava copiado à
+     mão perdia o algarismo de «player1_gender_required». */
+  const say = (err) => setError(signupErrorMessage(t, err))
+
+  // «Inscrever à mão» recusado porque um dos dois já está nesta categoria
+  // (Trello #480). O servidor manda o mesmo código seja qual for dos dois,
+  // e a frase de sempre — «Essa dupla já está inscrita» — estava errada:
+  // a dupla nova não existe, é UM deles que já lá está, com outra pessoa.
+  // Vai-se ver à lista da categoria ESCOLHIDA (pode não ser a do painel),
+  // e diz-se o nome. Só neste caminho de erro, por isso não custa nada.
+  const adminSignupError = async (err, choice) => {
+    if (errorCode(err) !== 'already_in_category') return signupErrorMessage(t, err)
+    try {
+      const name = whoIsAlreadyIn(await listEntries(choice.categoryId), [choice.player1Id, choice.partnerId])
+      return name ? t('tentries.error_already_in_category_named', { name }) : t('tentries.error_already_in_category')
+    } catch {
+      return t('tentries.error_already_in_category')
+    }
+  }
+
   const share = async (e) => {
     try {
       const token = await inviteToken(e.entry_id)
@@ -285,14 +317,23 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
       })), '_blank')
     } catch (err) {
       console.error('Error getting the invite token:', err)
-      setError(t('tsignup.error_generic'))
+      say(err)
     }
   }
+
+  // O convite acabado de criar, para o mostrar em vez de fechar a folha em
+  // silêncio (Trello #479, ponto 2). Quem passa as inscrições do formulário
+  // para a app fechava a folha a pensar que a pessoa tinha sido avisada —
+  // e o link, que é a única forma de ela ficar com o lugar, estava escondido
+  // atrás do avião de papel na lista. A `tournament_admin_signup` já devolve
+  // o `invite_token`, por isso não é preciso ir buscá-lo outra vez.
+  const [fresh, setFresh] = useState(null) // { token, name, email }
+  const freshLink = fresh ? tournamentInviteLink(fresh.token, window.location.origin) : ''
 
   const act = async (fn) => {
     setBusy(true); setError('')
     try { await fn(); load() }
-    catch (err) { console.error('Error acting on a tournament entry:', err); setError(t('tsignup.error_generic')) }
+    catch (err) { console.error('Error acting on a tournament entry:', err); say(err) }
     finally { setBusy(false) }
   }
 
@@ -315,7 +356,7 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
               </button>
             ))}
           </div>
-          <PrimaryButton variant="ghost" onClick={() => setAddOpen(true)} className="w-full !bg-white !border-ink-900">
+          <PrimaryButton variant="ghost" onClick={() => { setError(''); setAddOpen(true) }} className="w-full !bg-white !border-ink-900">
             <UserPlus size={18} /> {t('tentries.admin_add_title')}
           </PrimaryButton>
         </>
@@ -402,9 +443,60 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
           categoryId={category.id}
           busy={busy}
           error={error}
-          onConfirm={async (choice) => { await act(() => adminSignUp(choice)); setAddOpen(false) }}
-          onClose={() => setAddOpen(false)}
+          onConfirm={async (choice) => {
+            // A folha só fecha quando a inscrição ficou feita (Trello #480).
+            // Antes fechava sempre — o `act` apanha o erro e resolve na mesma
+            // — e o organizador perdia a categoria, os dois jogadores, o
+            // nome, o email e o «já pagou». No dia do Smash Cup, a passar
+            // dezenas de duplas, era voltar ao princípio a cada engano. Agora
+            // o erro aparece dentro da folha, ao lado do que escreveu.
+            setBusy(true); setError('')
+            try {
+              const res = await adminSignUp(choice)
+              // Só há link quando a dupla tem alguém sem conta.
+              if (res?.invite_token && choice.guestName) {
+                setFresh({ token: res.invite_token, name: choice.guestName, email: choice.guestEmail || null })
+              }
+              load()
+              setAddOpen(false)
+            } catch (err) {
+              console.error('Error signing up by hand:', err)
+              setError(await adminSignupError(err, choice))
+            } finally {
+              setBusy(false)
+            }
+          }}
+          onClose={() => { setAddOpen(false); setError('') }}
         />
+      )}
+
+      {/* Inscreveu alguém sem conta: o link é como ele fica a saber. Mesma
+          folha que o jogador vê ao inscrever a dupla dele (SignupSlot). */}
+      {fresh && (
+        <Sheet title={t('tsignup.invite_ready_title')} onClose={() => setFresh(null)}>
+          <div className="space-y-3">
+            {/* Sem o «Tu e o {nome} ficam dupla» que o jogador vê: aqui quem
+                inscreve não faz parte da dupla, e a frase ficava errada. O
+                resto serve tal e qual. */}
+            <p className="text-sm text-ink-900">
+              {fresh.email ? t('partner.invite_ready_email', { email: fresh.email }) : t('partner.invite_ready_no_email')}
+            </p>
+            <div className="rounded-ctrl bg-ink-50 px-3 py-2 text-xs text-ink-900 break-all">{freshLink}</div>
+            <PrimaryButton
+              onClick={() => window.open(whatsappShare(t('tsignup.invite_whatsapp_text', { name: fresh.name, title: tournament.name, link: freshLink })), '_blank')}
+              className="w-full"
+            >
+              {t('partner.invite_send_whatsapp')}
+            </PrimaryButton>
+            <PrimaryButton
+              variant="ghost"
+              onClick={() => navigator.clipboard?.writeText(freshLink)}
+              className="w-full !bg-white !border-ink-900"
+            >
+              <Copy size={18} /> {t('partner.invite_copy_link')}
+            </PrimaryButton>
+          </div>
+        </Sheet>
       )}
     </div>
   )

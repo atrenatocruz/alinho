@@ -12,6 +12,7 @@ import {
   entriesOpen, categoriesLeft, tournamentInviteLink,
 } from '../../lib/tournamentSignup'
 import { signUpBackLink } from '../../lib/loginLinks'
+import { signupErrorMessage } from '../../lib/tournamentError'
 
 /* O que fica por cima de tudo na página do torneio (Trello #362):
    inscrever a minha dupla, em que ponto está a minha inscrição, e o
@@ -68,10 +69,12 @@ export default function SignupSlot({ tournament, categories, category, my: first
     categoryCode: category?.code,
   })
 
-  const say = (err) => {
-    const key = `tsignup.error_${err?.message?.replace(/^.*?([a-z_]+)$/, '$1')}`
-    setError(t(key) === key ? t('tsignup.error_generic') : t(key))
-  }
+  // A mesma conta do lado do organizador, agora num sítio só. A versão que
+  // estava aqui não contava com algarismos (`[a-z_]+`), por isso
+  // `player1_gender_required` ficava-se por `_gender_required` — chave que
+  // não existe — e quem se inscrevia sem género lia «Não foi possível. Tenta
+  // outra vez.» em vez de «falta escolher o género» (Trello #476).
+  const say = (err) => setError(signupErrorMessage(t, err))
 
   const doSignUp = async (choice) => {
     setBusy(true); setError('')

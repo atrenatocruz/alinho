@@ -225,7 +225,25 @@ const RPC_MOCKS = {
   tournament_claim_entry: () => 'tour-smash-open',
   tournament_validate_entry: () => 'validada',
   tournament_remove_entry: () => null,
-  tournament_admin_signup: () => ({ entry_id: 'ent-mao', status: 'validada', invite_token: null }),
+  // Devolve o código do convite quando a dupla tem alguém sem conta, como a
+  // função a sério faz (`tournament_admin_signup` devolve `invite_token`).
+  // Estava sempre a null e, por isso, o link que o organizador tem de mandar
+  // nunca aparecia em localhost — só em produção (Trello #479).
+  tournament_admin_signup: (params) => {
+    // A mesma regra da função a sério: se algum dos dois já está numa dupla
+    // viva desta categoria, recusa com `already_in_category` (Trello #480).
+    // Na lista de teste o Tiago Ferreira já está inscrito — escolhê-lo como
+    // Jogador 2 mostra a frase com o nome.
+    const live = (RPC_MOCKS.list_tournament_entries() || []).filter((e) => e.status !== 'desistiu')
+    const taken = new Set(live.flatMap((e) => [e.player1_id, e.player2_id]).filter(Boolean))
+    if ([params?.p_player1_id, params?.p_partner_id].some((id) => id && taken.has(id))) {
+      return { __error: 'already_in_category' }
+    }
+    return {
+      entry_id: 'ent-mao', status: 'validada',
+      invite_token: params?.p_guest_name ? 'convite-torneio-a-mao' : null,
+    }
+  },
   // A lista do organizador: um de cada estado, para se ver tudo num print.
   list_tournament_entries: () => (localStorage.getItem('mockTSignup') ? [
     { entry_id: 'e1', status: 'por_validar', team_name: 'Dois não fazem um', waitlist_order: null, created_at: null, validated_at: null,
@@ -837,7 +855,15 @@ export function installDevMockNetwork() {
       if (!mock) return jsonResponse([])
       let params = {}
       try { params = init?.body ? JSON.parse(init.body) : {} } catch { /* not JSON — ignore */ }
-      return jsonResponse(mock(params))
+      const out = mock(params)
+      // Um mock pode recusar como a função a sério recusa: devolve
+      // { __error: 'codigo' } e sai o mesmo erro que o RAISE EXCEPTION dá
+      // (Trello #480). Sem isto, nenhum caminho de erro das funções se via
+      // em localhost.
+      if (out && typeof out === 'object' && out.__error) {
+        return jsonResponse({ code: 'P0001', message: out.__error }, 400)
+      }
+      return jsonResponse(out)
     }
 
     // localStorage.mockLimitError = 'true' faz qualquer criação/edição de

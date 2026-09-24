@@ -68,27 +68,45 @@ describe('o que falta em cada passo', () => {
     days: [day({ date: '2026-10-09' }), day({ date: '2026-10-10' })],
     entries_close_at: '2026-10-05T23:59',
     draw_at: '2026-10-07',
-    categories: [{ code: 'M5', slots: 16 }],
+    categories: [{ code: 'M5', slots: 16, day: '2026-10-09' }],
   }
+
+  // A ordem mudou a 23 set («#342»): 1 Pessoas · 2 Quando · 3 Onde joga.
   it('deixa avançar quando está tudo preenchido', () => {
     expect(stepProblem(1, draft)).toBe(null)
     expect(stepProblem(2, draft)).toBe(null)
     expect(stepProblem(3, draft)).toBe(null)
   })
-  it('apanha o que falta no passo 1', () => {
+
+  it('passo 1 · Pessoas: o nome e as categorias', () => {
     expect(stepProblem(1, { ...draft, name: '  ' })).toBe('name')
-    expect(stepProblem(1, { ...draft, days: [] })).toBe('days')
-    expect(stepProblem(1, { ...draft, entries_close_at: '' })).toBe('deadline')
+    expect(stepProblem(1, { ...draft, categories: [] })).toBe('categories')
+    expect(stepProblem(1, { ...draft, categories: [{ code: 'M5', slots: 1 }] })).toBe('slots')
   })
+
+  it('passo 1 já não pede dias nem prazos — isso é o passo 2', () => {
+    // Antes as categorias eram o 3.º passo e os dias o 1.º. Se isto voltar a
+    // falhar, é porque alguém repôs a ordem velha.
+    expect(stepProblem(1, { ...draft, days: [] })).toBe(null)
+    expect(stepProblem(1, { ...draft, entries_close_at: '' })).toBe(null)
+  })
+
+  it('passo 2 · Quando: os dias e os prazos', () => {
+    expect(stepProblem(2, { ...draft, days: [] })).toBe('days')
+    expect(stepProblem(2, { ...draft, entries_close_at: '' })).toBe('deadline')
+  })
+
   it('não deixa as inscrições fecharem depois de o torneio começar', () => {
-    expect(stepProblem(1, { ...draft, entries_close_at: '2026-10-10T23:59' })).toBe('deadline_after_start')
-    expect(stepProblem(1, { ...draft, draw_at: '2026-10-11' })).toBe('draw_after_start')
+    expect(stepProblem(2, { ...draft, entries_close_at: '2026-10-10T23:59' })).toBe('deadline_after_start')
+    expect(stepProblem(2, { ...draft, draw_at: '2026-10-11' })).toBe('draw_after_start')
   })
-  it('apanha horas e vagas em falta', () => {
-    expect(stepProblem(2, { ...draft, days: [day({ courts: 0 })] })).toBe('hours')
-    expect(stepProblem(2, { ...draft, days: [day({ starts_at: '23:00', ends_at: '09:00' })] })).toBe('hours_order')
-    expect(stepProblem(3, { ...draft, categories: [] })).toBe('categories')
-    expect(stepProblem(3, { ...draft, categories: [{ code: 'M5', slots: 1 }] })).toBe('slots')
+
+  it('passo 3 · Onde joga: horas, campos, e o dia de cada categoria', () => {
+    expect(stepProblem(3, { ...draft, days: [day({ courts: 0 })] })).toBe('hours')
+    expect(stepProblem(3, { ...draft, days: [day({ starts_at: '23:00', ends_at: '09:00' })] })).toBe('hours_order')
+    // A categoria vem do passo 1 sem dia: é aqui, onde os dias existem, que
+    // se apanha — senão ficava fora do horário sem ninguém dar por isso.
+    expect(stepProblem(3, { ...draft, categories: [{ code: 'M5', slots: 16 }] })).toBe('category_without_day')
   })
 })
 

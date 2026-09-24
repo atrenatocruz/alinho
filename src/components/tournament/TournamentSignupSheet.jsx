@@ -43,13 +43,12 @@ export default function TournamentSignupSheet({ tournament, categories, category
     let cancelled = false
     supabase
       .from('memberships')
-      .select('user_id, profile:profiles(id, name, avatar_url, is_platform_admin)')
+      .select('user_id, profile:profiles(id, name, avatar_url)')
       .eq('organization_id', tournament.organization_id)
       .then(({ data, error: loadErr }) => {
         if (cancelled || loadErr) return
         setMembers((data || [])
-          // Super admins da plataforma não aparecem para escolher (Trello #466).
-          .filter((m) => m.profile && !m.profile.is_platform_admin)
+          .filter((m) => m.profile)
           .map((m) => ({ id: m.user_id, name: m.profile.name || '?', avatar_url: m.profile.avatar_url }))
           .sort((a, b) => a.name.localeCompare(b.name, 'pt')))
       })
@@ -171,6 +170,9 @@ export default function TournamentSignupSheet({ tournament, categories, category
                 {touched && emailError && (
                   <p className="text-sm text-red-600 font-extrabold">{t('partner.email_error_invalid')}</p>
                 )}
+                {/* O mesmo aviso do mix: o email guarda-se, o convite vai
+                    por link enquanto o envio de emails nao existir (#479). */}
+                <p className="text-xs text-muted">{t('partner.email_hint')}</p>
                 <p className="text-xs text-muted">{t('tsignup.guest_hint')}</p>
               </div>
             ) : (

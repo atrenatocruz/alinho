@@ -12,7 +12,9 @@ import { listExploreEvents, getSavedLocation, saveLocation } from '../lib/explor
 import { countPeople, mixCapacity, isGenderMismatch, isAgeIneligible, isMissingBirthday } from '../lib/mixLogic'
 import { listFollowing } from '../lib/follows'
 import { isMemberLimitError } from '../lib/plans'
-import { describeError } from '../lib/errors'
+import { listOpenTournaments } from '../lib/tournamentApi'
+import OpenTournamentRow from '../components/tournament/OpenTournamentRow'
+import { describeError, errorKind } from '../lib/errors'
 import { getGroupMatches } from '../lib/groupMatches'
 import { getMyPrivateMatches, respondToPrivateMatch } from '../lib/privateMatches'
 import { GOOGLE_MAPS_API_KEY } from '../lib/googleMaps'
@@ -62,6 +64,21 @@ const writeSession = (key, value) => {
 
 export default function Home() {
   const { t, i18n } = useTranslation()
+  // Torneios com inscrições abertas, para quem ainda não é membro de nada
+  // (Trello #462). Quem já tem clube vê os torneios na agenda, pelo caminho
+  // do Dev 2 — aqui é só o caso de quem abre a app e não tem nada.
+  const [openTournaments, setOpenTournaments] = useState([])
+  useEffect(() => {
+    let alive = true
+    listOpenTournaments({ limit: 5 })
+      .then((rows) => { if (alive) setOpenTournaments(rows) })
+      .catch((error) => {
+        if (errorKind(error) !== 'not_ready') console.error('Error loading open tournaments:', error)
+        if (alive) setOpenTournaments([])
+      })
+    return () => { alive = false }
+  }, [])
+
   const { user, profile, memberships, joinOrganization, followOrganization, isPrivateMatchesEnabled } = useAuth()
   const navigate = useNavigate()
   const headerActions = useHeaderActions()
@@ -557,6 +574,19 @@ export default function Home() {
   // (o que vê quem ainda não tem clube está em aberto no épico).
   if (memberships.length === 0 && !hasAnyEvents) {
     return (
+      <div className="space-y-6">
+      {/* Antes desta pessoa ver «ainda não segues nenhum clube», mostra-se-lhe
+          o que está mesmo aberto: um torneio não pede aprovação nem exige ser
+          membro, e é a única coisa a que ela pode ir HOJE. Pedir um código de
+          clube privado a quem acabou de chegar é mandá-la embora. */}
+      {openTournaments.length > 0 && (
+        <section className="space-y-2">
+          <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('home.open_now')}</p>
+          {openTournaments.map((x) => <OpenTournamentRow key={x.id} tournament={x} />)}
+          <p className="text-[11.5px] text-muted">{t('home.open_now_hint')}</p>
+        </section>
+      )}
+
       <EmptyState
         icon={Users}
         title={t('home.no_clubs_followed_title')}
@@ -583,6 +613,7 @@ export default function Home() {
           </div>
         )}
       />
+      </div>
     )
   }
 

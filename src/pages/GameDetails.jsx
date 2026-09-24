@@ -351,15 +351,13 @@ export default function GameDetails() {
       // Partner picker is this org's member list — guests never appear in it
       const { data, error } = await supabase
         .from('memberships')
-        .select('user_id, profile:profiles(id, name, is_platform_admin)')
+        .select('user_id, profile:profiles(id, name)')
         .eq('organization_id', gameOrganizationId)
         .eq('is_guest', false)
         .neq('user_id', user.id)
 
       if (error) throw error
       const list = (data || [])
-        // Super admins da plataforma não aparecem para escolher (Trello #466).
-        .filter((m) => !m.profile?.is_platform_admin)
         .map((m) => ({ id: m.user_id, name: m.profile?.name || t('gamedetails.fallback_player_name') }))
         .sort((a, b) => a.name.localeCompare(b.name))
       setAllUsers(list)
