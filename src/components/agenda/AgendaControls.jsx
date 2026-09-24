@@ -7,6 +7,7 @@ import { RADIUS_OPTIONS } from '../../lib/explore'
 import { formatDate } from '../../lib/formatDate'
 import { toDayKey, fromDayKey, addDays, monthGrid, EVENT_KINDS, SHOW_OPTIONS, DEFAULT_FILTERS } from '../../lib/agenda'
 import { KIND_STYLE } from './EventCard'
+import { useAuth } from '../../contexts/AuthContext'
 
 /* Controlos da agenda da Home (Trello #258, Fase 1): o dia em cima com setas,
    o mês numa folha que sobe de baixo, e os filtros noutra folha. Tudo
@@ -155,6 +156,8 @@ const KIND_FILTER_KEY = { mix: 'agenda.filter_kind_mix', open: 'agenda.filter_ki
 
 export function FilterSheet({ filters, orgs, countFor, onApply, onClose }) {
   const { t } = useTranslation()
+  // Aulas escondidas (flag 'lessons'): o chip «Aulas» nao aparece.
+  const { isLessonsEnabled } = useAuth()
   const [draft, setDraft] = useState(filters)
   const chip = (on) => `inline-flex items-center gap-1.5 px-3 min-h-[40px] rounded-full text-sm font-extrabold border transition-colors duration-fast ${
     on ? 'bg-ink-900 text-white border-ink-900' : 'bg-canvas text-ink-700 border-line'
@@ -199,7 +202,7 @@ export function FilterSheet({ filters, orgs, countFor, onApply, onClose }) {
         <button type="button" onClick={() => setDraft((d) => ({ ...d, kinds: [...EVENT_KINDS] }))} className={chip(todosOsTipos)}>
           {t('agenda.filter_kind_all')}
         </button>
-        {EVENT_KINDS.map((k) => {
+        {EVENT_KINDS.filter((k) => k !== 'lesson' || isLessonsEnabled).map((k) => {
           const Icon = KIND_STYLE[k].icon
           // Com «Todos» ligado nenhum tipo aparece aceso, como na fila do
           // clube/grupo: dois sitios a dizer a mesma coisa confundem.

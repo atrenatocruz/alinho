@@ -12,7 +12,7 @@ import { Toggle } from './lessons/LessonBits'
 
 export default function AppFeaturesPanel() {
   const { t } = useTranslation()
-  const { isPrivateMatchesEnabled, refreshFeatureFlags } = useAuth()
+  const { isPrivateMatchesEnabled, isLessonsFlagOn, refreshFeatureFlags } = useAuth()
   const [saving, setSaving] = useState(false)
 
   const togglePrivateMatches = async () => {
@@ -25,6 +25,23 @@ export default function AppFeaturesPanel() {
       await refreshFeatureFlags()
     } catch (error) {
       console.error('Error toggling private matches flag:', error)
+      alert(describeError(t, error, 'gerirclube.error_toggle_feature'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Aulas: ligar mostra-as a toda a gente; desligadas, so a equipa Alinho
+  // as ve. Precisa da linha 'lessons' na tabela (migration_feature_flag_lessons.sql).
+  const toggleLessons = async () => {
+    const next = !isLessonsFlagOn
+    setSaving(true)
+    try {
+      const { error } = await supabase.rpc('admin_set_feature_flag', { p_key: 'lessons', p_enabled: next })
+      if (error) throw error
+      await refreshFeatureFlags()
+    } catch (error) {
+      console.error('Error toggling lessons flag:', error)
       alert(describeError(t, error, 'gerirclube.error_toggle_feature'))
     } finally {
       setSaving(false)
@@ -50,6 +67,19 @@ export default function AppFeaturesPanel() {
           checked={isPrivateMatchesEnabled}
           disabled={saving}
           onChange={togglePrivateMatches}
+        />
+        <Toggle
+          label={
+            <span>
+              <span className="block font-extrabold text-ink-900">{t('gerirclube.tab_lessons')}</span>
+              <span className="block text-[11px] text-muted">
+                {isLessonsFlagOn ? t('gerir.lessons_on_hint') : t('gerir.lessons_off_hint')}
+              </span>
+            </span>
+          }
+          checked={isLessonsFlagOn}
+          disabled={saving}
+          onChange={toggleLessons}
         />
       </div>
     </div>

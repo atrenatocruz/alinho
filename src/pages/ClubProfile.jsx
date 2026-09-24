@@ -24,7 +24,7 @@ export default function ClubProfile() {
   const { t, i18n } = useTranslation()
   const { slug } = useParams()
   const goBack = useGoBack('/comunidade')
-  const { memberships, followOrganization, leaveOrganization, toggleFavoriteOrganization } = useAuth()
+  const { memberships, followOrganization, leaveOrganization, toggleFavoriteOrganization, isLessonsEnabled } = useAuth()
   const [club, setClub] = useState(null)
   // Textos que nomeiam a entidade têm um gémeo "_group" — um grupo nunca
   // lê "deste clube" (mesma regra do GerirClube).
@@ -113,14 +113,15 @@ export default function ClubProfile() {
   }, [club?.id, club?.kind, club?.my_status])
 
   useEffect(() => {
-    if (club?.kind !== 'club') { setTeachers([]); return }
+    // Aulas escondidas (flag 'lessons'): sem professores das aulas aqui.
+    if (club?.kind !== 'club' || !isLessonsEnabled) { setTeachers([]); return }
     listClubTeachers(club.id)
       .then(setTeachers)
       .catch((error) => {
         if (errorKind(error) !== 'not_ready') console.error('Error loading club teachers:', error)
         setTeachers([])
       })
-  }, [club?.id, club?.kind])
+  }, [club?.id, club?.kind, isLessonsEnabled])
 
   const handleRequestJoinGroup = async (group) => {
     setGroupActingOn(group.id)

@@ -79,7 +79,7 @@ export default function Home() {
     return () => { alive = false }
   }, [])
 
-  const { user, profile, memberships, joinOrganization, followOrganization, isPrivateMatchesEnabled } = useAuth()
+  const { user, profile, memberships, joinOrganization, followOrganization, isPrivateMatchesEnabled, isLessonsEnabled } = useAuth()
   const navigate = useNavigate()
   const headerActions = useHeaderActions()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -260,6 +260,8 @@ export default function Home() {
   }
 
   const loadLessons = async () => {
+    // Aulas escondidas (flag 'lessons'): nem se pedem.
+    if (!isLessonsEnabled) { setLessonRows([]); return }
     const from = new Date()
     from.setDate(from.getDate() - 30)
     const to = new Date()
@@ -297,7 +299,7 @@ export default function Home() {
       .subscribe()
     return () => subscription.unsubscribe()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, orgIdsKey, isPrivateMatchesEnabled])
+  }, [user?.id, orgIdsKey, isPrivateMatchesEnabled, isLessonsEnabled])
 
   // Só se pede quando "Só os meus" está desligado: é o único momento em que
   // estes eventos podem aparecer. Sem a migração, a função não existe e a

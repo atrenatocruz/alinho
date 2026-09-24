@@ -852,6 +852,8 @@
   "gerir.app_features_description": "These switch features on and off for the whole app — every club and group, not just one.",
   "gerir.private_matches_on_hint": "On: anyone can create games with friends from their Profile.",
   "gerir.private_matches_off_hint": "Off: nobody sees or creates games with friends.",
+  "gerir.lessons_on_hint": "On: clubs manage lessons and classes, and players see them.",
+  "gerir.lessons_off_hint": "Off: only the Alinho team sees lessons. Clubs and players don't.",
   "gerir.private_matches_off_confirm": "Turn games with friends off for the whole app? Nobody will see or create them until you turn it back on.",
   "gerir.subtitle": "Choose the club or group you want to manage",
   "gerir.subtitle_platform_admin": "Choose the club or group you want to manage (you're a super admin — you see all)",
