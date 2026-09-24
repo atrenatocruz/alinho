@@ -1,7 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useLocation, useNavigate, useNavigationType } from 'react-router-dom'
-import { Home, Users, Trophy, Settings, LogOut, Phone, X, Bell, UserCheck, Swords, Shuffle } from 'lucide-react'
+import { Home, Users, Trophy, ClipboardList, LogOut, Phone, X, Bell, UserCheck, Swords, Shuffle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
 import { HeaderActionsProvider } from '../contexts/HeaderActionsContext'
@@ -565,7 +565,7 @@ export default function Layout({ children }) {
   // para todos», Trello #279): quem não gere nada vê lá "Criar grupo". Cada
   // um só vê o que administra — isso continua a ser a base de dados a decidir.
   if (!isGuest || isAdminOfAny || profile?.is_platform_admin) {
-    navItems.push({ path: '/gerir', icon: Settings, label: t('layout.nav_manage') })
+    navItems.push({ path: '/gerir', icon: ClipboardList, label: t('layout.nav_manage') })
   }
 
   // Notificações + logout — só o que sobra do antigo header escuro (o
