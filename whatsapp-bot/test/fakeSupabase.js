@@ -19,7 +19,7 @@ export function installFakeSupabase(supabase, db) {
     return out
   }
   function builder(table) {
-    const q = { filters: [], op: 'select', select: '*' }
+    const q = { filters: [], op: 'select', select: '*', orders: [] }
     const get = (r, c) => c.split('.').reduce((o, k) => o?.[k], r)
     const exec = () => {
       calls.push(table)
@@ -48,6 +48,18 @@ export function installFakeSupabase(supabase, db) {
       }
       let rows = db[table].map((r) => embed(r, q.select))
       for (const f of q.filters) rows = rows.filter(f)
+      // .order(col, { ascending }) — por ordem de chamada (a 1.ª manda, as
+      // seguintes desempatam), como no PostgREST.
+      if (q.orders.length) {
+        rows.sort((x, y) => {
+          for (const { col, asc } of q.orders) {
+            const a = get(x, col), b = get(y, col)
+            if (a === b) continue
+            return (a < b ? -1 : 1) * (asc ? 1 : -1)
+          }
+          return 0
+        })
+      }
       if (q.single) return rows[0] ? { data: rows[0], error: null } : { data: null, error: { message: 'not found' } }
       if (q.maybe) return { data: rows[0] ?? null, error: null }
       return { data: rows, error: null }
@@ -62,7 +74,7 @@ export function installFakeSupabase(supabase, db) {
       neq: (c, v) => { q.filters.push((r) => get(r, c) !== v); return api },
       in: (c, v) => { q.filters.push((r) => v.includes(get(r, c))); return api },
       gt: (c, v) => { q.filters.push((r) => get(r, c) > v); return api },
-      order: () => api,
+      order: (col, opts = {}) => { q.orders.push({ col, asc: opts.ascending !== false }); return api },
       limit: () => api,
       single: () => { q.single = true; return api },
       maybeSingle: () => { q.maybe = true; return api },

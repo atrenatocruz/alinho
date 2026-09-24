@@ -78,17 +78,24 @@ function hash(str) {
  * sent for it here (see the design spec's open edge case on replying to a
  * since-closed mix's message — commands.js handles that at reply time).
  */
-async function postGroupRoster(sendText, getGroupMentions, group, { tagAll = false, promotedByGameId = new Map() } = {}) {
+async function postGroupRoster(sendText, getGroupMentions, group, { tagAll = false, promotedByGameId = new Map(), gameIds = new Set() } = {}) {
   const timer = startTimer('repost')
   let sent = 0
   const visibleMixes = (await getOpenMixes(group.organizationId)).filter((mix) => mixVisibleToGroup(mix, group))
   const openMixes = visibleMixes.filter((mix) => mix.origin !== 'open_slot')
   const openSlotMixes = visibleMixes.filter((mix) => mix.origin === 'open_slot')
-  const mixStates = await Promise.all(openMixes.map((mix) => loadGame(mix.id)))
-  timer.mark('carregar')
   const st = stateFor(group.groupJid)
-  const total = mixStates.length
-  const seenGameIds = new Set()
+  const total = openMixes.length
+  // Só vale a pena carregar os mixes que mudaram SE a lista de abertos é a
+  // mesma do último repost — senão a numeração 01/02 dos outros muda e têm
+  // de ser todos refeitos.
+  const idsKey = openMixes.map((m) => m.id).join(',')
+  const narrow = gameIds.size > 0 && st.openIdsKey === idsKey
+  st.openIdsKey = idsKey
+  const toLoad = narrow ? openMixes.filter((m) => gameIds.has(m.id)) : openMixes
+  const mixStates = await Promise.all(toLoad.map((mix) => loadGame(mix.id)))
+  const indexOf = new Map(openMixes.map((m, i) => [m.id, i]))
+  timer.mark('carregar')
   const mentions = tagAll && (total > 0 || openSlotMixes.length > 0) ? await getGroupMentions(group.groupJid) : null
   // At most one @all per flush, however many mixes' messages (or the open-
   // slot batch message) end up resent in it — shared across both loops
@@ -96,11 +103,9 @@ async function postGroupRoster(sendText, getGroupMentions, group, { tagAll = fal
   // flush don't each carry their own @all.
   let taggedThisFlush = false
 
-  for (let i = 0; i < mixStates.length; i++) {
-    const state = mixStates[i]
+  for (const state of mixStates) {
     const gameId = state.game.id
-    seenGameIds.add(gameId)
-    const label = total > 1 ? String(i + 1).padStart(2, '0') : null
+    const label = total > 1 ? String(indexOf.get(gameId) + 1).padStart(2, '0') : null
 
     // Hash only the base message, never the one-time promotion callout — a
     // later reconcile tick never carries a promo, so hashing the
@@ -127,8 +132,9 @@ async function postGroupRoster(sendText, getGroupMentions, group, { tagAll = fal
   // Drop mixes no longer open, so a later reappearance (e.g. level filter
   // toggled off then back on) resends fresh instead of being swallowed as
   // "same as last post".
+  const openIds = new Set(openMixes.map((m) => m.id))
   for (const gameId of st.mixes.keys()) {
-    if (!seenGameIds.has(gameId)) st.mixes.delete(gameId)
+    if (!openIds.has(gameId)) st.mixes.delete(gameId)
   }
 
   // Jogos em aberto: uma mensagem combinada por open_batch_id, nunca uma
@@ -163,9 +169,11 @@ function flushRepost(sendText, getGroupMentions, group) {
   const st = stateFor(group.groupJid)
   const shouldTagAll = st.pendingTagAll
   const promotedByGameId = st.pendingPromotedByGame
+  const gameIds = st.pendingGameIds
   st.pendingTagAll = false
   st.pendingPromotedByGame = new Map()
-  postGroupRoster(sendText, getGroupMentions, group, { tagAll: shouldTagAll, promotedByGameId }).catch((err) =>
+  st.pendingGameIds = new Set()
+  postGroupRoster(sendText, getGroupMentions, group, { tagAll: shouldTagAll, promotedByGameId, gameIds }).catch((err) =>
     console.error(`Failed to repost roster to ${group.groupJid}:`, err)
   )
 }
@@ -345,7 +353,7 @@ export function startSync({ sendText, getGroupMentions }) {
         // check above skips a no-op send — no need to pre-filter which
         // mix this row belongs to. Someone joining/leaving isn't a
         // create/edit, so this never tags @all.
-        await scheduleRepostForOrg(sendText, getGroupMentions, orgId)
+        await scheduleRepostForOrg(sendText, getGroupMentions, orgId, { gameIds: [payload.new?.game_id ?? payload.old?.game_id] })
         return
       }
 
@@ -366,6 +374,7 @@ export function startSync({ sendText, getGroupMentions }) {
         .single()
 
       await scheduleRepostForOrg(sendText, getGroupMentions, orgId, {
+        gameIds: [payload.new.game_id],
         promotedNames: [
           { gameId: payload.new.game_id, name: promotedProfile?.name || 'Jogador', lang: promotedProfile?.language ?? 'pt' },
         ],
