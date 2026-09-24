@@ -11,7 +11,8 @@ import { formatRatingMaybeProvisional, isProvisional, bandProgress, ratingBand }
 import { tierFromXp, preTierProgress, formatXp } from '../lib/xp'
 import { winRatePct } from '../lib/statsLogic'
 import { followPlayer, removeFollow } from '../lib/follows'
-import { getGlobalRankings } from '../lib/privateMatches'
+import { getGlobalRankings, getPublicRankings } from '../lib/privateMatches'
+import { positionOf, scaleOf } from '../lib/rankingScales'
 import { formatDate } from '../lib/formatDate'
 import { describeError } from '../lib/errors'
 
@@ -99,10 +100,13 @@ export default function PlayerDetails() {
 
   const loadGlobalRank = async () => {
     try {
-      const rankings = await getGlobalRankings()
+      // O nível e o progresso vêm da lista de toda a gente (também de uma
+      // conta de teste que se esteja a ver); o lugar vem da lista que se
+      // mostra e pelas regras da página do ranking — só Masculino e
+      // Feminino, só depois do primeiro jogo (Trello #422).
+      const [rankings, visible] = await Promise.all([getGlobalRankings(), getPublicRankings()])
       const index = rankings.findIndex((p) => p.user_id === id)
-      // Sem nível não tem posição (a lista traz toda a gente, esses no fim).
-      setGlobalRank(index === -1 || rankings[index].rating == null ? null : index + 1)
+      setGlobalRank(positionOf(visible.map((p) => ({ ...p, ranked: p.rating != null })), id))
       setGlobalEntry(index === -1 ? null : rankings[index])
     } catch (error) {
       console.error('Error loading global rank:', error)
@@ -415,7 +419,7 @@ export default function PlayerDetails() {
             )}
             {!resultsHidden && globalRank && (
               <p className="text-xs text-muted tabular-nums">
-                {t('profile.card_global_ranking')} #{globalRank}
+                {t('profile.card_global_ranking')} #{globalRank} · {t(`rankings.scale_${scaleOf(playerExtras?.gender ?? globalEntry?.gender)}`)}
               </p>
             )}
           </div>

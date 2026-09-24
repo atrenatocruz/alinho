@@ -43,6 +43,12 @@ const FAKE_PEOPLE = {
 }
 
 const community = () => localStorage.getItem('mockCommunity') === 'true'
+const rankingCasos = () => localStorage.getItem('mockRankingCasos') === 'true'
+const RANKING_CASOS = [
+  { user_id: 'caso-teste', name: 'teste ruben', rating: 1900, rating_games: 0, gender: 'masculino', mix_wins: 0, mixes_played: 0, is_test: true },
+  { user_id: 'caso-sem-jogos', name: 'Nuno Declarado', rating: 1700, rating_games: 0, gender: 'masculino', mix_wins: 0, mixes_played: 0 },
+  { user_id: 'caso-sem-genero', name: 'Sam Lopes', rating: 1350, rating_games: 12, gender: null, mix_wins: 2, mixes_played: 6 },
+]
 const MOCK_NAMES = ['Diogo Alexandre', 'Renato Cruz', 'João Jesus', 'Ana Moreira', 'André Sousa', 'Beatriz Faria', 'Rui Costa', 'Pedro Lima', 'Inês Rocha', 'Miguel Santos', 'Rui Santos']
 const communityOrg = (o) => ({ group_logo_url: null, parent_organization_id: null, parent_name: null, location: null, my_status: 'none', open_join: false, ...o })
 const COMMUNITY_ORGS = [
@@ -99,6 +105,15 @@ const RPC_MOCKS = {
       { user_id: 'fake-nolevel-1', name: 'Rui Pinto', rating: null, rating_games: 0, gender: null, mix_wins: 0, mixes_played: 0 },
       { user_id: 'fake-nolevel-2', name: 'Bruno Nunes', rating: null, rating_games: 0, gender: 'masculino', mix_wins: 0, mixes_played: 0 },
     ] : []),
+  // O ranking que se MOSTRA (#422): o mesmo que o global, sem contas de
+  // teste. Com localStorage.mockRankingCasos = 'true' entram os casos que o
+  // #422 veio corrigir, para se verem em localhost: quem nunca jogou mas
+  // declarou um nível alto (estava no topo em produção), e quem jogou mas não
+  // tem género. A conta de teste da lista fica de fora — é o que a função
+  // a sério faz.
+  get_public_rankings: (params) => RPC_MOCKS.get_global_rankings(params)
+    .concat(rankingCasos() ? RANKING_CASOS.filter((p) => !p.is_test) : [])
+    .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1)),
   get_player_xp: () => [{ xp: 320, kudos: 12 }],
   get_player_achievements: () => [
     { achievement_key: 'primeira_bola', category: 'jogo', rarity: 'comum', rarity_pct: 66.7 },
