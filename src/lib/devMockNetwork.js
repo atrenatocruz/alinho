@@ -817,6 +817,17 @@ const TABLE_MOCKS = {
   ],
 }
 
+// O Gerir pede os mixes (origin=eq.admin) e os jogos em aberto
+// (origin=eq.open_slot) em separado. Sem respeitar o filtro, cada mix de
+// teste aparecia duas vezes na lista — como «Mix» e como «Jogo em aberto».
+// Um jogo de teste sem origin conta como 'admin', como na base de dados.
+const gamesSemFiltro = TABLE_MOCKS.games
+TABLE_MOCKS.games = (url) => {
+  const rows = gamesSemFiltro(url)
+  const origem = decodeURIComponent(url).match(/[?&]origin=eq\.([a-z_]+)/)
+  return origem && Array.isArray(rows) ? rows.filter((g) => (g.origin || 'admin') === origem[1]) : rows
+}
+
 const jsonResponse = (data, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } })
 
