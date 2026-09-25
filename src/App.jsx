@@ -8,6 +8,7 @@ import Layout, { Wordmark } from './components/Layout'
 import SplashScreen from './components/SplashScreen'
 import Login from './pages/Login'
 import Landing from './pages/Landing'
+import Plans from './pages/Plans'
 import Home from './pages/Home'
 import GameDetails from './pages/GameDetails'
 import Rankings from './pages/Rankings'
@@ -324,6 +325,8 @@ function AppRoutes() {
         <Route path="/instrucoes" element={<Instructions />} />
         <Route path="/privacidade" element={<PrivacyPolicy />} />
         <Route path="/termos" element={<TermsOfService />} />
+        {/* Página pública dos planos (Trello #327). */}
+        <Route path="/planos" element={<Plans />} />
         <Route path="/mix-offline" element={<MixOffline />} />
         <Route
           path="/"

@@ -277,6 +277,10 @@ const RPC_MOCKS = {
     { id: 'jr2', user_id: 'fake-2', name: 'Tiago Ferreira', avatar_url: null, created_at: new Date().toISOString() },
   ] : []),
   delete_self_serve_group: () => null,
+  // Entrar por link num grupo cheio (#447): localStorage.mockJoinPending =
+  // 'true' — a função devolve o grupo e a pessoa não fica membro (pedido).
+  approve_membership_request: () => (localStorage.getItem('mockGroupFull') === 'true' ? { __error: 'Grupo já atingiu o limite de 40 membros do plano' } : null),
+  join_organization: () => (localStorage.getItem('mockJoinPending') === 'true' ? 'org-cheio' : MOCK_ADMIN_ORG_ID),
   // Apagar conta (Trello #306). localStorage.mockDeletionRequestedAt =
   // '2026-09-18' mostra o ecrã de recuperar a conta.
   request_account_deletion: () => new Date().toISOString(),
@@ -966,6 +970,17 @@ const TABLE_MOCKS = {
 // teste aparecia duas vezes na lista — como «Mix» e como «Jogo em aberto».
 // Um jogo de teste sem origin conta como 'admin', como na base de dados.
 const gamesSemFiltro = TABLE_MOCKS.games
+// #447: o pedido pendente (ninguém é membro do grupo cheio) e, com
+// localStorage.mockGroupFull = 'true', um grupo Free com 40 pessoas.
+const membershipsSemFiltro = TABLE_MOCKS.memberships
+TABLE_MOCKS.memberships = (url) => {
+  const u = decodeURIComponent(url)
+  if (u.includes('organization_id=eq.org-cheio')) return []
+  if (localStorage.getItem('mockGroupFull') === 'true' && /select=id(,profile|&|$)/.test(u)) {
+    return Array.from({ length: 40 }, (_, i) => ({ id: `m${i}` }))
+  }
+  return membershipsSemFiltro(url)
+}
 // localStorage.mockMixDraft = 'true' — um mix em rascunho na lista do Gerir
 // e na agenda da Home (Trello #544; na Home tem de ficar de fora).
 const DRAFT_MIX = () => {
