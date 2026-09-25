@@ -165,3 +165,21 @@ test('parceiro que ainda não entrou na app: «só tu» tira a dupla toda e expl
   assert.equal(row(), undefined)
   assert.match(out, /ainda não entrou na app/)
 })
+
+test('a mensagem do mix explica como sair em dupla, só quando há duplas inscritas', async () => {
+  const { buildMixMessage } = await import('../src/roster.js')
+  const game = { id: 'm', title: 'Mix', date: new Date(Date.now() + 864e5).toISOString(), num_courts: 1, status: 'open', rotate_partners: false, allow_pair_signup: true }
+  const solo = buildMixMessage({ game, people: [{ name: 'A', pair: null }], capacity: 4, suplentes: [] })
+  const pair = buildMixMessage({ game, people: [{ name: 'A', pair: 1 }, { name: 'B', pair: 1 }], capacity: 4, suplentes: [] })
+  assert.doesNotMatch(solo, /Out dupla/)
+  assert.match(pair, /Out dupla/)
+  assert.match(pair, /Out @parceiro/)
+})
+
+test('com vários mixes abertos, «Out 01 dupla» tira a dupla do mix 01', async () => {
+  pairIn()
+  db.games.push({ id: 'm2', organization_id: 'o', title: 'Outro', status: 'open', origin: 'manual',
+    date: new Date(Date.now() + 2 * 864e5).toISOString(), num_courts: 1, max_players: 4, rotate_partners: false, allow_pair_signup: true })
+  await say('out 01 dupla', '351922222222')
+  assert.equal(row(), undefined)
+})
