@@ -3020,7 +3020,6 @@
   "tournament.draw.format_intro": "{{teams}} duplas. A app faz as contas com o tempo de campo do torneio e diz o que cabe.",
   "tournament.draw.format_none_title": "Poucas duplas para fazer um formato",
   "tournament.draw.format_none_subtitle": "Com {{teams}} duplas não há como montar grupos nem quadro.",
-  "tournament.draw.opt_groups": "{{groups}} grupos de {{size}} → passam {{per}}",
   "tournament.draw.opt_groups_equal_one": "1 grupo de {{size}} → $t(tournament.draw.opt_pass, {\"count\": {{per}} })",
   "tournament.draw.opt_groups_equal_other": "{{count}} grupos de {{size}} → $t(tournament.draw.opt_pass, {\"count\": {{per}} })",
   "tournament.draw.opt_groups_mixed_one": "1 grupo: {{sizes}} → $t(tournament.draw.opt_pass, {\"count\": {{per}} })",

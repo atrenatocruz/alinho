@@ -233,6 +233,15 @@ describe('peças dos separadores', () => {
     expect(rounds[0].matches.map((m) => m.id)).toEqual(['3', '2'])
   })
 
+  it('o 3.º lugar só aparece no quadro principal, não no secundário', () => {
+    const matches = [
+      { id: '1', stage: 'principal', round: 'F', bracket_slot: 1 },
+      { id: '4', stage: '3lugar', round: '3P', bracket_slot: 1 },
+    ]
+    expect(bracketRounds(matches, 'secundario')).toEqual([])
+    expect(bracketRounds(matches, 'principal').map((r) => r.round)).toEqual(['F', '3P'])
+  })
+
   it('o calendário agrupa por dia e por hora, e deixa de fora quem não tem hora', () => {
     const dias = byDayAndTime([
       { id: 'a', scheduled_at: '2026-10-10T09:00:00.000Z', court_name: 'Campo 2' },

@@ -3019,7 +3019,6 @@
   "tournament.draw.format_intro": "{{teams}} pairs. The app does the maths against the court time and says what fits.",
   "tournament.draw.format_none_title": "Too few pairs for a format",
   "tournament.draw.format_none_subtitle": "With {{teams}} pairs there is no way to build groups or a draw.",
-  "tournament.draw.opt_groups": "{{groups}} groups of {{size}} → top {{per}} go through",
   "tournament.draw.opt_groups_equal_one": "1 group of {{size}} → $t(tournament.draw.opt_pass, {\"count\": {{per}} })",
   "tournament.draw.opt_groups_equal_other": "{{count}} groups of {{size}} → $t(tournament.draw.opt_pass, {\"count\": {{per}} })",
   "tournament.draw.opt_groups_mixed_one": "1 group: {{sizes}} → $t(tournament.draw.opt_pass, {\"count\": {{per}} })",
