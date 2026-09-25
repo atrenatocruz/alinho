@@ -10,12 +10,13 @@
 -- 16 set). O que faltava:
 --
 -- 1. `search_clubs_for_teacher(p_query)` — o ecrã só listava os clubes de
---    que a pessoa já é membro. Esta procura TODOS os clubes (kind = 'club',
---    que desde 18 set é o plano Club), pelo nome, sem ligar a acentos nem a
+--    que a pessoa já é membro. Esta procura os clubes (kind = 'club', que
+--    desde 18 set é o plano Club) QUE SE DEIXAM ENCONTRAR (`org_is_findable`,
+--    a mesma regra da Comunidade — um clube escondido não aparece por outra
+--    porta; decisão do PO, 25 set), pelo nome, sem ligar a acentos nem a
 --    maiúsculas («almada» encontra «Smash Padel Almada», «joao» encontra
 --    «João»). Devolve só o que o campo precisa: id, nome, slug, zona e logo.
---    A `search_organizations` não serve: só mostra os clubes que se deixam
---    encontrar na Comunidade, e distingue acentos.
+--    A `search_organizations` não serve: distingue acentos e traz grupos.
 --
 -- 2. `resolve_teacher_club(p_id, p_accept, p_make_admin DEFAULT FALSE)` —
 --    ao ACEITAR, o professor passa a membro do clube, se ainda não for
@@ -57,6 +58,14 @@ AS $$
   SELECT o.id, o.name, o.slug, o.location, o.group_logo_url
     FROM organizations o, q
    WHERE o.kind = 'club'
+     -- Só os clubes que se deixam encontrar: a visibilidade é escolha do
+     -- admin, em qualquer plano (Decisions Log do Francisco). Um clube
+     -- escondido não aparece por esta porta a quem é de fora — MAS aparece
+     -- aos seus próprios membros: é assim que um clube escondido recebe
+     -- professores (convida a pessoa como membro, e ela escolhe-o aqui).
+     AND (org_is_findable(o)
+          OR EXISTS (SELECT 1 FROM memberships m
+                      WHERE m.organization_id = o.id AND m.user_id = auth.uid()))
      AND auth.uid() IS NOT NULL
      AND translate(lower(o.name), 'áàâãäéèêëíìîïóòôõöúùûüçñ', 'aaaaaeeeeiiiiooooouuuucn')
          LIKE '%' || q.t || '%'
@@ -245,6 +254,7 @@ END $$;
 --     FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace
 --      AND p.proname IN ('resolve_teacher_club', 'approve_teacher_profile',
 --                        'reject_teacher_profile', 'org_max_members', 'is_org_admin',
---                        'search_clubs_for_teacher', 'teacher_join_club');
+--                        'org_is_findable', 'search_clubs_for_teacher', 'teacher_join_club');
 -- Esperado: resolve_teacher_club(uuid,boolean), approve e reject uma só vez
--- cada; org_max_members e is_org_admin existem; as duas novas ainda não.
+-- cada; org_max_members, is_org_admin e org_is_findable existem; as duas
+-- novas ainda não.

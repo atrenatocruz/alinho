@@ -1615,6 +1615,11 @@ export default function GameDetails() {
   // flow (Trello #257) — see computeMixWinnerTeamId in mixLogic.js.
   const currentWinnerTeamId = computeMixWinnerTeamId(game, teams, matches)
   const anyScoreSaved = matches.some(m => m.winner_team_id)
+  // «Terminar Mix» antes do fim: a base de dados (finalize_mix) recusa com
+  // «Há jogos sem resultado registado» enquanto houver um jogo já sorteado
+  // sem vencedor. O botão fica desligado e diz porquê, em vez de deixar
+  // carregar e dar erro. No Americano a regra não existe.
+  const missingResults = isAmericano ? 0 : matches.filter(m => !m.winner_team_id).length
 
   const handleAdvance = async () => {
     setBusy(true)
@@ -2733,7 +2738,7 @@ export default function GameDetails() {
           {isRotating && placarResult.length > 0 && (
             <div className="card">
               <h3 className="text-lg text-ink-900">{t('gamedetails.placar_title')}</h3>
-              <p className="text-sm text-muted mb-3">{t('gamedetails.placar_hint')}</p>
+              <p className="text-sm text-muted mb-3">{t('gamedetails.placar_hint')} {t(game.ranked === false ? 'gamedetails.placar_ranking_friendly' : 'gamedetails.placar_ranking_ranked')}</p>
               <div className="space-y-1.5">
                 {placarResult.map((s, i) => (
                   <div key={s.player.id} className="flex items-center gap-3 text-sm py-1.5 border-b border-line last:border-0">
@@ -2928,7 +2933,7 @@ export default function GameDetails() {
                   {isRotating && placarResult.length > 0 && (
                         <div className="card">
                           <h3 className="text-lg text-ink-900">{t('gamedetails.placar_title')}</h3>
-                          <p className="text-sm text-muted mb-3">{t('gamedetails.placar_hint')}</p>
+                          <p className="text-sm text-muted mb-3">{t('gamedetails.placar_hint')} {t(game.ranked === false ? 'gamedetails.placar_ranking_friendly' : 'gamedetails.placar_ranking_ranked')}</p>
                           <div className="space-y-1.5">
                             {placarResult.map((s, i) => (
                               <div key={s.player.id} className="flex items-center gap-3 text-sm py-1.5 border-b border-line last:border-0">
@@ -3085,10 +3090,15 @@ export default function GameDetails() {
                   )}
                   {/* Sair mais cedo — disponível assim que houver pelo menos um resultado guardado */}
                   {roundsStarted && !canFinalize && anyScoreSaved && (
-                    <PrimaryButton variant="danger" onClick={() => handleFinalize(true)} disabled={busy} className="w-full">
-                      <Trophy size={20} />
-                      {busy ? t('gamedetails.finalizing') : t('gamedetails.end_mix')}
-                    </PrimaryButton>
+                    <>
+                      <PrimaryButton variant="danger" onClick={() => handleFinalize(true)} disabled={busy || missingResults > 0} className="w-full">
+                        <Trophy size={20} />
+                        {busy ? t('gamedetails.finalizing') : t('gamedetails.end_mix')}
+                      </PrimaryButton>
+                      {missingResults > 0 && (
+                        <p className="text-xs text-muted text-center">{t('gamedetails.end_mix_blocked', { count: missingResults })}</p>
+                      )}
+                    </>
                   )}
                 </>
               )}
