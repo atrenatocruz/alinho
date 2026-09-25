@@ -2,7 +2,7 @@ import { supabase } from './supabase'
 import { LESSON_RPC_MOCKS, LESSON_TABLE_MOCKS, LESSON_NOTICES } from './devMockLessons'
 import {
   TOURNAMENT_RPC_MOCKS, TOURNAMENT_TABLE_MOCKS, TOURNAMENT_CLOSE_RPC_MOCKS, TOURNAMENT_CLOSE_TABLE_MOCKS,
-  TOURNAMENT_SCORE_TODAY_TABLE_MOCKS,
+  TOURNAMENT_SCORE_TODAY_TABLE_MOCKS, TOURNAMENT_REOPEN_RPC_MOCKS,
 } from './devMockTournament'
 import { TOURNAMENT_DRAW_TABLE_MOCKS, TOURNAMENT_DRAW_RPC_MOCKS } from './devMockTournamentDraw'
 
@@ -864,9 +864,9 @@ TABLE_MOCKS.games = (url) => {
 // Fechar categorias (#485, mockTClose): ganha aos outros mocks das mesmas
 // vistas só quando está ligado — devolve `undefined` quando não está, e
 // aí responde quem respondia antes.
-for (const [name, fn] of Object.entries(TOURNAMENT_CLOSE_RPC_MOCKS)) {
+for (const [name, fn] of [...Object.entries(TOURNAMENT_CLOSE_RPC_MOCKS), ...Object.entries(TOURNAMENT_REOPEN_RPC_MOCKS)]) {
   const before = RPC_MOCKS[name]
-  RPC_MOCKS[name] = (params) => fn(params) ?? before?.(params) ?? null
+  RPC_MOCKS[name] = (params) => fn(params, before) ?? before?.(params) ?? null
 }
 for (const [name, fn] of [...Object.entries(TOURNAMENT_CLOSE_TABLE_MOCKS), ...Object.entries(TOURNAMENT_SCORE_TODAY_TABLE_MOCKS)]) {
   const before = TABLE_MOCKS[name]

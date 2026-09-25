@@ -526,3 +526,20 @@ export const TOURNAMENT_SCORE_TODAY_TABLE_MOCKS = {
     ]
   },
 }
+
+// ── Reabrir inscrições de uma categoria (Trello #517) ───────────────────
+// Funciona com os dados do sorteio (mockTDraw). Reabrir põe a categoria em
+// «inscrições» até recarregar a página. localStorage.mockTReopenLate =
+// 'true' faz o servidor responder que o prazo do torneio já passou.
+const reopened = new Set()
+export const TOURNAMENT_REOPEN_RPC_MOCKS = {
+  reopen_category_entries: (params) => {
+    reopened.add(params?.p_category_id)
+    return { chosen_back: 16, waitlist_back: 0, deadline_passed: localStorage.getItem('mockTReopenLate') === 'true' }
+  },
+  list_tournament_categories_admin: (params, before) => {
+    if (!reopened.size || !before) return undefined
+    const data = before(params)
+    return { ...data, categories: (data?.categories || []).map((c) => (reopened.has(c.id) ? { ...c, status: 'inscricoes' } : c)) }
+  },
+}
