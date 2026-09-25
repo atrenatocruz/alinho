@@ -1,10 +1,20 @@
 import { supabase } from './supabase'
 import { errorKind } from './errors'
 
+// Procurar pessoas pelo nome (PlayerSearch: jogo privado, convidar no Gerir;
+// inscrições do torneio). SÓ id, nome e foto (Trello #518): a
+// `search_players` manda também nível, género, lado e clubes de toda a gente
+// para o telemóvel, e nenhum destes ecrãs os usa. Enquanto a
+// `search_people_basic` (Dev 3) não correr em produção, cai para a antiga,
+// guardando só os mesmos três campos.
+const basicPerson = ({ id, name, avatar_url }) => ({ id, name, avatar_url })
 export const searchPlayers = async (query) => {
-  const { data, error } = await supabase.rpc('search_players', { p_query: query })
-  if (error) throw error
-  return data || []
+  const { data, error } = await supabase.rpc('search_people_basic', { p_query: query })
+  if (!error) return (data || []).map(basicPerson)
+  if (!/search_people_basic|PGRST202|42883/i.test(`${error.code} ${error.message}`)) throw error
+  const old = await supabase.rpc('search_players', { p_query: query })
+  if (old.error) throw old.error
+  return (old.data || []).map(basicPerson)
 }
 
 export const listPlayers = async (limit = 20) => {
