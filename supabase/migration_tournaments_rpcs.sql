@@ -1,3 +1,11 @@
+-- ⚠️⚠️ NÃO VOLTAR A CORRER ESTE FICHEIRO INTEIRO (Dev 3, 25 set 2026, #491).
+-- Tem o CREATE OR REPLACE da mark_walkover ANTIGA, de 4 argumentos: sem as
+-- faltas em cadeia do #459 e sem as regras do #491. Correr isto outra vez
+-- deixa duas mark_walkover em produção (chamadas «ambíguas», PGRST203, como
+-- no #465). A que vale é a de 6 argumentos, da
+-- migration_tournaments_walkover_rest.sql + migration_tournament_walkover
+-- _guards.sql. Precisas de outra peça daqui? Copia só essa função.
+--
 -- ════════════════════════════════════════════════════════════════════════
 -- TORNEIOS, PARTE 2: AS FUNÇÕES QUE ESCREVEM  (Dev 3, 21 set 2026)
 -- Cartões #361 («Torneio 1/6») e #365 («Torneio 5/6»).

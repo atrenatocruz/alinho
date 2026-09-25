@@ -165,6 +165,13 @@ function CourtCard({ match, scoring, tieTarget = 7, onSave, onWalkover, onUndoWa
   /** O problema do tie-break, se houver (pro set em 8-8/9-8, ou sets 7-6). */
   const tieProblem = () => {
     if (bySets) {
+      // «2 sets + super tie-break»: o 3.º set é um super tie-break — acaba
+      // aos 10, com 2 de vantagem (decisão do Francisco, 25 set, via BA).
+      const third = sets[2]
+      if (scoring === 'melhor_2_sets' && third && third.a !== '' && third.b !== '') {
+        const p = tieBreakProblem(third.a, third.b, 10)
+        if (p) return p
+      }
       for (const [i, s] of sets.entries()) {
         if ((i === 2 && scoring === 'melhor_2_sets') || !isSevenSix(s)) continue
         const p = tieBreakProblem(s.ta ?? '', s.tb ?? '', 7)
