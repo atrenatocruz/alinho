@@ -249,6 +249,10 @@ export const AuthProvider = ({ children }) => {
   const PROFILE_RETRY_DELAYS_MS = [700, 1500, 3000]
 
   const loadProfile = (userId, attempt = 0) => {
+    // Sessão de teste (Admin(Dev)): o perfil e os clubes vêm do mock e não
+    // da base de dados. Sem isto, abrir um link ?org= em localhost recarregava
+    // o perfil e dava «Não foi possível carregar os teus dados» (#447).
+    if (import.meta.env.DEV && localStorage.getItem(MOCK_ADMIN_KEY) === 'true') return Promise.resolve()
     const isInitialLoad = !initialLoadDoneRef.current
     if (attempt === 0) {
       if (profileRequestRef.current?.userId === userId) {
