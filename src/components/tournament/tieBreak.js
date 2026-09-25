@@ -34,6 +34,19 @@ export function tieBreakProblem(a, b, target = 7) {
   return null
 }
 
+/** O tie-break de um jogo acabado, para as listas (Trello #561):
+ *    pro set  → { tb: '7-5', super: false }   (o 9-8 já se lê ao lado)
+ *    por sets → { sets: '6-4 · 6-7 (5-7) · 10-8' }
+ *  null se não houver nada a acrescentar ao resultado. */
+export function matchTieBreak(m) {
+  const sets = m?.sets || []
+  if (sets.length === 1 && sets[0].tiebreak_a != null) {
+    return { tb: `${sets[0].tiebreak_a}-${sets[0].tiebreak_b}`, super: !!sets[0].is_super_tiebreak }
+  }
+  if (sets.length > 1) return { sets: sets.map(setText).join(' · ') }
+  return null
+}
+
 /** «7-6 (7-5)», «9-8 (10-8)», «6-4». */
 export const setText = (s) => (
   s.tiebreak_a != null && s.tiebreak_b != null

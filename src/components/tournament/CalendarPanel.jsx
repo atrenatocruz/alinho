@@ -10,6 +10,7 @@ import { EmptyState } from '../ui'
 import { MonoLabel, StatePill } from './TournamentBits'
 import useCategoryBoard from './useCategoryBoard'
 import { byDayAndTime, unscheduled } from '../../lib/tournamentDraw'
+import { matchTieBreak } from './tieBreak'
 
 const hhmm = (iso) => new Date(iso).toTimeString().slice(0, 5)
 
@@ -41,8 +42,12 @@ function MatchRow({ match, entries, t }) {
         </p>
       </div>
       {done ? (
-        <b className="font-mono text-[12px] text-ink-900">
+        <b className="shrink-0 whitespace-nowrap font-mono text-[12px] text-ink-900">
           {match.score_a}-{match.score_b}
+          {/* O tie-break do pro set ao lado do 9-8 (Trello #561). */}
+          {match.status === 'terminado' && matchTieBreak(match)?.tb && (
+            <span className="font-normal text-muted"> ({matchTieBreak(match).tb})</span>
+          )}
         </b>
       ) : match.status === 'a_decorrer' ? (
         <StatePill tone="live">{t('tournament.draw.live')}</StatePill>
