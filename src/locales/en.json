@@ -2433,7 +2433,7 @@
   "teacher.schedule_error_order": "The end time has to be after the start time.",
   "teacher.schedule_error_overlap": "This slot overlaps another one on the same day.",
   "teacher.schedule_error_save": "Couldn't save. Try again.",
-  "teacher.schedule_saved": "Saved. It now shows on your coach page.",
+  "teacher.schedule_saved": "Schedule saved",
   "rankings.scale_title": "Scale",
   "rankings.scale_masculino": "Men",
   "rankings.scale_feminino": "Women",

@@ -2434,7 +2434,7 @@
   "teacher.schedule_error_order": "A hora de fim tem de ser depois da de início.",
   "teacher.schedule_error_overlap": "Este horário choca com outro no mesmo dia.",
   "teacher.schedule_error_save": "Não foi possível guardar. Tenta outra vez.",
-  "teacher.schedule_saved": "Guardado. Já aparece na tua página de professor.",
+  "teacher.schedule_saved": "Horário guardado",
   "rankings.scale_title": "Escala",
   "rankings.scale_masculino": "Masculino",
   "rankings.scale_feminino": "Feminino",
