@@ -181,7 +181,8 @@ export default function TeacherSection() {
             <span className="text-muted">{t('teacher.contact_label')}</span>
             <span className="text-ink-900 font-extrabold break-words">{mine.contact}</span>
           </div>
-          {/* #550: aprova quem aceitar primeiro — o clube ou a equipa Alinho. */}
+          {/* Decisão B (Francisco, 25 set): com clube decide o clube; sem clube
+              decide a equipa Alinho (com a prova, #320). */}
           {mine.status === 'pending' && (
             <p className="text-sm text-ink-500">
               {clubName

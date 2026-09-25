@@ -835,6 +835,9 @@ const TABLE_MOCKS = {
     ...(community() ? { searchable: true } : {}),
     owner_id: MOCK_ADMIN_USER_ID, plan_tier: localStorage.getItem('mockPlanTier') || 'pro',
   }],
+  // localStorage.mockTeacherFollowed = 'true' — já sigo o professor (#418, assunto 4).
+  follows: () => (localStorage.getItem('mockTeacherFollowed') === 'true'
+    ? [{ id: 'f-teacher', status: 'accepted', followed_id: 'u-ana' }] : []),
   // localStorage.mockCommunity — um professor com clube e um sem clube.
   teacher_profiles: (url) => (community() && url.includes('club_status=eq.pending') ? [
     { id: 'tp-c1', status: 'approved', contact: '914 555 666', zone: 'Almada', created_at: '2026-09-16T08:00:00Z', user: { name: 'Sofia Ramos' } },
