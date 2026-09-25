@@ -136,7 +136,11 @@ export const TOURNAMENT_RPC_MOCKS = {
       entry_count: 84,
       category_count: 5,
     }]
-    return [...created, ...base]
+    // mockTPrivate = 'true': mais um, privado e com inscrições abertas (#482).
+    const priv = localStorage.getItem('mockTPrivate') === 'true' && !empty()
+      ? [{ ...TOURNAMENT(), id: 'tour-private', slug: 'smash-cup-privado', name: 'Smash Cup by WFit', status: 'inscricoes', is_public: false, entry_count: 12, category_count: 7 }]
+      : []
+    return [...created, ...priv, ...base]
   },
   create_tournament: (params) => {
     const d = params?.p_draft || {}
@@ -243,8 +247,16 @@ export const TOURNAMENT_RPC_MOCKS = {
     const fri = nextFriday()
     const mine = created.find((x) => x.id === params?.p_tournament_id)
     const t = mine ? { ...TOURNAMENT(), ...mine } : TOURNAMENT()
+    // mockTBadDates (Trello #514): 'past' = prazo já passado (ontem);
+    // 'draw' = sorteio antes do prazo; 'duration' = mínima maior que a máxima.
+    const bad = localStorage.getItem('mockTBadDates')
+    const yesterday = dayAfter(new Date(), -1)
+    const edits = bad === 'past' ? { entries_deadline: `${iso(yesterday)}T22:59:00+00:00` }
+      : bad === 'draw' ? { draw_on: iso(dayAfter(fri, -6)) }
+        : {}
+    const rules = bad === 'duration' ? { duration_min: 90, duration_max: 60 } : {}
     return {
-      tournament: { ...t, draw_on: t.draw_on, rules: {} },
+      tournament: { ...t, draw_on: t.draw_on, ...edits, rules },
       days: [0, 1, 2].map((n) => ({
         id: `d${n}`, date: iso(dayAfter(fri, n)), starts_at: n === 0 ? '18:00' : '09:00', ends_at: n === 2 ? '18:00' : '21:00', courts: n === 2 ? 3 : 4,
       })),
