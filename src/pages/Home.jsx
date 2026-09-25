@@ -1,12 +1,13 @@
 import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { Link, useSearchParams, useNavigationType, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Users } from 'lucide-react'
+import { Users, Search, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { EmptyState, PrimaryButton } from '../components/ui'
 import { GameEventCard, FriendsEventCard, ExploreEventCard } from '../components/agenda/EventCard'
-import { DayHeader, MonthSheet, FilterSheet, FilterChips, LocationChip, LocationSheet, ViewToggle, Sheet, dayLabel } from '../components/agenda/AgendaControls'
+import { DayHeader, MonthSheet, FilterSheet, FilterChips, LocationChip, LocationSheet, ViewToggle, Sheet, dayLabel, KIND_FILTER_KEY, SHOW_LABEL_KEY } from '../components/agenda/AgendaControls'
+import HomeSearch from '../components/agenda/HomeSearch'
 import { MapView } from '../components/agenda/MapView'
 import { listExploreEvents, getSavedLocation, saveLocation } from '../lib/explore'
 import { countPeople, mixCapacity, isGenderMismatch, isAgeIneligible, isMissingBirthday } from '../lib/mixLogic'
@@ -100,6 +101,8 @@ export default function Home() {
   const [joinError, setJoinError] = useState('')
 
   const [filters, setFilters] = useState(() => normalizeFilters(readSession(FILTERS_KEY, null)))
+  // Procurar um evento (Trello #547): com texto, a lista dá lugar aos resultados.
+  const [search, setSearch] = useState('')
   // O dia que está no topo da lista — é o que a data do cabeçalho mostra.
   const [visibleDay, setVisibleDay] = useState(() => toDayKey(new Date()))
   // Dia de torneio: quem marca resultados tem o botão em «Hoje» (#505).
@@ -361,6 +364,22 @@ export default function Home() {
     || filters.orgIds != null
     || EVENT_KINDS.some((k) => !filters.kinds.includes(k))
   const emptyByFilters = filtersActive && visible.length === 0 && events.length > 0
+  const searching = search.trim().length > 0
+  // Ao começar a procurar, os resultados abrem no topo — a Home guarda a
+  // posição da agenda (salta para hoje), que deixava a lista a meio.
+  useEffect(() => {
+    if (!searching) return
+    const main = scroller()
+    if (main) main.scrollTop = 0
+    else window.scrollTo(0, 0)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searching])
+  // «A procurar só em …»: os filtros ligados, com as palavras dos próprios filtros.
+  const filtersLabel = [
+    filters.show !== DEFAULT_FILTERS.show ? t(SHOW_LABEL_KEY[filters.show]) : null,
+    ...(EVENT_KINDS.some((k) => !filters.kinds.includes(k)) ? filters.kinds.map((k) => t(KIND_FILTER_KEY[k])) : []),
+    ...(filters.orgIds ? orgs.filter((o) => filters.orgIds.includes(o.id)).map((o) => o.name) : []),
+  ].filter(Boolean).join(', ')
   // O mapa só mostra o que ainda vem à frente — pins de eventos passados não
   // ajudam a decidir onde jogar a seguir.
   const pins = useMemo(() => eventsToPins(visible.filter((e) => !isPastEvent(e, today))), [visible, today])
@@ -731,13 +750,52 @@ export default function Home() {
             {headerActions}
           </div>
         </div>
-        {viewMode === 'list' && <DayHeader dayKey={visibleDay} onOpenMonth={() => setMonthOpen(true)} />}
-        <FilterChips filters={filters} onOpenFilters={() => setFiltersOpen(true)} />
+        {/* Procurar (Trello #547): por cima da data e dos filtros, com a
+            mesma forma da Comunidade e dos Rankings. */}
+        {viewMode === 'list' && (
+          <label className="flex items-center gap-2 input-field focus-within:border-ink-500 focus-within:ring-2 focus-within:ring-ink-50">
+            <Search size={16} className="text-muted shrink-0" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+              placeholder={t('agenda.search_placeholder')}
+              className="flex-1 min-w-0 bg-transparent outline-none text-base"
+            />
+            {search && (
+              <button type="button" onClick={() => setSearch('')} aria-label={t('agenda.search_clear')} className="text-muted shrink-0">
+                <X size={16} />
+              </button>
+            )}
+          </label>
+        )}
+        {viewMode === 'list' && !searching && <DayHeader dayKey={visibleDay} onOpenMonth={() => setMonthOpen(true)} />}
+        {(!searching || filtersActive) && <FilterChips filters={filters} onOpenFilters={() => setFiltersOpen(true)} />}
       </div>
 
 
       {viewMode === 'map' ? (
         <MapView pins={pins} location={location} onSelectPin={setSelectedPin} />
+      ) : searching ? (
+        <HomeSearch
+          events={visible}
+          query={search}
+          todayKey={today}
+          filtersActive={filtersActive}
+          filtersLabel={filtersLabel}
+          onSearchAll={() => setFilters(DEFAULT_FILTERS)}
+          onClear={() => setSearch('')}
+          results={myMixResults}
+          linkFor={(e) => (
+            e.source === 'game' || e.source === 'explore' ? `/jogo/${e.id}`
+              : e.kind === 'tournament' ? (e.slug || e.id ? `/torneio/${e.slug || e.id}` : null)
+                : e.source === 'lesson' ? `/aula/${e.id}`
+                  : e.source === 'group_match' ? (orgSlugById.get(e.orgId) ? `/clube/${orgSlugById.get(e.orgId)}/jogos` : null)
+                    : e.source === 'private_match' ? '/jogos-privados'
+                      : null
+          )}
+        />
       ) : (
         <div className="mt-3 space-y-5">
           {days.map(({ dayKey, events: dayEvents }) => (
