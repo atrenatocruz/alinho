@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
-import { ChevronLeft, ChevronRight, ChevronDown, Calendar, X, MapPin, LocateFixed, Map, List } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronDown, Calendar, X, MapPin, LocateFixed, Map, List, Search } from 'lucide-react'
 import { useGooglePlacesAutocomplete } from '../../lib/useGooglePlacesAutocomplete'
 import { RADIUS_OPTIONS } from '../../lib/explore'
 import { formatDate } from '../../lib/formatDate'
@@ -153,7 +153,7 @@ export function MonthSheet({ dayKey, counts, onPick, onClose }) {
 
 export const SHOW_LABEL_KEY = { all: 'agenda.show_all', enrolled: 'agenda.show_enrolled', open: 'agenda.show_open' }
 
-const KIND_FILTER_KEY = { mix: 'agenda.filter_kind_mix', open: 'agenda.filter_kind_open', friends: 'agenda.filter_kind_friends', lesson: 'agenda.filter_kind_lesson', tournament: 'agenda.filter_kind_tournament' }
+export const KIND_FILTER_KEY = { mix: 'agenda.filter_kind_mix', open: 'agenda.filter_kind_open', friends: 'agenda.filter_kind_friends', lesson: 'agenda.filter_kind_lesson', tournament: 'agenda.filter_kind_tournament' }
 
 export function FilterSheet({ filters, orgs, countFor, onApply, onClose }) {
   const { t } = useTranslation()
@@ -358,7 +358,9 @@ export function LocationSheet({ location, onSave, onClose }) {
   )
 }
 
-export function FilterChips({ filters, onOpenFilters }) {
+// onOpenSearch (Home, #547): a lupa é a primeira pastilha da fila, redonda e
+// do tamanho das outras — abre a pesquisa por cima da Home.
+export function FilterChips({ filters, onOpenFilters, onOpenSearch }) {
   const { t } = useTranslation()
   const kindsOn = filters.kinds.length < EVENT_KINDS.length
   const orgsOn = filters.orgIds != null
@@ -367,6 +369,12 @@ export function FilterChips({ filters, onOpenFilters }) {
   }`
   return (
     <div className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-1 px-1">
+      {onOpenSearch && (
+        <button type="button" onClick={onOpenSearch} aria-label={t('agenda.search_open')} title={t('agenda.search_open')}
+          className="shrink-0 inline-flex items-center justify-center w-9 min-h-[36px] rounded-full border bg-canvas text-ink-700 border-line">
+          <Search size={16} />
+        </button>
+      )}
       {/* "Todos" é o normal: só fica escuro quando se escolhe outra opção. */}
       <button type="button" onClick={onOpenFilters} className={chip(filters.show !== 'all')}>
         {t(SHOW_LABEL_KEY[filters.show] || SHOW_LABEL_KEY.all)} <ChevronDown size={14} />
