@@ -49,7 +49,8 @@ function Field({ label, children, hint, error }) {
   )
 }
 
-const inputClass = 'w-full rounded-ctrl border border-line bg-canvas px-3 py-2.5 text-sm text-ink-900 placeholder:text-ink-300'
+// min-h 44: alvo de toque para o dedo, à beira do campo (Trello #558).
+const inputClass = 'w-full min-h-[44px] rounded-ctrl border border-line bg-canvas px-3 py-2.5 text-sm text-ink-900 placeholder:text-ink-300'
 
 // Só para os botões de acrescentar (+ dia, + campo, + categoria). As
 // escolhas usam <Chips>, a pastilha única da app (Trello #528).
@@ -58,7 +59,7 @@ function Chip({ onClick, children }) {
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-line px-3 py-1.5 text-[12.5px] text-ink-700 transition-colors hover:bg-ink-50"
+      className="inline-flex min-h-[44px] items-center gap-1 whitespace-nowrap rounded-full border border-line px-3 py-1.5 text-[12.5px] text-ink-700 transition-colors hover:bg-ink-50"
     >
       {children}
     </button>
@@ -108,12 +109,12 @@ function DayCategories({ draft, set, dayLabel }) {
                 <input
                   type="time"
                   aria-label={t('tournament.create.start_time')}
-                  className="w-[100px] shrink-0 rounded-ctrl border border-line bg-canvas px-2 py-2 text-sm"
+                  className="w-[100px] min-h-[44px] shrink-0 rounded-ctrl border border-line bg-canvas px-2 py-2 text-sm"
                   value={c.start_time || ''}
                   onChange={(e) => patch(c.code, { start_time: e.target.value })}
                 />
                 <button type="button" onClick={() => patch(c.code, { day: '' })}
-                  aria-label={t('tournament.create.remove')} className="shrink-0 text-ink-300 hover:text-danger">
+                  aria-label={t('tournament.create.remove')} className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center -my-3 -mx-2 shrink-0 text-ink-300 hover:text-danger">
                   <X size={14} />
                 </button>
               </div>
@@ -320,7 +321,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
                   type="button"
                   onClick={removePoster}
                   aria-label={t('tournament.create.poster_remove')}
-                  className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-ink-900/80 text-white"
+                  className="absolute right-2 top-2 inline-flex h-11 w-11 items-center justify-center rounded-full bg-ink-900/80 text-white"
                 >
                   <X size={15} />
                 </button>
@@ -371,7 +372,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
               <div className="min-w-0 flex-1">
                 <DateField value={draft.entries_close_at.slice(0, 10)} onChange={(v) => set({ entries_close_at: `${v}T${draft.entries_close_at.slice(11) || '23:59'}` })} />
               </div>
-              <input type="time" className="w-[104px] rounded-ctrl border border-line bg-canvas px-2 py-2.5 text-sm" value={draft.entries_close_at.slice(11) || '23:59'} onChange={(e) => set({ entries_close_at: `${draft.entries_close_at.slice(0, 10)}T${e.target.value}` })} />
+              <input type="time" className="w-[104px] min-h-[44px] rounded-ctrl border border-line bg-canvas px-2 py-2.5 text-sm" value={draft.entries_close_at.slice(11) || '23:59'} onChange={(e) => set({ entries_close_at: `${draft.entries_close_at.slice(0, 10)}T${e.target.value}` })} />
             </div>
           </Field>
           <Field label={t('tournament.create.draw')} hint={t('tournament.create.draw_hint')} error={fieldError(DRAW_PROBLEMS)}>
@@ -415,8 +416,8 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
                   {c.day ? ` · ${dayLabel(c.day)}${c.start_time ? ` ${c.start_time}` : ''}` : ''}
                 </span>
               </span>
-              <button type="button" onClick={() => setEditing(i)} className="text-[11.5px] text-ink-500 hover:underline">{t('tournament.create.edit')}</button>
-              <button type="button" aria-label={t('tournament.create.remove')} onClick={() => set({ categories: draft.categories.filter((_, k) => k !== i) })} className="text-ink-300 hover:text-danger">
+              <button type="button" onClick={() => setEditing(i)} className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center -my-3 -mx-2 text-[11.5px] text-ink-500 hover:underline">{t('tournament.create.edit')}</button>
+              <button type="button" aria-label={t('tournament.create.remove')} onClick={() => set({ categories: draft.categories.filter((_, k) => k !== i) })} className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center -my-3 -mx-2 text-ink-300 hover:text-danger">
                 <Trash2 size={15} />
               </button>
             </div>
@@ -462,7 +463,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
               {draft.days.map((d) => (
                 <span key={d.date} className="inline-flex items-center gap-1.5 rounded-full bg-ink-900 px-3 py-1.5 text-[12.5px] font-semibold text-white">
                   {dayLabel(d.date)}
-                  <button type="button" aria-label={t('tournament.create.remove')} onClick={() => set({ days: draft.days.filter((x) => x.date !== d.date) })}>
+                  <button type="button" aria-label={t('tournament.create.remove')} onClick={() => set({ days: draft.days.filter((x) => x.date !== d.date) })} className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center -my-3 -mx-2">
                     <X size={13} />
                   </button>
                 </span>
@@ -479,7 +480,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
               <div className="min-w-0 flex-1">
                 <DateField value={draft.entries_close_at.slice(0, 10)} onChange={(v) => set({ entries_close_at: `${v}T${draft.entries_close_at.slice(11) || '23:59'}` })} />
               </div>
-              <input type="time" className="w-[104px] rounded-ctrl border border-line bg-canvas px-2 py-2.5 text-sm" value={draft.entries_close_at.slice(11) || '23:59'} onChange={(e) => set({ entries_close_at: `${draft.entries_close_at.slice(0, 10)}T${e.target.value}` })} />
+              <input type="time" className="w-[104px] min-h-[44px] rounded-ctrl border border-line bg-canvas px-2 py-2.5 text-sm" value={draft.entries_close_at.slice(11) || '23:59'} onChange={(e) => set({ entries_close_at: `${draft.entries_close_at.slice(0, 10)}T${e.target.value}` })} />
             </div>
           </Field>
           <Field label={t('tournament.create.draw')} hint={t('tournament.create.draw_hint')} error={fieldError(DRAW_PROBLEMS)}>
@@ -500,12 +501,12 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
             <div key={d.date} className="mt-2 rounded-card border border-line p-3">
               <b className="text-sm text-ink-900">{dayLabel(d.date)}</b>
               <div className="mt-2 flex items-center gap-2">
-                <input type="time" className="w-[100px] rounded-ctrl border border-line bg-canvas px-2 py-2 text-sm" value={d.starts_at} onChange={(e) => patchDay(i, { starts_at: e.target.value })} />
+                <input type="time" className="w-[100px] min-h-[44px] rounded-ctrl border border-line bg-canvas px-2 py-2 text-sm" value={d.starts_at} onChange={(e) => patchDay(i, { starts_at: e.target.value })} />
                 <span className="text-xs text-ink-500">{t('tournament.create.to')}</span>
-                <input type="time" className="w-[100px] rounded-ctrl border border-line bg-canvas px-2 py-2 text-sm" value={d.ends_at} onChange={(e) => patchDay(i, { ends_at: e.target.value })} />
+                <input type="time" className="w-[100px] min-h-[44px] rounded-ctrl border border-line bg-canvas px-2 py-2 text-sm" value={d.ends_at} onChange={(e) => patchDay(i, { ends_at: e.target.value })} />
               </div>
               <div className="mt-2 flex items-center gap-2">
-                <input type="number" min="1" max="30" className="w-[72px] rounded-ctrl border border-line bg-canvas px-2 py-2 text-sm" value={d.courts} onChange={(e) => patchDay(i, { courts: e.target.value })} />
+                <input type="number" min="1" max="30" className="w-[72px] min-h-[44px] rounded-ctrl border border-line bg-canvas px-2 py-2 text-sm" value={d.courts} onChange={(e) => patchDay(i, { courts: e.target.value })} />
                 <span className="text-xs text-ink-500">{t('tournament.create.courts_label')}</span>
               </div>
             </div>
@@ -515,7 +516,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
               {draft.courts.map((name, i) => (
                 <span key={i} className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-[12.5px]">
                   {name}
-                  <button type="button" aria-label={t('tournament.create.remove')} onClick={() => set({ courts: draft.courts.filter((_, k) => k !== i) })}><X size={13} /></button>
+                  <button type="button" aria-label={t('tournament.create.remove')} onClick={() => set({ courts: draft.courts.filter((_, k) => k !== i) })} className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center -my-3 -mx-2"><X size={13} /></button>
                 </span>
               ))}
               <Chip onClick={() => set({ courts: [...draft.courts, t('tournament.create.court_n', { n: draft.courts.length + 1 })] })}>
@@ -572,9 +573,9 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
           )}
           <Field label={t('tournament.create.duration')} hint={t('tournament.create.duration_hint', { max: draft.rules.duration_max })} error={fieldError(['duration_order'])}>
             <div className="flex items-center gap-2">
-              <input type="number" min="15" max="180" step="5" className="w-[86px] rounded-ctrl border border-line bg-canvas px-2 py-2 text-sm" value={draft.rules.duration_min} onChange={(e) => setRule('duration_min', Number(e.target.value))} />
+              <input type="number" min="15" max="180" step="5" className="w-[86px] min-h-[44px] rounded-ctrl border border-line bg-canvas px-2 py-2 text-sm" value={draft.rules.duration_min} onChange={(e) => setRule('duration_min', Number(e.target.value))} />
               <span className="text-xs text-ink-500">{t('tournament.create.to')}</span>
-              <input type="number" min="15" max="180" step="5" className="w-[86px] rounded-ctrl border border-line bg-canvas px-2 py-2 text-sm" value={draft.rules.duration_max} onChange={(e) => setRule('duration_max', Number(e.target.value))} />
+              <input type="number" min="15" max="180" step="5" className="w-[86px] min-h-[44px] rounded-ctrl border border-line bg-canvas px-2 py-2 text-sm" value={draft.rules.duration_max} onChange={(e) => setRule('duration_max', Number(e.target.value))} />
               <span className="text-xs text-ink-500">min</span>
             </div>
           </Field>
