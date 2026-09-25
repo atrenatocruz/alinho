@@ -13,9 +13,11 @@ import { useTranslation } from 'react-i18next'
 import { ChevronLeft, Shuffle, Check, AlertTriangle, RefreshCw, Printer } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { PrimaryButton, EmptyState, ConfirmSheet } from '../ui'
+import { Sheet } from '../agenda/AgendaControls'
+import { describeError } from '../../lib/errors'
 import { MonoLabel, StatePill } from './TournamentBits'
 import {
-  listCategoriesAdmin, listCategorySeeding, closeCategoryEntries,
+  listCategoriesAdmin, listCategorySeeding, closeCategoryEntries, reopenCategoryEntries,
   saveCategoryFormat, drawCategory, clearCategoryDraw, buildDrawPayload, buildKnockoutPayload,
 } from '../../lib/tournamentDraw'
 import { formatOptions, recommendFormat, availableCourtHours, pickSeeds } from '../../lib/tournamentFormat'
@@ -239,7 +241,8 @@ function FormatStep({ days: dayRows, rules, category, teamCount, onDone, t }) {
 /* ── Passo 3: o sorteio ─────────────────────────────────────────────────
    Ver antes de confirmar. Nada é gravado enquanto o organizador não
    carregar em «Confirmar sorteio» — pode voltar a sortear as vezes que
-   quiser, e as cabeças de série são trocáveis. */
+   quiser, e trocar as cabeças de série à mão (Trello #517): a app propõe
+   pelos pontos, o organizador troca, e «Repor pelos pontos» volta atrás. */
 function DrawStep({ category, onDone, onChangeFormat, t }) {
   const [teams, setTeams] = useState(null)
   const [seedIds, setSeedIds] = useState(null)
@@ -266,11 +269,28 @@ function DrawStep({ category, onDone, onChangeFormat, t }) {
     return () => { cancelled = true }
   }, [category.id])
 
+  // A proposta pelos pontos, e as cabeças que valem: as escolhidas à mão,
+  // se as houver (Trello #517). «Sortear outra vez» só baralha o resto.
+  const proposed = useMemo(() => (teams && groupCount ? pickSeeds(teams, groupCount) : []), [teams, groupCount])
   const seeds = useMemo(() => {
     if (!teams || !groupCount) return []
     if (seedIds) return seedIds.map((id) => teams.find((x) => x.id === id)).filter(Boolean)
-    return pickSeeds(teams, groupCount)
-  }, [teams, groupCount, seedIds])
+    return proposed
+  }, [teams, groupCount, seedIds, proposed])
+  const [swapIndex, setSwapIndex] = useState(null) // a cabeça que se está a trocar
+  const [swapPick, setSwapPick] = useState(null)
+
+  // Escolher para a cabeça N uma dupla que já é cabeça troca as duas de
+  // lugar — nunca há a mesma dupla em dois grupos, nem um grupo sem cabeça.
+  const chooseSeed = (index, id) => {
+    const ids = seeds.map((x) => x.id)
+    const already = ids.indexOf(id)
+    if (already >= 0) [ids[index], ids[already]] = [ids[already], ids[index]]
+    else ids[index] = id
+    const same = ids.every((x, i) => x === proposed[i]?.id)
+    setSeedIds(same ? null : ids)
+    setSwapIndex(null)
+  }
 
   const payload = useMemo(() => {
     if (!teams) return null
@@ -344,20 +364,72 @@ function DrawStep({ category, onDone, onChangeFormat, t }) {
   return (
     <div>
       <MonoLabel className="mb-1">{t('tournament.draw.seeds_label')}</MonoLabel>
-      <p className="mb-1.5 text-[11.5px] text-muted">{t('tournament.draw.seeds_note')}</p>
-      <div className="mb-3 overflow-hidden rounded-xl border border-ink-100 bg-white">
-        {seeds.map((s, i) => (
-          <div key={s.id} className="flex items-center gap-2 border-t border-ink-50 px-3 py-2 first:border-t-0">
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#E9E7FB] font-mono text-[10.5px] font-bold text-[#4338A8]">
-              {i + 1}
-            </span>
-            <span className="min-w-0 flex-1 truncate text-[12.5px] text-ink-900">{s.name}</span>
-            <span className="font-mono text-[10px] text-muted">
-              {s.incomplete ? t('tournament.draw.points_unknown') : t('tournament.draw.points', { n: s.points })}
-            </span>
-          </div>
-        ))}
+      <p className="mb-1.5 text-[11.5px] text-muted">{t('tournament.draw.seeds_note_swap')}</p>
+      <div className="mb-1 overflow-hidden rounded-xl border border-ink-100 bg-white">
+        {seeds.map((s, i) => {
+          const byHand = seedIds && s.id !== proposed[i]?.id
+          return (
+            <div key={s.id} className={`flex min-h-[52px] items-center gap-2 border-t border-ink-50 px-3 py-1.5 first:border-t-0 ${byHand ? 'bg-lime-100/60' : ''}`}>
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#E9E7FB] font-mono text-[10.5px] font-bold text-[#4338A8]">
+                {i + 1}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-[13px] font-bold text-ink-900">{s.name}</span>
+              {byHand
+                ? <span className="shrink-0 rounded-full bg-lime-200 px-2 py-0.5 text-[10.5px] font-bold text-ink-900">{t('tournament.draw.seed_by_hand')}</span>
+                : (
+                  <span className="shrink-0 font-mono text-[10px] text-muted">
+                    {s.incomplete ? t('tournament.draw.points_none') : t('tournament.draw.points', { n: s.points })}
+                  </span>
+                )}
+              <button type="button" onClick={() => { setSwapIndex(i); setSwapPick(s.id) }} disabled={busy}
+                className="min-h-[44px] shrink-0 rounded-full border border-ink-900 bg-white px-3.5 text-[12.5px] font-bold text-ink-900">
+                {t('tournament.draw.seed_swap')}
+              </button>
+            </div>
+          )
+        })}
       </div>
+      {seedIds ? (
+        <button type="button" onClick={() => setSeedIds(null)} disabled={busy}
+          className="mb-3 min-h-[44px] text-[12.5px] font-bold text-ink-900 underline underline-offset-2">
+          {t('tournament.draw.seeds_reset')}
+        </button>
+      ) : <div className="mb-3" />}
+
+      {swapIndex != null && (
+        <Sheet title={t('tournament.draw.seed_sheet_title', { n: swapIndex + 1 })} onClose={() => setSwapIndex(null)}>
+          <p className="-mt-1 mb-2 text-[13px] text-ink-700">{t('tournament.draw.seed_sheet_hint')}</p>
+          <div className="mb-3 divide-y divide-line">
+            {teams.map((x) => {
+              const seedAt = seeds.findIndex((y) => y.id === x.id)
+              const on = swapPick === x.id
+              return (
+                <button key={x.id} type="button" onClick={() => setSwapPick(x.id)}
+                  className={`flex min-h-[48px] w-full items-center gap-2 px-1 text-left ${on ? 'bg-ink-50' : ''}`}>
+                  <span className="min-w-0 flex-1 truncate text-[14px] font-bold text-ink-900">{x.name}</span>
+                  {seedAt >= 0 && (
+                    <span className="shrink-0 rounded-full bg-[#E9E7FB] px-2 py-0.5 font-mono text-[10.5px] font-bold text-[#4338A8]">
+                      {t('tournament.draw.seed_tag')} {seedAt + 1}
+                    </span>
+                  )}
+                  <span className="w-[72px] shrink-0 text-right font-mono text-[11px] text-muted">
+                    {x.incomplete ? t('tournament.draw.points_none') : x.points}
+                  </span>
+                  <span className="w-4 shrink-0 text-ink-900">{on && <Check size={15} strokeWidth={3} />}</span>
+                </button>
+              )
+            })}
+          </div>
+          {/* Preso em baixo: com 16 duplas a lista desce, e o botão não pode
+              ir com ela. */}
+          <div className="sticky -bottom-5 -mx-5 bg-surface px-5 pb-5 pt-2">
+            <button type="button" disabled={!swapPick} onClick={() => chooseSeed(swapIndex, swapPick)}
+              className="flex min-h-[52px] w-full items-center justify-center rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold text-white disabled:opacity-40">
+              {t('tournament.draw.seed_choose', { name: teams.find((x) => x.id === swapPick)?.name || '' })}
+            </button>
+          </div>
+        </Sheet>
+      )}
 
       <MonoLabel className="mb-1">{t('tournament.draw.preview_label')}</MonoLabel>
       {payload.groups.map((g) => (
@@ -385,13 +457,52 @@ function DrawStep({ category, onDone, onChangeFormat, t }) {
         <PrimaryButton onClick={confirm} disabled={busy}>{t('tournament.draw.draw_confirm')}</PrimaryButton>
         <button
           type="button"
-          onClick={() => { setSeedIds(null); setSeed((n) => n + 1) }}
+          // Mantém as cabeças escolhidas; só volta a baralhar o resto (#517).
+          onClick={() => setSeed((n) => n + 1)}
           disabled={busy}
           className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-2 text-[12px] font-semibold text-ink-700 hover:bg-ink-50"
         >
           <RefreshCw size={14} /> {t('tournament.draw.draw_again')}
         </button>
       </div>
+    </div>
+  )
+}
+
+/* ── A caixa do estado de uma categoria fechada e ainda não sorteada ─────
+   Com «Reabrir inscrições» (Trello #517): discreto, porque não é o de
+   todos os dias, e a pergunta é SEM vermelho — reabrir não estraga nada,
+   volta-se a fechar. Mas diz o que se perde: a escolha de quem entra. */
+function ClosedBox({ category, onReopened, t }) {
+  const [asking, setAsking] = useState(false)
+  const selected = category.selected_count || 0
+  const waitlist = category.waitlist_count || 0
+  const reopen = async () => {
+    const result = await reopenCategoryEntries(category.id)
+    onReopened(result)
+  }
+  return (
+    <div className="mb-3 rounded-xl border border-ink-100 bg-white px-3 py-2.5">
+      <b className="text-[13px] font-extrabold text-ink-900">{t('tournament.draw.closed_box_title')}</b>
+      <p className="mt-0.5 text-[12px] text-ink-700">
+        {[t('tournament.n.selected', { count: selected }), waitlist ? t('tournament.n.reserves', { count: waitlist }) : null].filter(Boolean).join(' · ')}
+      </p>
+      <button type="button" onClick={() => setAsking(true)}
+        className="mt-0.5 min-h-[44px] text-[13px] font-bold text-ink-900 underline underline-offset-2">
+        {t('tournament.draw.reopen')}
+      </button>
+      <ConfirmSheet
+        open={asking}
+        title={t('tournament.draw.reopen_title', { code: category.code })}
+        message={waitlist
+          ? t('tournament.draw.reopen_message', { chosen: selected, waitlist: t('tournament.n.reserves', { count: waitlist }) })
+          : t('tournament.draw.reopen_message_no_waitlist', { chosen: selected })}
+        confirmLabel={t('tournament.draw.reopen')}
+        cancelLabel={t('tournament.draw.reopen_not_now')}
+        onConfirm={reopen}
+        onClose={() => setAsking(false)}
+        errorOf={(err) => describeError(t, err)}
+      />
     </div>
   )
 }
@@ -465,6 +576,9 @@ export default function DrawAdminPanel({ tournament, onBack }) {
   const [reload, setReload] = useState(0)
   // «Mudar formato» a partir do sorteio: volta ao passo 2 sem apagar nada.
   const [reformatId, setReformatId] = useState(null)
+  // Reabriu com o prazo do torneio já passado: ninguém se inscreve até ele
+  // o mudar. Diz-se aqui, no sítio onde se reabriu.
+  const [reopenedLate, setReopenedLate] = useState(null)
 
   useEffect(() => {
     let cancelled = false
@@ -523,11 +637,22 @@ export default function DrawAdminPanel({ tournament, onBack }) {
           ))
         )
       ) : picked.status === 'inscricoes' ? (
-        <CloseEntriesStep category={picked} onDone={done} t={t} />
-      ) : picked.status === 'fechada' && (!picked.format || reformatId === picked.id) ? (
-        <FormatStep days={data.days} rules={data.rules} category={picked} teamCount={teamCount} onDone={done} t={t} />
+        <>
+          {reopenedLate === picked.id && (
+            <p className="mb-2 rounded-xl border border-[#E8C58A] bg-[#FFF6E5] px-3 py-2.5 text-[12.5px] text-ink-900">
+              {t('tournament.draw.reopen_deadline_passed')}
+            </p>
+          )}
+          <CloseEntriesStep category={picked} onDone={done} t={t} />
+        </>
       ) : picked.status === 'fechada' ? (
-        <DrawStep category={picked} onDone={done} onChangeFormat={() => setReformatId(picked.id)} t={t} />
+        <>
+          <ClosedBox category={picked} t={t}
+            onReopened={(r) => { setReopenedLate(r?.deadline_passed ? picked.id : null); done() }} />
+          {!picked.format || reformatId === picked.id
+            ? <FormatStep days={data.days} rules={data.rules} category={picked} teamCount={teamCount} onDone={done} t={t} />
+            : <DrawStep category={picked} onDone={done} onChangeFormat={() => setReformatId(picked.id)} t={t} />}
+        </>
       ) : (
         <DoneStep tournament={tournament} category={picked} onDone={done} t={t} />
       )}

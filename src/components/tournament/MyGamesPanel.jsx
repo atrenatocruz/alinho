@@ -6,9 +6,12 @@ import { useTranslation } from 'react-i18next'
 import { Trophy } from 'lucide-react'
 import { EmptyState } from '../ui'
 import { MonoLabel } from './TournamentBits'
+import useCategoryBoard from './useCategoryBoard'
+import { myMatchesFromBoard } from '../../lib/myTournamentMatches'
 
 /** Sáb 10:00 — dia curto + hora, em mono, como no desenho. */
 function When({ date, time, locale }) {
+  if (!date) return <b className="font-mono text-[10.5px] font-bold text-ink-500">—</b>
   const d = new Date(`${date}T${time || '00:00'}`)
   const day = d.toLocaleDateString(locale, { weekday: 'short' }).replace('.', '')
   return (
@@ -18,9 +21,19 @@ function When({ date, time, locale }) {
   )
 }
 
-export default function MyGamesPanel({ category, myMatches = [] }) {
+export default function MyGamesPanel({ category, myEntries = [], myMatches = [] }) {
   const { t, i18n } = useTranslation()
-  const rows = myMatches.filter((m) => !category || m.category_id === category.id)
+  // Os jogos vêm das vistas públicas da categoria (Trello #508): a base de
+  // dados nunca mandou `my_matches`, por isso o separador ficava vazio.
+  // `myMatches` fica só para o mock de localhost, que ainda o traz.
+  const board = useCategoryBoard(category?.id)
+  const myIds = myEntries.filter((e) => e.category_id === category?.id).map((e) => e.entry_id).filter(Boolean)
+  const fromBoard = myMatchesFromBoard(board, myIds)
+  const rows = fromBoard.length ? fromBoard : myMatches.filter((m) => !category || m.category_id === category.id)
+
+  if (board.loading && !rows.length) {
+    return <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-8 w-8 border-[3px] border-ink-50 border-t-ink-700"></div></div>
+  }
 
   if (!rows.length) {
     return (
@@ -32,8 +45,9 @@ export default function MyGamesPanel({ category, myMatches = [] }) {
     )
   }
 
-  // O jogo seguinte é o primeiro que ainda não tem resultado.
-  const nextId = rows.find((m) => !m.score)?.id
+  // O jogo seguinte é o primeiro que ainda não acabou (falta e desistência
+  // também acabam o jogo, mesmo sem resultado).
+  const nextId = rows.find((m) => !(m.done ?? m.score))?.id
 
   return (
     <div>
@@ -41,7 +55,7 @@ export default function MyGamesPanel({ category, myMatches = [] }) {
       {rows.map((m) => {
         const phase = m.group_label
           ? `${m.group_label}${m.order_in_group ? ` · ${m.order_in_group}/${m.of_group}` : ''}`
-          : m.round_label
+          : m.round_label || (m.round ? t(`tournament.draw.round_${m.round}`) : '')
         const unknown = !m.opponent
         const isNext = m.id === nextId
         return (
@@ -59,9 +73,9 @@ export default function MyGamesPanel({ category, myMatches = [] }) {
                 {unknown ? t('tournament.my_games_if_you_win') : t('tournament.my_games_vs', { opponent: m.opponent })}
               </em>
             </span>
-            {m.score ? (
+            {m.score || (m.done && m.status !== 'terminado') ? (
               <span className={`whitespace-nowrap text-[11px] font-bold ${m.won ? 'text-ok' : 'text-ink-500'}`}>
-                {m.score} {m.won ? '✓' : ''}
+                {m.score || t(m.status === 'desistencia' ? 'tournament.score.desistencia_title' : 'tournament.score.walkover')} {m.won ? '✓' : ''}
               </span>
             ) : m.previous_time ? (
               <span className="whitespace-nowrap text-[11.5px] text-ink-500">

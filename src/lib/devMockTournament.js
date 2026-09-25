@@ -67,6 +67,8 @@ const MY_MATCHES = () => {
   ]
 }
 
+const myGamesReal = () => localStorage.getItem('mockTMyGamesReal') === 'true'
+
 const TOURNAMENT = () => {
   const fri = nextFriday()
   // `mockTournamentEmpty` = torneio acabado de criar. Se o estado for pedido
@@ -267,8 +269,14 @@ export const TOURNAMENT_RPC_MOCKS = {
         id: `d${n}`, date: iso(dayAfter(fri, n)),
         starts_at: n === 0 ? '18:00' : '09:00', ends_at: n === 2 ? '18:00' : '21:00',
       })),
-      my: empty() ? null : { category_id: 'cat-m5', state: 'validada', entry_id: 'en-me' },
-      my_matches: empty() || state() === 'inscricoes' ? [] : MY_MATCHES(),
+      // localStorage.mockTMyGamesReal = 'true' (+ mockTDraw): sou a dupla e1
+      // do M4 e «Os meus jogos» lê as vistas, como em produção (Trello #508).
+      ...(myGamesReal()
+        ? { my: { category_id: 'cat-m4', state: 'validada', entry_id: 'e1' },
+            my_entries: [{ category_id: 'cat-m4', status: 'validada', state: 'validada', entry_id: 'e1' }],
+            my_matches: [] }
+        : { my: empty() ? null : { category_id: 'cat-m5', state: 'validada', entry_id: 'en-me' },
+            my_matches: empty() || state() === 'inscricoes' ? [] : MY_MATCHES() }),
     }
   },
 }
@@ -524,5 +532,22 @@ export const TOURNAMENT_SCORE_TODAY_TABLE_MOCKS = {
       { id: 'tour-amanha', slug: 'torneio-de-amanha', name: 'Torneio de amanhã', club_name: 'Smash Padel',
         starts_on: lisbonDay(1), ends_on: lisbonDay(2), status: 'sorteado' },
     ]
+  },
+}
+
+// ── Reabrir inscrições de uma categoria (Trello #517) ───────────────────
+// Funciona com os dados do sorteio (mockTDraw). Reabrir põe a categoria em
+// «inscrições» até recarregar a página. localStorage.mockTReopenLate =
+// 'true' faz o servidor responder que o prazo do torneio já passou.
+const reopened = new Set()
+export const TOURNAMENT_REOPEN_RPC_MOCKS = {
+  reopen_category_entries: (params) => {
+    reopened.add(params?.p_category_id)
+    return { chosen_back: 16, waitlist_back: 0, deadline_passed: localStorage.getItem('mockTReopenLate') === 'true' }
+  },
+  list_tournament_categories_admin: (params, before) => {
+    if (!reopened.size || !before) return undefined
+    const data = before(params)
+    return { ...data, categories: (data?.categories || []).map((c) => (reopened.has(c.id) ? { ...c, status: 'inscricoes' } : c)) }
   },
 }

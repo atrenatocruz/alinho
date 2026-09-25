@@ -88,6 +88,16 @@ export default function TournamentEventCard({ event, past }) {
         </p>
       )}
 
+      {/* Jogo acabado: o resultado, do meu lado primeiro (Trello #508). */}
+      {isMatch && event.finished && (event.myScore || event.won != null) && (
+        <p className="mt-1 text-sm font-extrabold text-ink-900 tabular-nums">
+          {[
+            event.myScore,
+            event.won != null ? t(event.won ? 'agenda.result_win' : 'agenda.result_loss') : null,
+          ].filter(Boolean).join(' · ')}
+        </p>
+      )}
+
       <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted">
         <Avatar name={event.orgName} url={event.orgLogo} size="w-[18px] h-[18px] text-[8px]" />
         <span className="min-w-0 truncate">
@@ -103,7 +113,7 @@ export default function TournamentEventCard({ event, past }) {
 
       {/* Hora prevista, nunca garantida — a regra da Federação que o
           desenho manda repetir no cartão (SPEC §6). */}
-      {isMatch && !past && (
+      {isMatch && !past && !event.finished && (
         <p className="mt-2 flex items-center gap-1.5 text-xs" style={{ color: LILAC.ink }}>
           <Clock size={13} /> {t('tagenda.may_start_earlier')}
         </p>
