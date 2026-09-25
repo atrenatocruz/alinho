@@ -14,6 +14,7 @@ import { Link } from 'react-router-dom'
 import { SearchX } from 'lucide-react'
 import { semAcentos } from '../../lib/semAcentos'
 import { formatDate, formatTime } from '../../lib/formatDate'
+import { friendsMatchTitle } from './EventCard'
 
 const eventTitle = (e) => e.raw?.title || e.raw?.name || e.raw?.tournament_name || ''
 const eventPlace = (e) => e.raw?.location || e.courtName || ''
@@ -40,7 +41,7 @@ function Realce({ text, query }) {
   )
 }
 
-export default function HomeSearch({ events, query, todayKey, filtersActive, filtersLabel, onSearchAll, onClear, linkFor, results }) {
+export default function HomeSearch({ events, query, todayKey, filtersActive, filtersLabel, onSearchAll, onClear, linkFor, results, userId }) {
   const { t, i18n } = useTranslation()
   const found = events.filter((e) => e.dayKey && eventMatches(e, query))
   const past = (e) => e.finished || e.dayKey < todayKey
@@ -50,7 +51,8 @@ export default function HomeSearch({ events, query, todayKey, filtersActive, fil
   const row = (e, isPast) => {
     const d = e.startsAt
     const weekday = formatDate(d, i18n.language, { weekday: 'short' }).replace('.', '').slice(0, 3).toUpperCase()
-    const title = eventTitle(e) || e.orgName || ''
+    // Jogos entre amigos não têm título: o mesmo nome do cartão da Home.
+    const title = eventTitle(e) || (e.kind === 'friends' ? friendsMatchTitle(e.raw || {}, userId, t) : '') || e.orgName || ''
     const result = results?.get?.(e.id)
     const extra = isPast
       ? (result?.mix_won ? t('agenda.search_won') : t('agenda.search_played'))

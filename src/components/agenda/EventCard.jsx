@@ -347,12 +347,21 @@ export function ExploreEventCard({ event, profile, distance = null, onJoin = nul
 
 const SLOTS = ['team_a_player1', 'team_a_player2', 'team_b_player1', 'team_b_player2']
 
+/** O nome de um jogo entre amigos, que não tem título: «Tu + Ana vs Rui + Zé».
+ *  O próprio aparece como "Tu". Usado no cartão e na pesquisa da Home (#547). */
+export function friendsMatchTitle(m, userId, t) {
+  const nameOf = (slot) => (m[`${slot}_id`] && m[`${slot}_id`] === userId ? t('agenda.you') : m[`${slot}_name`] || m[`${slot}_guest_name`] || null)
+  const team = (prefix) => [nameOf(`${prefix}_player1`), nameOf(`${prefix}_player2`)].filter(Boolean)
+  const teamA = team('team_a')
+  const teamB = team('team_b')
+  return teamB.length ? `${teamA.join(' + ')} ${t('gamedetails.vs')} ${teamB.join(' + ')}` : teamA.join(' + ')
+}
+
 export function FriendsEventCard({ event, userId, orgSlug = null, invite = null, past = false }) {
   const { t, i18n } = useTranslation()
   const m = event.raw
   // O próprio aparece como "Tu": o cartão é lido por quem está nele.
   const nameOf = (slot) => (m[`${slot}_id`] && m[`${slot}_id`] === userId ? t('agenda.you') : m[`${slot}_name`] || m[`${slot}_guest_name`] || null)
-  const team = (prefix) => [nameOf(`${prefix}_player1`), nameOf(`${prefix}_player2`)].filter(Boolean)
   const players = SLOTS
     .filter((s) => m[`${s}_id`] || m[`${s}_guest_name`])
     .map((s) => ({ id: m[`${s}_id`], name: nameOf(s), avatar_url: m[`${s}_avatar`] }))
@@ -361,11 +370,7 @@ export function FriendsEventCard({ event, userId, orgSlug = null, invite = null,
   const ranked = event.source === 'private_match' ? m.ranked_intent : m.ranked
   const to = event.source === 'private_match' ? '/jogos-privados' : orgSlug ? `/clube/${orgSlug}/jogos` : null
 
-  const teamA = team('team_a')
-  const teamB = team('team_b')
-  const title = teamB.length
-    ? `${teamA.join(' + ')} ${t('gamedetails.vs')} ${teamB.join(' + ')}`
-    : teamA.join(' + ')
+  const title = friendsMatchTitle(m, userId, t)
 
   let state = null
   if (past || event.finished) state = <StateTag tone="grey" icon={CheckCircle2}>{t('agenda.state_finished')}</StateTag>

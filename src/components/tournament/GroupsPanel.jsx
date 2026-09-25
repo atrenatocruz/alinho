@@ -20,6 +20,13 @@ function GroupTable({ group, matches, entries, qualifiers, myEntryId, t }) {
     (m) => m.stage === 'grupo' && m.group_id === group.id && m.score_a != null,
   ).length
   const total = matches.filter((m) => m.stage === 'grupo' && m.group_id === group.id).length
+  // Só se marca quem passa quando o grupo acabou (Trello #513): a meio, a
+  // marca prometia um apuramento que ainda pode mudar. Acabado = cada jogo
+  // tem resultado ou vencedor gravado (falta/desistência), a mesma conta do
+  // «Passar ao quadro».
+  const done = total > 0 && matches
+    .filter((m) => m.stage === 'grupo' && m.group_id === group.id)
+    .every((m) => ['terminado', 'falta', 'desistencia'].includes(m.status) || m.winner_entry_id)
 
   return (
     <section className="mb-3 overflow-hidden rounded-xl border border-ink-100 bg-white">
@@ -44,12 +51,17 @@ function GroupTable({ group, matches, entries, qualifiers, myEntryId, t }) {
             <th className="w-10 py-1.5 text-center font-semibold" title={t('tournament.draw.col_diff_full')}>
               {t('tournament.draw.col_diff')}
             </th>
+            {/* Jogos ganhos: o 4.º critério do desempate — sem a coluna não
+                se percebia porque é que uma dupla ficou à frente (#513). */}
+            <th className="w-9 py-1.5 text-center font-semibold" title={t('tournament.draw.col_games_won_full')}>
+              {t('tournament.draw.col_games_won')}
+            </th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row, i) => {
             const team = entries[row.id]
-            const passes = i < qualifiers
+            const passes = done && i < qualifiers
             const mine = myEntryId && row.id === myEntryId
             return (
               <tr
@@ -81,6 +93,7 @@ function GroupTable({ group, matches, entries, qualifiers, myEntryId, t }) {
                 <td className="py-1.5 text-center font-mono text-[11px] text-muted">
                   {row.diff > 0 ? `+${row.diff}` : row.diff}
                 </td>
+                <td className="py-1.5 text-center font-mono text-[11px] text-muted">{row.gamesWon}</td>
               </tr>
             )
           })}
@@ -88,7 +101,7 @@ function GroupTable({ group, matches, entries, qualifiers, myEntryId, t }) {
       </table>
 
       <p className="border-t border-ink-50 px-3 py-1.5 text-[10.5px] text-muted">
-        {t('tournament.draw.qualify_note', { count: qualifiers })}
+        {t(done ? 'tournament.draw.qualify_note' : 'tournament.draw.qualify_note_running', { count: qualifiers })}
       </p>
     </section>
   )

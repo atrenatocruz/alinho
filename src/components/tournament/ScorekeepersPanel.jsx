@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Users } from 'lucide-react'
-import { addScorekeeper, listScorekeepers, removeScorekeeper } from '../../lib/tournamentApi'
+import { addScorekeeper, listScorekeepers, removeScorekeeper, searchScorekeeperCandidates } from '../../lib/tournamentApi'
 import { describeError, errorKind } from '../../lib/errors'
 import { Avatar } from '../ui'
 import PlayerSearch from '../PlayerSearch'
@@ -72,7 +72,8 @@ export default function ScorekeepersPanel({ tournament, onBack }) {
 
       <div className="mt-4">
         <MonoLabel className="mb-1.5">{t('tournament.score.keeper_add')}</MonoLabel>
-        <PlayerSearch onSelect={add} excludeIds={(list || []).map((k) => k.user_id)} />
+        {/* Só nome e foto, de toda a app (Trello #518, decisão do PO). */}
+        <PlayerSearch onSelect={add} searchFn={searchScorekeeperCandidates} excludeIds={(list || []).map((k) => k.user_id)} />
       </div>
 
       <div className="mt-4 flex items-start gap-2 rounded-ctrl border border-line bg-surface p-2.5 text-[12px] text-ink-700">

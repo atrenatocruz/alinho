@@ -49,6 +49,7 @@ import {
    ════════════════════════════════════════════════════════════════════════ */
 
 const FILTERS_KEY = 'home.agenda.filters'
+const SEARCH_KEY = 'home.agenda.search'
 const VIEW_MODE_KEY = 'home.agenda.view'
 let homeShownBefore = false
 
@@ -101,8 +102,19 @@ export default function Home() {
   const [joinError, setJoinError] = useState('')
 
   const [filters, setFilters] = useState(() => normalizeFilters(readSession(FILTERS_KEY, null)))
-  // Procurar um evento (Trello #547): com texto, a lista dá lugar aos resultados.
-  const [search, setSearch] = useState('')
+  // Procurar um evento (Trello #547). Desde a mudança de 25 set: uma lupa na
+  // fila dos filtros abre a pesquisa POR CIMA da Home. Guardada na sessão para
+  // «voltar do evento regressa à pesquisa, com o texto escrito»; «Fechar»
+  // limpa e volta à Home tal como estava.
+  const [searchState, setSearchState] = useState(() => readSession(SEARCH_KEY, { open: false, q: '' }))
+  const search = searchState.q || ''
+  const searchOpen = !!searchState.open
+  const setSearch = (q) => setSearchState((st) => ({ ...st, q }))
+  const openSearch = () => setSearchState({ open: true, q: '' })
+  const closeSearch = () => setSearchState({ open: false, q: '' })
+  useEffect(() => {
+    try { sessionStorage.setItem(SEARCH_KEY, JSON.stringify(searchState)) } catch { /* sem sessão, sem memória */ }
+  }, [searchState])
   // O dia que está no topo da lista — é o que a data do cabeçalho mostra.
   const [visibleDay, setVisibleDay] = useState(() => toDayKey(new Date()))
   // Dia de torneio: quem marca resultados tem o botão em «Hoje» (#505).
@@ -365,15 +377,6 @@ export default function Home() {
     || EVENT_KINDS.some((k) => !filters.kinds.includes(k))
   const emptyByFilters = filtersActive && visible.length === 0 && events.length > 0
   const searching = search.trim().length > 0
-  // Ao começar a procurar, os resultados abrem no topo — a Home guarda a
-  // posição da agenda (salta para hoje), que deixava a lista a meio.
-  useEffect(() => {
-    if (!searching) return
-    const main = scroller()
-    if (main) main.scrollTop = 0
-    else window.scrollTo(0, 0)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searching])
   // «A procurar só em …»: os filtros ligados, com as palavras dos próprios filtros.
   const filtersLabel = [
     filters.show !== DEFAULT_FILTERS.show ? t(SHOW_LABEL_KEY[filters.show]) : null,
@@ -750,52 +753,13 @@ export default function Home() {
             {headerActions}
           </div>
         </div>
-        {/* Procurar (Trello #547): por cima da data e dos filtros, com a
-            mesma forma da Comunidade e dos Rankings. */}
-        {viewMode === 'list' && (
-          <label className="flex items-center gap-2 input-field focus-within:border-ink-500 focus-within:ring-2 focus-within:ring-ink-50">
-            <Search size={16} className="text-muted shrink-0" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
-              placeholder={t('agenda.search_placeholder')}
-              className="flex-1 min-w-0 bg-transparent outline-none text-base"
-            />
-            {search && (
-              <button type="button" onClick={() => setSearch('')} aria-label={t('agenda.search_clear')} className="text-muted shrink-0">
-                <X size={16} />
-              </button>
-            )}
-          </label>
-        )}
-        {viewMode === 'list' && !searching && <DayHeader dayKey={visibleDay} onOpenMonth={() => setMonthOpen(true)} />}
-        {(!searching || filtersActive) && <FilterChips filters={filters} onOpenFilters={() => setFiltersOpen(true)} />}
+        {viewMode === 'list' && <DayHeader dayKey={visibleDay} onOpenMonth={() => setMonthOpen(true)} />}
+        <FilterChips filters={filters} onOpenFilters={() => setFiltersOpen(true)} onOpenSearch={viewMode === 'list' ? openSearch : undefined} />
       </div>
 
 
       {viewMode === 'map' ? (
         <MapView pins={pins} location={location} onSelectPin={setSelectedPin} />
-      ) : searching ? (
-        <HomeSearch
-          events={visible}
-          query={search}
-          todayKey={today}
-          filtersActive={filtersActive}
-          filtersLabel={filtersLabel}
-          onSearchAll={() => setFilters(DEFAULT_FILTERS)}
-          onClear={() => setSearch('')}
-          results={myMixResults}
-          linkFor={(e) => (
-            e.source === 'game' || e.source === 'explore' ? `/jogo/${e.id}`
-              : e.kind === 'tournament' ? (e.slug || e.id ? `/torneio/${e.slug || e.id}` : null)
-                : e.source === 'lesson' ? `/aula/${e.id}`
-                  : e.source === 'group_match' ? (orgSlugById.get(e.orgId) ? `/clube/${orgSlugById.get(e.orgId)}/jogos` : null)
-                    : e.source === 'private_match' ? '/jogos-privados'
-                      : null
-          )}
-        />
       ) : (
         <div className="mt-3 space-y-5">
           {days.map(({ dayKey, events: dayEvents }) => (
@@ -825,6 +789,72 @@ export default function Home() {
           ))}
           {/* Espaço no fim para o último dia poder subir até ao cabeçalho. */}
           <div className="h-[40vh]" aria-hidden="true" />
+        </div>
+      )}
+
+      {/* A pesquisa por cima da Home (Trello #547, 25 set): ecrã inteiro,
+          teclado aberto, «Fechar» limpa e volta à Home tal como estava. */}
+      {searchOpen && (
+        <div className="fixed inset-0 z-50 bg-canvas overflow-y-auto">
+          <div className="max-w-lg mx-auto px-4 pt-4 pb-10">
+            <div className="flex items-center gap-2">
+              <label className="flex-1 min-w-0 flex items-center gap-2 input-field !border-2 !border-ink-900">
+                <Search size={16} className="text-muted shrink-0" />
+                <input
+                  type="text"
+                  value={search}
+                  autoFocus
+                  onChange={(e) => setSearch(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+                  placeholder={t('agenda.search_placeholder_short')}
+                  className="flex-1 min-w-0 bg-transparent outline-none text-base"
+                />
+                {search && (
+                  <button type="button" onClick={() => setSearch('')} aria-label={t('agenda.search_clear')} className="text-muted shrink-0">
+                    <X size={16} />
+                  </button>
+                )}
+              </label>
+              <button type="button" onClick={closeSearch} className="shrink-0 px-2 min-h-[44px] text-sm font-extrabold text-ink-900">
+                {t('agenda.search_close')}
+              </button>
+            </div>
+            {searching ? (
+              <HomeSearch
+                events={visible}
+                query={search}
+                todayKey={today}
+                filtersActive={filtersActive}
+                filtersLabel={filtersLabel}
+                onSearchAll={() => setFilters(DEFAULT_FILTERS)}
+                onClear={() => setSearch('')}
+                results={myMixResults}
+                userId={user.id}
+                linkFor={(e) => (
+                  e.source === 'game' || e.source === 'explore' ? `/jogo/${e.id}`
+                    : e.kind === 'tournament' ? (e.slug || e.id ? `/torneio/${e.slug || e.id}` : null)
+                      : e.source === 'lesson' ? `/aula/${e.id}`
+                        : e.source === 'group_match' ? (orgSlugById.get(e.orgId) ? `/clube/${orgSlugById.get(e.orgId)}/jogos` : null)
+                          : e.source === 'private_match' ? '/jogos-privados'
+                            : null
+                )}
+              />
+            ) : (
+              <div className="mt-4 space-y-3">
+                <p className="text-sm text-muted">{t('agenda.search_help')}</p>
+                {orgs.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {orgs.map((o) => (
+                      <button key={o.id} type="button" onClick={() => setSearch(o.name)}
+                        className="inline-flex items-center px-3 min-h-[40px] rounded-full border border-line bg-canvas text-sm font-extrabold text-ink-900">
+                        {o.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
