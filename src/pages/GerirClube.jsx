@@ -2731,12 +2731,13 @@ export default function GerirClube() {
                       // evento e na Home (#383) -- nunca numa etiqueta a parte.
                       if (row.recurrence_id) sufixo = t('ui.recurring')
                       acao = { texto: t('gerirclube.edit_action'), fazer: () => startEditGame(row), perigo: false }
-                      // Rascunho (Trello #544): «Mix · Rascunho», «só tu vês» e
-                      // «Publicar» no lugar de «Editar».
+                      // Rascunho (Trello #544): «Mix · Rascunho», «só tu vês», e
+                      // «Editar» + «Publicar» — só com «Publicar» o rascunho não
+                      // se conseguia editar nem apagar (revisão da designer, 25 set).
                       if (isDraftMix(row)) {
                         sufixo = t('mixdraft.draft')
                         detalhe = [item.quando ? quandoCurto(item.quando, true) : null, t('mixdraft.only_you')].filter(Boolean).join(' · ')
-                        acao = { texto: t('mixdraft.publish'), fazer: () => setPublishing(row), perigo: false, forte: true }
+                        acao = { ...acao, publicar: () => setPublishing(row) }
                       }
                     }
                     if (tipo === 'aberto' && row.status !== 'cancelled' && !(row.participants || []).some((p) => p.status === 'confirmed')) {
@@ -2750,7 +2751,7 @@ export default function GerirClube() {
                   // O rascunho fica sem cor e a tracejado até ser publicado.
                   const rascunho = tipo === 'mix' && isDraftMix(row)
                   return (
-                    <div key={item.chave} className={`flex items-stretch rounded-ctrl border transition-[filter] duration-fast hover:brightness-[0.98] ${
+                    <div key={item.chave} className={`flex ${rascunho ? 'flex-col' : 'items-stretch'} rounded-ctrl border transition-[filter] duration-fast hover:brightness-[0.98] ${
                       rascunho ? 'bg-white border-2 border-dashed border-ink-200' : cor.card
                     }`}>
                       <button type="button" onClick={abrir} className="flex-1 min-w-0 text-left p-4">
@@ -2765,14 +2766,22 @@ export default function GerirClube() {
                         <p className="text-lg font-semibold text-ink-900 mt-1 truncate">{linha}</p>
                         <p className="text-sm text-muted mt-0.5">{detalhe}</p>
                       </button>
-                      {acao && acao.forte ? (
-                        <span className="shrink-0 flex items-center pr-3">
+                      {acao && acao.publicar ? (
+                        // Por baixo do texto, para o nome não ficar cortado.
+                        <span className="flex items-center justify-end gap-1 px-3 pb-3 -mt-2">
                           <button
                             type="button"
                             onClick={acao.fazer}
-                            className="min-h-[44px] rounded-full bg-ink-900 px-4 text-sm font-extrabold text-white"
+                            className="min-h-[44px] px-2 text-sm font-extrabold text-ink-900 hover:underline"
                           >
                             {acao.texto}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={acao.publicar}
+                            className="min-h-[44px] rounded-full bg-ink-900 px-4 text-sm font-extrabold text-white"
+                          >
+                            {t('mixdraft.publish')}
                           </button>
                         </span>
                       ) : acao && (
