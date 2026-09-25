@@ -50,7 +50,9 @@ function AdminEntrySheet({ organizationId, categories = [], categoryId: initialC
   const [partner, setPartner] = useState(null)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
-  const [paid, setPaid] = useState(true)
+  // Desmarcado à partida (Trello #516): quem se esquecesse de o tirar
+  // validava uma dupla que não pagou. Marca-se quando o pagamento foi feito.
+  const [paid, setPaid] = useState(false)
 
   useEffect(() => {
     let cancelled = false
