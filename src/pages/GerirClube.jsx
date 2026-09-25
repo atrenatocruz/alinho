@@ -11,7 +11,7 @@ import { createGroup } from '../lib/platformAdmin'
 import { listClubGroups, getOrganizationDeleteBlocker, deleteSelfServeGroup, transferOrganizationOwnership, setOrganizationPlan } from '../lib/organizations'
 import { formatRating } from '../lib/elo'
 import { formatDate as formatDateLib, formatTime as formatTimeLib } from '../lib/formatDate'
-import { DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal, OrgKindBadge, PlanBadge, PLAN_TIERS, planName, Tabs } from '../components/ui'
+import { DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal, ConfirmSheet, OrgKindBadge, PlanBadge, PLAN_TIERS, planName, Tabs } from '../components/ui'
 import { planLimitMessage, isMixLimitError, isMemberLimitError, limitsFor, nextPlanTier } from '../lib/plans'
 import { totalRounds, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, SCORING_FORMAT_LABEL_KEY } from '../lib/mixLogic'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
@@ -33,6 +33,7 @@ import ClubTournamentsPanel from '../components/tournament/ClubTournamentsPanel'
 import { KIND_STYLE } from '../components/agenda/EventCard'
 import { tournamentsAvailable } from '../lib/tournamentApi'
 import { describeError } from '../lib/errors'
+import { isDraftMix, publishDraftMix, advanceByFrequency, pendingOccurrenceRow } from '../lib/mixDraft'
 
 const sanitizeSlug = (value) => value.toLowerCase().replace(/[^a-z0-9-]/g, '')
 
@@ -244,6 +245,10 @@ export default function GerirClube() {
   const [loading, setLoading] = useState(true)
   const [showCreateGame, setShowCreateGame] = useState(false)
   const [editingGame, setEditingGame] = useState(null)
+  // Mix em rascunho (Trello #544): o que se vai publicar ou eliminar,
+  // enquanto a pergunta está aberta.
+  const [publishing, setPublishing] = useState(null)
+  const [deletingDraft, setDeletingDraft] = useState(null)
   // «Editar» esta em cada linha da lista, mas o formulario abre no topo do
   // separador: sem isto, quem edita um mix la em baixo nao via nada mudar.
   const formMixRef = useRef(null)
@@ -915,18 +920,8 @@ export default function GerirClube() {
     ...(typeof game.allow_pair_signup === 'boolean' ? { allow_pair_signup: game.allow_pair_signup } : {}),
   })
 
-  // Computes the date one frequency step after `date` — used to pre-create
-  // the first pending occurrence when a recurrence starts (createRecurrence
-  // below), mirroring what process_due_game_recurrences (supabase/schema.sql)
-  // does for every occurrence after that.
-  const advanceByFrequency = (date, frequency) => {
-    const d = new Date(date)
-    if (frequency === 'daily') d.setDate(d.getDate() + 1)
-    else if (frequency === 'weekly') d.setDate(d.getDate() + 7)
-    else if (frequency === 'monthly') d.setMonth(d.getMonth() + 1)
-    else if (frequency === 'yearly') d.setFullYear(d.getFullYear() + 1)
-    return d
-  }
+  // advanceByFrequency vive em src/lib/mixDraft.js: publicar um rascunho de
+  // uma série (Trello #544) prepara a data seguinte com a mesma conta.
 
   // Converts the "N dias antes, às HH:MM" input into the same
   // mix_offset_seconds shape the rest of the system (and the cron
@@ -976,7 +971,7 @@ export default function GerirClube() {
     (isMixLimitError(error?.message || '') && planLimitMessage(t, 'mix', org?.plan_tier))
     || describeError(t, error, fallbackKey)
 
-  const createRecurrence = async (game, recurrence, userId) => {
+  const createRecurrence = async (game, recurrence, userId, { skipNext = false } = {}) => {
     const mixOffsetSeconds = computeLaunchOffsetSeconds(game.date, recurrence.launchDaysBefore, recurrence.launchTime)
 
     const { data: newRecurrence, error: recurrenceError } = await supabase
@@ -1007,6 +1002,11 @@ export default function GerirClube() {
       return
     }
 
+    // Série criada em rascunho (Trello #544): a regra fica gravada, mas a
+    // data seguinte só se prepara ao publicar (publishDraftMix) — senão o
+    // cron abria-a sozinho antes de o primeiro mix existir para alguém.
+    if (skipNext) return
+
     // Respect the "termina" rule before pre-creating the next occurrence —
     // mirrors the same check process_due_game_recurrences() makes before
     // every insert (supabase/schema.sql), so a recurrence limited to N
@@ -1032,35 +1032,13 @@ export default function GerirClube() {
     // was left for the cron to create later; now it must exist immediately.
     const { error: pendingError } = await supabase
       .from('games')
-      .insert([{
-        organization_id: currentOrganizationId,
-        title: game.title,
-        date: nextDate.toISOString(),
-        location: game.location,
-        price_per_player: game.price_per_player,
-        prize: game.prize,
-        has_voucher: game.has_voucher,
-        num_courts: game.num_courts,
-        max_players: (game.num_courts || 1) * 4,
-        court_time_minutes: game.court_time_minutes,
-        game_time_minutes: game.game_time_minutes,
-        format: game.format,
-        gender_restriction: game.gender_restriction,
-        age_restriction: game.age_restriction ?? null,
-        level: game.level,
-        auto_start_hours_before: game.auto_start_hours_before,
-        // Mesmas escolhas do mix de origem; só vão quando não são o valor por
-        // omissão, para não rebentar antes das migrações que criam as colunas.
-        ...(game.pairing_mode && game.pairing_mode !== 'por_nivel' ? { pairing_mode: game.pairing_mode } : {}),
-        ...(game.rotate_partners ? { rotate_partners: true } : {}),
-        ...(game.ranked === false ? { ranked: false } : {}),
-        ...(game.allow_pair_signup ? { allow_pair_signup: true } : {}),
-        status: 'pending',
-        created_by: userId,
-        recurrence_id: newRecurrence.id,
-        is_recurrence_origin: false,
-        launch_at: new Date(nextDate.getTime() - mixOffsetSeconds * 1000).toISOString(),
-      }])
+      .insert([pendingOccurrenceRow(game, {
+        nextDate,
+        launchAt: new Date(nextDate.getTime() - mixOffsetSeconds * 1000),
+        userId,
+        recurrenceId: newRecurrence.id,
+        organizationId: currentOrganizationId,
+      })])
 
     if (pendingError) {
       console.error('Error pre-creating next occurrence:', pendingError)
@@ -1083,6 +1061,9 @@ export default function GerirClube() {
   const handleCreateGame = async (e) => {
     e.preventDefault()
     setGameError('')
+    // «Guardar como rascunho» é o segundo botão de enviar (Trello #544): o
+    // formulário valida-se na mesma, e o botão diz qual foi.
+    const asDraft = e.nativeEvent?.submitter?.value === 'draft'
 
     // Date used to be enforced by DateTimeField's underlying native
     // input's `required` attribute — it's a fully custom component now.
@@ -1150,7 +1131,7 @@ export default function GerirClube() {
             ...(gameForm.ranked === false ? { ranked: false } : {}),
             level: gameForm.level || null,
             created_by: user.id,
-            status: 'open'
+            status: asDraft ? 'draft' : 'open'
           }
         ])
         .select()
@@ -1163,7 +1144,7 @@ export default function GerirClube() {
       console.log('Game created successfully:', data)
 
       if (recurrence.enabled) {
-        await createRecurrence(data[0], recurrence, user.id)
+        await createRecurrence(data[0], recurrence, user.id, { skipNext: asDraft })
       }
 
       const scopedGroup = mixScopeId ? clubGroups.find((g) => g.id === mixScopeId) : null
@@ -1358,7 +1339,7 @@ export default function GerirClube() {
       } else if (!hadActiveRecurrence && recurrence.enabled) {
         // Wasn't recurring (never was, or a previous recurrence was stopped): start a new one.
         const { data: { user } } = await supabase.auth.getUser()
-        await createRecurrence(data, recurrence, user.id)
+        await createRecurrence(data, recurrence, user.id, { skipNext: isDraftMix(data) })
       }
 
       setEditingGame(null)
@@ -1375,8 +1356,8 @@ export default function GerirClube() {
     }
   }
 
-  const handleDeleteGame = async (gameId) => {
-    if (!confirm(t('gerirclube.confirm_delete_game'))) return
+  const handleDeleteGame = async (gameId, { confirmed = false } = {}) => {
+    if (!confirmed && !confirm(t('gerirclube.confirm_delete_game'))) return
 
     try {
       const gameToDelete = games.find(g => g.id === gameId)
@@ -1418,6 +1399,17 @@ export default function GerirClube() {
         ? t('gerirclube.delete_game_has_results')
         : describeError(t, error, 'gerirclube.error_delete_game'))
     }
+  }
+
+  // Publicar um rascunho (Trello #544). Um erro de limite do plano diz-se
+  // na folha, com as palavras do plano; o resto com o erro descrito.
+  const publishErrorText = (error) =>
+    (isMixLimitError(error?.message || '') && planLimitMessage(t, 'mix', org?.plan_tier))
+    || describeError(t, error, 'mixdraft.publish_error')
+  const handlePublishDraft = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    await publishDraftMix(publishing, user.id)
+    loadGames()
   }
 
   const handleStopRecurrence = async (recurrenceId) => {
@@ -2575,24 +2567,52 @@ export default function GerirClube() {
                       <p className="rounded-ctrl bg-danger/10 text-danger text-sm font-extrabold p-3.5 mb-2">{gameError}</p>
                     )}
 
-                    <div className="flex gap-3">
-                      <button type="submit" className="btn-primary flex-1">
-                        {editingGame ? t('gerirclube.update_button') : t('gerirclube.create_button')}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowCreateGame(false)
-                          setEditingGame(null)
-                          setGameForm(EMPTY_GAME_FORM)
-                          setMixScopeId('')
-                          setGameError('')
-                        }}
-                        className="btn-secondary flex-1"
-                      >
-                        {t('gerirclube.cancel_button')}
-                      </button>
-                    </div>
+                    {/* Criar: «Publicar mix» ou «Guardar como rascunho», cada um
+                        a dizer o que faz (Trello #544, desenho de 25 set).
+                        Editar fica como estava. */}
+                    {editingGame ? (
+                      <div className="flex gap-3">
+                        <button type="submit" className="btn-primary flex-1">
+                          {t('gerirclube.update_button')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowCreateGame(false)
+                            setEditingGame(null)
+                            setGameForm(EMPTY_GAME_FORM)
+                            setMixScopeId('')
+                            setGameError('')
+                          }}
+                          className="btn-secondary flex-1"
+                        >
+                          {t('gerirclube.cancel_button')}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <button type="submit" value="publish" className="btn-primary w-full">
+                          {t('mixdraft.publish_mix')}
+                        </button>
+                        <p className="text-xs text-muted text-center">{t('mixdraft.publish_mix_hint')}</p>
+                        <button type="submit" value="draft" className="btn-secondary w-full !mt-3">
+                          {t('mixdraft.save_draft')}
+                        </button>
+                        <p className="text-xs text-muted text-center">{t('mixdraft.save_draft_hint')}</p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowCreateGame(false)
+                            setGameForm(EMPTY_GAME_FORM)
+                            setMixScopeId('')
+                            setGameError('')
+                          }}
+                          className="w-full min-h-[44px] text-sm font-extrabold text-muted hover:text-ink-900"
+                        >
+                          {t('gerirclube.cancel_button')}
+                        </button>
+                      </div>
+                    )}
                   </form>
 
                   {/* O que estava no cartao da lista e nao e editar: as outras
@@ -2644,7 +2664,10 @@ export default function GerirClube() {
                         )}
                         <button
                           type="button"
-                          onClick={async () => { if (await handleDeleteGame(editingGame.id)) fechar() }}
+                          onClick={async () => {
+                            if (isDraftMix(editingGame)) { setDeletingDraft(editingGame); return }
+                            if (await handleDeleteGame(editingGame.id)) fechar()
+                          }}
                           className="w-full min-h-[44px] rounded-full border border-danger text-danger text-sm font-extrabold hover:bg-danger/10"
                         >
                           {t('gerirclube.delete_mix_button')}
@@ -2708,6 +2731,13 @@ export default function GerirClube() {
                       // evento e na Home (#383) -- nunca numa etiqueta a parte.
                       if (row.recurrence_id) sufixo = t('ui.recurring')
                       acao = { texto: t('gerirclube.edit_action'), fazer: () => startEditGame(row), perigo: false }
+                      // Rascunho (Trello #544): «Mix · Rascunho», «só tu vês» e
+                      // «Publicar» no lugar de «Editar».
+                      if (isDraftMix(row)) {
+                        sufixo = t('mixdraft.draft')
+                        detalhe = [item.quando ? quandoCurto(item.quando, true) : null, t('mixdraft.only_you')].filter(Boolean).join(' · ')
+                        acao = { texto: t('mixdraft.publish'), fazer: () => setPublishing(row), perigo: false, forte: true }
+                      }
                     }
                     if (tipo === 'aberto' && row.status !== 'cancelled' && !(row.participants || []).some((p) => p.status === 'confirmed')) {
                       acao = { texto: t('open_slots.cancel_button'), fazer: () => handleCancelOpenGame(row.id), perigo: true }
@@ -2717,11 +2747,15 @@ export default function GerirClube() {
                   // («Cores e pagina do evento», 17 set): fundo claro na linha,
                   // etiqueta branca com o texto na cor.
                   const cor = KIND_STYLE[{ mix: 'mix', aberto: 'open', torneio: 'tournament', turma: 'lesson' }[tipo]]
+                  // O rascunho fica sem cor e a tracejado até ser publicado.
+                  const rascunho = tipo === 'mix' && isDraftMix(row)
                   return (
-                    <div key={item.chave} className={`flex items-stretch rounded-ctrl border transition-[filter] duration-fast hover:brightness-[0.98] ${cor.card}`}>
+                    <div key={item.chave} className={`flex items-stretch rounded-ctrl border transition-[filter] duration-fast hover:brightness-[0.98] ${
+                      rascunho ? 'bg-white border-2 border-dashed border-ink-200' : cor.card
+                    }`}>
                       <button type="button" onClick={abrir} className="flex-1 min-w-0 text-left p-4">
                         <span className="flex items-center justify-between gap-2">
-                          <span className={`inline-flex items-center gap-1 bg-white text-[11px] font-extrabold px-2 py-1 rounded-full ${cor.text}`}>
+                          <span className={`inline-flex items-center gap-1 text-[11px] font-extrabold px-2 py-1 rounded-full ${rascunho ? 'bg-ink-50 text-ink-700' : `bg-white ${cor.text}`}`}>
                             <Icone size={12} /> {t(etiqueta)}{sufixo && <> · {sufixo}</>}
                           </span>
                           {marca && (
@@ -2731,7 +2765,17 @@ export default function GerirClube() {
                         <p className="text-lg font-semibold text-ink-900 mt-1 truncate">{linha}</p>
                         <p className="text-sm text-muted mt-0.5">{detalhe}</p>
                       </button>
-                      {acao && (
+                      {acao && acao.forte ? (
+                        <span className="shrink-0 flex items-center pr-3">
+                          <button
+                            type="button"
+                            onClick={acao.fazer}
+                            className="min-h-[44px] rounded-full bg-ink-900 px-4 text-sm font-extrabold text-white"
+                          >
+                            {acao.texto}
+                          </button>
+                        </span>
+                      ) : acao && (
                         <button
                           type="button"
                           onClick={acao.fazer}
@@ -2757,6 +2801,36 @@ export default function GerirClube() {
                 {t(gameFilter === 'finished' ? 'gerirclube.see_upcoming' : 'gerirclube.see_past')}
               </button>
               </div>
+
+              {/* Publicar pergunta uma vez: a mensagem do robô não se apaga
+                  (regra das janelas, 24 set). Sem vermelho. */}
+              <ConfirmSheet
+                open={!!publishing}
+                title={t('mixdraft.publish_title', { name: publishing?.title || '' })}
+                message={t('mixdraft.publish_message')}
+                confirmLabel={t('mixdraft.publish')}
+                cancelLabel={t('mixdraft.not_now')}
+                onConfirm={handlePublishDraft}
+                onClose={() => setPublishing(null)}
+                errorOf={publishErrorText}
+              />
+              <ConfirmSheet
+                open={!!deletingDraft}
+                danger
+                title={t('mixdraft.delete_title', { name: deletingDraft?.title || '' })}
+                message={t('mixdraft.delete_message')}
+                confirmLabel={t('mixdraft.delete_confirm')}
+                cancelLabel={t('mixdraft.delete_keep')}
+                onConfirm={async () => {
+                  if (!(await handleDeleteGame(deletingDraft.id, { confirmed: true }))) throw new Error('delete_failed')
+                  setEditingGame(null)
+                  setGameForm(EMPTY_GAME_FORM)
+                  setMixScopeId('')
+                  setGameError('')
+                }}
+                onClose={() => setDeletingDraft(null)}
+                errorOf={() => t('gerirclube.error_delete_game')}
+              />
             </div>
           )}
 
