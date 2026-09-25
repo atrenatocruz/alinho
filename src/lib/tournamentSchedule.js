@@ -23,8 +23,16 @@ export const SCHEDULE_DEFAULTS = {
 /** Ordem das fases dentro de uma categoria: a seguinte só começa quando a
     anterior acabar. */
 export const STAGE_ORDER = ['grupo', 'R32', 'R16', 'QF', 'SF', '3P', 'F']
-const stageRank = (stage) => {
-  const i = STAGE_ORDER.indexOf(stage)
+
+/** Em que fase está um jogo — a mesma conta do servidor
+    (`tournament_phase_rank(stage, round)`). A eliminatória grava-se com
+    `stage` 'principal' ou '3lugar' e a ronda em `round` ('SF', 'F', '3P'…):
+    olhar só para o `stage` punha todas as rondas na mesma fase, e a proposta
+    marcava a final à hora das meias — o servidor recusava (Trello #502).
+    Sem `round`, vale o `stage` (é como o horário se escreve à mão). */
+export const phaseRank = (match) => {
+  if (match?.stage === 'grupo') return 0
+  const i = STAGE_ORDER.indexOf(match?.round ?? match?.stage)
   return i === -1 ? STAGE_ORDER.length : i
 }
 
@@ -38,11 +46,18 @@ export function daySlots(day, durationMaxMin = SCHEDULE_DEFAULTS.durationMaxMin)
   const slots = []
   const start = new Date(`${day.date}T${day.start}:00`)
   const end = new Date(`${day.date}T${day.end}:00`)
+  const [h0, m0] = String(day.start).split(':').map(Number)
   for (const court of day.courts) {
     let t = new Date(start)
+    let n = 0
     while (addMin(t, durationMaxMin) <= end) {
-      slots.push({ court, startsAt: new Date(t), endsAt: addMin(t, durationMaxMin) })
+      // `date` e `time` são a hora escrita do dia (a da categoria compara-se
+      // com estas), sem passar pelo relógio do aparelho.
+      const minutes = h0 * 60 + m0 + n * durationMaxMin
+      const time = `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
+      slots.push({ court, startsAt: new Date(t), endsAt: addMin(t, durationMaxMin), date: day.date, time })
       t = addMin(t, durationMaxMin)
+      n++
     }
   }
   return slots.sort((a, b) => a.startsAt - b.startsAt || String(a.court).localeCompare(String(b.court)))
@@ -59,7 +74,10 @@ const playersOf = (match) => (match.players || []).filter(Boolean)
 /** Marca os jogos pela ordem das fases, no primeiro lugar livre que não
     parta nenhuma regra. Devolve { scheduled, unscheduled }.
 
-    `matches`: [{ id, categoryId, stage, groupId, players: [ids] }]
+    `matches`: [{ id, categoryId, stage, round?, groupId, players: [ids],
+    day?, notBefore? }] — `day` ('AAAA-MM-DD') e `notBefore` ('HH:MM') são
+    o dia e a hora da categoria («sábado, a partir das 12h»): o jogo só vai
+    para uma hora desse dia e a partir dessa hora (Trello #502).
     Greedy de propósito: é o que o admin percebe e consegue corrigir à mão
     arrastando na grelha (print 10). Não tenta ser ótimo. */
 export function scheduleMatches(matches, days, options = {}) {
@@ -68,7 +86,7 @@ export function scheduleMatches(matches, days, options = {}) {
     .sort((a, b) => a.startsAt - b.startsAt || String(a.court).localeCompare(String(b.court)))
 
   const ordered = [...matches].sort((a, b) =>
-    stageRank(a.stage) - stageRank(b.stage)
+    phaseRank(a) - phaseRank(b)
     || String(a.categoryId).localeCompare(String(b.categoryId))
     || String(a.groupId ?? '').localeCompare(String(b.groupId ?? '')))
 
@@ -80,6 +98,7 @@ export function scheduleMatches(matches, days, options = {}) {
     const slot = slots.find((s) => {
       const key = `${s.court}@${s.startsAt.toISOString()}`
       if (used.has(key)) return false
+      if (!fitsCategoryWindow(match, s)) return false
       const candidate = { ...match, court: s.court, startsAt: s.startsAt, endsAt: s.endsAt }
       return canPlace(candidate, scheduled, rules)
     })
@@ -90,6 +109,11 @@ export function scheduleMatches(matches, days, options = {}) {
 
   return { scheduled, unscheduled }
 }
+
+/** A hora cabe no dia e na hora de início da categoria? */
+const fitsCategoryWindow = (match, slot) =>
+  (!match.day || slot.date === match.day)
+  && (!match.notBefore || slot.time >= match.notBefore)
 
 /** Pode este jogo ficar nesta hora/campo, com os que já estão marcados? */
 export function canPlace(candidate, scheduled, options = {}) {
@@ -106,10 +130,10 @@ export function canPlace(candidate, scheduled, options = {}) {
     if (shared && overlaps(candidate.startsAt, candidate.endsAt, other.startsAt, other.endsAt)) return false
     // A fase seguinte da categoria só depois de acabada a anterior.
     if (other.categoryId === candidate.categoryId
-      && stageRank(other.stage) > stageRank(candidate.stage)
+      && phaseRank(other) > phaseRank(candidate)
       && other.startsAt < candidate.endsAt) return false
     if (other.categoryId === candidate.categoryId
-      && stageRank(other.stage) < stageRank(candidate.stage)
+      && phaseRank(other) < phaseRank(candidate)
       && candidate.startsAt < other.endsAt) return false
   }
 
