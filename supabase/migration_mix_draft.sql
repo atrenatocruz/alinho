@@ -117,6 +117,10 @@ BEGIN
 END;
 $function$;
 
+-- Funções novas: o Supabase dá EXECUTE a anon por omissão. São funções de
+-- trigger (não se chamam por RPC), mas fecha-se na mesma, por regra.
+REVOKE EXECUTE ON FUNCTION public.participants_draft_guard() FROM anon, authenticated, PUBLIC;
+
 DROP TRIGGER IF EXISTS participants_draft_guard_trigger ON participants;
 CREATE TRIGGER participants_draft_guard_trigger
   BEFORE INSERT OR UPDATE OF game_id ON participants
@@ -136,6 +140,8 @@ BEGIN
   RETURN NEW;
 END;
 $function$;
+
+REVOKE EXECUTE ON FUNCTION public.games_draft_one_way() FROM anon, authenticated, PUBLIC;
 
 DROP TRIGGER IF EXISTS games_draft_one_way_trigger ON games;
 CREATE TRIGGER games_draft_one_way_trigger
