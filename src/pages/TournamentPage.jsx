@@ -192,7 +192,7 @@ export default function TournamentPage() {
   if (isAdmin && adminMode === 'sorteio') {
     // Sem o «Voltar» da página: o ecrã do sorteio já traz o dele, e dois
     // seguidos deixam quem organiza sem saber qual é qual.
-    return <div className="space-y-4"><DrawAdminPanel tournament={tour} onBack={closeAdmin} /></div>
+    return <div className="space-y-4"><DrawAdminPanel tournament={tour} onBack={closeAdmin} onEdit={() => openAdmin('editar')} /></div>
   }
   if (isAdmin && adminMode === 'editar' && editing) {
     return (

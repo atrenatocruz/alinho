@@ -9,7 +9,7 @@
 // O sorteio só se grava quando ele carrega em «Confirmar»: até lá pode
 // mover duplas, trocar cabeças de série e voltar a sortear à vontade.
 import { useEffect, useMemo, useState } from 'react'
-import { useTranslation } from 'react-i18next'
+import { Trans, useTranslation } from 'react-i18next'
 import { ChevronLeft, Shuffle, Check, AlertTriangle, RefreshCw, Printer } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { PrimaryButton, EmptyState, ConfirmSheet } from '../ui'
@@ -568,7 +568,7 @@ function DoneStep({ tournament, category, onDone, t }) {
   )
 }
 
-export default function DrawAdminPanel({ tournament, onBack }) {
+export default function DrawAdminPanel({ tournament, onBack, onEdit }) {
   const { t } = useTranslation()
   const [data, setData] = useState(null)
   const [pickedId, setPickedId] = useState(null)
@@ -593,6 +593,9 @@ export default function DrawAdminPanel({ tournament, onBack }) {
   const done = () => { setReformatId(null); setReload((n) => n + 1) }
 
   const teamCount = picked?.selected_count || 0
+  // O prazo do torneio já passou: uma categoria com inscrições abertas não
+  // recebe ninguém. O aviso fica até o prazo ser mudado (designer, 25 set).
+  const deadlinePassed = !!tournament.entries_deadline && new Date(tournament.entries_deadline) < new Date()
 
   return (
     <div>
@@ -638,9 +641,12 @@ export default function DrawAdminPanel({ tournament, onBack }) {
         )
       ) : picked.status === 'inscricoes' ? (
         <>
-          {reopenedLate === picked.id && (
-            <p className="mb-2 rounded-xl border border-[#E8C58A] bg-[#FFF6E5] px-3 py-2.5 text-[12.5px] text-ink-900">
-              {t('tournament.draw.reopen_deadline_passed')}
+          {/* «Precisa de ti»: âmbar do sistema (warning), não vermelho — não
+              correu mal, falta uma ação. «Editar» leva ao editar do torneio. */}
+          {(reopenedLate === picked.id || deadlinePassed) && (
+            <p className="mb-2 rounded-ctrl border border-warning/30 bg-warning/10 px-3 py-2.5 text-[12.5px] text-ink-900">
+              <Trans i18nKey="tournament.draw.reopen_deadline_passed"
+                components={{ edit: <button type="button" onClick={onEdit} className="font-extrabold underline underline-offset-2" /> }} />
             </p>
           )}
           <CloseEntriesStep category={picked} onDone={done} t={t} />
