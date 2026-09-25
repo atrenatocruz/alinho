@@ -1257,6 +1257,32 @@ export function PageHeader({ title, children }) {
 /* ─── EmptyState ─────────────────────────────────────────────────────────
    Friendly copy + court-line motif (now with a small lime ball-ring accent,
    a nod to the logo) + always one clear action. */
+/* ─── NeedsYou — o aviso «Precisa de ti» ─────────────────────────────────
+   O 4.º tipo de aviso da regra das janelas (aprovado pelo Francisco a
+   25 set — design-handoff/2026-09-24-janelas-perguntas-avisos/SPEC.md,
+   aviso-precisa-de-ti.png): nada correu mal, mas fica algo por fazer.
+   Âmbar claro com o token `warning`, junto ao sítio, com a ação que
+   resolve escrita na frase e tocável. Fica à vista até se resolver.
+
+   `children` é a frase; `action` = { label, onClick } entra no fim, como
+   no desenho («… até o mudares em **Editar**»). Nunca âmbar escrito à mão. */
+export function NeedsYou({ children, action, className = '' }) {
+  return (
+    <div className={`rounded-ctrl border border-warning/30 bg-warning/10 px-3.5 py-2.5 text-sm font-semibold text-ink-900 ${className}`}>
+      {children}
+      {action && (
+        <>
+          {' '}
+          <button type="button" onClick={action.onClick} disabled={action.disabled}
+            className="inline font-extrabold underline underline-offset-2 py-2 disabled:opacity-40">
+            {action.label}
+          </button>.
+        </>
+      )}
+    </div>
+  )
+}
+
 export function EmptyState({ icon: Icon, title, subtitle, action }) {
   return (
     <div className="card text-center py-12 px-6 animate-fade-up">

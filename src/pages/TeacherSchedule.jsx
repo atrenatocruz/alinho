@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, GraduationCap, Plus, X } from 'lucide-react'
+import { ArrowLeft, Check, GraduationCap, Plus, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { DAYS, listTeacherProfiles, replaceTeacherAvailability, updateTeacherContact } from '../lib/teachers'
 import {
@@ -33,6 +33,7 @@ export default function TeacherSchedule() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
+  const [contactMissing, setContactMissing] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -55,7 +56,14 @@ export default function TeacherSchedule() {
     return () => { alive = false }
   }, [user?.id])
 
-  const changed = () => { setSaved(false); setError('') }
+  const changed = () => { setSaved(false); setError(''); setContactMissing(false) }
+  // «Correu bem»: tira preta em baixo que desaparece sozinha em 3 s (regra
+  // das janelas, design-handoff/2026-09-24-janelas-perguntas-avisos).
+  useEffect(() => {
+    if (!saved) return undefined
+    const timer = setTimeout(() => setSaved(false), 3000)
+    return () => clearTimeout(timer)
+  }, [saved])
   const removeSlot = (day, index) => { setByDay({ ...byDay, [day]: byDay[day].filter((_, i) => i !== index) }); changed() }
   const addProblem = adding ? slotProblem(byDay[adding.day], adding) : null
   const confirmAdd = () => {
@@ -67,7 +75,7 @@ export default function TeacherSchedule() {
     setError('')
     if (!contact.trim()) {
       setEditing('contact')
-      setError(t('comunidade.teacher_error_missing_contact'))
+      setContactMissing(true)
       return
     }
     // A janela de «+ Horas» já não deixa entrar choques; isto é só a rede.
@@ -114,13 +122,17 @@ export default function TeacherSchedule() {
     )
   }
 
-  const field = (key, label, value, setValue, placeholder) => (
+  const field = (key, label, value, setValue, placeholder, missing = false) => (
     <div className="grid grid-cols-[76px_1fr_auto] items-center gap-2 py-2 text-sm">
       <span className="text-muted">{label}</span>
       {editing === key ? (
-        <input type="text" value={value} autoFocus placeholder={placeholder}
-          onChange={(e) => { setValue(e.target.value); changed() }}
-          className="input-field !min-h-[40px] !py-1.5 col-span-2" />
+        <div className="col-span-2">
+          <input type="text" value={value} autoFocus placeholder={placeholder} aria-invalid={missing || undefined}
+            onChange={(e) => { setValue(e.target.value); changed() }}
+            className={`input-field !min-h-[40px] !py-1.5 ${missing ? '!border-danger' : ''}`} />
+          {/* Campo em falta: contorno vermelho e a frase por baixo dele. */}
+          {missing && <p role="alert" className="text-xs font-extrabold text-danger mt-1">{t('comunidade.teacher_error_missing_contact')}</p>}
+        </div>
       ) : (
         <>
           <b className="font-extrabold text-ink-900 break-words min-w-0">{value || '—'}</b>
@@ -169,15 +181,21 @@ export default function TeacherSchedule() {
 
       <div className="card !py-2">
         {field('zone', t('teacher.zone_label'), zone, setZone, t('teacher.zone_placeholder'))}
-        {field('contact', t('teacher.contact_label'), contact, setContact, t('comunidade.contact_placeholder'))}
+        {field('contact', t('teacher.contact_label'), contact, setContact, t('comunidade.contact_placeholder'), contactMissing)}
       </div>
 
       {error && <div role="alert" className="bg-danger/10 text-danger px-4 py-3 rounded-ctrl text-sm font-extrabold">{error}</div>}
-      {saved && <div className="bg-ok/10 text-ok px-4 py-3 rounded-ctrl text-sm font-extrabold">{t('teacher.schedule_saved')}</div>}
 
       <PrimaryButton className="w-full" onClick={handleSave} disabled={saving}>
         {saving ? t('layout.saving') : t('layout.save')}
       </PrimaryButton>
+
+      {saved && (
+        <div role="status" className="fixed left-4 right-4 bottom-[104px] z-50 mx-auto max-w-md bg-ink-900 text-white px-4 py-3 rounded-ctrl text-sm font-extrabold flex items-center gap-2 animate-fade-up">
+          <Check size={16} className="shrink-0" />
+          {t('teacher.schedule_saved')}
+        </div>
+      )}
 
       {/* «+ Horas»: escolher início e fim. Selects nativos, porque o <Select>
           da app abre outra janela por baixo desta. */}

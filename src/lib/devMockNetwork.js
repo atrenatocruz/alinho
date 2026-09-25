@@ -348,11 +348,23 @@ const RPC_MOCKS = {
     if ([params?.p_player1_id, params?.p_partner_id].some((id) => id && taken.has(id))) {
       return { __error: 'already_in_category' }
     }
+    // Sem parceiro nem nome → sozinho (Trello #515); jogador 1 pelo nome →
+    // também tem link, como a função do Dev 3.
+    // localStorage.mockTAdminError = '<código>' — a função recusa com esse
+    // código, para se ver a frase na folha (erros do organizador, #515).
+    if (localStorage.getItem('mockTAdminError')) return { __error: localStorage.getItem('mockTAdminError') }
+    const solo = !params?.p_partner_id && !params?.p_guest_name
     return {
-      entry_id: 'ent-mao', status: 'validada',
+      entry_id: 'ent-mao', status: solo ? 'sem_parceiro' : 'validada',
       invite_token: params?.p_guest_name ? 'convite-torneio-a-mao' : null,
+      invite_token_player1: !params?.p_player1_id && params?.p_player1_guest_name ? 'convite-jogador-1' : null,
     }
   },
+  tournament_admin_set_partner: (params) => (localStorage.getItem('mockTAdminError') ? { __error: localStorage.getItem('mockTAdminError') } : params?.p_partner_id || params?.p_guest_name
+    ? { entry_id: params.p_entry_id, status: 'por_validar', invite_token: params?.p_guest_name ? 'convite-parceiro-depois' : null }
+    : { __error: 'partner_required' }),
+  tournament_invite_token: () => 'convite-jogador-2',
+  tournament_invite_token_player1: () => 'convite-jogador-1',
   // A lista do organizador: um de cada estado, para se ver tudo num print.
   list_tournament_entries: () => (localStorage.getItem('mockTSignup') ? [
     { entry_id: 'e1', status: 'por_validar', team_name: 'Dois não fazem um', waitlist_order: null, created_at: null, validated_at: null,
@@ -371,6 +383,11 @@ const RPC_MOCKS = {
       player1_id: 'p5', player1_name: 'Ana Moreira', player1_avatar: null,
       player2_id: null, player2_name: null, player2_avatar: null,
       guest_name: null, guest_email: null, invite_token: null, respond_by: null },
+    // Nenhum dos dois tem conta (Trello #515): os dois entraram pelo nome.
+    { entry_id: 'e7', status: 'por_validar', team_name: null, waitlist_order: null, created_at: null, validated_at: null,
+      player1_id: null, player1_name: 'Carla Nunes', player1_avatar: null,
+      player2_id: null, player2_name: null, player2_avatar: null,
+      guest_name: 'Sofia Reis', guest_email: null, has_invite: true, respond_by: null },
     { entry_id: 'e6', status: 'desistiu', team_name: null, waitlist_order: null, created_at: null, validated_at: null,
       player1_id: 'p8', player1_name: 'Zé Pinto', player1_avatar: null,
       player2_id: 'p9', player2_name: 'Nuno Alves', player2_avatar: null,
@@ -974,13 +991,22 @@ const SERIES_NEXT_MIX = () => {
     organization: { name: 'Dev Org', kind: 'group', group_logo_url: null },
   }
 }
+// O mix de origem da mesma recorrência, já aberto (para «Outras datas», #562).
+const SERIES_ORIGIN_MIX = () => {
+  const next = SERIES_NEXT_MIX()
+  const d = new Date(next.date); d.setDate(d.getDate() - 7)
+  return { ...next, id: 'fake-series-origin', date: d.toISOString(), status: 'open', is_recurrence_origin: true, launch_at: null }
+}
 RPC_MOCKS.skip_recurrence_game = () => { const d = new Date(); d.setDate(d.getDate() + 13); d.setHours(20, 0, 0, 0); return d.toISOString() }
-RPC_MOCKS.ensure_recurrence_successor = () => 'created'
+// mockEnsureStatus = 'ended' | 'no_base' — o que a base responde ao criar o
+// próximo Mix em falta; mockNoPending = 'true' — a série sem próximo Mix.
+RPC_MOCKS.ensure_recurrence_successor = () => localStorage.getItem('mockEnsureStatus') || 'created'
 TABLE_MOCKS.games = (url) => {
   let rows = gamesSemFiltro(url)
   const u = decodeURIComponent(url)
   if (localStorage.getItem('mockMixDraft') === 'true' && Array.isArray(rows) && !/[?&]id=eq\./.test(u)) rows = [...rows, DRAFT_MIX()]
-  if (localStorage.getItem('mockSeriesNext') === 'true' && Array.isArray(rows) && !/[?&]id=eq\./.test(u)) rows = [...rows, SERIES_NEXT_MIX()]
+  if (localStorage.getItem('mockSeriesNext') === 'true' && Array.isArray(rows) && !/[?&]id=eq\./.test(u)) rows = [...rows, ...(localStorage.getItem('mockSeriesOrigin') === 'false' ? [] : [SERIES_ORIGIN_MIX()]), SERIES_NEXT_MIX()]
+  if (localStorage.getItem('mockNoPending') === 'true' && /status=eq\.pending/.test(u)) rows = []
   const origem = u.match(/[?&]origin=eq\.([a-z_]+)/)
   return origem && Array.isArray(rows) ? rows.filter((g) => (g.origin || 'admin') === origem[1]) : rows
 }
@@ -1089,6 +1115,13 @@ export function installDevMockNetwork() {
         notready: { code: 'PGRST204', message: "Could not find the 'pairing_mode' column of 'games' in the schema cache" },
       }[errorCase]
       if (body) return jsonResponse(body, 400)
+    }
+
+    // localStorage.mockDeleteHasResults = 'true' — apagar um mix falha como
+    // quando já tem resultados (23503), para ver a razão na folha.
+    if (localStorage.getItem('mockDeleteHasResults') === 'true' && /\/rest\/v1\/games\?/.test(url)
+        && (init?.method || input?.method || 'GET').toUpperCase() === 'DELETE') {
+      return jsonResponse({ code: '23503', message: 'update or delete on table "games" violates foreign key constraint' }, 409)
     }
 
     if (localStorage.getItem('mockLimitError') === 'true'
