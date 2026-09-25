@@ -106,7 +106,7 @@ Deno.serve(async (req) => {
   // ── O mix aceita isto? ────────────────────────────────────────────────
   const { data: game, error: gameError } = await admin
     .from('games')
-    .select('id, organization_id, status, format, rotate_partners, max_players, num_courts')
+    .select('id, organization_id, status, format, rotate_partners, allow_pair_signup, max_players, num_courts')
     .eq('id', gameId)
     .maybeSingle()
   if (gameError) {
@@ -118,6 +118,11 @@ Deno.serve(async (req) => {
   // Só faz sentido em duplas fixas: num mix que roda parceiros a dupla
   // desfaz-se na ronda seguinte.
   if (game.rotate_partners) return jsonResponse({ error: 'game_rotates_partners' }, 409)
+  // «Inscrição em dupla» do mix (migration_mix_pair_signup.sql). Esta função
+  // usa a service-role, por isso o trigger de participants não a apanha —
+  // a verificação tem de estar aqui. O ecrã já esconde o botão; isto fecha a
+  // porta a quem chama a função diretamente.
+  if (!game.allow_pair_signup) return jsonResponse({ error: 'pair_signup_disabled' }, 409)
 
   const { data: membership } = await admin
     .from('memberships')

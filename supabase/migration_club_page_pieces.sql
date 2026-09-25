@@ -22,7 +22,13 @@
 --      rating   NUMERIC — o nível; o ecrã faz a banda com `ratingBand` como
 --                         no resto da app. NULL quando a pessoa esconde os
 --                         resultados (`results_visibility`) a quem está a ver.
---      gender   TEXT    — a banda depende dele (M/F).
+--      gender   TEXT    — a banda depende dele (M/F); tal como o rating, NULL
+--                         quando a pessoa esconde os resultados.
+--
+-- ⚠️ QUANDO CORRER (System Integrator, 24 set): o ecrã de hoje da página do
+-- clube não conhece o `locked`, e para quem não é membro de um grupo fechado
+-- mostraria os eventos com a linha «N/M jogadores» partida. Correr junto com
+-- a ida do ecrã novo do Dev 1 para o site, não antes.
 --    Mudar as colunas que uma função devolve obriga a apagá-la e criá-la
 --    de novo: as permissões que ela tinha são repostas tal e qual.
 --
@@ -93,8 +99,11 @@ DECLARE
   c_tipo_mau  CONSTANT TEXT := 'RETURNS TABLE\(id uuid, name text, avatar_url text\)';
   c_tipo_bom  CONSTANT TEXT := 'RETURNS TABLE(id uuid, name text, avatar_url text, is_admin boolean, rating numeric, gender text)';
   c_sel_mau   CONSTANT TEXT := '(SELECT\s+p\.id,\s*p\.name,\s*p\.avatar_url)(\s+FROM)';
+  -- O género só serve para a letra da banda (M/F) — por isso só vem quando o
+  -- nível também vem (revisão do System Integrator, 24 set).
   c_sel_bom   CONSTANT TEXT := '\1, m.is_admin, '
-    || 'CASE WHEN can_view_section(p.id, p.results_visibility) THEN p.rating END, p.gender\2';
+    || 'CASE WHEN can_view_section(p.id, p.results_visibility) THEN p.rating END, '
+    || 'CASE WHEN can_view_section(p.id, p.results_visibility) THEN p.gender END\2';
   v_oid   OID;
   v_def   TEXT;
   v_novo  TEXT;
