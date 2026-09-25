@@ -17,7 +17,8 @@ const MOCK_ADMIN_PROFILE = {
   email: 'admin@dev.local',
   name: 'Admin (Dev)',
   gender: 'masculino',
-  phone_hash: 'dev-bypass', // dummy — skips the mandatory-phone modal for the dev bypass
+  phone_hash: typeof localStorage !== 'undefined' && localStorage.getItem('mockPhoneUnconfirmed') === 'true' ? 'hash-de-teste' : 'dev-bypass', // dummy — skips the mandatory-phone modal for the dev bypass; mockPhoneUnconfirmed mostra o «Confirma o teu número» (#537)
+  phone_verified_at: typeof localStorage !== 'undefined' && localStorage.getItem('mockPhoneConfirmed') === 'true' ? '2026-09-24T20:00:00Z' : null,
   // localStorage.mockPlatformAdmin = 'true' → vê o seletor de plano no Gerir.
   is_platform_admin: typeof localStorage !== 'undefined' && localStorage.getItem('mockPlatformAdmin') === 'true',
   // Rating fictício (11 set 2026) — sem isto o aro de progresso do Perfil
@@ -362,8 +363,11 @@ export const AuthProvider = ({ children }) => {
 
   // Manual escape hatch for the "couldn't load your data" screen (App.jsx)
   // — re-runs the same retry-with-backoff loadProfile from attempt 0.
+  // Devolve a promessa, para quem precisa de esperar pelo perfil novo
+  // (ex.: «Já enviei» ao confirmar o número, #537).
   const retryProfile = () => {
-    if (user) loadProfile(user.id)
+    if (user) return loadProfile(user.id)
+    return Promise.resolve()
   }
 
   const signUp = async (email, password, userData) => {

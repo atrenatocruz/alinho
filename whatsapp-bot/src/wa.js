@@ -2,6 +2,7 @@ import makeWASocket, { useMultiFileAuthState, fetchLatestBaileysVersion, Disconn
 import qrcode from 'qrcode-terminal'
 import pino from 'pino'
 import { config } from './config.js'
+import { createParticipatingGroups } from './participatingGroups.js'
 
 const logger = pino({ level: 'info' })
 
@@ -28,6 +29,9 @@ export async function connectWhatsApp({ onGroupMessage }) {
   // live, even after WhatsApp cycles the connection (which happens
   // routinely, not just on real outages).
   let sock
+  // Em que grupos esta conta está — um pedido de cada vez, só com a ligação
+  // aberta (participatingGroups.js).
+  const participating = createParticipatingGroups()
   let connecting = false
   let reconnectAttempts = 0
 
@@ -67,8 +71,11 @@ export async function connectWhatsApp({ onGroupMessage }) {
         connecting = false
         reconnectAttempts = 0
         logger.info('WhatsApp connection established.')
+        participating.setOpen(true)
         try {
-          const groups = await sock.groupFetchAllParticipating()
+          // O mesmo pedido serve o log e a lista dos grupos servidos (antes
+          // eram dois ao mesmo tempo → «rate-overlimit»).
+          const groups = (await participating.refresh(() => sock.groupFetchAllParticipating())) || {}
           logger.info('Groups this account participates in (register each served group in the whatsapp_groups table — see supabase/migration_whatsapp_groups.sql):')
           for (const g of Object.values(groups)) {
             logger.info(`  ${g.subject}  ->  ${g.id}`)
@@ -79,6 +86,7 @@ export async function connectWhatsApp({ onGroupMessage }) {
       }
 
       if (connection === 'close') {
+        participating.setOpen(false)
         connecting = false
         const statusCode = lastDisconnect?.error?.output?.statusCode
         const loggedOut = statusCode === DisconnectReason.loggedOut
@@ -136,9 +144,50 @@ export async function connectWhatsApp({ onGroupMessage }) {
         // though it isn't the official Business API.
         const quotedStanzaId = msg.message.extendedTextMessage?.contextInfo?.stanzaId ?? null
 
-        onGroupMessage({ groupJid, senderJid, senderPn, text, key: msg.key, message: msg, quotedStanzaId })
+        // Quem foi mencionado (@) — é assim que se diz ao bot quem é o
+        // parceiro («In @João»). Só se procura o número quando há menções,
+        // para a conversa normal do grupo não custar nada.
+        const mentionedJids = msg.message.extendedTextMessage?.contextInfo?.mentionedJid ?? []
+        const deliver = (mentionedPns) =>
+          onGroupMessage({ groupJid, senderJid, senderPn, text, key: msg.key, message: msg, quotedStanzaId, mentionedJids, mentionedPns })
+        if (mentionedJids.length === 0) {
+          deliver([])
+        } else {
+          Promise.all(mentionedJids.map((jid) => resolveMentionPn(groupJid, jid)))
+            .then(deliver)
+            .catch((err) => {
+              logger.error({ err }, 'Failed to resolve mentions')
+              deliver(mentionedJids.map(() => null))
+            })
+        }
       }
     })
+  }
+
+  /**
+   * O número (JID @s.whatsapp.net) de quem foi mencionado, ou null se o
+   * WhatsApp não o deixar saber. Num grupo com números escondidos a menção
+   * chega como @lid: tenta-se o mapa LID→número do Baileys (versões novas) e
+   * depois a lista de participantes do grupo. Sem número não há como
+   * encontrar a pessoa (o perfil guarda o telemóvel, não o LID) — quem chama
+   * pede então o nome.
+   */
+  async function resolveMentionPn(groupJid, jid) {
+    if (!jid) return null
+    if (jid.endsWith('@s.whatsapp.net')) return jid
+    if (!jid.endsWith('@lid')) return null
+    try {
+      const mapped = await sock?.signalRepository?.lidMapping?.getPNForLID?.(jid)
+      if (typeof mapped === 'string' && mapped.endsWith('@s.whatsapp.net')) return mapped
+    } catch { /* versão do Baileys sem o mapa — segue para os participantes */ }
+    try {
+      const metadata = await sock.groupMetadata(groupJid)
+      const p = metadata.participants.find((x) => x.id === jid || x.lid === jid)
+      const pn = [p?.jid, p?.phoneNumber, p?.id].find((x) => typeof x === 'string' && x.endsWith('@s.whatsapp.net'))
+      return pn ?? null
+    } catch {
+      return null
+    }
   }
 
   await start()
@@ -148,10 +197,6 @@ export async function connectWhatsApp({ onGroupMessage }) {
   // bots (números) a partilhar a mesma base de dados, cada processo só
   // posta/lembra/auto-arranca nos grupos da sua própria conta. TTL curto
   // para apanhar entradas/saídas de grupos sem reiniciar.
-  const PARTICIPATING_CACHE_TTL_MS = 5 * 60 * 1000
-  let participatingJids = null
-  let participatingAt = 0
-
   return {
     // Returns the sent message's WhatsApp id (or null if unavailable) —
     // sync.js records it against the mix it just posted so a later reply
@@ -173,20 +218,7 @@ export async function connectWhatsApp({ onGroupMessage }) {
     // Set dos JIDs de grupo em que esta conta participa, ou null se ainda
     // não for possível saber (socket em reconexão) — null significa
     // "não filtrar", fail-open, para uma reconexão nunca silenciar o bot.
-    getParticipatingGroupJids: async () => {
-      if (participatingJids && Date.now() - participatingAt < PARTICIPATING_CACHE_TTL_MS) {
-        return participatingJids
-      }
-      if (!sock) return participatingJids // stale-if-error > nada
-      try {
-        const groups = await sock.groupFetchAllParticipating()
-        participatingJids = new Set(Object.keys(groups))
-        participatingAt = Date.now()
-        return participatingJids
-      } catch (err) {
-        console.error('Failed to list participating groups:', err)
-        return participatingJids
-      }
-    },
+    getParticipatingGroupJids: async () =>
+      participating.get(() => sock.groupFetchAllParticipating()),
   }
 }

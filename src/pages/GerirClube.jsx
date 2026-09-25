@@ -153,6 +153,7 @@ const EMPTY_GAME_FORM = {
   scoring_format: 'pontos_simples',
   pairing_mode: 'por_nivel',
   rotate_partners: false,
+  allow_pair_signup: false,
   // Conta para o ranking (Trello #267). Por omissão sim.
   ranked: true,
   gender_restriction: 'indiferente',
@@ -169,6 +170,10 @@ const EMPTY_GAME_FORM = {
 // migration_whatsapp_groups.sql). '' = sem nível → visível em todos os
 // grupos do clube. Escalas F/MX entram quando houver grupos dessas escalas.
 const MIX_LEVELS = ['M6', 'M5', 'M4', 'M3', 'M2', 'M1']
+
+// Duplas fixas = não é Americano e os parceiros não trocam a cada ronda —
+// só aí se pode entrar já em dupla.
+const pairsAreFixed = (form) => form.format !== 'americano' && !(form.rotate_partners && form.format === 'sobe_desce')
 
 /* Segmented tab selector for form options */
 function Segmented({ options, value, onChange }) {
@@ -901,6 +906,10 @@ export default function GerirClube() {
     ...(game.pairing_mode && game.pairing_mode !== 'por_nivel' ? { pairing_mode: game.pairing_mode } : {}),
     ...(game.rotate_partners ? { rotate_partners: true } : {}),
     ...(game.ranked === false ? { ranked: false } : {}),
+    // O `game` aqui é a linha que a base de dados devolveu: com a coluna, vai
+    // sempre (também «Não», para editar Sim→Não chegar à recorrência); antes
+    // da migração o campo não vem e não se manda nada.
+    ...(typeof game.allow_pair_signup === 'boolean' ? { allow_pair_signup: game.allow_pair_signup } : {}),
   })
 
   // Computes the date one frequency step after `date` — used to pre-create
@@ -1042,6 +1051,7 @@ export default function GerirClube() {
         ...(game.pairing_mode && game.pairing_mode !== 'por_nivel' ? { pairing_mode: game.pairing_mode } : {}),
         ...(game.rotate_partners ? { rotate_partners: true } : {}),
         ...(game.ranked === false ? { ranked: false } : {}),
+        ...(game.allow_pair_signup ? { allow_pair_signup: true } : {}),
         status: 'pending',
         created_by: userId,
         recurrence_id: newRecurrence.id,
@@ -1084,7 +1094,7 @@ export default function GerirClube() {
     // pairing_mode sai pelo mesmo motivo: só é enviado quando não é o valor
     // por omissão, para criar/editar mixes não rebentar antes de
     // migration_mix_pairing_mode.sql correr.
-    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, ranked: _ranked, ...gameFields } = gameForm
+    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, ranked: _ranked, allow_pair_signup: _allowPairSignup, ...gameFields } = gameForm
 
     const recurrenceError = validateRecurrence(recurrence)
     if (recurrenceError) {
@@ -1128,6 +1138,10 @@ export default function GerirClube() {
             ...(gameForm.pairing_mode !== 'por_nivel' ? { pairing_mode: gameForm.pairing_mode } : {}),
             // Mesmo truque: só vai quando está ligado (e só no Sobe e desce).
             ...(gameForm.rotate_partners && gameForm.format === 'sobe_desce' ? { rotate_partners: true } : {}),
+            // «Inscrição em dupla» (Renato, 24 set): só vai quando é «Sim» e as
+            // duplas são fixas — antes de migration_mix_pair_signup.sql a
+            // coluna não existe, e «Não» é o valor por omissão.
+            ...(gameForm.allow_pair_signup && pairsAreFixed(gameForm) ? { allow_pair_signup: true } : {}),
             // Só vai quando é amigável — antes de migration_mix_ranked.sql
             // correr, a coluna não existe.
             ...(gameForm.ranked === false ? { ranked: false } : {}),
@@ -1273,7 +1287,7 @@ export default function GerirClube() {
     // pairing_mode sai pelo mesmo motivo: só é enviado quando não é o valor
     // por omissão, para criar/editar mixes não rebentar antes de
     // migration_mix_pairing_mode.sql correr.
-    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, ranked: _ranked, ...gameFields } = gameForm
+    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, ranked: _ranked, allow_pair_signup: _allowPairSignup, ...gameFields } = gameForm
     // Any mix in an active recurring series shares the same underlying
     // game_recurrences row (via recurrence_id) — not just the origin — so
     // recurrence management works from any of them, not only the one that
@@ -1316,6 +1330,7 @@ export default function GerirClube() {
           ...(gameForm.format === 'grupos_eliminatorias' ? { pool_size: parseInt(gameForm.pool_size, 10) || 4 } : {}),
           ...((gameForm.pairing_mode !== 'por_nivel' || editingGame.pairing_mode) ? { pairing_mode: gameForm.pairing_mode } : {}),
           ...((gameForm.rotate_partners || editingGame.rotate_partners) ? { rotate_partners: !!gameForm.rotate_partners && gameForm.format === 'sobe_desce' } : {}),
+          ...((gameForm.allow_pair_signup || editingGame.allow_pair_signup) ? { allow_pair_signup: !!gameForm.allow_pair_signup && pairsAreFixed(gameForm) } : {}),
           ...((gameForm.ranked === false || editingGame.ranked === false) ? { ranked: gameForm.ranked !== false } : {}),
           level: gameForm.level || null,
           ...pendingLaunchUpdate,
@@ -1773,6 +1788,7 @@ export default function GerirClube() {
       scoring_format: game.scoring_format || 'pontos_simples',
       pairing_mode: game.pairing_mode || 'por_nivel',
       rotate_partners: !!game.rotate_partners,
+      allow_pair_signup: !!game.allow_pair_signup,
       ranked: game.ranked !== false,
       gender_restriction: game.gender_restriction || 'indiferente',
       age_restriction: game.age_restriction ?? null,
@@ -2234,6 +2250,28 @@ export default function GerirClube() {
                         />
                         <p className="text-sm text-muted mt-1.5">
                           {t(gameForm.rotate_partners ? 'gerirclube.rotate_partners_rotate_help' : 'gerirclube.rotate_partners_fixed_help')}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Inscrição em dupla (Renato, 24 set): só faz sentido com
+                        duplas fixas. Com «Sim», a app mostra «Entrar com
+                        parceiro» e o bot aceita «In com …». */}
+                    {pairsAreFixed(gameForm) && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          {t('gerirclube.pair_signup_label')}
+                        </label>
+                        <Segmented
+                          options={[
+                            { value: 'no', label: t('gerirclube.pair_signup_no') },
+                            { value: 'yes', label: t('gerirclube.pair_signup_yes') },
+                          ]}
+                          value={gameForm.allow_pair_signup ? 'yes' : 'no'}
+                          onChange={(v) => setGameForm({ ...gameForm, allow_pair_signup: v === 'yes' })}
+                        />
+                        <p className="text-sm text-muted mt-1.5">
+                          {t(gameForm.allow_pair_signup ? 'gerirclube.pair_signup_yes_help' : 'gerirclube.pair_signup_no_help')}
                         </p>
                       </div>
                     )}

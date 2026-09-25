@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { hashPhone } from '../lib/hashPhone'
 import { PrimaryButton, DateField, Select, RatingBadge } from '../components/ui'
 import ChangePasswordSection from '../components/ChangePasswordSection'
+import ConfirmPhoneCard from '../components/ConfirmPhoneCard'
 import { formatRating } from '../lib/elo'
 import { countryOptions, countryName } from '../lib/countries'
 import { AGE_LABEL_KEY, ageCategory } from '../lib/ageCategories'
@@ -357,6 +358,7 @@ export default function PersonalInfo() {
             <div>
               <p className={fieldLabel}>{t('profile.phone_label')}</p>
               <p className={fieldValue}>{profile?.phone_hash ? t('profile.phone_linked') : t('profile.phone_not_linked')}</p>
+              <div className="mt-2"><ConfirmPhoneCard /></div>
             </div>
 
             <div>

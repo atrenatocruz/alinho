@@ -4,6 +4,7 @@ import { loadOpenSlotBatch, buildOpenSlotsMessage } from './openSlots.js'
 import { getGroups, getGroupsForOrg, mixVisibleToGroup } from './groups.js'
 import { helpFooter } from './messages.js'
 import { t } from './locales.js'
+import { startTimer } from './timing.js'
 
 const DEBOUNCE_MS = 4000
 const RECONCILE_INTERVAL_MS = 60 * 1000
@@ -19,6 +20,36 @@ const RECONCILE_INTERVAL_MS = 60 * 1000
 // pendingTagAll e pendingPromotedByGame (sticky através da coalescência).
 const groupState = new Map() // groupJid -> state
 
+// Guardados pelo startSync — o commands.js pede reposts por aqui.
+let deps = null
+
+/** Um «In»/«Out» acabou de gravar: pede o repost já, sem esperar pelo
+ *  Realtime (que também vai chegar — o hash engole o repetido). Passa
+ *  SEMPRE pela fila de 4 s por grupo, para uma rajada continuar a dar no
+ *  máximo 2 mensagens. No «Out», quem chama diz quem subiu da lista de
+ *  suplentes (`promotedNames`, como o handler Realtime) — senão o repost
+ *  sairia antes do Realtime e perdia o «🎉 X subiu…». */
+function requestRepostForGame(organizationId, gameId, { promotedNames = [] } = {}) {
+  if (!deps) return
+  scheduleRepostForOrg(deps.sendText, deps.getGroupMentions, organizationId, { gameIds: [gameId], promotedNames })
+    .catch((err) => console.error('Failed to request repost:', err))
+}
+// Num objeto (e não um export solto) para os testes o poderem simular.
+export const repostHooks = { requestRepostForGame }
+
+/** Só para testes: um pedido de repost SEM pista (como o de uma edição do mix). */
+export function scheduleRepostForOrgForTests(organizationId, opts = {}) {
+  return scheduleRepostForOrg(deps.sendText, deps.getGroupMentions, organizationId, opts)
+}
+
+/** Só para testes: liga os deps sem abrir o Realtime nem os intervalos, e
+ *  esquece o estado por grupo (hashes, filas) do teste anterior. */
+export function startSyncForTests(d) {
+  deps = d
+  for (const st of groupState.values()) if (st.debounceTimer) clearTimeout(st.debounceTimer)
+  groupState.clear()
+}
+
 function stateFor(groupJid) {
   let st = groupState.get(groupJid)
   if (!st) {
@@ -29,6 +60,11 @@ function stateFor(groupJid) {
       openSlotBatches: new Map(), // batchId -> { hash, messageId }
       pendingTagAll: false,
       pendingPromotedByGame: new Map(), // gameId -> { name, lang }
+      pendingGameIds: new Set(), // mixes que mudaram desde o último repost (Tarefa 7)
+      // Houve um pedido SEM pista (edição de um mix, reconciliação…) desde o
+      // último repost: esse repost tem de recarregar tudo, mesmo que também
+      // haja pistas (revisão final, 4).
+      pendingAll: false,
     }
     groupState.set(groupJid, st)
   }
@@ -52,14 +88,24 @@ function hash(str) {
  * sent for it here (see the design spec's open edge case on replying to a
  * since-closed mix's message — commands.js handles that at reply time).
  */
-async function postGroupRoster(sendText, getGroupMentions, group, { tagAll = false, promotedByGameId = new Map() } = {}) {
+async function postGroupRoster(sendText, getGroupMentions, group, { tagAll = false, promotedByGameId = new Map(), gameIds = new Set() } = {}) {
+  const timer = startTimer('repost')
+  let sent = 0
   const visibleMixes = (await getOpenMixes(group.organizationId)).filter((mix) => mixVisibleToGroup(mix, group))
   const openMixes = visibleMixes.filter((mix) => mix.origin !== 'open_slot')
   const openSlotMixes = visibleMixes.filter((mix) => mix.origin === 'open_slot')
-  const mixStates = await Promise.all(openMixes.map((mix) => loadGame(mix.id)))
   const st = stateFor(group.groupJid)
-  const total = mixStates.length
-  const seenGameIds = new Set()
+  const total = openMixes.length
+  // Só vale a pena carregar os mixes que mudaram SE a lista de abertos é a
+  // mesma do último repost — senão a numeração 01/02 dos outros muda e têm
+  // de ser todos refeitos.
+  const idsKey = openMixes.map((m) => m.id).join(',')
+  const narrow = gameIds.size > 0 && st.openIdsKey === idsKey
+  st.openIdsKey = idsKey
+  const toLoad = narrow ? openMixes.filter((m) => gameIds.has(m.id)) : openMixes
+  const mixStates = await Promise.all(toLoad.map((mix) => loadGame(mix.id)))
+  const indexOf = new Map(openMixes.map((m, i) => [m.id, i]))
+  timer.mark('carregar')
   const mentions = tagAll && (total > 0 || openSlotMixes.length > 0) ? await getGroupMentions(group.groupJid) : null
   // At most one @all per flush, however many mixes' messages (or the open-
   // slot batch message) end up resent in it — shared across both loops
@@ -67,11 +113,9 @@ async function postGroupRoster(sendText, getGroupMentions, group, { tagAll = fal
   // flush don't each carry their own @all.
   let taggedThisFlush = false
 
-  for (let i = 0; i < mixStates.length; i++) {
-    const state = mixStates[i]
+  for (const state of mixStates) {
     const gameId = state.game.id
-    seenGameIds.add(gameId)
-    const label = total > 1 ? String(i + 1).padStart(2, '0') : null
+    const label = total > 1 ? String(indexOf.get(gameId) + 1).padStart(2, '0') : null
 
     // Hash only the base message, never the one-time promotion callout — a
     // later reconcile tick never carries a promo, so hashing the
@@ -89,6 +133,7 @@ async function postGroupRoster(sendText, getGroupMentions, group, { tagAll = fal
     const fullText = shouldTagThis ? `📢 @all\n\n${text}` : text
 
     const messageId = await sendText(group.groupJid, fullText, shouldTagThis ? { mentions } : {})
+    sent++
     if (shouldTagThis) taggedThisFlush = true
     st.mixes.set(gameId, { hash: nextHash, messageId })
     if (messageId) recordMixMessage(messageId, gameId)
@@ -97,8 +142,9 @@ async function postGroupRoster(sendText, getGroupMentions, group, { tagAll = fal
   // Drop mixes no longer open, so a later reappearance (e.g. level filter
   // toggled off then back on) resends fresh instead of being swallowed as
   // "same as last post".
+  const openIds = new Set(openMixes.map((m) => m.id))
   for (const gameId of st.mixes.keys()) {
-    if (!seenGameIds.has(gameId)) st.mixes.delete(gameId)
+    if (!openIds.has(gameId)) st.mixes.delete(gameId)
   }
 
   // Jogos em aberto: uma mensagem combinada por open_batch_id, nunca uma
@@ -117,6 +163,7 @@ async function postGroupRoster(sendText, getGroupMentions, group, { tagAll = fal
     const shouldTagThis = tagAll && !taggedThisFlush
     const fullText = shouldTagThis ? `📢 @all\n\n${baseText}` : baseText
     const messageId = await sendText(group.groupJid, fullText, shouldTagThis ? { mentions } : {})
+    sent++
     if (shouldTagThis) taggedThisFlush = true
     st.openSlotBatches.set(batchId, { hash: nextHash, messageId })
   }
@@ -124,15 +171,21 @@ async function postGroupRoster(sendText, getGroupMentions, group, { tagAll = fal
   for (const batchId of st.openSlotBatches.keys()) {
     if (!seenBatchIds.has(batchId)) st.openSlotBatches.delete(batchId)
   }
+  timer.mark('enviar')
+  timer.end({ group: group.groupJid, mixes: total, sent })
 }
 
 function flushRepost(sendText, getGroupMentions, group) {
   const st = stateFor(group.groupJid)
   const shouldTagAll = st.pendingTagAll
   const promotedByGameId = st.pendingPromotedByGame
+  // Com um pedido «de tudo» pelo meio, não se passa pista nenhuma.
+  const gameIds = st.pendingAll ? new Set() : st.pendingGameIds
   st.pendingTagAll = false
   st.pendingPromotedByGame = new Map()
-  postGroupRoster(sendText, getGroupMentions, group, { tagAll: shouldTagAll, promotedByGameId }).catch((err) =>
+  st.pendingGameIds = new Set()
+  st.pendingAll = false
+  postGroupRoster(sendText, getGroupMentions, group, { tagAll: shouldTagAll, promotedByGameId, gameIds }).catch((err) =>
     console.error(`Failed to repost roster to ${group.groupJid}:`, err)
   )
 }
@@ -142,8 +195,11 @@ function flushRepost(sendText, getGroupMentions, group) {
 // janela calma posta imediatamente; os que chegarem dentro da janela
 // coalescem num único repost final. Rajada de N joins custa no máximo 2
 // mensagens por grupo, e o hash-dedupe engole envios sem alterações.
-function scheduleGroupRepost(sendText, getGroupMentions, group, { tagAll = false, promotedNames = [] } = {}) {
+function scheduleGroupRepost(sendText, getGroupMentions, group, { tagAll = false, promotedNames = [], gameIds = [] } = {}) {
   const st = stateFor(group.groupJid)
+  const hinted = gameIds.filter(Boolean)
+  if (hinted.length === 0) st.pendingAll = true
+  for (const id of hinted) st.pendingGameIds.add(id)
   st.pendingTagAll = st.pendingTagAll || tagAll
   // Each entry is { gameId, name, lang } — keyed by gameId so the callout
   // prefixes only that specific mix's message, not every open mix's.
@@ -243,6 +299,7 @@ async function primeGroupHashes() {
 
 /** Wires Supabase Realtime so any game/participant change — from the app OR from the bot's own WhatsApp-driven writes, for ANY currently open mix of ANY served club — results in a fresh roster repost to every group that can see it. */
 export function startSync({ sendText, getGroupMentions }) {
+  deps = { sendText, getGroupMentions }
   primeGroupHashes().catch((err) => console.error('Failed to prime roster hashes:', err))
 
   supabase
@@ -310,7 +367,7 @@ export function startSync({ sendText, getGroupMentions }) {
         // check above skips a no-op send — no need to pre-filter which
         // mix this row belongs to. Someone joining/leaving isn't a
         // create/edit, so this never tags @all.
-        await scheduleRepostForOrg(sendText, getGroupMentions, orgId)
+        await scheduleRepostForOrg(sendText, getGroupMentions, orgId, { gameIds: [payload.new?.game_id ?? payload.old?.game_id] })
         return
       }
 
@@ -331,6 +388,7 @@ export function startSync({ sendText, getGroupMentions }) {
         .single()
 
       await scheduleRepostForOrg(sendText, getGroupMentions, orgId, {
+        gameIds: [payload.new.game_id],
         promotedNames: [
           { gameId: payload.new.game_id, name: promotedProfile?.name || 'Jogador', lang: promotedProfile?.language ?? 'pt' },
         ],

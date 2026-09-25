@@ -51,6 +51,12 @@ export function errorKind(error) {
   return 'unknown'
 }
 
+/** O mix encheu entre ver e carregar: o trigger das vagas
+ *  (migration_mix_capacity_guard.sql) recusa com a mensagem `game_full`. */
+export function isGameFull(error) {
+  return /(^|\W)game_full$/.test(String(error?.message || '').trim())
+}
+
 /** Código técnico curto para o utilizador enviar à equipa, ou null. */
 export function errorCode(error) {
   if (!error) return null

@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, Suspense, lazy } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { WifiOff } from 'lucide-react'
+import { WifiOff, Compass } from 'lucide-react'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
-import { PrimaryButton } from './components/ui'
+import { PrimaryButton, EmptyState } from './components/ui'
 import Layout, { Wordmark } from './components/Layout'
 import SplashScreen from './components/SplashScreen'
 import Login from './pages/Login'
@@ -158,6 +158,41 @@ function PublicShell({ children }) {
       <main className="flex-1">
         <div className="max-w-2xl mx-auto px-4 pt-6 pb-16 animate-fade-up">{children}</div>
       </main>
+    </div>
+  )
+}
+
+// Endereço que não existe (alinho.pt/qualquer-coisa): antes ficava em
+// branco — não havia rota para o resto e a Vercel manda tudo para o
+// index.html. Uma página curta, no estilo do EmptyState, com «Ir para o
+// início» e, sem sessão, «Entrar». Com sessão aparece dentro da app, com
+// a barra de baixo.
+function NotFound({ showSplash }) {
+  const { user } = useAuth()
+  const { t } = useTranslation()
+  if (showSplash) return <SplashScreen />
+  const pagina = (
+    <EmptyState
+      icon={Compass}
+      title={t('notfound.title')}
+      subtitle={t('notfound.subtitle')}
+      action={
+        <div className="flex flex-col gap-2 max-w-xs mx-auto">
+          <Link to="/" className="btn-primary w-full inline-flex items-center justify-center">{t('notfound.go_home')}</Link>
+          {!user && (
+            <Link to="/login" className="btn-secondary w-full inline-flex items-center justify-center">{t('landing.login_link')}</Link>
+          )}
+        </div>
+      }
+    />
+  )
+  if (user) return <Layout>{pagina}</Layout>
+  return (
+    <div className="min-h-screen bg-canvas px-4 py-8">
+      <div className="max-w-md mx-auto space-y-6">
+        <Link to="/" aria-label="alinho" className="block w-32"><Wordmark variant="light" /></Link>
+        {pagina}
+      </div>
     </div>
   )
 }
@@ -483,6 +518,8 @@ function AppRoutes() {
             </Guard>
           }
         />
+        {/* Tudo o que não é uma página da app. Tem de ficar em último. */}
+        <Route path="*" element={<NotFound showSplash={showSplash} />} />
       </Routes>
     </Suspense>
     </ErrorBoundary>

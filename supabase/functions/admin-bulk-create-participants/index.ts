@@ -10,7 +10,7 @@
 // left to RLS) because this uses the service-role key, which bypasses RLS.
 //
 // Contract: POST { organization_id, entries: [{ name, game_id }] }
-//        -> { created: [{name,user_id,game_id}],
+//        -> { created: [{name,user_id,game_id,status}],   (status: confirmed, ou waitlisted se o mix encheu)
 //             skipped: [{name,game_id,reason}],   // already in that game
 //             failed:  [{name,game_id,error}] }
 // Idempotent per (game_id, name): re-sending the same list only creates the
@@ -163,7 +163,7 @@ Deno.serve(async (req) => {
     }
   }
 
-  const created: Array<{ name: string; user_id: string; game_id: string }> = []
+  const created: Array<{ name: string; user_id: string; game_id: string; status: 'confirmed' | 'waitlisted' }> = []
   const skipped: Array<{ name: string; game_id: string; reason: string }> = []
   const failed: Array<{ name: string; game_id: string; error: string }> = []
 
@@ -224,18 +224,34 @@ Deno.serve(async (req) => {
         continue
       }
 
-      const { error: participantError } = await admin.from('participants').insert({
+      let status: 'confirmed' | 'waitlisted' = 'confirmed'
+      let { error: participantError } = await admin.from('participants').insert({
         game_id: entry.game_id,
         user_id: authUser.user.id,
-        status: 'confirmed',
+        status,
         joined_alone: true,
       })
+      // Mix cheio: o trigger das vagas (migration_mix_capacity_guard.sql)
+      // recusa com `game_full` — esta função usa a service-role, por isso não
+      // conta como admin. A pessoa entra como suplente, como na app.
+      if (participantError && /(^|\W)game_full$/.test(participantError.message.trim())) {
+        status = 'waitlisted'
+        ;({ error: participantError } = await admin.from('participants').insert({
+          game_id: entry.game_id,
+          user_id: authUser.user.id,
+          status,
+          joined_alone: true,
+        }))
+      }
       if (participantError) {
+        // Sem inscrição, a conta de convidado acabada de criar ficava órfã na
+        // lista de membros — e cada nova tentativa criava outra.
+        await admin.auth.admin.deleteUser(authUser.user.id).catch(() => {})
         failed.push({ name, game_id: entry.game_id, error: participantError.message })
         continue
       }
 
-      created.push({ name, user_id: authUser.user.id, game_id: entry.game_id })
+      created.push({ name, user_id: authUser.user.id, game_id: entry.game_id, status })
       // Keep the in-memory snapshot current so a name repeated later in the
       // SAME payload is skipped rather than created twice.
       namesInGame.add(normalizeName(name))
