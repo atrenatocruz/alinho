@@ -75,6 +75,12 @@ export const slotProblem = (slots = [], slot) => {
   return clash ? 'overlap' : null
 }
 
+/** Resumo curto de um bloco para cartões: 9:00–13:00 → «9–13h», 18:30–21:00 → «18:30–21h». */
+export const shortRange = (start, end) => {
+  const h = (v) => { const [hh, mm] = shortTime(v).split(':'); return mm === '00' ? String(Number(hh)) : `${Number(hh)}:${mm}` }
+  return `${h(start)}–${h(end)}h`
+}
+
 /** Próximo intervalo a propor ao carregar em «+ Horas» num dia. */
 export const nextSlot = (slots = []) => {
   if (slots.length === 0) return { start: '09:00', end: '13:00' }

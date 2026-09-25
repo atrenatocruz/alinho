@@ -19,7 +19,7 @@ export const DAY_LABEL_KEY = Object.fromEntries(DAYS.map((d) => [d.value, d.labe
 export const listTeacherProfiles = async () => {
   const { data, error } = await supabase
     .from('teacher_profiles')
-    .select('*, user:profiles!teacher_profiles_user_id_fkey(name, avatar_url), organization:organizations(name, slug), availability:teacher_availability(*)')
+    .select('*, user:profiles!teacher_profiles_user_id_fkey(name, avatar_url, gender, rating), organization:organizations(name, slug), availability:teacher_availability(*)')
   if (error) throw error
   return data || []
 }
@@ -96,11 +96,20 @@ export const withdrawTeacherProfile = async (id) => {
 export const listPendingClubTeachers = async (organizationId) => {
   const { data, error } = await supabase
     .from('teacher_profiles')
-    .select('id, contact, zone, status, created_at, user:profiles!teacher_profiles_user_id_fkey(name, avatar_url)')
+    .select('id, user_id, contact, zone, status, created_at, user:profiles!teacher_profiles_user_id_fkey(name, avatar_url, gender)')
     .eq('organization_id', organizationId)
     .eq('club_status', 'pending')
   if (error) throw error
   return data || []
+}
+
+// Depois de aceitar (desenho aprovado 25 set, assunto 2), a janela pergunta
+// se também fica admin — o mesmo RPC de «Pessoas» → tornar admin.
+export const makeClubAdmin = async (organizationId, userId) => {
+  const { error } = await supabase.rpc('admin_set_membership_admin', {
+    p_organization_id: organizationId, p_user_id: userId, p_is_admin: true,
+  })
+  if (error) throw error
 }
 
 // makeAdmin (#550): ao aceitar, dar também papel de admin do clube. Só se

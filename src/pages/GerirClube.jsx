@@ -20,7 +20,8 @@ import PlayerSearch from '../components/PlayerSearch'
 import WhatsappGroupsSection from '../components/WhatsappGroupsSection'
 import { searchPlayers } from '../lib/privateMatches'
 import { inviteToOrganization } from '../lib/orgInvites'
-import { listPendingClubTeachers, resolveTeacherClub } from '../lib/teachers'
+import { listPendingClubTeachers } from '../lib/teachers'
+import TeacherRequestCard from '../components/TeacherRequestCard'
 import VoucherScanner from '../components/VoucherScanner'
 import { isValidVoucherId, normalizeScannedVoucherId } from '../lib/vouchers'
 import OpenSlotsPanel from '../components/OpenSlotsPanel'
@@ -34,6 +35,7 @@ import { KIND_STYLE } from '../components/agenda/EventCard'
 import { tournamentsAvailable } from '../lib/tournamentApi'
 import { describeError } from '../lib/errors'
 import { isDraftMix, publishDraftMix, advanceByFrequency, pendingOccurrenceRow } from '../lib/mixDraft'
+import LaunchDayPicker from '../components/LaunchDayPicker'
 
 const sanitizeSlug = (value) => value.toLowerCase().replace(/[^a-z0-9-]/g, '')
 
@@ -514,20 +516,6 @@ export default function GerirClube() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentOrganizationId, org?.kind])
 
-  // #550: ao aceitar um professor, pode dar-se também papel de admin —
-  // desligado por defeito, uma escolha por pedido.
-  const [teacherAdminById, setTeacherAdminById] = useState({})
-  const handleClubTeacher = async (id, accept) => {
-    try {
-      await resolveTeacherClub(id, accept, accept && !!teacherAdminById[id])
-      await loadClubTeachers()
-    } catch (error) {
-      console.error('Error resolving club teacher:', error)
-      alert(describeError(t, error, accept ? 'gerirclube.error_approve_teacher_request' : 'gerirclube.error_reject_teacher_request'))
-    }
-  }
-
-
   // Only clubs contain groups — a group's own Gerir page has none of its
   // own (create_group rejects a group as a parent), so this stays empty
   // there and the scope picker in the create-game form never renders on a
@@ -948,15 +936,18 @@ export default function GerirClube() {
     return { daysBefore, launchTime }
   }
 
+  // Sem dia escolhido, o erro aparece por baixo das pastilhas (regra das
+  // janelas); o resto no formulário, junto aos botões. Nunca alert().
+  const [launchDayError, setLaunchDayError] = useState('')
   const validateRecurrence = (recurrence) => {
     if (!recurrence.enabled) return null
     if (!recurrence.launchDaysBefore || parseInt(recurrence.launchDaysBefore, 10) < 1) {
-      return t('gerirclube.validate_launch_days_before')
+      return { field: 'launchDay', message: t('gerirclube.validate_launch_days_before') }
     }
-    if (!recurrence.launchTime) return t('gerirclube.validate_launch_time')
-    if (recurrence.endsType === 'on_date' && !recurrence.endsOn) return t('gerirclube.validate_end_date')
+    if (!recurrence.launchTime) return { message: t('gerirclube.validate_launch_time') }
+    if (recurrence.endsType === 'on_date' && !recurrence.endsOn) return { message: t('gerirclube.validate_end_date') }
     if (recurrence.endsType === 'after_occurrences' && (!recurrence.endsAfterOccurrences || parseInt(recurrence.endsAfterOccurrences, 10) < 1)) {
-      return t('gerirclube.validate_occurrences_count')
+      return { message: t('gerirclube.validate_occurrences_count') }
     }
     return null
   }
@@ -1082,7 +1073,8 @@ export default function GerirClube() {
 
     const recurrenceError = validateRecurrence(recurrence)
     if (recurrenceError) {
-      alert(recurrenceError)
+      if (recurrenceError.field === 'launchDay') setLaunchDayError(recurrenceError.message)
+      else setGameError(recurrenceError.message)
       return
     }
 
@@ -1294,7 +1286,8 @@ export default function GerirClube() {
 
     const recurrenceError = validateRecurrence(recurrence)
     if (recurrenceError) {
-      alert(recurrenceError)
+      if (recurrenceError.field === 'launchDay') setLaunchDayError(recurrenceError.message)
+      else setGameError(recurrenceError.message)
       return
     }
 
@@ -2561,60 +2554,23 @@ export default function GerirClube() {
                               )}
                             </div>
 
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">
-                                {t('gerirclube.launch_days_before_label')}
-                              </label>
-                              <input
-                                type="number"
-                                min="1"
-                                value={gameForm.recurrence.launchDaysBefore}
-                                onChange={(e) => setGameForm({
-                                  ...gameForm,
-                                  recurrence: { ...gameForm.recurrence, launchDaysBefore: e.target.value }
-                                })}
-                                className="input-field"
-                                placeholder={t('gerirclube.launch_days_placeholder')}
-                                required
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">
-                                {t('gerirclube.launch_time_label')}
-                              </label>
-                              <input
-                                type="time"
-                                value={gameForm.recurrence.launchTime}
-                                onChange={(e) => setGameForm({
-                                  ...gameForm,
-                                  recurrence: { ...gameForm.recurrence, launchTime: e.target.value }
-                                })}
-                                className="input-field"
-                                required
-                              />
-                              <p className="text-sm text-muted mt-1.5">
-                                {t('gerirclube.launch_time_help')}
-                              </p>
-                              {/* O próximo lançamento com data real, para o admin não
-                                  fazer contas de cabeça (Trello #396). */}
-                              {(() => {
-                                const r = gameForm.recurrence
-                                const days = parseInt(r.launchDaysBefore, 10)
-                                if (!gameForm.date || !r.launchTime || !(days >= 1)) return null
-                                const nextMix = advanceByFrequency(new Date(gameForm.date), r.frequency)
-                                if (Number.isNaN(nextMix.getTime())) return null
-                                const launch = new Date(nextMix)
-                                launch.setDate(launch.getDate() - days)
-                                const [hh, mm] = r.launchTime.split(':').map(Number)
-                                launch.setHours(hh, mm, 0, 0)
-                                const day = (d) => formatDateLib(d, i18n.language, { weekday: 'long', day: 'numeric', month: 'short' })
-                                return (
-                                  <p className="text-sm font-extrabold text-ink-900 mt-1.5">
-                                    {t('gerirclube.next_launch_preview', { launch: day(launch), time: r.launchTime, mix: day(nextMix) })}
-                                  </p>
-                                )
-                              })()}
-                            </div>
+                            {/* Abrem as inscrições: escolhe-se o DIA, com a data à vista
+                                (desenho aprovado a 25 set). Guarda-se como antes: dias
+                                antes + hora. As datas são as do próximo Mix, o primeiro
+                                que abre com esta regra. */}
+                            <LaunchDayPicker
+                              key={`${editingGame?.id || 'novo'}-${gameForm.recurrence.frequency}`}
+                              mixDate={gameForm.date ? advanceByFrequency(new Date(gameForm.date), gameForm.recurrence.frequency) : null}
+                              frequency={gameForm.recurrence.frequency}
+                              daysBefore={gameForm.recurrence.launchDaysBefore}
+                              onDaysBefore={(v) => {
+                                setLaunchDayError('')
+                                setGameForm({ ...gameForm, recurrence: { ...gameForm.recurrence, launchDaysBefore: String(v) } })
+                              }}
+                              time={gameForm.recurrence.launchTime}
+                              onTime={(v) => setGameForm({ ...gameForm, recurrence: { ...gameForm.recurrence, launchTime: v } })}
+                              error={launchDayError}
+                            />
                           </>
                         )}
                       </div>
@@ -2981,48 +2937,12 @@ export default function GerirClube() {
               {!isGroupOrg && clubTeachers.length > 0 && (
                 <div className="space-y-2">
                   <h3 className="text-sm font-extrabold text-ink-900 flex items-center gap-1.5">
-                    <Clock size={14} /> {t('gerirclube.club_teachers_heading', { count: clubTeachers.length })}
+                    <Clock size={14} /> {t('gerirclube.teacher_requests_heading', { count: clubTeachers.length })}
                   </h3>
+                  {/* Desenho aprovado 25 set (professores, assunto 2). */}
                   {clubTeachers.map((req) => (
-                    <div key={req.id} className="card space-y-3">
-                      <div className="flex items-center gap-3">
-                        <Avatar name={req.user?.name} url={req.user?.avatar_url} size="w-10 h-10 text-sm" />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-extrabold text-ink-900 truncate">{req.user?.name || t('gerirclube.fallback_player_name')}</p>
-                          <p className="text-xs text-muted truncate">
-                            {req.status === 'approved' ? t('gerirclube.teacher_verified') : t('gerirclube.teacher_being_verified')}
-                            {req.zone ? ` · ${req.zone}` : ''}
-                          </p>
-                        </div>
-                      </div>
-                      <p className="text-sm text-ink-900 break-words">{req.contact}</p>
-                      <label className="flex items-start gap-2.5 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          className="mt-0.5 w-4 h-4 accent-ink-900"
-                          checked={!!teacherAdminById[req.id]}
-                          onChange={(e) => setTeacherAdminById((m) => ({ ...m, [req.id]: e.target.checked }))}
-                        />
-                        <span>
-                          <span className="block text-sm font-extrabold text-ink-900">{t('gerirclube.teacher_make_admin')}</span>
-                          <span className="block text-xs text-muted">{t('gerirclube.teacher_make_admin_hint')}</span>
-                        </span>
-                      </label>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleClubTeacher(req.id, true)}
-                          className="flex-1 inline-flex items-center justify-center gap-1.5 min-h-[44px] rounded-full bg-lime-400 text-ink-900 text-sm font-extrabold"
-                        >
-                          <Check size={16} /> {t('gerirclube.accept_teacher')}
-                        </button>
-                        <button
-                          onClick={() => handleClubTeacher(req.id, false)}
-                          className="flex-1 inline-flex items-center justify-center gap-1.5 min-h-[44px] rounded-full bg-ink-50 text-ink-700 text-sm font-extrabold"
-                        >
-                          <X size={16} /> {t('gerirclube.reject_action')}
-                        </button>
-                      </div>
-                    </div>
+                    <TeacherRequestCard key={req.id} req={req} organizationId={currentOrganizationId}
+                      onResolved={loadClubTeachers} />
                   ))}
                 </div>
               )}
