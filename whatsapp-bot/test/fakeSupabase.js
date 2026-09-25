@@ -75,6 +75,16 @@ export function installFakeSupabase(supabase, db) {
       delete: () => { q.op = 'delete'; return api },
       eq: (c, v) => { q.filters.push((r) => get(r, c) === v); return api },
       neq: (c, v) => { q.filters.push((r) => get(r, c) !== v); return api },
+      // .not(col, 'is', null) e .not(col, 'like', 'padrão%') — o que o phone.js usa.
+      not: (c, op, v) => {
+        // LIKE do SQL: % = qualquer coisa; o resto é literal.
+        const like = (x) => {
+          const parts = String(v).split('%').map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+          return new RegExp('^' + parts.join('.*') + '$').test(x ?? '')
+        }
+        q.filters.push((r) => (op === 'is' ? get(r, c) !== v && get(r, c) !== undefined : op === 'like' ? !like(get(r, c)) : true))
+        return api
+      },
       in: (c, v) => { q.filters.push((r) => v.includes(get(r, c))); return api },
       gt: (c, v) => { q.filters.push((r) => get(r, c) > v); return api },
       order: (col, opts = {}) => { q.orders.push({ col, asc: opts.ascending !== false }); return api },
@@ -86,7 +96,10 @@ export function installFakeSupabase(supabase, db) {
     return api
   }
   supabase.from = builder
-  supabase.rpc = async () => ({ data: [], error: null })
+  supabase.rpc = async (name, args) => {
+    ;(db.rpcCalls ??= []).push([name, args])
+    return { data: [], error: null }
+  }
   supabase.auth.admin.createUser = async ({ user_metadata }) => ({ data: { user: { id: 'u-' + crypto.randomUUID().slice(0, 8), user_metadata } }, error: null })
   supabase.auth.admin.deleteUser = async () => ({})
 }

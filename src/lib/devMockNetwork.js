@@ -2,6 +2,7 @@ import { supabase } from './supabase'
 import { LESSON_RPC_MOCKS, LESSON_TABLE_MOCKS, LESSON_NOTICES } from './devMockLessons'
 import {
   TOURNAMENT_RPC_MOCKS, TOURNAMENT_TABLE_MOCKS, TOURNAMENT_CLOSE_RPC_MOCKS, TOURNAMENT_CLOSE_TABLE_MOCKS,
+  TOURNAMENT_SCORE_TODAY_TABLE_MOCKS,
 } from './devMockTournament'
 import { TOURNAMENT_DRAW_TABLE_MOCKS, TOURNAMENT_DRAW_RPC_MOCKS } from './devMockTournamentDraw'
 
@@ -874,7 +875,7 @@ for (const [name, fn] of Object.entries(TOURNAMENT_CLOSE_RPC_MOCKS)) {
   const before = RPC_MOCKS[name]
   RPC_MOCKS[name] = (params) => fn(params) ?? before?.(params) ?? null
 }
-for (const [name, fn] of Object.entries(TOURNAMENT_CLOSE_TABLE_MOCKS)) {
+for (const [name, fn] of [...Object.entries(TOURNAMENT_CLOSE_TABLE_MOCKS), ...Object.entries(TOURNAMENT_SCORE_TODAY_TABLE_MOCKS)]) {
   const before = TABLE_MOCKS[name]
   TABLE_MOCKS[name] = (url) => fn(url) ?? before?.(url) ?? []
 }
@@ -916,6 +917,18 @@ export function installDevMockNetwork() {
     // há service-role nem conta para criar, por isso devolve-se um código
     // de convite fictício. localStorage.mockPartnerError = 'email_already_in_use'
     // (ou outro) mostra a mensagem de erro em vez do sucesso.
+    // «Não está na app?» no «Adicionar jogador» (#546): a conta é inventada.
+    // Com o email ana@exemplo.pt faz de conta que o email já tinha conta.
+    if (url && url.includes('/functions/v1/admin-bulk-create-participants')) {
+      let body = {}
+      try { body = JSON.parse(init?.body || '{}') } catch { /* ignora */ }
+      const p = body.players?.[0] || {}
+      if ((p.email || '').toLowerCase() === 'ana@exemplo.pt') {
+        return jsonResponse({ created: [{ name: 'Ana Silva', user_id: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', existing_account: true }], failed: [] })
+      }
+      return jsonResponse({ created: [{ name: p.name, user_id: 'ffffffff-ffff-ffff-ffff-ffffffffffff', existing_account: false }], failed: [] })
+    }
+
     if (url && url.includes('/functions/v1/join-with-named-partner')) {
       const forced = localStorage.getItem('mockPartnerError')
       if (forced) return jsonResponse({ error: forced }, 409)

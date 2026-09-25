@@ -54,3 +54,63 @@ export function hhmmInTz(iso, timeZone = TOURNAMENT_TZ) {
     timeZone, hour: '2-digit', minute: '2-digit', hour12: false,
   }).format(d)
 }
+
+/* ── Gravar e mostrar uma hora escrita num formulário (Trello #487, Dev 1) ──
+   Vieram de `tournaments.js` para aqui a 24 set: um relógio só para o
+   torneio, o mesmo `TOURNAMENT_TZ` dos dois lados. */
+
+/* O prazo das inscrições (Trello #487). No ecrã escreve-se «5 out, 23:59» —
+   hora de quem está a montar o torneio. Ia para a base de dados como
+   "2026-10-05T23:59", SEM FUSO, e a base de dados guardava-o como UTC: em
+   Lisboa ficava 00:59 do dia seguinte, e as inscrições fechavam uma hora
+   depois do anunciado (duas no inverno não, uma — mas errada na mesma).
+
+   E ao abrir para editar fazia-se o contrário do certo: cortavam-se os 16
+   primeiros caracteres do valor guardado, que vem em UTC, e mostrava-se
+   essa hora como se fosse de Lisboa. Por isso o ecrã de editar parecia
+   certo enquanto a base de dados estava errada.
+
+   Estas duas funções são as únicas portas entre um e outro. */
+
+/** As peças de um instante, lidas no relógio do torneio. */
+function partsInTz(date, tz = TOURNAMENT_TZ) {
+  const out = {}
+  for (const { type, value } of new Intl.DateTimeFormat('en-GB', {
+    timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(date)) out[type] = value
+  return out
+}
+
+/** Quantos minutos o relógio do torneio está à frente do UTC naquele
+ *  instante (60 no verão, 0 no inverno, em Lisboa). */
+function offsetMinutes(date, tz = TOURNAMENT_TZ) {
+  const p = partsInTz(date, tz)
+  const asUtc = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute)
+  return Math.round((asUtc - Math.floor(date.getTime() / 60000) * 60000) / 60000)
+}
+
+/** "2026-10-05T23:59" — hora de Lisboa, como o ecrã a mostra — → o instante
+ *  exacto em ISO (UTC), pronto para a base de dados. Vazio fica vazio. */
+export function localInputToIso(value, tz = TOURNAMENT_TZ) {
+  if (!value) return null
+  const m = String(value).match(/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?$/)
+  if (!m) return null
+  const [, y, mo, d, h = '00', mi = '00'] = m
+  const wall = Date.UTC(+y, +mo - 1, +d, +h, +mi)
+  // Primeiro palpite com o desvio desse momento; depois acerta-se com o
+  // desvio do instante encontrado, que é o que resolve a mudança de hora.
+  let t = wall - offsetMinutes(new Date(wall), tz) * 60000
+  t = wall - offsetMinutes(new Date(t), tz) * 60000
+  return new Date(t).toISOString()
+}
+
+/** O inverso: um instante vindo da base de dados → "YYYY-MM-DDTHH:MM" no
+ *  relógio do torneio, para o ecrã. */
+export function isoToLocalInput(iso, tz = TOURNAMENT_TZ) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const p = partsInTz(d, tz)
+  return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`
+}

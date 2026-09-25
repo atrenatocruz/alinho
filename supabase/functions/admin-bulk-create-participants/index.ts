@@ -18,6 +18,19 @@
 // timeout is safe. The client sends the list in small chunks (~50) to stay
 // well inside the Edge Function wall-clock limit; the 500 cap below is a
 // backstop, not the expected batch size.
+//
+// Modo «create_only» (Trello #546, 25 set — admin adiciona ao mix uma
+// pessoa sem conta): POST { organization_id, create_only: true,
+//   players: [{ name, email? }] }
+//   -> { created: [{ name, user_id, existing_account }], failed: [{ name, error }] }
+// Só cria a conta (ou encontra a que já existe com esse email) e a torna
+// membro do clube; a inscrição no mix fica com a app, pelo mesmo caminho do
+// «Adicionar jogador» (vagas, suplente, mais um campo — as regras de sempre).
+//  · com email: a conta fica com esse email, para a pessoa entrar depois com
+//    ele e ficar com os jogos e o nível;
+//  · se o email já tem conta, usa-se essa (existing_account: true) e passa a
+//    membro do clube se ainda não era — não se cria outra;
+//  · sem email: um email inventado, como nos convidados em massa.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
@@ -60,6 +73,13 @@ interface Entry {
   game_id: string
 }
 
+interface NewPlayer {
+  name: string
+  email?: string
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -73,7 +93,7 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: 'Unauthorized' }, 401)
   }
 
-  let body: { organization_id?: string; entries?: Entry[] }
+  let body: { organization_id?: string; entries?: Entry[]; create_only?: boolean; players?: NewPlayer[] }
   try {
     body = await req.json()
   } catch {
@@ -82,11 +102,21 @@ Deno.serve(async (req) => {
 
   const organizationId = body.organization_id
   const entries = body.entries
-  if (!organizationId || !Array.isArray(entries) || entries.length === 0) {
-    return jsonResponse({ error: 'Missing organization_id or entries' }, 400)
+  const createOnly = body.create_only === true
+  if (!organizationId) {
+    return jsonResponse({ error: 'Missing organization_id' }, 400)
   }
-  if (entries.length > 500) {
-    return jsonResponse({ error: 'Too many entries in one call (max 500)' }, 400)
+  if (createOnly) {
+    if (!Array.isArray(body.players) || body.players.length === 0 || body.players.length > 10) {
+      return jsonResponse({ error: 'players must have 1 to 10 entries' }, 400)
+    }
+  } else {
+    if (!Array.isArray(entries) || entries.length === 0) {
+      return jsonResponse({ error: 'Missing organization_id or entries' }, 400)
+    }
+    if (entries.length > 500) {
+      return jsonResponse({ error: 'Too many entries in one call (max 500)' }, 400)
+    }
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
@@ -109,6 +139,83 @@ Deno.serve(async (req) => {
   }
   if (!callerMembership?.is_admin) {
     return jsonResponse({ error: 'Only org admins can bulk-import participants' }, 403)
+  }
+
+  if (createOnly) {
+    const created: Array<{ name: string; user_id: string; existing_account: boolean }> = []
+    const failed: Array<{ name: string; error: string }> = []
+    for (const player of body.players as NewPlayer[]) {
+      const name = typeof player?.name === 'string' ? player.name.trim().replace(/\s+/g, ' ') : ''
+      const email = typeof player?.email === 'string' ? player.email.trim().toLowerCase() : ''
+      try {
+        if (!name || name.length > 60) {
+          failed.push({ name, error: 'invalid_name' })
+          continue
+        }
+        if (email && !EMAIL_RE.test(email)) {
+          failed.push({ name, error: 'invalid_email' })
+          continue
+        }
+
+        // O email já tem conta: inscreve-se essa, não se cria outra.
+        if (email) {
+          const { data: existing, error: existingError } = await admin
+            .from('profiles')
+            .select('id, name')
+            .eq('email', email)
+            .limit(1)
+          if (existingError) throw existingError
+          if (existing?.length) {
+            const profile = existing[0]
+            const { data: alreadyMember } = await admin
+              .from('memberships')
+              .select('id')
+              .eq('organization_id', organizationId)
+              .eq('user_id', profile.id)
+              .maybeSingle()
+            if (!alreadyMember) {
+              const { error: memberError } = await admin.from('memberships').insert({
+                user_id: profile.id,
+                organization_id: organizationId,
+                is_admin: false,
+                is_guest: false,
+              })
+              if (memberError) throw memberError
+            }
+            created.push({ name: profile.name || name, user_id: profile.id, existing_account: true })
+            continue
+          }
+        }
+
+        const { data: authUser, error: createError } = await admin.auth.admin.createUser({
+          email: email || `bulk-${crypto.randomUUID()}@padelapp.test`,
+          email_confirm: true,
+          password: crypto.randomUUID(),
+          user_metadata: { name },
+        })
+        if (createError || !authUser?.user) {
+          failed.push({ name, error: createError?.message || 'Failed to create auth user' })
+          continue
+        }
+        const { error: membershipError } = await admin.from('memberships').insert({
+          user_id: authUser.user.id,
+          organization_id: organizationId,
+          is_admin: false,
+          is_guest: true,
+          level: 'iniciante',
+        })
+        if (membershipError) {
+          // Sem ficar membro, a conta acabada de criar ficava órfã.
+          await admin.auth.admin.deleteUser(authUser.user.id).catch(() => {})
+          failed.push({ name, error: membershipError.message })
+          continue
+        }
+        created.push({ name, user_id: authUser.user.id, existing_account: false })
+      } catch (err) {
+        failed.push({ name, error: err instanceof Error ? err.message : 'Unknown error' })
+      }
+    }
+    return jsonResponse({ created, failed })
   }
 
   // Verify that all game_ids belong to this organization before proceeding.
@@ -135,7 +242,7 @@ Deno.serve(async (req) => {
   const normalizeName = (n: unknown): string =>
     typeof n === 'string' ? n.trim().toLowerCase().replace(/\s+/g, ' ') : ''
 
-  const batchGameIds = [...new Set(entries.map((e) => e?.game_id).filter((g): g is string => !!g))]
+  const batchGameIds = [...new Set((entries as Entry[]).map((e) => e?.game_id).filter((g): g is string => !!g))]
     .filter((g) => validGameIds.has(g))
   const existingNamesByGame = new Map<string, Set<string>>()
   if (batchGameIds.length > 0) {
@@ -167,7 +274,7 @@ Deno.serve(async (req) => {
   const skipped: Array<{ name: string; game_id: string; reason: string }> = []
   const failed: Array<{ name: string; game_id: string; error: string }> = []
 
-  for (const entry of entries) {
+  for (const entry of entries as Entry[]) {
     try {
       const name = entry.name?.trim()
       if (!name || !entry.game_id) {

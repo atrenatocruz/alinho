@@ -19,14 +19,14 @@ export default function LocationOpenWith({ location, latitude, longitude, classN
           href={navigatorUrl(preferredNav, place)}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-start gap-1.5 min-w-0 text-[13px] text-ink-900"
+          className="flex min-h-[44px] items-center gap-1.5 min-w-0 text-[13px] text-ink-900"
         >
-          <MapPin size={15} className="text-ink-700 shrink-0 mt-0.5" />
+          <MapPin size={15} className="text-ink-700 shrink-0" />
           <span>{location}</span>
         </a>
         <button
           onClick={() => setPickerOpen((open) => !open)}
-          className="shrink-0 text-[13px] font-extrabold text-ink-900 underline underline-offset-2 min-h-[36px]"
+          className="shrink-0 text-[13px] font-extrabold text-ink-900 underline underline-offset-2 min-h-[44px]"
         >
           {t('gamedetails.open_with')}
         </button>

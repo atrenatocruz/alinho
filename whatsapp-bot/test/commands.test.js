@@ -32,10 +32,11 @@ beforeEach(async () => {
   calls.length = 0
 })
 
-export async function say(text, pn = '351911111111') {
+export async function say(text, pn = '351911111111', mentionPns = []) {
   const sent = []
   await handleGroupMessage(
-    { groupJid: 'g@g.us', senderPn: `${pn}@s.whatsapp.net`, text, message: {}, quotedStanzaId: null },
+    { groupJid: 'g@g.us', senderPn: `${pn}@s.whatsapp.net`, text, message: {}, quotedStanzaId: null,
+      mentionedJids: mentionPns.map((p) => `${p}@s.whatsapp.net`), mentionedPns: mentionPns.map((p) => `${p}@s.whatsapp.net`) },
     { sendText: async (_g, t) => { sent.push(t) } },
   )
   return sent.join('\n')
@@ -97,4 +98,112 @@ test('«Out» com suplentes: o repost já leva quem subiu (sem esperar pelo Real
   assert.equal(asked.length, 1)
   assert.equal(asked[0][0], 'm')
   assert.deepEqual(asked[0][1].map((p) => [p.gameId, p.name]), [['m', 'Sofia Suplente']])
+})
+
+// ── Sair de uma dupla (Renato, 25 set) ────────────────────────────────────
+// Bernardo (a, 911…) inscreveu a dupla com Afonso (b, 922…).
+function pairIn() {
+  db.profiles.push({ id: 'c', name: 'Carlos Mendes', phone_hash: hash('933333333'), language: 'pt' })
+  db.memberships.push({ user_id: 'c', organization_id: 'o' })
+  db.participants.push({ id: 'row', game_id: 'm', user_id: 'a', partner_id: 'b', status: 'confirmed', joined_alone: false, created_at: '2026-09-01T10:00:00Z' })
+}
+const row = () => db.participants.find((p) => p.id === 'row')
+
+test('«Out dupla» (dito pelo parceiro) tira a dupla toda', async () => {
+  pairIn()
+  await say('out dupla', '351922222222')
+  assert.equal(row(), undefined)
+})
+
+test('«Out @parceiro» tira só o parceiro; quem escreveu fica sozinho', async () => {
+  pairIn()
+  const out = await say('out @afonso', '351911111111', ['351922222222'])
+  assert.deepEqual([row().user_id, row().partner_id], ['a', null])
+  assert.match(out, /Afonso Dias/)
+  assert.deepEqual(db.rpcCalls?.map((c) => c[0]), ['promote_waitlist'])
+})
+
+test('o parceiro convidado também pode tirar quem o inscreveu («Out @Bernardo»)', async () => {
+  pairIn()
+  await say('out @bernardo', '351922222222', ['351911111111'])
+  assert.deepEqual([row().user_id, row().partner_id], ['b', null])
+})
+
+test('«Out @alguém» que não é o parceiro: não mexe e explica', async () => {
+  pairIn()
+  const out = await say('out @carlos', '351911111111', ['351933333333'])
+  assert.deepEqual([row().user_id, row().partner_id], ['a', 'b'])
+  assert.match(out, /não está na tua dupla/)
+})
+
+test('«Out» sozinho em dupla pergunta 1/2/3; «2» = só tu', async () => {
+  pairIn()
+  const menu = await say('out')
+  assert.match(menu, /1\. Dupla[\s\S]*2\. Só tu[\s\S]*3\. /)
+  assert.deepEqual([row().user_id, row().partner_id], ['a', 'b'])
+  await say('2')
+  assert.deepEqual([row().user_id, row().partner_id], ['b', null])
+})
+
+test('«Out» → «3» tira o parceiro; «Out» → «1» tira a dupla; resposta inválida pede outra vez', async () => {
+  pairIn()
+  await say('out')
+  assert.match(await say('talvez'), /1.*2.*3/)
+  await say('3')
+  assert.deepEqual([row().user_id, row().partner_id], ['a', null])
+  db.participants.find((p) => p.id === 'row').partner_id = 'b'
+  await say('out')
+  await say('1')
+  assert.equal(row(), undefined)
+})
+
+test('parceiro que ainda não entrou na app: «só tu» tira a dupla toda e explica', async () => {
+  pairIn()
+  db.profiles.find((p) => p.id === 'b').claim_pending = true
+  await say('out')
+  const out = await say('2')
+  assert.equal(row(), undefined)
+  assert.match(out, /ainda não entrou na app/)
+})
+
+test('a mensagem do mix explica como sair em dupla, só quando há duplas inscritas', async () => {
+  const { buildMixMessage } = await import('../src/roster.js')
+  const game = { id: 'm', title: 'Mix', date: new Date(Date.now() + 864e5).toISOString(), num_courts: 1, status: 'open', rotate_partners: false, allow_pair_signup: true }
+  const solo = buildMixMessage({ game, people: [{ name: 'A', pair: null }], capacity: 4, suplentes: [] })
+  const pair = buildMixMessage({ game, people: [{ name: 'A', pair: 1 }, { name: 'B', pair: 1 }], capacity: 4, suplentes: [] })
+  assert.doesNotMatch(solo, /Out dupla/)
+  assert.match(pair, /Out dupla/)
+  assert.match(pair, /Out @parceiro/)
+})
+
+test('com vários mixes abertos, «Out 01 dupla» tira a dupla do mix 01', async () => {
+  pairIn()
+  db.games.push({ id: 'm2', organization_id: 'o', title: 'Outro', status: 'open', origin: 'manual',
+    date: new Date(Date.now() + 2 * 864e5).toISOString(), num_courts: 1, max_players: 4, rotate_partners: false, allow_pair_signup: true })
+  await say('out 01 dupla', '351922222222')
+  assert.equal(row(), undefined)
+})
+
+// ── #537 (ramo bugs-537-bot) ──────────────────────────────────────────────
+test('duas contas com o mesmo telemóvel no clube: o «In» usa a registada, não o convidado', async () => {
+  db.profiles.push({ id: 'g', name: 'Bernardo (convidado)', email: 'guest-1@whatsapp.alinho.pt', phone_hash: hash('911111111'), language: 'pt' })
+  db.memberships.push({ user_id: 'g', organization_id: 'o', is_guest: true })
+  db.profiles.find((p) => p.id === 'a').phone_verified_at = '2026-09-25T10:00:00Z'
+  await say('in')
+  assert.deepEqual(db.participants.map((p) => p.user_id), ['a'])
+})
+
+test('conta registada (número confirmado) fora do clube: o «In» torna-a membro, sem criar convidado', async () => {
+  db.profiles.push({ id: 'r', name: 'Rita Registada', email: 'rita@mail.pt', phone_hash: hash('966666666'), phone_verified_at: '2026-09-25T10:00:00Z', language: 'pt' })
+  await say('in', '351966666666')
+  assert.deepEqual(db.participants.map((p) => p.user_id), ['r'])
+  assert.ok(db.memberships.some((m) => m.user_id === 'r' && m.organization_id === 'o'))
+  assert.equal(db.profiles.filter((p) => /whatsapp\.alinho\.pt/.test(p.email || '')).length, 0)
+})
+
+test('«In @parceiro» com conta registada fora do clube: o parceiro também passa a membro', async () => {
+  db.profiles.push({ id: 'r', name: 'Rita Registada', email: 'rita@mail.pt', phone_hash: hash('966666666'), phone_verified_at: '2026-09-25T10:00:00Z', language: 'pt' })
+  await say('in @rita', '351911111111', ['351966666666'])
+  assert.deepEqual(db.participants.map((p) => [p.user_id, p.partner_id]), [['a', 'r']])
+  assert.ok(db.memberships.some((m) => m.user_id === 'r' && m.organization_id === 'o'), 'a Rita tem de ficar membro do clube')
 })

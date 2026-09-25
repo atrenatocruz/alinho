@@ -1,7 +1,7 @@
 import { supabase } from './supabase.js'
 import { getGroupByJid, mixVisibleToGroup } from './groups.js'
 import { loadGame, getOpenMixes, formatDateTime, weekdayKeyPt, mixLocalParts, gameIdForMessage, labelableMixes, mixLabel } from './roster.js'
-import { resolveProfileByPhoneJid, createGuestProfile } from './phone.js'
+import { resolveProfileByPhoneJid, createGuestProfile, ensureMembership } from './phone.js'
 import { joinWithUnregisteredPartner } from './partnerInvite.js'
 import { config } from './config.js'
 import { helpText, helpFooter } from './messages.js'
@@ -345,6 +345,18 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
   // then, so they can play without registering first, while still being
   // nudged to sign up for their history/friends/rewards (Trello #19).
   async function requireProfileOrCreateGuest(profile, senderPnForGuest) {
+    // #537: já tem conta (número confirmado) mas não é deste clube → passa a
+    // membro com a conta dele, em vez de ganhar um convidado.
+    if (profile?.notMember) {
+      try {
+        await ensureMembership(profile.id, organizationId)
+        return { profile: { ...profile, notMember: false }, isNewGuest: false }
+      } catch (err) {
+        console.error('Failed to add registered member:', err)
+        await reply('not_found', { appUrl: config.appUrl })
+        return { profile: null, isNewGuest: false }
+      }
+    }
     if (profile) return { profile, isNewGuest: false }
     try {
       const created = await createGuestProfile(senderPnForGuest, message?.pushName, organizationId)
@@ -359,6 +371,21 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
   if (pending) {
     const normalized = stripAccents(text.trim().toLowerCase())
     const key = pendingKey(senderPn, groupJid)
+
+    if (pending.kind === 'out_pair') {
+      const choice = { 1: 'pair', dupla: 'pair', 2: 'me', eu: 'me', 'so eu': 'me', 'so tu': 'me', 3: 'partner', parceiro: 'partner' }[normalized]
+      if (choice) {
+        pendingSuplenteConfirmations.delete(key)
+        await confirmOutPair(pending, choice)
+        return
+      }
+      if (!pending.reprompted) {
+        pending.reprompted = true
+        await reply('out_pair_reprompt')
+        return
+      }
+      pendingSuplenteConfirmations.delete(key)
+    }
 
     if (normalized === 'sim' && pending.kind === 'pair_unregistered') {
       pendingSuplenteConfirmations.delete(key)
@@ -426,6 +453,17 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
 
   // «In com João» / «In @João» — entrar já em dupla (A2N, 24 set). Só para
   // «in»; num «out» o parceiro não interessa.
+  // «Out dupla» / «Out @parceiro» (Renato, 25 set): quem sai de uma dupla.
+  // A palavra e a menção saem do identificador do mix («out 01 dupla»).
+  let outRequest = null
+  if (action === 'out' && rest !== null) {
+    const r = rest.replace(/@\S+/g, ' ')
+    const wantsPair = /(^|\s)dupla(\s|$)/.test(r)
+    if (wantsPair) outRequest = { kind: 'pair' }
+    else if (mentionedJids.length > 0) outRequest = { kind: 'mention', pns: mentionedPns }
+    if (outRequest) rest = r.replace(/(^|\s)dupla(?=\s|$)/g, ' ').replace(/\s+/g, ' ').trim() || null
+  }
+
   let partnerRequest = null
   if (action === 'in') {
     const split = splitPartner(rest)
@@ -475,6 +513,12 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     const pn = (partnerRequest.mentionedPns || [])[0]
     if (pn) {
       const found = await resolveProfileByPhoneJid(pn, organizationId)
+      if (found?.notMember) {
+        // #537: o parceiro tem conta (número confirmado) mas não é deste
+        // clube — passa a membro, como quem escreve (requireProfileOrCreateGuest).
+        await ensureMembership(found.id, organizationId)
+        return { partner: { ...found, notMember: false }, isNewGuest: false }
+      }
       if (found) return { partner: found, isNewGuest: false }
       try {
         const guestName = partnerRequest.name
@@ -634,6 +678,93 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     }
   }
 
+  /**
+   * Sair de uma dupla (Renato, 25 set). `choice`: 'pair' (saem os dois), 'me'
+   * (sai quem escreveu, o outro fica sozinho) ou 'partner' (sai o outro).
+   * Sem escolha: vem do «Out dupla» / «Out @parceiro», ou pergunta-se 1/2/3.
+   *
+   * Tirar UMA pessoa não apaga a linha — encolhe-a — e o promote_waitlist só
+   * corre sozinho num DELETE; por isso chama-se aqui (também reabre o mix).
+   * Se quem fica seria um parceiro que ainda não entrou na app (convite por
+   * link), sai a dupla toda: não fica um lugar só com um convite.
+   */
+  async function leavePair({ game, pairRow, profile, rows, suplentes, choice = null }) {
+    const otherId = pairRow.user_id === profile.id ? pairRow.partner_id : pairRow.user_id
+    const { data: others } = await supabase.from('profiles').select('id, name, claim_pending').eq('id', otherId)
+    const other = others?.[0] ?? { id: otherId, name: '?', claim_pending: false }
+
+    if (!choice && outRequest?.kind === 'pair') choice = 'pair'
+    if (!choice && outRequest?.kind === 'mention') {
+      const pns = (outRequest.pns || []).filter(Boolean)
+      if (outRequest.pns.length > 1) {
+        await reply('partner_one_mention')
+        return
+      }
+      const mentioned = pns.length === 1 ? await resolveProfileByPhoneJid(pns[0], organizationId) : null
+      if (!mentioned) {
+        await reply('out_mention_unreadable')
+        return
+      }
+      if (mentioned.id === profile.id) choice = 'me'
+      else if (mentioned.id === otherId) choice = 'partner'
+      else {
+        await reply('out_not_your_partner', { name: mentioned.name })
+        return
+      }
+    }
+    if (!choice) {
+      pendingSuplenteConfirmations.set(pendingKey(senderPn, groupJid), {
+        kind: 'out_pair', gameId: game.id, rowId: pairRow.id,
+        expiresAt: Date.now() + SUPLENTE_CONFIRM_TTL_MS, reprompted: false,
+      })
+      await reply('out_pair_menu', { partner: other.name })
+      return
+    }
+
+    if (choice === 'pair' || (choice === 'me' && other.claim_pending)) {
+      const { error } = await supabase.from('participants').delete().eq('id', pairRow.id)
+      timer.mark('gravar')
+      if (error) throw new Error(`Failed to remove pair: ${error.message}`)
+      await repostAfterLeave(game, rows, suplentes)
+      if (choice === 'me') await reply('out_pair_whole_unclaimed', { partner: other.name })
+      return
+    }
+
+    // Fica uma pessoa: a que não sai. A linha mantém a posição na lista.
+    const stayId = choice === 'me' ? otherId : profile.id
+    const { error } = await supabase
+      .from('participants')
+      .update({ user_id: stayId, partner_id: null, joined_alone: true })
+      .eq('id', pairRow.id)
+    timer.mark('gravar')
+    if (error) throw new Error(`Failed to shrink pair: ${error.message}`)
+    // O convite por link de quem saiu deixa de ter lugar.
+    if (choice === 'partner' && other.claim_pending) {
+      await supabase.from('partner_invites').delete().eq('participant_id', pairRow.id)
+    }
+    const { error: promoteError } = await supabase.rpc('promote_waitlist', { p_game_id: game.id })
+    // Ex.: o 1.º suplente é uma dupla e só abriu uma vaga — o trigger das
+    // vagas recusa; a saída já está feita, fica só sem promoção.
+    if (promoteError) console.error('promote_waitlist after pair shrink failed:', promoteError.message)
+    await repostAfterLeave(game, rows, suplentes)
+    await reply(choice === 'me' ? 'out_pair_done_me' : 'out_pair_done_partner', { partner: other.name, title: game.title })
+  }
+
+  // Resposta ao menu 1/2/3: o mix e a dupla podem ter mudado nos minutos da
+  // pergunta — volta-se a carregar e a confirmar.
+  async function confirmOutPair(pending, choice) {
+    const profile = await requireProfile(resolvedProfile)
+    if (!profile) return
+    const { game, rows, suplentes } = await loadGame(pending.gameId)
+    const pairRow = rows.find((row) => row.id === pending.rowId && row.status === 'confirmed' && row.partner_id
+      && (row.user_id === profile.id || row.partner_id === profile.id))
+    if (!OPEN_STATUSES.has(game.status) || new Date(game.date).getTime() <= Date.now() || !pairRow) {
+      await reply('mix_no_longer_available')
+      return
+    }
+    await leavePair({ game, pairRow, profile, rows, suplentes, choice })
+  }
+
   // Joins/leaves a specific, already-resolved mix — the same logic
   // regardless of how that mix got picked (explicit code, the only-one-open
   // shortcut, or being the one mix the sender is in for a bare "out").
@@ -722,6 +853,16 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     }
 
     // action === 'out'
+    const pairRow = existingRows.find((row) => row.status === 'confirmed' && row.partner_id
+      && (row.user_id === profile.id || row.partner_id === profile.id))
+    if (pairRow) {
+      await leavePair({ game, pairRow, profile, rows, suplentes })
+      return
+    }
+    if (outRequest?.kind === 'mention') {
+      await reply('out_not_in_pair')
+      return
+    }
     if (asPartnerRow) {
       await reply('partner_joined_use_app')
       return
@@ -738,11 +879,18 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     const { error: deleteError } = await supabase.from('participants').delete().eq('id', ownConfirmedRow.id)
     timer.mark('gravar')
     if (deleteError) throw new Error(`Failed to remove participant: ${deleteError.message}`)
-    // Sem resposta: a lista publicada de novo é a confirmação — e pede-se já,
-    // sem esperar pelo Realtime (que às vezes chega tarde, e aí só a
-    // reconciliação de 60 s repostava). Para não perder o «🎉 X subiu da
-    // lista de suplentes», vê-se aqui mesmo quem o promote_waitlist promoveu:
-    // os suplentes de antes do DELETE que agora estão confirmados.
+    // Sem resposta: a lista publicada de novo é a confirmação.
+    await repostAfterLeave(game, rows, suplentes)
+  }
+
+  /**
+   * Depois de alguém sair: pede o repost já, sem esperar pelo Realtime (que
+   * às vezes chega tarde, e aí só a reconciliação de 60 s repostava). Para
+   * não perder o «🎉 X subiu da lista de suplentes», vê-se aqui quem o
+   * promote_waitlist promoveu: os suplentes de antes que agora estão
+   * confirmados. `rows`/`suplentes` são os do loadGame de ANTES da saída.
+   */
+  async function repostAfterLeave(game, rows, suplentes) {
     const waitlistedBefore = rows.filter((row) => row.status === 'waitlisted')
     let promotedNames = []
     if (waitlistedBefore.length > 0) {

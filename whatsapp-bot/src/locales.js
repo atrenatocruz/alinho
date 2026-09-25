@@ -28,7 +28,10 @@ Se ele ainda não estiver na app: com a menção @ o bot inscreve-o como convida
 
 Para saíres de um mix:
 • *Out* / *Fora* / *Estou fora* / *Saio*
-(Quem inscreveu a dupla sai com a dupla toda. Se foste inscrito por um parceiro, sai pela app 📱)
+Em dupla:
+• *Out dupla* — saem os dois
+• *Out @parceiro* — sai só o parceiro, tu ficas
+• *Out* — o bot pergunta: 1. Dupla · 2. Só tu · 3. Parceiro
 
 Para veres os mixes abertos, com as vagas de cada um:
 • */mix*
@@ -70,15 +73,30 @@ Para veres esta lista:
   mix_no_longer_available: '🤖 Este mix já não está disponível para inscrições.',
   already_waitlisted: '🤖 Já estás na lista de suplentes deste mix! 🎾',
   waitlisted: '🤖 Estás na lista de suplentes! Quando alguém sair, entras automaticamente. 🎾',
-  guest_waitlisted: '🤖 Fixe, {{name}}! Ficas na lista de suplentes como convidado 🎾 Entras automaticamente quando alguém sair. Regista-te em {{appUrl}} para veres o teu histórico e desbloquear recompensas.',
+  guest_waitlisted: '🤖 Fixe, {{name}}! Ficas na lista de suplentes como convidado 🎾 Entras automaticamente quando alguém sair. Regista-te em {{appUrl}} e confirma o teu número no perfil: o que jogaste como convidado passa para a tua conta.',
   waitlist_declined: '🤖 Sem problema, não entraste na lista de suplentes. Inscreve-te para o próximo mix! 🎾',
   did_not_understand_yes_no: '🤖 Não percebi 🤔 Responde só com *Sim* ou *Não*.',
   no_open_mixes: '🤖 Não há nenhum mix com inscrições abertas neste momento.',
   mix_already_started_out: '🤖 Este mix já começou/terminou — já não é possível sair por aqui.',
   already_joined: '🤖 Já estás inscrito neste mix! 🎾',
   mix_full_offer_waitlist: '🤖 Mix cheio! Queres entrar como suplente? Responde com *Sim* ou *Não*.',
-  guest_joined: '🤖 Fixe, {{name}}! Inscrevi-te como convidado 🎾 Regista-te em {{appUrl}} para veres o teu histórico, o dos teus amigos, e desbloquear recompensas.',
+  guest_joined: '🤖 Fixe, {{name}}! Inscrevi-te como convidado 🎾 Regista-te em {{appUrl}} e confirma o teu número no perfil: o que jogaste como convidado passa para a tua conta.',
+  // verify.js (#537) — resposta a uma mensagem PRIVADA com o código
+  verify_ok: '🤖 Número confirmado, {{name}}! ✅ Já podes voltar à app.',
+  verify_ok_merged: '🤖 Número confirmado, {{name}}! ✅ O que jogaste como convidado passou para a tua conta. Já podes voltar à app.',
+  verify_bad_code: '🤖 Este código não é válido ou já passou o prazo 😕 Pede um novo na app (Perfil → Informação pessoal) e envia-o a partir do número que tens no perfil.',
+  verify_phone_changed: '🤖 O número do teu perfil mudou depois de pedires o código. Pede um novo na app.',
+  verify_no_number: '🤖 Não consegui ver o teu número 😕 Envia o código a partir do WhatsApp do número que tens no perfil.',
+  verify_error: '🤖 Algo correu mal a confirmar o número. Tenta outra vez daqui a pouco.',
   partner_joined_use_app: '🤖 Estás inscrito em dupla por outra pessoa — quem inscreveu a dupla pode tirá-la com *Out*, ou sai tu pela app 📱',
+  out_pair_menu: '🤖 Estás inscrito em dupla com *{{partner}}*. Queres sair como?\n\n1. Dupla (saem os dois)\n2. Só tu ({{partner}} fica)\n3. Parceiro (sai {{partner}}, tu ficas)\n\nEscreve *1*, *2* ou *3*.',
+  out_pair_reprompt: '🤖 Não percebi 🤔 Responde com *1* (dupla), *2* (só tu) ou *3* (parceiro).',
+  out_pair_done_me: '🤖 Saíste do *{{title}}*. *{{partner}}* continua inscrito, agora sozinho.',
+  out_pair_done_partner: '🤖 *{{partner}}* saiu do *{{title}}*. Continuas inscrito, agora sozinho.',
+  out_pair_whole_unclaimed: '🤖 O *{{partner}}* ainda não entrou na app, por isso saiu a dupla toda.',
+  out_not_your_partner: '🤖 *{{name}}* não está na tua dupla neste mix. Para tirar o teu parceiro: *Out @parceiro*. Para saírem os dois: *Out dupla*.',
+  out_not_in_pair: '🤖 Não estás inscrito em dupla neste mix — para saíres, escreve só *Out*.',
+  out_mention_unreadable: '🤖 Não consegui saber quem mencionaste 😅 Escreve só *Out* e o bot pergunta como queres sair.',
   waitlisted_use_app: '🤖 Estás na lista de suplentes — para sair, usa a app 📱',
   not_joined: '🤖 Não estás inscrito neste mix.',
   mix_identifier_not_found: '🤖 Não encontrei nenhum mix aberto com isso. Escreve *mix* para veres a lista dos mixes abertos.',
@@ -122,7 +140,10 @@ If they're not on the app yet: with the @ mention the bot signs them up as a gue
 
 To leave a mix:
 • *Out* / *Fora* / *Estou fora* / *Saio*
-(Whoever signed up the pair leaves with the whole pair. If a partner signed you up, leave through the app 📱)
+As a pair:
+• *Out dupla* — both leave
+• *Out @partner* — only your partner leaves, you stay
+• *Out* — the bot asks: 1. Pair · 2. Just you · 3. Partner
 
 To see the open mixes and their free spots:
 • */mix*
@@ -164,15 +185,29 @@ To see this list:
   mix_no_longer_available: '🤖 This mix is no longer open for sign-ups.',
   already_waitlisted: "🤖 You're already on the waitlist for this mix! 🎾",
   waitlisted: "🤖 You're on the waitlist! When a spot opens up, you'll join automatically. 🎾",
-  guest_waitlisted: "🤖 Nice one, {{name}}! You're on the waitlist as a guest 🎾 You'll join automatically when a spot opens up. Sign up at {{appUrl}} to see your history and unlock rewards.",
+  guest_waitlisted: "🤖 Nice one, {{name}}! You're on the waitlist as a guest 🎾 You'll join automatically when a spot opens up. Sign up at {{appUrl}} and confirm your number in your profile: what you played as a guest moves to your account.",
   waitlist_declined: "🤖 No problem, you weren't added to the waitlist. Sign up for the next mix! 🎾",
   did_not_understand_yes_no: "🤖 Sorry, I didn't catch that 🤔 Reply with just *Sim* or *Não*.",
   no_open_mixes: "🤖 There's no mix open for sign-ups right now.",
   mix_already_started_out: "🤖 This mix has already started or finished — you can't leave here anymore.",
   already_joined: "🤖 You're already signed up for this mix! 🎾",
   mix_full_offer_waitlist: '🤖 Mix is full! Want to join the waitlist? Reply *Sim* or *Não*.',
-  guest_joined: "🤖 Nice one, {{name}}! You're in as a guest 🎾 Sign up at {{appUrl}} to see your history, your friends', and unlock rewards.",
+  guest_joined: "🤖 Nice one, {{name}}! You're in as a guest 🎾 Sign up at {{appUrl}} and confirm your number in your profile: what you played as a guest moves to your account.",
+  verify_ok: '🤖 Number confirmed, {{name}}! ✅ You can go back to the app.',
+  verify_ok_merged: '🤖 Number confirmed, {{name}}! ✅ What you played as a guest moved to your account. You can go back to the app.',
+  verify_bad_code: "🤖 This code isn't valid or has expired 😕 Ask for a new one in the app (Profile → Personal info) and send it from the number in your profile.",
+  verify_phone_changed: '🤖 Your profile number changed after you asked for the code. Ask for a new one in the app.',
+  verify_no_number: "🤖 I couldn't see your number 😕 Send the code from the WhatsApp of the number in your profile.",
+  verify_error: '🤖 Something went wrong confirming your number. Try again in a bit.',
   partner_joined_use_app: '🤖 Someone else signed you up as a pair — whoever signed up the pair can take it off with *Out*, or leave through the app 📱',
+  out_pair_menu: '🤖 You are signed up as a pair with *{{partner}}*. How do you want to leave?\n\n1. Pair (both leave)\n2. Just you ({{partner}} stays)\n3. Partner ({{partner}} leaves, you stay)\n\nType *1*, *2* or *3*.',
+  out_pair_reprompt: "🤖 I didn't get that 🤔 Reply with *1* (pair), *2* (just you) or *3* (partner).",
+  out_pair_done_me: '🤖 You left *{{title}}*. *{{partner}}* is still signed up, now on their own.',
+  out_pair_done_partner: '🤖 *{{partner}}* left *{{title}}*. You are still signed up, now on your own.',
+  out_pair_whole_unclaimed: "🤖 *{{partner}}* hasn't joined the app yet, so the whole pair left.",
+  out_not_your_partner: "🤖 *{{name}}* isn't in your pair for this mix. To remove your partner: *Out @partner*. For both to leave: *Out dupla*.",
+  out_not_in_pair: "🤖 You're not signed up as a pair in this mix — to leave, just type *Out*.",
+  out_mention_unreadable: "🤖 I couldn't tell who you mentioned 😅 Just type *Out* and the bot will ask how you want to leave.",
   waitlisted_use_app: "🤖 You're on the waitlist — to leave, use the app 📱",
   not_joined: "🤖 You're not signed up for this mix.",
   mix_identifier_not_found: "🤖 I couldn't find any open mix matching that. Type *mix* to see the list of open mixes.",

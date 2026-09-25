@@ -185,6 +185,19 @@ export async function closeCategoryEntries(categoryId, entryIds, waitlistIds = n
   return data
 }
 
+/** Reabrir as inscrições de uma categoria fechada, só antes do sorteio
+ *  (Trello #517; desenho aprovado a 25 set,
+ *  design-handoff/2026-09-25-torneio-reabrir-e-cabecas/SPEC.md §1). As
+ *  escolhidas e os suplentes voltam a ficar só inscritos — escolhe-se outra
+ *  vez ao fechar; a ordem dos suplentes fica guardada para esse fecho.
+ *  Devolve `{ chosen_back, waitlist_back, deadline_passed }` — com o prazo
+ *  já passado, ninguém se inscreve até o organizador o mudar. */
+export async function reopenCategoryEntries(categoryId) {
+  const { data, error } = await supabase.rpc('reopen_category_entries', { p_category_id: categoryId })
+  if (error) throw error
+  return data
+}
+
 /** A opção escolhida no assistente de formato, guardada tal e qual. */
 export async function saveCategoryFormat(categoryId, format) {
   const { error } = await supabase.rpc('save_category_format', {
