@@ -395,6 +395,11 @@ export const TOURNAMENT_SCORE_RPC_MOCKS = {
     } : m))
     return null
   },
+  // Procurar marcadores (Trello #518): só id, nome e foto.
+  search_people_basic: () => [
+    { id: 'u-marta', name: 'Marta Costa', avatar_url: null },
+    { id: 'u-tiago', name: 'Tiago Ferreira', avatar_url: null },
+  ],
   // Desfazer falta (Trello #491): o jogo volta a estar por jogar.
   undo_walkover: (params) => {
     if (!MATCHES) resetMatches()

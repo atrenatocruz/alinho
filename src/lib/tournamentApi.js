@@ -164,6 +164,22 @@ export async function undoWalkover(matchId) {
   if (error) throw error
 }
 
+/** Procurar quem vai marcar resultados (Trello #518). Toda a app — o
+ *  marcador pode ser alguém de fora do clube (ex.: da WFit) —, mas SÓ com
+ *  id, nome e foto, e sem quem escolheu não aparecer nas pesquisas (decisão
+ *  do PO, 25 set). A `search_players` de hoje devolve também nível, género
+ *  e clubes: esconder no ecrã não chegava, os dados iam na mesma para o
+ *  telemóvel. ⚠️ FUNÇÃO POR ESCREVER (Dev 3, `search_people_basic`). Até
+ *  existir, usa a procura antiga mas só se guardam id, nome e foto. */
+export async function searchScorekeeperCandidates(query) {
+  const { data, error } = await supabase.rpc('search_people_basic', { p_query: query })
+  if (!error) return (data || []).map(({ id, name, avatar_url }) => ({ id, name, avatar_url }))
+  if (!/search_people_basic|PGRST202|42883/i.test(`${error.code} ${error.message}`)) throw error
+  const old = await supabase.rpc('search_players', { p_query: query })
+  if (old.error) throw old.error
+  return (old.data || []).map(({ id, name, avatar_url }) => ({ id, name, avatar_url }))
+}
+
 /** O fim do torneio (print 12): quem ganhou cada categoria e o que a pessoa
  *  que está a ver levou de lá.
  *
