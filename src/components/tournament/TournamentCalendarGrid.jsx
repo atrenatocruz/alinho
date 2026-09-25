@@ -223,7 +223,7 @@ export default function TournamentCalendarGrid({ tournament, onBack }) {
             <button
               type="button"
               onClick={() => setCategoryCode(null)}
-              className={`whitespace-nowrap rounded-full px-3 py-1.5 text-[12px] ${categoryCode === null ? 'bg-ink-900 font-bold text-white' : 'border border-line text-ink-700'}`}
+              className={`inline-flex min-h-[44px] items-center whitespace-nowrap rounded-full px-3 py-1.5 text-[12px] ${categoryCode === null ? 'bg-ink-900 font-bold text-white' : 'border border-line text-ink-700'}`}
             >
               {t('tournament.grid.all_categories')}
             </button>
@@ -232,7 +232,7 @@ export default function TournamentCalendarGrid({ tournament, onBack }) {
                 key={code}
                 type="button"
                 onClick={() => setCategoryCode(code === categoryCode ? null : code)}
-                className={`whitespace-nowrap rounded-full px-3 py-1.5 text-[12px] font-semibold ${code === categoryCode ? 'bg-ink-900 text-white' : 'border border-line'}`}
+                className={`inline-flex min-h-[44px] items-center whitespace-nowrap rounded-full px-3 py-1.5 text-[12px] font-semibold ${code === categoryCode ? 'bg-ink-900 text-white' : 'border border-line'}`}
                 style={code === categoryCode ? undefined : { color: colorOf(code).text }}
               >
                 {code}
@@ -329,7 +329,7 @@ export default function TournamentCalendarGrid({ tournament, onBack }) {
                         type="button"
                         disabled={busy}
                         onClick={() => moveTo(fix.match, fix.hour, fix.court)}
-                        className="mt-1 block text-left text-ink-900 underline"
+                        className="flex min-h-[44px] items-center text-left text-ink-900 underline"
                       >
                         {t('tournament.grid.conflict_fix', {
                           match: [fix.match.category_code, fix.match.group_label || fix.match.round_label].filter(Boolean).join(' '),

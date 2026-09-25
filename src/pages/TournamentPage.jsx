@@ -25,6 +25,8 @@ import { TOURNAMENT_PANELS, TOURNAMENT_TABS, TOURNAMENT_TAB_OWNER } from '../com
 import AdminBar from '../components/tournament/AdminBar'
 import CreateTournamentForm from '../components/tournament/CreateTournamentForm'
 import DrawAdminPanel from '../components/tournament/DrawAdminPanel'
+import TournamentCalendarGrid from '../components/tournament/TournamentCalendarGrid'
+import { drawProgress, statusKey } from '../components/tournament/drawProgress'
 
 /** "9–11 out" quando é tudo no mesmo mês, "30 set – 2 out" quando não é. */
 function dateRange(startIso, endIso, locale) {
@@ -137,7 +139,7 @@ export default function TournamentPage() {
   // fica tudo o resto, INCLUSIVE o botão de inscrever: se estiver partido é
   // isso mesmo que o admin precisa de ver.
   const publicView = params.get('ver') === 'publico'
-  const adminMode = params.get('admin')   // 'editar' | 'sorteio'
+  const adminMode = params.get('admin')   // 'editar' | 'sorteio' | 'horario'
   const canManage = !!memberships?.find((m) => m.organization_id === tour.organization_id)?.is_admin
   const isAdmin = canManage && !publicView
   const Panel = TOURNAMENT_PANELS[tab]
@@ -194,6 +196,11 @@ export default function TournamentPage() {
     // seguidos deixam quem organiza sem saber qual é qual.
     return <div className="space-y-4"><DrawAdminPanel tournament={tour} onBack={closeAdmin} onEdit={() => openAdmin('editar')} /></div>
   }
+  // A grelha de horas (Trello #563): no sítio, como o sorteio; o «Voltar»
+  // dela e o do telemóvel regressam à página, porque o modo vive no endereço.
+  if (isAdmin && adminMode === 'horario') {
+    return <div className="space-y-4"><TournamentCalendarGrid tournament={tour} onBack={closeAdmin} /></div>
+  }
   if (isAdmin && adminMode === 'editar' && editing) {
     return (
       <div className="space-y-4">
@@ -239,9 +246,11 @@ export default function TournamentPage() {
         <>
           <AdminBar
             tournament={tour}
+            categories={categories}
             onChanged={() => window.dispatchEvent(new Event('tournament:reload'))}
             onEdit={() => openAdmin('editar')}
             onDraw={() => openAdmin('sorteio')}
+            onSchedule={() => openAdmin('horario')}
           />
           {adminError && <p className="text-[12px] text-danger">{adminError}</p>}
         </>
@@ -262,7 +271,7 @@ export default function TournamentPage() {
           <TourTag>{t('tournament.label')}</TourTag>
           {['validada', 'selecionada'].includes(activeMy(data)?.state)
             ? <StatePill tone="in">{t('tournament.state_entered')}</StatePill>
-            : <StatePill tone={STATE_PILL[tour.status] || 'grey'}>{t(`tournament.status_${tour.status}`)}</StatePill>}
+            : <StatePill tone={STATE_PILL[tour.status] || 'grey'}>{t(statusKey(tour.status, drawProgress(categories)), drawProgress(categories))}</StatePill>}
         </div>
         <h1 className="mt-2 font-display text-xl font-extrabold leading-tight text-ink-900">{tour.name}</h1>
         <div className="mt-1 flex items-center gap-1.5 text-xs text-ink-500">

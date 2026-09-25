@@ -122,8 +122,14 @@ const TOURNAMENT = () => {
 // day_date (a data mesmo), como o Dev 3 escreveu na nota de 21 set.
 const categories = () => {
   const fri = nextFriday()
+  // mockTDrawPartial (Trello #560): 'true' = M5 sorteada, M3 e M4 fechadas
+  // por sortear, F4 e MX4 ainda abertas; 'all' = todas sorteadas.
+  const partial = localStorage.getItem('mockTDrawPartial')
+  const statusOf = (c) => (partial === 'all' ? 'sorteada'
+    : partial === 'true' && ['M3', 'M4'].includes(c.code) ? 'fechada' : c.status)
   return CATEGORIES.map(({ day_index, ...c }) => ({
     ...c,
+    status: statusOf(c),
     day_date: iso(dayAfter(fri, day_index)),
     entry_count: empty() ? 0 : c.entry_count,
   }))
