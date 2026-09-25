@@ -127,6 +127,8 @@ export default function GameDetails() {
   const [addPlayerOpen, setAddPlayerOpen] = useState(false)
   // Publicar um rascunho (Trello #544) — a pergunta aberta.
   const [publishOpen, setPublishOpen] = useState(false)
+  // Cancelar um mix que correu mal (Trello #464) — a pergunta aberta.
+  const [cancelOpen, setCancelOpen] = useState(false)
   const [changedKeys, setChangedKeys] = useState(() => new Set())
   const [editNotice, setEditNotice] = useState('')
   // A tira preta de «correu bem» desaparece sozinha em 3 s, sem pedir toque
@@ -2159,13 +2161,22 @@ export default function GameDetails() {
           || describeError(t, error, 'mixdraft.publish_error')}
       />
 
+      {/* Mix cancelado (Trello #464): diz-se logo em cima, a toda a gente —
+          quem lá esteve chega aqui pelo link ou pelo grupo. */}
+      {game.status === 'cancelled' && (
+        <div className="rounded-card border border-line bg-surface p-4">
+          <p className="font-extrabold text-ink-900">{t('mixcancel.banner_title')}</p>
+          <p className="text-sm text-muted mt-0.5">{t('mixcancel.banner_text')}</p>
+        </div>
+      )}
+
       {/* Topo = o cartão da Home em grande (SPEC 17 set, design-handoff/
           2026-09-17-cores-e-pagina-do-evento): cor e etiqueta do tipo, dono,
           hora grande, data em minúsculas, morada com "Abrir com…" na mesma
           caixa. Inscrito = contorno verde + pastilha "Inscrito"; lista de
           espera = âmbar tracejado. Saiu a barra lima. */}
       <div className={`rounded-card p-4 ${
-        game.status === 'finished'
+        game.status === 'finished' || game.status === 'cancelled'
           ? 'bg-surface border border-line'
           // Rascunho: sem cor e a tracejado até ser publicado (#544).
           : isDraftMix(game)
@@ -3220,8 +3231,9 @@ export default function GameDetails() {
                       </div>
                     </Link>
                   )}
-                  {/* Mix parado: mexer na lista partiria as duplas ja formadas (#416). */}
-                  {isAdmin && !mixPaused && (
+                  {/* Mix parado: mexer na lista partiria as duplas ja formadas (#416).
+                      Cancelado (#464): a lista fica como estava, sem mexer. */}
+                  {isAdmin && !mixPaused && game.status !== 'cancelled' && (
                     <button
                       onClick={() => handleRemovePerson(person)}
                       disabled={busy}
@@ -3405,8 +3417,9 @@ export default function GameDetails() {
         />
       )}
 
-      {/* Ações de inscrição — nenhuma num rascunho (#544). */}
-      {!mixStarted && !isDraftMix(game) && (
+      {/* Ações de inscrição — nenhuma num rascunho (#544) nem num mix
+          cancelado (#464). */}
+      {!mixStarted && !isDraftMix(game) && game.status !== 'cancelled' && (
         <div className="space-y-3">
           {joinError && (
             <div className="bg-danger/10 text-danger px-4 py-3 rounded-ctrl text-sm font-extrabold animate-fade-up">
@@ -3655,6 +3668,35 @@ export default function GameDetails() {
           )}
         </div>
       )}
+
+      {/* Cancelar um mix que correu mal (Trello #464): aqui, na página do
+          mix, que foi onde o dono do grupo a foi procurar. Só enquanto não
+          terminou — terminado já deu pontos, e isso não se desfaz aqui. Nada
+          se apaga: inscritos, duplas e jogos ficam guardados. */}
+      {isAdmin && ['open', 'closed', 'in_progress'].includes(game.status) && (
+        <button
+          type="button"
+          onClick={() => setCancelOpen(true)}
+          className="w-full min-h-[44px] rounded-full border border-danger text-danger text-sm font-extrabold hover:bg-danger/10"
+        >
+          {t('mixcancel.button')}
+        </button>
+      )}
+      <ConfirmSheet
+        open={cancelOpen}
+        danger
+        title={t('mixcancel.confirm_title', { name: game.title || '' })}
+        message={t('mixcancel.confirm_message')}
+        cancelLabel={t('mixcancel.keep')}
+        confirmLabel={t('mixcancel.confirm')}
+        onConfirm={async () => {
+          const { error } = await supabase.from('games').update({ status: 'cancelled' }).eq('id', id)
+          if (error) throw error
+          loadGameDetails()
+        }}
+        onClose={() => setCancelOpen(false)}
+        errorOf={(error) => describeError(t, error, 'mixcancel.error')}
+      />
     </div>
   )
 }
