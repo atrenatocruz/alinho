@@ -68,9 +68,22 @@ export const listPendingClubTeachers = async (organizationId) => {
   return data || []
 }
 
-export const resolveTeacherClub = async (id, accept) => {
-  const { error } = await supabase.rpc('resolve_teacher_club', { p_id: id, p_accept: accept })
+// makeAdmin (#550): ao aceitar, dar também papel de admin do clube. Só se
+// manda quando é true, para a chamada de sempre continuar igual.
+export const resolveTeacherClub = async (id, accept, makeAdmin = false) => {
+  const { error } = await supabase.rpc('resolve_teacher_club', {
+    p_id: id, p_accept: accept, ...(makeAdmin ? { p_make_admin: true } : {}),
+  })
   if (error) throw error
+}
+
+// #550: o professor pode pedir QUALQUER clube da app, não só aqueles de que
+// é membro. Procura por nome, sem acentos (migration_teacher_any_club.sql,
+// Dev 3). Devolve [{ id, name, slug, location, group_logo_url }], máx. 20.
+export const searchClubsForTeacher = async (query) => {
+  const { data, error } = await supabase.rpc('search_clubs_for_teacher', { p_query: query || '' })
+  if (error) throw error
+  return data || []
 }
 
 // O clube só aparece ao lado do professor depois de o clube o aceitar. Antes

@@ -1,47 +1,45 @@
+// A página do clube e do grupo (Trello #419; desenho aprovado pelo
+// Francisco a 24 set, assunto a assunto — design-handoff/2026-09-23-
+// pagina-do-grupo/SPEC.md). Uma página que se desce, a mesma para clube e
+// grupo, sem separadores:
+//   cabeçalho · o que vem aí · pessoas · (grupos do clube) ·
+//   jogos entre membros · sobre
+// As secções vivem em components/club/ClubSections.jsx.
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, Users, UserPlus, Clock, Heart, MapPin, Phone, Instagram, Globe, Calendar, Building2 } from 'lucide-react'
+import { ArrowLeft, Clock, Building2, ChevronRight } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../lib/supabase'
 import { getClubProfile, listOrganizationMembers } from '../lib/clubProfile'
 import { listClubGroups } from '../lib/organizations'
-import { Avatar, EmptyState, PrimaryButton, Tabs } from '../components/ui'
+import { listClubTournaments } from '../lib/tournamentApi'
+import { followPlayer, removeFollow } from '../lib/follows'
+import { Avatar, EmptyState } from '../components/ui'
 import PadelIcon from '../components/icons/PadelIcon'
-import { formatDate } from '../lib/formatDate'
 import { describeError, errorKind } from '../lib/errors'
 import { listClubTeachers } from '../lib/lessonsApi'
-import ClubTeachersList from '../components/lessons/ClubTeachersList'
-import ClubTournamentsList from '../components/ClubTournamentsList'
-
-const asWebsiteUrl = (value) => (/^https?:\/\//i.test(value) ? value : `https://${value}`)
-const asInstagramUrl = (value) => {
-  if (/^https?:\/\//i.test(value)) return value
-  return `https://instagram.com/${value.trim().replace(/^@/, '')}`
-}
+import { ClubHeader, ClubEvents, ClubPeople, ClubAbout, buildClubEvents } from '../components/club/ClubSections'
 
 export default function ClubProfile() {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const { slug } = useParams()
   const goBack = useGoBack('/comunidade')
-  const { memberships, followOrganization, leaveOrganization, toggleFavoriteOrganization, isLessonsEnabled } = useAuth()
+  const { user, memberships, followOrganization, leaveOrganization, toggleFavoriteOrganization } = useAuth()
   const [club, setClub] = useState(null)
-  // Textos que nomeiam a entidade têm um gémeo "_group" — um grupo nunca
-  // lê "deste clube" (mesma regra do GerirClube).
-  const kk = (key) => (club?.kind === 'group' ? `${key}_group` : key)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [acting, setActing] = useState(false)
   const [favoriting, setFavoriting] = useState(false)
+  const [error, setError] = useState('')
   const [groups, setGroups] = useState([])
   const [groupActingOn, setGroupActingOn] = useState(null)
   const [members, setMembers] = useState([])
-  const [membersLoading, setMembersLoading] = useState(false)
-  const [showMembers, setShowMembers] = useState(false)
-  // Aulas (Trello #49): só clubes têm professores. Sem professores (ou antes
-  // de a migração das aulas correr) a página fica como era, sem separadores.
   const [teachers, setTeachers] = useState([])
-  const [tab, setTab] = useState('mixes')
+  const [tournaments, setTournaments] = useState([])
+  const [follows, setFollows] = useState({})
+  const [followActing, setFollowActing] = useState(null)
   // Guards against an in-flight request for a stale slug (or a stale
   // handleFollow/handleUnfollow reload) resolving after a newer one and
   // clobbering state — each load() call captures its own generation and
@@ -53,14 +51,11 @@ export default function ClubProfile() {
     try {
       const data = await getClubProfile(slug)
       if (requestId !== requestIdRef.current) return
-      if (!data) {
-        setNotFound(true)
-      } else {
-        setClub(data)
-      }
-    } catch (error) {
+      if (!data) setNotFound(true)
+      else setClub(data)
+    } catch (err) {
       if (requestId !== requestIdRef.current) return
-      console.error('Error loading club profile:', error)
+      console.error('Error loading club profile:', err)
       setNotFound(true)
     } finally {
       if (requestId === requestIdRef.current) setLoading(false)
@@ -70,127 +65,154 @@ export default function ClubProfile() {
   useEffect(() => {
     setLoading(true)
     setNotFound(false)
-    setShowMembers(false)
     setMembers([])
-    setTab('mixes')
+    setError('')
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug])
 
-  // Loaded on demand (mirrors the "Confrontos diretos" expand pattern) —
-  // previously there was no way to see who the club's members were from
-  // this public page at all, only from the admin "Gerir" panel.
-  const handleToggleMembers = async () => {
-    if (showMembers) {
-      setShowMembers(false)
-      return
-    }
-    setShowMembers(true)
-    if (members.length > 0) return
-    setMembersLoading(true)
-    try {
-      const data = await listOrganizationMembers(club.id)
-      setMembers(data)
-    } catch (error) {
-      console.error('Error loading club members:', error)
-    } finally {
-      setMembersLoading(false)
-    }
-  }
+  const isAdmin = !!club && memberships.some((m) => m.organization_id === club.id && m.is_admin)
+  const isFavorite = club ? memberships.find((m) => m.organization_id === club.id)?.is_favorite === true : false
+
+  // Pessoas: a lista de membros vem logo (antes só abria ao tocar no
+  // número). `is_admin` dá «Quem organiza»; sem a migração do Dev 3 não vem
+  // e a secção simplesmente não aparece.
+  useEffect(() => {
+    if (!club?.id || !club.member_count) { setMembers([]); return }
+    listOrganizationMembers(club.id)
+      .then(setMembers)
+      .catch((err) => { console.error('Error loading club members:', err); setMembers([]) })
+  }, [club?.id, club?.member_count, club?.my_status])
 
   // Only a club member can see its groups (list_club_groups' own gate is
-  // club membership) — no point calling it otherwise, it would just return
-  // zero rows. This is the reachable, member-facing counterpart to the
-  // admin-only groups panel in GerirClube.jsx.
+  // club membership) — no point calling it otherwise.
   useEffect(() => {
     if (club?.kind === 'club' && club.my_status === 'member') {
-      listClubGroups(club.id)
-        .then(setGroups)
-        .catch((error) => console.error('Error loading club groups:', error))
+      listClubGroups(club.id).then(setGroups).catch((err) => console.error('Error loading club groups:', err))
     } else {
       setGroups([])
     }
   }, [club?.id, club?.kind, club?.my_status])
 
+  // Professores só como pessoas (seguir), sem aulas: as aulas estão
+  // escondidas até 11 out, mas quem ensina no clube vê-se.
   useEffect(() => {
-    // Aulas escondidas (flag 'lessons'): sem professores das aulas aqui.
-    if (club?.kind !== 'club' || !isLessonsEnabled) { setTeachers([]); return }
+    if (club?.kind !== 'club') { setTeachers([]); return }
     listClubTeachers(club.id)
       .then(setTeachers)
-      .catch((error) => {
-        if (errorKind(error) !== 'not_ready') console.error('Error loading club teachers:', error)
+      .catch((err) => {
+        if (errorKind(err) !== 'not_ready') console.error('Error loading club teachers:', err)
         setTeachers([])
       })
-  }, [club?.id, club?.kind, isLessonsEnabled])
+  }, [club?.id, club?.kind])
 
-  // Os mixes da página abrem a página do mix, onde a pessoa se inscreve
-  // (Trello #535). Só para quem é membro: quem não é não consegue ler o mix
-  // (a regra da base de dados) e ia dar a «não encontrado» — o caminho dele
-  // é primeiro entrar no clube, com o botão desta página.
-  const MixCardBox = ({ game, children }) => (club?.my_status === 'member'
-    ? <Link to={`/jogo/${game.id}`} className="card press block hover:shadow-lift">{children}</Link>
-    : <div className="card">{children}</div>)
+  // Os meus «seguir», para cada professor dizer o estado certo.
+  useEffect(() => {
+    if (!user?.id || teachers.length === 0) return
+    supabase.from('follows').select('id, followed_id, status').eq('follower_id', user.id)
+      .then(({ data, error: err }) => {
+        if (err) { console.error('Error loading follows:', err); return }
+        setFollows(Object.fromEntries((data || []).map((f) => [f.followed_id, f])))
+      })
+  }, [user?.id, teachers.length])
+
+  // Torneios do clube (Trello #456): a vista pública (só publicados); quem
+  // gere vê também os rascunhos, pelo mesmo RPC do Gerir.
+  useEffect(() => {
+    if (!club?.id) { setTournaments([]); return undefined }
+    let alive = true
+    const q = isAdmin
+      ? listClubTournaments(club.id)
+      : supabase.from('tournament_public').select('id, slug, name, starts_on, ends_on, status')
+        .eq('organization_id', club.id)
+        .then(({ data, error: err }) => { if (err) throw err; return data || [] })
+    q.then((rows) => { if (alive) setTournaments(rows) })
+      .catch((err) => {
+        if (errorKind(err) !== 'not_ready') console.error('Error loading club tournaments:', err)
+        if (alive) setTournaments([])
+      })
+    return () => { alive = false }
+  }, [club?.id, isAdmin])
+
+  const kk = (key) => (club?.kind === 'group' ? `${key}_group` : key)
+
+  const handleFollow = async () => {
+    setActing(true); setError('')
+    try {
+      const { error: err } = await followOrganization(club.id)
+      if (err) throw err
+      await load()
+    } catch (err) {
+      console.error('Error following club:', err)
+      setError(describeError(t, err, kk('clubprofile.error_follow')))
+    } finally {
+      setActing(false)
+    }
+  }
+
+  // Chamado pela pergunta (ConfirmSheet): se falhar, o erro fica lá.
+  const handleUnfollow = async () => {
+    const { error: err } = await leaveOrganization(club.id)
+    if (err) throw err
+    await load()
+  }
+
+  const handleToggleFavorite = async () => {
+    setFavoriting(true); setError('')
+    try {
+      const { error: err } = await toggleFavoriteOrganization(club.id, !isFavorite)
+      if (err) throw err
+    } catch (err) {
+      console.error('Error toggling favorite club:', err)
+      setError(describeError(t, err, 'clubprofile.error_toggle_favorite'))
+    } finally {
+      setFavoriting(false)
+    }
+  }
 
   const handleRequestJoinGroup = async (group) => {
-    setGroupActingOn(group.id)
+    setGroupActingOn(group.id); setError('')
     try {
-      const { error } = await followOrganization(group.id)
-      if (error) throw error
-      const data = await listClubGroups(club.id)
-      setGroups(data)
-    } catch (error) {
-      console.error('Error requesting to join group:', error)
-      alert(describeError(t, error, 'clubprofile.error_request_join_group'))
+      const { error: err } = await followOrganization(group.id)
+      if (err) throw err
+      setGroups(await listClubGroups(club.id))
+    } catch (err) {
+      console.error('Error requesting to join group:', err)
+      setError(describeError(t, err, 'clubprofile.error_request_join_group'))
     } finally {
       setGroupActingOn(null)
     }
   }
 
-  const handleFollow = async () => {
-    setActing(true)
+  const refreshFollow = async (userId) => {
+    const { data } = await supabase.from('follows').select('id, followed_id, status')
+      .eq('follower_id', user.id).eq('followed_id', userId)
+    setFollows((m) => ({ ...m, [userId]: data?.[0] || null }))
+  }
+  const handleFollowTeacher = async (teacher) => {
+    setFollowActing(teacher.user_id); setError('')
     try {
-      const { error } = await followOrganization(club.id)
-      if (error) throw error
-      await load()
-    } catch (error) {
-      console.error('Error following club:', error)
-      alert(describeError(t, error, kk('clubprofile.error_follow')))
+      await followPlayer(teacher.user_id)
+      await refreshFollow(teacher.user_id)
+    } catch (err) {
+      console.error('Error following teacher:', err)
+      setError(describeError(t, err))
     } finally {
-      setActing(false)
+      setFollowActing(null)
     }
   }
-
-  const handleUnfollow = async () => {
-    if (!confirm(t(kk('clubprofile.confirm_unfollow'), { name: club.name }))) return
-    setActing(true)
+  const handleUnfollowTeacher = async (teacher) => {
+    const follow = follows[teacher.user_id]
+    if (!follow?.id) return
+    setFollowActing(teacher.user_id); setError('')
     try {
-      const { error } = await leaveOrganization(club.id)
-      if (error) throw error
-      await load()
-    } catch (error) {
-      console.error('Error leaving club:', error)
-      alert(describeError(t, error, kk('clubprofile.error_unfollow')))
+      await removeFollow(follow.id)
+      await refreshFollow(teacher.user_id)
+    } catch (err) {
+      console.error('Error unfollowing teacher:', err)
+      setError(describeError(t, err))
     } finally {
-      setActing(false)
-    }
-  }
-
-  const hasTeachers = club?.kind === 'club' && teachers.length > 0
-  // Admin do clube vê também os rascunhos dos torneios (#456).
-  const canManageTournaments = !!club && memberships.some((m) => m.organization_id === club.id && m.is_admin)
-
-  const isFavorite = club ? memberships.find((m) => m.organization_id === club.id)?.is_favorite === true : false
-
-  const handleToggleFavorite = async () => {
-    setFavoriting(true)
-    try {
-      const { error } = await toggleFavoriteOrganization(club.id, !isFavorite)
-      if (error) throw error
-    } catch (error) {
-      console.error('Error toggling favorite club:', error)
-      alert(describeError(t, error, 'clubprofile.error_toggle_favorite'))
-    } finally {
-      setFavoriting(false)
+      setFollowActing(null)
     }
   }
 
@@ -202,185 +224,88 @@ export default function ClubProfile() {
     )
   }
 
+  const back = (
+    <button type="button" onClick={goBack} className="inline-flex min-h-[44px] items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline">
+      <ArrowLeft size={16} /> {t('common.back')}
+    </button>
+  )
+
   if (notFound || !club) {
     return (
       <div className="space-y-5">
-        <button type="button" onClick={goBack} className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline">
-          <ArrowLeft size={16} /> {t('common.back')}
-        </button>
-        <EmptyState
-          icon={PadelIcon}
-          title={t('clubprofile.not_found_title')}
-          subtitle={t('clubprofile.not_found_subtitle')}
-        />
+        {back}
+        <EmptyState icon={PadelIcon} title={t('clubprofile.not_found_title')} subtitle={t('clubprofile.not_found_subtitle')} />
       </div>
     )
   }
 
+  const gerirHref = `/gerir/${club.slug}`
+  const events = buildClubEvents(club, tournaments)
+
   return (
     <div className="space-y-5">
-      <button type="button" onClick={goBack} className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline">
-        <ArrowLeft size={16} /> {t('common.back')}
-      </button>
-
-      {club.kind === 'group' && club.parent_slug && (
-        <Link
-          to={`/clube/${club.parent_slug}`}
-          className="inline-flex items-center gap-1.5 text-sm font-extrabold text-lime-700 hover:underline"
-        >
-          <Building2 size={14} /> {t('clubprofile.group_within', { name: club.parent_name })}
-        </Link>
-      )}
-
-      {/* Nome e botão em linhas separadas: "Pedir para entrar" é largo e, ao
-          lado do nome, tapava-o (bug do Francisco, 17 set). */}
-      <div className="card flex flex-wrap items-center gap-3.5">
-        <Avatar name={club.name} url={club.group_logo_url} size="w-16 h-16 text-xl" />
-        <div className="flex-1 min-w-0">
-          <h2 className="text-2xl text-ink-900 truncate">{club.name}</h2>
-          {/* Vazio num grupo dentro de um clube para quem não é do grupo
-              (migration_searchable_orgs.sql). */}
-          {club.member_count == null ? null : club.member_count > 0 ? (
-            <button
-              type="button"
-              onClick={handleToggleMembers}
-              className="text-sm text-muted flex items-center gap-1.5 hover:underline"
-            >
-              <Users size={13} /> {t('clubprofile.member_count', { count: club.member_count })}
-            </button>
-          ) : (
-            <p className="text-sm text-muted flex items-center gap-1.5">
-              <Users size={13} /> {t('clubprofile.member_count', { count: club.member_count })}
-            </p>
-          )}
-        </div>
-
-        {club.my_status === 'member' ? (
-          <button
-            onClick={handleToggleFavorite}
-            disabled={favoriting}
-            aria-label={isFavorite ? t('clubprofile.remove_favorite') : t('clubprofile.mark_favorite')}
-            title={isFavorite ? t('clubprofile.remove_favorite') : t(kk('clubprofile.mark_favorite_title'))}
-            className="shrink-0 w-11 h-11 min-h-[44px] rounded-full flex items-center justify-center transition-colors duration-fast disabled:opacity-40 hover:bg-ink-50"
-          >
-            <Heart size={20} className={isFavorite ? 'fill-lime-400 text-lime-400' : 'text-ink-200'} />
-          </button>
-        ) : club.my_status === 'pending' ? (
-          <span className="whitespace-nowrap inline-flex items-center gap-1.5 text-xs font-extrabold px-3 py-2 rounded-full bg-ink-50 text-muted">
-            <Clock size={14} /> {t('clubprofile.request_sent')}
-          </span>
-        ) : (
-          <PrimaryButton onClick={handleFollow} disabled={acting} className="w-full basis-full">
-            <UserPlus size={16} />
-            {club.open_join ? t('clubprofile.follow_button') : t('clubprofile.request_join_button')}
-          </PrimaryButton>
+      <div>
+        {back}
+        {club.kind === 'group' && club.parent_slug && (
+          <Link to={`/clube/${club.parent_slug}`}
+            className="flex min-h-[44px] items-center gap-1.5 text-sm font-extrabold text-ink-900 hover:underline">
+            <Building2 size={14} /> {t('clubprofile.group_within', { name: club.parent_name })} <ChevronRight size={14} />
+          </Link>
         )}
       </div>
 
-      {showMembers && (
-        <div className="card p-0 overflow-hidden animate-fade-up">
-          {membersLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-[3px] border-ink-50 border-t-ink-700"></div>
-            </div>
-          ) : members.length === 0 ? (
-            <p className="text-muted text-sm text-center py-6">{t('clubprofile.no_members_visible')}</p>
-          ) : (
-            <div className="divide-y divide-line">
-              {members.map((m) => (
-                <Link
-                  key={m.id}
-                  to={`/jogador/${m.id}`}
-                  className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50"
-                >
-                  <Avatar name={m.name} url={m.avatar_url} size="w-9 h-9 text-sm" />
-                  <p className="flex-1 min-w-0 font-extrabold text-ink-900 text-sm truncate">{m.name}</p>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      <ClubHeader
+        club={club}
+        isFavorite={isFavorite}
+        acting={acting}
+        favoriting={favoriting}
+        onFollow={handleFollow}
+        onUnfollow={handleUnfollow}
+        onToggleFavorite={handleToggleFavorite}
+      />
+      {error && <p role="alert" className="rounded-ctrl bg-danger/10 px-4 py-3 text-sm font-extrabold text-danger">{error}</p>}
 
-      {club.my_status === 'member' && (
-        <button
-          onClick={handleUnfollow}
-          disabled={acting}
-          className="text-danger text-sm font-extrabold hover:underline disabled:opacity-40"
-        >
-          {t('clubprofile.unfollow_button')}
-        </button>
-      )}
+      <ClubEvents club={club} events={events} isAdmin={isAdmin} gerirHref={gerirHref} />
 
-      {hasTeachers && (
-        // Mixes · Professores · Sobre mostram coisas diferentes: separador,
-        // não filtro (#528).
-        <Tabs
-          value={tab}
-          onChange={setTab}
-          options={[
-            { value: 'mixes', label: t('clubprofile.tab_mixes') },
-            // Sem a contagem: com ela, «Professores · 3» não cabia num terço e
-            // saía cortado. A lista de professores já diz quantos são.
-            { value: 'teachers', label: t('clubprofile.tab_teachers') },
-            { value: 'about', label: t('clubprofile.tab_about') },
-          ]}
-        />
-      )}
-
-      {hasTeachers ? (
-        <>
-          {tab === 'mixes' && (
-            <>
-      {/* Jogo dentro do grupo/clube (Trello #239) — qualquer membro pode
-          criar/ver, ao contrário dos Mixs (admin-only, GerirClube.jsx).
-          Sistema à parte do "jogo entre amigos" do perfil (#233). */}
-      {club.my_status === 'member' && (
-        <Link to={`/clube/${slug}/jogos`} className="card press flex items-center justify-between gap-3">
-          <h3 className="font-extrabold text-ink-900">{t(club.kind === 'group' ? 'clubprofile.jogos_heading_group' : 'clubprofile.jogos_heading')}</h3>
-          <span className="text-ink-700 text-sm font-extrabold shrink-0">{t(club.kind === 'group' ? 'clubprofile.jogos_link_group' : 'clubprofile.jogos_link')}</span>
-        </Link>
-      )}
+      <ClubPeople
+        club={club}
+        members={members}
+        teachers={teachers}
+        follows={follows}
+        followActing={followActing}
+        onFollowTeacher={handleFollowTeacher}
+        onUnfollowTeacher={handleUnfollowTeacher}
+      />
 
       {groups.length > 0 && (
-        <div>
-          <h3 className="text-lg text-ink-900 mb-3">{t('clubprofile.groups_heading')}</h3>
-          <div className="space-y-3">
+        <section>
+          <h3 className="mb-2 text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('clubprofile.club_groups')}</h3>
+          <div className="space-y-2.5">
             {groups.map((group) => {
               const isMemberish = group.can_manage || group.my_status === 'member' || group.my_status === 'admin'
               return (
                 <div key={group.id} className="card flex items-center gap-3.5">
                   <Avatar name={group.name} url={group.group_logo_url} size="w-11 h-11 text-sm" />
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-extrabold text-ink-900 truncate">{group.name}</h4>
-                    {isMemberish ? (
-                      <p className="text-sm text-muted">
-                        {t('clubprofile.member_count', { count: group.member_count })}
-                      </p>
-                    ) : (
-                      <p className="text-sm text-muted">
-                        {group.my_status === 'pending' ? t('clubprofile.request_sent') : t('clubprofile.group_within_club')}
-                      </p>
-                    )}
+                  <div className="min-w-0 flex-1">
+                    <h4 className="truncate font-extrabold text-ink-900">{group.name}</h4>
+                    <p className="text-sm text-muted">
+                      {isMemberish
+                        ? t('clubprofile.member_count', { count: group.member_count })
+                        : group.my_status === 'pending' ? t('clubprofile.request_sent') : t('clubprofile.group_within_club')}
+                    </p>
                   </div>
                   {isMemberish ? (
-                    <Link
-                      to={`/clube/${group.slug}`}
-                      className="shrink-0 whitespace-nowrap text-xs font-extrabold px-3.5 py-2 min-h-[44px] rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast inline-flex items-center"
-                    >
-                      {t('clubprofile.view_group')}
+                    <Link to={`/clube/${group.slug}`}
+                      className="inline-flex min-h-[44px] shrink-0 items-center gap-0.5 whitespace-nowrap text-sm font-extrabold text-ink-900">
+                      {t('clubprofile.view_group')} <ChevronRight size={15} />
                     </Link>
                   ) : group.my_status === 'pending' ? (
-                    <span className="shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 text-xs font-extrabold px-3 py-2 rounded-full bg-ink-50 text-muted">
+                    <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-ink-50 px-3 py-2 text-xs font-extrabold text-muted">
                       <Clock size={14} /> {t('clubprofile.request_sent')}
                     </span>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => handleRequestJoinGroup(group)}
-                      disabled={groupActingOn === group.id}
-                      className="shrink-0 whitespace-nowrap text-xs font-extrabold px-3.5 py-2 min-h-[44px] rounded-full bg-lime-400 text-ink-900 hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
-                    >
+                    <button type="button" onClick={() => handleRequestJoinGroup(group)} disabled={groupActingOn === group.id}
+                      className="min-h-[44px] shrink-0 whitespace-nowrap rounded-full bg-lime-400 px-3.5 text-xs font-extrabold text-ink-900 hover:bg-lime-600 disabled:opacity-40">
                       {t('clubprofile.request_join_button')}
                     </button>
                   )}
@@ -388,221 +313,24 @@ export default function ClubProfile() {
               )
             })}
           </div>
-        </div>
+        </section>
       )}
 
-      {/* Torneios do clube (Trello #456) — antes nunca apareciam aqui. */}
-      <ClubTournamentsList organizationId={club.id} canManage={canManageTournaments} />
-
-      <div>
-        <h3 className="text-lg text-ink-900 mb-3">{t('clubprofile.open_mixes_heading')}</h3>
-        {club.open_games.length === 0 ? (
-          <EmptyState
-            icon={Calendar}
-            title={t('clubprofile.no_open_mixes_title')}
-            subtitle={t(kk('clubprofile.no_open_mixes_subtitle'))}
-          />
-        ) : (
-          <div className="space-y-3">
-            {club.open_games.map((game) => (
-              <MixCardBox key={game.id} game={game}>
-                <h4 className="font-extrabold text-ink-900">{game.title}</h4>
-                <p className="text-sm text-muted">
-                  {formatDate(game.date, i18n.language, { day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' })}
-                </p>
-                {game.location && (
-                  <p className="flex items-center gap-1.5 text-sm text-muted mt-1">
-                    <MapPin size={13} className="shrink-0" /> {game.location}
-                  </p>
-                )}
-                <p className="flex items-center gap-1.5 text-sm text-muted mt-1">
-                  <Users size={13} /> {t('clubprofile.players_ratio', { count: game.confirmed_count, max: game.max_players })}
-                </p>
-              </MixCardBox>
-            ))}
-          </div>
-        )}
-      </div>
-            </>
-          )}
-          {tab === 'teachers' && <ClubTeachersList teachers={teachers} />}
-          {tab === 'about' && (
-            <>
-      {club.description && (
-        <div className="card">
-          <h3 className="text-sm font-extrabold text-ink-900 uppercase tracking-wide mb-2">{t('clubprofile.about')}</h3>
-          <p className="text-ink-900 whitespace-pre-line">{club.description}</p>
-        </div>
-      )}
-
-      {club.kind === 'club' && club.location && (
-        <div className="card">
-          <h3 className="text-sm font-extrabold text-ink-900 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-            <MapPin size={15} /> {t('clubprofile.location')}
-          </h3>
-          <p className="text-ink-900">{club.location}</p>
-        </div>
-      )}
-
-      {club.kind === 'club' && (club.phone || club.instagram || club.website) && (
-        <div className="card space-y-2">
-          <h3 className="text-sm font-extrabold text-ink-900 uppercase tracking-wide mb-2">{t('clubprofile.contacts')}</h3>
-          {club.phone && (
-            <a href={`tel:${club.phone}`} className="flex items-center gap-2 text-ink-900 hover:underline">
-              <Phone size={15} className="shrink-0" /> {club.phone}
-            </a>
-          )}
-          {club.instagram && (
-            <a href={asInstagramUrl(club.instagram)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-ink-900 hover:underline">
-              <Instagram size={15} className="shrink-0" /> {club.instagram}
-            </a>
-          )}
-          {club.website && (
-            <a href={asWebsiteUrl(club.website)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-ink-900 hover:underline">
-              <Globe size={15} className="shrink-0" /> {club.website}
-            </a>
-          )}
-        </div>
-      )}
-
-              {!club.description && !club.location && !club.phone && !club.instagram && !club.website && (
-                <p className="text-sm text-muted">{t('clubprofile.about_empty')}</p>
-              )}
-            </>
-          )}
-        </>
-      ) : (
-        <>
       {/* Jogo dentro do grupo/clube (Trello #239) — qualquer membro pode
-          criar/ver, ao contrário dos Mixs (admin-only, GerirClube.jsx).
-          Sistema à parte do "jogo entre amigos" do perfil (#233). */}
+          criar/ver. O nome da secção espera o Renato: usa-se o que existe. */}
       {club.my_status === 'member' && (
-        <Link to={`/clube/${slug}/jogos`} className="card press flex items-center justify-between gap-3">
-          <h3 className="font-extrabold text-ink-900">{t(club.kind === 'group' ? 'clubprofile.jogos_heading_group' : 'clubprofile.jogos_heading')}</h3>
-          <span className="text-ink-700 text-sm font-extrabold shrink-0">{t(club.kind === 'group' ? 'clubprofile.jogos_link_group' : 'clubprofile.jogos_link')}</span>
-        </Link>
-      )}
-
-      {club.description && (
-        <div className="card">
-          <h3 className="text-sm font-extrabold text-ink-900 uppercase tracking-wide mb-2">{t('clubprofile.about')}</h3>
-          <p className="text-ink-900 whitespace-pre-line">{club.description}</p>
-        </div>
-      )}
-
-      {club.kind === 'club' && club.location && (
-        <div className="card">
-          <h3 className="text-sm font-extrabold text-ink-900 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-            <MapPin size={15} /> {t('clubprofile.location')}
+        <section>
+          <h3 className="mb-2 text-[11px] font-extrabold uppercase tracking-widest text-muted">
+            {t(club.kind === 'group' ? 'clubprofile.of_group' : 'clubprofile.of_club')}
           </h3>
-          <p className="text-ink-900">{club.location}</p>
-        </div>
+          <Link to={`/clube/${slug}/jogos`} className="card press flex min-h-[52px] items-center justify-between gap-3">
+            <span className="font-extrabold text-ink-900">{t(club.kind === 'group' ? 'clubprofile.jogos_heading_group' : 'clubprofile.jogos_heading')}</span>
+            <ChevronRight size={17} className="shrink-0 text-ink-700" />
+          </Link>
+        </section>
       )}
 
-      {club.kind === 'club' && (club.phone || club.instagram || club.website) && (
-        <div className="card space-y-2">
-          <h3 className="text-sm font-extrabold text-ink-900 uppercase tracking-wide mb-2">{t('clubprofile.contacts')}</h3>
-          {club.phone && (
-            <a href={`tel:${club.phone}`} className="flex items-center gap-2 text-ink-900 hover:underline">
-              <Phone size={15} className="shrink-0" /> {club.phone}
-            </a>
-          )}
-          {club.instagram && (
-            <a href={asInstagramUrl(club.instagram)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-ink-900 hover:underline">
-              <Instagram size={15} className="shrink-0" /> {club.instagram}
-            </a>
-          )}
-          {club.website && (
-            <a href={asWebsiteUrl(club.website)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-ink-900 hover:underline">
-              <Globe size={15} className="shrink-0" /> {club.website}
-            </a>
-          )}
-        </div>
-      )}
-
-      {groups.length > 0 && (
-        <div>
-          <h3 className="text-lg text-ink-900 mb-3">{t('clubprofile.groups_heading')}</h3>
-          <div className="space-y-3">
-            {groups.map((group) => {
-              const isMemberish = group.can_manage || group.my_status === 'member' || group.my_status === 'admin'
-              return (
-                <div key={group.id} className="card flex items-center gap-3.5">
-                  <Avatar name={group.name} url={group.group_logo_url} size="w-11 h-11 text-sm" />
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-extrabold text-ink-900 truncate">{group.name}</h4>
-                    {isMemberish ? (
-                      <p className="text-sm text-muted">
-                        {t('clubprofile.member_count', { count: group.member_count })}
-                      </p>
-                    ) : (
-                      <p className="text-sm text-muted">
-                        {group.my_status === 'pending' ? t('clubprofile.request_sent') : t('clubprofile.group_within_club')}
-                      </p>
-                    )}
-                  </div>
-                  {isMemberish ? (
-                    <Link
-                      to={`/clube/${group.slug}`}
-                      className="shrink-0 whitespace-nowrap text-xs font-extrabold px-3.5 py-2 min-h-[44px] rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast inline-flex items-center"
-                    >
-                      {t('clubprofile.view_group')}
-                    </Link>
-                  ) : group.my_status === 'pending' ? (
-                    <span className="shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 text-xs font-extrabold px-3 py-2 rounded-full bg-ink-50 text-muted">
-                      <Clock size={14} /> {t('clubprofile.request_sent')}
-                    </span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => handleRequestJoinGroup(group)}
-                      disabled={groupActingOn === group.id}
-                      className="shrink-0 whitespace-nowrap text-xs font-extrabold px-3.5 py-2 min-h-[44px] rounded-full bg-lime-400 text-ink-900 hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
-                    >
-                      {t('clubprofile.request_join_button')}
-                    </button>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Torneios do clube (Trello #456) — antes nunca apareciam aqui. */}
-      <ClubTournamentsList organizationId={club.id} canManage={canManageTournaments} />
-
-      <div>
-        <h3 className="text-lg text-ink-900 mb-3">{t('clubprofile.open_mixes_heading')}</h3>
-        {club.open_games.length === 0 ? (
-          <EmptyState
-            icon={Calendar}
-            title={t('clubprofile.no_open_mixes_title')}
-            subtitle={t(kk('clubprofile.no_open_mixes_subtitle'))}
-          />
-        ) : (
-          <div className="space-y-3">
-            {club.open_games.map((game) => (
-              <MixCardBox key={game.id} game={game}>
-                <h4 className="font-extrabold text-ink-900">{game.title}</h4>
-                <p className="text-sm text-muted">
-                  {formatDate(game.date, i18n.language, { day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' })}
-                </p>
-                {game.location && (
-                  <p className="flex items-center gap-1.5 text-sm text-muted mt-1">
-                    <MapPin size={13} className="shrink-0" /> {game.location}
-                  </p>
-                )}
-                <p className="flex items-center gap-1.5 text-sm text-muted mt-1">
-                  <Users size={13} /> {t('clubprofile.players_ratio', { count: game.confirmed_count, max: game.max_players })}
-                </p>
-              </MixCardBox>
-            ))}
-          </div>
-        )}
-      </div>
-        </>
-      )}
+      <ClubAbout club={club} isAdmin={isAdmin} gerirHref={gerirHref} />
     </div>
   )
 }
