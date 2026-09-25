@@ -232,7 +232,7 @@ const RPC_MOCKS = {
     id: FAKE_MEMBER_ID, name: 'Marta Costa', avatar_url: null, rating: 1380,
     gender: 'feminino', preferred_side: 'left', club_names: 'Dev Org',
   }],
-  search_people_basic: () => [{ id: FAKE_MEMBER_ID, name: 'Marta Costa', avatar_url: null }],
+  search_people_basic: () => [{ id: FAKE_MEMBER_ID, name: 'Marta Costa', avatar_url: null }, { id: 'fake-invite-1', name: 'Rui Pinto', avatar_url: null }],
   list_players: () => [{
     id: FAKE_MEMBER_ID, name: longNames() ? 'Marta Sofia Costa de Vasconcelos Rodrigues' : 'Marta Costa', avatar_url: null, rating: 1380,
     gender: 'feminino', preferred_side: 'left', club_names: 'Dev Org',
@@ -1021,6 +1021,12 @@ TABLE_MOCKS.games = (url) => {
   const u = decodeURIComponent(url)
   if (localStorage.getItem('mockMixDraft') === 'true' && Array.isArray(rows) && !/[?&]id=eq\./.test(u)) rows = [...rows, DRAFT_MIX()]
   if (localStorage.getItem('mockSeriesNext') === 'true' && Array.isArray(rows) && !/[?&]id=eq\./.test(u)) rows = [...rows, ...(localStorage.getItem('mockSeriesOrigin') === 'false' ? [] : [SERIES_ORIGIN_MIX()]), SERIES_NEXT_MIX()]
+  // localStorage.mockOpenGameEmpty = 'true' — um jogo em aberto sem ninguém
+  // inscrito no Gerir, para ver o «Cancelar» na janela da app.
+  if (localStorage.getItem('mockOpenGameEmpty') === 'true' && /origin=eq\.open_slot/.test(u)) {
+    const d = new Date(); d.setDate(d.getDate() + 2); d.setHours(19, 0, 0, 0)
+    return [{ id: 'fake-open-empty', organization_id: MOCK_ADMIN_ORG_ID, title: 'Jogo em aberto', date: d.toISOString(), location: 'Smash Padel Almada', status: 'open', origin: 'open_slot', max_players: 4, num_courts: 1, participants: [] }]
+  }
   if (localStorage.getItem('mockNoPending') === 'true' && /status=eq\.pending/.test(u)) rows = []
   const origem = u.match(/[?&]origin=eq\.([a-z_]+)/)
   return origem && Array.isArray(rows) ? rows.filter((g) => (g.origin || 'admin') === origem[1]) : rows
