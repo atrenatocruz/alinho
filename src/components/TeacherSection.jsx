@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { GraduationCap, Search, X } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { CalendarClock, GraduationCap, Search, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { listTeacherProfiles, requestTeacherProfile, withdrawTeacherProfile, searchClubsForTeacher } from '../lib/teachers'
 import { describeError } from '../lib/errors'
@@ -12,7 +13,7 @@ import { contemTexto } from '../lib/semAcentos'
    sem pedido → formulário curto → em análise → aprovado / recusado.
    - Clube opcional: sem clube mostra "Sem clube associado".
    - Zona: para ser encontrado na Comunidade.
-   - Horários e reservas ficam para depois de aprovado (#49).
+   - Depois de aprovado: «O meu horário» (#418) — contacto, zona e horário.
    - Que prova se pede e quem aprova: por definir pelo Francisco — até lá o
      pedido não pede comprovativo. Clube e zona precisam de
      migration_teacher_profiles_open.sql. */
@@ -22,6 +23,7 @@ const NO_CLUB = ''
 export default function TeacherSection() {
   const { t } = useTranslation()
   const { user, memberships } = useAuth()
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [mine, setMine] = useState(null)
   const [showForm, setShowForm] = useState(false)
@@ -155,6 +157,17 @@ export default function TeacherSection() {
             <span className="text-ink-900 font-extrabold break-words">{mine.contact}</span>
           </div>
           {mine.status === 'pending' && <p className="text-xs text-muted">{t('teacher.pending_hint')}</p>}
+          {mine.status === 'pending' && <p className="text-xs text-muted">{t('teacher.later_hint')}</p>}
+          {/* «O meu horário» (Trello #418): logo depois de aprovado. */}
+          {mine.status === 'approved' && (
+            <button
+              type="button"
+              onClick={() => navigate('/perfil/professor')}
+              className="btn-primary w-full flex items-center justify-center gap-2"
+            >
+              <CalendarClock size={18} /> {t('teacher.schedule_button')}
+            </button>
+          )}
           <button
             type="button"
             onClick={handleWithdraw}
