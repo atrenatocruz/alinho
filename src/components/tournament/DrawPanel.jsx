@@ -10,6 +10,7 @@ import { EmptyState } from '../ui'
 import { MonoLabel } from './TournamentBits'
 import useCategoryBoard from './useCategoryBoard'
 import { bracketRounds } from '../../lib/tournamentDraw'
+import { matchTieBreak } from './tieBreak'
 
 const hhmm = (iso) => (iso ? new Date(iso).toTimeString().slice(0, 5) : null)
 
@@ -35,6 +36,12 @@ function Side({ entryId, source, entries, score, isWinner, t }) {
 function MatchCard({ match, entries, t }) {
   const done = ['terminado', 'falta', 'desistencia'].includes(match.status)
   const when = hhmm(match.scheduled_at)
+  // O tie-break do jogo (Trello #561): «Tie-break 7-5» no pro set, os sets
+  // (com o tie-break de cada 7-6) nos formatos por sets.
+  const tb = done && match.status === 'terminado' ? matchTieBreak(match) : null
+  const tbText = tb?.tb
+    ? t(tb.super ? 'tournament.score.super_tiebreak_result' : 'tournament.score.tiebreak_result', { a: tb.tb.split('-')[0], b: tb.tb.split('-')[1] })
+    : tb?.sets || null
 
   return (
     <div className="mb-1.5 rounded-lg border border-ink-100 bg-white px-2.5 py-1.5">
@@ -55,9 +62,10 @@ function MatchCard({ match, entries, t }) {
         isWinner={done && match.winner_entry_id === match.entry_b_id}
         t={t}
       />
-      {(when || match.court_name || match.status === 'falta' || match.status === 'desistencia') && (
+      {(when || match.court_name || tbText || match.status === 'falta' || match.status === 'desistencia') && (
         <p className="mt-1 font-mono text-[9.5px] text-muted">
           {[
+            tbText,
             match.court_name,
             when,
             match.status === 'falta' ? t('tournament.draw.walkover') : null,

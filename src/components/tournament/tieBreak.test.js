@@ -35,3 +35,21 @@ describe('tie-break do torneio', () => {
     expect(setText({ score_a: 6, score_b: 4 })).toBe('6-4')
   })
 })
+
+describe('o tie-break nas listas (#561)', () => {
+  it('pro set: só os pontos do tie-break', async () => {
+    const { matchTieBreak } = await import('./tieBreak')
+    expect(matchTieBreak({ sets: [{ score_a: 9, score_b: 8, tiebreak_a: 7, tiebreak_b: 5 }] })).toEqual({ tb: '7-5', super: false })
+    expect(matchTieBreak({ sets: [{ score_a: 8, score_b: 9, tiebreak_a: 8, tiebreak_b: 10, is_super_tiebreak: true }] })).toEqual({ tb: '8-10', super: true })
+  })
+  it('por sets: os sets, com o tie-break do 7-6', async () => {
+    const { matchTieBreak } = await import('./tieBreak')
+    expect(matchTieBreak({ sets: [{ score_a: 6, score_b: 4 }, { score_a: 6, score_b: 7, tiebreak_a: 5, tiebreak_b: 7 }, { score_a: 10, score_b: 8 }] }))
+      .toEqual({ sets: '6-4 · 6-7 (5-7) · 10-8' })
+  })
+  it('sem sets ou sem tie-break: nada', async () => {
+    const { matchTieBreak } = await import('./tieBreak')
+    expect(matchTieBreak({})).toBe(null)
+    expect(matchTieBreak({ sets: [{ score_a: 9, score_b: 5 }] })).toBe(null)
+  })
+})
