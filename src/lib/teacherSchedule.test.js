@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  TIME_OPTIONS, compactTime, shortRange, nextSlot, slotProblem, rowsFromSchedule, scheduleFromRows, scheduleProblems, shortTime, weeklyFromItems,
+  TIME_OPTIONS, compactTime, shortRange, isActiveTeacherProfile, nextSlot, slotProblem, rowsFromSchedule, scheduleFromRows, scheduleProblems, shortTime, weeklyFromItems,
 } from './teacherSchedule'
 
 describe('teacherSchedule', () => {
@@ -22,8 +22,8 @@ describe('teacherSchedule', () => {
       { day_of_week: 'sabado', start_time: '10:00:00', end_time: '12:00:00' },
       { day_of_week: 'feriado', start_time: '10:00:00', end_time: '12:00:00' },
     ])
-    expect(byDay.terca).toEqual([{ start: '09:00', end: '13:00' }, { start: '18:00', end: '21:00' }])
-    expect(byDay.sabado).toEqual([{ start: '10:00', end: '12:00' }])
+    expect(byDay.terca.map(({ start, end }) => ({ start, end }))).toEqual([{ start: '09:00', end: '13:00' }, { start: '18:00', end: '21:00' }])
+    expect(byDay.sabado.map(({ start, end }) => ({ start, end }))).toEqual([{ start: '10:00', end: '12:00' }])
     expect(byDay.segunda).toEqual([])
     expect(Object.keys(byDay)).toHaveLength(7)
   })
@@ -89,5 +89,25 @@ describe('teacherSchedule', () => {
   it('shortRange para os cartões da Comunidade', () => {
     expect(shortRange('09:00', '13:00')).toBe('9–13h')
     expect(shortRange('18:30:00', '21:00:00')).toBe('18:30–21h')
+  })
+
+  it('vários clubes: cada bloco guarda o perfil e grava-se por perfil', () => {
+    const byDay = scheduleFromRows([
+      { day_of_week: 'terca', start_time: '09:00:00', end_time: '13:00:00', teacher_profile_id: 'a' },
+      { day_of_week: 'quinta', start_time: '18:00:00', end_time: '21:00:00', teacher_profile_id: 'b' },
+    ])
+    expect(byDay.terca[0].tp).toBe('a')
+    expect(rowsFromSchedule(byDay, 'a')).toEqual([{ day: 'terca', start: '09:00', end: '13:00' }])
+    expect(rowsFromSchedule(byDay, 'b')).toEqual([{ day: 'quinta', start: '18:00', end: '21:00' }])
+    expect(rowsFromSchedule(byDay)).toHaveLength(2)
+    // Blocos de clubes diferentes no mesmo dia também não se sobrepõem.
+    expect(scheduleProblems({ terca: [{ start: '09:00', end: '13:00', tp: 'a' }, { start: '12:00', end: '14:00', tp: 'b' }] })).toHaveLength(2)
+  })
+
+  it('isActiveTeacherProfile: aprovado e, com clube, aceite', () => {
+    expect(isActiveTeacherProfile({ status: 'approved', organization_id: null })).toBe(true)
+    expect(isActiveTeacherProfile({ status: 'approved', organization_id: 'o', club_status: 'accepted' })).toBe(true)
+    expect(isActiveTeacherProfile({ status: 'approved', organization_id: 'o', club_status: 'pending' })).toBe(false)
+    expect(isActiveTeacherProfile({ status: 'pending', organization_id: null })).toBe(false)
   })
 })

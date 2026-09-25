@@ -5,10 +5,10 @@ import { ArrowLeft, Check, GraduationCap, Plus, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { DAYS, listTeacherProfiles, replaceTeacherAvailability, updateTeacherContact } from '../lib/teachers'
 import {
-  TIME_OPTIONS, compactTime, nextSlot, rowsFromSchedule, scheduleFromRows, scheduleProblems, slotProblem,
+  TIME_OPTIONS, compactTime, isActiveTeacherProfile, nextSlot, rowsFromSchedule, scheduleFromRows, scheduleProblems, slotProblem,
 } from '../lib/teacherSchedule'
 import { describeError } from '../lib/errors'
-import { ConfirmSheet, EmptyState, PrimaryButton } from '../components/ui'
+import { Chips, ConfirmSheet, EmptyState, PrimaryButton } from '../components/ui'
 
 /* ─── «O meu horário» (Trello #418) ───────────────────────────────────────
    Pedido de um professor real (Diogo Gonçalves, A2N, 25 set 2026): depois
@@ -25,6 +25,8 @@ export default function TeacherSchedule() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [mine, setMine] = useState(null)
+  // Um perfil de professor por clube (#392, assunto 3): os ativos têm horário.
+  const [profiles, setProfiles] = useState([])
   const [contact, setContact] = useState('')
   const [zone, setZone] = useState('')
   const [editing, setEditing] = useState(null) // 'zone' | 'contact' | null
@@ -40,15 +42,18 @@ export default function TeacherSchedule() {
     listTeacherProfiles()
       .then((all) => {
         if (!alive) return
-        // Como na secção do Perfil: o pedido mais recente da pessoa.
+        // Os perfis da pessoa (um por clube), do mais antigo para o mais novo.
         const own = all
           .filter((p) => p.user_id === user.id)
-          .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))[0] || null
-        setMine(own)
-        if (own) {
-          setContact(own.contact || '')
-          setZone(own.zone || '')
-          setByDay(scheduleFromRows(own.availability || []))
+          .sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')))
+        const active = own.filter(isActiveTeacherProfile)
+        setProfiles(active)
+        const main = active[0] || own[own.length - 1] || null
+        setMine(main)
+        if (main) {
+          setContact(main.contact || '')
+          setZone(main.zone || '')
+          setByDay(scheduleFromRows(active.flatMap((p) => p.availability || [])))
         }
       })
       .catch((err) => console.error('Error loading teacher profile:', err))
@@ -67,7 +72,7 @@ export default function TeacherSchedule() {
   const removeSlot = (day, index) => { setByDay({ ...byDay, [day]: byDay[day].filter((_, i) => i !== index) }); changed() }
   const addProblem = adding ? slotProblem(byDay[adding.day], adding) : null
   const confirmAdd = () => {
-    setByDay({ ...byDay, [adding.day]: [...byDay[adding.day], { start: adding.start, end: adding.end }] })
+    setByDay({ ...byDay, [adding.day]: [...byDay[adding.day], { start: adding.start, end: adding.end, tp: adding.tp }] })
     changed()
   }
 
@@ -85,8 +90,12 @@ export default function TeacherSchedule() {
     }
     setSaving(true)
     try {
-      await updateTeacherContact(mine.id, { contact: contact.trim(), zone: zone.trim() })
-      await replaceTeacherAvailability(mine.id, rowsFromSchedule(byDay))
+      // O contacto e a zona são da pessoa: vão para todos os perfis. O
+      // horário grava-se em cada clube, com os blocos desse clube.
+      for (const p of profiles) {
+        await updateTeacherContact(p.id, { contact: contact.trim(), zone: zone.trim() })
+        await replaceTeacherAvailability(p.id, rowsFromSchedule(byDay, p.id))
+      }
       setEditing(null)
       setSaved(true)
     } catch (err) {
@@ -113,7 +122,7 @@ export default function TeacherSchedule() {
 
   // Só quem já foi aprovado chega aqui pelo Perfil; um link direto antes
   // disso cai nesta mensagem.
-  if (!mine || mine.status !== 'approved') {
+  if (profiles.length === 0) {
     return (
       <div className="space-y-5">
         {back}
@@ -145,6 +154,13 @@ export default function TeacherSchedule() {
   )
 
   const selectClass = 'input-field !min-h-[44px] !py-2'
+  // Com mais de um clube, cada bloco diz o clube e o «+ Horas» pergunta onde.
+  const manyClubs = profiles.length > 1
+  const clubOf = (tp) => profiles.find((p) => p.id === tp)?.organization?.name || t('comunidade.teacher_no_club_short')
+  const startAdding = (day) => {
+    const last = byDay[day][byDay[day].length - 1]
+    setAdding({ day, tp: last?.tp || profiles[0].id, ...nextSlot(byDay[day]) })
+  }
 
   return (
     <div className="space-y-4">
@@ -160,8 +176,11 @@ export default function TeacherSchedule() {
             <span className="w-10 shrink-0 font-extrabold text-ink-900 capitalize">{t(`lessons.wd_short_${i + 1}`)}</span>
             <div className="flex flex-wrap items-center gap-1.5 min-w-0">
               {byDay[day].map((slot, j) => (
-                <span key={j} className="inline-flex items-center gap-1.5 rounded-full bg-ink-900 text-white text-[13px] font-extrabold pl-3 pr-1.5 py-1">
-                  {compactTime(slot.start)}–{compactTime(slot.end)}
+                <span key={j} className={`inline-flex items-center gap-1.5 bg-ink-900 text-white text-[13px] font-extrabold pl-3 pr-1.5 py-1 ${manyClubs ? 'rounded-[14px]' : 'rounded-full'}`}>
+                  <span className="flex flex-col leading-tight">
+                    {compactTime(slot.start)}–{compactTime(slot.end)}
+                    {manyClubs && <span className="text-[11px] font-bold text-white/75">{clubOf(slot.tp)}</span>}
+                  </span>
                   <button type="button" onClick={() => removeSlot(day, j)}
                     aria-label={t('teacher.schedule_remove', { hours: `${compactTime(slot.start)}–${compactTime(slot.end)}` })}
                     className="w-6 h-6 inline-flex items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/15">
@@ -169,7 +188,7 @@ export default function TeacherSchedule() {
                   </button>
                 </span>
               ))}
-              <button type="button" onClick={() => setAdding({ day, ...nextSlot(byDay[day]) })}
+              <button type="button" onClick={() => startAdding(day)}
                 aria-label={t('teacher.schedule_add_aria', { day: t(DAYS[i].labelKey).toLowerCase() })}
                 className="inline-flex items-center gap-1 rounded-full border-[1.5px] border-dashed border-ink-200 text-ink-500 text-[13px] font-extrabold px-2.5 min-h-[32px] hover:border-ink-500 hover:text-ink-900">
                 <Plus size={13} />{byDay[day].length === 0 && t('teacher.schedule_add')}
@@ -201,7 +220,7 @@ export default function TeacherSchedule() {
           da app abre outra janela por baixo desta. */}
       <ConfirmSheet
         open={!!adding}
-        title={adding ? t('teacher.schedule_add_title', { day: t(DAYS.find((d) => d.value === adding.day).labelKey).toLowerCase() }) : ''}
+        title={adding ? t('teacher.schedule_add_title', { day: t(DAYS.find((d) => d.value === adding.day).labelKey) }) : ''}
         confirmLabel={t('teacher.schedule_add_confirm')}
         cancelLabel={t('comunidade.cancel')}
         confirmDisabled={!!addProblem}
@@ -210,6 +229,13 @@ export default function TeacherSchedule() {
       >
         {adding && (
           <div className="mt-4 space-y-3">
+            {manyClubs && (
+              <div>
+                <span className="block text-sm font-extrabold text-ink-900 mb-1.5">{t('teacher.schedule_where')}</span>
+                <Chips options={profiles.map((p) => ({ value: p.id, label: clubOf(p.id) }))}
+                  value={adding.tp} onChange={(v) => setAdding({ ...adding, tp: v })} />
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <label className="block">
                 <span className="block text-sm font-extrabold text-ink-900 mb-1.5">{t('teacher.schedule_from')}</span>
