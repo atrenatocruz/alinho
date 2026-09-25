@@ -158,7 +158,8 @@ function AdminEntrySheet({ organizationId, categories = [], categoryId: initialC
     return (
 
     <div className="space-y-1.5">
-      <p className="font-mono text-[11px] uppercase tracking-widest text-ink-500">{label}</p>
+      {/* Rótulos de campo como no Criar mix (revisão «mesma app», 26 set). */}
+      <p className="block text-sm font-medium text-gray-700 mb-2">{label}</p>
       {picked ? (
         <>
         <button onClick={() => setPicked(null)} className="press flex w-full items-center gap-2.5 rounded-ctrl border-2 border-ok bg-ok/5 px-3 py-2">
@@ -214,23 +215,14 @@ function AdminEntrySheet({ organizationId, categories = [], categoryId: initialC
     <Sheet onClose={onClose} title={title || t('tentries.admin_add_title')}>
       <div className="space-y-4">
         {newEntry && categories.length > 1 && (
-          <div className="space-y-1.5">
-            <p className="font-mono text-[11px] uppercase tracking-widest text-ink-500">{t('tentries.admin_category')}</p>
-            <div className="flex flex-wrap gap-1.5">
-              {categories.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => setCategoryId(c.id)}
-                  aria-pressed={c.id === categoryId}
-                  className={`press rounded-full border px-3 py-1.5 text-sm font-extrabold ${
-                    c.id === categoryId ? 'border-ink-900 bg-ink-900 text-white' : 'border-line bg-canvas text-ink-900'
-                  }`}
-                >
-                  {c.code || c.name}
-                </button>
-              ))}
-            </div>
+          <div>
+            <p className="block text-sm font-medium text-gray-700 mb-2">{t('tentries.admin_category')}</p>
+            <Chips
+              label={t('tentries.admin_category')}
+              value={categoryId}
+              onChange={setCategoryId}
+              options={categories.map((c) => ({ value: c.id, label: c.code || c.name }))}
+            />
           </div>
         )}
         {newEntry && (
@@ -416,22 +408,18 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
     <div className="space-y-3">
       {isAdmin && (
         <>
-          <div className="flex flex-wrap gap-1.5">
-            {FILTERS.map((f) => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`press min-h-[44px] rounded-full px-3 py-1.5 text-sm font-semibold border-2 ${
-                  filter === f ? 'border-ink-900 bg-ink-900 text-white' : 'border-line text-ink-900'
-                }`}
-              >
-                {t(`tentries.filter_${f}`)} {f === 'all' ? rows.length : rows.filter((r) => r.status === f).length}
-              </button>
-            ))}
-          </div>
-          <PrimaryButton variant="ghost" onClick={() => { setError(''); setAddOpen(true) }} className="w-full !bg-white !border-ink-900">
+          {/* Filtros: as pastilhas da app, numa só linha (revisão «mesma app»). */}
+          <Chips
+            value={filter}
+            onChange={setFilter}
+            options={FILTERS.map((f) => ({
+              value: f,
+              label: `${t(`tentries.filter_${f}`)} ${f === 'all' ? rows.length : rows.filter((r) => r.status === f).length}`,
+            }))}
+          />
+          <button type="button" onClick={() => { setError(''); setAddOpen(true) }} className="btn-secondary w-full inline-flex items-center justify-center gap-2">
             <UserPlus size={18} /> {t('tentries.admin_add_title')}
-          </PrimaryButton>
+          </button>
         </>
       )}
 
@@ -623,20 +611,24 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
                 <div className="rounded-ctrl bg-ink-50 px-3 py-2 text-xs text-ink-900 break-all">{linkOf(f.token)}</div>
                 {/* Um só botão lima na folha (vigia da designer, 25 set): com
                     duas pessoas sem conta, o WhatsApp da segunda é contorno. */}
-                <PrimaryButton
-                  variant={i === 0 ? 'lime' : 'ghost'}
-                  onClick={() => window.open(whatsappShare(t('tsignup.invite_whatsapp_text', { name: f.name, title: tournament.name, link: linkOf(f.token) })), '_blank')}
-                  className={i === 0 ? 'w-full' : 'w-full !bg-white !border-ink-900'}
-                >
-                  {t('partner.invite_send_whatsapp')}
-                </PrimaryButton>
-                <PrimaryButton
-                  variant="ghost"
-                  onClick={() => navigator.clipboard?.writeText(linkOf(f.token))}
-                  className="w-full !bg-white !border-ink-900"
-                >
+                {i === 0 ? (
+                  <PrimaryButton
+                    onClick={() => window.open(whatsappShare(t('tsignup.invite_whatsapp_text', { name: f.name, title: tournament.name, link: linkOf(f.token) })), '_blank')}
+                    className="w-full"
+                  >
+                    {t('partner.invite_send_whatsapp')}
+                  </PrimaryButton>
+                ) : (
+                  <button type="button"
+                    onClick={() => window.open(whatsappShare(t('tsignup.invite_whatsapp_text', { name: f.name, title: tournament.name, link: linkOf(f.token) })), '_blank')}
+                    className="btn-secondary w-full inline-flex items-center justify-center gap-2">
+                    {t('partner.invite_send_whatsapp')}
+                  </button>
+                )}
+                <button type="button" onClick={() => navigator.clipboard?.writeText(linkOf(f.token))}
+                  className="btn-secondary w-full inline-flex items-center justify-center gap-2">
                   <Copy size={18} /> {t('partner.invite_copy_link')}
-                </PrimaryButton>
+                </button>
               </div>
             ))}
           </div>

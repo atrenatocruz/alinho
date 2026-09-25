@@ -11,7 +11,7 @@ import { useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Trophy } from 'lucide-react'
 import { useGoBack } from '../lib/useGoBack'
-import { getTournamentPage, getTournamentForEdit, listMatchesToScore, markWalkover, saveMatchResult, undoWalkover } from '../lib/tournamentApi'
+import { getTournamentPage, getTournamentForEdit, listMatchesToScore, markWalkover, saveMatchResult, undoWalkover, resolveMatchCorrection } from '../lib/tournamentApi'
 import { saveMatchSchedule } from '../lib/tournamentDraw'
 import { needsDecider, resultProblem } from '../lib/tournamentScore'
 import { computeSetsResult } from '../lib/scoringLogic'
@@ -19,7 +19,7 @@ import { describeError, errorKind } from '../lib/errors'
 import { dayKeyInTz, msUntilNextDay, hhmmInTz } from '../lib/tournamentDay'
 import { cardsByCourt, unscheduledMatches, proposeSchedule, courtNames } from '../lib/scorePage'
 import { useAuth } from '../contexts/AuthContext'
-import { ConfirmSheet, EmptyState, PrimaryButton } from '../components/ui'
+import { ConfirmSheet, EmptyState, PrimaryButton, NeedsYou } from '../components/ui'
 import { MonoLabel, StatePill } from '../components/tournament/TournamentBits'
 import { proSetTieBreakTarget, tieBreakProblem, setText } from '../components/tournament/tieBreak'
 
@@ -119,7 +119,7 @@ const filledSets = (sets) => sets
   }))
 
 /** O cartão de um campo: quem está a jogar, o resultado e os três botões. */
-function CourtCard({ match, scoring, tieTarget = 7, onSave, onWalkover, onUndoWalkover, busy, t }) {
+function CourtCard({ match, scoring, tieTarget = 7, onSave, onWalkover, onUndoWalkover, onResolve, busy, t }) {
   const finished = ['terminado', 'falta', 'desistencia'].includes(match.status)
   const bySets = SETS_FORMATS.includes(scoring)
   const [editing, setEditing] = useState(!finished)
@@ -211,8 +211,9 @@ function CourtCard({ match, scoring, tieTarget = 7, onSave, onWalkover, onUndoWa
     setEditing(false)
   }
 
+  const ask = match.correction_request
   return (
-    <div className="rounded-card border border-line p-3">
+    <div id={`jogo-${match.match_id}`} className="rounded-card border border-line p-3 scroll-mt-20">
       <div className="flex items-center justify-between gap-2">
         <b className="text-sm text-ink-900">{match.court} · {label}</b>
         {match.status === 'a_decorrer'
@@ -320,6 +321,25 @@ function CourtCard({ match, scoring, tieTarget = 7, onSave, onWalkover, onUndoWa
           </div>
         </div>
       )}
+
+      {/* Pedido de correção de quem jogou (Trello #485): quem pediu, o
+          resultado que pede e a nota, com Aceitar e Recusar. */}
+      {ask && onResolve && (
+        <NeedsYou className="mt-2.5">
+          <span className="block">
+            {t('tcorrection.card_line', { name: ask.by_name || '?', a: ask.score_a, b: ask.score_b })}
+          </span>
+          {ask.note && <span className="mt-0.5 block font-normal text-ink-700">«{ask.note}»</span>}
+          <span className="mt-2 flex flex-wrap gap-2">
+            <button type="button" disabled={busy} onClick={() => onResolve(match, true)} className={`${BTN} bg-ink-900 font-bold text-white disabled:opacity-60`}>
+              {t('tcorrection.accept')}
+            </button>
+            <button type="button" disabled={busy} onClick={() => onResolve(match, false)} className={`${BTN} border border-ink-900 bg-white font-semibold text-ink-900 disabled:opacity-60`}>
+              {t('tcorrection.reject')}
+            </button>
+          </span>
+        </NeedsYou>
+      )}
     </div>
   )
 }
@@ -405,6 +425,7 @@ export default function TournamentScorePage() {
   const [proposal, setProposal] = useState(null) // { slots, preview, left, noCourts }
   const [sheet, setSheet] = useState(null) // { match, kind }
   const [undoing, setUndoing] = useState(null) // o jogo cuja falta se desfaz (#491)
+  const [accepting, setAccepting] = useState(null) // o pedido de correção a aceitar (#485)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -552,6 +573,22 @@ export default function TournamentScorePage() {
     .sort((x, y) => String(x.scheduled_at).localeCompare(String(y.scheduled_at)))
   const done = matches.filter((m) => ['terminado', 'falta', 'desistencia'].includes(m.status))
   const noTime = unscheduledMatches(allMatches)
+  // Pedidos de correção à espera (Trello #485), de todos os dias: o aviso
+  // leva ao primeiro, trocando de dia se for preciso.
+  const asks = allMatches.filter((m) => m.correction_request)
+  const goToAsk = () => {
+    const first = asks[0]
+    if (!first) return
+    if (first.scheduled_at) setDay(dayKeyInTz(new Date(first.scheduled_at)))
+    setTimeout(() => document.getElementById(`jogo-${first.match_id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 150)
+  }
+  const resolve = async (match, accept) => {
+    if (accept) { setAccepting(match); return }
+    setBusy(true); setError('')
+    try { await resolveMatchCorrection(match.match_id, false); load() }
+    catch (err) { console.error('Error rejecting a correction:', err); setError(describeError(t, err)) }
+    finally { setBusy(false) }
+  }
   const labelFor = (iso) => new Date(`${iso}T12:00`).toLocaleDateString(i18n.language, { weekday: 'short', day: 'numeric', month: 'short' }).replace(/\./g, '')
   const dayLabel = labelFor(day)
   const shortDay = (iso) => new Date(`${iso}T12:00`).toLocaleDateString(i18n.language, { weekday: 'short', day: 'numeric' }).replace(/\./g, '')
@@ -586,6 +623,12 @@ export default function TournamentScorePage() {
       )}
 
       {error && <p className="text-[12px] text-danger">{error}</p>}
+
+      {asks.length > 0 && (
+        <NeedsYou action={{ label: t('tcorrection.see'), onClick: goToAsk }}>
+          {t('tcorrection.pending', { count: asks.length })}
+        </NeedsYou>
+      )}
 
       {isAdmin && noTime.length > 0 && (
         <div className="rounded-card border-2 border-dashed border-ink-900/30 p-3">
@@ -663,11 +706,28 @@ export default function TournamentScorePage() {
           <div className="space-y-2">
             {done.map((m) => (
               <CourtCard key={m.match_id} match={m} scoring={scoring} tieTarget={tieTarget} busy={busy} t={t}
-                onSave={save} onWalkover={(match, kind) => setSheet({ match, kind })} onUndoWalkover={isAdmin ? setUndoing : null} />
+                onSave={save} onWalkover={(match, kind) => setSheet({ match, kind })} onUndoWalkover={isAdmin ? setUndoing : null}
+                onResolve={resolve} />
             ))}
           </div>
         </>
       )}
+
+      {/* Aceitar mexe no resultado e, com a categoria fechada, nos pontos:
+          pergunta uma vez, sem vermelho (regra das janelas). */}
+      <ConfirmSheet
+        open={!!accepting}
+        title={t('tcorrection.accept_title')}
+        message={accepting ? t('tcorrection.accept_message', {
+          from: `${accepting.score_a}-${accepting.score_b}`,
+          to: `${accepting.correction_request?.score_a}-${accepting.correction_request?.score_b}`,
+        }) : ''}
+        confirmLabel={t('tcorrection.accept')}
+        cancelLabel={t('tournament.score.undo_not_now')}
+        onConfirm={async () => { await resolveMatchCorrection(accepting.match_id, true); load() }}
+        onClose={() => setAccepting(null)}
+        errorOf={(err) => describeError(t, err)}
+      />
 
       {sheet && (
         <WalkoverSheet match={sheet.match} kind={sheet.kind} t={t}
