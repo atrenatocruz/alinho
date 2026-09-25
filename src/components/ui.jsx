@@ -542,20 +542,27 @@ export function Tabs({ options, value, onChange, label, className = '' }) {
  *  `options`: [{ value, label }]. */
 export function Chips({ options, value, onChange, label, className = '' }) {
   return (
-    <div role="group" aria-label={label} className={`-mx-1 flex gap-2 overflow-x-auto px-1 no-scrollbar ${className}`}>
+    // -my-0.5: o botão tem 44 px e a pastilha 40 — a margem devolve os 2 px
+    // de cada lado, e o espaço entre filas fica o mesmo.
+    <div role="group" aria-label={label} className={`-mx-1 -my-0.5 flex gap-2 overflow-x-auto px-1 no-scrollbar ${className}`}>
       {options.map((o) => {
         const on = o.value === value
         return (
+          // 40 px à vista, 44 px ao toque (Trello #558, designer 25 set): o
+          // botão é a zona de toque, transparente, 2 px acima e abaixo da
+          // pastilha; para o lado não cresce — as vizinhas não se tocam.
           <button
             key={String(o.value)}
             type="button"
             aria-pressed={on}
             onClick={() => onChange(o.value)}
-            className={`inline-flex min-h-[40px] flex-none items-center whitespace-nowrap rounded-full border px-3.5 text-sm font-extrabold transition-colors duration-fast ${
-              on ? 'border-ink-900 bg-ink-900 text-white' : 'border-line bg-canvas text-ink-700'
-            }`}
+            className="inline-flex min-h-[44px] flex-none items-center"
           >
-            {o.label}
+            <span className={`inline-flex min-h-[40px] items-center whitespace-nowrap rounded-full border px-3.5 text-sm font-extrabold transition-colors duration-fast ${
+              on ? 'border-ink-900 bg-ink-900 text-white' : 'border-line bg-canvas text-ink-700'
+            }`}>
+              {o.label}
+            </span>
           </button>
         )
       })}
