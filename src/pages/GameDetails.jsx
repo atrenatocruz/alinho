@@ -1162,13 +1162,10 @@ export default function GameDetails() {
             console.error('Error notifying players about being added:', error)
           }
         }
-        // Pessoa sem conta, criada agora (#546): a tira diz que está no mix,
-        // ou que o email já tinha conta e foi essa a inscrita.
-        setEditNotice(newPlayer?.existingAccount
-          ? t('mixedit.notice_existing_account', { name: newPlayer.name })
-          : status === 'confirmed'
-            ? (newPlayer ? t('mixedit.notice_in_mix', { name: newPlayer.name }) : t('mixedit.notice_added_open', { names }))
-            : t('mixedit.notice_waitlist_open', { names }))
+        // Pessoa sem conta, criada agora (#546): a tira diz que está no mix.
+        setEditNotice(status === 'confirmed'
+          ? (newPlayer ? t('mixedit.notice_in_mix', { name: newPlayer.name }) : t('mixedit.notice_added_open', { names }))
+          : t('mixedit.notice_waitlist_open', { names }))
         loadGameDetails()
         return
       }

@@ -45,6 +45,10 @@ export default function AddPlayerSheet({ game, excludeIds, peopleCount, capacity
   const [touched, setTouched] = useState(false)
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState('')
+  const [createInfo, setCreateInfo] = useState('')
+  // O email fica escondido: só se o admin quiser (Francisco, 25 set). Sem
+  // ele, a pessoa entra só com o nome.
+  const [showEmail, setShowEmail] = useState(false)
   const [newPlayer, setNewPlayer] = useState(null) // { name, existingAccount }
 
   useEffect(() => {
@@ -100,16 +104,24 @@ export default function AddPlayerSheet({ game, excludeIds, peopleCount, capacity
   const criarEInscrever = async () => {
     setCreating(true)
     setCreateError('')
+    setCreateInfo('')
     try {
       const { data, error } = await supabase.functions.invoke('admin-bulk-create-participants', {
         body: { organization_id: game.organization_id, create_only: true, players: [{ name: newName.trim(), email: newEmail.trim() }] },
       })
       if (error) throw error
+      // Email que já tem conta (Francisco, 25 set): não se inscreve nem se
+      // diz de quem é — a pessoa recebe o convite para o clube/grupo e
+      // aceita ou não.
+      if (data?.existing?.length) {
+        setCreateInfo(t(data.existing[0].status === 'member' ? 'mixedit.email_already_member' : 'mixedit.email_invited'))
+        return
+      }
       const criado = data?.created?.[0]
       if (!criado) throw new Error(data?.failed?.[0]?.error || 'create_failed')
       const pessoa = { id: criado.user_id, name: criado.name, avatar_url: null, gender: null }
       setMembers((list) => (list.some((m) => m.id === pessoa.id) ? list : [...list, pessoa]))
-      const extra = { newPlayer: { name: criado.name, existingAccount: !!criado.existing_account } }
+      const extra = { newPlayer: { name: criado.name } }
       setNewPlayer(extra.newPlayer)
       setPlayerId(criado.user_id)
       setNamed(false)
@@ -240,20 +252,27 @@ export default function AddPlayerSheet({ game, excludeIds, peopleCount, capacity
                   <p className="mt-1 text-sm text-red-600 font-extrabold">{t(`partner.name_error_${nameError}`)}</p>
                 )}
               </div>
-              <div>
-                <input
-                  value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
-                  type="email"
-                  inputMode="email"
-                  placeholder={t('partner.email_placeholder')}
-                  className="input-field"
-                />
-                {touched && emailError && (
-                  <p className="mt-1 text-sm text-red-600 font-extrabold">{t('partner.email_error_invalid')}</p>
-                )}
-                <p className="mt-1 text-xs text-muted">{t('mixedit.new_player_email_hint')}</p>
-              </div>
+              {showEmail ? (
+                <div>
+                  <input
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    type="email"
+                    inputMode="email"
+                    placeholder={t('partner.email_placeholder')}
+                    className="input-field"
+                    autoFocus
+                  />
+                  {touched && emailError && (
+                    <p className="mt-1 text-sm text-red-600 font-extrabold">{t('partner.email_error_invalid')}</p>
+                  )}
+                  <p className="mt-1 text-xs text-muted">{t('mixedit.new_player_email_hint')}</p>
+                </div>
+              ) : (
+                <button type="button" onClick={() => setShowEmail(true)} className="text-sm font-extrabold text-ink-700 hover:underline">
+                  {t('mixedit.add_email_optional')}
+                </button>
+              )}
             </div>
           ) : (
             <button type="button" onClick={() => { setNamed(true); setPlayerId(null); setTouched(false) }} className="press w-full text-left">
@@ -265,6 +284,7 @@ export default function AddPlayerSheet({ game, excludeIds, peopleCount, capacity
           )}
         </div>
         {createError && <p className="text-sm text-red-600 font-extrabold">{createError}</p>}
+        {createInfo && <p className="text-sm text-ink-900 font-extrabold">{createInfo}</p>}
 
         {withPartner && (
           <div>
@@ -275,7 +295,9 @@ export default function AddPlayerSheet({ game, excludeIds, peopleCount, capacity
           </div>
         )}
 
-        <p className="text-xs text-muted">{t(beforeStart ? 'mixedit.add_hint_open' : 'mixedit.reform_hint')}</p>
+        {/* «Recebe um aviso, pode sair sozinho» não vale para quem não está
+            na app (#546): nessa altura não se mostra. */}
+        {!named && <p className="text-xs text-muted">{t(beforeStart ? 'mixedit.add_hint_open' : 'mixedit.reform_hint')}</p>}
         <PrimaryButton className="w-full" disabled={!ready || busy || creating} onClick={next}>
           {busy || creating
             ? t('mixedit.saving')

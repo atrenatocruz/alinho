@@ -195,6 +195,13 @@ const RPC_MOCKS = {
   // Eliminar grupo (Trello #241). Por omissão o grupo pode ser eliminado;
   // localStorage.mockDeleteBlocker = 'has_activity' mostra o estado bloqueado.
   get_organization_delete_blocker: () => localStorage.getItem('mockDeleteBlocker') || null,
+  // #550: o professor procura QUALQUER clube (só clubes, sem acentos).
+  search_clubs_for_teacher: (params) => {
+    const q = String(params?.p_query || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+    return COMMUNITY_ORGS.filter((o) => o.kind === 'club')
+      .filter((o) => o.name.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().includes(q))
+      .map((o) => ({ id: o.id, name: o.name, slug: o.slug, location: o.location || null, group_logo_url: null }))
+  },
   // Confirmar o número pelo WhatsApp (#537): um código de teste.
   start_phone_verification: () => [{ code: '482917', expires_at: new Date(Date.now() + 15 * 60000).toISOString() }],
   // Pedidos de entrada por responder, como o Gerir os lê (a RPC, não a
@@ -919,15 +926,15 @@ export function installDevMockNetwork() {
     // de convite fictício. localStorage.mockPartnerError = 'email_already_in_use'
     // (ou outro) mostra a mensagem de erro em vez do sucesso.
     // «Não está na app?» no «Adicionar jogador» (#546): a conta é inventada.
-    // Com o email ana@exemplo.pt faz de conta que o email já tinha conta.
+    // Com o email ana@exemplo.pt faz de conta que o email já tem conta.
     if (url && url.includes('/functions/v1/admin-bulk-create-participants')) {
       let body = {}
       try { body = JSON.parse(init?.body || '{}') } catch { /* ignora */ }
       const p = body.players?.[0] || {}
       if ((p.email || '').toLowerCase() === 'ana@exemplo.pt') {
-        return jsonResponse({ created: [{ name: 'Ana Silva', user_id: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', existing_account: true }], failed: [] })
+        return jsonResponse({ created: [], existing: [{ name: p.name, status: 'invited' }], failed: [] })
       }
-      return jsonResponse({ created: [{ name: p.name, user_id: 'ffffffff-ffff-ffff-ffff-ffffffffffff', existing_account: false }], failed: [] })
+      return jsonResponse({ created: [{ name: p.name, user_id: 'ffffffff-ffff-ffff-ffff-ffffffffffff' }], existing: [], failed: [] })
     }
 
     if (url && url.includes('/functions/v1/join-with-named-partner')) {

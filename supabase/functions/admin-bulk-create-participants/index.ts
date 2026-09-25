@@ -22,14 +22,18 @@
 // Modo «create_only» (Trello #546, 25 set — admin adiciona ao mix uma
 // pessoa sem conta): POST { organization_id, create_only: true,
 //   players: [{ name, email? }] }
-//   -> { created: [{ name, user_id, existing_account }], failed: [{ name, error }] }
+//   -> { created: [{ name, user_id }], existing: [{ name, status }], failed: [{ name, error }] }
 // Só cria a conta (ou encontra a que já existe com esse email) e a torna
 // membro do clube; a inscrição no mix fica com a app, pelo mesmo caminho do
 // «Adicionar jogador» (vagas, suplente, mais um campo — as regras de sempre).
 //  · com email: a conta fica com esse email, para a pessoa entrar depois com
 //    ele e ficar com os jogos e o nível;
-//  · se o email já tem conta, usa-se essa (existing_account: true) e passa a
-//    membro do clube se ainda não era — não se cria outra;
+//  · se o email já tem conta, a conta NÃO passa a membro nem é inscrita
+//    (Francisco, 25 set — privacidade): recebe o convite de sempre para o
+//    clube/grupo (invite_to_organization, feito EM NOME do admin que chama,
+//    com as verificações dessa função) e aceita ou não. A resposta não diz
+//    de quem é o email: `existing: [{ name, status }]` com o nome que o
+//    admin escreveu e status 'invited' (ou 'member', se já era do clube);
 //  · sem email: um email inventado, como nos convidados em massa.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
@@ -142,7 +146,14 @@ Deno.serve(async (req) => {
   }
 
   if (createOnly) {
-    const created: Array<{ name: string; user_id: string; existing_account: boolean }> = []
+    const created: Array<{ name: string; user_id: string }> = []
+    const existing: Array<{ name: string; status: 'invited' | 'member' }> = []
+    // O convite vai em nome de quem chama: um cliente com o token dele, para
+    // o invite_to_organization ver auth.uid() = o admin (e o verificar).
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')
+    const asCaller = anonKey
+      ? createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } } })
+      : null
     const failed: Array<{ name: string; error: string }> = []
     for (const player of body.players as NewPlayer[]) {
       const name = typeof player?.name === 'string' ? player.name.trim().replace(/\s+/g, ' ') : ''
@@ -157,32 +168,41 @@ Deno.serve(async (req) => {
           continue
         }
 
-        // O email já tem conta: inscreve-se essa, não se cria outra.
+        // O email já tem conta: convite para o clube/grupo, que a pessoa
+        // aceita ou não. Não se inscreve, não passa a membro, e não se diz
+        // de quem é.
         if (email) {
-          const { data: existing, error: existingError } = await admin
+          const { data: found, error: foundError } = await admin
             .from('profiles')
-            .select('id, name')
+            .select('id')
             .eq('email', email)
             .limit(1)
-          if (existingError) throw existingError
-          if (existing?.length) {
-            const profile = existing[0]
-            const { data: alreadyMember } = await admin
+          if (foundError) throw foundError
+          if (found?.length) {
+            const personId = found[0].id
+            const { data: member } = await admin
               .from('memberships')
               .select('id')
               .eq('organization_id', organizationId)
-              .eq('user_id', profile.id)
+              .eq('user_id', personId)
               .maybeSingle()
-            if (!alreadyMember) {
-              const { error: memberError } = await admin.from('memberships').insert({
-                user_id: profile.id,
-                organization_id: organizationId,
-                is_admin: false,
-                is_guest: false,
-              })
-              if (memberError) throw memberError
+            if (member) {
+              existing.push({ name, status: 'member' })
+              continue
             }
-            created.push({ name: profile.name || name, user_id: profile.id, existing_account: true })
+            if (!asCaller) throw new Error('SUPABASE_ANON_KEY is not set')
+            const { error: inviteError } = await asCaller.rpc('invite_to_organization', {
+              p_organization_id: organizationId,
+              p_user_id: personId,
+              p_as_admin: false,
+            })
+            if (inviteError) throw inviteError
+            // O email do convite, como no Gerir: se falhar, o convite fica
+            // na app (no sino) na mesma.
+            await asCaller.functions
+              .invoke('send-email', { body: { type: 'organization_invite', organization_id: organizationId, user_id: personId } })
+              .catch((err: unknown) => console.error('Invite email not sent:', err))
+            existing.push({ name, status: 'invited' })
             continue
           }
         }
@@ -210,12 +230,12 @@ Deno.serve(async (req) => {
           failed.push({ name, error: membershipError.message })
           continue
         }
-        created.push({ name, user_id: authUser.user.id, existing_account: false })
+        created.push({ name, user_id: authUser.user.id })
       } catch (err) {
         failed.push({ name, error: err instanceof Error ? err.message : 'Unknown error' })
       }
     }
-    return jsonResponse({ created, failed })
+    return jsonResponse({ created, existing, failed })
   }
 
   // Verify that all game_ids belong to this organization before proceeding.
