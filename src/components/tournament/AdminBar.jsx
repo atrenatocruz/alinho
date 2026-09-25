@@ -21,6 +21,7 @@ import { canDelete } from '../../lib/tournaments'
 import { TOURNAMENT_TZ } from '../../lib/tournamentDay'
 import { MonoLabel, StatePill } from './TournamentBits'
 import CloseCategories from './CloseCategories'
+import { drawProgress, statusKey } from './drawProgress'
 import { ConfirmSheet } from '../ui'
 
 /** O passo seguinte de cada estado. Do sorteio em diante não se anda à mão:
@@ -49,7 +50,7 @@ const STATE_PILL = {
   sorteado: 'dark', a_decorrer: 'live', terminado: 'grey',
 }
 
-export default function AdminBar({ tournament, onChanged, onEdit, onDraw }) {
+export default function AdminBar({ tournament, categories = [], onChanged, onEdit, onDraw }) {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const [busy, setBusy] = useState(false)
@@ -59,6 +60,17 @@ export default function AdminBar({ tournament, onChanged, onEdit, onDraw }) {
 
   const status = tournament?.status
   const next = NEXT_STEP[status]
+  // O sorteio anda categoria a categoria (Trello #560): o botão fica
+  // enquanto houver uma categoria fechada e por sortear, e o estado diz
+  // quantas faltam — o torneio já está «sorteado» desde a primeira.
+  const progress = drawProgress(categories)
+  const canDraw = status !== 'rascunho' && (status === 'fechado' || progress.toDraw.length > 0)
+  const codes = (list) => list.map((c) => c.code).filter(Boolean).join(', ')
+  const partialLine = [
+    t('tournament.admin.state_draw_partial', { drawn: progress.drawn, total: progress.total }),
+    progress.toDraw.length > 0 && t('tournament.admin.state_draw_left', { codes: codes(progress.toDraw) }),
+    progress.open.length > 0 && t('tournament.admin.state_draw_open', { codes: codes(progress.open) }),
+  ].filter(Boolean).join(' ')
   // `is_preview` vem da base de dados e quer dizer: este torneio NÃO abre a
   // quem chega de fora — ou porque ainda é rascunho, ou porque está
   // escondido. É o que fechava o «#437»: a seta do Gerir dava «Torneio não
@@ -100,7 +112,7 @@ export default function AdminBar({ tournament, onChanged, onEdit, onDraw }) {
     <div className="rounded-card border border-line bg-ink-50/60 p-3">
       <div className="flex items-center justify-between gap-2">
         <MonoLabel>{preview ? t('tournament.admin.preview_label') : t('tournament.admin.label')}</MonoLabel>
-        <StatePill tone={STATE_PILL[status] || 'grey'}>{t(`tournament.status_${status}`)}</StatePill>
+        <StatePill tone={STATE_PILL[status] || 'grey'}>{t(statusKey(status, progress), { drawn: progress.drawn, total: progress.total })}</StatePill>
       </div>
 
       {/* A linha que explica o estado ACRESCENTA à pastilha, não a repete:
@@ -117,10 +129,12 @@ export default function AdminBar({ tournament, onChanged, onEdit, onDraw }) {
           a de cima já disse melhor. Duas linhas a dizer o mesmo é o que o
           desenho manda evitar. */}
       {!(preview && status === 'rascunho') && (
-        <p className="mt-1.5 text-[12px] text-ink-700">{t(`tournament.admin.state_${status}`, {
-          deadline: whenDeadline(tournament?.entries_deadline, i18n.language),
-          matches: tournament?.match_count ?? 0,
-        })}</p>
+        <p className="mt-1.5 text-[12px] text-ink-700">{progress.partial && ['sorteado', 'a_decorrer'].includes(status)
+          ? partialLine
+          : t(`tournament.admin.state_${status}`, {
+            deadline: whenDeadline(tournament?.entries_deadline, i18n.language),
+            matches: tournament?.match_count ?? 0,
+          })}</p>
       )}
 
       <div className="mt-2.5 flex flex-wrap gap-1.5">
@@ -133,7 +147,7 @@ export default function AdminBar({ tournament, onChanged, onEdit, onDraw }) {
             {t(`tournament.admin.to_${next}`)}
           </button>
         )}
-        {status === 'fechado' && (
+        {canDraw && (
           <button type="button" disabled={busy} onClick={draw}
             className="min-h-[44px] rounded-ctrl bg-ink-900 px-3 py-2 text-[12px] font-bold text-white disabled:opacity-50">
             {t('tournament.admin.do_draw')}

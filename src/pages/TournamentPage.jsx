@@ -25,6 +25,7 @@ import { TOURNAMENT_PANELS, TOURNAMENT_TABS, TOURNAMENT_TAB_OWNER } from '../com
 import AdminBar from '../components/tournament/AdminBar'
 import CreateTournamentForm from '../components/tournament/CreateTournamentForm'
 import DrawAdminPanel from '../components/tournament/DrawAdminPanel'
+import { drawProgress, statusKey } from '../components/tournament/drawProgress'
 
 /** "9–11 out" quando é tudo no mesmo mês, "30 set – 2 out" quando não é. */
 function dateRange(startIso, endIso, locale) {
@@ -239,6 +240,7 @@ export default function TournamentPage() {
         <>
           <AdminBar
             tournament={tour}
+            categories={categories}
             onChanged={() => window.dispatchEvent(new Event('tournament:reload'))}
             onEdit={() => openAdmin('editar')}
             onDraw={() => openAdmin('sorteio')}
@@ -262,7 +264,7 @@ export default function TournamentPage() {
           <TourTag>{t('tournament.label')}</TourTag>
           {['validada', 'selecionada'].includes(activeMy(data)?.state)
             ? <StatePill tone="in">{t('tournament.state_entered')}</StatePill>
-            : <StatePill tone={STATE_PILL[tour.status] || 'grey'}>{t(`tournament.status_${tour.status}`)}</StatePill>}
+            : <StatePill tone={STATE_PILL[tour.status] || 'grey'}>{t(statusKey(tour.status, drawProgress(categories)), drawProgress(categories))}</StatePill>}
         </div>
         <h1 className="mt-2 font-display text-xl font-extrabold leading-tight text-ink-900">{tour.name}</h1>
         <div className="mt-1 flex items-center gap-1.5 text-xs text-ink-500">
