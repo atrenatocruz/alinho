@@ -12,6 +12,7 @@ import { cancelEnrolment, confirmEnrolment, getTeacherPage } from '../lib/lesson
 import EnrolSheet from '../components/lessons/EnrolSheet'
 import { describeError, errorKind } from '../lib/errors'
 import { priceRowFor, LESSON_CAPACITY, LESSON_DURATIONS } from '../lib/lessons'
+import { weeklyFromItems } from '../lib/teacherSchedule'
 import { Avatar, EmptyState, PrimaryButton } from '../components/ui'
 import {
   LevelPill, MonoLabel, TealTag, TEAL, bandLabel, levelRange, hm, hhmm, isoWeekday, sameDay, euros, lessonTypeLabel,
@@ -102,6 +103,8 @@ export default function TeacherPage({ view = 'profile' }) {
   // que faltam ficam com travessão.
   const hasPrices = Object.keys(LESSON_CAPACITY).some((type) => LESSON_DURATIONS.some((d) => priceFor(type, d) != null))
 
+  const weekly = weeklyFromItems(items)
+
   // "Esta semana": seg–dom; domingo só aparece se tiver alguma coisa.
   const days = [1, 2, 3, 4, 5, 6, 7].filter((wd) => wd < 7 || items.some((it) => it.weekday === 7))
 
@@ -138,6 +141,23 @@ export default function TeacherPage({ view = 'profile' }) {
           </a>
         )}
       </div>
+
+      {/* Horário da semana (Trello #418): fica à vista mesmo com as aulas
+          escondidas (Francisco, 25 set) — só o horário, sem «Pedir aula».
+          Com as aulas à vista, o mesmo horário aparece na grelha em baixo. */}
+      {!isLessonsEnabled && weekly.length > 0 && (
+        <div>
+          <MonoLabel>{t('teacher.public_schedule_heading')}</MonoLabel>
+          <ul className="mt-1.5 text-sm">
+            {weekly.map((s, i) => (
+              <li key={i} className="flex justify-between gap-3 border-t border-line py-1.5 first:border-t-0">
+                <span className="font-semibold text-ink-900">{t(`lessons.wd_long_${s.weekday}`)}</span>
+                <span className="tabular-nums text-ink-900">{s.start}–{s.end}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {isLessonsEnabled && hasPrices && (
       <div>
