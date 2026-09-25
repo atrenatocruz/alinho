@@ -12,6 +12,18 @@
 @import '@fontsource/geist-mono/500.css';
 @import '@fontsource/geist-mono/700.css';
 
+/* «1.º» e «2.ª» (Trello #499). A Geist desenha o º e o ª como um «o» e um
+   «a» normais, ao nível da linha — «3.º lugar» lia-se «3.o lugar», e
+   parecia gralha. Só esses dois sinais passam a vir da letra do sistema,
+   que os desenha pequenos e em cima; o resto do texto não muda. Entra à
+   frente de todas as famílias (tailwind.config.js). */
+@font-face {
+  font-family: 'Alinho Ordinais';
+  src: local('Helvetica Neue'), local('HelveticaNeue'), local('Helvetica'), local('Arial'), local('ArialMT'), local('Roboto'), local('Segoe UI');
+  unicode-range: U+00AA, U+00BA;
+  font-weight: 100 900;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -167,7 +179,7 @@
   border-radius: var(--radius-ctrl) !important;
   box-shadow: var(--shadow-lift) !important;
   background-color: rgb(var(--surface)) !important;
-  font-family: 'Geist Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+  font-family: 'Alinho Ordinais', 'Geist Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
 }
 .pac-container:empty {
   display: none !important;

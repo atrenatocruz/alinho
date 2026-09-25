@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { pricePerPlayer } from '../../lib/tournaments'
 import { Search, UserPlus, Euro } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../contexts/AuthContext'
 import { Sheet } from '../agenda/AgendaControls'
 import { Avatar, PrimaryButton } from '../ui'
 import { partnerNameError, partnerEmailError, PARTNER_NAME_MAX } from '../../lib/partnerInvite'
@@ -29,6 +30,7 @@ const euroWords = (v, locale) => Number(v).toLocaleString(locale, {
 
 export default function TournamentSignupSheet({ tournament, categories, category, categoriesLeft, busy, error, onConfirm, onClose }) {
   const { t, i18n } = useTranslation()
+  const { user } = useAuth()
   const [categoryId, setCategoryId] = useState(category?.id || categories[0]?.id || null)
   const [mode, setMode] = useState('partner') // 'partner' | 'named' | 'alone'
   const [members, setMembers] = useState([])
@@ -49,12 +51,13 @@ export default function TournamentSignupSheet({ tournament, categories, category
       .then(({ data, error: loadErr }) => {
         if (cancelled || loadErr) return
         setMembers((data || [])
-          .filter((m) => m.profile)
+          // Quem se está a inscrever não é parceiro de si próprio (#498).
+          .filter((m) => m.profile && m.user_id !== user?.id)
           .map((m) => ({ id: m.user_id, name: m.profile.name || '?', avatar_url: m.profile.avatar_url }))
           .sort((a, b) => a.name.localeCompare(b.name, 'pt')))
       })
     return () => { cancelled = true }
-  }, [tournament?.organization_id])
+  }, [tournament?.organization_id, user?.id])
 
   // Sem contar acentos: «goncalves» encontra «Gonçalves».
   const q = query.trim()

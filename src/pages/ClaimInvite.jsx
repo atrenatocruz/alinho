@@ -6,6 +6,7 @@ import { PrimaryButton } from '../components/ui'
 import { claimPartnerInvite } from '../lib/partnerInvite'
 import { claimEntry } from '../lib/tournamentSignup'
 import { signUpBackLink } from '../lib/loginLinks'
+import { errorCode } from '../lib/tournamentError'
 
 /* Ficar com o lugar que alguém guardou para mim num mix (Trello #339).
 
@@ -42,9 +43,12 @@ export default function ClaimInvite() {
         // Torneio: primeiro o texto próprio do convite, depois o da inscrição
         // (tsignup.error_*: «esse convite é teu», máximo de categorias, …),
         // e só no fim o genérico — antes quase tudo caía no «tenta outra vez».
+        // O código vem no fim da mensagem, mesmo quando o servidor lhe junta
+        // texto à frente (os avisos das regras novas, b417e61) — #497.
+        const code = errorCode(err)
         const ns = isTournament ? 'tsignup' : 'partner'
-        const keys = [`${ns}.claim_error_${err.message}`]
-        if (isTournament) keys.push(`tsignup.error_${err.message}`)
+        const keys = [`${ns}.claim_error_${code}`]
+        if (isTournament) keys.push(`tsignup.error_${code}`)
         const found = keys.find((k) => t(k) !== k)
         setError(found ? t(found) : t('partner.claim_error_generic'))
         setState('error')
