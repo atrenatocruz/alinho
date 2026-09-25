@@ -86,7 +86,10 @@ export function installFakeSupabase(supabase, db) {
     return api
   }
   supabase.from = builder
-  supabase.rpc = async () => ({ data: [], error: null })
+  supabase.rpc = async (name, args) => {
+    ;(db.rpcCalls ??= []).push([name, args])
+    return { data: [], error: null }
+  }
   supabase.auth.admin.createUser = async ({ user_metadata }) => ({ data: { user: { id: 'u-' + crypto.randomUUID().slice(0, 8), user_metadata } }, error: null })
   supabase.auth.admin.deleteUser = async () => ({})
 }
