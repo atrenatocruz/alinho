@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { Check } from 'lucide-react'
@@ -22,6 +22,10 @@ export default function TeacherRequestCard({ req, organizationId, onResolved }) 
   // conteúdo do Gerir tem uma animação com transform, que prende os
   // elementos «fixed» a ele e os deixava fora do ecrã.
   const [notice, setNotice] = useState('')
+  // A ConfirmSheet fecha (onClose) depois de a ação correr bem: o ref diz
+  // se foi com «Sim, tornar admin».
+  const adminDoneRef = useRef(false)
+  const setAdminDone = (v) => { adminDoneRef.current = v }
   useEffect(() => {
     if (!notice) return undefined
     const timer = setTimeout(() => { setNotice(''); onResolved?.() }, 3000)
@@ -49,18 +53,6 @@ export default function TeacherRequestCard({ req, organizationId, onResolved }) 
     setAsking(null)
     setNotice(t(female ? 'gerirclube.teacher_accepted_f' : 'gerirclube.teacher_accepted', { name: fullName })
       + (admin ? t('gerirclube.teacher_accepted_admin') : '.'))
-  }
-  const becomeAdmin = async () => {
-    setBusy(true); setError('')
-    try {
-      await makeClubAdmin(organizationId, req.user_id)
-      finish(true)
-    } catch (err) {
-      console.error('Error making teacher admin:', err)
-      setError(describeError(t, err, 'gerirclube.error_update_permissions'))
-    } finally {
-      setBusy(false)
-    }
   }
 
   // Aceite: o cartão sai logo da lista e fica só a tira; a lista recarrega
@@ -110,31 +102,18 @@ export default function TeacherRequestCard({ req, organizationId, onResolved }) 
       />
 
       {/* Depois de «Aceitar»: a aceitação já está feita, por isso «Agora não»
-          vem primeiro e a preto, e não desfaz nada. */}
-      {asking === 'admin' && createPortal(
-        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 animate-fade-in sm:items-center sm:p-4">
-          <div role="alertdialog" aria-modal="true" aria-labelledby="teacher-admin-title"
-            className="w-full max-w-md rounded-t-[24px] bg-white px-5 pt-2.5 pb-[calc(env(safe-area-inset-bottom)+20px)] shadow-lift sm:rounded-[24px]">
-            <div className="mx-auto mb-4 h-1 w-9 rounded-full bg-ink-200" />
-            <p id="teacher-admin-title" className="text-[20px] font-extrabold leading-tight text-ink-900">
-              {t(female ? 'gerirclube.teacher_admin_title_f' : 'gerirclube.teacher_admin_title', { name })}
-            </p>
-            <p className="mt-2 text-[15px] leading-snug text-ink-500">{g('gerirclube.teacher_admin_text')}</p>
-            {error && <p role="alert" className="mt-3 rounded-ctrl border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-sm font-bold text-danger">{error}</p>}
-            <div className="mt-5 space-y-2.5">
-              <button type="button" disabled={busy} onClick={() => finish(false)}
-                className="w-full min-h-[52px] rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold text-white disabled:opacity-40">
-                {t('gerirclube.teacher_admin_no')}
-              </button>
-              <button type="button" disabled={busy} onClick={becomeAdmin}
-                className="w-full min-h-[52px] rounded-ctrl border-[1.5px] border-line bg-white px-4 text-[15px] font-extrabold text-ink-900 disabled:opacity-40">
-                {t('gerirclube.teacher_admin_yes')}
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body,
-      )}
+          vem primeiro e a preto, e fechar (tocar fora, Esc) é o mesmo. */}
+      <ConfirmSheet
+        open={asking === 'admin'}
+        outline
+        title={t(female ? 'gerirclube.teacher_admin_title_f' : 'gerirclube.teacher_admin_title', { name })}
+        message={g('gerirclube.teacher_admin_text')}
+        cancelLabel={t('gerirclube.teacher_admin_no')}
+        confirmLabel={t('gerirclube.teacher_admin_yes')}
+        onConfirm={async () => { await makeClubAdmin(organizationId, req.user_id); setAdminDone(true) }}
+        onClose={() => finish(adminDoneRef.current)}
+        errorOf={(err) => describeError(t, err, 'gerirclube.error_update_permissions')}
+      />
 
     </div>
   )

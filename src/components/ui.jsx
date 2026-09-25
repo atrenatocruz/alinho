@@ -984,7 +984,11 @@ export function DangerConfirmModal({ open, title, message, emphasis, confirmLabe
 
    A DangerConfirmModal (acima) é a janela antiga: os sítios que a usam
    passam para esta quando chegar a vez deles (mix, Gerir, resto). */
-export function ConfirmSheet({ open, title, message, confirmLabel, cancelLabel, danger = false, onConfirm, onClose, errorOf, children, confirmDisabled = false }) {
+// outline: a ação vai em segundo, com contorno, e o preto (primeiro) é o
+// «não» — para quando o que já aconteceu não se desfaz e a pergunta é só um
+// extra (ex.: depois de aceitar um professor, «Agora não» · «Sim, tornar
+// admin»; desenho aprovado 25 set, professores, assunto 2).
+export function ConfirmSheet({ open, title, message, confirmLabel, cancelLabel, danger = false, outline = false, onConfirm, onClose, errorOf, children, confirmDisabled = false }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   useEffect(() => { if (!open) { setBusy(false); setError('') } }, [open])
@@ -1010,12 +1014,15 @@ export function ConfirmSheet({ open, title, message, confirmLabel, cancelLabel, 
     }
   }
 
-  const safe = danger
+  const safe = danger || outline
     ? <button type="button" onClick={onClose} disabled={busy}
         className="w-full min-h-[52px] rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold text-white disabled:opacity-40">{cancelLabel}</button>
     : <button type="button" onClick={confirm} disabled={busy || confirmDisabled}
         className="w-full min-h-[52px] rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold text-white disabled:opacity-40">{confirmLabel}</button>
-  const second = danger
+  const second = outline
+    ? <button type="button" onClick={confirm} disabled={busy || confirmDisabled}
+        className="w-full min-h-[52px] rounded-ctrl border-[1.5px] border-line bg-white px-4 text-[15px] font-extrabold text-ink-900 disabled:opacity-40">{confirmLabel}</button>
+    : danger
     ? <button type="button" onClick={confirm} disabled={busy || confirmDisabled}
         className="w-full min-h-[52px] rounded-ctrl border-2 border-danger bg-white px-4 text-[15px] font-extrabold text-danger disabled:opacity-40">{confirmLabel}</button>
     : <button type="button" onClick={onClose} disabled={busy}

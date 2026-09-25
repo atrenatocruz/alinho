@@ -295,7 +295,7 @@ export default function Comunidade() {
               {joinsDirectly ? t('comunidade.join_action') : t('comunidade.request_entry_action')}
             </button>
           )}
-          {cardError[org.id] && <p role="alert" className="mt-2 text-xs font-extrabold text-danger">{cardError[org.id]}</p>}
+          {cardError[org.id] && <p role="alert" className="mt-2 rounded-ctrl border border-danger/30 bg-danger/10 px-2.5 py-2 text-xs font-bold text-danger">{cardError[org.id]}</p>}
         </div>
       </Link>
     )
