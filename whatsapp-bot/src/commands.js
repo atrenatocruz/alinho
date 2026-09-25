@@ -513,6 +513,12 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     const pn = (partnerRequest.mentionedPns || [])[0]
     if (pn) {
       const found = await resolveProfileByPhoneJid(pn, organizationId)
+      if (found?.notMember) {
+        // #537: o parceiro tem conta (número confirmado) mas não é deste
+        // clube — passa a membro, como quem escreve (requireProfileOrCreateGuest).
+        await ensureMembership(found.id, organizationId)
+        return { partner: { ...found, notMember: false }, isNewGuest: false }
+      }
       if (found) return { partner: found, isNewGuest: false }
       try {
         const guestName = partnerRequest.name

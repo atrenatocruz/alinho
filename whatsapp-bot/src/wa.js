@@ -142,7 +142,9 @@ export async function connectWhatsApp({ onGroupMessage, onDirectMessage }) {
         // o número (#537). O número verdadeiro vem no próprio JID ou, quando
         // o WhatsApp mostra um @lid, no senderPn.
         if (!groupJid.endsWith('@g.us')) {
-          if (groupJid === 'status@broadcast' || !onDirectMessage) continue
+          // Só conversas com pessoas (número ou @lid) — não canais
+          // (@newsletter), listas de difusão nem estados.
+          if (!onDirectMessage || !/@(s\.whatsapp\.net|lid)$/.test(groupJid)) continue
           const dmPn = msg.key.senderPn || (groupJid.endsWith('@s.whatsapp.net') ? groupJid : null)
           onDirectMessage({ chatJid: groupJid, senderPn: dmPn, text, message: msg })
           continue
