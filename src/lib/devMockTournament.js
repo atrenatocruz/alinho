@@ -96,12 +96,17 @@ const TOURNAMENT = () => {
     entry_fee_cents: 2500,
     // Como a base de dados o guarda: um instante com fuso. 22:59 UTC é 23:59
     // em Lisboa no horário de verão — é o que o ecrã tem de mostrar (#487).
-    entries_deadline: `${iso(dayAfter(fri, -4))}T22:59:00+00:00`,
+    // mockTReopenLate: o prazo do torneio já passou (ontem) — o aviso do
+    // sorteio fica até ser mudado.
+    entries_deadline: localStorage.getItem('mockTReopenLate') === 'true'
+      ? `${iso(dayAfter(new Date(), -1))}T22:59:00+00:00`
+      : `${iso(dayAfter(fri, -4))}T22:59:00+00:00`,
     draw_on: iso(dayAfter(fri, -2)),
     organizer_text: 'Pagamento na receção ou por MB Way. A inscrição só fica válida quando o clube confirmar.',
     // mockTournamentScoring = 'melhor_2_sets' | 'melhor_3_sets' para ver o
     // ecrã do marcador a pedir os sets um a um.
-    rules: { scoring: localStorage.getItem('mockTournamentScoring') || 'pro_set_9' },
+    // mockTTieBreak = 'super_tiebreak': o 8-8 decide-se no super tie-break a 10.
+    rules: { scoring: localStorage.getItem('mockTournamentScoring') || 'pro_set_9', tiebreak_8_8: localStorage.getItem('mockTTieBreak') || 'tiebreak' },
     // Cartaz fictício, para se ver o topo da página com imagem. Em
     // localhost não há Storage: carregar um cartaz a sério precisa de
     // sessão verdadeira.

@@ -4,6 +4,7 @@
 //                               'group'         grupo cheio, visto por quem segue
 //                               'group-closed'  grupo fechado, visto de fora
 //                               'club-empty'    clube meu, sem nada — os convites do admin
+//                               'group-empty'   grupo que sigo, sem nada marcado
 // Ganha aos outros mocks das mesmas funções só enquanto estiver ligado.
 // Os campos novos (origin, recurrence_id, my_state, locked, is_admin,
 // rating, gender) são os da migration_club_page_pieces.sql (Dev 3).
@@ -76,7 +77,7 @@ export const CLUB_PAGE_RPC_MOCKS = {
   get_club_profile: () => {
     const m = mode()
     if (!m) return undefined
-    return [{ club: CLUB, group: GROUP, 'group-closed': GROUP_CLOSED, 'club-empty': CLUB_EMPTY }[m]?.() || CLUB()]
+    return [{ club: CLUB, group: GROUP, 'group-closed': GROUP_CLOSED, 'club-empty': CLUB_EMPTY, 'group-empty': () => ({ ...GROUP(), open_games: [] }) }[m]?.() || CLUB()]
   },
   list_organization_members: () => {
     const m = mode()
@@ -88,7 +89,12 @@ export const CLUB_PAGE_RPC_MOCKS = {
     ? [{ teacher_profile_id: 'tp-1', user_id: 'u-tiago', name: 'Tiago Lopes', avatar_url: null, rating: 1650, gender: 'masculino' }]
     : mode() ? [] : undefined),
   list_club_groups: () => (mode() === 'club'
-    ? [{ id: 'grp-manhas', name: 'Smash Manhãs', slug: 'smash-manhas', group_logo_url: null, member_count: 14, my_status: 'member', can_manage: false }]
+    ? [
+      { id: 'grp-manhas', name: 'Smash Manhãs', slug: 'smash-manhas', group_logo_url: null, member_count: 14, my_status: 'member', can_manage: false },
+      // Um com o pedido feito e um onde ainda não estou: os três casos da lista.
+      { id: 'grp-sabados', name: 'Sábados de manhã', slug: 'sabados-de-manha', group_logo_url: null, member_count: 9, my_status: 'pending', can_manage: false },
+      { id: 'grp-noite', name: 'Smash à noite', slug: 'smash-a-noite', group_logo_url: null, member_count: 22, my_status: 'none', can_manage: false },
+    ]
     : mode() ? [] : undefined),
 }
 
