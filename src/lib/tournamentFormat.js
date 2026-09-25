@@ -314,7 +314,12 @@ export function groupStandings(teamIds, matches, { tiebreak = TIEBREAK_DEFAULT }
     passa a contar só entre as que ficaram. Caso do Renato (Trello #484): três
     em ciclo, a diferença de jogos tira uma; as outras duas decidem-se pelo
     jogo entre elas, não pelos jogos ganhos. Só se passa ao critério seguinte
-    quando o atual não separa ninguém. */
+    quando o atual não separa ninguém.
+
+    Quem continua empatado depois de TODOS os critérios fica na ordem em que
+    veio e leva `tiedWith`: os ids das outras duplas desse empate. É o
+    organizador que decide (sorteio, moeda) — as contas não inventam uma
+    ordem (Trello #484). Sem empate destes, `tiedWith` não aparece. */
 export function sortWithTiebreak(rows, matches, tiebreak = TIEBREAK_DEFAULT) {
   const value = (row, criterion, tiedIds) => {
     switch (criterion) {
@@ -327,7 +332,11 @@ export function sortWithTiebreak(rows, matches, tiebreak = TIEBREAK_DEFAULT) {
   }
 
   const compareWithin = (group, depth) => {
-    if (group.length <= 1 || depth >= tiebreak.length) return group
+    if (group.length <= 1) return group
+    if (depth >= tiebreak.length) {
+      const ids = group.map((r) => r.id)
+      return group.map((r) => ({ ...r, tiedWith: ids.filter((id) => id !== r.id) }))
+    }
     const criterion = tiebreak[depth]
     const tiedIds = group.map((r) => r.id)
     const scored = group.map((r) => ({ row: r, v: value(r, criterion, tiedIds) }))

@@ -16,6 +16,7 @@ import {
   groupStandings, TIEBREAK_DEFAULT, nextPowerOfTwo, groupSizes,
   drawGroups, groupRoundRobin, pickSeeds,
 } from './tournamentFormat'
+import { dayKeyInTz, hhmmInTz } from './tournamentDay'
 
 /** Tudo o que os separadores Grupos, Quadro e Calendário precisam de uma
  *  categoria, em três leituras. Devolve:
@@ -94,11 +95,19 @@ const FINISHED = new Set(['terminado', 'falta', 'desistencia'])
  *  `ready` só é verdadeiro quando todos os jogos de grupo acabaram; até lá,
  *  `pending` diz quantos faltam e a lista é a de «se acabasse agora».
  *  Os `label` são exatamente os do sorteio (`qualifierLabels`), que é como a
- *  base de dados encontra os lugares. */
+ *  base de dados encontra os lugares.
+ *
+ *  `ties: [{ group, groupName, entry_ids, positions: [de, até] }]` — duplas
+ *  que continuam empatadas depois de todos os critérios E em que o empate
+ *  mexe no quadro: quem passa (atravessa o corte) ou em que lugar entra
+ *  (1.º ou 2.º). Um empate só entre quem já não passa não aparece. Enquanto
+ *  houver empates, o ecrã não deve deixar passar ao quadro sem o organizador
+ *  escolher a ordem (combinado com o Dev 1, Trello #484). */
 export function qualifiedFromGroups(groups, matches, perGroup) {
   const groupMatches = matches.filter((m) => m.stage === 'grupo')
   const pending = groupMatches.filter((m) => !FINISHED.has(m.status) && !m.winner_entry_id).length
   const qualified = []
+  const ties = []
   for (const g of groups) {
     const table = standingsOf(g, matches)
     for (let position = 1; position <= perGroup; position++) {
@@ -106,8 +115,19 @@ export function qualifiedFromGroups(groups, matches, perGroup) {
       if (!row) continue
       qualified.push({ label: `${position}.º do ${g.name}`, entry_id: row.id, group: g.number, position })
     }
+    // Cada empate aparece uma vez, pela primeira dupla dele na tabela.
+    const seen = new Set()
+    for (const row of table) {
+      if (!row.tiedWith?.length || seen.has(row.id)) continue
+      const block = table.filter((r) => r.id === row.id || row.tiedWith.includes(r.id))
+      block.forEach((r) => seen.add(r.id))
+      const from = block[0].position
+      const to = block[block.length - 1].position
+      if (from > perGroup) continue
+      ties.push({ group: g.number, groupName: g.name, entry_ids: block.map((r) => r.id), positions: [from, to] })
+    }
   }
-  return { ready: groupMatches.length > 0 && pending === 0, pending, qualified }
+  return { ready: groupMatches.length > 0 && pending === 0, pending, qualified, ties }
 }
 
 /** Passar os apurados para o quadro, depois de o organizador confirmar. Só
@@ -148,14 +168,16 @@ export function bracketRounds(matches, stage = 'principal') {
 }
 
 /** Os jogos agrupados por dia e por hora, para o calendário. Os que ainda
- *  não têm hora ficam de fora — aparecem na lista "sem hora marcada". */
+ *  não têm hora ficam de fora — aparecem na lista "sem hora marcada".
+ *  Dia e hora vêm do mesmo relógio, o de Portugal, como no servidor: um
+ *  jogo às 00:30 de sábado fica no sábado, venha o aparelho de onde vier
+ *  (visto pelo Dev 1; o mesmo erro do #487). */
 export function byDayAndTime(matches) {
   const withTime = matches.filter((m) => m.scheduled_at)
   const days = new Map()
   for (const m of withTime) {
-    const d = new Date(m.scheduled_at)
-    const dayKey = d.toISOString().slice(0, 10)
-    const timeKey = d.toTimeString().slice(0, 5)
+    const dayKey = dayKeyInTz(m.scheduled_at)
+    const timeKey = hhmmInTz(m.scheduled_at)
     if (!days.has(dayKey)) days.set(dayKey, new Map())
     const slots = days.get(dayKey)
     if (!slots.has(timeKey)) slots.set(timeKey, [])
