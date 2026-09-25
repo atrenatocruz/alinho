@@ -194,6 +194,8 @@ const RPC_MOCKS = {
   // Eliminar grupo (Trello #241). Por omissão o grupo pode ser eliminado;
   // localStorage.mockDeleteBlocker = 'has_activity' mostra o estado bloqueado.
   get_organization_delete_blocker: () => localStorage.getItem('mockDeleteBlocker') || null,
+  // Confirmar o número pelo WhatsApp (#537): um código de teste.
+  start_phone_verification: () => [{ code: '482917', expires_at: new Date(Date.now() + 15 * 60000).toISOString() }],
   // Pedidos de entrada por responder, como o Gerir os lê (a RPC, não a
   // tabela): localStorage.mockJoinRequests = 'true'. Mostra o número no
   // separador «Pessoas» (Trello #528).

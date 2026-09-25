@@ -15,7 +15,7 @@ import { isMemberLimitError } from '../lib/plans'
 import { listOpenTournaments } from '../lib/tournamentApi'
 import OpenTournamentRow from '../components/tournament/OpenTournamentRow'
 import ScoreTodayCard, { useTournamentsToScoreToday } from '../components/tournament/ScoreTodayCard'
-import { describeError, errorKind } from '../lib/errors'
+import { describeError, errorKind, isGameFull } from '../lib/errors'
 import { getGroupMatches } from '../lib/groupMatches'
 import { getMyPrivateMatches, respondToPrivateMatch } from '../lib/privateMatches'
 import { GOOGLE_MAPS_API_KEY } from '../lib/googleMaps'
@@ -425,7 +425,12 @@ export default function Home() {
       await loadGames()
     } catch (error) {
       console.error('Error updating participation from the agenda card:', error)
-      setCardError({ key: event.key, message: describeError(t, error, 'home.card_action_error') })
+      // Mix que encheu entre ver o cartão e carregar (trigger das vagas).
+      const message = isGameFull(error)
+        ? t('gamedetails.error_game_full')
+        : describeError(t, error, 'home.card_action_error')
+      setCardError({ key: event.key, message })
+      if (isGameFull(error)) loadGames()
     } finally {
       markPending(event.key, false)
     }

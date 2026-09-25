@@ -2,9 +2,12 @@ import { supabase } from './supabase.js'
 import { getGroupByJid, mixVisibleToGroup } from './groups.js'
 import { loadGame, getOpenMixes, formatDateTime, weekdayKeyPt, mixLocalParts, gameIdForMessage, labelableMixes, mixLabel } from './roster.js'
 import { resolveProfileByPhoneJid, createGuestProfile } from './phone.js'
+import { joinWithUnregisteredPartner } from './partnerInvite.js'
 import { config } from './config.js'
 import { helpText, helpFooter } from './messages.js'
 import { t } from './locales.js'
+import { startTimer } from './timing.js'
+import { repostHooks } from './sync.js'
 
 function stripAccents(str) {
   return str.normalize('NFD').replace(/[̀-ͯ]/g, '')
@@ -13,7 +16,9 @@ function stripAccents(str) {
 const IN_WORDS = ['in', 'dentro', 'estou dentro', 'to dentro', 'tou dentro', 'alinho']
 const OUT_WORDS = ['out', 'fora', 'estou fora', 'saio']
 const HELP_WORDS = ['/help', 'help', 'ajuda', '/ajuda']
-const MIX_LIST_WORDS = ['mix', 'mixes']
+// Com e sem barra: o /help sempre aceitou as duas, e «/mix» é o que as
+// pessoas escrevem por analogia (Renato, 24 set).
+const MIX_LIST_WORDS = ['mix', 'mixes', 'mixs', '/mix', '/mixes', '/mixs']
 // Longest first: "estou dentro" must win over "in" when both could start
 // matching the same text — matters for the glued (no-space) parse below.
 const ACTION_WORDS = [...IN_WORDS, ...OUT_WORDS].sort((a, b) => b.length - a.length)
@@ -37,6 +42,11 @@ function looksLikeIdentifier(rest) {
 }
 
 const SUPLENTE_CONFIRM_TTL_MS = 10 * 60 * 1000
+
+/** O trigger das vagas (migration_mix_capacity_guard.sql) recusa com a
+ *  mensagem exata `game_full` quando outra pessoa apanhou a última vaga
+ *  um instante antes. */
+const isGameFull = (error) => /(^|\W)game_full$/.test(String(error?.message || '').trim())
 
 // Tracks "we asked sender X whether they want to join mix Y as a
 // suplente" so their very next message is interpreted as that answer
@@ -103,6 +113,39 @@ function parseCommand(text) {
   return null
 }
 
+/**
+ * Separa, do texto depois do «In», o que diz QUAL mix («01», «segunda m4»)
+ * do que diz COM QUEM («com João», ou uma menção @). A menção chega no texto
+ * como «@351…» (ou os dígitos do LID) — sai do identificador, e quem é vem
+ * de `mentionedPns`. Ex.: «in 01 com joao silva» → rest «01», nome «joao
+ * silva»; «in @3519…» → rest null, com menção.
+ */
+function splitPartner(rest) {
+  if (!rest) return { rest: null, partnerName: null }
+  let r = rest.replace(/@\S+/g, ' ')
+  let partnerName = null
+  const m = r.match(/(?:^|\s)com\s+(.+)$/)
+  if (m) {
+    partnerName = m[1].replace(/\s+/g, ' ').trim() || null
+    r = r.slice(0, m.index)
+  } else {
+    r = r.replace(/(?:^|\s)com\s*$/, ' ')
+  }
+  r = r.replace(/\s+/g, ' ').trim()
+  return { rest: r || null, partnerName }
+}
+
+/** «joao silva» → «Joao Silva»: o texto chega em minúsculas (parseCommand normaliza). */
+function titleCase(text) {
+  return text.replace(/(^|\s)(\p{L})/gu, (_, sp, c) => sp + c.toUpperCase())
+}
+
+/** Todas as palavras escritas aparecem no nome (sem acentos, pelo início de cada palavra do nome). */
+function nameMatches(fullName, query) {
+  const words = stripAccents((fullName || '').toLowerCase()).split(/\s+/).filter(Boolean)
+  return query.split(' ').every((q) => words.some((w) => w.startsWith(q)))
+}
+
 const OPEN_STATUSES = new Set(['open', 'closed'])
 
 function formatMixLine(mix, lang, label) {
@@ -115,6 +158,27 @@ function formatMixLine(mix, lang, label) {
 function formatMixListForReply(matches, allOpenMixes, lang) {
   const labelable = labelableMixes(allOpenMixes)
   return matches.map((mix) => formatMixLine(mix, lang, mixLabel(mix, labelable))).join('\n')
+}
+
+/** A lista do «/mix»: além do número, dia e local, as vagas de cada um e se
+ *  é de duplas fixas (onde se pode entrar em dupla). Uma consulta só para
+ *  todos os mixes. */
+async function formatMixListWithSpots(openMixes, lang) {
+  const labelable = labelableMixes(openMixes)
+  const { data: rows, error } = await supabase
+    .from('participants')
+    .select('game_id, partner_id')
+    .in('game_id', openMixes.map((m) => m.id))
+    .eq('status', 'confirmed')
+  if (error) throw new Error(`Failed to count participants: ${error.message}`)
+  const taken = new Map()
+  for (const row of rows) taken.set(row.game_id, (taken.get(row.game_id) || 0) + (row.partner_id ? 2 : 1))
+  return openMixes.map((mix) => {
+    const capacity = mix.max_players || mix.num_courts * 4
+    const spots = t('mix_list_spots', lang, { filled: taken.get(mix.id) || 0, capacity })
+    const pairs = mix.allow_pair_signup && !mix.rotate_partners ? t('mix_list_fixed_pairs', lang) : ''
+    return `${formatMixLine(mix, lang, mixLabel(mix, labelable))}\n   ${spots}${pairs}`
+  }).join('\n')
 }
 
 /** Does this one identifier token single out `mix`? `label` is that mix's own "01"/"02" (null when it's the only mix open — nothing to number). Independent checks, not mutually exclusive — a token can validly hit more than one field of the same mix. */
@@ -222,18 +286,32 @@ function matchOpenMixesByText(openMixes, rest, { glued }) {
  * confirmation, matching the reference bot's behavior. Only rejections and
  * disambiguation prompts reply directly.
  */
-export async function handleGroupMessage({ groupJid, senderPn, text, message, quotedStanzaId }, { sendText }) {
+// Mede cada comando (timing.js): uma linha de log por comando, só para os
+// que passaram o filtro (a conversa normal do grupo não escreve nada).
+export async function handleGroupMessage(payload, deps) {
+  const ctx = { timer: startTimer('cmd'), action: null }
+  try {
+    return await handleGroupMessageInner(payload, deps, ctx)
+  } finally {
+    if (ctx.action) ctx.timer.end({ action: ctx.action, group: payload.groupJid })
+  }
+}
+
+async function handleGroupMessageInner({ groupJid, senderPn, text, message, quotedStanzaId, mentionedJids = [], mentionedPns = [] }, { sendText }, ctx) {
+  const timer = ctx.timer
   // Gate on hardcoded, in-memory checks first — normal group chatter never
   // matches either of these, so it never touches the DB (the group lookup
   // used to run unconditionally here, costing every message a query).
   const pending = getPendingConfirmation(senderPn, groupJid)
   const parsed = parseCommand(text)
   if (!pending && !parsed) return
+  ctx.action = parsed?.action ?? 'pending'
 
   // Multi-grupo: o grupo de onde a mensagem veio determina o clube (e o
   // filtro de nível) de TUDO o resto deste handler. Grupo não mapeado em
   // whatsapp_groups → silêncio, como o gate antigo de JID único.
   const group = await getGroupByJid(groupJid)
+  timer.mark('grupo')
   if (!group) return
   const organizationId = group.organizationId
 
@@ -242,7 +320,12 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message, qu
   // group broadcasts in roster.js/sync.js/reminders.js/autostart.js), so it
   // always uses their own profiles.language. An unresolved sender (not
   // found, or a fresh guest about to be created) falls back to 'pt'.
+  // Quem escreveu e que mixes estão abertos não dependem um do outro — em
+  // paralelo. Os mixes só se usam mais abaixo; o erro fica para lá.
+  const openMixesPromise = getOpenMixes(organizationId)
+  openMixesPromise.catch(() => {})
   const resolvedProfile = await resolveProfileByPhoneJid(senderPn, organizationId)
+  timer.mark('perfil')
   const lang = resolvedProfile?.language ?? 'pt'
 
   // Quote the sender's own message so a reply is unambiguous even when
@@ -277,6 +360,17 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message, qu
     const normalized = stripAccents(text.trim().toLowerCase())
     const key = pendingKey(senderPn, groupJid)
 
+    if (normalized === 'sim' && pending.kind === 'pair_unregistered') {
+      pendingSuplenteConfirmations.delete(key)
+      await confirmPairWithUnregistered(pending)
+      return
+    }
+    if (normalized === 'nao' && pending.kind === 'pair_unregistered') {
+      pendingSuplenteConfirmations.delete(key)
+      await reply('partner_offer_declined')
+      return
+    }
+
     if (normalized === 'sim') {
       pendingSuplenteConfirmations.delete(key)
 
@@ -301,6 +395,7 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message, qu
         }
         throw new Error(`Failed to insert waitlisted participant: ${insertError.message}`)
       }
+      repostHooks.requestRepostForGame(organizationId, pending.gameId)
       if (isNewGuest) {
         await reply('guest_waitlisted', { name: profile.name, appUrl: config.appUrl })
       } else {
@@ -326,7 +421,22 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message, qu
   }
 
   if (!parsed) return
-  const { action, rest, glued } = parsed
+  const { action, glued } = parsed
+  let { rest } = parsed
+
+  // «In com João» / «In @João» — entrar já em dupla (A2N, 24 set). Só para
+  // «in»; num «out» o parceiro não interessa.
+  let partnerRequest = null
+  if (action === 'in') {
+    const split = splitPartner(rest)
+    if (split.partnerName || mentionedJids.length > 0) {
+      // O nome como a pessoa o escreveu (com acentos e maiúsculas) — para as
+      // respostas e para o perfil de convidado; a procura usa o normalizado.
+      const typed = text.replace(/@\S+/g, ' ').match(/(?:^|\s)com\s+(.+)$/i)?.[1]?.replace(/\s+/g, ' ').trim()
+      partnerRequest = { name: split.partnerName, typedName: typed || null, mentionedPns }
+      rest = split.rest
+    }
+  }
 
   if (action === 'help') {
     await sendText(groupJid, helpText(lang), { quoted: message })
@@ -336,23 +446,200 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message, qu
   // resolvedProfile was already fetched once, up front, alongside lang.
   // Só os mixes do clube deste grupo, filtrados pelo nível do grupo — um
   // "In" aqui nunca pode inscrever alguém num mix que o grupo não vê.
-  const openMixes = (await getOpenMixes(organizationId)).filter((mix) => mixVisibleToGroup(mix, group))
+  const openMixes = (await openMixesPromise).filter((mix) => mixVisibleToGroup(mix, group))
+  timer.mark('mixes')
   if (openMixes.length === 0) {
     await reply('no_open_mixes')
     return
   }
 
   if (action === 'mix') {
-    const list = formatMixListForReply(openMixes, openMixes, lang)
+    const list = await formatMixListWithSpots(openMixes, lang)
     await reply('mix_list', { count: openMixes.length, list })
     return
+  }
+
+  /**
+   * Quem é o parceiro pedido: pela menção (número → perfil do clube, ou um
+   * convidado novo, como o bot já faz com quem escreve «In» sem conta), ou
+   * pelo nome, entre os membros do clube. Devolve { partner, isNewGuest } ou
+   * null depois de já ter respondido ao grupo a dizer porquê.
+   */
+  const shownName = () => titleCase(partnerRequest.typedName || partnerRequest.name)
+
+  async function resolvePartner(profile, game = null) {
+    if ((partnerRequest.mentionedPns || []).length > 1) {
+      await reply('partner_one_mention')
+      return null
+    }
+    const pn = (partnerRequest.mentionedPns || [])[0]
+    if (pn) {
+      const found = await resolveProfileByPhoneJid(pn, organizationId)
+      if (found) return { partner: found, isNewGuest: false }
+      try {
+        const guestName = partnerRequest.name
+          ? shownName()
+          : t('partner_guest_default_name', lang, { name: profile.name })
+        const created = await createGuestProfile(pn, guestName, organizationId)
+        return { partner: created, isNewGuest: true }
+      } catch (err) {
+        console.error('Failed to create partner guest profile:', err)
+        await reply('partner_not_found_app', { appUrl: config.appUrl })
+        return null
+      }
+    }
+    if (!partnerRequest.name) {
+      // Houve menção, mas o WhatsApp não deu o número (grupo com LID).
+      await reply('partner_mention_unreadable')
+      return null
+    }
+    const { data: rows, error } = await supabase
+      .from('memberships')
+      .select('user_id, profile:profiles!inner(id, name)')
+      .eq('organization_id', organizationId)
+    if (error) throw new Error(`Failed to load members for partner lookup: ${error.message}`)
+    const query = stripAccents(partnerRequest.name.toLowerCase())
+    const people = rows.map((r) => ({ id: r.user_id, name: r.profile.name })).filter((x) => x.id !== profile.id)
+    const exact = people.filter((x) => stripAccents((x.name || '').toLowerCase()) === query)
+    const matches = exact.length === 1 ? exact : people.filter((x) => nameMatches(x.name, query))
+    if (matches.length === 1) return { partner: matches[0], isNewGuest: false }
+    if (matches.length === 0) {
+      // Pode ser alguém que não está na app nem no grupo (não dá para o
+      // mencionar). Em vez de parar aqui, pergunta-se — «Sim» faz o mesmo
+      // que o «Não está na app?» da app (partnerInvite.js). A pergunta
+      // evita criar uma pessoa nova por um nome mal escrito.
+      const name = shownName()
+      if (game && name.length >= 2 && name.length <= 60) {
+        pendingSuplenteConfirmations.set(pendingKey(senderPn, groupJid), {
+          kind: 'pair_unregistered',
+          gameId: game.id,
+          name,
+          expiresAt: Date.now() + SUPLENTE_CONFIRM_TTL_MS,
+          reprompted: false,
+        })
+        await reply('partner_offer_unregistered', { name })
+        return null
+      }
+      await reply('partner_not_found', { name })
+      return null
+    }
+    const list = matches.slice(0, 6).map((x) => `• ${x.name}`).join('\n')
+    await reply('partner_ambiguous', { name: shownName(), list, example: matches[0].name })
+    return null
+  }
+
+  // «Sim» à pergunta «inscrever a dupla com quem não está na app?». Entre a
+  // pergunta e a resposta passaram até 10 minutos: volta-se a verificar o mix
+  // e as vagas antes de criar a conta por reclamar e o convite.
+  async function confirmPairWithUnregistered(pending) {
+    const { game, people, capacity, rows } = await loadGame(pending.gameId)
+    if (!OPEN_STATUSES.has(game.status) || new Date(game.date).getTime() <= Date.now()) {
+      await reply('mix_no_longer_available')
+      return
+    }
+    if (game.rotate_partners) {
+      await reply('partner_not_fixed_pairs')
+      return
+    }
+    if (!game.allow_pair_signup) {
+      await reply('pair_signup_off')
+      return
+    }
+    if (capacity - people.length < 2) {
+      await reply(capacity - people.length <= 0 ? 'mix_full_pair' : 'mix_one_spot_pair')
+      return
+    }
+    const { profile, isNewGuest } = await requireProfileOrCreateGuest(resolvedProfile, senderPn)
+    if (!profile) return
+    if (rows.some((row) => row.user_id === profile.id || row.partner_id === profile.id)) {
+      await reply('already_joined')
+      return
+    }
+    let token
+    try {
+      token = await joinWithUnregisteredPartner({
+        gameId: game.id, organizationId, callerId: profile.id, name: pending.name,
+      })
+    } catch (err) {
+      if (isGameFull(err)) {
+        await reply('mix_full_pair')
+        return
+      }
+      console.error('Failed to join with unregistered partner:', err)
+      await reply('partner_not_found_app', { appUrl: config.appUrl })
+      return
+    }
+    repostHooks.requestRepostForGame(organizationId, game.id)
+    await reply('pair_partner_invite_created', {
+      partner: pending.name,
+      link: `${config.appUrl}/convite/${token}`,
+    })
+    if (isNewGuest) await reply('guest_joined', { name: profile.name, appUrl: config.appUrl })
+  }
+
+  // Entrar em dupla: as mesmas regras da app (GameDetails, «Entrar com
+  // parceiro»): só em duplas fixas, uma linha em participants com o
+  // partner_id, e a dupla ocupa dois lugares. Sem lista de suplentes para
+  // duplas — a app também não a tem.
+  async function joinAsPair({ game, people, capacity, profile, isNewGuest, existingRows }) {
+    if (game.rotate_partners) {
+      await reply('partner_not_fixed_pairs')
+      return
+    }
+    // «Inscrição em dupla» do mix (migration_mix_pair_signup.sql): sem «Sim»
+    // não se entra em dupla, como na app. Antes de a migração correr a coluna
+    // não existe — e aí também é «Não», que é o que se decidiu para os mixes
+    // de antes.
+    if (!game.allow_pair_signup) {
+      await reply('pair_signup_off')
+      return
+    }
+    const left = capacity - people.length
+    if (left < 2) {
+      await reply(left <= 0 ? 'mix_full_pair' : 'mix_one_spot_pair')
+      return
+    }
+    const resolved = await resolvePartner(profile, game)
+    if (!resolved) return
+    const { partner, isNewGuest: partnerIsNewGuest } = resolved
+    if (partner.id === profile.id) {
+      await reply('partner_is_you')
+      return
+    }
+    if (existingRows.some((row) => row.user_id === partner.id || row.partner_id === partner.id)) {
+      await reply('partner_already_in', { name: partner.name })
+      return
+    }
+    const { error: insertError } = await supabase
+      .from('participants')
+      .insert([{ game_id: game.id, user_id: profile.id, partner_id: partner.id, status: 'confirmed', joined_alone: false }])
+    if (insertError) {
+      if (insertError.code === '23505') {
+        await reply('already_joined')
+        return
+      }
+      if (isGameFull(insertError)) {
+        await reply('mix_full_pair')
+        return
+      }
+      throw new Error(`Failed to insert pair participant: ${insertError.message}`)
+    }
+    repostHooks.requestRepostForGame(organizationId, game.id)
+    // Como no «In» sozinho: a lista publicada de novo é a confirmação. Só se
+    // responde quando alguém acabou de ganhar um perfil de convidado.
+    if (partnerIsNewGuest) {
+      await reply('pair_partner_guest_created', { partner: partner.name, appUrl: config.appUrl })
+    } else if (isNewGuest) {
+      await reply('guest_joined', { name: profile.name, appUrl: config.appUrl })
+    }
   }
 
   // Joins/leaves a specific, already-resolved mix — the same logic
   // regardless of how that mix got picked (explicit code, the only-one-open
   // shortcut, or being the one mix the sender is in for a bare "out").
   async function actOnGame(mixRow, profile) {
-    const { game, people, capacity } = await loadGame(mixRow.id)
+    const { game, people, capacity, rows, suplentes } = await loadGame(mixRow.id)
+    timer.mark('mix')
     const gameIsFuture = new Date(game.date).getTime() > Date.now()
 
     if (!OPEN_STATUSES.has(game.status) || !gameIsFuture) {
@@ -372,13 +659,8 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message, qu
     }
     if (!profile) return
 
-    const { data: existingRows, error: existingError } = await supabase
-      .from('participants')
-      .select('id, user_id, partner_id, status')
-      .eq('game_id', game.id)
-      .in('status', ['confirmed', 'waitlisted'])
-
-    if (existingError) throw new Error(`Failed to check existing participants: ${existingError.message}`)
+    // Os inscritos já vieram com o loadGame — sem outra ida à BD.
+    const existingRows = rows
 
     const ownConfirmedRow = existingRows.find((row) => row.user_id === profile.id && row.status === 'confirmed')
     const ownWaitlistRow = existingRows.find((row) => row.user_id === profile.id && row.status === 'waitlisted')
@@ -391,6 +673,10 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message, qu
       }
       if (ownWaitlistRow) {
         await reply('already_waitlisted')
+        return
+      }
+      if (partnerRequest) {
+        await joinAsPair({ game, people, capacity, profile, isNewGuest, existingRows })
         return
       }
       if (people.length >= capacity) {
@@ -406,14 +692,24 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message, qu
       const { error: insertError } = await supabase
         .from('participants')
         .insert([{ game_id: game.id, user_id: profile.id, status: 'confirmed', joined_alone: true }])
+      timer.mark('gravar')
 
       if (insertError) {
         if (insertError.code === '23505') {
           await reply('already_joined')
           return
         }
+        if (isGameFull(insertError)) {
+          pendingSuplenteConfirmations.set(pendingKey(senderPn, groupJid), {
+            gameId: game.id, expiresAt: Date.now() + SUPLENTE_CONFIRM_TTL_MS, reprompted: false,
+          })
+          await reply('mix_full_offer_waitlist')
+          return
+        }
         throw new Error(`Failed to insert participant: ${insertError.message}`)
       }
+      // Pede o repost já, sem esperar pelo Realtime (sync.js, pela fila de 4 s).
+      repostHooks.requestRepostForGame(organizationId, game.id)
       // A regular join gets no reply — the participants INSERT triggers a
       // roster repost via sync.js, and that repost IS the confirmation. A
       // brand-new guest still needs an explicit nudge, though: a bare
@@ -440,8 +736,30 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message, qu
     }
 
     const { error: deleteError } = await supabase.from('participants').delete().eq('id', ownConfirmedRow.id)
+    timer.mark('gravar')
     if (deleteError) throw new Error(`Failed to remove participant: ${deleteError.message}`)
-    // No reply — the participants DELETE triggers a roster repost via sync.js.
+    // Sem resposta: a lista publicada de novo é a confirmação — e pede-se já,
+    // sem esperar pelo Realtime (que às vezes chega tarde, e aí só a
+    // reconciliação de 60 s repostava). Para não perder o «🎉 X subiu da
+    // lista de suplentes», vê-se aqui mesmo quem o promote_waitlist promoveu:
+    // os suplentes de antes do DELETE que agora estão confirmados.
+    const waitlistedBefore = rows.filter((row) => row.status === 'waitlisted')
+    let promotedNames = []
+    if (waitlistedBefore.length > 0) {
+      const { data: after, error: afterError } = await supabase
+        .from('participants')
+        .select('id, status')
+        .in('id', waitlistedBefore.map((row) => row.id))
+      if (afterError) {
+        console.error('Failed to check promotions after leaving:', afterError)
+      } else {
+        const nowConfirmed = new Set(after.filter((row) => row.status === 'confirmed').map((row) => row.id))
+        promotedNames = waitlistedBefore
+          .map((row, i) => (nowConfirmed.has(row.id) ? { gameId: game.id, name: suplentes[i]?.name || 'Jogador', lang: suplentes[i]?.language ?? 'pt' } : null))
+          .filter(Boolean)
+      }
+    }
+    repostHooks.requestRepostForGame(organizationId, game.id, { promotedNames })
   }
 
   // 1) Replying to a specific mix's own message beats any identifier text
@@ -484,7 +802,7 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message, qu
     }
     if (matched.length > 1) {
       const list = formatMixListForReply(matched, openMixes, lang)
-      await reply(action === 'in' ? 'disambiguate_in' : 'disambiguate_out', { list })
+      await reply(action === 'in' ? (partnerRequest ? 'disambiguate_in_pair' : 'disambiguate_in') : 'disambiguate_out', { list })
       return
     }
     await reply('mix_identifier_not_found')
@@ -517,7 +835,7 @@ export async function handleGroupMessage({ groupJid, senderPn, text, message, qu
       // option there.
     }
     const list = formatMixListForReply(candidates, openMixes, lang)
-    await reply('disambiguate_in', { list })
+    await reply(partnerRequest ? 'disambiguate_in_pair' : 'disambiguate_in', { list })
     return
   }
 

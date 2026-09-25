@@ -7,6 +7,11 @@
 -- Pode-se correr outra vez sem estragar: os triggers são recriados, e o
 -- remendo da página só acrescenta o campo se ainda lá não estiver.
 --
+-- REVISTO a 24 set à noite (correr outra vez): o trigger dos resultados
+-- também disparava quando apagar uma inscrição punha o `winner_entry_id` a
+-- NULL em cascata, e assim um torneio com jogos inválidos ou de outro dia
+-- não se deixava apagar.
+--
 -- ─────────────────────────────────────────────────────────────────────────
 -- PORQUÊ TRIGGERS E NÃO MEXER NAS FUNÇÕES
 -- ─────────────────────────────────────────────────────────────────────────
@@ -146,11 +151,13 @@ DECLARE
   v_lo         INTEGER;
 BEGIN
   -- Só interessa quando o jogo passa a ter resultado, ou o resultado muda.
+  -- O `winner_entry_id` sozinho NÃO conta: apagar uma inscrição põe-no a
+  -- NULL em cascata (ON DELETE SET NULL), e isso não é um resultado novo —
+  -- validá-lo aí impedia de apagar um torneio com jogos (24 set, à noite).
   IF NEW.status NOT IN ('terminado', 'falta', 'desistencia')
      OR (NEW.status IS NOT DISTINCT FROM OLD.status
          AND NEW.score_a IS NOT DISTINCT FROM OLD.score_a
-         AND NEW.score_b IS NOT DISTINCT FROM OLD.score_b
-         AND NEW.winner_entry_id IS NOT DISTINCT FROM OLD.winner_entry_id) THEN
+         AND NEW.score_b IS NOT DISTINCT FROM OLD.score_b) THEN
     RETURN NEW;
   END IF;
 
