@@ -19,7 +19,7 @@ export const DAY_LABEL_KEY = Object.fromEntries(DAYS.map((d) => [d.value, d.labe
 export const listTeacherProfiles = async () => {
   const { data, error } = await supabase
     .from('teacher_profiles')
-    .select('*, user:profiles!teacher_profiles_user_id_fkey(name, avatar_url), organization:organizations(name, slug), availability:teacher_availability(*)')
+    .select('*, user:profiles!teacher_profiles_user_id_fkey(name, avatar_url, gender, rating), organization:organizations(name, slug), availability:teacher_availability(*)')
   if (error) throw error
   return data || []
 }
