@@ -5,6 +5,7 @@
 //
 // É usado de pé, no clube, com uma mão: os números são grandes, os botões
 // são três, e não há menus escondidos.
+import { createPortal } from 'react-dom'
 import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -258,16 +259,15 @@ function CourtCard({ match, scoring, onSave, onWalkover, onUndoWalkover, busy, t
 function WalkoverSheet({ match, kind, onClose, onConfirm, t }) {
   const [loser, setLoser] = useState(null)
   const [justified, setJustified] = useState(null)
-  // Desistência a meio: «como estava?» — o resultado até ali (Trello #458).
-  // Opcional: em branco conta como se ainda não houvesse resultado.
-  const [pa, setPa] = useState('')
-  const [pb, setPb] = useState('')
-  const partial = kind === 'desistencia' && pa !== '' && pb !== '' && !(Number(pa) === 0 && Number(pb) === 0)
-    ? { score_a: Math.max(0, parseInt(pa, 10) || 0), score_b: Math.max(0, parseInt(pb, 10) || 0) }
-    : null
+  // Desistir é perder o jogo inteiro: o resultado até ali não conta
+  // (Francisco, 23 set — Trello #458). Já não se pergunta «como estava?».
   const ready = loser && (kind === 'desistencia' || justified !== null)
 
-  return (
+  // Para o body (createPortal), como as outras folhas da app: dentro da
+  // página, a animação de entrada do Layout (transform) prendia o `fixed`
+  // à página, e a folha abria lá em baixo, fora do ecrã — só se via o
+  // escuro (encontrado a 25 set, com o #458).
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink-900/50" onClick={onClose}>
       <div className="w-full max-w-md rounded-t-card bg-canvas p-5" onClick={(e) => e.stopPropagation()}>
         <h3 className="font-display text-lg font-extrabold text-ink-900">{t(`tournament.score.${kind}_title`)}</h3>
@@ -284,21 +284,6 @@ function WalkoverSheet({ match, kind, onClose, onConfirm, t }) {
             </button>
           ))}
         </div>
-
-        {kind === 'desistencia' && (
-          <>
-            <MonoLabel className="mt-3">{t('tournament.score.partial_label')}</MonoLabel>
-            <div className="mt-1.5 grid grid-cols-[minmax(0,1fr)_64px] items-center gap-x-2 gap-y-1.5 text-[12.5px] text-ink-900">
-              {[['a', match.team_a, pa, setPa], ['b', match.team_b, pb, setPb]].map(([side, team, value, set]) => (
-                <label key={side} className="contents">
-                  <span className="truncate">{team?.name}</span>
-                  <input type="number" min="0" inputMode="numeric" value={value} onChange={(e) => set(e.target.value)}
-                    className="w-16 rounded-ctrl border border-line bg-surface px-2 py-1.5 text-center font-extrabold" placeholder="0" />
-                </label>
-              ))}
-            </div>
-          </>
-        )}
 
         {kind === 'falta' && (
           <>
@@ -323,14 +308,15 @@ function WalkoverSheet({ match, kind, onClose, onConfirm, t }) {
           {t(`tournament.score.${kind}_effect`)}
         </div>
 
-        <PrimaryButton className="mt-4 w-full" disabled={!ready} onClick={() => onConfirm(loser, justified, partial)}>
+        <PrimaryButton className="mt-4 w-full" disabled={!ready} onClick={() => onConfirm(loser, justified)}>
           {t(`tournament.score.${kind}_confirm`)}
         </PrimaryButton>
         <button type="button" onClick={onClose} className="mt-2 w-full py-2 text-sm font-semibold text-ink-500">
           {t('tournament.create.cancel')}
         </button>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -457,13 +443,13 @@ export default function TournamentScorePage() {
     }
   }
 
-  const confirmWalkover = async (loser, justified, partial = null) => {
+  const confirmWalkover = async (loser, justified) => {
     const { match, kind } = sheet
     setBusy(true)
     setError('')
     try {
       // O ecrã mostra já o que fica marcado; o servidor guarda o mesmo.
-      await markWalkover(match.match_id, { kind, loser, justified, partial })
+      await markWalkover(match.match_id, { kind, loser, justified })
       setSheet(null)
       load()
     } catch (err) {
