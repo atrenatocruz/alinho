@@ -7,6 +7,7 @@
 // `courtHours` daqui desaparece (é a mesma conta, só que ainda não existe
 // no ramo).
 import { ratingBand } from './elo'
+import { localInputToIso } from './tournamentDay'
 
 /** Os estados por onde um torneio passa, pela ordem do desenho (SPEC §3). */
 export const TOURNAMENT_STATUS = ['rascunho', 'inscricoes', 'fechado', 'sorteado', 'a_decorrer', 'terminado']
@@ -57,7 +58,12 @@ export const levelFromRating = (rating) => {
 
 /** O que falta preencher em cada passo, para o botão "Seguinte" saber se
  *  pode avançar. Devolve a chave do texto a mostrar, ou null se estiver bem. */
-export function stepProblem(step, draft) {
+/** `opts` (Trello #514):
+ *    now             o instante de agora — para travar um prazo já passado
+ *    initialDeadline o prazo que o torneio já tinha, a editar: se não mudou,
+ *                    não se trava (um torneio com o prazo passado continua a
+ *                    poder mudar as regras). */
+export function stepProblem(step, draft, opts = {}) {
   // A ordem dos passos mudou a 23 set («#342»): 1 Pessoas · 2 Quando ·
   // 3 Onde joga · 4 Regras. As categorias passaram do 3.º para o 1.º, e o
   // dia/hora de cada uma para o 3.º, ao lado das horas de cada dia.
@@ -72,10 +78,18 @@ export function stepProblem(step, draft) {
   if (step === 2) {
     if (!draft.days?.length) return 'days'
     if (!draft.entries_close_at) return 'deadline'
+    // Um prazo que já passou não deixa ninguém inscrever-se (Trello #514).
+    if (opts.now && draft.entries_close_at !== opts.initialDeadline) {
+      const iso = localInputToIso(draft.entries_close_at)
+      if (iso && iso < new Date(opts.now).toISOString()) return 'deadline_past'
+    }
     // O prazo das inscrições e o sorteio têm de ser antes do primeiro dia.
     const first = [...draft.days].map((d) => d.date).sort()[0]
     if (first && draft.entries_close_at.slice(0, 10) > first) return 'deadline_after_start'
     if (draft.draw_at && first && draft.draw_at.slice(0, 10) > first) return 'draw_after_start'
+    // O sorteio faz-se com as inscrições fechadas: nunca antes do dia do
+    // prazo (no próprio dia pode ser, a seguir à hora).
+    if (draft.draw_at && draft.draw_at.slice(0, 10) < draft.entries_close_at.slice(0, 10)) return 'draw_before_deadline'
     return null
   }
   if (step === 3) {
@@ -86,8 +100,19 @@ export function stepProblem(step, draft) {
     if (draft.categories?.some((c) => !c.day)) return 'category_without_day'
     return null
   }
+  if (step === 4) {
+    // O horário faz-se pela duração máxima; a mínima maior não faz sentido.
+    const min = Number(draft.rules?.duration_min)
+    const max = Number(draft.rules?.duration_max)
+    if (min && max && min > max) return 'duration_order'
+    return null
+  }
   return null
 }
+
+/** Os problemas que se veem ao GUARDAR sem passar pelos passos (a editar um
+ *  torneio com inscrições, ou no último passo): as datas e as regras. */
+export const saveProblem = (draft, opts = {}) => stepProblem(2, draft, opts) || stepProblem(4, draft, opts)
 
 /** Um torneio só se apaga enquanto ninguém se inscreveu; com inscrições,
  *  arquiva-se (regra do cartão #361). */
