@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import { eventFromTournament, eventFromTournamentMatch } from './agenda'
 import { latestNotice } from './tournamentNotices'
+import { isMatchDone } from './myTournamentMatches'
 
 /* O torneio na Home (Trello #363, fronteira combinada com o Dev 1 a 22 set).
 
@@ -72,7 +73,7 @@ export async function loadTournamentEvents({ userId, orgIds = [], today }) {
   if (mine.length) {
     const { data, error } = await supabase
       .from('tournament_public_matches')
-      .select('id, category_id, stage, round, entry_a_id, entry_b_id, scheduled_at, previous_scheduled_at, court_name, status')
+      .select('id, category_id, stage, round, entry_a_id, entry_b_id, scheduled_at, previous_scheduled_at, court_name, status, score_a, score_b, winner_entry_id')
       .in('category_id', mine.map((e) => e.category_id))
     if (error) quiet(error, 'tournament matches')
     matches = (data || []).filter((m) => myEntryIds.has(m.entry_a_id) || myEntryIds.has(m.entry_b_id))
@@ -115,7 +116,13 @@ export async function loadTournamentEvents({ userId, orgIds = [], today }) {
     if (!tour) continue
     withMatches.add(tour.id)
     const mineIsA = myEntryIds.has(match.entry_a_id)
+    const myEntry = mineIsA ? match.entry_a_id : match.entry_b_id
     events.push(eventFromTournamentMatch(match, {
+      // Acabado = resultado, falta ou desistência (Trello #508) — antes só
+      // `terminado`, e os outros ficavam na Home como próximos.
+      done: isMatchDone(match),
+      mineIsA,
+      won: match.winner_entry_id != null ? match.winner_entry_id === myEntry : null,
       tournament: tour,
       category: cat,
       notice: noticeByTournament.get(tour.id) || null,

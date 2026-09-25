@@ -290,6 +290,27 @@ describe('torneios na agenda (Trello #363)', () => {
     expect(e.previousAt).toBe('2026-10-10T17:00:00')
   })
 
+  it('um jogo com resultado aparece acabado, com o meu resultado primeiro (#508)', () => {
+    const e = eventFromTournamentMatch(
+      { id: 'm4', scheduled_at: '2026-10-10T10:00:00', status: 'terminado', score_a: 6, score_b: 9 },
+      { tournament: tour, done: true, mineIsA: false, won: true },
+    )
+    expect(e.finished).toBe(true)
+    expect(e.myState).toBe('played')
+    expect(e.myScore).toBe('9-6')
+    expect(e.won).toBe(true)
+  })
+
+  it('falta e desistência também acabam o jogo (#508)', () => {
+    const e = eventFromTournamentMatch(
+      { id: 'm5', scheduled_at: '2026-10-10T11:00:00', status: 'falta', score_a: null, score_b: null },
+      { tournament: tour, done: true, mineIsA: true, won: false },
+    )
+    expect(e.finished).toBe(true)
+    expect(e.myScore).toBe(null)
+    expect(e.won).toBe(false)
+  })
+
   it('um jogo sem hora marcada não cai em dia nenhum', () => {
     const e = eventFromTournamentMatch({ id: 'm3', scheduled_at: null, status: 'marcado' }, { tournament: tour })
     expect(e.dayKey).toBe(null)

@@ -670,7 +670,12 @@ const TABLE_MOCKS = {
   ] : []),
   // A lista pública de inscritos do torneio (Trello #362) — nomes sim,
   // email e telemóvel nunca (regra de 19 set).
-  tournament_public_entries: () => (localStorage.getItem('mockTHome') ? [
+  tournament_public_entries: () => (localStorage.getItem('mockTMyGamesReal') === 'true' ? [
+    // As duplas do sorteio de teste (e1 sou eu) — Trello #508.
+    { id: 'e1', category_id: 'cat-m4', team_name: null, status: 'validada', player1_name: 'Admin (Dev)', player2_name: 'Pedro Silva' },
+    { id: 'e2', category_id: 'cat-m4', team_name: 'Dois não fazem um', status: 'validada', player1_name: 'Miguel Rosa', player2_name: 'André Pinto' },
+    { id: 'e5', category_id: 'cat-m4', team_name: null, status: 'validada', player1_name: 'Hugo Gomes', player2_name: 'Nuno Pais' },
+  ] : localStorage.getItem('mockTHome') ? [
     { id: 'my-entry', category_id: 'cat-m4', team_name: null, status: 'validada', seed_number: null, waitlist_order: null,
       player1_name: 'Admin (Dev)', player1_avatar: null, player2_name: 'Rui Oliveira Gomes', player2_avatar: null, player2_is_guest: false },
     { id: 'rival-1', category_id: 'cat-m4', team_name: 'Dois não fazem um', status: 'validada', seed_number: null, waitlist_order: null,
@@ -700,8 +705,10 @@ const TABLE_MOCKS = {
     }
     return [{ ...tour, starts_on: day(1), ends_on: day(3), status: 'inscricoes', category_count: 5 }]
   },
-  tournament_entries: () => (localStorage.getItem('mockTHome')
-    ? [{ id: 'my-entry', category_id: 'cat-m4', status: 'validada' }] : []),
+  tournament_entries: () => (localStorage.getItem('mockTMyGamesReal') === 'true'
+    ? [{ id: 'e1', category_id: 'cat-m4', status: 'validada' }]
+    : localStorage.getItem('mockTHome')
+      ? [{ id: 'my-entry', category_id: 'cat-m4', status: 'validada' }] : []),
   tournament_public_categories: () => (localStorage.getItem('mockTHome')
     ? [{ id: 'cat-m4', tournament_id: 'tour-smash-open', code: 'M4', name: 'Masculinos 4' }] : []),
   tournament_public_matches: () => {
