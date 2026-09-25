@@ -11,6 +11,7 @@
 //
 // O torneio é uma ENTIDADE NOVA: nada aqui toca em `games` (o mix).
 import { supabase } from './supabase'
+import { isMatchDone } from './myTournamentMatches'
 
 /** Cabeçalho da página do torneio + categorias, numa só chamada.
  *
@@ -322,4 +323,38 @@ export async function listOpenTournaments({ limit = 20, organizationId = null, i
   })
   if (error) throw error
   return data || []
+}
+
+/** Trocar um jogador de uma dupla (Trello #434, ponto 2). Só o organizador,
+ *  a qualquer momento — mesmo com o torneio a decorrer. `slot` é 1 ou 2 (o
+ *  lugar de quem sai); quem entra vem com conta (`playerId`) ou só pelo nome
+ *  (`guestName`, `guestEmail`). `playerGender` só quando o admin o escolheu
+ *  por a pessoa ainda não o ter.
+ *
+ *  Devolve { entry_id, status, invite_token } — o token é o link do lugar
+ *  trocado quando entra alguém sem conta; nulo quando entra alguém com conta.
+ *  Os jogos já jogados ficam com quem os jogou (o #442 guarda-o).
+ *
+ *  Função do Dev 3, com este nome combinado a 26 set. Erros: player_required,
+ *  player_already_in_category, same_player, player_gender_required,
+ *  gender_mismatch, not_admin, entry_not_found. */
+export async function replaceTournamentPlayer(entryId, slot, { playerId = null, guestName = null, guestEmail = null, playerGender = null } = {}) {
+  const { data, error } = await supabase.rpc('tournament_admin_replace_player', {
+    p_entry_id: entryId, p_slot: slot, p_player_id: playerId,
+    p_guest_name: guestName, p_guest_email: guestEmail, p_player_gender: playerGender,
+  })
+  if (error) throw error
+  return data
+}
+
+/** A dupla já tem jogos acabados? É o que faz a folha de trocar avisar que
+ *  os resultados já jogados ficam com a dupla (Trello #434). Lê a mesma
+ *  vista pública do quadro. Na dúvida (erro), diz que não. */
+export async function entryHasPlayedMatches(entryId) {
+  const { data, error } = await supabase
+    .from('tournament_public_matches')
+    .select('id, status, winner_entry_id')
+    .or(`entry_a_id.eq.${entryId},entry_b_id.eq.${entryId}`)
+  if (error) { console.error('Error loading the pair matches:', error); return false }
+  return (data || []).some(isMatchDone)
 }

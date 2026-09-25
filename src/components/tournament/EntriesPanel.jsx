@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
-import { Search, Check, X, UserPlus, Send, Copy } from 'lucide-react'
+import { Search, Check, UserPlus, Send, Copy, ChevronRight, Repeat, Trash2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { searchPlayers } from '../../lib/privateMatches'
 import { useAuth } from '../../contexts/AuthContext'
@@ -10,6 +11,7 @@ import { partnerNameError, partnerEmailError } from '../../lib/partnerInvite'
 import { listEntries, validateEntry, removeEntry, adminSignUp, adminSetPartner, tournamentInviteLink, inviteToken, inviteTokenPlayer1, whoIsAlreadyIn } from '../../lib/tournamentSignup'
 import { whatsappShare } from '../../lib/partnerInvite'
 import { signupErrorMessage, errorCode } from '../../lib/tournamentError'
+import { replaceTournamentPlayer, entryHasPlayedMatches } from '../../lib/tournamentApi'
 
 /* Separador «Inscritos» (Trello #362).
    Desenho: print 08 (lista por categoria, Validar a um toque) e a regra
@@ -68,7 +70,7 @@ function NotInApp({ t, name, setName, email, setEmail }) {
 /* `mode`: 'new' é o «Inscrever à mão» inteiro; 'partner' é só o parceiro,
    para juntar a quem se inscreveu sozinho (Trello #515) — a mesma procura,
    o mesmo «Não está na app?» e o mesmo género, sem duplicar nada. */
-function AdminEntrySheet({ organizationId, categories = [], categoryId: initialCategoryId, busy, error, onConfirm, onClose, mode = 'new', title, excludeId = null }) {
+function AdminEntrySheet({ organizationId, categories = [], categoryId: initialCategoryId, busy, error, onConfirm, onClose, mode = 'new', title, excludeId = null, pickerLabel, confirmLabel }) {
   const newEntry = mode === 'new'
   const { t } = useTranslation()
   // A categoria escolhe-se aqui, à vista — antes vinha calada do painel e
@@ -125,7 +127,7 @@ function AdminEntrySheet({ organizationId, categories = [], categoryId: initialC
     const mine = members.filter((m) => !needle || m.name.toLowerCase().includes(needle))
     const seen = new Set(mine.map((m) => m.id))
     const all = [...mine, ...(needle ? others[slot].filter((p) => !seen.has(p.id)) : [])]
-      .filter((m) => m.id !== exclude)
+      .filter((m) => ![].concat(exclude).includes(m.id))
     return { shown: all.slice(0, PAGE), more: all.length > PAGE }
   }
 
@@ -245,7 +247,7 @@ function AdminEntrySheet({ organizationId, categories = [], categoryId: initialC
 
         {(!newEntry || !solo) && (
           <>
-            {picker({ label: t('tentries.admin_player2'), q: q2, setQ: setQ2, picked: partner, setPicked: setPartner, exclude: player1?.id || excludeId, slot: 2 })}
+            {picker({ label: pickerLabel || t('tentries.admin_player2'), q: q2, setQ: setQ2, picked: partner, setPicked: setPartner, exclude: player1?.id || excludeId, slot: 2 })}
             {!partner && NotInApp({ t, name, setName, email, setEmail })}
           </>
         )}
@@ -269,6 +271,8 @@ function AdminEntrySheet({ organizationId, categories = [], categoryId: initialC
               partnerGender: needsGender(partner) ? chosenGender[partner.id] : null,
               guestName: partner ? null : name.trim() || null,
               guestEmail: partner ? null : email.trim() || null,
+              // Para a mensagem «X entrou na dupla.» (Trello #434).
+              partnerName: partner ? partner.name : name.trim(),
             }
             if (!newEntry) { onConfirm(second); return }
             onConfirm({
@@ -284,7 +288,7 @@ function AdminEntrySheet({ organizationId, categories = [], categoryId: initialC
           disabled={!ready || busy}
           className="w-full"
         >
-          {t(newEntry ? 'tentries.admin_add_confirm' : 'tentries.join_partner')}
+          {confirmLabel || t(newEntry ? 'tentries.admin_add_confirm' : 'tentries.join_partner')}
         </PrimaryButton>
       </div>
     </Sheet>
@@ -303,6 +307,16 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
   const [addOpen, setAddOpen] = useState(false)
   // Juntar parceiro a quem está sozinho (Trello #515).
   const [joinFor, setJoinFor] = useState(null)
+  // Trello #434: tocar na dupla abre as ações; «Trocar jogador» pergunta
+  // primeiro quem sai (swap.slot vazio) e depois quem entra.
+  const [actionsFor, setActionsFor] = useState(null)
+  const [swap, setSwap] = useState(null) // { entry, slot, played }
+  const [toast, setToast] = useState('')
+  useEffect(() => {
+    if (!toast) return undefined
+    const id = setTimeout(() => setToast(''), 3000)
+    return () => clearTimeout(id)
+  }, [toast])
 
   const load = () => {
     if (!category?.id) return
@@ -393,6 +407,8 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
   // o `invite_token`, por isso não é preciso ir buscá-lo outra vez.
   // Uma pessoa por link: desde o #515 podem ser duas (nenhuma com conta).
   const [fresh, setFresh] = useState(null) // [{ token, name, email }]
+  // Numa troca não há inscrição nova: o título diz o que falta (#434).
+  const [freshTitle, setFreshTitle] = useState('')
   const linkOf = (token) => tournamentInviteLink(token, window.location.origin)
 
   const act = async (fn) => {
@@ -439,7 +455,17 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
         <div className="space-y-1.5">
           {shown.map((e) => (
             <div key={e.id || e.entry_id} className="space-y-1.5">
-            <div className={`card flex items-center gap-3 py-3 ${
+            {/* O organizador toca na dupla para as ações (Trello #434): na
+                linha fica só o «Validar»; reenviar, trocar e tirar vão para
+                a folha. Quem desistiu não tem ações. */}
+            <div
+              {...(isAdmin && e.status !== 'desistiu' ? {
+                role: 'button', tabIndex: 0, 'aria-label': t('tentries.open_actions'),
+                onClick: () => { setError(''); setActionsFor(e) },
+                onKeyDown: (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); setError(''); setActionsFor(e) } },
+              } : {})}
+              className={`card flex items-center gap-3 py-3 ${
+              isAdmin && e.status !== 'desistiu' ? 'press cursor-pointer' : ''} ${
               (e.withdrawn || e.status === 'desistiu') ? 'opacity-60' : ''}`}>
               <div className="min-w-0 flex-1">
                 {/* Até duas linhas: com os botões ao lado, «Carla N…» não
@@ -464,40 +490,18 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
                 {t(`tentries.state_${e.status}`)}
               </span>
 
-              {isAdmin && e.status !== 'desistiu' && (
-                <div className="flex shrink-0 gap-1">
-                  {/* Reenviar o convite de quem ainda não tem conta: o link
-                      é a única forma de ele ficar com o lugar. */}
-                  {e.has_invite && (!e.player1_id || (!e.player2_id && e.guest_name)) && (
-                    <button
-                      onClick={() => share(e)}
-                      disabled={busy}
-                      aria-label={t('tentries.invite_again')}
-                      className="press flex h-11 w-11 items-center justify-center rounded-full bg-ink-50 text-ink-900"
-                    >
-                      <Send size={16} />
-                    </button>
-                  )}
-                  {e.status === 'por_validar' && (
-                    <button
-                      onClick={() => act(() => validateEntry(e.entry_id, true))}
-                      disabled={busy}
-                      aria-label={t('tentries.validate')}
-                      className="press flex h-11 w-11 items-center justify-center rounded-full bg-lime-400 text-ink-900"
-                    >
-                      <Check size={18} />
-                    </button>
-                  )}
-                  <button
-                    onClick={() => { setError(''); setAskRemove(e) }}
-                    disabled={busy}
-                    aria-label={t('tentries.remove')}
-                    className="press flex h-11 w-11 items-center justify-center rounded-full bg-ink-50 text-muted"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
+              {isAdmin && e.status === 'por_validar' && (
+                <button
+                  onClick={(ev) => { ev.stopPropagation(); act(() => validateEntry(e.entry_id, true)) }}
+                  onKeyDown={(ev) => ev.stopPropagation()}
+                  disabled={busy}
+                  aria-label={t('tentries.validate')}
+                  className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-lime-400 text-ink-900"
+                >
+                  <Check size={18} />
+                </button>
               )}
+              {isAdmin && e.status !== 'desistiu' && <ChevronRight size={18} className="shrink-0 -ml-1 text-muted" />}
             </div>
             {/* Sozinho à espera de parceiro: «Precisa de ti», com a ação
                 que resolve (regra de 25 set; Trello #515). */}
@@ -509,6 +513,126 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
             </div>
           ))}
         </div>
+      )}
+
+      {/* As ações de uma dupla, por esta ordem (desenho da designer, #434):
+          trocar, reenviar o link, validar e, por último e a vermelho, tirar. */}
+      {actionsFor && (
+        <Sheet title={actionsFor.team_name || pairName(actionsFor, t)} onClose={() => setActionsFor(null)}>
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={() => {
+                const e = actionsFor
+                setActionsFor(null); setError('')
+                setSwap({ entry: e, slot: null, played: null })
+                entryHasPlayedMatches(e.entry_id).then((played) => setSwap((cur) => (cur?.entry === e ? { ...cur, played } : cur)))
+              }}
+              className="btn-secondary w-full inline-flex items-center justify-center gap-2"
+            >
+              <Repeat size={18} /> {t('tentries.swap')}
+            </button>
+            {/* O link é a única forma de quem não tem conta ficar com o lugar. */}
+            {actionsFor.has_invite && (!actionsFor.player1_id || (!actionsFor.player2_id && actionsFor.guest_name)) && (
+              <button
+                type="button"
+                onClick={() => { const e = actionsFor; setActionsFor(null); share(e) }}
+                disabled={busy}
+                className="btn-secondary w-full inline-flex items-center justify-center gap-2"
+              >
+                <Send size={18} /> {t('tentries.resend_link')}
+              </button>
+            )}
+            {actionsFor.status === 'por_validar' && (
+              <button
+                type="button"
+                onClick={() => { const e = actionsFor; setActionsFor(null); act(() => validateEntry(e.entry_id, true)) }}
+                disabled={busy}
+                className="btn-secondary w-full inline-flex items-center justify-center gap-2"
+              >
+                <Check size={18} /> {t('tentries.validate')}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => { const e = actionsFor; setActionsFor(null); setError(''); setAskRemove(e) }}
+              disabled={busy}
+              className="press w-full min-h-[44px] rounded-ctrl border border-red-200 bg-white px-4 py-2.5 text-sm font-extrabold text-red-600 inline-flex items-center justify-center gap-2 hover:bg-red-50"
+            >
+              <Trash2 size={18} /> {t('tentries.remove_pair')}
+            </button>
+          </div>
+        </Sheet>
+      )}
+
+      {/* Trocar jogador, 1.º passo: quem sai. Com jogos já jogados, diz-se
+          logo que esses resultados não mudam (#442 guarda quem jogou). */}
+      {swap && !swap.slot && (
+        <Sheet title={t('tentries.swap')} onClose={() => setSwap(null)}>
+          <div className="space-y-3">
+            {swap.played && (
+              <p className="rounded-ctrl bg-ink-50 px-3 py-2.5 text-sm text-ink-900">{t('tentries.swap_played')}</p>
+            )}
+            <p className="block text-sm font-medium text-gray-700">{t('tentries.swap_who')}</p>
+            {[
+              { slot: 1, name: swap.entry.player1_name, avatar: swap.entry.player1_avatar },
+              { slot: 2, name: swap.entry.player2_name || swap.entry.guest_name, avatar: swap.entry.player2_avatar },
+            ].filter((p) => p.name).map((p) => (
+              <button
+                key={p.slot}
+                type="button"
+                onClick={() => { setError(''); setSwap((cur) => ({ ...cur, slot: p.slot })) }}
+                className="press flex w-full items-center gap-2.5 rounded-ctrl bg-ink-50 px-3 py-2.5 text-left"
+              >
+                <Avatar name={p.name} url={p.avatar} size="w-8 h-8 text-[11px]" />
+                <span className="min-w-0 flex-1 text-sm font-semibold text-ink-900 truncate">{p.name}</span>
+                <ChevronRight size={18} className="shrink-0 text-muted" />
+              </button>
+            ))}
+          </div>
+        </Sheet>
+      )}
+
+      {/* 2.º passo: quem entra — a mesma procura e o mesmo «Não está na
+          app?» do «Inscrever à mão» (#515). */}
+      {swap?.slot && (
+        <AdminEntrySheet
+          mode="partner"
+          // Nem quem fica nem quem sai aparecem na procura.
+          excludeId={[swap.entry.player1_id, swap.entry.player2_id].filter(Boolean)}
+          title={t('tentries.swap_in_title', {
+            name: (swap.slot === 1 ? swap.entry.player1_name : swap.entry.player2_name || swap.entry.guest_name) || '?',
+          })}
+          pickerLabel={t('tentries.swap_in_label')}
+          confirmLabel={t('tentries.swap_confirm')}
+          organizationId={tournament.organization_id}
+          busy={busy}
+          error={error}
+          onConfirm={async (choice) => {
+            setBusy(true); setError('')
+            try {
+              const res = await replaceTournamentPlayer(swap.entry.entry_id, swap.slot, {
+                playerId: choice.partnerId, guestName: choice.guestName,
+                guestEmail: choice.guestEmail, playerGender: choice.partnerGender,
+              })
+              if (res?.invite_token && choice.guestName) {
+                setFresh([{ token: res.invite_token, name: choice.guestName, email: choice.guestEmail || null }])
+                setFreshTitle(t('tentries.swap_link_title'))
+              }
+              setToast(t('tentries.swap_done', { name: choice.partnerName }))
+              load()
+              setSwap(null)
+            } catch (err) {
+              console.error('Error replacing a player:', err)
+              // Até a função do Dev 3 correr em produção, não existe: diz-se
+              // isso em vez do «Não foi possível» de sempre.
+              setError(err?.code === 'PGRST202' ? t('tentries.swap_not_ready') : signupErrorMessage(t, err))
+            } finally {
+              setBusy(false)
+            }
+          }}
+          onClose={() => { setSwap(null); setError('') }}
+        />
       )}
 
       {/* Tirar uma dupla pergunta na folha da app (#435). */}
@@ -596,7 +720,7 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
           folha que o jogador vê ao inscrever a dupla dele (SignupSlot); com
           uma dupla sem contas, um link por pessoa (Trello #515). */}
       {fresh && (
-        <Sheet title={t('tsignup.invite_ready_title')} onClose={() => setFresh(null)}>
+        <Sheet title={freshTitle || t('tsignup.invite_ready_title')} onClose={() => { setFresh(null); setFreshTitle('') }}>
           <div className="space-y-5">
             {fresh.map((f, i) => (
               <div key={f.token} className="space-y-3">
@@ -633,6 +757,13 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
             ))}
           </div>
         </Sheet>
+      )}
+      {/* «X entrou na dupla.» — 3 segundos, no topo para não tapar a folha do link (#434). */}
+      {toast && createPortal(
+        <div role="status" className="fixed top-4 left-1/2 z-[60] -translate-x-1/2 w-max max-w-[calc(100vw-32px)] rounded-full bg-ink-900 px-4 py-2.5 text-sm font-extrabold text-white shadow-lift animate-fade-in">
+          {toast}
+        </div>,
+        document.body,
       )}
     </div>
   )

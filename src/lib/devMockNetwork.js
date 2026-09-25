@@ -303,7 +303,8 @@ const RPC_MOCKS = {
   get_tournament_page: (params) => {
     const page = TOURNAMENT_RPC_MOCKS.get_tournament_page?.(params)
     const mode = localStorage.getItem('mockTSignup')
-    if (!page || !mode) return page
+    // Com mockTReplacePlayed o torneio fica a decorrer (Trello #434).
+    if (!page || !mode || localStorage.getItem('mockTReplacePlayed') === 'true') return page
     const soon = new Date(Date.now() + 7 * 86400000).toISOString()
     return {
       ...page,
@@ -367,6 +368,13 @@ const RPC_MOCKS = {
   tournament_admin_set_partner: (params) => (localStorage.getItem('mockTAdminError') ? { __error: localStorage.getItem('mockTAdminError') } : params?.p_partner_id || params?.p_guest_name
     ? { entry_id: params.p_entry_id, status: 'por_validar', invite_token: params?.p_guest_name ? 'convite-parceiro-depois' : null }
     : { __error: 'partner_required' }),
+  // Trocar um jogador (Trello #434): a função do Dev 3 ainda não existe;
+  // aqui responde como ela vai responder. mockTAdminError mostra os erros.
+  tournament_admin_replace_player: (params) => (localStorage.getItem('mockTAdminError')
+    ? { __error: localStorage.getItem('mockTAdminError') }
+    : params?.p_player_id || params?.p_guest_name
+      ? { entry_id: params.p_entry_id, status: 'validada', invite_token: params?.p_guest_name ? 'convite-troca' : null }
+      : { __error: 'player_required' }),
   tournament_invite_token: () => 'convite-jogador-2',
   tournament_invite_token_player1: () => 'convite-jogador-1',
   // A lista do organizador: um de cada estado, para se ver tudo num print.
@@ -808,6 +816,11 @@ const TABLE_MOCKS = {
   tournament_public_categories: () => (localStorage.getItem('mockTHome')
     ? [{ id: 'cat-m4', tournament_id: 'tour-smash-open', code: 'M4', name: 'Masculinos 4' }] : []),
   tournament_public_matches: () => {
+    // localStorage.mockTReplacePlayed = 'true' (com mockTSignup): a dupla já
+    // jogou, e a folha de trocar jogador avisa (Trello #434).
+    if (localStorage.getItem('mockTReplacePlayed') === 'true') {
+      return [{ id: 'rp1', category_id: 'cat-m4', entry_a_id: 'e1', entry_b_id: 'e3', status: 'terminado', winner_entry_id: 'e1', score_a: 9, score_b: 6 }]
+    }
     if (localStorage.getItem('mockTHome') !== 'matches') return []
     const at = (days, hour) => {
       const d = new Date(); d.setDate(d.getDate() + days); d.setHours(hour, 0, 0, 0)
