@@ -509,9 +509,12 @@ export default function GerirClube() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentOrganizationId, org?.kind])
 
+  // #550: ao aceitar um professor, pode dar-se também papel de admin —
+  // desligado por defeito, uma escolha por pedido.
+  const [teacherAdminById, setTeacherAdminById] = useState({})
   const handleClubTeacher = async (id, accept) => {
     try {
-      await resolveTeacherClub(id, accept)
+      await resolveTeacherClub(id, accept, accept && !!teacherAdminById[id])
       await loadClubTeachers()
     } catch (error) {
       console.error('Error resolving club teacher:', error)
@@ -2841,6 +2844,18 @@ export default function GerirClube() {
                         </div>
                       </div>
                       <p className="text-sm text-ink-900 break-words">{req.contact}</p>
+                      <label className="flex items-start gap-2.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="mt-0.5 w-4 h-4 accent-ink-900"
+                          checked={!!teacherAdminById[req.id]}
+                          onChange={(e) => setTeacherAdminById((m) => ({ ...m, [req.id]: e.target.checked }))}
+                        />
+                        <span>
+                          <span className="block text-sm font-extrabold text-ink-900">{t('gerirclube.teacher_make_admin')}</span>
+                          <span className="block text-xs text-muted">{t('gerirclube.teacher_make_admin_hint')}</span>
+                        </span>
+                      </label>
                       <div className="flex gap-2">
                         <button
                           onClick={() => handleClubTeacher(req.id, true)}

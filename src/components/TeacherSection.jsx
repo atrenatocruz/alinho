@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { GraduationCap } from 'lucide-react'
+import { GraduationCap, Search, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { listTeacherProfiles, requestTeacherProfile, withdrawTeacherProfile } from '../lib/teachers'
-import { Select } from './ui'
+import { listTeacherProfiles, requestTeacherProfile, withdrawTeacherProfile, searchClubsForTeacher } from '../lib/teachers'
 import { describeError } from '../lib/errors'
+import { contemTexto } from '../lib/semAcentos'
 
 /* ─── Professor, no Perfil (Trello #283, épico #271) ─────────────────────────
    Saiu da Comunidade: não é qualquer um, pede-se e alguém aprova. Secção
@@ -30,6 +30,11 @@ export default function TeacherSection() {
   const [contact, setContact] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  // #550: o clube procura-se entre TODOS os clubes da app, pelo nome e sem
+  // acentos — antes só apareciam os de que a pessoa já era membro.
+  const [clubQuery, setClubQuery] = useState('')
+  const [clubResults, setClubResults] = useState([])
+  const [chosenClub, setChosenClub] = useState(null) // { id, name }
 
   const load = async () => {
     try {
@@ -51,13 +56,30 @@ export default function TeacherSection() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id])
 
-  const clubOptions = [
-    { value: NO_CLUB, label: t('teacher.no_club_option') },
-    // Só clubes: um grupo nunca tem professores (Francisco, 16 set).
-    ...memberships
-      .filter((m) => m.organization?.kind === 'club')
-      .map((m) => ({ value: m.organization_id, label: m.organization.name })),
-  ]
+  // Só clubes: um grupo nunca tem professores (Francisco, 16 set). Enquanto
+  // a procura nova não existir na base de dados, usam-se os clubes de que a
+  // pessoa é membro, como antes.
+  const myClubs = memberships
+    .filter((m) => m.organization?.kind === 'club')
+    .map((m) => ({ id: m.organization_id, name: m.organization.name, location: m.organization.location }))
+
+  useEffect(() => {
+    if (!showForm || chosenClub) return undefined
+    let alive = true
+    const timer = setTimeout(() => {
+      searchClubsForTeacher(clubQuery.trim())
+        .then((rows) => { if (alive) setClubResults(rows.slice(0, 6)) })
+        .catch(() => {
+          if (alive) setClubResults(myClubs.filter((c) => contemTexto(c.name, clubQuery)).slice(0, 6))
+        })
+    }, 250)
+    return () => { alive = false; clearTimeout(timer) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clubQuery, showForm, chosenClub])
+
+  useEffect(() => {
+    setOrgId(chosenClub ? chosenClub.id : NO_CLUB)
+  }, [chosenClub])
 
   const handleSubmit = async () => {
     setError('')
@@ -157,7 +179,36 @@ export default function TeacherSection() {
         <>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">{t('teacher.club_optional_label')}</label>
-            <Select value={orgId} onChange={setOrgId} options={clubOptions} placeholder={t('teacher.club_optional_label')} />
+            {chosenClub ? (
+              <div className="flex items-center gap-2 input-field">
+                <span className="flex-1 min-w-0 truncate font-extrabold text-ink-900">{chosenClub.name}</span>
+                <button type="button" onClick={() => { setChosenClub(null); setClubQuery('') }}
+                  aria-label={t('teacher.club_change')} title={t('teacher.club_change')} className="text-muted shrink-0">
+                  <X size={16} />
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <label className="flex items-center gap-2 input-field focus-within:border-ink-500">
+                  <Search size={16} className="text-muted shrink-0" />
+                  <input
+                    type="text"
+                    value={clubQuery}
+                    onChange={(e) => setClubQuery(e.target.value)}
+                    placeholder={t('teacher.club_search_placeholder')}
+                    className="flex-1 min-w-0 bg-transparent outline-none text-base"
+                  />
+                </label>
+                {clubResults.map((c) => (
+                  <button key={c.id} type="button" onClick={() => setChosenClub({ id: c.id, name: c.name })}
+                    className="w-full text-left px-3 py-2 rounded-ctrl bg-ink-50 hover:bg-ink-200/60">
+                    <span className="block text-sm font-extrabold text-ink-900 truncate">{c.name}</span>
+                    {c.location && <span className="block text-xs text-muted truncate">{c.location}</span>}
+                  </button>
+                ))}
+                <p className="text-xs text-muted">{t('teacher.club_search_hint')}</p>
+              </div>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">{t('teacher.zone_label')}</label>
@@ -189,7 +240,7 @@ export default function TeacherSection() {
             </button>
             <button
               type="button"
-              onClick={() => { setShowForm(false); setError('') }}
+              onClick={() => { setShowForm(false); setError(''); setChosenClub(null); setClubQuery('') }}
               disabled={saving}
               className="flex-1 text-sm font-extrabold px-3 py-2 min-h-[44px] rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast disabled:opacity-40"
             >

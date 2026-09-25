@@ -17,6 +17,7 @@ import Profile from './pages/Profile'
 import PersonalInfo from './pages/PersonalInfo'
 import Comunidade from './pages/Comunidade'
 import ClubProfile from './pages/ClubProfile'
+import ClubMembers from './pages/ClubMembers'
 import TeacherPage from './pages/TeacherPage'
 import LessonPage from './pages/LessonPage'
 import TournamentPage from './pages/TournamentPage'
@@ -360,6 +361,14 @@ function AppRoutes() {
           element={
             <Guard require="member" showSplash={showSplash}>
               <ClubProfile />
+            </Guard>
+          }
+        />
+        <Route
+          path="/clube/:slug/membros"
+          element={
+            <Guard require="member" showSplash={showSplash}>
+              <ClubMembers />
             </Guard>
           }
         />

@@ -316,7 +316,16 @@ export default function Comunidade() {
     const btn = 'flex-1 inline-flex items-center justify-center gap-1.5 min-h-[40px] px-3 rounded-full text-sm font-extrabold transition-colors duration-fast disabled:opacity-40'
     return (
       <div key={teacher.id} className="card p-3.5 space-y-3">
-        <Link to={`/professor/${teacher.id}`} className="flex items-center gap-3">
+        {/* A página de professor só existe quando o clube já o aceitou
+            (teacher_profile_active). Com o pedido ao clube por aceitar,
+            o nome abre o perfil normal da pessoa (#550 — o Francisco
+            caía em «Professor não encontrado»). */}
+        <Link
+          to={!teacher.organization_id || !teacher.club_status || teacher.club_status === 'accepted'
+            ? `/professor/${teacher.id}`
+            : `/jogador/${teacher.user_id}`}
+          className="flex items-center gap-3"
+        >
           <Avatar name={teacher.user?.name} url={teacher.user?.avatar_url} size="w-12 h-12 text-base" />
           <div className="flex-1 min-w-0">
             <h3 className="font-extrabold text-ink-900 truncate">{teacher.user?.name}</h3>
