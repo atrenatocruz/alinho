@@ -610,7 +610,7 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
       {fresh && (
         <Sheet title={t('tsignup.invite_ready_title')} onClose={() => setFresh(null)}>
           <div className="space-y-5">
-            {fresh.map((f) => (
+            {fresh.map((f, i) => (
               <div key={f.token} className="space-y-3">
                 {fresh.length > 1 && <p className="text-sm font-extrabold text-ink-900">{f.name}</p>}
                 {/* Sem o «Tu e o {nome} ficam dupla» que o jogador vê: aqui
@@ -621,9 +621,12 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
                   {f.email ? t('partner.invite_ready_email', { email: f.email }) : t('tentries.invite_ready_named', { name: f.name })}
                 </p>
                 <div className="rounded-ctrl bg-ink-50 px-3 py-2 text-xs text-ink-900 break-all">{linkOf(f.token)}</div>
+                {/* Um só botão lima na folha (vigia da designer, 25 set): com
+                    duas pessoas sem conta, o WhatsApp da segunda é contorno. */}
                 <PrimaryButton
+                  variant={i === 0 ? 'lime' : 'ghost'}
                   onClick={() => window.open(whatsappShare(t('tsignup.invite_whatsapp_text', { name: f.name, title: tournament.name, link: linkOf(f.token) })), '_blank')}
-                  className="w-full"
+                  className={i === 0 ? 'w-full' : 'w-full !bg-white !border-ink-900'}
                 >
                   {t('partner.invite_send_whatsapp')}
                 </PrimaryButton>

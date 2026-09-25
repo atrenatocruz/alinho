@@ -1124,6 +1124,7 @@
   "gerirclube.open_join_hint": "Sem isto, pedidos de entrada precisam da tua aprovação",
   "gerirclube.open_join_label": "Entrada livre",
   "gerirclube.other_dates_heading": "Outras datas desta recorrência",
+  "gerirclube.opens_at": "Abre {{when}}",
   "gerirclube.pause_button": "Pausar",
   "gerirclube.pending_request_label": "Pedido pendente",
   "gerirclube.phone_label": "Telefone",

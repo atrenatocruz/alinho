@@ -991,13 +991,22 @@ const SERIES_NEXT_MIX = () => {
     organization: { name: 'Dev Org', kind: 'group', group_logo_url: null },
   }
 }
+// O mix de origem da mesma recorrência, já aberto (para «Outras datas», #562).
+const SERIES_ORIGIN_MIX = () => {
+  const next = SERIES_NEXT_MIX()
+  const d = new Date(next.date); d.setDate(d.getDate() - 7)
+  return { ...next, id: 'fake-series-origin', date: d.toISOString(), status: 'open', is_recurrence_origin: true, launch_at: null }
+}
 RPC_MOCKS.skip_recurrence_game = () => { const d = new Date(); d.setDate(d.getDate() + 13); d.setHours(20, 0, 0, 0); return d.toISOString() }
-RPC_MOCKS.ensure_recurrence_successor = () => 'created'
+// mockEnsureStatus = 'ended' | 'no_base' — o que a base responde ao criar o
+// próximo Mix em falta; mockNoPending = 'true' — a série sem próximo Mix.
+RPC_MOCKS.ensure_recurrence_successor = () => localStorage.getItem('mockEnsureStatus') || 'created'
 TABLE_MOCKS.games = (url) => {
   let rows = gamesSemFiltro(url)
   const u = decodeURIComponent(url)
   if (localStorage.getItem('mockMixDraft') === 'true' && Array.isArray(rows) && !/[?&]id=eq\./.test(u)) rows = [...rows, DRAFT_MIX()]
-  if (localStorage.getItem('mockSeriesNext') === 'true' && Array.isArray(rows) && !/[?&]id=eq\./.test(u)) rows = [...rows, SERIES_NEXT_MIX()]
+  if (localStorage.getItem('mockSeriesNext') === 'true' && Array.isArray(rows) && !/[?&]id=eq\./.test(u)) rows = [...rows, ...(localStorage.getItem('mockSeriesOrigin') === 'false' ? [] : [SERIES_ORIGIN_MIX()]), SERIES_NEXT_MIX()]
+  if (localStorage.getItem('mockNoPending') === 'true' && /status=eq\.pending/.test(u)) rows = []
   const origem = u.match(/[?&]origin=eq\.([a-z_]+)/)
   return origem && Array.isArray(rows) ? rows.filter((g) => (g.origin || 'admin') === origem[1]) : rows
 }
@@ -1106,6 +1115,13 @@ export function installDevMockNetwork() {
         notready: { code: 'PGRST204', message: "Could not find the 'pairing_mode' column of 'games' in the schema cache" },
       }[errorCase]
       if (body) return jsonResponse(body, 400)
+    }
+
+    // localStorage.mockDeleteHasResults = 'true' — apagar um mix falha como
+    // quando já tem resultados (23503), para ver a razão na folha.
+    if (localStorage.getItem('mockDeleteHasResults') === 'true' && /\/rest\/v1\/games\?/.test(url)
+        && (init?.method || input?.method || 'GET').toUpperCase() === 'DELETE') {
+      return jsonResponse({ code: '23503', message: 'update or delete on table "games" violates foreign key constraint' }, 409)
     }
 
     if (localStorage.getItem('mockLimitError') === 'true'
