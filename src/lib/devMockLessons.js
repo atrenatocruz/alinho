@@ -220,6 +220,31 @@ export const LESSON_RPC_MOCKS = {
       } : {}),
     }
   },
+  // «Pedir aula» (#392, entrega 2). localStorage.mockBookingSent = 'whatsapp'
+  // | 'email' — já há um pedido meu por responder a este professor.
+  get_teacher_booking: () => {
+    if (!on()) return null
+    const d = new Date(); d.setDate(d.getDate() + ((2 - d.getDay() + 7) % 7 || 7)); d.setHours(10, 30, 0, 0)
+    const sent = localStorage.getItem('mockBookingSent')
+    return {
+      teacher: { user_id: 'u-tiago', name: 'Tiago Lopes', gender: 'masculino', avatar_url: null },
+      profiles: [
+        { teacher_profile_id: 'tp-ana', organization_id: 'o1', org_name: 'Clube Exemplo',
+          availability: [{ day_of_week: 'terca', start_time: '09:00:00', end_time: '13:00:00' },
+            { day_of_week: 'sabado', start_time: '09:00:00', end_time: '12:00:00' }],
+          peak_hours: [{ day_of_week: 2, start_time: '18:00:00', end_time: '22:00:00' }], prices: PRICES() },
+        { teacher_profile_id: 'tp-2', organization_id: 'o2', org_name: 'Clube Ex. 2',
+          availability: [{ day_of_week: 'quinta', start_time: '18:00:00', end_time: '21:00:00' }],
+          peak_hours: [], prices: PRICES().map((p) => ({ ...p, teacher_profile_id: null })) },
+      ],
+      busy: [{ starts_at: new Date(d.getTime() - 30 * 60000).toISOString(), ends_at: new Date(d.getTime() + 30 * 60000).toISOString(), kind: 'request' }],
+      mine: sent ? [{ id: 'rq-1', teacher_profile_id: 'tp-ana', starts_at: d.toISOString(), duration_minutes: 90,
+        lesson_type: 'duo', price_per_person: 35, contact_via: sent, status: 'pending', org_name: 'Clube Exemplo' }] : [],
+      i_have_whatsapp: localStorage.getItem('mockHasWhatsapp') === 'true',
+    }
+  },
+  request_lesson: () => 'rq-new',
+  cancel_lesson_request: () => null,
   set_lesson_prices: () => null,
   set_club_peak_hours: () => null,
   set_teacher_sort_order: () => null,

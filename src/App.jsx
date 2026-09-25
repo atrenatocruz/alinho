@@ -17,6 +17,7 @@ import ClaimInvite from './pages/ClaimInvite'
 import Profile from './pages/Profile'
 import PersonalInfo from './pages/PersonalInfo'
 import TeacherSchedule from './pages/TeacherSchedule'
+import RequestLesson from './pages/RequestLesson'
 import Comunidade from './pages/Comunidade'
 import ClubProfile from './pages/ClubProfile'
 import ClubMembers from './pages/ClubMembers'
@@ -447,6 +448,15 @@ function AppRoutes() {
           element={
             <Guard require="lessons" showSplash={showSplash}>
               <LessonPage />
+            </Guard>
+          }
+        />
+        {/* «Pedir aula» (Trello #392) — atrás da bandeira das aulas até 11 out. */}
+        <Route
+          path="/professor/:id/pedir"
+          element={
+            <Guard require="lessons" showSplash={showSplash}>
+              <RequestLesson />
             </Guard>
           }
         />

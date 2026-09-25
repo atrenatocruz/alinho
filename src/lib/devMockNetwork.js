@@ -116,6 +116,15 @@ const ACHIEVEMENTS_CATALOG = [
 
 const RPC_MOCKS = {
   ...LESSON_RPC_MOCKS,
+  // Professores na Comunidade pela RPC (#392 entrega 2): os mesmos do mock
+  // da tabela, já achatados.
+  list_teachers_public: () => (TABLE_MOCKS.teacher_profiles('') || [])
+    .filter((r) => r.status === 'approved' && (!r.organization_id || !r.club_status || r.club_status === 'accepted'))
+    .map((r) => ({ id: r.id, user_id: r.user_id, organization_id: r.organization_id, club_status: r.club_status || (r.organization_id ? 'accepted' : null),
+      status: r.status, zone: r.zone, contact: r.contact, created_at: r.created_at, name: r.user?.name,
+      avatar_url: null, gender: r.user?.gender || null, rating: r.user?.rating || null,
+      org_name: r.organization?.name || null, org_slug: r.organization?.slug || null,
+      availability: (r.availability || []).map((a) => ({ teacher_profile_id: r.id, ...a })) })),
   ...TOURNAMENT_RPC_MOCKS,
   ...TOURNAMENT_DRAW_RPC_MOCKS,
   get_player_profile: (params) => {
