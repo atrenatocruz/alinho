@@ -41,9 +41,10 @@ export const courtNames = (courts = []) => (courts || []).map((c) => c?.name).fi
     `save_match_schedule` e o que não coube.
 
     `days` vem da página do torneio: { date, starts_at: 'HH:MM:SS',
-    ends_at, courts: N }. As horas de abertura são horas do dia, não
+    ends_at, courts: N }. `categories`: [{ id, day_date, start_time }], da
+    mesma página — sem elas a proposta não respeita o dia de cada categoria. As horas de abertura são horas do dia, não
     instantes — por isso aqui corta-se, e está certo. */
-export function proposeSchedule({ matches = [], days = [], courts = [], durationMaxMin } = {}) {
+export function proposeSchedule({ matches = [], days = [], courts = [], categories = [], durationMaxMin } = {}) {
   const names = courtNames(courts)
   if (!names.length) return { slots: [], preview: [], left: matches, noCourts: true }
 
@@ -54,10 +55,18 @@ export function proposeSchedule({ matches = [], days = [], courts = [], duration
     courts: names.slice(0, Number(d.courts) > 0 ? Number(d.courts) : names.length),
   }))
 
+  // O dia e a hora de cada categoria («domingo, a partir das 9h»): uma
+  // categoria de domingo não vai para sexta (Trello #502).
+  const catById = new Map((categories || []).map((c) => [c.id, c]))
   const input = matches.map((m) => ({
     id: m.match_id,
     categoryId: m.category_id,
     stage: m.stage,
+    // A ronda da eliminatória (SF, F, 3P) — é ela que dá a ordem das fases,
+    // não o `stage`, que é 'principal' em todas (Trello #502).
+    round: m.round_label ?? m.round ?? null,
+    day: catById.get(m.category_id)?.day_date || null,
+    notBefore: String(catById.get(m.category_id)?.start_time || '').slice(0, 5) || null,
     groupId: m.group_label || null,
     // O mesmo nome em duas categorias é a mesma pessoa: é o que impede
     // que jogue em dois campos à mesma hora.

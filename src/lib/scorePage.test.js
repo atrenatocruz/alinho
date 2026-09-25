@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { cardsByCourt, unscheduledMatches, courtNames, proposeSchedule } from './scorePage'
+import { dayKeyInTz, hhmmInTz } from './tournamentDay'
 
 const pair = (a, b) => ({ name: `${a} / ${b}`, players: [a, b] })
 const m = (o) => ({ match_id: o.id, category_id: 'c1', stage: 'grupo', group_label: 'A', status: 'marcado', court: 'Campo 1', ...o })
@@ -92,6 +93,59 @@ describe('proposeSchedule — propor as horas', () => {
     const r = proposeSchedule({ days, courts, matches: cheio })
     expect(r.slots).toHaveLength(6) // 3 horas × 2 campos
     expect(r.left).toHaveLength(3)
+  })
+
+  // Trello #502: o quadro grava-se com stage 'principal'/'3lugar' e a ronda
+  // em `round_label`; cada categoria tem o seu dia e a sua hora de início.
+  describe('eliminatória e o dia de cada categoria (#502)', () => {
+    const dias = [
+      { date: '2026-10-09', starts_at: '18:00:00', ends_at: '23:00:00', courts: 2 },
+      { date: '2026-10-10', starts_at: '09:00:00', ends_at: '21:00:00', courts: 2 },
+      { date: '2026-10-11', starts_at: '09:00:00', ends_at: '18:00:00', courts: 2 },
+    ]
+    const categories = [
+      { id: 'X', day_date: '2026-10-10', start_time: '12:00:00' }, // meias + 3.º + final, sábado
+      { id: 'Y', day_date: '2026-10-11', start_time: '09:00:00' }, // meia + final, domingo
+    ]
+    const ko = (id, category_id, stage, round_label, a, b) =>
+      m({ id, category_id, stage, round_label, group_label: null, team_a: pair(`${a}1`, `${a}2`), team_b: pair(`${b}1`, `${b}2`) })
+    const jogos = [
+      ko('xF', 'X', 'principal', 'F', 'p', 'q'),
+      ko('x3', 'X', '3lugar', '3P', 'r', 's'),
+      ko('xS1', 'X', 'principal', 'SF', 'a', 'b'),
+      ko('xS2', 'X', 'principal', 'SF', 'c', 'd'),
+      ko('yF', 'Y', 'principal', 'F', 'e', 'f'),
+      ko('yS', 'Y', 'principal', 'SF', 'g', 'h'),
+    ]
+    const RANK = { SF: 4, '3P': 5, F: 6 } // o mesmo que tournament_phase_rank
+    const r = proposeSchedule({ days: dias, courts, categories, matches: jogos, durationMaxMin: 60 })
+    const slot = Object.fromEntries(r.slots.map((s) => [s.match_id, s]))
+    const hora = (id) => new Date(slot[id].starts_at).getTime()
+
+    it('marca todos', () => {
+      expect(r.left).toEqual([])
+      expect(r.slots).toHaveLength(6)
+    })
+
+    it('cada categoria fica no seu dia e a partir da sua hora', () => {
+      for (const id of ['xF', 'x3', 'xS1', 'xS2']) {
+        expect(dayKeyInTz(slot[id].starts_at)).toBe('2026-10-10')
+        expect(hhmmInTz(slot[id].starts_at) >= '12:00').toBe(true)
+      }
+      for (const id of ['yF', 'yS']) expect(dayKeyInTz(slot[id].starts_at)).toBe('2026-10-11')
+    })
+
+    it('a fase seguinte só começa depois de a anterior acabar — a regra que o servidor verifica', () => {
+      const hour = 60 * 60000
+      for (const a of jogos) {
+        for (const b of jogos) {
+          if (a.category_id !== b.category_id || RANK[a.round_label] >= RANK[b.round_label]) continue
+          // a é de uma fase anterior a b: tem de acabar antes de b começar.
+          expect(hora(a.match_id) + hour).toBeLessThanOrEqual(hora(b.match_id))
+        }
+      }
+      expect(hora('xF')).toBeGreaterThan(hora('xS1'))
+    })
   })
 
   it('courtNames ignora campos sem nome', () => {
