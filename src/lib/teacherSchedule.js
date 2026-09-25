@@ -62,7 +62,20 @@ export const scheduleProblems = (byDay = {}) => {
   return problems
 }
 
-/** Próximo intervalo a propor ao carregar em «Adicionar horas» num dia. */
+/** '09:00' → '9:00' (como no desenho aprovado, «9:00–13:00»). */
+export const compactTime = (hhmm) => shortTime(hhmm).replace(/^0(\d)/, '$1')
+
+/**
+ * Pode entrar este intervalo no dia? null = sim; 'order' = acaba antes de
+ * começar; 'overlap' = choca com um que já lá está.
+ */
+export const slotProblem = (slots = [], slot) => {
+  if (toMinutes(slot.end) <= toMinutes(slot.start)) return 'order'
+  const clash = slots.some((o) => toMinutes(slot.start) < toMinutes(o.end) && toMinutes(o.start) < toMinutes(slot.end))
+  return clash ? 'overlap' : null
+}
+
+/** Próximo intervalo a propor ao carregar em «+ Horas» num dia. */
 export const nextSlot = (slots = []) => {
   if (slots.length === 0) return { start: '09:00', end: '13:00' }
   const lastEnd = Math.max(...slots.map((s) => toMinutes(s.end)))

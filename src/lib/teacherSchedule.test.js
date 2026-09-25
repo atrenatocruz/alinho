@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  TIME_OPTIONS, nextSlot, rowsFromSchedule, scheduleFromRows, scheduleProblems, shortTime, weeklyFromItems,
+  TIME_OPTIONS, compactTime, nextSlot, slotProblem, rowsFromSchedule, scheduleFromRows, scheduleProblems, shortTime, weeklyFromItems,
 } from './teacherSchedule'
 
 describe('teacherSchedule', () => {
@@ -71,5 +71,18 @@ describe('teacherSchedule', () => {
       { weekday: 4, start: '18:00', end: '21:00' },
     ])
     expect(weeklyFromItems([])).toEqual([])
+  })
+
+  it('compactTime tira o zero da frente', () => {
+    expect(compactTime('09:00')).toBe('9:00')
+    expect(compactTime('17:30:00')).toBe('17:30')
+  })
+
+  it('slotProblem diz se um intervalo novo pode entrar no dia', () => {
+    const day = [{ start: '09:00', end: '13:00' }]
+    expect(slotProblem(day, { start: '13:00', end: '15:00' })).toBeNull()
+    expect(slotProblem(day, { start: '12:00', end: '14:00' })).toBe('overlap')
+    expect(slotProblem(day, { start: '15:00', end: '14:00' })).toBe('order')
+    expect(slotProblem([], { start: '09:00', end: '13:00' })).toBeNull()
   })
 })
