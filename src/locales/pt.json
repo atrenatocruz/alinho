@@ -2419,6 +2419,7 @@
   "gerir.teacher_wants_club": "Quer dar aulas no {{club}}",
   "teacher.club_status_pending": "Ligação ao clube: à espera de o clube aceitar",
   "teacher.club_status_rejected": "Ligação ao clube: o clube não aceitou",
+  "gerir.teacher_club_decides": "Quem decide é o {{club}}.",
   "comunidade.teacher_label_f": "Professora",
   "comunidade.teacher_no_club_short": "Sem clube",
   "comunidade.teacher_no_schedule": "Ainda sem horário",

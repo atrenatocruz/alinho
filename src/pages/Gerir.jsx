@@ -335,6 +335,11 @@ export default function Gerir() {
             </div>
           </div>
           <p className="text-sm text-ink-900 break-words">{req.contact}</p>
+          {/* Decisão B (Francisco, 25 set): com clube decide o clube — a
+              equipa Alinho só vê. Sem clube decide a equipa Alinho. */}
+          {req.organization_id ? (
+            <p className="text-sm text-muted">{t('gerir.teacher_club_decides', { club: req.organization?.name || '' })}</p>
+          ) : (
           <div className="flex gap-2">
             <button
               type="button"
@@ -353,6 +358,7 @@ export default function Gerir() {
               <X size={16} /> {t('gerirclube.reject_action')}
             </button>
           </div>
+          )}
         </div>
       ))}
     </div>
