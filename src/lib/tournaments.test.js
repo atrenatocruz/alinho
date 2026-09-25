@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   TOURNAMENT_STATUS, canDelete, categoryCode, courtHours, levelFromRating,
-  nextStatus, previousStatus, stepProblem, totalCourtHours, totalSlots, pricePerPlayer } from './tournaments'
+  nextStatus, previousStatus, stepProblem, saveProblem, totalCourtHours, totalSlots, pricePerPlayer } from './tournaments'
 
 const day = (o) => ({ date: '2026-10-09', starts_at: '18:00', ends_at: '23:00', courts: 4, ...o })
 
@@ -128,5 +128,35 @@ describe('pricePerPlayer', () => {
   it('aguenta o campo vazio sem escrever disparates', () => {
     expect(pricePerPlayer('', 'pt-PT')).toBe('0')
     expect(pricePerPlayer(undefined, 'pt-PT')).toBe('')
+  })
+})
+
+describe('datas e duração que não fazem sentido (#514)', () => {
+  const base = {
+    days: [{ date: '2026-10-09' }],
+    entries_close_at: '2026-10-05T23:59',
+    draw_at: '2026-10-07',
+    rules: { duration_min: 30, duration_max: 60 },
+  }
+  const now = '2026-09-25T10:00:00Z'
+
+  it('prazo no passado não deixa avançar', () => {
+    expect(stepProblem(2, { ...base, entries_close_at: '2026-09-20T23:59', draw_at: '2026-09-21' }, { now })).toBe('deadline_past')
+  })
+  it('a editar, um prazo que já estava gravado e não mudou não trava', () => {
+    const d = { ...base, entries_close_at: '2026-09-20T23:59', draw_at: '2026-09-21' }
+    expect(stepProblem(2, d, { now, initialDeadline: '2026-09-20T23:59' })).toBe(null)
+  })
+  it('sorteio antes do dia do prazo', () => {
+    expect(stepProblem(2, { ...base, draw_at: '2026-10-04' }, { now })).toBe('draw_before_deadline')
+    expect(stepProblem(2, { ...base, draw_at: '2026-10-05' }, { now })).toBe(null)
+  })
+  it('duração mínima maior do que a máxima', () => {
+    expect(stepProblem(4, { ...base, rules: { duration_min: 70, duration_max: 60 } })).toBe('duration_order')
+    expect(stepProblem(4, base)).toBe(null)
+  })
+  it('ao guardar sem passos vê as datas e as regras', () => {
+    expect(saveProblem({ ...base, rules: { duration_min: 90, duration_max: 60 } }, { now })).toBe('duration_order')
+    expect(saveProblem(base, { now })).toBe(null)
   })
 })

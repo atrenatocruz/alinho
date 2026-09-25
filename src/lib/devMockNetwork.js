@@ -232,6 +232,7 @@ const RPC_MOCKS = {
     id: FAKE_MEMBER_ID, name: 'Marta Costa', avatar_url: null, rating: 1380,
     gender: 'feminino', preferred_side: 'left', club_names: 'Dev Org',
   }],
+  search_people_basic: () => [{ id: FAKE_MEMBER_ID, name: 'Marta Costa', avatar_url: null }],
   list_players: () => [{
     id: FAKE_MEMBER_ID, name: longNames() ? 'Marta Sofia Costa de Vasconcelos Rodrigues' : 'Marta Costa', avatar_url: null, rating: 1380,
     gender: 'feminino', preferred_side: 'left', club_names: 'Dev Org',
