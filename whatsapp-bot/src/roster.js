@@ -222,6 +222,11 @@ export function buildMixMessage({ game, people, capacity, suplentes = [] }, { la
     if (game.allow_pair_signup && !game.rotate_partners && capacity - people.length >= 2) {
       lines.push(`🤝 Em dupla: *In${label ? ` ${label}` : ''} com* e o nome do parceiro, ou *In @parceiro*`)
     }
+    // Sair em dupla (commands.js, leavePair) — só quando há duplas na lista.
+    if (people.some((person) => person.pair)) {
+      const n = label ? ` ${label}` : ''
+      lines.push(`🚪 Sair em dupla: *Out${n} dupla* (os dois), *Out${n} @parceiro* (só ele), ou *Out${n}* e o bot pergunta`)
+    }
     if (suplentes.length > 0) {
       lines.push(`👥 *Suplentes:* ${suplentes.map(nameWithBand).join(', ')}`)
     }

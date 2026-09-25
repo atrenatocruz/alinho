@@ -16,15 +16,24 @@
 -- ─────────────────────────────────────────────────────────────────────────
 -- O QUE FAZ — o contrário do fecho, até onde o fecho se pode desfazer
 -- ─────────────────────────────────────────────────────────────────────────
---   1. A categoria volta a `inscricoes`.
---   2. As `selecionada` voltam ao estado de inscritas. O fecho juntou num
---      só estado as validadas e as por validar; a diferença fica em
---      `validated_at`: com validação → `validada`, sem → `por_validar`.
---   3. Os suplentes ficam suplentes, com a MESMA ordem — ninguém perde o
---      lugar na fila. Se houver vagas livres (o organizador escolheu menos
---      duplas do que as vagas), sobem pela ordem, como numa desistência
---      (`tournament_promote_waitlist`). Quem já tinha sido validado volta a
---      `validada`, e não a `por_validar`.
+-- Desenho aprovado pelo Francisco a 25 set
+-- (design-handoff/2026-09-25-torneio-reabrir-e-cabecas/SPEC.md, §1): «As N
+-- escolhidas e os N suplentes voltam a ficar só inscritos — escolhes outra
+-- vez quando fechares.»
+--   1. As `selecionada` E os `suplente` voltam ao estado de inscritas. O
+--      fecho juntou validadas e por validar num só estado; a diferença fica
+--      em `validated_at`: com validação → `validada`, sem → `por_validar`.
+--      Um suplente cujo parceiro nunca disse que sim (entrou em suplente
+--      logo na inscrição) volta a `convite`, com 3 dias para responder — como
+--      quando sobe da lista de espera; sem parceiro nenhum, `sem_parceiro`.
+--   2. A ordem que os suplentes tinham FICA guardada (`waitlist_order`): se
+--      o organizador fechar outra vez sem dar ordem, é essa a que vale
+--      primeiro. As escolhidas ficam sem ordem.
+--   3. SÓ DEPOIS a categoria volta a `inscricoes`. A ordem importa: com a
+--      categoria ainda fechada, a tranca das vagas do Renato
+--      (`tournament_entries_guard`, #16) não conta estas mudanças — as
+--      duplas já lá estavam, não estão a entrar agora. Pode ficar com mais
+--      inscritas do que vagas; quem chegar a seguir fica suplente.
 --   4. O torneio volta a `inscricoes` se estava `fechado`. Se já estiver
 --      `sorteado` (outra categoria sorteada), fica — quem manda é a
 --      categoria (#521).
@@ -55,8 +64,7 @@ DECLARE
   v_tournament UUID;
   v_status     TEXT;
   v_back       INTEGER;
-  v_promoted   INTEGER := 0;
-  v_next       UUID;
+  v_subs       INTEGER;
   v_deadline   TIMESTAMPTZ;
 BEGIN
   v_tournament := tournament_of_category(p_category_id);
@@ -77,24 +85,28 @@ BEGIN
     RAISE EXCEPTION 'Esta categoria já foi sorteada: as inscrições não reabrem';
   END IF;
 
-  -- 1. A categoria volta a receber inscrições.
-  UPDATE tournament_categories SET status = 'inscricoes' WHERE id = p_category_id;
-
-  -- 2. As escolhidas voltam a inscritas, com a validação que tinham.
+  -- 1. As escolhidas voltam a inscritas, com a validação que tinham.
+  --    (Ainda com a categoria fechada — ver o cabeçalho, ponto 3.)
   UPDATE tournament_entries
      SET status = CASE WHEN validated_at IS NOT NULL THEN 'validada' ELSE 'por_validar' END,
          waitlist_order = NULL
    WHERE category_id = p_category_id AND status = 'selecionada';
   GET DIAGNOSTICS v_back = ROW_COUNT;
 
-  -- 3. Vagas livres: sobem os suplentes, pela ordem da fila.
-  LOOP
-    v_next := tournament_promote_waitlist(p_category_id);
-    EXIT WHEN v_next IS NULL;
-    v_promoted := v_promoted + 1;
-    UPDATE tournament_entries SET status = 'validada'
-     WHERE id = v_next AND status = 'por_validar' AND validated_at IS NOT NULL;
-  END LOOP;
+  -- 2. Os suplentes também, guardando a ordem que tinham.
+  UPDATE tournament_entries
+     SET status = CASE
+           WHEN player2_id IS NOT NULL AND partner_accepted_at IS NULL THEN 'convite'
+           WHEN player2_id IS NULL AND guest_name IS NULL THEN 'sem_parceiro'
+           WHEN validated_at IS NOT NULL THEN 'validada'
+           ELSE 'por_validar' END,
+         respond_by = CASE WHEN player2_id IS NOT NULL AND partner_accepted_at IS NULL
+                           THEN NOW() + INTERVAL '3 days' ELSE respond_by END
+   WHERE category_id = p_category_id AND status = 'suplente';
+  GET DIAGNOSTICS v_subs = ROW_COUNT;
+
+  -- 3. Só agora a categoria volta a receber inscrições.
+  UPDATE tournament_categories SET status = 'inscricoes' WHERE id = p_category_id;
 
   -- 4. O torneio volta a receber inscrições se estava só fechado.
   UPDATE tournaments SET status = 'inscricoes'
@@ -103,10 +115,8 @@ BEGIN
   SELECT entries_deadline INTO v_deadline FROM tournaments WHERE id = v_tournament;
 
   RETURN jsonb_build_object(
-    'back_in',         v_back,
-    'promoted',        v_promoted,
-    'waitlist',        (SELECT count(*) FROM tournament_entries
-                         WHERE category_id = p_category_id AND status = 'suplente'),
+    'chosen_back',     v_back,
+    'waitlist_back',   v_subs,
     'deadline_passed', v_deadline IS NOT NULL AND v_deadline < NOW());
 END;
 $$;
@@ -119,8 +129,8 @@ GRANT EXECUTE ON FUNCTION reopen_category_entries(UUID) TO authenticated;
 -- ═════════════════════════════════════════════════════════════════════════
 --   SELECT proname FROM pg_proc WHERE pronamespace = 'public'::regnamespace
 --      AND proname IN ('tournament_of_category', 'is_tournament_admin',
---                      'tournament_promote_waitlist', 'reopen_category_entries');
+--                      'reopen_category_entries');
 --   SELECT column_name FROM information_schema.columns
 --    WHERE table_name = 'tournament_entries'
 --      AND column_name IN ('validated_at', 'partner_accepted_at', 'waitlist_order');
--- Esperado: as três primeiras funções existem, a última ainda não; as três colunas existem.
+-- Esperado: as duas primeiras funções existem, a última ainda não; as três colunas existem.

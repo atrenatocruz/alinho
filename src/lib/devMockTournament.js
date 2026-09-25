@@ -503,3 +503,26 @@ export const TOURNAMENT_CLOSE_TABLE_MOCKS = {
     return CLOSE_MATCHES[c] ? CLOSE_MATCHES[c](c) : []
   },
 }
+
+// ── Marcar resultados na Home, no dia (Trello #505) ─────────────────────
+// localStorage.mockTScoreToday = 'true': sou marcador de um torneio que se
+// joga hoje (e de outro que só é amanhã, que NÃO pode aparecer). Ganha aos
+// outros mocks das mesmas tabelas só enquanto estiver ligado.
+const scoreTodayOn = () => localStorage.getItem('mockTScoreToday') === 'true'
+const lisbonDay = (n) => {
+  const d = new Date(Date.now() + n * 86400000)
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Lisbon', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d)
+}
+export const TOURNAMENT_SCORE_TODAY_TABLE_MOCKS = {
+  tournament_scorekeepers: () => (scoreTodayOn()
+    ? [{ tournament_id: 'tour-hoje' }, { tournament_id: 'tour-amanha' }] : undefined),
+  tournament_public: (url) => {
+    if (!scoreTodayOn() || !/status=in\./.test(decodeURIComponent(url))) return undefined
+    return [
+      { id: 'tour-hoje', slug: 'smash-open-2026', name: 'Smash Open 2026', club_name: 'Smash Padel',
+        starts_on: lisbonDay(-1), ends_on: lisbonDay(1), status: 'a_decorrer' },
+      { id: 'tour-amanha', slug: 'torneio-de-amanha', name: 'Torneio de amanhã', club_name: 'Smash Padel',
+        starts_on: lisbonDay(1), ends_on: lisbonDay(2), status: 'sorteado' },
+    ]
+  },
+}

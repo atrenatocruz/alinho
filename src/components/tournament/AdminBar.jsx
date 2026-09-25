@@ -17,7 +17,8 @@ import { useTranslation } from 'react-i18next'
 import { Eye, Pencil, Trash2 } from 'lucide-react'
 import { deleteTournament, setTournamentStatus } from '../../lib/tournamentApi'
 import { describeError } from '../../lib/errors'
-import { canDelete, TOURNAMENT_TZ } from '../../lib/tournaments'
+import { canDelete } from '../../lib/tournaments'
+import { TOURNAMENT_TZ } from '../../lib/tournamentDay'
 import { MonoLabel, StatePill } from './TournamentBits'
 import CloseCategories from './CloseCategories'
 import { ConfirmSheet } from '../ui'
@@ -125,13 +126,13 @@ export default function AdminBar({ tournament, onChanged, onEdit, onDraw }) {
       <div className="mt-2.5 flex flex-wrap gap-1.5">
         {next && (
           <button type="button" disabled={busy} onClick={() => go(next)}
-            className="rounded-ctrl bg-ink-900 px-3 py-2 text-[12px] font-bold text-white disabled:opacity-50">
+            className="min-h-[44px] rounded-ctrl bg-ink-900 px-3 py-2 text-[12px] font-bold text-white disabled:opacity-50">
             {t(`tournament.admin.to_${next}`)}
           </button>
         )}
         {status === 'fechado' && (
           <button type="button" disabled={busy} onClick={draw}
-            className="rounded-ctrl bg-ink-900 px-3 py-2 text-[12px] font-bold text-white disabled:opacity-50">
+            className="min-h-[44px] rounded-ctrl bg-ink-900 px-3 py-2 text-[12px] font-bold text-white disabled:opacity-50">
             {t('tournament.admin.do_draw')}
           </button>
         )}
@@ -142,7 +143,7 @@ export default function AdminBar({ tournament, onChanged, onEdit, onDraw }) {
             O formulário de editar não tem rota própria, por isso não havia
             para onde navegar: tem de abrir no sítio. */}
         <button type="button" onClick={() => onEdit?.()}
-          className="inline-flex items-center gap-1.5 rounded-ctrl border border-line bg-canvas px-3 py-2 text-[12px] font-bold text-ink-900">
+          className="inline-flex items-center gap-1.5 min-h-[44px] rounded-ctrl border border-line bg-canvas px-3 py-2 text-[12px] font-bold text-ink-900">
           <Pencil size={14} /> {preview ? t('tournament.admin.keep_editing') : t('tournament.admin.edit')}
         </button>
         <button type="button" onClick={() => {
@@ -150,7 +151,7 @@ export default function AdminBar({ tournament, onChanged, onEdit, onDraw }) {
           url.searchParams.set('ver', 'publico')
           navigate(`${url.pathname}${url.search}`)
         }}
-          className="inline-flex items-center gap-1.5 rounded-ctrl border border-line bg-canvas px-3 py-2 text-[12px] font-bold text-ink-900">
+          className="inline-flex items-center gap-1.5 min-h-[44px] rounded-ctrl border border-line bg-canvas px-3 py-2 text-[12px] font-bold text-ink-900">
           <Eye size={14} /> {t('tournament.admin.view_public')}
         </button>
       </div>
@@ -167,7 +168,7 @@ export default function AdminBar({ tournament, onChanged, onEdit, onDraw }) {
       )}
       {deletable ? (
         <button type="button" disabled={busy} onClick={() => setAsk('delete')}
-          className="mt-2 inline-flex items-center gap-1.5 rounded-ctrl border border-line bg-canvas px-3 py-2 text-[12px] font-bold text-danger disabled:opacity-50">
+          className="mt-2 inline-flex items-center gap-1.5 min-h-[44px] rounded-ctrl border border-line bg-canvas px-3 py-2 text-[12px] font-bold text-danger disabled:opacity-50">
           <Trash2 size={14} /> {t('tournament.admin.delete')}
         </button>
       ) : (
