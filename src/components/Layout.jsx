@@ -17,6 +17,7 @@ import { listMyUnreadNotifications, markNotificationsRead, MIX_NOTICE_KINDS } fr
 import { kudosVoters, joinNames, MAX_KUDOS_VOTERS } from '../lib/kudos'
 import { listMyInvites as listMyTournamentInvites } from '../lib/tournamentSignup'
 import LessonNoticeRow, { LESSON_NOTICE_KINDS } from './lessons/LessonNoticeRow'
+import TournamentNoticeRow, { TOURNAMENT_NOTICE_KINDS } from './tournament/TournamentNoticeRow'
 import { formatDate } from '../lib/formatDate'
 import AccountDeletionPending from './AccountDeletionPending'
 
@@ -406,10 +407,13 @@ export default function Layout({ children }) {
   const [mixNotices, setMixNotices] = useState([])
   // Avisos das aulas (Trello #49) — mesma tabela, outros kinds.
   const [lessonNotices, setLessonNotices] = useState([])
+  // Avisos do torneio (Trello #548): suplente que subiu para dentro.
+  const [tournamentNotices, setTournamentNotices] = useState([])
   useEffect(() => {
     if (!profile?.id || isGuest) {
       setMixNotices([])
       setLessonNotices([])
+      setTournamentNotices([])
       return
     }
     let cancelled = false
@@ -418,6 +422,7 @@ export default function Layout({ children }) {
         if (cancelled) return
         setMixNotices(data.filter((n) => MIX_NOTICE_KINDS.includes(n.kind)))
         setLessonNotices(isLessonsEnabled ? data.filter((n) => LESSON_NOTICE_KINDS.includes(n.kind)) : [])
+        setTournamentNotices(data.filter((n) => TOURNAMENT_NOTICE_KINDS.includes(n.kind)))
       })
       .catch((error) => console.error('Error loading mix notices:', error))
     return () => {
@@ -452,6 +457,12 @@ export default function Layout({ children }) {
     markNotificationsRead([notice.id]).catch((error) => console.error('Error marking notice as read:', error))
   }
 
+  const openTournamentNotice = (notice) => {
+    setShowNotifications(false)
+    setTournamentNotices((list) => list.filter((n) => n.id !== notice.id))
+    markNotificationsRead([notice.id]).catch((error) => console.error('Error marking notice as read:', error))
+  }
+
   const mixNoticeText = (notice) => {
     const d = notice.data || {}
     const vars = {
@@ -469,7 +480,7 @@ export default function Layout({ children }) {
   }
 
   const joinRequestsTotal = joinRequestsByOrg.reduce((sum, org) => sum + org.count, 0)
-  const notificationsTotal = followRequests.length + joinRequestsTotal + orgInvites.length + privateMatchTodos.length + mixNotices.length + lessonNotices.length + tournamentInvites.length
+  const notificationsTotal = followRequests.length + joinRequestsTotal + orgInvites.length + privateMatchTodos.length + mixNotices.length + lessonNotices.length + tournamentInvites.length + tournamentNotices.length
 
   // `main` below is the app's only scrolling region (see the app-shell comment
   // on the root div) — the document itself never scrolls, so neither the browser
@@ -610,6 +621,9 @@ export default function Layout({ children }) {
                 <div className="max-h-80 overflow-y-auto divide-y divide-line">
                   {lessonNotices.map((notice) => (
                     <LessonNoticeRow key={notice.id} notice={notice} onOpen={openLessonNotice} />
+                  ))}
+                  {tournamentNotices.map((notice) => (
+                    <TournamentNoticeRow key={notice.id} notice={notice} onOpen={openTournamentNotice} />
                   ))}
                   {tournamentInvites.map((inv) => (
                     <Link

@@ -2523,6 +2523,8 @@
   "tournament.tab_calendar": "Calendário",
   "tournament.tab_entries": "Inscritos",
   "tournament.tabs_label": "Separadores do torneio",
+  "tournament.notice_promoted": "Entraste no {{tournament}} — {{code}}. Já não estás na lista de suplentes.",
+  "tournament.notice_promoted_partner_pending": "Entraste no {{tournament}} — {{code}}. Falta {{partner}} aceitar até {{day}}.",
   "tournament.tab_not_built": "Este separador ainda não está feito.",
   "tournament.not_found_title": "Torneio não encontrado",
   "tournament.not_found_subtitle": "O link pode estar errado, ou o torneio ainda não foi publicado.",
