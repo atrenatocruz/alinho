@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
-import { useTranslation } from 'react-i18next'
-import { GraduationCap, Search, X } from 'lucide-react'
+import { Trans, useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
+import { ChevronRight, GraduationCap, Search, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { listTeacherProfiles, requestTeacherProfile, withdrawTeacherProfile, searchClubsForTeacher } from '../lib/teachers'
+import { DAYS, listTeacherProfiles, requestTeacherProfile, withdrawTeacherProfile, searchClubsForTeacher } from '../lib/teachers'
+import { compactTime, scheduleFromRows } from '../lib/teacherSchedule'
+import { ConfirmSheet } from './ui'
 import { describeError } from '../lib/errors'
 import { contemTexto } from '../lib/semAcentos'
 
@@ -12,7 +15,7 @@ import { contemTexto } from '../lib/semAcentos'
    sem pedido → formulário curto → em análise → aprovado / recusado.
    - Clube opcional: sem clube mostra "Sem clube associado".
    - Zona: para ser encontrado na Comunidade.
-   - Horários e reservas ficam para depois de aprovado (#49).
+   - Depois de aprovado: «O meu horário» (#418) — contacto, zona e horário.
    - Que prova se pede e quem aprova: por definir pelo Francisco — até lá o
      pedido não pede comprovativo. Clube e zona precisam de
      migration_teacher_profiles_open.sql. */
@@ -22,6 +25,7 @@ const NO_CLUB = ''
 export default function TeacherSection() {
   const { t } = useTranslation()
   const { user, memberships } = useAuth()
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [mine, setMine] = useState(null)
   const [showForm, setShowForm] = useState(false)
@@ -29,6 +33,7 @@ export default function TeacherSection() {
   const [zone, setZone] = useState('')
   const [contact, setContact] = useState('')
   const [saving, setSaving] = useState(false)
+  const [asking, setAsking] = useState(null) // 'withdraw' | 'stop' | null
   const [error, setError] = useState('')
   // #550: o clube procura-se entre TODOS os clubes da app, pelo nome e sem
   // acentos — antes só apareciam os de que a pessoa já era membro.
@@ -100,18 +105,11 @@ export default function TeacherSection() {
     }
   }
 
+  // Pergunta antes pela janela de baixo (ConfirmSheet); os erros aparecem
+  // dentro dela.
   const handleWithdraw = async () => {
-    if (!confirm(t('comunidade.confirm_withdraw_teacher'))) return
-    setSaving(true)
-    try {
-      await withdrawTeacherProfile(mine.id)
-      setMine(null)
-    } catch (err) {
-      console.error('Error withdrawing teacher profile:', err)
-      alert(describeError(t, err, 'comunidade.withdraw_teacher_failed'))
-    } finally {
-      setSaving(false)
-    }
+    await withdrawTeacherProfile(mine.id)
+    setMine(null)
   }
 
   if (loading) return null
@@ -122,14 +120,48 @@ export default function TeacherSection() {
     rejected: 'bg-danger/10 text-danger',
   }
 
+  const clubName = mine?.organization?.name || null
+  const byDay = scheduleFromRows(mine?.availability || [])
+  const summary = DAYS.flatMap(({ value }, i) => byDay[value].map((s) =>
+    `${t(`lessons.wd_short_${i + 1}`).replace(/^./, (c) => c.toUpperCase())} ${compactTime(s.start)}–${compactTime(s.end)}`))
+
   return (
     <div className="card space-y-4">
       <h3 className="text-lg text-ink-900 flex items-center gap-2">
         <GraduationCap size={20} className="text-ink-700" />
         {t('teacher.heading')}
+        {mine?.status === 'approved' && (
+          <span className={`ml-auto inline-flex px-2 py-0.5 rounded-full text-xs font-extrabold ${statusLook.approved}`}>{t('teacher.status_approved')}</span>
+        )}
       </h3>
 
-      {mine ? (
+      {mine?.status === 'approved' ? (
+        /* Aprovado (desenho aprovado 25 set, assunto 1, ecrã 2): o cartão é
+           a porta do professor — o horário (#418) e a página pública. */
+        <>
+          <p className="-mt-2 text-sm text-muted">{[clubName || t('comunidade.teacher_no_club'), mine.zone].filter(Boolean).join(' · ')}</p>
+          {summary.length === 0 ? (
+            <div className="rounded-[14px] border-[1.5px] border-dashed border-ink-200 p-3 text-sm text-ink-500 leading-snug">
+              <b className="block text-ink-900 font-extrabold">{t('teacher.no_schedule_title')}</b>
+              {t('teacher.no_schedule_text')}
+            </div>
+          ) : (
+            <p className="text-sm font-extrabold text-ink-900">{summary.join(' · ')}</p>
+          )}
+          <button type="button" onClick={() => navigate('/perfil/professor')}
+            className="w-full min-h-[48px] rounded-full bg-ink-900 text-white font-extrabold hover:bg-ink-700 transition-colors duration-fast">
+            {summary.length === 0 ? t('teacher.schedule_make') : t('teacher.schedule_edit')}
+          </button>
+          <button type="button" onClick={() => navigate(`/professor/${mine.id}`)}
+            className="w-full inline-flex items-center justify-center gap-1 text-sm font-extrabold text-ink-900 hover:underline">
+            {t('teacher.see_my_page')} <ChevronRight size={16} />
+          </button>
+          <button type="button" onClick={() => setAsking('stop')} disabled={saving}
+            className="w-full text-sm font-extrabold text-muted hover:text-ink-900 disabled:opacity-40">
+            {t('teacher.stop_button')}
+          </button>
+        </>
+      ) : mine ? (
         <>
           <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
             <span className="text-muted">{t('teacher.status_label')}</span>
@@ -139,12 +171,7 @@ export default function TeacherSection() {
               </span>
             </span>
             <span className="text-muted">{t('teacher.club_label')}</span>
-            <span className="text-ink-900 font-extrabold">
-              {mine.organization?.name || t('comunidade.teacher_no_club')}
-              {mine.organization && mine.club_status && mine.club_status !== 'accepted' && (
-                <span className="block text-xs font-normal text-muted">{t(`teacher.club_status_${mine.club_status}`)}</span>
-              )}
-            </span>
+            <span className="text-ink-900 font-extrabold">{clubName || t('comunidade.teacher_no_club')}</span>
             {mine.zone && (
               <>
                 <span className="text-muted">{t('teacher.zone_label')}</span>
@@ -154,14 +181,18 @@ export default function TeacherSection() {
             <span className="text-muted">{t('teacher.contact_label')}</span>
             <span className="text-ink-900 font-extrabold break-words">{mine.contact}</span>
           </div>
-          {mine.status === 'pending' && <p className="text-xs text-muted">{t('teacher.pending_hint')}</p>}
-          <button
-            type="button"
-            onClick={handleWithdraw}
-            disabled={saving}
-            className="text-sm font-extrabold px-4 min-h-[44px] rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast disabled:opacity-40"
-          >
-            {mine.status === 'approved' ? t('teacher.stop_button') : t('comunidade.withdraw_button')}
+          {/* Decisão B (Francisco, 25 set): com clube decide o clube; sem clube
+              decide a equipa Alinho (com a prova, #320). */}
+          {mine.status === 'pending' && (
+            <p className="text-sm text-ink-500">
+              {clubName
+                ? <Trans i18nKey="teacher.pending_hint_club" values={{ club: clubName }} components={{ b: <b className="font-extrabold text-ink-900" /> }} />
+                : t('teacher.pending_hint')}
+            </p>
+          )}
+          <button type="button" onClick={() => setAsking('withdraw')} disabled={saving}
+            className="w-full text-sm font-extrabold text-muted hover:text-ink-900 disabled:opacity-40">
+            {t('teacher.withdraw_request')}
           </button>
         </>
       ) : !showForm ? (
@@ -249,6 +280,18 @@ export default function TeacherSection() {
           </div>
         </>
       )}
+
+      <ConfirmSheet
+        open={!!asking}
+        danger
+        title={asking === 'stop' ? t('teacher.stop_title') : t('teacher.withdraw_title')}
+        message={asking === 'stop' ? t('teacher.stop_text') : t('teacher.withdraw_text')}
+        cancelLabel={asking === 'stop' ? t('teacher.stop_keep') : t('teacher.withdraw_keep')}
+        confirmLabel={asking === 'stop' ? t('teacher.stop_confirm') : t('teacher.withdraw_confirm')}
+        onConfirm={handleWithdraw}
+        onClose={() => setAsking(null)}
+        errorOf={(err) => describeError(t, err, 'comunidade.withdraw_teacher_failed')}
+      />
     </div>
   )
 }

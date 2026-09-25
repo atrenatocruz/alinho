@@ -15,6 +15,7 @@ import PlayerDetails from './pages/PlayerDetails'
 import ClaimInvite from './pages/ClaimInvite'
 import Profile from './pages/Profile'
 import PersonalInfo from './pages/PersonalInfo'
+import TeacherSchedule from './pages/TeacherSchedule'
 import Comunidade from './pages/Comunidade'
 import ClubProfile from './pages/ClubProfile'
 import ClubMembers from './pages/ClubMembers'
@@ -484,6 +485,16 @@ function AppRoutes() {
           element={
             <Guard require="protected" showSplash={showSplash}>
               <PersonalInfo />
+            </Guard>
+          }
+        />
+        {/* «O meu horário» do professor (Trello #418) — fora da bandeira das
+            aulas: o professor edita contacto, zona e horário da semana. */}
+        <Route
+          path="/perfil/professor"
+          element={
+            <Guard require="protected" showSplash={showSplash}>
+              <TeacherSchedule />
             </Guard>
           }
         />

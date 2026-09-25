@@ -835,6 +835,9 @@ const TABLE_MOCKS = {
     ...(community() ? { searchable: true } : {}),
     owner_id: MOCK_ADMIN_USER_ID, plan_tier: localStorage.getItem('mockPlanTier') || 'pro',
   }],
+  // localStorage.mockTeacherFollowed = 'true' — já sigo o professor (#418, assunto 4).
+  follows: () => (localStorage.getItem('mockTeacherFollowed') === 'true'
+    ? [{ id: 'f-teacher', status: 'accepted', followed_id: 'u-ana' }] : []),
   // localStorage.mockCommunity — um professor com clube e um sem clube.
   teacher_profiles: (url) => (community() && url.includes('club_status=eq.pending') ? [
     { id: 'tp-c1', status: 'approved', contact: '914 555 666', zone: 'Almada', created_at: '2026-09-16T08:00:00Z', user: { name: 'Sofia Ramos' } },
@@ -848,7 +851,18 @@ const TABLE_MOCKS = {
     // localStorage.mockTeacherState = 'pending' | 'approved' — o meu pedido.
     ...(localStorage.getItem('mockTeacherState') ? [{
       id: 'tp-me', user_id: MOCK_ADMIN_USER_ID, organization_id: null, status: localStorage.getItem('mockTeacherState'),
-      contact: '912 000 111', zone: 'Cascais', created_at: '2026-09-16T10:00:00Z', user: { name: 'Admin (Dev)' }, organization: null, availability: [],
+      contact: '912 000 111', created_at: '2026-09-16T10:00:00Z', user: { name: 'Admin (Dev)' },
+      // localStorage.mockTeacherClub = 'true' — o pedido é para um clube (#550).
+      ...(localStorage.getItem('mockTeacherClub') === 'true'
+        ? { organization_id: 'co-1', zone: 'Almada', organization: { name: 'Smash Padel', slug: 'smash-padel' } }
+        : { zone: 'Cascais', organization: null }),
+      // localStorage.mockTeacherSchedule = 'full' — «O meu horário» já preenchido (#418).
+      availability: localStorage.getItem('mockTeacherSchedule') === 'full' ? [
+        { day_of_week: 'terca', start_time: '09:00:00', end_time: '13:00:00' },
+        { day_of_week: 'terca', start_time: '18:00:00', end_time: '21:00:00' },
+        { day_of_week: 'quinta', start_time: '18:30:00', end_time: '21:00:00' },
+        { day_of_week: 'sabado', start_time: '09:00:00', end_time: '13:00:00' },
+      ] : [],
     }] : []),
     { id: 'tp-1', user_id: 'fake-t1', organization_id: 'co-1', status: 'approved', contact: '912 345 678',
       user: { name: 'Ana Moreira' }, organization: { name: 'Smash Padel', slug: 'smash-padel' },
@@ -946,10 +960,27 @@ const DRAFT_MIX = () => {
     recurrence_id: null, participants: [], organization: { name: 'Dev Org', kind: 'group', group_logo_url: null },
   }
 }
+// localStorage.mockSeriesNext = 'true' — o próximo Mix (pending) de uma
+// recorrência na lista do Gerir, para ver o «saltar esta data» (Trello #529).
+const SERIES_NEXT_MIX = () => {
+  const d = new Date(); d.setDate(d.getDate() + 6); d.setHours(20, 0, 0, 0)
+  const launch = new Date(d); launch.setDate(launch.getDate() - 2)
+  return {
+    id: 'fake-series-next', organization_id: MOCK_ADMIN_ORG_ID, title: 'Terças @ IPC', date: d.toISOString(),
+    location: 'IPC Lisboa', status: 'pending', origin: 'admin', format: 'sobe_desce', num_courts: 2,
+    max_players: 8, price_per_player: 7, prize: null, gender_restriction: 'indiferente', level: null,
+    recurrence_id: 'rec-529', is_recurrence_origin: false, launch_at: launch.toISOString(), participants: [],
+    recurrence: { id: 'rec-529', is_active: true, is_paused: false, frequency: 'weekly', ends_type: 'never', ends_on: null, mix_offset_seconds: 172800 },
+    organization: { name: 'Dev Org', kind: 'group', group_logo_url: null },
+  }
+}
+RPC_MOCKS.skip_recurrence_game = () => { const d = new Date(); d.setDate(d.getDate() + 13); d.setHours(20, 0, 0, 0); return d.toISOString() }
+RPC_MOCKS.ensure_recurrence_successor = () => 'created'
 TABLE_MOCKS.games = (url) => {
   let rows = gamesSemFiltro(url)
   const u = decodeURIComponent(url)
   if (localStorage.getItem('mockMixDraft') === 'true' && Array.isArray(rows) && !/[?&]id=eq\./.test(u)) rows = [...rows, DRAFT_MIX()]
+  if (localStorage.getItem('mockSeriesNext') === 'true' && Array.isArray(rows) && !/[?&]id=eq\./.test(u)) rows = [...rows, SERIES_NEXT_MIX()]
   const origem = u.match(/[?&]origin=eq\.([a-z_]+)/)
   return origem && Array.isArray(rows) ? rows.filter((g) => (g.origin || 'admin') === origem[1]) : rows
 }

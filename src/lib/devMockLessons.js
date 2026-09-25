@@ -208,6 +208,16 @@ export const LESSON_RPC_MOCKS = {
       },
       prices: PRICES(),
       items: empty() ? [] : weekItems(params?.p_from, params?.p_to),
+      // Página do professor (#418, assunto 4): localStorage.mockTeacherPage =
+      // 'noclub' (sem clube, contacto por email) | 'me' (o próprio professor).
+      ...(localStorage.getItem('mockTeacherPage') === 'noclub' ? {
+        teacher: { ...teacherRow(base), name: 'Tiago Lopes', gender: 'masculino', contact: 'tiago.lopes@mail.pt', zone: 'Cascais',
+          organization_id: null, org_name: null, org_slug: null, org_city: null },
+      } : {}),
+      ...(localStorage.getItem('mockTeacherPage') === 'me' ? {
+        teacher: { ...teacherRow(base), user_id: '00000000-0000-0000-0000-000000000000', contact: '914 555 666', zone: 'Almada',
+          organization_id: '00000000-0000-0000-0000-0000000000aa', org_name: 'Smash Padel', org_slug: 'smash-padel', org_city: 'Almada' },
+      } : {}),
     }
   },
   set_lesson_prices: () => null,

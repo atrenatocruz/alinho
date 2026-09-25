@@ -50,6 +50,41 @@ export const requestTeacherProfile = async (organizationId, userId, contact, slo
   return data
 }
 
+// «O meu horário» (Trello #418): o próprio professor muda o contacto e a zona.
+// A base de dados só lhe deixa escrever estas duas colunas (GRANT UPDATE
+// (contact, zone)) e só na sua linha (policy «Owner can update own profile»).
+export const updateTeacherContact = async (id, { contact, zone }) => {
+  const { error } = await supabase
+    .from('teacher_profiles')
+    .update({ contact, zone: zone || null })
+    .eq('id', id)
+  if (error) throw error
+}
+
+// Troca o horário semanal inteiro (policy «Owner manages own availability»).
+// Grava primeiro o novo e só depois apaga o antigo: se a gravação falhar, o
+// professor não fica sem horário.
+export const replaceTeacherAvailability = async (teacherProfileId, rows) => {
+  const { data: old, error: readError } = await supabase
+    .from('teacher_availability')
+    .select('id')
+    .eq('teacher_profile_id', teacherProfileId)
+  if (readError) throw readError
+
+  if (rows.length > 0) {
+    const { error: insertError } = await supabase
+      .from('teacher_availability')
+      .insert(rows.map((r) => ({ teacher_profile_id: teacherProfileId, day_of_week: r.day, start_time: r.start, end_time: r.end })))
+    if (insertError) throw insertError
+  }
+
+  const oldIds = (old || []).map((r) => r.id)
+  if (oldIds.length > 0) {
+    const { error: deleteError } = await supabase.from('teacher_availability').delete().in('id', oldIds)
+    if (deleteError) throw deleteError
+  }
+}
+
 export const withdrawTeacherProfile = async (id) => {
   const { error } = await supabase.from('teacher_profiles').delete().eq('id', id)
   if (error) throw error
