@@ -8,7 +8,9 @@ import { DndContext, useDraggable, useDroppable, PointerSensor, TouchSensor, use
 import { CSS } from '@dnd-kit/utilities'
 import { supabase, supabaseUrl } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { PrimaryButton, GuestBadge, PlayerAvatarRow, EmptyState, ShareModal, RoundTimer, Avatar, Select, RatingBadge, DateField, GroupLevelBadge, Tabs } from '../components/ui'
+import { PrimaryButton, GuestBadge, PlayerAvatarRow, EmptyState, ShareModal, RoundTimer, Avatar, Select, RatingBadge, DateField, GroupLevelBadge, Tabs, ConfirmSheet } from '../components/ui'
+import { isDraftMix, publishDraftMix } from '../lib/mixDraft'
+import { isMixLimitError, planLimitMessage } from '../lib/plans'
 import { KIND_STYLE, KindTag, StateTag, Owner } from '../components/agenda/EventCard'
 import PoolGroupStage from '../components/PoolGroupStage'
 import PreviousEditions from '../components/agenda/PreviousEditions'
@@ -123,6 +125,8 @@ export default function GameDetails() {
   const [editingPairs, setEditingPairs] = useState(false)
   // Mix à última da hora (Trello #292): adicionar/tirar antes da Ronda 1.
   const [addPlayerOpen, setAddPlayerOpen] = useState(false)
+  // Publicar um rascunho (Trello #544) — a pergunta aberta.
+  const [publishOpen, setPublishOpen] = useState(false)
   const [changedKeys, setChangedKeys] = useState(() => new Set())
   const [editNotice, setEditNotice] = useState('')
   const [editedTeams, setEditedTeams] = useState([]) // staged copy of `teams`, only written to DB on Concluir
@@ -2092,13 +2096,16 @@ export default function GameDetails() {
           <ArrowLeft size={20} />
           {t('gamedetails.back')}
         </button>
-        <button
-          onClick={() => setShowShare(true)}
-          className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm min-h-[44px] pl-3"
-        >
-          <Share2 size={20} />
-          {t('gamedetails.share')}
-        </button>
+        {/* Um rascunho não se partilha: quem recebesse o link não o abria (#544). */}
+        {!isDraftMix(game) && (
+          <button
+            onClick={() => setShowShare(true)}
+            className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm min-h-[44px] pl-3"
+          >
+            <Share2 size={20} />
+            {t('gamedetails.share')}
+          </button>
+        )}
       </div>
 
       {showShare && (
@@ -2119,6 +2126,32 @@ export default function GameDetails() {
         />
       )}
 
+      {/* Mix em rascunho (Trello #544): só os admins chegam aqui (a base de
+          dados esconde-o dos outros). Faixa a tracejado com «Publicar». */}
+      {isDraftMix(game) && isAdmin && (
+        <div className="rounded-card border-2 border-dashed border-ink-200 bg-surface p-4 space-y-3">
+          <div>
+            <p className="font-extrabold text-ink-900">{t('mixdraft.banner_title')}</p>
+            <p className="text-sm text-muted mt-0.5">{t('mixdraft.banner_text')}</p>
+          </div>
+          <button type="button" onClick={() => setPublishOpen(true)}
+            className="w-full min-h-[48px] rounded-ctrl bg-ink-900 px-4 text-base font-extrabold text-white">
+            {t('mixdraft.publish')}
+          </button>
+        </div>
+      )}
+      <ConfirmSheet
+        open={publishOpen}
+        title={t('mixdraft.publish_title', { name: game.title || '' })}
+        message={t('mixdraft.publish_message')}
+        confirmLabel={t('mixdraft.publish')}
+        cancelLabel={t('mixdraft.not_now')}
+        onConfirm={async () => { await publishDraftMix(game, user.id); loadGameDetails() }}
+        onClose={() => setPublishOpen(false)}
+        errorOf={(error) => (isMixLimitError(error?.message || '') && planLimitMessage(t, 'mix', gameMembership?.organization?.plan_tier))
+          || describeError(t, error, 'mixdraft.publish_error')}
+      />
+
       {/* Topo = o cartão da Home em grande (SPEC 17 set, design-handoff/
           2026-09-17-cores-e-pagina-do-evento): cor e etiqueta do tipo, dono,
           hora grande, data em minúsculas, morada com "Abrir com…" na mesma
@@ -2127,6 +2160,9 @@ export default function GameDetails() {
       <div className={`rounded-card p-4 ${
         game.status === 'finished'
           ? 'bg-surface border border-line'
+          // Rascunho: sem cor e a tracejado até ser publicado (#544).
+          : isDraftMix(game)
+          ? 'bg-white border-2 border-dashed border-ink-200'
           : isUserJoined
           ? `${KIND_STYLE[kindOf(game)].bg} border-2 border-ok`
           : isUserWaitlisted
@@ -2134,7 +2170,7 @@ export default function GameDetails() {
             : `${KIND_STYLE[kindOf(game)].card} border`
       }`}>
         <div className="flex items-start justify-between gap-2">
-          <KindTag kind={kindOf(game)} suffix={game.recurrence_id ? t('ui.recurring') : null} />
+          <KindTag kind={kindOf(game)} suffix={isDraftMix(game) ? t('mixdraft.draft') : game.recurrence_id ? t('ui.recurring') : null} />
           {/* Terminado: cinza, como o cartão passado na Home. */}
           {game.status === 'finished' ? (
             <StateTag tone="grey" icon={Check}>{t('agenda.state_finished')}</StateTag>
@@ -3119,8 +3155,9 @@ export default function GameDetails() {
         </>
       )}
 
-      {/* Jogadores (antes do sorteio) */}
-      {!mixStarted && (
+      {/* Jogadores (antes do sorteio). Num rascunho não há inscritos nem
+          inscrições (#544): o «sê o primeiro» enganava. */}
+      {!mixStarted && !isDraftMix(game) && (
         <div className="card">
           <h3 className="text-lg text-ink-900 mb-4">{t('gamedetails.players_title', { count: people.length, max: capacity })}</h3>
 
@@ -3361,8 +3398,8 @@ export default function GameDetails() {
         />
       )}
 
-      {/* Ações de inscrição */}
-      {!mixStarted && (
+      {/* Ações de inscrição — nenhuma num rascunho (#544). */}
+      {!mixStarted && !isDraftMix(game) && (
         <div className="space-y-3">
           {joinError && (
             <div className="bg-danger/10 text-danger px-4 py-3 rounded-ctrl text-sm font-extrabold animate-fade-up">

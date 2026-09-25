@@ -576,8 +576,9 @@ const lmState = () => {
   if (lmStore) return lmStore
   const mode = lastMinute()
   const odd = mode === 'odd'
-  const beforeStart = mode === 'open' || mode === 'closed'
-  const confirmed = LM_PEOPLE.slice(0, odd ? 7 : mode === 'open' ? 5 : 8)
+  // 'draft' = mix em rascunho (Trello #544): sem inscritos nem duplas.
+  const beforeStart = mode === 'open' || mode === 'closed' || mode === 'draft'
+  const confirmed = LM_PEOPLE.slice(0, odd ? 7 : mode === 'draft' ? 0 : mode === 'open' ? 5 : 8)
   lmStore = {
     game: {
       id: LM_GAME_ID, organization_id: MOCK_ADMIN_ORG_ID, title: 'Mix de Quinta-feira', date: tomorrow8pm.toISOString(),
@@ -870,9 +871,22 @@ const TABLE_MOCKS = {
 // teste aparecia duas vezes na lista — como «Mix» e como «Jogo em aberto».
 // Um jogo de teste sem origin conta como 'admin', como na base de dados.
 const gamesSemFiltro = TABLE_MOCKS.games
+// localStorage.mockMixDraft = 'true' — um mix em rascunho na lista do Gerir
+// e na agenda da Home (Trello #544; na Home tem de ficar de fora).
+const DRAFT_MIX = () => {
+  const d = new Date(); d.setDate(d.getDate() + 5); d.setHours(19, 0, 0, 0)
+  return {
+    id: 'fake-draft-1', organization_id: MOCK_ADMIN_ORG_ID, title: 'Mix de quarta', date: d.toISOString(),
+    location: 'Smash Padel Almada', status: 'draft', origin: 'admin', format: 'sobe_desce', num_courts: 2,
+    max_players: 8, price_per_player: 6, prize: null, gender_restriction: 'indiferente', level: null,
+    recurrence_id: null, participants: [], organization: { name: 'Dev Org', kind: 'group', group_logo_url: null },
+  }
+}
 TABLE_MOCKS.games = (url) => {
-  const rows = gamesSemFiltro(url)
-  const origem = decodeURIComponent(url).match(/[?&]origin=eq\.([a-z_]+)/)
+  let rows = gamesSemFiltro(url)
+  const u = decodeURIComponent(url)
+  if (localStorage.getItem('mockMixDraft') === 'true' && Array.isArray(rows) && !/[?&]id=eq\./.test(u)) rows = [...rows, DRAFT_MIX()]
+  const origem = u.match(/[?&]origin=eq\.([a-z_]+)/)
   return origem && Array.isArray(rows) ? rows.filter((g) => (g.origin || 'admin') === origem[1]) : rows
 }
 
