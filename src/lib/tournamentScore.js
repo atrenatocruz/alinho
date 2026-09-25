@@ -14,18 +14,14 @@ export function walkoverScore(scoring, loser) {
   return loser === 'a' ? { score_a: 0, score_b: max } : { score_a: max, score_b: 0 }
 }
 
-/** Desistência a meio: a outra dupla ganha, mas **fica o resultado até
- *  ali** (SPEC §7). Se ainda não havia resultado, vale o máximo, como uma
- *  falta. */
-export function retirementScore(scoring, loser, partial) {
-  const a = Number(partial?.score_a) || 0
-  const b = Number(partial?.score_b) || 0
-  if (a === 0 && b === 0) return walkoverScore(scoring, loser)
-  // O que estava marcado mantém-se; só se garante que quem desistiu não
-  // fica com o jogo ganho.
-  if (loser === 'a' && a > b) return { score_a: b, score_b: a }
-  if (loser === 'b' && b > a) return { score_a: b, score_b: a }
-  return { score_a: a, score_b: b }
+/** Desistência a meio: quem desiste perde o JOGO INTEIRO, mesmo que
+ *  estivesse a ganhar — o resultado até ali não conta, e vale o mesmo que
+ *  uma falta (decisão do Francisco, 23 set, «#458»; substitui a regra
+ *  antiga do SPEC §7, «fica o resultado até ali»). É o que a mark_walkover
+ *  grava quando não recebe resultado (Trello #511). O resultado até ali, se
+ *  alguém o passar, é ignorado. */
+export function retirementScore(scoring, loser) {
+  return walkoverScore(scoring, loser)
 }
 
 /** O que falta para se poder guardar o resultado. Devolve a chave do aviso
