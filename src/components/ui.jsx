@@ -968,13 +968,16 @@ export function DangerConfirmModal({ open, title, message, emphasis, confirmLabe
        contorno («Sim, desisto»);
      · sem `danger`: a ação a preto e, por baixo, «Agora não» em texto.
 
+   `children` entra por baixo da consequência, quando é preciso ver o que
+   se vai confirmar (uma lista, um pódio).
+
    `onConfirm` pode ser assíncrono: enquanto corre, a folha não fecha; se
    falhar, o erro aparece AQUI, junto ao que falhou (`errorOf(err)` diz o
    texto), e a pessoa pode tentar outra vez. Se correr bem, fecha sozinha.
 
    A DangerConfirmModal (acima) é a janela antiga: os sítios que a usam
    passam para esta quando chegar a vez deles (mix, Gerir, resto). */
-export function ConfirmSheet({ open, title, message, confirmLabel, cancelLabel, danger = false, onConfirm, onClose, errorOf }) {
+export function ConfirmSheet({ open, title, message, confirmLabel, cancelLabel, danger = false, onConfirm, onClose, errorOf, children, confirmDisabled = false }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   useEffect(() => { if (!open) { setBusy(false); setError('') } }, [open])
@@ -1003,10 +1006,10 @@ export function ConfirmSheet({ open, title, message, confirmLabel, cancelLabel, 
   const safe = danger
     ? <button type="button" onClick={onClose} disabled={busy}
         className="w-full min-h-[52px] rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold text-white disabled:opacity-40">{cancelLabel}</button>
-    : <button type="button" onClick={confirm} disabled={busy}
+    : <button type="button" onClick={confirm} disabled={busy || confirmDisabled}
         className="w-full min-h-[52px] rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold text-white disabled:opacity-40">{confirmLabel}</button>
   const second = danger
-    ? <button type="button" onClick={confirm} disabled={busy}
+    ? <button type="button" onClick={confirm} disabled={busy || confirmDisabled}
         className="w-full min-h-[52px] rounded-ctrl border-2 border-danger bg-white px-4 text-[15px] font-extrabold text-danger disabled:opacity-40">{confirmLabel}</button>
     : <button type="button" onClick={onClose} disabled={busy}
         className="w-full min-h-[44px] px-4 text-[15px] font-extrabold text-ink-700 disabled:opacity-40">{cancelLabel}</button>
@@ -1026,6 +1029,9 @@ export function ConfirmSheet({ open, title, message, confirmLabel, cancelLabel, 
         <div className="mx-auto mb-4 h-1 w-9 rounded-full bg-ink-200" />
         <p id="confirm-sheet-title" className="text-[20px] font-extrabold leading-tight text-ink-900">{title}</p>
         {message && <p className="mt-2 text-[15px] leading-snug text-ink-500">{message}</p>}
+        {/* O que a pergunta precisa de mostrar para se decidir (ex.: a lista
+            de quem passa para o quadro, #484). */}
+        {children}
         {error && (
           <p role="alert" className="mt-3 rounded-ctrl border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-sm font-bold text-danger">{error}</p>
         )}

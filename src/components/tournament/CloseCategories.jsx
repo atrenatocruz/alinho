@@ -15,8 +15,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { finishCategory } from '../../lib/tournamentApi'
-import { getCategoryBoard, listCategoriesAdmin, standingsOf } from '../../lib/tournamentDraw'
+import {
+  getCategoryBoard, listCategoriesAdmin, standingsOf,
+  qualifiedFromGroups, qualifiersPerGroup, fillBracketFromGroups, clearBracketFromGroups,
+} from '../../lib/tournamentDraw'
 import { describeError } from '../../lib/errors'
+import { ConfirmSheet } from '../ui'
 import { MonoLabel } from './TournamentBits'
 
 const DRAWN = ['sorteada', 'a_decorrer']
@@ -57,6 +61,35 @@ export function closeStatus(category, board) {
     return { kind: 'ready', fromBracket: false, podium: [ids[0] || null, ids[1] || null, ids[2] || null] }
   }
   return { kind: 'ready', fromBracket: false, choose: true, podium: [null, null, null] }
+}
+
+const FINISHED = ['terminado', 'falta', 'desistencia']
+
+/** Grupos → quadro (Trello #484). Só quando o quadro sai dos grupos: os
+ *  lugares da eliminatória dizem «1.º do Grupo A», e é por esse texto que a
+ *  base de dados os encontra (`fill_bracket_from_groups`, Dev 3).
+ *    null            esta categoria não tem quadro a sair dos grupos
+ *    groups_running  ainda há jogos de grupo por acabar (`pending`)
+ *    to_fill         grupos acabados, quadro vazio → `qualified` (a lista) e
+ *                    `ties` (empates por resolver — com eles não se passa)
+ *    filled          quadro já preenchido; `canUndo` até ao 1.º resultado */
+export function bracketStatus(category, board) {
+  const { groups = [], matches = [] } = board || {}
+  if (!groups.length) return null
+  const q = qualifiedFromGroups(groups, matches, qualifiersPerGroup(category))
+  const labels = new Set(q.qualified.map((x) => x.label))
+  const slots = []
+  for (const m of matches.filter((x) => x.stage === 'principal')) {
+    if (labels.has(m.source_a)) slots.push(m.entry_a_id)
+    if (labels.has(m.source_b)) slots.push(m.entry_b_id)
+  }
+  if (!slots.length) return null
+  const started = matches.some((m) => m.stage !== 'grupo' && (FINISHED.includes(m.status) || m.winner_entry_id))
+  if (slots.every(Boolean)) return { kind: 'filled', canUndo: !started }
+  if (!q.ready) return { kind: 'groups_running', pending: q.pending }
+  // Empate que as regras não desfazem, e que mexe em quem passa: não se
+  // passa ninguém ao acaso (`ties`, Dev 3 — sem o campo, não há empates).
+  return { kind: 'to_fill', qualified: q.qualified, ties: q.ties || [] }
 }
 
 const PLACES = ['first', 'second', 'third']
@@ -100,6 +133,8 @@ function PodiumPicker({ value, onChange, entries, t }) {
 function CategoryRow({ category, board, onClosed }) {
   const { t } = useTranslation()
   const status = closeStatus(category, board)
+  const bracket = bracketStatus(category, board)
+  const [asking, setAsking] = useState(null) // null | 'fill' | 'undo'
   const [open, setOpen] = useState(false)
   const [picked, setPicked] = useState([null, null, null])
   const [busy, setBusy] = useState(false)
@@ -126,7 +161,22 @@ function CategoryRow({ category, board, onClosed }) {
     }
   }
 
-  const right = {
+  const fill = async () => {
+    await fillBracketFromGroups(category.id, bracket.qualified)
+    onClosed?.()
+  }
+  const undo = async () => {
+    await clearBracketFromGroups(category.id)
+    onClosed?.()
+  }
+  const toFill = bracket?.kind === 'to_fill'
+
+  const right = toFill ? (
+    <button type="button" onClick={() => setAsking('fill')}
+      className="min-h-[44px] rounded-ctrl bg-ink-900 px-3 py-1.5 text-[12px] font-bold text-white">
+      {t('tournament.bracket.fill')}
+    </button>
+  ) : {
     closed: <span className="text-[11.5px] font-bold text-ink-500">{t('tournament.close.closed')}</span>,
     not_drawn: <span className="text-[11.5px] text-ink-500">{t('tournament.close.not_drawn')}</span>,
     pending: <span className="text-[11.5px] text-ink-500">{t('tournament.close.pending', { count: status.pending })}</span>,
@@ -147,6 +197,60 @@ function CategoryRow({ category, board, onClosed }) {
         </span>
         {right}
       </div>
+
+      {/* Quadro já preenchido: diz-se, e desfaz-se até ao 1.º resultado. */}
+      {bracket?.kind === 'filled' && status.kind !== 'closed' && (
+        <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11.5px] text-ink-500">
+          {t('tournament.bracket.filled')}
+          {bracket.canUndo && (
+            <button type="button" onClick={() => setAsking('undo')}
+              className="min-h-[44px] font-bold text-ink-900 underline underline-offset-2">
+              {t('tournament.bracket.undo')}
+            </button>
+          )}
+        </p>
+      )}
+
+      <ConfirmSheet
+        open={asking === 'fill'}
+        title={t('tournament.bracket.fill_title', { code: category.code || category.name })}
+        message={t('tournament.bracket.fill_message')}
+        confirmLabel={t('tournament.bracket.fill')}
+        cancelLabel={t('tournament.bracket.not_now')}
+        confirmDisabled={toFill && bracket.ties.length > 0}
+        onConfirm={fill}
+        onClose={() => setAsking(null)}
+        errorOf={(err) => describeError(t, err)}
+      >
+        {toFill && bracket.ties.map((tie) => (
+          <p key={tie.group} role="alert" className="mt-3 rounded-ctrl border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-sm font-bold text-danger">
+            {t('tournament.bracket.tie', {
+              group: tie.groupName || tie.group,
+              names: (tie.entry_ids || []).map((id) => board?.entries?.[id]?.name || '?').join(t('tournament.bracket.and')),
+            })}
+          </p>
+        ))}
+        {toFill && (
+          <ul className="mt-3 divide-y divide-line rounded-ctrl border border-line">
+            {bracket.qualified.map((q) => (
+              <li key={q.label} className="flex items-center justify-between gap-3 px-3 py-2 text-[14px]">
+                <span className="shrink-0 text-ink-500">{q.label}</span>
+                <span className="min-w-0 truncate text-right font-bold text-ink-900">{board?.entries?.[q.entry_id]?.name || '?'}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </ConfirmSheet>
+      <ConfirmSheet
+        open={asking === 'undo'}
+        title={t('tournament.bracket.undo_title', { code: category.code || category.name })}
+        message={t('tournament.bracket.undo_message')}
+        confirmLabel={t('tournament.bracket.undo')}
+        cancelLabel={t('tournament.bracket.not_now')}
+        onConfirm={undo}
+        onClose={() => setAsking(null)}
+        errorOf={(err) => describeError(t, err)}
+      />
 
       {open && (
         <div className="mt-2 rounded-ctrl border border-line bg-canvas p-2.5">

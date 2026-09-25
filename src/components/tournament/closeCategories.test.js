@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { closeStatus } from './CloseCategories'
+import { closeStatus, bracketStatus } from './CloseCategories'
 
 const drawn = { id: 'c1', status: 'a_decorrer' }
 const m = (over) => ({
@@ -56,5 +56,42 @@ describe('closeStatus — as mesmas regras da finish_category (#485)', () => {
       m({ group_id: 'g2', entry_a_id: 'c', entry_b_id: 'd', winner_entry_id: 'c' }),
     ] }
     expect(closeStatus(drawn, board)).toMatchObject({ kind: 'ready', choose: true })
+  })
+})
+
+describe('bracketStatus — grupos para o quadro (#484)', () => {
+  const groups = [{ id: 'gA', number: 1, name: 'Grupo A', teams: ['a1', 'a2', 'a3'] }, { id: 'gB', number: 2, name: 'Grupo B', teams: ['b1', 'b2', 'b3'] }]
+  const g = (group, a, b, winner, over = {}) => ({ stage: 'grupo', group_id: group, entry_a_id: a, entry_b_id: b, status: 'terminado', score_a: winner === a ? 9 : 4, score_b: winner === b ? 9 : 4, winner_entry_id: winner, ...over })
+  const groupMatches = [
+    g('gA', 'a1', 'a2', 'a1'), g('gA', 'a1', 'a3', 'a1'), g('gA', 'a2', 'a3', 'a2'),
+    g('gB', 'b1', 'b2', 'b1'), g('gB', 'b1', 'b3', 'b1'), g('gB', 'b2', 'b3', 'b2'),
+  ]
+  const sf = (slot, sa, sb, ea = null, eb = null, over = {}) => ({ stage: 'principal', round: 'SF', bracket_slot: slot, source_a: sa, source_b: sb, entry_a_id: ea, entry_b_id: eb, status: 'marcado', winner_entry_id: null, ...over })
+  const cat = { status: 'a_decorrer', format: { qualifiers_per_group: 2 } }
+
+  it('sem quadro a sair dos grupos: nada a fazer', () => {
+    expect(bracketStatus(cat, { groups, matches: groupMatches })).toBe(null)
+  })
+
+  it('grupos a decorrer: diz quantos faltam', () => {
+    const matches = [...groupMatches.slice(0, 5), g('gB', 'b2', 'b3', null, { status: 'marcado', score_a: null, score_b: null }), sf(1, '1.º do Grupo A', '2.º do Grupo B')]
+    expect(bracketStatus(cat, { groups, matches })).toEqual({ kind: 'groups_running', pending: 1 })
+  })
+
+  it('grupos acabados e quadro vazio: a lista de quem passa', () => {
+    const matches = [...groupMatches, sf(1, '1.º do Grupo A', '2.º do Grupo B'), sf(2, '1.º do Grupo B', '2.º do Grupo A')]
+    const s = bracketStatus(cat, { groups, matches })
+    expect(s.kind).toBe('to_fill')
+    expect(s.ties).toEqual([])
+    expect(Object.fromEntries(s.qualified.map((q) => [q.label, q.entry_id]))).toEqual({
+      '1.º do Grupo A': 'a1', '2.º do Grupo A': 'a2', '1.º do Grupo B': 'b1', '2.º do Grupo B': 'b2',
+    })
+  })
+
+  it('quadro preenchido: desfaz-se até ao primeiro resultado do quadro', () => {
+    const filled = [sf(1, '1.º do Grupo A', '2.º do Grupo B', 'a1', 'b2'), sf(2, '1.º do Grupo B', '2.º do Grupo A', 'b1', 'a2')]
+    expect(bracketStatus(cat, { groups, matches: [...groupMatches, ...filled] })).toEqual({ kind: 'filled', canUndo: true })
+    const played = [{ ...filled[0], status: 'terminado', winner_entry_id: 'a1' }, filled[1]]
+    expect(bracketStatus(cat, { groups, matches: [...groupMatches, ...played] })).toEqual({ kind: 'filled', canUndo: false })
   })
 })

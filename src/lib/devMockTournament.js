@@ -431,7 +431,28 @@ const CLOSE_CATS = [
   { id: 'cc-f3', code: 'F3', name: 'Femininos 3', status: 'a_decorrer', position: 5 },
   { id: 'cc-mx4', code: 'MX4', name: 'Mistos 4', status: 'sorteada', position: 6 },
   { id: 'cc-f5', code: 'F5', name: 'Femininos 5', status: 'fechada', position: 7 },
+  // #484: dois grupos acabados e o quadro por preencher; e um já preenchido.
+  { id: 'cc-mx5', code: 'MX5', name: 'Mistos 5', status: 'a_decorrer', position: 8, format: { qualifiers_per_group: 2 } },
+  { id: 'cc-m6', code: 'M6', name: 'Masculinos 6', status: 'a_decorrer', position: 9, format: { qualifiers_per_group: 2 } },
 ]
+const bracketFilled = new Set(['cc-m6'])
+const twoGroupsDone = (c) => [
+  cm(c, 1, { entry_a_id: e(c, 1), entry_b_id: e(c, 2), winner_entry_id: e(c, 1) }),
+  cm(c, 2, { entry_a_id: e(c, 1), entry_b_id: e(c, 3), winner_entry_id: e(c, 1) }),
+  cm(c, 3, { entry_a_id: e(c, 2), entry_b_id: e(c, 3), winner_entry_id: e(c, 2) }),
+  cm(c, 4, { group_id: `${c}-g2`, entry_a_id: e(c, 4), entry_b_id: e(c, 5), winner_entry_id: e(c, 4) }),
+  cm(c, 5, { group_id: `${c}-g2`, entry_a_id: e(c, 4), entry_b_id: e(c, 6), winner_entry_id: e(c, 4) }),
+  cm(c, 6, { group_id: `${c}-g2`, entry_a_id: e(c, 5), entry_b_id: e(c, 6), winner_entry_id: e(c, 5) }),
+]
+const semis = (c) => {
+  const f = bracketFilled.has(c)
+  const open = { status: 'marcado', score_a: null, score_b: null, winner_entry_id: null, group_id: null, stage: 'principal', round: 'SF' }
+  return [
+    cm(c, 7, { ...open, bracket_slot: 1, source_a: '1.º do Grupo A', source_b: '2.º do Grupo B', entry_a_id: f ? e(c, 1) : null, entry_b_id: f ? e(c, 5) : null }),
+    cm(c, 8, { ...open, bracket_slot: 2, source_a: '1.º do Grupo B', source_b: '2.º do Grupo A', entry_a_id: f ? e(c, 4) : null, entry_b_id: f ? e(c, 2) : null }),
+    cm(c, 9, { ...open, round: 'F', bracket_slot: 1, source_a: 'Vencedor da 1.ª meia', source_b: 'Vencedor da 2.ª meia', entry_a_id: null, entry_b_id: null }),
+  ]
+}
 const PAIRS = ['Barros / Antunes', 'Lima / Reis', 'Costa / Pinto', 'Santos / Santos', 'Mendes / Silva', 'Rosa / Pinto']
 const closeEntries = (cat) => PAIRS.map((name, i) => ({
   id: `${cat}-e${i + 1}`, category_id: cat, team_name: name, status: 'selecionada', seed_number: null,
@@ -470,6 +491,8 @@ const CLOSE_MATCHES = {
     cm(c, 1),
     cm(c, 2, { group_id: `${c}-g2`, entry_a_id: e(c, 3), entry_b_id: e(c, 4), winner_entry_id: e(c, 3) }),
   ],
+  'cc-mx5': (c) => [...twoGroupsDone(c), ...semis(c)],
+  'cc-m6': (c) => [...twoGroupsDone(c), ...semis(c)],
   // a final tem uma dupla e espera pela outra
   'cc-mx4': (c) => [
     cm(c, 1),
@@ -482,6 +505,8 @@ const CLOSE_GROUPS = {
   'cc-f4': [[1, 2, 3, 4]],
   'cc-f3': [[1, 2], [3, 4]],
   'cc-mx4': [[1, 2, 3]],
+  'cc-mx5': [[1, 2, 3], [4, 5, 6]],
+  'cc-m6': [[1, 2, 3], [4, 5, 6]],
 }
 const catOf = (url) => decodeURIComponent(url).match(/category_id=eq\.([a-z0-9-]+)/)?.[1]
 
@@ -490,6 +515,16 @@ export const TOURNAMENT_CLOSE_RPC_MOCKS = {
     rules: {}, days: [],
     categories: CLOSE_CATS.map((c) => (closedNow.has(c.id) ? { ...c, status: 'terminada' } : c)),
   } : undefined),
+  fill_bracket_from_groups: (params) => {
+    if (!closeOn()) return undefined
+    bracketFilled.add(params?.p_category_id)
+    return { filled: (params?.p_qualified || []).length }
+  },
+  clear_bracket_from_groups: (params) => {
+    if (!closeOn()) return undefined
+    bracketFilled.delete(params?.p_category_id)
+    return { cleared: true }
+  },
   finish_category: (params) => {
     if (!closeOn()) return undefined
     closedNow.add(params?.p_category_id)
