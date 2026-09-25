@@ -2,7 +2,7 @@ import { supabase } from './supabase'
 import { LESSON_RPC_MOCKS, LESSON_TABLE_MOCKS, LESSON_NOTICES } from './devMockLessons'
 import {
   TOURNAMENT_RPC_MOCKS, TOURNAMENT_TABLE_MOCKS, TOURNAMENT_CLOSE_RPC_MOCKS, TOURNAMENT_CLOSE_TABLE_MOCKS,
-  TOURNAMENT_SCORE_TODAY_TABLE_MOCKS, TOURNAMENT_REOPEN_RPC_MOCKS,
+  TOURNAMENT_SCORE_TODAY_TABLE_MOCKS, TOURNAMENT_REOPEN_RPC_MOCKS, TOURNAMENT_GROUPS_DONE_TABLE_MOCKS,
 } from './devMockTournament'
 import { TOURNAMENT_DRAW_TABLE_MOCKS, TOURNAMENT_DRAW_RPC_MOCKS } from './devMockTournamentDraw'
 import { CLUB_PAGE_RPC_MOCKS, CLUB_PAGE_TABLE_MOCKS } from './devMockClubPage'
@@ -960,9 +960,9 @@ for (const [name, fn] of [...Object.entries(TOURNAMENT_CLOSE_RPC_MOCKS), ...Obje
   const before = RPC_MOCKS[name]
   RPC_MOCKS[name] = (params) => fn(params, before) ?? before?.(params) ?? null
 }
-for (const [name, fn] of [...Object.entries(TOURNAMENT_CLOSE_TABLE_MOCKS), ...Object.entries(TOURNAMENT_SCORE_TODAY_TABLE_MOCKS), ...Object.entries(CLUB_PAGE_TABLE_MOCKS)]) {
+for (const [name, fn] of [...Object.entries(TOURNAMENT_CLOSE_TABLE_MOCKS), ...Object.entries(TOURNAMENT_SCORE_TODAY_TABLE_MOCKS), ...Object.entries(CLUB_PAGE_TABLE_MOCKS), ...Object.entries(TOURNAMENT_GROUPS_DONE_TABLE_MOCKS)]) {
   const before = TABLE_MOCKS[name]
-  TABLE_MOCKS[name] = (url) => fn(url) ?? before?.(url) ?? []
+  TABLE_MOCKS[name] = (url) => fn(url, before) ?? before?.(url) ?? []
 }
 
 const jsonResponse = (data, status = 200) =>
