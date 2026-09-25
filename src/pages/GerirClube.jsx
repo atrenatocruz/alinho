@@ -306,6 +306,12 @@ export default function GerirClube() {
   // de um alert do browser que não diz em que plano estamos (Trello #265).
   const [gameError, setGameError] = useState('')
   const [membersError, setMembersError] = useState('')
+  // Regra das janelas (24 set): o que falha fica escrito junto ao sítio,
+  // nunca na caixa do telemóvel. Um estado por zona do Gerir.
+  const [gamesError, setGamesError] = useState('')
+  const [groupsError, setGroupsError] = useState('')
+  const [inviteError, setInviteError] = useState('')
+  const [cancelOpenAsk, setCancelOpenAsk] = useState(null) // o jogo em aberto a cancelar
   const [createdGroupName, setCreatedGroupName] = useState(null)
   const [clubGroups, setClubGroups] = useState([])
   const [groupsLoading, setGroupsLoading] = useState(false)
@@ -576,7 +582,7 @@ export default function GerirClube() {
       setExpandedGroupRequests(requestsRes.data || [])
     } catch (error) {
       console.error('Error loading group details:', error)
-      alert(describeError(t, error, 'gerirclube.error_load_group_details'))
+      setGroupsError(describeError(t, error, 'gerirclube.error_load_group_details'))
     } finally {
       setExpandedGroupLoading(false)
     }
@@ -632,7 +638,7 @@ export default function GerirClube() {
       await loadExpandedGroupDetails(groupId)
     } catch (error) {
       console.error('Error rejecting group request:', error)
-      alert(describeError(t, error, 'gerirclube.error_reject_request'))
+      setMembersError(describeError(t, error, 'gerirclube.error_reject_request'))
     }
   }
 
@@ -644,7 +650,7 @@ export default function GerirClube() {
       await loadClubGroups()
     } catch (error) {
       console.error('Error requesting to join group:', error)
-      alert(describeError(t, error, 'gerirclube.error_join_group_fallback'))
+      setGroupsError(describeError(t, error, 'gerirclube.error_join_group_fallback'))
     } finally {
       setGroupActingOn(null)
     }
@@ -704,9 +710,10 @@ export default function GerirClube() {
       }
 
       setGames(data || [])
+      setGamesError('')
     } catch (error) {
       console.error('Error in loadGames:', error)
-      alert(describeError(t, error, 'gerirclube.error_load_games'))
+      setGamesError(describeError(t, error, 'gerirclube.error_load_games'))
     }
   }
 
@@ -734,14 +741,16 @@ export default function GerirClube() {
   // Cancelar um jogo em aberto so existia dentro do painel «Em aberto».
   // Com o painel reduzido ao formulario, passa para a linha da lista --
   // mesma regra de antes: so enquanto ninguem se inscreveu.
-  const handleCancelOpenGame = async (gameId) => {
-    if (!confirm(t('open_slots.confirm_cancel'))) return
+  // Pergunta na folha da app; o erro fica na folha (lança), o sucesso vai
+  // para a tira de 3 s.
+  const handleCancelOpenGame = (gameId) => setCancelOpenAsk(openGames.find((g) => g.id === gameId) || { id: gameId })
+  const cancelOpenGameNow = async (gameId) => {
     const { error } = await supabase.from('games').update({ status: 'cancelled' }).eq('id', gameId)
     if (error) {
       console.error('Error cancelling open slot:', error)
-      alert(describeError(t, error, 'open_slots.error_cancel'))
-      return
+      throw new Error(describeError(t, error, 'open_slots.error_cancel'))
     }
+    setDoneNotice(t('gerirclube.open_game_cancelled'))
     loadOpenGames()
   }
 
@@ -845,19 +854,20 @@ export default function GerirClube() {
       await loadRequests()
     } catch (error) {
       console.error('Error rejecting request:', error)
-      alert(describeError(t, error, 'gerirclube.error_reject_request'))
+      setMembersError(describeError(t, error, 'gerirclube.error_reject_request'))
     }
   }
 
   const handleInvitePlayer = async (player) => {
+    setInviteError('')
     try {
       const status = await inviteToOrganization(org.id, player.id, inviteAsAdmin)
-      alert(status === 'pending'
+      setDoneNotice(status === 'pending'
         ? t(inviteAsAdmin ? 'gerirclube.invite_sent_admin' : 'gerirclube.invite_sent', { name: player.name })
         : t('gerirclube.invite_already_pending', { name: player.name }))
     } catch (error) {
       console.error('Error inviting player:', error)
-      alert(error.message?.includes('já é membro') ? t(kk('gerirclube.already_member'), { name: player.name }) : describeError(t, error, 'gerirclube.error_invite_failed'))
+      setInviteError(error.message?.includes('já é membro') ? t(kk('gerirclube.already_member'), { name: player.name }) : describeError(t, error, 'gerirclube.error_invite_failed'))
     }
   }
 
@@ -869,7 +879,7 @@ export default function GerirClube() {
       setTimeout(() => setLinkCopied(false), 2000)
     } catch (error) {
       console.error('Error copying invite link:', error)
-      alert(describeError(t, error, 'gerirclube.error_copy_invite_link'))
+      setInviteError(describeError(t, error, 'gerirclube.error_copy_invite_link'))
     }
   }
 
@@ -2002,6 +2012,7 @@ export default function GerirClube() {
 
           {activeTab === 'events' && !turmaAberta && (
             <div className="space-y-4">
+              {gamesError && <p role="alert" className="rounded-ctrl border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-sm font-bold text-danger">{gamesError}</p>}
               {/* Criar: um botao por tipo, todos iguais e sem ligado/desligado
                   -- cada um so abre o formulario desse tipo (desenho de 23
                   set). Num grupo so ha mixes. Secundarios: quatro blocos
@@ -2995,6 +3006,7 @@ export default function GerirClube() {
                     disabledLabel={t('comunidade.member_label')}
                     onSelect={handleInvitePlayer}
                   />
+                  {inviteError && <div className="mt-2"><p role="alert" className="rounded-ctrl border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-sm font-bold text-danger">{inviteError}</p></div>}
                 </div>
                 <div className="pt-3 border-t border-line">
                   <button
@@ -3369,6 +3381,7 @@ export default function GerirClube() {
                     {t('gerirclube.groups_description')}
                   </p>
 
+                  {groupsError && <div className="mb-3"><p role="alert" className="rounded-ctrl border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-sm font-bold text-danger">{groupsError}</p></div>}
                   {groupsLoading ? (
                     <div className="flex items-center justify-center py-8">
                       <div className="animate-spin rounded-full h-8 w-8 border-[3px] border-ink-50 border-t-ink-700"></div>
@@ -3667,6 +3680,18 @@ export default function GerirClube() {
         </>
       )}
 
+      {/* Cancelar um jogo em aberto (regra das janelas, 24 set). */}
+      <ConfirmSheet
+        open={!!cancelOpenAsk}
+        danger
+        title={t('gerirclube.cancel_open_game_title', { when: cancelOpenAsk?.date ? quandoCurto(cancelOpenAsk.date).replace(/^./, (c) => c.toLowerCase()) : '' })}
+        message={t('gerirclube.cancel_open_game_message')}
+        cancelLabel={t('gerirclube.cancel_open_game_keep')}
+        confirmLabel={t('gerirclube.cancel_open_game_yes')}
+        onConfirm={() => cancelOpenGameNow(cancelOpenAsk.id)}
+        errorOf={(err) => err?.message || t('open_slots.error_cancel')}
+        onClose={() => setCancelOpenAsk(null)}
+      />
       {/* Eliminar um mix / saltar a data de uma recorrência (regra das
           janelas, 24 set; #529). Fica fora das secções: serve as duas. */}
       <ConfirmSheet
