@@ -303,7 +303,8 @@ const RPC_MOCKS = {
   get_tournament_page: (params) => {
     const page = TOURNAMENT_RPC_MOCKS.get_tournament_page?.(params)
     const mode = localStorage.getItem('mockTSignup')
-    if (!page || !mode) return page
+    // Com mockTReplacePlayed o torneio fica a decorrer (Trello #434).
+    if (!page || !mode || localStorage.getItem('mockTReplacePlayed') === 'true') return page
     const soon = new Date(Date.now() + 7 * 86400000).toISOString()
     return {
       ...page,
@@ -367,6 +368,13 @@ const RPC_MOCKS = {
   tournament_admin_set_partner: (params) => (localStorage.getItem('mockTAdminError') ? { __error: localStorage.getItem('mockTAdminError') } : params?.p_partner_id || params?.p_guest_name
     ? { entry_id: params.p_entry_id, status: 'por_validar', invite_token: params?.p_guest_name ? 'convite-parceiro-depois' : null }
     : { __error: 'partner_required' }),
+  // Trocar um jogador (Trello #434): a função do Dev 3 ainda não existe;
+  // aqui responde como ela vai responder. mockTAdminError mostra os erros.
+  tournament_admin_replace_player: (params) => (localStorage.getItem('mockTAdminError')
+    ? { __error: localStorage.getItem('mockTAdminError') }
+    : params?.p_player_id || params?.p_guest_name
+      ? { entry_id: params.p_entry_id, status: 'validada', invite_token: params?.p_guest_name ? 'convite-troca' : null }
+      : { __error: 'player_required' }),
   tournament_invite_token: () => 'convite-jogador-2',
   tournament_invite_token_player1: () => 'convite-jogador-1',
   // A lista do organizador: um de cada estado, para se ver tudo num print.
@@ -808,6 +816,11 @@ const TABLE_MOCKS = {
   tournament_public_categories: () => (localStorage.getItem('mockTHome')
     ? [{ id: 'cat-m4', tournament_id: 'tour-smash-open', code: 'M4', name: 'Masculinos 4' }] : []),
   tournament_public_matches: () => {
+    // localStorage.mockTReplacePlayed = 'true' (com mockTSignup): a dupla já
+    // jogou, e a folha de trocar jogador avisa (Trello #434).
+    if (localStorage.getItem('mockTReplacePlayed') === 'true') {
+      return [{ id: 'rp1', category_id: 'cat-m4', entry_a_id: 'e1', entry_b_id: 'e3', status: 'terminado', winner_entry_id: 'e1', score_a: 9, score_b: 6 }]
+    }
     if (localStorage.getItem('mockTHome') !== 'matches') return []
     const at = (days, hour) => {
       const d = new Date(); d.setDate(d.getDate() + days); d.setHours(hour, 0, 0, 0)
@@ -879,12 +892,26 @@ const TABLE_MOCKS = {
         : { zone: 'Cascais', organization: null }),
       // localStorage.mockTeacherSchedule = 'full' — «O meu horário» já preenchido (#418).
       availability: localStorage.getItem('mockTeacherSchedule') === 'full' ? [
-        { day_of_week: 'terca', start_time: '09:00:00', end_time: '13:00:00' },
-        { day_of_week: 'terca', start_time: '18:00:00', end_time: '21:00:00' },
-        { day_of_week: 'quinta', start_time: '18:30:00', end_time: '21:00:00' },
-        { day_of_week: 'sabado', start_time: '09:00:00', end_time: '13:00:00' },
+        { teacher_profile_id: 'tp-me', day_of_week: 'terca', start_time: '09:00:00', end_time: '13:00:00' },
+        ...(localStorage.getItem('mockTeacherClubs') === 'two' ? [] : [
+          { teacher_profile_id: 'tp-me', day_of_week: 'terca', start_time: '18:00:00', end_time: '21:00:00' },
+          { teacher_profile_id: 'tp-me', day_of_week: 'quinta', start_time: '18:30:00', end_time: '21:00:00' },
+        ]),
+        { teacher_profile_id: 'tp-me', day_of_week: 'sabado', start_time: '09:00:00', end_time: '13:00:00' },
       ] : [],
     }] : []),
+    // localStorage.mockTeacherClubs = 'two' — dá aulas noutro clube aceite e
+    // tem um terceiro à espera (#392, assunto 3).
+    ...(localStorage.getItem('mockTeacherState') === 'approved' && localStorage.getItem('mockTeacherClubs') === 'two' ? [
+      { id: 'tp-me2', user_id: MOCK_ADMIN_USER_ID, organization_id: 'co-2', status: 'approved', club_status: 'accepted',
+        contact: '912 000 111', zone: 'Almada', created_at: '2026-09-20T10:00:00Z', user: { name: 'Admin (Dev)' },
+        organization: { name: 'Padel Parque', slug: 'padel-parque' },
+        availability: localStorage.getItem('mockTeacherSchedule') === 'full'
+          ? [{ teacher_profile_id: 'tp-me2', day_of_week: 'quinta', start_time: '18:00:00', end_time: '21:00:00' }] : [] },
+      { id: 'tp-me3', user_id: MOCK_ADMIN_USER_ID, organization_id: 'co-3', status: 'pending', club_status: 'pending',
+        contact: '912 000 111', zone: 'Almada', created_at: '2026-09-25T10:00:00Z', user: { name: 'Admin (Dev)' },
+        organization: { name: 'Racket Club', slug: 'racket-club' }, availability: [] },
+    ] : []),
     { id: 'tp-1', user_id: 'fake-t1', organization_id: 'co-1', status: 'approved', contact: '912 345 678',
       zone: 'Almada', user: { name: 'Ana Moreira', gender: 'feminino', rating: 1650 }, organization: { name: 'Smash Padel', slug: 'smash-padel' },
       availability: [{ day_of_week: 'terca', start_time: '09:00:00', end_time: '13:00:00' }, { day_of_week: 'quinta', start_time: '17:00:00', end_time: '20:00:00' }] },

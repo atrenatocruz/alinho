@@ -162,7 +162,10 @@ export function bracketRounds(matches, stage = 'principal') {
       matches: rows.filter((m) => m.round === round).sort((a, b) => (a.bracket_slot ?? 0) - (b.bracket_slot ?? 0)),
     }))
     .filter((r) => r.matches.length)
-  const third = matches.filter((m) => m.stage === '3lugar')
+  // O 3.º e 4.º lugar é do quadro principal. Juntá-lo a qualquer quadro
+  // punha-o também debaixo de «Quadro secundário», mesmo sem haver quadro
+  // secundário nenhum (visto pelo Dev 1 nos prints de 25 set).
+  const third = stage === 'principal' ? matches.filter((m) => m.stage === '3lugar') : []
   if (third.length) rounds.push({ round: '3P', matches: third })
   return rounds
 }

@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { ChevronRight, GraduationCap, Search, X } from 'lucide-react'
+import { ChevronRight, GraduationCap, Plus, Search, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { DAYS, listTeacherProfiles, requestTeacherProfile, withdrawTeacherProfile, searchClubsForTeacher } from '../lib/teachers'
-import { compactTime, scheduleFromRows } from '../lib/teacherSchedule'
-import { ConfirmSheet } from './ui'
+import { compactTime, isActiveTeacherProfile, scheduleFromRows } from '../lib/teacherSchedule'
+import { Avatar, ConfirmSheet } from './ui'
 import { describeError } from '../lib/errors'
 import { contemTexto } from '../lib/semAcentos'
 
@@ -28,6 +28,10 @@ export default function TeacherSection() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [mine, setMine] = useState(null)
+  // Todos os pedidos da pessoa: um por clube (#392, assunto 3 — vários clubes).
+  const [rows, setRows] = useState([])
+  const [addingClub, setAddingClub] = useState(false)
+  const [leaving, setLeaving] = useState(null) // perfil (clube) de que quer sair
   const [showForm, setShowForm] = useState(false)
   const [orgId, setOrgId] = useState(NO_CLUB)
   const [zone, setZone] = useState('')
@@ -44,11 +48,13 @@ export default function TeacherSection() {
   const load = async () => {
     try {
       const all = await listTeacherProfiles()
-      // Um pedido por pessoa neste ecrã: o mais recente.
+      // Os pedidos da pessoa, um por clube. O principal é o primeiro ativo
+      // (aprovado e aceite); sem nenhum ativo, o mais recente.
       const own = all
         .filter((p) => p.user_id === user.id)
-        .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
-      setMine(own[0] || null)
+        .sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')))
+      setRows(own)
+      setMine(own.find(isActiveTeacherProfile) || own[own.length - 1] || null)
     } catch (err) {
       console.error('Error loading teacher profile:', err)
     } finally {
@@ -69,7 +75,7 @@ export default function TeacherSection() {
     .map((m) => ({ id: m.organization_id, name: m.organization.name, location: m.organization.location }))
 
   useEffect(() => {
-    if (!showForm || chosenClub) return undefined
+    if ((!showForm && !addingClub) || chosenClub) return undefined
     let alive = true
     const timer = setTimeout(() => {
       searchClubsForTeacher(clubQuery.trim())
@@ -80,7 +86,7 @@ export default function TeacherSection() {
     }, 250)
     return () => { alive = false; clearTimeout(timer) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clubQuery, showForm, chosenClub])
+  }, [clubQuery, showForm, addingClub, chosenClub])
 
   useEffect(() => {
     setOrgId(chosenClub ? chosenClub.id : NO_CLUB)
@@ -108,8 +114,26 @@ export default function TeacherSection() {
   // Pergunta antes pela janela de baixo (ConfirmSheet); os erros aparecem
   // dentro dela.
   const handleWithdraw = async () => {
-    await withdrawTeacherProfile(mine.id)
-    setMine(null)
+    const ids = asking === 'stop' ? rows.map((r) => r.id) : [mine.id]
+    for (const id of ids) await withdrawTeacherProfile(id)
+    await load()
+  }
+
+  // «＋ Dar aulas noutro clube»: o mesmo pedido, com o contacto e a zona que
+  // já tem. Decide esse clube, sem prova (decisão B).
+  const handleAddClub = async () => {
+    if (!chosenClub) return
+    setSaving(true); setError('')
+    try {
+      await requestTeacherProfile(chosenClub.id, user.id, mine.contact, [], mine.zone || '')
+      setAddingClub(false); setChosenClub(null); setClubQuery('')
+      await load()
+    } catch (err) {
+      console.error('Error requesting another club:', err)
+      setError(describeError(t, err, 'comunidade.teacher_error_submit_failed'))
+    } finally {
+      setSaving(false)
+    }
   }
 
   if (loading) return null
@@ -121,7 +145,9 @@ export default function TeacherSection() {
   }
 
   const clubName = mine?.organization?.name || null
-  const byDay = scheduleFromRows(mine?.availability || [])
+  const active = rows.filter(isActiveTeacherProfile)
+  const clubRows = rows.filter((r) => r.organization_id && r.status !== 'rejected' && r.club_status !== 'rejected')
+  const byDay = scheduleFromRows(active.flatMap((r) => r.availability || []))
   const summary = DAYS.flatMap(({ value }, i) => byDay[value].map((s) =>
     `${t(`lessons.wd_short_${i + 1}`).replace(/^./, (c) => c.toUpperCase())} ${compactTime(s.start)}–${compactTime(s.end)}`))
 
@@ -130,16 +156,81 @@ export default function TeacherSection() {
       <h3 className="text-lg text-ink-900 flex items-center gap-2">
         <GraduationCap size={20} className="text-ink-700" />
         {t('teacher.heading')}
-        {mine?.status === 'approved' && (
+        {active.length > 0 && (
           <span className={`ml-auto inline-flex px-2 py-0.5 rounded-full text-xs font-extrabold ${statusLook.approved}`}>{t('teacher.status_approved')}</span>
         )}
       </h3>
 
-      {mine?.status === 'approved' ? (
+      {active.length > 0 ? (
         /* Aprovado (desenho aprovado 25 set, assunto 1, ecrã 2): o cartão é
            a porta do professor — o horário (#418) e a página pública. */
         <>
-          <p className="-mt-2 text-sm text-muted">{[clubName || t('comunidade.teacher_no_club'), mine.zone].filter(Boolean).join(' · ')}</p>
+          {clubRows.length === 0 ? (
+            <p className="-mt-2 text-sm text-muted">{[t('comunidade.teacher_no_club'), mine.zone].filter(Boolean).join(' · ')}</p>
+          ) : (
+            /* Onde dás aulas (#392, assunto 3): aceites e à espera. Tocar num
+               aceite deixa sair dele — se não for o único. */
+            <div className="-mt-1">
+              <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mb-1">{t('teacher.where_you_teach')}</p>
+              {clubRows.map((r) => {
+                const ok = isActiveTeacherProfile(r)
+                const canLeave = ok && active.length > 1
+                return (
+                  <button key={r.id} type="button" disabled={!canLeave} onClick={() => setLeaving(r)}
+                    className="w-full flex items-center gap-2.5 py-2 border-b border-line last:border-0 text-left disabled:cursor-default">
+                    <Avatar name={r.organization?.name} size="w-7 h-7 text-[10px]" colorClass="bg-ink-900 text-lime-400" shape="square" />
+                    <span className="flex-1 min-w-0 truncate text-sm font-extrabold text-ink-900">{r.organization?.name}</span>
+                    <span className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-extrabold ${ok ? statusLook.approved : statusLook.pending}`}>
+                      {t(ok ? 'teacher.club_accepted' : 'teacher.status_pending')}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+          {addingClub ? (
+            <div className="space-y-2">
+              {chosenClub ? (
+                <div className="flex items-center gap-2 input-field">
+                  <span className="flex-1 min-w-0 truncate font-extrabold text-ink-900">{chosenClub.name}</span>
+                  <button type="button" onClick={() => { setChosenClub(null); setClubQuery('') }}
+                    aria-label={t('teacher.club_change')} title={t('teacher.club_change')} className="text-muted shrink-0">
+                    <X size={16} />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <label className="flex items-center gap-2 input-field focus-within:border-ink-500">
+                    <Search size={16} className="text-muted shrink-0" />
+                    <input type="text" value={clubQuery} autoFocus onChange={(e) => setClubQuery(e.target.value)}
+                      placeholder={t('teacher.club_search_placeholder')} className="flex-1 min-w-0 bg-transparent outline-none text-base" />
+                  </label>
+                  {clubResults.filter((c) => !rows.some((r) => r.organization_id === c.id)).map((c) => (
+                    <button key={c.id} type="button" onClick={() => setChosenClub({ id: c.id, name: c.name })}
+                      className="w-full text-left px-3 py-2 rounded-ctrl bg-ink-50 hover:bg-ink-200/60">
+                      <span className="block text-sm font-extrabold text-ink-900 truncate">{c.name}</span>
+                      {c.location && <span className="block text-xs text-muted truncate">{c.location}</span>}
+                    </button>
+                  ))}
+                </>
+              )}
+              {chosenClub && (
+                <p className="text-sm text-ink-500"><Trans i18nKey="teacher.other_club_decides" values={{ club: chosenClub.name }} components={{ b: <b className="font-extrabold text-ink-900" /> }} /></p>
+              )}
+              {error && <p role="alert" className="rounded-ctrl border border-danger/30 bg-danger/10 px-3 py-2 text-sm font-bold text-danger">{error}</p>}
+              <div className="flex gap-2">
+                <button type="button" onClick={handleAddClub} disabled={!chosenClub || saving}
+                  className="flex-1 min-h-[44px] rounded-full bg-ink-900 text-white text-sm font-extrabold disabled:opacity-40">{t('comunidade.send_request')}</button>
+                <button type="button" onClick={() => { setAddingClub(false); setChosenClub(null); setClubQuery(''); setError('') }} disabled={saving}
+                  className="flex-1 min-h-[44px] rounded-full bg-ink-50 text-ink-700 text-sm font-extrabold disabled:opacity-40">{t('comunidade.cancel')}</button>
+              </div>
+            </div>
+          ) : (
+            <button type="button" onClick={() => setAddingClub(true)}
+              className="w-full inline-flex items-center gap-1.5 text-sm font-extrabold text-ink-900 hover:underline">
+              <Plus size={16} /> {t('teacher.add_other_club')}
+            </button>
+          )}
           {summary.length === 0 ? (
             <div className="rounded-[14px] border-[1.5px] border-dashed border-ink-200 p-3 text-sm text-ink-500 leading-snug">
               <b className="block text-ink-900 font-extrabold">{t('teacher.no_schedule_title')}</b>
@@ -152,7 +243,7 @@ export default function TeacherSection() {
             className="w-full min-h-[48px] rounded-full bg-ink-900 text-white font-extrabold hover:bg-ink-700 transition-colors duration-fast">
             {summary.length === 0 ? t('teacher.schedule_make') : t('teacher.schedule_edit')}
           </button>
-          <button type="button" onClick={() => navigate(`/professor/${mine.id}`)}
+          <button type="button" onClick={() => navigate(`/professor/${active[0].id}`)}
             className="w-full inline-flex items-center justify-center gap-1 text-sm font-extrabold text-ink-900 hover:underline">
             {t('teacher.see_my_page')} <ChevronRight size={16} />
           </button>
@@ -280,6 +371,18 @@ export default function TeacherSection() {
           </div>
         </>
       )}
+
+      <ConfirmSheet
+        open={!!leaving}
+        danger
+        title={t('teacher.leave_club_title', { club: leaving?.organization?.name || '' })}
+        message={t('teacher.leave_club_text')}
+        cancelLabel={t('teacher.leave_club_keep')}
+        confirmLabel={t('teacher.leave_club_confirm')}
+        onConfirm={async () => { await withdrawTeacherProfile(leaving.id); await load() }}
+        onClose={() => setLeaving(null)}
+        errorOf={(err) => describeError(t, err, 'comunidade.withdraw_teacher_failed')}
+      />
 
       <ConfirmSheet
         open={!!asking}
