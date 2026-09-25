@@ -11,7 +11,7 @@ import { useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Trophy } from 'lucide-react'
 import { useGoBack } from '../lib/useGoBack'
-import { getTournamentPage, getTournamentForEdit, listMatchesToScore, markWalkover, saveMatchResult } from '../lib/tournamentApi'
+import { getTournamentPage, getTournamentForEdit, listMatchesToScore, markWalkover, saveMatchResult, undoWalkover } from '../lib/tournamentApi'
 import { saveMatchSchedule } from '../lib/tournamentDraw'
 import { needsDecider, resultProblem } from '../lib/tournamentScore'
 import { computeSetsResult, computeProSetFinalScore } from '../lib/scoringLogic'
@@ -19,7 +19,7 @@ import { describeError, errorKind } from '../lib/errors'
 import { dayKeyInTz, msUntilNextDay, hhmmInTz } from '../lib/tournamentDay'
 import { cardsByCourt, unscheduledMatches, proposeSchedule, courtNames } from '../lib/scorePage'
 import { useAuth } from '../contexts/AuthContext'
-import { EmptyState, PrimaryButton } from '../components/ui'
+import { ConfirmSheet, EmptyState, PrimaryButton } from '../components/ui'
 import { MonoLabel, StatePill } from '../components/tournament/TournamentBits'
 
 // Hora de Portugal, nunca cortada do texto da base de dados (vinha em UTC:
@@ -82,7 +82,7 @@ const filledSets = (sets) => sets
   .map((s) => ({ score_a: Number(s.a), score_b: Number(s.b) }))
 
 /** O cartão de um campo: quem está a jogar, o resultado e os três botões. */
-function CourtCard({ match, scoring, onSave, onWalkover, busy, t }) {
+function CourtCard({ match, scoring, onSave, onWalkover, onUndoWalkover, busy, t }) {
   const finished = ['terminado', 'falta', 'desistencia'].includes(match.status)
   const bySets = SETS_FORMATS.includes(scoring)
   const [editing, setEditing] = useState(!finished)
@@ -195,19 +195,28 @@ function CourtCard({ match, scoring, onSave, onWalkover, busy, t }) {
             <button type="button" disabled={busy} onClick={save} className={`${BTN} bg-lime-400 font-bold text-ink-900 disabled:opacity-60`}>
               {t('tournament.score.save')}
             </button>
-            <button type="button" disabled={busy} onClick={() => onWalkover(match, 'falta')} className={`${BTN} border border-ink-900 font-semibold text-ink-900`}>
-              {t('tournament.score.walkover')}
-            </button>
-            <button type="button" disabled={busy} onClick={() => onWalkover(match, 'desistencia')} className={`${BTN} border border-ink-900 font-semibold text-ink-900`}>
-              {t('tournament.score.retirement')}
-            </button>
+            {/* Falta e desistência só num jogo com as duas duplas e ainda por
+                jogar (Trello #491): num jogo «a definir» não há quem falte, e
+                num jogo acabado corrige-se o resultado — não se marca falta. */}
+            {!finished && match.team_a && match.team_b && (
+              <>
+                <button type="button" disabled={busy} onClick={() => onWalkover(match, 'falta')} className={`${BTN} border border-ink-900 font-semibold text-ink-900`}>
+                  {t('tournament.score.walkover')}
+                </button>
+                <button type="button" disabled={busy} onClick={() => onWalkover(match, 'desistencia')} className={`${BTN} border border-ink-900 font-semibold text-ink-900`}>
+                  {t('tournament.score.retirement')}
+                </button>
+              </>
+            )}
             {finished && (
               <button type="button" onClick={() => setEditing(false)} className="min-h-[44px] px-3 text-sm text-ink-500 hover:underline">
                 {t('tournament.create.cancel')}
               </button>
             )}
           </div>
-          <p className="mt-1.5 text-[11.5px] text-ink-500">{t('tournament.score.walkover_hint')}</p>
+          {!finished && match.team_a && match.team_b && (
+            <p className="mt-1.5 text-[11.5px] text-ink-500">{t('tournament.score.walkover_hint')}</p>
+          )}
         </>
       ) : (
         <div className="mt-2 flex items-center justify-between gap-2">
@@ -223,9 +232,20 @@ function CourtCard({ match, scoring, onSave, onWalkover, busy, t }) {
             {match.corrected_by_name && (
               <span className="text-[11px] text-ink-500">{t('tournament.score.corrected_by', { name: match.corrected_by_name })}</span>
             )}
-            <button type="button" onClick={() => setEditing(true)} className={`${BTN} border border-line font-semibold text-ink-700`}>
-              {t('tournament.score.correct')}
-            </button>
+            {/* Falta marcada por engano: desfaz-se (Trello #491). O jogo volta
+                a estar por jogar; o servidor recusa se o jogo seguinte da
+                categoria já tiver resultado. */}
+            {/* Só o organizador desfaz: o marcador corrige resultados, não
+                apaga faltas (Trello #491). */}
+            {['falta', 'desistencia'].includes(match.status) ? (onUndoWalkover && (
+              <button type="button" disabled={busy} onClick={() => onUndoWalkover(match)} className={`${BTN} border border-line font-semibold text-ink-700`}>
+                {t(match.status === 'falta' ? 'tournament.score.undo_walkover' : 'tournament.score.undo_retirement')}
+              </button>
+            )) : (
+              <button type="button" onClick={() => setEditing(true)} className={`${BTN} border border-line font-semibold text-ink-700`}>
+                {t('tournament.score.correct')}
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -313,6 +333,7 @@ export default function TournamentScorePage() {
   const [pageDays, setPageDays] = useState([])
   const [proposal, setProposal] = useState(null) // { slots, preview, left, noCourts }
   const [sheet, setSheet] = useState(null) // { match, kind }
+  const [undoing, setUndoing] = useState(null) // o jogo cuja falta se desfaz (#491)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -541,7 +562,7 @@ export default function TournamentScorePage() {
               <div className="space-y-2">
                 {cards.map((c) => (
                   <CourtCard key={c.card.match_id} match={c.card} scoring={scoring} busy={busy} t={t}
-                    onSave={save} onWalkover={(match, kind) => setSheet({ match, kind })} />
+                    onSave={save} onWalkover={(match, kind) => setSheet({ match, kind })} onUndoWalkover={isAdmin ? setUndoing : null} />
                 ))}
               </div>
             </>
@@ -567,7 +588,7 @@ export default function TournamentScorePage() {
           <div className="space-y-2">
             {done.map((m) => (
               <CourtCard key={m.match_id} match={m} scoring={scoring} busy={busy} t={t}
-                onSave={save} onWalkover={(match, kind) => setSheet({ match, kind })} />
+                onSave={save} onWalkover={(match, kind) => setSheet({ match, kind })} onUndoWalkover={isAdmin ? setUndoing : null} />
             ))}
           </div>
         </>
@@ -576,6 +597,19 @@ export default function TournamentScorePage() {
       {sheet && (
         <WalkoverSheet match={sheet.match} kind={sheet.kind} t={t}
           onClose={() => setSheet(null)} onConfirm={confirmWalkover} />
+      )}
+      {undoing && (
+        <ConfirmSheet
+          open
+          title={t(undoing.status === 'falta' ? 'tournament.score.undo_walkover_title' : 'tournament.score.undo_retirement_title',
+            { a: undoing.team_a?.name || '?', b: undoing.team_b?.name || '?' })}
+          message={t('tournament.score.undo_walkover_consequence')}
+          confirmLabel={t(undoing.status === 'falta' ? 'tournament.score.undo_walkover' : 'tournament.score.undo_retirement')}
+          cancelLabel={t('tournament.score.undo_not_now')}
+          onConfirm={async () => { await undoWalkover(undoing.match_id); load() }}
+          onClose={() => setUndoing(null)}
+          errorOf={(err) => describeError(t, err)}
+        />
       )}
     </div>
   )

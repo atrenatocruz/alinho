@@ -829,6 +829,7 @@ export default function Home() {
                 onSearchAll={() => setFilters(DEFAULT_FILTERS)}
                 onClear={() => setSearch('')}
                 results={myMixResults}
+                userId={user.id}
                 linkFor={(e) => (
                   e.source === 'game' || e.source === 'explore' ? `/jogo/${e.id}`
                     : e.kind === 'tournament' ? (e.slug || e.id ? `/torneio/${e.slug || e.id}` : null)

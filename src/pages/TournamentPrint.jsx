@@ -17,11 +17,32 @@ import { useEffect, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { getTournamentPage } from '../lib/tournamentApi'
-import { getCategoryBoard, bracketRounds, byDayAndTime } from '../lib/tournamentDraw'
+import { getCategoryBoard, bracketRounds, byDayAndTime, standingsOf } from '../lib/tournamentDraw'
+import { hhmmInTz } from '../lib/tournamentDay'
 
 const ROUND_PT = { R32: '16 avos', R16: 'Oitavos', QF: 'Quartos', SF: 'Meias-finais', F: 'Final', '3P': '3.º e 4.º' }
 
-const hhmm = (iso) => (iso ? new Date(iso).toTimeString().slice(0, 5) : '')
+// Hora de Portugal, como o resto do torneio — não a do computador que
+// imprime (Trello #519, #487).
+const hhmm = (iso) => hhmmInTz(iso)
+
+/** «sex, 9 out» — como no resto da app, nunca «2026-10-09» (Trello #519). */
+const shortDay = (date, locale) => {
+  const d = new Date(`${date}T12:00:00`)
+  const part = (opts) => d.toLocaleDateString(locale, opts).replace(/\./g, '')
+  return `${part({ weekday: 'short' })}, ${part({ day: 'numeric' })} ${part({ month: 'short' })}`
+}
+
+/** O resultado de um jogo já jogado, para a folha (Trello #519): o que foi
+ *  lançado na app aparece impresso; o que falta fica em branco para
+ *  escrever à mão. */
+const FINISHED = ['terminado', 'falta', 'desistencia']
+const played = (m) => FINISHED.includes(m.status) || !!m.winner_entry_id
+const resultText = (m) => {
+  if (m.status === 'falta') return `${m.score_a ?? ''}–${m.score_b ?? ''} (falta)`
+  if (m.status === 'desistencia') return `${m.score_a ?? ''}–${m.score_b ?? ''} (desist.)`
+  return `${m.score_a ?? ''}–${m.score_b ?? ''}`
+}
 
 const dayLabel = (date, locale) => {
   const d = new Date(`${date}T12:00:00`)
@@ -39,6 +60,10 @@ const Blank = ({ w = 44 }) => (
 function GroupSheet({ group, matches, entries }) {
   const mine = matches.filter((m) => m.stage === 'grupo' && m.group_id === group.id)
   const nameOf = (id) => entries[id]?.name || '—'
+  // Com jogos já feitos, a tabela sai com a classificação de agora (o mesmo
+  // desempate da página); sem nenhum, fica em branco para somar à mão.
+  const anyPlayed = mine.some(played)
+  const rows = anyPlayed ? standingsOf(group, matches) : group.teams.map((id) => ({ id }))
 
   return (
     <section className="mb-4 break-inside-avoid">
@@ -56,14 +81,14 @@ function GroupSheet({ group, matches, entries }) {
           </tr>
         </thead>
         <tbody>
-          {group.teams.map((id, i) => (
-            <tr key={id}>
+          {rows.map((row, i) => (
+            <tr key={row.id}>
               <td className="border border-black px-1 py-1 text-center">{i + 1}</td>
-              <td className="border border-black px-1 py-1">{nameOf(id)}</td>
-              <td className="border border-black" />
-              <td className="border border-black" />
-              <td className="border border-black" />
-              <td className="border border-black" />
+              <td className="border border-black px-1 py-1">{nameOf(row.id)}</td>
+              <td className="border border-black px-1 text-center">{anyPlayed ? row.played : ''}</td>
+              <td className="border border-black px-1 text-center">{anyPlayed ? row.wins : ''}</td>
+              <td className="border border-black px-1 text-center">{anyPlayed ? row.gamesWon : ''}</td>
+              <td className="border border-black px-1 text-center">{anyPlayed ? (row.diff > 0 ? `+${row.diff}` : row.diff) : ''}</td>
             </tr>
           ))}
         </tbody>
@@ -77,7 +102,9 @@ function GroupSheet({ group, matches, entries }) {
             </span>
             <span className="w-16 shrink-0 font-mono text-[10px]">{m.court_name || '_______'}</span>
             <span className="flex-1">{nameOf(m.entry_a_id)} × {nameOf(m.entry_b_id)}</span>
-            <span className="shrink-0"><Blank w={26} /> – <Blank w={26} /></span>
+            <span className="shrink-0">
+              {played(m) ? <b>{resultText(m)}</b> : <><Blank w={26} /> – <Blank w={26} /></>}
+            </span>
           </li>
         ))}
       </ul>
@@ -107,11 +134,16 @@ function BracketSheet({ matches, entries, title }) {
             {ms.map((m) => (
               <div key={m.id} className="mb-1.5 border border-black p-1 text-[11px]">
                 <p className="flex items-baseline justify-between gap-1">
-                  <span className="truncate">{side(m, 'a')}</span><Blank w={22} />
+                  <span className={`truncate ${played(m) && m.winner_entry_id === m.entry_a_id ? 'font-bold' : ''}`}>{side(m, 'a')}</span>
+                  {played(m) ? <b className="shrink-0">{m.score_a ?? ''}</b> : <Blank w={22} />}
                 </p>
                 <p className="mt-0.5 flex items-baseline justify-between gap-1 border-t border-dotted border-black pt-0.5">
-                  <span className="truncate">{side(m, 'b')}</span><Blank w={22} />
+                  <span className={`truncate ${played(m) && m.winner_entry_id === m.entry_b_id ? 'font-bold' : ''}`}>{side(m, 'b')}</span>
+                  {played(m) ? <b className="shrink-0">{m.score_b ?? ''}</b> : <Blank w={22} />}
                 </p>
+                {played(m) && m.status !== 'terminado' && (
+                  <p className="mt-0.5 text-[9px]">{m.status === 'falta' ? 'Falta' : 'Desistência'}</p>
+                )}
                 <p className="mt-0.5 font-mono text-[9px]">
                   {m.scheduled_at ? hhmm(m.scheduled_at) : '__:__'} · {m.court_name || '_______'}
                 </p>
@@ -172,7 +204,9 @@ function DayGrid({ day, matches, entries, locale }) {
                         <span className="block">
                           {nameOf(m.entry_b_id) || m.source_b || '—'}
                         </span>
-                        <span className="mt-0.5 block"><Blank w={20} /> – <Blank w={20} /></span>
+                        <span className="mt-0.5 block">
+                          {played(m) ? <b>{resultText(m)}</b> : <><Blank w={20} /> – <Blank w={20} /></>}
+                        </span>
                       </>
                     ) : null}
                   </td>
@@ -269,7 +303,7 @@ export default function TournamentPrint() {
         <h1 className="text-[18px] font-extrabold">{t.name}</h1>
         <p className="text-[11px]">
           {[t.club_name, t.location].filter(Boolean).join(' · ')}
-          {t.starts_on ? ` · ${t.starts_on}${t.ends_on && t.ends_on !== t.starts_on ? ` a ${t.ends_on}` : ''}` : ''}
+          {t.starts_on ? ` · ${shortDay(t.starts_on, i18n.language)}${t.ends_on && t.ends_on !== t.starts_on ? ` a ${shortDay(t.ends_on, i18n.language)}` : ''}` : ''}
         </p>
         <p className="mt-0.5 text-[10px]">
           Impresso a {new Date().toLocaleString(i18n.language)}. As horas são previstas.
