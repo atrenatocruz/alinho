@@ -9,6 +9,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Check, ChevronRight, Clock, Globe, Heart, Instagram, Lock, MapPin, Phone, Plus } from 'lucide-react'
 import { Avatar, ConfirmSheet, PrimaryButton } from '../ui'
+import { describeError, errorKind } from '../../lib/errors'
 import { KIND_STYLE, KindTag, StateTag } from '../agenda/EventCard'
 
 const asWebsiteUrl = (value) => (/^https?:\/\//i.test(value) ? value : `https://${value}`)
@@ -91,6 +92,9 @@ export function ClubHeader({ club, isFavorite, acting, favoriting, onFollow, onU
         confirmLabel={t('clubprofile.unfollow_yes')}
         onConfirm={onUnfollow}
         onClose={() => setAsking(false)}
+        // Sem ligação ou sessão: a frase de sempre. O resto: a do clube/grupo,
+        // nunca a mensagem técnica da base de dados.
+        errorOf={(err) => (['offline', 'session'].includes(errorKind(err)) ? describeError(t, err) : t(kk('clubprofile.error_unfollow')))}
       />
     </div>
   )
@@ -201,6 +205,7 @@ export function ClubEvents({ club, events, isAdmin, gerirHref }) {
         isAdmin ? (
           <div className="rounded-card border-2 border-dashed border-line p-3.5">
             <p className="text-sm font-extrabold text-ink-900">{t('clubprofile.nothing_yet_admin')}</p>
+            <p className="text-[13px] text-muted">{t(kk('clubprofile.nothing_yet_admin_hint'))}</p>
             <Link to={gerirHref} className="mt-1 inline-flex min-h-[44px] items-center gap-1 text-sm font-extrabold text-ink-900">
               <Plus size={15} /> {t('clubprofile.schedule_mix')} <ChevronRight size={15} />
             </Link>
@@ -334,6 +339,7 @@ export function ClubAbout({ club, isAdmin, gerirHref }) {
         <h3 className="mb-2 text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('clubprofile.about')}</h3>
         <div className="rounded-card border-2 border-dashed border-line p-3.5">
           <p className="text-sm font-extrabold text-ink-900">{t(kk('clubprofile.about_invite'))}</p>
+          <p className="text-[13px] text-muted">{t('clubprofile.about_invite_hint')}</p>
           <Link to={gerirHref} className="mt-1 inline-flex min-h-[44px] items-center gap-1 text-sm font-extrabold text-ink-900">
             {t('clubprofile.write_in_gerir')} <ChevronRight size={15} />
           </Link>

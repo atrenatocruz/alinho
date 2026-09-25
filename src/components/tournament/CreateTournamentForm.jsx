@@ -7,6 +7,7 @@ import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, ImagePlus, Lock, Plus, Trash2, X } from 'lucide-react'
 import { Chips, DateField, PrimaryButton } from '../ui'
+import { TIEBREAK_RULES } from './tieBreak'
 import { categoryCode, categoryName, stepProblem, saveProblem, totalCourtHours, totalSlots, pricePerPlayer } from '../../lib/tournaments'
 import { localInputToIso, isoToLocalInput } from '../../lib/tournamentDay'
 import { MonoLabel } from './TournamentBits'
@@ -16,6 +17,7 @@ import { describeError } from '../../lib/errors'
 const DEFAULT_RULES = {
   entry_mode: 'dupla',        // dupla | sozinho | as_duas
   scoring: 'pro_set_9',
+  tiebreak_8_8: 'tiebreak',   // em 8-8: tie-break a 7 | super tie-break a 10
   duration_min: 30,
   duration_max: 60,
   max_consecutive: 2,         // nunca 3 seguidos (SPEC §6)
@@ -37,7 +39,9 @@ function Field({ label, children, hint, error }) {
   return (
     <div className="mt-3">
       <MonoLabel className="mb-1.5">{label}</MonoLabel>
-      {children}
+      {/* Campo em falta ou errado: contorno vermelho no campo E a frase por
+          baixo (regra das janelas, 24 set). */}
+      {error ? <div className="[&_input]:!border [&_input]:!border-danger [&_.input-field]:!border-danger">{children}</div> : children}
       {/* O porquê fica junto ao campo que o causa (Trello #514). */}
       {error && <p role="alert" className="mt-1 text-[12px] font-bold text-danger">{error}</p>}
       {hint && <p className="mt-1 text-[11.5px] text-ink-500">{hint}</p>}
@@ -557,6 +561,15 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
               label={t('tournament.create.scoring')}
               options={SCORINGS.map((s) => ({ value: s, label: t(`tournament.create.scoring_${s}`) }))} />
           </Field>
+          {/* Pro set em 8-8: tie-break a 7 ou super tie-break a 10 — escolhe
+              quem organiza (Francisco, 25 set). Nos sets, o 6-6 é sempre a 7. */}
+          {draft.rules.scoring === 'pro_set_9' && (
+            <Field label={t('tournament.create.tiebreak_8_8')}>
+              <Chips value={draft.rules.tiebreak_8_8 || 'tiebreak'} onChange={(v) => setRule('tiebreak_8_8', v)}
+                label={t('tournament.create.tiebreak_8_8')}
+                options={TIEBREAK_RULES.map((r) => ({ value: r, label: t(`tournament.create.tiebreak_8_8_${r}`) }))} />
+            </Field>
+          )}
           <Field label={t('tournament.create.duration')} hint={t('tournament.create.duration_hint', { max: draft.rules.duration_max })} error={fieldError(['duration_order'])}>
             <div className="flex items-center gap-2">
               <input type="number" min="15" max="180" step="5" className="w-[86px] rounded-ctrl border border-line bg-canvas px-2 py-2 text-sm" value={draft.rules.duration_min} onChange={(e) => setRule('duration_min', Number(e.target.value))} />

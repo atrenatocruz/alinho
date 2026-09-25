@@ -9,23 +9,33 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { describeError } from '../lib/errors'
 import { Toggle } from './lessons/LessonBits'
+import { ConfirmSheet } from './ui'
 
 export default function AppFeaturesPanel() {
   const { t } = useTranslation()
   const { isPrivateMatchesEnabled, isLessonsFlagOn, refreshFeatureFlags } = useAuth()
   const [saving, setSaving] = useState(false)
+  // Janelas e avisos da app (SPEC de 24 set): desligar pergunta na folha da
+  // app, e o que correr mal fica escrito junto aos interruptores.
+  const [askOff, setAskOff] = useState(false)
+  const [error, setError] = useState('')
+
+  const setPrivateMatches = async (next) => {
+    const { error: rpcError } = await supabase.rpc('admin_set_feature_flag', { p_key: 'private_matches', p_enabled: next })
+    if (rpcError) throw rpcError
+    await refreshFeatureFlags()
+  }
 
   const togglePrivateMatches = async () => {
     const next = !isPrivateMatchesEnabled
-    if (!next && !confirm(t('gerir.private_matches_off_confirm'))) return
+    setError('')
+    if (!next) { setAskOff(true); return }
     setSaving(true)
     try {
-      const { error } = await supabase.rpc('admin_set_feature_flag', { p_key: 'private_matches', p_enabled: next })
-      if (error) throw error
-      await refreshFeatureFlags()
-    } catch (error) {
-      console.error('Error toggling private matches flag:', error)
-      alert(describeError(t, error, 'gerirclube.error_toggle_feature'))
+      await setPrivateMatches(next)
+    } catch (err) {
+      console.error('Error toggling private matches flag:', err)
+      setError(describeError(t, err, 'gerirclube.error_toggle_feature'))
     } finally {
       setSaving(false)
     }
@@ -35,14 +45,15 @@ export default function AppFeaturesPanel() {
   // as ve. Precisa da linha 'lessons' na tabela (migration_feature_flag_lessons.sql).
   const toggleLessons = async () => {
     const next = !isLessonsFlagOn
+    setError('')
     setSaving(true)
     try {
-      const { error } = await supabase.rpc('admin_set_feature_flag', { p_key: 'lessons', p_enabled: next })
-      if (error) throw error
+      const { error: rpcError } = await supabase.rpc('admin_set_feature_flag', { p_key: 'lessons', p_enabled: next })
+      if (rpcError) throw rpcError
       await refreshFeatureFlags()
-    } catch (error) {
-      console.error('Error toggling lessons flag:', error)
-      alert(describeError(t, error, 'gerirclube.error_toggle_feature'))
+    } catch (err) {
+      console.error('Error toggling lessons flag:', err)
+      setError(describeError(t, err, 'gerirclube.error_toggle_feature'))
     } finally {
       setSaving(false)
     }
@@ -81,7 +92,22 @@ export default function AppFeaturesPanel() {
           disabled={saving}
           onChange={toggleLessons}
         />
+        {error && (
+          <p role="alert" className="mt-3 rounded-ctrl border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-sm font-bold text-danger">{error}</p>
+        )}
       </div>
+
+      <ConfirmSheet
+        open={askOff}
+        danger
+        title={t('gerir.private_matches_off_title')}
+        message={t('gerir.private_matches_off_confirm')}
+        cancelLabel={t('gerir.private_matches_off_keep')}
+        confirmLabel={t('gerir.private_matches_off_yes')}
+        onConfirm={() => setPrivateMatches(false)}
+        errorOf={(err) => describeError(t, err, 'gerirclube.error_toggle_feature')}
+        onClose={() => setAskOff(false)}
+      />
     </div>
   )
 }

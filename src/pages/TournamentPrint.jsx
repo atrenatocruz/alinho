@@ -19,6 +19,7 @@ import { useTranslation } from 'react-i18next'
 import { getTournamentPage } from '../lib/tournamentApi'
 import { getCategoryBoard, bracketRounds, byDayAndTime, standingsOf } from '../lib/tournamentDraw'
 import { hhmmInTz } from '../lib/tournamentDay'
+import { setText } from '../components/tournament/tieBreak'
 
 const ROUND_PT = { R32: '16 avos', R16: 'Oitavos', QF: 'Quartos', SF: 'Meias-finais', F: 'Final', '3P': '3.º e 4.º' }
 
@@ -41,6 +42,11 @@ const played = (m) => FINISHED.includes(m.status) || !!m.winner_entry_id
 const resultText = (m) => {
   if (m.status === 'falta') return `${m.score_a ?? ''}–${m.score_b ?? ''} (falta)`
   if (m.status === 'desistencia') return `${m.score_a ?? ''}–${m.score_b ?? ''} (desist.)`
+  // Com o tie-break (25 set): «9–8 (7-5)»; por sets, os sets todos:
+  // «2–1 (6-4 · 6-7 (5-7) · 10-8)».
+  const sets = m.sets || []
+  if (sets.length > 1) return `${m.score_a ?? ''}–${m.score_b ?? ''} (${sets.map(setText).join(' · ')})`
+  if (sets.length === 1 && sets[0].tiebreak_a != null) return `${m.score_a ?? ''}–${m.score_b ?? ''} (${sets[0].tiebreak_a}-${sets[0].tiebreak_b})`
   return `${m.score_a ?? ''}–${m.score_b ?? ''}`
 }
 
