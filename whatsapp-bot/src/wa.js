@@ -21,8 +21,12 @@ const logger = pino({ level: 'info' })
  * the sender's own message id), or null if this message isn't a reply —
  * this is how commands.js resolves "In"/"Out" sent as a native reply to
  * one specific mix's roster message (2026-09-14 disambiguation redesign).
+ *
+ * onDirectMessage(payload) (opcional) fires for plain-text PRIVATE messages
+ * sent to the bot — só se usam para confirmar o número (verify.js, #537).
+ *   payload: { chatJid, senderPn, text, message }
  */
-export async function connectWhatsApp({ onGroupMessage }) {
+export async function connectWhatsApp({ onGroupMessage, onDirectMessage }) {
   // `sock` is reassigned by `start()` on every (re)connect. `sendText`
   // below closes over this outer binding — not over a specific socket
   // instance — so it always talks to whichever connection is currently
@@ -126,13 +130,23 @@ export async function connectWhatsApp({ onGroupMessage }) {
       for (const msg of messages) {
         if (!msg.message || msg.key.fromMe) continue
         const groupJid = msg.key.remoteJid
-        if (!groupJid || !groupJid.endsWith('@g.us')) continue
+        if (!groupJid) continue
 
         const text =
           msg.message.conversation ||
           msg.message.extendedTextMessage?.text ||
           null
         if (!text) continue
+
+        // Mensagem privada (não é grupo nem estado): só serve para confirmar
+        // o número (#537). O número verdadeiro vem no próprio JID ou, quando
+        // o WhatsApp mostra um @lid, no senderPn.
+        if (!groupJid.endsWith('@g.us')) {
+          if (groupJid === 'status@broadcast' || !onDirectMessage) continue
+          const dmPn = msg.key.senderPn || (groupJid.endsWith('@s.whatsapp.net') ? groupJid : null)
+          onDirectMessage({ chatJid: groupJid, senderPn: dmPn, text, message: msg })
+          continue
+        }
 
         // participantPn (if present) carries the real phone-number JID even
         // when the group presents senders via a privacy-preserving @lid.
