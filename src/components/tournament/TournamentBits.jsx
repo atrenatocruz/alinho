@@ -70,7 +70,7 @@ export function CategorySelect({ categories, value, onChange, label, mineId = nu
         onClick={() => setOpen((v) => !v)}
         aria-label={label}
         aria-expanded={open}
-        className="inline-flex items-center gap-1.5 rounded-full border border-line bg-canvas px-3 py-1.5 text-[12.5px] font-semibold text-ink-900"
+        className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-line bg-canvas px-3 py-1.5 text-[12.5px] font-semibold text-ink-900"
       >
         {current.code} · {current.name}
         <ChevronDown size={14} strokeWidth={2.4} className={open ? 'rotate-180 transition-transform' : 'transition-transform'} />

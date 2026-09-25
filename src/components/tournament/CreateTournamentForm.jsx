@@ -7,7 +7,8 @@ import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, ImagePlus, Lock, Plus, Trash2, X } from 'lucide-react'
 import { Chips, DateField, PrimaryButton } from '../ui'
-import { categoryCode, categoryName, stepProblem, totalCourtHours, totalSlots, pricePerPlayer, localInputToIso, isoToLocalInput } from '../../lib/tournaments'
+import { categoryCode, categoryName, stepProblem, totalCourtHours, totalSlots, pricePerPlayer } from '../../lib/tournaments'
+import { localInputToIso, isoToLocalInput } from '../../lib/tournamentDay'
 import { MonoLabel } from './TournamentBits'
 import { removeTournamentPoster, uploadTournamentPoster } from '../../lib/tournamentPosterStorage'
 import { describeError } from '../../lib/errors'
@@ -271,7 +272,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
 
   return (
     <div>
-      <button type="button" onClick={step === 1 ? onCancel : () => setStep(step - 1)} className="inline-flex items-center gap-1.5 text-sm font-extrabold text-ink-700 hover:underline">
+      <button type="button" onClick={step === 1 ? onCancel : () => setStep(step - 1)} className="inline-flex min-h-[44px] items-center gap-1.5 text-sm font-extrabold text-ink-700 hover:underline">
         <ArrowLeft size={16} /> {step === 1 ? t('tournament.create.cancel') : t('common.back')}
       </button>
 

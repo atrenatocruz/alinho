@@ -129,6 +129,31 @@ export async function finishCategory(categoryId, { champion = null, runnerUp = n
   return data
 }
 
+/** Os torneios em que a pessoa marca resultados HOJE (Trello #505): é
+ *  marcador nomeado, ou admin do clube que organiza. Só os já sorteados ou a
+ *  decorrer, e só no dia — «hoje» em hora de Portugal, o mesmo dia que o
+ *  /marcar e o servidor contam (`dayKeyInTz`). Lê a tabela dos marcadores,
+ *  que já deixa cada um ver as suas linhas; nada de novo na base de dados. */
+export async function listTournamentsToScoreToday({ userId, adminOrgIds = [], today }) {
+  if (!userId || !today) return []
+  const { data: keeperRows, error: keeperError } = await supabase
+    .from('tournament_scorekeepers').select('tournament_id').eq('user_id', userId)
+  if (keeperError) throw keeperError
+  const ids = [...new Set((keeperRows || []).map((r) => r.tournament_id))]
+  if (ids.length === 0 && adminOrgIds.length === 0) return []
+  const or = [
+    ids.length ? `id.in.(${ids.join(',')})` : null,
+    adminOrgIds.length ? `organization_id.in.(${adminOrgIds.join(',')})` : null,
+  ].filter(Boolean).join(',')
+  const { data, error } = await supabase
+    .from('tournament_public')
+    .select('id, slug, name, club_name, starts_on, ends_on, status')
+    .in('status', ['sorteado', 'a_decorrer'])
+    .or(or)
+  if (error) throw error
+  return (data || []).filter((x) => x.starts_on && x.starts_on <= today && (x.ends_on || x.starts_on) >= today)
+}
+
 /** O fim do torneio (print 12): quem ganhou cada categoria e o que a pessoa
  *  que está a ver levou de lá.
  *
