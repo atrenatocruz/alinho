@@ -1123,6 +1123,7 @@
   "gerirclube.open_join_hint": "Without this, join requests need your approval",
   "gerirclube.open_join_label": "Open join",
   "gerirclube.other_dates_heading": "Other dates in this recurrence",
+  "gerirclube.opens_at": "Opens {{when}}",
   "gerirclube.pause_button": "Pause",
   "gerirclube.pending_request_label": "Pending request",
   "gerirclube.phone_label": "Phone",

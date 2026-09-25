@@ -1169,6 +1169,8 @@ export default function GerirClube() {
   // Updates the snapshot + rule on the origin Mix's recurrence. Only ever
   // called from handleUpdateGame when editing the origin of an active
   // recurrence — already-created Mixes are never touched by this.
+  // Devolve { error } (fica escrito no formulário, junto ao que falhou) ou
+  // { notice } (tira preta de 3 s) — regra das janelas, sem alert().
   const updateRecurrence = async (recurrenceId, game, recurrence) => {
     const mixOffsetSeconds = computeLaunchOffsetSeconds(game.date, recurrence.launchDaysBefore, recurrence.launchTime)
 
@@ -1183,8 +1185,7 @@ export default function GerirClube() {
 
     if (error) {
       console.error('Error updating recurrence:', error)
-      alert(describeError(t, error, 'gerirclube.error_recurrence_update_failed'))
-      return
+      return { error: describeError(t, error, 'gerirclube.error_recurrence_update_failed') }
     }
 
     // Keep the already pre-created pending occurrence's launch time in sync
@@ -1199,8 +1200,7 @@ export default function GerirClube() {
 
     if (pendingFetchError) {
       console.error('Error finding pending occurrence:', pendingFetchError)
-      alert(describeError(t, pendingFetchError, 'gerirclube.error_recurrence_launch_update_failed'))
-      return
+      return { error: describeError(t, pendingFetchError, 'gerirclube.error_recurrence_launch_update_failed') }
     }
     // Sem o próximo Mix (Trello #529): antes saía aqui em silêncio e a hora
     // nova não servia para nada. Agora cria-se já, com a regra acabada de
@@ -1209,13 +1209,11 @@ export default function GerirClube() {
       const { data: status, error: ensureError } = await supabase.rpc('ensure_recurrence_successor', { p_recurrence_id: recurrenceId })
       if (ensureError) {
         console.error('Error creating the next occurrence:', ensureError)
-        alert(describeError(t, ensureError, 'gerirclube.error_recurrence_no_next'))
-      } else if (status === 'ended') {
-        alert(t('gerirclube.recurrence_ended_no_next'))
-      } else if (status === 'no_base') {
-        alert(t('gerirclube.error_recurrence_no_next'))
+        return { error: describeError(t, ensureError, 'gerirclube.error_recurrence_no_next') }
       }
-      return
+      if (status === 'no_base') return { error: t('gerirclube.error_recurrence_no_next') }
+      if (status === 'ended') return { notice: t('gerirclube.recurrence_ended_no_next') }
+      return {}
     }
 
     const { error: launchUpdateError } = await supabase
@@ -1225,8 +1223,9 @@ export default function GerirClube() {
 
     if (launchUpdateError) {
       console.error('Error updating pending occurrence launch time:', launchUpdateError)
-      alert(describeError(t, launchUpdateError, 'gerirclube.error_recurrence_launch_update_failed'))
+      return { error: describeError(t, launchUpdateError, 'gerirclube.error_recurrence_launch_update_failed') }
     }
+    return {}
   }
 
   // Deactivates a recurrence and removes its not-yet-launched pending
@@ -1342,7 +1341,15 @@ export default function GerirClube() {
 
       if (hadActiveRecurrence && recurrence.enabled) {
         // Origin Mix, recurrence still on: keep the shared rule/snapshot in sync.
-        await updateRecurrence(editingGame.recurrence.id, data, recurrence)
+        const result = await updateRecurrence(editingGame.recurrence.id, data, recurrence)
+        // O mix ficou gravado; o que falhou na recorrência fica escrito no
+        // formulário, que não fecha, para o admin ver onde foi.
+        if (result.error) {
+          setGameError(result.error)
+          loadGames()
+          return
+        }
+        if (result.notice) setDoneNotice(result.notice)
       } else if (hadActiveRecurrence && !recurrence.enabled) {
         // Origin Mix, toggled off: stop creating future Mixes and remove the
         // already pre-created pending occurrence. Confirmed explicitly —
@@ -1374,7 +1381,7 @@ export default function GerirClube() {
   // Eliminar um mix (regra das janelas, 24 set): a pergunta é a folha da
   // app, com o nome do mix; o que correr mal aparece na própria folha; o que
   // correr bem é a tira preta em baixo, que desaparece em 3 s.
-  // `confirmed` = quem chama já perguntou (a folha do rascunho, #544).
+  // Quem já perguntou (a folha do rascunho, #544) chama deleteGameNow.
   // Devolve true quando o mix saiu, para quem chama poder fechar a edição.
   const [deleteAsk, setDeleteAsk] = useState(null) // { game, resolve }
   const [doneNotice, setDoneNotice] = useState('')
@@ -1438,18 +1445,9 @@ export default function GerirClube() {
     loadGames()
   }
 
-  const handleDeleteGame = async (gameId, { confirmed = false } = {}) => {
-    if (!confirmed) {
-      const game = games.find(g => g.id === gameId)
-      return new Promise((resolve) => setDeleteAsk({ game: game || { id: gameId }, resolve }))
-    }
-    try {
-      await deleteGameNow(gameId)
-      return true
-    } catch (error) {
-      alert(error.message)
-      return false
-    }
+  const handleDeleteGame = (gameId) => {
+    const game = games.find(g => g.id === gameId)
+    return new Promise((resolve) => setDeleteAsk({ game: game || { id: gameId }, resolve }))
   }
 
   // Publicar um rascunho (Trello #544). Um erro de limite do plano diz-se
@@ -1800,6 +1798,16 @@ export default function GerirClube() {
     const semana = parte({ weekday: 'short' })
     const dia = `${semana.charAt(0).toUpperCase()}${semana.slice(1)} ${d.getDate()} ${parte({ month: 'short' })}`
     return comHora ? `${dia} · ${formatTimeLib(d, i18n.language, { hour: '2-digit', minute: '2-digit' })}` : dia
+  }
+  // Mix de uma recorrência que ainda não abriu (Trello #562): quando abrem as
+  // inscrições, ao lado da data — «Abre qui 1/10, 10:00». Antes só se via
+  // dentro do formulário da recorrência.
+  const abreEm = (game) => {
+    if (game?.status !== 'pending' || !game.launch_at) return null
+    const d = new Date(game.launch_at)
+    const semana = formatDateLib(d, i18n.language, { weekday: 'short' }).replace('.', '').slice(0, 3).toLowerCase()
+    const hora = formatTimeLib(d, i18n.language, { hour: '2-digit', minute: '2-digit' })
+    return t('gerirclube.opens_at', { when: `${semana} ${d.getDate()}/${d.getMonth() + 1}, ${hora}` })
   }
 
   const formatDate = (dateString) =>
@@ -2692,7 +2700,7 @@ export default function GerirClube() {
                             </p>
                             {outrasDatas.map((h) => (
                               <div key={h.id} className="flex items-center justify-between gap-2 bg-canvas rounded-lg px-3 py-2 border border-line">
-                                <p className="text-sm text-ink-900 truncate">{quandoCurto(h.date)}</p>
+                                <p className="text-sm text-ink-900 min-w-0">{[quandoCurto(h.date), abreEm(h)].filter(Boolean).join(' · ')}</p>
                                 <button
                                   type="button"
                                   onClick={() => startEditGame(h)}
@@ -2775,7 +2783,7 @@ export default function GerirClube() {
                     etiqueta = { mix: 'gerirclube.event_label_mix', aberto: 'gerirclube.event_label_open', torneio: 'gerirclube.event_label_tournament' }[tipo]
                     Icone = { mix: Calendar, aberto: Clock, torneio: Trophy }[tipo]
                     linha = tipo === 'torneio' ? row.name : row.title
-                    detalhe = [item.quando ? quandoCurto(item.quando, tipo !== 'torneio') : null, aDecorrer, lugares, duplas, prazo].filter(Boolean).join(' · ')
+                    detalhe = [item.quando ? quandoCurto(item.quando, tipo !== 'torneio') : null, tipo === 'mix' ? abreEm(row) : null, aDecorrer, lugares, duplas, prazo].filter(Boolean).join(' · ')
                     abrir = () => navigate(tipo === 'torneio' ? `/torneio/${row.slug || row.id}` : `/jogo/${row.id}`)
                     // Torneio privado (Trello #482): não aparece na Home nem na
                     // Comunidade, e o link só abre a quem gere. Tem de se ler aqui.
@@ -2890,14 +2898,16 @@ export default function GerirClube() {
                 confirmLabel={t('mixdraft.delete_confirm')}
                 cancelLabel={t('mixdraft.delete_keep')}
                 onConfirm={async () => {
-                  if (!(await handleDeleteGame(deletingDraft.id, { confirmed: true }))) throw new Error('delete_failed')
+                  // A razão verdadeira (ex.: «já tem resultados») vai para a
+                  // folha — deleteGameNow lança o erro com o texto.
+                  await deleteGameNow(deletingDraft.id)
                   setEditingGame(null)
                   setGameForm(EMPTY_GAME_FORM)
                   setMixScopeId('')
                   setGameError('')
                 }}
                 onClose={() => setDeletingDraft(null)}
-                errorOf={() => t('gerirclube.error_delete_game')}
+                errorOf={(err) => err?.message || t('gerirclube.error_delete_game')}
               />
             </div>
           )}
