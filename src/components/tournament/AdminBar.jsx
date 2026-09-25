@@ -14,7 +14,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Eye, Pencil, Trash2 } from 'lucide-react'
+import { CalendarDays, Eye, Pencil, Trash2 } from 'lucide-react'
 import { deleteTournament, setTournamentStatus } from '../../lib/tournamentApi'
 import { describeError } from '../../lib/errors'
 import { canDelete } from '../../lib/tournaments'
@@ -50,7 +50,7 @@ const STATE_PILL = {
   sorteado: 'dark', a_decorrer: 'live', terminado: 'grey',
 }
 
-export default function AdminBar({ tournament, categories = [], onChanged, onEdit, onDraw }) {
+export default function AdminBar({ tournament, categories = [], onChanged, onEdit, onDraw, onSchedule }) {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const [busy, setBusy] = useState(false)
@@ -163,6 +163,15 @@ export default function AdminBar({ tournament, categories = [], onChanged, onEdi
           className="inline-flex items-center gap-1.5 min-h-[44px] rounded-ctrl border border-line bg-canvas px-3 py-2 text-[12px] font-bold text-ink-900">
           <Pencil size={14} /> {preview ? t('tournament.admin.keep_editing') : t('tournament.admin.edit')}
         </button>
+        {/* A grelha de horas (Trello #563): tinha ficado sem entrada quando o
+            Gerir passou à lista única de Eventos. Secundário, igual ao
+            «Editar», só com jogos marcados (designer, 25 set). */}
+        {(status === 'sorteado' || status === 'a_decorrer') && (
+          <button type="button" onClick={() => onSchedule?.()}
+            className="inline-flex items-center gap-1.5 min-h-[44px] rounded-ctrl border border-line bg-canvas px-3 py-2 text-[12px] font-bold text-ink-900">
+            <CalendarDays size={14} /> {t('tournament.admin.schedule')}
+          </button>
+        )}
         <button type="button" onClick={() => {
           const url = new URL(window.location.href)
           url.searchParams.set('ver', 'publico')
