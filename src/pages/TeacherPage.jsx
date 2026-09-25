@@ -18,7 +18,7 @@ import { supabase } from '../lib/supabase'
 import { followPlayer, getFollowCounts, unfollowPlayer } from '../lib/follows'
 import { Avatar, ConfirmSheet, EmptyState, PrimaryButton } from '../components/ui'
 import {
-  LevelPill, MonoLabel, TealTag, TEAL, bandLabel, levelRange, hm, hhmm, isoWeekday, sameDay, euros, lessonTypeLabel,
+  LevelPill, MonoLabel, TealTag, TEAL, bandLabel, levelRange, hhmm, isoWeekday, sameDay, euros, lessonTypeLabel,
 } from '../components/lessons/LessonBits'
 
 const pad = (n) => String(n).padStart(2, '0')
@@ -149,8 +149,6 @@ export default function TeacherPage({ view = 'profile' }) {
 
   const weekly = weeklyFromItems(items)
 
-  // "Esta semana": seg–dom; domingo só aparece se tiver alguma coisa.
-  const days = [1, 2, 3, 4, 5, 6, 7].filter((wd) => wd < 7 || items.some((it) => it.weekday === 7))
 
   // Desenho aprovado (25 set, assunto 4): toda a gente vê quem é, o horário
   // e onde dá aulas. Preços e «Pedir aula» só com as aulas ligadas.
@@ -210,30 +208,43 @@ export default function TeacherPage({ view = 'profile' }) {
         </button>
       ) : (
         <div className="space-y-2">
+          {/* Com a marcação ligada (#392, assunto 1): «Pedir aula» é a lima,
+              «Seguir» a contorno e o contacto por baixo, discreto. */}
           <div className="flex gap-2">
+            {isLessonsEnabled && (
+              <PrimaryButton className="flex-1 !px-3 !rounded-full" onClick={() => navigate(`/professor/${id}/pedir`)}>
+                {t('lessons.request_lesson')}
+              </PrimaryButton>
+            )}
             {followed || requested ? (
               <button type="button" disabled={followBusy} onClick={() => (followed ? setAskUnfollow(true) : unfollow())}
                 className="flex-1 inline-flex items-center justify-center gap-1.5 min-h-[48px] rounded-full border-[1.5px] border-line bg-white text-ink-900 font-extrabold disabled:opacity-40">
                 {followed ? <><Check size={16} /> {t('playerdetails.following_button')}</> : t('playerdetails.requested_button')}
+              </button>
+            ) : isLessonsEnabled ? (
+              <button type="button" disabled={followBusy} onClick={follow}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 min-h-[48px] rounded-full border-[1.5px] border-line bg-white text-ink-900 font-extrabold disabled:opacity-40">
+                <Plus size={16} /> {t('playerdetails.follow_button')}
               </button>
             ) : (
               <PrimaryButton className="flex-1 !px-3 !rounded-full" disabled={followBusy} onClick={follow}>
                 <Plus size={16} /> {t('playerdetails.follow_button')}
               </PrimaryButton>
             )}
-            {contact && (
+            {contact && !isLessonsEnabled && (
               <a href={contact.href} target="_blank" rel="noopener noreferrer"
                 className="flex-1 inline-flex items-center justify-center gap-2 rounded-full min-h-[48px] border-[1.5px] border-line bg-white text-ink-900 font-extrabold hover:bg-ink-50 transition-colors duration-fast">
                 {contactLabel}
               </a>
             )}
           </div>
-          {followError && <p role="alert" className="text-sm font-extrabold text-danger">{followError}</p>}
-          {isLessonsEnabled && (
-            <PrimaryButton variant="ghost" className="w-full" onClick={() => navigate(`/professor/${id}/disponibilidade`)}>
-              {t('lessons.request_lesson')}
-            </PrimaryButton>
+          {contact && isLessonsEnabled && (
+            <a href={contact.href} target="_blank" rel="noopener noreferrer"
+              className="flex items-center justify-center gap-1 text-sm font-extrabold text-ink-900 hover:underline">
+              {contactLabel} <ChevronRight size={15} />
+            </a>
           )}
+          {followError && <p role="alert" className="text-sm font-extrabold text-danger">{followError}</p>}
         </div>
       )}
 
@@ -285,24 +296,8 @@ export default function TeacherPage({ view = 'profile' }) {
       </div>
       )}
 
-      {isLessonsEnabled && (
-      <div>
-        <MonoLabel>{t('lessons.this_week')}</MonoLabel>
-        <div className="grid gap-1 mt-2" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))` }}>
-          {days.map((wd) => (
-            <div key={wd} className="flex flex-col gap-[3px] text-center">
-              <span className="font-mono text-[10.5px] font-bold text-ink-500 capitalize">{t(`lessons.wd_short_${wd}`)}</span>
-              {items.filter((it) => it.weekday === wd).map((it, i) => <WeekBlock key={i} item={it} />)}
-            </div>
-          ))}
-        </div>
-        <div className="flex flex-wrap gap-3 mt-2.5 text-[11px] text-ink-500">
-          <span className="inline-flex items-center gap-1"><i className="inline-block w-3 h-[9px] rounded-[3px] bg-white" style={{ border: `1.5px dashed ${TEAL.text}` }} />{t('lessons.legend_free')}</span>
-          <span className="inline-flex items-center gap-1"><i className="inline-block w-3 h-[9px] rounded-[3px]" style={{ background: TEAL.bg }} />{t('lessons.legend_open')}</span>
-          <span className="inline-flex items-center gap-1"><i className="inline-block w-3 h-[9px] rounded-[3px] bg-ink-50" />{t('lessons.legend_busy')}</span>
-        </div>
-      </div>
-      )}
+      {/* «Esta semana» saiu (designer, 26 set): repetia «Quando dá aulas»;
+          a disponibilidade de cada dia está no «Pedir aula». */}
 
       <ConfirmSheet
         open={askUnfollow}
@@ -317,23 +312,6 @@ export default function TeacherPage({ view = 'profile' }) {
       />
     </div>
   )
-}
-
-/** Bloco da grelha "Esta semana": altura proporcional à duração (4h ≈ 60px). */
-function WeekBlock({ item }) {
-  const { t } = useTranslation()
-  const mins = minutesBetween(item.starts_at, item.ends_at)
-  const height = Math.max(22, Math.round(mins / 4))
-  const full = item.kind === 'series' && item.taken >= item.capacity
-  const base = 'rounded-md text-[10px] font-semibold flex items-center justify-center'
-  if (item.kind === 'free') {
-    const label = mins >= 240 ? `${hm(item.starts_at).replace(':00', '')}–${hm(item.ends_at).replace(':00', '')}` : t('lessons.free_lower')
-    return <span className={`${base} bg-white`} style={{ height, border: `1.5px dashed ${TEAL.text}`, color: TEAL.text }}>{label}</span>
-  }
-  if (item.kind === 'series' && !full) {
-    return <span className={base} style={{ height, background: TEAL.bg, color: TEAL.text }}>{t(`lessons.short_type_${item.lesson_type}`)}</span>
-  }
-  return <span className={`${base} bg-ink-50`} style={{ height }} />
 }
 
 function Availability({ teacher, prices, items, day, setDay, goBack, today }) {

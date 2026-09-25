@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Search, Users, Clock, GraduationCap, X, MapPin, Lock, Check, Building2, Plus, ChevronRight } from 'lucide-react'
 import { searchOrganizations, listGlobalOrganizations } from '../lib/organizations'
-import { DAYS, listTeacherProfiles, teacherClubName } from '../lib/teachers'
+import { DAYS, listTeachersPublic, teacherClubName } from '../lib/teachers'
 import { scheduleFromRows, shortRange } from '../lib/teacherSchedule'
 import { teacherContact } from '../lib/teacherContact'
 import { LevelPill, bandLabel } from '../components/lessons/LessonBits'
@@ -111,7 +111,7 @@ export default function Comunidade() {
   const loadTeachers = async () => {
     setTeachersLoading(true)
     try {
-      setTeachers(await listTeacherProfiles())
+      setTeachers(await listTeachersPublic())
     } catch (error) {
       console.error('Error loading teacher profiles:', error)
     } finally {
