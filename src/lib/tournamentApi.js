@@ -241,14 +241,11 @@ export async function rescheduleMatch(matchId, { scheduled_at, court }) {
 /** Falta ou desistência. `loser` é 'a' ou 'b' — quem faltou ou desistiu;
  *  `justified` só conta nas faltas (justificada / sem justificação), e a
  *  sem justificação fica no histórico visível aos admins (SPEC §7). */
-export async function markWalkover(matchId, { kind, loser, justified = null, partial = null }) {
+export async function markWalkover(matchId, { kind, loser, justified = null }) {
+  // Só os quatro campos: desistir é perder o jogo inteiro, o resultado até
+  // ali não conta (Francisco, 23 set — Trello #458). Sem p_score_*, a
+  // mark_walkover dá a falta cheia (0 contra o máximo), como na falta.
   const args = { p_match_id: matchId, p_kind: kind, p_loser: loser, p_justified: justified }
-  // Desistência a meio: o resultado até ali (Trello #458). Só vai quando
-  // existe, para a chamada sem ele continuar igual.
-  if (kind === 'desistencia' && partial) {
-    args.p_score_a = partial.score_a
-    args.p_score_b = partial.score_b
-  }
   const { error } = await supabase.rpc('mark_walkover', args)
   if (error) throw error
 }
