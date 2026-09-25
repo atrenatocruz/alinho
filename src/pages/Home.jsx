@@ -1,4 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useSearchParams, useNavigationType, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Users, Search, X } from 'lucide-react'
@@ -106,12 +107,14 @@ export default function Home() {
   // fila dos filtros abre a pesquisa POR CIMA da Home. Guardada na sessão para
   // «voltar do evento regressa à pesquisa, com o texto escrito»; «Fechar»
   // limpa e volta à Home tal como estava.
-  const [searchState, setSearchState] = useState(() => readSession(SEARCH_KEY, { open: false, q: '' }))
+  // `all`: «Procurar em tudo» só dentro da pesquisa — os filtros da Home
+  // ficam como estavam para quando se fecha (designer, 25 set).
+  const [searchState, setSearchState] = useState(() => readSession(SEARCH_KEY, { open: false, q: '', all: false }))
   const search = searchState.q || ''
   const searchOpen = !!searchState.open
   const setSearch = (q) => setSearchState((st) => ({ ...st, q }))
-  const openSearch = () => setSearchState({ open: true, q: '' })
-  const closeSearch = () => setSearchState({ open: false, q: '' })
+  const openSearch = () => setSearchState({ open: true, q: '', all: false })
+  const closeSearch = () => setSearchState({ open: false, q: '', all: false })
   useEffect(() => {
     try { sessionStorage.setItem(SEARCH_KEY, JSON.stringify(searchState)) } catch { /* sem sessão, sem memória */ }
   }, [searchState])
@@ -367,6 +370,10 @@ export default function Home() {
   }, [games, groupMatches, privateMatches, exploreRows, lessonRows, tournamentEvents, user])
 
   const visible = useMemo(() => applyFilters(events, filters, location), [events, filters, location])
+  const searchEvents = useMemo(
+    () => (searchState.all ? applyFilters(events, DEFAULT_FILTERS, location) : visible),
+    [searchState.all, events, location, visible],
+  )
   const counts = useMemo(() => countByDay(visible), [visible])
   const today = toDayKey(new Date())
   const days = useMemo(() => groupByDay(visible, today), [visible, today])
@@ -794,7 +801,10 @@ export default function Home() {
 
       {/* A pesquisa por cima da Home (Trello #547, 25 set): ecrã inteiro,
           teclado aberto, «Fechar» limpa e volta à Home tal como estava. */}
-      {searchOpen && (
+      {/* Portal para o body: dentro do bloco animado da página (transform) o
+          `fixed` ficava preso a ele, e ao abrir a Home já com a pesquisa
+          aberta o salto para «hoje» levava-a para fora do ecrã. */}
+      {searchOpen && createPortal(
         <div className="fixed inset-0 z-50 bg-canvas overflow-y-auto">
           <div className="max-w-lg mx-auto px-4 pt-4 pb-10">
             <div className="flex items-center gap-2">
@@ -821,12 +831,12 @@ export default function Home() {
             </div>
             {searching ? (
               <HomeSearch
-                events={visible}
+                events={searchEvents}
                 query={search}
                 todayKey={today}
-                filtersActive={filtersActive}
+                filtersActive={filtersActive && !searchState.all}
                 filtersLabel={filtersLabel}
-                onSearchAll={() => setFilters(DEFAULT_FILTERS)}
+                onSearchAll={() => setSearchState((st) => ({ ...st, all: true }))}
                 onClear={() => setSearch('')}
                 results={myMixResults}
                 userId={user.id}
@@ -855,7 +865,8 @@ export default function Home() {
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
 
       {selectedPin && (

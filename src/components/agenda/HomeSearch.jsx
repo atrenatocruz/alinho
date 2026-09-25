@@ -5,9 +5,9 @@
      acentos nem maiúsculas (semAcentos).
    - Cada resultado mostra o dia em grande à esquerda — é o que distingue sete
      «+1 Mix de Segunda-feira».
-   - «Para vir» primeiro; por baixo, a cinzento, «Já jogaste»: só os eventos
-     em que a pessoa esteve (a lista que recebe já vem filtrada assim pelo
-     applyFilters — os passados de outros não aparecem).
+   - «Para vir» primeiro; por baixo, a cinzento, «Já jogaste»: só os MIXES
+     em que a pessoa jogou — nem os que ficou como suplente, nem jogos entre
+     amigos, jogos em aberto ou torneios (SPEC; designer, 25 set).
    - Respeita os filtros ativos e diz que está a procurar só em parte. */
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
@@ -18,6 +18,8 @@ import { friendsMatchTitle } from './EventCard'
 
 const eventTitle = (e) => e.raw?.title || e.raw?.name || e.raw?.tournament_name || ''
 const eventPlace = (e) => e.raw?.location || e.courtName || ''
+// «Jogaste · …»: agora abre a linha, por isso leva maiúscula.
+const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s)
 
 /** O evento tem a pesquisa no nome, no clube/grupo ou no sítio? */
 export const eventMatches = (e, query) => {
@@ -46,7 +48,7 @@ export default function HomeSearch({ events, query, todayKey, filtersActive, fil
   const found = events.filter((e) => e.dayKey && eventMatches(e, query))
   const past = (e) => e.finished || e.dayKey < todayKey
   const upcoming = found.filter((e) => !past(e)).sort((a, b) => a.startsAt - b.startsAt)
-  const played = found.filter(past).sort((a, b) => b.startsAt - a.startsAt)
+  const played = found.filter((e) => past(e) && e.kind === 'mix' && e.myState === 'in').sort((a, b) => b.startsAt - a.startsAt)
 
   const row = (e, isPast) => {
     const d = e.startsAt
@@ -55,9 +57,11 @@ export default function HomeSearch({ events, query, todayKey, filtersActive, fil
     const title = eventTitle(e) || (e.kind === 'friends' ? friendsMatchTitle(e.raw || {}, userId, t) : '') || e.orgName || ''
     const result = results?.get?.(e.id)
     const extra = isPast
-      ? (result?.mix_won ? t('agenda.search_won') : t('agenda.search_played'))
+      ? cap(result?.mix_won ? t('agenda.search_won') : t('agenda.search_played'))
       : e.hasTime ? formatTime(d, i18n.language, { hour: '2-digit', minute: '2-digit' }) : null
-    const sub = [e.orgName, eventPlace(e) && eventPlace(e) !== e.orgName ? eventPlace(e) : null, extra].filter(Boolean)
+    // A hora (ou «jogaste») vem PRIMEIRO: nas linhas longas corta-se o sítio,
+    // não a hora (designer, 25 set).
+    const sub = [extra, e.orgName, eventPlace(e) && eventPlace(e) !== e.orgName ? eventPlace(e) : null].filter(Boolean)
     const to = linkFor(e)
     const content = (
       <>
@@ -99,7 +103,7 @@ export default function HomeSearch({ events, query, todayKey, filtersActive, fil
         </p>
       )}
 
-      {found.length === 0 ? (
+      {upcoming.length + played.length === 0 ? (
         <div className="text-center py-10 px-4">
           <SearchX size={28} className="mx-auto text-muted" />
           <p className="mt-3 font-extrabold text-ink-900">{t('agenda.search_none_title', { q: query.trim() })}</p>
