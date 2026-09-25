@@ -244,6 +244,13 @@ describe('peças dos separadores', () => {
     expect(dias[0].slots[0].matches.map((m) => m.court_name)).toEqual(['Campo 1', 'Campo 2'])
   })
 
+  it('o calendário conta o dia e a hora em Portugal, venha o aparelho de onde vier', () => {
+    // 23:30 em UTC a 9 out = 00:30 de sábado, 10 out, em Lisboa (verão).
+    const dias = byDayAndTime([{ id: 'a', scheduled_at: '2026-10-09T23:30:00.000Z', court_name: 'Campo 1' }])
+    expect(dias[0].date).toBe('2026-10-10')
+    expect(dias[0].slots[0].time).toBe('00:30')
+  })
+
   it('a classificação de um grupo usa o desempate do plano', () => {
     const group = { id: 'g1', teams: ['a', 'b', 'c'] }
     const matches = [
@@ -309,6 +316,49 @@ describe('quem passa dos grupos para o quadro (#484)', () => {
     const r = qualifiedFromGroups(groups, matches, 2)
     expect(r.ready).toBe(false)
     expect(r.pending).toBe(1)
+  })
+
+  it('sem empates por resolver, a lista de empates vem vazia', () => {
+    const { groups, matches } = gruposComJogos()
+    expect(qualifiedFromGroups(groups, matches, 2).ties).toEqual([])
+  })
+
+  // Três em ciclo com o mesmo resultado em todos os jogos: nenhum critério
+  // os separa, e é o organizador que decide (#484).
+  const ciclo = (g, [x, y, z]) => {
+    const jogo = (a, b) => ({
+      stage: 'grupo', group_id: g, entry_a_id: a, entry_b_id: b, score_a: 6, score_b: 3,
+      status: 'terminado', winner_entry_id: a,
+    })
+    return [jogo(x, y), jogo(y, z), jogo(z, x)]
+  }
+
+  it('um empate total que decide quem passa aparece, com os lugares que estão em jogo', () => {
+    const groups = [{ id: 'gA', number: 1, name: 'Grupo A', teams: ['a1', 'a2', 'a3'] }]
+    const r = qualifiedFromGroups(groups, ciclo('gA', ['a1', 'a2', 'a3']), 2)
+    expect(r.ties).toHaveLength(1)
+    expect(r.ties[0].group).toBe(1)
+    expect(r.ties[0].groupName).toBe('Grupo A')
+    expect([...r.ties[0].entry_ids].sort()).toEqual(['a1', 'a2', 'a3'])
+    expect(r.ties[0].positions).toEqual([1, 3])
+    // Os lugares continuam preenchidos («se ficasse assim»).
+    expect(r.qualified).toHaveLength(2)
+  })
+
+  it('um empate só entre quem já não passa não aparece', () => {
+    const groups = [{ id: 'gA', number: 1, name: 'Grupo A', teams: ['a1', 'a2', 'a3', 'a4'] }]
+    const ganha = (b) => ({
+      stage: 'grupo', group_id: 'gA', entry_a_id: 'a1', entry_b_id: b, score_a: 6, score_b: 0,
+      status: 'terminado', winner_entry_id: 'a1',
+    })
+    const matches = [ganha('a2'), ganha('a3'), ganha('a4'), ...ciclo('gA', ['a2', 'a3', 'a4'])]
+    // Passa 1: o empate é do 2.º ao 4.º, ninguém dele passa.
+    expect(qualifiedFromGroups(groups, matches, 1).ties).toEqual([])
+    // Passam 2: o mesmo empate decide o 2.º lugar.
+    const r = qualifiedFromGroups(groups, matches, 2)
+    expect(r.ties).toHaveLength(1)
+    expect(r.ties[0].positions).toEqual([2, 4])
+    expect(r.qualified[0].entry_id).toBe('a1')
   })
 })
 
