@@ -283,7 +283,8 @@ function OrganizersBar() {
 export const PLANS = [
   { key: 'free', name: 'Free', features: [['f1'], ['f2'], ['f3']] },
   { key: 'plus', name: 'Squad', features: [['f1'], ['f2'], ['f3']] },
-  { key: 'pro', name: 'Community', highlight: true, features: [['f1'], ['f2'], ['f3'], ['f4'], ['f5', 'soon']] },
+  // Torneios já existem; a liga ainda não (Francisco, 25 set; Trello #538).
+  { key: 'pro', name: 'Community', highlight: true, features: [['f1'], ['f2'], ['f3'], ['f4'], ['f5'], ['f6', 'soon']] },
   { key: 'club', name: 'Club', features: [['f1'], ['f2', 'soon'], ['f3', 'soon'], ['f4', 'soon']] },
 ]
 
@@ -331,12 +332,11 @@ export function PlanCard({ plan }) {
   )
 }
 
-// ── PREÇOS NA PÁGINA PRINCIPAL — BLOCO PROVISÓRIO ─────────────────────────
-// O desenho aprovado tira os 4 planos daqui (vão para /planos). Tirá-los mexe
-// na forma de vender aos clubes, por isso é PROPOSTA POR ACORDAR COM O
-// RENATO. Até ele responder, ficam como estavam (PO, 25 set). Quando ele
-// disser, passa isto a false — e não é preciso mexer em mais nada.
-const SHOW_PRICES_ON_HOME = true
+// ── PREÇOS NA PÁGINA PRINCIPAL ────────────────────────────────────────────
+// Os planos e os preços ficam só em /planos; aqui fica a faixa «Ver os
+// planos ›» (Francisco, 26 set: «se não gostarem a gente volta a alterar»).
+// Para os voltar a mostrar aqui, basta passar isto a true.
+const SHOW_PRICES_ON_HOME = false
 
 export function PlansGrid() {
   return (

@@ -20,7 +20,7 @@ import {
   listCategoriesAdmin, listCategorySeeding, closeCategoryEntries, reopenCategoryEntries,
   saveCategoryFormat, drawCategory, clearCategoryDraw, buildDrawPayload, buildKnockoutPayload,
 } from '../../lib/tournamentDraw'
-import { formatOptions, recommendFormat, availableCourtHours, pickSeeds } from '../../lib/tournamentFormat'
+import { formatOptions, recommendFormat, availableCourtHours, pickSeeds, groupsWords } from '../../lib/tournamentFormat'
 
 const euros = (c) => (c == null ? null : `${(c / 100).toFixed(0)} €`)
 
@@ -129,6 +129,7 @@ function CloseEntriesStep({ category, onDone, t }) {
    A app faz as contas com as duplas que entraram e o tempo de campo do
    torneio, e diz o que cabe. O organizador escolhe. */
 function FormatStep({ days: dayRows, rules, category, teamCount, onDone, t }) {
+  const { i18n } = useTranslation()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
   const [thirdPlace, setThirdPlace] = useState(Boolean(category.third_place_match))
@@ -201,7 +202,9 @@ function FormatStep({ days: dayRows, rules, category, teamCount, onDone, t }) {
             <div className="flex items-center justify-between gap-2">
               <b className="text-[13px] font-extrabold text-ink-900">
                 {o.groupCount
-                  ? t('tournament.draw.opt_groups', { groups: o.groupCount, size: o.sizes?.[0] ?? 0, per: o.qualifiersPerGroup })
+                  // «3 grupos: 4, 3 e 3 → passa 1» quando os grupos não são iguais
+                  // (Trello #540, contas do Dev 3).
+                  ? (() => { const w = groupsWords(o, i18n.language === 'en' ? 'en' : 'pt-PT'); return t(w.key, w.values) })()
                   : t('tournament.draw.opt_knockout')}
               </b>
               {o.key === best?.key && <StatePill tone="dark">{t('tournament.draw.recommended')}</StatePill>}

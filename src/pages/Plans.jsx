@@ -31,12 +31,14 @@ export default function Plans() {
         <section className="mt-10 rounded-card bg-white border border-line p-6 max-w-xl">
           <h2 className="text-2xl text-ink-900">{t('plans.club_title')}</h2>
           <p className="text-ink-700 mt-1">{t('plans.club_text')}</p>
+          {/* «Quem escreve escolhe» (Francisco): os dois iguais, só com
+              contorno. O verde do WhatsApp é uma cor fora da marca. */}
           <div className="mt-4 flex gap-3">
             <a href={mailtoLink(t('plans.email_subject'))} className={`${contact} border border-ink-900 bg-white text-ink-900 hover:bg-ink-50`}>
               <Mail size={18} /> {t('plans.email')}
             </a>
             <a href={whatsappContactLink(t('plans.whatsapp_text'))} target="_blank" rel="noopener noreferrer"
-               className={`${contact} bg-[#25D366] text-ink-900 hover:brightness-95`}>
+               className={`${contact} border border-ink-900 bg-white text-ink-900 hover:bg-ink-50`}>
               <MessageCircle size={18} /> {t('plans.whatsapp')}
             </a>
           </div>
