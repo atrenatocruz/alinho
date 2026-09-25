@@ -1199,9 +1199,24 @@ export default function GerirClube() {
 
     if (pendingFetchError) {
       console.error('Error finding pending occurrence:', pendingFetchError)
+      alert(describeError(t, pendingFetchError, 'gerirclube.error_recurrence_launch_update_failed'))
       return
     }
-    if (!pendingGame) return
+    // Sem o próximo Mix (Trello #529): antes saía aqui em silêncio e a hora
+    // nova não servia para nada. Agora cria-se já, com a regra acabada de
+    // gravar — por isso sai à hora nova, sem mais nada a atualizar.
+    if (!pendingGame) {
+      const { data: status, error: ensureError } = await supabase.rpc('ensure_recurrence_successor', { p_recurrence_id: recurrenceId })
+      if (ensureError) {
+        console.error('Error creating the next occurrence:', ensureError)
+        alert(describeError(t, ensureError, 'gerirclube.error_recurrence_no_next'))
+      } else if (status === 'ended') {
+        alert(t('gerirclube.recurrence_ended_no_next'))
+      } else if (status === 'no_base') {
+        alert(t('gerirclube.error_recurrence_no_next'))
+      }
+      return
+    }
 
     const { error: launchUpdateError } = await supabase
       .from('games')
@@ -1357,10 +1372,28 @@ export default function GerirClube() {
   }
 
   const handleDeleteGame = async (gameId, { confirmed = false } = {}) => {
+    const gameToDelete = games.find(g => g.id === gameId)
+    // O próximo Mix de uma recorrência (Trello #529): apagá-lo salta só essa
+    // data e a recorrência continua — a base de dados cria logo o seguinte.
+    // Antes apagava-se como um Mix qualquer e a recorrência parava sem aviso.
+    const isNextOfSeries = gameToDelete?.status === 'pending' && gameToDelete.recurrence_id && !gameToDelete.is_recurrence_origin
+    if (isNextOfSeries) {
+      if (!confirm(t('gerirclube.confirm_skip_recurrence_game'))) return
+      const { data: nextDate, error } = await supabase.rpc('skip_recurrence_game', { p_game_id: gameId })
+      if (error) {
+        console.error('Error skipping recurrence date:', error)
+        alert(describeError(t, error, 'gerirclube.error_delete_game'))
+        return
+      }
+      alert(nextDate
+        ? t('gerirclube.skip_recurrence_done', { date: formatDateLib(nextDate, i18n.language, { weekday: 'long', day: '2-digit', month: '2-digit' }) })
+        : t('gerirclube.skip_recurrence_ended'))
+      loadGames()
+      return true
+    }
     if (!confirmed && !confirm(t('gerirclube.confirm_delete_game'))) return
 
     try {
-      const gameToDelete = games.find(g => g.id === gameId)
 
       // Um mix com resultados já conta para o ranking e para o XP, e a base
       // de dados não o deixa apagar. Diz-se isso antes de tentar, em vez de
