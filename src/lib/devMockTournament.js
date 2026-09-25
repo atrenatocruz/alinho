@@ -610,3 +610,29 @@ export const TOURNAMENT_GROUPS_DONE_TABLE_MOCKS = {
       ? { ...m, status: 'terminado', score_a: 9, score_b: 7, winner_entry_id: m.entry_a_id } : m))
   },
 }
+
+// ── Suplente que sobe para dentro (Trello #548) ─────────────────────────
+// localStorage.mockTPromoted = 'true': dois avisos no sino — um já dentro,
+// outro à espera que o parceiro aceite.
+const promotedRead = new Set()
+export const TOURNAMENT_PROMOTED_RPC_MOCKS = {
+  mark_notifications_read: (params) => {
+    if (localStorage.getItem('mockTPromoted') !== 'true') return undefined
+    for (const id of params?.p_ids || []) promotedRead.add(id)
+    return null
+  },
+}
+export const TOURNAMENT_PROMOTED_TABLE_MOCKS = {
+  notifications: (url, before) => {
+    if (localStorage.getItem('mockTPromoted') !== 'true') return undefined
+    const respondBy = new Date(Date.now() + 3 * 86400000).toISOString()
+    const base = { tournament_id: 'tour-smash-open', tournament_slug: 'smash-open-2026', tournament_name: 'Smash Open 2026' }
+    return [
+      { id: 'tp1', kind: 'tournament_promoted', game_id: null, created_at: new Date().toISOString(),
+        data: { ...base, entry_id: 'e-1', status: 'validada', category_id: 'cat-m4', category_code: 'M4', category_name: 'Masculinos 4', partner_name: 'Rui Mendes', partner_pending: false } },
+      { id: 'tp2', kind: 'tournament_promoted', game_id: null, created_at: new Date().toISOString(),
+        data: { ...base, entry_id: 'e-2', status: 'convite', category_id: 'cat-mx4', category_code: 'MX4', category_name: 'Mistos 4', partner_name: 'Ana Costa', partner_pending: true, respond_by: respondBy } },
+      ...((before && before(url)) || []),
+    ].filter((n) => !promotedRead.has(n.id))
+  },
+}
