@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
@@ -35,6 +36,7 @@ import { KIND_STYLE } from '../components/agenda/EventCard'
 import { tournamentsAvailable } from '../lib/tournamentApi'
 import { describeError } from '../lib/errors'
 import { isDraftMix, publishDraftMix, advanceByFrequency, pendingOccurrenceRow } from '../lib/mixDraft'
+import LaunchDayPicker from '../components/LaunchDayPicker'
 
 const sanitizeSlug = (value) => value.toLowerCase().replace(/[^a-z0-9-]/g, '')
 
@@ -241,6 +243,9 @@ export default function GerirClube() {
   const [members, setMembers] = useState([])
   const [linkCopied, setLinkCopied] = useState(false)
   const [requests, setRequests] = useState([])
+  // Quantos membros tem o grupo (todos, como a base de dados conta), para
+  // dizer ao admin quando os pedidos estão à espera de lugar (Trello #447).
+  const [memberTotal, setMemberTotal] = useState(null)
   const [clubTeachers, setClubTeachers] = useState([])
   const [settings, setSettings] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -810,6 +815,14 @@ export default function GerirClube() {
       return
     }
     setRequests(data || [])
+    if ((data || []).length > 0 && limitsFor(org?.plan_tier).members != null) {
+      // Os admins da plataforma não contam para o limite (Renato, 23 set:
+      // org_max_members soma-os ao máximo) — por isso também não contam aqui.
+      const { data: rows } = await supabase.from('memberships')
+        .select('id, profile:profiles(is_platform_admin)')
+        .eq('organization_id', currentOrganizationId)
+      setMemberTotal(rows ? rows.filter((r) => !r.profile?.is_platform_admin).length : null)
+    }
   }
 
   const handleApproveRequest = async (requestId) => {
@@ -935,15 +948,18 @@ export default function GerirClube() {
     return { daysBefore, launchTime }
   }
 
+  // Sem dia escolhido, o erro aparece por baixo das pastilhas (regra das
+  // janelas); o resto no formulário, junto aos botões. Nunca alert().
+  const [launchDayError, setLaunchDayError] = useState('')
   const validateRecurrence = (recurrence) => {
     if (!recurrence.enabled) return null
     if (!recurrence.launchDaysBefore || parseInt(recurrence.launchDaysBefore, 10) < 1) {
-      return t('gerirclube.validate_launch_days_before')
+      return { field: 'launchDay', message: t('gerirclube.validate_launch_days_before') }
     }
-    if (!recurrence.launchTime) return t('gerirclube.validate_launch_time')
-    if (recurrence.endsType === 'on_date' && !recurrence.endsOn) return t('gerirclube.validate_end_date')
+    if (!recurrence.launchTime) return { message: t('gerirclube.validate_launch_time') }
+    if (recurrence.endsType === 'on_date' && !recurrence.endsOn) return { message: t('gerirclube.validate_end_date') }
     if (recurrence.endsType === 'after_occurrences' && (!recurrence.endsAfterOccurrences || parseInt(recurrence.endsAfterOccurrences, 10) < 1)) {
-      return t('gerirclube.validate_occurrences_count')
+      return { message: t('gerirclube.validate_occurrences_count') }
     }
     return null
   }
@@ -1069,7 +1085,8 @@ export default function GerirClube() {
 
     const recurrenceError = validateRecurrence(recurrence)
     if (recurrenceError) {
-      alert(recurrenceError)
+      if (recurrenceError.field === 'launchDay') setLaunchDayError(recurrenceError.message)
+      else setGameError(recurrenceError.message)
       return
     }
 
@@ -1281,7 +1298,8 @@ export default function GerirClube() {
 
     const recurrenceError = validateRecurrence(recurrence)
     if (recurrenceError) {
-      alert(recurrenceError)
+      if (recurrenceError.field === 'launchDay') setLaunchDayError(recurrenceError.message)
+      else setGameError(recurrenceError.message)
       return
     }
 
@@ -2548,60 +2566,23 @@ export default function GerirClube() {
                               )}
                             </div>
 
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">
-                                {t('gerirclube.launch_days_before_label')}
-                              </label>
-                              <input
-                                type="number"
-                                min="1"
-                                value={gameForm.recurrence.launchDaysBefore}
-                                onChange={(e) => setGameForm({
-                                  ...gameForm,
-                                  recurrence: { ...gameForm.recurrence, launchDaysBefore: e.target.value }
-                                })}
-                                className="input-field"
-                                placeholder={t('gerirclube.launch_days_placeholder')}
-                                required
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">
-                                {t('gerirclube.launch_time_label')}
-                              </label>
-                              <input
-                                type="time"
-                                value={gameForm.recurrence.launchTime}
-                                onChange={(e) => setGameForm({
-                                  ...gameForm,
-                                  recurrence: { ...gameForm.recurrence, launchTime: e.target.value }
-                                })}
-                                className="input-field"
-                                required
-                              />
-                              <p className="text-sm text-muted mt-1.5">
-                                {t('gerirclube.launch_time_help')}
-                              </p>
-                              {/* O próximo lançamento com data real, para o admin não
-                                  fazer contas de cabeça (Trello #396). */}
-                              {(() => {
-                                const r = gameForm.recurrence
-                                const days = parseInt(r.launchDaysBefore, 10)
-                                if (!gameForm.date || !r.launchTime || !(days >= 1)) return null
-                                const nextMix = advanceByFrequency(new Date(gameForm.date), r.frequency)
-                                if (Number.isNaN(nextMix.getTime())) return null
-                                const launch = new Date(nextMix)
-                                launch.setDate(launch.getDate() - days)
-                                const [hh, mm] = r.launchTime.split(':').map(Number)
-                                launch.setHours(hh, mm, 0, 0)
-                                const day = (d) => formatDateLib(d, i18n.language, { weekday: 'long', day: 'numeric', month: 'short' })
-                                return (
-                                  <p className="text-sm font-extrabold text-ink-900 mt-1.5">
-                                    {t('gerirclube.next_launch_preview', { launch: day(launch), time: r.launchTime, mix: day(nextMix) })}
-                                  </p>
-                                )
-                              })()}
-                            </div>
+                            {/* Abrem as inscrições: escolhe-se o DIA, com a data à vista
+                                (desenho aprovado a 25 set). Guarda-se como antes: dias
+                                antes + hora. As datas são as do próximo Mix, o primeiro
+                                que abre com esta regra. */}
+                            <LaunchDayPicker
+                              key={`${editingGame?.id || 'novo'}-${gameForm.recurrence.frequency}`}
+                              mixDate={gameForm.date ? advanceByFrequency(new Date(gameForm.date), gameForm.recurrence.frequency) : null}
+                              frequency={gameForm.recurrence.frequency}
+                              daysBefore={gameForm.recurrence.launchDaysBefore}
+                              onDaysBefore={(v) => {
+                                setLaunchDayError('')
+                                setGameForm({ ...gameForm, recurrence: { ...gameForm.recurrence, launchDaysBefore: String(v) } })
+                              }}
+                              time={gameForm.recurrence.launchTime}
+                              onTime={(v) => setGameForm({ ...gameForm, recurrence: { ...gameForm.recurrence, launchTime: v } })}
+                              error={launchDayError}
+                            />
                           </>
                         )}
                       </div>
@@ -2913,6 +2894,19 @@ export default function GerirClube() {
                   <h3 className="text-sm font-extrabold text-ink-900 flex items-center gap-1.5">
                     <Clock size={14} /> {t('gerirclube.join_requests_heading', { count: requests.length })}
                   </h3>
+                  {/* Grupo cheio (Trello #447): os pedidos (muitos vêm do link)
+                      ficam à espera de lugar. Aviso «Precisa de ti» — âmbar,
+                      junto ao sítio, com a ação que resolve; fica até haver lugar. */}
+                  {memberTotal != null && limitsFor(org?.plan_tier).members != null && memberTotal >= limitsFor(org?.plan_tier).members && (
+                    <p role="status" className="rounded-ctrl border border-warning/30 bg-warning/10 px-3.5 py-2.5 text-sm font-semibold text-ink-900">
+                      {t('gerirclube.requests_group_full', { plan: planName(org?.plan_tier), members: limitsFor(org?.plan_tier).members })}{' '}
+                      {nextPlanTier(org?.plan_tier) && t('plans.next_plan_members', { next: planName(nextPlanTier(org?.plan_tier)) })}{' '}
+                      <button type="button" onClick={() => document.getElementById('gerir-membros')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                        className="font-extrabold underline underline-offset-2">
+                        {t('gerirclube.requests_group_full_action')}
+                      </button>
+                    </p>
+                  )}
                   {requests.map((req) => (
                     <div key={req.id} className="card flex items-center gap-3">
                       <Avatar name={req.name} url={req.avatar_url} size="w-9 h-9 text-sm" />
@@ -3014,7 +3008,7 @@ export default function GerirClube() {
                 </div>
               </div>
 
-              <div className="card bg-blue-50">
+              <div id="gerir-membros" className="card bg-blue-50 scroll-mt-4">
                 <p className="text-gray-700">
                   <strong>{t('gerirclube.total_members_label')}</strong> {members.length}
                 </p>
@@ -3691,11 +3685,15 @@ export default function GerirClube() {
         errorOf={(err) => err?.message || t('gerirclube.error_delete_game')}
         onClose={() => { deleteAsk?.resolve(false); setDeleteAsk(null) }}
       />
-      {doneNotice && (
+      {/* Portal para o body (Trello #565): dentro do bloco animado da página
+          (transform) o `fixed` ficava preso a ele e a tira aparecia fora do
+          ecrã — a mesma causa da lupa da Home. */}
+      {doneNotice && createPortal(
         <div role="status" className="fixed left-4 right-4 bottom-[104px] z-50 mx-auto max-w-md bg-ink-900 text-white px-4 py-3 rounded-ctrl text-sm font-extrabold flex items-center gap-2 animate-fade-up">
           <Check size={16} className="shrink-0" />
           {doneNotice}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )

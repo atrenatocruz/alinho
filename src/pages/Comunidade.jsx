@@ -1,13 +1,16 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Search, Users, Clock, GraduationCap, X, MapPin, Lock, Check, Building2, Plus } from 'lucide-react'
+import { Search, Users, Clock, GraduationCap, X, MapPin, Lock, Check, Building2, Plus, ChevronRight } from 'lucide-react'
 import { searchOrganizations, listGlobalOrganizations } from '../lib/organizations'
-import { listTeacherProfiles, teacherClubName } from '../lib/teachers'
+import { DAYS, listTeacherProfiles, teacherClubName } from '../lib/teachers'
+import { scheduleFromRows, shortRange } from '../lib/teacherSchedule'
+import { teacherContact } from '../lib/teacherContact'
+import { LevelPill, bandLabel } from '../components/lessons/LessonBits'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { followPlayer, removeFollow } from '../lib/follows'
-import { Avatar, EmptyState, GroupLevelBadge, OrgKindBadge, orgAvatarShape, PageHeader } from '../components/ui'
+import { Avatar, Chips, ConfirmSheet, EmptyState, GroupLevelBadge, OrgKindBadge, orgAvatarShape, PageHeader } from '../components/ui'
 import { describeError } from '../lib/errors'
 import { useHeaderActions } from '../contexts/HeaderActionsContext'
 import { semAcentos } from '../lib/semAcentos'
@@ -54,18 +57,6 @@ const TABS = [
   { key: 'groups', labelKey: 'comunidade.filter_groups' },
   { key: 'teachers', labelKey: 'comunidade.tab_teachers' },
 ]
-
-// «Contactar» liga ou escreve, conforme o contacto que o professor deixou:
-// email → escrever, @conta → Instagram, número → ligar.
-const contactHref = (contact) => {
-  const c = (contact || '').trim()
-  if (!c) return null
-  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c)) return `mailto:${c}`
-  if (/^@[\w.]+$/.test(c)) return `https://instagram.com/${c.slice(1)}`
-  const digits = c.replace(/\D/g, '')
-  if (digits.length >= 9) return `tel:+${digits.length === 9 ? `351${digits}` : digits}`
-  return null
-}
 
 // A mesma regra de todas as pesquisas de nomes (src/lib/semAcentos.js).
 const norm = semAcentos
@@ -184,8 +175,14 @@ export default function Comunidade() {
       })
   }, [user?.id])
 
+  // Erros no cartão, nada de alert()/confirm() (desenho aprovado 25 set,
+  // professores, assunto 3; regra das janelas).
+  const [cardError, setCardError] = useState({}) // { [id]: texto }
+  const [askUnfollow, setAskUnfollow] = useState(null) // professor
+  const setErr = (id, text) => setCardError((m) => ({ ...m, [id]: text }))
+
   const handleTeacherFollow = async (teacher) => {
-    setFollowActing(teacher.user_id)
+    setFollowActing(teacher.user_id); setErr(teacher.id, '')
     try {
       const status = await followPlayer(teacher.user_id)
       const { data } = await supabase.from('follows').select('id, followed_id, status')
@@ -193,38 +190,37 @@ export default function Comunidade() {
       setMyFollows((m) => ({ ...m, [teacher.user_id]: data?.[0] || { status } }))
     } catch (error) {
       console.error('Error following teacher:', error)
-      alert(describeError(t, error))
+      setErr(teacher.id, describeError(t, error, 'comunidade.follow_failed'))
     } finally {
       setFollowActing(null)
     }
   }
 
-  // Deixar de seguir pede confirmação, como no perfil; cancelar um pedido não.
-  const handleTeacherUnfollow = async (teacher, confirmar = true) => {
+  // Deixar de seguir pergunta antes (janela de baixo); cancelar um pedido não.
+  const handleTeacherUnfollow = async (teacher) => {
     const follow = myFollows[teacher.user_id]
     if (!follow?.id) return
-    if (confirmar && !confirm(t('playerdetails.unfollow_confirm', { name: teacher.user?.name || '' }))) return
-    setFollowActing(teacher.user_id)
+    setFollowActing(teacher.user_id); setErr(teacher.id, '')
     try {
       await removeFollow(follow.id)
       setMyFollows((m) => { const n = { ...m }; delete n[teacher.user_id]; return n })
     } catch (error) {
       console.error('Error unfollowing teacher:', error)
-      alert(describeError(t, error))
+      setErr(teacher.id, t('comunidade.unfollow_failed_card'))
     } finally {
       setFollowActing(null)
     }
   }
 
   const handleFollow = async (org) => {
-    setActingOn(org.id)
+    setActingOn(org.id); setErr(org.id, '')
     try {
       const { error } = await followOrganization(org.id)
       if (error) throw error
       await reloadOrganizations()
     } catch (error) {
       console.error('Error following organization:', error)
-      alert(describeError(t, error, 'comunidade.follow_failed'))
+      setErr(org.id, describeError(t, error, 'comunidade.follow_failed'))
     } finally {
       setActingOn(null)
     }
@@ -299,21 +295,26 @@ export default function Comunidade() {
               {joinsDirectly ? t('comunidade.join_action') : t('comunidade.request_entry_action')}
             </button>
           )}
+          {cardError[org.id] && <p role="alert" className="mt-2 text-xs font-extrabold text-danger">{cardError[org.id]}</p>}
         </div>
       </Link>
     )
   }
 
-  // Abre o perfil do professor (aulas, Trello #49).
-  // Cartão do professor (desenho aprovado a 24 set, pasta
-  // 2026-09-23-pagina-do-grupo, assunto 3): a foto da pessoa, «Professor ·
-  // clube» e a zona, e dois botões — «Seguir» (o seguir de pessoas que já
-  // existe) e «Contactar». Os horários saíram: são das aulas, escondidas
-  // até depois do Smash Cup. Tocar no nome abre o perfil do professor.
+  // Cartão do professor (desenho aprovado 25 set, pasta
+  // 2026-09-25-professores-proposta, assunto 3): nome, «Professora/Professor
+  // · clube · zona», nível e o resumo do horário (#418); a seta diz que o
+  // cartão abre a página do professor. «Seguir» e o contacto com o nome do
+  // que faz (WhatsApp, Email, Instagram).
   const renderTeacher = (teacher) => {
     const follow = teacher.user_id ? myFollows[teacher.user_id] : null
-    const contacto = contactHref(teacher.contact)
-    const btn = 'flex-1 inline-flex items-center justify-center gap-1.5 min-h-[40px] px-3 rounded-full text-sm font-extrabold transition-colors duration-fast disabled:opacity-40'
+    const contact = teacherContact(teacher.contact)
+    const female = teacher.user?.gender === 'feminino'
+    const byDay = scheduleFromRows(teacher.availability || [])
+    const summary = DAYS.flatMap(({ value }, i) => byDay[value].map((sl) =>
+      `${t(`lessons.wd_short_${i + 1}`).replace(/^./, (c) => c.toUpperCase())} ${shortRange(sl.start, sl.end)}`))
+    const level = bandLabel(teacher.user?.rating, teacher.user?.gender)
+    const btn = 'flex-1 inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3 rounded-full text-sm font-extrabold transition-colors duration-fast disabled:opacity-40'
     return (
       <div key={teacher.id} className="card p-3.5 space-y-3">
         {/* A página de professor só existe quando o clube já o aceitou
@@ -330,23 +331,30 @@ export default function Comunidade() {
           <div className="flex-1 min-w-0">
             <h3 className="font-extrabold text-ink-900 truncate">{teacher.user?.name}</h3>
             <p className="text-xs text-muted truncate">
-              {t('comunidade.teacher_label')} · {teacherClubName(teacher) || t('comunidade.teacher_no_club')}
+              {[t(female ? 'comunidade.teacher_label_f' : 'comunidade.teacher_label'),
+                teacherClubName(teacher) || t('comunidade.teacher_no_club_short'), teacher.zone].filter(Boolean).join(' · ')}
             </p>
-            {teacher.zone && <p className="text-xs text-muted truncate">{teacher.zone}</p>}
+            <p className="text-xs flex items-center gap-1.5 mt-0.5 min-w-0">
+              {level && <LevelPill label={level} />}
+              {summary.length > 0
+                ? <span className="text-ink-700 truncate">{summary.join(' · ')}</span>
+                : <span className="text-muted">{t('comunidade.teacher_no_schedule')}</span>}
+            </p>
           </div>
+          <ChevronRight size={18} className="text-muted shrink-0" />
         </Link>
         <div className="flex gap-2">
           {teacher.user_id && (
             follow?.status === 'accepted' ? (
               <button type="button" disabled={followActing === teacher.user_id}
-                onClick={() => handleTeacherUnfollow(teacher)}
-                className={`${btn} border border-line bg-canvas text-ink-900`}>
+                onClick={() => setAskUnfollow(teacher)}
+                className={`${btn} border-[1.5px] border-line bg-white text-ink-900`}>
                 <Check size={15} /> {t('playerdetails.following_button')}
               </button>
             ) : follow?.status === 'pending' ? (
               <button type="button" disabled={followActing === teacher.user_id}
-                onClick={() => handleTeacherUnfollow(teacher, false)}
-                className={`${btn} border border-line bg-canvas text-muted`}>
+                onClick={() => handleTeacherUnfollow(teacher)}
+                className={`${btn} border-[1.5px] border-line bg-white text-muted`}>
                 <Clock size={15} /> {t('playerdetails.requested_button')}
               </button>
             ) : (
@@ -357,17 +365,19 @@ export default function Comunidade() {
               </button>
             )
           )}
-          {contacto && (
-            <a href={contacto} target={contacto.startsWith('http') ? '_blank' : undefined} rel="noopener noreferrer"
-              className={`${btn} border border-line bg-canvas text-ink-900`}>
-              {t('comunidade.contact_button')}
+          {contact && (
+            <a href={contact.href} target="_blank" rel="noopener noreferrer"
+              className={`${btn} border-[1.5px] border-line bg-white text-ink-900`}>
+              {t(`teacher.contact_${contact.kind}`)}
             </a>
           )}
         </div>
+        {cardError[teacher.id] && (
+          <p role="alert" className="rounded-ctrl border border-danger/30 bg-danger/10 px-3 py-2 text-sm font-bold text-danger">{cardError[teacher.id]}</p>
+        )}
       </div>
     )
   }
-
 
   const busy = loading || (showTeachers && teachersLoading)
   const nothing = !busy
@@ -399,20 +409,7 @@ export default function Comunidade() {
           mesmo vazios. Com a pesquisa a funcionar em cima, o filtro deixa de
           mandar e mostram-se os resultados de tudo. */}
       {!searching && (
-        <div className="flex flex-wrap gap-2">
-          {TABS.map((f) => (
-            <button
-              key={f.key}
-              type="button"
-              onClick={() => setTab(f.key)}
-              className={`inline-flex items-center gap-1.5 px-3 min-h-[40px] rounded-full text-sm font-extrabold border transition-colors duration-fast ${
-                tab === f.key ? 'bg-ink-900 text-white border-ink-900' : 'bg-canvas text-ink-700 border-line'
-              }`}
-            >
-              {t(f.labelKey)}
-            </button>
-          ))}
-        </div>
+        <Chips options={TABS.map((f) => ({ value: f.key, label: t(f.labelKey) }))} value={tab} onChange={setTab} />
       )}
 
       {busy ? (
@@ -454,13 +451,23 @@ export default function Comunidade() {
 
           {showTeachers && approvedTeachers.length > 0 && (
             <section>
-              <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mb-2">{t('comunidade.tab_teachers')}</p>
+              <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mb-2">{t('comunidade.tab_teachers')} · {approvedTeachers.length}</p>
               <div className="space-y-3">{approvedTeachers.map(renderTeacher)}</div>
             </section>
           )}
         </>
       )}
 
+      <ConfirmSheet
+        open={!!askUnfollow}
+        danger
+        title={askUnfollow ? t(askUnfollow.user?.gender === 'feminino' ? 'teacher.unfollow_title_f' : 'teacher.unfollow_title', { name: (askUnfollow.user?.name || '').split(' ')[0] }) : ''}
+        message={t(askUnfollow?.user?.gender === 'feminino' ? 'teacher.unfollow_text_f' : 'teacher.unfollow_text')}
+        cancelLabel={t('teacher.unfollow_keep')}
+        confirmLabel={t('teacher.unfollow_confirm')}
+        onConfirm={() => handleTeacherUnfollow(askUnfollow)}
+        onClose={() => setAskUnfollow(null)}
+      />
     </div>
   )
 }
