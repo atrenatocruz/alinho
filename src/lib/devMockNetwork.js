@@ -64,6 +64,56 @@ const COMMUNITY_ORGS = [
   communityOrg({ id: 'co-6', name: 'Terças à Noite', slug: 'tercas', kind: 'group', member_count: 9, avg_rating: null, open_join: true }),
 ]
 
+const ACHIEVEMENTS_CATALOG = [
+  { key: 'primeira_bola', category: 'jogo', rarity: 'comum', sort: 10 },
+  { key: 'areia_nos_tenis', category: 'jogo', rarity: 'comum', sort: 11 },
+  { key: 'cliente_da_casa', category: 'jogo', rarity: 'comum', sort: 12 },
+  { key: 'residente', category: 'jogo', rarity: 'raro', sort: 13 },
+  { key: 'meio_cento', category: 'jogo', rarity: 'epico', sort: 14 },
+  { key: 'centuriao_do_vidro', category: 'jogo', rarity: 'lendario', sort: 15 },
+  { key: 'semana_cheia', category: 'jogo', rarity: 'raro', sort: 16 },
+  { key: 'mes_cheio', category: 'jogo', rarity: 'epico', sort: 17 },
+  { key: 'ritual_de_segunda', category: 'jogo', rarity: 'comum', sort: 18 },
+  { key: 'coruja_do_padel', category: 'jogo', rarity: 'comum', sort: 19 },
+  { key: 'madrugador', category: 'jogo', rarity: 'comum', sort: 20 },
+  { key: 'fds_sagrado', category: 'jogo', rarity: 'raro', sort: 21 },
+  { key: 'primeiro_grito', category: 'jogo', rarity: 'comum', sort: 30 },
+  { key: 'mao_quente', category: 'jogo', rarity: 'raro', sort: 31 },
+  { key: 'dono_do_campo_1', category: 'jogo', rarity: 'epico', sort: 32 },
+  { key: 'dinastia', category: 'jogo', rarity: 'lendario', sort: 33 },
+  { key: 'noite_perfeita', category: 'jogo', rarity: 'raro', sort: 34 },
+  { key: 'bis', category: 'jogo', rarity: 'epico', sort: 35 },
+  { key: 'bandeja_de_prata', category: 'jogo', rarity: 'raro', sort: 36 },
+  { key: 'maquina_de_pontos', category: 'jogo', rarity: 'epico', sort: 37 },
+  { key: 'remontada', category: 'jogo', rarity: 'epico', sort: 38 },
+  { key: 'entre_amigos', category: 'jogo', rarity: 'comum', sort: 40 },
+  { key: 'circuito_paralelo', category: 'jogo', rarity: 'raro', sort: 41 },
+  { key: 'sempre_em_jogo', category: 'jogo', rarity: 'epico', sort: 42 },
+  { key: 'calibrado', category: 'elo', rarity: 'comum', sort: 50 },
+  { key: 'fora_da_areia', category: 'elo', rarity: 'comum', sort: 51 },
+  { key: 'subida_ao_vidro', category: 'elo', rarity: 'raro', sort: 52 },
+  { key: 'zona_nobre', category: 'elo', rarity: 'epico', sort: 53 },
+  { key: 'ar_rarefeito', category: 'elo', rarity: 'lendario', sort: 54 },
+  { key: 'gigante', category: 'elo', rarity: 'lendario', sort: 55 },
+  { key: 'primeiro_escudo', category: 'xp', rarity: 'comum', sort: 60 },
+  { key: 'escudo_ouro', category: 'xp', rarity: 'raro', sort: 61 },
+  { key: 'escudo_esmeralda', category: 'xp', rarity: 'raro', sort: 62 },
+  { key: 'escudo_diamante', category: 'xp', rarity: 'epico', sort: 63 },
+  { key: 'lenda_viva', category: 'xp', rarity: 'lendario', sort: 64 },
+  { key: 'world_class', category: 'xp', rarity: 'lendario', sort: 65 },
+  { key: 'primeiro_aplauso', category: 'kudos', rarity: 'comum', sort: 70 },
+  { key: 'bom_de_balneario', category: 'kudos', rarity: 'raro', sort: 71 },
+  { key: 'querido_do_clube', category: 'kudos', rarity: 'epico', sort: 72 },
+  { key: 'idolo_da_bancada', category: 'kudos', rarity: 'lendario', sort: 73 },
+  { key: 'mvp_da_noite', category: 'kudos', rarity: 'epico', sort: 74 },
+  { key: 'fair_play', category: 'kudos', rarity: 'raro', sort: 75 },
+  { key: 'socio_fundador', category: 'antiguidade', rarity: 'lendario', sort: 80 },
+  { key: 'meio_ano_de_casa', category: 'antiguidade', rarity: 'comum', sort: 81 },
+  { key: 'um_ano_de_casa', category: 'antiguidade', rarity: 'raro', sort: 82 },
+  { key: 'velha_guarda', category: 'antiguidade', rarity: 'epico', sort: 83 },
+  { key: 'embaixador', category: 'antiguidade', rarity: 'raro', sort: 84 },
+]
+
 const RPC_MOCKS = {
   ...LESSON_RPC_MOCKS,
   ...TOURNAMENT_RPC_MOCKS,
@@ -119,9 +169,23 @@ const RPC_MOCKS = {
     .concat(rankingCasos() ? RANKING_CASOS.filter((p) => !p.is_test) : [])
     .sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1)),
   get_player_xp: () => [{ xp: 320, kudos: 12 }],
+  // As 14 conquistas ganhas pela conta de exemplo (Trello #551, imagem do
+  // Marketing a 7 out) — espalhadas pelas categorias, com raridades reais.
   get_player_achievements: () => [
-    { achievement_key: 'primeira_bola', category: 'jogo', rarity: 'comum', rarity_pct: 66.7 },
-    { achievement_key: 'mes_cheio', category: 'jogo', rarity: 'epico', rarity_pct: 13.3 },
+    { achievement_key: 'primeira_bola', category: 'jogo', rarity: 'comum', rarity_pct: 72.4 },
+    { achievement_key: 'areia_nos_tenis', category: 'jogo', rarity: 'comum', rarity_pct: 58.1 },
+    { achievement_key: 'cliente_da_casa', category: 'jogo', rarity: 'comum', rarity_pct: 41.0 },
+    { achievement_key: 'ritual_de_segunda', category: 'jogo', rarity: 'comum', rarity_pct: 33.3 },
+    { achievement_key: 'coruja_do_padel', category: 'jogo', rarity: 'comum', rarity_pct: 27.6 },
+    { achievement_key: 'primeiro_grito', category: 'jogo', rarity: 'comum', rarity_pct: 61.9 },
+    { achievement_key: 'mao_quente', category: 'jogo', rarity: 'raro', rarity_pct: 18.2 },
+    { achievement_key: 'noite_perfeita', category: 'jogo', rarity: 'raro', rarity_pct: 12.5 },
+    { achievement_key: 'entre_amigos', category: 'jogo', rarity: 'comum', rarity_pct: 39.8 },
+    { achievement_key: 'calibrado', category: 'elo', rarity: 'comum', rarity_pct: 80.0 },
+    { achievement_key: 'fora_da_areia', category: 'elo', rarity: 'comum', rarity_pct: 44.7 },
+    { achievement_key: 'primeiro_escudo', category: 'xp', rarity: 'comum', rarity_pct: 66.0 },
+    { achievement_key: 'primeiro_aplauso', category: 'kudos', rarity: 'comum', rarity_pct: 52.3 },
+    { achievement_key: 'meio_ano_de_casa', category: 'antiguidade', rarity: 'comum', rarity_pct: 25.1 },
   ],
   get_player_public_extras: (params) => {
     const person = FAKE_PEOPLE[params?.p_user_id] || FAKE_PEOPLE[FAKE_PLAYER_ID]
@@ -800,10 +864,9 @@ const TABLE_MOCKS = {
     // ele so a equipa Alinho (mockPlatformAdmin) as ve.
     { key: 'lessons', enabled: localStorage.getItem('mockLessonsFlag') === 'true' },
   ],
-  achievements: () => [
-    { key: 'primeira_bola', category: 'jogo', rarity: 'comum', sort: 1 },
-    { key: 'mes_cheio', category: 'jogo', rarity: 'epico', sort: 2 },
-  ],
+  // O catálogo inteiro: as 47 conquistas de produção, com a mesma chave,
+  // categoria, raridade e ordem de supabase/migration_trophies.sql (#551).
+  achievements: () => ACHIEVEMENTS_CATALOG,
   player_stats: () => [{ game_wins: 24, game_losses: 16, mix_wins: 3, mixes_played: 8, total_points: 120 }],
   mix_player_stats: () => (agenda()
     ? [{ game_id: 'ag-finished-yesterday', user_id: MOCK_ADMIN_USER_ID, mix_won: false, rating_delta: 18, points_earned: 14,
