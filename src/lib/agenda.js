@@ -38,7 +38,9 @@ export const addDays = (key, n) => {
 }
 
 const FINISHED_GAME = ['finished', 'completed']
-const HIDDEN_GAME = ['cancelled', 'pending']
+// 'draft' = mix em rascunho (Trello #544): nem o admin o vê na Home — vê-o
+// no Gerir e na página do mix.
+const HIDDEN_GAME = ['cancelled', 'pending', 'draft']
 
 /** Mix ou jogo em aberto (tabela games). `userId` decide o "meu". */
 export function eventFromGame(game, userId) {
