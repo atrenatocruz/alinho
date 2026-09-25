@@ -2447,6 +2447,7 @@
   "gerir.teacher_wants_club": "Wants to teach at {{club}}",
   "teacher.club_status_pending": "Link to the club: waiting for the club to accept",
   "teacher.club_status_rejected": "Link to the club: the club didn't accept",
+  "gerir.teacher_club_decides": "{{club}} decides.",
   "comunidade.teacher_label_f": "Coach",
   "comunidade.teacher_no_club_short": "No club",
   "comunidade.teacher_no_schedule": "No schedule yet",
