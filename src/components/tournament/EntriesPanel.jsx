@@ -5,9 +5,9 @@ import { supabase } from '../../lib/supabase'
 import { searchPlayers } from '../../lib/privateMatches'
 import { useAuth } from '../../contexts/AuthContext'
 import { Sheet } from '../agenda/AgendaControls'
-import { Avatar, ConfirmSheet, PrimaryButton, EmptyState } from '../ui'
+import { Avatar, ConfirmSheet, PrimaryButton, EmptyState, Chips, NeedsYou } from '../ui'
 import { partnerNameError, partnerEmailError } from '../../lib/partnerInvite'
-import { listEntries, validateEntry, removeEntry, adminSignUp, tournamentInviteLink, inviteToken, whoIsAlreadyIn } from '../../lib/tournamentSignup'
+import { listEntries, validateEntry, removeEntry, adminSignUp, adminSetPartner, tournamentInviteLink, inviteToken, inviteTokenPlayer1, whoIsAlreadyIn } from '../../lib/tournamentSignup'
 import { whatsappShare } from '../../lib/partnerInvite'
 import { signupErrorMessage, errorCode } from '../../lib/tournamentError'
 
@@ -36,9 +36,40 @@ function pairName(e, t) {
   return `${e.player1_name} / ${second}`
 }
 
+/* Quem, na dupla, entrou só pelo nome (Trello #515: o jogador 1 também pode).
+   Diz-se o nome — com um «sem conta» solto não se sabia de qual dos dois. */
+function noAccountTag(e, t) {
+  const p1 = !e.player1_id && !!e.player1_name
+  const p2 = !!(e.player2_is_guest || (!e.player2_id && e.guest_name))
+  if (p1 && p2) return t('tentries.no_account_both')
+  if (p1) return t('tentries.no_account_named', { name: e.player1_name })
+  if (p2) return t('tentries.no_account_named', { name: e.player2_name || e.guest_name })
+  return null
+}
+
+/* O bloco «Não está na app?» — nome e email de quem entra sem conta. O mesmo
+   para o jogador 1 e para o 2 (Trello #515). */
+function NotInApp({ t, name, setName, email, setEmail }) {
+  return (
+    <div className="rounded-ctrl border-2 border-line p-3 space-y-2">
+      <p className="text-sm font-extrabold text-ink-900">{t('partner.not_in_app_title')}</p>
+      <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('tentries.admin_name_placeholder')} className="input-field" />
+      <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder={t('partner.email_placeholder')} className="input-field" />
+      {/* Dizer a verdade a quem passa as inscricoes do formulario para a
+          app: o email fica guardado mas NAO sai daqui nenhum email — o
+          convite vai pelo link (Trello #479). */}
+      <p className="text-xs text-muted">{t('partner.email_hint')}</p>
+    </div>
+  )
+}
+
 /* Inscrever à mão — o Smash Cup ainda recebe inscrições pelo formulário
    do clube, e alguém tem de as passar para cá (ATUALIZACOES-21-SET, 6). */
-function AdminEntrySheet({ organizationId, categories = [], categoryId: initialCategoryId, busy, error, onConfirm, onClose }) {
+/* `mode`: 'new' é o «Inscrever à mão» inteiro; 'partner' é só o parceiro,
+   para juntar a quem se inscreveu sozinho (Trello #515) — a mesma procura,
+   o mesmo «Não está na app?» e o mesmo género, sem duplicar nada. */
+function AdminEntrySheet({ organizationId, categories = [], categoryId: initialCategoryId, busy, error, onConfirm, onClose, mode = 'new', title, excludeId = null }) {
+  const newEntry = mode === 'new'
   const { t } = useTranslation()
   // A categoria escolhe-se aqui, à vista — antes vinha calada do painel e
   // dava para inscrever alguém na categoria errada sem dar por isso (Trello #453).
@@ -50,6 +81,11 @@ function AdminEntrySheet({ organizationId, categories = [], categoryId: initialC
   const [partner, setPartner] = useState(null)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
+  // Jogador 1 sem conta, pelo nome (Trello #515).
+  const [name1, setName1] = useState('')
+  const [email1, setEmail1] = useState('')
+  // «Sozinho, à espera de parceiro» (Trello #515): fica sem_parceiro.
+  const [solo, setSolo] = useState(false)
   // Desmarcado à partida (Trello #516): quem se esquecesse de o tirar
   // validava uma dupla que não pagou. Marca-se quando o pagamento foi feito.
   const [paid, setPaid] = useState(false)
@@ -110,8 +146,10 @@ function AdminEntrySheet({ organizationId, categories = [], categoryId: initialC
   const genderOk = (p) => !needsGender(p) || !!chosenGender[p.id]
 
   const nameError = name ? partnerNameError(name) : null
-  const ready = player1 && genderOk(player1) && genderOk(partner)
-    && (partner || (name && !nameError && !partnerEmailError(email)))
+  const guestOk = (n, e) => !!n.trim() && !partnerNameError(n) && !partnerEmailError(e)
+  const player1Ok = player1 ? genderOk(player1) : guestOk(name1, email1)
+  const partnerOk = solo || (partner ? genderOk(partner) : (!!name && !nameError && !partnerEmailError(email)))
+  const ready = newEntry ? player1Ok && partnerOk : partnerOk
 
   // Chamado como função, não como <Picker/>: um componente definido aqui
   // dentro era recriado a cada letra e a caixa perdia o foco.
@@ -173,9 +211,9 @@ function AdminEntrySheet({ organizationId, categories = [], categoryId: initialC
   }
 
   return (
-    <Sheet onClose={onClose} title={t('tentries.admin_add_title')}>
+    <Sheet onClose={onClose} title={title || t('tentries.admin_add_title')}>
       <div className="space-y-4">
-        {categories.length > 1 && (
+        {newEntry && categories.length > 1 && (
           <div className="space-y-1.5">
             <p className="font-mono text-[11px] uppercase tracking-widest text-ink-500">{t('tentries.admin_category')}</p>
             <div className="flex flex-wrap gap-1.5">
@@ -195,43 +233,66 @@ function AdminEntrySheet({ organizationId, categories = [], categoryId: initialC
             </div>
           </div>
         )}
-        {picker({ label: t('tentries.admin_player1'), q: q1, setQ: setQ1, picked: player1, setPicked: setPlayer1, exclude: partner?.id, slot: 1 })}
-        {picker({ label: t('tentries.admin_player2'), q: q2, setQ: setQ2, picked: partner, setPicked: setPartner, exclude: player1?.id, slot: 2 })}
+        {newEntry && (
+          <>
+            {picker({ label: t('tentries.admin_player1'), q: q1, setQ: setQ1, picked: player1, setPicked: setPlayer1, exclude: partner?.id, slot: 1 })}
+            {!player1 && NotInApp({ t, name: name1, setName: setName1, email: email1, setEmail: setEmail1 })}
 
-        {!partner && (
-          <div className="rounded-ctrl border-2 border-line p-3 space-y-2">
-            <p className="text-sm font-extrabold text-ink-900">{t('partner.not_in_app_title')}</p>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('partner.name_placeholder')} className="input-field" />
-            <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder={t('partner.email_placeholder')} className="input-field" />
-            {/* Dizer a verdade a quem passa as inscricoes do formulario para a
-                app: o email fica guardado mas NAO sai daqui nenhum email — o
-                convite vai pelo link que se copia na lista (Trello #479). O
-                mix ja avisava disto; o torneio nao. Mesmo texto dos dois lados,
-                de proposito. */}
-            <p className="text-xs text-muted">{t('partner.email_hint')}</p>
-          </div>
+            {/* Com parceiro, ou sozinho à espera de um (Trello #515). É uma
+                escolha num formulário: pastilhas, não separador (#528). */}
+            <Chips
+              value={solo}
+              onChange={setSolo}
+              options={[
+                { value: false, label: t('tentries.admin_with_partner') },
+                { value: true, label: t('tentries.admin_alone') },
+              ]}
+            />
+          </>
         )}
 
-        <label className="flex items-center gap-2.5 text-sm font-semibold text-ink-900">
-          <input type="checkbox" checked={paid} onChange={(e) => setPaid(e.target.checked)} className="h-5 w-5 rounded" />
-          {t('tentries.admin_paid')}
-        </label>
+        {(!newEntry || !solo) && (
+          <>
+            {picker({ label: t('tentries.admin_player2'), q: q2, setQ: setQ2, picked: partner, setPicked: setPartner, exclude: player1?.id || excludeId, slot: 2 })}
+            {!partner && NotInApp({ t, name, setName, email, setEmail })}
+          </>
+        )}
+
+        {newEntry && solo && <p className="text-xs text-muted">{t('tentries.admin_alone_hint')}</p>}
+
+        {newEntry && (
+          <label className="flex items-center gap-2.5 text-sm font-semibold text-ink-900">
+            <input type="checkbox" checked={paid} onChange={(e) => setPaid(e.target.checked)} className="h-5 w-5 rounded" />
+            {t('tentries.admin_paid')}
+          </label>
+        )}
 
         {error && <p className="text-sm text-red-600 font-extrabold">{error}</p>}
 
         <PrimaryButton
-          onClick={() => ready && onConfirm({
-            categoryId, player1Id: player1.id, partnerId: partner?.id || null,
-            player1Gender: needsGender(player1) ? chosenGender[player1.id] : null,
-            partnerGender: needsGender(partner) ? chosenGender[partner.id] : null,
-            guestName: partner ? null : name.trim() || null,
-            guestEmail: partner ? null : email.trim() || null,
-            paid,
-          })}
+          onClick={() => {
+            if (!ready) return
+            const second = {
+              partnerId: partner?.id || null,
+              partnerGender: needsGender(partner) ? chosenGender[partner.id] : null,
+              guestName: partner ? null : name.trim() || null,
+              guestEmail: partner ? null : email.trim() || null,
+            }
+            if (!newEntry) { onConfirm(second); return }
+            onConfirm({
+              categoryId,
+              player1Id: player1?.id || null,
+              player1GuestName: player1 ? null : name1.trim(),
+              player1GuestEmail: player1 ? null : email1.trim() || null,
+              player1Gender: needsGender(player1) ? chosenGender[player1.id] : null,
+              ...(solo ? { partnerId: null, partnerGender: null, guestName: null, guestEmail: null } : second),
+              paid,
+            })
+          }}
           disabled={!ready || busy}
           className="w-full"
         >
-          {t('tentries.admin_add_confirm')}
+          {t(newEntry ? 'tentries.admin_add_confirm' : 'tentries.join_partner')}
         </PrimaryButton>
       </div>
     </Sheet>
@@ -248,6 +309,8 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
   const [error, setError] = useState('')
   const [askRemove, setAskRemove] = useState(null) // a inscrição a tirar
   const [addOpen, setAddOpen] = useState(false)
+  // Juntar parceiro a quem está sozinho (Trello #515).
+  const [joinFor, setJoinFor] = useState(null)
 
   const load = () => {
     if (!category?.id) return
@@ -310,14 +373,20 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
     }
   }
 
+  // Reenviar: abre a folha dos links com o de cada pessoa sem conta da
+  // dupla — o jogador 1, o 2, ou os dois (Trello #515).
   const share = async (e) => {
     try {
-      const token = await inviteToken(e.entry_id)
-      if (!token) return
-      const link = tournamentInviteLink(token, window.location.origin)
-      window.open(whatsappShare(t('tsignup.invite_whatsapp_text', {
-        name: e.guest_name || '', title: tournament.name, link,
-      })), '_blank')
+      const links = []
+      if (!e.player1_id) {
+        const token = await inviteTokenPlayer1(e.entry_id)
+        if (token) links.push({ token, name: e.player1_name || '', email: null })
+      }
+      if (!e.player2_id && e.guest_name) {
+        const token = await inviteToken(e.entry_id)
+        if (token) links.push({ token, name: e.guest_name, email: null })
+      }
+      if (links.length) setFresh(links)
     } catch (err) {
       console.error('Error getting the invite token:', err)
       say(err)
@@ -330,8 +399,9 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
   // e o link, que é a única forma de ela ficar com o lugar, estava escondido
   // atrás do avião de papel na lista. A `tournament_admin_signup` já devolve
   // o `invite_token`, por isso não é preciso ir buscá-lo outra vez.
-  const [fresh, setFresh] = useState(null) // { token, name, email }
-  const freshLink = fresh ? tournamentInviteLink(fresh.token, window.location.origin) : ''
+  // Uma pessoa por link: desde o #515 podem ser duas (nenhuma com conta).
+  const [fresh, setFresh] = useState(null) // [{ token, name, email }]
+  const linkOf = (token) => tournamentInviteLink(token, window.location.origin)
 
   const act = async (fn) => {
     setBusy(true); setError('')
@@ -380,17 +450,20 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
       ) : (
         <div className="space-y-1.5">
           {shown.map((e) => (
-            <div key={e.id || e.entry_id} className={`card flex items-center gap-3 py-3 ${
+            <div key={e.id || e.entry_id} className="space-y-1.5">
+            <div className={`card flex items-center gap-3 py-3 ${
               (e.withdrawn || e.status === 'desistiu') ? 'opacity-60' : ''}`}>
               <div className="min-w-0 flex-1">
-                <p className="font-extrabold text-ink-900 truncate">
+                {/* Até duas linhas: com os botões ao lado, «Carla N…» não
+                    dizia quem era (Trello #515). */}
+                <p className="font-extrabold text-ink-900 line-clamp-2 break-words">
                   {e.team_name || pairName(e, t)}
                 </p>
-                <p className="text-xs text-muted truncate">
+                <p className="text-xs text-muted line-clamp-2">
                   {[
                     e.team_name ? pairName(e, t) : null,
                     e.status === 'suplente' && e.waitlist_order ? t('tentries.waitlist_n', { n: e.waitlist_order }) : null,
-                    (e.player2_is_guest || (!e.player2_id && e.guest_name)) ? t('partner.no_account_tag') : null,
+                    noAccountTag(e, t),
                     (e.withdrawn || e.status === 'desistiu') ? t('tentries.state_desistiu') : null,
                     // Quando se inscreveu — é por aqui que o organizador
                     // percebe a ordem de chegada (print 08).
@@ -407,7 +480,7 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
                 <div className="flex shrink-0 gap-1">
                   {/* Reenviar o convite de quem ainda não tem conta: o link
                       é a única forma de ele ficar com o lugar. */}
-                  {e.has_invite && !e.player2_id && (
+                  {e.has_invite && (!e.player1_id || (!e.player2_id && e.guest_name)) && (
                     <button
                       onClick={() => share(e)}
                       disabled={busy}
@@ -437,6 +510,14 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
                   </button>
                 </div>
               )}
+            </div>
+            {/* Sozinho à espera de parceiro: «Precisa de ti», com a ação
+                que resolve (regra de 25 set; Trello #515). */}
+            {isAdmin && e.status === 'sem_parceiro' && (
+              <NeedsYou action={{ label: t('tentries.join_partner'), onClick: () => { setError(''); setJoinFor(e) }, disabled: busy }}>
+                {t('tentries.needs_partner', { name: e.player1_name || '?' })}
+              </NeedsYou>
+            )}
             </div>
           ))}
         </div>
@@ -472,10 +553,16 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
             setBusy(true); setError('')
             try {
               const res = await adminSignUp(choice)
-              // Só há link quando a dupla tem alguém sem conta.
-              if (res?.invite_token && choice.guestName) {
-                setFresh({ token: res.invite_token, name: choice.guestName, email: choice.guestEmail || null })
+              // Só há link para quem entrou sem conta — o jogador 1, o 2,
+              // ou os dois (Trello #515).
+              const links = []
+              if (res?.invite_token_player1 && choice.player1GuestName) {
+                links.push({ token: res.invite_token_player1, name: choice.player1GuestName, email: choice.player1GuestEmail || null })
               }
+              if (res?.invite_token && choice.guestName) {
+                links.push({ token: res.invite_token, name: choice.guestName, email: choice.guestEmail || null })
+              }
+              if (links.length) setFresh(links)
               load()
               setAddOpen(false)
             } catch (err) {
@@ -489,31 +576,66 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
         />
       )}
 
+      {joinFor && (
+        <AdminEntrySheet
+          mode="partner"
+          excludeId={joinFor.player1_id}
+          title={t('tentries.join_partner_title', { name: joinFor.player1_name || '?' })}
+          organizationId={tournament.organization_id}
+          busy={busy}
+          error={error}
+          onConfirm={async (choice) => {
+            setBusy(true); setError('')
+            try {
+              const res = await adminSetPartner(joinFor.entry_id, choice)
+              if (res?.invite_token && choice.guestName) {
+                setFresh([{ token: res.invite_token, name: choice.guestName, email: choice.guestEmail || null }])
+              }
+              load()
+              setJoinFor(null)
+            } catch (err) {
+              console.error('Error joining a partner:', err)
+              setError(signupErrorMessage(t, err))
+            } finally {
+              setBusy(false)
+            }
+          }}
+          onClose={() => { setJoinFor(null); setError('') }}
+        />
+      )}
+
       {/* Inscreveu alguém sem conta: o link é como ele fica a saber. Mesma
-          folha que o jogador vê ao inscrever a dupla dele (SignupSlot). */}
+          folha que o jogador vê ao inscrever a dupla dele (SignupSlot); com
+          uma dupla sem contas, um link por pessoa (Trello #515). */}
       {fresh && (
         <Sheet title={t('tsignup.invite_ready_title')} onClose={() => setFresh(null)}>
-          <div className="space-y-3">
-            {/* Sem o «Tu e o {nome} ficam dupla» que o jogador vê: aqui quem
-                inscreve não faz parte da dupla, e a frase ficava errada. O
-                resto serve tal e qual. */}
-            <p className="text-sm text-ink-900">
-              {fresh.email ? t('partner.invite_ready_email', { email: fresh.email }) : t('partner.invite_ready_no_email')}
-            </p>
-            <div className="rounded-ctrl bg-ink-50 px-3 py-2 text-xs text-ink-900 break-all">{freshLink}</div>
-            <PrimaryButton
-              onClick={() => window.open(whatsappShare(t('tsignup.invite_whatsapp_text', { name: fresh.name, title: tournament.name, link: freshLink })), '_blank')}
-              className="w-full"
-            >
-              {t('partner.invite_send_whatsapp')}
-            </PrimaryButton>
-            <PrimaryButton
-              variant="ghost"
-              onClick={() => navigator.clipboard?.writeText(freshLink)}
-              className="w-full !bg-white !border-ink-900"
-            >
-              <Copy size={18} /> {t('partner.invite_copy_link')}
-            </PrimaryButton>
+          <div className="space-y-5">
+            {fresh.map((f) => (
+              <div key={f.token} className="space-y-3">
+                {fresh.length > 1 && <p className="text-sm font-extrabold text-ink-900">{f.name}</p>}
+                {/* Sem o «Tu e o {nome} ficam dupla» que o jogador vê: aqui
+                    quem inscreve não faz parte da dupla. */}
+                <p className="text-sm text-ink-900">
+                  {/* Com o nome e sem «ele»: podem ser duas pessoas, e de
+                      qualquer género (Trello #515). */}
+                  {f.email ? t('partner.invite_ready_email', { email: f.email }) : t('tentries.invite_ready_named', { name: f.name })}
+                </p>
+                <div className="rounded-ctrl bg-ink-50 px-3 py-2 text-xs text-ink-900 break-all">{linkOf(f.token)}</div>
+                <PrimaryButton
+                  onClick={() => window.open(whatsappShare(t('tsignup.invite_whatsapp_text', { name: f.name, title: tournament.name, link: linkOf(f.token) })), '_blank')}
+                  className="w-full"
+                >
+                  {t('partner.invite_send_whatsapp')}
+                </PrimaryButton>
+                <PrimaryButton
+                  variant="ghost"
+                  onClick={() => navigator.clipboard?.writeText(linkOf(f.token))}
+                  className="w-full !bg-white !border-ink-900"
+                >
+                  <Copy size={18} /> {t('partner.invite_copy_link')}
+                </PrimaryButton>
+              </div>
+            ))}
           </div>
         </Sheet>
       )}
