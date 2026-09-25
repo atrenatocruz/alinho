@@ -409,7 +409,12 @@ export default function Comunidade() {
           mesmo vazios. Com a pesquisa a funcionar em cima, o filtro deixa de
           mandar e mostram-se os resultados de tudo. */}
       {!searching && (
-        <Chips options={TABS.map((f) => ({ value: f.key, label: t(f.labelKey) }))} value={tab} onChange={setTab} />
+        // A fila vai até à beira do ecrã (Francisco, 26 set): num telemóvel
+        // pequeno a última pastilha aparece meio escondida, a mostrar que há
+        // mais para o lado, em vez de ser cortada pela margem da página.
+        <div className="-mx-4">
+          <Chips className="!mx-0 !px-4" options={TABS.map((f) => ({ value: f.key, label: t(f.labelKey) }))} value={tab} onChange={setTab} />
+        </div>
       )}
 
       {busy ? (

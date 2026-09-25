@@ -175,6 +175,26 @@ function finishOption(option, { maxDurationMin, availableHours, slack }) {
   }
 }
 
+/** O rótulo de uma opção de formato, como vão sair os grupos (Trello #540).
+    «3 grupos de 4» só quando são todos iguais; senão «3 grupos: 4, 3 e 3»
+    — antes dizia «3 grupos de 4» para 4+3+3. Devolve a chave e os números
+    (quem traduz é o ecrã, como o `formatWords` da página pública); a
+    chave trata do singular e do plural dos grupos e de quem passa.
+    Só para opções com grupos — «Só eliminatória» tem o seu texto. */
+export function groupsWords(option, locale = 'pt-PT') {
+  const sizes = option?.sizes || []
+  const equal = sizes.every((n) => n === sizes[0])
+  return {
+    key: equal ? 'tournament.draw.opt_groups_equal' : 'tournament.draw.opt_groups_mixed',
+    values: {
+      count: option?.groupCount ?? sizes.length,
+      size: sizes[0] ?? 0,
+      sizes: new Intl.ListFormat(locale, { style: 'long', type: 'conjunction' }).format(sizes.map(String)),
+      per: option?.qualifiersPerGroup ?? 0,
+    },
+  }
+}
+
 /** A opção recomendada: a que dá mais jogos garantidos e ainda cabe com
     folga. Se nenhuma couber com folga, a que cabe. Se nenhuma couber, a
     mais curta — e o ecrã dirá que não cabe.
