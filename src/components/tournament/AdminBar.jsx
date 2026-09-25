@@ -55,7 +55,7 @@ export default function AdminBar({ tournament, onChanged, onEdit, onDraw }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
   // Perguntas na folha da app, não na caixa do telemóvel (#435).
-  const [ask, setAsk] = useState(null) // null | 'delete'
+  const [ask, setAsk] = useState(null) // null | 'delete' | 'close'
 
   const status = tournament?.status
   const next = NEXT_STEP[status]
@@ -125,7 +125,10 @@ export default function AdminBar({ tournament, onChanged, onEdit, onDraw }) {
 
       <div className="mt-2.5 flex flex-wrap gap-1.5">
         {next && (
-          <button type="button" disabled={busy} onClick={() => go(next)}
+          <button type="button" disabled={busy}
+            // Fechar as inscrições pergunta antes (Trello #500): um toque por
+            // engano deixava toda a gente de fora. Sem vermelho — reabre-se.
+            onClick={() => (next === 'fechado' ? setAsk('close') : go(next))}
             className="min-h-[44px] rounded-ctrl bg-ink-900 px-3 py-2 text-[12px] font-bold text-white disabled:opacity-50">
             {t(`tournament.admin.to_${next}`)}
           </button>
@@ -176,6 +179,16 @@ export default function AdminBar({ tournament, onChanged, onEdit, onDraw }) {
       )}
       {error && <p className="mt-2 text-[12px] text-danger">{error}</p>}
 
+      <ConfirmSheet
+        open={ask === 'close'}
+        title={t('tournament.admin.close_title', { name: tournament?.name })}
+        message={t('tournament.admin.close_consequence')}
+        confirmLabel={t('tournament.admin.to_fechado')}
+        cancelLabel={t('tournament.admin.close_not_now')}
+        onConfirm={async () => { await setTournamentStatus(tournament.id, 'fechado'); onChanged?.() }}
+        onClose={() => setAsk(null)}
+        errorOf={(err) => describeError(t, err)}
+      />
       <ConfirmSheet
         open={ask === 'delete'}
         danger

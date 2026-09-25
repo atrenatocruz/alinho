@@ -154,6 +154,16 @@ export async function listTournamentsToScoreToday({ userId, adminOrgIds = [], to
   return (data || []).filter((x) => x.starts_on && x.starts_on <= today && (x.ends_on || x.starts_on) >= today)
 }
 
+/** Desfazer uma falta ou desistência marcada por engano (Trello #491): o
+ *  jogo volta a ficar por jogar, sem resultado. Só o organizador, e só
+ *  enquanto o jogo seguinte da categoria não tiver resultado — é o servidor
+ *  que o diz. ⚠️ FUNÇÃO POR ESCREVER (Dev 3, `undo_walkover`); até existir,
+ *  o erro é «ainda não disponível». */
+export async function undoWalkover(matchId) {
+  const { error } = await supabase.rpc('undo_walkover', { p_match_id: matchId })
+  if (error) throw error
+}
+
 /** O fim do torneio (print 12): quem ganhou cada categoria e o que a pessoa
  *  que está a ver levou de lá.
  *

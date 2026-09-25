@@ -395,6 +395,13 @@ export const TOURNAMENT_SCORE_RPC_MOCKS = {
     } : m))
     return null
   },
+  // Desfazer falta (Trello #491): o jogo volta a estar por jogar.
+  undo_walkover: (params) => {
+    if (!MATCHES) resetMatches()
+    MATCHES = MATCHES.map((m) => (m.match_id === params?.p_match_id
+      ? { ...m, status: 'marcado', score_a: null, score_b: null } : m))
+    return null
+  },
   mark_walkover: (params) => {
     if (!MATCHES) resetMatches()
     MATCHES = MATCHES.map((m) => (m.match_id === params?.p_match_id ? {
@@ -584,5 +591,17 @@ export const TOURNAMENT_REOPEN_RPC_MOCKS = {
     if (!reopened.size || !before) return undefined
     const data = before(params)
     return { ...data, categories: (data?.categories || []).map((c) => (reopened.has(c.id) ? { ...c, status: 'inscricoes' } : c)) }
+  },
+}
+
+// ── Grupos acabados (Trello #513) ───────────────────────────────────────
+// localStorage.mockTGroupsDone = 'true' (com mockTDraw): o jogo que estava
+// a decorrer no Grupo A do sorteio de teste acaba, para se ver a tabela
+// com os apurados marcados.
+export const TOURNAMENT_GROUPS_DONE_TABLE_MOCKS = {
+  tournament_public_matches: (url, before) => {
+    if (localStorage.getItem('mockTGroupsDone') !== 'true' || !before) return undefined
+    return (before(url) || []).map((m) => (m.stage === 'grupo' && m.status === 'a_decorrer'
+      ? { ...m, status: 'terminado', score_a: 9, score_b: 7, winner_entry_id: m.entry_a_id } : m))
   },
 }
