@@ -892,12 +892,26 @@ const TABLE_MOCKS = {
         : { zone: 'Cascais', organization: null }),
       // localStorage.mockTeacherSchedule = 'full' — «O meu horário» já preenchido (#418).
       availability: localStorage.getItem('mockTeacherSchedule') === 'full' ? [
-        { day_of_week: 'terca', start_time: '09:00:00', end_time: '13:00:00' },
-        { day_of_week: 'terca', start_time: '18:00:00', end_time: '21:00:00' },
-        { day_of_week: 'quinta', start_time: '18:30:00', end_time: '21:00:00' },
-        { day_of_week: 'sabado', start_time: '09:00:00', end_time: '13:00:00' },
+        { teacher_profile_id: 'tp-me', day_of_week: 'terca', start_time: '09:00:00', end_time: '13:00:00' },
+        ...(localStorage.getItem('mockTeacherClubs') === 'two' ? [] : [
+          { teacher_profile_id: 'tp-me', day_of_week: 'terca', start_time: '18:00:00', end_time: '21:00:00' },
+          { teacher_profile_id: 'tp-me', day_of_week: 'quinta', start_time: '18:30:00', end_time: '21:00:00' },
+        ]),
+        { teacher_profile_id: 'tp-me', day_of_week: 'sabado', start_time: '09:00:00', end_time: '13:00:00' },
       ] : [],
     }] : []),
+    // localStorage.mockTeacherClubs = 'two' — dá aulas noutro clube aceite e
+    // tem um terceiro à espera (#392, assunto 3).
+    ...(localStorage.getItem('mockTeacherState') === 'approved' && localStorage.getItem('mockTeacherClubs') === 'two' ? [
+      { id: 'tp-me2', user_id: MOCK_ADMIN_USER_ID, organization_id: 'co-2', status: 'approved', club_status: 'accepted',
+        contact: '912 000 111', zone: 'Almada', created_at: '2026-09-20T10:00:00Z', user: { name: 'Admin (Dev)' },
+        organization: { name: 'Padel Parque', slug: 'padel-parque' },
+        availability: localStorage.getItem('mockTeacherSchedule') === 'full'
+          ? [{ teacher_profile_id: 'tp-me2', day_of_week: 'quinta', start_time: '18:00:00', end_time: '21:00:00' }] : [] },
+      { id: 'tp-me3', user_id: MOCK_ADMIN_USER_ID, organization_id: 'co-3', status: 'pending', club_status: 'pending',
+        contact: '912 000 111', zone: 'Almada', created_at: '2026-09-25T10:00:00Z', user: { name: 'Admin (Dev)' },
+        organization: { name: 'Racket Club', slug: 'racket-club' }, availability: [] },
+    ] : []),
     { id: 'tp-1', user_id: 'fake-t1', organization_id: 'co-1', status: 'approved', contact: '912 345 678',
       zone: 'Almada', user: { name: 'Ana Moreira', gender: 'feminino', rating: 1650 }, organization: { name: 'Smash Padel', slug: 'smash-padel' },
       availability: [{ day_of_week: 'terca', start_time: '09:00:00', end_time: '13:00:00' }, { day_of_week: 'quinta', start_time: '17:00:00', end_time: '20:00:00' }] },
