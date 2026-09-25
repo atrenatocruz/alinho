@@ -857,8 +857,8 @@ const TABLE_MOCKS = {
     ? [{ id: 'f-teacher', status: 'accepted', followed_id: 'u-ana' }] : []),
   // localStorage.mockCommunity — um professor com clube e um sem clube.
   teacher_profiles: (url) => (community() && url.includes('club_status=eq.pending') ? [
-    { id: 'tp-c1', status: 'approved', contact: '914 555 666', zone: 'Almada', created_at: '2026-09-16T08:00:00Z', user: { name: 'Sofia Ramos' } },
-    { id: 'tp-c2', status: 'pending', contact: '@miguel.coach', zone: null, created_at: '2026-09-16T12:00:00Z', user: { name: 'Miguel Tavares' } },
+    { id: 'tp-c1', status: 'approved', contact: '914 555 666', zone: 'Almada', created_at: '2026-09-16T08:00:00Z', user_id: 'fake-sofia', user: { name: 'Sofia Ramos', gender: 'feminino' } },
+    { id: 'tp-c2', status: 'pending', contact: '@miguel.coach', zone: null, created_at: '2026-09-16T12:00:00Z', user_id: 'fake-miguel', user: { name: 'Miguel Tavares', gender: 'masculino' } },
   ] : community() && url.includes('status=eq.pending') ? [
     { id: 'tp-p1', user_id: 'fake-t3', organization_id: null, status: 'pending', contact: '913 222 444', zone: 'Oeiras', created_at: '2026-09-16T09:00:00Z',
       user: { name: 'Carla Mendes' }, organization: null },

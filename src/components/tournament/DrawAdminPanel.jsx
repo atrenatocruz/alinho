@@ -539,7 +539,7 @@ function DoneStep({ tournament, category, onDone, t }) {
       <div className="flex flex-wrap items-center gap-2">
         <Link
           to={`/torneio/${tournament.slug || tournament.id}/imprimir?categoria=${category.id}`}
-          className="inline-flex items-center gap-1.5 rounded-full bg-ink-900 px-3 py-2 text-[12px] font-bold text-white"
+          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full bg-ink-900 px-3 py-2 text-[12px] font-bold text-white"
         >
           <Printer size={14} /> {t('tournament.draw.print')}
         </Link>
@@ -547,7 +547,7 @@ function DoneStep({ tournament, category, onDone, t }) {
           <button
             type="button"
             onClick={() => setAsking(true)}
-            className="rounded-full border border-line px-3 py-2 text-[12px] font-semibold text-ink-700 hover:bg-ink-50"
+            className="min-h-[44px] rounded-full border border-line px-3 py-2 text-[12px] font-semibold text-ink-700 hover:bg-ink-50"
           >
             {t('tournament.draw.undo')}
           </button>

@@ -85,7 +85,7 @@ export function Sheet({ title, onClose, children }) {
       >
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-lg text-ink-900">{title}</h3>
-          <button onClick={onClose} aria-label={t('ui.close')} className="w-9 h-9 flex items-center justify-center rounded-full text-muted hover:bg-ink-50 hover:text-ink-900">
+          <button onClick={onClose} aria-label={t('ui.close')} className="w-11 h-11 flex items-center justify-center rounded-full text-muted hover:bg-ink-50 hover:text-ink-900">
             <X size={20} />
           </button>
         </div>
@@ -364,14 +364,17 @@ export function FilterChips({ filters, onOpenFilters, onOpenSearch }) {
   const { t } = useTranslation()
   const kindsOn = filters.kinds.length < EVENT_KINDS.length
   const orgsOn = filters.orgIds != null
-  const chip = (on) => `inline-flex items-center gap-1 px-3 min-h-[36px] rounded-full text-[13px] font-extrabold border whitespace-nowrap ${
+  // 36 px à vista, 44 px ao toque (Trello #558, designer 25 set): a zona
+  // estende-se 4 px para cima e para baixo, sem se ver.
+  const tap = "relative before:absolute before:inset-x-0 before:-inset-y-1 before:content-['']"
+  const chip = (on) => `${tap} inline-flex items-center gap-1 px-3 min-h-[36px] rounded-full text-[13px] font-extrabold border whitespace-nowrap ${
     on ? 'bg-ink-900 text-white border-ink-900' : 'bg-canvas text-ink-700 border-line'
   }`
   return (
-    <div className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-1 px-1">
+    <div className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-1 -my-1 px-1 py-1">
       {onOpenSearch && (
         <button type="button" onClick={onOpenSearch} aria-label={t('agenda.search_open')} title={t('agenda.search_open')}
-          className="shrink-0 inline-flex items-center justify-center w-9 min-h-[36px] rounded-full border bg-canvas text-ink-700 border-line">
+          className={`${tap} shrink-0 inline-flex items-center justify-center w-9 min-h-[36px] rounded-full border bg-canvas text-ink-700 border-line`}>
           <Search size={16} />
         </button>
       )}
