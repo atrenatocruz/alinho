@@ -182,3 +182,31 @@ export async function cancelLessonPeriod(seriesId, fromIso, toIso, reason, note)
   })
   if (error) throw error
 }
+
+// ── Pedir aula (Trello #392, assunto 1; migration_lessons_3_requests.sql) ──
+
+/** Tudo para o ecrã «Pedir aula», dos clubes todos do professor:
+    { teacher, profiles: [{ teacher_profile_id, org_name, availability,
+    peak_hours, prices }], busy: [{ starts_at, ends_at }], mine: [pedidos
+    meus por fechar], i_have_whatsapp }. null com a marcação desligada. */
+export async function getTeacherBooking(teacherProfileId) {
+  const { data, error } = await supabase.rpc('get_teacher_booking', { p_teacher_profile_id: teacherProfileId })
+  if (error) throw error
+  return data || null
+}
+
+/** Envia o pedido. contactVia 'whatsapp' | 'email'; phone só com WhatsApp e
+    só se a conta não estiver ligada ao WhatsApp (o servidor usa esse). */
+export async function requestLesson({ teacherProfileId, startsAt, duration, type, contactVia, phone }) {
+  const { data, error } = await supabase.rpc('request_lesson', {
+    p_teacher_profile_id: teacherProfileId, p_starts_at: startsAt, p_duration: duration, p_type: type,
+    p_contact_via: contactVia, p_phone: phone || null,
+  })
+  if (error) throw error
+  return data
+}
+
+export async function cancelLessonRequest(id) {
+  const { error } = await supabase.rpc('cancel_lesson_request', { p_id: id })
+  if (error) throw error
+}
