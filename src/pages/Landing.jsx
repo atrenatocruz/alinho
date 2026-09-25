@@ -1,10 +1,21 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { CheckCircle2, MapPin, Lock, Calendar, Trophy, Users, MessageCircle } from 'lucide-react'
+import { CheckCircle2, Trophy, Shuffle, ChevronRight } from 'lucide-react'
 import { Wordmark } from '../components/Layout'
-import PadelIcon from '../components/icons/PadelIcon'
 import i18n from '../lib/i18n'
+
+/* alinho.pt antes de entrar (Trello #327) — desenho APROVADO pelo Francisco
+   a 24 set: design-handoff/2026-09-24-alinho-pt-antes-de-entrar/SPEC.md e
+   prints/10-FINAL-aprovada.png.
+
+   Para o jogador que chega por um clube ou por um evento — qualquer um. Uma
+   só ação: «Criar conta». Topo branco com o telemóvel, uma secção por tipo
+   com a cor do tipo (como na app), fim e rodapé em preto.
+
+   Regra do PRODUCT.md: nada de testemunhos, números, pessoas ou clubes
+   reais. O telemóvel mostra a conta de EXEMPLO do modo de teste, com
+   «Imagem ilustrativa» (decisão do Francisco, 25 set). */
 
 // Same pattern as Layout.jsx's header toggle, minus the profile persistence
 // (there's no profile yet on this pre-auth page) — just the instant UI flip
@@ -35,57 +46,10 @@ function LanguageToggle({ className = '' }) {
   )
 }
 
-// Fires once, the first time the ref'd element enters the viewport — drives
-// the .reveal / .reveal-visible transition (src/index.css) instead of a
-// mount-time animation, so below-the-fold sections come alive as the visitor
-// scrolls to them rather than animating uselessly offscreen on page load.
-function useReveal() {
-  const ref = useRef(null)
-  const [visible, setVisible] = useState(false)
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setVisible(true)
-          observer.disconnect()
-        }
-      },
-      { threshold: 0.2 }
-    )
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [])
-  return [ref, visible]
-}
-
-// One-shot count from `start` to `target` on mount — used on the hero mock
-// card so the player count visibly fills in, a small concrete stand-in for
-// the real-time updates the copy promises. Skips straight to `target` under
-// prefers-reduced-motion.
-function useCountUp(target, start) {
-  const [value, setValue] = useState(start)
-  useEffect(() => {
-    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      setValue(target)
-      return
-    }
-    let current = start
-    const id = setInterval(() => {
-      current += 1
-      setValue(current)
-      if (current >= target) clearInterval(id)
-    }, 220)
-    return () => clearInterval(id)
-  }, [target, start])
-  return value
-}
-
 // Builds the /login href, preserving ?org=<slug> from the current URL (the
 // invite-link mechanism — see Home.jsx / Login.jsx) so landing-page CTAs
 // don't silently drop it for logged-out visitors landing on `/?org=...`.
-function useLoginHref() {
+export function useLoginHref() {
   const [params] = useSearchParams()
   const org = params.get('org')
   return (mode) => {
@@ -97,9 +61,9 @@ function useLoginHref() {
   }
 }
 
-// Fixed nav — floats transparently over the hero, solidifies once scrolled
-// past it, matching Layout.jsx's header treatment for logged-in pages.
-function Nav() {
+// O menu por cima do topo branco: transparente em cima, branco ao descer.
+// O «Planos» leva à página própria (antes saltava para #planos).
+export function Nav() {
   const { t } = useTranslation()
   const [scrolled, setScrolled] = useState(false)
   const loginHref = useLoginHref()
@@ -111,97 +75,53 @@ function Nav() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
+  const link = 'inline-flex items-center min-h-[44px] px-1 text-ink-700 hover:text-ink-900 font-extrabold text-sm transition-colors duration-fast'
   return (
     <header
       className={`fixed top-0 inset-x-0 z-20 transition-colors duration-base ${
-        scrolled
-          ? 'bg-ink-900/95 backdrop-blur-xl border-b border-white/5 supports-[backdrop-filter]:bg-ink-900/85'
-          : 'bg-transparent'
+        scrolled ? 'bg-[#F7F7F4]/95 backdrop-blur-xl border-b border-line' : 'bg-transparent'
       }`}
     >
       <div className="max-w-5xl mx-auto px-5 h-16 flex items-center justify-between">
         <Link to="/" className="leading-none">
-          <Wordmark />
+          <Wordmark variant="light" />
         </Link>
         <div className="flex items-center gap-4">
-          <LanguageToggle className="text-white/80 hover:text-white" />
-          <a
-            href="#planos"
-            className="inline-flex items-center min-h-[44px] px-1 text-white/80 hover:text-white font-extrabold text-sm transition-colors duration-fast"
-          >
-            {t('landing.pricing_nav_link')}
-          </a>
-          <Link
-            to={loginHref()}
-            className="inline-flex items-center min-h-[44px] px-1 text-white/80 hover:text-white font-extrabold text-sm transition-colors duration-fast"
-          >
-            {t('landing.login_link')}
-          </Link>
-          {/* Hidden on narrow mobile to avoid crowding — the hero below
-              already carries a full-size "Criar conta" CTA. */}
-          {/* `.btn-primary` only ever styles real <button> elements elsewhere
-              in this codebase (see src/components/ui.jsx)
-              — it relies on min-h-[48px], which has no effect on the default
-              `display: inline` a Link/<a> renders as. inline-flex + centering
-              utilities are required here so the link actually sizes and
-              centers like a button. */}
-          <Link
-            to={loginHref('signup')}
-            className="btn-primary hidden sm:inline-flex items-center justify-center"
-          >
-            {t('landing.signup_link')}
-          </Link>
+          <LanguageToggle className="text-ink-700 hover:text-ink-900" />
+          <Link to="/planos" className={link}>{t('landing.pricing_nav_link')}</Link>
+          <Link to={loginHref()} className={link}>{t('landing.login_link')}</Link>
         </div>
       </div>
     </header>
   )
 }
 
-// Illustrative mockup of a real game card (same visual grammar as
-// MixCard in src/components/ui.jsx) — hardcoded content, no live data,
-// no screenshot asset needed.
-function HeroMockCard() {
+// O telemóvel do topo, cortado em baixo pela secção seguinte: a Home da
+// conta de EXEMPLO (Jogador Alinho, Clube Exemplo) — nunca uma conta real,
+// nem com nomes desfocados (Francisco, 25 set).
+function PhoneShot() {
   const { t } = useTranslation()
-  const players = useCountUp(8, 5)
   return (
-    <div className="card w-full max-w-sm shadow-lift" style={{ transform: 'rotate(-3deg)' }}>
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <div>
-          <p className="text-xs font-extrabold uppercase tracking-widest text-ink-700">{t('landing.saturday')}</p>
-          <p className="text-2xl text-ink-900 leading-tight">18:00</p>
-        </div>
-        <span className="inline-flex items-center gap-1.5 bg-lime-400 text-ink-900 text-xs font-extrabold px-3 py-1.5 rounded-full">
-          <CheckCircle2 size={14} /> {t('landing.joined_badge')}
-        </span>
-      </div>
-
-      <h3 className="text-lg text-ink-900 leading-snug mb-1">{t('landing.hero_card_title')}</h3>
-      <p className="flex items-center gap-1.5 text-muted text-sm mb-4">
-        <MapPin size={15} className="shrink-0" /> {t('landing.hero_card_location')}
-      </p>
-
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pt-3 border-t border-line">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="flex -space-x-2">
-            {/* 8 players spelling "ALINHOPT" — a small branding wink in the
-                illustrative mockup, not real data. */}
-            {['A', 'L', 'I', 'N', 'H', 'O', 'P', 'T'].map((letter, i, letters) => (
-              <div
-                key={letter}
-                style={{ zIndex: letters.length - i }}
-                className="w-9 h-9 text-sm rounded-full flex items-center justify-center shrink-0 font-extrabold bg-ink-700 text-white ring-2 ring-surface"
-              >
-                {letter}
-              </div>
-            ))}
+    <div className="relative mx-auto w-[280px] sm:w-[300px]">
+      <div className="h-[440px] sm:h-[480px] overflow-hidden">
+        <div className="relative rounded-[46px] bg-ink-900 p-[10px] shadow-[0_30px_60px_-20px_rgba(4,4,4,0.45)]">
+          <div className="overflow-hidden rounded-[36px] bg-white">
+            {/* Barra de estado: a ilha fica por cima dela e não tapa a Home
+                (o print de exemplo não tem barra de estado). */}
+            <div className="relative flex h-[40px] items-center justify-between px-6 text-[12px] font-extrabold text-ink-900" aria-hidden="true">
+              <span>9:41</span>
+              <span className="absolute left-1/2 top-[8px] h-[24px] w-[88px] -translate-x-1/2 rounded-full bg-ink-900" />
+              <span className="tracking-widest">•••</span>
+            </div>
+            <img
+              src="/landing/home-exemplo.webp"
+              alt={t('landing.phone_alt')}
+              width="640"
+              height="1386"
+              className="block w-full"
+            />
           </div>
-          <span className="text-sm font-extrabold text-ink-900 tabular-nums">
-            {players}<span className="text-muted font-normal">{t('landing.hero_card_players')}</span>
-          </span>
         </div>
-        <span className="ml-auto inline-flex items-center gap-1.5 bg-ok/10 text-ok text-[11px] font-extrabold px-2.5 py-1 rounded-full">
-          <Lock size={13} className="shrink-0" /> {t('landing.hero_card_status')}
-        </span>
       </div>
     </div>
   )
@@ -211,216 +131,145 @@ function Hero() {
   const { t } = useTranslation()
   const loginHref = useLoginHref()
   return (
-    <section className="relative bg-ink-900 overflow-hidden">
-      {/* Court lines + dashed net-line motif, evolved from Login.jsx's hero */}
-      <svg
-        viewBox="0 0 800 500"
-        className="absolute inset-0 w-full h-full text-white/[0.05]"
-        preserveAspectRatio="xMidYMid slice"
-        aria-hidden="true"
-      >
-        <rect x="60" y="-60" width="680" height="600" rx="24" stroke="currentColor" strokeWidth="3" fill="none" />
-        <line x1="400" y1="-60" x2="400" y2="540" stroke="currentColor" strokeWidth="3" />
-        <line x1="60" y1="240" x2="740" y2="240" stroke="currentColor" strokeWidth="3" strokeDasharray="10 12" />
-      </svg>
-
-      <div className="relative max-w-5xl mx-auto px-5 pt-20 pb-24 lg:pt-28 lg:pb-32 lg:flex lg:items-center lg:gap-12">
-        <div className="lg:flex-1 animate-fade-up">
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl text-white leading-tight max-w-xl">
+    <section className="bg-[#F7F7F4] overflow-hidden">
+      <div className="max-w-5xl mx-auto px-5 pt-24 lg:pt-32 lg:flex lg:items-end lg:gap-12">
+        <div className="lg:flex-1 lg:pb-24 animate-fade-up">
+          <h1 className="text-[40px] sm:text-5xl lg:text-6xl text-ink-900 leading-[1.05] max-w-xl">
             {t('landing.hero_title')}
           </h1>
-          <p className="text-ink-200 text-lg mt-5 max-w-md">
-            {t('landing.hero_description')}
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3 mt-8">
-            {/* Both CTAs need inline-flex + centering utilities explicitly —
-                min-h-[48px] and vertical padding have no effect on the
-                default `display: inline` a Link/<a> renders as. */}
-            <Link
-              to={loginHref('signup')}
-              className="btn-primary inline-flex items-center justify-center"
-            >
+          <p className="text-ink-700 text-lg mt-5 max-w-md">{t('landing.hero_description')}</p>
+          <div className="flex flex-col sm:flex-row gap-3 mt-8 max-w-md">
+            {/* inline-flex + centragem: num <a>, min-h e padding não fazem nada
+                sem eles. «Criar conta» é a única coisa lima do ecrã. */}
+            <Link to={loginHref('signup')} className="btn-primary inline-flex items-center justify-center sm:flex-1">
               {t('landing.signup_link')}
             </Link>
             <Link
               to={loginHref()}
               className="inline-flex items-center justify-center font-extrabold py-3.5 px-6 rounded-ctrl min-h-[48px] text-base
-                         border border-white/20 text-white hover:bg-white/10
+                         border border-ink-200 bg-white text-ink-900 hover:bg-ink-50 sm:flex-1
                          transition-all duration-fast active:scale-[0.98]"
             >
               {t('landing.already_account_link')}
             </Link>
           </div>
+          <p className="text-sm text-muted mt-3 max-w-md text-center sm:text-left">{t('landing.free_google')}</p>
         </div>
-
-        <div className="mt-14 lg:mt-0 lg:flex-1 flex justify-center animate-fade-up">
-          <HeroMockCard />
-        </div>
-      </div>
-    </section>
-  )
-}
-
-// WhatsApp bot gets its own spotlighted tile below (see Features) — it's
-// alinho's real differentiator per PRODUCT.md's Positioning (meet players in
-// the chat thread they already use), not just another item in a grid.
-// Translation keys are resolved in Features component, not here
-const OTHER_FEATURES = [
-  {
-    icon: Calendar,
-    titleKey: 'landing.feature_games_title',
-    descriptionKey: 'landing.feature_games_description',
-  },
-  {
-    icon: Trophy,
-    titleKey: 'landing.feature_rankings_title',
-    descriptionKey: 'landing.feature_rankings_description',
-  },
-  {
-    icon: Users,
-    titleKey: 'landing.feature_community_title',
-    descriptionKey: 'landing.feature_community_description',
-  },
-  {
-    icon: PadelIcon,
-    titleKey: 'landing.feature_clubs_title',
-    descriptionKey: 'landing.feature_clubs_description',
-  },
-  {
-    icon: Lock,
-    titleKey: 'landing.feature_private_games_title',
-    descriptionKey: 'landing.feature_private_games_description',
-  },
-]
-
-// Shows the actual mechanism instead of describing it: a bot prompt and the
-// one-word reply that's alinho's real differentiator (PRODUCT.md Positioning).
-// Plays once, staggered, the first time the tile scrolls into view.
-function WhatsAppDemo({ visible }) {
-  const { t } = useTranslation()
-  const reveal = (delayMs) => ({
-    transitionDelay: `${delayMs}ms`,
-  })
-  return (
-    <div className="mt-6 space-y-2" aria-hidden="true">
-      <div
-        className={`reveal ${visible ? 'reveal-visible' : ''} max-w-[85%] rounded-ctrl rounded-bl-sm bg-white/10 text-ink-200 text-xs px-3 py-2`}
-        style={reveal(0)}
-      >
-        {t('landing.whatsapp_demo_prompt')}
-      </div>
-      <div
-        className={`reveal ${visible ? 'reveal-visible' : ''} max-w-[45%] ml-auto rounded-ctrl rounded-br-sm bg-[#25D366] text-ink-900 text-xs font-extrabold px-3 py-2 text-center`}
-        style={reveal(500)}
-      >
-        {t('landing.whatsapp_demo_reply')}
-      </div>
-      <div
-        className={`reveal ${visible ? 'reveal-visible' : ''} flex items-center gap-1.5 text-[11px] text-lime-400 font-extrabold pt-1`}
-        style={reveal(950)}
-      >
-        <CheckCircle2 size={12} /> {t('landing.whatsapp_demo_confirmation')}
-      </div>
-    </div>
-  )
-}
-
-function FeatureRow({ icon: Icon, titleKey, descriptionKey }) {
-  const { t } = useTranslation()
-  return (
-    <div className="flex items-start gap-4 py-5 first:pt-0">
-      <div className="w-10 h-10 shrink-0 rounded-full bg-lime-400/15 text-lime-600 flex items-center justify-center">
-        <Icon size={18} />
-      </div>
-      <div>
-        <h3 className="text-base font-semibold text-ink-900 mb-0.5">{t(titleKey)}</h3>
-        <p className="text-sm text-muted">{t(descriptionKey)}</p>
-      </div>
-    </div>
-  )
-}
-
-// One spotlighted tile (the real differentiator, per PRODUCT.md) beside a
-// plain divided list for the rest — deliberately not six identical cards.
-function Features() {
-  const { t } = useTranslation()
-  const [whatsappRef, whatsappVisible] = useReveal()
-  return (
-    <section className="bg-canvas py-20 px-5">
-      <div className="max-w-5xl mx-auto">
-        <h2 className="text-3xl text-ink-900 max-w-lg mb-12">{t('landing.features_heading')}</h2>
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-x-10 gap-y-8">
-          <div ref={whatsappRef} className="lg:col-span-2 rounded-card bg-ink-900 p-7 flex flex-col justify-between min-h-[240px]">
-            <div>
-              <div className="w-11 h-11 rounded-full bg-[#25D366]/15 text-[#25D366] flex items-center justify-center mb-5">
-                <MessageCircle size={20} />
-              </div>
-              <h3 className="text-xl text-white mb-2">{t('landing.whatsapp_bot_title')}</h3>
-              <p className="text-ink-200 text-sm leading-relaxed">
-                {t('landing.whatsapp_bot_description')}
-              </p>
-              <WhatsAppDemo visible={whatsappVisible} />
-            </div>
-          </div>
-          <div className="lg:col-span-3 divide-y divide-line border-t border-line lg:border-t-0">
-            {OTHER_FEATURES.map((f) => (
-              <FeatureRow key={f.titleKey} {...f} />
-            ))}
-          </div>
+        <div className="mt-10 lg:mt-0 lg:flex-1 animate-fade-up">
+          <PhoneShot />
+          <p className="text-center text-[11px] text-muted py-2">{t('landing.illustrative')}</p>
         </div>
       </div>
     </section>
   )
 }
 
-const STEPS = [
-  {
-    number: '1',
-    titleKey: 'landing.step_1_title',
-    descriptionKey: 'landing.step_1_description',
-  },
-  {
-    number: '2',
-    titleKey: 'landing.step_2_title',
-    descriptionKey: 'landing.step_2_description',
-  },
-  {
-    number: '3',
-    titleKey: 'landing.step_3_title',
-    descriptionKey: 'landing.step_3_description',
-  },
-]
+// Uma secção por ponto, com a cor do tipo como na app e uma letra grande a
+// espreitar ao fundo (SPEC, «Aspeto»).
+function Point({ bg, eyebrowClass, eyebrow, title, text, back, children }) {
+  return (
+    <section className={`relative overflow-hidden ${bg}`}>
+      {back && (
+        <div aria-hidden="true" className="pointer-events-none absolute -right-4 bottom-0 select-none leading-none">
+          {back}
+        </div>
+      )}
+      <div className="relative max-w-5xl mx-auto px-5 py-14 lg:py-20 lg:flex lg:items-center lg:gap-12">
+        <div className="lg:flex-1">
+          <p className={`font-mono text-[12px] font-bold uppercase tracking-widest ${eyebrowClass}`}>{eyebrow}</p>
+          <h2 className="text-3xl lg:text-4xl text-ink-900 mt-2 max-w-md">{title}</h2>
+          <p className="text-ink-700 mt-3 max-w-md">{text}</p>
+        </div>
+        <div className="mt-6 lg:mt-0 lg:flex-1 max-w-sm">{children}</div>
+      </div>
+    </section>
+  )
+}
 
-function HowItWorks() {
+function LevelPoint() {
   const { t } = useTranslation()
   return (
-    <section className="bg-surface py-20 px-5">
-      <div className="max-w-5xl mx-auto">
-        <div className="text-center max-w-lg mx-auto mb-12">
-          <h2 className="text-3xl text-ink-900">{t('landing.steps_heading')}</h2>
+    <Point
+      bg="bg-[#F4F8DC]"
+      eyebrowClass="text-[#5B6B00]"
+      eyebrow={t('landing.level_eyebrow')}
+      title={t('landing.level_title')}
+      text={t('landing.level_text')}
+      back={<span className="font-display text-[170px] font-extrabold text-ink-900/[0.07]">M4</span>}
+    >
+      {/* Só a etiqueta, sem números (SPEC, «Exemplos»). */}
+      <div className="inline-flex items-center gap-3 rounded-card bg-white px-4 py-3 shadow-card">
+        <span className="rounded-lg bg-ink-900 px-2.5 py-1.5 font-mono text-lg font-extrabold text-lime-400">M4</span>
+        <span>
+          <b className="block text-sm text-ink-900">{t('landing.level_chip_title')}</b>
+          <span className="block text-xs text-muted">{t('landing.level_chip_text')}</span>
+        </span>
+      </div>
+    </Point>
+  )
+}
+
+function TournamentPoint() {
+  const { t } = useTranslation()
+  return (
+    <Point
+      bg="bg-[#E9E7FB]"
+      eyebrowClass="text-[#4338A8]"
+      eyebrow={t('landing.tour_eyebrow')}
+      title={t('landing.tour_title')}
+      text={t('landing.tour_text')}
+      back={<Trophy size={170} strokeWidth={1.2} className="text-[#4338A8]/10" />}
+    >
+      <div className="rounded-card border-2 border-[#C9C3F3] bg-[#E9E7FB] p-4 shadow-card">
+        <div className="flex items-center justify-between gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-extrabold text-[#4338A8]">
+            <Trophy size={13} /> {t('agenda.kind_tournament')}
+          </span>
+          <span className="rounded-full bg-white px-2.5 py-1 text-xs font-extrabold text-[#4338A8]">{t('landing.tour_card_state')}</span>
         </div>
-        <div className="relative grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-5">
-          {/* One dashed line spanning from the first circle's center to the
-              last circle's center, painted BEHIND the step circles (it's
-              the first child, so DOM/paint order puts every later sibling
-              on top) — their opaque bg-ink-900 masks the line where it
-              passes under them, giving a continuous "through the circles"
-              look without fragile per-gap calc() math tied to column width. */}
-          <div
-            className="hidden lg:block absolute top-6 h-px border-t-2 border-dashed border-line"
-            style={{ left: 'calc(100% / 6)', right: 'calc(100% / 6)' }}
-            aria-hidden="true"
-          />
-          {STEPS.map((step) => (
-            <div key={step.number} className="relative">
-              <div className="relative w-12 h-12 rounded-full bg-ink-900 text-lime-400 font-mono font-extrabold text-lg flex items-center justify-center mb-4 mx-auto">
-                {step.number}
-              </div>
-              <h3 className="text-lg text-ink-900 mb-1.5 text-center">{t(step.titleKey)}</h3>
-              <p className="text-sm text-muted text-center">{t(step.descriptionKey)}</p>
-            </div>
-          ))}
+        <p className="mt-2 font-display text-lg font-extrabold text-ink-900">{t('landing.tour_card_title')}</p>
+        <p className="text-xs text-muted">{t('landing.tour_card_sub')}</p>
+      </div>
+    </Point>
+  )
+}
+
+function MixPoint() {
+  const { t } = useTranslation()
+  return (
+    <Point
+      bg="bg-[#FBE7DE]"
+      eyebrowClass="text-[#9A3A17]"
+      eyebrow={t('landing.mix_eyebrow')}
+      title={t('landing.mix_title')}
+      text={t('landing.mix_text')}
+      back={<Shuffle size={170} strokeWidth={1.2} className="text-[#9A3A17]/10" />}
+    >
+      {/* A conversa no grupo — o mecanismo mostrado, não descrito. */}
+      <div className="space-y-2" aria-hidden="true">
+        <div className="max-w-[80%] rounded-ctrl rounded-bl-sm bg-white px-3 py-2 text-sm text-ink-900 shadow-card">
+          {t('landing.whatsapp_demo_prompt')}
         </div>
+        <div className="ml-auto max-w-[40%] rounded-ctrl rounded-br-sm bg-[#25D366] px-3 py-2 text-center text-sm font-extrabold text-ink-900">
+          {t('landing.whatsapp_demo_reply')}
+        </div>
+        <p className="flex items-center justify-end gap-1.5 text-xs font-extrabold text-ok">
+          <CheckCircle2 size={13} /> {t('landing.whatsapp_demo_confirmation')}
+        </p>
+      </div>
+    </Point>
+  )
+}
+
+function OrganizersBar() {
+  const { t } = useTranslation()
+  return (
+    <section className="bg-white border-y border-line">
+      <div className="max-w-5xl mx-auto px-5 py-4 flex items-center justify-between gap-3">
+        <p className="text-sm text-ink-700">{t('landing.organizers_text')}</p>
+        <Link to="/planos" className="inline-flex shrink-0 items-center gap-1 min-h-[44px] text-sm font-extrabold text-ink-900 hover:underline">
+          {t('landing.organizers_link')} <ChevronRight size={16} />
+        </Link>
       </div>
     </section>
   )
@@ -431,14 +280,14 @@ function HowItWorks() {
 // não há subscrições: só o Free tem botão, os pagos dizem "em breve". O que
 // não existe no produto vai marcado "em breve" — nada de "mais escolhido" ou
 // outros sinais inventados (PRODUCT.md). Preços de lançamento, por validar.
-const PLANS = [
+export const PLANS = [
   { key: 'free', name: 'Free', features: [['f1'], ['f2'], ['f3']] },
   { key: 'plus', name: 'Squad', features: [['f1'], ['f2'], ['f3']] },
   { key: 'pro', name: 'Community', highlight: true, features: [['f1'], ['f2'], ['f3'], ['f4'], ['f5', 'soon']] },
   { key: 'club', name: 'Club', features: [['f1'], ['f2', 'soon'], ['f3', 'soon'], ['f4', 'soon']] },
 ]
 
-function PlanCard({ plan }) {
+export function PlanCard({ plan }) {
   const { t } = useTranslation()
   const loginHref = useLoginHref()
   const dark = plan.highlight
@@ -482,18 +331,31 @@ function PlanCard({ plan }) {
   )
 }
 
+// ── PREÇOS NA PÁGINA PRINCIPAL — BLOCO PROVISÓRIO ─────────────────────────
+// O desenho aprovado tira os 4 planos daqui (vão para /planos). Tirá-los mexe
+// na forma de vender aos clubes, por isso é PROPOSTA POR ACORDAR COM O
+// RENATO. Até ele responder, ficam como estavam (PO, 25 set). Quando ele
+// disser, passa isto a false — e não é preciso mexer em mais nada.
+const SHOW_PRICES_ON_HOME = true
+
+export function PlansGrid() {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {PLANS.map((plan) => <PlanCard key={plan.key} plan={plan} />)}
+    </div>
+  )
+}
+
 function Pricing() {
   const { t } = useTranslation()
   return (
-    <section id="planos" className="bg-canvas py-20 px-5 scroll-mt-16">
+    <section id="planos" className="bg-canvas py-16 px-5 scroll-mt-16">
       <div className="max-w-5xl mx-auto">
-        <div className="text-center max-w-lg mx-auto mb-12">
+        <div className="text-center max-w-lg mx-auto mb-10">
           <h2 className="text-3xl text-ink-900">{t('landing.pricing_heading')}</h2>
           <p className="text-muted mt-3">{t('landing.pricing_intro')}</p>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {PLANS.map((plan) => <PlanCard key={plan.key} plan={plan} />)}
-        </div>
+        <PlansGrid />
         <p className="text-xs text-muted text-center mt-8 max-w-lg mx-auto">{t('landing.pricing_footnote')}</p>
       </div>
     </section>
@@ -504,43 +366,34 @@ function ClosingCta() {
   const { t } = useTranslation()
   const loginHref = useLoginHref()
   return (
-    <section className="bg-ink-900 py-16 px-5 text-center">
+    <section className="bg-ink-900 pt-16 pb-12 px-5 text-center">
       <div className="max-w-lg mx-auto">
         <h2 className="text-3xl text-white mb-6">{t('landing.closing_cta_heading')}</h2>
-        <Link
-          to={loginHref('signup')}
-          className="btn-primary inline-flex items-center justify-center"
-        >
+        <Link to={loginHref('signup')} className="btn-primary inline-flex w-full sm:w-auto items-center justify-center">
           {t('landing.signup_link')}
         </Link>
+        <p className="text-sm text-ink-200 mt-3">{t('landing.free_google')}</p>
       </div>
     </section>
   )
 }
 
-function Footer() {
+// Rodapé em preto, colado ao fim (Night Court).
+export function Footer() {
   const { t } = useTranslation()
   const year = new Date().getFullYear()
   const loginHref = useLoginHref()
+  const link = 'inline-flex items-center min-h-[44px] px-1 text-white/80 hover:text-white font-extrabold text-sm'
   return (
-    <footer className="bg-canvas py-10 px-5 border-t border-line">
-      <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-        <Wordmark variant="light" />
-        <div className="flex items-center gap-6">
-          <Link to={loginHref()} className="inline-flex items-center min-h-[44px] px-1 text-ink-700 font-extrabold text-sm hover:underline">
-            {t('landing.login_link')}
-          </Link>
-          <Link to="/instrucoes" className="inline-flex items-center min-h-[44px] px-1 text-ink-700 font-extrabold text-sm hover:underline">
-            {t('landing.instructions_link')}
-          </Link>
-          <Link to="/termos" className="inline-flex items-center min-h-[44px] px-1 text-ink-700 font-extrabold text-sm hover:underline">
-            {t('landing.terms_link')}
-          </Link>
-          <Link to="/privacidade" className="inline-flex items-center min-h-[44px] px-1 text-ink-700 font-extrabold text-sm hover:underline">
-            {t('landing.privacy_link')}
-          </Link>
+    <footer className="bg-ink-900 border-t border-white/10 py-6 px-5">
+      <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-center gap-x-5">
+          <Link to={loginHref()} className={link}>{t('landing.login_link')}</Link>
+          <Link to="/instrucoes" className={link}>{t('landing.instructions_link')}</Link>
+          <Link to="/termos" className={link}>{t('landing.terms_link')}</Link>
+          <Link to="/privacidade" className={link}>{t('landing.privacy_link')}</Link>
         </div>
-        <p className="text-muted text-xs">&copy; {year} alinho</p>
+        <p className="text-white/50 text-xs">&copy; {year} alinho</p>
       </div>
     </footer>
   )
@@ -548,12 +401,16 @@ function Footer() {
 
 export default function Landing() {
   return (
-    <div className="min-h-screen bg-canvas">
+    <div className="min-h-screen bg-[#F7F7F4]">
       <Nav />
       <Hero />
-      <Features />
-      <HowItWorks />
-      <Pricing />
+      <LevelPoint />
+      <TournamentPoint />
+      <MixPoint />
+      {/* Espaço guardado (SPEC, ponto 5): «Já se joga na alinho», só com
+          clubes e só com autorização escrita de cada um. Não aparece até lá. */}
+      <OrganizersBar />
+      {SHOW_PRICES_ON_HOME && <Pricing />}
       <ClosingCta />
       <Footer />
     </div>

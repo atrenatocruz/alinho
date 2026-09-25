@@ -2,7 +2,7 @@ import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useSearchParams, useNavigationType, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Users, Search, X } from 'lucide-react'
+import { Users, Search, X, Check } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { EmptyState, PrimaryButton } from '../components/ui'
@@ -101,6 +101,15 @@ export default function Home() {
   const [joinSlug, setJoinSlug] = useState('')
   const [joining, setJoining] = useState(false)
   const [joinError, setJoinError] = useState('')
+  // «Pedido enviado» (Trello #447): o link de um grupo cheio, ou de um grupo
+  // que aprova quem entra, deixa um pedido à espera do admin em vez de erro.
+  // Tira preta de 3 s (regra das janelas).
+  const [joinNotice, setJoinNotice] = useState('')
+  useEffect(() => {
+    if (!joinNotice) return undefined
+    const timer = setTimeout(() => setJoinNotice(''), 3000)
+    return () => clearTimeout(timer)
+  }, [joinNotice])
 
   const [filters, setFilters] = useState(() => normalizeFilters(readSession(FILTERS_KEY, null)))
   // Procurar um evento (Trello #547). Desde a mudança de 25 set: uma lupa na
@@ -151,8 +160,15 @@ export default function Home() {
     setJoining(true)
     setJoinError('')
     try {
-      const { error } = await joinOrganization(slug)
+      const { data: orgId, error } = await joinOrganization(slug)
       if (error) throw error
+      // Entrou ou ficou com um pedido? A função devolve o grupo nos dois
+      // casos; quem não ficou membro ficou à espera do admin.
+      if (orgId && user) {
+        const { data: mine } = await supabase.from('memberships').select('id')
+          .eq('organization_id', orgId).eq('user_id', user.id).maybeSingle()
+        if (!mine) setJoinNotice(t('home.join_request_sent'))
+      }
     } catch (error) {
       console.error('Error joining organization:', error)
       // Um grupo cheio é diferente de um nome errado. Quem tenta entrar não
@@ -600,10 +616,19 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewMode, resetTick])
 
+  const joinStrip = joinNotice ? createPortal(
+    <div role="status" className="fixed left-4 right-4 bottom-[104px] z-50 mx-auto max-w-md bg-ink-900 text-white px-4 py-3 rounded-ctrl text-sm font-extrabold flex items-center gap-2 animate-fade-up">
+      <Check size={16} className="shrink-0" />
+      {joinNotice}
+    </div>,
+    document.body,
+  ) : null
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
         <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
+        {joinStrip}
       </div>
     )
   }
@@ -616,6 +641,7 @@ export default function Home() {
   if (memberships.length === 0 && !hasAnyEvents) {
     return (
       <div className="space-y-6">
+      {joinStrip}
       {/* Antes desta pessoa ver «ainda não segues nenhum clube», mostra-se-lhe
           o que está mesmo aberto: um torneio não pede aprovação nem exige ser
           membro, e é a única coisa a que ela pode ir HOJE. Pedir um código de
@@ -868,6 +894,8 @@ export default function Home() {
         </div>,
         document.body,
       )}
+
+      {joinStrip}
 
       {selectedPin && (
         <Sheet

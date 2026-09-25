@@ -277,6 +277,10 @@ const RPC_MOCKS = {
     { id: 'jr2', user_id: 'fake-2', name: 'Tiago Ferreira', avatar_url: null, created_at: new Date().toISOString() },
   ] : []),
   delete_self_serve_group: () => null,
+  // Entrar por link num grupo cheio (#447): localStorage.mockJoinPending =
+  // 'true' — a função devolve o grupo e a pessoa não fica membro (pedido).
+  approve_membership_request: () => (localStorage.getItem('mockGroupFull') === 'true' ? { __error: 'Grupo já atingiu o limite de 40 membros do plano' } : null),
+  join_organization: () => (localStorage.getItem('mockJoinPending') === 'true' ? 'org-cheio' : MOCK_ADMIN_ORG_ID),
   // Apagar conta (Trello #306). localStorage.mockDeletionRequestedAt =
   // '2026-09-18' mostra o ecrã de recuperar a conta.
   request_account_deletion: () => new Date().toISOString(),
@@ -854,7 +858,7 @@ const TABLE_MOCKS = {
   }],
   // localStorage.mockTeacherFollowed = 'true' — já sigo o professor (#418, assunto 4).
   follows: () => (localStorage.getItem('mockTeacherFollowed') === 'true'
-    ? [{ id: 'f-teacher', status: 'accepted', followed_id: 'u-ana' }] : []),
+    ? [{ id: 'f-teacher', status: 'accepted', followed_id: 'u-ana' }, { id: 'f-tiago', status: 'accepted', followed_id: 'fake-t2' }] : []),
   // localStorage.mockCommunity — um professor com clube e um sem clube.
   teacher_profiles: (url) => (community() && url.includes('club_status=eq.pending') ? [
     { id: 'tp-c1', status: 'approved', contact: '914 555 666', zone: 'Almada', created_at: '2026-09-16T08:00:00Z', user_id: 'fake-sofia', user: { name: 'Sofia Ramos', gender: 'feminino' } },
@@ -882,11 +886,11 @@ const TABLE_MOCKS = {
       ] : [],
     }] : []),
     { id: 'tp-1', user_id: 'fake-t1', organization_id: 'co-1', status: 'approved', contact: '912 345 678',
-      user: { name: 'Ana Moreira' }, organization: { name: 'Smash Padel', slug: 'smash-padel' },
-      availability: [{ day_of_week: 'segunda', start_time: '18:00:00', end_time: '21:00:00' }, { day_of_week: 'quarta', start_time: '18:00:00', end_time: '21:00:00' }] },
+      zone: 'Almada', user: { name: 'Ana Moreira', gender: 'feminino', rating: 1650 }, organization: { name: 'Smash Padel', slug: 'smash-padel' },
+      availability: [{ day_of_week: 'terca', start_time: '09:00:00', end_time: '13:00:00' }, { day_of_week: 'quinta', start_time: '17:00:00', end_time: '20:00:00' }] },
     { id: 'tp-2', user_id: 'fake-t2', organization_id: null, status: 'approved', contact: 'tiago.lopes@mail.pt',
-      zone: 'Cascais', user: { name: 'Tiago Lopes' }, organization: null,
-      availability: [{ day_of_week: 'sabado', start_time: '09:00:00', end_time: '13:00:00' }] },
+      zone: 'Cascais', user: { name: 'Tiago Lopes', gender: 'masculino' }, organization: null,
+      availability: [] },
   ] : []),
   // localStorage.mockPrivateMatchesOff = 'true' — o interruptor "Jogo entre
   // amigos" desligado no Gerir, para ver a app sem essa funcionalidade.
@@ -966,6 +970,17 @@ const TABLE_MOCKS = {
 // teste aparecia duas vezes na lista — como «Mix» e como «Jogo em aberto».
 // Um jogo de teste sem origin conta como 'admin', como na base de dados.
 const gamesSemFiltro = TABLE_MOCKS.games
+// #447: o pedido pendente (ninguém é membro do grupo cheio) e, com
+// localStorage.mockGroupFull = 'true', um grupo Free com 40 pessoas.
+const membershipsSemFiltro = TABLE_MOCKS.memberships
+TABLE_MOCKS.memberships = (url) => {
+  const u = decodeURIComponent(url)
+  if (u.includes('organization_id=eq.org-cheio')) return []
+  if (localStorage.getItem('mockGroupFull') === 'true' && /select=id(,profile|&|$)/.test(u)) {
+    return Array.from({ length: 40 }, (_, i) => ({ id: `m${i}` }))
+  }
+  return membershipsSemFiltro(url)
+}
 // localStorage.mockMixDraft = 'true' — um mix em rascunho na lista do Gerir
 // e na agenda da Home (Trello #544; na Home tem de ficar de fora).
 const DRAFT_MIX = () => {
