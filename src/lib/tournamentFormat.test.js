@@ -1,8 +1,11 @@
 import { describe, it, expect } from 'vitest'
+import i18next from 'i18next'
+import pt from '../locales/pt.json'
+import en from '../locales/en.json'
 import {
   groupSizes, possibleGroupCounts, groupMatchCount, groupStageMatchCount,
   guaranteedMatches, nextPowerOfTwo, knockoutMatchCount, knockoutRounds,
-  courtHours, availableCourtHours, formatOptions, recommendFormat,
+  courtHours, availableCourtHours, formatOptions, recommendFormat, groupsWords,
   pickSeeds, drawGroups, groupRoundRobin, groupStandings, headToHeadWins,
   bestOfPosition, buildFirstRound, noSameGroupClash, seededRandom,
   TIEBREAK_DEFAULT,
@@ -386,5 +389,39 @@ describe('quadro', () => {
   it('com 3 apurados por grupo continua a evitar o mesmo grupo', () => {
     const { matches } = buildFirstRound(apurados(['A', 'B', 'C', 'D'], [1, 2, 3]))
     expect(noSameGroupClash(matches)).toBe(true)
+  })
+})
+
+// Trello #540: o rótulo diz como os grupos vão sair — antes, 10 duplas em 3
+// grupos (4+3+3) apareciam como «3 grupos de 4».
+describe('groupsWords — o rótulo de cada opção de formato (#540)', () => {
+  const t = i18next.createInstance()
+  t.init({ resources: { pt: { translation: pt }, en: { translation: en } }, lng: 'pt', interpolation: { escapeValue: false } })
+  const label = (teams, opts = {}, lng = 'pt') => formatOptions(teams, opts)
+    .filter((o) => o.groupCount)
+    .map((o) => { const w = groupsWords(o, lng === 'pt' ? 'pt-PT' : 'en'); return t.t(w.key, { ...w.values, lng }) })
+
+  it('10 duplas em grupos até 4 (o caso do Renato): «3 grupos: 4, 3 e 3»', () => {
+    const l = label(10, { max: 4 })
+    expect(l).toContain('3 grupos: 4, 3 e 3 → passa 1')
+    expect(l).toContain('3 grupos: 4, 3 e 3 → passam 2')
+    expect(l.some((x) => x.startsWith('3 grupos de 4'))).toBe(false)
+  })
+
+  it('grupos desiguais com 7, 11 e 13 duplas', () => {
+    expect(label(7)).toContain('2 grupos: 4 e 3 → passam 2')
+    expect(label(11)).toContain('3 grupos: 4, 4 e 3 → passam 2')
+    expect(label(13)).toContain('4 grupos: 4, 3, 3 e 3 → passa 1')
+  })
+
+  it('10, 12 e 16 duplas com as regras de hoje: grupos iguais, «N grupos de M»', () => {
+    expect(label(10)).toEqual(['2 grupos de 5 → passa 1', '2 grupos de 5 → passam 2'])
+    expect(label(12)).toContain('3 grupos de 4 → passam 2')
+    expect(label(16)).toContain('4 grupos de 4 → passam 2')
+  })
+
+  it('em inglês também', () => {
+    expect(label(10, { max: 4 }, 'en')).toContain('3 groups: 4, 3, and 3 → top 1 goes through')
+    expect(label(12, {}, 'en')).toContain('3 groups of 4 → top 2 go through')
   })
 })
