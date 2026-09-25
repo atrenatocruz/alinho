@@ -15,7 +15,14 @@ const on = () => localStorage.getItem('mockTDraw') === 'true'
 
 const CAT = 'cat-m4'
 const GROUP = 'grp-a'
-const at = (hhmm) => `2026-10-10T${hhmm}:00.000Z`
+// Com mockTMyGamesReal os jogos passam para hoje, para se verem na Home
+// (Trello #508); sem ele ficam no dia do torneio de teste.
+const at = (hhmm) => {
+  if (localStorage.getItem('mockTMyGamesReal') !== 'true') return `2026-10-10T${hhmm}:00.000Z`
+  const d = new Date()
+  const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return new Date(`${day}T${hhmm}:00`).toISOString()
+}
 
 /** Um grupo de 3 duplas: o mínimo que o formato aceita, e o que deixa ver a
     tabela com jogos feitos e um jogo ainda por jogar. */

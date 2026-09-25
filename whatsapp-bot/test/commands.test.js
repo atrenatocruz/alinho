@@ -165,3 +165,45 @@ test('parceiro que ainda não entrou na app: «só tu» tira a dupla toda e expl
   assert.equal(row(), undefined)
   assert.match(out, /ainda não entrou na app/)
 })
+
+test('a mensagem do mix explica como sair em dupla, só quando há duplas inscritas', async () => {
+  const { buildMixMessage } = await import('../src/roster.js')
+  const game = { id: 'm', title: 'Mix', date: new Date(Date.now() + 864e5).toISOString(), num_courts: 1, status: 'open', rotate_partners: false, allow_pair_signup: true }
+  const solo = buildMixMessage({ game, people: [{ name: 'A', pair: null }], capacity: 4, suplentes: [] })
+  const pair = buildMixMessage({ game, people: [{ name: 'A', pair: 1 }, { name: 'B', pair: 1 }], capacity: 4, suplentes: [] })
+  assert.doesNotMatch(solo, /Out dupla/)
+  assert.match(pair, /Out dupla/)
+  assert.match(pair, /Out @parceiro/)
+})
+
+test('com vários mixes abertos, «Out 01 dupla» tira a dupla do mix 01', async () => {
+  pairIn()
+  db.games.push({ id: 'm2', organization_id: 'o', title: 'Outro', status: 'open', origin: 'manual',
+    date: new Date(Date.now() + 2 * 864e5).toISOString(), num_courts: 1, max_players: 4, rotate_partners: false, allow_pair_signup: true })
+  await say('out 01 dupla', '351922222222')
+  assert.equal(row(), undefined)
+})
+
+// ── #537 (ramo bugs-537-bot) ──────────────────────────────────────────────
+test('duas contas com o mesmo telemóvel no clube: o «In» usa a registada, não o convidado', async () => {
+  db.profiles.push({ id: 'g', name: 'Bernardo (convidado)', email: 'guest-1@whatsapp.alinho.pt', phone_hash: hash('911111111'), language: 'pt' })
+  db.memberships.push({ user_id: 'g', organization_id: 'o', is_guest: true })
+  db.profiles.find((p) => p.id === 'a').phone_verified_at = '2026-09-25T10:00:00Z'
+  await say('in')
+  assert.deepEqual(db.participants.map((p) => p.user_id), ['a'])
+})
+
+test('conta registada (número confirmado) fora do clube: o «In» torna-a membro, sem criar convidado', async () => {
+  db.profiles.push({ id: 'r', name: 'Rita Registada', email: 'rita@mail.pt', phone_hash: hash('966666666'), phone_verified_at: '2026-09-25T10:00:00Z', language: 'pt' })
+  await say('in', '351966666666')
+  assert.deepEqual(db.participants.map((p) => p.user_id), ['r'])
+  assert.ok(db.memberships.some((m) => m.user_id === 'r' && m.organization_id === 'o'))
+  assert.equal(db.profiles.filter((p) => /whatsapp\.alinho\.pt/.test(p.email || '')).length, 0)
+})
+
+test('«In @parceiro» com conta registada fora do clube: o parceiro também passa a membro', async () => {
+  db.profiles.push({ id: 'r', name: 'Rita Registada', email: 'rita@mail.pt', phone_hash: hash('966666666'), phone_verified_at: '2026-09-25T10:00:00Z', language: 'pt' })
+  await say('in @rita', '351911111111', ['351966666666'])
+  assert.deepEqual(db.participants.map((p) => [p.user_id, p.partner_id]), [['a', 'r']])
+  assert.ok(db.memberships.some((m) => m.user_id === 'r' && m.organization_id === 'o'), 'a Rita tem de ficar membro do clube')
+})

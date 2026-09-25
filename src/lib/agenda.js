@@ -304,6 +304,8 @@ export function eventFromTournament(row, my = null) {
 /** Um jogo do torneio, já com dia, hora e campo (print 04). */
 export function eventFromTournamentMatch(match, context = {}) {
   const { tournament = {}, category = null, opponentName = null, myTeamName = null, notice = null } = context
+  const done = context.done ?? match.status === 'terminado'
+  const hasScore = match.score_a != null && match.score_b != null
   const startsAt = match.scheduled_at ? new Date(match.scheduled_at) : null
   return {
     key: `tmatch:${match.id}`,
@@ -320,7 +322,7 @@ export function eventFromTournamentMatch(match, context = {}) {
     orgKind: 'club',
     orgLogo: tournament.club_logo_url || null,
     mine: true,
-    myState: match.status === 'terminado' ? 'played' : 'playing',
+    myState: done ? 'played' : 'playing',
     categoryCode: category?.code || null,
     courtName: match.court_name || null,
     // "era 17:00" — a hora antiga quando o jogo foi antecipado (SPEC §6).
@@ -329,7 +331,12 @@ export function eventFromTournamentMatch(match, context = {}) {
     myTeamName,
     // Aviso do organizador, quando existe (cartão #366).
     notice,
-    finished: match.status === 'terminado',
+    finished: done,
+    // O meu resultado primeiro («9-6» é sempre do meu lado) — Trello #508.
+    myScore: done && hasScore
+      ? (context.mineIsA === false ? `${match.score_b}-${match.score_a}` : `${match.score_a}-${match.score_b}`)
+      : null,
+    won: done ? context.won ?? null : null,
     raw: match,
   }
 }

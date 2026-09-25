@@ -67,6 +67,8 @@ const MY_MATCHES = () => {
   ]
 }
 
+const myGamesReal = () => localStorage.getItem('mockTMyGamesReal') === 'true'
+
 const TOURNAMENT = () => {
   const fri = nextFriday()
   // `mockTournamentEmpty` = torneio acabado de criar. Se o estado for pedido
@@ -267,8 +269,14 @@ export const TOURNAMENT_RPC_MOCKS = {
         id: `d${n}`, date: iso(dayAfter(fri, n)),
         starts_at: n === 0 ? '18:00' : '09:00', ends_at: n === 2 ? '18:00' : '21:00',
       })),
-      my: empty() ? null : { category_id: 'cat-m5', state: 'validada', entry_id: 'en-me' },
-      my_matches: empty() || state() === 'inscricoes' ? [] : MY_MATCHES(),
+      // localStorage.mockTMyGamesReal = 'true' (+ mockTDraw): sou a dupla e1
+      // do M4 e «Os meus jogos» lê as vistas, como em produção (Trello #508).
+      ...(myGamesReal()
+        ? { my: { category_id: 'cat-m4', state: 'validada', entry_id: 'e1' },
+            my_entries: [{ category_id: 'cat-m4', status: 'validada', state: 'validada', entry_id: 'e1' }],
+            my_matches: [] }
+        : { my: empty() ? null : { category_id: 'cat-m5', state: 'validada', entry_id: 'en-me' },
+            my_matches: empty() || state() === 'inscricoes' ? [] : MY_MATCHES() }),
     }
   },
 }

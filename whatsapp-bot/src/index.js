@@ -4,6 +4,7 @@ import { connectWhatsApp } from './wa.js'
 import { setParticipatingJidsProvider } from './groups.js'
 import { handleGroupMessage } from './commands.js'
 import { createKeyedQueue } from './keyedQueue.js'
+import { handleDirectMessage } from './verify.js'
 import { startSync } from './sync.js'
 import { startReminders } from './reminders.js'
 import { startAutoStart } from './autostart.js'
@@ -24,6 +25,11 @@ async function main() {
   const { sendText, getGroupMentions, getParticipatingGroupJids } = await connectWhatsApp({
     onGroupMessage: (payload) => {
       enqueue(payload.groupJid, () => handleGroupMessage(payload, { sendText }))
+    },
+    // Confirmar o número pelo WhatsApp (#537): mensagens privadas, cada
+    // conversa na sua fila (não atrasam os grupos).
+    onDirectMessage: (payload) => {
+      enqueue(`dm:${payload.chatJid}`, () => handleDirectMessage(payload, { sendText }))
     },
   })
 

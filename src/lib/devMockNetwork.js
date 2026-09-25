@@ -671,7 +671,12 @@ const TABLE_MOCKS = {
   ] : []),
   // A lista pública de inscritos do torneio (Trello #362) — nomes sim,
   // email e telemóvel nunca (regra de 19 set).
-  tournament_public_entries: () => (localStorage.getItem('mockTHome') ? [
+  tournament_public_entries: () => (localStorage.getItem('mockTMyGamesReal') === 'true' ? [
+    // As duplas do sorteio de teste (e1 sou eu) — Trello #508.
+    { id: 'e1', category_id: 'cat-m4', team_name: null, status: 'validada', player1_name: 'Admin (Dev)', player2_name: 'Pedro Silva' },
+    { id: 'e2', category_id: 'cat-m4', team_name: 'Dois não fazem um', status: 'validada', player1_name: 'Miguel Rosa', player2_name: 'André Pinto' },
+    { id: 'e5', category_id: 'cat-m4', team_name: null, status: 'validada', player1_name: 'Hugo Gomes', player2_name: 'Nuno Pais' },
+  ] : localStorage.getItem('mockTHome') ? [
     { id: 'my-entry', category_id: 'cat-m4', team_name: null, status: 'validada', seed_number: null, waitlist_order: null,
       player1_name: 'Admin (Dev)', player1_avatar: null, player2_name: 'Rui Oliveira Gomes', player2_avatar: null, player2_is_guest: false },
     { id: 'rival-1', category_id: 'cat-m4', team_name: 'Dois não fazem um', status: 'validada', seed_number: null, waitlist_order: null,
@@ -701,8 +706,10 @@ const TABLE_MOCKS = {
     }
     return [{ ...tour, starts_on: day(1), ends_on: day(3), status: 'inscricoes', category_count: 5 }]
   },
-  tournament_entries: () => (localStorage.getItem('mockTHome')
-    ? [{ id: 'my-entry', category_id: 'cat-m4', status: 'validada' }] : []),
+  tournament_entries: () => (localStorage.getItem('mockTMyGamesReal') === 'true'
+    ? [{ id: 'e1', category_id: 'cat-m4', status: 'validada' }]
+    : localStorage.getItem('mockTHome')
+      ? [{ id: 'my-entry', category_id: 'cat-m4', status: 'validada' }] : []),
   tournament_public_categories: () => (localStorage.getItem('mockTHome')
     ? [{ id: 'cat-m4', tournament_id: 'tour-smash-open', code: 'M4', name: 'Masculinos 4' }] : []),
   tournament_public_matches: () => {
@@ -910,6 +917,18 @@ export function installDevMockNetwork() {
     // há service-role nem conta para criar, por isso devolve-se um código
     // de convite fictício. localStorage.mockPartnerError = 'email_already_in_use'
     // (ou outro) mostra a mensagem de erro em vez do sucesso.
+    // «Não está na app?» no «Adicionar jogador» (#546): a conta é inventada.
+    // Com o email ana@exemplo.pt faz de conta que o email já tinha conta.
+    if (url && url.includes('/functions/v1/admin-bulk-create-participants')) {
+      let body = {}
+      try { body = JSON.parse(init?.body || '{}') } catch { /* ignora */ }
+      const p = body.players?.[0] || {}
+      if ((p.email || '').toLowerCase() === 'ana@exemplo.pt') {
+        return jsonResponse({ created: [{ name: 'Ana Silva', user_id: 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', existing_account: true }], failed: [] })
+      }
+      return jsonResponse({ created: [{ name: p.name, user_id: 'ffffffff-ffff-ffff-ffff-ffffffffffff', existing_account: false }], failed: [] })
+    }
+
     if (url && url.includes('/functions/v1/join-with-named-partner')) {
       const forced = localStorage.getItem('mockPartnerError')
       if (forced) return jsonResponse({ error: forced }, 409)
