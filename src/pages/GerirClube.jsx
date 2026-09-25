@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
-import { Plus, Calendar, Trash2, Edit2, Check, X, UserX, Clock, ArrowLeft, Camera, Settings, Copy, QrCode, GraduationCap, Trophy } from 'lucide-react'
+import { Plus, Calendar, Trash2, Edit2, Check, X, UserX, Clock, ArrowLeft, Camera, Settings, Copy, QrCode, GraduationCap, Trophy, Lock } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
@@ -2698,7 +2698,7 @@ export default function GerirClube() {
                   // evento; a direita, uma acao so, escrita por extenso.
                   const tipo = item.tipo
                   const row = tipo === 'mix' ? item.entry.game : item.row
-                  let etiqueta, Icone, linha, detalhe, abrir, marca = null, acao = null, sufixo = null
+                  let etiqueta, Icone, linha, detalhe, abrir, marca = null, acao = null, sufixo = null, privado = false
                   if (tipo === 'turma') {
                     const quando = seriesWhen(t, row)
                     etiqueta = 'gerirclube.event_label_series'
@@ -2726,6 +2726,9 @@ export default function GerirClube() {
                     linha = tipo === 'torneio' ? row.name : row.title
                     detalhe = [item.quando ? quandoCurto(item.quando, tipo !== 'torneio') : null, aDecorrer, lugares, duplas, prazo].filter(Boolean).join(' · ')
                     abrir = () => navigate(tipo === 'torneio' ? `/torneio/${row.slug || row.id}` : `/jogo/${row.id}`)
+                    // Torneio privado (Trello #482): não aparece na Home nem na
+                    // Comunidade, e o link só abre a quem gere. Tem de se ler aqui.
+                    privado = tipo === 'torneio' && row.is_public === false
                     if (tipo === 'mix') {
                       // «MIX · RECORRENTE», colado a etiqueta como na pagina do
                       // evento e na Home (#383) -- nunca numa etiqueta a parte.
@@ -2758,6 +2761,11 @@ export default function GerirClube() {
                           <span className={`inline-flex items-center gap-1 text-[11px] font-extrabold px-2 py-1 rounded-full ${rascunho ? 'bg-ink-50 text-ink-700' : `bg-white ${cor.text}`}`}>
                             <Icone size={12} /> {t(etiqueta)}{sufixo && <> · {sufixo}</>}
                           </span>
+                          {privado && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-ink-900 px-2 py-[3px] text-[11px] font-semibold text-white">
+                              <Lock size={11} /> {t('tournament.admin.private')}
+                            </span>
+                          )}
                           {marca && (
                             <span className="rounded-full bg-ink-900 px-2 py-[3px] text-[11px] font-semibold text-white">{marca}</span>
                           )}

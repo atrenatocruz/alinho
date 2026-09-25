@@ -7,7 +7,7 @@ import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, ImagePlus, Lock, Plus, Trash2, X } from 'lucide-react'
 import { Chips, DateField, PrimaryButton } from '../ui'
-import { categoryCode, categoryName, stepProblem, totalCourtHours, totalSlots, pricePerPlayer } from '../../lib/tournaments'
+import { categoryCode, categoryName, stepProblem, saveProblem, totalCourtHours, totalSlots, pricePerPlayer } from '../../lib/tournaments'
 import { localInputToIso, isoToLocalInput } from '../../lib/tournamentDay'
 import { MonoLabel } from './TournamentBits'
 import { removeTournamentPoster, uploadTournamentPoster } from '../../lib/tournamentPosterStorage'
@@ -33,11 +33,13 @@ const pad = (n) => String(n).padStart(2, '0')
 const isoDate = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 
 /** Campo de texto simples, com o rótulo em mono como nos wireframes. */
-function Field({ label, children, hint }) {
+function Field({ label, children, hint, error }) {
   return (
     <div className="mt-3">
       <MonoLabel className="mb-1.5">{label}</MonoLabel>
       {children}
+      {/* O porquê fica junto ao campo que o causa (Trello #514). */}
+      {error && <p role="alert" className="mt-1 text-[12px] font-bold text-danger">{error}</p>}
       {hint && <p className="mt-1 text-[11.5px] text-ink-500">{hint}</p>}
     </div>
   )
@@ -193,7 +195,22 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
   const set = (patch) => setDraft((d) => ({ ...d, ...patch }))
   const setRule = (key, value) => setDraft((d) => ({ ...d, rules: { ...d.rules, [key]: value } }))
   const hours = useMemo(() => totalCourtHours(draft.days), [draft.days])
-  const problem = stepProblem(step, draft)
+  // O prazo que o torneio já tinha, a editar: se não mudar, não se trava.
+  const [initialDeadline] = useState(() => isoToLocalInput(initial?.tournament?.entries_deadline))
+  const checkOpts = { now: new Date(), initialDeadline: initial ? initialDeadline : undefined }
+  const problem = stepProblem(step, draft, checkOpts)
+  // A guardar sem passos (a editar com inscrições, ou no fim): datas e regras.
+  const finalProblem = saveProblem(draft, checkOpts)
+  const shown = tried ? ((locked || step === 4) ? (problem || finalProblem) : problem) : null
+  const fieldError = (keys) => (shown && keys.includes(shown) ? t(`tournament.create.problem_${shown}`) : null)
+  const DEADLINE_PROBLEMS = ['deadline', 'deadline_past', 'deadline_after_start']
+  const DRAW_PROBLEMS = ['draw_after_start', 'draw_before_deadline']
+  // Guarda só sem problemas; com um, mostra-o junto ao campo.
+  const guarded = (fn) => () => {
+    const p = problem || finalProblem
+    if (p) { setTried(true); return }
+    fn()
+  }
   const firstDay = draft.days.length ? [...draft.days].map((d) => d.date).sort()[0] : null
 
   const addDay = (date) => {
@@ -345,7 +362,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
           <Field label={t('tournament.create.location')}>
             <input className={inputClass} value={draft.location} onChange={(e) => set({ location: e.target.value })} />
           </Field>
-          <Field label={t('tournament.create.entries_until')}>
+          <Field label={t('tournament.create.entries_until')} error={fieldError(DEADLINE_PROBLEMS)}>
             <div className="flex gap-2">
               <div className="min-w-0 flex-1">
                 <DateField value={draft.entries_close_at.slice(0, 10)} onChange={(v) => set({ entries_close_at: `${v}T${draft.entries_close_at.slice(11) || '23:59'}` })} />
@@ -353,7 +370,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
               <input type="time" className="w-[104px] rounded-ctrl border border-line bg-canvas px-2 py-2.5 text-sm" value={draft.entries_close_at.slice(11) || '23:59'} onChange={(e) => set({ entries_close_at: `${draft.entries_close_at.slice(0, 10)}T${e.target.value}` })} />
             </div>
           </Field>
-          <Field label={t('tournament.create.draw')} hint={t('tournament.create.draw_hint')}>
+          <Field label={t('tournament.create.draw')} hint={t('tournament.create.draw_hint')} error={fieldError(DRAW_PROBLEMS)}>
             <DateField value={draft.draw_at} onChange={(v) => set({ draw_at: v })} />
           </Field>
           <Field label={t('tournament.create.organizer_text')}>
@@ -453,7 +470,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
               )}
             </div>
           </Field>
-          <Field label={t('tournament.create.entries_until')}>
+          <Field label={t('tournament.create.entries_until')} error={fieldError(DEADLINE_PROBLEMS)}>
             <div className="flex gap-2">
               <div className="min-w-0 flex-1">
                 <DateField value={draft.entries_close_at.slice(0, 10)} onChange={(v) => set({ entries_close_at: `${v}T${draft.entries_close_at.slice(11) || '23:59'}` })} />
@@ -461,7 +478,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
               <input type="time" className="w-[104px] rounded-ctrl border border-line bg-canvas px-2 py-2.5 text-sm" value={draft.entries_close_at.slice(11) || '23:59'} onChange={(e) => set({ entries_close_at: `${draft.entries_close_at.slice(0, 10)}T${e.target.value}` })} />
             </div>
           </Field>
-          <Field label={t('tournament.create.draw')} hint={t('tournament.create.draw_hint')}>
+          <Field label={t('tournament.create.draw')} hint={t('tournament.create.draw_hint')} error={fieldError(DRAW_PROBLEMS)}>
             <DateField value={draft.draw_at} onChange={(v) => set({ draw_at: v })} />
           </Field>
         </>
@@ -540,7 +557,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
               label={t('tournament.create.scoring')}
               options={SCORINGS.map((s) => ({ value: s, label: t(`tournament.create.scoring_${s}`) }))} />
           </Field>
-          <Field label={t('tournament.create.duration')} hint={t('tournament.create.duration_hint', { max: draft.rules.duration_max })}>
+          <Field label={t('tournament.create.duration')} hint={t('tournament.create.duration_hint', { max: draft.rules.duration_max })} error={fieldError(['duration_order'])}>
             <div className="flex items-center gap-2">
               <input type="number" min="15" max="180" step="5" className="w-[86px] rounded-ctrl border border-line bg-canvas px-2 py-2 text-sm" value={draft.rules.duration_min} onChange={(e) => setRule('duration_min', Number(e.target.value))} />
               <span className="text-xs text-ink-500">{t('tournament.create.to')}</span>
@@ -580,17 +597,19 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
         </>
       )}
 
-      {tried && problem && <p className="mt-3 text-[12px] text-danger">{t(`tournament.create.problem_${problem}`)}</p>}
+      {shown && ![...DEADLINE_PROBLEMS, ...DRAW_PROBLEMS, 'duration_order'].includes(shown) && (
+        <p className="mt-3 text-[12px] text-danger">{t(`tournament.create.problem_${shown}`)}</p>
+      )}
       {error && <p className="mt-3 text-[12px] text-danger">{error}</p>}
 
       <div className="mt-5 space-y-2">
         {locked ? (
-          <PrimaryButton className="w-full" disabled={saving} onClick={() => onCreate(outgoing(draft))}>{t('tournament.create.save_changes')}</PrimaryButton>
+          <PrimaryButton className="w-full" disabled={saving} onClick={guarded(() => onCreate(outgoing(draft)))}>{t('tournament.create.save_changes')}</PrimaryButton>
         ) : step < 4 ? (
           <PrimaryButton className="w-full" onClick={() => (problem ? setTried(true) : (setTried(false), setStep(step + 1)))}>{t('tournament.create.next')}</PrimaryButton>
         ) : (
           editing_existing ? (
-            <PrimaryButton className="w-full" disabled={saving} onClick={() => onCreate(outgoing(draft))}>
+            <PrimaryButton className="w-full" disabled={saving} onClick={guarded(() => onCreate(outgoing(draft)))}>
               {t('tournament.create.save_changes')}
             </PrimaryButton>
           ) : (
@@ -609,12 +628,12 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
                palavra e os dois botões ficam na mesma. */
             <>
               <p className="text-sm font-extrabold text-ink-900">{t('tournament.create.open_now_question')}</p>
-              <button type="button" disabled={saving} onClick={() => publish('inscricoes')}
+              <button type="button" disabled={saving} onClick={guarded(() => publish('inscricoes'))}
                 className="w-full rounded-ctrl border-2 border-ink-900 bg-canvas px-3 py-2.5 text-left disabled:opacity-50">
                 <b className="block text-sm text-ink-900">{t('tournament.create.publish')}</b>
                 <span className="mt-0.5 block text-[11.5px] text-ink-500">{t('tournament.create.publish_hint')}</span>
               </button>
-              <button type="button" disabled={saving} onClick={() => publish('rascunho')}
+              <button type="button" disabled={saving} onClick={guarded(() => publish('rascunho'))}
                 className="w-full rounded-ctrl border border-line bg-canvas px-3 py-2.5 text-left disabled:opacity-50">
                 <b className="block text-sm text-ink-900">{t('tournament.create.save_draft')}</b>
                 <span className="mt-0.5 block text-[11.5px] text-ink-500">{t('tournament.create.save_draft_hint')}</span>
