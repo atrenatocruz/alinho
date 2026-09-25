@@ -14,9 +14,15 @@
 
 /** Judges a pro-set games score the UI is about to submit as final.
     valid: a normal win-by-2 finish (up to 9). needsBreaker: the score is
-    8-8 — not valid on its own, the UI must collect a super tie-break next
-    (see computeProSetFinalScore). Anything else (an in-progress score, or
-    9-8/8-9 typed directly rather than produced by a breaker) is neither. */
+    8-8 — not valid on its own, the UI must collect a tie-break next (see
+    computeProSetFinalScore). Which tie-break is a rule of the event, not of
+    this function: in tournaments it's a 7-point tie-break by default (FPP)
+    or a 10-point super tie-break if the organiser chose it
+    (`rules.tiebreak_8_8`, Francisco 25 set — the target and the point
+    check live in components/tournament/tieBreak.js); the mix score screen
+    (ScoreEntry) asks for a super tie-break. Anything else (an in-progress
+    score, or 9-8/8-9 typed directly rather than produced by a breaker) is
+    neither. */
 export function validateProSetScore(a, b) {
   if (a === 8 && b === 8) return { valid: false, needsBreaker: true }
   const higher = Math.max(a, b)
@@ -25,7 +31,8 @@ export function validateProSetScore(a, b) {
   return { valid, needsBreaker: false }
 }
 
-/** Converts an 8-8 pro-set plus its super tie-break into the recorded 9-8
+/** Converts an 8-8 pro-set plus its tie-break (7-point or 10-point — the
+    winner is who scored more, whichever it was) into the recorded 9-8
     final score. `breaker` is null for a normal (non-8-8) finish, in which
     case gamesA/gamesB pass through unchanged — the caller must have
     already confirmed via validateProSetScore that they're a valid direct

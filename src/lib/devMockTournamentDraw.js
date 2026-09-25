@@ -60,9 +60,18 @@ const MATCHES = () => [
     status: 'marcado', score_a: null, score_b: null, sets: null, winner_entry_id: null },
 ]
 
+// mockTTbShow = 'true' (Trello #561): o jogo 1 acaba 9-8 no tie-break (7-5)
+// e a final 8-9 no super tie-break (8-10) — para se ver o tie-break nas listas.
+const withTieBreaks = (list) => (localStorage.getItem('mockTTbShow') !== 'true' ? list : list.map((m) => (
+  m.id === 'm1' ? { ...m, score_a: 9, score_b: 8, sets: [{ score_a: 9, score_b: 8, tiebreak_a: 7, tiebreak_b: 5, is_super_tiebreak: false }] }
+    : m.id === 'm4' ? { ...m, entry_b_id: 'e2', status: 'terminado', score_a: 8, score_b: 9, winner_entry_id: 'e2',
+      sets: [{ score_a: 8, score_b: 9, tiebreak_a: 8, tiebreak_b: 10, is_super_tiebreak: true }] }
+      : m
+)))
+
 export const TOURNAMENT_DRAW_TABLE_MOCKS = {
   tournament_public_groups: () => (on() ? GROUPS() : []),
-  tournament_public_matches: () => (on() ? MATCHES() : []),
+  tournament_public_matches: () => (on() ? withTieBreaks(MATCHES()) : []),
 }
 
 /* Os ecrãs do organizador (fechar inscrições, formato, sortear) leem por

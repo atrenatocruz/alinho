@@ -36,6 +36,13 @@ describe('computeProSetFinalScore', () => {
   it('converts an 8-8 + won breaker into 8-9 for the breaker winner (side b)', () => {
     expect(computeProSetFinalScore(8, 8, { a: 6, b: 10 })).toEqual({ score_a: 8, score_b: 9 })
   })
+
+  // Francisco, 25 set: in tournaments the 8-8 default is a 7-point tie-break
+  // (FPP); the 10-point super tie-break is the organiser's choice.
+  it('a 7-point tie-break (the tournament default) gives the same 9-8', () => {
+    expect(computeProSetFinalScore(8, 8, { a: 7, b: 5 })).toEqual({ score_a: 9, score_b: 8 })
+    expect(computeProSetFinalScore(8, 8, { a: 8, b: 10 })).toEqual({ score_a: 8, score_b: 9 })
+  })
 })
 
 describe('computeSetsResult', () => {

@@ -38,7 +38,7 @@ const isSevenSix = (s) => s.a !== '' && s.b !== '' && Math.max(Number(s.a), Numb
 
 /** O resultado do tie-break: duas caixas, uma por dupla (pedido do
  *  Francisco, 25 set — antes só se escolhia quem ganhou). */
-function TieBreakBoxes({ title, a, b, onA, onB, teamA, teamB }) {
+function TieBreakBoxes({ title, label, a, b, onA, onB, teamA, teamB }) {
   const box = 'h-11 w-[56px] rounded-md border border-line bg-surface px-2 text-center font-display text-[18px] font-extrabold text-ink-900'
   return (
     <div className="mt-1.5 rounded-ctrl bg-ink-50 p-2.5">
@@ -47,7 +47,7 @@ function TieBreakBoxes({ title, a, b, onA, onB, teamA, teamB }) {
         <span />
         <span className="truncate text-center text-[10.5px] font-semibold text-ink-500">{teamA}</span>
         <span className="truncate text-center text-[10.5px] font-semibold text-ink-500">{teamB}</span>
-        <span className="text-[12px] text-ink-700">Tie-break</span>
+        <span className="text-[12px] text-ink-700">{label}</span>
         <input type="number" inputMode="numeric" min="0" max="99" aria-label={`${title} · ${teamA}`} value={a} onChange={(e) => onA(e.target.value)} className={box} />
         <input type="number" inputMode="numeric" min="0" max="99" aria-label={`${title} · ${teamB}`} value={b} onChange={(e) => onB(e.target.value)} className={box} />
       </div>
@@ -96,7 +96,7 @@ function SetRows({ sets, onChange, teamA, teamB, decider, t }) {
               O super tie-break do 3.º set já é os próprios pontos. */}
           {!(i === 2 && decider) && isSevenSix(s) && (
             <div className="col-span-3 -mt-1">
-              <TieBreakBoxes title={t('tournament.score.set_tiebreak', { number: i + 1 })}
+              <TieBreakBoxes title={t('tournament.score.set_tiebreak', { number: i + 1 })} label={t('tournament.score.tiebreak_label')}
                 a={s.ta ?? ''} b={s.tb ?? ''} onA={(v) => setOne(i, 'ta', v)} onB={(v) => setOne(i, 'tb', v)}
                 teamA={teamA} teamB={teamB} />
             </div>
@@ -254,6 +254,7 @@ function CourtCard({ match, scoring, tieTarget = 7, onSave, onWalkover, onUndoWa
           {askTieBreak && (
             <TieBreakBoxes
               title={t(tieTarget === 10 ? 'tournament.score.super_tiebreak_title' : 'tournament.score.tiebreak_title', { a, b })}
+              label={t(tieTarget === 10 ? 'tournament.score.super_tiebreak' : 'tournament.score.tiebreak_label')}
               a={tbA} b={tbB} onA={setTbA} onB={setTbB} teamA={match.team_a?.name} teamB={match.team_b?.name} />
           )}
           {problem && <p className="mt-1.5 text-[12px] text-danger">{t(`tournament.score.problem_${problem}`)}</p>}
