@@ -9,7 +9,11 @@
 -- Esta função devolve SÓ id, name e avatar_url, com as mesmas regras de
 -- quem aparece que a `search_players` de hoje (migration_kind_follows_plan
 -- .sql): pelo menos 2 letras, nunca a própria pessoa, e nunca as contas de
--- teste (memberships.is_test). Máximo 10, por nome.
+-- teste (memberships.is_test). Máximo 10, por nome. Procura SEM ACENTOS,
+-- como a search_players viva desde 24 set: «Goncalves» encontra «Gonçalves»
+-- (reportado pelo Francisco). Usa a sem_acentos(text) que existe em
+-- produção — não está em nenhum ficheiro do repositório; se faltar, o
+-- ficheiro pára no passo 0.
 --
 -- Não mexe na `search_players` (decisão do PO, 25 set: os outros ecrãs
 -- que a usam decidem-se à parte).
@@ -29,6 +33,9 @@ BEGIN
                     AND column_name = 'is_test') THEN
     RAISE EXCEPTION 'Falta memberships.is_test. Parar e ler.';
   END IF;
+  IF to_regprocedure('public.sem_acentos(text)') IS NULL THEN
+    RAISE EXCEPTION 'Falta a função sem_acentos(text) (a da search_players de 24 set). Parar e ler.';
+  END IF;
 END $$;
 
 -- ── 1. A função ─────────────────────────────────────────────────────────
@@ -43,7 +50,9 @@ AS $$
     FROM profiles p
    WHERE length(trim(p_query)) >= 2
      AND p.id <> auth.uid()   -- sem sessão não devolve ninguém
-     AND p.name ILIKE '%' || trim(p_query) || '%'
+     -- ILIKE e não LIKE: funciona quer a sem_acentos passe a minúsculas,
+     -- quer não («ana» encontra «Ana»).
+     AND sem_acentos(p.name) ILIKE '%' || sem_acentos(trim(p_query)) || '%'
      AND NOT EXISTS (
        SELECT 1 FROM memberships m WHERE m.user_id = p.id AND m.is_test = true
      )

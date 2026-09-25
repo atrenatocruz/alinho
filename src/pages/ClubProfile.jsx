@@ -9,7 +9,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, Clock, Building2, ChevronRight } from 'lucide-react'
+import { ArrowLeft, Building2, ChevronRight } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { getClubProfile, listOrganizationMembers } from '../lib/clubProfile'
@@ -34,7 +34,6 @@ export default function ClubProfile() {
   const [favoriting, setFavoriting] = useState(false)
   const [error, setError] = useState('')
   const [groups, setGroups] = useState([])
-  const [groupActingOn, setGroupActingOn] = useState(null)
   const [members, setMembers] = useState([])
   const [teachers, setTeachers] = useState([])
   const [tournaments, setTournaments] = useState([])
@@ -170,20 +169,6 @@ export default function ClubProfile() {
     }
   }
 
-  const handleRequestJoinGroup = async (group) => {
-    setGroupActingOn(group.id); setError('')
-    try {
-      const { error: err } = await followOrganization(group.id)
-      if (err) throw err
-      setGroups(await listClubGroups(club.id))
-    } catch (err) {
-      console.error('Error requesting to join group:', err)
-      setError(describeError(t, err, 'clubprofile.error_request_join_group'))
-    } finally {
-      setGroupActingOn(null)
-    }
-  }
-
   const refreshFollow = async (userId) => {
     const { data } = await supabase.from('follows').select('id, followed_id, status')
       .eq('follower_id', user.id).eq('followed_id', userId)
@@ -294,21 +279,13 @@ export default function ClubProfile() {
                         : group.my_status === 'pending' ? t('clubprofile.request_sent') : t('clubprofile.group_within_club')}
                     </p>
                   </div>
-                  {isMemberish ? (
-                    <Link to={`/clube/${group.slug}`}
-                      className="inline-flex min-h-[44px] shrink-0 items-center gap-0.5 whitespace-nowrap text-sm font-extrabold text-ink-900">
-                      {t('clubprofile.view_group')} <ChevronRight size={15} />
-                    </Link>
-                  ) : group.my_status === 'pending' ? (
-                    <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-ink-50 px-3 py-2 text-xs font-extrabold text-muted">
-                      <Clock size={14} /> {t('clubprofile.request_sent')}
-                    </span>
-                  ) : (
-                    <button type="button" onClick={() => handleRequestJoinGroup(group)} disabled={groupActingOn === group.id}
-                      className="min-h-[44px] shrink-0 whitespace-nowrap rounded-full bg-lime-400 px-3.5 text-xs font-extrabold text-ink-900 hover:bg-lime-600 disabled:opacity-40">
-                      {t('clubprofile.request_join_button')}
-                    </button>
-                  )}
+                  {/* «Ver ›» em todas (SPEC de 24 set, §4): pedir para entrar
+                      faz-se na página do grupo, onde o botão lima é o único
+                      do ecrã — não um lima por cada linha aqui. */}
+                  <Link to={`/clube/${group.slug}`}
+                    className="inline-flex min-h-[44px] shrink-0 items-center gap-0.5 whitespace-nowrap text-sm font-extrabold text-ink-900">
+                    {t('clubprofile.view')} <ChevronRight size={15} />
+                  </Link>
                 </div>
               )
             })}

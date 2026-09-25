@@ -146,16 +146,41 @@ export async function removeEntry(entryId) {
   if (error) throw error
 }
 
-export async function adminSignUp({ categoryId, player1Id, partnerId = null, guestName = null, guestEmail = null, teamName = null, paid = false, player1Gender = null, partnerGender = null }) {
+export async function adminSignUp({ categoryId, player1Id = null, player1GuestName = null, player1GuestEmail = null, partnerId = null, guestName = null, guestEmail = null, teamName = null, paid = false, player1Gender = null, partnerGender = null }) {
   const args = {
     p_category_id: categoryId, p_player1_id: player1Id, p_partner_id: partnerId,
     p_guest_name: guestName, p_guest_email: guestEmail, p_team_name: teamName, p_paid: paid,
+  }
+  // Jogador 1 sem conta, só pelo nome (Trello #515). Só vai quando existe,
+  // para a chamada de sempre continuar igual antes da migração do Dev 3.
+  if (!player1Id && player1GuestName) {
+    args.p_player1_guest_name = player1GuestName
+    args.p_player1_guest_email = player1GuestEmail || null
   }
   // Género escolhido pelo admin para quem ainda não o tem (#433). Só vai
   // quando existe, para a chamada sem ele continuar igual.
   if (player1Gender) args.p_player1_gender = player1Gender
   if (partnerGender) args.p_partner_gender = partnerGender
   const { data, error } = await supabase.rpc('tournament_admin_signup', args)
+  if (error) throw error
+  return data
+}
+
+/* Juntar o parceiro a quem se inscreveu sozinho (Trello #515). Devolve
+   { entry_id, status, invite_token } — o token quando o parceiro entrou só
+   pelo nome. */
+export async function adminSetPartner(entryId, { partnerId = null, guestName = null, guestEmail = null, partnerGender = null }) {
+  const { data, error } = await supabase.rpc('tournament_admin_set_partner', {
+    p_entry_id: entryId, p_partner_id: partnerId, p_guest_name: guestName,
+    p_guest_email: guestEmail, p_partner_gender: partnerGender,
+  })
+  if (error) throw error
+  return data
+}
+
+/* O link do jogador 1 que entrou pelo nome (só o organizador o pede). */
+export async function inviteTokenPlayer1(entryId) {
+  const { data, error } = await supabase.rpc('tournament_invite_token_player1', { p_entry_id: entryId })
   if (error) throw error
   return data
 }

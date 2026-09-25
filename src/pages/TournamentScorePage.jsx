@@ -14,13 +14,14 @@ import { useGoBack } from '../lib/useGoBack'
 import { getTournamentPage, getTournamentForEdit, listMatchesToScore, markWalkover, saveMatchResult, undoWalkover } from '../lib/tournamentApi'
 import { saveMatchSchedule } from '../lib/tournamentDraw'
 import { needsDecider, resultProblem } from '../lib/tournamentScore'
-import { computeSetsResult, computeProSetFinalScore } from '../lib/scoringLogic'
+import { computeSetsResult } from '../lib/scoringLogic'
 import { describeError, errorKind } from '../lib/errors'
 import { dayKeyInTz, msUntilNextDay, hhmmInTz } from '../lib/tournamentDay'
 import { cardsByCourt, unscheduledMatches, proposeSchedule, courtNames } from '../lib/scorePage'
 import { useAuth } from '../contexts/AuthContext'
 import { ConfirmSheet, EmptyState, PrimaryButton } from '../components/ui'
 import { MonoLabel, StatePill } from '../components/tournament/TournamentBits'
+import { proSetTieBreakTarget, tieBreakProblem, setText } from '../components/tournament/tieBreak'
 
 // Hora de Portugal, nunca cortada do texto da base de dados (vinha em UTC:
 // 17:00 onde o resto da app dizia 18:00 — Trello #487).
@@ -31,6 +32,28 @@ const hhmm = (iso) => hhmmInTz(iso)
 const BTN = 'min-h-[44px] rounded-full px-4 text-sm'
 
 const SETS_FORMATS = ['melhor_2_sets', 'melhor_3_sets']
+
+/** Um set a 6 que acabou 7-6: teve tie-break. */
+const isSevenSix = (s) => s.a !== '' && s.b !== '' && Math.max(Number(s.a), Number(s.b)) === 7 && Math.min(Number(s.a), Number(s.b)) === 6
+
+/** O resultado do tie-break: duas caixas, uma por dupla (pedido do
+ *  Francisco, 25 set — antes só se escolhia quem ganhou). */
+function TieBreakBoxes({ title, a, b, onA, onB, teamA, teamB }) {
+  const box = 'h-11 w-[56px] rounded-md border border-line bg-surface px-2 text-center font-display text-[18px] font-extrabold text-ink-900'
+  return (
+    <div className="mt-1.5 rounded-ctrl bg-ink-50 p-2.5">
+      <p className="text-[12.5px] font-semibold text-ink-900">{title}</p>
+      <div className="mt-1.5 grid grid-cols-[minmax(0,1fr)_56px_56px] items-center gap-2">
+        <span />
+        <span className="truncate text-center text-[10.5px] font-semibold text-ink-500">{teamA}</span>
+        <span className="truncate text-center text-[10.5px] font-semibold text-ink-500">{teamB}</span>
+        <span className="text-[12px] text-ink-700">Tie-break</span>
+        <input type="number" inputMode="numeric" min="0" max="99" aria-label={`${title} · ${teamA}`} value={a} onChange={(e) => onA(e.target.value)} className={box} />
+        <input type="number" inputMode="numeric" min="0" max="99" aria-label={`${title} · ${teamB}`} value={b} onChange={(e) => onB(e.target.value)} className={box} />
+      </div>
+    </div>
+  )
+}
 
 /** Nos formatos por sets, o jogo já acabou quando alguém marca: escrevem-se
  *  os sets todos de uma vez, não um a um (é o contrário do mix, onde se
@@ -69,6 +92,15 @@ function SetRows({ sets, onChange, teamA, teamB, decider, t }) {
               className="h-11 w-full rounded-md border border-line px-2 text-center font-display text-[18px] font-extrabold text-ink-900"
             />
           ))}
+          {/* 7-6: o set foi ao tie-break (a 7) — escreve-se o resultado dele.
+              O super tie-break do 3.º set já é os próprios pontos. */}
+          {!(i === 2 && decider) && isSevenSix(s) && (
+            <div className="col-span-3 -mt-1">
+              <TieBreakBoxes title={t('tournament.score.set_tiebreak', { number: i + 1 })}
+                a={s.ta ?? ''} b={s.tb ?? ''} onA={(v) => setOne(i, 'ta', v)} onB={(v) => setOne(i, 'tb', v)}
+                teamA={teamA} teamB={teamB} />
+            </div>
+          )}
         </div>
       ))}
     </div>
@@ -79,10 +111,15 @@ const emptySets = (n) => Array.from({ length: n }, () => ({ a: '', b: '' }))
 /** Os sets escritos que já estão completos, na forma que o servidor espera. */
 const filledSets = (sets) => sets
   .filter((s) => s.a !== '' && s.b !== '' && Number(s.a) !== Number(s.b))
-  .map((s) => ({ score_a: Number(s.a), score_b: Number(s.b) }))
+  .map((s) => ({
+    score_a: Number(s.a),
+    score_b: Number(s.b),
+    ...(isSevenSix(s) && s.ta !== undefined && s.ta !== '' && s.tb !== undefined && s.tb !== ''
+      ? { tiebreak_a: Number(s.ta), tiebreak_b: Number(s.tb) } : {}),
+  }))
 
 /** O cartão de um campo: quem está a jogar, o resultado e os três botões. */
-function CourtCard({ match, scoring, onSave, onWalkover, onUndoWalkover, busy, t }) {
+function CourtCard({ match, scoring, tieTarget = 7, onSave, onWalkover, onUndoWalkover, busy, t }) {
   const finished = ['terminado', 'falta', 'desistencia'].includes(match.status)
   const bySets = SETS_FORMATS.includes(scoring)
   const [editing, setEditing] = useState(!finished)
@@ -95,11 +132,16 @@ function CourtCard({ match, scoring, onSave, onWalkover, onUndoWalkover, busy, t
   // deixar escolher quem ganhou, e 9-8 dizia «não fecha o jogo». O servidor
   // sempre aceitou 9-8. Agora: 8-8 pergunta quem ganhou e grava 9-8; e 9-8
   // escrito diretamente — que é o que as pessoas escrevem — também vale.
-  const [breaker, setBreaker] = useState(null) // 'a' | 'b'
+  // 25 set (Francisco): em 8-8 escreve-se o resultado do tie-break (a 7) ou
+  // do super tie-break (a 10, se o torneio o escolheu) — não só quem ganhou.
+  // Grava 9-8 e os pontos do tie-break no set. 9-8 escrito diretamente
+  // também pede o tie-break, que tem de dar a vitória a quem tem 9.
+  const [tbA, setTbA] = useState('')
+  const [tbB, setTbB] = useState('')
   const eightAll = !SETS_FORMATS.includes(scoring) && Number(a) === 8 && Number(b) === 8 && a !== '' && b !== ''
   const nineEight = !SETS_FORMATS.includes(scoring)
     && Math.max(Number(a), Number(b)) === 9 && Math.min(Number(a), Number(b)) === 8
-  useEffect(() => { if (!eightAll) setBreaker(null) }, [eightAll])
+  const askTieBreak = eightAll || nineEight
 
   useEffect(() => { setA(match.score_a ?? ''); setB(match.score_b ?? '') }, [match.score_a, match.score_b])
 
@@ -120,18 +162,42 @@ function CourtCard({ match, scoring, onSave, onWalkover, onUndoWalkover, busy, t
     if (!needThird && thirdIsEmpty) setSets((prev) => prev.slice(0, 2))
   }, [bySets, needThird, thirdIsEmpty, sets.length])
 
+  /** O problema do tie-break, se houver (pro set em 8-8/9-8, ou sets 7-6). */
+  const tieProblem = () => {
+    if (bySets) {
+      for (const [i, s] of sets.entries()) {
+        if ((i === 2 && scoring === 'melhor_2_sets') || !isSevenSix(s)) continue
+        const p = tieBreakProblem(s.ta ?? '', s.tb ?? '', 7)
+        if (p) return p
+        if ((Number(s.ta) > Number(s.tb)) !== (Number(s.a) > Number(s.b))) return 'tb_winner'
+      }
+      return null
+    }
+    if (!askTieBreak) return null
+    const p = tieBreakProblem(tbA, tbB, tieTarget)
+    if (p) return p
+    if (nineEight && (Number(tbA) > Number(tbB)) !== (Number(a) > Number(b))) return 'tb_winner'
+    return null
+  }
+
   const save = () => {
+    const tb = tieProblem()
+    if (tb) { setProblem(tb); return }
     const input = bySets
       ? (() => {
         const rows = filledSets(sets)
         const { setsA, setsB } = computeSetsResult(rows)
         return { score_a: setsA, score_b: setsB, sets: rows.map((r, i) => ({ ...r, is_super_tiebreak: i === 2 && scoring === 'melhor_2_sets' })) }
       })()
-      : eightAll && breaker
-        ? computeProSetFinalScore(8, 8, { a: breaker === 'a' ? 1 : 0, b: breaker === 'b' ? 1 : 0 })
+      : askTieBreak
+        ? (() => {
+          const aWon = Number(tbA) > Number(tbB)
+          const score = { score_a: aWon ? 9 : 8, score_b: aWon ? 8 : 9 }
+          return { ...score, sets: [{ ...score, tiebreak_a: Number(tbA), tiebreak_b: Number(tbB), is_super_tiebreak: tieTarget === 10 }] }
+        })()
         : { score_a: Number(a), score_b: Number(b) }
-    // 9-8 (escrito, ou saído do 8-8 + tie-break) é um fim válido de pro set.
-    const p = (nineEight || (eightAll && breaker)) ? null : resultProblem(scoring, input)
+    // 9-8 com o tie-break escrito é um fim válido de pro set.
+    const p = askTieBreak ? null : resultProblem(scoring, input)
     setProblem(p)
     if (p) return
     onSave(match, input, finished)
@@ -177,20 +243,12 @@ function CourtCard({ match, scoring, onSave, onWalkover, onUndoWalkover, busy, t
             </div>
           ))}
           {bySets && <p className="mt-1 text-[11px] text-ink-500">{t('tournament.score.sets_hint')}</p>}
-          {eightAll && (
-            <div className="mt-2 rounded-ctrl bg-ink-50 p-2.5">
-              <p className="text-[12.5px] font-semibold text-ink-900">{t('tournament.score.tiebreak_title')}</p>
-              <div className="mt-1.5 grid grid-cols-2 gap-1.5">
-                {[['a', match.team_a], ['b', match.team_b]].map(([side, team]) => (
-                  <button key={side} type="button" onClick={() => setBreaker(side)} aria-pressed={breaker === side}
-                    className={`${BTN} truncate border ${breaker === side ? 'border-ink-900 bg-ink-900 text-white font-bold' : 'border-line bg-surface text-ink-900'}`}>
-                    {team?.name}
-                  </button>
-                ))}
-              </div>
-            </div>
+          {askTieBreak && (
+            <TieBreakBoxes
+              title={t(tieTarget === 10 ? 'tournament.score.super_tiebreak_title' : 'tournament.score.tiebreak_title', { a, b })}
+              a={tbA} b={tbB} onA={setTbA} onB={setTbB} teamA={match.team_a?.name} teamB={match.team_b?.name} />
           )}
-          {problem && !(eightAll && breaker) && <p className="mt-1.5 text-[12px] text-danger">{t(`tournament.score.problem_${problem}`)}</p>}
+          {problem && <p className="mt-1.5 text-[12px] text-danger">{t(`tournament.score.problem_${problem}`)}</p>}
           <div className="mt-2.5 flex flex-wrap gap-2">
             <button type="button" disabled={busy} onClick={save} className={`${BTN} bg-lime-400 font-bold text-ink-900 disabled:opacity-60`}>
               {t('tournament.score.save')}
@@ -224,7 +282,12 @@ function CourtCard({ match, scoring, onSave, onWalkover, onUndoWalkover, busy, t
             <b className="block font-display text-[20px] font-extrabold text-ink-900">{match.score_a}-{match.score_b}</b>
             {match.sets?.length > 0 && (
               <span className="block text-[11px] text-ink-500">
-                {match.sets.map((x) => `${x.score_a}-${x.score_b}`).join(' · ')}
+                {/* Pro set: só o tie-break (o 9-8 já está em cima). Por sets:
+                    os sets, com o tie-break de cada 7-6. */}
+                {match.sets.length === 1 && match.sets[0].tiebreak_a != null
+                  ? t(match.sets[0].is_super_tiebreak ? 'tournament.score.super_tiebreak_result' : 'tournament.score.tiebreak_result',
+                    { a: match.sets[0].tiebreak_a, b: match.sets[0].tiebreak_b })
+                  : match.sets.map(setText).join(' · ')}
               </span>
             )}
           </span>
@@ -390,6 +453,7 @@ export default function TournamentScorePage() {
   useEffect(() => { load() }, [load])
 
   const scoring = tournament?.rules?.scoring || 'pro_set_9'
+  const tieTarget = proSetTieBreakTarget(tournament?.rules)
   const isAdmin = !!tournament && (memberships || [])
     .some((m) => m.organization_id === tournament.organization_id && m.is_admin)
 
@@ -406,6 +470,9 @@ export default function TournamentScorePage() {
         days: pageDays,
         courts: edit?.courts || [],
         durationMaxMin: Number(tournament?.rules?.duration_max) || undefined,
+        // O dia e a hora de início de cada categoria (#502, Dev 3): a
+        // proposta não põe uma categoria fora do dia dela.
+        categories: edit?.categories || [],
       }))
     } catch (err) {
       setError(describeError(t, err))
@@ -561,7 +628,7 @@ export default function TournamentScorePage() {
               <MonoLabel>{t('tournament.score.to_score')}</MonoLabel>
               <div className="space-y-2">
                 {cards.map((c) => (
-                  <CourtCard key={c.card.match_id} match={c.card} scoring={scoring} busy={busy} t={t}
+                  <CourtCard key={c.card.match_id} match={c.card} scoring={scoring} tieTarget={tieTarget} busy={busy} t={t}
                     onSave={save} onWalkover={(match, kind) => setSheet({ match, kind })} onUndoWalkover={isAdmin ? setUndoing : null} />
                 ))}
               </div>
@@ -587,7 +654,7 @@ export default function TournamentScorePage() {
           <MonoLabel className="pt-2">{t('tournament.score.finished')}</MonoLabel>
           <div className="space-y-2">
             {done.map((m) => (
-              <CourtCard key={m.match_id} match={m} scoring={scoring} busy={busy} t={t}
+              <CourtCard key={m.match_id} match={m} scoring={scoring} tieTarget={tieTarget} busy={busy} t={t}
                 onSave={save} onWalkover={(match, kind) => setSheet({ match, kind })} onUndoWalkover={isAdmin ? setUndoing : null} />
             ))}
           </div>

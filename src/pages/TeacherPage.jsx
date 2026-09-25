@@ -3,16 +3,20 @@
 //  · view="availability" /professor/:id/disponibilidade  dia a dia (print 05, 2.º)
 // "Pedir para entrar" e "Pedir aula" ligam-se nas fases seguintes (1b e 3).
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, Check, ChevronLeft, Clock, GraduationCap, Phone, Repeat } from 'lucide-react'
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, Clock, GraduationCap, Plus, Repeat } from 'lucide-react'
 import { useGoBack } from '../lib/useGoBack'
 import { useAuth } from '../contexts/AuthContext'
 import { cancelEnrolment, confirmEnrolment, getTeacherPage } from '../lib/lessonsApi'
 import EnrolSheet from '../components/lessons/EnrolSheet'
 import { describeError, errorKind } from '../lib/errors'
 import { priceRowFor, LESSON_CAPACITY, LESSON_DURATIONS } from '../lib/lessons'
-import { Avatar, EmptyState, PrimaryButton } from '../components/ui'
+import { compactTime, weeklyFromItems } from '../lib/teacherSchedule'
+import { teacherContact } from '../lib/teacherContact'
+import { supabase } from '../lib/supabase'
+import { followPlayer, getFollowCounts, unfollowPlayer } from '../lib/follows'
+import { Avatar, ConfirmSheet, EmptyState, PrimaryButton } from '../components/ui'
 import {
   LevelPill, MonoLabel, TealTag, TEAL, bandLabel, levelRange, hm, hhmm, isoWeekday, sameDay, euros, lessonTypeLabel,
 } from '../components/lessons/LessonBits'
@@ -22,11 +26,6 @@ const localIso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.get
 const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x }
 const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x }
 const minutesBetween = (a, b) => Math.round((new Date(b) - new Date(a)) / 60000)
-const waLink = (contact) => {
-  const digits = (contact || '').replace(/\D/g, '')
-  if (digits.length < 9) return null
-  return `https://wa.me/${digits.length === 9 ? `351${digits}` : digits}`
-}
 
 export default function TeacherPage({ view = 'profile' }) {
   const { t } = useTranslation()
@@ -39,7 +38,54 @@ export default function TeacherPage({ view = 'profile' }) {
   const [day, setDay] = useState(null)
   // Com as aulas escondidas a pagina fica so com quem e e o contacto:
   // sem precos, sem «Pedir aula» e sem a semana das aulas.
-  const { isLessonsEnabled } = useAuth()
+  const { isLessonsEnabled, user } = useAuth()
+  // Seguir (desenho aprovado 25 set, assunto 4): o «follow» de sempre.
+  const [followRow, setFollowRow] = useState(null) // { id, status } | null
+  const [followers, setFollowers] = useState(null)
+  const [followBusy, setFollowBusy] = useState(false)
+  const [followError, setFollowError] = useState('')
+  const [askUnfollow, setAskUnfollow] = useState(false)
+  const targetId = data?.teacher?.user_id
+
+  const loadFollow = async () => {
+    if (!targetId || !user?.id) return
+    try {
+      const [{ data: rows }, counts] = await Promise.all([
+        supabase.from('follows').select('id, status').eq('follower_id', user.id).eq('followed_id', targetId),
+        getFollowCounts(targetId),
+      ])
+      setFollowRow(rows?.[0] || null)
+      setFollowers(Number(counts?.followers_count ?? 0))
+    } catch (error) {
+      console.error('Error loading follow state:', error)
+    }
+  }
+  useEffect(() => {
+    loadFollow()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetId, user?.id])
+
+  const follow = async () => {
+    setFollowBusy(true); setFollowError('')
+    try {
+      await followPlayer(targetId)
+      await loadFollow()
+    } catch (error) {
+      console.error('Error following teacher:', error)
+      setFollowError(describeError(t, error, 'comunidade.follow_failed'))
+    } finally {
+      setFollowBusy(false)
+    }
+  }
+  const unfollow = async () => {
+    setFollowBusy(true); setFollowError('')
+    try {
+      await unfollowPlayer(targetId, user.id)
+      await loadFollow()
+    } finally {
+      setFollowBusy(false)
+    }
+  }
 
   // Semana corrente (perfil) ou as próximas duas semanas (disponibilidade).
   const range = useMemo(() => {
@@ -91,9 +137,8 @@ export default function TeacherPage({ view = 'profile' }) {
   }
 
   const levels = levelRange(t, teacher.level_from, teacher.level_to)
-  const whatsapp = waLink(teacher.contact)
   const role = t(teacher.gender === 'feminino' ? 'lessons.teacher_role_f' : 'lessons.teacher_role')
-  const where = [teacher.org_name || t('lessons.no_club'), teacher.org_city || teacher.zone].filter(Boolean).join(' · ')
+  const where = [teacher.org_name || t('lessons.no_club'), teacher.zone || teacher.org_city].filter(Boolean).join(' · ')
   const priceFor = (type, dur) => priceRowFor(prices, {
     teacherProfileId: teacher.teacher_profile_id, lessonType: type, durationMinutes: dur, peak: true, onIso: today,
   })?.price_lesson
@@ -102,17 +147,47 @@ export default function TeacherPage({ view = 'profile' }) {
   // que faltam ficam com travessão.
   const hasPrices = Object.keys(LESSON_CAPACITY).some((type) => LESSON_DURATIONS.some((d) => priceFor(type, d) != null))
 
+  const weekly = weeklyFromItems(items)
+
   // "Esta semana": seg–dom; domingo só aparece se tiver alguma coisa.
   const days = [1, 2, 3, 4, 5, 6, 7].filter((wd) => wd < 7 || items.some((it) => it.weekday === 7))
 
+  // Desenho aprovado (25 set, assunto 4): toda a gente vê quem é, o horário
+  // e onde dá aulas. Preços e «Pedir aula» só com as aulas ligadas.
+  const isMe = user?.id && teacher.user_id === user.id
+  const female = teacher.gender === 'feminino'
+  const contact = teacherContact(teacher.contact)
+  const contactLabel = contact ? t(`teacher.contact_${contact.kind}`) : null
+  const followed = followRow?.status === 'accepted'
+  const requested = followRow?.status === 'pending'
+  const scheduleCard = weekly.length > 0 && (
+    <div className="card space-y-1">
+      <h3 className="text-base text-ink-900 mb-1">{t('teacher.public_when')}</h3>
+      {weekly.map((s, i) => (
+        <div key={i} className={`flex gap-4 py-1.5 text-sm ${i < weekly.length - 1 ? 'border-b border-line' : ''}`}>
+          <span className="w-10 font-extrabold text-ink-900 capitalize">{t(`lessons.wd_short_${s.weekday}`)}</span>
+          <span className="tabular-nums text-ink-900">{compactTime(s.start)}–{compactTime(s.end)}</span>
+        </div>
+      ))}
+      <p className="text-xs text-muted pt-1.5">{t(female ? 'teacher.public_when_hint_f' : 'teacher.public_when_hint')}</p>
+    </div>
+  )
+
   return (
     <div className="space-y-5">
-      <button type="button" onClick={goBack} className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline">
-        <ArrowLeft size={16} /> {t('common.back')}
+      <button type="button" onClick={isMe ? () => navigate('/perfil') : goBack} className="inline-flex items-center gap-1.5 text-ink-900 font-extrabold text-sm hover:underline">
+        <ArrowLeft size={16} /> {isMe ? t('teacher.schedule_back') : t('common.back')}
       </button>
 
+      {isMe && (
+        <div className="rounded-[14px] border border-line bg-white p-3 text-sm text-ink-500 leading-snug">
+          <b className="block text-ink-900 font-extrabold">{t('teacher.public_me_title')}</b>
+          {t('teacher.public_me_text')}
+        </div>
+      )}
+
       <div className="flex items-center gap-3.5">
-        <Avatar name={teacher.name} url={teacher.avatar_url} size="w-16 h-16 text-xl" colorClass="bg-ink-50 text-ink-500" />
+        <Avatar name={teacher.name} url={teacher.avatar_url} size="w-16 h-16 text-xl" colorClass="bg-ink-900 text-white" />
         <div className="min-w-0">
           <h2 className="text-2xl text-ink-900 truncate">{teacher.name}</h2>
           <p className="text-sm text-muted">{role} · {where}</p>
@@ -122,22 +197,63 @@ export default function TeacherPage({ view = 'profile' }) {
               {levels && <span>{t('lessons.teaches_levels', { range: levels })}</span>}
             </p>
           )}
+          {followers != null && (
+            <p className="text-xs text-muted mt-0.5">{t('playerdetails.followers_count', { count: followers })}</p>
+          )}
         </div>
       </div>
 
-      <div className="flex gap-2">
-        {isLessonsEnabled && (
-          <PrimaryButton className="flex-1 !px-3" onClick={() => navigate(`/professor/${id}/disponibilidade`)}>
-            {t('lessons.request_lesson')}
-          </PrimaryButton>
-        )}
-        {whatsapp && (
-          <a href={whatsapp} target="_blank" rel="noopener noreferrer"
-            className="flex-1 inline-flex items-center justify-center gap-2 rounded-ctrl min-h-[48px] bg-ink-50 text-ink-900 font-extrabold hover:bg-ink-200 transition-colors duration-fast">
-            <Phone size={16} /> WhatsApp
-          </a>
-        )}
-      </div>
+      {isMe ? (
+        <button type="button" onClick={() => navigate('/perfil/professor')}
+          className="w-full min-h-[48px] rounded-full bg-ink-900 text-white font-extrabold hover:bg-ink-700 transition-colors duration-fast">
+          {t('teacher.schedule_edit')}
+        </button>
+      ) : (
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            {followed || requested ? (
+              <button type="button" disabled={followBusy} onClick={() => (followed ? setAskUnfollow(true) : unfollow())}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 min-h-[48px] rounded-full border-[1.5px] border-line bg-white text-ink-900 font-extrabold disabled:opacity-40">
+                {followed ? <><Check size={16} /> {t('playerdetails.following_button')}</> : t('playerdetails.requested_button')}
+              </button>
+            ) : (
+              <PrimaryButton className="flex-1 !px-3 !rounded-full" disabled={followBusy} onClick={follow}>
+                <Plus size={16} /> {t('playerdetails.follow_button')}
+              </PrimaryButton>
+            )}
+            {contact && (
+              <a href={contact.href} target="_blank" rel="noopener noreferrer"
+                className="flex-1 inline-flex items-center justify-center gap-2 rounded-full min-h-[48px] border-[1.5px] border-line bg-white text-ink-900 font-extrabold hover:bg-ink-50 transition-colors duration-fast">
+                {contactLabel}
+              </a>
+            )}
+          </div>
+          {followError && <p role="alert" className="text-sm font-extrabold text-danger">{followError}</p>}
+          {isLessonsEnabled && (
+            <PrimaryButton variant="ghost" className="w-full" onClick={() => navigate(`/professor/${id}/disponibilidade`)}>
+              {t('lessons.request_lesson')}
+            </PrimaryButton>
+          )}
+        </div>
+      )}
+
+      {weekly.length > 0 ? scheduleCard : !isMe && (
+        <div className="rounded-[14px] border-[1.5px] border-dashed border-ink-200 p-3 text-sm text-ink-500 leading-snug">
+          <b className="block text-ink-900 font-extrabold">{t('teacher.public_empty_title')}</b>
+          {contact && t(`teacher.public_empty_${contact.kind}`)}
+        </div>
+      )}
+
+      {teacher.org_name && (
+        <div className="card">
+          <h3 className="text-base text-ink-900 mb-2">{t('teacher.public_where')}</h3>
+          <Link to={`/clube/${teacher.org_slug}`} className="flex items-center gap-2.5 text-sm font-extrabold text-ink-900 hover:underline">
+            <Avatar name={teacher.org_name} url={teacher.org_logo || null} size="w-8 h-8 text-[11px]" colorClass="bg-ink-900 text-lime-400" shape="square" />
+            <span className="flex-1 min-w-0 truncate">{teacher.org_name}</span>
+            <ChevronRight size={16} className="text-muted shrink-0" />
+          </Link>
+        </div>
+      )}
 
       {isLessonsEnabled && hasPrices && (
       <div>
@@ -187,6 +303,18 @@ export default function TeacherPage({ view = 'profile' }) {
         </div>
       </div>
       )}
+
+      <ConfirmSheet
+        open={askUnfollow}
+        danger
+        title={t(female ? 'teacher.unfollow_title_f' : 'teacher.unfollow_title', { name: teacher.name.split(' ')[0] })}
+        message={t(female ? 'teacher.unfollow_text_f' : 'teacher.unfollow_text')}
+        cancelLabel={t('teacher.unfollow_keep')}
+        confirmLabel={t('teacher.unfollow_confirm')}
+        onConfirm={unfollow}
+        onClose={() => setAskUnfollow(false)}
+        errorOf={(err) => describeError(t, err, 'comunidade.unfollow_failed')}
+      />
     </div>
   )
 }

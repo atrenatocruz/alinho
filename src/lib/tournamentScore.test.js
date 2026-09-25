@@ -8,14 +8,16 @@ describe('falta e desistência (SPEC §7)', () => {
     expect(walkoverScore('melhor_2_sets', 'b')).toEqual({ score_a: 2, score_b: 0 })
     expect(walkoverScore('melhor_3_sets', 'a')).toEqual({ score_a: 0, score_b: 2 })
   })
-  it('desistir a meio guarda o resultado até ali', () => {
-    expect(retirementScore('pro_set_9', 'b', { score_a: 5, score_b: 3 })).toEqual({ score_a: 5, score_b: 3 })
+  // Decisão do Francisco, 23 set (#458, #511): quem desiste perde o jogo
+  // inteiro, mesmo a ganhar ou empatado — o resultado até ali não conta.
+  it('desistir a meio perde o jogo inteiro, mesmo a ganhar', () => {
+    expect(retirementScore('pro_set_9', 'b', { score_a: 3, score_b: 5 })).toEqual({ score_a: 9, score_b: 0 })
   })
-  it('quem desiste nunca fica com o jogo ganho', () => {
-    expect(retirementScore('pro_set_9', 'a', { score_a: 6, score_b: 2 })).toEqual({ score_a: 2, score_b: 6 })
+  it('desistir com o resultado empatado também perde o jogo inteiro', () => {
+    expect(retirementScore('pro_set_9', 'a', { score_a: 3, score_b: 3 })).toEqual({ score_a: 0, score_b: 9 })
   })
-  it('desistir antes de haver resultado vale o mesmo que uma falta', () => {
-    expect(retirementScore('pro_set_9', 'a', { score_a: 0, score_b: 0 })).toEqual({ score_a: 0, score_b: 9 })
+  it('desistir vale o mesmo que uma falta, em qualquer pontuação', () => {
+    expect(retirementScore('melhor_3_sets', 'a', { score_a: 1, score_b: 0 })).toEqual(walkoverScore('melhor_3_sets', 'a'))
   })
   it('faltas e desistências não contam para o ranking', () => {
     expect(countsForRanking({ status: 'terminado' })).toBe(true)
