@@ -57,7 +57,11 @@ DECLARE
   c_fechado_bom CONSTANT TEXT :=
     '\1COALESCE((SELECT json_agg(json_build_object(''id'', g.id, ''title'', g.title, ''date'', g.date, '
     || '''origin'', g.origin, ''locked'', true) ORDER BY g.date) FROM games g '
-    || 'WHERE g.organization_id = o.id AND g.status NOT IN (''finished'', ''completed'', ''cancelled'', ''pending'')), '
+    -- O `draft` (rascunho, #544) também fica de fora. Escrito com `<> ALL`
+    -- de propósito: a migration_mix_draft.sql conta as cópias do filtro
+    -- `NOT IN (...)` e parava (ou saltava) se esta fosse igual a elas. Assim
+    -- os dois ficheiros correm por qualquer ordem.
+    || 'WHERE g.organization_id = o.id AND g.status <> ALL (ARRAY[''finished'', ''completed'', ''cancelled'', ''pending'', ''draft''])), '
     || '''[]''::json)::jsonb';
   f      RECORD;
   v_def  TEXT;
