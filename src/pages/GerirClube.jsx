@@ -34,6 +34,7 @@ import { KIND_STYLE } from '../components/agenda/EventCard'
 import { tournamentsAvailable } from '../lib/tournamentApi'
 import { describeError } from '../lib/errors'
 import { isDraftMix, publishDraftMix, advanceByFrequency, pendingOccurrenceRow } from '../lib/mixDraft'
+import LaunchDayPicker from '../components/LaunchDayPicker'
 
 const sanitizeSlug = (value) => value.toLowerCase().replace(/[^a-z0-9-]/g, '')
 
@@ -948,15 +949,18 @@ export default function GerirClube() {
     return { daysBefore, launchTime }
   }
 
+  // Sem dia escolhido, o erro aparece por baixo das pastilhas (regra das
+  // janelas); o resto no formulário, junto aos botões. Nunca alert().
+  const [launchDayError, setLaunchDayError] = useState('')
   const validateRecurrence = (recurrence) => {
     if (!recurrence.enabled) return null
     if (!recurrence.launchDaysBefore || parseInt(recurrence.launchDaysBefore, 10) < 1) {
-      return t('gerirclube.validate_launch_days_before')
+      return { field: 'launchDay', message: t('gerirclube.validate_launch_days_before') }
     }
-    if (!recurrence.launchTime) return t('gerirclube.validate_launch_time')
-    if (recurrence.endsType === 'on_date' && !recurrence.endsOn) return t('gerirclube.validate_end_date')
+    if (!recurrence.launchTime) return { message: t('gerirclube.validate_launch_time') }
+    if (recurrence.endsType === 'on_date' && !recurrence.endsOn) return { message: t('gerirclube.validate_end_date') }
     if (recurrence.endsType === 'after_occurrences' && (!recurrence.endsAfterOccurrences || parseInt(recurrence.endsAfterOccurrences, 10) < 1)) {
-      return t('gerirclube.validate_occurrences_count')
+      return { message: t('gerirclube.validate_occurrences_count') }
     }
     return null
   }
@@ -1082,7 +1086,8 @@ export default function GerirClube() {
 
     const recurrenceError = validateRecurrence(recurrence)
     if (recurrenceError) {
-      alert(recurrenceError)
+      if (recurrenceError.field === 'launchDay') setLaunchDayError(recurrenceError.message)
+      else setGameError(recurrenceError.message)
       return
     }
 
@@ -1294,7 +1299,8 @@ export default function GerirClube() {
 
     const recurrenceError = validateRecurrence(recurrence)
     if (recurrenceError) {
-      alert(recurrenceError)
+      if (recurrenceError.field === 'launchDay') setLaunchDayError(recurrenceError.message)
+      else setGameError(recurrenceError.message)
       return
     }
 
@@ -2561,60 +2567,23 @@ export default function GerirClube() {
                               )}
                             </div>
 
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">
-                                {t('gerirclube.launch_days_before_label')}
-                              </label>
-                              <input
-                                type="number"
-                                min="1"
-                                value={gameForm.recurrence.launchDaysBefore}
-                                onChange={(e) => setGameForm({
-                                  ...gameForm,
-                                  recurrence: { ...gameForm.recurrence, launchDaysBefore: e.target.value }
-                                })}
-                                className="input-field"
-                                placeholder={t('gerirclube.launch_days_placeholder')}
-                                required
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">
-                                {t('gerirclube.launch_time_label')}
-                              </label>
-                              <input
-                                type="time"
-                                value={gameForm.recurrence.launchTime}
-                                onChange={(e) => setGameForm({
-                                  ...gameForm,
-                                  recurrence: { ...gameForm.recurrence, launchTime: e.target.value }
-                                })}
-                                className="input-field"
-                                required
-                              />
-                              <p className="text-sm text-muted mt-1.5">
-                                {t('gerirclube.launch_time_help')}
-                              </p>
-                              {/* O próximo lançamento com data real, para o admin não
-                                  fazer contas de cabeça (Trello #396). */}
-                              {(() => {
-                                const r = gameForm.recurrence
-                                const days = parseInt(r.launchDaysBefore, 10)
-                                if (!gameForm.date || !r.launchTime || !(days >= 1)) return null
-                                const nextMix = advanceByFrequency(new Date(gameForm.date), r.frequency)
-                                if (Number.isNaN(nextMix.getTime())) return null
-                                const launch = new Date(nextMix)
-                                launch.setDate(launch.getDate() - days)
-                                const [hh, mm] = r.launchTime.split(':').map(Number)
-                                launch.setHours(hh, mm, 0, 0)
-                                const day = (d) => formatDateLib(d, i18n.language, { weekday: 'long', day: 'numeric', month: 'short' })
-                                return (
-                                  <p className="text-sm font-extrabold text-ink-900 mt-1.5">
-                                    {t('gerirclube.next_launch_preview', { launch: day(launch), time: r.launchTime, mix: day(nextMix) })}
-                                  </p>
-                                )
-                              })()}
-                            </div>
+                            {/* Abrem as inscrições: escolhe-se o DIA, com a data à vista
+                                (desenho aprovado a 25 set). Guarda-se como antes: dias
+                                antes + hora. As datas são as do próximo Mix, o primeiro
+                                que abre com esta regra. */}
+                            <LaunchDayPicker
+                              key={`${editingGame?.id || 'novo'}-${gameForm.recurrence.frequency}`}
+                              mixDate={gameForm.date ? advanceByFrequency(new Date(gameForm.date), gameForm.recurrence.frequency) : null}
+                              frequency={gameForm.recurrence.frequency}
+                              daysBefore={gameForm.recurrence.launchDaysBefore}
+                              onDaysBefore={(v) => {
+                                setLaunchDayError('')
+                                setGameForm({ ...gameForm, recurrence: { ...gameForm.recurrence, launchDaysBefore: String(v) } })
+                              }}
+                              time={gameForm.recurrence.launchTime}
+                              onTime={(v) => setGameForm({ ...gameForm, recurrence: { ...gameForm.recurrence, launchTime: v } })}
+                              error={launchDayError}
+                            />
                           </>
                         )}
                       </div>
