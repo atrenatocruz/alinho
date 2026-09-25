@@ -1,7 +1,7 @@
 import { supabase } from './supabase.js'
 import { getGroupByJid, mixVisibleToGroup } from './groups.js'
 import { loadGame, getOpenMixes, formatDateTime, weekdayKeyPt, mixLocalParts, gameIdForMessage, labelableMixes, mixLabel } from './roster.js'
-import { resolveProfileByPhoneJid, createGuestProfile } from './phone.js'
+import { resolveProfileByPhoneJid, createGuestProfile, ensureMembership } from './phone.js'
 import { joinWithUnregisteredPartner } from './partnerInvite.js'
 import { config } from './config.js'
 import { helpText, helpFooter } from './messages.js'
@@ -345,6 +345,18 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
   // then, so they can play without registering first, while still being
   // nudged to sign up for their history/friends/rewards (Trello #19).
   async function requireProfileOrCreateGuest(profile, senderPnForGuest) {
+    // #537: já tem conta (número confirmado) mas não é deste clube → passa a
+    // membro com a conta dele, em vez de ganhar um convidado.
+    if (profile?.notMember) {
+      try {
+        await ensureMembership(profile.id, organizationId)
+        return { profile: { ...profile, notMember: false }, isNewGuest: false }
+      } catch (err) {
+        console.error('Failed to add registered member:', err)
+        await reply('not_found', { appUrl: config.appUrl })
+        return { profile: null, isNewGuest: false }
+      }
+    }
     if (profile) return { profile, isNewGuest: false }
     try {
       const created = await createGuestProfile(senderPnForGuest, message?.pushName, organizationId)
