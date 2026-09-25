@@ -153,7 +153,7 @@ export function MonthSheet({ dayKey, counts, onPick, onClose }) {
 
 export const SHOW_LABEL_KEY = { all: 'agenda.show_all', enrolled: 'agenda.show_enrolled', open: 'agenda.show_open' }
 
-const KIND_FILTER_KEY = { mix: 'agenda.filter_kind_mix', open: 'agenda.filter_kind_open', friends: 'agenda.filter_kind_friends', lesson: 'agenda.filter_kind_lesson', tournament: 'agenda.filter_kind_tournament' }
+export const KIND_FILTER_KEY = { mix: 'agenda.filter_kind_mix', open: 'agenda.filter_kind_open', friends: 'agenda.filter_kind_friends', lesson: 'agenda.filter_kind_lesson', tournament: 'agenda.filter_kind_tournament' }
 
 export function FilterSheet({ filters, orgs, countFor, onApply, onClose }) {
   const { t } = useTranslation()
