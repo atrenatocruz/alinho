@@ -159,6 +159,23 @@ export async function listTournamentsToScoreToday({ userId, adminOrgIds = [], to
  *  enquanto o jogo seguinte da categoria não tiver resultado — é o servidor
  *  que o diz. ⚠️ FUNÇÃO POR ESCREVER (Dev 3, `undo_walkover`); até existir,
  *  o erro é «ainda não disponível». */
+/** Pedir a correção de um resultado (Trello #485). Só quem jogou o jogo;
+ *  o resultado vai na ordem do jogo (a × b). A organização aceita ou recusa
+ *  em /marcar. */
+export async function requestMatchCorrection(matchId, { scoreA, scoreB, note = null }) {
+  const { error } = await supabase.rpc('request_match_correction', {
+    p_match_id: matchId, p_score_a: scoreA, p_score_b: scoreB, p_note: note,
+  })
+  if (error) throw error
+}
+
+/** Aceitar (grava o resultado pedido e, com a categoria fechada, acerta os
+ *  pontos — save_match_result) ou recusar um pedido de correção. */
+export async function resolveMatchCorrection(matchId, accept) {
+  const { error } = await supabase.rpc('resolve_match_correction', { p_match_id: matchId, p_accept: accept })
+  if (error) throw error
+}
+
 export async function undoWalkover(matchId) {
   const { error } = await supabase.rpc('undo_walkover', { p_match_id: matchId })
   if (error) throw error

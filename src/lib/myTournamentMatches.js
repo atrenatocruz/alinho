@@ -63,6 +63,10 @@ export function myMatchesFromBoard(board, myEntryIds) {
       won: done && m.winner_entry_id != null ? m.winner_entry_id === myEntry : null,
       done,
       status: m.status,
+      // Para pedir a correção na ordem do jogo (Trello #485).
+      mine_is_a: meA,
+      score_a: m.score_a,
+      score_b: m.score_b,
       previous_time: m.previous_scheduled_at ? hhmmInTz(m.previous_scheduled_at) : null,
     }
   })

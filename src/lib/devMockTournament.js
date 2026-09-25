@@ -341,7 +341,12 @@ const resetMatches = () => {
 
   MATCHES = [
     m('m-1', 'M5', 'Grupo A', 'Campo 1', '10:00', 'terminado', barros, santos, [9, 6]),
-    m('m-2', 'MX4', 'Grupo B', 'Campo 2', '10:00', 'terminado', silva, reis, [9, 7]),
+    // localStorage.mockTCorrection = 'true': a Marta pede a correção deste
+    // jogo (Trello #485), para se ver o pedido no /marcar.
+    { ...m('m-2', 'MX4', 'Grupo B', 'Campo 2', '10:00', 'terminado', silva, reis, [9, 7]),
+      correction_request: localStorage.getItem('mockTCorrection') === 'true'
+        ? { score_a: 7, score_b: 9, note: 'Trocaram as duplas ao marcar.', at: new Date().toISOString(), by_name: 'Marta Silva' }
+        : null },
     m('m-3', 'F4', 'Grupo A', 'Campo 1', '11:00', 'a_decorrer', tapia, barao),
     m('m-4', 'M5', 'Grupo B', 'Campo 2', '11:00', 'a_decorrer', lima, pinto),
     m('m-5', 'MX4', 'Grupo A', 'Campo 1', '12:00', 'marcado', marta, gomes),
@@ -375,6 +380,20 @@ export const TOURNAMENT_SCORE_RPC_MOCKS = {
   list_tournament_scorekeepers: () => (on() && !empty() ? SCOREKEEPERS : []),
   add_tournament_scorekeeper: () => null,
   remove_tournament_scorekeeper: () => null,
+  // Pedidos de correção (Trello #485): pedir não muda nada no /marcar de
+  // teste; resolver grava (aceitar) ou só limpa o pedido (recusar).
+  request_match_correction: () => null,
+  resolve_match_correction: (params) => {
+    if (!MATCHES) resetMatches()
+    MATCHES = MATCHES.map((m) => {
+      if (m.match_id !== params?.p_match_id || !m.correction_request) return m
+      const r = m.correction_request
+      return params.p_accept
+        ? { ...m, score_a: r.score_a, score_b: r.score_b, corrected_by_name: 'Admin (Dev)', correction_request: null }
+        : { ...m, correction_request: null }
+    })
+    return null
+  },
   list_tournament_matches_to_score: () => {
     if (!on()) return []
     if (!MATCHES) resetMatches()
