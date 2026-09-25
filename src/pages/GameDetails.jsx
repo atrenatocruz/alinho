@@ -129,6 +129,13 @@ export default function GameDetails() {
   const [publishOpen, setPublishOpen] = useState(false)
   const [changedKeys, setChangedKeys] = useState(() => new Set())
   const [editNotice, setEditNotice] = useState('')
+  // A tira preta de «correu bem» desaparece sozinha em 3 s, sem pedir toque
+  // (regra das janelas e avisos, SPEC de 24 set).
+  useEffect(() => {
+    if (!editNotice) return undefined
+    const timer = setTimeout(() => setEditNotice(''), 3000)
+    return () => clearTimeout(timer)
+  }, [editNotice])
   const [editedTeams, setEditedTeams] = useState([]) // staged copy of `teams`, only written to DB on Concluir
   const [activeDragChip, setActiveDragChip] = useState(null) // { teamId, slot, player } — for the drag overlay
   const [justSwappedId, setJustSwappedId] = useState(null) // chip id that just received a dragged player — brief lime confirmation
