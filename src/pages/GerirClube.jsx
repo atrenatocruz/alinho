@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useSearchParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
 import { Plus, Calendar, Trash2, Edit2, Check, X, UserX, Clock, ArrowLeft, Camera, Settings, Copy, QrCode, GraduationCap, Trophy, Lock, ChevronRight } from 'lucide-react'
@@ -37,6 +37,8 @@ import { tournamentsAvailable } from '../lib/tournamentApi'
 import { describeError } from '../lib/errors'
 import { isDraftMix, publishDraftMix, advanceByFrequency, pendingOccurrenceRow } from '../lib/mixDraft'
 import LaunchDayPicker from '../components/LaunchDayPicker'
+import MixWizard from '../components/mix/MixWizard'
+import { LEVEL_SCALES, LEVEL_NUMBERS, parseLevel } from '../lib/mixLevels'
 
 const sanitizeSlug = (value) => value.toLowerCase().replace(/[^a-z0-9-]/g, '')
 
@@ -172,8 +174,7 @@ const EMPTY_GAME_FORM = {
 // Bandas do ranking (RANKING.md) — o nível opcional de um mix decide que
 // grupos WhatsApp o veem (whatsapp_groups.levels; ver
 // migration_whatsapp_groups.sql). '' = sem nível → visível em todos os
-// grupos do clube. Escalas F/MX entram quando houver grupos dessas escalas.
-const MIX_LEVELS = ['M6', 'M5', 'M4', 'M3', 'M2', 'M1']
+// grupos do clube. Masculino, Feminino e Misto de 1 a 6 (#577): lib/mixLevels.
 
 // Duplas fixas = não é Americano e os parceiros não trocam a cada ronda —
 // só aí se pode entrar já em dupla.
@@ -203,10 +204,17 @@ function Segmented({ options, value, onChange }) {
 
 export default function GerirClube() {
   const { t, i18n } = useTranslation()
-  const { slug } = useParams()
+  const { slug, editId } = useParams()
+  const location = useLocation()
   const goBack = useGoBack('/gerir')
   const [searchParams, setSearchParams] = useSearchParams()
-  const { profile: currentUser, memberships, adminOrganizations, ensureOrgAdminAccess, refreshMemberships, followOrganization, isLessonsEnabled } = useAuth()
+  const { profile: currentUser, memberships, adminOrganizations, ensureOrgAdminAccess, refreshMemberships, followOrganization, isLessonsEnabled, isMixWizardEnabled } = useAuth()
+  // Mix numa página própria, por passos (#342): 'create' em
+  // /gerir/:slug/criar/mix, 'edit' em /gerir/:slug/editar/mix/:id. Com a
+  // bandeira desligada, estes endereços abrem o Gerir de sempre.
+  const mixPage = !isMixWizardEnabled ? null
+    : location.pathname.endsWith('/criar/mix') ? 'create'
+      : editId ? 'edit' : null
   const [org, setOrg] = useState(null)
   const [orgLoading, setOrgLoading] = useState(true)
   // The tab lives in the URL (?tab=…), so coming back from a tournament,
@@ -251,6 +259,8 @@ export default function GerirClube() {
   const [loading, setLoading] = useState(true)
   const [showCreateGame, setShowCreateGame] = useState(false)
   const [editingGame, setEditingGame] = useState(null)
+  // O escalão escolhido no formulário antes de haver número (#577).
+  const [formLevelScale, setFormLevelScale] = useState('')
   // Mix em rascunho (Trello #544): o que se vai publicar ou eliminar,
   // enquanto a pergunta está aberta.
   const [publishing, setPublishing] = useState(null)
@@ -385,6 +395,8 @@ export default function GerirClube() {
         return passados ? y - x : x - y
       })
   }
+
+  useEffect(() => { setFormLevelScale('') }, [showCreateGame, editingGame?.id])
 
   useGooglePlacesAutocomplete(
     locationInputRef,
@@ -762,6 +774,7 @@ export default function GerirClube() {
   const abrirCriar = (tipo) => {
     setAvisoCriado('')
     setCreatedMixScope(null)
+    if (tipo === 'mix' && isMixWizardEnabled) { navigate(`/gerir/${org.slug}/criar/mix`, { state: { fromGerir: true } }); return }
     if (tipo === 'mix') { setCriar(null); setShowCreateGame(true); return }
     // Os jogos em aberto abrem na página própria, em passos (#342).
     if (tipo === 'aberto') { navigate(`/gerir/${slug}/criar/em-aberto`); return }
@@ -1177,6 +1190,9 @@ export default function GerirClube() {
       }
 
       const scopedGroup = mixScopeId ? clubGroups.find((g) => g.id === mixScopeId) : null
+      saidaNotice.current = asDraft ? t('mixwizard.notice_draft')
+        : scopedGroup ? t('mixwizard.notice_published_in', { name: scopedGroup.name })
+          : t('mixwizard.notice_published')
       setShowCreateGame(false)
       setGameForm(EMPTY_GAME_FORM)
       setMixScopeId('')
@@ -1379,7 +1395,7 @@ export default function GerirClube() {
           loadGames()
           return
         }
-        if (result.notice) setDoneNotice(result.notice)
+        if (result.notice) { setDoneNotice(result.notice); saidaNotice.current = result.notice }
       } else if (hadActiveRecurrence && !recurrence.enabled) {
         // Origin Mix, toggled off: stop creating future Mixes and remove the
         // already pre-created pending occurrence. Confirmed explicitly —
@@ -1394,6 +1410,7 @@ export default function GerirClube() {
         await createRecurrence(data, recurrence, user.id, { skipNext: isDraftMix(data) })
       }
 
+      if (!saidaNotice.current) saidaNotice.current = t('mixwizard.notice_saved')
       setEditingGame(null)
       setGameForm(EMPTY_GAME_FORM)
       loadGames()
@@ -1415,6 +1432,75 @@ export default function GerirClube() {
   // Devolve true quando o mix saiu, para quem chama poder fechar a edição.
   const [deleteAsk, setDeleteAsk] = useState(null) // { game, resolve }
   const [doneNotice, setDoneNotice] = useState('')
+  // Voltar da página do mix (ou de outra página de criar, #342): a tira de
+  // 3 s chega pelo state da navegação ou, quando se volta pelo histórico,
+  // pela sessão.
+  useEffect(() => {
+    if (mixPage) return
+    let n = location.state?.notice || ''
+    try {
+      n = n || sessionStorage.getItem('gerir.notice') || ''
+      sessionStorage.removeItem('gerir.notice')
+    } catch { /* sem sessão */ }
+    if (n) setDoneNotice(n)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.key])
+  const saidaNotice = useRef('')
+
+  // Página do mix (#342): abre o formulário certo quando a página abre…
+  const mixAberto = useRef(false)
+  // O React reaproveita o mesmo GerirClube entre /gerir/:slug e a página do
+  // mix: sem isto, o recarregar da lista depois de gravar voltava a abrir o
+  // formulário (uma vez por visita à página).
+  const mixAbriu = useRef(false)
+  const mixSaiu = useRef(false)
+  useEffect(() => { if (!mixPage) { mixAbriu.current = false; mixSaiu.current = false } }, [mixPage])
+  useEffect(() => {
+    if (!mixPage || !org || mixSaiu.current) return
+    if (mixPage === 'create' && !mixAbriu.current) {
+      mixAbriu.current = true
+      setCreatedMixScope(null)
+      setCriar(null)
+      setShowCreateGame(true)
+    }
+    if (mixPage === 'edit' && editingGame?.id !== editId) {
+      const game = games.find((g) => g.id === editId)
+      if (game) startEditGame(game)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mixPage, org?.id, editId, games])
+  // O «Editar» da barra de quem organiza, na página do mix (ações do
+  // evento, 26 set), vem sempre por este endereço. Sem a bandeira do mix por
+  // passos, abre o formulário de sempre aqui no Gerir e o endereço volta a
+  // ser o do Gerir — senão, ao gravar, o formulário abria outra vez.
+  useEffect(() => {
+    if (isMixWizardEnabled || !editId || !org) return
+    const game = games.find((g) => g.id === editId)
+    if (!game) return
+    setActiveTab('events')
+    setTurmaAberta(null)
+    startEditGame(game)
+    navigate(`/gerir/${org.slug}`, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMixWizardEnabled, org?.id, editId, games])
+  // …e quando se grava, cancela ou elimina, volta ao Gerir, com a tira.
+  useEffect(() => {
+    if (!mixPage) return
+    const aberto = showCreateGame || !!editingGame
+    if (aberto) { mixAberto.current = true; return }
+    if (!mixAberto.current) return
+    mixAberto.current = false
+    mixSaiu.current = true
+    const notice = saidaNotice.current || doneNotice
+    saidaNotice.current = ''
+    if (location.state?.fromGerir) {
+      try { if (notice) sessionStorage.setItem('gerir.notice', notice) } catch { /* sem sessão */ }
+      navigate(-1)
+    } else {
+      navigate(`/gerir/${org?.slug || slug}`, { replace: true, state: { notice } })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mixPage, showCreateGame, editingGame])
   useEffect(() => {
     if (!doneNotice) return undefined
     const timer = setTimeout(() => setDoneNotice(''), 3000)
@@ -1849,6 +1935,13 @@ export default function GerirClube() {
       minute: '2-digit'
     })
 
+  // Editar um mix: página própria por passos (#342) ou, sem a bandeira, o
+  // formulário de sempre. `replace` ao saltar entre datas da mesma série.
+  const abrirEdicaoMix = (game, { replace = false } = {}) => {
+    if (!isMixWizardEnabled) { startEditGame(game); return }
+    navigate(`/gerir/${org.slug}/editar/mix/${game.id}`, { replace, state: { fromGerir: replace ? !!location.state?.fromGerir : true } })
+  }
+
   const startEditGame = (game) => {
     setEditingGame(game)
     const hasActiveRecurrence = !!game.recurrence?.is_active
@@ -1910,6 +2003,129 @@ export default function GerirClube() {
         <button type="button" onClick={goBack} className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline">
           <ArrowLeft size={16} /> {t('common.back')}
         </button>
+      </div>
+    )
+  }
+
+  // A folha de eliminar e a tira de 3 s servem o Gerir e a página do mix.
+  const deleteSheet = (
+    <>
+      {/* Eliminar um mix / saltar a data de uma recorrência (regra das
+          janelas, 24 set; #529). Fica fora das secções: serve as duas. */}
+      <ConfirmSheet
+        open={!!deleteAsk}
+        danger
+        title={isNextOfSeries(deleteAsk?.game)
+          ? t('gerirclube.skip_recurrence_title', { name: deleteAsk?.game?.title || '' })
+          : t('gerirclube.delete_game_title', { name: deleteAsk?.game?.title || '' })}
+        message={isNextOfSeries(deleteAsk?.game) ? t('gerirclube.confirm_skip_recurrence_game') : t('gerirclube.confirm_delete_game')}
+        cancelLabel={t('gerirclube.delete_game_keep')}
+        confirmLabel={isNextOfSeries(deleteAsk?.game) ? t('gerirclube.skip_recurrence_yes') : t('gerirclube.delete_game_yes')}
+        onConfirm={async () => {
+          await deleteGameNow(deleteAsk.game.id)
+          deleteAsk.resolve(true)
+        }}
+        errorOf={(err) => err?.message || t('gerirclube.error_delete_game')}
+        onClose={() => { deleteAsk?.resolve(false); setDeleteAsk(null) }}
+      />
+      {/* Portal para o body (Trello #565): dentro do bloco animado da página
+          (transform) o `fixed` ficava preso a ele e a tira aparecia fora do
+          ecrã — a mesma causa da lupa da Home. */}
+    </>
+  )
+  const doneStrip = (
+    <>
+      {doneNotice && createPortal(
+        <div role="status" className="fixed left-4 right-4 bottom-[104px] z-50 mx-auto max-w-md bg-ink-900 text-white px-4 py-3 rounded-ctrl text-sm font-extrabold flex items-center gap-2 animate-fade-up">
+          <Check size={16} className="shrink-0" />
+          {doneNotice}
+        </div>,
+        document.body,
+      )}
+    </>
+  )
+
+  if (mixPage) {
+    const fecharMix = () => {
+      saidaNotice.current = ''
+      setShowCreateGame(false)
+      setEditingGame(null)
+      setGameForm(EMPTY_GAME_FORM)
+      setMixScopeId('')
+      setGameError('')
+    }
+    // Ao editar fica só «Pausar a série» (designer, 26 set). As outras
+    // datas, cancelar uma data e apagar a série vão para o cartão da série e
+    // para o «Mais ⋯» (ações do evento, design-handoff/2026-09-26-acoes-do-evento).
+    const extras = editingGame?.recurrence?.is_active && (
+      <div className="pt-4 border-t border-line space-y-4">
+        {editingGame.recurrence?.is_active && (
+          <div className="flex items-center justify-between gap-3 p-3 rounded-ctrl bg-ink-50">
+            <div>
+              <p className="text-sm font-extrabold text-ink-900">
+                {editingGame.recurrence.is_paused ? t('gerirclube.recurrence_paused_label') : t('gerirclube.recurrence_active_label')}
+              </p>
+              <p className="text-[11px] text-muted">
+                {editingGame.recurrence.is_paused ? t('gerirclube.recurrence_paused_help') : t('gerirclube.recurrence_active_help')}
+              </p>
+            </div>
+            <button type="button" onClick={() => handleTogglePauseRecurrence(editingGame.recurrence.id, editingGame.recurrence.is_paused)}
+              className="shrink-0 text-xs font-extrabold px-3.5 py-2 min-h-[44px] rounded-full bg-ink-900 text-lime-400">
+              {editingGame.recurrence.is_paused ? t('gerirclube.resume_button') : t('gerirclube.pause_button')}
+            </button>
+          </div>
+        )}
+      </div>
+    )
+    const aCarregar = mixPage === 'edit' && !editingGame
+    return (
+      <div className="space-y-6">
+        {aCarregar ? (
+          loading || games.length === 0 && !gamesError ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
+            </div>
+          ) : (
+            <div className="card text-center py-12 px-6">
+              <p className="text-muted text-sm mb-4">{t('mixwizard.not_found')}</p>
+              <button type="button" onClick={() => navigate(`/gerir/${org.slug}`, { replace: true })} className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline">
+                <ArrowLeft size={16} /> {t('common.back')}
+              </button>
+            </div>
+          )
+        ) : (
+          <MixWizard
+            key={editingGame?.id || 'novo'}
+            form={gameForm}
+            setForm={setGameForm}
+            editingGame={editingGame}
+            options={{
+              courtTimes: COURT_TIMES,
+              gameTimes: GAME_TIMES,
+              formats: translatedFormats,
+              scoringFormats: translatedScoringFormats,
+              pairingModes: PAIRING_MODE_OPTIONS,
+              scopes: clubGroups.some((g) => g.can_manage)
+                ? [{ value: '', label: t(kk('gerirclube.scope_whole_club')) }, ...clubGroups.filter((g) => g.can_manage).map((g) => ({ value: g.id, label: g.name }))]
+                : [],
+            }}
+            mixScopeId={mixScopeId}
+            setMixScopeId={setMixScopeId}
+            maxCourts={maxCourts}
+            locationInputRef={locationInputRef}
+            launchDayError={launchDayError}
+            clearLaunchDayError={() => setLaunchDayError('')}
+            error={gameError}
+            onCancel={fecharMix}
+            onSubmit={async (asDraft) => {
+              const e = { preventDefault() {}, nativeEvent: { submitter: { value: asDraft ? 'draft' : 'publish' } } }
+              await (editingGame ? handleUpdateGame(e) : handleCreateGame(e))
+            }}
+            editExtras={extras}
+          />
+        )}
+        {deleteSheet}
+        {doneStrip}
       </div>
     )
   }
@@ -2452,14 +2668,28 @@ export default function GerirClube() {
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         {t('gerirclube.level_optional_label')}
                       </label>
+                      {/* Masculino, Feminino ou Misto, de 1 a 6 (#577). */}
                       <Segmented
                         options={[
                           { value: '', label: t('gerirclube.level_any') },
-                          ...MIX_LEVELS.map((l) => ({ value: l, label: l })),
+                          ...LEVEL_SCALES.map((s) => ({ value: s, label: t(`mixlevels.scale_${s.toLowerCase()}`) })),
                         ]}
-                        value={gameForm.level}
-                        onChange={(v) => setGameForm({ ...gameForm, level: v })}
+                        value={parseLevel(gameForm.level)?.scale || formLevelScale}
+                        onChange={(s) => {
+                          setFormLevelScale(s)
+                          const num = parseLevel(gameForm.level)?.num
+                          setGameForm({ ...gameForm, level: s && num ? `${s}${num}` : '' })
+                        }}
                       />
+                      {(parseLevel(gameForm.level)?.scale || formLevelScale) && (
+                        <div className="mt-2">
+                          <Segmented
+                            options={LEVEL_NUMBERS.map((n) => ({ value: `${parseLevel(gameForm.level)?.scale || formLevelScale}${n}`, label: String(n) }))}
+                            value={gameForm.level}
+                            onChange={(v) => setGameForm({ ...gameForm, level: v })}
+                          />
+                        </div>
+                      )}
                       <p className="text-sm text-muted mt-1.5">{t(kk('gerirclube.level_help'))}</p>
                     </div>
 
@@ -2703,7 +2933,7 @@ export default function GerirClube() {
                                 <p className="text-sm text-ink-900 min-w-0">{[quandoCurto(h.date), abreEm(h)].filter(Boolean).join(' · ')}</p>
                                 <button
                                   type="button"
-                                  onClick={() => startEditGame(h)}
+                                  onClick={() => abrirEdicaoMix(h, { replace: true })}
                                   className="shrink-0 px-2 py-1 text-sm font-extrabold text-ink-900 hover:bg-ink-50 rounded-lg"
                                 >
                                   {t('gerirclube.edit_action')}
@@ -2783,7 +3013,9 @@ export default function GerirClube() {
                     etiqueta = { mix: 'gerirclube.event_label_mix', aberto: 'gerirclube.event_label_open', torneio: 'gerirclube.event_label_tournament' }[tipo]
                     Icone = { mix: Calendar, aberto: Clock, torneio: Trophy }[tipo]
                     linha = tipo === 'torneio' ? row.name : row.title
-                    detalhe = [item.quando ? quandoCurto(item.quando, tipo !== 'torneio') : null, tipo === 'mix' ? abreEm(row) : null, aDecorrer, lugares, duplas, prazo].filter(Boolean).join(' · ')
+                    // O nível do mix no fim da linha, «… · MX4» (#577, designer 26 set).
+                    const nivel = tipo === 'mix' && parseLevel(row.level) ? `${parseLevel(row.level).scale}${parseLevel(row.level).num}` : null
+                    detalhe = [item.quando ? quandoCurto(item.quando, tipo !== 'torneio') : null, tipo === 'mix' ? abreEm(row) : null, aDecorrer, lugares, duplas, prazo, nivel].filter(Boolean).join(' · ')
                     abrir = () => navigate(tipo === 'torneio' ? `/torneio/${row.slug || row.id}` : `/jogo/${row.id}`)
                     // Torneio privado (Trello #482): não aparece na Home nem na
                     // Comunidade, e o link só abre a quem gere. Tem de se ler aqui.
@@ -2792,7 +3024,7 @@ export default function GerirClube() {
                       // «MIX · RECORRENTE», colado a etiqueta como na pagina do
                       // evento e na Home (#383) -- nunca numa etiqueta a parte.
                       if (row.recurrence_id) sufixo = t('ui.recurring')
-                      acao = { texto: t('gerirclube.edit_action'), fazer: () => startEditGame(row), perigo: false }
+                      acao = { texto: t('gerirclube.edit_action'), fazer: () => abrirEdicaoMix(row), perigo: false }
                       // Rascunho (Trello #544): «Mix · Rascunho», «só tu vês», e
                       // «Editar» + «Publicar» — só com «Publicar» o rascunho não
                       // se conseguia editar nem apagar (revisão da designer, 25 set).
@@ -3719,34 +3951,8 @@ export default function GerirClube() {
         errorOf={(err) => err?.message || t('open_slots.error_cancel')}
         onClose={() => setCancelOpenAsk(null)}
       />
-      {/* Eliminar um mix / saltar a data de uma recorrência (regra das
-          janelas, 24 set; #529). Fica fora das secções: serve as duas. */}
-      <ConfirmSheet
-        open={!!deleteAsk}
-        danger
-        title={isNextOfSeries(deleteAsk?.game)
-          ? t('gerirclube.skip_recurrence_title', { name: deleteAsk?.game?.title || '' })
-          : t('gerirclube.delete_game_title', { name: deleteAsk?.game?.title || '' })}
-        message={isNextOfSeries(deleteAsk?.game) ? t('gerirclube.confirm_skip_recurrence_game') : t('gerirclube.confirm_delete_game')}
-        cancelLabel={t('gerirclube.delete_game_keep')}
-        confirmLabel={isNextOfSeries(deleteAsk?.game) ? t('gerirclube.skip_recurrence_yes') : t('gerirclube.delete_game_yes')}
-        onConfirm={async () => {
-          await deleteGameNow(deleteAsk.game.id)
-          deleteAsk.resolve(true)
-        }}
-        errorOf={(err) => err?.message || t('gerirclube.error_delete_game')}
-        onClose={() => { deleteAsk?.resolve(false); setDeleteAsk(null) }}
-      />
-      {/* Portal para o body (Trello #565): dentro do bloco animado da página
-          (transform) o `fixed` ficava preso a ele e a tira aparecia fora do
-          ecrã — a mesma causa da lupa da Home. */}
-      {doneNotice && createPortal(
-        <div role="status" className="fixed left-4 right-4 bottom-[104px] z-50 mx-auto max-w-md bg-ink-900 text-white px-4 py-3 rounded-ctrl text-sm font-extrabold flex items-center gap-2 animate-fade-up">
-          <Check size={16} className="shrink-0" />
-          {doneNotice}
-        </div>,
-        document.body,
-      )}
+      {deleteSheet}
+      {doneStrip}
     </div>
   )
 }

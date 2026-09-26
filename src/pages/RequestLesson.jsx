@@ -276,8 +276,19 @@ export default function RequestLesson() {
 
   const chip = (on) => `rounded-full border px-3.5 min-h-[40px] text-sm font-extrabold transition-colors duration-fast ${on ? 'border-ink-900 bg-ink-900 text-white' : 'border-line bg-canvas text-ink-700'}`
   const taken = starts.filter((o) => o.taken).map((o) => o.time)
+  // Porque é que as horas apagadas estão apagadas (falha do QA, 26 set): a
+  // hora ocupada, e as que começam antes e acabavam já dentro dela.
+  const hm = (iso) => { const d = new Date(iso); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` }
+  const ranges = !block ? [] : (data?.busy || [])
+    .filter((b) => {
+      const d = new Date(b.starts_at)
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` === block.date
+    })
+    .map((b) => ({ from: hm(b.starts_at), to: hm(b.ends_at) }))
+  const before = taken.filter((h) => !ranges.some((r) => h >= r.from && h < r.to))
   const reasons = [
-    ...taken.slice(0, 1).map((h) => t('booking.start_taken', { time: compactTime(h) })),
+    ...ranges.slice(0, 2).map((r) => t('booking.busy_range', { from: compactTime(r.from), to: compactTime(r.to) })),
+    ...(before.length ? [t('booking.busy_before', { duration: t(`lessons.duration_${duration}`), times: before.map(compactTime).join(', ').replace(/, ([^,]*)$/, ` ${t('booking.or')} $1`) })] : []),
     ...(noFit ? [t('booking.start_nofit', { time: compactTime(noFit), duration: t(`lessons.duration_${duration}`) })] : []),
   ]
 
@@ -355,7 +366,7 @@ export default function RequestLesson() {
             {LESSON_TYPES.filter((ty) => priceOf(ty) != null).map((ty) => (
               <button key={ty} type="button" aria-pressed={ty === type} onClick={() => setType(ty)}
                 className={`flex items-center justify-between rounded-ctrl bg-white px-3.5 min-h-[48px] text-sm font-extrabold text-ink-900 ${ty === type ? 'border-2 border-ink-900' : 'border border-line'}`}>
-                <span>{t(`lessons.price_row_${ty}`)}</span><span>{euros(priceOf(ty))}</span>
+                <span>{t(`lessons.price_row_${ty}`)}</span><span>{t('booking.per_person', { price: euros(priceOf(ty)) })}</span>
               </button>
             ))}
           </div>

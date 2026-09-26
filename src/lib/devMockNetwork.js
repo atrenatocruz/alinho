@@ -417,6 +417,13 @@ const RPC_MOCKS = {
     ? [{ match_id: 'fs-1', creator_name: 'Rita Figueira', scheduled_date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), scheduled_time: '10:00:00', location: 'Clube Exemplo', people: 6 }] : []),
   list_my_friend_sessions: () => (['ready', 'waiting', 'app'].includes(localStorage.getItem('mockFriendSession'))
     ? [{ match_id: 'fs-1', scheduled_date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), scheduled_time: '10:00:00', location: 'Clube Exemplo', court: 'Campo 3', is_creator: true, people: 5, accepted: localStorage.getItem('mockFriendSession') === 'waiting' ? 4 : 5, pending: localStorage.getItem('mockFriendSession') === 'waiting' ? 1 : 0 }] : []),
+  // Aceitar o convite de parceiro (26 set): mockPartnerClaim = 'pending'
+  // mostra «É para José Metello. És tu?»; mockClaimError = '<código>' faz o
+  // claim recusar com esse código.
+  get_partner_invite: () => (localStorage.getItem('mockPartnerClaim')
+    ? { guest_name: 'José Metello', game_id: 'fake-game-1', game_title: 'Mix de Quinta-feira', inviter_name: 'Nuno Reis', status: localStorage.getItem('mockPartnerClaim') }
+    : null),
+  claim_partner_invite: () => (localStorage.getItem('mockClaimError') ? { __error: localStorage.getItem('mockClaimError') } : 'fake-game-1'),
   tournament_invite_token: () => 'convite-jogador-2',
   tournament_invite_token_player1: () => 'convite-jogador-1',
   // A lista do organizador: um de cada estado, para se ver tudo num print.
@@ -552,8 +559,15 @@ const EV_MATCHES = () => [
   { id: 'em1', game_id: 'fake-game-1', round_number: 1, court_number: 1, phase: 'group', team_a_id: 'et1', team_b_id: 'et2', score_a: 6, score_b: 4, winner_team_id: 'et1' },
   { id: 'em2', game_id: 'fake-game-1', round_number: 1, court_number: 2, phase: 'group', team_a_id: 'et3', team_b_id: 'et4', score_a: 6, score_b: 2, winner_team_id: 'et3' },
   ...(eventState() === 'finished' ? [] : [
-    { id: 'em3', game_id: 'fake-game-1', round_number: 2, court_number: 1, phase: 'group', team_a_id: 'et1', team_b_id: 'et3', score_a: null, score_b: null, winner_team_id: null },
-    { id: 'em4', game_id: 'fake-game-1', round_number: 2, court_number: 2, phase: 'group', team_a_id: 'et2', team_b_id: 'et4', score_a: null, score_b: null, winner_team_id: null },
+    // localStorage.mockRoundDone = 'true': a ronda 2 com os resultados todos,
+    // para se ver o «Terminar Ronda 2» na barra de quem organiza (26 set).
+    ...(localStorage.getItem('mockRoundDone') === 'true' ? [
+      { id: 'em3', game_id: 'fake-game-1', round_number: 2, court_number: 1, phase: 'group', team_a_id: 'et1', team_b_id: 'et3', score_a: 6, score_b: 3, winner_team_id: 'et1' },
+      { id: 'em4', game_id: 'fake-game-1', round_number: 2, court_number: 2, phase: 'group', team_a_id: 'et2', team_b_id: 'et4', score_a: 6, score_b: 5, winner_team_id: 'et2' },
+    ] : [
+      { id: 'em3', game_id: 'fake-game-1', round_number: 2, court_number: 1, phase: 'group', team_a_id: 'et1', team_b_id: 'et3', score_a: null, score_b: null, winner_team_id: null },
+      { id: 'em4', game_id: 'fake-game-1', round_number: 2, court_number: 2, phase: 'group', team_a_id: 'et2', team_b_id: 'et4', score_a: null, score_b: null, winner_team_id: null },
+    ]),
   ]),
 ]
 
@@ -583,7 +597,8 @@ const AGENDA_GAMES = () => [
     id: 'ag-mine-today', organization_id: MOCK_CLUB_ID, title: 'Mix de terça', date: atDay(0, 19).toISOString(),
     location: 'Smash Padel, Parque das Nações', status: 'open', origin: 'admin', format: 'sobe_desce', num_courts: 4,
     max_players: 16, price_per_player: 8, prize: 'Bolas Head', gender_restriction: 'masculino', age_restriction: 'plus35',
-    level: 'M3', recurrence_id: 'rec-1', organization: { name: 'Smash Padel Almada', kind: 'club', group_logo_url: null },
+    // localStorage.mockMixLevels = 'true': os níveis novos (#577), um Misto 4 e um F3.
+    level: localStorage.getItem('mockMixLevels') === 'true' ? 'MX4' : 'M3', recurrence_id: 'rec-1', organization: { name: 'Smash Padel Almada', kind: 'club', group_logo_url: null },
     participants: [
       { id: 'p1', user_id: MOCK_ADMIN_USER_ID, partner_id: null, status: 'confirmed', user: ADMIN_PERSON },
       { id: 'p2', user_id: FAKE_MEMBER_ID, partner_id: FAKE_PARTNER_ID, status: 'confirmed', user: person(FAKE_MEMBER_ID), partner: person(FAKE_PARTNER_ID) },
@@ -1021,7 +1036,7 @@ const TABLE_MOCKS = {
     price_per_player: 8,
     prize: null,
     gender_restriction: 'indiferente',
-    level: null,
+    level: localStorage.getItem('mockMixLevels') === 'true' ? 'F3' : null,
     recurrence_id: null,
     ...(eventState() ? {
       title: '+1 Mix de Quinta-feira', recurrence_id: 'rec-ev', num_courts: 2, max_players: 8, price_per_player: 11.5,
