@@ -46,8 +46,10 @@ export function installFakeSupabase(supabase, db) {
         return { data: null, error: null }
       }
       if (q.op === 'update') {
-        for (const row of db[table].filter((r) => q.filters.every((f) => f(r)))) Object.assign(row, q.patch)
-        return { data: null, error: null }
+        const changed = db[table].filter((r) => q.filters.every((f) => f(r)))
+        for (const row of changed) Object.assign(row, q.patch)
+        // Como o PostgREST com .select(): devolve as linhas alteradas.
+        return { data: q.single ? changed[0] ?? null : changed, error: null }
       }
       let rows = db[table].map((r) => embed(r, q.select))
       for (const f of q.filters) rows = rows.filter(f)

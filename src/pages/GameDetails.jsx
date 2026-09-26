@@ -36,6 +36,7 @@ import { notifyMixChanges } from '../lib/notifications'
 import AddPlayerSheet from '../components/mix/AddPlayerSheet'
 import JoinPartnerSheet from '../components/mix/JoinPartnerSheet'
 import { Sheet } from '../components/agenda/AgendaControls'
+import { MonoLabel } from '../components/tournament/TournamentBits'
 import { joinWithNamedPartner, listGameInvites, inviteLink, whatsappShare } from '../lib/partnerInvite'
 
 // Tipo do evento como na Home (src/lib/agenda.js): um jogo em aberto é
@@ -3220,68 +3221,98 @@ export default function GameDetails() {
               {t('gamedetails.be_first_to_join')}
             </p>
           ) : (
-            <div className="space-y-2.5">
-              {people.map((person, idx) => (
-                <div
-                  key={`${person.id}-${idx}`}
-                  className={`rounded-ctrl p-3.5 flex items-center gap-3 ${
-                    person.id === user.id ? 'bg-ink-50' : 'bg-canvas'
-                  }`}
-                >
-                  {person.is_guest ? (
-                    <>
-                      <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" provisional={isProvisional(person.rating_games)} />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-extrabold text-ink-900 truncate">
-                          {person.name}
-                          {person.id === user.id && (
-                            <span className="text-muted font-normal text-sm">{t('gamedetails.you_suffix')}</span>
-                          )}
-                        </p>
-                        <div className="mt-1">
-                          {/* Quem foi posto na dupla pelo nome ainda não tem
-                              conta: diz-se isso, não "convidado" (#339). */}
-                          <GuestBadge
-                            label={pendingInviteFor(person.id)
-                              ? t('partner.no_account_tag')
-                              : person.is_test ? t('gamedetails.test_badge') : t('gamedetails.guest_badge')}
-                            isTest={person.is_test}
-                          />
+            // Inscrição em dupla: cada dupla num cartão, com o número que o
+            // robô lhe dá no WhatsApp («(1)», pela ordem de inscrição), e quem
+            // entrou sozinho à parte — como a lista de inscritos do torneio.
+            // Antes pareciam todos soltos (Francisco, 26 set). Nos mixes só a
+            // solo (ou que rodam parceiros), a lista de sempre.
+            (() => {
+              const personRow = (person, idx) => (
+                  <div
+                    key={`${person.id}-${idx}`}
+                    className={`rounded-ctrl p-3.5 flex items-center gap-3 ${
+                      person.id === user.id ? 'bg-ink-50' : 'bg-canvas'
+                    }`}
+                  >
+                    {person.is_guest ? (
+                      <>
+                        <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" provisional={isProvisional(person.rating_games)} />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-extrabold text-ink-900 truncate">
+                            {person.name}
+                            {person.id === user.id && (
+                              <span className="text-muted font-normal text-sm">{t('gamedetails.you_suffix')}</span>
+                            )}
+                          </p>
+                          <div className="mt-1">
+                            {/* Quem foi posto na dupla pelo nome ainda não tem
+                                conta: diz-se isso, não "convidado" (#339). */}
+                            <GuestBadge
+                              label={pendingInviteFor(person.id)
+                                ? t('partner.no_account_tag')
+                                : person.is_test ? t('gamedetails.test_badge') : t('gamedetails.guest_badge')}
+                              isTest={person.is_test}
+                            />
+                          </div>
                         </div>
+                      </>
+                    ) : (
+                      <Link to={`/jogador/${person.id}`} className="flex items-center gap-3 flex-1 min-w-0">
+                        <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" provisional={isProvisional(person.rating_games)} />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-extrabold text-ink-900 truncate">
+                            {person.name}
+                            {person.id === user.id && (
+                              <span className="text-muted font-normal text-sm">{t('gamedetails.you_suffix')}</span>
+                            )}
+                          </p>
+                          <p className="text-xs text-muted truncate flex items-center gap-1.5">
+                            <RatingBadge rating={ratingInfoById[person.id]?.rating} gender={ratingInfoById[person.id]?.gender} />
+                            {sideLabel(person.preferred_side)}
+                          </p>
+                        </div>
+                      </Link>
+                    )}
+                    {/* Mix parado: mexer na lista partiria as duplas ja formadas (#416).
+                        Cancelado (#464): a lista fica como estava, sem mexer. */}
+                    {isAdmin && !mixPaused && game.status !== 'cancelled' && (
+                      <button
+                        onClick={() => handleRemovePerson(person)}
+                        disabled={busy}
+                        title={t('gamedetails.remove_person_title', { name: person.name })}
+                        className="w-9 h-9 flex items-center justify-center rounded-full text-muted hover:text-danger hover:bg-danger/10 transition-colors duration-fast shrink-0"
+                      >
+                        <X size={16} />
+                      </button>
+                    )}
+                  </div>
+              )
+              const pairs = participants.filter((r) => r.user?.id && r.partner?.id)
+              if (!game.allow_pair_signup || game.rotate_partners || pairs.length === 0) {
+                return <div className="space-y-2.5">{people.map(personRow)}</div>
+              }
+              const solos = people.filter((x) => !x.hasPartner)
+              return (
+                <div className="space-y-2.5">
+                  {pairs.map((r, i) => {
+                    const two = people.filter((x) => x.rowId === r.id)
+                    const mine = two.some((x) => x.id === user.id)
+                    return (
+                      <div key={`pair-${r.id}`} className={`card !p-3 ${mine ? '!border-[#BBF7D0] !bg-[#DCFCE7]' : ''}`}>
+                        <MonoLabel className={`mb-2 ${mine ? '!text-[#14532D]' : ''}`}>{t('gamedetails.pair_label', { n: i + 1 })}</MonoLabel>
+                        <div className="space-y-2">{two.map(personRow)}</div>
                       </div>
-                    </>
-                  ) : (
-                    <Link to={`/jogador/${person.id}`} className="flex items-center gap-3 flex-1 min-w-0">
-                      <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" provisional={isProvisional(person.rating_games)} />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-extrabold text-ink-900 truncate">
-                          {person.name}
-                          {person.id === user.id && (
-                            <span className="text-muted font-normal text-sm">{t('gamedetails.you_suffix')}</span>
-                          )}
-                        </p>
-                        <p className="text-xs text-muted truncate flex items-center gap-1.5">
-                          <RatingBadge rating={ratingInfoById[person.id]?.rating} gender={ratingInfoById[person.id]?.gender} />
-                          {sideLabel(person.preferred_side)}
-                        </p>
-                      </div>
-                    </Link>
-                  )}
-                  {/* Mix parado: mexer na lista partiria as duplas ja formadas (#416).
-                      Cancelado (#464): a lista fica como estava, sem mexer. */}
-                  {isAdmin && !mixPaused && game.status !== 'cancelled' && (
-                    <button
-                      onClick={() => handleRemovePerson(person)}
-                      disabled={busy}
-                      title={t('gamedetails.remove_person_title', { name: person.name })}
-                      className="w-9 h-9 flex items-center justify-center rounded-full text-muted hover:text-danger hover:bg-danger/10 transition-colors duration-fast shrink-0"
-                    >
-                      <X size={16} />
-                    </button>
+                    )
+                  })}
+                  {solos.length > 0 && (
+                    <div className="pt-2">
+                      <MonoLabel className="mb-2">{t('gamedetails.solo_heading', { count: solos.length })}</MonoLabel>
+                      <div className="space-y-2.5">{solos.map(personRow)}</div>
+                    </div>
                   )}
                 </div>
-              ))}
-            </div>
+              )
+            })()
           )}
 
           {/* O admin inscreve alguém do grupo antes de o mix começar
