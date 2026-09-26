@@ -226,7 +226,7 @@ export const LESSON_RPC_MOCKS = {
     if (!on()) return null
     const d = new Date(); d.setDate(d.getDate() + ((2 - d.getDay() + 7) % 7 || 7)); d.setHours(10, 30, 0, 0)
     const sent = localStorage.getItem('mockBookingSent')
-    return {
+    const out = {
       teacher: { user_id: 'u-tiago', name: 'Tiago Lopes', gender: 'masculino', avatar_url: null },
       profiles: [
         { teacher_profile_id: 'tp-ana', organization_id: 'o1', org_name: 'Clube Exemplo',
@@ -246,6 +246,12 @@ export const LESSON_RPC_MOCKS = {
         ...(sent === 'proposal' ? { proposed_by: 'teacher', proposed_starts_at: new Date(d.getTime() + 2 * 86400000 + 7.5 * 3600000).toISOString(), original_starts_at: d.toISOString() } : {}) }] : [],
       i_have_whatsapp: localStorage.getItem('mockHasWhatsapp') === 'true',
     }
+    // localStorage.mockBookingEmpty = 'schedule' | 'prices' — o professor ainda
+    // não pôs o horário, ou pôs o horário mas não os preços.
+    const empty = localStorage.getItem('mockBookingEmpty')
+    if (empty === 'schedule') out.profiles = out.profiles.map((p) => ({ ...p, availability: [] }))
+    if (empty === 'prices') out.profiles = out.profiles.map((p) => ({ ...p, prices: [] }))
+    return out
   },
   request_lesson: () => 'rq-new',
   // O professor responde (#392, entrega 3). localStorage.mockTeacherRequests =
