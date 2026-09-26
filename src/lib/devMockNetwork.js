@@ -999,10 +999,12 @@ const TABLE_MOCKS = {
   // Tiago é membro — os três casos da regra do dono (Trello #261).
   memberships: () => [
     { user_id: MOCK_ADMIN_USER_ID, organization_id: MOCK_ADMIN_ORG_ID, level: 'avançado', is_guest: false, is_admin: true, profile: { name: 'Admin (Dev)', avatar_url: null } },
-    { user_id: FAKE_MEMBER_ID, organization_id: MOCK_ADMIN_ORG_ID, level: 'avançado', is_guest: false, is_admin: true, profile: { name: FAKE_PEOPLE[FAKE_MEMBER_ID].name, avatar_url: FAKE_PEOPLE[FAKE_MEMBER_ID].avatar_url } },
+    { user_id: FAKE_MEMBER_ID, organization_id: MOCK_ADMIN_ORG_ID, level: 'avançado', is_guest: false, is_admin: true, profile: { name: FAKE_PEOPLE[FAKE_MEMBER_ID].name, avatar_url: FAKE_PEOPLE[FAKE_MEMBER_ID].avatar_url, gender: FAKE_PEOPLE[FAKE_MEMBER_ID].gender } },
     // mockPartnerInvite: o Tiago passa a ser a conta por reclamar do parceiro
     // inscrito pelo nome (Trello #339), para se ver a marca "sem conta".
-    { user_id: FAKE_PARTNER_ID, organization_id: MOCK_ADMIN_ORG_ID, level: 'avançado', is_guest: localStorage.getItem('mockPartnerInvite') === 'true', is_admin: false, profile: { name: FAKE_PEOPLE[FAKE_PARTNER_ID].name, avatar_url: FAKE_PEOPLE[FAKE_PARTNER_ID].avatar_url } },
+    { user_id: FAKE_PARTNER_ID, organization_id: MOCK_ADMIN_ORG_ID, level: 'avançado', is_guest: localStorage.getItem('mockPartnerInvite') === 'true', is_admin: false, profile: { name: FAKE_PEOPLE[FAKE_PARTNER_ID].name, avatar_url: FAKE_PEOPLE[FAKE_PARTNER_ID].avatar_url, gender: FAKE_PEOPLE[FAKE_PARTNER_ID].gender } },
+    // mockMixMen: alguém sem género no perfil, para se ver a marca na folha do parceiro (26 set).
+    ...(localStorage.getItem('mockMixMen') === 'true' ? [{ user_id: 'caso-sem-genero', organization_id: MOCK_ADMIN_ORG_ID, level: 'intermédio', is_guest: false, is_admin: false, profile: { name: 'Sam Lopes', avatar_url: null, gender: null } }] : []),
   ],
 }
 
@@ -1070,7 +1072,7 @@ TABLE_MOCKS.games = (url) => {
   }
   if (localStorage.getItem('mockNoPending') === 'true' && /status=eq\.pending/.test(u)) rows = []
   // localStorage.mockMixMen = 'true' — o mix passa a só homens (26 set).
-  if (localStorage.getItem('mockMixMen') === 'true' && Array.isArray(rows)) rows = rows.map((g) => ({ ...g, gender_restriction: 'masculino' }))
+  if (localStorage.getItem('mockMixMen') === 'true' && Array.isArray(rows)) rows = rows.map((g) => ({ ...g, gender_restriction: 'masculino', allow_pair_signup: true, rotate_partners: false }))
   const origem = u.match(/[?&]origin=eq\.([a-z_]+)/)
   return origem && Array.isArray(rows) ? rows.filter((g) => (g.origin || 'admin') === origem[1]) : rows
 }

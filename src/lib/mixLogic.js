@@ -45,11 +45,10 @@ export const countPeople = (participants = []) =>
     ver achado #5 da code review do Trello #51. */
 export const mixCapacity = (game) => game?.max_players || (game?.num_courts || 1) * 4
 
-/** Se o genero do jogador impede a entrada num mix com gender_restriction
-    definido — so 'masculino'/'feminino' restringem, 'misto'/'indiferente'
-    nao. So decide se se mostra o botao de entrar ou uma explicacao; a
-    aplicacao real e a RLS de INSERT em participants. Mesma duplicacao do
-    achado #5 acima. */
+/** Se o genero do jogador nao bate com um mix com gender_restriction
+    definido — so 'masculino'/'feminino' contam, 'misto'/'indiferente' nao.
+    Ja nao impede a entrada (Francisco, 26 set): so decide se se pergunta
+    «tens a certeza?». Mesma duplicacao do achado #5 acima. */
 const genderRule = (game) =>
   (game?.gender_restriction && !['indiferente', 'misto'].includes(game.gender_restriction) ? game.gender_restriction : null)
 
@@ -62,7 +61,8 @@ export const isGenderMismatch = (game, profile) => {
 }
 
 /** Mix só de homens ou só de mulheres e o jogador sem sexo no perfil — pede-se
-    antes de entrar (a policy de INSERT em participants recusa-o sem ele). */
+    antes de entrar, com «Agora não». O sexo nunca bloqueia (Francisco, 26 set;
+    a policy de INSERT em participants deixou de o verificar). */
 export const isMissingGender = (game, profile) => Boolean(genderRule(game)) && !profile?.gender
 
 /** Se o mix exige escalao etario e o jogador ainda nao indicou a data de
