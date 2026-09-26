@@ -14,6 +14,7 @@ import {
 } from '../../lib/tournamentSignup'
 import { signUpBackLink } from '../../lib/loginLinks'
 import { signupErrorMessage } from '../../lib/tournamentError'
+import { categoryGenderQuestion } from './genderCheck'
 
 /* O que fica por cima de tudo na página do torneio (Trello #362):
    inscrever a minha dupla, em que ponto está a minha inscrição, e o
@@ -42,6 +43,8 @@ export default function SignupSlot({ tournament, categories, category, my: first
   const [error, setError] = useState('')
   const [fresh, setFresh] = useState(null) // convite acabado de criar
   const [askLeave, setAskLeave] = useState(false)
+  // O sexo não bate com a categoria: pergunta-se, não se bloqueia (26 set).
+  const [genderAsk, setGenderAsk] = useState(null) // { key, then }
 
   const reloadInvites = () => {
     if (!user) return
@@ -102,8 +105,8 @@ export default function SignupSlot({ tournament, categories, category, my: first
     finally { setBusy(false) }
   }
 
-  // Sem género definido não há inscrição (Francisco, 23 set — Trello #433):
-  // pergunta-se ali mesmo, e a seguir abre a inscrição.
+  // Sem género no perfil pergunta-se ali mesmo, com «Agora não»: o sexo
+  // nunca bloqueia (Francisco, 26 set; antes era obrigatório, #433).
   const startSignUp = () => {
     setError('')
     if (!profile?.gender) setGenderSheet(true)
@@ -116,6 +119,12 @@ export default function SignupSlot({ tournament, categories, category, my: first
     if (err) { console.error('Error saving gender:', err); say(err); return }
     setGenderSheet(false)
     setSheet(true)
+  }
+  // Antes de gravar: se o sexo da dupla não bate com a categoria, pergunta.
+  const trySignUp = (choice) => {
+    const key = categoryGenderQuestion(categories.find((c) => c.id === choice.categoryId), [profile?.gender, choice.partnerGender])
+    if (key) setGenderAsk({ key, then: () => doSignUp(choice) })
+    else doSignUp(choice)
   }
 
   const answer = async (entryId, accept) => {
@@ -217,6 +226,10 @@ export default function SignupSlot({ tournament, categories, category, my: first
                 { value: 'feminino', label: t('login.gender_female') },
               ]}
             />
+            <button type="button" onClick={() => { setGenderSheet(false); setSheet(true) }} disabled={busy}
+              className="w-full min-h-[44px] text-sm font-extrabold text-ink-900 underline underline-offset-2">
+              {t('gamedetails.gender_skip')}
+            </button>
             {error && <p className="text-sm text-danger font-extrabold">{error}</p>}
           </div>
         </Sheet>
@@ -230,7 +243,7 @@ export default function SignupSlot({ tournament, categories, category, my: first
           categoriesLeft={left}
           busy={busy}
           error={error}
-          onConfirm={doSignUp}
+          onConfirm={trySignUp}
           onClose={() => { setSheet(false); setError('') }}
         />
       )}
@@ -261,6 +274,15 @@ export default function SignupSlot({ tournament, categories, category, my: first
           </div>
         </Sheet>
       )}
+      <ConfirmSheet
+        open={!!genderAsk}
+        title={genderAsk ? t(genderAsk.key) : ''}
+        message={t('tsignup.gender_confirm_message')}
+        confirmLabel={t('tsignup.gender_confirm_yes')}
+        cancelLabel={t('gamedetails.gender_confirm_cancel')}
+        onConfirm={() => { const next = genderAsk?.then; setGenderAsk(null); if (next) next() }}
+        onClose={() => setGenderAsk(null)}
+      />
       <ConfirmSheet
         open={askLeave}
         danger

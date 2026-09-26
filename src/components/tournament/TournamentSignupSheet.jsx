@@ -63,14 +63,14 @@ export default function TournamentSignupSheet({ tournament, categories, category
     let cancelled = false
     supabase
       .from('memberships')
-      .select('user_id, profile:profiles(id, name, avatar_url)')
+      .select('user_id, profile:profiles(id, name, avatar_url, gender)')
       .eq('organization_id', tournament.organization_id)
       .then(({ data, error: loadErr }) => {
         if (cancelled || loadErr) return
         setMembers((data || [])
           // Quem se está a inscrever não é parceiro de si próprio (#498).
           .filter((m) => m.profile && m.user_id !== user?.id)
-          .map((m) => ({ id: m.user_id, name: m.profile.name || '?', avatar_url: m.profile.avatar_url }))
+          .map((m) => ({ id: m.user_id, name: m.profile.name || '?', avatar_url: m.profile.avatar_url, gender: m.profile.gender || null }))
           .sort((a, b) => a.name.localeCompare(b.name, 'pt')))
       })
     return () => { cancelled = true }
@@ -96,6 +96,8 @@ export default function TournamentSignupSheet({ tournament, categories, category
     onConfirm({
       categoryId,
       partnerId: mode === 'partner' ? partnerId : null,
+      // Só para a pergunta do sexo (SignupSlot); não vai para a base de dados.
+      partnerGender: mode === 'partner' ? members.find((m) => m.id === partnerId)?.gender || null : null,
       guestName: mode === 'named' ? name.trim() : null,
       guestEmail: mode === 'named' ? email.trim() : null,
       teamName: teamName.trim() || null,
