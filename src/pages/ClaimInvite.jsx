@@ -3,7 +3,7 @@ import { useNavigate, useParams, useLocation, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton } from '../components/ui'
-import { claimPartnerInvite } from '../lib/partnerInvite'
+import { claimPartnerInvite, getPartnerInvite } from '../lib/partnerInvite'
 import { claimEntry } from '../lib/tournamentSignup'
 import { claimFriendMatchInvite } from '../lib/privateMatches'
 import { signUpBackLink } from '../lib/loginLinks'
@@ -34,9 +34,40 @@ export default function ClaimInvite() {
   const navigate = useNavigate()
   const [state, setState] = useState(user ? 'claiming' : 'signed_out')
   const [error, setError] = useState('')
+  // Convite de parceiro num mix: antes de aceitar, «É para X. És tu?»
+  // (Francisco, 26 set). Aconteceu duas vezes: quem criou o convite aceitou-o
+  // ele próprio, e um convite para o José foi aceite pelo João.
+  const isMix = !isTournament && !isFriends
+  const [invite, setInvite] = useState(null)
+  const [confirmed, setConfirmed] = useState(false)
+
+  useEffect(() => {
+    if (!user || !token || !isMix) return
+    let cancelled = false
+    setState('checking')
+    getPartnerInvite(token)
+      .then((inv) => {
+        if (cancelled) return
+        if (!inv) { setConfirmed(true); return } // função ainda por correr: como antes
+        if (inv.status && inv.status !== 'pending') {
+          setError(t(`partner.claim_error_invite_${inv.status === 'claimed' ? 'claimed' : inv.status === 'expired' ? 'expired' : 'not_found'}`))
+          setState('error')
+          return
+        }
+        setInvite(inv)
+        setState('confirm')
+      })
+      .catch((err) => {
+        if (cancelled) return
+        console.error('Error reading partner invite:', err)
+        setConfirmed(true)
+      })
+    return () => { cancelled = true }
+  }, [user, token, isMix, t])
 
   useEffect(() => {
     if (!user || !token) return
+    if (isMix && !confirmed) return
     let cancelled = false
     setState('claiming')
     ;(isTournament ? claimEntry(token) : isFriends ? claimFriendMatchInvite(token) : claimPartnerInvite(token))
@@ -63,7 +94,7 @@ export default function ClaimInvite() {
         setState('error')
       })
     return () => { cancelled = true }
-  }, [user, token, navigate, t, isTournament, isFriends])
+  }, [user, token, navigate, t, isTournament, isFriends, isMix, confirmed])
 
   return (
     <div className="p-4 max-w-md mx-auto space-y-4">
@@ -80,7 +111,19 @@ export default function ClaimInvite() {
           </>
         )}
 
-        {state === 'claiming' && <p className="text-sm text-muted">{t('partner.claim_working')}</p>}
+        {state === 'confirm' && invite && (
+          <>
+            <p className="text-sm text-ink-900">{t('partner.claim_is_it_you', { name: invite.guest_name })}</p>
+            {invite.game_title && <p className="text-xs text-muted">{invite.game_title}</p>}
+            <PrimaryButton onClick={() => setConfirmed(true)} className="w-full">{t('partner.claim_yes')}</PrimaryButton>
+            <button type="button" onClick={() => navigate(invite.game_id ? `/jogo/${invite.game_id}` : '/', { replace: true })}
+              className="btn-secondary w-full">
+              {t('partner.claim_no')}
+            </button>
+          </>
+        )}
+
+        {(state === 'claiming' || state === 'checking') && <p className="text-sm text-muted">{t('partner.claim_working')}</p>}
 
         {state === 'error' && (
           <>
