@@ -1,9 +1,10 @@
 import { useState, useEffect, useLayoutEffect } from 'react'
 import { Link, useSearchParams, useNavigationType } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { CheckCircle2, Trophy, Shuffle, ChevronRight } from 'lucide-react'
+import { CheckCircle2, Trophy, Shuffle, ChevronRight, Mail, MessageCircle } from 'lucide-react'
 import { Wordmark } from '../components/Layout'
 import i18n from '../lib/i18n'
+import { mailtoLink, whatsappContactLink, SUPPORT_EMAIL_READY } from '../lib/contacts'
 
 /* alinho.pt antes de entrar (Trello #327) — desenho APROVADO pelo Francisco
    a 24 set: design-handoff/2026-09-24-alinho-pt-antes-de-entrar/SPEC.md e
@@ -104,7 +105,7 @@ export function Nav() {
         </Link>
         <div className="flex items-center gap-4">
           <LanguageToggle className="text-ink-700 hover:text-ink-900" />
-          <Link to="/planos" className={link}>{t('landing.pricing_nav_link')}</Link>
+          <Link to="/planos" className={link} onClick={() => { if (window.location.pathname === '/planos') window.scrollTo(0, 0) }}>{t('landing.pricing_nav_link')}</Link>
           <Link to={loginHref()} className={link}>{t('landing.login_link')}</Link>
         </div>
       </div>
@@ -277,15 +278,32 @@ function MixPoint() {
   )
 }
 
+/* A faixa de quem organiza, com o contacto (reparos de 26 set, aprovados
+   pelo Francisco): os planos e o WhatsApp, e o Email ao lado quando a caixa
+   existir (#572). Os contactos vêm do contacts.js, como na página Planos. */
 function OrganizersBar() {
   const { t } = useTranslation()
+  const contact = 'inline-flex flex-1 items-center justify-center gap-2 min-h-[48px] rounded-ctrl px-4 font-extrabold border border-ink-900 bg-white text-ink-900 hover:bg-ink-50'
   return (
     <section className="bg-white border-y border-line">
-      <div className="max-w-5xl mx-auto px-5 py-4 flex items-center justify-between gap-3">
-        <p className="text-sm text-ink-700">{t('landing.organizers_text')}</p>
-        <Link to="/planos" className="inline-flex shrink-0 items-center gap-1 min-h-[44px] text-sm font-extrabold text-ink-900 hover:underline">
-          {t('landing.organizers_link')} <ChevronRight size={16} />
-        </Link>
+      <div className="max-w-5xl mx-auto px-5 py-8">
+        <div className="max-w-md">
+          <h2 className="text-2xl text-ink-900">{t('landing.organizers_text')}</h2>
+          <p className="text-ink-700 mt-1">{t('landing.organizers_contact_text')}</p>
+          <div className="mt-4 flex gap-3">
+            {SUPPORT_EMAIL_READY && (
+              <a href={mailtoLink(t('plans.email_subject'))} className={contact}>
+                <Mail size={18} /> {t('plans.email')}
+              </a>
+            )}
+            <a href={whatsappContactLink(t('plans.whatsapp_text'))} target="_blank" rel="noopener noreferrer" className={contact}>
+              <MessageCircle size={18} /> {t('landing.organizers_whatsapp')}
+            </a>
+          </div>
+          <Link to="/planos" className="mt-3 inline-flex items-center gap-1 min-h-[44px] text-sm font-extrabold text-ink-900 hover:underline">
+            {t('landing.organizers_link')} <ChevronRight size={16} />
+          </Link>
+        </div>
       </div>
     </section>
   )
