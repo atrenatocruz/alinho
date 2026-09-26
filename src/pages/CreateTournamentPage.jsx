@@ -11,7 +11,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { createTournament, setTournamentStatus } from '../lib/tournamentApi'
+import { createTournament, scheduleTournamentOpening, setTournamentStatus } from '../lib/tournamentApi'
 import { describeError } from '../lib/errors'
 import CreateTournamentForm from '../components/tournament/CreateTournamentForm'
 import { EmptyState } from '../components/ui'
@@ -49,7 +49,11 @@ export default function CreateTournamentPage() {
       // — abre-se a página dele na mesma, onde a barra diz que está em
       // rascunho, em vez de ficar aqui e criar um segundo ao carregar outra vez.
       if (draft.status === 'inscricoes' && id) {
-        try { await setTournamentStatus(id, 'inscricoes') } catch (err) { console.error('Error opening entries:', err) }
+        try {
+          // Com um dia escolhido, fica marcado e abre sozinho a essa hora.
+          if (draft.opens_at) await scheduleTournamentOpening(id, draft.opens_at)
+          else await setTournamentStatus(id, 'inscricoes')
+        } catch (err) { console.error('Error opening entries:', err) }
       }
       // Guardar abre a página do torneio criado (revisão de 26 set, ponto 0).
       navigate(id ? `/torneio/${id}` : `/gerir/${slug}?tab=events`, { replace: true })
