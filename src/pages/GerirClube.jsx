@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
-import { Plus, Calendar, Trash2, Edit2, Check, X, UserX, Clock, ArrowLeft, Camera, Settings, Copy, QrCode, GraduationCap, Trophy, Lock } from 'lucide-react'
+import { Plus, Calendar, Trash2, Edit2, Check, X, UserX, Clock, ArrowLeft, Camera, Settings, Copy, QrCode, GraduationCap, Trophy, Lock, ChevronRight } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
@@ -25,7 +25,7 @@ import { listPendingClubTeachers } from '../lib/teachers'
 import TeacherRequestCard from '../components/TeacherRequestCard'
 import VoucherScanner from '../components/VoucherScanner'
 import { isValidVoucherId, normalizeScannedVoucherId } from '../lib/vouchers'
-import { Prices as LessonPrices, ClubTeachers, NewSeries } from '../components/lessons/ClubLessonsPanel'
+import { ClubTeachers, NewSeries } from '../components/lessons/ClubLessonsPanel'
 import { SeriesManage } from '../components/lessons/ClubSeriesPanel'
 import { lessonTypeLabel, seriesWhen } from '../components/lessons/LessonBits'
 import { listClubTournaments } from '../lib/tournamentApi'
@@ -766,6 +766,8 @@ export default function GerirClube() {
     if (tipo === 'aberto') { navigate(`/gerir/${slug}/criar/em-aberto`); return }
     // O torneio abre numa página só do formulário (ponto 0, 26 set).
     if (tipo === 'torneio') { navigate(`/gerir/${slug}/criar/torneio`); return }
+    // A turma também, em 3 passos (#342, versão final de 26 set).
+    if (tipo === 'turma') { navigate(`/gerir/${slug}/criar/turma`); return }
     setShowCreateGame(false)
     setCriar(tipo)
   }
@@ -3372,10 +3374,16 @@ export default function GerirClube() {
                   (desenho de 23 set). Mesmo componente de antes, sem mexer. */}
               {org?.kind !== 'group' && lessonsReady && (
                 <div className="mt-6 pt-6 border-t border-gray-200">
-                  <h4 className="text-base font-semibold text-ink-900 mb-3">
-                    {t('lessons.gerir_tab_prices')}
-                  </h4>
-                  <LessonPrices organizationId={currentOrganizationId} orgName={org?.name} />
+                  {/* Os preços passaram para a página própria das aulas
+                      (Professores · Turmas · Preços, versão final de 26 set). */}
+                  <button type="button" onClick={() => navigate(`/gerir/${slug}/aulas`)}
+                    className="card flex w-full items-center justify-between gap-3 text-left hover:bg-ink-50">
+                    <span>
+                      <span className="block text-base font-extrabold text-ink-900">{t('gerirclube.lessons_card')}</span>
+                      <span className="block text-sm text-muted">{t('gerirclube.lessons_card_hint')}</span>
+                    </span>
+                    <ChevronRight size={20} className="shrink-0 text-ink-500" />
+                  </button>
                 </div>
               )}
 

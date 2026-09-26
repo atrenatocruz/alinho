@@ -174,7 +174,9 @@ function MonthCalendar({ selected, viewDate, onNavigate, onJumpTo, onSelectDay, 
   )
 }
 
-export function DateField({ value, onChange, max, min, placeholder, hideToday = false }) {
+// display (opcional): como mostrar a data escolhida, quando o campo é
+// estreito (ex.: «30 set» na promoção da turma, #342).
+export function DateField({ value, onChange, max, min, placeholder, hideToday = false, display = null }) {
   const { t, i18n } = useTranslation()
   const resolvedPlaceholder = placeholder ?? t('ui.select_date_placeholder')
   const [open, setOpen] = useState(false)
@@ -183,8 +185,8 @@ export function DateField({ value, onChange, max, min, placeholder, hideToday = 
   const maxDate = max ? new Date(max + 'T00:00:00') : null
   const [viewDate, setViewDate] = useState(selectedDate || new Date())
 
-  const display = value
-    ? formatDate(value + 'T00:00:00', i18n.language, { day: '2-digit', month: 'long', year: 'numeric' })
+  const shown = value
+    ? (display ? display(value) : formatDate(value + 'T00:00:00', i18n.language, { day: '2-digit', month: 'long', year: 'numeric' }))
     : resolvedPlaceholder
 
   const openPicker = () => {
@@ -220,7 +222,7 @@ export function DateField({ value, onChange, max, min, placeholder, hideToday = 
         onClick={openPicker}
         className={`input-field flex items-center justify-between text-left ${value ? 'text-ink-900' : 'text-muted'}`}
       >
-        <span className="truncate">{display}</span>
+        <span className="truncate">{shown}</span>
         <Calendar size={20} className="text-ink-700 shrink-0 ml-2" />
       </button>
 
