@@ -133,11 +133,14 @@ export default function TeacherLessons() {
 
   const requestCard = (r) => {
     const clash = !r.merge && pending.find((o) => o.id !== r.id && !o.merge && overlaps(o, r))
+    // Choca com uma aula já aceite (falha do QA, 26 set): dizer já, e não só
+    // quando carrega em Aceitar e a base de dados recusa.
+    const clashLesson = !r.merge && accepted.find((o) => overlaps(o, r))
     return (
       <div key={r.id} className="card space-y-2">
         {head(r)}
         <p className="text-sm text-muted">
-          {when(r)} · {t(`lessons.price_row_${r.lesson_type}`)}{r.price_per_person != null ? ` · ${euros(r.price_per_person)}` : ''}
+          {when(r)} · {t(`lessons.price_row_${r.lesson_type}`)}{r.price_per_person != null ? ` · ${t('booking.per_person', { price: euros(r.price_per_person) })}` : ''}
         </p>
         {/* Propor outra hora (lista das aprovações, Francisco 26 set): quem
             recebe a proposta é que aceita. */}
@@ -161,7 +164,9 @@ export default function TeacherLessons() {
           </p>
         )}
         <p className="text-sm text-muted">
-          {clash ? t('myLessons.clashes_with', { name: (clash.student?.name || '') }) : [r.org_name, ago(r.created_at)].filter(Boolean).join(' · ')}
+          {clashLesson ? t('myLessons.clashes_with_lesson', { name: (clashLesson.student?.name || '') })
+            : clash ? t('myLessons.clashes_with', { name: (clash.student?.name || '') })
+              : [r.org_name, ago(r.created_at)].filter(Boolean).join(' · ')}
         </p>
         {errorBox(r)}
         <div className="flex flex-wrap items-center gap-2 pt-1">
