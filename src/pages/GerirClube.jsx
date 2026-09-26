@@ -39,6 +39,10 @@ import { isDraftMix, publishDraftMix, advanceByFrequency, pendingOccurrenceRow }
 import LaunchDayPicker from '../components/LaunchDayPicker'
 import MixWizard from '../components/mix/MixWizard'
 import { LEVEL_SCALES, LEVEL_NUMBERS, parseLevel } from '../lib/mixLevels'
+import SeriesPage from '../components/mix/SeriesPage'
+import { weekdayShort } from '../lib/launchDay'
+import EventActionsSheet from '../components/EventActionsSheet'
+import { cancelMixDate } from '../lib/mixCancel'
 
 const sanitizeSlug = (value) => value.toLowerCase().replace(/[^a-z0-9-]/g, '')
 
@@ -204,7 +208,7 @@ function Segmented({ options, value, onChange }) {
 
 export default function GerirClube() {
   const { t, i18n } = useTranslation()
-  const { slug, editId } = useParams()
+  const { slug, editId, serieId } = useParams()
   const location = useLocation()
   const goBack = useGoBack('/gerir')
   const [searchParams, setSearchParams] = useSearchParams()
@@ -261,6 +265,10 @@ export default function GerirClube() {
   const [editingGame, setEditingGame] = useState(null)
   // O escalão escolhido no formulário antes de haver número (#577).
   const [formLevelScale, setFormLevelScale] = useState('')
+  // Mix que não se repete: tocar abre a folha das ações (ações do evento,
+  // assunto 2, ponto 6) — e a pergunta de cancelar.
+  const [singleSheet, setSingleSheet] = useState(null)
+  const [singleCancel, setSingleCancel] = useState(null)
   // Mix em rascunho (Trello #544): o que se vai publicar ou eliminar,
   // enquanto a pergunta está aberta.
   const [publishing, setPublishing] = useState(null)
@@ -2028,6 +2036,43 @@ export default function GerirClube() {
         errorOf={(err) => err?.message || t('gerirclube.error_delete_game')}
         onClose={() => { deleteAsk?.resolve(false); setDeleteAsk(null) }}
       />
+      {/* Mix que não se repete (ações do evento, assunto 2, ponto 6): a
+          mesma folha do «Mais ⋯» da página do mix. */}
+      {singleSheet && (() => {
+        const d = new Date(singleSheet.date)
+        const dia = `${weekdayShort(d, i18n.language)} ${d.getDate()} ${formatDateLib(d, i18n.language, { month: 'short' }).replace(/\./g, '').toLocaleLowerCase(i18n.language)}`
+        const hora = formatTimeLib(d, i18n.language, { hour: '2-digit', minute: '2-digit' })
+        const porComecar = ['pending', 'open', 'closed'].includes(singleSheet.status)
+        return (
+          <EventActionsSheet
+            open
+            title={singleSheet.title}
+            subtitle={[`${dia} · ${hora}`, singleSheet.location].filter(Boolean).join(' · ')}
+            actions={[
+              { key: 'open', label: t('series.open_this'), hint: t('series.open_this_hint'), onClick: () => navigate(`/jogo/${singleSheet.id}`) },
+              porComecar && { key: 'edit', label: t('eventactions.edit'), hint: t('eventactions.edit_hint'), onClick: () => abrirEdicaoMix(singleSheet) },
+              (porComecar || singleSheet.status === 'in_progress') && { key: 'cancel', danger: true, label: t('eventactions.cancel_one'), hint: t('eventactions.cancel_one_hint'), onClick: () => setSingleCancel(singleSheet) },
+            ].filter(Boolean)}
+            onClose={() => setSingleSheet(null)}
+          />
+        )
+      })()}
+      <ConfirmSheet
+        open={!!singleCancel}
+        danger
+        title={singleCancel ? t('mixcancel.confirm_title', { name: singleCancel.title }) : ''}
+        message={singleCancel && !(singleCancel.participants || []).some((p) => ['confirmed', 'waitlisted'].includes(p.status))
+          ? t('eventactions.cancel_nobody') : t('eventactions.cancel_one_hint')}
+        cancelLabel={t('mixcancel.keep')}
+        confirmLabel={t('mixcancel.confirm')}
+        onConfirm={async () => {
+          await cancelMixDate(singleCancel)
+          setDoneNotice(t('eventactions.cancel_done_removed', { name: singleCancel.title }))
+          loadGames()
+        }}
+        onClose={() => setSingleCancel(null)}
+        errorOf={(error) => describeError(t, error, 'mixcancel.error')}
+      />
       {/* Portal para o body (Trello #565): dentro do bloco animado da página
           (transform) o `fixed` ficava preso a ele e a tira aparecia fora do
           ecrã — a mesma causa da lupa da Home. */}
@@ -2044,6 +2089,37 @@ export default function GerirClube() {
       )}
     </>
   )
+
+  // A página da série (ações do evento, assunto 2): o cartão de criação e um
+  // cartão por data. Os dados são os do Gerir (loadGames traz todas as datas).
+  if (serieId && org) {
+    const daSerie = games.filter((g) => g.recurrence_id === serieId)
+    const voltar = (notice) => {
+      if (location.state?.fromGerir && !notice) { navigate(-1); return }
+      navigate(`/gerir/${org.slug}`, { replace: true, state: notice ? { notice } : undefined })
+    }
+    if (daSerie.length === 0) {
+      return (
+        <div className="flex items-center justify-center py-16">
+          {gamesError
+            ? <p className="text-sm text-danger font-extrabold">{gamesError}</p>
+            : <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>}
+        </div>
+      )
+    }
+    return (
+      <SeriesPage
+        games={daSerie}
+        abreEm={abreEm}
+        onBack={() => voltar()}
+        onOpen={(g) => navigate(`/jogo/${g.id}`)}
+        onEditRules={(g) => navigate(`/gerir/${org.slug}/editar/mix/${g.id}`, { state: { fromGerir: true } })}
+        onChanged={loadGames}
+        onStopSeries={deactivateRecurrence}
+        onDeleted={(notice) => { loadGames(); voltar(notice) }}
+      />
+    )
+  }
 
   if (mixPage) {
     const fecharMix = () => {
@@ -3017,6 +3093,14 @@ export default function GerirClube() {
                     const nivel = tipo === 'mix' && parseLevel(row.level) ? `${parseLevel(row.level).scale}${parseLevel(row.level).num}` : null
                     detalhe = [item.quando ? quandoCurto(item.quando, tipo !== 'torneio') : null, tipo === 'mix' ? abreEm(row) : null, aDecorrer, lugares, duplas, prazo, nivel].filter(Boolean).join(' · ')
                     abrir = () => navigate(tipo === 'torneio' ? `/torneio/${row.slug || row.id}` : `/jogo/${row.id}`)
+                    // Ações do evento (assunto 2): o mix que se repete aparece
+                    // uma vez e abre a página da série; o que não se repete abre
+                    // a folha com «Abrir este mix» e «Cancelar este mix».
+                    if (tipo === 'mix' && !isDraftMix(row)) {
+                      abrir = row.recurrence_id
+                        ? () => navigate(`/gerir/${org.slug}/serie/${row.recurrence_id}`, { state: { fromGerir: true } })
+                        : () => setSingleSheet(row)
+                    }
                     // Torneio privado (Trello #482): não aparece na Home nem na
                     // Comunidade, e o link só abre a quem gere. Tem de se ler aqui.
                     privado = tipo === 'torneio' && row.is_public === false

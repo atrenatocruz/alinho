@@ -636,6 +636,8 @@ function AppRoutes() {
         {/* Criar e editar um mix numa página própria, por passos (#342). */}
         <Route path="/gerir/:slug/criar/mix" element={<Guard require="protected" showSplash={showSplash}><GerirClube /></Guard>} />
         <Route path="/gerir/:slug/editar/mix/:editId" element={<Guard require="protected" showSplash={showSplash}><GerirClube /></Guard>} />
+        {/* A página de um mix que se repete (ações do evento, 26 set). */}
+        <Route path="/gerir/:slug/serie/:serieId" element={<Guard require="protected" showSplash={showSplash}><GerirClube /></Guard>} />
         {/* Tudo o que não é uma página da app. Tem de ficar em último. */}
         <Route path="*" element={<NotFound showSplash={showSplash} />} />
       </Routes>
