@@ -77,7 +77,18 @@ export const CLUB_PAGE_RPC_MOCKS = {
   get_club_profile: () => {
     const m = mode()
     if (!m) return undefined
-    return [{ club: CLUB, group: GROUP, 'group-closed': GROUP_CLOSED, 'club-empty': CLUB_EMPTY, 'group-empty': () => ({ ...GROUP(), open_games: [] }) }[m]?.() || CLUB()]
+    const row = { club: CLUB, group: GROUP, 'group-closed': GROUP_CLOSED, 'club-empty': CLUB_EMPTY, 'group-empty': () => ({ ...GROUP(), open_games: [] }) }[m]?.() || CLUB()
+    // mockClubLongText = 'true': textos compridos, como a morada do A2N em
+    // produção (26 set) — para ver que nada empurra a página para o lado.
+    if (localStorage.getItem('mockClubLongText') === 'true') {
+      return [{
+        ...row,
+        name: 'A2N Padel Academy — Associação Desportiva de Padel da Margem Sul',
+        location: 'A2N Padel Academy - Av. Vieira da Silva, Alameda Santa Marta do Pinhal 53, 2855-000 Corroios, Seixal',
+        open_games: (row.open_games || []).map((g, i) => (i === 0 ? { ...g, title: 'MixDeSábadoÀTardeParaTodosOsNíveisComJantarNoFim' } : g)),
+      }]
+    }
+    return [row]
   },
   list_organization_members: () => {
     const m = mode()

@@ -31,6 +31,7 @@ import CookieConsentBanner from './components/CookieConsentBanner'
 import ErrorBoundary from './components/ErrorBoundary'
 import { safeInternalPath } from './lib/loginLinks'
 import { reloadOnceForChunk, clearChunkReload } from './lib/chunkReload'
+import { notifyRouteChange } from './lib/appUpdate'
 
 // Route-level splitting (impeccable audit, P3 perf finding): these are all
 // low-traffic relative to the routes above — admin-only, feature-flagged,
@@ -295,6 +296,10 @@ function AfterLogin() {
 
 function AppRoutes() {
   const { user, loading: authLoading } = useAuth()
+  // Versão nova à espera (app instalada): mudar de página é um momento
+  // seguro para passar a ela (lib/appUpdate.js).
+  const { pathname } = useLocation()
+  useEffect(() => { notifyRouteChange() }, [pathname])
   const [minDurationElapsed, setMinDurationElapsed] = useState(false)
 
   useEffect(() => {

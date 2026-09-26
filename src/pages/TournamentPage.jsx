@@ -228,15 +228,15 @@ export default function TournamentPage() {
           no ar. Sai com um toque, e o botão de trás do telemóvel também sai
           do modo em vez de sair da página. */}
       {publicView && canManage && (
-        <div className="rounded-card border border-line bg-ink-50/60 p-3">
-          <p className="flex items-start gap-2 text-[12px] text-ink-700">
+        <div className="card">
+          <p className="flex items-start gap-2 text-sm text-ink-700">
             <Eye size={15} className="mt-0.5 shrink-0" />
             {tour.status === 'rascunho'
               ? t('tournament.admin.public_view_draft')
               : t('tournament.admin.public_view')}
           </p>
           <button type="button" onClick={() => navigate(-1)}
-            className="mt-2 min-h-[44px] rounded-ctrl bg-ink-900 px-3 py-2 text-[12px] font-bold text-white">
+            className="btn-secondary mt-3 w-full">
             {t('tournament.admin.back_to_admin')}
           </button>
         </div>
@@ -252,7 +252,7 @@ export default function TournamentPage() {
             onDraw={() => openAdmin('sorteio')}
             onSchedule={() => openAdmin('horario')}
           />
-          {adminError && <p className="text-[12px] text-danger">{adminError}</p>}
+          {adminError && <p className="text-sm text-danger">{adminError}</p>}
         </>
       )}
 
@@ -266,14 +266,16 @@ export default function TournamentPage() {
         {tour.poster_url && (
           <img src={tour.poster_url} alt={tour.name} className="block max-h-56 w-full object-cover" />
         )}
-        <div className="p-3.5">
+        {/* Como o topo da página do mix: p-4 e o título grande (revisão
+            da designer de 26 set). */}
+        <div className="p-4">
         <div className="flex items-center justify-between gap-2">
           <TourTag>{t('tournament.label')}</TourTag>
           {['validada', 'selecionada'].includes(activeMy(data)?.state)
             ? <StatePill tone="in">{t('tournament.state_entered')}</StatePill>
             : <StatePill tone={STATE_PILL[tour.status] || 'grey'}>{t(statusKey(tour.status, drawProgress(categories)), drawProgress(categories))}</StatePill>}
         </div>
-        <h1 className="mt-2 font-display text-xl font-extrabold leading-tight text-ink-900">{tour.name}</h1>
+        <h1 className="mt-2.5 font-display text-2xl leading-tight text-ink-900">{tour.name}</h1>
         <div className="mt-1 flex items-center gap-1.5 text-xs text-ink-500">
           <Avatar name={tour.club_name} url={tour.club_logo_url} size="w-[18px] h-[18px] text-[8px]" />
           <span className="min-w-0 truncate">
@@ -281,7 +283,7 @@ export default function TournamentPage() {
               .filter(Boolean).join(' · ')}
           </span>
         </div>
-        <div className="mt-2.5 grid grid-cols-4 gap-1 text-center text-[10px] text-ink-500">
+        <div className="mt-3 grid grid-cols-4 gap-1 text-center text-xs text-ink-500">
           {[
             [tour.category_count, t('tournament.kv_categories')],
             [tour.entry_count, t('tournament.kv_teams')],
@@ -289,7 +291,7 @@ export default function TournamentPage() {
             [tour.day_count, t('tournament.kv_days')],
           ].map(([value, label]) => (
             <div key={label}>
-              <b className="block font-display text-[17px] text-ink-900">{value ?? 0}</b>
+              <b className="block font-display text-lg font-extrabold text-ink-900">{value ?? 0}</b>
               {label}
             </div>
           ))}

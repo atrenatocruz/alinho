@@ -5,7 +5,6 @@
 //
 // É usado de pé, no clube, com uma mão: os números são grandes, os botões
 // são três, e não há menus escondidos.
-import { createPortal } from 'react-dom'
 import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -19,17 +18,23 @@ import { describeError, errorKind } from '../lib/errors'
 import { dayKeyInTz, msUntilNextDay, hhmmInTz } from '../lib/tournamentDay'
 import { cardsByCourt, unscheduledMatches, proposeSchedule, courtNames } from '../lib/scorePage'
 import { useAuth } from '../contexts/AuthContext'
-import { ConfirmSheet, EmptyState, PrimaryButton, NeedsYou } from '../components/ui'
-import { MonoLabel, StatePill } from '../components/tournament/TournamentBits'
+import { Chips, ConfirmSheet, EmptyState, PrimaryButton } from '../components/ui'
+import { Sheet } from '../components/agenda/AgendaControls'
+import { FieldLabel, MonoLabel, StatePill } from '../components/tournament/TournamentBits'
 import { proSetTieBreakTarget, tieBreakProblem, setText } from '../components/tournament/tieBreak'
 
 // Hora de Portugal, nunca cortada do texto da base de dados (vinha em UTC:
 // 17:00 onde o resto da app dizia 18:00 — Trello #487).
 const hhmm = (iso) => hhmmInTz(iso)
 
-// Botões e caixas para usar com o dedo, de pé, à beira do campo: 44px de
-// altura no mínimo (antes eram 32).
-const BTN = 'min-h-[44px] rounded-full px-4 text-sm'
+// Botões para usar com o dedo, de pé, à beira do campo: os da app — 48 px,
+// rounded-ctrl, extrabold (revisão da designer de 26 set, «parece outra app»).
+const BTN = 'inline-flex min-h-[48px] items-center justify-center gap-2 rounded-ctrl px-5 text-base font-extrabold transition-all duration-fast active:scale-[0.98] disabled:opacity-40'
+const LIME = 'bg-lime-400 text-ink-900 hover:bg-lime-600 shadow-card'
+const GHOST = 'bg-surface text-ink-900 border border-line hover:bg-ink-50'
+// Numa lista, a ação que se repete em cada cartão é preta — a lima fica
+// para o estado vivo (designer, 26 set: um lima por ecrã).
+const DARK = 'bg-ink-900 text-white hover:bg-ink-700'
 
 const SETS_FORMATS = ['melhor_2_sets', 'melhor_3_sets']
 
@@ -39,15 +44,15 @@ const isSevenSix = (s) => s.a !== '' && s.b !== '' && Math.max(Number(s.a), Numb
 /** O resultado do tie-break: duas caixas, uma por dupla (pedido do
  *  Francisco, 25 set — antes só se escolhia quem ganhou). */
 function TieBreakBoxes({ title, label, a, b, onA, onB, teamA, teamB }) {
-  const box = 'h-11 w-[56px] rounded-md border border-line bg-surface px-2 text-center font-display text-[18px] font-extrabold text-ink-900'
+  const box = 'h-11 w-[56px] rounded-md border border-line bg-surface px-2 text-center font-display text-lg font-extrabold text-ink-900'
   return (
     <div className="mt-1.5 rounded-ctrl bg-ink-50 p-2.5">
-      <p className="text-[12.5px] font-semibold text-ink-900">{title}</p>
+      <p className="text-sm font-semibold text-ink-900">{title}</p>
       <div className="mt-1.5 grid grid-cols-[minmax(0,1fr)_56px_56px] items-center gap-2">
         <span />
-        <span className="truncate text-center text-[10.5px] font-semibold text-ink-500">{teamA}</span>
-        <span className="truncate text-center text-[10.5px] font-semibold text-ink-500">{teamB}</span>
-        <span className="text-[12px] text-ink-700">{label}</span>
+        <span className="truncate text-center text-xs font-semibold text-ink-500">{teamA}</span>
+        <span className="truncate text-center text-xs font-semibold text-ink-500">{teamB}</span>
+        <span className="text-xs text-ink-700">{label}</span>
         <input type="number" inputMode="numeric" min="0" max="99" aria-label={`${title} · ${teamA}`} value={a} onChange={(e) => onA(e.target.value)} className={box} />
         <input type="number" inputMode="numeric" min="0" max="99" aria-label={`${title} · ${teamB}`} value={b} onChange={(e) => onB(e.target.value)} className={box} />
       </div>
@@ -71,12 +76,12 @@ function SetRows({ sets, onChange, teamA, teamB, decider, t }) {
     <div className="mt-2">
       <div className="grid grid-cols-[minmax(0,1fr)_56px_56px] items-center gap-2 pb-1">
         <span />
-        <span className="text-center text-[10.5px] font-semibold text-ink-500">{teamA}</span>
-        <span className="text-center text-[10.5px] font-semibold text-ink-500">{teamB}</span>
+        <span className="text-center text-xs font-semibold text-ink-500">{teamA}</span>
+        <span className="text-center text-xs font-semibold text-ink-500">{teamB}</span>
       </div>
       {sets.map((s, i) => (
         <div key={i} className="grid grid-cols-[minmax(0,1fr)_56px_56px] items-center gap-2 py-1">
-          <span className="text-[12px] text-ink-700">
+          <span className="text-xs text-ink-700">
             {i === 2 && decider ? t('tournament.score.super_tiebreak') : t('tournament.score.set_number', { number: i + 1 })}
           </span>
           {['a', 'b'].map((side) => (
@@ -89,7 +94,7 @@ function SetRows({ sets, onChange, teamA, teamB, decider, t }) {
               aria-label={`${t('tournament.score.set_number', { number: i + 1 })} · ${side === 'a' ? teamA : teamB}`}
               value={s[side]}
               onChange={(e) => setOne(i, side, e.target.value)}
-              className="h-11 w-full rounded-md border border-line px-2 text-center font-display text-[18px] font-extrabold text-ink-900"
+              className="h-11 w-full rounded-md border border-line px-2 text-center font-display text-lg font-extrabold text-ink-900"
             />
           ))}
           {/* 7-6: o set foi ao tie-break (a 7) — escreve-se o resultado dele.
@@ -119,7 +124,7 @@ const filledSets = (sets) => sets
   }))
 
 /** O cartão de um campo: quem está a jogar, o resultado e os três botões. */
-function CourtCard({ match, scoring, tieTarget = 7, onSave, onWalkover, onUndoWalkover, onResolve, busy, t }) {
+function CourtCard({ match, scoring, tieTarget = 7, onSave, onWalkover, onUndoWalkover, onResolve, busy, error, t }) {
   const finished = ['terminado', 'falta', 'desistencia'].includes(match.status)
   const bySets = SETS_FORMATS.includes(scoring)
   const [editing, setEditing] = useState(!finished)
@@ -213,7 +218,7 @@ function CourtCard({ match, scoring, tieTarget = 7, onSave, onWalkover, onUndoWa
 
   const ask = match.correction_request
   return (
-    <div id={`jogo-${match.match_id}`} className="rounded-card border border-line p-3 scroll-mt-20">
+    <div id={`jogo-${match.match_id}`} className="card scroll-mt-20">
       <div className="flex items-center justify-between gap-2">
         <b className="text-sm text-ink-900">{match.court} · {label}</b>
         {match.status === 'a_decorrer'
@@ -222,7 +227,7 @@ function CourtCard({ match, scoring, tieTarget = 7, onSave, onWalkover, onUndoWa
             ? <StatePill tone="dark">{hhmm(match.scheduled_at)}</StatePill>
             : <StatePill tone={finished ? 'grey' : 'dark'}>{t(`tournament.score.status_${match.status}`)}</StatePill>}
       </div>
-      <p className="mt-0.5 text-[11.5px] text-ink-500">{match.team_a?.name} × {match.team_b?.name}</p>
+      <p className="mt-0.5 text-xs text-ink-500">{match.team_a?.name} × {match.team_b?.name}</p>
 
       {editing ? (
         <>
@@ -237,7 +242,7 @@ function CourtCard({ match, scoring, tieTarget = 7, onSave, onWalkover, onUndoWa
             />
           ) : [['a', match.team_a, a, setA], ['b', match.team_b, b, setB]].map(([side, team, value, set]) => (
             <div key={side} className="mt-1.5 flex items-center justify-between gap-2 rounded-ctrl border border-line px-3 py-1.5">
-              <span className="min-w-0 truncate text-[12px] text-ink-900">{team?.name}</span>
+              <span className="min-w-0 truncate text-xs text-ink-900">{team?.name}</span>
               <input
                 type="number"
                 inputMode="numeric"
@@ -246,20 +251,20 @@ function CourtCard({ match, scoring, tieTarget = 7, onSave, onWalkover, onUndoWa
                 aria-label={team?.name}
                 value={value}
                 onChange={(e) => set(e.target.value)}
-                className="h-11 w-[64px] rounded-md border border-line px-2 text-right font-display text-[20px] font-extrabold text-ink-900"
+                className="h-11 w-[64px] rounded-md border border-line px-2 text-right font-display text-xl font-extrabold text-ink-900"
               />
             </div>
           ))}
-          {bySets && <p className="mt-1 text-[11px] text-ink-500">{t('tournament.score.sets_hint')}</p>}
+          {bySets && <p className="mt-1 text-xs text-ink-500">{t('tournament.score.sets_hint')}</p>}
           {askTieBreak && (
             <TieBreakBoxes
               title={t(tieTarget === 10 ? 'tournament.score.super_tiebreak_title' : 'tournament.score.tiebreak_title', { a, b })}
               label={t(tieTarget === 10 ? 'tournament.score.super_tiebreak' : 'tournament.score.tiebreak_label')}
               a={tbA} b={tbB} onA={setTbA} onB={setTbB} teamA={match.team_a?.name} teamB={match.team_b?.name} />
           )}
-          {problem && <p className="mt-1.5 text-[12px] text-danger">{t(`tournament.score.problem_${problem}`)}</p>}
+          {problem && <p className="mt-1.5 text-xs text-danger">{t(`tournament.score.problem_${problem}`)}</p>}
           <div className="mt-2.5 flex flex-wrap gap-2">
-            <button type="button" disabled={busy} onClick={save} className={`${BTN} bg-lime-400 font-bold text-ink-900 disabled:opacity-60`}>
+            <button type="button" disabled={busy} onClick={save} className={`${BTN} ${DARK}`}>
               {t('tournament.score.save')}
             </button>
             {/* Falta e desistência só num jogo com as duas duplas e ainda por
@@ -267,10 +272,10 @@ function CourtCard({ match, scoring, tieTarget = 7, onSave, onWalkover, onUndoWa
                 num jogo acabado corrige-se o resultado — não se marca falta. */}
             {!finished && match.team_a && match.team_b && (
               <>
-                <button type="button" disabled={busy} onClick={() => onWalkover(match, 'falta')} className={`${BTN} border border-ink-900 font-semibold text-ink-900`}>
+                <button type="button" disabled={busy} onClick={() => onWalkover(match, 'falta')} className={`${BTN} ${GHOST}`}>
                   {t('tournament.score.walkover')}
                 </button>
-                <button type="button" disabled={busy} onClick={() => onWalkover(match, 'desistencia')} className={`${BTN} border border-ink-900 font-semibold text-ink-900`}>
+                <button type="button" disabled={busy} onClick={() => onWalkover(match, 'desistencia')} className={`${BTN} ${GHOST}`}>
                   {t('tournament.score.retirement')}
                 </button>
               </>
@@ -282,15 +287,15 @@ function CourtCard({ match, scoring, tieTarget = 7, onSave, onWalkover, onUndoWa
             )}
           </div>
           {!finished && match.team_a && match.team_b && (
-            <p className="mt-1.5 text-[11.5px] text-ink-500">{t('tournament.score.walkover_hint')}</p>
+            <p className="mt-1.5 text-xs text-ink-500">{t('tournament.score.walkover_hint')}</p>
           )}
         </>
       ) : (
         <div className="mt-2 flex items-center justify-between gap-2">
           <span className="min-w-0">
-            <b className="block font-display text-[20px] font-extrabold text-ink-900">{match.score_a}-{match.score_b}</b>
+            <b className="block font-display text-xl font-extrabold text-ink-900">{match.score_a}-{match.score_b}</b>
             {match.sets?.length > 0 && (
-              <span className="block text-[11px] text-ink-500">
+              <span className="block text-xs text-ink-500">
                 {/* Pro set: só o tie-break (o 9-8 já está em cima). Por sets:
                     os sets, com o tie-break de cada 7-6. */}
                 {match.sets.length === 1 && match.sets[0].tiebreak_a != null
@@ -302,7 +307,7 @@ function CourtCard({ match, scoring, tieTarget = 7, onSave, onWalkover, onUndoWa
           </span>
           <div className="flex items-center gap-2">
             {match.corrected_by_name && (
-              <span className="text-[11px] text-ink-500">{t('tournament.score.corrected_by', { name: match.corrected_by_name })}</span>
+              <span className="text-xs text-ink-500">{t('tournament.score.corrected_by', { name: match.corrected_by_name })}</span>
             )}
             {/* Falta marcada por engano: desfaz-se (Trello #491). O jogo volta
                 a estar por jogar; o servidor recusa se o jogo seguinte da
@@ -310,11 +315,11 @@ function CourtCard({ match, scoring, tieTarget = 7, onSave, onWalkover, onUndoWa
             {/* Só o organizador desfaz: o marcador corrige resultados, não
                 apaga faltas (Trello #491). */}
             {['falta', 'desistencia'].includes(match.status) ? (onUndoWalkover && (
-              <button type="button" disabled={busy} onClick={() => onUndoWalkover(match)} className={`${BTN} border border-line font-semibold text-ink-700`}>
+              <button type="button" disabled={busy} onClick={() => onUndoWalkover(match)} className={`${BTN} ${GHOST}`}>
                 {t(match.status === 'falta' ? 'tournament.score.undo_walkover' : 'tournament.score.undo_retirement')}
               </button>
             )) : (
-              <button type="button" onClick={() => setEditing(true)} className={`${BTN} border border-line font-semibold text-ink-700`}>
+              <button type="button" onClick={() => setEditing(true)} className={`${BTN} ${GHOST}`}>
                 {t('tournament.score.correct')}
               </button>
             )}
@@ -331,14 +336,19 @@ function CourtCard({ match, scoring, tieTarget = 7, onSave, onWalkover, onUndoWa
           </span>
           {ask.note && <span className="mt-0.5 block font-normal text-ink-700">«{ask.note}»</span>}
           <span className="mt-2 flex flex-wrap gap-2">
-            <button type="button" disabled={busy} onClick={() => onResolve(match, true)} className={`${BTN} bg-ink-900 font-bold text-white disabled:opacity-60`}>
+            <button type="button" disabled={busy} onClick={() => onResolve(match, true)} className={`${BTN} ${DARK}`}>
               {t('tcorrection.accept')}
             </button>
-            <button type="button" disabled={busy} onClick={() => onResolve(match, false)} className={`${BTN} border border-ink-900 bg-white font-semibold text-ink-900 disabled:opacity-60`}>
+            <button type="button" disabled={busy} onClick={() => onResolve(match, false)} className={`${BTN} ${GHOST}`}>
               {t('tcorrection.reject')}
             </button>
           </span>
         </NeedsYou>
+      )}
+      {/* O erro junto ao jogo que falhou, não no topo da página (designer,
+          26 set: «correu mal» fica junto ao que falhou). */}
+      {error && (
+        <p role="alert" className="mt-2.5 rounded-ctrl border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-sm font-bold text-danger">{error}</p>
       )}
     </div>
   )
@@ -347,67 +357,42 @@ function CourtCard({ match, scoring, tieTarget = 7, onSave, onWalkover, onUndoWa
 /** A folha que pergunta quem faltou (ou desistiu) e, na falta, se foi
  *  justificada. A sem justificação fica no histórico do jogador, visível
  *  só aos admins (SPEC §7). */
-function WalkoverSheet({ match, kind, onClose, onConfirm, t }) {
+function WalkoverSheet({ match, kind, onClose, onConfirm, error, t }) {
   const [loser, setLoser] = useState(null)
   const [justified, setJustified] = useState(null)
   // Desistir é perder o jogo inteiro: o resultado até ali não conta
   // (Francisco, 23 set — Trello #458). Já não se pergunta «como estava?».
   const ready = loser && (kind === 'desistencia' || justified !== null)
 
-  // Para o body (createPortal), como as outras folhas da app: dentro da
-  // página, a animação de entrada do Layout (transform) prendia o `fixed`
-  // à página, e a folha abria lá em baixo, fora do ecrã — só se via o
-  // escuro (encontrado a 25 set, com o #458).
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink-900/50" onClick={onClose}>
-      <div className="w-full max-w-md rounded-t-card bg-canvas p-5" onClick={(e) => e.stopPropagation()}>
-        <h3 className="font-display text-lg font-extrabold text-ink-900">{t(`tournament.score.${kind}_title`)}</h3>
-        <MonoLabel className="mt-3">{t(`tournament.score.${kind}_who`)}</MonoLabel>
-        <div className="mt-1.5 flex flex-wrap gap-1.5">
-          {[['a', match.team_a], ['b', match.team_b]].map(([side, team]) => (
-            <button
-              key={side}
-              type="button"
-              onClick={() => setLoser(side)}
-              className={`rounded-full px-3 py-1.5 text-[12.5px] ${loser === side ? 'border-2 border-ok px-[11px] py-[5px] font-semibold text-ink-900' : 'border border-line text-ink-700'}`}
-            >
-              {team?.name}
-            </button>
-          ))}
-        </div>
+  // A folha da app (Sheet), como as outras — e já vai para o body, o que
+  // resolvia o `fixed` preso à página (#458).
+  return (
+    <Sheet title={t(`tournament.score.${kind}_title`)} onClose={onClose}>
+      <FieldLabel>{t(`tournament.score.${kind}_who`)}</FieldLabel>
+      <Chips label={t(`tournament.score.${kind}_who`)} value={loser} onChange={setLoser}
+        options={[{ value: 'a', label: match.team_a?.name }, { value: 'b', label: match.team_b?.name }]} />
 
-        {kind === 'falta' && (
-          <>
-            <MonoLabel className="mt-3">{t('tournament.score.justified_label')}</MonoLabel>
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {[[true, t('tournament.score.justified')], [false, t('tournament.score.unjustified')]].map(([v, label]) => (
-                <button
-                  key={String(v)}
-                  type="button"
-                  onClick={() => setJustified(v)}
-                  className={`rounded-full px-3 py-1.5 text-[12.5px] ${justified === v ? 'border-2 border-ok px-[11px] py-[5px] font-semibold text-ink-900' : 'border border-line text-ink-700'}`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            {justified === false && <p className="mt-1.5 text-[11.5px] text-ink-500">{t('tournament.score.unjustified_hint')}</p>}
-          </>
-        )}
+      {kind === 'falta' && (
+        <>
+          <FieldLabel className="mt-4">{t('tournament.score.justified_label')}</FieldLabel>
+          <Chips label={t('tournament.score.justified_label')} value={justified} onChange={setJustified}
+            options={[{ value: true, label: t('tournament.score.justified') }, { value: false, label: t('tournament.score.unjustified') }]} />
+          {justified === false && <p className="mt-2 text-xs text-ink-500">{t('tournament.score.unjustified_hint')}</p>}
+        </>
+      )}
 
-        <div className="mt-3 rounded-ctrl border border-[#F5D6A8] bg-[#FFF7EC] p-2.5 text-[11.5px] text-ink-700">
-          {t(`tournament.score.${kind}_effect`)}
-        </div>
+      {/* O que isto faz: explicação, não um aviso — texto normal (designer). */}
+      <p className="mt-4 text-sm text-ink-500">{t(`tournament.score.${kind}_effect`)}</p>
 
-        <PrimaryButton className="mt-4 w-full" disabled={!ready} onClick={() => onConfirm(loser, justified)}>
-          {t(`tournament.score.${kind}_confirm`)}
-        </PrimaryButton>
-        <button type="button" onClick={onClose} className="mt-2 w-full py-2 text-sm font-semibold text-ink-500">
-          {t('tournament.create.cancel')}
-        </button>
-      </div>
-    </div>,
-    document.body
+      {error && <p role="alert" className="mt-3 rounded-ctrl border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-sm font-bold text-danger">{error}</p>}
+
+      <PrimaryButton className="mt-4 w-full" disabled={!ready} onClick={() => onConfirm(loser, justified)}>
+        {t(`tournament.score.${kind}_confirm`)}
+      </PrimaryButton>
+      <button type="button" onClick={onClose} className="mt-2 min-h-[48px] w-full text-base font-extrabold text-ink-700">
+        {t('tournament.create.cancel')}
+      </button>
+    </Sheet>
   )
 }
 
@@ -428,6 +413,8 @@ export default function TournamentScorePage() {
   const [accepting, setAccepting] = useState(null) // o pedido de correção a aceitar (#485)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  // O jogo onde o erro aconteceu — é aí que ele aparece.
+  const [errorFor, setErrorFor] = useState(null)
 
   // Dia em hora de Portugal, que é como o servidor conta o dia de um jogo
   // (`scheduled_at AT TIME ZONE 'Europe/Lisbon'`), e escolhido entre os dias
@@ -491,7 +478,7 @@ export default function TournamentScorePage() {
   // torneio — vê a proposta, e grava. Afinar um jogo a seguir é na grelha.
   const propose = async () => {
     setBusy(true)
-    setError('')
+    setError(''); setErrorFor(null)
     try {
       const edit = await getTournamentForEdit(tourId)
       setProposal(proposeSchedule({
@@ -512,7 +499,7 @@ export default function TournamentScorePage() {
 
   const saveSchedule = async () => {
     setBusy(true)
-    setError('')
+    setError(''); setErrorFor(null)
     try {
       // O servidor volta a verificar os choques antes de gravar — se algum
       // escapar, recusa tudo e diz qual.
@@ -528,12 +515,12 @@ export default function TournamentScorePage() {
 
   const save = async (match, input) => {
     setBusy(true)
-    setError('')
+    setError(''); setErrorFor(null)
     try {
       await saveMatchResult(match.match_id, input)
       load()
     } catch (err) {
-      setError(describeError(t, err))
+      setError(describeError(t, err)); setErrorFor(match.match_id)
     } finally {
       setBusy(false)
     }
@@ -542,14 +529,14 @@ export default function TournamentScorePage() {
   const confirmWalkover = async (loser, justified) => {
     const { match, kind } = sheet
     setBusy(true)
-    setError('')
+    setError(''); setErrorFor(null)
     try {
       // O ecrã mostra já o que fica marcado; o servidor guarda o mesmo.
       await markWalkover(match.match_id, { kind, loser, justified })
       setSheet(null)
       load()
     } catch (err) {
-      setError(describeError(t, err))
+      setError(describeError(t, err)); setErrorFor(match.match_id)
     } finally {
       setBusy(false)
     }
@@ -584,9 +571,9 @@ export default function TournamentScorePage() {
   }
   const resolve = async (match, accept) => {
     if (accept) { setAccepting(match); return }
-    setBusy(true); setError('')
+    setBusy(true); setError(''); setErrorFor(null)
     try { await resolveMatchCorrection(match.match_id, false); load() }
-    catch (err) { console.error('Error rejecting a correction:', err); setError(describeError(t, err)) }
+    catch (err) { console.error('Error rejecting a correction:', err); setError(describeError(t, err)); setErrorFor(match.match_id) }
     finally { setBusy(false) }
   }
   const labelFor = (iso) => new Date(`${iso}T12:00`).toLocaleDateString(i18n.language, { weekday: 'short', day: 'numeric', month: 'short' }).replace(/\./g, '')
@@ -597,32 +584,18 @@ export default function TournamentScorePage() {
     <div className="space-y-4 pb-28">
       {back}
       <div>
-        <h1 className="font-display text-lg font-extrabold text-ink-900">{t('tournament.score.title', { day: dayLabel })}</h1>
-        <p className="mt-0.5 text-[11.5px] text-ink-500">
+        <h1 className="font-display text-2xl leading-tight text-ink-900">{t('tournament.score.title', { day: dayLabel })}</h1>
+        <p className="mt-0.5 text-xs text-ink-500">
           {tournament?.name}{matches.length ? ` · ${t('tournament.score.done_count', { done: done.length, total: matches.length })}` : ''}
         </p>
       </div>
 
       {days.length > 1 && (
-        <div className="flex flex-wrap gap-1.5" role="tablist" aria-label={t('tournament.score.day_picker')}>
-          {days.map((d) => (
-            <button
-              key={d}
-              type="button"
-              role="tab"
-              aria-selected={d === day}
-              onClick={() => setDay(d)}
-              className={`min-h-[36px] rounded-full border px-3 text-[12px] font-extrabold ${
-                d === day ? 'border-ink-900 bg-ink-900 text-white' : 'border-line bg-canvas text-ink-700'
-              }`}
-            >
-              {labelFor(d)}{d === today ? ` · ${t('tournament.score.today')}` : ''}
-            </button>
-          ))}
-        </div>
+        <Chips label={t('tournament.score.day_picker')} value={day} onChange={setDay}
+          options={days.map((d) => ({ value: d, label: `${labelFor(d)}${d === today ? ` · ${t('tournament.score.today')}` : ''}` }))} />
       )}
 
-      {error && <p className="text-[12px] text-danger">{error}</p>}
+      {error && !errorFor && <p role="alert" className="rounded-ctrl border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-sm font-bold text-danger">{error}</p>}
 
       {asks.length > 0 && (
         <NeedsYou action={{ label: t('tcorrection.see'), onClick: goToAsk }}>
@@ -635,19 +608,19 @@ export default function TournamentScorePage() {
           <b className="text-sm text-ink-900">{t('tournament.score.unscheduled_title', { count: noTime.length })}</b>
           {!proposal ? (
             <>
-              <p className="mt-1 text-[12.5px] text-ink-700">{t('tournament.score.unscheduled_body')}</p>
-              <button type="button" disabled={busy} onClick={propose} className={`${BTN} mt-2 bg-ink-900 font-bold text-white disabled:opacity-60`}>
+              <p className="mt-1 text-sm text-ink-700">{t('tournament.score.unscheduled_body')}</p>
+              <button type="button" disabled={busy} onClick={propose} className={`${BTN} ${LIME} mt-2`}>
                 {t('tournament.score.propose')}
               </button>
             </>
           ) : proposal.noCourts ? (
-            <p className="mt-1 text-[12.5px] text-ink-900">{t('tournament.score.no_courts')}</p>
+            <p className="mt-1 text-sm text-ink-900">{t('tournament.score.no_courts')}</p>
           ) : (
             <>
               <div className="mt-2">
                 {proposal.preview.map((m) => (
-                  <div key={m.match_id} className="grid grid-cols-[104px_minmax(0,1fr)] items-center gap-2 border-t border-line py-2 text-[12px]">
-                    <b className="whitespace-nowrap font-mono text-[11px] text-ink-900">{shortDay(dayKeyInTz(new Date(m.scheduled_at)))} · {hhmm(m.scheduled_at)}</b>
+                  <div key={m.match_id} className="grid grid-cols-[104px_minmax(0,1fr)] items-center gap-2 border-t border-line py-2 text-xs">
+                    <b className="whitespace-nowrap font-mono text-xs text-ink-900">{shortDay(dayKeyInTz(new Date(m.scheduled_at)))} · {hhmm(m.scheduled_at)}</b>
                     <span className="min-w-0 text-ink-700">
                       {m.court} · {m.category_code} · {m.team_a?.name || m.source_a} × {m.team_b?.name || m.source_b}
                     </span>
@@ -655,10 +628,10 @@ export default function TournamentScorePage() {
                 ))}
               </div>
               {proposal.left.length > 0 && (
-                <p className="mt-1.5 text-[12px] text-danger">{t('tournament.score.schedule_left', { count: proposal.left.length })}</p>
+                <p className="mt-1.5 text-xs text-danger">{t('tournament.score.schedule_left', { count: proposal.left.length })}</p>
               )}
               <div className="mt-2.5 flex flex-wrap gap-2">
-                <button type="button" disabled={busy || !proposal.slots.length} onClick={saveSchedule} className={`${BTN} bg-lime-400 font-bold text-ink-900 disabled:opacity-60`}>
+                <button type="button" disabled={busy || !proposal.slots.length} onClick={saveSchedule} className={`${BTN} ${LIME}`}>
                   {t('tournament.score.save_schedule')}
                 </button>
                 <button type="button" onClick={() => setProposal(null)} className="min-h-[44px] px-3 text-sm text-ink-500 hover:underline">
@@ -680,7 +653,8 @@ export default function TournamentScorePage() {
               <div className="space-y-2">
                 {cards.map((c) => (
                   <CourtCard key={c.card.match_id} match={c.card} scoring={scoring} tieTarget={tieTarget} busy={busy} t={t}
-                    onSave={save} onWalkover={(match, kind) => setSheet({ match, kind })} onUndoWalkover={isAdmin ? setUndoing : null} />
+                    onSave={save} onWalkover={(match, kind) => setSheet({ match, kind })} onUndoWalkover={isAdmin ? setUndoing : null}
+                    error={errorFor === c.card.match_id && !sheet ? error : null} />
                 ))}
               </div>
             </>
@@ -689,8 +663,8 @@ export default function TournamentScorePage() {
           {upcoming.length > 0 && <MonoLabel className="pt-2">{t('tournament.score.next')}</MonoLabel>}
           <div>
             {upcoming.map((m) => (
-              <div key={m.match_id} className="grid grid-cols-[52px_minmax(0,1fr)] items-center gap-2 border-t border-line py-2 text-[11.5px]">
-                <b className="font-mono text-[10.5px] text-ink-900">{hhmm(m.scheduled_at)}</b>
+              <div key={m.match_id} className="grid grid-cols-[52px_minmax(0,1fr)] items-center gap-2 border-t border-line py-2 text-xs">
+                <b className="font-mono text-xs text-ink-900">{hhmm(m.scheduled_at)}</b>
                 <span className="min-w-0 text-ink-700">
                   {m.court} · {m.category_code} · {m.team_a?.name} × {m.team_b?.name}
                 </span>
@@ -707,7 +681,7 @@ export default function TournamentScorePage() {
             {done.map((m) => (
               <CourtCard key={m.match_id} match={m} scoring={scoring} tieTarget={tieTarget} busy={busy} t={t}
                 onSave={save} onWalkover={(match, kind) => setSheet({ match, kind })} onUndoWalkover={isAdmin ? setUndoing : null}
-                onResolve={resolve} />
+                onResolve={resolve} error={errorFor === m.match_id && !sheet ? error : null} />
             ))}
           </div>
         </>
@@ -731,7 +705,8 @@ export default function TournamentScorePage() {
 
       {sheet && (
         <WalkoverSheet match={sheet.match} kind={sheet.kind} t={t}
-          onClose={() => setSheet(null)} onConfirm={confirmWalkover} />
+          error={errorFor === sheet.match.match_id ? error : null}
+          onClose={() => { setSheet(null); setError(''); setErrorFor(null) }} onConfirm={confirmWalkover} />
       )}
       {undoing && (
         <ConfirmSheet

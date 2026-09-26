@@ -39,10 +39,13 @@ export function ClubHeader({ club, isFavorite, acting, favoriting, onFollow, onU
   const { t } = useTranslation()
   const kk = (key) => (club.kind === 'group' ? `${key}_group` : key)
   const [asking, setAsking] = useState(false)
+  // A terra pode ser uma morada inteira (A2N, 26 set): essa parte pode partir
+  // a linha; «Clube» e «N membros» nunca partem. Nada pode empurrar a página
+  // para o lado.
   const sub = [
-    t(club.kind === 'group' ? 'clubprofile.kind_group' : 'clubprofile.kind_club'),
-    club.kind !== 'group' ? club.location : null,
-    club.member_count != null ? t('clubprofile.member_count', { count: club.member_count }) : null,
+    { text: t(club.kind === 'group' ? 'clubprofile.kind_group' : 'clubprofile.kind_club'), long: false },
+    club.kind !== 'group' && club.location ? { text: club.location, long: true } : null,
+    club.member_count != null ? { text: t('clubprofile.member_count', { count: club.member_count }), long: false } : null,
   ].filter(Boolean)
 
   return (
@@ -52,7 +55,9 @@ export function ClubHeader({ club, isFavorite, acting, favoriting, onFollow, onU
         <div className="min-w-0 flex-1">
           <h2 className="text-2xl leading-tight text-ink-900 [overflow-wrap:anywhere]">{club.name}</h2>
           <p className="mt-0.5 text-sm text-muted">
-            {sub.map((part, i) => <span key={i} className="whitespace-nowrap">{i > 0 && ' · '}{part}</span>)}
+            {sub.map((part, i) => (
+              <span key={i} className={part.long ? '[overflow-wrap:anywhere]' : 'whitespace-nowrap'}>{i > 0 && ' · '}{part.text}</span>
+            ))}
           </p>
         </div>
       </div>
@@ -164,7 +169,7 @@ function EventRow({ event, member }) {
         <KindTag kind={event.kind} suffix={event.recurring ? t('ui.recurring') : null} />
         {event.locked ? <Lock size={15} className="mt-1 text-muted" /> : state}
       </div>
-      <h4 className="mt-2 text-base font-extrabold leading-snug text-ink-900">{event.title}</h4>
+      <h4 className="mt-2 text-base font-extrabold leading-snug text-ink-900 [overflow-wrap:anywhere]">{event.title}</h4>
       <p className="mt-0.5 text-[13px] text-ink-700">{line}</p>
     </>
   )

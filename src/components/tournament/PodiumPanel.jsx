@@ -33,8 +33,8 @@ function PodiumRow({ place, team, prize, people, meName }) {
   const swapped = people.length > 2 ? people : []
   return (
     <div className="mt-1.5 grid grid-cols-[24px_minmax(0,1fr)] items-center gap-x-2 gap-y-0.5 rounded-ctrl border border-line px-2.5 py-2">
-      <span className="row-span-2 text-[18px] leading-none">{MEDALS[place]}</span>
-      <b className="text-[13px] text-ink-900">
+      <span className="row-span-2 text-lg leading-none">{MEDALS[place]}</span>
+      <b className="text-sm text-ink-900">
         {parts.map((part, i) => (
           <span key={i}>
             {i > 0 && ' / '}
@@ -42,14 +42,14 @@ function PodiumRow({ place, team, prize, people, meName }) {
           </span>
         ))}
       </b>
-      {prize && <em className="not-italic text-[10.5px] text-ink-500">{prize}</em>}
+      {prize && <em className="not-italic text-xs text-ink-500">{prize}</em>}
 
       {swapped.length > 0 && (
         <ul className="col-start-2 mt-1 space-y-0.5 border-t border-line pt-1.5">
           {swapped.map((p) => (
-            <li key={p.name} className="flex items-baseline justify-between gap-2 text-[11.5px] text-ink-700">
+            <li key={p.name} className="flex items-baseline justify-between gap-2 text-xs text-ink-700">
               <span className="min-w-0 truncate">{mark(p.name)}</span>
-              <span className="shrink-0 text-[10px] text-ink-500">
+              <span className="shrink-0 text-xs text-ink-500">
                 {p.played_final ? t('tournament.podium.played_final') : t('tournament.podium.matches', { count: p.matches_played })}
               </span>
             </li>
@@ -86,7 +86,7 @@ export default function PodiumPanel({ tournament }) {
   const meName = mine?.player_name || null
 
   return (
-    <div className="rounded-card border border-line p-3.5">
+    <div className="card">
       <MonoLabel>{t('tournament.podium.title')}</MonoLabel>
 
       {data.categories.map((c) => {
@@ -104,7 +104,7 @@ export default function PodiumPanel({ tournament }) {
       })}
 
       {mine && (
-        <div className="mt-4 flex items-start gap-2 rounded-ctrl border border-[#E3EE8F] bg-[#F8FCD4] p-2.5 text-[12px] text-ink-900">
+        <div className="mt-4 flex items-start gap-2 rounded-ctrl border border-[#E3EE8F] bg-[#F8FCD4] p-2.5 text-xs text-ink-900">
           <Trophy size={16} className="mt-0.5 shrink-0" />
           <span>
             {/* Sem XP: não existe conta de XP nos torneios (procurado em

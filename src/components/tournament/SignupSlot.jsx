@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Copy } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
-import { ConfirmSheet, PrimaryButton } from '../ui'
+import { Chips, ConfirmSheet, PrimaryButton } from '../ui'
 import { Sheet } from '../agenda/AgendaControls'
 import { whatsappShare } from '../../lib/partnerInvite'
 import TournamentSignupSheet from './TournamentSignupSheet'
@@ -145,7 +145,7 @@ export default function SignupSlot({ tournament, categories, category, my: first
         <div className="card flex items-center justify-between gap-3">
           <p className="min-w-0 text-sm font-semibold text-ink-900">{t('tournament.score.link_title')}</p>
           <Link to={`/torneio/${tournament.slug || tournament.id}/marcar`}
-            className="inline-flex min-h-[44px] shrink-0 items-center rounded-full bg-ink-900 px-4 text-sm font-bold text-white">
+            className="btn-secondary shrink-0 !px-4 inline-flex items-center">
             {t('tournament.score.link_cta')}
           </Link>
         </div>
@@ -163,7 +163,7 @@ export default function SignupSlot({ tournament, categories, category, my: first
             <PrimaryButton onClick={() => answer(inv.entry_id, true)} disabled={busy} className="flex-1">
               {t('tsignup.invite_accept')}
             </PrimaryButton>
-            <PrimaryButton variant="ghost" onClick={() => answer(inv.entry_id, false)} disabled={busy} className="flex-1 !bg-white !border-ink-900">
+            <PrimaryButton variant="ghost" onClick={() => answer(inv.entry_id, false)} disabled={busy} className="flex-1">
               {t('tsignup.invite_decline')}
             </PrimaryButton>
           </div>
@@ -194,7 +194,7 @@ export default function SignupSlot({ tournament, categories, category, my: first
         </PrimaryButton>
       ) : null}
 
-      {error && !sheet && <p className="text-sm text-red-600 font-extrabold">{error}</p>}
+      {error && !sheet && <p className="text-sm text-danger font-extrabold">{error}</p>}
 
       {/* O cartaz: categorias com dia, hora e vagas, pagamento, mapa e
           quem organiza. Enquanto houver inscrições é o que faz decidir;
@@ -205,15 +205,18 @@ export default function SignupSlot({ tournament, categories, category, my: first
         <Sheet title={t('tsignup.gender_title')} onClose={() => setGenderSheet(false)}>
           <div className="space-y-3">
             <p className="text-sm text-ink-900">{t('tsignup.gender_body')}</p>
-            <div className="flex gap-2">
-              <PrimaryButton onClick={() => chooseGender('masculino')} disabled={busy} className="flex-1">
-                {t('login.gender_male')}
-              </PrimaryButton>
-              <PrimaryButton onClick={() => chooseGender('feminino')} disabled={busy} className="flex-1">
-                {t('login.gender_female')}
-              </PrimaryButton>
-            </div>
-            {error && <p className="text-sm text-red-600 font-extrabold">{error}</p>}
+            {/* Uma resposta, não duas ações: pastilhas, sem lima (revisão da
+                designer, 26 set). */}
+            <Chips
+              label={t('tsignup.gender_title')}
+              value={null}
+              onChange={(g) => { if (!busy) chooseGender(g) }}
+              options={[
+                { value: 'masculino', label: t('login.gender_male') },
+                { value: 'feminino', label: t('login.gender_female') },
+              ]}
+            />
+            {error && <p className="text-sm text-danger font-extrabold">{error}</p>}
           </div>
         </Sheet>
       )}
@@ -250,7 +253,7 @@ export default function SignupSlot({ tournament, categories, category, my: first
             <PrimaryButton
               variant="ghost"
               onClick={() => navigator.clipboard?.writeText(link)}
-              className="w-full !bg-white !border-ink-900"
+              className="w-full"
             >
               <Copy size={18} /> {t('partner.invite_copy_link')}
             </PrimaryButton>

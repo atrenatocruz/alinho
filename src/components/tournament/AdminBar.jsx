@@ -109,7 +109,7 @@ export default function AdminBar({ tournament, categories = [], onChanged, onEdi
   const draw = () => onDraw?.()
 
   return (
-    <div className="rounded-card border border-line bg-ink-50/60 p-3">
+    <div className="card">
       <div className="flex items-center justify-between gap-2">
         <MonoLabel>{preview ? t('tournament.admin.preview_label') : t('tournament.admin.label')}</MonoLabel>
         <StatePill tone={STATE_PILL[status] || 'grey'}>{t(statusKey(status, progress), { drawn: progress.drawn, total: progress.total })}</StatePill>
@@ -119,7 +119,7 @@ export default function AdminBar({ tournament, categories = [], onChanged, onEdi
           a pastilha diz onde se está, a linha diz o que falta. É o ponto do
           desenho — sem ela o estado é decoração. */}
       {preview && (
-        <p className="mt-1.5 text-[12px] text-ink-900">
+        <p className="mt-1.5 text-xs text-ink-900">
           <b>{t('tournament.admin.preview_nobody')}</b>
           {status === 'rascunho' && ` ${t('tournament.admin.preview_how')}`}
         </p>
@@ -129,7 +129,7 @@ export default function AdminBar({ tournament, categories = [], onChanged, onEdi
           a de cima já disse melhor. Duas linhas a dizer o mesmo é o que o
           desenho manda evitar. */}
       {!(preview && status === 'rascunho') && (
-        <p className="mt-1.5 text-[12px] text-ink-700">{progress.partial && ['sorteado', 'a_decorrer'].includes(status)
+        <p className="mt-1.5 text-xs text-ink-700">{progress.partial && ['sorteado', 'a_decorrer'].includes(status)
           ? partialLine
           : t(`tournament.admin.state_${status}`, {
             deadline: whenDeadline(tournament?.entries_deadline, i18n.language),
@@ -143,13 +143,13 @@ export default function AdminBar({ tournament, categories = [], onChanged, onEdi
             // Fechar as inscrições pergunta antes (Trello #500): um toque por
             // engano deixava toda a gente de fora. Sem vermelho — reabre-se.
             onClick={() => (next === 'fechado' ? setAsk('close') : go(next))}
-            className="min-h-[44px] rounded-ctrl bg-ink-900 px-3 py-2 text-[12px] font-bold text-white disabled:opacity-50">
+            className="inline-flex min-h-[48px] items-center justify-center gap-1.5 rounded-ctrl bg-ink-900 px-5 text-base font-extrabold text-white disabled:opacity-50">
             {t(`tournament.admin.to_${next}`)}
           </button>
         )}
         {canDraw && (
           <button type="button" disabled={busy} onClick={draw}
-            className="min-h-[44px] rounded-ctrl bg-ink-900 px-3 py-2 text-[12px] font-bold text-white disabled:opacity-50">
+            className="inline-flex min-h-[48px] items-center justify-center gap-1.5 rounded-ctrl bg-ink-900 px-5 text-base font-extrabold text-white disabled:opacity-50">
             {t('tournament.admin.do_draw')}
           </button>
         )}
@@ -160,7 +160,7 @@ export default function AdminBar({ tournament, categories = [], onChanged, onEdi
             O formulário de editar não tem rota própria, por isso não havia
             para onde navegar: tem de abrir no sítio. */}
         <button type="button" onClick={() => onEdit?.()}
-          className="inline-flex items-center gap-1.5 min-h-[44px] rounded-ctrl border border-line bg-canvas px-3 py-2 text-[12px] font-bold text-ink-900">
+          className="inline-flex min-h-[48px] items-center justify-center gap-1.5 rounded-ctrl border border-line bg-surface px-5 text-base font-extrabold text-ink-900">
           <Pencil size={14} /> {preview ? t('tournament.admin.keep_editing') : t('tournament.admin.edit')}
         </button>
         {/* A grelha de horas (Trello #563): tinha ficado sem entrada quando o
@@ -168,7 +168,7 @@ export default function AdminBar({ tournament, categories = [], onChanged, onEdi
             «Editar», só com jogos marcados (designer, 25 set). */}
         {(status === 'sorteado' || status === 'a_decorrer') && (
           <button type="button" onClick={() => onSchedule?.()}
-            className="inline-flex items-center gap-1.5 min-h-[44px] rounded-ctrl border border-line bg-canvas px-3 py-2 text-[12px] font-bold text-ink-900">
+            className="inline-flex min-h-[48px] items-center justify-center gap-1.5 rounded-ctrl border border-line bg-surface px-5 text-base font-extrabold text-ink-900">
             <CalendarDays size={14} /> {t('tournament.admin.schedule')}
           </button>
         )}
@@ -177,7 +177,7 @@ export default function AdminBar({ tournament, categories = [], onChanged, onEdi
           url.searchParams.set('ver', 'publico')
           navigate(`${url.pathname}${url.search}`)
         }}
-          className="inline-flex items-center gap-1.5 min-h-[44px] rounded-ctrl border border-line bg-canvas px-3 py-2 text-[12px] font-bold text-ink-900">
+          className="inline-flex min-h-[48px] items-center justify-center gap-1.5 rounded-ctrl border border-line bg-surface px-5 text-base font-extrabold text-ink-900">
           <Eye size={14} /> {t('tournament.admin.view_public')}
         </button>
       </div>
@@ -190,17 +190,17 @@ export default function AdminBar({ tournament, categories = [], onChanged, onEdi
 
       {/* Um botão que sai deixa a razão no lugar dele, nunca um vazio. */}
       {!next && status !== 'fechado' && status !== 'sorteado' && status !== 'a_decorrer' && (
-        <p className="mt-2 text-[11.5px] text-ink-500">{t('tournament.admin.no_step')}</p>
+        <p className="mt-2 text-xs text-ink-500">{t('tournament.admin.no_step')}</p>
       )}
       {deletable ? (
         <button type="button" disabled={busy} onClick={() => setAsk('delete')}
-          className="mt-2 inline-flex items-center gap-1.5 min-h-[44px] rounded-ctrl border border-line bg-canvas px-3 py-2 text-[12px] font-bold text-danger disabled:opacity-50">
+          className="mt-2 inline-flex min-h-[48px] items-center justify-center gap-1.5 rounded-ctrl border border-line bg-surface px-5 text-base font-extrabold text-danger disabled:opacity-50">
           <Trash2 size={14} /> {t('tournament.admin.delete')}
         </button>
       ) : (
-        <p className="mt-1.5 text-[11.5px] text-ink-500">{t('tournament.admin.cannot_delete')}</p>
+        <p className="mt-1.5 text-xs text-ink-500">{t('tournament.admin.cannot_delete')}</p>
       )}
-      {error && <p className="mt-2 text-[12px] text-danger">{error}</p>}
+      {error && <p className="mt-2 text-xs text-danger">{error}</p>}
 
       <ConfirmSheet
         open={ask === 'close'}

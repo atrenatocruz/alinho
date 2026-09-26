@@ -234,38 +234,30 @@ export default function Login() {
   const inputLabel = 'block text-sm font-extrabold text-ink-900 mb-2'
 
   return (
-    <div className="min-h-screen bg-ink-900 flex flex-col">
-      {/* Hero — court lines + lime ball */}
+    <div className="min-h-screen bg-[#F7F7F4] flex flex-col">
+      {/* Topo claro, como a página inicial, e sem as linhas do campo
+          (reparos de 26 set, aprovados pelo Francisco). O formulário por
+          baixo fica exatamente como estava. */}
       <div className="relative px-6 pt-14 pb-10 text-center overflow-hidden shrink-0">
         <button
           type="button"
           onClick={toggleLanguage}
           title={t('layout.toggle_language')}
-          className="absolute top-4 right-4 z-10 inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-full text-white/80 hover:text-white hover:bg-white/10 font-extrabold text-xs transition-colors duration-fast"
+          className="absolute top-4 right-4 z-10 inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-full text-ink-900 hover:bg-ink-50 font-extrabold text-sm transition-colors duration-fast"
         >
           {i18n.language === 'en' ? 'PT' : 'EN'}
         </button>
-        <svg
-          viewBox="0 0 400 200"
-          className="absolute inset-0 w-full h-full text-white/[0.06]"
-          preserveAspectRatio="xMidYMid slice"
-          aria-hidden="true"
-        >
-          <rect x="40" y="-40" width="320" height="280" rx="18" stroke="currentColor" strokeWidth="3" fill="none" />
-          <line x1="200" y1="-40" x2="200" y2="240" stroke="currentColor" strokeWidth="3" />
-          <line x1="40" y1="100" x2="360" y2="100" stroke="currentColor" strokeWidth="3" strokeDasharray="8 10" />
-        </svg>
         <div className="relative">
-          <h1 className="text-5xl text-white">
+          <h1 className="text-5xl text-ink-900">
             {/* Logo leva à página inicial, como no resto da app — sem sessão
                 o Login não tinha outra saída (Francisco, 15 set 2026). */}
             <Link to="/" className="inline-block leading-none">
-              <Wordmark />
+              <Wordmark variant="light" className="!h-9" />
             </Link>
           </h1>
-          <p className="text-ink-200 mt-3">
+          <h2 className="text-3xl text-ink-900 mt-4">
             {mode === 'login' ? t('login.welcome_back') : t('login.create_account')}
-          </p>
+          </h2>
         </div>
       </div>
 
