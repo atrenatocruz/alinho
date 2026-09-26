@@ -2,68 +2,16 @@ import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
-import { Users, X } from 'lucide-react'
+import { Users } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { createPrivateMatch } from '../lib/privateMatches'
-import { PrimaryButton, Avatar, DateTimeField, Select, Chips } from '../components/ui'
+import { createFriendMatch } from '../lib/privateMatches'
+import { PrimaryButton, DateTimeField, Select, Chips } from '../components/ui'
 import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
-import PlayerSearch from '../components/PlayerSearch'
 import { describeError } from '../lib/errors'
 import StepPage from '../components/steps/StepPage'
+import InviteesStep, { MIN_PEOPLE } from '../components/friends/InviteesStep'
 
 const NUM_SETS_OPTIONS = Array.from({ length: 8 }, (_, i) => i + 2) // 2..9
-
-// One of the 3 non-creator slots: either a real app player (PlayerSearch)
-// or a name-only guest ("sem conta na app") — mutually exclusive, matching
-// the DB's guest_xor_id check. Guests never count for ranking (nobody to
-// confirm with), which the parent handles by disabling the ranked toggle's
-// meaning, not here — this component only cares about collecting one or
-// the other.
-function PlayerOrGuestSlot({ label, selected, onSelect, onClear, guestName, onGuestNameChange, excludeIds }) {
-  const { t } = useTranslation()
-  const [mode, setMode] = useState('search')
-
-  if (selected) {
-    return (
-      <PlayerSearch label={label} selected={selected} onSelect={onSelect} onClear={onClear} excludeIds={excludeIds} />
-    )
-  }
-
-  if (mode === 'guest') {
-    return (
-      <div className="flex items-center gap-2 input-field focus-within:border-ink-500 focus-within:ring-2 focus-within:ring-ink-50">
-        <input
-          type="text"
-          value={guestName}
-          onChange={(e) => onGuestNameChange(e.target.value)}
-          placeholder={t('createprivatematch.guest_name_placeholder')}
-          className="flex-1 bg-transparent outline-none text-sm"
-        />
-        <button
-          type="button"
-          onClick={() => { setMode('search'); onGuestNameChange('') }}
-          aria-label={t('createprivatematch.guest_cancel_aria')}
-          className="text-muted hover:text-ink-900 shrink-0"
-        >
-          <X size={16} />
-        </button>
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-1.5">
-      <PlayerSearch label={label} selected={selected} onSelect={onSelect} onClear={onClear} excludeIds={excludeIds} />
-      <button
-        type="button"
-        onClick={() => setMode('guest')}
-        className="text-xs font-extrabold text-ink-700 hover:text-ink-900"
-      >
-        {t('createprivatematch.guest_toggle')}
-      </button>
-    </div>
-  )
-}
 
 export default function CreatePrivateMatch() {
   const goBack = useGoBack('/jogos-privados')
@@ -71,29 +19,25 @@ export default function CreatePrivateMatch() {
   const { profile } = useAuth()
   const navigate = useNavigate()
 
-  // Quatro passos, como todos os eventos (#342, Francisco 26 set): Pessoas ·
-  // Quando · Onde joga · Regras. Esta 1.ª entrega mantém os 4 lugares de
-  // hoje (a tua dupla e a dupla adversária); convidar primeiro e formar as
-  // equipas depois vem numa entrega à parte, com a base de dados do Dev 3.
+  // Quatro passos, como todos os eventos (#342, versão final de 26 set):
+  // Pessoas · Quando · Onde joga · Regras. Primeiro as pessoas, sem duplas —
+  // podem ser mais de 4; as equipas fazem-se depois de todos aceitarem, na
+  // página do jogo (base de dados do Dev 3: create_friend_match).
   const [step, setStep] = useState(1)
-
-  const [teamAPlayer2, setTeamAPlayer2] = useState(null)
-  const [teamAPlayer2Guest, setTeamAPlayer2Guest] = useState('')
-  const [teamBPlayer1, setTeamBPlayer1] = useState(null)
-  const [teamBPlayer1Guest, setTeamBPlayer1Guest] = useState('')
-  const [teamBPlayer2, setTeamBPlayer2] = useState(null)
-  const [teamBPlayer2Guest, setTeamBPlayer2Guest] = useState('')
+  const [people, setPeople] = useState([]) // sem o criador
 
   const [rankedIntent, setRankedIntent] = useState(true)
-  // «Dia e hora» num campo só, como no mix (versão final, 26 set).
+  // «Dia e hora» num campo só, como no mix.
   const [when, setWhen] = useState('') // 'YYYY-MM-DDTHH:mm'
   const scheduledDate = when.slice(0, 10)
   const scheduledTime = when.slice(11, 16)
   const [location, setLocation] = useState('')
   const [locationCoords, setLocationCoords] = useState({ latitude: null, longitude: null })
-  // Sets vem escolhido, como na versão final (26 set).
+  const [court, setCourt] = useState('')
+  // Sets vem escolhido, como na versão final.
   const [scoringFormat, setScoringFormat] = useState('sets')
   const [numSets, setNumSets] = useState(3)
+  const [teamsMode, setTeamsMode] = useState('manual')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -103,7 +47,8 @@ export default function CreatePrivateMatch() {
     setLocationCoords({ latitude, longitude })
   })
 
-  const hasGuest = !!(teamAPlayer2Guest || teamBPlayer1Guest || teamBPlayer2Guest)
+  const hasGuest = people.some((p) => p.guest)
+  const missing = Math.max(0, MIN_PEOPLE - (people.length + 1))
 
   const handleCreate = async () => {
     setError('')
@@ -114,26 +59,26 @@ export default function CreatePrivateMatch() {
     }
     setSaving(true)
     try {
-      await createPrivateMatch({
+      const id = await createFriendMatch({
         rankedIntent,
         scheduledDate,
         scheduledTime: scheduledTime || null,
         location: location.trim() || null,
         locationLatitude: locationCoords.latitude,
         locationLongitude: locationCoords.longitude,
+        court: court.trim() || null,
         scoringFormat,
         numSets: scoringFormat === 'sets' ? numSets : null,
-        teamAPlayer2Id: teamAPlayer2?.id,
-        teamAPlayer2GuestName: teamAPlayer2Guest.trim() || null,
-        teamBPlayer1Id: teamBPlayer1?.id,
-        teamBPlayer1GuestName: teamBPlayer1Guest.trim() || null,
-        teamBPlayer2Id: teamBPlayer2?.id,
-        teamBPlayer2GuestName: teamBPlayer2Guest.trim() || null,
+        teamsMode,
+        invitees: people.map((p) => (p.guest
+          ? { guest_name: p.name, ...(p.email ? { guest_email: p.email } : {}) }
+          : { user_id: p.user_id })),
       })
-      navigate('/jogos-privados')
+      navigate(`/jogos-privados/sessao/${id}`)
     } catch (err) {
-      console.error('Error creating private match:', err)
-      setError(describeError(t, err, 'createprivatematch.error_create'))
+      console.error('Error creating friend match:', err)
+      // As funções do Dev 3 recusam com a frase já escrita (P0001).
+      setError(err?.code === 'P0001' && err?.message ? err.message : describeError(t, err, 'createprivatematch.error_create'))
     } finally {
       setSaving(false)
     }
@@ -150,8 +95,8 @@ export default function CreatePrivateMatch() {
       stepLabel={stepLabels[step - 1]}
       onBack={() => { setError(''); if (step === 1) goBack(); else setStep(step - 1) }}
       onNext={() => { setError(''); setStep(step + 1) }}
-      nextDisabled={step === 2 && !scheduledDate}
-      nextHint={t('createprivatematch.date_missing')}
+      nextDisabled={(step === 1 && missing > 0) || (step === 2 && !scheduledDate)}
+      nextHint={step === 1 ? t('friends.missing_people', { count: missing }) : t('createprivatematch.date_missing')}
       error={error}
       footer={step === 4 ? (
         <PrimaryButton onClick={handleCreate} disabled={saving} className="w-full">
@@ -161,81 +106,60 @@ export default function CreatePrivateMatch() {
       ) : null}
     >
       {step === 1 && (
-        <>
-          <div>
-            <p className={label}>{t('createprivatematch.your_dupla')}</p>
-            <div className="space-y-2">
-              <div className="flex items-center gap-3 rounded-ctrl border border-[#BBF7D0] bg-[#DCFCE7] p-3">
-                <Avatar name={profile?.name} url={profile?.avatar_url} size="w-9 h-9 text-sm" />
-                <p className="text-sm font-extrabold text-[#14532D]">{t('createprivatematch.you_suffix', { name: profile?.name })}</p>
-              </div>
-              <PlayerOrGuestSlot
-                label={t('createprivatematch.search_partner')}
-                selected={teamAPlayer2}
-                onSelect={setTeamAPlayer2}
-                onClear={() => setTeamAPlayer2(null)}
-                guestName={teamAPlayer2Guest}
-                onGuestNameChange={setTeamAPlayer2Guest}
-                excludeIds={[profile?.id, teamBPlayer1?.id, teamBPlayer2?.id].filter(Boolean)}
-              />
-            </div>
-          </div>
-          <div>
-            <p className={label}>{t('createprivatematch.opponent_dupla')}</p>
-            <div className="space-y-2">
-              <PlayerOrGuestSlot
-                label={t('createprivatematch.search_opponent1')}
-                selected={teamBPlayer1}
-                onSelect={setTeamBPlayer1}
-                onClear={() => setTeamBPlayer1(null)}
-                guestName={teamBPlayer1Guest}
-                onGuestNameChange={setTeamBPlayer1Guest}
-                excludeIds={[profile?.id, teamAPlayer2?.id, teamBPlayer2?.id].filter(Boolean)}
-              />
-              <PlayerOrGuestSlot
-                label={t('createprivatematch.search_opponent2')}
-                selected={teamBPlayer2}
-                onSelect={setTeamBPlayer2}
-                onClear={() => setTeamBPlayer2(null)}
-                guestName={teamBPlayer2Guest}
-                onGuestNameChange={setTeamBPlayer2Guest}
-                excludeIds={[profile?.id, teamAPlayer2?.id, teamBPlayer1?.id].filter(Boolean)}
-              />
-            </div>
-          </div>
-          <p className="text-xs text-muted">{t('createprivatematch.missing_player_hint')}</p>
-        </>
+        <InviteesStep
+          me={profile}
+          people={people}
+          onAdd={(p) => setPeople((list) => (list.some((x) => x.key === p.key) ? list : [...list, p]))}
+          onRemove={(key) => setPeople((list) => list.filter((x) => x.key !== key))}
+        />
       )}
 
       {step === 2 && (
-        <>
-          <div>
-            <p className={label}>{t('steps.datetime_label')}</p>
-            <DateTimeField value={when} onChange={setWhen} />
-            <p className="mt-2 text-xs text-muted">{t('createprivatematch.when_hint')}</p>
-          </div>
-        </>
+        <div>
+          <p className={label}>{t('steps.datetime_label')}</p>
+          <DateTimeField value={when} onChange={setWhen} />
+          <p className="mt-2 text-xs text-muted">{t('createprivatematch.when_hint')}</p>
+        </div>
       )}
 
       {step === 3 && (
-        <div>
-          <p className={label}>{t('steps.where_label')}</p>
-          <input
-            ref={locationInputRef}
-            type="text"
-            value={location}
-            // Escrever a morada à mão invalida as coordenadas — ficariam a
-            // apontar para o sítio escolhido antes (mesmo cuidado que
-            // GerirClube.jsx tem para o local dos mixes).
-            onChange={(e) => { setLocation(e.target.value); setLocationCoords({ latitude: null, longitude: null }) }}
-            placeholder={t('createprivatematch.location_placeholder')}
-            className="input-field"
-          />
-        </div>
+        <>
+          <div>
+            <p className={label}>{t('steps.where_label')}</p>
+            <input
+              ref={locationInputRef}
+              type="text"
+              value={location}
+              // Escrever a morada à mão invalida as coordenadas — ficariam a
+              // apontar para o sítio escolhido antes (mesmo cuidado que
+              // GerirClube.jsx tem para o local dos mixes).
+              onChange={(e) => { setLocation(e.target.value); setLocationCoords({ latitude: null, longitude: null }) }}
+              placeholder={t('friends.where_placeholder')}
+              className="input-field"
+            />
+          </div>
+          <div>
+            <p className={label}>{t('friends.court_label')}</p>
+            <input type="text" value={court} onChange={(e) => setCourt(e.target.value)} maxLength={40}
+              placeholder={t('friends.court_placeholder')} className="input-field" />
+          </div>
+        </>
       )}
 
       {step === 4 && (
         <>
+          <div>
+            <p className={label}>{t('friends.teams_label')}</p>
+            <Chips
+              value={teamsMode}
+              onChange={setTeamsMode}
+              options={[
+                { value: 'manual', label: t('friends.teams_me_later') },
+                { value: 'app', label: t('friends.teams_app') },
+              ]}
+            />
+            <p className="mt-2 text-xs text-muted">{t('friends.teams_app_hint')}</p>
+          </div>
           <div>
             <p className={label}>{t('steps.ranking_heading')}</p>
             <Chips

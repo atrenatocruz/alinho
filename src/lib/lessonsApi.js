@@ -118,6 +118,13 @@ export async function createLessonSeries(fields) {
   return data
 }
 
+/** O preço de uma turma (migration_lessons_7): price null = tabela;
+    price sem until = «Outro preço» para sempre; com until = promoção. */
+export async function setLessonSeriesPrice(seriesId, price, until) {
+  const { error } = await supabase.rpc('set_lesson_series_price', { p_series_id: seriesId, p_price: price, p_until: until || null })
+  if (error) throw error
+}
+
 /** Professor/clube aceita ou recusa um pedido para entrar na turma. */
 export async function resolveEnrolment(enrolmentId, accept) {
   const { error } = await supabase.rpc('resolve_enrolment', { p_enrolment_id: enrolmentId, p_accept: accept })
