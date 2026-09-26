@@ -22,6 +22,7 @@ import { advanceByFrequency } from '../../lib/mixDraft'
 import { totalRounds } from '../../lib/mixLogic'
 import { AGE_RESTRICTIONS } from '../../lib/ageCategories'
 import { formatDate, formatTime } from '../../lib/formatDate'
+import { LEVEL_SCALES, LEVEL_NUMBERS, parseLevel, scaleForGender } from '../../lib/mixLevels'
 
 const pairsAreFixed = (form) => form.format !== 'americano' && !(form.rotate_partners && form.format === 'sobe_desce')
 
@@ -64,6 +65,10 @@ export default function MixWizard({
   const rankedLocked = editingGame && ['in_progress', 'finished'].includes(editingGame.status)
   // O nível: «Qualquer nível» ou «Escolher» → aparecem os níveis de hoje.
   const [pickLevel, setPickLevel] = useState(!!form.level)
+  // Masculino, Feminino ou Misto, de 1 a 6 (#577). O escalão começa pelo
+  // «Quem pode entrar» (só mulheres → F, misto → MX) e pode mudar-se.
+  const [levelScale, setLevelScale] = useState(parseLevel(form.level)?.scale || scaleForGender(form.gender_restriction))
+  const levelNum = parseLevel(form.level)?.num
 
   // O que falta em cada passo para o «Seguinte» andar.
   const missing = (() => {
@@ -159,7 +164,11 @@ export default function MixWizard({
           <Chips
             label={t('mixwizard.level_label')}
             value={pickLevel ? 'pick' : 'any'}
-            onChange={(v) => { setPickLevel(v === 'pick'); if (v === 'any') set({ level: '' }) }}
+            onChange={(v) => {
+              setPickLevel(v === 'pick')
+              if (v === 'any') set({ level: '' })
+              else setLevelScale(parseLevel(form.level)?.scale || scaleForGender(form.gender_restriction))
+            }}
             options={[
               { value: 'any', label: t('mixwizard.level_any') },
               { value: 'pick', label: t('mixwizard.level_pick') },
@@ -167,8 +176,13 @@ export default function MixWizard({
           />
           {pickLevel && (
             <div className="mt-2">
-              <Chips label={t('mixwizard.level_label')} value={form.level} onChange={(v) => set({ level: v })}
-                options={options.levels.map((l) => ({ value: l, label: l }))} />
+              <Chips label={t('mixlevels.scale_label')} value={levelScale}
+                onChange={(s) => { setLevelScale(s); if (levelNum) set({ level: `${s}${levelNum}` }) }}
+                options={LEVEL_SCALES.map((s) => ({ value: s, label: t(`mixlevels.scale_${s.toLowerCase()}`) }))} />
+              <div className="mt-2">
+                <Chips label={t('mixwizard.level_label')} value={form.level} onChange={(v) => set({ level: v })}
+                  options={LEVEL_NUMBERS.map((n) => ({ value: `${levelScale}${n}`, label: String(n) }))} />
+              </div>
             </div>
           )}
         </Field>

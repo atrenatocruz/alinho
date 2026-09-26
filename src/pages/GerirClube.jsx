@@ -38,6 +38,7 @@ import { describeError } from '../lib/errors'
 import { isDraftMix, publishDraftMix, advanceByFrequency, pendingOccurrenceRow } from '../lib/mixDraft'
 import LaunchDayPicker from '../components/LaunchDayPicker'
 import MixWizard from '../components/mix/MixWizard'
+import { LEVEL_SCALES, LEVEL_NUMBERS, parseLevel } from '../lib/mixLevels'
 
 const sanitizeSlug = (value) => value.toLowerCase().replace(/[^a-z0-9-]/g, '')
 
@@ -173,8 +174,7 @@ const EMPTY_GAME_FORM = {
 // Bandas do ranking (RANKING.md) — o nível opcional de um mix decide que
 // grupos WhatsApp o veem (whatsapp_groups.levels; ver
 // migration_whatsapp_groups.sql). '' = sem nível → visível em todos os
-// grupos do clube. Escalas F/MX entram quando houver grupos dessas escalas.
-const MIX_LEVELS = ['M6', 'M5', 'M4', 'M3', 'M2', 'M1']
+// grupos do clube. Masculino, Feminino e Misto de 1 a 6 (#577): lib/mixLevels.
 
 // Duplas fixas = não é Americano e os parceiros não trocam a cada ronda —
 // só aí se pode entrar já em dupla.
@@ -259,6 +259,8 @@ export default function GerirClube() {
   const [loading, setLoading] = useState(true)
   const [showCreateGame, setShowCreateGame] = useState(false)
   const [editingGame, setEditingGame] = useState(null)
+  // O escalão escolhido no formulário antes de haver número (#577).
+  const [formLevelScale, setFormLevelScale] = useState('')
   // Mix em rascunho (Trello #544): o que se vai publicar ou eliminar,
   // enquanto a pergunta está aberta.
   const [publishing, setPublishing] = useState(null)
@@ -393,6 +395,8 @@ export default function GerirClube() {
         return passados ? y - x : x - y
       })
   }
+
+  useEffect(() => { setFormLevelScale('') }, [showCreateGame, editingGame?.id])
 
   useGooglePlacesAutocomplete(
     locationInputRef,
@@ -2101,7 +2105,6 @@ export default function GerirClube() {
               formats: translatedFormats,
               scoringFormats: translatedScoringFormats,
               pairingModes: PAIRING_MODE_OPTIONS,
-              levels: MIX_LEVELS,
               scopes: clubGroups.some((g) => g.can_manage)
                 ? [{ value: '', label: t(kk('gerirclube.scope_whole_club')) }, ...clubGroups.filter((g) => g.can_manage).map((g) => ({ value: g.id, label: g.name }))]
                 : [],
@@ -2665,14 +2668,28 @@ export default function GerirClube() {
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         {t('gerirclube.level_optional_label')}
                       </label>
+                      {/* Masculino, Feminino ou Misto, de 1 a 6 (#577). */}
                       <Segmented
                         options={[
                           { value: '', label: t('gerirclube.level_any') },
-                          ...MIX_LEVELS.map((l) => ({ value: l, label: l })),
+                          ...LEVEL_SCALES.map((s) => ({ value: s, label: t(`mixlevels.scale_${s.toLowerCase()}`) })),
                         ]}
-                        value={gameForm.level}
-                        onChange={(v) => setGameForm({ ...gameForm, level: v })}
+                        value={parseLevel(gameForm.level)?.scale || formLevelScale}
+                        onChange={(s) => {
+                          setFormLevelScale(s)
+                          const num = parseLevel(gameForm.level)?.num
+                          setGameForm({ ...gameForm, level: s && num ? `${s}${num}` : '' })
+                        }}
                       />
+                      {(parseLevel(gameForm.level)?.scale || formLevelScale) && (
+                        <div className="mt-2">
+                          <Segmented
+                            options={LEVEL_NUMBERS.map((n) => ({ value: `${parseLevel(gameForm.level)?.scale || formLevelScale}${n}`, label: String(n) }))}
+                            value={gameForm.level}
+                            onChange={(v) => setGameForm({ ...gameForm, level: v })}
+                          />
+                        </div>
+                      )}
                       <p className="text-sm text-muted mt-1.5">{t(kk('gerirclube.level_help'))}</p>
                     </div>
 
@@ -2996,7 +3013,9 @@ export default function GerirClube() {
                     etiqueta = { mix: 'gerirclube.event_label_mix', aberto: 'gerirclube.event_label_open', torneio: 'gerirclube.event_label_tournament' }[tipo]
                     Icone = { mix: Calendar, aberto: Clock, torneio: Trophy }[tipo]
                     linha = tipo === 'torneio' ? row.name : row.title
-                    detalhe = [item.quando ? quandoCurto(item.quando, tipo !== 'torneio') : null, tipo === 'mix' ? abreEm(row) : null, aDecorrer, lugares, duplas, prazo].filter(Boolean).join(' · ')
+                    // O nível do mix no fim da linha, «… · MX4» (#577, designer 26 set).
+                    const nivel = tipo === 'mix' && parseLevel(row.level) ? `${parseLevel(row.level).scale}${parseLevel(row.level).num}` : null
+                    detalhe = [item.quando ? quandoCurto(item.quando, tipo !== 'torneio') : null, tipo === 'mix' ? abreEm(row) : null, aDecorrer, lugares, duplas, prazo, nivel].filter(Boolean).join(' · ')
                     abrir = () => navigate(tipo === 'torneio' ? `/torneio/${row.slug || row.id}` : `/jogo/${row.id}`)
                     // Torneio privado (Trello #482): não aparece na Home nem na
                     // Comunidade, e o link só abre a quem gere. Tem de se ler aqui.
