@@ -42,6 +42,10 @@ export function errorKind(error) {
     return 'not_ready'
   }
 
+  // 42501 escrito por nós (ex.: create_tournament num plano Free/Squad, #523:
+  // «Os torneios são a partir do plano Community…») é uma frase para o
+  // utilizador; só o 42501 do Postgres (RLS, permission denied) é genérico.
+  if (code === '42501' && msg && !/row-level security|permission denied/i.test(msg)) return 'business'
   if (code === '42501' || /row-level security|permission denied/i.test(msg)) return 'permission'
   if (code === '23505' || /duplicate key/i.test(msg)) return 'duplicate'
 
