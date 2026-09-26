@@ -295,12 +295,22 @@ export const LESSON_RPC_MOCKS = {
   mark_lesson_court_booked: () => null,
   cancel_lesson_request: () => null,
   set_lesson_prices: () => null,
+  set_teacher_availability: () => null,
   set_club_peak_hours: () => null,
   set_teacher_sort_order: () => null,
 }
 
 export const LESSON_TABLE_MOCKS = {
-  lesson_prices: () => (on() && !empty() ? PRICES() : []),
+  // Com teacher_profile_id: «Os meus preços» do professor sem clube (26 set);
+  // localStorage.mockBookingEmpty = 'prices' mostra a tabela ainda vazia.
+  lesson_prices: (url = '') => {
+    const own = url.match(/teacher_profile_id=eq\.([^&]+)/)
+    if (own) {
+      return localStorage.getItem('mockBookingEmpty') === 'prices' ? []
+        : PRICES().filter((r) => !r.peak).map((r) => ({ ...r, organization_id: null, teacher_profile_id: own[1] }))
+    }
+    return on() && !empty() ? PRICES() : []
+  },
   club_peak_hours: () => (on() && !empty() ? PEAK_HOURS() : []),
 }
 

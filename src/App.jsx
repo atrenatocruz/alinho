@@ -521,6 +521,17 @@ function AppRoutes() {
             </Guard>
           }
         />
+        {/* O mesmo ecrã, para o admin do clube pôr o horário de um
+            professor do clube (26 set). Quem pode gravar decide a base de
+            dados (set_teacher_availability). */}
+        <Route
+          path="/gerir/professor/:tp/horario"
+          element={
+            <Guard require="protected" showSplash={showSplash}>
+              <TeacherSchedule />
+            </Guard>
+          }
+        />
         <Route
           path="/jogos-privados"
           element={

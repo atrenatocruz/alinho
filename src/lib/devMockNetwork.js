@@ -887,7 +887,15 @@ const TABLE_MOCKS = {
   follows: () => (localStorage.getItem('mockTeacherFollowed') === 'true'
     ? [{ id: 'f-teacher', status: 'accepted', followed_id: 'u-ana' }, { id: 'f-tiago', status: 'accepted', followed_id: 'fake-t2' }] : []),
   // localStorage.mockCommunity — um professor com clube e um sem clube.
-  teacher_profiles: (url) => (community() && url.includes('club_status=eq.pending') ? [
+  // O horário de um professor do clube, aberto pelo admin (26 set).
+  teacher_profiles: (url) => (url.includes('id=eq.tp-ana') ? [
+    { id: 'tp-ana', user_id: 'u-ana', organization_id: 'co-1', status: 'approved', club_status: 'accepted', managed_by: 'both',
+      user: { name: 'Ana Moreira', gender: 'feminino' }, organization: { name: 'Smash Padel', slug: 'smash-padel' },
+      availability: localStorage.getItem('mockTeacherSchedule') === 'full' ? [
+        { teacher_profile_id: 'tp-ana', day_of_week: 'terca', start_time: '09:00:00', end_time: '13:00:00' },
+        { teacher_profile_id: 'tp-ana', day_of_week: 'quinta', start_time: '17:00:00', end_time: '20:00:00' },
+      ] : [] },
+  ] : community() && url.includes('club_status=eq.pending') ? [
     { id: 'tp-c1', status: 'approved', contact: '914 555 666', zone: 'Almada', created_at: '2026-09-16T08:00:00Z', user_id: 'fake-sofia', user: { name: 'Sofia Ramos', gender: 'feminino' } },
     { id: 'tp-c2', status: 'pending', contact: '@miguel.coach', zone: null, created_at: '2026-09-16T12:00:00Z', user_id: 'fake-miguel', user: { name: 'Miguel Tavares', gender: 'masculino' } },
   ] : community() && url.includes('status=eq.pending') ? [
