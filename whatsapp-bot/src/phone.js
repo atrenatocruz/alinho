@@ -107,7 +107,8 @@ export async function resolveProfileByPhoneJid(phoneJid, organizationId) {
     return null
   }
 
-  let data = pickBestAccount((rows || []).filter((r) => !r.is_test))
+  const candidates = (rows || []).filter((r) => !r.is_test)
+  let data = pickBestAccount(candidates)
 
   // #537: quem já tem conta com o número CONFIRMADO mas ainda não é membro
   // deste clube não recebe um convidado — usa-se a conta dele, e passa a
@@ -141,7 +142,13 @@ export async function resolveProfileByPhoneJid(phoneJid, organizationId) {
       })
   }
 
-  return { id: data.user_id, name: data.profile.name, language: data.profile.language }
+  // Todas as contas do clube com este número (a escolhida incluída): uma
+  // inscrição feita com qualquer delas é desta pessoa. Sem isto, com o
+  // convidado do bot inscrito e a conta registada escolhida, o «Out»
+  // respondia «Não estás inscrito» (Leandro, 26 set). A identidade é
+  // SEMPRE o número (Ruben).
+  const aliasIds = candidates.map((r) => r.user_id)
+  return { id: data.user_id, name: data.profile.name, language: data.profile.language, aliasIds }
 }
 
 // E-mail inventado com que o bot cria os convidados (createGuestProfile).

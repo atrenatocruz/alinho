@@ -1,13 +1,13 @@
 import { supabase } from './supabase.js'
 import { getGroupByJid, mixVisibleToGroup } from './groups.js'
-import { loadGame, getOpenMixes, formatDateTime, weekdayKeyPt, mixLocalParts, gameIdForMessage, labelableMixes, mixLabel } from './roster.js'
+import { loadGame, getOpenMixes, formatDateTime, weekdayKeyPt, mixLocalParts, gameIdForMessage, labelableMixes, mixLabel, buildMixMessage, recordMixMessage } from './roster.js'
 import { resolveProfileByPhoneJid, createGuestProfile, ensureMembership } from './phone.js'
 import { joinWithUnregisteredPartner } from './partnerInvite.js'
 import { config } from './config.js'
 import { helpText, helpFooter } from './messages.js'
 import { t } from './locales.js'
 import { startTimer } from './timing.js'
-import { repostHooks } from './sync.js'
+import { repostHooks, cardSentRecently, noteCardSent } from './sync.js'
 
 function stripAccents(str) {
   return str.normalize('NFD').replace(/[̀-ͯ]/g, '')
@@ -23,6 +23,10 @@ const MIX_LIST_WORDS = ['mix', 'mixes', 'mixs', '/mix', '/mixes', '/mixs']
 // matching the same text — matters for the glued (no-space) parse below.
 const ACTION_WORDS = [...IN_WORDS, ...OUT_WORDS].sort((a, b) => b.length - a.length)
 const WEEKDAY_KEYS = ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo']
+// Níveis dos mixes: M (masculino), F (feminino), N (sem sexo) e MX (misto),
+// de 1 a 6 — «In mx4», «In f3», «In n2» (Renato, 26 set). Em minúsculas,
+// porque o texto já chega normalizado.
+const LEVEL_TOKEN = /^(mx|m|f|n)[1-6]$/
 
 // Shape-only check, no DB access yet — just enough to tell "in7291"/"in01"
 // (a real identifier glued on) apart from "interessante"/"inscrevi-me"
@@ -34,7 +38,7 @@ function looksLikeIdentifier(rest) {
   return (
     /^\d{1,4}$/.test(rest) ||
     WEEKDAY_KEYS.includes(rest) ||
-    /^m[1-6]$/.test(rest) ||
+    LEVEL_TOKEN.test(rest) ||
     /^\d{1,2}h\d{0,2}$/.test(rest) ||
     /^\d{1,2}:\d{2}$/.test(rest) ||
     /^\d{1,2}\/\d{1,2}$/.test(rest)
@@ -146,6 +150,11 @@ function nameMatches(fullName, query) {
   return query.split(' ').every((q) => words.some((w) => w.startsWith(q)))
 }
 
+/** Esta conta é de quem escreveu? Com duas contas com o mesmo número
+ *  (convidado do bot + conta registada), qualquer uma conta — phone.js,
+ *  aliasIds. */
+const isMine = (profile, id) => id != null && (id === profile?.id || (profile?.aliasIds ?? []).includes(id))
+
 const OPEN_STATUSES = new Set(['open', 'closed'])
 
 function formatMixLine(mix, lang, label) {
@@ -163,8 +172,9 @@ function formatMixListForReply(matches, allOpenMixes, lang) {
 /** A lista do «/mix»: além do número, dia e local, as vagas de cada um e se
  *  é de duplas fixas (onde se pode entrar em dupla). Uma consulta só para
  *  todos os mixes. */
-async function formatMixListWithSpots(openMixes, lang) {
-  const labelable = labelableMixes(openMixes)
+async function formatMixListWithSpots(openMixes, lang, allOpenMixes = openMixes) {
+  // A numeração vem da lista TODA dos abertos (a mesma dos cartões).
+  const labelable = labelableMixes(allOpenMixes)
   const { data: rows, error } = await supabase
     .from('participants')
     .select('game_id, partner_id')
@@ -196,7 +206,7 @@ function mixMatchesToken(mix, token, label) {
 
   if (WEEKDAY_KEYS.includes(token) && weekdayKeyPt(mix.date) === token) return true
 
-  if (/^m[1-6]$/.test(token) && mix.level && mix.level.toLowerCase() === token) return true
+  if (LEVEL_TOKEN.test(token) && mix.level && mix.level.toLowerCase() === token) return true
 
   const hhmm = token.match(/^(\d{1,2})h(\d{0,2})$/) || token.match(/^(\d{1,2}):(\d{2})$/)
   if (hhmm) {
@@ -491,9 +501,27 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     return
   }
 
+  // #552 — «mix» mostra o cartão completo de cada mix aberto (o mesmo do
+  // anúncio: vagas numeradas, inscritos, «Escreve In»), e responder «In» a
+  // um cartão inscreve nesse mix. Anti-bloqueio: um mix cujo cartão saiu há
+  // menos de 10 min vai só na lista curta; no máximo 5 cartões por «mix».
   if (action === 'mix') {
-    const list = await formatMixListWithSpots(openMixes, lang)
-    await reply('mix_list', { count: openMixes.length, list })
+    const MAX_CARDS = 5
+    const labelable = labelableMixes(openMixes)
+    const fresh = openMixes.filter((mix) => !cardSentRecently(groupJid, mix.id)).slice(0, MAX_CARDS)
+    const states = await Promise.all(fresh.map((mix) => loadGame(mix.id)))
+    for (const state of states) {
+      const text = buildMixMessage(state, { label: mixLabel(state.game, labelable) })
+      const messageId = await sendText(groupJid, text)
+      recordMixMessage(messageId, state.game.id)
+      noteCardSent(groupJid, state.game.id, text, messageId)
+    }
+    const freshIds = new Set(fresh.map((mix) => mix.id))
+    const rest = openMixes.filter((mix) => !freshIds.has(mix.id))
+    if (rest.length > 0) {
+      const list = await formatMixListWithSpots(rest, lang, openMixes)
+      await reply(states.length > 0 ? 'mix_list_more' : 'mix_list_recent', { count: rest.length, list })
+    }
     return
   }
 
@@ -505,7 +533,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
    */
   const shownName = () => titleCase(partnerRequest.typedName || partnerRequest.name)
 
-  async function resolvePartner(profile, game = null) {
+  async function resolvePartner(profile, game = null, { addToRowId = null } = {}) {
     if ((partnerRequest.mentionedPns || []).length > 1) {
       await reply('partner_one_mention')
       return null
@@ -543,7 +571,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
       .eq('organization_id', organizationId)
     if (error) throw new Error(`Failed to load members for partner lookup: ${error.message}`)
     const query = stripAccents(partnerRequest.name.toLowerCase())
-    const people = rows.map((r) => ({ id: r.user_id, name: r.profile.name })).filter((x) => x.id !== profile.id)
+    const people = rows.map((r) => ({ id: r.user_id, name: r.profile.name })).filter((x) => !isMine(profile, x.id))
     const exact = people.filter((x) => stripAccents((x.name || '').toLowerCase()) === query)
     const matches = exact.length === 1 ? exact : people.filter((x) => nameMatches(x.name, query))
     if (matches.length === 1) return { partner: matches[0], isNewGuest: false }
@@ -557,6 +585,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
         pendingSuplenteConfirmations.set(pendingKey(senderPn, groupJid), {
           kind: 'pair_unregistered',
           gameId: game.id,
+          addToRowId,
           name,
           expiresAt: Date.now() + SUPLENTE_CONFIRM_TTL_MS,
           reprompted: false,
@@ -589,13 +618,22 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
       await reply('pair_signup_off')
       return
     }
-    if (capacity - people.length < 2) {
-      await reply(capacity - people.length <= 0 ? 'mix_full_pair' : 'mix_one_spot_pair')
+    const adding = Boolean(pending.addToRowId)
+    const needed = adding ? 1 : 2
+    if (capacity - people.length < needed) {
+      await reply(adding ? 'mix_full_add_partner' : capacity - people.length <= 0 ? 'mix_full_pair' : 'mix_one_spot_pair')
       return
     }
     const { profile, isNewGuest } = await requireProfileOrCreateGuest(resolvedProfile, senderPn)
     if (!profile) return
-    if (rows.some((row) => row.user_id === profile.id || row.partner_id === profile.id)) {
+    if (adding) {
+      // A inscrição sozinha tem de continuar lá, ser desta pessoa e sem parceiro.
+      const own = rows.find((row) => row.id === pending.addToRowId)
+      if (!own || own.status !== 'confirmed' || own.partner_id || !isMine(profile, own.user_id)) {
+        await reply('mix_no_longer_available')
+        return
+      }
+    } else if (rows.some((row) => isMine(profile, row.user_id) || isMine(profile, row.partner_id))) {
       await reply('already_joined')
       return
     }
@@ -603,10 +641,11 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     try {
       token = await joinWithUnregisteredPartner({
         gameId: game.id, organizationId, callerId: profile.id, name: pending.name,
+        existingParticipantId: pending.addToRowId ?? null,
       })
     } catch (err) {
       if (isGameFull(err)) {
-        await reply('mix_full_pair')
+        await reply(pending.addToRowId ? 'mix_full_add_partner' : 'mix_full_pair')
         return
       }
       console.error('Failed to join with unregistered partner:', err)
@@ -619,6 +658,57 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
       link: `${config.appUrl}/convite/${token}`,
     })
     if (isNewGuest) await reply('guest_joined', { name: profile.name, appUrl: config.appUrl })
+  }
+
+  /**
+   * #554 — quem já deu «In» sozinho junta o parceiro depois, sem sair: a
+   * inscrição que já existe ganha o partner_id, e mantém o lugar na lista.
+   * As regras do «In com …» (duplas fixas, «Inscrição em dupla», parceiro
+   * que não é a própria pessoa nem já está inscrito, sem conta → convidado)
+   * — mas só precisa de UMA vaga, a do parceiro. O trigger das vagas
+   * (participants_capacity_guard) volta a contar: a linha cresce.
+   */
+  async function addPartnerToRow({ game, people, capacity, profile, row, existingRows }) {
+    if (game.rotate_partners) {
+      await reply('partner_not_fixed_pairs')
+      return
+    }
+    if (!game.allow_pair_signup) {
+      await reply('pair_signup_off')
+      return
+    }
+    if (capacity - people.length < 1) {
+      await reply('mix_full_add_partner')
+      return
+    }
+    const resolved = await resolvePartner(profile, game, { addToRowId: row.id })
+    if (!resolved) return
+    const { partner, isNewGuest: partnerIsNewGuest } = resolved
+    if (isMine(profile, partner.id)) {
+      await reply('partner_is_you')
+      return
+    }
+    if (existingRows.some((r) => r.user_id === partner.id || r.partner_id === partner.id)) {
+      await reply('partner_already_in', { name: partner.name })
+      return
+    }
+    const { error } = await supabase
+      .from('participants')
+      .update({ partner_id: partner.id, joined_alone: false })
+      .eq('id', row.id)
+    timer.mark('gravar')
+    if (error) {
+      if (isGameFull(error)) {
+        await reply('mix_full_add_partner')
+        return
+      }
+      throw new Error(`Failed to add partner: ${error.message}`)
+    }
+    // A lista publicada de novo, já com a dupla, é a confirmação.
+    repostHooks.requestRepostForGame(organizationId, game.id)
+    if (partnerIsNewGuest) {
+      await reply('pair_partner_guest_created', { partner: partner.name, appUrl: config.appUrl })
+    }
   }
 
   // Entrar em dupla: as mesmas regras da app (GameDetails, «Entrar com
@@ -646,7 +736,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     const resolved = await resolvePartner(profile, game)
     if (!resolved) return
     const { partner, isNewGuest: partnerIsNewGuest } = resolved
-    if (partner.id === profile.id) {
+    if (isMine(profile, partner.id)) {
       await reply('partner_is_you')
       return
     }
@@ -689,7 +779,8 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
    * link), sai a dupla toda: não fica um lugar só com um convite.
    */
   async function leavePair({ game, pairRow, profile, rows, suplentes, choice = null }) {
-    const otherId = pairRow.user_id === profile.id ? pairRow.partner_id : pairRow.user_id
+    const mineInRow = isMine(profile, pairRow.user_id) ? pairRow.user_id : pairRow.partner_id
+    const otherId = mineInRow === pairRow.user_id ? pairRow.partner_id : pairRow.user_id
     const { data: others } = await supabase.from('profiles').select('id, name, claim_pending').eq('id', otherId)
     const other = others?.[0] ?? { id: otherId, name: '?', claim_pending: false }
 
@@ -705,7 +796,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
         await reply('out_mention_unreadable')
         return
       }
-      if (mentioned.id === profile.id) choice = 'me'
+      if (isMine(profile, mentioned.id)) choice = 'me'
       else if (mentioned.id === otherId) choice = 'partner'
       else {
         await reply('out_not_your_partner', { name: mentioned.name })
@@ -731,7 +822,8 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     }
 
     // Fica uma pessoa: a que não sai. A linha mantém a posição na lista.
-    const stayId = choice === 'me' ? otherId : profile.id
+    // Fica a conta que já estava na linha (pode ser o convidado do mesmo número).
+    const stayId = choice === 'me' ? otherId : mineInRow
     const { error } = await supabase
       .from('participants')
       .update({ user_id: stayId, partner_id: null, joined_alone: true })
@@ -757,7 +849,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     if (!profile) return
     const { game, rows, suplentes } = await loadGame(pending.gameId)
     const pairRow = rows.find((row) => row.id === pending.rowId && row.status === 'confirmed' && row.partner_id
-      && (row.user_id === profile.id || row.partner_id === profile.id))
+      && (isMine(profile, row.user_id) || isMine(profile, row.partner_id)))
     if (!OPEN_STATUSES.has(game.status) || new Date(game.date).getTime() <= Date.now() || !pairRow) {
       await reply('mix_no_longer_available')
       return
@@ -793,11 +885,17 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     // Os inscritos já vieram com o loadGame — sem outra ida à BD.
     const existingRows = rows
 
-    const ownConfirmedRow = existingRows.find((row) => row.user_id === profile.id && row.status === 'confirmed')
-    const ownWaitlistRow = existingRows.find((row) => row.user_id === profile.id && row.status === 'waitlisted')
-    const asPartnerRow = existingRows.find((row) => row.partner_id === profile.id)
+    const ownConfirmedRow = existingRows.find((row) => isMine(profile, row.user_id) && row.status === 'confirmed')
+    const ownWaitlistRow = existingRows.find((row) => isMine(profile, row.user_id) && row.status === 'waitlisted')
+    const asPartnerRow = existingRows.find((row) => isMine(profile, row.partner_id))
 
     if (action === 'in') {
+      // #554: já inscrito sozinho e agora «In com …» → junta o parceiro à
+      // inscrição que já tem, em vez de «Já estás inscrito».
+      if (ownConfirmedRow && !ownConfirmedRow.partner_id && partnerRequest) {
+        await addPartnerToRow({ game, people, capacity, profile, row: ownConfirmedRow, existingRows })
+        return
+      }
       if (ownConfirmedRow || asPartnerRow) {
         await reply('already_joined')
         return
@@ -854,7 +952,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
 
     // action === 'out'
     const pairRow = existingRows.find((row) => row.status === 'confirmed' && row.partner_id
-      && (row.user_id === profile.id || row.partner_id === profile.id))
+      && (isMine(profile, row.user_id) || isMine(profile, row.partner_id)))
     if (pairRow) {
       await leavePair({ game, pairRow, profile, rows, suplentes })
       return
@@ -970,7 +1068,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
         .eq('status', 'confirmed')
       if (error) throw new Error(`Failed to check existing participants: ${error.message}`)
       const memberGameIds = new Set(
-        rows.filter((row) => row.user_id === resolvedProfile.id || row.partner_id === resolvedProfile.id).map((row) => row.game_id)
+        rows.filter((row) => isMine(resolvedProfile, row.user_id) || isMine(resolvedProfile, row.partner_id)).map((row) => row.game_id)
       )
       const notJoined = openMixes.filter((m) => !memberGameIds.has(m.id))
       if (notJoined.length === 1) {
@@ -1001,7 +1099,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
   if (error) throw new Error(`Failed to check existing participants: ${error.message}`)
 
   const memberGameIds = new Set(
-    rows.filter((row) => row.user_id === profile.id || row.partner_id === profile.id).map((row) => row.game_id)
+    rows.filter((row) => isMine(profile, row.user_id) || isMine(profile, row.partner_id)).map((row) => row.game_id)
   )
   const memberMixes = openMixes.filter((m) => memberGameIds.has(m.id))
 

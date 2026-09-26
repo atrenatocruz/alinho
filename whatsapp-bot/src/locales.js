@@ -24,7 +24,8 @@ Para entrares num mix:
 Para entrares já em dupla (nos mixes com «👥 Inscrição individual ou em dupla»):
 • *In com João Silva* — o nome como está na app
 • ou *In @João* — menciona o teu parceiro
-Se ele ainda não estiver na app: com a menção @ o bot inscreve-o como convidado; pelo nome, o bot pergunta se queres inscrever a dupla na mesma e dá-te um link para lhe enviares. A dupla aparece na lista com o mesmo número à frente dos dois nomes, ex.: *(1)*.
+Se ele ainda não estiver na app: com a menção @ o bot inscreve-o como convidado; pelo nome, o bot pergunta se queres inscrever a dupla na mesma e dá-te um link para lhe enviares.
+Já entraste sozinho? *In com* e o nome (ou *In @parceiro*) junta o parceiro, sem perderes o lugar. A dupla aparece na lista com o mesmo número à frente dos dois nomes, ex.: *(1)*.
 
 Para saíres de um mix:
 • *Out* / *Fora* / *Estou fora* / *Saio*
@@ -33,12 +34,12 @@ Em dupla:
 • *Out @parceiro* — sai só o parceiro, tu ficas
 • *Out* — o bot pergunta: 1. Dupla · 2. Só tu · 3. Parceiro
 
-Para veres os mixes abertos, com as vagas de cada um:
+Para veres o cartão de cada mix aberto (inscritos e vagas) — responde-lhe com *In* para entrares:
 • */mix*
 
 Se houver mais do que um mix aberto ao mesmo tempo, cada um tem a sua própria mensagem e um número (🔢 01, 02...). Para dizer a qual te referes:
 • Responde à mensagem desse mix com *In* ou *Out*
-• Ou escreve *In 01*, *In segunda*, *In m4* — dá para combinar, ex.: *In segunda m4* ou *In 01 com João*
+• Ou escreve *In 01*, *In segunda*, *In m4* (nível: m, f, n ou mx + 1–6) — dá para combinar, ex.: *In segunda m4* ou *In 01 com João*
 
 Se o mix estiver cheio, o bot pergunta se queres entrar como suplente — responde *Sim* ou *Não*. Quando alguém sair, o primeiro suplente entra automaticamente. (Em dupla não há suplentes: a dupla precisa de duas vagas livres.)
 
@@ -91,6 +92,7 @@ Para veres esta lista:
   partner_joined_use_app: '🤖 Estás inscrito em dupla por outra pessoa — quem inscreveu a dupla pode tirá-la com *Out*, ou sai tu pela app 📱',
   out_pair_menu: '🤖 Estás inscrito em dupla com *{{partner}}*. Queres sair como?\n\n1. Dupla (saem os dois)\n2. Só tu ({{partner}} fica)\n3. Parceiro (sai {{partner}}, tu ficas)\n\nEscreve *1*, *2* ou *3*.',
   out_pair_reprompt: '🤖 Não percebi 🤔 Responde com *1* (dupla), *2* (só tu) ou *3* (parceiro).',
+  mix_full_add_partner: '🤖 O mix está cheio — não há vaga para o teu parceiro. Continuas inscrito sozinho.',
   out_pair_done_me: '🤖 Saíste do *{{title}}*. *{{partner}}* continua inscrito, agora sozinho.',
   out_pair_done_partner: '🤖 *{{partner}}* saiu do *{{title}}*. Continuas inscrito, agora sozinho.',
   out_pair_whole_unclaimed: '🤖 O *{{partner}}* ainda não entrou na app, por isso saiu a dupla toda.',
@@ -106,6 +108,8 @@ Para veres esta lista:
   disambiguate_out: '🤖 Estás inscrito em vários mixes! De qual queres sair?\n\n{{list}}\n\nResponde à mensagem do mix que queres com *Out*, ou escreve *Out* seguido do número, dia, hora ou nível (ex.: *Out 01*).',
   // commands.js — «/mix» e entrar em dupla (A2N, 24 set)
   mix_list_spots: '👥 {{filled}}/{{capacity}}',
+  mix_list_recent: '🤖 Os cartões destes mixes saíram há pouco aqui no grupo — responde a esse cartão com *In*, ou escreve *In* e o número:\n\n{{list}}',
+  mix_list_more: '🤖 E mais {{count}}:\n\n{{list}}\n\nEscreve *In* e o número para entrares.',
   mix_list_fixed_pairs: ' · aceita duplas 🤝',
   pair_signup_off: '🤖 Este mix é só de inscrição individual — entra sozinho com *In* 🎾 As duplas são formadas no início.',
   disambiguate_in_pair: '🤖 Há vários mixes abertos! Em qual querem entrar?\n\n{{list}}\n\nEscreve o número e o parceiro outra vez (ex.: *In 01 com João* ou *In 01 @João*).',
@@ -136,7 +140,8 @@ To join a mix:
 To join straight away as a pair (mixes marked «👥 Inscrição individual ou em dupla»):
 • *In com João Silva* — the name as it appears in the app
 • or *In @João* — mention your partner
-If they're not on the app yet: with the @ mention the bot signs them up as a guest; by name, the bot asks whether to sign up the pair anyway and gives you a link to send them. The pair shows up on the list with the same number next to both names, e.g. *(1)*.
+If they're not on the app yet: with the @ mention the bot signs them up as a guest; by name, the bot asks whether to sign up the pair anyway and gives you a link to send them.
+Already in on your own? *In com* and the name (or *In @partner*) adds your partner, keeping your spot. The pair shows up on the list with the same number next to both names, e.g. *(1)*.
 
 To leave a mix:
 • *Out* / *Fora* / *Estou fora* / *Saio*
@@ -145,12 +150,12 @@ As a pair:
 • *Out @partner* — only your partner leaves, you stay
 • *Out* — the bot asks: 1. Pair · 2. Just you · 3. Partner
 
-To see the open mixes and their free spots:
+To see the card of each open mix (players and free spots) — reply *In* to it to join:
 • */mix*
 
 If more than one mix is open at the same time, each one gets its own message and a number (🔢 01, 02...). To say which one you mean:
 • Reply to that mix's message with *In* or *Out*
-• Or type *In 01*, *In segunda* (weekday), *In m4* (level) — you can combine them, e.g. *In segunda m4* or *In 01 com João*
+• Or type *In 01*, *In segunda* (weekday), *In m4* (level: m, f, n or mx + 1–6) — you can combine them, e.g. *In segunda m4* or *In 01 com João*
 
 If the mix is full, the bot asks if you want to join as a substitute — reply *Sim* or *Não*. When someone leaves, the first substitute joins automatically. (Pairs have no substitute list: a pair needs two free spots.)
 
@@ -202,6 +207,7 @@ To see this list:
   partner_joined_use_app: '🤖 Someone else signed you up as a pair — whoever signed up the pair can take it off with *Out*, or leave through the app 📱',
   out_pair_menu: '🤖 You are signed up as a pair with *{{partner}}*. How do you want to leave?\n\n1. Pair (both leave)\n2. Just you ({{partner}} stays)\n3. Partner ({{partner}} leaves, you stay)\n\nType *1*, *2* or *3*.',
   out_pair_reprompt: "🤖 I didn't get that 🤔 Reply with *1* (pair), *2* (just you) or *3* (partner).",
+  mix_full_add_partner: "🤖 The mix is full — there's no spot for your partner. You're still signed up on your own.",
   out_pair_done_me: '🤖 You left *{{title}}*. *{{partner}}* is still signed up, now on their own.',
   out_pair_done_partner: '🤖 *{{partner}}* left *{{title}}*. You are still signed up, now on your own.',
   out_pair_whole_unclaimed: "🤖 *{{partner}}* hasn't joined the app yet, so the whole pair left.",
@@ -216,6 +222,8 @@ To see this list:
   not_in_any_open_mix: "🤖 You're not signed up for any open mix.",
   disambiguate_out: "🤖 You're signed up for several mixes! Which one do you want to leave?\n\n{{list}}\n\nReply to the mix you want with *Out*, or type *Out* followed by the number, weekday, time or level (e.g. *Out 01*).",
   mix_list_spots: '👥 {{filled}}/{{capacity}}',
+  mix_list_recent: "🤖 These mixes' cards went out here a moment ago — reply *In* to that card, or type *In* and the number:\n\n{{list}}",
+  mix_list_more: '🤖 And {{count}} more:\n\n{{list}}\n\nType *In* and the number to join.',
   mix_list_fixed_pairs: ' · pairs welcome 🤝',
   pair_signup_off: '🤖 This mix is individual sign-up only — join on your own with *In* 🎾 Pairs are formed when it starts.',
   disambiguate_in_pair: '🤖 There are several mixes open! Which one do you both want to join?\n\n{{list}}\n\nType the number and your partner again (e.g. *In 01 com João* or *In 01 @João*).',
