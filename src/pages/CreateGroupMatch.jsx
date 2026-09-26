@@ -7,7 +7,7 @@ import { getClubProfile } from '../lib/clubProfile'
 import { listOrganizationMembers } from '../lib/clubProfile'
 import { createGroupMatch } from '../lib/groupMatches'
 import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
-import { DateField, Select, PrimaryButton, Chips } from '../components/ui'
+import { DateTimeField, Select, PrimaryButton, Chips } from '../components/ui'
 import StepPage from '../components/steps/StepPage'
 import { describeError } from '../lib/errors'
 
@@ -21,8 +21,10 @@ export default function CreateGroupMatch() {
   const [org, setOrg] = useState(null)
   const [members, setMembers] = useState([])
   const [ranked, setRanked] = useState(true)
-  const [scheduledDate, setScheduledDate] = useState('')
-  const [scheduledTime, setScheduledTime] = useState('')
+  // «Dia e hora» num campo só, como no mix (versão final, 26 set).
+  const [when, setWhen] = useState('') // 'YYYY-MM-DDTHH:mm'
+  const scheduledDate = when.slice(0, 10)
+  const scheduledTime = when.slice(11, 16)
   const [location, setLocation] = useState('')
   const [locationCoords, setLocationCoords] = useState({ latitude: null, longitude: null })
   const [teamAPlayer2Id, setTeamAPlayer2Id] = useState('')
@@ -97,7 +99,6 @@ export default function CreateGroupMatch() {
   return (
     <StepPage
       title={t('creategroupmatch.title_new')}
-      top={org ? <p className="-mt-3 text-sm text-muted">{t('creategroupmatch.subtitle', { group: org.name })}</p> : null}
       step={step}
       total={4}
       stepLabel={stepLabels[step - 1]}
@@ -124,20 +125,16 @@ export default function CreateGroupMatch() {
       {step === 2 && (
         <>
           <div>
-            <p className={label}>{t('creategroupmatch.date_label')}</p>
-            <DateField value={scheduledDate} onChange={setScheduledDate} />
+            <p className={label}>{t('steps.datetime_label')}</p>
+            <DateTimeField value={when} onChange={setWhen} />
+            <p className="mt-2 text-xs text-muted">{t('createprivatematch.when_hint')}</p>
           </div>
-          <div>
-            <p className={label}>{t('creategroupmatch.time_label')}</p>
-            <input type="time" value={scheduledTime} onChange={(e) => setScheduledTime(e.target.value)} className="input-field" />
-          </div>
-          <p className="text-xs text-muted">{t('createprivatematch.when_hint')}</p>
         </>
       )}
 
       {step === 3 && (
         <div>
-          <p className={label}>{t('creategroupmatch.location_label')}</p>
+          <p className={label}>{t('steps.where_label')}</p>
           <input
             ref={locationInputRef}
             type="text"
@@ -151,13 +148,13 @@ export default function CreateGroupMatch() {
 
       {step === 4 && (
         <div>
-          <p className={label}>{t('creategroupmatch.ranked_heading')}</p>
+          <p className={label}>{t('steps.ranking_heading')}</p>
           <Chips
             value={ranked}
             onChange={setRanked}
             options={[
-              { value: true, label: t('createprivatematch.ranked_option') },
-              { value: false, label: t('createprivatematch.friendly_option') },
+              { value: true, label: t('steps.ranking_yes') },
+              { value: false, label: t('steps.ranking_friendly') },
             ]}
           />
         </div>

@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { Users, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { createPrivateMatch } from '../lib/privateMatches'
-import { PrimaryButton, Avatar, DateField, Select, Chips } from '../components/ui'
+import { PrimaryButton, Avatar, DateTimeField, Select, Chips } from '../components/ui'
 import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
 import PlayerSearch from '../components/PlayerSearch'
 import { describeError } from '../lib/errors'
@@ -85,11 +85,14 @@ export default function CreatePrivateMatch() {
   const [teamBPlayer2Guest, setTeamBPlayer2Guest] = useState('')
 
   const [rankedIntent, setRankedIntent] = useState(true)
-  const [scheduledDate, setScheduledDate] = useState('')
-  const [scheduledTime, setScheduledTime] = useState('')
+  // «Dia e hora» num campo só, como no mix (versão final, 26 set).
+  const [when, setWhen] = useState('') // 'YYYY-MM-DDTHH:mm'
+  const scheduledDate = when.slice(0, 10)
+  const scheduledTime = when.slice(11, 16)
   const [location, setLocation] = useState('')
   const [locationCoords, setLocationCoords] = useState({ latitude: null, longitude: null })
-  const [scoringFormat, setScoringFormat] = useState('pontos_simples')
+  // Sets vem escolhido, como na versão final (26 set).
+  const [scoringFormat, setScoringFormat] = useState('sets')
   const [numSets, setNumSets] = useState(3)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -207,20 +210,16 @@ export default function CreatePrivateMatch() {
       {step === 2 && (
         <>
           <div>
-            <p className={label}>{t('createprivatematch.date_label')}</p>
-            <DateField value={scheduledDate} onChange={setScheduledDate} />
+            <p className={label}>{t('steps.datetime_label')}</p>
+            <DateTimeField value={when} onChange={setWhen} />
+            <p className="mt-2 text-xs text-muted">{t('createprivatematch.when_hint')}</p>
           </div>
-          <div>
-            <p className={label}>{t('createprivatematch.time_label')}</p>
-            <input type="time" value={scheduledTime} onChange={(e) => setScheduledTime(e.target.value)} className="input-field" />
-          </div>
-          <p className="text-xs text-muted">{t('createprivatematch.when_hint')}</p>
         </>
       )}
 
       {step === 3 && (
         <div>
-          <p className={label}>{t('createprivatematch.location_label')}</p>
+          <p className={label}>{t('steps.where_label')}</p>
           <input
             ref={locationInputRef}
             type="text"
@@ -238,34 +237,31 @@ export default function CreatePrivateMatch() {
       {step === 4 && (
         <>
           <div>
-            <p className={label}>{t('createprivatematch.ranked_heading')}</p>
+            <p className={label}>{t('steps.ranking_heading')}</p>
             <Chips
               value={rankedIntent}
               onChange={setRankedIntent}
               options={[
-                { value: true, label: t('createprivatematch.ranked_option') },
-                { value: false, label: t('createprivatematch.friendly_option') },
+                { value: true, label: t('steps.ranking_yes') },
+                { value: false, label: t('steps.ranking_friendly') },
               ]}
             />
-            <p className="text-xs text-muted mt-1.5">
-              {rankedIntent
-                ? (hasGuest ? t('createprivatematch.ranked_hint_blocked_by_guest') : t('createprivatematch.ranked_hint'))
-                : t('createprivatematch.friendly_hint')}
-            </p>
+            {/* Com um convidado sem conta o jogo não conta: diz-se, não se
+                esconde (regra do ranking, #17-18 set). */}
+            {rankedIntent && hasGuest && (
+              <p className="mt-2 text-xs text-muted">{t('createprivatematch.ranked_hint_blocked_by_guest')}</p>
+            )}
           </div>
           <div>
-            <p className={label}>{t('createprivatematch.scoring_format_label')}</p>
+            <p className={label}>{t('steps.how_counted')}</p>
             <Chips
               value={scoringFormat}
               onChange={setScoringFormat}
               options={[
-                { value: 'pontos_simples', label: t('createprivatematch.format_points') },
                 { value: 'sets', label: t('createprivatematch.format_sets') },
+                { value: 'pontos_simples', label: t('createprivatematch.format_points') },
               ]}
             />
-            <p className="text-xs text-muted mt-1.5">
-              {scoringFormat === 'pontos_simples' ? t('createprivatematch.format_points_hint') : t('createprivatematch.format_sets_hint')}
-            </p>
             {scoringFormat === 'sets' && (
               <div className="mt-2">
                 <Select

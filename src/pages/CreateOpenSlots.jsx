@@ -7,7 +7,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useGoBack } from '../lib/useGoBack'
@@ -98,27 +98,24 @@ export default function CreateOpenSlots() {
                 «Hoje» (Trello #357). */}
             <DateField value={date} onChange={setDate} min={new Date().toISOString().slice(0, 10)} />
           </div>
-          <div className="space-y-2">
+          <div>
             <p className={label}>{t('open_slots.free_times_label')}</p>
+            <div className="space-y-2">
+            {/* Um horário por linha, início e fim lado a lado (versão
+                final, 26 set). Um horário deixado em branco não conta. */}
             {ranges.map((range, i) => (
-              <div key={i} className="flex items-center gap-2">
+              <div key={i} className="grid grid-cols-2 gap-2">
                 <PickerInput type="time" value={range.start} onChange={(e) => updateRange(i, 'start', e.target.value)}
-                  hint={t('open_slots.start_hint')} aria-label={t('open_slots.start_hint')} className="flex-1" />
-                <span className="text-muted">–</span>
+                  hint={t('open_slots.start_hint')} aria-label={t('open_slots.start_hint')} />
                 <PickerInput type="time" value={range.end} onChange={(e) => updateRange(i, 'end', e.target.value)}
-                  hint={t('open_slots.end_hint')} aria-label={t('open_slots.end_hint')} className="flex-1" />
-                {ranges.length > 1 && (
-                  <button type="button" onClick={() => setRanges((rs) => rs.filter((_, k) => k !== i))}
-                    className="p-2 text-danger" aria-label={t('open_slots.remove_range')}>
-                    <Trash2 size={18} />
-                  </button>
-                )}
+                  hint={t('open_slots.end_hint')} aria-label={t('open_slots.end_hint')} />
               </div>
             ))}
             <button type="button" onClick={() => setRanges((rs) => [...rs, EMPTY_RANGE()])}
-              className="press inline-flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-ctrl border border-dashed border-ink-200 text-sm font-extrabold text-ink-700">
+              className="press inline-flex min-h-[48px] w-full items-center justify-center gap-1.5 rounded-ctrl border border-dashed border-ink-200 text-sm font-extrabold text-ink-900">
               <Plus size={16} /> {t('open_slots.join_time')}
             </button>
+            </div>
           </div>
         </>
       ) : (
