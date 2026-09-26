@@ -19,6 +19,7 @@ import { groupGamesBySeries } from '../lib/recurrenceGrouping'
 import { AGE_RESTRICTIONS } from '../lib/ageCategories'
 import PlayerSearch from '../components/PlayerSearch'
 import WhatsappGroupsSection from '../components/WhatsappGroupsSection'
+import WhatsappPostHours from '../components/WhatsappPostHours'
 import { searchPlayers } from '../lib/privateMatches'
 import { inviteToOrganization } from '../lib/orgInvites'
 import { listPendingClubTeachers } from '../lib/teachers'
@@ -2252,6 +2253,14 @@ export default function GerirClube() {
               </div>
                 )
               })()}
+
+              {/* A que horas o robô publica os mixes no WhatsApp (#553). Some
+                  sozinho sem grupos de WhatsApp ou antes da migração. */}
+              <WhatsappPostHours
+                organizationId={currentOrganizationId}
+                hours={org?.whatsapp_post_hours}
+                onSaved={(saved) => setOrg((o) => (o ? { ...o, whatsapp_post_hours: saved } : o))}
+              />
 
               {/* O cartao para os jogos entre membros (/clube/:slug/jogos)
                   saiu daqui (Francisco, 24 set: «temos o card e o botao, nao

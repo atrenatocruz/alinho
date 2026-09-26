@@ -207,3 +207,164 @@ test('«In @parceiro» com conta registada fora do clube: o parceiro também pas
   assert.deepEqual(db.participants.map((p) => [p.user_id, p.partner_id]), [['a', 'r']])
   assert.ok(db.memberships.some((m) => m.user_id === 'r' && m.organization_id === 'o'), 'a Rita tem de ficar membro do clube')
 })
+
+// ── Níveis novos: F (feminino), N (sem sexo), MX (misto) — Renato, 26 set ──
+function levelMixes() {
+  db.games = [
+    { id: 'gm', organization_id: 'o', title: 'Mix A', status: 'open', origin: 'manual', level: 'M4',
+      date: new Date(Date.now() + 1 * 864e5).toISOString(), num_courts: 1, max_players: 4, rotate_partners: false },
+    { id: 'gx', organization_id: 'o', title: 'Mix B', status: 'open', origin: 'manual', level: 'MX4',
+      date: new Date(Date.now() + 2 * 864e5).toISOString(), num_courts: 1, max_players: 4, rotate_partners: false },
+    { id: 'gf', organization_id: 'o', title: 'Mix C', status: 'open', origin: 'manual', level: 'F3',
+      date: new Date(Date.now() + 3 * 864e5).toISOString(), num_courts: 1, max_players: 4, rotate_partners: false },
+    { id: 'gn', organization_id: 'o', title: 'Mix D', status: 'open', origin: 'manual', level: 'N2',
+      date: new Date(Date.now() + 4 * 864e5).toISOString(), num_courts: 1, max_players: 4, rotate_partners: false },
+  ]
+}
+
+for (const [text, gameId] of [['in mx4', 'gx'], ['in m4', 'gm'], ['in f3', 'gf'], ['in n2', 'gn'], ['inmx4', 'gx'], ['in F3', 'gf']]) {
+  test(`«${text}» entra no mix com esse nível`, async () => {
+    levelMixes()
+    await say(text)
+    assert.deepEqual(db.participants.map((p) => p.game_id), [gameId])
+  })
+}
+
+test('o filtro de nível do grupo aceita os níveis novos e não liga a maiúsculas', async () => {
+  const { mixVisibleToGroup } = await import('../src/groups.js')
+  const group = { levels: ['MX4', 'N2'] }
+  assert.equal(mixVisibleToGroup({ level: 'MX4' }, group), true)
+  assert.equal(mixVisibleToGroup({ level: 'mx4' }, group), true)
+  assert.equal(mixVisibleToGroup({ level: 'N2' }, group), true)
+  assert.equal(mixVisibleToGroup({ level: 'M4' }, group), false)
+  assert.equal(mixVisibleToGroup({ level: 'F3' }, { levels: ['f3'] }), true)
+})
+
+// ── Duas contas com o mesmo número (caso do Leandro, 26 set) ───────────────
+// O convidado do bot (g) está inscrito; a conta registada (a) é a escolhida.
+function twoAccounts() {
+  db.profiles.push({ id: 'g', name: 'Bernardo (convidado)', email: 'guest-1@whatsapp.alinho.pt', phone_hash: hash('911111111'), language: 'pt' })
+  db.memberships.push({ user_id: 'g', organization_id: 'o', is_guest: true })
+}
+
+test('«Out» encontra a inscrição feita com o convidado do mesmo número', async () => {
+  twoAccounts()
+  db.participants.push({ id: 'pg', game_id: 'm', user_id: 'g', status: 'confirmed', created_at: '2026-09-25T22:17:00Z' })
+  const out = await say('out')
+  assert.doesNotMatch(out, /Não estás inscrito/)
+  assert.equal(db.participants.length, 0)
+})
+
+test('«In» não inscreve outra vez quem já está com o convidado do mesmo número', async () => {
+  twoAccounts()
+  db.participants.push({ id: 'pg', game_id: 'm', user_id: 'g', status: 'confirmed', created_at: '2026-09-25T22:17:00Z' })
+  const out = await say('in')
+  assert.match(out, /Já estás inscrito/)
+  assert.equal(db.participants.length, 1)
+})
+
+test('dupla inscrita com o convidado: «Out» abre o menu e «3» deixa o convidado sozinho', async () => {
+  twoAccounts()
+  db.participants.push({ id: 'row', game_id: 'm', user_id: 'g', partner_id: 'b', status: 'confirmed', created_at: '2026-09-25T22:17:00Z' })
+  assert.match(await say('out'), /1\. Dupla/)
+  await say('3')
+  assert.deepEqual([row().user_id, row().partner_id], ['g', null])
+})
+
+// ── #554: juntar o parceiro a quem já deu «In» sozinho ────────────────────
+function soloIn({ full = false } = {}) {
+  db.participants.push({ id: 'solo', game_id: 'm', user_id: 'a', partner_id: null, status: 'confirmed', joined_alone: true, created_at: '2026-09-25T15:54:00Z' })
+  if (full) {
+    for (const [id, u] of [['x1', 'u1'], ['x2', 'u2'], ['x3', 'u3']]) {
+      db.participants.push({ id, game_id: 'm', user_id: u, status: 'confirmed', created_at: '2026-09-25T16:00:00Z' })
+    }
+  }
+}
+const solo = () => db.participants.find((p) => p.id === 'solo')
+
+test('#554 «In com» já inscrito sozinho junta o parceiro na mesma linha (mantém o lugar)', async () => {
+  soloIn()
+  const out = await say('in com afonso')
+  assert.doesNotMatch(out, /Já estás inscrito/)
+  assert.deepEqual([solo().partner_id, solo().joined_alone, solo().created_at], ['b', false, '2026-09-25T15:54:00Z'])
+  assert.equal(db.participants.length, 1)
+})
+
+test('#554 mix cheio: recusa com mensagem clara e fica como estava', async () => {
+  soloIn({ full: true })
+  const out = await say('in com afonso')
+  assert.match(out, /não há vaga para o teu parceiro/)
+  assert.equal(solo().partner_id, null)
+})
+
+test('#554 parceiro já inscrito: recusa', async () => {
+  soloIn()
+  db.participants.push({ id: 'pb', game_id: 'm', user_id: 'b', status: 'confirmed', created_at: '2026-09-25T16:00:00Z' })
+  const out = await say('in com afonso')
+  assert.match(out, /já está inscrito/)
+  assert.equal(solo().partner_id, null)
+})
+
+test('#554 mix sem «Inscrição em dupla»: recusa', async () => {
+  soloIn()
+  db.games[0].allow_pair_signup = false
+  const out = await say('in com afonso')
+  assert.match(out, /só de inscrição individual/)
+  assert.equal(solo().partner_id, null)
+})
+
+test('#554 parceiro que não está na app: «Sim» junta-o à inscrição que já existe, com link', async () => {
+  soloIn()
+  assert.match(await say('in com rui costa'), /Queres inscrever a dupla/)
+  const out = await say('sim')
+  assert.match(out, /convite\//)
+  assert.equal(db.participants.length, 1)
+  assert.ok(solo().partner_id, 'o parceiro fica na linha que já existia')
+  assert.equal(db.partner_invites[0].participant_id, 'solo')
+})
+
+// ── #552: «mix» mostra o cartão completo de cada mix aberto ────────────────
+async function sayWithIds(text, quotedStanzaId = null, pn = '351911111111') {
+  const sent = []
+  let n = 0
+  await handleGroupMessage(
+    { groupJid: 'g@g.us', senderPn: `${pn}@s.whatsapp.net`, text, message: {}, quotedStanzaId },
+    { sendText: async (_g, t) => { sent.push({ id: `card-${Date.now()}-${++n}`, text: t }); return sent.at(-1).id } },
+  )
+  return sent
+}
+function threeMixes() {
+  db.games = ['m1', 'm2', 'm3'].map((id, i) => ({
+    id, organization_id: 'o', title: `Mix ${id}`, status: 'open', origin: 'manual',
+    date: new Date(Date.now() + (i + 1) * 864e5).toISOString(), num_courts: 1, max_players: 4, rotate_partners: false,
+  }))
+}
+
+test('#552 «mix» com 1 mix aberto: envia o cartão completo', async () => {
+  sync._resetGroupStateForTests()
+  const sent = await sayWithIds('mix')
+  assert.equal(sent.length, 1)
+  assert.match(sent[0].text, /\*Mix\*/)
+  assert.match(sent[0].text, /\(vaga livre\)/)
+})
+
+test('#552 «mix» com 3 mixes: 3 cartões numerados; «mix» repetido logo a seguir só dá a lista curta', async () => {
+  sync._resetGroupStateForTests()
+  threeMixes()
+  const first = await sayWithIds('mix')
+  assert.equal(first.length, 3)
+  assert.match(first[0].text, /Nº: 01/)
+  assert.match(first[2].text, /Nº: 03/)
+  const again = await sayWithIds('/mix')
+  assert.equal(again.length, 1)
+  assert.match(again[0].text, /saíram há pouco/)
+  assert.doesNotMatch(again[0].text, /\(vaga livre\)/)
+})
+
+test('#552 responder «In» a um cartão do «mix» inscreve nesse mix', async () => {
+  sync._resetGroupStateForTests()
+  threeMixes()
+  const cards = await sayWithIds('mix')
+  await sayWithIds('in', cards[1].id)
+  assert.deepEqual(db.participants.map((p) => p.game_id), ['m2'])
+})

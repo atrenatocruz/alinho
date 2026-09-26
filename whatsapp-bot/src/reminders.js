@@ -1,12 +1,15 @@
 import { supabase } from './supabase.js'
 import { config } from './config.js'
 import { getGroups, getGroupsForOrg, getServedOrgIds, mixVisibleToGroup } from './groups.js'
-import { getOpenMixes, loadGame, formatDateTime } from './roster.js'
+import { getOpenMixes, loadGame, formatDateTime, buildMixMessage, recordMixMessage, labelableMixes, mixLabel } from './roster.js'
+import { cardSentRecently, noteCardSent } from './sync.js'
+import { dueOrgs, postKey } from './postSchedule.js'
 import { helpFooter } from './messages.js'
 import { t } from './locales.js'
 
 const GAME_DAY_CHECK_INTERVAL_MS = 10 * 60 * 1000 // 10 min — fine grain relative to reminderHoursBefore
-const DIGEST_CHECK_INTERVAL_MS = 5 * 60 * 1000 // just needs to land inside the target hour once a day
+const POST_CHECK_INTERVAL_MS = 5 * 60 * 1000 // tem de cair nos primeiros 15 min de cada hora (postSchedule.js)
+const MAX_CARDS_PER_POST = 5
 
 
 // A WhatsApp mention token is "@<digits>" inline in the text, matched up
@@ -128,63 +131,85 @@ async function checkGameDayReminders({ sendText }) {
   }
 }
 
-/** Once a day, nudges each group about every mix IT can see that's open but not yet full. */
-async function sendOpenMixesDigest({ sendText, getGroupMentions }) {
-  const groups = await getGroups()
+/**
+ * As horas de publicação de cada clube (#553). Sem a migração
+ * (migration_whatsapp_post_hours.sql) a coluna não existe: fica a hora de
+ * sempre (DAILY_DIGEST_HOUR) para todos, como antes.
+ */
+export async function loadPostHours(orgIds) {
+  const fallback = () => new Map(orgIds.map((id) => [id, [config.dailyDigestHour]]))
+  if (orgIds.length === 0) return new Map()
+  const { data, error } = await supabase.from('organizations').select('id, whatsapp_post_hours').in('id', orgIds)
+  if (error) {
+    if (error.code !== '42703') console.error('Failed to load WhatsApp post hours:', error)
+    return fallback()
+  }
+  return new Map((data || []).map((org) => [org.id, Array.isArray(org.whatsapp_post_hours) ? org.whatsapp_post_hours : [config.dailyDigestHour]]))
+}
 
+/**
+ * Publica, em cada grupo de WhatsApp do clube, o cartão completo de cada mix
+ * aberto que ainda tem vagas — o mesmo cartão do anúncio e do «mix» (#552),
+ * com o número 01/02 igual; responder «In» a um cartão inscreve nesse mix.
+ * @all em cada publicação (escolha do Renato), mas uma vez por grupo: só na
+ * 1.ª mensagem. Anti-bloqueio: no máximo 5 cartões por grupo, e não se
+ * repete um cartão que saiu no grupo há menos de 10 min.
+ */
+export async function publishOrgCards(orgId, { sendText, getGroupMentions }) {
+  const groups = await getGroupsForOrg(orgId)
   for (const group of groups) {
     try {
       const openMixes = (await getOpenMixes(group.organizationId)).filter((mix) => mixVisibleToGroup(mix, group))
-      const mixStates = await Promise.all(openMixes.map((mix) => loadGame(mix.id)))
-      const incomplete = mixStates.filter(({ people, capacity }) => people.length < capacity)
-      if (incomplete.length === 0) continue
-
-      // Group broadcast, not addressed to one profile — stays 'pt', same
-      // reasoning as sendGameDayReminder's group post above.
-      const lang = 'pt'
-      const lines = incomplete.map(({ game, people, capacity }) => {
-        const vagas = capacity - people.length
-        const locationLine = game.location ? `, ${game.location}` : ''
-        return t('digest_mix_line', lang, {
-          title: game.title,
-          when: formatDateTime(game.date),
-          location: locationLine,
-          filled: people.length,
-          capacity,
-          vagas,
-        })
-      })
+      const labelable = labelableMixes(openMixes)
+      const states = await Promise.all(
+        openMixes.filter((mix) => !cardSentRecently(group.groupJid, mix.id)).map((mix) => loadGame(mix.id))
+      )
+      const withSpots = states.filter(({ people, capacity }) => people.length < capacity).slice(0, MAX_CARDS_PER_POST)
+      if (withSpots.length === 0) continue
 
       const mentions = await getGroupMentions(group.groupJid)
-      const text = t('digest_text', lang, { lines: lines.join('\n\n') }) + helpFooter(lang)
-      await sendText(group.groupJid, text, { mentions })
+      for (let i = 0; i < withSpots.length; i++) {
+        const state = withSpots[i]
+        const card = buildMixMessage(state, { label: mixLabel(state.game, labelable) })
+        const text = i === 0 ? `📢 @all\n\n${card}` : card
+        const messageId = await sendText(group.groupJid, text, i === 0 ? { mentions } : {})
+        recordMixMessage(messageId, state.game.id)
+        noteCardSent(group.groupJid, state.game.id, card, messageId)
+      }
     } catch (err) {
       // Um grupo com problemas (JID inválido, expulso do grupo…) nunca
-      // impede o digest dos restantes.
-      console.error(`Failed to send daily digest to ${group.groupJid}:`, err)
+      // impede a publicação nos restantes.
+      console.error(`Failed to publish mixes to ${group.groupJid}:`, err)
     }
   }
 }
 
-// No date library in this project — reading the current wall-clock hour in
+// No date library in this project — reading the current wall-clock time in
 // a specific timezone via toLocaleString's implicit re-parse is the
-// pragmatic option over pulling in a dependency for one field.
-function lisbonHour() {
-  return new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Lisbon' })).getHours()
+// pragmatic option over pulling in a dependency for a couple of fields.
+function lisbonNow() {
+  const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Lisbon' }))
+  return {
+    hour: d.getHours(),
+    minute: d.getMinutes(),
+    // Dia de Lisboa como chave — o ISO em UTC mudava de dia umas horas antes.
+    dayKey: new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Lisbon' }),
+  }
 }
 
-let lastDigestDateKey = null
+const sentPosts = new Set()
 
-function checkDailyDigest({ sendText, getGroupMentions }) {
-  if (lisbonHour() !== config.dailyDigestHour) return
-  // Lisbon-local calendar day as the dedupe key — plain ISO-UTC slicing
-  // would flip a couple hours off from the actual Lisbon day boundary.
-  const todayKey = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Lisbon' })
-  if (lastDigestDateKey === todayKey) return
-  lastDigestDateKey = todayKey
-  sendOpenMixesDigest({ sendText, getGroupMentions }).catch((err) =>
-    console.error('Failed to send daily open-mixes digest:', err)
-  )
+async function checkScheduledPosts({ sendText, getGroupMentions }) {
+  const { hour, minute, dayKey } = lisbonNow()
+  if (minute >= 15) return
+  const orgIds = await getServedOrgIds()
+  const hoursByOrg = await loadPostHours(orgIds)
+  for (const orgId of dueOrgs({ hoursByOrg, hour, minute, dayKey, sent: sentPosts })) {
+    sentPosts.add(postKey(orgId, dayKey, hour))
+    await publishOrgCards(orgId, { sendText, getGroupMentions }).catch((err) =>
+      console.error(`Failed to publish scheduled mixes for org ${orgId}:`, err)
+    )
+  }
 }
 
 /** Starts both reminder loops. Call once from index.js, same shape as startSync. */
@@ -194,6 +219,6 @@ export function startReminders({ sendText, getGroupMentions }) {
   }, GAME_DAY_CHECK_INTERVAL_MS)
 
   setInterval(() => {
-    checkDailyDigest({ sendText, getGroupMentions })
-  }, DIGEST_CHECK_INTERVAL_MS)
+    checkScheduledPosts({ sendText, getGroupMentions }).catch((err) => console.error('Scheduled posts check failed:', err))
+  }, POST_CHECK_INTERVAL_MS)
 }

@@ -139,5 +139,8 @@ export function mixVisibleToGroup(game, group) {
   if (game.origin === 'open_slot') return true
   if (!group.levels || group.levels.length === 0) return true
   if (!game.level) return true
-  return group.levels.includes(game.level)
+  // Sem ligar a maiúsculas: «mx4» escrito à mão na tabela ou no mix não
+  // pode esconder o mix para sempre sem erro em lado nenhum.
+  const level = String(game.level).toUpperCase()
+  return group.levels.some((l) => String(l).toUpperCase() === level)
 }
