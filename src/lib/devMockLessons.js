@@ -239,8 +239,10 @@ export const LESSON_RPC_MOCKS = {
       ],
       busy: [{ starts_at: new Date(d.getTime() - 30 * 60000).toISOString(), ends_at: new Date(d.getTime() + 30 * 60000).toISOString(), kind: 'request' }],
       mine: sent ? [{ id: 'rq-1', teacher_profile_id: 'tp-ana', starts_at: d.toISOString(), duration_minutes: 90,
-        lesson_type: 'duo', price_per_person: 35, contact_via: sent === 'proposal' ? 'whatsapp' : sent, status: 'pending', org_name: 'Clube Exemplo',
+        lesson_type: 'duo', price_per_person: 35, contact_via: ['proposal', 'merge'].includes(sent) ? 'whatsapp' : sent, status: 'pending', org_name: 'Clube Exemplo',
         // localStorage.mockBookingSent = 'proposal' — o professor propôs outra hora.
+        ...(sent === 'merge' ? { merge: { id: 'mg-1', starts_at: new Date(d.getTime() + 30 * 60000).toISOString(), duration_minutes: 60,
+          lesson_type: 'duo', price_per_person: 23, status: 'pending' }, merge_answer: 'pending' } : {}),
         ...(sent === 'proposal' ? { proposed_by: 'teacher', proposed_starts_at: new Date(d.getTime() + 2 * 86400000 + 7.5 * 3600000).toISOString(), original_starts_at: d.toISOString() } : {}) }] : [],
       i_have_whatsapp: localStorage.getItem('mockHasWhatsapp') === 'true',
     }
@@ -262,6 +264,10 @@ export const LESSON_RPC_MOCKS = {
         lesson_type: 'private', price_per_person: 40, org_name: 'Clube Exemplo', lesson_id: null, court_booked_at: null,
         student: { user_id: 'u-rui', name: 'Rui Costa', gender: 'masculino', rating: 1500 }, contact_via: 'email', contact_href: 'mailto:rui@example.com' },
     ]
+    if (mode === 'merged') {
+      const merge = { id: 'mg-1', starts_at: at(11, 0), duration_minutes: 60, lesson_type: 'duo', price_per_person: 23, status: 'pending' }
+      return [{ ...pending[0], merge, merge_answer: 'pending' }, { ...pending[1], merge, merge_answer: 'accepted' }]
+    }
     if (mode === 'proposals') {
       return [
         { ...pending[0], proposed_by: 'student', proposed_starts_at: at(12, 0), original_starts_at: pending[0].starts_at },
@@ -276,6 +282,9 @@ export const LESSON_RPC_MOCKS = {
   accept_lesson_request: () => 'les-new',
   accept_lesson_proposal: () => 'les-new',
   propose_lesson_time: () => null,
+  propose_lesson_merge: () => 'mg-1',
+  answer_lesson_merge: () => null,
+  cancel_lesson_merge: () => null,
   reject_lesson_request: () => null,
   mark_lesson_court_booked: () => null,
   cancel_lesson_request: () => null,

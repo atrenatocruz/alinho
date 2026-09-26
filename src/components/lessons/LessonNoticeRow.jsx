@@ -15,11 +15,16 @@ export const LESSON_NOTICE_KINDS = [
   'lesson_needs_court',
   // Propor outra hora, dos dois lados (migration_lessons_5).
   'lesson_time_proposed_by_teacher', 'lesson_time_proposed_by_student', 'lesson_proposal_accepted',
+  // Juntar pedidos (migration_lessons_6).
+  'lesson_merge_proposed', 'lesson_merge_declined', 'lesson_merge_booked',
 ]
 
 function target(notice) {
   const d = notice.data || {}
   if (['lesson_request_new', 'lesson_request_cancelled', 'lesson_time_proposed_by_student', 'lesson_proposal_accepted'].includes(notice.kind)) return '/perfil/aulas'
+  if (notice.kind === 'lesson_merge_declined') return '/perfil/aulas'
+  if (notice.kind === 'lesson_merge_booked') return notice.lesson_id ? `/aula/${notice.lesson_id}` : '/perfil/aulas'
+  if (notice.kind === 'lesson_merge_proposed') return d.teacher_profile_id ? `/professor/${d.teacher_profile_id}/pedir` : '/'
   if (notice.kind === 'lesson_time_proposed_by_teacher') return d.teacher_profile_id ? `/professor/${d.teacher_profile_id}/pedir` : '/'
   if (notice.kind === 'lesson_request_accepted') return notice.lesson_id ? `/aula/${notice.lesson_id}` : '/'
   if (notice.kind === 'lesson_request_rejected' || notice.kind === 'lesson_needs_court') return '/'

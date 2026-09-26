@@ -4,8 +4,10 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Check, GraduationCap } from 'lucide-react'
 import {
-  acceptLessonRequest, emailLessonRequest, listMyTeacherRequests, markLessonCourtBooked, proposeLessonTime, rejectLessonRequest,
+  acceptLessonRequest, cancelLessonMerge, emailLessonRequest, listMyTeacherRequests, markLessonCourtBooked, proposeLessonMerge,
+  proposeLessonTime, rejectLessonRequest,
 } from '../lib/lessonsApi'
+import MergeSheet from '../components/lessons/MergeSheet'
 import ProposeTimeSheet from '../components/lessons/ProposeTimeSheet'
 import { endTime } from '../lib/lessonBooking'
 import { compactTime } from '../lib/teacherSchedule'
@@ -44,6 +46,7 @@ export default function TeacherLessons() {
   const [rejecting, setRejecting] = useState(null)
   const [notice, setNotice] = useState('')
   const [proposing, setProposing] = useState(null) // pedido a que propõe outra hora
+  const [merging, setMerging] = useState(null) // pedidos a juntar
 
   const load = async () => {
     try {
@@ -63,10 +66,19 @@ export default function TeacherLessons() {
   }, [notice])
 
   const pending = rows.filter((r) => r.status === 'pending')
+  // Pedidos que chocam e ainda não estão numa junção: grupos para sugerir
+  // «Juntar numa aula a N» (SPEC de 18 set §6.1).
+  const free = pending.filter((r) => !r.merge && r.proposed_by !== 'teacher')
+  const groups = []
+  for (const r of free) {
+    const g = groups.find((grp) => grp.some((o) => o.teacher_profile_id === r.teacher_profile_id && overlaps(o, r)))
+    if (g) g.push(r); else groups.push([r])
+  }
+  const clashGroups = groups.filter((g) => g.length >= 2 && g.length <= 4)
   const accepted = rows.filter((r) => r.status === 'accepted')
-  const when = (r, iso = r.starts_at) => {
+  const when = (r, iso = r.starts_at, minutes = r.duration_minutes) => {
     const { d, hm } = parts(iso)
-    return `${t(`lessons.wd_short_${((d.getDay() + 6) % 7) + 1}`).replace(/^./, (c) => c.toUpperCase())} ${d.getDate()}/${d.getMonth() + 1} · ${compactTime(hm)}–${compactTime(endTime(hm, r.duration_minutes))}`
+    return `${t(`lessons.wd_short_${((d.getDay() + 6) % 7) + 1}`).replace(/^./, (c) => c.toUpperCase())} ${d.getDate()}/${d.getMonth() + 1} · ${compactTime(hm)}–${compactTime(endTime(hm, minutes))}`
   }
   const ago = (iso) => {
     const mins = Math.max(1, Math.round((Date.now() - new Date(iso).getTime()) / 60000))
@@ -120,7 +132,7 @@ export default function TeacherLessons() {
   )
 
   const requestCard = (r) => {
-    const clash = pending.find((o) => o.id !== r.id && overlaps(o, r))
+    const clash = !r.merge && pending.find((o) => o.id !== r.id && !o.merge && overlaps(o, r))
     return (
       <div key={r.id} className="card space-y-2">
         {head(r)}
@@ -129,6 +141,15 @@ export default function TeacherLessons() {
         </p>
         {/* Propor outra hora (lista das aprovações, Francisco 26 set): quem
             recebe a proposta é que aceita. */}
+        {r.merge && (
+          <p className="rounded-ctrl bg-ink-50 px-3 py-2 text-sm text-ink-900">
+            {t('merge.teacher_line', { type: t(`lessons.price_row_${r.merge.lesson_type}`), when: when(r, r.merge.starts_at, r.merge.duration_minutes), price: euros(r.merge.price_per_person) })}
+            {' '}
+            <span className={`inline-flex rounded-full px-2 py-[2px] text-[11px] font-extrabold ${r.merge_answer === 'pending' ? 'bg-ink-50 text-ink-700' : 'bg-ok/10 text-ok'}`}>
+              {r.merge_answer === 'pending' ? t(r.student?.gender === 'feminino' ? 'merge.waiting_pill_f' : 'merge.waiting_pill', { name: (r.student?.name || '').split(' ')[0] }) : t('merge.in_pill')}
+            </span>
+          </p>
+        )}
         {r.proposed_by === 'student' && (
           <p className="rounded-ctrl bg-ink-50 px-3 py-2 text-sm text-ink-900">
             {t('proposal.student_proposed', { name: r.student?.name || '', when: when(r, r.proposed_starts_at), asked: when(r, r.original_starts_at || r.starts_at) })}
@@ -144,16 +165,23 @@ export default function TeacherLessons() {
         </p>
         {errorBox(r)}
         <div className="flex flex-wrap items-center gap-2 pt-1">
-          {r.proposed_by !== 'teacher' && (
+          {r.merge ? (
+            <button type="button" disabled={busyId === r.id} onClick={async () => { await cancelLessonMerge(r.merge.id); await load() }}
+              className="inline-flex items-center justify-center min-h-[40px] px-4 rounded-full border-[1.5px] border-line bg-white text-ink-900 text-sm font-extrabold disabled:opacity-40">
+              {t('merge.undo')}
+            </button>
+          ) : r.proposed_by !== 'teacher' && (
             <button type="button" disabled={busyId === r.id} onClick={() => accept(r)}
               className="inline-flex items-center justify-center min-h-[40px] px-5 rounded-full bg-ink-900 text-white text-sm font-extrabold disabled:opacity-40">
               {t('myLessons.accept')}
             </button>
           )}
-          <button type="button" disabled={busyId === r.id} onClick={() => setProposing(r)}
-            className="inline-flex items-center justify-center min-h-[40px] px-4 rounded-full border-[1.5px] border-line bg-white text-ink-900 text-sm font-extrabold disabled:opacity-40">
-            {t('proposal.propose')}
-          </button>
+          {!r.merge && (
+            <button type="button" disabled={busyId === r.id} onClick={() => setProposing(r)}
+              className="inline-flex items-center justify-center min-h-[40px] px-4 rounded-full border-[1.5px] border-line bg-white text-ink-900 text-sm font-extrabold disabled:opacity-40">
+              {t('proposal.propose')}
+            </button>
+          )}
           <button type="button" disabled={busyId === r.id} onClick={() => setRejecting(r)}
             className="min-h-[40px] px-3 text-sm font-extrabold text-muted hover:text-ink-900 disabled:opacity-40">
             {t('myLessons.reject')}
@@ -202,7 +230,27 @@ export default function TeacherLessons() {
       ) : tab === 'requests' ? (
         pending.length === 0
           ? <EmptyState icon={GraduationCap} title={t('myLessons.no_requests_title')} subtitle={t('myLessons.no_requests_text')} />
-          : <div className="space-y-3">{pending.map(requestCard)}</div>
+          : (
+            <div className="space-y-3">
+              {/* «Dois pedidos que chocam aparecem juntos com a sugestão»
+                  (desenho de 18 set): a sugestão por cima, numa caixa só. */}
+              {clashGroups.map((g) => (
+                <div key={g.map((r) => r.id).join('|')} className="rounded-card border border-lime-400/60 bg-lime-400/10 p-2 space-y-2">
+                  <div className="px-1.5 pt-1 space-y-2">
+                    <p className="text-sm text-ink-900">
+                      {t('merge.suggest', { count: g.length, when: when(g[0]), names: g.map((r) => r.student?.name).join(', ') })}
+                    </p>
+                    <button type="button" onClick={() => setMerging(g)}
+                      className="inline-flex items-center justify-center min-h-[40px] px-4 rounded-full bg-ink-900 text-white text-sm font-extrabold">
+                      {t('merge.propose')}
+                    </button>
+                  </div>
+                  {g.map(requestCard)}
+                </div>
+              ))}
+              {pending.filter((r) => !clashGroups.some((g) => g.includes(r))).map(requestCard)}
+            </div>
+          )
       ) : (
         accepted.length === 0
           ? <EmptyState icon={GraduationCap} title={t('myLessons.no_lessons_title')} subtitle={t('myLessons.no_lessons_text')} />
@@ -219,6 +267,13 @@ export default function TeacherLessons() {
         onConfirm={async () => { await rejectLessonRequest(rejecting.id); emailLessonRequest('lesson_request_student', rejecting.id); await load() }}
         onClose={() => setRejecting(null)}
         errorOf={(err) => describeError(t, err, 'myLessons.error_reject')}
+      />
+
+      <MergeSheet
+        open={!!merging}
+        requests={merging || []}
+        onSend={async (opts) => { await proposeLessonMerge(merging.map((r) => r.id), opts); setNotice(t('merge.sent')); await load() }}
+        onClose={() => setMerging(null)}
       />
 
       <ProposeTimeSheet
