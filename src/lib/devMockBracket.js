@@ -5,12 +5,13 @@
 // do mockTDraw e do mockTMyGamesReal (sou a dupla e1 do M4):
 //   localStorage.mockTBracket = '8' | '16' | '32'   ← quantas duplas
 //     '3': 3 duplas, uma passa direto à final — uma meia-final só
+//     '12' | '28': com «Bye» (quadro de 16 e de 32), como a M4 do Smash Cup
 //   localStorage.mockTBracketNoTime = 'true'  ← nenhum jogo com hora
 //   localStorage.mockTBracketStage = 'antes' | 'meio' | 'fim'
 //     antes: sorteado, nada jogado · meio: 1.ª ronda jogada e a 2.ª a meio
 //     fim: tudo jogado até à final
 const size = () => Number(localStorage.getItem('mockTBracket')) || 0
-const on = () => [3, 8, 16, 32].includes(size())
+const on = () => [3, 8, 12, 16, 28, 32].includes(size())
 const stage = () => localStorage.getItem('mockTBracketStage') || 'meio'
 
 const CAT = 'cat-m4'
@@ -21,6 +22,7 @@ const NAMES = [
   'Pinto / Costa', 'Rosa / Pinto', 'Santos / Santos', 'Brito / Nunes', 'Branco / Lima', 'Neves / Cunha', 'Matos / Reis', 'Seixas / Ramos',
 ]
 const ROUNDS = { 32: ['R32', 'R16', 'QF', 'SF', 'F'], 16: ['R16', 'QF', 'SF', 'F'], 8: ['QF', 'SF', 'F'] }
+const pow2 = (n) => 2 ** Math.ceil(Math.log2(n))
 const HOURS = ['09:00', '11:00', '13:00', '15:00', '17:00']
 
 // 3 duplas: a e1 passa direto à final e a meia 2 é a única — o sorteio
@@ -40,15 +42,26 @@ const noTime = (list) => (localStorage.getItem('mockTBracketNoTime') === 'true'
 function build() {
   const n = size()
   if (n === 3) return three()
-  const rounds = ROUNDS[n]
+  const full = pow2(n)
+  const rounds = ROUNDS[full]
   const played = stage() === 'antes' ? 0 : stage() === 'fim' ? rounds.length : 1
   const matches = []
-  let alive = Array.from({ length: n }, (_, i) => `e${i + 1}`)
+  // Os «Bye» ficam espalhados pela 1.ª ronda (lugares 2, 2+k, …): a dupla
+  // sem adversário não tem jogo e aparece logo na ronda seguinte.
+  const byes = full - n
+  const byeSlots = new Set(Array.from({ length: byes }, (_, i) => Math.floor((i * full) / 2 / byes) + 2))
+  let alive = []
+  let k = 1
+  for (let s = 1; s <= full / 2; s++) {
+    alive.push(`e${k++}`)
+    alive.push(byeSlots.has(s) ? null : `e${k++}`)
+  }
   rounds.forEach((round, r) => {
     const next = []
     for (let s = 1; s <= alive.length / 2; s++) {
       const a = alive[2 * s - 2]
       const b = alive[2 * s - 1]
+      if (r === 0 && !(a && b)) { next.push(a || b); continue }
       // Jogada: a ronda já passou; a meio: metade dos jogos da ronda seguinte.
       const done = a && b && (r < played || (r === played && stage() === 'meio' && s % 2 === 1))
       // Ganha a de cima, exceto de 3 em 3 — e a e1 (eu) ganha sempre.

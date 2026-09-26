@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildTree, halfOf, sourceOf, stripStartsOpen } from './treeLayout'
+import { buildTree, byeEntries, halfOf, quarterOf, quarterPath, sourceOf, stripStartsOpen } from './treeLayout'
 
 const m = (round, slot, over = {}) => ({ id: `${round}-${slot}`, round, bracket_slot: slot, status: 'marcado', entry_a_id: null, entry_b_id: null, ...over })
 const rounds = (list) => ['R16', 'QF', 'SF', 'F', '3P']
@@ -48,5 +48,25 @@ describe('treeLayout (#571)', () => {
     expect(stripStartsOpen({ ...base, started: false, myIds: ['a2'], meInCurrent: true })).toBe(true)
     // Uma ronda já jogada fecha sozinha.
     expect(stripStartsOpen({ ...base, current: 'QF', started: true, myIds: ['a2'], meInCurrent: true })).toBe(false)
+  })
+})
+
+
+describe('torneio grande (#571, pontos 7 e 8)', () => {
+  // 12 duplas num quadro de 16: 4 jogos de oitavos, 4 duplas direto aos quartos.
+  const r16 = [2, 3, 6, 7].map((s) => m('R16', s, { entry_a_id: `a${s}`, entry_b_id: `b${s}` }))
+  // O lado do Bye é o que não tem jogo de oitavos a dar nele.
+  const qf = [1, 2, 3, 4].map((s) => m('QF', s, s % 2 ? { entry_a_id: `bye${s}` } : { entry_b_id: `bye${s}` }))
+  const tree = buildTree(rounds([...r16, ...qf, m('SF', 1), m('SF', 2), m('F', 1)]))
+
+  it('encontra quem passa direto à 2.ª ronda (Bye)', () => {
+    expect(byeEntries(tree).map((b) => b.id)).toEqual(['bye1', 'bye2', 'bye3', 'bye4'])
+  })
+
+  it('cada jogo das rondas de antes dá num quarto', () => {
+    expect(quarterOf('R16', 3)).toBe(2)
+    expect(quarterOf('R32', 5)).toBe(2)
+    expect(quarterOf('QF', 3)).toBe(3)
+    expect(quarterPath(tree, 2).map((r) => [r.round, r.matches.map((x) => x.slot)])).toEqual([['R16', [3]]])
   })
 })
