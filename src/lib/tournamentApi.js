@@ -163,10 +163,18 @@ export async function listTournamentsToScoreToday({ userId, adminOrgIds = [], to
 /** Pedir a correção de um resultado (Trello #485). Só quem jogou o jogo;
  *  o resultado vai na ordem do jogo (a × b). A organização aceita ou recusa
  *  em /marcar. */
-export async function requestMatchCorrection(matchId, { scoreA, scoreB, note = null }) {
-  const { error } = await supabase.rpc('request_match_correction', {
-    p_match_id: matchId, p_score_a: scoreA, p_score_b: scoreB, p_note: note,
-  })
+export async function requestMatchCorrection(matchId, { scoreA, scoreB, note = null, sets = null }) {
+  const args = { p_match_id: matchId, p_score_a: scoreA, p_score_b: scoreB, p_note: note }
+  // Os sets e o tie-break (QA, 26 set) na forma do save_match_result:
+  // [{ score_a, score_b, tiebreak_a, tiebreak_b, is_super_tiebreak }]. Até a
+  // migração do Dev 3 correr, a função não os aceita (PGRST202): vai sem
+  // eles, como antes.
+  if (sets?.length) {
+    const { error } = await supabase.rpc('request_match_correction', { ...args, p_sets: sets })
+    if (!error) return
+    if (error.code !== 'PGRST202') throw error
+  }
+  const { error } = await supabase.rpc('request_match_correction', args)
   if (error) throw error
 }
 
