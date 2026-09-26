@@ -938,6 +938,8 @@
   "gamedetails.end_mix": "Terminar Mix",
   "gamedetails.stop_mix": "Parar Mix",
   "gamedetails.players_title": "Inscritos · {{count}}/{{max}}",
+  "gamedetails.pair_label": "Dupla {{n}}",
+  "gamedetails.solo_heading": "Sozinhos · {{count}}",
   "gamedetails.be_first_to_join": "Sê o primeiro a inscrever-te 🎾",
   "gamedetails.you_suffix": " · tu",
   "gamedetails.test_badge": "Teste",

@@ -937,6 +937,8 @@
   "gamedetails.end_mix": "End Mix",
   "gamedetails.stop_mix": "Stop Mix",
   "gamedetails.players_title": "Signed up · {{count}}/{{max}}",
+  "gamedetails.pair_label": "Pair {{n}}",
+  "gamedetails.solo_heading": "On their own · {{count}}",
   "gamedetails.be_first_to_join": "Be the first to join 🎾",
   "gamedetails.you_suffix": " · you",
   "gamedetails.test_badge": "Test",

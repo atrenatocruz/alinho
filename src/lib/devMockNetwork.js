@@ -984,6 +984,8 @@ const TABLE_MOCKS = {
     // localStorage.mockLessonsFlag = 'true' liga as aulas para todos; sem
     // ele so a equipa Alinho (mockPlatformAdmin) as ve.
     { key: 'lessons', enabled: localStorage.getItem('mockLessonsFlag') === 'true' },
+    // localStorage.mockFriendInvites = 'true' liga o jogo entre amigos novo (#342).
+    { key: 'friend_invites', enabled: localStorage.getItem('mockFriendInvites') === 'true' },
   ],
   // O catálogo inteiro: as 47 conquistas de produção, com a mesma chave,
   // categoria, raridade e ordem de supabase/migration_trophies.sql (#551).
@@ -1115,10 +1117,31 @@ TABLE_MOCKS.games = (url) => {
     return [{ id: 'fake-open-empty', organization_id: MOCK_ADMIN_ORG_ID, title: 'Jogo em aberto', date: d.toISOString(), location: 'Smash Padel Almada', status: 'open', origin: 'open_slot', max_players: 4, num_courts: 1, participants: [] }]
   }
   if (localStorage.getItem('mockNoPending') === 'true' && /status=eq\.pending/.test(u)) rows = []
+  // localStorage.mockMixPairs = 'mixed' | 'pairs' | 'mine' — mix com
+  // inscrição em dupla, para a lista «Inscritos» com as duplas (26 set).
+  if (localStorage.getItem('mockMixPairs') && Array.isArray(rows)) rows = rows.map((g) => ({ ...g, status: 'open', allow_pair_signup: true, rotate_partners: false, max_players: 8 }))
   // localStorage.mockMixMen = 'true' — o mix passa a só homens (26 set).
   if (localStorage.getItem('mockMixMen') === 'true' && Array.isArray(rows)) rows = rows.map((g) => ({ ...g, gender_restriction: 'masculino', allow_pair_signup: true, rotate_partners: false }))
   const origem = u.match(/[?&]origin=eq\.([a-z_]+)/)
   return origem && Array.isArray(rows) ? rows.filter((g) => (g.origin || 'admin') === origem[1]) : rows
+}
+
+// Inscritos com duplas (mockMixPairs, 26 set): 'mixed' = 2 duplas e 3
+// sozinhos (o 7/8 do Francisco); 'pairs' = só duplas; 'mine' = eu numa dupla.
+const participantsSemFiltro = TABLE_MOCKS.participants
+TABLE_MOCKS.participants = (url) => {
+  const mode = localStorage.getItem('mockMixPairs')
+  if (!mode) return participantsSemFiltro(url)
+  if (decodeURIComponent(url).includes('status=eq.waitlisted')) return []
+  const who = (id, name) => ({ id, name, avatar_url: null, preferred_side: 'both', rating_games: 30, is_guest: false })
+  const row = (n, a, b) => ({ id: `mp-${n}`, game_id: 'fake-game-1', user_id: a.id, partner_id: b ? b.id : null, status: 'confirmed',
+    joined_alone: !b, created_at: new Date(Date.now() - (10 - n) * 60000).toISOString(), user: a, partner: b || null })
+  const rui = who('mp-rui', 'Rui Costa'); const ana = who('mp-ana', 'Ana Marques'); const tl = who('mp-tl', 'Tiago Lopes')
+  const pedro = who('mp-pedro', 'Pedro Lima'); const joao = who('mp-joao', 'João Neves'); const marta = who('mp-marta', 'Marta Silva')
+  const nuno = who('mp-nuno', 'Nuno Reis'); const me = who(MOCK_ADMIN_USER_ID, 'Admin (Dev)')
+  if (mode === 'pairs') return [row(1, rui, ana), row(2, tl, pedro), row(3, joao, marta), row(4, nuno, who('mp-ze', 'Zé Pinto'))]
+  if (mode === 'mine') return [row(1, rui, ana), row(2, me, tl), row(3, pedro), row(4, joao)]
+  return [row(1, rui, ana), row(2, pedro), row(3, tl, joao), row(4, marta), row(5, nuno)]
 }
 
 // Fechar categorias (#485, mockTClose): ganha aos outros mocks das mesmas
