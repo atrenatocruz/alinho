@@ -5,14 +5,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { ArrowDown, ArrowUp, GraduationCap } from 'lucide-react'
-import { Avatar, EmptyState, PrimaryButton, Tabs } from '../ui'
+import { Avatar, Chips, EmptyState, PrimaryButton, Tabs } from '../ui'
 import {
   listClubTeachers, getClubLessonSettings, saveClubLessonPrices, saveClubPeakHours, saveTeacherOrder,
   getTeacherLessonPrices, saveTeacherLessonPrices,
 } from '../../lib/lessonsApi'
 import { priceRowFor, LESSON_CAPACITY, LESSON_DURATIONS } from '../../lib/lessons'
 import { describeError } from '../../lib/errors'
-import { MonoLabel, levelsText, euros } from './LessonBits'
+import { levelsText, euros } from './LessonBits'
 import ClubSeriesPanel from './ClubSeriesPanel'
 import CreateSeriesForm from './CreateSeriesForm'
 
@@ -200,7 +200,7 @@ function TeachersOrder({ organizationId, teachers, setTeachers, loading }) {
 // 26 set). Sem clube nao ha horas de ponta, por isso e uma tabela so.
 export function Prices({ organizationId, orgName, teacherProfileId = null }) {
   const { t } = useTranslation()
-  const [view, setView] = useState('peak') // peak | off | hours
+  const [view, setView] = useState('peak') // peak | off
   const [loaded, setLoaded] = useState(null)
   const [draft, setDraft] = useState({})
   const [hours, setHours] = useState({})
@@ -247,7 +247,9 @@ export function Prices({ organizationId, orgName, teacherProfileId = null }) {
     setDraft((d) => ({ ...d, [k]: { ...d[k], [field]: value.replace(/[^\d.,]/g, '') } }))
   }
 
-  const savePrices = async () => {
+  // Um botão só, «Guardar preços»: a tabela e, no clube, as horas de ponta
+  // (Gerir › Aulas › Preços, versão final de 26 set).
+  const saveAll = async () => {
     const rows = []
     for (const [k, v] of Object.entries(draft)) {
       const [type, duration, p] = k.split('-')
@@ -257,32 +259,22 @@ export function Prices({ organizationId, orgName, teacherProfileId = null }) {
       if (month == null && lesson == null) continue
       rows.push({ lesson_type: type, duration_minutes: Number(duration), peak: p === 'p', price_month: month, price_lesson: lesson })
     }
-    setSaving(true)
-    setMessage(null)
-    try {
-      if (teacherProfileId) await saveTeacherLessonPrices(teacherProfileId, rows)
-      else await saveClubLessonPrices(organizationId, rows)
-      setMessage({ ok: true, text: t('lessons.prices_saved') })
-    } catch (error) {
-      setMessage({ ok: false, text: describeError(t, error, 'lessons.error_save_prices') })
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const saveHours = async () => {
     const ranges = Object.entries(hours)
       .filter(([, v]) => v.start && v.end)
       .map(([wd, v]) => ({ day_of_week: Number(wd), start_time: v.start, end_time: v.end }))
-    if (ranges.some((r) => r.end_time <= r.start_time)) {
+    if (!teacherProfileId && ranges.some((r) => r.end_time <= r.start_time)) {
       setMessage({ ok: false, text: t('lessons.error_peak_order') })
       return
     }
     setSaving(true)
     setMessage(null)
     try {
-      await saveClubPeakHours(organizationId, ranges)
-      setMessage({ ok: true, text: t('lessons.peak_saved') })
+      if (teacherProfileId) await saveTeacherLessonPrices(teacherProfileId, rows)
+      else {
+        await saveClubLessonPrices(organizationId, rows)
+        await saveClubPeakHours(organizationId, ranges)
+      }
+      setMessage({ ok: true, text: t('lessons.prices_saved') })
     } catch (error) {
       setMessage({ ok: false, text: describeError(t, error, 'lessons.error_save_prices') })
     } finally {
@@ -301,79 +293,88 @@ export function Prices({ organizationId, orgName, teacherProfileId = null }) {
     />
   )
 
+  const label = 'block text-sm font-medium text-gray-700 mb-2'
+  const colHead = 'text-xs font-medium text-ink-500 text-right pb-1'
   return (
-    <div className="space-y-3">
+    <div className="space-y-6">
       <p className="text-sm text-muted">{teacherProfileId ? t('lessons.prices_own_intro') : t('lessons.prices_agreed', { name: orgName })}</p>
 
-      {!teacherProfileId && <Tabs
-        value={view}
-        onChange={(v) => { setView(v); setMessage(null) }}
-        options={[
-          { value: 'peak', label: t('lessons.peak') },
-          { value: 'off', label: t('lessons.off_peak') },
-          { value: 'hours', label: t('lessons.peak_hours_tab') },
-        ]}
-      />}
-
-      {view === 'hours' ? (
-        <div className="card space-y-2">
-          <MonoLabel>{t('lessons.peak_hours_title')}</MonoLabel>
-          {[1, 2, 3, 4, 5, 6, 7].map((wd) => (
-            <div key={wd} className="flex items-center gap-2">
-              <span className="w-16 shrink-0 text-sm font-semibold text-ink-900">{t(`lessons.wd_long_${wd}`)}</span>
-              <input type="time" value={hours[wd]?.start || ''} aria-label={t('lessons.peak_start')} className={timeCls}
-                onChange={(e) => setHours((h) => ({ ...h, [wd]: { ...h[wd], start: e.target.value } }))} />
-              <span className="text-muted">–</span>
-              <input type="time" value={hours[wd]?.end || ''} aria-label={t('lessons.peak_end')} className={timeCls}
-                onChange={(e) => setHours((h) => ({ ...h, [wd]: { ...h[wd], end: e.target.value } }))} />
-            </div>
-          ))}
-          <p className="text-xs text-muted pt-1">{t('lessons.peak_hours_hint')}</p>
-        </div>
-      ) : (
-        <div className="card p-3">
-          <table className="w-full text-sm tabular-nums border-collapse">
-            <thead>
-              <tr>
-                <th />
-                <th />
-                <th className="font-mono text-[10.5px] text-ink-500 text-right font-bold pb-1">{t('lessons.col_month')}</th>
-                <th className="font-mono text-[10.5px] text-ink-500 text-right font-bold pb-1">{t('lessons.col_lesson')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ROWS.map(({ type, duration }, i) => {
-                const k = keyOf(type, duration, peak)
-                const firstOfType = i % LESSON_DURATIONS.length === 0
-                return (
-                  <tr key={k} className={firstOfType ? 'border-t border-line' : ''}>
-                    <td className="py-1 font-semibold text-ink-900">{firstOfType ? t(`lessons.price_row_${type}`) : ''}</td>
-                    <td className="py-1 pr-1 text-ink-500">{t(`lessons.duration_${duration}`)}</td>
-                    <td className="py-1 text-right">{cell(k, 'month')}</td>
-                    <td className="py-1 pl-1.5 text-right">{cell(k, 'lesson')}</td>
-                  </tr>
-                )
-              })}
-              <tr className="border-t border-line">
-                <td className="py-1 font-semibold text-ink-900" colSpan={2}>{t('lessons.trial')}</td>
-                <td className="py-1 text-right text-ink-500">—</td>
-                <td className="py-1 pl-1.5 text-right">{cell(keyOf('trial', 60, peak), 'lesson')}</td>
-              </tr>
-            </tbody>
-          </table>
-          <p className="text-xs text-muted mt-2">{t('lessons.prices_table_hint')}</p>
+      {/* «Hora de ponta / Fora de ponta» é uma escolha da mesma tabela, por
+          isso pastilhas e não separador (regra de 24 set). */}
+      {!teacherProfileId && (
+        <div>
+          <p className={label}>{t('lessons.f_hour')}</p>
+          <Chips label={t('lessons.f_hour')} value={view} onChange={(v) => { setView(v); setMessage(null) }} options={[
+            { value: 'peak', label: t('lessons.peak') },
+            { value: 'off', label: t('lessons.off_peak') },
+          ]} />
         </div>
       )}
 
-      {message && <p className={`text-sm font-semibold ${message.ok ? 'text-ok' : 'text-danger'}`}>{message.text}</p>}
-      <PrimaryButton className="w-full" disabled={saving} onClick={view === 'hours' ? saveHours : savePrices}>
-        {t('lessons.save')}
-      </PrimaryButton>
-      {lastChange && (
-        <p className="text-xs text-muted">
-          {t('lessons.prices_last_change', { date: `${t(`lessons.month_short_${Number(lastChange.slice(5, 7))}`)} ${lastChange.slice(0, 4)}` })}
-        </p>
+      <div className="card !p-3">
+        <table className="w-full text-sm tabular-nums border-collapse">
+          <thead>
+            <tr>
+              <th />
+              <th />
+              <th className={colHead}>{t('lessons.col_month')}</th>
+              <th className={colHead}>{t('lessons.col_lesson')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ROWS.map(({ type, duration }, i) => {
+              const k = keyOf(type, duration, peak)
+              const firstOfType = i % LESSON_DURATIONS.length === 0
+              return (
+                <tr key={k} className={firstOfType ? 'border-t border-line' : ''}>
+                  <td className="py-1 font-semibold text-ink-900">{firstOfType ? t(`lessons.price_row_${type}`) : ''}</td>
+                  <td className="py-1 pr-1 text-ink-500">{t(`lessons.duration_${duration}`)}</td>
+                  <td className="py-1 text-right">{cell(k, 'month')}</td>
+                  <td className="py-1 pl-1.5 text-right">{cell(k, 'lesson')}</td>
+                </tr>
+              )
+            })}
+            <tr className="border-t border-line">
+              <td className="py-1 font-semibold text-ink-900" colSpan={2}>{t('lessons.trial')}</td>
+              <td className="py-1 text-right text-ink-500">—</td>
+              <td className="py-1 pl-1.5 text-right">{cell(keyOf('trial', 60, peak), 'lesson')}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p className="text-xs text-muted mt-2">{t('lessons.prices_table_hint')}</p>
+      </div>
+
+      {/* As horas de ponta ficam na mesma página, por baixo da tabela. */}
+      {!teacherProfileId && (
+        <div>
+          <p className={label}>{t('lessons.peak_hours_label')}</p>
+          <div className="card space-y-2">
+            {[1, 2, 3, 4, 5, 6, 7].map((wd) => (
+              <div key={wd} className="flex items-center gap-2">
+                <span className="w-16 shrink-0 text-sm font-semibold text-ink-900">{t(`lessons.wd_long_${wd}`)}</span>
+                <input type="time" value={hours[wd]?.start || ''} aria-label={t('lessons.peak_start')} className={timeCls}
+                  onChange={(e) => setHours((h) => ({ ...h, [wd]: { ...h[wd], start: e.target.value } }))} />
+                <span className="text-muted">–</span>
+                <input type="time" value={hours[wd]?.end || ''} aria-label={t('lessons.peak_end')} className={timeCls}
+                  onChange={(e) => setHours((h) => ({ ...h, [wd]: { ...h[wd], end: e.target.value } }))} />
+              </div>
+            ))}
+            <p className="text-xs text-muted pt-1">{t('lessons.peak_hours_hint')}</p>
+          </div>
+        </div>
       )}
+
+      <div className="space-y-2">
+        {message && <p className={`text-sm font-semibold ${message.ok ? 'text-ok' : 'text-danger'}`}>{message.text}</p>}
+        <PrimaryButton className="w-full" disabled={saving} onClick={saveAll}>
+          {t('lessons.save_prices')}
+        </PrimaryButton>
+        {lastChange && (
+          <p className="text-xs text-muted">
+            {t('lessons.prices_last_change', { date: `${t(`lessons.month_short_${Number(lastChange.slice(5, 7))}`)} ${lastChange.slice(0, 4)}` })}
+          </p>
+        )}
+      </div>
     </div>
   )
 }

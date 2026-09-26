@@ -296,6 +296,7 @@ export const LESSON_RPC_MOCKS = {
   cancel_lesson_request: () => null,
   set_lesson_prices: () => null,
   set_teacher_availability: () => null,
+  set_lesson_series_price: () => null,
   set_club_peak_hours: () => null,
   set_teacher_sort_order: () => null,
 }
