@@ -31,10 +31,10 @@ function MatchRow({ match, entries, t }) {
   return (
     <div className="flex items-start justify-between gap-2 border-t border-ink-50 py-1.5 first:border-t-0">
       <div className="min-w-0">
-        <p className="truncate text-[12px] text-ink-900">
+        <p className="truncate text-xs text-ink-900">
           {a} <span className="text-muted">×</span> {b}
         </p>
-        <p className="font-mono text-[9.5px] text-muted">
+        <p className="font-mono text-xs text-muted">
           {[match.court_name, match.group_id ? null : t(`tournament.draw.round_${match.round}`)]
             .filter(Boolean)
             .join(' · ')}
@@ -42,7 +42,7 @@ function MatchRow({ match, entries, t }) {
         </p>
       </div>
       {done ? (
-        <b className="shrink-0 whitespace-nowrap font-mono text-[12px] text-ink-900">
+        <b className="shrink-0 whitespace-nowrap font-mono text-xs text-ink-900">
           {match.score_a}-{match.score_b}
           {/* O tie-break do pro set ao lado do 9-8 (Trello #561). */}
           {match.status === 'terminado' && matchTieBreak(match)?.tb && (
@@ -61,7 +61,7 @@ export default function CalendarPanel({ category }) {
   const { entries, matches, loading } = useCategoryBoard(category?.id)
 
   if (loading) {
-    return <p className="py-6 text-center text-[12px] text-muted">{t('common.loading')}</p>
+    return <p className="py-6 text-center text-xs text-muted">{t('common.loading')}</p>
   }
 
   const days = byDayAndTime(matches)
@@ -83,10 +83,10 @@ export default function CalendarPanel({ category }) {
         <section key={day.date} className="mb-3">
           <MonoLabel className="mb-1">{dayLabel(day.date, i18n.language)}</MonoLabel>
           {day.slots.map((slot) => (
-            <div key={slot.time} className="mb-1.5 rounded-xl border border-ink-100 bg-white">
-              <header className="flex items-center gap-2 border-b border-ink-100 px-3 py-1.5">
-                <b className="font-mono text-[11px] font-bold text-ink-900">{slot.time}</b>
-                <span className="text-[10.5px] text-muted">
+            <div key={slot.time} className="card mb-2 !p-0 overflow-hidden">
+              <header className="flex items-center gap-2 border-b border-line px-4 py-2">
+                <b className="font-mono text-xs font-bold text-ink-900">{slot.time}</b>
+                <span className="text-xs text-muted">
                   {t('tournament.draw.n_courts', { count: slot.matches.length })}
                 </span>
               </header>
@@ -103,7 +103,7 @@ export default function CalendarPanel({ category }) {
       {pending.length ? (
         <section className="mb-2">
           <MonoLabel className="mb-1">{t('tournament.draw.no_time_label')}</MonoLabel>
-          <div className="rounded-xl border border-dashed border-ink-200 bg-white px-3 py-1">
+          <div className="rounded-card border border-dashed border-ink-200 bg-surface px-4 py-1">
             {pending.map((m) => (
               <MatchRow key={m.id} match={m} entries={entries} t={t} />
             ))}
@@ -111,7 +111,7 @@ export default function CalendarPanel({ category }) {
         </section>
       ) : null}
 
-      <p className="px-1 pb-2 text-[10.5px] text-muted">{t('tournament.draw.time_warning')}</p>
+      <p className="px-1 pb-2 text-xs text-muted">{t('tournament.draw.time_warning')}</p>
     </div>
   )
 }

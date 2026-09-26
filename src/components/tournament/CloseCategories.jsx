@@ -20,7 +20,7 @@ import {
   qualifiedFromGroups, qualifiersPerGroup, fillBracketFromGroups, clearBracketFromGroups,
 } from '../../lib/tournamentDraw'
 import { describeError } from '../../lib/errors'
-import { ConfirmSheet } from '../ui'
+import { ConfirmSheet, Select } from '../ui'
 import { MonoLabel } from './TournamentBits'
 
 const DRAWN = ['sorteada', 'a_decorrer']
@@ -98,7 +98,7 @@ function Podium({ podium, entries, t }) {
   return (
     <ol className="mt-1.5 space-y-0.5">
       {podium.map((id, i) => id && (
-        <li key={PLACES[i]} className="text-[12px] text-ink-900">
+        <li key={PLACES[i]} className="text-xs text-ink-900">
           <span className="inline-block w-7 font-bold">{t(`tournament.close.place_${PLACES[i]}`)}</span>
           {entries[id]?.name || '?'}
         </li>
@@ -112,18 +112,22 @@ function PodiumPicker({ value, onChange, entries, t }) {
   const options = Object.values(entries).filter((e) => !e.status || e.status === 'selecionada')
   return (
     <div className="mt-1.5 space-y-1.5">
-      <p className="text-[11.5px] text-ink-700">{t('tournament.close.choose_hint')}</p>
+      <p className="text-xs text-ink-700">{t('tournament.close.choose_hint')}</p>
       {PLACES.map((place, i) => (
-        <label key={place} className="flex items-center gap-2 text-[12px] text-ink-900">
+        <label key={place} className="flex items-center gap-2 text-xs text-ink-900">
           <span className="w-7 font-bold">{t(`tournament.close.place_${place}`)}</span>
-          <select value={value[i] || ''}
-            onChange={(e) => onChange(value.map((v, j) => (j === i ? (e.target.value || null) : v)))}
-            className="min-w-0 flex-1 min-h-[44px] rounded-ctrl border border-line bg-canvas px-2 py-1.5 text-[12px]">
-            <option value="">{i === 2 ? t('tournament.close.nobody') : t('tournament.close.pick')}</option>
-            {options.map((e) => (
-              <option key={e.id} value={e.id} disabled={value.some((v, j) => j !== i && v === e.id)}>{e.name}</option>
-            ))}
-          </select>
+          {/* O Select da app (revisão da designer, 26 set). Uma dupla já
+              escolhida noutro lugar não aparece — em vez de ficar cinzenta. */}
+          <Select
+            className="min-w-0 flex-1"
+            value={value[i] || ''}
+            onChange={(v) => onChange(value.map((x, j) => (j === i ? (v || null) : x)))}
+            placeholder={t('tournament.close.pick')}
+            options={[
+              ...(i === 2 ? [{ value: '', label: t('tournament.close.nobody') }] : []),
+              ...options.filter((e) => !value.some((v, j) => j !== i && v === e.id)).map((e) => ({ value: e.id, label: e.name })),
+            ]}
+          />
         </label>
       ))}
     </div>
@@ -173,17 +177,17 @@ function CategoryRow({ category, board, onClosed }) {
 
   const right = toFill ? (
     <button type="button" onClick={() => setAsking('fill')}
-      className="min-h-[44px] rounded-ctrl bg-ink-900 px-3 py-1.5 text-[12px] font-bold text-white">
+      className="inline-flex min-h-[48px] items-center justify-center gap-1.5 rounded-ctrl bg-ink-900 px-5 text-base font-extrabold text-white">
       {t('tournament.bracket.fill')}
     </button>
   ) : {
-    closed: <span className="text-[11.5px] font-bold text-ink-500">{t('tournament.close.closed')}</span>,
-    not_drawn: <span className="text-[11.5px] text-ink-500">{t('tournament.close.not_drawn')}</span>,
-    pending: <span className="text-[11.5px] text-ink-500">{t('tournament.close.pending', { count: status.pending })}</span>,
-    final_unplayed: <span className="text-[11.5px] text-ink-500">{t('tournament.close.final_unplayed')}</span>,
+    closed: <span className="text-xs font-bold text-ink-500">{t('tournament.close.closed')}</span>,
+    not_drawn: <span className="text-xs text-ink-500">{t('tournament.close.not_drawn')}</span>,
+    pending: <span className="text-xs text-ink-500">{t('tournament.close.pending', { count: status.pending })}</span>,
+    final_unplayed: <span className="text-xs text-ink-500">{t('tournament.close.final_unplayed')}</span>,
     ready: !open && (
       <button type="button" onClick={() => setOpen(true)}
-        className="min-h-[44px] rounded-ctrl bg-ink-900 px-3 py-1.5 text-[12px] font-bold text-white">
+        className="inline-flex min-h-[48px] items-center justify-center gap-1.5 rounded-ctrl bg-ink-900 px-5 text-base font-extrabold text-white">
         {t('tournament.close.close')}
       </button>
     ),
@@ -192,7 +196,7 @@ function CategoryRow({ category, board, onClosed }) {
   return (
     <li className="py-2">
       <div className="flex items-center justify-between gap-2">
-        <span className="min-w-0 truncate text-[12.5px] font-bold text-ink-900">
+        <span className="min-w-0 truncate text-sm font-bold text-ink-900">
           {category.code && <span className="mr-1.5 text-ink-500">{category.code}</span>}{category.name}
         </span>
         {right}
@@ -200,7 +204,7 @@ function CategoryRow({ category, board, onClosed }) {
 
       {/* Quadro já preenchido: diz-se, e desfaz-se até ao 1.º resultado. */}
       {bracket?.kind === 'filled' && status.kind !== 'closed' && (
-        <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11.5px] text-ink-500">
+        <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-ink-500">
           {t('tournament.bracket.filled')}
           {bracket.canUndo && (
             <button type="button" onClick={() => setAsking('undo')}
@@ -233,7 +237,7 @@ function CategoryRow({ category, board, onClosed }) {
         {toFill && (
           <ul className="mt-3 divide-y divide-line rounded-ctrl border border-line">
             {bracket.qualified.map((q) => (
-              <li key={q.label} className="flex items-center justify-between gap-3 px-3 py-2 text-[14px]">
+              <li key={q.label} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
                 <span className="shrink-0 text-ink-500">{q.label}</span>
                 <span className="min-w-0 truncate text-right font-bold text-ink-900">{board?.entries?.[q.entry_id]?.name || '?'}</span>
               </li>
@@ -254,22 +258,22 @@ function CategoryRow({ category, board, onClosed }) {
 
       {open && (
         <div className="mt-2 rounded-ctrl border border-line bg-canvas p-2.5">
-          <p className="text-[12px] font-bold text-ink-900">{t('tournament.close.podium_title')}</p>
+          <p className="text-xs font-bold text-ink-900">{t('tournament.close.podium_title')}</p>
           {status.choose
             ? <PodiumPicker value={picked} onChange={setPicked} entries={board?.entries || {}} t={t} />
             : <Podium podium={podium} entries={board?.entries || {}} t={t} />}
-          <p className="mt-2 text-[11.5px] text-ink-700">{t('tournament.close.what_it_does')}</p>
+          <p className="mt-2 text-xs text-ink-700">{t('tournament.close.what_it_does')}</p>
           <div className="mt-2 flex flex-wrap gap-1.5">
             <button type="button" disabled={busy || !canConfirm} onClick={confirm}
-              className="min-h-[44px] rounded-ctrl bg-ink-900 px-3 py-2 text-[12px] font-bold text-white disabled:opacity-50">
+              className="inline-flex min-h-[48px] items-center justify-center gap-1.5 rounded-ctrl bg-ink-900 px-5 text-base font-extrabold text-white disabled:opacity-50">
               {t('tournament.close.confirm', { name: category.name })}
             </button>
             <button type="button" disabled={busy} onClick={() => { setOpen(false); setError(null) }}
-              className="min-h-[44px] rounded-ctrl border border-line bg-canvas px-3 py-2 text-[12px] font-bold text-ink-900">
+              className="inline-flex min-h-[48px] items-center justify-center gap-1.5 rounded-ctrl border border-line bg-surface px-5 text-base font-extrabold text-ink-900">
               {t('tournament.close.cancel')}
             </button>
           </div>
-          {error && <p className="mt-2 text-[12px] text-danger">{error}</p>}
+          {error && <p className="mt-2 text-xs text-danger">{error}</p>}
         </div>
       )}
     </li>
@@ -297,10 +301,15 @@ export default function CloseCategories({ tournament, onChanged }) {
 
   useEffect(() => { load() }, [load])
 
-  if (error) return <p className="mt-2 text-[12px] text-danger">{error}</p>
+  if (error) return <p className="mt-2 text-xs text-danger">{error}</p>
   if (!rows || rows.length === 0) return null
 
-  const blocked = rows.filter((r) => closeStatus(r.category, r.board).kind === 'not_drawn').length
+  // Só prende o torneio uma categoria sem sorteio COM inscrições confirmadas
+  // (validada ou selecionada) — a mesma regra da finish_category (#539, Dev
+  // 3). `confirmed_count` vem da list_tournament_categories_admin; sem ele
+  // (função antiga), conta-se como antes.
+  const blocked = rows.filter((r) => closeStatus(r.category, r.board).kind === 'not_drawn'
+    && (r.category.confirmed_count == null || Number(r.category.confirmed_count) > 0)).length
 
   return (
     <div className="mt-3 border-t border-line pt-2">
@@ -314,7 +323,7 @@ export default function CloseCategories({ tournament, onChanged }) {
       {/* O torneio não tem botão de fechar: fecha com a última categoria. E
           uma categoria sem sorteio segura-o aberto — tem de se dizer, senão
           fica «a decorrer» para sempre sem ninguém perceber porquê. */}
-      <p className="mt-1 text-[11.5px] text-ink-500">
+      <p className="mt-1 text-xs text-ink-500">
         {blocked > 0 ? t('tournament.close.tournament_blocked', { count: blocked }) : t('tournament.close.tournament_closes_itself')}
       </p>
     </div>
