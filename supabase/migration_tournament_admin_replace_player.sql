@@ -22,10 +22,9 @@
 --       not_admin · entry_not_found (não existe ou desistiu) ·
 --       slot_invalid · player_required (nem conta nem nome) ·
 --       same_player (é quem já lá está, ou o parceiro dele) ·
---       player_already_in_category · max_categories_reached ·
---       player_gender_required (conta sem género e o organizador não o
---       escolheu — regra de hoje, #495 à espera do Renato) ·
---       gender_mismatch (vem da regra #19 do Renato, no guard).
+--       player_already_in_category · max_categories_reached
+--       (o sexo nunca bloqueia — Francisco, 26 set; ver
+--       migration_tournament_sexo_nao_bloqueia.sql).
 --   · O estado da inscrição mantém-se; só uma dupla que estava à espera de
 --     parceiro (sem_parceiro/convite) e recebe o jogador 2 passa a
 --     validada (se já estava paga) ou por_validar, como na
@@ -96,14 +95,12 @@ BEGIN
     IF tournament_categories_left(v_cat.tournament_id, p_player_id) <= 0 THEN
       RAISE EXCEPTION 'max_categories_reached';
     END IF;
-    -- Género, como na inscrição à mão (#433): quem não o tem, o organizador
-    -- escolhe-o, e fica no perfil (regra de hoje; #495 à espera do Renato).
-    IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = p_player_id AND COALESCE(gender, '') <> '') THEN
-      IF p_player_gender IN ('masculino', 'feminino') THEN
-        UPDATE profiles SET gender = p_player_gender WHERE id = p_player_id;
-      ELSE
-        RAISE EXCEPTION 'player_gender_required';
-      END IF;
+    -- Género: quem não o tem, o organizador pode escolhê-lo, e fica no perfil
+    -- (regra de hoje; #495 à espera do Renato). Se não vier, entra na mesma:
+    -- o sexo nunca bloqueia (Francisco, 26 set).
+    IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = p_player_id AND COALESCE(gender, '') <> '')
+       AND p_player_gender IN ('masculino', 'feminino') THEN
+      UPDATE profiles SET gender = p_player_gender WHERE id = p_player_id;
     END IF;
   ELSE
     v_token := tournament_new_invite_token();
