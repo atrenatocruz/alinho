@@ -416,6 +416,13 @@ const RPC_MOCKS = {
     ? [{ match_id: 'fs-1', creator_name: 'Rita Figueira', scheduled_date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), scheduled_time: '10:00:00', location: 'Clube Exemplo', people: 6 }] : []),
   list_my_friend_sessions: () => (['ready', 'waiting', 'app'].includes(localStorage.getItem('mockFriendSession'))
     ? [{ match_id: 'fs-1', scheduled_date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), scheduled_time: '10:00:00', location: 'Clube Exemplo', court: 'Campo 3', is_creator: true, people: 5, accepted: localStorage.getItem('mockFriendSession') === 'waiting' ? 4 : 5, pending: localStorage.getItem('mockFriendSession') === 'waiting' ? 1 : 0 }] : []),
+  // Aceitar o convite de parceiro (26 set): mockPartnerClaim = 'pending'
+  // mostra «É para José Metello. És tu?»; mockClaimError = '<código>' faz o
+  // claim recusar com esse código.
+  get_partner_invite: () => (localStorage.getItem('mockPartnerClaim')
+    ? { guest_name: 'José Metello', game_id: 'fake-game-1', game_title: 'Mix de Quinta-feira', inviter_name: 'Nuno Reis', status: localStorage.getItem('mockPartnerClaim') }
+    : null),
+  claim_partner_invite: () => (localStorage.getItem('mockClaimError') ? { __error: localStorage.getItem('mockClaimError') } : 'fake-game-1'),
   tournament_invite_token: () => 'convite-jogador-2',
   tournament_invite_token_player1: () => 'convite-jogador-1',
   // A lista do organizador: um de cada estado, para se ver tudo num print.
