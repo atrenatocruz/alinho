@@ -12,6 +12,7 @@ import { listEntries, validateEntry, removeEntry, adminSignUp, adminSetPartner, 
 import { whatsappShare } from '../../lib/partnerInvite'
 import { signupErrorMessage, errorCode } from '../../lib/tournamentError'
 import { replaceTournamentPlayer, entryHasPlayedMatches } from '../../lib/tournamentApi'
+import { categoryGenderQuestion } from './genderCheck'
 
 /* Separador «Inscritos» (Trello #362).
    Desenho: print 08 (lista por categoria, Validar a um toque) e a regra
@@ -70,7 +71,7 @@ function NotInApp({ t, name, setName, email, setEmail }) {
 /* `mode`: 'new' é o «Inscrever à mão» inteiro; 'partner' é só o parceiro,
    para juntar a quem se inscreveu sozinho (Trello #515) — a mesma procura,
    o mesmo «Não está na app?» e o mesmo género, sem duplicar nada. */
-function AdminEntrySheet({ organizationId, categories = [], categoryId: initialCategoryId, busy, error, onConfirm, onClose, mode = 'new', title, excludeId = null, pickerLabel, confirmLabel }) {
+function AdminEntrySheet({ organizationId, categories = [], categoryId: initialCategoryId, busy, error, onConfirm, onClose, mode = 'new', title, excludeId = null, pickerLabel, confirmLabel, category = null }) {
   const newEntry = mode === 'new'
   const { t } = useTranslation()
   // A categoria escolhe-se aqui, à vista — antes vinha calada do painel e
@@ -145,12 +146,15 @@ function AdminEntrySheet({ organizationId, categories = [], categoryId: initialC
     })
   }, [player1?.id, partner?.id, genders])
   const needsGender = (p) => !!p && p.id in genders && !genders[p.id]
-  const genderOk = (p) => !needsGender(p) || !!chosenGender[p.id]
+  // O sexo nunca bloqueia (Francisco, 26 set): escolhê-lo é opcional, e se
+  // não bater com a categoria pergunta-se antes de gravar.
+  const genderOf = (p) => (p ? genders[p.id] || chosenGender[p.id] || null : null)
+  const [genderAsk, setGenderAsk] = useState(null) // { key, then }
 
   const nameError = name ? partnerNameError(name) : null
   const guestOk = (n, e) => !!n.trim() && !partnerNameError(n) && !partnerEmailError(e)
-  const player1Ok = player1 ? genderOk(player1) : guestOk(name1, email1)
-  const partnerOk = solo || (partner ? genderOk(partner) : (!!name && !nameError && !partnerEmailError(email)))
+  const player1Ok = player1 ? true : guestOk(name1, email1)
+  const partnerOk = solo || (partner ? true : (!!name && !nameError && !partnerEmailError(email)))
   const ready = newEntry ? player1Ok && partnerOk : partnerOk
 
   // Chamado como função, não como <Picker/>: um componente definido aqui
@@ -274,8 +278,14 @@ function AdminEntrySheet({ organizationId, categories = [], categoryId: initialC
               // Para a mensagem «X entrou na dupla.» (Trello #434).
               partnerName: partner ? partner.name : name.trim(),
             }
-            if (!newEntry) { onConfirm(second); return }
-            onConfirm({
+            const cat = newEntry ? categories.find((c) => c.id === categoryId) : category
+            const ask = (payload, people) => {
+              const key = categoryGenderQuestion(cat, people)
+              if (key) setGenderAsk({ key, then: () => onConfirm(payload) })
+              else onConfirm(payload)
+            }
+            if (!newEntry) { ask(second, [genderOf(partner)]); return }
+            ask({
               categoryId,
               player1Id: player1?.id || null,
               player1GuestName: player1 ? null : name1.trim(),
@@ -283,7 +293,7 @@ function AdminEntrySheet({ organizationId, categories = [], categoryId: initialC
               player1Gender: needsGender(player1) ? chosenGender[player1.id] : null,
               ...(solo ? { partnerId: null, partnerGender: null, guestName: null, guestEmail: null } : second),
               paid,
-            })
+            }, [genderOf(player1), solo ? null : genderOf(partner)])
           }}
           disabled={!ready || busy}
           className="w-full"
@@ -291,6 +301,15 @@ function AdminEntrySheet({ organizationId, categories = [], categoryId: initialC
           {confirmLabel || t(newEntry ? 'tentries.admin_add_confirm' : 'tentries.join_partner')}
         </PrimaryButton>
       </div>
+      <ConfirmSheet
+        open={!!genderAsk}
+        title={genderAsk ? t(genderAsk.key) : ''}
+        message={t('tentries.gender_confirm_message')}
+        confirmLabel={t('tsignup.gender_confirm_yes')}
+        cancelLabel={t('gamedetails.gender_confirm_cancel')}
+        onConfirm={() => { const next = genderAsk?.then; setGenderAsk(null); if (next) next() }}
+        onClose={() => setGenderAsk(null)}
+      />
     </Sheet>
   )
 }
@@ -598,6 +617,7 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
       {swap?.slot && (
         <AdminEntrySheet
           mode="partner"
+          category={category}
           // Nem quem fica nem quem sai aparecem na procura.
           excludeId={[swap.entry.player1_id, swap.entry.player2_id].filter(Boolean)}
           title={t('tentries.swap_in_title', {
@@ -695,6 +715,7 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
       {joinFor && (
         <AdminEntrySheet
           mode="partner"
+          category={category}
           excludeId={joinFor.player1_id}
           title={t('tentries.join_partner_title', { name: joinFor.player1_name || '?' })}
           organizationId={tournament.organization_id}
