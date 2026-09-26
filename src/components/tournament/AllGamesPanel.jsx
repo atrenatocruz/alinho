@@ -38,7 +38,7 @@ export default function AllGamesPanel(props) {
             <MonoLabel>{t(`tournament.section_${key}`)}</MonoLabel>
             {/* A linha por baixo do título está no desenho: com três secções
                 seguidas, o título sozinho não diz qual é qual a quem chega. */}
-            <p className="mb-1.5 mt-0.5 text-[11.5px] text-ink-500">{t(`tournament.section_${key}_hint`)}</p>
+            <p className="mb-1.5 mt-0.5 text-xs text-ink-500">{t(`tournament.section_${key}_hint`)}</p>
             <Suspense fallback={spinner}><Panel {...props} /></Suspense>
           </section>
         )

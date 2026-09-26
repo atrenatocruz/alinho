@@ -28,10 +28,8 @@ const UI = 'src/components/ui.jsx'
 // o teste avisa se uma exceção deixar de ser precisa.
 const EXCECOES = {
   oldTrack: {},
-  tablist: {
-    'src/pages/TournamentScorePage.jsx':
-      'Dev 2 — os dias do marcador são filtro (o desenho já cumpre); o papel de separador está a mais',
-  },
+  // Os dias do marcador passaram a <Chips> (Dev 1, alinhamento de 26 set).
+  tablist: {},
 }
 
 const files = (dir) => readdirSync(dir).flatMap((name) => {

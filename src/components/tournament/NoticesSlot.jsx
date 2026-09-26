@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { Megaphone, Pencil, Trash2, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
-import { ConfirmSheet, PrimaryButton } from '../ui'
+import { Chips, ConfirmSheet, PrimaryButton } from '../ui'
+import { FieldLabel } from './TournamentBits'
 import { Sheet } from '../agenda/AgendaControls'
 import {
   activeNotices, noticeAge, noticeError, editedWords, expiryFrom,
@@ -60,22 +61,9 @@ function NoticeComposer({ tournament, editing, busy, error, onSave, onClose }) {
             lá para sempre — e um aviso velho confunde mais do que ajuda. */}
         {!editing ? (
           <div>
-            <p className="mb-1.5 font-mono text-[11px] uppercase tracking-widest text-ink-500">
-              {t('tnotices.expiry_label')}
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {EXPIRY_CHOICES.map((choice) => (
-                <button
-                  key={choice}
-                  onClick={() => setExpiry(choice)}
-                  className={`press rounded-full px-3 py-1.5 text-sm font-semibold border-2 ${
-                    expiry === choice ? 'border-ink-900 bg-ink-900 text-white' : 'border-line text-ink-900'
-                  }`}
-                >
-                  {t(`tnotices.expiry_${choice}`)}
-                </button>
-              ))}
-            </div>
+            <FieldLabel>{t('tnotices.expiry_label')}</FieldLabel>
+            <Chips label={t('tnotices.expiry_label')} value={expiry} onChange={setExpiry}
+              options={EXPIRY_CHOICES.map((choice) => ({ value: choice, label: t(`tnotices.expiry_${choice}`) }))} />
           </div>
         ) : editing.expires_at ? (
           // Editar não mexe no fim, a não ser que se diga — senão corrigir

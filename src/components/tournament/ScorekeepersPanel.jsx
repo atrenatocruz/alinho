@@ -47,27 +47,27 @@ export default function ScorekeepersPanel({ tournament, onBack }) {
       <button type="button" onClick={onBack} className="inline-flex min-h-[44px] items-center gap-1.5 text-sm font-extrabold text-ink-700 hover:underline">
         <ArrowLeft size={16} /> {t('common.back')}
       </button>
-      <h2 className="mt-3 font-display text-lg font-extrabold text-ink-900">{t('tournament.score.keepers_title')}</h2>
-      <p className="mt-0.5 text-[11.5px] text-ink-500">{t('tournament.score.keepers_subtitle')}</p>
+      <h2 className="mt-3 font-display text-2xl leading-tight text-ink-900">{t('tournament.score.keepers_title')}</h2>
+      <p className="mt-0.5 text-xs text-ink-500">{t('tournament.score.keepers_subtitle')}</p>
 
-      {error && <p className="mt-2 text-[12px] text-danger">{error}</p>}
+      {error && <p className="mt-2 text-xs text-danger">{error}</p>}
 
       <div className="mt-3">
         {(list || []).map((k) => (
           <div key={k.user_id} className="flex items-center gap-2.5 border-t border-line py-2">
-            <Avatar name={k.name} url={k.avatar_url} size="w-8 h-8 text-[10px]" />
+            <Avatar name={k.name} url={k.avatar_url} size="w-8 h-8 text-xs" />
             <span className="min-w-0 flex-1">
-              <b className="block truncate text-[13px] font-semibold text-ink-900">{k.name}</b>
-              <span className="text-[11px] text-ink-500">
+              <b className="block truncate text-sm font-semibold text-ink-900">{k.name}</b>
+              <span className="text-xs text-ink-500">
                 {k.category_codes?.length ? t('tournament.score.keeper_some', { list: k.category_codes.join(', ') }) : t('tournament.score.keeper_all')}
               </span>
             </span>
-            <button type="button" onClick={() => remove(k.user_id)} className="text-[11.5px] text-ink-500 hover:underline">
+            <button type="button" onClick={() => remove(k.user_id)} className="inline-flex min-h-[44px] items-center text-sm font-extrabold text-ink-700 hover:underline">
               {t('tournament.score.keeper_remove')}
             </button>
           </div>
         ))}
-        {list && list.length === 0 && <p className="border-t border-line py-3 text-[12px] text-ink-500">{t('tournament.score.keepers_empty')}</p>}
+        {list && list.length === 0 && <p className="border-t border-line py-3 text-xs text-ink-500">{t('tournament.score.keepers_empty')}</p>}
       </div>
 
       <div className="mt-4">
@@ -76,7 +76,7 @@ export default function ScorekeepersPanel({ tournament, onBack }) {
         <PlayerSearch onSelect={add} searchFn={searchScorekeeperCandidates} excludeIds={(list || []).map((k) => k.user_id)} />
       </div>
 
-      <div className="mt-4 flex items-start gap-2 rounded-ctrl border border-line bg-surface p-2.5 text-[12px] text-ink-700">
+      <div className="mt-4 flex items-start gap-2 rounded-ctrl border border-line bg-surface p-2.5 text-xs text-ink-700">
         <Users size={16} className="mt-0.5 shrink-0 text-ink-500" />
         <span>{t('tournament.score.keepers_note')}</span>
       </div>

@@ -1,3 +1,4 @@
+import { MonoLabel } from './TournamentBits'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Share2, Euro, Info } from 'lucide-react'
@@ -33,7 +34,7 @@ export default function PublicInfo({ tournament, categories = [] }) {
   return (
     <div className="card space-y-3">
       <div className="flex items-center justify-between gap-2">
-        <p className="font-mono text-[11px] uppercase tracking-widest text-ink-500">{t('tpublic.title')}</p>
+        <MonoLabel>{t('tpublic.title')}</MonoLabel>
         <button onClick={share} className="press flex min-h-[44px] items-center gap-1.5 text-sm font-extrabold text-ink-900">
           <Share2 size={16} /> {t('tpublic.share')}
         </button>
