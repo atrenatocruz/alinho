@@ -626,7 +626,11 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
               console.error('Error replacing a player:', err)
               // Até a função do Dev 3 correr em produção, não existe: diz-se
               // isso em vez do «Não foi possível» de sempre.
-              setError(err?.code === 'PGRST202' ? t('tentries.swap_not_ready') : signupErrorMessage(t, err))
+              // O código do máximo de categorias fala para o jogador («Já
+              // estás…»); aqui é o organizador a pôr outra pessoa.
+              setError(err?.code === 'PGRST202' ? t('tentries.swap_not_ready')
+                : errorCode(err) === 'max_categories_reached' ? t('tentries.swap_max_categories')
+                : signupErrorMessage(t, err))
             } finally {
               setBusy(false)
             }
