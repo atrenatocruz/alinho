@@ -67,6 +67,7 @@ const CreatePrivateMatch = lazyPage(() => import('./pages/CreatePrivateMatch'))
 const JoinPrivateMatch = lazyPage(() => import('./pages/JoinPrivateMatch'))
 const GroupMatches = lazyPage(() => import('./pages/GroupMatches'))
 const CreateGroupMatch = lazyPage(() => import('./pages/CreateGroupMatch'))
+const CreateOpenSlots = lazyPage(() => import('./pages/CreateOpenSlots'))
 const Gerir = lazyPage(() => import('./pages/Gerir'))
 const GerirClube = lazyPage(() => import('./pages/GerirClube'))
 const Instructions = lazyPage(() => import('./pages/Instructions'))
@@ -558,6 +559,16 @@ function AppRoutes() {
           element={
             <Guard require="protected" showSplash={showSplash}>
               <GerirClube />
+            </Guard>
+          }
+        />
+        {/* Criar por passos, numa página própria (#342): o padrão combinado
+            entre devs é /gerir/:slug/criar/<tipo>. */}
+        <Route
+          path="/gerir/:slug/criar/em-aberto"
+          element={
+            <Guard require="protected" showSplash={showSplash}>
+              <CreateOpenSlots />
             </Guard>
           }
         />

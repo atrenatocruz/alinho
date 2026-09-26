@@ -1,37 +1,15 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { getClubProfile } from '../lib/clubProfile'
 import { listOrganizationMembers } from '../lib/clubProfile'
 import { createGroupMatch } from '../lib/groupMatches'
 import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
-import { DateField, Select, PrimaryButton } from '../components/ui'
+import { DateField, Select, PrimaryButton, Chips } from '../components/ui'
+import StepPage from '../components/steps/StepPage'
 import { describeError } from '../lib/errors'
-
-/* Segmented tab selector — same pattern as GerirClube.jsx's own Segmented,
-   duplicated locally rather than shared since it's a few lines and this
-   page has no other reason to import from GerirClube. */
-function Segmented({ options, value, onChange }) {
-  return (
-    <div className="flex gap-1.5 flex-wrap">
-      {options.map((opt) => (
-        <button
-          key={opt.value}
-          type="button"
-          onClick={() => onChange(opt.value)}
-          className={`px-3.5 py-2 min-h-[44px] rounded-ctrl text-sm font-extrabold transition-all duration-fast ${
-            value === opt.value ? 'bg-ink-900 text-white' : 'bg-surface text-muted border border-line hover:text-ink-900'
-          }`}
-        >
-          {opt.label}
-        </button>
-      ))}
-    </div>
-  )
-}
 
 export default function CreateGroupMatch() {
   const { t } = useTranslation()
@@ -52,9 +30,12 @@ export default function CreateGroupMatch() {
   const [teamBPlayer2Id, setTeamBPlayer2Id] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  // Os mesmos quatro passos do jogo entre amigos e do mix (#342, Francisco
+  // 26 set). Pessoas continua com os 3 lugares de hoje.
+  const [step, setStep] = useState(1)
   const locationInputRef = useRef(null)
 
-  useGooglePlacesAutocomplete(locationInputRef, true, ({ value, latitude, longitude }) => {
+  useGooglePlacesAutocomplete(locationInputRef, step === 3, ({ value, latitude, longitude }) => {
     setLocation(value)
     setLocationCoords({ latitude, longitude })
   })
@@ -80,11 +61,11 @@ export default function CreateGroupMatch() {
       .filter((m) => m.id === excludeId || !chosenIds.includes(m.id))
       .map((m) => ({ value: m.id, label: m.name }))
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
+  const handleSubmit = async () => {
     setError('')
     if (!scheduledDate) {
       setError(t('creategroupmatch.validate_date_required'))
+      setStep(2)
       return
     }
     setSaving(true)
@@ -110,47 +91,53 @@ export default function CreateGroupMatch() {
     }
   }
 
+  const label = 'block text-sm font-medium text-gray-700 mb-2'
+  const stepLabels = [t('steps.people'), t('steps.when'), t('steps.where'), t('steps.rules')]
+
   return (
-    <div className="space-y-5 max-w-lg mx-auto">
-      <button type="button" onClick={goBack} className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline">
-        <ArrowLeft size={16} /> {t('common.back')}
-      </button>
-
-      <div>
-        <h2 className="text-3xl text-ink-900">{t('creategroupmatch.title')}</h2>
-        {org && <p className="text-muted text-sm mt-0.5">{t('creategroupmatch.subtitle', { group: org.name })}</p>}
-      </div>
-
-      <form onSubmit={handleSubmit} className="card space-y-5">
+    <StepPage
+      title={t('creategroupmatch.title_new')}
+      top={org ? <p className="-mt-3 text-sm text-muted">{t('creategroupmatch.subtitle', { group: org.name })}</p> : null}
+      step={step}
+      total={4}
+      stepLabel={stepLabels[step - 1]}
+      onBack={() => { setError(''); if (step === 1) goBack(); else setStep(step - 1) }}
+      onNext={() => { setError(''); setStep(step + 1) }}
+      nextDisabled={step === 2 && !scheduledDate}
+      nextHint={t('createprivatematch.date_missing')}
+      error={error}
+      footer={step === 4 ? (
+        <PrimaryButton onClick={handleSubmit} disabled={saving || !org} className="w-full">
+          {saving ? t('creategroupmatch.creating') : t('createprivatematch.create_and_invite')}
+        </PrimaryButton>
+      ) : null}
+    >
+      {step === 1 && (
         <div className="space-y-2">
-          <label className="block text-sm font-extrabold text-ink-900">{t('creategroupmatch.ranked_heading')}</label>
-          <Segmented
-            value={ranked}
-            onChange={setRanked}
-            options={[
-              { value: true, label: t('creategroupmatch.ranked_option') },
-              { value: false, label: t('creategroupmatch.friendly_option') },
-            ]}
-          />
+          <p className={label}>{t('creategroupmatch.teammates_heading')}</p>
+          <Select value={teamAPlayer2Id} onChange={setTeamAPlayer2Id} options={memberOptions(teamAPlayer2Id)} placeholder={t('creategroupmatch.teammate_placeholder')} />
+          <Select value={teamBPlayer1Id} onChange={setTeamBPlayer1Id} options={memberOptions(teamBPlayer1Id)} placeholder={t('creategroupmatch.teammate_placeholder')} />
+          <Select value={teamBPlayer2Id} onChange={setTeamBPlayer2Id} options={memberOptions(teamBPlayer2Id)} placeholder={t('creategroupmatch.teammate_placeholder')} />
         </div>
+      )}
 
-        <div className="space-y-2">
-          <label className="block text-sm font-extrabold text-ink-900">{t('creategroupmatch.date_label')}</label>
-          <DateField value={scheduledDate} onChange={setScheduledDate} />
-        </div>
+      {step === 2 && (
+        <>
+          <div>
+            <p className={label}>{t('creategroupmatch.date_label')}</p>
+            <DateField value={scheduledDate} onChange={setScheduledDate} />
+          </div>
+          <div>
+            <p className={label}>{t('creategroupmatch.time_label')}</p>
+            <input type="time" value={scheduledTime} onChange={(e) => setScheduledTime(e.target.value)} className="input-field" />
+          </div>
+          <p className="text-xs text-muted">{t('createprivatematch.when_hint')}</p>
+        </>
+      )}
 
-        <div className="space-y-2">
-          <label className="block text-sm font-extrabold text-ink-900">{t('creategroupmatch.time_label')}</label>
-          <input
-            type="time"
-            value={scheduledTime}
-            onChange={(e) => setScheduledTime(e.target.value)}
-            className="input-field"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <label className="block text-sm font-extrabold text-ink-900">{t('creategroupmatch.location_label')}</label>
+      {step === 3 && (
+        <div>
+          <p className={label}>{t('creategroupmatch.location_label')}</p>
           <input
             ref={locationInputRef}
             type="text"
@@ -160,20 +147,21 @@ export default function CreateGroupMatch() {
             placeholder={t('creategroupmatch.location_placeholder')}
           />
         </div>
+      )}
 
-        <div className="space-y-3">
-          <label className="block text-sm font-extrabold text-ink-900">{t('creategroupmatch.teammates_heading')}</label>
-          <Select value={teamAPlayer2Id} onChange={setTeamAPlayer2Id} options={memberOptions(teamAPlayer2Id)} placeholder={t('creategroupmatch.teammate_placeholder')} />
-          <Select value={teamBPlayer1Id} onChange={setTeamBPlayer1Id} options={memberOptions(teamBPlayer1Id)} placeholder={t('creategroupmatch.teammate_placeholder')} />
-          <Select value={teamBPlayer2Id} onChange={setTeamBPlayer2Id} options={memberOptions(teamBPlayer2Id)} placeholder={t('creategroupmatch.teammate_placeholder')} />
+      {step === 4 && (
+        <div>
+          <p className={label}>{t('creategroupmatch.ranked_heading')}</p>
+          <Chips
+            value={ranked}
+            onChange={setRanked}
+            options={[
+              { value: true, label: t('createprivatematch.ranked_option') },
+              { value: false, label: t('createprivatematch.friendly_option') },
+            ]}
+          />
         </div>
-
-        {error && <div className="bg-danger/10 text-danger px-4 py-3 rounded-ctrl text-sm font-extrabold">{error}</div>}
-
-        <PrimaryButton type="submit" disabled={saving} className="w-full">
-          {saving ? t('creategroupmatch.creating') : t('creategroupmatch.submit_button')}
-        </PrimaryButton>
-      </form>
-    </div>
+      )}
+    </StepPage>
   )
 }

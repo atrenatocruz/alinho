@@ -1,14 +1,15 @@
 import { useRef, useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, Users, X } from 'lucide-react'
+import { Users, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { createPrivateMatch } from '../lib/privateMatches'
 import { PrimaryButton, Avatar, DateField, Select, Chips } from '../components/ui'
 import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
 import PlayerSearch from '../components/PlayerSearch'
 import { describeError } from '../lib/errors'
+import StepPage from '../components/steps/StepPage'
 
 const NUM_SETS_OPTIONS = Array.from({ length: 8 }, (_, i) => i + 2) // 2..9
 
@@ -70,8 +71,10 @@ export default function CreatePrivateMatch() {
   const { profile } = useAuth()
   const navigate = useNavigate()
 
-  // Passo 1 — jogadores primeiro, o resto depois (pedido do Francisco:
-  // "primeiro procurar jogadores e depois definir o resto").
+  // Quatro passos, como todos os eventos (#342, Francisco 26 set): Pessoas ·
+  // Quando · Onde joga · Regras. Esta 1.ª entrega mantém os 4 lugares de
+  // hoje (a tua dupla e a dupla adversária); convidar primeiro e formar as
+  // equipas depois vem numa entrega à parte, com a base de dados do Dev 3.
   const [step, setStep] = useState(1)
 
   const [teamAPlayer2, setTeamAPlayer2] = useState(null)
@@ -92,7 +95,7 @@ export default function CreatePrivateMatch() {
   const [error, setError] = useState('')
 
   const locationInputRef = useRef(null)
-  useGooglePlacesAutocomplete(locationInputRef, step === 2, ({ value, latitude, longitude }) => {
+  useGooglePlacesAutocomplete(locationInputRef, step === 3, ({ value, latitude, longitude }) => {
     setLocation(value)
     setLocationCoords({ latitude, longitude })
   })
@@ -103,6 +106,7 @@ export default function CreatePrivateMatch() {
     setError('')
     if (!scheduledDate) {
       setError(t('createprivatematch.error_date_required'))
+      setStep(2)
       return
     }
     setSaving(true)
@@ -132,33 +136,35 @@ export default function CreatePrivateMatch() {
     }
   }
 
+  const label = 'block text-sm font-medium text-gray-700 mb-2'
+  const stepLabels = [t('steps.people'), t('steps.when'), t('steps.where'), t('steps.rules')]
+
   return (
-    <div className="space-y-5">
-      <button type="button" onClick={goBack} className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm min-h-[44px]">
-        <ArrowLeft size={20} />
-        {t('createprivatematch.back')}
-      </button>
-
-      <div>
-        <h2 className="text-3xl text-ink-900">{t('createprivatematch.title')}</h2>
-        <p className="text-muted text-sm mt-1">
-          {step === 1 ? t('createprivatematch.step1_subtitle') : t('createprivatematch.step2_subtitle')}
-        </p>
-      </div>
-
-      <div className="flex gap-1.5">
-        <div className={`h-1 flex-1 rounded-full ${step >= 1 ? 'bg-lime-400' : 'bg-ink-50'}`} />
-        <div className={`h-1 flex-1 rounded-full ${step >= 2 ? 'bg-lime-400' : 'bg-ink-50'}`} />
-      </div>
-
-      {step === 1 ? (
-        <div className="card space-y-4">
+    <StepPage
+      title={t('createprivatematch.title_new')}
+      step={step}
+      total={4}
+      stepLabel={stepLabels[step - 1]}
+      onBack={() => { setError(''); if (step === 1) goBack(); else setStep(step - 1) }}
+      onNext={() => { setError(''); setStep(step + 1) }}
+      nextDisabled={step === 2 && !scheduledDate}
+      nextHint={t('createprivatematch.date_missing')}
+      error={error}
+      footer={step === 4 ? (
+        <PrimaryButton onClick={handleCreate} disabled={saving} className="w-full">
+          <Users size={18} />
+          {saving ? t('createprivatematch.creating') : t('createprivatematch.create_and_invite')}
+        </PrimaryButton>
+      ) : null}
+    >
+      {step === 1 && (
+        <>
           <div>
-            <p className="text-sm font-extrabold text-ink-900 mb-2">{t('createprivatematch.your_dupla')}</p>
+            <p className={label}>{t('createprivatematch.your_dupla')}</p>
             <div className="space-y-2">
-              <div className="flex items-center gap-3 p-3 rounded-ctrl border border-line bg-ink-50">
+              <div className="flex items-center gap-3 rounded-ctrl border border-[#BBF7D0] bg-[#DCFCE7] p-3">
                 <Avatar name={profile?.name} url={profile?.avatar_url} size="w-9 h-9 text-sm" />
-                <p className="font-extrabold text-ink-900 text-sm">{t('createprivatematch.you_suffix', { name: profile?.name })}</p>
+                <p className="text-sm font-extrabold text-[#14532D]">{t('createprivatematch.you_suffix', { name: profile?.name })}</p>
               </div>
               <PlayerOrGuestSlot
                 label={t('createprivatematch.search_partner')}
@@ -171,9 +177,8 @@ export default function CreatePrivateMatch() {
               />
             </div>
           </div>
-
           <div>
-            <p className="text-sm font-extrabold text-ink-900 mb-2">{t('createprivatematch.opponent_dupla')}</p>
+            <p className={label}>{t('createprivatematch.opponent_dupla')}</p>
             <div className="space-y-2">
               <PlayerOrGuestSlot
                 label={t('createprivatematch.search_opponent1')}
@@ -195,19 +200,45 @@ export default function CreatePrivateMatch() {
               />
             </div>
           </div>
+          <p className="text-xs text-muted">{t('createprivatematch.missing_player_hint')}</p>
+        </>
+      )}
 
-          <p className="text-xs text-muted">
-            {t('createprivatematch.missing_player_hint')}
-          </p>
-
-          <PrimaryButton onClick={() => setStep(2)} className="w-full">
-            {t('createprivatematch.next_step')}
-          </PrimaryButton>
-        </div>
-      ) : (
-        <div className="card space-y-4">
+      {step === 2 && (
+        <>
           <div>
-            <p className="text-sm font-extrabold text-ink-900 mb-2">{t('createprivatematch.ranked_heading')}</p>
+            <p className={label}>{t('createprivatematch.date_label')}</p>
+            <DateField value={scheduledDate} onChange={setScheduledDate} />
+          </div>
+          <div>
+            <p className={label}>{t('createprivatematch.time_label')}</p>
+            <input type="time" value={scheduledTime} onChange={(e) => setScheduledTime(e.target.value)} className="input-field" />
+          </div>
+          <p className="text-xs text-muted">{t('createprivatematch.when_hint')}</p>
+        </>
+      )}
+
+      {step === 3 && (
+        <div>
+          <p className={label}>{t('createprivatematch.location_label')}</p>
+          <input
+            ref={locationInputRef}
+            type="text"
+            value={location}
+            // Escrever a morada à mão invalida as coordenadas — ficariam a
+            // apontar para o sítio escolhido antes (mesmo cuidado que
+            // GerirClube.jsx tem para o local dos mixes).
+            onChange={(e) => { setLocation(e.target.value); setLocationCoords({ latitude: null, longitude: null }) }}
+            placeholder={t('createprivatematch.location_placeholder')}
+            className="input-field"
+          />
+        </div>
+      )}
+
+      {step === 4 && (
+        <>
+          <div>
+            <p className={label}>{t('createprivatematch.ranked_heading')}</p>
             <Chips
               value={rankedIntent}
               onChange={setRankedIntent}
@@ -222,36 +253,8 @@ export default function CreatePrivateMatch() {
                 : t('createprivatematch.friendly_hint')}
             </p>
           </div>
-
           <div>
-            <p className="text-sm font-extrabold text-ink-900 mb-2">{t('createprivatematch.date_label')}</p>
-            <DateField value={scheduledDate} onChange={setScheduledDate} />
-          </div>
-          <div>
-            <p className="text-sm font-extrabold text-ink-900 mb-2">{t('createprivatematch.time_label')}</p>
-            <input
-              type="time"
-              value={scheduledTime}
-              onChange={(e) => setScheduledTime(e.target.value)}
-              className="input-field"
-            />
-          </div>
-          <div>
-            <p className="text-sm font-extrabold text-ink-900 mb-2">{t('createprivatematch.location_label')}</p>
-            <input
-              ref={locationInputRef}
-              type="text"
-              value={location}
-              // Escrever a morada à mão invalida as coordenadas — ficariam a
-              // apontar para o sítio escolhido antes (mesmo cuidado que
-              // GerirClube.jsx tem para o local dos mixes).
-              onChange={(e) => { setLocation(e.target.value); setLocationCoords({ latitude: null, longitude: null }) }}
-              placeholder={t('createprivatematch.location_placeholder')}
-              className="input-field"
-            />
-          </div>
-          <div>
-            <p className="text-sm font-extrabold text-ink-900 mb-2">{t('createprivatematch.scoring_format_label')}</p>
+            <p className={label}>{t('createprivatematch.scoring_format_label')}</p>
             <Chips
               value={scoringFormat}
               onChange={setScoringFormat}
@@ -273,22 +276,8 @@ export default function CreatePrivateMatch() {
               </div>
             )}
           </div>
-
-          {error && (
-            <div className="bg-danger/10 text-danger px-4 py-3 rounded-ctrl text-sm font-extrabold">{error}</div>
-          )}
-
-          <div className="flex gap-3">
-            <PrimaryButton type="button" variant="ghost" onClick={() => setStep(1)} className="flex-1">
-              {t('createprivatematch.previous_step')}
-            </PrimaryButton>
-            <PrimaryButton onClick={handleCreate} disabled={saving} className="flex-1">
-              <Users size={18} />
-              {saving ? t('createprivatematch.creating') : t('createprivatematch.create_button')}
-            </PrimaryButton>
-          </div>
-        </div>
+        </>
       )}
-    </div>
+    </StepPage>
   )
 }
