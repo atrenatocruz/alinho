@@ -150,6 +150,11 @@ function nameMatches(fullName, query) {
   return query.split(' ').every((q) => words.some((w) => w.startsWith(q)))
 }
 
+/** Esta conta é de quem escreveu? Com duas contas com o mesmo número
+ *  (convidado do bot + conta registada), qualquer uma conta — phone.js,
+ *  aliasIds. */
+const isMine = (profile, id) => id != null && (id === profile?.id || (profile?.aliasIds ?? []).includes(id))
+
 const OPEN_STATUSES = new Set(['open', 'closed'])
 
 function formatMixLine(mix, lang, label) {
@@ -547,7 +552,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
       .eq('organization_id', organizationId)
     if (error) throw new Error(`Failed to load members for partner lookup: ${error.message}`)
     const query = stripAccents(partnerRequest.name.toLowerCase())
-    const people = rows.map((r) => ({ id: r.user_id, name: r.profile.name })).filter((x) => x.id !== profile.id)
+    const people = rows.map((r) => ({ id: r.user_id, name: r.profile.name })).filter((x) => !isMine(profile, x.id))
     const exact = people.filter((x) => stripAccents((x.name || '').toLowerCase()) === query)
     const matches = exact.length === 1 ? exact : people.filter((x) => nameMatches(x.name, query))
     if (matches.length === 1) return { partner: matches[0], isNewGuest: false }
@@ -599,7 +604,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     }
     const { profile, isNewGuest } = await requireProfileOrCreateGuest(resolvedProfile, senderPn)
     if (!profile) return
-    if (rows.some((row) => row.user_id === profile.id || row.partner_id === profile.id)) {
+    if (rows.some((row) => isMine(profile, row.user_id) || isMine(profile, row.partner_id))) {
       await reply('already_joined')
       return
     }
@@ -650,7 +655,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     const resolved = await resolvePartner(profile, game)
     if (!resolved) return
     const { partner, isNewGuest: partnerIsNewGuest } = resolved
-    if (partner.id === profile.id) {
+    if (isMine(profile, partner.id)) {
       await reply('partner_is_you')
       return
     }
@@ -693,7 +698,8 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
    * link), sai a dupla toda: não fica um lugar só com um convite.
    */
   async function leavePair({ game, pairRow, profile, rows, suplentes, choice = null }) {
-    const otherId = pairRow.user_id === profile.id ? pairRow.partner_id : pairRow.user_id
+    const mineInRow = isMine(profile, pairRow.user_id) ? pairRow.user_id : pairRow.partner_id
+    const otherId = mineInRow === pairRow.user_id ? pairRow.partner_id : pairRow.user_id
     const { data: others } = await supabase.from('profiles').select('id, name, claim_pending').eq('id', otherId)
     const other = others?.[0] ?? { id: otherId, name: '?', claim_pending: false }
 
@@ -709,7 +715,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
         await reply('out_mention_unreadable')
         return
       }
-      if (mentioned.id === profile.id) choice = 'me'
+      if (isMine(profile, mentioned.id)) choice = 'me'
       else if (mentioned.id === otherId) choice = 'partner'
       else {
         await reply('out_not_your_partner', { name: mentioned.name })
@@ -735,7 +741,8 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     }
 
     // Fica uma pessoa: a que não sai. A linha mantém a posição na lista.
-    const stayId = choice === 'me' ? otherId : profile.id
+    // Fica a conta que já estava na linha (pode ser o convidado do mesmo número).
+    const stayId = choice === 'me' ? otherId : mineInRow
     const { error } = await supabase
       .from('participants')
       .update({ user_id: stayId, partner_id: null, joined_alone: true })
@@ -761,7 +768,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     if (!profile) return
     const { game, rows, suplentes } = await loadGame(pending.gameId)
     const pairRow = rows.find((row) => row.id === pending.rowId && row.status === 'confirmed' && row.partner_id
-      && (row.user_id === profile.id || row.partner_id === profile.id))
+      && (isMine(profile, row.user_id) || isMine(profile, row.partner_id)))
     if (!OPEN_STATUSES.has(game.status) || new Date(game.date).getTime() <= Date.now() || !pairRow) {
       await reply('mix_no_longer_available')
       return
@@ -797,9 +804,9 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     // Os inscritos já vieram com o loadGame — sem outra ida à BD.
     const existingRows = rows
 
-    const ownConfirmedRow = existingRows.find((row) => row.user_id === profile.id && row.status === 'confirmed')
-    const ownWaitlistRow = existingRows.find((row) => row.user_id === profile.id && row.status === 'waitlisted')
-    const asPartnerRow = existingRows.find((row) => row.partner_id === profile.id)
+    const ownConfirmedRow = existingRows.find((row) => isMine(profile, row.user_id) && row.status === 'confirmed')
+    const ownWaitlistRow = existingRows.find((row) => isMine(profile, row.user_id) && row.status === 'waitlisted')
+    const asPartnerRow = existingRows.find((row) => isMine(profile, row.partner_id))
 
     if (action === 'in') {
       if (ownConfirmedRow || asPartnerRow) {
@@ -858,7 +865,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
 
     // action === 'out'
     const pairRow = existingRows.find((row) => row.status === 'confirmed' && row.partner_id
-      && (row.user_id === profile.id || row.partner_id === profile.id))
+      && (isMine(profile, row.user_id) || isMine(profile, row.partner_id)))
     if (pairRow) {
       await leavePair({ game, pairRow, profile, rows, suplentes })
       return
@@ -974,7 +981,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
         .eq('status', 'confirmed')
       if (error) throw new Error(`Failed to check existing participants: ${error.message}`)
       const memberGameIds = new Set(
-        rows.filter((row) => row.user_id === resolvedProfile.id || row.partner_id === resolvedProfile.id).map((row) => row.game_id)
+        rows.filter((row) => isMine(resolvedProfile, row.user_id) || isMine(resolvedProfile, row.partner_id)).map((row) => row.game_id)
       )
       const notJoined = openMixes.filter((m) => !memberGameIds.has(m.id))
       if (notJoined.length === 1) {
@@ -1005,7 +1012,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
   if (error) throw new Error(`Failed to check existing participants: ${error.message}`)
 
   const memberGameIds = new Set(
-    rows.filter((row) => row.user_id === profile.id || row.partner_id === profile.id).map((row) => row.game_id)
+    rows.filter((row) => isMine(profile, row.user_id) || isMine(profile, row.partner_id)).map((row) => row.game_id)
   )
   const memberMixes = openMixes.filter((m) => memberGameIds.has(m.id))
 

@@ -239,3 +239,34 @@ test('o filtro de nível do grupo aceita os níveis novos e não liga a maiúscu
   assert.equal(mixVisibleToGroup({ level: 'M4' }, group), false)
   assert.equal(mixVisibleToGroup({ level: 'F3' }, { levels: ['f3'] }), true)
 })
+
+// ── Duas contas com o mesmo número (caso do Leandro, 26 set) ───────────────
+// O convidado do bot (g) está inscrito; a conta registada (a) é a escolhida.
+function twoAccounts() {
+  db.profiles.push({ id: 'g', name: 'Bernardo (convidado)', email: 'guest-1@whatsapp.alinho.pt', phone_hash: hash('911111111'), language: 'pt' })
+  db.memberships.push({ user_id: 'g', organization_id: 'o', is_guest: true })
+}
+
+test('«Out» encontra a inscrição feita com o convidado do mesmo número', async () => {
+  twoAccounts()
+  db.participants.push({ id: 'pg', game_id: 'm', user_id: 'g', status: 'confirmed', created_at: '2026-09-25T22:17:00Z' })
+  const out = await say('out')
+  assert.doesNotMatch(out, /Não estás inscrito/)
+  assert.equal(db.participants.length, 0)
+})
+
+test('«In» não inscreve outra vez quem já está com o convidado do mesmo número', async () => {
+  twoAccounts()
+  db.participants.push({ id: 'pg', game_id: 'm', user_id: 'g', status: 'confirmed', created_at: '2026-09-25T22:17:00Z' })
+  const out = await say('in')
+  assert.match(out, /Já estás inscrito/)
+  assert.equal(db.participants.length, 1)
+})
+
+test('dupla inscrita com o convidado: «Out» abre o menu e «3» deixa o convidado sozinho', async () => {
+  twoAccounts()
+  db.participants.push({ id: 'row', game_id: 'm', user_id: 'g', partner_id: 'b', status: 'confirmed', created_at: '2026-09-25T22:17:00Z' })
+  assert.match(await say('out'), /1\. Dupla/)
+  await say('3')
+  assert.deepEqual([row().user_id, row().partner_id], ['g', null])
+})
