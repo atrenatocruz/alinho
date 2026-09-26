@@ -445,6 +445,7 @@ function Availability({ teacher, prices, items, day, setDay, goBack, today }) {
                         <>
                           <span className="text-xs text-ink-500 inline-flex items-center gap-1">
                             {it.taken}/{it.capacity} · {t('lessons.average')} <LevelPill label={bandLabel(it.avg_rating, it.avg_gender)} /> · {t('lessons.per_month', { price: euros(it.price_month) })}
+                            {it.promo && <span className="rounded-full bg-lime-400/25 px-2 py-[2px] text-xs font-extrabold text-ink-900">{t('lessons.promo_price')}</span>}
                           </span>
                           {!enrolled && (
                             <button type="button" onClick={() => setEnrolItem(it)} className={`ml-auto bg-lime-400 text-ink-900 hover:bg-lime-600 ${btn}`}>
