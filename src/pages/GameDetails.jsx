@@ -3314,7 +3314,9 @@ export default function GameDetails() {
                   </div>
               )
               const pairs = participants.filter((r) => r.user?.id && r.partner?.id)
-              if (!game.allow_pair_signup || game.rotate_partners || pairs.length === 0) {
+              // Mesmo sem nenhuma dupla, quem está sozinho aparece como tal
+              // («Sozinhos · 8», o M4 de terça do A2N, Francisco 26 set).
+              if (!game.allow_pair_signup || game.rotate_partners) {
                 return <div className="space-y-2.5">{people.map(personRow)}</div>
               }
               const solos = people.filter((x) => !x.hasPartner)
@@ -3331,7 +3333,7 @@ export default function GameDetails() {
                     )
                   })}
                   {solos.length > 0 && (
-                    <div className="pt-2">
+                    <div className={pairs.length ? 'pt-2' : ''}>
                       <MonoLabel className="mb-2">{t('gamedetails.solo_heading', { count: solos.length })}</MonoLabel>
                       <div className="space-y-2.5">{solos.map(personRow)}</div>
                     </div>

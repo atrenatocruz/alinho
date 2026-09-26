@@ -1143,7 +1143,8 @@ TABLE_MOCKS.games = (url) => {
 }
 
 // Inscritos com duplas (mockMixPairs, 26 set): 'mixed' = 2 duplas e 3
-// sozinhos (o 7/8 do Francisco); 'pairs' = só duplas; 'mine' = eu numa dupla.
+// sozinhos (o 7/8 do Francisco); 'pairs' = só duplas; 'mine' = eu numa dupla;
+// 'solos' = 8 inscritos e nenhuma dupla (o M4 de terça do A2N).
 const participantsSemFiltro = TABLE_MOCKS.participants
 TABLE_MOCKS.participants = (url) => {
   const mode = localStorage.getItem('mockMixPairs')
@@ -1155,6 +1156,7 @@ TABLE_MOCKS.participants = (url) => {
   const rui = who('mp-rui', 'Rui Costa'); const ana = who('mp-ana', 'Ana Marques'); const tl = who('mp-tl', 'Tiago Lopes')
   const pedro = who('mp-pedro', 'Pedro Lima'); const joao = who('mp-joao', 'João Neves'); const marta = who('mp-marta', 'Marta Silva')
   const nuno = who('mp-nuno', 'Nuno Reis'); const me = who(MOCK_ADMIN_USER_ID, 'Admin (Dev)')
+  if (mode === 'solos') return [rui, ana, tl, pedro, joao, marta, nuno, who('mp-ze', 'Zé Pinto')].map((x, k) => row(k + 1, x))
   if (mode === 'pairs') return [row(1, rui, ana), row(2, tl, pedro), row(3, joao, marta), row(4, nuno, who('mp-ze', 'Zé Pinto'))]
   if (mode === 'mine') return [row(1, rui, ana), row(2, me, tl), row(3, pedro), row(4, joao)]
   return [row(1, rui, ana), row(2, pedro), row(3, tl, joao), row(4, marta), row(5, nuno)]
