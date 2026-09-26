@@ -97,7 +97,8 @@ export default function MyGamesPanel({ category, myEntries = [], myMatches = [] 
   const fromBoard = myMatchesFromBoard(board, myIds)
   const rows = fromBoard.length ? fromBoard : myMatches.filter((m) => !category || m.category_id === category.id)
   // Pedido de correção (Trello #485): o jogo aberto na folha, e os que já
-  // foram pedidos nesta visita (a vista pública não diz se há pedido).
+  // foram pedidos nesta visita — a vista pública diz os outros
+  // (`correction_pending`), mas só depois de recarregar.
   const [asking, setAsking] = useState(null)
   const [requested, setRequested] = useState(() => new Set())
 
@@ -156,7 +157,7 @@ export default function MyGamesPanel({ category, myEntries = [], myMatches = [] 
                 antigo não traz o lado de cada um). */}
             {m.done && m.mine_is_a !== undefined && (
               <span className="col-span-3 -mt-1 text-right">
-                {requested.has(m.id) ? (
+                {requested.has(m.id) || m.correction_pending ? (
                   <span className="text-[11.5px] font-semibold text-ink-500">{t('tcorrection.requested')}</span>
                 ) : (
                   <button type="button" onClick={() => setAsking(m)} className="min-h-[44px] px-1 text-[12px] font-extrabold text-ink-900 underline underline-offset-2">

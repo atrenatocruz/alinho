@@ -39,6 +39,12 @@ describe('myMatchesFromBoard', () => {
     expect(rows[2].opponent).toBe(null)
   })
 
+  it('pedido de correção por resolver (#485); sem o campo, falso', () => {
+    const withAsk = { ...board, matches: board.matches.map((m) => (m.id === 'm1' ? { ...m, correction_pending: true } : m)) }
+    expect(myMatchesFromBoard(withAsk, ['me'])[0].correction_pending).toBe(true)
+    expect(rows[0].correction_pending).toBe(false)
+  })
+
   it('sem inscrição ou sem jogos: lista vazia', () => {
     expect(myMatchesFromBoard(board, [])).toEqual([])
     expect(myMatchesFromBoard({ matches: [] }, ['me'])).toEqual([])

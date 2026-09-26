@@ -11,7 +11,11 @@ import { useTranslation } from 'react-i18next'
 import { Trophy } from 'lucide-react'
 import { TOURNAMENT_TZ } from '../../lib/tournamentDay'
 
-export const TOURNAMENT_NOTICE_KINDS = ['tournament_promoted']
+//
+// 'tournament_correction_requested' (Trello #485, Dev 2): um jogador pediu a
+// correção de um resultado; vai aos admins do torneio, que aceitam ou
+// recusam no /marcar. O aviso leva direto a esse ecrã.
+export const TOURNAMENT_NOTICE_KINDS = ['tournament_promoted', 'tournament_correction_requested']
 
 /** «qui, 2 out» — o dia até ao qual o parceiro tem de aceitar, na hora do
  *  torneio. */
@@ -31,12 +35,17 @@ export default function TournamentNoticeRow({ notice, onOpen }) {
     code: d.category_code || d.category_name || '',
     partner: d.partner_name || '',
     day: dayOf(d.respond_by, i18n.language),
+    name: d.requester_name || '',
   }
+  const correction = notice.kind === 'tournament_correction_requested'
   // Texto aprovado pelo Francisco (via PO, 25 set) — não mudar.
-  const text = d.partner_pending
+  const text = correction
+    ? t('tournament.notice_correction_requested', vars)
+    : d.partner_pending
     ? t('tournament.notice_promoted_partner_pending', vars)
     : t('tournament.notice_promoted', vars)
-  const to = d.tournament_slug || d.tournament_id ? `/torneio/${d.tournament_slug || d.tournament_id}` : '/'
+  const page = d.tournament_slug || d.tournament_id ? `/torneio/${d.tournament_slug || d.tournament_id}` : null
+  const to = page ? (correction ? `${page}/marcar` : page) : '/'
   return (
     <Link to={to} onClick={() => onOpen(notice)}
       className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50">

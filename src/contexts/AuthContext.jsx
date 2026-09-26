@@ -16,7 +16,8 @@ const MOCK_ADMIN_PROFILE = {
   id: '00000000-0000-0000-0000-000000000000',
   email: 'admin@dev.local',
   name: 'Admin (Dev)',
-  gender: 'masculino',
+  // localStorage.mockNoGender = 'true' → perfil sem sexo (mix só de homens, 26 set).
+  gender: typeof localStorage !== 'undefined' && localStorage.getItem('mockNoGender') === 'true' ? null : 'masculino',
   phone_hash: typeof localStorage !== 'undefined' && localStorage.getItem('mockPhoneUnconfirmed') === 'true' ? 'hash-de-teste' : 'dev-bypass', // dummy — skips the mandatory-phone modal for the dev bypass; mockPhoneUnconfirmed mostra o «Confirma o teu número» (#537)
   phone_verified_at: typeof localStorage !== 'undefined' && localStorage.getItem('mockPhoneConfirmed') === 'true' ? '2026-09-24T20:00:00Z' : null,
   // localStorage.mockPlatformAdmin = 'true' → vê o seletor de plano no Gerir.
@@ -471,6 +472,13 @@ export const AuthProvider = ({ children }) => {
 
   const updateProfile = async (updates) => {
     if (!user) return { error: new Error('No user logged in') }
+    // Sessão fictícia: não há perfil a sério para gravar — muda-se só aqui,
+    // para o ecrã seguir como seguiria (antes ficava com outro perfil).
+    if (import.meta.env.DEV && localStorage.getItem(MOCK_ADMIN_KEY) === 'true') {
+      let next = null
+      setProfile((p) => (next = { ...p, ...updates }))
+      return { data: next, error: null }
+    }
 
     const { data, error } = await supabase
       .from('profiles')

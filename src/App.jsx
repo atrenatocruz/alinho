@@ -18,6 +18,7 @@ import Profile from './pages/Profile'
 import PersonalInfo from './pages/PersonalInfo'
 import TeacherSchedule from './pages/TeacherSchedule'
 import RequestLesson from './pages/RequestLesson'
+import TeacherLessons from './pages/TeacherLessons'
 import Comunidade from './pages/Comunidade'
 import ClubProfile from './pages/ClubProfile'
 import ClubMembers from './pages/ClubMembers'
@@ -496,6 +497,17 @@ function AppRoutes() {
         />
         {/* «O meu horário» do professor (Trello #418) — fora da bandeira das
             aulas: o professor edita contacto, zona e horário da semana. */}
+        {/* «As minhas aulas» do professor (Trello #392) — fora do Gerir. Os
+            pedidos só existem com a marcação ligada; a página em si é do
+            perfil de professor. */}
+        <Route
+          path="/perfil/aulas"
+          element={
+            <Guard require="protected" showSplash={showSplash}>
+              <TeacherLessons />
+            </Guard>
+          }
+        />
         <Route
           path="/perfil/professor"
           element={

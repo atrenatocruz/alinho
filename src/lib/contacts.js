@@ -6,6 +6,11 @@
 // quando existir, troca-se esta linha.
 export const SUPPORT_EMAIL = 'support@alinho.pt'
 
+// A caixa ainda não existe: um clube que escrevesse perdia a mensagem. O
+// botão Email fica escondido e fica só o WhatsApp, que o Renato lê, até o PO
+// dizer que a caixa existe (26 set). Nesse dia, passa a true.
+export const SUPPORT_EMAIL_READY = false
+
 // O número do robô (decisão do Francisco, 25 set). O robô ignora as
 // mensagens privadas que não são um código, por isso quem escreve espera por
 // uma pessoa da equipa — a página diz isso por baixo dos botões.

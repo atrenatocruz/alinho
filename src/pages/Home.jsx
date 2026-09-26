@@ -11,7 +11,7 @@ import { DayHeader, MonthSheet, FilterSheet, FilterChips, LocationChip, Location
 import HomeSearch from '../components/agenda/HomeSearch'
 import { MapView } from '../components/agenda/MapView'
 import { listExploreEvents, getSavedLocation, saveLocation } from '../lib/explore'
-import { countPeople, mixCapacity, isGenderMismatch, isAgeIneligible, isMissingBirthday } from '../lib/mixLogic'
+import { countPeople, mixCapacity, isGenderMismatch, isMissingGender, isAgeIneligible, isMissingBirthday } from '../lib/mixLogic'
 import { listFollowing } from '../lib/follows'
 import { isMemberLimitError } from '../lib/plans'
 import { listOpenTournaments } from '../lib/tournamentApi'
@@ -435,6 +435,8 @@ export default function Home() {
     if (isGenderMismatch(game, profile)) return null
     // Sem data de nascimento pede-se num modal — é trabalho da página do mix.
     if (isAgeIneligible(game, profile) || isMissingBirthday(game, profile)) return null
+    // Sem sexo no perfil, idem: escolhe-se na página do mix.
+    if (isMissingGender(game, profile)) return null
     return countPeople(rows) < mixCapacity(game) ? { kind: 'join' } : { kind: 'waitlist' }
   }
 
