@@ -25,7 +25,6 @@ import { listPendingClubTeachers } from '../lib/teachers'
 import TeacherRequestCard from '../components/TeacherRequestCard'
 import VoucherScanner from '../components/VoucherScanner'
 import { isValidVoucherId, normalizeScannedVoucherId } from '../lib/vouchers'
-import OpenSlotsPanel from '../components/OpenSlotsPanel'
 import { Prices as LessonPrices, ClubTeachers, NewSeries } from '../components/lessons/ClubLessonsPanel'
 import { SeriesManage } from '../components/lessons/ClubSeriesPanel'
 import { lessonTypeLabel, seriesWhen } from '../components/lessons/LessonBits'
@@ -477,7 +476,7 @@ export default function GerirClube() {
   useEffect(() => {
     // ?tab=open_slots abria o formulario de publicar: continua a abrir.
     // Aulas e torneios estao agora na propria lista de eventos.
-    if (tabParam === 'open_slots') setCriar('aberto')
+    if (tabParam === 'open_slots') navigate(`/gerir/${slug}/criar/em-aberto`, { replace: true })
   }, [tabParam])
 
   useEffect(() => {
@@ -763,6 +762,10 @@ export default function GerirClube() {
     setAvisoCriado('')
     setCreatedMixScope(null)
     if (tipo === 'mix') { setCriar(null); setShowCreateGame(true); return }
+    // Os jogos em aberto abrem na página própria, em passos (#342).
+    if (tipo === 'aberto') { navigate(`/gerir/${slug}/criar/em-aberto`); return }
+    // O torneio abre numa página só do formulário (ponto 0, 26 set).
+    if (tipo === 'torneio') { navigate(`/gerir/${slug}/criar/torneio`); return }
     setShowCreateGame(false)
     setCriar(tipo)
   }
@@ -2069,13 +2072,6 @@ export default function GerirClube() {
                 </div>
               )}
 
-              {criar === 'aberto' && (
-                <OpenSlotsPanel
-                  organizationId={currentOrganizationId}
-                  onlyForm
-                  onDone={({ created }) => { setCriar(null); if (created) loadOpenGames() }}
-                />
-              )}
               {criar === 'torneio' && (
                 <ClubTournamentsPanel
                   organizationId={org.id}
