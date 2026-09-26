@@ -375,3 +375,30 @@ test('#552 responder «In» a um cartão do «mix» inscreve nesse mix', async (
   await sayWithIds('in', cards[1].id)
   assert.deepEqual(db.participants.map((p) => p.game_id), ['m2'])
 })
+
+test('convidado novo: as boas-vindas vão em privado, com o número e os passos; o grupo não recebe nada', async () => {
+  const sent = []
+  await handleGroupMessage(
+    { groupJid: 'g@g.us', senderPn: '351938311445@s.whatsapp.net', text: 'in', message: { pushName: 'Cátia' },
+      quotedStanzaId: null, mentionedJids: [], mentionedPns: [] },
+    { sendText: async (to, t) => { sent.push([to, t]) } },
+  )
+  assert.equal(sent.length, 1)
+  const [to, text] = sent[0]
+  assert.equal(to, '351938311445@s.whatsapp.net')
+  assert.match(text, /\+351 938 311 445/)
+  assert.match(text, /Confirmar pelo WhatsApp/)
+  assert.match(text, /aqui, nesta conversa/)
+  assert.doesNotMatch(text, /\/help/)
+})
+
+test('convidado novo: se o privado falhar, as boas-vindas ficam no grupo', async () => {
+  const sent = []
+  await handleGroupMessage(
+    { groupJid: 'g@g.us', senderPn: '351938311445@s.whatsapp.net', text: 'in', message: { pushName: 'Cátia' },
+      quotedStanzaId: null, mentionedJids: [], mentionedPns: [] },
+    { sendText: async (to, t) => { if (to !== 'g@g.us') throw new Error('dm falhou'); sent.push(t) } },
+  )
+  assert.equal(sent.length, 1)
+  assert.match(sent[0], /Confirmar pelo WhatsApp/)
+})

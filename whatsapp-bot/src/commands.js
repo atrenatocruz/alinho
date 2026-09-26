@@ -7,6 +7,14 @@ import { config } from './config.js'
 import { helpText, helpFooter } from './messages.js'
 import { t } from './locales.js'
 import { startTimer } from './timing.js'
+
+// «351938311445@s.whatsapp.net» → «+351 938 311 445» (outros países: «+<dígitos>»).
+function formatPhone(jid) {
+  const digits = String(jid ?? '').split('@')[0].replace(/\D/g, '')
+  if (!digits) return ''
+  const m = digits.match(/^351(\d{3})(\d{3})(\d{3})$/)
+  return m ? `+351 ${m[1]} ${m[2]} ${m[3]}` : `+${digits}`
+}
 import { repostHooks, cardSentRecently, noteCardSent } from './sync.js'
 
 function stripAccents(str) {
@@ -343,6 +351,21 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
   // back to /help, except the help listing itself.
   const reply = (key, vars) => sendText(groupJid, `${t(key, lang, vars)}${helpFooter(lang)}`, { quoted: message })
 
+  // Boas-vindas a um convidado novo vão em PRIVADO, não para o grupo: é
+  // conversa só dele, e os passos para ligar o número à conta acabam num
+  // código que ele envia ao bot nesta mesma conversa (#537). No grupo basta
+  // a lista publicada de novo. Se o privado falhar, fica no grupo.
+  async function welcomeGuest(key, profile) {
+    const text = `${t(key, lang, { name: profile.name })}\n\n${t('guest_link_steps', lang, { appUrl: config.appUrl, phone: formatPhone(senderPn) })}`
+    try {
+      if (!senderPn) throw new Error('sender phone unknown')
+      await sendText(senderPn, text)
+    } catch (err) {
+      console.error('Failed to DM guest welcome, falling back to group:', err)
+      await sendText(groupJid, text, { quoted: message })
+    }
+  }
+
   // Same check a plain resolveProfileByPhoneJid result needs before use —
   // avoids a redundant query.
   async function requireProfile(profile) {
@@ -433,11 +456,8 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
         throw new Error(`Failed to insert waitlisted participant: ${insertError.message}`)
       }
       repostHooks.requestRepostForGame(organizationId, pending.gameId)
-      if (isNewGuest) {
-        await reply('guest_waitlisted', { name: profile.name, appUrl: config.appUrl })
-      } else {
-        await reply('waitlisted')
-      }
+      await reply('waitlisted')
+      if (isNewGuest) await welcomeGuest('guest_waitlisted', profile)
       return
     }
 
@@ -657,7 +677,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
       partner: pending.name,
       link: `${config.appUrl}/convite/${token}`,
     })
-    if (isNewGuest) await reply('guest_joined', { name: profile.name, appUrl: config.appUrl })
+    if (isNewGuest) await welcomeGuest('guest_joined', profile)
   }
 
   /**
@@ -764,7 +784,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     if (partnerIsNewGuest) {
       await reply('pair_partner_guest_created', { partner: partner.name, appUrl: config.appUrl })
     } else if (isNewGuest) {
-      await reply('guest_joined', { name: profile.name, appUrl: config.appUrl })
+      await welcomeGuest('guest_joined', profile)
     }
   }
 
@@ -945,7 +965,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
       // roster repost wouldn't explain what just happened or that signing
       // up unlocks their history/friends/rewards (Trello #19).
       if (isNewGuest) {
-        await reply('guest_joined', { name: profile.name, appUrl: config.appUrl })
+        await welcomeGuest('guest_joined', profile)
       }
       return
     }
