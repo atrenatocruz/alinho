@@ -36,6 +36,8 @@ import { notifyMixChanges } from '../lib/notifications'
 import AddPlayerSheet from '../components/mix/AddPlayerSheet'
 import JoinPartnerSheet from '../components/mix/JoinPartnerSheet'
 import { Sheet } from '../components/agenda/AgendaControls'
+import ConfirmPhoneCard from '../components/ConfirmPhoneCard'
+import { whatsappLookalikeInGame, rememberWhatsappGuest, rememberedWhatsappGuest } from '../lib/whatsappGuest'
 import { MonoLabel } from '../components/tournament/TournamentBits'
 import { joinWithNamedPartner, listGameInvites, inviteLink, whatsappShare } from '../lib/partnerInvite'
 import MixAdminBar from '../components/mix/MixAdminBar'
@@ -124,6 +126,10 @@ export default function GameDetails() {
   const [genderError, setGenderError] = useState('')
   // Sexo que não bate com o mix: pergunta-se, não se bloqueia (26 set).
   const [genderConfirm, setGenderConfirm] = useState(null) // { then, name? } | null
+  // Já entrei pelo WhatsApp? (Francisco, 26 set) — { name, then } enquanto
+  // se pergunta; o nome fica guardado depois do «Sim, sou eu».
+  const [lookalike, setLookalike] = useState(null)
+  const [waGuestName, setWaGuestName] = useState(() => rememberedWhatsappGuest(id))
   const [birthdayValue, setBirthdayValue] = useState('')
   const [savingBirthday, setSavingBirthday] = useState(false)
   const [birthdayError, setBirthdayError] = useState('')
@@ -2031,10 +2037,17 @@ export default function GameDetails() {
   const genderMismatch = isGenderMismatch(game, profile)
   // Sem sexo no perfil, pergunta-se ao carregar em entrar (Francisco, 26 set).
   const missingGender = isMissingGender(game, profile)
-  const withGender = (action) => () => {
+  const genderStep = (action) => {
     if (missingGender) { setGenderError(''); setGenderPrompt({ then: action }); return }
     if (genderMismatch) { setGenderConfirm({ then: action }); return }
     action()
+  }
+  // Antes de inscrever: há um convidado do WhatsApp parecido comigo neste
+  // mix? Então pergunta-se primeiro «És tu?» — senão ficava duas vezes.
+  const withGender = (action) => async () => {
+    const rows = await whatsappLookalikeInGame(id)
+    if (rows.length) { setLookalike({ name: rows[0].name, then: () => genderStep(action) }); return }
+    genderStep(action)
   }
   const chooseGender = async (gender) => {
     setSavingGender(true)
@@ -2415,6 +2428,19 @@ export default function GameDetails() {
         >
           <Play size={18} /> {t('gamedetails.live_see_round')}
         </PrimaryButton>
+      ) : !mixStarted && !isUserJoined && waGuestName ? (
+        // Disse que sim, que é o convidado do WhatsApp: não se inscreve outra
+        // vez. Liga a conta ao número (#537) e as inscrições juntam-se.
+        <div className="card space-y-3">
+          <p className="text-sm text-ink-900">{t('gamedetails.wa_guest_in', { name: waGuestName })}</p>
+          {profile?.phone_hash && profile.phone_hash !== 'dev-bypass'
+            ? <ConfirmPhoneCard />
+            : (
+              <Link to="/perfil/informacao" className="btn-secondary inline-flex w-full items-center justify-center">
+                {t('gamedetails.wa_add_number')}
+              </Link>
+            )}
+        </div>
       ) : !mixStarted && canJoin && !joinMode && !ageIneligible && !missingBirthday ? (
         <div className="space-y-2">
           <PrimaryButton onClick={withGender(handleJoinAlone)} disabled={joining} className="w-full">
@@ -3690,6 +3716,22 @@ export default function GameDetails() {
           {/* O sexo não bate: pergunta, sem vermelho, e a inscrição continua
               se disser que sim. O admin tira a pessoa se for caso disso
               (Francisco, 26 set). Também para o parceiro. */}
+          {/* Já entrei pelo WhatsApp? Duas respostas, e fechar não inscreve. */}
+          {lookalike && (
+            <Sheet title={t('gamedetails.wa_lookalike_title')} onClose={() => setLookalike(null)}>
+              <div className="space-y-3">
+                <p className="text-sm text-ink-900">{t('gamedetails.wa_lookalike_message', { name: lookalike.name })}</p>
+                <PrimaryButton className="w-full"
+                  onClick={() => { rememberWhatsappGuest(id, lookalike.name); setWaGuestName(lookalike.name); setLookalike(null) }}>
+                  {t('gamedetails.wa_lookalike_yes')}
+                </PrimaryButton>
+                <button type="button" className="btn-secondary w-full"
+                  onClick={() => { const next = lookalike.then; setLookalike(null); next() }}>
+                  {t('gamedetails.wa_lookalike_no')}
+                </button>
+              </div>
+            </Sheet>
+          )}
           <ConfirmSheet
             open={!!genderConfirm}
             title={game?.gender_restriction === 'feminino' ? t('gamedetails.gender_confirm_title_feminino') : t('gamedetails.gender_confirm_title_masculino')}

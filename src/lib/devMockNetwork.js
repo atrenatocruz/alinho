@@ -424,6 +424,10 @@ const RPC_MOCKS = {
     ? { guest_name: 'José Metello', game_id: 'fake-game-1', game_title: 'Mix de Quinta-feira', inviter_name: 'Nuno Reis', status: localStorage.getItem('mockPartnerClaim') }
     : null),
   claim_partner_invite: () => (localStorage.getItem('mockClaimError') ? { __error: localStorage.getItem('mockClaimError') } : 'fake-game-1'),
+  // «Já estás neste mix?» (26 set): mockWaLookalike = 'true' — um convidado
+  // do WhatsApp parecido comigo no mix.
+  whatsapp_lookalike_in_game: () => (localStorage.getItem('mockWaLookalike') === 'true'
+    ? [{ participant_id: 'wa-p1', guest_user_id: 'wa-g1', name: 'J. S. S. R.', as_partner: false }] : []),
   tournament_invite_token: () => 'convite-jogador-2',
   tournament_invite_token_player1: () => 'convite-jogador-1',
   // A lista do organizador: um de cada estado, para se ver tudo num print.
