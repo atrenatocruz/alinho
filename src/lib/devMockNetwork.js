@@ -1116,6 +1116,25 @@ const SERIES_ORIGIN_MIX = () => {
   const d = new Date(next.date); d.setDate(d.getDate() - 7)
   return { ...next, id: 'fake-series-origin', date: d.toISOString(), status: 'open', is_recurrence_origin: true, launch_at: null }
 }
+// localStorage.mockSeriesPast = 'true' (com mockSeriesNext) — a página da
+// série (ações do evento, 26 set): o de hoje com inscritos e quatro já jogados.
+const SERIES_PAST_MIXES = () => {
+  const origin = SERIES_ORIGIN_MIX()
+  const d0 = new Date(); d0.setHours(20, 0, 0, 0)
+  const who = (n) => Array.from({ length: n }, (_, i) => ({ id: `sp${i}`, user_id: `spu${i}`, partner_id: null, status: 'confirmed' }))
+  const today = { ...origin, date: d0.toISOString(), participants: who(6) }
+  const past = [1, 2, 3, 4].map((w) => {
+    const d = new Date(d0); d.setDate(d.getDate() - 7 * w)
+    return { ...origin, id: `fake-series-past-${w}`, date: d.toISOString(), status: 'finished', is_recurrence_origin: w === 4, participants: who(8 - (w % 2) * 2) }
+  })
+  return [{ ...today, is_recurrence_origin: false }, ...past].map((g) => ({ ...g, title: 'Mix da semana' }))
+}
+// Na página da série, a data por abrir fica a uma semana da de hoje.
+const SERIES_PAST_NEXT = () => {
+  const d = new Date(); d.setDate(d.getDate() + 7); d.setHours(20, 0, 0, 0)
+  const launch = new Date(d); launch.setDate(launch.getDate() - 2)
+  return { ...SERIES_NEXT_MIX(), title: 'Mix da semana', date: d.toISOString(), launch_at: launch.toISOString() }
+}
 RPC_MOCKS.skip_recurrence_game = () => { const d = new Date(); d.setDate(d.getDate() + 13); d.setHours(20, 0, 0, 0); return d.toISOString() }
 // mockEnsureStatus = 'ended' | 'no_base' — o que a base responde ao criar o
 // próximo Mix em falta; mockNoPending = 'true' — a série sem próximo Mix.
@@ -1124,7 +1143,11 @@ TABLE_MOCKS.games = (url) => {
   let rows = gamesSemFiltro(url)
   const u = decodeURIComponent(url)
   if (localStorage.getItem('mockMixDraft') === 'true' && Array.isArray(rows) && !/[?&]id=eq\./.test(u)) rows = [...rows, DRAFT_MIX()]
-  if (localStorage.getItem('mockSeriesNext') === 'true' && Array.isArray(rows) && !/[?&]id=eq\./.test(u)) rows = [...rows, ...(localStorage.getItem('mockSeriesOrigin') === 'false' ? [] : [SERIES_ORIGIN_MIX()]), SERIES_NEXT_MIX()]
+  if (localStorage.getItem('mockSeriesNext') === 'true' && Array.isArray(rows) && !/[?&]id=eq\./.test(u)) {
+    const others = localStorage.getItem('mockSeriesPast') === 'true' ? SERIES_PAST_MIXES()
+      : localStorage.getItem('mockSeriesOrigin') === 'false' ? [] : [SERIES_ORIGIN_MIX()]
+    rows = [...rows, ...others, localStorage.getItem('mockSeriesPast') === 'true' ? SERIES_PAST_NEXT() : SERIES_NEXT_MIX()]
+  }
   // localStorage.mockOpenGameEmpty = 'true' — um jogo em aberto sem ninguém
   // inscrito no Gerir, para ver o «Cancelar» na janela da app.
   if (localStorage.getItem('mockOpenGameEmpty') === 'true' && /origin=eq\.open_slot/.test(u)) {
