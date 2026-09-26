@@ -19,7 +19,9 @@ const agoText = (t, isoTs) => {
   return h < 24 ? t('lessons.ago_hours', { count: h }) : t('lessons.ago_days', { count: Math.round(h / 24) })
 }
 
-export default function ClubSeriesPanel({ organizationId, teachers, prices, peakHours }) {
+// onCreate: a turma nova abre na página própria em passos (#342); sem ele,
+// o formulário antigo por baixo.
+export default function ClubSeriesPanel({ organizationId, teachers, prices, peakHours, onCreate = null }) {
   const { t } = useTranslation()
   const [series, setSeries] = useState([])
   const [loading, setLoading] = useState(true)
@@ -49,7 +51,7 @@ export default function ClubSeriesPanel({ organizationId, teachers, prices, peak
   return (
     <div className="space-y-3">
       {notice && <p className="text-sm font-semibold text-ok">{notice}</p>}
-      <PrimaryButton className="w-full" disabled={teachers.length === 0} onClick={() => { setNotice(''); setMode({ view: 'create' }) }}>
+      <PrimaryButton className="w-full" disabled={teachers.length === 0} onClick={() => { setNotice(''); if (onCreate) onCreate(); else setMode({ view: 'create' }) }}>
         <Plus size={16} /> {t('lessons.new_series')}
       </PrimaryButton>
       {teachers.length === 0 && <p className="text-xs text-muted">{t('lessons.need_teacher_first')}</p>}

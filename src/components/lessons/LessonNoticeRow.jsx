@@ -17,6 +17,8 @@ export const LESSON_NOTICE_KINDS = [
   'lesson_time_proposed_by_teacher', 'lesson_time_proposed_by_student', 'lesson_proposal_accepted',
   // Juntar pedidos (migration_lessons_6).
   'lesson_merge_proposed', 'lesson_merge_declined', 'lesson_merge_booked',
+  // A promoção da turma acaba daqui a 7 dias (migration_lessons_7).
+  'lesson_promo_ending',
 ]
 
 function target(notice) {
@@ -46,6 +48,9 @@ export default function LessonNoticeRow({ notice, onOpen }) {
     type: d.lesson_type ? t(`lessons.price_row_${d.lesson_type}`) : '',
     asked: d.original_starts_at ? formatDate(d.original_starts_at, i18n.language, { weekday: 'long', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '',
     when: (d.lesson_date || d.starts_at) ? formatDate(d.lesson_date || d.starts_at, i18n.language, { weekday: 'long', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '',
+    promo: d.promo_price != null ? `${Number(d.promo_price)} €` : '',
+    table: d.table_price != null ? `${Number(d.table_price)} €` : '',
+    until: d.until ? formatDate(`${d.until}T12:00:00`, i18n.language, { day: 'numeric', month: 'short' }) : '',
     reason: d.reason ? t(`lessons.reason_${d.reason}`).toLowerCase() : '',
   }
   const bad = ['lesson_cancelled', 'lesson_enrolment_rejected', 'lesson_request_rejected', 'lesson_request_cancelled'].includes(notice.kind)
