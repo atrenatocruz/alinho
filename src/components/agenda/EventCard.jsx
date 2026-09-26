@@ -6,6 +6,7 @@ import { formatTime, formatCurrency } from '../../lib/formatDate'
 import { FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, mixCapacity, isGenderMismatch, isAgeIneligible } from '../../lib/mixLogic'
 import { AGE_LABEL_KEY } from '../../lib/ageCategories'
 import { ratingBand } from '../../lib/elo'
+import { parseLevel, levelNumber } from '../../lib/mixLevels'
 
 /* ════════════════════════════════════════════════════════════════════════
    Cartão da agenda da Home (Homepage unificada, Fase 1, Trello #258).
@@ -185,7 +186,7 @@ export function GameEventCard({ event, profile, friendIds = null, action = null,
       mismatchKey = 'agenda.state_not_for_you'
     } else if (game.level) {
       const mine = ratingBand(profile.rating, profile.gender)
-      if (mine?.fullVars?.num != null && String(mine.fullVars.num) !== game.level.slice(1)) {
+      if (mine?.fullVars?.num != null && String(mine.fullVars.num) !== levelNumber(game.level)) {
         mismatchKey = 'agenda.state_other_level'
       }
     }
@@ -204,8 +205,14 @@ export function GameEventCard({ event, profile, friendIds = null, action = null,
 
       <div className="flex items-start justify-between gap-2">
         <div className="flex flex-wrap gap-1">
-          {/* Recorrência como sufixo da etiqueta, igual à página do evento (Trello #383). */}
-          <KindTag kind={event.kind} past={past} suffix={game.recurrence_id ? t('ui.recurring') : null} />
+          {/* Recorrência e nível (#577) como sufixo da etiqueta, «Mix · Recorrente
+              · MX4», igual à página do evento (Trello #383). O nível não vai numa
+              pastilha preta: a de baixo, «N4», é o nível médio dos inscritos
+              (designer, 26 set). Sem nível escolhido, só o que já havia. */}
+          <KindTag kind={event.kind} past={past} suffix={[
+            game.recurrence_id ? t('ui.recurring') : null,
+            event.kind === 'mix' && parseLevel(game.level) ? `${parseLevel(game.level).scale}${parseLevel(game.level).num}` : null,
+          ].filter(Boolean).join(' · ') || null} />
         </div>
         {state}
       </div>
@@ -284,7 +291,7 @@ export function ExploreEventCard({ event, profile, distance = null, onJoin = nul
       mismatchKey = 'agenda.state_not_for_you'
     } else if (game.level) {
       const mine = ratingBand(profile.rating, profile.gender)
-      if (mine?.fullVars?.num != null && String(mine.fullVars.num) !== game.level.slice(1)) mismatchKey = 'agenda.state_other_level'
+      if (mine?.fullVars?.num != null && String(mine.fullVars.num) !== levelNumber(game.level)) mismatchKey = 'agenda.state_other_level'
     }
   }
 

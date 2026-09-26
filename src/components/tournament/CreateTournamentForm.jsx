@@ -14,6 +14,8 @@ import { FieldLabel, MonoLabel } from './TournamentBits'
 import { removeTournamentPoster, uploadTournamentPoster } from '../../lib/tournamentPosterStorage'
 import { describeError } from '../../lib/errors'
 import StepPage from '../steps/StepPage'
+import OpensPicker, { openingDays } from './OpensPicker'
+import { weekdayLong, isMasculineWeekday } from '../../lib/launchDay'
 
 const DEFAULT_RULES = {
   entry_mode: 'dupla',        // dupla | sozinho | as_duas
@@ -176,6 +178,9 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
   const [poster, setPoster] = useState({ busy: false, error: '' })
   const [editing, setEditing] = useState(null) // índice da categoria aberta, ou 'new'
   const [draft, setDraft] = useState(() => ({
+    // «Abrem as inscrições»: 'now' («Já») ou o dia escolhido, e a hora.
+    opens_day: 'now',
+    opens_time: '10:00',
     name: initial?.tournament?.name || '',
     location: initial?.tournament?.location || club?.location || club?.name || '',
     poster_url: initial?.tournament?.poster_url || null,
@@ -268,6 +273,12 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
   // lia-o como UTC, e em Lisboa as inscrições fechavam às 00:59.
   // A data do sorteio é opcional: vazia vai como null, porque "" rebenta no
   // ::timestamptz do servidor (22007) e o organizador só via «Algo correu mal».
+  // O dia de abrir que ainda vale (um dia depois do prazo volta a «Já»,
+  // como no OpensPicker).
+  const opensDay = draft.opens_day !== 'now' && openingDays(draft.entries_close_at.slice(0, 10) || firstDay).includes(draft.opens_day)
+    ? draft.opens_day : null
+  const opensAt = opensDay && draft.opens_time ? localInputToIso(`${opensDay}T${draft.opens_time}`) : null
+
   const outgoing = (d) => ({
     ...d,
     entries_close_at: localInputToIso(d.entries_close_at),
@@ -278,6 +289,8 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
     ...outgoing(draft),
     is_public: true,
     status,
+    // Com um dia escolhido, abre sozinho a essa hora (schedule_tournament_opening).
+    opens_at: status === 'inscricoes' ? opensAt : null,
     categories: draft.categories.map((c) => ({
       ...c, slots: Number(c.slots), price: Number(c.price) || 0,
       prize_first: (c.prize_first || '').trim() || null,
@@ -356,11 +369,19 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
      palavra e os dois botões ficam na mesma. */
   const footer = !locked && step === 4 && !editing_existing ? (
     <div className="space-y-2">
-      <p className="text-sm font-extrabold text-ink-900">{t('tournament.create.open_now_question')}</p>
+      {/* Com um dia escolhido no passo 2 a pergunta sai: o botão marca a
+          abertura (desenho, 26 set). */}
+      {!opensAt && <p className="text-sm font-extrabold text-ink-900">{t('tournament.create.open_now_question')}</p>}
       <button type="button" disabled={saving} onClick={guarded(() => publish('inscricoes'))} className="btn-primary w-full disabled:opacity-40">
-        {t('tournament.create.publish')}
+        {opensAt ? t('tournament.create.schedule_opening') : t('tournament.create.publish')}
       </button>
-      <p className="text-center text-xs text-muted">{t('tournament.create.publish_hint')}</p>
+      <p className="text-center text-xs text-muted">
+        {opensAt ? t(isMasculineWeekday(new Date(`${opensDay}T12:00`)) ? 'tournament.create.schedule_opening_hint_m' : 'tournament.create.schedule_opening_hint', {
+          day: weekdayLong(new Date(`${opensDay}T12:00`), i18n.language),
+          date: new Intl.DateTimeFormat(i18n.language, { day: 'numeric', month: 'short' }).format(new Date(`${opensDay}T12:00`)).replace('.', '').replace(' de ', ' '),
+          time: draft.opens_time,
+        }) : t('tournament.create.publish_hint')}
+      </p>
       <button type="button" disabled={saving} onClick={guarded(() => publish('rascunho'))} className="btn-secondary w-full !mt-3 disabled:opacity-40">
         {t('tournament.create.save_draft')}
       </button>
@@ -512,11 +533,11 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
             </div>
           </Field>
           {/* «Abrem as inscrições», o mesmo controlo do mix (acrescento de 25
-              set). Escolher outro dia precisa da base de dados: por agora só
-              «Já», que abre ao publicar no último passo. */}
-          <Field label={t('launchday.label')} hint={t('tournament.create.opens_now_hint')}>
-            <Chips label={t('launchday.label')} value="now" onChange={() => {}}
-              options={[{ value: 'now', label: t('tournament.create.opens_now') }]} />
+              set): «Já», ou o dia e a hora em que abre sozinho. */}
+          <Field label={t('launchday.label')}>
+            <OpensPicker value={draft.opens_day} time={draft.opens_time}
+              onChange={(v) => set({ opens_day: v })} onTime={(v) => set({ opens_time: v })}
+              until={draft.entries_close_at.slice(0, 10) || firstDay} firstDay={firstDay} />
           </Field>
           <Field label={t('tournament.create.entries_until')} error={fieldError(DEADLINE_PROBLEMS)}>
             <div className="flex gap-2">

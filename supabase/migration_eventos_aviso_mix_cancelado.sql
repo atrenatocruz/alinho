@@ -14,6 +14,13 @@
 -- cancelou. Guarda o título e a data do mix no momento (como os outros
 -- avisos de mix), para o sino não ter de voltar a ler o jogo.
 --
+-- Só avisa quando é uma PESSOA a cancelar (auth.uid() preenchido). O cron
+-- diário 'cancel-stale-mixes' (cancel_stale_open_mixes, 06:00) põe
+-- 'cancelled' nos mixes que ficaram abertos mais de 24 h depois da data —
+-- em geral jogados e que ninguém fechou; avisar esses era falso (SI, 26 set).
+-- Não se usa «a data já passou»: quem organiza pode cancelar um mix que já
+-- começou e correu mal (#464), e aí os inscritos têm de saber.
+--
 -- O robô NÃO manda estes avisos por mensagem privada: o mixNotices.js só lê
 -- 'mix_joined', 'mix_removed' e 'mix_partner_changed'. Não mexe no robô.
 --
@@ -33,6 +40,11 @@ SECURITY DEFINER
 SET search_path = public
 AS $function$
 BEGIN
+  -- Sem pessoa (cron, service role): não é um cancelamento a avisar.
+  IF auth.uid() IS NULL THEN
+    RETURN NEW;
+  END IF;
+
   INSERT INTO notifications (user_id, kind, game_id, actor_id, data)
   SELECT DISTINCT who.user_id, 'mix_cancelled', NEW.id, auth.uid(),
          jsonb_build_object('game_title', NEW.title, 'game_date', NEW.date)
@@ -44,7 +56,7 @@ BEGIN
        WHERE p.game_id = NEW.id AND p.status IN ('confirmed', 'waitlisted')
     ) who
    WHERE who.user_id IS NOT NULL
-     AND who.user_id IS DISTINCT FROM auth.uid();
+     AND who.user_id <> auth.uid();
   RETURN NEW;
 END;
 $function$;

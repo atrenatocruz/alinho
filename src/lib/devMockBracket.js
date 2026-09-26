@@ -1,0 +1,75 @@
+// Dados de teste do quadro em árvore (#571), para se ver a árvore com 8, 16
+// e 32 duplas sem base de dados.
+//
+// Ligar em localhost, com a sessão Admin(Dev), por cima do mockTournament,
+// do mockTDraw e do mockTMyGamesReal (sou a dupla e1 do M4):
+//   localStorage.mockTBracket = '8' | '16' | '32'   ← quantas duplas
+//   localStorage.mockTBracketStage = 'antes' | 'meio' | 'fim'
+//     antes: sorteado, nada jogado · meio: 1.ª ronda jogada e a 2.ª a meio
+//     fim: tudo jogado até à final
+const size = () => Number(localStorage.getItem('mockTBracket')) || 0
+const on = () => [8, 16, 32].includes(size())
+const stage = () => localStorage.getItem('mockTBracketStage') || 'meio'
+
+const CAT = 'cat-m4'
+const NAMES = [
+  'Mendes / Silva', 'Almeida / Sousa', 'Serra / Mota', 'Vamos a isso', 'Barros / Costa', 'Os do costume', 'Cruz / Brito', 'Gomes / Pais',
+  'Faria / Rocha', 'Lima / Reis', 'Nunes / Faria', 'Silva / Lopes', 'Vaz / Luz', 'Paz / Gil', 'Sá / Leal', 'Mota / Brás',
+  'Dias / Sá', 'Luz / Paz', 'Rei / Gil', 'Vaz / Mar', 'Leal / Sol', 'Ruas / Pio', 'Cruz / Bó', 'Sena / Ávila',
+  'Pinto / Costa', 'Rosa / Pinto', 'Santos / Santos', 'Brito / Nunes', 'Branco / Lima', 'Neves / Cunha', 'Matos / Reis', 'Seixas / Ramos',
+]
+const ROUNDS = { 32: ['R32', 'R16', 'QF', 'SF', 'F'], 16: ['R16', 'QF', 'SF', 'F'], 8: ['QF', 'SF', 'F'] }
+const HOURS = ['09:00', '11:00', '13:00', '15:00', '17:00']
+
+function build() {
+  const n = size()
+  const rounds = ROUNDS[n]
+  const played = stage() === 'antes' ? 0 : stage() === 'fim' ? rounds.length : 1
+  const matches = []
+  let alive = Array.from({ length: n }, (_, i) => `e${i + 1}`)
+  rounds.forEach((round, r) => {
+    const next = []
+    for (let s = 1; s <= alive.length / 2; s++) {
+      const a = alive[2 * s - 2]
+      const b = alive[2 * s - 1]
+      // Jogada: a ronda já passou; a meio: metade dos jogos da ronda seguinte.
+      const done = a && b && (r < played || (r === played && stage() === 'meio' && s % 2 === 1))
+      // Ganha a de cima, exceto de 3 em 3 — e a e1 (eu) ganha sempre.
+      const win = done ? (b === 'e1' || (a !== 'e1' && s % 3 === 0) ? b : a) : null
+      matches.push({
+        id: `bt-${round}-${s}`, category_id: CAT, stage: 'principal', group_id: null, round, bracket_slot: s,
+        entry_a_id: a || null, entry_b_id: b || null, source_a: null, source_b: null,
+        scheduled_at: `2026-10-10T${HOURS[r] || '18:00'}:00.000Z`, previous_scheduled_at: null,
+        court_name: `Campo ${((s - 1) % 4) + 1}`,
+        status: done ? 'terminado' : 'marcado',
+        score_a: done ? (win === a ? 9 : s % 2 ? 7 : 6) : null,
+        score_b: done ? (win === b ? 9 : s % 2 ? 7 : 5) : null,
+        // Um jogo acabado no tie-break, para se ver «TB 7-5».
+        sets: done && s === 2 ? [{ score_a: win === a ? 9 : 8, score_b: win === b ? 9 : 8, tiebreak_a: win === a ? 7 : 5, tiebreak_b: win === b ? 7 : 5, is_super_tiebreak: false }] : null,
+        winner_entry_id: win,
+      })
+      next.push(win)
+    }
+    alive = next
+  })
+  // O 3.º lugar, junto da final.
+  matches.push({
+    id: 'bt-3P', category_id: CAT, stage: '3lugar', group_id: null, round: '3P', bracket_slot: 1,
+    entry_a_id: null, entry_b_id: null, source_a: null, source_b: null,
+    scheduled_at: '2026-10-11T12:00:00.000Z', previous_scheduled_at: null, court_name: 'Campo 2',
+    status: 'marcado', score_a: null, score_b: null, sets: null, winner_entry_id: null,
+  })
+  return matches
+}
+
+const entries = () => Array.from({ length: size() }, (_, i) => ({
+  id: `e${i + 1}`, category_id: CAT, team_name: i === 0 ? null : NAMES[i], status: 'validada',
+  player1_name: i === 0 ? 'Admin (Dev)' : null, player2_name: i === 0 ? 'Pedro Silva' : null,
+}))
+
+// Ganham aos outros dados de teste das mesmas vistas só quando ligados.
+export const BRACKET_TABLE_MOCKS = {
+  tournament_public_matches: () => (on() ? build() : undefined),
+  tournament_public_entries: () => (on() ? entries() : undefined),
+  tournament_public_groups: () => (on() ? [] : undefined),
+}
