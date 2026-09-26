@@ -1069,6 +1069,8 @@ TABLE_MOCKS.games = (url) => {
     return [{ id: 'fake-open-empty', organization_id: MOCK_ADMIN_ORG_ID, title: 'Jogo em aberto', date: d.toISOString(), location: 'Smash Padel Almada', status: 'open', origin: 'open_slot', max_players: 4, num_courts: 1, participants: [] }]
   }
   if (localStorage.getItem('mockNoPending') === 'true' && /status=eq\.pending/.test(u)) rows = []
+  // localStorage.mockMixMen = 'true' — o mix passa a só homens (26 set).
+  if (localStorage.getItem('mockMixMen') === 'true' && Array.isArray(rows)) rows = rows.map((g) => ({ ...g, gender_restriction: 'masculino' }))
   const origem = u.match(/[?&]origin=eq\.([a-z_]+)/)
   return origem && Array.isArray(rows) ? rows.filter((g) => (g.origin || 'admin') === origem[1]) : rows
 }
