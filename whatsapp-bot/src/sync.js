@@ -34,6 +34,29 @@ function requestRepostForGame(organizationId, gameId, { promotedNames = [] } = {
   scheduleRepostForOrg(deps.sendText, deps.getGroupMentions, organizationId, { gameIds: [gameId], promotedNames })
     .catch((err) => console.error('Failed to request repost:', err))
 }
+// #552 — o «mix» envia o cartão completo de cada mix aberto. Para o
+// WhatsApp não bloquear o robô, o cartão de um mix que saiu no grupo há
+// menos de 10 min (pelo «mix» ou por um anúncio) não se repete.
+const CARD_COOLDOWN_MS = 10 * 60 * 1000
+
+/** O cartão deste mix saiu neste grupo há menos de 10 min? */
+export function cardSentRecently(groupJid, gameId, now = Date.now()) {
+  const entry = groupState.get(groupJid)?.mixes.get(gameId)
+  return Boolean(entry?.sentAt && now - entry.sentAt < CARD_COOLDOWN_MS)
+}
+
+/** O «mix» acabou de enviar este cartão: conta como o último anúncio do mix
+ *  (mesmo hash que o repost calcula), para a reconciliação não o repetir. */
+export function noteCardSent(groupJid, gameId, text, messageId) {
+  stateFor(groupJid).mixes.set(gameId, { hash: hash(text), messageId, sentAt: Date.now() })
+}
+
+/** Só para testes: esquece o estado por grupo. */
+export function _resetGroupStateForTests() {
+  for (const st of groupState.values()) if (st.debounceTimer) clearTimeout(st.debounceTimer)
+  groupState.clear()
+}
+
 // Num objeto (e não um export solto) para os testes o poderem simular.
 export const repostHooks = { requestRepostForGame }
 
@@ -56,7 +79,7 @@ function stateFor(groupJid) {
     st = {
       debounceTimer: null,
       lastPostAt: 0,
-      mixes: new Map(), // gameId -> { hash, messageId }
+      mixes: new Map(), // gameId -> { hash, messageId, sentAt }
       openSlotBatches: new Map(), // batchId -> { hash, messageId }
       pendingTagAll: false,
       pendingPromotedByGame: new Map(), // gameId -> { name, lang }
@@ -135,7 +158,7 @@ async function postGroupRoster(sendText, getGroupMentions, group, { tagAll = fal
     const messageId = await sendText(group.groupJid, fullText, shouldTagThis ? { mentions } : {})
     sent++
     if (shouldTagThis) taggedThisFlush = true
-    st.mixes.set(gameId, { hash: nextHash, messageId })
+    st.mixes.set(gameId, { hash: nextHash, messageId, sentAt: Date.now() })
     if (messageId) recordMixMessage(messageId, gameId)
   }
 
@@ -282,7 +305,7 @@ async function primeGroupHashes() {
         // No messageId — a reply to a message sent before this restart
         // can't be resolved via roster.js's map; it just falls back to
         // text-based matching in commands.js, same as an unknown stanzaId.
-        st.mixes.set(state.game.id, { hash: hash(buildMixMessage(state, { label })), messageId: null })
+        st.mixes.set(state.game.id, { hash: hash(buildMixMessage(state, { label })), messageId: null, sentAt: 0 })
       }
 
       const batchIds = new Set(openSlotMixes.map((m) => m.open_batch_id).filter(Boolean))

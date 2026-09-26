@@ -17,7 +17,7 @@ import { supabase } from './supabase.js'
  * Devolve o token. Se algum passo falhar, apaga a conta criada, como a edge
  * function, para não ficarem contas órfãs.
  */
-export async function joinWithUnregisteredPartner({ gameId, organizationId, callerId, name }) {
+export async function joinWithUnregisteredPartner({ gameId, organizationId, callerId, name, existingParticipantId = null }) {
   const placeholderEmail = `sem-conta+${crypto.randomUUID()}@invalid.alinho.pt`
   const { data: created, error: createError } = await supabase.auth.admin.createUser({
     email: placeholderEmail,
@@ -38,11 +38,20 @@ export async function joinWithUnregisteredPartner({ gameId, organizationId, call
       .insert({ user_id: partnerId, organization_id: organizationId, is_guest: true })
     if (memberError) throw new Error(`membership: ${memberError.message}`)
 
-    const { data: participant, error: joinError } = await supabase
-      .from('participants')
-      .insert({ game_id: gameId, user_id: callerId, partner_id: partnerId, status: 'confirmed', joined_alone: false })
-      .select('id')
-      .single()
+    // #554: quem já estava inscrito sozinho junta o parceiro à inscrição que
+    // já tem (mantém o lugar na lista); senão, inscreve a dupla de novo.
+    const { data: participant, error: joinError } = existingParticipantId
+      ? await supabase
+        .from('participants')
+        .update({ partner_id: partnerId, joined_alone: false })
+        .eq('id', existingParticipantId)
+        .select('id')
+        .single()
+      : await supabase
+        .from('participants')
+        .insert({ game_id: gameId, user_id: callerId, partner_id: partnerId, status: 'confirmed', joined_alone: false })
+        .select('id')
+        .single()
     // A mensagem vai tal e qual: o commands.js reconhece o `game_full` do
     // trigger das vagas pelo fim da mensagem.
     if (joinError) throw new Error(joinError.message)
