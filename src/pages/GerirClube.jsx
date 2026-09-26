@@ -1465,6 +1465,20 @@ export default function GerirClube() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mixPage, org?.id, editId, games])
+  // O «Editar» da barra de quem organiza, na página do mix (ações do
+  // evento, 26 set), vem sempre por este endereço. Sem a bandeira do mix por
+  // passos, abre o formulário de sempre aqui no Gerir e o endereço volta a
+  // ser o do Gerir — senão, ao gravar, o formulário abria outra vez.
+  useEffect(() => {
+    if (isMixWizardEnabled || !editId || !org) return
+    const game = games.find((g) => g.id === editId)
+    if (!game) return
+    setActiveTab('events')
+    setTurmaAberta(null)
+    startEditGame(game)
+    navigate(`/gerir/${org.slug}`, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMixWizardEnabled, org?.id, editId, games])
   // …e quando se grava, cancela ou elimina, volta ao Gerir, com a tira.
   useEffect(() => {
     if (!mixPage) return

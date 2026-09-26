@@ -38,6 +38,11 @@ import JoinPartnerSheet from '../components/mix/JoinPartnerSheet'
 import { Sheet } from '../components/agenda/AgendaControls'
 import { MonoLabel } from '../components/tournament/TournamentBits'
 import { joinWithNamedPartner, listGameInvites, inviteLink, whatsappShare } from '../lib/partnerInvite'
+import MixAdminBar from '../components/mix/MixAdminBar'
+import ChangeOneMixSheet from '../components/mix/ChangeOneMixSheet'
+import EventActionsSheet from '../components/EventActionsSheet'
+import { cancelMixDate } from '../lib/mixCancel'
+import { weekdayShort } from '../lib/launchDay'
 
 // Tipo do evento como na Home (src/lib/agenda.js): um jogo em aberto é
 // "open" (salmão), o resto é "mix" (azul) — Trello #409.
@@ -136,6 +141,18 @@ export default function GameDetails() {
   const [publishOpen, setPublishOpen] = useState(false)
   // Cancelar um mix que correu mal (Trello #464) — a pergunta aberta.
   const [cancelOpen, setCancelOpen] = useState(false)
+  // Ações do evento (desenho de 26 set): a folha do «Mais ⋯», o «Mudar só
+  // este mix» e a pergunta do «Recomeçar».
+  const [moreOpen, setMoreOpen] = useState(false)
+  const [changeOneOpen, setChangeOneOpen] = useState(false)
+  const [restartOpen, setRestartOpen] = useState(false)
+  // A tira preta de 3 s depois de uma ação da folha (ex.: «Mudar só este mix»).
+  const [doneNotice, setDoneNotice] = useState('')
+  useEffect(() => {
+    if (!doneNotice) return undefined
+    const timer = setTimeout(() => setDoneNotice(''), 3000)
+    return () => clearTimeout(timer)
+  }, [doneNotice])
   const [changedKeys, setChangedKeys] = useState(() => new Set())
   const [editNotice, setEditNotice] = useState('')
   // A tira preta de «correu bem» desaparece sozinha em 3 s, sem pedir toque
@@ -1319,46 +1336,44 @@ export default function GameDetails() {
   //
   // Pontos e XP nao entram nesta conta: so sao creditados por finalize_mix
   // ("Terminar Mix"), e este botao so existe com o mix a decorrer.
-  const handleStopMix = async () => {
+  // «Recomeçar» (ações do evento, 26 set): a pergunta vem na folha da app
+  // (ConfirmSheet), já não na caixa do telemóvel. O texto é o de sempre.
+  const stopMixMessage = () => {
     const duplasFixas = !isAmericano && !game?.rotate_partners
     let msg = duplasFixas
       ? (matches.length > 0
           ? t('gamedetails.confirm_stop_mix_with_results')
           : t('gamedetails.confirm_stop_mix_no_results'))
       : t('gamedetails.confirm_stop_mix_no_fixed_duplas')
-    if (game?.auto_start_hours_before) msg += '\n\n' + t('gamedetails.confirm_stop_mix_disables_autostart')
-    if (!confirm(msg)) return
+    if (game?.auto_start_hours_before) msg += ' ' + t('gamedetails.confirm_stop_mix_disables_autostart')
+    return msg
+  }
 
-    setBusy(true)
+  // Lança o erro: quem mostra é a ConfirmSheet, junto ao botão.
+  const handleStopMix = async () => {
+    const duplasFixas = !isAmericano && !game?.rotate_partners
     setMixError('')
-    try {
-      const { error: matchesError } = await supabase.from('matches').delete().eq('game_id', id)
-      if (matchesError) throw matchesError
+    const { error: matchesError } = await supabase.from('matches').delete().eq('game_id', id)
+    if (matchesError) throw matchesError
 
-      if (!duplasFixas) {
-        const { error: teamsError } = await supabase.from('teams').delete().eq('game_id', id)
-        if (teamsError) throw teamsError
-      }
-
-      const { error: statusError } = await supabase
-        .from('games')
-        .update({
-          status: 'closed',
-          winner_team_id: null,
-          auto_start_hours_before: null,
-          round_started_at: null,
-          round_duration_minutes: null,
-        })
-        .eq('id', id)
-      if (statusError) throw statusError
-
-      loadGameDetails()
-    } catch (error) {
-      console.error('Error stopping mix:', error)
-      setMixError(describeError(t, error, 'gamedetails.error_stop_mix'))
-    } finally {
-      setBusy(false)
+    if (!duplasFixas) {
+      const { error: teamsError } = await supabase.from('teams').delete().eq('game_id', id)
+      if (teamsError) throw teamsError
     }
+
+    const { error: statusError } = await supabase
+      .from('games')
+      .update({
+        status: 'closed',
+        winner_team_id: null,
+        auto_start_hours_before: null,
+        round_started_at: null,
+        round_duration_minutes: null,
+      })
+      .eq('id', id)
+    if (statusError) throw statusError
+
+    loadGameDetails()
   }
 
   // Volta a por o mix a decorrer com as duplas que la estao. A seguir
@@ -2061,7 +2076,49 @@ export default function GameDetails() {
   const canStart = isAdmin && !mixStarted && showClosed && !mixPaused
   const canStartGames = isAdmin && mixPaused
   const canRedoDuplas = canStartGames && matches.length === 0
-  const rounds = [...new Set(matches.map(m => m.round_number))].sort((a, b) => a - b)
+
+  // Barra de quem organiza (ações do evento, desenho de 26 set): onde se
+  // está, o que falta, e UM botão para o passo seguinte — o mesmo que antes
+  // aparecia solto mais abaixo, agora só aqui.
+  const showAdminBar = isAdmin && ['pending', 'open', 'closed', 'in_progress'].includes(game?.status) && !isDraftMix(game)
+  const isSeriesDate = !!game?.recurrence_id
+  const missingNow = currentRoundMatches.filter((m) => !m.winner_team_id).length
+  let barPrimary = null
+  if (canStart) {
+    barPrimary = { label: busy ? t('gamedetails.forming_duplas') : t('gamedetails.start_mix'), onClick: handleStartMix, disabled: busy }
+  } else if (canStartGames) {
+    barPrimary = { label: t('gamedetails.start_mix'), onClick: handleStartGames, disabled: busy }
+  } else if (game?.status === 'in_progress' && !inPoolStage) {
+    if (!roundsStarted && !isAmericano) {
+      barPrimary = { label: busy ? t('gamedetails.drawing') : t('gamedetails.start_round1'), onClick: handleStartRound1, disabled: busy || unpaired.length > 0 }
+    } else if (roundsStarted && canAdvance) {
+      barPrimary = {
+        label: busy ? t('gamedetails.processing')
+          : inGroupPhase ? t('gamedetails.end_round', { number: maxRound })
+          : t('gamedetails.end_round_and_draw', { number: maxRound, phase: PHASE_LABEL_KEY[nextPhase] ? t(PHASE_LABEL_KEY[nextPhase]).toLowerCase() : '' }),
+        onClick: handleAdvance,
+        disabled: busy,
+      }
+    } else if (canFinalize) {
+      barPrimary = { label: busy ? t('gamedetails.finalizing') : t('gamedetails.finalize_mix'), onClick: () => handleFinalize(false), disabled: busy }
+    }
+  }
+  const barState = game?.status === 'pending' ? t('eventactions.state_pending')
+    : game?.status === 'in_progress' ? (roundsStarted && !isAmericano ? t('eventactions.state_round', { number: maxRound }) : t('eventactions.state_running'))
+    : mixPaused ? t('eventactions.state_stopped')
+    : showClosed ? t('eventactions.state_closed')
+    : t('eventactions.state_open')
+  const barLine = game?.status === 'pending' ? null
+    : game?.status === 'in_progress'
+      ? (!roundsStarted ? t('eventactions.line_duplas_ready')
+        : canAdvance || canFinalize ? t('eventactions.line_round_done')
+        : missingNow > 0 ? t('eventactions.line_missing', { count: missingNow })
+        : null)
+    : mixPaused ? null
+    : peopleCount === 0 ? t('eventactions.line_nobody')
+    : t('eventactions.line_signed', { count: peopleCount, max: capacity })
+  const orgSlug = gameMembership?.organization?.slug
+  const rounds =[...new Set(matches.map(m => m.round_number))].sort((a, b) => a - b)
   const tctStandings = !isSobeDesce && teams.length ? standings(teams, matches) : []
   const americanoStandingsResult = isAmericano && teams.length ? americanoStandings(matches, teams) : []
   const placarResult = isRotating && teams.length ? rotatingPlacar(matches, teams) : []
@@ -2169,6 +2226,17 @@ export default function GameDetails() {
             formattedDate: formatDate(game.date),
             winnerTeamId: game.winner_team_id,
           }}
+        />
+      )}
+
+      {showAdminBar && (
+        <MixAdminBar
+          stateLabel={barState}
+          line={barLine}
+          error={mixError}
+          primary={barPrimary}
+          onEdit={orgSlug ? () => navigate(`/gerir/${orgSlug}/editar/mix/${game.id}`) : null}
+          onMore={() => setMoreOpen(true)}
         />
       )}
 
@@ -2532,34 +2600,23 @@ export default function GameDetails() {
         </div>
       )}
 
-      {mixError && (
+      {/* Com a barra de quem organiza, o erro aparece nela, junto ao botão. */}
+      {mixError && !showAdminBar && (
         <div className="bg-danger/10 text-danger px-4 py-3 rounded-ctrl text-sm font-extrabold animate-fade-up">
           {mixError}
         </div>
       )}
 
-      {/* Começar o Mix (admin, mix cheio) — só forma as duplas; a Ronda 1 arranca à parte */}
-      {canStart && (
-        <PrimaryButton onClick={handleStartMix} disabled={busy} className="w-full">
-          <Play size={20} />
-          {busy ? t('gamedetails.forming_duplas') : t('gamedetails.start_mix')}
-        </PrimaryButton>
-      )}
+      {/* «Começar o Mix» passou para a barra de quem organiza (26 set). */}
 
-      {/* Mix parado (Trello #448): os resultados foram apagados, as duplas ficaram. */}
+      {/* Mix parado (Trello #448): os resultados foram apagados, as duplas
+          ficaram. O «Começar o Mix» (que só cria os jogos, com as duplas
+          que lá estão) está na barra de quem organiza. */}
       {canStartGames && (
         <div className="space-y-2.5">
           <div className="bg-ink-900 text-white px-4 py-3 rounded-ctrl text-sm font-extrabold">
             {t('gamedetails.mix_paused')}
           </div>
-          {/* Mesmo nome do outro (Francisco, 23 set: «fica comecar o mix, ja
-              houve essa decisao»), mas NAO e a mesma funcao: handleStartMix
-              sorteia duplas do zero, e aqui as duplas ja existem e tem de
-              ficar. So se criam os jogos. */}
-          <PrimaryButton onClick={handleStartGames} disabled={busy} className="w-full">
-            <Play size={20} />
-            {t('gamedetails.start_mix')}
-          </PrimaryButton>
           {canRedoDuplas && (
             <PrimaryButton variant="ghost" onClick={handleRedoDuplas} disabled={busy} className="w-full">
               <Repeat size={18} />
@@ -3142,31 +3199,13 @@ export default function GameDetails() {
               the pool structure if used during that window. They reappear
               once the bracket is seeded, to run the existing, unmodified
               elimination-phase progression. "Abortar mix" stays available
-              throughout since it doesn't depend on any of that logic. */}
-          {isAdmin && game.status === 'in_progress' && (
+              throughout since it doesn't depend on any of that logic.
+              Ações do evento (26 set): «Iniciar Ronda 1», «Terminar Ronda N»
+              e «Terminar e dar os pontos» passaram para a barra de quem
+              organiza, em cima; o «Recomeçar» para a folha do «Mais ⋯». */}
+          {isAdmin && game.status === 'in_progress' && !inPoolStage && (
             <div className="space-y-3">
-              {!inPoolStage && (
                 <>
-                  {!roundsStarted && !isAmericano && (
-                    <PrimaryButton onClick={handleStartRound1} disabled={busy || unpaired.length > 0} className="w-full">
-                      <Play size={20} />
-                      {busy ? t('gamedetails.drawing') : t('gamedetails.start_round1')}
-                    </PrimaryButton>
-                  )}
-                  {roundsStarted && canAdvance && (
-                    <PrimaryButton onClick={handleAdvance} disabled={busy} className="w-full">
-                      <ChevronRight size={20} />
-                      {busy ? t('gamedetails.processing')
-                        : inGroupPhase ? t('gamedetails.end_round', { number: maxRound })
-                        : t('gamedetails.end_round_and_draw', { number: maxRound, phase: PHASE_LABEL_KEY[nextPhase] ? t(PHASE_LABEL_KEY[nextPhase]).toLowerCase() : '' })}
-                    </PrimaryButton>
-                  )}
-                  {canFinalize && (
-                    <PrimaryButton variant="navy" onClick={() => handleFinalize(false)} disabled={busy} className="w-full">
-                      <Trophy size={20} />
-                      {busy ? t('gamedetails.finalizing') : t('gamedetails.finalize_mix')}
-                    </PrimaryButton>
-                  )}
                   {roundsStarted && !canAdvance && !canFinalize && (
                     <p className="text-muted text-sm text-center">
                       {isAmericano
@@ -3192,19 +3231,6 @@ export default function GameDetails() {
                     </>
                   )}
                 </>
-              )}
-
-              {/* Aborta o mix todo (apaga duplas + resultados) para recomeçar
-                  do zero — diferente de "Terminar Mix", que finaliza com um
-                  vencedor e atualiza o ranking. */}
-              <button
-                onClick={handleStopMix}
-                disabled={busy}
-                className="w-full inline-flex items-center justify-center gap-1.5 text-danger text-sm font-extrabold min-h-[44px] px-2"
-              >
-                <RotateCcw size={16} />
-                {t('gamedetails.stop_mix')}
-              </button>
             </div>
           )}
         </>
@@ -3771,30 +3797,78 @@ export default function GameDetails() {
           mix, que foi onde o dono do grupo a foi procurar. Só enquanto não
           terminou — terminado já deu pontos, e isso não se desfaz aqui. Nada
           se apaga: inscritos, duplas e jogos ficam guardados. */}
-      {isAdmin && ['open', 'closed', 'in_progress'].includes(game.status) && (
-        <button
-          type="button"
-          onClick={() => setCancelOpen(true)}
-          className="w-full min-h-[44px] rounded-full border border-danger text-danger text-sm font-extrabold hover:bg-danger/10"
-        >
-          {t('mixcancel.button')}
-        </button>
+      {/* Ações do evento (26 set): o botão vermelho solto saiu — «Cancelar
+          este mix» está na folha do «Mais ⋯», em último e a vermelho. */}
+      {showAdminBar && (() => {
+        // «ter 6 out», como no desenho (e no Gerir).
+        const part = (o) => formatDateLib(game.date, i18n.language, o).replace(/\./g, '').toLocaleLowerCase(i18n.language)
+        const shortDay = `${weekdayShort(new Date(game.date), i18n.language)} ${new Date(game.date).getDate()} ${part({ month: 'short' })}`
+        const time = formatTime(game.date, i18n.language, { hour: '2-digit', minute: '2-digit' })
+        const notStarted = ['pending', 'open', 'closed'].includes(game.status) && !mixPaused
+        const actions = [
+          isSeriesDate && notStarted && { key: 'change', label: t('eventactions.change_one'), hint: t('eventactions.change_one_hint'), onClick: () => setChangeOneOpen(true) },
+          game.status === 'in_progress' && { key: 'restart', label: t('eventactions.restart'), hint: t('eventactions.restart_hint'), onClick: () => setRestartOpen(true) },
+          { key: 'cancel', danger: true, label: t('eventactions.cancel_one'), hint: t(isSeriesDate ? 'eventactions.cancel_one_hint_series' : 'eventactions.cancel_one_hint'), onClick: () => setCancelOpen(true) },
+        ].filter(Boolean)
+        const nobody = peopleCount === 0 && waitlist.length === 0 && !anyScoreSaved
+        const dateTitle = isSeriesDate ? `${game.title} · ${shortDay}` : game.title
+        return (
+          <>
+            <EventActionsSheet
+              open={moreOpen}
+              title={dateTitle}
+              subtitle={isSeriesDate ? [time, game.location].filter(Boolean).join(' · ') : `${shortDay} · ${time}`}
+              actions={actions}
+              onClose={() => setMoreOpen(false)}
+            />
+            <ChangeOneMixSheet
+              open={changeOneOpen}
+              game={game}
+              title={t('eventactions.change_one_title', { name: dateTitle })}
+              onClose={() => setChangeOneOpen(false)}
+              onSaved={() => { setDoneNotice(t('eventactions.change_one_done')); loadGameDetails() }}
+            />
+            <ConfirmSheet
+              open={restartOpen}
+              danger
+              title={t('eventactions.restart_title', { name: game.title || '' })}
+              message={stopMixMessage()}
+              cancelLabel={t('eventactions.restart_keep')}
+              confirmLabel={t('eventactions.restart_confirm')}
+              onConfirm={handleStopMix}
+              onClose={() => setRestartOpen(false)}
+              errorOf={(error) => describeError(t, error, 'gamedetails.error_stop_mix')}
+            />
+            <ConfirmSheet
+              open={cancelOpen}
+              danger
+              title={t('mixcancel.confirm_title', { name: dateTitle || '' })}
+              message={nobody
+                ? t(isSeriesDate ? 'eventactions.cancel_nobody_series' : 'eventactions.cancel_nobody')
+                : t(isSeriesDate ? 'eventactions.cancel_one_hint_series' : 'eventactions.cancel_one_hint')}
+              cancelLabel={t('mixcancel.keep')}
+              confirmLabel={t('mixcancel.confirm')}
+              onConfirm={async () => {
+                const { outcome } = await cancelMixDate(game)
+                if (outcome === 'cancel') { loadGameDetails(); return }
+                // Desapareceu: volta ao Gerir, com a tira a dizer o que aconteceu.
+                const notice = t('eventactions.cancel_done_removed', { name: dateTitle })
+                if (orgSlug) navigate(`/gerir/${orgSlug}`, { replace: true, state: { notice } })
+                else navigate('/', { replace: true })
+              }}
+              onClose={() => setCancelOpen(false)}
+              errorOf={(error) => describeError(t, error, 'mixcancel.error')}
+            />
+          </>
+        )
+      })()}
+      {doneNotice && createPortal(
+        <div role="status" className="fixed left-4 right-4 bottom-[104px] z-50 mx-auto max-w-md bg-ink-900 text-white px-4 py-3 rounded-ctrl text-sm font-extrabold flex items-center gap-2 animate-fade-up">
+          <Check size={16} className="shrink-0" />
+          {doneNotice}
+        </div>,
+        document.body,
       )}
-      <ConfirmSheet
-        open={cancelOpen}
-        danger
-        title={t('mixcancel.confirm_title', { name: game.title || '' })}
-        message={t('mixcancel.confirm_message')}
-        cancelLabel={t('mixcancel.keep')}
-        confirmLabel={t('mixcancel.confirm')}
-        onConfirm={async () => {
-          const { error } = await supabase.from('games').update({ status: 'cancelled' }).eq('id', id)
-          if (error) throw error
-          loadGameDetails()
-        }}
-        onClose={() => setCancelOpen(false)}
-        errorOf={(error) => describeError(t, error, 'mixcancel.error')}
-      />
     </div>
   )
 }
