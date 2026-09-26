@@ -20,14 +20,14 @@ function Side({ entryId, source, entries, score, isWinner, t }) {
   return (
     <div className="flex items-baseline justify-between gap-2 py-0.5">
       <span
-        className={`truncate text-[12px] ${
+        className={`truncate text-xs ${
           team ? (isWinner ? 'font-bold text-ink-900' : 'text-ink-900') : 'italic text-muted'
         }`}
       >
         {team?.name || source || t('tournament.draw.tbd')}
       </span>
       {score != null ? (
-        <b className={`font-mono text-[12px] ${isWinner ? 'text-ink-900' : 'text-muted'}`}>{score}</b>
+        <b className={`font-mono text-xs ${isWinner ? 'text-ink-900' : 'text-muted'}`}>{score}</b>
       ) : null}
     </div>
   )
@@ -44,7 +44,7 @@ function MatchCard({ match, entries, t }) {
     : tb?.sets || null
 
   return (
-    <div className="mb-1.5 rounded-lg border border-ink-100 bg-white px-2.5 py-1.5">
+    <div className="card mb-2 !px-4 !py-3">
       <Side
         entryId={match.entry_a_id}
         source={match.source_a}
@@ -63,7 +63,7 @@ function MatchCard({ match, entries, t }) {
         t={t}
       />
       {(when || match.court_name || tbText || match.status === 'falta' || match.status === 'desistencia') && (
-        <p className="mt-1 font-mono text-[9.5px] text-muted">
+        <p className="mt-1 font-mono text-xs text-muted">
           {[
             tbText,
             match.court_name,
@@ -84,7 +84,7 @@ export default function DrawPanel({ category }) {
   const { entries, matches, loading } = useCategoryBoard(category?.id)
 
   if (loading) {
-    return <p className="py-6 text-center text-[12px] text-muted">{t('common.loading')}</p>
+    return <p className="py-6 text-center text-xs text-muted">{t('common.loading')}</p>
   }
 
   const main = bracketRounds(matches, 'principal')
@@ -105,9 +105,9 @@ export default function DrawPanel({ category }) {
       <MonoLabel className="mb-1">{label}</MonoLabel>
       {rounds.map(({ round, matches: list }) => (
         <section key={round} className="mb-2">
-          <h4 className="mb-1 text-[11px] font-extrabold uppercase tracking-wide text-muted">
+          <MonoLabel className="mb-1">
             {t(`tournament.draw.round_${round}`)}
-          </h4>
+          </MonoLabel>
           {list.map((m) => (
             <MatchCard key={m.id} match={m} entries={entries} t={t} />
           ))}

@@ -20,6 +20,9 @@ describe('errorKind', () => {
     expect(errorKind({ code: '23505', message: 'duplicate key value violates unique constraint' })).toBe('duplicate')
     expect(errorKind({ code: 'PGRST202', message: 'Could not find the function public.x in the schema cache' })).toBe('not_ready')
     expect(errorKind({ code: 'P0001', message: 'Não és membro deste grupo' })).toBe('business')
+    // 42501 com frase nossa (#523): mostra-se a frase, não a de permissão.
+    expect(errorKind({ code: '42501', message: 'Os torneios são a partir do plano Community. Muda o plano para criar um torneio.' })).toBe('business')
+    expect(errorKind({ code: '42501', message: 'permission denied for function create_tournament' })).toBe('permission')
     expect(errorKind({ message: 'Invalid login credentials', status: 400 })).toBe('invalid_login')
     expect(errorKind({ message: 'weird', code: '23503' })).toBe('unknown')
   })

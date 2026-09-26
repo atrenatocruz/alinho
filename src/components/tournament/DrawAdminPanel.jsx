@@ -64,8 +64,8 @@ function CloseEntriesStep({ category, onDone, t }) {
     }
   }
 
-  if (error && !rows) return <p className="py-6 text-center text-[12px] text-danger">{error}</p>
-  if (!rows) return <p className="py-6 text-center text-[12px] text-muted">{t('common.loading')}</p>
+  if (error && !rows) return <p className="py-6 text-center text-xs text-danger">{error}</p>
+  if (!rows) return <p className="py-6 text-center text-xs text-muted">{t('common.loading')}</p>
   if (!rows.length) {
     return <EmptyState icon={AlertTriangle} title={t('tournament.draw.close_nobody_title')}
       subtitle={t('tournament.draw.close_nobody_subtitle')} />
@@ -75,11 +75,11 @@ function CloseEntriesStep({ category, onDone, t }) {
 
   return (
     <div>
-      <p className="mb-2 text-[12.5px] text-ink-700">
+      <p className="mb-2 text-sm text-ink-700">
         {t('tournament.draw.close_intro', { teams: rows.length, slots: category.slots || rows.length })}
       </p>
 
-      <div className="mb-2 overflow-hidden rounded-xl border border-ink-100 bg-white">
+      <div className="mb-2 card !p-0 overflow-hidden">
         {rows.map((row, i) => {
           const inside = chosen.includes(row.entry_id)
           return (
@@ -93,15 +93,15 @@ function CloseEntriesStep({ category, onDone, t }) {
                 <Check size={13} strokeWidth={3} />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[12.5px] text-ink-900">{row.name}</span>
-                <span className="font-mono text-[10px] text-muted">
+                <span className="block truncate text-sm text-ink-900">{row.name}</span>
+                <span className="font-mono text-xs text-muted">
                   {row.points_incomplete
                     ? t('tournament.draw.points_unknown')
                     : t('tournament.draw.points', { n: row.points })}
                 </span>
               </span>
               {!inside && (
-                <span className="shrink-0 font-mono text-[10px] text-[#B86E00]">
+                <span className="shrink-0 font-mono text-xs text-[#B86E00]">
                   {t('tournament.draw.waitlist_tag')}
                 </span>
               )}
@@ -111,12 +111,12 @@ function CloseEntriesStep({ category, onDone, t }) {
       </div>
 
       {over && (
-        <p className="mb-2 text-[11.5px] text-danger">
+        <p className="mb-2 text-xs text-danger">
           {t('tournament.draw.close_over', { slots: category.slots, chosen: chosen.length })}
         </p>
       )}
-      <p className="mb-2 text-[11px] text-muted">{t('tournament.draw.close_waitlist_note')}</p>
-      {error && <p className="mb-2 text-[12px] text-danger">{error}</p>}
+      <p className="mb-2 text-xs text-muted">{t('tournament.draw.close_waitlist_note')}</p>
+      {error && <p className="mb-2 text-xs text-danger">{error}</p>}
 
       <PrimaryButton onClick={close} disabled={busy || over || !chosen.length}>
         {t('tournament.draw.close_confirm', { teams: t('tournament.n.teams', { count: chosen.length }) })}
@@ -184,7 +184,7 @@ function FormatStep({ days: dayRows, rules, category, teamCount, onDone, t }) {
 
   return (
     <div>
-      <p className="mb-2 text-[12.5px] text-ink-700">
+      <p className="mb-2 text-sm text-ink-700">
         {t('tournament.draw.format_intro', { teams: teamCount })}
       </p>
 
@@ -200,7 +200,7 @@ function FormatStep({ days: dayRows, rules, category, teamCount, onDone, t }) {
             } ${o.fits === false ? 'opacity-60' : ''}`}
           >
             <div className="flex items-center justify-between gap-2">
-              <b className="text-[13px] font-extrabold text-ink-900">
+              <b className="text-sm font-extrabold text-ink-900">
                 {o.groupCount
                   // «3 grupos: 4, 3 e 3 → passa 1» quando os grupos não são iguais
                   // (Trello #540, contas do Dev 3).
@@ -209,7 +209,7 @@ function FormatStep({ days: dayRows, rules, category, teamCount, onDone, t }) {
               </b>
               {o.key === best?.key && <StatePill tone="dark">{t('tournament.draw.recommended')}</StatePill>}
             </div>
-            <p className="mt-0.5 font-mono text-[10.5px] text-muted">
+            <p className="mt-0.5 font-mono text-xs text-muted">
               {t('tournament.draw.opt_line', {
                 guaranteed: t('tournament.draw.opt_guaranteed', { count: o.guaranteed }),
                 matches: t('tournament.n.matches', { count: o.matches }),
@@ -218,7 +218,7 @@ function FormatStep({ days: dayRows, rules, category, teamCount, onDone, t }) {
               })}
             </p>
             {o.fits === false && (
-              <p className="mt-0.5 text-[11px] text-danger">
+              <p className="mt-0.5 text-xs text-danger">
                 {t('tournament.draw.opt_no_fit', { hours: Math.round(o.hours) })}
               </p>
             )}
@@ -228,12 +228,12 @@ function FormatStep({ days: dayRows, rules, category, teamCount, onDone, t }) {
 
       {/* Linha inteira a 44 px e a caixa a 22 px: à beira do campo, com o
           telemóvel numa mão, a caixa de 13 px não se acertava (#512). */}
-      <label className="mb-2 mt-1 flex min-h-[44px] cursor-pointer items-center gap-2.5 text-[13px] text-ink-700">
+      <label className="mb-2 mt-1 flex min-h-[44px] cursor-pointer items-center gap-2.5 text-sm text-ink-700">
         <input type="checkbox" checked={thirdPlace} onChange={(e) => setThirdPlace(e.target.checked)} className="h-[22px] w-[22px] shrink-0 accent-ink-900" />
         {t('tournament.draw.third_place')}
       </label>
 
-      {error && <p className="mb-2 text-[12px] text-danger">{error}</p>}
+      {error && <p className="mb-2 text-xs text-danger">{error}</p>}
       <PrimaryButton onClick={save} disabled={busy || !chosen}>
         {t('tournament.draw.format_confirm')}
       </PrimaryButton>
@@ -319,8 +319,8 @@ function DrawStep({ category, onDone, onChangeFormat, t }) {
     }
   }
 
-  if (error && !teams) return <p className="py-6 text-center text-[12px] text-danger">{error}</p>
-  if (!teams) return <p className="py-6 text-center text-[12px] text-muted">{t('common.loading')}</p>
+  if (error && !teams) return <p className="py-6 text-center text-xs text-danger">{error}</p>
+  if (!teams) return <p className="py-6 text-center text-xs text-muted">{t('common.loading')}</p>
   if (!payload) {
     return (
       <div>
@@ -341,22 +341,22 @@ function DrawStep({ category, onDone, onChangeFormat, t }) {
     return (
       <div>
         <MonoLabel className="mb-1">{t('tournament.draw.preview_label')}</MonoLabel>
-        <p className="mb-1.5 text-[11.5px] text-muted">{t('tournament.draw.knockout_note')}</p>
+        <p className="mb-1.5 text-xs text-muted">{t('tournament.draw.knockout_note')}</p>
         {firstRound.map((m) => (
-          <div key={m.slot} className="mb-1.5 rounded-xl border border-ink-100 bg-white px-3 py-2 text-[12px] text-ink-900">
+          <div key={m.slot} className="mb-1.5 card !p-0 px-3 py-2 text-xs text-ink-900">
             {byId[m.a]?.name || m.a} <span className="text-muted">×</span> {byId[m.b]?.name || m.b}
           </div>
         ))}
         {byeIds.length > 0 && (
-          <p className="mb-2 text-[11.5px] text-muted">
+          <p className="mb-2 text-xs text-muted">
             {t('tournament.draw.knockout_byes', { names: byeIds.map((id) => byId[id]?.name || id).join(', ') })}
           </p>
         )}
-        {error && <p className="mb-2 text-[12px] text-danger">{error}</p>}
+        {error && <p className="mb-2 text-xs text-danger">{error}</p>}
         <div className="flex flex-wrap gap-2">
           <PrimaryButton onClick={confirm} disabled={busy}>{t('tournament.draw.draw_confirm')}</PrimaryButton>
           <button type="button" onClick={onChangeFormat} disabled={busy}
-            className="rounded-full border border-line px-3 py-2 text-[12px] font-semibold text-ink-700 hover:bg-ink-50">
+            className="rounded-full border border-line px-3 py-2 text-xs font-semibold text-ink-700 hover:bg-ink-50">
             {t('tournament.draw.change_format')}
           </button>
         </div>
@@ -367,25 +367,25 @@ function DrawStep({ category, onDone, onChangeFormat, t }) {
   return (
     <div>
       <MonoLabel className="mb-1">{t('tournament.draw.seeds_label')}</MonoLabel>
-      <p className="mb-1.5 text-[11.5px] text-muted">{t('tournament.draw.seeds_note_swap')}</p>
-      <div className="mb-1 overflow-hidden rounded-xl border border-ink-100 bg-white">
+      <p className="mb-1.5 text-xs text-muted">{t('tournament.draw.seeds_note_swap')}</p>
+      <div className="mb-1 card !p-0 overflow-hidden">
         {seeds.map((s, i) => {
           const byHand = seedIds && s.id !== proposed[i]?.id
           return (
             <div key={s.id} className={`flex min-h-[52px] items-center gap-2 border-t border-ink-50 px-3 py-1.5 first:border-t-0 ${byHand ? 'bg-lime-100/60' : ''}`}>
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#E9E7FB] font-mono text-[10.5px] font-bold text-[#4338A8]">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#E9E7FB] font-mono text-xs font-bold text-[#4338A8]">
                 {i + 1}
               </span>
-              <span className="min-w-0 flex-1 truncate text-[13px] font-bold text-ink-900">{s.name}</span>
+              <span className="min-w-0 flex-1 truncate text-sm font-bold text-ink-900">{s.name}</span>
               {byHand
-                ? <span className="shrink-0 rounded-full bg-lime-200 px-2 py-0.5 text-[10.5px] font-bold text-ink-900">{t('tournament.draw.seed_by_hand')}</span>
+                ? <span className="shrink-0 rounded-full bg-lime-200 px-2 py-0.5 text-xs font-bold text-ink-900">{t('tournament.draw.seed_by_hand')}</span>
                 : (
-                  <span className="shrink-0 font-mono text-[10px] text-muted">
+                  <span className="shrink-0 font-mono text-xs text-muted">
                     {s.incomplete ? t('tournament.draw.points_none') : t('tournament.draw.points', { n: s.points })}
                   </span>
                 )}
               <button type="button" onClick={() => { setSwapIndex(i); setSwapPick(s.id) }} disabled={busy}
-                className="min-h-[44px] shrink-0 rounded-full border border-ink-900 bg-white px-3.5 text-[12.5px] font-bold text-ink-900">
+                className="min-h-[44px] shrink-0 rounded-full border border-ink-900 bg-white px-3.5 text-sm font-bold text-ink-900">
                 {t('tournament.draw.seed_swap')}
               </button>
             </div>
@@ -394,14 +394,14 @@ function DrawStep({ category, onDone, onChangeFormat, t }) {
       </div>
       {seedIds ? (
         <button type="button" onClick={() => setSeedIds(null)} disabled={busy}
-          className="mb-3 min-h-[44px] text-[12.5px] font-bold text-ink-900 underline underline-offset-2">
+          className="mb-3 min-h-[44px] text-sm font-bold text-ink-900 underline underline-offset-2">
           {t('tournament.draw.seeds_reset')}
         </button>
       ) : <div className="mb-3" />}
 
       {swapIndex != null && (
         <Sheet title={t('tournament.draw.seed_sheet_title', { n: swapIndex + 1 })} onClose={() => setSwapIndex(null)}>
-          <p className="-mt-1 mb-2 text-[13px] text-ink-700">{t('tournament.draw.seed_sheet_hint')}</p>
+          <p className="-mt-1 mb-2 text-sm text-ink-700">{t('tournament.draw.seed_sheet_hint')}</p>
           <div className="mb-3 divide-y divide-line">
             {teams.map((x) => {
               const seedAt = seeds.findIndex((y) => y.id === x.id)
@@ -409,13 +409,13 @@ function DrawStep({ category, onDone, onChangeFormat, t }) {
               return (
                 <button key={x.id} type="button" onClick={() => setSwapPick(x.id)}
                   className={`flex min-h-[48px] w-full items-center gap-2 px-1 text-left ${on ? 'bg-ink-50' : ''}`}>
-                  <span className="min-w-0 flex-1 truncate text-[14px] font-bold text-ink-900">{x.name}</span>
+                  <span className="min-w-0 flex-1 truncate text-sm font-bold text-ink-900">{x.name}</span>
                   {seedAt >= 0 && (
-                    <span className="shrink-0 rounded-full bg-[#E9E7FB] px-2 py-0.5 font-mono text-[10.5px] font-bold text-[#4338A8]">
+                    <span className="shrink-0 rounded-full bg-[#E9E7FB] px-2 py-0.5 font-mono text-xs font-bold text-[#4338A8]">
                       {t('tournament.draw.seed_tag')} {seedAt + 1}
                     </span>
                   )}
-                  <span className="w-[72px] shrink-0 text-right font-mono text-[11px] text-muted">
+                  <span className="w-[72px] shrink-0 text-right font-mono text-xs text-muted">
                     {x.incomplete ? t('tournament.draw.points_none') : x.points}
                   </span>
                   <span className="w-4 shrink-0 text-ink-900">{on && <Check size={15} strokeWidth={3} />}</span>
@@ -427,7 +427,7 @@ function DrawStep({ category, onDone, onChangeFormat, t }) {
               ir com ela. */}
           <div className="sticky -bottom-5 -mx-5 bg-surface px-5 pb-5 pt-2">
             <button type="button" disabled={!swapPick} onClick={() => chooseSeed(swapIndex, swapPick)}
-              className="flex min-h-[52px] w-full items-center justify-center rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold text-white disabled:opacity-40">
+              className="flex min-h-[52px] w-full items-center justify-center rounded-ctrl bg-ink-900 px-4 text-base font-extrabold text-white disabled:opacity-40">
               {t('tournament.draw.seed_choose', { name: teams.find((x) => x.id === swapPick)?.name || '' })}
             </button>
           </div>
@@ -436,18 +436,18 @@ function DrawStep({ category, onDone, onChangeFormat, t }) {
 
       <MonoLabel className="mb-1">{t('tournament.draw.preview_label')}</MonoLabel>
       {payload.groups.map((g) => (
-        <div key={g.number} className="mb-1.5 rounded-xl border border-ink-100 bg-white px-3 py-2">
-          <b className="text-[12.5px] font-extrabold text-ink-900">{g.name}</b>
+        <div key={g.number} className="mb-1.5 card !p-0 px-3 py-2">
+          <b className="text-sm font-extrabold text-ink-900">{g.name}</b>
           {g.teams.map((id, i) => (
-            <p key={id} className="mt-0.5 flex items-center gap-1.5 text-[12px] text-ink-900">
-              {i === 0 && <span className="font-mono text-[9.5px] text-[#4338A8]">{t('tournament.draw.seed_tag')}</span>}
+            <p key={id} className="mt-0.5 flex items-center gap-1.5 text-xs text-ink-900">
+              {i === 0 && <span className="font-mono text-xs text-[#4338A8]">{t('tournament.draw.seed_tag')}</span>}
               <span className="truncate">{byId[id]?.name || id}</span>
             </p>
           ))}
         </div>
       ))}
 
-      <p className="mb-2 text-[11.5px] text-muted">
+      <p className="mb-2 text-xs text-muted">
         {t('tournament.draw.preview_summary', {
           groupMatches: payload.group_matches.length,
           bracket: payload.bracket.length,
@@ -455,7 +455,7 @@ function DrawStep({ category, onDone, onChangeFormat, t }) {
         })}
       </p>
 
-      {error && <p className="mb-2 text-[12px] text-danger">{error}</p>}
+      {error && <p className="mb-2 text-xs text-danger">{error}</p>}
       <div className="flex gap-2">
         <PrimaryButton onClick={confirm} disabled={busy}>{t('tournament.draw.draw_confirm')}</PrimaryButton>
         <button
@@ -463,7 +463,7 @@ function DrawStep({ category, onDone, onChangeFormat, t }) {
           // Mantém as cabeças escolhidas; só volta a baralhar o resto (#517).
           onClick={() => setSeed((n) => n + 1)}
           disabled={busy}
-          className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-2 text-[12px] font-semibold text-ink-700 hover:bg-ink-50"
+          className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-2 text-xs font-semibold text-ink-700 hover:bg-ink-50"
         >
           <RefreshCw size={14} /> {t('tournament.draw.draw_again')}
         </button>
@@ -485,13 +485,13 @@ function ClosedBox({ category, onReopened, t }) {
     onReopened(result)
   }
   return (
-    <div className="mb-3 rounded-xl border border-ink-100 bg-white px-3 py-2.5">
-      <b className="text-[13px] font-extrabold text-ink-900">{t('tournament.draw.closed_box_title')}</b>
-      <p className="mt-0.5 text-[12px] text-ink-700">
+    <div className="mb-3 card !p-0 px-3 py-2.5">
+      <b className="text-sm font-extrabold text-ink-900">{t('tournament.draw.closed_box_title')}</b>
+      <p className="mt-0.5 text-xs text-ink-700">
         {[t('tournament.n.selected', { count: selected }), waitlist ? t('tournament.n.reserves', { count: waitlist }) : null].filter(Boolean).join(' · ')}
       </p>
       <button type="button" onClick={() => setAsking(true)}
-        className="mt-0.5 min-h-[44px] text-[13px] font-bold text-ink-900 underline underline-offset-2">
+        className="mt-0.5 min-h-[44px] text-sm font-bold text-ink-900 underline underline-offset-2">
         {t('tournament.draw.reopen')}
       </button>
       <ConfirmSheet
@@ -524,9 +524,9 @@ function DoneStep({ tournament, category, onDone, t }) {
 
   return (
     <div>
-      <div className="mb-2 rounded-xl border border-ink-100 bg-white px-3 py-2.5">
-        <b className="text-[13px] font-extrabold text-ink-900">{t('tournament.draw.done_title')}</b>
-        <p className="mt-0.5 text-[12px] text-ink-700">
+      <div className="mb-2 card !p-0 px-3 py-2.5">
+        <b className="text-sm font-extrabold text-ink-900">{t('tournament.draw.done_title')}</b>
+        <p className="mt-0.5 text-xs text-ink-700">
           {category.group_count
             ? t('tournament.draw.done_line', {
               groups: t('tournament.n.groups', { count: category.group_count }),
@@ -534,7 +534,7 @@ function DoneStep({ tournament, category, onDone, t }) {
             })
             : t('tournament.draw.done_line_ko', { matches: t('tournament.n.matches', { count: category.match_count || 0 }) })}
         </p>
-        <p className="mt-1 text-[11.5px] text-muted">
+        <p className="mt-1 text-xs text-muted">
           {locked ? t('tournament.draw.done_locked') : t('tournament.draw.done_can_undo')}
         </p>
       </div>
@@ -542,7 +542,7 @@ function DoneStep({ tournament, category, onDone, t }) {
       <div className="flex flex-wrap items-center gap-2">
         <Link
           to={`/torneio/${tournament.slug || tournament.id}/imprimir?categoria=${category.id}`}
-          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full bg-ink-900 px-3 py-2 text-[12px] font-bold text-white"
+          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full bg-ink-900 px-3 py-2 text-xs font-bold text-white"
         >
           <Printer size={14} /> {t('tournament.draw.print')}
         </Link>
@@ -550,7 +550,7 @@ function DoneStep({ tournament, category, onDone, t }) {
           <button
             type="button"
             onClick={() => setAsking(true)}
-            className="min-h-[44px] rounded-full border border-line px-3 py-2 text-[12px] font-semibold text-ink-700 hover:bg-ink-50"
+            className="min-h-[44px] rounded-full border border-line px-3 py-2 text-xs font-semibold text-ink-700 hover:bg-ink-50"
           >
             {t('tournament.draw.undo')}
           </button>
@@ -603,19 +603,19 @@ export default function DrawAdminPanel({ tournament, onBack, onEdit }) {
   return (
     <div>
       <button type="button" onClick={picked ? () => setPickedId(null) : onBack}
-        className="mb-2 inline-flex min-h-[44px] items-center gap-1 text-[12.5px] font-semibold text-ink-500 hover:text-ink-900">
+        className="mb-2 inline-flex min-h-[44px] items-center gap-1 text-sm font-semibold text-ink-500 hover:text-ink-900">
         <ChevronLeft size={16} /> {picked ? t('tournament.draw.back_categories') : t('common.back')}
       </button>
 
       <h3 className="font-display text-lg font-extrabold text-ink-900">
         {picked ? `${picked.code} · ${picked.name}` : t('tournament.draw.admin_title')}
       </h3>
-      <p className="mb-3 text-[12px] text-muted">{tournament.name}</p>
+      <p className="mb-3 text-xs text-muted">{tournament.name}</p>
 
-      {error && <p className="mb-2 text-[12px] text-danger">{error}</p>}
+      {error && <p className="mb-2 text-xs text-danger">{error}</p>}
 
       {!categories ? (
-        <p className="py-6 text-center text-[12px] text-muted">{t('common.loading')}</p>
+        <p className="py-6 text-center text-xs text-muted">{t('common.loading')}</p>
       ) : !picked ? (
         categories.length === 0 ? (
           <EmptyState icon={Shuffle} title={t('tournament.draw.no_categories_title')}
@@ -623,10 +623,10 @@ export default function DrawAdminPanel({ tournament, onBack, onEdit }) {
         ) : (
           categories.map((c) => (
             <button key={c.id} type="button" onClick={() => setPickedId(c.id)}
-              className="mb-1.5 flex w-full items-center justify-between gap-2 rounded-xl border border-ink-100 bg-white px-3 py-2.5 text-left">
+              className="mb-1.5 flex w-full items-center justify-between gap-2 card !p-0 px-3 py-2.5 text-left">
               <span className="min-w-0">
-                <b className="block truncate text-[13px] font-extrabold text-ink-900">{c.code} · {c.name}</b>
-                <span className="font-mono text-[10.5px] text-muted">
+                <b className="block truncate text-sm font-extrabold text-ink-900">{c.code} · {c.name}</b>
+                <span className="font-mono text-xs text-muted">
                   {t('tournament.draw.cat_counts', {
                     selected: t('tournament.n.selected', { count: c.selected_count || 0 }),
                     waiting: c.waiting_count || 0,
@@ -647,7 +647,7 @@ export default function DrawAdminPanel({ tournament, onBack, onEdit }) {
           {/* «Precisa de ti»: âmbar do sistema (warning), não vermelho — não
               correu mal, falta uma ação. «Editar» leva ao editar do torneio. */}
           {(reopenedLate === picked.id || deadlinePassed) && (
-            <p className="mb-2 rounded-ctrl border border-warning/30 bg-warning/10 px-3 py-2.5 text-[12.5px] text-ink-900">
+            <p className="mb-2 rounded-ctrl border border-warning/30 bg-warning/10 px-3 py-2.5 text-sm text-ink-900">
               <Trans i18nKey="tournament.draw.reopen_deadline_passed"
                 components={{ edit: <button type="button" onClick={onEdit} className="font-extrabold underline underline-offset-2" /> }} />
             </p>
