@@ -94,7 +94,7 @@ function renderLayout(opts: {
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#FFFFFF;border-radius:16px;overflow:hidden;">
         <tr>
           <td style="background:#040404;padding:28px 32px;">
-            <img src="https://alinho.pt/email-logo.png" width="140" height="35" alt="alinho" style="display:block;border:0;outline:none;text-decoration:none;width:140px;height:35px;">
+            <img src="https://www.alinho.pt/email-logo.png" width="140" height="35" alt="alinho" style="display:block;border:0;outline:none;text-decoration:none;width:140px;height:35px;">
           </td>
         </tr>
         <tr>

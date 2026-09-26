@@ -13,11 +13,14 @@ export const LESSON_NOTICE_KINDS = [
   // Pedidos de aula (Trello #392, migration_lessons_3/4).
   'lesson_request_new', 'lesson_request_cancelled', 'lesson_request_accepted', 'lesson_request_rejected',
   'lesson_needs_court',
+  // Propor outra hora, dos dois lados (migration_lessons_5).
+  'lesson_time_proposed_by_teacher', 'lesson_time_proposed_by_student', 'lesson_proposal_accepted',
 ]
 
 function target(notice) {
   const d = notice.data || {}
-  if (notice.kind === 'lesson_request_new' || notice.kind === 'lesson_request_cancelled') return '/perfil/aulas'
+  if (['lesson_request_new', 'lesson_request_cancelled', 'lesson_time_proposed_by_student', 'lesson_proposal_accepted'].includes(notice.kind)) return '/perfil/aulas'
+  if (notice.kind === 'lesson_time_proposed_by_teacher') return d.teacher_profile_id ? `/professor/${d.teacher_profile_id}/pedir` : '/'
   if (notice.kind === 'lesson_request_accepted') return notice.lesson_id ? `/aula/${notice.lesson_id}` : '/'
   if (notice.kind === 'lesson_request_rejected' || notice.kind === 'lesson_needs_court') return '/'
   if (notice.kind === 'lesson_enrolment_request') return d.org_slug ? `/gerir/${d.org_slug}` : '/gerir'
@@ -36,6 +39,7 @@ export default function LessonNoticeRow({ notice, onOpen }) {
     series: d.series_label,
     org: d.org_name || '',
     type: d.lesson_type ? t(`lessons.price_row_${d.lesson_type}`) : '',
+    asked: d.original_starts_at ? formatDate(d.original_starts_at, i18n.language, { weekday: 'long', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '',
     when: (d.lesson_date || d.starts_at) ? formatDate(d.lesson_date || d.starts_at, i18n.language, { weekday: 'long', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '',
     reason: d.reason ? t(`lessons.reason_${d.reason}`).toLowerCase() : '',
   }

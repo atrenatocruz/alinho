@@ -239,7 +239,9 @@ export const LESSON_RPC_MOCKS = {
       ],
       busy: [{ starts_at: new Date(d.getTime() - 30 * 60000).toISOString(), ends_at: new Date(d.getTime() + 30 * 60000).toISOString(), kind: 'request' }],
       mine: sent ? [{ id: 'rq-1', teacher_profile_id: 'tp-ana', starts_at: d.toISOString(), duration_minutes: 90,
-        lesson_type: 'duo', price_per_person: 35, contact_via: sent, status: 'pending', org_name: 'Clube Exemplo' }] : [],
+        lesson_type: 'duo', price_per_person: 35, contact_via: sent === 'proposal' ? 'whatsapp' : sent, status: 'pending', org_name: 'Clube Exemplo',
+        // localStorage.mockBookingSent = 'proposal' — o professor propôs outra hora.
+        ...(sent === 'proposal' ? { proposed_by: 'teacher', proposed_starts_at: new Date(d.getTime() + 2 * 86400000 + 7.5 * 3600000).toISOString(), original_starts_at: d.toISOString() } : {}) }] : [],
       i_have_whatsapp: localStorage.getItem('mockHasWhatsapp') === 'true',
     }
   },
@@ -253,19 +255,27 @@ export const LESSON_RPC_MOCKS = {
     const at = (h, m) => { const x = new Date(d); x.setHours(h, m, 0, 0); return x.toISOString() }
     const ago = (mins) => new Date(Date.now() - mins * 60000).toISOString()
     const pending = [
-      { id: 'rq-a', teacher_profile_id: 'tp-me', status: 'pending', created_at: ago(120), starts_at: at(10, 30), duration_minutes: 90,
+      { id: 'rq-a', teacher_profile_id: 'tp-ana', status: 'pending', created_at: ago(120), starts_at: at(10, 30), duration_minutes: 90,
         lesson_type: 'duo', price_per_person: 35, org_name: 'Clube Exemplo', lesson_id: null, court_booked_at: null,
         student: { user_id: 'u-ana', name: 'Ana Silva', gender: 'feminino', rating: 1450 }, contact_via: 'whatsapp', contact_href: 'https://wa.me/351912345678' },
-      { id: 'rq-r', teacher_profile_id: 'tp-me', status: 'pending', created_at: ago(60), starts_at: at(11, 0), duration_minutes: 60,
+      { id: 'rq-r', teacher_profile_id: 'tp-ana', status: 'pending', created_at: ago(60), starts_at: at(11, 0), duration_minutes: 60,
         lesson_type: 'private', price_per_person: 40, org_name: 'Clube Exemplo', lesson_id: null, court_booked_at: null,
         student: { user_id: 'u-rui', name: 'Rui Costa', gender: 'masculino', rating: 1500 }, contact_via: 'email', contact_href: 'mailto:rui@example.com' },
     ]
+    if (mode === 'proposals') {
+      return [
+        { ...pending[0], proposed_by: 'student', proposed_starts_at: at(12, 0), original_starts_at: pending[0].starts_at },
+        { ...pending[1], proposed_by: 'teacher', proposed_starts_at: at(17, 0), original_starts_at: pending[1].starts_at },
+      ]
+    }
     if (mode === 'accepted') {
       return [pending[1], { ...pending[0], status: 'accepted', lesson_id: 'les-new' }]
     }
     return pending
   },
   accept_lesson_request: () => 'les-new',
+  accept_lesson_proposal: () => 'les-new',
+  propose_lesson_time: () => null,
   reject_lesson_request: () => null,
   mark_lesson_court_booked: () => null,
   cancel_lesson_request: () => null,

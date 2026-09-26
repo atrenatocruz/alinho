@@ -4,8 +4,9 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Check, GraduationCap } from 'lucide-react'
 import {
-  acceptLessonRequest, emailLessonRequest, listMyTeacherRequests, markLessonCourtBooked, rejectLessonRequest,
+  acceptLessonRequest, emailLessonRequest, listMyTeacherRequests, markLessonCourtBooked, proposeLessonTime, rejectLessonRequest,
 } from '../lib/lessonsApi'
+import ProposeTimeSheet from '../components/lessons/ProposeTimeSheet'
 import { endTime } from '../lib/lessonBooking'
 import { compactTime } from '../lib/teacherSchedule'
 import { describeError, errorKind } from '../lib/errors'
@@ -42,6 +43,7 @@ export default function TeacherLessons() {
   const [errors, setErrors] = useState({})
   const [rejecting, setRejecting] = useState(null)
   const [notice, setNotice] = useState('')
+  const [proposing, setProposing] = useState(null) // pedido a que propõe outra hora
 
   const load = async () => {
     try {
@@ -62,8 +64,8 @@ export default function TeacherLessons() {
 
   const pending = rows.filter((r) => r.status === 'pending')
   const accepted = rows.filter((r) => r.status === 'accepted')
-  const when = (r) => {
-    const { d, hm } = parts(r.starts_at)
+  const when = (r, iso = r.starts_at) => {
+    const { d, hm } = parts(iso)
     return `${t(`lessons.wd_short_${((d.getDay() + 6) % 7) + 1}`).replace(/^./, (c) => c.toUpperCase())} ${d.getDate()}/${d.getMonth() + 1} · ${compactTime(hm)}–${compactTime(endTime(hm, r.duration_minutes))}`
   }
   const ago = (iso) => {
@@ -125,14 +127,32 @@ export default function TeacherLessons() {
         <p className="text-sm text-muted">
           {when(r)} · {t(`lessons.price_row_${r.lesson_type}`)}{r.price_per_person != null ? ` · ${euros(r.price_per_person)}` : ''}
         </p>
+        {/* Propor outra hora (lista das aprovações, Francisco 26 set): quem
+            recebe a proposta é que aceita. */}
+        {r.proposed_by === 'student' && (
+          <p className="rounded-ctrl bg-ink-50 px-3 py-2 text-sm text-ink-900">
+            {t('proposal.student_proposed', { name: r.student?.name || '', when: when(r, r.proposed_starts_at), asked: when(r, r.original_starts_at || r.starts_at) })}
+          </p>
+        )}
+        {r.proposed_by === 'teacher' && (
+          <p className="rounded-ctrl bg-ink-50 px-3 py-2 text-sm text-ink-900">
+            {t('proposal.you_proposed_teacher', { name: r.student?.name || '', when: when(r, r.proposed_starts_at) })}
+          </p>
+        )}
         <p className="text-sm text-muted">
           {clash ? t('myLessons.clashes_with', { name: (clash.student?.name || '') }) : [r.org_name, ago(r.created_at)].filter(Boolean).join(' · ')}
         </p>
         {errorBox(r)}
         <div className="flex flex-wrap items-center gap-2 pt-1">
-          <button type="button" disabled={busyId === r.id} onClick={() => accept(r)}
-            className="inline-flex items-center justify-center min-h-[40px] px-5 rounded-full bg-ink-900 text-white text-sm font-extrabold disabled:opacity-40">
-            {t('myLessons.accept')}
+          {r.proposed_by !== 'teacher' && (
+            <button type="button" disabled={busyId === r.id} onClick={() => accept(r)}
+              className="inline-flex items-center justify-center min-h-[40px] px-5 rounded-full bg-ink-900 text-white text-sm font-extrabold disabled:opacity-40">
+              {t('myLessons.accept')}
+            </button>
+          )}
+          <button type="button" disabled={busyId === r.id} onClick={() => setProposing(r)}
+            className="inline-flex items-center justify-center min-h-[40px] px-4 rounded-full border-[1.5px] border-line bg-white text-ink-900 text-sm font-extrabold disabled:opacity-40">
+            {t('proposal.propose')}
           </button>
           <button type="button" disabled={busyId === r.id} onClick={() => setRejecting(r)}
             className="min-h-[40px] px-3 text-sm font-extrabold text-muted hover:text-ink-900 disabled:opacity-40">
@@ -199,6 +219,14 @@ export default function TeacherLessons() {
         onConfirm={async () => { await rejectLessonRequest(rejecting.id); emailLessonRequest('lesson_request_student', rejecting.id); await load() }}
         onClose={() => setRejecting(null)}
         errorOf={(err) => describeError(t, err, 'myLessons.error_reject')}
+      />
+
+      <ProposeTimeSheet
+        open={!!proposing}
+        teacherProfileId={proposing?.teacher_profile_id}
+        durationMinutes={proposing?.duration_minutes}
+        onSend={async (startsAt) => { await proposeLessonTime(proposing.id, startsAt); setNotice(t('proposal.sent')); await load() }}
+        onClose={() => setProposing(null)}
       />
 
       {notice && createPortal(
