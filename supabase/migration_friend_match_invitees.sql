@@ -13,8 +13,11 @@
 --     conta logo como aceite). Um nome com email recebe um link
 --     (invite_token) e um email; o email em si é da send-email (Renato) —
 --     aqui fica marcado email_status = 'queued' (proposta a ele à parte).
---     Um email que já tem conta não fica como convidado: vira convite na
---     app para essa pessoa.
+--     Privacidade (regra do #546, PO 26 set): escrever um email nunca diz
+--     ao criador se esse email tem conta nem de quem é. O criador vê sempre
+--     o nome que escreveu; se o email já tiver conta, essa pessoa recebe
+--     também o convite no sino, e a ligação à conta só se faz quando ela
+--     aceita (respond_friend_match_invite, ou o link do email).
 --   · A 1.ª linha do private_matches é a sessão (is_friend_session): guarda
 --     o dia, a hora, o sítio, as regras, e é o JOGO 1. Os jogos seguintes
 --     são linhas novas com session_id = a 1.ª e game_number 2, 3…
@@ -31,8 +34,8 @@
 --   create_friend_match · add_friend_match_invitees ·
 --   remove_friend_match_invitee · respond_friend_match_invite ·
 --   set_friend_match_teams · add_friend_match_game · get_friend_match ·
---   list_my_friend_match_invites · claim_friend_match_invite ·
---   claim_friend_match_invites_by_email
+--   list_my_friend_match_invites · list_my_friend_sessions ·
+--   claim_friend_match_invite · claim_friend_match_invites_by_email
 -- Aviso no sino: notifications kind 'friend_match_invite'.
 --
 -- Não mexe nas funções que já existem (create_private_match, submit,
@@ -64,6 +67,9 @@ BEGIN
                     AND column_name = 'team_b_player2_guest_name') THEN
     RAISE EXCEPTION 'Falta a migration_private_match_ranked_consent.sql. Parar e ler.';
   END IF;
+  IF to_regprocedure('public.can_view_section(uuid, text)') IS NULL THEN
+    RAISE EXCEPTION 'Falta can_view_section(uuid, text). Parar e ler.';
+  END IF;
 END $$;
 
 -- ── 1. A sessão e os jogos seguintes ────────────────────────────────────
@@ -73,6 +79,8 @@ ALTER TABLE private_matches ADD COLUMN IF NOT EXISTS game_number INTEGER;
 ALTER TABLE private_matches ADD COLUMN IF NOT EXISTS teams_mode TEXT;
 ALTER TABLE private_matches ADD COLUMN IF NOT EXISTS pairing_mode TEXT;
 ALTER TABLE private_matches ADD COLUMN IF NOT EXISTS teams_set_at TIMESTAMPTZ;
+-- «Campo (opcional)» do passo «Onde joga», texto livre (ex. «Campo 3»).
+ALTER TABLE private_matches ADD COLUMN IF NOT EXISTS court TEXT;
 ALTER TABLE private_matches DROP CONSTRAINT IF EXISTS private_matches_friend_modes_check;
 ALTER TABLE private_matches ADD CONSTRAINT private_matches_friend_modes_check CHECK (
   (teams_mode IS NULL OR teams_mode IN ('manual', 'app'))
@@ -91,6 +99,9 @@ CREATE TABLE IF NOT EXISTS private_match_invitees (
   invite_token TEXT UNIQUE,
   email_status TEXT NOT NULL DEFAULT 'none' CHECK (email_status IN ('none', 'queued', 'sent', 'failed')),
   invited_by   UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  -- Convite por email a uma conta que o recusou. Só serve para o tirar da
+  -- lista dessa pessoa; o criador nunca o vê (continua a ver o nome).
+  email_declined_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
   -- clock_timestamp e não NOW(): a lista inteira entra na mesma transação,
   -- e é por esta hora que a lista sai pela ordem em que foi escrita.
   created_at   TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
@@ -98,6 +109,9 @@ CREATE TABLE IF NOT EXISTS private_match_invitees (
   CHECK (user_id IS NOT NULL OR guest_name IS NOT NULL),
   CHECK (user_id IS NULL OR guest_name IS NULL)
 );
+-- Se a 1.ª versão deste ficheiro já tiver corrido, a tabela existe sem isto.
+ALTER TABLE private_match_invitees ADD COLUMN IF NOT EXISTS email_declined_by UUID REFERENCES profiles(id) ON DELETE SET NULL;
+ALTER TABLE private_match_invitees ALTER COLUMN created_at SET DEFAULT clock_timestamp();
 CREATE UNIQUE INDEX IF NOT EXISTS private_match_invitees_user_uniq
   ON private_match_invitees (match_id, user_id) WHERE user_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS private_match_invitees_guest_uniq
@@ -121,15 +135,9 @@ DECLARE
   v_name    TEXT := NULLIF(trim(p_item->>'guest_name'), '');
   v_email   TEXT := NULLIF(lower(trim(p_item->>'guest_email')), '');
   v_id      UUID;
+  v_notify  UUID;
 BEGIN
   SELECT * INTO v_root FROM private_matches WHERE id = p_root;
-  -- Um email que já tem conta: é essa pessoa, com convite na app.
-  IF v_user IS NULL AND v_email IS NOT NULL THEN
-    SELECT u.id INTO v_user FROM auth.users u
-     WHERE lower(u.email) = v_email AND EXISTS (SELECT 1 FROM profiles p WHERE p.id = u.id)
-     LIMIT 1;
-    IF v_user IS NOT NULL THEN v_name := NULL; v_email := NULL; END IF;
-  END IF;
   IF v_user IS NULL AND v_name IS NULL THEN
     RAISE EXCEPTION 'Cada pessoa tem de ter conta ou um nome';
   END IF;
@@ -154,10 +162,18 @@ BEGIN
           auth.uid())
   RETURNING id INTO v_id;
 
-  -- Convite na app: aviso no sino.
-  IF v_user IS NOT NULL THEN
+  -- Convite na app: aviso no sino. Um email que já tem conta fica como
+  -- convidado pelo nome (é o que o criador vê) e essa pessoa é avisada
+  -- também no sino — só passa a conta quando aceitar.
+  v_notify := v_user;
+  IF v_user IS NULL AND v_email IS NOT NULL THEN
+    SELECT u.id INTO v_notify FROM auth.users u
+     WHERE lower(u.email) = v_email AND EXISTS (SELECT 1 FROM profiles p WHERE p.id = u.id)
+     LIMIT 1;
+  END IF;
+  IF v_notify IS NOT NULL AND v_notify IS DISTINCT FROM auth.uid() THEN
     INSERT INTO notifications (user_id, kind, actor_id, data)
-    VALUES (v_user, 'friend_match_invite', auth.uid(), jsonb_build_object(
+    VALUES (v_notify, 'friend_match_invite', auth.uid(), jsonb_build_object(
       'match_id', p_root,
       'creator_name', (SELECT name FROM profiles WHERE id = v_root.creator_id),
       'scheduled_date', v_root.scheduled_date, 'scheduled_time', v_root.scheduled_time,
@@ -238,6 +254,9 @@ REVOKE ALL ON FUNCTION public.friend_match_add_invitee(UUID, JSONB) FROM PUBLIC,
 REVOKE ALL ON FUNCTION public.friend_match_slots(UUID, UUID[], UUID[]) FROM PUBLIC, anon, authenticated;
 
 -- ── 4. Criar ────────────────────────────────────────────────────────────
+-- A 1.ª versão deste ficheiro não tinha p_court: se já tiver corrido, sai
+-- aqui a assinatura antiga para não ficarem duas.
+DROP FUNCTION IF EXISTS public.create_friend_match(date, time, text, double precision, double precision, boolean, text, integer, text, jsonb);
 CREATE OR REPLACE FUNCTION public.create_friend_match(
   p_scheduled_date     DATE,
   p_scheduled_time     TIME DEFAULT NULL,
@@ -248,7 +267,8 @@ CREATE OR REPLACE FUNCTION public.create_friend_match(
   p_scoring_format     TEXT DEFAULT 'pontos_simples',
   p_num_sets           INTEGER DEFAULT NULL,
   p_teams_mode         TEXT DEFAULT 'manual',
-  p_invitees           JSONB DEFAULT '[]'::jsonb)
+  p_invitees           JSONB DEFAULT '[]'::jsonb,
+  p_court              TEXT DEFAULT NULL)
 RETURNS UUID
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -273,11 +293,12 @@ BEGIN
   INSERT INTO private_matches (
     creator_id, team_a_player1_id, ranked_intent, scheduled_date, scheduled_time,
     location, location_latitude, location_longitude, scoring_format, num_sets,
-    team_a_player1_status, is_friend_session, game_number, teams_mode)
+    team_a_player1_status, is_friend_session, game_number, teams_mode, court)
   VALUES (
     auth.uid(), auth.uid(), p_ranked_intent, p_scheduled_date, p_scheduled_time,
     p_location, p_location_latitude, p_location_longitude, p_scoring_format, p_num_sets,
-    CASE WHEN p_ranked_intent THEN 'accepted_all' ELSE 'accepted_no_ranking' END, TRUE, 1, p_teams_mode)
+    CASE WHEN p_ranked_intent THEN 'accepted_all' ELSE 'accepted_no_ranking' END, TRUE, 1, p_teams_mode,
+    NULLIF(trim(p_court), ''))
   RETURNING id INTO v_id;
 
   -- O criador também está na lista, já aceite.
@@ -332,11 +353,12 @@ BEGIN
   IF v_root.teams_set_at IS NOT NULL THEN RAISE EXCEPTION 'As equipas já foram formadas'; END IF;
   IF v_inv.user_id IS NOT DISTINCT FROM v_root.creator_id THEN RAISE EXCEPTION 'Quem criou o jogo não sai da lista'; END IF;
   DELETE FROM private_match_invitees WHERE id = p_invitee_id;
-  IF v_inv.user_id IS NOT NULL THEN
-    UPDATE notifications SET read_at = NOW()
-     WHERE user_id = v_inv.user_id AND kind = 'friend_match_invite' AND read_at IS NULL
-       AND data->>'match_id' = v_root.id::text;
-  END IF;
+  UPDATE notifications SET read_at = NOW()
+   WHERE kind = 'friend_match_invite' AND read_at IS NULL
+     AND data->>'match_id' = v_root.id::text
+     AND (user_id = v_inv.user_id
+          OR (v_inv.guest_email IS NOT NULL
+              AND user_id IN (SELECT u.id FROM auth.users u WHERE lower(u.email) = v_inv.guest_email)));
 END;
 $$;
 
@@ -350,13 +372,30 @@ AS $$
 DECLARE
   v_root private_matches;
   v_status TEXT := CASE WHEN p_accept THEN 'accepted' ELSE 'declined' END;
+  v_guest UUID;
 BEGIN
   SELECT * INTO v_root FROM private_matches WHERE id = p_match_id AND is_friend_session;
   IF v_root.id IS NULL THEN RAISE EXCEPTION 'Jogo não encontrado'; END IF;
-  IF v_root.teams_set_at IS NOT NULL THEN RAISE EXCEPTION 'As equipas já foram formadas'; END IF;
-  UPDATE private_match_invitees SET status = v_status, responded_at = NOW()
-   WHERE match_id = p_match_id AND user_id = auth.uid() AND user_id IS DISTINCT FROM v_root.creator_id;
-  IF NOT FOUND THEN RAISE EXCEPTION 'Não tens convite para este jogo'; END IF;
+  IF EXISTS (SELECT 1 FROM private_match_invitees
+              WHERE match_id = p_match_id AND user_id = auth.uid() AND user_id IS DISTINCT FROM v_root.creator_id) THEN
+    IF v_root.teams_set_at IS NOT NULL THEN RAISE EXCEPTION 'As equipas já foram formadas'; END IF;
+    UPDATE private_match_invitees SET status = v_status, responded_at = NOW()
+     WHERE match_id = p_match_id AND user_id = auth.uid();
+  ELSE
+    -- Convidado pelo email desta conta: aceitar liga o lugar à conta (daí
+    -- para a frente o criador vê quem é). Recusar não muda nada do lado
+    -- do criador: continua a ver o nome que escreveu.
+    SELECT i.id INTO v_guest FROM private_match_invitees i
+     WHERE i.match_id = p_match_id AND i.user_id IS NULL
+       AND i.guest_email = (SELECT lower(u.email) FROM auth.users u WHERE u.id = auth.uid())
+     ORDER BY i.created_at LIMIT 1;
+    IF v_guest IS NULL THEN RAISE EXCEPTION 'Não tens convite para este jogo'; END IF;
+    IF p_accept THEN
+      PERFORM friend_match_claim_guest(v_guest);
+    ELSE
+      UPDATE private_match_invitees SET email_declined_by = auth.uid() WHERE id = v_guest;
+    END IF;
+  END IF;
   UPDATE notifications SET read_at = NOW()
    WHERE user_id = auth.uid() AND kind = 'friend_match_invite' AND read_at IS NULL
      AND data->>'match_id' = p_match_id::text;
@@ -424,7 +463,7 @@ BEGIN
   s := friend_match_slots(p_match_id, p_team_a, p_team_b);
   INSERT INTO private_matches (
     creator_id, ranked_intent, scheduled_date, scheduled_time, location, location_latitude, location_longitude,
-    scoring_format, num_sets, session_id, game_number, pairing_mode, teams_set_at,
+    court, scoring_format, num_sets, session_id, game_number, pairing_mode, teams_set_at,
     team_a_player1_id, team_a_player1_status,
     team_a_player2_id, team_a_player2_status, team_a_player2_guest_name,
     team_b_player1_id, team_b_player1_status, team_b_player1_guest_name,
@@ -432,7 +471,7 @@ BEGIN
   VALUES (
     v_root.creator_id, v_root.ranked_intent, v_root.scheduled_date, v_root.scheduled_time,
     v_root.location, v_root.location_latitude, v_root.location_longitude,
-    v_root.scoring_format, v_root.num_sets, p_match_id,
+    v_root.court, v_root.scoring_format, v_root.num_sets, p_match_id,
     (SELECT COALESCE(max(game_number), 1) + 1 FROM private_matches WHERE session_id = p_match_id),
     v_root.pairing_mode, NOW(),
     (s->>'team_a_player1_id')::uuid, s->>'team_a_player1_status',
@@ -461,7 +500,11 @@ BEGIN
   IF v_root IS NULL OR NOT EXISTS (SELECT 1 FROM private_matches WHERE id = v_root AND is_friend_session) THEN
     RAISE EXCEPTION 'Jogo não encontrado';
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM private_match_invitees WHERE match_id = v_root AND user_id = auth.uid()) THEN
+  IF NOT EXISTS (SELECT 1 FROM private_match_invitees i
+                  WHERE i.match_id = v_root
+                    AND (i.user_id = auth.uid()
+                         OR (i.user_id IS NULL
+                             AND i.guest_email = (SELECT lower(u.email) FROM auth.users u WHERE u.id = auth.uid())))) THEN
     RAISE EXCEPTION 'Não estás neste jogo' USING ERRCODE = 'insufficient_privilege';
   END IF;
 
@@ -470,12 +513,16 @@ BEGIN
                 'id', m.id, 'creator_id', m.creator_id, 'creator_name', p.name,
                 'scheduled_date', m.scheduled_date, 'scheduled_time', m.scheduled_time,
                 'location', m.location, 'location_latitude', m.location_latitude, 'location_longitude', m.location_longitude,
-                'ranked_intent', m.ranked_intent, 'scoring_format', m.scoring_format, 'num_sets', m.num_sets,
+                'court', m.court, 'ranked_intent', m.ranked_intent, 'scoring_format', m.scoring_format, 'num_sets', m.num_sets,
                 'teams_mode', m.teams_mode, 'pairing_mode', m.pairing_mode, 'teams_set_at', m.teams_set_at)
                 FROM private_matches m LEFT JOIN profiles p ON p.id = m.creator_id WHERE m.id = v_root),
     'invitees', COALESCE((SELECT jsonb_agg(jsonb_build_object(
                   'invitee_id', i.id, 'user_id', i.user_id, 'name', COALESCE(p.name, i.guest_name),
-                  'avatar_url', p.avatar_url, 'rating', p.rating, 'gender', p.gender,
+                  'avatar_url', p.avatar_url,
+                  -- Nível e sexo só com a visibilidade do perfil, como na
+                  -- lista de membros (can_view_section).
+                  'rating', CASE WHEN can_view_section(p.id, p.results_visibility) THEN p.rating END,
+                  'gender', CASE WHEN can_view_section(p.id, p.results_visibility) THEN p.gender END,
                   'status', i.status, 'is_guest', i.user_id IS NULL,
                   'is_creator', i.user_id IS NOT DISTINCT FROM m.creator_id,
                   'guest_email_sent', i.email_status IN ('queued', 'sent'))
@@ -533,9 +580,37 @@ AS $$
            'people', (SELECT count(*) FROM private_match_invitees x WHERE x.match_id = m.id AND x.status <> 'declined'))
            ORDER BY m.scheduled_date, m.scheduled_time), '[]'::jsonb)
     FROM private_match_invitees i
-    JOIN private_matches m ON m.id = i.match_id AND m.is_friend_session AND m.teams_set_at IS NULL
+    JOIN private_matches m ON m.id = i.match_id AND m.is_friend_session
     LEFT JOIN profiles p ON p.id = m.creator_id
-   WHERE i.user_id = auth.uid() AND i.status = 'pending';
+   WHERE (i.user_id = auth.uid() AND i.status = 'pending' AND m.teams_set_at IS NULL)
+      -- convidado pelo email desta conta, ainda por responder
+      OR (i.user_id IS NULL
+          AND i.guest_email = (SELECT lower(u.email) FROM auth.users u WHERE u.id = auth.uid())
+          AND NOT EXISTS (SELECT 1 FROM private_match_invitees j
+                           WHERE j.match_id = i.match_id AND j.user_id = auth.uid())
+          AND i.email_declined_by IS DISTINCT FROM auth.uid());
+$$;
+
+-- As sessões ainda sem equipas em que estou (criador ou já aceitei): para
+-- voltar ao jogo, ver quem falta e formar as equipas (pedido do Dev 2).
+CREATE OR REPLACE FUNCTION public.list_my_friend_sessions()
+RETURNS JSONB
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT COALESCE(jsonb_agg(jsonb_build_object(
+           'match_id', m.id, 'scheduled_date', m.scheduled_date, 'scheduled_time', m.scheduled_time,
+           'location', m.location, 'court', m.court, 'is_creator', m.creator_id = auth.uid(),
+           'people', (SELECT count(*) FROM private_match_invitees x WHERE x.match_id = m.id AND x.status <> 'declined'),
+           'accepted', (SELECT count(*) FROM private_match_invitees x WHERE x.match_id = m.id AND x.status IN ('accepted', 'guest')),
+           'pending', (SELECT count(*) FROM private_match_invitees x WHERE x.match_id = m.id AND x.status = 'pending'))
+           ORDER BY m.scheduled_date, m.scheduled_time), '[]'::jsonb)
+    FROM private_matches m
+   WHERE m.is_friend_session AND m.teams_set_at IS NULL
+     AND EXISTS (SELECT 1 FROM private_match_invitees i
+                  WHERE i.match_id = m.id AND i.user_id = auth.uid() AND i.status = 'accepted');
 $$;
 
 -- ── 9. Quem entrou pelo nome e depois criou conta ───────────────────────
@@ -569,6 +644,9 @@ BEGIN
      SET user_id = auth.uid(), guest_name = NULL, guest_email = NULL, invite_token = NULL,
          status = 'accepted', responded_at = NOW()
    WHERE id = p_invitee_id;
+  UPDATE notifications SET read_at = NOW()
+   WHERE user_id = auth.uid() AND kind = 'friend_match_invite' AND read_at IS NULL
+     AND data->>'match_id' = v_inv.match_id::text;
   RETURN v_inv.match_id;
 END;
 $$;
@@ -590,7 +668,9 @@ BEGIN
 END;
 $$;
 
--- Depois do login: os convites guardados com o email desta conta.
+-- Depois do login: os convites guardados com o email desta conta ANTES de
+-- ela existir (quem criou conta para entrar). Um convite a uma conta que já
+-- existia fica por responder: é a pessoa que escolhe.
 CREATE OR REPLACE FUNCTION public.claim_friend_match_invites_by_email()
 RETURNS INTEGER
 LANGUAGE plpgsql
@@ -598,15 +678,16 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  v_email TEXT;
-  v_id    UUID;
-  v_n     INTEGER := 0;
+  v_email   TEXT;
+  v_created TIMESTAMPTZ;
+  v_id      UUID;
+  v_n       INTEGER := 0;
 BEGIN
   IF auth.uid() IS NULL THEN RETURN 0; END IF;
-  SELECT lower(email) INTO v_email FROM auth.users WHERE id = auth.uid();
+  SELECT lower(email), created_at INTO v_email, v_created FROM auth.users WHERE id = auth.uid();
   IF v_email IS NULL THEN RETURN 0; END IF;
   FOR v_id IN SELECT i.id FROM private_match_invitees i
-               WHERE i.user_id IS NULL AND i.guest_email = v_email
+               WHERE i.user_id IS NULL AND i.guest_email = v_email AND i.created_at < v_created
                  AND NOT EXISTS (SELECT 1 FROM private_match_invitees j
                                   WHERE j.match_id = i.match_id AND j.user_id = auth.uid()) LOOP
     PERFORM friend_match_claim_guest(v_id);
@@ -645,7 +726,7 @@ DO $$
 DECLARE f TEXT;
 BEGIN
   FOREACH f IN ARRAY ARRAY[
-    'public.create_friend_match(date, time, text, double precision, double precision, boolean, text, integer, text, jsonb)',
+    'public.create_friend_match(date, time, text, double precision, double precision, boolean, text, integer, text, jsonb, text)',
     'public.add_friend_match_invitees(uuid, jsonb)',
     'public.remove_friend_match_invitee(uuid)',
     'public.respond_friend_match_invite(uuid, boolean)',
@@ -653,12 +734,17 @@ BEGIN
     'public.add_friend_match_game(uuid, uuid[], uuid[])',
     'public.get_friend_match(uuid)',
     'public.list_my_friend_match_invites()',
+    'public.list_my_friend_sessions()',
     'public.claim_friend_match_invite(text)',
     'public.claim_friend_match_invites_by_email()'] LOOP
     EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC', f);
     EXECUTE format('REVOKE ALL ON FUNCTION %s FROM anon', f);
     EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO authenticated', f);
   END LOOP;
+  -- A agenda também tinha EXECUTE para anon (visto pelo SI a 26 set).
+  REVOKE ALL ON FUNCTION public.get_my_private_matches() FROM PUBLIC;
+  REVOKE ALL ON FUNCTION public.get_my_private_matches() FROM anon;
+  GRANT EXECUTE ON FUNCTION public.get_my_private_matches() TO authenticated;
 END $$;
 
 COMMIT;
