@@ -11,8 +11,12 @@
 -- O que faz:
 --   1. tournament_board_visible(torneio, categoria): quem vê o quadro — toda
 --      a gente num torneio publicado (e que não seja rascunho, como até
---      aqui), e num privado só o organizador (admin do clube ou da
---      plataforma) e os marcadores dessa categoria (can_score_tournament).
+--      aqui), e num privado o organizador (admin do clube ou da
+--      plataforma), os marcadores dessa categoria (can_score_tournament) e
+--      quem está inscrito nessa categoria (acrescentado a 26 set, decisão
+--      do PO: os jogadores veem os seus jogos, grupos e quadro).
+--      Pode-se correr outra vez: a função é substituída e as vistas dizem
+--      «já estava».
 --   2. As três vistas deixam de juntar a tournament_public e passam a
 --      juntar tournaments com essa regra. Mesmas colunas, pela mesma ordem;
 --      troca-se só o JOIN no corpo vivo (pg_get_viewdef), e recusa se não o
@@ -50,7 +54,12 @@ SET search_path = public
 AS $$
   SELECT EXISTS (SELECT 1 FROM tournaments t
                   WHERE t.id = p_tournament_id AND t.is_public AND t.status <> 'rascunho')
-      OR can_score_tournament(p_tournament_id, p_category_id);
+      OR can_score_tournament(p_tournament_id, p_category_id)
+      -- Quem está inscrito nessa categoria vê os seus jogos, grupos e quadro
+      -- (decisão do PO, 26 set). Sem sessão, auth.uid() é nulo e não conta.
+      OR EXISTS (SELECT 1 FROM tournament_entries e
+                  WHERE e.category_id = p_category_id
+                    AND auth.uid() IN (e.player1_id, e.player2_id));
 $$;
 
 REVOKE ALL ON FUNCTION public.tournament_board_visible(UUID, UUID) FROM PUBLIC;

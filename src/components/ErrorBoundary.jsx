@@ -1,6 +1,7 @@
 import { Component } from 'react'
 import { RotateCcw } from 'lucide-react'
 import i18n from '../lib/i18n'
+import { isChunkLoadError, reloadOnceForChunk } from '../lib/chunkReload'
 
 /**
  * Rede de segurança para o ecrã branco (Francisco, 22 set 2026).
@@ -17,19 +18,26 @@ import i18n from '../lib/i18n'
 export default class ErrorBoundary extends Component {
   constructor(props) {
     super(props)
-    this.state = { failed: false }
+    this.state = { failed: false, reloading: false }
   }
 
-  static getDerivedStateFromError() {
-    return { failed: true }
+  // Falta um pedaço da app depois de uma publicação nova (#569): recarrega
+  // sozinha uma vez, sem mostrar o erro. Os painéis do torneio carregam-se
+  // à parte e não passavam pelo recarregamento das páginas (App.jsx).
+  static getDerivedStateFromError(error) {
+    return { failed: true, reloading: isChunkLoadError(error) }
   }
 
   componentDidCatch(error, info) {
+    if (this.state.reloading && reloadOnceForChunk()) return
+    if (this.state.reloading) this.setState({ reloading: false })
     console.error('Erro não apanhado:', error, info?.componentStack)
   }
 
   render() {
     if (!this.state.failed) return this.props.children
+    // A recarregar: nada de ecrã de erro por um instante.
+    if (this.state.reloading) return <div className="min-h-screen bg-canvas" />
 
     const t = (key, fallback) => {
       try {

@@ -68,6 +68,9 @@ export function myMatchesFromBoard(board, myEntryIds) {
       score_a: m.score_a,
       score_b: m.score_b,
       previous_time: m.previous_scheduled_at ? hhmmInTz(m.previous_scheduled_at) : null,
+      // Há um pedido de correção por resolver (Dev 3, na vista pública):
+      // o «Correção pedida» fica depois de recarregar (#485).
+      correction_pending: !!m.correction_pending,
     }
   })
 }

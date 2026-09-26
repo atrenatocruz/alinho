@@ -21,20 +21,28 @@ const toMinutes = (hhmm) => {
   return h * 60 + m
 }
 
-/** Linhas de teacher_availability → { segunda: [{ start, end }], … } por ordem de hora. */
+/**
+ * Linhas de teacher_availability → { segunda: [{ start, end, tp }], … } por
+ * ordem de hora. `tp` é o perfil de professor (um por clube) a que o bloco
+ * pertence — com vários clubes, cada bloco diz o clube (#392, assunto 3).
+ */
 export const scheduleFromRows = (rows = []) => {
   const byDay = Object.fromEntries(DAY_VALUES.map((d) => [d, []]))
   for (const r of rows) {
     if (!byDay[r.day_of_week]) continue
-    byDay[r.day_of_week].push({ start: shortTime(r.start_time), end: shortTime(r.end_time) })
+    byDay[r.day_of_week].push({ start: shortTime(r.start_time), end: shortTime(r.end_time), tp: r.teacher_profile_id })
   }
   for (const d of DAY_VALUES) byDay[d].sort((a, b) => toMinutes(a.start) - toMinutes(b.start))
   return byDay
 }
 
-/** { segunda: [...] } → linhas para gravar, ordenadas por dia e hora. */
-export const rowsFromSchedule = (byDay = {}) =>
+/**
+ * { segunda: [...] } → linhas para gravar, ordenadas por dia e hora. Com `tp`,
+ * só os blocos desse perfil (clube); sem `tp`, todos.
+ */
+export const rowsFromSchedule = (byDay = {}, tp) =>
   DAY_VALUES.flatMap((day) => [...(byDay[day] || [])]
+    .filter((s) => tp === undefined || s.tp === tp)
     .sort((a, b) => toMinutes(a.start) - toMinutes(b.start))
     .map((s) => ({ day, start: s.start, end: s.end })))
 
@@ -80,6 +88,10 @@ export const shortRange = (start, end) => {
   const h = (v) => { const [hh, mm] = shortTime(v).split(':'); return mm === '00' ? String(Number(hh)) : `${Number(hh)}:${mm}` }
   return `${h(start)}–${h(end)}h`
 }
+
+/** Perfil de professor que conta como ativo: aprovado e, com clube, aceite pelo clube. */
+export const isActiveTeacherProfile = (p) =>
+  p?.status === 'approved' && (!p.organization_id || !p.club_status || p.club_status === 'accepted')
 
 /** Próximo intervalo a propor ao carregar em «+ Horas» num dia. */
 export const nextSlot = (slots = []) => {

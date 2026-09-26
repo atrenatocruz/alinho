@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Mail, MessageCircle } from 'lucide-react'
-import { Nav, Footer, PlansGrid, useLoginHref } from './Landing'
-import { mailtoLink, whatsappContactLink } from '../lib/contacts'
+import { Nav, Footer, PlansGrid, useLoginHref, usePageTop, PRIMARY_CTA } from './Landing'
+import { mailtoLink, whatsappContactLink, SUPPORT_EMAIL_READY } from '../lib/contacts'
 
 /* Página «Planos» (Trello #327) — NOVA: antes o «Planos» do menu só saltava
    para #planos na página inicial. Desenho aprovado a 24 set
@@ -15,6 +15,7 @@ import { mailtoLink, whatsappContactLink } from '../lib/contacts'
 export default function Plans() {
   const { t } = useTranslation()
   const loginHref = useLoginHref()
+  usePageTop()
   const contact = 'inline-flex flex-1 items-center justify-center gap-2 min-h-[48px] rounded-ctrl px-4 font-extrabold'
   return (
     <div className="min-h-screen bg-[#F7F7F4]">
@@ -30,13 +31,15 @@ export default function Plans() {
 
         <section className="mt-10 rounded-card bg-white border border-line p-6 max-w-xl">
           <h2 className="text-2xl text-ink-900">{t('plans.club_title')}</h2>
-          <p className="text-ink-700 mt-1">{t('plans.club_text')}</p>
+          <p className="text-ink-700 mt-1">{t(SUPPORT_EMAIL_READY ? 'plans.club_text' : 'plans.club_text_whatsapp')}</p>
           {/* «Quem escreve escolhe» (Francisco): os dois iguais, só com
               contorno. O verde do WhatsApp é uma cor fora da marca. */}
           <div className="mt-4 flex gap-3">
-            <a href={mailtoLink(t('plans.email_subject'))} className={`${contact} border border-ink-900 bg-white text-ink-900 hover:bg-ink-50`}>
-              <Mail size={18} /> {t('plans.email')}
-            </a>
+            {SUPPORT_EMAIL_READY && (
+              <a href={mailtoLink(t('plans.email_subject'))} className={`${contact} border border-ink-900 bg-white text-ink-900 hover:bg-ink-50`}>
+                <Mail size={18} /> {t('plans.email')}
+              </a>
+            )}
             <a href={whatsappContactLink(t('plans.whatsapp_text'))} target="_blank" rel="noopener noreferrer"
                className={`${contact} border border-ink-900 bg-white text-ink-900 hover:bg-ink-50`}>
               <MessageCircle size={18} /> {t('plans.whatsapp')}
@@ -48,7 +51,7 @@ export default function Plans() {
         </section>
 
         <div className="mt-10 max-w-xl">
-          <Link to={loginHref('signup')} className="btn-primary inline-flex w-full sm:w-auto items-center justify-center">
+          <Link to={loginHref('signup')} className={`${PRIMARY_CTA} inline-flex w-full sm:w-auto items-center justify-center`}>
             {t('landing.plan_free_cta')}
           </Link>
         </div>

@@ -4,6 +4,14 @@ import App from './App.jsx'
 import './index.css'
 import './lib/i18n'
 import { installDevMockNetwork } from './lib/devMockNetwork'
+import { reloadOnceForChunk } from './lib/chunkReload'
+
+// O Vite avisa quando um ficheiro pré-carregado de uma página já não existe
+// (publicação nova com a app aberta, #569): recarrega-se uma vez em vez de
+// deixar o erro chegar ao ecrã.
+window.addEventListener('vite:preloadError', (event) => {
+  if (reloadOnceForChunk()) event.preventDefault()
+})
 
 // No-op fora de DEV e fora da sessão "Entrar como Admin" — ver o próprio
 // ficheiro para o porquê.

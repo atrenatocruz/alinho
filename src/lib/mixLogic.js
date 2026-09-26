@@ -50,10 +50,20 @@ export const mixCapacity = (game) => game?.max_players || (game?.num_courts || 1
     nao. So decide se se mostra o botao de entrar ou uma explicacao; a
     aplicacao real e a RLS de INSERT em participants. Mesma duplicacao do
     achado #5 acima. */
+const genderRule = (game) =>
+  (game?.gender_restriction && !['indiferente', 'misto'].includes(game.gender_restriction) ? game.gender_restriction : null)
+
+/* Quem ainda não tem o sexo no perfil não fica de fora: escolhe-o ali mesmo
+   e a inscrição continua, como no torneio (#433). Antes contava como «não é
+   para ti» e a pessoa não tinha como entrar (Francisco, 26 set). */
 export const isGenderMismatch = (game, profile) => {
-  const restricted = game?.gender_restriction && !['indiferente', 'misto'].includes(game.gender_restriction)
-  return Boolean(restricted) && profile?.gender !== game.gender_restriction
+  const rule = genderRule(game)
+  return Boolean(rule) && Boolean(profile?.gender) && profile.gender !== rule
 }
+
+/** Mix só de homens ou só de mulheres e o jogador sem sexo no perfil — pede-se
+    antes de entrar (a policy de INSERT em participants recusa-o sem ele). */
+export const isMissingGender = (game, profile) => Boolean(genderRule(game)) && !profile?.gender
 
 /** Se o mix exige escalao etario e o jogador ainda nao indicou a data de
     nascimento. Distinto de `isAgeIneligible` de proposito: isto resolve-se

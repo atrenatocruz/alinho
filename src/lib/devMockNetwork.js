@@ -116,6 +116,15 @@ const ACHIEVEMENTS_CATALOG = [
 
 const RPC_MOCKS = {
   ...LESSON_RPC_MOCKS,
+  // Professores na Comunidade pela RPC (#392 entrega 2): os mesmos do mock
+  // da tabela, já achatados.
+  list_teachers_public: () => (TABLE_MOCKS.teacher_profiles('') || [])
+    .filter((r) => r.status === 'approved' && (!r.organization_id || !r.club_status || r.club_status === 'accepted'))
+    .map((r) => ({ id: r.id, user_id: r.user_id, organization_id: r.organization_id, club_status: r.club_status || (r.organization_id ? 'accepted' : null),
+      status: r.status, zone: r.zone, contact: r.contact, created_at: r.created_at, name: r.user?.name,
+      avatar_url: null, gender: r.user?.gender || null, rating: r.user?.rating || null,
+      org_name: r.organization?.name || null, org_slug: r.organization?.slug || null,
+      availability: (r.availability || []).map((a) => ({ teacher_profile_id: r.id, ...a })) })),
   ...TOURNAMENT_RPC_MOCKS,
   ...TOURNAMENT_DRAW_RPC_MOCKS,
   get_player_profile: (params) => {
@@ -859,7 +868,12 @@ const TABLE_MOCKS = {
       data: { game_title: 'Mix de Sábado', game_date: tomorrow8pm.toISOString(), partner_name: 'Rui Oliveira Gomes', actor_name: 'Marta Costa' } },
     { id: 'n3', kind: 'mix_removed', game_id: 'fake-game-1', created_at: new Date().toISOString(),
       data: { game_title: 'Mix de Terça', game_date: tomorrow8pm.toISOString() } },
-  ] : []).concat(LESSON_NOTICES()),
+  ] : []).concat(LESSON_NOTICES()).concat(localStorage.getItem('mockTCorrection') === 'true' ? [
+    // Pedido de correção a chegar ao organizador (Trello #485, forma do Dev 3).
+    { id: 'tc1', kind: 'tournament_correction_requested', game_id: null, created_at: new Date().toISOString(),
+      data: { tournament_id: 'tour-smash-open', tournament_slug: 'smash-open-2026', tournament_name: 'Smash Open 2026',
+              category_code: 'MX4', match_id: 'm-2', requester_name: 'Marta Silva' } },
+  ] : []),
   // A organização do Admin(Dev). Sem esta linha o separador Definições do
   // Gerir ficava em branco (loadSettings nunca recebia nada). Marcada como
   // grupo criado na Comunidade para se poder validar o "Eliminar grupo".
@@ -892,12 +906,26 @@ const TABLE_MOCKS = {
         : { zone: 'Cascais', organization: null }),
       // localStorage.mockTeacherSchedule = 'full' — «O meu horário» já preenchido (#418).
       availability: localStorage.getItem('mockTeacherSchedule') === 'full' ? [
-        { day_of_week: 'terca', start_time: '09:00:00', end_time: '13:00:00' },
-        { day_of_week: 'terca', start_time: '18:00:00', end_time: '21:00:00' },
-        { day_of_week: 'quinta', start_time: '18:30:00', end_time: '21:00:00' },
-        { day_of_week: 'sabado', start_time: '09:00:00', end_time: '13:00:00' },
+        { teacher_profile_id: 'tp-me', day_of_week: 'terca', start_time: '09:00:00', end_time: '13:00:00' },
+        ...(localStorage.getItem('mockTeacherClubs') === 'two' ? [] : [
+          { teacher_profile_id: 'tp-me', day_of_week: 'terca', start_time: '18:00:00', end_time: '21:00:00' },
+          { teacher_profile_id: 'tp-me', day_of_week: 'quinta', start_time: '18:30:00', end_time: '21:00:00' },
+        ]),
+        { teacher_profile_id: 'tp-me', day_of_week: 'sabado', start_time: '09:00:00', end_time: '13:00:00' },
       ] : [],
     }] : []),
+    // localStorage.mockTeacherClubs = 'two' — dá aulas noutro clube aceite e
+    // tem um terceiro à espera (#392, assunto 3).
+    ...(localStorage.getItem('mockTeacherState') === 'approved' && localStorage.getItem('mockTeacherClubs') === 'two' ? [
+      { id: 'tp-me2', user_id: MOCK_ADMIN_USER_ID, organization_id: 'co-2', status: 'approved', club_status: 'accepted',
+        contact: '912 000 111', zone: 'Almada', created_at: '2026-09-20T10:00:00Z', user: { name: 'Admin (Dev)' },
+        organization: { name: 'Padel Parque', slug: 'padel-parque' },
+        availability: localStorage.getItem('mockTeacherSchedule') === 'full'
+          ? [{ teacher_profile_id: 'tp-me2', day_of_week: 'quinta', start_time: '18:00:00', end_time: '21:00:00' }] : [] },
+      { id: 'tp-me3', user_id: MOCK_ADMIN_USER_ID, organization_id: 'co-3', status: 'pending', club_status: 'pending',
+        contact: '912 000 111', zone: 'Almada', created_at: '2026-09-25T10:00:00Z', user: { name: 'Admin (Dev)' },
+        organization: { name: 'Racket Club', slug: 'racket-club' }, availability: [] },
+    ] : []),
     { id: 'tp-1', user_id: 'fake-t1', organization_id: 'co-1', status: 'approved', contact: '912 345 678',
       zone: 'Almada', user: { name: 'Ana Moreira', gender: 'feminino', rating: 1650 }, organization: { name: 'Smash Padel', slug: 'smash-padel' },
       availability: [{ day_of_week: 'terca', start_time: '09:00:00', end_time: '13:00:00' }, { day_of_week: 'quinta', start_time: '17:00:00', end_time: '20:00:00' }] },
@@ -1041,6 +1069,8 @@ TABLE_MOCKS.games = (url) => {
     return [{ id: 'fake-open-empty', organization_id: MOCK_ADMIN_ORG_ID, title: 'Jogo em aberto', date: d.toISOString(), location: 'Smash Padel Almada', status: 'open', origin: 'open_slot', max_players: 4, num_courts: 1, participants: [] }]
   }
   if (localStorage.getItem('mockNoPending') === 'true' && /status=eq\.pending/.test(u)) rows = []
+  // localStorage.mockMixMen = 'true' — o mix passa a só homens (26 set).
+  if (localStorage.getItem('mockMixMen') === 'true' && Array.isArray(rows)) rows = rows.map((g) => ({ ...g, gender_restriction: 'masculino' }))
   const origem = u.match(/[?&]origin=eq\.([a-z_]+)/)
   return origem && Array.isArray(rows) ? rows.filter((g) => (g.origin || 'admin') === origem[1]) : rows
 }

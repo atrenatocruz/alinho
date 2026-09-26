@@ -24,6 +24,26 @@ export const listTeacherProfiles = async () => {
   return data || []
 }
 
+// Professores ativos para quem os procura (Comunidade), com nome e foto
+// para toda a gente — pela RPC, sem abrir as regras da profiles (falha do QA,
+// 26 set: sem grupo em comum, aparecia «?»). Mesma forma que
+// listTeacherProfiles. Antes de migration_lessons_3_requests.sql correr, cai
+// no caminho antigo.
+export const listTeachersPublic = async () => {
+  const { data, error } = await supabase.rpc('list_teachers_public')
+  if (error) {
+    if (['PGRST202', '42883'].includes(error.code)) return listTeacherProfiles()
+    throw error
+  }
+  return (data || []).map((r) => ({
+    id: r.id, user_id: r.user_id, organization_id: r.organization_id, club_status: r.club_status,
+    status: r.status, zone: r.zone, contact: r.contact, created_at: r.created_at,
+    user: { name: r.name, avatar_url: r.avatar_url, gender: r.gender, rating: r.rating },
+    organization: r.org_name ? { name: r.org_name, slug: r.org_slug } : null,
+    availability: r.availability || [],
+  }))
+}
+
 // organizationId pode ser null (professor sem clube) e zone é opcional — as
 // duas precisam de migration_teacher_profiles_open.sql; sem zona não se envia
 // a coluna, para o pedido com clube continuar a funcionar antes disso.
