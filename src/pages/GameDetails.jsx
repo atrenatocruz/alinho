@@ -116,6 +116,8 @@ export default function GameDetails() {
   const [genderPrompt, setGenderPrompt] = useState(null) // { then } | null
   const [savingGender, setSavingGender] = useState(false)
   const [genderError, setGenderError] = useState('')
+  // Sexo que não bate com o mix: pergunta-se, não se bloqueia (26 set).
+  const [genderConfirm, setGenderConfirm] = useState(null) // { then, name? } | null
   const [birthdayValue, setBirthdayValue] = useState('')
   const [savingBirthday, setSavingBirthday] = useState(false)
   const [birthdayError, setBirthdayError] = useState('')
@@ -456,6 +458,11 @@ export default function GameDetails() {
   // está na app. O segundo caminho passa pela edge function, porque criar a
   // conta por reclamar precisa da service-role.
   const handleJoinPartner = async (choice) => {
+    // Parceiro com o sexo que não bate: a mesma pergunta, antes de gravar.
+    if (choice.mismatchName) {
+      setGenderConfirm({ name: choice.mismatchName, then: () => handleJoinPartner({ ...choice, mismatchName: null }) })
+      return
+    }
     setJoining(true)
     setJoinError('')
     try {
@@ -2002,16 +2009,16 @@ export default function GameDetails() {
   const waitlistPeople = waitlist.map(w => ({ ...w.user, rowOwner: true, rowId: w.id, hasPartner: false }))
   const isUserWaitlisted = waitlist.some(w => w.user_id === user.id)
   const canJoin = game?.status === 'open' && peopleCount < capacity && !isUserJoined
-  // The real enforcement is the participants INSERT RLS policy
-  // (migration_mix_gender_restriction.sql) — this only decides whether to
-  // show the join button or a friendly explanation instead of a raw error.
+  // O sexo nunca bloqueia (Francisco, 26 set): a base de dados deixou de o
+  // verificar (migration_mix_join_policy_sem_sexo.sql). Com o sexo que não
+  // bate, pergunta-se «tens a certeza?»; o admin tira a pessoa se for caso.
   const genderMismatch = isGenderMismatch(game, profile)
   // Sem sexo no perfil, pergunta-se ao carregar em entrar (Francisco, 26 set).
   const missingGender = isMissingGender(game, profile)
   const withGender = (action) => () => {
-    if (!missingGender) { action(); return }
-    setGenderError('')
-    setGenderPrompt({ then: action })
+    if (missingGender) { setGenderError(''); setGenderPrompt({ then: action }); return }
+    if (genderMismatch) { setGenderConfirm({ then: action }); return }
+    action()
   }
   const chooseGender = async (gender) => {
     setSavingGender(true)
@@ -2025,9 +2032,11 @@ export default function GameDetails() {
     }
     const next = genderPrompt?.then
     setGenderPrompt(null)
-    // Com o sexo do mix, a inscrição continua; com o outro, a página passa
-    // a mostrar a mensagem de sempre («Este mix é só homens…»).
-    if (gender === game?.gender_restriction && next) next()
+    // Com o sexo do mix, a inscrição continua; com o outro, pergunta-se se
+    // quer mesmo entrar — nunca se bloqueia (Francisco, 26 set).
+    if (!next) return
+    if (gender === game?.gender_restriction) next()
+    else setGenderConfirm({ then: next })
   }
   // Escalao etario (Trello #212). Duas situacoes diferentes de proposito:
   // sem data de nascimento resolve-se aqui mesmo (modal), fora do escalao
@@ -2337,7 +2346,7 @@ export default function GameDetails() {
         >
           <Play size={18} /> {t('gamedetails.live_see_round')}
         </PrimaryButton>
-      ) : !mixStarted && canJoin && !joinMode && !genderMismatch && !ageIneligible && !missingBirthday ? (
+      ) : !mixStarted && canJoin && !joinMode && !ageIneligible && !missingBirthday ? (
         <div className="space-y-2">
           <PrimaryButton onClick={withGender(handleJoinAlone)} disabled={joining} className="w-full">
             {joining ? t('gamedetails.joining') : t('gamedetails.join_mix')}
@@ -3509,7 +3518,7 @@ export default function GameDetails() {
               — inscricao normal e lista de suplentes — porque a policy de
               INSERT em participants nao distingue os dois: qualquer linha
               nova passa pela mesma verificacao. */}
-          {(canJoin || (isFull && !isUserJoined && !isUserWaitlisted)) && !joinMode && !genderMismatch
+          {(canJoin || (isFull && !isUserJoined && !isUserWaitlisted)) && !joinMode
             && (ageIneligible || missingBirthday) && (
             ageIneligible ? (
               <div className="bg-ink-50 text-muted px-4 py-3 rounded-ctrl text-sm font-extrabold text-center">
@@ -3531,21 +3540,7 @@ export default function GameDetails() {
             )
           )}
 
-          {canJoin && !joinMode && !ageIneligible && !missingBirthday && (
-            genderMismatch ? (
-              <div className="bg-ink-50 text-muted px-4 py-3 rounded-ctrl text-sm font-extrabold text-center">
-                {t('gamedetails.gender_restricted_message', { restriction: t(GENDER_RESTRICTION_LABEL_KEY[game.gender_restriction]).toLowerCase() })}
-              </div>
-            ) : (
-              <>
-                {/* "Entrar no mix" passou para por baixo do topo (SPEC 17 set).
-                    "Entrar com parceiro" continua escondido (setJoinMode
-                    ('partner') e o seletor abaixo ainda funcionam). */}
-              </>
-            )
-          )}
-
-          {isFull && !isUserJoined && !isUserWaitlisted && !genderMismatch && !ageIneligible && !missingBirthday && (
+          {isFull && !isUserJoined && !isUserWaitlisted && !ageIneligible && !missingBirthday && (
             <PrimaryButton
               variant="ghost"
               onClick={withGender(handleJoinAsSuplente)}
@@ -3617,10 +3612,34 @@ export default function GameDetails() {
                     {t('login.gender_female')}
                   </PrimaryButton>
                 </div>
+                {/* Pergunta, mas não bloqueia (Francisco, 26 set): quem salta
+                    entra na mesma, sem género no perfil, e a pergunta volta da
+                    próxima vez. Só nos mixes — no torneio fica obrigatório. */}
+                <button
+                  type="button"
+                  onClick={() => { const next = genderPrompt?.then; setGenderPrompt(null); if (next) next() }}
+                  disabled={savingGender}
+                  className="w-full min-h-[44px] text-sm font-extrabold text-ink-900 underline underline-offset-2"
+                >
+                  {t('gamedetails.gender_skip')}
+                </button>
                 {genderError && <p className="text-sm text-red-600 font-extrabold">{genderError}</p>}
               </div>
             </Sheet>
           )}
+
+          {/* O sexo não bate: pergunta, sem vermelho, e a inscrição continua
+              se disser que sim. O admin tira a pessoa se for caso disso
+              (Francisco, 26 set). Também para o parceiro. */}
+          <ConfirmSheet
+            open={!!genderConfirm}
+            title={game?.gender_restriction === 'feminino' ? t('gamedetails.gender_confirm_title_feminino') : t('gamedetails.gender_confirm_title_masculino')}
+            message={genderConfirm?.name ? t('gamedetails.gender_confirm_partner', { name: genderConfirm.name }) : t('gamedetails.gender_confirm_me')}
+            confirmLabel={t('gamedetails.gender_confirm_yes')}
+            cancelLabel={t('gamedetails.gender_confirm_cancel')}
+            onConfirm={() => { const next = genderConfirm?.then; setGenderConfirm(null); if (next) next() }}
+            onClose={() => setGenderConfirm(null)}
+          />
 
           {/* Entrar com parceiro (Trello #339) — da lista do grupo, ou pelo
               nome de quem ainda não está na app. */}
