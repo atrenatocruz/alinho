@@ -246,3 +246,40 @@ export function emailLessonRequest(type, requestId) {
   supabase.functions.invoke('send-email', { body: { type, request_id: requestId } })
     .catch((err) => console.error('Error sending lesson email:', err))
 }
+
+// ── Propor outra hora, dos dois lados (Trello #392; migration_lessons_5) ──
+
+/** Professor ou aluno propõe outra hora; quem recebe é que aceita. */
+export async function proposeLessonTime(id, startsAt) {
+  const { error } = await supabase.rpc('propose_lesson_time', { p_id: id, p_starts_at: startsAt })
+  if (error) throw error
+}
+
+/** Aceita a última proposta do outro lado: a aula fica marcada. */
+export async function acceptLessonProposal(id) {
+  const { data, error } = await supabase.rpc('accept_lesson_proposal', { p_id: id })
+  if (error) throw error
+  return data
+}
+
+// ── Juntar pedidos (Trello #392; migration_lessons_6_merge) ──
+
+/** O professor propõe juntar pedidos numa aula. Só tem de aceitar o aluno a
+    quem muda a hora, o preço ou o tipo; se ninguém, fica logo marcada. */
+export async function proposeLessonMerge(requestIds, { startsAt, duration, type }) {
+  const { data, error } = await supabase.rpc('propose_lesson_merge', {
+    p_request_ids: requestIds, p_starts_at: startsAt, p_duration: duration, p_type: type,
+  })
+  if (error) throw error
+  return data
+}
+
+export async function answerLessonMerge(mergeId, accept) {
+  const { error } = await supabase.rpc('answer_lesson_merge', { p_merge_id: mergeId, p_accept: accept })
+  if (error) throw error
+}
+
+export async function cancelLessonMerge(mergeId) {
+  const { error } = await supabase.rpc('cancel_lesson_merge', { p_merge_id: mergeId })
+  if (error) throw error
+}
