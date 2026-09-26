@@ -1,13 +1,13 @@
 import { supabase } from './supabase.js'
 import { getGroupByJid, mixVisibleToGroup } from './groups.js'
-import { loadGame, getOpenMixes, formatDateTime, weekdayKeyPt, mixLocalParts, gameIdForMessage, labelableMixes, mixLabel } from './roster.js'
+import { loadGame, getOpenMixes, formatDateTime, weekdayKeyPt, mixLocalParts, gameIdForMessage, labelableMixes, mixLabel, buildMixMessage, recordMixMessage } from './roster.js'
 import { resolveProfileByPhoneJid, createGuestProfile, ensureMembership } from './phone.js'
 import { joinWithUnregisteredPartner } from './partnerInvite.js'
 import { config } from './config.js'
 import { helpText, helpFooter } from './messages.js'
 import { t } from './locales.js'
 import { startTimer } from './timing.js'
-import { repostHooks } from './sync.js'
+import { repostHooks, cardSentRecently, noteCardSent } from './sync.js'
 
 function stripAccents(str) {
   return str.normalize('NFD').replace(/[̀-ͯ]/g, '')
@@ -172,8 +172,9 @@ function formatMixListForReply(matches, allOpenMixes, lang) {
 /** A lista do «/mix»: além do número, dia e local, as vagas de cada um e se
  *  é de duplas fixas (onde se pode entrar em dupla). Uma consulta só para
  *  todos os mixes. */
-async function formatMixListWithSpots(openMixes, lang) {
-  const labelable = labelableMixes(openMixes)
+async function formatMixListWithSpots(openMixes, lang, allOpenMixes = openMixes) {
+  // A numeração vem da lista TODA dos abertos (a mesma dos cartões).
+  const labelable = labelableMixes(allOpenMixes)
   const { data: rows, error } = await supabase
     .from('participants')
     .select('game_id, partner_id')
@@ -500,9 +501,27 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     return
   }
 
+  // #552 — «mix» mostra o cartão completo de cada mix aberto (o mesmo do
+  // anúncio: vagas numeradas, inscritos, «Escreve In»), e responder «In» a
+  // um cartão inscreve nesse mix. Anti-bloqueio: um mix cujo cartão saiu há
+  // menos de 10 min vai só na lista curta; no máximo 5 cartões por «mix».
   if (action === 'mix') {
-    const list = await formatMixListWithSpots(openMixes, lang)
-    await reply('mix_list', { count: openMixes.length, list })
+    const MAX_CARDS = 5
+    const labelable = labelableMixes(openMixes)
+    const fresh = openMixes.filter((mix) => !cardSentRecently(groupJid, mix.id)).slice(0, MAX_CARDS)
+    const states = await Promise.all(fresh.map((mix) => loadGame(mix.id)))
+    for (const state of states) {
+      const text = buildMixMessage(state, { label: mixLabel(state.game, labelable) })
+      const messageId = await sendText(groupJid, text)
+      recordMixMessage(messageId, state.game.id)
+      noteCardSent(groupJid, state.game.id, text, messageId)
+    }
+    const freshIds = new Set(fresh.map((mix) => mix.id))
+    const rest = openMixes.filter((mix) => !freshIds.has(mix.id))
+    if (rest.length > 0) {
+      const list = await formatMixListWithSpots(rest, lang, openMixes)
+      await reply(states.length > 0 ? 'mix_list_more' : 'mix_list_recent', { count: rest.length, list })
+    }
     return
   }
 

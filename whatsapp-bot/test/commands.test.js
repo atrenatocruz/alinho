@@ -322,3 +322,49 @@ test('#554 parceiro que não está na app: «Sim» junta-o à inscrição que j�
   assert.ok(solo().partner_id, 'o parceiro fica na linha que já existia')
   assert.equal(db.partner_invites[0].participant_id, 'solo')
 })
+
+// ── #552: «mix» mostra o cartão completo de cada mix aberto ────────────────
+async function sayWithIds(text, quotedStanzaId = null, pn = '351911111111') {
+  const sent = []
+  let n = 0
+  await handleGroupMessage(
+    { groupJid: 'g@g.us', senderPn: `${pn}@s.whatsapp.net`, text, message: {}, quotedStanzaId },
+    { sendText: async (_g, t) => { sent.push({ id: `card-${Date.now()}-${++n}`, text: t }); return sent.at(-1).id } },
+  )
+  return sent
+}
+function threeMixes() {
+  db.games = ['m1', 'm2', 'm3'].map((id, i) => ({
+    id, organization_id: 'o', title: `Mix ${id}`, status: 'open', origin: 'manual',
+    date: new Date(Date.now() + (i + 1) * 864e5).toISOString(), num_courts: 1, max_players: 4, rotate_partners: false,
+  }))
+}
+
+test('#552 «mix» com 1 mix aberto: envia o cartão completo', async () => {
+  sync._resetGroupStateForTests()
+  const sent = await sayWithIds('mix')
+  assert.equal(sent.length, 1)
+  assert.match(sent[0].text, /\*Mix\*/)
+  assert.match(sent[0].text, /\(vaga livre\)/)
+})
+
+test('#552 «mix» com 3 mixes: 3 cartões numerados; «mix» repetido logo a seguir só dá a lista curta', async () => {
+  sync._resetGroupStateForTests()
+  threeMixes()
+  const first = await sayWithIds('mix')
+  assert.equal(first.length, 3)
+  assert.match(first[0].text, /Nº: 01/)
+  assert.match(first[2].text, /Nº: 03/)
+  const again = await sayWithIds('/mix')
+  assert.equal(again.length, 1)
+  assert.match(again[0].text, /saíram há pouco/)
+  assert.doesNotMatch(again[0].text, /\(vaga livre\)/)
+})
+
+test('#552 responder «In» a um cartão do «mix» inscreve nesse mix', async () => {
+  sync._resetGroupStateForTests()
+  threeMixes()
+  const cards = await sayWithIds('mix')
+  await sayWithIds('in', cards[1].id)
+  assert.deepEqual(db.participants.map((p) => p.game_id), ['m2'])
+})

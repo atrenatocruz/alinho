@@ -34,7 +34,7 @@ Em dupla:
 • *Out @parceiro* — sai só o parceiro, tu ficas
 • *Out* — o bot pergunta: 1. Dupla · 2. Só tu · 3. Parceiro
 
-Para veres os mixes abertos, com as vagas de cada um:
+Para veres o cartão de cada mix aberto (inscritos e vagas) — responde-lhe com *In* para entrares:
 • */mix*
 
 Se houver mais do que um mix aberto ao mesmo tempo, cada um tem a sua própria mensagem e um número (🔢 01, 02...). Para dizer a qual te referes:
@@ -108,6 +108,8 @@ Para veres esta lista:
   disambiguate_out: '🤖 Estás inscrito em vários mixes! De qual queres sair?\n\n{{list}}\n\nResponde à mensagem do mix que queres com *Out*, ou escreve *Out* seguido do número, dia, hora ou nível (ex.: *Out 01*).',
   // commands.js — «/mix» e entrar em dupla (A2N, 24 set)
   mix_list_spots: '👥 {{filled}}/{{capacity}}',
+  mix_list_recent: '🤖 Os cartões destes mixes saíram há pouco aqui no grupo — responde a esse cartão com *In*, ou escreve *In* e o número:\n\n{{list}}',
+  mix_list_more: '🤖 E mais {{count}}:\n\n{{list}}\n\nEscreve *In* e o número para entrares.',
   mix_list_fixed_pairs: ' · aceita duplas 🤝',
   pair_signup_off: '🤖 Este mix é só de inscrição individual — entra sozinho com *In* 🎾 As duplas são formadas no início.',
   disambiguate_in_pair: '🤖 Há vários mixes abertos! Em qual querem entrar?\n\n{{list}}\n\nEscreve o número e o parceiro outra vez (ex.: *In 01 com João* ou *In 01 @João*).',
@@ -148,7 +150,7 @@ As a pair:
 • *Out @partner* — only your partner leaves, you stay
 • *Out* — the bot asks: 1. Pair · 2. Just you · 3. Partner
 
-To see the open mixes and their free spots:
+To see the card of each open mix (players and free spots) — reply *In* to it to join:
 • */mix*
 
 If more than one mix is open at the same time, each one gets its own message and a number (🔢 01, 02...). To say which one you mean:
@@ -220,6 +222,8 @@ To see this list:
   not_in_any_open_mix: "🤖 You're not signed up for any open mix.",
   disambiguate_out: "🤖 You're signed up for several mixes! Which one do you want to leave?\n\n{{list}}\n\nReply to the mix you want with *Out*, or type *Out* followed by the number, weekday, time or level (e.g. *Out 01*).",
   mix_list_spots: '👥 {{filled}}/{{capacity}}',
+  mix_list_recent: "🤖 These mixes' cards went out here a moment ago — reply *In* to that card, or type *In* and the number:\n\n{{list}}",
+  mix_list_more: '🤖 And {{count}} more:\n\n{{list}}\n\nType *In* and the number to join.',
   mix_list_fixed_pairs: ' · pairs welcome 🤝',
   pair_signup_off: '🤖 This mix is individual sign-up only — join on your own with *In* 🎾 Pairs are formed when it starts.',
   disambiguate_in_pair: '🤖 There are several mixes open! Which one do you both want to join?\n\n{{list}}\n\nType the number and your partner again (e.g. *In 01 com João* or *In 01 @João*).',
