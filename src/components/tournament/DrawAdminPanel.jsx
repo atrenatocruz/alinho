@@ -343,7 +343,7 @@ function DrawStep({ category, onDone, onChangeFormat, t }) {
         <MonoLabel className="mb-1">{t('tournament.draw.preview_label')}</MonoLabel>
         <p className="mb-1.5 text-xs text-muted">{t('tournament.draw.knockout_note')}</p>
         {firstRound.map((m) => (
-          <div key={m.slot} className="mb-1.5 card !p-0 px-3 py-2 text-xs text-ink-900">
+          <div key={m.slot} className="mb-1.5 card !px-4 !py-3 text-xs text-ink-900">
             {byId[m.a]?.name || m.a} <span className="text-muted">×</span> {byId[m.b]?.name || m.b}
           </div>
         ))}
@@ -436,12 +436,12 @@ function DrawStep({ category, onDone, onChangeFormat, t }) {
 
       <MonoLabel className="mb-1">{t('tournament.draw.preview_label')}</MonoLabel>
       {payload.groups.map((g) => (
-        <div key={g.number} className="mb-1.5 card !p-0 px-3 py-2">
+        <div key={g.number} className="mb-1.5 card !px-4 !py-3">
           <b className="text-sm font-extrabold text-ink-900">{g.name}</b>
           {g.teams.map((id, i) => (
             <p key={id} className="mt-0.5 flex items-center gap-1.5 text-xs text-ink-900">
-              {i === 0 && <span className="font-mono text-xs text-[#4338A8]">{t('tournament.draw.seed_tag')}</span>}
               <span className="truncate">{byId[id]?.name || id}</span>
+              {i === 0 && <span className="shrink-0 rounded-full bg-[#E9E7FB] px-2 py-0.5 text-xs font-extrabold text-[#4338A8]">{t('tournament.draw.seed_tag')}</span>}
             </p>
           ))}
         </div>
@@ -485,7 +485,7 @@ function ClosedBox({ category, onReopened, t }) {
     onReopened(result)
   }
   return (
-    <div className="mb-3 card !p-0 px-3 py-2.5">
+    <div className="mb-3 card !px-4 !py-3">
       <b className="text-sm font-extrabold text-ink-900">{t('tournament.draw.closed_box_title')}</b>
       <p className="mt-0.5 text-xs text-ink-700">
         {[t('tournament.n.selected', { count: selected }), waitlist ? t('tournament.n.reserves', { count: waitlist }) : null].filter(Boolean).join(' · ')}
@@ -524,7 +524,7 @@ function DoneStep({ tournament, category, onDone, t }) {
 
   return (
     <div>
-      <div className="mb-2 card !p-0 px-3 py-2.5">
+      <div className="mb-2 card !px-4 !py-3">
         <b className="text-sm font-extrabold text-ink-900">{t('tournament.draw.done_title')}</b>
         <p className="mt-0.5 text-xs text-ink-700">
           {category.group_count
@@ -623,7 +623,7 @@ export default function DrawAdminPanel({ tournament, onBack, onEdit }) {
         ) : (
           categories.map((c) => (
             <button key={c.id} type="button" onClick={() => setPickedId(c.id)}
-              className="mb-1.5 flex w-full items-center justify-between gap-2 card !p-0 px-3 py-2.5 text-left">
+              className="mb-1.5 flex w-full items-center justify-between gap-2 card !px-4 !py-3 text-left">
               <span className="min-w-0">
                 <b className="block truncate text-sm font-extrabold text-ink-900">{c.code} · {c.name}</b>
                 <span className="font-mono text-xs text-muted">

@@ -370,7 +370,11 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
           <Field label={t('tournament.create.entries_until')} error={fieldError(DEADLINE_PROBLEMS)}>
             <div className="flex gap-2">
               <div className="min-w-0 flex-1">
-                <DateField value={draft.entries_close_at.slice(0, 10)} onChange={(v) => set({ entries_close_at: `${v}T${draft.entries_close_at.slice(11) || '23:59'}` })} />
+                {/* Escolher o dia fecha às 23:59 desse dia, em Lisboa (QA, 26 set).
+                    Antes mantinha a hora que lá estava: um prazo antigo em
+                    00:59 (guardado sem fuso antes do #487) fazia «5 out»
+                    virar 5 out 00:59, a véspera à noite. */}
+                <DateField value={draft.entries_close_at.slice(0, 10)} onChange={(v) => set({ entries_close_at: `${v}T23:59` })} />
               </div>
               <input type="time" className="input-field !w-[104px] !px-2" value={draft.entries_close_at.slice(11) || '23:59'} onChange={(e) => set({ entries_close_at: `${draft.entries_close_at.slice(0, 10)}T${e.target.value}` })} />
             </div>
@@ -444,10 +448,12 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
               options={[1, 2, 3].map((n) => ({ value: n, label: String(n) }))} />
           </Field>
 
-          {draft.categories.length > 0 && (
-            <div className="mt-3 rounded-ctrl border border-[#F5D6A8] bg-[#FFF7EC] p-2.5 text-xs text-ink-700">
+          {/* Só com dias e campos: antes disso a conta dava «0 h de campo» (QA,
+              26 set). É uma explicação, por isso texto normal. */}
+          {draft.categories.length > 0 && Math.round(hours) > 0 && (
+            <p className="mt-3 text-xs text-ink-500">
               {t('tournament.create.slots_vs_hours', { teams: totalSlots(draft.categories), hours: Math.round(hours) })}
-            </div>
+            </p>
           )}
         </>
       )}
@@ -478,7 +484,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
           <Field label={t('tournament.create.entries_until')} error={fieldError(DEADLINE_PROBLEMS)}>
             <div className="flex gap-2">
               <div className="min-w-0 flex-1">
-                <DateField value={draft.entries_close_at.slice(0, 10)} onChange={(v) => set({ entries_close_at: `${v}T${draft.entries_close_at.slice(11) || '23:59'}` })} />
+                <DateField value={draft.entries_close_at.slice(0, 10)} onChange={(v) => set({ entries_close_at: `${v}T23:59` })} />
               </div>
               <input type="time" className="input-field !w-[104px] !px-2" value={draft.entries_close_at.slice(11) || '23:59'} onChange={(e) => set({ entries_close_at: `${draft.entries_close_at.slice(0, 10)}T${e.target.value}` })} />
             </div>
