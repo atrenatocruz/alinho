@@ -384,6 +384,38 @@ const RPC_MOCKS = {
     : params?.p_player_id || params?.p_guest_name
       ? { entry_id: params.p_entry_id, status: 'validada', invite_token: params?.p_guest_name ? 'convite-troca' : null }
       : { __error: 'player_required' }),
+  // Jogo entre amigos, 2.ª entrega (#342). localStorage.mockFriendSession =
+  // 'waiting' (falta 1 responder) · 'ready' (todos aceitaram, sou o criador)
+  // · 'invited' (convidaram-me) · 'app' (como 'ready', com «A app faz»).
+  create_friend_match: () => 'fs-1',
+  get_friend_match: () => {
+    const mode = localStorage.getItem('mockFriendSession') || 'ready'
+    const me = MOCK_ADMIN_USER_ID
+    const inv = (id, name, rating, status, extra = {}) => ({ invitee_id: `i-${id}`, user_id: id, name, avatar_url: null, rating, gender: 'masculino', status, is_guest: false, is_creator: false, guest_email_sent: false, ...extra })
+    const creatorIsMe = mode !== 'invited'
+    const creator = creatorIsMe
+      ? inv(me, 'Admin (Dev)', 1450, 'accepted', { is_creator: true })
+      : inv('c-1', 'Rita Figueira', 1400, 'accepted', { is_creator: true })
+    return {
+      match: { id: 'fs-1', scheduled_date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), scheduled_time: '10:00:00', location: 'Clube Exemplo', court: 'Campo 3', teams_mode: mode === 'app' ? 'app' : 'manual' },
+      invitees: [
+        creator,
+        inv('u-tl', 'Tiago Lopes', 1500, 'accepted'),
+        inv('u-am', 'Ana Marques', 1100, mode === 'waiting' ? 'pending' : 'accepted', { gender: 'feminino' }),
+        inv('u-rc', 'Rui Costa', 1300, 'accepted'),
+        { invitee_id: 'i-g1', user_id: null, name: 'Zé Pinto', avatar_url: null, rating: null, gender: null, status: 'guest', is_guest: true, is_creator: false, guest_email_sent: true },
+        ...(creatorIsMe ? [] : [inv(me, 'Admin (Dev)', 1450, 'pending')]),
+      ],
+      games: [],
+    }
+  },
+  set_friend_match_teams: () => null,
+  add_friend_match_game: () => 'fs-g',
+  respond_friend_match_invite: (params) => (params?.p_accept ? 'accepted' : 'declined'),
+  list_my_friend_match_invites: () => (localStorage.getItem('mockFriendSession') === 'invited'
+    ? [{ match_id: 'fs-1', creator_name: 'Rita Figueira', scheduled_date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), scheduled_time: '10:00:00', location: 'Clube Exemplo', people: 6 }] : []),
+  list_my_friend_sessions: () => (['ready', 'waiting', 'app'].includes(localStorage.getItem('mockFriendSession'))
+    ? [{ match_id: 'fs-1', scheduled_date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), scheduled_time: '10:00:00', location: 'Clube Exemplo', court: 'Campo 3', is_creator: true, people: 5, accepted: localStorage.getItem('mockFriendSession') === 'waiting' ? 4 : 5, pending: localStorage.getItem('mockFriendSession') === 'waiting' ? 1 : 0 }] : []),
   tournament_invite_token: () => 'convite-jogador-2',
   tournament_invite_token_player1: () => 'convite-jogador-1',
   // A lista do organizador: um de cada estado, para se ver tudo num print.
@@ -868,7 +900,11 @@ const TABLE_MOCKS = {
       data: { game_title: 'Mix de Sábado', game_date: tomorrow8pm.toISOString(), partner_name: 'Rui Oliveira Gomes', actor_name: 'Marta Costa' } },
     { id: 'n3', kind: 'mix_removed', game_id: 'fake-game-1', created_at: new Date().toISOString(),
       data: { game_title: 'Mix de Terça', game_date: tomorrow8pm.toISOString() } },
-  ] : []).concat(LESSON_NOTICES()).concat(localStorage.getItem('mockTCorrection') === 'true' ? [
+  ] : []).concat(LESSON_NOTICES()).concat(localStorage.getItem('mockFriendSession') === 'invited' ? [
+    // Convite para um jogo entre amigos (#342).
+    { id: 'fn1', kind: 'friend_match_invite', game_id: null, created_at: new Date().toISOString(),
+      data: { match_id: 'fs-1', creator_name: 'Rita Figueira', scheduled_date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), scheduled_time: '10:00:00', location: 'Clube Exemplo' } },
+  ] : []).concat(localStorage.getItem('mockTCorrection') === 'true' ? [
     // Pedido de correção a chegar ao organizador (Trello #485, forma do Dev 3).
     { id: 'tc1', kind: 'tournament_correction_requested', game_id: null, created_at: new Date().toISOString(),
       data: { tournament_id: 'tour-smash-open', tournament_slug: 'smash-open-2026', tournament_name: 'Smash Open 2026',

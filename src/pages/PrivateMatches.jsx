@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton, EmptyState } from '../components/ui'
 import { formatDate } from '../lib/formatDate'
 import { describeError } from '../lib/errors'
+import FriendSessionsList from '../components/friends/FriendSessionsList'
 
 // The 3 slots that can be empty, filled by an app player, or filled by a
 // name-only guest — team_a_player1 is always the creator, always a real
@@ -337,6 +338,9 @@ export default function PrivateMatches() {
           </PrimaryButton>
         </Link>
       </div>
+
+      {/* Convites por responder e jogos à espera de equipas (#342). */}
+      <FriendSessionsList />
 
       {pending.length > 0 && (
         <div>

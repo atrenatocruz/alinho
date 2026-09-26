@@ -149,3 +149,111 @@ export const getPublicRankings = async () => {
   if (errorKind(error) !== 'not_ready') throw error
   return getGlobalRankings()
 }
+
+// ── Jogo entre amigos: convidar primeiro, equipas depois (#342, 2.ª entrega) ──
+// Funções do Dev 3 (supabase/migration_friend_match_invitees.sql). Uma
+// «sessão» tem uma raiz (o id do create) e um jogo por ronda; as equipas e
+// os jogos vêm sempre de volta do get_friend_match — a base de dados pode
+// reordenar (o lugar team_a_player1 tem de ser de alguém com conta).
+// Convidados: [{ user_id } | { guest_name, guest_email? }] — sem o criador.
+
+export const createFriendMatch = async ({
+  scheduledDate, scheduledTime = null, location = null, locationLatitude = null, locationLongitude = null,
+  rankedIntent, scoringFormat = 'pontos_simples', numSets = null, teamsMode = 'manual', invitees = [], court = null,
+}) => {
+  const args = {
+    p_scheduled_date: scheduledDate,
+    p_scheduled_time: scheduledTime || null,
+    p_location: location || null,
+    p_location_latitude: locationLatitude ?? null,
+    p_location_longitude: locationLongitude ?? null,
+    p_ranked_intent: rankedIntent,
+    p_scoring_format: scoringFormat,
+    p_num_sets: numSets || null,
+    p_teams_mode: teamsMode,
+    p_invitees: invitees,
+  }
+  // «Campo (opcional)»: só vai quando está preenchido — a função do Dev 3
+  // ganha p_court depois (pedido a 26 set); assim funciona antes e depois.
+  if (court) args.p_court = court
+  const { data, error } = await supabase.rpc('create_friend_match', args)
+  if (error) throw error
+  return data
+}
+
+export const addFriendMatchInvitees = async (matchId, invitees) => {
+  const { data, error } = await supabase.rpc('add_friend_match_invitees', { p_match_id: matchId, p_invitees: invitees })
+  if (error) throw error
+  return data
+}
+
+export const removeFriendMatchInvitee = async (inviteeId) => {
+  const { error } = await supabase.rpc('remove_friend_match_invitee', { p_invitee_id: inviteeId })
+  if (error) throw error
+}
+
+export const respondFriendMatchInvite = async (matchId, accept) => {
+  const { data, error } = await supabase.rpc('respond_friend_match_invite', { p_match_id: matchId, p_accept: accept })
+  if (error) throw error
+  return data
+}
+
+/** Equipas do jogo 1 (e o modo das duplas). `teamA`/`teamB`: [invitee_id, invitee_id]. */
+export const setFriendMatchTeams = async (matchId, { pairingMode, teamA, teamB }) => {
+  const { error } = await supabase.rpc('set_friend_match_teams', {
+    p_match_id: matchId, p_pairing_mode: pairingMode, p_team_a: teamA, p_team_b: teamB,
+  })
+  if (error) throw error
+}
+
+/** O jogo seguinte da sessão; devolve o id do jogo novo. */
+export const addFriendMatchGame = async (matchId, { teamA, teamB }) => {
+  const { data, error } = await supabase.rpc('add_friend_match_game', { p_match_id: matchId, p_team_a: teamA, p_team_b: teamB })
+  if (error) throw error
+  return data
+}
+
+/** { match, invitees: [...], games: [...] } — aceita a raiz ou o id de um jogo. */
+export const getFriendMatch = async (matchId) => {
+  const { data, error } = await supabase.rpc('get_friend_match', { p_match_id: matchId })
+  if (error) throw error
+  return data
+}
+
+export const listMyFriendMatchInvites = async () => {
+  const { data, error } = await supabase.rpc('list_my_friend_match_invites')
+  if (error) {
+    if (errorKind(error) === 'not_ready') return []
+    throw error
+  }
+  return data || []
+}
+
+/** O link do email (/convite-amigos/<token>); devolve o match_id. */
+export const claimFriendMatchInvite = async (token) => {
+  const { data, error } = await supabase.rpc('claim_friend_match_invite', { p_token: token })
+  if (error) throw error
+  return data
+}
+
+/** Depois de entrar: junta os convites guardados com o email da conta. */
+export const claimFriendMatchInvitesByEmail = async () => {
+  const { data, error } = await supabase.rpc('claim_friend_match_invites_by_email')
+  if (error) {
+    if (errorKind(error) === 'not_ready') return 0
+    throw error
+  }
+  return data || 0
+}
+
+/** As sessões ainda sem equipas em que estou (criador ou já aceitei):
+ *  [{ match_id, scheduled_date, scheduled_time, location, court, is_creator,
+ *  people, accepted, pending }]. Sem a migração, lista vazia. */
+export const listMyFriendSessions = async () => {
+  const { data, error } = await supabase.rpc('list_my_friend_sessions')
+  if (error) {
+    if (errorKind(error) === 'not_ready') return []
+    throw error
+  }
+  return data || []
+}

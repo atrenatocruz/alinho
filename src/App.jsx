@@ -64,6 +64,7 @@ const ForgotPassword = lazyPage(() => import('./pages/ForgotPassword'))
 const ResetPassword = lazyPage(() => import('./pages/ResetPassword'))
 const PrivateMatches = lazyPage(() => import('./pages/PrivateMatches'))
 const CreatePrivateMatch = lazyPage(() => import('./pages/CreatePrivateMatch'))
+const FriendSession = lazyPage(() => import('./pages/FriendSession'))
 const JoinPrivateMatch = lazyPage(() => import('./pages/JoinPrivateMatch'))
 const GroupMatches = lazyPage(() => import('./pages/GroupMatches'))
 const CreateGroupMatch = lazyPage(() => import('./pages/CreateGroupMatch'))
@@ -404,6 +405,15 @@ function AppRoutes() {
             </Guard>
           }
         />
+        {/* O link do email do jogo entre amigos (#342, 2.ª entrega). */}
+        <Route
+          path="/convite-amigos/:token"
+          element={
+            <Guard require="public" showSplash={showSplash}>
+              <ClaimInvite />
+            </Guard>
+          }
+        />
         <Route
           path="/convite/:token"
           element={
@@ -547,6 +557,16 @@ function AppRoutes() {
           element={
             <Guard require="privateMatches" showSplash={showSplash}>
               <CreatePrivateMatch />
+            </Guard>
+          }
+        />
+        {/* O jogo entre amigos antes de haver equipas: aceitar, e formar as
+            equipas quando todos aceitarem (#342, 2.ª entrega). */}
+        <Route
+          path="/jogos-privados/sessao/:id"
+          element={
+            <Guard require="privateMatches" showSplash={showSplash}>
+              <FriendSession />
             </Guard>
           }
         />

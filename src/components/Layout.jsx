@@ -11,13 +11,14 @@ import { hashPhone } from '../lib/hashPhone'
 import { listIncomingFollowRequests, acceptFollowRequest, removeFollow } from '../lib/follows'
 import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
 import { listIncomingOrganizationInvites, acceptOrganizationInvite, declineOrganizationInvite } from '../lib/orgInvites'
-import { getMyPrivateMatches, privateMatchActions } from '../lib/privateMatches'
+import { getMyPrivateMatches, privateMatchActions, claimFriendMatchInvitesByEmail } from '../lib/privateMatches'
 import { describeError } from '../lib/errors'
 import { listMyUnreadNotifications, markNotificationsRead, MIX_NOTICE_KINDS } from '../lib/notifications'
 import { kudosVoters, joinNames, MAX_KUDOS_VOTERS } from '../lib/kudos'
 import { listMyInvites as listMyTournamentInvites } from '../lib/tournamentSignup'
 import LessonNoticeRow, { LESSON_NOTICE_KINDS } from './lessons/LessonNoticeRow'
 import TournamentNoticeRow, { TOURNAMENT_NOTICE_KINDS } from './tournament/TournamentNoticeRow'
+import FriendInviteRow, { FRIEND_NOTICE_KINDS } from './friends/FriendInviteRow'
 import { formatDate } from '../lib/formatDate'
 import AccountDeletionPending from './AccountDeletionPending'
 
@@ -409,11 +410,23 @@ export default function Layout({ children }) {
   const [lessonNotices, setLessonNotices] = useState([])
   // Avisos do torneio (Trello #548): suplente que subiu para dentro.
   const [tournamentNotices, setTournamentNotices] = useState([])
+  // Convites para jogos entre amigos (#342): ficam até se responder.
+  const [friendNotices, setFriendNotices] = useState([])
+  // Quem criou conta por causa de um convite por email fica logo com o
+  // jogo: junta-se uma vez por sessão do browser (Dev 3, #342).
+  useEffect(() => {
+    if (!profile?.id || isGuest) return
+    try { if (sessionStorage.getItem('friendInvitesClaimed') === profile.id) return } catch { /* sem storage */ }
+    claimFriendMatchInvitesByEmail()
+      .then(() => { try { sessionStorage.setItem('friendInvitesClaimed', profile.id) } catch { /* sem storage */ } })
+      .catch((error) => console.error('Error claiming friend invites by email:', error))
+  }, [profile?.id, isGuest])
   useEffect(() => {
     if (!profile?.id || isGuest) {
       setMixNotices([])
       setLessonNotices([])
       setTournamentNotices([])
+      setFriendNotices([])
       return
     }
     let cancelled = false
@@ -423,6 +436,7 @@ export default function Layout({ children }) {
         setMixNotices(data.filter((n) => MIX_NOTICE_KINDS.includes(n.kind)))
         setLessonNotices(isLessonsEnabled ? data.filter((n) => LESSON_NOTICE_KINDS.includes(n.kind)) : [])
         setTournamentNotices(data.filter((n) => TOURNAMENT_NOTICE_KINDS.includes(n.kind)))
+        setFriendNotices(data.filter((n) => FRIEND_NOTICE_KINDS.includes(n.kind)))
       })
       .catch((error) => console.error('Error loading mix notices:', error))
     return () => {
@@ -480,7 +494,7 @@ export default function Layout({ children }) {
   }
 
   const joinRequestsTotal = joinRequestsByOrg.reduce((sum, org) => sum + org.count, 0)
-  const notificationsTotal = followRequests.length + joinRequestsTotal + orgInvites.length + privateMatchTodos.length + mixNotices.length + lessonNotices.length + tournamentInvites.length + tournamentNotices.length
+  const notificationsTotal = followRequests.length + joinRequestsTotal + orgInvites.length + privateMatchTodos.length + mixNotices.length + lessonNotices.length + tournamentInvites.length + tournamentNotices.length + friendNotices.length
 
   // `main` below is the app's only scrolling region (see the app-shell comment
   // on the root div) — the document itself never scrolls, so neither the browser
@@ -624,6 +638,9 @@ export default function Layout({ children }) {
                   ))}
                   {tournamentNotices.map((notice) => (
                     <TournamentNoticeRow key={notice.id} notice={notice} onOpen={openTournamentNotice} />
+                  ))}
+                  {friendNotices.map((notice) => (
+                    <FriendInviteRow key={notice.id} notice={notice} onOpen={() => setShowNotifications(false)} />
                   ))}
                   {tournamentInvites.map((inv) => (
                     <Link
