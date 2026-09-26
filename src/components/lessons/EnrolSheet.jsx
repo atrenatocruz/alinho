@@ -59,6 +59,8 @@ export default function EnrolSheet({ item, teacher, onClose, onSent }) {
             <span className="text-ink-700">{t('lessons.monthly_fee')}</span>
             <b className="text-ink-900">{t('lessons.per_month', { price: euros(item.price_month) })}</b>
           </div>
+          {/* Turma em promoção (#342): o aluno sabe que o preço é promocional. */}
+          {item.promo && <p className="text-xs font-extrabold text-ink-900">{t('lessons.promo_price')}</p>}
           {!adj.full && (
             <>
               <div className="flex justify-between gap-2 pt-1.5 border-t border-line">

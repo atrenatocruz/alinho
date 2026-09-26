@@ -119,7 +119,10 @@ export default function BracketTree({ rounds, entries, myIds = [] }) {
   const labelsOf = (m, round) => {
     const src = (side) => {
       const s = sourceOf(round, m.slot ?? m.bracket_slot ?? 1, side, present)
-      if (s) return t(`tournament.tree.winner_${s.round}`, { n: s.n })
+      // Com uma meia-final só não há «meia 2»: «Vencedor da meia-final».
+      if (s) return s.round === 'SF' && rounds.find((r) => r.round === 'SF')?.matches.length === 1
+        ? t('tournament.tree.winner_only_SF')
+        : t(`tournament.tree.winner_${s.round}`, { n: s.n })
       return (side === 'a' ? m.source_a : m.source_b) || t('tournament.draw.tbd')
     }
     return { a: src('a'), b: src('b') }

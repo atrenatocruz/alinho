@@ -20,7 +20,12 @@ export default function AllGamesPanel(props) {
   const { t } = useTranslation()
   const spinner = <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-7 w-7 border-[3px] border-ink-50 border-t-ink-700" /></div>
 
-  const built = SECTIONS.filter((key) => TOURNAMENT_PANELS[key])
+  // Só eliminatórias (formato com 0 grupos): a secção Grupos não aparece —
+  // mostrava «Grupos ainda não sorteados» num torneio que nunca os terá
+  // (QA, 26 set). Sem formato escolhido ainda, fica.
+  const format = props.category?.format
+  const noGroups = format && Number(format.groups) === 0
+  const built = SECTIONS.filter((key) => TOURNAMENT_PANELS[key] && !(key === 'groups' && noGroups))
   if (built.length === 0) {
     return (
       <div className="rounded-card border border-dashed border-line px-4 py-8 text-center">
