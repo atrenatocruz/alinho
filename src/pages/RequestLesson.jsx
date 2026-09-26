@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, GraduationCap } from 'lucide-react'
+import { getTeacherPage } from '../lib/lessonsApi'
+import { teacherContact } from '../lib/teacherContact'
 import { acceptLessonProposal, answerLessonMerge, cancelLessonRequest, emailLessonRequest, getTeacherBooking, proposeLessonTime, requestLesson } from '../lib/lessonsApi'
 import ProposeTimeSheet from '../components/lessons/ProposeTimeSheet'
 import {
@@ -34,6 +36,8 @@ export default function RequestLesson() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [data, setData] = useState(null)
+  // Contacto do professor e clube, para quando ainda não dá para pedir.
+  const [page, setPage] = useState(null)
   const [loading, setLoading] = useState(true)
   const [blockKey, setBlockKey] = useState(null)
   const [duration, setDuration] = useState(null)
@@ -53,6 +57,8 @@ export default function RequestLesson() {
   const load = async () => {
     try {
       setData(await getTeacherBooking(id))
+      const today = new Date().toISOString().slice(0, 10)
+      getTeacherPage(id, today, today).then((p) => setPage(p?.teacher || null)).catch(() => setPage(null))
     } catch (err) {
       if (errorKind(err) !== 'not_ready') console.error('Error loading booking:', err)
       setData(null)
@@ -63,6 +69,10 @@ export default function RequestLesson() {
   useEffect(() => { load() }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const blocks = useMemo(() => upcomingBlocks(data?.profiles || []), [data])
+  // Sem nenhum preço em nenhum dos dias: também não dá para pedir.
+  const noPrices = blocks.length > 0 && blocks.every((b) =>
+    availableDurations(b, (data?.profiles || []).find((p) => p.teacher_profile_id === b.tp)).length === 0)
+  const pageContact = teacherContact(page?.contact)
   const block = blocks.find((b) => b.key === blockKey) || null
   const profile = block ? data.profiles.find((p) => p.teacher_profile_id === block.tp) : null
   const durations = availableDurations(block, profile)
@@ -277,9 +287,27 @@ export default function RequestLesson() {
       <h2 className="text-2xl text-ink-900">{g('booking.title')}</h2>
 
       <section>
-        <span className={label}>{t('booking.day')}</span>
-        {blocks.length === 0 ? (
-          <p className="text-sm text-muted">{g('booking.no_days')}</p>
+        {!(blocks.length === 0 || noPrices) && <span className={label}>{t('booking.day')}</span>}
+        {blocks.length === 0 || noPrices ? (
+          /* Sem horário ou sem preços (aulas ligadas a 26 set, antes de os
+             professores preencherem): quem chega fala com ele diretamente. */
+          <div className="rounded-2xl border border-line bg-white p-3.5 space-y-2.5">
+            <p className="text-sm text-ink-900">{g(blocks.length === 0 ? 'booking.no_schedule_contact' : 'booking.no_prices_contact')}</p>
+            <div className="flex flex-wrap gap-2">
+              {pageContact && (
+                <a href={pageContact.href} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center min-h-[44px] px-4 rounded-full bg-ink-900 text-white text-sm font-extrabold">
+                  {t(`teacher.contact_${pageContact.kind}`)}
+                </a>
+              )}
+              {page?.org_slug && (
+                <button type="button" onClick={() => navigate(`/clube/${page.org_slug}`)}
+                  className="inline-flex items-center justify-center min-h-[44px] px-4 rounded-full border-[1.5px] border-line bg-white text-sm font-extrabold text-ink-900">
+                  {t('booking.see_club', { club: page.org_name })}
+                </button>
+              )}
+            </div>
+          </div>
         ) : (
           <div className="-mx-4 flex gap-2 overflow-x-auto no-scrollbar px-4">
             {blocks.map((b) => (
