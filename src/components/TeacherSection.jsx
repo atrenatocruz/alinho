@@ -5,6 +5,7 @@ import { ChevronRight, GraduationCap, Plus, Search, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { DAYS, listTeacherProfiles, requestTeacherProfile, withdrawTeacherProfile, searchClubsForTeacher } from '../lib/teachers'
 import { compactTime, isActiveTeacherProfile, scheduleFromRows } from '../lib/teacherSchedule'
+import { listMyTeacherRequests } from '../lib/lessonsApi'
 import { Avatar, ConfirmSheet } from './ui'
 import { describeError } from '../lib/errors'
 import { contemTexto } from '../lib/semAcentos'
@@ -32,6 +33,9 @@ export default function TeacherSection() {
   const [rows, setRows] = useState([])
   const [addingClub, setAddingClub] = useState(false)
   const [leaving, setLeaving] = useState(null) // perfil (clube) de que quer sair
+  // Pedidos de aula por responder (#392, assunto 2): o botão preto passa a
+  // «Ver pedidos · N novos». Sem a migração ou sem pedidos, fica 0.
+  const [newRequests, setNewRequests] = useState(0)
   const [showForm, setShowForm] = useState(false)
   const [orgId, setOrgId] = useState(NO_CLUB)
   const [zone, setZone] = useState('')
@@ -54,6 +58,11 @@ export default function TeacherSection() {
         .filter((p) => p.user_id === user.id)
         .sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')))
       setRows(own)
+      if (own.some(isActiveTeacherProfile)) {
+        listMyTeacherRequests()
+          .then((list) => setNewRequests(list.filter((r) => r.status === 'pending').length))
+          .catch(() => setNewRequests(0))
+      }
       setMine(own.find(isActiveTeacherProfile) || own[own.length - 1] || null)
     } catch (err) {
       console.error('Error loading teacher profile:', err)
@@ -239,14 +248,32 @@ export default function TeacherSection() {
           ) : (
             <p className="text-sm font-extrabold text-ink-900">{summary.join(' · ')}</p>
           )}
-          <button type="button" onClick={() => navigate('/perfil/professor')}
-            className="w-full min-h-[48px] rounded-full bg-ink-900 text-white font-extrabold hover:bg-ink-700 transition-colors duration-fast">
-            {summary.length === 0 ? t('teacher.schedule_make') : t('teacher.schedule_edit')}
-          </button>
-          <button type="button" onClick={() => navigate(`/professor/${active[0].id}`)}
-            className="w-full inline-flex items-center justify-center gap-1 text-sm font-extrabold text-ink-900 hover:underline">
-            {t('teacher.see_my_page')} <ChevronRight size={16} />
-          </button>
+          {newRequests > 0 ? (
+            <button type="button" onClick={() => navigate('/perfil/aulas')}
+              className="w-full min-h-[48px] rounded-full bg-ink-900 text-white font-extrabold hover:bg-ink-700 transition-colors duration-fast">
+              {t('teacher.see_requests', { count: newRequests })}
+            </button>
+          ) : (
+            <button type="button" onClick={() => navigate('/perfil/professor')}
+              className="w-full min-h-[48px] rounded-full bg-ink-900 text-white font-extrabold hover:bg-ink-700 transition-colors duration-fast">
+              {summary.length === 0 ? t('teacher.schedule_make') : t('teacher.schedule_edit')}
+            </button>
+          )}
+          {/* Por baixo: o outro caminho (horário ou as minhas aulas) e o perfil público. */}
+          <div className="flex items-center justify-between text-sm font-extrabold text-ink-900">
+            {newRequests > 0 ? (
+              <button type="button" onClick={() => navigate('/perfil/professor')} className="hover:underline">
+                {summary.length === 0 ? t('teacher.schedule_make') : t('teacher.schedule_edit')}
+              </button>
+            ) : (
+              <button type="button" onClick={() => navigate('/perfil/aulas')} className="hover:underline">
+                {t('myLessons.title')}
+              </button>
+            )}
+            <button type="button" onClick={() => navigate(`/professor/${active[0].id}`)} className="inline-flex items-center gap-0.5 hover:underline">
+              {t('teacher.my_profile_link')} <ChevronRight size={16} />
+            </button>
+          </div>
           <button type="button" onClick={() => setAsking('stop')} disabled={saving}
             className="w-full text-sm font-extrabold text-muted hover:text-ink-900 disabled:opacity-40">
             {t('teacher.stop_button')}

@@ -279,9 +279,131 @@ const welcome: Handler = async ({ admin, callerId, appUrl }) => {
   return { email, release }
 }
 
+// ── Aulas: pedidos (Trello #392; migration_lessons_4_teacher_responds.sql) ──
+// Tipos, dias e horas em Lisboa, iguais ao sino.
+const LESSON_TYPE_PT: Record<string, string> = { private: 'aula privada', duo: 'aula a 2', trio: 'aula a 3', quad: 'aula a 4' }
+const LESSON_TYPE_EN: Record<string, string> = { private: 'private lesson', duo: 'lesson for 2', trio: 'lesson for 3', quad: 'lesson for 4' }
+
+function lessonWhen(startsAt: string, minutes: number, en: boolean): string {
+  const start = new Date(startsAt)
+  const end = new Date(start.getTime() + minutes * 60000)
+  const locale = en ? 'en-GB' : 'pt-PT'
+  const day = new Intl.DateTimeFormat(locale, { timeZone: 'Europe/Lisbon', weekday: 'long', day: 'numeric', month: 'long' }).format(start)
+  const hm = (d: Date) => new Intl.DateTimeFormat(locale, { timeZone: 'Europe/Lisbon', hour: '2-digit', minute: '2-digit' }).format(d)
+  return `${day}, ${hm(start)}–${hm(end)}`
+}
+
+// Ao professor, quando chega um pedido. Quem chama é o aluno que acabou de o
+// enviar; claim_lesson_request_email só devolve a linha uma vez. O botão de
+// contacto é o que o aluno escolheu — WhatsApp (wa.me) ou email (mailto) —
+// sem o número escrito no texto.
+const lessonRequest: Handler = async ({ admin, callerId, appUrl, body }) => {
+  const requestId = body.request_id
+  if (typeof requestId !== 'string' || !UUID_RE.test(requestId)) return { skip: 'invalid_request' }
+
+  const { data, error } = await admin.rpc('claim_lesson_request_email', { p_request_id: requestId, p_caller_id: callerId })
+  if (error) throw error
+  const req = data?.[0]
+  if (!req) return { skip: 'nothing_to_send' }
+
+  const release = async () => {
+    const { error: releaseError } = await admin.from('lesson_requests').update({ teacher_emailed_at: null }).eq('id', requestId)
+    if (releaseError) console.error('Failed to release lesson request email claim:', releaseError)
+  }
+
+  const [{ data: teacher, error: tErr }, { data: student, error: sErr }] = await Promise.all([
+    admin.auth.admin.getUserById(req.teacher_user_id),
+    admin.auth.admin.getUserById(req.student_user_id),
+  ])
+  if (tErr || sErr) { await release(); throw tErr || sErr }
+  const to = teacher?.user?.email
+  if (!isDeliverable(to)) return { skip: 'no_deliverable_address' }
+
+  const en = req.teacher_language === 'en'
+  const name = escapeHtml(req.student_name || '')
+  const when = escapeHtml(lessonWhen(req.starts_at, req.duration_minutes, en))
+  const type = escapeHtml((en ? LESSON_TYPE_EN : LESSON_TYPE_PT)[req.lesson_type] || req.lesson_type)
+  const club = req.org_name ? escapeHtml(req.org_name) : ''
+  const price = req.price_per_person != null ? `${Number(req.price_per_person)} €` : ''
+  const contactUrl = req.contact_via === 'whatsapp' && req.contact_phone
+    ? `https://wa.me/${req.contact_phone}`
+    : (isDeliverable(student?.user?.email) ? `mailto:${student.user.email}` : '')
+  const contactLabel = req.contact_via === 'whatsapp'
+    ? (en ? 'Chat on WhatsApp' : 'Falar no WhatsApp')
+    : (en ? 'Send email' : 'Mandar email')
+  const details = [when, `${type}${price ? ` · ${price} ${en ? 'per person' : 'por pessoa'}` : ''}`, club].filter(Boolean).join('<br>')
+  const contact = contactUrl ? `<a href="${escapeHtml(contactUrl)}" style="color:#040404;font-weight:700;">${contactLabel}</a>` : ''
+
+  const email: Outgoing = {
+    to,
+    subject: en ? `New lesson request · ${req.student_name}` : `Novo pedido de aula · ${req.student_name}`,
+    html: renderLayout({
+      heading: en ? `${name} asked you for a lesson` : `${name} pediu-te uma aula`,
+      paragraphs: [details, ...(contact ? [contact] : [])],
+      ctaLabel: en ? 'See request' : 'Ver pedido',
+      ctaUrl: `${appUrl}/perfil/aulas`,
+      footnote: en
+        ? 'You get this email because you are a coach on alinho. The student chose how you contact them; the contact is deleted when the request closes.'
+        : 'Recebes este email porque és professor no alinho. O aluno escolheu como falas com ele; o contacto apaga-se quando o pedido fecha.',
+    }),
+  }
+  return { email, release }
+}
+
+// Ao aluno, quando o professor responde, se o aluno escolheu «Por email».
+// Quem chama é o professor desse pedido; uma vez por estado.
+const lessonRequestStudent: Handler = async ({ admin, callerId, appUrl, body }) => {
+  const requestId = body.request_id
+  if (typeof requestId !== 'string' || !UUID_RE.test(requestId)) return { skip: 'invalid_request' }
+
+  const { data, error } = await admin.rpc('claim_lesson_request_student_email', { p_request_id: requestId, p_caller_id: callerId })
+  if (error) throw error
+  const req = data?.[0]
+  if (!req) return { skip: 'nothing_to_send' }
+
+  const release = async () => {
+    const { error: releaseError } = await admin.from('lesson_requests').update({ student_emailed_for: null }).eq('id', requestId)
+    if (releaseError) console.error('Failed to release student lesson email claim:', releaseError)
+  }
+
+  const { data: student, error: sErr } = await admin.auth.admin.getUserById(req.student_user_id)
+  if (sErr) { await release(); throw sErr }
+  const to = student?.user?.email
+  if (!isDeliverable(to)) return { skip: 'no_deliverable_address' }
+
+  const en = req.student_language === 'en'
+  const teacher = escapeHtml(req.teacher_name || '')
+  const when = escapeHtml(lessonWhen(req.starts_at, req.duration_minutes, en))
+  const club = req.org_name ? ` · ${escapeHtml(req.org_name)}` : ''
+  const accepted = req.status === 'accepted'
+
+  const email: Outgoing = {
+    to,
+    subject: accepted
+      ? (en ? `${req.teacher_name} accepted your lesson` : `${req.teacher_name} aceitou a tua aula`)
+      : (en ? `${req.teacher_name} can't give that lesson` : `${req.teacher_name} não pode dar essa aula`),
+    html: renderLayout({
+      heading: accepted
+        ? (en ? `Your lesson with ${teacher} is booked` : `A tua aula com ${teacher} está marcada`)
+        : (en ? `${teacher} can't give that lesson` : `${teacher} não pode dar essa aula`),
+      paragraphs: [`${when}${club}`, accepted
+        ? (en ? 'The coach books the court with the club. You don’t need to.' : 'O campo é marcado pelo professor com o clube: não precisas de reservar.')
+        : (en ? 'You can ask for another time.' : 'Podes pedir outra hora.')],
+      ctaLabel: accepted ? (en ? 'See lesson' : 'Ver a aula') : (en ? 'Open alinho' : 'Abrir o alinho'),
+      ctaUrl: accepted && req.lesson_id ? `${appUrl}/aula/${req.lesson_id}` : appUrl,
+      footnote: en
+        ? 'You get this email because you asked for a lesson on alinho and chose to be contacted by email.'
+        : 'Recebes este email porque pediste uma aula no alinho e escolheste ser contactado por email.',
+    }),
+  }
+  return { email, release }
+}
+
 const handlers: Record<string, Handler> = {
   organization_invite: organizationInvite,
   welcome,
+  lesson_request: lessonRequest,
+  lesson_request_student: lessonRequestStudent,
 }
 
 async function sendWithResend(apiKey: string, email: Outgoing): Promise<void> {
