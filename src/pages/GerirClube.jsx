@@ -763,6 +763,8 @@ export default function GerirClube() {
     setAvisoCriado('')
     setCreatedMixScope(null)
     if (tipo === 'mix') { setCriar(null); setShowCreateGame(true); return }
+    // O torneio abre numa página só do formulário (ponto 0, 26 set).
+    if (tipo === 'torneio') { navigate(`/gerir/${slug}/criar/torneio`); return }
     setShowCreateGame(false)
     setCriar(tipo)
   }

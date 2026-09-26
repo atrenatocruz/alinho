@@ -68,6 +68,7 @@ const JoinPrivateMatch = lazyPage(() => import('./pages/JoinPrivateMatch'))
 const GroupMatches = lazyPage(() => import('./pages/GroupMatches'))
 const CreateGroupMatch = lazyPage(() => import('./pages/CreateGroupMatch'))
 const Gerir = lazyPage(() => import('./pages/Gerir'))
+const CreateTournamentPage = lazyPage(() => import('./pages/CreateTournamentPage'))
 const GerirClube = lazyPage(() => import('./pages/GerirClube'))
 const Instructions = lazyPage(() => import('./pages/Instructions'))
 const PrivacyPolicy = lazyPage(() => import('./pages/PrivacyPolicy'))
@@ -558,6 +559,15 @@ function AppRoutes() {
           element={
             <Guard require="protected" showSplash={showSplash}>
               <GerirClube />
+            </Guard>
+          }
+        />
+        {/* Criar um torneio numa página só do formulário (ponto 0, 26 set). */}
+        <Route
+          path="/gerir/:slug/criar/torneio"
+          element={
+            <Guard require="protected" showSplash={showSplash}>
+              <CreateTournamentPage />
             </Guard>
           }
         />
