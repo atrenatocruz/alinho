@@ -222,13 +222,20 @@ function levelMixes() {
   ]
 }
 
-for (const [text, gameId] of [['in mx4', 'gx'], ['in m4', 'gm'], ['in f3', 'gf'], ['in n2', 'gn'], ['inmx4', 'gx'], ['in F3', 'gf']]) {
+for (const [text, gameId] of [['in mx4', 'gx'], ['in m4', 'gm'], ['in f3', 'gf'], ['inmx4', 'gx'], ['in F3', 'gf']]) {
   test(`«${text}» entra no mix com esse nível`, async () => {
     levelMixes()
     await say(text)
     assert.deepEqual(db.participants.map((p) => p.game_id), [gameId])
   })
 }
+
+test('«in n2» já não é um nível (sem N — decisão do Francisco)', async () => {
+  levelMixes()
+  const out = await say('in n2')
+  assert.equal(db.participants.length, 0)
+  assert.match(out, /Não encontrei nenhum mix/)
+})
 
 test('o filtro de nível do grupo aceita os níveis novos e não liga a maiúsculas', async () => {
   const { mixVisibleToGroup } = await import('../src/groups.js')
