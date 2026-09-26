@@ -926,6 +926,7 @@
   "gamedetails.add_test_player": "Adicionar jogador de teste",
   "gamedetails.add_test_player_waitlist": "Adicionar jogador de teste como suplente",
   "gamedetails.gender_restricted_message": "Este mix é {{restriction}} — não podes entrar.",
+  "gamedetails.gender_body": "Este mix é {{restriction}}, por isso precisamos de saber o teu género antes de te inscrever. Fica guardado no teu perfil.",
   "gamedetails.age_restricted_message": "Este mix é só para o escalão {{restriction}} — não podes entrar.",
   "gamedetails.age_needs_birthday": "Este mix é só para o escalão {{restriction}}. Indica a tua data de nascimento para poderes entrar.",
   "gamedetails.age_add_birthday": "Indicar data de nascimento",
