@@ -23,6 +23,10 @@ const MIX_LIST_WORDS = ['mix', 'mixes', 'mixs', '/mix', '/mixes', '/mixs']
 // matching the same text — matters for the glued (no-space) parse below.
 const ACTION_WORDS = [...IN_WORDS, ...OUT_WORDS].sort((a, b) => b.length - a.length)
 const WEEKDAY_KEYS = ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo']
+// Níveis dos mixes: M (masculino), F (feminino), N (sem sexo) e MX (misto),
+// de 1 a 6 — «In mx4», «In f3», «In n2» (Renato, 26 set). Em minúsculas,
+// porque o texto já chega normalizado.
+const LEVEL_TOKEN = /^(mx|m|f|n)[1-6]$/
 
 // Shape-only check, no DB access yet — just enough to tell "in7291"/"in01"
 // (a real identifier glued on) apart from "interessante"/"inscrevi-me"
@@ -34,7 +38,7 @@ function looksLikeIdentifier(rest) {
   return (
     /^\d{1,4}$/.test(rest) ||
     WEEKDAY_KEYS.includes(rest) ||
-    /^m[1-6]$/.test(rest) ||
+    LEVEL_TOKEN.test(rest) ||
     /^\d{1,2}h\d{0,2}$/.test(rest) ||
     /^\d{1,2}:\d{2}$/.test(rest) ||
     /^\d{1,2}\/\d{1,2}$/.test(rest)
@@ -196,7 +200,7 @@ function mixMatchesToken(mix, token, label) {
 
   if (WEEKDAY_KEYS.includes(token) && weekdayKeyPt(mix.date) === token) return true
 
-  if (/^m[1-6]$/.test(token) && mix.level && mix.level.toLowerCase() === token) return true
+  if (LEVEL_TOKEN.test(token) && mix.level && mix.level.toLowerCase() === token) return true
 
   const hhmm = token.match(/^(\d{1,2})h(\d{0,2})$/) || token.match(/^(\d{1,2}):(\d{2})$/)
   if (hhmm) {

@@ -207,3 +207,35 @@ test('«In @parceiro» com conta registada fora do clube: o parceiro também pas
   assert.deepEqual(db.participants.map((p) => [p.user_id, p.partner_id]), [['a', 'r']])
   assert.ok(db.memberships.some((m) => m.user_id === 'r' && m.organization_id === 'o'), 'a Rita tem de ficar membro do clube')
 })
+
+// ── Níveis novos: F (feminino), N (sem sexo), MX (misto) — Renato, 26 set ──
+function levelMixes() {
+  db.games = [
+    { id: 'gm', organization_id: 'o', title: 'Mix A', status: 'open', origin: 'manual', level: 'M4',
+      date: new Date(Date.now() + 1 * 864e5).toISOString(), num_courts: 1, max_players: 4, rotate_partners: false },
+    { id: 'gx', organization_id: 'o', title: 'Mix B', status: 'open', origin: 'manual', level: 'MX4',
+      date: new Date(Date.now() + 2 * 864e5).toISOString(), num_courts: 1, max_players: 4, rotate_partners: false },
+    { id: 'gf', organization_id: 'o', title: 'Mix C', status: 'open', origin: 'manual', level: 'F3',
+      date: new Date(Date.now() + 3 * 864e5).toISOString(), num_courts: 1, max_players: 4, rotate_partners: false },
+    { id: 'gn', organization_id: 'o', title: 'Mix D', status: 'open', origin: 'manual', level: 'N2',
+      date: new Date(Date.now() + 4 * 864e5).toISOString(), num_courts: 1, max_players: 4, rotate_partners: false },
+  ]
+}
+
+for (const [text, gameId] of [['in mx4', 'gx'], ['in m4', 'gm'], ['in f3', 'gf'], ['in n2', 'gn'], ['inmx4', 'gx'], ['in F3', 'gf']]) {
+  test(`«${text}» entra no mix com esse nível`, async () => {
+    levelMixes()
+    await say(text)
+    assert.deepEqual(db.participants.map((p) => p.game_id), [gameId])
+  })
+}
+
+test('o filtro de nível do grupo aceita os níveis novos e não liga a maiúsculas', async () => {
+  const { mixVisibleToGroup } = await import('../src/groups.js')
+  const group = { levels: ['MX4', 'N2'] }
+  assert.equal(mixVisibleToGroup({ level: 'MX4' }, group), true)
+  assert.equal(mixVisibleToGroup({ level: 'mx4' }, group), true)
+  assert.equal(mixVisibleToGroup({ level: 'N2' }, group), true)
+  assert.equal(mixVisibleToGroup({ level: 'M4' }, group), false)
+  assert.equal(mixVisibleToGroup({ level: 'F3' }, { levels: ['f3'] }), true)
+})

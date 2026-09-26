@@ -38,7 +38,7 @@ Para veres os mixes abertos, com as vagas de cada um:
 
 Se houver mais do que um mix aberto ao mesmo tempo, cada um tem a sua própria mensagem e um número (🔢 01, 02...). Para dizer a qual te referes:
 • Responde à mensagem desse mix com *In* ou *Out*
-• Ou escreve *In 01*, *In segunda*, *In m4* — dá para combinar, ex.: *In segunda m4* ou *In 01 com João*
+• Ou escreve *In 01*, *In segunda*, *In m4* (nível: m, f, n ou mx + 1–6) — dá para combinar, ex.: *In segunda m4* ou *In 01 com João*
 
 Se o mix estiver cheio, o bot pergunta se queres entrar como suplente — responde *Sim* ou *Não*. Quando alguém sair, o primeiro suplente entra automaticamente. (Em dupla não há suplentes: a dupla precisa de duas vagas livres.)
 
@@ -150,7 +150,7 @@ To see the open mixes and their free spots:
 
 If more than one mix is open at the same time, each one gets its own message and a number (🔢 01, 02...). To say which one you mean:
 • Reply to that mix's message with *In* or *Out*
-• Or type *In 01*, *In segunda* (weekday), *In m4* (level) — you can combine them, e.g. *In segunda m4* or *In 01 com João*
+• Or type *In 01*, *In segunda* (weekday), *In m4* (level: m, f, n or mx + 1–6) — you can combine them, e.g. *In segunda m4* or *In 01 com João*
 
 If the mix is full, the bot asks if you want to join as a substitute — reply *Sim* or *Não*. When someone leaves, the first substitute joins automatically. (Pairs have no substitute list: a pair needs two free spots.)
 
