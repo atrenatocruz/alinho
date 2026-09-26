@@ -23,10 +23,10 @@ const MIX_LIST_WORDS = ['mix', 'mixes', 'mixs', '/mix', '/mixes', '/mixs']
 // matching the same text — matters for the glued (no-space) parse below.
 const ACTION_WORDS = [...IN_WORDS, ...OUT_WORDS].sort((a, b) => b.length - a.length)
 const WEEKDAY_KEYS = ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo']
-// Níveis dos mixes: M (masculino), F (feminino), N (sem sexo) e MX (misto),
-// de 1 a 6 — «In mx4», «In f3», «In n2» (Renato, 26 set). Em minúsculas,
-// porque o texto já chega normalizado.
-const LEVEL_TOKEN = /^(mx|m|f|n)[1-6]$/
+// Níveis dos mixes: M (masculino), F (feminino) e MX (misto), de 1 a 6 —
+// «In mx4», «In f3» (Renato, 26 set; sem N, decisão do Francisco —
+// migration_niveis_mx.sql). Em minúsculas, porque o texto já chega normalizado.
+const LEVEL_TOKEN = /^(mx|m|f)[1-6]$/
 
 // Shape-only check, no DB access yet — just enough to tell "in7291"/"in01"
 // (a real identifier glued on) apart from "interessante"/"inscrevi-me"

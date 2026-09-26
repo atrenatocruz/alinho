@@ -6,6 +6,7 @@ import {
 } from './devMockTournament'
 import { TOURNAMENT_DRAW_TABLE_MOCKS, TOURNAMENT_DRAW_RPC_MOCKS } from './devMockTournamentDraw'
 import { CLUB_PAGE_RPC_MOCKS, CLUB_PAGE_TABLE_MOCKS } from './devMockClubPage'
+import { BRACKET_TABLE_MOCKS } from './devMockBracket'
 
 // Dev-only: quando a sessão é o atalho "Entrar como Admin (Dev)"
 // (AuthContext.jsx, MOCK_ADMIN_KEY), essa sessão nunca teve um auth.uid()
@@ -423,6 +424,10 @@ const RPC_MOCKS = {
     ? { guest_name: 'José Metello', game_id: 'fake-game-1', game_title: 'Mix de Quinta-feira', inviter_name: 'Nuno Reis', status: localStorage.getItem('mockPartnerClaim') }
     : null),
   claim_partner_invite: () => (localStorage.getItem('mockClaimError') ? { __error: localStorage.getItem('mockClaimError') } : 'fake-game-1'),
+  // «Já estás neste mix?» (26 set): mockWaLookalike = 'true' — um convidado
+  // do WhatsApp parecido comigo no mix.
+  whatsapp_lookalike_in_game: () => (localStorage.getItem('mockWaLookalike') === 'true'
+    ? [{ participant_id: 'wa-p1', guest_user_id: 'wa-g1', name: 'J. S. S. R.', as_partner: false }] : []),
   tournament_invite_token: () => 'convite-jogador-2',
   tournament_invite_token_player1: () => 'convite-jogador-1',
   // A lista do organizador: um de cada estado, para se ver tudo num print.
@@ -596,7 +601,8 @@ const AGENDA_GAMES = () => [
     id: 'ag-mine-today', organization_id: MOCK_CLUB_ID, title: 'Mix de terça', date: atDay(0, 19).toISOString(),
     location: 'Smash Padel, Parque das Nações', status: 'open', origin: 'admin', format: 'sobe_desce', num_courts: 4,
     max_players: 16, price_per_player: 8, prize: 'Bolas Head', gender_restriction: 'masculino', age_restriction: 'plus35',
-    level: 'M3', recurrence_id: 'rec-1', organization: { name: 'Smash Padel Almada', kind: 'club', group_logo_url: null },
+    // localStorage.mockMixLevels = 'true': os níveis novos (#577), um Misto 4 e um F3.
+    level: localStorage.getItem('mockMixLevels') === 'true' ? 'MX4' : 'M3', recurrence_id: 'rec-1', organization: { name: 'Smash Padel Almada', kind: 'club', group_logo_url: null },
     participants: [
       { id: 'p1', user_id: MOCK_ADMIN_USER_ID, partner_id: null, status: 'confirmed', user: ADMIN_PERSON },
       { id: 'p2', user_id: FAKE_MEMBER_ID, partner_id: FAKE_PARTNER_ID, status: 'confirmed', user: person(FAKE_MEMBER_ID), partner: person(FAKE_PARTNER_ID) },
@@ -1034,7 +1040,7 @@ const TABLE_MOCKS = {
     price_per_player: 8,
     prize: null,
     gender_restriction: 'indiferente',
-    level: null,
+    level: localStorage.getItem('mockMixLevels') === 'true' ? 'F3' : null,
     recurrence_id: null,
     ...(eventState() ? {
       title: '+1 Mix de Quinta-feira', recurrence_id: 'rec-ev', num_courts: 2, max_players: 8, price_per_player: 11.5,
@@ -1115,6 +1121,25 @@ const SERIES_ORIGIN_MIX = () => {
   const d = new Date(next.date); d.setDate(d.getDate() - 7)
   return { ...next, id: 'fake-series-origin', date: d.toISOString(), status: 'open', is_recurrence_origin: true, launch_at: null }
 }
+// localStorage.mockSeriesPast = 'true' (com mockSeriesNext) — a página da
+// série (ações do evento, 26 set): o de hoje com inscritos e quatro já jogados.
+const SERIES_PAST_MIXES = () => {
+  const origin = SERIES_ORIGIN_MIX()
+  const d0 = new Date(); d0.setHours(20, 0, 0, 0)
+  const who = (n) => Array.from({ length: n }, (_, i) => ({ id: `sp${i}`, user_id: `spu${i}`, partner_id: null, status: 'confirmed' }))
+  const today = { ...origin, date: d0.toISOString(), participants: who(6) }
+  const past = [1, 2, 3, 4].map((w) => {
+    const d = new Date(d0); d.setDate(d.getDate() - 7 * w)
+    return { ...origin, id: `fake-series-past-${w}`, date: d.toISOString(), status: 'finished', is_recurrence_origin: w === 4, participants: who(8 - (w % 2) * 2) }
+  })
+  return [{ ...today, is_recurrence_origin: false }, ...past].map((g) => ({ ...g, title: 'Mix da semana' }))
+}
+// Na página da série, a data por abrir fica a uma semana da de hoje.
+const SERIES_PAST_NEXT = () => {
+  const d = new Date(); d.setDate(d.getDate() + 7); d.setHours(20, 0, 0, 0)
+  const launch = new Date(d); launch.setDate(launch.getDate() - 2)
+  return { ...SERIES_NEXT_MIX(), title: 'Mix da semana', date: d.toISOString(), launch_at: launch.toISOString() }
+}
 RPC_MOCKS.skip_recurrence_game = () => { const d = new Date(); d.setDate(d.getDate() + 13); d.setHours(20, 0, 0, 0); return d.toISOString() }
 // mockEnsureStatus = 'ended' | 'no_base' — o que a base responde ao criar o
 // próximo Mix em falta; mockNoPending = 'true' — a série sem próximo Mix.
@@ -1123,7 +1148,11 @@ TABLE_MOCKS.games = (url) => {
   let rows = gamesSemFiltro(url)
   const u = decodeURIComponent(url)
   if (localStorage.getItem('mockMixDraft') === 'true' && Array.isArray(rows) && !/[?&]id=eq\./.test(u)) rows = [...rows, DRAFT_MIX()]
-  if (localStorage.getItem('mockSeriesNext') === 'true' && Array.isArray(rows) && !/[?&]id=eq\./.test(u)) rows = [...rows, ...(localStorage.getItem('mockSeriesOrigin') === 'false' ? [] : [SERIES_ORIGIN_MIX()]), SERIES_NEXT_MIX()]
+  if (localStorage.getItem('mockSeriesNext') === 'true' && Array.isArray(rows) && !/[?&]id=eq\./.test(u)) {
+    const others = localStorage.getItem('mockSeriesPast') === 'true' ? SERIES_PAST_MIXES()
+      : localStorage.getItem('mockSeriesOrigin') === 'false' ? [] : [SERIES_ORIGIN_MIX()]
+    rows = [...rows, ...others, localStorage.getItem('mockSeriesPast') === 'true' ? SERIES_PAST_NEXT() : SERIES_NEXT_MIX()]
+  }
   // localStorage.mockOpenGameEmpty = 'true' — um jogo em aberto sem ninguém
   // inscrito no Gerir, para ver o «Cancelar» na janela da app.
   if (localStorage.getItem('mockOpenGameEmpty') === 'true' && /origin=eq\.open_slot/.test(u)) {
@@ -1141,7 +1170,8 @@ TABLE_MOCKS.games = (url) => {
 }
 
 // Inscritos com duplas (mockMixPairs, 26 set): 'mixed' = 2 duplas e 3
-// sozinhos (o 7/8 do Francisco); 'pairs' = só duplas; 'mine' = eu numa dupla.
+// sozinhos (o 7/8 do Francisco); 'pairs' = só duplas; 'mine' = eu numa dupla;
+// 'solos' = 8 inscritos e nenhuma dupla (o M4 de terça do A2N).
 const participantsSemFiltro = TABLE_MOCKS.participants
 TABLE_MOCKS.participants = (url) => {
   const mode = localStorage.getItem('mockMixPairs')
@@ -1153,6 +1183,7 @@ TABLE_MOCKS.participants = (url) => {
   const rui = who('mp-rui', 'Rui Costa'); const ana = who('mp-ana', 'Ana Marques'); const tl = who('mp-tl', 'Tiago Lopes')
   const pedro = who('mp-pedro', 'Pedro Lima'); const joao = who('mp-joao', 'João Neves'); const marta = who('mp-marta', 'Marta Silva')
   const nuno = who('mp-nuno', 'Nuno Reis'); const me = who(MOCK_ADMIN_USER_ID, 'Admin (Dev)')
+  if (mode === 'solos') return [rui, ana, tl, pedro, joao, marta, nuno, who('mp-ze', 'Zé Pinto')].map((x, k) => row(k + 1, x))
   if (mode === 'pairs') return [row(1, rui, ana), row(2, tl, pedro), row(3, joao, marta), row(4, nuno, who('mp-ze', 'Zé Pinto'))]
   if (mode === 'mine') return [row(1, rui, ana), row(2, me, tl), row(3, pedro), row(4, joao)]
   return [row(1, rui, ana), row(2, pedro), row(3, tl, joao), row(4, marta), row(5, nuno)]
@@ -1165,7 +1196,7 @@ for (const [name, fn] of [...Object.entries(TOURNAMENT_CLOSE_RPC_MOCKS), ...Obje
   const before = RPC_MOCKS[name]
   RPC_MOCKS[name] = (params) => fn(params, before) ?? before?.(params) ?? null
 }
-for (const [name, fn] of [...Object.entries(TOURNAMENT_CLOSE_TABLE_MOCKS), ...Object.entries(TOURNAMENT_SCORE_TODAY_TABLE_MOCKS), ...Object.entries(CLUB_PAGE_TABLE_MOCKS), ...Object.entries(TOURNAMENT_GROUPS_DONE_TABLE_MOCKS), ...Object.entries(TOURNAMENT_PROMOTED_TABLE_MOCKS)]) {
+for (const [name, fn] of [...Object.entries(TOURNAMENT_CLOSE_TABLE_MOCKS), ...Object.entries(TOURNAMENT_SCORE_TODAY_TABLE_MOCKS), ...Object.entries(CLUB_PAGE_TABLE_MOCKS), ...Object.entries(TOURNAMENT_GROUPS_DONE_TABLE_MOCKS), ...Object.entries(TOURNAMENT_PROMOTED_TABLE_MOCKS), ...Object.entries(BRACKET_TABLE_MOCKS)]) {
   const before = TABLE_MOCKS[name]
   TABLE_MOCKS[name] = (url) => fn(url, before) ?? before?.(url) ?? []
 }
