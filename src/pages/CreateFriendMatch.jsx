@@ -13,7 +13,7 @@ import InviteesStep, { MIN_PEOPLE } from '../components/friends/InviteesStep'
 
 const NUM_SETS_OPTIONS = Array.from({ length: 8 }, (_, i) => i + 2) // 2..9
 
-export default function CreatePrivateMatch() {
+export default function CreateFriendMatch() {
   const goBack = useGoBack('/jogos-privados')
   const { t } = useTranslation()
   const { profile } = useAuth()
