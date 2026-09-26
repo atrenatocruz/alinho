@@ -11,6 +11,8 @@ import { MonoLabel, StatePill } from './TournamentBits'
 import useCategoryBoard from './useCategoryBoard'
 import { byDayAndTime, unscheduled } from '../../lib/tournamentDraw'
 import { matchTieBreak } from './tieBreak'
+import { phaseRank } from '../../lib/tournamentSchedule'
+import { sourceText } from './sourceText'
 
 const hhmm = (iso) => new Date(iso).toTimeString().slice(0, 5)
 
@@ -22,9 +24,9 @@ function dayLabel(date, locale) {
 }
 
 /** Uma linha de jogo: campo, duplas, e o que já se sabe do resultado. */
-function MatchRow({ match, entries, t }) {
-  const a = entries[match.entry_a_id]?.name || match.source_a || t('tournament.draw.tbd')
-  const b = entries[match.entry_b_id]?.name || match.source_b || t('tournament.draw.tbd')
+function MatchRow({ match, entries, matches, t }) {
+  const a = entries[match.entry_a_id]?.name || sourceText(match.source_a, matches, t) || t('tournament.draw.tbd')
+  const b = entries[match.entry_b_id]?.name || sourceText(match.source_b, matches, t) || t('tournament.draw.tbd')
   const done = ['terminado', 'falta', 'desistencia'].includes(match.status)
   const earlier = match.previous_scheduled_at
 
@@ -65,7 +67,11 @@ export default function CalendarPanel({ category }) {
   }
 
   const days = byDayAndTime(matches)
+  // Pela ordem das fases (grupos, quartos, meias, 3.º lugar, final) e, dentro
+  // de cada uma, pelo lugar no quadro — antes o 3.º lugar vinha antes das
+  // meias (QA, 26 set).
   const pending = unscheduled(matches)
+    .sort((x, y) => phaseRank(x) - phaseRank(y) || (x.bracket_slot ?? 0) - (y.bracket_slot ?? 0))
 
   if (!days.length && !pending.length) {
     return (
@@ -92,7 +98,7 @@ export default function CalendarPanel({ category }) {
               </header>
               <div className="px-3 py-1">
                 {slot.matches.map((m) => (
-                  <MatchRow key={m.id} match={m} entries={entries} t={t} />
+                  <MatchRow key={m.id} match={m} entries={entries} matches={matches} t={t} />
                 ))}
               </div>
             </div>
@@ -105,7 +111,7 @@ export default function CalendarPanel({ category }) {
           <MonoLabel className="mb-1">{t('tournament.draw.no_time_label')}</MonoLabel>
           <div className="rounded-card border border-dashed border-ink-200 bg-surface px-4 py-1">
             {pending.map((m) => (
-              <MatchRow key={m.id} match={m} entries={entries} t={t} />
+              <MatchRow key={m.id} match={m} entries={entries} matches={matches} t={t} />
             ))}
           </div>
         </section>

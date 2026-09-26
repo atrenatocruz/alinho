@@ -3353,6 +3353,7 @@
   "tournament.tree.winner_R16": "Winner R16 {{n}}",
   "tournament.tree.winner_QF": "Winner QF{{n}}",
   "tournament.tree.winner_SF": "Winner SF {{n}}",
+  "tournament.tree.winner_only_SF": "Winner of the semi-final",
   "tournament.tree.loser_SF": "Loser SF {{n}}",
   "tournament.tree.final": "Final",
   "tournament.tree.third": "3rd place",

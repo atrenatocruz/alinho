@@ -3354,6 +3354,7 @@
   "tournament.tree.winner_R16": "Vencedor O{{n}}",
   "tournament.tree.winner_QF": "Vencedor Q{{n}}",
   "tournament.tree.winner_SF": "Vencedor meia {{n}}",
+  "tournament.tree.winner_only_SF": "Vencedor da meia-final",
   "tournament.tree.loser_SF": "Vencido meia {{n}}",
   "tournament.tree.final": "Final",
   "tournament.tree.third": "3.º lugar",
