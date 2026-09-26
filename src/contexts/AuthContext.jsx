@@ -101,6 +101,10 @@ export const AuthProvider = ({ children }) => {
   // 24 set). Sem linha na tabela = desligado, por isso nao e preciso
   // escrever nada em producao para as esconder.
   const [isLessonsFlagOn, setIsLessonsFlagOn] = useState(false)
+  // Criar/editar mix por passos (#342): bandeira `assistente_mix`. Desligada,
+  // volta o formulário antigo (voltar atrás em segundos, sem publicar). Os
+  // admins da plataforma veem-no sempre, para testar antes de ligar.
+  const [isMixWizardFlagOn, setIsMixWizardFlagOn] = useState(false)
   // Set only once every retry in loadProfile has been exhausted — lets the
   // UI show a "couldn't load your data, try again" screen instead of
   // silently rendering as if the account had no profile/memberships (see
@@ -117,6 +121,8 @@ export const AuthProvider = ({ children }) => {
       // localStorage.mockPrivateMatchesOff = 'true' — ver a app com o
       // interruptor "Jogo entre amigos" desligado no Gerir.
       setIsPrivateMatchesEnabled(localStorage.getItem('mockPrivateMatchesOff') !== 'true')
+      // localStorage.mockAssistenteMix = 'true' — o mix por passos (#342).
+      setIsMixWizardFlagOn(localStorage.getItem('mockAssistenteMix') === 'true')
       setLoading(false)
       return
     }
@@ -224,6 +230,7 @@ export const AuthProvider = ({ children }) => {
     const privateMatchesFlag = data?.find((f) => f.key === 'private_matches')
     setIsPrivateMatchesEnabled(privateMatchesFlag?.enabled ?? true)
     setIsLessonsFlagOn(data?.find((f) => f.key === 'lessons')?.enabled === true)
+    setIsMixWizardFlagOn(data?.find((f) => f.key === 'assistente_mix')?.enabled === true)
   }
 
   // getSession() and onAuthStateChange (below) both call loadProfile on
@@ -620,6 +627,7 @@ export const AuthProvider = ({ children }) => {
     // aulas mesmo desligadas, para as poder testar (Francisco, 24 set).
     isLessonsFlagOn,
     isLessonsEnabled: isLessonsFlagOn || profile?.is_platform_admin === true,
+    isMixWizardEnabled: isMixWizardFlagOn || profile?.is_platform_admin === true,
     refreshFeatureFlags: loadFeatureFlags,
     signUp,
     signIn,

@@ -424,8 +424,9 @@ export default function Comunidade() {
       ) : nothing ? (
         <EmptyState
           icon={tab === 'teachers' ? GraduationCap : Users}
-          title={t('comunidade.nothing_found_title')}
-          subtitle={searching ? t('comunidade.try_another_name') : t('comunidade.no_clubs_subtitle')}
+          // Em «Professores», vazio fala de professores (falha do QA, 26 set).
+          title={!searching && tab === 'teachers' ? t('comunidade.no_teachers_title') : t('comunidade.nothing_found_title')}
+          subtitle={searching ? t('comunidade.try_another_name') : tab === 'teachers' ? t('comunidade.no_teachers_subtitle') : t('comunidade.no_clubs_subtitle')}
         />
       ) : (
         <>
