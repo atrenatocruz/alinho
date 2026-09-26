@@ -9,16 +9,18 @@ import { EmptyState, PrimaryButton } from '../ui'
 import { Sheet } from '../agenda/AgendaControls'
 import { requestMatchCorrection } from '../../lib/tournamentApi'
 import { MonoLabel } from './TournamentBits'
+import { useScoreEntry, toMatchOrder } from './ScoreEntry'
+import { proSetTieBreakTarget } from './tieBreak'
 import useCategoryBoard from './useCategoryBoard'
 import { myMatchesFromBoard } from '../../lib/myTournamentMatches'
 
 /** Sáb 10:00 — dia curto + hora, em mono, como no desenho. */
 function When({ date, time, locale }) {
-  if (!date) return <b className="font-mono text-[10.5px] font-bold text-ink-500">—</b>
+  if (!date) return <b className="font-mono text-xs font-bold text-ink-500">—</b>
   const d = new Date(`${date}T${time || '00:00'}`)
   const day = d.toLocaleDateString(locale, { weekday: 'short' }).replace('.', '')
   return (
-    <b className="font-mono text-[10.5px] font-bold text-ink-900">
+    <b className="font-mono text-xs font-bold text-ink-900">
       {day.charAt(0).toUpperCase() + day.slice(1)} {time}
     </b>
   )
@@ -26,42 +28,38 @@ function When({ date, time, locale }) {
 
 /* Pedir a correção de um resultado (Trello #485). O lado do jogador vem
    primeiro — é assim que ele lê o jogo; manda-se na ordem do jogo (a × b).
-   Uma nota opcional para quem organiza perceber o que aconteceu. */
-function CorrectionSheet({ match, onClose, onSent }) {
+   Com as regras do marcador (QA, 26 set): pergunta o tie-break num 8-8 ou
+   9-8, os sets nos torneios por sets, e não deixa enviar um resultado que
+   não fecha o jogo. Uma nota opcional para quem organiza. */
+function CorrectionSheet({ match, scoring, tieTarget, onClose, onSent }) {
   const { t } = useTranslation()
-  const [mine, setMine] = useState('')
-  const [theirs, setTheirs] = useState('')
+  const score = useScoreEntry({ scoring, tieTarget })
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const a = match.mine_is_a === false ? theirs : mine
-  const b = match.mine_is_a === false ? mine : theirs
-  const ready = mine !== '' && theirs !== ''
 
   const send = async () => {
-    const sa = parseInt(a, 10); const sb = parseInt(b, 10)
-    if (!(sa >= 0) || !(sb >= 0)) { setError(t('tcorrection.error_invalid')); return }
-    if (sa === sb) { setError(t('tcorrection.error_tie')); return }
-    if (sa === match.score_a && sb === match.score_b) { setError(t('tcorrection.error_same')); return }
+    const { input, problem } = score.build()
+    if (problem) { setError(t(`tournament.score.problem_${problem}`)); return }
+    const ordered = toMatchOrder(input, match.mine_is_a)
+    if (!ordered.sets && ordered.score_a === match.score_a && ordered.score_b === match.score_b) {
+      setError(t('tcorrection.error_same')); return
+    }
     setBusy(true); setError('')
     try {
-      await requestMatchCorrection(match.id, { scoreA: sa, scoreB: sb, note: note.trim() || null })
+      await requestMatchCorrection(match.id, {
+        scoreA: ordered.score_a, scoreB: ordered.score_b, note: note.trim() || null, sets: ordered.sets || null,
+      })
       onSent(match.id)
     } catch (err) {
       console.error('Error requesting a result correction:', err)
-      setError(t('tcorrection.error_generic'))
+      // A base de dados recusa um resultado impossível com a frase já
+      // escrita (a mesma trava do marcador); o resto é a frase genérica.
+      setError(err?.code === 'P0001' && err?.message ? err.message : t('tcorrection.error_generic'))
     } finally {
       setBusy(false)
     }
   }
-
-  const box = (label, value, set) => (
-    <label className="flex items-center justify-between gap-2 rounded-ctrl border border-line px-3 py-1.5">
-      <span className="min-w-0 truncate text-sm text-ink-900">{label}</span>
-      <input type="number" inputMode="numeric" min="0" max="99" value={value} onChange={(e) => set(e.target.value)}
-        aria-label={label} className="h-11 w-[64px] rounded-md border border-line px-2 text-right font-display text-[20px] font-extrabold text-ink-900" />
-    </label>
-  )
 
   return (
     <Sheet title={t('tcorrection.title')} onClose={onClose}>
@@ -70,16 +68,15 @@ function CorrectionSheet({ match, onClose, onSent }) {
           {t('tcorrection.now', { score: match.score || t(match.status === 'desistencia' ? 'tournament.score.desistencia_title' : 'tournament.score.walkover') })}
         </p>
         <p className="text-sm font-medium text-gray-700">{t('tcorrection.right_result')}</p>
-        {box(t('tcorrection.us'), mine, setMine)}
-        {box(match.opponent || '?', theirs, setTheirs)}
+        {score.render({ teamA: t('tcorrection.us'), teamB: match.opponent || '?' })}
         <label className="block">
           <span className="block text-sm font-medium text-gray-700 mb-2">{t('tcorrection.note_label')}</span>
           <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} maxLength={240}
             placeholder={t('tcorrection.note_placeholder')} className="input-field" />
         </label>
         <p className="text-xs text-muted">{t('tcorrection.hint')}</p>
-        {error && <p className="text-sm font-extrabold text-danger">{error}</p>}
-        <PrimaryButton className="w-full" disabled={!ready || busy} onClick={send}>
+        {error && <p className="rounded-ctrl border border-danger/30 bg-danger/10 px-3 py-2 text-sm font-extrabold text-danger">{error}</p>}
+        <PrimaryButton className="w-full" disabled={busy} onClick={send}>
           {busy ? t('tcorrection.sending') : t('tcorrection.send')}
         </PrimaryButton>
       </div>
@@ -87,7 +84,7 @@ function CorrectionSheet({ match, onClose, onSent }) {
   )
 }
 
-export default function MyGamesPanel({ category, myEntries = [], myMatches = [] }) {
+export default function MyGamesPanel({ tournament, category, myEntries = [], myMatches = [] }) {
   const { t, i18n } = useTranslation()
   // Os jogos vêm das vistas públicas da categoria (Trello #508): a base de
   // dados nunca mandou `my_matches`, por isso o separador ficava vazio.
@@ -132,8 +129,8 @@ export default function MyGamesPanel({ category, myEntries = [], myMatches = [] 
         return (
           <div
             key={m.id}
-            className={`grid grid-cols-[62px_minmax(0,1fr)_auto] items-center gap-2 border-t border-line px-0.5 py-2 text-[11.5px] ${
-              isNext ? 'mt-0.5 rounded-ctrl border-t-0 bg-[#F0FDF4] px-1.5' : ''
+            className={`card mt-1.5 grid grid-cols-[62px_minmax(0,1fr)_auto] items-center gap-2 !py-2.5 text-xs ${
+              isNext ? '!bg-[#F0FDF4] !border-[#BBF7D0]' : ''
             } ${unknown && !isNext ? 'opacity-55' : ''}`}
           >
             <When date={m.date} time={m.time} locale={i18n.language} />
@@ -145,11 +142,11 @@ export default function MyGamesPanel({ category, myEntries = [], myMatches = [] 
               </em>
             </span>
             {m.score || (m.done && m.status !== 'terminado') ? (
-              <span className={`whitespace-nowrap text-[11px] font-bold ${m.won ? 'text-ok' : 'text-ink-500'}`}>
+              <span className={`whitespace-nowrap text-xs font-bold ${m.won ? 'text-ok' : 'text-ink-500'}`}>
                 {m.score || t(m.status === 'desistencia' ? 'tournament.score.desistencia_title' : 'tournament.score.walkover')} {m.won ? '✓' : ''}
               </span>
             ) : m.previous_time ? (
-              <span className="whitespace-nowrap text-[11.5px] text-ink-500">
+              <span className="whitespace-nowrap text-xs text-ink-500">
                 {t('tournament.my_games_was_at', { time: m.previous_time })}
               </span>
             ) : <span />}
@@ -158,9 +155,9 @@ export default function MyGamesPanel({ category, myEntries = [], myMatches = [] 
             {m.done && m.mine_is_a !== undefined && (
               <span className="col-span-3 -mt-1 text-right">
                 {requested.has(m.id) || m.correction_pending ? (
-                  <span className="text-[11.5px] font-semibold text-ink-500">{t('tcorrection.requested')}</span>
+                  <span className="text-xs font-semibold text-ink-500">{t('tcorrection.requested')}</span>
                 ) : (
-                  <button type="button" onClick={() => setAsking(m)} className="min-h-[44px] px-1 text-[12px] font-extrabold text-ink-900 underline underline-offset-2">
+                  <button type="button" onClick={() => setAsking(m)} className="min-h-[44px] px-1 text-xs font-extrabold text-ink-900 underline underline-offset-2">
                     {t('tcorrection.ask')}
                   </button>
                 )}
@@ -172,6 +169,8 @@ export default function MyGamesPanel({ category, myEntries = [], myMatches = [] 
       {asking && (
         <CorrectionSheet
           match={asking}
+          scoring={tournament?.rules?.scoring || 'pro_set_9'}
+          tieTarget={proSetTieBreakTarget(tournament?.rules)}
           onClose={() => setAsking(null)}
           onSent={(id) => { setRequested((s) => new Set(s).add(id)); setAsking(null) }}
         />
