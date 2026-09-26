@@ -7,7 +7,9 @@ import { errorKind } from './errors'
    também manda por WhatsApp. Enquanto a migração não correr, ler devolve
    lista vazia e avisar não faz nada — nunca parte o ecrã de quem chama. */
 
-export const MIX_NOTICE_KINDS = ['mix_joined', 'mix_removed', 'mix_partner_changed']
+// mix_cancelled: quem organiza cancelou um mix onde estavas inscrito (ações do
+// evento, 26 set) — nasce na base de dados (migration_eventos_aviso_mix_cancelado.sql).
+export const MIX_NOTICE_KINDS = ['mix_joined', 'mix_removed', 'mix_partner_changed', 'mix_cancelled']
 
 export async function listMyUnreadNotifications(limit = 20) {
   const { data, error } = await supabase
