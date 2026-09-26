@@ -618,7 +618,7 @@ export default function TournamentScorePage() {
           ) : (
             <>
               <div className="mt-2">
-                {proposal.preview.map((m) => (
+                {[...proposal.preview].sort((x, y) => String(x.scheduled_at).localeCompare(String(y.scheduled_at))).map((m) => (
                   <div key={m.match_id} className="grid grid-cols-[104px_minmax(0,1fr)] items-center gap-2 border-t border-line py-2 text-xs">
                     <b className="whitespace-nowrap font-mono text-xs text-ink-900">{shortDay(dayKeyInTz(new Date(m.scheduled_at)))} · {hhmm(m.scheduled_at)}</b>
                     <span className="min-w-0 text-ink-700">

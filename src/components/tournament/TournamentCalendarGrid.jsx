@@ -10,6 +10,7 @@
 // só se mostram.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Link } from 'react-router-dom'
 import { ArrowLeft, CalendarDays } from 'lucide-react'
 import { listMatchesToScore, rescheduleMatch } from '../../lib/tournamentApi'
 import { SCHEDULE_DEFAULTS, canPlace, findConflicts } from '../../lib/tournamentSchedule'
@@ -200,7 +201,12 @@ export default function TournamentCalendarGrid({ tournament, onBack }) {
 
       {ofDay.length === 0 ? (
         <div className="mt-3">
-          <EmptyState icon={CalendarDays} title={t('tournament.grid.empty_title')} subtitle={t('tournament.grid.empty_subtitle')} />
+          <EmptyState icon={CalendarDays} title={t('tournament.grid.empty_title')} subtitle={t('tournament.grid.empty_subtitle')}
+            action={(
+              <Link to={`/torneio/${tournament.slug || tournament.id}/marcar`} className="btn-secondary inline-flex items-center">
+                {t('tournament.grid.empty_cta')}
+              </Link>
+            )} />
         </div>
       ) : (
         <>

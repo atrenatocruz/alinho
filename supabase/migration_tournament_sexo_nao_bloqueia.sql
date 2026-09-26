@@ -20,8 +20,10 @@
 --   4. tournament_entries_guard — a regra #19 (o sexo da dupla tem de bater
 --      com a categoria: masculinos, femininos, mistos) deixa de recusar
 --      (gender_mismatch). Tira-se o bloco inteiro.
--- A tournament_admin_replace_player (#434) ainda não correu: o ficheiro
--- dela já foi acertado da mesma maneira.
+--   5. tournament_admin_replace_player (#434) — deixa de recusar quem não
+--      tem sexo (player_gender_required). Já estava viva na versão ef496ae
+--      (o System Integrator correu-a a 26 set, 00h40); o ficheiro dela também
+--      foi acertado, para quem o voltar a correr.
 --
 -- Cada troca recusa se não encontrar o fragmento exatamente uma vez, e diz
 -- «já estava» quando o erro já não existe na função. Mesmas assinaturas: as
@@ -46,6 +48,9 @@ DECLARE
           ''],
     ARRAY['tournament_admin_set_partner', 'partner_gender_required',
           '\s+ELSE\s+RAISE EXCEPTION ''partner_gender_required'';',
+          ''],
+    ARRAY['tournament_admin_replace_player', 'player_gender_required',
+          '\s+ELSE\s+RAISE EXCEPTION ''player_gender_required'';',
           ''],
     ARRAY['tournament_entries_guard', 'gender_mismatch',
           'IF NEW\.status <> ''desistiu'' AND v_gender IN .*?RAISE EXCEPTION ''gender_mismatch'';\s+END IF;\s+END IF;',
@@ -91,7 +96,8 @@ BEGIN
   FOR f IN SELECT p.oid::regprocedure AS sig, p.proname FROM pg_proc p
             WHERE p.pronamespace = 'public'::regnamespace
               AND p.proname IN ('tournament_signup', 'tournament_admin_signup',
-                                'tournament_admin_set_partner', 'tournament_entries_guard') LOOP
+                                'tournament_admin_set_partner', 'tournament_admin_replace_player',
+                                'tournament_entries_guard') LOOP
     EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC', f.sig);
     EXECUTE format('REVOKE ALL ON FUNCTION %s FROM anon', f.sig);
     IF f.proname = 'tournament_entries_guard' THEN

@@ -20,7 +20,10 @@ const eachOf = (cents, locale) => pricePerPlayer((cents || 0) / 100, locale)
    que falta a quem não tem conta é o botão de inscrever — que vive no
    SignupSlot, já com o caminho para criar conta. */
 
-export default function PublicInfo({ tournament, categories = [] }) {
+// `entriesOpen`: as vagas só se mostram com as inscrições abertas; o resto
+// (categorias, dias e horas, preço, texto da organização) vê-se sempre —
+// em rascunho, na pré-visualização, e nos dias do torneio (QA, 26 set).
+export default function PublicInfo({ tournament, categories = [], entriesOpen = true }) {
   const { t, i18n } = useTranslation()
   const [open, setOpen] = useState(false)
 
@@ -55,7 +58,7 @@ export default function PublicInfo({ tournament, categories = [] }) {
                 <p className="font-extrabold text-ink-900 truncate">
                   {c.code} · {c.name}
                 </p>
-                {slots && (
+                {entriesOpen && slots && (
                   <span className={`shrink-0 text-xs font-extrabold ${slots.key === 'tsignup.category_full' ? 'text-muted' : 'text-ok-700'}`}>
                     {t(slots.key, slots.values)}
                   </span>

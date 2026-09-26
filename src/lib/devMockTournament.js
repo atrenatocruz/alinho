@@ -262,7 +262,10 @@ export const TOURNAMENT_RPC_MOCKS = {
     // 'draw' = sorteio antes do prazo; 'duration' = mínima maior que a máxima.
     const bad = localStorage.getItem('mockTBadDates')
     const yesterday = dayAfter(new Date(), -1)
-    const edits = bad === 'past' ? { entries_deadline: `${iso(yesterday)}T22:59:00+00:00` }
+    // 'legacy' (QA, 26 set): o prazo guardado sem fuso antes do #487 —
+    // 23:59 em UTC, que em Lisboa é 00:59 do dia seguinte.
+    const edits = bad === 'legacy' ? { entries_deadline: '2026-10-05T23:59:00+00:00' }
+      : bad === 'past' ? { entries_deadline: `${iso(yesterday)}T22:59:00+00:00` }
       : bad === 'draw' ? { draw_on: iso(dayAfter(fri, -6)) }
         : {}
     const rules = bad === 'duration' ? { duration_min: 90, duration_max: 60 } : {}

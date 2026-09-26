@@ -196,10 +196,11 @@ export default function SignupSlot({ tournament, categories, category, my: first
 
       {error && !sheet && <p className="text-sm text-danger font-extrabold">{error}</p>}
 
-      {/* O cartaz: categorias com dia, hora e vagas, pagamento, mapa e
-          quem organiza. Enquanto houver inscrições é o que faz decidir;
-          depois do sorteio quem manda são os separadores (Trello #363). */}
-      {open && <PublicInfo tournament={tournament} categories={categories} />}
+      {/* O cartaz: categorias com dia e hora, pagamento, mapa e quem
+          organiza — SEMPRE, também em rascunho (pré-visualização) e depois
+          do fecho, que é quando se joga (QA, 26 set). Só as vagas e o botão
+          de inscrever dependem das inscrições abertas. */}
+      <PublicInfo tournament={tournament} categories={categories} entriesOpen={open} />
 
       {genderSheet && (
         <Sheet title={t('tsignup.gender_title')} onClose={() => setGenderSheet(false)}>
