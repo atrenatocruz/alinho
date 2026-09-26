@@ -77,7 +77,9 @@ const weekItems = (fromIso, toIso) => {
   for (const d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
     for (const it of ANA_WEEK[isoWeekday(d)] || []) {
       const { start, end, ...rest } = it
-      items.push({ ...rest, weekday: isoWeekday(d), starts_at: at(d, start), ends_at: at(d, end), avg_gender: 'masculino', my_status: rest.kind === 'series' ? myStatus() : null, my_enrolment_id: rest.kind === 'series' && myStatus() ? 'en-me' : null })
+      items.push({ ...rest, weekday: isoWeekday(d), starts_at: at(d, start), ends_at: at(d, end), avg_gender: 'masculino', my_status: rest.kind === 'series' ? myStatus() : null, my_enrolment_id: rest.kind === 'series' && myStatus() ? 'en-me' : null,
+        // localStorage.mockSeriesPromo = 'true' — a turma de terça em promoção (#342).
+        ...(rest.series_id === 'ser-ter' && localStorage.getItem('mockSeriesPromo') === 'true' ? { price_month: 45, promo: true, promo_until: '2026-11-30' } : {}) })
     }
   }
   return items
