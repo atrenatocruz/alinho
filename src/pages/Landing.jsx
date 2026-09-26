@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useState, useEffect, useLayoutEffect } from 'react'
+import { Link, useSearchParams, useNavigationType } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { CheckCircle2, Trophy, Shuffle, ChevronRight } from 'lucide-react'
 import { Wordmark } from '../components/Layout'
@@ -49,6 +49,22 @@ function LanguageToggle({ className = '' }) {
 // Builds the /login href, preserving ?org=<slug> from the current URL (the
 // invite-link mechanism — see Home.jsx / Login.jsx) so landing-page CTAs
 // don't silently drop it for logged-out visitors landing on `/?org=...`.
+/* Estas páginas vivem fora do Layout, que é quem põe as outras no topo.
+   Sem isto, «Ver os planos» abria a página Planos lá em baixo, onde estava o
+   dedo — parecia que os planos não existiam (Francisco, 26 set). Ao voltar
+   atrás, o browser devolve a posição de antes. */
+export function usePageTop() {
+  const navigationType = useNavigationType()
+  useLayoutEffect(() => {
+    if (navigationType !== 'POP') window.scrollTo(0, 0)
+  }, [navigationType])
+}
+
+/* O lima escuro é o «passar o rato». Num telemóvel fica preso no botão que
+   estava debaixo do dedo e parecia desativado (Francisco, 26 set). Sem rato,
+   fica o lima de sempre. */
+export const PRIMARY_CTA = 'btn-primary [@media(hover:none)]:hover:bg-lime-400'
+
 export function useLoginHref() {
   const [params] = useSearchParams()
   const org = params.get('org')
@@ -141,7 +157,7 @@ function Hero() {
           <div className="flex flex-col sm:flex-row gap-3 mt-8 max-w-md">
             {/* inline-flex + centragem: num <a>, min-h e padding não fazem nada
                 sem eles. «Criar conta» é a única coisa lima do ecrã. */}
-            <Link to={loginHref('signup')} className="btn-primary inline-flex items-center justify-center sm:flex-1">
+            <Link to={loginHref('signup')} className={`${PRIMARY_CTA} inline-flex items-center justify-center sm:flex-1`}>
               {t('landing.signup_link')}
             </Link>
             <Link
@@ -319,7 +335,7 @@ export function PlanCard({ plan }) {
       </ul>
       <div className="mt-6">
         {plan.key === 'free' ? (
-          <Link to={loginHref('signup')} className="btn-primary w-full inline-flex items-center justify-center">
+          <Link to={loginHref('signup')} className={`${PRIMARY_CTA} w-full inline-flex items-center justify-center`}>
             {t('landing.plan_free_cta')}
           </Link>
         ) : (
@@ -369,7 +385,7 @@ function ClosingCta() {
     <section className="bg-ink-900 pt-16 pb-12 px-5 text-center">
       <div className="max-w-lg mx-auto">
         <h2 className="text-3xl text-white mb-6">{t('landing.closing_cta_heading')}</h2>
-        <Link to={loginHref('signup')} className="btn-primary inline-flex w-full sm:w-auto items-center justify-center">
+        <Link to={loginHref('signup')} className={`${PRIMARY_CTA} inline-flex w-full sm:w-auto items-center justify-center`}>
           {t('landing.signup_link')}
         </Link>
         <p className="text-sm text-ink-200 mt-3">{t('landing.free_google')}</p>
@@ -400,6 +416,7 @@ export function Footer() {
 }
 
 export default function Landing() {
+  usePageTop()
   return (
     <div className="min-h-screen bg-[#F7F7F4]">
       <Nav />

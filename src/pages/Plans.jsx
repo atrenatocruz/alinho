@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Mail, MessageCircle } from 'lucide-react'
-import { Nav, Footer, PlansGrid, useLoginHref } from './Landing'
+import { Nav, Footer, PlansGrid, useLoginHref, usePageTop, PRIMARY_CTA } from './Landing'
 import { mailtoLink, whatsappContactLink, SUPPORT_EMAIL_READY } from '../lib/contacts'
 
 /* Página «Planos» (Trello #327) — NOVA: antes o «Planos» do menu só saltava
@@ -15,6 +15,7 @@ import { mailtoLink, whatsappContactLink, SUPPORT_EMAIL_READY } from '../lib/con
 export default function Plans() {
   const { t } = useTranslation()
   const loginHref = useLoginHref()
+  usePageTop()
   const contact = 'inline-flex flex-1 items-center justify-center gap-2 min-h-[48px] rounded-ctrl px-4 font-extrabold'
   return (
     <div className="min-h-screen bg-[#F7F7F4]">
@@ -50,7 +51,7 @@ export default function Plans() {
         </section>
 
         <div className="mt-10 max-w-xl">
-          <Link to={loginHref('signup')} className="btn-primary inline-flex w-full sm:w-auto items-center justify-center">
+          <Link to={loginHref('signup')} className={`${PRIMARY_CTA} inline-flex w-full sm:w-auto items-center justify-center`}>
             {t('landing.plan_free_cta')}
           </Link>
         </div>
