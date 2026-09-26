@@ -6,6 +6,7 @@ import {
 } from './devMockTournament'
 import { TOURNAMENT_DRAW_TABLE_MOCKS, TOURNAMENT_DRAW_RPC_MOCKS } from './devMockTournamentDraw'
 import { CLUB_PAGE_RPC_MOCKS, CLUB_PAGE_TABLE_MOCKS } from './devMockClubPage'
+import { BRACKET_TABLE_MOCKS } from './devMockBracket'
 
 // Dev-only: quando a sessão é o atalho "Entrar como Admin (Dev)"
 // (AuthContext.jsx, MOCK_ADMIN_KEY), essa sessão nunca teve um auth.uid()
@@ -1189,7 +1190,7 @@ for (const [name, fn] of [...Object.entries(TOURNAMENT_CLOSE_RPC_MOCKS), ...Obje
   const before = RPC_MOCKS[name]
   RPC_MOCKS[name] = (params) => fn(params, before) ?? before?.(params) ?? null
 }
-for (const [name, fn] of [...Object.entries(TOURNAMENT_CLOSE_TABLE_MOCKS), ...Object.entries(TOURNAMENT_SCORE_TODAY_TABLE_MOCKS), ...Object.entries(CLUB_PAGE_TABLE_MOCKS), ...Object.entries(TOURNAMENT_GROUPS_DONE_TABLE_MOCKS), ...Object.entries(TOURNAMENT_PROMOTED_TABLE_MOCKS)]) {
+for (const [name, fn] of [...Object.entries(TOURNAMENT_CLOSE_TABLE_MOCKS), ...Object.entries(TOURNAMENT_SCORE_TODAY_TABLE_MOCKS), ...Object.entries(CLUB_PAGE_TABLE_MOCKS), ...Object.entries(TOURNAMENT_GROUPS_DONE_TABLE_MOCKS), ...Object.entries(TOURNAMENT_PROMOTED_TABLE_MOCKS), ...Object.entries(BRACKET_TABLE_MOCKS)]) {
   const before = TABLE_MOCKS[name]
   TABLE_MOCKS[name] = (url) => fn(url, before) ?? before?.(url) ?? []
 }

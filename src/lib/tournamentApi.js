@@ -108,6 +108,15 @@ export async function setTournamentStatus(tournamentId, status) {
   if (error) throw error
 }
 
+/** «Abrem as inscrições» (Dev 3, migration_abrem_inscricoes.sql): com uma
+ *  hora no futuro o torneio fica em rascunho e abre sozinho a essa hora; sem
+ *  hora, ou já passada, abre agora. Devolve o estado em que ficou. */
+export async function scheduleTournamentOpening(tournamentId, opensAt) {
+  const { data, error } = await supabase.rpc('schedule_tournament_opening', { p_tournament_id: tournamentId, p_opens_at: opensAt || null })
+  if (error) throw error
+  return data
+}
+
 /** Só enquanto for rascunho e ninguém se tiver inscrito (cartão #361). */
 export async function deleteTournament(tournamentId) {
   const { error } = await supabase.rpc('delete_tournament', { p_tournament_id: tournamentId })
