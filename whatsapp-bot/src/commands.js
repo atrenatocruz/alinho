@@ -514,7 +514,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
    */
   const shownName = () => titleCase(partnerRequest.typedName || partnerRequest.name)
 
-  async function resolvePartner(profile, game = null) {
+  async function resolvePartner(profile, game = null, { addToRowId = null } = {}) {
     if ((partnerRequest.mentionedPns || []).length > 1) {
       await reply('partner_one_mention')
       return null
@@ -566,6 +566,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
         pendingSuplenteConfirmations.set(pendingKey(senderPn, groupJid), {
           kind: 'pair_unregistered',
           gameId: game.id,
+          addToRowId,
           name,
           expiresAt: Date.now() + SUPLENTE_CONFIRM_TTL_MS,
           reprompted: false,
@@ -598,13 +599,22 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
       await reply('pair_signup_off')
       return
     }
-    if (capacity - people.length < 2) {
-      await reply(capacity - people.length <= 0 ? 'mix_full_pair' : 'mix_one_spot_pair')
+    const adding = Boolean(pending.addToRowId)
+    const needed = adding ? 1 : 2
+    if (capacity - people.length < needed) {
+      await reply(adding ? 'mix_full_add_partner' : capacity - people.length <= 0 ? 'mix_full_pair' : 'mix_one_spot_pair')
       return
     }
     const { profile, isNewGuest } = await requireProfileOrCreateGuest(resolvedProfile, senderPn)
     if (!profile) return
-    if (rows.some((row) => isMine(profile, row.user_id) || isMine(profile, row.partner_id))) {
+    if (adding) {
+      // A inscrição sozinha tem de continuar lá, ser desta pessoa e sem parceiro.
+      const own = rows.find((row) => row.id === pending.addToRowId)
+      if (!own || own.status !== 'confirmed' || own.partner_id || !isMine(profile, own.user_id)) {
+        await reply('mix_no_longer_available')
+        return
+      }
+    } else if (rows.some((row) => isMine(profile, row.user_id) || isMine(profile, row.partner_id))) {
       await reply('already_joined')
       return
     }
@@ -612,10 +622,11 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     try {
       token = await joinWithUnregisteredPartner({
         gameId: game.id, organizationId, callerId: profile.id, name: pending.name,
+        existingParticipantId: pending.addToRowId ?? null,
       })
     } catch (err) {
       if (isGameFull(err)) {
-        await reply('mix_full_pair')
+        await reply(pending.addToRowId ? 'mix_full_add_partner' : 'mix_full_pair')
         return
       }
       console.error('Failed to join with unregistered partner:', err)
@@ -628,6 +639,57 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
       link: `${config.appUrl}/convite/${token}`,
     })
     if (isNewGuest) await reply('guest_joined', { name: profile.name, appUrl: config.appUrl })
+  }
+
+  /**
+   * #554 — quem já deu «In» sozinho junta o parceiro depois, sem sair: a
+   * inscrição que já existe ganha o partner_id, e mantém o lugar na lista.
+   * As regras do «In com …» (duplas fixas, «Inscrição em dupla», parceiro
+   * que não é a própria pessoa nem já está inscrito, sem conta → convidado)
+   * — mas só precisa de UMA vaga, a do parceiro. O trigger das vagas
+   * (participants_capacity_guard) volta a contar: a linha cresce.
+   */
+  async function addPartnerToRow({ game, people, capacity, profile, row, existingRows }) {
+    if (game.rotate_partners) {
+      await reply('partner_not_fixed_pairs')
+      return
+    }
+    if (!game.allow_pair_signup) {
+      await reply('pair_signup_off')
+      return
+    }
+    if (capacity - people.length < 1) {
+      await reply('mix_full_add_partner')
+      return
+    }
+    const resolved = await resolvePartner(profile, game, { addToRowId: row.id })
+    if (!resolved) return
+    const { partner, isNewGuest: partnerIsNewGuest } = resolved
+    if (isMine(profile, partner.id)) {
+      await reply('partner_is_you')
+      return
+    }
+    if (existingRows.some((r) => r.user_id === partner.id || r.partner_id === partner.id)) {
+      await reply('partner_already_in', { name: partner.name })
+      return
+    }
+    const { error } = await supabase
+      .from('participants')
+      .update({ partner_id: partner.id, joined_alone: false })
+      .eq('id', row.id)
+    timer.mark('gravar')
+    if (error) {
+      if (isGameFull(error)) {
+        await reply('mix_full_add_partner')
+        return
+      }
+      throw new Error(`Failed to add partner: ${error.message}`)
+    }
+    // A lista publicada de novo, já com a dupla, é a confirmação.
+    repostHooks.requestRepostForGame(organizationId, game.id)
+    if (partnerIsNewGuest) {
+      await reply('pair_partner_guest_created', { partner: partner.name, appUrl: config.appUrl })
+    }
   }
 
   // Entrar em dupla: as mesmas regras da app (GameDetails, «Entrar com
@@ -809,6 +871,12 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     const asPartnerRow = existingRows.find((row) => isMine(profile, row.partner_id))
 
     if (action === 'in') {
+      // #554: já inscrito sozinho e agora «In com …» → junta o parceiro à
+      // inscrição que já tem, em vez de «Já estás inscrito».
+      if (ownConfirmedRow && !ownConfirmedRow.partner_id && partnerRequest) {
+        await addPartnerToRow({ game, people, capacity, profile, row: ownConfirmedRow, existingRows })
+        return
+      }
       if (ownConfirmedRow || asPartnerRow) {
         await reply('already_joined')
         return

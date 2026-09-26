@@ -24,7 +24,8 @@ Para entrares num mix:
 Para entrares já em dupla (nos mixes com «👥 Inscrição individual ou em dupla»):
 • *In com João Silva* — o nome como está na app
 • ou *In @João* — menciona o teu parceiro
-Se ele ainda não estiver na app: com a menção @ o bot inscreve-o como convidado; pelo nome, o bot pergunta se queres inscrever a dupla na mesma e dá-te um link para lhe enviares. A dupla aparece na lista com o mesmo número à frente dos dois nomes, ex.: *(1)*.
+Se ele ainda não estiver na app: com a menção @ o bot inscreve-o como convidado; pelo nome, o bot pergunta se queres inscrever a dupla na mesma e dá-te um link para lhe enviares.
+Já entraste sozinho? *In com* e o nome (ou *In @parceiro*) junta o parceiro, sem perderes o lugar. A dupla aparece na lista com o mesmo número à frente dos dois nomes, ex.: *(1)*.
 
 Para saíres de um mix:
 • *Out* / *Fora* / *Estou fora* / *Saio*
@@ -91,6 +92,7 @@ Para veres esta lista:
   partner_joined_use_app: '🤖 Estás inscrito em dupla por outra pessoa — quem inscreveu a dupla pode tirá-la com *Out*, ou sai tu pela app 📱',
   out_pair_menu: '🤖 Estás inscrito em dupla com *{{partner}}*. Queres sair como?\n\n1. Dupla (saem os dois)\n2. Só tu ({{partner}} fica)\n3. Parceiro (sai {{partner}}, tu ficas)\n\nEscreve *1*, *2* ou *3*.',
   out_pair_reprompt: '🤖 Não percebi 🤔 Responde com *1* (dupla), *2* (só tu) ou *3* (parceiro).',
+  mix_full_add_partner: '🤖 O mix está cheio — não há vaga para o teu parceiro. Continuas inscrito sozinho.',
   out_pair_done_me: '🤖 Saíste do *{{title}}*. *{{partner}}* continua inscrito, agora sozinho.',
   out_pair_done_partner: '🤖 *{{partner}}* saiu do *{{title}}*. Continuas inscrito, agora sozinho.',
   out_pair_whole_unclaimed: '🤖 O *{{partner}}* ainda não entrou na app, por isso saiu a dupla toda.',
@@ -136,7 +138,8 @@ To join a mix:
 To join straight away as a pair (mixes marked «👥 Inscrição individual ou em dupla»):
 • *In com João Silva* — the name as it appears in the app
 • or *In @João* — mention your partner
-If they're not on the app yet: with the @ mention the bot signs them up as a guest; by name, the bot asks whether to sign up the pair anyway and gives you a link to send them. The pair shows up on the list with the same number next to both names, e.g. *(1)*.
+If they're not on the app yet: with the @ mention the bot signs them up as a guest; by name, the bot asks whether to sign up the pair anyway and gives you a link to send them.
+Already in on your own? *In com* and the name (or *In @partner*) adds your partner, keeping your spot. The pair shows up on the list with the same number next to both names, e.g. *(1)*.
 
 To leave a mix:
 • *Out* / *Fora* / *Estou fora* / *Saio*
@@ -202,6 +205,7 @@ To see this list:
   partner_joined_use_app: '🤖 Someone else signed you up as a pair — whoever signed up the pair can take it off with *Out*, or leave through the app 📱',
   out_pair_menu: '🤖 You are signed up as a pair with *{{partner}}*. How do you want to leave?\n\n1. Pair (both leave)\n2. Just you ({{partner}} stays)\n3. Partner ({{partner}} leaves, you stay)\n\nType *1*, *2* or *3*.',
   out_pair_reprompt: "🤖 I didn't get that 🤔 Reply with *1* (pair), *2* (just you) or *3* (partner).",
+  mix_full_add_partner: "🤖 The mix is full — there's no spot for your partner. You're still signed up on your own.",
   out_pair_done_me: '🤖 You left *{{title}}*. *{{partner}}* is still signed up, now on their own.',
   out_pair_done_partner: '🤖 *{{partner}}* left *{{title}}*. You are still signed up, now on your own.',
   out_pair_whole_unclaimed: "🤖 *{{partner}}* hasn't joined the app yet, so the whole pair left.",

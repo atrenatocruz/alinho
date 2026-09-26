@@ -270,3 +270,55 @@ test('dupla inscrita com o convidado: «Out» abre o menu e «3» deixa o convid
   await say('3')
   assert.deepEqual([row().user_id, row().partner_id], ['g', null])
 })
+
+// ── #554: juntar o parceiro a quem já deu «In» sozinho ────────────────────
+function soloIn({ full = false } = {}) {
+  db.participants.push({ id: 'solo', game_id: 'm', user_id: 'a', partner_id: null, status: 'confirmed', joined_alone: true, created_at: '2026-09-25T15:54:00Z' })
+  if (full) {
+    for (const [id, u] of [['x1', 'u1'], ['x2', 'u2'], ['x3', 'u3']]) {
+      db.participants.push({ id, game_id: 'm', user_id: u, status: 'confirmed', created_at: '2026-09-25T16:00:00Z' })
+    }
+  }
+}
+const solo = () => db.participants.find((p) => p.id === 'solo')
+
+test('#554 «In com» já inscrito sozinho junta o parceiro na mesma linha (mantém o lugar)', async () => {
+  soloIn()
+  const out = await say('in com afonso')
+  assert.doesNotMatch(out, /Já estás inscrito/)
+  assert.deepEqual([solo().partner_id, solo().joined_alone, solo().created_at], ['b', false, '2026-09-25T15:54:00Z'])
+  assert.equal(db.participants.length, 1)
+})
+
+test('#554 mix cheio: recusa com mensagem clara e fica como estava', async () => {
+  soloIn({ full: true })
+  const out = await say('in com afonso')
+  assert.match(out, /não há vaga para o teu parceiro/)
+  assert.equal(solo().partner_id, null)
+})
+
+test('#554 parceiro já inscrito: recusa', async () => {
+  soloIn()
+  db.participants.push({ id: 'pb', game_id: 'm', user_id: 'b', status: 'confirmed', created_at: '2026-09-25T16:00:00Z' })
+  const out = await say('in com afonso')
+  assert.match(out, /já está inscrito/)
+  assert.equal(solo().partner_id, null)
+})
+
+test('#554 mix sem «Inscrição em dupla»: recusa', async () => {
+  soloIn()
+  db.games[0].allow_pair_signup = false
+  const out = await say('in com afonso')
+  assert.match(out, /só de inscrição individual/)
+  assert.equal(solo().partner_id, null)
+})
+
+test('#554 parceiro que não está na app: «Sim» junta-o à inscrição que já existe, com link', async () => {
+  soloIn()
+  assert.match(await say('in com rui costa'), /Queres inscrever a dupla/)
+  const out = await say('sim')
+  assert.match(out, /convite\//)
+  assert.equal(db.participants.length, 1)
+  assert.ok(solo().partner_id, 'o parceiro fica na linha que já existia')
+  assert.equal(db.partner_invites[0].participant_id, 'solo')
+})
