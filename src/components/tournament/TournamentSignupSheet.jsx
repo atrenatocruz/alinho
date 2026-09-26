@@ -4,8 +4,10 @@ import { pricePerPlayer } from '../../lib/tournaments'
 import { Search, UserPlus, Euro } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
+import { ratingBand } from '../../lib/elo'
 import { Sheet } from '../agenda/AgendaControls'
-import { Avatar, PrimaryButton } from '../ui'
+import { Avatar, Chips, PrimaryButton } from '../ui'
+import { FieldLabel } from './TournamentBits'
 import { partnerNameError, partnerEmailError, PARTNER_NAME_MAX } from '../../lib/partnerInvite'
 import { slotsLeft, isCategoryFull } from '../../lib/tournamentSignup'
 import { contemTexto } from '../../lib/semAcentos'
@@ -30,7 +32,22 @@ const euroWords = (v, locale) => Number(v).toLocaleString(locale, {
 
 export default function TournamentSignupSheet({ tournament, categories, category, categoriesLeft, busy, error, onConfirm, onClose }) {
   const { t, i18n } = useTranslation()
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
+  // As que servem à pessoa primeiro — o género dela (ou misto) e o nível
+  // mais perto do dela —, depois as outras, pela ordem do torneio. Com as
+  // pastilhas numa fila que desliza, a que interessa fica quase sempre nas
+  // três primeiras (designer, 26 set).
+  const myNum = Number(String(ratingBand(profile?.rating, profile?.gender)?.label || '').replace(/\D/g, '')) || null
+  const fitsGender = (c) => !profile?.gender || c.gender === 'misto' || c.gender === profile.gender
+  const ordered = [...categories].sort((a, b) => {
+    const g = Number(fitsGender(b)) - Number(fitsGender(a))
+    if (g) return g
+    if (myNum != null) {
+      const d = Math.abs((a.level ?? 99) - myNum) - Math.abs((b.level ?? 99) - myNum)
+      if (d) return d
+    }
+    return (a.position ?? 0) - (b.position ?? 0)
+  })
   const [categoryId, setCategoryId] = useState(category?.id || categories[0]?.id || null)
   const [mode, setMode] = useState('partner') // 'partner' | 'named' | 'alone'
   const [members, setMembers] = useState([])
@@ -92,34 +109,32 @@ export default function TournamentSignupSheet({ tournament, categories, category
       <div className="space-y-4">
         {/* Categoria */}
         <div>
-          <p className="mb-1.5 font-mono text-[11px] uppercase tracking-widest text-ink-500">
-            {t('tsignup.category_label', { max: categoriesLeft })}
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {categories.map((c) => {
-              const full = isCategoryFull(c)
+          <FieldLabel>{t('tsignup.category_label', { max: categoriesLeft })}</FieldLabel>
+          {/* Uma escolha de formulário: as pastilhas da regra única (#528).
+              Cheia não fecha a porta: o servidor põe quem chega depois como
+              suplente, por ordem de chegada — o ecrã só o diz. */}
+          {/* A fila vai até à beira da folha: a última pastilha aparece meio
+              escondida, a mostrar que há mais (como na Comunidade). */}
+          <div className="-mx-5">
+          <Chips
+            className="!mx-0 !px-5"
+            label={t('tsignup.category_label', { max: categoriesLeft })}
+            value={categoryId}
+            onChange={setCategoryId}
+            options={ordered.map((c) => {
               const left = slotsLeft(c)
-              return (
-                // Cheia não fecha a porta: o servidor põe quem chega depois
-                // como suplente, por ordem de chegada — o ecrã só o diz.
-                <button
-                  key={c.id}
-                  onClick={() => setCategoryId(c.id)}
-                  className={`press rounded-full px-3 py-1.5 text-sm font-semibold border-2 ${
-                    categoryId === c.id ? 'border-ink-900 bg-ink-900 text-white'
-                      : full ? 'border-line text-ink-500' : 'border-line text-ink-900'
-                  }`}
-                >
-                  {c.code} · {full ? t('tsignup.category_full_waitlist') : left == null ? c.name : t('tsignup.category_slots', { count: left })}
-                </button>
-              )
+              return {
+                value: c.id,
+                label: `${c.code} · ${isCategoryFull(c) ? t('tsignup.category_full_waitlist') : left == null ? c.name : t('tsignup.category_slots', { count: left })}`,
+              }
             })}
+          />
           </div>
         </div>
 
         {/* Com quem jogas? */}
         <div className="space-y-2">
-          <p className="font-mono text-[11px] uppercase tracking-widest text-ink-500">{t('tsignup.partner_label')}</p>
+          <FieldLabel className="!mb-0">{t('tsignup.partner_label')}</FieldLabel>
 
           <div className="relative">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
@@ -163,7 +178,7 @@ export default function TournamentSignupSheet({ tournament, categories, category
                   autoFocus
                 />
                 {touched && nameError && (
-                  <p className="text-sm text-red-600 font-extrabold">{t(`partner.name_error_${nameError}`)}</p>
+                  <p className="text-sm text-danger font-extrabold">{t(`partner.name_error_${nameError}`)}</p>
                 )}
                 <input
                   value={email}
@@ -174,7 +189,7 @@ export default function TournamentSignupSheet({ tournament, categories, category
                   className="input-field"
                 />
                 {touched && emailError && (
-                  <p className="text-sm text-red-600 font-extrabold">{t('partner.email_error_invalid')}</p>
+                  <p className="text-sm text-danger font-extrabold">{t('partner.email_error_invalid')}</p>
                 )}
                 {/* O mesmo aviso do mix: o email guarda-se, o convite vai
                     por link enquanto o envio de emails nao existir (#479). */}
@@ -202,7 +217,7 @@ export default function TournamentSignupSheet({ tournament, categories, category
 
         {/* Nome da equipa */}
         <div>
-          <p className="mb-1.5 font-mono text-[11px] uppercase tracking-widest text-ink-500">{t('tsignup.team_name_label')}</p>
+          <FieldLabel>{t('tsignup.team_name_label')}</FieldLabel>
           <input
             value={teamName}
             onChange={(e) => setTeamName(e.target.value)}
@@ -221,7 +236,7 @@ export default function TournamentSignupSheet({ tournament, categories, category
           </div>
         </div>
 
-        {error && <p className="text-sm text-red-600 font-extrabold">{error}</p>}
+        {error && <p className="text-sm text-danger font-extrabold">{error}</p>}
 
         <PrimaryButton onClick={confirm} disabled={!ready || busy} className="w-full">
           {busy ? t('gamedetails.joining') : t('tsignup.confirm')}

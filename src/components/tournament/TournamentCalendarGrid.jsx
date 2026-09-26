@@ -14,7 +14,7 @@ import { ArrowLeft, CalendarDays } from 'lucide-react'
 import { listMatchesToScore, rescheduleMatch } from '../../lib/tournamentApi'
 import { SCHEDULE_DEFAULTS, canPlace, findConflicts } from '../../lib/tournamentSchedule'
 import { describeError, errorKind } from '../../lib/errors'
-import { EmptyState } from '../ui'
+import { Chips, EmptyState } from '../ui'
 import { MonoLabel } from './TournamentBits'
 
 // Uma cor por categoria, pela ordem em que aparecem — as três do desenho,
@@ -196,7 +196,7 @@ export default function TournamentCalendarGrid({ tournament, onBack }) {
       <h2 className="mt-3 font-display text-lg font-extrabold text-ink-900">
         {currentDay ? t('tournament.grid.title', { day: dayLabel(currentDay) }) : t('tournament.grid.title_empty')}
       </h2>
-      {error && <p className="mt-2 text-[12px] text-danger">{error}</p>}
+      {error && <p className="mt-2 text-xs text-danger">{error}</p>}
 
       {ofDay.length === 0 ? (
         <div className="mt-3">
@@ -205,43 +205,17 @@ export default function TournamentCalendarGrid({ tournament, onBack }) {
       ) : (
         <>
           {days.length > 1 && (
-            <div className="-mx-1 mt-2 flex gap-1.5 overflow-x-auto no-scrollbar px-1">
-              {days.map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => setDay(d)}
-                  className={`whitespace-nowrap rounded-full px-3 py-1.5 text-[12px] font-bold ${d === currentDay ? 'bg-ink-900 text-white' : 'bg-ink-50 text-ink-700'}`}
-                >
-                  {dayLabel(d)}
-                </button>
-              ))}
-            </div>
+            // Filtro (a mesma grelha, outro dia) → <Chips>, como no /marcar.
+            <Chips className="mt-2" label={t('tournament.score.day_picker')} value={currentDay} onChange={setDay}
+              options={days.map((d) => ({ value: d, label: dayLabel(d) }))} />
           )}
 
-          <div className="-mx-1 mt-2 flex gap-1.5 overflow-x-auto no-scrollbar px-1">
-            <button
-              type="button"
-              onClick={() => setCategoryCode(null)}
-              className={`inline-flex min-h-[44px] items-center whitespace-nowrap rounded-full px-3 py-1.5 text-[12px] ${categoryCode === null ? 'bg-ink-900 font-bold text-white' : 'border border-line text-ink-700'}`}
-            >
-              {t('tournament.grid.all_categories')}
-            </button>
-            {codes.map((code) => (
-              <button
-                key={code}
-                type="button"
-                onClick={() => setCategoryCode(code === categoryCode ? null : code)}
-                className={`inline-flex min-h-[44px] items-center whitespace-nowrap rounded-full px-3 py-1.5 text-[12px] font-semibold ${code === categoryCode ? 'bg-ink-900 text-white' : 'border border-line'}`}
-                style={code === categoryCode ? undefined : { color: colorOf(code).text }}
-              >
-                {code}
-              </button>
-            ))}
-          </div>
+          <Chips className="mt-2" label={t('tournament.grid.all_categories')} value={categoryCode ?? 'all'}
+            onChange={(v) => setCategoryCode(v === 'all' || v === categoryCode ? null : v)}
+            options={[{ value: 'all', label: t('tournament.grid.all_categories') }, ...codes.map((code) => ({ value: code, label: code }))]} />
 
           {moving && (
-            <div className="mt-2 flex items-center justify-between gap-2 rounded-ctrl border border-ink-900 bg-ink-50 px-3 py-2 text-[11.5px]">
+            <div className="mt-2 flex items-center justify-between gap-2 rounded-ctrl border border-ink-900 bg-ink-50 px-3 py-2 text-xs">
               <span className="min-w-0">
                 {landingSpots.size > 0
                   ? t('tournament.grid.moving', { match: [moving.category_code, moving.group_label || moving.round_label].filter(Boolean).join(' ') })
@@ -261,14 +235,14 @@ export default function TournamentCalendarGrid({ tournament, onBack }) {
               <div className="flex gap-1">
                 <div className="sticky left-0 z-10 w-[42px] shrink-0 bg-canvas" />
                 {courts.map((court) => (
-                  <div key={court} className="w-[132px] shrink-0 pb-1 text-center font-mono text-[9.5px] font-bold uppercase tracking-[0.05em] text-ink-500">
+                  <div key={court} className="w-[132px] shrink-0 pb-1 text-center font-mono text-xs font-bold uppercase tracking-[0.05em] text-ink-500">
                     {court}
                   </div>
                 ))}
               </div>
               {hours.map((hour) => (
                 <div key={hour} className="flex items-stretch gap-1 pb-1">
-                  <div className="sticky left-0 z-10 flex w-[42px] shrink-0 items-start bg-canvas pt-1 font-mono text-[9.5px] text-ink-500">
+                  <div className="sticky left-0 z-10 flex w-[42px] shrink-0 items-start bg-canvas pt-1 font-mono text-xs text-ink-500">
                     {hour}
                   </div>
                   {courts.map((court) => {
@@ -281,7 +255,7 @@ export default function TournamentCalendarGrid({ tournament, onBack }) {
                           type="button"
                           disabled={busy}
                           onClick={() => moveTo(moving, hour, court)}
-                          className="w-[132px] shrink-0 rounded-lg border-2 border-dashed border-ok bg-[#F0FDF4] text-[9.5px] font-semibold text-ok"
+                          className="w-[132px] shrink-0 rounded-lg border-2 border-dashed border-ok bg-[#F0FDF4] text-xs font-semibold text-ok"
                         >
                           {t('tournament.grid.drop_here')}
                         </button>
@@ -296,7 +270,7 @@ export default function TournamentCalendarGrid({ tournament, onBack }) {
                         type="button"
                         onClick={() => setMoving(chosen ? null : m)}
                         aria-pressed={chosen}
-                        className={`w-[132px] shrink-0 rounded-lg px-1.5 py-1 text-left text-[9.5px] leading-[1.3] ${
+                        className={`w-[132px] shrink-0 rounded-lg px-1.5 py-1 text-left text-xs leading-[1.3] ${
                           chosen ? 'outline outline-2 -outline-offset-2 outline-ink-900'
                             : bad ? 'outline outline-2 -outline-offset-2 outline-[#B42318]' : ''
                         } ${moving && !chosen ? 'opacity-45' : ''}`}
@@ -320,7 +294,7 @@ export default function TournamentCalendarGrid({ tournament, onBack }) {
               {conflicts.map((c, i) => {
                 const fix = suggestionFor(c)
                 return (
-                  <div key={i} className="rounded-ctrl border border-[#F4B4B4] bg-[#FEF0F0] p-2.5 text-[11.5px] text-ink-900">
+                  <div key={i} className="rounded-ctrl border border-warning/30 bg-warning/10 px-3.5 py-2.5 text-sm text-ink-900">
                     {c.kind === 'jogos_seguidos' && t('tournament.grid.conflict_run', { player: c.player, count: c.count })}
                     {c.kind === 'dois_jogos_a_mesma_hora' && t('tournament.grid.conflict_same_time', { players: (c.players || []).join(', ') })}
                     {c.kind === 'campo_ocupado' && t('tournament.grid.conflict_court', { court: c.court })}
@@ -345,7 +319,7 @@ export default function TournamentCalendarGrid({ tournament, onBack }) {
           )}
 
           <MonoLabel className="mt-4">{t('tournament.grid.legend')}</MonoLabel>
-          <p className="mt-1 text-[11.5px] text-ink-500">{t('tournament.grid.move_later')}</p>
+          <p className="mt-1 text-xs text-ink-500">{t('tournament.grid.move_later')}</p>
         </>
       )}
     </div>

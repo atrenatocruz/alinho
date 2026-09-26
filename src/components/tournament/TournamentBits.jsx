@@ -11,16 +11,24 @@ export const LILAC = { bg: '#E9E7FB', border: '#C9C3F3', text: '#4338A8' }
 /** Etiqueta branca com texto lilás ("Torneio", "M5 · Grupo A · 1/3"). */
 export function TourTag({ icon: Icon = Trophy, children }) {
   return (
-    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-white px-2 py-[3px] text-[11px] font-semibold" style={{ color: LILAC.text }}>
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-white px-2 py-[3px] text-[11px] font-extrabold" style={{ color: LILAC.text }}>
       {Icon && <Icon size={12} strokeWidth={2.2} />}
       {children}
     </span>
   )
 }
 
-/** Rótulo em mono maiúsculo ("GRUPO A · PASSAM OS 2 PRIMEIROS"). */
+/** Rótulo em mono maiúsculo ("GRUPO A · PASSAM OS 2 PRIMEIROS"). Só para
+ *  estados e títulos pequenos de secção ou de dia — NUNCA para o rótulo de
+ *  um campo de formulário, que é o FieldLabel (DESIGN.md 126-127; revisão
+ *  da designer de 26 set, «os torneios parecem outra app»). */
 export function MonoLabel({ children, className = '' }) {
-  return <p className={`font-mono text-[10.5px] font-bold uppercase tracking-[0.06em] text-ink-500 ${className}`}>{children}</p>
+  return <p className={`font-mono text-[11px] font-extrabold uppercase tracking-[0.06em] text-ink-500 ${className}`}>{children}</p>
+}
+
+/** O rótulo de um campo, igual ao do «Criar mix» (Geist, normal). */
+export function FieldLabel({ children, className = '', htmlFor }) {
+  return <label htmlFor={htmlFor} className={`block text-sm font-medium text-gray-700 mb-2 ${className}`}>{children}</label>
 }
 
 /** A própria pessoa nunca é "Tu" — é o nome dela, destacado a verde-claro
@@ -41,7 +49,7 @@ export function StatePill({ tone = 'grey', children }) {
   }
   const style = tone === 'wait' ? { background: '#B86E00' } : tone === 'live' ? { background: '#C5DD01' } : undefined
   return (
-    <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-[3px] text-[11px] font-semibold ${tones[tone] || tones.grey}`} style={style}>
+    <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-[3px] text-[11px] font-extrabold ${tones[tone] || tones.grey}`} style={style}>
       {children}
     </span>
   )

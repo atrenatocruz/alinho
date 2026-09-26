@@ -244,6 +244,30 @@ export const LESSON_RPC_MOCKS = {
     }
   },
   request_lesson: () => 'rq-new',
+  // O professor responde (#392, entrega 3). localStorage.mockTeacherRequests =
+  // 'two' (dois pedidos que chocam) | 'accepted' (+ uma aula aceite sem campo).
+  list_my_teacher_requests: () => {
+    const mode = localStorage.getItem('mockTeacherRequests')
+    if (!mode) return []
+    const d = new Date(); d.setDate(d.getDate() + ((2 - d.getDay() + 7) % 7 || 7)); d.setHours(10, 30, 0, 0)
+    const at = (h, m) => { const x = new Date(d); x.setHours(h, m, 0, 0); return x.toISOString() }
+    const ago = (mins) => new Date(Date.now() - mins * 60000).toISOString()
+    const pending = [
+      { id: 'rq-a', teacher_profile_id: 'tp-me', status: 'pending', created_at: ago(120), starts_at: at(10, 30), duration_minutes: 90,
+        lesson_type: 'duo', price_per_person: 35, org_name: 'Clube Exemplo', lesson_id: null, court_booked_at: null,
+        student: { user_id: 'u-ana', name: 'Ana Silva', gender: 'feminino', rating: 1450 }, contact_via: 'whatsapp', contact_href: 'https://wa.me/351912345678' },
+      { id: 'rq-r', teacher_profile_id: 'tp-me', status: 'pending', created_at: ago(60), starts_at: at(11, 0), duration_minutes: 60,
+        lesson_type: 'private', price_per_person: 40, org_name: 'Clube Exemplo', lesson_id: null, court_booked_at: null,
+        student: { user_id: 'u-rui', name: 'Rui Costa', gender: 'masculino', rating: 1500 }, contact_via: 'email', contact_href: 'mailto:rui@example.com' },
+    ]
+    if (mode === 'accepted') {
+      return [pending[1], { ...pending[0], status: 'accepted', lesson_id: 'les-new' }]
+    }
+    return pending
+  },
+  accept_lesson_request: () => 'les-new',
+  reject_lesson_request: () => null,
+  mark_lesson_court_booked: () => null,
   cancel_lesson_request: () => null,
   set_lesson_prices: () => null,
   set_club_peak_hours: () => null,
@@ -256,7 +280,12 @@ export const LESSON_TABLE_MOCKS = {
 }
 
 // Avisos das aulas no sino (localStorage.mockLessonNotices = 'true').
-export const LESSON_NOTICES = () => (localStorage.getItem('mockLessonNotices') === 'true' ? [
+export const LESSON_NOTICES = () => (localStorage.getItem('mockLessonNotices') === 'request' ? [
+  { id: 'ln-r1', kind: 'lesson_request_new', game_id: null, created_at: new Date().toISOString(),
+    data: { student_name: 'Ana Silva', starts_at: at(dayOffset(3), '10:30'), lesson_type: 'duo', org_name: 'Clube Exemplo' } },
+  { id: 'ln-r2', kind: 'lesson_needs_court', game_id: null, created_at: new Date().toISOString(),
+    data: { teacher_name: 'Tiago Lopes', student_name: 'Ana Silva', starts_at: at(dayOffset(3), '10:30'), org_name: 'Clube Exemplo' } },
+] : localStorage.getItem('mockLessonNotices') === 'true' ? [
   { id: 'ln1', kind: 'lesson_enrolment_accepted', game_id: null, created_at: new Date().toISOString(),
     data: { teacher_name: 'Ana Moreira', teacher_profile_id: 'tp-ana', series_label: 'Turma a 4 de terças' } },
   { id: 'ln2', kind: 'lesson_cancelled', game_id: null, created_at: new Date().toISOString(),

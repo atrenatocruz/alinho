@@ -458,6 +458,11 @@ export default function GerirClube() {
   }, [slug, memberships, currentUser?.is_platform_admin, ensureOrgAdminAccess])
 
   const currentOrganizationId = org?.id
+  // Jogos em aberto e torneios: pelo PLANO, não pelo tipo (Francisco, 26 set:
+  // «o plano tem de mostrar aquilo tudo que o plano permite»; #538). Um grupo
+  // Community ou Club vê-os como um clube; Free e Squad ficam só com o mix.
+  // As turmas continuam só nos clubes (e atrás da bandeira das aulas).
+  const canPlanEvents = org?.kind === 'club' || ['pro', 'club'].includes(org?.plan_tier)
 
   // Separador «Aulas» (Trello #49): só em clubes e só depois de a migração
   // das aulas correr — até lá a tabela não existe e o separador não aparece.
@@ -476,21 +481,21 @@ export default function GerirClube() {
   }, [tabParam])
 
   useEffect(() => {
-    if (!currentOrganizationId || org?.kind !== 'club') { setLessonsReady(false); return }
+    if (!currentOrganizationId || !canPlanEvents) { setLessonsReady(false); setTournamentsReady(false); return }
     let alive = true
     // Aulas escondidas (flag 'lessons'): e aqui que tudo o que e das aulas
-    // no Gerir desaparece de uma vez.
-    if (isLessonsEnabled) lessonsAvailable().then((ok) => { if (alive) setLessonsReady(ok) })
+    // no Gerir desaparece de uma vez. Só clubes.
+    if (isLessonsEnabled && org?.kind === 'club') lessonsAvailable().then((ok) => { if (alive) setLessonsReady(ok) })
     else setLessonsReady(false)
     tournamentsAvailable().then((ok) => { if (alive) setTournamentsReady(ok) })
     return () => { alive = false }
-  }, [currentOrganizationId, org?.kind, isLessonsEnabled])
+  }, [currentOrganizationId, org?.kind, canPlanEvents, isLessonsEnabled])
 
   // Saber se ha torneios chega DEPOIS de o loadData ja ter corrido: sem
   // isto, a lista de eventos ficava sem torneios ate se mudar de separador.
   useEffect(() => {
-    if (activeTab === 'events' && org?.kind === 'club' && tournamentsReady) loadTournaments()
-  }, [tournamentsReady, activeTab, org?.kind, currentOrganizationId])
+    if (activeTab === 'events' && canPlanEvents && tournamentsReady) loadTournaments()
+  }, [tournamentsReady, activeTab, canPlanEvents, currentOrganizationId])
 
   useEffect(() => {
     if (activeTab === 'events' && org?.kind === 'club' && lessonsReady) loadTurmas()
@@ -664,8 +669,8 @@ export default function GerirClube() {
         // e o mais lento e que manda.
         await Promise.all([
           loadGames(),
-          isGroupOrg ? Promise.resolve() : loadOpenGames(),
-          !isGroupOrg && tournamentsReady ? loadTournaments() : Promise.resolve(),
+          canPlanEvents ? loadOpenGames() : Promise.resolve(),
+          canPlanEvents && tournamentsReady ? loadTournaments() : Promise.resolve(),
         ])
       } else if (activeTab === 'members') {
         await loadMembers()
@@ -827,9 +832,13 @@ export default function GerirClube() {
     if ((data || []).length > 0 && limitsFor(org?.plan_tier).members != null) {
       // Os admins da plataforma não contam para o limite (Renato, 23 set:
       // org_max_members soma-os ao máximo) — por isso também não contam aqui.
+      // Nem os convidados do robô nem as contas de teste (#542: a base de
+      // dados já não os conta; o aviso dizia «cheio» a quem tinha lugar).
       const { data: rows } = await supabase.from('memberships')
         .select('id, profile:profiles(is_platform_admin)')
         .eq('organization_id', currentOrganizationId)
+        .not('is_guest', 'is', true)
+        .not('is_test', 'is', true)
       setMemberTotal(rows ? rows.filter((r) => !r.profile?.is_platform_admin).length : null)
     }
   }
@@ -2017,13 +2026,16 @@ export default function GerirClube() {
                   -- cada um so abre o formulario desse tipo (desenho de 23
                   set). Num grupo so ha mixes. Secundarios: quatro blocos
                   lima seguidos competiam uns com os outros (DESIGN.md). */}
-              <div className={`grid gap-2 ${isGroupOrg ? 'grid-cols-1' : 'grid-cols-2'}`}>
-                {[
+              {(() => {
+                const botoes = [
                   ['mix', 'gerirclube.event_label_mix', true],
-                  ['aberto', 'gerirclube.tab_open_slots', !isGroupOrg],
-                  ['torneio', 'gerirclube.event_label_tournament', !isGroupOrg && tournamentsReady],
+                  ['aberto', 'gerirclube.tab_open_slots', canPlanEvents],
+                  ['torneio', 'gerirclube.event_label_tournament', canPlanEvents && tournamentsReady],
                   ['turma', 'gerirclube.event_label_series', !isGroupOrg && lessonsReady],
-                ].filter(([, , mostra]) => mostra).map(([tipo, texto]) => (
+                ].filter(([, , mostra]) => mostra)
+                return (
+              <div className={`grid gap-2 ${botoes.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                {botoes.map(([tipo, texto]) => (
                   <button
                     key={tipo}
                     type="button"
@@ -2034,6 +2046,8 @@ export default function GerirClube() {
                   </button>
                 ))}
               </div>
+                )
+              })()}
 
               {/* O cartao para os jogos entre membros (/clube/:slug/jogos)
                   saiu daqui (Francisco, 24 set: «temos o card e o botao, nao

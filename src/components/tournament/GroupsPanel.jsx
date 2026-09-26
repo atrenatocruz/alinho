@@ -29,17 +29,17 @@ function GroupTable({ group, matches, entries, qualifiers, myEntryId, t }) {
     .every((m) => ['terminado', 'falta', 'desistencia'].includes(m.status) || m.winner_entry_id)
 
   return (
-    <section className="mb-3 overflow-hidden rounded-xl border border-ink-100 bg-white">
-      <header className="flex items-center justify-between border-b border-ink-100 px-3 py-2">
-        <b className="text-[13px] font-extrabold text-ink-900">{group.name}</b>
-        <span className="font-mono text-[10.5px] text-muted">
+    <section className="card mb-3 !p-0 overflow-hidden">
+      <header className="flex items-center justify-between border-b border-line px-4 py-2.5">
+        <b className="text-sm font-extrabold text-ink-900">{group.name}</b>
+        <span className="font-mono text-xs text-muted">
           {t('tournament.draw.played_of', { played, total })}
         </span>
       </header>
 
-      <table className="w-full border-collapse text-[12px]">
+      <table className="w-full border-collapse text-xs">
         <thead>
-          <tr className="text-[10px] uppercase tracking-wide text-muted">
+          <tr className="text-xs uppercase tracking-wide text-muted">
             <th className="w-7 py-1.5 text-center font-semibold">#</th>
             <th className="py-1.5 text-left font-semibold">{t('tournament.draw.col_team')}</th>
             <th className="w-8 py-1.5 text-center font-semibold" title={t('tournament.draw.col_played_full')}>
@@ -70,7 +70,7 @@ function GroupTable({ group, matches, entries, qualifiers, myEntryId, t }) {
               >
                 <td className="py-1.5 text-center">
                   <span
-                    className={`inline-flex h-5 w-5 items-center justify-center rounded-full font-mono text-[10.5px] font-bold ${
+                    className={`inline-flex h-5 w-5 items-center justify-center rounded-full font-mono text-xs font-bold ${
                       passes ? 'bg-[#E9E7FB] text-[#4338A8]' : 'text-muted'
                     }`}
                   >
@@ -78,29 +78,29 @@ function GroupTable({ group, matches, entries, qualifiers, myEntryId, t }) {
                   </span>
                 </td>
                 <td className="py-1.5 pr-2">
-                  <span className={`text-[12px] ${passes ? 'font-bold text-ink-900' : 'text-ink-900'}`}>
+                  <span className={`text-xs ${passes ? 'font-bold text-ink-900' : 'text-ink-900'}`}>
                     {team?.name || '—'}
                   </span>
                   {team?.seed ? (
-                    <span className="ml-1 font-mono text-[9.5px] text-muted">
+                    <span className="ml-1 font-mono text-xs text-muted">
                       {t('tournament.draw.seed_short', { n: team.seed })}
                     </span>
                   ) : null}
                   {mine ? <Me>{t('tournament.draw.you')}</Me> : null}
                 </td>
-                <td className="py-1.5 text-center font-mono text-[11px] text-muted">{row.played}</td>
-                <td className="py-1.5 text-center font-mono text-[11px] font-bold text-ink-900">{row.wins}</td>
-                <td className="py-1.5 text-center font-mono text-[11px] text-muted">
+                <td className="py-1.5 text-center font-mono text-xs text-muted">{row.played}</td>
+                <td className="py-1.5 text-center font-mono text-xs font-bold text-ink-900">{row.wins}</td>
+                <td className="py-1.5 text-center font-mono text-xs text-muted">
                   {row.diff > 0 ? `+${row.diff}` : row.diff}
                 </td>
-                <td className="py-1.5 text-center font-mono text-[11px] text-muted">{row.gamesWon}</td>
+                <td className="py-1.5 text-center font-mono text-xs text-muted">{row.gamesWon}</td>
               </tr>
             )
           })}
         </tbody>
       </table>
 
-      <p className="border-t border-ink-50 px-3 py-1.5 text-[10.5px] text-muted">
+      <p className="border-t border-ink-50 px-3 py-1.5 text-xs text-muted">
         {t(done ? 'tournament.draw.qualify_note' : 'tournament.draw.qualify_note_running', { count: qualifiers })}
       </p>
     </section>
@@ -112,7 +112,7 @@ export default function GroupsPanel({ category, my }) {
   const { groups, entries, matches, loading } = useCategoryBoard(category?.id)
 
   if (loading) {
-    return <p className="py-6 text-center text-[12px] text-muted">{t('common.loading')}</p>
+    return <p className="py-6 text-center text-xs text-muted">{t('common.loading')}</p>
   }
 
   if (!groups.length) {
@@ -141,7 +141,7 @@ export default function GroupsPanel({ category, my }) {
           t={t}
         />
       ))}
-      <p className="px-1 pb-2 text-[10.5px] text-muted">{t('tournament.draw.tiebreak_note')}</p>
+      <p className="px-1 pb-2 text-xs text-muted">{t('tournament.draw.tiebreak_note')}</p>
     </div>
   )
 }

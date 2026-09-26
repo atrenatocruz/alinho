@@ -210,3 +210,39 @@ export async function cancelLessonRequest(id) {
   const { error } = await supabase.rpc('cancel_lesson_request', { p_id: id })
   if (error) throw error
 }
+
+// ── O professor responde (Trello #392, assunto 2; migration_lessons_4) ──
+
+/** Pedidos que recebi como professor (todos os meus clubes), por responder
+    primeiro. Cada um traz `contact_href` (wa.me / mailto) — o botão que o
+    aluno escolheu; o número não vem escrito. */
+export async function listMyTeacherRequests() {
+  const { data, error } = await supabase.rpc('list_my_teacher_requests')
+  if (error) throw error
+  return data || []
+}
+
+/** Aceita o pedido tal como o aluno o fez: fica logo inscrito. */
+export async function acceptLessonRequest(id) {
+  const { data, error } = await supabase.rpc('accept_lesson_request', { p_id: id })
+  if (error) throw error
+  return data
+}
+
+export async function rejectLessonRequest(id) {
+  const { error } = await supabase.rpc('reject_lesson_request', { p_id: id })
+  if (error) throw error
+}
+
+/** «Já marquei» o campo com a receção do clube. */
+export async function markLessonCourtBooked(id) {
+  const { error } = await supabase.rpc('mark_lesson_court_booked', { p_id: id })
+  if (error) throw error
+}
+
+/** Email (Edge Function send-email) — sempre um extra ao sino; se falhar,
+    não se mostra erro nenhum. */
+export function emailLessonRequest(type, requestId) {
+  supabase.functions.invoke('send-email', { body: { type, request_id: requestId } })
+    .catch((err) => console.error('Error sending lesson email:', err))
+}
