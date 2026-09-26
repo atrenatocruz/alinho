@@ -24,6 +24,11 @@
 //               muda-o quem chama, com nextLabel)
 //   Sem passos (total ≤ 1, ou sem total): não se desenha a barra — é o
 //   formulário de uma página só, como editar um torneio com inscrições.
+//
+// Espaço da versão final (26 set): título → nome/barra 24 px, barra → 1.ª
+// pergunta 24 px, entre perguntas 24 px, rótulo → campo 8 px (o mb-2 do
+// rótulo), último campo → botão 32 px. Nada fica tapado pelo menu de baixo
+// (pb-28, pedido do Bugs e da designer).
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft } from 'lucide-react'
 import { PrimaryButton } from '../ui'
@@ -35,16 +40,16 @@ export default function StepPage({
   const { t } = useTranslation()
   const stepped = total > 1
   return (
-    <div className="mx-auto max-w-lg space-y-4">
+    <div className="mx-auto max-w-lg pb-28">
       <button type="button" onClick={onBack} className="inline-flex min-h-[44px] items-center gap-1.5 text-sm font-extrabold text-ink-700">
         <ArrowLeft size={20} />
         {step === 1 ? t('steps.cancel') : t('common.back')}
       </button>
 
-      <h2 className="text-3xl text-ink-900">{title}</h2>
-      {top}
+      <h2 className="mt-2 text-3xl text-ink-900">{title}</h2>
+      {top && <div className="mt-6">{top}</div>}
 
-      {stepped && <div>
+      {stepped && <div className="mt-6">
         <div className="h-1 overflow-hidden rounded-sm bg-ink-50">
           <i className="block h-full rounded-sm bg-ink-900 transition-all duration-fast" style={{ width: `${(step / total) * 100}%` }} />
         </div>
@@ -53,14 +58,14 @@ export default function StepPage({
         </p>
       </div>}
 
-      <div className="space-y-5">{children}</div>
+      <div className="mt-6 space-y-6">{children}</div>
 
       {error && (
-        <p className="rounded-ctrl border border-danger/30 bg-danger/10 px-3 py-2 text-sm font-extrabold text-danger">{error}</p>
+        <p className="mt-6 rounded-ctrl border border-danger/30 bg-danger/10 px-3 py-2 text-sm font-extrabold text-danger">{error}</p>
       )}
 
-      {footer || (
-        <div>
+      {footer ? <div className="mt-8">{footer}</div> : (
+        <div className="mt-8">
           <PrimaryButton onClick={onNext} disabled={nextDisabled || busy} className="w-full">
             {nextLabel || t('steps.next')}
           </PrimaryButton>
