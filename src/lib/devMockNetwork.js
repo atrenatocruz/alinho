@@ -868,7 +868,12 @@ const TABLE_MOCKS = {
       data: { game_title: 'Mix de Sábado', game_date: tomorrow8pm.toISOString(), partner_name: 'Rui Oliveira Gomes', actor_name: 'Marta Costa' } },
     { id: 'n3', kind: 'mix_removed', game_id: 'fake-game-1', created_at: new Date().toISOString(),
       data: { game_title: 'Mix de Terça', game_date: tomorrow8pm.toISOString() } },
-  ] : []).concat(LESSON_NOTICES()),
+  ] : []).concat(LESSON_NOTICES()).concat(localStorage.getItem('mockTCorrection') === 'true' ? [
+    // Pedido de correção a chegar ao organizador (Trello #485, forma do Dev 3).
+    { id: 'tc1', kind: 'tournament_correction_requested', game_id: null, created_at: new Date().toISOString(),
+      data: { tournament_id: 'tour-smash-open', tournament_slug: 'smash-open-2026', tournament_name: 'Smash Open 2026',
+              category_code: 'MX4', match_id: 'm-2', requester_name: 'Marta Silva' } },
+  ] : []),
   // A organização do Admin(Dev). Sem esta linha o separador Definições do
   // Gerir ficava em branco (loadSettings nunca recebia nada). Marcada como
   // grupo criado na Comunidade para se poder validar o "Eliminar grupo".

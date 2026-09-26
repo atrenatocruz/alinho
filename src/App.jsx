@@ -29,6 +29,7 @@ import TournamentPrint from './pages/TournamentPrint'
 import CookieConsentBanner from './components/CookieConsentBanner'
 import ErrorBoundary from './components/ErrorBoundary'
 import { safeInternalPath } from './lib/loginLinks'
+import { reloadOnceForChunk, clearChunkReload } from './lib/chunkReload'
 
 // Route-level splitting (impeccable audit, P3 perf finding): these are all
 // low-traffic relative to the routes above — admin-only, feature-flagged,
@@ -41,25 +42,17 @@ import { safeInternalPath } from './lib/loginLinks'
 // import falha e o ecra fica em branco (medido no alinho.pt, 22 set 2026).
 // Recarregar vai buscar os nomes novos. Uma vez so: se a falha for outra, o
 // erro sobe para o ErrorBoundary em vez de ficar a recarregar em ciclo.
-const RELOAD_KEY = 'reloadedForChunk'
+// As contas de «recarregar uma vez» vivem em lib/chunkReload.js (#569), que
+// o ErrorBoundary também usa para os painéis do torneio.
 const lazyPage = (importer) =>
   lazy(() =>
     importer().then(
       (mod) => {
-        try { sessionStorage.removeItem(RELOAD_KEY) } catch { /* sem sessionStorage: segue */ }
+        clearChunkReload()
         return mod
       },
       (error) => {
-        let alreadyReloaded = true
-        try {
-          alreadyReloaded = sessionStorage.getItem(RELOAD_KEY) === '1'
-          if (!alreadyReloaded) sessionStorage.setItem(RELOAD_KEY, '1')
-        } catch {
-          // Sem sessionStorage nao ha como saber se ja se recarregou, e
-          // recarregar as cegas arrisca um ciclo: mostra-se o erro.
-        }
-        if (alreadyReloaded) throw error
-        window.location.reload()
+        if (!reloadOnceForChunk()) throw error
         return new Promise(() => {}) // a pagina esta a recarregar
       }
     )
