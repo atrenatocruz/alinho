@@ -105,6 +105,27 @@ export const replaceTeacherAvailability = async (teacherProfileId, rows) => {
   }
 }
 
+// Um perfil só, com o horário: o ecrã do admin do clube (#418). A RLS já
+// deixa o admin do clube e a equipa Alinho ver o perfil.
+export const getTeacherProfile = async (id) => {
+  const { data, error } = await supabase
+    .from('teacher_profiles')
+    .select('*, user:profiles!teacher_profiles_user_id_fkey(name, gender), organization:organizations(name, slug), availability:teacher_availability(*)')
+    .eq('id', id)
+  if (error) throw error
+  return data?.[0] || null
+}
+
+// O horário de outro professor (admin do clube ou equipa Alinho): pela RPC,
+// porque a tabela só deixa o dono escrever (migration_teacher_availability_admin.sql).
+export const setTeacherAvailability = async (teacherProfileId, rows) => {
+  const { error } = await supabase.rpc('set_teacher_availability', {
+    p_teacher_profile_id: teacherProfileId,
+    p_slots: rows.map((r) => ({ day_of_week: r.day, start_time: r.start, end_time: r.end })),
+  })
+  if (error) throw error
+}
+
 export const withdrawTeacherProfile = async (id) => {
   const { error } = await supabase.from('teacher_profiles').delete().eq('id', id)
   if (error) throw error

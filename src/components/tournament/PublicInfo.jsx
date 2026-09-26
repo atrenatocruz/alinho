@@ -85,12 +85,17 @@ export default function PublicInfo({ tournament, categories = [], entriesOpen = 
       {(tournament.organizer_text || tournament.entry_fee_cents != null) && (
         <div className="flex gap-2 text-sm">
           <Euro size={16} className="mt-0.5 shrink-0 text-muted" />
-          <p className="text-ink-900">
+          {/* O preço numa linha e, por baixo, o texto do organizador com as
+              mudanças de linha dele — antes ficava tudo colado numa parede,
+              junto ao preço (QA, 26 set). */}
+          <div className="min-w-0 text-ink-900">
             {tournament.entry_fee_cents != null && (
-              <b className="mr-1">{t('tsignup.price', { price: (tournament.entry_fee_cents / 100).toFixed(0), each: eachOf(tournament.entry_fee_cents, i18n.language) })}</b>
+              <p className="font-extrabold">{t('tsignup.price', { price: (tournament.entry_fee_cents / 100).toFixed(0), each: eachOf(tournament.entry_fee_cents, i18n.language) })}</p>
             )}
-            <span className="text-muted">{tournament.organizer_text}</span>
-          </p>
+            {tournament.organizer_text && (
+              <p className="mt-0.5 whitespace-pre-line text-muted [overflow-wrap:anywhere]">{tournament.organizer_text}</p>
+            )}
+          </div>
         </div>
       )}
 

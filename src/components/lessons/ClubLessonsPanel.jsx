@@ -3,10 +3,12 @@
 // print 08, 1.º telemóvel) e Turmas (Fase 1b). Pedidos entram na Fase 3.
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import { ArrowDown, ArrowUp, GraduationCap } from 'lucide-react'
 import { Avatar, EmptyState, PrimaryButton, Tabs } from '../ui'
 import {
   listClubTeachers, getClubLessonSettings, saveClubLessonPrices, saveClubPeakHours, saveTeacherOrder,
+  getTeacherLessonPrices, saveTeacherLessonPrices,
 } from '../../lib/lessonsApi'
 import { priceRowFor, LESSON_CAPACITY, LESSON_DURATIONS } from '../../lib/lessons'
 import { describeError } from '../../lib/errors'
@@ -127,6 +129,7 @@ export function NewSeries({ organizationId, onDone }) {
 
 function TeachersOrder({ organizationId, teachers, setTeachers, loading }) {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const [saving, setSaving] = useState(false)
 
   const move = async (index, delta) => {
@@ -166,6 +169,12 @@ function TeachersOrder({ organizationId, teachers, setTeachers, loading }) {
                   {[levels, teacher.from_price != null && t('lessons.from_price', { price: euros(teacher.from_price) })]
                     .filter(Boolean).join(' · ')}
                 </p>
+                {/* O horário do professor, posto pelo clube (26 set): o
+                    Tiago põe o do Diogo. Mesmo ecrã de «O meu horário». */}
+                <button type="button" onClick={() => navigate(`/gerir/professor/${teacher.teacher_profile_id}/horario`)}
+                  className="mt-0.5 inline-flex items-center min-h-[32px] text-[13px] font-extrabold text-ink-900 hover:underline">
+                  {t('teacher.schedule_admin_button')} ›
+                </button>
               </div>
               <div className="flex gap-1 shrink-0">
                 <button type="button" disabled={saving || i === 0} onClick={() => move(i, -1)} aria-label={t('lessons.move_up')}
@@ -187,7 +196,9 @@ function TeachersOrder({ organizationId, teachers, setTeachers, loading }) {
 
 // Usado tambem no separador «Clube» do Gerir, que e onde os precos vivem
 // desde 24 set: sao configuracao do clube, nao um evento.
-export function Prices({ organizationId, orgName }) {
+// Com teacherProfileId: «Os meus preços» do professor sem clube (o Daniel,
+// 26 set). Sem clube nao ha horas de ponta, por isso e uma tabela so.
+export function Prices({ organizationId, orgName, teacherProfileId = null }) {
   const { t } = useTranslation()
   const [view, setView] = useState('peak') // peak | off | hours
   const [loaded, setLoaded] = useState(null)
@@ -198,14 +209,15 @@ export function Prices({ organizationId, orgName }) {
 
   useEffect(() => {
     let alive = true
-    getClubLessonSettings(organizationId)
+    const load = teacherProfileId ? getTeacherLessonPrices(teacherProfileId) : getClubLessonSettings(organizationId)
+    load
       .then((res) => {
         if (!alive) return
         const on = todayIso()
         const d = {}
         for (const peak of [true, false]) {
           for (const { type, duration } of [...ROWS, { type: 'trial', duration: 60 }]) {
-            const row = priceRowFor(res.prices, { lessonType: type, durationMinutes: duration, peak, onIso: on })
+            const row = priceRowFor(res.prices, { teacherProfileId, lessonType: type, durationMinutes: duration, peak, onIso: on })
             d[keyOf(type, duration, peak)] = { month: row?.price_month ?? '', lesson: row?.price_lesson ?? '' }
           }
         }
@@ -220,7 +232,7 @@ export function Prices({ organizationId, orgName }) {
       })
       .catch((error) => console.error('Error loading lesson prices:', error))
     return () => { alive = false }
-  }, [organizationId])
+  }, [organizationId, teacherProfileId])
 
   const lastChange = useMemo(() => {
     const dates = (loaded?.prices || []).map((p) => p.valid_from).filter(Boolean).sort()
@@ -228,7 +240,7 @@ export function Prices({ organizationId, orgName }) {
   }, [loaded])
 
   if (!loaded) return null
-  const peak = view === 'peak'
+  const peak = teacherProfileId ? false : view === 'peak'
 
   const setCell = (k, field, value) => {
     setMessage(null)
@@ -239,6 +251,7 @@ export function Prices({ organizationId, orgName }) {
     const rows = []
     for (const [k, v] of Object.entries(draft)) {
       const [type, duration, p] = k.split('-')
+      if (teacherProfileId && p === 'p') continue
       const month = type === 'trial' ? null : num(v.month)
       const lesson = num(v.lesson)
       if (month == null && lesson == null) continue
@@ -247,7 +260,8 @@ export function Prices({ organizationId, orgName }) {
     setSaving(true)
     setMessage(null)
     try {
-      await saveClubLessonPrices(organizationId, rows)
+      if (teacherProfileId) await saveTeacherLessonPrices(teacherProfileId, rows)
+      else await saveClubLessonPrices(organizationId, rows)
       setMessage({ ok: true, text: t('lessons.prices_saved') })
     } catch (error) {
       setMessage({ ok: false, text: describeError(t, error, 'lessons.error_save_prices') })
@@ -289,9 +303,9 @@ export function Prices({ organizationId, orgName }) {
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-muted">{t('lessons.prices_agreed', { name: orgName })}</p>
+      <p className="text-sm text-muted">{teacherProfileId ? t('lessons.prices_own_intro') : t('lessons.prices_agreed', { name: orgName })}</p>
 
-      <Tabs
+      {!teacherProfileId && <Tabs
         value={view}
         onChange={(v) => { setView(v); setMessage(null) }}
         options={[
@@ -299,7 +313,7 @@ export function Prices({ organizationId, orgName }) {
           { value: 'off', label: t('lessons.off_peak') },
           { value: 'hours', label: t('lessons.peak_hours_tab') },
         ]}
-      />
+      />}
 
       {view === 'hours' ? (
         <div className="card space-y-2">

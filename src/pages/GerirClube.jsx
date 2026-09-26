@@ -764,6 +764,8 @@ export default function GerirClube() {
     if (tipo === 'mix') { setCriar(null); setShowCreateGame(true); return }
     // Os jogos em aberto abrem na página própria, em passos (#342).
     if (tipo === 'aberto') { navigate(`/gerir/${slug}/criar/em-aberto`); return }
+    // O torneio abre numa página só do formulário (ponto 0, 26 set).
+    if (tipo === 'torneio') { navigate(`/gerir/${slug}/criar/torneio`); return }
     setShowCreateGame(false)
     setCriar(tipo)
   }

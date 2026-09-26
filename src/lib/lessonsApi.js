@@ -51,6 +51,22 @@ export async function saveClubLessonPrices(organizationId, rows) {
   if (error) throw error
 }
 
+/** Preços do próprio professor, sem clube (o Daniel, 26 set). */
+export async function getTeacherLessonPrices(teacherProfileId) {
+  const { data, error } = await supabase.from('lesson_prices').select('*').eq('teacher_profile_id', teacherProfileId)
+  if (error) throw error
+  return { prices: data || [], peakHours: [] }
+}
+
+/** A mesma revisão de tabela, mas do professor (set_lesson_prices deixa-o
+    gravar com can_edit_lessons). */
+export async function saveTeacherLessonPrices(teacherProfileId, rows) {
+  const { error } = await supabase.rpc('set_lesson_prices', {
+    p_organization_id: null, p_teacher_profile_id: teacherProfileId, p_prices: rows,
+  })
+  if (error) throw error
+}
+
 /** ranges: [{ day_of_week: 1..7, start_time: 'HH:MM', end_time: 'HH:MM' }] */
 export async function saveClubPeakHours(organizationId, ranges) {
   const { error } = await supabase.rpc('set_club_peak_hours', { p_organization_id: organizationId, p_ranges: ranges })

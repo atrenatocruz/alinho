@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Check, GraduationCap, Plus, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { DAYS, listTeacherProfiles, replaceTeacherAvailability, updateTeacherContact } from '../lib/teachers'
+import { DAYS, getTeacherProfile, listTeacherProfiles, replaceTeacherAvailability, setTeacherAvailability, updateTeacherContact } from '../lib/teachers'
 import {
   TIME_OPTIONS, compactTime, isActiveTeacherProfile, nextSlot, rowsFromSchedule, scheduleFromRows, scheduleProblems, slotProblem,
 } from '../lib/teacherSchedule'
 import { describeError } from '../lib/errors'
 import { Chips, ConfirmSheet, EmptyState, PrimaryButton } from '../components/ui'
+import { Prices } from '../components/lessons/ClubLessonsPanel'
 
 /* ─── «O meu horário» (Trello #418) ───────────────────────────────────────
    Pedido de um professor real (Diogo Gonçalves, A2N, 25 set 2026): depois
@@ -17,12 +18,18 @@ import { Chips, ConfirmSheet, EmptyState, PrimaryButton } from '../components/ui
    assunto 1, ecrã 3. Entra-se pelo Perfil → Professor e fica FORA da
    bandeira das aulas: o horário aparece já na página do professor; preços
    e marcação de aulas continuam escondidos até 11 out.
-   Grava direto nas tabelas — a RLS só deixa o dono escrever a sua linha. */
+   Grava direto nas tabelas — a RLS só deixa o dono escrever a sua linha.
+
+   Em /gerir/professor/:tp/horario (26 set) é o mesmo ecrã para o admin do
+   clube ou a equipa Alinho porem o horário de outro professor: só o
+   horário, gravado pela RPC set_teacher_availability. */
 
 export default function TeacherSchedule() {
   const { t } = useTranslation()
-  const { user } = useAuth()
+  const { user, isLessonsEnabled } = useAuth()
   const navigate = useNavigate()
+  // O horário de outro professor (admin do clube / equipa Alinho).
+  const { tp: adminTp = null } = useParams()
   const [loading, setLoading] = useState(true)
   const [mine, setMine] = useState(null)
   // Um perfil de professor por clube (#392, assunto 3): os ativos têm horário.
@@ -39,6 +46,18 @@ export default function TeacherSchedule() {
 
   useEffect(() => {
     let alive = true
+    if (adminTp) {
+      getTeacherProfile(adminTp)
+        .then((p) => {
+          if (!alive || !p) return
+          setProfiles([p])
+          setMine(p)
+          setByDay(scheduleFromRows(p.availability || []))
+        })
+        .catch((err) => console.error('Error loading teacher profile:', err))
+        .finally(() => { if (alive) setLoading(false) })
+      return () => { alive = false }
+    }
     listTeacherProfiles()
       .then((all) => {
         if (!alive) return
@@ -59,7 +78,7 @@ export default function TeacherSchedule() {
       .catch((err) => console.error('Error loading teacher profile:', err))
       .finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
-  }, [user?.id])
+  }, [user?.id, adminTp])
 
   const changed = () => { setSaved(false); setError(''); setContactMissing(false) }
   // «Correu bem»: tira preta em baixo que desaparece sozinha em 3 s (regra
@@ -78,7 +97,7 @@ export default function TeacherSchedule() {
 
   const handleSave = async () => {
     setError('')
-    if (!contact.trim()) {
+    if (!adminTp && !contact.trim()) {
       setEditing('contact')
       setContactMissing(true)
       return
@@ -93,6 +112,10 @@ export default function TeacherSchedule() {
       // O contacto e a zona são da pessoa: vão para todos os perfis. O
       // horário grava-se em cada clube, com os blocos desse clube.
       for (const p of profiles) {
+        if (adminTp) {
+          await setTeacherAvailability(p.id, rowsFromSchedule(byDay, p.id))
+          continue
+        }
         await updateTeacherContact(p.id, { contact: contact.trim(), zone: zone.trim() })
         await replaceTeacherAvailability(p.id, rowsFromSchedule(byDay, p.id))
       }
@@ -107,8 +130,8 @@ export default function TeacherSchedule() {
   }
 
   const back = (
-    <button type="button" onClick={() => navigate('/perfil')} className="inline-flex items-center gap-1.5 text-ink-900 font-extrabold text-sm hover:underline">
-      <ArrowLeft size={16} /> {t('teacher.schedule_back')}
+    <button type="button" onClick={() => (adminTp ? navigate(-1) : navigate('/perfil'))} className="inline-flex items-center gap-1.5 text-ink-900 font-extrabold text-sm hover:underline">
+      <ArrowLeft size={16} /> {adminTp ? t('teacher.schedule_admin_back') : t('teacher.schedule_back')}
     </button>
   )
 
@@ -154,6 +177,8 @@ export default function TeacherSchedule() {
   )
 
   const selectClass = 'input-field !min-h-[44px] !py-2'
+  const firstName = (mine?.user?.name || '').split(' ')[0]
+  const ownPricesTp = !adminTp && isLessonsEnabled ? profiles.find((p) => !p.organization_id)?.id || null : null
   // Com mais de um clube, cada bloco diz o clube e o «+ Horas» pergunta onde.
   const manyClubs = profiles.length > 1
   const clubOf = (tp) => profiles.find((p) => p.id === tp)?.organization?.name || t('comunidade.teacher_no_club_short')
@@ -166,8 +191,12 @@ export default function TeacherSchedule() {
     <div className="space-y-4">
       {back}
       <div>
-        <h2 className="text-2xl text-ink-900">{t('teacher.schedule_title')}</h2>
-        <p className="text-sm text-muted mt-1">{t('teacher.schedule_intro')}</p>
+        <h2 className="text-2xl text-ink-900">
+          {adminTp ? t('teacher.schedule_admin_title', { name: firstName, context: mine?.user?.gender === 'feminino' ? 'f' : undefined }) : t('teacher.schedule_title')}
+        </h2>
+        <p className="text-sm text-muted mt-1">
+          {adminTp ? t('teacher.schedule_admin_intro', { club: mine?.organization?.name || '' }) : t('teacher.schedule_intro')}
+        </p>
       </div>
 
       <div className="card !py-1">
@@ -198,16 +227,25 @@ export default function TeacherSchedule() {
         ))}
       </div>
 
-      <div className="card !py-2">
+      {!adminTp && <div className="card !py-2">
         {field('zone', t('teacher.zone_label'), zone, setZone, t('teacher.zone_placeholder'))}
         {field('contact', t('teacher.contact_label'), contact, setContact, t('comunidade.contact_placeholder'), contactMissing)}
-      </div>
+      </div>}
 
       {error && <div role="alert" className="bg-danger/10 text-danger px-4 py-3 rounded-ctrl text-sm font-extrabold">{error}</div>}
 
       <PrimaryButton className="w-full" onClick={handleSave} disabled={saving}>
         {saving ? t('layout.saving') : t('layout.save')}
       </PrimaryButton>
+
+      {/* «Os meus preços» (26 set): quem não tem clube (o Daniel) não tem
+          tabela de clube a que ir buscar o preço, por isso põe a sua. */}
+      {ownPricesTp && (
+        <div className="pt-4 border-t border-line space-y-3">
+          <h3 className="text-lg font-extrabold text-ink-900">{t('teacher.own_prices_title')}</h3>
+          <Prices teacherProfileId={ownPricesTp} />
+        </div>
+      )}
 
       {saved && (
         <div role="status" className="fixed left-4 right-4 bottom-[104px] z-50 mx-auto max-w-md bg-ink-900 text-white px-4 py-3 rounded-ctrl text-sm font-extrabold flex items-center gap-2 animate-fade-up">

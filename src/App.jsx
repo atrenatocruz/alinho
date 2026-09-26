@@ -69,6 +69,7 @@ const GroupMatches = lazyPage(() => import('./pages/GroupMatches'))
 const CreateGroupMatch = lazyPage(() => import('./pages/CreateGroupMatch'))
 const CreateOpenSlots = lazyPage(() => import('./pages/CreateOpenSlots'))
 const Gerir = lazyPage(() => import('./pages/Gerir'))
+const CreateTournamentPage = lazyPage(() => import('./pages/CreateTournamentPage'))
 const GerirClube = lazyPage(() => import('./pages/GerirClube'))
 const Instructions = lazyPage(() => import('./pages/Instructions'))
 const PrivacyPolicy = lazyPage(() => import('./pages/PrivacyPolicy'))
@@ -522,6 +523,17 @@ function AppRoutes() {
             </Guard>
           }
         />
+        {/* O mesmo ecrã, para o admin do clube pôr o horário de um
+            professor do clube (26 set). Quem pode gravar decide a base de
+            dados (set_teacher_availability). */}
+        <Route
+          path="/gerir/professor/:tp/horario"
+          element={
+            <Guard require="protected" showSplash={showSplash}>
+              <TeacherSchedule />
+            </Guard>
+          }
+        />
         <Route
           path="/jogos-privados"
           element={
@@ -569,6 +581,15 @@ function AppRoutes() {
           element={
             <Guard require="protected" showSplash={showSplash}>
               <CreateOpenSlots />
+            </Guard>
+          }
+        />
+        {/* Criar um torneio numa página só do formulário (ponto 0, 26 set). */}
+        <Route
+          path="/gerir/:slug/criar/torneio"
+          element={
+            <Guard require="protected" showSplash={showSplash}>
+              <CreateTournamentPage />
             </Guard>
           }
         />
