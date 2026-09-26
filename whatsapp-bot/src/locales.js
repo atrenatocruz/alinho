@@ -81,7 +81,9 @@ Para veres esta lista:
   mix_already_started_out: '🤖 Este mix já começou/terminou — já não é possível sair por aqui.',
   already_joined: '🤖 Já estás inscrito neste mix! 🎾',
   mix_full_offer_waitlist: '🤖 Mix cheio! Queres entrar como suplente? Responde com *Sim* ou *Não*.',
-  guest_joined: '🤖 Fixe, {{name}}! Inscrevi-te como convidado 🎾 Regista-te em {{appUrl}} e confirma o teu número no perfil: o que jogaste como convidado passa para a tua conta.',
+  // Texto do Francisco, 27 set (palavra por palavra). Vai no grupo, como
+  // antes — nunca em privado (risco de o WhatsApp banir o robô).
+  guest_joined: 'Olá {{name}}! Acabaste de entrar num mix como *convidado* — podes jogar assim, mas os jogos ficam numa conta temporária.\nRegista-te em https://alinho.pt e confirma o teu número de telefone para associares a tua conta temporária à tua conta principal\n\n⚠️ *Não voltes a fazer In na app* antes de confirmar o número — se a conta nova e a de convidado estiverem no mesmo mix, não consigo juntá-las e ficas com duas contas.',
   // verify.js (#537) — resposta a uma mensagem PRIVADA com o código
   verify_ok: '🤖 Número confirmado, {{name}}! ✅ Já podes voltar à app.',
   verify_ok_merged: '🤖 Número confirmado, {{name}}! ✅ O que jogaste como convidado passou para a tua conta. Já podes voltar à app.',
@@ -197,7 +199,7 @@ To see this list:
   mix_already_started_out: "🤖 This mix has already started or finished — you can't leave here anymore.",
   already_joined: "🤖 You're already signed up for this mix! 🎾",
   mix_full_offer_waitlist: '🤖 Mix is full! Want to join the waitlist? Reply *Sim* or *Não*.',
-  guest_joined: "🤖 Nice one, {{name}}! You're in as a guest 🎾 Sign up at {{appUrl}} and confirm your number in your profile: what you played as a guest moves to your account.",
+  guest_joined: "Hi {{name}}! You've just joined a mix as a *guest* — you can play like this, but your games are kept in a temporary account.\nSign up at https://alinho.pt and confirm your phone number to link your temporary account to your main account\n\n⚠️ *Don't join again in the app* before confirming your number — if the new account and the guest one are in the same mix, I can't merge them and you'll end up with two accounts.",
   verify_ok: '🤖 Number confirmed, {{name}}! ✅ You can go back to the app.',
   verify_ok_merged: '🤖 Number confirmed, {{name}}! ✅ What you played as a guest moved to your account. You can go back to the app.',
   verify_bad_code: "🤖 This code isn't valid or has expired 😕 Ask for a new one in the app (Profile → Personal info) and send it from the number in your profile.",

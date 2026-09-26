@@ -153,7 +153,7 @@ export async function resolveProfileByPhoneJid(phoneJid, organizationId) {
 
 // E-mail inventado com que o bot cria os convidados (createGuestProfile).
 const GUEST_EMAIL_LIKE = 'guest-%@whatsapp.alinho.pt'
-const isGuestEmail = (email) => /^guest-.*@whatsapp\.alinho\.pt$/.test(email || '')
+export const isGuestEmail = (email) => /^guest-.*@whatsapp\.alinho\.pt$/.test(email || '')
 
 /**
  * Entre várias contas com o mesmo telemóvel no clube (#537), prefere a
