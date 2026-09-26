@@ -2981,6 +2981,8 @@
   "tournament.create.pick_day": "Pick the day",
   "tournament.create.location": "Location",
   "tournament.create.entries_until": "Entries until",
+  "tournament.create.opens_now": "Now",
+  "tournament.create.opens_now_hint": "Entries open when you publish.",
   "tournament.create.draw": "Draw",
   "tournament.create.draw_hint": "When groups and times are published.",
   "tournament.create.to": "to",
