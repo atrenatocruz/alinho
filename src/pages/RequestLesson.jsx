@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, GraduationCap } from 'lucide-react'
-import { cancelLessonRequest, getTeacherBooking, requestLesson } from '../lib/lessonsApi'
+import { cancelLessonRequest, emailLessonRequest, getTeacherBooking, requestLesson } from '../lib/lessonsApi'
 import {
   LESSON_TYPES, availableDurations, endTime, isPeak, lessonPrice, localDateTime, startOptions, upcomingBlocks,
 } from '../lib/lessonBooking'
@@ -101,6 +101,7 @@ export default function RequestLesson() {
     try {
       const startsAt = localDateTime(block.date, start).toISOString()
       const reqId = await requestLesson({ teacherProfileId: block.tp, startsAt, duration, type, contactVia, phone: data.i_have_whatsapp ? null : phone })
+      emailLessonRequest('lesson_request', reqId)
       setSent({ id: reqId, starts_at: startsAt, duration_minutes: duration, lesson_type: type, price_per_person: price, contact_via: contactVia, org_name: block.orgName })
       setPhone('')
     } catch (err) {
