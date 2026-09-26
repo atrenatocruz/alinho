@@ -50,6 +50,18 @@ export async function joinWithNamedPartner({ gameId, name, email }) {
   return data
 }
 
+/* Para quem é o convite, sem o aceitar (Dev 3, 26 set): { guest_name,
+   game_id, game_title, inviter_name, status }. Antes de a função existir em
+   produção (PGRST202) devolve null — o ecrã aceita como antes. */
+export async function getPartnerInvite(token) {
+  const { data, error } = await supabase.rpc('get_partner_invite', { p_token: token })
+  if (error) {
+    if (error.code === 'PGRST202' || /get_partner_invite/.test(error.message || '')) return null
+    throw error
+  }
+  return data || null
+}
+
 export async function claimPartnerInvite(token) {
   const { data, error } = await supabase.rpc('claim_partner_invite', { p_token: token })
   if (error) throw error
