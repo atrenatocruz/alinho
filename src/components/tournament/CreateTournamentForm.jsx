@@ -5,7 +5,7 @@
 // aqui não aparece, porque nesta altura ainda não se sabe quantas duplas há.
 import { useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeft, ImagePlus, Lock, Plus, Trash2, X } from 'lucide-react'
+import { ImagePlus, Lock, Plus, Trash2, X } from 'lucide-react'
 import { Chips, DateField, PrimaryButton } from '../ui'
 import { TIEBREAK_RULES } from './tieBreak'
 import { categoryCode, categoryName, stepProblem, saveProblem, totalCourtHours, totalSlots, pricePerPlayer } from '../../lib/tournaments'
@@ -13,6 +13,7 @@ import { localInputToIso, isoToLocalInput } from '../../lib/tournamentDay'
 import { FieldLabel, MonoLabel } from './TournamentBits'
 import { removeTournamentPoster, uploadTournamentPoster } from '../../lib/tournamentPosterStorage'
 import { describeError } from '../../lib/errors'
+import StepPage from '../steps/StepPage'
 
 const DEFAULT_RULES = {
   entry_mode: 'dupla',        // dupla | sozinho | as_duas
@@ -35,9 +36,9 @@ const pad = (n) => String(n).padStart(2, '0')
 const isoDate = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 
 /** Campo de texto simples, com o rótulo em mono como nos wireframes. */
-function Field({ label, children, hint, error }) {
+function Field({ label, children, hint, error, className = '' }) {
   return (
-    <div className="mt-3">
+    <div className={className}>
       <FieldLabel>{label}</FieldLabel>
       {/* Campo em falta ou errado: contorno vermelho no campo E a frase por
           baixo (regra das janelas, 24 set). */}
@@ -90,7 +91,7 @@ function DayCategories({ draft, set, dayLabel }) {
   const semDia = draft.categories.filter((c) => !c.day)
 
   return (
-    <div className="mt-4">
+    <div>
       <FieldLabel>{t('tournament.create.who_plays_when')}</FieldLabel>
       {draft.days.map((d) => {
         const doDia = draft.categories.filter((c) => c.day === d.date)
@@ -150,7 +151,7 @@ function DayCategories({ draft, set, dayLabel }) {
 function Locked({ title, reason, children }) {
   const { t } = useTranslation()
   return (
-    <div className="card mt-4">
+    <div className="card">
       <div className="flex items-center gap-1.5">
         <Lock size={13} className="shrink-0 text-ink-500" />
         <b className="text-sm text-ink-700">{title}</b>
@@ -292,70 +293,96 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
     return `${weekday.charAt(0).toUpperCase() + weekday.slice(1)} ${d.getDate()} ${part({ month: 'short' })}`
   }
 
-  return (
-    <div>
-      <button type="button" onClick={step === 1 ? onCancel : () => setStep(step - 1)} className="inline-flex min-h-[44px] items-center gap-1.5 text-sm font-extrabold text-ink-700 hover:underline">
-        <ArrowLeft size={16} /> {step === 1 ? t('tournament.create.cancel') : t('common.back')}
-      </button>
+  // A mesma moldura dos outros «criar» (StepPage, revisão da designer de
+  // 26 set): nome e cartaz no «top», soltos; a barra «N de 4 · passo»; o
+  // botão de baixo. O espaçamento entre campos é o da StepPage, como no mix.
+  /* O nome e o cartaz são a IDENTIDADE do torneio, não um passo: ficam
+     por cima da barra de progresso, à vista do princípio ao fim, como o
+     título de um documento (desenho de 23 set, «#342»).
 
-      <h2 className="mt-3 text-xl font-semibold text-ink-900">
-        {editing_existing ? t('tournament.create.edit_title') : t('tournament.create.title')}
-      </h2>
-      {/* O nome e o cartaz são a IDENTIDADE do torneio, não um passo: ficam
-          por cima da barra de progresso, à vista do princípio ao fim, como o
-          título de um documento (desenho de 23 set, «#342»).
-
-          Com «Pessoas» a abrir, meter o nome lá dentro obrigava a definir
-          categorias antes de dar nome ao torneio, o que ninguém faz. E um
-          quinto passo não se acrescenta: um fluxo pode SALTAR um passo,
-          nunca inventar um. */}
-      <div className="card mt-3 space-y-0">
-          <Field label={t('tournament.create.name')}>
-            <input className={inputClass} value={draft.name} onChange={(e) => set({ name: e.target.value })} placeholder={t('tournament.create.name_placeholder')} />
-          </Field>
-          <Field label={t('tournament.create.poster')} hint={draft.poster_url ? null : t('tournament.create.poster_hint')}>
-            {draft.poster_url ? (
-              <div className="relative overflow-hidden rounded-ctrl border border-line">
-                <img src={draft.poster_url} alt={t('tournament.create.poster')} className="block max-h-60 w-full object-cover" />
-                <button
-                  type="button"
-                  onClick={removePoster}
-                  aria-label={t('tournament.create.poster_remove')}
-                  className="absolute right-2 top-2 inline-flex h-11 w-11 items-center justify-center rounded-full bg-ink-900/80 text-white"
-                >
-                  <X size={15} />
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                disabled={poster.busy}
-                onClick={() => fileInput.current?.click()}
-                className={`${inputClass} flex items-center gap-2 text-left text-ink-500 disabled:opacity-60`}
-              >
-                <ImagePlus size={18} />
-                {poster.busy ? t('tournament.create.poster_uploading') : t('tournament.create.poster_pick')}
-              </button>
-            )}
-            <input ref={fileInput} type="file" accept="image/*" className="hidden" onChange={pickPoster} />
-            {poster.error && <p className="mt-1 text-xs text-danger">{poster.error}</p>}
-          </Field>
-      </div>
-
-      {locked ? (
-        <p className="mt-1.5 text-xs text-ink-500">{t('tournament.create.edit_locked')}</p>
-      ) : (
-        <>
-          {/* Barra de progresso, nunca pastilhas: passos não são separadores e
-              não podem parecer separadores (regra do Francisco, «#342»). */}
-          <div className="mt-1.5 h-1 overflow-hidden rounded-sm bg-ink-50">
-            <i className="block h-full rounded-sm bg-ink-900 transition-all duration-fast" style={{ width: `${(step / 4) * 100}%` }} />
+     Com «Pessoas» a abrir, meter o nome lá dentro obrigava a definir
+     categorias antes de dar nome ao torneio, o que ninguém faz. E um
+     quinto passo não se acrescenta: um fluxo pode SALTAR um passo,
+     nunca inventar um. */
+  const top = (
+    <div className="space-y-5">
+      {/* O nome sem rótulo, como o do mix (versão final de 26 set). */}
+      <input className="input-field text-base font-extrabold" value={draft.name} onChange={(e) => set({ name: e.target.value })}
+        placeholder={t('tournament.create.name_placeholder')} aria-label={t('tournament.create.name')} />
+      <Field label={t('tournament.create.poster')} hint={draft.poster_url ? null : t('tournament.create.poster_hint')}>
+        {draft.poster_url ? (
+          <div className="relative overflow-hidden rounded-ctrl border border-line">
+            <img src={draft.poster_url} alt={t('tournament.create.poster')} className="block max-h-60 w-full object-cover" />
+            <button
+              type="button"
+              onClick={removePoster}
+              aria-label={t('tournament.create.poster_remove')}
+              className="absolute right-2 top-2 inline-flex h-11 w-11 items-center justify-center rounded-full bg-ink-900/80 text-white"
+            >
+              <X size={15} />
+            </button>
           </div>
-          <p className="mt-1.5 text-xs text-ink-500">
-            {t('tournament.create.step_of', { step, total: 4 })} · <b className="font-semibold text-ink-700">{t(`tournament.create.step${step}`)}</b>
-          </p>
-        </>
-      )}
+        ) : (
+          <button
+            type="button"
+            disabled={poster.busy}
+            onClick={() => fileInput.current?.click()}
+            className={`${inputClass} flex items-center gap-2 text-left text-ink-500 disabled:opacity-60`}
+          >
+            <ImagePlus size={18} />
+            {poster.busy ? t('tournament.create.poster_uploading') : t('tournament.create.poster_pick')}
+          </button>
+        )}
+        <input ref={fileInput} type="file" accept="image/*" className="hidden" onChange={pickPoster} />
+        {poster.error && <p className="mt-1 text-xs text-danger">{poster.error}</p>}
+      </Field>
+    </div>
+  )
+
+  const save = guarded(() => onCreate(outgoing(draft)))
+  /* Uma pergunta a sério, dois botões do tamanho dos normais, cada um com
+     a consequência escrita por baixo — como os do mix (desenho de 23 set,
+     ponto 4; versão final de 26 set).
+     Antes era um botão grande e verde em cima e um pequeno de
+     contorno por baixo: não é uma pergunta, é um caminho normal com
+     uma saída lateral — e foi assim que se criou um torneio sem dar
+     pela escolha.
+
+     ⚠️ «Abrir inscrições» substitui «Publicar e anunciar»: a função
+     só escreve o estado novo na tabela — não cria aviso, não manda
+     nada para o WhatsApp, não toca no sino de ninguém. O nome
+     antigo prometia o que o código não faz. É PROPOSTA, por acordar
+     com o Renato e o Ruben; se decidirem outro nome, muda-se a
+     palavra e os dois botões ficam na mesma. */
+  const footer = !locked && step === 4 && !editing_existing ? (
+    <div className="space-y-2">
+      <p className="text-sm font-extrabold text-ink-900">{t('tournament.create.open_now_question')}</p>
+      <button type="button" disabled={saving} onClick={guarded(() => publish('inscricoes'))} className="btn-primary w-full disabled:opacity-40">
+        {t('tournament.create.publish')}
+      </button>
+      <p className="text-center text-xs text-muted">{t('tournament.create.publish_hint')}</p>
+      <button type="button" disabled={saving} onClick={guarded(() => publish('rascunho'))} className="btn-secondary w-full !mt-3 disabled:opacity-40">
+        {t('tournament.create.save_draft')}
+      </button>
+      <p className="text-center text-xs text-muted">{t('tournament.create.save_draft_hint')}</p>
+    </div>
+  ) : null
+
+  return (
+    <StepPage
+      title={editing_existing ? t('tournament.create.edit_title') : t('tournament.create.title')}
+      step={locked ? 1 : step}
+      total={locked ? 1 : 4}
+      stepLabel={t(`tournament.create.step${step}`)}
+      onBack={step === 1 || locked ? onCancel : () => setStep(step - 1)}
+      top={top}
+      onNext={locked || step === 4 ? save : () => (problem ? setTried(true) : (setTried(false), setStep(step + 1)))}
+      nextLabel={locked || step === 4 ? t('tournament.create.save_changes') : t('tournament.create.next')}
+      footer={footer}
+      error={error}
+      busy={saving}
+    >
+      {locked && <p className="text-xs text-ink-500">{t('tournament.create.edit_locked')}</p>}
 
       {/* Com inscrições feitas, só se mexe no que não as estraga — é a mesma
           regra que o update_tournament impõe na base de dados. O que não se
@@ -410,6 +437,8 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
       )}
       {!locked && step === 1 && (
         <>
+          {/* A lista das categorias é um bloco só: as linhas ficam coladas. */}
+          {draft.categories.length > 0 && <div>
           {draft.categories.map((c, i) => (
             <div key={i} className="flex items-center gap-2.5 border-t border-line py-2">
               <span className="rounded-md bg-ink-900 px-1.5 py-0.5 font-mono text-xs font-bold text-white">{c.code}</span>
@@ -426,6 +455,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
               </button>
             </div>
           ))}
+          </div>}
 
           {editing !== null ? (
             <CategoryEditor
@@ -437,7 +467,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
               onSave={saveCategory}
             />
           ) : (
-            <div className="mt-3">
+            <div>
               <Chip onClick={() => setEditing('new')}><Plus size={13} /> {t('tournament.create.add_category')}</Chip>
             </div>
           )}
@@ -451,7 +481,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
           {/* Só com dias e campos: antes disso a conta dava «0 h de campo» (QA,
               26 set). É uma explicação, por isso texto normal. */}
           {draft.categories.length > 0 && Math.round(hours) > 0 && (
-            <p className="mt-3 text-xs text-ink-500">
+            <p className="text-xs text-ink-500">
               {t('tournament.create.slots_vs_hours', { teams: totalSlots(draft.categories), hours: Math.round(hours) })}
             </p>
           )}
@@ -481,6 +511,13 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
               )}
             </div>
           </Field>
+          {/* «Abrem as inscrições», o mesmo controlo do mix (acrescento de 25
+              set). Escolher outro dia precisa da base de dados: por agora só
+              «Já», que abre ao publicar no último passo. */}
+          <Field label={t('launchday.label')} hint={t('tournament.create.opens_now_hint')}>
+            <Chips label={t('launchday.label')} value="now" onChange={() => {}}
+              options={[{ value: 'now', label: t('tournament.create.opens_now') }]} />
+          </Field>
           <Field label={t('tournament.create.entries_until')} error={fieldError(DEADLINE_PROBLEMS)}>
             <div className="flex gap-2">
               <div className="min-w-0 flex-1">
@@ -504,7 +541,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
             <input className={inputClass} value={draft.location} onChange={(e) => set({ location: e.target.value })} />
           </Field>
           {draft.days.map((d, i) => (
-            <div key={d.date} className="card mt-2">
+            <div key={d.date} className="card">
               <b className="text-sm text-ink-900">{dayLabel(d.date)}</b>
               <div className="mt-2 flex items-center gap-2">
                 <input type="time" className="input-field !w-[100px] !px-2" value={d.starts_at} onChange={(e) => patchDay(i, { starts_at: e.target.value })} />
@@ -530,7 +567,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
               </Chip>
             </div>
           </Field>
-          <div className="mt-4 flex items-center justify-between border-t border-line pt-3 text-sm">
+          <div className="flex items-center justify-between border-t border-line pt-3 text-sm">
             <span className="text-ink-500">{t('tournament.create.court_time')}</span>
             <b className="text-ink-900">{t('tournament.create.hours', { count: Math.round(hours) })}</b>
           </div>
@@ -543,7 +580,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
           jogos, paragens e assim podem mudar» (Francisco, 23 set). É também
           o que o `editable` do get_tournament_for_edit deixa. */}
       {locked && (
-        <div className="mt-4 flex items-center gap-1.5 border-t border-line pt-3">
+        <div className="flex items-center gap-1.5 border-t border-line pt-3">
           <b className="text-sm text-ink-700">{t('tournament.create.section4')}</b>
           <span className="text-xs text-ink-500">· {t('tournament.create.rules_editable')}</span>
         </div>
@@ -618,51 +655,9 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
       )}
 
       {shown && ![...DEADLINE_PROBLEMS, ...DRAW_PROBLEMS, 'duration_order'].includes(shown) && (
-        <p className="mt-3 text-xs text-danger">{t(`tournament.create.problem_${shown}`)}</p>
+        <p className="text-xs text-danger">{t(`tournament.create.problem_${shown}`)}</p>
       )}
-      {error && <p className="mt-3 text-xs text-danger">{error}</p>}
-
-      <div className="mt-5 space-y-2">
-        {locked ? (
-          <PrimaryButton className="w-full" disabled={saving} onClick={guarded(() => onCreate(outgoing(draft)))}>{t('tournament.create.save_changes')}</PrimaryButton>
-        ) : step < 4 ? (
-          <PrimaryButton className="w-full" onClick={() => (problem ? setTried(true) : (setTried(false), setStep(step + 1)))}>{t('tournament.create.next')}</PrimaryButton>
-        ) : (
-          editing_existing ? (
-            <PrimaryButton className="w-full" disabled={saving} onClick={guarded(() => onCreate(outgoing(draft)))}>
-              {t('tournament.create.save_changes')}
-            </PrimaryButton>
-          ) : (
-            /* Uma pergunta a sério, dois botões do mesmo tamanho, cada um com
-               a consequência escrita por baixo (desenho de 23 set, ponto 4).
-               Antes era um botão grande e verde em cima e um pequeno de
-               contorno por baixo: não é uma pergunta, é um caminho normal com
-               uma saída lateral — e foi assim que se criou um torneio sem dar
-               pela escolha.
-
-               ⚠️ «Abrir inscrições» substitui «Publicar e anunciar»: a função
-               só escreve o estado novo na tabela — não cria aviso, não manda
-               nada para o WhatsApp, não toca no sino de ninguém. O nome
-               antigo prometia o que o código não faz. É PROPOSTA, por acordar
-               com o Renato e o Ruben; se decidirem outro nome, muda-se a
-               palavra e os dois botões ficam na mesma. */
-            <>
-              <p className="text-sm font-extrabold text-ink-900">{t('tournament.create.open_now_question')}</p>
-              <button type="button" disabled={saving} onClick={guarded(() => publish('inscricoes'))}
-                className="w-full min-h-[48px] rounded-ctrl bg-lime-400 px-5 py-3 text-left shadow-card transition-all duration-fast hover:bg-lime-600 active:scale-[0.98] disabled:opacity-40">
-                <b className="block text-base font-extrabold text-ink-900">{t('tournament.create.publish')}</b>
-                <span className="mt-0.5 block text-xs text-ink-700">{t('tournament.create.publish_hint')}</span>
-              </button>
-              <button type="button" disabled={saving} onClick={guarded(() => publish('rascunho'))}
-                className="w-full min-h-[48px] rounded-ctrl border border-line bg-surface px-5 py-3 text-left transition-all duration-fast hover:bg-ink-50 active:scale-[0.98] disabled:opacity-40">
-                <b className="block text-base font-extrabold text-ink-900">{t('tournament.create.save_draft')}</b>
-                <span className="mt-0.5 block text-xs text-ink-500">{t('tournament.create.save_draft_hint')}</span>
-              </button>
-            </>
-          )
-        )}
-      </div>
-    </div>
+    </StepPage>
   )
 }
 
@@ -683,22 +678,22 @@ function CategoryEditor({ value, taken = [], days, dayLabel, onCancel, onSave })
   const repeated = taken.includes(code)
 
   return (
-    <div className="card mt-3">
+    <div className="card">
       <div className="flex items-center justify-between">
         <b className="text-sm text-ink-900">{code} · {name}</b>
         <button type="button" onClick={onCancel} aria-label={t('tournament.create.cancel')} className="text-ink-300 hover:text-ink-700"><X size={16} /></button>
       </div>
-      <Field label={t('tournament.create.gender')}>
+      <Field className="mt-3" label={t('tournament.create.gender')}>
         <Chips value={cat.gender} onChange={(g) => set({ gender: g, name: '' })}
           label={t('tournament.create.gender')}
           options={GENDERS.map((g) => ({ value: g, label: t(`tournament.create.gender_${g}`) }))} />
       </Field>
-      <Field label={t('tournament.create.level')}>
+      <Field className="mt-3" label={t('tournament.create.level')}>
         <Chips value={cat.level} onChange={(n) => set({ level: n, name: '' })}
           label={t('tournament.create.level')}
           options={[1, 2, 3, 4, 5, 6].map((n) => ({ value: n, label: String(n) }))} />
       </Field>
-      <Field label={t('tournament.create.category_custom_name')}>
+      <Field className="mt-3" label={t('tournament.create.category_custom_name')}>
         <input className={inputClass} value={cat.name} onChange={(e) => set({ name: e.target.value })} placeholder={categoryName(t, cat.gender, cat.level)} />
       </Field>
       <div className="mt-3 flex gap-3">

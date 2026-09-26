@@ -2933,6 +2933,8 @@
   "tournament.create.pick_day": "Escolher o dia",
   "tournament.create.location": "Local",
   "tournament.create.entries_until": "Inscrições até",
+  "tournament.create.opens_now": "Já",
+  "tournament.create.opens_now_hint": "Abre as inscrições ao publicar.",
   "tournament.create.draw": "Sorteio",
   "tournament.create.draw_hint": "É quando saem os grupos e as horas.",
   "tournament.create.to": "a",
