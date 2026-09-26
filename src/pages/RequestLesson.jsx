@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, GraduationCap } from 'lucide-react'
-import { acceptLessonProposal, cancelLessonRequest, emailLessonRequest, getTeacherBooking, proposeLessonTime, requestLesson } from '../lib/lessonsApi'
+import { acceptLessonProposal, answerLessonMerge, cancelLessonRequest, emailLessonRequest, getTeacherBooking, proposeLessonTime, requestLesson } from '../lib/lessonsApi'
 import ProposeTimeSheet from '../components/lessons/ProposeTimeSheet'
 import {
   LESSON_TYPES, availableDurations, endTime, isPeak, lessonPrice, localDateTime, startOptions, upcomingBlocks,
@@ -21,7 +21,7 @@ import { Chips, ConfirmSheet, EmptyState, PrimaryButton } from '../components/ui
    RGPD: o telefone só vai com «Pelo WhatsApp», dado pelo aluno para este
    pedido; o servidor apaga-o quando o pedido fecha. */
 
-const label = 'block text-[11px] font-extrabold uppercase tracking-widest text-muted mb-2'
+const label = 'block text-sm font-extrabold text-ink-900 mb-2'
 const euros = (v) => `${Number(v).toLocaleString('pt-PT', { maximumFractionDigits: 2 })} €`
 const dayLabel = (t, dateIso) => {
   const d = new Date(`${dateIso}T12:00:00`)
@@ -142,6 +142,30 @@ export default function RequestLesson() {
     const pad = (n) => String(n).padStart(2, '0')
     const iso = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
     const hm = `${pad(d.getHours())}:${pad(d.getMinutes())}`
+    // O professor propôs juntar-te com outros alunos e muda-te alguma coisa:
+    // aceitas ou recusas (recusar deixa o teu pedido como estava).
+    if (r.merge && r.merge_answer === 'pending') {
+      return (
+        <div key={r.id} className="rounded-2xl bg-white p-3.5 space-y-2" style={{ border: '1.5px dashed #9CA3AF' }}>
+          <span className="inline-flex rounded-full bg-ink-900 px-2 py-[3px] text-[11px] font-extrabold text-white">{t('proposal.pill')}</span>
+          <p className="font-display font-extrabold text-lg text-ink-900 leading-tight">{t('booking.sent_title', { name: shortName })}</p>
+          <p className="text-sm text-ink-900">
+            {g('merge.student_line', { type: t(`lessons.price_row_${r.merge.lesson_type}`), when: whenOf(r.merge.starts_at, r.merge.duration_minutes), price: euros(r.merge.price_per_person) })}
+          </p>
+          <p className="text-sm text-muted">{t('merge.you_asked', { when: whenOf(r.starts_at, r.duration_minutes), type: t(`lessons.price_row_${r.lesson_type}`), price: euros(r.price_per_person) })}</p>
+          {cardError && <p role="alert" className="rounded-ctrl border border-danger/30 bg-danger/10 px-3 py-2 text-sm font-bold text-danger">{cardError}</p>}
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <button type="button" onClick={async () => { setCardError(''); try { await answerLessonMerge(r.merge.id, true); await load() } catch (err) { setCardError(describeError(t, err, 'proposal.error_accept')) } }}
+              className="inline-flex items-center justify-center min-h-[44px] px-5 rounded-full bg-ink-900 text-white text-sm font-extrabold">{t('myLessons.accept')}</button>
+            {/* Numa junção só se aceita ou fica com o pedido (Francisco, 26 set):
+                uma contraproposta desfazia o acordo dos outros alunos. */}
+            <button type="button" onClick={async () => { setCardError(''); try { await answerLessonMerge(r.merge.id, false); await load() } catch (err) { setCardError(describeError(t, err, 'proposal.error_accept')) } }}
+              className="min-h-[44px] px-3 text-sm font-extrabold text-muted hover:text-ink-900">{t('merge.keep_mine')}</button>
+          </div>
+          <p className="text-xs text-muted">{t('merge.keep_mine_hint')}</p>
+        </div>
+      )
+    }
     // O professor propôs outra hora: quem recebe é que aceita (Francisco, 26 set).
     if (r.proposed_by === 'teacher' && r.proposed_starts_at) {
       return (

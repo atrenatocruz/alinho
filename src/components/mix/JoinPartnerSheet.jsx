@@ -6,6 +6,7 @@ import { Sheet } from '../agenda/AgendaControls'
 import { Avatar, PrimaryButton } from '../ui'
 import { partnerNameError, partnerEmailError, PARTNER_NAME_MAX } from '../../lib/partnerInvite'
 import { contemTexto } from '../../lib/semAcentos'
+import { isGenderMismatch, isMissingGender } from '../../lib/mixLogic'
 
 /* Entrar num mix de duplas fixas com parceiro (Trello #339).
    Desenho: design-handoff/2026-09-19-torneios/wireframes/inscricoes.html,
@@ -33,7 +34,7 @@ export default function JoinPartnerSheet({ game, excludeIds, busy, error, onConf
     let cancelled = false
     supabase
       .from('memberships')
-      .select('user_id, profile:profiles(id, name, avatar_url)')
+      .select('user_id, profile:profiles(id, name, avatar_url, gender)')
       .eq('organization_id', game.organization_id)
       .then(({ data, error: loadErr }) => {
         if (cancelled) return
@@ -44,7 +45,7 @@ export default function JoinPartnerSheet({ game, excludeIds, busy, error, onConf
         }
         setMembers((data || [])
           .filter((m) => m.profile)
-          .map((m) => ({ id: m.user_id, name: m.profile.name || '?', avatar_url: m.profile.avatar_url }))
+          .map((m) => ({ id: m.user_id, name: m.profile.name || '?', avatar_url: m.profile.avatar_url, gender: m.profile.gender || null }))
           .sort((a, b) => a.name.localeCompare(b.name, 'pt')))
       })
     return () => { cancelled = true }
@@ -62,8 +63,9 @@ export default function JoinPartnerSheet({ game, excludeIds, busy, error, onConf
   const confirm = () => {
     setTouched(true)
     if (!ready || busy) return
+    const partner = members.find((m) => m.id === partnerId)
     onConfirm(mode === 'member'
-      ? { kind: 'member', partnerId }
+      ? { kind: 'member', partnerId, mismatchName: isGenderMismatch(game, partner) ? partner.name : null }
       : { kind: 'named', name: name.trim(), email: email.trim() })
   }
 
@@ -87,6 +89,12 @@ export default function JoinPartnerSheet({ game, excludeIds, busy, error, onConf
           <div className="space-y-1.5">
             {shown.map((m) => {
               const picked = mode === 'member' && partnerId === m.id
+              // Mix só de homens ou só de mulheres: o género nunca bloqueia
+              // (Francisco, 26 set). Diz-se o que não bate, e ao inscrever a
+              // dupla pergunta-se se tem a certeza. Ninguém grava o género de
+              // outra pessoa (PO) — pede-se a ela que o ponha.
+              const note = isGenderMismatch(game, m) ? t('mixedit.outside_gender')
+                : isMissingGender(game, m) ? t('partner.needs_gender') : null
               return (
                 <button
                   key={m.id}
@@ -96,7 +104,10 @@ export default function JoinPartnerSheet({ game, excludeIds, busy, error, onConf
                   }`}
                 >
                   <Avatar name={m.name} url={m.avatar_url} size="w-8 h-8 text-[11px]" />
-                  <span className="text-sm font-semibold text-ink-900 truncate">{m.name}</span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold text-ink-900 truncate">{m.name}</span>
+                    {note && <span className="block text-xs text-muted">{note}</span>}
+                  </span>
                 </button>
               )
             })}

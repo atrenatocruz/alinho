@@ -62,7 +62,7 @@ export default function ProposeTimeSheet({ open, teacherProfileId, durationMinut
           <p id="propose-title" className="text-[20px] font-extrabold leading-tight text-ink-900">{t('proposal.title')}</p>
           <button type="button" onClick={onClose} aria-label={t('ui.close')} className="w-9 h-9 -mr-2 flex items-center justify-center rounded-full text-muted hover:bg-ink-50"><X size={20} /></button>
         </div>
-        <span className="block text-[11px] font-extrabold uppercase tracking-widest text-muted mt-4 mb-2">{t('booking.day')}</span>
+        <span className="block text-sm font-extrabold text-ink-900 mt-4 mb-2">{t('booking.day')}</span>
         {/* Numa linha que desliza (regra dos filtros), com o clube por baixo
             das horas, como no «Pedir aula» (designer, 26 set). */}
         <div className="-mx-5 flex gap-2 overflow-x-auto no-scrollbar px-5">
@@ -79,7 +79,7 @@ export default function ProposeTimeSheet({ open, teacherProfileId, durationMinut
         </div>
         {block && (
           <>
-            <span className="block text-[11px] font-extrabold uppercase tracking-widest text-muted mt-4 mb-2">{t('booking.start')}</span>
+            <span className="block text-sm font-extrabold text-ink-900 mt-4 mb-2">{t('booking.start')}</span>
             <div className="flex flex-wrap gap-2">
               {options.map((o) => (
                 <button key={o.time} type="button" disabled={o.taken} aria-pressed={o.time === start} onClick={() => setStart(o.time)}

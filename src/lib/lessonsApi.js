@@ -261,3 +261,25 @@ export async function acceptLessonProposal(id) {
   if (error) throw error
   return data
 }
+
+// ── Juntar pedidos (Trello #392; migration_lessons_6_merge) ──
+
+/** O professor propõe juntar pedidos numa aula. Só tem de aceitar o aluno a
+    quem muda a hora, o preço ou o tipo; se ninguém, fica logo marcada. */
+export async function proposeLessonMerge(requestIds, { startsAt, duration, type }) {
+  const { data, error } = await supabase.rpc('propose_lesson_merge', {
+    p_request_ids: requestIds, p_starts_at: startsAt, p_duration: duration, p_type: type,
+  })
+  if (error) throw error
+  return data
+}
+
+export async function answerLessonMerge(mergeId, accept) {
+  const { error } = await supabase.rpc('answer_lesson_merge', { p_merge_id: mergeId, p_accept: accept })
+  if (error) throw error
+}
+
+export async function cancelLessonMerge(mergeId) {
+  const { error } = await supabase.rpc('cancel_lesson_merge', { p_merge_id: mergeId })
+  if (error) throw error
+}
