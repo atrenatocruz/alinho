@@ -15,6 +15,7 @@ import { balancedSplit, rotatingGame, followingGames } from '../lib/friendTeams'
 import { describeError } from '../lib/errors'
 import { Avatar, Chips, PrimaryButton, EmptyState } from '../components/ui'
 import { dayText } from '../components/friends/dayText'
+import FriendGameNow, { currentGame } from '../components/friends/FriendGameNow'
 
 const STATUS_KEY = { accepted: 'friends.status_accepted', pending: 'friends.status_pending', declined: 'friends.status_declined', guest: 'friends.guest_tag' }
 
@@ -54,6 +55,16 @@ export default function FriendSession() {
       })
   }, [id, t])
   useEffect(() => { load() }, [load])
+  // Jogo com tempo a decorrer ou por começar: os outros telemóveis veem o
+  // «Começar» e o ± de quem criou (não há realtime aqui; Dev 3, 27 set).
+  const timedNow = !!data?.match?.game_minutes && !!currentGame(data?.games)
+  useEffect(() => {
+    if (!timedNow) return undefined
+    const i = setInterval(() => {
+      getFriendMatch(id).then(setData).catch((err) => console.error('Error refreshing friend match:', err))
+    }, 10000)
+    return () => clearInterval(i)
+  }, [timedNow, id])
 
   const match = data?.match
   const invitees = data?.invitees || []
@@ -111,7 +122,9 @@ export default function FriendSession() {
         // eslint-disable-next-line no-await-in-loop
         await addFriendMatchGame(match.id, { teamA: ids(g.teamA), teamB: ids(g.teamB) })
       }
-      navigate('/jogos-privados')
+      // Com tempo fica-se aqui, no jogo 1, para o começar.
+      if (match.game_minutes) load()
+      else navigate('/jogos-privados')
     } catch (err) {
       console.error('Error setting friend match teams:', err)
       setError(err?.code === 'P0001' && err?.message ? err.message : describeError(t, err))
@@ -160,6 +173,18 @@ export default function FriendSession() {
       <div className="space-y-2">{list.map((p) => person(p, () => cycle(p)))}</div>
     </div>
   )
+
+  // Com tempo, depois das equipas: o jogo a decorrer, com o cronómetro.
+  const nowGame = match.game_minutes ? currentGame(games) : null
+  if (nowGame) {
+    return (
+      <div className="mx-auto max-w-lg pb-28">
+        {back}
+        <FriendGameNow match={match} games={games} game={nowGame} invitees={invitees} iAmCreator={iAmCreator} onChanged={load}
+          dayPlace={[match.scheduled_date ? dayText(match.scheduled_date, i18n.language) : null, match.location].filter(Boolean).join(' · ')} />
+      </div>
+    )
+  }
 
   return (
     <div className="mx-auto max-w-lg pb-28">
