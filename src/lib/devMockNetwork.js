@@ -564,10 +564,17 @@ const EV_PEOPLE = [
   ...EV_NAMES.map((name, i) => ({ id: `fake-${i}`, name, avatar_url: null, preferred_side: i % 2 ? 'both' : 'right' })),
 ]
 const evPeople = () => (eventState() === 'open' ? EV_PEOPLE.slice(1) : EV_PEOPLE)
-const EV_PARTICIPANTS = () => evPeople().map((u, i) => ({
-  id: `ev-p${i}`, game_id: 'fake-game-1', user_id: u.id, partner_id: null, status: 'confirmed',
-  created_at: new Date(Date.now() - (10 - i) * 60000).toISOString(), user: u, partner: null,
-}))
+// localStorage.mockAllPairs = 'true': toda a gente inscrita em dupla (o
+// «Sortear duplas» não aparece — sortear-duplas, 27 set).
+const EV_PARTICIPANTS = () => (localStorage.getItem('mockAllPairs') === 'true'
+  ? [0, 2, 4, 6].map((i) => ({
+    id: `ev-p${i}`, game_id: 'fake-game-1', user_id: EV_PEOPLE[i].id, partner_id: EV_PEOPLE[i + 1].id, status: 'confirmed',
+    created_at: new Date(Date.now() - (10 - i) * 60000).toISOString(), user: EV_PEOPLE[i], partner: EV_PEOPLE[i + 1],
+  }))
+  : evPeople().map((u, i) => ({
+    id: `ev-p${i}`, game_id: 'fake-game-1', user_id: u.id, partner_id: null, status: 'confirmed',
+    created_at: new Date(Date.now() - (10 - i) * 60000).toISOString(), user: u, partner: null,
+  })))
 const evTeam = (id, a, b, seed) => ({ id, game_id: 'fake-game-1', player1_id: a.id, player2_id: b.id, player1: a, player2: b, seed_ranking: seed, created_at: new Date().toISOString() })
 const [e0, e1, e2, e3, e4, e5, e6, e7] = EV_PEOPLE
 const EV_TEAMS = [evTeam('et1', e1, e0, 4), evTeam('et2', e2, e3, 3), evTeam('et3', e4, e5, 2), evTeam('et4', e6, e7, 1)]
