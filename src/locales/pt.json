@@ -2960,6 +2960,8 @@
   "mixwizard.repeat_monthly": "Todos os meses",
   "mixwizard.opens_now": "Já",
   "mixwizard.first_opens_now": "O primeiro mix, de {{date}}, abre as inscrições ao publicar. A partir do seguinte, abrem no dia que escolheres aqui:",
+  "mixwizard.launch_past": "Esse dia e hora já passaram. Escolhe outro dia, ou «Já».",
+  "mixwizard.notice_scheduled": "Mix guardado. {{when}}.",
   "mixwizard.opens_now_hint": "Abre as inscrições ao publicar.",
   "mixwizard.ends_label": "Acaba",
   "mixwizard.ends_never": "Nunca",
