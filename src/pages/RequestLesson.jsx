@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, GraduationCap } from 'lucide-react'
 import { getTeacherPage } from '../lib/lessonsApi'
@@ -40,6 +40,10 @@ export default function RequestLesson() {
   const [page, setPage] = useState(null)
   const [loading, setLoading] = useState(true)
   const [blockKey, setBlockKey] = useState(null)
+  // Vindo do calendário (tocar numa hora livre): ?dia=AAAA-MM-DD&hora=HH:MM
+  // já escolhidos (SPEC-calendario-2, assunto 1, ponto 3).
+  const [searchParams] = useSearchParams()
+  const [wanted, setWanted] = useState(() => (searchParams.get('dia') ? { dia: searchParams.get('dia'), hora: searchParams.get('hora') } : null))
   const [duration, setDuration] = useState(null)
   const [start, setStart] = useState(null)
   const [type, setType] = useState(null)
@@ -80,6 +84,20 @@ export default function RequestLesson() {
   const peak = block && start && duration ? isPeak(profile.peak_hours, block.weekday, start, duration) : false
   const priceOf = (ty) => (block && duration ? lessonPrice(profile.prices, block.tp, ty, duration, peak, block.date) : null)
   const price = type ? priceOf(type) : null
+
+  // O dia e a hora que vieram do calendário: o bloco desse dia e a duração
+  // mais curta em que essa hora está livre. Uma vez só.
+  useEffect(() => {
+    if (!wanted || !data || blocks.length === 0) return
+    const b = blocks.find((x) => x.date === wanted.dia && x.start <= wanted.hora && wanted.hora < x.end && x.tp === id)
+      || blocks.find((x) => x.date === wanted.dia && x.start <= wanted.hora && wanted.hora < x.end)
+    setWanted(null)
+    if (!b) return
+    setBlockKey(b.key)
+    const p = data.profiles.find((x) => x.teacher_profile_id === b.tp)
+    const d = availableDurations(b, p).find((dur) => startOptions(b, dur, data.busy || []).options.some((o) => o.time === wanted.hora && !o.taken))
+    if (d) { setDuration(d); setStart(wanted.hora) }
+  }, [wanted, data, blocks]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Mudar uma escolha de cima limpa as de baixo que deixaram de caber.
   const chooseBlock = (key) => { setBlockKey(key); setDuration(null); setStart(null); setType(null) }
@@ -366,7 +384,7 @@ export default function RequestLesson() {
             {LESSON_TYPES.filter((ty) => priceOf(ty) != null).map((ty) => (
               <button key={ty} type="button" aria-pressed={ty === type} onClick={() => setType(ty)}
                 className={`flex items-center justify-between rounded-ctrl bg-white px-3.5 min-h-[48px] text-sm font-extrabold text-ink-900 ${ty === type ? 'border-2 border-ink-900' : 'border border-line'}`}>
-                <span>{t(`lessons.price_row_${ty}`)}</span><span>{t('booking.per_person', { price: euros(priceOf(ty)) })}</span>
+                <span>{t(`lessons.price_row_${ty}`)}</span><span className="whitespace-nowrap">{t('booking.per_person', { price: euros(priceOf(ty)) })}</span>
               </button>
             ))}
           </div>
