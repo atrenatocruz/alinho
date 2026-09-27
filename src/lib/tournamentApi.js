@@ -117,6 +117,19 @@ export async function scheduleTournamentOpening(tournamentId, opensAt) {
   return data
 }
 
+/** As duplas do torneio onde alguém esconde os resultados
+ *  (results_visibility), para os cartões de partilha dizerem «Dupla M4» em
+ *  vez dos nomes (Dev 3, tournament_entries_hiding_results). Só a lista de
+ *  duplas, nunca o valor de cada pessoa. Sem a função, ninguém esconde. */
+export async function entriesHidingResults(tournamentId) {
+  const { data, error } = await supabase.rpc('tournament_entries_hiding_results', { p_tournament_id: tournamentId })
+  if (error) {
+    if (error.code === 'PGRST202') return []
+    throw error
+  }
+  return Array.isArray(data) ? data : []
+}
+
 /** Mudar o nome da dupla depois da inscrição (nome-da-dupla, 27 set): os
  *  dois da dupla ou um admin do clube, até as inscrições fecharem. Vazio =
  *  sem nome (aparecem os dois nomes). Devolve o nome que ficou gravado.
