@@ -30,6 +30,7 @@
 // rótulo), último campo → botão 32 px. Nada fica tapado pelo menu de baixo
 // (pb-28, pedido do Bugs e da designer).
 import { useTranslation } from 'react-i18next'
+import { BackBar } from '../ui'
 import { ArrowLeft } from 'lucide-react'
 import { PrimaryButton } from '../ui'
 
@@ -41,10 +42,8 @@ export default function StepPage({
   const stepped = total > 1
   return (
     <div className="mx-auto max-w-lg pb-28">
-      <button type="button" onClick={onBack} className="inline-flex min-h-[44px] items-center gap-1.5 text-sm font-extrabold text-ink-700">
-        <ArrowLeft size={20} />
-        {step === 1 ? t('steps.cancel') : t('common.back')}
-      </button>
+      {/* «Cancelar / Voltar» sempre visível ao deslizar (27 set). */}
+      <BackBar onBack={onBack} label={step === 1 ? t('steps.cancel') : t('common.back')} title={title} />
 
       <h2 className="mt-2 text-3xl text-ink-900">{title}</h2>
       {top && <div className="mt-6">{top}</div>}

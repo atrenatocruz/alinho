@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { BackBar } from '../components/ui'
 import { sourceText } from '../components/tournament/sourceText'
 import { ArrowLeft, Trophy } from 'lucide-react'
 import { useGoBack } from '../lib/useGoBack'
@@ -543,11 +544,7 @@ export default function TournamentScorePage() {
     }
   }
 
-  const back = (
-    <button type="button" onClick={goBack} className="inline-flex items-center gap-1.5 text-sm font-extrabold text-ink-700 hover:underline">
-      <ArrowLeft size={16} /> {t('common.back')}
-    </button>
-  )
+  const back = <BackBar onBack={goBack} title={tournament?.name} />
 
   if (allMatches === null) {
     return <div className="flex items-center justify-center py-16"><div className="h-10 w-10 animate-spin rounded-full border-[3px] border-ink-50 border-t-ink-700" /></div>

@@ -10,6 +10,7 @@
 // só se mostram.
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { BackBar } from '../ui'
 import { Link } from 'react-router-dom'
 import { ArrowLeft, CalendarDays } from 'lucide-react'
 import { listMatchesToScore, rescheduleMatch } from '../../lib/tournamentApi'
@@ -181,11 +182,7 @@ export default function TournamentCalendarGrid({ tournament, onBack }) {
     return `${weekday.charAt(0).toUpperCase() + weekday.slice(1)} ${d.getDate()} ${part({ month: 'short' })}`
   }
 
-  const back = (
-    <button type="button" onClick={onBack} className="inline-flex min-h-[44px] items-center gap-1.5 text-sm font-extrabold text-ink-700 hover:underline">
-      <ArrowLeft size={16} /> {t('common.back')}
-    </button>
-  )
+  const back = <BackBar onBack={onBack} title={tournament?.name} />
 
   if (matches === null) {
     return <div className="flex justify-center py-10"><div className="h-8 w-8 animate-spin rounded-full border-[3px] border-ink-50 border-t-ink-700" /></div>

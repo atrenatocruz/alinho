@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation, Trans } from 'react-i18next'
+import { BackBar } from '../components/ui'
 import { Calendar, ArrowLeft, UserPlus, Check, Trophy, Play, ChevronRight, Swords, X, Repeat, Share2, ChevronDown, RotateCcw, Euro, GripVertical, Pencil, History, ThumbsUp, Users, Copy } from 'lucide-react'
 import { DndContext, useDraggable, useDroppable, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
@@ -2314,26 +2315,10 @@ export default function GameDetails() {
         document.body
       )}
 
-      <div className="flex items-center justify-between">
-        <button
-          type="button"
-          onClick={goBack}
-          className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm min-h-[44px] pr-3"
-        >
-          <ArrowLeft size={20} />
-          {t('gamedetails.back')}
-        </button>
-        {/* Um rascunho não se partilha: quem recebesse o link não o abria (#544). */}
-        {!isDraftMix(game) && (
-          <button
-            onClick={() => setShowShare(true)}
-            className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm min-h-[44px] pl-3"
-          >
-            <Share2 size={20} />
-            {t('gamedetails.share')}
-          </button>
-        )}
-      </div>
+      {/* «← Voltar» sempre visível; o «Partilhar» fica na faixa (27 set).
+          Um rascunho não se partilha: quem recebesse o link não o abria (#544). */}
+      <BackBar onBack={goBack} label={t('gamedetails.back')} title={game?.title}
+        onShare={isDraftMix(game) ? undefined : () => setShowShare(true)} />
 
       {showShare && (
         <ShareModal

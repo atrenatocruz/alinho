@@ -2023,6 +2023,7 @@
   "mixoffline.share_court_line": "Campo {{court}}: {{teamA}} vs {{teamB}}",
   "mixoffline.share_final_header": "🎾 {{title}}",
   "mixoffline.share_winners_line": "🏆 Vencedores: {{name}}",
+  "ui.share": "Partilhar",
   "ui.level_band_no_gender": "Nível {{num}} — N de Nível, porque o género não está preenchido. Indica-o no perfil para veres M ou F.",
   "ui.level_band": "Nível {{label}}",
   "ui.level_beginner": "Iniciante",

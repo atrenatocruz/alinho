@@ -4,6 +4,7 @@
 // receção ao mesmo tempo — é isso que o aviso do fim diz.
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { BackBar } from '../ui'
 import { ArrowLeft, Users } from 'lucide-react'
 import { addScorekeeper, listScorekeepers, removeScorekeeper, searchScorekeeperCandidates } from '../../lib/tournamentApi'
 import { describeError, errorKind } from '../../lib/errors'
@@ -44,9 +45,7 @@ export default function ScorekeepersPanel({ tournament, onBack }) {
 
   return (
     <div>
-      <button type="button" onClick={onBack} className="inline-flex min-h-[44px] items-center gap-1.5 text-sm font-extrabold text-ink-700 hover:underline">
-        <ArrowLeft size={16} /> {t('common.back')}
-      </button>
+      <BackBar onBack={onBack} title={t('tournament.score.keepers_title')} />
       <h2 className="mt-3 font-display text-2xl leading-tight text-ink-900">{t('tournament.score.keepers_title')}</h2>
       <p className="mt-0.5 text-xs text-ink-500">{t('tournament.score.keepers_subtitle')}</p>
 

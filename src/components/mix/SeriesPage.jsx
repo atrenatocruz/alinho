@@ -11,6 +11,7 @@
 // com o que mexe nesse dia.
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { BackBar } from '../ui'
 import { ArrowLeft, ChevronRight } from 'lucide-react'
 import { ConfirmSheet } from '../ui'
 import EventActionsSheet from '../EventActionsSheet'
@@ -133,9 +134,7 @@ export default function SeriesPage({ games, onBack, onEditRules, onOpen, onChang
 
   return (
     <div className="space-y-3">
-      <button type="button" onClick={onBack} className="inline-flex min-h-[44px] items-center gap-1.5 text-sm font-extrabold text-ink-900">
-        <ArrowLeft size={18} /> {t('series.back')}
-      </button>
+      <BackBar onBack={onBack} label={t('series.back')} />
 
       {/* O cartão de criação: as regras que fazem os mixes. */}
       <div className="rounded-card border-2 border-ink-900 bg-white p-4">

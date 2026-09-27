@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { BackBar } from '../components/ui'
 import { ArrowLeft, GraduationCap } from 'lucide-react'
 import { getTeacherPage } from '../lib/lessonsApi'
 import { teacherContact } from '../lib/teacherContact'
@@ -152,11 +153,7 @@ export default function RequestLesson() {
   if (loading) {
     return <div className="flex items-center justify-center py-16"><div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div></div>
   }
-  const back = (to, text) => (
-    <button type="button" onClick={() => navigate(to)} className="inline-flex items-center gap-1.5 text-ink-900 font-extrabold text-sm hover:underline">
-      <ArrowLeft size={16} /> {text}
-    </button>
-  )
+  const back = (to, text) => <BackBar onBack={() => navigate(to)} label={text} title={data?.teacher?.name} />
   if (!data?.teacher) {
     return (
       <div className="space-y-5">

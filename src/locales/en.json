@@ -2022,6 +2022,7 @@
   "mixoffline.share_court_line": "Court {{court}}: {{teamA}} vs {{teamB}}",
   "mixoffline.share_final_header": "🎾 {{title}}",
   "mixoffline.share_winners_line": "🏆 Winners: {{name}}",
+  "ui.share": "Share",
   "ui.level_band_no_gender": "Level {{num}} — N for Nível, because gender is not set. Set it on your profile to see M or F.",
   "ui.level_band": "Level {{label}}",
   "ui.level_beginner": "Beginner",

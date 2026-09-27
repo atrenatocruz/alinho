@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { BackBar } from '../components/ui'
 import { ArrowLeft, Check, GraduationCap } from 'lucide-react'
 import {
   acceptLessonRequest, cancelLessonMerge, emailLessonRequest, listMyTeacherRequests, markLessonCourtBooked, proposeLessonMerge,
@@ -221,9 +222,7 @@ export default function TeacherLessons() {
 
   return (
     <div className="space-y-4">
-      <button type="button" onClick={() => navigate('/perfil')} className="inline-flex items-center gap-1.5 text-ink-900 font-extrabold text-sm hover:underline">
-        <ArrowLeft size={16} /> {t('teacher.schedule_back')}
-      </button>
+      <BackBar onBack={() => navigate('/perfil')} label={t('teacher.schedule_back')} title={t('myLessons.title')} />
       <h2 className="text-2xl text-ink-900">{t('myLessons.title')}</h2>
       <Tabs value={tab} onChange={setTab} options={[
         { value: 'requests', label: t('myLessons.tab_requests', { count: pending.length }) },

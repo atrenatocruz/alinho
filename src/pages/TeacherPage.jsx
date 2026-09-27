@@ -5,6 +5,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { BackBar } from '../components/ui'
+import { sharePageLink } from '../lib/shareImage'
 import { ArrowLeft, Check, ChevronLeft, ChevronRight, Clock, GraduationCap, Plus, Repeat } from 'lucide-react'
 import { useGoBack } from '../lib/useGoBack'
 import { useAuth } from '../contexts/AuthContext'
@@ -139,9 +141,7 @@ export default function TeacherPage({ view = 'profile' }) {
   if (failed || !data?.teacher) {
     return (
       <div className="space-y-5">
-        <button type="button" onClick={goBack} className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline">
-          <ArrowLeft size={16} /> {t('common.back')}
-        </button>
+        <BackBar onBack={goBack} />
         <EmptyState icon={GraduationCap} title={t('lessons.teacher_not_found_title')} subtitle={t('lessons.teacher_not_found_subtitle')} />
       </div>
     )
@@ -194,9 +194,8 @@ export default function TeacherPage({ view = 'profile' }) {
 
   return (
     <div className="space-y-5">
-      <button type="button" onClick={isMe ? () => navigate('/perfil') : goBack} className="inline-flex items-center gap-1.5 text-ink-900 font-extrabold text-sm hover:underline">
-        <ArrowLeft size={16} /> {isMe ? t('teacher.schedule_back') : t('common.back')}
-      </button>
+      <BackBar onBack={isMe ? () => navigate('/perfil') : goBack} label={isMe ? t('teacher.schedule_back') : t('common.back')} title={teacher.name}
+        onShare={() => sharePageLink({ title: teacher.name, url: window.location.href })} />
 
       {isMe && (
         <div className="rounded-[14px] border border-line bg-white p-3 text-sm text-ink-500 leading-snug">

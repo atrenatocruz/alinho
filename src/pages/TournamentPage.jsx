@@ -14,6 +14,9 @@
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { BackBar } from '../components/ui'
+import { shareMessage, tournamentUrl } from '../lib/tournamentPublic'
+import { whatsappShare } from '../lib/partnerInvite'
 import { ArrowLeft, Eye, Trophy } from 'lucide-react'
 import { useGoBack } from '../lib/useGoBack'
 import { useAuth } from '../contexts/AuthContext'
@@ -115,11 +118,14 @@ export default function TournamentPage() {
     setParams(next, { replace: true, state: { keepScroll: true } })
   }
 
-  const back = (
-    <button type="button" onClick={goBack} className="inline-flex min-h-[44px] items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline">
-      <ArrowLeft size={16} /> {t('common.back')}
-    </button>
-  )
+  const shareTournament = () => {
+    const tour = data?.tournament
+    if (!tour) return
+    const text = shareMessage(tour, window.location.origin)
+    if (navigator.share) { navigator.share({ title: tour.name, text, url: tournamentUrl(tour, window.location.origin) }).catch(() => {}); return }
+    window.open(whatsappShare(text), '_blank')
+  }
+  const back = <BackBar onBack={goBack} title={data?.tournament?.name} onShare={data?.tournament?.status === 'rascunho' ? undefined : shareTournament} />
 
   if (failed) {
     return (

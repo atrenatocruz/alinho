@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { BackBar } from '../components/ui'
 import { ArrowLeft, MapPin } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { getFriendMatch, respondFriendMatchInvite, setFriendMatchTeams, addFriendMatchGame, listMyFriendMatchInvites } from '../lib/privateMatches'
@@ -141,11 +142,7 @@ export default function FriendSession() {
     finally { setBusy(false) }
   }
 
-  const back = (
-    <Link to="/jogos-privados" className="inline-flex min-h-[44px] items-center gap-1.5 text-sm font-extrabold text-ink-700">
-      <ArrowLeft size={20} /> {t('createprivatematch.title')}
-    </Link>
-  )
+  const back = <BackBar to="/jogos-privados" label={t('createprivatematch.title')} />
 
   if (loadError) return <div className="mx-auto max-w-lg">{back}<EmptyState title={loadError} /></div>
   if (!data) {

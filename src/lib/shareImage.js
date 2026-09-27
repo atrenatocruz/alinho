@@ -57,7 +57,17 @@ export async function shareOrSaveImage(blob, { filename = 'alinho.png', title = 
 
 /** O nome do ficheiro: «alinho-smash-cup-m5-final.png». */
 export function shareFilename(...parts) {
-  const slug = parts.filter(Boolean).join('-').normalize('NFD').replace(/[̀-ͯ]/g, '')
+  const slug = parts.filter(Boolean).join('-').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
   return `alinho-${slug || 'torneio'}.png`
+}
+
+/** Partilhar o link de uma página (o botão redondo do BackBar): a folha de
+ *  partilha do telemóvel; sem ela, o WhatsApp com o nome e o link. */
+export function sharePageLink({ title = '', text = '', url }) {
+  if (typeof navigator !== 'undefined' && navigator.share) {
+    navigator.share({ title, text: text || title, url }).catch(() => {})
+    return
+  }
+  window.open(`https://wa.me/?text=${encodeURIComponent([text || title, url].filter(Boolean).join(' '))}`, '_blank')
 }

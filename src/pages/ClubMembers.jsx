@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { BackBar } from '../components/ui'
 import { ArrowLeft } from 'lucide-react'
 import { useGoBack } from '../lib/useGoBack'
 import { getClubProfile, listOrganizationMembers } from '../lib/clubProfile'
@@ -39,9 +40,7 @@ export default function ClubMembers() {
 
   return (
     <div className="space-y-4">
-      <button type="button" onClick={goBack} className="inline-flex min-h-[44px] items-center gap-1.5 text-sm font-extrabold text-ink-700 hover:underline">
-        <ArrowLeft size={16} /> {club?.name || t('common.back')}
-      </button>
+      <BackBar onBack={goBack} label={club?.name || t('common.back')} title={t('clubprofile.members_title')} />
       <div>
         <h2 className="text-2xl text-ink-900">{t('clubprofile.members_title')}</h2>
         {club?.member_count != null && <p className="text-sm text-muted">{t('clubprofile.member_count', { count: club.member_count })}</p>}

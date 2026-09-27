@@ -9,6 +9,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
+import { BackBar } from '../components/ui'
 import { ArrowLeft, Building2, ChevronRight } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -209,11 +210,7 @@ export default function ClubProfile() {
     )
   }
 
-  const back = (
-    <button type="button" onClick={goBack} className="inline-flex min-h-[44px] items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline">
-      <ArrowLeft size={16} /> {t('common.back')}
-    </button>
-  )
+  const back = <BackBar onBack={goBack} title={club?.name} />
 
   if (notFound || !club) {
     return (
@@ -229,8 +226,8 @@ export default function ClubProfile() {
 
   return (
     <div className="space-y-5">
+      {back}
       <div>
-        {back}
         {club.kind === 'group' && club.parent_slug && (
           <Link to={`/clube/${club.parent_slug}`}
             className="flex min-h-[44px] items-center gap-1.5 text-sm font-extrabold text-ink-900 hover:underline">

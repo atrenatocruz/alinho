@@ -12,7 +12,7 @@ import { createGroup } from '../lib/platformAdmin'
 import { listClubGroups, getOrganizationDeleteBlocker, deleteSelfServeGroup, transferOrganizationOwnership, setOrganizationPlan } from '../lib/organizations'
 import { formatRating } from '../lib/elo'
 import { formatDate as formatDateLib, formatTime as formatTimeLib } from '../lib/formatDate'
-import { DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal, ConfirmSheet, OrgKindBadge, PlanBadge, PLAN_TIERS, planName, Tabs } from '../components/ui'
+import { DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal, ConfirmSheet, OrgKindBadge, PlanBadge, PLAN_TIERS, planName, Tabs, BackBar } from '../components/ui'
 import { planLimitMessage, isMixLimitError, isMemberLimitError, limitsFor, nextPlanTier } from '../lib/plans'
 import { totalRounds, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, SCORING_FORMAT_LABEL_KEY } from '../lib/mixLogic'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
@@ -2278,23 +2278,18 @@ export default function GerirClube() {
 
   return (
     <div className="space-y-6">
+      {/* Um só "Voltar", sempre no topo (Francisco, 15 set 2026) — e sempre
+          visível ao deslizar (27 set). Nas Definições e no Validar voucher
+          volta aos Jogos; nos Jogos/Membros volta à página anterior (só quem
+          tem mais de um clube/grupo). */}
+      {activeTab === 'redeem' ? (
+        <BackBar
+          onBack={() => { handleResetRedeem(); if (voucherScan) setVoucherScan(false); else setActiveTab('events') }}
+          label={t('gerirclube.back_button')} title={org?.name} />
+      ) : (adminOrganizations.length > 1 || currentUser?.is_platform_admin) && (
+        <BackBar onBack={goBack} title={org?.name} />
+      )}
       <div>
-        {/* Um só "Voltar", sempre no topo (Francisco, 15 set 2026). Nas
-            Definições e no Validar voucher volta aos Jogos; nos Jogos/Membros
-            volta à página anterior (só quem tem mais de um clube/grupo). */}
-        {activeTab === 'redeem' ? (
-          <button
-            type="button"
-            onClick={() => { handleResetRedeem(); if (voucherScan) setVoucherScan(false); else setActiveTab('events') }}
-            className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline mb-6"
-          >
-            <ArrowLeft size={16} /> {t('gerirclube.back_button')}
-          </button>
-        ) : (adminOrganizations.length > 1 || currentUser?.is_platform_admin) && (
-          <button type="button" onClick={goBack} className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline mb-6">
-            <ArrowLeft size={16} /> {t('common.back')}
-          </button>
-        )}
         {/* "Gerir" as a small label above, so the title is the group's name
             alone — as "Gerir: <nome>" it truncated to "Gerir: Grup…" on a
             phone (Francisco, 15 set 2026). Kept outside the row below so the

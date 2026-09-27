@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { BackBar } from '../components/ui'
 import { ArrowLeft, Check, GraduationCap, Plus, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { DAYS, getTeacherProfile, listTeacherProfiles, replaceTeacherAvailability, setTeacherAvailability, updateTeacherContact } from '../lib/teachers'
@@ -129,11 +130,7 @@ export default function TeacherSchedule() {
     }
   }
 
-  const back = (
-    <button type="button" onClick={() => (adminTp ? navigate(-1) : navigate('/perfil'))} className="inline-flex items-center gap-1.5 text-ink-900 font-extrabold text-sm hover:underline">
-      <ArrowLeft size={16} /> {adminTp ? t('teacher.schedule_admin_back') : t('teacher.schedule_back')}
-    </button>
-  )
+  const back = <BackBar onBack={() => (adminTp ? navigate(-1) : navigate('/perfil'))} label={adminTp ? t('teacher.schedule_admin_back') : t('teacher.schedule_back')} />
 
   if (loading) {
     return (

@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { BackBar } from '../components/ui'
 import { ArrowLeft } from 'lucide-react'
 import { useGoBack } from '../lib/useGoBack'
 import { getClubProfile } from '../lib/clubProfile'
@@ -41,9 +42,7 @@ export default function GerirAulas() {
 
   return (
     <div className="mx-auto max-w-lg pb-28">
-      <button type="button" onClick={goBack} className="inline-flex min-h-[44px] items-center gap-1.5 text-sm font-extrabold text-ink-700">
-        <ArrowLeft size={20} /> {t('lessons.back_to_gerir')}
-      </button>
+      <BackBar onBack={goBack} label={t('lessons.back_to_gerir')} title={t('lessons.page_title')} />
       <h2 className="mt-2 text-3xl text-ink-900">{t('lessons.page_title')}</h2>
 
       <div className="mt-6">

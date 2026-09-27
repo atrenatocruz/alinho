@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
+import { BackBar } from '../components/ui'
 import { ArrowLeft, Plus, Trophy, Copy, Check, Trash2, Calendar, MapPin } from 'lucide-react'
 import {
   getMyPrivateMatches, submitPrivateMatchScore, confirmPrivateMatch, deletePrivateMatch, respondToPrivateMatch, privateMatchCanConfirm } from '../lib/privateMatches'
@@ -325,10 +326,7 @@ export default function PrivateMatches() {
 
   return (
     <div className="space-y-5">
-      <button type="button" onClick={goBack} className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm min-h-[44px]">
-        <ArrowLeft size={20} />
-        {t('privatematches.back')}
-      </button>
+      <BackBar onBack={goBack} label={t('privatematches.back')} title={t('privatematches.title')} />
 
       <div className="flex items-center justify-between">
         <h2 className="text-3xl text-ink-900">{t('privatematches.title')}</h2>

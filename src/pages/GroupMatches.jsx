@@ -4,6 +4,7 @@ import { listGroupFriendMatches } from '../lib/privateMatches'
 import { useParams, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
+import { BackBar } from '../components/ui'
 import { ArrowLeft, Plus, MapPin, Clock, Trash2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { getClubProfile } from '../lib/clubProfile'
@@ -282,9 +283,7 @@ export default function GroupMatches() {
 
   return (
     <div className="space-y-5 max-w-lg mx-auto">
-      <button type="button" onClick={goBack} className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline">
-        <ArrowLeft size={16} /> {t('common.back')}
-      </button>
+      <BackBar onBack={goBack} title={t('groupmatches.title')} />
 
       {/* Botão por baixo do subtítulo, a toda a largura: ao lado do título ficava
           espremido em três linhas e o ícone encolhia. */}

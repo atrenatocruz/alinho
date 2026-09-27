@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
+import { BackBar } from '../components/ui'
+import { sharePageLink } from '../lib/shareImage'
 import { ArrowLeft, Award, Swords, ChevronDown, UserPlus, UserCheck, Clock, Lock, ShieldCheck, ThumbsUp } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { PrimaryButton, EmptyState, Avatar, RatingBadge, PhotoViewerModal, FollowListModal, AchievementCard } from '../components/ui'
@@ -279,14 +281,8 @@ export default function PlayerDetails() {
 
   return (
     <div className="space-y-4">
-      <button
-        type="button"
-        onClick={goBack}
-        className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm min-h-[44px] pr-3"
-      >
-        <ArrowLeft size={20} />
-        {t('playerdetails.back')}
-      </button>
+      <BackBar onBack={goBack} label={t('playerdetails.back')} title={player?.name}
+        onShare={player ? () => sharePageLink({ title: player.name, url: window.location.href }) : undefined} />
 
       {/* Hero — cartão claro, mesmo tratamento do cabeçalho do perfil
           próprio (Profile.jsx, 11 set 2026): aro de progresso à volta da

@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { BackBar } from '../components/ui'
 import { ArrowLeft, CheckCircle2, Euro, GraduationCap, MapPin, Phone } from 'lucide-react'
 import { useGoBack } from '../lib/useGoBack'
 import { cancelEnrolment, getLesson, setLessonAttendance } from '../lib/lessonsApi'
@@ -38,11 +39,7 @@ export default function LessonPage() {
     return () => { alive = false }
   }, [id])
 
-  const back = (
-    <button type="button" onClick={goBack} className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline">
-      <ArrowLeft size={16} /> {t('common.back')}
-    </button>
-  )
+  const back = <BackBar onBack={goBack} />
   if (failed) {
     return <div className="space-y-5">{back}<EmptyState icon={GraduationCap} title={t('lessons.lesson_not_found_title')} subtitle={t('lessons.lesson_not_found_subtitle')} /></div>
   }

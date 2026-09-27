@@ -1284,6 +1284,51 @@ export function PlayerAvatarRow({ players = [], max = 4, size = 'md', cap = 6 })
    para as notificações/logout (passados como `children`, vindos de
    HeaderActionsContext) continuarem sempre alcançáveis. `-mx-4 px-4 -mt-6`
    cancela o padding do <main> do Layout para chegar à borda do ecrã. */
+/* ─── BackBar — o voltar sempre visível, no estilo do iPhone ─────────────
+   design-handoff/2026-09-27-voltar-sempre-visivel (SPEC reescrito, aprovado
+   pelo Francisco a 27 set): preso em cima ao deslizar; à esquerda um botão
+   redondo de 44 px só com a seta; ao meio o nome da página (com «…»); à
+   direita o mesmo botão com o ícone de partilhar, só nas páginas que se
+   partilham (`onShare`). Sem menu «⋯». Fundo branco translúcido com a
+   página desfocada por trás; respeita o espaço seguro do iPhone.
+   Fica no fluxo (sticky), no lugar do Voltar de antes — e tem de ser filho
+   direto do contentor da página, porque o sticky só prende dentro do pai.
+   `label` diz o que a seta faz (leitores de ecrã); `to` em vez de `onBack`
+   para um Link.
+   Como no iPhone: o nome só aparece na barra quando o topo da página (o
+   que vem logo a seguir à barra — o título grande, o cartão do evento…)
+   sai do ecrã ao deslizar; com a página no topo, só a seta e a partilha. */
+export function BackBar({ onBack, to, label, title, onShare }) {
+  const { t } = useTranslation()
+  const barRef = useRef(null)
+  const [showTitle, setShowTitle] = useState(false)
+  useEffect(() => {
+    const bar = barRef.current
+    const next = bar?.nextElementSibling
+    if (!bar || !next || typeof IntersectionObserver === 'undefined') { setShowTitle(true); return undefined }
+    const io = new IntersectionObserver(
+      ([entry]) => setShowTitle(!entry.isIntersecting),
+      { rootMargin: `-${bar.offsetHeight}px 0px 0px 0px`, threshold: 0 },
+    )
+    io.observe(next)
+    return () => io.disconnect()
+  }, [title])
+  const round = 'flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/95 text-ink-900 shadow-card'
+  return (
+    <div ref={barRef} className="sticky top-0 z-10 -mx-4 -mt-6 mb-1 bg-white/70 px-4 backdrop-blur-md" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+      <div className="grid h-16 grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-3">
+        {to
+          ? <Link to={to} aria-label={label || t('common.back')} className={round}><ChevronLeft size={22} /></Link>
+          : <button type="button" onClick={onBack} aria-label={label || t('common.back')} className={round}><ChevronLeft size={22} /></button>}
+        <p aria-hidden={!showTitle} className={`min-w-0 truncate text-center text-base font-extrabold text-ink-900 transition-opacity duration-fast ${showTitle ? 'opacity-100' : 'opacity-0'}`}>{title}</p>
+        {onShare
+          ? <button type="button" onClick={onShare} aria-label={t('ui.share')} className={round}><Share2 size={18} /></button>
+          : <span aria-hidden />}
+      </div>
+    </div>
+  )
+}
+
 export function PageHeader({ title, children }) {
   return (
     <div className="sticky top-0 z-10 -mx-4 px-4 -mt-6 pt-4 pb-3 bg-canvas flex items-center justify-between gap-2 border-b border-line/70">
