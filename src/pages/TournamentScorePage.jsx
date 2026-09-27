@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { sourceText } from '../components/tournament/sourceText'
 import { ArrowLeft, Trophy } from 'lucide-react'
 import { useGoBack } from '../lib/useGoBack'
 import { getTournamentPage, getTournamentForEdit, listMatchesToScore, markWalkover, saveMatchResult, undoWalkover, resolveMatchCorrection } from '../lib/tournamentApi'
@@ -622,7 +623,7 @@ export default function TournamentScorePage() {
                   <div key={m.match_id} className="grid grid-cols-[104px_minmax(0,1fr)] items-center gap-2 border-t border-line py-2 text-xs">
                     <b className="whitespace-nowrap font-mono text-xs text-ink-900">{shortDay(dayKeyInTz(new Date(m.scheduled_at)))} · {hhmm(m.scheduled_at)}</b>
                     <span className="min-w-0 text-ink-700">
-                      {m.court} · {m.category_code} · {m.team_a?.name || m.source_a} × {m.team_b?.name || m.source_b}
+                      {m.court} · {m.category_code} · {m.team_a?.name || sourceText(m.source_a, null, t)} × {m.team_b?.name || sourceText(m.source_b, null, t)}
                     </span>
                   </div>
                 ))}
