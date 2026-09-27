@@ -634,18 +634,22 @@ const AGENDA_GAMES = () => [
   {
     id: 'ag-open-today', organization_id: MOCK_CLUB_ID, title: 'Falta 1 jogador', date: atDay(0, 20, 30).toISOString(),
     location: 'Smash Padel, Parque das Nações', status: 'open', origin: 'open_slot', format: 'sobe_desce', num_courts: 1,
-    max_players: 4, price_per_player: 6, prize: null, gender_restriction: 'indiferente', level: 'M3', recurrence_id: null,
+    // localStorage.mockWomenOnly = 'true': só para mulheres (#574: o botão
+    // aparece e pergunta-se «tens a certeza?»).
+    max_players: 4, price_per_player: 6, prize: null, gender_restriction: localStorage.getItem('mockWomenOnly') === 'true' ? 'feminino' : 'indiferente', level: 'M3', recurrence_id: null,
     organization: { name: 'Smash Padel Almada', kind: 'club', group_logo_url: null },
     participants: [0, 1, 2].map((i) => ({ id: `po${i}`, user_id: `o${i}`, partner_id: null, status: 'confirmed', user: extra(i + 2) })),
   },
   {
     id: 'ag-full-tomorrow', organization_id: MOCK_ADMIN_ORG_ID, title: 'Mix do +1', date: atDay(1, 21).toISOString(),
     location: 'Clube VII, Lisboa', status: 'closed', origin: 'admin', format: 'todos_contra_todos', num_courts: 1,
-    max_players: 4, price_per_player: 10, prize: null, gender_restriction: 'misto', level: 'M2', recurrence_id: null,
+    // localStorage.mockFullOtherLevel = 'true': cheio, de outro nível, e eu
+    // ainda não sou suplente — o cartão tem de mostrar «Suplente» (27 set).
+    max_players: 4, price_per_player: 10, prize: null, gender_restriction: 'misto', level: localStorage.getItem('mockFullOtherLevel') === 'true' ? 'M5' : 'M2', recurrence_id: null,
     organization: { name: 'Dev Org', kind: 'group', group_logo_url: null },
     participants: [
       ...[0, 1, 2, 3].map((i) => ({ id: `pf${i}`, user_id: `f${i}`, partner_id: null, status: 'confirmed', user: extra(i) })),
-      { id: 'pfw', user_id: MOCK_ADMIN_USER_ID, partner_id: null, status: 'waitlisted', user: ADMIN_PERSON },
+      ...(localStorage.getItem('mockFullOtherLevel') === 'true' ? [] : [{ id: 'pfw', user_id: MOCK_ADMIN_USER_ID, partner_id: null, status: 'waitlisted', user: ADMIN_PERSON }]),
     ],
   },
   {
