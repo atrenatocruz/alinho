@@ -58,6 +58,9 @@ const SIDE_LABEL_KEY = { left: 'gamedetails.side_left', right: 'gamedetails.side
 // invocation must stay well under the Edge Function wall-clock limit.
 // 50 names ≈ 25s per call.
 const BULK_IMPORT_CHUNK_SIZE = 50
+// #541: a importação em massa saiu da página do mix (27 set). Fica aqui,
+// desligada, até ter sítio próprio (proposta: Gerir › Pessoas), com desenho.
+const SHOW_BULK_IMPORT_ON_MIX = false
 
 // Histórico de entradas e saídas (Trello #171) — verde = entrou, vermelho
 // tingido = saiu, âmbar = suplente, cinzento = alteração de parceiro.
@@ -3663,8 +3666,12 @@ export default function GameDetails() {
               nome. Apareciam a qualquer admin de grupo e confundiam — o Rui
               pensou que era assim que se inscrevia a malta (Trello #344).
               Ficam só para admins da plataforma até haver desenho próprio
-              para o admin inscrever jogadores. */}
-          {isPlatformAdmin && (
+              para o admin inscrever jogadores.
+              #541 (Francisco, 27 set: «não faz sentido ter aquilo ali»): o
+              jogador de teste só em desenvolvimento — no site não aparece a
+              ninguém. A importação em massa sai da página do mix (fica no
+              código e na edge function até ter sítio, com desenho). */}
+          {isPlatformAdmin && import.meta.env.DEV && (
             <PrimaryButton
               variant="ghost"
               onClick={handleAddTestUser}
@@ -3680,7 +3687,7 @@ export default function GameDetails() {
             </PrimaryButton>
           )}
 
-          {isPlatformAdmin && (
+          {SHOW_BULK_IMPORT_ON_MIX && isPlatformAdmin && (
             <div className="card space-y-3">
               <h3 className="text-lg text-ink-900">{t('gamedetails.bulk_import_title')}</h3>
               <textarea
