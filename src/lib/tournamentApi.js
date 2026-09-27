@@ -117,6 +117,16 @@ export async function scheduleTournamentOpening(tournamentId, opensAt) {
   return data
 }
 
+/** Mudar o nome da dupla depois da inscrição (nome-da-dupla, 27 set): os
+ *  dois da dupla ou um admin do clube, até as inscrições fecharem. Vazio =
+ *  sem nome (aparecem os dois nomes). Devolve o nome que ficou gravado.
+ *  Função do Dev 3; erros «not_allowed» e «entries_closed». */
+export async function renameTournamentEntry(entryId, teamName) {
+  const { data, error } = await supabase.rpc('rename_tournament_entry', { p_entry_id: entryId, p_team_name: (teamName || '').trim() || null })
+  if (error) throw error
+  return data ?? null
+}
+
 /** Só enquanto for rascunho e ninguém se tiver inscrito (cartão #361). */
 export async function deleteTournament(tournamentId) {
   const { error } = await supabase.rpc('delete_tournament', { p_tournament_id: tournamentId })
