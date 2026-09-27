@@ -2422,6 +2422,7 @@
   "close.open": "Open",
   "close.error": "Couldn't close. Try again.",
   "calendar.this_week": "This week",
+  "calendar.back_to_this_week": "Back to this week",
   "calendar.next_week": "Next week",
   "calendar.free": "Free",
   "calendar.busy": "Busy",

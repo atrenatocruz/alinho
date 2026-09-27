@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import TodayButton from '../TodayButton'
 import { daySegments, isoDate, maxWeekOffset, pickTime, weekDays, weekHourRange } from '../../lib/teacherWeek'
 
 const HOUR_PX = 18
@@ -66,7 +67,9 @@ export default function RealWeekCalendar({ booking, mode = 'public', now = new D
   const today = isoDate(now)
   const month = (d) => t(`lessons.month_short_${d.getMonth() + 1}`)
   const dates = `${days[0].getDate()} ${days[0].getMonth() === days[6].getMonth() ? '' : `${month(days[0])} `}– ${days[6].getDate()} ${month(days[6])}`.replace('  ', ' ')
-  const title = offset < 2 ? `${t(offset === 0 ? 'calendar.this_week' : 'calendar.next_week')} · ${dates}` : dates
+  // Com o ícone de hoje ao lado, a partir da próxima semana basta a data
+  // (no cartão do Perfil, «Próxima semana · …» partia em duas linhas).
+  const title = offset === 0 ? `${t('calendar.this_week')} · ${dates}` : dates
 
   const look = (s, d) => {
     if (s.kind === 'free') return { style: FREE, cls: 'text-ink-900' }
@@ -101,7 +104,12 @@ export default function RealWeekCalendar({ booking, mode = 'public', now = new D
       <div className="mb-2 flex items-center justify-between gap-2">
         <button type="button" disabled={offset === 0} onClick={() => setOffset(offset - 1)} aria-label={t('calendar.prev_week')}
           className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-ink-900 disabled:opacity-30"><ChevronLeft size={18} /></button>
-        <p className="text-sm font-extrabold text-ink-900">{title}</p>
+        {/* O calendário com o número de hoje leva à semana de hoje (a peça
+            partilhada da Home, design-handoff/2026-09-27-home-botao-hoje). */}
+        <span className="flex min-w-0 items-center gap-1">
+          <p className="whitespace-nowrap text-sm font-extrabold text-ink-900">{title}</p>
+          <TodayButton onClick={() => setOffset(0)} label={t('calendar.back_to_this_week')} />
+        </span>
         <button type="button" disabled={offset >= maxOffset} onClick={() => setOffset(offset + 1)} aria-label={t('calendar.next_week')}
           className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-ink-900 disabled:opacity-30"><ChevronRight size={18} /></button>
       </div>
