@@ -189,10 +189,11 @@ export default function CreateFriendMatch({ group = null }) {
                 { value: false, label: t('steps.ranking_friendly') },
               ]}
             />
-            {/* Com um convidado sem conta o jogo não conta: diz-se, não se
-                esconde (regra do ranking, #17-18 set). */}
+            {/* A regra é jogo a jogo (base de dados): um jogo com um convidado
+                sem conta não conta, os outros da sessão contam — e quem
+                criar conta pelo convite passa a contar (QA/PO, 27 set). */}
             {rankedIntent && hasGuest && (
-              <p className="mt-2 text-xs text-muted">{t('createprivatematch.ranked_hint_blocked_by_guest')}</p>
+              <p className="mt-2 text-xs text-muted">{t('friends.ranked_hint_guests')}</p>
             )}
           </div>
           <div>
