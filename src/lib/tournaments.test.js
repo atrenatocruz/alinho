@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  TOURNAMENT_STATUS, canDelete, categoryCode, courtHours, levelFromRating,
+  TOURNAMENT_STATUS, canDelete, categoryOutsideDay, categoryCode, courtHours, levelFromRating,
   nextStatus, previousStatus, stepProblem, saveProblem, totalCourtHours, totalSlots, pricePerPlayer } from './tournaments'
 
 const day = (o) => ({ date: '2026-10-09', starts_at: '18:00', ends_at: '23:00', courts: 4, ...o })
@@ -160,3 +160,19 @@ describe('datas e duração que não fazem sentido (#514)', () => {
     expect(saveProblem(base, { now })).toBe(null)
   })
 })
+
+describe('categoria fora do horário do dia (QA, 27 set; #453)', () => {
+  const days = [{ date: '2026-10-09', starts_at: '18:00', ends_at: '21:00', courts: 4 }]
+  it('antes de abrir, ou à hora de fechar, está fora', () => {
+    expect(categoryOutsideDay({ day: '2026-10-09', start_time: '09:00' }, days)).toBe(true)
+    expect(categoryOutsideDay({ day: '2026-10-09', start_time: '21:00' }, days)).toBe(true)
+    expect(categoryOutsideDay({ day: '2026-10-09', start_time: '18:00' }, days)).toBe(false)
+    expect(categoryOutsideDay({ day: '', start_time: '09:00' }, days)).toBe(false)
+  })
+  it('trava o passo 3', () => {
+    const draft = { days, categories: [{ code: 'M5', slots: 16, day: '2026-10-09', start_time: '09:00' }] }
+    expect(stepProblem(3, draft)).toBe('category_time')
+    expect(stepProblem(3, { ...draft, categories: [{ ...draft.categories[0], start_time: '18:30' }] })).toBe(null)
+  })
+})
+

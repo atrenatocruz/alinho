@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next'
 import { ImagePlus, Lock, Plus, Trash2, X } from 'lucide-react'
 import { Chips, DateField, PrimaryButton } from '../ui'
 import { TIEBREAK_RULES } from './tieBreak'
-import { categoryCode, categoryName, stepProblem, saveProblem, totalCourtHours, totalSlots, pricePerPlayer } from '../../lib/tournaments'
+import { categoryCode, categoryName, categoryOutsideDay, stepProblem, saveProblem, totalCourtHours, totalSlots, pricePerPlayer } from '../../lib/tournaments'
 import { localInputToIso, isoToLocalInput } from '../../lib/tournamentDay'
 import { FieldLabel, MonoLabel } from './TournamentBits'
 import { removeTournamentPoster, uploadTournamentPoster } from '../../lib/tournamentPosterStorage'
@@ -106,23 +106,34 @@ function DayCategories({ draft, set, dayLabel }) {
             </span>
             {doDia.length === 0 ? (
               <p className="mt-1.5 text-xs text-ink-500">{t('tournament.create.day_no_categories')}</p>
-            ) : doDia.map((c) => (
-              <div key={c.code} className="mt-1.5 flex items-center gap-2">
+            ) : doDia.map((c) => {
+              const outside = categoryOutsideDay(c, draft.days)
+              return (
+              <div key={c.code} className="mt-1.5">
+              <div className="flex items-center gap-2">
                 <span className="rounded-md bg-ink-900 px-1.5 py-0.5 font-mono text-xs font-bold text-white">{c.code}</span>
                 <span className="min-w-0 flex-1 truncate text-sm text-ink-700">{c.name}</span>
                 <input
                   type="time"
                   aria-label={t('tournament.create.start_time')}
-                  className="input-field !w-[100px] !px-2 shrink-0"
+                  aria-invalid={outside || undefined}
+                  className={`input-field !w-[100px] !px-2 shrink-0 ${outside ? '!border !border-danger' : ''}`}
                   value={c.start_time || ''}
                   onChange={(e) => patch(c.code, { start_time: e.target.value })}
                 />
-                <button type="button" onClick={() => patch(c.code, { day: '' })}
+                <button type="button" onClick={() => patch(c.code, { day: '', start_time: '' })}
                   aria-label={t('tournament.create.remove')} className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center -my-3 -mx-2 shrink-0 text-ink-300 hover:text-danger">
                   <X size={14} />
                 </button>
               </div>
-            ))}
+              {outside && (
+                <p role="alert" className="mt-1 text-xs font-bold text-danger">
+                  {t('tournament.create.category_time_outside', { from: d.starts_at, to: d.ends_at })}
+                </p>
+              )}
+              </div>
+              )
+            })}
           </div>
         )
       })}
@@ -135,7 +146,9 @@ function DayCategories({ draft, set, dayLabel }) {
               <span className="rounded-md bg-ink-900 px-1.5 py-0.5 font-mono text-xs font-bold text-white">{c.code}</span>
               <span className="min-w-0 flex-1 truncate text-sm text-ink-700">{c.name}</span>
               {draft.days.map((d) => (
-                <Chip key={d.date} onClick={() => patch(c.code, { day: d.date, start_time: c.start_time || d.starts_at })}>
+                // Ao pôr a categoria num dia, a hora passa a ser a de abertura
+                // desse dia — antes ficava a que tinha (QA, 27 set; #453).
+                <Chip key={d.date} onClick={() => patch(c.code, { day: d.date, start_time: d.starts_at })}>
                   {dayLabel(d.date)}
                 </Chip>
               ))}

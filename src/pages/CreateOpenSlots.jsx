@@ -16,6 +16,8 @@ import { buildOpenSlotRows } from '../lib/openSlots'
 import { describeError } from '../lib/errors'
 import { PrimaryButton, PickerInput, DateField } from '../components/ui'
 import StepPage from '../components/steps/StepPage'
+import WhatsappHoursField from '../components/WhatsappHoursField'
+import { setEventWhatsappPostTimes } from '../lib/whatsappHours'
 
 const EMPTY_RANGE = () => ({ start: '', end: '' })
 
@@ -30,6 +32,9 @@ export default function CreateOpenSlots() {
   const [date, setDate] = useState('')
   const [ranges, setRanges] = useState([EMPTY_RANGE()])
   const [price, setPrice] = useState('')
+  // Horas do WhatsApp (27 set): null = vem com as do último jogo em aberto
+  // do clube; [] = sem lembretes. Só no criar — em aberto não há editar.
+  const [horas, setHoras] = useState(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -58,13 +63,20 @@ export default function CreateOpenSlots() {
       return
     }
     setSaving(true)
-    const { error: err } = await supabase.from('games').insert(rows)
-    setSaving(false)
+    const { data: created, error: err } = await supabase.from('games').insert(rows).select('id')
     if (err) {
+      setSaving(false)
       console.error('Error publishing open slots:', err)
       setError(describeError(t, err, 'open_slots.error_publish'))
       return
     }
+    // As mesmas horas em cada horário publicado. Os jogos já estão criados:
+    // se isto falhar, ficam com as horas do clube, como até aqui.
+    if (Array.isArray(horas)) {
+      await Promise.all((created || []).map((g) => setEventWhatsappPostTimes('open_slot', g.id, horas)))
+        .catch((e) => console.error('Error saving WhatsApp hours:', e))
+    }
+    setSaving(false)
     navigate(`/gerir/${slug}`)
   }
 
@@ -119,11 +131,14 @@ export default function CreateOpenSlots() {
           </div>
         </>
       ) : (
-        <div>
-          <p className={label}>{t('open_slots.price_label')}</p>
-          <input type="number" step="0.01" min="0" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)}
-            className="input-field" placeholder={t('open_slots.price_example')} />
-        </div>
+        <>
+          <div>
+            <p className={label}>{t('open_slots.price_label')}</p>
+            <input type="number" step="0.01" min="0" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)}
+              className="input-field" placeholder={t('open_slots.price_example')} />
+          </div>
+          <WhatsappHoursField organizationId={org?.id} kind="open_slot" value={horas} onChange={setHoras} />
+        </>
       )}
     </StepPage>
   )

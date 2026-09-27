@@ -98,6 +98,9 @@ export function stepProblem(step, draft, opts = {}) {
     // Uma categoria sem dia não joga em lado nenhum, e o horário não a
     // apanha: é aqui que se vê, porque é aqui que os dias existem.
     if (draft.categories?.some((c) => !c.day)) return 'category_without_day'
+    // Uma categoria que começa fora do horário do dia manda gente ao clube à
+    // hora errada (QA, 27 set; cartão #453, ponto 1).
+    if (draft.categories?.some((c) => categoryOutsideDay(c, draft.days))) return 'category_time'
     return null
   }
   if (step === 4) {
@@ -108,6 +111,15 @@ export function stepProblem(step, draft, opts = {}) {
     return null
   }
   return null
+}
+
+/** A hora de início da categoria cai fora do horário do dia dela (antes de
+ *  abrir, ou à hora de fechar ou depois)? Sem dia ou sem hora, não se diz. */
+export function categoryOutsideDay(category, days = []) {
+  const day = days.find((d) => d.date === category?.day)
+  const at = (category?.start_time || '').slice(0, 5)
+  if (!day || !at || !day.starts_at || !day.ends_at) return false
+  return at < day.starts_at.slice(0, 5) || at >= day.ends_at.slice(0, 5)
 }
 
 /** Os problemas que se veem ao GUARDAR sem passar pelos passos (a editar um
