@@ -9,9 +9,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { BackBar } from '../components/ui'
-import { MapPin, MoreHorizontal, Pencil, Share2 } from 'lucide-react'
+import { MapPin, MoreHorizontal, Pencil, Share2, X, Plus } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { getFriendMatch, respondFriendMatchInvite, setFriendMatchTeams, addFriendMatchGame, listMyFriendMatchInvites, cancelFriendMatch } from '../lib/privateMatches'
+import { getFriendMatch, respondFriendMatchInvite, setFriendMatchTeams, addFriendMatchGame, listMyFriendMatchInvites, cancelFriendMatch, playFriendMatchWithoutName, keepFriendMatchSeat, removeFriendMatchInvitee } from '../lib/privateMatches'
+import AddPersonSheet from '../components/friends/AddPersonSheet'
 import { balancedSplit, rotatingGame, followingGames } from '../lib/friendTeams'
 import { describeError } from '../lib/errors'
 import { Avatar, Chips, PrimaryButton, EmptyState, ConfirmSheet } from '../components/ui'
@@ -147,10 +148,35 @@ export default function FriendSession() {
     }
   }
 
-  const respond = async (accept) => {
+  // Três respostas (quem recusa, 27 set): «Vou», «Vou, mas sem o meu nome» e
+  // «Não vou». Nas duas últimas o jogo deixa de ser meu: volta-se à lista.
+  const respond = async (answer) => {
     setBusy(true); setError('')
-    try { await respondFriendMatchInvite(match.id, accept); setInvitedHere(false); load() }
-    catch (err) { console.error('Error answering friend match invite:', err); setError(describeError(t, err)) }
+    try {
+      if (answer === 'anon') await playFriendMatchWithoutName(match.id)
+      else await respondFriendMatchInvite(match.id, answer === 'yes')
+      setInvitedHere(false)
+      if (answer === 'yes') load()
+      else navigate('/jogos-privados', { replace: true })
+    } catch (err) { console.error('Error answering friend match invite:', err); setError(describeError(t, err)) }
+    finally { setBusy(false) }
+  }
+
+  // Quem criou tira e junta pessoas em «Quem joga», sem ir ao Editar.
+  const [addingPerson, setAddingPerson] = useState(false)
+  const removePerson = async (inv) => {
+    setBusy(true); setError('')
+    try { await removeFriendMatchInvitee(inv.invitee_id); load() }
+    catch (err) {
+      console.error('Error removing a person from a friend match:', err)
+      const code = ['has_results', 'in_first_game'].find((k) => String(err?.message || '').includes(k))
+      setError(code ? t(`friends.edit_error_${code}`) : describeError(t, err))
+    } finally { setBusy(false) }
+  }
+  const keepSeat = async (inv) => {
+    setBusy(true); setError('')
+    try { await keepFriendMatchSeat(inv.invitee_id); load() }
+    catch (err) { console.error('Error keeping a friend match seat:', err); setError(describeError(t, err)) }
     finally { setBusy(false) }
   }
 
@@ -269,17 +295,51 @@ export default function FriendSession() {
       )}
       {creatorBar}
 
-      {/* Convidado por responder: aceitar ou recusar. */}
+      {/* Convidado por responder: «Vou» · «Vou, mas sem o meu nome» · «Não vou». */}
       {(me?.status === 'pending' || invitedHere) && (
-        <div className="card mt-6 space-y-3">
-          <p className="text-sm text-ink-900">{t('friends.invited_by', { name: creator?.name || '' })}</p>
-          <div className="flex gap-2">
-            <PrimaryButton onClick={() => respond(true)} disabled={busy} className="flex-1">{t('friends.accept')}</PrimaryButton>
-            <button type="button" onClick={() => respond(false)} disabled={busy} className="btn-secondary flex-1">{t('friends.decline')}</button>
-          </div>
+        <div className="mt-6 space-y-2.5">
+          <p className="rounded-card border border-line bg-white p-3.5 text-sm text-ink-900">
+            <b>{t('friends.invited_you', { name: creator?.name || '' })}</b> {t('friends.invited_you_rest', {
+              details: [dayText(match.scheduled_date, i18n.language), match.scheduled_time ? match.scheduled_time.slice(0, 5) : null, match.location].filter(Boolean).join(', ') })}
+          </p>
+          <PrimaryButton onClick={() => respond('yes')} disabled={busy} className="w-full">{t('friends.answer_yes')}</PrimaryButton>
+          {[['anon', 'friends.answer_anon', 'friends.answer_anon_hint'], ['no', 'friends.answer_no', 'friends.answer_no_hint']].map(([k, title, hint]) => (
+            <button key={k} type="button" onClick={() => respond(k)} disabled={busy}
+              className="press w-full rounded-ctrl border border-line bg-white p-3.5 text-left disabled:opacity-40">
+              <span className="block text-sm font-extrabold text-ink-900">{t(title)}</span>
+              <span className="mt-0.5 block text-xs text-muted">{t(hint, { name: creator?.name || '' })}</span>
+            </button>
+          ))}
           {games.length > 0 && <p className="text-xs text-muted">{t('friends.invite_card_note')}</p>}
         </div>
       )}
+
+      {/* Alguém saiu («Não vou»): quem criou convida outra pessoa ou mantém o
+          lugar como «Jogador sem nome» (quem recusa, 27 set). */}
+      {iAmCreator && invitees.some((i) => i.status === 'declined' && i.left_name) && (() => {
+        const left = invitees.filter((i) => i.status === 'declined' && i.left_name)
+        const missing = Math.max(0, 4 - players.length)
+        return (
+          <div className="mt-6 space-y-2.5">
+            {left.map((i) => (
+              <p key={i.invitee_id} className="rounded-card border border-warning/30 bg-warning/10 p-3.5 text-sm text-ink-900">
+                <b>{t('friends.left_bold', { name: i.left_name })}</b>{missing > 0 ? ` ${t('friends.left_missing', { count: missing })}` : ''}
+              </p>
+            ))}
+            <Link to={`/jogos-privados/sessao/${match.id}/editar`}
+              className="press flex min-h-[52px] w-full items-center justify-center rounded-ctrl bg-lime-400 px-4 text-[15px] font-extrabold text-ink-900">
+              {t('friends.invite_another')}
+            </Link>
+            {left.map((i) => (
+              <button key={`k-${i.invitee_id}`} type="button" onClick={() => keepSeat(i)} disabled={busy}
+                className="press min-h-[52px] w-full rounded-ctrl border-[1.5px] border-line bg-white px-4 text-[15px] font-extrabold text-ink-900 disabled:opacity-40">
+                {left.length > 1 ? t('friends.keep_seat_of', { name: i.left_name }) : t('friends.keep_seat')}
+              </button>
+            ))}
+            <p className="rounded-card bg-ink-50 p-3 text-xs text-ink-700">{t('friends.keep_seat_note')}</p>
+          </div>
+        )
+      })()}
 
       {ready && iAmCreator ? (
         <div className="mt-6 space-y-6">
@@ -325,20 +385,41 @@ export default function FriendSession() {
           <div>
             <p className={label}>{t('friends.who_plays', { count: invitees.filter((i) => i.status !== 'declined').length })}</p>
             <div className="space-y-2">
-              {invitees.map((i) => (
+              {/* Quem disse «Não vou» sai de «Quem joga». */}
+              {invitees.filter((i) => i.status !== 'declined').map((i) => (
                 <div key={i.invitee_id} className={`flex min-h-[48px] items-center gap-3 rounded-ctrl border px-3 py-2 ${
                   i.user_id === profile?.id ? 'border-[#BBF7D0] bg-[#DCFCE7]' : 'border-line bg-white'} ${i.status === 'declined' ? 'opacity-60' : ''}`}>
                   <Avatar name={i.name} url={i.avatar_url} size="w-8 h-8 text-[11px]" />
-                  <span className={`min-w-0 flex-1 truncate text-sm font-semibold ${i.user_id === profile?.id ? 'text-[#14532D]' : 'text-ink-900'}`}>
-                    {i.user_id === profile?.id ? t('friends.me_row', { name: i.name }) : i.name}
+                  <span className={`min-w-0 flex-1 truncate text-sm font-semibold ${i.user_id === profile?.id ? 'text-[#14532D]' : i.is_anonymous ? 'italic text-muted' : 'text-ink-900'}`}>
+                    {i.user_id === profile?.id ? t('friends.me_row', { name: i.name }) : i.is_anonymous ? t('friends.anon_name') : i.name}
                   </span>
-                  <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${i.status === 'accepted'
-                    ? 'bg-[#DCFCE7] text-[#14532D]' : 'border border-line bg-ink-50 text-ink-700'}`}>
-                    {t(STATUS_KEY[i.status] || 'friends.status_pending')}
-                  </span>
+                  {!i.is_anonymous && (
+                    <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${i.status === 'accepted'
+                      ? 'bg-[#DCFCE7] text-[#14532D]' : 'border border-line bg-ink-50 text-ink-700'}`}>
+                      {t(STATUS_KEY[i.status] || 'friends.status_pending')}
+                    </span>
+                  )}
+                  {/* Quem criou tira quem ainda não jogou (Francisco, 27 set). */}
+                  {iAmCreator && !i.is_creator && !i.has_results && (
+                    <button type="button" onClick={() => removePerson(i)} disabled={busy}
+                      aria-label={t('friends.remove_person', { name: i.name })}
+                      className="press -mr-1.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted">
+                      <X size={18} />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
+            {iAmCreator && (
+              <button type="button" onClick={() => setAddingPerson(true)}
+                className="press mt-2 flex min-h-[48px] w-full items-center justify-center gap-1.5 rounded-ctrl border border-dashed border-line bg-white text-sm font-extrabold text-ink-900">
+                <Plus size={16} /> {t('friends.add_person_button')}
+              </button>
+            )}
+            {addingPerson && (
+              <AddPersonSheet matchId={match.id} inGame={new Set(invitees.map((i) => i.user_id).filter(Boolean))}
+                onClose={() => setAddingPerson(false)} onSaved={() => { setAddingPerson(false); load() }} />
+            )}
           </div>
           )}
           {/* Quem criou, com pessoas por responder: não fica à espera. */}

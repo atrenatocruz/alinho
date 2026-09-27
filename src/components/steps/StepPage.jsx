@@ -35,7 +35,7 @@ import { ArrowLeft } from 'lucide-react'
 import { PrimaryButton } from '../ui'
 
 export default function StepPage({
-  title, step, total, stepLabel, onBack, top = null, children,
+  title, subtitle = null, step, total, stepLabel, onBack, top = null, children,
   onNext, nextLabel, nextDisabled = false, nextHint = null, footer = null, error = '', busy = false,
 }) {
   const { t } = useTranslation()
@@ -46,6 +46,8 @@ export default function StepPage({
       <BackBar onBack={onBack} label={step === 1 ? t('steps.cancel') : t('common.back')} title={title} />
 
       <h2 className="mt-2 text-3xl text-ink-900">{title}</h2>
+      {/* «No <grupo>» por baixo de «Novo jogo entre amigos» (27 set). */}
+      {subtitle && <p className="mt-0.5 text-sm text-muted">{subtitle}</p>}
       {top && <div className="mt-6">{top}</div>}
 
       {stepped && <div className="mt-6">
