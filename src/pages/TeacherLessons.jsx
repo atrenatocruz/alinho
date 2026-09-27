@@ -68,7 +68,7 @@ export default function TeacherLessons() {
   const pending = rows.filter((r) => r.status === 'pending')
   // Pedidos que chocam e ainda não estão numa junção: grupos para sugerir
   // «Juntar numa aula a N» (SPEC de 18 set §6.1).
-  const free = pending.filter((r) => !r.merge && r.proposed_by !== 'teacher')
+  const free = pending.filter((r) => !r.merge && r.proposed_by !== 'teacher' && r.lesson_type !== 'trial')
   const groups = []
   for (const r of free) {
     const g = groups.find((grp) => grp.some((o) => o.teacher_profile_id === r.teacher_profile_id && overlaps(o, r)))

@@ -227,7 +227,7 @@ export default function TeacherPage({ view = 'profile' }) {
           <div className="flex gap-2">
             {isLessonsEnabled && (
               <PrimaryButton className="flex-1 !px-3 !rounded-full" onClick={() => navigate(`/professor/${id}/pedir`)}>
-                {t('lessons.request_lesson')}
+                {t('booking.title_marcar')}
               </PrimaryButton>
             )}
             {followed || requested ? (
