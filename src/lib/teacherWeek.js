@@ -80,6 +80,14 @@ export const daySegments = (date, profiles = [], busy = [], now = new Date()) =>
   return out.filter((s) => s.end > s.start).sort((a, b) => a.start - b.start)
 }
 
+/** Até onde se marca: 3 meses (Francisco, 27 set). A última semana que o calendário mostra. */
+export const MAX_DAYS_AHEAD = 92
+export const maxWeekOffset = (now = new Date()) => {
+  const last = new Date(now); last.setDate(last.getDate() + MAX_DAYS_AHEAD)
+  const mondayNow = weekDays(now, 0)[0]
+  return Math.floor((last - mondayNow) / (7 * 86400000))
+}
+
 /** Hora cheia antes do primeiro e depois do último bloco da semana; null sem blocos. */
 export const weekHourRange = (days) => {
   const all = days.flat()

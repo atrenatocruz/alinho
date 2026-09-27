@@ -4,7 +4,9 @@ import { useTranslation } from 'react-i18next'
 import { ArrowLeft, GraduationCap } from 'lucide-react'
 import { getTeacherPage } from '../lib/lessonsApi'
 import { teacherContact } from '../lib/teacherContact'
-import { acceptLessonProposal, answerLessonMerge, cancelLessonRequest, emailLessonRequest, getTeacherBooking, proposeLessonTime, requestLesson } from '../lib/lessonsApi'
+import { acceptLessonProposal, answerLessonMerge, cancelLessonRequest, emailLessonRequest, getTeacherBooking, getTeacherBusyRange, proposeLessonTime, requestLesson } from '../lib/lessonsApi'
+import { isoDate as isoOfDay, maxWeekOffset, weekDays } from '../lib/teacherWeek'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import ProposeTimeSheet from '../components/lessons/ProposeTimeSheet'
 import {
   LESSON_TYPES, availableDurations, endTime, isPeak, lessonPrice, localDateTime, startOptions, upcomingBlocks,
@@ -78,15 +80,43 @@ export default function RequestLesson() {
   }
   useEffect(() => { load() }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const blocks = useMemo(() => upcomingBlocks(data?.profiles || []), [data])
+  // Os dias da semana em que se está (até 3 meses; Francisco, 27 set), em
+  // vez da lista fixa de 14 dias. O ocupado de cada semana pede-se ao chegar.
+  const [weekOffset, setWeekOffset] = useState(() => {
+    const dia = searchParams.get('dia')
+    if (!dia) return 0
+    const mondayNow = weekDays(new Date(), 0)[0]
+    return Math.max(0, Math.floor((new Date(`${dia}T12:00:00`) - mondayNow) / (7 * 86400000)))
+  })
+  const [weekBusy, setWeekBusy] = useState({})
+  const weekDates = useMemo(() => weekDays(new Date(), weekOffset), [weekOffset])
+  useEffect(() => {
+    if (weekOffset < 2 || weekBusy[weekOffset]) return
+    getTeacherBusyRange(id, isoOfDay(weekDates[0]), isoOfDay(weekDates[6]))
+      .then((b) => setWeekBusy((x) => ({ ...x, [weekOffset]: b })))
+      .catch(() => setWeekBusy((x) => ({ ...x, [weekOffset]: [] })))
+  }, [weekOffset]) // eslint-disable-line react-hooks/exhaustive-deps
+  const allBlocks = useMemo(() => upcomingBlocks(data?.profiles || [], new Date(), 93), [data])
+  const blocks = useMemo(() => {
+    const inWeek = new Set(weekDates.map(isoOfDay))
+    return allBlocks.filter((b) => inWeek.has(b.date))
+  }, [allBlocks, weekDates])
+  // Sem dia escolhido e sem horas nesta semana (ex.: domingo à noite):
+  // abre na primeira semana que tem horas.
+  useEffect(() => {
+    if (searchParams.get('dia') || !data || blocks.length > 0 || allBlocks.length === 0) return
+    const mondayNow = weekDays(new Date(), 0)[0]
+    setWeekOffset(Math.max(0, Math.floor((new Date(`${allBlocks[0].date}T12:00:00`) - mondayNow) / (7 * 86400000))))
+  }, [data]) // eslint-disable-line react-hooks/exhaustive-deps
+  const busyNow = weekOffset < 2 ? data?.busy || [] : [...(data?.busy || []), ...(weekBusy[weekOffset] || [])]
   // Sem nenhum preço em nenhum dos dias: também não dá para pedir.
-  const noPrices = blocks.length > 0 && blocks.every((b) =>
+  const noPrices = allBlocks.length > 0 && allBlocks.every((b) =>
     availableDurations(b, (data?.profiles || []).find((p) => p.teacher_profile_id === b.tp)).length === 0)
   const pageContact = teacherContact(page?.contact)
   const block = blocks.find((b) => b.key === blockKey) || null
   const profile = block ? data.profiles.find((p) => p.teacher_profile_id === block.tp) : null
   const durations = availableDurations(block, profile)
-  const { options: starts, noFit } = startOptions(block, duration, data?.busy || [])
+  const { options: starts, noFit } = startOptions(block, duration, busyNow)
   const peak = block && start && duration ? isPeak(profile.peak_hours, block.weekday, start, duration) : false
   const priceOf = (ty) => (block && duration ? lessonPrice(profile.prices, block.tp, ty, duration, peak, block.date) : null)
   // A experimental: 1 h, com o preço da linha «Experimental» do clube.
@@ -108,9 +138,12 @@ export default function RequestLesson() {
     if (!b) return
     setBlockKey(b.key)
     const p = data.profiles.find((x) => x.teacher_profile_id === b.tp)
-    const d = availableDurations(b, p).find((dur) => startOptions(b, dur, data.busy || []).options.some((o) => o.time === wanted.hora && !o.taken))
+    const d = availableDurations(b, p).find((dur) => startOptions(b, dur, busyNow).options.some((o) => o.time === wanted.hora && !o.taken))
     if (d) { setDuration(d); setStart(wanted.hora) }
   }, [wanted, data, blocks]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const monthOf = (d) => t(`lessons.month_short_${d.getMonth() + 1}`)
+  const weekTitle = `${weekDates[0].getDate()}${weekDates[0].getMonth() !== weekDates[6].getMonth() ? ` ${monthOf(weekDates[0])}` : ''} – ${weekDates[6].getDate()} ${monthOf(weekDates[6])}`
 
   // Mudar uma escolha de cima limpa as de baixo que deixaram de caber.
   const chooseBlock = (key) => { setBlockKey(key); setDuration(kind === 'trial' ? 60 : null); setStart(null); setType(null) }
@@ -328,7 +361,7 @@ export default function RequestLesson() {
         <p className="text-sm text-muted mt-1">{g('booking.confirms_sub', { club: (block?.orgName || data.profiles?.[0]?.org_name) ? `${block?.orgName || data.profiles[0].org_name} · ` : '' })}</p>
       </div>
 
-      {anyTrial && !(blocks.length === 0 || noPrices) && (
+      {anyTrial && !(allBlocks.length === 0 || noPrices) && (
         <section>
           <span className={label}>{t('booking.which_lesson')}</span>
           <div className="flex gap-2">
@@ -345,12 +378,23 @@ export default function RequestLesson() {
       )}
 
       <section>
-        {!(blocks.length === 0 || noPrices) && <span className={label}>{t('booking.day')}</span>}
-        {blocks.length === 0 || noPrices ? (
+        {!(allBlocks.length === 0 || noPrices) && (
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className={`${label} !mb-0`}>{t('booking.day')}</span>
+            <span className="flex items-center gap-1">
+              <button type="button" disabled={weekOffset === 0} onClick={() => { setWeekOffset(weekOffset - 1); chooseBlock(null) }} aria-label={t('calendar.prev_week')}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-line bg-white text-ink-900 disabled:opacity-30"><ChevronLeft size={18} /></button>
+              <span className="text-xs font-extrabold text-ink-700 tabular-nums">{weekTitle}</span>
+              <button type="button" disabled={weekOffset >= maxWeekOffset()} onClick={() => { setWeekOffset(weekOffset + 1); chooseBlock(null) }} aria-label={t('calendar.next_week')}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-line bg-white text-ink-900 disabled:opacity-30"><ChevronRight size={18} /></button>
+            </span>
+          </div>
+        )}
+        {allBlocks.length === 0 || noPrices ? (
           /* Sem horário ou sem preços (aulas ligadas a 26 set, antes de os
              professores preencherem): quem chega fala com ele diretamente. */
           <div className="rounded-2xl border border-line bg-white p-3.5 space-y-2.5">
-            <p className="text-sm text-ink-900">{g(blocks.length === 0 ? 'booking.no_schedule_contact' : 'booking.no_prices_contact')}</p>
+            <p className="text-sm text-ink-900">{g(allBlocks.length === 0 ? 'booking.no_schedule_contact' : 'booking.no_prices_contact')}</p>
             <div className="flex flex-wrap gap-2">
               {pageContact && (
                 <a href={pageContact.href} target="_blank" rel="noopener noreferrer"
@@ -367,7 +411,7 @@ export default function RequestLesson() {
             </div>
           </div>
         ) : (
-          <div className="-mx-4 flex gap-2 overflow-x-auto no-scrollbar px-4">
+          blocks.length === 0 ? <p className="text-sm text-muted">{t('booking.week_empty')}</p> : <div className="-mx-4 flex gap-2 overflow-x-auto no-scrollbar px-4">
             {blocks.map((b) => (
               <button key={b.key} type="button" aria-pressed={b.key === blockKey} onClick={() => chooseBlock(b.key)}
                 className={`flex-none whitespace-nowrap text-left rounded-2xl border px-3 py-1.5 transition-colors duration-fast ${b.key === blockKey ? 'border-ink-900 bg-ink-900 text-white' : 'border-line bg-canvas text-ink-900'}`}>

@@ -6,10 +6,10 @@
 //                    tocar num bloco livre chama onPickFree(tp, dia, hora).
 //   mode 'teacher' — o próprio: livre / aula marcada / pedido / já passou;
 //                    tocar num dia chama onPickDay(dia, segmentos).
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { daySegments, isoDate, pickTime, weekDays, weekHourRange } from '../../lib/teacherWeek'
+import { daySegments, isoDate, maxWeekOffset, pickTime, weekDays, weekHourRange } from '../../lib/teacherWeek'
 
 const HOUR_PX = 18
 const FREE = { background: '#99E2D6', borderColor: '#5CC7B6' }
@@ -17,7 +17,9 @@ const FREE = { background: '#99E2D6', borderColor: '#5CC7B6' }
 const CLOSED = { background: 'repeating-linear-gradient(135deg, #F3F4F6 0 4px, #D1D5DB 4px 6px)', borderColor: '#D1D5DB' }
 const label = (m) => { const h = Math.floor(m / 60); const mm = m % 60; return mm ? `${h}:${String(mm).padStart(2, '0')}` : String(h) }
 
-export default function RealWeekCalendar({ booking, mode = 'public', now = new Date(), onPickFree = null, onPickDay = null }) {
+// loadBusy(de, até): o ocupado de uma semana além dos 15 dias do booking
+// (até 3 meses, Francisco 27 set). Sem ele, as setas ficam nas duas semanas.
+export default function RealWeekCalendar({ booking, mode = 'public', now = new Date(), onPickFree = null, onPickDay = null, loadBusy = null }) {
   const { t } = useTranslation()
   // Abre nesta semana; se já não há nada por passar nela (ao domingo à
   // noite, por exemplo), abre na próxima.
@@ -25,7 +27,15 @@ export default function RealWeekCalendar({ booking, mode = 'public', now = new D
     .some((d) => daySegments(d, booking?.profiles || [], booking?.busy || [], now).some((s) => !s.past)) ? 0 : 1))
   const days = useMemo(() => weekDays(now, offset), [now, offset])
   const profiles = booking?.profiles || []
-  const segs = useMemo(() => days.map((d) => daySegments(d, profiles, booking?.busy || [], now)), [days, profiles, booking, now])
+  const maxOffset = loadBusy ? maxWeekOffset(now) : 1
+  // O ocupado das semanas além do booking, pedido ao chegar lá.
+  const [extra, setExtra] = useState({}) // { offset: busy[] }
+  useEffect(() => {
+    if (offset < 2 || !loadBusy || extra[offset]) return
+    loadBusy(isoDate(days[0]), isoDate(days[6])).then((b) => setExtra((x) => ({ ...x, [offset]: b || [] }))).catch(() => setExtra((x) => ({ ...x, [offset]: [] })))
+  }, [offset]) // eslint-disable-line react-hooks/exhaustive-deps
+  const weekBusy = offset < 2 ? booking?.busy || [] : extra[offset] || []
+  const segs = useMemo(() => days.map((d) => daySegments(d, profiles, weekBusy, now)), [days, profiles, weekBusy, now])
   // As horas: as mesmas nas duas semanas, para o calendário não saltar.
   const range = useMemo(() => weekHourRange([0, 1].flatMap((o) => weekDays(now, o).map((d) => daySegments(d, profiles, booking?.busy || [], now)))),
     [now, profiles, booking])
@@ -42,7 +52,8 @@ export default function RealWeekCalendar({ booking, mode = 'public', now = new D
   const height = span * HOUR_PX
   const today = isoDate(now)
   const month = (d) => t(`lessons.month_short_${d.getMonth() + 1}`)
-  const title = `${t(offset === 0 ? 'calendar.this_week' : 'calendar.next_week')} · ${days[0].getDate()} ${days[0].getMonth() === days[6].getMonth() ? '' : `${month(days[0])} `}– ${days[6].getDate()} ${month(days[6])}`.replace('  ', ' ')
+  const dates = `${days[0].getDate()} ${days[0].getMonth() === days[6].getMonth() ? '' : `${month(days[0])} `}– ${days[6].getDate()} ${month(days[6])}`.replace('  ', ' ')
+  const title = offset < 2 ? `${t(offset === 0 ? 'calendar.this_week' : 'calendar.next_week')} · ${dates}` : dates
 
   const look = (s) => {
     if (s.kind === 'free') return { style: FREE, cls: 'text-ink-900' }
@@ -72,10 +83,10 @@ export default function RealWeekCalendar({ booking, mode = 'public', now = new D
   return (
     <div>
       <div className="mb-2 flex items-center justify-between gap-2">
-        <button type="button" disabled={offset === 0} onClick={() => setOffset(0)} aria-label={t('calendar.this_week')}
+        <button type="button" disabled={offset === 0} onClick={() => setOffset(offset - 1)} aria-label={t('calendar.prev_week')}
           className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-ink-900 disabled:opacity-30"><ChevronLeft size={18} /></button>
         <p className="text-sm font-extrabold text-ink-900">{title}</p>
-        <button type="button" disabled={offset === 1} onClick={() => setOffset(1)} aria-label={t('calendar.next_week')}
+        <button type="button" disabled={offset >= maxOffset} onClick={() => setOffset(offset + 1)} aria-label={t('calendar.next_week')}
           className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-ink-900 disabled:opacity-30"><ChevronRight size={18} /></button>
       </div>
       <div className="grid grid-cols-[28px_repeat(7,minmax(0,1fr))] gap-x-1">
@@ -108,7 +119,7 @@ export default function RealWeekCalendar({ booking, mode = 'public', now = new D
               ))}
               {segs[i].map((s) => {
                 const lk = look(s)
-                const clickable = mode === 'public' && s.kind === 'free' && !s.past && onPickFree
+                const clickable = mode === 'public' && s.kind === 'free' && !s.past && onPickFree && (d - now) / 86400000 <= 92
                 const B = clickable ? 'button' : 'span'
                 return (
                   <B key={`${s.kind}-${s.start}-${s.past}`} type={clickable ? 'button' : undefined}

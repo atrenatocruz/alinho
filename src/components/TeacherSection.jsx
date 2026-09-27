@@ -9,7 +9,7 @@ import WeekCalendar from './lessons/WeekCalendar'
 import RealWeekCalendar from './lessons/RealWeekCalendar'
 import DaySheet from './lessons/DaySheet'
 import CloseDaysSheet from './lessons/CloseDaysSheet'
-import { getTeacherBooking, listMyTeacherClosures, listMyTeacherRequests, openTeacherDays } from '../lib/lessonsApi'
+import { getTeacherBooking, getTeacherBusyRange, listMyTeacherClosures, listMyTeacherRequests, openTeacherDays } from '../lib/lessonsApi'
 import { Avatar, ConfirmSheet } from './ui'
 import { describeError } from '../lib/errors'
 import { contemTexto } from '../lib/semAcentos'
@@ -272,7 +272,8 @@ export default function TeacherSection() {
             </div>
           ) : (
             booking?.profiles?.some((p) => (p.availability || []).length > 0)
-              ? <RealWeekCalendar booking={booking} mode="teacher" onPickDay={(day, segments) => setOpenDay({ day, segments })} />
+              ? <RealWeekCalendar booking={booking} mode="teacher" onPickDay={(day, segments) => setOpenDay({ day, segments })}
+                  loadBusy={(a, b) => getTeacherBusyRange(active[0].id, a, b)} />
               : <WeekCalendar slots={summary} clubs={calendarClubs} />
           )}
           {newRequests > 0 ? (

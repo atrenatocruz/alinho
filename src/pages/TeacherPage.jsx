@@ -15,7 +15,7 @@ import { priceRowFor, LESSON_CAPACITY, LESSON_DURATIONS } from '../lib/lessons'
 import { weeklyFromItems } from '../lib/teacherSchedule'
 import WeekCalendar from '../components/lessons/WeekCalendar'
 import RealWeekCalendar from '../components/lessons/RealWeekCalendar'
-import { getTeacherBooking } from '../lib/lessonsApi'
+import { getTeacherBooking, getTeacherBusyRange } from '../lib/lessonsApi'
 import { teacherContact } from '../lib/teacherContact'
 import { supabase } from '../lib/supabase'
 import { followPlayer, getFollowCounts, unfollowPlayer } from '../lib/follows'
@@ -176,7 +176,7 @@ export default function TeacherPage({ view = 'profile' }) {
       {/* A semana em calendário (Francisco, 27 set: «Fica o calendário»);
           com as aulas ligadas, as semanas a sério e tocar para pedir. */}
       {booking?.profiles?.some((p) => (p.availability || []).length > 0)
-        ? <RealWeekCalendar booking={booking} mode="public"
+        ? <RealWeekCalendar booking={booking} mode="public" loadBusy={(a, b) => getTeacherBusyRange(id, a, b)}
             onPickFree={isMe ? null : (tp, dia, hora) => navigate(`/professor/${tp}/pedir?dia=${dia}&hora=${hora}`)} />
         : <WeekCalendar slots={weekly} />}
       {!booking?.profiles?.some((p) => (p.availability || []).length > 0) && (

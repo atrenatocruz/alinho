@@ -257,6 +257,14 @@ export async function listMyTeacherClosures() {
   return data || []
 }
 
+/** O ocupado do professor entre duas datas, até 3 meses (migration_lessons_13):
+    o calendário e o «Marcar aula» pedem cada semana ao navegar. */
+export async function getTeacherBusyRange(teacherProfileId, fromIso, toIso) {
+  const { data, error } = await supabase.rpc('get_teacher_busy_range', { p_teacher_profile_id: teacherProfileId, p_from: fromIso, p_to: toIso })
+  if (error) throw error
+  return data || []
+}
+
 export async function cancelLessonRequest(id) {
   const { error } = await supabase.rpc('cancel_lesson_request', { p_id: id })
   if (error) throw error
