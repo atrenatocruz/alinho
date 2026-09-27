@@ -13,6 +13,8 @@
 --     só a lotação. O professor nunca aparece como aluno.
 --     Aulas que quem vê não pode ver (lesson_visible_to_me): só a hora, o tipo
 --     e a lotação — nunca nomes nem preço.
+--     Não sai a média de nível dos alunos (nota do SI, 27 set: numa aula a um
+--     era o nível exato da pessoa). O nível que se mostra é o da turma.
 --
 -- Ordem: depois da _1 (lesson_visible_to_me, lesson_capacity, lesson_price_row)
 -- e da migration_instagram_follow_system (can_view_section). Pode correr outra vez.
@@ -49,8 +51,6 @@ BEGIN
         'taken', CASE WHEN l.series_id IS NOT NULL
                    THEN (SELECT COUNT(*) FROM lesson_enrolments e WHERE e.series_id = l.series_id AND e.status IN ('accepted', 'confirmed', 'leaving'))
                    ELSE (SELECT COUNT(*) FROM lesson_attendees a WHERE a.lesson_id = l.id AND a.status IN ('accepted', 'confirmed')) END,
-        'avg_rating', (SELECT AVG(pr.rating) FROM lesson_attendees a JOIN profiles pr ON pr.id = a.user_id
-                        WHERE a.lesson_id = l.id AND a.status IN ('accepted', 'confirmed')),
         'price_month', CASE WHEN x.visible AND l.series_id IS NOT NULL THEN COALESCE(s.promo_price_month,
             (lesson_price_row(l.teacher_profile_id, l.organization_id, l.lesson_type, l.duration_minutes, s.price_peak,
                               (l.starts_at AT TIME ZONE 'Europe/Lisbon')::date)).price_month) END,
