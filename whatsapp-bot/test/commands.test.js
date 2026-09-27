@@ -178,8 +178,12 @@ test('a mensagem do mix explica como sair em dupla, só quando há duplas inscri
 
 test('com vários mixes abertos, «Out 01 dupla» tira a dupla do mix 01', async () => {
   pairIn()
+  // Hora fixa (20:00): com «agora + 24 h», entre a 01:00 e as 01:59 o mix
+  // ficava às 01:xx e o «01» também apanhava a hora — o teste falhava de noite.
+  const at20 = (days) => { const d = new Date(); d.setDate(d.getDate() + days); d.setHours(20, 0, 0, 0); return d.toISOString() }
+  db.games[0].date = at20(1)
   db.games.push({ id: 'm2', organization_id: 'o', title: 'Outro', status: 'open', origin: 'manual',
-    date: new Date(Date.now() + 2 * 864e5).toISOString(), num_courts: 1, max_players: 4, rotate_partners: false, allow_pair_signup: true })
+    date: at20(2), num_courts: 1, max_players: 4, rotate_partners: false, allow_pair_signup: true })
   await say('out 01 dupla', '351922222222')
   assert.equal(row(), undefined)
 })
