@@ -799,12 +799,12 @@ export function AchievementCard({ achievementKey, category, rarity, earned = fal
 export function VoucherCard({ prizeText, gameTitle, gameDate, organizationName, status, usedAtLabel, onMarkUsed, onShowQR, needsConsent = false, shared = false, onAccept, onUnshare }) {
   const { t } = useTranslation()
   const used = status === 'usado'
-  // #556: sem o sim do jogador, o clube não tem o contacto e o voucher não
-  // se usa — o cartão pede-o («Ver e aceitar») no lugar do «Usar».
+  // #556: partilhar o contacto é um convite, não uma porta — o voucher usa-se
+  // na mesma («não queremos obrigar a ter a app», Francisco, 27 set).
   return (
     <div
       className={`card relative overflow-hidden ${used ? 'shadow-none' : 'shadow-lift cursor-pointer'}`}
-      onClick={!used ? (needsConsent ? onAccept : onShowQR) : undefined}
+      onClick={!used ? onShowQR : undefined}
       role={!used ? 'button' : undefined}
       tabIndex={!used ? 0 : undefined}
     >
@@ -829,18 +829,18 @@ export function VoucherCard({ prizeText, gameTitle, gameDate, organizationName, 
         </p>
       )}
 
-      {!used && needsConsent ? (
+      {!used ? (
         <>
-          <p className="mt-3 rounded-ctrl border border-warning/30 bg-warning/10 px-3 py-2 text-xs leading-snug text-ink-900">
-            <b className="font-extrabold">{t('vouchers.consent_lead')}</b> {t('vouchers.consent_rest', { club: organizationName })}
-          </p>
-          <button type="button" onClick={(e) => { e.stopPropagation(); onAccept() }}
-            className="mt-3 inline-flex min-h-[48px] w-full items-center justify-center rounded-ctrl bg-ink-900 px-5 text-base font-extrabold text-white">
-            {t('vouchers.see_accept')}
-          </button>
-        </>
-      ) : !used ? (
-        <>
+          {/* O convite a partilhar o contacto (#556): opcional. */}
+          {needsConsent && (
+            <div className="mt-3 flex items-start justify-between gap-3 text-xs">
+              <span className="text-muted">{t('vouchers.consent_invite', { club: organizationName })}</span>
+              <button type="button" onClick={(e) => { e.stopPropagation(); onAccept() }}
+                className="shrink-0 font-extrabold text-ink-900 underline underline-offset-2">
+                {t('vouchers.see_accept')}
+              </button>
+            </div>
+          )}
           {shared && (
             <div className="mt-3 flex items-start justify-between gap-3 text-xs">
               <span className="text-ok-700">✓ {t('vouchers.shared_with', { club: organizationName })}</span>
