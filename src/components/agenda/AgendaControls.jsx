@@ -1,13 +1,14 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
-import { ChevronLeft, ChevronRight, ChevronDown, Calendar, X, MapPin, LocateFixed, Map, List, Search } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronDown, X, MapPin, LocateFixed, Map, List, Search } from 'lucide-react'
 import { useGooglePlacesAutocomplete } from '../../lib/useGooglePlacesAutocomplete'
 import { RADIUS_OPTIONS } from '../../lib/explore'
 import { formatDate } from '../../lib/formatDate'
 import { toDayKey, fromDayKey, addDays, monthGrid, EVENT_KINDS, SHOW_OPTIONS, DEFAULT_FILTERS } from '../../lib/agenda'
 import { KIND_STYLE } from './EventCard'
 import { Chips } from '../ui'
+import TodayButton from '../TodayButton'
 import { useAuth } from '../../contexts/AuthContext'
 
 /* Controlos da agenda da Home (Trello #258, Fase 1): o dia em cima com setas,
@@ -31,14 +32,18 @@ export function dayLabel(dayKey, t, lang) {
 
 /* Sem setas (Francisco, 16 set): muda-se de dia a fazer scroll, e a data
    acompanha o dia que está no topo da lista. Tocar abre o mês. */
-export function DayHeader({ dayKey, onOpenMonth }) {
+// A data abre o mês para escolher outro dia; o calendário com o número de
+// hoje, afastado da data, volta a hoje num toque (Francisco, 27 set:
+// design-handoff/2026-09-27-home-botao-hoje).
+export function DayHeader({ dayKey, onOpenMonth, onToday }) {
   const { t, i18n } = useTranslation()
   return (
-    <div className="flex items-center justify-center">
+    <div className="flex items-center justify-center gap-3">
       <button type="button" onClick={onOpenMonth} className="flex items-center gap-1.5 min-h-[44px] px-2 text-xl font-extrabold text-ink-900 font-display">
         {dayLabel(dayKey, t, i18n.language)}
-        <Calendar size={16} className="text-muted" />
+        <ChevronDown size={18} className="text-muted" />
       </button>
+      {onToday && <TodayButton onClick={onToday} />}
     </div>
   )
 }

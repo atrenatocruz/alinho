@@ -830,7 +830,7 @@ export default function Home() {
             {headerActions}
           </div>
         </div>
-        {viewMode === 'list' && <DayHeader dayKey={visibleDay} onOpenMonth={() => setMonthOpen(true)} />}
+        {viewMode === 'list' && <DayHeader dayKey={visibleDay} onOpenMonth={() => setMonthOpen(true)} onToday={() => scrollToDay(today)} />}
         <FilterChips filters={filters} onOpenFilters={() => setFiltersOpen(true)} onOpenSearch={viewMode === 'list' ? openSearch : undefined} />
       </div>
 
