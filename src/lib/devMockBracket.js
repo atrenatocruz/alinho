@@ -95,6 +95,8 @@ function build() {
 const entries = () => Array.from({ length: size() }, (_, i) => ({
   id: `e${i + 1}`, category_id: CAT, team_name: i === 0 ? null : NAMES[i], status: 'validada',
   player1_name: i === 0 ? 'Admin (Dev)' : null, player2_name: i === 0 ? 'Pedro Silva' : null,
+  // mockTHides = 'true': a e3 esconde os resultados (cartões de partilha).
+  hides_results: localStorage.getItem('mockTHides') === 'true' && i === 2,
 }))
 
 // Ganham aos outros dados de teste das mesmas vistas só quando ligados.
