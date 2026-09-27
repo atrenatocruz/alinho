@@ -364,8 +364,91 @@ export function friendsMatchTitle(m, userId, t) {
   return teamB.length ? `${teamA.join(' + ')} ${t('gamedetails.vs')} ${teamB.join(' + ')}` : teamA.join(' + ')
 }
 
+/* Um jogo entre amigos a rodar, num cartão só (desenho da UX, 27 set):
+   «Jogo entre amigos · a rodar», «Com Ruben, Claudia e mais 3», as pessoas
+   da sessão (6/6); a decorrer «Ronda 2 de 5», acabado «5 jogos · ganhaste 3».
+   Tocar abre a sessão. */
+export function FriendSessionCard({ event, userId, past = false }) {
+  const { t, i18n } = useTranslation()
+  const games = event.raw.games
+  const people = new Map()
+  for (const g of games) {
+    for (const s of SLOTS) {
+      const id = g[`${s}_id`]
+      const guest = g[`${s}_guest_name`]
+      if (!id && !guest) continue
+      const k = id || `g:${guest}`
+      if (!people.has(k)) people.set(k, { id, name: id === userId ? t('agenda.you') : g[`${s}_name`] || guest, avatar_url: g[`${s}_avatar`], me: id === userId })
+    }
+  }
+  const all = [...people.values()]
+  const others = all.filter((p) => !p.me).map((p) => String(p.name || '').split(/\s+/)[0]).filter(Boolean)
+  // Quem joga lê «Com Rita, Tiago e mais 3»; quem não joga (página do
+  // grupo) lê «Rita, Tiago e mais 4», sem o «Com» (UX, 27 set).
+  const inSession = all.some((p) => p.me)
+  const k = inSession ? 'session_title' : 'session_names'
+  const title = others.length > 2
+    ? t(`agenda.${k}_more`, { a: others[0], b: others[1], count: others.length - 2 })
+    : others.length === 2 ? t(`agenda.${k}_two`, { a: others[0], b: others[1] })
+      : t(`agenda.${k}_one`, { a: others[0] || '' })
+  const done = (g) => g.score_a != null && g.score_b != null
+  const played = games.filter(done)
+  const wins = played.filter((g) => {
+    const slot = SLOTS.find((s) => g[`${s}_id`] === userId)
+    const team = slot ? slot.slice(0, 6).replace('team_', '') : null
+    return team && g.winner_team === team
+  }).length
+  const running = !event.finished && (played.length > 0 || games.some((g) => g.started_at))
+  const facts = event.finished
+    ? (inSession ? t('agenda.session_done', { count: games.length, wins }) : t('agenda.session_done_plain', { count: games.length }))
+    : running ? t('agenda.session_round', { n: games.findIndex((g) => !done(g)) + 1, total: games.length }) : null
+  // Só quem jogou abre a sessão; no grupo, para os outros, não se toca
+  // (o Francisco não aprovou abrir a sessão a quem não jogou, 27 set).
+  const to = !inSession ? null : event.id ? `/jogos-privados/sessao/${event.id}` : '/jogos-privados'
+  const m = event.raw
+
+  let state = null
+  if (past || event.finished) state = <StateTag tone="grey" icon={CheckCircle2}>{t('agenda.state_finished')}</StateTag>
+  else if (running) state = <StateTag tone="live" icon={Play}>{t('ui.status_live')}</StateTag>
+  else if (inSession) state = <StateTag tone="in" icon={CheckCircle2}>{t('agenda.state_in')}</StateTag>
+
+  return (
+    <div className={`relative overflow-hidden rounded-card p-3.5 ${to ? 'press' : ''} ${cardFrame(event, past)}`}>
+      {to && <Link to={to} className="absolute inset-0" aria-label={title} />}
+      <div className="flex items-start justify-between gap-2">
+        <KindTag kind="friends" past={past} suffix={t('agenda.session_rotating')} />
+        {state}
+      </div>
+      {event.hasTime ? (
+        <p className={`text-[22px] font-extrabold leading-none mt-2.5 ${past ? 'text-muted' : 'text-ink-900'}`}>
+          {formatTime(event.startsAt, i18n.language, { hour: '2-digit', minute: '2-digit' })}
+        </p>
+      ) : (
+        <p className="flex items-center gap-1 text-xs font-extrabold text-muted mt-2.5"><Clock size={12} /> {t('agenda.no_time')}</p>
+      )}
+      <h3 className={`text-base leading-snug mt-1.5 ${past ? 'text-muted' : 'text-ink-900'}`}>{title}</h3>
+      <div className="mt-1"><Owner event={event} fallbackKey="agenda.owner_friends" /></div>
+      {m.location && (
+        <p className="flex items-center gap-1.5 text-ink-700 text-[13px] mt-1.5">
+          <MapPin size={14} className="shrink-0" /> <span className="truncate">{m.location}</span>
+        </p>
+      )}
+      <p className="text-ink-700 text-[13px] mt-1.5">
+        {[m.ranked_intent ? t('agenda.friends_ranked') : t('gamedetails.badge_friendly'), facts].filter(Boolean).join(' · ')}
+      </p>
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2 pt-2.5 mt-2.5 border-t border-ink-900/10">
+        <div className="flex items-center gap-2 min-w-0">
+          {/* A lotação são as pessoas da sessão (6/6), não os 4 de um jogo. */}
+          <PlayerAvatarRow players={all} max={all.length} size="sm" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function FriendsEventCard({ event, userId, orgSlug = null, invite = null, past = false }) {
   const { t, i18n } = useTranslation()
+  if (event.source === 'friend_session') return <FriendSessionCard event={event} userId={userId} past={past} />
   const m = event.raw
   // O próprio aparece como "Tu": o cartão é lido por quem está nele.
   const nameOf = (slot) => (m[`${slot}_id`] && m[`${slot}_id`] === userId ? t('agenda.you') : m[`${slot}_name`] || m[`${slot}_guest_name`] || null)

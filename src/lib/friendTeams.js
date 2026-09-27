@@ -89,7 +89,68 @@ export function followingGames(people, game1, mode) {
     const four = [...game1.teamA, ...game1.teamB]
     return [2, 3].map((n) => rotatingGame(four, n))
   }
-  // Quem descansou no jogo 1 vai à frente: a rotação continua a partir dele.
-  const order = [...game1.resting, ...people.filter((p) => !game1.resting.includes(p))]
-  return Array.from({ length: people.length - 1 }, (_, i) => rotatingGame(order, i + 2))
+  return rotationAfter(people, game1, people.length - 1)
+}
+
+const key2 = (a, b) => [a.id, b.id].sort().join('|')
+
+/** Os jogos a rodar depois do jogo 1, com mais de 4 (falha vista pelo
+ *  Francisco a 27 set: com 6, o jogo 5 repetia o 2 e o 6 repetia o 3, porque
+ *  quem descansa rodava por uma ordem fixa e os mesmos 4 voltavam a jogar).
+ *  Jogo a jogo, escolhe:
+ *   1. quem descansa: quem descansou menos até aí (todos descansam o mesmo);
+ *      entre esses, todas as combinações possíveis;
+ *   2. as duplas: primeiro nunca repetir um parceiro, depois repetir o menos
+ *      possível o mesmo adversário, e só no fim o nível mais equilibrado.
+ *  Um jogo igual a outro já feito fica para último recurso. */
+export function rotationAfter(people, game1, count) {
+  const r = ratingsOf(people)
+  const rests = new Map(people.map((p) => [p.id, 0]))
+  const partners = new Map()
+  const opponents = new Map()
+  const seen = new Set()
+  const bump = (m, k) => m.set(k, (m.get(k) || 0) + 1)
+  const record = (g) => {
+    g.resting.forEach((p) => rests.set(p.id, rests.get(p.id) + 1))
+    bump(partners, key2(...g.teamA)); bump(partners, key2(...g.teamB))
+    for (const a of g.teamA) for (const b of g.teamB) bump(opponents, key2(a, b))
+    seen.add([ids2(g.teamA), ids2(g.teamB)].sort().join(' x '))
+  }
+  record(game1)
+  const k = people.length - 4
+  const out = []
+  for (let n = 0; n < count; n += 1) {
+    // Quem pode descansar: os que descansaram menos, até completar k.
+    const byRest = [...people].sort((a, b) => rests.get(a.id) - rests.get(b.id))
+    const cut = rests.get(byRest[k - 1].id)
+    const sure = byRest.filter((p) => rests.get(p.id) < cut)
+    const tied = byRest.filter((p) => rests.get(p.id) === cut)
+    let best = null
+    for (const extra of combos(tied, k - sure.length)) {
+      const resting = [...sure, ...extra]
+      const playing = people.filter((p) => !resting.includes(p))
+      for (const [x, y] of pairings(playing)) {
+        const partnerRep = (partners.get(key2(...x)) || 0) + (partners.get(key2(...y)) || 0)
+        let oppRep = 0
+        for (const a of x) for (const b of y) oppRep += opponents.get(key2(a, b)) || 0
+        const same = seen.has([ids2(x), ids2(y)].sort().join(' x ')) ? 1 : 0
+        const diff = Math.abs(r(x[0]) + r(x[1]) - r(y[0]) - r(y[1]))
+        const score = same * 1e9 + partnerRep * 1e6 + oppRep * 1e3 + diff
+        if (!best || score < best.score) best = { score, g: { teamA: x, teamB: y, resting } }
+      }
+    }
+    record(best.g)
+    out.push(best.g)
+  }
+  return out
+}
+
+const ids2 = (team) => team.map((p) => p.id).sort().join('+')
+
+/** Todas as combinações de `size` elementos de `list`, pela ordem. */
+function combos(list, size) {
+  if (size <= 0) return [[]]
+  const out = []
+  list.forEach((x, i) => { for (const rest of combos(list.slice(i + 1), size - 1)) out.push([x, ...rest]) })
+  return out
 }

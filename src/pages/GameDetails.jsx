@@ -3078,11 +3078,13 @@ export default function GameDetails() {
                 </div>
 
                 {/* O alarme das rondas (27 set): no mix vem ligado; cada um
-                    desliga no seu telemóvel. */}
+                    desliga no seu telemóvel. Com os resultados todos a ronda
+                    acabou (SPEC, ponto 7): cala-se e fica à espera da
+                    seguinte, sem a tira âmbar (designer, 27 set). */}
                 {isCurrent && game.round_started_at && game.round_duration_minutes > 0 && (
                   <div className="mb-3">
                     <RoundAlarm
-                      roundKey={`${id}:${game.round_started_at}`}
+                      roundKey={ms.length > 0 && ms.every((m) => m.winner_team_id) ? null : `${id}:${game.round_started_at}`}
                       endsAt={new Date(game.round_started_at).getTime() + game.round_duration_minutes * 60000}
                       roundNumber={r}
                       eventName={game.title}
@@ -3336,6 +3338,16 @@ export default function GameDetails() {
                         <> {t('gamedetails.round_results_missing', { count: currentRoundMatches.filter((m) => !m.winner_team_id).length })}</>
                       )}
                     </p>
+                  )}
+                  {/* O passo seguinte também aqui, por baixo da ronda, onde está quem
+                      marca (Francisco, 27 set, mix real em Carcavelos: «tem de estar
+                      aqui»): o mesmo botão preto da barra de cima — «Terminar Ronda
+                      N» ou, na última, «Terminar e dar os pontos». */}
+                  {roundsStarted && (canAdvance || canFinalize) && barPrimary && (
+                    <button type="button" onClick={barPrimary.onClick} disabled={barPrimary.disabled}
+                      className="press inline-flex min-h-[52px] w-full items-center justify-center gap-1.5 rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold leading-tight text-white disabled:opacity-50">
+                      {barPrimary.label}
+                    </button>
                   )}
                   {/* Sair mais cedo — disponível assim que houver pelo menos um resultado guardado */}
                   {roundsStarted && !canFinalize && anyScoreSaved && (

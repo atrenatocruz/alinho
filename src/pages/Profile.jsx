@@ -20,6 +20,7 @@ import { formatRating, formatRatingMaybeProvisional, isProvisional, bandProgress
 import { XP_TIERS, tierFromXp, preTierProgress, formatXp } from '../lib/xp'
 import { AGE_LABEL_KEY, ageCategory } from '../lib/ageCategories'
 import { formatDate as formatDateLib } from '../lib/formatDate'
+import { dayText } from '../components/friends/dayText'
 import { sortVouchersForWallet, shareVoucherContact, unshareVoucherContact } from '../lib/vouchers'
 import ShareContactSheet from '../components/vouchers/ShareContactSheet'
 import { describeError } from '../lib/errors'
@@ -423,14 +424,39 @@ export default function Profile() {
       result: m.position ? t('profile.position_of_total', { position: ordinal(m.position), total: m.totalDuplas }) : null,
       highlight: m.position === 1,
     })),
-    ...privateMatchHistory.map((m) => ({
-      key: `pm:${m.id}`,
-      kind: 'friends',
-      date: matchDate(m),
-      subtitle: t('agenda.owner_friends'),
-      to: '/jogos-privados',
-      ...matchSummary(m),
-    })),
+    // Um jogo a rodar é uma linha só (UX, 27 set: «é o mesmo jogo»): o dia,
+    // «Jogo entre amigos · a rodar», «6 jogos · ganhaste 3» e os pontos de
+    // ranking somados, se já contaram. Os jogos de 4 ficam um por linha; as
+    // contas do perfil continuam jogo a jogo.
+    ...Object.values(privateMatchHistory.reduce((acc, m) => {
+      const k = m.session_id || ('session_id' in m ? `solo:${m.id}` : `${m.scheduled_date || ''}|${m.scheduled_time || ''}|${m.location || ''}`)
+      ;(acc[k] = acc[k] || []).push(m)
+      return acc
+    }, {})).map((list) => {
+      const m = list[0]
+      if (list.length === 1 && !m.session_id) {
+        return { key: `pm:${m.id}`, kind: 'friends', date: matchDate(m), subtitle: t('agenda.owner_friends'), to: '/jogos-privados', ...matchSummary(m) }
+      }
+      const wins = list.filter((g) => {
+        const slot = ['team_a_player1', 'team_a_player2', 'team_b_player1', 'team_b_player2'].find((sl) => g[`${sl}_id`] === profile?.id)
+        return slot && g.winner_team === slot.slice(5, 6)
+      }).length
+      const deltas = list.map((g) => g.my_rating_delta).filter((d) => d != null)
+      const points = deltas.length ? Math.round(deltas.reduce((a, d) => a + Number(d), 0)) : null
+      return {
+        key: `ps:${m.session_id || m.id}`,
+        kind: 'friends',
+        suffix: t('agenda.session_rotating'),
+        date: matchDate(m),
+        title: t('agenda.session_done', { count: list.length, wins }),
+        subtitle: t('agenda.owner_friends'),
+        to: m.session_id ? `/jogos-privados/sessao/${m.session_id}` : '/jogos-privados',
+        result: points != null ? t('profile.session_points', { points: points > 0 ? `+${points}` : String(points) }) : null,
+        // Verde, não lima: o «Ranking global» por cima já é lima (UX, 27 set).
+        tone: points > 0 ? 'green' : null,
+        dateLabel: m.scheduled_date ? dayText(m.scheduled_date, i18n.language).toLocaleLowerCase(i18n.language) : null,
+      }
+    }),
     ...groupMatchHistory.map(({ match, org }) => ({
       key: `gm:${match.id}`,
       kind: 'friends',
@@ -984,15 +1010,15 @@ export default function Profile() {
                   )}
                   <Link to={g.to} className="card press flex items-center gap-3 hover:shadow-lift">
                     <div className="flex-1 min-w-0">
-                      <KindTag kind={g.kind} />
+                      <KindTag kind={g.kind} suffix={g.suffix} />
                       <p className="font-extrabold text-ink-900 text-sm truncate mt-1.5">{g.title}</p>
                       <p className="text-[11px] text-muted mt-1 truncate">
-                        {formatMixDate(g.date)}{g.subtitle ? ` · ${g.subtitle}` : ''}
+                        {g.dateLabel || formatMixDate(g.date)}{g.subtitle ? ` · ${g.subtitle}` : ''}
                       </p>
                     </div>
                     {g.result && (
                       <span className={`text-xs font-extrabold px-2.5 py-1.5 rounded-full shrink-0 tabular-nums ${
-                        g.highlight ? 'bg-lime-400 text-ink-900' : 'bg-ink-50 text-ink-700'
+                        g.tone === 'green' ? 'bg-[#DCFCE7] text-[#14532D]' : g.highlight ? 'bg-lime-400 text-ink-900' : 'bg-ink-50 text-ink-700'
                       }`}>
                         {g.result}
                       </span>
