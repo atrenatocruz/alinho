@@ -1187,7 +1187,13 @@ TABLE_MOCKS.memberships = (url) => {
   if (localStorage.getItem('mockGroupFull') === 'true' && /select=id(,profile|&|$)/.test(u)) {
     return Array.from({ length: 40 }, (_, i) => ({ id: `m${i}` }))
   }
-  return membershipsSemFiltro(url)
+  // localStorage.mockEventGuests = 'true': dois convidados do WhatsApp no mix
+  // a decorrer (João Jesus e Beatriz Faria), para se ver o «Convidado» junto
+  // do jogador (27 set).
+  const guests = localStorage.getItem('mockEventGuests') === 'true'
+    ? ['fake-2', 'fake-5'].map((id) => ({ user_id: id, organization_id: MOCK_ADMIN_ORG_ID, level: null, is_guest: true, is_test: false, is_admin: false }))
+    : []
+  return [...membershipsSemFiltro(url), ...guests]
 }
 // localStorage.mockMixDraft = 'true' — um mix em rascunho na lista do Gerir
 // e na agenda da Home (Trello #544; na Home tem de ficar de fora).

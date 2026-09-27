@@ -1937,7 +1937,6 @@ export default function GameDetails() {
   const teamPoints = (team) => (pointsById[team?.player1?.id] ?? 0) + (pointsById[team?.player2?.id] ?? 0)
   const renderDuplaBlock = (team, { showPoints = true } = {}) => {
     const isMine = team?.player1?.id === user.id || team?.player2?.id === user.id
-    const hasGuest = team?.player1?.is_guest || team?.player2?.is_guest
     return (
       <div
         key={team.id}
@@ -1948,23 +1947,25 @@ export default function GameDetails() {
           changedKeys.has(teamPairKey(team)) && lastMinuteEditable ? 'rounded-ctrl ring-2 ring-[#075985] ring-offset-4 ring-offset-canvas' : '',
         ].join(' ')}
       >
-        {(showPoints || team.id === game.winner_team_id || hasGuest) && (
+        {(showPoints || team.id === game.winner_team_id) && (
           <div className="flex items-center justify-between mb-1.5">
             <p className="text-[11px] font-extrabold text-muted uppercase tracking-wide">
               {showPoints && <>{teamPoints(team)} {t('gamedetails.points_suffix')}</>}
             </p>
-            <div className="flex items-center gap-1.5">
-              {team.id === game.winner_team_id && <span>🏆</span>}
-              {hasGuest && <GuestBadge isTest={team.player1?.is_test || team.player2?.is_test} />}
-            </div>
+            {team.id === game.winner_team_id && <span>🏆</span>}
           </div>
         )}
         <div className="space-y-1.5">
           {[team.player1, team.player2].map((player, idx) => {
+            // «Convidado» colado ao nome de quem é (Francisco, 27 set: «Não sei
+            // quem é convidado»): o nome encurta, a etiqueta fica sempre à vista.
             const name = (
-              <span className="flex-1 min-w-0 text-sm font-extrabold text-ink-900 truncate">
-                {player?.name || '?'}
-                {player?.id === user.id && <span className="font-normal text-muted"> · {t('agenda.you').toLowerCase()}</span>}
+              <span className="flex-1 min-w-0 flex items-center gap-1.5">
+                <span className="min-w-0 text-sm font-extrabold text-ink-900 truncate">
+                  {player?.name || '?'}
+                  {player?.id === user.id && <span className="font-normal text-muted"> · {t('agenda.you').toLowerCase()}</span>}
+                </span>
+                {player?.is_guest && <span className="shrink-0"><GuestBadge isTest={player.is_test} /></span>}
               </span>
             )
             return (
@@ -2234,10 +2235,7 @@ export default function GameDetails() {
                             <p className="text-[11px] font-extrabold text-muted uppercase tracking-wide">
                               {t('gamedetails.dupla_number', { number: i + 1 })} · {(pointsById[team.player1?.id] ?? 0) + (pointsById[team.player2?.id] ?? 0)} {t('gamedetails.points_suffix')}
                             </p>
-                            <div className="flex items-center gap-1.5">
-                              {team.id === game.winner_team_id && <span>🏆</span>}
-                              {(team.player1?.is_guest || team.player2?.is_guest) && <GuestBadge isTest={team.player1?.is_test || team.player2?.is_test} />}
-                            </div>
+                            {team.id === game.winner_team_id && <span>🏆</span>}
                           </div>
                           <div className="space-y-1.5">
                             {[['player1_id', team.player1], ['player2_id', team.player2]].map(([slot, player]) => {
@@ -4096,7 +4094,10 @@ function SwapChip({ id, player, disabled, justSwapped }) {
     >
       <GripVertical size={16} className="text-muted shrink-0" />
       <Avatar name={player?.name} url={player?.avatar_url} size="w-7 h-7 text-xs" />
-      <span className="flex-1 min-w-0 text-sm font-extrabold text-ink-900 truncate">{player?.name || '?'}</span>
+      <span className="flex-1 min-w-0 flex items-center gap-1.5">
+        <span className="min-w-0 text-sm font-extrabold text-ink-900 truncate">{player?.name || '?'}</span>
+        {player?.is_guest && <span className="shrink-0"><GuestBadge isTest={player.is_test} /></span>}
+      </span>
       <span className="text-xs font-extrabold text-muted shrink-0">
         {t(SIDE_LABEL_KEY[player?.preferred_side] || SIDE_LABEL_KEY.both)}
       </span>
