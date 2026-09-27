@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { validateProSetScore, computeProSetFinalScore, computeSetsResult } from '../lib/scoringLogic'
+import { tieBreakProblem, matchTieBreak } from './tournament/tieBreak'
 
 /** Renders the score-input UI for one match, branching on the mix's
     scoring_format. pontos_simples/pro_set_9 are a single {a, b} input pair
@@ -9,9 +10,13 @@ import { validateProSetScore, computeProSetFinalScore, computeSetsResult } from 
     the sibling task that adds that branch — this file is incomplete
     without it, the two land together before GameDetails.jsx is wired to
     use either). */
+// tieBreakTarget (#580): o 8-8 do pro set decide-se com tie-break a 7 (FPP,
+// por defeito) ou super tie-break a 10, se quem organiza o escolheu
+// (games.tiebreak_8_8) — como no torneio. O resultado valida-se com a mesma
+// regra do torneio (tieBreakProblem) e os pontos gravam-se no set.
 export default function ScoreEntry({
   match, scoringFormat, editable, teamAName, teamBName,
-  initialScores, onScoreChange, onSave, saving,
+  initialScores, onScoreChange, onSave, saving, tieBreakTarget = 7,
 }) {
   const { t } = useTranslation()
   // Must be called unconditionally on every render (rules-of-hooks) — even
@@ -47,6 +52,7 @@ export default function ScoreEntry({
   let needsBreaker = false
   let readyToSave = false
   let finalScore = null
+  let breakerProblem = null
 
   if (scoringFormat === 'pro_set_9') {
     if (bothEntered) {
@@ -68,9 +74,13 @@ export default function ScoreEntry({
         const ba = parseInt(breakerScore.a, 10)
         const bb = parseInt(breakerScore.b, 10)
         const breakerBothEntered = breakerScore.a !== '' && breakerScore.b !== '' && !Number.isNaN(ba) && !Number.isNaN(bb)
-        if (breakerBothEntered && ba !== bb) {
+        // Validado como no torneio: chega ao alvo, com 2 de vantagem.
+        breakerProblem = breakerBothEntered ? tieBreakProblem(ba, bb, tieBreakTarget) : null
+        if (breakerBothEntered && !breakerProblem) {
           readyToSave = true
-          finalScore = computeProSetFinalScore(aNum, bNum, { a: ba, b: bb })
+          const score = computeProSetFinalScore(aNum, bNum, { a: ba, b: bb })
+          // O 9-8 e os pontos do tie-break, num set só (match_sets): «9-8 (7-5)».
+          finalScore = { ...score, sets: [{ ...score, tiebreak_a: ba, tiebreak_b: bb, is_super_tiebreak: tieBreakTarget === 10 }] }
         }
       }
     }
@@ -104,11 +114,18 @@ export default function ScoreEntry({
     )
   }
 
+  // O tie-break de um jogo acabado: «Tie-break 7-5» por baixo do 9-8 (#580).
+  const tb = matchTieBreak({ sets: [...(match.sets || [])].sort((x, y) => x.set_number - y.set_number) })
   if (!editable) {
     return (
       <div className="space-y-1.5">
         {readOnlyRow(teamAName, match.team_a_id, match.score_a)}
         {readOnlyRow(teamBName, match.team_b_id, match.score_b)}
+        {tb?.tb && (
+          <p className="px-3 text-xs font-extrabold text-muted">
+            {t(tb.super ? 'gamedetails.super_tiebreak_result' : 'gamedetails.tiebreak_result', { score: tb.tb })}
+          </p>
+        )}
       </div>
     )
   }
@@ -138,7 +155,7 @@ export default function ScoreEntry({
 
       {needsBreaker && (
         <div className="rounded-ctrl bg-canvas p-2.5 space-y-2">
-          <p className="text-xs font-extrabold text-muted">{t('gamedetails.super_tiebreak_prompt')}</p>
+          <p className="text-xs font-extrabold text-muted">{t(tieBreakTarget === 10 ? 'gamedetails.super_tiebreak_prompt' : 'gamedetails.tiebreak_prompt')}</p>
           <div className="flex items-center gap-2">
             <input
               type="number" min="0" inputMode="numeric"
@@ -156,6 +173,9 @@ export default function ScoreEntry({
               placeholder="0"
             />
           </div>
+          {breakerProblem && (
+            <p className="text-xs font-extrabold text-danger" role="status">{t(`tournament.score.problem_${breakerProblem}`)}</p>
+          )}
         </div>
       )}
 

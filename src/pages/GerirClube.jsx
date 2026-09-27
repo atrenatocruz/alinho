@@ -182,6 +182,8 @@ const EMPTY_GAME_FORM = {
   // preencher (o campo traz as do último mix), [] = sem lembretes. Grava-se
   // à parte, por set_event_whatsapp_post_times — nunca vai no payload.
   whatsapp_post_times: null,
+  // O 8-8 do pro set (#580): 'tiebreak' (a 7, FPP) ou 'super_tiebreak' (a 10).
+  tiebreak_8_8: 'tiebreak',
 }
 
 // Bandas do ranking (RANKING.md) — o nível opcional de um mix decide que
@@ -976,6 +978,15 @@ export default function GerirClube() {
     // sempre (também «Não», para editar Sim→Não chegar à recorrência); antes
     // da migração o campo não vem e não se manda nada.
     ...(typeof game.allow_pair_signup === 'boolean' ? { allow_pair_signup: game.allow_pair_signup } : {}),
+    // #580: a série guarda a contagem, os grupos e o 8-8 — cada nova data
+    // herda-os (recurrence_insert_pending). O `game` é a linha da base de
+    // dados: com as colunas, vão sempre (também para voltar a «pontos
+    // simples» ao editar); antes da migração o campo não vem e não vai.
+    ...('tiebreak_8_8' in game ? {
+      scoring_format: game.scoring_format || 'pontos_simples',
+      pool_size: game.pool_size ?? null,
+      tiebreak_8_8: game.tiebreak_8_8 ?? null,
+    } : {}),
   })
 
   // advanceByFrequency vive em src/lib/mixDraft.js: publicar um rascunho de
@@ -1158,7 +1169,7 @@ export default function GerirClube() {
     // pairing_mode sai pelo mesmo motivo: só é enviado quando não é o valor
     // por omissão, para criar/editar mixes não rebentar antes de
     // migration_mix_pairing_mode.sql correr.
-    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, ranked: _ranked, allow_pair_signup: _allowPairSignup, launch, whatsapp_post_times: postTimes, ...gameFields } = gameForm
+    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, ranked: _ranked, allow_pair_signup: _allowPairSignup, launch, whatsapp_post_times: postTimes, tiebreak_8_8: tieBreak88, ...gameFields } = gameForm
 
     const recurrenceError = validateRecurrence(recurrence)
     if (recurrenceError) {
@@ -1222,6 +1233,9 @@ export default function GerirClube() {
             ...(gameForm.ranked === false ? { ranked: false } : {}),
             level: gameForm.level || null,
             created_by: user.id,
+            // O 8-8 (#580): só vai quando é o super tie-break (antes da
+            // migração a coluna não existe, e o tie-break a 7 é o de omissão).
+            ...(gameForm.scoring_format === 'pro_set_9' && tieBreak88 === 'super_tiebreak' ? { tiebreak_8_8: 'super_tiebreak' } : {}),
             status: asDraft ? 'draft' : launchAt ? 'pending' : 'open',
             ...(launchAt ? { launch_at: launchAt.toISOString() } : {}),
           }
@@ -1385,7 +1399,7 @@ export default function GerirClube() {
     // pairing_mode sai pelo mesmo motivo: só é enviado quando não é o valor
     // por omissão, para criar/editar mixes não rebentar antes de
     // migration_mix_pairing_mode.sql correr.
-    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, ranked: _ranked, allow_pair_signup: _allowPairSignup, launch: _launch, whatsapp_post_times: postTimes, ...gameFields } = gameForm
+    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, ranked: _ranked, allow_pair_signup: _allowPairSignup, launch: _launch, whatsapp_post_times: postTimes, tiebreak_8_8: tieBreak88, ...gameFields } = gameForm
     // Any mix in an active recurring series shares the same underlying
     // game_recurrences row (via recurrence_id) — not just the origin — so
     // recurrence management works from any of them, not only the one that
@@ -1432,6 +1446,7 @@ export default function GerirClube() {
           ...((gameForm.allow_pair_signup || editingGame.allow_pair_signup) ? { allow_pair_signup: !!gameForm.allow_pair_signup && pairsAreFixed(gameForm) } : {}),
           ...((gameForm.ranked === false || editingGame.ranked === false) ? { ranked: gameForm.ranked !== false } : {}),
           level: gameForm.level || null,
+          ...((tieBreak88 === 'super_tiebreak' || editingGame.tiebreak_8_8) ? { tiebreak_8_8: gameForm.scoring_format === 'pro_set_9' && tieBreak88 === 'super_tiebreak' ? 'super_tiebreak' : null } : {}),
           ...pendingLaunchUpdate,
         })
         .eq('id', editingGame.id)
@@ -2030,6 +2045,7 @@ export default function GerirClube() {
       level: game.level || '',
       // As horas do WhatsApp do próprio mix ('HH:MM'); sem nenhuma escolhida
       // (null), o campo traz as do último mix.
+      tiebreak_8_8: game.tiebreak_8_8 || 'tiebreak',
       whatsapp_post_times: Array.isArray(game.whatsapp_post_times) ? game.whatsapp_post_times.map((h) => String(h).slice(0, 5)) : null,
       auto_start_hours_before: game.auto_start_hours_before ?? '',
       recurrence: hasActiveRecurrence

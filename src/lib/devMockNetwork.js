@@ -568,7 +568,10 @@ const evTeam = (id, a, b, seed) => ({ id, game_id: 'fake-game-1', player1_id: a.
 const [e0, e1, e2, e3, e4, e5, e6, e7] = EV_PEOPLE
 const EV_TEAMS = [evTeam('et1', e1, e0, 4), evTeam('et2', e2, e3, 3), evTeam('et3', e4, e5, 2), evTeam('et4', e6, e7, 1)]
 const EV_MATCHES = () => [
-  { id: 'em1', game_id: 'fake-game-1', round_number: 1, court_number: 1, phase: 'group', team_a_id: 'et1', team_b_id: 'et2', score_a: 6, score_b: 4, winner_team_id: 'et1' },
+  localStorage.getItem('mockProSet')
+    ? { id: 'em1', game_id: 'fake-game-1', round_number: 1, court_number: 1, phase: 'group', team_a_id: 'et1', team_b_id: 'et2', score_a: 9, score_b: 8, winner_team_id: 'et1',
+        sets: [{ set_number: 1, score_a: 9, score_b: 8, tiebreak_a: 7, tiebreak_b: 5, is_super_tiebreak: false }] }
+    : { id: 'em1', game_id: 'fake-game-1', round_number: 1, court_number: 1, phase: 'group', team_a_id: 'et1', team_b_id: 'et2', score_a: 6, score_b: 4, winner_team_id: 'et1' },
   { id: 'em2', game_id: 'fake-game-1', round_number: 1, court_number: 2, phase: 'group', team_a_id: 'et3', team_b_id: 'et4', score_a: 6, score_b: 2, winner_team_id: 'et3' },
   ...(eventState() === 'finished' ? [] : [
     // localStorage.mockRoundDone = 'true': a ronda 2 com os resultados todos,
@@ -1069,6 +1072,9 @@ const TABLE_MOCKS = {
       status: { open: 'open', joined: 'closed', live: 'in_progress', finished: 'finished', paused: 'closed' }[eventState()],
       ...(eventState() === 'finished' ? { winner_team_id: 'et1' } : {}),
       ...(eventState() === 'live' ? { round_started_at: new Date().toISOString(), round_duration_minutes: 20 } : {}),
+      // localStorage.mockProSet = '7' | '10' — o mix em pro set a 9, com o 8-8
+      // a tie-break a 7 ou a super tie-break a 10 (#580).
+      ...(localStorage.getItem('mockProSet') ? { scoring_format: 'pro_set_9', tiebreak_8_8: localStorage.getItem('mockProSet') === '10' ? 'super_tiebreak' : null } : {}),
     } : {}),
     organization: { name: 'Dev Org', group_logo_url: null },
     participants: [{
