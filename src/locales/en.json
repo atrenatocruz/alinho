@@ -3036,6 +3036,7 @@
   "mixwizard.first_opens_now": "The first mix, on {{date}}, opens for sign-ups when you publish. From the next one on, they open on the day you pick here:",
   "mixwizard.launch_past": "That day and time have already passed. Pick another day, or «Now».",
   "mixwizard.notice_scheduled": "Mix saved. {{when}}.",
+  "mixwizard.hours_not_saved": "Mix saved, but the WhatsApp times weren't saved. Open the mix and try again.",
   "mixwizard.opens_now_hint": "Sign-ups open when you publish.",
   "mixwizard.ends_label": "Ends",
   "mixwizard.ends_never": "Never",
