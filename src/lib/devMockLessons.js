@@ -239,7 +239,10 @@ export const LESSON_RPC_MOCKS = {
           availability: [{ day_of_week: 'quinta', start_time: '18:00:00', end_time: '21:00:00' }],
           peak_hours: [], prices: PRICES().map((p) => ({ ...p, teacher_profile_id: null })) },
       ],
-      busy: [{ starts_at: new Date(d.getTime() - 30 * 60000).toISOString(), ends_at: new Date(d.getTime() + 30 * 60000).toISOString(), kind: 'request' }],
+      busy: [{ starts_at: new Date(d.getTime() - 30 * 60000).toISOString(), ends_at: new Date(d.getTime() + 30 * 60000).toISOString(), kind: 'request' },
+        // Uma aula marcada na quinta a seguir (calendário do professor, 27 set).
+        ...(() => { const q = new Date(d); q.setDate(q.getDate() + 2); q.setHours(19, 0, 0, 0)
+          return [{ starts_at: q.toISOString(), ends_at: new Date(q.getTime() + 3600000).toISOString(), kind: 'lesson' }] })()],
       mine: sent ? [{ id: 'rq-1', teacher_profile_id: 'tp-ana', starts_at: d.toISOString(), duration_minutes: 90,
         lesson_type: 'duo', price_per_person: 35, contact_via: ['proposal', 'merge'].includes(sent) ? 'whatsapp' : sent, status: 'pending', org_name: 'Clube Exemplo',
         // localStorage.mockBookingSent = 'proposal' — o professor propôs outra hora.

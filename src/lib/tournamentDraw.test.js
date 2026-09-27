@@ -72,11 +72,17 @@ describe('quadro vazio, em texto', () => {
   it('as rondas seguintes dizem de onde vem cada dupla', () => {
     const bracket = buildBracketSkeleton(grupos(4), 2)
     const meia1 = bracket.find((m) => m.round === 'SF' && m.slot === 1)
-    expect(meia1.source_a).toBe('Vencedor dos quartos 1')
-    expect(meia1.source_b).toBe('Vencedor dos quartos 2')
+    expect(meia1.source_a).toBe('Vencedor Q1')
+    expect(meia1.source_b).toBe('Vencedor Q2')
     const final = bracket.find((m) => m.round === 'F')
-    expect(final.source_a).toBe('Vencedor das meias 1')
-    expect(final.source_b).toBe('Vencedor das meias 2')
+    expect(final.source_a).toBe('Vencedor meia 1')
+    expect(final.source_b).toBe('Vencedor meia 2')
+  })
+
+  it('dos oitavos para os quartos diz «Vencedor O<n>» (designer, 27 set)', () => {
+    const quartos = buildKnockoutPayload(duplas(16)).bracket.filter((m) => m.round === 'QF')
+    expect(quartos[0].source_a).toBe('Vencedor O1')
+    expect(quartos[0].source_b).toBe('Vencedor O2')
   })
 
   it('4 grupos, passa 1: meias e final — 3 jogos', () => {
@@ -389,7 +395,7 @@ describe('buildKnockoutPayload — só eliminatória (Trello #455)', () => {
     const final = p.bracket.find((m) => m.round === 'F')
     expect(final.a).toBe('e1')
     expect(final.b).toBeNull()
-    expect(final.source_b).toMatch(/Vencedor das meias/)
+    expect(final.source_b).toMatch(/Vencedor meia/)
     expect(p.third_place).toBe(false)
   })
 

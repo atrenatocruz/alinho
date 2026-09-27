@@ -6,7 +6,9 @@ import { useAuth } from '../contexts/AuthContext'
 import { DAYS, listTeacherProfiles, requestTeacherProfile, withdrawTeacherProfile, searchClubsForTeacher } from '../lib/teachers'
 import { isActiveTeacherProfile, scheduleFromRows } from '../lib/teacherSchedule'
 import WeekCalendar from './lessons/WeekCalendar'
-import { listMyTeacherRequests } from '../lib/lessonsApi'
+import RealWeekCalendar from './lessons/RealWeekCalendar'
+import DaySheet from './lessons/DaySheet'
+import { getTeacherBooking, listMyTeacherRequests } from '../lib/lessonsApi'
 import { Avatar, ConfirmSheet } from './ui'
 import { describeError } from '../lib/errors'
 import { contemTexto } from '../lib/semAcentos'
@@ -37,6 +39,11 @@ export default function TeacherSection() {
   // Pedidos de aula por responder (#392, assunto 2): o botão preto passa a
   // «Ver pedidos · N novos». Sem a migração ou sem pedidos, fica 0.
   const [newRequests, setNewRequests] = useState(0)
+  // O calendário em semanas a sério (SPEC-calendario-2): o livre, as aulas e
+  // os pedidos de cada dia; tocar num dia abre o detalhe.
+  const [booking, setBooking] = useState(null)
+  const [teacherRequests, setTeacherRequests] = useState([])
+  const [openDay, setOpenDay] = useState(null) // { day, segments }
   const [showForm, setShowForm] = useState(false)
   const [orgId, setOrgId] = useState(NO_CLUB)
   const [zone, setZone] = useState('')
@@ -61,8 +68,9 @@ export default function TeacherSection() {
       setRows(own)
       if (own.some(isActiveTeacherProfile)) {
         listMyTeacherRequests()
-          .then((list) => setNewRequests(list.filter((r) => r.status === 'pending').length))
+          .then((list) => { setTeacherRequests(list); setNewRequests(list.filter((r) => r.status === 'pending').length) })
           .catch(() => setNewRequests(0))
+        getTeacherBooking(own.find(isActiveTeacherProfile).id).then(setBooking).catch(() => setBooking(null))
       }
       setMine(own.find(isActiveTeacherProfile) || own[own.length - 1] || null)
     } catch (err) {
@@ -251,7 +259,9 @@ export default function TeacherSection() {
               {t('teacher.no_schedule_text')}
             </div>
           ) : (
-            <WeekCalendar slots={summary} clubs={calendarClubs} />
+            booking?.profiles?.some((p) => (p.availability || []).length > 0)
+              ? <RealWeekCalendar booking={booking} mode="teacher" onPickDay={(day, segments) => setOpenDay({ day, segments })} />
+              : <WeekCalendar slots={summary} clubs={calendarClubs} />
           )}
           {newRequests > 0 ? (
             <button type="button" onClick={() => navigate('/perfil/aulas')}
@@ -427,6 +437,7 @@ export default function TeacherSection() {
         onClose={() => setAsking(null)}
         errorOf={(err) => describeError(t, err, 'comunidade.withdraw_teacher_failed')}
       />
+      <DaySheet day={openDay?.day} segments={openDay?.segments} requests={teacherRequests} onClose={() => setOpenDay(null)} />
     </div>
   )
 }
