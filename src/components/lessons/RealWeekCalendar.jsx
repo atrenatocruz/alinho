@@ -13,6 +13,8 @@ import { daySegments, isoDate, pickTime, weekDays, weekHourRange } from '../../l
 
 const HOUR_PX = 18
 const FREE = { background: '#99E2D6', borderColor: '#5CC7B6' }
+// Fechado pelo professor: às riscas (SPEC-calendario-2, assunto 2).
+const CLOSED = { background: 'repeating-linear-gradient(135deg, #F3F4F6 0 4px, #D1D5DB 4px 6px)', borderColor: '#D1D5DB' }
 const label = (m) => { const h = Math.floor(m / 60); const mm = m % 60; return mm ? `${h}:${String(mm).padStart(2, '0')}` : String(h) }
 
 export default function RealWeekCalendar({ booking, mode = 'public', now = new Date(), onPickFree = null, onPickDay = null }) {
@@ -45,10 +47,11 @@ export default function RealWeekCalendar({ booking, mode = 'public', now = new D
   const look = (s) => {
     if (s.kind === 'free') return { style: FREE, cls: 'text-ink-900' }
     if (mode === 'public') return { style: { background: '#D1D5DB', borderColor: '#9CA3AF' }, cls: 'text-transparent' }
+    if (s.kind === 'closed') return { style: CLOSED, cls: 'text-ink-500' }
     if (s.kind === 'lesson') return { style: { background: '#0F766E', borderColor: '#0F766E' }, cls: 'text-white' }
     return { style: { background: '#CCF3EC', borderColor: '#5CC7B6', borderStyle: 'dashed' }, cls: 'text-[#0F766E]' }
   }
-  const tag = (s) => (mode === 'teacher' && s.kind === 'lesson' ? t('calendar.lesson_short') : mode === 'teacher' && s.kind === 'request' ? t('calendar.request_short') : null)
+  const tag = (s) => (mode !== 'teacher' ? null : s.kind === 'lesson' ? t('calendar.lesson_short') : s.kind === 'request' ? t('calendar.request_short') : s.kind === 'closed' ? t('calendar.closed') : null)
 
   const onBlock = (e, day, s) => {
     if (mode !== 'public' || s.kind !== 'free' || s.past || !onPickFree) return
@@ -60,10 +63,10 @@ export default function RealWeekCalendar({ booking, mode = 'public', now = new D
 
   const legend = mode === 'public'
     ? [['free', t('calendar.free')], ['busy', t('calendar.busy')], ['past', t('calendar.past')]]
-    : [['free', t('calendar.free')], ['lesson', t('calendar.lesson')], ['request', t('calendar.request')], ['past', t('calendar.past')]]
+    : [['free', t('calendar.free')], ['lesson', t('calendar.lesson')], ['request', t('calendar.request')], ['closed', t('calendar.closed')], ['past', t('calendar.past')]]
   const swatch = {
     free: FREE, busy: { background: '#D1D5DB', borderColor: '#9CA3AF' }, lesson: { background: '#0F766E', borderColor: '#0F766E' },
-    request: { background: '#CCF3EC', borderColor: '#5CC7B6', borderStyle: 'dashed' }, past: { background: '#fff', borderColor: '#E5E7EB' },
+    request: { background: '#CCF3EC', borderColor: '#5CC7B6', borderStyle: 'dashed' }, closed: CLOSED, past: { background: '#fff', borderColor: '#E5E7EB' },
   }
 
   return (
@@ -116,7 +119,7 @@ export default function RealWeekCalendar({ booking, mode = 'public', now = new D
                     {mode === 'public' && s.kind !== 'free' ? null : (
                       <>
                         <span>{tag(s) || label(s.start)}</span>
-                        {s.end - s.start > 60 && <span>{tag(s) ? label(s.start) : label(s.end)}</span>}
+                        {s.end - s.start > 60 && s.kind !== 'closed' && <span>{tag(s) ? label(s.start) : label(s.end)}</span>}
                       </>
                     )}
                   </B>

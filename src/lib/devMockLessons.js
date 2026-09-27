@@ -242,7 +242,11 @@ export const LESSON_RPC_MOCKS = {
       busy: [{ starts_at: new Date(d.getTime() - 30 * 60000).toISOString(), ends_at: new Date(d.getTime() + 30 * 60000).toISOString(), kind: 'request' },
         // Uma aula marcada na quinta a seguir (calendário do professor, 27 set).
         ...(() => { const q = new Date(d); q.setDate(q.getDate() + 2); q.setHours(19, 0, 0, 0)
-          return [{ starts_at: q.toISOString(), ends_at: new Date(q.getTime() + 3600000).toISOString(), kind: 'lesson' }] })()],
+          return [{ starts_at: q.toISOString(), ends_at: new Date(q.getTime() + 3600000).toISOString(), kind: 'lesson' }] })(),
+        // localStorage.mockClosures = 'true': sexta e sábado fechados (o dia todo).
+        ...(localStorage.getItem('mockClosures') === 'true' ? (() => { const f = new Date(); f.setDate(f.getDate() + ((5 - f.getDay() + 7) % 7 || 7)); f.setHours(0, 0, 0, 0)
+          const e = new Date(f); e.setDate(f.getDate() + 2)
+          return [{ starts_at: f.toISOString(), ends_at: e.toISOString(), kind: 'closed' }] })() : [])],
       mine: sent ? [{ id: 'rq-1', teacher_profile_id: 'tp-ana', starts_at: d.toISOString(), duration_minutes: 90,
         lesson_type: 'duo', price_per_person: 35, contact_via: ['proposal', 'merge'].includes(sent) ? 'whatsapp' : sent, status: 'pending', org_name: 'Clube Exemplo',
         // localStorage.mockBookingSent = 'proposal' — o professor propôs outra hora.
@@ -313,6 +317,17 @@ export const LESSON_RPC_MOCKS = {
   set_lesson_prices: () => null,
   set_teacher_availability: () => null,
   set_lesson_series_price: () => null,
+  // Fechar dias (SPEC-calendario-2, assunto 2). localStorage.mockClosures = 'true'
+  // — sexta e sábado da próxima semana fechados.
+  close_teacher_days: () => 'cl-new',
+  open_teacher_days: () => null,
+  list_my_teacher_closures: () => {
+    if (localStorage.getItem('mockClosures') !== 'true') return []
+    const fri = new Date(); fri.setDate(fri.getDate() + ((5 - fri.getDay() + 7) % 7 || 7))
+    const iso = (x) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
+    const sat = new Date(fri); sat.setDate(fri.getDate() + 1)
+    return [{ id: 'cl-1', from_date: iso(fri), to_date: iso(sat), start_time: null, end_time: null }]
+  },
   set_club_peak_hours: () => null,
   set_teacher_sort_order: () => null,
 }

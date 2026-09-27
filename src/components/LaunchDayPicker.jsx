@@ -10,7 +10,10 @@ import {
   dayOptions, launchDate, lastPageFor, pageForDays, weekdayShort, weekdayLong, isMasculineWeekday,
 } from '../lib/launchDay'
 
-export default function LaunchDayPicker({ mixDate, frequency, daysBefore, onDaysBefore, time, onTime, error }) {
+// allowNow (mix que não se repete, SPEC do mix por passos): a primeira
+// pastilha é «Já» (0 dias = abre ao publicar), os dias que já passaram não
+// aparecem, e a frase não tem «Depois, sempre…».
+export default function LaunchDayPicker({ mixDate, frequency, daysBefore, onDaysBefore, time, onTime, error, allowNow = false }) {
   const { t, i18n } = useTranslation()
   const lang = i18n.language
   const days = parseInt(daysBefore, 10)
@@ -29,8 +32,11 @@ export default function LaunchDayPicker({ mixDate, frequency, daysBefore, onDays
   }, [days, shownPage])
 
   const dayMonth = (d) => `${d.getDate()}/${d.getMonth() + 1}`
+  const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0)
   const options = valid
-    ? dayOptions(mixDate, frequency, shownPage).map((o) => ({
+    ? [
+      ...(allowNow ? [{ value: 0, label: <span className="block py-1">{t('mixwizard.opens_now')}</span> }] : []),
+      ...dayOptions(mixDate, frequency, shownPage).filter((o) => !allowNow || o.date >= startOfToday).map((o) => ({
       value: o.days,
       label: (
         <span className="flex flex-col items-center leading-tight py-1">
@@ -38,7 +44,8 @@ export default function LaunchDayPicker({ mixDate, frequency, daysBefore, onDays
           <span className="text-[11px] font-semibold opacity-70">{dayMonth(o.date)}</span>
         </span>
       ),
-    }))
+    })),
+    ]
     : []
 
   // A frase com o resultado em datas.
@@ -55,17 +62,18 @@ export default function LaunchDayPicker({ mixDate, frequency, daysBefore, onDays
       date: longDate(open),
       time,
     })
-    const then = frequency === 'weekly'
-      ? t(masc ? 'launchday.then_weekday_m' : 'launchday.then_weekday', { day: weekdayLong(open, lang) })
-      : t('launchday.then_days', { count: days })
-    summary = `${summary} ${then}`
+    const then = !frequency ? null
+      : frequency === 'weekly'
+        ? t(masc ? 'launchday.then_weekday_m' : 'launchday.then_weekday', { day: weekdayLong(open, lang) })
+        : t('launchday.then_days', { count: days })
+    if (then) summary = `${summary} ${then}`
   }
 
   return (
     <div className="space-y-2">
       <p className="text-sm font-medium text-gray-700">{t('launchday.label')}</p>
       {valid ? (
-        <div ref={rowRef}><Chips options={options} value={days >= 1 ? days : null} onChange={onDaysBefore} label={t('launchday.label')} /></div>
+        <div ref={rowRef}><Chips options={options} value={days >= 1 || (allowNow && days === 0) ? days : null} onChange={onDaysBefore} label={t('launchday.label')} /></div>
       ) : (
         <p className="text-sm text-muted">{t('launchday.pick_date_first')}</p>
       )}
@@ -85,7 +93,8 @@ export default function LaunchDayPicker({ mixDate, frequency, daysBefore, onDays
       )}
       {error && <p className="text-sm font-bold text-danger">{error}</p>}
 
-      <div className="flex items-center gap-2 pt-1">
+      {allowNow && days === 0 && <p className="text-sm text-muted">{t('mixwizard.opens_now_hint')}</p>}
+      {!(allowNow && days === 0) && <div className="flex items-center gap-2 pt-1">
         <span className="text-sm font-medium text-gray-700">{t('launchday.at')}</span>
         <input
           type="time"
@@ -94,7 +103,7 @@ export default function LaunchDayPicker({ mixDate, frequency, daysBefore, onDays
           className="input-field !w-auto"
           required
         />
-      </div>
+      </div>}
 
       {summary && (
         <p className="rounded-ctrl bg-lime-100 px-3.5 py-2.5 text-sm text-ink-900">{summary}</p>
