@@ -1,10 +1,12 @@
-import { useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
 import { Users } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { createFriendMatch } from '../lib/privateMatches'
+import { listOrganizationMembers } from '../lib/clubProfile'
+import { contemTexto } from '../lib/semAcentos'
 import { PrimaryButton, DateTimeField, Select, Chips } from '../components/ui'
 import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
 import { describeError } from '../lib/errors'
@@ -13,8 +15,11 @@ import InviteesStep, { MIN_PEOPLE } from '../components/friends/InviteesStep'
 
 const NUM_SETS_OPTIONS = Array.from({ length: 8 }, (_, i) => i + 2) // 2..9
 
-export default function CreateFriendMatch() {
-  const goBack = useGoBack('/jogos-privados')
+/* `group` ({ id, slug, name }): o jogo de grupo — o mesmo desenho, com a
+   pesquisa só entre os membros do grupo, e o jogo fica do grupo (ranking do
+   grupo): create_friend_match com p_organization_id (Dev 3). */
+export default function CreateFriendMatch({ group = null }) {
+  const goBack = useGoBack(group ? `/clube/${group.slug}/jogos` : '/jogos-privados')
   const { t } = useTranslation()
   const { profile } = useAuth()
   const navigate = useNavigate()
@@ -47,6 +52,18 @@ export default function CreateFriendMatch() {
     setLocationCoords({ latitude, longitude })
   })
 
+  // Os membros do grupo, para a pesquisa (sem mim).
+  const [members, setMembers] = useState([])
+  useEffect(() => {
+    if (!group?.id) return
+    listOrganizationMembers(group.id)
+      .then((data) => setMembers((data || []).filter((m) => m.id !== profile?.id)))
+      .catch((err) => console.error('Error loading group members:', err))
+  }, [group?.id, profile?.id])
+  // Estável entre desenhos: a pesquisa do InviteesStep volta a correr quando
+  // a função muda.
+  const searchMembers = useCallback(async (q) => members.filter((m) => contemTexto(m.name, q)), [members])
+
   const hasGuest = people.some((p) => p.guest)
   const missing = Math.max(0, MIN_PEOPLE - (people.length + 1))
 
@@ -70,6 +87,7 @@ export default function CreateFriendMatch() {
         scoringFormat,
         numSets: scoringFormat === 'sets' ? numSets : null,
         teamsMode,
+        organizationId: group?.id || null,
         invitees: people.map((p) => (p.guest
           ? { guest_name: p.name, ...(p.email ? { guest_email: p.email } : {}) }
           : { user_id: p.user_id })),
@@ -89,7 +107,7 @@ export default function CreateFriendMatch() {
 
   return (
     <StepPage
-      title={t('createprivatematch.title_new')}
+      title={group ? t('creategroupmatch.title_new') : t('createprivatematch.title_new')}
       step={step}
       total={4}
       stepLabel={stepLabels[step - 1]}
@@ -107,6 +125,7 @@ export default function CreateFriendMatch() {
     >
       {step === 1 && (
         <InviteesStep
+          {...(group ? { searchFn: searchMembers, searchPlaceholder: t('friends.search_group_placeholder') } : {})}
           me={profile}
           people={people}
           onAdd={(p) => setPeople((list) => (list.some((x) => x.key === p.key) ? list : [...list, p]))}

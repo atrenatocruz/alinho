@@ -413,6 +413,13 @@ const RPC_MOCKS = {
   set_friend_match_teams: () => null,
   add_friend_match_game: () => 'fs-g',
   respond_friend_match_invite: (params) => (params?.p_accept ? 'accepted' : 'declined'),
+  // Jogos de grupo do desenho novo, na página «Jogos» do grupo (mockFriendInvites).
+  list_group_friend_matches: () => (localStorage.getItem('mockFriendInvites') === 'true' ? [
+    { id: 'gf-2', root_id: 'gf-1', n: 2, scheduled_date: new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10), scheduled_time: '19:00:00', location: 'Clube Exemplo', court: 'Campo 3', status: 'pending', ranked_intent: true, score_a: null, score_b: null,
+      team_a: [{ user_id: 'u1', name: 'Rita Figueira' }, { user_id: 'u2', name: 'Tiago Lopes' }], team_b: [{ user_id: 'u3', name: 'Ana Marques' }, { user_id: null, name: 'Zé Pinto' }] },
+    { id: 'gf-1', root_id: 'gf-1', n: 1, scheduled_date: new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10), scheduled_time: '19:00:00', location: 'Clube Exemplo', court: 'Campo 3', status: 'confirmed', ranked_intent: true, score_a: 9, score_b: 6,
+      team_a: [{ user_id: 'u1', name: 'Rita Figueira' }, { user_id: 'u3', name: 'Ana Marques' }], team_b: [{ user_id: 'u2', name: 'Tiago Lopes' }, { user_id: 'u4', name: 'Rui Costa' }] },
+  ] : []),
   list_my_friend_match_invites: () => (localStorage.getItem('mockFriendSession') === 'invited'
     ? [{ match_id: 'fs-1', creator_name: 'Rita Figueira', scheduled_date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), scheduled_time: '10:00:00', location: 'Clube Exemplo', people: 6 }] : []),
   list_my_friend_sessions: () => (['ready', 'waiting', 'app'].includes(localStorage.getItem('mockFriendSession'))
