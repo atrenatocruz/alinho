@@ -381,6 +381,18 @@ export default function MixWizard({
               onChange={(v) => set({ scoring_format: v })} options={options.scoringFormats} />
           </Field>
         )}
+        {/* O 8-8 do pro set (#580), como no torneio: tie-break a 7 (FPP) ou
+            super tie-break a 10. */}
+        {form.format !== 'americano' && form.scoring_format === 'pro_set_9' && (
+          <Field label={t('tournament.create.tiebreak_8_8')}>
+            <Chips label={t('tournament.create.tiebreak_8_8')} value={form.tiebreak_8_8 || 'tiebreak'}
+              onChange={(v) => set({ tiebreak_8_8: v })}
+              options={[
+                { value: 'tiebreak', label: t('tournament.create.tiebreak_8_8_tiebreak') },
+                { value: 'super_tiebreak', label: t('tournament.create.tiebreak_8_8_super_tiebreak') },
+              ]} />
+          </Field>
+        )}
         {form.format === 'sobe_desce' && (
           <Field label={t('mixwizard.pairs_label')}
             hint={t(form.rotate_partners ? 'gerirclube.rotate_partners_rotate_help' : 'gerirclube.rotate_partners_fixed_help')}>

@@ -50,3 +50,19 @@ describe('pendingOccurrenceRow', () => {
     expect(row).not.toHaveProperty('pairing_mode')
   })
 })
+
+describe('pendingOccurrenceRow — a série guarda a contagem (#580)', () => {
+  const plan = { nextDate: new Date('2026-10-06T19:00:00Z'), launchAt: new Date('2026-10-01T09:00:00Z'), userId: 'u', recurrenceId: 'r' }
+  it('copia o pro set, o super tie-break e o tamanho dos grupos', () => {
+    const row = pendingOccurrenceRow({ title: 'M', format: 'grupos_eliminatorias', pool_size: 5, scoring_format: 'pro_set_9', tiebreak_8_8: 'super_tiebreak', num_courts: 2 }, plan)
+    expect(row.scoring_format).toBe('pro_set_9')
+    expect(row.tiebreak_8_8).toBe('super_tiebreak')
+    expect(row.pool_size).toBe(5)
+  })
+  it('em pontos simples não manda nada a mais', () => {
+    const row = pendingOccurrenceRow({ title: 'M', format: 'sobe_desce', scoring_format: 'pontos_simples', num_courts: 1 }, plan)
+    expect('scoring_format' in row).toBe(false)
+    expect('tiebreak_8_8' in row).toBe(false)
+    expect('pool_size' in row).toBe(false)
+  })
+})

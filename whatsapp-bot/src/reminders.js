@@ -3,7 +3,9 @@ import { config } from './config.js'
 import { getGroups, getGroupsForOrg, getServedOrgIds, mixVisibleToGroup } from './groups.js'
 import { getOpenMixes, loadGame, formatDateTime, buildMixMessage, recordMixMessage, labelableMixes, mixLabel } from './roster.js'
 import { cardSentRecently, noteCardSent } from './sync.js'
-import { dueMixes, postKey, slotFor } from './postSchedule.js'
+import { dueMixes, postKey, slotFor, mixPostTimes } from './postSchedule.js'
+import { loadTournamentsToPost, buildTournamentMessage, loadOpenSlotGames, loadLessonSeriesToPost, buildLessonSeriesMessage } from './eventPosts.js'
+import { loadOpenSlotBatch, buildOpenSlotsMessage } from './openSlots.js'
 import { helpFooter } from './messages.js'
 import { t } from './locales.js'
 
@@ -220,6 +222,70 @@ export async function checkScheduledPosts({ sendText, getGroupMentions }, now = 
     } catch (err) {
       console.error(`Failed to publish scheduled mixes for org ${orgId}:`, err)
     }
+  }
+  await publishOtherEvents({ sendText, getGroupMentions }, { orgIds, hoursByOrg, slot, dayKey })
+}
+
+/** Uma mensagem em todos os grupos do clube, com @all (como os cartões dos mixes). */
+async function sendToOrgGroups(orgId, text, { sendText, getGroupMentions }) {
+  for (const group of await getGroupsForOrg(orgId)) {
+    try {
+      const mentions = await getGroupMentions(group.groupJid)
+      await sendText(group.groupJid, `📢 @all\n\n${text}`, { mentions })
+    } catch (err) {
+      console.error(`Failed to publish event to ${group.groupJid}:`, err)
+    }
+  }
+}
+
+/**
+ * Torneios, jogos em aberto e turmas às horas de cada um (design-handoff/
+ * 2026-09-27-whatsapp-no-evento): as mesmas regras dos mixes — as horas do
+ * evento, ou as do clube; uma vez por meia hora; só com vagas.
+ */
+async function publishOtherEvents(deps, { orgIds, hoursByOrg, slot, dayKey }) {
+  const isDue = (event, key) => mixPostTimes(event, hoursByOrg.get(event.organization_id)).includes(slot) && !sentPosts.has(postKey(key, dayKey, slot))
+
+  try {
+    for (const item of await loadTournamentsToPost(orgIds)) {
+      const key = `t:${item.tournament.id}`
+      if (!isDue(item.tournament, key)) continue
+      sentPosts.add(postKey(key, dayKey, slot))
+      await sendToOrgGroups(item.tournament.organization_id, buildTournamentMessage(item), deps)
+    }
+  } catch (err) {
+    console.error('Failed to publish scheduled tournaments:', err)
+  }
+
+  try {
+    for (const item of await loadLessonSeriesToPost(orgIds)) {
+      const key = `l:${item.series.id}`
+      if (!isDue(item.series, key)) continue
+      sentPosts.add(postKey(key, dayKey, slot))
+      await sendToOrgGroups(item.series.organization_id, buildLessonSeriesMessage(item), deps)
+    }
+  } catch (err) {
+    console.error('Failed to publish scheduled lesson series:', err)
+  }
+
+  // Jogos em aberto: uma mensagem por lote (open_batch_id), como sempre;
+  // sai se algum jogo do lote tem esta hora e ainda há lugar num deles.
+  try {
+    const games = await loadOpenSlotGames(orgIds)
+    const batches = new Map()
+    for (const game of games) {
+      if (!game.open_batch_id || !isDue(game, `os:${game.open_batch_id}`)) continue
+      batches.set(game.open_batch_id, game.organization_id)
+    }
+    for (const [batchId, orgId] of batches) {
+      sentPosts.add(postKey(`os:${batchId}`, dayKey, slot))
+      const batch = await loadOpenSlotBatch(batchId)
+      const hasSpot = batch.games.some(({ game, people }) => people.length < (game.max_players || game.num_courts * 4))
+      if (!hasSpot) continue
+      await sendToOrgGroups(orgId, buildOpenSlotsMessage(batch), deps)
+    }
+  } catch (err) {
+    console.error('Failed to publish scheduled open slots:', err)
   }
 }
 

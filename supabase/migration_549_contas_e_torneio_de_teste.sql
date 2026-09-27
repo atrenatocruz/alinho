@@ -118,7 +118,9 @@ ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS is_test BOOLEAN NOT NULL DEFAUL
 -- apply_tournament_elo: logo à entrada, um torneio de teste não faz nada.
 DO $$
 DECLARE
-  c_mau CONSTANT TEXT := '(\nBEGIN\n)';
+  -- \r? porque a função viva pode estar gravada com quebras CRLF (visto pelo
+  -- SI a 27 set: só com \n, a âncora não aparecia e o ficheiro parava).
+  c_mau CONSTANT TEXT := '(\r?\nBEGIN\r?\n)';
   c_bom CONSTANT TEXT := '\1  -- Torneio de teste (#549): não mexe no nível nem dá pontos a ninguém.
   IF EXISTS (SELECT 1 FROM tournament_categories tc JOIN tournaments tt ON tt.id = tc.tournament_id
               WHERE tc.id = p_category_id AND tt.is_test) THEN
@@ -139,8 +141,8 @@ BEGIN
     END IF;
     v_def := pg_get_functiondef(f.oid);
     -- O primeiro BEGIN sozinho numa linha é o do corpo (antes só há o DECLARE).
-    IF position(E'\nBEGIN\n' IN v_def) = 0
-       OR position(E'\nBEGIN\n' IN v_def) < position('AS $function$' IN v_def) THEN
+    IF regexp_instr(v_def, c_mau) = 0
+       OR regexp_instr(v_def, c_mau) < position('AS $function$' IN v_def) THEN
       RAISE EXCEPTION 'apply_tournament_elo(%): não encontrei o início do corpo. Ler o corpo vivo.', f.args;
     END IF;
     EXECUTE regexp_replace(v_def, c_mau, c_bom);

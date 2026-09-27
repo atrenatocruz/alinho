@@ -26,13 +26,17 @@ import { dayKeyInTz, hhmmInTz } from './tournamentDay'
 export async function getCategoryBoard(categoryId) {
   if (!categoryId) return { groups: [], entries: {}, matches: [] }
 
-  const [groupRows, entryRows, matchRows] = await Promise.all([
+  const [groupRows, entryRows, matchRows, hidingRows] = await Promise.all([
     supabase.from('tournament_public_groups').select('*').eq('category_id', categoryId),
     supabase.from('tournament_public_entries').select('*').eq('category_id', categoryId),
     supabase.from('tournament_public_matches').select('*').eq('category_id', categoryId),
+    // Duplas com alguém que esconde os resultados (partilha nas redes: aí
+    // aparecem como «Dupla M4»). Sem a função ainda viva, ninguém esconde.
+    supabase.rpc('tournament_entries_hiding_results', { p_category_id: categoryId }),
   ])
   const firstError = groupRows.error || entryRows.error || matchRows.error
   if (firstError) throw firstError
+  const hiding = new Set(hidingRows.error ? [] : (hidingRows.data || []))
 
   // A vista dos grupos vem uma linha por dupla; junta-se por grupo.
   const byGroup = new Map()
@@ -54,6 +58,7 @@ export async function getCategoryBoard(categoryId) {
       players: [e.player1_name, e.player2_name].filter(Boolean),
       seed: e.seed_number || null,
       status: e.status,
+      hides_results: hiding.has(e.id),
     }
   }
 
