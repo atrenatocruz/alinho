@@ -272,6 +272,38 @@ export function eventFromLesson(row) {
   }
 }
 
+/**
+ * Pedido de aula por responder (Trello #392): ainda não é uma aula, mas o
+ * aluno vê-o na Home como no desenho de 18 set («Pedido enviado»). Os aceites
+ * já são aulas e vêm de list_my_lessons.
+ */
+export function eventFromLessonRequest(row) {
+  const startsAt = new Date(row.starts_at)
+  const endsAt = new Date(startsAt.getTime() + row.duration_minutes * 60000)
+  return {
+    key: `lessonreq:${row.id}`,
+    source: 'lesson',
+    kind: 'lesson',
+    id: row.id,
+    startsAt,
+    hasTime: true,
+    dayKey: toDayKey(startsAt),
+    orgId: null,
+    orgName: row.org_name || null,
+    orgKind: row.org_name ? 'club' : null,
+    orgLogo: null,
+    mine: true,
+    myState: 'requested',
+    finished: false,
+    latitude: null,
+    longitude: null,
+    raw: {
+      ...row, request_id: row.id, lesson_id: null, starts_at: startsAt.toISOString(), ends_at: endsAt.toISOString(),
+      form: 'single', status: 'pending', organization: row.org_name ? { name: row.org_name, kind: 'club' } : null,
+    },
+  }
+}
+
 /* ── Torneios (Trello #363) ──────────────────────────────────────────────
    Dois cartões diferentes, conforme o momento (SPEC §3):
    • antes do sorteio, UM cartão do torneio — categorias, prazo, inscrever;
