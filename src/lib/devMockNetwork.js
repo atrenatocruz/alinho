@@ -410,9 +410,13 @@ const RPC_MOCKS = {
       invitees: [
         creator,
         inv('u-tl', 'Tiago Lopes', 1500, 'accepted'),
-        inv('u-am', 'Ana Marques', 1100, mode === 'waiting' || late ? 'pending' : 'accepted', { gender: 'feminino' }),
-        inv('u-rc', 'Rui Costa', 1300, late ? 'pending' : 'accepted'),
-        { invitee_id: 'i-g1', user_id: null, name: 'Zé Pinto', avatar_url: null, rating: null, gender: null, status: 'guest', is_guest: true, is_creator: false, guest_email_sent: true },
+        (mode === 'left'
+          ? { invitee_id: 'i-u-am', user_id: null, name: 'Jogador sem nome', avatar_url: null, rating: null, gender: null, status: 'declined', is_guest: true, is_creator: false, is_anonymous: true, left_name: 'Ana Marques', has_results: false }
+          : mode === 'anon'
+          ? { invitee_id: 'i-u-am', user_id: null, name: 'Jogador sem nome', avatar_url: null, rating: null, gender: null, status: 'guest', is_guest: true, is_creator: false, is_anonymous: true, left_name: null, has_results: true }
+          : inv('u-am', 'Ana Marques', 1100, mode === 'waiting' || late ? 'pending' : 'accepted', { gender: 'feminino' })),
+        inv('u-rc', 'Rui Costa', 1300, late || mode === 'left' ? 'pending' : 'accepted'),
+        ...(mode === 'left' ? [] : [{ invitee_id: 'i-g1', user_id: null, name: 'Zé Pinto', avatar_url: null, rating: null, gender: null, status: 'guest', is_guest: true, is_creator: false, guest_email_sent: true }]),
         ...(creatorIsMe ? [] : [inv(me, 'Admin (Dev)', 1450, 'pending')]),
       ],
       // Com tempo (27 set): 5 jogos, o 1 já com resultado, o 2 por começar
@@ -424,9 +428,9 @@ const RPC_MOCKS = {
         return { id: `fs-g${n}`, n, team_a: n === 2 ? [P.me, P.rc] : [P.me, P.tl], team_b: n === 2 ? [P.tl, P.am] : [P.am, P.ze],
           resting: n === 2 ? ['i-g1'] : ['i-u-rc'], score_a: n === 1 ? 6 : null, score_b: n === 1 ? 4 : null, winner_team: n === 1 ? 'a' : null, status: n === 1 ? 'confirmed' : 'pending',
           started_at: running ? new Date(Date.now() - 440000).toISOString() : null, ends_at: running ? new Date(Date.now() + 760000).toISOString() : null }
-      }) : ['results', 'invited_results'].includes(mode) ? (() => {
+      }) : ['results', 'invited_results', 'anon'].includes(mode) ? (() => {
         const cr = creatorIsMe ? { user_id: me, name: 'Admin (Dev)', invitee_id: `i-${me}` } : { user_id: 'c-1', name: 'Rita Figueira', invitee_id: 'i-c-1' }
-        const P = { tl: { user_id: 'u-tl', name: 'Tiago Lopes', invitee_id: 'i-u-tl' }, am: { user_id: 'u-am', name: 'Ana Marques', invitee_id: 'i-u-am' },
+        const P = { tl: { user_id: 'u-tl', name: 'Tiago Lopes', invitee_id: 'i-u-tl' }, am: mode === 'anon' ? { user_id: null, name: 'Jogador sem nome', invitee_id: 'i-u-am' } : { user_id: 'u-am', name: 'Ana Marques', invitee_id: 'i-u-am' },
           rc: { user_id: 'u-rc', name: 'Rui Costa', invitee_id: 'i-u-rc' }, ze: { user_id: null, name: 'Zé Pinto', invitee_id: 'i-g1' },
           me: { user_id: me, name: 'Admin (Dev)', invitee_id: `i-${me}` } }
         const x = creatorIsMe ? P.rc : P.me
@@ -447,6 +451,8 @@ const RPC_MOCKS = {
     }
   },
   record_friend_match_result: () => 'pending',
+  play_friend_match_without_name: () => 'guest',
+  keep_friend_match_seat: () => null,
   update_friend_match: () => null,
   cancel_friend_match: () => null,
   start_friend_match_game: () => new Date(Date.now() + 1200000).toISOString(),
@@ -994,7 +1000,10 @@ const TABLE_MOCKS = {
       data: { game_title: 'Mix de Sábado', game_date: tomorrow8pm.toISOString(), partner_name: 'Rui Oliveira Gomes', actor_name: 'Marta Costa' } },
     { id: 'n3', kind: 'mix_removed', game_id: 'fake-game-1', created_at: new Date().toISOString(),
       data: { game_title: 'Mix de Terça', game_date: tomorrow8pm.toISOString() } },
-  ] : []).concat(LESSON_NOTICES()).concat(localStorage.getItem('mockFriendSession') === 'invited' ? [
+  ] : []).concat(LESSON_NOTICES()).concat(localStorage.getItem('mockFriendSession') === 'left' ? [
+    { id: 'fd1', kind: 'friend_match_declined', game_id: null, created_at: new Date().toISOString(),
+      data: { match_id: 'fs-1', name: 'Ana Marques', scheduled_date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), scheduled_time: '10:00:00' } },
+  ] : []).concat(localStorage.getItem('mockFriendSession') === 'invited' ? [
     // Convite para um jogo entre amigos (#342).
     { id: 'fn1', kind: 'friend_match_invite', game_id: null, created_at: new Date().toISOString(),
       data: { match_id: 'fs-1', creator_name: 'Rita Figueira', scheduled_date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), scheduled_time: '10:00:00', location: 'Clube Exemplo' } },

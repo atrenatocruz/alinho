@@ -330,3 +330,18 @@ export const cancelFriendMatch = async (matchId) => {
   const { error } = await supabase.rpc('cancel_friend_match', { p_match_id: matchId })
   if (error) throw error
 }
+
+/** «Vou, mas sem o meu nome» (quem recusa, Dev 3, 27 set): joga, o nome não
+ *  aparece e o jogo não fica na conta. Devolve 'guest'. */
+export const playFriendMatchWithoutName = async (matchId) => {
+  const { data, error } = await supabase.rpc('play_friend_match_without_name', { p_match_id: matchId })
+  if (error) throw error
+  return data
+}
+
+/** «Manter o lugar sem nome»: quem criou guarda o lugar de quem saiu como
+ *  «Jogador sem nome» (não conta para o ranking de ninguém). */
+export const keepFriendMatchSeat = async (inviteeId) => {
+  const { error } = await supabase.rpc('keep_friend_match_seat', { p_invitee_id: inviteeId })
+  if (error) throw error
+}

@@ -283,13 +283,15 @@ export default function GroupMatches() {
 
   return (
     <div className="space-y-5 max-w-lg mx-auto">
-      <BackBar onBack={goBack} title={t('groupmatches.title')} />
+      <BackBar onBack={goBack} title={t('groupmatches.title_group')} />
 
       {/* Botão por baixo do subtítulo, a toda a largura: ao lado do título ficava
           espremido em três linhas e o ícone encolhia. */}
       <div className="space-y-3">
         <div>
-          <h2 className="text-3xl text-ink-900">{t(org?.kind === 'group' ? 'groupmatches.title_group' : 'groupmatches.title')}</h2>
+          {/* Grupos e clubes: sempre «Jogos entre amigos», com o grupo por baixo;
+              «Jogos em aberto» é só o dos horários livres (Francisco, 27 set). */}
+          <h2 className="text-3xl text-ink-900">{t('groupmatches.title_group')}</h2>
           {org && <p className="text-muted text-sm mt-0.5">{t('groupmatches.subtitle', { group: org.name })}</p>}
         </div>
         <Link to={`/clube/${slug}/jogos/novo`} className="block">

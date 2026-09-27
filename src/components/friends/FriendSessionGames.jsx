@@ -12,7 +12,13 @@ import { shareWithMissing, sessionLink, shortName } from './friendShare'
 import { dayText } from './dayText'
 
 const hasScore = (g) => g.score_a != null && g.score_b != null
-const pair = (team) => (team || []).map((p) => shortName(p.name)).join(' / ')
+// «Jogador sem nome» (quem recusa, 27 set): em itálico e cinzento, inteiro.
+const pairOf = (anon, anonLabel) => (team) => (team || []).map((p, i) => (
+  <span key={p.invitee_id || i}>
+    {i > 0 && ' / '}
+    {anon.has(p.invitee_id) ? <i className="font-semibold text-muted">{anonLabel}</i> : shortName(p.name)}
+  </span>
+))
 
 export function ShareMissingButton({ match, creatorName }) {
   const { t, i18n } = useTranslation()
@@ -33,6 +39,10 @@ export function ShareMissingButton({ match, creatorName }) {
 export default function FriendSessionGames({ match, games, invitees, players, iAmCreator, myUserId, onChanged, resultFor, setResultFor }) {
   const { t } = useTranslation()
   const [adding, setAdding] = useState(false)
+  const anon = new Set(invitees.filter((i) => i.is_anonymous).map((i) => i.invitee_id))
+  // A base de dados numera («Jogador sem nome 2»); aqui é sempre o mesmo nome.
+  const pair = pairOf(anon, t('friends.anon_name'))
+  const hasAnon = (g) => [...(g.team_a || []), ...(g.team_b || [])].some((p) => anon.has(p.invitee_id))
   const pending = invitees.filter((i) => i.status === 'pending').length
   const creator = invitees.find((i) => i.is_creator)
   const me = invitees.find((i) => i.user_id && i.user_id === myUserId)
@@ -54,7 +64,9 @@ export default function FriendSessionGames({ match, games, invitees, players, iA
           {g.sets?.length > 1 && (
             <p className="mt-0.5 text-xs tabular-nums text-ink-700">{g.sets.map((x) => `${x.score_a}–${x.score_b}`).join(' · ')}</p>
           )}
-          {!g.counts && g.waiting_for?.length > 0 && (
+          {hasAnon(g) ? (
+            <p className="mt-1 text-xs text-muted">{t('friends.anon_no_ranking')}</p>
+          ) : !g.counts && g.waiting_for?.length > 0 && (
             <p className="mt-1 text-xs text-muted">
               {t('friends.counts_when', { names: g.waiting_for.map((w) => String(w.name || '').split(/\s+/)[0]).join(', ') })}
             </p>
@@ -74,6 +86,9 @@ export default function FriendSessionGames({ match, games, invitees, players, iA
         </div>
       )))}
 
+      {games.some(hasAnon) && (
+        <p className="rounded-card bg-ink-50 p-3.5 text-sm text-ink-700">{t('friends.anon_box_before')} <b className="text-ink-900">«{t('friends.anon_name')}»</b>{t('friends.anon_box_after')}</p>
+      )}
       {pending > 0 && (
         <p className="rounded-card bg-ink-50 p-3.5 text-sm text-ink-700">
           <b className="text-ink-900">{t('friends.not_answered_bold', { count: pending })}</b> {t('friends.not_answered_rest')}
