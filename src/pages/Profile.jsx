@@ -22,6 +22,7 @@ import { AGE_LABEL_KEY, ageCategory } from '../lib/ageCategories'
 import { formatDate as formatDateLib } from '../lib/formatDate'
 import { sortVouchersForWallet } from '../lib/vouchers'
 import { describeError } from '../lib/errors'
+import { useFeatureFlag } from '../lib/useFeatureFlag'
 
 const SIDE_LABEL_KEY = { left: 'gamedetails.side_left', right: 'gamedetails.side_right', both: 'gamedetails.side_both' }
 const HAND_LABEL_KEY = { right: 'profile.dominant_hand_right', left: 'profile.dominant_hand_left' }
@@ -36,6 +37,8 @@ const TABS = [
 export default function Profile() {
   const { t, i18n } = useTranslation()
   const { profile, updateProfile, currentOrganizationId, isGuest, signOut, refreshMemberships, memberships, isPrivateMatchesEnabled } = useAuth()
+  // Com o jogo entre amigos novo (#342) o cartão diz «convida»; sem ele, o antigo «regista».
+  const { on: friendInvitesOn } = useFeatureFlag('friend_invites')
   const headerActions = useHeaderActions()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -666,7 +669,7 @@ export default function Profile() {
               11 set 2026). */}
           <div>
             <p className="font-extrabold text-sm leading-tight min-h-[2.2em]">{t('home.friendly_match')}</p>
-            <p className="text-[10.5px] opacity-80 mt-0.5">{t('home.friendly_match_subtitle')}</p>
+            <p className="text-[10.5px] opacity-80 mt-0.5">{friendInvitesOn ? t('friends.profile_button_line') : t('home.friendly_match_subtitle')}</p>
           </div>
         </Link>
         )}

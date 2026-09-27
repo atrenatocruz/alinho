@@ -204,6 +204,9 @@ export default function FriendSession() {
           {error && <p className="rounded-ctrl border border-danger/30 bg-danger/10 px-3 py-2 text-sm font-extrabold text-danger">{error}</p>}
           <div className="space-y-2">
             <PrimaryButton onClick={confirm} disabled={!valid || busy} className="w-full">{t('friends.confirm_teams')}</PrimaryButton>
+            {/* Botão apagado diz porquê, como o «Faltam pelo menos N pessoas»
+                do StepPage (QA, texto da UX, 27 set). */}
+            {!valid && <p className="-mt-0.5 text-center text-xs text-muted">{t('friends.teams_need_two')}</p>}
             <button type="button" onClick={byApp} disabled={busy} className="btn-secondary w-full">{t('friends.app_does_it')}</button>
           </div>
         </div>
