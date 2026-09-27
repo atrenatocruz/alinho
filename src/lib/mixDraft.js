@@ -65,6 +65,11 @@ export function pendingOccurrenceRow(game, { nextDate, launchAt, userId, recurre
     ...(game.rotate_partners ? { rotate_partners: true } : {}),
     ...(game.ranked === false ? { ranked: false } : {}),
     ...(game.allow_pair_signup ? { allow_pair_signup: true } : {}),
+    // A contagem, o tamanho dos grupos e o 8-8 (#580) — só quando não são
+    // os de omissão, como os outros acima.
+    ...(game.scoring_format && game.scoring_format !== 'pontos_simples' ? { scoring_format: game.scoring_format } : {}),
+    ...(game.format === 'grupos_eliminatorias' && game.pool_size ? { pool_size: game.pool_size } : {}),
+    ...(game.tiebreak_8_8 === 'super_tiebreak' ? { tiebreak_8_8: 'super_tiebreak' } : {}),
     status: 'pending',
     created_by: userId,
     recurrence_id: recurrenceId,
