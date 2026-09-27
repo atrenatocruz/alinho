@@ -379,3 +379,36 @@ test('#552 responder «In» a um cartão do «mix» inscreve nesse mix', async (
   await sayWithIds('in', cards[1].id)
   assert.deepEqual(db.participants.map((p) => p.game_id), ['m2'])
 })
+
+
+// ── «In com X» com o X já inscrito (A2N, M4, 27 set) ────────────────────
+test('«In com X» com o X inscrito sozinho: quem escreve entra em dupla com ele, sem o X perder o lugar', async () => {
+  db.participants.push({ id: 'solo', game_id: 'm', user_id: 'b', partner_id: null, status: 'confirmed', joined_alone: true, created_at: '2026-09-01T10:00:00Z' })
+  const out = await say('in com afonso')
+  assert.match(out, /✅ Bernardo Ramos entrou em dupla com Afonso Dias\./)
+  const row = db.participants.find((p) => p.id === 'solo')
+  assert.equal(row.partner_id, 'a')
+  assert.equal(row.joined_alone, false)
+  assert.equal(db.participants.filter((p) => p.game_id === 'm').length, 1, 'não cria outra inscrição')
+})
+
+test('«In com X» com o X já em dupla: diz com quem, e não inscreve', async () => {
+  db.profiles.push({ id: 'c', name: 'Carlos Mendes', phone_hash: hash('933333333'), language: 'pt' })
+  db.memberships.push({ user_id: 'c', organization_id: 'o' })
+  db.participants.push({ id: 'par', game_id: 'm', user_id: 'b', partner_id: 'c', status: 'confirmed', joined_alone: false, created_at: '2026-09-01T10:00:00Z' })
+  const out = await say('in com afonso')
+  assert.match(out, /Afonso Dias já está em dupla com Carlos Mendes\. Escreve \*In\* para entrares sozinho\./)
+  assert.equal(db.participants.length, 1)
+})
+
+test('«In com X» com o X sozinho e só 1 vaga: cabe (o X já ocupava a dele)', async () => {
+  db.profiles.push({ id: 'c', name: 'Carlos Mendes', phone_hash: hash('933333333'), language: 'pt' }, { id: 'd', name: 'Duarte Lima', phone_hash: hash('944444444'), language: 'pt' })
+  db.memberships.push({ user_id: 'c', organization_id: 'o' }, { user_id: 'd', organization_id: 'o' })
+  db.participants.push(
+    { id: 'p1', game_id: 'm', user_id: 'c', partner_id: 'd', status: 'confirmed', joined_alone: false, created_at: '2026-09-01T09:00:00Z' },
+    { id: 'solo', game_id: 'm', user_id: 'b', partner_id: null, status: 'confirmed', joined_alone: true, created_at: '2026-09-01T10:00:00Z' },
+  )
+  const out = await say('in com afonso')
+  assert.match(out, /entrou em dupla com Afonso Dias/)
+  assert.equal(db.participants.find((p) => p.id === 'solo').partner_id, 'a')
+})

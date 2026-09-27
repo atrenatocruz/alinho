@@ -316,9 +316,10 @@ export default function GameDetails() {
         .order('seed_ranking', { ascending: false })
         .order('id')
 
+      // Com os sets (#580): o tie-break do 8-8 lê-se daí («9-8 (7-5)»).
       const { data: matchesData } = await supabase
         .from('matches')
-        .select('*')
+        .select('*, sets:match_sets(*)')
         .eq('game_id', id)
         .order('round_number')
         .order('court_number')
@@ -1483,6 +1484,8 @@ export default function GameDetails() {
             score_a: s.score_a,
             score_b: s.score_b,
             is_super_tiebreak: !!s.is_super_tiebreak,
+            // Os pontos do tie-break do 8-8 (#580) — só quando há.
+            ...(s.tiebreak_a != null ? { tiebreak_a: s.tiebreak_a, tiebreak_b: s.tiebreak_b } : {}),
           }))
         )
         if (setsError) throw setsError
@@ -3026,6 +3029,7 @@ export default function GameDetails() {
                           key={`${m.id}-${isCorrecting}`}
                           match={m}
                           scoringFormat={game.scoring_format || 'pontos_simples'}
+                          tieBreakTarget={game.tiebreak_8_8 === 'super_tiebreak' ? 10 : 7}
                           editable={editable}
                           teamAName={teamName(m.team_a_id)}
                           teamBName={teamName(m.team_b_id)}
@@ -3189,6 +3193,7 @@ export default function GameDetails() {
                                   key={`${m.id}-${isCorrecting}`}
                                   match={m}
                                   scoringFormat={game.scoring_format || 'pontos_simples'}
+                          tieBreakTarget={game.tiebreak_8_8 === 'super_tiebreak' ? 10 : 7}
                                   editable={editable}
                                   teamAName={teamName(m.team_a_id)}
                                   teamBName={teamName(m.team_b_id)}

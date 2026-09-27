@@ -740,8 +740,8 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
       return
     }
     const left = capacity - people.length
-    if (left < 2) {
-      await reply(left <= 0 ? 'mix_full_pair' : 'mix_one_spot_pair')
+    if (left <= 0) {
+      await reply('mix_full_pair')
       return
     }
     const resolved = await resolvePartner(profile, game)
@@ -751,8 +751,42 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
       await reply('partner_is_you')
       return
     }
+    // O parceiro já está inscrito (A2N, M4, 27 set: «in com Diogo» com o
+    // Diogo já dentro dava «já está inscrito» e o Bernardo ficava de fora).
+    // Sozinho → quem escreveu entra na inscrição dele e ficam em dupla, sem
+    // o Diogo perder o lugar; só precisa de 1 vaga. Já em dupla → diz com
+    // quem, e que pode entrar sozinho.
+    const partnerRow = existingRows.find((row) => row.status === 'confirmed' && (row.user_id === partner.id || row.partner_id === partner.id))
+    if (partnerRow) {
+      if (partnerRow.partner_id) {
+        const otherId = partnerRow.user_id === partner.id ? partnerRow.partner_id : partnerRow.user_id
+        const other = people.find((p) => p.id === otherId)?.name || '?'
+        await reply('partner_in_pair', { name: partner.name, other })
+        return
+      }
+      const { error } = await supabase
+        .from('participants')
+        .update({ partner_id: profile.id, joined_alone: false })
+        .eq('id', partnerRow.id)
+      timer.mark('gravar')
+      if (error) {
+        if (isGameFull(error)) {
+          await reply('mix_full_pair')
+          return
+        }
+        throw new Error(`Failed to join partner's row: ${error.message}`)
+      }
+      repostHooks.requestRepostForGame(organizationId, game.id)
+      await reply('pair_joined_partner', { name: profile.name, partner: partner.name })
+      if (isNewGuest) await reply('guest_joined', { name: profile.name, appUrl: config.appUrl })
+      return
+    }
     if (existingRows.some((row) => row.user_id === partner.id || row.partner_id === partner.id)) {
       await reply('partner_already_in', { name: partner.name })
+      return
+    }
+    if (left < 2) {
+      await reply('mix_one_spot_pair')
       return
     }
     const { error: insertError } = await supabase
