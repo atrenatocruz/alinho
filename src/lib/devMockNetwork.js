@@ -976,7 +976,18 @@ const TABLE_MOCKS = {
         ? { organization_id: 'co-1', zone: 'Almada', organization: { name: 'Smash Padel', slug: 'smash-padel' } }
         : { zone: 'Cascais', organization: null }),
       // localStorage.mockTeacherSchedule = 'full' — «O meu horário» já preenchido (#418).
-      availability: localStorage.getItem('mockTeacherSchedule') === 'full' ? [
+      // 'hourly' = como o Diogo (27 set): muitos blocos de uma hora seguidos;
+      // 'one' = um dia só.
+      availability: localStorage.getItem('mockTeacherSchedule') === 'hourly' ? [
+        ...[['segunda', 18.5, 21.5], ['terca', 18, 22], ['quarta', 10, 11], ['quarta', 19, 22], ['quinta', 18, 22], ['sexta', 9, 10], ['sexta', 17, 22]]
+          .flatMap(([day, from, to]) => Array.from({ length: to - from }, (_, k) => {
+            const hh = (v) => `${String(Math.floor(v)).padStart(2, '0')}:${v % 1 ? '30' : '00'}:00`
+            return { teacher_profile_id: 'tp-me', day_of_week: day, start_time: hh(from + k), end_time: hh(from + k + 1) }
+          })),
+      ] : localStorage.getItem('mockTeacherSchedule') === 'one' ? [
+        { teacher_profile_id: 'tp-me', day_of_week: 'terca', start_time: '18:00:00', end_time: '19:00:00' },
+        { teacher_profile_id: 'tp-me', day_of_week: 'terca', start_time: '19:00:00', end_time: '20:00:00' },
+      ] : localStorage.getItem('mockTeacherSchedule') === 'full' ? [
         { teacher_profile_id: 'tp-me', day_of_week: 'terca', start_time: '09:00:00', end_time: '13:00:00' },
         ...(localStorage.getItem('mockTeacherClubs') === 'two' ? [] : [
           { teacher_profile_id: 'tp-me', day_of_week: 'terca', start_time: '18:00:00', end_time: '21:00:00' },

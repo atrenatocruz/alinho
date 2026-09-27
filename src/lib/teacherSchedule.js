@@ -89,6 +89,31 @@ export const shortRange = (start, end) => {
   return `${h(start)}–${h(end)}h`
 }
 
+/**
+ * Junta os blocos seguidos ou sobrepostos de um dia (18:30–19:30 + 19:30–20:30
+ * → 18:30–20:30), por ordem. O resumo do horário mostra-os assim (Francisco,
+ * 27 set: uma linha por dia, com os blocos seguidos juntos).
+ */
+export const mergeSlots = (slots = []) => {
+  const sorted = [...slots].sort((a, b) => toMinutes(a.start) - toMinutes(b.start))
+  const out = []
+  for (const s of sorted) {
+    const last = out[out.length - 1]
+    if (last && toMinutes(s.start) <= toMinutes(last.end)) {
+      if (toMinutes(s.end) > toMinutes(last.end)) last.end = s.end
+    } else out.push({ start: s.start, end: s.end })
+  }
+  return out
+}
+
+/**
+ * Resumo por dia: [{ weekday 1..7, slots: [{ start, end }] }], só os dias com
+ * horas, com os blocos seguidos juntos. slots: [{ weekday, start, end }].
+ */
+export const weekSummary = (slots = []) => [1, 2, 3, 4, 5, 6, 7]
+  .map((weekday) => ({ weekday, slots: mergeSlots(slots.filter((s) => s.weekday === weekday)) }))
+  .filter((d) => d.slots.length > 0)
+
 /** Perfil de professor que conta como ativo: aprovado e, com clube, aceite pelo clube. */
 export const isActiveTeacherProfile = (p) =>
   p?.status === 'approved' && (!p.organization_id || !p.club_status || p.club_status === 'accepted')
