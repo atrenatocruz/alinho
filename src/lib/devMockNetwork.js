@@ -1173,7 +1173,28 @@ const TABLE_MOCKS = {
   matches: () => (['live', 'finished'].includes(eventState()) ? EV_MATCHES() : rotating() ? ROT_MATCHES_FN() : []),
   // Mix em aberto — 1 dupla já confirmada, a segunda por preencher (2 de 4
   // lugares), para se ver o cartão no estado "aberto/junto-te" na Home.
-  games: (url) => agenda() ? (url.includes('recurrence_id=eq.') ? AGENDA_PREVIOUS_EDITIONS() : AGENDA_GAMES()) : [{
+  // localStorage.mockGerirPast = 'true': no Gerir, um mix a seguir, um
+  // acabado e um cancelado (acerto de 27 set, «Ver o que já passou»).
+  games: (url) => localStorage.getItem('mockGerirPast') === 'true' && !/[?&]id=eq./.test(url) ? (() => {
+    const base = { organization_id: 'dev-org', format: 'sobe_desce', num_courts: 2, max_players: 8, game_time_minutes: 20, court_time_minutes: 80, recurrence_id: null, recurrence: null, level: null, location: 'Smash Padel Almada' }
+    const day = (n) => new Date(Date.now() + n * 86400000).toISOString()
+    const pp = (n) => Array.from({ length: n }, (_, i) => ({ id: `gp${i}`, user_id: `u${i}`, partner_id: null, status: 'confirmed' }))
+    // A página da série (/gerir/:slug/serie/rec-gp): as mesmas datas, da série.
+    // mockGerirSeries = 'true': as três datas são da série rec-gp (a página da série).
+    if (url.includes('recurrence_id=eq.') || localStorage.getItem('mockGerirSeries') === 'true') {
+      const rec = { id: 'rec-gp', is_active: true, is_paused: false, frequency: 'weekly', mix_offset_seconds: 3 * 86400 }
+      return [
+        { ...base, id: 'gp-next', title: 'Padel domingueiro', date: day(3), status: 'open', participants: pp(3), recurrence_id: 'rec-gp', recurrence: rec },
+        { ...base, id: 'gp-done', title: 'Padel domingueiro', date: day(-4), status: 'finished', participants: pp(8), recurrence_id: 'rec-gp', recurrence: rec },
+        { ...base, id: 'gp-cancel', title: 'Padel domingueiro', date: day(-11), status: 'cancelled', participants: pp(3), recurrence_id: 'rec-gp', recurrence: rec },
+      ]
+    }
+    return [
+      { ...base, id: 'gp-next', title: 'Mix de Quinta-feira', date: day(3), status: 'open', participants: pp(3) },
+      { ...base, id: 'gp-done', title: 'Padel domingueiro', date: day(-1), status: 'finished', participants: pp(8) },
+      { ...base, id: 'gp-cancel', title: 'Padel Domingueiro', date: day(-21), status: 'cancelled', participants: pp(3) },
+    ]
+  })() : agenda() ? (url.includes('recurrence_id=eq.') ? AGENDA_PREVIOUS_EDITIONS() : AGENDA_GAMES()) : [{
     // localStorage.mockFriendlyMix = 'true' — mix amigável, sem ranking (Trello #267).
     ...(localStorage.getItem('mockFriendlyMix') === 'true' ? { ranked: false } : {}),
     ...(longNames() ? { status: 'finished' } : {}),

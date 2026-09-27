@@ -105,11 +105,16 @@ export default function SeriesPage({ games, onBack, onEditRules, onOpen, onChang
     const d = new Date(g.date)
     const isToday = sameDay(d, today) && !DONE.includes(g.status)
     const grey = isPast(g) && !isToday
+    // Já jogado: abre logo o mix com os resultados; cancelado: não abre
+    // (acerto de 27 set, SPEC ações do evento).
+    const cancelled = g.status === 'cancelled'
+    const onClick = cancelled ? undefined : DONE.includes(g.status) ? () => onOpen(g) : () => setSheetGame(g)
     return (
       <button
         key={g.id}
         type="button"
-        onClick={() => setSheetGame(g)}
+        onClick={onClick}
+        disabled={cancelled}
         className={`w-full flex items-center gap-3 rounded-ctrl p-3 text-left ${
           grey ? 'bg-surface border border-line' : isToday ? 'bg-blue-50 border-2 border-ink-900' : 'bg-blue-50 border border-blue-200'
         }`}
@@ -124,7 +129,7 @@ export default function SeriesPage({ games, onBack, onEditRules, onOpen, onChang
           </span>
           <span className="block truncate text-[13px] text-muted">{subline(g)}</span>
         </span>
-        <ChevronRight size={16} className="shrink-0 text-muted" />
+        {!cancelled && <ChevronRight size={16} className="shrink-0 text-muted" />}
       </button>
     )
   }

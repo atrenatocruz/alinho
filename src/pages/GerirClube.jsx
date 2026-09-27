@@ -3137,7 +3137,7 @@ export default function GerirClube() {
                   // evento; a direita, uma acao so, escrita por extenso.
                   const tipo = item.tipo
                   const row = tipo === 'mix' ? item.entry.game : item.row
-                  let etiqueta, Icone, linha, detalhe, abrir, marca = null, acao = null, sufixo = null, privado = false
+                  let etiqueta, Icone, linha, detalhe, abrir, marca = null, acao = null, sufixo = null, privado = false, cinzento = false
                   if (tipo === 'turma') {
                     const quando = seriesWhen(t, row)
                     etiqueta = 'gerirclube.event_label_series'
@@ -3192,6 +3192,16 @@ export default function GerirClube() {
                         acao = { ...acao, publicar: () => setPublishing(row) }
                       }
                     }
+                    // Já jogado ou cancelado (acerto de 27 set, falha vista pelo
+                    // Francisco): linha cinzenta, sem ação à direita. O acabado abre
+                    // logo a página com os resultados; o cancelado não abre.
+                    if (tipo === 'mix' && ['finished', 'completed'].includes(row.status)) {
+                      cinzento = true; acao = null; abrir = () => navigate(`/jogo/${row.id}`)
+                      detalhe = [item.quando ? quandoCurto(item.quando, true) : null, t('gerirclube.status_finished'), nivel].filter(Boolean).join(' · ')
+                    } else if (tipo === 'mix' && row.status === 'cancelled') {
+                      cinzento = true; acao = null; abrir = null
+                      detalhe = [item.quando ? quandoCurto(item.quando, true) : null, t('gerirclube.status_cancelled')].filter(Boolean).join(' · ')
+                    }
                     if (tipo === 'aberto' && row.status !== 'cancelled' && !(row.participants || []).some((p) => p.status === 'confirmed')) {
                       acao = { texto: t('open_slots.cancel_button'), fazer: () => handleCancelOpenGame(row.id), perigo: true }
                     }
@@ -3203,12 +3213,12 @@ export default function GerirClube() {
                   // O rascunho fica sem cor e a tracejado até ser publicado.
                   const rascunho = tipo === 'mix' && isDraftMix(row)
                   return (
-                    <div key={item.chave} className={`flex ${rascunho ? 'flex-col' : 'items-stretch'} rounded-ctrl border transition-[filter] duration-fast hover:brightness-[0.98] ${
-                      rascunho ? 'bg-white border-2 border-dashed border-ink-200' : cor.card
+                    <div key={item.chave} className={`flex ${rascunho ? 'flex-col' : 'items-stretch'} rounded-ctrl border transition-[filter] duration-fast ${abrir ? 'hover:brightness-[0.98]' : ''} ${
+                      rascunho ? 'bg-white border-2 border-dashed border-ink-200' : cinzento ? 'bg-surface border-line' : cor.card
                     }`}>
-                      <button type="button" onClick={abrir} className="flex-1 min-w-0 text-left p-4">
+                      <button type="button" onClick={abrir || undefined} disabled={!abrir} className="flex-1 min-w-0 text-left p-4 disabled:cursor-default">
                         <span className="flex items-center justify-between gap-2">
-                          <span className={`inline-flex items-center gap-1 text-[11px] font-extrabold px-2 py-1 rounded-full ${rascunho ? 'bg-ink-50 text-ink-700' : `bg-white ${cor.text}`}`}>
+                          <span className={`inline-flex items-center gap-1 text-[11px] font-extrabold px-2 py-1 rounded-full ${rascunho || cinzento ? 'bg-ink-50 text-ink-700' : `bg-white ${cor.text}`}`}>
                             <Icone size={12} /> {t(etiqueta)}{sufixo && <> · {sufixo}</>}
                           </span>
                           {privado && (
@@ -3220,7 +3230,7 @@ export default function GerirClube() {
                             <span className="rounded-full bg-ink-900 px-2 py-[3px] text-[11px] font-semibold text-white">{marca}</span>
                           )}
                         </span>
-                        <p className="text-lg font-semibold text-ink-900 mt-1 truncate">{linha}</p>
+                        <p className={`text-lg font-semibold mt-1 truncate ${cinzento ? 'text-muted' : 'text-ink-900'}`}>{linha}</p>
                         <p className="text-sm text-muted mt-0.5">{detalhe}</p>
                       </button>
                       {acao && acao.publicar ? (
