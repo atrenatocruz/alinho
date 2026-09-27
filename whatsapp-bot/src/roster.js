@@ -3,10 +3,20 @@ import { config } from './config.js'
 import { helpFooter } from './messages.js'
 import { t } from './locales.js'
 import { nameWithBand } from './elo.js'
+import { isGuestEmail, isPlaceholderEmail } from './phone.js'
+
+// Quem entrou pelo robô sem conta (e-mail guest-…@whatsapp.alinho.pt) leva
+// « (convidado)» no fim do nome, na lista do grupo (Francisco, 27 set).
+// Se o nome já o traz, não se repete.
+export function rosterName(person) {
+  const base = nameWithBand(person)
+  if (!person?.guest || /\(convidado\)/i.test(person.name || '')) return base
+  return `${base} (convidado)`
+}
 
 /** Loads a game plus its confirmed participants (flattened to one entry per person, partners included — mirrors GameDetails.jsx's `people` derivation), the suplentes, and the raw `rows` (confirmed + waitlisted) so callers don't re-query them. */
 export async function loadGame(gameId) {
-  const PROFILE = 'id, name, language, rating, gender'
+  const PROFILE = 'id, name, language, rating, gender, email'
   const participantsSelect = (profile) =>
     `id, user_id, partner_id, status, created_at, user:profiles!participants_user_id_fkey(${profile}), partner:profiles!participants_partner_id_fkey(${profile})`
   const fetchRows = (profile) =>
@@ -27,7 +37,7 @@ export async function loadGame(gameId) {
     fetchRows(PROFILE),
   ])
   // 42703: a migração do Elo ainda não correu — nomes sem banda.
-  if (rowsResult.error?.code === '42703') rowsResult = await fetchRows('id, name, language')
+  if (rowsResult.error?.code === '42703') rowsResult = await fetchRows('id, name, language, email')
 
   const { data: game, error: gameError } = gameResult
   if (gameError) throw new Error(`Failed to load game ${gameId}: ${gameError.message}`)
@@ -40,12 +50,14 @@ export async function loadGame(gameId) {
   // Quem entrou em dupla leva o número da dupla (1, 2, …) — o «(1)» à frente
   // dos dois nomes (A2N, 24 set). Quem entrou sozinho não leva nada.
   let pairNumber = 0
+  // `guest`: entrou pelo robô sem conta — a lista mostra « (convidado)».
+  const person = (p) => (p ? { ...p, guest: isGuestEmail(p.email) || isPlaceholderEmail(p.email) } : FALLBACK_PERSON)
   for (const row of confirmed) {
     const pair = row.partner_id ? ++pairNumber : null
-    people.push({ ...(row.user || FALLBACK_PERSON), pair })
-    if (row.partner_id) people.push({ ...(row.partner || FALLBACK_PERSON), pair })
+    people.push({ ...person(row.user), pair })
+    if (row.partner_id) people.push({ ...person(row.partner), pair })
   }
-  const suplentes = all.filter((r) => r.status === 'waitlisted').map((r) => r.user || FALLBACK_PERSON)
+  const suplentes = all.filter((r) => r.status === 'waitlisted').map((r) => person(r.user))
   const rows = all.map(({ id, user_id, partner_id, status }) => ({ id, user_id, partner_id, status }))
   const capacity = game.max_players || game.num_courts * 4
   return { game, people, capacity, suplentes, rows }
@@ -203,7 +215,7 @@ export function buildMixMessage({ game, people, capacity, suplentes = [] }, { la
       // num grupo com dois Rubens M.
       const person = people[i]
       const pairTag = person?.pair ? ` (${person.pair})` : ''
-      lines.push(person ? `${i + 1}. 🎾 ${nameWithBand(person)}${pairTag}` : `${i + 1}. 🎾 (vaga livre)`)
+      lines.push(person ? `${i + 1}. 🎾 ${rosterName(person)}${pairTag}` : `${i + 1}. 🎾 (vaga livre)`)
     }
     lines.push('')
     if (people.some((person) => person.pair)) {
@@ -228,7 +240,7 @@ export function buildMixMessage({ game, people, capacity, suplentes = [] }, { la
       lines.push(`🚪 Sair em dupla: *Out${n} dupla* (os dois), *Out${n} @parceiro* (só ele), ou *Out${n}* e o bot pergunta`)
     }
     if (suplentes.length > 0) {
-      lines.push(`👥 *Suplentes:* ${suplentes.map(nameWithBand).join(', ')}`)
+      lines.push(`👥 *Suplentes:* ${suplentes.map(rosterName).join(', ')}`)
     }
   }
 

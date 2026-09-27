@@ -132,6 +132,8 @@ const categories = () => {
     status: statusOf(c),
     day_date: iso(dayAfter(fri, day_index)),
     entry_count: empty() ? 0 : c.entry_count,
+    // Quadro de teste (devMockBracket): a M4 só com eliminatórias.
+    ...(c.code === 'M4' && localStorage.getItem('mockTBracket') ? { format: { groups: 0 } } : {}),
   }))
 }
 

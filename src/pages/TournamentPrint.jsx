@@ -16,6 +16,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { sourceText } from '../components/tournament/sourceText'
 import { getTournamentPage } from '../lib/tournamentApi'
 import { getCategoryBoard, bracketRounds, byDayAndTime, standingsOf } from '../lib/tournamentDraw'
 import { hhmmInTz } from '../lib/tournamentDay'
@@ -120,6 +121,7 @@ function GroupSheet({ group, matches, entries }) {
 
 /* ── Quadro: os lugares e os caminhos, com espaço para escrever ─────── */
 function BracketSheet({ matches, entries, title }) {
+  const { t } = useTranslation()
   const rounds = bracketRounds(matches, 'principal')
   const secondary = bracketRounds(matches, 'secundario')
   if (!rounds.length && !secondary.length) return null
@@ -127,7 +129,7 @@ function BracketSheet({ matches, entries, title }) {
   const side = (m, which) => {
     const id = which === 'a' ? m.entry_a_id : m.entry_b_id
     const source = which === 'a' ? m.source_a : m.source_b
-    return entries[id]?.name || source || '—'
+    return entries[id]?.name || sourceText(source, matches, t) || '—'
   }
 
   const Bracket = ({ list, label }) => (

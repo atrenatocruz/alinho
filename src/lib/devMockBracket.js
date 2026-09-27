@@ -4,11 +4,14 @@
 // Ligar em localhost, com a sessão Admin(Dev), por cima do mockTournament,
 // do mockTDraw e do mockTMyGamesReal (sou a dupla e1 do M4):
 //   localStorage.mockTBracket = '8' | '16' | '32'   ← quantas duplas
+//     '3': 3 duplas, uma passa direto à final — uma meia-final só
+//     '12' | '28': com «Bye» (quadro de 16 e de 32), como a M4 do Smash Cup
+//   localStorage.mockTBracketNoTime = 'true'  ← nenhum jogo com hora
 //   localStorage.mockTBracketStage = 'antes' | 'meio' | 'fim'
 //     antes: sorteado, nada jogado · meio: 1.ª ronda jogada e a 2.ª a meio
 //     fim: tudo jogado até à final
 const size = () => Number(localStorage.getItem('mockTBracket')) || 0
-const on = () => [8, 16, 32].includes(size())
+const on = () => [3, 8, 12, 16, 28, 32].includes(size())
 const stage = () => localStorage.getItem('mockTBracketStage') || 'meio'
 
 const CAT = 'cat-m4'
@@ -19,19 +22,46 @@ const NAMES = [
   'Pinto / Costa', 'Rosa / Pinto', 'Santos / Santos', 'Brito / Nunes', 'Branco / Lima', 'Neves / Cunha', 'Matos / Reis', 'Seixas / Ramos',
 ]
 const ROUNDS = { 32: ['R32', 'R16', 'QF', 'SF', 'F'], 16: ['R16', 'QF', 'SF', 'F'], 8: ['QF', 'SF', 'F'] }
+const pow2 = (n) => 2 ** Math.ceil(Math.log2(n))
 const HOURS = ['09:00', '11:00', '13:00', '15:00', '17:00']
+
+// 3 duplas: a e1 passa direto à final e a meia 2 é a única — o sorteio
+// guarda «Vencedor das meias 2» na final (buildKnockoutPayload).
+const three = () => [
+  { id: 'bt-SF-2', category_id: CAT, stage: 'principal', group_id: null, round: 'SF', bracket_slot: 2,
+    entry_a_id: 'e2', entry_b_id: 'e3', source_a: null, source_b: null, scheduled_at: null, previous_scheduled_at: null,
+    court_name: null, status: 'marcado', score_a: null, score_b: null, sets: null, winner_entry_id: null },
+  { id: 'bt-F-1', category_id: CAT, stage: 'principal', group_id: null, round: 'F', bracket_slot: 1,
+    entry_a_id: 'e1', entry_b_id: null, source_a: null, source_b: 'Vencedor das meias 2', scheduled_at: null, previous_scheduled_at: null,
+    court_name: null, status: 'marcado', score_a: null, score_b: null, sets: null, winner_entry_id: null },
+]
+
+const noTime = (list) => (localStorage.getItem('mockTBracketNoTime') === 'true'
+  ? list.map((m) => ({ ...m, scheduled_at: null, court_name: null })) : list)
 
 function build() {
   const n = size()
-  const rounds = ROUNDS[n]
+  if (n === 3) return three()
+  const full = pow2(n)
+  const rounds = ROUNDS[full]
   const played = stage() === 'antes' ? 0 : stage() === 'fim' ? rounds.length : 1
   const matches = []
-  let alive = Array.from({ length: n }, (_, i) => `e${i + 1}`)
+  // Os «Bye» ficam espalhados pela 1.ª ronda (lugares 2, 2+k, …): a dupla
+  // sem adversário não tem jogo e aparece logo na ronda seguinte.
+  const byes = full - n
+  const byeSlots = new Set(Array.from({ length: byes }, (_, i) => Math.floor((i * full) / 2 / byes) + 2))
+  let alive = []
+  let k = 1
+  for (let s = 1; s <= full / 2; s++) {
+    alive.push(`e${k++}`)
+    alive.push(byeSlots.has(s) ? null : `e${k++}`)
+  }
   rounds.forEach((round, r) => {
     const next = []
     for (let s = 1; s <= alive.length / 2; s++) {
       const a = alive[2 * s - 2]
       const b = alive[2 * s - 1]
+      if (r === 0 && !(a && b)) { next.push(a || b); continue }
       // Jogada: a ronda já passou; a meio: metade dos jogos da ronda seguinte.
       const done = a && b && (r < played || (r === played && stage() === 'meio' && s % 2 === 1))
       // Ganha a de cima, exceto de 3 em 3 — e a e1 (eu) ganha sempre.
@@ -69,7 +99,7 @@ const entries = () => Array.from({ length: size() }, (_, i) => ({
 
 // Ganham aos outros dados de teste das mesmas vistas só quando ligados.
 export const BRACKET_TABLE_MOCKS = {
-  tournament_public_matches: () => (on() ? build() : undefined),
+  tournament_public_matches: () => (on() ? noTime(build()) : undefined),
   tournament_public_entries: () => (on() ? entries() : undefined),
   tournament_public_groups: () => (on() ? [] : undefined),
 }
