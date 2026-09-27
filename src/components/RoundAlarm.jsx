@@ -19,9 +19,13 @@ import {
  * - eventName: para o ecrã bloqueado, «Ronda N · <nome>».
  * - defaultOn: como vem a quem nunca mexeu no interruptor — ligado nos mixes,
  *   desligado no resto (Francisco, 27 set).
+ * - unit: 'round' («Ronda N», o mix) ou 'game' («Jogo N», o jogo entre amigos).
  */
-export default function RoundAlarm({ roundKey, endsAt, roundNumber, eventName, defaultOn = false }) {
-  const { t } = useTranslation()
+export default function RoundAlarm({ roundKey, endsAt, roundNumber, eventName, defaultOn = false, unit = 'round' }) {
+  const { t: tr } = useTranslation()
+  // Os textos com «ronda» têm a versão «_game» ao lado (jogo entre amigos).
+  const UNIT_KEYS = ['title', 'waiting', 'started', 'tap_to_ring', 'turn_on_round', 'media_title']
+  const t = (key, opts) => tr(unit === 'game' && UNIT_KEYS.includes(key.split('.')[1]) ? `${key}_game` : key, opts)
   const [prefs, setPrefs] = useState(() => loadAlarmPrefs(defaultOn))
   const [now, setNow] = useState(Date.now())
   const [blocked, setBlocked] = useState(false) // o telemóvel pediu um toque
