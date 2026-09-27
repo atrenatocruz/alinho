@@ -1098,7 +1098,9 @@ const TABLE_MOCKS = {
       // resultados foram apagados.
       status: { open: 'open', joined: 'closed', live: 'in_progress', finished: 'finished', paused: 'closed' }[eventState()],
       ...(eventState() === 'finished' ? { winner_team_id: 'et1' } : {}),
-      ...(eventState() === 'live' ? { round_started_at: new Date().toISOString(), round_duration_minutes: 20 } : {}),
+      // localStorage.mockRoundAgoMin = '7' | '21': a ronda começou há N min
+      // (21 = o tempo acabou, entre rondas) — o alarme das rondas, 27 set.
+      ...(eventState() === 'live' ? { round_started_at: new Date(Date.now() - Number(localStorage.getItem('mockRoundAgoMin') || 0) * 60000).toISOString(), round_duration_minutes: 20 } : {}),
       // localStorage.mockProSet = '7' | '10' — o mix em pro set a 9, com o 8-8
       // a tie-break a 7 ou a super tie-break a 10 (#580).
       ...(localStorage.getItem('mockProSet') ? { scoring_format: 'pro_set_9', tiebreak_8_8: localStorage.getItem('mockProSet') === '10' ? 'super_tiebreak' : null } : {}),
