@@ -256,6 +256,17 @@ export const LESSON_RPC_MOCKS = {
     return out
   },
   request_lesson: () => 'rq-new',
+  // Home do aluno (#392): localStorage.mockHomeRequest = 'sent' | 'proposal' | 'merge'.
+  list_my_lesson_requests: () => {
+    const mode = localStorage.getItem('mockHomeRequest')
+    if (!mode) return []
+    const d = at(dayOffset(3), '10:30')
+    const base = { id: 'rq-h1', teacher_profile_id: 'tp-ana', teacher_name: 'Ana Moreira', teacher_gender: 'feminino', org_name: 'Smash Padel',
+      starts_at: d, duration_minutes: 60, lesson_type: 'duo', price_per_person: 25, contact_via: 'whatsapp', status: 'pending' }
+    if (mode === 'proposal') return [{ ...base, proposed_by: 'teacher', proposed_starts_at: at(dayOffset(3), '18:00'), original_starts_at: d, price_per_person: 30 }]
+    if (mode === 'merge') return [{ ...base, merge: { id: 'mg-1', starts_at: at(dayOffset(3), '11:00'), duration_minutes: 60, lesson_type: 'duo', price_per_person: 23, status: 'pending' }, merge_answer: 'pending' }]
+    return [base]
+  },
   // O professor responde (#392, entrega 3). localStorage.mockTeacherRequests =
   // 'two' (dois pedidos que chocam) | 'accepted' (+ uma aula aceite sem campo).
   list_my_teacher_requests: () => {
