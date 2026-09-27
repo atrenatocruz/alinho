@@ -2457,6 +2457,7 @@
   "close.open": "Abrir",
   "close.error": "Não foi possível fechar. Tenta outra vez.",
   "calendar.this_week": "Esta semana",
+  "calendar.back_to_this_week": "Voltar a esta semana",
   "calendar.next_week": "Próxima semana",
   "calendar.free": "Livre",
   "calendar.busy": "Ocupado",
