@@ -796,13 +796,15 @@ export function AchievementCard({ achievementKey, category, rarity, earned = fal
    on the actual call to action — not repeated across a border, a bar and
    a pill, which would just be the same "this is actionable" fact said
    three times. */
-export function VoucherCard({ prizeText, gameTitle, gameDate, organizationName, status, usedAtLabel, onMarkUsed, onShowQR }) {
+export function VoucherCard({ prizeText, gameTitle, gameDate, organizationName, status, usedAtLabel, onMarkUsed, onShowQR, needsConsent = false, shared = false, onAccept, onUnshare }) {
   const { t } = useTranslation()
   const used = status === 'usado'
+  // #556: sem o sim do jogador, o clube não tem o contacto e o voucher não
+  // se usa — o cartão pede-o («Ver e aceitar») no lugar do «Usar».
   return (
     <div
       className={`card relative overflow-hidden ${used ? 'shadow-none' : 'shadow-lift cursor-pointer'}`}
-      onClick={!used ? onShowQR : undefined}
+      onClick={!used ? (needsConsent ? onAccept : onShowQR) : undefined}
       role={!used ? 'button' : undefined}
       tabIndex={!used ? 0 : undefined}
     >
@@ -827,10 +829,31 @@ export function VoucherCard({ prizeText, gameTitle, gameDate, organizationName, 
         </p>
       )}
 
-      {!used ? (
-        <PrimaryButton onClick={(e) => { e.stopPropagation(); onMarkUsed() }} className="mt-3 w-full">
-          {t('profile.voucher_mark_used_action')}
-        </PrimaryButton>
+      {!used && needsConsent ? (
+        <>
+          <p className="mt-3 rounded-ctrl border border-warning/30 bg-warning/10 px-3 py-2 text-xs leading-snug text-ink-900">
+            <b className="font-extrabold">{t('vouchers.consent_lead')}</b> {t('vouchers.consent_rest', { club: organizationName })}
+          </p>
+          <button type="button" onClick={(e) => { e.stopPropagation(); onAccept() }}
+            className="mt-3 inline-flex min-h-[48px] w-full items-center justify-center rounded-ctrl bg-ink-900 px-5 text-base font-extrabold text-white">
+            {t('vouchers.see_accept')}
+          </button>
+        </>
+      ) : !used ? (
+        <>
+          {shared && (
+            <div className="mt-3 flex items-start justify-between gap-3 text-xs">
+              <span className="text-ok-700">✓ {t('vouchers.shared_with', { club: organizationName })}</span>
+              <button type="button" onClick={(e) => { e.stopPropagation(); onUnshare() }}
+                className="shrink-0 font-extrabold text-ink-900 underline underline-offset-2">
+                {t('vouchers.unshare')}
+              </button>
+            </div>
+          )}
+          <PrimaryButton onClick={(e) => { e.stopPropagation(); onMarkUsed() }} className="mt-3 w-full">
+            {t('profile.voucher_mark_used_action')}
+          </PrimaryButton>
+        </>
       ) : (
         <p className="mt-3 text-[10px] text-ink-200">{t('profile.voucher_used_at', { date: usedAtLabel })}</p>
       )}

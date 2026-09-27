@@ -11,7 +11,7 @@ import { positionOf } from '../lib/rankingScales'
 import { getGroupMatches } from '../lib/groupMatches'
 import { KindTag } from '../components/agenda/EventCard'
 import { getFollowCounts } from '../lib/follows'
-import { PrimaryButton, GuestBadge, Avatar, EmptyState, RatingBadge, PhotoViewerModal, FollowListModal, AchievementCard, VoucherCard, VoucherQRModal, PageHeader, Tabs } from '../components/ui'
+import { PrimaryButton, GuestBadge, Avatar, EmptyState, RatingBadge, PhotoViewerModal, FollowListModal, AchievementCard, VoucherCard, VoucherQRModal, PageHeader, Tabs, ConfirmSheet } from '../components/ui'
 import { useHeaderActions } from '../contexts/HeaderActionsContext'
 import { CATEGORY_ORDER } from '../lib/achievements'
 import TeacherSection from '../components/TeacherSection'
@@ -20,7 +20,8 @@ import { formatRating, formatRatingMaybeProvisional, isProvisional, bandProgress
 import { XP_TIERS, tierFromXp, preTierProgress, formatXp } from '../lib/xp'
 import { AGE_LABEL_KEY, ageCategory } from '../lib/ageCategories'
 import { formatDate as formatDateLib } from '../lib/formatDate'
-import { sortVouchersForWallet } from '../lib/vouchers'
+import { sortVouchersForWallet, shareVoucherContact, unshareVoucherContact } from '../lib/vouchers'
+import ShareContactSheet from '../components/vouchers/ShareContactSheet'
 import { describeError } from '../lib/errors'
 import { useFeatureFlag } from '../lib/useFeatureFlag'
 
@@ -36,7 +37,7 @@ const TABS = [
 
 export default function Profile() {
   const { t, i18n } = useTranslation()
-  const { profile, updateProfile, currentOrganizationId, isGuest, signOut, refreshMemberships, memberships, isPrivateMatchesEnabled } = useAuth()
+  const { user, profile, updateProfile, currentOrganizationId, isGuest, signOut, refreshMemberships, memberships, isPrivateMatchesEnabled } = useAuth()
   // Com o jogo entre amigos novo (#342) o cartão diz «convida»; sem ele, o antigo «regista».
   const { on: friendInvitesOn } = useFeatureFlag('friend_invites')
   const headerActions = useHeaderActions()
@@ -56,6 +57,9 @@ export default function Profile() {
   const [vouchers, setVouchers] = useState([])
   const [vouchersLoading, setVouchersLoading] = useState(true)
   const [qrVoucher, setQrVoucher] = useState(null)
+  const [voucherConsent, setVoucherConsent] = useState(false)
+  const [shareFor, setShareFor] = useState(null) // o voucher da janela «Partilhar»
+  const [unshareFor, setUnshareFor] = useState(null)
   const [privateMatchHistory, setPrivateMatchHistory] = useState([])
   const [privateMatchHistoryLoading, setPrivateMatchHistoryLoading] = useState(true)
   // Jogos entre amigos dentro dos grupos/clubes (Homepage unificada, Trello
@@ -177,12 +181,20 @@ export default function Profile() {
   const loadVouchers = async () => {
     setVouchersLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('vouchers')
-        .select('id, status, used_at, created_at, game:games (id, title, date, prize, organization:organizations (name))')
-        .eq('user_id', profile.id)
-        .order('created_at', { ascending: false })
+      // #556: com a coluna contact_shared_at (Dev 3) o voucher só se usa
+      // depois do sim. Enquanto ela não existir em produção, lê-se como
+      // antes e tudo fica como hoje.
+      const select = 'id, status, used_at, created_at, game:games (id, title, date, prize, organization:organizations (name))'
+      let { data, error } = await supabase.from('vouchers').select(`${select}, contact_shared_at`)
+        .eq('user_id', profile.id).order('created_at', { ascending: false })
+      let consent = true
+      if (error && (error.code === '42703' || /contact_shared_at/.test(error.message || ''))) {
+        consent = false
+        ;({ data, error } = await supabase.from('vouchers').select(select)
+          .eq('user_id', profile.id).order('created_at', { ascending: false }))
+      }
       if (error) throw error
+      setVoucherConsent(consent)
       setVouchers(data || [])
     } catch (error) {
       // Treated the same as "no vouchers" — covers both a genuinely empty
@@ -1008,12 +1020,42 @@ export default function Profile() {
                   usedAtLabel={v.used_at ? formatDateLib(v.used_at, i18n.language, { day: '2-digit', month: 'short', year: 'numeric' }) : ''}
                   onMarkUsed={() => handleMarkVoucherUsed(v.id)}
                   onShowQR={() => handleShowVoucherQR(v)}
+                  needsConsent={voucherConsent && v.status === 'por_usar' && !v.contact_shared_at}
+                  shared={voucherConsent && !!v.contact_shared_at}
+                  onAccept={() => setShareFor(v)}
+                  onUnshare={() => setUnshareFor(v)}
                 />
               ))}
             </div>
           )
         )
       )}
+
+      <ShareContactSheet
+        open={!!shareFor}
+        club={shareFor?.game?.organization?.name || ''}
+        name={profile?.name}
+        email={user?.email}
+        onAccept={async () => {
+          const at = await shareVoucherContact(shareFor.id)
+          setVouchers((prev) => prev.map((x) => (x.id === shareFor.id ? { ...x, contact_shared_at: at } : x)))
+        }}
+        onClose={() => setShareFor(null)}
+      />
+      <ConfirmSheet
+        open={!!unshareFor}
+        title={t('vouchers.unshare_title')}
+        message={t('vouchers.unshare_body', { club: unshareFor?.game?.organization?.name || '' })}
+        confirmLabel={t('vouchers.unshare')}
+        cancelLabel={t('common.back')}
+        outline
+        errorOf={(err) => describeError(t, err)}
+        onConfirm={async () => {
+          await unshareVoucherContact(unshareFor.id)
+          setVouchers((prev) => prev.map((x) => (x.id === unshareFor.id ? { ...x, contact_shared_at: null } : x)))
+        }}
+        onClose={() => setUnshareFor(null)}
+      />
 
       {qrVoucher && (
         <VoucherQRModal voucher={qrVoucher} onClose={() => setQrVoucher(null)} />

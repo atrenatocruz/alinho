@@ -7,6 +7,7 @@ import {
 import { TOURNAMENT_DRAW_TABLE_MOCKS, TOURNAMENT_DRAW_RPC_MOCKS } from './devMockTournamentDraw'
 import { CLUB_PAGE_RPC_MOCKS, CLUB_PAGE_TABLE_MOCKS } from './devMockClubPage'
 import { BRACKET_TABLE_MOCKS } from './devMockBracket'
+import { VOUCHER_RPC_MOCKS, VOUCHER_TABLE_MOCKS } from './devMockVouchers'
 
 // Dev-only: quando a sessão é o atalho "Entrar como Admin (Dev)"
 // (AuthContext.jsx, MOCK_ADMIN_KEY), essa sessão nunca teve um auth.uid()
@@ -1210,11 +1211,11 @@ TABLE_MOCKS.participants = (url) => {
 // Fechar categorias (#485, mockTClose): ganha aos outros mocks das mesmas
 // vistas só quando está ligado — devolve `undefined` quando não está, e
 // aí responde quem respondia antes.
-for (const [name, fn] of [...Object.entries(TOURNAMENT_CLOSE_RPC_MOCKS), ...Object.entries(TOURNAMENT_REOPEN_RPC_MOCKS), ...Object.entries(CLUB_PAGE_RPC_MOCKS), ...Object.entries(TOURNAMENT_PROMOTED_RPC_MOCKS)]) {
+for (const [name, fn] of [...Object.entries(TOURNAMENT_CLOSE_RPC_MOCKS), ...Object.entries(TOURNAMENT_REOPEN_RPC_MOCKS), ...Object.entries(CLUB_PAGE_RPC_MOCKS), ...Object.entries(TOURNAMENT_PROMOTED_RPC_MOCKS), ...Object.entries(VOUCHER_RPC_MOCKS)]) {
   const before = RPC_MOCKS[name]
   RPC_MOCKS[name] = (params) => fn(params, before) ?? before?.(params) ?? null
 }
-for (const [name, fn] of [...Object.entries(TOURNAMENT_CLOSE_TABLE_MOCKS), ...Object.entries(TOURNAMENT_SCORE_TODAY_TABLE_MOCKS), ...Object.entries(CLUB_PAGE_TABLE_MOCKS), ...Object.entries(TOURNAMENT_GROUPS_DONE_TABLE_MOCKS), ...Object.entries(TOURNAMENT_PROMOTED_TABLE_MOCKS), ...Object.entries(BRACKET_TABLE_MOCKS)]) {
+for (const [name, fn] of [...Object.entries(TOURNAMENT_CLOSE_TABLE_MOCKS), ...Object.entries(TOURNAMENT_SCORE_TODAY_TABLE_MOCKS), ...Object.entries(CLUB_PAGE_TABLE_MOCKS), ...Object.entries(TOURNAMENT_GROUPS_DONE_TABLE_MOCKS), ...Object.entries(TOURNAMENT_PROMOTED_TABLE_MOCKS), ...Object.entries(BRACKET_TABLE_MOCKS), ...Object.entries(VOUCHER_TABLE_MOCKS)]) {
   const before = TABLE_MOCKS[name]
   TABLE_MOCKS[name] = (url) => fn(url, before) ?? before?.(url) ?? []
 }
@@ -1290,7 +1291,8 @@ export function installDevMockNetwork() {
       // (Trello #480). Sem isto, nenhum caminho de erro das funções se via
       // em localhost.
       if (out && typeof out === 'object' && out.__error) {
-        return jsonResponse({ code: 'P0001', message: out.__error }, 400)
+        // __code: outro código do PostgREST (ex.: PGRST202, a função ainda não existe).
+        return jsonResponse({ code: out.__code || 'P0001', message: out.__error }, out.__code === 'PGRST202' ? 404 : 400)
       }
       return jsonResponse(out)
     }
@@ -1345,6 +1347,9 @@ export function installDevMockNetwork() {
     if (tableMatch) {
       const mock = TABLE_MOCKS[tableMatch[1]]
       const data = mock ? mock(url) : []
+      // Um mock pode responder como um erro do PostgREST (ex.: 42703, a
+      // coluna ainda não existe): { __tableError: 'codigo' }.
+      if (data && data.__tableError) return jsonResponse({ code: data.__tableError, message: data.__tableError }, 400)
       if (wantsSingle(init)) {
         return data[0] ? jsonResponse(data[0]) : jsonResponse({ message: 'no rows', code: 'PGRST116' }, 406)
       }
