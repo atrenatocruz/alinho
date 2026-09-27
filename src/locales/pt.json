@@ -2677,6 +2677,7 @@
   "lessons.notice_merge_proposed": "{{teacher}} propôs juntar-te numa aula: {{when}}",
   "lessons.notice_merge_declined": "{{student}} não aceitou a junção de {{when}}",
   "lessons.notice_merge_booked": "Aula marcada com todos: {{when}}",
+  "lessons.notice_merge_dissolved": "A aula conjunta de {{when}} já não vai acontecer. Fica o teu pedido, como o fizeste.",
   "proposal.propose": "Propor outra hora",
   "proposal.title": "Propor outra hora",
   "proposal.send": "Enviar proposta",
