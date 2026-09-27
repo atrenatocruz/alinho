@@ -14,6 +14,7 @@ import { FieldLabel, MonoLabel } from './TournamentBits'
 import { removeTournamentPoster, uploadTournamentPoster } from '../../lib/tournamentPosterStorage'
 import { describeError } from '../../lib/errors'
 import StepPage from '../steps/StepPage'
+import WhatsappHoursField from '../WhatsappHoursField'
 import OpensPicker, { openingDays } from './OpensPicker'
 import { weekdayLong, isMasculineWeekday } from '../../lib/launchDay'
 
@@ -199,6 +200,10 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
       prize_first: c.prize_first || '', prize_second: c.prize_second || '',
     })),
     organizer_text: initial?.tournament?.organizer_text || '',
+    // Lembretes no WhatsApp (27 set): null = ainda por escolher — o campo
+    // preenche-o com as horas do último torneio do clube.
+    whatsapp_post_times: Array.isArray(initial?.tournament?.whatsapp_post_times)
+      ? initial.tournament.whatsapp_post_times.map((h) => String(h).slice(0, 5)) : null,
     rules: { ...DEFAULT_RULES, ...(initial?.tournament?.rules || {}) },
   }))
   const editing_existing = !!initial
@@ -672,6 +677,10 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
           <Field label={t('tournament.create.organizer_text')}>
             <textarea rows={3} className={inputClass} value={draft.organizer_text} onChange={(e) => set({ organizer_text: e.target.value })} placeholder={t('tournament.create.organizer_text_placeholder')} />
           </Field>
+          {/* Lembrar no WhatsApp: no último passo, por cima do botão final
+              (design-handoff/2026-09-27-whatsapp-no-evento). Só com grupos. */}
+          <WhatsappHoursField organizationId={club?.id} kind="tournament"
+            value={draft.whatsapp_post_times} onChange={(v) => set({ whatsapp_post_times: v })} />
         </>
       )}
 
