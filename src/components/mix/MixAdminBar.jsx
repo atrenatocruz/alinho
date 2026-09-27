@@ -41,6 +41,8 @@ export default function MixAdminBar({ stateLabel, line, error, primary, onEdit, 
           {t('eventactions.more')} <MoreHorizontal size={16} />
         </button>
       </div>
+      {/* O que o botão preto faz, numa frase (sortear-duplas, 27 set). */}
+      {primary?.hint && <p className="mt-1.5 text-xs text-ink-500">{primary.hint}</p>}
       {error && <p role="alert" className="mt-2 text-sm font-extrabold text-danger">{error}</p>}
     </div>
   )

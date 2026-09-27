@@ -9,7 +9,7 @@ process.env.APP_URL = 'https://alinho.pt'
 
 const { supabase } = await import('../src/supabase.js')
 const { installFakeSupabase, calls } = await import('./fakeSupabase.js')
-const { handleGroupMessage } = await import('../src/commands.js')
+const { handleGroupMessage, _clearPairRequestsForTests } = await import('../src/commands.js')
 
 const hash = (d) => crypto.createHmac('sha256', 'segredo').update(d.slice(-9)).digest('hex')
 export let db
@@ -21,7 +21,7 @@ beforeEach(async () => {
       { id: 'b', name: 'Afonso Dias', phone_hash: hash('922222222'), language: 'pt' },
     ],
     memberships: [{ user_id: 'a', organization_id: 'o' }, { user_id: 'b', organization_id: 'o' }],
-    participants: [], partner_invites: [],
+    participants: [], partner_invites: [], teams: [],
     games: [{ id: 'm', organization_id: 'o', title: 'Mix', status: 'open', origin: 'manual',
       date: new Date(Date.now() + 864e5).toISOString(), num_courts: 1, max_players: 4,
       rotate_partners: false, allow_pair_signup: true }],
@@ -29,6 +29,7 @@ beforeEach(async () => {
   installFakeSupabase(supabase, db)
   const { _clearOpenMixesCacheForTests } = await import('../src/roster.js')
   _clearOpenMixesCacheForTests()
+  _clearPairRequestsForTests()
   calls.length = 0
 })
 
@@ -312,7 +313,8 @@ test('#554 parceiro já inscrito: recusa', async () => {
   soloIn()
   db.participants.push({ id: 'pb', game_id: 'm', user_id: 'b', status: 'confirmed', created_at: '2026-09-25T16:00:00Z' })
   const out = await say('in com afonso')
-  assert.match(out, /já está inscrito/)
+  // Desde 27 set (Francisco): o Afonso tem de aceitar — pergunta-se-lhe.
+  assert.match(out, /quer fazer dupla contigo neste mix/)
   assert.equal(solo().partner_id, null)
 })
 
@@ -381,15 +383,42 @@ test('#552 responder «In» a um cartão do «mix» inscreve nesse mix', async (
 })
 
 
-// ── «In com X» com o X já inscrito (A2N, M4, 27 set) ────────────────────
-test('«In com X» com o X inscrito sozinho: quem escreve entra em dupla com ele, sem o X perder o lugar', async () => {
-  db.participants.push({ id: 'solo', game_id: 'm', user_id: 'b', partner_id: null, status: 'confirmed', joined_alone: true, created_at: '2026-09-01T10:00:00Z' })
+// ── «In com X» com o X já inscrito (A2N, M4, 27 set): o X tem de aceitar ──
+const xSolo = () => db.participants.push({ id: 'solo', game_id: 'm', user_id: 'b', partner_id: null, status: 'confirmed', joined_alone: true, created_at: '2026-09-01T10:00:00Z' })
+
+test('«In com X» com o X sozinho: quem escreve entra sozinho e o robô pergunta ao X', async () => {
+  xSolo()
   const out = await say('in com afonso')
-  assert.match(out, /✅ Bernardo Ramos entrou em dupla com Afonso Dias\./)
-  const row = db.participants.find((p) => p.id === 'solo')
-  assert.equal(row.partner_id, 'a')
-  assert.equal(row.joined_alone, false)
-  assert.equal(db.participants.filter((p) => p.game_id === 'm').length, 1, 'não cria outra inscrição')
+  assert.match(out, /Afonso Dias, o Bernardo Ramos quer fazer dupla contigo neste mix\. Responde "Sim" para aceitar\./)
+  assert.equal(db.participants.find((p) => p.id === 'solo').partner_id, null, 'ainda não há dupla')
+  assert.ok(db.participants.some((p) => p.user_id === 'a' && p.status === 'confirmed' && !p.partner_id), 'o Bernardo entra sozinho')
+})
+
+test('o X responde «Sim»: a dupla forma-se na inscrição do X, e a do Bernardo sai', async () => {
+  xSolo()
+  await say('in com afonso')
+  const out = await say('Sim', '351922222222')
+  assert.match(out, /✅ Afonso Dias aceitou: Bernardo Ramos e Afonso Dias jogam em dupla\./)
+  assert.equal(db.participants.find((p) => p.id === 'solo').partner_id, 'a')
+  assert.equal(db.participants.filter((p) => p.game_id === 'm').length, 1)
+})
+
+test('só o X pode aceitar: o «Sim» de outra pessoa não faz nada', async () => {
+  xSolo()
+  db.profiles.push({ id: 'c', name: 'Carlos Mendes', phone_hash: hash('933333333'), language: 'pt' })
+  db.memberships.push({ user_id: 'c', organization_id: 'o' })
+  await say('in com afonso')
+  const out = await say('Sim', '351933333333')
+  assert.doesNotMatch(out, /aceitou/)
+  assert.equal(db.participants.find((p) => p.id === 'solo').partner_id, null)
+})
+
+test('o X responde «Não»: ficam os dois sozinhos', async () => {
+  xSolo()
+  await say('in com afonso')
+  const out = await say('não', '351922222222')
+  assert.match(out, /ficam inscritos sozinhos/)
+  assert.equal(db.participants.filter((p) => p.game_id === 'm' && !p.partner_id).length, 2)
 })
 
 test('«In com X» com o X já em dupla: diz com quem, e não inscreve', async () => {
@@ -401,14 +430,11 @@ test('«In com X» com o X já em dupla: diz com quem, e não inscreve', async (
   assert.equal(db.participants.length, 1)
 })
 
-test('«In com X» com o X sozinho e só 1 vaga: cabe (o X já ocupava a dele)', async () => {
-  db.profiles.push({ id: 'c', name: 'Carlos Mendes', phone_hash: hash('933333333'), language: 'pt' }, { id: 'd', name: 'Duarte Lima', phone_hash: hash('944444444'), language: 'pt' })
-  db.memberships.push({ user_id: 'c', organization_id: 'o' }, { user_id: 'd', organization_id: 'o' })
-  db.participants.push(
-    { id: 'p1', game_id: 'm', user_id: 'c', partner_id: 'd', status: 'confirmed', joined_alone: false, created_at: '2026-09-01T09:00:00Z' },
-    { id: 'solo', game_id: 'm', user_id: 'b', partner_id: null, status: 'confirmed', joined_alone: true, created_at: '2026-09-01T10:00:00Z' },
-  )
-  const out = await say('in com afonso')
-  assert.match(out, /entrou em dupla com Afonso Dias/)
-  assert.equal(db.participants.find((p) => p.id === 'solo').partner_id, 'a')
+test('o pedido cai se as duplas já foram sorteadas', async () => {
+  xSolo()
+  await say('in com afonso')
+  db.teams = [{ id: 't1', game_id: 'm' }]
+  const out = await say('sim', '351922222222')
+  assert.match(out, /já não vale/)
+  assert.equal(db.participants.find((p) => p.id === 'solo').partner_id, null)
 })

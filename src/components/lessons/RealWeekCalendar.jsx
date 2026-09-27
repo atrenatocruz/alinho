@@ -19,7 +19,10 @@ const label = (m) => { const h = Math.floor(m / 60); const mm = m % 60; return m
 
 // loadBusy(de, até): o ocupado de uma semana além dos 15 dias do booking
 // (até 3 meses, Francisco 27 set). Sem ele, as setas ficam nas duas semanas.
-export default function RealWeekCalendar({ booking, mode = 'public', now = new Date(), onPickFree = null, onPickDay = null, loadBusy = null }) {
+// loadDetails(de, até): as aulas da semana com o tipo, o nível e a lotação
+// (assunto 4): na página pública, as turmas com lugar ficam à vista, e tocar
+// num dia chama onPickDay(dia, segmentos, aulas).
+export default function RealWeekCalendar({ booking, mode = 'public', now = new Date(), onPickFree = null, onPickDay = null, loadBusy = null, loadDetails = null }) {
   const { t } = useTranslation()
   // Abre nesta semana; se já não há nada por passar nela (ao domingo à
   // noite, por exemplo), abre na próxima.
@@ -35,6 +38,16 @@ export default function RealWeekCalendar({ booking, mode = 'public', now = new D
     loadBusy(isoDate(days[0]), isoDate(days[6])).then((b) => setExtra((x) => ({ ...x, [offset]: b || [] }))).catch(() => setExtra((x) => ({ ...x, [offset]: [] })))
   }, [offset]) // eslint-disable-line react-hooks/exhaustive-deps
   const weekBusy = offset < 2 ? booking?.busy || [] : extra[offset] || []
+  // As aulas da semana (tipo, nível, lotação), para as turmas com lugar.
+  const [details, setDetails] = useState({}) // { offset: aulas[] }
+  useEffect(() => {
+    if (!loadDetails || details[offset]) return
+    loadDetails(isoDate(days[0]), isoDate(days[6])).then((d) => setDetails((x) => ({ ...x, [offset]: d || [] }))).catch(() => setDetails((x) => ({ ...x, [offset]: [] })))
+  }, [offset]) // eslint-disable-line react-hooks/exhaustive-deps
+  const weekDetails = details[offset] || []
+  const minOf = (iso) => { const x = new Date(iso); return x.getHours() * 60 + x.getMinutes() }
+  const openSeries = (d, s) => s.kind === 'lesson' && weekDetails.some((x) => x.form === 'series' && x.visible && x.taken < x.capacity
+    && new Date(x.starts_at).toDateString() === d.toDateString() && minOf(x.starts_at) === s.start)
   const segs = useMemo(() => days.map((d) => daySegments(d, profiles, weekBusy, now)), [days, profiles, weekBusy, now])
   // As horas: as mesmas nas duas semanas, para o calendário não saltar.
   const range = useMemo(() => weekHourRange([0, 1].flatMap((o) => weekDays(now, o).map((d) => daySegments(d, profiles, booking?.busy || [], now)))),
@@ -55,8 +68,10 @@ export default function RealWeekCalendar({ booking, mode = 'public', now = new D
   const dates = `${days[0].getDate()} ${days[0].getMonth() === days[6].getMonth() ? '' : `${month(days[0])} `}– ${days[6].getDate()} ${month(days[6])}`.replace('  ', ' ')
   const title = offset < 2 ? `${t(offset === 0 ? 'calendar.this_week' : 'calendar.next_week')} · ${dates}` : dates
 
-  const look = (s) => {
+  const look = (s, d) => {
     if (s.kind === 'free') return { style: FREE, cls: 'text-ink-900' }
+    // Turma com lugar: contorno verde, fundo branco, «Turma» (assunto 4).
+    if (mode === 'public' && d && openSeries(d, s)) return { style: { background: '#fff', borderColor: '#0F766E', borderWidth: 1.5 }, cls: 'text-[#0F766E]', series: true }
     if (mode === 'public') return { style: { background: '#D1D5DB', borderColor: '#9CA3AF' }, cls: 'text-transparent' }
     if (s.kind === 'closed') return { style: CLOSED, cls: 'text-ink-500' }
     if (s.kind === 'lesson') return { style: { background: '#0F766E', borderColor: '#0F766E' }, cls: 'text-white' }
@@ -72,11 +87,12 @@ export default function RealWeekCalendar({ booking, mode = 'public', now = new D
     onPickFree(s.tp, isoDate(day), pickTime(s, minute))
   }
 
+  const hasOpenSeries = mode === 'public' && days.some((d, i) => segs[i].some((s) => openSeries(d, s)))
   const legend = mode === 'public'
-    ? [['free', t('calendar.free')], ['busy', t('calendar.busy')], ['past', t('calendar.past')]]
+    ? [['free', t('calendar.free')], ...(hasOpenSeries ? [['series', t('calendar.series_open')]] : []), ['busy', t('calendar.busy')], ['past', t('calendar.past')]]
     : [['free', t('calendar.free')], ['lesson', t('calendar.lesson')], ['request', t('calendar.request')], ['closed', t('calendar.closed')], ['past', t('calendar.past')]]
   const swatch = {
-    free: FREE, busy: { background: '#D1D5DB', borderColor: '#9CA3AF' }, lesson: { background: '#0F766E', borderColor: '#0F766E' },
+    series: { background: '#fff', borderColor: '#0F766E' }, free: FREE, busy: { background: '#D1D5DB', borderColor: '#9CA3AF' }, lesson: { background: '#0F766E', borderColor: '#0F766E' },
     request: { background: '#CCF3EC', borderColor: '#5CC7B6', borderStyle: 'dashed' }, closed: CLOSED, past: { background: '#fff', borderColor: '#E5E7EB' },
   }
 
@@ -109,17 +125,17 @@ export default function RealWeekCalendar({ booking, mode = 'public', now = new D
           ))}
         </div>
         {days.map((d, i) => {
-          const Col = mode === 'teacher' && onPickDay && segs[i].length > 0 ? 'button' : 'div'
+          const Col = onPickDay && segs[i].some((s) => !s.past) ? 'button' : 'div'
           return (
-            <Col key={i} type={Col === 'button' ? 'button' : undefined} onClick={Col === 'button' ? () => onPickDay(d, segs[i]) : undefined}
+            <Col key={i} type={Col === 'button' ? 'button' : undefined} onClick={Col === 'button' ? () => onPickDay(d, segs[i], weekDetails) : undefined}
               aria-label={Col === 'button' ? `${t(`lessons.wd_long_${i + 1}`)} ${d.getDate()}` : undefined}
               className="relative mt-1 block w-full overflow-hidden rounded-[6px] bg-white text-left" style={{ height }}>
               {marks.slice(1, -1).map((h) => (
                 <span key={h} className="absolute inset-x-0 border-t border-dashed border-ink-200/60" style={{ top: (h - range.from) * HOUR_PX }} />
               ))}
               {segs[i].map((s) => {
-                const lk = look(s)
-                const clickable = mode === 'public' && s.kind === 'free' && !s.past && onPickFree && (d - now) / 86400000 <= 92
+                const lk = look(s, d)
+                const clickable = mode === 'public' && !onPickDay && s.kind === 'free' && !s.past && onPickFree && (d - now) / 86400000 <= 92
                 const B = clickable ? 'button' : 'span'
                 return (
                   <B key={`${s.kind}-${s.start}-${s.past}`} type={clickable ? 'button' : undefined}
@@ -127,7 +143,7 @@ export default function RealWeekCalendar({ booking, mode = 'public', now = new D
                     aria-label={clickable ? t('calendar.pick_aria', { from: label(s.start), to: label(s.end) }) : undefined}
                     className={`absolute inset-x-0.5 flex flex-col justify-between overflow-hidden rounded-[5px] border px-0.5 py-px text-center text-[9px] font-extrabold leading-tight tabular-nums ${lk.cls} ${s.past ? 'opacity-35' : ''}`}
                     style={{ ...lk.style, top: ((s.start - range.from * 60) / 60) * HOUR_PX, height: ((s.end - s.start) / 60) * HOUR_PX }}>
-                    {mode === 'public' && s.kind !== 'free' ? null : (
+                    {lk.series ? <span>{t('calendar.series_short')}</span> : mode === 'public' && s.kind !== 'free' ? null : (
                       <>
                         <span>{tag(s) || label(s.start)}</span>
                         {s.end - s.start > 60 && s.kind !== 'closed' && <span>{tag(s) ? label(s.start) : label(s.end)}</span>}
@@ -147,7 +163,7 @@ export default function RealWeekCalendar({ booking, mode = 'public', now = new D
           </span>
         ))}
       </div>
-      {mode === 'public' && onPickFree && <p className="mt-1.5 pl-8 text-xs text-muted">{t('calendar.tap_free')}</p>}
+      {mode === 'public' && (onPickDay || onPickFree) && <p className="mt-1.5 pl-8 text-xs text-muted">{t(onPickDay ? 'calendar.tap_day' : 'calendar.tap_free')}</p>}
     </div>
   )
 }

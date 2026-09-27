@@ -22,7 +22,8 @@ describe('canAddBeforeStart (#534)', () => {
     expect(canAddBeforeStart({ status: 'in_progress' }, 0)).toBe(false)
     expect(canAddBeforeStart({ status: 'finished' }, 0)).toBe(false)
     expect(canAddBeforeStart({ status: 'cancelled' }, 0)).toBe(false)
-    expect(canAddBeforeStart({ status: 'closed' }, 4)).toBe(false)
+    // Com as duplas sorteadas também (27 set): a base de dados desfá-las.
+    expect(canAddBeforeStart({ status: 'closed' }, 4)).toBe(true)
   })
 })
 

@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { Users, Search, X, Check } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { EmptyState, PrimaryButton } from '../components/ui'
+import { EmptyState, PrimaryButton, ConfirmSheet } from '../components/ui'
 import { GameEventCard, FriendsEventCard, ExploreEventCard } from '../components/agenda/EventCard'
 import { DayHeader, MonthSheet, FilterSheet, FilterChips, LocationChip, LocationSheet, ViewToggle, Sheet, dayLabel, KIND_FILTER_KEY, SHOW_LABEL_KEY } from '../components/agenda/AgendaControls'
 import HomeSearch from '../components/agenda/HomeSearch'
@@ -98,6 +98,10 @@ export default function Home() {
   // O erro de uma ação num cartão aparece por baixo desse cartão, não no
   // topo da página, onde ninguém o via (Trello #414). { key, message } | null
   const [cardError, setCardError] = useState(null)
+  // Mix só de homens ou só de mulheres e o sexo não bate: o botão está lá,
+  // e ao carregar pergunta-se «tens a certeza?», como na página do mix
+  // (#574 — o sexo nunca bloqueia, Francisco 26 set). { event, kind } | null
+  const [genderConfirm, setGenderConfirm] = useState(null)
   const [joinSlug, setJoinSlug] = useState('')
   const [joining, setJoining] = useState(false)
   const [joinError, setJoinError] = useState('')
@@ -436,13 +440,16 @@ export default function Home() {
     }
     // Inscrito como parceiro de outra pessoa: a linha é dela.
     if (iAmSomeonesPartner) return null
-    if (game.status !== 'open') return null
-    if (isGenderMismatch(game, profile)) return null
+    // Cheio, o mix passa a 'closed' (trigger das vagas) — e é aí que mais
+    // interessa entrar como suplente, como na página do mix. Fechado sem
+    // estar cheio (fechado à mão, ou parado com as duplas feitas) não.
+    const full = countPeople(rows) >= mixCapacity(game)
+    if (game.status !== 'open' && !(game.status === 'closed' && full)) return null
     // Sem data de nascimento pede-se num modal — é trabalho da página do mix.
     if (isAgeIneligible(game, profile) || isMissingBirthday(game, profile)) return null
     // Sem sexo no perfil, idem: escolhe-se na página do mix.
     if (isMissingGender(game, profile)) return null
-    return countPeople(rows) < mixCapacity(game) ? { kind: 'join' } : { kind: 'waitlist' }
+    return full ? { kind: 'waitlist' } : { kind: 'join' }
   }
 
   const markPending = (key, on) => setPendingKeys((prev) => {
@@ -452,8 +459,12 @@ export default function Home() {
     return next
   })
 
-  const handleGameAction = async (event, kind) => {
+  const handleGameAction = async (event, kind, { genderConfirmed = false } = {}) => {
     if (kind === 'leave' && !confirm(t('gamedetails.confirm_leave_game'))) return
+    if ((kind === 'join' || kind === 'waitlist') && !genderConfirmed && isGenderMismatch(event.raw, profile)) {
+      setGenderConfirm({ event, kind })
+      return
+    }
     const game = event.raw
     markPending(event.key, true)
     setCardError(null)
@@ -929,6 +940,16 @@ export default function Home() {
           </div>
         </Sheet>
       )}
+
+      <ConfirmSheet
+        open={!!genderConfirm}
+        title={genderConfirm?.event.raw.gender_restriction === 'feminino' ? t('gamedetails.gender_confirm_title_feminino') : t('gamedetails.gender_confirm_title_masculino')}
+        message={t('gamedetails.gender_confirm_me')}
+        confirmLabel={t('gamedetails.gender_confirm_yes')}
+        cancelLabel={t('gamedetails.gender_confirm_cancel')}
+        onConfirm={() => { const next = genderConfirm; setGenderConfirm(null); if (next) handleGameAction(next.event, next.kind, { genderConfirmed: true }) }}
+        onClose={() => setGenderConfirm(null)}
+      />
 
       {monthOpen && (
         <MonthSheet

@@ -58,6 +58,9 @@ const SIDE_LABEL_KEY = { left: 'gamedetails.side_left', right: 'gamedetails.side
 // invocation must stay well under the Edge Function wall-clock limit.
 // 50 names ≈ 25s per call.
 const BULK_IMPORT_CHUNK_SIZE = 50
+// #541: a importação em massa saiu da página do mix (27 set). Fica aqui,
+// desligada, até ter sítio próprio (proposta: Gerir › Pessoas), com desenho.
+const SHOW_BULK_IMPORT_ON_MIX = false
 
 // Histórico de entradas e saídas (Trello #171) — verde = entrou, vermelho
 // tingido = saiu, âmbar = suplente, cinzento = alteração de parceiro.
@@ -959,7 +962,11 @@ export default function GameDetails() {
   }
 
   // Só forma as duplas — as rondas arrancam depois, uma a uma, por decisão do admin.
-  const handleStartMix = async () => {
+  // `start: false` = «Sortear duplas» (Francisco, 27 set,
+  // design-handoff/2026-09-27-sortear-duplas): forma as duplas e deixa o mix
+  // por começar; ficam à vista de todos. O Americano não tem duplas fixas:
+  // começa sempre.
+  const handleStartMix = async ({ start = true } = {}) => {
     setBusy(true)
     setMixError('')
     try {
@@ -1071,16 +1078,25 @@ export default function GameDetails() {
         }
       }
 
-      const { error: teamsError } = await supabase
+      const { data: insertedTeams, error: teamsError } = await supabase
         .from('teams')
         .insert(teamRows)
+        .select()
       if (teamsError) throw teamsError
 
-      const { error: statusError } = await supabase
-        .from('games')
-        .update({ status: 'in_progress' })
-        .eq('id', id)
-      if (statusError) throw statusError
+      if (start) {
+        const { error: statusError } = await supabase
+          .from('games')
+          .update({ status: 'in_progress' })
+          .eq('id', id)
+        if (statusError) throw statusError
+        // Com duplas fixas, «Começar o Mix» já sorteia a ronda 1 (27 set).
+        if (!isGruposEliminatorias && !game?.rotate_partners && insertedTeams?.length) {
+          setBusy(false)
+          await handleStartRound1({ teamsOverride: insertedTeams })
+          return
+        }
+      }
 
       loadGameDetails()
     } catch (error) {
@@ -1397,12 +1413,22 @@ export default function GameDetails() {
       const { error } = await supabase.from('games').update({ status: 'in_progress' }).eq('id', id)
       if (error) throw error
       loadGameDetails()
+      return true
     } catch (error) {
       console.error('Error starting games:', error)
       setMixError(describeError(t, error, 'gamedetails.error_start_games'))
+      return false
     } finally {
       setBusy(false)
     }
+  }
+
+  // «Começar o Mix» com as duplas já sorteadas (sortear-duplas, 27 set):
+  // começa e sorteia logo a ronda 1 pelos campos. Grupos + eliminatórias e
+  // Americano têm a sua própria primeira fase: aí só começa.
+  const handleStartDrawnMix = async () => {
+    const ok = await handleStartGames()
+    if (ok && !isGruposEliminatorias && !isAmericano) await handleStartRound1()
   }
 
   // O que o "Parar" fazia de util e deixou de fazer: sortear as duplas outra
@@ -1422,20 +1448,23 @@ export default function GameDetails() {
       return
     }
     setBusy(false)
-    await handleStartMix()
+    // «Sortear outra vez»: sorteia de novo, e o mix continua por começar.
+    await handleStartMix({ start: false })
   }
 
-  const orderedTeamIds = () =>
-    [...teams].sort((a, b) => (b.seed_ranking ?? 0) - (a.seed_ranking ?? 0)).map(team => team.id)
+  const orderedTeamIds = (list = teams) =>
+    [...list].sort((a, b) => (b.seed_ranking ?? 0) - (a.seed_ranking ?? 0)).map(team => team.id)
 
-  const handleStartRound1 = async () => {
+  // `teamsOverride`: as duplas acabadas de gravar (o estado ainda não as tem).
+  const handleStartRound1 = async ({ teamsOverride = null } = {}) => {
+    const ts = teamsOverride || teams
     setBusy(true)
     setMixError('')
     try {
       const numCourts = game.num_courts || 1
       const rows = isSobeDesce
-        ? seedCourts(teams, numCourts)
-        : roundRobinRound(orderedTeamIds(), numCourts, 0)
+        ? seedCourts(ts, numCourts)
+        : roundRobinRound(orderedTeamIds(ts), numCourts, 0)
 
       const { error } = await supabase.from('matches').insert(
         rows.map(m => ({ ...m, game_id: id, round_number: 1, phase: 'group' }))
@@ -2109,11 +2138,28 @@ export default function GameDetails() {
   const showAdminBar = isAdmin && ['pending', 'open', 'closed', 'in_progress'].includes(game?.status) && !isDraftMix(game)
   const isSeriesDate = !!game?.recurrence_id
   const missingNow = currentRoundMatches.filter((m) => !m.winner_team_id).length
+  // «Sortear duplas» antes de «Começar o Mix» (27 set): só com duplas fixas
+  // formadas pela app — com toda a gente inscrita em dupla, ou com parceiros
+  // que trocam a cada ronda / Americano, não há nada para sortear.
+  const fixedPairsFormat = !isAmericano && !game?.rotate_partners
+  const someoneAlone = participants.some((p) => !p.partner_id && !p.partner)
   let barPrimary = null
-  if (canStart) {
-    barPrimary = { label: busy ? t('gamedetails.forming_duplas') : t('gamedetails.start_mix'), onClick: handleStartMix, disabled: busy }
+  if (canStart && fixedPairsFormat && someoneAlone) {
+    barPrimary = {
+      label: busy ? t('gamedetails.forming_duplas') : t('eventactions.draw_duplas'),
+      onClick: () => handleStartMix({ start: false }),
+      disabled: busy,
+      hint: t(`eventactions.draw_hint_${game?.pairing_mode || 'por_nivel'}`),
+    }
+  } else if (canStart) {
+    barPrimary = {
+      label: busy ? t('gamedetails.forming_duplas') : t('gamedetails.start_mix'),
+      onClick: () => handleStartMix(),
+      disabled: busy,
+      hint: fixedPairsFormat ? t('eventactions.all_pairs_hint') : null,
+    }
   } else if (canStartGames) {
-    barPrimary = { label: t('gamedetails.start_mix'), onClick: handleStartGames, disabled: busy }
+    barPrimary = { label: t('gamedetails.start_mix'), onClick: handleStartDrawnMix, disabled: busy, hint: t('eventactions.start_hint') }
   } else if (game?.status === 'in_progress' && !inPoolStage) {
     if (!roundsStarted && !isAmericano) {
       barPrimary = { label: busy ? t('gamedetails.drawing') : t('gamedetails.start_round1'), onClick: handleStartRound1, disabled: busy || unpaired.length > 0 }
@@ -2131,7 +2177,7 @@ export default function GameDetails() {
   }
   const barState = game?.status === 'pending' ? t('eventactions.state_pending')
     : game?.status === 'in_progress' ? (roundsStarted && !isAmericano ? t('eventactions.state_round', { number: maxRound }) : t('eventactions.state_running'))
-    : mixPaused ? t('eventactions.state_stopped')
+    : mixPaused ? t('eventactions.state_drawn')
     : showClosed ? t('eventactions.state_closed')
     : t('eventactions.state_open')
   const barLine = game?.status === 'pending' ? null
@@ -2171,6 +2217,57 @@ export default function GameDetails() {
       points: (pointsByUser[team.player1_id] || 0) + (pointsByUser[team.player2_id] || 0),
     }))
     .sort((a, b) => b.points - a.points)
+
+  // O editor de arrastar jogadores entre duplas (Trello #292). Serve durante
+  // o mix antes da ronda 1 e, desde 27 set, com as duplas sorteadas antes de
+  // começar (sortear-duplas, proposta (C) da designer).
+  const renderPairsEditor = () => (
+    <DndContext sensors={dndSensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+                    <div className="space-y-2">
+                      {editedTeams.map((team, i) => (
+                        <div key={team.id} className={`rounded-ctrl p-3 ${
+                          team.id === game.winner_team_id ? 'bg-ink-50' : 'bg-canvas'
+                        }`}>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <p className="text-[11px] font-extrabold text-muted uppercase tracking-wide">
+                              {t('gamedetails.dupla_number', { number: i + 1 })} · {(pointsById[team.player1?.id] ?? 0) + (pointsById[team.player2?.id] ?? 0)} {t('gamedetails.points_suffix')}
+                            </p>
+                            <div className="flex items-center gap-1.5">
+                              {team.id === game.winner_team_id && <span>🏆</span>}
+                              {(team.player1?.is_guest || team.player2?.is_guest) && <GuestBadge isTest={team.player1?.is_test || team.player2?.is_test} />}
+                            </div>
+                          </div>
+                          <div className="space-y-1.5">
+                            {[['player1_id', team.player1], ['player2_id', team.player2]].map(([slot, player]) => {
+                              const chipId = `${team.id}::${slot}`
+                              return (
+                                <SwapChip
+                                  key={slot}
+                                  id={chipId}
+                                  player={player}
+                                  disabled={busy}
+                                  justSwapped={justSwappedId === chipId}
+                                />
+                              )
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {createPortal(
+                      <DragOverlay dropAnimation={swapDropAnimation}>
+                        {activeDragChip && (
+                          <div className="flex items-center gap-2 px-2.5 py-2 rounded-ctrl border border-ink-900 bg-surface shadow-card">
+                            <GripVertical size={16} className="text-muted shrink-0" />
+                            <Avatar name={activeDragChip.player?.name} url={activeDragChip.player?.avatar_url} size="w-7 h-7 text-xs" />
+                            <span className="text-sm font-extrabold text-ink-900">{activeDragChip.player?.name || '?'}</span>
+                          </div>
+                        )}
+                      </DragOverlay>,
+                      document.body
+                    )}
+                  </DndContext>
+  )
 
   if (loading) {
     return (
@@ -2648,20 +2745,47 @@ export default function GameDetails() {
 
       {/* «Começar o Mix» passou para a barra de quem organiza (26 set). */}
 
-      {/* Mix parado (Trello #448): os resultados foram apagados, as duplas
-          ficaram. O «Começar o Mix» (que só cria os jogos, com as duplas
-          que lá estão) está na barra de quem organiza. */}
-      {canStartGames && (
-        <div className="space-y-2.5">
-          <div className="bg-ink-900 text-white px-4 py-3 rounded-ctrl text-sm font-extrabold">
-            {t('gamedetails.mix_paused')}
+      {/* Duplas sorteadas, mix por começar (27 set, sortear-duplas): à vista
+          de todos, como «Dupla N» (o mesmo dos inscritos e do robô). Também é
+          o estado depois de «Recomeçar» (#448): as duplas ficam. Quem
+          organiza pode «Sortear outra vez» (pergunta antes). Se alguém entra
+          ou sai, a base de dados apaga as duplas e volta a «Sortear duplas». */}
+      {mixPaused && !isDraftMix(game) && (
+        <div className="card">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <h3 className="text-lg text-ink-900">{t('gamedetails.duplas')}</h3>
+            {isAdmin && canRedoDuplas && !editingPairs && (
+              <div className="flex items-center gap-3">
+                <button type="button" onClick={startEditingPairs} disabled={busy}
+                  className="text-sm font-extrabold text-ink-900 underline underline-offset-2 disabled:opacity-40">
+                  {t('gamedetails.edit_duplas')}
+                </button>
+                <button type="button" onClick={handleRedoDuplas} disabled={busy}
+                  className="text-sm font-extrabold text-ink-900 underline underline-offset-2 disabled:opacity-40">
+                  {busy ? t('gamedetails.forming_duplas') : t('eventactions.draw_again')}
+                </button>
+              </div>
+            )}
+            {isAdmin && editingPairs && (
+              <div className="flex items-center gap-3">
+                <button type="button" onClick={cancelEditingPairs} disabled={busy}
+                  className="text-sm font-extrabold text-muted disabled:opacity-40">{t('gamedetails.cancel')}</button>
+                <button type="button" onClick={saveEditedPairs} disabled={busy}
+                  className="text-sm font-extrabold text-ink-900 underline underline-offset-2 disabled:opacity-40">
+                  {busy ? t('gamedetails.saving') : t('gamedetails.done')}
+                </button>
+              </div>
+            )}
           </div>
-          {canRedoDuplas && (
-            <PrimaryButton variant="ghost" onClick={handleRedoDuplas} disabled={busy} className="w-full">
-              <Repeat size={18} />
-              {busy ? t('gamedetails.forming_duplas') : t('gamedetails.redo_duplas')}
-            </PrimaryButton>
-          )}
+          {editingPairs ? renderPairsEditor() : <div className="space-y-2">
+            {[...teams].sort((a, b) => (b.seed_ranking ?? 0) - (a.seed_ranking ?? 0)).map((team, i) => (
+              <div key={team.id} className="rounded-ctrl bg-canvas px-3 py-2.5">
+                <p className="font-mono text-[11px] font-extrabold uppercase tracking-widest text-ink-500">{t('gamedetails.dupla_number', { number: i + 1 })}</p>
+                <p className="text-[15px] font-extrabold text-ink-900">{team.player1?.name || '?'} / {team.player2?.name || '?'}</p>
+              </div>
+            ))}
+          </div>}
+          <p className="mt-2 text-xs text-muted">{t('eventactions.drawn_everyone_sees')}</p>
         </div>
       )}
 
@@ -2737,51 +2861,7 @@ export default function GameDetails() {
                 )}
 
                 {editingPairs ? (
-                  <DndContext sensors={dndSensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-                    <div className="space-y-2">
-                      {editedTeams.map((team, i) => (
-                        <div key={team.id} className={`rounded-ctrl p-3 ${
-                          team.id === game.winner_team_id ? 'bg-ink-50' : 'bg-canvas'
-                        }`}>
-                          <div className="flex items-center justify-between mb-1.5">
-                            <p className="text-[11px] font-extrabold text-muted uppercase tracking-wide">
-                              {t('gamedetails.dupla_number', { number: i + 1 })} · {(pointsById[team.player1?.id] ?? 0) + (pointsById[team.player2?.id] ?? 0)} {t('gamedetails.points_suffix')}
-                            </p>
-                            <div className="flex items-center gap-1.5">
-                              {team.id === game.winner_team_id && <span>🏆</span>}
-                              {(team.player1?.is_guest || team.player2?.is_guest) && <GuestBadge isTest={team.player1?.is_test || team.player2?.is_test} />}
-                            </div>
-                          </div>
-                          <div className="space-y-1.5">
-                            {[['player1_id', team.player1], ['player2_id', team.player2]].map(([slot, player]) => {
-                              const chipId = `${team.id}::${slot}`
-                              return (
-                                <SwapChip
-                                  key={slot}
-                                  id={chipId}
-                                  player={player}
-                                  disabled={busy}
-                                  justSwapped={justSwappedId === chipId}
-                                />
-                              )
-                            })}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    {createPortal(
-                      <DragOverlay dropAnimation={swapDropAnimation}>
-                        {activeDragChip && (
-                          <div className="flex items-center gap-2 px-2.5 py-2 rounded-ctrl border border-ink-900 bg-surface shadow-card">
-                            <GripVertical size={16} className="text-muted shrink-0" />
-                            <Avatar name={activeDragChip.player?.name} url={activeDragChip.player?.avatar_url} size="w-7 h-7 text-xs" />
-                            <span className="text-sm font-extrabold text-ink-900">{activeDragChip.player?.name || '?'}</span>
-                          </div>
-                        )}
-                      </DragOverlay>,
-                      document.body
-                    )}
-                  </DndContext>
+                  renderPairsEditor()
                 ) : (
                   <div className="space-y-2">
                     {(() => {
@@ -3586,8 +3666,12 @@ export default function GameDetails() {
               nome. Apareciam a qualquer admin de grupo e confundiam — o Rui
               pensou que era assim que se inscrevia a malta (Trello #344).
               Ficam só para admins da plataforma até haver desenho próprio
-              para o admin inscrever jogadores. */}
-          {isPlatformAdmin && (
+              para o admin inscrever jogadores.
+              #541 (Francisco, 27 set: «não faz sentido ter aquilo ali»): o
+              jogador de teste só em desenvolvimento — no site não aparece a
+              ninguém. A importação em massa sai da página do mix (fica no
+              código e na edge function até ter sítio, com desenho). */}
+          {isPlatformAdmin && import.meta.env.DEV && (
             <PrimaryButton
               variant="ghost"
               onClick={handleAddTestUser}
@@ -3603,7 +3687,7 @@ export default function GameDetails() {
             </PrimaryButton>
           )}
 
-          {isPlatformAdmin && (
+          {SHOW_BULK_IMPORT_ON_MIX && isPlatformAdmin && (
             <div className="card space-y-3">
               <h3 className="text-lg text-ink-900">{t('gamedetails.bulk_import_title')}</h3>
               <textarea
