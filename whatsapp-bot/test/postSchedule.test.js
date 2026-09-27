@@ -47,6 +47,8 @@ function setup() {
     whatsapp_groups: [{ organization_id: 'o', group_jid: 'g@g.us', label: 'x', levels: null }],
     organizations: [{ id: 'o', whatsapp_post_hours: [10, 19] }],
     profiles: [], memberships: [],
+    // Os outros eventos (torneios, turmas) — sem nenhum aqui.
+    tournaments: [], tournament_categories: [], tournament_entries: [], lesson_series: [], lesson_enrolments: [], teacher_profiles: [], feature_flags: [],
     participants: [{ id: 'p1', game_id: 'cheio', user_id: 'u1', partner_id: 'u2', status: 'confirmed', created_at: '1' },
       { id: 'p2', game_id: 'cheio', user_id: 'u3', partner_id: 'u4', status: 'confirmed', created_at: '2' }],
     games: [
