@@ -316,6 +316,7 @@ export const LESSON_RPC_MOCKS = {
   cancel_lesson_request: () => null,
   set_lesson_prices: () => null,
   set_teacher_availability: () => null,
+  get_teacher_busy_range: () => [],
   set_lesson_series_price: () => null,
   // Fechar dias (SPEC-calendario-2, assunto 2). localStorage.mockClosures = 'true'
   // — sexta e sábado da próxima semana fechados.
