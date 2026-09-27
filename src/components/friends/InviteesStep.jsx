@@ -15,7 +15,7 @@ import { partnerNameError, partnerEmailError, PARTNER_NAME_MAX } from '../../lib
 
 export const MIN_PEOPLE = 4
 
-export default function InviteesStep({ me, people, onAdd, onRemove, searchFn = searchPlayers }) {
+export default function InviteesStep({ me, people, onAdd, onRemove, searchFn = searchPlayers, searchPlaceholder }) {
   const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
@@ -56,7 +56,7 @@ export default function InviteesStep({ me, people, onAdd, onRemove, searchFn = s
       <div>
         <div className="relative">
           <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted" />
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('partner.search_placeholder')}
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={searchPlaceholder || t('partner.search_placeholder')}
             className="input-field pl-10" />
         </div>
         {results.length > 0 && (
