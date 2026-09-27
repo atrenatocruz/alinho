@@ -1139,6 +1139,8 @@ const TABLE_MOCKS = {
     ...(eventState() ? {
       title: '+1 Mix de Quinta-feira', recurrence_id: 'rec-ev', num_courts: 2, max_players: 8, price_per_player: 11.5,
       prize: 'Voucher 1h30 para a dupla vencedora', location: 'Smash Padel Almada, Av. do Cristo Rei', game_time_minutes: 20,
+      // localStorage.mockLastRound = 'true': só 2 rondas (a 2 é a última) — o «Terminar e dar os pontos» por baixo da ronda (27 set).
+      ...(localStorage.getItem('mockLastRound') === 'true' ? { court_time_minutes: 40 } : {}),
       // 'paused': o mix parado do #448 — as duplas ficam, os jogos e os
       // resultados foram apagados.
       status: { open: 'open', joined: 'closed', live: 'in_progress', finished: 'finished', paused: 'closed' }[eventState()],

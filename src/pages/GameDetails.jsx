@@ -3337,6 +3337,16 @@ export default function GameDetails() {
                       )}
                     </p>
                   )}
+                  {/* O passo seguinte também aqui, por baixo da ronda, onde está quem
+                      marca (Francisco, 27 set, mix real em Carcavelos: «tem de estar
+                      aqui»): o mesmo botão preto da barra de cima — «Terminar Ronda
+                      N» ou, na última, «Terminar e dar os pontos». */}
+                  {roundsStarted && (canAdvance || canFinalize) && barPrimary && (
+                    <button type="button" onClick={barPrimary.onClick} disabled={barPrimary.disabled}
+                      className="press inline-flex min-h-[52px] w-full items-center justify-center gap-1.5 rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold leading-tight text-white disabled:opacity-50">
+                      {barPrimary.label}
+                    </button>
+                  )}
                   {/* Sair mais cedo — disponível assim que houver pelo menos um resultado guardado */}
                   {roundsStarted && !canFinalize && anyScoreSaved && (
                     <>
