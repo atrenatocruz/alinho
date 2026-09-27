@@ -2,7 +2,8 @@ import { supabase } from './supabase.js'
 import { getGroupByJid, mixVisibleToGroup } from './groups.js'
 import { loadGame, getOpenMixes, formatDateTime, weekdayKeyPt, mixLocalParts, gameIdForMessage, labelableMixes, mixLabel, buildMixMessage, recordMixMessage } from './roster.js'
 import { resolveProfileByPhoneJid, createGuestProfile, ensureMembership } from './phone.js'
-import { joinWithUnregisteredPartner } from './partnerInvite.js'
+import { joinWithUnregisteredPartner, createNamedGuest } from './partnerInvite.js'
+import { parseCopiedRoster, extraNames, isSenderName, normName, nameMatches as copiedNameMatches } from './copiedRoster.js'
 import { config } from './config.js'
 import { helpText, helpFooter } from './messages.js'
 import { t } from './locales.js'
@@ -313,9 +314,13 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
   // matches either of these, so it never touches the DB (the group lookup
   // used to run unconditionally here, costing every message a query).
   const pending = getPendingConfirmation(senderPn, groupJid)
-  const parsed = parseCommand(text)
+  let parsed = parseCommand(text)
+  // Cópia da lista do robô com nomes a mais (Francisco, 27 set): trata-se
+  // como um «In» — de quem enviou, ou das pessoas que acrescentou.
+  const copied = !pending && !parsed ? parseCopiedRoster(text) : null
+  if (copied) parsed = { action: 'in', rest: null, glued: false }
   if (!pending && !parsed) return
-  ctx.action = parsed?.action ?? 'pending'
+  ctx.action = copied ? 'copied_list' : (parsed?.action ?? 'pending')
 
   // Multi-grupo: o grupo de onde a mensagem veio determina o clube (e o
   // filtro de nível) de TUDO o resto deste handler. Grupo não mapeado em
@@ -497,7 +502,13 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
   const openMixes = (await openMixesPromise).filter((mix) => mixVisibleToGroup(mix, group))
   timer.mark('mixes')
   if (openMixes.length === 0) {
+    // Uma lista copiada sem mix aberto é conversa: não se responde.
+    if (copied) return
     await reply('no_open_mixes')
+    return
+  }
+  if (copied) {
+    await handleCopiedList(copied, openMixes)
     return
   }
 
@@ -947,7 +958,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
       if (isNewGuest) {
         await reply('guest_joined', { name: profile.name, appUrl: config.appUrl })
       }
-      return
+      return { joined: true, isNewGuest, name: profile.name }
     }
 
     // action === 'out'
@@ -979,6 +990,82 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     if (deleteError) throw new Error(`Failed to remove participant: ${deleteError.message}`)
     // Sem resposta: a lista publicada de novo é a confirmação.
     await repostAfterLeave(game, rows, suplentes)
+  }
+
+  /**
+   * Lista do robô copiada e publicada com nomes a mais (Francisco, 27 set).
+   * O mix é o do grupo; com vários abertos, o que a cópia mostra (link,
+   * número ou título). Cada nome a mais, dentro das vagas:
+   *   · é quem enviou → «In» por ele, com as regras do «In» normal;
+   *   · é alguém do clube (nome igual, ou o único parecido) → inscreve-o;
+   *   · há mais do que um parecido → não adivinha, diz quais;
+   *   · ninguém → convidado criado pelo nome (conta por reclamar).
+   * Sem nomes a mais: ignora.
+   */
+  async function handleCopiedList(copied, openMixes) {
+    const labelable = labelableMixes(openMixes)
+    let mix = copied.gameId ? openMixes.find((m) => m.id === copied.gameId) : null
+    if (!mix && copied.label) mix = openMixes.find((m) => mixLabel(m, labelable) === copied.label)
+    if (!mix && copied.title) mix = openMixes.find((m) => normName(m.title) === normName(copied.title))
+    if (!mix && openMixes.length === 1) mix = openMixes[0]
+    if (!mix) return
+
+    const state = await loadGame(mix.id)
+    if (!OPEN_STATUSES.has(state.game.status) || new Date(state.game.date).getTime() <= Date.now()) return
+    const extras = extraNames(copied.names, [...state.people, ...state.suplentes].map((p) => p.name))
+    if (extras.length === 0) return
+
+    const senderNames = [resolvedProfile?.name, message?.pushName]
+    let members = null
+    let spots = state.capacity - state.people.length
+    const enrolledIds = new Set(state.rows.flatMap((r) => [r.user_id, r.partner_id]).filter(Boolean))
+    const full = []
+    for (const extra of extras) {
+      if (isSenderName(extra, senderNames)) {
+        const result = await actOnGame(mix, resolvedProfile)
+        if (result?.joined) {
+          spots -= 1
+          if (!result.isNewGuest) await reply('copied_list_joined', { name: result.name })
+        }
+        continue
+      }
+      if (spots <= 0) { full.push(extra); continue }
+      if (!members) {
+        const { data, error } = await supabase
+          .from('memberships')
+          .select('user_id, profile:profiles!inner(id, name)')
+          .eq('organization_id', organizationId)
+        if (error) throw new Error(`Failed to load members for copied list: ${error.message}`)
+        members = data.map((r) => ({ id: r.user_id, name: r.profile.name })).filter((x) => !enrolledIds.has(x.id))
+      }
+      const exact = members.filter((x) => normName(x.name) === normName(extra))
+      const matches = exact.length === 1 ? exact : members.filter((x) => copiedNameMatches(x.name, extra))
+      if (matches.length > 1) {
+        await reply('copied_list_ambiguous', { name: extra, list: matches.slice(0, 6).map((x) => `• ${x.name}`).join('\n') })
+        continue
+      }
+      let who = matches[0] ?? null
+      let guest = null
+      if (!who) {
+        guest = await createNamedGuest({ organizationId, name: extra, createdBy: resolvedProfile?.id ?? null })
+        who = guest
+      }
+      const { error: insertError } = await supabase
+        .from('participants')
+        .insert([{ game_id: mix.id, user_id: who.id, status: 'confirmed', joined_alone: true }])
+      if (insertError) {
+        if (guest) await guest.remove()
+        if (isGameFull(insertError)) { spots = 0; full.push(extra); continue }
+        if (insertError.code === '23505') continue
+        throw new Error(`Failed to insert copied-list participant: ${insertError.message}`)
+      }
+      spots -= 1
+      enrolledIds.add(who.id)
+      members = members.filter((x) => x.id !== who.id)
+      repostHooks.requestRepostForGame(organizationId, mix.id)
+      await reply(guest ? 'copied_list_added_guest' : 'copied_list_added_member', { name: who.name })
+    }
+    if (full.length > 0) await reply('copied_list_full', { names: full.join(', ') })
   }
 
   /**

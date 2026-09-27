@@ -17,6 +17,38 @@ import { supabase } from './supabase.js'
  * Devolve o token. Se algum passo falhar, apaga a conta criada, como a edge
  * function, para não ficarem contas órfãs.
  */
+/**
+ * Uma pessoa que não está na app nem no grupo, inscrita pelo NOME por outra
+ * (lista copiada com um nome a mais, Francisco 27 set): a mesma conta por
+ * reclamar do parceiro sem conta (claim_pending, membro convidado do clube),
+ * mas sozinha. Quem chama faz a inscrição; se falhar, chama `remove()`.
+ */
+export async function createNamedGuest({ organizationId, name, createdBy }) {
+  const placeholderEmail = `sem-conta+${crypto.randomUUID()}@invalid.alinho.pt`
+  const { data: created, error: createError } = await supabase.auth.admin.createUser({
+    email: placeholderEmail,
+    email_confirm: false,
+    user_metadata: { name, claim_pending: true, created_by: createdBy },
+  })
+  if (createError || !created?.user) throw new Error(`Failed to create named guest: ${createError?.message}`)
+  const id = created.user.id
+  const remove = () => supabase.auth.admin.deleteUser(id).catch(() => {})
+  try {
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .upsert({ id, name, email: placeholderEmail, claim_pending: true })
+    if (profileError) throw new Error(`profile: ${profileError.message}`)
+    const { error: memberError } = await supabase
+      .from('memberships')
+      .insert({ user_id: id, organization_id: organizationId, is_guest: true })
+    if (memberError) throw new Error(`membership: ${memberError.message}`)
+  } catch (err) {
+    await remove()
+    throw err
+  }
+  return { id, name, remove }
+}
+
 export async function joinWithUnregisteredPartner({ gameId, organizationId, callerId, name, existingParticipantId = null }) {
   const placeholderEmail = `sem-conta+${crypto.randomUUID()}@invalid.alinho.pt`
   const { data: created, error: createError } = await supabase.auth.admin.createUser({

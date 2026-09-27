@@ -3,7 +3,7 @@ import { config } from './config.js'
 import { helpFooter } from './messages.js'
 import { t } from './locales.js'
 import { nameWithBand } from './elo.js'
-import { isGuestEmail } from './phone.js'
+import { isGuestEmail, isPlaceholderEmail } from './phone.js'
 
 // Quem entrou pelo robô sem conta (e-mail guest-…@whatsapp.alinho.pt) leva
 // « (convidado)» no fim do nome, na lista do grupo (Francisco, 27 set).
@@ -51,7 +51,7 @@ export async function loadGame(gameId) {
   // dos dois nomes (A2N, 24 set). Quem entrou sozinho não leva nada.
   let pairNumber = 0
   // `guest`: entrou pelo robô sem conta — a lista mostra « (convidado)».
-  const person = (p) => (p ? { ...p, guest: isGuestEmail(p.email) } : FALLBACK_PERSON)
+  const person = (p) => (p ? { ...p, guest: isGuestEmail(p.email) || isPlaceholderEmail(p.email) } : FALLBACK_PERSON)
   for (const row of confirmed) {
     const pair = row.partner_id ? ++pairNumber : null
     people.push({ ...person(row.user), pair })
