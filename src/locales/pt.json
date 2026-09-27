@@ -3809,5 +3809,22 @@
   "eventactions.cancel_nobody": "Ainda ninguém se inscreveu, por isso o mix desaparece.",
   "eventactions.cancel_nobody_series": "Ainda ninguém se inscreveu, por isso este mix desaparece. Os outros mixes ficam.",
   "eventactions.cancel_done_removed": "{{name}} cancelado.",
-  "layout.mix_notice_cancelled": "O {{title}} ({{when}}) foi cancelado. Não se joga."
+  "layout.mix_notice_cancelled": "O {{title}} ({{when}}) foi cancelado. Não se joga.",
+  "roundalarm.title": "Alarme no fim de cada ronda",
+  "roundalarm.off_hint": "Só neste telemóvel. Toca mesmo com o ecrã desligado, se a página ficar aberta.",
+  "roundalarm.on_hint": "Só neste telemóvel. Podes desligar o ecrã: deixa só esta página aberta.",
+  "roundalarm.warn_label": "Aviso antes do fim",
+  "roundalarm.warn_chip_30": "30 s",
+  "roundalarm.warn_chip_60": "1 min",
+  "roundalarm.warn_chip_120": "2 min",
+  "roundalarm.warn_30": "30 s",
+  "roundalarm.warn_60": "1 min",
+  "roundalarm.warn_120": "2 min",
+  "roundalarm.note": "Uma chamada ou outra música podem calar o alarme. O ± do cronómetro acerta o alarme sozinho.",
+  "roundalarm.waiting": "✓ Ligado · toca na ronda {{number}} quando começar",
+  "roundalarm.started": "Ronda {{number}} começou.",
+  "roundalarm.tap_to_ring": "Toca para o alarme desta ronda tocar neste telemóvel.",
+  "roundalarm.turn_on_round": "Ligar o alarme da ronda {{number}}",
+  "roundalarm.media_title": "Ronda {{number}} · {{name}}",
+  "roundalarm.media_subtitle": "alinho · aviso {{warn}} antes"
 }

@@ -43,6 +43,7 @@ import { joinWithNamedPartner, listGameInvites, inviteLink, whatsappShare } from
 import MixAdminBar from '../components/mix/MixAdminBar'
 import ChangeOneMixSheet from '../components/mix/ChangeOneMixSheet'
 import EventActionsSheet from '../components/EventActionsSheet'
+import RoundAlarm from '../components/RoundAlarm'
 import { cancelMixDate } from '../lib/mixCancel'
 import { weekdayShort } from '../lib/launchDay'
 import { adminPairSolos, adminSplitPair, mixPairErrorMessage } from '../lib/mixPairs'
@@ -3092,6 +3093,20 @@ export default function GameDetails() {
                     />
                   )}
                 </div>
+
+                {/* O alarme das rondas (27 set): no mix vem ligado; cada um
+                    desliga no seu telemóvel. */}
+                {isCurrent && game.round_started_at && game.round_duration_minutes > 0 && (
+                  <div className="mb-3">
+                    <RoundAlarm
+                      roundKey={`${id}:${game.round_started_at}`}
+                      endsAt={new Date(game.round_started_at).getTime() + game.round_duration_minutes * 60000}
+                      roundNumber={r}
+                      eventName={game.title}
+                      defaultOn
+                    />
+                  </div>
+                )}
 
                 <div className="space-y-2.5">
                   {ms.map(m => {

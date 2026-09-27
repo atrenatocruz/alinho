@@ -3797,5 +3797,22 @@
   "eventactions.cancel_nobody": "Nobody has signed up yet, so the mix disappears.",
   "eventactions.cancel_nobody_series": "Nobody has signed up yet, so this mix disappears. The other mixes stay.",
   "eventactions.cancel_done_removed": "{{name}} cancelled.",
-  "layout.mix_notice_cancelled": "{{title}} ({{when}}) was cancelled. It won't be played."
+  "layout.mix_notice_cancelled": "{{title}} ({{when}}) was cancelled. It won't be played.",
+  "roundalarm.title": "Alarm at the end of each round",
+  "roundalarm.off_hint": "Only on this phone. It rings even with the screen off, as long as the page stays open.",
+  "roundalarm.on_hint": "Only on this phone. You can turn the screen off: just leave this page open.",
+  "roundalarm.warn_label": "Warning before the end",
+  "roundalarm.warn_chip_30": "30 s",
+  "roundalarm.warn_chip_60": "1 min",
+  "roundalarm.warn_chip_120": "2 min",
+  "roundalarm.warn_30": "30 s",
+  "roundalarm.warn_60": "1 min",
+  "roundalarm.warn_120": "2 min",
+  "roundalarm.note": "A call or other music can silence the alarm. The timer's ± adjusts the alarm by itself.",
+  "roundalarm.waiting": "✓ On · rings in round {{number}} when it starts",
+  "roundalarm.started": "Round {{number}} has started.",
+  "roundalarm.tap_to_ring": "Tap so this round's alarm rings on this phone.",
+  "roundalarm.turn_on_round": "Turn on the round {{number}} alarm",
+  "roundalarm.media_title": "Round {{number}} · {{name}}",
+  "roundalarm.media_subtitle": "alinho · warning {{warn}} before"
 }
