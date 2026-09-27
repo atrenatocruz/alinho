@@ -9,6 +9,7 @@ import { startSync } from './sync.js'
 import { startReminders } from './reminders.js'
 import { startAutoStart } from './autostart.js'
 import { startMixNotices } from './mixNotices.js'
+import { startGuestVoucherNotices } from './voucherNotices.js'
 
 async function main() {
   // FIFO: as mensagens do grupo processam-se UMA de cada vez, pela ordem em
@@ -42,6 +43,7 @@ async function main() {
   startReminders({ sendText, getGroupMentions })
   startAutoStart({ sendText })
   startMixNotices({ sendText })
+  startGuestVoucherNotices({ sendText })
 
   // Minimal health endpoint so Fly.io's http_service check keeps the
   // machine (and the WhatsApp socket it holds) running.
