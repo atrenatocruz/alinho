@@ -23,6 +23,7 @@ import { totalRounds } from '../../lib/mixLogic'
 import { AGE_RESTRICTIONS } from '../../lib/ageCategories'
 import { formatDate, formatTime } from '../../lib/formatDate'
 import { LEVEL_SCALES, LEVEL_NUMBERS, parseLevel, scaleForGender, GENDER_FOR_SCALE } from '../../lib/mixLevels'
+import WhatsappHoursField from '../WhatsappHoursField'
 
 const pairsAreFixed = (form) => form.format !== 'americano' && !(form.rotate_partners && form.format === 'sobe_desce')
 
@@ -49,16 +50,20 @@ function Field({ label, children, hint }) {
  *  onCancel            — sair sem gravar
  *  onSubmit(asDraft)   — criar (publicar ou rascunho) / guardar a edição
  *  editExtras          — ao editar: pausar, outras datas, parar, eliminar (vêm do GerirClube)
+ *  organizationId      — o clube (ou o grupo do âmbito) do mix: o dos grupos de WhatsApp
  */
 export default function MixWizard({
   form, setForm, editingGame, options, mixScopeId, setMixScopeId, maxCourts, locationInputRef,
-  launchDayError, clearLaunchDayError, error, onCancel, onSubmit, editExtras = null,
+  launchDayError, clearLaunchDayError, error, onCancel, onSubmit, editExtras = null, organizationId = null,
 }) {
   const { t, i18n } = useTranslation()
   const [step, setStep] = useState(1)
   const [busy, setBusy] = useState(false)
-  const set = (patch) => setForm({ ...form, ...patch })
-  const setRec = (patch) => setForm({ ...form, recurrence: { ...form.recurrence, ...patch } })
+  // Sempre sobre o form mais recente: o campo das horas do WhatsApp
+  // preenche-se depois de uma ida à base de dados, e um set com o form de
+  // antes apagava o que se escreveu entretanto.
+  const set = (patch) => setForm((f) => ({ ...f, ...patch }))
+  const setRec = (patch) => setForm((f) => ({ ...f, recurrence: { ...f.recurrence, ...patch } }))
   const rec = form.recurrence
   const labels = [t('steps.people'), t('steps.when'), t('steps.where'), t('steps.rules')]
   const numCourts = parseInt(form.num_courts, 10) || 1
@@ -417,6 +422,18 @@ export default function MixWizard({
             <span className="text-sm text-ink-900">{t('gerirclube.has_voucher_label')}</span>
           </label>
         </Field>
+        {/* Lembretes no WhatsApp dentro do evento (design-handoff/
+            2026-09-27-whatsapp-no-evento): no último passo, por cima do botão
+            final. Sempre kind="mix" — é daí que vêm os textos e as horas do
+            último mix; a série grava-se à parte (GerirClube). */}
+        {organizationId && (
+          <WhatsappHoursField
+            organizationId={organizationId}
+            kind="mix"
+            value={form.whatsapp_post_times ?? null}
+            onChange={(v) => set({ whatsapp_post_times: v })}
+          />
+        )}
       </div>
     </StepPage>
   )

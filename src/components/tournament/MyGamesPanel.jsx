@@ -4,7 +4,7 @@
 // destacado; a hora antecipada mostra também a antiga ("era 17:00").
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Trophy } from 'lucide-react'
+import { Trophy, Share2 } from 'lucide-react'
 import { EmptyState, PrimaryButton } from '../ui'
 import { Sheet } from '../agenda/AgendaControls'
 import { requestMatchCorrection } from '../../lib/tournamentApi'
@@ -13,6 +13,9 @@ import { useScoreEntry, toMatchOrder } from './ScoreEntry'
 import { proSetTieBreakTarget } from './tieBreak'
 import useCategoryBoard from './useCategoryBoard'
 import { myMatchesFromBoard } from '../../lib/myTournamentMatches'
+import TournamentShareFlow from './TournamentShareFlow'
+import { resultShare } from './shareData'
+import { useAuth } from '../../contexts/AuthContext'
 
 /** Sáb 10:00 — dia curto + hora, em mono, como no desenho. */
 function When({ date, time, locale }) {
@@ -97,6 +100,9 @@ export default function MyGamesPanel({ tournament, category, myEntries = [], myM
   // foram pedidos nesta visita — a vista pública diz os outros
   // (`correction_pending`), mas só depois de recarregar.
   const [asking, setAsking] = useState(null)
+  // Partilhar nas redes (SPEC-torneio.md): o jogo aberto no fluxo.
+  const [sharing, setSharing] = useState(null)
+  const { profile } = useAuth()
   const [requested, setRequested] = useState(() => new Set())
 
   if (board.loading && !rows.length) {
@@ -150,6 +156,14 @@ export default function MyGamesPanel({ tournament, category, myEntries = [], myM
                 {t('tournament.my_games_was_at', { time: m.previous_time })}
               </span>
             ) : <span />}
+            {/* «↗ Partilhar resultado» em cada jogo teu acabado, com
+                resultado (desenho de 27 set). */}
+            {m.done && m.score && m.mine_is_a !== undefined && (
+              <button type="button" onClick={() => setSharing(m)}
+                className="col-span-3 mt-1 btn-secondary w-full inline-flex items-center justify-center gap-1.5">
+                <Share2 size={16} /> {t('tshare.cta')}
+              </button>
+            )}
             {/* Só nos jogos acabados, e só com os jogos a sério (o mock
                 antigo não traz o lado de cada um). */}
             {m.done && m.mine_is_a !== undefined && (
@@ -166,6 +180,14 @@ export default function MyGamesPanel({ tournament, category, myEntries = [], myM
           </div>
         )
       })}
+      {sharing && (() => {
+        const myEntryId = myIds[0]
+        const built = resultShare({ tournament, category, board, matchId: sharing.id, myEntryId, myName: profile?.name, t, lang: i18n.language })
+        return built && (
+          <TournamentShareFlow tournament={tournament} variant="result" data={built.data} text={built.text}
+            filenameParts={built.filenameParts} onClose={() => setSharing(null)} />
+        )
+      })()}
       {asking && (
         <CorrectionSheet
           match={asking}

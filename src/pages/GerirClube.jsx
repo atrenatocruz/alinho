@@ -19,7 +19,6 @@ import { groupGamesBySeries } from '../lib/recurrenceGrouping'
 import { AGE_RESTRICTIONS } from '../lib/ageCategories'
 import PlayerSearch from '../components/PlayerSearch'
 import WhatsappGroupsSection from '../components/WhatsappGroupsSection'
-import WhatsappPostHours from '../components/WhatsappPostHours'
 import { searchPlayers } from '../lib/privateMatches'
 import { inviteToOrganization } from '../lib/orgInvites'
 import { listPendingClubTeachers } from '../lib/teachers'
@@ -41,6 +40,7 @@ import LaunchDayPicker from '../components/LaunchDayPicker'
 import MixWizard from '../components/mix/MixWizard'
 import { LEVEL_SCALES, LEVEL_NUMBERS, parseLevel } from '../lib/mixLevels'
 import SeriesPage from '../components/mix/SeriesPage'
+import { setEventWhatsappPostTimes } from '../lib/whatsappHours'
 import { weekdayShort, launchDate } from '../lib/launchDay'
 import EventActionsSheet from '../components/EventActionsSheet'
 import { cancelMixDate } from '../lib/mixCancel'
@@ -178,6 +178,10 @@ const EMPTY_GAME_FORM = {
   // publicar); 1–7 = dias antes, à hora `time` (fica 'pending' + launch_at).
   // Nunca vai para a BD tal como está — sai em handleCreateGame.
   launch: { daysBefore: '0', time: '10:00' },
+  // Horas dos lembretes no WhatsApp (whatsapp_post_times): null = ainda por
+  // preencher (o campo traz as do último mix), [] = sem lembretes. Grava-se
+  // à parte, por set_event_whatsapp_post_times — nunca vai no payload.
+  whatsapp_post_times: null,
 }
 
 // Bandas do ranking (RANKING.md) — o nível opcional de um mix decide que
@@ -1028,6 +1032,25 @@ export default function GerirClube() {
     (isMixLimitError(error?.message || '') && planLimitMessage(t, 'mix', org?.plan_tier))
     || describeError(t, error, fallbackKey)
 
+  // Lembretes no WhatsApp (Dev 3, set_event_whatsapp_post_times): o mix, e,
+  // numa série, a regra da série — que também muda as datas já criadas por
+  // começar. null = o campo não apareceu (sem grupos): não se grava nada.
+  // Devolve o aviso para a tira, ou null.
+  const saveMixPostTimes = async (gameId, isSeries, times) => {
+    if (times == null) return null
+    try {
+      await setEventWhatsappPostTimes('mix', gameId, times)
+      if (isSeries) {
+        const { data: row } = await supabase.from('games').select('recurrence_id').eq('id', gameId).maybeSingle()
+        if (row?.recurrence_id) await setEventWhatsappPostTimes('mix_series', row.recurrence_id, times)
+      }
+      return null
+    } catch (err) {
+      console.error('Error saving WhatsApp post times:', err)
+      return t('mixwizard.hours_not_saved')
+    }
+  }
+
   const createRecurrence = async (game, recurrence, userId, { skipNext = false } = {}) => {
     const mixOffsetSeconds = computeLaunchOffsetSeconds(game.date, recurrence.launchDaysBefore, recurrence.launchTime)
 
@@ -1135,7 +1158,7 @@ export default function GerirClube() {
     // pairing_mode sai pelo mesmo motivo: só é enviado quando não é o valor
     // por omissão, para criar/editar mixes não rebentar antes de
     // migration_mix_pairing_mode.sql correr.
-    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, ranked: _ranked, allow_pair_signup: _allowPairSignup, launch, ...gameFields } = gameForm
+    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, ranked: _ranked, allow_pair_signup: _allowPairSignup, launch, whatsapp_post_times: postTimes, ...gameFields } = gameForm
 
     const recurrenceError = validateRecurrence(recurrence)
     if (recurrenceError) {
@@ -1215,9 +1238,13 @@ export default function GerirClube() {
       if (recurrence.enabled) {
         await createRecurrence(data[0], recurrence, user.id, { skipNext: asDraft })
       }
+      // As horas do WhatsApp deste mix (e da série, que as passa às datas
+      // seguintes). O mix já está criado: se isto falhar, fica com as horas
+      // do clube, como antes, e diz-se na tira.
+      const hoursWarning = await saveMixPostTimes(data[0].id, recurrence.enabled, postTimes)
 
       const scopedGroup = mixScopeId ? clubGroups.find((g) => g.id === mixScopeId) : null
-      saidaNotice.current = asDraft ? t('mixwizard.notice_draft')
+      saidaNotice.current = hoursWarning || asDraft ? (hoursWarning || t('mixwizard.notice_draft'))
         : launchAt ? t('mixwizard.notice_scheduled', { when: abreEm({ status: 'pending', launch_at: launchAt.toISOString() }) })
         : scopedGroup ? t('mixwizard.notice_published_in', { name: scopedGroup.name })
           : t('mixwizard.notice_published')
@@ -1358,7 +1385,7 @@ export default function GerirClube() {
     // pairing_mode sai pelo mesmo motivo: só é enviado quando não é o valor
     // por omissão, para criar/editar mixes não rebentar antes de
     // migration_mix_pairing_mode.sql correr.
-    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, ranked: _ranked, allow_pair_signup: _allowPairSignup, launch: _launch, ...gameFields } = gameForm
+    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, ranked: _ranked, allow_pair_signup: _allowPairSignup, launch: _launch, whatsapp_post_times: postTimes, ...gameFields } = gameForm
     // Any mix in an active recurring series shares the same underlying
     // game_recurrences row (via recurrence_id) — not just the origin — so
     // recurrence management works from any of them, not only the one that
@@ -1438,6 +1465,9 @@ export default function GerirClube() {
         await createRecurrence(data, recurrence, user.id, { skipNext: isDraftMix(data) })
       }
 
+      // As horas do WhatsApp: numa série ativa, da série inteira.
+      const hoursWarning = await saveMixPostTimes(editingGame.id, recurrence.enabled, postTimes)
+      if (hoursWarning) saidaNotice.current = hoursWarning
       if (!saidaNotice.current) saidaNotice.current = t('mixwizard.notice_saved')
       setEditingGame(null)
       setGameForm(EMPTY_GAME_FORM)
@@ -1998,6 +2028,9 @@ export default function GerirClube() {
       gender_restriction: game.gender_restriction || 'indiferente',
       age_restriction: game.age_restriction ?? null,
       level: game.level || '',
+      // As horas do WhatsApp do próprio mix ('HH:MM'); sem nenhuma escolhida
+      // (null), o campo traz as do último mix.
+      whatsapp_post_times: Array.isArray(game.whatsapp_post_times) ? game.whatsapp_post_times.map((h) => String(h).slice(0, 5)) : null,
       auto_start_hours_before: game.auto_start_hours_before ?? '',
       recurrence: hasActiveRecurrence
         ? {
@@ -2218,6 +2251,7 @@ export default function GerirClube() {
               await (editingGame ? handleUpdateGame(e) : handleCreateGame(e))
             }}
             editExtras={extras}
+            organizationId={mixScopeId || currentOrganizationId}
           />
         )}
         {deleteSheet}
@@ -2367,13 +2401,9 @@ export default function GerirClube() {
                 )
               })()}
 
-              {/* A que horas o robô publica os mixes no WhatsApp (#553). Some
-                  sozinho sem grupos de WhatsApp ou antes da migração. */}
-              <WhatsappPostHours
-                organizationId={currentOrganizationId}
-                hours={org?.whatsapp_post_hours}
-                onSaved={(saved) => setOrg((o) => (o ? { ...o, whatsapp_post_hours: saved } : o))}
-              />
+              {/* O painel «Publicar os mixes no WhatsApp» (#553) saiu a 27 set:
+                  as horas escolhem-se dentro de cada evento, no último passo
+                  (design-handoff/2026-09-27-whatsapp-no-evento). */}
 
               {/* O cartao para os jogos entre membros (/clube/:slug/jogos)
                   saiu daqui (Francisco, 24 set: «temos o card e o botao, nao

@@ -6,7 +6,9 @@
 // disso não fica espaço reservado nenhum — como os avisos do organizador.
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Trophy } from 'lucide-react'
+import { Share2, Trophy } from 'lucide-react'
+import TournamentShareFlow from './TournamentShareFlow'
+import { podiumShare } from './shareData'
 import { getTournamentResults } from '../../lib/tournamentApi'
 import { errorKind } from '../../lib/errors'
 import { MonoLabel, Me } from './TournamentBits'
@@ -61,8 +63,9 @@ function PodiumRow({ place, team, prize, people, meName }) {
 }
 
 export default function PodiumPanel({ tournament }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [data, setData] = useState(null)
+  const [sharing, setSharing] = useState(false)
   const finished = tournament?.status === 'terminado'
 
   useEffect(() => {
@@ -126,6 +129,20 @@ export default function PodiumPanel({ tournament }) {
           </span>
         </div>
       )}
+      {/* «↗ Partilhar resultado» do pódio da categoria (desenho de 27 set). */}
+      {mine?.final_position && (
+        <button type="button" onClick={() => setSharing(true)}
+          className="mt-3 inline-flex min-h-[48px] w-full items-center justify-center gap-1.5 rounded-ctrl bg-lime-400 px-4 text-base font-extrabold text-ink-900">
+          <Share2 size={18} /> {t('tshare.cta')}
+        </button>
+      )}
+      {sharing && (() => {
+        const built = podiumShare({ tournament, results: data, myName: meName, t, lang: i18n.language })
+        return built && (
+          <TournamentShareFlow tournament={tournament} variant="podium" data={built.data} text={built.text}
+            filenameParts={built.filenameParts} onClose={() => setSharing(false)} />
+        )
+      })()}
     </div>
   )
 }
