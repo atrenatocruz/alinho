@@ -81,6 +81,11 @@ Para veres esta lista:
   mix_already_started_out: '🤖 Este mix já começou/terminou — já não é possível sair por aqui.',
   already_joined: '🤖 Já estás inscrito neste mix! 🎾',
   mix_full_offer_waitlist: '🤖 Mix cheio! Queres entrar como suplente? Responde com *Sim* ou *Não*.',
+  copied_list_joined: '✅ Inscrevi-te, {{name}}. Para a próxima basta escrever In.',
+  copied_list_added_guest: '✅ Inscrevi {{name}} como convidado. Para o tirar, pede ao admin.',
+  copied_list_added_member: '✅ Inscrevi {{name}}. Para o tirar, pede ao admin.',
+  copied_list_ambiguous: '🤖 Não inscrevi «{{name}}»: há mais do que uma pessoa com esse nome no clube:\n{{list}}\n\nPara entrar, a pessoa escreve In.',
+  copied_list_full: '🤖 O mix já está cheio: não inscrevi {{names}}. Para ficar como suplente, a pessoa escreve In.',
   // Texto do Francisco, 27 set (palavra por palavra). Vai no grupo, como
   // antes — nunca em privado (risco de o WhatsApp banir o robô).
   guest_joined: 'Olá {{name}}! Acabaste de entrar num mix como *convidado* — podes jogar assim, mas os jogos ficam numa conta temporária.\nRegista-te em https://alinho.pt e confirma o teu número de telefone para associares a tua conta temporária à tua conta principal\n\n⚠️ *Não voltes a fazer In na app* antes de confirmar o número — se a conta nova e a de convidado estiverem no mesmo mix, não consigo juntá-las e ficas com duas contas.',
@@ -199,6 +204,11 @@ To see this list:
   mix_already_started_out: "🤖 This mix has already started or finished — you can't leave here anymore.",
   already_joined: "🤖 You're already signed up for this mix! 🎾",
   mix_full_offer_waitlist: '🤖 Mix is full! Want to join the waitlist? Reply *Sim* or *Não*.',
+  copied_list_joined: '✅ You\'re in, {{name}}. Next time just write In.',
+  copied_list_added_guest: '✅ I signed {{name}} up as a guest. To remove them, ask the admin.',
+  copied_list_added_member: '✅ I signed {{name}} up. To remove them, ask the admin.',
+  copied_list_ambiguous: '🤖 I didn\'t sign up «{{name}}»: there\'s more than one person with that name in the club:\n{{list}}\n\nTo join, the person writes In.',
+  copied_list_full: '🤖 The mix is already full: I didn\'t sign up {{names}}. To go on the waiting list, the person writes In.',
   guest_joined: "Hi {{name}}! You've just joined a mix as a *guest* — you can play like this, but your games are kept in a temporary account.\nSign up at https://alinho.pt and confirm your phone number to link your temporary account to your main account\n\n⚠️ *Don't join again in the app* before confirming your number — if the new account and the guest one are in the same mix, I can't merge them and you'll end up with two accounts.",
   verify_ok: '🤖 Number confirmed, {{name}}! ✅ You can go back to the app.',
   verify_ok_merged: '🤖 Number confirmed, {{name}}! ✅ What you played as a guest moved to your account. You can go back to the app.',

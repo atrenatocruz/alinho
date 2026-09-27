@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
-import { Search, Check, UserPlus, Send, Copy, ChevronRight, Repeat, Trash2 } from 'lucide-react'
+import { Search, Check, UserPlus, Send, Copy, ChevronRight, Repeat, Trash2, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { searchPlayers } from '../../lib/privateMatches'
 import { useAuth } from '../../contexts/AuthContext'
@@ -32,6 +32,9 @@ const STATE_TONE = {
 }
 
 const FILTERS = ['all', 'por_validar', 'sem_parceiro', 'suplente']
+
+// Sem acentos nem maiúsculas: «joao» encontra «João».
+const plain = (s) => String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
 
 function pairName(e, t) {
   const second = e.player2_name || e.guest_name
@@ -358,9 +361,26 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
 
   // Quem desistiu fica na lista, marcado — desaparecer a meio do torneio
   // deixava o adversário em branco no quadro (vista do Dev 3, 22 set).
+  // Procurar pelo nome, só o organizador (receção no dia; designer, 27 set).
+  // A partir de 2 letras procura em TODAS as categorias: a escolha de
+  // categoria deixa de filtrar enquanto houver texto.
+  const [query, setQuery] = useState('')
+  const [allRows, setAllRows] = useState(null) // null = ainda não carregado
+  const searching = isAdmin && query.trim().length >= 2
+  const loadAll = () => Promise.all(categories.map((c) => listEntries(c.id)
+    .then((data) => data.map((r) => ({ ...r, id: r.entry_id, category_code: c.code })))))
+    .then((lists) => setAllRows(lists.flat()))
+    .catch((err) => console.error('Error loading tournament entries:', err))
+  useEffect(() => { if (searching && allRows === null) loadAll() }, [searching]) // eslint-disable-line react-hooks/exhaustive-deps
+  const base = useMemo(() => {
+    if (!searching) return rows
+    const q = plain(query.trim())
+    return (allRows || []).filter((r) => [r.team_name, r.player1_name, r.player2_name, r.guest_name].some((n) => n && plain(n).includes(q)))
+  }, [searching, query, rows, allRows])
+
   const shown = useMemo(
-    () => (filter === 'all' ? rows : rows.filter((r) => r.status === filter)),
-    [rows, filter],
+    () => (filter === 'all' ? base : base.filter((r) => r.status === filter)),
+    [base, filter],
   )
 
   // Dois números que se liam mal juntos: o de cima contava as confirmadas e
@@ -432,7 +452,7 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
 
   const act = async (fn) => {
     setBusy(true); setError('')
-    try { await fn(); load() }
+    try { await fn(); load(); if (searching) loadAll() }
     catch (err) { console.error('Error acting on a tournament entry:', err); say(err) }
     finally { setBusy(false) }
   }
@@ -443,13 +463,24 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
     <div className="space-y-3">
       {isAdmin && (
         <>
+          <div className="relative">
+            <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted" />
+            <input value={query} onChange={(ev) => setQuery(ev.target.value)} placeholder={t('tentries.search_placeholder')}
+              aria-label={t('tentries.search_placeholder')} className="input-field pl-10 pr-12" />
+            {query && (
+              <button type="button" onClick={() => setQuery('')} aria-label={t('tentries.search_clear')}
+                className="absolute right-1 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center text-muted">
+                <X size={18} />
+              </button>
+            )}
+          </div>
           {/* Filtros: as pastilhas da app, numa só linha (revisão «mesma app»). */}
           <Chips
             value={filter}
             onChange={setFilter}
             options={FILTERS.map((f) => ({
               value: f,
-              label: `${t(`tentries.filter_${f}`)} ${f === 'all' ? rows.length : rows.filter((r) => r.status === f).length}`,
+              label: `${t(`tentries.filter_${f}`)} ${f === 'all' ? base.length : base.filter((r) => r.status === f).length}`,
             }))}
           />
           <button type="button" onClick={() => { setError(''); setAddOpen(true) }} className="btn-secondary w-full inline-flex items-center justify-center gap-2">
@@ -460,15 +491,17 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
 
       {error && <p className="text-sm text-red-600 font-extrabold">{error}</p>}
 
-      <p className="text-xs text-muted">
+      {!searching && <p className="text-xs text-muted">
         {t('tentries.count_line', {
           confirmed: t('tournament.n.confirmed', { count: confirmed }),
           total: t('tournament.n.entries', { count: rows.length }),
         })}
         {category.slots ? ` · ${t('tentries.count_slots', { count: category.slots })}` : ''}
-      </p>
+      </p>}
 
-      {shown.length === 0 ? (
+      {searching && allRows !== null && shown.length === 0 ? (
+        <p className="py-6 text-center text-sm text-muted">{t('tentries.search_none')}</p>
+      ) : shown.length === 0 ? (
         <EmptyState icon={UserPlus} title={t('tentries.empty_title')} subtitle={t('tentries.empty_subtitle')} />
       ) : (
         <div className="space-y-1.5">
@@ -490,13 +523,19 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
                 {/* Até duas linhas: com os botões ao lado, «Carla N…» não
                     dizia quem era (Trello #515). */}
                 <p className="font-extrabold text-ink-900 line-clamp-2 break-words">
+                  {/* A procurar em todas as categorias: a pastilha diz de qual. */}
+                  {searching && e.category_code && (
+                    <span className="mr-1.5 rounded-md bg-ink-900 px-1.5 py-0.5 align-[1px] font-mono text-xs font-bold text-white">{e.category_code}</span>
+                  )}
                   {e.team_name || pairName(e, t)}
                 </p>
                 <p className="text-xs text-muted line-clamp-2">
                   {[
                     e.team_name ? pairName(e, t) : null,
                     e.status === 'suplente' && e.waitlist_order ? t('tentries.waitlist_n', { n: e.waitlist_order }) : null,
-                    noAccountTag(e, t),
+                    // «sem conta» só para o organizador; o público vê os
+                    // nomes e mais nada (designer, 27 set).
+                    isAdmin ? noAccountTag(e, t) : null,
                     (e.withdrawn || e.status === 'desistiu') ? t('tentries.state_desistiu') : null,
                     // Quando se inscreveu — é por aqui que o organizador
                     // percebe a ordem de chegada (print 08).
