@@ -1024,6 +1024,7 @@
   "mixpairs.error_not_in_game": "One of them is no longer signed up for this mix.",
   "mixpairs.error_same_person": "Pick someone else.",
   "mixpairs.error_mix_started": "The mix has started: pairs can't change now.",
+  "mixpairs.error_partner_invite_pending": "The partner hasn't accepted the invite yet, so the pair can't be split. To remove them, use the ✕ next to their name.",
   "mixpairs.error_generic": "Couldn't change the pair. Try again.",
   "gamedetails.be_first_to_join": "Be the first to join 🎾",
   "gamedetails.you_suffix": " · you",

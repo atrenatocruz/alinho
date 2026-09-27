@@ -1025,6 +1025,7 @@
   "mixpairs.error_not_in_game": "Um dos dois já não está inscrito neste mix.",
   "mixpairs.error_same_person": "Escolhe outra pessoa.",
   "mixpairs.error_mix_started": "O mix já começou: as duplas já não mudam.",
+  "mixpairs.error_partner_invite_pending": "O parceiro ainda não aceitou o convite, por isso a dupla não se separa. Para o tirar, usa o ✕ ao lado do nome dele.",
   "mixpairs.error_generic": "Não deu para mudar a dupla. Tenta outra vez.",
   "gamedetails.be_first_to_join": "Sê o primeiro a inscrever-te 🎾",
   "gamedetails.you_suffix": " · tu",

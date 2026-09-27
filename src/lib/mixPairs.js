@@ -17,7 +17,9 @@ export async function adminSplitPair(gameId, userId) {
   if (error) throw error
 }
 
-const KNOWN = ['not_allowed', 'not_solo', 'not_in_game', 'same_person', 'mix_started']
+// partner_invite_pending: o parceiro ainda não aceitou o convite — cancela-se
+// o convite em vez de separar (Dev 3).
+const KNOWN = ['not_allowed', 'not_solo', 'not_in_game', 'same_person', 'mix_started', 'partner_invite_pending']
 
 /** A frase para o erro; sem a função (PGRST202), «ainda não disponível». */
 export function mixPairErrorMessage(t, error) {
