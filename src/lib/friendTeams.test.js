@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { balancedSplit, restingFor, rotatingGame, fixedGame, followingGames } from './friendTeams'
+import { balancedSplit, restingFor, rotatingGame, fixedGame, followingGames, planRounds, roundsFor, courtsFor } from './friendTeams'
 
 const p = (id, rating) => ({ id, rating })
 const ids = (team) => team.map((x) => x.id).sort().join('+')
@@ -129,3 +129,44 @@ describe('rotação sem repetir (falha de 27 set)', () => {
     expect(new Set(Object.values(count)).size).toBe(1)
   })
 })
+
+describe('por rondas (planRounds)', () => {
+  const people = (n) => Array.from({ length: n }, (_, i) => p(`P${i + 1}`, 1000 + i * 30))
+  const duplas = (rounds) => rounds.flatMap((r) => r.courts.flatMap((c) => [ids(c.teamA), ids(c.teamB)]))
+
+  it('com 8 e 2 campos: 7 rondas, ninguém descansa, cada um joga com todos uma vez', () => {
+    const eight = people(8)
+    expect(courtsFor(8)).toBe(2)
+    const r1 = { courts: [{ teamA: [eight[0], eight[1]], teamB: [eight[2], eight[3]] }, { teamA: [eight[4], eight[5]], teamB: [eight[6], eight[7]] }], resting: [] }
+    const all = [r1, ...planRounds(eight, [r1], 2, roundsFor(8) - 1)]
+    expect(all).toHaveLength(7)
+    all.forEach((r) => {
+      expect(r.resting).toHaveLength(0)
+      const inRound = r.courts.flatMap((c) => [...c.teamA, ...c.teamB].map((x) => x.id))
+      expect(new Set(inRound).size).toBe(8)
+    })
+    const d = duplas(all)
+    expect(new Set(d).size).toBe(d.length)
+  })
+
+  it('com 10 e 2 campos: 10 rondas, dois descansam de cada vez, todos o mesmo', () => {
+    const ten = people(10)
+    const [r1] = planRounds(ten, [], 2, 1)
+    const all = [r1, ...planRounds(ten, [r1], 2, roundsFor(10) - 1)]
+    expect(all).toHaveLength(10)
+    const count = {}
+    all.forEach((r) => r.resting.forEach((x) => { count[x.id] = (count[x.id] || 0) + 1 }))
+    expect(new Set(Object.values(count))).toEqual(new Set([2]))
+    const d = duplas(all)
+    expect(new Set(d).size).toBe(d.length)
+  })
+
+  it('com 6 e 1 campo: igual à rotação de antes, sem repetir', () => {
+    const six = people(6)
+    const r1 = { courts: [{ teamA: [six[0], six[1]], teamB: [six[2], six[3]] }], resting: [six[4], six[5]] }
+    const all = [r1, ...planRounds(six, [r1], 1, 5)]
+    const d = duplas(all)
+    expect(new Set(d).size).toBe(d.length)
+  })
+})
+

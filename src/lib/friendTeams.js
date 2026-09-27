@@ -154,3 +154,82 @@ function combos(list, size) {
   list.forEach((x, i) => { for (const rest of combos(list.slice(i + 1), size - 1)) out.push([x, ...rest]) })
   return out
 }
+
+// ── Por rondas, com um ou dois campos (SPEC amigos-por-rondas, 27 set) ──
+// Com 8 ou mais pessoas jogam-se dois campos por ronda, como no mix.
+export const courtsFor = (n) => (n >= 8 ? 2 : 1)
+
+/** Quantas rondas: todos descansam o mesmo número de vezes (N rondas); sem
+ *  ninguém a descansar, cada um joga com todos os outros uma vez (N-1), e
+ *  com 4 são as 3 formas de duplas. */
+export function roundsFor(n, courts = courtsFor(n)) {
+  if (n === 4) return 3
+  return n === 4 * courts ? n - 1 : n
+}
+
+/** As divisões de 8 pessoas em dois grupos de 4 (35, sem repetir). */
+function splitsOf(eight) {
+  const [first, ...rest] = eight
+  return combos(rest, 3).map((three) => {
+    const a = [first, ...three]
+    return [a, eight.filter((p) => !a.includes(p))]
+  })
+}
+
+/** As rondas seguintes, dadas as que já estão feitas (`done`: [{ courts:
+ *  [{ teamA, teamB }], resting }]). Ronda a ronda escolhe quem descansa (quem
+ *  descansou menos) e as duplas de cada campo: primeiro nunca repetir um
+ *  parceiro nem um jogo, depois repetir o menos possível o adversário, e só
+ *  no fim o nível mais equilibrado. Devolve `count` rondas novas. */
+export function planRounds(people, done, courts, count) {
+  const r = ratingsOf(people)
+  const rests = new Map(people.map((p) => [p.id, 0]))
+  const partners = new Map()
+  const opponents = new Map()
+  const seen = new Set()
+  const bump = (m, k) => m.set(k, (m.get(k) || 0) + 1)
+  const gameKey = (x, y) => [ids2(x), ids2(y)].sort().join(' x ')
+  const record = (round) => {
+    round.resting.forEach((p) => rests.set(p.id, (rests.get(p.id) || 0) + 1))
+    for (const c of round.courts) {
+      bump(partners, key2(...c.teamA)); bump(partners, key2(...c.teamB))
+      for (const a of c.teamA) for (const b of c.teamB) bump(opponents, key2(a, b))
+      seen.add(gameKey(c.teamA, c.teamB))
+    }
+  }
+  done.forEach(record)
+  const scoreCourt = (x, y) => {
+    const partnerRep = (partners.get(key2(...x)) || 0) + (partners.get(key2(...y)) || 0)
+    let oppRep = 0
+    for (const a of x) for (const b of y) oppRep += opponents.get(key2(a, b)) || 0
+    const same = seen.has(gameKey(x, y)) ? 1 : 0
+    const diff = Math.abs(r(x[0]) + r(x[1]) - r(y[0]) - r(y[1]))
+    return same * 1e9 + partnerRep * 1e6 + oppRep * 1e3 + diff
+  }
+  // O melhor campo para 4 pessoas: a melhor das 3 formas de duplas.
+  const bestCourt = (four) => pairings(four)
+    .map(([x, y]) => ({ score: scoreCourt(x, y), court: { teamA: x, teamB: y } }))
+    .reduce((a, b) => (b.score < a.score ? b : a))
+  const k = Math.max(0, people.length - 4 * courts)
+  const out = []
+  for (let n = 0; n < count; n += 1) {
+    const byRest = [...people].sort((a, b) => rests.get(a.id) - rests.get(b.id))
+    const cut = k ? rests.get(byRest[k - 1].id) : 0
+    const sure = k ? byRest.filter((p) => rests.get(p.id) < cut) : []
+    const tied = k ? byRest.filter((p) => rests.get(p.id) === cut) : []
+    let best = null
+    for (const extra of combos(tied, k - sure.length)) {
+      const resting = [...sure, ...extra]
+      const playing = people.filter((p) => !resting.includes(p))
+      const options = courts === 1 ? [[playing]] : splitsOf(playing)
+      for (const groups of options) {
+        const picks = groups.map(bestCourt)
+        const score = picks.reduce((a, c) => a + c.score, 0)
+        if (!best || score < best.score) best = { score, round: { courts: picks.map((c) => c.court), resting } }
+      }
+    }
+    record(best.round)
+    out.push(best.round)
+  }
+  return out
+}

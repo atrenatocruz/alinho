@@ -415,6 +415,37 @@ const RPC_MOCKS = {
   create_friend_match: () => 'fs-1',
   get_friend_match: () => {
     const mode = localStorage.getItem('mockFriendSession') || 'ready'
+    // Por rondas (27 set): 'rounds6' = 6 pessoas, 1 campo, Melhor de 3 — a
+    // ronda 1 acabou (6-4 6-3), a 2 vai no set 2 (6-4), a 3 a seguir;
+    // 'rounds8' = 8 pessoas, 2 campos, a ronda 1 a decorrer.
+    if (mode === 'rounds6' || mode === 'rounds8') {
+      const me = MOCK_ADMIN_USER_ID
+      const P = [[me, 'Admin (Dev)'], ['u-rf', 'Rita Figueira'], ['u-tl', 'Tiago Lopes'], ['u-am', 'Ana Marques'], ['u-rc', 'Rui Costa'], ['u-zp', 'Zé Pinto'],
+        ['u-mr', 'Marta Rocha'], ['u-pl', 'Pedro Lima']].slice(0, mode === 'rounds8' ? 8 : 6)
+      const invitees = P.map(([uid, name], i) => ({ invitee_id: `i-${uid}`, user_id: uid, name, avatar_url: null, rating: 1000 + i * 40, gender: 'masculino',
+        status: 'accepted', is_guest: false, is_creator: i === 0, has_results: true, is_anonymous: false }))
+      const sl = (i) => ({ user_id: P[i][0], name: P[i][1], invitee_id: `i-${P[i][0]}`, slot_status: 'accepted' })
+      const g = (id, round, court, a, b, sets, done) => ({ id, n: id === 'fs-1' ? 1 : Number(id.replace(/\D/g, '')), round_number: round, court_number: court,
+        team_a: a.map(sl), team_b: b.map(sl), resting: [], sets: sets.map(([x, y]) => ({ score_a: x, score_b: y })),
+        score_a: done ? sets.filter(([x, y]) => x > y).length : null, score_b: done ? sets.filter(([x, y]) => y > x).length : null,
+        winner_team: done ? 'a' : null, status: done ? 'pending' : 'pending', counts: false, waiting_for: [], started_at: null, ends_at: null })
+      const games = mode === 'rounds6' ? [
+        g('fs-1', 1, 1, [1, 2], [3, 4], [[6, 4], [6, 3]], true),
+        g('fs-g2', 2, 1, [5, 1], [0, 2], [[6, 4]], false),
+        g('fs-g3', 3, 1, [3, 0], [4, 5], [], false),
+        g('fs-g4', 4, 1, [2, 4], [1, 5], [], false),
+      ] : [
+        g('fs-1', 1, 1, [0, 1], [2, 3], [[6, 3]], false),
+        g('fs-g2', 1, 2, [4, 5], [6, 7], [], false),
+        g('fs-g3', 2, 1, [0, 4], [1, 6], [], false),
+        g('fs-g4', 2, 2, [2, 5], [3, 7], [], false),
+      ]
+      return {
+        match: { id: 'fs-1', scheduled_date: new Date(Date.now() + 6 * 86400000).toISOString().slice(0, 10), scheduled_time: '10:00:00', location: 'Clube Exemplo', court: null,
+          teams_mode: 'app', pairing_mode: 'rotating', scoring_format: 'sets', num_sets: 3, game_minutes: null, teams_set_at: new Date().toISOString() },
+        invitees, games,
+      }
+    }
     const me = MOCK_ADMIN_USER_ID
     const inv = (id, name, rating, status, extra = {}) => ({ invitee_id: `i-${id}`, user_id: id, name, avatar_url: null, rating, gender: 'masculino', status, is_guest: false, is_creator: false, guest_email_sent: false, has_results: withResults.has(id), ...extra })
     // Amigos sem bloquear (27 set): 'pending2' = 2 por responder, sem equipas;
@@ -474,6 +505,11 @@ const RPC_MOCKS = {
     }
   },
   record_friend_match_result: () => 'pending',
+  save_friend_match_set: () => ({ sets: [], sets_a: 1, sets_b: 1, finished: false, status: 'pending' }),
+  finish_friend_match_game: () => 'pending',
+  set_friend_match_round_teams: () => null,
+  remove_friend_match_game: () => null,
+  add_friend_match_round: () => ['fs-new'],
   play_friend_match_without_name: () => 'guest',
   keep_friend_match_seat: () => null,
   update_friend_match: () => null,

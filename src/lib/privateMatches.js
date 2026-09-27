@@ -345,3 +345,44 @@ export const keepFriendMatchSeat = async (inviteeId) => {
   const { error } = await supabase.rpc('keep_friend_match_seat', { p_invitee_id: inviteeId })
   if (error) throw error
 }
+
+// ── Por rondas, como no mix (Dev 3, 27 set) ──────────────────────────────
+// p_courts: [{ team_a: [inviteeId, inviteeId], team_b: [...] }], um por campo.
+// Sem roundNumber cria a ronda seguinte; com 1 junta o campo 2 à ronda 1.
+export const addFriendMatchRound = async (matchId, courts, roundNumber = null) => {
+  const { data, error } = await supabase.rpc('add_friend_match_round', {
+    p_match_id: matchId, p_courts: courts, ...(roundNumber ? { p_round_number: roundNumber } : {}),
+  })
+  if (error) throw error
+  return data
+}
+
+/** «Editar duplas»: todos os campos da ronda de uma vez ([{ game_id, team_a,
+ *  team_b }]). Erros: already_counted, same_person_twice, bad_courts. */
+export const setFriendMatchRoundTeams = async (matchId, roundNumber, courts) => {
+  const { error } = await supabase.rpc('set_friend_match_round_teams', { p_match_id: matchId, p_round_number: roundNumber, p_courts: courts })
+  if (error) throw error
+}
+
+/** Tira um jogo por jogar (para refazer as rondas seguintes). */
+export const removeFriendMatchGame = async (gameId) => {
+  const { error } = await supabase.rpc('remove_friend_match_game', { p_game_id: gameId })
+  if (error) throw error
+}
+
+/** Set a set: guarda o set N (novo ou corrigido). Devolve { sets, sets_a,
+ *  sets_b, finished, status }. Erros: bad_score, already_counted. */
+export const saveFriendMatchSet = async (gameId, setNumber, scoreA, scoreB) => {
+  const { data, error } = await supabase.rpc('save_friend_match_set', {
+    p_game_id: gameId, p_set_number: setNumber, p_score_a: scoreA, p_score_b: scoreB,
+  })
+  if (error) throw error
+  return data
+}
+
+/** «O jogo acabou assim»: fecha com os sets marcados. */
+export const finishFriendMatchGame = async (gameId) => {
+  const { data, error } = await supabase.rpc('finish_friend_match_game', { p_game_id: gameId })
+  if (error) throw error
+  return data
+}

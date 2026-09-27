@@ -11,16 +11,18 @@ import { useTranslation } from 'react-i18next'
 import { BackBar } from '../components/ui'
 import { MapPin, MoreHorizontal, Pencil, Share2, X, Plus } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { getFriendMatch, respondFriendMatchInvite, setFriendMatchTeams, addFriendMatchGame, listMyFriendMatchInvites, cancelFriendMatch, playFriendMatchWithoutName, keepFriendMatchSeat, removeFriendMatchInvitee } from '../lib/privateMatches'
+import { getFriendMatch, respondFriendMatchInvite, setFriendMatchTeams, addFriendMatchGame, addFriendMatchRound, listMyFriendMatchInvites, cancelFriendMatch, playFriendMatchWithoutName, keepFriendMatchSeat, removeFriendMatchInvitee } from '../lib/privateMatches'
 import AddPersonSheet from '../components/friends/AddPersonSheet'
-import { balancedSplit, rotatingGame, followingGames } from '../lib/friendTeams'
+import { balancedSplit, rotatingGame, followingGames, planRounds, roundsFor, courtsFor } from '../lib/friendTeams'
 import { describeError } from '../lib/errors'
 import { Avatar, Chips, PrimaryButton, EmptyState, ConfirmSheet } from '../components/ui'
 import { Sheet } from '../components/agenda/AgendaControls'
 import { shareWithMissing, sessionLink } from '../components/friends/friendShare'
 import { dayText } from '../components/friends/dayText'
 import FriendGameNow, { currentGame } from '../components/friends/FriendGameNow'
-import FriendSessionGames, { ShareMissingButton } from '../components/friends/FriendSessionGames'
+import { ShareMissingButton } from '../components/friends/FriendSessionGames'
+import FriendRounds from '../components/friends/FriendRounds'
+import { formatKey } from '../components/friends/friendScoring'
 import FriendResultSheet from '../components/friends/FriendResultSheet'
 
 // «Vai» / «Por responder» (amigos sem bloquear, 27 set).
@@ -33,8 +35,19 @@ function appProposal(people) {
     const [teamA, teamB] = balancedSplit(people)
     return { teamA, teamB, resting: [] }
   }
+  // Com 8 ou mais, dois campos (por rondas, como no mix): a 1.ª ronda da
+  // rotação — o campo 2 são as equipas 'c' e 'd'.
+  if (courtsFor(people.length) === 2) {
+    const [r] = planRounds(people, [], 2, 1)
+    return { teamA: r.courts[0].teamA, teamB: r.courts[0].teamB, teamC: r.courts[1].teamA, teamD: r.courts[1].teamB, resting: r.resting }
+  }
   return rotatingGame(people, 1)
 }
+const sidesOf = (g) => Object.fromEntries([
+  ...g.teamA.map((p) => [p.id, 'a']), ...g.teamB.map((p) => [p.id, 'b']),
+  ...(g.teamC || []).map((p) => [p.id, 'c']), ...(g.teamD || []).map((p) => [p.id, 'd']),
+  ...g.resting.map((p) => [p.id, 'rest']),
+])
 
 export default function FriendSession() {
   const { id } = useParams()
@@ -99,43 +112,54 @@ export default function FriendSession() {
   // As equipas do jogo 1, no ecrã. 'a' | 'b' | 'rest' por invitee_id.
   const [side, setSide] = useState({})
   const [mode, setMode] = useState(null) // 'rotating' | 'fixed'
+  const courts = courtsFor(players.length)
   useEffect(() => {
     if (!ready) return
+    // Dois campos só a rodar (as duplas fixas são com um campo).
     setMode((m) => m || (players.length > 4 ? 'rotating' : 'fixed'))
     setSide((s) => {
       if (Object.keys(s).length) return s
       const g = match?.teams_mode === 'app'
         ? appProposal(players)
-        : { teamA: players.slice(0, 2), teamB: players.slice(2, 4), resting: players.slice(4) }
-      return Object.fromEntries([
-        ...g.teamA.map((p) => [p.id, 'a']), ...g.teamB.map((p) => [p.id, 'b']), ...g.resting.map((p) => [p.id, 'rest']),
-      ])
+        : courtsFor(players.length) === 2
+          ? { teamA: players.slice(0, 2), teamB: players.slice(2, 4), teamC: players.slice(4, 6), teamD: players.slice(6, 8), resting: players.slice(8) }
+          : { teamA: players.slice(0, 2), teamB: players.slice(2, 4), resting: players.slice(4) }
+      return sidesOf(g)
     })
   }, [ready, players, match?.teams_mode])
 
   const group = (k) => players.filter((p) => side[p.id] === k)
-  const teamA = group('a'); const teamB = group('b'); const resting = group('rest')
-  const valid = teamA.length === 2 && teamB.length === 2
+  const teamA = group('a'); const teamB = group('b'); const teamC = group('c'); const teamD = group('d'); const resting = group('rest')
+  const valid = teamA.length === 2 && teamB.length === 2 && (courts === 1 || (teamC.length === 2 && teamD.length === 2))
   const cycle = (p) => {
-    const order = players.length > 4 ? ['a', 'b', 'rest'] : ['a', 'b']
+    const order = courts === 2
+      ? ['a', 'b', 'c', 'd', ...(players.length > 8 ? ['rest'] : [])]
+      : players.length > 4 ? ['a', 'b', 'rest'] : ['a', 'b']
     setSide((s) => ({ ...s, [p.id]: order[(order.indexOf(s[p.id]) + 1) % order.length] }))
   }
-  const byApp = () => {
-    const g = appProposal(players)
-    setSide(Object.fromEntries([
-      ...g.teamA.map((p) => [p.id, 'a']), ...g.teamB.map((p) => [p.id, 'b']), ...g.resting.map((p) => [p.id, 'rest']),
-    ]))
-  }
+  const byApp = () => setSide(sidesOf(appProposal(players)))
 
   const confirm = async () => {
     if (!valid) return
     setBusy(true); setError('')
     try {
       const ids = (team) => team.map((p) => p.id)
-      await setFriendMatchTeams(match.id, { pairingMode: mode, teamA: ids(teamA), teamB: ids(teamB) })
-      for (const g of followingGames(players, { teamA, teamB, resting }, mode)) {
-        // eslint-disable-next-line no-await-in-loop
-        await addFriendMatchGame(match.id, { teamA: ids(g.teamA), teamB: ids(g.teamB) })
+      const rotating = courts === 2 || mode === 'rotating'
+      await setFriendMatchTeams(match.id, { pairingMode: rotating ? 'rotating' : mode, teamA: ids(teamA), teamB: ids(teamB) })
+      if (!rotating) {
+        for (const g of followingGames(players, { teamA, teamB, resting }, mode)) {
+          // eslint-disable-next-line no-await-in-loop
+          await addFriendMatchGame(match.id, { teamA: ids(g.teamA), teamB: ids(g.teamB) })
+        }
+      } else {
+        // Por rondas (como no mix): o campo 2 da ronda 1, e depois as rondas
+        // seguintes, sem repetir duplas nem jogos (Dev 3: add_friend_match_round).
+        if (courts === 2) await addFriendMatchRound(match.id, [{ team_a: ids(teamC), team_b: ids(teamD) }], 1)
+        const round1 = { courts: [{ teamA, teamB }, ...(courts === 2 ? [{ teamA: teamC, teamB: teamD }] : [])], resting }
+        for (const r of planRounds(players, [round1], courts, roundsFor(players.length, courts) - 1)) {
+          // eslint-disable-next-line no-await-in-loop
+          await addFriendMatchRound(match.id, r.courts.map((c) => ({ team_a: ids(c.teamA), team_b: ids(c.teamB) })))
+        }
       }
       // Fica-se aqui: os jogos e os resultados marcam-se na sessão.
       load()
@@ -288,10 +312,13 @@ export default function FriendSession() {
       <h1 className="mt-2 font-display text-2xl text-ink-900">{whenText}</h1>
       {actions}
       {games.length > 0 ? (
+        // «6 pessoas · 1 campo · a rodar · Melhor de 3» (por rondas, 27 set).
         <p className="mt-1 text-sm text-muted">
-          {[t('friends.games_recorded', { count: games.filter((g) => g.score_a != null && g.score_b != null).length }),
-            games.some((g) => g.score_a == null) ? t('friends.to_mark', { count: games.filter((g) => g.score_a == null).length }) : null,
-          ].filter(Boolean).join(' · ')}
+          {[t('friends.people_count', { count: players.length }),
+            t('friends.courts_count', { count: Math.max(1, ...games.map((g) => g.court_number || 1)) }),
+            match.pairing_mode === 'fixed' ? t('friends.pairs_fixed_short') : t('friends.pairs_rotating_short'),
+            t({ best3: 'friends.format_best3', free: 'friends.format_free', points: 'createprivatematch.format_points' }[formatKey(match.scoring_format, match.num_sets)]),
+          ].join(' · ')}
         </p>
       ) : (match.location || players.length > 0) && (
         <p className="mt-1 inline-flex items-center gap-1 text-sm text-muted">
@@ -350,6 +377,7 @@ export default function FriendSession() {
       {ready && iAmCreator ? (
         <div className="mt-6 space-y-6">
           {pending === 0 && <p className="text-sm text-ink-900">{t('friends.all_accepted', { count: players.length })}</p>}
+          {courts === 1 && (
           <div>
             <p className={label}>{t('friends.pairs_label')}</p>
             <Chips value={mode} onChange={setMode} options={[
@@ -357,11 +385,18 @@ export default function FriendSession() {
               { value: 'fixed', label: t('friends.pairs_fixed') },
             ]} />
           </div>
+          )}
           <div className="space-y-3">
-            <p className="block text-sm font-medium text-gray-700">{t('friends.game_n', { n: 1 })}</p>
+            <p className="block text-sm font-medium text-gray-700">{t('friends.round_n', { n: 1 })}</p>
+            {courts === 2 && <p className="font-mono text-[11px] font-extrabold uppercase tracking-wider text-ink-700">{t('friends.court_n', { n: 1 })}</p>}
             {box(t('friends.team_n', { n: 1 }), teamA)}
             {box(t('friends.team_n', { n: 2 }), teamB)}
-            {players.length > 4 && box(t('friends.resting'), resting, true)}
+            {courts === 2 && (<>
+              <p className="font-mono text-[11px] font-extrabold uppercase tracking-wider text-ink-700">{t('friends.court_n', { n: 2 })}</p>
+              {box(t('friends.team_n', { n: 1 }), teamC)}
+              {box(t('friends.team_n', { n: 2 }), teamD)}
+            </>)}
+            {players.length > 4 * courts && box(t('friends.resting_plural'), resting, true)}
             <p className="text-xs text-muted">
               {t('friends.tap_to_move')}{mode === 'rotating' ? ` ${t('friends.rotation_note')}` : ''}
             </p>
@@ -378,8 +413,8 @@ export default function FriendSession() {
       ) : (
         <div className="mt-6 space-y-6">
           {games.length > 0 ? (
-            <FriendSessionGames match={match} games={games} invitees={invitees} players={players} iAmCreator={iAmCreator}
-              myUserId={profile?.id} onChanged={load} resultFor={resultFor} setResultFor={setResultFor} />
+            <FriendRounds match={match} games={games} invitees={invitees} players={players} iAmCreator={iAmCreator}
+              myUserId={profile?.id} onChanged={load} />
           ) : iAmCreator && canForm && pending > 0 ? null : (
             <p className="text-sm text-ink-900">
               {pending > 0 ? t('friends.waiting_answers', { count: pending })
