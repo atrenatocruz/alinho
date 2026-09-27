@@ -303,3 +303,30 @@ export const recordFriendMatchResult = async (matchId, finalScore) => {
   if (error) throw error
   return data
 }
+
+/** Editar o jogo entre amigos (editar e juntar sets, Dev 3, 27 set): só quem
+ *  criou; manda o formulário inteiro. Erros: not_allowed, format_locked. */
+export const updateFriendMatch = async (matchId, {
+  scheduledDate, scheduledTime = null, location = null, locationLatitude = null, locationLongitude = null,
+  court = null, gameMinutes = null, scoringFormat, numSets = null,
+}) => {
+  const { error } = await supabase.rpc('update_friend_match', {
+    p_match_id: matchId,
+    p_scheduled_date: scheduledDate,
+    p_scheduled_time: scheduledTime || null,
+    p_location: location || null,
+    p_location_latitude: locationLatitude ?? null,
+    p_location_longitude: locationLongitude ?? null,
+    p_court: court || null,
+    p_game_minutes: gameMinutes || null,
+    p_scoring_format: scoringFormat,
+    p_num_sets: numSets || null,
+  })
+  if (error) throw error
+}
+
+/** «Cancelar o jogo»: só quem criou; has_counted se algum jogo já contou. */
+export const cancelFriendMatch = async (matchId) => {
+  const { error } = await supabase.rpc('cancel_friend_match', { p_match_id: matchId })
+  if (error) throw error
+}

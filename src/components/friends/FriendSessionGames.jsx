@@ -44,10 +44,16 @@ export default function FriendSessionGames({ match, games, invitees, players, iA
   return (
     <div className="space-y-3">
       {games.map((g) => (hasScore(g) ? (
-        <div key={g.id} className="rounded-card border border-line bg-white p-3.5">
+        // Um resultado corrige-se enquanto não contou (editar e sets, 27 set).
+        <div key={g.id} className={`rounded-card border border-line bg-white p-3.5 ${!g.counts && canRecord(g) ? 'press cursor-pointer' : ''}`}
+          {...(!g.counts && canRecord(g) ? { role: 'button', tabIndex: 0, onClick: () => setResultFor(g),
+            onKeyDown: (e) => { if (e.key === 'Enter') setResultFor(g) }, 'aria-label': t('friends.correct_result', { n: g.n }) } : {})}>
           <p className="text-sm font-extrabold text-ink-900">
             {pair(g.team_a)} <span className="tabular-nums">{g.score_a}–{g.score_b}</span> {pair(g.team_b)}
           </p>
+          {g.sets?.length > 1 && (
+            <p className="mt-0.5 text-xs tabular-nums text-ink-700">{g.sets.map((x) => `${x.score_a}–${x.score_b}`).join(' · ')}</p>
+          )}
           {!g.counts && g.waiting_for?.length > 0 && (
             <p className="mt-1 text-xs text-muted">
               {t('friends.counts_when', { names: g.waiting_for.map((w) => String(w.name || '').split(/\s+/)[0]).join(', ') })}

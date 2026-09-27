@@ -393,17 +393,19 @@ const RPC_MOCKS = {
   get_friend_match: () => {
     const mode = localStorage.getItem('mockFriendSession') || 'ready'
     const me = MOCK_ADMIN_USER_ID
-    const inv = (id, name, rating, status, extra = {}) => ({ invitee_id: `i-${id}`, user_id: id, name, avatar_url: null, rating, gender: 'masculino', status, is_guest: false, is_creator: false, guest_email_sent: false, ...extra })
+    const inv = (id, name, rating, status, extra = {}) => ({ invitee_id: `i-${id}`, user_id: id, name, avatar_url: null, rating, gender: 'masculino', status, is_guest: false, is_creator: false, guest_email_sent: false, has_results: withResults.has(id), ...extra })
     // Amigos sem bloquear (27 set): 'pending2' = 2 por responder, sem equipas;
     // 'results' = 5 jogos, 3 com resultado à espera de confirmações; 'invited_results'
     // = eu por responder numa sessão já com resultados.
     const creatorIsMe = !['invited', 'invited_results'].includes(mode)
     const late = ['pending2', 'results'].includes(mode)
+    const withResults = new Set(mode === 'results' ? [me, 'u-tl', 'u-am'] : [])
     const creator = creatorIsMe
       ? inv(me, 'Admin (Dev)', 1450, 'accepted', { is_creator: true })
       : inv('c-1', 'Rita Figueira', 1400, 'accepted', { is_creator: true })
     return {
       match: { id: 'fs-1', scheduled_date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), scheduled_time: '10:00:00', location: 'Clube Exemplo', court: 'Campo 3', teams_mode: mode === 'app' ? 'app' : 'manual',
+        scoring_format: localStorage.getItem('mockFriendFormat') === 'free' ? 'sets' : 'sets', num_sets: localStorage.getItem('mockFriendFormat') === 'free' ? null : 3,
         game_minutes: ['timed', 'running'].includes(mode) ? 20 : null },
       invitees: [
         creator,
@@ -436,12 +438,17 @@ const RPC_MOCKS = {
           [[P.tl, P.ze], [P.am, x], null, null, []],
           [[cr, x], [P.am, P.ze], null, null, []],
         ]
-        return rows.map(([a, b, sa, sb, wf], k) => ({ id: `fs-r${k + 1}`, n: k + 1, team_a: a, team_b: b, resting: [], score_a: sa, score_b: sb,
+        const SETS = [[[6, 4], [3, 6], [6, 2]], [[3, 6], [4, 6]], [[6, 2], [6, 3]]]
+        return rows.map(([a, b, sa, sb, wf], k) => ({ id: `fs-r${k + 1}`, n: k + 1, team_a: a, team_b: b, resting: [],
+          sets: sa == null ? [] : SETS[k].map(([x, y]) => ({ score_a: x, score_b: y })),
+          score_a: sa == null ? null : SETS[k].filter(([x, y]) => x > y).length, score_b: sb == null ? null : SETS[k].filter(([x, y]) => y > x).length,
           winner_team: sa == null ? null : sa > sb ? 'a' : 'b', status: 'pending', counts: false, waiting_for: sa == null ? [] : wf, started_at: null, ends_at: null }))
       })() : [],
     }
   },
   record_friend_match_result: () => 'pending',
+  update_friend_match: () => null,
+  cancel_friend_match: () => null,
   start_friend_match_game: () => new Date(Date.now() + 1200000).toISOString(),
   adjust_friend_match_timer: () => new Date(Date.now() + 820000).toISOString(),
   set_friend_match_teams: () => null,

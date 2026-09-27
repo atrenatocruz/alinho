@@ -6,15 +6,17 @@
 // Ao confirmar, gravam-se o jogo 1 e os seguintes; a partir daí cada jogo é
 // um jogo entre amigos como os outros (resultado e confirmação de sempre).
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { BackBar } from '../components/ui'
-import { ArrowLeft, MapPin } from 'lucide-react'
+import { MapPin, MoreHorizontal, Pencil, Share2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { getFriendMatch, respondFriendMatchInvite, setFriendMatchTeams, addFriendMatchGame, listMyFriendMatchInvites } from '../lib/privateMatches'
+import { getFriendMatch, respondFriendMatchInvite, setFriendMatchTeams, addFriendMatchGame, listMyFriendMatchInvites, cancelFriendMatch } from '../lib/privateMatches'
 import { balancedSplit, rotatingGame, followingGames } from '../lib/friendTeams'
 import { describeError } from '../lib/errors'
-import { Avatar, Chips, PrimaryButton, EmptyState } from '../components/ui'
+import { Avatar, Chips, PrimaryButton, EmptyState, ConfirmSheet } from '../components/ui'
+import { Sheet } from '../components/agenda/AgendaControls'
+import { shareWithMissing, sessionLink } from '../components/friends/friendShare'
 import { dayText } from '../components/friends/dayText'
 import FriendGameNow, { currentGame } from '../components/friends/FriendGameNow'
 import FriendSessionGames, { ShareMissingButton } from '../components/friends/FriendSessionGames'
@@ -37,6 +39,10 @@ export default function FriendSession() {
   const { id } = useParams()
   const { t, i18n } = useTranslation()
   const { profile } = useAuth()
+  const navigate = useNavigate()
+  // A folha de ações de quem criou (editar e juntar sets, 27 set).
+  const [actionsOpen, setActionsOpen] = useState(false)
+  const [askCancel, setAskCancel] = useState(false)
   const [data, setData] = useState(null)
   const [loadError, setLoadError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -149,6 +155,54 @@ export default function FriendSession() {
   }
 
   const back = <BackBar to="/jogos-privados" label={t('createprivatematch.title')} />
+  // Quem criou: «✎ Editar» e «Mais ⋯», como no mix (MixAdminBar). O ⋯ não
+  // vai na barra de cima — a BackBar não tem menu (Francisco, 27 set).
+  const pill = 'inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-ctrl border border-line bg-surface px-2.5 text-sm font-extrabold text-ink-900 whitespace-nowrap'
+  const creatorBar = iAmCreator && match && (
+    <div className="mt-3 flex gap-1.5">
+      <Link to={`/jogos-privados/sessao/${match.id}/editar`} className={pill}><Pencil size={14} /> {t('friends.edit_short')}</Link>
+      <button type="button" onClick={() => setActionsOpen(true)} className={pill} aria-haspopup="dialog">
+        {t('friends.more')} <MoreHorizontal size={16} />
+      </button>
+    </div>
+  )
+  // «✎ Editar o jogo» · «↗ Partilhar com quem falta» · «Cancelar o jogo».
+  const actions = match && (
+    <>
+      {actionsOpen && (
+        <Sheet title={t('friends.actions_title')} onClose={() => setActionsOpen(false)}>
+          <div className="divide-y divide-line overflow-hidden rounded-card border border-line">
+            <Link to={`/jogos-privados/sessao/${match.id}/editar`}
+              className="press flex min-h-[52px] items-center gap-2 bg-white px-4 text-[15px] font-extrabold text-ink-900">
+              <Pencil size={16} /> {t('friends.edit_game')}
+            </Link>
+            {pending > 0 && (
+              <button type="button" onClick={() => { setActionsOpen(false); shareWithMissing(t('friends.share_text', {
+                name: creator?.name || '', day: dayText(match.scheduled_date, i18n.language), link: sessionLink(match.id) })) }}
+                className="press flex min-h-[52px] w-full items-center gap-2 bg-white px-4 text-left text-[15px] font-extrabold text-ink-900">
+                <Share2 size={16} /> {t('friends.share_missing')}
+              </button>
+            )}
+            <button type="button" onClick={() => { setActionsOpen(false); setAskCancel(true) }}
+              className="press flex min-h-[52px] w-full items-center bg-white px-4 text-left text-[15px] font-extrabold text-danger">
+              {t('friends.cancel_game')}
+            </button>
+          </div>
+        </Sheet>
+      )}
+      <ConfirmSheet
+        open={askCancel}
+        danger
+        title={t('friends.cancel_title')}
+        message={t('friends.cancel_message')}
+        confirmLabel={t('friends.cancel_confirm')}
+        cancelLabel={t('friends.cancel_keep')}
+        onConfirm={async () => { await cancelFriendMatch(match.id); navigate('/jogos-privados') }}
+        onClose={() => setAskCancel(false)}
+        errorOf={(err) => (String(err?.message || '').includes('has_counted') ? t('friends.cancel_error_has_counted') : describeError(t, err))}
+      />
+    </>
+  )
 
   if (loadError) return <div className="mx-auto max-w-lg">{back}<EmptyState title={loadError} /></div>
   if (!data) {
@@ -190,6 +244,8 @@ export default function FriendSession() {
           <FriendResultSheet match={match} game={resultFor} onClose={() => setResultFor(null)}
             onSaved={() => { setResultFor(null); load() }} />
         )}
+        {creatorBar}
+        {actions}
       </div>
     )
   }
@@ -198,14 +254,20 @@ export default function FriendSession() {
     <div className="mx-auto max-w-lg pb-28">
       {back}
       <h1 className="mt-2 font-display text-2xl text-ink-900">{whenText}</h1>
+      {actions}
       {games.length > 0 ? (
-        <p className="mt-1 text-sm text-muted">{t('friends.games_recorded', { count: games.filter((g) => g.score_a != null && g.score_b != null).length })}</p>
+        <p className="mt-1 text-sm text-muted">
+          {[t('friends.games_recorded', { count: games.filter((g) => g.score_a != null && g.score_b != null).length }),
+            games.some((g) => g.score_a == null) ? t('friends.to_mark', { count: games.filter((g) => g.score_a == null).length }) : null,
+          ].filter(Boolean).join(' · ')}
+        </p>
       ) : (match.location || players.length > 0) && (
         <p className="mt-1 inline-flex items-center gap-1 text-sm text-muted">
           {match.location && <MapPin size={14} />}
           {[match.location, match.court, t('friends.people_count', { count: players.length })].filter(Boolean).join(' · ')}
         </p>
       )}
+      {creatorBar}
 
       {/* Convidado por responder: aceitar ou recusar. */}
       {(me?.status === 'pending' || invitedHere) && (

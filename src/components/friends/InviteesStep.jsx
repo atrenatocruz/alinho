@@ -8,16 +8,20 @@
 // (sem o criador — ele aparece à parte, em primeiro).
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, Search, X, UserPlus } from 'lucide-react'
+import { Plus, Search, X, UserPlus, Lock } from 'lucide-react'
 import { Avatar } from '../ui'
 import { searchPlayers } from '../../lib/privateMatches'
 import { partnerNameError, partnerEmailError, PARTNER_NAME_MAX } from '../../lib/partnerInvite'
 
 export const MIN_PEOPLE = 4
 
-export default function InviteesStep({ me, people, onAdd, onRemove, searchFn = searchPlayers, searchPlaceholder }) {
+// No editar (27 set): `lockedKeys` = quem já tem resultados (🔒 em vez do ✕,
+// com a frase por baixo) e `collapsedSearch` = a pesquisa só abre com
+// «＋ Juntar pessoa», como no desenho.
+export default function InviteesStep({ me, people, onAdd, onRemove, searchFn = searchPlayers, searchPlaceholder, lockedKeys = null, collapsedSearch = false }) {
   const { t } = useTranslation()
   const [query, setQuery] = useState('')
+  const [searchOpen, setSearchOpen] = useState(!collapsedSearch)
   const [results, setResults] = useState([])
   const timer = useRef(null)
 
@@ -53,6 +57,7 @@ export default function InviteesStep({ me, people, onAdd, onRemove, searchFn = s
 
   return (
     <>
+      {searchOpen && (
       <div>
         <div className="relative">
           <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted" />
@@ -79,6 +84,7 @@ export default function InviteesStep({ me, people, onAdd, onRemove, searchFn = s
           </div>
         )}
       </div>
+      )}
 
       <div>
         <p className={label}>{t('friends.who_plays', { count })}</p>
@@ -97,13 +103,30 @@ export default function InviteesStep({ me, people, onAdd, onRemove, searchFn = s
               {p.guest && (
                 <span className="shrink-0 rounded-full border border-line bg-ink-50 px-2.5 py-0.5 text-xs font-semibold text-ink-700">{t('friends.guest_tag')}</span>
               )}
-              <button type="button" onClick={() => onRemove(p.key)} aria-label={t('friends.remove_person', { name: p.name })}
-                className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted">
-                <X size={18} />
-              </button>
+              {lockedKeys?.has(p.key) ? (
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center text-warning" aria-label={t('friends.locked_person')}>
+                  <Lock size={16} />
+                </span>
+              ) : (
+                <button type="button" onClick={() => onRemove(p.key)} aria-label={t('friends.remove_person', { name: p.name })}
+                  className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted">
+                  <X size={18} />
+                </button>
+              )}
             </div>
           ))}
         </div>
+        {!searchOpen && (
+          <button type="button" onClick={() => setSearchOpen(true)}
+            className="press mt-2 flex min-h-[48px] w-full items-center justify-center gap-1.5 rounded-ctrl border border-dashed border-line bg-white text-sm font-extrabold text-ink-900">
+            <Plus size={16} /> {t('friends.add_person_button')}
+          </button>
+        )}
+        {lockedKeys?.size > 0 && (
+          <p className="mt-2 flex items-start gap-1.5 rounded-ctrl border border-dashed border-line px-3 py-2 text-xs text-muted">
+            <Lock size={12} className="mt-0.5 shrink-0 text-warning" /> {t('friends.locked_hint')}
+          </p>
+        )}
         {count > MIN_PEOPLE && <p className="mt-2 text-xs text-muted">{t('friends.rotating_line', { count })}</p>}
       </div>
 

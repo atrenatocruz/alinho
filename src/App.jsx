@@ -65,6 +65,7 @@ const ResetPassword = lazyPage(() => import('./pages/ResetPassword'))
 const PrivateMatches = lazyPage(() => import('./pages/PrivateMatches'))
 const CreatePrivateMatch = lazyPage(() => import('./pages/CreatePrivateMatch'))
 const FriendSession = lazyPage(() => import('./pages/FriendSession'))
+const EditFriendMatch = lazyPage(() => import('./pages/EditFriendMatch'))
 const JoinPrivateMatch = lazyPage(() => import('./pages/JoinPrivateMatch'))
 const GroupMatches = lazyPage(() => import('./pages/GroupMatches'))
 const CreateGroupMatch = lazyPage(() => import('./pages/CreateGroupMatch'))
@@ -569,6 +570,14 @@ function AppRoutes() {
           element={
             <Guard require="privateMatches" showSplash={showSplash}>
               <FriendSession />
+            </Guard>
+          }
+        />
+        <Route
+          path="/jogos-privados/sessao/:id/editar"
+          element={
+            <Guard require="privateMatches" showSplash={showSplash}>
+              <EditFriendMatch />
             </Guard>
           }
         />
