@@ -160,7 +160,7 @@ export const getPublicRankings = async () => {
 export const createFriendMatch = async ({
   scheduledDate, scheduledTime = null, location = null, locationLatitude = null, locationLongitude = null,
   rankedIntent, scoringFormat = 'pontos_simples', numSets = null, teamsMode = 'manual', invitees = [], court = null,
-  organizationId = null,
+  organizationId = null, gameMinutes = null,
 }) => {
   const args = {
     p_scheduled_date: scheduledDate,
@@ -179,7 +179,24 @@ export const createFriendMatch = async ({
   if (court) args.p_court = court
   // Jogo de grupo (#342): o mesmo criar, dentro do grupo (Dev 3).
   if (organizationId) args.p_organization_id = organizationId
+  // «Cada jogo dura» (27 set): só com tempo escolhido; null = sem tempo.
+  if (gameMinutes) args.p_game_minutes = gameMinutes
   const { data, error } = await supabase.rpc('create_friend_match', args)
+  if (error) throw error
+  return data
+}
+
+/** Cronómetro do jogo entre amigos com tempo (Dev 3, 27 set): só quem criou
+ *  começa o jogo e mexe no ±. Devolvem o novo ends_at. Erros: not_allowed,
+ *  no_duration, already_started, not_started. */
+export const startFriendMatchGame = async (matchId) => {
+  const { data, error } = await supabase.rpc('start_friend_match_game', { p_match_id: matchId })
+  if (error) throw error
+  return data
+}
+
+export const adjustFriendMatchTimer = async (matchId, deltaMinutes) => {
+  const { data, error } = await supabase.rpc('adjust_friend_match_timer', { p_match_id: matchId, p_delta_minutes: deltaMinutes })
   if (error) throw error
   return data
 }

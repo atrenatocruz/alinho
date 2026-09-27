@@ -399,7 +399,8 @@ const RPC_MOCKS = {
       ? inv(me, 'Admin (Dev)', 1450, 'accepted', { is_creator: true })
       : inv('c-1', 'Rita Figueira', 1400, 'accepted', { is_creator: true })
     return {
-      match: { id: 'fs-1', scheduled_date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), scheduled_time: '10:00:00', location: 'Clube Exemplo', court: 'Campo 3', teams_mode: mode === 'app' ? 'app' : 'manual' },
+      match: { id: 'fs-1', scheduled_date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), scheduled_time: '10:00:00', location: 'Clube Exemplo', court: 'Campo 3', teams_mode: mode === 'app' ? 'app' : 'manual',
+        game_minutes: ['timed', 'running'].includes(mode) ? 20 : null },
       invitees: [
         creator,
         inv('u-tl', 'Tiago Lopes', 1500, 'accepted'),
@@ -408,9 +409,20 @@ const RPC_MOCKS = {
         { invitee_id: 'i-g1', user_id: null, name: 'Zé Pinto', avatar_url: null, rating: null, gender: null, status: 'guest', is_guest: true, is_creator: false, guest_email_sent: true },
         ...(creatorIsMe ? [] : [inv(me, 'Admin (Dev)', 1450, 'pending')]),
       ],
-      games: [],
+      // Com tempo (27 set): 5 jogos, o 1 já com resultado, o 2 por começar
+      // ('timed') ou a decorrer há 7:20 ('running').
+      games: ['timed', 'running'].includes(mode) ? [1, 2, 3, 4, 5].map((n) => {
+        const P = { me: { user_id: me, name: 'Admin (Dev)', invitee_id: `i-${me}` }, tl: { user_id: 'u-tl', name: 'Tiago Lopes', invitee_id: 'i-u-tl' },
+          am: { user_id: 'u-am', name: 'Ana Marques', invitee_id: 'i-u-am' }, rc: { user_id: 'u-rc', name: 'Rui Costa', invitee_id: 'i-u-rc' }, ze: { user_id: null, name: 'Zé Pinto', invitee_id: 'i-g1' } }
+        const running = mode === 'running' && n === 2
+        return { id: `fs-g${n}`, n, team_a: n === 2 ? [P.me, P.rc] : [P.me, P.tl], team_b: n === 2 ? [P.tl, P.am] : [P.am, P.ze],
+          resting: n === 2 ? ['i-g1'] : ['i-u-rc'], score_a: n === 1 ? 6 : null, score_b: n === 1 ? 4 : null, winner_team: n === 1 ? 'a' : null, status: n === 1 ? 'confirmed' : 'pending',
+          started_at: running ? new Date(Date.now() - 440000).toISOString() : null, ends_at: running ? new Date(Date.now() + 760000).toISOString() : null }
+      }) : [],
     }
   },
+  start_friend_match_game: () => new Date(Date.now() + 1200000).toISOString(),
+  adjust_friend_match_timer: () => new Date(Date.now() + 820000).toISOString(),
   set_friend_match_teams: () => null,
   add_friend_match_game: () => 'fs-g',
   respond_friend_match_invite: (params) => (params?.p_accept ? 'accepted' : 'declined'),

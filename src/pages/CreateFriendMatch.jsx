@@ -43,6 +43,8 @@ export default function CreateFriendMatch({ group = null }) {
   const [scoringFormat, setScoringFormat] = useState('sets')
   const [numSets, setNumSets] = useState(3)
   const [teamsMode, setTeamsMode] = useState('manual')
+  // «Cada jogo dura» (27 set): 0 = sem tempo; só com mais de 4 pessoas.
+  const [gameMinutes, setGameMinutes] = useState(0)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -88,6 +90,7 @@ export default function CreateFriendMatch({ group = null }) {
         numSets: scoringFormat === 'sets' ? numSets : null,
         teamsMode,
         organizationId: group?.id || null,
+        gameMinutes: people.length + 1 > MIN_PEOPLE ? gameMinutes || null : null,
         invitees: people.map((p) => (p.guest
           ? { guest_name: p.name, ...(p.email ? { guest_email: p.email } : {}) }
           : { user_id: p.user_id })),
@@ -216,6 +219,22 @@ export default function CreateFriendMatch({ group = null }) {
               </div>
             )}
           </div>
+          {/* Com tempo há cronómetro em cada jogo e alarme; com 4 não roda,
+              por isso não aparece (alarmes das rondas, 27 set). */}
+          {people.length + 1 > MIN_PEOPLE && (
+            <div>
+              <p className={label}>{t('friends.game_minutes_label')}</p>
+              <Chips
+                value={gameMinutes}
+                onChange={setGameMinutes}
+                options={[
+                  { value: 0, label: t('friends.game_minutes_none') },
+                  ...[15, 20, 30].map((m) => ({ value: m, label: t('friends.game_minutes_option', { count: m }) })),
+                ]}
+              />
+              <p className="mt-2 text-xs text-muted">{t('friends.game_minutes_hint')}</p>
+            </div>
+          )}
         </>
       )}
     </StepPage>
