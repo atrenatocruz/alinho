@@ -146,6 +146,12 @@ export default function TournamentPage() {
   const TopSlot = TOURNAMENT_PANELS.top
   const UnderHeader = TOURNAMENT_PANELS.under_header
   const Podium = TOURNAMENT_PANELS.podium
+  // Dentro = até às vagas de cada categoria; o resto espera (suplentes).
+  // Depois de fechar, os suplentes vêm à parte (waitlist_count, Dev 3).
+  const teamsIn = categories.length
+    ? categories.reduce((n, c) => n + (c.slots ? Math.min(c.entry_count || 0, c.slots) : (c.entry_count || 0)), 0)
+    : null
+  const waiting = categories.reduce((n, c) => n + (c.slots ? Math.max(0, (c.entry_count || 0) - c.slots) : 0) + (c.waitlist_count || 0), 0)
   const panelProps = {
     tournament: tour,
     categories,
@@ -286,13 +292,17 @@ export default function TournamentPage() {
         <div className="mt-3 grid grid-cols-4 gap-1 text-center text-xs text-ink-500">
           {[
             [tour.category_count, t('tournament.kv_categories')],
-            [tour.entry_count, t('tournament.kv_teams')],
+            // Só as duplas que estão dentro; as que passam das vagas são
+            // suplentes e dizem-se por baixo (designer, 27 set — simulação
+            // do QA: «100 duplas» para 62 lugares enganava).
+            [teamsIn ?? tour.entry_count, t('tournament.kv_teams'), waiting > 0 ? t('tournament.kv_waiting', { count: waiting }) : null],
             [tour.match_count, t('tournament.kv_matches')],
             [tour.day_count, t('tournament.kv_days')],
-          ].map(([value, label]) => (
+          ].map(([value, label, extra]) => (
             <div key={label}>
               <b className="block font-display text-lg font-extrabold text-ink-900">{value ?? 0}</b>
               {label}
+              {extra && <span className="block whitespace-nowrap">{extra}</span>}
             </div>
           ))}
         </div>
