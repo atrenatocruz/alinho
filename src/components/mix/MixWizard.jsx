@@ -22,7 +22,7 @@ import { advanceByFrequency } from '../../lib/mixDraft'
 import { totalRounds } from '../../lib/mixLogic'
 import { AGE_RESTRICTIONS } from '../../lib/ageCategories'
 import { formatDate, formatTime } from '../../lib/formatDate'
-import { LEVEL_SCALES, LEVEL_NUMBERS, parseLevel, scaleForGender } from '../../lib/mixLevels'
+import { LEVEL_SCALES, LEVEL_NUMBERS, parseLevel, scaleForGender, GENDER_FOR_SCALE } from '../../lib/mixLevels'
 
 const pairsAreFixed = (form) => form.format !== 'americano' && !(form.rotate_partners && form.format === 'sobe_desce')
 
@@ -151,7 +151,14 @@ export default function MixWizard({
           <Chips
             label={t('mixwizard.who_label')}
             value={form.gender_restriction}
-            onChange={(v) => set({ gender_restriction: v })}
+            onChange={(v) => {
+              // O nível segue «Quem pode entrar» (QA, 27 set): um mix só de
+              // mulheres com nível M saía nos grupos de WhatsApp masculinos.
+              if (v === 'indiferente') { set({ gender_restriction: v }); return }
+              const s = scaleForGender(v)
+              setLevelScale(s)
+              set({ gender_restriction: v, ...(levelNum ? { level: `${s}${levelNum}` } : {}) })
+            }}
             options={[
               { value: 'indiferente', label: t('mixwizard.who_anyone') },
               { value: 'masculino', label: t('mixwizard.who_men') },
@@ -177,7 +184,11 @@ export default function MixWizard({
           {pickLevel && (
             <div className="mt-2">
               <Chips label={t('mixlevels.scale_label')} value={levelScale}
-                onChange={(s) => { setLevelScale(s); if (levelNum) set({ level: `${s}${levelNum}` }) }}
+                onChange={(s) => {
+                  // …e o contrário: escolher o escalão acerta «Quem pode entrar».
+                  setLevelScale(s)
+                  set({ gender_restriction: GENDER_FOR_SCALE[s], ...(levelNum ? { level: `${s}${levelNum}` } : {}) })
+                }}
                 options={LEVEL_SCALES.map((s) => ({ value: s, label: t(`mixlevels.scale_${s.toLowerCase()}`) }))} />
               <div className="mt-2">
                 <Chips label={t('mixwizard.level_label')} value={form.level} onChange={(v) => set({ level: v })}
@@ -227,6 +238,13 @@ export default function MixWizard({
               ]}
             />
           </Field>
+        )}
+        {/* Numa série, o dia escolhido é o dos mixes seguintes; o primeiro
+            abre ao publicar — e isso tem de estar escrito (QA, 27 set). */}
+        {rec.enabled && !editingGame && form.date && (
+          <p className="text-sm text-ink-700">
+            {t('mixwizard.first_opens_now', { date: formatDate(form.date, i18n.language, { weekday: 'short', day: 'numeric', month: 'numeric' }).replace(/\./g, '') })}
+          </p>
         )}
         {rec.enabled ? (
           <LaunchDayPicker

@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
+import GroupFriendGames from '../components/friends/GroupFriendGames'
+import { listGroupFriendMatches } from '../lib/privateMatches'
 import { useParams, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
@@ -250,6 +252,8 @@ export default function GroupMatches() {
   const { profile: currentUser, memberships } = useAuth()
   const [org, setOrg] = useState(null)
   const [matches, setMatches] = useState([])
+  // Os jogos de grupo do desenho novo (#342) — outra tabela, outra lista.
+  const [friendGames, setFriendGames] = useState([])
   const [loading, setLoading] = useState(true)
 
   const isOrgAdmin = !!memberships.find((m) => m.organization?.slug === slug)?.is_admin
@@ -261,6 +265,10 @@ export default function GroupMatches() {
       if (clubData?.id) {
         const data = await getGroupMatches(clubData.id)
         setMatches(data)
+        setFriendGames(await listGroupFriendMatches(clubData.id).catch((err) => {
+          console.error('Error loading group friend matches:', err)
+          return []
+        }))
       }
     } catch (err) {
       console.error('Error loading group matches:', err)
@@ -294,10 +302,11 @@ export default function GroupMatches() {
         <div className="flex items-center justify-center py-16">
           <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
         </div>
-      ) : matches.length === 0 ? (
+      ) : matches.length === 0 && friendGames.length === 0 ? (
         <EmptyState title={t('groupmatches.empty_title')} subtitle={t('groupmatches.empty_subtitle')} />
       ) : (
         <div className="space-y-3.5">
+          <GroupFriendGames games={friendGames} />
           {matches.map((match) => (
             <MatchCard key={match.id} match={match} org={org} currentUser={currentUser} isOrgAdmin={isOrgAdmin} onChanged={load} t={t} i18n={i18n} />
           ))}

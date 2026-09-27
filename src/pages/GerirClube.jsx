@@ -25,6 +25,7 @@ import { inviteToOrganization } from '../lib/orgInvites'
 import { listPendingClubTeachers } from '../lib/teachers'
 import TeacherRequestCard from '../components/TeacherRequestCard'
 import VoucherScanner from '../components/VoucherScanner'
+import VouchersAdmin from '../components/vouchers/VouchersAdmin'
 import { isValidVoucherId, normalizeScannedVoucherId } from '../lib/vouchers'
 import { ClubTeachers, NewSeries } from '../components/lessons/ClubLessonsPanel'
 import { SeriesManage } from '../components/lessons/ClubSeriesPanel'
@@ -286,6 +287,9 @@ export default function GerirClube() {
   const [nameInput, setNameInput] = useState('')
   const [renamingOrg, setRenamingOrg] = useState(false)
   const [scanInput, setScanInput] = useState('')
+  // #406: o ícone do QR abre a lista «Vouchers»; o validar de hoje fica atrás
+  // do «Ler QR code» (voucherScan).
+  const [voucherScan, setVoucherScan] = useState(false)
   const [scanLookupState, setScanLookupState] = useState('idle') // 'idle' | 'loading' | 'not_found' | 'found'
   const [scannedVoucher, setScannedVoucher] = useState(null)
   const [cameraActive, setCameraActive] = useState(false)
@@ -2215,7 +2219,7 @@ export default function GerirClube() {
         {activeTab === 'redeem' ? (
           <button
             type="button"
-            onClick={() => { handleResetRedeem(); setActiveTab('events') }}
+            onClick={() => { handleResetRedeem(); if (voucherScan) setVoucherScan(false); else setActiveTab('events') }}
             className="inline-flex items-center gap-1.5 text-ink-700 font-extrabold text-sm hover:underline mb-6"
           >
             <ArrowLeft size={16} /> {t('gerirclube.back_button')}
@@ -2276,9 +2280,9 @@ export default function GerirClube() {
           </div>
           <button
             type="button"
-            onClick={() => setActiveTab('redeem')}
-            title={t('gerirclube.redeem_voucher_label')}
-            aria-label={t('gerirclube.redeem_voucher_label')}
+            onClick={() => { setVoucherScan(false); setActiveTab('redeem') }}
+            title={t('vouchers.title')}
+            aria-label={t('vouchers.title')}
             className="shrink-0 -mt-1 w-11 h-11 flex items-center justify-center rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast"
           >
             <QrCode size={20} />
@@ -3934,7 +3938,10 @@ export default function GerirClube() {
               above, not a pill tab and not a button inside Members (see
               docs/superpowers/specs/2026-09-14-voucher-qr-redemption-design.md,
               Key Decisions). */}
-          {activeTab === 'redeem' && (
+          {activeTab === 'redeem' && !voucherScan && (
+            <VouchersAdmin organizationId={org?.id} onScan={() => setVoucherScan(true)} />
+          )}
+          {activeTab === 'redeem' && voucherScan && (
             <div>
               <h3 className="text-xl font-semibold text-ink-900 mb-6">{t('gerirclube.redeem_heading')}</h3>
 

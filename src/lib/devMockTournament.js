@@ -142,6 +142,9 @@ const categories = () => {
 let created = []
 
 export const TOURNAMENT_RPC_MOCKS = {
+  // Mudar o nome da dupla (Dev 3, rename_tournament_entry): devolve o nome
+  // gravado — vazio passa a null, como a função a sério.
+  rename_tournament_entry: (params) => (params?.p_team_name || '').trim() || null,
   list_club_tournaments: () => {
     if (!on()) return []
     const base = empty() ? [] : [{
