@@ -8,14 +8,30 @@
 // do que já saiu vive só em memória).
 export const POST_WINDOW_MINUTES = 15
 
-export const postKey = (orgId, dayKey, hour) => `${orgId}|${dayKey}|${hour}`
+// Desde 27 set (design-handoff/2026-09-27-whatsapp-no-evento) cada mix tem as
+// suas horas (games.whatsapp_post_times, 'HH:MM', de meia em meia hora, até
+// 3). Sem horas escolhidas (null), valem as do clube, como antes; [] = sem
+// lembretes (só o anúncio ao publicar).
 
-/** Os clubes que têm de publicar agora e ainda não publicaram esta hora hoje. */
-export function dueOrgs({ hoursByOrg, hour, minute, dayKey, sent }) {
-  if (minute >= POST_WINDOW_MINUTES) return []
-  const due = []
-  for (const [orgId, hours] of hoursByOrg) {
-    if ((hours || []).includes(hour) && !sent.has(postKey(orgId, dayKey, hour))) due.push(orgId)
-  }
-  return due
+const pad = (n) => String(n).padStart(2, '0')
+
+/** A meia hora em que se está a publicar ('10:00', '18:30'), ou null fora da janela. */
+export function slotFor(hour, minute) {
+  if (minute < POST_WINDOW_MINUTES) return `${pad(hour)}:00`
+  if (minute >= 30 && minute < 30 + POST_WINDOW_MINUTES) return `${pad(hour)}:30`
+  return null
+}
+
+/** As horas de um mix: as dele ('HH:MM:SS' da base de dados → 'HH:MM') ou as do clube. */
+export function mixPostTimes(mix, orgHours) {
+  if (Array.isArray(mix.whatsapp_post_times)) return mix.whatsapp_post_times.map((h) => String(h).slice(0, 5))
+  return (orgHours || []).map((h) => `${pad(h)}:00`)
+}
+
+export const postKey = (mixId, dayKey, slot) => `${mixId}|${dayKey}|${slot}`
+
+/** Os mixes que têm de sair agora e ainda não saíram nesta meia hora hoje. */
+export function dueMixes({ mixes, orgHours, slot, dayKey, sent }) {
+  if (!slot) return []
+  return mixes.filter((mix) => mixPostTimes(mix, orgHours).includes(slot) && !sent.has(postKey(mix.id, dayKey, slot)))
 }

@@ -1162,6 +1162,10 @@ const SERIES_PAST_NEXT = () => {
 RPC_MOCKS.skip_recurrence_game = () => { const d = new Date(); d.setDate(d.getDate() + 13); d.setHours(20, 0, 0, 0); return d.toISOString() }
 // mockEnsureStatus = 'ended' | 'no_base' — o que a base responde ao criar o
 // próximo Mix em falta; mockNoPending = 'true' — a série sem próximo Mix.
+// O campo «Lembrar no WhatsApp» (27 set): com mockWaGroups = 'true' o clube
+// tem grupos (devMockTournament.js); as horas do «último mix» são 10:00 e 18:30.
+RPC_MOCKS.default_whatsapp_post_times = () => ['10:00', '18:30']
+RPC_MOCKS.set_event_whatsapp_post_times = (params) => [...(params?.p_times || [])].sort()
 RPC_MOCKS.ensure_recurrence_successor = () => localStorage.getItem('mockEnsureStatus') || 'created'
 TABLE_MOCKS.games = (url) => {
   let rows = gamesSemFiltro(url)

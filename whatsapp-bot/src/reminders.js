@@ -3,7 +3,7 @@ import { config } from './config.js'
 import { getGroups, getGroupsForOrg, getServedOrgIds, mixVisibleToGroup } from './groups.js'
 import { getOpenMixes, loadGame, formatDateTime, buildMixMessage, recordMixMessage, labelableMixes, mixLabel } from './roster.js'
 import { cardSentRecently, noteCardSent } from './sync.js'
-import { dueOrgs, postKey } from './postSchedule.js'
+import { dueMixes, postKey, slotFor } from './postSchedule.js'
 import { helpFooter } from './messages.js'
 import { t } from './locales.js'
 
@@ -155,14 +155,18 @@ export async function loadPostHours(orgIds) {
  * 1.ª mensagem. Anti-bloqueio: no máximo 5 cartões por grupo, e não se
  * repete um cartão que saiu no grupo há menos de 10 min.
  */
-export async function publishOrgCards(orgId, { sendText, getGroupMentions }) {
+// `onlyMixIds`: só estes mixes (os que têm esta hora — cada mix tem as suas
+// desde 27 set). Sem ele, todos os abertos, como antes.
+export async function publishOrgCards(orgId, { sendText, getGroupMentions }, { onlyMixIds = null } = {}) {
   const groups = await getGroupsForOrg(orgId)
   for (const group of groups) {
     try {
       const openMixes = (await getOpenMixes(group.organizationId)).filter((mix) => mixVisibleToGroup(mix, group))
       const labelable = labelableMixes(openMixes)
       const states = await Promise.all(
-        openMixes.filter((mix) => !cardSentRecently(group.groupJid, mix.id)).map((mix) => loadGame(mix.id))
+        openMixes
+          .filter((mix) => !onlyMixIds || onlyMixIds.has(mix.id))
+          .filter((mix) => !cardSentRecently(group.groupJid, mix.id)).map((mix) => loadGame(mix.id))
       )
       const withSpots = states.filter(({ people, capacity }) => people.length < capacity).slice(0, MAX_CARDS_PER_POST)
       if (withSpots.length === 0) continue
@@ -199,18 +203,28 @@ function lisbonNow() {
 
 const sentPosts = new Set()
 
-async function checkScheduledPosts({ sendText, getGroupMentions }) {
-  const { hour, minute, dayKey } = lisbonNow()
-  if (minute >= 15) return
+// Cada mix às suas horas (games.whatsapp_post_times), às horas certas e às
+// meias horas; sem horas escolhidas, as do clube. Exportada para os testes.
+export async function checkScheduledPosts({ sendText, getGroupMentions }, now = lisbonNow()) {
+  const { hour, minute, dayKey } = now
+  const slot = slotFor(hour, minute)
+  if (!slot) return
   const orgIds = await getServedOrgIds()
   const hoursByOrg = await loadPostHours(orgIds)
-  for (const orgId of dueOrgs({ hoursByOrg, hour, minute, dayKey, sent: sentPosts })) {
-    sentPosts.add(postKey(orgId, dayKey, hour))
-    await publishOrgCards(orgId, { sendText, getGroupMentions }).catch((err) =>
+  for (const orgId of orgIds) {
+    try {
+      const due = dueMixes({ mixes: await getOpenMixes(orgId), orgHours: hoursByOrg.get(orgId), slot, dayKey, sent: sentPosts })
+      if (due.length === 0) continue
+      for (const mix of due) sentPosts.add(postKey(mix.id, dayKey, slot))
+      await publishOrgCards(orgId, { sendText, getGroupMentions }, { onlyMixIds: new Set(due.map((mix) => mix.id)) })
+    } catch (err) {
       console.error(`Failed to publish scheduled mixes for org ${orgId}:`, err)
-    )
+    }
   }
 }
+
+/** Só para testes. */
+export function _clearSentPostsForTests() { sentPosts.clear() }
 
 /** Starts both reminder loops. Call once from index.js, same shape as startSync. */
 export function startReminders({ sendText, getGroupMentions }) {
