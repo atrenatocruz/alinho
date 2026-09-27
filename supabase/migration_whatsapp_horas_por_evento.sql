@@ -118,7 +118,11 @@ $$;
 
 REVOKE ALL ON FUNCTION public.club_whatsapp_post_times(UUID) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.whatsapp_times_text(TIME[]) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.whatsapp_post_times_ok(TIME[]) FROM PUBLIC, anon, authenticated;
+-- A whatsapp_post_times_ok NÃO se revoga: é usada nos CHECK das 4 tabelas,
+-- e o Postgres verifica o EXECUTE a quem escreve a linha (qualquer UPDATE
+-- dela, até do robô com service_role). Revogá-la partia as escritas em
+-- games (visto pelo SI, 27 set). É IMMUTABLE e não lê nada: não há risco.
+GRANT EXECUTE ON FUNCTION public.whatsapp_post_times_ok(TIME[]) TO PUBLIC, anon, authenticated, service_role;
 
 -- ── 3. Gravar ───────────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.set_event_whatsapp_post_times(p_kind TEXT, p_id UUID, p_times TEXT[])
