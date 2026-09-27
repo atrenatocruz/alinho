@@ -39,7 +39,8 @@ export default function LessonPage() {
     return () => { alive = false }
   }, [id])
 
-  const back = <BackBar onBack={goBack} />
+  // O nome na barra ao deslizar: o mesmo título do cartão («Aula com …»).
+  const back = <BackBar onBack={goBack} title={data?.lesson ? t(data.lesson.form === 'class' ? 'lessons.series_with' : 'lessons.lesson_with', { name: data.teacher?.name }) : undefined} />
   if (failed) {
     return <div className="space-y-5">{back}<EmptyState icon={GraduationCap} title={t('lessons.lesson_not_found_title')} subtitle={t('lessons.lesson_not_found_subtitle')} /></div>
   }

@@ -291,14 +291,14 @@ export default function ClubProfile() {
       )}
 
       {/* Jogo dentro do grupo/clube (Trello #239) — qualquer membro pode
-          criar/ver. O nome da secção espera o Renato: usa-se o que existe. */}
+          criar/ver. «Jogos entre amigos» em grupos e clubes (Francisco, 27 set). */}
       {club.my_status === 'member' && (
         <section>
           <h3 className="mb-2 text-[11px] font-extrabold uppercase tracking-widest text-muted">
             {t(club.kind === 'group' ? 'clubprofile.of_group' : 'clubprofile.of_club')}
           </h3>
           <Link to={`/clube/${slug}/jogos`} className="card press flex min-h-[52px] items-center justify-between gap-3">
-            <span className="font-extrabold text-ink-900">{t(club.kind === 'group' ? 'clubprofile.jogos_heading_group' : 'clubprofile.jogos_heading')}</span>
+            <span className="font-extrabold text-ink-900">{t('clubprofile.jogos_heading_group')}</span>
             <ChevronRight size={17} className="shrink-0 text-ink-700" />
           </Link>
         </section>

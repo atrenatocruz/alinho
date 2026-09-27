@@ -6,10 +6,10 @@
 // A linha vem do list_live_events (Dev 3), kind 'tournament':
 //   { slug, tournament_id, name, org_name, category_code, stage ('groups' |
 //     'knockout'), round ('R32'…'F' | null), matches_live,
-//     last_result: { a_name, b_name, a_hidden, b_hidden, a_number, b_number,
-//                    score ('6-4 3-6 10-8', do lado A), a_won } | null }
-// Quem esconde os resultados nunca chega aqui pelo nome: vem o número e
-// escreve-se «Dupla N», como no torneio.
+//     last_result: { a_name, b_name, a_hidden, b_hidden,
+//                    score ('6-4 · 3-6 · 10-7', do lado A), a_won } | null }
+// Quem esconde os resultados nunca chega aqui pelo nome: escreve-se «Dupla
+// M4», como nos cartões de partilha do torneio.
 
 const ROUNDS = ['R32', 'R16', 'QF', 'SF', 'F', '3P']
 
@@ -23,16 +23,16 @@ export function winnerScore(score, aWon) {
   }).join(' ')
 }
 
-function side(r, key, t) {
-  if (r[`${key}_hidden`] || !r[`${key}_name`]) return t('livetour.hidden_pair', { n: r[`${key}_number`] ?? '' }).trim()
+function side(r, key, t, code) {
+  if (r[`${key}_hidden`] || !r[`${key}_name`]) return t('livetour.hidden_pair', { n: r[`${key}_number`] ?? code ?? '' }).trim()
   return r[`${key}_name`]
 }
 
 /** «Serra / Mota 6–4»: quem ganhou o último jogo acabado, e o resultado. */
-export function lastResultText(r, t) {
+export function lastResultText(r, t, code) {
   if (!r) return ''
   const winner = r.a_won ? 'a' : 'b'
-  return [side(r, winner, t), winnerScore(r.score, r.a_won)].filter(Boolean).join(' ')
+  return [side(r, winner, t, code), winnerScore(r.score, r.a_won)].filter(Boolean).join(' ')
 }
 
 /** Para onde leva o toque: «Todos os jogos», na secção da fase. */
@@ -50,7 +50,7 @@ export function liveTournamentCard(row, t) {
     ? t('livetour.phase_groups')
     : t(`tournament.draw.round_${row.round}`)
   const live = Number(row.matches_live) || 0
-  const lead = lastResultText(row.last_result, t)
+  const lead = lastResultText(row.last_result, t, row.category_code)
   return {
     // A fase em minúsculas, como o «Mix · ronda 2 de 4».
     tag: t('livetour.tag', { phase: phase.toLocaleLowerCase() }),
