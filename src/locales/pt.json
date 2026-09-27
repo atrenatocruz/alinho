@@ -2241,6 +2241,8 @@
   "lessons.trial_free": "Experimental grátis",
   "lessons.announce_whatsapp": "Anunciar no WhatsApp do clube",
   "lessons.create_series": "Criar turma",
+  "calendar.prev_week": "Semana anterior",
+  "booking.week_empty": "Sem horas livres nesta semana. Passa à seguinte com ›.",
   "booking.title_marcar": "Marcar aula",
   "booking.confirms_sub": "{{club}}o {{name}} confirma a aula",
   "booking.confirms_sub_f": "{{club}}a {{name}} confirma a aula",

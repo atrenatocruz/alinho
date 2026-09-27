@@ -2240,6 +2240,8 @@
   "lessons.trial_free": "Free trial",
   "lessons.announce_whatsapp": "Announce in the club's WhatsApp",
   "lessons.create_series": "Create class",
+  "calendar.prev_week": "Previous week",
+  "booking.week_empty": "No free times this week. Go to the next with ›.",
   "booking.title_marcar": "Book a lesson",
   "booking.confirms_sub": "{{club}}{{name}} confirms the lesson",
   "booking.confirms_sub_f": "{{club}}{{name}} confirms the lesson",
