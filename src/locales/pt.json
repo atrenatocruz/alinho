@@ -3332,6 +3332,8 @@
   "tournament.create.problem_hours_order": "Há um dia que acaba antes de começar.",
   "tournament.create.problem_categories": "Acrescenta pelo menos uma categoria.",
   "tournament.create.problem_category_without_day": "Há uma categoria sem dia: escolhe em que dia joga.",
+  "tournament.create.problem_category_time": "Há uma categoria a começar fora do horário do dia: acerta a hora de início.",
+  "tournament.create.category_time_outside": "Fora do horário do dia ({{from}} às {{to}}).",
   "tournament.create.problem_slots": "Cada categoria precisa de pelo menos 2 vagas.",
   "tournament.admin.create": "Criar torneio",
   "tournament.admin.empty_title": "Ainda não há torneios",

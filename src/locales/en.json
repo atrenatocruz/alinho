@@ -3331,6 +3331,8 @@
   "tournament.create.problem_hours_order": "One day ends before it starts.",
   "tournament.create.problem_categories": "Add at least one category.",
   "tournament.create.problem_category_without_day": "A category has no day yet: pick which day it plays.",
+  "tournament.create.problem_category_time": "A category starts outside the day’s hours: fix its start time.",
+  "tournament.create.category_time_outside": "Outside the day’s hours ({{from}} to {{to}}).",
   "tournament.create.problem_slots": "Each category needs at least 2 slots.",
   "tournament.admin.create": "Create tournament",
   "tournament.admin.empty_title": "No tournaments yet",
