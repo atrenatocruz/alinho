@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  TIME_OPTIONS, compactTime, shortRange, isActiveTeacherProfile, nextSlot, slotProblem, rowsFromSchedule, scheduleFromRows, scheduleProblems, shortTime, weeklyFromItems,
+  TIME_OPTIONS, compactTime, shortRange, isActiveTeacherProfile, nextSlot, slotProblem, rowsFromSchedule, scheduleFromRows, scheduleProblems, shortTime, weeklyFromItems, mergeSlots, weekSummary,
 } from './teacherSchedule'
 
 describe('teacherSchedule', () => {
@@ -109,5 +109,27 @@ describe('teacherSchedule', () => {
     expect(isActiveTeacherProfile({ status: 'approved', organization_id: 'o', club_status: 'accepted' })).toBe(true)
     expect(isActiveTeacherProfile({ status: 'approved', organization_id: 'o', club_status: 'pending' })).toBe(false)
     expect(isActiveTeacherProfile({ status: 'pending', organization_id: null })).toBe(false)
+  })
+})
+
+describe('mergeSlots / weekSummary', () => {
+  it('junta blocos seguidos e sobrepostos', () => {
+    expect(mergeSlots([
+      { start: '19:30', end: '20:30' }, { start: '18:30', end: '19:30' }, { start: '20:30', end: '21:30' },
+    ])).toEqual([{ start: '18:30', end: '21:30' }])
+    expect(mergeSlots([{ start: '09:00', end: '11:00' }, { start: '10:00', end: '12:00' }])).toEqual([{ start: '09:00', end: '12:00' }])
+  })
+  it('mantém faixas separadas', () => {
+    expect(mergeSlots([{ start: '17:00', end: '18:00' }, { start: '09:00', end: '10:00' }]))
+      .toEqual([{ start: '09:00', end: '10:00' }, { start: '17:00', end: '18:00' }])
+  })
+  it('só os dias com horas, por ordem da semana', () => {
+    expect(weekSummary([
+      { weekday: 5, start: '09:00', end: '10:00' }, { weekday: 1, start: '18:30', end: '19:30' }, { weekday: 1, start: '19:30', end: '20:30' },
+    ])).toEqual([
+      { weekday: 1, slots: [{ start: '18:30', end: '20:30' }] },
+      { weekday: 5, slots: [{ start: '09:00', end: '10:00' }] },
+    ])
+    expect(weekSummary([])).toEqual([])
   })
 })

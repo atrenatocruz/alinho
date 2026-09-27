@@ -12,7 +12,8 @@ import { cancelEnrolment, confirmEnrolment, getTeacherPage } from '../lib/lesson
 import EnrolSheet from '../components/lessons/EnrolSheet'
 import { describeError, errorKind } from '../lib/errors'
 import { priceRowFor, LESSON_CAPACITY, LESSON_DURATIONS } from '../lib/lessons'
-import { compactTime, weeklyFromItems } from '../lib/teacherSchedule'
+import { weeklyFromItems } from '../lib/teacherSchedule'
+import WeekCalendar from '../components/lessons/WeekCalendar'
 import { teacherContact } from '../lib/teacherContact'
 import { supabase } from '../lib/supabase'
 import { followPlayer, getFollowCounts, unfollowPlayer } from '../lib/follows'
@@ -161,12 +162,8 @@ export default function TeacherPage({ view = 'profile' }) {
   const scheduleCard = weekly.length > 0 && (
     <div className="card space-y-1">
       <h3 className="text-base text-ink-900 mb-1">{t('teacher.public_when')}</h3>
-      {weekly.map((s, i) => (
-        <div key={i} className={`flex gap-4 py-1.5 text-sm ${i < weekly.length - 1 ? 'border-b border-line' : ''}`}>
-          <span className="w-10 font-extrabold text-ink-900 capitalize">{t(`lessons.wd_short_${s.weekday}`)}</span>
-          <span className="tabular-nums text-ink-900">{compactTime(s.start)}–{compactTime(s.end)}</span>
-        </div>
-      ))}
+      {/* A semana em calendário (Francisco, 27 set: «Fica o calendário»). */}
+      <WeekCalendar slots={weekly} />
       <p className="text-xs text-muted pt-1.5">{t(female ? 'teacher.public_when_hint_f' : 'teacher.public_when_hint')}</p>
     </div>
   )
