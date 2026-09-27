@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Copy } from 'lucide-react'
+import { Copy, Pencil } from 'lucide-react'
+import { createPortal } from 'react-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { Chips, ConfirmSheet, PrimaryButton } from '../ui'
 import { Sheet } from '../agenda/AgendaControls'
 import { whatsappShare } from '../../lib/partnerInvite'
 import TournamentSignupSheet from './TournamentSignupSheet'
 import PublicInfo from './PublicInfo'
+import TeamNameSheet from './TeamNameSheet'
+import { supabase } from '../../lib/supabase'
 import {
   signUp, respondToInvite, listMyInvites, withdrawEntry,
   entriesOpen, categoriesLeft, tournamentInviteLink, canScoreTournament,
@@ -34,7 +37,7 @@ const STATE_KEY = {
 }
 
 export default function SignupSlot({ tournament, categories, category, my: firstEntry, myEntries = [] }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { user, profile, updateProfile } = useAuth()
   const [genderSheet, setGenderSheet] = useState(false)
   const [invites, setInvites] = useState([])
@@ -43,6 +46,13 @@ export default function SignupSlot({ tournament, categories, category, my: first
   const [error, setError] = useState('')
   const [fresh, setFresh] = useState(null) // convite acabado de criar
   const [askLeave, setAskLeave] = useState(false)
+  const [renaming, setRenaming] = useState(false)
+  const [toast, setToast] = useState('')
+  useEffect(() => {
+    if (!toast) return undefined
+    const id = setTimeout(() => setToast(''), 3000)
+    return () => clearTimeout(id)
+  }, [toast])
   // O sexo não bate com a categoria: pergunta-se, não se bloqueia (26 set).
   const [genderAsk, setGenderAsk] = useState(null) // { key, then }
 
@@ -73,6 +83,19 @@ export default function SignupSlot({ tournament, categories, category, my: first
   // nela e ainda posso ir a mais uma, aparece o botão de inscrever; se já
   // não posso, mostra-se a que tenho (Trello #451).
   const my = myEntries.find((e) => e.category_id === category?.id)
+  const myCategory = categories.find((c) => c.id === my?.category_id)
+  // O nome da dupla e os dois nomes vêm da lista pública de inscritos: a
+  // página só traz o estado da minha inscrição.
+  const [myRow, setMyRow] = useState(null)
+  const loadMyRow = () => {
+    if (!my?.entry_id) { setMyRow(null); return }
+    supabase.from('tournament_public_entries').select('*').eq('id', my.entry_id).limit(1)
+      .then(({ data, error: err }) => {
+        if (err) { console.error('Error loading my entry:', err); return }
+        setMyRow((data || []).find((r) => r.id === my.entry_id) || null)
+      })
+  }
+  useEffect(loadMyRow, [my?.entry_id])
     || (left === 0 ? firstEntry : null)
   // Quem chega do WhatsApp sem conta carrega em «Criar conta para me
   // inscrever» e tem de aterrar no separador de CRIAR CONTA — e voltar a
@@ -179,15 +202,39 @@ export default function SignupSlot({ tournament, categories, category, my: first
         </div>
       ))}
 
-      {/* A minha inscrição, ou o convite para me inscrever. */}
+      {/* A minha inscrição, ou o convite para me inscrever. O nome da
+          dupla em destaque, e «Mudar o nome» até as inscrições fecharem
+          (nome-da-dupla, 27 set). */}
       {my ? (
-        <div className="card flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="font-extrabold text-ink-900">{t(STATE_KEY[my.state] || 'tsignup.state_in')}</p>
-            {my.state === 'suplente' && <p className="text-sm text-muted">{t('tsignup.state_waitlist_hint')}</p>}
+        <div className="card space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <p className="flex min-w-0 items-center gap-2">
+              {myCategory?.code && <span className="shrink-0 rounded-md bg-ink-900 px-1.5 py-0.5 font-mono text-xs font-bold text-white">{myCategory.code}</span>}
+              <b className="truncate text-sm font-extrabold text-ink-900">{myCategory?.name}</b>
+            </p>
+            <span className="shrink-0 rounded-full bg-[#DCFCE7] px-2 py-[3px] text-[11px] font-extrabold text-ok-700">{t(STATE_KEY[my.state] || 'tsignup.state_in')}</span>
           </div>
+          {my.state === 'suplente' && <p className="text-sm text-muted">{t('tsignup.state_waitlist_hint')}</p>}
+          {myRow && (
+            <div>
+              {myRow.team_name
+                ? <p className="font-display text-xl font-extrabold leading-tight text-ink-900">{myRow.team_name}</p>
+                : <p className="text-sm text-muted">{t('tteamname.none')}</p>}
+              <p className="text-sm text-muted">{[myRow.player1_name, myRow.player2_name || myRow.guest_name].filter(Boolean).join(' / ')}</p>
+            </div>
+          )}
+          {open && myRow && (
+            <div>
+              <button type="button" onClick={() => setRenaming(true)} className="inline-flex min-h-[44px] items-center gap-1.5 text-sm font-extrabold text-ink-900 underline underline-offset-2">
+                <Pencil size={14} /> {t('tteamname.change')}
+              </button>
+              {tournament.entries_deadline && (
+                <p className="text-xs text-muted">{t('tteamname.until', { date: new Intl.DateTimeFormat(i18n.language, { day: 'numeric', month: 'short', timeZone: 'Europe/Lisbon' }).format(new Date(tournament.entries_deadline)).replace('.', '').replace(' de ', ' ') })}</p>
+              )}
+            </div>
+          )}
           {open && (
-            <button onClick={() => setAskLeave(true)} disabled={busy} className="press text-sm font-extrabold text-ink-900 underline shrink-0">
+            <button onClick={() => setAskLeave(true)} disabled={busy} className="press min-h-[44px] w-full text-sm font-extrabold text-ink-900">
               {t('tsignup.withdraw')}
             </button>
           )}
@@ -204,6 +251,17 @@ export default function SignupSlot({ tournament, categories, category, my: first
       ) : null}
 
       {error && !sheet && <p className="text-sm text-danger font-extrabold">{error}</p>}
+
+      {renaming && myRow && (
+        <TeamNameSheet entryId={my.entry_id} initial={myRow.team_name || ''} onClose={() => setRenaming(false)}
+          onSaved={(name) => { setMyRow((r) => ({ ...r, team_name: name })); setRenaming(false); setToast(t('tteamname.saved')) }} />
+      )}
+      {toast && createPortal(
+        <div role="status" className="fixed top-4 left-1/2 z-[60] -translate-x-1/2 w-max max-w-[calc(100vw-32px)] rounded-full bg-ink-900 px-4 py-2.5 text-sm font-extrabold text-white shadow-lift animate-fade-in">
+          {toast}
+        </div>,
+        document.body,
+      )}
 
       {/* O cartaz: categorias com dia e hora, pagamento, mapa e quem
           organiza — SEMPRE, também em rascunho (pré-visualização) e depois

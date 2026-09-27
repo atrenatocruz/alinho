@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
-import { Search, Check, UserPlus, Send, Copy, ChevronRight, Repeat, Trash2, X } from 'lucide-react'
+import { Search, Check, UserPlus, Send, Copy, ChevronRight, Repeat, Trash2, X, Pencil } from 'lucide-react'
+import TeamNameSheet from './TeamNameSheet'
 import { supabase } from '../../lib/supabase'
 import { searchPlayers } from '../../lib/privateMatches'
 import { useAuth } from '../../contexts/AuthContext'
@@ -332,6 +333,7 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
   // Trello #434: tocar na dupla abre as ações; «Trocar jogador» pergunta
   // primeiro quem sai (swap.slot vazio) e depois quem entra.
   const [actionsFor, setActionsFor] = useState(null)
+  const [renameFor, setRenameFor] = useState(null)
   const [swap, setSwap] = useState(null) // { entry, slot, played }
   const [toast, setToast] = useState('')
   useEffect(() => {
@@ -368,7 +370,7 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
   const [allRows, setAllRows] = useState(null) // null = ainda não carregado
   const searching = isAdmin && query.trim().length >= 2
   const loadAll = () => Promise.all(categories.map((c) => listEntries(c.id)
-    .then((data) => data.map((r) => ({ ...r, id: r.entry_id, category_code: c.code })))))
+    .then((data) => data.map((r) => ({ ...r, id: r.entry_id, category_id: c.id, category_code: c.code })))))
     .then((lists) => setAllRows(lists.flat()))
     .catch((err) => console.error('Error loading tournament entries:', err))
   useEffect(() => { if (searching && allRows === null) loadAll() }, [searching]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -578,6 +580,29 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
       {actionsFor && (
         <Sheet title={actionsFor.team_name || pairName(actionsFor, t)} onClose={() => setActionsFor(null)}>
           <div className="space-y-2">
+            {/* Ordem da receção (designer, 27 set): Validar, Mudar o nome da
+                dupla, Trocar jogador, e por último, a vermelho, Tirar. */}
+            {actionsFor.status === 'por_validar' && (
+              <button
+                type="button"
+                onClick={() => { const e = actionsFor; setActionsFor(null); act(() => validateEntry(e.entry_id, true)) }}
+                disabled={busy}
+                className="btn-secondary w-full inline-flex items-center justify-center gap-2"
+              >
+                <Check size={18} /> {t('tentries.validate')}
+              </button>
+            )}
+            {/* Mudar o nome da dupla, até as inscrições fecharem — a mesma
+                janela e a mesma regra dos dois da dupla (nome-da-dupla, 27 set). */}
+            {(categories.find((c) => c.id === (actionsFor.category_id || category?.id)) || category)?.status === 'inscricoes' && (
+              <button
+                type="button"
+                onClick={() => { const e = actionsFor; setActionsFor(null); setRenameFor(e) }}
+                className="btn-secondary w-full inline-flex items-center justify-center gap-2"
+              >
+                <Pencil size={18} /> {t('tteamname.admin_action')}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => {
@@ -599,16 +624,6 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
                 className="btn-secondary w-full inline-flex items-center justify-center gap-2"
               >
                 <Send size={18} /> {t('tentries.resend_link')}
-              </button>
-            )}
-            {actionsFor.status === 'por_validar' && (
-              <button
-                type="button"
-                onClick={() => { const e = actionsFor; setActionsFor(null); act(() => validateEntry(e.entry_id, true)) }}
-                disabled={busy}
-                className="btn-secondary w-full inline-flex items-center justify-center gap-2"
-              >
-                <Check size={18} /> {t('tentries.validate')}
               </button>
             )}
             <button
@@ -822,6 +837,11 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
           </div>
         </Sheet>
       )}
+      {renameFor && (
+        <TeamNameSheet entryId={renameFor.entry_id} initial={renameFor.team_name || ''} onClose={() => setRenameFor(null)}
+          onSaved={() => { setRenameFor(null); setToast(t('tteamname.saved')); load(); if (searching) loadAll() }} />
+      )}
+
       {/* «X entrou na dupla.» — 3 segundos, no topo para não tapar a folha do link (#434). */}
       {toast && createPortal(
         <div role="status" className="fixed top-4 left-1/2 z-[60] -translate-x-1/2 w-max max-w-[calc(100vw-32px)] rounded-full bg-ink-900 px-4 py-2.5 text-sm font-extrabold text-white shadow-lift animate-fade-in">
