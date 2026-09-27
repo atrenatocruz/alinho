@@ -229,6 +229,13 @@ export async function requestLesson({ teacherProfileId, startsAt, duration, type
   return data
 }
 
+/** Os meus pedidos de aula por responder e aceites (Home do aluno, #392). */
+export async function listMyLessonRequests() {
+  const { data, error } = await supabase.rpc('list_my_lesson_requests')
+  if (error) throw error
+  return data || []
+}
+
 export async function cancelLessonRequest(id) {
   const { error } = await supabase.rpc('cancel_lesson_request', { p_id: id })
   if (error) throw error

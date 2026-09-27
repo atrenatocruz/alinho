@@ -23,6 +23,7 @@ import { formatDate as formatDateLib } from '../lib/formatDate'
 import { sortVouchersForWallet, shareVoucherContact, unshareVoucherContact } from '../lib/vouchers'
 import ShareContactSheet from '../components/vouchers/ShareContactSheet'
 import { describeError } from '../lib/errors'
+import { useFeatureFlag } from '../lib/useFeatureFlag'
 
 const SIDE_LABEL_KEY = { left: 'gamedetails.side_left', right: 'gamedetails.side_right', both: 'gamedetails.side_both' }
 const HAND_LABEL_KEY = { right: 'profile.dominant_hand_right', left: 'profile.dominant_hand_left' }
@@ -37,6 +38,8 @@ const TABS = [
 export default function Profile() {
   const { t, i18n } = useTranslation()
   const { user, profile, updateProfile, currentOrganizationId, isGuest, signOut, refreshMemberships, memberships, isPrivateMatchesEnabled } = useAuth()
+  // Com o jogo entre amigos novo (#342) o cartão diz «convida»; sem ele, o antigo «regista».
+  const { on: friendInvitesOn } = useFeatureFlag('friend_invites')
   const headerActions = useHeaderActions()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -678,7 +681,7 @@ export default function Profile() {
               11 set 2026). */}
           <div>
             <p className="font-extrabold text-sm leading-tight min-h-[2.2em]">{t('home.friendly_match')}</p>
-            <p className="text-[10.5px] opacity-80 mt-0.5">{t('home.friendly_match_subtitle')}</p>
+            <p className="text-[10.5px] opacity-80 mt-0.5">{friendInvitesOn ? t('friends.profile_button_line') : t('home.friendly_match_subtitle')}</p>
           </div>
         </Link>
         )}
@@ -761,8 +764,12 @@ export default function Profile() {
       {/* Ecrã cheio da explicação de XP — substitui o antigo popover do (?),
           que ficava cortado nas larguras estreitas. Mesmo conteúdo de
           sempre (instructions.xp_*), só que sem limite de largura/altura e
-          com "Voltar" em vez de fechar ao tocar fora. */}
-      {xpHelpOpen && (
+          com "Voltar" em vez de fechar ao tocar fora.
+          Portal para o body (Francisco, 27 set): dentro do bloco animado da
+          página (transform) o `fixed` ficava preso a ele — o ecrã tinha a
+          altura do Perfil inteiro e deslizava muito para lá do último nível.
+          A mesma causa da pesquisa da Home (#547) e da tira do Gerir (#565). */}
+      {xpHelpOpen && createPortal(
         <div className="fixed inset-0 z-50 bg-canvas overflow-y-auto animate-fade-in">
           <div className="sticky top-0 bg-canvas border-b border-line flex items-center gap-3 px-4 py-3.5">
             <button
@@ -775,7 +782,8 @@ export default function Profile() {
             </button>
             <h2 className="text-lg text-ink-900 font-extrabold">{t('profile.card_xp_heading')}</h2>
           </div>
-          <div className="max-w-lg mx-auto p-4 space-y-4">
+          {/* Em baixo, só o espaço da barra de navegação. */}
+          <div className="max-w-lg mx-auto px-4 pt-4 pb-[calc(env(safe-area-inset-bottom)+112px)] space-y-4">
             <p className="text-sm text-ink-700 leading-relaxed">{t('instructions.xp_intro')}</p>
             <ul className="space-y-1.5 text-sm text-muted">
               <li>• {t('instructions.xp_v1')}</li>
@@ -796,7 +804,8 @@ export default function Profile() {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
 
       {photoError && (

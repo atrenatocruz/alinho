@@ -342,12 +342,16 @@ export function placeQualifiers(labels, size) {
   return tryPlace(true) || tryPlace(false) || classic
 }
 
-/** Como se lê «vencedor de» cada ronda, para o texto do quadro. */
-const ROUND_SOURCE = { R32: 'dos 16 avos', R16: 'dos oitavos', QF: 'dos quartos', SF: 'das meias' }
+/** Como se lê «vencedor de» cada ronda, para o texto do quadro. Um nome por
+    caso, em todo o lado (designer, 27 set): «Vencedor O1» (oitavos),
+    «Vencedor Q1» (quartos), «Vencedor meia 1»; no 3.º lugar, «Perdedor
+    meia 1» (esse texto grava-o o draw_category). Os 16 avos não entraram na
+    decisão: ficam como estavam. */
+const ROUND_SOURCE = { R32: (n) => `Vencedor dos 16 avos ${n}`, R16: (n) => `Vencedor O${n}`, QF: (n) => `Vencedor Q${n}`, SF: (n) => `Vencedor meia ${n}` }
 
 /** O quadro vazio, em texto, para o momento do sorteio: os grupos ainda não
     se jogaram, por isso não há duplas — há lugares («1.º do Grupo A») e
-    caminhos («Vencedor dos quartos 2»). É o que o jogador vê no separador
+    caminhos («Vencedor Q2»). É o que o jogador vê no separador
     Quadro antes de os grupos acabarem, e é o que deixa cada um ver o
     caminho dele até à final.
 
@@ -392,8 +396,8 @@ export function buildBracketSkeleton(groups, perGroup, { stage = 'principal' } =
         stage,
         round: name,
         slot,
-        source_a: prevByes.get(fa) || `Vencedor ${ROUND_SOURCE[prevName]} ${fa}`,
-        source_b: prevByes.get(fb) || `Vencedor ${ROUND_SOURCE[prevName]} ${fb}`,
+        source_a: prevByes.get(fa) || ROUND_SOURCE[prevName](fa),
+        source_b: prevByes.get(fb) || ROUND_SOURCE[prevName](fb),
       })
     }
     prevCount = count
@@ -434,8 +438,8 @@ export function buildDrawPayload(teams, {
       stage: m.stage, round: m.round, slot: m.slot,
       source_a: m.source_a, source_b: m.source_b,
     })),
-    // O jogo do 3.º/4.º lugar é «perdedor da 1.ª meia» contra «perdedor da
-    // 2.ª»: só existe se as DUAS meias-finais existirem. Com 3 apurados (3
+    // O jogo do 3.º/4.º lugar é «Perdedor meia 1» contra «Perdedor meia
+    // 2»: só existe se as DUAS meias-finais existirem. Com 3 apurados (3
     // grupos a passar 1) há 3 duplas num quadro de 4 — o melhor primeiro vai
     // direto à final e joga-se UMA meia. Pedir o 3.º lugar aí deixava no
     // quadro um jogo à espera de um perdedor que nunca aparecia, e que não
@@ -487,8 +491,8 @@ export function buildKnockoutPayload(teams, { thirdPlace = false, stage = 'princ
         stage, round: name, slot,
         a: prevByes.get(fa) || null,
         b: prevByes.get(fb) || null,
-        source_a: prevByes.has(fa) ? null : `Vencedor ${ROUND_SOURCE[prevName]} ${fa}`,
-        source_b: prevByes.has(fb) ? null : `Vencedor ${ROUND_SOURCE[prevName]} ${fb}`,
+        source_a: prevByes.has(fa) ? null : ROUND_SOURCE[prevName](fa),
+        source_b: prevByes.has(fb) ? null : ROUND_SOURCE[prevName](fb),
       })
     }
     prevCount = count
