@@ -3688,6 +3688,8 @@
   "livetour.matches_live_other": "{{count}} matches in progress",
   "livetour.last": "Last:",
   "livetour.hidden_pair": "Pair {{n}}",
+  "testenv.banner_lead": "Test environment",
+  "testenv.banner_rest": "the data isn’t real",
   "tournament.tree.half": "Half {{n}}",
   "tournament.tree.round_R32": "Round of 32",
   "tournament.tree.round_R16": "Round of 16",

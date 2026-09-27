@@ -7,6 +7,8 @@ import { installDevMockNetwork } from './lib/devMockNetwork'
 import { reloadOnceForChunk } from './lib/chunkReload'
 import { registerSW } from 'virtual:pwa-register'
 import { setupAppUpdate } from './lib/appUpdate'
+import { IS_TEST_ENV } from './lib/appEnv'
+import TestEnvBanner from './components/TestEnvBanner'
 
 // A app instalada apanha a versão nova sem ter de ser fechada (#569, QA 26 set).
 if (import.meta.env.PROD) setupAppUpdate(registerSW)
@@ -22,8 +24,13 @@ window.addEventListener('vite:preloadError', (event) => {
 // ficheiro para o porquê.
 installDevMockNetwork()
 
+// O site de testes (#585): a classe liga as regras de index.css que abrem
+// espaço à faixa «Ambiente de testes».
+if (IS_TEST_ENV) document.documentElement.classList.add('test-env')
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
+    <TestEnvBanner />
     <App />
   </React.StrictMode>,
 )

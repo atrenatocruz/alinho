@@ -1315,7 +1315,7 @@ export function BackBar({ onBack, to, label, title, onShare }) {
   }, [title])
   const round = 'flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/95 text-ink-900 shadow-card'
   return (
-    <div ref={barRef} className="sticky top-0 z-10 -mx-4 -mt-6 mb-1 bg-white/70 px-4 backdrop-blur-md" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+    <div ref={barRef} className="sticky top-0 z-10 -mx-4 -mt-6 mb-1 bg-white/70 px-4 backdrop-blur-md" style={{ paddingTop: 'var(--safe-top, env(safe-area-inset-top))' }}>
       <div className="grid h-16 grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-3">
         {to
           ? <Link to={to} aria-label={label || t('common.back')} className={round}><ChevronLeft size={22} /></Link>
