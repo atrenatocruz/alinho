@@ -130,7 +130,11 @@ export default function TeacherSchedule() {
     }
   }
 
-  const back = <BackBar onBack={() => (adminTp ? navigate(-1) : navigate('/perfil'))} label={adminTp ? t('teacher.schedule_admin_back') : t('teacher.schedule_back')} />
+  // O nome na barra ao deslizar: o mesmo título da página.
+  const heading = adminTp
+    ? t('teacher.schedule_admin_title', { name: (mine?.user?.name || '').split(' ')[0], context: mine?.user?.gender === 'feminino' ? 'f' : undefined })
+    : t('teacher.schedule_title')
+  const back = <BackBar onBack={() => (adminTp ? navigate(-1) : navigate('/perfil'))} label={adminTp ? t('teacher.schedule_admin_back') : t('teacher.schedule_back')} title={heading} />
 
   if (loading) {
     return (
@@ -174,7 +178,6 @@ export default function TeacherSchedule() {
   )
 
   const selectClass = 'input-field !min-h-[44px] !py-2'
-  const firstName = (mine?.user?.name || '').split(' ')[0]
   const ownPricesTp = !adminTp && isLessonsEnabled ? profiles.find((p) => !p.organization_id)?.id || null : null
   // Com mais de um clube, cada bloco diz o clube e o «+ Horas» pergunta onde.
   const manyClubs = profiles.length > 1
@@ -189,7 +192,7 @@ export default function TeacherSchedule() {
       {back}
       <div>
         <h2 className="text-2xl text-ink-900">
-          {adminTp ? t('teacher.schedule_admin_title', { name: firstName, context: mine?.user?.gender === 'feminino' ? 'f' : undefined }) : t('teacher.schedule_title')}
+          {heading}
         </h2>
         <p className="text-sm text-muted mt-1">
           {adminTp ? t('teacher.schedule_admin_intro', { club: mine?.organization?.name || '' }) : t('teacher.schedule_intro')}
