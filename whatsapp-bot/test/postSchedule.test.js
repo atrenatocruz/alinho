@@ -5,27 +5,40 @@ process.env.SUPABASE_URL = 'http://localhost:1'
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'x'
 process.env.PHONE_HASH_SECRET = 'x'
 
-const { dueOrgs, postKey } = await import('../src/postSchedule.js')
+const { dueMixes, postKey, slotFor, mixPostTimes } = await import('../src/postSchedule.js')
 const { supabase } = await import('../src/supabase.js')
 const { installFakeSupabase } = await import('./fakeSupabase.js')
-const { publishOrgCards, loadPostHours } = await import('../src/reminders.js')
+const { publishOrgCards, loadPostHours, checkScheduledPosts, _clearSentPostsForTests } = await import('../src/reminders.js')
 const { _clearOpenMixesCacheForTests, gameIdForMessage } = await import('../src/roster.js')
 const { _resetGroupStateForTests } = await import('../src/sync.js')
 
-// ── Que clubes publicam agora (#553) ──────────────────────────────────────
-const hoursByOrg = new Map([['a2n', [10, 14, 19]], ['smash', [10]], ['off', []]])
-
-test('publica os clubes com esta hora, só nos primeiros 15 min', () => {
-  assert.deepEqual(dueOrgs({ hoursByOrg, hour: 10, minute: 3, dayKey: '2026-09-27', sent: new Set() }), ['a2n', 'smash'])
-  assert.deepEqual(dueOrgs({ hoursByOrg, hour: 14, minute: 0, dayKey: '2026-09-27', sent: new Set() }), ['a2n'])
-  assert.deepEqual(dueOrgs({ hoursByOrg, hour: 14, minute: 20, dayKey: '2026-09-27', sent: new Set() }), [])
-  assert.deepEqual(dueOrgs({ hoursByOrg, hour: 11, minute: 0, dayKey: '2026-09-27', sent: new Set() }), [])
+// ── Que mixes saem agora (horas por evento, 27 set) ───────────────────────
+test('a janela: 15 min depois da hora certa e da meia hora', () => {
+  assert.equal(slotFor(10, 3), '10:00')
+  assert.equal(slotFor(18, 31), '18:30')
+  assert.equal(slotFor(10, 20), null)
+  assert.equal(slotFor(10, 50), null)
 })
 
-test('não repete a mesma hora no mesmo dia', () => {
-  const sent = new Set([postKey('a2n', '2026-09-27', 10)])
-  assert.deepEqual(dueOrgs({ hoursByOrg, hour: 10, minute: 5, dayKey: '2026-09-27', sent }), ['smash'])
-  assert.deepEqual(dueOrgs({ hoursByOrg, hour: 10, minute: 5, dayKey: '2026-09-28', sent }), ['a2n', 'smash'])
+test('cada mix às suas horas; sem horas escolhidas, as do clube; [] = nunca', () => {
+  const mixes = [
+    { id: 'proprias', whatsapp_post_times: ['09:30:00', '18:30:00'] },
+    { id: 'clube', whatsapp_post_times: null },
+    { id: 'sem', whatsapp_post_times: [] },
+  ]
+  assert.deepEqual(mixPostTimes(mixes[0], [10]), ['09:30', '18:30'])
+  const at = (slot) => dueMixes({ mixes, orgHours: [10, 18], slot, dayKey: '2026-09-27', sent: new Set() }).map((m) => m.id)
+  assert.deepEqual(at('18:30'), ['proprias'])
+  assert.deepEqual(at('10:00'), ['clube'])
+  assert.deepEqual(at('18:00'), ['clube'])
+  assert.deepEqual(at('12:00'), [])
+})
+
+test('não repete a mesma meia hora no mesmo dia', () => {
+  const mixes = [{ id: 'm', whatsapp_post_times: ['10:00'] }]
+  const sent = new Set([postKey('m', '2026-09-27', '10:00')])
+  assert.deepEqual(dueMixes({ mixes, orgHours: [], slot: '10:00', dayKey: '2026-09-27', sent }), [])
+  assert.equal(dueMixes({ mixes, orgHours: [], slot: '10:00', dayKey: '2026-09-28', sent }).length, 1)
 })
 
 // ── Publicar os cartões ───────────────────────────────────────────────────
@@ -69,4 +82,23 @@ test('sem a migração (coluna em falta) fica a hora de sempre para todos', asyn
   db.organizations = [{ id: 'o' }]
   const map = await loadPostHours(['o'])
   assert.deepEqual(map.get('o'), [10])
+})
+
+
+test('às 18:30 só sai o mix que tem essa hora — o outro fica com as do clube', async () => {
+  const db = setup()
+  db.games[1] = { ...db.games[1], status: 'open', id: 'outro', title: 'Outro mix', whatsapp_post_times: null }
+  db.games[0] = { ...db.games[0], whatsapp_post_times: ['18:30:00'] }
+  db.participants = []
+  _clearSentPostsForTests()
+  const sent = []
+  const deps = { sendText: async (_g, text) => { sent.push(text); return `id-${sent.length}` }, getGroupMentions: async () => [] }
+  await checkScheduledPosts(deps, { hour: 18, minute: 31, dayKey: '2026-09-27' })
+  assert.equal(sent.length, 1)
+  assert.match(sent[0], /Mix com vagas/)
+  await checkScheduledPosts(deps, { hour: 18, minute: 35, dayKey: '2026-09-27' })
+  assert.equal(sent.length, 1, 'não repete na mesma meia hora')
+  await checkScheduledPosts(deps, { hour: 19, minute: 2, dayKey: '2026-09-27' })
+  assert.equal(sent.length, 2, 'às 19:00 sai o outro, com as horas do clube')
+  assert.match(sent[1], /Outro mix/)
 })
