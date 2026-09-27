@@ -233,7 +233,12 @@ export const TOURNAMENT_RPC_MOCKS = {
             pp('Nuno Reis', 3, true, 4, 2),
           ] },
       ],
-      my: {
+      // localStorage.mockTPodiumPlace = '3': quem vê é a Ana, 3.ª no MX4
+      // (para o cartão de partilha do pódio com os três títulos).
+      my: localStorage.getItem('mockTPodiumPlace') === '3' ? {
+        player_name: 'Ana Moreira', category_code: 'MX4', category_name: 'Mistos 4',
+        matches: 4, matches_won: 2, rating_delta: 6, final_position: 3,
+      } : {
         player_name: 'Francisco Barros', category_code: 'M5', category_name: 'Masculinos 5',
         matches: 5, matches_won: 4, rating_delta: 18, final_position: 1,
       },
