@@ -67,3 +67,33 @@ export function stripStartsOpen({ round, matches, current, started, myIds, meInC
 }
 
 export const isMine = (m, myIds) => !!m && (myIds.includes(m.entry_a_id) || myIds.includes(m.entry_b_id))
+
+/** Em que quarto de final dá um jogo das rondas antes dos quartos (1 a 4). */
+export const quarterOf = (round, slot) => Math.ceil(slot / Math.max(1, SIZE[round] / 4))
+
+/** Quem não joga a 1.ª ronda (Bye, ponto 7): o sorteio não cria jogo para
+ *  quem não tem adversário e põe a dupla logo na ronda seguinte. Aqui
+ *  encontram-se: um lado da 2.ª ronda com dupla, sem jogo na 1.ª que dê
+ *  nele. Devolve [{ id, round, slot }] — a ronda e o lugar onde a dupla
+ *  aparece. */
+export function byeEntries(tree) {
+  const [first, second] = tree.present
+  if (!first || !second || first === 'F') return []
+  const all = (r) => [...tree.halves[0].rounds, ...tree.halves[1].rounds].filter((x) => x.round === r).flatMap((x) => x.matches)
+  const firstSlots = new Set(all(first).map((m) => m.slot))
+  const out = []
+  for (const m of all(second)) {
+    if (m.entry_a_id && !firstSlots.has(2 * m.slot - 1)) out.push({ id: m.entry_a_id, round: second, slot: m.slot })
+    if (m.entry_b_id && !firstSlots.has(2 * m.slot)) out.push({ id: m.entry_b_id, round: second, slot: m.slot })
+  }
+  return out
+}
+
+/** O caminho até ao quarto q (ponto 8): os jogos das rondas antes dos
+ *  quartos que dão nesse quarto, da ronda mais cedo para a mais perto. */
+export function quarterPath(tree, q) {
+  const all = [...tree.halves[0].rounds, ...tree.halves[1].rounds]
+  return EARLY_ROUNDS
+    .map((round) => ({ round, matches: all.filter((r) => r.round === round).flatMap((r) => r.matches).filter((m) => quarterOf(round, m.slot) === q) }))
+    .filter((r) => r.matches.length)
+}
