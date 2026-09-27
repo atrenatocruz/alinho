@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, GraduationCap } from 'lucide-react'
 import { getTeacherPage } from '../lib/lessonsApi'
@@ -38,8 +38,16 @@ export default function RequestLesson() {
   const [data, setData] = useState(null)
   // Contacto do professor e clube, para quando ainda não dá para pedir.
   const [page, setPage] = useState(null)
+  // «Marcar aula» (SPEC-calendario-2, assunto 3): «Aula avulsa» ou «Aula
+  // experimental» (1 h, sem tipo, preço da linha «Experimental» do clube).
+  const [kind, setKind] = useState('single')
+  const [hasSeries, setHasSeries] = useState(false)
   const [loading, setLoading] = useState(true)
   const [blockKey, setBlockKey] = useState(null)
+  // Vindo do calendário (tocar numa hora livre): ?dia=AAAA-MM-DD&hora=HH:MM
+  // já escolhidos (SPEC-calendario-2, assunto 1, ponto 3).
+  const [searchParams] = useSearchParams()
+  const [wanted, setWanted] = useState(() => (searchParams.get('dia') ? { dia: searchParams.get('dia'), hora: searchParams.get('hora') } : null))
   const [duration, setDuration] = useState(null)
   const [start, setStart] = useState(null)
   const [type, setType] = useState(null)
@@ -58,7 +66,9 @@ export default function RequestLesson() {
     try {
       setData(await getTeacherBooking(id))
       const today = new Date().toISOString().slice(0, 10)
-      getTeacherPage(id, today, today).then((p) => setPage(p?.teacher || null)).catch(() => setPage(null))
+      const in14 = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10)
+      getTeacherPage(id, today, in14).then((p) => { setPage(p?.teacher || null); setHasSeries((p?.items || []).some((it) => it.kind === 'series')) })
+        .catch(() => setPage(null))
     } catch (err) {
       if (errorKind(err) !== 'not_ready') console.error('Error loading booking:', err)
       setData(null)
@@ -79,10 +89,31 @@ export default function RequestLesson() {
   const { options: starts, noFit } = startOptions(block, duration, data?.busy || [])
   const peak = block && start && duration ? isPeak(profile.peak_hours, block.weekday, start, duration) : false
   const priceOf = (ty) => (block && duration ? lessonPrice(profile.prices, block.tp, ty, duration, peak, block.date) : null)
-  const price = type ? priceOf(type) : null
+  // A experimental: 1 h, com o preço da linha «Experimental» do clube.
+  const trialPrice = block && start ? lessonPrice(profile.prices, block.tp, 'trial', 60, isPeak(profile.peak_hours, block.weekday, start, 60), block.date) : null
+  const price = kind === 'trial' ? trialPrice : type ? priceOf(type) : null
+  // Só se mostra «Aula experimental» se algum clube dele tiver esse preço.
+  const anyTrial = (data?.profiles || []).some((p) => (p.prices || []).some((r) => r.lesson_type === 'trial' && r.price_lesson != null && (r.teacher_profile_id === p.teacher_profile_id || r.teacher_profile_id == null)))
+  const lessonsFrom = Math.min(...(data?.profiles || []).flatMap((p) => (p.prices || []).filter((r) => r.lesson_type !== 'trial' && r.price_lesson != null).map((r) => Number(r.price_lesson))))
+  const trialFrom = Math.min(...(data?.profiles || []).flatMap((p) => (p.prices || []).filter((r) => r.lesson_type === 'trial' && r.price_lesson != null).map((r) => Number(r.price_lesson))))
+  const chooseKind = (k) => { setKind(k); setDuration(k === 'trial' && block ? 60 : null); setStart(null); setType(null) }
+
+  // O dia e a hora que vieram do calendário: o bloco desse dia e a duração
+  // mais curta em que essa hora está livre. Uma vez só.
+  useEffect(() => {
+    if (!wanted || !data || blocks.length === 0) return
+    const b = blocks.find((x) => x.date === wanted.dia && x.start <= wanted.hora && wanted.hora < x.end && x.tp === id)
+      || blocks.find((x) => x.date === wanted.dia && x.start <= wanted.hora && wanted.hora < x.end)
+    setWanted(null)
+    if (!b) return
+    setBlockKey(b.key)
+    const p = data.profiles.find((x) => x.teacher_profile_id === b.tp)
+    const d = availableDurations(b, p).find((dur) => startOptions(b, dur, data.busy || []).options.some((o) => o.time === wanted.hora && !o.taken))
+    if (d) { setDuration(d); setStart(wanted.hora) }
+  }, [wanted, data, blocks]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Mudar uma escolha de cima limpa as de baixo que deixaram de caber.
-  const chooseBlock = (key) => { setBlockKey(key); setDuration(null); setStart(null); setType(null) }
+  const chooseBlock = (key) => { setBlockKey(key); setDuration(kind === 'trial' ? 60 : null); setStart(null); setType(null) }
   const chooseDuration = (d) => { setDuration(d); setStart(null); setType(null) }
 
   if (loading) {
@@ -286,16 +317,32 @@ export default function RequestLesson() {
     })
     .map((b) => ({ from: hm(b.starts_at), to: hm(b.ends_at) }))
   const before = taken.filter((h) => !ranges.some((r) => h >= r.from && h < r.to))
-  const reasons = [
-    ...ranges.slice(0, 2).map((r) => t('booking.busy_range', { from: compactTime(r.from), to: compactTime(r.to) })),
-    ...(before.length ? [t('booking.busy_before', { duration: t(`lessons.duration_${duration}`), times: before.map(compactTime).join(', ').replace(/, ([^,]*)$/, ` ${t('booking.or')} $1`) })] : []),
-    ...(noFit ? [t('booking.start_nofit', { time: compactTime(noFit), duration: t(`lessons.duration_${duration}`) })] : []),
-  ]
+  // Uma frase só (designer, 27 set): a linha técnica era comprida.
+  const reasons = taken.length > 0 || noFit ? [t('booking.struck_hint')] : []
 
   return (
     <div className="space-y-5 pb-4">
       {back(`/professor/${id}`, shortName)}
-      <h2 className="text-2xl text-ink-900">{g('booking.title')}</h2>
+      <div>
+        <h2 className="text-2xl text-ink-900">{t('booking.title_marcar')}</h2>
+        <p className="text-sm text-muted mt-1">{g('booking.confirms_sub', { club: (block?.orgName || data.profiles?.[0]?.org_name) ? `${block?.orgName || data.profiles[0].org_name} · ` : '' })}</p>
+      </div>
+
+      {anyTrial && !(blocks.length === 0 || noPrices) && (
+        <section>
+          <span className={label}>{t('booking.which_lesson')}</span>
+          <div className="flex gap-2">
+            {[['single', t('booking.kind_single'), Number.isFinite(lessonsFrom) ? t('booking.from_per_person', { price: euros(lessonsFrom) }) : ''],
+              ['trial', t('booking.kind_trial'), Number.isFinite(trialFrom) ? (trialFrom === 0 ? t('lessons.free_price') : euros(trialFrom)) : '']].map(([k, a, b]) => (
+              <button key={k} type="button" aria-pressed={kind === k} onClick={() => chooseKind(k)}
+                className={`rounded-full border px-4 py-1.5 text-center leading-tight ${kind === k ? 'border-ink-900 bg-ink-900 text-white' : 'border-line bg-white text-ink-900'}`}>
+                <span className="block text-sm font-extrabold">{a}</span>
+                <span className={`block text-[11px] ${kind === k ? 'text-white/80' : 'text-muted'}`}>{b}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section>
         {!(blocks.length === 0 || noPrices) && <span className={label}>{t('booking.day')}</span>}
@@ -337,9 +384,11 @@ export default function RequestLesson() {
       {block && (
         <section>
           <span className={label}>{t('booking.duration')}</span>
-          {durations.length === 0
-            ? <p className="text-sm text-muted">{t('booking.no_prices')}</p>
-            : <Chips options={durations.map((d) => ({ value: d, label: t(`lessons.duration_${d}`) }))} value={duration} onChange={chooseDuration} />}
+          {kind === 'trial'
+            ? <p className="rounded-ctrl bg-ink-50 px-3.5 py-3 text-sm text-ink-700">{t('booking.trial_duration')}</p>
+            : durations.length === 0
+              ? <p className="text-sm text-muted">{t('booking.no_prices')}</p>
+              : <Chips options={durations.map((d) => ({ value: d, label: t(`lessons.duration_${d}`) }))} value={duration} onChange={chooseDuration} />}
         </section>
       )}
 
@@ -349,7 +398,7 @@ export default function RequestLesson() {
           <div className="flex flex-wrap gap-2">
             {starts.map((o) => (
               <button key={o.time} type="button" disabled={o.taken} aria-pressed={o.time === start}
-                onClick={() => { setStart(o.time); setType(null) }}
+                onClick={() => { setStart(o.time); setType(kind === 'trial' ? 'trial' : null) }}
                 className={`${chip(o.time === start)} disabled:line-through disabled:text-muted disabled:bg-ink-50`}>
                 {compactTime(o.time)}
               </button>
@@ -359,21 +408,27 @@ export default function RequestLesson() {
         </section>
       )}
 
-      {block && duration && start && (
+      {block && duration && start && kind === 'single' && (
         <section>
-          <span className={label}>{t('booking.type')}</span>
-          <div className="grid grid-cols-2 gap-2">
+          <span className={label}>{t('booking.type_group')}</span>
+          <div className="flex flex-wrap gap-2">
             {LESSON_TYPES.filter((ty) => priceOf(ty) != null).map((ty) => (
               <button key={ty} type="button" aria-pressed={ty === type} onClick={() => setType(ty)}
-                className={`flex items-center justify-between rounded-ctrl bg-white px-3.5 min-h-[48px] text-sm font-extrabold text-ink-900 ${ty === type ? 'border-2 border-ink-900' : 'border border-line'}`}>
-                <span>{t(`lessons.price_row_${ty}`)}</span><span>{t('booking.per_person', { price: euros(priceOf(ty)) })}</span>
+                className={`rounded-full border px-4 py-1.5 text-center leading-tight ${ty === type ? 'border-ink-900 bg-ink-900 text-white' : 'border-line bg-white text-ink-900'}`}>
+                <span className="block text-sm font-extrabold">{t(`lessons.price_row_${ty}`)}</span>
+                <span className={`block text-[11px] ${ty === type ? 'text-white/80' : 'text-muted'}`}>{euros(priceOf(ty))}</span>
               </button>
             ))}
           </div>
+          {/* Grupo todas as semanas: as turmas (assunto 3, ponto 3). */}
+          {hasSeries && (
+            <button type="button" onClick={() => navigate(`/professor/${id}/disponibilidade`)}
+              className="mt-2 text-sm font-extrabold text-ink-900 underline underline-offset-2">{g('booking.see_series')}</button>
+          )}
         </section>
       )}
 
-      {type && (
+      {type && block && start && (
         <section>
           <span className={label}>{g('booking.contact_question')}</span>
           <div className="grid grid-cols-2 gap-2">
@@ -397,11 +452,11 @@ export default function RequestLesson() {
         </section>
       )}
 
-      {type && (
+      {type && block && start && (
         <div className="space-y-2">
           <p className="flex justify-between gap-3 text-sm text-ink-900">
             <span>{dayLabel(t, block.date)} · {compactTime(start)}–{compactTime(endTime(start, duration))} · {t(`lessons.price_row_${type}`)}</span>
-            <b className="font-extrabold shrink-0">{t('booking.per_person', { price: euros(price) })}</b>
+            <b className="font-extrabold shrink-0">{Number(price) === 0 ? t('lessons.free_price') : t('booking.per_person', { price: euros(price) })}</b>
           </p>
           {error && <p role="alert" className="rounded-ctrl border border-danger/30 bg-danger/10 px-3 py-2 text-sm font-bold text-danger">{error}</p>}
           <PrimaryButton className="w-full" onClick={send} disabled={sending}>{t('booking.send')}</PrimaryButton>

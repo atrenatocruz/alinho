@@ -173,6 +173,7 @@ function BracketSheet({ matches, entries, title }) {
 
 /* ── A grelha do dia: horas × campos, todas as categorias ───────────── */
 function DayGrid({ day, matches, entries, locale }) {
+  const { t } = useTranslation()
   const courts = [...new Set(matches.map((m) => m.court_name).filter(Boolean))].sort()
   if (!courts.length) return null
   const times = day.slots.map((s) => s.time)
@@ -207,10 +208,10 @@ function DayGrid({ day, matches, entries, locale }) {
                           {m.round ? ` · ${ROUND_PT[m.round] || m.round}` : ''}
                         </span>
                         <span className="block">
-                          {nameOf(m.entry_a_id) || m.source_a || '—'}
+                          {nameOf(m.entry_a_id) || sourceText(m.source_a, null, t) || '—'}
                         </span>
                         <span className="block">
-                          {nameOf(m.entry_b_id) || m.source_b || '—'}
+                          {nameOf(m.entry_b_id) || sourceText(m.source_b, null, t) || '—'}
                         </span>
                         <span className="mt-0.5 block">
                           {played(m) ? <b>{resultText(m)}</b> : <><Blank w={20} /> – <Blank w={20} /></>}

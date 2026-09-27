@@ -135,7 +135,7 @@ export default function MergeSheet({ open, requests = [], onSend, onClose }) {
               {LESSON_TYPES.filter((ty) => capacity[ty] >= requests.length && priceOf(ty) != null).map((ty) => (
                 <button key={ty} type="button" aria-pressed={ty === type} onClick={() => setType(ty)}
                   className={`flex items-center justify-between rounded-ctrl bg-white px-3.5 min-h-[48px] text-sm font-extrabold text-ink-900 ${ty === type ? 'border-2 border-ink-900' : 'border border-line'}`}>
-                  <span>{t(`lessons.price_row_${ty}`)}</span><span>{t('booking.per_person', { price: euros(priceOf(ty)) })}</span>
+                  <span>{t(`lessons.price_row_${ty}`)}</span><span className="whitespace-nowrap">{t('booking.per_person', { price: euros(priceOf(ty)) })}</span>
                 </button>
               ))}
             </div>

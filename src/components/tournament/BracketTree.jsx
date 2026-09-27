@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { Tabs } from '../ui'
 import { LILAC } from './TournamentBits'
+import { sourceText } from './sourceText'
 import { matchTieBreak } from './tieBreak'
 import { hhmmInTz, TOURNAMENT_TZ } from '../../lib/tournamentDay'
 import { EARLY_ROUNDS, buildTree, byeEntries, halfOf, isDone, isMine, quarterOf, quarterPath, sourceOf, stripStartsOpen } from './treeLayout'
@@ -148,11 +149,10 @@ export default function BracketTree({ rounds, entries, myIds = [] }) {
   const labelsOf = (m, round) => {
     const src = (side) => {
       const s = sourceOf(round, m.slot ?? m.bracket_slot ?? 1, side, present)
-      // Com uma meia-final só não há «meia 2»: «Vencedor da meia-final».
-      if (s) return s.round === 'SF' && rounds.find((r) => r.round === 'SF')?.matches.length === 1
-        ? t('tournament.tree.winner_only_SF')
-        : t(`tournament.tree.winner_${s.round}`, { n: s.n })
-      return (side === 'a' ? m.source_a : m.source_b) || t('tournament.draw.tbd')
+      // Um nome só em todo o lado (designer, 27 set): «Vencedor O1»,
+      // «Vencedor Q1», «Vencedor meia 1», sempre com o número.
+      if (s) return t(`tournament.tree.winner_${s.round}`, { n: s.n })
+      return sourceText(side === 'a' ? m.source_a : m.source_b, null, t) || t('tournament.draw.tbd')
     }
     return { a: src('a'), b: src('b') }
   }
@@ -303,6 +303,9 @@ export default function BracketTree({ rounds, entries, myIds = [] }) {
     </p>
   )
   const hasHalves = halves[0].rounds.length > 0
+  // Só com as duas metades é que os rótulos «Metade» dizem alguma coisa
+  // (com uma meia-final só não há metade 1; designer, 27 set).
+  const bothHalves = hasHalves && halves[1].rounds.length > 0
 
   return (
     <div>
@@ -320,7 +323,7 @@ export default function BracketTree({ rounds, entries, myIds = [] }) {
 
       {/* Telemóvel: de pé. */}
       <div className={showView === 'tudo' ? 'hidden' : 'md:hidden'}>
-        {hasHalves && halfLabel(1)}
+        {bothHalves && halfLabel(1)}
         {hasHalves && half(1)}
         {final && (
           <div>
@@ -335,11 +338,13 @@ export default function BracketTree({ rounds, entries, myIds = [] }) {
                   label={t('tournament.tree.third')} />
               </div>
             )}
-            {halves[1].rounds.length > 0 && <Stem />}
           </div>
         )}
+        {/* «Metade 2» logo a seguir ao 3.º lugar, por cima da meia-final da
+            metade 2: é aí que ela começa, a subir (designer, 27 set). */}
+        {bothHalves && <div className="mt-3">{halfLabel(2)}</div>}
+        {halves[1].rounds.length > 0 && final && <Stem />}
         {halves[1].rounds.length > 0 && half(2)}
-        {halves[1].rounds.length > 0 && <div className="mt-2">{halfLabel(2)}</div>}
       </div>
 
       {/* Computador: deitada. */}
