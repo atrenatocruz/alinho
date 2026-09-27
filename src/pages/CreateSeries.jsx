@@ -18,6 +18,8 @@ import { describeError } from '../lib/errors'
 import { Chips, DateField, EmptyState, PrimaryButton, Select } from '../components/ui'
 import { Toggle, euros } from '../components/lessons/LessonBits'
 import StepPage from '../components/steps/StepPage'
+import WhatsappHoursField from '../components/WhatsappHoursField'
+import { setEventWhatsappPostTimes } from '../lib/whatsappHours'
 
 const pad = (n) => String(n).padStart(2, '0')
 const iso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
@@ -54,6 +56,9 @@ export default function CreateSeries() {
     close_hours_before: 24, accepts_trial: true, trial_free: true, announce_whatsapp: false,
   })
   const [busy, setBusy] = useState(false)
+  // As horas dos lembretes no WhatsApp (design-handoff/2026-09-27-whatsapp-no-evento):
+  // null = vem com as da última turma do clube; [] = sem lembretes.
+  const [horas, setHoras] = useState(null)
   const [error, setError] = useState('')
   const set = (patch) => { setError(''); setF((x) => ({ ...x, ...patch })) }
   const today = iso(new Date())
@@ -122,6 +127,7 @@ export default function CreateSeries() {
       })
       if (f.price_mode === 'custom') await setLessonSeriesPrice(id, customPrice, null)
       if (f.price_mode === 'promo') await setLessonSeriesPrice(id, promoPrice, f.promo_until)
+      if (f.announce_whatsapp && horas) await setEventWhatsappPostTimes('lesson', id, horas)
       // A tira de 3 s no Gerir: a mesma entrada que o Bugs abriu para todas
       // as páginas de criar (state.notice, ou a sessão quando se volta pelo
       // histórico).
@@ -327,6 +333,8 @@ export default function CreateSeries() {
             <Toggle label={t('lessons.trial_free')} checked={f.accepts_trial && f.trial_free} disabled={!f.accepts_trial} onChange={(v) => set({ trial_free: v })} />
             <Toggle label={t('lessons.announce_whatsapp')} checked={f.announce_whatsapp} onChange={(v) => set({ announce_whatsapp: v })} />
           </div>
+          {/* Só com «Anunciar no WhatsApp» ligado (e grupos ligados, que o campo vê). */}
+          {f.announce_whatsapp && <WhatsappHoursField organizationId={org?.id} kind="lesson" value={horas} onChange={setHoras} />}
         </>
       )}
     </StepPage>
