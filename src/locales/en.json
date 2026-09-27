@@ -1382,6 +1382,7 @@
   "vouchers.consent_lead": "To use this voucher,",
   "vouchers.consent_rest": "{{club}} needs your name and email.",
   "vouchers.see_accept": "See and accept",
+  "vouchers.consent_invite": "Want to share your name and email with {{club}}? You don’t need to, to use the voucher.",
   "vouchers.share_title": "Share your contact with {{club}}?",
   "vouchers.share_body": "To use the voucher, the club needs these details. Only {{club}} sees them, and only for this voucher.",
   "vouchers.share_name": "Name",
