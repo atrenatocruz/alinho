@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { createTournament, scheduleTournamentOpening, setTournamentStatus } from '../lib/tournamentApi'
+import { setEventWhatsappPostTimes } from '../lib/whatsappHours'
 import { describeError } from '../lib/errors'
 import CreateTournamentForm from '../components/tournament/CreateTournamentForm'
 import { EmptyState } from '../components/ui'
@@ -44,6 +45,11 @@ export default function CreateTournamentPage() {
     setError('')
     try {
       const id = await createTournament(org.id, draft)
+      // As horas dos lembretes no WhatsApp guardam-se à parte, logo a seguir
+      // (Dev 3). Se falharem, o torneio já existe: fica com as do clube.
+      if (id && Array.isArray(draft.whatsapp_post_times)) {
+        try { await setEventWhatsappPostTimes('tournament', id, draft.whatsapp_post_times) } catch (err) { console.error('Error saving WhatsApp times:', err) }
+      }
       // O create_tournament grava sempre em rascunho: «Abrir inscrições» é um
       // segundo passo (como no Gerir). Se só este falhar, o torneio já existe
       // — abre-se a página dele na mesma, onde a barra diz que está em
