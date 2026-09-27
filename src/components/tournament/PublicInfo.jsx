@@ -46,6 +46,12 @@ export default function PublicInfo({ tournament, categories = [], entriesOpen = 
       {/* O cartaz não vem aqui: desde 22 set mora no cartão do topo,
           por cima do nome do torneio (Dev 1). */}
 
+      {/* «O formato é anunciado depois das inscrições» uma vez só, e não em
+          cada categoria (designer, 27 set). */}
+      {categories.some((c) => formatWords(c).key === 'tpublic.format_unknown') && (
+        <p className="text-sm text-muted">{t('tpublic.format_unknown_once')}</p>
+      )}
+
       {/* Categorias: dia, hora e vagas — é o que decide se me inscrevo. */}
       <div className="space-y-1.5">
         {(open ? categories : categories.slice(0, 4)).map((c) => {
@@ -67,7 +73,7 @@ export default function PublicInfo({ tournament, categories = [], entriesOpen = 
               <p className="text-xs text-muted">
                 {[
                   when && (typeof when === 'string' ? when : t('tpublic.when', when)),
-                  t(fmt.key, fmt.values),
+                  fmt.key === 'tpublic.format_unknown' ? null : t(fmt.key, fmt.values),
                   c.price_cents != null ? t('tsignup.price', { price: (c.price_cents / 100).toFixed(0), each: eachOf(c.price_cents, i18n.language) }) : null,
                 ].filter(Boolean).join(' · ')}
               </p>
