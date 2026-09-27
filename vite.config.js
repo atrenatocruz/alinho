@@ -1,36 +1,59 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
-export default defineConfig({
+// O site de testes (teste.alinho.pt, #585): com VITE_APP_ENV=test (só no
+// Preview do ramo dev, na Vercel) a app instalada chama-se «alinho TESTE»,
+// tem o ícone com a fita cor de laranja e a barra das horas cor de laranja.
+// Só o valor exato 'test' — sem ele, tudo como no alinho.pt. A faixa no topo
+// das páginas está em src/lib/appEnv.js.
+const TEST_ORANGE = '#EA580C'
+
+// O título, o ícone do separador, o do iPhone e a cor da barra das horas
+// vêm do index.html: trocam-se aqui, no build.
+const testEnvHtml = (isTest) => ({
+  name: 'alinho-test-env-html',
+  transformIndexHtml: (html) => (!isTest ? html : html
+    .replace('<title>alinho</title>', '<title>alinho TESTE</title>')
+    .replace('href="/favicon.ico"', 'href="/favicon-teste.ico"')
+    .replace('href="/apple-touch-icon.png"', 'href="/apple-touch-icon-teste.png"')
+    .replace('<meta name="theme-color" content="#040404" />', `<meta name="theme-color" content="${TEST_ORANGE}" />`)
+    .replace('</head>', '  <meta name="apple-mobile-web-app-title" content="alinho TESTE" />\n  </head>')),
+})
+
+export default defineConfig(({ mode }) => {
+  const isTest = loadEnv(mode, process.cwd(), 'VITE_').VITE_APP_ENV === 'test'
+  const icon = (file) => (isTest ? file.replace(/\.(png|ico)$/, '-teste.$1') : file)
+  return {
   plugins: [
     react(),
+    testEnvHtml(isTest),
     VitePWA({
       // Quem decide quando recarregar a página aberta é src/lib/appUpdate.js
       // (uma vez, nunca a meio de um formulário, #569). O service worker novo
       // ativa logo (skipWaiting/clientsClaim, em baixo).
       registerType: 'prompt',
-      includeAssets: ['favicon.ico', 'robots.txt', 'apple-touch-icon.png'],
+      includeAssets: [icon('favicon.ico'), 'robots.txt', icon('apple-touch-icon.png')],
       manifest: {
-        name: 'alinho',
-        short_name: 'alinho',
+        name: isTest ? 'alinho TESTE' : 'alinho',
+        short_name: isTest ? 'alinho TESTE' : 'alinho',
         description: 'A comunidade de jogadores, grupos e clubes de padel.',
-        theme_color: '#040404',
+        theme_color: isTest ? TEST_ORANGE : '#040404',
         background_color: '#FFFFFF',
         display: 'standalone',
         icons: [
           {
-            src: 'pwa-192x192.png',
+            src: icon('pwa-192x192.png'),
             sizes: '192x192',
             type: 'image/png'
           },
           {
-            src: 'pwa-512x512.png',
+            src: icon('pwa-512x512.png'),
             sizes: '512x512',
             type: 'image/png'
           },
           {
-            src: 'maskable-icon-512x512.png',
+            src: icon('maskable-icon-512x512.png'),
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable'
@@ -57,6 +80,7 @@ export default defineConfig({
       }
     })
   ]
+  }
 })
 
 

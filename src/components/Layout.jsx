@@ -798,7 +798,9 @@ export default function Layout({ children }) {
     // anchored to this non-scrolling shell instead of the viewport, so it
     // still hovers over the tail end of scrolled content like before, but
     // there's no document-level momentum scroll left to detach it from.
-    <div className="relative flex flex-col h-screen bg-canvas overflow-hidden" style={{ height: '100dvh' }}>
+    // --app-h: no site de testes a faixa «Ambiente de testes» fica por cima e
+    // o ecrã da app encolhe à medida (index.css, #585).
+    <div className="relative flex flex-col h-screen bg-canvas overflow-hidden" style={{ height: 'var(--app-h, 100dvh)' }}>
       {/* Main — the only scrolling region in the shell (see the app-shell
           comment above the root div). pb-28 keeps the last bit of content
           from hiding behind the nav overlay below. No dark header above it

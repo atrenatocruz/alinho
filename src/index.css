@@ -287,3 +287,19 @@
     font-size: 16px;
   }
 }
+
+/* ─── Site de testes (#585) ───────────────────────────────────────────────
+   Só com html.test-env (src/lib/appEnv.js). A faixa «Ambiente de testes»
+   (TestEnvBanner) fica no topo e ocupa o espaço das horas do telemóvel;
+   nada da app fica por baixo dela:
+   - o ecrã da app (Layout) encolhe a altura da faixa;
+   - o «Voltar» preso (BackBar) já não soma o espaço das horas;
+   - as janelas que abrem por cima (fixed inset-0) começam por baixo dela. */
+html.test-env {
+  --tb-h: calc(1.5rem + env(safe-area-inset-top));
+  --app-h: calc(100dvh - var(--tb-h));
+  --safe-top: 0px;
+}
+html.test-env .fixed.inset-0 {
+  top: var(--tb-h);
+}

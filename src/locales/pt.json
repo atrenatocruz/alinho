@@ -3736,6 +3736,8 @@
   "livetour.matches_live_other": "{{count}} jogos a decorrer",
   "livetour.last": "Último:",
   "livetour.hidden_pair": "Dupla {{n}}",
+  "testenv.banner_lead": "Ambiente de testes",
+  "testenv.banner_rest": "os dados não são reais",
   "tournament.tree.half": "Metade {{n}}",
   "tournament.tree.round_R32": "16-avos",
   "tournament.tree.round_R16": "Oitavos",
