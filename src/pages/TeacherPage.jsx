@@ -15,7 +15,9 @@ import { priceRowFor, LESSON_CAPACITY, LESSON_DURATIONS } from '../lib/lessons'
 import { weeklyFromItems } from '../lib/teacherSchedule'
 import WeekCalendar from '../components/lessons/WeekCalendar'
 import RealWeekCalendar from '../components/lessons/RealWeekCalendar'
-import { getTeacherBooking, getTeacherBusyRange } from '../lib/lessonsApi'
+import { getTeacherBooking, getTeacherBusyRange, getTeacherLessonsDetail } from '../lib/lessonsApi'
+import PublicDaySheet from '../components/lessons/PublicDaySheet'
+import SeriesSheet from '../components/lessons/SeriesSheet'
 import { teacherContact } from '../lib/teacherContact'
 import { supabase } from '../lib/supabase'
 import { followPlayer, getFollowCounts, unfollowPlayer } from '../lib/follows'
@@ -45,6 +47,10 @@ export default function TeacherPage({ view = 'profile' }) {
   // Semanas a sério (SPEC-calendario-2, assunto 1): com as aulas ligadas, o
   // livre e o ocupado de cada dia; sem elas, fica a semana-tipo.
   const [booking, setBooking] = useState(null)
+  // O dia aberto no calendário, a turma aberta e o «Pedir para entrar» (assunto 4).
+  const [openDay, setOpenDay] = useState(null) // { day, segments, details }
+  const [openSeries, setOpenSeries] = useState(null)
+  const [joinItem, setJoinItem] = useState(null)
   useEffect(() => {
     if (!isLessonsEnabled) { setBooking(null); return undefined }
     let alive = true
@@ -177,7 +183,8 @@ export default function TeacherPage({ view = 'profile' }) {
           com as aulas ligadas, as semanas a sério e tocar para pedir. */}
       {booking?.profiles?.some((p) => (p.availability || []).length > 0)
         ? <RealWeekCalendar booking={booking} mode="public" loadBusy={(a, b) => getTeacherBusyRange(id, a, b)}
-            onPickFree={isMe ? null : (tp, dia, hora) => navigate(`/professor/${tp}/pedir?dia=${dia}&hora=${hora}`)} />
+            loadDetails={(a, b) => getTeacherLessonsDetail(id, a, b)}
+            onPickDay={(day, segments, details) => setOpenDay({ day, segments, details })} />
         : <WeekCalendar slots={weekly} />}
       {!booking?.profiles?.some((p) => (p.availability || []).length > 0) && (
         <p className="text-xs text-muted pt-1.5">{t(female ? 'teacher.public_when_hint_f' : 'teacher.public_when_hint')}</p>
@@ -324,6 +331,14 @@ export default function TeacherPage({ view = 'profile' }) {
         onClose={() => setAskUnfollow(false)}
         errorOf={(err) => describeError(t, err, 'comunidade.unfollow_failed')}
       />
+      <PublicDaySheet day={openDay?.day} segments={openDay?.segments} details={openDay?.details}
+        onBook={isMe ? null : (hora) => { const d = openDay.day; const p = (n) => String(n).padStart(2, '0'); navigate(`/professor/${id}/pedir?dia=${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}&hora=${hora}`) }}
+        onSeeSeries={(d) => setOpenSeries(d)} onClose={() => setOpenDay(null)} />
+      <SeriesSheet detail={openSeries} teacher={teacher} onClose={() => setOpenSeries(null)}
+        onJoin={isMe ? null : (d) => { setOpenSeries(null); setOpenDay(null); setJoinItem({ ...d, weekday: ((new Date(d.starts_at).getDay() + 6) % 7) + 1 }) }} />
+      {joinItem && (
+        <EnrolSheet item={joinItem} teacher={teacher} onClose={() => setJoinItem(null)} onSent={() => setJoinItem(null)} />
+      )}
     </div>
   )
 }

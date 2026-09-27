@@ -45,6 +45,8 @@ export default function PersonalInfo() {
   const [activityVisibility, setActivityVisibility] = useState(profile?.activity_visibility || 'public')
   const [resultsVisibility, setResultsVisibility] = useState(profile?.results_visibility || 'public')
   const [clubsVisibility, setClubsVisibility] = useState(profile?.clubs_visibility || 'public')
+  // «Aulas (onde e com quem treinas)» (Francisco, 27 set): Privado por omissão.
+  const [lessonsVisibility, setLessonsVisibility] = useState(profile?.lessons_visibility || 'private')
   const [isPrivate, setIsPrivate] = useState(profile?.is_private || false)
   const [phone, setPhone] = useState('')
   const [phoneError, setPhoneError] = useState('')
@@ -66,6 +68,7 @@ export default function PersonalInfo() {
     setActivityVisibility(profile?.activity_visibility || 'public')
     setResultsVisibility(profile?.results_visibility || 'public')
     setClubsVisibility(profile?.clubs_visibility || 'public')
+    setLessonsVisibility(profile?.lessons_visibility || 'private')
     setIsPrivate(profile?.is_private || false)
     setPhone('')
     setPhoneError('')
@@ -92,6 +95,8 @@ export default function PersonalInfo() {
         activity_visibility: activityVisibility,
         results_visibility: resultsVisibility,
         clubs_visibility: clubsVisibility,
+        // Só depois da migration_lessons_14 (sem a coluna, gravar o resto não falha).
+        ...(profile && 'lessons_visibility' in profile ? { lessons_visibility: lessonsVisibility } : {}),
         is_private: isPrivate,
       }
       // Só entra no UPDATE quando muda — ver a nota original no Perfil:
@@ -304,6 +309,15 @@ export default function PersonalInfo() {
                   </label>
                   <Select value={clubsVisibility} onChange={setClubsVisibility} options={VISIBILITY_OPTIONS} />
                 </div>
+                {profile && 'lessons_visibility' in profile && (
+                  <div>
+                    <label className={inputLabel}>
+                      {t('profile.visibility_lessons_label')}
+                      <span className="block text-xs font-normal text-muted mt-0.5">{t('profile.visibility_lessons_hint')}</span>
+                    </label>
+                    <Select value={lessonsVisibility} onChange={setLessonsVisibility} options={VISIBILITY_OPTIONS} />
+                  </div>
+                )}
               </div>
             </div>
 

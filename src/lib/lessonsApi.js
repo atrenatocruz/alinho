@@ -265,6 +265,14 @@ export async function getTeacherBusyRange(teacherProfileId, fromIso, toIso) {
   return data || []
 }
 
+/** As aulas de um professor entre duas datas, com o tipo, o nível, a lotação e
+    só os nomes de quem deixou (migration_lessons_14; privacidade das aulas). */
+export async function getTeacherLessonsDetail(teacherProfileId, fromIso, toIso) {
+  const { data, error } = await supabase.rpc('get_teacher_lessons_detail', { p_teacher_profile_id: teacherProfileId, p_from: fromIso, p_to: toIso })
+  if (error) throw error
+  return data || []
+}
+
 export async function cancelLessonRequest(id) {
   const { error } = await supabase.rpc('cancel_lesson_request', { p_id: id })
   if (error) throw error

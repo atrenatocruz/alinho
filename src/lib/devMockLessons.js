@@ -317,6 +317,18 @@ export const LESSON_RPC_MOCKS = {
   set_lesson_prices: () => null,
   set_teacher_availability: () => null,
   get_teacher_busy_range: () => [],
+  // Calendário interativo (assunto 4): a turma de quinta com lugar e a aula da
+  // terça; localStorage.mockLessonPeople = 'true' mostra quem deixou ver o nome.
+  get_teacher_lessons_detail: () => {
+    const d = new Date(); d.setDate(d.getDate() + ((2 - d.getDay() + 7) % 7 || 7)); d.setHours(10, 30, 0, 0)
+    const q = new Date(d); q.setDate(q.getDate() + 2); q.setHours(19, 0, 0, 0)
+    const people = localStorage.getItem('mockLessonPeople') === 'true'
+      ? [{ user_id: 'u-rui', name: 'Rui Costa', avatar_url: null, me: false }] : []
+    return [
+      { lesson_id: 'les-q', series_id: 'ser-qui', teacher_profile_id: 'tp-ana', starts_at: q.toISOString(), ends_at: new Date(q.getTime() + 3600000).toISOString(),
+        lesson_type: 'quad', form: 'series', level_from: 4, level_to: 3, capacity: 4, taken: 2, avg_rating: 1100, price_month: 45, visible: true, people },
+    ]
+  },
   set_lesson_series_price: () => null,
   // Fechar dias (SPEC-calendario-2, assunto 2). localStorage.mockClosures = 'true'
   // — sexta e sábado da próxima semana fechados.

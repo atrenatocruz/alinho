@@ -30,6 +30,8 @@ const MOCK_ADMIN_PROFILE = {
   // a conta (apagar conta, Trello #306).
   deletion_requested_at: typeof localStorage !== 'undefined' ? localStorage.getItem('mockDeletionRequestedAt') : null,
   rating_games: 30,
+  // «Aulas (onde e com quem treinas)» (migration_lessons_14): Privado por omissão.
+  lessons_visibility: 'private',
   // localStorage.mockOnboarding = 'true' → ecrã "Qual é o teu nível?" (Trello #288).
   ...(typeof localStorage !== 'undefined' && localStorage.getItem('mockOnboarding') === 'true' ? { rating_onboarded_at: null } : {}),
   // Foto fictícia (SVG local, sem pedido de rede) — sem isto o botão de
