@@ -3078,11 +3078,13 @@ export default function GameDetails() {
                 </div>
 
                 {/* O alarme das rondas (27 set): no mix vem ligado; cada um
-                    desliga no seu telemóvel. */}
+                    desliga no seu telemóvel. Com os resultados todos a ronda
+                    acabou (SPEC, ponto 7): cala-se e fica à espera da
+                    seguinte, sem a tira âmbar (designer, 27 set). */}
                 {isCurrent && game.round_started_at && game.round_duration_minutes > 0 && (
                   <div className="mb-3">
                     <RoundAlarm
-                      roundKey={`${id}:${game.round_started_at}`}
+                      roundKey={ms.length > 0 && ms.every((m) => m.winner_team_id) ? null : `${id}:${game.round_started_at}`}
                       endsAt={new Date(game.round_started_at).getTime() + game.round_duration_minutes * 60000}
                       roundNumber={r}
                       eventName={game.title}
