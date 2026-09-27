@@ -258,13 +258,19 @@ export default function MixWizard({
             error={launchDayError}
           />
         ) : !editingGame && (
-          // Num mix que não se repete, as inscrições abrem ao publicar.
-          // Escolher outro dia precisa da base de dados (Dev 3) — fica para
-          // depois (plano aprovado pelo Francisco, 26 set).
-          <Field label={t('launchday.label')} hint={t('mixwizard.opens_now_hint')}>
-            <Chips label={t('launchday.label')} value="now" onChange={() => {}}
-              options={[{ value: 'now', label: t('mixwizard.opens_now') }]} />
-          </Field>
+          // Num mix que não se repete: «Já» (abre ao publicar) ou um dos dias
+          // antes — o mix fica 'pending' com launch_at e abre sozinho a essa
+          // hora (migration_abrem_inscricoes.sql, Dev 3, 27 set).
+          <LaunchDayPicker
+            allowNow
+            mixDate={form.date ? new Date(form.date) : null}
+            frequency={null}
+            daysBefore={form.launch?.daysBefore ?? '0'}
+            onDaysBefore={(v) => { clearLaunchDayError(); set({ launch: { ...(form.launch || {}), daysBefore: String(v) } }) }}
+            time={form.launch?.time || '10:00'}
+            onTime={(v) => { clearLaunchDayError(); set({ launch: { ...(form.launch || {}), time: v } }) }}
+            error={launchDayError}
+          />
         )}
         {rec.enabled && (
           <Field label={t('mixwizard.ends_label')}>

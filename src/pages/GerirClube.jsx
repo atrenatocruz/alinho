@@ -41,7 +41,7 @@ import LaunchDayPicker from '../components/LaunchDayPicker'
 import MixWizard from '../components/mix/MixWizard'
 import { LEVEL_SCALES, LEVEL_NUMBERS, parseLevel } from '../lib/mixLevels'
 import SeriesPage from '../components/mix/SeriesPage'
-import { weekdayShort } from '../lib/launchDay'
+import { weekdayShort, launchDate } from '../lib/launchDay'
 import EventActionsSheet from '../components/EventActionsSheet'
 import { cancelMixDate } from '../lib/mixCancel'
 
@@ -174,6 +174,10 @@ const EMPTY_GAME_FORM = {
   level: '',
   auto_start_hours_before: '',
   recurrence: EMPTY_RECURRENCE,
+  // Mix que não se repete: quando abrem as inscrições. '0' = «Já» (ao
+  // publicar); 1–7 = dias antes, à hora `time` (fica 'pending' + launch_at).
+  // Nunca vai para a BD tal como está — sai em handleCreateGame.
+  launch: { daysBefore: '0', time: '10:00' },
 }
 
 // Bandas do ranking (RANKING.md) — o nível opcional de um mix decide que
@@ -1131,12 +1135,22 @@ export default function GerirClube() {
     // pairing_mode sai pelo mesmo motivo: só é enviado quando não é o valor
     // por omissão, para criar/editar mixes não rebentar antes de
     // migration_mix_pairing_mode.sql correr.
-    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, ranked: _ranked, allow_pair_signup: _allowPairSignup, ...gameFields } = gameForm
+    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, ranked: _ranked, allow_pair_signup: _allowPairSignup, launch, ...gameFields } = gameForm
 
     const recurrenceError = validateRecurrence(recurrence)
     if (recurrenceError) {
       if (recurrenceError.field === 'launchDay') setLaunchDayError(recurrenceError.message)
       else setGameError(recurrenceError.message)
+      return
+    }
+
+    // Mix que não se repete com dia para abrir (não «Já»): fica 'pending' e
+    // abre sozinho no launch_at (migration_abrem_inscricoes.sql, Dev 3).
+    // Um rascunho não abre sozinho — publica-se à mão.
+    const launchDays = !recurrence.enabled && !asDraft ? parseInt(launch?.daysBefore, 10) || 0 : 0
+    const launchAt = launchDays >= 1 ? launchDate(new Date(gameForm.date), launchDays, launch?.time || '10:00') : null
+    if (launchAt && launchAt <= new Date()) {
+      setLaunchDayError(t('mixwizard.launch_past'))
       return
     }
 
@@ -1185,7 +1199,8 @@ export default function GerirClube() {
             ...(gameForm.ranked === false ? { ranked: false } : {}),
             level: gameForm.level || null,
             created_by: user.id,
-            status: asDraft ? 'draft' : 'open'
+            status: asDraft ? 'draft' : launchAt ? 'pending' : 'open',
+            ...(launchAt ? { launch_at: launchAt.toISOString() } : {}),
           }
         ])
         .select()
@@ -1203,6 +1218,7 @@ export default function GerirClube() {
 
       const scopedGroup = mixScopeId ? clubGroups.find((g) => g.id === mixScopeId) : null
       saidaNotice.current = asDraft ? t('mixwizard.notice_draft')
+        : launchAt ? t('mixwizard.notice_scheduled', { when: abreEm({ status: 'pending', launch_at: launchAt.toISOString() }) })
         : scopedGroup ? t('mixwizard.notice_published_in', { name: scopedGroup.name })
           : t('mixwizard.notice_published')
       setShowCreateGame(false)
@@ -1342,7 +1358,7 @@ export default function GerirClube() {
     // pairing_mode sai pelo mesmo motivo: só é enviado quando não é o valor
     // por omissão, para criar/editar mixes não rebentar antes de
     // migration_mix_pairing_mode.sql correr.
-    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, ranked: _ranked, allow_pair_signup: _allowPairSignup, ...gameFields } = gameForm
+    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, ranked: _ranked, allow_pair_signup: _allowPairSignup, launch: _launch, ...gameFields } = gameForm
     // Any mix in an active recurring series shares the same underlying
     // game_recurrences row (via recurrence_id) — not just the origin — so
     // recurrence management works from any of them, not only the one that
