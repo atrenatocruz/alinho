@@ -20,6 +20,9 @@ export const levelNumber = (level) => {
   return p ? String(p.num) : null
 }
 
+/** «Quem pode entrar» para cada escalão (o contrário de scaleForGender). */
+export const GENDER_FOR_SCALE = { M: 'masculino', F: 'feminino', MX: 'misto' }
+
 /** O escalão que faz sentido para «Quem pode entrar». */
 export function scaleForGender(gender) {
   if (gender === 'feminino') return 'F'
