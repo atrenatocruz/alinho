@@ -288,3 +288,18 @@ export const listGroupFriendMatches = async (organizationId) => {
   }
   return data || []
 }
+
+/** Resultado de um jogo da sessão (amigos sem bloquear, Dev 3, 27 set):
+ *  quem criou (mesmo a descansar) ou um jogador desse jogo que já aceitou.
+ *  Corrige-se enquanto não conta. Devolve 'confirmed' | 'pending'. Erros:
+ *  not_allowed, already_counted, bad_score. */
+export const recordFriendMatchResult = async (matchId, finalScore) => {
+  const { data, error } = await supabase.rpc('record_friend_match_result', {
+    p_match_id: matchId,
+    p_score_a: finalScore.score_a,
+    p_score_b: finalScore.score_b,
+    p_sets: finalScore.sets ? finalScore.sets.map((s) => ({ score_a: s.score_a, score_b: s.score_b })) : null,
+  })
+  if (error) throw error
+  return data
+}

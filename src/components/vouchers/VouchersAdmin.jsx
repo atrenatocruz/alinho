@@ -4,8 +4,7 @@
 // atrás do «Ler QR code».
 //
 // O email e o telemóvel só aparecem de quem aceitou partilhar (#556, assunto
-// 1). Enquanto essa parte não estiver na base de dados, todos aparecem da
-// mesma forma, sem contactos, e o «Dar baixa» é o de hoje.
+// 1). O «Dar baixa» é para todos (Francisco, 27 set).
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
@@ -56,8 +55,10 @@ export default function VouchersAdmin({ organizationId, onScan }) {
     .filter((v) => filter === 'all' || v.status === filter)
     .filter((v) => mix === 'all' || v.game_id === mix)
 
-  // Com a parte do acordo na base de dados, só quem aceitou tem «Dar baixa».
-  const canRedeem = (v) => v.status === 'por_usar' && (!consent || !!v.contact_shared_at)
+  // «Dar baixa» sempre, também a quem não aceitou partilhar e a convidados
+  // sem conta («não queremos obrigar a ter a app», Francisco, 27 set). O
+  // contacto continua a aparecer só de quem aceitou.
+  const canRedeem = (v) => v.status === 'por_usar'
 
   return (
     <div className="space-y-4">

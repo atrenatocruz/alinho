@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next'
 import { ChevronRight } from 'lucide-react'
 import { listMyFriendSessions, listMyFriendMatchInvites } from '../../lib/privateMatches'
 import { dayText } from './dayText'
+import FriendInviteCard from './FriendInviteCard'
 
 function when(date, time, locale) {
   return [dayText(date, locale), time ? String(time).slice(0, 5) : null].filter(Boolean).join(' · ')
@@ -35,7 +36,9 @@ export default function FriendSessionsList() {
   if (!invites.length && !sessions.length) return null
   return (
     <div className="space-y-3">
-      {invites.map((i) => row(`i-${i.match_id}`, `/jogos-privados/sessao/${i.match_id}`,
+      {/* Com equipas e resultados já feitos: o convite âmbar (27 set). */}
+      {invites.filter((i) => i.teams_set).map((i) => <FriendInviteCard key={`c-${i.match_id}`} invite={i} />)}
+      {invites.filter((i) => !i.teams_set).map((i) => row(`i-${i.match_id}`, `/jogos-privados/sessao/${i.match_id}`,
         t('friends.invited_by', { name: i.creator_name || '' }),
         [when(i.scheduled_date, i.scheduled_time, i18n.language), i.location].filter(Boolean).join(' · ')))}
       {sessions.map((s) => row(`s-${s.match_id}`, `/jogos-privados/sessao/${s.match_id}`,
