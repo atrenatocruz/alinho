@@ -89,6 +89,8 @@ export function installFakeSupabase(supabase, db) {
       },
       in: (c, v) => { q.filters.push((r) => v.includes(get(r, c))); return api },
       gt: (c, v) => { q.filters.push((r) => get(r, c) > v); return api },
+      // .is(col, null) — o que o voucherNotices.js usa.
+      is: (c, v) => { q.filters.push((r) => (get(r, c) ?? null) === v); return api },
       order: (col, opts = {}) => { q.orders.push({ col, asc: opts.ascending !== false }); return api },
       limit: () => api,
       single: () => { q.single = true; return api },

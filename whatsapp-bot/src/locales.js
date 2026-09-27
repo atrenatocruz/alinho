@@ -61,6 +61,8 @@ Para veres esta lista:
   mix_notice_partner_changed: '🤖 🔄 *A tua dupla mudou* no *{{title}}*.\n📅 {{when}}\n{{partner}}',
   mix_notice_partner: '🤝 Jogas com *{{name}}*.',
   mix_notice_no_partner: 'Ainda estás sem par — o admin vai completar a dupla.',
+  // voucherNotices.js — um convidado do WhatsApp ganhou um voucher (27 set, texto do Francisco).
+  voucher_guest_won: '🎁 {{who}}, ganhaste um voucher! Usa-o na receção. Queres guardar este e os próximos prémios? Cria conta em alinho.pt com este número e confirma-o no perfil.',
   duplas_updated: '🤖 🔄 *Duplas atualizadas — {{title}}*\n\n{{lines}}',
   reminder_dm: '🤖 ⏰ *Lembrete!* O teu mix *{{title}}* começa daqui a {{hours}}h.\n📅 {{when}}{{location}}\n\nNão faltes! 🎾',
   digest_mix_line: '🎾 *{{title}}* — {{when}}{{location}}\n👥 {{filled}}/{{capacity}} (faltam {{vagas}})',
@@ -190,6 +192,7 @@ To see this list:
   mix_notice_partner_changed: '🤖 🔄 *Your pair changed* in *{{title}}*.\n📅 {{when}}\n{{partner}}',
   mix_notice_partner: '🤝 You play with *{{name}}*.',
   mix_notice_no_partner: "You don't have a partner yet — the admin will complete the pair.",
+  voucher_guest_won: '🎁 {{who}}, you won a voucher! Use it at the front desk. Want to keep this and future prizes? Sign up at alinho.pt with this number and confirm it in your profile.',
   duplas_updated: '🤖 🔄 *Pairs updated — {{title}}*\n\n{{lines}}',
   reminder_dm: "🤖 ⏰ *Reminder!* Your mix *{{title}}* starts in {{hours}}h.\n📅 {{when}}{{location}}\n\nDon't miss it! 🎾",
   digest_mix_line: '🎾 *{{title}}* — {{when}}{{location}}\n👥 {{filled}}/{{capacity}} ({{vagas}} spot(s) left)',
