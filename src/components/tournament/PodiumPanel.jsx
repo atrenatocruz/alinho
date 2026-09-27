@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next'
 import { Share2, Trophy } from 'lucide-react'
 import TournamentShareFlow from './TournamentShareFlow'
 import { podiumShare } from './shareData'
-import { getTournamentResults } from '../../lib/tournamentApi'
+import { entriesHidingResults, getTournamentResults } from '../../lib/tournamentApi'
 import { errorKind } from '../../lib/errors'
 import { MonoLabel, Me } from './TournamentBits'
 
@@ -66,6 +66,16 @@ export default function PodiumPanel({ tournament }) {
   const { t, i18n } = useTranslation()
   const [data, setData] = useState(null)
   const [sharing, setSharing] = useState(false)
+  const [hidingIds, setHidingIds] = useState([])
+  // As duplas onde alguém esconde os resultados, só para o cartão de partilha.
+  useEffect(() => {
+    if (!sharing || !tournament?.id) return undefined
+    let alive = true
+    entriesHidingResults(tournament.id)
+      .then((ids) => { if (alive) setHidingIds(ids) })
+      .catch((err) => console.error('Error loading hidden pairs:', err))
+    return () => { alive = false }
+  }, [sharing, tournament?.id])
   const finished = tournament?.status === 'terminado'
 
   useEffect(() => {
@@ -137,7 +147,7 @@ export default function PodiumPanel({ tournament }) {
         </button>
       )}
       {sharing && (() => {
-        const built = podiumShare({ tournament, results: data, myName: meName, t, lang: i18n.language })
+        const built = podiumShare({ tournament, results: data, myName: meName, hidingIds, t, lang: i18n.language })
         return built && (
           <TournamentShareFlow tournament={tournament} variant="podium" data={built.data} text={built.text}
             filenameParts={built.filenameParts} onClose={() => setSharing(false)} />

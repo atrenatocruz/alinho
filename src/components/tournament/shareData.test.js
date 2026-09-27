@@ -48,3 +48,16 @@ describe('pódio', () => {
   })
 })
 
+describe('pódio: quem esconde os resultados', () => {
+  it('aparece como «Dupla MX4»', () => {
+    const team = (id, a, b) => ({ entry_id: id, name: `${a} / ${b}`, players: [a, b] })
+    const results = {
+      categories: [{ code: 'MX4', champion: team('e1', 'Marta Silva', 'Tiago Lopes'), runner_up: team('e2', 'Rui Costa', 'Ana Reis'), third: null }],
+      my: { category_code: 'MX4', final_position: 1, matches: 4, matches_won: 4 },
+    }
+    const built = podiumShare({ tournament: { name: 'Smash Cup' }, results, myName: 'Marta Silva', hidingIds: ['e2'], t: (k) => (k === 'tshare.pair_hidden' ? 'Dupla' : k), lang: 'pt' })
+    expect(built.data.rows[1].pair).toBe('Dupla MX4')
+    expect(built.data.rows[0].pair).toBe('Marta S. / Tiago L.')
+  })
+})
+

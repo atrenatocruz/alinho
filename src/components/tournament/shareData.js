@@ -133,14 +133,16 @@ export function resultShare({ tournament, category, board, matchId, myEntryId, m
 
 /** O cartão do pódio da categoria (ou do lugar, do 4.º para baixo).
  *  `results` = getTournamentResults(); `my` = results.my. */
-export function podiumShare({ tournament, results, myName, t, lang }) {
+export function podiumShare({ tournament, results, myName, hidingIds = [], t, lang }) {
   const my = results?.my
   const c = (results?.categories || []).find((x) => x.code === my?.category_code)
   if (!my?.final_position || !c) return null
   const place = my.final_position
   const playersOf = (team) => (team?.players?.length ? team.players : String(team?.name || '').split(/\s*\/\s*/)).map((n) => String(n).trim())
   const hasMe = (team) => !!myName && playersOf(team).includes(myName)
-  const teams = [c.champion, c.runner_up, c.third]
+  // Quem esconde os resultados aparece como «Dupla M4» (PO, 27 set).
+  const hides = new Set(hidingIds)
+  const teams = [c.champion, c.runner_up, c.third].map((team) => (team && hides.has(team.entry_id) ? { ...team, hides_results: true } : team))
   const rows = place <= 3
     ? teams.map((team, i) => (team ? { place: i + 1, pair: pairShort(team, `${t('tshare.pair_hidden')} ${c.code}`), title: t(placeTitleKey(i + 1)), mine: i + 1 === place || hasMe(team) } : null)).filter(Boolean)
     : []

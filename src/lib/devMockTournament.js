@@ -142,6 +142,9 @@ const categories = () => {
 let created = []
 
 export const TOURNAMENT_RPC_MOCKS = {
+  // localStorage.mockTHides = 'true': a dupla «Lima / Reis» esconde os
+  // resultados (cartões de partilha dizem «Dupla M5»).
+  tournament_entries_hiding_results: () => (localStorage.getItem('mockTHides') === 'true' ? ['Lima / Reis'] : []),
   // Lembretes no WhatsApp (27 set). localStorage.mockWaGroups = 'true': o
   // clube tem um grupo ligado e o último torneio tinha 10:00 e 18:00.
   list_whatsapp_groups: () => (localStorage.getItem('mockWaGroups') === 'true'
