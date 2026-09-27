@@ -18,6 +18,7 @@ import { ArrowLeft, Eye, Trophy } from 'lucide-react'
 import { useGoBack } from '../lib/useGoBack'
 import { useAuth } from '../contexts/AuthContext'
 import { getTournamentForEdit, getTournamentPage, updateTournament } from '../lib/tournamentApi'
+import { setEventWhatsappPostTimes } from '../lib/whatsappHours'
 import { describeError, errorKind } from '../lib/errors'
 import { Avatar, EmptyState, Tabs } from '../components/ui'
 import { CategorySelect, LILAC, MonoLabel, StatePill, TourTag } from '../components/tournament/TournamentBits'
@@ -185,6 +186,8 @@ export default function TournamentPage() {
     setSavingEdit(true); setAdminError('')
     try {
       await updateTournament(tour.id, draft)
+      // As horas do WhatsApp gravam-se à parte (Dev 3).
+      if (Array.isArray(draft.whatsapp_post_times)) await setEventWhatsappPostTimes('tournament', tour.id, draft.whatsapp_post_times)
       closeAdmin()
       window.dispatchEvent(new Event('tournament:reload'))
     } catch (err) {

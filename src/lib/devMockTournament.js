@@ -142,6 +142,12 @@ const categories = () => {
 let created = []
 
 export const TOURNAMENT_RPC_MOCKS = {
+  // Lembretes no WhatsApp (27 set). localStorage.mockWaGroups = 'true': o
+  // clube tem um grupo ligado e o último torneio tinha 10:00 e 18:00.
+  list_whatsapp_groups: () => (localStorage.getItem('mockWaGroups') === 'true'
+    ? [{ id: 'wg1', organization_id: 'dev-org', label: 'Padel Dev Org', whatsapp_group_id: '1203630@g.us' }] : []),
+  default_whatsapp_post_times: () => (localStorage.getItem('mockWaGroups') === 'true' ? ['10:00', '18:00'] : []),
+  set_event_whatsapp_post_times: (params) => params?.p_times || [],
   // Mudar o nome da dupla (Dev 3, rename_tournament_entry): devolve o nome
   // gravado — vazio passa a null, como a função a sério.
   rename_tournament_entry: (params) => (params?.p_team_name || '').trim() || null,
