@@ -318,7 +318,11 @@ export const LESSON_TABLE_MOCKS = {
 }
 
 // Avisos das aulas no sino (localStorage.mockLessonNotices = 'true').
-export const LESSON_NOTICES = () => (localStorage.getItem('mockLessonNotices') === 'request' ? [
+// 'dissolved' = a junção desfez-se porque outro aluno saiu (migration_lessons_10).
+export const LESSON_NOTICES = () => (localStorage.getItem('mockLessonNotices') === 'dissolved' ? [
+  { id: 'ln-d1', kind: 'lesson_merge_dissolved', game_id: null, created_at: new Date().toISOString(),
+    data: { teacher_name: 'Ana Moreira', teacher_profile_id: 'tp-ana', lesson_date: at(dayOffset(3), '11:00'), starts_at: at(dayOffset(3), '10:30') } },
+] : localStorage.getItem('mockLessonNotices') === 'request' ? [
   { id: 'ln-r1', kind: 'lesson_request_new', game_id: null, created_at: new Date().toISOString(),
     data: { student_name: 'Ana Silva', starts_at: at(dayOffset(3), '10:30'), lesson_type: 'duo', org_name: 'Clube Exemplo' } },
   { id: 'ln-r2', kind: 'lesson_needs_court', game_id: null, created_at: new Date().toISOString(),

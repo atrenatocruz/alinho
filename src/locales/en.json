@@ -2668,6 +2668,7 @@
   "lessons.notice_merge_proposed": "{{teacher}} suggested joining you in a lesson: {{when}}",
   "lessons.notice_merge_declined": "{{student}} did not accept the merge on {{when}}",
   "lessons.notice_merge_booked": "Lesson booked with everyone: {{when}}",
+  "lessons.notice_merge_dissolved": "The joint lesson on {{when}} won't happen. Your own request stays as you made it.",
   "proposal.propose": "Suggest another time",
   "proposal.title": "Suggest another time",
   "proposal.send": "Send suggestion",
