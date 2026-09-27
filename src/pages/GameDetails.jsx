@@ -45,6 +45,7 @@ import ChangeOneMixSheet from '../components/mix/ChangeOneMixSheet'
 import EventActionsSheet from '../components/EventActionsSheet'
 import { cancelMixDate } from '../lib/mixCancel'
 import { weekdayShort } from '../lib/launchDay'
+import { adminPairSolos, adminSplitPair, mixPairErrorMessage } from '../lib/mixPairs'
 
 // Tipo do evento como na Home (src/lib/agenda.js): um jogo em aberto é
 // "open" (salmão), o resto é "mix" (azul) — Trello #409.
@@ -126,6 +127,10 @@ export default function GameDetails() {
   const [genderError, setGenderError] = useState('')
   // Sexo que não bate com o mix: pergunta-se, não se bloqueia (26 set).
   const [genderConfirm, setGenderConfirm] = useState(null) // { then, name? } | null
+  // O admin junta dois «Sozinhos» ou separa uma dupla (Francisco, 27 set).
+  const [pairFor, setPairFor] = useState(null) // a pessoa sozinha
+  const [pairWith, setPairWith] = useState(null) // o id escolhido
+  const [splitFor, setSplitFor] = useState(null) // { userId, names }
   // Já entrei pelo WhatsApp? (Francisco, 26 set) — { name, then } enquanto
   // se pergunta; o nome fica guardado depois do «Sim, sou eu».
   const [lookalike, setLookalike] = useState(null)
@@ -2086,6 +2091,11 @@ export default function GameDetails() {
   // Parado com as duplas guardadas: o botao nao pode ser o "Comecar o Mix",
   // que sorteia duplas de novo (Trello #448).
   const mixPaused = !mixStarted && teams.length > 0
+  // Juntar sozinhos: só num mix em dupla (sem rodar), antes de começar, e
+  // com pelo menos dois sozinhos (os mesmos «Sozinhos» da lista).
+  const canPairSolos = isAdmin && !mixStarted && !mixPaused && game?.status !== 'cancelled'
+    && game?.allow_pair_signup && !game?.rotate_partners
+    && participants.filter((r) => r.user?.id && !r.partner?.id).length >= 2
   const canStart = isAdmin && !mixStarted && showClosed && !mixPaused
   const canStartGames = isAdmin && mixPaused
   const canRedoDuplas = canStartGames && matches.length === 0
@@ -3325,6 +3335,14 @@ export default function GameDetails() {
                         </div>
                       </Link>
                     )}
+                    {/* Sozinho num mix em dupla: o admin junta-lhe um parceiro de
+                        entre os outros sozinhos (Francisco, 27 set). */}
+                    {canPairSolos && !person.hasPartner && (
+                      <button type="button" onClick={() => { setPairWith(null); setPairFor(person) }} disabled={busy}
+                        className="press shrink-0 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-extrabold text-ink-900">
+                        {t('mixpairs.join')}
+                      </button>
+                    )}
                     {/* Mix parado: mexer na lista partiria as duplas ja formadas (#416).
                         Cancelado (#464): a lista fica como estava, sem mexer. */}
                     {isAdmin && !mixPaused && game.status !== 'cancelled' && (
@@ -3346,6 +3364,7 @@ export default function GameDetails() {
                 return <div className="space-y-2.5">{people.map(personRow)}</div>
               }
               const solos = people.filter((x) => !x.hasPartner)
+              const canSplit = isAdmin && !mixStarted && !mixPaused && game.status !== 'cancelled'
               return (
                 <div className="space-y-2.5">
                   {pairs.map((r, i) => {
@@ -3353,7 +3372,16 @@ export default function GameDetails() {
                     const mine = two.some((x) => x.id === user.id)
                     return (
                       <div key={`pair-${r.id}`} className={`card !p-3 ${mine ? '!border-[#BBF7D0] !bg-[#DCFCE7]' : ''}`}>
-                        <MonoLabel className={`mb-2 ${mine ? '!text-[#14532D]' : ''}`}>{t('gamedetails.pair_label', { n: i + 1 })}</MonoLabel>
+                        <div className="mb-2 flex items-center justify-between gap-2">
+                          <MonoLabel className={mine ? '!text-[#14532D]' : ''}>{t('gamedetails.pair_label', { n: i + 1 })}</MonoLabel>
+                          {canSplit && (
+                            <button type="button" disabled={busy}
+                              onClick={() => setSplitFor({ userId: r.user.id, names: two.map((x) => x.name).join(' e ') })}
+                              className="press -my-2 min-h-[44px] px-1 text-xs font-extrabold text-muted">
+                              {t('mixpairs.split')}
+                            </button>
+                          )}
+                        </div>
                         <div className="space-y-2">{two.map(personRow)}</div>
                       </div>
                     )
@@ -3732,6 +3760,43 @@ export default function GameDetails() {
               </div>
             </Sheet>
           )}
+          {/* Juntar dois sozinhos: escolhe-se o parceiro de entre os outros
+              sozinhos e confirma-se. Desfaz-se com «Separar». */}
+          <ConfirmSheet
+            open={!!pairFor}
+            title={t('mixpairs.join_title', { name: pairFor?.name || '' })}
+            message={t('mixpairs.join_message')}
+            confirmLabel={t('mixpairs.join_confirm')}
+            cancelLabel={t('gamedetails.cancel')}
+            confirmDisabled={!pairWith}
+            onConfirm={async () => { await adminPairSolos(id, pairFor.id, pairWith); loadGameDetails() }}
+            onClose={() => { setPairFor(null); setPairWith(null) }}
+            errorOf={(error) => mixPairErrorMessage(t, error)}
+          >
+            <div className="space-y-2">
+              {people.filter((x) => !x.hasPartner && x.id !== pairFor?.id).map((x) => (
+                <button key={x.id} type="button" onClick={() => setPairWith(x.id)}
+                  className={`press flex min-h-[48px] w-full items-center gap-3 rounded-ctrl border px-3 py-2 text-left ${pairWith === x.id ? 'border-ink-900 bg-ink-900 text-white' : 'border-line bg-white text-ink-900'}`}>
+                  <Avatar name={x.name} url={x.avatar_url} size="w-8 h-8 text-[11px]" />
+                  <span className="min-w-0 flex-1 truncate text-sm font-extrabold">{x.name}</span>
+                  {pairWith === x.id && <Check size={18} />}
+                </button>
+              ))}
+            </div>
+          </ConfirmSheet>
+          <ConfirmSheet
+            open={!!splitFor}
+            title={t('mixpairs.split_title')}
+            message={t('mixpairs.split_message', { names: splitFor?.names || '' })}
+            confirmLabel={t('mixpairs.split_confirm')}
+            cancelLabel={t('mixpairs.split_keep')}
+            // Regra das janelas (UX, 27 set): o seguro primeiro e a preto;
+            // separar vai em contorno, não vermelho — volta-se a juntar.
+            outline
+            onConfirm={async () => { await adminSplitPair(id, splitFor.userId); loadGameDetails() }}
+            onClose={() => setSplitFor(null)}
+            errorOf={(error) => mixPairErrorMessage(t, error)}
+          />
           <ConfirmSheet
             open={!!genderConfirm}
             title={game?.gender_restriction === 'feminino' ? t('gamedetails.gender_confirm_title_feminino') : t('gamedetails.gender_confirm_title_masculino')}

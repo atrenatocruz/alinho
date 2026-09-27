@@ -436,6 +436,10 @@ const RPC_MOCKS = {
   // do WhatsApp parecido comigo no mix.
   whatsapp_lookalike_in_game: () => (localStorage.getItem('mockWaLookalike') === 'true'
     ? [{ participant_id: 'wa-p1', guest_user_id: 'wa-g1', name: 'J. S. S. R.', as_partner: false }] : []),
+  // Juntar sozinhos / separar dupla no mix (27 set). mockPairError =
+  // '<código>' faz a função recusar com esse código.
+  admin_pair_solos: () => (localStorage.getItem('mockPairError') ? { __error: localStorage.getItem('mockPairError') } : 'mp-2'),
+  admin_split_pair: () => (localStorage.getItem('mockPairError') ? { __error: localStorage.getItem('mockPairError') } : null),
   tournament_invite_token: () => 'convite-jogador-2',
   tournament_invite_token_player1: () => 'convite-jogador-1',
   // A lista do organizador: um de cada estado, para se ver tudo num print.
