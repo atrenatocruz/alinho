@@ -31,7 +31,8 @@ const merge = (list) => {
 /**
  * O dia `date` (Date): [{ start, end (minutos do dia), kind, tp, past }].
  * kind: 'free' (horário sem nada), 'lesson' (aula marcada), 'request' (pedido
- * por responder). Uma aula aceite também é um pedido aceite: conta como aula.
+ * por responder), 'closed' (o professor fechou — só onde havia horário).
+ * Uma aula aceite também é um pedido aceite: conta como aula.
  * O que acaba antes de `now` fica com past = true (partido ao meio se preciso).
  */
 export const daySegments = (date, profiles = [], busy = [], now = new Date()) => {
@@ -48,31 +49,30 @@ export const daySegments = (date, profiles = [], busy = [], now = new Date()) =>
     return e > s ? { start: s, end: e } : null
   }
   const lessons = merge(busy.filter((b) => b.kind === 'lesson').map(clip).filter(Boolean).map((x) => ({ ...x, kind: 'lesson', tp: null })))
-  const requests = merge(busy.filter((b) => b.kind !== 'lesson').map(clip).filter(Boolean)
+  const requests = merge(busy.filter((b) => b.kind === 'request').map(clip).filter(Boolean)
     .filter((r) => !lessons.some((l) => r.start >= l.start && r.end <= l.end))
     .map((x) => ({ ...x, kind: 'request', tp: null })))
   const taken = [...lessons, ...requests]
+  const closedRaw = merge(busy.filter((b) => b.kind === 'closed').map(clip).filter(Boolean).map((x) => ({ ...x, kind: 'closed', tp: null })))
+  const minus = (list, cuts) => list.flatMap((f) => cuts.reduce((pieces, b) => pieces.flatMap((p) => {
+    if (b.end <= p.start || b.start >= p.end) return [p]
+    const out = []
+    if (b.start > p.start) out.push({ ...p, end: b.start })
+    if (b.end < p.end) out.push({ ...p, start: b.end })
+    return out
+  }), [{ ...f }]))
+  // Fechado: só onde havia horário, e por baixo do que já está marcado.
+  const closed = minus(free.flatMap((f) => closedRaw
+    .filter((c) => c.start < f.end && c.end > f.start)
+    .map((c) => ({ start: Math.max(c.start, f.start), end: Math.min(c.end, f.end), kind: 'closed', tp: f.tp }))), taken)
 
-  // O livre é o horário menos o que já está ocupado.
-  const freeLeft = []
-  for (const f of free) {
-    let pieces = [{ ...f }]
-    for (const b of taken) {
-      pieces = pieces.flatMap((p) => {
-        if (b.end <= p.start || b.start >= p.end) return [p]
-        const out = []
-        if (b.start > p.start) out.push({ ...p, end: b.start })
-        if (b.end < p.end) out.push({ ...p, start: b.end })
-        return out
-      })
-    }
-    freeLeft.push(...pieces)
-  }
+  // O livre é o horário menos o que já está ocupado ou fechado.
+  const freeLeft = minus(free, [...taken, ...closedRaw])
 
   // Já passou: o que acaba antes de agora; o que está a meio parte-se.
   const nowMin = day < isoDate(now) ? 24 * 60 : day > isoDate(now) ? -1 : now.getHours() * 60 + now.getMinutes()
   const out = []
-  for (const s of [...freeLeft, ...taken]) {
+  for (const s of [...freeLeft, ...closed, ...taken]) {
     if (s.end <= nowMin) out.push({ ...s, past: true })
     else if (s.start < nowMin) out.push({ ...s, end: nowMin, past: true }, { ...s, start: nowMin, past: false })
     else out.push({ ...s, past: false })

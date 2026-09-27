@@ -32,6 +32,14 @@ describe('daySegments', () => {
     const s = daySegments(tue, profiles, [], new Date('2026-09-29T19:30:00'))
     expect(s.map((x) => [x.start, x.end, x.past])).toEqual([[1080, 1170, true], [1170, 1320, false]])
   })
+  it('fechado: só onde havia horário, por baixo das aulas', () => {
+    const busy = [
+      { starts_at: new Date('2026-09-29T00:00:00').toISOString(), ends_at: new Date('2026-09-30T00:00:00').toISOString(), kind: 'closed' },
+      { starts_at: at('19:00'), ends_at: at('20:00'), kind: 'lesson' },
+    ]
+    const s = daySegments(tue, profiles, busy, before)
+    expect(s.map((x) => [x.start / 60, x.end / 60, x.kind])).toEqual([[18, 19, 'closed'], [19, 20, 'lesson'], [20, 22, 'closed']])
+  })
   it('dia sem horário', () => {
     expect(daySegments(new Date('2026-09-30T12:00:00'), profiles, [], before)).toEqual([])
   })

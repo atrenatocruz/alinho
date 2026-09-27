@@ -24,6 +24,7 @@ export default function DaySheet({ day, segments = [], requests = [], onClose, c
     free: 'bg-[#CCF3EC] text-[#0F766E]',
     lesson: 'bg-[#0F766E] text-white',
     request: 'border border-dashed border-[#5CC7B6] text-[#0F766E]',
+    closed: 'bg-ink-50 text-ink-500',
   }
   const rows = segments.filter((s) => !s.past)
   return createPortal(
@@ -44,7 +45,7 @@ export default function DaySheet({ day, segments = [], requests = [], onClose, c
                 {s.kind === 'lesson' && who(s) && <p className="text-xs text-muted truncate">{who(s)}</p>}
               </div>
               <span className={`shrink-0 rounded-full px-2 py-[3px] text-[11px] font-extrabold ${pill[s.kind]}`}>
-                {t(s.kind === 'free' ? 'calendar.free' : s.kind === 'lesson' ? 'calendar.lesson' : 'calendar.request')}
+                {t(s.kind === 'free' ? 'calendar.free' : s.kind === 'lesson' ? 'calendar.lesson' : s.kind === 'closed' ? 'calendar.closed' : 'calendar.request')}
               </span>
             </div>
           ))}

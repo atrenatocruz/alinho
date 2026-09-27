@@ -236,6 +236,27 @@ export async function listMyLessonRequests() {
   return data || []
 }
 
+// ── Fechar dias ou horas (SPEC-calendario-2, assunto 2; migration_lessons_11) ──
+/** start/end null = o dia todo. rejectRequests: recusa os pedidos por responder nessas horas. */
+export async function closeTeacherDays({ from, to, start = null, end = null, rejectRequests }) {
+  const { data, error } = await supabase.rpc('close_teacher_days', {
+    p_from: from, p_to: to, p_start: start, p_end: end, p_reject_requests: !!rejectRequests,
+  })
+  if (error) throw error
+  return data
+}
+
+export async function openTeacherDays(id) {
+  const { error } = await supabase.rpc('open_teacher_days', { p_id: id })
+  if (error) throw error
+}
+
+export async function listMyTeacherClosures() {
+  const { data, error } = await supabase.rpc('list_my_teacher_closures')
+  if (error) throw error
+  return data || []
+}
+
 export async function cancelLessonRequest(id) {
   const { error } = await supabase.rpc('cancel_lesson_request', { p_id: id })
   if (error) throw error

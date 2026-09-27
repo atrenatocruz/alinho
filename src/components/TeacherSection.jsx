@@ -4,11 +4,12 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronRight, GraduationCap, Plus, Search, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { DAYS, listTeacherProfiles, requestTeacherProfile, withdrawTeacherProfile, searchClubsForTeacher } from '../lib/teachers'
-import { isActiveTeacherProfile, scheduleFromRows } from '../lib/teacherSchedule'
+import { compactTime, isActiveTeacherProfile, scheduleFromRows } from '../lib/teacherSchedule'
 import WeekCalendar from './lessons/WeekCalendar'
 import RealWeekCalendar from './lessons/RealWeekCalendar'
 import DaySheet from './lessons/DaySheet'
-import { getTeacherBooking, listMyTeacherRequests } from '../lib/lessonsApi'
+import CloseDaysSheet from './lessons/CloseDaysSheet'
+import { getTeacherBooking, listMyTeacherClosures, listMyTeacherRequests, openTeacherDays } from '../lib/lessonsApi'
 import { Avatar, ConfirmSheet } from './ui'
 import { describeError } from '../lib/errors'
 import { contemTexto } from '../lib/semAcentos'
@@ -44,6 +45,9 @@ export default function TeacherSection() {
   const [booking, setBooking] = useState(null)
   const [teacherRequests, setTeacherRequests] = useState([])
   const [openDay, setOpenDay] = useState(null) // { day, segments }
+  // Fechar dias ou horas (SPEC-calendario-2, assunto 2).
+  const [closing, setClosing] = useState(null) // { day: 'AAAA-MM-DD' | null }
+  const [closures, setClosures] = useState([])
   const [showForm, setShowForm] = useState(false)
   const [orgId, setOrgId] = useState(NO_CLUB)
   const [zone, setZone] = useState('')
@@ -71,6 +75,7 @@ export default function TeacherSection() {
           .then((list) => { setTeacherRequests(list); setNewRequests(list.filter((r) => r.status === 'pending').length) })
           .catch(() => setNewRequests(0))
         getTeacherBooking(own.find(isActiveTeacherProfile).id).then(setBooking).catch(() => setBooking(null))
+        listMyTeacherClosures().then(setClosures).catch(() => setClosures([]))
       }
       setMine(own.find(isActiveTeacherProfile) || own[own.length - 1] || null)
     } catch (err) {
@@ -171,6 +176,13 @@ export default function TeacherSection() {
   const summary = DAYS.flatMap(({ value }, i) => byDay[value].map((s) => ({
     weekday: i + 1, start: s.start, end: s.end, club: Math.max(0, active.findIndex((p) => p.id === s.tp)),
   })))
+  // «sex 2 – sáb 3 out · o dia todo» / «qui 1 out · 18:00–19:00»
+  const closureLine = (c) => {
+    const d = (iso) => { const x = new Date(`${iso}T12:00:00`); return `${t(`lessons.wd_short_${((x.getDay() + 6) % 7) + 1}`)} ${x.getDate()}` }
+    const m = (iso) => t(`lessons.month_short_${new Date(`${iso}T12:00:00`).getMonth() + 1}`)
+    const days = c.from_date === c.to_date ? `${d(c.from_date)} ${m(c.from_date)}` : `${d(c.from_date)} – ${d(c.to_date)} ${m(c.to_date)}`
+    return `${days} · ${c.start_time ? `${compactTime(c.start_time.slice(0, 5))}–${compactTime(c.end_time.slice(0, 5))}` : t('close.all_day_lower')}`
+  }
   const calendarClubs = active.map((p) => p.organization?.name || t('comunidade.teacher_no_club_short'))
 
   return (
@@ -273,6 +285,27 @@ export default function TeacherSection() {
               className="w-full min-h-[48px] rounded-full bg-ink-900 text-white font-extrabold hover:bg-ink-700 transition-colors duration-fast">
               {summary.length === 0 ? t('teacher.schedule_make') : t('teacher.schedule_edit')}
             </button>
+          )}
+          {/* «Fechar dias ou horas», a seguir ao «Mudar o horário» (assunto 2). */}
+          {booking?.profiles?.some((p) => (p.availability || []).length > 0) && (
+            <button type="button" onClick={() => setClosing({ day: null })}
+              className="w-full min-h-[48px] rounded-full border-[1.5px] border-line bg-white font-extrabold text-ink-900 hover:bg-ink-50">
+              {t('close.title')}
+            </button>
+          )}
+          {closures.length > 0 && (
+            <div>
+              <p className="text-sm font-extrabold text-ink-900">{t('close.list_title')}</p>
+              <div className="divide-y divide-line">
+                {closures.map((c) => (
+                  <div key={c.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                    <span className="text-ink-700">{closureLine(c)}</span>
+                    <button type="button" onClick={async () => { try { await openTeacherDays(c.id); load() } catch (err) { console.error('Error opening days:', err) } }}
+                      className="shrink-0 font-extrabold text-ink-900 underline underline-offset-2">{t('close.open')}</button>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
           {/* Por baixo: o outro caminho (horário ou as minhas aulas) e o perfil público. */}
           <div className="flex items-center justify-between text-sm font-extrabold text-ink-900">
@@ -437,7 +470,16 @@ export default function TeacherSection() {
         onClose={() => setAsking(null)}
         errorOf={(err) => describeError(t, err, 'comunidade.withdraw_teacher_failed')}
       />
-      <DaySheet day={openDay?.day} segments={openDay?.segments} requests={teacherRequests} onClose={() => setOpenDay(null)} />
+      <DaySheet day={openDay?.day} segments={openDay?.segments} requests={teacherRequests} onClose={() => setOpenDay(null)}>
+        {openDay && openDay.segments.some((s) => !s.past) && (
+          <button type="button" onClick={() => { const d = openDay.day; setOpenDay(null); setClosing({ day: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }) }}
+            className="mt-3 w-full min-h-[48px] rounded-ctrl border-[1.5px] border-line bg-white font-extrabold text-ink-900">
+            {t('close.this_day')}
+          </button>
+        )}
+      </DaySheet>
+      <CloseDaysSheet open={!!closing} initialDay={closing?.day} busy={booking?.busy || []} requests={teacherRequests}
+        onClose={() => setClosing(null)} onDone={() => { setClosing(null); load() }} />
     </div>
   )
 }
