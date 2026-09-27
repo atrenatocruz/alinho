@@ -160,6 +160,7 @@ export const getPublicRankings = async () => {
 export const createFriendMatch = async ({
   scheduledDate, scheduledTime = null, location = null, locationLatitude = null, locationLongitude = null,
   rankedIntent, scoringFormat = 'pontos_simples', numSets = null, teamsMode = 'manual', invitees = [], court = null,
+  organizationId = null,
 }) => {
   const args = {
     p_scheduled_date: scheduledDate,
@@ -176,6 +177,8 @@ export const createFriendMatch = async ({
   // «Campo (opcional)»: só vai quando está preenchido — a função do Dev 3
   // ganha p_court depois (pedido a 26 set); assim funciona antes e depois.
   if (court) args.p_court = court
+  // Jogo de grupo (#342): o mesmo criar, dentro do grupo (Dev 3).
+  if (organizationId) args.p_organization_id = organizationId
   const { data, error } = await supabase.rpc('create_friend_match', args)
   if (error) throw error
   return data
@@ -251,6 +254,17 @@ export const claimFriendMatchInvitesByEmail = async () => {
  *  people, accepted, pending }]. Sem a migração, lista vazia. */
 export const listMyFriendSessions = async () => {
   const { data, error } = await supabase.rpc('list_my_friend_sessions')
+  if (error) {
+    if (errorKind(error) === 'not_ready') return []
+    throw error
+  }
+  return data || []
+}
+
+/** Os jogos de grupo do desenho novo (#342), já com equipas, para a página
+ *  «Jogos» do grupo. Só membros. Sem a migração, lista vazia. */
+export const listGroupFriendMatches = async (organizationId) => {
+  const { data, error } = await supabase.rpc('list_group_friend_matches', { p_organization_id: organizationId })
   if (error) {
     if (errorKind(error) === 'not_ready') return []
     throw error
