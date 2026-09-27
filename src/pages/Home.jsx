@@ -21,13 +21,13 @@ import { describeError, errorKind, isGameFull } from '../lib/errors'
 import { getGroupMatches } from '../lib/groupMatches'
 import { getMyPrivateMatches, respondToPrivateMatch } from '../lib/privateMatches'
 import { GOOGLE_MAPS_API_KEY } from '../lib/googleMaps'
-import { listMyLessons, listLessonEvents, setLessonAttendance } from '../lib/lessonsApi'
+import { cancelLessonRequest, listMyLessonRequests, listMyLessons, listLessonEvents, setLessonAttendance } from '../lib/lessonsApi'
 import { loadTournamentEvents } from '../lib/tournamentAgenda'
 import LessonEventCard from '../components/lessons/LessonEventCard'
 import TournamentEventCard from '../components/agenda/TournamentEventCard'
 import { useHeaderActions } from '../contexts/HeaderActionsContext'
 import {
-  toDayKey, eventFromGame, eventFromGroupMatch, eventFromPrivateMatch, eventFromExplore, eventFromLesson, isAgendaGame,
+  toDayKey, eventFromGame, eventFromGroupMatch, eventFromPrivateMatch, eventFromExplore, eventFromLesson, eventFromLessonRequest, isAgendaGame,
   applyFilters, groupByDay, countByDay, eventDistance, normalizeFilters, isPastEvent, eventsToPins, DEFAULT_FILTERS, EVENT_KINDS,
 } from '../lib/agenda'
 
@@ -138,6 +138,8 @@ export default function Home() {
   // Aulas com professores (Trello #49): as minhas e as em aberto. Sem a
   // migração das aulas as RPCs não existem e isto fica vazio.
   const [lessonRows, setLessonRows] = useState([])
+  // Pedidos de aula por responder (#392): «Pedido enviado» na Home.
+  const [lessonRequests, setLessonRequests] = useState([])
   // Torneios (Trello #363): o cartão de inscrição antes do sorteio, e os
   // meus jogos depois dele — é na Home que a malta vê a que horas joga.
   const [tournamentEvents, setTournamentEvents] = useState([])
@@ -303,10 +305,12 @@ export default function Home() {
     from.setDate(from.getDate() - 30)
     const to = new Date()
     to.setDate(to.getDate() + 60)
-    const [mine, open] = await Promise.all([
+    const [mine, open, requests] = await Promise.all([
       listMyLessons(toDayKey(from), toDayKey(to)).catch(() => []),
       listLessonEvents(toDayKey(new Date()), toDayKey(to)).catch(() => []),
+      listMyLessonRequests().catch(() => []),
     ])
+    setLessonRequests(requests.filter((r) => r.status === 'pending'))
     const mineIds = new Set(mine.map((l) => l.lesson_id))
     setLessonRows([...mine, ...open.filter((l) => !mineIds.has(l.lesson_id))])
   }
@@ -380,10 +384,11 @@ export default function Home() {
       ...privateMatches.map((m) => eventFromPrivateMatch(m, user.id)).filter(Boolean),
       ...exploreRows.map(eventFromExplore),
       ...lessonRows.map(eventFromLesson),
+      ...lessonRequests.map(eventFromLessonRequest),
       // Já vêm montados: um cartão do torneio, ou um por jogo meu.
       ...tournamentEvents.filter((e) => e.dayKey),
     ]
-  }, [games, groupMatches, privateMatches, exploreRows, lessonRows, tournamentEvents, user])
+  }, [games, groupMatches, privateMatches, exploreRows, lessonRows, lessonRequests, tournamentEvents, user])
 
   const visible = useMemo(() => applyFilters(events, filters, location), [events, filters, location])
   const searchEvents = useMemo(
@@ -701,6 +706,20 @@ export default function Home() {
     }
   }
 
+  // «Cancelar pedido» (desenho de 18 set): pergunta primeiro, no cartão.
+  const handleCancelLessonRequest = async (event) => {
+    markPending(event.key, true)
+    setCardError(null)
+    try {
+      await cancelLessonRequest(event.id)
+      setLessonRequests((rows) => rows.filter((r) => r.id !== event.id))
+    } catch (error) {
+      setCardError({ key: event.key, message: describeError(t, error, 'booking.error_cancel') })
+    } finally {
+      markPending(event.key, false)
+    }
+  }
+
   const renderEvent = (event) => {
     const past = event.finished || event.dayKey < today
     const distance = eventDistance(event, location)
@@ -727,6 +746,7 @@ export default function Home() {
           past={past}
           busy={pendingKeys.has(event.key)}
           onAttendance={(going) => handleLessonAttendance(event, going)}
+          onCancelRequest={event.raw.request_id ? () => handleCancelLessonRequest(event) : null}
         />
       )
     }
