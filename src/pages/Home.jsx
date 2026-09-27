@@ -29,7 +29,7 @@ import LessonEventCard from '../components/lessons/LessonEventCard'
 import TournamentEventCard from '../components/agenda/TournamentEventCard'
 import { useHeaderActions } from '../contexts/HeaderActionsContext'
 import {
-  toDayKey, eventFromGame, eventFromGroupMatch, eventFromPrivateMatch, eventFromExplore, eventFromLesson, eventFromLessonRequest, isAgendaGame,
+  toDayKey, eventFromGame, eventFromGroupMatch, eventsFromPrivateMatches, eventFromExplore, eventFromLesson, eventFromLessonRequest, isAgendaGame,
   applyFilters, groupByDay, countByDay, eventDistance, normalizeFilters, isPastEvent, eventsToPins, DEFAULT_FILTERS, EVENT_KINDS,
 } from '../lib/agenda'
 
@@ -395,14 +395,16 @@ export default function Home() {
     return [
       ...games.map((g) => eventFromGame(g, user.id)),
       ...groupMatches.map(({ match, org }) => eventFromGroupMatch(match, user.id, org)),
-      ...privateMatches.map((m) => eventFromPrivateMatch(m, user.id)).filter(Boolean),
+      // Um cartão por sessão de jogo entre amigos (bug de 27 set).
+      ...eventsFromPrivateMatches(privateMatches, user.id, new Map((memberships || []).map((ms) => [ms.organization_id,
+        { name: ms.organization?.name, kind: ms.organization?.kind, logo: ms.organization?.group_logo_url }]))),
       ...exploreRows.map(eventFromExplore),
       ...lessonRows.map(eventFromLesson),
       ...lessonRequests.map(eventFromLessonRequest),
       // Já vêm montados: um cartão do torneio, ou um por jogo meu.
       ...tournamentEvents.filter((e) => e.dayKey),
     ]
-  }, [games, groupMatches, privateMatches, exploreRows, lessonRows, lessonRequests, tournamentEvents, user])
+  }, [games, groupMatches, privateMatches, exploreRows, lessonRows, lessonRequests, tournamentEvents, user, memberships])
 
   const visible = useMemo(() => applyFilters(events, filters, location), [events, filters, location])
   const searchEvents = useMemo(
@@ -916,6 +918,7 @@ export default function Home() {
                     : e.kind === 'tournament' ? (e.slug || e.id ? `/torneio/${e.slug || e.id}` : null)
                       : e.source === 'lesson' ? `/aula/${e.id}`
                         : e.source === 'group_match' ? (orgSlugById.get(e.orgId) ? `/clube/${orgSlugById.get(e.orgId)}/jogos` : null)
+                          : e.source === 'friend_session' ? (e.id ? `/jogos-privados/sessao/${e.id}` : '/jogos-privados')
                           : e.source === 'private_match' ? '/jogos-privados'
                             : null
                 )}

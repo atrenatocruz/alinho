@@ -87,3 +87,45 @@ describe('followingGames', () => {
     expect(followingGames(four, { teamA: four.slice(0, 2), teamB: four.slice(2), resting: [] }, 'fixed')).toEqual([])
   })
 })
+
+describe('rotação sem repetir (falha de 27 set)', () => {
+  const six = ['Francisco', 'Claudia', 'Renato', 'Ruben', 'Catia', 'David'].map((id, i) => p(id, 1000 + i * 50))
+  const g1 = { teamA: [six[0], six[1]], teamB: [six[2], six[3]], resting: [six[4], six[5]] }
+  const games = [g1, ...followingGames(six, g1, 'rotating')]
+  const gameKey = (g) => [ids(g.teamA), ids(g.teamB)].sort().join(' x ')
+
+  it('com 6: seis jogos, nenhum igual a outro', () => {
+    expect(games).toHaveLength(6)
+    expect(new Set(games.map(gameKey)).size).toBe(6)
+  })
+
+  it('com 6: nenhuma dupla repete', () => {
+    const duplas = games.flatMap((g) => [ids(g.teamA), ids(g.teamB)])
+    expect(new Set(duplas).size).toBe(duplas.length)
+  })
+
+  it('com 6: cada um descansa duas vezes', () => {
+    const count = {}
+    games.forEach((g) => g.resting.forEach((x) => { count[x.id] = (count[x.id] || 0) + 1 }))
+    expect(Object.values(count)).toEqual([2, 2, 2, 2, 2, 2])
+  })
+
+  it('com 5: cada um descansa uma vez e nenhuma dupla repete', () => {
+    const five = six.slice(0, 5)
+    const f1 = { teamA: [five[0], five[1]], teamB: [five[2], five[3]], resting: [five[4]] }
+    const all = [f1, ...followingGames(five, f1, 'rotating')]
+    expect(all.flatMap((g) => g.resting.map((x) => x.id)).sort()).toEqual(five.map((x) => x.id).sort())
+    const duplas = all.flatMap((g) => [ids(g.teamA), ids(g.teamB)])
+    expect(new Set(duplas).size).toBe(duplas.length)
+  })
+
+  it('com 8: oito jogos, nenhum igual e descanso igual', () => {
+    const eight = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map((id) => p(id, 1000))
+    const e1 = { teamA: [eight[0], eight[1]], teamB: [eight[2], eight[3]], resting: eight.slice(4) }
+    const all = [e1, ...followingGames(eight, e1, 'rotating')]
+    expect(new Set(all.map(gameKey)).size).toBe(8)
+    const count = {}
+    all.forEach((g) => g.resting.forEach((x) => { count[x.id] = (count[x.id] || 0) + 1 }))
+    expect(new Set(Object.values(count)).size).toBe(1)
+  })
+})

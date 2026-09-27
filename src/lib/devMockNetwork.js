@@ -250,7 +250,30 @@ const RPC_MOCKS = {
   }],
   // localStorage.mockPrivateInvite = 'true' — um convite por responder e um
   // resultado por confirmar, para ver os avisos no sino (Trello #248/#249).
-  get_my_private_matches: () => agenda() ? AGENDA_PRIVATE_MATCHES() : (localStorage.getItem('mockPrivateInvite') === 'true' ? [
+  // Um cartão por sessão na Home (27 set). mockHomeSession = 'before' |
+  // 'running' | 'done': uma sessão de 6 a rodar (5 jogos) e um jogo de 4 no
+  // mesmo dia.
+  get_my_private_matches: () => localStorage.getItem('mockHomeSession') ? (() => {
+    const mode = localStorage.getItem('mockHomeSession')
+    const day = new Date().toISOString().slice(0, 10)
+    const P = { me: [MOCK_ADMIN_USER_ID, 'Admin (Dev)'], ru: ['u-ru', 'Ruben Miles'], cl: ['u-cl', 'Claudia Ferreira'], re: ['u-re', 'Renato Cruz'], ca: ['u-ca', 'Cátia Soares'], da: ['u-da', 'David Antunes'] }
+    const row = (id, n, a1, a2, b1, b2, sa, sb, extra = {}) => ({ id, status: sa == null ? 'pending' : 'confirmed', score_a: sa, score_b: sb, winner_team: sa == null ? null : sa > sb ? 'a' : 'b',
+      played_at: null, confirmed_at: null, is_creator: true, ranked_intent: true, scheduled_date: day, scheduled_time: '10:00:00', location: 'A2N', scoring_format: 'sets', num_sets: 3,
+      team_a_player1_id: a1[0], team_a_player1_name: a1[1], team_a_player1_status: 'accepted', team_a_player2_id: a2[0], team_a_player2_name: a2[1], team_a_player2_status: 'accepted',
+      team_b_player1_id: b1[0], team_b_player1_name: b1[1], team_b_player1_status: 'accepted', team_b_player2_id: b2[0], team_b_player2_name: b2[1], team_b_player2_status: 'accepted',
+      session_id: 'fs-home', game_number: n, organization_id: null, game_minutes: null, started_at: null, pairing_mode: 'rotating',
+      my_rating_delta: sa == null ? null : (sa > sb ? 6 : -4), ...extra })
+    const sc = (n) => (mode === 'done' || (mode === 'running' && n <= 2) ? [2, n % 2] : [null, null])
+    const session = [
+      row('fs-home', 1, P.me, P.cl, P.re, P.ru, ...sc(1)),
+      row('fs-h2', 2, P.re, P.ca, P.ru, P.da, ...sc(2)),
+      row('fs-h3', 3, P.me, P.ca, P.cl, P.da, ...sc(3)),
+      row('fs-h4', 4, P.cl, P.ru, P.ca, P.da, ...sc(4)),
+      row('fs-h5', 5, P.me, P.re, P.ru, P.ca, ...sc(5)),
+    ]
+    const solo = row('pm-solo', 1, P.me, P.da, P.ru, P.cl, null, null, { session_id: null, scheduled_time: '19:00:00', location: 'Smash Padel Almada', game_number: null })
+    return [...session, solo]
+  })() : agenda() ? AGENDA_PRIVATE_MATCHES() : (localStorage.getItem('mockPrivateInvite') === 'true' ? [
     {
       id: 'pm-invite', status: 'pending', ranked_intent: true, scheduled_date: '2026-09-20', scheduled_time: '19:00:00', location: 'Smash Padel Almada',
       score_a: null, score_b: null, score_submitted_by: null, is_creator: false,

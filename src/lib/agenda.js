@@ -147,6 +147,57 @@ export function eventFromPrivateMatch(match, userId) {
   }
 }
 
+/**
+ * Os jogos entre amigos da agenda, um cartão por sessão (bug do Francisco,
+ * 27 set: «É o mesmo jogo, simplesmente as pessoas rodaram e fizeram vários
+ * jogos. Não precisamos de vários cards»). As linhas do get_my_private_matches
+ * juntam-se pelo session_id (Dev 3); enquanto a função não o devolve, pelas
+ * que partilham dia, hora e sítio. Um jogo solto fica como estava.
+ * `orgsById`: id → { name, kind, logo } dos meus clubes e grupos.
+ */
+export function eventsFromPrivateMatches(rows, userId, orgsById = new Map()) {
+  const groups = new Map()
+  for (const m of rows) {
+    // Com a função nova, um jogo solto (session_id null) fica sozinho; antes
+    // dela (sem o campo), junta-se pelo dia, hora e sítio.
+    const key = m.session_id || ('session_id' in m ? `solo:${m.id}` : `${m.scheduled_date || ''}|${m.scheduled_time || ''}|${m.location || ''}`)
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key).push(m)
+  }
+  const out = []
+  for (const list of groups.values()) {
+    if (list.length === 1 && !list[0].session_id) { out.push(eventFromPrivateMatch(list[0], userId)); continue }
+    const mine = list.filter((m) => {
+      const slot = SLOTS.find((s) => m[`${s}_id`] === userId)
+      return !slot || m[`${slot}_status`] !== 'rejected'
+    })
+    if (!mine.length) continue
+    const games = [...mine].sort((a, b) => (a.game_number || 0) - (b.game_number || 0))
+    const first = games[0]
+    const startsAt = first.scheduled_date ? scheduledAt(first.scheduled_date, first.scheduled_time) : new Date(first.played_at)
+    const org = first.organization_id ? orgsById.get(first.organization_id) : null
+    const done = (g) => g.score_a != null && g.score_b != null
+    out.push({
+      key: `friend_session:${first.session_id || first.id}`,
+      source: 'friend_session',
+      kind: 'friends',
+      id: first.session_id || null,
+      startsAt,
+      hasTime: Boolean(first.scheduled_date && first.scheduled_time),
+      dayKey: first.scheduled_date || toDayKey(startsAt),
+      orgId: first.organization_id || null,
+      orgName: org?.name || null,
+      orgKind: org?.kind || null,
+      orgLogo: org?.logo || null,
+      mine: true,
+      myState: 'in',
+      finished: games.every(done),
+      raw: { ...first, games },
+    })
+  }
+  return out.filter(Boolean)
+}
+
 const num = (v) => (v == null || v === '' ? null : Number(v))
 
 /**

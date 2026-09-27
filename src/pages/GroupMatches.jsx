@@ -307,7 +307,7 @@ export default function GroupMatches() {
         <EmptyState title={t('groupmatches.empty_title')} subtitle={t('groupmatches.empty_subtitle')} />
       ) : (
         <div className="space-y-3.5">
-          <GroupFriendGames games={friendGames} />
+          <GroupFriendGames games={friendGames} org={org} />
           {matches.map((match) => (
             <MatchCard key={match.id} match={match} org={org} currentUser={currentUser} isOrgAdmin={isOrgAdmin} onChanged={load} t={t} i18n={i18n} />
           ))}

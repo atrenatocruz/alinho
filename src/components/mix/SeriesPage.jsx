@@ -134,7 +134,7 @@ export default function SeriesPage({ games, onBack, onEditRules, onOpen, onChang
 
   return (
     <div className="space-y-3">
-      <BackBar onBack={onBack} label={t('series.back')} />
+      <BackBar onBack={onBack} label={t('series.back')} title={base.title} />
 
       {/* O cartão de criação: as regras que fazem os mixes. */}
       <div className="rounded-card border-2 border-ink-900 bg-white p-4">
