@@ -4,7 +4,8 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronRight, GraduationCap, Plus, Search, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { DAYS, listTeacherProfiles, requestTeacherProfile, withdrawTeacherProfile, searchClubsForTeacher } from '../lib/teachers'
-import { compactTime, isActiveTeacherProfile, scheduleFromRows } from '../lib/teacherSchedule'
+import { isActiveTeacherProfile, scheduleFromRows } from '../lib/teacherSchedule'
+import WeekCalendar from './lessons/WeekCalendar'
 import { listMyTeacherRequests } from '../lib/lessonsApi'
 import { Avatar, ConfirmSheet } from './ui'
 import { describeError } from '../lib/errors'
@@ -157,8 +158,12 @@ export default function TeacherSection() {
   const active = rows.filter(isActiveTeacherProfile)
   const clubRows = rows.filter((r) => r.organization_id && r.status !== 'rejected' && r.club_status !== 'rejected')
   const byDay = scheduleFromRows(active.flatMap((r) => r.availability || []))
-  const summary = DAYS.flatMap(({ value }, i) => byDay[value].map((s) =>
-    `${t(`lessons.wd_short_${i + 1}`).replace(/^./, (c) => c.toUpperCase())} ${compactTime(s.start)}–${compactTime(s.end)}`))
+  // O horário numa semana pequena (Francisco, 27 set: «Fica o calendário»);
+  // com mais de um clube, uma cor por clube.
+  const summary = DAYS.flatMap(({ value }, i) => byDay[value].map((s) => ({
+    weekday: i + 1, start: s.start, end: s.end, club: Math.max(0, active.findIndex((p) => p.id === s.tp)),
+  })))
+  const calendarClubs = active.map((p) => p.organization?.name || t('comunidade.teacher_no_club_short'))
 
   return (
     <div className="card space-y-4">
@@ -246,7 +251,7 @@ export default function TeacherSection() {
               {t('teacher.no_schedule_text')}
             </div>
           ) : (
-            <p className="text-sm font-extrabold text-ink-900">{summary.join(' · ')}</p>
+            <WeekCalendar slots={summary} clubs={calendarClubs} />
           )}
           {newRequests > 0 ? (
             <button type="button" onClick={() => navigate('/perfil/aulas')}
