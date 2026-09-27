@@ -17,6 +17,8 @@ import { isMemberLimitError } from '../lib/plans'
 import { listOpenTournaments } from '../lib/tournamentApi'
 import OpenTournamentRow from '../components/tournament/OpenTournamentRow'
 import ScoreTodayCard, { useTournamentsToScoreToday } from '../components/tournament/ScoreTodayCard'
+import FriendInviteCard from '../components/friends/FriendInviteCard'
+import { listMyFriendMatchInvites } from '../lib/privateMatches'
 import { describeError, errorKind, isGameFull } from '../lib/errors'
 import { getGroupMatches } from '../lib/groupMatches'
 import { getMyPrivateMatches, respondToPrivateMatch } from '../lib/privateMatches'
@@ -135,6 +137,14 @@ export default function Home() {
   const [visibleDay, setVisibleDay] = useState(() => toDayKey(new Date()))
   // Dia de torneio: quem marca resultados tem o botão em «Hoje» (#505).
   const scoreToday = useTournamentsToScoreToday()
+  // Jogos entre amigos com resultados à espera de mim (amigos sem bloquear,
+  // 27 set): o convite âmbar em hoje, como no desenho aprovado.
+  const [friendInvites, setFriendInvites] = useState([])
+  useEffect(() => {
+    listMyFriendMatchInvites()
+      .then((rows) => setFriendInvites(rows.filter((r) => r.teams_set)))
+      .catch((err) => console.error('Error loading friend invites:', err))
+  }, [])
   const navigationType = useNavigationType()
   const [monthOpen, setMonthOpen] = useState(false)
   // Explorar (Fase 2): eventos de clubes da Comunidade onde ainda não estou.
@@ -609,12 +619,13 @@ export default function Home() {
     }
     // O próximo evento que ainda não acabou, com o filtro que estiver
     // escolhido (em "Todos", inscrito ou não) — a Home nunca abre em branco.
-    // Dia de torneio em que marco resultados: abre em Hoje, onde está o botão.
-    const next = scoreToday.length > 0 ? null
+    // Dia de torneio em que marco resultados, ou um convite de jogo entre
+    // amigos à espera de mim: abre em Hoje, onde está o botão.
+    const next = scoreToday.length > 0 || friendInvites.length > 0 ? null
       : days.find((d) => d.dayKey >= today && d.events.some((e) => !e.finished))
     scrollToDay(next ? next.dayKey : today)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, days, scoreToday.length])
+  }, [loading, days, scoreToday.length, friendInvites.length])
 
   // Alternar de mapa para lista, ou tocar outra vez no separador "Jogos" da
   // barra de baixo (aviso do Layout — ver home:reset-scroll), volta sempre
@@ -837,8 +848,9 @@ export default function Home() {
               <p className={`text-[11px] font-extrabold uppercase tracking-widest ${dayKey === today ? 'text-ink-900' : 'text-muted'}`}>
                 {dayLabel(dayKey, t, i18n.language)}
               </p>
+              {dayKey === today && friendInvites.map((inv) => <FriendInviteCard key={inv.match_id} invite={inv} />)}
               {dayKey === today && <ScoreTodayCard rows={scoreToday} />}
-              {dayKey === today && scoreToday.length > 0 && dayEvents.length === 0 ? null
+              {dayKey === today && (scoreToday.length > 0 || friendInvites.length > 0) && dayEvents.length === 0 ? null
                 : dayEvents.length === 0 && emptyByFilters
                 ? (
                   <div className="text-sm text-muted py-3 px-3 rounded-card border border-dashed border-line flex items-center justify-between gap-3">

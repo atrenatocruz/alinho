@@ -3,13 +3,13 @@
 // cronómetro», aprovado pelo Francisco a 27 set). «Jogo N de M», as equipas,
 // quem descansa e o cronómetro: por começar a cinzento, com «Começar jogo N»
 // só para quem criou; a decorrer a preto, com ±1 min só para quem criou. O
-// resultado marca-se como hoje, na lista dos jogos entre amigos.
+// resultado marca-se na folha «Resultado do jogo N» (amigos sem bloquear).
 // Base de dados do Dev 3: start_friend_match_game / adjust_friend_match_timer.
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { startFriendMatchGame, adjustFriendMatchTimer } from '../../lib/privateMatches'
 import { describeError } from '../../lib/errors'
+import RoundAlarm from '../RoundAlarm'
 
 const TIMER_ERRORS = ['not_allowed', 'no_duration', 'already_started', 'not_started']
 
@@ -23,7 +23,7 @@ export function currentGame(games) {
   return (games || []).find((g) => g.score_a == null && g.score_b == null && g.status !== 'cancelled') || null
 }
 
-export default function FriendGameNow({ match, games, game, invitees, iAmCreator, onChanged, dayPlace = '' }) {
+export default function FriendGameNow({ match, games, game, invitees, iAmCreator, onChanged, onMarkResult, dayPlace = '' }) {
   const { t } = useTranslation()
   const [now, setNow] = useState(Date.now())
   const [busy, setBusy] = useState(false)
@@ -94,17 +94,19 @@ export default function FriendGameNow({ match, games, game, invitees, iAmCreator
         </button>
       )}
 
-      {/* Aqui entra o alarme das rondas, a peça partilhada do Bugs
-          (RoundAlarm: roundKey `${game.id}:${game.started_at}`, endsAt,
-          roundNumber game.n), quando estiver no dev. */}
+      {/* O alarme das rondas, a peça partilhada do Bugs (desligado por
+          omissão, só neste telemóvel). Por começar: roundKey null e o número
+          do jogo anterior — ele diz «toca no seguinte quando começar». */}
+      <RoundAlarm roundKey={started ? `${game.id}:${game.started_at}` : null} endsAt={endsAt}
+        roundNumber={started ? game.n : game.n - 1} eventName={t('createprivatematch.title')} unit="game" />
 
       {error && <p className="rounded-ctrl border border-danger/30 bg-danger/10 px-3 py-2 text-sm font-extrabold text-danger">{error}</p>}
 
-      {started && (
-        <Link to="/jogos-privados"
-          className="press flex min-h-[52px] w-full items-center justify-center rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold text-white">
+      {started && onMarkResult && (
+        <button type="button" onClick={onMarkResult}
+          className="press min-h-[52px] w-full rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold text-white">
           {t('friends.mark_result')}
-        </Link>
+        </button>
       )}
     </div>
   )

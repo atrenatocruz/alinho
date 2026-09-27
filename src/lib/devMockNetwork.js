@@ -394,7 +394,11 @@ const RPC_MOCKS = {
     const mode = localStorage.getItem('mockFriendSession') || 'ready'
     const me = MOCK_ADMIN_USER_ID
     const inv = (id, name, rating, status, extra = {}) => ({ invitee_id: `i-${id}`, user_id: id, name, avatar_url: null, rating, gender: 'masculino', status, is_guest: false, is_creator: false, guest_email_sent: false, ...extra })
-    const creatorIsMe = mode !== 'invited'
+    // Amigos sem bloquear (27 set): 'pending2' = 2 por responder, sem equipas;
+    // 'results' = 5 jogos, 3 com resultado à espera de confirmações; 'invited_results'
+    // = eu por responder numa sessão já com resultados.
+    const creatorIsMe = !['invited', 'invited_results'].includes(mode)
+    const late = ['pending2', 'results'].includes(mode)
     const creator = creatorIsMe
       ? inv(me, 'Admin (Dev)', 1450, 'accepted', { is_creator: true })
       : inv('c-1', 'Rita Figueira', 1400, 'accepted', { is_creator: true })
@@ -404,8 +408,8 @@ const RPC_MOCKS = {
       invitees: [
         creator,
         inv('u-tl', 'Tiago Lopes', 1500, 'accepted'),
-        inv('u-am', 'Ana Marques', 1100, mode === 'waiting' ? 'pending' : 'accepted', { gender: 'feminino' }),
-        inv('u-rc', 'Rui Costa', 1300, 'accepted'),
+        inv('u-am', 'Ana Marques', 1100, mode === 'waiting' || late ? 'pending' : 'accepted', { gender: 'feminino' }),
+        inv('u-rc', 'Rui Costa', 1300, late ? 'pending' : 'accepted'),
         { invitee_id: 'i-g1', user_id: null, name: 'Zé Pinto', avatar_url: null, rating: null, gender: null, status: 'guest', is_guest: true, is_creator: false, guest_email_sent: true },
         ...(creatorIsMe ? [] : [inv(me, 'Admin (Dev)', 1450, 'pending')]),
       ],
@@ -418,9 +422,26 @@ const RPC_MOCKS = {
         return { id: `fs-g${n}`, n, team_a: n === 2 ? [P.me, P.rc] : [P.me, P.tl], team_b: n === 2 ? [P.tl, P.am] : [P.am, P.ze],
           resting: n === 2 ? ['i-g1'] : ['i-u-rc'], score_a: n === 1 ? 6 : null, score_b: n === 1 ? 4 : null, winner_team: n === 1 ? 'a' : null, status: n === 1 ? 'confirmed' : 'pending',
           started_at: running ? new Date(Date.now() - 440000).toISOString() : null, ends_at: running ? new Date(Date.now() + 760000).toISOString() : null }
-      }) : [],
+      }) : ['results', 'invited_results'].includes(mode) ? (() => {
+        const cr = creatorIsMe ? { user_id: me, name: 'Admin (Dev)', invitee_id: `i-${me}` } : { user_id: 'c-1', name: 'Rita Figueira', invitee_id: 'i-c-1' }
+        const P = { tl: { user_id: 'u-tl', name: 'Tiago Lopes', invitee_id: 'i-u-tl' }, am: { user_id: 'u-am', name: 'Ana Marques', invitee_id: 'i-u-am' },
+          rc: { user_id: 'u-rc', name: 'Rui Costa', invitee_id: 'i-u-rc' }, ze: { user_id: null, name: 'Zé Pinto', invitee_id: 'i-g1' },
+          me: { user_id: me, name: 'Admin (Dev)', invitee_id: `i-${me}` } }
+        const x = creatorIsMe ? P.rc : P.me
+        const w = (...ps) => ps.map((q) => ({ invitee_id: q.invitee_id, name: q.name }))
+        const rows = [
+          [[cr, P.tl], [P.am, x], 6, 4, w(P.am, x)],
+          [[cr, P.am], [P.tl, P.ze], 3, 6, w(P.am)],
+          [[P.tl, x], [P.ze, cr], 6, 2, w(x)],
+          [[P.tl, P.ze], [P.am, x], null, null, []],
+          [[cr, x], [P.am, P.ze], null, null, []],
+        ]
+        return rows.map(([a, b, sa, sb, wf], k) => ({ id: `fs-r${k + 1}`, n: k + 1, team_a: a, team_b: b, resting: [], score_a: sa, score_b: sb,
+          winner_team: sa == null ? null : sa > sb ? 'a' : 'b', status: 'pending', counts: false, waiting_for: sa == null ? [] : wf, started_at: null, ends_at: null }))
+      })() : [],
     }
   },
+  record_friend_match_result: () => 'pending',
   start_friend_match_game: () => new Date(Date.now() + 1200000).toISOString(),
   adjust_friend_match_timer: () => new Date(Date.now() + 820000).toISOString(),
   set_friend_match_teams: () => null,
@@ -433,8 +454,9 @@ const RPC_MOCKS = {
     { id: 'gf-1', root_id: 'gf-1', n: 1, scheduled_date: new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10), scheduled_time: '19:00:00', location: 'Clube Exemplo', court: 'Campo 3', status: 'confirmed', ranked_intent: true, score_a: 9, score_b: 6,
       team_a: [{ user_id: 'u1', name: 'Rita Figueira' }, { user_id: 'u3', name: 'Ana Marques' }], team_b: [{ user_id: 'u2', name: 'Tiago Lopes' }, { user_id: 'u4', name: 'Rui Costa' }] },
   ] : []),
-  list_my_friend_match_invites: () => (localStorage.getItem('mockFriendSession') === 'invited'
-    ? [{ match_id: 'fs-1', creator_name: 'Rita Figueira', scheduled_date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), scheduled_time: '10:00:00', location: 'Clube Exemplo', people: 6 }] : []),
+  list_my_friend_match_invites: () => (['invited', 'invited_results'].includes(localStorage.getItem('mockFriendSession'))
+    ? [{ match_id: 'fs-1', creator_name: 'Rita Figueira', scheduled_date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), scheduled_time: '10:00:00', location: 'Clube Exemplo', people: 6,
+      teams_set: localStorage.getItem('mockFriendSession') === 'invited_results', results_with_me: localStorage.getItem('mockFriendSession') === 'invited_results' ? 3 : 0 }] : []),
   list_my_friend_sessions: () => (['ready', 'waiting', 'app'].includes(localStorage.getItem('mockFriendSession'))
     ? [{ match_id: 'fs-1', scheduled_date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), scheduled_time: '10:00:00', location: 'Clube Exemplo', court: 'Campo 3', is_creator: true, people: 5, accepted: localStorage.getItem('mockFriendSession') === 'waiting' ? 4 : 5, pending: localStorage.getItem('mockFriendSession') === 'waiting' ? 1 : 0 }] : []),
   // Aceitar o convite de parceiro (26 set): mockPartnerClaim = 'pending'

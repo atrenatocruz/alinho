@@ -6,7 +6,7 @@
 // Ao confirmar, gravam-se o jogo 1 e os seguintes; a partir daí cada jogo é
 // um jogo entre amigos como os outros (resultado e confirmação de sempre).
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { BackBar } from '../components/ui'
 import { ArrowLeft, MapPin } from 'lucide-react'
@@ -17,8 +17,11 @@ import { describeError } from '../lib/errors'
 import { Avatar, Chips, PrimaryButton, EmptyState } from '../components/ui'
 import { dayText } from '../components/friends/dayText'
 import FriendGameNow, { currentGame } from '../components/friends/FriendGameNow'
+import FriendSessionGames, { ShareMissingButton } from '../components/friends/FriendSessionGames'
+import FriendResultSheet from '../components/friends/FriendResultSheet'
 
-const STATUS_KEY = { accepted: 'friends.status_accepted', pending: 'friends.status_pending', declined: 'friends.status_declined', guest: 'friends.guest_tag' }
+// «Vai» / «Por responder» (amigos sem bloquear, 27 set).
+const STATUS_KEY = { accepted: 'friends.tag_going', pending: 'friends.status_pending', declined: 'friends.tag_declined', guest: 'friends.guest_tag' }
 
 /** A proposta da app para o jogo 1: com 4, as duplas mais equilibradas; com
  *  mais, descansa quem calha e as 4 que jogam ficam equilibradas. */
@@ -34,7 +37,6 @@ export default function FriendSession() {
   const { id } = useParams()
   const { t, i18n } = useTranslation()
   const { profile } = useAuth()
-  const navigate = useNavigate()
   const [data, setData] = useState(null)
   const [loadError, setLoadError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -73,14 +75,19 @@ export default function FriendSession() {
   const me = invitees.find((i) => i.user_id && i.user_id === profile?.id)
   const creator = invitees.find((i) => i.is_creator)
   const iAmCreator = !!me?.is_creator
-  // Quem joga: quem aceitou e os convidados sem conta (contam como aceites).
+  // Quem joga: todos menos quem recusou — quem está por responder também pode
+  // ir para uma equipa; quem criou nunca fica à espera (amigos sem bloquear,
+  // aprovado pelo Francisco a 27 set; base de dados do Dev 3).
   const players = useMemo(
-    () => invitees.filter((i) => i.status === 'accepted' || i.status === 'guest')
+    () => invitees.filter((i) => i.status !== 'declined')
       .map((i) => ({ ...i, id: i.invitee_id })),
     [invitees],
   )
   const pending = invitees.filter((i) => i.status === 'pending').length
-  const ready = games.length === 0 && pending === 0 && players.length >= 4
+  const [formNow, setFormNow] = useState(false)
+  const canForm = games.length === 0 && players.length >= 4
+  const ready = canForm && !!me?.is_creator && (pending === 0 || formNow)
+  const [resultFor, setResultFor] = useState(null) // o jogo da folha «Resultado»
 
   // As equipas do jogo 1, no ecrã. 'a' | 'b' | 'rest' por invitee_id.
   const [side, setSide] = useState({})
@@ -123,9 +130,8 @@ export default function FriendSession() {
         // eslint-disable-next-line no-await-in-loop
         await addFriendMatchGame(match.id, { teamA: ids(g.teamA), teamB: ids(g.teamB) })
       }
-      // Com tempo fica-se aqui, no jogo 1, para o começar.
-      if (match.game_minutes) load()
-      else navigate('/jogos-privados')
+      // Fica-se aqui: os jogos e os resultados marcam-se na sessão.
+      load()
     } catch (err) {
       console.error('Error setting friend match teams:', err)
       setError(err?.code === 'P0001' && err?.message ? err.message : describeError(t, err))
@@ -178,7 +184,12 @@ export default function FriendSession() {
       <div className="mx-auto max-w-lg pb-28">
         {back}
         <FriendGameNow match={match} games={games} game={nowGame} invitees={invitees} iAmCreator={iAmCreator} onChanged={load}
+          onMarkResult={() => setResultFor(nowGame)}
           dayPlace={[match.scheduled_date ? dayText(match.scheduled_date, i18n.language) : null, match.location].filter(Boolean).join(' · ')} />
+        {resultFor && (
+          <FriendResultSheet match={match} game={resultFor} onClose={() => setResultFor(null)}
+            onSaved={() => { setResultFor(null); load() }} />
+        )}
       </div>
     )
   }
@@ -187,9 +198,12 @@ export default function FriendSession() {
     <div className="mx-auto max-w-lg pb-28">
       {back}
       <h1 className="mt-2 font-display text-2xl text-ink-900">{whenText}</h1>
-      {match.location && (
+      {games.length > 0 ? (
+        <p className="mt-1 text-sm text-muted">{t('friends.games_recorded', { count: games.filter((g) => g.score_a != null && g.score_b != null).length })}</p>
+      ) : (match.location || players.length > 0) && (
         <p className="mt-1 inline-flex items-center gap-1 text-sm text-muted">
-          <MapPin size={14} /> {[match.location, match.court].filter(Boolean).join(' · ')}
+          {match.location && <MapPin size={14} />}
+          {[match.location, match.court, t('friends.people_count', { count: players.length })].filter(Boolean).join(' · ')}
         </p>
       )}
 
@@ -201,12 +215,13 @@ export default function FriendSession() {
             <PrimaryButton onClick={() => respond(true)} disabled={busy} className="flex-1">{t('friends.accept')}</PrimaryButton>
             <button type="button" onClick={() => respond(false)} disabled={busy} className="btn-secondary flex-1">{t('friends.decline')}</button>
           </div>
+          {games.length > 0 && <p className="text-xs text-muted">{t('friends.invite_card_note')}</p>}
         </div>
       )}
 
       {ready && iAmCreator ? (
         <div className="mt-6 space-y-6">
-          <p className="text-sm text-ink-900">{t('friends.all_accepted', { count: players.length })}</p>
+          {pending === 0 && <p className="text-sm text-ink-900">{t('friends.all_accepted', { count: players.length })}</p>}
           <div>
             <p className={label}>{t('friends.pairs_label')}</p>
             <Chips value={mode} onChange={setMode} options={[
@@ -235,17 +250,16 @@ export default function FriendSession() {
       ) : (
         <div className="mt-6 space-y-6">
           {games.length > 0 ? (
-            <div className="card space-y-3">
-              <p className="text-sm text-ink-900">{t('friends.teams_done')}</p>
-              <Link to="/jogos-privados" className="btn-secondary inline-flex w-full items-center justify-center">{t('friends.see_games')}</Link>
-            </div>
-          ) : (
+            <FriendSessionGames match={match} games={games} invitees={invitees} players={players} iAmCreator={iAmCreator}
+              myUserId={profile?.id} onChanged={load} resultFor={resultFor} setResultFor={setResultFor} />
+          ) : iAmCreator && canForm && pending > 0 ? null : (
             <p className="text-sm text-ink-900">
               {pending > 0 ? t('friends.waiting_answers', { count: pending })
                 : players.length < 4 ? t('friends.not_enough', { count: players.length })
                   : t('friends.waiting_creator', { name: creator?.name || '' })}
             </p>
           )}
+          {games.length === 0 && (
           <div>
             <p className={label}>{t('friends.who_plays', { count: invitees.filter((i) => i.status !== 'declined').length })}</p>
             <div className="space-y-2">
@@ -256,13 +270,25 @@ export default function FriendSession() {
                   <span className={`min-w-0 flex-1 truncate text-sm font-semibold ${i.user_id === profile?.id ? 'text-[#14532D]' : 'text-ink-900'}`}>
                     {i.user_id === profile?.id ? t('friends.me_row', { name: i.name }) : i.name}
                   </span>
-                  {!i.is_creator && (
-                    <span className="shrink-0 rounded-full border border-line bg-ink-50 px-2.5 py-0.5 text-xs font-semibold text-ink-700">{t(STATUS_KEY[i.status] || 'friends.status_pending')}</span>
-                  )}
+                  <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${i.status === 'accepted'
+                    ? 'bg-[#DCFCE7] text-[#14532D]' : 'border border-line bg-ink-50 text-ink-700'}`}>
+                    {t(STATUS_KEY[i.status] || 'friends.status_pending')}
+                  </span>
                 </div>
               ))}
             </div>
           </div>
+          )}
+          {/* Quem criou, com pessoas por responder: não fica à espera. */}
+          {games.length === 0 && iAmCreator && canForm && pending > 0 && (
+            <div className="space-y-3">
+              <p className="rounded-card bg-ink-50 p-3.5 text-sm text-ink-700">
+                <b className="text-ink-900">{t('friends.no_need_to_wait_bold')}</b> {t('friends.no_need_to_wait_rest')}
+              </p>
+              <PrimaryButton onClick={() => setFormNow(true)} className="w-full">{t('friends.form_teams')}</PrimaryButton>
+              <ShareMissingButton match={match} creatorName={creator?.name} />
+            </div>
+          )}
           {error && <p className="rounded-ctrl border border-danger/30 bg-danger/10 px-3 py-2 text-sm font-extrabold text-danger">{error}</p>}
         </div>
       )}
