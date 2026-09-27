@@ -47,6 +47,11 @@ export function errorKind(error) {
   // utilizador; só o 42501 do Postgres (RLS, permission denied) é genérico.
   if (code === '42501' && msg && !/row-level security|permission denied/i.test(msg)) return 'business'
   if (code === '42501' || /row-level security|permission denied/i.test(msg)) return 'permission'
+  // Nome de grupo/clube repetido (Francisco, 27 set; migration_nomes_de_grupo_unicos.sql):
+  // 'name_taken' das funções de criar, ou o índice ao mudar o nome.
+  if (/(^|\W)name_taken$/.test(msg) || (code === '23505' && /organizations_name_unaccent_key/.test(`${msg} ${error.details || ''}`))) {
+    return 'org_name_taken'
+  }
   if (code === '23505' || /duplicate key/i.test(msg)) return 'duplicate'
 
   // RAISE EXCEPTION das nossas funções — frases já escritas para o utilizador
@@ -88,6 +93,7 @@ export function describeError(t, error, fallbackKey = 'errors.generic') {
     case 'too_many': return t('errors.too_many')
     case 'not_ready': return t('errors.not_ready')
     case 'permission': return t('errors.permission')
+    case 'org_name_taken': return t('errors.org_name_taken')
     case 'duplicate': return t('errors.duplicate')
     case 'business': return sentence(error.message)
     default: {

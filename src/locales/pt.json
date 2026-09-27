@@ -2813,6 +2813,7 @@
   "errors.session_expired": "A tua sessão expirou. Sai e volta a entrar.",
   "errors.permission": "Não tens permissão para fazer isto. Se achas que devias, fala com quem gere o grupo.",
   "errors.duplicate": "Já existe um igual. Muda o nome e tenta outra vez.",
+  "errors.org_name_taken": "Já existe um grupo ou clube com este nome. Escolhe outro.",
   "errors.not_ready": "Esta funcionalidade ainda está a ser ativada. Tenta mais tarde.",
   "errors.invalid_login": "Email ou password errados.",
   "errors.already_registered": "Já existe uma conta com este email. Entra com ele ou recupera a password.",

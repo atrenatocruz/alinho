@@ -18,6 +18,10 @@ describe('errorKind', () => {
     expect(errorKind({ code: 'PGRST301', message: 'JWT expired' })).toBe('session')
     expect(errorKind({ code: '42501', message: 'new row violates row-level security policy for table "games"' })).toBe('permission')
     expect(errorKind({ code: '23505', message: 'duplicate key value violates unique constraint' })).toBe('duplicate')
+    // Nome de grupo/clube repetido (27 set): das funções de criar, ou do índice ao mudar o nome.
+    expect(errorKind({ code: 'P0001', message: 'name_taken' })).toBe('org_name_taken')
+    expect(errorKind({ code: '23505', message: 'duplicate key value violates unique constraint "organizations_name_unaccent_key"' })).toBe('org_name_taken')
+    expect(errorKind({ code: '23505', message: 'duplicate key value violates unique constraint "organizations_slug_key"' })).toBe('duplicate')
     expect(errorKind({ code: 'PGRST202', message: 'Could not find the function public.x in the schema cache' })).toBe('not_ready')
     expect(errorKind({ code: 'P0001', message: 'Não és membro deste grupo' })).toBe('business')
     // 42501 com frase nossa (#523): mostra-se a frase, não a de permissão.

@@ -8,6 +8,7 @@ import { Avatar, EmptyState, PrimaryButton, OrgKindBadge, PlanBadge, orgAvatarSh
 import PlayerSearch from '../components/PlayerSearch'
 import AdminDeleteAccountPanel from '../components/AdminDeleteAccountPanel'
 import { searchAnyPlayer, createOrganization, createSelfServeGroup } from '../lib/platformAdmin'
+import { useOrgNameTaken, OrgNameTakenHint } from '../components/OrgNameTaken'
 import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
 import { listAllPendingTeacherRequests, approveTeacherProfile, rejectTeacherProfile } from '../lib/teachers'
 import { describeError } from '../lib/errors'
@@ -26,6 +27,7 @@ export default function Gerir() {
 
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [name, setName] = useState('')
+  const clubNameTaken = useOrgNameTaken(name, { enabled: showCreateForm })
   const [slug, setSlug] = useState('')
   const [selectedAdmin, setSelectedAdmin] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -108,6 +110,7 @@ export default function Gerir() {
   const [groupSlug, setGroupSlug] = useState('')
   const [creatingGroup, setCreatingGroup] = useState(false)
   const [groupError, setGroupError] = useState('')
+  const groupNameTaken = useOrgNameTaken(groupName, { enabled: showGroupForm })
 
   // Só salta direto para o clube quando não há mais nada a fazer aqui: gere
   // um só e já tem o seu grupo (senão tinha de ver "Criar grupo").
@@ -172,6 +175,7 @@ export default function Gerir() {
               className="input-field"
               placeholder={t('comunidade.group_name_placeholder')}
             />
+            <OrgNameTakenHint taken={groupNameTaken} />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">{t('comunidade.slug_label')}</label>
@@ -189,7 +193,7 @@ export default function Gerir() {
           <div className="flex gap-3">
             <PrimaryButton
               onClick={handleCreateGroup}
-              disabled={!groupName.trim() || !groupSlug.trim() || creatingGroup}
+              disabled={!groupName.trim() || !groupSlug.trim() || creatingGroup || groupNameTaken}
               className="flex-1"
             >
               {creatingGroup ? t('comunidade.creating_group') : t('comunidade.create_group_submit')}
@@ -275,6 +279,7 @@ export default function Gerir() {
               className="input-field"
               placeholder={t('comunidade.group_name_placeholder')}
             />
+            <OrgNameTakenHint taken={clubNameTaken} />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">{t('gerir.slug_label')}</label>

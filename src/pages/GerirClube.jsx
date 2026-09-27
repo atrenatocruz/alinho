@@ -34,10 +34,11 @@ import { lessonsAvailable, listClubSeries } from '../lib/lessonsApi'
 import ClubTournamentsPanel from '../components/tournament/ClubTournamentsPanel'
 import { KIND_STYLE } from '../components/agenda/EventCard'
 import { tournamentsAvailable } from '../lib/tournamentApi'
-import { describeError } from '../lib/errors'
+import { describeError, errorKind } from '../lib/errors'
 import { isDraftMix, publishDraftMix, advanceByFrequency, pendingOccurrenceRow } from '../lib/mixDraft'
 import LaunchDayPicker from '../components/LaunchDayPicker'
 import MixWizard from '../components/mix/MixWizard'
+import { useOrgNameTaken, OrgNameTakenHint } from '../components/OrgNameTaken'
 import { LEVEL_SCALES, LEVEL_NUMBERS, parseLevel } from '../lib/mixLevels'
 import SeriesPage from '../components/mix/SeriesPage'
 import { setEventWhatsappPostTimes } from '../lib/whatsappHours'
@@ -334,6 +335,10 @@ export default function GerirClube() {
   const [groupSlug, setGroupSlug] = useState('')
   const [creatingGroup, setCreatingGroup] = useState(false)
   const [groupError, setGroupError] = useState('')
+  // Nomes repetidos (27 set): avisa enquanto se escreve.
+  const renameTaken = useOrgNameTaken(nameInput, { excludeId: org?.id, enabled: editingName && nameInput.trim() !== org?.name })
+  const settingsNameTaken = useOrgNameTaken(settings?.name, { excludeId: org?.id, enabled: activeTab === 'settings' && !!settings && settings.name?.trim() !== org?.name })
+  const newGroupNameTaken = useOrgNameTaken(groupName, { enabled: showCreateGroup })
   // Limites do plano: a mensagem fica no ecrã, junto do que falhou, em vez
   // de um alert do browser que não diz em que plano estamos (Trello #265).
   const [gameError, setGameError] = useState('')
@@ -1813,6 +1818,8 @@ export default function GerirClube() {
 
   const handleUpdateSettings = async (e) => {
     e.preventDefault()
+    // Nome de outro grupo ou clube: a frase já está por baixo do campo.
+    if (settingsNameTaken) return
 
     try {
       const { error } = await supabase
@@ -1855,6 +1862,8 @@ export default function GerirClube() {
       setEditingName(false)
       return
     }
+    // Nome de outro grupo ou clube: fica a editar, com a frase por baixo.
+    if (renameTaken) return
     setRenamingOrg(true)
     try {
       const { error } = await supabase.from('organizations').update({ name: trimmed }).eq('id', org.id)
@@ -1864,6 +1873,7 @@ export default function GerirClube() {
       setEditingName(false)
     } catch (error) {
       console.error('Error renaming organization:', error)
+      if (errorKind(error) === 'org_name_taken') return // a frase já está por baixo do campo
       alert(describeError(t, error, 'gerirclube.error_rename_org'))
     } finally {
       setRenamingOrg(false)
@@ -2298,6 +2308,7 @@ export default function GerirClube() {
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             {editingName ? (
+              <>
               <div className="flex items-center gap-2">
                 <input
                   type="text"
@@ -2313,6 +2324,8 @@ export default function GerirClube() {
                   className="text-3xl font-bold text-ink-900 bg-transparent border-b-2 border-lime-400 outline-none focus:ring-2 focus:ring-ink-50 min-w-0 flex-1 disabled:opacity-50"
                 />
               </div>
+              <OrgNameTakenHint taken={renameTaken} />
+              </>
             ) : (
               <h2 className="text-3xl font-bold text-ink-900 min-w-0 break-words">
                 {/* Wraps instead of truncating ("Smash Padel …"), and the pencil
@@ -3526,6 +3539,7 @@ export default function GerirClube() {
                     className="input-field"
                     required
                   />
+                  <OrgNameTakenHint taken={settingsNameTaken} />
                 </div>
 
                 <div>
@@ -3902,6 +3916,7 @@ export default function GerirClube() {
                         className="input-field"
                         placeholder={t('gerirclube.group_name_placeholder')}
                       />
+                      <OrgNameTakenHint taken={newGroupNameTaken} className="!mt-0" />
                       <input
                         type="text"
                         value={groupSlug}
@@ -3916,7 +3931,7 @@ export default function GerirClube() {
                         <button
                           type="button"
                           onClick={handleCreateGroup}
-                          disabled={!groupName.trim() || !groupSlug.trim() || creatingGroup}
+                          disabled={!groupName.trim() || !groupSlug.trim() || creatingGroup || newGroupNameTaken}
                           className="btn-primary flex-1"
                         >
                           {creatingGroup ? t('gerirclube.creating_group_label') : t('gerirclube.create_group_submit')}

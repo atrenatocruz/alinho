@@ -474,6 +474,13 @@ const RPC_MOCKS = {
   // '<código>' faz a função recusar com esse código.
   admin_pair_solos: () => (localStorage.getItem('mockPairError') ? { __error: localStorage.getItem('mockPairError') } : 'mp-2'),
   admin_split_pair: () => (localStorage.getItem('mockPairError') ? { __error: localStorage.getItem('mockPairError') } : null),
+  // Nomes repetidos (27 set): os nomes dos clubes do modo de teste estão
+  // «tomados» — sem maiúsculas nem acentos, como o índice da base de dados.
+  organization_name_taken: (params) => {
+    const key = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim().replace(/\s+/g, ' ')
+    const orgs = [['00000000-0000-0000-0000-0000000000dd', 'Smash Padel Almada'], [MOCK_ADMIN_ORG_ID, 'Dev Org'], ['ag-org-open', 'Padel Parque']]
+    return orgs.some(([id, n]) => id !== params?.p_exclude_id && key(n) === key(params?.p_name))
+  },
   tournament_invite_token: () => 'convite-jogador-2',
   tournament_invite_token_player1: () => 'convite-jogador-1',
   // A lista do organizador: um de cada estado, para se ver tudo num print.
