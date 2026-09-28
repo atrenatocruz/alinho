@@ -1,13 +1,13 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import i18n from '../lib/i18n'
 
 // Cloudflare Turnstile — the captcha Supabase Auth verifies on signup, login
 // and password recovery once "Attack Protection → Captcha" is on in the
-// dashboard. Free. Appearance "always": the small Cloudflare box with the
-// "Success ✓" seal sits above the submit button (Ruben, 28 set — he wants
-// the visible sign that the form is protected). The check itself still runs
-// on its own; a real challenge only appears when Cloudflare distrusts the
-// browser.
+// dashboard. Free. Appearance "interaction-only" (Francisco, 28 set: the dark
+// "Sucesso! · CLOUDFLARE" bar in the middle of the light form was ugly —
+// this replaces Ruben's "always" of the same day): nothing shows while the
+// check runs on its own; the box only appears, light and as wide as the
+// fields, when Cloudflare distrusts the browser and asks for a click.
 //
 // Motivation is the email quota, not fake accounts (Trello #—): with
 // "Confirm email" on, every signup and every "esqueci a password" sends an
@@ -24,7 +24,11 @@ import i18n from '../lib/i18n'
 // Tokens are single-use, so a failed login has to call reset() before the
 // person tries again.
 
-export const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || ''
+// Em dev, localStorage.mockTurnstileKey troca a chave por uma das chaves de
+// teste públicas da Cloudflare (ex.: 3x00000000000000000000FF obriga a
+// carregar), para ver a caixa sem mexer no .env.
+const devKey = () => { try { return import.meta.env.DEV ? localStorage.getItem('mockTurnstileKey') : null } catch { return null } }
+export const TURNSTILE_SITE_KEY = devKey() || import.meta.env.VITE_TURNSTILE_SITE_KEY || ''
 
 const SCRIPT_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
 let scriptPromise = null
@@ -54,6 +58,8 @@ const TurnstileWidget = forwardRef(function TurnstileWidget({ onToken, action, c
   const widgetIdRef = useRef(null)
   const onTokenRef = useRef(onToken)
   onTokenRef.current = onToken
+  // A caixa só se vê quando a Cloudflare pede para carregar.
+  const [shown, setShown] = useState(false)
 
   useImperativeHandle(ref, () => ({
     reset: () => {
@@ -74,8 +80,11 @@ const TurnstileWidget = forwardRef(function TurnstileWidget({ onToken, action, c
         widgetIdRef.current = turnstile.render(containerRef.current, {
           sitekey: TURNSTILE_SITE_KEY,
           ...(action ? { action } : {}),
-          appearance: 'always',
+          appearance: 'interaction-only',
+          theme: 'light',
           size: 'flexible',
+          'before-interactive-callback': () => setShown(true),
+          'after-interactive-callback': () => setShown(false),
           language: i18n.language === 'en' ? 'en' : 'pt',
           callback: (token) => onTokenRef.current?.(token),
           'expired-callback': () => onTokenRef.current?.(null),
@@ -103,7 +112,10 @@ const TurnstileWidget = forwardRef(function TurnstileWidget({ onToken, action, c
   }, [])
 
   if (!TURNSTILE_SITE_KEY) return null
-  return <div ref={containerRef} className={className} />
+  // Escondida: sem altura e sem o espaço do formulário por cima (nada de
+  // buraco entre a palavra-passe e o botão). À vista: a largura dos campos e
+  // os cantos deles (designer, 28 set).
+  return <div ref={containerRef} className={`${shown ? 'overflow-hidden rounded-ctrl' : '!mt-0 h-0 overflow-hidden'} ${className}`} />
 })
 
 export default TurnstileWidget
