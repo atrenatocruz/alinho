@@ -65,6 +65,7 @@ export function installFakeSupabase(supabase, db) {
           return 0
         })
       }
+      if (q.limit != null) rows = rows.slice(0, q.limit)
       if (q.single) return rows[0] ? { data: rows[0], error: null } : { data: null, error: { message: 'not found' } }
       if (q.maybe) return { data: rows[0] ?? null, error: null }
       return { data: rows, error: null }
@@ -89,10 +90,11 @@ export function installFakeSupabase(supabase, db) {
       },
       in: (c, v) => { q.filters.push((r) => v.includes(get(r, c))); return api },
       gt: (c, v) => { q.filters.push((r) => get(r, c) > v); return api },
+      lt: (c, v) => { q.filters.push((r) => get(r, c) < v); return api },
       // .is(col, null) — o que o voucherNotices.js usa.
       is: (c, v) => { q.filters.push((r) => (get(r, c) ?? null) === v); return api },
       order: (col, opts = {}) => { q.orders.push({ col, asc: opts.ascending !== false }); return api },
-      limit: () => api,
+      limit: (n) => { q.limit = n; return api },
       single: () => { q.single = true; return api },
       maybeSingle: () => { q.maybe = true; return api },
       then: (res, rej) => Promise.resolve(exec()).then(res, rej),
