@@ -413,11 +413,17 @@ const RPC_MOCKS = {
   // 'waiting' (falta 1 responder) · 'ready' (todos aceitaram, sou o criador)
   // · 'invited' (convidaram-me) · 'app' (como 'ready', com «A app faz»).
   create_friend_match: () => 'fs-1',
+  // Rondas editáveis (Dev 3, 27 set): no ecrã só se vê o pedido a sair.
+  remove_friend_match_round: () => null,
+  move_friend_match_round: () => null,
   get_friend_match: () => {
     const mode = localStorage.getItem('mockFriendSession') || 'ready'
     // Por rondas (27 set): 'rounds6' = 6 pessoas, 1 campo, Melhor de 3 — a
     // ronda 1 acabou (6-4 6-3), a 2 vai no set 2 (6-4), a 3 a seguir;
     // 'rounds8' = 8 pessoas, 2 campos, a ronda 1 a decorrer.
+    // localStorage.mockFriendCounted = 'true': a ronda 1 já contou para o
+    // ranking (os 4 confirmaram) — «Contou», o cadeado, e o ranking trancado
+    // no editar (rondas editáveis, 27 set).
     if (mode === 'rounds6' || mode === 'rounds8') {
       const me = MOCK_ADMIN_USER_ID
       const P = [[me, 'Admin (Dev)'], ['u-rf', 'Rita Figueira'], ['u-tl', 'Tiago Lopes'], ['u-am', 'Ana Marques'], ['u-rc', 'Rui Costa'], ['u-zp', 'Zé Pinto'],
@@ -440,9 +446,12 @@ const RPC_MOCKS = {
         g('fs-g3', 2, 1, [0, 4], [1, 6], [], false),
         g('fs-g4', 2, 2, [2, 5], [3, 7], [], false),
       ]
+      const counted = localStorage.getItem('mockFriendCounted') === 'true'
+      if (counted) games[0].counts = true
       return {
         match: { id: 'fs-1', scheduled_date: new Date(Date.now() + 6 * 86400000).toISOString().slice(0, 10), scheduled_time: '10:00:00', location: 'Clube Exemplo', court: null,
-          teams_mode: 'app', pairing_mode: 'rotating', scoring_format: 'sets', num_sets: 3, game_minutes: null, teams_set_at: new Date().toISOString() },
+          teams_mode: 'app', pairing_mode: 'rotating', scoring_format: 'sets', num_sets: 3, game_minutes: null, teams_set_at: new Date().toISOString(),
+          ranked_intent: true, ranking_locked: counted },
         invitees, games,
       }
     }

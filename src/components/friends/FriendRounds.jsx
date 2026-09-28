@@ -5,24 +5,39 @@
 // por baixo, e «Descansam». A ronda a decorrer tem contorno preto, com
 // «⇄ Editar duplas» e «Marcar set N». Em «Pontos» marca-se o resultado de
 // uma vez, como antes.
+//
+// Rondas editáveis (27 set, SPEC amigos-por-rondas, fim — «o mais editável
+// possível»): quem criou junta rondas («＋ Ronda»), remove qualquer ronda
+// (também jogadas e a que decorre, com pergunta) e muda-as de lugar (↑ ↓).
+// O único cadeado é a ronda que já contou para o ranking.
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeftRight } from 'lucide-react'
+import { ArrowDown, ArrowLeftRight, ArrowUp, Lock, Plus } from 'lucide-react'
 import { shortName } from './friendShare'
-import { roundsOf, hasResult, setsOf, setsWon } from './roundsData'
+import { roundsOf, hasResult, setsOf, setsWon, canMove, roundResults } from './roundsData'
 import { formatKey } from './friendScoring'
 import FriendSetSheet from './FriendSetSheet'
 import FriendResultSheet from './FriendResultSheet'
 import EditPairsSheet from './EditPairsSheet'
-import AddGameSheet from './AddGameSheet'
 import { ShareMissingButton } from './FriendSessionGames'
+import { ConfirmSheet } from '../ui'
+import { addFriendMatchRound, moveFriendMatchRound, removeFriendMatchRound } from '../../lib/privateMatches'
+import { planRounds, courtsFor } from '../../lib/friendTeams'
+import { describeError } from '../../lib/errors'
+
+// Os erros das funções novas (Dev 3). Sem a função em produção, describeError
+// já diz «ainda não disponível» (not_ready).
+const roundError = (t, err) => (String(err?.message || '').includes('already_counted')
+  ? t('friends.round_error_counted') : describeError(t, err))
 
 export default function FriendRounds({ match, games, invitees, players, iAmCreator, myUserId, onChanged }) {
   const { t } = useTranslation()
   const [setFor, setSetFor] = useState(null) // { game, round }
   const [resultFor, setResultFor] = useState(null)
   const [editFor, setEditFor] = useState(null) // a ronda
-  const [adding, setAdding] = useState(false)
+  const [removeFor, setRemoveFor] = useState(null) // a ronda
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
   const format = formatKey(match.scoring_format, match.num_sets)
   const bySets = format !== 'points'
   const rounds = roundsOf(games, players)
@@ -73,7 +88,49 @@ export default function FriendRounds({ match, games, invitees, players, iAmCreat
     )
   }
 
-  const tag = (r) => (r.done
+  // Só quem criou, e à vez: mexem na ordem das rondas.
+  const act = async (fn) => {
+    setBusy(true); setError('')
+    try { await fn(); onChanged() } catch (err) {
+      console.error('Error editing friend match rounds:', err)
+      setError(roundError(t, err))
+    } finally { setBusy(false) }
+  }
+  const move = (r, dir) => act(() => moveFriendMatchRound(match.id, r.number, dir === 'up' ? r.number - 1 : r.number + 1))
+
+  // «＋ Ronda»: a app faz a ronda seguinte — quem joga e quem descansa — sem
+  // repetir duplas nem jogos das que já existem (a mesma conta do formar).
+  const addRound = () => act(async () => {
+    const byId = new Map(players.map((p) => [p.invitee_id, p]))
+    const person = (x) => byId.get(x.invitee_id) || { ...x, id: x.invitee_id }
+    const done = rounds.map((r) => ({
+      courts: r.courts.map((g) => ({ teamA: (g.team_a || []).map(person), teamB: (g.team_b || []).map(person) })),
+      resting: r.resting,
+    }))
+    const courts = Math.min(Math.max(1, ...rounds.map((r) => r.courts.length)), courtsFor(players.length))
+    const [next] = planRounds(players, done, courts, 1)
+    const ids = (team) => team.map((p) => p.id)
+    await addFriendMatchRound(match.id, next.courts.map((c) => ({ team_a: ids(c.teamA), team_b: ids(c.teamB) })))
+  })
+
+  // «Remover a ronda N?» — diz o que se perde: os resultados, ou as duplas.
+  const names = (team) => (team || []).map((p) => shortName(p.name)).join(' / ')
+  const removeMessage = (r) => {
+    const res = roundResults(r)
+    if (res.length) {
+      const text = res.map(({ game, won }) => {
+        const [wa, wb] = won
+        return wa >= wb ? `${names(game.team_a)} ${wa}–${wb}` : `${names(game.team_b)} ${wb}–${wa}`
+      }).join(', ')
+      return t('friends.remove_round_with_results', { results: text })
+    }
+    const pairs = r.courts.map((g) => `${names(g.team_a)} × ${names(g.team_b)}`).join(', ')
+    return t('friends.remove_round_no_results', { pairs, count: r.courts.length })
+  }
+
+  const tag = (r) => (r.counted
+    ? <span className="rounded-full bg-[#DCFCE7] px-2.5 py-0.5 text-xs font-extrabold text-[#14532D]">{t('friends.round_counted')}</span>
+    : r.done
     ? <span className="rounded-full bg-[#DCFCE7] px-2.5 py-0.5 text-xs font-extrabold text-[#14532D]">{t('friends.round_done')}</span>
     : r.current
       ? <span className="rounded-full bg-danger/10 px-2.5 py-0.5 text-xs font-extrabold text-danger">
@@ -83,35 +140,56 @@ export default function FriendRounds({ match, games, invitees, players, iAmCreat
 
   return (
     <div className="space-y-3">
-      {rounds.map((r) => {
+      {rounds.map((r, i) => {
         const single = r.courts.length === 1 ? r.courts[0] : null
         const canEdit = iAmCreator && !r.counted
         const canMark = r.current && single && canRecord(single) && !hasResult(single)
+        const arrow = 'press inline-flex h-9 w-9 items-center justify-center rounded-full border border-line bg-white text-ink-900 disabled:opacity-30'
         return (
           <section key={r.number} className={`rounded-card p-3 ${r.current ? 'border-2 border-ink-900 bg-white' : 'bg-surface'}`}>
             <div className="mb-2 flex items-center justify-between gap-2">
-              <h3 className="font-display text-base text-ink-900">{t('friends.round_n', { n: r.number })}</h3>
+              <div className="flex items-center gap-1.5">
+                <h3 className="mr-1 font-display text-base text-ink-900">{t('friends.round_n', { n: r.number })}</h3>
+                {/* ↑ ↓: a de cima sem ↑, a de baixo sem ↓; a que contou sem nenhuma. */}
+                {canEdit && i > 0 && (
+                  <button type="button" onClick={() => move(r, 'up')} disabled={busy || !canMove(rounds, i, 'up')}
+                    aria-label={t('friends.round_move_up', { n: r.number })} className={arrow}><ArrowUp size={16} /></button>
+                )}
+                {canEdit && i < rounds.length - 1 && (
+                  <button type="button" onClick={() => move(r, 'down')} disabled={busy || !canMove(rounds, i, 'down')}
+                    aria-label={t('friends.round_move_down', { n: r.number })} className={arrow}><ArrowDown size={16} /></button>
+                )}
+              </div>
               {tag(r)}
             </div>
             <div className="space-y-2">{r.courts.map((g) => court(g, r))}</div>
             {r.resting.length > 0 && (
               <p className="mt-2 text-xs text-muted">{t('friends.resting_line_plural', { names: r.resting.map((p) => (p.is_anonymous ? t('friends.anon_name') : shortName(p.name))).join(', ') })}</p>
             )}
-            {(canEdit || canMark) && (
+            {r.counted && iAmCreator && (
+              <p className="mt-2.5 flex items-start gap-1.5 text-xs text-muted">
+                <Lock size={12} className="mt-0.5 shrink-0 text-warning" /> {t('friends.round_counted_lock')}
+              </p>
+            )}
+            {canEdit && (
               <div className="mt-2.5 flex gap-2">
-                {canEdit && (
-                  <button type="button" onClick={() => setEditFor(r)}
-                    className="press inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-ctrl border-[1.5px] border-line bg-white px-3 text-sm font-extrabold text-ink-900">
-                    <ArrowLeftRight size={15} /> {t('friends.edit_pairs')}
-                  </button>
-                )}
-                {canMark && (
-                  <button type="button" onClick={() => open(single, r)}
-                    className="press min-h-[44px] flex-1 rounded-ctrl bg-ink-900 px-3 text-sm font-extrabold text-white">
-                    {bySets ? t('friends.mark_set', { n: setsOf(single).length + 1 }) : t('friends.mark_result')}
-                  </button>
-                )}
+                <button type="button" onClick={() => setEditFor(r)}
+                  className="press inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-ctrl border-[1.5px] border-line bg-white px-3 text-sm font-extrabold text-ink-900">
+                  <ArrowLeftRight size={15} /> {t('friends.edit_pairs')}
+                </button>
+                <button type="button" onClick={() => setRemoveFor(r)} disabled={busy}
+                  className="press min-h-[44px] flex-1 rounded-ctrl border-[1.5px] border-danger/40 bg-white px-3 text-sm font-extrabold text-danger">
+                  {t('friends.remove_round')}
+                </button>
               </div>
+            )}
+            {/* Na ronda a decorrer, «Marcar set» a toda a largura, por baixo
+                (designer, 27 set: o Remover também está nesta ronda). */}
+            {canMark && (
+              <button type="button" onClick={() => open(single, r)}
+                className="press mt-2 min-h-[44px] w-full rounded-ctrl bg-ink-900 px-3 text-sm font-extrabold text-white">
+                {bySets ? t('friends.mark_set', { n: setsOf(single).length + 1 }) : t('friends.mark_result')}
+              </button>
             )}
           </section>
         )
@@ -126,10 +204,11 @@ export default function FriendRounds({ match, games, invitees, players, iAmCreat
         </p>
       )}
       {pending > 0 && iAmCreator && <ShareMissingButton match={match} creatorName={creator?.name} />}
-      {iAmCreator && rounds.every((r) => r.done) && (
-        <button type="button" onClick={() => setAdding(true)}
-          className="press min-h-[52px] w-full rounded-ctrl border-[1.5px] border-line bg-white px-4 text-[15px] font-extrabold text-ink-900">
-          {t('friends.add_game')}
+      {error && <p className="rounded-ctrl border border-danger/30 bg-danger/10 px-3 py-2 text-sm font-extrabold text-danger">{error}</p>}
+      {iAmCreator && (
+        <button type="button" onClick={addRound} disabled={busy}
+          className="press inline-flex min-h-[52px] w-full items-center justify-center gap-1.5 rounded-ctrl border-[1.5px] border-dashed border-ink-200 bg-white px-4 text-[15px] font-extrabold text-ink-900 disabled:opacity-40">
+          <Plus size={16} /> {t('friends.add_round')}
         </button>
       )}
 
@@ -145,10 +224,17 @@ export default function FriendRounds({ match, games, invitees, players, iAmCreat
         <EditPairsSheet match={match} round={editFor} rounds={rounds} players={players}
           onClose={() => setEditFor(null)} onSaved={() => { setEditFor(null); onChanged() }} />
       )}
-      {adding && (
-        <AddGameSheet matchId={match.id} players={players} onClose={() => setAdding(false)}
-          onSaved={() => { setAdding(false); onChanged() }} />
-      )}
+      <ConfirmSheet
+        open={!!removeFor}
+        danger
+        title={removeFor ? t('friends.remove_round_title', { n: removeFor.number }) : ''}
+        message={removeFor ? removeMessage(removeFor) : ''}
+        cancelLabel={t('friends.remove_round_keep')}
+        confirmLabel={t('friends.remove_round_yes')}
+        onConfirm={async () => { await removeFriendMatchRound(match.id, removeFor.number); onChanged() }}
+        onClose={() => setRemoveFor(null)}
+        errorOf={(err) => roundError(t, err)}
+      />
     </div>
   )
 }

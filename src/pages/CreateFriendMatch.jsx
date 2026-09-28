@@ -23,7 +23,7 @@ const personFrom = (i) => ({
   key: i.invitee_id, inviteeId: i.invitee_id, user_id: i.user_id, name: i.name, avatar_url: i.avatar_url,
   guest: i.is_guest || i.status === 'guest',
 })
-const EDIT_ERRORS = ['not_allowed', 'format_locked', 'has_results', 'in_first_game']
+const EDIT_ERRORS = ['not_allowed', 'format_locked', 'has_results', 'in_first_game', 'ranked_locked', 'teams_locked']
 
 export default function CreateFriendMatch({ group = null, edit = null }) {
   const m = edit?.match
@@ -44,7 +44,11 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
   const lockedKeys = edit ? new Set(original.filter((i) => i.has_results).map((i) => i.invitee_id)) : null
   const scoringLocked = !!edit?.games?.some((g) => g.score_a != null && g.score_b != null)
 
-  const [rankedIntent, setRankedIntent] = useState(true)
+  // «Conta para o ranking?» e «Equipas» também no editar (27 set: «o editar
+  // tem tudo o que o criar tem»). O ranking tranca quando algum jogo já
+  // contou; as equipas quando já há resultados (base de dados do Dev 3).
+  const [rankedIntent, setRankedIntent] = useState(m ? m.ranked_intent !== false : true)
+  const rankingLocked = !!(m?.ranking_locked || edit?.games?.some((g) => g.counts))
   // «Dia e hora» num campo só, como no mix.
   const [when, setWhen] = useState(() => (m?.scheduled_date
     ? `${m.scheduled_date}T${String(m.scheduled_time || '').slice(0, 5)}` : '')) // 'YYYY-MM-DDTHH:mm'
@@ -55,7 +59,7 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
   const [court, setCourt] = useState(m?.court || '')
   // «Melhor de 3» vem escolhido (27 set); substitui o «N sets» fixo.
   const [format, setFormat] = useState(m ? formatKey(m.scoring_format, m.num_sets) : 'best3')
-  const [teamsMode, setTeamsMode] = useState('manual')
+  const [teamsMode, setTeamsMode] = useState(m?.teams_mode || 'manual')
   // «Cada jogo dura» (27 set): 0 = sem tempo; só com mais de 4 pessoas.
   const [gameMinutes, setGameMinutes] = useState(m?.game_minutes || 0)
   const [saving, setSaving] = useState(false)
@@ -143,6 +147,9 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
         court: court.trim() || null,
         gameMinutes: people.length + 1 > MIN_PEOPLE ? gameMinutes || null : null,
         ...FORMAT_DB[format],
+        // Só vão quando mudam (a função recusa com o cadeado).
+        rankedIntent: rankedIntent !== (m.ranked_intent !== false) ? rankedIntent : undefined,
+        teamsMode: teamsMode !== (m.teams_mode || 'manual') ? teamsMode : undefined,
       })
       navigate(`/jogos-privados/sessao/${m.id}`)
     } catch (err) {
@@ -155,6 +162,55 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
   }
 
   const label = 'block text-sm font-medium text-gray-700 mb-2'
+  // «Equipas» e «Conta para o ranking?»: os mesmos no criar e no editar.
+  // No editar, com cadeado e a razão à vista (SPEC amigos-por-rondas, fim).
+  const teamsLocked = !!edit && scoringLocked
+  const teamsBlock = (
+    <div>
+      <p className={label}>{t('friends.teams_label')}</p>
+      <div className={teamsLocked ? 'pointer-events-none opacity-50' : ''} aria-disabled={teamsLocked || undefined}>
+        <Chips
+          value={teamsMode}
+          onChange={setTeamsMode}
+          options={[
+            { value: 'manual', label: t('friends.teams_me_later') },
+            { value: 'app', label: t('friends.teams_app') },
+          ]}
+        />
+      </div>
+      {teamsLocked ? (
+        <p className="mt-2 flex items-start gap-1.5 text-xs text-muted">
+          <Lock size={12} className="mt-0.5 shrink-0 text-warning" /> {t('friends.teams_locked_hint')}
+        </p>
+      ) : <p className="mt-2 text-xs text-muted">{t('friends.teams_app_hint')}</p>}
+    </div>
+  )
+  const rankedLocked = !!edit && rankingLocked
+  const rankedBlock = (
+    <div>
+      <p className={label}>{t('steps.ranking_heading')}</p>
+      <div className={rankedLocked ? 'pointer-events-none opacity-50' : ''} aria-disabled={rankedLocked || undefined}>
+        <Chips
+          value={rankedIntent}
+          onChange={setRankedIntent}
+          options={[
+            { value: true, label: t('steps.ranking_yes') },
+            { value: false, label: t('steps.ranking_friendly') },
+          ]}
+        />
+      </div>
+      {/* A regra é jogo a jogo (base de dados): um jogo com um convidado
+          sem conta não conta, os outros da sessão contam — e quem
+          criar conta pelo convite passa a contar (QA/PO, 27 set). */}
+      {rankedLocked ? (
+        <p className="mt-2 flex items-start gap-1.5 text-xs text-muted">
+          <Lock size={12} className="mt-0.5 shrink-0 text-warning" /> {t('friends.ranked_locked_hint')}
+        </p>
+      ) : edit ? <p className="mt-2 text-xs text-muted">{t('friends.ranked_edit_hint')}</p>
+        : rankedIntent && hasGuest && <p className="mt-2 text-xs text-muted">{t('friends.ranked_hint_guests')}</p>}
+    </div>
+  )
+
   // «Cada jogo dura» — no criar depois da forma de contar, no editar antes
   // (os dois desenhos de 27 set). Com 4 não roda, por isso não aparece.
   const durationBlock = people.length + 1 > MIN_PEOPLE && (
@@ -243,35 +299,8 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
       {step === 4 && (
         <>
           {!edit && (<>
-          <div>
-            <p className={label}>{t('friends.teams_label')}</p>
-            <Chips
-              value={teamsMode}
-              onChange={setTeamsMode}
-              options={[
-                { value: 'manual', label: t('friends.teams_me_later') },
-                { value: 'app', label: t('friends.teams_app') },
-              ]}
-            />
-            <p className="mt-2 text-xs text-muted">{t('friends.teams_app_hint')}</p>
-          </div>
-          <div>
-            <p className={label}>{t('steps.ranking_heading')}</p>
-            <Chips
-              value={rankedIntent}
-              onChange={setRankedIntent}
-              options={[
-                { value: true, label: t('steps.ranking_yes') },
-                { value: false, label: t('steps.ranking_friendly') },
-              ]}
-            />
-            {/* A regra é jogo a jogo (base de dados): um jogo com um convidado
-                sem conta não conta, os outros da sessão contam — e quem
-                criar conta pelo convite passa a contar (QA/PO, 27 set). */}
-            {rankedIntent && hasGuest && (
-              <p className="mt-2 text-xs text-muted">{t('friends.ranked_hint_guests')}</p>
-            )}
-          </div>
+          {teamsBlock}
+          {rankedBlock}
           </>)}
           {edit && durationBlock}
           <div>
@@ -294,6 +323,8 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
               </p>
             )}
           </div>
+          {edit && teamsBlock}
+          {edit && rankedBlock}
           {!edit && durationBlock}
         </>
       )}
