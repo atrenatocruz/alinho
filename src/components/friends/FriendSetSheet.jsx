@@ -10,6 +10,7 @@ import { saveFriendMatchSet, finishFriendMatchGame } from '../../lib/privateMatc
 import { describeError } from '../../lib/errors'
 import { shortName } from './friendShare'
 import { setsOf, setsWon } from './roundsData'
+import { setRowProblem } from '../tournament/scoreProblem'
 
 const pair = (team) => (team || []).map((p) => shortName(p.name)).join(' / ')
 const ERRORS = ['bad_score', 'already_counted', 'not_allowed']
@@ -28,6 +29,9 @@ export default function FriendSetSheet({ game, roundNumber, format, onClose, onS
   const last = rows[rows.length - 1]
   const newFilled = !decided && last && last.a !== '' && last.b !== ''
   const changed = rows.slice(0, saved.length).some((r, i) => r.a !== saved[i].a || r.b !== saved[i].b)
+  // #588: cada set a 6, com a regra única (a mesma do torneio). O servidor
+  // também recusa (set_invalid) nos jogos novos; aqui avisa-se antes.
+  const setProb = rows.map((r) => setRowProblem(r.a, r.b)).find(Boolean) || null
 
   const persist = async () => {
     for (let i = 0; i < rows.length; i += 1) {
@@ -73,13 +77,14 @@ export default function FriendSetSheet({ game, roundNumber, format, onClose, onS
               )))}
           </div>
         ))}
+        {setProb && <p className="text-xs font-extrabold text-danger" role="status">{t(`tournament.score.problem_${setProb}`)}</p>}
         {error && <p className="rounded-ctrl border border-danger/30 bg-danger/10 px-3 py-2 text-sm font-extrabold text-danger">{error}</p>}
-        <button type="button" disabled={busy || (!newFilled && !changed)} onClick={() => run(false)}
+        <button type="button" disabled={busy || !!setProb || (!newFilled && !changed)} onClick={() => run(false)}
           className="press min-h-[52px] w-full rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold text-white disabled:opacity-40">
           {changed && !newFilled ? t('friends.save_sets') : t('friends.save_set', { n: next })}
         </button>
         {format === 'free' && (
-          <button type="button" disabled={busy || (saved.length === 0 && !newFilled)} onClick={() => run(true)}
+          <button type="button" disabled={busy || !!setProb || (saved.length === 0 && !newFilled)} onClick={() => run(true)}
             className="press min-h-[52px] w-full rounded-ctrl border-[1.5px] border-line bg-white px-4 text-[15px] font-extrabold text-ink-900 disabled:opacity-40">
             {t('friends.game_ended_like_this')}
           </button>

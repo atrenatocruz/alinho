@@ -8,7 +8,7 @@
 import { useTranslation } from 'react-i18next'
 import { Users } from 'lucide-react'
 import { EmptyState } from '../ui'
-import { MonoLabel, Me } from './TournamentBits'
+import { Me } from './TournamentBits'
 import useCategoryBoard from './useCategoryBoard'
 import { standingsOf, qualifiersPerGroup } from '../../lib/tournamentDraw'
 
@@ -129,7 +129,8 @@ export default function GroupsPanel({ category, my }) {
 
   return (
     <div>
-      <MonoLabel className="mb-1">{t('tournament.draw.groups_label')}</MonoLabel>
+      {/* Sem título próprio: «Todos os jogos» já põe «Grupos» por cima da
+          secção (designer, 28 set — aparecia duas vezes seguidas). */}
       {groups.map((group) => (
         <GroupTable
           key={group.id}

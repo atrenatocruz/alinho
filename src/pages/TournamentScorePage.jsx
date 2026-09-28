@@ -24,6 +24,7 @@ import { Chips, ConfirmSheet, EmptyState, PrimaryButton } from '../components/ui
 import { Sheet } from '../components/agenda/AgendaControls'
 import { FieldLabel, MonoLabel, StatePill } from '../components/tournament/TournamentBits'
 import { proSetTieBreakTarget, tieBreakProblem, setText } from '../components/tournament/tieBreak'
+import { setsResultProblem } from '../components/tournament/scoreProblem'
 
 // Hora de Portugal, nunca cortada do texto da base de dados (vinha em UTC:
 // 17:00 onde o resto da app dizia 18:00 — Trello #487).
@@ -215,7 +216,8 @@ function CourtCard({ match, scoring, tieTarget = 7, onSave, onWalkover, onUndoWa
         })()
         : { score_a: Number(a), score_b: Number(b) }
     // 9-8 com o tie-break escrito é um fim válido de pro set.
-    const p = askTieBreak ? null : resultProblem(scoring, input)
+    // #588: por sets, cada set com a regra única (um 9-2 já não passa).
+    const p = askTieBreak ? null : bySets ? setsResultProblem(scoring, input) : resultProblem(scoring, input)
     setProblem(p)
     if (p) return
     onSave(match, input, finished)

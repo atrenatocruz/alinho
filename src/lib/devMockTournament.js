@@ -322,6 +322,9 @@ export const TOURNAMENT_RPC_MOCKS = {
         ? { my: { category_id: 'cat-m4', state: 'validada', entry_id: 'e1' },
             my_entries: [{ category_id: 'cat-m4', status: 'validada', state: 'validada', entry_id: 'e1' }],
             my_matches: [] }
+        // localStorage.mockTNotEntered = 'true': vejo o torneio sem estar
+        // inscrito — sem «Os meus jogos» (separadores, 28 set).
+        : localStorage.getItem('mockTNotEntered') === 'true' ? { my: null, my_entries: [], my_matches: [] }
         : { my: empty() ? null : { category_id: 'cat-m5', state: 'validada', entry_id: 'en-me' },
             my_matches: empty() || state() === 'inscricoes' ? [] : MY_MATCHES() }),
     }

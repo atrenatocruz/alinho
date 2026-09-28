@@ -62,7 +62,8 @@ export default function AllGamesPanel(props) {
             <MonoLabel>{t(`tournament.section_${key}`)}</MonoLabel>
             {/* A linha por baixo do título está no desenho: com três secções
                 seguidas, o título sozinho não diz qual é qual a quem chega. */}
-            <p className="mb-1.5 mt-0.5 text-xs text-ink-500">{t(`tournament.section_${key}_hint`)}</p>
+            {/* Sem inscrição não há «tua tabela» (designer, 28 set). */}
+            <p className="mb-1.5 mt-0.5 text-xs text-ink-500">{t(key === 'groups' && !props.my ? 'tournament.section_groups_hint_open' : `tournament.section_${key}_hint`)}</p>
             <Suspense fallback={spinner}><Panel {...props} /></Suspense>
           </section>
         )
