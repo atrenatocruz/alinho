@@ -78,14 +78,30 @@ export function pendingOccurrenceRow(game, { nextDate, launchAt, userId, recurre
   }
 }
 
+/** A regra da série de um rascunho (para a pergunta «Abrem as inscrições»
+ *  ao publicar): a frequência e os segundos entre a abertura e o mix. */
+export async function draftRecurrence(recurrenceId) {
+  if (!recurrenceId) return null
+  const { data, error } = await supabase
+    .from('game_recurrences').select('id, frequency, mix_offset_seconds').eq('id', recurrenceId).single()
+  if (error) throw error
+  return data
+}
+
 /** Publica um rascunho: passa a `open` (o robô anuncia) e, se for o início
  *  de uma série, prepara a data seguinte como `pending`, como faz o criar
  *  de hoje. Devolve o mix publicado. Um erro de limite do plano vem da
- *  política de UPDATE e sobe tal e qual, para o ecrã o explicar. */
-export async function publishDraftMix(game, userId) {
+ *  política de UPDATE e sobe tal e qual, para o ecrã o explicar.
+ *
+ *  «Abrem as inscrições» ao publicar (Francisco, 28 set): com `launchAt` no
+ *  futuro fica `pending` com launch_at e abre sozinho a essa hora, como o
+ *  mix único; numa série, `offsetSeconds` passa a ser a regra das datas
+ *  seguintes (mix_offset_seconds, a do process_due_game_recurrences). */
+export async function publishDraftMix(game, userId, { launchAt = null, offsetSeconds = null } = {}) {
+  const later = launchAt && launchAt.getTime() > Date.now()
   const { data, error } = await supabase
     .from('games')
-    .update({ status: 'open' })
+    .update(later ? { status: 'pending', launch_at: launchAt.toISOString() } : { status: 'open' })
     .eq('id', game.id)
     .eq('status', DRAFT)
     .select()
@@ -102,6 +118,12 @@ export async function publishDraftMix(game, userId) {
     .single()
   if (recError) throw recError
   if (!recurrence?.is_active) return published
+  if (offsetSeconds != null && offsetSeconds !== recurrence.mix_offset_seconds) {
+    const { error: offError } = await supabase
+      .from('game_recurrences').update({ mix_offset_seconds: offsetSeconds }).eq('id', recurrence.id)
+    if (offError) throw offError
+    recurrence.mix_offset_seconds = offsetSeconds
+  }
 
   // Já existe o próximo? Então não se cria outro (publicar duas vezes, ou
   // alguém que o criou à mão).

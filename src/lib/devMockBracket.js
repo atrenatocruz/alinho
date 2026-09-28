@@ -3,7 +3,7 @@
 //
 // Ligar em localhost, com a sessão Admin(Dev), por cima do mockTournament,
 // do mockTDraw e do mockTMyGamesReal (sou a dupla e1 do M4):
-//   localStorage.mockTBracket = '8' | '16' | '32'   ← quantas duplas
+//   localStorage.mockTBracket = '4' | '8' | '16' | '32'   ← quantas duplas
 //     '3': 3 duplas, uma passa direto à final — uma meia-final só
 //     '12' | '28': com «Bye» (quadro de 16 e de 32), como a M4 do Smash Cup
 //   localStorage.mockTBracketNoTime = 'true'  ← nenhum jogo com hora
@@ -11,7 +11,7 @@
 //     antes: sorteado, nada jogado · meio: 1.ª ronda jogada e a 2.ª a meio
 //     fim: tudo jogado até à final
 const size = () => Number(localStorage.getItem('mockTBracket')) || 0
-const on = () => [3, 8, 12, 16, 28, 32].includes(size())
+const on = () => [3, 4, 8, 12, 16, 28, 32].includes(size())
 const stage = () => localStorage.getItem('mockTBracketStage') || 'meio'
 
 const CAT = 'cat-m4'
@@ -21,7 +21,7 @@ const NAMES = [
   'Dias / Sá', 'Luz / Paz', 'Rei / Gil', 'Vaz / Mar', 'Leal / Sol', 'Ruas / Pio', 'Cruz / Bó', 'Sena / Ávila',
   'Pinto / Costa', 'Rosa / Pinto', 'Santos / Santos', 'Brito / Nunes', 'Branco / Lima', 'Neves / Cunha', 'Matos / Reis', 'Seixas / Ramos',
 ]
-const ROUNDS = { 32: ['R32', 'R16', 'QF', 'SF', 'F'], 16: ['R16', 'QF', 'SF', 'F'], 8: ['QF', 'SF', 'F'] }
+const ROUNDS = { 32: ['R32', 'R16', 'QF', 'SF', 'F'], 16: ['R16', 'QF', 'SF', 'F'], 8: ['QF', 'SF', 'F'], 4: ['SF', 'F'] }
 const pow2 = (n) => 2 ** Math.ceil(Math.log2(n))
 const HOURS = ['09:00', '11:00', '13:00', '15:00', '17:00']
 

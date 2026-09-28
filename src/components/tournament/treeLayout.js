@@ -30,7 +30,7 @@ export function sourceOf(round, slot, side, present) {
 
 /**
  * rounds: o que o bracketRounds devolve ([{ round, matches }], com o '3P').
- * Devolve { present, final, third, halves: [metade1, metade2], current, started }
+ * Devolve { present, columns, final, third, halves: [metade1, metade2], current, started }
  *   metade = { rounds: [{ round, matches }] } — da ronda mais cedo para a final
  *   current = a ronda a decorrer (a primeira com jogos por acabar)
  */
@@ -48,6 +48,10 @@ export function buildTree(rounds) {
   const started = current ? withSlot(current).some((m) => isDone(m) || m.status === 'a_decorrer') : false
   return {
     present,
+    // Uma coluna por ronda, pela ordem em que se joga, com todos os jogos
+    // pela ordem do quadro (28 set: telemóvel por rondas, computador da
+    // esquerda para a direita). A final é a última.
+    columns: present.map((r) => ({ round: r, matches: withSlot(r) })),
     final: withSlot('F')[0] || null,
     third: (byRound['3P'] || [])[0] || null,
     halves,

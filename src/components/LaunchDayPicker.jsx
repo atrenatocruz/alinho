@@ -13,7 +13,9 @@ import {
 // allowNow (mix que não se repete, SPEC do mix por passos): a primeira
 // pastilha é «Já» (0 dias = abre ao publicar), os dias que já passaram não
 // aparecem, e a frase não tem «Depois, sempre…».
-export default function LaunchDayPicker({ mixDate, frequency, daysBefore, onDaysBefore, time, onTime, error, allowNow = false }) {
+// `summaryExtra`: uma frase a juntar à caixa verde (ex.: «O robô anuncia nessa
+// hora.» ao publicar um rascunho, 28 set).
+export default function LaunchDayPicker({ mixDate, frequency, daysBefore, onDaysBefore, time, onTime, error, allowNow = false, summaryExtra = null }) {
   const { t, i18n } = useTranslation()
   const lang = i18n.language
   const days = parseInt(daysBefore, 10)
@@ -67,6 +69,7 @@ export default function LaunchDayPicker({ mixDate, frequency, daysBefore, onDays
         ? t(masc ? 'launchday.then_weekday_m' : 'launchday.then_weekday', { day: weekdayLong(open, lang) })
         : t('launchday.then_days', { count: days })
     if (then) summary = `${summary} ${then}`
+    if (summaryExtra) summary = `${summary} ${summaryExtra}`
   }
 
   return (

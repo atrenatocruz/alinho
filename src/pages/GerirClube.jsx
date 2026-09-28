@@ -34,10 +34,12 @@ import { lessonsAvailable, listClubSeries } from '../lib/lessonsApi'
 import { KIND_STYLE } from '../components/agenda/EventCard'
 import { tournamentsAvailable } from '../lib/tournamentApi'
 import { describeError, errorKind } from '../lib/errors'
-import { isDraftMix, publishDraftMix, advanceByFrequency, pendingOccurrenceRow } from '../lib/mixDraft'
+import { isDraftMix, advanceByFrequency, pendingOccurrenceRow } from '../lib/mixDraft'
+import PublishDraftSheet from '../components/mix/PublishDraftSheet'
 import LaunchDayPicker from '../components/LaunchDayPicker'
 import MixWizard from '../components/mix/MixWizard'
 import { useOrgNameTaken, OrgNameTakenHint } from '../components/OrgNameTaken'
+import PlacesUnavailableHint from '../components/PlacesUnavailableHint'
 import { LEVEL_SCALES, LEVEL_NUMBERS, parseLevel } from '../lib/mixLevels'
 import SeriesPage from '../components/mix/SeriesPage'
 import { setEventWhatsappPostTimes } from '../lib/whatsappHours'
@@ -1646,11 +1648,6 @@ export default function GerirClube() {
   const publishErrorText = (error) =>
     (isMixLimitError(error?.message || '') && planLimitMessage(t, 'mix', org?.plan_tier))
     || describeError(t, error, 'mixdraft.publish_error')
-  const handlePublishDraft = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    await publishDraftMix(publishing, user.id)
-    loadGames()
-  }
 
   const handleStopRecurrence = async (recurrenceId) => {
     if (!confirm(t('gerirclube.confirm_stop_recurrence'))) return
@@ -2514,6 +2511,7 @@ export default function GerirClube() {
                         className="input-field"
                         placeholder={t('gerirclube.location_placeholder')}
                       />
+                      <PlacesUnavailableHint />
                     </div>
 
                     <div>
@@ -3269,13 +3267,11 @@ export default function GerirClube() {
 
               {/* Publicar pergunta uma vez: a mensagem do robô não se apaga
                   (regra das janelas, 24 set). Sem vermelho. */}
-              <ConfirmSheet
-                open={!!publishing}
-                title={t('mixdraft.publish_title', { name: publishing?.title || '' })}
-                message={t('mixdraft.publish_message')}
-                confirmLabel={t('mixdraft.publish')}
-                cancelLabel={t('mixdraft.not_now')}
-                onConfirm={handlePublishDraft}
+              {/* «Abrem as inscrições» ao publicar (28 set): «Já» ou um dia e hora. */}
+              <PublishDraftSheet
+                game={publishing}
+                userId={currentUser?.id}
+                onPublished={() => loadGames()}
                 onClose={() => setPublishing(null)}
                 errorOf={publishErrorText}
               />
@@ -3633,6 +3629,7 @@ export default function GerirClube() {
                         className="input-field"
                         placeholder={t(kk('gerirclube.address_placeholder'))}
                       />
+                      <PlacesUnavailableHint />
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
