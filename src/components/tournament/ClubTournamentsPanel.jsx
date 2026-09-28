@@ -8,7 +8,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ChevronRight, Pencil, Plus, Trash2, Trophy, Shuffle } from 'lucide-react'
-import { createTournament, deleteTournament, getTournamentForEdit, listClubTournaments, setTournamentStatus, updateTournament } from '../../lib/tournamentApi'
+import { createTournament, deleteTournament, getTournamentForEdit, listClubTournaments, scheduleTournamentOpening, setTournamentStatus, updateTournament } from '../../lib/tournamentApi'
 import { canDelete, nextStatus, previousStatus } from '../../lib/tournaments'
 import { describeError, errorKind } from '../../lib/errors'
 import { DangerConfirmModal, EmptyState, PrimaryButton } from '../ui'
@@ -93,6 +93,8 @@ export default function ClubTournamentsPanel({ organizationId, club, startCreati
     setError('')
     try {
       await updateTournament(editing.row.id, draft)
+      // «Abrem as inscrições» mudou num rascunho (#586).
+      if (draft.schedule_opening) await scheduleTournamentOpening(editing.row.id, draft.schedule_opening.at)
       setEditing(null)
       load()
     } catch (err) {

@@ -3494,6 +3494,7 @@
   "tournament.create.entries_until": "Entries until",
   "tournament.create.opens_now": "Now",
   "tournament.create.opens_now_hint": "Entries open when you publish.",
+  "tournament.create.opens_already_open": "🔒 Entries are already open.",
   "tournament.create.opens_summary": "The tournament on {{tourDay}} {{tourDate}} opens entries on {{day}} {{date}}, at {{time}}.",
   "tournament.create.opens_summary_m": "The tournament on {{tourDay}} {{tourDate}} opens entries on {{day}} {{date}}, at {{time}}.",
   "tournament.create.opens_summary_no_day": "The tournament opens entries on {{day}} {{date}}, at {{time}}.",

@@ -89,7 +89,16 @@ export async function createTournament(organizationId, draft) {
 export async function getTournamentForEdit(tournamentId) {
   const { data, error } = await supabase.rpc('get_tournament_for_edit', { p_tournament_id: tournamentId })
   if (error) throw error
-  return data || null
+  if (!data?.tournament) return data || null
+  // A get_tournament_for_edit não traz a abertura marcada nem as horas do
+  // WhatsApp (auditoria «Editar tem tudo», #586): lêem-se à parte, senão o
+  // editar mostrava «Já» e as horas por omissão, e gravava-as por cima.
+  const { data: extra } = await supabase
+    .from('tournaments')
+    .select('registrations_open_at, whatsapp_post_times')
+    .eq('id', tournamentId)
+    .maybeSingle()
+  return extra ? { ...data, tournament: { ...data.tournament, ...extra } } : data
 }
 
 /** Editar um torneio. Enquanto não há inscrições muda-se tudo; depois, só o

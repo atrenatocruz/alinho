@@ -3495,6 +3495,7 @@
   "tournament.create.entries_until": "Inscrições até",
   "tournament.create.opens_now": "Já",
   "tournament.create.opens_now_hint": "Abre as inscrições ao publicar.",
+  "tournament.create.opens_already_open": "🔒 As inscrições já abriram.",
   "tournament.create.opens_summary": "O torneio de {{tourDay}} {{tourDate}} abre as inscrições na {{day}} {{date}}, às {{time}}.",
   "tournament.create.opens_summary_m": "O torneio de {{tourDay}} {{tourDate}} abre as inscrições no {{day}} {{date}}, às {{time}}.",
   "tournament.create.opens_summary_no_day": "O torneio abre as inscrições na {{day}} {{date}}, às {{time}}.",
