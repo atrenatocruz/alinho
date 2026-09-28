@@ -11,9 +11,10 @@
 // have a different language set. Those broadcasts stay in 'pt' (this app's
 // default, per CLAUDE.md "Portuguese-first"). Messages addressed to ONE
 // specific person — the in/out/waitlist confirmation replies in
-// commands.js, the individual DM reminder in reminders.js, and the
+// commands.js and the
 // "you were promoted from the waitlist" callout line in roster.js/sync.js —
-// use that person's own profiles.language.
+// use that person's own profiles.language. The bot never sends private
+// messages — everything goes to the group (Renato, 28 set).
 const pt = {
   help_footer: '\n\n💬 Escreve */help* para ver todos os comandos.',
   help_text: `🤖 *Comandos do bot*
@@ -55,16 +56,9 @@ Para veres esta lista:
   // reminders.js
   reminder_roster_line: 'Inscritos: {{names}}\n\n',
   reminder_group: '🤖 ⏰ *Lembrete!* O mix *{{title}}* começa daqui a {{hours}}h.\n📅 {{when}}{{location}}\n\n{{roster}}Não faltes! 🎾',
-  // mixNotices.js — o admin mexeu num mix já começado (Trello #292).
-  mix_notice_joined: '🤖 🎾 *Entraste no {{title}}!*\n📅 {{when}}\n{{partner}}',
-  mix_notice_removed: '🤖 Saíste do *{{title}}*.\n📅 {{when}}',
-  mix_notice_partner_changed: '🤖 🔄 *A tua dupla mudou* no *{{title}}*.\n📅 {{when}}\n{{partner}}',
-  mix_notice_partner: '🤝 Jogas com *{{name}}*.',
-  mix_notice_no_partner: 'Ainda estás sem par — o admin vai completar a dupla.',
   // voucherNotices.js — um convidado do WhatsApp ganhou um voucher (27 set, texto do Francisco).
   voucher_guest_won: '🎁 {{who}}, ganhaste um voucher! Usa-o na receção. Queres guardar este e os próximos prémios? Cria conta em alinho.pt com este número e confirma-o no perfil.',
   duplas_updated: '🤖 🔄 *Duplas atualizadas — {{title}}*\n\n{{lines}}',
-  reminder_dm: '🤖 ⏰ *Lembrete!* O teu mix *{{title}}* começa daqui a {{hours}}h.\n📅 {{when}}{{location}}\n\nNão faltes! 🎾',
   digest_mix_line: '🎾 *{{title}}* — {{when}}{{location}}\n👥 {{filled}}/{{capacity}} (faltam {{vagas}})',
   digest_text: '🤖 📢 @all *Mixes ainda em aberto!*\n\n{{lines}}\n\nAinda há vagas — inscrevam-se antes que feche! 🎾',
 
@@ -91,13 +85,6 @@ Para veres esta lista:
   // Texto do Francisco, 27 set (palavra por palavra). Vai no grupo, como
   // antes — nunca em privado (risco de o WhatsApp banir o robô).
   guest_joined: 'Olá {{name}}! Acabaste de entrar num mix como *convidado* — podes jogar assim, mas os jogos ficam numa conta temporária.\nRegista-te em https://alinho.pt e confirma o teu número de telefone para associares a tua conta temporária à tua conta principal\n\n⚠️ *Não voltes a fazer In na app* antes de confirmar o número — se a conta nova e a de convidado estiverem no mesmo mix, não consigo juntá-las e ficas com duas contas.',
-  // verify.js (#537) — resposta a uma mensagem PRIVADA com o código
-  verify_ok: '🤖 Número confirmado, {{name}}! ✅ Já podes voltar à app.',
-  verify_ok_merged: '🤖 Número confirmado, {{name}}! ✅ O que jogaste como convidado passou para a tua conta. Já podes voltar à app.',
-  verify_bad_code: '🤖 Este código não é válido ou já passou o prazo 😕 Pede um novo na app (Perfil → Informação pessoal) e envia-o a partir do número que tens no perfil.',
-  verify_phone_changed: '🤖 O número do teu perfil mudou depois de pedires o código. Pede um novo na app.',
-  verify_no_number: '🤖 Não consegui ver o teu número 😕 Envia o código a partir do WhatsApp do número que tens no perfil.',
-  verify_error: '🤖 Algo correu mal a confirmar o número. Tenta outra vez daqui a pouco.',
   partner_joined_use_app: '🤖 Estás inscrito em dupla por outra pessoa — quem inscreveu a dupla pode tirá-la com *Out*, ou sai tu pela app 📱',
   out_pair_menu: '🤖 Estás inscrito em dupla com *{{partner}}*. Queres sair como?\n\n1. Dupla (saem os dois)\n2. Só tu ({{partner}} fica)\n3. Parceiro (sai {{partner}}, tu ficas)\n\nEscreve *1*, *2* ou *3*.',
   out_pair_reprompt: '🤖 Não percebi 🤔 Responde com *1* (dupla), *2* (só tu) ou *3* (parceiro).',
@@ -187,14 +174,8 @@ To see this list:
   reminder_roster_line: 'Signed up: {{names}}\n\n',
   reminder_group: "🤖 ⏰ *Reminder!* *{{title}}* starts in {{hours}}h.\n📅 {{when}}{{location}}\n\n{{roster}}Don't miss it! 🎾",
   // mixNotices.js — the admin changed a mix that already started (Trello #292).
-  mix_notice_joined: "🤖 🎾 *You're in {{title}}!*\n📅 {{when}}\n{{partner}}",
-  mix_notice_removed: "🤖 You're out of *{{title}}*.\n📅 {{when}}",
-  mix_notice_partner_changed: '🤖 🔄 *Your pair changed* in *{{title}}*.\n📅 {{when}}\n{{partner}}',
-  mix_notice_partner: '🤝 You play with *{{name}}*.',
-  mix_notice_no_partner: "You don't have a partner yet — the admin will complete the pair.",
   voucher_guest_won: '🎁 {{who}}, you won a voucher! Use it at the front desk. Want to keep this and future prizes? Sign up at alinho.pt with this number and confirm it in your profile.',
   duplas_updated: '🤖 🔄 *Pairs updated — {{title}}*\n\n{{lines}}',
-  reminder_dm: "🤖 ⏰ *Reminder!* Your mix *{{title}}* starts in {{hours}}h.\n📅 {{when}}{{location}}\n\nDon't miss it! 🎾",
   digest_mix_line: '🎾 *{{title}}* — {{when}}{{location}}\n👥 {{filled}}/{{capacity}} ({{vagas}} spot(s) left)',
   digest_text: '🤖 📢 @all *Mixes still open!*\n\n{{lines}}\n\nStill spots open — sign up before it closes! 🎾',
 
@@ -219,12 +200,6 @@ To see this list:
   copied_list_ambiguous: '🤖 I didn\'t sign up «{{name}}»: there\'s more than one person with that name in the club:\n{{list}}\n\nTo join, the person writes In.',
   copied_list_full: '🤖 The mix is already full: I didn\'t sign up {{names}}. To go on the waiting list, the person writes In.',
   guest_joined: "Hi {{name}}! You've just joined a mix as a *guest* — you can play like this, but your games are kept in a temporary account.\nSign up at https://alinho.pt and confirm your phone number to link your temporary account to your main account\n\n⚠️ *Don't join again in the app* before confirming your number — if the new account and the guest one are in the same mix, I can't merge them and you'll end up with two accounts.",
-  verify_ok: '🤖 Number confirmed, {{name}}! ✅ You can go back to the app.',
-  verify_ok_merged: '🤖 Number confirmed, {{name}}! ✅ What you played as a guest moved to your account. You can go back to the app.',
-  verify_bad_code: "🤖 This code isn't valid or has expired 😕 Ask for a new one in the app (Profile → Personal info) and send it from the number in your profile.",
-  verify_phone_changed: '🤖 Your profile number changed after you asked for the code. Ask for a new one in the app.',
-  verify_no_number: "🤖 I couldn't see your number 😕 Send the code from the WhatsApp of the number in your profile.",
-  verify_error: '🤖 Something went wrong confirming your number. Try again in a bit.',
   partner_joined_use_app: '🤖 Someone else signed you up as a pair — whoever signed up the pair can take it off with *Out*, or leave through the app 📱',
   out_pair_menu: '🤖 You are signed up as a pair with *{{partner}}*. How do you want to leave?\n\n1. Pair (both leave)\n2. Just you ({{partner}} stays)\n3. Partner ({{partner}} leaves, you stay)\n\nType *1*, *2* or *3*.',
   out_pair_reprompt: "🤖 I didn't get that 🤔 Reply with *1* (pair), *2* (just you) or *3* (partner).",

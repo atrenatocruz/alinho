@@ -1,15 +1,14 @@
 import { supabase } from './supabase.js'
 import { getGroupsForOrg, getServedOrgIds, mixVisibleToGroup } from './groups.js'
-import { formatDateTime } from './roster.js'
 import { helpFooter } from './messages.js'
 import { t } from './locales.js'
 
 // Avisos de mix (Trello #292, supabase/migration_mix_notices.sql): quando o
 // admin adiciona, tira ou refaz duplas num mix já começado, a app regista
-// um aviso por jogador afetado. Este ciclo manda-os por WhatsApp:
-//   • mensagem privada a cada jogador com WhatsApp ligado, na língua dele;
-//   • a lista nova de duplas aos grupos do clube que veem este mix, a marcar
-//     só quem mudou — senão o grupo ficava com as duplas antigas.
+// um aviso por jogador afetado (que a app mostra). Este ciclo manda aos
+// grupos do clube que veem este mix a lista nova de duplas, a marcar só quem
+// mudou — senão o grupo ficava com as duplas antigas. Sem mensagens
+// privadas: o bot só escreve nos grupos (Renato, 28 set).
 // Espera QUIET_MS depois da ÚLTIMA mudança do mix e manda tudo de uma vez:
 // três mudanças seguidas dão uma mensagem, e o que o admin desfez antes
 // disso já foi limpo pela base de dados (notify_mix_changes junta avisos).
@@ -20,15 +19,6 @@ const KINDS = ['mix_joined', 'mix_removed', 'mix_partner_changed']
 
 function mentionToken(jid) {
   return `@${jid.split('@')[0]}`
-}
-
-export function noticeText(notice, lang) {
-  const d = notice.data || {}
-  const when = d.game_date ? formatDateTime(d.game_date, lang) : ''
-  const partner = d.partner_name
-    ? t('mix_notice_partner', lang, { name: d.partner_name })
-    : t('mix_notice_no_partner', lang)
-  return t(notice.kind.replace('mix_', 'mix_notice_'), lang, { title: d.game_title || '', when, partner })
 }
 
 async function announceUpdatedDuplas(game, changedIds, { sendText }) {
@@ -83,23 +73,6 @@ async function processGame(game, notices, { sendText }) {
   const claimedIds = new Set((claimed || []).map((row) => row.id))
   const mine = notices.filter((n) => claimedIds.has(n.id))
   if (mine.length === 0) return
-
-  const { data: profiles } = await supabase
-    .from('profiles')
-    .select('id, name, whatsapp_jid, language')
-    .in('id', mine.map((n) => n.user_id))
-  const profileById = new Map((profiles || []).map((p) => [p.id, p]))
-
-  for (const notice of mine) {
-    const profile = profileById.get(notice.user_id)
-    if (!profile?.whatsapp_jid) continue
-    try {
-      await sendText(profile.whatsapp_jid, noticeText(notice, profile.language ?? 'pt'))
-    } catch (err) {
-      // Best-effort, como os lembretes: uma DM falhada não trava as outras.
-      console.error(`Failed to DM mix notice to ${profile.name}:`, err)
-    }
-  }
 
   if (game.status === 'in_progress') {
     const changedIds = new Set(mine.filter((n) => n.kind !== 'mix_removed').map((n) => n.user_id))
