@@ -273,6 +273,25 @@ export async function getTeacherLessonsDetail(teacherProfileId, fromIso, toIso) 
   return data || []
 }
 
+/** «Mudar o pedido» (AUDITORIA, ponto 7; migration_lessons_15): enquanto o
+    professor não aceitou, o aluno muda o dia, a hora, a duração, o tipo e o
+    contacto. phone só se mudar de número; sem ele o servidor mantém o que havia. */
+export async function updateLessonRequest({ id, startsAt, duration, type, contactVia, phone }) {
+  const { error } = await supabase.rpc('update_lesson_request', {
+    p_id: id, p_starts_at: startsAt, p_duration: duration, p_type: type,
+    p_contact_via: contactVia, p_phone: phone || null,
+  })
+  if (error) throw error
+}
+
+/** A aula nasceu de um pedido meu? (o cadeado do «Mudar pedido», AUDITORIA,
+    ponto 7). Lê os meus pedidos pela regra «Own lesson requests», sem RPC. */
+export async function lessonFromMyRequest(lessonId) {
+  const { data, error } = await supabase.from('lesson_requests').select('id').eq('lesson_id', lessonId).limit(1)
+  if (error) throw error
+  return (data || []).length > 0
+}
+
 export async function cancelLessonRequest(id) {
   const { error } = await supabase.rpc('cancel_lesson_request', { p_id: id })
   if (error) throw error

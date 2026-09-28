@@ -133,9 +133,16 @@ export default function LessonEventCard({ event, past = false, onAttendance = nu
           {event.myState === 'not_going' && <span className="text-ink-500">{l.taken}/{l.capacity}</span>}
           {l.avg_rating != null && event.myState !== 'not_going' && <LevelPill label={bandLabel(l.avg_rating, l.avg_gender)} />}
           {/* «Cancelar pedido» (desenho de 18 set), com a pergunta da janela de baixo. */}
+          {/* «Mudar» (AUDITORIA, ponto 7): os passos do «Marcar aula», já preenchidos. */}
+          {onCancelRequest && !needsYou && (
+            <button type="button" onClick={() => navigate(`/professor/${base.teacher_profile_id}/pedir?mudar=${base.request_id}`)}
+              className="relative ml-auto rounded-full border border-ink-900 bg-white px-3.5 py-1.5 text-xs font-bold text-ink-900 hover:bg-ink-50">
+              {t('lessons.change_request')}
+            </button>
+          )}
           {onCancelRequest && !needsYou && (
             <button type="button" disabled={busy} onClick={() => setAsking(true)}
-              className="relative ml-auto rounded-full border border-ink-900 bg-white px-3.5 py-1.5 text-xs font-bold text-ink-900 hover:bg-ink-50 disabled:opacity-40">
+              className="relative rounded-full border border-ink-900 bg-white px-3.5 py-1.5 text-xs font-bold text-ink-900 hover:bg-ink-50 disabled:opacity-40">
               {t('lessons.cancel_request')}
             </button>
           )}

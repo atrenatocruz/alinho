@@ -5,7 +5,7 @@ import { BackBar } from '../components/ui'
 import { ArrowLeft, GraduationCap } from 'lucide-react'
 import { getTeacherPage } from '../lib/lessonsApi'
 import { teacherContact } from '../lib/teacherContact'
-import { acceptLessonProposal, answerLessonMerge, cancelLessonRequest, emailLessonRequest, getTeacherBooking, getTeacherBusyRange, proposeLessonTime, requestLesson } from '../lib/lessonsApi'
+import { acceptLessonProposal, answerLessonMerge, cancelLessonRequest, emailLessonRequest, getTeacherBooking, getTeacherBusyRange, proposeLessonTime, requestLesson, updateLessonRequest } from '../lib/lessonsApi'
 import { isoDate as isoOfDay, maxWeekOffset, weekDays } from '../lib/teacherWeek'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import ProposeTimeSheet from '../components/lessons/ProposeTimeSheet'
@@ -49,7 +49,7 @@ export default function RequestLesson() {
   const [blockKey, setBlockKey] = useState(null)
   // Vindo do calendário (tocar numa hora livre): ?dia=AAAA-MM-DD&hora=HH:MM
   // já escolhidos (SPEC-calendario-2, assunto 1, ponto 3).
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [wanted, setWanted] = useState(() => (searchParams.get('dia') ? { dia: searchParams.get('dia'), hora: searchParams.get('hora') } : null))
   const [duration, setDuration] = useState(null)
   const [start, setStart] = useState(null)
@@ -64,6 +64,9 @@ export default function RequestLesson() {
   const [proposing, setProposing] = useState(null) // pedido a que propõe outra hora
   const [cardError, setCardError] = useState('')
   const [booked, setBooked] = useState(null) // aula acabada de marcar (aceitou a proposta)
+  // «Mudar o pedido» (AUDITORIA, ponto 7): o pedido por responder que se está
+  // a mudar, com os mesmos passos do «Marcar aula», já preenchidos.
+  const [editing, setEditing] = useState(null)
 
   const load = async () => {
     try {
@@ -109,7 +112,9 @@ export default function RequestLesson() {
     const mondayNow = weekDays(new Date(), 0)[0]
     setWeekOffset(Math.max(0, Math.floor((new Date(`${allBlocks[0].date}T12:00:00`) - mondayNow) / (7 * 86400000))))
   }, [data]) // eslint-disable-line react-hooks/exhaustive-deps
-  const busyNow = weekOffset < 2 ? data?.busy || [] : [...(data?.busy || []), ...(weekBusy[weekOffset] || [])]
+  const ownSlot = (b) => editing && b.kind === 'request' && new Date(b.starts_at).getTime() === new Date(editing.starts_at).getTime()
+    && new Date(b.ends_at).getTime() === new Date(editing.starts_at).getTime() + editing.duration_minutes * 60000
+  const busyNow = (weekOffset < 2 ? data?.busy || [] : [...(data?.busy || []), ...(weekBusy[weekOffset] || [])]).filter((b) => !ownSlot(b))
   // Sem nenhum preço em nenhum dos dias: também não dá para pedir.
   const noPrices = allBlocks.length > 0 && allBlocks.every((b) =>
     availableDurations(b, (data?.profiles || []).find((p) => p.teacher_profile_id === b.tp)).length === 0)
@@ -139,8 +144,10 @@ export default function RequestLesson() {
     if (!b) return
     setBlockKey(b.key)
     const p = data.profiles.find((x) => x.teacher_profile_id === b.tp)
-    const d = availableDurations(b, p).find((dur) => startOptions(b, dur, busyNow).options.some((o) => o.time === wanted.hora && !o.taken))
-    if (d) { setDuration(d); setStart(wanted.hora) }
+    const fits = (dur) => startOptions(b, dur, busyNow).options.some((o) => o.time === wanted.hora && !o.taken)
+    const d = wanted.duration && availableDurations(b, p).includes(wanted.duration) && fits(wanted.duration)
+      ? wanted.duration : availableDurations(b, p).find(fits)
+    if (d) { setDuration(d); setStart(wanted.hora); if (wanted.type) setType(wanted.type) }
   }, [wanted, data, blocks]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const monthOf = (d) => t(`lessons.month_short_${d.getMonth() + 1}`)
@@ -149,6 +156,26 @@ export default function RequestLesson() {
   // Mudar uma escolha de cima limpa as de baixo que deixaram de caber.
   const chooseBlock = (key) => { setBlockKey(key); setDuration(kind === 'trial' ? 60 : null); setStart(null); setType(null) }
   const chooseDuration = (d) => { setDuration(d); setStart(null); setType(null) }
+
+  const startEdit = (r) => {
+    const p2 = (n) => String(n).padStart(2, '0')
+    const d = new Date(r.starts_at)
+    const dia = `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`
+    const mondayNow = weekDays(new Date(), 0)[0]
+    setKind(r.lesson_type === 'trial' ? 'trial' : 'single')
+    setBlockKey(null); setDuration(null); setStart(null); setType(null)
+    setWeekOffset(Math.max(0, Math.floor((new Date(`${dia}T12:00:00`) - mondayNow) / (7 * 86400000))))
+    setWanted({ dia, hora: `${p2(d.getHours())}:${p2(d.getMinutes())}`, duration: r.duration_minutes, type: r.lesson_type })
+    setContactVia(r.contact_via); setMissing(null); setError('')
+    setEditing(r)
+  }
+
+  // Vindo da Home («Mudar» no cartão do pedido): ?mudar=<id do pedido>.
+  useEffect(() => {
+    const want = searchParams.get('mudar')
+    const r = want && (data?.mine || []).find((x) => x.id === want && !x.merge && !(x.proposed_by === 'teacher' && x.proposed_starts_at))
+    if (r) { startEdit(r); setSearchParams({}, { replace: true }) }
+  }, [data]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
     return <div className="flex items-center justify-center py-16"><div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div></div>
@@ -168,20 +195,28 @@ export default function RequestLesson() {
   const shortName = (() => { const [a, b] = (data.teacher.name || '').split(' '); return b ? `${a} ${b[0]}.` : a })()
   const g = (key, vars) => t(female ? `${key}_f` : key, { name: first, ...vars })
 
+  // Já há número: o da conta, ou o do pedido que se está a mudar.
+  const hasPhone = data.i_have_whatsapp || editing?.contact_via === 'whatsapp'
   const send = async () => {
     setError('')
     if (!contactVia) { setMissing('contact'); return }
-    if (contactVia === 'whatsapp' && !data.i_have_whatsapp && phone.replace(/\D/g, '').length < 9) { setMissing('phone'); return }
+    if (contactVia === 'whatsapp' && !hasPhone && phone.replace(/\D/g, '').length < 9) { setMissing('phone'); return }
     setSending(true)
     try {
       const startsAt = localDateTime(block.date, start).toISOString()
+      if (editing) {
+        await updateLessonRequest({ id: editing.id, startsAt, duration, type, contactVia, phone: hasPhone ? null : phone })
+        setEditing(null); setSent(null); setPhone('')
+        await load()
+        return
+      }
       const reqId = await requestLesson({ teacherProfileId: block.tp, startsAt, duration, type, contactVia, phone: data.i_have_whatsapp ? null : phone })
       emailLessonRequest('lesson_request', reqId)
       setSent({ id: reqId, starts_at: startsAt, duration_minutes: duration, lesson_type: type, price_per_person: price, contact_via: contactVia, org_name: block.orgName })
       setPhone('')
     } catch (err) {
       console.error('Error requesting lesson:', err)
-      setError(describeError(t, err, 'booking.error_send'))
+      setError(describeError(t, err, editing ? 'booking.error_change' : 'booking.error_send'))
     } finally {
       setSending(false)
     }
@@ -274,10 +309,16 @@ export default function RequestLesson() {
         <p className="rounded-ctrl bg-ink-50 px-3 py-2.5 text-sm text-ink-900 leading-snug">
           {g(r.contact_via === 'whatsapp' ? 'booking.sent_info_whatsapp' : 'booking.sent_info_email')}
         </p>
-        <button type="button" onClick={() => setAsking(r)}
-          className="w-full min-h-[48px] rounded-full border-[1.5px] border-line bg-white text-ink-900 font-extrabold hover:bg-ink-50">
-          {t('booking.cancel')}
-        </button>
+        <div className="grid grid-cols-2 gap-2">
+          <button type="button" onClick={() => startEdit(r)}
+            className="min-h-[48px] rounded-full bg-ink-900 text-white font-extrabold">
+            {t('booking.change')}
+          </button>
+          <button type="button" onClick={() => setAsking(r)}
+            className="min-h-[48px] rounded-full border-[1.5px] border-line bg-white text-ink-900 font-extrabold hover:bg-ink-50">
+            {t('booking.cancel')}
+          </button>
+        </div>
       </div>
     )
   }
@@ -298,7 +339,7 @@ export default function RequestLesson() {
 
   // Depois de enviar (ou com um pedido meu por responder), o ecrã fica só com
   // o cartão do pedido — nunca o formulário outra vez (designer, 26 set).
-  const pending = sent ? [sent] : (data.mine || [])
+  const pending = editing ? [] : sent ? [sent] : (data.mine || [])
   const proposeSheet = (
     <ProposeTimeSheet
       open={!!proposing}
@@ -352,9 +393,9 @@ export default function RequestLesson() {
 
   return (
     <div className="space-y-5 pb-4">
-      {back(`/professor/${id}`, shortName)}
+      {editing ? <BackBar onBack={() => setEditing(null)} label={t('booking.change_keep')} title={data?.teacher?.name} /> : back(`/professor/${id}`, shortName)}
       <div>
-        <h2 className="text-2xl text-ink-900">{t('booking.title_marcar')}</h2>
+        <h2 className="text-2xl text-ink-900">{t(editing ? 'booking.change_title' : 'booking.title_marcar')}</h2>
         <p className="text-sm text-muted mt-1">{g('booking.confirms_sub', { club: (block?.orgName || data.profiles?.[0]?.org_name) ? `${block?.orgName || data.profiles[0].org_name} · ` : '' })}</p>
       </div>
 
@@ -481,7 +522,7 @@ export default function RequestLesson() {
             ))}
           </div>
           {missing === 'contact' && <p role="alert" className="text-xs font-extrabold text-danger mt-1.5">{t('booking.missing_contact')}</p>}
-          {contactVia === 'whatsapp' && !data.i_have_whatsapp && (
+          {contactVia === 'whatsapp' && !hasPhone && (
             <div className="mt-2">
               <input type="tel" inputMode="tel" value={phone} onChange={(e) => { setPhone(e.target.value); setMissing(null) }}
                 placeholder={t('booking.phone_placeholder')} aria-invalid={missing === 'phone' || undefined}
@@ -500,8 +541,12 @@ export default function RequestLesson() {
             <b className="font-extrabold shrink-0">{Number(price) === 0 ? t('lessons.free_price') : t('booking.per_person', { price: euros(price) })}</b>
           </p>
           {error && <p role="alert" className="rounded-ctrl border border-danger/30 bg-danger/10 px-3 py-2 text-sm font-bold text-danger">{error}</p>}
-          <PrimaryButton className="w-full" onClick={send} disabled={sending}>{t('booking.send')}</PrimaryButton>
-          <p className="text-xs text-muted text-center">{g('booking.send_hint')}</p>
+          <PrimaryButton className="w-full" onClick={send} disabled={sending}>{t(editing ? 'booking.change_save' : 'booking.send')}</PrimaryButton>
+          <p className="text-xs text-muted text-center">{g(editing ? 'booking.change_hint' : 'booking.send_hint')}</p>
+          {editing && (
+            <button type="button" onClick={() => setEditing(null)}
+              className="w-full min-h-[44px] text-sm font-extrabold text-muted hover:text-ink-900">{t('booking.change_keep')}</button>
+          )}
         </div>
       )}
 

@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next'
 import { BackBar } from '../components/ui'
 import { ArrowLeft, CheckCircle2, Euro, GraduationCap, MapPin, Phone } from 'lucide-react'
 import { useGoBack } from '../lib/useGoBack'
-import { cancelEnrolment, getLesson, setLessonAttendance } from '../lib/lessonsApi'
+import { cancelEnrolment, getLesson, lessonFromMyRequest, setLessonAttendance } from '../lib/lessonsApi'
 import { enrolmentEndDate } from '../lib/lessons'
 import { describeError, errorKind } from '../lib/errors'
 import { formatDate } from '../lib/formatDate'
@@ -27,6 +27,7 @@ export default function LessonPage() {
   const [failed, setFailed] = useState(false)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
+  const [fromRequest, setFromRequest] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -36,6 +37,7 @@ export default function LessonPage() {
         if (errorKind(error) !== 'not_ready') console.error('Error loading lesson:', error)
         if (alive) setFailed(true)
       })
+    lessonFromMyRequest(id).then((yes) => { if (alive) setFromRequest(yes) }).catch(() => {})
     return () => { alive = false }
   }, [id])
 
@@ -172,6 +174,9 @@ export default function LessonPage() {
         </div>
       )}
       {my === 'not_going' && <p className="text-xs text-muted">{t('lessons.not_going_line', { name: firstName })}</p>}
+      {/* Aula que nasceu de um pedido meu, já aceite: mudar já não é aqui
+          (AUDITORIA, ponto 7; só nessas, designer 28 set). */}
+      {enrolled && fromRequest && future && <p className="rounded-ctrl bg-ink-50 px-3 py-2.5 text-sm text-ink-700">{t('lessons.accepted_lock')}</p>}
       {enrolled && <p className="text-xs text-muted">{t('lessons.cant_go_hint')}</p>}
 
       {isSeries && data.my_enrolment_id && !notice && (
