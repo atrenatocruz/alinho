@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
+import PlacesUnavailableHint from '../components/PlacesUnavailableHint'
 import { Users, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { createPrivateMatch } from '../lib/privateMatches'
@@ -234,6 +235,7 @@ export default function CreatePrivateMatchSlots() {
             placeholder={t('createprivatematch.location_placeholder')}
             className="input-field"
           />
+          <PlacesUnavailableHint />
         </div>
       )}
 
