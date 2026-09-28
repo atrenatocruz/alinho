@@ -25,7 +25,7 @@
 // cartão à parte (PO, 28 set).
 //   'empty' · 'negative' · 'set_invalid' · 'tiebreak_needed' ·
 //   'tiebreak_invalid' · 'super_tiebreak_invalid' · 'proset_invalid' ·
-//   'proset_breaker_needed' · 'match_open' · 'too_many_sets' · 'tie'
+//   'proset_short' · 'proset_breaker_needed' · 'match_open' · 'too_many_sets' · 'tie'
 
 const isInt = (n) => Number.isInteger(n)
 const num = (v) => (v === null || v === undefined || v === '' ? NaN : Number(v))
@@ -92,6 +92,10 @@ export function proSetProblem(set, breaker = 'tiebreak') {
     if ((ta > tb) !== (a > b)) return 'tiebreak_invalid'
     return null
   }
+  // O que está mal, como os avisos do torneio (Renato, 28 set, fa39e61):
+  // empate, ninguém chegou aos 9, ou resultado impossível.
+  if (a === b) return 'tie'
+  if (w < 9) return 'proset_short'
   return 'proset_invalid'
 }
 

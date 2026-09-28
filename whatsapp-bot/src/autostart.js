@@ -124,6 +124,30 @@ function botConsegueComecar(game) {
  * announces the pairings to the WhatsApp group, tagging both players in
  * each dupla whose WhatsApp JID is already known.
  */
+/**
+ * Os pares a não repetir: os dos últimos QUATRO mixes da MESMA SÉRIE
+ * (recurrence_id) — Francisco, 28 set: «é no mesmo mix, não no mesmo grupo.
+ * Uma coisa é segunda, outra é quinta». Num mix que não se repete, os
+ * últimos 4 mixes do grupo, como antes. A mesma regra do botão da app
+ * (GameDetails.jsx, loadRepeatPairKeys).
+ */
+export async function loadRepeatPairKeys(game) {
+  let query = supabase.from('games').select('id')
+  query = game.recurrence_id
+    ? query.eq('recurrence_id', game.recurrence_id)
+    : query.eq('organization_id', game.organization_id)
+  const { data: previousGames } = await query
+    .lt('date', game.date)
+    .order('date', { ascending: false })
+    .limit(4)
+  if (!previousGames?.length) return new Set()
+  const { data: previousTeams } = await supabase
+    .from('teams')
+    .select('player1_id, player2_id')
+    .in('game_id', previousGames.map((g) => g.id))
+  return new Set((previousTeams || []).map((team) => pairKey(team.player1_id, team.player2_id)))
+}
+
 async function autoStartMix(game, { sendText }) {
   if (!botConsegueComecar(game)) {
     console.log(`Auto-start ignorado (formato que o bot não conduz) para o mix ${game.id}`)
@@ -151,26 +175,7 @@ async function autoStartMix(game, { sendText }) {
   if (rErr) throw new Error(`Failed to load rankings for auto-start: ${rErr.message}`)
   const pointsById = Object.fromEntries((rankings || []).map((r) => [r.user_id, Math.round(r.rating || 0)]))
 
-  // Os últimos QUATRO mixes, como em GameDetails.jsx (loadRepeatPairKeys) —
-  // a regra do Francisco é não repetir pares durante pelo menos 4 mixes.
-  // Este bloco olhava só para o mix anterior, por isso um mix começado pelo
-  // bot repetia pares que o mesmo mix começado na app teria evitado: no mix
-  // de 21 set, 3 das 6 duplas já tinham jogado juntas nos 4 anteriores.
-  const { data: previousGames } = await supabase
-    .from('games')
-    .select('id')
-    .eq('organization_id', game.organization_id)
-    .lt('date', game.date)
-    .order('date', { ascending: false })
-    .limit(4)
-  let repeatPairKeys = new Set()
-  if (previousGames?.length) {
-    const { data: previousTeams } = await supabase
-      .from('teams')
-      .select('player1_id, player2_id')
-      .in('game_id', previousGames.map((g) => g.id))
-    repeatPairKeys = new Set((previousTeams || []).map((team) => pairKey(team.player1_id, team.player2_id)))
-  }
+  const repeatPairKeys = await loadRepeatPairKeys(game)
 
   // O lado preferido de cada um, para não formar duplas do mesmo lado.
   const soloIds = (participants || []).filter((p) => !p.partner_id).map((p) => p.user_id)

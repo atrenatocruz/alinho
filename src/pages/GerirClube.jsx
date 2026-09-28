@@ -38,6 +38,7 @@ import { isDraftMix, publishDraftMix, advanceByFrequency, pendingOccurrenceRow }
 import LaunchDayPicker from '../components/LaunchDayPicker'
 import MixWizard from '../components/mix/MixWizard'
 import { useOrgNameTaken, OrgNameTakenHint } from '../components/OrgNameTaken'
+import PlacesUnavailableHint from '../components/PlacesUnavailableHint'
 import { LEVEL_SCALES, LEVEL_NUMBERS, parseLevel } from '../lib/mixLevels'
 import SeriesPage from '../components/mix/SeriesPage'
 import { setEventWhatsappPostTimes } from '../lib/whatsappHours'
@@ -2514,6 +2515,7 @@ export default function GerirClube() {
                         className="input-field"
                         placeholder={t('gerirclube.location_placeholder')}
                       />
+                      <PlacesUnavailableHint />
                     </div>
 
                     <div>
@@ -3633,6 +3635,7 @@ export default function GerirClube() {
                         className="input-field"
                         placeholder={t(kk('gerirclube.address_placeholder'))}
                       />
+                      <PlacesUnavailableHint />
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

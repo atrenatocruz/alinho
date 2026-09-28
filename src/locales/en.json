@@ -2944,6 +2944,7 @@
   "errors.session_expired": "Your session has expired. Sign out and sign back in.",
   "errors.permission": "You don't have permission to do this. If you think you should, ask whoever manages the group.",
   "errors.duplicate": "One with the same name already exists. Change the name and try again.",
+  "places.unavailable": "Couldn't look up the address. What you typed will be used.",
   "errors.org_name_taken": "A group or club with this name already exists. Choose another.",
   "errors.not_ready": "This feature is still being switched on. Try again later.",
   "errors.invalid_login": "Wrong email or password.",
