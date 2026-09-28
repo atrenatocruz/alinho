@@ -322,6 +322,9 @@ export const TOURNAMENT_RPC_MOCKS = {
         ? { my: { category_id: 'cat-m4', state: 'validada', entry_id: 'e1' },
             my_entries: [{ category_id: 'cat-m4', status: 'validada', state: 'validada', entry_id: 'e1' }],
             my_matches: [] }
+        // localStorage.mockTNotEntered = 'true': vejo o torneio sem estar
+        // inscrito — sem «Os meus jogos» (separadores, 28 set).
+        : localStorage.getItem('mockTNotEntered') === 'true' ? { my: null, my_entries: [], my_matches: [] }
         : { my: empty() ? null : { category_id: 'cat-m5', state: 'validada', entry_id: 'en-me' },
             my_matches: empty() || state() === 'inscricoes' ? [] : MY_MATCHES() }),
     }
@@ -630,18 +633,21 @@ export const TOURNAMENT_CLOSE_TABLE_MOCKS = {
 // joga hoje (e de outro que só é amanhã, que NÃO pode aparecer). Ganha aos
 // outros mocks das mesmas tabelas só enquanto estiver ligado.
 const scoreTodayOn = () => localStorage.getItem('mockTScoreToday') === 'true'
+// Com mockTHome (os meus jogos na Home), o torneio que marco é o mesmo em
+// que jogo: «Marcar resultados» vem por baixo do meu jogo, como ligação.
+const scoreTodayId = () => (localStorage.getItem('mockTHome') ? 'tour-smash-open' : 'tour-hoje')
 const lisbonDay = (n) => {
   const d = new Date(Date.now() + n * 86400000)
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Lisbon', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d)
 }
 export const TOURNAMENT_SCORE_TODAY_TABLE_MOCKS = {
   tournament_scorekeepers: () => (scoreTodayOn()
-    ? [{ tournament_id: 'tour-hoje' }, { tournament_id: 'tour-amanha' }] : undefined),
+    ? [{ tournament_id: scoreTodayId() }, { tournament_id: 'tour-amanha' }] : undefined),
   tournament_public: (url) => {
     if (!scoreTodayOn() || !/status=in\./.test(decodeURIComponent(url))) return undefined
     return [
-      { id: 'tour-hoje', slug: 'smash-open-2026', name: 'Smash Open 2026', club_name: 'Smash Padel',
-        starts_on: lisbonDay(-1), ends_on: lisbonDay(1), status: 'a_decorrer' },
+      { id: scoreTodayId(), slug: 'smash-open-2026', name: 'Smash Open 2026', club_name: 'Smash Padel',
+        starts_on: lisbonDay(-1), ends_on: lisbonDay(1), status: 'a_decorrer', category_count: 5, location: 'Smash Padel · Almada' },
       { id: 'tour-amanha', slug: 'torneio-de-amanha', name: 'Torneio de amanhã', club_name: 'Smash Padel',
         starts_on: lisbonDay(1), ends_on: lisbonDay(2), status: 'sorteado' },
     ]

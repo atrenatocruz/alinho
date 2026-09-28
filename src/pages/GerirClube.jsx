@@ -762,7 +762,7 @@ export default function GerirClube() {
   const loadOpenGames = async () => {
     const { data, error } = await supabase
       .from('games')
-      .select('id, title, date, location, status, max_players, num_courts, participants(id, user_id, partner_id, status)')
+      .select('id, title, date, location, status, max_players, num_courts, open_batch_id, participants(id, user_id, partner_id, status)')
       .eq('organization_id', currentOrganizationId)
       .eq('origin', 'open_slot')
       .order('date', { ascending: false })
@@ -799,6 +799,9 @@ export default function GerirClube() {
     setCreatedMixScope(null)
     if (tipo === 'mix' && isMixWizardEnabled) { navigate(`/gerir/${org.slug}/criar/mix`, { state: { fromGerir: true } }); return }
     if (tipo === 'mix') { setShowCreateGame(true); return }
+    // Jogo entre amigos do grupo (Francisco, 28 set): o mesmo criar da
+    // página do grupo, já ligado a ele («No <grupo>»).
+    if (tipo === 'amigos') { navigate(`/clube/${slug}/jogos/novo`); return }
     // Os jogos em aberto abrem na página própria, em passos (#342).
     if (tipo === 'aberto') { navigate(`/gerir/${slug}/criar/em-aberto`); return }
     // O torneio abre numa página só do formulário (ponto 0, 26 set).
@@ -2394,12 +2397,16 @@ export default function GerirClube() {
               {gamesError && <p role="alert" className="rounded-ctrl border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-sm font-bold text-danger">{gamesError}</p>}
               {/* Criar: um botao por tipo, todos iguais e sem ligado/desligado
                   -- cada um so abre o formulario desse tipo (desenho de 23
-                  set). Num grupo so ha mixes. Secundarios: quatro blocos
+                  set). Num grupo: mix e jogo entre amigos (Francisco, 28 set:
+                  «falta o jogo entre amigos do grupo»). Secundarios: quatro blocos
                   lima seguidos competiam uns com os outros (DESIGN.md). */}
               {(() => {
                 const botoes = [
                   ['mix', 'gerirclube.event_label_mix', true],
-                  ['aberto', 'gerirclube.tab_open_slots', canPlanEvents],
+                  ['amigos', 'gerirclube.create_friends', isGroupOrg],
+                  // «Clube tem jogos em aberto; os grupos é que têm jogos entre
+                  // amigos» (Francisco, 28 set). Os que já existam continuam na lista.
+                  ['aberto', 'gerirclube.tab_open_slots', canPlanEvents && !isGroupOrg],
                   ['torneio', 'gerirclube.event_label_tournament', canPlanEvents && tournamentsReady],
                   ['turma', 'gerirclube.event_label_series', !isGroupOrg && lessonsReady],
                 ].filter(([, , mostra]) => mostra)
@@ -3179,7 +3186,12 @@ export default function GerirClube() {
                       cinzento = true; acao = null; abrir = null
                       detalhe = [item.quando ? quandoCurto(item.quando, true) : null, t('gerirclube.status_cancelled')].filter(Boolean).join(' · ')
                     }
-                    if (tipo === 'aberto' && row.status !== 'cancelled' && !(row.participants || []).some((p) => p.status === 'confirmed')) {
+                    // «Editar» (auditoria «Editar tem tudo», #586): abre a publicação
+                    // inteira — lá tira-se um horário sem ninguém, que é o cancelar.
+                    // Sem batch (jogos antigos), fica o «Cancelar» de antes.
+                    if (tipo === 'aberto' && row.status !== 'cancelled' && row.open_batch_id) {
+                      acao = { texto: t('gerirclube.edit_action'), fazer: () => navigate(`/gerir/${org.slug}/editar/em-aberto/${row.open_batch_id}`), perigo: false }
+                    } else if (tipo === 'aberto' && row.status !== 'cancelled' && !(row.participants || []).some((p) => p.status === 'confirmed')) {
                       acao = { texto: t('open_slots.cancel_button'), fazer: () => handleCancelOpenGame(row.id), perigo: true }
                     }
                   }

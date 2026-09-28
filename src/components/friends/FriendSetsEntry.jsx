@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { Plus } from 'lucide-react'
 import { setsState, best3NeedsThird } from './friendScoring'
 import { shortName } from './friendShare'
+import { setRowProblem } from '../tournament/scoreProblem'
 
 const pair = (team) => (team || []).map((p) => shortName(p.name)).join(' / ')
 const EMPTY = () => ({ a: '', b: '' })
@@ -22,6 +23,10 @@ export default function FriendSetsEntry({ mode, maxSets = null, teamA, teamB, on
     : sets
   if (mode === 'best3' && shown.length !== sets.length) setSets(shown)
   const st = setsState(shown, mode)
+  // #588: cada set a 6, com a regra única — o primeiro set impossível avisa
+  // e não deixa gravar. O empate tem a frase dele (set_no_draw).
+  const setProb = shown.map((s) => (s.a !== s.b ? setRowProblem(s.a, s.b) : null)).find(Boolean) || null
+  const ready = st.ready && !setProb
   const canAdd = mode === 'free' && (!maxSets || shown.length < maxSets)
   const winner = st.winsA > st.winsB ? pair(teamA) : pair(teamB)
 
@@ -51,13 +56,14 @@ export default function FriendSetsEntry({ mode, maxSets = null, teamA, teamB, on
         </button>
       )}
       {st.filled && !st.noDraw && <p className="text-xs font-extrabold text-danger">{t('friends.set_no_draw')}</p>}
+      {setProb && <p className="text-xs font-extrabold text-danger" role="status">{t(`tournament.score.problem_${setProb}`)}</p>}
       {mode === 'free' && st.tied && <p className="text-xs font-extrabold text-ink-700">{t('friends.sets_tied')}</p>}
-      {st.ready && (
+      {ready && (
         <p className="rounded-ctrl bg-lime-100 px-3 py-2.5 text-sm text-ink-900">
           {t('friends.winner_line', { team: winner, a: Math.max(st.winsA, st.winsB), b: Math.min(st.winsA, st.winsB) })}
         </p>
       )}
-      <button type="button" disabled={!st.ready}
+      <button type="button" disabled={!ready}
         onClick={() => onSave({ score_a: st.winsA, score_b: st.winsB, sets: st.parsed.map((x) => ({ score_a: x.a, score_b: x.b })) })}
         className="press min-h-[52px] w-full rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold text-white disabled:opacity-40">
         {t('friends.result_save')}

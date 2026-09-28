@@ -851,7 +851,10 @@ export default function Home() {
                 {dayLabel(dayKey, t, i18n.language)}
               </p>
               {dayKey === today && friendInvites.map((inv) => <FriendInviteCard key={inv.match_id} invite={inv} />)}
-              {dayKey === today && <ScoreTodayCard rows={scoreToday} />}
+              {/* Quem só marca: o cartão do torneio com «Marcar resultados».
+                  Quem também joga hoje: vem por baixo dos jogos, como ligação
+                  (28 set). */}
+              {dayKey === today && <ScoreTodayCard rows={scoreToday.filter((x) => !dayEvents.some((e) => e.kind === 'tournament' && e.mine && e.id === x.id))} />}
               {dayKey === today && (scoreToday.length > 0 || friendInvites.length > 0) && dayEvents.length === 0 ? null
                 : dayEvents.length === 0 && emptyByFilters
                 ? (
@@ -865,6 +868,7 @@ export default function Home() {
                 : dayEvents.length === 0
                 ? <p className="text-sm text-muted py-3 px-3 rounded-card border border-dashed border-line">{t('agenda.today_empty')}</p>
                 : dayEvents.map(renderEventWithError)}
+              {dayKey === today && <ScoreTodayCard asLink rows={scoreToday.filter((x) => dayEvents.some((e) => e.kind === 'tournament' && e.mine && e.id === x.id))} />}
             </section>
           ))}
           {/* Espaço no fim para o último dia poder subir até ao cabeçalho. */}

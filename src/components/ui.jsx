@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -502,8 +502,45 @@ export function Tabs({ options, value, onChange, label, className = '' }) {
     // Com mais de 3 não é separador: a página tem de ser repensada (SPEC).
     console.warn('[Tabs] mais de 3 separadores — a regra é 2 ou 3:', options.map((o) => o.label))
   }
+  // Se alguma opção não couber a 15 px, todas descem para 13 px — as
+  // larguras continuam iguais, e nunca «…» nem duas linhas (SPEC dos
+  // separadores, acerto de 28 set: «Os meus jogos · Todos os jogos ·
+  // Inscritos» num telemóvel de 360–390 px). Mede-se o texto a negrito,
+  // o da opção escolhida, para não saltar ao tocar.
+  const ref = useRef(null)
+  const canvas = useRef(null)
+  // 0 = 15 px (folga 8 px de cada lado) · 1 = 13 px (folga 4) · 2 = 12 px
+  // (folga 2, só em ecrãs de 360 px ou menos, onde nem a 13 px cabe).
+  const [level, setLevel] = useState(0)
+  const labels = options.map((o) => `${o.label}|${o.badge > 0 ? 1 : 0}`).join('·')
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return undefined
+    const fit = () => {
+      const btn = el.querySelector('button')
+      if (!btn) return
+      if (!canvas.current) canvas.current = document.createElement('canvas').getContext('2d')
+      const ctx = canvas.current
+      if (!ctx) return
+      const family = getComputedStyle(btn).fontFamily
+      const fits = (px, pad) => {
+        ctx.font = `800 ${px}px ${family}`
+        const room = btn.clientWidth - 2 * pad - 2 // 2 px de margem para arredondamentos
+        return options.every((o) => ctx.measureText(String(o.label)).width + (o.badge > 0 ? 24 : 0) <= room)
+      }
+      setLevel(fits(15, 8) ? 0 : fits(13, 4) ? 1 : 2)
+    }
+    fit()
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(fit) : null
+    ro?.observe(el)
+    document.fonts?.ready?.then(fit)
+    return () => ro?.disconnect()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [labels])
+  const size = ['px-2 text-[15px]', 'px-1 text-[13px]', 'px-0.5 text-[12px]'][level]
   return (
     <div
+      ref={ref}
       role="tablist"
       aria-label={label}
       className={`grid gap-1 rounded-full bg-[#E7E9ED] p-1 ${className}`}
@@ -518,7 +555,7 @@ export function Tabs({ options, value, onChange, label, className = '' }) {
             role="tab"
             aria-selected={on}
             onClick={() => onChange(o.value)}
-            className={`flex min-h-[44px] min-w-0 items-center justify-center gap-1.5 rounded-full px-2 text-[15px] leading-tight transition-colors duration-fast ${
+            className={`flex min-h-[44px] min-w-0 items-center justify-center gap-1.5 rounded-full ${size} leading-tight transition-colors duration-fast ${
               on
                 ? 'bg-white font-extrabold text-[#040404] shadow-[0_1px_2px_rgba(0,0,0,0.10),0_2px_6px_rgba(0,0,0,0.08)]'
                 : 'font-bold text-[#4B5563] hover:text-[#040404]'

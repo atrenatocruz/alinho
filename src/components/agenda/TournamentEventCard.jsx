@@ -28,17 +28,31 @@ const STATE_KEY = {
 const hhmm = (date, language) =>
   new Date(date).toLocaleTimeString(language === 'en' ? 'en-GB' : 'pt-PT', { hour: '2-digit', minute: '2-digit' })
 
-export default function TournamentEventCard({ event, past }) {
+/* `footer`: o que vai no fundo do cartão, fora da ligação ao torneio — o
+   «Marcar resultados» de quem marca (ScoreTodayCard, 28 set). O corpo fica
+   exatamente o mesmo: foi o cartão mudar que o Francisco estranhou. */
+export default function TournamentEventCard({ event, past, footer = null }) {
   const { t, i18n } = useTranslation()
   const isMatch = event.source === 'tournament_match'
   const to = `/torneio/${event.slug || event.id}`
+  const frame = { background: LILAC.bg, borderColor: LILAC.border, borderWidth: 2 }
 
+  if (footer) {
+    return (
+      <div className={`card ${past ? 'opacity-60' : ''}`} style={frame}>
+        <Link to={to} className="press block">{body()}</Link>
+        {footer}
+      </div>
+    )
+  }
   return (
-    <Link
-      to={to}
-      className={`card press block hover:shadow-lift ${past ? 'opacity-60' : ''}`}
-      style={{ background: LILAC.bg, borderColor: LILAC.border, borderWidth: 2 }}
-    >
+    <Link to={to} className={`card press block hover:shadow-lift ${past ? 'opacity-60' : ''}`} style={frame}>
+      {body()}
+    </Link>
+  )
+
+  function body() {
+    return (<>
       {/* O aviso do organizador vem com o cartão, em cima: quem está
           inscrito vê-o na Home sem ter de ir procurar (cartão #366). */}
       {event.notice && (
@@ -124,6 +138,6 @@ export default function TournamentEventCard({ event, past }) {
           <MapPin size={13} /> {event.raw.location}
         </p>
       )}
-    </Link>
-  )
+    </>)
+  }
 }

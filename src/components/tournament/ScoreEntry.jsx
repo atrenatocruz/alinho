@@ -17,6 +17,7 @@ import { useTranslation } from 'react-i18next'
 import { needsDecider, resultProblem } from '../../lib/tournamentScore'
 import { computeSetsResult } from '../../lib/scoringLogic'
 import { tieBreakProblem } from './tieBreak'
+import { setsResultProblem } from './scoreProblem'
 
 export const SETS_FORMATS = ['melhor_2_sets', 'melhor_3_sets']
 
@@ -104,7 +105,8 @@ export function useScoreEntry({ scoring = 'pro_set_9', tieTarget = 7 } = {}) {
       const rows = filledSets(sets)
       const { setsA, setsB } = computeSetsResult(rows)
       const input = { score_a: setsA, score_b: setsB, sets: rows.map((r, i) => ({ ...r, is_super_tiebreak: i === 2 && decider })) }
-      const p = resultProblem(scoring, input)
+      // #588: cada set com a regra única (um 9-2 já não passa por set).
+      const p = setsResultProblem(scoring, input)
       return p ? { problem: p } : { input }
     }
     if (askTieBreak) {
