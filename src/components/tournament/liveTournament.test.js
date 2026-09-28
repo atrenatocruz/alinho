@@ -29,13 +29,13 @@ describe('«A decorrer agora» — cartão do torneio', () => {
       meta: 'M4 · 4 jogos a decorrer',
       leadLabel: 'Último:',
       lead: 'Serra / Mota 6–4',
-      to: '/torneio/smash-open?cat=M4&tab=all_games&sec=draw',
+      to: '/torneio/smash-open?cat=M4&tab=board&sec=draw',
     })
   })
   it('nos grupos, a fase é «grupos» e o toque leva à secção dos grupos', () => {
     const c = liveTournamentCard({ ...row, stage: 'groups', round: null }, t)
     expect(c.tag).toBe('Torneio · grupos')
-    expect(c.to).toBe('/torneio/smash-open?cat=M4&tab=all_games&sec=groups')
+    expect(c.to).toBe('/torneio/smash-open?cat=M4&tab=board&sec=groups')
   })
   it('o resultado aparece do lado de quem ganhou', () => {
     expect(winnerScore('4-6 6-3 8-10', false)).toBe('6–4 3–6 10–8')
@@ -54,6 +54,6 @@ describe('«A decorrer agora» — cartão do torneio', () => {
     expect(c.meta).toBe('M4 · Clube Exemplo')
   })
   it('sem endereço curto, usa o id', () => {
-    expect(liveTournamentLink({ tournament_id: 't9', stage: 'groups' })).toBe('/torneio/t9?tab=all_games&sec=groups')
+    expect(liveTournamentLink({ tournament_id: 't9', stage: 'groups' })).toBe('/torneio/t9?tab=board&sec=groups')
   })
 })

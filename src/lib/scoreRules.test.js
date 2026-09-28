@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { tiebreakProblem, setProblem, proSetProblem, pointsProblem, matchProblem, setsWon } from './scoreRules'
+import { tiebreakProblem, setProblem, proSetProblem, pointsProblem, matchProblem, setsWon, friendSetProblem, friendMatchResult } from './scoreRules'
 
 const s = (a, b, extra = {}) => ({ score_a: a, score_b: b, ...extra })
 
@@ -69,6 +69,33 @@ describe('pontos', () => {
     expect(pointsProblem(5, 5, { allowDraw: true })).toBeNull()
     expect(pointsProblem(-2, 3)).toBe('negative')
     expect(pointsProblem(2.5, 3)).toBe('empty')
+  })
+})
+
+describe('amigos: sets por acabar (Francisco, 28 set)', () => {
+  it('vale tudo de 0 a 7, menos 7-7', () => {
+    for (const [a, b] of [[4, 4], [4, 3], [5, 2], [0, 0], [6, 4], [7, 6], [6, 7], [7, 0], [7, 5]]) expect(friendSetProblem(s(a, b))).toBeNull()
+    for (const [a, b] of [[7, 7], [8, 6], [9, 2], [6, 8]]) expect(friendSetProblem(s(a, b))).toBe('set_invalid')
+    expect(friendSetProblem(s(-1, 3))).toBe('negative')
+    expect(friendSetProblem(s('', 3))).toBe('empty')
+  })
+  it('ganha quem tem mais sets; um set empatado não é de ninguém', () => {
+    expect(friendMatchResult([s(6, 4), s(4, 4)])).toMatchObject({ problem: null, setsA: 1, setsB: 0, winner: 'a' })
+    expect(friendMatchResult([s(2, 6), s(3, 3), s(1, 6)])).toMatchObject({ setsA: 0, setsB: 2, winner: 'b' })
+  })
+  it('com os sets empatados, quem fez mais jogos; tudo igual é empate', () => {
+    expect(friendMatchResult([s(6, 1), s(4, 6)])).toMatchObject({ problem: null, gamesA: 10, gamesB: 7, winner: 'a' })
+    expect(friendMatchResult([s(4, 4)])).toMatchObject({ problem: null, winner: 'draw' })
+    expect(friendMatchResult([s(6, 4), s(4, 6)])).toMatchObject({ problem: null, winner: 'draw' })
+  })
+  it('melhor de 3: fecha antes dos 2 sets, mas não continua depois', () => {
+    expect(friendMatchResult([s(6, 4), s(4, 4)], { numSets: 3 }).problem).toBeNull()
+    expect(friendMatchResult([s(6, 4), s(6, 2), s(3, 3)], { numSets: 3 }).problem).toBe('too_many_sets')
+    expect(friendMatchResult([s(6, 4), s(2, 6), s(4, 4), s(1, 1)], { numSets: 3 }).problem).toBe('too_many_sets')
+  })
+  it('sem sets, ou um set acima de 7-6', () => {
+    expect(friendMatchResult([]).problem).toBe('empty')
+    expect(friendMatchResult([s(6, 4), s(8, 6)])).toMatchObject({ problem: 'set_invalid', winner: null })
   })
 })
 

@@ -32,6 +32,10 @@ export const TOURNAMENT_PANELS = {
   // «Todos os jogos»: a moldura que empilha os três do Dev 3 em secções.
   // Desde 23 set deixaram de ser separadores — ver TOURNAMENT_TABS.
   all_games: lazy(() => import('./AllGamesPanel')), //  Dev 1 · «#436»
+  // «Quadro · Horário · Duplas» (28 set): o quadro (grupos + eliminatória) e o
+  // horário, cada um no seu separador.
+  board: lazy(() => import('./BoardPanel')), //         Dev 1 · revisão de 28 set
+  schedule: lazy(() => import('./CalendarPanel')), //   Dev 1 · revisão de 28 set
   // Continuam registados aqui, com o mesmo nome e o mesmo dono: é daqui
   // que o AllGamesPanel os vai buscar. O Dev 3 não tem de mexer em nada.
   groups: lazy(() => import('./GroupsPanel')), //       Dev 3 · «Torneio 4/6»
@@ -48,12 +52,17 @@ export const TOURNAMENT_PANELS = {
  *  — a regra do Francisco é nunca mais de três, larguras iguais, e nada
  *  escondido. Com três cabem num telemóvel de 375 px sem cortar, e some
  *  de caminho o «#430» (a fila que rolava e saltava para o início). */
-export const TOURNAMENT_TABS = ['my_games', 'all_games', 'entries']
+// Desde 28 set (revisão do Renato + Francisco): «Quadro · Horário · Duplas»,
+// os mesmos para toda a gente. «Os meus jogos» deixou de ser separador: é o
+// botão lima de quem joga (TournamentPage), que abre `my_games`.
+export const TOURNAMENT_TABS = ['board', 'schedule', 'entries']
 
 /** De que cartão vem cada separador — é o que aparece enquanto não está
  *  feito, para se perceber à vista quem falta entregar. */
 export const TOURNAMENT_TAB_OWNER = {
   my_games: 'Torneio 1/6',
   all_games: 'Torneio 4/6',
+  board: 'Torneio 4/6',
+  schedule: 'Torneio 4/6',
   entries: 'Torneio 2/6',
 }

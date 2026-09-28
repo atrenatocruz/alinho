@@ -17,7 +17,7 @@ import { TOURNAMENT_PANELS } from './panels'
 
 const SECTIONS = ['groups', 'draw', 'calendar']
 
-export default function AllGamesPanel(props) {
+export default function AllGamesPanel({ sections = SECTIONS, ...props }) {
   const { t } = useTranslation()
   const [params] = useSearchParams()
   const target = params.get('sec')
@@ -29,7 +29,7 @@ export default function AllGamesPanel(props) {
   // (QA, 26 set). Sem formato escolhido ainda, fica.
   const format = props.category?.format
   const noGroups = format && Number(format.groups) === 0
-  const built = SECTIONS.filter((key) => TOURNAMENT_PANELS[key] && !(key === 'groups' && noGroups))
+  const built = sections.filter((key) => TOURNAMENT_PANELS[key] && !(key === 'groups' && noGroups))
   // «A decorrer agora» (27 set): o toque no cartão do torneio abre aqui com
   // ?sec=groups|draw, já na secção da fase a decorrer. Os painéis carregam
   // aos poucos e empurram o que está por baixo, por isso volta a apontar

@@ -135,6 +135,13 @@ export default function NoticesSlot({ tournament, publicView = false }) {
       })
   }, [tournament.id])
   useEffect(load, [load])
+  // «Publicar aviso» do «Mais ⋯» da barra de quem organiza (28 set).
+  useEffect(() => {
+    if (!isAdmin) return undefined
+    const open = () => { setError(''); setComposer('new') }
+    window.addEventListener('tournament:new-notice', open)
+    return () => window.removeEventListener('tournament:new-notice', open)
+  }, [isAdmin])
 
   const rows = activeNotices(notices)
 
@@ -203,15 +210,9 @@ export default function NoticesSlot({ tournament, publicView = false }) {
         )
       })}
 
-      {/* Só o organizador escreve. Quem joga lê — e mais nada. */}
-      {isAdmin && (
-        <button
-          onClick={() => { setError(''); setComposer('new') }}
-          className="press flex w-full items-center justify-center gap-2 rounded-ctrl border-2 border-dashed border-line py-2.5 text-sm font-extrabold text-ink-900"
-        >
-          <Megaphone size={16} /> {t('tnotices.new_title')}
-        </button>
-      )}
+      {/* Só o organizador escreve, pelo «Publicar aviso» do «Mais ⋯» da
+          barra (designer, 28 set: a barra fica só com passo seguinte, Editar
+          e Mais, como em todos os eventos). Quem joga lê — e mais nada. */}
 
       {error && !composer && (
         <div className="flex items-start gap-2 rounded-ctrl bg-ink-50 px-3 py-2">

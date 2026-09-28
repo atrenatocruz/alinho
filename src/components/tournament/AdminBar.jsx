@@ -11,10 +11,10 @@
 //   · UM botão para o passo seguinte, com o nome do que faz;
 //   · nunca um ícone sozinho — cada acção diz-se por extenso;
 //   · um botão que desaparece deixa no lugar a RAZÃO, não um espaço vazio.
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { CalendarDays, Eye, Pencil, Trash2 } from 'lucide-react'
+import { MoreHorizontal, Pencil } from 'lucide-react'
 import { deleteTournament, setTournamentStatus } from '../../lib/tournamentApi'
 import { describeError } from '../../lib/errors'
 import { canDelete } from '../../lib/tournaments'
@@ -23,6 +23,7 @@ import { MonoLabel, StatePill } from './TournamentBits'
 import CloseCategories from './CloseCategories'
 import { drawProgress, statusKey } from './drawProgress'
 import { ConfirmSheet } from '../ui'
+import EventActionsSheet from '../EventActionsSheet'
 
 /** O passo seguinte de cada estado. Do sorteio em diante não se anda à mão:
  *  é o que a `set_tournament_status` deixa fazer, e a barra não promete o
@@ -45,12 +46,16 @@ function whenDeadline(iso, locale) {
   return `${day}, ${time}`
 }
 
+// Compactos, para os três caberem numa linha no telemóvel (como no mix).
+const PRIMARY = 'inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-ctrl bg-ink-900 px-2.5 text-sm leading-tight font-extrabold text-white disabled:opacity-50'
+const SECONDARY = 'inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-ctrl border border-line bg-surface px-2.5 text-sm font-extrabold text-ink-900 shrink-0 whitespace-nowrap'
+
 const STATE_PILL = {
   rascunho: 'grey', inscricoes: 'grey', fechado: 'grey',
   sorteado: 'dark', a_decorrer: 'live', terminado: 'grey',
 }
 
-export default function AdminBar({ tournament, categories = [], onChanged, onEdit, onDraw, onSchedule }) {
+export default function AdminBar({ tournament, categories = [], onChanged, onEdit, onDraw, onSchedule, onEntries }) {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const [busy, setBusy] = useState(false)
@@ -60,9 +65,13 @@ export default function AdminBar({ tournament, categories = [], onChanged, onEdi
   // Categorias com tudo jogado, à espera do «Terminar» (vem do CloseCategories).
   const [played, setPlayed] = useState({ codes: [], all: false })
   const onReady = useCallback((codes, all) => setPlayed({ codes, all }), [])
+  // «Mais ⋯» (revisão de 28 set, peça 5): tudo o resto, numa folha.
+  const [moreOpen, setMoreOpen] = useState(false)
+  const closeRef = useRef(null)
 
   const status = tournament?.status
   const next = NEXT_STEP[status]
+  const live = status === 'sorteado' || status === 'a_decorrer'
   // O sorteio anda categoria a categoria (Trello #560): o botão fica
   // enquanto houver uma categoria fechada e por sortear, e o estado diz
   // quantas faltam — o torneio já está «sorteado» desde a primeira.
@@ -144,68 +153,68 @@ export default function AdminBar({ tournament, categories = [], onChanged, onEdi
           })}</p>
       )}
 
-      <div className="mt-2.5 flex flex-wrap gap-1.5">
+      {/* A mesma forma da barra do mix (página do evento, assunto 1): UM
+          botão preto para o passo seguinte, «Editar» e «Mais ⋯», que junta
+          tudo o resto — marcar resultados, horário, duplas, publicar aviso,
+          terminar categoria, ver como quem chega de fora e apagar. */}
+      <div className="mt-2.5 flex gap-1.5">
         {next && (
           <button type="button" disabled={busy}
             // Fechar as inscrições pergunta antes (Trello #500): um toque por
             // engano deixava toda a gente de fora. Sem vermelho — reabre-se.
             onClick={() => (next === 'fechado' ? setAsk('close') : go(next))}
-            className="inline-flex min-h-[48px] items-center justify-center gap-1.5 rounded-ctrl bg-ink-900 px-5 text-base font-extrabold text-white disabled:opacity-50">
+            className={`${PRIMARY} min-w-0 flex-1 whitespace-nowrap`}>
             {t(`tournament.admin.to_${next}`)}
           </button>
         )}
         {canDraw && (
-          <button type="button" disabled={busy} onClick={draw}
-            className="inline-flex min-h-[48px] items-center justify-center gap-1.5 rounded-ctrl bg-ink-900 px-5 text-base font-extrabold text-white disabled:opacity-50">
+          <button type="button" disabled={busy} onClick={draw} className={`${PRIMARY} min-w-0 flex-1 whitespace-nowrap`}>
             {t('tournament.admin.do_draw')}
           </button>
         )}
-        {/* Abre AQUI, onde a pessoa já está. Antes mandava para `/gerir` com
-            parâmetros que ninguém lê — e `/gerir` sem clube é o ecrã de
-            escolher organização, onde há um «Remover foto» que apaga a foto
-            de PERFIL. Quem ia editar o torneio podia apagá-la sem perceber.
-            O formulário de editar não tem rota própria, por isso não havia
-            para onde navegar: tem de abrir no sítio. */}
-        <button type="button" onClick={() => onEdit?.()}
-          className="inline-flex min-h-[48px] items-center justify-center gap-1.5 rounded-ctrl border border-line bg-surface px-5 text-base font-extrabold text-ink-900">
-          <Pencil size={14} /> {preview ? t('tournament.admin.keep_editing') : t('tournament.admin.edit')}
+        {/* Abre AQUI, onde a pessoa já está (o formulário não tem rota própria). */}
+        <button type="button" onClick={() => onEdit?.()} className={`${SECONDARY} ${next || canDraw ? '' : 'flex-1'}`}>
+          <Pencil size={14} /> {preview ? t('tournament.admin.keep_editing') : t('eventactions.edit')}
         </button>
-        {/* A grelha de horas (Trello #563): tinha ficado sem entrada quando o
-            Gerir passou à lista única de Eventos. Secundário, igual ao
-            «Editar», só com jogos marcados (designer, 25 set). */}
-        {(status === 'sorteado' || status === 'a_decorrer') && (
-          <button type="button" onClick={() => onSchedule?.()}
-            className="inline-flex min-h-[48px] items-center justify-center gap-1.5 rounded-ctrl border border-line bg-surface px-5 text-base font-extrabold text-ink-900">
-            <CalendarDays size={14} /> {t('tournament.admin.schedule')}
-          </button>
-        )}
-        <button type="button" onClick={() => {
-          const url = new URL(window.location.href)
-          url.searchParams.set('ver', 'publico')
-          navigate(`${url.pathname}${url.search}`)
-        }}
-          className="inline-flex min-h-[48px] items-center justify-center gap-1.5 rounded-ctrl border border-line bg-surface px-5 text-base font-extrabold text-ink-900">
-          <Eye size={14} /> {t('tournament.admin.view_public')}
+        <button type="button" onClick={() => setMoreOpen(true)} aria-haspopup="dialog" className={`${SECONDARY} ${next || canDraw ? '' : 'flex-1'}`}>
+          {t('eventactions.more')} <MoreHorizontal size={16} />
         </button>
       </div>
 
+      <EventActionsSheet
+        open={moreOpen}
+        title={tournament?.name || ''}
+        subtitle={t(statusKey(status, progress), { drawn: progress.drawn, total: progress.total })}
+        onClose={() => setMoreOpen(false)}
+        actions={[
+          live && { key: 'score', label: t('tournament.score.link_cta'), hint: t('tournament.admin.more_score_hint'),
+            onClick: () => navigate(`/torneio/${tournament.slug || tournament.id}/marcar`) },
+          live && { key: 'schedule', label: t('tournament.admin.schedule'), hint: t('tournament.admin.more_schedule_hint'), onClick: () => onSchedule?.() },
+          { key: 'entries', label: t('tournament.admin.more_entries'), hint: t('tournament.admin.more_entries_hint'), onClick: () => onEntries?.() },
+          { key: 'notice', label: t('tournament.admin.more_notice'), hint: t('tournament.admin.more_notice_hint'),
+            onClick: () => window.dispatchEvent(new CustomEvent('tournament:new-notice')) },
+          live && { key: 'finish', label: t('tournament.admin.more_finish'), hint: t('tournament.admin.more_finish_hint'),
+            onClick: () => closeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }) },
+          { key: 'public', label: t('tournament.admin.view_public'), hint: t('tournament.admin.more_public_hint'), onClick: () => {
+            const url = new URL(window.location.href)
+            url.searchParams.set('ver', 'publico')
+            navigate(`${url.pathname}${url.search}`)
+          } },
+          // Sempre em último; sem se poder apagar, apagado e com a razão.
+          { key: 'delete', danger: true, disabled: !deletable, label: t('tournament.admin.delete_tournament'),
+            hint: deletable ? null : t('tournament.admin.cannot_delete'), onClick: () => setAsk('delete') },
+        ].filter(Boolean)}
+      />
+
       {/* Com o sorteio feito, o passo seguinte é fechar cada categoria — e
           o torneio fecha sozinho com a última (Trello #485). */}
-      {(status === 'sorteado' || status === 'a_decorrer') && (
-        <CloseCategories tournament={tournament} onChanged={onChanged} onReady={onReady} />
+      {live && (
+        <div ref={closeRef}><CloseCategories tournament={tournament} onChanged={onChanged} onReady={onReady} /></div>
       )}
 
       {/* Um botão que sai deixa a razão no lugar dele, nunca um vazio. */}
       {!next && status !== 'fechado' && status !== 'sorteado' && status !== 'a_decorrer' && (
         <p className="mt-2 text-xs text-ink-500">{t('tournament.admin.no_step')}</p>
-      )}
-      {deletable ? (
-        <button type="button" disabled={busy} onClick={() => setAsk('delete')}
-          className="mt-2 inline-flex min-h-[48px] items-center justify-center gap-1.5 rounded-ctrl border border-line bg-surface px-5 text-base font-extrabold text-danger disabled:opacity-50">
-          <Trash2 size={14} /> {t('tournament.admin.delete')}
-        </button>
-      ) : (
-        <p className="mt-1.5 text-xs text-ink-500">{t('tournament.admin.cannot_delete')}</p>
       )}
       {error && <p className="mt-2 text-xs text-danger">{error}</p>}
 
