@@ -20,7 +20,7 @@ import { whatsappShare } from '../lib/partnerInvite'
 import { ArrowLeft, Eye, Trophy } from 'lucide-react'
 import { useGoBack } from '../lib/useGoBack'
 import { useAuth } from '../contexts/AuthContext'
-import { getTournamentForEdit, getTournamentPage, updateTournament } from '../lib/tournamentApi'
+import { getTournamentForEdit, getTournamentPage, scheduleTournamentOpening, updateTournament } from '../lib/tournamentApi'
 import { setEventWhatsappPostTimes } from '../lib/whatsappHours'
 import { describeError, errorKind } from '../lib/errors'
 import { Avatar, EmptyState, Tabs } from '../components/ui'
@@ -194,6 +194,8 @@ export default function TournamentPage() {
       await updateTournament(tour.id, draft)
       // As horas do WhatsApp gravam-se à parte (Dev 3).
       if (Array.isArray(draft.whatsapp_post_times)) await setEventWhatsappPostTimes('tournament', tour.id, draft.whatsapp_post_times)
+      // «Abrem as inscrições» mudou num rascunho (#586).
+      if (draft.schedule_opening) await scheduleTournamentOpening(tour.id, draft.schedule_opening.at)
       closeAdmin()
       window.dispatchEvent(new Event('tournament:reload'))
     } catch (err) {

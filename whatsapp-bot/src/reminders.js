@@ -48,8 +48,8 @@ async function loadConfirmedParticipantProfiles(gameId) {
  * Sends the "mix starts in a few hours" reminder for one game: one group
  * post @-mentioning every confirmed participant whose WhatsApp JID is
  * already known (see phone.js), falling back to their app name for anyone
- * who's never messaged the group, PLUS a best-effort individual DM to each
- * participant whose JID is known. Marks reminder_sent_at so this never
+ * who's never messaged the group. No private messages — the bot only ever
+ * writes to groups (Renato, 28 set). Marks reminder_sent_at so this never
  * re-fires for the same mix.
  */
 async function sendGameDayReminder(game, { sendText }) {
@@ -69,8 +69,7 @@ async function sendGameDayReminder(game, { sendText }) {
 
   // Group post — aos grupos do clube deste mix que o conseguem ver
   // (filtro de nível). Addressed to everyone at once, not one profile, so
-  // it stays 'pt' (see locales.js scope note). The individual DM below is
-  // the one that respects each participant's own language.
+  // it stays 'pt' (see locales.js scope note).
   const groups = (await getGroupsForOrg(game.organization_id)).filter((g) => mixVisibleToGroup(game, g))
   const groupLang = 'pt'
   const rosterLine = rosterNames.length > 0 ? t('reminder_roster_line', groupLang, { names: rosterNames.join(' ') }) : ''
@@ -82,20 +81,6 @@ async function sendGameDayReminder(game, { sendText }) {
       await sendText(group.groupJid, groupText, { mentions: rosterMentions })
     } catch (err) {
       console.error(`Failed to post game-day reminder to ${group.groupJid}:`, err)
-    }
-  }
-
-  for (const profile of profiles) {
-    if (!profile.whatsapp_jid) continue
-    const lang = profile.language ?? 'pt'
-    const whenForProfile = formatDateTime(game.date, lang)
-    const dmText = t('reminder_dm', lang, { title: game.title, hours: hoursLeft, when: whenForProfile, location: locationLine })
-    try {
-      await sendText(profile.whatsapp_jid, dmText)
-    } catch (err) {
-      // Best-effort — a failed DM (blocked number, stale JID, etc.) never
-      // blocks the others or the group post above.
-      console.error(`Failed to DM game-day reminder to ${profile.name}:`, err)
     }
   }
 

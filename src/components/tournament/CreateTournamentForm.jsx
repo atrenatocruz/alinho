@@ -191,10 +191,15 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
   const fileInput = useRef(null)
   const [poster, setPoster] = useState({ busy: false, error: '' })
   const [editing, setEditing] = useState(null) // índice da categoria aberta, ou 'new'
+  // A abertura marcada de um torneio em rascunho (editar, #586): o dia e a
+  // hora em que abre sozinho. Sem marcação, «Já».
+  const scheduledOpening = initial?.tournament?.status === 'rascunho' && initial?.tournament?.registrations_open_at
+    && new Date(initial.tournament.registrations_open_at) > new Date()
+    ? isoToLocalInput(initial.tournament.registrations_open_at) : null
   const [draft, setDraft] = useState(() => ({
     // «Abrem as inscrições»: 'now' («Já») ou o dia escolhido, e a hora.
-    opens_day: 'now',
-    opens_time: '10:00',
+    opens_day: scheduledOpening ? scheduledOpening.slice(0, 10) : 'now',
+    opens_time: scheduledOpening ? scheduledOpening.slice(11, 16) : '10:00',
     name: initial?.tournament?.name || '',
     location: initial?.tournament?.location || club?.location || club?.name || '',
     poster_url: initial?.tournament?.poster_url || null,
@@ -370,7 +375,12 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
     </div>
   )
 
-  const save = guarded(() => onCreate(outgoing(draft)))
+  // A editar um rascunho: se «Abrem as inscrições» mudou, quem grava marca a
+  // abertura nova (scheduleTournamentOpening; «Já» abre agora). Depois de
+  // abertas não se mexe — o campo mostra o cadeado.
+  const openingEditable = editing_existing && initial?.tournament?.status === 'rascunho'
+  const openingChanged = openingEditable && (opensAt || null) !== (scheduledOpening ? localInputToIso(scheduledOpening) : null)
+  const save = guarded(() => onCreate({ ...outgoing(draft), ...(openingChanged ? { schedule_opening: { at: opensAt || null } } : {}) }))
   /* Uma pergunta a sério, dois botões do tamanho dos normais, cada um com
      a consequência escrita por baixo — como os do mix (desenho de 23 set,
      ponto 4; versão final de 26 set).
@@ -553,9 +563,13 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
           {/* «Abrem as inscrições», o mesmo controlo do mix (acrescento de 25
               set): «Já», ou o dia e a hora em que abre sozinho. */}
           <Field label={t('launchday.label')}>
-            <OpensPicker value={draft.opens_day} time={draft.opens_time}
-              onChange={(v) => set({ opens_day: v })} onTime={(v) => set({ opens_time: v })}
-              until={draft.entries_close_at.slice(0, 10) || firstDay} firstDay={firstDay} />
+            {editing_existing && !openingEditable ? (
+              <p className="text-sm text-muted">{t('tournament.create.opens_already_open')}</p>
+            ) : (
+              <OpensPicker value={draft.opens_day} time={draft.opens_time}
+                onChange={(v) => set({ opens_day: v })} onTime={(v) => set({ opens_time: v })}
+                until={draft.entries_close_at.slice(0, 10) || firstDay} firstDay={firstDay} />
+            )}
           </Field>
           <Field label={t('tournament.create.entries_until')} error={fieldError(DEADLINE_PROBLEMS)}>
             <div className="flex gap-2">

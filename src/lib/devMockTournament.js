@@ -78,6 +78,8 @@ const TOURNAMENT = () => {
   const st = empty() && !asked ? 'inscricoes' : state()
   return {
     id: 'tour-smash-open',
+    // mockTOpensAt = '<ISO>': a abertura marcada de um rascunho (#586).
+    registrations_open_at: localStorage.getItem('mockTOpensAt') || null,
     slug: 'smash-open-2026',
     name: 'Smash Open 2026',
     organization_id: '00000000-0000-0000-0000-0000000000aa',

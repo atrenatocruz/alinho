@@ -1401,6 +1401,17 @@ for (const [name, fn] of [...Object.entries(TOURNAMENT_CLOSE_TABLE_MOCKS), ...Ob
   TABLE_MOCKS[name] = (url) => fn(url, before) ?? before?.(url) ?? []
 }
 
+// localStorage.mockFriendGroup = 'true': o jogo entre amigos é de um grupo
+// (Dev Org), para o Editar procurar só nos membros (#586, 28 set).
+{
+  const before = RPC_MOCKS.get_friend_match
+  RPC_MOCKS.get_friend_match = (params) => {
+    const r = before(params)
+    if (localStorage.getItem('mockFriendGroup') !== 'true' || !r?.match) return r
+    return { ...r, match: { ...r.match, organization_id: MOCK_ADMIN_ORG_ID, organization_name: 'Dev Org', organization_slug: 'dev-org' } }
+  }
+}
+
 const jsonResponse = (data, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } })
 

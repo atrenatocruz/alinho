@@ -28,5 +28,9 @@ export default function EditFriendMatch() {
   }
   const mine = (data.invitees || []).some((i) => i.is_creator && i.user_id === profile?.id)
   if (!mine) return <EmptyState title={t('friends.edit_error_not_allowed')} />
-  return <CreateFriendMatch edit={data} />
+  // Jogo de grupo (#586): juntar pessoas procura só nos membros do grupo,
+  // como no criar. O grupo vem na get_friend_match (Dev 3); sem ele, como antes.
+  const m = data.match || {}
+  const group = m.organization_id ? { id: m.organization_id, slug: m.organization_slug, name: m.organization_name } : null
+  return <CreateFriendMatch edit={data} group={group} />
 }
