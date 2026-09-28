@@ -11,6 +11,7 @@ import { ChevronRight, Pencil, Plus, Trash2, Trophy, Shuffle } from 'lucide-reac
 import { createTournament, deleteTournament, getTournamentForEdit, listClubTournaments, scheduleTournamentOpening, setTournamentStatus, updateTournament } from '../../lib/tournamentApi'
 import { canDelete, nextStatus, previousStatus } from '../../lib/tournaments'
 import { describeError, errorKind } from '../../lib/errors'
+import { setEventWhatsappPostTimes } from '../../lib/whatsappHours'
 import { DangerConfirmModal, EmptyState, PrimaryButton } from '../ui'
 import { MonoLabel, StatePill } from './TournamentBits'
 import CreateTournamentForm from './CreateTournamentForm'
@@ -93,6 +94,9 @@ export default function ClubTournamentsPanel({ organizationId, club, startCreati
     setError('')
     try {
       await updateTournament(editing.row.id, draft)
+      // As horas do WhatsApp gravam-se à parte, como na página do torneio
+      // (#586: a partir do painel do clube não gravavam).
+      if (Array.isArray(draft.whatsapp_post_times)) await setEventWhatsappPostTimes('tournament', editing.row.id, draft.whatsapp_post_times)
       // «Abrem as inscrições» mudou num rascunho (#586).
       if (draft.schedule_opening) await scheduleTournamentOpening(editing.row.id, draft.schedule_opening.at)
       setEditing(null)
