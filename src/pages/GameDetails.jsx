@@ -10,7 +10,8 @@ import { CSS } from '@dnd-kit/utilities'
 import { supabase, supabaseUrl } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton, GuestBadge, PlayerAvatarRow, EmptyState, ShareModal, RoundTimer, Avatar, Select, RatingBadge, DateField, GroupLevelBadge, Tabs, ConfirmSheet } from '../components/ui'
-import { isDraftMix, publishDraftMix } from '../lib/mixDraft'
+import { isDraftMix } from '../lib/mixDraft'
+import PublishDraftSheet from '../components/mix/PublishDraftSheet'
 import { isMixLimitError, planLimitMessage } from '../lib/plans'
 import { KIND_STYLE, KindTag, StateTag, Owner } from '../components/agenda/EventCard'
 import PoolGroupStage from '../components/PoolGroupStage'
@@ -2361,13 +2362,11 @@ export default function GameDetails() {
           </button>
         </div>
       )}
-      <ConfirmSheet
-        open={publishOpen}
-        title={t('mixdraft.publish_title', { name: game.title || '' })}
-        message={t('mixdraft.publish_message')}
-        confirmLabel={t('mixdraft.publish')}
-        cancelLabel={t('mixdraft.not_now')}
-        onConfirm={async () => { await publishDraftMix(game, user.id); loadGameDetails() }}
+      {/* «Abrem as inscrições» ao publicar (28 set): «Já» ou um dia e hora. */}
+      <PublishDraftSheet
+        game={publishOpen ? game : null}
+        userId={user?.id}
+        onPublished={() => loadGameDetails()}
         onClose={() => setPublishOpen(false)}
         errorOf={(error) => (isMixLimitError(error?.message || '') && planLimitMessage(t, 'mix', gameMembership?.organization?.plan_tier))
           || describeError(t, error, 'mixdraft.publish_error')}

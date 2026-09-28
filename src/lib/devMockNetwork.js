@@ -1299,6 +1299,14 @@ const DRAFT_MIX = () => {
     location: 'Smash Padel Almada', status: 'draft', origin: 'admin', format: 'sobe_desce', num_courts: 2,
     max_players: 8, price_per_player: 6, prize: null, gender_restriction: 'indiferente', level: null,
     recurrence_id: null, participants: [], organization: { name: 'Dev Org', kind: 'group', group_logo_url: null },
+    // mockMixDraft = 'serie': o rascunho é o 1.º de uma série semanal que abre
+    // 3 dias antes às 10:00; 'publicado': já publicado para abrir mais tarde —
+    // a linha do Gerir diz «Abre …» (publicar com «Abrem as inscrições», 28 set).
+    ...(localStorage.getItem('mockMixDraft') === 'serie' ? { recurrence_id: 'rec-draft', is_recurrence_origin: true } : {}),
+    ...(localStorage.getItem('mockMixDraft') === 'publicado' ? (() => {
+      const o = new Date(d); o.setDate(o.getDate() - 2); o.setHours(10, 0, 0, 0)
+      return { status: 'pending', launch_at: o.toISOString() }
+    })() : {}),
   }
 }
 // localStorage.mockSeriesNext = 'true' — o próximo Mix (pending) de uma
@@ -1348,6 +1356,14 @@ RPC_MOCKS.skip_recurrence_game = () => { const d = new Date(); d.setDate(d.getDa
 RPC_MOCKS.default_whatsapp_post_times = () => ['10:00', '18:30']
 RPC_MOCKS.set_event_whatsapp_post_times = (params) => [...(params?.p_times || [])].sort()
 RPC_MOCKS.ensure_recurrence_successor = () => localStorage.getItem('mockEnsureStatus') || 'created'
+// A regra da série do rascunho (mockMixDraft = 'serie'): semanal, abre 3
+// dias antes às 10:00 (o mix é às 19:00).
+{
+  const before = TABLE_MOCKS.game_recurrences
+  TABLE_MOCKS.game_recurrences = (url) => (localStorage.getItem('mockMixDraft') === 'serie' && /rec-draft/.test(decodeURIComponent(url))
+    ? [{ id: 'rec-draft', frequency: 'weekly', mix_offset_seconds: 3 * 86400 + 9 * 3600, is_active: true }]
+    : before ? before(url) : [])
+}
 const OPEN_BATCH = () => {
   const at = (h, m = 0) => { const d = new Date(); d.setDate(d.getDate() + 2); d.setHours(h, m, 0, 0); return d.toISOString() }
   const g = (id, h, m, people) => ({ id, organization_id: MOCK_ADMIN_ORG_ID, title: 'Jogo em aberto', date: at(h, m), court_time_minutes: 90,
@@ -1359,7 +1375,7 @@ RPC_MOCKS.update_open_slot_batch = () => ['ob-1', 'ob-2', 'ob-3']
 TABLE_MOCKS.games = (url) => {
   let rows = gamesSemFiltro(url)
   const u = decodeURIComponent(url)
-  if (localStorage.getItem('mockMixDraft') === 'true' && Array.isArray(rows) && !/[?&]id=eq\./.test(u)) rows = [...rows, DRAFT_MIX()]
+  if (['true', 'serie', 'publicado'].includes(localStorage.getItem('mockMixDraft')) && Array.isArray(rows) && !/[?&]id=eq\./.test(u)) rows = [...rows, DRAFT_MIX()]
   if (localStorage.getItem('mockSeriesNext') === 'true' && Array.isArray(rows) && !/[?&]id=eq\./.test(u)) {
     const others = localStorage.getItem('mockSeriesPast') === 'true' ? SERIES_PAST_MIXES()
       : localStorage.getItem('mockSeriesOrigin') === 'false' ? [] : [SERIES_ORIGIN_MIX()]
