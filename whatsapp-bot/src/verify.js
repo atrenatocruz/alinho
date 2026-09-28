@@ -8,40 +8,29 @@
 // número confirmado, o histórico do convidado do bot com esse número passa
 // para a conta registada.
 //
-// Mensagens privadas que não são um código são ignoradas: o bot não
-// conversa, e não responde a quem lhe escreve outra coisa.
+// O bot NÃO responde em privado — só escreve nos grupos (Renato, 28 set). O
+// resultado vê-se na app («Já enviei»). Mensagens privadas que não são um
+// código são ignoradas.
 import { supabase } from './supabase.js'
 import { hashPhone } from './phone.js'
-import { t } from './locales.js'
 
 const CODE = /(?:^|\D)(\d{6})(?:\D|$)/
 
-export async function handleDirectMessage({ chatJid, senderPn, text, message }, { sendText }) {
+export async function handleDirectMessage({ senderPn, text }) {
   const match = (text || '').trim().match(CODE)
   if (!match) return
 
-  const reply = (key, vars) => sendText(chatJid, t(key, 'pt', vars), { quoted: message })
-
   // Sem o número verdadeiro (o WhatsApp às vezes só mostra um @lid), não há
   // como confirmar — e nunca se confirma às cegas.
-  if (!senderPn) {
-    await reply('verify_no_number')
-    return
-  }
+  if (!senderPn) return
 
   const hash = hashPhone(senderPn.split('@')[0])
   const { data, error } = await supabase.rpc('confirm_phone_from_whatsapp', { p_phone_hash: hash, p_code: match[1] })
   if (error) {
     console.error('Failed to confirm phone:', error)
-    await reply('verify_error')
     return
   }
-  if (!data?.ok) {
-    await reply(data?.reason === 'phone_changed' ? 'verify_phone_changed' : 'verify_bad_code')
-    return
-  }
-  if (data.failed?.length) {
+  if (data?.ok && data.failed?.length) {
     console.error('Phone confirmed but merging a guest failed (ver à mão):', JSON.stringify(data.failed))
   }
-  await reply(data.merged > 0 ? 'verify_ok_merged' : 'verify_ok', { name: data.name || '' })
 }
