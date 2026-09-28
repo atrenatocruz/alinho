@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton } from '../components/ui'
 import { Wordmark } from '../components/Layout'
 import { describeError } from '../lib/errors'
+import TurnstileWidget from '../components/TurnstileWidget'
 
 export default function ForgotPassword() {
   const { t } = useTranslation()
@@ -17,16 +18,19 @@ export default function ForgotPassword() {
   // reveals that either, so mirroring it here avoids leaking who has an
   // account on this app (Supabase's own recommended pattern).
   const [sent, setSent] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState(null)
+  const captchaRef = useRef(null)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
     setError('')
     try {
-      const { error } = await resetPassword(email)
+      const { error } = await resetPassword(email, captchaToken)
       if (error) throw error
       setSent(true)
     } catch (err) {
+      captchaRef.current?.reset()
       setError(describeError(t, err, 'login.forgot_password_error'))
     } finally {
       setLoading(false)
@@ -89,6 +93,8 @@ export default function ForgotPassword() {
                   {error}
                 </div>
               )}
+
+              <TurnstileWidget ref={captchaRef} onToken={setCaptchaToken} />
 
               <PrimaryButton type="submit" disabled={loading} className="w-full">
                 {loading ? t('login.forgot_password_sending') : t('login.forgot_password_submit')}

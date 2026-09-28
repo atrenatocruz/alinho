@@ -2923,6 +2923,7 @@
   "errors.already_registered": "Já existe uma conta com este email. Entra com ele ou recupera a password.",
   "errors.email_not_confirmed": "Ainda não confirmaste o teu email. Procura a mensagem na tua caixa de correio.",
   "errors.too_many": "Demasiadas tentativas seguidas. Espera um pouco e tenta outra vez.",
+  "errors.captcha": "Não conseguimos confirmar que não és um robô. Recarrega a página e tenta outra vez.",
   "gerirclube.searchable_label": "Aparecer na pesquisa",
   "gerirclube.searchable_hint": "Qualquer jogador encontra este clube na Comunidade: nome, número de membros e nível médio.",
   "gerirclube.searchable_hint_group": "Qualquer jogador encontra este grupo na Comunidade: nome, número de membros e nível médio.",
