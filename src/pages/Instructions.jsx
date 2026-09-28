@@ -248,6 +248,7 @@ export default function Instructions() {
             <li>• {t('instructions.elo_b5')}</li>
             <li>• {t('instructions.elo_b6')}</li>
             <li>• {t('instructions.elo_b7')}</li>
+            <li>• {t('instructions.elo_b8')}</li>
           </ul>
           <p className="text-gray-500 text-sm mt-3">{t('instructions.elo_note')}</p>
         </div>
