@@ -61,15 +61,18 @@ export default function GroupFriendGames({ games, org = null }) {
         const when = [dayText(g.scheduled_date, i18n.language), g.scheduled_time ? String(g.scheduled_time).slice(0, 5) : null].filter(Boolean).join(' · ')
         const where = [g.location, g.court].filter(Boolean).join(' · ')
         const done = g.score_a != null && g.score_b != null
+        // Como no cartão da sessão: só quem joga abre o jogo (27 set).
+        const iPlay = [...(g.team_a || []), ...(g.team_b || [])].some((p) => p.user_id && p.user_id === user?.id)
+        const Card = iPlay ? Link : 'div'
         return (
-          <Link key={g.id} to="/jogos-privados" className="card press block">
+          <Card key={g.id} {...(iPlay ? { to: `/jogos-privados/sessao/${g.root_id || g.id}` } : {})} className={`card block ${iPlay ? 'press' : ''}`}>
             <div className="flex items-start justify-between gap-2">
               <p className="min-w-0 text-sm font-extrabold text-ink-900">
                 {names(g.team_a)} <span className="font-semibold text-muted">×</span> {names(g.team_b)}
               </p>
               {done
                 ? <b className="shrink-0 font-display text-lg text-ink-900">{g.score_a}-{g.score_b}</b>
-                : <ChevronRight size={18} className="shrink-0 text-muted" />}
+                : iPlay && <ChevronRight size={18} className="shrink-0 text-muted" />}
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted">
               <span>{t('friends.game_n', { n: g.n })}</span>
@@ -77,7 +80,7 @@ export default function GroupFriendGames({ games, org = null }) {
               {where && <span className="inline-flex items-center gap-1"><MapPin size={12} /> {where}</span>}
               <span className="font-semibold">{g.ranked_intent ? t('steps.ranking_yes_short') : t('steps.ranking_friendly_short')}</span>
             </div>
-          </Link>
+          </Card>
         )
       })}
     </div>

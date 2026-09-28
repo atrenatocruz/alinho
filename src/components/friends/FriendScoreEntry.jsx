@@ -42,19 +42,26 @@ export function ScoreEntrySimple({ initial, onSave, saving }) {
 // registam-se todos de uma vez, sem regra de "quem fecha primeiro" (os
 // amigos nem sempre seguem as regras todas). O resultado final é quantos
 // sets cada lado ganhou; empate nos sets é empate do jogo (#420).
-export function ScoreEntrySets({ numSets, onSave, saving }) {
+export function ScoreEntrySets({ numSets, onSave, saving, initial = null }) {
   const { t } = useTranslation()
-  const [sets, setSets] = useState(() => Array.from({ length: numSets }, () => ({ a: '', b: '' })))
+  const [sets, setSets] = useState(() => Array.from({ length: numSets }, (_, i) => initial?.[i] || { a: '', b: '' }))
 
   const updateSet = (i, side, value) =>
     setSets((prev) => prev.map((s, idx) => (idx === i ? { ...s, [side]: value } : s)))
 
-  const parsed = sets.map((s) => ({ a: parseInt(s.a, 10), b: parseInt(s.b, 10) }))
-  const allFilled = sets.every((s, i) =>
-    s.a !== '' && s.b !== '' && !Number.isNaN(parsed[i].a) && !Number.isNaN(parsed[i].b) && parsed[i].a >= 0 && parsed[i].b >= 0
-  )
+  const filledOk = (s) => s.a !== '' && s.b !== '' && parseInt(s.a, 10) >= 0 && parseInt(s.b, 10) >= 0
+  // Os sets preenchidos, do primeiro até ao primeiro vazio. Quando uma
+  // equipa já ganhou a maioria, os que faltam não se jogaram e ficam vazios.
+  const firstEmpty = sets.findIndex((s) => s.a === '' && s.b === '')
+  const played = firstEmpty === -1 ? sets : sets.slice(0, firstEmpty)
+  const parsed = played.map((s) => ({ a: parseInt(s.a, 10), b: parseInt(s.b, 10) }))
   const setsWonA = parsed.filter((s) => s.a > s.b).length
   const setsWonB = parsed.filter((s) => s.b > s.a).length
+  const majority = Math.floor(numSets / 2) + 1
+  const decidedEarly = setsWonA >= majority || setsWonB >= majority
+  const allFilled = played.length > 0 && played.every(filledOk)
+    && sets.slice(played.length).every((s) => s.a === '' && s.b === '')
+    && (played.length === numSets || decidedEarly)
   const tied = allFilled && setsWonA === setsWonB
 
   return (
