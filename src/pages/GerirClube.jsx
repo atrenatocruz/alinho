@@ -26,12 +26,11 @@ import TeacherRequestCard from '../components/TeacherRequestCard'
 import VoucherScanner from '../components/VoucherScanner'
 import VouchersAdmin from '../components/vouchers/VouchersAdmin'
 import { isValidVoucherId, normalizeScannedVoucherId } from '../lib/vouchers'
-import { ClubTeachers, NewSeries } from '../components/lessons/ClubLessonsPanel'
+import { ClubTeachers } from '../components/lessons/ClubLessonsPanel'
 import { SeriesManage } from '../components/lessons/ClubSeriesPanel'
 import { lessonTypeLabel, seriesWhen } from '../components/lessons/LessonBits'
 import { listClubTournaments } from '../lib/tournamentApi'
 import { lessonsAvailable, listClubSeries } from '../lib/lessonsApi'
-import ClubTournamentsPanel from '../components/tournament/ClubTournamentsPanel'
 import { KIND_STYLE } from '../components/agenda/EventCard'
 import { tournamentsAvailable } from '../lib/tournamentApi'
 import { describeError, errorKind } from '../lib/errors'
@@ -256,9 +255,6 @@ export default function GerirClube() {
   // Qual das formas de marcar esta aberta: 'aberto' | 'aulas' | 'torneios'.
   // Os paineis que antes eram seccoes empilhadas passam a viver atras dos
   // botoes de marcar -- nenhum foi reescrito, so mudou quem os abre.
-  // O formulario de criar que esta aberto: 'aberto' | 'torneio' | 'turma'.
-  // O do mix continua com o seu proprio estado (showCreateGame).
-  const [criar, setCriar] = useState(null)
   const [avisoCriado, setAvisoCriado] = useState('')
   // As turmas entram na lista de eventos; tocar numa abre a gestao dela.
   const [turmas, setTurmas] = useState([])
@@ -802,7 +798,7 @@ export default function GerirClube() {
     setAvisoCriado('')
     setCreatedMixScope(null)
     if (tipo === 'mix' && isMixWizardEnabled) { navigate(`/gerir/${org.slug}/criar/mix`, { state: { fromGerir: true } }); return }
-    if (tipo === 'mix') { setCriar(null); setShowCreateGame(true); return }
+    if (tipo === 'mix') { setShowCreateGame(true); return }
     // Os jogos em aberto abrem na página própria, em passos (#342).
     if (tipo === 'aberto') { navigate(`/gerir/${slug}/criar/em-aberto`); return }
     // O torneio abre numa página só do formulário (ponto 0, 26 set).
@@ -810,7 +806,6 @@ export default function GerirClube() {
     // A turma também, em 3 passos (#342, versão final de 26 set).
     if (tipo === 'turma') { navigate(`/gerir/${slug}/criar/turma`); return }
     setShowCreateGame(false)
-    setCriar(tipo)
   }
 
   const loadTournaments = async () => {
@@ -1538,7 +1533,6 @@ export default function GerirClube() {
     if (mixPage === 'create' && !mixAbriu.current) {
       mixAbriu.current = true
       setCreatedMixScope(null)
-      setCriar(null)
       setShowCreateGame(true)
     }
     if (mixPage === 'edit' && editingGame?.id !== editId) {
@@ -2449,23 +2443,6 @@ export default function GerirClube() {
                 </div>
               )}
 
-              {criar === 'torneio' && (
-                <ClubTournamentsPanel
-                  organizationId={org.id}
-                  club={org}
-                  startCreating
-                  onDone={({ created }) => { setCriar(null); if (created) loadTournaments() }}
-                />
-              )}
-              {criar === 'turma' && (
-                <NewSeries
-                  organizationId={currentOrganizationId}
-                  onDone={({ created, name }) => {
-                    setCriar(null)
-                    if (created) { setAvisoCriado(t('lessons.series_created_pending', { name })); loadTurmas() }
-                  }}
-                />
-              )}
               {avisoCriado && <p className="text-sm font-semibold text-ok">{avisoCriado}</p>}
 
               {/* Create/Edit Game Form */}
