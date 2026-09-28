@@ -177,7 +177,7 @@ export default function LessonPage() {
       {/* Aula que nasceu de um pedido meu, já aceite: mudar já não é aqui
           (AUDITORIA, ponto 7; só nessas, designer 28 set). */}
       {enrolled && fromRequest && future && <p className="rounded-ctrl bg-ink-50 px-3 py-2.5 text-sm text-ink-700">{t('lessons.accepted_lock')}</p>}
-      {enrolled && <p className="text-xs text-muted">{t('lessons.cant_go_hint')}</p>}
+      {enrolled && <p className="text-xs text-muted">{t(isSeries ? 'lessons.cant_go_hint' : 'lessons.cant_go_hint_single')}</p>}
 
       {isSeries && data.my_enrolment_id && !notice && (
         <button type="button" disabled={busy} onClick={cancelSeries} className="text-danger text-sm font-extrabold hover:underline disabled:opacity-40">

@@ -2404,6 +2404,7 @@
   "lessons.free_seats_other": "{{count}} lugares livres",
   "lessons.accepts_levels": "Aceita níveis {{range}}",
   "lessons.cant_go_hint": "\"Não posso ir\" é só para esta aula e avisa o professor. A mensalidade mantém-se.",
+  "lessons.cant_go_hint_single": "\"Não posso ir\" é só para esta aula e avisa o professor.",
   "lessons.cancel_enrolment": "Cancelar inscrição",
   "lessons.absence_note_prompt": "Falta de {{name}}. Nota (opcional, ex.: ligou):",
   "lessons.confirm_cancel_one": "Cancelar a aula de {{day}}? Os alunos são avisados com a razão.",
