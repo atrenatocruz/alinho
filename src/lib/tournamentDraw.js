@@ -56,6 +56,13 @@ export async function getCategoryBoard(categoryId) {
       id: e.id,
       name: e.team_name || [e.player1_name, e.player2_name].filter(Boolean).join(' / ') || '?',
       players: [e.player1_name, e.player2_name].filter(Boolean),
+      // Com a foto de cada um, para os cartões do quadro e do horário
+      // (28 set). Quem não tem foto (ou é convidado) fica com a inicial.
+      people: [
+        { name: e.player1_name, avatar_url: e.player1_avatar || null },
+        { name: e.player2_name, avatar_url: e.player2_avatar || null },
+      ].filter((p) => p.name),
+      team_name: e.team_name || null,
       seed: e.seed_number || null,
       status: e.status,
       hides_results: hiding.has(e.id),
