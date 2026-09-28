@@ -233,7 +233,7 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
   return (
     <StepPage
       title={edit ? t('friends.edit_title') : group ? t('creategroupmatch.title_new') : t('createprivatematch.title_new')}
-      subtitle={!edit && group ? t('creategroupmatch.in_group', { group: group.name }) : null}
+      subtitle={group ? t('creategroupmatch.in_group', { group: group.name }) : null}
       step={step}
       total={4}
       stepLabel={stepLabels[step - 1]}

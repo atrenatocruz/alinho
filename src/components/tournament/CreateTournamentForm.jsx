@@ -482,6 +482,12 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
               </span>
             </div>
           ))}
+          {/* «Editar tem tudo o que o Criar tem» (auditoria, 27 set): o máximo
+              por pessoa também se vê com inscritos, trancado com as categorias. */}
+          <div className="flex items-center gap-2 border-t border-line pt-2 mt-1">
+            <span className="min-w-0 flex-1 text-sm text-ink-700">{t('tournament.create.max_categories')}</span>
+            <b className="shrink-0 text-sm text-ink-900">{draft.rules.max_categories}</b>
+          </div>
         </Locked>
       )}
       {!locked && step === 1 && (
