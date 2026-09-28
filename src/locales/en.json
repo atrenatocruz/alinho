@@ -3273,6 +3273,7 @@
   "mixdraft.banner_text": "It hasn't been announced. Players can't see it or sign up.",
   "mixdraft.publish_title": "Publish {{name}}?",
   "mixdraft.publish_message": "It shows in the app and the bot announces it in the WhatsApp group. Once announced, the message can't be deleted.",
+  "mixdraft.bot_announces_then": "The bot announces it at that time.",
   "mixwizard.title_new": "New mix",
   "mixwizard.title_edit": "Edit mix",
   "mixwizard.missing_title": "The mix name is missing, at the top.",
