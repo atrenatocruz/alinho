@@ -48,6 +48,7 @@ import RoundAlarm from '../components/RoundAlarm'
 import { cancelMixDate } from '../lib/mixCancel'
 import { weekdayShort } from '../lib/launchDay'
 import { adminPairSolos, adminSplitPair, mixPairErrorMessage } from '../lib/mixPairs'
+import { loadRepeatPairKeys as loadRepeatPairKeysFor } from '../lib/repeatPairKeys'
 
 // Tipo do evento como na Home (src/lib/agenda.js): um jogo em aberto é
 // "open" (salmão), o resto é "mix" (azul) — Trello #409.
@@ -863,27 +864,13 @@ export default function GameDetails() {
 
   /* ─── Mix engine actions (admin) ──────────────────────────────────── */
 
-  // Duplas dos últimos 4 mixes deste clube — solos cujo pareamento por
-  // pontos recriaria um destes pares são reshuffled com o próximo mais
-  // próximo em pontos em vez disso; só se aceita a repetição quando
-  // for matematicamente impossível evitá-la (ver formDuplas).
-  const loadRepeatPairKeys = async () => {
-    const { data: previousGames } = await supabase
-      .from('games')
-      .select('id')
-      .eq('organization_id', gameOrganizationId)
-      .lt('date', game.date)
-      .order('date', { ascending: false })
-      .limit(4)
-    if (!previousGames?.length) return new Set()
-    const { data: previousTeams } = await supabase
-      .from('teams')
-      .select('player1_id, player2_id')
-      .in('game_id', previousGames.map(g => g.id))
-    return new Set(
-      (previousTeams || []).map(team => [team.player1_id, team.player2_id].sort().join('|'))
-    )
-  }
+  // Duplas dos últimos 4 mixes da mesma série (ou do grupo, num mix que não
+  // se repete — Francisco, 28 set) — solos cujo pareamento por pontos
+  // recriaria um destes pares são reshuffled com o próximo mais próximo em
+  // pontos em vez disso; só se aceita a repetição quando for matematicamente
+  // impossível evitá-la (ver formDuplas). A mesma regra do robô.
+  const loadRepeatPairKeys = () =>
+    loadRepeatPairKeysFor(supabase, { organization_id: gameOrganizationId, recurrence_id: game.recurrence_id, date: game.date })
 
   // Forma as duplas e devolve as linhas de `teams` prontas a inserir, sem
   // gravar nada. Partilhado por «Começar o Mix» e por refazer as duplas à
