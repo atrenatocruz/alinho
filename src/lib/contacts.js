@@ -1,15 +1,15 @@
 // Os contactos da Alinho, num sítio só (Trello #327 — «Falar connosco» da
 // página Planos). Trocar aqui e só aqui.
 //
-// SUPPORT_EMAIL é PROVISÓRIO (Francisco, 25 set: «algo como
-// support@alinho.pt», ainda não está fechado). O Ruben cria o endereço;
-// quando existir, troca-se esta linha.
+// Caixa criada pelo Ruben a 28 set: Cloudflare Email Routing reencaminha
+// support@alinho.pt para a caixa Gmail da equipa. Só recebe — as respostas
+// saem, por agora, do Gmail. O mesmo endereço está na política de
+// privacidade e nos termos (privacy.*/terms.* em src/locales).
 export const SUPPORT_EMAIL = 'support@alinho.pt'
 
-// A caixa ainda não existe: um clube que escrevesse perdia a mensagem. O
-// botão Email fica escondido e fica só o WhatsApp, que o Renato lê, até o PO
-// dizer que a caixa existe (26 set). Nesse dia, passa a true.
-export const SUPPORT_EMAIL_READY = false
+// Enquanto a caixa não existia, o botão Email da página Planos ficava
+// escondido para um clube não escrever para o vazio. Existe desde 28 set.
+export const SUPPORT_EMAIL_READY = true
 
 // O número do robô (decisão do Francisco, 25 set). O robô ignora as
 // mensagens privadas que não são um código, por isso quem escreve espera por
