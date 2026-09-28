@@ -70,3 +70,19 @@ describe('torneio grande (#571, pontos 7 e 8)', () => {
     expect(quarterPath(tree, 2).map((r) => [r.round, r.matches.map((x) => x.slot)])).toEqual([['R16', [3]]])
   })
 })
+
+describe('quadro por rondas (28 set)', () => {
+  it('uma coluna por ronda, pela ordem em que se joga, com os jogos pela ordem do quadro', () => {
+    const mk = (round, slot) => ({ id: `${round}${slot}`, round, bracket_slot: slot, status: 'marcado' })
+    const tree = buildTree([
+      { round: 'SF', matches: [mk('SF', 2), mk('SF', 1)] },
+      { round: 'QF', matches: [mk('QF', 3), mk('QF', 1), mk('QF', 4), mk('QF', 2)] },
+      { round: 'F', matches: [mk('F', 1)] },
+      { round: '3P', matches: [mk('3P', 1)] },
+    ])
+    expect(tree.columns.map((c) => c.round)).toEqual(['QF', 'SF', 'F'])
+    expect(tree.columns[0].matches.map((m) => m.slot)).toEqual([1, 2, 3, 4])
+    expect(tree.third.id).toBe('3P1')
+  })
+})
+
