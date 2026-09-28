@@ -33,3 +33,19 @@ export function roundsOf(games, players) {
   const current = rounds.find((r) => !r.done)
   return rounds.map((r) => ({ ...r, current: r === current }))
 }
+
+// ── Rondas editáveis (27 set, SPEC amigos-por-rondas, fim) ────────────────
+// O único cadeado é a ronda que já contou para o ranking. ↑ ↓ trocam a ronda
+// com a do lado — por isso nenhuma das duas pode ter contado (a que contou
+// não muda de lugar, nem arrastada).
+export function canMove(rounds, i, dir) {
+  const j = dir === 'up' ? i - 1 : i + 1
+  if (!rounds[i] || !rounds[j]) return false
+  return !rounds[i].counted && !rounds[j].counted
+}
+
+/** Os resultados que se perdem ao remover a ronda: um por campo com
+ *  resultado ou sets marcados ([{ game, sets: [a, b] }]). */
+export const roundResults = (round) => round.courts
+  .filter((g) => hasResult(g) || setsOf(g).length > 0)
+  .map((g) => ({ game: g, won: setsWon(g) }))

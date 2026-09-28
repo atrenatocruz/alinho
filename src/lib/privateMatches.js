@@ -308,9 +308,17 @@ export const recordFriendMatchResult = async (matchId, finalScore) => {
  *  criou; manda o formulário inteiro. Erros: not_allowed, format_locked. */
 export const updateFriendMatch = async (matchId, {
   scheduledDate, scheduledTime = null, location = null, locationLatitude = null, locationLongitude = null,
-  court = null, gameMinutes = null, scoringFormat, numSets = null,
+  court = null, gameMinutes = null, scoringFormat, numSets = null, rankedIntent, teamsMode,
 }) => {
+  // «Conta para o ranking?» e «Equipas» no editar (27 set, Dev 3): só vão
+  // quando a pessoa os muda — undefined fica de fora, e o editar continua a
+  // funcionar antes da função nova estar em produção. Erros: ranked_locked
+  // (já há jogos que contaram), teams_locked (já há resultados).
+  const extra = {}
+  if (rankedIntent !== undefined) extra.p_ranked_intent = rankedIntent
+  if (teamsMode !== undefined) extra.p_teams_mode = teamsMode
   const { error } = await supabase.rpc('update_friend_match', {
+    ...extra,
     p_match_id: matchId,
     p_scheduled_date: scheduledDate,
     p_scheduled_time: scheduledTime || null,
@@ -361,6 +369,21 @@ export const addFriendMatchRound = async (matchId, courts, roundNumber = null) =
  *  team_b }]). Erros: already_counted, same_person_twice, bad_courts. */
 export const setFriendMatchRoundTeams = async (matchId, roundNumber, courts) => {
   const { error } = await supabase.rpc('set_friend_match_round_teams', { p_match_id: matchId, p_round_number: roundNumber, p_courts: courts })
+  if (error) throw error
+}
+
+/** «Remover» uma ronda (27 set, Dev 3): apaga os jogos dela, com os
+ *  resultados, e as seguintes descem um número. A única ronda → a sessão
+ *  volta a formar as equipas. Erro: already_counted (contou para o ranking). */
+export const removeFriendMatchRound = async (matchId, roundNumber) => {
+  const { error } = await supabase.rpc('remove_friend_match_round', { p_match_id: matchId, p_round_number: roundNumber })
+  if (error) throw error
+}
+
+/** ↑ ↓: muda a ronda de lugar e renumera. Erros: already_counted (alguma
+ *  ronda que mude de número já contou), bad_move. */
+export const moveFriendMatchRound = async (matchId, roundNumber, toRound) => {
+  const { error } = await supabase.rpc('move_friend_match_round', { p_match_id: matchId, p_round_number: roundNumber, p_to_round: toRound })
   if (error) throw error
 }
 
