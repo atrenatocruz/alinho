@@ -14,7 +14,9 @@ function when(date, time, locale) {
   return [dayText(date, locale), time ? String(time).slice(0, 5) : null].filter(Boolean).join(' · ')
 }
 
-export default function FriendSessionsList() {
+/* `sessions={false}`: só os convites — a lista «Jogos entre amigos» mostra
+   os jogos sem equipas no seu cartão, com o «⋯» (28 set). */
+export default function FriendSessionsList({ sessions: showSessions = true }) {
   const { t, i18n } = useTranslation()
   const [invites, setInvites] = useState([])
   const [sessions, setSessions] = useState([])
@@ -33,7 +35,8 @@ export default function FriendSessionsList() {
     </Link>
   )
 
-  if (!invites.length && !sessions.length) return null
+  const shownSessions = showSessions ? sessions : []
+  if (!invites.length && !shownSessions.length) return null
   return (
     <div className="space-y-3">
       {/* Com equipas e resultados já feitos: o convite âmbar (27 set). */}
@@ -41,7 +44,7 @@ export default function FriendSessionsList() {
       {invites.filter((i) => !i.teams_set).map((i) => row(`i-${i.match_id}`, `/jogos-privados/sessao/${i.match_id}`,
         t('friends.invited_by', { name: i.creator_name || '' }),
         [when(i.scheduled_date, i.scheduled_time, i18n.language), i.location].filter(Boolean).join(' · ')))}
-      {sessions.map((s) => row(`s-${s.match_id}`, `/jogos-privados/sessao/${s.match_id}`,
+      {shownSessions.map((s) => row(`s-${s.match_id}`, `/jogos-privados/sessao/${s.match_id}`,
         when(s.scheduled_date, s.scheduled_time, i18n.language),
         s.pending > 0
           ? t('friends.waiting_answers', { count: s.pending })

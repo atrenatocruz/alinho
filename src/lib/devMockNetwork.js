@@ -253,6 +253,8 @@ const RPC_MOCKS = {
   // Um cartão por sessão na Home (27 set). mockHomeSession = 'before' |
   // 'running' | 'done': uma sessão de 6 a rodar (5 jogos) e um jogo de 4 no
   // mesmo dia.
+  // Cancelar/apagar da lista (Dev 3, migration_amigos_apagar_da_lista).
+  delete_friend_match: () => 'deleted',
   get_my_private_matches: () => localStorage.getItem('mockHomeSession') ? (() => {
     const mode = localStorage.getItem('mockHomeSession')
     const day = new Date().toISOString().slice(0, 10)
@@ -276,7 +278,13 @@ const RPC_MOCKS = {
     // (os sets estão em private_match_sets: 6-7, 2-6).
     const soloSets = row('pm-sets', 1, P.me, P.da, P.ru, P.cl, null, null, { session_id: null, scheduled_time: '18:00:00', location: 'Smash Padel Almada', game_number: null,
       score_a: 0, score_b: 2, winner_team: 'b', score_submitted_by: MOCK_ADMIN_USER_ID, score_submitted_by_name: 'Admin (Dev)' })
-    return [...session, solo, soloSets]
+    // Um jogo amigável já jogado, com «Jogador sem nome» (o do Francisco no
+    // Histórico, 28 set): apaga-se pelo «⋯».
+    const friendly = row('fs-amig', 1, P.me, P.cl, P.ru, P.da, 1, 0, { session_id: 'fs-amig', ranked_intent: false, my_points: null, my_rating_delta: null,
+      scheduled_date: '2026-09-26', scheduled_time: '10:00:00', location: 'Smash Padel Almada',
+      team_b_player1_id: null, team_b_player1_name: null, team_b_player1_guest_name: 'Jogador sem nome',
+      team_b_player2_id: null, team_b_player2_name: null, team_b_player2_guest_name: 'Jogador sem nome 2' })
+    return [...session, solo, soloSets, friendly]
   })() : agenda() ? AGENDA_PRIVATE_MATCHES() : (localStorage.getItem('mockPrivateInvite') === 'true' ? [
     {
       id: 'pm-invite', status: 'pending', ranked_intent: true, scheduled_date: '2026-09-20', scheduled_time: '19:00:00', location: 'Smash Padel Almada',
@@ -972,8 +980,14 @@ function lastMinuteRequest(table, url, method, body) {
 
 const TABLE_MOCKS = {
   // Os sets do jogo solto «pm-sets» do mockHomeSession (Editar resultado).
-  private_match_sets: (url) => (/pm-sets/.test(decodeURIComponent(url))
-    ? [{ set_number: 1, score_a: 6, score_b: 7 }, { set_number: 2, score_a: 2, score_b: 6 }] : []),
+  private_match_sets: (url) => {
+    const u = decodeURIComponent(url)
+    if (/in\.\(/.test(u)) {
+      // Os sets de vários jogos (o cartão da lista): um jogo por sets.
+      return /fs-home/.test(u) ? [{ private_match_id: 'fs-home', set_number: 1, score_a: 6, score_b: 4 }, { private_match_id: 'fs-home', set_number: 2, score_a: 6, score_b: 3 }] : []
+    }
+    return /pm-sets/.test(u) ? [{ set_number: 1, score_a: 6, score_b: 7 }, { set_number: 2, score_a: 2, score_b: 6 }] : []
+  },
   // localStorage.mockJoinRequests = 'true' — 2 pedidos para entrar no Dev Org,
   // para ver o aviso no sino (Francisco, 19 set: já não há faixa na Home).
   membership_requests: () => (localStorage.getItem('mockJoinRequests') === 'true' ? [

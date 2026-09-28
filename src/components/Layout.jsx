@@ -478,11 +478,12 @@ export default function Layout({ children }) {
   }
 
   // O convite fica até se responder (a base de dados apaga-o ao responder);
-  // o «<Nome> não vai» é só para saber: tocar-lhe tira-o, como os outros
-  // avisos. Antes ficava lá para sempre (Francisco, 28 set).
+  // o «<Nome> não vai», «cancelou» e «apagou» são só para saber: tocar-lhes
+  // tira-os, como os outros avisos. Antes ficavam lá para sempre (Francisco,
+  // 28 set).
   const openFriendNotice = (notice) => {
     setShowNotifications(false)
-    if (notice.kind !== 'friend_match_declined') return
+    if (notice.kind === 'friend_match_invite') return
     setFriendNotices((list) => list.filter((n) => n.id !== notice.id))
     markNotificationsRead([notice.id]).catch((error) => console.error('Error marking notice as read:', error))
   }

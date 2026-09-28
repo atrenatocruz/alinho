@@ -5,11 +5,12 @@ import { useTranslation } from 'react-i18next'
 import { BackBar } from '../components/ui'
 import { ArrowLeft, Plus, Trophy, Copy, Check, Trash2, Calendar, MapPin } from 'lucide-react'
 import {
-  getMyPrivateMatches, submitPrivateMatchScore, confirmPrivateMatch, deletePrivateMatch, respondToPrivateMatch, privateMatchCanConfirm } from '../lib/privateMatches'
+  getMyPrivateMatches, listMyFriendSessions, submitPrivateMatchScore, confirmPrivateMatch, deletePrivateMatch, respondToPrivateMatch, privateMatchCanConfirm } from '../lib/privateMatches'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { eventsFromPrivateMatches } from '../lib/agenda'
-import { FriendSessionCard } from '../components/agenda/EventCard'
+import { groupFriendGames, friendGameFacts } from '../lib/friendGames'
+import { loadSetsByGame } from '../lib/friendMatchDelete'
+import FriendGameRow from '../components/friends/FriendGameRow'
 import { PrimaryButton, EmptyState } from '../components/ui'
 import { formatDate } from '../lib/formatDate'
 import { describeError } from '../lib/errors'
@@ -147,8 +148,12 @@ const teamLabel = (m, prefix, t) => {
 export default function PrivateMatches() {
   const goBack = useGoBack('/perfil')
   const { t, i18n } = useTranslation()
-  const { profile, memberships } = useAuth()
+  const { profile } = useAuth()
   const [matches, setMatches] = useState([])
+  // Jogos ainda sem equipas (list_my_friend_sessions) e os sets de cada
+  // jogo, para o cartão dizer «6-4 6-3».
+  const [noTeams, setNoTeams] = useState([])
+  const [setsById, setSetsById] = useState({})
   const [loading, setLoading] = useState(true)
   // Pending matches whose already-submitted score is being corrected.
   const [editingScoreIds, setEditingScoreIds] = useState(new Set())
@@ -186,8 +191,12 @@ export default function PrivateMatches() {
 
   const load = useCallback(async () => {
     try {
-      const data = await getMyPrivateMatches()
+      const [data, sessions] = await Promise.all([getMyPrivateMatches(), listMyFriendSessions().catch(() => [])])
       setMatches(data)
+      setNoTeams(sessions)
+      loadSetsByGame(data.filter((m) => m.score_a != null).map((m) => m.id))
+        .then(setSetsById)
+        .catch((error) => console.error('Error loading sets:', error))
     } catch (error) {
       console.error('Error loading private matches:', error)
     } finally {
@@ -250,20 +259,26 @@ export default function PrivateMatches() {
     }
   }
 
-  // Os jogos do desenho novo (convidar primeiro, equipas depois — têm
-  // session_id) abrem no ecrã deles, com editar, rondas e sets: aqui um
-  // cartão por sessão, o mesmo da Home. O cartão de sempre, com o resultado
-  // aqui dentro, fica só para os jogos soltos antigos (Francisco, 28 set:
-  // «porque não consigo editar o jogo… só editar o resultado»).
-  const openSessionIds = new Set(matches.filter((m) => m.session_id && m.status === 'pending').map((m) => m.session_id))
-  const sessionEvents = eventsFromPrivateMatches(
-    matches.filter((m) => openSessionIds.has(m.session_id)),
-    profile?.id,
-    new Map((memberships || []).map((ms) => [ms.organization_id,
-      { name: ms.organization?.name, kind: ms.organization?.kind, logo: ms.organization?.group_logo_url }])),
-  ).sort((a, b) => a.startsAt - b.startsAt)
+  // Um cartão por jogo entre amigos (REGRAS.md ponto 1, Francisco, 28 set):
+  // os do desenho novo (têm session_id) abrem no ecrã deles, com editar,
+  // rondas e sets. O cartão de sempre, com o resultado aqui dentro, fica só
+  // para os jogos soltos antigos por confirmar. Quem criou tem o «⋯»:
+  // cancelar ou apagar (2026-09-28-amigos-apagar-da-lista).
+  const groups = groupFriendGames(matches.filter((m) => m.session_id || m.status === 'confirmed'))
+    .map((g) => ({ ...g, facts: friendGameFacts(g, setsById) }))
+  // «A seguir» é só o que ainda não aconteceu ou está a decorrer (hoje);
+  // acabado, ou de um dia que já passou, vai para o Histórico (UX, 28 set).
+  const now = new Date()
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  const isPast = (g) => g.facts.finished || Boolean(g.facts.date && g.facts.date < today)
+  const upcoming = groups.filter((g) => !isPast(g))
+    .sort((a, b) => `${a.facts.date}${a.facts.time}`.localeCompare(`${b.facts.date}${b.facts.time}`))
+  const finishedGroups = groups.filter(isPast)
   const pending = matches.filter((m) => m.status === 'pending' && !m.session_id)
-  const confirmed = matches.filter((m) => m.status === 'confirmed')
+  const reload = () => { load() }
+  const noTeamsLine = (s) => (s.pending > 0
+    ? t('friends.waiting_answers', { count: s.pending })
+    : s.is_creator ? t('friends.form_teams_now') : t('friends.waiting_teams'))
 
   if (loading) {
     return (
@@ -286,12 +301,26 @@ export default function PrivateMatches() {
         </Link>
       </div>
 
-      {/* Convites por responder e jogos à espera de equipas (#342). */}
-      <FriendSessionsList />
+      {/* Convites por responder (#342). */}
+      <FriendSessionsList sessions={false} />
 
-      {sessionEvents.map((event) => (
-        <FriendSessionCard key={event.key} event={event} userId={profile?.id} />
-      ))}
+      {(noTeams.length > 0 || upcoming.length > 0) && (
+        <div>
+          <h3 className="text-lg text-ink-900 mb-3">{t('friends.upcoming')}</h3>
+          <div className="space-y-2.5">
+            {noTeams.map((s) => (
+              <FriendGameRow key={`nt-${s.match_id}`} id={s.match_id} to={`/jogos-privados/sessao/${s.match_id}`}
+                facts={{ date: s.scheduled_date, time: s.scheduled_time ? String(s.scheduled_time).slice(0, 5) : null, location: s.location, isCreator: s.is_creator, hasResults: false, results: [], people: s.people }}
+                line={noTeamsLine(s)} pending={s.pending} creatorName={profile?.name || ''} onChanged={reload} />
+            ))}
+            {upcoming.map((g) => (
+              <FriendGameRow key={g.id} id={g.id} to={g.isSession ? `/jogos-privados/sessao/${g.id}` : null} facts={g.facts}
+                line={g.facts.ranked ? t('agenda.friends_ranked') : t('gamedetails.badge_friendly')}
+                creatorName={profile?.name || ''} onChanged={reload} />
+            ))}
+          </div>
+        </div>
+      )}
 
       {pending.length > 0 && (
         <div>
@@ -414,7 +443,7 @@ export default function PrivateMatches() {
 
       <div>
         <h3 className="text-lg text-ink-900 mb-3">{t('privatematches.history')}</h3>
-        {confirmed.length === 0 ? (
+        {finishedGroups.length === 0 ? (
           <EmptyState
             icon={Trophy}
             title={t('privatematches.empty_title')}
@@ -422,23 +451,9 @@ export default function PrivateMatches() {
           />
         ) : (
           <div className="space-y-2.5">
-            {confirmed.map((m) => (
-              <div key={m.id} className="card flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="font-extrabold text-ink-900 text-sm truncate">{teamLabel(m, 'team_a', t)} vs {teamLabel(m, 'team_b', t)}</p>
-                  <p className="text-[11px] text-muted mt-0.5">
-                    {m.my_points != null
-                      ? t('privatematches.history_score_points', { scoreA: m.score_a, scoreB: m.score_b, points: m.my_points })
-                      : t('privatematches.history_score_friendly', { scoreA: m.score_a, scoreB: m.score_b })}
-                    {m.winner_team === 'draw' && <> · {t('privatematches.draw_label')}</>}
-                  </p>
-                </div>
-                {m.my_rating_delta != null && (
-                  <span className={`shrink-0 text-sm font-extrabold tabular-nums ${m.my_rating_delta >= 0 ? 'text-ok' : 'text-danger'}`}>
-                    {m.my_rating_delta >= 0 ? '+' : ''}{Math.round(m.my_rating_delta)} {t('privatematches.ranking_unit')}
-                  </span>
-                )}
-              </div>
+            {finishedGroups.map((g) => (
+              <FriendGameRow key={g.id} id={g.id} to={g.isSession ? `/jogos-privados/sessao/${g.id}` : null} facts={g.facts}
+                creatorName={profile?.name || ''} onChanged={reload} />
             ))}
           </div>
         )}
