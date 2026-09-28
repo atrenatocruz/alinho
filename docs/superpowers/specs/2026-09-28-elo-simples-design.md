@@ -14,6 +14,7 @@ Ao ritmo do piloto (1 mix por semana, 4 jogos por mix), o motor #440 mudava mais
 | Repartição dentro da dupla | **Igual.** Cada um leva `K_próprio × (S − E)`. |
 | Prémios | **Nenhum.** Sai o prémio da noite, a noite perfeita, a taxa por surpresa, a trava de domínio e o prémio do campeão de torneio. O prémio da noite é assunto de XP / pontos de clube (já existem). |
 | Soma zero | Deixa de ser forçada. É soma zero por construção quando os quatro estão a K 20; com um novato a K 40 não é, e isso é aceite (+18 pontos de inflação por 10 novos). |
+| Teto de ganho | **200 acima da média da dupla adversária → ganho 0**; perder custa o normal. Sem isto, quem ganha sempre num grupo mais fraco sobe sem fim (1821 ao fim de um ano no simulado; com o teto estabiliza em ~1250). 200 e não 300 para o empurrão "joga com o teu nível" chegar um nível mais cedo (2 meses vs 6). "Pontitos" acima do teto (+1 por vitória) foram rejeitados: +200 por ano, o problema voltava. |
 | Convidado sem conta | Não entra na média nem recebe; os outros movem normalmente. Sai a regra "dupla com convidado move metade". |
 | Provisório na UI | 12 jogos (era 8), alinhado com a janela do K 40. |
 | Admin corrigir o nível de entrada | **Adiado** (Ruben, 28 set). É a ferramenta que resolve o erro grosseiro numa noite; volta a ser discutida à parte. |

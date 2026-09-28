@@ -18,7 +18,10 @@
 --   · Um lugar sem conta (convidado por nome) não conta para a média nem
 --     recebe nada; os outros movem normalmente. Acaba a regra «dupla com
 --     convidado move metade».
---   · Chão em 0. Sem teto. Arredondamento a 2 casas por pessoa.
+--   · 200 ou mais acima da média da dupla adversária, ganhar dá 0 pontos
+--     (perder custa o normal). Trava quem só ganha num grupo mais fraco de
+--     subir sem fim; para subir, joga com o seu nível.
+--   · Chão em 0. Sem teto absoluto. Arredondamento a 2 casas por pessoa.
 --
 -- O QUE NÃO MUDA
 --   · Quem entra e como (complete_rating_onboarding, âncoras 600–1900).
@@ -92,6 +95,13 @@ BEGIN
     v_s := CASE WHEN i <= 2 THEN p_s_a ELSE 1 - p_s_a END;
     v_e := CASE WHEN i <= 2 THEN v_ea ELSE 1 - v_ea END;
     v_d := round(v_k * (v_s - v_e), 2);
+    -- Regra 7: 200 ou mais acima da média dos adversários, ganhar não dá
+    -- nada; perder continua a custar o normal. Sem isto, quem ganha sempre
+    -- num grupo mais fraco sobe sem fim (a média da dupla nunca deixa o
+    -- esperado chegar a 1). Só sobe jogando com o seu nível.
+    IF v_d > 0 AND p_r[i] - (CASE WHEN i <= 2 THEN v_rb ELSE v_ra END) >= 200 THEN
+      v_d := 0;
+    END IF;
     -- Chão em 0: nunca se perde mais do que se tem.
     IF v_d < 0 THEN
       v_d := -LEAST(-v_d, GREATEST(p_r[i], 0));
@@ -308,4 +318,8 @@ REVOKE ALL ON FUNCTION apply_tournament_elo(UUID, UUID) FROM public, anon, authe
 --     → {10.00, NULL, -10.00, -10.00}           (lugar sem conta: ignorado)
 --   SELECT elo_jogo_deltas(ARRAY[5,1800,500,500], ARRAY[30,30,30,30], 0);
 --     → {-5.00, -18.21, 18.21, 18.21}           (chão em 0 para quem tem 5)
+--   SELECT elo_jogo_deltas(ARRAY[1250,950,1000,1000], ARRAY[30,30,30,30], 1);
+--     → {0.00, 7.20, -7.20, -7.20}              (1250 está 250 acima: ganha 0; o parceiro o normal)
+--   SELECT elo_jogo_deltas(ARRAY[1250,950,1000,1000], ARRAY[30,30,30,30], 0);
+--     → {-12.80, -12.80, 12.80, 12.80}          (perder custa na mesma)
 --   SELECT proname FROM pg_proc WHERE proname IN ('elo_opcoes','elo_k_factor');   -- vazio

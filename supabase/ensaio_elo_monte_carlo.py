@@ -20,7 +20,8 @@ Modelos:
   antigo    #440: K 40/30/20 @8/20, soma zero, repartição 35/65, prémio
             da noite +1 % (+0,5 % noite perfeita) pago por surpresa, trava
   simples   migration_elo_simples.sql: K 20, K 40 nos primeiros 12 jogos só
-            para o próprio, cada um da dupla leva o mesmo, sem prémio
+            para o próprio, cada um da dupla leva o mesmo, sem prémio, e
+            ganho 0 a 200+ acima da média dos adversários (regra 7)
 """
 import random
 import statistics as st
@@ -62,9 +63,17 @@ def jogo_antigo(r, g, s_a):
     return out
 
 
-def jogo_simples(r, g, s_a, k_novo=40, janela=12):
-    e = E((r[0] + r[1]) / 2, (r[2] + r[3]) / 2)
-    return [(k_novo if g[i] < janela else 20) * ((s_a - e) if i < 2 else (e - s_a)) for i in range(4)]
+def jogo_simples(r, g, s_a, k_novo=40, janela=12, teto=200):
+    ra, rb = (r[0] + r[1]) / 2, (r[2] + r[3]) / 2
+    e = E(ra, rb)
+    out = []
+    for i in range(4):
+        d = (k_novo if g[i] < janela else 20) * ((s_a - e) if i < 2 else (e - s_a))
+        # Regra 7: 200+ acima da média dos adversários, ganhar dá 0.
+        if teto and d > 0 and r[i] - (rb if i < 2 else ra) >= teto:
+            d = 0.0
+        out.append(d)
+    return out
 
 
 # ── uma noite de mix: 8 pessoas, 4 duplas fixas, 4 jogos ─────────────────
@@ -125,8 +134,9 @@ def declarado(t, rnd, p_acima=0.25):
 MODELOS = {
     'antigo (#440, com prémio)': (jogo_antigo, True),
     'antigo sem prémio': (jogo_antigo, False),
-    'simples (K20, K40×12 só o próprio)': (jogo_simples, False),
-    'K20 puro': (lambda r, g, s: jogo_simples(r, g, s, 20, 0), False),
+    'simples (K20, K40×12, teto 200)': (jogo_simples, False),
+    'simples sem teto': (lambda r, g, s: jogo_simples(r, g, s, teto=0), False),
+    'K20 puro': (lambda r, g, s: jogo_simples(r, g, s, 20, 0, 0), False),
 }
 
 
@@ -217,7 +227,7 @@ def ensaio_extremos(seeds=200):
 
 def ensaio_invicto(seeds=50):
     print("\n== INVICTO: começa a 850, ganha todos os jogos, campo de cima (950–1050), 1 mix × 4 jogos/semana ==")
-    print(f"{'modelo':38} {'2 meses':>8} {'6 meses':>8} {'1 ano':>8}")
+    print(f"{'modelo':38} {'2 meses':>8} {'6 meses':>8} {'1 ano':>8} {'2 anos':>8}")
     for nm, (motor, _) in MODELOS.items():
         if 'prémio' in nm and 'sem' not in nm:
             continue
@@ -225,15 +235,15 @@ def ensaio_invicto(seeds=50):
         for s in range(seeds):
             rnd = random.Random(s)
             rx, gx, out = 850.0, 0, {}
-            for wk in range(1, 53):
+            for wk in range(1, 105):
                 for _ in range(4):
                     rp = rnd.uniform(950, 1050)
                     o1, o2 = rnd.uniform(950, 1050), rnd.uniform(950, 1050)
                     rx += motor([rx, rp, o1, o2], [gx, 30, 30, 30], 1.0)[0]; gx += 1
-                if wk in (8, 26, 52):
+                if wk in (8, 26, 52, 104):
                     out[wk] = rx
             acc.append(out)
-        print(f"{nm:38} " + " ".join(f"{st.median(a[w] for a in acc):8.0f}" for w in (8, 26, 52)))
+        print(f"{nm:38} " + " ".join(f"{st.median(a[w] for a in acc):8.0f}" for w in (8, 26, 52, 104)))
 
 
 if __name__ == '__main__':
