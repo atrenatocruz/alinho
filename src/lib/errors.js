@@ -54,6 +54,8 @@ export function errorKind(error) {
     return 'org_name_taken'
   }
   if (code === '23505' || /duplicate key/i.test(msg)) return 'duplicate'
+  // Resultado antes da hora do jogo (Dev 3, migration_resultado_so_a_partir_da_hora.sql).
+  if (/(^|\W)too_early$/.test(msg)) return 'too_early'
 
   // RAISE EXCEPTION das nossas funções — frases já escritas para o utilizador
   if (code === 'P0001' && msg) return 'business'
@@ -96,6 +98,7 @@ export function describeError(t, error, fallbackKey = 'errors.generic') {
     case 'not_ready': return t('errors.not_ready')
     case 'permission': return t('errors.permission')
     case 'org_name_taken': return t('errors.org_name_taken')
+    case 'too_early': return t('errors.too_early')
     case 'duplicate': return t('errors.duplicate')
     case 'business': return sentence(error.message)
     default: {

@@ -253,6 +253,8 @@ const RPC_MOCKS = {
   // Um cartão por sessão na Home (27 set). mockHomeSession = 'before' |
   // 'running' | 'done': uma sessão de 6 a rodar (5 jogos) e um jogo de 4 no
   // mesmo dia.
+  // Cancelar/apagar da lista (Dev 3, migration_amigos_apagar_da_lista).
+  delete_friend_match: () => 'deleted',
   get_my_private_matches: () => localStorage.getItem('mockHomeSession') ? (() => {
     const mode = localStorage.getItem('mockHomeSession')
     const day = new Date().toISOString().slice(0, 10)
@@ -262,7 +264,7 @@ const RPC_MOCKS = {
       team_a_player1_id: a1[0], team_a_player1_name: a1[1], team_a_player1_status: 'accepted', team_a_player2_id: a2[0], team_a_player2_name: a2[1], team_a_player2_status: 'accepted',
       team_b_player1_id: b1[0], team_b_player1_name: b1[1], team_b_player1_status: 'accepted', team_b_player2_id: b2[0], team_b_player2_name: b2[1], team_b_player2_status: 'accepted',
       session_id: 'fs-home', game_number: n, organization_id: null, game_minutes: null, started_at: null, pairing_mode: 'rotating',
-      my_rating_delta: sa == null ? null : (sa > sb ? 6 : -4), ...extra })
+      my_rating_delta: sa == null ? null : (sa > sb ? 6 : -4), my_points: sa == null ? null : (sa > sb ? 3 : 1), ...extra })
     const sc = (n) => (mode === 'done' || (mode === 'running' && n <= 2) ? [2, n % 2] : [null, null])
     const session = [
       row('fs-home', 1, P.me, P.cl, P.re, P.ru, ...sc(1)),
@@ -272,7 +274,17 @@ const RPC_MOCKS = {
       row('fs-h5', 5, P.me, P.re, P.ru, P.ca, ...sc(5)),
     ]
     const solo = row('pm-solo', 1, P.me, P.da, P.ru, P.cl, null, null, { session_id: null, scheduled_time: '19:00:00', location: 'Smash Padel Almada', game_number: null })
-    return [...session, solo]
+    // Um jogo solto antigo com resultado por sets à espera da outra equipa
+    // (os sets estão em private_match_sets: 6-7, 2-6).
+    const soloSets = row('pm-sets', 1, P.me, P.da, P.ru, P.cl, null, null, { session_id: null, scheduled_time: '18:00:00', location: 'Smash Padel Almada', game_number: null,
+      score_a: 0, score_b: 2, winner_team: 'b', score_submitted_by: MOCK_ADMIN_USER_ID, score_submitted_by_name: 'Admin (Dev)' })
+    // Um jogo amigável já jogado, com «Jogador sem nome» (o do Francisco no
+    // Histórico, 28 set): apaga-se pelo «⋯».
+    const friendly = row('fs-amig', 1, P.me, P.cl, P.ru, P.da, 1, 0, { session_id: 'fs-amig', ranked_intent: false, my_points: null, my_rating_delta: null,
+      scheduled_date: '2026-09-26', scheduled_time: '10:00:00', location: 'Smash Padel Almada',
+      team_b_player1_id: null, team_b_player1_name: null, team_b_player1_guest_name: 'Jogador sem nome',
+      team_b_player2_id: null, team_b_player2_name: null, team_b_player2_guest_name: 'Jogador sem nome 2' })
+    return [...session, solo, soloSets, friendly]
   })() : agenda() ? AGENDA_PRIVATE_MATCHES() : (localStorage.getItem('mockPrivateInvite') === 'true' ? [
     {
       id: 'pm-invite', status: 'pending', ranked_intent: true, scheduled_date: '2026-09-20', scheduled_time: '19:00:00', location: 'Smash Padel Almada',
@@ -448,8 +460,13 @@ const RPC_MOCKS = {
       ]
       const counted = localStorage.getItem('mockFriendCounted') === 'true'
       if (counted) games[0].counts = true
+      // mockFriendStarted = 'false': o jogo é daqui a 6 dias, ainda sem
+      // resultados, e o «Marcar» fica apagado (resultado só a partir da hora,
+      // 28 set). Por omissão começou ontem, com os resultados acima.
+      const notStarted = localStorage.getItem('mockFriendStarted') === 'false'
+      if (notStarted) games.forEach((x) => Object.assign(x, { sets: [], score_a: null, score_b: null, winner_team: null }))
       return {
-        match: { id: 'fs-1', scheduled_date: new Date(Date.now() + 6 * 86400000).toISOString().slice(0, 10), scheduled_time: '10:00:00', location: 'Clube Exemplo', court: null,
+        match: { id: 'fs-1', scheduled_date: new Date(Date.now() + (notStarted ? 6 : -1) * 86400000).toISOString().slice(0, 10), scheduled_time: '10:00:00', location: 'Clube Exemplo', court: null,
           teams_mode: 'app', pairing_mode: 'rotating', scoring_format: 'sets', num_sets: 3, game_minutes: null, teams_set_at: new Date().toISOString(),
           ranked_intent: true, ranking_locked: counted },
         invitees, games,
@@ -967,6 +984,15 @@ function lastMinuteRequest(table, url, method, body) {
 }
 
 const TABLE_MOCKS = {
+  // Os sets do jogo solto «pm-sets» do mockHomeSession (Editar resultado).
+  private_match_sets: (url) => {
+    const u = decodeURIComponent(url)
+    if (/in\.\(/.test(u)) {
+      // Os sets de vários jogos (o cartão da lista): um jogo por sets.
+      return /fs-home/.test(u) ? [{ private_match_id: 'fs-home', set_number: 1, score_a: 6, score_b: 4 }, { private_match_id: 'fs-home', set_number: 2, score_a: 6, score_b: 3 }] : []
+    }
+    return /pm-sets/.test(u) ? [{ set_number: 1, score_a: 6, score_b: 7 }, { set_number: 2, score_a: 2, score_b: 6 }] : []
+  },
   // localStorage.mockJoinRequests = 'true' — 2 pedidos para entrar no Dev Org,
   // para ver o aviso no sino (Francisco, 19 set: já não há faixa na Home).
   membership_requests: () => (localStorage.getItem('mockJoinRequests') === 'true' ? [

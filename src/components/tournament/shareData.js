@@ -160,3 +160,32 @@ export function podiumShare({ tournament, results, myName, hidingIds = [], t, la
   }, t)
   return { data, text, filenameParts: [tournament?.name, c.code, `${place}o-lugar`] }
 }
+
+/** Os 3.º lugares de uma categoria: `thirds` (Dev 3, 28 set — sem jogo do
+ *  3.º lugar são as duas duplas que perderam as meias), ou o `third` antigo. */
+export const thirdsOf = (c) => (Array.isArray(c?.thirds) ? c.thirds : c?.third ? [c.third] : [])
+
+/** A imagem «Campeões» (revisão do torneio, 28 set, peça 4): o cartão do
+ *  Pódio na versão de quem não jogou — «Campeões» no lugar de «<n>.º lugar»
+ *  e as três duplas sem destaque. Serve ao clube e a quem visita. */
+export function championsShare({ tournament, category, hidingIds = [], t, lang }) {
+  if (!category?.champion) return null
+  const hides = new Set(hidingIds)
+  const hidden = `${t('tshare.pair_hidden')} ${category.code}`
+  const name = (team) => pairShort(hides.has(team.entry_id) ? { ...team, hides_results: true } : team, hidden)
+  const thirds = thirdsOf(category)
+  const rows = [
+    { place: 1, pair: name(category.champion) },
+    category.runner_up ? { place: 2, pair: name(category.runner_up) } : null,
+    thirds.length ? { place: 3, pair: thirds.map(name).join(' · ') } : null,
+  ].filter(Boolean)
+  const data = {
+    kicker: [tournament?.name, category.code].filter(Boolean).join(' · '),
+    date: shortDate(tournament?.ends_on ? `${tournament.ends_on}T12:00:00Z` : null, lang),
+    title: t('tshare.champions'),
+    rows,
+  }
+  const text = t('tshare.text_champions', { category: category.code, tournament: tournament?.name, pair: rows[0].pair })
+  return { data, text, filenameParts: [tournament?.name, category.code, 'campeoes'] }
+}
+

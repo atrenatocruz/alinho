@@ -217,6 +217,8 @@ export const TOURNAMENT_RPC_MOCKS = {
           champion: t2('Barros / Antunes', ['Francisco Barros', 'Hugo Antunes']),
           runner_up: t2('Lima / Reis', ['Pedro Lima', 'Nuno Reis']),
           third: null, prize_first: '2 garrafas de bolas · voucher', prize_second: '1 garrafa de bolas',
+          // Sem jogo do 3.º lugar: as duas que perderam as meias (Dev 3, 28 set).
+          thirds: [t2('Cruz / Brito', ['Rui Cruz', 'Luís Brito']), t2('Gomes / Pais', ['Ana Gomes', 'Rita Pais'])],
           // O Rui Costa torceu o tornozelo nos grupos; entrou o Hugo Antunes
           // e jogou a final. Os três ficam campeões (Francisco, 23 set).
           podium_players: [
@@ -230,6 +232,7 @@ export const TOURNAMENT_RPC_MOCKS = {
           champion: t2('Silva / Lopes', ['Marta Silva', 'Tiago Lopes']),
           runner_up: t2('Francisco Barros / Silva', ['Francisco Barros', 'Marta Silva']),
           third: t2('Reis / Ana', ['Nuno Reis', 'Ana Moreira']), prize_first: null, prize_second: null,
+          thirds: [t2('Reis / Ana', ['Nuno Reis', 'Ana Moreira'])],
           podium_players: [
             pp('Marta Silva', 1, true, 4, 4),
             pp('Tiago Lopes', 1, true, 4, 4),

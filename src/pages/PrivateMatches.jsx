@@ -5,8 +5,13 @@ import { useTranslation } from 'react-i18next'
 import { BackBar } from '../components/ui'
 import { ArrowLeft, Plus, Trophy, Copy, Check, Trash2, Calendar, MapPin } from 'lucide-react'
 import {
-  getMyPrivateMatches, submitPrivateMatchScore, confirmPrivateMatch, deletePrivateMatch, respondToPrivateMatch, privateMatchCanConfirm } from '../lib/privateMatches'
+  getMyPrivateMatches, listMyFriendSessions, submitPrivateMatchScore, confirmPrivateMatch, deletePrivateMatch, respondToPrivateMatch, privateMatchCanConfirm } from '../lib/privateMatches'
 import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../lib/supabase'
+import { groupFriendGames, friendGameFacts, beforeStart } from '../lib/friendGames'
+import { dayText } from '../components/friends/dayText'
+import { loadSetsByGame } from '../lib/friendMatchDelete'
+import FriendGameRow from '../components/friends/FriendGameRow'
 import { PrimaryButton, EmptyState } from '../components/ui'
 import { formatDate } from '../lib/formatDate'
 import { describeError } from '../lib/errors'
@@ -146,6 +151,10 @@ export default function PrivateMatches() {
   const { t, i18n } = useTranslation()
   const { profile } = useAuth()
   const [matches, setMatches] = useState([])
+  // Jogos ainda sem equipas (list_my_friend_sessions) e os sets de cada
+  // jogo, para o cartão dizer «6-4 6-3».
+  const [noTeams, setNoTeams] = useState([])
+  const [setsById, setSetsById] = useState({})
   const [loading, setLoading] = useState(true)
   // Pending matches whose already-submitted score is being corrected.
   const [editingScoreIds, setEditingScoreIds] = useState(new Set())
@@ -155,26 +164,40 @@ export default function PrivateMatches() {
   const [submittingId, setSubmittingId] = useState(null)
   const [respondingId, setRespondingId] = useState(null)
 
-  const toggleEditScore = (match) => {
-    setEditingScoreIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(match.id)) {
+  const toggleEditScore = async (match) => {
+    if (editingScoreIds.has(match.id)) {
+      setEditingScoreIds((prev) => {
+        const next = new Set(prev)
         next.delete(match.id)
-      } else {
-        next.add(match.id)
-        // Prefill from the stored score so opening "corrigir" doesn't start
-        // from a blank pair — only meaningful for the single-pair formats,
-        // harmless (unused) for the sets ones.
-        setScores((prevScores) => ({ ...prevScores, [match.id]: { a: String(match.score_a ?? ''), b: String(match.score_b ?? '') } }))
-      }
-      return next
-    })
+        return next
+      })
+      return
+    }
+    // Prefill from the stored score so opening "corrigir" doesn't start
+    // from a blank pair. Nos sets, os sets gravados: sem isto o «Editar
+    // resultado» abria vazio e parecia que o resultado tinha ido a zero
+    // (Francisco, 28 set — o 0-2 eram os sets ganhos, 6-7 e 2-6).
+    let sets = null
+    if ((match.scoring_format || 'pontos_simples') === 'sets') {
+      const { data } = await supabase
+        .from('private_match_sets')
+        .select('set_number, score_a, score_b')
+        .eq('private_match_id', match.id)
+        .order('set_number')
+      sets = (data || []).map((s) => ({ a: String(s.score_a), b: String(s.score_b) }))
+    }
+    setScores((prevScores) => ({ ...prevScores, [match.id]: { a: String(match.score_a ?? ''), b: String(match.score_b ?? ''), sets } }))
+    setEditingScoreIds((prev) => new Set(prev).add(match.id))
   }
 
   const load = useCallback(async () => {
     try {
-      const data = await getMyPrivateMatches()
+      const [data, sessions] = await Promise.all([getMyPrivateMatches(), listMyFriendSessions().catch(() => [])])
       setMatches(data)
+      setNoTeams(sessions)
+      loadSetsByGame(data.filter((m) => m.score_a != null).map((m) => m.id))
+        .then(setSetsById)
+        .catch((error) => console.error('Error loading sets:', error))
     } catch (error) {
       console.error('Error loading private matches:', error)
     } finally {
@@ -237,8 +260,26 @@ export default function PrivateMatches() {
     }
   }
 
-  const pending = matches.filter((m) => m.status === 'pending')
-  const confirmed = matches.filter((m) => m.status === 'confirmed')
+  // Um cartão por jogo entre amigos (REGRAS.md ponto 1, Francisco, 28 set):
+  // os do desenho novo (têm session_id) abrem no ecrã deles, com editar,
+  // rondas e sets. O cartão de sempre, com o resultado aqui dentro, fica só
+  // para os jogos soltos antigos por confirmar. Quem criou tem o «⋯»:
+  // cancelar ou apagar (2026-09-28-amigos-apagar-da-lista).
+  const groups = groupFriendGames(matches.filter((m) => m.session_id || m.status === 'confirmed'))
+    .map((g) => ({ ...g, facts: friendGameFacts(g, setsById) }))
+  // «A seguir» é só o que ainda não aconteceu ou está a decorrer (hoje);
+  // acabado, ou de um dia que já passou, vai para o Histórico (UX, 28 set).
+  const now = new Date()
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  const isPast = (g) => g.facts.finished || Boolean(g.facts.date && g.facts.date < today)
+  const upcoming = groups.filter((g) => !isPast(g))
+    .sort((a, b) => `${a.facts.date}${a.facts.time}`.localeCompare(`${b.facts.date}${b.facts.time}`))
+  const finishedGroups = groups.filter(isPast)
+  const pending = matches.filter((m) => m.status === 'pending' && !m.session_id)
+  const reload = () => { load() }
+  const noTeamsLine = (s) => (s.pending > 0
+    ? t('friends.waiting_answers', { count: s.pending })
+    : s.is_creator ? t('friends.form_teams_now') : t('friends.waiting_teams'))
 
   if (loading) {
     return (
@@ -261,8 +302,26 @@ export default function PrivateMatches() {
         </Link>
       </div>
 
-      {/* Convites por responder e jogos à espera de equipas (#342). */}
-      <FriendSessionsList />
+      {/* Convites por responder (#342). */}
+      <FriendSessionsList sessions={false} />
+
+      {(noTeams.length > 0 || upcoming.length > 0) && (
+        <div>
+          <h3 className="text-lg text-ink-900 mb-3">{t('friends.upcoming')}</h3>
+          <div className="space-y-2.5">
+            {noTeams.map((s) => (
+              <FriendGameRow key={`nt-${s.match_id}`} id={s.match_id} to={`/jogos-privados/sessao/${s.match_id}`}
+                facts={{ date: s.scheduled_date, time: s.scheduled_time ? String(s.scheduled_time).slice(0, 5) : null, location: s.location, isCreator: s.is_creator, hasResults: false, results: [], people: s.people }}
+                line={noTeamsLine(s)} pending={s.pending} creatorName={profile?.name || ''} onChanged={reload} />
+            ))}
+            {upcoming.map((g) => (
+              <FriendGameRow key={g.id} id={g.id} to={g.isSession ? `/jogos-privados/sessao/${g.id}` : null} facts={g.facts}
+                line={g.facts.ranked ? t('agenda.friends_ranked') : t('gamedetails.badge_friendly')}
+                creatorName={profile?.name || ''} onChanged={reload} />
+            ))}
+          </div>
+        </div>
+      )}
 
       {pending.length > 0 && (
         <div>
@@ -340,11 +399,18 @@ export default function PrivateMatches() {
                         {t('privatematches.edit_score')}
                       </button>
                     </>
+                  ) : beforeStart(m.scheduled_date, m.scheduled_time) ? (
+                    // Antes da hora do jogo não se marca resultado (Francisco, 28 set).
+                    <p className="text-sm text-muted mt-3">{t('friends.results_from', {
+                      time: m.scheduled_time ? m.scheduled_time.slice(0, 5) : '00:00',
+                      day: dayText(m.scheduled_date, i18n.language).toLocaleLowerCase(i18n.language),
+                    })}</p>
                   ) : allFilled ? (
                     <div className="mt-3">
                       {(m.scoring_format || 'pontos_simples') === 'sets' ? (
                         <ScoreEntrySets
                           numSets={m.num_sets || 3}
+                          initial={scores[m.id]?.sets}
                           onSave={(finalScore) => handleSubmitScore(m.id, finalScore)}
                           saving={submittingId === m.id}
                         />
@@ -384,7 +450,7 @@ export default function PrivateMatches() {
 
       <div>
         <h3 className="text-lg text-ink-900 mb-3">{t('privatematches.history')}</h3>
-        {confirmed.length === 0 ? (
+        {finishedGroups.length === 0 ? (
           <EmptyState
             icon={Trophy}
             title={t('privatematches.empty_title')}
@@ -392,23 +458,9 @@ export default function PrivateMatches() {
           />
         ) : (
           <div className="space-y-2.5">
-            {confirmed.map((m) => (
-              <div key={m.id} className="card flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="font-extrabold text-ink-900 text-sm truncate">{teamLabel(m, 'team_a', t)} vs {teamLabel(m, 'team_b', t)}</p>
-                  <p className="text-[11px] text-muted mt-0.5">
-                    {m.my_points != null
-                      ? t('privatematches.history_score_points', { scoreA: m.score_a, scoreB: m.score_b, points: m.my_points })
-                      : t('privatematches.history_score_friendly', { scoreA: m.score_a, scoreB: m.score_b })}
-                    {m.winner_team === 'draw' && <> · {t('privatematches.draw_label')}</>}
-                  </p>
-                </div>
-                {m.my_rating_delta != null && (
-                  <span className={`shrink-0 text-sm font-extrabold tabular-nums ${m.my_rating_delta >= 0 ? 'text-ok' : 'text-danger'}`}>
-                    {m.my_rating_delta >= 0 ? '+' : ''}{Math.round(m.my_rating_delta)} {t('privatematches.ranking_unit')}
-                  </span>
-                )}
-              </div>
+            {finishedGroups.map((g) => (
+              <FriendGameRow key={g.id} id={g.id} to={g.isSession ? `/jogos-privados/sessao/${g.id}` : null} facts={g.facts}
+                creatorName={profile?.name || ''} onChanged={reload} />
             ))}
           </div>
         )}

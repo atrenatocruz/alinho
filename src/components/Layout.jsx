@@ -477,6 +477,17 @@ export default function Layout({ children }) {
     markNotificationsRead([notice.id]).catch((error) => console.error('Error marking notice as read:', error))
   }
 
+  // O convite fica até se responder (a base de dados apaga-o ao responder);
+  // o «<Nome> não vai», «cancelou» e «apagou» são só para saber: tocar-lhes
+  // tira-os, como os outros avisos. Antes ficavam lá para sempre (Francisco,
+  // 28 set).
+  const openFriendNotice = (notice) => {
+    setShowNotifications(false)
+    if (notice.kind === 'friend_match_invite') return
+    setFriendNotices((list) => list.filter((n) => n.id !== notice.id))
+    markNotificationsRead([notice.id]).catch((error) => console.error('Error marking notice as read:', error))
+  }
+
   const mixNoticeText = (notice) => {
     const d = notice.data || {}
     const vars = {
@@ -641,7 +652,7 @@ export default function Layout({ children }) {
                     <TournamentNoticeRow key={notice.id} notice={notice} onOpen={openTournamentNotice} />
                   ))}
                   {friendNotices.map((notice) => (
-                    <FriendInviteRow key={notice.id} notice={notice} onOpen={() => setShowNotifications(false)} />
+                    <FriendInviteRow key={notice.id} notice={notice} onOpen={openFriendNotice} />
                   ))}
                   {tournamentInvites.map((inv) => (
                     <Link
@@ -677,7 +688,7 @@ export default function Layout({ children }) {
                   {privateMatchTodos.map(({ kind, match }) => (
                     <Link
                       key={`${kind}-${match.id}`}
-                      to="/jogos-privados"
+                      to={match.session_id ? `/jogos-privados/sessao/${match.session_id}` : '/jogos-privados'}
                       onClick={() => setShowNotifications(false)}
                       className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50"
                     >

@@ -2,10 +2,10 @@ import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useSearchParams, useNavigationType, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Users, Search, X, Check } from 'lucide-react'
+import { Search, X, Check } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { EmptyState, PrimaryButton, ConfirmSheet } from '../components/ui'
+import { ConfirmSheet } from '../components/ui'
 import { GameEventCard, FriendsEventCard, ExploreEventCard } from '../components/agenda/EventCard'
 import { DayHeader, MonthSheet, FilterSheet, FilterChips, LocationChip, LocationSheet, ViewToggle, Sheet, dayLabel, KIND_FILTER_KEY, SHOW_LABEL_KEY } from '../components/agenda/AgendaControls'
 import HomeSearch from '../components/agenda/HomeSearch'
@@ -667,53 +667,43 @@ export default function Home() {
   const orgSlugById = new Map(orgs.map((o) => [o.id, o.slug]))
   const hasAnyEvents = events.length > 0
 
-  // Sem clubes nem jogos entre amigos: o ecrã de entrar num clube de sempre
-  // (o que vê quem ainda não tem clube está em aberto no épico).
-  if (memberships.length === 0 && !hasAnyEvents) {
-    return (
-      <div className="space-y-6">
-      {joinStrip}
-      {/* Antes desta pessoa ver «ainda não segues nenhum clube», mostra-se-lhe
-          o que está mesmo aberto: um torneio não pede aprovação nem exige ser
-          membro, e é a única coisa a que ela pode ir HOJE. Pedir um código de
-          clube privado a quem acabou de chegar é mandá-la embora. */}
-      {openTournaments.length > 0 && (
-        <section className="space-y-2">
-          <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('home.open_now')}</p>
-          {openTournaments.map((x) => <OpenTournamentRow key={x.id} tournament={x} />)}
-          <p className="text-[11.5px] text-muted">{t('home.open_now_hint')}</p>
-        </section>
-      )}
-
-      <EmptyState
-        icon={Users}
-        title={t('home.no_clubs_followed_title')}
-        subtitle={joining ? t('home.joining_club') : t('home.no_clubs_followed_subtitle')}
-        action={!joining && (
-          <div className="space-y-4 max-w-xs mx-auto">
-            <Link to="/comunidade">
-              <PrimaryButton type="button" className="w-full">{t('home.view_community')}</PrimaryButton>
-            </Link>
-            <form onSubmit={(e) => { e.preventDefault(); handleJoin() }} className="space-y-2">
-              <input
-                type="text"
-                value={joinSlug}
-                onChange={(e) => setJoinSlug(e.target.value)}
-                placeholder={t('home.private_club_code_placeholder')}
-                // text-base: abaixo de 16px o Safari iOS faz zoom ao focar.
-                className="input-field text-center text-base"
-              />
-              <PrimaryButton type="submit" variant="ghost" disabled={!joinSlug.trim()} className="w-full">
-                {t('home.join_club')}
-              </PrimaryButton>
-              {joinError && <p className="text-xs text-danger">{joinError}</p>}
-            </form>
-          </div>
-        )}
-      />
+  // Quem ainda não está em nenhum clube nem grupo (Francisco, 28 set:
+  // «o calendário?»): a Home normal, com o que está aberto perto, e por
+  // baixo dos eventos de hoje o convite para entrar num clube
+  // (design-handoff/2026-09-28-home-sem-clubes). Desaparece com o 1.º clube.
+  const noClubs = memberships.length === 0
+  const noClubsCard = noClubs && (
+    <div className="card space-y-3 border-2 border-ink-900 !bg-white">
+      <div>
+        <p className="font-display text-lg font-extrabold leading-tight text-ink-900">{t('home.no_clubs_title')}</p>
+        <p className="mt-1 text-sm text-muted">{joining ? t('home.joining_club') : t('home.no_clubs_subtitle')}</p>
       </div>
-    )
-  }
+      {!joining && (
+        <>
+          <Link to="/comunidade"
+            className="press flex min-h-[52px] w-full items-center justify-center rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold text-white">
+            {t('home.view_community')}
+          </Link>
+          <form onSubmit={(e) => { e.preventDefault(); handleJoin() }} className="flex gap-2">
+            <input
+              type="text"
+              value={joinSlug}
+              onChange={(e) => setJoinSlug(e.target.value)}
+              placeholder={t('home.club_code_placeholder')}
+              aria-label={t('home.club_code_placeholder')}
+              // text-base: abaixo de 16px o Safari iOS faz zoom ao focar.
+              className="input-field min-w-0 flex-1 text-base"
+            />
+            <button type="submit" disabled={!joinSlug.trim()}
+              className="press min-h-[48px] shrink-0 rounded-ctrl border-[1.5px] border-line bg-white px-5 text-[15px] font-extrabold text-ink-900 disabled:opacity-40">
+              {t('home.join_short')}
+            </button>
+          </form>
+          {joinError && <p className="text-xs text-danger">{joinError}</p>}
+        </>
+      )}
+    </div>
+  )
 
   // "Não posso ir" / "Afinal vou" (Trello #49): só esse dia, a mensalidade
   // não muda.
@@ -866,9 +856,12 @@ export default function Home() {
                   </div>
                 )
                 : dayEvents.length === 0
-                ? <p className="text-sm text-muted py-3 px-3 rounded-card border border-dashed border-line">{t('agenda.today_empty')}</p>
+                ? <p className="text-sm text-muted py-3 px-3 rounded-card border border-dashed border-line">{t(noClubs && dayKey === today ? 'home.no_clubs_today_empty' : 'agenda.today_empty')}</p>
                 : dayEvents.map(renderEventWithError)}
               {dayKey === today && <ScoreTodayCard asLink rows={scoreToday.filter((x) => dayEvents.some((e) => e.kind === 'tournament' && e.mine && e.id === x.id))} />}
+              {/* Os torneios abertos a quem chega (não pedem clube) e o convite. */}
+              {dayKey === today && noClubs && openTournaments.map((x) => <OpenTournamentRow key={x.id} tournament={x} />)}
+              {dayKey === today && noClubsCard}
             </section>
           ))}
           {/* Espaço no fim para o último dia poder subir até ao cabeçalho. */}

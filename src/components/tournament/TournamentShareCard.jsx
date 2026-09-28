@@ -128,7 +128,7 @@ function PodiumBody({ d, compact }) {
   return (
     <div>
       <Mono>{d.kicker}</Mono>
-      <p className={`mt-1 font-display font-extrabold leading-none text-white ${compact ? 'text-[22px]' : 'text-[30px]'}`}>{t('tshare.place', { n: d.place })}</p>
+      <p className={`mt-1 font-display font-extrabold leading-none text-white ${compact ? 'text-[22px]' : 'text-[30px]'}`} style={d.title ? { color: LIME } : undefined}>{d.title || t('tshare.place', { n: d.place })}</p>
       <div className={`${compact ? 'mt-2 space-y-1.5' : 'mt-3 space-y-2'}`}>
         {d.rows.map((r) => (
           <div key={r.place} className={`flex items-center gap-3 rounded-[10px] px-3 ${compact ? 'py-1.5' : 'py-2.5'} ${r.mine ? 'border-2' : 'bg-[#1A1A1D]'}`}

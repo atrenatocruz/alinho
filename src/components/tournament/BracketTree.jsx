@@ -218,10 +218,15 @@ function Board({ columns, card, heading, current, byeLine, third }) {
 
   const line = LILAC.border
   const pairs = (list) => list.reduce((acc, m, i) => (i % 2 ? acc : [...acc, list.slice(i, i + 2)]), [])
+  // Só sai da coluna da página quando as rondas não cabem nela: a largura é a
+  // que as colunas pedem (260 px cada + 32 px entre elas), nunca menos do que
+  // a coluna, nunca mais do que 1100 px ou o ecrã. Com poucas rondas fica
+  // alinhado com o resto da página em vez de largo e encostado à esquerda.
+  const need = columns.length * 260 + Math.max(0, columns.length - 1) * 32
   return (
-    // Só o quadro sai da coluna da página e usa o ecrã (até 1100 px), ao
-    // centro; com mais rondas do que cabem, desliza dentro dele.
-    <div className="relative left-1/2 hidden w-[min(1100px,calc(100vw-48px))] -translate-x-1/2 md:block">
+    // Ao centro; com mais rondas do que cabem, desliza dentro dele.
+    <div className="relative left-1/2 hidden -translate-x-1/2 md:block"
+      style={{ width: `min(max(100%, ${need}px), 1100px, calc(100vw - 48px))` }}>
       <div ref={scroller} className="overflow-x-auto pb-2">
         <div className="flex items-stretch gap-8" style={{ minWidth: columns.length * 232 }}>
           {columns.map((c, i) => {

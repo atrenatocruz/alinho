@@ -7,7 +7,6 @@ import { useTranslation } from 'react-i18next'
 import { Plus } from 'lucide-react'
 import { setsState, best3NeedsThird } from './friendScoring'
 import { shortName } from './friendShare'
-import { setRowProblem } from '../tournament/scoreProblem'
 
 const pair = (team) => (team || []).map((p) => shortName(p.name)).join(' / ')
 const EMPTY = () => ({ a: '', b: '' })
@@ -23,12 +22,10 @@ export default function FriendSetsEntry({ mode, maxSets = null, teamA, teamB, on
     : sets
   if (mode === 'best3' && shown.length !== sets.length) setSets(shown)
   const st = setsState(shown, mode)
-  // #588: cada set a 6, com a regra única — o primeiro set impossível avisa
-  // e não deixa gravar. O empate tem a frase dele (set_no_draw).
-  const setProb = shown.map((s) => (s.a !== s.b ? setRowProblem(s.a, s.b) : null)).find(Boolean) || null
-  const ready = st.ready && !setProb
+  // Sets por acabar valem (Francisco, 28 set): só se avisa de passar de 7-6.
+  const ready = st.ready
   const canAdd = mode === 'free' && (!maxSets || shown.length < maxSets)
-  const winner = st.winsA > st.winsB ? pair(teamA) : pair(teamB)
+  const winner = st.winner === 'a' ? pair(teamA) : pair(teamB)
 
   const cell = 'input-field h-12 w-full text-center text-lg font-extrabold tabular-nums'
   return (
@@ -55,12 +52,12 @@ export default function FriendSetsEntry({ mode, maxSets = null, teamA, teamB, on
           <Plus size={16} /> {t('friends.add_set')}
         </button>
       )}
-      {st.filled && !st.noDraw && <p className="text-xs font-extrabold text-danger">{t('friends.set_no_draw')}</p>}
-      {setProb && <p className="text-xs font-extrabold text-danger" role="status">{t(`tournament.score.problem_${setProb}`)}</p>}
-      {mode === 'free' && st.tied && <p className="text-xs font-extrabold text-ink-700">{t('friends.sets_tied')}</p>}
+      {st.problem && <p className="text-xs font-extrabold text-danger" role="status">{t(`friends.set_problem_${st.problem}`)}</p>}
       {ready && (
         <p className="rounded-ctrl bg-lime-100 px-3 py-2.5 text-sm text-ink-900">
-          {t('friends.winner_line', { team: winner, a: Math.max(st.winsA, st.winsB), b: Math.min(st.winsA, st.winsB) })}
+          {!st.winner ? t('friends.result_draw')
+            : st.bySets ? t('friends.winner_line', { team: winner, count: Math.max(st.winsA, st.winsB), a: Math.max(st.winsA, st.winsB), b: Math.min(st.winsA, st.winsB) })
+              : t('friends.winner_games_line', { team: winner, a: Math.max(st.gamesA, st.gamesB), b: Math.min(st.gamesA, st.gamesB) })}
         </p>
       )}
       <button type="button" disabled={!ready}

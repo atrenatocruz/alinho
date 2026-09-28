@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { setRowProblem, setsResultProblem } from './scoreProblem'
+import { setsResultProblem } from './scoreProblem'
 
 const sets = (...list) => ({ sets: list.map(([a, b]) => ({ score_a: a, score_b: b })) })
 
@@ -15,12 +15,5 @@ describe('#588 — resultados do torneio e dos amigos com a regra única', () =>
   it('melhor de 2: o 3.º é super tie-break a 10', () => {
     expect(setsResultProblem('melhor_2_sets', { sets: [{ score_a: 6, score_b: 4 }, { score_a: 3, score_b: 6 }, { score_a: 10, score_b: 8, is_super_tiebreak: true }] })).toBe(null)
     expect(setsResultProblem('melhor_2_sets', { sets: [{ score_a: 6, score_b: 4 }, { score_a: 3, score_b: 6 }, { score_a: 10, score_b: 9, is_super_tiebreak: true }] })).toBe('tb_margin')
-  })
-  it('amigos: cada set a 6; vazio ainda não é problema', () => {
-    expect(setRowProblem('9', '2')).toBe('set_invalid')
-    expect(setRowProblem('7', '6')).toBe(null)
-    expect(setRowProblem('7', '5')).toBe(null)
-    expect(setRowProblem('6', '5')).toBe('set_invalid')
-    expect(setRowProblem('', '3')).toBe(null)
   })
 })

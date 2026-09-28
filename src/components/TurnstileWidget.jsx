@@ -1,13 +1,14 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import i18n from '../lib/i18n'
 
 // Cloudflare Turnstile — the captcha Supabase Auth verifies on signup, login
 // and password recovery once "Attack Protection → Captcha" is on in the
-// dashboard. Free. Appearance "interaction-only" (Francisco, 28 set: the dark
-// "Sucesso! · CLOUDFLARE" bar in the middle of the light form was ugly —
-// this replaces Ruben's "always" of the same day): nothing shows while the
-// check runs on its own; the box only appears, light and as wide as the
-// fields, when Cloudflare distrusts the browser and asks for a click.
+// dashboard. Free. Appearance "always", light, as wide as the fields: the
+// Cloudflare box with the "Sucesso ✓" seal stays above the submit button —
+// the visible sign that the form is protected (Ruben, 28 set; Renato chose
+// it back over "interaction-only" the same day, keeping the light theme).
+// The check itself still runs on its own; a real challenge only appears
+// when Cloudflare distrusts the browser.
 //
 // Motivation is the email quota, not fake accounts (Trello #—): with
 // "Confirm email" on, every signup and every "esqueci a password" sends an
@@ -58,8 +59,6 @@ const TurnstileWidget = forwardRef(function TurnstileWidget({ onToken, action, c
   const widgetIdRef = useRef(null)
   const onTokenRef = useRef(onToken)
   onTokenRef.current = onToken
-  // A caixa só se vê quando a Cloudflare pede para carregar.
-  const [shown, setShown] = useState(false)
 
   useImperativeHandle(ref, () => ({
     reset: () => {
@@ -80,13 +79,11 @@ const TurnstileWidget = forwardRef(function TurnstileWidget({ onToken, action, c
         widgetIdRef.current = turnstile.render(containerRef.current, {
           sitekey: TURNSTILE_SITE_KEY,
           ...(action ? { action } : {}),
-          appearance: 'interaction-only',
+          appearance: 'always',
           size: 'flexible',
           // Fixed light: the box sits on a white form, and 'auto' would go dark
           // on phones in dark mode.
           theme: 'light',
-          'before-interactive-callback': () => setShown(true),
-          'after-interactive-callback': () => setShown(false),
           language: i18n.language === 'en' ? 'en' : 'pt',
           callback: (token) => onTokenRef.current?.(token),
           'expired-callback': () => onTokenRef.current?.(null),
@@ -114,10 +111,8 @@ const TurnstileWidget = forwardRef(function TurnstileWidget({ onToken, action, c
   }, [])
 
   if (!TURNSTILE_SITE_KEY) return null
-  // Escondida: sem altura e sem o espaço do formulário por cima (nada de
-  // buraco entre a palavra-passe e o botão). À vista: a largura dos campos e
-  // os cantos deles (designer, 28 set).
-  return <div ref={containerRef} className={`${shown ? 'overflow-hidden rounded-ctrl' : '!mt-0 h-0 overflow-hidden'} ${className}`} />
+  // A largura dos campos e os cantos deles (designer, 28 set).
+  return <div ref={containerRef} className={`overflow-hidden rounded-ctrl ${className}`} />
 })
 
 export default TurnstileWidget
