@@ -60,12 +60,12 @@ export function groupRatingBand(rating) {
 
 export const formatRating = (rating) => (rating == null ? '—' : String(Math.round(rating)))
 
-// Provisório: menos de 8 jogos contados (2 mixes) — o rating ainda é uma
-// aproximação. Espelha o limiar único de "novo" no Postgres
-// (migration_elo_provisional_8.sql): rótulo NOVO, escudo de parceiro e o
-// K mais alto (elo_k_factor, migration_elo_entry_levels.sql) estão todos
-// alinhados nos 8 jogos; mudar lá → mudar aqui.
-export const PROVISIONAL_GAMES = 8
+// Provisório: menos de 12 jogos contados (3 mixes) — o rating ainda é uma
+// estimativa e mostra-se como "~902" e com a marca NOVO. É o mesmo limiar do
+// K 40 no motor (migration_elo_simples.sql: até aos 12 jogos a pessoa move o
+// dobro, e só ela); mudar lá → mudar aqui. Nota: o troféu "calibrado" ficou
+// nos 8 jogos — é um marco, não o cálculo.
+export const PROVISIONAL_GAMES = 12
 export const isProvisional = (ratingGames) => ratingGames != null && ratingGames < PROVISIONAL_GAMES
 
 /** "~902" para provisórios, "902" para estabelecidos. */
