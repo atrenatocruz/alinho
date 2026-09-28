@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { BackBar } from '../components/ui'
+import { useGoBack } from '../lib/useGoBack'
 import { MapPin, MoreHorizontal, Pencil, Share2, X, Plus } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { getFriendMatch, respondFriendMatchInvite, setFriendMatchTeams, addFriendMatchGame, addFriendMatchRound, listMyFriendMatchInvites, cancelFriendMatch, playFriendMatchWithoutName, keepFriendMatchSeat, removeFriendMatchInvitee } from '../lib/privateMatches'
@@ -54,6 +55,7 @@ export default function FriendSession() {
   const { t, i18n } = useTranslation()
   const { profile } = useAuth()
   const navigate = useNavigate()
+  const goBack = useGoBack('/jogos-privados')
   // A folha de ações de quem criou (editar e juntar sets, 27 set).
   const [actionsOpen, setActionsOpen] = useState(false)
   const [askCancel, setAskCancel] = useState(false)
@@ -210,7 +212,10 @@ export default function FriendSession() {
   const barTitle = !match ? '' : liveGame
     ? t('friends.game_of', { n: liveGame.n, total: games.length })
     : [match.scheduled_date ? dayText(match.scheduled_date, i18n.language) : null, match.scheduled_time ? match.scheduled_time.slice(0, 5) : null].filter(Boolean).join(' · ')
-  const back = <BackBar to="/jogos-privados" label={t('createprivatematch.title')} title={barTitle} />
+  // Voltar para onde se veio, não para a lista: com um link fixo, a lista
+  // voltava ao jogo e o jogo à lista, sem nunca sair dali (Francisco, 28 set:
+  // «estou num loop… não volto ao perfil»).
+  const back = <BackBar onBack={goBack} label={t('createprivatematch.title')} title={barTitle} />
   // Quem criou: «✎ Editar» e «Mais ⋯», como no mix (MixAdminBar). O ⋯ não
   // vai na barra de cima — a BackBar não tem menu (Francisco, 27 set).
   const pill = 'inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-ctrl border border-line bg-surface px-2.5 text-sm font-extrabold text-ink-900 whitespace-nowrap'
