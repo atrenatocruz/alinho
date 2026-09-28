@@ -110,11 +110,19 @@ export default function MyGamesPanel({ tournament, category, myEntries = [], myM
   }
 
   if (!rows.length) {
+    // O vazio diz a verdade do momento: quem não está inscrito não espera
+    // sorteio nenhum, e depois do sorteio já não se diz «quando fizerem o
+    // sorteio» (revisão dos torneios, 28 set).
+    const entered = myEntries.some((e) => e.category_id === category?.id)
+    const drawn = ['sorteada', 'a_decorrer', 'terminada'].includes(category?.status)
+    const subtitle = !entered
+      ? 'tournament.my_games_empty_not_entered'
+      : drawn ? 'tournament.my_games_empty_drawn' : 'tournament.my_games_empty_subtitle'
     return (
       <EmptyState
         icon={Trophy}
         title={t('tournament.my_games_empty_title')}
-        subtitle={t('tournament.my_games_empty_subtitle')}
+        subtitle={t(subtitle)}
       />
     )
   }

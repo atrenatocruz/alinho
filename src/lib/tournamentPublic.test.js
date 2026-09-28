@@ -17,6 +17,12 @@ describe('formatWords', () => {
     expect(formatWords({ format: { knockout_size: 16 } }))
       .toEqual({ key: 'tpublic.format_knockout', values: { teams: 16 } })
   })
+  it('só eliminatória como o sorteio a grava (sem knockout_size)', () => {
+    // DrawAdminPanel grava { key, groups: 0, qualifiers_per_group: 0, qualifiers }.
+    // Antes dizia «O formato é anunciado depois das inscrições» com o sorteio feito.
+    expect(formatWords({ format: { key: 'eliminatoria', groups: 0, qualifiers_per_group: 0, qualifiers: 4, third_place: true } }))
+      .toEqual({ key: 'tpublic.format_knockout', values: { teams: 4 } })
+  })
 })
 
 describe('categoryWhen', () => {

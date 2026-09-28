@@ -24,6 +24,7 @@ import { Chips, ConfirmSheet, EmptyState, PrimaryButton } from '../components/ui
 import { Sheet } from '../components/agenda/AgendaControls'
 import { FieldLabel, MonoLabel, StatePill } from '../components/tournament/TournamentBits'
 import { proSetTieBreakTarget, tieBreakProblem, setText } from '../components/tournament/tieBreak'
+import { setsResultProblem } from '../components/tournament/scoreProblem'
 
 // Hora de Portugal, nunca cortada do texto da base de dados (vinha em UTC:
 // 17:00 onde o resto da app dizia 18:00 — Trello #487).
@@ -152,7 +153,11 @@ function CourtCard({ match, scoring, tieTarget = 7, onSave, onWalkover, onUndoWa
 
   useEffect(() => { setA(match.score_a ?? ''); setB(match.score_b ?? '') }, [match.score_a, match.score_b])
 
-  const label = [match.category_code, match.group_label || match.round_label].filter(Boolean).join(' ')
+  // A fase por extenso — «M5 · Meia-final», não «M5 SF» (revisão dos
+  // torneios, 28 set). Uma ronda sem tradução passa como veio.
+  const round = match.round_label
+  const roundText = round && t(`tournament.score.round_${round}`, { defaultValue: round })
+  const label = [match.category_code, match.group_label || roundText].filter(Boolean).join(' · ')
 
   // Um terceiro set só faz sentido depois de os DOIS PRIMEIROS ficarem 1-1
   // — e a conta é só sobre esses dois. Com os três, o jogo já está decidido
@@ -211,7 +216,8 @@ function CourtCard({ match, scoring, tieTarget = 7, onSave, onWalkover, onUndoWa
         })()
         : { score_a: Number(a), score_b: Number(b) }
     // 9-8 com o tie-break escrito é um fim válido de pro set.
-    const p = askTieBreak ? null : resultProblem(scoring, input)
+    // #588: por sets, cada set com a regra única (um 9-2 já não passa).
+    const p = askTieBreak ? null : bySets ? setsResultProblem(scoring, input) : resultProblem(scoring, input)
     setProblem(p)
     if (p) return
     onSave(match, input, finished)

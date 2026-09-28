@@ -16,7 +16,8 @@ export const sessionLink = (matchId) => `${window.location.origin}/jogos-privado
 
 /** «Rita Figueira» → «Rita F.» */
 export const shortName = (name) => {
-  const parts = String(name || '').trim().split(/\s+/)
+  // O que está entre parênteses não é apelido («Renato Cruz (dev)» → «Renato C.»).
+  const parts = String(name || '').replace(/\([^)]*\)/g, ' ').trim().split(/\s+/)
   const initial = parts.length > 1 ? parts[parts.length - 1].match(/\p{L}/u)?.[0] : null
   return initial ? `${parts[0]} ${initial}.` : parts[0] || ''
 }

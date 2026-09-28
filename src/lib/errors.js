@@ -36,6 +36,7 @@ export function errorKind(error) {
   if (/user already registered|already been registered/i.test(msg)) return 'already_registered'
   if (/email not confirmed/i.test(msg)) return 'email_not_confirmed'
   if (status === 429 || /rate limit|too many requests|security purposes.*after/i.test(msg)) return 'too_many'
+  if (/captcha/i.test(msg)) return 'captcha'
 
   // Migração por correr: função, coluna ou tabela que a base de dados ainda não tem
   if (['PGRST202', 'PGRST204', '42703', '42883', '42P01'].includes(code) || /schema cache|does not exist/i.test(msg)) {
@@ -91,6 +92,7 @@ export function describeError(t, error, fallbackKey = 'errors.generic') {
     case 'already_registered': return t('errors.already_registered')
     case 'email_not_confirmed': return t('errors.email_not_confirmed')
     case 'too_many': return t('errors.too_many')
+    case 'captcha': return t('errors.captcha')
     case 'not_ready': return t('errors.not_ready')
     case 'permission': return t('errors.permission')
     case 'org_name_taken': return t('errors.org_name_taken')

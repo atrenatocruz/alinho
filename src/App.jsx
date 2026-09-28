@@ -70,6 +70,7 @@ const JoinPrivateMatch = lazyPage(() => import('./pages/JoinPrivateMatch'))
 const GroupMatches = lazyPage(() => import('./pages/GroupMatches'))
 const CreateGroupMatch = lazyPage(() => import('./pages/CreateGroupMatch'))
 const CreateOpenSlots = lazyPage(() => import('./pages/CreateOpenSlots'))
+const EditOpenSlots = lazyPage(() => import('./pages/EditOpenSlots'))
 const CreateSeries = lazyPage(() => import('./pages/CreateSeries'))
 const GerirAulas = lazyPage(() => import('./pages/GerirAulas'))
 const Gerir = lazyPage(() => import('./pages/Gerir'))
@@ -639,6 +640,15 @@ function AppRoutes() {
           element={
             <Guard require="protected" showSplash={showSplash}>
               <CreateOpenSlots />
+            </Guard>
+          }
+        />
+        {/* Editar um jogo em aberto — a publicação inteira (#586, 28 set). */}
+        <Route
+          path="/gerir/:slug/editar/em-aberto/:batchId"
+          element={
+            <Guard require="protected" showSplash={showSplash}>
+              <EditOpenSlots />
             </Guard>
           }
         />

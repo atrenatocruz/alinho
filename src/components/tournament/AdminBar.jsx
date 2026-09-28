@@ -11,7 +11,7 @@
 //   · UM botão para o passo seguinte, com o nome do que faz;
 //   · nunca um ícone sozinho — cada acção diz-se por extenso;
 //   · um botão que desaparece deixa no lugar a RAZÃO, não um espaço vazio.
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { CalendarDays, Eye, Pencil, Trash2 } from 'lucide-react'
@@ -57,6 +57,9 @@ export default function AdminBar({ tournament, categories = [], onChanged, onEdi
   const [error, setError] = useState(null)
   // Perguntas na folha da app, não na caixa do telemóvel (#435).
   const [ask, setAsk] = useState(null) // null | 'delete' | 'close'
+  // Categorias com tudo jogado, à espera do «Terminar» (vem do CloseCategories).
+  const [played, setPlayed] = useState({ codes: [], all: false })
+  const onReady = useCallback((codes, all) => setPlayed({ codes, all }), [])
 
   const status = tournament?.status
   const next = NEXT_STEP[status]
@@ -129,7 +132,11 @@ export default function AdminBar({ tournament, categories = [], onChanged, onEdi
           a de cima já disse melhor. Duas linhas a dizer o mesmo é o que o
           desenho manda evitar. */}
       {!(preview && status === 'rascunho') && (
-        <p className="mt-1.5 text-xs text-ink-700">{progress.partial && ['sorteado', 'a_decorrer'].includes(status)
+        <p className={`mt-1.5 text-xs ${played.codes.length ? 'font-bold text-ink-900' : 'text-ink-700'}`}>{played.all
+          ? t('tournament.admin.state_all_played')
+          : played.codes.length
+          ? t('tournament.admin.state_some_played', { codes: played.codes.join(', ') })
+          : progress.partial && ['sorteado', 'a_decorrer'].includes(status)
           ? partialLine
           : t(`tournament.admin.state_${status}`, {
             deadline: whenDeadline(tournament?.entries_deadline, i18n.language),
@@ -185,7 +192,7 @@ export default function AdminBar({ tournament, categories = [], onChanged, onEdi
       {/* Com o sorteio feito, o passo seguinte é fechar cada categoria — e
           o torneio fecha sozinho com a última (Trello #485). */}
       {(status === 'sorteado' || status === 'a_decorrer') && (
-        <CloseCategories tournament={tournament} onChanged={onChanged} />
+        <CloseCategories tournament={tournament} onChanged={onChanged} onReady={onReady} />
       )}
 
       {/* Um botão que sai deixa a razão no lugar dele, nunca um vazio. */}

@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation, Trans } from 'react-i18next'
 import { Eye, EyeOff, Lock } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton, DateField, Select, Tabs } from '../components/ui'
 import { Wordmark } from '../components/Layout'
+import TurnstileWidget from '../components/TurnstileWidget'
 import { hashPhone } from '../lib/hashPhone'
 import i18n from '../lib/i18n'
 import { describeError } from '../lib/errors'
@@ -123,6 +124,12 @@ export default function Login() {
   const [signupGender, setSignupGender] = useState('')
   const [signupPassword, setSignupPassword] = useState('')
   const [signupConfirmPassword, setSignupConfirmPassword] = useState('')
+  // One Turnstile widget per visible form (login/signup are never mounted
+  // together). Token is single-use: reset after any failed attempt.
+  const [captchaToken, setCaptchaToken] = useState(null)
+  const captchaRef = useRef(null)
+  const resetCaptcha = () => captchaRef.current?.reset()
+
   // Set once signUp succeeds without a session — i.e. Supabase's "Confirm
   // email" is on and the account only becomes usable from the emailed link.
   const [confirmationSent, setConfirmationSent] = useState(false)
@@ -133,10 +140,11 @@ export default function Login() {
     setError('')
 
     try {
-      const { error } = await signIn(loginEmail, loginPassword)
+      const { error } = await signIn(loginEmail, loginPassword, captchaToken)
       if (error) throw error
       navigate(redirectTo)
     } catch (err) {
+      resetCaptcha()
       setError(describeError(t, err, 'login.error_invalid_email_password'))
     } finally {
       setLoading(false)
@@ -190,7 +198,7 @@ export default function Login() {
         name: signupName,
         birthday: signupBirthday,
         gender: signupGender,
-      })
+      }, captchaToken)
 
       if (error) throw error
 
@@ -209,9 +217,9 @@ export default function Login() {
         return
       }
 
-      // Auto-login after signup
-      const { error: loginError } = await signIn(signupEmail, signupPassword)
-      if (loginError) throw loginError
+      // With "Confirm email" off, signUp already returns the session and
+      // the client is signed in — no second call needed (and none possible
+      // once captcha is on: the token above was single-use).
 
       // Hashing needs an authenticated session (the Edge Function rejects
       // the anon key on purpose), so this can only happen after sign-in —
@@ -225,6 +233,7 @@ export default function Login() {
 
       navigate(redirectTo)
     } catch (err) {
+      resetCaptcha()
       setError(describeError(t, err, 'login.error_signup_failed'))
     } finally {
       setLoading(false)
@@ -350,6 +359,8 @@ export default function Login() {
                 </div>
               )}
 
+              <TurnstileWidget ref={captchaRef} action="login" onToken={setCaptchaToken} />
+
               <PrimaryButton type="submit" disabled={loading} className="w-full">
                 {loading ? t('login.signing_in') : t('login.login_button')}
               </PrimaryButton>
@@ -459,6 +470,8 @@ export default function Login() {
                   {error}
                 </div>
               )}
+
+              <TurnstileWidget ref={captchaRef} action="signup" onToken={setCaptchaToken} />
 
               <PrimaryButton type="submit" disabled={loading} className="w-full">
                 {loading ? t('login.creating_account') : t('login.signup_button')}

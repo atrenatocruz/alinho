@@ -616,8 +616,21 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
           <Field label={t('tournament.create.court_names')} hint={t('tournament.create.court_names_hint')}>
             <div className="flex flex-wrap gap-1.5">
               {draft.courts.map((name, i) => (
-                <span key={i} className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-sm">
-                  {name}
+                <span key={i} className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-sm focus-within:border-ink-900">
+                  {/* O nome edita-se no próprio chip — antes só dava para apagar
+                      e voltar a juntar, e «Campo 1 · KIA» ficava impossível
+                      (revisão dos torneios, 28 set). Vazio volta ao nome base. */}
+                  <input
+                    value={name}
+                    size={Math.max(String(name).length, 6)}
+                    aria-label={t('tournament.create.court_rename', { n: i + 1 })}
+                    onChange={(e) => set({ courts: draft.courts.map((c, k) => (k === i ? e.target.value : c)) })}
+                    onBlur={(e) => {
+                      const clean = e.target.value.trim()
+                      set({ courts: draft.courts.map((c, k) => (k === i ? (clean || t('tournament.create.court_n', { n: i + 1 })) : c)) })
+                    }}
+                    className="min-w-0 bg-transparent text-sm text-ink-900 outline-none"
+                  />
                   <button type="button" aria-label={t('tournament.create.remove')} onClick={() => set({ courts: draft.courts.filter((_, k) => k !== i) })} className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center -my-3 -mx-2"><X size={13} /></button>
                 </span>
               ))}

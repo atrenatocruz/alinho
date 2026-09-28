@@ -110,7 +110,13 @@ export default function TournamentPage() {
   // deixar de funcionar por causa de uma arrumação nossa.
   const tabParam = params.get('tab')
   const LEGACY_TABS = { groups: 'all_games', draw: 'all_games', calendar: 'all_games' }
-  const tab = TOURNAMENT_TABS.includes(tabParam) ? tabParam : (LEGACY_TABS[tabParam] || 'my_games')
+  // «Os meus jogos» só para quem está inscrito (Francisco, 28 set: «se não
+  // estás inscrito não devia aparecer»). Sem inscrição ficam dois
+  // separadores e a página abre em «Todos os jogos».
+  const entered = activeEntries(data).length > 0
+  const tabs = entered ? TOURNAMENT_TABS : TOURNAMENT_TABS.filter((k) => k !== 'my_games')
+  const asked = LEGACY_TABS[tabParam] || tabParam
+  const tab = tabs.includes(asked) ? asked : tabs[0]
 
   const setParam = (key, value) => {
     const next = new URLSearchParams(params)
@@ -166,6 +172,9 @@ export default function TournamentPage() {
     my: activeMy(data),
     myEntries: activeEntries(data),
     myMatches: data.my_matches || [],
+    // «Ver como quem chega de fora»: os painéis escondem o que é de quem
+    // organiza ou marca (revisão dos torneios, 28 set).
+    publicView,
   }
   const clubForForm = { id: tour.organization_id, name: tour.club_name, location: tour.location }
 
@@ -335,7 +344,7 @@ export default function TournamentPage() {
       {/* O separador único da app (Trello #528): muda o que o ecrã mostra,
           por isso é pílula cinzenta — não pastilhas pretas, que são filtro. */}
       <Tabs
-        options={TOURNAMENT_TABS.map((key) => ({ value: key, label: t(`tournament.tab_${key}`) }))}
+        options={tabs.map((key) => ({ value: key, label: t(`tournament.tab_${key}`) }))}
         value={tab}
         onChange={(next) => setParam('tab', next)}
         label={t('tournament.tabs_label')}
@@ -344,8 +353,10 @@ export default function TournamentPage() {
       <div>
         {/* O pódio vive DENTRO de «Os meus jogos», em cima — é onde o desenho
             de 23 set o põe. Estava acima dos separadores desde ontem; foi
-            engano meu. Ele próprio só aparece com o torneio terminado. */}
-        {tab === 'my_games' && Podium && (
+            engano meu. Ele próprio só aparece com o torneio terminado.
+            Sem inscrição não há «Os meus jogos»: vai para o primeiro
+            separador, «Todos os jogos» (28 set). */}
+        {tab === tabs[0] && Podium && (
           <div className="mb-4"><Suspense fallback={null}><Podium {...panelProps} /></Suspense></div>
         )}
         {Panel ? (

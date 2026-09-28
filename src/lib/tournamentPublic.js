@@ -16,14 +16,17 @@ import { slotsLeft } from './tournamentSignup'
    em vez de inventar. */
 export function formatWords(category) {
   const f = category?.format
-  if (!f || (!f.groups && !f.knockout_size)) return { key: 'tpublic.format_unknown', values: {} }
+  // O sorteio grava a eliminatória como { key: 'eliminatoria', groups: 0,
+  // qualifiers } — sem `knockout_size`. Lê-se das duas maneiras.
+  const knockoutTeams = f?.knockout_size || (f?.key === 'eliminatoria' ? f.qualifiers : null)
+  if (!f || (!f.groups && !knockoutTeams)) return { key: 'tpublic.format_unknown', values: {} }
   if (f.groups > 0) {
     return {
       key: 'tpublic.format_groups',
       values: { groups: f.groups, qualifiers: f.qualifiers_per_group || 1 },
     }
   }
-  return { key: 'tpublic.format_knockout', values: { teams: f.knockout_size } }
+  return { key: 'tpublic.format_knockout', values: { teams: knockoutTeams } }
 }
 
 /* "Sábado, a partir das 12h" — dia e hora de começo da categoria.

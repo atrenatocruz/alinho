@@ -1016,7 +1016,8 @@ const TABLE_MOCKS = {
       const d = new Date(); d.setDate(d.getDate() + n)
       return d.toISOString().slice(0, 10)
     }
-    return [{ ...tour, starts_on: day(1), ends_on: day(3), status: 'inscricoes', category_count: 5 }]
+    const d0 = localStorage.getItem('mockTHomeToday') === 'true' ? 0 : 1
+    return [{ ...tour, starts_on: day(d0), ends_on: day(d0 + 2), status: d0 === 0 ? 'a_decorrer' : 'inscricoes', category_count: 5 }]
   },
   tournament_entries: () => (localStorage.getItem('mockTMyGamesReal') === 'true'
     ? [{ id: 'e1', category_id: 'cat-m4', status: 'validada' }]
@@ -1031,8 +1032,11 @@ const TABLE_MOCKS = {
       return [{ id: 'rp1', category_id: 'cat-m4', entry_a_id: 'e1', entry_b_id: 'e3', status: 'terminado', winner_entry_id: 'e1', score_a: 9, score_b: 6 }]
     }
     if (localStorage.getItem('mockTHome') !== 'matches') return []
+    // localStorage.mockTHomeToday = 'true': os meus jogos são hoje (para ver
+    // o «Marcar resultados» por baixo deles, 28 set).
+    const shift = localStorage.getItem('mockTHomeToday') === 'true' ? -1 : 0
     const at = (days, hour) => {
-      const d = new Date(); d.setDate(d.getDate() + days); d.setHours(hour, 0, 0, 0)
+      const d = new Date(); d.setDate(d.getDate() + days + shift); d.setHours(hour, 0, 0, 0)
       return d.toISOString()
     }
     const was = (days, hour) => at(days, hour)
@@ -1344,6 +1348,14 @@ RPC_MOCKS.skip_recurrence_game = () => { const d = new Date(); d.setDate(d.getDa
 RPC_MOCKS.default_whatsapp_post_times = () => ['10:00', '18:30']
 RPC_MOCKS.set_event_whatsapp_post_times = (params) => [...(params?.p_times || [])].sort()
 RPC_MOCKS.ensure_recurrence_successor = () => localStorage.getItem('mockEnsureStatus') || 'created'
+const OPEN_BATCH = () => {
+  const at = (h, m = 0) => { const d = new Date(); d.setDate(d.getDate() + 2); d.setHours(h, m, 0, 0); return d.toISOString() }
+  const g = (id, h, m, people) => ({ id, organization_id: MOCK_ADMIN_ORG_ID, title: 'Jogo em aberto', date: at(h, m), court_time_minutes: 90,
+    price_per_player: 8, location: 'Smash Padel Almada', status: 'open', origin: 'open_slot', open_batch_id: 'b-open', max_players: 4, num_courts: 1,
+    participants: people.map((st, i) => ({ id: `${id}-p${i}`, user_id: `u-${id}-${i}`, partner_id: null, status: st })) })
+  return [g('ob-1', 18, 0, ['confirmed', 'confirmed']), g('ob-2', 19, 30, []), g('ob-3', 21, 0, [])]
+}
+RPC_MOCKS.update_open_slot_batch = () => ['ob-1', 'ob-2', 'ob-3']
 TABLE_MOCKS.games = (url) => {
   let rows = gamesSemFiltro(url)
   const u = decodeURIComponent(url)
@@ -1358,6 +1370,12 @@ TABLE_MOCKS.games = (url) => {
   if (localStorage.getItem('mockOpenGameEmpty') === 'true' && /origin=eq\.open_slot/.test(u)) {
     const d = new Date(); d.setDate(d.getDate() + 2); d.setHours(19, 0, 0, 0)
     return [{ id: 'fake-open-empty', organization_id: MOCK_ADMIN_ORG_ID, title: 'Jogo em aberto', date: d.toISOString(), location: 'Smash Padel Almada', status: 'open', origin: 'open_slot', max_players: 4, num_courts: 1, participants: [] }]
+  }
+  // localStorage.mockOpenBatch = 'true' — uma publicação de jogos em aberto
+  // com três horários no mesmo dia, o primeiro já com alguém confirmado:
+  // o «Editar» no Gerir e o cadeado por horário (#586, 28 set).
+  if (localStorage.getItem('mockOpenBatch') === 'true' && (/origin=eq\.open_slot/.test(u) || /open_batch_id=eq\./.test(u))) {
+    return OPEN_BATCH()
   }
   if (localStorage.getItem('mockNoPending') === 'true' && /status=eq\.pending/.test(u)) rows = []
   // localStorage.mockMixPairs = 'mixed' | 'pairs' | 'mine' — mix com

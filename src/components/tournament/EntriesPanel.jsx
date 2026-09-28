@@ -318,10 +318,11 @@ function AdminEntrySheet({ organizationId, categories = [], categoryId: initialC
   )
 }
 
-export default function EntriesPanel({ tournament, categories = [], category }) {
+export default function EntriesPanel({ tournament, categories = [], category, publicView = false }) {
   const { t } = useTranslation()
   const { adminOrganizations } = useAuth()
-  const isAdmin = (adminOrganizations || []).some?.((o) => (o.id || o) === tournament.organization_id)
+  // Na vista de quem chega de fora, a lista é a de toda a gente.
+  const isAdmin = !publicView && (adminOrganizations || []).some?.((o) => (o.id || o) === tournament.organization_id)
   const [rows, setRows] = useState([])
   const [filter, setFilter] = useState('all')
   const [busy, setBusy] = useState(false)
@@ -485,9 +486,13 @@ export default function EntriesPanel({ tournament, categories = [], category }) 
               label: `${t(`tentries.filter_${f}`)} ${f === 'all' ? base.length : base.filter((r) => r.status === f).length}`,
             }))}
           />
-          <button type="button" onClick={() => { setError(''); setAddOpen(true) }} className="btn-secondary w-full inline-flex items-center justify-center gap-2">
-            <UserPlus size={18} /> {t('tentries.admin_add_title')}
-          </button>
+          {/* Depois do sorteio já não se inscreve à mão: a dupla não entrava no
+              quadro nem nos jogos (revisão dos torneios, 28 set). */}
+          {!['sorteada', 'a_decorrer', 'terminada'].includes(category.status) && (
+            <button type="button" onClick={() => { setError(''); setAddOpen(true) }} className="btn-secondary w-full inline-flex items-center justify-center gap-2">
+              <UserPlus size={18} /> {t('tentries.admin_add_title')}
+            </button>
+          )}
         </>
       )}
 

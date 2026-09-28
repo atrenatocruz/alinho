@@ -109,10 +109,11 @@ function NoticeComposer({ tournament, editing, busy, error, onSave, onClose }) {
   )
 }
 
-export default function NoticesSlot({ tournament }) {
+export default function NoticesSlot({ tournament, publicView = false }) {
   const { t } = useTranslation()
   const { adminOrganizations } = useAuth()
-  const isAdmin = (adminOrganizations || []).some?.((o) => (o.id || o) === tournament.organization_id)
+  // Na vista de quem chega de fora não há «Publicar aviso» nem editar.
+  const isAdmin = !publicView && (adminOrganizations || []).some?.((o) => (o.id || o) === tournament.organization_id)
   const [composer, setComposer] = useState(null) // null | 'new' | notice
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')

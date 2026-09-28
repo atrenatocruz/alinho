@@ -384,22 +384,27 @@ export const AuthProvider = ({ children }) => {
     return Promise.resolve()
   }
 
-  const signUp = async (email, password, userData) => {
+  // captchaToken: the Turnstile token (src/components/TurnstileWidget.jsx),
+  // only sent when the widget produced one. Supabase ignores it while its
+  // captcha toggle is off and requires it once the toggle is on.
+  const signUp = async (email, password, userData, captchaToken) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: userData,
         emailRedirectTo: window.location.href,
+        ...(captchaToken ? { captchaToken } : {}),
       }
     })
     return { data, error }
   }
 
-  const signIn = async (email, password) => {
+  const signIn = async (email, password, captchaToken) => {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
+      ...(captchaToken ? { options: { captchaToken } } : {}),
     })
     return { data, error }
   }
@@ -408,9 +413,10 @@ export const AuthProvider = ({ children }) => {
   // allow-list (Authentication → URL Configuration, dashboard config, not
   // code — see the domain-redirects note in CLAUDE.md) or the link in the
   // email silently fails to sign the visitor in on the other end.
-  const resetPassword = async (email) => {
+  const resetPassword = async (email, captchaToken) => {
     const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/redefinir-password`,
+      ...(captchaToken ? { captchaToken } : {}),
     })
     return { data, error }
   }

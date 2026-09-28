@@ -17,21 +17,49 @@ function pairKey(a, b) {
   return [a, b].sort().join('|')
 }
 
-// Port of src/lib/mixLogic.js's formDuplas — same algorithm, adapted to
-// work off raw ids (user_id/partner_id) instead of hydrated profile
-// objects, since the bot doesn't need the extra fields the web app's
-// version carries through for display.
+// Port of src/lib/mixLogic.js's formDuplas (modo «por nível») — o mesmo
+// algoritmo, sobre ids (user_id/partner_id) em vez de perfis.
 //
-// Lado preferido (Trello #404): o bot escolhia o parceiro só por pontos e
-// por pares repetidos, sem olhar ao lado — juntava dois esquerdinos à
-// vontade, e o mix começado pelo bot saía pior do que o mesmo mix começado
-// na app. Agora a escolha é: sem repetir E lados diferentes; depois sem
-// repetir; e só no fim o mais próximo em pontos.
-//
-// A app faz melhor: recua e experimenta outras combinações para chegar ao
-// mínimo possível de duplas do mesmo lado. Aqui a escolha é seguida, sem
-// recuar. Unificar as três implementações é o que o cartão #399 regista.
-function formDuplas(participants, pointsById, repeatPairKeys, sideById = {}) {
+// Até 28 set a escolha aqui era seguida, sem recuar: cada um levava o mais
+// próximo em pontos que não fosse repetição, e os dois últimos ficavam
+// juntos mesmo que já tivessem jogado juntos (idx = 0). No mix +1 de 28 set
+// saiu assim Aurélio + Diogo Alexandre, dupla do mix de 21 set, quando havia
+// uma escolha sem repetições (a que a app faz). Agora é a mesma busca da
+// app: sem repetir pares dos últimos 4 mixes, com o lado preferido como
+// segunda ordem (primeiro zero duplas do mesmo lado, depois uma…), e a
+// recuar sempre que uma escolha deixa o resto sem saída. Só quando é mesmo
+// impossível não repetir é que volta à escolha seguida — e diz quais.
+const SEARCH_STEPS = 200000
+
+/** Tenta 0 duplas do mesmo lado, depois 1, depois 2… e fica com a primeira
+    que completa a lista. null = as repetições não deixam. */
+function fewestSameSide(searchOnce, maxPairs) {
+  for (let allowance = 0; allowance <= maxPairs; allowance++) {
+    const result = searchOnce(allowance, { steps: SEARCH_STEPS })
+    if (result) return result
+  }
+  return null
+}
+
+function matchWithoutRepeats(remaining, repeatPairKeys, sidesFit, sameSideLeft, budget) {
+  if (remaining.length <= 1) return []
+  if (budget.steps-- <= 0) return null
+  const [a, ...rest] = remaining
+  const tiers = sameSideLeft > 0 ? [true, false] : [true]
+  for (const wantFit of tiers) {
+    for (let i = 0; i < rest.length; i++) {
+      const b = rest[i]
+      if (repeatPairKeys.has(pairKey(a, b))) continue
+      if (sidesFit(a, b) !== wantFit) continue
+      const others = [...rest.slice(0, i), ...rest.slice(i + 1)]
+      const completion = matchWithoutRepeats(others, repeatPairKeys, sidesFit, wantFit ? sameSideLeft : sameSideLeft - 1, budget)
+      if (completion) return [[a, b], ...completion]
+    }
+  }
+  return null
+}
+
+export function formDuplas(participants, pointsById, repeatPairKeys, sideById = {}) {
   const duplas = []
   const solos = []
   for (const row of participants) {
@@ -44,20 +72,35 @@ function formDuplas(participants, pointsById, repeatPairKeys, sideById = {}) {
   const sidesFit = (x, y) => sideOf(x) === 'both' || sideOf(y) === 'both' || sideOf(x) !== sideOf(y)
   solos.sort((a, b) => pointsOf(b) - pointsOf(a))
 
-  while (solos.length >= 2) {
-    const a = solos.shift()
-    let idx = solos.findIndex((candidate) => !repeatPairKeys.has(pairKey(a, candidate)) && sidesFit(a, candidate))
-    if (idx === -1) idx = solos.findIndex((candidate) => !repeatPairKeys.has(pairKey(a, candidate)))
-    if (idx === -1) idx = 0 // everyone left is a repeat — accept the closest rather than leave a gap
-    const b = solos.splice(idx, 1)[0]
-    duplas.push([a, b])
+  const forcedRepeats = []
+  let soloPairs = fewestSameSide(
+    (allowance, budget) => matchWithoutRepeats(solos, repeatPairKeys, sidesFit, allowance, budget),
+    Math.floor(solos.length / 2),
+  )
+  if (!soloPairs) {
+    // Impossível sem repetir: a escolha seguida de antes, e fica registado.
+    soloPairs = []
+    const remaining = [...solos]
+    while (remaining.length >= 2) {
+      const a = remaining.shift()
+      let idx = remaining.findIndex((candidate) => !repeatPairKeys.has(pairKey(a, candidate)) && sidesFit(a, candidate))
+      if (idx === -1) idx = remaining.findIndex((candidate) => !repeatPairKeys.has(pairKey(a, candidate)))
+      if (idx === -1) idx = 0
+      const b = remaining.splice(idx, 1)[0]
+      if (repeatPairKeys.has(pairKey(a, b))) forcedRepeats.push([a, b])
+      soloPairs.push([a, b])
+    }
   }
+  duplas.push(...soloPairs)
 
-  return duplas.map(([p1, p2]) => ({
+  const rows = duplas.map(([p1, p2]) => ({
     player1_id: p1,
     player2_id: p2,
     seed_ranking: pointsOf(p1) + pointsOf(p2),
   }))
+  // Para o log (e para os testes): quem repetiu por não haver alternativa.
+  rows.forcedRepeats = forcedRepeats
+  return rows
 }
 
 // O bot só sabe conduzir o que consegue formar: duplas fixas em "Sobe e
@@ -142,6 +185,9 @@ async function autoStartMix(game, { sendText }) {
   }
 
   const duplas = formDuplas(participants || [], pointsById, repeatPairKeys, sideById)
+  if (duplas.forcedRepeats.length) {
+    console.warn(`Auto-start do mix ${game.id}: ${duplas.forcedRepeats.length} dupla(s) repetida(s) por não haver alternativa`)
+  }
   if (duplas.length < 2) {
     // Not enough confirmed players yet — leave status alone, try again
     // next tick (mirrors "São precisas pelo menos 2 duplas" client-side).
