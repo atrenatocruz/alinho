@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { CheckCircle2, Clock, GraduationCap, Repeat } from 'lucide-react'
-import { Owner, StateTag } from '../agenda/EventCard'
+import { OrgHeader, Owner, StateTag } from '../agenda/EventCard'
 import { ConfirmSheet } from '../ui'
 import { LevelPill, TEAL, TealTag, bandLabel, euros, hhmm, lessonTypeLabel } from './LessonBits'
 
@@ -88,6 +88,7 @@ export default function LessonEventCard({ event, past = false, onAttendance = nu
   return (
     <div className={`relative overflow-hidden rounded-card p-3.5 press ${frame}`} style={frameStyle}>
       <Link to={isRequest ? `/professor/${base.teacher_profile_id}/pedir` : `/aula/${l.lesson_id}`} className="absolute inset-0" aria-label={title} />
+      <OrgHeader event={event} past={past} />
       <div className="flex items-start justify-between gap-2">
         <span className="flex flex-wrap gap-1">
           <TealTag icon={GraduationCap}>{typeLabel}</TealTag>
@@ -105,8 +106,8 @@ export default function LessonEventCard({ event, past = false, onAttendance = nu
         <p className="text-[13px] text-ink-700 mt-1">{t('lessons.cancel_line', { name: l.teacher_name, reason: t(`lessons.reason_${l.cancel_reason || 'other'}`).toLowerCase() })}{l.cancel_note ? ` ${l.cancel_note}` : ''}</p>
       ) : (
         <div className="mt-1 flex items-center gap-1 min-w-0 text-sm text-ink-700">
-          <div className="min-w-0"><Owner event={event} fallbackKey="lessons.no_club" /></div>
-          {price && <span className="shrink-0">· {price}</span>}
+          {!event.orgName && <div className="min-w-0"><Owner event={event} fallbackKey="lessons.no_club" /></div>}
+          {price && <span className="shrink-0">{event.orgName ? price : `· ${price}`}</span>}
         </div>
       )}
       {event.myState === 'not_going' && !cancelled && (

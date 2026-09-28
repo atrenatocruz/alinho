@@ -2405,8 +2405,11 @@ export default function GameDetails() {
                 orgName: gameMembership.organization.name,
                 orgKind: gameMembership.organization.kind,
                 orgLogo: gameMembership.organization.group_logo_url,
+                orgSlug: gameMembership.organization.slug,
+                orgId: game.organization_id,
               }}
               fallbackKey="agenda.owner_none"
+              link
             />
           </div>
         )}

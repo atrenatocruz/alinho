@@ -4133,5 +4133,7 @@
   "lessons.edit_err_not_allowed": "You can't change this class.",
   "lessons.notice_series_changed": "The {{old}} class changed: it's now {{series}}",
   "lessons.notice_series_changed_teacher": "The {{old}} class changed: it's now with {{teacher_now}}",
-  "lessons.notice_series_changed_both": "The {{old}} class changed: it's now {{series}}, with {{teacher_now}}"
+  "lessons.notice_series_changed_both": "The {{old}} class changed: it's now {{series}}, with {{teacher_now}}",
+  "agenda.org_group_organizer": "Organising group",
+  "agenda.org_club_organizer": "Organising club"
 }

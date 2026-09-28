@@ -4145,5 +4145,7 @@
   "lessons.edit_err_not_allowed": "Não podes mudar esta turma.",
   "lessons.notice_series_changed": "A turma de {{old}} mudou: agora é {{series}}",
   "lessons.notice_series_changed_teacher": "A turma de {{old}} mudou: agora é com {{teacher_now}}",
-  "lessons.notice_series_changed_both": "A turma de {{old}} mudou: agora é {{series}}, com {{teacher_now}}"
+  "lessons.notice_series_changed_both": "A turma de {{old}} mudou: agora é {{series}}, com {{teacher_now}}",
+  "agenda.org_group_organizer": "Grupo organizador",
+  "agenda.org_club_organizer": "Clube organizador"
 }
