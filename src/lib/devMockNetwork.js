@@ -262,7 +262,7 @@ const RPC_MOCKS = {
       team_a_player1_id: a1[0], team_a_player1_name: a1[1], team_a_player1_status: 'accepted', team_a_player2_id: a2[0], team_a_player2_name: a2[1], team_a_player2_status: 'accepted',
       team_b_player1_id: b1[0], team_b_player1_name: b1[1], team_b_player1_status: 'accepted', team_b_player2_id: b2[0], team_b_player2_name: b2[1], team_b_player2_status: 'accepted',
       session_id: 'fs-home', game_number: n, organization_id: null, game_minutes: null, started_at: null, pairing_mode: 'rotating',
-      my_rating_delta: sa == null ? null : (sa > sb ? 6 : -4), ...extra })
+      my_rating_delta: sa == null ? null : (sa > sb ? 6 : -4), my_points: sa == null ? null : (sa > sb ? 3 : 1), ...extra })
     const sc = (n) => (mode === 'done' || (mode === 'running' && n <= 2) ? [2, n % 2] : [null, null])
     const session = [
       row('fs-home', 1, P.me, P.cl, P.re, P.ru, ...sc(1)),
@@ -272,7 +272,11 @@ const RPC_MOCKS = {
       row('fs-h5', 5, P.me, P.re, P.ru, P.ca, ...sc(5)),
     ]
     const solo = row('pm-solo', 1, P.me, P.da, P.ru, P.cl, null, null, { session_id: null, scheduled_time: '19:00:00', location: 'Smash Padel Almada', game_number: null })
-    return [...session, solo]
+    // Um jogo solto antigo com resultado por sets à espera da outra equipa
+    // (os sets estão em private_match_sets: 6-7, 2-6).
+    const soloSets = row('pm-sets', 1, P.me, P.da, P.ru, P.cl, null, null, { session_id: null, scheduled_time: '18:00:00', location: 'Smash Padel Almada', game_number: null,
+      score_a: 0, score_b: 2, winner_team: 'b', score_submitted_by: MOCK_ADMIN_USER_ID, score_submitted_by_name: 'Admin (Dev)' })
+    return [...session, solo, soloSets]
   })() : agenda() ? AGENDA_PRIVATE_MATCHES() : (localStorage.getItem('mockPrivateInvite') === 'true' ? [
     {
       id: 'pm-invite', status: 'pending', ranked_intent: true, scheduled_date: '2026-09-20', scheduled_time: '19:00:00', location: 'Smash Padel Almada',
@@ -958,6 +962,9 @@ function lastMinuteRequest(table, url, method, body) {
 }
 
 const TABLE_MOCKS = {
+  // Os sets do jogo solto «pm-sets» do mockHomeSession (Editar resultado).
+  private_match_sets: (url) => (/pm-sets/.test(decodeURIComponent(url))
+    ? [{ set_number: 1, score_a: 6, score_b: 7 }, { set_number: 2, score_a: 2, score_b: 6 }] : []),
   // localStorage.mockJoinRequests = 'true' — 2 pedidos para entrar no Dev Org,
   // para ver o aviso no sino (Francisco, 19 set: já não há faixa na Home).
   membership_requests: () => (localStorage.getItem('mockJoinRequests') === 'true' ? [

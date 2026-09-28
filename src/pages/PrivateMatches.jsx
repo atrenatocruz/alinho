@@ -7,6 +7,9 @@ import { ArrowLeft, Plus, Trophy, Copy, Check, Trash2, Calendar, MapPin } from '
 import {
   getMyPrivateMatches, submitPrivateMatchScore, confirmPrivateMatch, deletePrivateMatch, respondToPrivateMatch, privateMatchCanConfirm } from '../lib/privateMatches'
 import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../lib/supabase'
+import { eventsFromPrivateMatches } from '../lib/agenda'
+import { FriendSessionCard } from '../components/agenda/EventCard'
 import { PrimaryButton, EmptyState } from '../components/ui'
 import { formatDate } from '../lib/formatDate'
 import { describeError } from '../lib/errors'
@@ -144,7 +147,7 @@ const teamLabel = (m, prefix, t) => {
 export default function PrivateMatches() {
   const goBack = useGoBack('/perfil')
   const { t, i18n } = useTranslation()
-  const { profile } = useAuth()
+  const { profile, memberships } = useAuth()
   const [matches, setMatches] = useState([])
   const [loading, setLoading] = useState(true)
   // Pending matches whose already-submitted score is being corrected.
@@ -155,20 +158,30 @@ export default function PrivateMatches() {
   const [submittingId, setSubmittingId] = useState(null)
   const [respondingId, setRespondingId] = useState(null)
 
-  const toggleEditScore = (match) => {
-    setEditingScoreIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(match.id)) {
+  const toggleEditScore = async (match) => {
+    if (editingScoreIds.has(match.id)) {
+      setEditingScoreIds((prev) => {
+        const next = new Set(prev)
         next.delete(match.id)
-      } else {
-        next.add(match.id)
-        // Prefill from the stored score so opening "corrigir" doesn't start
-        // from a blank pair — only meaningful for the single-pair formats,
-        // harmless (unused) for the sets ones.
-        setScores((prevScores) => ({ ...prevScores, [match.id]: { a: String(match.score_a ?? ''), b: String(match.score_b ?? '') } }))
-      }
-      return next
-    })
+        return next
+      })
+      return
+    }
+    // Prefill from the stored score so opening "corrigir" doesn't start
+    // from a blank pair. Nos sets, os sets gravados: sem isto o «Editar
+    // resultado» abria vazio e parecia que o resultado tinha ido a zero
+    // (Francisco, 28 set — o 0-2 eram os sets ganhos, 6-7 e 2-6).
+    let sets = null
+    if ((match.scoring_format || 'pontos_simples') === 'sets') {
+      const { data } = await supabase
+        .from('private_match_sets')
+        .select('set_number, score_a, score_b')
+        .eq('private_match_id', match.id)
+        .order('set_number')
+      sets = (data || []).map((s) => ({ a: String(s.score_a), b: String(s.score_b) }))
+    }
+    setScores((prevScores) => ({ ...prevScores, [match.id]: { a: String(match.score_a ?? ''), b: String(match.score_b ?? ''), sets } }))
+    setEditingScoreIds((prev) => new Set(prev).add(match.id))
   }
 
   const load = useCallback(async () => {
@@ -237,7 +250,19 @@ export default function PrivateMatches() {
     }
   }
 
-  const pending = matches.filter((m) => m.status === 'pending')
+  // Os jogos do desenho novo (convidar primeiro, equipas depois — têm
+  // session_id) abrem no ecrã deles, com editar, rondas e sets: aqui um
+  // cartão por sessão, o mesmo da Home. O cartão de sempre, com o resultado
+  // aqui dentro, fica só para os jogos soltos antigos (Francisco, 28 set:
+  // «porque não consigo editar o jogo… só editar o resultado»).
+  const openSessionIds = new Set(matches.filter((m) => m.session_id && m.status === 'pending').map((m) => m.session_id))
+  const sessionEvents = eventsFromPrivateMatches(
+    matches.filter((m) => openSessionIds.has(m.session_id)),
+    profile?.id,
+    new Map((memberships || []).map((ms) => [ms.organization_id,
+      { name: ms.organization?.name, kind: ms.organization?.kind, logo: ms.organization?.group_logo_url }])),
+  ).sort((a, b) => a.startsAt - b.startsAt)
+  const pending = matches.filter((m) => m.status === 'pending' && !m.session_id)
   const confirmed = matches.filter((m) => m.status === 'confirmed')
 
   if (loading) {
@@ -263,6 +288,10 @@ export default function PrivateMatches() {
 
       {/* Convites por responder e jogos à espera de equipas (#342). */}
       <FriendSessionsList />
+
+      {sessionEvents.map((event) => (
+        <FriendSessionCard key={event.key} event={event} userId={profile?.id} />
+      ))}
 
       {pending.length > 0 && (
         <div>
@@ -345,6 +374,7 @@ export default function PrivateMatches() {
                       {(m.scoring_format || 'pontos_simples') === 'sets' ? (
                         <ScoreEntrySets
                           numSets={m.num_sets || 3}
+                          initial={scores[m.id]?.sets}
                           onSave={(finalScore) => handleSubmitScore(m.id, finalScore)}
                           saving={submittingId === m.id}
                         />
