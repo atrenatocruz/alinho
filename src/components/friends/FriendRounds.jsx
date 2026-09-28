@@ -24,6 +24,8 @@ import { ConfirmSheet } from '../ui'
 import { addFriendMatchRound, moveFriendMatchRound, removeFriendMatchRound } from '../../lib/privateMatches'
 import { planRounds, courtsFor } from '../../lib/friendTeams'
 import { describeError } from '../../lib/errors'
+import { beforeStart } from '../../lib/friendGames'
+import { dayText } from './dayText'
 
 // Os erros das funções novas (Dev 3). Sem a função em produção, describeError
 // já diz «ainda não disponível» (not_ready).
@@ -31,7 +33,7 @@ const roundError = (t, err) => (String(err?.message || '').includes('already_cou
   ? t('friends.round_error_counted') : describeError(t, err))
 
 export default function FriendRounds({ match, games, invitees, players, iAmCreator, myUserId, onChanged }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [setFor, setSetFor] = useState(null) // { game, round }
   const [resultFor, setResultFor] = useState(null)
   const [editFor, setEditFor] = useState(null) // a ronda
@@ -50,7 +52,14 @@ export default function FriendRounds({ match, games, invitees, players, iAmCreat
   const name = (p) => (anon.has(p.invitee_id) ? <i key={p.invitee_id} className="font-semibold text-muted">{t('friends.anon_name')}</i> : shortName(p.name))
   const pair = (team) => (team || []).map((p, i) => <span key={p.invitee_id || i}>{i > 0 && ' / '}{name(p)}</span>)
   const hasAnon = (g) => [...(g.team_a || []), ...(g.team_b || [])].some((p) => anon.has(p.invitee_id))
-  const open = (g, round) => (bySets ? setSetFor({ game: g, round: round.number }) : setResultFor(g))
+  // O resultado marca-se a partir da hora do jogo, durante ou depois
+  // (Francisco, 28 set): antes, «Marcar» fica apagado, com a frase.
+  const early = beforeStart(match.scheduled_date, match.scheduled_time)
+  const earlyText = t('friends.results_from', {
+    time: match.scheduled_time ? String(match.scheduled_time).slice(0, 5) : '00:00',
+    day: match.scheduled_date ? dayText(match.scheduled_date, i18n.language).toLocaleLowerCase(i18n.language) : '',
+  })
+  const open = (g, round) => { if (!early) (bySets ? setSetFor({ game: g, round: round.number }) : setResultFor(g)) }
 
   const court = (g, round) => {
     const [wa, wb] = setsWon(g)
@@ -79,8 +88,8 @@ export default function FriendRounds({ match, games, invitees, players, iAmCreat
           )}
         {/* Dois campos: cada um marca o seu. */}
         {round.current && round.courts.length > 1 && canRecord(g) && !hasResult(g) && (
-          <button type="button" onClick={(e) => { e.stopPropagation(); open(g, round) }}
-            className="press mt-2.5 min-h-[44px] w-full rounded-ctrl bg-ink-900 px-3 text-sm font-extrabold text-white">
+          <button type="button" onClick={(e) => { e.stopPropagation(); open(g, round) }} disabled={early}
+            className="press mt-2.5 min-h-[44px] w-full rounded-ctrl bg-ink-900 px-3 text-sm font-extrabold text-white disabled:bg-ink-200 disabled:text-ink-500">
             {bySets ? t('friends.mark_set', { n: s.length + 1 }) : t('friends.mark_result')}
           </button>
         )}
@@ -132,7 +141,8 @@ export default function FriendRounds({ match, games, invitees, players, iAmCreat
     ? <span className="rounded-full bg-[#DCFCE7] px-2.5 py-0.5 text-xs font-extrabold text-[#14532D]">{t('friends.round_counted')}</span>
     : r.done
     ? <span className="rounded-full bg-[#DCFCE7] px-2.5 py-0.5 text-xs font-extrabold text-[#14532D]">{t('friends.round_done')}</span>
-    : r.current
+    // Antes da hora do jogo nenhuma ronda está «A decorrer» (UX, 28 set).
+    : r.current && !early
       ? <span className="rounded-full bg-danger/10 px-2.5 py-0.5 text-xs font-extrabold text-danger">
         {bySets ? t('friends.round_live_set', { n: Math.max(1, ...r.courts.map((g) => setsOf(g).length + 1)) }) : t('friends.round_live')}
       </span>
@@ -186,11 +196,12 @@ export default function FriendRounds({ match, games, invitees, players, iAmCreat
             {/* Na ronda a decorrer, «Marcar set» a toda a largura, por baixo
                 (designer, 27 set: o Remover também está nesta ronda). */}
             {canMark && (
-              <button type="button" onClick={() => open(single, r)}
-                className="press mt-2 min-h-[44px] w-full rounded-ctrl bg-ink-900 px-3 text-sm font-extrabold text-white">
+              <button type="button" onClick={() => open(single, r)} disabled={early}
+                className="press mt-2 min-h-[44px] w-full rounded-ctrl bg-ink-900 px-3 text-sm font-extrabold text-white disabled:bg-ink-200 disabled:text-ink-500">
                 {bySets ? t('friends.mark_set', { n: setsOf(single).length + 1 }) : t('friends.mark_result')}
               </button>
             )}
+            {early && r.current && <p className="mt-1.5 text-xs text-muted">{earlyText}</p>}
           </section>
         )
       })}

@@ -8,7 +8,8 @@ import {
   getMyPrivateMatches, listMyFriendSessions, submitPrivateMatchScore, confirmPrivateMatch, deletePrivateMatch, respondToPrivateMatch, privateMatchCanConfirm } from '../lib/privateMatches'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { groupFriendGames, friendGameFacts } from '../lib/friendGames'
+import { groupFriendGames, friendGameFacts, beforeStart } from '../lib/friendGames'
+import { dayText } from '../components/friends/dayText'
 import { loadSetsByGame } from '../lib/friendMatchDelete'
 import FriendGameRow from '../components/friends/FriendGameRow'
 import { PrimaryButton, EmptyState } from '../components/ui'
@@ -398,6 +399,12 @@ export default function PrivateMatches() {
                         {t('privatematches.edit_score')}
                       </button>
                     </>
+                  ) : beforeStart(m.scheduled_date, m.scheduled_time) ? (
+                    // Antes da hora do jogo não se marca resultado (Francisco, 28 set).
+                    <p className="text-sm text-muted mt-3">{t('friends.results_from', {
+                      time: m.scheduled_time ? m.scheduled_time.slice(0, 5) : '00:00',
+                      day: dayText(m.scheduled_date, i18n.language).toLocaleLowerCase(i18n.language),
+                    })}</p>
                   ) : allFilled ? (
                     <div className="mt-3">
                       {(m.scoring_format || 'pontos_simples') === 'sets' ? (

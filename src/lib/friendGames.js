@@ -72,3 +72,20 @@ export function friendGameFacts(group, setsById = {}) {
     location: first.location || null,
   }
 }
+
+/** Quando o jogo começa (dia e hora marcados, hora de cá). Os resultados só
+ *  se marcam a partir daí — durante («a decorrer», como no mix) ou depois
+ *  (Francisco, 28 set, SPEC 2026-09-28-amigos-apagar-da-lista). Sem dia, null:
+ *  não há regra. Sem hora, o começo do dia. */
+export function friendMatchStartsAt(date, time) {
+  if (!date) return null
+  const [y, m, d] = String(date).split('-').map(Number)
+  const [hh = 0, mm = 0] = time ? String(time).split(':').map(Number) : []
+  return new Date(y, m - 1, d, hh, mm)
+}
+
+/** Ainda antes da hora do jogo? */
+export const beforeStart = (date, time, now = new Date()) => {
+  const at = friendMatchStartsAt(date, time)
+  return Boolean(at && now < at)
+}

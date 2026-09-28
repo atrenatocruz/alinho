@@ -460,8 +460,13 @@ const RPC_MOCKS = {
       ]
       const counted = localStorage.getItem('mockFriendCounted') === 'true'
       if (counted) games[0].counts = true
+      // mockFriendStarted = 'false': o jogo é daqui a 6 dias, ainda sem
+      // resultados, e o «Marcar» fica apagado (resultado só a partir da hora,
+      // 28 set). Por omissão começou ontem, com os resultados acima.
+      const notStarted = localStorage.getItem('mockFriendStarted') === 'false'
+      if (notStarted) games.forEach((x) => Object.assign(x, { sets: [], score_a: null, score_b: null, winner_team: null }))
       return {
-        match: { id: 'fs-1', scheduled_date: new Date(Date.now() + 6 * 86400000).toISOString().slice(0, 10), scheduled_time: '10:00:00', location: 'Clube Exemplo', court: null,
+        match: { id: 'fs-1', scheduled_date: new Date(Date.now() + (notStarted ? 6 : -1) * 86400000).toISOString().slice(0, 10), scheduled_time: '10:00:00', location: 'Clube Exemplo', court: null,
           teams_mode: 'app', pairing_mode: 'rotating', scoring_format: 'sets', num_sets: 3, game_minutes: null, teams_set_at: new Date().toISOString(),
           ranked_intent: true, ranking_locked: counted },
         invitees, games,
