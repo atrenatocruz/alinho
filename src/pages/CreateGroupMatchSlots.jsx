@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
+import PlacesUnavailableHint from '../components/PlacesUnavailableHint'
 import { useAuth } from '../contexts/AuthContext'
 import { getClubProfile } from '../lib/clubProfile'
 import { listOrganizationMembers } from '../lib/clubProfile'
@@ -145,6 +146,7 @@ export default function CreateGroupMatchSlots() {
             className="input-field"
             placeholder={t('creategroupmatch.location_placeholder')}
           />
+          <PlacesUnavailableHint />
         </div>
       )}
 

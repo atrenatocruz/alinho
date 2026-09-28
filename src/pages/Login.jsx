@@ -202,6 +202,16 @@ export default function Login() {
 
       if (error) throw error
 
+      // With "Confirm email" on, Supabase answers a signup for an address
+      // that already has an account with a fake success (no session, no
+      // email sent) rather than an error, so nobody can probe which emails
+      // are registered. Its documented tell is an empty `identities` list.
+      // Without this check the person would sit waiting for a confirmation
+      // email that never comes.
+      if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+        throw new Error('User already registered')
+      }
+
       // No session means the address has to be confirmed first — signing in
       // now would just fail with "email not confirmed". AuthContext hashes
       // the stashed phone once the confirmation link produces a session.

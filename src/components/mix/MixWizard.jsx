@@ -24,6 +24,7 @@ import { AGE_RESTRICTIONS } from '../../lib/ageCategories'
 import { formatDate, formatTime } from '../../lib/formatDate'
 import { LEVEL_SCALES, LEVEL_NUMBERS, parseLevel, scaleForGender, GENDER_FOR_SCALE } from '../../lib/mixLevels'
 import WhatsappHoursField from '../WhatsappHoursField'
+import PlacesUnavailableHint from '../PlacesUnavailableHint'
 
 const pairsAreFixed = (form) => form.format !== 'americano' && !(form.rotate_partners && form.format === 'sobe_desce')
 
@@ -332,6 +333,7 @@ export default function MixWizard({
             className="input-field"
             placeholder={t('gerirclube.location_placeholder')}
           />
+          <PlacesUnavailableHint />
         </Field>
         <Field label={t('mixwizard.courts_label')}>
           <div className="flex items-center gap-3">
