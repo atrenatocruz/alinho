@@ -5,7 +5,8 @@
 // (src/lib/scoringLogic.js) — não se repete aqui. O que é próprio do
 // torneio é o que acontece quando alguém não aparece ou desiste, e a
 // arrumação dos jogos por campo no ecrã de quem marca.
-import { computeSetsResult, validateProSetScore } from './scoringLogic'
+import { computeSetsResult } from './scoringLogic'
+import { proSetProblem } from './scoreRules'
 
 /** O jogo dado por ganho vale o máximo da pontuação (SPEC §7: «ex. 9-0»).
  *  `loser` é 'a' ou 'b' — quem faltou ou desistiu. */
@@ -42,12 +43,14 @@ export function resultProblem(scoring, input) {
     if (Math.max(a, b) !== 2 || Math.min(a, b) > 1) return 'sets_open'
     return a === b ? 'tie' : null
   }
-  const { valid, needsBreaker } = validateProSetScore(a, b)
-  if (needsBreaker) return 'needs_breaker'
-  if (valid) return null
-  // O aviso diz o que está mal, em vez de um «não fecha o jogo» para tudo.
-  if (a === b) return 'tie'
-  if (Math.max(a, b) < 9) return 'short'
+  // A regra do pro set é a única (scoreRules.js, #588). O aviso diz o que
+  // está mal, em vez de um «não fecha o jogo» para tudo. Aqui chega só o
+  // resultado (sem os pontos do desempate): um 9-8 escrito à mão não fecha.
+  if (a === 8 && b === 8) return 'needs_breaker'
+  const problem = proSetProblem({ score_a: a, score_b: b })
+  if (!problem) return null
+  if (problem === 'tie') return 'tie'
+  if (problem === 'proset_short') return 'short'
   return 'invalid'
 }
 

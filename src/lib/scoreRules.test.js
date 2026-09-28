@@ -54,8 +54,11 @@ describe('pro set a 9', () => {
     expect(proSetProblem(s(8, 9, { tiebreak_a: 8, tiebreak_b: 10 }), 'super_tiebreak')).toBeNull()
     expect(proSetProblem(s(9, 8, { tiebreak_a: 4, tiebreak_b: 7 }))).toBe('tiebreak_invalid')
   })
-  it('recusa 9-8 sem ser de desempate e resultados fora do pro set', () => {
-    for (const [a, b] of [[10, 8], [6, 4], [9, 9]]) expect(proSetProblem(s(a, b))).toBe('proset_invalid')
+  it('diz o que está mal: empate, ninguém chegou aos 9, impossível', () => {
+    expect(proSetProblem(s(9, 9))).toBe('tie')
+    expect(proSetProblem(s(4, 4))).toBe('tie')
+    expect(proSetProblem(s(6, 4))).toBe('proset_short')
+    for (const [a, b] of [[10, 8], [10, 3]]) expect(proSetProblem(s(a, b))).toBe('proset_invalid')
   })
 })
 
