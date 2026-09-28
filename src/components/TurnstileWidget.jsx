@@ -3,10 +3,11 @@ import i18n from '../lib/i18n'
 
 // Cloudflare Turnstile — the captcha Supabase Auth verifies on signup, login
 // and password recovery once "Attack Protection → Captcha" is on in the
-// dashboard. Free, and in "interaction-only" appearance it's invisible for
-// almost everyone: the token arrives on its own a second after the form
-// shows, and a visible challenge only appears when Cloudflare distrusts
-// the browser.
+// dashboard. Free. Appearance "always": the small Cloudflare box with the
+// "Success ✓" seal sits above the submit button (Ruben, 28 set — he wants
+// the visible sign that the form is protected). The check itself still runs
+// on its own; a real challenge only appears when Cloudflare distrusts the
+// browser.
 //
 // Motivation is the email quota, not fake accounts (Trello #—): with
 // "Confirm email" on, every signup and every "esqueci a password" sends an
@@ -73,7 +74,8 @@ const TurnstileWidget = forwardRef(function TurnstileWidget({ onToken, action, c
         widgetIdRef.current = turnstile.render(containerRef.current, {
           sitekey: TURNSTILE_SITE_KEY,
           ...(action ? { action } : {}),
-          appearance: 'interaction-only',
+          appearance: 'always',
+          size: 'flexible',
           language: i18n.language === 'en' ? 'en' : 'pt',
           callback: (token) => onTokenRef.current?.(token),
           'expired-callback': () => onTokenRef.current?.(null),
