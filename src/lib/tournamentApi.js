@@ -189,7 +189,7 @@ export async function listTournamentsToScoreToday({ userId, adminOrgIds = [], to
   ].filter(Boolean).join(',')
   const { data, error } = await supabase
     .from('tournament_public')
-    .select('id, slug, name, club_name, starts_on, ends_on, status')
+    .select('id, slug, name, organization_id, club_name, club_logo_url, location, starts_on, ends_on, status, category_count')
     .in('status', ['sorteado', 'a_decorrer'])
     .or(or)
   if (error) throw error
