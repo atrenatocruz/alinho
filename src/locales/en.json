@@ -2941,6 +2941,7 @@
   "errors.already_registered": "An account with this email already exists. Sign in or reset your password.",
   "errors.email_not_confirmed": "You haven't confirmed your email yet. Look for the message in your inbox.",
   "errors.too_many": "Too many attempts in a row. Wait a moment and try again.",
+  "errors.captcha": "We couldn't confirm you're not a robot. Reload the page and try again.",
   "gerirclube.searchable_label": "Show in search",
   "gerirclube.searchable_hint": "Any player can find this club in Community: name, member count and average level.",
   "gerirclube.searchable_hint_group": "Any player can find this group in Community: name, member count and average level.",
