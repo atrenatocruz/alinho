@@ -120,6 +120,58 @@ export function setsWon(sets = []) {
   return { setsA: a, setsB: b }
 }
 
+// ── Jogos entre amigos (Francisco, 28 set — design-handoff/2026-09-28-
+// amigos-regras-francisco/REGRAS.md, ponto 2) ─────────────────────────────
+// Um set pode ficar por acabar porque acabou o tempo (4-4, 4-3, 5-2…). O
+// único limite é 7-6: cada lado de 0 a 7, nunca 7-7. O torneio e o mix
+// ficam com as regras oficiais de cima. Espelhado no servidor
+// (migration_amigos_sets_por_acabar.sql).
+
+/** Um set entre amigos: 0 a 7 de cada lado, nunca 7-7 ('set_invalid' →
+ *  «Um set vai no máximo até 7-6.»). */
+export function friendSetProblem(set) {
+  const a = num(set?.score_a)
+  const b = num(set?.score_b)
+  if (!isInt(a) || !isInt(b)) return 'empty'
+  if (a < 0 || b < 0) return 'negative'
+  if (a > 7 || b > 7 || (a === 7 && b === 7)) return 'set_invalid'
+  return null
+}
+
+/** O resultado de um jogo entre amigos aos sets. Ganha quem ganhou mais
+ *  sets; com os sets empatados, quem fez mais jogos; tudo igual é 'draw'
+ *  (por agora não conta para o ranking — #591). Um set empatado (4-4) não
+ *  é ganho por ninguém. `numSets` = 3 no «Melhor de 3»: pode fechar antes
+ *  dos 2 sets, mas não continua depois de alguém chegar aos 2.
+ *  Devolve { problem, setsA, setsB, gamesA, gamesB, winner }. */
+export function friendMatchResult(sets = [], { numSets = null } = {}) {
+  const list = Array.isArray(sets) ? sets : []
+  let setsA = 0
+  let setsB = 0
+  let gamesA = 0
+  let gamesB = 0
+  const out = (problem) => ({ problem, setsA, setsB, gamesA, gamesB, winner: problem ? null : winnerOf() })
+  const winnerOf = () => {
+    if (setsA !== setsB) return setsA > setsB ? 'a' : 'b'
+    if (gamesA !== gamesB) return gamesA > gamesB ? 'a' : 'b'
+    return 'draw'
+  }
+  if (!list.length) return out('empty')
+  if (list.length > (numSets || 9)) return out('too_many_sets')
+  for (const s of list) {
+    const p = friendSetProblem(s)
+    if (p) return out(p)
+    if (numSets === 3 && Math.max(setsA, setsB) >= 2) return out('too_many_sets')
+    const a = num(s.score_a)
+    const b = num(s.score_b)
+    gamesA += a
+    gamesB += b
+    if (a > b) setsA++
+    else if (b > a) setsB++
+  }
+  return out(null)
+}
+
 /** O jogo inteiro, por forma de contar:
  *   · 'melhor_3_sets' — sets a 6; 2-0 em 2 sets, ou 3.º set normal com 1-1.
  *   · 'melhor_2_sets' — sets a 6; com 1-1, super tie-break a 10.

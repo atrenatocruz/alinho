@@ -206,8 +206,10 @@ CREATE TRIGGER mix_matches_score_guard_trigger
   FOR EACH ROW EXECUTE FUNCTION mix_matches_score_guard();
 
 -- ── 5. Amigos: cada set ─────────────────────────────────────────────────
--- Em «Melhor de 3» e «Sets à vontade» cada set é um set a 6 (o 7-6 sem os
--- pontos, que os amigos ainda não guardam).
+-- Amigos (Francisco, 28 set — design-handoff/2026-09-28-amigos-regras-
+-- francisco/REGRAS.md): um set pode ficar por acabar (4-4, 4-3…); só não
+-- passa de 7-6 — cada lado de 0 a 7, nunca 7-7. Igual à de
+-- migration_amigos_sets_por_acabar.sql.
 CREATE OR REPLACE FUNCTION public.friend_match_sets_guard()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -223,10 +225,13 @@ BEGIN
   END IF;
   SELECT scoring_format, results_validated INTO g FROM private_matches WHERE id = NEW.private_match_id;
   IF g IS NULL OR NOT g.results_validated THEN RETURN NEW; END IF;
-  IF g.scoring_format = 'sets' THEN
-    v_p := score_set_problem(NEW.score_a, NEW.score_b, NULL, NULL, 6);
-  ELSIF NEW.score_a < 0 OR NEW.score_b < 0 THEN
+  IF NEW.score_a < 0 OR NEW.score_b < 0 THEN
     v_p := 'negative';
+  ELSIF g.scoring_format = 'sets'
+        AND (NEW.score_a > 7 OR NEW.score_b > 7 OR (NEW.score_a = 7 AND NEW.score_b = 7)) THEN
+    -- Amigos (Francisco, 28 set): um set pode ficar por acabar; só não
+    -- passa de 7-6.
+    v_p := 'set_invalid';
   END IF;
   IF v_p IS NOT NULL THEN
     RAISE EXCEPTION '%', v_p USING ERRCODE = 'check_violation', HINT = 'set ' || NEW.set_number;
