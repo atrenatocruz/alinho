@@ -5,6 +5,10 @@
 // sempre no clube que a cria. Os campos são os do formulário antigo
 // (CreateSeriesForm), arrumados; o preço pode ser o da tabela, outro preço
 // para sempre, ou uma promoção com data de fim (migration_lessons_7).
+// «Editar turma» (AUDITORIA editar-tem-tudo, ponto 6): os mesmos 3 passos,
+// já preenchidos, em /gerir/:slug/editar/turma/:seriesId. Grava só o que
+// mudou (update_lesson_series, do Dev 3); com inscritos, as próximas aulas
+// mudam e os alunos recebem um aviso; o preço novo é só para quem entrar.
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -12,9 +16,9 @@ import { ChevronRight, GraduationCap } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useGoBack } from '../lib/useGoBack'
 import { getClubProfile } from '../lib/clubProfile'
-import { createLessonSeries, getClubLessonSettings, listClubTeachers, setLessonSeriesPrice } from '../lib/lessonsApi'
+import { createLessonSeries, getClubLessonSettings, getLessonSeries, listClubSeries, listClubTeachers, setLessonSeriesPrice, updateLessonSeries } from '../lib/lessonsApi'
 import { LESSON_CAPACITY, LESSON_DURATIONS, peakStatus, priceRowFor } from '../lib/lessons'
-import { describeError } from '../lib/errors'
+import { describeError, errorCode } from '../lib/errors'
 import { Chips, DateField, EmptyState, PrimaryButton, Select } from '../components/ui'
 import { Toggle, euros } from '../components/lessons/LessonBits'
 import StepPage from '../components/steps/StepPage'
@@ -41,7 +45,10 @@ const num = (v) => (v === '' || v == null ? null : Number(String(v).replace(',',
 
 export default function CreateSeries() {
   const { t } = useTranslation()
-  const { slug } = useParams()
+  const { slug, seriesId } = useParams()
+  const editing = !!seriesId
+  // A turma como estava (editar): os campos para comparar e quantos inscritos tem.
+  const [orig, setOrig] = useState(null)
   const navigate = useNavigate()
   const goBack = useGoBack(`/gerir/${slug}`)
   const { user } = useAuth()
@@ -73,11 +80,32 @@ export default function CreateSeries() {
         if (!alive) return
         setTeachers(rows)
         setSettings(res)
-        if (rows.length === 1) setF((x) => ({ ...x, teacher_profile_id: rows[0].teacher_profile_id }))
+        if (!seriesId && rows.length === 1) setF((x) => ({ ...x, teacher_profile_id: rows[0].teacher_profile_id }))
+        if (seriesId) {
+          const [row, list] = await Promise.all([getLessonSeries(seriesId), listClubSeries(club.id)])
+          if (!alive || !row) return
+          const start = String(row.start_time).slice(0, 5)
+          const peakNow = peakStatus(res.peakHours, row.day_of_week, start, row.duration_minutes)
+          const form = {
+            teacher_profile_id: row.teacher_profile_id,
+            level_mode: row.level_from == null ? 'none' : 'range', level_from: row.level_from ?? 6, level_to: row.level_to ?? 4,
+            gender_restriction: row.gender_restriction, visibility: row.visibility,
+            day_of_week: row.day_of_week, start_time: start, duration_minutes: row.duration_minutes, starts_on: row.starts_on,
+            lesson_type: row.lesson_type, peak_choice: peakNow === 'mixed' ? row.price_peak : null,
+            price_mode: row.promo_price_month == null ? 'table' : row.promo_until ? 'promo' : 'custom',
+            custom_price: row.promo_price_month != null && !row.promo_until ? String(row.promo_price_month) : '',
+            promo_price: row.promo_until ? String(row.promo_price_month) : '', promo_until: row.promo_until || '',
+            close_hours_before: row.close_hours_before, accepts_trial: row.accepts_trial, trial_free: row.trial_free,
+            announce_whatsapp: row.announce_whatsapp,
+          }
+          setF(form)
+          setHoras(row.whatsapp_post_times ?? null)
+          setOrig({ form, row, taken: (list.find((x) => x.series_id === seriesId) || {}).taken || 0 })
+        }
       })
       .catch((err) => { console.error('Error loading lessons data:', err); if (alive) setTeachers([]) })
     return () => { alive = false }
-  }, [slug])
+  }, [slug, seriesId])
 
   const levelOptions = useMemo(() => [7, 6, 5, 4, 3, 2, 1].map((n) => ({
     value: n, label: n === 7 ? t('lessons.level_beginner') : String(n),
@@ -85,7 +113,11 @@ export default function CreateSeries() {
 
   const teacher = (teachers || []).find((x) => x.teacher_profile_id === f.teacher_profile_id)
   // Criada pelo clube para outro professor: ele aceita uma vez (SPEC de 26 set).
-  const forOther = teacher && teacher.user_id !== user?.id
+  const forOther = teacher && teacher.user_id !== user?.id && (!orig || f.teacher_profile_id !== orig.form.teacher_profile_id)
+  // Editar com alunos inscritos: o aviso, e o preço novo só para quem entrar.
+  const enrolled = !!orig && orig.taken > 0
+  // Já começou: o «A partir de» fica como está (as aulas passadas não mudam).
+  const started = !!orig && !!orig.form.starts_on && orig.form.starts_on <= iso(new Date())
   const levelOk = f.level_mode === 'none' || f.level_from >= f.level_to
   const startsOn = f.starts_on || (f.day_of_week ? nextWeekdayIso(f.day_of_week) : '')
 
@@ -114,7 +146,43 @@ export default function CreateSeries() {
     || (f.price_mode === 'custom' && customPrice != null && customPrice >= 0)
     || (f.price_mode === 'promo' && promoPrice != null && promoPrice >= 0 && f.promo_until >= today))
 
+  // Editar: manda só o que mudou; o preço e as horas do WhatsApp à parte.
+  const payload = () => ({
+    teacher_profile_id: f.teacher_profile_id, day_of_week: f.day_of_week, start_time: f.start_time,
+    duration_minutes: f.duration_minutes, lesson_type: f.lesson_type, price_peak: usePeak, starts_on: startsOn,
+    level_from: f.level_mode === 'none' ? null : f.level_from, level_to: f.level_mode === 'none' ? null : f.level_to,
+    gender_restriction: f.gender_restriction, visibility: f.visibility, close_hours_before: f.close_hours_before,
+    accepts_trial: f.accepts_trial, trial_free: f.accepts_trial && f.trial_free, announce_whatsapp: f.announce_whatsapp,
+  })
+  const save = async () => {
+    setBusy(true)
+    setError('')
+    try {
+      const was = { ...orig.row, start_time: String(orig.row.start_time).slice(0, 5) }
+      const changed = Object.fromEntries(Object.entries(payload()).filter(([k, v]) => (was[k] ?? null) !== (v ?? null)))
+      if (Object.keys(changed).length > 0) await updateLessonSeries(seriesId, changed)
+      const priceNow = f.price_mode === 'table' ? [null, null] : f.price_mode === 'custom' ? [customPrice, null] : [promoPrice, f.promo_until]
+      const priceWas = [orig.row.promo_price_month == null ? null : Number(orig.row.promo_price_month), orig.row.promo_until || null]
+      if (priceNow[0] !== priceWas[0] || priceNow[1] !== priceWas[1]) await setLessonSeriesPrice(seriesId, priceNow[0], priceNow[1])
+      if (f.announce_whatsapp && horas && JSON.stringify(horas) !== JSON.stringify(orig.row.whatsapp_post_times)) {
+        await setEventWhatsappPostTimes('lesson', seriesId, horas)
+      }
+      const notice = t('lessons.series_saved')
+      try { sessionStorage.setItem('gerir.notice', notice) } catch { /* sem sessão */ }
+      navigate(`/gerir/${slug}`, { state: { notice } })
+    } catch (err) {
+      console.error('Error saving lesson series:', err)
+      // Os códigos do update_lesson_series (Dev 3) têm frase própria.
+      const code = String(err?.message || errorCode(err) || '')
+      const known = ['no_price', 'teacher_not_active', 'other_club', 'series_ended', 'not_allowed'].find((c) => code.includes(c))
+      setError(known ? t(`lessons.edit_err_${known}`) : describeError(t, err, 'lessons.error_edit_series'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const submit = async () => {
+    if (editing) { await save(); return }
     setBusy(true)
     setError('')
     try {
@@ -147,7 +215,7 @@ export default function CreateSeries() {
   const result = 'rounded-ctrl bg-lime-400/15 px-3 py-2.5 text-sm text-ink-900'
   const stepLabels = [t('steps.people'), t('steps.when'), t('steps.rules')]
 
-  if (teachers === null) return null
+  if (teachers === null || (editing && !orig)) return null
   if (teachers.length === 0) {
     return (
       <StepPage title={t('lessons.new_series')} step={1} total={1} onBack={goBack}
@@ -159,7 +227,7 @@ export default function CreateSeries() {
 
   return (
     <StepPage
-      title={t('lessons.new_series')}
+      title={t(editing ? 'lessons.edit_series' : 'lessons.new_series')}
       step={step}
       total={3}
       stepLabel={stepLabels[step - 1]}
@@ -170,7 +238,7 @@ export default function CreateSeries() {
       footer={step === 3 ? (
         <div>
           <PrimaryButton onClick={submit} disabled={busy || !priceOk || !org} className="w-full">
-            {t('lessons.create_series')}
+            {t(editing ? 'lessons.save_series' : 'lessons.create_series')}
           </PrimaryButton>
           {forOther && <p className="mt-1.5 text-center text-xs text-muted">{t('lessons.series_teacher_gets_request', { name: teacher.name.split(' ')[0], context: teacher.gender === 'feminino' ? 'f' : undefined })}</p>}
         </div>
@@ -183,6 +251,7 @@ export default function CreateSeries() {
             <Chips label={t('lessons.f_teacher')} value={f.teacher_profile_id} onChange={(v) => set({ teacher_profile_id: v })}
               options={teachers.map((x) => ({ value: x.teacher_profile_id, label: x.name }))} />
             {forOther && <p className={help}>{t('lessons.series_teacher_accepts')}</p>}
+            {enrolled && f.teacher_profile_id !== orig.form.teacher_profile_id && <p className={help}>{t('lessons.series_next_change')}</p>}
           </div>
           <div>
             <p className={label}>{t('lessons.f_level')}</p>
@@ -223,7 +292,7 @@ export default function CreateSeries() {
         <>
           <div>
             <p className={label}>{t('lessons.f_day')}</p>
-            <Chips label={t('lessons.f_day')} value={f.day_of_week} onChange={(v) => set({ day_of_week: v, peak_choice: null, starts_on: '' })}
+            <Chips label={t('lessons.f_day')} value={f.day_of_week} onChange={(v) => set({ day_of_week: v, peak_choice: null, ...(started ? {} : { starts_on: '' }) })}
               options={[1, 2, 3, 4, 5, 6, 7].map((d) => ({ value: d, label: t(`lessons.wd_chip_${d}`) }))} />
           </div>
           <div>
@@ -238,7 +307,10 @@ export default function CreateSeries() {
           </div>
           <div>
             <p className={label}>{t('lessons.f_starts_on')}</p>
-            <DateField value={startsOn} onChange={(v) => set({ starts_on: v })} min={today} />
+            {started
+              ? <p className="rounded-ctrl bg-ink-50 px-3.5 py-3 text-sm text-ink-700">{dateLabel(startsOn)}</p>
+              : <DateField value={startsOn} onChange={(v) => set({ starts_on: v })} min={today} />}
+            {started && <p className={help}>{t('lessons.series_started_lock')}</p>}
           </div>
           {step2Ok && (
             <p className={result}>
@@ -248,6 +320,7 @@ export default function CreateSeries() {
               })}
             </p>
           )}
+          {enrolled && <p className={help}>{t('lessons.series_next_change')}</p>}
         </>
       )}
 
@@ -317,6 +390,7 @@ export default function CreateSeries() {
               )}
             </>
           )}
+          {enrolled && <p className={help}>{t('lessons.series_price_lock')}</p>}
           <button type="button" onClick={() => navigate(`/gerir/${slug}/aulas?tab=prices`)}
             className="btn-secondary flex w-full items-center justify-between !px-4 text-sm">
             <span>{t('lessons.see_club_prices')}</span><ChevronRight size={18} />

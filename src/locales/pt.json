@@ -4030,5 +4030,20 @@
   "booking.error_change": "Não foi possível mudar o pedido. Tenta outra vez.",
   "lessons.change_request": "Mudar pedido",
   "lessons.accepted_lock": "🔒 O professor já aceitou. Para mudar, fala com ele ou cancela.",
-  "lessons.notice_request_changed": "{{student}} mudou o pedido de aula para {{when}}"
+  "lessons.notice_request_changed": "{{student}} mudou o pedido de aula para {{when}}",
+  "lessons.edit_series": "Editar turma",
+  "lessons.save_series": "Guardar alterações",
+  "lessons.series_saved": "Turma guardada.",
+  "lessons.series_next_change": "As próximas aulas mudam. Os alunos inscritos recebem um aviso.",
+  "lessons.series_price_lock": "🔒 O preço novo vale para quem se inscrever a partir de agora.",
+  "lessons.series_started_lock": "🔒 A turma já começou. As próximas aulas mudam a partir de agora.",
+  "lessons.error_edit_series": "Não foi possível guardar a turma.",
+  "lessons.edit_err_no_price": "Não há preço na tabela do clube para esta aula. Junta-o em Preços ou escolhe outra duração.",
+  "lessons.edit_err_teacher_not_active": "Esse professor já não está ativo neste clube.",
+  "lessons.edit_err_other_club": "Esse professor é de outro clube.",
+  "lessons.edit_err_series_ended": "Esta turma já acabou e não se pode mudar.",
+  "lessons.edit_err_not_allowed": "Não podes mudar esta turma.",
+  "lessons.notice_series_changed": "A turma de {{old}} mudou: agora é {{series}}",
+  "lessons.notice_series_changed_teacher": "A turma de {{old}} mudou: agora é com {{teacher_now}}",
+  "lessons.notice_series_changed_both": "A turma de {{old}} mudou: agora é {{series}}, com {{teacher_now}}"
 }

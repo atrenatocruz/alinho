@@ -4018,5 +4018,20 @@
   "booking.error_change": "Couldn't change the request. Try again.",
   "lessons.change_request": "Change request",
   "lessons.accepted_lock": "🔒 The coach has already accepted. To change it, talk to them or cancel.",
-  "lessons.notice_request_changed": "{{student}} changed the lesson request to {{when}}"
+  "lessons.notice_request_changed": "{{student}} changed the lesson request to {{when}}",
+  "lessons.edit_series": "Edit class",
+  "lessons.save_series": "Save changes",
+  "lessons.series_saved": "Class saved.",
+  "lessons.series_next_change": "Upcoming lessons change. Enrolled students get a notice.",
+  "lessons.series_price_lock": "🔒 The new price applies to people who sign up from now on.",
+  "lessons.series_started_lock": "🔒 The class has already started. Upcoming lessons change from now on.",
+  "lessons.error_edit_series": "Couldn't save the class.",
+  "lessons.edit_err_no_price": "The club's price table has no price for this lesson. Add it in Prices or pick another duration.",
+  "lessons.edit_err_teacher_not_active": "That coach is no longer active at this club.",
+  "lessons.edit_err_other_club": "That coach belongs to another club.",
+  "lessons.edit_err_series_ended": "This class has ended and can't be changed.",
+  "lessons.edit_err_not_allowed": "You can't change this class.",
+  "lessons.notice_series_changed": "The {{old}} class changed: it's now {{series}}",
+  "lessons.notice_series_changed_teacher": "The {{old}} class changed: it's now with {{teacher_now}}",
+  "lessons.notice_series_changed_both": "The {{old}} class changed: it's now {{series}}, with {{teacher_now}}"
 }

@@ -4,6 +4,7 @@
 // de uma aula ou de um período (1c). Convidados sem conta entram na Fase 2.
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate, useParams } from 'react-router-dom'
 import { ChevronLeft, GraduationCap, Plus, Repeat } from 'lucide-react'
 import { Avatar, EmptyState, PrimaryButton, DateField } from '../ui'
 import { cancelLesson, cancelLessonPeriod, getSeriesRoster, listClubSeries, markLessonAbsence, resolveEnrolment } from '../../lib/lessonsApi'
@@ -95,6 +96,8 @@ export default function ClubSeriesPanel({ organizationId, teachers, prices, peak
 // Tambem aberto pelo Gerir, ao tocar numa turma da lista de eventos.
 export function SeriesManage({ seriesId, onBack }) {
   const { t } = useTranslation()
+  const navigate = useNavigate()
+  const { slug } = useParams()
   const [data, setData] = useState(null)
   const [acting, setActing] = useState(null)
   const [answered, setAnswered] = useState({})
@@ -126,10 +129,17 @@ export function SeriesManage({ seriesId, onBack }) {
           className="w-10 h-10 shrink-0 rounded-full border border-line flex items-center justify-center text-ink-900 hover:bg-ink-50">
           <ChevronLeft size={18} />
         </button>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h3 className="text-xl text-ink-900 truncate">{t('lessons.series_title', { day: when.day.toLowerCase(), time: when.start })}</h3>
           <p className="text-xs text-muted truncate">{s.teacher_name} · {lessonTypeLabel(t, s.lesson_type, { series: true })} · {t('lessons.per_month', { price: euros(s.price_month) })}</p>
         </div>
+        {/* «Editar turma» (AUDITORIA editar-tem-tudo, ponto 6). */}
+        {slug && s.status !== 'ended' && (
+          <button type="button" onClick={() => navigate(`/gerir/${slug}/editar/turma/${seriesId}`)}
+            className="shrink-0 rounded-full border border-ink-900 bg-white px-3.5 py-1.5 text-xs font-bold text-ink-900 hover:bg-ink-50">
+            {t('ui.edit')}
+          </button>
+        )}
       </div>
 
       {s.status === 'pending_teacher' && (

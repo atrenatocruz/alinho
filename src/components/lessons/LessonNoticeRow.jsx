@@ -21,6 +21,8 @@ export const LESSON_NOTICE_KINDS = [
   'lesson_merge_dissolved',
   // A promoção da turma acaba daqui a 7 dias (migration_lessons_7).
   'lesson_promo_ending',
+  // A turma mudou de dia, hora, duração ou professor (Editar turma, Dev 3).
+  'lesson_series_changed',
 ]
 
 function target(notice) {
@@ -40,6 +42,14 @@ function target(notice) {
   return d.lesson_id ? `/aula/${d.lesson_id}` : '/'
 }
 
+// A turma mudou: a frase diz o professor quando é ele que muda (designer, 28 set).
+function changedSuffix(notice) {
+  if (notice.kind !== 'lesson_series_changed') return ''
+  const c = notice.data?.changes || []
+  if (!c.includes('teacher')) return ''
+  return c.some((x) => x !== 'teacher') ? '_both' : '_teacher'
+}
+
 export default function LessonNoticeRow({ notice, onOpen }) {
   const { t, i18n } = useTranslation()
   const d = notice.data || {}
@@ -47,6 +57,8 @@ export default function LessonNoticeRow({ notice, onOpen }) {
     teacher: d.teacher_name,
     student: d.student_name,
     series: d.series_label,
+    old: d.old_label,
+    teacher_now: d.teacher_name,
     org: d.org_name || '',
     type: d.lesson_type ? t(`lessons.price_row_${d.lesson_type}`) : '',
     asked: d.original_starts_at ? formatDate(d.original_starts_at, i18n.language, { weekday: 'long', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '',
@@ -64,7 +76,7 @@ export default function LessonNoticeRow({ notice, onOpen }) {
         style={bad ? undefined : { background: TEAL.bg, color: TEAL.text }}>
         <GraduationCap size={16} />
       </div>
-      <p className="flex-1 min-w-0 text-sm text-ink-900">{t(`lessons.notice_${notice.kind.replace('lesson_', '')}`, vars)}</p>
+      <p className="flex-1 min-w-0 text-sm text-ink-900">{t(`lessons.notice_${notice.kind.replace('lesson_', '')}${changedSuffix(notice)}`, vars)}</p>
       <span aria-hidden="true" className="w-2 h-2 rounded-full bg-lime-400 shrink-0" />
     </Link>
   )
