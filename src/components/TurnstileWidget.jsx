@@ -81,8 +81,10 @@ const TurnstileWidget = forwardRef(function TurnstileWidget({ onToken, action, c
           sitekey: TURNSTILE_SITE_KEY,
           ...(action ? { action } : {}),
           appearance: 'interaction-only',
-          theme: 'light',
           size: 'flexible',
+          // Fixed light: the box sits on a white form, and 'auto' would go dark
+          // on phones in dark mode.
+          theme: 'light',
           'before-interactive-callback': () => setShown(true),
           'after-interactive-callback': () => setShown(false),
           language: i18n.language === 'en' ? 'en' : 'pt',
