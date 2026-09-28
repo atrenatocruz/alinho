@@ -359,7 +359,7 @@ export default function Login() {
                 </div>
               )}
 
-              <TurnstileWidget ref={captchaRef} onToken={setCaptchaToken} />
+              <TurnstileWidget ref={captchaRef} action="login" onToken={setCaptchaToken} />
 
               <PrimaryButton type="submit" disabled={loading} className="w-full">
                 {loading ? t('login.signing_in') : t('login.login_button')}
@@ -471,7 +471,7 @@ export default function Login() {
                 </div>
               )}
 
-              <TurnstileWidget ref={captchaRef} onToken={setCaptchaToken} />
+              <TurnstileWidget ref={captchaRef} action="signup" onToken={setCaptchaToken} />
 
               <PrimaryButton type="submit" disabled={loading} className="w-full">
                 {loading ? t('login.creating_account') : t('login.signup_button')}

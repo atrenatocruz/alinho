@@ -94,7 +94,7 @@ export default function ForgotPassword() {
                 </div>
               )}
 
-              <TurnstileWidget ref={captchaRef} onToken={setCaptchaToken} />
+              <TurnstileWidget ref={captchaRef} action="recovery" onToken={setCaptchaToken} />
 
               <PrimaryButton type="submit" disabled={loading} className="w-full">
                 {loading ? t('login.forgot_password_sending') : t('login.forgot_password_submit')}

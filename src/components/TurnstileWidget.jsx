@@ -46,7 +46,9 @@ function loadTurnstile() {
   return scriptPromise
 }
 
-const TurnstileWidget = forwardRef(function TurnstileWidget({ onToken, className = '' }, ref) {
+// `action`: a label per form (login / signup / recovery) — Cloudflare's
+// analytics split by it; Supabase doesn't check it.
+const TurnstileWidget = forwardRef(function TurnstileWidget({ onToken, action, className = '' }, ref) {
   const containerRef = useRef(null)
   const widgetIdRef = useRef(null)
   const onTokenRef = useRef(onToken)
@@ -70,6 +72,7 @@ const TurnstileWidget = forwardRef(function TurnstileWidget({ onToken, className
         if (cancelled || !containerRef.current) return
         widgetIdRef.current = turnstile.render(containerRef.current, {
           sitekey: TURNSTILE_SITE_KEY,
+          ...(action ? { action } : {}),
           appearance: 'interaction-only',
           language: i18n.language === 'en' ? 'en' : 'pt',
           callback: (token) => onTokenRef.current?.(token),
