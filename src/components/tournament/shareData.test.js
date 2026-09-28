@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bigScore, podiumShare, pairShort, recordOf, recordWords, setsWords, shortName, suggestedText } from './shareData'
+import { bigScore, championsShare, podiumShare, pairShort, recordOf, recordWords, setsWords, shortName, suggestedText, thirdsOf } from './shareData'
 
 const t = (k, v = {}) => `${k}|${Object.entries(v).map(([a, b]) => `${a}=${b}`).join(',')}`
 
@@ -65,3 +65,20 @@ describe('pódio: quem esconde os resultados', () => {
   })
 })
 
+
+describe('imagem «Campeões» (28 set)', () => {
+  const team = (name) => ({ entry_id: name, name, players: name.split(' / ') })
+  it('1.º, 2.º e os dois 3.º juntos, sem destaque', () => {
+    const c = { code: 'M5', champion: team('Almeida / Sousa'), runner_up: team('Os do costume'), thirds: [team('Barros / Costa'), team('Gomes / Pais')] }
+    const out = championsShare({ tournament: { name: 'Smash Open 2026' }, category: c, t, lang: 'pt' })
+    expect(out.data.title).toBe('tshare.champions|')
+    expect(out.data.kicker).toBe('Smash Open 2026 · M5')
+    expect(out.data.rows.map((r) => r.place)).toEqual([1, 2, 3])
+    expect(out.data.rows.some((r) => r.mine)).toBe(false)
+    expect(out.data.rows[2].pair).toContain(' · ')
+  })
+  it('sem campeão não há imagem; o third antigo ainda serve', () => {
+    expect(championsShare({ category: { code: 'M5' }, t })).toBe(null)
+    expect(thirdsOf({ third: team('A / B') }).length).toBe(1)
+  })
+})

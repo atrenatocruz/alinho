@@ -35,11 +35,11 @@ export function lastResultText(r, t, code) {
   return [side(r, winner, t, code), winnerScore(r.score, r.a_won)].filter(Boolean).join(' ')
 }
 
-/** Para onde leva o toque: «Todos os jogos», na secção da fase. */
+/** Para onde leva o toque: o «Quadro», na secção da fase. */
 export function liveTournamentLink(row) {
   const params = new URLSearchParams()
   if (row.category_code) params.set('cat', row.category_code)
-  params.set('tab', 'all_games')
+  params.set('tab', 'board')
   params.set('sec', row.stage === 'groups' ? 'groups' : 'draw')
   return `/torneio/${row.slug || row.tournament_id}?${params}`
 }

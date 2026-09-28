@@ -3,7 +3,7 @@
 // que avisa, no sítio e na forma de sempre (tournament.score.problem_*).
 // Os códigos da regra passam às frases que o torneio já tinha; os novos
 // (set_invalid, too_many_sets, negative) têm frase própria.
-import { matchProblem, setProblem } from '../../lib/scoreRules'
+import { matchProblem } from '../../lib/scoreRules'
 
 const TO_TOURNAMENT = {
   match_open: 'sets_open',
@@ -17,12 +17,4 @@ const TO_TOURNAMENT = {
 export function setsResultProblem(scoring, input) {
   const { problem } = matchProblem(scoring, input)
   return problem ? (TO_TOURNAMENT[problem] || problem) : null
-}
-
-/** Um set a 6, escrito à mão (jogos entre amigos): a mesma regra, a mesma
- *  frase. Vazio não é problema — ainda se está a escrever. */
-export function setRowProblem(a, b) {
-  if (a === '' || b === '' || a == null || b == null) return null
-  const p = setProblem({ score_a: a, score_b: b }, 6)
-  return p ? (TO_TOURNAMENT[p] || p) : null
 }

@@ -28,6 +28,7 @@ import { CategorySelect, LILAC, MonoLabel, StatePill, TourTag } from '../compone
 import { TOURNAMENT_PANELS, TOURNAMENT_TABS, TOURNAMENT_TAB_OWNER } from '../components/tournament/panels'
 import AdminBar from '../components/tournament/AdminBar'
 import CreateTournamentForm from '../components/tournament/CreateTournamentForm'
+import ChampionsBlock from '../components/tournament/ChampionsBlock'
 import DrawAdminPanel from '../components/tournament/DrawAdminPanel'
 import TournamentCalendarGrid from '../components/tournament/TournamentCalendarGrid'
 import { drawProgress, statusKey } from '../components/tournament/drawProgress'
@@ -57,6 +58,19 @@ const STATE_PILL = {
   sorteado: 'dark',
   a_decorrer: 'live',
   terminado: 'grey',
+}
+
+/** O botão lima de quem joga: «A decorrer · o meu jogo», ou «O teu próximo
+ *  jogo · sáb 12:00», ou, sem nenhum por jogar, «Os meus jogos». */
+function nextGameLabel(myMatches, t, lang) {
+  const open = myMatches.filter((m) => !['terminado', 'falta', 'desistencia'].includes(m.status))
+  if (open.some((m) => m.status === 'a_decorrer')) return t('tournament.my_game_live')
+  const when = (m) => (m.date ? new Date(`${m.date}T${m.time || '00:00'}`) : null)
+  const next = open.filter((m) => when(m)).sort((a, b) => when(a) - when(b))[0]
+  if (!next) return t('tournament.tab_my_games')
+  const d = when(next)
+  const day = d.toLocaleDateString(lang, { weekday: 'short' }).replace('.', '').slice(0, 3).toLowerCase()
+  return t('tournament.my_next_game', { when: next.time ? `${day} ${next.time.slice(0, 5)}` : day })
 }
 
 export default function TournamentPage() {
@@ -109,14 +123,14 @@ export default function TournamentPage() {
   // set. O endereço do torneio anda no WhatsApp e em cartazes — não pode
   // deixar de funcionar por causa de uma arrumação nossa.
   const tabParam = params.get('tab')
-  const LEGACY_TABS = { groups: 'all_games', draw: 'all_games', calendar: 'all_games' }
-  // «Os meus jogos» só para quem está inscrito (Francisco, 28 set: «se não
-  // estás inscrito não devia aparecer»). Sem inscrição ficam dois
-  // separadores e a página abre em «Todos os jogos».
+  const LEGACY_TABS = { groups: 'board', draw: 'board', all_games: 'board', calendar: 'schedule' }
+  // «Quadro · Horário · Duplas», iguais para todos, a abrir no Quadro
+  // (revisão de 28 set). «Os meus jogos» abre-se pelo botão lima de quem
+  // joga — não é separador; sem inscrição, cai no Quadro.
   const entered = activeEntries(data).length > 0
-  const tabs = entered ? TOURNAMENT_TABS : TOURNAMENT_TABS.filter((k) => k !== 'my_games')
+  const tabs = TOURNAMENT_TABS
   const asked = LEGACY_TABS[tabParam] || tabParam
-  const tab = tabs.includes(asked) ? asked : tabs[0]
+  const tab = tabs.includes(asked) || (asked === 'my_games' && entered) ? asked : tabs[0]
 
   const setParam = (key, value) => {
     const next = new URLSearchParams(params)
@@ -277,6 +291,7 @@ export default function TournamentPage() {
             onEdit={() => openAdmin('editar')}
             onDraw={() => openAdmin('sorteio')}
             onSchedule={() => openAdmin('horario')}
+            onEntries={() => setParam('tab', 'entries')}
           />
           {adminError && <p className="text-sm text-danger">{adminError}</p>}
         </>
@@ -329,6 +344,24 @@ export default function TournamentPage() {
         </div>
       </div>
 
+      {/* Campeões da categoria, quando termina (peça 2, 28 set). */}
+      <ChampionsBlock tournament={tour} category={category} />
+
+      {/* O botão lima de quem joga (bloco 3 da página do evento): abre os
+          seus jogos e o seu caminho. Quem não joga não o tem. */}
+      {entered && !publicView && (
+        <div>
+          {/* Com a categoria terminada, o lima é o «Partilhar os campeões»:
+              este passa a contorno (um lima por ecrã, designer, 28 set). */}
+          <button type="button" onClick={() => setParam('tab', 'my_games')}
+            className={`press flex min-h-[52px] w-full items-center justify-center gap-1 rounded-ctrl px-4 text-[15px] font-extrabold text-ink-900 ${
+              category?.status === 'terminada' || tour.status === 'terminado' ? 'border-[1.5px] border-line bg-white' : 'bg-lime-400 shadow-card'}`}>
+            {nextGameLabel(data.my_matches || [], t, i18n.language)} ›
+          </button>
+          <p className="mt-1.5 text-xs text-muted">{t('tournament.my_games_hint')}</p>
+        </div>
+      )}
+
       {UnderHeader && <Suspense fallback={null}><UnderHeader {...panelProps} /></Suspense>}
 
       {categories.length > 0 && (
@@ -356,7 +389,9 @@ export default function TournamentPage() {
             engano meu. Ele próprio só aparece com o torneio terminado.
             Sem inscrição não há «Os meus jogos»: vai para o primeiro
             separador, «Todos os jogos» (28 set). */}
-        {tab === tabs[0] && Podium && (
+        {/* O pódio antigo deu lugar aos «Campeões» no topo (28 set); fica o
+            que a pessoa levou do torneio, em «Os meus jogos». */}
+        {tab === 'my_games' && Podium && (
           <div className="mb-4"><Suspense fallback={null}><Podium {...panelProps} /></Suspense></div>
         )}
         {Panel ? (

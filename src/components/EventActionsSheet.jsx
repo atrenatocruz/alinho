@@ -41,10 +41,13 @@ export default function EventActionsSheet({ open, title, subtitle, actions = [],
             <button
               key={a.key}
               type="button"
+              // `disabled`: a ação existe mas agora não se pode — fica à vista,
+              // apagada, com a razão por baixo (torneio, 28 set).
+              disabled={a.disabled}
               onClick={() => { onClose(); a.onClick() }}
-              className="block w-full py-3.5 text-left"
+              className="block w-full py-3.5 text-left disabled:cursor-default"
             >
-              <span className={`block text-[15px] font-extrabold ${a.danger ? 'text-danger' : 'text-ink-900'}`}>{a.label}</span>
+              <span className={`block text-[15px] font-extrabold ${a.disabled ? 'text-ink-500' : a.danger ? 'text-danger' : 'text-ink-900'}`}>{a.label}</span>
               {a.hint && <span className="mt-0.5 block text-[13px] leading-snug text-ink-500">{a.hint}</span>}
             </button>
           ))}
