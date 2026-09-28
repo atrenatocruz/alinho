@@ -240,6 +240,8 @@ export const LESSON_RPC_MOCKS = {
           peak_hours: [], prices: PRICES().map((p) => ({ ...p, teacher_profile_id: null })) },
       ],
       busy: [{ starts_at: new Date(d.getTime() - 30 * 60000).toISOString(), ends_at: new Date(d.getTime() + 30 * 60000).toISOString(), kind: 'request' },
+        // O meu pedido também ocupa (como no servidor): 11:30–13:00.
+        ...(sent ? [{ starts_at: new Date(d.getTime() + 3600000).toISOString(), ends_at: new Date(d.getTime() + 3600000 + 90 * 60000).toISOString(), kind: 'request' }] : []),
         // Uma aula marcada na quinta a seguir (calendário do professor, 27 set).
         ...(() => { const q = new Date(d); q.setDate(q.getDate() + 2); q.setHours(19, 0, 0, 0)
           return [{ starts_at: q.toISOString(), ends_at: new Date(q.getTime() + 3600000).toISOString(), kind: 'lesson' }] })(),
@@ -247,7 +249,7 @@ export const LESSON_RPC_MOCKS = {
         ...(localStorage.getItem('mockClosures') === 'true' ? (() => { const f = new Date(); f.setDate(f.getDate() + ((5 - f.getDay() + 7) % 7 || 7)); f.setHours(0, 0, 0, 0)
           const e = new Date(f); e.setDate(f.getDate() + 2)
           return [{ starts_at: f.toISOString(), ends_at: e.toISOString(), kind: 'closed' }] })() : [])],
-      mine: sent ? [{ id: 'rq-1', teacher_profile_id: 'tp-ana', starts_at: d.toISOString(), duration_minutes: 90,
+      mine: sent ? [{ id: 'rq-1', teacher_profile_id: 'tp-ana', starts_at: new Date(d.getTime() + 3600000).toISOString(), duration_minutes: 90,
         lesson_type: 'duo', price_per_person: 35, contact_via: ['proposal', 'merge'].includes(sent) ? 'whatsapp' : sent, status: 'pending', org_name: 'Clube Exemplo',
         // localStorage.mockBookingSent = 'proposal' — o professor propôs outra hora.
         ...(sent === 'merge' ? { merge: { id: 'mg-1', starts_at: new Date(d.getTime() + 30 * 60000).toISOString(), duration_minutes: 60,
@@ -263,6 +265,7 @@ export const LESSON_RPC_MOCKS = {
     return out
   },
   request_lesson: () => 'rq-new',
+  update_lesson_request: () => null,
   // Home do aluno (#392): localStorage.mockHomeRequest = 'sent' | 'proposal' | 'merge'.
   list_my_lesson_requests: () => {
     const mode = localStorage.getItem('mockHomeRequest')
@@ -357,6 +360,8 @@ export const LESSON_TABLE_MOCKS = {
     return on() && !empty() ? PRICES() : []
   },
   club_peak_hours: () => (on() && !empty() ? PEAK_HOURS() : []),
+  // A aula privada com o Tiago (les-2) nasceu de um pedido meu (cadeado do «Mudar pedido»).
+  lesson_requests: (url = '') => (on() && /lesson_id=eq\.les-2(&|$)/.test(url) ? [{ id: 'rq-acc' }] : []),
 }
 
 // Avisos das aulas no sino (localStorage.mockLessonNotices = 'true').

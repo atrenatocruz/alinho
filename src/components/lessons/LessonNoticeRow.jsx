@@ -11,7 +11,7 @@ export const LESSON_NOTICE_KINDS = [
   'lesson_enrolment_request', 'lesson_enrolment_accepted', 'lesson_enrolment_rejected',
   'lesson_cancelled', 'lesson_student_not_going',
   // Pedidos de aula (Trello #392, migration_lessons_3/4).
-  'lesson_request_new', 'lesson_request_cancelled', 'lesson_request_accepted', 'lesson_request_rejected',
+  'lesson_request_new', 'lesson_request_cancelled', 'lesson_request_changed', 'lesson_request_accepted', 'lesson_request_rejected',
   'lesson_needs_court',
   // Propor outra hora, dos dois lados (migration_lessons_5).
   'lesson_time_proposed_by_teacher', 'lesson_time_proposed_by_student', 'lesson_proposal_accepted',
@@ -25,7 +25,7 @@ export const LESSON_NOTICE_KINDS = [
 
 function target(notice) {
   const d = notice.data || {}
-  if (['lesson_request_new', 'lesson_request_cancelled', 'lesson_time_proposed_by_student', 'lesson_proposal_accepted'].includes(notice.kind)) return '/perfil/aulas'
+  if (['lesson_request_new', 'lesson_request_cancelled', 'lesson_request_changed', 'lesson_time_proposed_by_student', 'lesson_proposal_accepted'].includes(notice.kind)) return '/perfil/aulas'
   if (notice.kind === 'lesson_merge_declined') return '/perfil/aulas'
   if (notice.kind === 'lesson_merge_booked') return notice.lesson_id ? `/aula/${notice.lesson_id}` : '/perfil/aulas'
   if (notice.kind === 'lesson_merge_dissolved') return d.teacher_profile_id ? `/professor/${d.teacher_profile_id}/pedir` : '/'

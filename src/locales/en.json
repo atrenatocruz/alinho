@@ -4007,5 +4007,15 @@
   "roundalarm.started_game": "Game {{number}} has started.",
   "roundalarm.tap_to_ring_game": "Tap so this game's alarm rings on this phone.",
   "roundalarm.turn_on_round_game": "Turn on the game {{number}} alarm",
-  "roundalarm.media_title_game": "Game {{number}} · {{name}}"
+  "roundalarm.media_title_game": "Game {{number}} · {{name}}",
+  "booking.change": "Change request",
+  "booking.change_title": "Change request",
+  "booking.change_save": "Save changes",
+  "booking.change_keep": "Keep as it is",
+  "booking.change_hint": "{{name}} gets a notice with the new request.",
+  "booking.change_hint_f": "{{name}} gets a notice with the new request.",
+  "booking.error_change": "Couldn't change the request. Try again.",
+  "lessons.change_request": "Change request",
+  "lessons.accepted_lock": "🔒 The coach has already accepted. To change it, talk to them or cancel.",
+  "lessons.notice_request_changed": "{{student}} changed the lesson request to {{when}}"
 }
