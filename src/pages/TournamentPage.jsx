@@ -166,6 +166,9 @@ export default function TournamentPage() {
     my: activeMy(data),
     myEntries: activeEntries(data),
     myMatches: data.my_matches || [],
+    // «Ver como quem chega de fora»: os painéis escondem o que é de quem
+    // organiza ou marca (revisão dos torneios, 28 set).
+    publicView,
   }
   const clubForForm = { id: tour.organization_id, name: tour.club_name, location: tour.location }
 

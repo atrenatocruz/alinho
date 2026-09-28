@@ -87,8 +87,11 @@ export default function PublicInfo({ tournament, categories = [], entriesOpen = 
         )}
       </div>
 
-      {/* Pagamento e o que inclui — texto do organizador, tal como o escreveu. */}
-      {(tournament.organizer_text || tournament.entry_fee_cents != null) && (
+      {/* Pagamento e o que inclui — texto do organizador, tal como o escreveu.
+          Com os jogos a decorrer ou acabados já não se paga inscrição nenhuma
+          (revisão dos torneios, 28 set). */}
+      {!['a_decorrer', 'terminado'].includes(tournament.status)
+        && (tournament.organizer_text || tournament.entry_fee_cents != null) && (
         <div className="flex gap-2 text-sm">
           <Euro size={16} className="mt-0.5 shrink-0 text-muted" />
           {/* O preço numa linha e, por baixo, o texto do organizador com as

@@ -152,7 +152,11 @@ function CourtCard({ match, scoring, tieTarget = 7, onSave, onWalkover, onUndoWa
 
   useEffect(() => { setA(match.score_a ?? ''); setB(match.score_b ?? '') }, [match.score_a, match.score_b])
 
-  const label = [match.category_code, match.group_label || match.round_label].filter(Boolean).join(' ')
+  // A fase por extenso — «M5 · Meia-final», não «M5 SF» (revisão dos
+  // torneios, 28 set). Uma ronda sem tradução passa como veio.
+  const round = match.round_label
+  const roundText = round && t(`tournament.score.round_${round}`, { defaultValue: round })
+  const label = [match.category_code, match.group_label || roundText].filter(Boolean).join(' · ')
 
   // Um terceiro set só faz sentido depois de os DOIS PRIMEIROS ficarem 1-1
   // — e a conta é só sobre esses dois. Com os três, o jogo já está decidido

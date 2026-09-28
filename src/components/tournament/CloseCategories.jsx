@@ -280,10 +280,20 @@ function CategoryRow({ category, board, onClosed }) {
   )
 }
 
-export default function CloseCategories({ tournament, onChanged }) {
+// `onReady(codes, allReady)`: diz à barra que categorias têm tudo jogado e
+// só esperam o «Terminar» — senão a barra continuava «Os resultados vão
+// entrando» com o torneio acabado (revisão dos torneios, 28 set).
+export default function CloseCategories({ tournament, onChanged, onReady }) {
   const { t } = useTranslation()
   const [rows, setRows] = useState(null)
   const [error, setError] = useState(null)
+
+  useEffect(() => {
+    if (!rows || !onReady) return
+    const open = rows.filter((r) => r.category.status !== 'terminada')
+    const ready = open.filter((r) => closeStatus(r.category, r.board).kind === 'ready')
+    onReady(ready.map((r) => r.category.code || r.category.name), open.length > 0 && ready.length === open.length)
+  }, [rows, onReady])
 
   const load = useCallback(async () => {
     try {

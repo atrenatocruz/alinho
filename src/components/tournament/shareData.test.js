@@ -8,7 +8,11 @@ describe('cartões de partilha do torneio', () => {
     expect(shortName('Rita Figueira')).toBe('Rita F.')
     expect(shortName('Ana Maria Marques')).toBe('Ana M.')
     expect(shortName('Rui')).toBe('Rui')
-    expect(shortName('Admin (Dev)')).toBe('Admin D.')
+    // O que está entre parênteses não é apelido (revisão dos torneios, 28
+    // set): «Renato Cruz (dummy)» dava «Renato D.».
+    expect(shortName('Admin (Dev)')).toBe('Admin')
+    expect(shortName('Renato Cruz (dummy)')).toBe('Renato C.')
+    expect(shortName('Francisco Barros (superadmin)')).toBe('Francisco B.')
     expect(pairShort({ players: ['Rita Figueira', 'Tiago Lopes'] })).toBe('Rita F. / Tiago L.')
   })
   it('quem esconde os resultados não aparece pelo nome', () => {

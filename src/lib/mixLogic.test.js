@@ -4,7 +4,7 @@ import {
   poolRoundNumbers, poolRoundsPlayed, roundRobinRound,
   generateAmericanoSchedule, americanoStandings,
   computeMixWinnerTeamId, formDuplas,
-  nextSobeDesceRotating, splitPartnerRows, rotatingPlacar,
+  nextSobeDesceRotating, splitPartnerRows, rotatingPlacar, shortName,
 } from './mixLogic'
 
 describe('splitIntoPools', () => {
@@ -730,5 +730,16 @@ describe('formDuplas — duplas do mesmo lado (Trello #404)', () => {
     const { duplas, forcedRepeats } = formDuplas(rows, porPontos(rows), proibidos)
     expect(forcedRepeats).toEqual([])
     expect(duplas.filter(mesmoLado)).toHaveLength(2)
+  })
+})
+
+describe('shortName', () => {
+  it('keeps short names whole and abbreviates long ones', () => {
+    expect(shortName('Rui Lopes')).toBe('Rui Lopes')
+    expect(shortName('Renato Pereira da Cruz')).toBe('Renato C.')
+  })
+  it('ignores what is in brackets', () => {
+    expect(shortName('Renato Cruz (superadmin)')).toBe('Renato C.')
+    expect(shortName('Administrador (Dev)')).toBe('Administrador')
   })
 })

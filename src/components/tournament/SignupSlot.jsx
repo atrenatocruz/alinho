@@ -36,7 +36,7 @@ const STATE_KEY = {
   suplente: 'tsignup.state_waitlist',
 }
 
-export default function SignupSlot({ tournament, categories, category, my: firstEntry, myEntries = [] }) {
+export default function SignupSlot({ tournament, categories, category, my: firstEntry, myEntries = [], publicView = false }) {
   const { t, i18n } = useTranslation()
   const { user, profile, updateProfile } = useAuth()
   const [genderSheet, setGenderSheet] = useState(false)
@@ -173,7 +173,7 @@ export default function SignupSlot({ tournament, categories, category, my: first
 
   return (
     <div className="space-y-2.5">
-      {canScore && (
+      {canScore && !publicView && (
         <div className="card flex items-center justify-between gap-3">
           <p className="min-w-0 text-sm font-semibold text-ink-900">{t('tournament.score.link_title')}</p>
           <Link to={`/torneio/${tournament.slug || tournament.id}/marcar`}

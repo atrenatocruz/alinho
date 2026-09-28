@@ -44,8 +44,11 @@ export function resultProblem(scoring, input) {
   }
   const { valid, needsBreaker } = validateProSetScore(a, b)
   if (needsBreaker) return 'needs_breaker'
-  if (!valid) return 'invalid'
-  return null
+  if (valid) return null
+  // O aviso diz o que está mal, em vez de um «não fecha o jogo» para tudo.
+  if (a === b) return 'tie'
+  if (Math.max(a, b) < 9) return 'short'
+  return 'invalid'
 }
 
 /** Faz falta um terceiro set? A conta é SÓ sobre os dois primeiros: com os

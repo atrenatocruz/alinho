@@ -28,8 +28,11 @@ import { meetsAgeRestriction } from './ageCategories'
     Short names (<= maxLen) are kept in full. "Renato Pereira da Cruz" -> "Renato C." */
 export function shortName(name, maxLen = 16) {
   if (!name) return ''
-  const parts = name.trim().split(/\s+/)
-  if (parts.length <= 1 || name.length <= maxLen) return name
+  if (name.length <= maxLen) return name
+  // What's in brackets isn't a surname: "Renato Cruz (superadmin)" -> "Renato C.",
+  // not "Renato (." (tournament review, 28 Sep).
+  const parts = name.replace(/\([^)]*\)/g, ' ').trim().split(/\s+/).filter(Boolean)
+  if (parts.length <= 1) return parts[0] || name
   const last = parts[parts.length - 1]
   return `${parts[0]} ${last.charAt(0).toUpperCase()}.`
 }

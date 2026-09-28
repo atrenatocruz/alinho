@@ -29,7 +29,15 @@ describe('falta e desistência (SPEC §7)', () => {
 describe('o que falta para guardar', () => {
   it('pro set: 9-7 guarda-se, 5-4 não', () => {
     expect(resultProblem('pro_set_9', { score_a: 9, score_b: 7 })).toBe(null)
-    expect(resultProblem('pro_set_9', { score_a: 5, score_b: 4 })).toBe('invalid')
+    expect(resultProblem('pro_set_9', { score_a: 5, score_b: 4 })).toBe('short')
+  })
+  // Revisão dos torneios, 28 set: «Este resultado não fecha o jogo» servia
+  // para tudo e não dizia o que estava mal.
+  it('pro set: o aviso diz o que está mal', () => {
+    expect(resultProblem('pro_set_9', { score_a: 9, score_b: 9 })).toBe('tie')
+    expect(resultProblem('pro_set_9', { score_a: 4, score_b: 4 })).toBe('tie')
+    expect(resultProblem('pro_set_9', { score_a: 6, score_b: 3 })).toBe('short')
+    expect(resultProblem('pro_set_9', { score_a: 10, score_b: 3 })).toBe('invalid')
   })
   it('pro set a 8-8 pede o super tie-break', () => {
     expect(resultProblem('pro_set_9', { score_a: 8, score_b: 8 })).toBe('needs_breaker')

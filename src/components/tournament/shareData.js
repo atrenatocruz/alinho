@@ -4,9 +4,10 @@
 
 /** «Rita Figueira» → «Rita F.»; um nome só fica como está. */
 export function shortName(name) {
-  const parts = String(name || '').trim().split(/\s+/).filter(Boolean)
+  // O que está entre parênteses não é apelido: «Renato Cruz (dummy)» →
+  // «Renato C.», não «Renato D.» (revisão dos torneios, 28 set).
+  const parts = String(name || '').replace(/\([^)]*\)/g, ' ').trim().split(/\s+/).filter(Boolean)
   if (parts.length < 2) return parts[0] || ''
-  // A primeira letra do último nome («(Dev)» não conta como nome).
   const initialOf = (parts[parts.length - 1].match(/\p{L}/u) || [''])[0]
   return initialOf ? `${parts[0]} ${initialOf.toUpperCase()}.` : parts[0]
 }
