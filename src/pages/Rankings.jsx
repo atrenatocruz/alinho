@@ -9,6 +9,7 @@ import { formatRatingMaybeProvisional, isProvisional } from '../lib/elo'
 import { tierFromXp, formatXp } from '../lib/xp'
 import { winRatePct, buildMonthlyLeaderboard } from '../lib/statsLogic'
 import { getPublicRankings } from '../lib/privateMatches'
+import { getRankingHiddenIds, withoutHidden } from '../lib/rankingVisibility'
 import { errorKind } from '../lib/errors'
 import { useHeaderActions } from '../contexts/HeaderActionsContext'
 import { applyScale, defaultScale, rankedCount, SCALES } from '../lib/rankingScales'
@@ -108,7 +109,9 @@ export default function Rankings() {
       }
 
       // Um clube ou grupo: meses (para a pastilha de período) + lista.
-      const monthly = await loadMonthly(scope)
+      // Estas duas o ecrã monta sozinho, por isso tira aqui os professores
+      // que não querem aparecer (o Global e o XP já vêm filtrados).
+      const [monthly, hidden] = await Promise.all([loadMonthly(scope), getRankingHiddenIds().catch(() => new Set())])
       if (!cancelled) {
         setMonths(monthly.months)
         if (wantMonthly.current && monthly.months[0]) {
@@ -117,14 +120,14 @@ export default function Rankings() {
         }
       }
       if (period !== ALWAYS) {
-        return (monthly.byMonth[period] || []).map((p) => ({
+        return withoutHidden(monthly.byMonth[period], hidden).map((p) => ({
           // Está na lista do mês porque jogou nesse mês.
           user_id: p.user_id, name: p.user?.name || '—', avatar_url: null, gender: p.user?.gender, ranked: true, played: true,
           sub: `${t('rankings.mix_count', { count: p.participations })} · 🏆 ${t('rankings.mixes_won_count', { count: p.mixesWon })}`,
           value: p.points > 0 ? `+${p.points}` : String(p.points), valueLabel: t('rankings.points_label'),
         }))
       }
-      return (await loadOrganizationRanking(scope)).map(toRatingRow)
+      return withoutHidden(await loadOrganizationRanking(scope), hidden).map(toRatingRow)
     }
 
     load()
