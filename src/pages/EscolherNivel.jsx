@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { CheckCircle2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { PrimaryButton, RatingBadge, Select } from '../components/ui'
+import { PrimaryButton, RatingBadge, Select, DateField } from '../components/ui'
+import { MIN_SIGNUP_AGE, ADULT_AGE, isAtLeast } from '../lib/age'
 import { Wordmark } from '../components/Layout'
 import { ONBOARDING_LEVELS } from '../lib/elo'
 import { countryOptions } from '../lib/countries'
@@ -37,7 +38,12 @@ export default function EscolherNivel() {
   // base se a pessoa escolheu — pede-se aqui, sem pré-seleção, e a
   // formação de duplas dos mixes passa a ter o dado desde o primeiro dia.
   const [side, setSide] = useState('')
-  const ready = selected && side && (!needsGender || gender)
+  // Data de nascimento: as contas Google chegam sem ela. É obrigatória
+  // (idade mínima 13, Lei 58/2019) e decide se a conta nasce privada.
+  const needsBirthday = profile?.birthday == null
+  const [birthday, setBirthday] = useState('')
+  const birthdayTooYoung = needsBirthday && birthday && !isAtLeast(birthday, MIN_SIGNUP_AGE)
+  const ready = selected && side && (!needsGender || gender) && (!needsBirthday || (birthday && !birthdayTooYoung))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -48,9 +54,18 @@ export default function EscolherNivel() {
     try {
       // Género e lado primeiro: se falhar, o nível ainda não ficou gravado
       // e o utilizador volta a este ecrã inteiro em vez de ficar sem eles.
+      // Menores (13–17): perfil privado por omissão — quem quiser segui-los
+      // pede primeiro. Podem mudar depois em Perfil.
+      const effectiveBirthday = needsBirthday ? birthday : profile?.birthday
+      const minor = effectiveBirthday && !isAtLeast(effectiveBirthday, ADULT_AGE)
       const { error: profileError } = await supabase
         .from('profiles')
-        .update({ preferred_side: side, ...(needsGender ? { gender } : {}) })
+        .update({
+          preferred_side: side,
+          ...(needsGender ? { gender } : {}),
+          ...(needsBirthday ? { birthday } : {}),
+          ...(minor ? { is_private: true } : {}),
+        })
         .eq('id', user.id)
       if (profileError) throw profileError
       const { error: rpcError } = await supabase.rpc('complete_rating_onboarding', {
@@ -123,6 +138,18 @@ export default function EscolherNivel() {
             )
           })}
         </div>
+
+        {needsBirthday && (
+          <div className="mb-5">
+            <label className="block text-sm font-extrabold text-ink-900 mb-2">
+              {t('login.birthday_label')}
+            </label>
+            <DateField value={birthday} onChange={setBirthday} max={new Date().toISOString().slice(0, 10)} hideToday />
+            {birthdayTooYoung && (
+              <p className="text-xs text-danger mt-1.5">{t('login.error_under_age', { age: MIN_SIGNUP_AGE })}</p>
+            )}
+          </div>
+        )}
 
         {needsGender && (
           <div className="mb-5">
