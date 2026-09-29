@@ -14,7 +14,7 @@ import { formatRating } from '../lib/elo'
 import { formatDate as formatDateLib, formatTime as formatTimeLib } from '../lib/formatDate'
 import { DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal, ConfirmSheet, OrgKindBadge, PlanBadge, PLAN_TIERS, planName, Tabs, BackBar } from '../components/ui'
 import { planLimitMessage, isMixLimitError, isMemberLimitError, limitsFor, nextPlanTier } from '../lib/plans'
-import { totalRounds, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, SCORING_FORMAT_LABEL_KEY } from '../lib/mixLogic'
+import { totalRounds, reverseClimbWarning, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, SCORING_FORMAT_LABEL_KEY } from '../lib/mixLogic'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
 import { AGE_RESTRICTIONS } from '../lib/ageCategories'
 import PlayerSearch from '../components/PlayerSearch'
@@ -2721,6 +2721,17 @@ export default function GerirClube() {
                         <p className="text-sm text-muted mt-1.5">
                           {t(gameForm.seed_reverse ? 'gerirclube.seed_reverse_reverse_help' : 'gerirclube.seed_reverse_normal_help')}
                         </p>
+                        {/* Dá tempo para subir? (29 set) — sobem um campo por ronda. */}
+                        {gameForm.seed_reverse && (() => {
+                          const courts = parseInt(gameForm.num_courts, 10) || 1
+                          const rounds = totalRounds(gameForm)
+                          const warn = reverseClimbWarning({ numCourts: courts, rounds })
+                          return warn ? (
+                            <p role="status" className={`mt-2 rounded-ctrl px-3 py-2 text-sm font-bold ${warn === 'cant_reach' ? 'bg-warning/10 text-[#92400E]' : 'bg-ink-50 text-ink-700'}`}>
+                              {t(`gerirclube.seed_reverse_warn_${warn}`, { courts, rounds })}
+                            </p>
+                          ) : null
+                        })()}
                       </div>
                     )}
 

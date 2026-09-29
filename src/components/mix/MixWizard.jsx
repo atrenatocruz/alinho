@@ -19,7 +19,7 @@ import StepPage from '../steps/StepPage'
 import LaunchDayPicker from '../LaunchDayPicker'
 import { Chips, DateField, DateTimeField, Select } from '../ui'
 import { advanceByFrequency } from '../../lib/mixDraft'
-import { totalRounds } from '../../lib/mixLogic'
+import { totalRounds, reverseClimbWarning } from '../../lib/mixLogic'
 import { AGE_RESTRICTIONS } from '../../lib/ageCategories'
 import { formatDate, formatTime } from '../../lib/formatDate'
 import { LEVEL_SCALES, LEVEL_NUMBERS, parseLevel, scaleForGender, GENDER_FOR_SCALE } from '../../lib/mixLevels'
@@ -423,6 +423,17 @@ export default function MixWizard({
                 { value: 'normal', label: t('gerirclube.seed_reverse_normal') },
                 { value: 'reverse', label: t('gerirclube.seed_reverse_reverse') },
               ]} />
+            {/* Dá tempo para subir? (29 set) — sobem um campo por ronda. */}
+            {form.seed_reverse && (() => {
+              const courts = parseInt(form.num_courts, 10) || 1
+              const rounds = totalRounds(form)
+              const warn = reverseClimbWarning({ numCourts: courts, rounds })
+              return warn ? (
+                <p role="status" className={`mt-2 rounded-ctrl px-3 py-2 text-sm font-bold ${warn === 'cant_reach' ? 'bg-warning/10 text-[#92400E]' : 'bg-ink-50 text-ink-700'}`}>
+                  {t(`gerirclube.seed_reverse_warn_${warn}`, { courts, rounds })}
+                </p>
+              ) : null
+            })()}
           </Field>
         )}
         <Field label={t('mixwizard.pairing_label')}

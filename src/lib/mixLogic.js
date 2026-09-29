@@ -83,6 +83,18 @@ export const isAgeIneligible = (game, profile) =>
   && Boolean(profile?.birthday)
   && !meetsAgeRestriction(profile.birthday, game.age_restriction)
 
+/** Sobe e desce invertido: dá tempo para as duplas mais fortes subirem?
+    Começam no último campo e sobem um por ronda ganha — com N campos, só
+    chegam ao Campo 1 na ronda N, a ganhar tudo. 'cant_reach' se há menos
+    rondas do que campos, 'last_round' se há tantas como campos, senão null. */
+export function reverseClimbWarning({ numCourts, rounds }) {
+  const courts = Number(numCourts) || 1
+  if (courts <= 1) return null
+  if (rounds < courts) return 'cant_reach'
+  if (rounds === courts) return 'last_round'
+  return null
+}
+
 /** Rondas disponíveis no court. */
 export const totalRounds = (game) =>
   Math.max(1, Math.floor((game.court_time_minutes || 90) / (game.game_time_minutes || 20)))

@@ -5,7 +5,7 @@ import {
   generateAmericanoSchedule, americanoStandings,
   computeMixWinnerTeamId, formDuplas,
   nextSobeDesceRotating, splitPartnerRows, rotatingPlacar, shortName,
-  thirdPlaceMatch, lowerPlacementMatches, placementOfCourt, PHASE_LABEL_KEY, seedCourts,
+  thirdPlaceMatch, lowerPlacementMatches, placementOfCourt, PHASE_LABEL_KEY, seedCourts, reverseClimbWarning,
 } from './mixLogic'
 
 describe('splitIntoPools', () => {
@@ -834,5 +834,18 @@ describe('seedCourts — Sobe e desce invertido (Renato, 29 set)', () => {
       { court_number: 1, team_a_id: 'c', team_b_id: 'd' },
       { court_number: 2, team_a_id: 'a', team_b_id: 'b' },
     ])
+  })
+})
+
+describe('reverseClimbWarning — dá tempo para subir? (29 set)', () => {
+  it('menos rondas do que campos: as mais fortes não chegam ao Campo 1', () => {
+    expect(reverseClimbWarning({ numCourts: 4, rounds: 3 })).toBe('cant_reach')
+  })
+  it('rondas iguais aos campos: só chegam na última ronda', () => {
+    expect(reverseClimbWarning({ numCourts: 4, rounds: 4 })).toBe('last_round')
+  })
+  it('rondas de sobra, ou um campo só: sem aviso', () => {
+    expect(reverseClimbWarning({ numCourts: 3, rounds: 5 })).toBeNull()
+    expect(reverseClimbWarning({ numCourts: 1, rounds: 1 })).toBeNull()
   })
 })
