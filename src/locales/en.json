@@ -1104,6 +1104,8 @@
   "gamedetails.scorekeeper_badge": "Scorekeeper",
   "gamedetails.make_scorekeeper": "Make scorekeeper",
   "gamedetails.round_number": "Round {{number}}",
+  "gamedetails.round_done_summary_one": "1 match",
+  "gamedetails.round_done_summary_other": "{{count}} matches",
   "gamedetails.save_score": "Save result",
   "gamedetails.score_tie_not_allowed": "There are no draws here, so the round can't close with this score. Play a tie-break point (or agree on a winner) and enter the final score — e.g. 6-5.",
   "gamedetails.set_tie_not_allowed": "A set can't end level. Enter the score the set finished on — e.g. 7-6.",
