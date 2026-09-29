@@ -118,7 +118,9 @@ export default function ScoreEntry({
   const tb = matchTieBreak({ sets: [...(match.sets || [])].sort((x, y) => x.set_number - y.set_number) })
   if (!editable) {
     return (
-      <div className="space-y-1.5">
+      // animate-fade-in: quando o resultado gravado toma o lugar dos campos,
+      // entra suave em vez de saltar (29 set).
+      <div className="space-y-1.5 animate-fade-in">
         {readOnlyRow(teamAName, match.team_a_id, match.score_a)}
         {readOnlyRow(teamBName, match.team_b_id, match.score_b)}
         {tb?.tb && (
@@ -189,9 +191,11 @@ export default function ScoreEntry({
         <button
           onClick={() => onSave(finalScore)}
           disabled={saving}
-          className="w-full py-2.5 rounded-ctrl bg-ink-900 text-lime-400 text-sm font-extrabold transition-all duration-fast active:scale-[0.98] disabled:opacity-40"
+          aria-busy={saving || undefined}
+          className="w-full min-h-[44px] py-2.5 rounded-ctrl bg-ink-900 text-lime-400 text-sm font-extrabold transition-all duration-fast active:scale-[0.98] disabled:opacity-70 inline-flex items-center justify-center gap-2"
         >
-          {t('gamedetails.save_score')}
+          {saving && <span className="h-4 w-4 rounded-full border-2 border-lime-400/30 border-t-lime-400 animate-spin" aria-hidden />}
+          {saving ? t('gamedetails.saving_score') : t('gamedetails.save_score')}
         </button>
       )}
     </div>
@@ -253,7 +257,9 @@ function SetsScoreEntry({ match, deciderIsSuperTiebreak, editable, teamAName, te
 
   if (!editable) {
     return (
-      <div className="space-y-1.5">
+      // animate-fade-in: quando o resultado gravado toma o lugar dos campos,
+      // entra suave em vez de saltar (29 set).
+      <div className="space-y-1.5 animate-fade-in">
         {readOnlyRow(teamAName, match.team_a_id, match.score_a)}
         {readOnlyRow(teamBName, match.team_b_id, match.score_b)}
       </div>

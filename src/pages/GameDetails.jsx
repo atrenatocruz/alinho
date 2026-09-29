@@ -1551,6 +1551,14 @@ export default function GameDetails() {
         if (setsError) throw setsError
       }
 
+      // O resultado aparece logo, antes de a leitura voltar (Renato, 29 set:
+      // «desaparece tudo e depois volta a aparecer os pontos»). Antes,
+      // limpavam-se os números escritos com o jogo ainda por jogar no ecrã:
+      // durante a leitura ficavam os campos vazios, sem botão.
+      const winnerId = a > b ? match.team_a_id : match.team_b_id
+      setMatches(prev => prev.map(m => (m.id === match.id
+        ? { ...m, score_a: a, score_b: b, winner_team_id: winnerId, ...(sets ? { sets: sets.map((st, i) => ({ ...st, set_number: i + 1 })) } : {}) }
+        : m)))
       setScores(prev => ({ ...prev, [match.id]: undefined }))
       setEditingMatchId(current => (current === match.id ? null : current))
       // Espera pela leitura: é a mais recente, e é ela que mostra o
