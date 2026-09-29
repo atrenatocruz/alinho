@@ -1,150 +1,123 @@
-# Ranking (rating / "nível") — como é calculado
+# Ranking (rating / "nível") — como funciona e porquê
 
-O que está implementado, seguindo o código. Fonte de verdade: `supabase/migration_ranking_soma_zero.sql` (Trello #440, 2026-09-24), que define as quatro funções do motor. Todo o cálculo vive no Postgres; o JavaScript só mostra (`src/lib/elo.js:1-8`).
+Modelo em vigor desde `supabase/migration_elo_simples.sql` (28 set 2026). A parte 1 é o que está implementado; a parte 2 é o raciocínio e as simulações que levaram a este modelo, para não se voltar a discutir do zero. Todo o cálculo vive no Postgres; o JavaScript só mostra (`src/lib/elo.js:1-8`).
 
-## Em duas frases
+---
 
-Cada pessoa tem **um** rating global, `profiles.rating` (2 casas decimais), escrito apenas por funções SQL `SECURITY DEFINER`; o cliente não lhe toca (`supabase/migration_elo_rating.sql:29-50`). O modelo é **soma zero**: o que uma dupla ganha num jogo, a outra perde, ao cêntimo.
+## Parte 1 — O modelo, em 7 regras
 
-## 1. Ponto de partida
+1. **Um rating global por pessoa** (`profiles.rating`). Começa no nível escolhido à entrada: N1 1900 · N2 1700 · N3 1500 · N4 1300 · N5 1100 · N6 850 · Iniciante 600 (`supabase/migration_elo_entry_levels.sql:140-170`); 900 para quem não escolheu.
+2. **Rating da dupla = média dos dois.** Esperado com a fórmula clássica: `E = 1 / (1 + 10^((R_adv − R_nós) / 400))`.
+3. **K = 20 para toda a gente.** Quem tem menos de 12 jogos contados usa K = 40, e isso só mexe no rating dele: os outros três no jogo movem pelo K 20 deles.
+4. **Cada um da dupla leva o mesmo.** Ganharam juntos, ganham o mesmo; perderam juntos, perdem o mesmo. Chão em 0, sem teto.
+5. **Só conta vitória, derrota ou empate.** Sets, jogos e pontos só decidem quem ganhou.
+6. **Nada mais mexe no rating.** Não há prémio por ganhar o mix, por noite perfeita, nem por ser campeão de torneio. Isso é assunto de XP e pontos de clube.
+7. **Quando a tua dupla está 150 pontos acima da adversária, ganhar vale cada vez menos, até zero aos 250.** Perder custa o normal. Para subir, joga com gente do teu nível.
 
-- Ao entrar na app, o ecrã "Qual é o teu nível?" chama `complete_rating_onboarding` (`supabase/migration_elo_entry_levels.sql:140-170`):
+Por jogo: `delta = K × (S − E)`, com `S` = 1 / 0.5 / 0. A 2 casas decimais na base, arredondado a inteiro no ecrã.
 
-  | Escolha | Rating inicial (`rating_anchor`) |
-  | --- | --- |
-  | N1 | 1900 |
-  | N2 | 1700 |
-  | N3 | 1500 |
-  | N4 | 1300 |
-  | N5 | 1100 |
-  | N6 | 850 |
-  | Iniciante | 600 |
+### Exemplos
 
-- Quem ainda não escolheu vale **900** em todas as contas (`COALESCE(rating, 900)`); convidados criados pelo bot do WhatsApp entram a 900 (`supabase/migration_backfill_guest_ratings.sql:18-23`).
-- A escolha **desloca** o rating em vez de o substituir: pontos ganhos antes de escolher o nível (um admin mete-te num mix antes de abrires a app) mantêm-se (`migration_elo_entry_levels.sql:164-168`). Só se pode escolher uma vez.
+| Situação | Ratings [A1, A2, B1, B2] | Deltas |
+| --- | --- | --- |
+| Duplas iguais, A ganha | 1100, 1100, 1100, 1100 | +10, +10, −10, −10 |
+| Idem, mas A1 tem menos de 12 jogos | 1100, 1100, 1100, 1100 | **+20**, +10, −10, −10 |
+| Dupla desnivelada (1200 + 1000) vs 1100 + 1100, A ganha | 1200, 1000, 1100, 1100 | +10, +10, −10, −10 |
+| Favoritos ganham (E = 0,76) | 1300, 1300, 1100, 1100 | +4.8, +4.8, −4.8, −4.8 |
+| Azarões ganham (E = 0,24) | 1100, 1100, 1300, 1300 | +15.2, +15.2, −15.2, −15.2 |
+| Lugar sem conta na dupla A | 1100, —, 1100, 1100 | +10, —, −10, −10 |
+| A1 está 250 acima, mas a dupla só 100 (E = 0,64): normal | 1250, 950, 1000, 1000 | +7.2, +7.2, −7.2, −7.2 |
+| Dupla 200 acima (E = 0,76): metade | 1300, 1100, 1000, 1000 | **+2.4**, **+2.4**, −4.8, −4.8 |
+| Dupla 250 acima (E = 0,81): zero | 1300, 1200, 1000, 1000 | **0**, **0**, −3.8, −3.8 |
+| Idem, mas perde: custa na mesma | 1300, 1200, 1000, 1000 | −16.2, −16.2, +16.2, +16.2 |
 
-## 2. Um jogo 2v2 — a fórmula
+### Onde está no código
 
-Função `elo_jogo_deltas` (`migration_ranking_soma_zero.sql:140-248`). Recebe os 4 ratings, os 4 contadores de jogos e o resultado; não lê nem escreve nada.
+| Peça | Ficheiro |
+| --- | --- |
+| A conta de um jogo (`elo_jogo_deltas`) | `supabase/migration_elo_simples.sql` §1 |
+| Ler os 4 ratings, aplicar, escrever (`apply_elo_pairing`) | idem §2 |
+| Mix: jogos por ordem de ronda → `mix_player_stats` (`apply_mix_elo`) | idem §3 |
+| Torneio: jogos por ordem → `tournament_player_stats` (`apply_tournament_elo`) | idem §4 |
+| Amigos: `friend_match_apply_game` / `confirm_private_match` → `apply_elo_pairing` | `migration_amigos_sem_bloquear.sql:240-337`, `migration_private_match_draw.sql` |
+| Grupo: `apply_group_match_ranking` / `reverse_group_match_ranking` | `migration_group_matches.sql:330-452` |
+| Entrada (`complete_rating_onboarding`) | `migration_elo_entry_levels.sql:140-170` |
+| Recalcular tudo por ordem de data (`recalcular_niveis`) | `supabase/recalcular_niveis.sql` |
+| Níveis (bandas), "provisório", formatação | `src/lib/elo.js` |
 
-1. **Rating da dupla** = média dos dois (`:185-186`). Um lugar sem conta (convidado por nome) é ignorado na média.
-2. **Esperado** da dupla A: `E = 1 / (1 + 10^((R_B − R_A) / 400))` (`:187`).
-3. **K** por pessoa, pelo número de jogos que já contaram (`:171-173`):
-
-   | `rating_games` | K |
-   | --- | --- |
-   | < 8 | 40 |
-   | < 20 | 30 |
-   | ≥ 20 | 20 |
-
-   O K do jogo é a média dos K das quatro pessoas. Movimento total: `M = 2 · K · (S − E)` (`:190-191`).
-4. **Resultado `S`**: 1 vitória, 0 derrota, 0.5 empate. **A margem não conta**: sets, jogos ou pontos só decidem quem ganhou (`src/lib/scoringLogic.js:4-12`).
-5. **Repartição dentro da dupla** (`:200-218`): na **vitória**, o mais fraco leva a fatia maior, `clamp(R_parceiro / (R_eu + R_parceiro), 0.35, 0.65)`, ponderada pelo K de cada um (um novato move mais, à custa da fatia do parceiro, não por cima). Na derrota e no empate é 50/50.
-6. **Soma zero e chão em 0** (`:220-246`): ninguém desce abaixo de 0; os vencedores recebem exatamente o que os perdedores perderam; o resto do arredondamento a 2 casas vai para o último vencedor.
-7. **Convidado sem conta na dupla**: o jogo move **metade** — opção `convidado = 'B'`, "dupla com convidado = uma pessoa" (`:129`, `:192-194`).
-
-Exemplos do próprio ficheiro (`:631-641`), todos com soma 0:
-
-| Caso | Ratings [A1, A2, B1, B2] | Jogos | Resultado |
-| --- | --- | --- | --- |
-| Dupla com convidado ganha | 1100, —, 1100, 1100 | 30, 0, 30, 30 | +10, —, −5, −5 |
-| Novato (0 jogos) ganha com par igual | 1100, 1100, 1100, 1100 | 0, 30, 30, 30 | +16.67, +8.33, −12.50, −12.50 |
-| Mais fraco da dupla ganha | 1200, 1000, 1100, 1100 | 30, 0, 30, 30 | +7.35, +17.65, −12.50, −12.50 |
-| Alguém a 5 perde (chão) | 5, 1800, 500, 500 | 30, 30, 30, 30 | −5, −18.21, +11.61, +11.60 |
-
-`apply_elo_pairing` (`:256-299`) é o invólucro que lê os 4 ratings vivos, chama a fórmula, e escreve `rating = GREATEST(0, rating + delta)` e `rating_games + 1`.
-
-## 3. Prémio da noite (mixes)
-
-`apply_mix_elo` (`:305-471`), opção `bonus_mix = 'pago'`:
-
-- **Prémio**: cada um da dupla vencedora do mix recebe **+1 %** do próprio rating; noite perfeita (ganhou tudo) **+0.5 %** extra (`:384-391`).
-- **Trava de domínio** (spec `docs/superpowers/specs/2026-09-15-fair-pairing-and-dominance-cap-design.md`): gap entre o meu rating no início do mix e a média dos adversários (`:395-400`):
-
-  | Gap | Limite (pontos dos jogos + prémio) |
-  | --- | --- |
-  | < 150 | sem limite |
-  | 150 – 299 | ≤ 15 |
-  | ≥ 300 | ≤ 5 |
-
-  Só corta o prémio, até 0; nunca tira pontos dos jogos.
-- **Quem paga**: só quem **perdeu contra um premiado**, ponderado pela surpresa da derrota (`1 − E`, com os ratings do início do mix). Uma derrota esperada paga ≈ 0 (`:404-428`). Se ninguém pagar, não há prémio (`:452-455`); se se cobrar menos do que o prometido, o prémio encolhe.
-- **Americano**: pontos por jogo sim, prémio não (`supabase/migration_mix_ranked.sql:325-334`).
-
-**Torneios** (`apply_tournament_elo`, `:477-607`): jogo a jogo igual; no fim, **+1 %** a quem jogou a final pela dupla campeã, **+0.5 %** se invicta, pago por toda a categoria proporcionalmente ao rating. Sem trava de domínio. Torneios `is_test` não contam (`supabase/migration_549_contas_e_torneio_de_teste.sql:118-155`).
-
-## 4. O que conta
+### O que conta
 
 | Evento | Conta? | Condição |
 | --- | --- | --- |
-| Mix de clube (sobe e desce, todos contra todos) | sim | `games.ranked` (`migration_mix_ranked.sql:171-173`) |
-| Mix Americano | sim, sem prémio | idem |
-| Jogo entre amigos | só se tudo isto | `ranked_intent` ∧ sem lugar com nome-convidado ∧ os 4 aceitaram ∧ **não é empate** (`supabase/migration_amigos_sem_bloquear.sql:268-274`) |
-| Jogo dentro de um grupo | sim | `group_matches.ranked` (`supabase/migration_group_matches.sql:347-349`) |
+| Mix de clube (todos os formatos) | sim | `games.ranked` (`migration_mix_ranked.sql:171-173`) |
+| Jogo entre amigos | só se | `ranked_intent` ∧ sem lugar com nome-convidado ∧ os 4 aceitaram ∧ não é empate (`migration_amigos_sem_bloquear.sql:268-274`) |
+| Jogo dentro de um grupo | sim | `group_matches.ranked` |
 | Torneio | sim | exceto `tournaments.is_test` |
-| Aulas | não | nenhuma migração de aulas escreve `profiles.rating` |
+| Aulas | não | — |
 
-- **Convidado de clube** (tem perfil, `memberships.is_guest`): o rating move-se, mas não fica registo em `mix_player_stats` (`migration_mix_ranked.sql:114`). É por isso que a correção pós-fecho recusa mixes com convidados (ver §5).
-- **Contas de teste** (`is_test`): saem das listas de ranking e da pesquisa, não do cálculo dos mixes.
-- Não há afinações por clube: `organizations.points_rules` só mexe nos **pontos** de clube (`player_stats`), nunca no rating.
+- Lugar sem conta (convidado por nome): não entra na média, não recebe nada; os outros movem normalmente.
+- Contas de teste (`is_test`) saem das listas de ranking, não do cálculo.
+- Não há afinações por clube: `organizations.points_rules` mexe nos pontos de clube, nunca no rating.
 
-## 5. Ordem, correções e reversões
+### Ordem, correções e reversões
 
-- **Dentro de um mix**: os jogos aplicam-se por `round_number, created_at, id`, com os ratings **vivos** a mudar jogo a jogo (`:358`). A trava de domínio e a surpresa usam a fotografia do início do mix, para a régua não andar (`:340-346`).
-- **Torneio**: por `scheduled_at, created_at, id` (`:521`).
-- **Correção pós-fecho de um mix** (`supabase/migration_correct_finished_americano.sql:218-255`): reverte os `rating_delta` guardados e volta a correr `apply_mix_elo`. Recusa quando falta delta a algum participante (`untracked_participant`), quando alguém já teve outro evento de rating depois (`later_elo_event`) ou quando o mix não é ranked (`sem_ranking`).
-- **Reversões que existem**: jogo de grupo (`reverse_group_match_ranking`, usa os deltas guardados em `group_matches.applied_elo_deltas`) e categoria de torneio (`undo_tournament_elo`). **Não existe** reversão para um mix apagado nem para um jogo entre amigos apagado.
-- **Recalcular tudo**: `supabase/recalcular_niveis.sql` repõe toda a gente no `rating_anchor` com 0 jogos e reproduz mixes, amigos, grupos e torneios por ordem cronológica, confirmando soma zero a cada evento. Dry-run por omissão.
+- Dentro de um mix: jogos por `round_number, created_at, id`, com ratings vivos jogo a jogo. Torneio: por `scheduled_at, created_at, id`.
+- Correção pós-fecho de um mix (`migration_correct_finished_americano.sql:218-255`): reverte os deltas guardados e volta a correr; recusa se faltar delta a alguém, se houver evento posterior, ou se o mix não for ranked. **Bug conhecido:** não reverte `rating_games` (linhas 249-251), que volta a incrementar ao reaplicar. Com o K 40 até aos 12 jogos, isto pode fechar a janela de alguém mais cedo. Cartão por abrir.
+- Reversões que existem: grupo (`reverse_group_match_ranking`) e torneio (`undo_tournament_elo`). Não há reversão para mix apagado nem amigos apagado; o `recalcular_niveis` resolve à mão.
+- `recalcular_niveis(FALSE)` mostra sem gravar; `(TRUE)` grava. Já não exige soma zero (os novatos a K 40 não são pagos por ninguém).
 
-## 6. O que deriva do rating
+### O que deriva do rating
 
-- **Nível mostrado** (`src/lib/elo.js:13-40`, copiado em `whatsapp-bot/src/elo.js` e em `lesson_band()`):
+- Nível mostrado: ≥ 1800 → 1, ≥ 1600 → 2, ≥ 1400 → 3, ≥ 1200 → 4, ≥ 1000 → 5, ≥ 700 → 6, < 700 Iniciante; prefixo M/F, N sem género (`src/lib/elo.js`). "Provisório" (`~902`, selo NOVO) até 12 jogos — o mesmo limiar do K 40.
+- Rankings global e por clube ordenam pelo mesmo `profiles.rating`; só quem já jogou tem lugar (`src/lib/rankingScales.js`).
+- Duplas do mix: `formDuplas` ordena por rating e evita repetir parceiro dos últimos 4 mixes (`src/lib/mixLogic.js`, `whatsapp-bot/src/autostart.js`). Seeds de torneio = soma dos dois ratings.
+- Etiquetas de evento (M4, MX3…) limitam quem se inscreve; nunca escrevem o rating.
 
-  | Rating | Nível |
-  | --- | --- |
-  | ≥ 1800 | 1 |
-  | ≥ 1600 | 2 |
-  | ≥ 1400 | 3 |
-  | ≥ 1200 | 4 |
-  | ≥ 1000 | 5 |
-  | ≥ 700 | 6 |
-  | < 700 | Iniciante |
+---
 
-  Prefixo M/F pelo género, N quando não está definido. "Provisório" (mostrado `~902`, selo NOVO) até **8** jogos (`src/lib/elo.js:68`).
-- **Rankings**: global e por clube ordenam pelo mesmo `profiles.rating` (`supabase/migration_rankings_everyone.sql`); não há rating por clube. Só quem já jogou tem lugar na escala M/F/Todos (`src/lib/rankingScales.js:1-25`).
-- **Duplas do mix**: `formDuplas` ordena os solos por rating e evita repetir parceiro dos últimos 4 mixes (`src/lib/mixLogic.js:205-270`; bot em `whatsapp-bot/src/autostart.js:109-143`). A dupla mais forte vai para o campo 1.
-- **Seeds de torneio**: soma dos dois ratings (`supabase/migration_tournaments_seeding.sql:68`).
-- **Níveis de evento** (M4, F3, MX5…): são etiquetas que limitam quem se inscreve, comparadas com o nível derivado; nunca escrevem o rating.
+## Parte 2 — Porquê este modelo (o raciocínio)
 
-## 7. Onde aparece
+Entre 25 ago e 24 set o motor acumulou regras: K por escada (40/30/20), repartição 35/65 dentro da dupla, escudo de parceiro, prémio da noite (+1 %, +0,5 % noite perfeita) pago por quem perdia contra o vencedor ponderado pela surpresa, trava de domínio, soma zero forçada, meia-conta para convidado. Cada uma tinha uma razão; juntas, ninguém as conseguia explicar a um jogador, e as simulações abaixo mostram que, ao ritmo real do piloto, faziam o ranking pior.
 
-Perfil (número, barra até ao nível seguinte, posição global — `src/pages/Profile.jsx:632-667`), Rankings (`src/pages/Rankings.jsx`), detalhe do mix (`+53` / `−5` por jogador, `src/pages/GameDetails.jsx:2663-2713`), lista de membros, roster do WhatsApp (`Nome (M6)`). No ecrã arredonda-se a inteiro; guarda-se com 2 casas.
+### O ritmo real: 1 mix por semana, 4 jogos
 
-## 8. Divergências conhecidas no código
+Tudo o que se segue foi simulado por Monte Carlo (`supabase/ensaio_elo_monte_carlo.py`): 50 jogadores com nível real entre 850 e 1200, nível declarado N5 ou N6 com 25 % a declararem-se acima, duplas formadas por rating como o `formDuplas`, 40 repetições. É simulação, não produção; serve para ordens de grandeza.
 
-Registadas para a equipa decidir; este ficheiro não as corrige.
+**1. A 3 meses, o motor antigo piorava o ranking.** Erro médio (rating − nível real): 71 no início → **78** com o modelo #440 → 69 sem prémio → **64** com K 20 puro. Pessoas com o nível certo: 83 % no início → 72 % (#440) → 83 % (K 20). Pessoas que mudavam de nível em 3 meses sem o nível real ter mudado: **24 %** (#440) vs 3 % (K 20). (O modelo simples dá 70 / 78 % / 14 % neste ensaio porque os 50 começam todos com 0 jogos e passam os 3 primeiros mixes a K 40; em regime normal só os recém-chegados estão nessa janela — ver o ponto 8.)
 
-1. `elo_k_factor` (escada 120/90/70/50/30/20, `migration_elo_entry_levels.sql:48-57`) existe mas **ninguém a chama**; o K real é o inline 40/30/20 de `elo_jogo_deltas`.
-2. `FEATURES.md:63` descreve o modelo anterior ao #440 (limiares 5/20, prémio pago proporcional ao rating).
-3. O comentário "ninguém entra em Iniciante" (`src/lib/elo.js:11-12`) contradiz a opção Iniciante = 600.
-4. **Provável bug**: a correção pós-fecho reverte `rating` mas não `rating_games`, que volta a incrementar ao reaplicar (`migration_correct_finished_americano.sql:249-251` vs `soma_zero:291`). Cada correção inflaciona o contador e pode mudar o K de alguém. Torneios e grupos fazem a reversão completa.
-5. O `partner_shield` (parceiro estabelecido absorvia a perda do novato) foi abolido pelo #440; `p_partner_chosen` ficou só por compatibilidade (`soma_zero:38`, `:254-255`).
+**2. O prémio da noite era o maior estrago.** Sozinho subia o erro de 69 para 78 e quase dobrava as mudanças de nível (13 % → 24 %). +1 % de 1200 = 12 pontos, o mesmo que 1–2 vitórias; era "quem ganha, ganha mais" em cima do Elo.
 
-## 9. Constantes
+**3. A repartição 35/65 não fazia diferença mensurável** (erro 73 vs 74). Custava a explicar e dava a sensação de castigar quem carrega a dupla. Fora.
 
-| | Valor | Onde |
-| --- | --- | --- |
-| Divisor da fórmula | 400 | `soma_zero:187` |
-| K | 40 (< 8 jogos) · 30 (< 20) · 20 | `soma_zero:171-173` |
-| Rating da dupla | média | `soma_zero:185-186` |
-| Fatia na vitória | 35 % – 65 %, o mais fraco leva mais | `soma_zero:209-216` |
-| Convidado sem conta | jogo move metade | `soma_zero:129`, `:192-194` |
-| Base sem escolha | 900 | `COALESCE(rating, 900)` |
-| Entradas | 1900 / 1700 / 1500 / 1300 / 1100 / 850 / 600 | `migration_elo_entry_levels.sql:145-152` |
-| Níveis | 1800 / 1600 / 1400 / 1200 / 1000 / 700 | `src/lib/elo.js:13-20` |
-| Provisório | 8 jogos | `src/lib/elo.js:68` |
-| Prémio do mix | +1 % · noite perfeita +0.5 % | `soma_zero:388-389` |
-| Trava de domínio | gap ≥ 150 → ≤ 15 · gap ≥ 300 → ≤ 5 | `soma_zero:396-400` |
-| Chão / teto | 0 / sem teto | `GREATEST(0, …)` |
-| Parceiro repetido | evita os últimos 4 mixes | `mixLogic.js`, `autostart.js:119-121` |
-| Margem de vitória | não conta | `scoringLogic.js:4-12` |
+**4. Subir o K não ajuda; com muitos jogos, estraga.** Escadas 40/30/20, 40/30, 50/35/25 e K 30 fixo: a 2 jogos por semana empatam (erro 101–109 ao fim de um ano); a 8 jogos por semana, K alto sobe o erro de 106 para 128–142 e a oscilação semanal de 22 para 33 pontos. K 120 nos primeiros 8–12 jogos **piora** os novos (71 → 90–108) e, no modelo de soma zero, contamina os veteranos (40 → 54), porque o K do jogo era a média dos quatro.
+
+**5. Não se estabiliza um rating a pares em 8 ou 12 jogos, com nenhum K.** O erro padrão da estimativa é ≈ `350 / √n` em singulares e o dobro a pares (a média da dupla dilui cada um): ±245 com 8 jogos, ±200 com 12, ±115 com 37, ±70 com 100. O nível declarado (80 % de acertos) é melhor estimativa do que 8 jogos.
+
+**6. Erros grosseiros de declaração corrigem-se numa época, não em semanas.** Com 1 mix × 4 jogos por semana, jogando só com M6, no modelo simples:
+- declarou M3 (1500), é M6 (850): chega a M6 em **24 semanas** (mediana). Aos 3 meses já é M5.
+- declarou M6 (850), é M4 (1300): chega a M4 em **27 semanas**. Passa a M5 ao 1.º mês e fica meses a ganhar tudo em mixes M6.
+- K 40 nos primeiros 12 jogos poupa 4 semanas face a K 20 puro (28 → 24); K 60 × 8 poupa 5, mas mais do que dobra a inflação (+18 → +43 por 10 novos) e faz os bem declarados oscilar 65 pontos em 3 meses (vs 52 com K 40, 41 sem regra). K 120 é lotaria: +107 de inflação e ±98 de oscilação.
+
+**7. Quem ganha sempre sobe sempre — daí a regra 7.** Alguém a começar em 850 que ganhe todos os jogos no campo de cima (adversários 950–1050) fica em ≈ 1250 aos 2 meses, ≈ 1580 aos 6, ≈ 1820 ao fim de um ano e ≈ 2220 aos três, sem teto. A causa é a média da dupla: um 1750 com parceiro 950 é uma dupla de 1350 contra 1000, E = 0,85, e cada vitória ainda vale +3, quatro vezes por semana; em singulares valeria +0,3. O Elo só estabiliza quando a pessoa perde, e ele não perde.
+
+A primeira versão da regra (28 set) olhava ao **indivíduo**: 200 acima da dupla adversária, ganho 0. No mix de 28 set deu Renato −2 e Duarte +10 pelos mesmos 4 jogos, e cortou uma vitória que o esperado da dupla dava a 64 %. Contradizia a regra 4 e castigava o forte por ter parceiro fraco. A 29 set passou a olhar à **dupla**, com rampa: a partir de 150 acima da média adversária o ganho desce, até 0 aos 250. Os dois levam sempre o mesmo e nunca se corta um jogo que o Elo dava como disputado. O preço: como o parceiro fraco dilui a média, a trava chega mais tarde (invicto do M6 estabiliza em ≈ 1550 aos 2 anos, contra 1250 na versão individual e 2220 sem regra). O Ruben escolheu 150→250 em vez de 200→300 (≈ 1650) para a trava chegar mais cedo. Num clube normal, onde nenhuma dupla está 150 acima da outra, a regra não muda nada.
+
+**8. Proteger os veteranos de um novato mal declarado.** Com K 20 e sem prémio, o dano já é limitado: ±20 por jogo, o novato entra em 1–2 dos 4 jogos por noite, ±10 a ±30 acumulados nos 12 jogos dele. Regras tipo FIDE ("jogos contra provisórios contam menos para os classificados") ganhavam 0–4 pontos de erro. O K 40 só para o próprio dá a correção mais rápida sem tocar em ninguém: num clube de 40 veteranos com 10 novos (30 % mal declarados), o erro dos veteranos fica em 49–50 com qualquer K do novato, e o dos novos passa de 167 (K 20) para 158 (K 40 × 12). Onde o novato mal declarado faz mesmo mal é no campo em que cai, não nos pontos.
+
+### Comparação com o Elo clássico e o chess.com
+
+O núcleo por jogo é Elo de manual: esperado com divisor 400, `K × (S − E)`, só o resultado conta, K maior para novos (FIDE: 40 até 30 partidas, 20 depois). As diferenças são as inevitáveis do 2v2 (média da dupla, ambos levam o mesmo). O chess.com usa Glicko (incerteza por jogador, que cresce com a inatividade); aplicado ao padel com 4 jogos por semana daria o mesmo que "K alto para novos", e a simulação mostra que isso não ajuda. Se um dia se quiser tratar a inatividade, é aí que o Glicko entra; não no arranque.
+
+### O que ficou de fora, de propósito
+
+- Admin corrigir o nível de entrada nos primeiros jogos (resolve o erro grosseiro numa noite; adiado por decisão do Ruben, 28 set).
+- Regras de proteção dos classificados contra provisórios.
+- Decaimento por inatividade.
+- Recalcular o histórico: `recalcular_niveis(TRUE)` faz isso quando for decidido.
+
+### Divergências que ainda existem no repositório
+
+1. `rating_games` não é revertido na correção pós-fecho (ver acima). Cartão por abrir.
+2. O troféu "calibrado" continua nos 8 jogos (`migration_trophies.sql:252`); é um marco, não o cálculo.
+3. `ensaio_recalcular_niveis.sql` foi gerado a partir do #440 e ainda tem a asserção de soma zero; regenerar se voltar a ser preciso.
+4. Os specs de 25 ago, 8 set e 15 set e `migration_ranking_soma_zero.sql` descrevem os modelos anteriores; são registos históricos e ficam como estão.

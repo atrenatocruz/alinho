@@ -533,8 +533,11 @@ export default function Home() {
 
   // Entrar no clube (entrada livre) ou pedir para entrar (com aprovação), a
   // partir de um evento de explorar. Usa a follow_organization de sempre —
-  // a mesma porta da Comunidade. Ao entrar, as memberships recarregam e o
-  // evento passa a ser do meu clube, já com o botão de inscrição.
+  // a mesma porta da Comunidade.
+  // Ao entrar, vai para a página do mix, onde a pessoa escolhe se se inscreve
+  // (bug do Francisco, 29 set). Antes ficava na Home: o cartão virava cartão
+  // de membro e, no MESMO sítio do «Entrar no clube», aparecia o «Entrar» que
+  // inscreve com um toque — um segundo toque inscrevia sem querer.
   const handleExploreJoin = async (event) => {
     markPending(event.key, true)
     setCardError(null)
@@ -544,7 +547,8 @@ export default function Home() {
       if (data === 'pending') {
         setExploreRows((rows) => rows.map((r) => (r.organization?.id === event.orgId ? { ...r, my_request_status: 'pending' } : r)))
       } else {
-        await loadExplore()
+        navigate(`/jogo/${event.id}`, { state: { notice: t('agenda.explore_joined', { name: event.orgName || '' }) } })
+        return
       }
     } catch (error) {
       console.error('Error joining organization from explore:', error)

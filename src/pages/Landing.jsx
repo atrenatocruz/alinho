@@ -281,6 +281,26 @@ function MixPoint() {
 /* A faixa de quem organiza, com o contacto (reparos de 26 set, aprovados
    pelo Francisco): os planos e o WhatsApp, e o Email ao lado quando a caixa
    existir (#572). Os contactos vêm do contacts.js, como na página Planos. */
+// «O que é o alinho», em frases declarativas (SEO, 29 set): é o parágrafo
+// que um resumo do Google consegue citar — o slogan do topo não serve.
+// O mesmo texto vai no index.html estático e no JSON-LD da Organization.
+function About() {
+  const { t } = useTranslation()
+  return (
+    <section id="sobre" className="bg-canvas py-12 px-5">
+      <div className="max-w-2xl mx-auto">
+        <h2 className="text-2xl text-ink-900 mb-3">{t('landing.about_heading')}</h2>
+        <p className="text-ink-700 leading-relaxed">{t('landing.about_text')}</p>
+        <p className="mt-3">
+          <Link to="/instrucoes#faq" className="text-sm font-extrabold text-ink-900 underline underline-offset-4">
+            {t('instructions.faq_title')} →
+          </Link>
+        </p>
+      </div>
+    </section>
+  )
+}
+
 function OrganizersBar() {
   const { t } = useTranslation()
   const contact = 'inline-flex flex-1 items-center justify-center gap-2 min-h-[48px] rounded-ctrl px-4 font-extrabold border border-ink-900 bg-white text-ink-900 hover:bg-ink-50'
@@ -442,6 +462,7 @@ export default function Landing() {
       <LevelPoint />
       <TournamentPoint />
       <MixPoint />
+      <About />
       {/* Espaço guardado (SPEC, ponto 5): «Já se joga na alinho», só com
           clubes e só com autorização escrita de cada um. Não aparece até lá. */}
       <OrganizersBar />

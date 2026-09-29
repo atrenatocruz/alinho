@@ -1,24 +1,40 @@
 // Separador «Horário» da página do torneio (Trello #364; redesenhado na
-// revisão de 28 set — design-handoff/2026-09-28-torneio-revisao-renato, peça 3).
-// Desenho: «Calendário · Sáb 10 out» e a regra do horário — a hora é sempre
-// PREVISTA, nunca garantida, e um jogo antecipado mostra a hora antiga
-// («era 17:00»).
+// revisão de 28 set — design-handoff/2026-09-28-torneio-revisao-renato, peça 3,
+// e outra vez no canvas «Torneio — Quadro e Horário», 28 set, aprovado pelo
+// Renato). Um filtro por dia; a hora à esquerda, os jogos à direita, com os
+// mesmos cartões do quadro (MatchCard, com as fotos das duplas). No dia de
+// hoje, uma linha «Agora» mostra onde se está. Tocar num jogo abre o
+// detalhe (MatchSheet).
+//
+// A regra do horário: a hora é sempre PREVISTA, nunca garantida, e um jogo
+// antecipado mostra a hora antiga («era 17:00»).
 //
 // Abre sem conta. Só mostra; arrastar e ajustar é no Gerir.
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { CalendarDays } from 'lucide-react'
-import { EmptyState } from '../ui'
+import { Chips, EmptyState } from '../ui'
 import { MonoLabel } from './TournamentBits'
 import useCategoryBoard from './useCategoryBoard'
 import { byDayAndTime, unscheduled } from '../../lib/tournamentDraw'
-import { matchTieBreak } from './tieBreak'
 import { phaseRank } from '../../lib/tournamentSchedule'
+import { dayKeyInTz, hhmmInTz } from '../../lib/tournamentDay'
 import { sourceText } from './sourceText'
-import { TREE_ROUNDS, sourceOf } from './treeLayout'
+import { TREE_ROUNDS, isDone, sourceOf } from './treeLayout'
+import { isThirdPlace } from './matchPath'
+import MatchCard from './MatchCard'
+import MatchSheet from './MatchSheet'
+import { footOf } from './BracketTree'
 
-const hhmm = (iso) => new Date(iso).toTimeString().slice(0, 5)
+/** «Sáb 10 out» — o dia no filtro. */
+function dayChip(date, locale) {
+  const d = new Date(`${date}T12:00:00`)
+  const weekday = d.toLocaleDateString(locale, { weekday: 'short' }).replace('.', '')
+  const short = d.toLocaleDateString(locale, { day: 'numeric', month: 'short' }).replace('.', '').replace(' de ', ' ')
+  return `${weekday.charAt(0).toUpperCase()}${weekday.slice(1)} ${short}`
+}
 
-/** «SÁBADO, 10 OUT» — o dia do bloco (revisão de 28 set). */
+/** «SÁBADO, 10 OUT» — o dia, quando só há um (sem filtro). */
 function dayLabel(date, locale) {
   const d = new Date(`${date}T12:00:00`)
   const weekday = d.toLocaleDateString(locale, { weekday: 'long' }).replace('.', '').replace('-feira', '')
@@ -26,74 +42,39 @@ function dayLabel(date, locale) {
   return `${weekday}, ${short}`
 }
 
-const DONE = ['terminado', 'falta', 'desistencia']
-
-/** «CAMPO 1 · QUARTOS» / «CAMPO 2 · MEIA-FINAL 1» / «CAMPO 3 · GRUPO A». */
+/** «Quartos» / «Meia-final 1» / «Grupo A». */
 function phaseOf(match, groups, t) {
   if (match.group_id) return groups.find((g) => g.id === match.group_id)?.name || t('tournament.draw.groups_label')
+  if (isThirdPlace(match)) return t('tournament.draw.round_3P')
   if (match.round === 'SF') return t('tournament.draw.semi_n', { n: match.bracket_slot || 1 })
   return t(`tournament.draw.round_${match.round}`)
 }
 
-/** Um jogo do horário (revisão de 28 set, a do Renato): campo e fase em cima;
- *  quem ganhou com ✓ e a negro, primeiro, com o resultado do lado dele
- *  («9-4», nunca «4-9»); o que está a decorrer diz «· A DECORRER». */
-function MatchCard({ match, entries, groups, present, t }) {
-  const label = (side) => {
-    const id = side === 'a' ? match.entry_a_id : match.entry_b_id
-    if (id) return entries[id]?.name || t('tournament.draw.tbd')
-    // O 3.º lugar: «Perdedor meia 1» / «Perdedor meia 2», como no quadro.
-    if (match.round === '3P' && present.includes('SF')) return t('tournament.tree.loser_SF', { n: side === 'a' ? 1 : 2 })
-    const src = !match.group_id && sourceOf(match.round, match.bracket_slot || 1, side, present)
-    if (src) return t(`tournament.tree.winner_${src.round}`, { n: src.n })
-    return sourceText(side === 'a' ? match.source_a : match.source_b, null, t) || t('tournament.draw.tbd')
-  }
-  const done = DONE.includes(match.status)
-  const live = match.status === 'a_decorrer'
-  const aWon = done && match.winner_entry_id && match.winner_entry_id === match.entry_a_id
-  const bWon = done && match.winner_entry_id && match.winner_entry_id === match.entry_b_id
-  // Quem ganhou vem primeiro.
-  const rows = bWon
-    ? [{ name: label('b'), won: true, score: `${match.score_b}-${match.score_a}` }, { name: label('a') }]
-    : [{ name: label('a'), won: aWon, score: aWon ? `${match.score_a}-${match.score_b}` : null }, { name: label('b') }]
-  // A decorrer: o resultado até agora, na linha de cima.
-  if (live && match.score_a != null && match.score_b != null) rows[0].score = `${match.score_a}-${match.score_b}`
-  const tb = done && match.status === 'terminado' ? matchTieBreak(match)?.tb : null
-  const earlier = match.previous_scheduled_at
-  const head = [match.court_name, phaseOf(match, groups, t), live ? t('tournament.draw.live_upper') : null]
-    .filter(Boolean).join(' · ')
-  return (
-    <div className={`rounded-ctrl border bg-white px-3 py-2 ${live ? 'border-ink-900' : 'border-line'}`}>
-      <p className="font-mono text-[10px] font-bold uppercase tracking-wide text-ink-500">
-        {head}{earlier ? ` · ${t('tournament.draw.was_at', { time: hhmm(earlier) })}` : ''}
-      </p>
-      {rows.map((r, i) => (
-        <div key={i} className="mt-0.5 flex items-baseline justify-between gap-2">
-          <span className={`min-w-0 truncate text-sm ${r.won ? 'font-extrabold text-ink-900' : done ? 'text-ink-500' : 'text-ink-900'}`}>
-            {r.won && '✓ '}{r.name}
-          </span>
-          {r.score && (
-            <b className="shrink-0 font-mono text-sm text-ink-900">
-              {r.score}{tb && <span className="font-normal text-muted"> ({tb})</span>}
-            </b>
-          )}
-        </div>
-      ))}
-    </div>
-  )
+/** A hora de agora em Portugal, a mudar de minuto a minuto. */
+function useNow() {
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60000)
+    return () => clearInterval(id)
+  }, [])
+  return now
 }
 
-export default function CalendarPanel({ category }) {
+export default function CalendarPanel({ category, myEntries }) {
   const { t, i18n } = useTranslation()
   const { entries, matches, groups, loading } = useCategoryBoard(category?.id)
+  const now = useNow()
+  const [pickedDay, setPickedDay] = useState(null)
+  const [openId, setOpenId] = useState(null)
   // As rondas do quadro que existem: para «Vencedor Q3» nos jogos por saber.
   const present = TREE_ROUNDS.filter((r) => matches.some((m) => !m.group_id && m.round === r))
+  const myIds = (myEntries || []).filter((e) => e.category_id === category?.id).map((e) => e.entry_id).filter(Boolean)
+  const days = useMemo(() => byDayAndTime(matches), [matches])
 
   if (loading) {
     return <p className="py-6 text-center text-xs text-muted">{t('common.loading')}</p>
   }
 
-  const days = byDayAndTime(matches)
   // Pela ordem das fases (grupos, quartos, meias, 3.º lugar, final) e, dentro
   // de cada uma, pelo lugar no quadro — antes o 3.º lugar vinha antes das
   // meias (QA, 26 set).
@@ -110,32 +91,93 @@ export default function CalendarPanel({ category }) {
     )
   }
 
+  // O dia que abre: o escolhido; senão hoje; senão o 1.º com jogos por
+  // acabar; senão o último.
+  const today = dayKeyInTz(now)
+  const openDay = days.find((d) => d.date === pickedDay)?.date
+    || days.find((d) => d.date === today)?.date
+    || days.find((d) => d.slots.some((s) => s.matches.some((m) => !isDone(m))))?.date
+    || days.at(-1)?.date
+  const day = days.find((d) => d.date === openDay)
+  const nowTime = hhmmInTz(now.toISOString())
+  // A linha «Agora» fica antes da 1.ª hora ainda por chegar (só hoje).
+  const nowBefore = day && day.date === today ? day.slots.findIndex((s) => s.time > nowTime) : -1
+
+  const labelsOf = (match) => {
+    const label = (side) => {
+      // O 3.º lugar: «Perdedor meia 1» / «Perdedor meia 2», como no quadro.
+      if (isThirdPlace(match) && present.includes('SF')) return t('tournament.tree.loser_SF', { n: side === 'a' ? 1 : 2 })
+      const src = !match.group_id && sourceOf(match.round, match.bracket_slot || 1, side, present)
+      if (src) return t(`tournament.tree.winner_${src.round}`, { n: src.n })
+      return sourceText(side === 'a' ? match.source_a : match.source_b, null, t) || t('tournament.draw.tbd')
+    }
+    return { a: label('a'), b: label('b') }
+  }
+  const card = (m) => {
+    const earlier = m.previous_scheduled_at
+    const head = [m.court_name, phaseOf(m, groups || [], t), earlier ? t('tournament.draw.was_at', { time: hhmmInTz(earlier) }) : null]
+      .filter(Boolean).join(' · ')
+    return (
+      <MatchCard key={m.id} match={m} entries={entries} labels={labelsOf(m)} myIds={myIds}
+        head={head} foot={footOf(m, t)} final={m.round === 'F' && !m.group_id} onOpen={() => setOpenId(m.id)} />
+    )
+  }
+  const opened = openId ? matches.find((m) => m.id === openId) : null
+
+  const nowLine = (
+    <div className="mb-3.5 flex items-center gap-2" aria-label={t('tournament.schedule.now_aria', { time: nowTime })}>
+      <span className="w-14 shrink-0 font-mono text-[11px] font-bold uppercase tracking-wide text-ink-900">{t('tournament.schedule.now')}</span>
+      <span className="-ml-1 h-2 w-2 shrink-0 rounded-full bg-ink-900" />
+      <span className="h-[1.5px] flex-1 bg-ink-900" />
+      <span className="font-mono text-[11px] font-bold text-ink-900">{nowTime}</span>
+    </div>
+  )
+
   return (
     <div>
-      {days.map((day) => day.slots.map((slot) => (
-        <section key={`${day.date}-${slot.time}`} className="mb-3">
-          {/* Um bloco por dia e hora: «SÁBADO, 10 OUT · 10:00». */}
-          <MonoLabel className="mb-1">{dayLabel(day.date, i18n.language)} · {slot.time}</MonoLabel>
-          <div className="space-y-2">
-            {slot.matches.map((m) => (
-              <MatchCard key={m.id} match={m} entries={entries} groups={groups || []} present={present} t={t} />
-            ))}
-          </div>
-        </section>
-      )))}
+      {days.length > 1 ? (
+        <Chips
+          className="mb-4"
+          label={t('tournament.schedule.day_filter')}
+          value={openDay}
+          onChange={setPickedDay}
+          options={days.map((d) => ({
+            value: d.date,
+            label: `${dayChip(d.date, i18n.language)} · ${d.slots.reduce((n, s) => n + s.matches.length, 0)}`,
+          }))}
+        />
+      ) : day ? (
+        <MonoLabel className="mb-3">{dayLabel(day.date, i18n.language)}</MonoLabel>
+      ) : null}
+
+      {day && (
+        <div>
+          {day.slots.map((slot, i) => (
+            <div key={slot.time}>
+              {i === nowBefore && nowLine}
+              <section className="flex gap-2.5 pb-[18px]">
+                <div className="w-14 shrink-0 pt-1.5">
+                  <p className="font-display text-xl font-extrabold leading-none tabular-nums text-ink-900">{slot.time}</p>
+                  {slot.matches.some((m) => !isDone(m)) && <p className="mt-1 text-[11px] text-ink-500">{t('tournament.sheet.planned')}</p>}
+                </div>
+                <div className="min-w-0 flex-1 space-y-2.5">{slot.matches.map(card)}</div>
+              </section>
+            </div>
+          ))}
+        </div>
+      )}
 
       {pending.length ? (
         <section className="mb-2">
-          <MonoLabel className="mb-1">{t('tournament.draw.no_time_label')}</MonoLabel>
-          <div className="space-y-2">
-            {pending.map((m) => (
-              <MatchCard key={m.id} match={m} entries={entries} groups={groups || []} present={present} t={t} />
-            ))}
-          </div>
+          <MonoLabel className="mb-2">{t('tournament.draw.no_time_label')}</MonoLabel>
+          <div className="space-y-2.5">{pending.map(card)}</div>
         </section>
       ) : null}
 
       <p className="px-1 pb-2 text-xs text-muted">{t('tournament.draw.time_warning')}</p>
+
+      <MatchSheet match={opened} entries={entries} matches={matches} labels={opened ? labelsOf(opened) : {}}
+        myIds={myIds} groups={groups || []} onClose={() => setOpenId(null)} />
     </div>
   )
 }

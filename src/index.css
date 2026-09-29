@@ -28,6 +28,12 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Marca de versão do CSS (29 set 2026). O nome do ficheiro em /assets é o
+   hash do conteúdo: a cache de um browser ficou com HTML no URL do CSS e,
+   sem o conteúdo mudar, o nome nunca mudava. Mudar este comentário muda o
+   hash. Sem efeito visual. */
+:root { --alinho-css: '2026-09-29'; }
+
 /* ════════════════════════════════════════════════════════════════════════
    DESIGN TOKENS — tweak the theme here, everything follows.
    Mapped into Tailwind utilities via tailwind.config.js.

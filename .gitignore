@@ -54,3 +54,4 @@ whatsapp-bot/.env
 # Fica fora do git para nao poluir os diffs (muda a cada alteracao de codigo)
 # nem arrastar ~6 MB. Se preferirem partilha-lo, removam esta linha.
 graphify-out/
+__pycache__/

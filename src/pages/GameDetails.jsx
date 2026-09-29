@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation, Trans } from 'react-i18next'
 import { BackBar } from '../components/ui'
@@ -17,15 +17,8 @@ import { KIND_STYLE, KindTag, StateTag, Owner } from '../components/agenda/Event
 import PoolGroupStage from '../components/PoolGroupStage'
 import PreviousEditions from '../components/agenda/PreviousEditions'
 import ScoreEntry from '../components/ScoreEntry'
-import {
-  countPeople, totalRounds, formDuplas, seedCourts, nextSobeDesce,
-  nextSobeDesceRotating, splitPartnerRows, rotatingPlacar,
-  roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches,
-  PHASE_LABEL_KEY, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY,
-  mixCapacity, isGenderMismatch, isMissingGender, isMissingBirthday, isAgeIneligible, splitIntoPools,
-  generateAmericanoSchedule, americanoStandings, computeMixWinnerTeamId,
-} from '../lib/mixLogic'
-import { isProvisional } from '../lib/elo'
+import { countPeople, totalRounds, formDuplas, seedCourts, nextSobeDesce, nextSobeDesceRotating, splitPartnerRows, rotatingPlacar, roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches, thirdPlaceMatch, lowerPlacementMatches, placementOfCourt, PHASE_LABEL_KEY, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, mixCapacity, isGenderMismatch, isMissingGender, isMissingBirthday, isAgeIneligible, splitIntoPools, generateAmericanoSchedule, americanoStandings, computeMixWinnerTeamId, formatLabelKey } from '../lib/mixLogic'
+import { isProvisional, formatRatingMaybeProvisional } from '../lib/elo'
 import { AGE_LABEL_KEY, meetsAgeRestriction } from '../lib/ageCategories'
 import { winRatePct, firstLastName } from '../lib/statsLogic'
 import { getGlobalRankings } from '../lib/privateMatches'
@@ -166,6 +159,13 @@ export default function GameDetails() {
   const [restartOpen, setRestartOpen] = useState(false)
   // A tira preta de 3 s depois de uma ação da folha (ex.: «Mudar só este mix»).
   const [doneNotice, setDoneNotice] = useState('')
+  // Chegou pelo «Entrar no clube» do cartão da Home (bug de 29 set): a faixa
+  // diz porque está aqui — entrou no clube, ainda não está inscrito.
+  const location = useLocation()
+  useEffect(() => {
+    if (location.state?.notice) setDoneNotice(location.state.notice)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.key])
   useEffect(() => {
     if (!doneNotice) return undefined
     const timer = setTimeout(() => setDoneNotice(''), 3000)
@@ -204,6 +204,10 @@ export default function GameDetails() {
   // em cada abertura da página de um mix.
   const [history, setHistory] = useState([])
   const [historyOpen, setHistoryOpen] = useState(false)
+  // Marcadores de resultado: dobrado por defeito (Renato, 29 set).
+  const [scorekeepersOpen, setScorekeepersOpen] = useState(false)
+  // Rondas já jogadas que a pessoa abriu à mão (as outras ficam dobradas).
+  const [openRounds, setOpenRounds] = useState({})
   // Escolha de app de navegacao (Trello #34). Fica no dispositivo e nao no
   // perfil — ver a nota em lib/navigators.js.
   const [historyLoading, setHistoryLoading] = useState(false)
@@ -244,26 +248,52 @@ export default function GameDetails() {
     loadGameDetails()
     loadAllUsers()
 
-    // Subscribe to updates
-    const subscription = supabase
-      .channel(`game_${id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'participants', filter: `game_id=eq.${id}` }, () => {
-        loadGameDetails()
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'matches', filter: `game_id=eq.${id}` }, () => {
-        loadGameDetails()
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'games', filter: `id=eq.${id}` }, () => {
-        loadGameDetails()
-      })
-      .subscribe()
+    // Tempo real: entradas e saídas, resultados, duplas e o próprio mix.
+    // Os resultados (matches) e as duplas (teams) só chegam com a
+    // migration_mix_tempo_real.sql corrida (29 set) — antes não estavam na
+    // publicação e quem tinha o mix aberto não via o resultado de outro admin.
+    // Vários avisos seguidos (dois campos a gravar ao mesmo tempo, uma ronda
+    // nova com vários jogos) dão uma só leitura.
+    let reloadTimer = null
+    const reloadSoon = () => {
+      clearTimeout(reloadTimer)
+      reloadTimer = setTimeout(() => loadGameDetails(), 300)
+    }
+    // Um canal por tabela (29 set): basta UMA tabela fora da publicação
+    // para o Supabase recusar o canal inteiro — em dev, participants e games
+    // não estavam, e por isso os resultados também não chegavam.
+    const channels = [
+      ['participants', { event: '*', filter: `game_id=eq.${id}` }],
+      ['matches', { event: '*', filter: `game_id=eq.${id}` }],
+      ['teams', { event: '*', filter: `game_id=eq.${id}` }],
+      ['games', { event: 'UPDATE', filter: `id=eq.${id}` }],
+    ].map(([table, opts]) => supabase
+      .channel(`game_${id}_${table}`)
+      .on('postgres_changes', { schema: 'public', table, ...opts }, reloadSoon)
+      .subscribe())
+
+    // O organizador muda de app a meio do mix (telemóvel): ao voltar, a
+    // página lê outra vez — o tempo real pode ter falhado entretanto.
+    const onVisible = () => { if (document.visibilityState === 'visible') loadGameDetails() }
+    document.addEventListener('visibilitychange', onVisible)
 
     return () => {
-      subscription.unsubscribe()
+      clearTimeout(reloadTimer)
+      channels.forEach((channel) => supabase.removeChannel(channel))
+      document.removeEventListener('visibilitychange', onVisible)
     }
   }, [id])
 
+  // Várias leituras correm ao mesmo tempo (depois de guardar, e o tempo real
+  // a cada mudança em matches/games): só a mais recente mexe no ecrã. Sem
+  // isto, uma leitura antiga que acabasse por último punha o jogo outra vez
+  // sem resultado e o «Terminar Ronda» não aparecia até recarregar (QA, 28
+  // set, mix 8-8 com tie-break; o «não encontrou como passar à ronda 2» de
+  // Carcavelos).
+  const loadSeqRef = useRef(0)
   const loadGameDetails = async () => {
+    const seq = ++loadSeqRef.current
+    const stale = () => seq !== loadSeqRef.current
     try {
       const { data: gameData, error: gameError } = await supabase
         .from('games')
@@ -272,6 +302,7 @@ export default function GameDetails() {
         .single()
 
       if (gameError) throw gameError
+      if (stale()) return
       setGame(gameData)
 
       // level/is_guest live on `memberships` now (per-org) — fetch this
@@ -340,6 +371,7 @@ export default function GameDetails() {
         .from('game_scorekeepers')
         .select('user_id')
         .eq('game_id', id)
+      if (stale()) return
       setScorekeeperIds((scorekeeperRows || []).map((r) => r.user_id))
 
       // Elo rating shown next to each player instead of/alongside their
@@ -354,6 +386,7 @@ export default function GameDetails() {
         console.error('Error loading global points:', error)
       }
 
+      if (stale()) return
       setParticipants((confirmedRows || []).map((p) => ({
         ...p,
         user: attachMembership(p.user),
@@ -390,6 +423,7 @@ export default function GameDetails() {
           .order('rating_after', { ascending: false, nullsFirst: false })
           .order('points_earned', { ascending: false })
           .order('matches_won', { ascending: false })
+        if (stale()) return
         setMixStats(statsData || [])
       } else {
         setMixStats([])
@@ -1453,7 +1487,8 @@ export default function GameDetails() {
     try {
       const numCourts = game.num_courts || 1
       const rows = isSobeDesce
-        ? seedCourts(ts, numCourts)
+        // Sobe e desce invertido: as mais fortes começam no último campo.
+        ? seedCourts(ts, numCourts, { reverse: !!game.seed_reverse })
         : roundRobinRound(orderedTeamIds(ts), numCourts, 0)
 
       const { error } = await supabase.from('matches').insert(
@@ -1515,9 +1550,19 @@ export default function GameDetails() {
         if (setsError) throw setsError
       }
 
+      // O resultado aparece logo, antes de a leitura voltar (Renato, 29 set:
+      // «desaparece tudo e depois volta a aparecer os pontos»). Antes,
+      // limpavam-se os números escritos com o jogo ainda por jogar no ecrã:
+      // durante a leitura ficavam os campos vazios, sem botão.
+      const winnerId = a > b ? match.team_a_id : match.team_b_id
+      setMatches(prev => prev.map(m => (m.id === match.id
+        ? { ...m, score_a: a, score_b: b, winner_team_id: winnerId, ...(sets ? { sets: sets.map((st, i) => ({ ...st, set_number: i + 1 })) } : {}) }
+        : m)))
       setScores(prev => ({ ...prev, [match.id]: undefined }))
       setEditingMatchId(current => (current === match.id ? null : current))
-      loadGameDetails()
+      // Espera pela leitura: é a mais recente, e é ela que mostra o
+      // «Terminar Ronda».
+      await loadGameDetails()
     } catch (error) {
       console.error('Error saving score:', error)
       setMixError(describeError(t, error, 'gamedetails.error_save_score'))
@@ -1699,6 +1744,7 @@ export default function GameDetails() {
     setMixError('')
     try {
       let rows, phase
+      let third = []
       if (inGroupPhase && isRotating) {
         // Duplas novas em cada campo — nextSobeDesceRotating decide quem
         // sobe/desce e com quem joga; aqui só se gravam as equipas desta
@@ -1738,14 +1784,42 @@ export default function GameDetails() {
         if (existingElim.length === 0) {
           const orderedIds = standings(teams, matches).map(s => s.team.id)
           rows = firstElimMatches(phase, orderedIds)
+          // 3.º lugar ao lado da final, no campo 2 (Renato, 29 set: «para
+          // ninguém ficar parado»): aqui, o 3.º contra o 4.º dos grupos.
+          if (phase === 'final') third = thirdPlaceMatch({ orderedTeamIds: orderedIds, numCourts })
         } else {
           const prevPhase = existingElim[existingElim.length - 1]
-          rows = nextElimMatches(matches.filter(m => m.phase === prevPhase))
+          const prev = matches.filter(m => m.phase === prevPhase)
+          rows = nextElimMatches(prev)
+          // Depois das meias: quem as perdeu joga o 3.º lugar.
+          if (phase === 'final') third = thirdPlaceMatch({ prevMatches: prev, numCourts })
         }
       }
-      const { error } = await supabase.from('matches').insert(
-        rows.map(m => ({ ...m, game_id: id, round_number: maxRound + 1, phase }))
-      )
+      // Campos 3, 4…: 5.º contra 6.º, 7.º contra 8.º… (Renato, 29 set) — as
+      // duplas que não estão na final nem no 3.º lugar, pela classificação
+      // dos grupos. Só quando há 3.º lugar (o campo 2 está ocupado).
+      let placement = []
+      if (phase === 'final' && third.length) {
+        const used = new Set([...rows, ...third].flatMap(m => [m.team_a_id, m.team_b_id]))
+        const rest = standings(teams, matches).map(s => s.team.id).filter(tid => !used.has(tid))
+        placement = lowerPlacementMatches({ orderedTeamIds: rest, numCourts })
+      }
+      const row = (m, ph) => ({ ...m, game_id: id, round_number: maxRound + 1, phase: ph })
+      const main = rows.map(m => row(m, phase))
+      const thirdRows = third.map(m => row(m, 'third'))
+      let { error } = await supabase.from('matches').insert([
+        ...main, ...thirdRows, ...placement.map(m => row(m, 'placement')),
+      ])
+      // Enquanto as migrações não correrem, a base de dados recusa as fases
+      // novas (CHECK, 23514): tenta-se sem os jogos de classificação
+      // (migration_mix_lugares.sql), depois sem o 3.º lugar
+      // (migration_mix_terceiro_lugar.sql) — a ronda avança sempre.
+      if (error?.code === '23514' && placement.length) {
+        ({ error } = await supabase.from('matches').insert([...main, ...thirdRows]))
+      }
+      if (error?.code === '23514' && thirdRows.length) {
+        ({ error } = await supabase.from('matches').insert(main))
+      }
       if (error) throw error
 
       const { error: timerError } = await supabase
@@ -2409,8 +2483,11 @@ export default function GameDetails() {
                 orgName: gameMembership.organization.name,
                 orgKind: gameMembership.organization.kind,
                 orgLogo: gameMembership.organization.group_logo_url,
+                orgSlug: gameMembership.organization.slug,
+                orgId: game.organization_id,
               }}
               fallbackKey="agenda.owner_none"
+              link
             />
           </div>
         )}
@@ -2450,7 +2527,7 @@ export default function GameDetails() {
           <p className="flex items-start gap-1.5">
             <Swords size={15} className="shrink-0 mt-0.5" />
             <span>
-              {(FORMAT_LABEL_KEY[game.format] ? t(FORMAT_LABEL_KEY[game.format]) : t('gamedetails.sobe_desce_label'))}{isRotating ? ` (${t('gamedetails.rotating_partners_short')})` : ''} · {t('gamedetails.court_count', { count: numCourts })} · {t('gamedetails.rounds_duration', { count: roundsTotal, minutes: game.game_time_minutes || 20 })}
+              {t(formatLabelKey(game))}{isRotating ? ` (${t('gamedetails.rotating_partners_short')})` : ''} · {t('gamedetails.court_count', { count: numCourts })} · {t('gamedetails.rounds_duration', { count: roundsTotal, minutes: game.game_time_minutes || 20 })}
               {game.ranked === false && <> · {t('gamedetails.badge_friendly')}</>}
             </span>
           </p>
@@ -2499,6 +2576,19 @@ export default function GameDetails() {
           </p>
         )}
       </div>
+
+      {/* Quem organiza, antes de o mix começar: o passo seguinte («Sortear
+          duplas» / «Começar o Mix») também aqui, no lugar do botão principal —
+          não só na barra pequena de cima (Renato, 29 set). É o mesmo botão
+          da barra (barPrimary), por isso fazem sempre o mesmo. */}
+      {game.status !== 'in_progress' && barPrimary && (
+        <div className="space-y-1.5">
+          <PrimaryButton onClick={barPrimary.onClick} disabled={barPrimary.disabled} className="w-full">
+            <Play size={18} /> {barPrimary.label}
+          </PrimaryButton>
+          {barPrimary.hint && <p className="px-1 text-center text-xs text-muted">{barPrimary.hint}</p>}
+        </div>
+      )}
 
       {/* Botão principal por baixo do topo (SPEC §5.9). Sem sino: seguir
           ainda não existe. Os outros caminhos (suplente, escalão etário,
@@ -3009,54 +3099,48 @@ export default function GameDetails() {
             </div>
           )}
 
-          {/* Marcadores de resultado — admin delegates score entry for this
-              mix to one or more players, so they don't have to walk court
-              to court collecting results themselves. Scoped to this game
-              only, and only while it's in_progress (see migration). */}
-          {isAdmin && (
-            <div className="card space-y-3">
-              <div>
-                <h3 className="text-lg text-ink-900">{t('gamedetails.scorekeepers_title')}</h3>
-                <p className="text-sm text-muted">
-                  {t('gamedetails.scorekeepers_description')}
-                </p>
-              </div>
-              <div className="space-y-2">
-                {people.filter((p, i, arr) => arr.findIndex((x) => x.id === p.id) === i).map((p) => (
-                  <div key={p.id} className="flex items-center gap-3">
-                    <Avatar name={p.name} url={p.avatar_url} size="w-8 h-8 text-xs" />
-                    <p className="flex-1 min-w-0 text-sm font-extrabold text-ink-900 truncate">{p.name}</p>
-                    <button
-                      onClick={() => handleToggleScorekeeper(p.id)}
-                      disabled={scorekeeperBusy === p.id}
-                      className={`text-xs font-extrabold px-3 py-2 min-h-[36px] rounded-full transition-colors duration-fast disabled:opacity-40 ${
-                        scorekeeperIds.includes(p.id) ? 'bg-ink-900 text-white' : 'bg-ink-50 text-ink-700 hover:bg-ink-200'
-                      }`}
-                    >
-                      {scorekeeperIds.includes(p.id) ? t('gamedetails.scorekeeper_badge') : t('gamedetails.make_scorekeeper')}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* Rondas */}
           {rounds.map(r => {
             const ms = matches.filter(m => m.round_number === r)
-            const phase = ms[0]?.phase || 'group'
+            const phase = (ms.find(m => m.phase !== 'third' && m.phase !== 'placement') || ms[0])?.phase || 'group'
             const isCurrent = r === maxRound && game.status === 'in_progress'
+            // As rondas já jogadas dobram-se sozinhas quando começa a
+            // seguinte (Renato, 29 set); tocar no título abre-as outra vez.
+            const open = isCurrent || !!openRounds[r]
+            const title = (
+              <h3 className="text-lg text-ink-900">
+                {t('gamedetails.round_number', { number: r })}
+                {phase !== 'group' && (
+                  <span className="ml-2 text-xs font-extrabold uppercase tracking-wide bg-ink-900 text-white px-2.5 py-1 rounded-full">
+                    {t(PHASE_LABEL_KEY[phase])}
+                  </span>
+                )}
+              </h3>
+            )
             return (
               <div key={r} id={`mix-ronda-${r}`} className={`card scroll-mt-24 ${isCurrent ? 'ring-2 ring-ink-900' : ''}`}>
+                {!isCurrent && (
+                  <button
+                    type="button"
+                    onClick={() => setOpenRounds((o) => ({ ...o, [r]: !o[r] }))}
+                    aria-expanded={open}
+                    className={`w-full min-h-[44px] flex items-center justify-between gap-3 text-left ${open ? 'mb-3' : ''}`}
+                  >
+                    {title}
+                    <span className="flex shrink-0 items-center gap-1.5 text-xs font-extrabold text-muted">
+                      {!open && (
+                        <>
+                          <Check size={14} strokeWidth={3} className="text-ok" />
+                          {t('gamedetails.round_done_summary', { count: ms.length })}
+                        </>
+                      )}
+                      <ChevronDown size={20} className={`transition-transform duration-base ${open ? 'rotate-180' : ''}`} />
+                    </span>
+                  </button>
+                )}
+                {isCurrent && (
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-lg text-ink-900">
-                    {t('gamedetails.round_number', { number: r })}
-                    {phase !== 'group' && (
-                      <span className="ml-2 text-xs font-extrabold uppercase tracking-wide bg-ink-900 text-white px-2.5 py-1 rounded-full">
-                        {t(PHASE_LABEL_KEY[phase])}
-                      </span>
-                    )}
-                  </h3>
+                  {title}
                   {isCurrent && (
                     <RoundTimer
                       startedAt={game.round_started_at}
@@ -3066,6 +3150,7 @@ export default function GameDetails() {
                     />
                   )}
                 </div>
+                )}
 
                 {/* O alarme das rondas (27 set): no mix vem ligado; cada um
                     desliga no seu telemóvel. Com os resultados todos a ronda
@@ -3083,6 +3168,7 @@ export default function GameDetails() {
                   </div>
                 )}
 
+                {open && (
                 <div className="space-y-2.5">
                   {ms.map(m => {
                     const done = !!m.winner_team_id
@@ -3093,7 +3179,7 @@ export default function GameDetails() {
                       <div key={m.id} className="rounded-ctrl bg-canvas p-2.5">
                         <div className="flex items-center justify-between mb-2 px-1">
                           <p className="font-mono text-[11px] font-extrabold uppercase tracking-widest text-ink-500">
-                            {t('gamedetails.court_number', { number: m.court_number })}
+                            {t('gamedetails.court_number', { number: m.court_number })}{m.phase === 'third' && ` · ${t('mixlogic.phase_third')}`}{m.phase === 'placement' && ` · ${t('mixlogic.phase_place_n', { n: placementOfCourt(m.court_number) })}`}
                           </p>
                           {canEditScores && done && !isCorrecting && (
                             <button
@@ -3130,6 +3216,7 @@ export default function GameDetails() {
                     )
                   })}
                 </div>
+                )}
               </div>
             )
           })}
@@ -3224,7 +3311,7 @@ export default function GameDetails() {
                   {/* Rondas */}
                   {rounds.map(r => {
                     const ms = matches.filter(m => m.round_number === r)
-                    const phase = ms[0]?.phase || 'group'
+                    const phase = (ms.find(m => m.phase !== 'third' && m.phase !== 'placement') || ms[0])?.phase || 'group'
                     const isCurrent = r === maxRound && game.status === 'in_progress'
                     return (
                       <div key={r} id={`mix-ronda-${r}`} className={`card ${isCurrent ? 'ring-2 ring-ink-900' : ''}`}>
@@ -3257,7 +3344,7 @@ export default function GameDetails() {
                               <div key={m.id} className="rounded-ctrl bg-canvas p-2.5">
                                 <div className="flex items-center justify-between mb-2 px-1">
                                   <p className="font-mono text-[11px] font-extrabold uppercase tracking-widest text-ink-500">
-                                    {t('gamedetails.court_number', { number: m.court_number })}
+                                    {t('gamedetails.court_number', { number: m.court_number })}{m.phase === 'third' && ` · ${t('mixlogic.phase_third')}`}{m.phase === 'placement' && ` · ${t('mixlogic.phase_place_n', { n: placementOfCourt(m.court_number) })}`}
                                   </p>
                                   {canEditScores && done && !isCorrecting && (
                                     <button
@@ -3331,9 +3418,11 @@ export default function GameDetails() {
                   )}
                   {/* O passo seguinte também aqui, por baixo da ronda, onde está quem
                       marca (Francisco, 27 set, mix real em Carcavelos: «tem de estar
-                      aqui»): o mesmo botão preto da barra de cima — «Terminar Ronda
-                      N» ou, na última, «Terminar e dar os pontos». */}
-                  {roundsStarted && (canAdvance || canFinalize) && barPrimary && (
+                      aqui»): o mesmo botão preto da barra de cima, SEMPRE que ela o
+                      tem — «Iniciar Ronda 1» (Francisco, 28 set, Mix M5 do A2N: «O
+                      começar ronda não pode estar só em cima… Como estava»),
+                      «Terminar Ronda N» ou, na última, «Terminar e dar os pontos». */}
+                  {barPrimary && (
                     <button type="button" onClick={barPrimary.onClick} disabled={barPrimary.disabled}
                       className="press inline-flex min-h-[52px] w-full items-center justify-center gap-1.5 rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold leading-tight text-white disabled:opacity-50">
                       {barPrimary.label}
@@ -3361,7 +3450,21 @@ export default function GameDetails() {
           inscrições (#544): o «sê o primeiro» enganava. */}
       {!mixStarted && !isDraftMix(game) && (
         <div className="card">
-          <h3 className="text-lg text-ink-900 mb-4">{t('gamedetails.players_title', { count: people.length, max: capacity })}</h3>
+          <h3 className="text-lg text-ink-900 mb-1">{t('gamedetails.players_title', { count: people.length, max: capacity })}</h3>
+          {/* Intervalo de pontos dos inscritos com nível (Ruben, 29 set):
+              responde ao «que nível é que este mix tem?» sem abrir perfis. */}
+          {(() => {
+            const rated = people.map((x) => ratingInfoById[x.id]?.rating).filter((v) => v != null)
+            if (rated.length < 2) return <div className="mb-3" />
+            const min = Math.round(Math.min(...rated))
+            const max = Math.round(Math.max(...rated))
+            const avg = Math.round(rated.reduce((a, b) => a + b, 0) / rated.length)
+            return (
+              <p className="text-xs text-muted mb-4 tabular-nums">
+                {t('gamedetails.roster_range', { min, max, avg })}
+              </p>
+            )
+          })()}
 
           {people.length === 0 ? (
             <p className="text-muted text-sm text-center py-4">
@@ -3415,6 +3518,13 @@ export default function GameDetails() {
                           </p>
                           <p className="text-xs text-muted truncate flex items-center gap-1.5">
                             <RatingBadge rating={ratingInfoById[person.id]?.rating} gender={ratingInfoById[person.id]?.gender} />
+                            {/* Os pontos ao lado do nível (Ruben, 29 set): para se ver
+                                de relance o intervalo de quem está inscrito. */}
+                            {ratingInfoById[person.id]?.rating != null && (
+                              <span className="font-extrabold text-ink-900 tabular-nums">
+                                {formatRatingMaybeProvisional(ratingInfoById[person.id].rating, person.rating_games)} {t('gamedetails.points_suffix')}
+                              </span>
+                            )}
                             {sideLabel(person.preferred_side)}
                           </p>
                         </div>
@@ -3455,10 +3565,21 @@ export default function GameDetails() {
                   {pairs.map((r, i) => {
                     const two = people.filter((x) => x.rowId === r.id)
                     const mine = two.some((x) => x.id === user.id)
+                    // O nível da dupla é a média dos dois — é com ela que o
+                    // ranking calcula o esperado de cada jogo (RANKING.md).
+                    const pairRatings = two.map((x) => ratingInfoById[x.id]?.rating).filter((v) => v != null)
+                    const pairAvg = pairRatings.length === 2 ? Math.round((pairRatings[0] + pairRatings[1]) / 2) : null
                     return (
                       <div key={`pair-${r.id}`} className={`card !p-3 ${mine ? '!border-[#BBF7D0] !bg-[#DCFCE7]' : ''}`}>
                         <div className="mb-2 flex items-center justify-between gap-2">
-                          <MonoLabel className={mine ? '!text-[#14532D]' : ''}>{t('gamedetails.pair_label', { n: i + 1 })}</MonoLabel>
+                          <MonoLabel className={mine ? '!text-[#14532D]' : ''}>
+                            {t('gamedetails.pair_label', { n: i + 1 })}
+                            {pairAvg != null && (
+                              <span className="ml-2 normal-case tracking-normal font-sans font-extrabold text-ink-900 tabular-nums">
+                                {t('gamedetails.pair_avg', { avg: pairAvg })}
+                              </span>
+                            )}
+                          </MonoLabel>
                           {canSplit && (
                             <button type="button" disabled={busy}
                               onClick={() => setSplitFor({ userId: r.user.id, names: two.map((x) => x.name).join(' e ') })}
@@ -3630,6 +3751,60 @@ export default function GameDetails() {
                   ))}
                 </ul>
               )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Marcadores de resultado — admin delegates score entry for this
+          mix to one or more players, so they don't have to walk court
+          to court collecting results themselves. Scoped to this game
+          only, and only while it's in_progress (see migration).
+          Dobrado e cá em baixo, depois do histórico (Renato, 29 set): com
+          o mix a decorrer o que importa são a classificação e as rondas. */}
+      {isAdmin && game.status === 'in_progress' && (
+        <div className="card">
+          <button
+            type="button"
+            onClick={() => setScorekeepersOpen((o) => !o)}
+            aria-expanded={scorekeepersOpen}
+            className="w-full min-h-[44px] flex items-center justify-between gap-3 text-left"
+          >
+            <h3 className="text-lg text-ink-900 flex items-center gap-2 min-w-0">
+              <Pencil size={18} className="text-muted shrink-0" />
+              <span className="truncate">{t('gamedetails.scorekeepers_title')}</span>
+              {scorekeeperIds.length > 0 && (
+                <span className="shrink-0 rounded-full bg-ink-900 px-2 py-0.5 text-xs font-extrabold text-white tabular-nums">{scorekeeperIds.length}</span>
+              )}
+            </h3>
+            <ChevronDown
+              size={20}
+              className={`text-muted shrink-0 transition-transform duration-base ${scorekeepersOpen ? 'rotate-180' : ''}`}
+            />
+          </button>
+
+          {scorekeepersOpen && (
+            <div className="mt-3 space-y-3">
+              <p className="text-sm text-muted">
+                {t('gamedetails.scorekeepers_description')}
+              </p>
+              <div className="space-y-2">
+                {people.filter((p, i, arr) => arr.findIndex((x) => x.id === p.id) === i).map((p) => (
+                  <div key={p.id} className="flex items-center gap-3">
+                    <Avatar name={p.name} url={p.avatar_url} size="w-8 h-8 text-xs" />
+                    <p className="flex-1 min-w-0 text-sm font-extrabold text-ink-900 truncate">{p.name}</p>
+                    <button
+                      onClick={() => handleToggleScorekeeper(p.id)}
+                      disabled={scorekeeperBusy === p.id}
+                      className={`text-xs font-extrabold px-3 py-2 min-h-[36px] rounded-full transition-colors duration-fast disabled:opacity-40 ${
+                        scorekeeperIds.includes(p.id) ? 'bg-ink-900 text-white' : 'bg-ink-50 text-ink-700 hover:bg-ink-200'
+                      }`}
+                    >
+                      {scorekeeperIds.includes(p.id) ? t('gamedetails.scorekeeper_badge') : t('gamedetails.make_scorekeeper')}
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>

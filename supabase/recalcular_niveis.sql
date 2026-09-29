@@ -6,6 +6,8 @@
 -- nível — os mixes (11, de 27 jul a 21 set), os jogos entre amigos, os jogos
 -- dentro do grupo e os torneios — com a conta de soma zero
 -- (`migration_ranking_soma_zero.sql`), por ordem de data.
+-- 28 set: serve igual para a conta simples (`migration_elo_simples.sql`) —
+-- usa as funções que estiverem vivas; só deixou de exigir soma zero.
 --   · Primeiro um ensaio numa CÓPIA, com a lista pessoa a pessoa de antes e
 --     depois, para o Francisco ver (`ensaio_recalcular_niveis.sql`).
 --   · Em produção só com o «corre» dele, e NUNCA entre 8 e 12 out (Smash Cup)
@@ -21,8 +23,10 @@
 --    as MESMAS funções que a app usa a partir de agora — não uma cópia das
 --    contas. O que ficou registado em cada sítio (quanto cada um mexeu
 --    naquele mix, naquele jogo) é reescrito com os números novos.
--- 3. Depois de cada coisa, confirma que a soma de todos os níveis não mudou
---    (soma zero). Se mudar, pára e não grava nada.
+-- 3. Depois de cada coisa, regista a soma de todos os níveis antes e depois.
+--    Até 28 set exigia-se soma zero; com migration_elo_simples.sql (K 40 nos
+--    primeiros 12 jogos, só para o próprio) a soma pode mexer alguns pontos
+--    por evento — fica na lista, não pára nada.
 --
 -- `SELECT * FROM recalcular_niveis(FALSE)` — SÓ VER: faz tudo, devolve a
 -- lista, e desfaz. É o modo por omissão.
@@ -35,7 +39,7 @@
 -- O QUE A LISTA DEVOLVE
 -- ─────────────────────────────────────────────────────────────────────────
 -- Uma linha por coisa refeita (tipo 'mix', 'amigos', 'grupo', 'torneio'),
--- com a soma dos níveis antes e depois (a diferença tem de ser 0), e uma
+-- com a soma dos níveis antes e depois (a diferença é o K 40 dos novatos), e uma
 -- linha por pessoa (tipo 'pessoa') com o nível antes e depois, os jogos, e
 -- uma nota quando o nível de hoje NÃO bate com o que está registado (sinal
 -- de um acerto à mão, ou de um jogo que mexeu sem ficar registado — como os
@@ -168,10 +172,9 @@ BEGIN
       END IF;
 
       SELECT COALESCE(sum(COALESCE(rating, 900)), 0) INTO v_soma1 FROM profiles;
-      IF v_soma1 <> v_soma0 THEN
-        RAISE EXCEPTION 'A soma dos níveis mudou % no % de % (%). Nada foi gravado.',
-          v_soma1 - v_soma0, e.tipo, e.quando, e.ref;
-      END IF;
+      -- Desde migration_elo_simples.sql (28 set) já não é soma zero: quem tem
+      -- menos de 12 jogos move a K 40 sem ninguém pagar. A diferença fica na
+      -- lista (coluna diferenca) para se ver; deixou de parar o recálculo.
 
       v_n := v_n + 1;
       v_linhas := v_linhas || jsonb_build_object(

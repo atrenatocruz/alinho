@@ -1,37 +1,48 @@
 // O quadro do torneio (#571). Desenho: design-handoff/2026-09-26-quadro-arvore/,
-// as secções de 28 set (o Francisco: «não percebo nada do quadro»):
+// as secções de 28 set (o Francisco: «não percebo nada do quadro»), e o
+// canvas «Torneio — Quadro e Horário» (28 set, aprovado pelo Renato):
 //   · Telemóvel — por rondas, de cima para baixo: Quartos → Meias-finais →
 //     🏆 Final → 🥉 3.º lugar, com uma frase pequena entre rondas a dizer
-//     quem passa. Sem árvore, sem linhas, sem «Metade 1/2». As rondas antes
-//     dos quartos vêm dobradas, a não ser a que está a decorrer.
+//     quem passa, e em cima uma barra com as rondas (a que está a decorrer
+//     marcada). As rondas antes dos quartos vêm dobradas, a não ser a que
+//     está a decorrer.
 //   · Computador — da esquerda para a direita, uma coluna por ronda pela
 //     ordem em que se joga, a final à direita; linhas lilás levam cada par
 //     de jogos ao seguinte. Se não couber, desliza dentro do quadro (nunca a
 //     página) e abre na ronda a decorrer.
 //   · Nos dois: o 3.º lugar à parte, por baixo, com título como a final.
-// Os cartões dos jogos são os mesmos: quem ganhou a negro com o resultado,
-// por jogar a tracejado, a final com contorno preto e fundo lilás, e a
-// dupla de quem vê a verde.
+// Os cartões são os do MatchCard (com as fotos das duplas), e tocar num
+// jogo abre o detalhe (MatchSheet).
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronDown, ChevronUp } from 'lucide-react'
+import { ArrowDown, Check, ChevronDown, ChevronUp } from 'lucide-react'
 import { LILAC } from './TournamentBits'
 import { sourceText } from './sourceText'
 import { matchTieBreak } from './tieBreak'
 import { hhmmInTz, TOURNAMENT_TZ } from '../../lib/tournamentDay'
-import { EARLY_ROUNDS, buildTree, byeEntries, isDone, isMine, sourceOf } from './treeLayout'
+import { EARLY_ROUNDS, buildTree, byeEntries, isDone, sourceOf } from './treeLayout'
+import MatchCard from './MatchCard'
+import MatchSheet from './MatchSheet'
 
-const MINE = '#DCFCE7'
+/** «Sáb 16:00» — o dia curto e a hora. */
+function whenShort(match, lang) {
+  if (!match.scheduled_at) return null
+  const day = new Intl.DateTimeFormat(lang, { weekday: 'short', timeZone: TOURNAMENT_TZ })
+    .format(new Date(match.scheduled_at)).replace('.', '')
+  return `${day} ${hhmmInTz(match.scheduled_at)}`
+}
 
-/** «SÁB 16:00 · C1 · TB 7-5» — dia, hora e campo, e o tie-break se houve. */
-function footerOf(match, t, lang) {
+/** A linha de cima do cartão: «Campo 1 · Sáb 09:00» (no computador «C1 · …»). */
+function headOf(match, lang, compact) {
+  const court = match.court_name
+    ? (compact ? String(match.court_name).replace(/^Campo\s+(\d+)$/i, 'C$1') : match.court_name)
+    : null
+  return [court, whenShort(match, lang)].filter(Boolean).join(' · ')
+}
+
+/** A linha de baixo: o tie-break (ou os sets), a falta, a desistência. */
+export function footOf(match, t) {
   const parts = []
-  if (match.scheduled_at) {
-    const day = new Intl.DateTimeFormat(lang, { weekday: 'short', timeZone: TOURNAMENT_TZ })
-      .format(new Date(match.scheduled_at)).replace('.', '')
-    parts.push(`${day} ${hhmmInTz(match.scheduled_at)}`)
-  }
-  if (match.court_name) parts.push(String(match.court_name).replace(/^Campo\s+(\d+)$/i, 'C$1'))
   const tb = match.status === 'terminado' ? matchTieBreak(match) : null
   if (tb?.tb) {
     const [a, b] = tb.tb.split('-')
@@ -50,51 +61,15 @@ function roundMeta(matches, t, lang) {
   return [when, matches.length > 1 ? t('tournament.tree.n_games', { count: matches.length }) : null].filter(Boolean).join(' · ')
 }
 
-function Side({ id, fallback, entries, score, won, lost, mine }) {
-  const team = id ? entries[id] : null
-  return (
-    <div className="flex items-baseline justify-between gap-1.5">
-      <span className={`min-w-0 truncate text-sm ${
-        !team ? 'italic text-muted' : won ? 'font-extrabold text-ink-900' : lost ? 'text-ink-500' : 'text-ink-900'
-      }`}>
-        {mine ? <span className="rounded px-1 font-extrabold text-ink-900" style={{ background: MINE }}>{team?.name}</span> : (team?.name || fallback)}
-      </span>
-      {score != null && <b className={`shrink-0 text-sm ${won ? 'text-ink-900' : 'font-normal text-ink-500'}`}>{score}</b>}
-    </div>
-  )
-}
-
-/** Um jogo: as duas duplas e, por baixo, dia, hora e campo. Por jogar:
- *  contorno tracejado. A final: contorno preto e fundo lilás. */
-function TreeCard({ match, labels, entries, myIds, final = false }) {
-  const { t, i18n } = useTranslation()
-  const done = isDone(match)
-  const known = match.entry_a_id && match.entry_b_id
-  const won = (id) => done && id && match.winner_entry_id === id
-  const lost = (id) => done && id && match.winner_entry_id && match.winner_entry_id !== id
-  const foot = footerOf(match, t, i18n.language)
-  const frame = final ? 'border-2 border-ink-900' : `border ${done || known ? 'border-line' : 'border-dashed'}`
-  return (
-    <div
-      data-mine={isMine(match, myIds) || undefined}
-      className={`rounded-ctrl bg-white px-3 py-2.5 ${frame}`}
-      style={{
-        background: final ? LILAC.bg : undefined,
-        borderColor: !final && !(done || known) ? LILAC.border : undefined,
-      }}
-    >
-      <Side id={match.entry_a_id} fallback={labels.a} entries={entries} score={match.score_a} won={won(match.entry_a_id)} lost={lost(match.entry_a_id)} mine={myIds.includes(match.entry_a_id)} />
-      <Side id={match.entry_b_id} fallback={labels.b} entries={entries} score={match.score_b} won={won(match.entry_b_id)} lost={lost(match.entry_b_id)} mine={myIds.includes(match.entry_b_id)} />
-      {foot && <p className="mt-1 truncate font-mono text-[10px] uppercase tracking-wide text-ink-500">{foot}</p>}
-    </div>
-  )
-}
-
-export default function BracketTree({ rounds, entries, myIds = [] }) {
+export default function BracketTree({ rounds, entries, myIds = [], allMatches, groups = [] }) {
   const { t, i18n } = useTranslation()
   const tree = useMemo(() => buildTree(rounds), [rounds])
   const { present, columns, third, current } = tree
   const byes = useMemo(() => byeEntries(tree), [tree])
+  // Para o detalhe: todos os jogos da categoria (com os dos grupos, para
+  // «Como chegaram aqui» nos quartos); sem eles, os do quadro.
+  const matches = useMemo(() => allMatches || rounds.flatMap((r) => r.matches), [allMatches, rounds])
+  const [openId, setOpenId] = useState(null)
 
   // As rondas antes dos quartos vêm dobradas, menos a que está a decorrer
   // (as já jogadas fecham sozinhas).
@@ -113,13 +88,23 @@ export default function BracketTree({ rounds, entries, myIds = [] }) {
     }
     return { a: src('a'), b: src('b') }
   }
-  const card = (m, round) => (
-    <TreeCard key={m.id} match={m} labels={labelsOf(m, round)} entries={entries} myIds={myIds} final={round === 'F'} />
+  const thirdLabels = { a: t('tournament.tree.loser_SF', { n: 1 }), b: t('tournament.tree.loser_SF', { n: 2 }) }
+  const card = (m, round, compact = false) => (
+    <MatchCard key={m.id} match={m} labels={labelsOf(m, round)} entries={entries} myIds={myIds}
+      head={headOf(m, i18n.language, compact)} foot={footOf(m, t)} final={round === 'F'} compact={compact}
+      onOpen={() => setOpenId(m.id)} />
   )
-  const thirdCard = third && (
-    <TreeCard match={third} entries={entries} myIds={myIds}
-      labels={{ a: t('tournament.tree.loser_SF', { n: 1 }), b: t('tournament.tree.loser_SF', { n: 2 }) }} />
+  const thirdCard = (compact = false) => third && (
+    <MatchCard match={third} entries={entries} myIds={myIds} labels={thirdLabels}
+      head={headOf(third, i18n.language, compact)} foot={footOf(third, t)} compact={compact}
+      onOpen={() => setOpenId(third.id)} />
   )
+
+  // O jogo aberto, e o que o detalhe escreve num lado ainda sem dupla.
+  const opened = openId ? matches.find((m) => m.id === openId) : null
+  const openedLabels = !opened ? {}
+    : opened.id === third?.id ? thirdLabels
+    : labelsOf(columns.flatMap((c) => c.matches).find((m) => m.id === opened.id) || opened, opened.round)
 
   // Quem não joga a 1.ª ronda não tem cartão — aparece logo na ronda
   // seguinte, e diz-se numa linha por baixo da 1.ª ronda.
@@ -140,61 +125,105 @@ export default function BracketTree({ rounds, entries, myIds = [] }) {
   // Telemóvel: o título à esquerda e o dia à direita; computador: por baixo.
   const heading = (r, matches, phone = true) => (phone ? (
     <div className="flex items-baseline justify-between gap-3">
-      <h3 className="font-display text-xl font-extrabold text-ink-900">{title(r)}</h3>
+      <h3 className="font-display text-[22px] font-extrabold text-ink-900">{title(r)}</h3>
       <span className="shrink-0 text-xs text-muted">{roundMeta(matches, t, i18n.language)}</span>
     </div>
   ) : (
     <div>
-      <h3 className="font-display text-lg font-extrabold text-ink-900">{title(r)}</h3>
+      <h3 className="font-display text-xl font-extrabold text-ink-900">{title(r)}</h3>
       <p className="text-xs text-muted">{roundMeta(matches, t, i18n.language)}</p>
     </div>
   ))
 
+  // A barra das rondas (telemóvel): as acabadas com ✓, a que está a decorrer
+  // com a bola, as que faltam com a hora do 1.º jogo. Tocar leva lá.
+  const goTo = (round) => {
+    if (EARLY_ROUNDS.includes(round)) setOpen((o) => ({ ...o, [round]: true }))
+    requestAnimationFrame(() => document.getElementById(`tree-${round}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  }
+  const progress = columns.length > 1 ? (
+    <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }}>
+      {columns.map((c) => {
+        const done = c.matches.every(isDone)
+        const now = c.round === current
+        const first = c.matches.map((m) => m.scheduled_at).filter(Boolean).sort()[0]
+        const doneShare = c.matches.length ? c.matches.filter(isDone).length / c.matches.length : 0
+        return (
+          <button key={c.round} type="button" onClick={() => goTo(c.round)} className="flex min-h-[44px] min-w-0 flex-col gap-[7px] text-left">
+            <span className="relative block h-1 w-full overflow-hidden rounded-full bg-line">
+              <span className="absolute inset-y-0 left-0 rounded-full bg-ink-900" style={{ width: `${Math.round((done ? 1 : doneShare) * 100)}%` }} />
+            </span>
+            <span className={`flex min-w-0 items-center gap-1 text-xs font-extrabold ${done || now ? 'text-ink-900' : 'text-ink-500'}`}>
+              {done && <Check size={12} strokeWidth={3} className="shrink-0" aria-hidden />}
+              {now && <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-lime-400 ring-2 ring-ink-900" aria-hidden />}
+              <span className="truncate">
+                {t(`tournament.draw.round_${c.round}`)}
+                {now ? ` · ${t('tournament.tree.now_short')}` : !done && first ? ` · ${hhmmInTz(first)}` : ''}
+              </span>
+            </span>
+          </button>
+        )
+      })}
+    </div>
+  ) : null
+
   return (
     <div>
       {/* Telemóvel: por rondas, de cima para baixo. */}
-      <div className="space-y-2 md:hidden">
+      <div className="md:hidden">
+        {progress}
         {columns.map((c, i) => {
           const folded = EARLY_ROUNDS.includes(c.round)
           const isOpen = !folded || open[c.round]
           const next = columns[i + 1]?.round
           return (
             <Fragment key={c.round}>
-              {folded ? (
-                <button type="button" onClick={() => setOpen((o) => ({ ...o, [c.round]: !o[c.round] }))} aria-expanded={isOpen}
-                  className={`flex min-h-[48px] w-full items-center justify-between gap-2 rounded-ctrl px-3 text-left ${isOpen ? 'border border-ink-900' : 'border border-dashed'}`}
-                  style={isOpen ? undefined : { borderColor: LILAC.border }}>
-                  <span className="font-display text-lg font-extrabold text-ink-900">{title(c.round)}</span>
-                  <span className="flex shrink-0 items-center gap-1 text-xs font-extrabold text-ink-700">
-                    {isOpen ? <>{t('tournament.tree.close')} <ChevronUp size={16} /></> : <>{t('tournament.tree.n_games', { count: c.matches.length })} <ChevronDown size={16} /></>}
+              <section id={`tree-${c.round}`} className="scroll-mt-20 space-y-2.5 pt-5">
+                {folded ? (
+                  <button type="button" onClick={() => setOpen((o) => ({ ...o, [c.round]: !o[c.round] }))} aria-expanded={isOpen}
+                    className={`flex min-h-[48px] w-full items-center justify-between gap-2 rounded-ctrl px-3 text-left ${isOpen ? 'border border-ink-900' : 'border border-dashed'}`}
+                    style={isOpen ? undefined : { borderColor: LILAC.border }}>
+                    <span className="font-display text-lg font-extrabold text-ink-900">{title(c.round)}</span>
+                    <span className="flex shrink-0 items-center gap-1 text-xs font-extrabold text-ink-700">
+                      {isOpen ? <>{t('tournament.tree.close')} <ChevronUp size={16} /></> : <>{t('tournament.tree.n_games', { count: c.matches.length })} <ChevronDown size={16} /></>}
+                    </span>
+                  </button>
+                ) : heading(c.round, c.matches)}
+                {isOpen && c.matches.map((m) => card(m, c.round))}
+                {i === 0 && isOpen && byeLine}
+              </section>
+              {next && (
+                <div className="flex justify-center pt-3">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-surface px-3 py-1.5 text-center text-xs text-ink-700">
+                    <ArrowDown size={14} strokeWidth={2.2} className="shrink-0" aria-hidden />{passes(next)}
                   </span>
-                </button>
-              ) : heading(c.round, c.matches)}
-              {isOpen && <div className="space-y-2">{c.matches.map((m) => card(m, c.round))}</div>}
-              {i === 0 && isOpen && byeLine}
-              {next && <p className="py-1 text-center text-xs text-muted">↓ {passes(next)}</p>}
+                </div>
+              )}
             </Fragment>
           )
         })}
-        {thirdCard && (
-          <div className="space-y-2 pt-3">
+        {third && (
+          <section id="tree-3P" className="space-y-2.5 pt-6">
             {heading('3P', [third])}
-            {thirdCard}
-          </div>
+            {thirdCard()}
+          </section>
         )}
+        <p className="pt-5 text-center text-xs text-ink-500">{t('tournament.tree.tap_hint')}</p>
       </div>
 
       {/* Computador: da esquerda para a direita. */}
-      <Board columns={columns} card={card} heading={heading} current={current} byeLine={byeLine}
-        third={thirdCard && (
-          <div className="mt-4 border-t border-line pt-4">
-            <div className="flex items-baseline gap-2">
-              <h3 className="font-display text-lg font-extrabold text-ink-900">{title('3P')}</h3>
+      <Board columns={columns} card={(m, r) => card(m, r, true)} heading={heading} current={current} byeLine={byeLine}
+        third={third && (
+          <div className="mt-5 flex flex-wrap items-center gap-x-8 gap-y-3 border-t border-line pt-5">
+            <div className="w-60">
+              <h3 className="font-display text-xl font-extrabold text-ink-900">{title('3P')}</h3>
+              <p className="text-xs text-muted">{[roundMeta([third], t, i18n.language), t('tournament.tree.third_who')].filter(Boolean).join(' · ')}</p>
             </div>
-            <p className="text-xs text-muted">{[roundMeta([third], t, i18n.language), t('tournament.tree.third_who')].filter(Boolean).join(' · ')}</p>
-            <div className="mt-2 w-60">{thirdCard}</div>
+            <div className="w-[260px]">{thirdCard(true)}</div>
           </div>
         )} />
+
+      <MatchSheet match={opened} entries={entries} matches={matches} labels={openedLabels} myIds={myIds} groups={groups} onClose={() => setOpenId(null)} />
     </div>
   )
 }
@@ -237,9 +266,9 @@ function Board({ columns, card, heading, current, byeLine, third }) {
                 <div className="flex flex-1 flex-col justify-around">
                   {last || c.matches.length < 2
                     ? c.matches.map((m) => (
-                      <div key={m.id} className="relative my-1">
+                      <div key={m.id} className="relative my-1.5">
                         {card(m, c.round)}
-                        {i > 0 && <span aria-hidden className="absolute -left-4 top-1/2 h-px w-4" style={{ background: line }} />}
+                        {i > 0 && <span aria-hidden className="absolute -left-4 top-1/2 w-4 border-t-[1.5px]" style={{ borderColor: line }} />}
                       </div>
                     ))
                     : pairs(c.matches).map((pair) => (
@@ -247,14 +276,14 @@ function Board({ columns, card, heading, current, byeLine, third }) {
                       // ao jogo da coluna seguinte (a meio do par).
                       <div key={pair[0].id} className="relative flex flex-1 flex-col justify-around">
                         {pair.map((m) => (
-                          <div key={m.id} className="relative my-1">
+                          <div key={m.id} className="relative my-1.5">
                             {card(m, c.round)}
-                            {i > 0 && <span aria-hidden className="absolute -left-4 top-1/2 h-px w-4" style={{ background: line }} />}
+                            {i > 0 && <span aria-hidden className="absolute -left-4 top-1/2 w-4 border-t-[1.5px]" style={{ borderColor: line }} />}
                           </div>
                         ))}
                         {/* O traço até ao jogo seguinte é o que esse jogo traz à esquerda. */}
                         {pair.length === 2 && (
-                          <span aria-hidden className="absolute -right-4 top-1/4 bottom-1/4 w-4 border-y border-r" style={{ borderColor: line }} />
+                          <span aria-hidden className="absolute -right-4 top-1/4 bottom-1/4 w-4 rounded-r-lg border-y-[1.5px] border-r-[1.5px]" style={{ borderColor: line }} />
                         )}
                       </div>
                     ))}

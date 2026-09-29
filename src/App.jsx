@@ -31,7 +31,6 @@ import CookieConsentBanner from './components/CookieConsentBanner'
 import ErrorBoundary from './components/ErrorBoundary'
 import { safeInternalPath } from './lib/loginLinks'
 import { reloadOnceForChunk, clearChunkReload } from './lib/chunkReload'
-import { notifyRouteChange } from './lib/appUpdate'
 
 // Route-level splitting (impeccable audit, P3 perf finding): these are all
 // low-traffic relative to the routes above — admin-only, feature-flagged,
@@ -81,6 +80,7 @@ const PrivacyPolicy = lazyPage(() => import('./pages/PrivacyPolicy'))
 const TermsOfService = lazyPage(() => import('./pages/TermsOfService'))
 const MixOffline = lazyPage(() => import('./pages/MixOffline'))
 const EscolherNivel = lazyPage(() => import('./pages/EscolherNivel'))
+const DefinirGenero = lazyPage(() => import('./pages/DefinirGenero'))
 const ConsentGate = lazyPage(() => import('./pages/ConsentGate'))
 
 // Same spinner used for every other in-app loading state (Home, Rankings,
@@ -235,6 +235,13 @@ const Guard = ({ require, showSplash, children }) => {
     return <EscolherNivel />
   }
 
+  // Género em falta (contas Google de antes de o EscolherNivel o pedir, e
+  // contas antigas): o rating tem prefixo M/F e os rankings separam por
+  // género, por isso não pode ficar em branco. Mesma comparação estrita.
+  if (user && profile && profile.gender === null) {
+    return <DefinirGenero />
+  }
+
   // "/" is the one public route: signed-out visitors see the Landing page
   // (no nav shell), signed-in ones see Home inside Layout.
   if (require === 'home') {
@@ -301,13 +308,37 @@ function AfterLogin() {
   return <Navigate to={safeInternalPath(searchParams.get('redirect'))} replace />
 }
 
+// SEO (29 set): o index.html traz título, descrição e canónico da landing;
+// nas páginas públicas que o Google indexa (/ e /instrucoes) cada uma põe o
+// seu canónico e título, e no resto da app o canónico sai — as páginas da
+// app estão fora do índice (robots.txt) e não devem apontar para a landing.
+const PUBLIC_HEAD = {
+  '/': { title: 'alinho — mixes, rankings e clubes de padel', canonical: 'https://www.alinho.pt/' },
+  '/instrucoes': { title: 'Como funciona o alinho — mixes, níveis e WhatsApp', canonical: 'https://www.alinho.pt/instrucoes' },
+}
+function useRouteHead() {
+  const location = useLocation()
+  useEffect(() => {
+    const head = PUBLIC_HEAD[location.pathname]
+    let link = document.querySelector('link[rel="canonical"]')
+    if (head) {
+      if (!link) {
+        link = document.createElement('link')
+        link.rel = 'canonical'
+        document.head.appendChild(link)
+      }
+      link.href = head.canonical
+      document.title = head.title
+    } else if (link) {
+      link.remove()
+    }
+  }, [location.pathname])
+}
+
 function AppRoutes() {
   const { user, loading: authLoading } = useAuth()
-  // Versão nova à espera (app instalada): mudar de página é um momento
-  // seguro para passar a ela (lib/appUpdate.js).
-  const { pathname } = useLocation()
-  useEffect(() => { notifyRouteChange() }, [pathname])
   const [minDurationElapsed, setMinDurationElapsed] = useState(false)
+  useRouteHead()
 
   useEffect(() => {
     const timer = setTimeout(() => setMinDurationElapsed(true), 700)

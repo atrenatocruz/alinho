@@ -14,7 +14,7 @@ const TEST_ORANGE = '#EA580C'
 const testEnvHtml = (isTest) => ({
   name: 'alinho-test-env-html',
   transformIndexHtml: (html) => (!isTest ? html : html
-    .replace('<title>alinho</title>', '<title>alinho TESTE</title>')
+    .replace('<title>alinho — mixes, rankings e clubes de padel</title>', '<title>alinho TESTE</title>')
     .replace('href="/favicon.ico"', 'href="/favicon-teste.ico"')
     .replace('href="/apple-touch-icon.png"', 'href="/apple-touch-icon-teste.png"')
     .replace('<meta name="theme-color" content="#040404" />', `<meta name="theme-color" content="${TEST_ORANGE}" />`)
@@ -29,10 +29,13 @@ export default defineConfig(({ mode }) => {
     react(),
     testEnvHtml(isTest),
     VitePWA({
-      // Quem decide quando recarregar a página aberta é src/lib/appUpdate.js
-      // (uma vez, nunca a meio de um formulário, #569). O service worker novo
-      // ativa logo (skipWaiting/clientsClaim, em baixo).
+      // Quem decide quando a versão nova entra é src/lib/appUpdate.js: fica à
+      // espera até a pessoa tocar em «Atualizar», ou até voltar à app depois
+      // de algum tempo fora (#569, revisto a 29 set).
       registerType: 'prompt',
+      // O registo do service worker é feito à mão (main.jsx, workbox-window):
+      // o plugin não mete o dele, que recarregava a página sozinho.
+      injectRegister: false,
       includeAssets: [icon('favicon.ico'), 'robots.txt', icon('apple-touch-icon.png')],
       manifest: {
         name: isTest ? 'alinho TESTE' : 'alinho',
@@ -72,9 +75,12 @@ export default defineConfig(({ mode }) => {
           handler: 'NetworkFirst',
           options: { cacheName: 'paginas', networkTimeoutSeconds: 4 },
         }],
-        // A versão nova ativa logo, sem esperar que se fechem todas as abas,
-        // e apaga a cache da versão anterior.
-        skipWaiting: true,
+        // A versão nova NÃO ativa sozinha (29 set): ativá-la logo apagava os
+        // ficheiros da versão aberta, e ao mudar de ecrã a página pedia um
+        // que já não existia e recarregava (o «refresh maluco»). À espera, o
+        // service worker antigo continua a servir a versão aberta; quem a
+        // ativa é o appUpdate.js. A cache antiga só se apaga depois disso.
+        skipWaiting: false,
         clientsClaim: true,
         cleanupOutdatedCaches: true,
       }

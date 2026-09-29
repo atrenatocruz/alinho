@@ -12,6 +12,7 @@ import CloseDaysSheet from './lessons/CloseDaysSheet'
 import { getTeacherBooking, getTeacherBusyRange, listMyTeacherClosures, listMyTeacherRequests, openTeacherDays } from '../lib/lessonsApi'
 import { Avatar, ConfirmSheet } from './ui'
 import { describeError } from '../lib/errors'
+import { setHideFromRankings } from '../lib/rankingVisibility'
 import { contemTexto } from '../lib/semAcentos'
 
 /* ─── Professor, no Perfil (Trello #283, épico #271) ─────────────────────────
@@ -29,7 +30,27 @@ const NO_CLUB = ''
 
 export default function TeacherSection() {
   const { t } = useTranslation()
-  const { user, memberships } = useAuth()
+  const { user, memberships, profile } = useAuth()
+  // Não aparecer nos rankings (29 set). Começa pelo que o perfil diz.
+  const [hideFromRankings, setHideFromRankingsState] = useState(!!profile?.hide_from_rankings)
+  const [hideBusy, setHideBusy] = useState(false)
+  const [hideError, setHideError] = useState('')
+  useEffect(() => { setHideFromRankingsState(!!profile?.hide_from_rankings) }, [profile?.hide_from_rankings])
+  const toggleHideFromRankings = async () => {
+    const next = !hideFromRankings
+    setHideBusy(true)
+    setHideError('')
+    setHideFromRankingsState(next)
+    try {
+      await setHideFromRankings(next)
+    } catch (err) {
+      console.error('Error changing ranking visibility:', err)
+      setHideFromRankingsState(!next)
+      setHideError(describeError(t, err, 'teacher.hide_rankings_error'))
+    } finally {
+      setHideBusy(false)
+    }
+  }
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [mine, setMine] = useState(null)
@@ -308,6 +329,26 @@ export default function TeacherSection() {
               </div>
             </div>
           )}
+          {/* Não aparecer nos rankings (Renato, 29 set): os pontos continuam a
+              contar — só deixa de aparecer nas listas e no «#N» do perfil. */}
+          <div className="flex items-start gap-3 rounded-ctrl bg-canvas px-3.5 py-3">
+            <div className="min-w-0 flex-1">
+              <p id="hide-rankings-label" className="text-sm font-extrabold text-ink-900">{t('teacher.hide_rankings_label')}</p>
+              <p className="mt-0.5 text-xs text-muted">{t('teacher.hide_rankings_hint')}</p>
+              {hideError && <p role="alert" className="mt-1 text-xs font-extrabold text-danger">{hideError}</p>}
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={hideFromRankings}
+              aria-labelledby="hide-rankings-label"
+              disabled={hideBusy}
+              onClick={toggleHideFromRankings}
+              className={`relative mt-0.5 h-7 w-12 shrink-0 rounded-full transition-colors duration-fast disabled:opacity-50 ${hideFromRankings ? 'bg-ink-900' : 'bg-ink-200'}`}
+            >
+              <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow-card transition-transform duration-fast ${hideFromRankings ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
+            </button>
+          </div>
           {/* Por baixo: o outro caminho (horário ou as minhas aulas) e o perfil público. */}
           <div className="flex items-center justify-between text-sm font-extrabold text-ink-900">
             {newRequests > 0 ? (
