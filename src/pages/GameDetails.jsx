@@ -266,13 +266,18 @@ export default function GameDetails() {
       clearTimeout(reloadTimer)
       reloadTimer = setTimeout(() => loadGameDetails(), 300)
     }
-    const subscription = supabase
-      .channel(`game_${id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'participants', filter: `game_id=eq.${id}` }, reloadSoon)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'matches', filter: `game_id=eq.${id}` }, reloadSoon)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'teams', filter: `game_id=eq.${id}` }, reloadSoon)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'games', filter: `id=eq.${id}` }, reloadSoon)
-      .subscribe()
+    // Um canal por tabela (29 set): basta UMA tabela fora da publicação
+    // para o Supabase recusar o canal inteiro — em dev, participants e games
+    // não estavam, e por isso os resultados também não chegavam.
+    const channels = [
+      ['participants', { event: '*', filter: `game_id=eq.${id}` }],
+      ['matches', { event: '*', filter: `game_id=eq.${id}` }],
+      ['teams', { event: '*', filter: `game_id=eq.${id}` }],
+      ['games', { event: 'UPDATE', filter: `id=eq.${id}` }],
+    ].map(([table, opts]) => supabase
+      .channel(`game_${id}_${table}`)
+      .on('postgres_changes', { schema: 'public', table, ...opts }, reloadSoon)
+      .subscribe())
 
     // O organizador muda de app a meio do mix (telemóvel): ao voltar, a
     // página lê outra vez — o tempo real pode ter falhado entretanto.
@@ -281,7 +286,7 @@ export default function GameDetails() {
 
     return () => {
       clearTimeout(reloadTimer)
-      subscription.unsubscribe()
+      channels.forEach((channel) => supabase.removeChannel(channel))
       document.removeEventListener('visibilitychange', onVisible)
     }
   }, [id])
