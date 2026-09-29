@@ -15,7 +15,20 @@ import { TOURNAMENT_TZ } from '../../lib/tournamentDay'
 // 'tournament_correction_requested' (Trello #485, Dev 2): um jogador pediu a
 // correção de um resultado; vai aos admins do torneio, que aceitam ou
 // recusam no /marcar. O aviso leva direto a esse ecrã.
-export const TOURNAMENT_NOTICE_KINDS = ['tournament_promoted', 'tournament_correction_requested']
+//
+// 'tournament_prize_changed' (AUDITORIA editar-tem-tudo, ponto 2; Francisco,
+// 28 set): o organizador mudou o prémio da categoria onde estou inscrito.
+// Sai da base de dados (Dev 3) quando o prize_first/prize_second muda.
+export const TOURNAMENT_NOTICE_KINDS = ['tournament_promoted', 'tournament_correction_requested', 'tournament_prize_changed']
+
+/** «150 € + troféu» ou, com os dois, «1.º 150 € · 2.º 50 €». */
+export function prizeText(first, second, t) {
+  const a = (first || '').trim()
+  const b = (second || '').trim()
+  if (a && b) return `${t('tournament.notice_prize_first', { prize: a })} · ${t('tournament.notice_prize_second', { prize: b })}`
+  if (b) return t('tournament.notice_prize_second', { prize: b })
+  return a
+}
 
 /** «qui, 2 out» — o dia até ao qual o parceiro tem de aceitar, na hora do
  *  torneio. */
@@ -38,9 +51,12 @@ export default function TournamentNoticeRow({ notice, onOpen }) {
     name: d.requester_name || '',
   }
   const correction = notice.kind === 'tournament_correction_requested'
+  const prize = notice.kind === 'tournament_prize_changed' ? prizeText(d.prize_first, d.prize_second, t) : null
   // Texto aprovado pelo Francisco (via PO, 25 set) — não mudar.
   const text = correction
     ? t('tournament.notice_correction_requested', vars)
+    : notice.kind === 'tournament_prize_changed'
+    ? (prize ? t('tournament.notice_prize_changed', { ...vars, prize }) : t('tournament.notice_prize_removed', vars))
     : d.partner_pending
     ? t('tournament.notice_promoted_partner_pending', vars)
     : t('tournament.notice_promoted', vars)

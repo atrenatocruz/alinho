@@ -90,7 +90,9 @@ export default function PersonalInfo() {
         preferred_side: preferredSide,
         nationality: nationality || null,
         birthday: birthday || null,
-        gender,
+        // Obrigatório (29 set): um Select sem opção vazia não deixa limpar,
+        // mas um perfil antigo sem género não pode ficar a gravar ''.
+        ...(gender ? { gender } : {}),
         language,
         activity_visibility: activityVisibility,
         results_visibility: resultsVisibility,
@@ -187,7 +189,7 @@ export default function PersonalInfo() {
               <Select
                 value={gender}
                 onChange={setGender}
-                placeholder={t('profile.gender_unspecified')}
+                placeholder={t('login.gender_placeholder')}
                 options={[
                   { value: 'masculino', label: t('login.gender_male') },
                   { value: 'feminino', label: t('login.gender_female') },

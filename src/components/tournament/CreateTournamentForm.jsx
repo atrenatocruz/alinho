@@ -490,6 +490,40 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
           </div>
         </Locked>
       )}
+      {/* Os prémios mudam-se com inscritos (Francisco, 28 set: «Sim, com aviso
+          aos inscritos»; AUDITORIA editar-tem-tudo, ponto 2): saem do cadeado
+          das categorias. O update_tournament já os grava; o aviso a cada
+          dupla da categoria sai da base de dados (Dev 3). */}
+      {locked && draft.categories.length > 0 && (
+        <div className="card space-y-3">
+          <div>
+            <b className="block text-sm text-ink-900">{t('tournament.create.prizes_title')}</b>
+            {/* À cabeça, e não no fim: com cinco categorias, no fim já ninguém a lê. */}
+            <p className="mt-0.5 text-xs text-ink-500">{t('tournament.create.prizes_notice_hint')}</p>
+          </div>
+          {draft.categories.map((c, i) => {
+            const setPrize = (patch) => set({ categories: draft.categories.map((x, j) => (j === i ? { ...x, ...patch } : x)) })
+            return (
+              <div key={c.code || i} className="space-y-2 border-t border-line pt-3">
+                <p className="flex items-center gap-2">
+                  <span className="rounded-md bg-ink-900 px-1.5 py-0.5 font-mono text-xs font-bold text-white">{c.code}</span>
+                  <span className="min-w-0 truncate text-sm font-extrabold text-ink-900">{c.name}</span>
+                </p>
+                <div>
+                  <FieldLabel>{t('tournament.create.prize_first')}</FieldLabel>
+                  <input type="text" maxLength={80} className={inputClass} placeholder={t('tournament.create.prize_placeholder')}
+                         value={c.prize_first || ''} onChange={(e) => setPrize({ prize_first: e.target.value })} />
+                </div>
+                <div>
+                  <FieldLabel>{t('tournament.create.prize_second')}</FieldLabel>
+                  <input type="text" maxLength={80} className={inputClass} placeholder={t('tournament.create.prize_placeholder')}
+                         value={c.prize_second || ''} onChange={(e) => setPrize({ prize_second: e.target.value })} />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
       {!locked && step === 1 && (
         <>
           {/* A lista das categorias é um bloco só: as linhas ficam coladas. */}

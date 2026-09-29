@@ -137,7 +137,7 @@ CREATE TABLE matches (
   team_b_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
   score_a INTEGER,
   score_b INTEGER,
-  phase TEXT NOT NULL DEFAULT 'group' CHECK (phase IN ('group', 'quarter', 'semi', 'final')),
+  phase TEXT NOT NULL DEFAULT 'group' CHECK (phase IN ('group', 'quarter', 'semi', 'final', 'third', 'placement')),  -- 'third' e 'placement': migration_mix_terceiro_lugar.sql, migration_mix_lugares.sql
   winner_team_id UUID REFERENCES teams(id),
   created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW())
 );

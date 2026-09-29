@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { CheckCircle2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { PrimaryButton, RatingBadge, Select } from '../components/ui'
+import { PrimaryButton, RatingBadge, Select, DateField } from '../components/ui'
+import { MIN_SIGNUP_AGE, ADULT_AGE, isAtLeast } from '../lib/age'
 import { Wordmark } from '../components/Layout'
 import { ONBOARDING_LEVELS } from '../lib/elo'
 import { countryOptions } from '../lib/countries'
@@ -26,14 +27,47 @@ export default function EscolherNivel() {
   // Nacionalidade (Trello #191): oferecida aqui, na criacao do perfil, mas
   // NUNCA obrigatoria — o botao de confirmar so depende do nivel.
   const [nationality, setNationality] = useState('')
+  // Género: obrigatório quando o perfil ainda não o tem — é o caso das
+  // contas Google, que não passam pelo formulário de registo (Ruben, 29 set).
+  // O rating tem prefixo M/F e os rankings separam por género; sem isto a
+  // conta ficava como "N" para sempre.
+  const needsGender = profile?.gender == null
+  const [gender, setGender] = useState('')
+  // Lado preferido: obrigatório para todas as contas novas (Ruben, 29 set).
+  // O perfil nasce com 'both' por omissão, por isso não se pode inferir da
+  // base se a pessoa escolheu — pede-se aqui, sem pré-seleção, e a
+  // formação de duplas dos mixes passa a ter o dado desde o primeiro dia.
+  const [side, setSide] = useState('')
+  // Data de nascimento: as contas Google chegam sem ela. É obrigatória
+  // (idade mínima 13, Lei 58/2019) e decide se a conta nasce privada.
+  const needsBirthday = profile?.birthday == null
+  const [birthday, setBirthday] = useState('')
+  const birthdayTooYoung = needsBirthday && birthday && !isAtLeast(birthday, MIN_SIGNUP_AGE)
+  const ready = selected && side && (!needsGender || gender) && (!needsBirthday || (birthday && !birthdayTooYoung))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
   const handleConfirm = async () => {
-    if (!selected || saving) return
+    if (!ready || saving) return
     setSaving(true)
     setError('')
     try {
+      // Género e lado primeiro: se falhar, o nível ainda não ficou gravado
+      // e o utilizador volta a este ecrã inteiro em vez de ficar sem eles.
+      // Menores (13–17): perfil privado por omissão — quem quiser segui-los
+      // pede primeiro. Podem mudar depois em Perfil.
+      const effectiveBirthday = needsBirthday ? birthday : profile?.birthday
+      const minor = effectiveBirthday && !isAtLeast(effectiveBirthday, ADULT_AGE)
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          preferred_side: side,
+          ...(needsGender ? { gender } : {}),
+          ...(needsBirthday ? { birthday } : {}),
+          ...(minor ? { is_private: true } : {}),
+        })
+        .eq('id', user.id)
+      if (profileError) throw profileError
       const { error: rpcError } = await supabase.rpc('complete_rating_onboarding', {
         p_level: selected,
       })
@@ -88,7 +122,7 @@ export default function EscolherNivel() {
                   <div className="flex-1 min-w-0">
                     <h3 className="text-base text-ink-900 flex items-center gap-2">
                       {level.num ? t('onboarding.level_title', { num: level.num }) : t('onboarding.level_iniciante_title')}
-                      <RatingBadge rating={level.points} gender={profile?.gender} />
+                      <RatingBadge rating={level.points} gender={profile?.gender || gender || undefined} />
                     </h3>
                     <p className="text-[13px] text-muted mt-0.5">{t(level.descriptionKey)}</p>
                   </div>
@@ -103,6 +137,53 @@ export default function EscolherNivel() {
               </button>
             )
           })}
+        </div>
+
+        {needsBirthday && (
+          <div className="mb-5">
+            <label className="block text-sm font-extrabold text-ink-900 mb-2">
+              {t('login.birthday_label')}
+            </label>
+            <DateField value={birthday} onChange={setBirthday} max={new Date().toISOString().slice(0, 10)} hideToday />
+            {birthdayTooYoung && (
+              <p className="text-xs text-danger mt-1.5">{t('login.error_under_age', { age: MIN_SIGNUP_AGE })}</p>
+            )}
+          </div>
+        )}
+
+        {needsGender && (
+          <div className="mb-5">
+            <label className="block text-sm font-extrabold text-ink-900 mb-2">
+              {t('login.gender_label')}
+            </label>
+            <Select
+              value={gender}
+              onChange={setGender}
+              placeholder={t('login.gender_placeholder')}
+              options={[
+                { value: 'masculino', label: t('login.gender_male') },
+                { value: 'feminino', label: t('login.gender_female') },
+              ]}
+            />
+            <p className="text-xs text-muted mt-1.5">{t('onboarding.gender_hint')}</p>
+          </div>
+        )}
+
+        <div className="mb-5">
+          <label className="block text-sm font-extrabold text-ink-900 mb-2">
+            {t('profile.preferred_side_label')}
+          </label>
+          <Select
+            value={side}
+            onChange={setSide}
+            placeholder={t('login.gender_placeholder')}
+            options={[
+              { value: 'left', label: t('gamedetails.side_left') },
+              { value: 'right', label: t('gamedetails.side_right') },
+              { value: 'both', label: t('gamedetails.side_both') },
+            ]}
+          />
+          <p className="text-xs text-muted mt-1.5">{t('profile.preferred_side_hint')}</p>
         </div>
 
         {/* Nacionalidade — opcional. Fica depois da escolha de nivel para
@@ -128,7 +209,7 @@ export default function EscolherNivel() {
 
         <PrimaryButton
           onClick={handleConfirm}
-          disabled={!selected || saving}
+          disabled={!ready || saving}
           className="w-full"
         >
           {saving ? t('onboarding.saving') : t('onboarding.confirm')}

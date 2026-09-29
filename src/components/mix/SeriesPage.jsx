@@ -20,7 +20,7 @@ import { cancelMixDate } from '../../lib/mixCancel'
 import { describeError } from '../../lib/errors'
 import { formatDate, formatTime } from '../../lib/formatDate'
 import { weekdayShort, weekdayLong, isMasculineWeekday } from '../../lib/launchDay'
-import { FORMAT_LABEL_KEY, mixCapacity } from '../../lib/mixLogic'
+import { mixCapacity, formatLabelKey } from '../../lib/mixLogic'
 
 const DONE = ['finished', 'completed', 'cancelled']
 const NOT_STARTED = ['pending', 'open', 'closed']
@@ -82,7 +82,7 @@ export default function SeriesPage({ games, onBack, onEditRules, onOpen, onChang
       day: weekdayLong(d, lang), time: formatTime(d, lang, { hour: '2-digit', minute: '2-digit' }),
     })
   })()
-  const rules = [time(base), base.location, FORMAT_LABEL_KEY[base.format] ? t(FORMAT_LABEL_KEY[base.format]) : null, t('series.places', { count: mixCapacity(base) })]
+  const rules = [time(base), base.location, t(formatLabelKey(base)), t('series.places', { count: mixCapacity(base) })]
     .filter(Boolean).join(' · ')
 
   const subline = (g) => {
