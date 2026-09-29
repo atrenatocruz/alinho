@@ -22,6 +22,11 @@ import {
   Route, Infinity as InfinityIcon, Target, ArrowUpRight, ChevronsUp,
   Star, Mountain, Swords, Shield, Award, Gem, Diamond, ThumbsUp, Heart,
   Smile, Key, Clock, Hourglass, Globe, Ticket,
+  CalendarRange, CalendarHeart, Zap, Sunset, RotateCcw, Cake, MapPin,
+  ArrowUpToLine, ArrowBigUpDash, CircleSlash2, Coins, Timer, LayoutGrid,
+  BarChart3, ArrowUpDown, Users, UsersRound, Link, UserPlus, MessageCircle,
+  Smartphone, Flag, ListOrdered, Layers, GraduationCap, BookOpen, Gift,
+  Scale, Hash, Compass, Crosshair, Anchor, Egg, Dumbbell, Plane, Bell,
 } from 'lucide-react'
 
 const ICONS = {
@@ -72,11 +77,65 @@ const ICONS = {
   um_ano_de_casa: CalendarCheck,
   velha_guarda: Hourglass,
   embaixador: Globe,
+  // ── as 53 de 29 set (migration_achievements_100.sql) ──
+  semana_sim_semana_sim: CalendarRange,
+  trimestre_de_ferro: Dumbbell,
+  ano_sem_falhar: CalendarHeart,
+  sete_dias: LayoutGrid,
+  turno_da_noite: Moon,
+  fim_de_tarde: Sunset,
+  regressado: RotateCcw,
+  anos_a_jogar: Cake,
+  turista: MapPin,
+  campo_1: Flag,
+  escalada: ArrowUpToLine,
+  do_fundo_ao_topo: ArrowBigUpDash,
+  rosca: Egg,
+  rosca_dupla: CircleSlash2,
+  punto_de_oro: Coins,
+  nervos_de_aco: Anchor,
+  tie_break: Timer,
+  todos_os_formatos: Layers,
+  final_four: Trophy,
+  em_chamas: Flame,
+  imparavel: Zap,
+  hat_trick: Hash,
+  meio_milhar: BarChart3,
+  recorde_da_casa: Crosshair,
+  contra_a_corrente: ArrowUpDown,
+  dez_parceiros: Users,
+  sociavel: UsersRound,
+  toda_a_gente: Globe,
+  dupla_de_sempre: Link,
+  quimica: Sparkles,
+  inscricao_a_dois: HeartHandshake,
+  salto_do_banco: Bell,
+  suplente_de_luxo: Star,
+  in: MessageCircle,
+  rei_do_in: Smartphone,
+  primeiro_a_chegar: Rocket,
+  organizador: ListOrdered,
+  anfitriao: Home,
+  sessao_completa: Repeat,
+  rivalidade: Swords,
+  jogo_de_grupo: Compass,
+  liga_interna: Scale,
+  estreia_em_torneio: Plane,
+  podio: Medal,
+  campeao: Trophy,
+  bicampeao: Crown,
+  invicto_no_torneio: Shield,
+  cabeca_de_serie: Target,
+  aula_experimental: BookOpen,
+  aluno_aplicado: GraduationCap,
+  recrutador: UserPlus,
+  premio_levantado: Gift,
+  cartao_completo: Award,
 }
 
 // Troféus de evento (ou futuros) sem ícone dedicado caem aqui.
 export const achievementIcon = (key, category) =>
-  ICONS[key] || (category === 'evento' ? Ticket : Award)
+  ICONS[key] || (category === 'evento' ? Ticket : category === 'torneio' ? Trophy : category === 'aulas' ? GraduationCap : Award)
 
 // Linguagem universal de raridade. Literais completos — o scanner do
 // Tailwind não vê classes construídas. `medal` é o medalhão preenchido do
@@ -108,4 +167,4 @@ export const RARITY_META = {
   },
 }
 
-export const CATEGORY_ORDER = ['jogo', 'elo', 'xp', 'kudos', 'antiguidade', 'evento']
+export const CATEGORY_ORDER = ['jogo', 'torneio', 'elo', 'xp', 'kudos', 'aulas', 'antiguidade', 'evento']
