@@ -202,6 +202,8 @@ export default function GameDetails() {
   // em cada abertura da página de um mix.
   const [history, setHistory] = useState([])
   const [historyOpen, setHistoryOpen] = useState(false)
+  // Marcadores de resultado: dobrado por defeito (Renato, 29 set).
+  const [scorekeepersOpen, setScorekeepersOpen] = useState(false)
   // Escolha de app de navegacao (Trello #34). Fica no dispositivo e nao no
   // perfil — ver a nota em lib/navigators.js.
   const [historyLoading, setHistoryLoading] = useState(false)
@@ -3034,38 +3036,6 @@ export default function GameDetails() {
             </div>
           )}
 
-          {/* Marcadores de resultado — admin delegates score entry for this
-              mix to one or more players, so they don't have to walk court
-              to court collecting results themselves. Scoped to this game
-              only, and only while it's in_progress (see migration). */}
-          {isAdmin && (
-            <div className="card space-y-3">
-              <div>
-                <h3 className="text-lg text-ink-900">{t('gamedetails.scorekeepers_title')}</h3>
-                <p className="text-sm text-muted">
-                  {t('gamedetails.scorekeepers_description')}
-                </p>
-              </div>
-              <div className="space-y-2">
-                {people.filter((p, i, arr) => arr.findIndex((x) => x.id === p.id) === i).map((p) => (
-                  <div key={p.id} className="flex items-center gap-3">
-                    <Avatar name={p.name} url={p.avatar_url} size="w-8 h-8 text-xs" />
-                    <p className="flex-1 min-w-0 text-sm font-extrabold text-ink-900 truncate">{p.name}</p>
-                    <button
-                      onClick={() => handleToggleScorekeeper(p.id)}
-                      disabled={scorekeeperBusy === p.id}
-                      className={`text-xs font-extrabold px-3 py-2 min-h-[36px] rounded-full transition-colors duration-fast disabled:opacity-40 ${
-                        scorekeeperIds.includes(p.id) ? 'bg-ink-900 text-white' : 'bg-ink-50 text-ink-700 hover:bg-ink-200'
-                      }`}
-                    >
-                      {scorekeeperIds.includes(p.id) ? t('gamedetails.scorekeeper_badge') : t('gamedetails.make_scorekeeper')}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* Rondas */}
           {rounds.map(r => {
             const ms = matches.filter(m => m.round_number === r)
@@ -3655,6 +3625,60 @@ export default function GameDetails() {
                   ))}
                 </ul>
               )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Marcadores de resultado — admin delegates score entry for this
+          mix to one or more players, so they don't have to walk court
+          to court collecting results themselves. Scoped to this game
+          only, and only while it's in_progress (see migration).
+          Dobrado e cá em baixo, depois do histórico (Renato, 29 set): com
+          o mix a decorrer o que importa são a classificação e as rondas. */}
+      {isAdmin && game.status === 'in_progress' && (
+        <div className="card">
+          <button
+            type="button"
+            onClick={() => setScorekeepersOpen((o) => !o)}
+            aria-expanded={scorekeepersOpen}
+            className="w-full min-h-[44px] flex items-center justify-between gap-3 text-left"
+          >
+            <h3 className="text-lg text-ink-900 flex items-center gap-2 min-w-0">
+              <Pencil size={18} className="text-muted shrink-0" />
+              <span className="truncate">{t('gamedetails.scorekeepers_title')}</span>
+              {scorekeeperIds.length > 0 && (
+                <span className="shrink-0 rounded-full bg-ink-900 px-2 py-0.5 text-xs font-extrabold text-white tabular-nums">{scorekeeperIds.length}</span>
+              )}
+            </h3>
+            <ChevronDown
+              size={20}
+              className={`text-muted shrink-0 transition-transform duration-base ${scorekeepersOpen ? 'rotate-180' : ''}`}
+            />
+          </button>
+
+          {scorekeepersOpen && (
+            <div className="mt-3 space-y-3">
+              <p className="text-sm text-muted">
+                {t('gamedetails.scorekeepers_description')}
+              </p>
+              <div className="space-y-2">
+                {people.filter((p, i, arr) => arr.findIndex((x) => x.id === p.id) === i).map((p) => (
+                  <div key={p.id} className="flex items-center gap-3">
+                    <Avatar name={p.name} url={p.avatar_url} size="w-8 h-8 text-xs" />
+                    <p className="flex-1 min-w-0 text-sm font-extrabold text-ink-900 truncate">{p.name}</p>
+                    <button
+                      onClick={() => handleToggleScorekeeper(p.id)}
+                      disabled={scorekeeperBusy === p.id}
+                      className={`text-xs font-extrabold px-3 py-2 min-h-[36px] rounded-full transition-colors duration-fast disabled:opacity-40 ${
+                        scorekeeperIds.includes(p.id) ? 'bg-ink-900 text-white' : 'bg-ink-50 text-ink-700 hover:bg-ink-200'
+                      }`}
+                    >
+                      {scorekeeperIds.includes(p.id) ? t('gamedetails.scorekeeper_badge') : t('gamedetails.make_scorekeeper')}
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
