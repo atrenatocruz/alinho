@@ -1886,6 +1886,8 @@
   "onboarding.save_failed_retry": "Couldn't save. Please try again.",
   "onboarding.saving": "Saving…",
   "onboarding.confirm": "Confirm",
+  "onboarding.gender_heading": "One thing missing: your gender",
+  "onboarding.gender_hint": "Rankings and your level (M/F) are split by gender. Just this, and it stays saved.",
   "onboarding.footnote": "This choice only sets your starting point — your public level (M6, M5…) evolves with your games.",
   "createprivatematch.back": "Back",
   "createprivatematch.title": "Game with friends",

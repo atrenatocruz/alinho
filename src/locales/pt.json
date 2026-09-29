@@ -1887,6 +1887,8 @@
   "onboarding.save_failed_retry": "Não foi possível guardar. Tenta novamente.",
   "onboarding.saving": "A guardar…",
   "onboarding.confirm": "Confirmar",
+  "onboarding.gender_heading": "Falta o teu género",
+  "onboarding.gender_hint": "Os rankings e o nível (M/F) separam por género. É só isto, e fica guardado.",
   "onboarding.footnote": "Esta escolha define só o ponto de partida — o nível público (M6, M5…) evolui com os teus jogos.",
   "createprivatematch.back": "Voltar",
   "createprivatematch.title": "Jogo entre amigos",
