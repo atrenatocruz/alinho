@@ -2579,6 +2579,19 @@ export default function GameDetails() {
         )}
       </div>
 
+      {/* Quem organiza, antes de o mix começar: o passo seguinte («Sortear
+          duplas» / «Começar o Mix») também aqui, no lugar do botão principal —
+          não só na barra pequena de cima (Renato, 29 set). É o mesmo botão
+          da barra (barPrimary), por isso fazem sempre o mesmo. */}
+      {game.status !== 'in_progress' && barPrimary && (
+        <div className="space-y-1.5">
+          <PrimaryButton onClick={barPrimary.onClick} disabled={barPrimary.disabled} className="w-full">
+            <Play size={18} /> {barPrimary.label}
+          </PrimaryButton>
+          {barPrimary.hint && <p className="px-1 text-center text-xs text-muted">{barPrimary.hint}</p>}
+        </div>
+      )}
+
       {/* Botão principal por baixo do topo (SPEC §5.9). Sem sino: seguir
           ainda não existe. Os outros caminhos (suplente, escalão etário,
           admin) continuam em "Ações de inscrição" mais abaixo. */}
