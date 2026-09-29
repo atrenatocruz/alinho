@@ -31,7 +31,8 @@ function sessionEvent(rows, org) {
   const first = games[0]
   const startsAt = first.scheduled_date ? new Date(`${first.scheduled_date}T${String(first.scheduled_time || '00:00').slice(0, 5)}`) : new Date()
   return {
-    key: `group_session:${first.session_id}`, source: 'friend_session', kind: 'friends', id: first.session_id,
+    // Num clube, o mesmo jogo chama-se «jogo em aberto» (28 set).
+    key: `group_session:${first.session_id}`, source: 'friend_session', kind: org?.kind && org.kind !== 'group' ? 'open' : 'friends', id: first.session_id,
     startsAt, hasTime: Boolean(first.scheduled_time), dayKey: first.scheduled_date,
     orgId: org?.id || null, orgName: org?.name || null, orgKind: org?.kind || null, orgLogo: org?.group_logo_url || null,
     mine: false, myState: null, finished: games.every((x) => x.score_a != null && x.score_b != null),

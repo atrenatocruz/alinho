@@ -160,7 +160,7 @@ export const getPublicRankings = async () => {
 export const createFriendMatch = async ({
   scheduledDate, scheduledTime = null, location = null, locationLatitude = null, locationLongitude = null,
   rankedIntent, scoringFormat = 'pontos_simples', numSets = null, teamsMode = 'manual', invitees = [], court = null,
-  organizationId = null, gameMinutes = null,
+  organizationId = null, gameMinutes = null, showLive = false,
 }) => {
   const args = {
     p_scheduled_date: scheduledDate,
@@ -181,6 +181,8 @@ export const createFriendMatch = async ({
   if (organizationId) args.p_organization_id = organizationId
   // «Cada jogo dura» (27 set): só com tempo escolhido; null = sem tempo.
   if (gameMinutes) args.p_game_minutes = gameMinutes
+  // «Mostrar a decorrer a toda a gente?» (27 set): só vai quando é «Sim».
+  if (showLive) args.p_show_live = true
   const { data, error } = await supabase.rpc('create_friend_match', args)
   if (error) throw error
   return data
@@ -308,7 +310,7 @@ export const recordFriendMatchResult = async (matchId, finalScore) => {
  *  criou; manda o formulário inteiro. Erros: not_allowed, format_locked. */
 export const updateFriendMatch = async (matchId, {
   scheduledDate, scheduledTime = null, location = null, locationLatitude = null, locationLongitude = null,
-  court = null, gameMinutes = null, scoringFormat, numSets = null, rankedIntent, teamsMode,
+  court = null, gameMinutes = null, scoringFormat, numSets = null, rankedIntent, teamsMode, showLive = null,
 }) => {
   // «Conta para o ranking?» e «Equipas» no editar (27 set, Dev 3): só vão
   // quando a pessoa os muda — undefined fica de fora, e o editar continua a
@@ -329,6 +331,7 @@ export const updateFriendMatch = async (matchId, {
     p_game_minutes: gameMinutes || null,
     p_scoring_format: scoringFormat,
     p_num_sets: numSets || null,
+    ...(showLive == null ? {} : { p_show_live: showLive }),
   })
   if (error) throw error
 }

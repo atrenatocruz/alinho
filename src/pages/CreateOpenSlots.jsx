@@ -21,7 +21,7 @@ import { getClubProfile } from '../lib/clubProfile'
 import { buildOpenSlotRows, batchToForm, batchSlotsPayload } from '../lib/openSlots'
 import { updateOpenSlotBatch } from '../lib/openSlotsApi'
 import { describeError } from '../lib/errors'
-import { PrimaryButton, PickerInput, DateField } from '../components/ui'
+import { PrimaryButton, DateField, TimeField } from '../components/ui'
 import StepPage from '../components/steps/StepPage'
 import WhatsappHoursField from '../components/WhatsappHoursField'
 import { setEventWhatsappPostTimes } from '../lib/whatsappHours'
@@ -62,7 +62,13 @@ export default function CreateOpenSlots({ edit = null }) {
   // quem já se comprometeu. O preço muda só nos horários sem ninguém.
   const anyLocked = ranges.some((r) => r.locked)
   const validRanges = ranges.filter((r) => r.start && r.end)
-  const updateRange = (i, field, value) => setRanges((rs) => rs.map((r, k) => (k === i ? { ...r, [field]: value } : r)))
+  const updateRange = (i, field, value) => setRanges((rs) => rs.map((r, k) => {
+    if (k !== i) return r
+    const next = { ...r, [field]: value }
+    // Um início depois do fim apaga o fim, em vez de deixar um horário ao contrário.
+    if (field === 'start' && next.end && next.end <= value) next.end = ''
+    return next
+  }))
   const removeRange = (i) => setRanges((rs) => (rs.length > 1 ? rs.filter((_, k) => k !== i) : [EMPTY_RANGE()]))
 
   const publish = async () => {
@@ -172,28 +178,33 @@ export default function CreateOpenSlots({ edit = null }) {
             <div className="space-y-2">
             {/* Um horário por linha, início e fim lado a lado (versão
                 final, 26 set). Um horário deixado em branco não conta. */}
-            {ranges.map((range, i) => (
+            {ranges.map((range, i) => {
+              // Apagar um horário (Renato, 29 set: «não o consegues apagar»):
+              // sempre, menos numa linha única vazia e nos que já têm alguém.
+              // No editar, o jogo desse horário é cancelado ao gravar.
+              const canRemove = !range.locked && (ranges.length > 1 || range.start || range.end)
+              return (
               <div key={range.gameId || `new-${i}`}>
-                <div className={`grid gap-2 ${edit && !range.locked ? 'grid-cols-[1fr_1fr_44px]' : 'grid-cols-2'}`}>
+                <div className={`grid gap-2 ${canRemove ? 'grid-cols-[1fr_1fr_44px]' : 'grid-cols-2'}`}>
                   <div className={range.locked ? 'pointer-events-none opacity-50' : ''}>
-                    <PickerInput type="time" value={range.start} onChange={(e) => updateRange(i, 'start', e.target.value)}
-                      hint={t('open_slots.start_hint')} aria-label={t('open_slots.start_hint')} />
+                    <TimeField value={range.start} onChange={(v) => updateRange(i, 'start', v)}
+                      hint={t('open_slots.start_hint')} />
                   </div>
                   <div className={range.locked ? 'pointer-events-none opacity-50' : ''}>
-                    <PickerInput type="time" value={range.end} onChange={(e) => updateRange(i, 'end', e.target.value)}
-                      hint={t('open_slots.end_hint')} aria-label={t('open_slots.end_hint')} />
+                    <TimeField value={range.end} onChange={(v) => updateRange(i, 'end', v)}
+                      hint={t('open_slots.end_hint')} min={range.start || null} />
                   </div>
-                  {/* No editar, um horário sem ninguém sai (o jogo é cancelado ao gravar). */}
-                  {edit && !range.locked && (
+                  {canRemove && (
                     <button type="button" onClick={() => removeRange(i)} aria-label={t('open_slots.remove_range')}
-                      className="inline-flex min-h-[44px] items-center justify-center text-ink-500 hover:text-danger">
+                      className="inline-flex min-h-[44px] items-center justify-center rounded-ctrl text-ink-500 hover:bg-ink-50 hover:text-danger">
                       <X size={18} />
                     </button>
                   )}
                 </div>
                 {range.locked && <LockLine>{t('open_slots.locked_slot')}</LockLine>}
               </div>
-            ))}
+              )
+            })}
             <button type="button" onClick={() => setRanges((rs) => [...rs, EMPTY_RANGE()])}
               className="press inline-flex min-h-[48px] w-full items-center justify-center gap-1.5 rounded-ctrl border border-dashed border-ink-200 text-sm font-extrabold text-ink-900">
               <Plus size={16} /> {t('open_slots.join_time')}

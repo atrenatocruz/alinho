@@ -17,15 +17,8 @@ import { KIND_STYLE, KindTag, StateTag, Owner } from '../components/agenda/Event
 import PoolGroupStage from '../components/PoolGroupStage'
 import PreviousEditions from '../components/agenda/PreviousEditions'
 import ScoreEntry from '../components/ScoreEntry'
-import {
-  countPeople, totalRounds, formDuplas, seedCourts, nextSobeDesce,
-  nextSobeDesceRotating, splitPartnerRows, rotatingPlacar,
-  roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches, thirdPlaceMatch,
-  PHASE_LABEL_KEY, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY,
-  mixCapacity, isGenderMismatch, isMissingGender, isMissingBirthday, isAgeIneligible, splitIntoPools,
-  generateAmericanoSchedule, americanoStandings, computeMixWinnerTeamId,
-} from '../lib/mixLogic'
-import { isProvisional } from '../lib/elo'
+import { countPeople, totalRounds, formDuplas, seedCourts, nextSobeDesce, nextSobeDesceRotating, splitPartnerRows, rotatingPlacar, roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches, thirdPlaceMatch, lowerPlacementMatches, placementOfCourt, PHASE_LABEL_KEY, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, mixCapacity, isGenderMismatch, isMissingGender, isMissingBirthday, isAgeIneligible, splitIntoPools, generateAmericanoSchedule, americanoStandings, computeMixWinnerTeamId, formatLabelKey } from '../lib/mixLogic'
+import { isProvisional, formatRatingMaybeProvisional } from '../lib/elo'
 import { AGE_LABEL_KEY, meetsAgeRestriction } from '../lib/ageCategories'
 import { winRatePct, firstLastName } from '../lib/statsLogic'
 import { getGlobalRankings } from '../lib/privateMatches'
@@ -1494,7 +1487,8 @@ export default function GameDetails() {
     try {
       const numCourts = game.num_courts || 1
       const rows = isSobeDesce
-        ? seedCourts(ts, numCourts)
+        // Sobe e desce invertido: as mais fortes começam no último campo.
+        ? seedCourts(ts, numCourts, { reverse: !!game.seed_reverse })
         : roundRobinRound(orderedTeamIds(ts), numCourts, 0)
 
       const { error } = await supabase.from('matches').insert(
@@ -1801,15 +1795,29 @@ export default function GameDetails() {
           if (phase === 'final') third = thirdPlaceMatch({ prevMatches: prev, numCourts })
         }
       }
-      const main = rows.map(m => ({ ...m, game_id: id, round_number: maxRound + 1, phase }))
+      // Campos 3, 4…: 5.º contra 6.º, 7.º contra 8.º… (Renato, 29 set) — as
+      // duplas que não estão na final nem no 3.º lugar, pela classificação
+      // dos grupos. Só quando há 3.º lugar (o campo 2 está ocupado).
+      let placement = []
+      if (phase === 'final' && third.length) {
+        const used = new Set([...rows, ...third].flatMap(m => [m.team_a_id, m.team_b_id]))
+        const rest = standings(teams, matches).map(s => s.team.id).filter(tid => !used.has(tid))
+        placement = lowerPlacementMatches({ orderedTeamIds: rest, numCourts })
+      }
+      const row = (m, ph) => ({ ...m, game_id: id, round_number: maxRound + 1, phase: ph })
+      const main = rows.map(m => row(m, phase))
+      const thirdRows = third.map(m => row(m, 'third'))
       let { error } = await supabase.from('matches').insert([
-        ...main,
-        ...third.map(m => ({ ...m, game_id: id, round_number: maxRound + 1, phase: 'third' })),
+        ...main, ...thirdRows, ...placement.map(m => row(m, 'placement')),
       ])
-      // Enquanto a migration_mix_terceiro_lugar.sql não correr, a base de
-      // dados recusa a fase 'third' (CHECK, 23514): grava-se só a final,
-      // como antes, em vez de a ronda não avançar.
-      if (error?.code === '23514' && third.length) {
+      // Enquanto as migrações não correrem, a base de dados recusa as fases
+      // novas (CHECK, 23514): tenta-se sem os jogos de classificação
+      // (migration_mix_lugares.sql), depois sem o 3.º lugar
+      // (migration_mix_terceiro_lugar.sql) — a ronda avança sempre.
+      if (error?.code === '23514' && placement.length) {
+        ({ error } = await supabase.from('matches').insert([...main, ...thirdRows]))
+      }
+      if (error?.code === '23514' && thirdRows.length) {
         ({ error } = await supabase.from('matches').insert(main))
       }
       if (error) throw error
@@ -2071,6 +2079,9 @@ export default function GameDetails() {
     } else {
       lines.push('', t('gamedetails.share_join_cta'))
     }
+    // Todas as partilhas acabam assim (Marketing, MARKETING.md; PO 29 set);
+    // no WhatsApp, o «alinho.pt» fica um link.
+    lines.push('', t('gamedetails.share_signature'))
     return lines.join('\n')
   }
 
@@ -2108,6 +2119,7 @@ export default function GameDetails() {
       }))
     })
     leftover.forEach((team) => lines.push(duplaLabel(team)))
+    lines.push('', t('gamedetails.share_signature'))
     return lines.join('\n')
   }
 
@@ -2515,7 +2527,7 @@ export default function GameDetails() {
           <p className="flex items-start gap-1.5">
             <Swords size={15} className="shrink-0 mt-0.5" />
             <span>
-              {(FORMAT_LABEL_KEY[game.format] ? t(FORMAT_LABEL_KEY[game.format]) : t('gamedetails.sobe_desce_label'))}{isRotating ? ` (${t('gamedetails.rotating_partners_short')})` : ''} · {t('gamedetails.court_count', { count: numCourts })} · {t('gamedetails.rounds_duration', { count: roundsTotal, minutes: game.game_time_minutes || 20 })}
+              {t(formatLabelKey(game))}{isRotating ? ` (${t('gamedetails.rotating_partners_short')})` : ''} · {t('gamedetails.court_count', { count: numCourts })} · {t('gamedetails.rounds_duration', { count: roundsTotal, minutes: game.game_time_minutes || 20 })}
               {game.ranked === false && <> · {t('gamedetails.badge_friendly')}</>}
             </span>
           </p>
@@ -2564,6 +2576,19 @@ export default function GameDetails() {
           </p>
         )}
       </div>
+
+      {/* Quem organiza, antes de o mix começar: o passo seguinte («Sortear
+          duplas» / «Começar o Mix») também aqui, no lugar do botão principal —
+          não só na barra pequena de cima (Renato, 29 set). É o mesmo botão
+          da barra (barPrimary), por isso fazem sempre o mesmo. */}
+      {game.status !== 'in_progress' && barPrimary && (
+        <div className="space-y-1.5">
+          <PrimaryButton onClick={barPrimary.onClick} disabled={barPrimary.disabled} className="w-full">
+            <Play size={18} /> {barPrimary.label}
+          </PrimaryButton>
+          {barPrimary.hint && <p className="px-1 text-center text-xs text-muted">{barPrimary.hint}</p>}
+        </div>
+      )}
 
       {/* Botão principal por baixo do topo (SPEC §5.9). Sem sino: seguir
           ainda não existe. Os outros caminhos (suplente, escalão etário,
@@ -3077,7 +3102,7 @@ export default function GameDetails() {
           {/* Rondas */}
           {rounds.map(r => {
             const ms = matches.filter(m => m.round_number === r)
-            const phase = (ms.find(m => m.phase !== 'third') || ms[0])?.phase || 'group'
+            const phase = (ms.find(m => m.phase !== 'third' && m.phase !== 'placement') || ms[0])?.phase || 'group'
             const isCurrent = r === maxRound && game.status === 'in_progress'
             // As rondas já jogadas dobram-se sozinhas quando começa a
             // seguinte (Renato, 29 set); tocar no título abre-as outra vez.
@@ -3154,7 +3179,7 @@ export default function GameDetails() {
                       <div key={m.id} className="rounded-ctrl bg-canvas p-2.5">
                         <div className="flex items-center justify-between mb-2 px-1">
                           <p className="font-mono text-[11px] font-extrabold uppercase tracking-widest text-ink-500">
-                            {t('gamedetails.court_number', { number: m.court_number })}{m.phase === 'third' && ` · ${t('mixlogic.phase_third')}`}
+                            {t('gamedetails.court_number', { number: m.court_number })}{m.phase === 'third' && ` · ${t('mixlogic.phase_third')}`}{m.phase === 'placement' && ` · ${t('mixlogic.phase_place_n', { n: placementOfCourt(m.court_number) })}`}
                           </p>
                           {canEditScores && done && !isCorrecting && (
                             <button
@@ -3286,7 +3311,7 @@ export default function GameDetails() {
                   {/* Rondas */}
                   {rounds.map(r => {
                     const ms = matches.filter(m => m.round_number === r)
-                    const phase = (ms.find(m => m.phase !== 'third') || ms[0])?.phase || 'group'
+                    const phase = (ms.find(m => m.phase !== 'third' && m.phase !== 'placement') || ms[0])?.phase || 'group'
                     const isCurrent = r === maxRound && game.status === 'in_progress'
                     return (
                       <div key={r} id={`mix-ronda-${r}`} className={`card ${isCurrent ? 'ring-2 ring-ink-900' : ''}`}>
@@ -3319,7 +3344,7 @@ export default function GameDetails() {
                               <div key={m.id} className="rounded-ctrl bg-canvas p-2.5">
                                 <div className="flex items-center justify-between mb-2 px-1">
                                   <p className="font-mono text-[11px] font-extrabold uppercase tracking-widest text-ink-500">
-                                    {t('gamedetails.court_number', { number: m.court_number })}{m.phase === 'third' && ` · ${t('mixlogic.phase_third')}`}
+                                    {t('gamedetails.court_number', { number: m.court_number })}{m.phase === 'third' && ` · ${t('mixlogic.phase_third')}`}{m.phase === 'placement' && ` · ${t('mixlogic.phase_place_n', { n: placementOfCourt(m.court_number) })}`}
                                   </p>
                                   {canEditScores && done && !isCorrecting && (
                                     <button
@@ -3425,7 +3450,21 @@ export default function GameDetails() {
           inscrições (#544): o «sê o primeiro» enganava. */}
       {!mixStarted && !isDraftMix(game) && (
         <div className="card">
-          <h3 className="text-lg text-ink-900 mb-4">{t('gamedetails.players_title', { count: people.length, max: capacity })}</h3>
+          <h3 className="text-lg text-ink-900 mb-1">{t('gamedetails.players_title', { count: people.length, max: capacity })}</h3>
+          {/* Intervalo de pontos dos inscritos com nível (Ruben, 29 set):
+              responde ao «que nível é que este mix tem?» sem abrir perfis. */}
+          {(() => {
+            const rated = people.map((x) => ratingInfoById[x.id]?.rating).filter((v) => v != null)
+            if (rated.length < 2) return <div className="mb-3" />
+            const min = Math.round(Math.min(...rated))
+            const max = Math.round(Math.max(...rated))
+            const avg = Math.round(rated.reduce((a, b) => a + b, 0) / rated.length)
+            return (
+              <p className="text-xs text-muted mb-4 tabular-nums">
+                {t('gamedetails.roster_range', { min, max, avg })}
+              </p>
+            )
+          })()}
 
           {people.length === 0 ? (
             <p className="text-muted text-sm text-center py-4">
@@ -3479,6 +3518,13 @@ export default function GameDetails() {
                           </p>
                           <p className="text-xs text-muted truncate flex items-center gap-1.5">
                             <RatingBadge rating={ratingInfoById[person.id]?.rating} gender={ratingInfoById[person.id]?.gender} />
+                            {/* Os pontos ao lado do nível (Ruben, 29 set): para se ver
+                                de relance o intervalo de quem está inscrito. */}
+                            {ratingInfoById[person.id]?.rating != null && (
+                              <span className="font-extrabold text-ink-900 tabular-nums">
+                                {formatRatingMaybeProvisional(ratingInfoById[person.id].rating, person.rating_games)} {t('gamedetails.points_suffix')}
+                              </span>
+                            )}
                             {sideLabel(person.preferred_side)}
                           </p>
                         </div>
@@ -3519,10 +3565,21 @@ export default function GameDetails() {
                   {pairs.map((r, i) => {
                     const two = people.filter((x) => x.rowId === r.id)
                     const mine = two.some((x) => x.id === user.id)
+                    // O nível da dupla é a média dos dois — é com ela que o
+                    // ranking calcula o esperado de cada jogo (RANKING.md).
+                    const pairRatings = two.map((x) => ratingInfoById[x.id]?.rating).filter((v) => v != null)
+                    const pairAvg = pairRatings.length === 2 ? Math.round((pairRatings[0] + pairRatings[1]) / 2) : null
                     return (
                       <div key={`pair-${r.id}`} className={`card !p-3 ${mine ? '!border-[#BBF7D0] !bg-[#DCFCE7]' : ''}`}>
                         <div className="mb-2 flex items-center justify-between gap-2">
-                          <MonoLabel className={mine ? '!text-[#14532D]' : ''}>{t('gamedetails.pair_label', { n: i + 1 })}</MonoLabel>
+                          <MonoLabel className={mine ? '!text-[#14532D]' : ''}>
+                            {t('gamedetails.pair_label', { n: i + 1 })}
+                            {pairAvg != null && (
+                              <span className="ml-2 normal-case tracking-normal font-sans font-extrabold text-ink-900 tabular-nums">
+                                {t('gamedetails.pair_avg', { avg: pairAvg })}
+                              </span>
+                            )}
+                          </MonoLabel>
                           {canSplit && (
                             <button type="button" disabled={busy}
                               onClick={() => setSplitFor({ userId: r.user.id, names: two.map((x) => x.name).join(' e ') })}

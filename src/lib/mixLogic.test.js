@@ -5,7 +5,8 @@ import {
   generateAmericanoSchedule, americanoStandings,
   computeMixWinnerTeamId, formDuplas,
   nextSobeDesceRotating, splitPartnerRows, rotatingPlacar, shortName,
-  thirdPlaceMatch, PHASE_LABEL_KEY,
+  thirdPlaceMatch, lowerPlacementMatches, placementOfCourt, PHASE_LABEL_KEY, seedCourts, reverseClimbWarning,
+  uiFormatOf, formatFieldsFor, formatLabelKey,
 } from './mixLogic'
 
 describe('splitIntoPools', () => {
@@ -777,5 +778,92 @@ describe('thirdPlaceMatch — 3.º lugar na ronda da final (Renato, 29 set)', ()
 
   it('a fase tem nome para o ecrã', () => {
     expect(PHASE_LABEL_KEY.third).toBe('mixlogic.phase_third')
+  })
+})
+
+describe('lowerPlacementMatches — 5.º, 7.º… lugar nos campos 3, 4… (Renato, 29 set)', () => {
+  it('com 4 campos: 5.º contra 6.º no campo 3 e 7.º contra 8.º no campo 4', () => {
+    expect(lowerPlacementMatches({ orderedTeamIds: ['e', 'f', 'g', 'h'], numCourts: 4 })).toEqual([
+      { court_number: 3, team_a_id: 'e', team_b_id: 'f' },
+      { court_number: 4, team_a_id: 'g', team_b_id: 'h' },
+    ])
+  })
+
+  it('só abre os campos que existem', () => {
+    expect(lowerPlacementMatches({ orderedTeamIds: ['e', 'f', 'g', 'h'], numCourts: 3 }))
+      .toEqual([{ court_number: 3, team_a_id: 'e', team_b_id: 'f' }])
+    expect(lowerPlacementMatches({ orderedTeamIds: ['e', 'f'], numCourts: 2 })).toEqual([])
+  })
+
+  it('uma dupla que sobre fica de fora', () => {
+    expect(lowerPlacementMatches({ orderedTeamIds: ['e', 'f', 'g'], numCourts: 4 }))
+      .toEqual([{ court_number: 3, team_a_id: 'e', team_b_id: 'f' }])
+  })
+
+  it('o lugar de cada campo: campo 3 → 5.º, campo 4 → 7.º', () => {
+    expect(placementOfCourt(3)).toBe(5)
+    expect(placementOfCourt(4)).toBe(7)
+    expect(PHASE_LABEL_KEY.placement).toBe('mixlogic.phase_placement')
+  })
+})
+
+describe('seedCourts — Sobe e desce invertido (Renato, 29 set)', () => {
+  const teams = [
+    { id: 'a', seed_ranking: 100 }, { id: 'b', seed_ranking: 90 },
+    { id: 'c', seed_ranking: 80 }, { id: 'd', seed_ranking: 70 },
+    { id: 'e', seed_ranking: 60 }, { id: 'f', seed_ranking: 50 },
+  ]
+
+  it('normal: as mais fortes no Campo 1', () => {
+    expect(seedCourts(teams, 3)).toEqual([
+      { court_number: 1, team_a_id: 'a', team_b_id: 'b' },
+      { court_number: 2, team_a_id: 'c', team_b_id: 'd' },
+      { court_number: 3, team_a_id: 'e', team_b_id: 'f' },
+    ])
+  })
+
+  it('invertido: os mesmos jogos, as mais fortes no último campo', () => {
+    expect(seedCourts(teams, 3, { reverse: true })).toEqual([
+      { court_number: 1, team_a_id: 'e', team_b_id: 'f' },
+      { court_number: 2, team_a_id: 'c', team_b_id: 'd' },
+      { court_number: 3, team_a_id: 'a', team_b_id: 'b' },
+    ])
+  })
+
+  it('invertido com menos duplas do que campos: não deixa o Campo 1 vazio', () => {
+    expect(seedCourts(teams.slice(0, 4), 3, { reverse: true })).toEqual([
+      { court_number: 1, team_a_id: 'c', team_b_id: 'd' },
+      { court_number: 2, team_a_id: 'a', team_b_id: 'b' },
+    ])
+  })
+})
+
+describe('reverseClimbWarning — dá tempo para subir? (29 set)', () => {
+  it('menos rondas do que campos: as mais fortes não chegam ao Campo 1', () => {
+    expect(reverseClimbWarning({ numCourts: 4, rounds: 3 })).toBe('cant_reach')
+  })
+  it('rondas iguais aos campos: só chegam na última ronda', () => {
+    expect(reverseClimbWarning({ numCourts: 4, rounds: 4 })).toBe('last_round')
+  })
+  it('rondas de sobra, ou um campo só: sem aviso', () => {
+    expect(reverseClimbWarning({ numCourts: 3, rounds: 5 })).toBeNull()
+    expect(reverseClimbWarning({ numCourts: 1, rounds: 1 })).toBeNull()
+  })
+})
+
+describe('Escalada — modo à parte, gravado como Sobe e desce invertido (29 set)', () => {
+  it('lê o modo a partir do que está gravado', () => {
+    expect(uiFormatOf({ format: 'sobe_desce', seed_reverse: true })).toBe('escalada')
+    expect(uiFormatOf({ format: 'sobe_desce', seed_reverse: false })).toBe('sobe_desce')
+    expect(uiFormatOf({ format: 'todos_contra_todos', seed_reverse: true })).toBe('todos_contra_todos')
+    expect(uiFormatOf({})).toBe('sobe_desce')
+  })
+  it('grava o modo escolhido', () => {
+    expect(formatFieldsFor('escalada')).toEqual({ format: 'sobe_desce', seed_reverse: true, rotate_partners: false })
+    expect(formatFieldsFor('americano')).toEqual({ format: 'americano', seed_reverse: false })
+  })
+  it('o nome do modo', () => {
+    expect(formatLabelKey({ format: 'sobe_desce', seed_reverse: true })).toBe('mixlogic.format_escalada')
+    expect(formatLabelKey({ format: 'sobe_desce' })).toBe('mixlogic.format_sobe_desce')
   })
 })

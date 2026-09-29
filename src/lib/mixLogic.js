@@ -83,6 +83,18 @@ export const isAgeIneligible = (game, profile) =>
   && Boolean(profile?.birthday)
   && !meetsAgeRestriction(profile.birthday, game.age_restriction)
 
+/** Sobe e desce invertido: dá tempo para as duplas mais fortes subirem?
+    Começam no último campo e sobem um por ronda ganha — com N campos, só
+    chegam ao Campo 1 na ronda N, a ganhar tudo. 'cant_reach' se há menos
+    rondas do que campos, 'last_round' se há tantas como campos, senão null. */
+export function reverseClimbWarning({ numCourts, rounds }) {
+  const courts = Number(numCourts) || 1
+  if (courts <= 1) return null
+  if (rounds < courts) return 'cant_reach'
+  if (rounds === courts) return 'last_round'
+  return null
+}
+
 /** Rondas disponíveis no court. */
 export const totalRounds = (game) =>
   Math.max(1, Math.floor((game.court_time_minutes || 90) / (game.game_time_minutes || 20)))
@@ -271,15 +283,25 @@ export function formDuplas(participants, pointsById = {}, repeatPairKeys = new S
 }
 
 /** Sobe e desce ronda 1: melhores duplas no campo 1. */
-export function seedCourts(teams, numCourts) {
+// `reverse` — Sobe e desce invertido (Renato, 29 set, «king of the hill»):
+// os mesmos jogos, mas com os campos virados ao contrário — as duplas mais
+// fortes começam no último campo e têm de subir até ao Campo 1. Com menos
+// duplas do que campos, usam-se os campos de cima (o Campo 1 nunca fica
+// vazio).
+export function seedCourts(teams, numCourts, { reverse = false } = {}) {
   const sorted = [...teams].sort((a, b) => (b.seed_ranking ?? 0) - (a.seed_ranking ?? 0))
-  const matches = []
+  const pairs = []
   for (let c = 1; c <= numCourts; c++) {
     const a = sorted[(c - 1) * 2]
     const b = sorted[(c - 1) * 2 + 1]
-    if (a && b) matches.push({ court_number: c, team_a_id: a.id, team_b_id: b.id })
+    if (a && b) pairs.push([a, b])
   }
-  return matches
+  const matches = pairs.map(([a, b], i) => ({
+    court_number: reverse ? pairs.length - i : i + 1,
+    team_a_id: a.id,
+    team_b_id: b.id,
+  }))
+  return matches.sort((x, y) => x.court_number - y.court_number)
 }
 
 /** Snake-seeds items into `ceil(items.length / poolSize)` pools, spreading
@@ -643,6 +665,23 @@ export function thirdPlaceMatch({ prevMatches = null, orderedTeamIds = null, num
   return [{ court_number: 2, team_a_id: orderedTeamIds[2], team_b_id: orderedTeamIds[3] }]
 }
 
+/** Os jogos de classificação nos campos 3, 4… da ronda da final (Renato,
+    29 set: «se tivermos 3 campos, o 5.º e 6.º; se 4, o 7.º e 8.º»).
+    `orderedTeamIds` são as duplas que NÃO estão na final nem no 3.º lugar,
+    pela classificação dos grupos; emparelham-se duas a duas, uma por campo,
+    a começar no campo 3. Só os campos que existem; uma dupla que sobre fica
+    de fora. */
+export function lowerPlacementMatches({ orderedTeamIds = [], numCourts = 1 }) {
+  const out = []
+  for (let court = 3, i = 0; court <= numCourts && i + 1 < orderedTeamIds.length; court++, i += 2) {
+    out.push({ court_number: court, team_a_id: orderedTeamIds[i], team_b_id: orderedTeamIds[i + 1] })
+  }
+  return out
+}
+
+/** Que lugar se joga num campo de classificação: campo 3 → 5.º, 4 → 7.º. */
+export const placementOfCourt = (court) => 2 * court - 1
+
 /** Americano: builds every round's partner-rotated duplas and court
     pairings in one pass — unlike sobe_desce/todos_contra_todos, no round
     depends on a previous round's result (only on who has already
@@ -770,14 +809,36 @@ export const PHASE_LABEL_KEY = {
   final: 'mixlogic.phase_final',
   // 3.º lugar: joga-se no campo 2, na mesma ronda da final (29 set).
   third: 'mixlogic.phase_third',
+  // 5.º, 7.º… lugar: campos 3, 4…, na ronda da final (29 set).
+  placement: 'mixlogic.phase_placement',
 }
 
 export const FORMAT_LABEL_KEY = {
   sobe_desce: 'mixlogic.format_sobe_desce',
+  // Escalada (Renato, 29 set): um modo à parte no ecrã; na base de dados é
+  // o Sobe e desce com seed_reverse (ver uiFormatOf).
+  escalada: 'mixlogic.format_escalada',
   todos_contra_todos: 'mixlogic.format_todos_contra_todos',
   grupos_eliminatorias: 'mixlogic.format_grupos_eliminatorias',
   americano: 'mixlogic.format_americano',
 }
+
+/** O modo que se mostra e se escolhe. A Escalada (29 set) é, por dentro,
+    o Sobe e desce com as mais fortes a começar no último campo
+    (seed_reverse) — assim o bot, o arranque automático e a escolha do
+    vencedor tratam-na como Sobe e desce, sem mudar nada. */
+export const uiFormatOf = (game) => {
+  const format = game?.format || 'sobe_desce'
+  return format === 'sobe_desce' && game?.seed_reverse ? 'escalada' : format
+}
+
+/** O que se grava para o modo escolhido. */
+export const formatFieldsFor = (uiFormat) => (uiFormat === 'escalada'
+  ? { format: 'sobe_desce', seed_reverse: true, rotate_partners: false }
+  : { format: uiFormat, seed_reverse: false })
+
+/** A chave do nome do modo de um mix («Escalada», «Sobe e desce»…). */
+export const formatLabelKey = (game) => FORMAT_LABEL_KEY[uiFormatOf(game)] || FORMAT_LABEL_KEY.sobe_desce
 
 export const SCORING_FORMAT_LABEL_KEY = {
   pontos_simples: 'mixlogic.scoring_pontos_simples',

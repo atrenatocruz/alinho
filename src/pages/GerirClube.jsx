@@ -14,7 +14,7 @@ import { formatRating } from '../lib/elo'
 import { formatDate as formatDateLib, formatTime as formatTimeLib } from '../lib/formatDate'
 import { DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal, ConfirmSheet, OrgKindBadge, PlanBadge, PLAN_TIERS, planName, Tabs, BackBar } from '../components/ui'
 import { planLimitMessage, isMixLimitError, isMemberLimitError, limitsFor, nextPlanTier } from '../lib/plans'
-import { totalRounds, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, SCORING_FORMAT_LABEL_KEY } from '../lib/mixLogic'
+import { totalRounds, reverseClimbWarning, uiFormatOf, formatFieldsFor, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, SCORING_FORMAT_LABEL_KEY } from '../lib/mixLogic'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
 import { AGE_RESTRICTIONS } from '../lib/ageCategories'
 import PlayerSearch from '../components/PlayerSearch'
@@ -74,6 +74,8 @@ const GAME_TIMES = [
 // instead of drifting into two different English labels for one value.
 const FORMATS = [
   { value: 'sobe_desce', labelKey: FORMAT_LABEL_KEY.sobe_desce },
+  // Escalada (29 set): gravada como Sobe e desce com seed_reverse (uiFormatOf).
+  { value: 'escalada', labelKey: FORMAT_LABEL_KEY.escalada },
   { value: 'todos_contra_todos', labelKey: FORMAT_LABEL_KEY.todos_contra_todos },
   { value: 'grupos_eliminatorias', labelKey: FORMAT_LABEL_KEY.grupos_eliminatorias },
   { value: 'americano', labelKey: FORMAT_LABEL_KEY.americano },
@@ -166,6 +168,8 @@ const EMPTY_GAME_FORM = {
   scoring_format: 'pontos_simples',
   pairing_mode: 'por_nivel',
   rotate_partners: false,
+  // Sobe e desce invertido (29 set): as mais fortes começam no último campo.
+  seed_reverse: false,
   allow_pair_signup: false,
   // Conta para o ranking (Trello #267). Por omissão sim.
   ranked: true,
@@ -978,6 +982,9 @@ export default function GerirClube() {
     // Só quando não é o valor por omissão — ver handleCreateGame.
     ...(game.pairing_mode && game.pairing_mode !== 'por_nivel' ? { pairing_mode: game.pairing_mode } : {}),
     ...(game.rotate_partners ? { rotate_partners: true } : {}),
+    // O `game` é a linha da base de dados: com a coluna vai sempre (também
+    // «Não», para editar Sim→Não chegar à série); sem ela, não vai.
+    ...(typeof game.seed_reverse === 'boolean' ? { seed_reverse: game.seed_reverse } : {}),
     ...(game.ranked === false ? { ranked: false } : {}),
     // O `game` aqui é a linha que a base de dados devolveu: com a coluna, vai
     // sempre (também «Não», para editar Sim→Não chegar à recorrência); antes
@@ -1174,7 +1181,7 @@ export default function GerirClube() {
     // pairing_mode sai pelo mesmo motivo: só é enviado quando não é o valor
     // por omissão, para criar/editar mixes não rebentar antes de
     // migration_mix_pairing_mode.sql correr.
-    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, ranked: _ranked, allow_pair_signup: _allowPairSignup, launch, whatsapp_post_times: postTimes, tiebreak_8_8: tieBreak88, ...gameFields } = gameForm
+    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, seed_reverse: _seedReverse, ranked: _ranked, allow_pair_signup: _allowPairSignup, launch, whatsapp_post_times: postTimes, tiebreak_8_8: tieBreak88, ...gameFields } = gameForm
 
     const recurrenceError = validateRecurrence(recurrence)
     if (recurrenceError) {
@@ -1229,6 +1236,9 @@ export default function GerirClube() {
             ...(gameForm.pairing_mode !== 'por_nivel' ? { pairing_mode: gameForm.pairing_mode } : {}),
             // Mesmo truque: só vai quando está ligado (e só no Sobe e desce).
             ...(gameForm.rotate_partners && gameForm.format === 'sobe_desce' ? { rotate_partners: true } : {}),
+            // Sobe e desce invertido: só vai quando está ligado (antes de
+            // migration_mix_sobe_desce_invertido.sql a coluna não existe).
+            ...(gameForm.seed_reverse && gameForm.format === 'sobe_desce' ? { seed_reverse: true } : {}),
             // «Inscrição em dupla» (Renato, 24 set): só vai quando é «Sim» e as
             // duplas são fixas — antes de migration_mix_pair_signup.sql a
             // coluna não existe, e «Não» é o valor por omissão.
@@ -1404,7 +1414,7 @@ export default function GerirClube() {
     // pairing_mode sai pelo mesmo motivo: só é enviado quando não é o valor
     // por omissão, para criar/editar mixes não rebentar antes de
     // migration_mix_pairing_mode.sql correr.
-    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, ranked: _ranked, allow_pair_signup: _allowPairSignup, launch: _launch, whatsapp_post_times: postTimes, tiebreak_8_8: tieBreak88, ...gameFields } = gameForm
+    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, seed_reverse: _seedReverse, ranked: _ranked, allow_pair_signup: _allowPairSignup, launch: _launch, whatsapp_post_times: postTimes, tiebreak_8_8: tieBreak88, ...gameFields } = gameForm
     // Any mix in an active recurring series shares the same underlying
     // game_recurrences row (via recurrence_id) — not just the origin — so
     // recurrence management works from any of them, not only the one that
@@ -1448,6 +1458,7 @@ export default function GerirClube() {
           ...(gameForm.format === 'grupos_eliminatorias' ? { pool_size: parseInt(gameForm.pool_size, 10) || 4 } : {}),
           ...((gameForm.pairing_mode !== 'por_nivel' || editingGame.pairing_mode) ? { pairing_mode: gameForm.pairing_mode } : {}),
           ...((gameForm.rotate_partners || editingGame.rotate_partners) ? { rotate_partners: !!gameForm.rotate_partners && gameForm.format === 'sobe_desce' } : {}),
+          ...((gameForm.seed_reverse || editingGame.seed_reverse) ? { seed_reverse: !!gameForm.seed_reverse && gameForm.format === 'sobe_desce' } : {}),
           ...((gameForm.allow_pair_signup || editingGame.allow_pair_signup) ? { allow_pair_signup: !!gameForm.allow_pair_signup && pairsAreFixed(gameForm) } : {}),
           ...((gameForm.ranked === false || editingGame.ranked === false) ? { ranked: gameForm.ranked !== false } : {}),
           level: gameForm.level || null,
@@ -2042,6 +2053,7 @@ export default function GerirClube() {
       scoring_format: game.scoring_format || 'pontos_simples',
       pairing_mode: game.pairing_mode || 'por_nivel',
       rotate_partners: !!game.rotate_partners,
+      seed_reverse: !!game.seed_reverse,
       allow_pair_signup: !!game.allow_pair_signup,
       ranked: game.ranked !== false,
       gender_restriction: game.gender_restriction || 'indiferente',
@@ -2627,10 +2639,10 @@ export default function GerirClube() {
                       </label>
                       <Segmented
                         options={translatedFormats}
-                        value={gameForm.format}
+                        value={uiFormatOf(gameForm)}
                         onChange={(v) => setGameForm({
                           ...gameForm,
-                          format: v,
+                          ...formatFieldsFor(v),
                           ...(v === 'americano' ? { scoring_format: 'pontos_simples' } : {}),
                           ...(v !== 'sobe_desce' ? { rotate_partners: false } : {}),
                         })}
@@ -2640,8 +2652,19 @@ export default function GerirClube() {
                           Americano dá a vitória a um jogador, não a uma
                           dupla, e ele próprio não sabia). */}
                       <p className="text-sm text-muted mt-1.5">
-                        {t(`mixlogic.format_help_${gameForm.format === 'sobe_desce' && gameForm.rotate_partners ? 'sobe_desce_rotate' : gameForm.format}`)}
+                        {t(`mixlogic.format_help_${uiFormatOf(gameForm) === 'sobe_desce' && gameForm.rotate_partners ? 'sobe_desce_rotate' : uiFormatOf(gameForm)}`)}
                       </p>
+                      {/* Escalada: dá tempo para subir? (29 set) — sobem um campo por ronda. */}
+                      {uiFormatOf(gameForm) === 'escalada' && (() => {
+                        const courts = parseInt(gameForm.num_courts, 10) || 1
+                        const rounds = totalRounds(gameForm)
+                        const warn = reverseClimbWarning({ numCourts: courts, rounds })
+                        return warn ? (
+                          <p role="status" className={`mt-2 rounded-ctrl px-3 py-2 text-sm font-bold ${warn === 'cant_reach' ? 'bg-warning/10 text-[#92400E]' : 'bg-ink-50 text-ink-700'}`}>
+                            {t(`gerirclube.seed_reverse_warn_${warn}`, { courts, rounds })}
+                          </p>
+                        ) : null
+                      })()}
                     </div>
 
                     {/* Conta para o ranking (Trello #267) — mesmas palavras do
@@ -2673,8 +2696,8 @@ export default function GerirClube() {
                     </div>
 
                     {/* Sobe e desce com parceiros que trocam (Trello #262,
-                        parte B) — só existe neste formato. */}
-                    {gameForm.format === 'sobe_desce' && (
+                        parte B) — só existe neste formato (não na Escalada). */}
+                    {uiFormatOf(gameForm) === 'sobe_desce' && (
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           {t('gerirclube.rotate_partners_label')}

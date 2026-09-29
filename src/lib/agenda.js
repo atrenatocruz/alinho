@@ -180,7 +180,8 @@ export function eventsFromPrivateMatches(rows, userId, orgsById = new Map()) {
     out.push({
       key: `friend_session:${first.session_id || first.id}`,
       source: 'friend_session',
-      kind: 'friends',
+      // Num clube chama-se «jogo em aberto» (Francisco, 28 set).
+      kind: org?.kind && org.kind !== 'group' ? 'open' : 'friends',
       id: first.session_id || null,
       startsAt,
       hasTime: Boolean(first.scheduled_date && first.scheduled_time),

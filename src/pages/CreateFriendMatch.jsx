@@ -62,6 +62,8 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
   const [teamsMode, setTeamsMode] = useState(m?.teams_mode || 'manual')
   // «Cada jogo dura» (27 set): 0 = sem tempo; só com mais de 4 pessoas.
   const [gameMinutes, setGameMinutes] = useState(m?.game_minutes || 0)
+  // «A decorrer agora» (27 set): só se quem criou deixar; «Não» por omissão.
+  const [showLive, setShowLive] = useState(!!m?.show_live)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -108,6 +110,7 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
         teamsMode,
         organizationId: group?.id || null,
         gameMinutes: people.length + 1 > MIN_PEOPLE ? gameMinutes || null : null,
+        showLive,
         invitees: people.map((p) => (p.guest
           ? { guest_name: p.name, ...(p.email ? { guest_email: p.email } : {}) }
           : { user_id: p.user_id })),
@@ -150,6 +153,7 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
         // Só vão quando mudam (a função recusa com o cadeado).
         rankedIntent: rankedIntent !== (m.ranked_intent !== false) ? rankedIntent : undefined,
         teamsMode: teamsMode !== (m.teams_mode || 'manual') ? teamsMode : undefined,
+        showLive,
       })
       navigate(`/jogos-privados/sessao/${m.id}`)
     } catch (err) {
@@ -228,11 +232,15 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
     </div>
   )
 
+  const isClubGame = !!group?.kind && group.kind !== 'group'
   const stepLabels = [t('steps.people'), t('steps.when'), t('steps.where'), t('steps.rules')]
 
   return (
     <StepPage
-      title={edit ? t('friends.edit_title') : group ? t('creategroupmatch.title_new') : t('createprivatematch.title_new')}
+      // Num clube chama-se «jogo em aberto»; num grupo, «jogo entre amigos»
+      // (Francisco, 28 set: «Em clube não há jogo entre amigos»).
+      title={edit ? t(isClubGame ? 'friends.edit_title_open' : 'friends.edit_title')
+        : group ? t(isClubGame ? 'creategroupmatch.title_new_open' : 'creategroupmatch.title_new') : t('createprivatematch.title_new')}
       subtitle={group ? t('creategroupmatch.in_group', { group: group.name }) : null}
       step={step}
       total={4}
@@ -255,7 +263,7 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
     >
       {step === 1 && (
         <InviteesStep
-          {...(group ? { searchFn: searchMembers, searchPlaceholder: t('friends.search_group_placeholder') } : {})}
+          {...(group ? { searchFn: searchMembers, searchPlaceholder: t(isClubGame ? 'friends.search_club_placeholder' : 'friends.search_group_placeholder') } : {})}
           me={profile}
           people={people}
           {...(edit ? { lockedKeys, collapsedSearch: true } : {})}
@@ -326,6 +334,18 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
           {edit && teamsBlock}
           {edit && rankedBlock}
           {!edit && durationBlock}
+          <div>
+            <p className={label}>{t('friends.show_live_label')}</p>
+            <Chips
+              value={showLive}
+              onChange={setShowLive}
+              options={[
+                { value: true, label: t('steps.ranking_yes') },
+                { value: false, label: t('friends.show_live_no') },
+              ]}
+            />
+            <p className="mt-2 text-xs text-muted">{t('friends.show_live_hint')}</p>
+          </div>
         </>
       )}
     </StepPage>

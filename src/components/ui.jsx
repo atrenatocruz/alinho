@@ -2,7 +2,8 @@ import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ChevronRight, ChevronDown, ChevronLeft, Lock, Calendar, X, Share2, MessageCircle, Link2, ImageDown, Trophy, Users, Ticket, Building2, Search } from 'lucide-react'
+import { ChevronRight, ChevronDown, ChevronLeft, Lock, Calendar, X, Share2, MessageCircle, Link2, ImageDown, Trophy, Users, Ticket, Building2, Search, Clock } from 'lucide-react'
+import { timeOptions, toMin } from '../lib/timeSlots'
 import ShareCard, { CARD_W, CARD_H } from './ShareCard'
 import QRCode from 'qrcode'
 import { ratingBand, groupRatingBand } from '../lib/elo'
@@ -264,7 +265,9 @@ export function DateField({ value, onChange, max, min, placeholder, hideToday = 
   )
 }
 
-export function DateTimeField({ value, onChange, placeholder }) {
+// min: Date (ou string) — dias anteriores ficam desligados no calendário;
+// a hora do próprio dia fica a cargo de quem valida o formulário.
+export function DateTimeField({ value, onChange, placeholder, min = null }) {
   const { t, i18n } = useTranslation()
   const resolvedPlaceholder = placeholder ?? t('ui.select_datetime_placeholder')
   const [open, setOpen] = useState(false)
@@ -361,7 +364,7 @@ export function DateTimeField({ value, onChange, placeholder }) {
               onNavigate={navigate}
               onJumpTo={jumpTo}
               onSelectDay={selectDay}
-              min={null}
+              min={min ? new Date(new Date(min).setHours(0, 0, 0, 0)) : null}
               max={null}
               showToday
               onToday={selectToday}
@@ -451,6 +454,148 @@ export function GroupLevelBadge({ rating, size = 'sm' }) {
   const band = groupRatingBand(rating)
   if (!band) return null
   return <BadgePill text={band.label} title={t(band.fullKey, band.fullVars)} size={size} />
+}
+
+/* ─── TimeField ───────────────────────────────────────────────────────────
+   A hora, sem o relógio nativo do browser (no computador era mau — Renato,
+   29 set). Uma lista simples, uma hora por linha, de 30 em 30 min, que abre
+   já na escolhida (à Google Calendar — a grelha de 34 botões ficava
+   amontoada, Renato, 29 set):
+     · computador: menu logo por baixo do campo (por cima, se não couber);
+     · telemóvel: folha em baixo, linhas grandes para o dedo.
+   `min` (HH:MM) é o «Fim» a seguir ao «Início»: só se mostram as horas
+   depois dela, cada uma com a duração («19:30 · 1h30»).
+   `value` e `onChange` em «HH:MM». */
+const durationLabel = (mins) => {
+  const h = Math.floor(mins / 60)
+  const m = mins % 60
+  return h ? `${h}h${m ? String(m).padStart(2, '0') : ''}` : `${m} min`
+}
+
+export function TimeField({ value, onChange, hint, min = null, from = '07:00', to = '23:30', step = 30, disabled = false, suggest = '18:00' }) {
+  const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
+  const [anchor, setAnchor] = useState(null) // posição do menu no computador
+  const triggerRef = useRef(null)
+  const listRef = useRef(null)
+  const title = hint || t('ui.hour_label')
+  const minM = toMin(min)
+  const options = timeOptions({ from, to, step, include: value })
+    .filter((o) => minM == null || toMin(o) > minM)
+
+  const openPicker = () => {
+    const wide = typeof window !== 'undefined' && window.matchMedia?.('(min-width: 640px)').matches
+    if (wide && triggerRef.current) {
+      const r = triggerRef.current.getBoundingClientRect()
+      const height = 264
+      const below = window.innerHeight - r.bottom - 8
+      setAnchor({ left: r.left, width: Math.max(r.width, 160), top: below >= height || below >= r.top ? r.bottom + 6 : r.top - 6 - Math.min(height, r.top - 8), maxHeight: Math.min(height, Math.max(below, r.top - 8)) })
+    } else {
+      setAnchor(null)
+    }
+    setOpen(true)
+  }
+
+  // Abre já na escolhida (ou na primeira), a meio da lista.
+  useEffect(() => {
+    if (!open) return undefined
+    // Sem hora escolhida: o «Início» abre por volta de `suggest` (o padel é
+    // ao fim do dia); o «Fim» abre no princípio, logo a seguir ao início.
+    const target = listRef.current?.querySelector('[data-selected="true"]')
+      || (minM == null && listRef.current?.querySelector(`[data-time="${suggest}"]`))
+      || listRef.current?.querySelector('button')
+    target?.scrollIntoView({ block: 'center' })
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open])
+
+  const pick = (o) => { onChange(o); setOpen(false) }
+  const items = (big) => options.map((o) => {
+    const selected = o === value
+    return (
+      <button
+        key={o}
+        type="button"
+        role="option"
+        aria-selected={selected}
+        data-selected={selected || undefined}
+        data-time={o}
+        onClick={() => pick(o)}
+        className={`flex w-full items-center justify-between rounded-ctrl px-3 text-left tabular-nums transition-colors duration-fast ${
+          big ? 'min-h-[48px] text-base' : 'min-h-[40px] text-[15px]'
+        } ${selected ? 'bg-ink-900 font-extrabold text-white' : 'font-bold text-ink-900 hover:bg-ink-50'}`}
+      >
+        <span>{o}</span>
+        {minM != null && (
+          <span className={`text-xs font-medium ${selected ? 'text-white/70' : 'text-muted'}`}>{durationLabel(toMin(o) - minM)}</span>
+        )}
+      </button>
+    )
+  })
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        disabled={disabled}
+        onClick={openPicker}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={value ? `${title}: ${value}` : title}
+        className={`input-field flex w-full min-w-0 items-center justify-between text-left disabled:opacity-50 ${value ? 'text-ink-900' : 'text-muted'}`}
+      >
+        <span className="truncate tabular-nums">{value || title}</span>
+        <Clock size={18} className="ml-2 shrink-0 text-ink-700" />
+      </button>
+
+      {open && createPortal(
+        anchor ? (
+          // Computador: menu por baixo do campo.
+          <div className="fixed inset-0 z-50" onClick={() => setOpen(false)}>
+            <div
+              ref={listRef}
+              role="listbox"
+              aria-label={title}
+              className="fixed overflow-y-auto overscroll-contain rounded-ctrl border border-line bg-white p-1 shadow-lift animate-pop"
+              style={{ left: anchor.left, top: anchor.top, width: anchor.width, maxHeight: anchor.maxHeight }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {items(false)}
+            </div>
+          </div>
+        ) : (
+          // Telemóvel: folha em baixo.
+          <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink-900/50 animate-fade-in" onClick={() => setOpen(false)}>
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label={title}
+              className="flex max-h-[60vh] w-full flex-col overflow-hidden rounded-t-card bg-surface shadow-lift animate-pop"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex shrink-0 items-center justify-between px-5 pb-2 pt-5">
+                <h3 className="text-lg text-ink-900">{title}</h3>
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  aria-label={t('ui.close')}
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-muted transition-colors duration-fast hover:bg-ink-50 hover:text-ink-900"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              <div ref={listRef} role="listbox" className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-[calc(env(safe-area-inset-bottom)+16px)]">
+                {items(true)}
+              </div>
+            </div>
+          </div>
+        ),
+        document.body
+      )}
+    </>
+  )
 }
 
 /* ─── PrimaryButton ──────────────────────────────────────────────────────
@@ -583,7 +728,10 @@ export function Chips({ options, value, onChange, label, className = '' }) {
   return (
     // -my-0.5: o botão tem 44 px e a pastilha 40 — a margem devolve os 2 px
     // de cada lado, e o espaço entre filas fica o mesmo.
-    <div role="group" aria-label={label} className={`-mx-1 -my-0.5 flex gap-2 overflow-x-auto px-1 no-scrollbar ${className}`}>
+    // No telemóvel, uma fila que desliza para o lado (o dedo faz scroll);
+    // no computador não há como deslizar sem barra, e as pastilhas ficavam
+    // cortadas (Ruben, 29 set) — a partir de sm embrulham em várias filas.
+    <div role="group" aria-label={label} className={`-mx-1 -my-0.5 flex gap-2 overflow-x-auto px-1 no-scrollbar sm:flex-wrap sm:overflow-visible ${className}`}>
       {options.map((o) => {
         const on = o.value === value
         return (
@@ -1820,6 +1968,19 @@ export function Select({ value, onChange, options, placeholder, className = '', 
     ? options.filter((o) => stripAccents(o.label).toLowerCase().includes(stripAccents(query).toLowerCase()))
     : options
   const closeSheet = () => { setOpen(false); setQuery('') }
+  // Com pesquisa, no telemóvel o teclado abre e tapa a metade de baixo do
+  // ecrã: a folha passa para CIMA e fica com a altura do que o teclado
+  // deixa à vista (visualViewport), com a pesquisa sempre visível e só a
+  // lista a deslizar (Renato, 29 set: «o formulário fica escondido»).
+  const [viewportH, setViewportH] = useState(null)
+  useEffect(() => {
+    const vv = typeof window !== 'undefined' ? window.visualViewport : null
+    if (!open || !searchable || !vv) return undefined
+    const update = () => setViewportH(vv.height)
+    update()
+    vv.addEventListener('resize', update)
+    return () => vv.removeEventListener('resize', update)
+  }, [open, searchable])
 
   return (
     <>
@@ -1847,14 +2008,19 @@ export function Select({ value, onChange, options, placeholder, className = '', 
 
       {open && createPortal(
         <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-ink-900/50 animate-fade-in"
+          className={`fixed inset-0 z-50 flex justify-center bg-ink-900/50 animate-fade-in sm:items-center ${
+            searchable ? 'items-start px-3 pt-[calc(env(safe-area-inset-top)+12px)] sm:px-0 sm:pt-0' : 'items-end'
+          }`}
           onClick={closeSheet}
         >
           <div
-            className="bg-surface rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-md max-h-[70vh] overflow-y-auto animate-pop"
+            className={`bg-surface shadow-lift w-full sm:max-w-md animate-pop ${
+              searchable ? 'flex flex-col rounded-card overflow-hidden' : 'rounded-t-card sm:rounded-card max-h-[70vh] overflow-y-auto'
+            }`}
+            style={searchable ? { maxHeight: viewportH ? `${Math.max(240, viewportH - 24)}px` : '70vh' } : undefined}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between px-5 pt-5 pb-3">
+            <div className="flex shrink-0 items-center justify-between px-5 pt-5 pb-3">
               <h3 className="text-lg text-ink-900">{resolvedPlaceholder}</h3>
               <button
                 onClick={closeSheet}
@@ -1865,7 +2031,7 @@ export function Select({ value, onChange, options, placeholder, className = '', 
               </button>
             </div>
             {searchable && (
-              <div className="px-5 pb-3">
+              <div className="shrink-0 px-5 pb-3">
                 <div className="flex items-center gap-2 input-field focus-within:border-ink-500 focus-within:ring-2 focus-within:ring-ink-50">
                   <Search size={16} className="text-muted shrink-0" />
                   <input
@@ -1879,7 +2045,7 @@ export function Select({ value, onChange, options, placeholder, className = '', 
                 </div>
               </div>
             )}
-            <div className="px-2 pb-5">
+            <div className={`px-2 pb-5 ${searchable ? 'min-h-0 flex-1 overflow-y-auto overscroll-contain' : ''}`}>
               {visibleOptions.length === 0 ? (
                 <p className="px-3.5 py-3 text-sm text-muted">{t('ui.select_search_empty')}</p>
               ) : visibleOptions.map((o) => (

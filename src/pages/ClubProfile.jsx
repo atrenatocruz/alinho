@@ -22,6 +22,7 @@ import PadelIcon from '../components/icons/PadelIcon'
 import { describeError, errorKind } from '../lib/errors'
 import { listClubTeachers } from '../lib/lessonsApi'
 import { ClubHeader, ClubEvents, ClubPeople, ClubAbout, buildClubEvents } from '../components/club/ClubSections'
+import LiveStrip from '../components/live/LiveStrip'
 
 export default function ClubProfile() {
   const { t } = useTranslation()
@@ -247,6 +248,9 @@ export default function ClubProfile() {
       />
       {error && <p role="alert" className="rounded-ctrl bg-danger/10 px-4 py-3 text-sm font-extrabold text-danger">{error}</p>}
 
+      {/* «A decorrer agora no clube» por cima dos próximos (27 set). */}
+      <LiveStrip organizationId={club.id} orgKind={club.kind} />
+
       <ClubEvents club={club} events={events} isAdmin={isAdmin} gerirHref={gerirHref} />
 
       <ClubPeople
@@ -298,7 +302,7 @@ export default function ClubProfile() {
             {t(club.kind === 'group' ? 'clubprofile.of_group' : 'clubprofile.of_club')}
           </h3>
           <Link to={`/clube/${slug}/jogos`} className="card press flex min-h-[52px] items-center justify-between gap-3">
-            <span className="font-extrabold text-ink-900">{t('clubprofile.jogos_heading_group')}</span>
+            <span className="font-extrabold text-ink-900">{t(club.kind === 'group' ? 'clubprofile.jogos_heading_group' : 'clubprofile.jogos_heading')}</span>
             <ChevronRight size={17} className="shrink-0 text-ink-700" />
           </Link>
         </section>
