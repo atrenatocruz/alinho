@@ -255,6 +255,7 @@ const RPC_MOCKS = {
   // mesmo dia.
   // Cancelar/apagar da lista (Dev 3, migration_amigos_apagar_da_lista).
   delete_friend_match: () => 'deleted',
+  finish_friend_session: () => ({ removed: 2, notified: 1 }),
   get_my_private_matches: () => localStorage.getItem('mockHomeSession') ? (() => {
     const mode = localStorage.getItem('mockHomeSession')
     const day = new Date().toISOString().slice(0, 10)
@@ -465,6 +466,12 @@ const RPC_MOCKS = {
       // 28 set). Por omissão começou ontem, com os resultados acima.
       const notStarted = localStorage.getItem('mockFriendStarted') === 'false'
       if (notStarted) games.forEach((x) => Object.assign(x, { sets: [], score_a: null, score_b: null, winner_team: null }))
+      // mockFriendStarted = 'done': todas as rondas jogadas, e Ana e Rui por
+      // confirmar a primeira («Terminar o jogo», 28 set).
+      if (localStorage.getItem('mockFriendStarted') === 'done') {
+        games.forEach((x) => Object.assign(x, { sets: [{ score_a: 6, score_b: 4 }, { score_a: 6, score_b: 3 }], score_a: 2, score_b: 0, winner_team: 'a' }))
+        games[0].waiting_for = [{ invitee_id: 'i-u-am', name: 'Ana Marques' }, { invitee_id: 'i-u-rc', name: 'Rui Costa' }]
+      }
       return {
         match: { id: 'fs-1', scheduled_date: new Date(Date.now() + (notStarted ? 6 : -1) * 86400000).toISOString().slice(0, 10), scheduled_time: '10:00:00', location: 'Clube Exemplo', court: null,
           teams_mode: 'app', pairing_mode: 'rotating', scoring_format: 'sets', num_sets: 3, game_minutes: null, teams_set_at: new Date().toISOString(),
@@ -1207,7 +1214,7 @@ const TABLE_MOCKS = {
     ? [{ game_id: 'ag-finished-yesterday', user_id: MOCK_ADMIN_USER_ID, mix_won: false, rating_delta: 18, points_earned: 14,
         game: { id: 'ag-finished-yesterday', title: 'Mix de segunda', date: atDay(-1, 19).toISOString(), location: 'Smash Padel, Parque das Nações' } }]
     : longNames() ? LONG_STATS : []),
-  teams: (url) => (agenda() && url.includes('ag-winner') ? AGENDA_WINNER_TEAMS() : ['live', 'finished', 'paused'].includes(eventState()) ? EV_TEAMS : rotating() ? ROT_TEAMS : []),
+  teams: (url) => (agenda() && url.includes('ag-winner') ? AGENDA_WINNER_TEAMS() : ['live', 'finished', 'paused', 'ready'].includes(eventState()) ? EV_TEAMS : rotating() ? ROT_TEAMS : []),
   participants: () => (eventState() ? EV_PARTICIPANTS() : []),
   matches: () => (['live', 'finished'].includes(eventState()) ? EV_MATCHES() : rotating() ? ROT_MATCHES_FN() : []),
   // Mix em aberto — 1 dupla já confirmada, a segunda por preencher (2 de 4
@@ -1262,7 +1269,8 @@ const TABLE_MOCKS = {
       ...(localStorage.getItem('mockLastRound') === 'true' ? { court_time_minutes: 40 } : {}),
       // 'paused': o mix parado do #448 — as duplas ficam, os jogos e os
       // resultados foram apagados.
-      status: { open: 'open', joined: 'closed', live: 'in_progress', finished: 'finished', paused: 'closed' }[eventState()],
+      // 'ready': o mix começou (duplas feitas), a Ronda 1 ainda não (28 set).
+      status: { open: 'open', joined: 'closed', live: 'in_progress', finished: 'finished', paused: 'closed', ready: 'in_progress' }[eventState()],
       ...(eventState() === 'finished' ? { winner_team_id: 'et1' } : {}),
       // localStorage.mockRoundAgoMin = '7' | '21': a ronda começou há N min
       // (21 = o tempo acabou, entre rondas) — o alarme das rondas, 27 set.
