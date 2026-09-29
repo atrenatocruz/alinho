@@ -26,14 +26,29 @@ export default function EscolherNivel() {
   // Nacionalidade (Trello #191): oferecida aqui, na criacao do perfil, mas
   // NUNCA obrigatoria — o botao de confirmar so depende do nivel.
   const [nationality, setNationality] = useState('')
+  // Género: obrigatório quando o perfil ainda não o tem — é o caso das
+  // contas Google, que não passam pelo formulário de registo (Ruben, 29 set).
+  // O rating tem prefixo M/F e os rankings separam por género; sem isto a
+  // conta ficava como "N" para sempre.
+  const needsGender = profile?.gender == null
+  const [gender, setGender] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
   const handleConfirm = async () => {
-    if (!selected || saving) return
+    if (!selected || saving || (needsGender && !gender)) return
     setSaving(true)
     setError('')
     try {
+      // Género primeiro: se falhar, o nível ainda não ficou gravado e o
+      // utilizador volta a este ecrã inteiro em vez de ficar sem género.
+      if (needsGender) {
+        const { error: genderError } = await supabase
+          .from('profiles')
+          .update({ gender })
+          .eq('id', user.id)
+        if (genderError) throw genderError
+      }
       const { error: rpcError } = await supabase.rpc('complete_rating_onboarding', {
         p_level: selected,
       })
@@ -88,7 +103,7 @@ export default function EscolherNivel() {
                   <div className="flex-1 min-w-0">
                     <h3 className="text-base text-ink-900 flex items-center gap-2">
                       {level.num ? t('onboarding.level_title', { num: level.num }) : t('onboarding.level_iniciante_title')}
-                      <RatingBadge rating={level.points} gender={profile?.gender} />
+                      <RatingBadge rating={level.points} gender={profile?.gender || gender || undefined} />
                     </h3>
                     <p className="text-[13px] text-muted mt-0.5">{t(level.descriptionKey)}</p>
                   </div>
@@ -104,6 +119,24 @@ export default function EscolherNivel() {
             )
           })}
         </div>
+
+        {needsGender && (
+          <div className="mb-5">
+            <label className="block text-sm font-extrabold text-ink-900 mb-2">
+              {t('login.gender_label')}
+            </label>
+            <Select
+              value={gender}
+              onChange={setGender}
+              placeholder={t('login.gender_placeholder')}
+              options={[
+                { value: 'masculino', label: t('login.gender_male') },
+                { value: 'feminino', label: t('login.gender_female') },
+              ]}
+            />
+            <p className="text-xs text-muted mt-1.5">{t('onboarding.gender_hint')}</p>
+          </div>
+        )}
 
         {/* Nacionalidade — opcional. Fica depois da escolha de nivel para
             nao competir com ela, que e o que desbloqueia o botao. */}
@@ -128,7 +161,7 @@ export default function EscolherNivel() {
 
         <PrimaryButton
           onClick={handleConfirm}
-          disabled={!selected || saving}
+          disabled={!selected || saving || (needsGender && !gender)}
           className="w-full"
         >
           {saving ? t('onboarding.saving') : t('onboarding.confirm')}

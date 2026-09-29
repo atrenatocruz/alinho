@@ -80,6 +80,7 @@ const PrivacyPolicy = lazyPage(() => import('./pages/PrivacyPolicy'))
 const TermsOfService = lazyPage(() => import('./pages/TermsOfService'))
 const MixOffline = lazyPage(() => import('./pages/MixOffline'))
 const EscolherNivel = lazyPage(() => import('./pages/EscolherNivel'))
+const DefinirGenero = lazyPage(() => import('./pages/DefinirGenero'))
 const ConsentGate = lazyPage(() => import('./pages/ConsentGate'))
 
 // Same spinner used for every other in-app loading state (Home, Rankings,
@@ -232,6 +233,13 @@ const Guard = ({ require, showSplash, children }) => {
   // pode ficar preso aqui.
   if (user && profile && profile.rating_onboarded_at === null) {
     return <EscolherNivel />
+  }
+
+  // Género em falta (contas Google de antes de o EscolherNivel o pedir, e
+  // contas antigas): o rating tem prefixo M/F e os rankings separam por
+  // género, por isso não pode ficar em branco. Mesma comparação estrita.
+  if (user && profile && profile.gender === null) {
+    return <DefinirGenero />
   }
 
   // "/" is the one public route: signed-out visitors see the Landing page
