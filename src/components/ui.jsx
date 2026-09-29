@@ -1820,6 +1820,19 @@ export function Select({ value, onChange, options, placeholder, className = '', 
     ? options.filter((o) => stripAccents(o.label).toLowerCase().includes(stripAccents(query).toLowerCase()))
     : options
   const closeSheet = () => { setOpen(false); setQuery('') }
+  // Com pesquisa, no telemóvel o teclado abre e tapa a metade de baixo do
+  // ecrã: a folha passa para CIMA e fica com a altura do que o teclado
+  // deixa à vista (visualViewport), com a pesquisa sempre visível e só a
+  // lista a deslizar (Renato, 29 set: «o formulário fica escondido»).
+  const [viewportH, setViewportH] = useState(null)
+  useEffect(() => {
+    const vv = typeof window !== 'undefined' ? window.visualViewport : null
+    if (!open || !searchable || !vv) return undefined
+    const update = () => setViewportH(vv.height)
+    update()
+    vv.addEventListener('resize', update)
+    return () => vv.removeEventListener('resize', update)
+  }, [open, searchable])
 
   return (
     <>
@@ -1847,14 +1860,19 @@ export function Select({ value, onChange, options, placeholder, className = '', 
 
       {open && createPortal(
         <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-ink-900/50 animate-fade-in"
+          className={`fixed inset-0 z-50 flex justify-center bg-ink-900/50 animate-fade-in sm:items-center ${
+            searchable ? 'items-start px-3 pt-[calc(env(safe-area-inset-top)+12px)] sm:px-0 sm:pt-0' : 'items-end'
+          }`}
           onClick={closeSheet}
         >
           <div
-            className="bg-surface rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-md max-h-[70vh] overflow-y-auto animate-pop"
+            className={`bg-surface shadow-lift w-full sm:max-w-md animate-pop ${
+              searchable ? 'flex flex-col rounded-card overflow-hidden' : 'rounded-t-card sm:rounded-card max-h-[70vh] overflow-y-auto'
+            }`}
+            style={searchable ? { maxHeight: viewportH ? `${Math.max(240, viewportH - 24)}px` : '70vh' } : undefined}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between px-5 pt-5 pb-3">
+            <div className="flex shrink-0 items-center justify-between px-5 pt-5 pb-3">
               <h3 className="text-lg text-ink-900">{resolvedPlaceholder}</h3>
               <button
                 onClick={closeSheet}
@@ -1865,7 +1883,7 @@ export function Select({ value, onChange, options, placeholder, className = '', 
               </button>
             </div>
             {searchable && (
-              <div className="px-5 pb-3">
+              <div className="shrink-0 px-5 pb-3">
                 <div className="flex items-center gap-2 input-field focus-within:border-ink-500 focus-within:ring-2 focus-within:ring-ink-50">
                   <Search size={16} className="text-muted shrink-0" />
                   <input
@@ -1879,7 +1897,7 @@ export function Select({ value, onChange, options, placeholder, className = '', 
                 </div>
               </div>
             )}
-            <div className="px-2 pb-5">
+            <div className={`px-2 pb-5 ${searchable ? 'min-h-0 flex-1 overflow-y-auto overscroll-contain' : ''}`}>
               {visibleOptions.length === 0 ? (
                 <p className="px-3.5 py-3 text-sm text-muted">{t('ui.select_search_empty')}</p>
               ) : visibleOptions.map((o) => (
