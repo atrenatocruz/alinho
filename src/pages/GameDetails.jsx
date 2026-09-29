@@ -24,7 +24,7 @@ import {
   mixCapacity, isGenderMismatch, isMissingGender, isMissingBirthday, isAgeIneligible, splitIntoPools,
   generateAmericanoSchedule, americanoStandings, computeMixWinnerTeamId,
 } from '../lib/mixLogic'
-import { isProvisional } from '../lib/elo'
+import { isProvisional, formatRatingMaybeProvisional } from '../lib/elo'
 import { AGE_LABEL_KEY, meetsAgeRestriction } from '../lib/ageCategories'
 import { winRatePct, firstLastName } from '../lib/statsLogic'
 import { getGlobalRankings } from '../lib/privateMatches'
@@ -3447,7 +3447,21 @@ export default function GameDetails() {
           inscrições (#544): o «sê o primeiro» enganava. */}
       {!mixStarted && !isDraftMix(game) && (
         <div className="card">
-          <h3 className="text-lg text-ink-900 mb-4">{t('gamedetails.players_title', { count: people.length, max: capacity })}</h3>
+          <h3 className="text-lg text-ink-900 mb-1">{t('gamedetails.players_title', { count: people.length, max: capacity })}</h3>
+          {/* Intervalo de pontos dos inscritos com nível (Ruben, 29 set):
+              responde ao «que nível é que este mix tem?» sem abrir perfis. */}
+          {(() => {
+            const rated = people.map((x) => ratingInfoById[x.id]?.rating).filter((v) => v != null)
+            if (rated.length < 2) return <div className="mb-3" />
+            const min = Math.round(Math.min(...rated))
+            const max = Math.round(Math.max(...rated))
+            const avg = Math.round(rated.reduce((a, b) => a + b, 0) / rated.length)
+            return (
+              <p className="text-xs text-muted mb-4 tabular-nums">
+                {t('gamedetails.roster_range', { min, max, avg })}
+              </p>
+            )
+          })()}
 
           {people.length === 0 ? (
             <p className="text-muted text-sm text-center py-4">
@@ -3501,6 +3515,13 @@ export default function GameDetails() {
                           </p>
                           <p className="text-xs text-muted truncate flex items-center gap-1.5">
                             <RatingBadge rating={ratingInfoById[person.id]?.rating} gender={ratingInfoById[person.id]?.gender} />
+                            {/* Os pontos ao lado do nível (Ruben, 29 set): para se ver
+                                de relance o intervalo de quem está inscrito. */}
+                            {ratingInfoById[person.id]?.rating != null && (
+                              <span className="font-extrabold text-ink-900 tabular-nums">
+                                {formatRatingMaybeProvisional(ratingInfoById[person.id].rating, person.rating_games)} {t('gamedetails.points_suffix')}
+                              </span>
+                            )}
                             {sideLabel(person.preferred_side)}
                           </p>
                         </div>
@@ -3541,10 +3562,21 @@ export default function GameDetails() {
                   {pairs.map((r, i) => {
                     const two = people.filter((x) => x.rowId === r.id)
                     const mine = two.some((x) => x.id === user.id)
+                    // O nível da dupla é a média dos dois — é com ela que o
+                    // ranking calcula o esperado de cada jogo (RANKING.md).
+                    const pairRatings = two.map((x) => ratingInfoById[x.id]?.rating).filter((v) => v != null)
+                    const pairAvg = pairRatings.length === 2 ? Math.round((pairRatings[0] + pairRatings[1]) / 2) : null
                     return (
                       <div key={`pair-${r.id}`} className={`card !p-3 ${mine ? '!border-[#BBF7D0] !bg-[#DCFCE7]' : ''}`}>
                         <div className="mb-2 flex items-center justify-between gap-2">
-                          <MonoLabel className={mine ? '!text-[#14532D]' : ''}>{t('gamedetails.pair_label', { n: i + 1 })}</MonoLabel>
+                          <MonoLabel className={mine ? '!text-[#14532D]' : ''}>
+                            {t('gamedetails.pair_label', { n: i + 1 })}
+                            {pairAvg != null && (
+                              <span className="ml-2 normal-case tracking-normal font-sans font-extrabold text-ink-900 tabular-nums">
+                                {t('gamedetails.pair_avg', { avg: pairAvg })}
+                              </span>
+                            )}
+                          </MonoLabel>
                           {canSplit && (
                             <button type="button" disabled={busy}
                               onClick={() => setSplitFor({ userId: r.user.id, names: two.map((x) => x.name).join(' e ') })}

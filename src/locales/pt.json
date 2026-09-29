@@ -1071,6 +1071,8 @@
   "gamedetails.drag_player_hint": "Arrasta um jogador para <1>outra dupla</1> para os trocar.",
   "gamedetails.dupla_number": "Dupla {{number}}",
   "gamedetails.points_suffix": "pts",
+  "gamedetails.roster_range": "Pontos: {{min}}\u2013{{max}} \u00b7 m\u00e9dia {{avg}}",
+  "gamedetails.pair_avg": "m\u00e9dia {{avg}} pts",
   "gamedetails.court_number": "Campo {{number}}",
   "gamedetails.vs": "vs",
   "gamedetails.share_duplas_title": "Partilhar Duplas",
