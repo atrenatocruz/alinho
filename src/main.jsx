@@ -9,8 +9,10 @@ import { registerSW } from 'virtual:pwa-register'
 import { setupAppUpdate } from './lib/appUpdate'
 import { IS_TEST_ENV } from './lib/appEnv'
 import TestEnvBanner from './components/TestEnvBanner'
+import UpdatePill from './components/UpdatePill'
 
-// A app instalada apanha a versão nova sem ter de ser fechada (#569, QA 26 set).
+// A versão nova: avisa com a app à frente (UpdatePill) e só entra sozinha
+// ao voltar à app depois de algum tempo fora (#569, revisto a 29 set).
 if (import.meta.env.PROD) setupAppUpdate(registerSW)
 
 // O Vite avisa quando um ficheiro pré-carregado de uma página já não existe
@@ -32,6 +34,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <TestEnvBanner />
     <App />
+    <UpdatePill />
   </React.StrictMode>,
 )
 

@@ -4296,5 +4296,8 @@
   "lessons.notice_series_changed_teacher": "A turma de {{old}} mudou: agora é com {{teacher_now}}",
   "lessons.notice_series_changed_both": "A turma de {{old}} mudou: agora é {{series}}, com {{teacher_now}}",
   "agenda.org_group_organizer": "Grupo organizador",
-  "agenda.org_club_organizer": "Clube organizador"
+  "agenda.org_club_organizer": "Clube organizador",
+  "appupdate.new_version": "Nova versão",
+  "appupdate.update": "Atualizar",
+  "appupdate.later": "Agora não"
 }
