@@ -32,23 +32,27 @@ export default function EscolherNivel() {
   // conta ficava como "N" para sempre.
   const needsGender = profile?.gender == null
   const [gender, setGender] = useState('')
+  // Lado preferido: obrigatório para todas as contas novas (Ruben, 29 set).
+  // O perfil nasce com 'both' por omissão, por isso não se pode inferir da
+  // base se a pessoa escolheu — pede-se aqui, sem pré-seleção, e a
+  // formação de duplas dos mixes passa a ter o dado desde o primeiro dia.
+  const [side, setSide] = useState('')
+  const ready = selected && side && (!needsGender || gender)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
   const handleConfirm = async () => {
-    if (!selected || saving || (needsGender && !gender)) return
+    if (!ready || saving) return
     setSaving(true)
     setError('')
     try {
-      // Género primeiro: se falhar, o nível ainda não ficou gravado e o
-      // utilizador volta a este ecrã inteiro em vez de ficar sem género.
-      if (needsGender) {
-        const { error: genderError } = await supabase
-          .from('profiles')
-          .update({ gender })
-          .eq('id', user.id)
-        if (genderError) throw genderError
-      }
+      // Género e lado primeiro: se falhar, o nível ainda não ficou gravado
+      // e o utilizador volta a este ecrã inteiro em vez de ficar sem eles.
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ preferred_side: side, ...(needsGender ? { gender } : {}) })
+        .eq('id', user.id)
+      if (profileError) throw profileError
       const { error: rpcError } = await supabase.rpc('complete_rating_onboarding', {
         p_level: selected,
       })
@@ -138,6 +142,23 @@ export default function EscolherNivel() {
           </div>
         )}
 
+        <div className="mb-5">
+          <label className="block text-sm font-extrabold text-ink-900 mb-2">
+            {t('profile.preferred_side_label')}
+          </label>
+          <Select
+            value={side}
+            onChange={setSide}
+            placeholder={t('login.gender_placeholder')}
+            options={[
+              { value: 'left', label: t('gamedetails.side_left') },
+              { value: 'right', label: t('gamedetails.side_right') },
+              { value: 'both', label: t('gamedetails.side_both') },
+            ]}
+          />
+          <p className="text-xs text-muted mt-1.5">{t('profile.preferred_side_hint')}</p>
+        </div>
+
         {/* Nacionalidade — opcional. Fica depois da escolha de nivel para
             nao competir com ela, que e o que desbloqueia o botao. */}
         <div className="mb-5">
@@ -161,7 +182,7 @@ export default function EscolherNivel() {
 
         <PrimaryButton
           onClick={handleConfirm}
-          disabled={!selected || saving || (needsGender && !gender)}
+          disabled={!ready || saving}
           className="w-full"
         >
           {saving ? t('onboarding.saving') : t('onboarding.confirm')}
