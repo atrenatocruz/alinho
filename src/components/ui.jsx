@@ -456,33 +456,91 @@ export function GroupLevelBadge({ rating, size = 'sm' }) {
 
 /* ─── TimeField ───────────────────────────────────────────────────────────
    A hora, sem o relógio nativo do browser (no computador era mau — Renato,
-   29 set). Abre uma folha com as horas de 30 em 30 min numa grelha; a
-   escolhida a preto. `min` (HH:MM) desliga as horas até ela, inclusive — é
-   o «Fim» a seguir ao «Início». Ao abrir, a lista desce até à escolhida, ou
-   à primeira que se pode escolher. `value` e `onChange` em «HH:MM». */
-export function TimeField({ value, onChange, hint, min = null, from = '07:00', to = '23:30', step = 30, disabled = false }) {
+   29 set). Uma lista simples, uma hora por linha, de 30 em 30 min, que abre
+   já na escolhida (à Google Calendar — a grelha de 34 botões ficava
+   amontoada, Renato, 29 set):
+     · computador: menu logo por baixo do campo (por cima, se não couber);
+     · telemóvel: folha em baixo, linhas grandes para o dedo.
+   `min` (HH:MM) é o «Fim» a seguir ao «Início»: só se mostram as horas
+   depois dela, cada uma com a duração («19:30 · 1h30»).
+   `value` e `onChange` em «HH:MM». */
+const durationLabel = (mins) => {
+  const h = Math.floor(mins / 60)
+  const m = mins % 60
+  return h ? `${h}h${m ? String(m).padStart(2, '0') : ''}` : `${m} min`
+}
+
+export function TimeField({ value, onChange, hint, min = null, from = '07:00', to = '23:30', step = 30, disabled = false, suggest = '18:00' }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
+  const [anchor, setAnchor] = useState(null) // posição do menu no computador
+  const triggerRef = useRef(null)
   const listRef = useRef(null)
   const title = hint || t('ui.hour_label')
-  const options = timeOptions({ from, to, step, include: value })
   const minM = toMin(min)
-  const off = (o) => minM != null && toMin(o) <= minM
+  const options = timeOptions({ from, to, step, include: value })
+    .filter((o) => minM == null || toMin(o) > minM)
 
+  const openPicker = () => {
+    const wide = typeof window !== 'undefined' && window.matchMedia?.('(min-width: 640px)').matches
+    if (wide && triggerRef.current) {
+      const r = triggerRef.current.getBoundingClientRect()
+      const height = 264
+      const below = window.innerHeight - r.bottom - 8
+      setAnchor({ left: r.left, width: Math.max(r.width, 160), top: below >= height || below >= r.top ? r.bottom + 6 : r.top - 6 - Math.min(height, r.top - 8), maxHeight: Math.min(height, Math.max(below, r.top - 8)) })
+    } else {
+      setAnchor(null)
+    }
+    setOpen(true)
+  }
+
+  // Abre já na escolhida (ou na primeira), a meio da lista.
   useEffect(() => {
-    if (!open) return
-    const list = listRef.current
-    if (!list) return
-    const target = list.querySelector('[data-selected="true"]') || list.querySelector('button:not([disabled])')
+    if (!open) return undefined
+    // Sem hora escolhida: o «Início» abre por volta de `suggest` (o padel é
+    // ao fim do dia); o «Fim» abre no princípio, logo a seguir ao início.
+    const target = listRef.current?.querySelector('[data-selected="true"]')
+      || (minM == null && listRef.current?.querySelector(`[data-time="${suggest}"]`))
+      || listRef.current?.querySelector('button')
     target?.scrollIntoView({ block: 'center' })
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
   }, [open])
+
+  const pick = (o) => { onChange(o); setOpen(false) }
+  const items = (big) => options.map((o) => {
+    const selected = o === value
+    return (
+      <button
+        key={o}
+        type="button"
+        role="option"
+        aria-selected={selected}
+        data-selected={selected || undefined}
+        data-time={o}
+        onClick={() => pick(o)}
+        className={`flex w-full items-center justify-between rounded-ctrl px-3 text-left tabular-nums transition-colors duration-fast ${
+          big ? 'min-h-[48px] text-base' : 'min-h-[40px] text-[15px]'
+        } ${selected ? 'bg-ink-900 font-extrabold text-white' : 'font-bold text-ink-900 hover:bg-ink-50'}`}
+      >
+        <span>{o}</span>
+        {minM != null && (
+          <span className={`text-xs font-medium ${selected ? 'text-white/70' : 'text-muted'}`}>{durationLabel(toMin(o) - minM)}</span>
+        )}
+      </button>
+    )
+  })
 
   return (
     <>
       <button
+        ref={triggerRef}
         type="button"
         disabled={disabled}
-        onClick={() => setOpen(true)}
+        onClick={openPicker}
+        aria-haspopup="listbox"
+        aria-expanded={open}
         aria-label={value ? `${title}: ${value}` : title}
         className={`input-field flex w-full min-w-0 items-center justify-between text-left disabled:opacity-50 ${value ? 'text-ink-900' : 'text-muted'}`}
       >
@@ -491,52 +549,47 @@ export function TimeField({ value, onChange, hint, min = null, from = '07:00', t
       </button>
 
       {open && createPortal(
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-ink-900/50 animate-fade-in sm:items-center"
-          onClick={() => setOpen(false)}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label={title}
-            className="flex max-h-[75vh] w-full flex-col overflow-hidden rounded-t-card bg-surface shadow-lift animate-pop sm:max-w-md sm:rounded-card"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex shrink-0 items-center justify-between px-5 pb-3 pt-5">
-              <h3 className="text-lg text-ink-900">{title}</h3>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                aria-label={t('ui.close')}
-                className="flex h-9 w-9 items-center justify-center rounded-full text-muted transition-colors duration-fast hover:bg-ink-50 hover:text-ink-900"
-              >
-                <X size={20} />
-              </button>
+        anchor ? (
+          // Computador: menu por baixo do campo.
+          <div className="fixed inset-0 z-50" onClick={() => setOpen(false)}>
+            <div
+              ref={listRef}
+              role="listbox"
+              aria-label={title}
+              className="fixed overflow-y-auto overscroll-contain rounded-ctrl border border-line bg-white p-1 shadow-lift animate-pop"
+              style={{ left: anchor.left, top: anchor.top, width: anchor.width, maxHeight: anchor.maxHeight }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {items(false)}
             </div>
-            <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-[calc(env(safe-area-inset-bottom)+20px)]">
-              <div className="grid grid-cols-4 gap-2">
-                {options.map((o) => {
-                  const selected = o === value
-                  return (
-                    <button
-                      key={o}
-                      type="button"
-                      disabled={off(o)}
-                      data-selected={selected || undefined}
-                      aria-pressed={selected}
-                      onClick={() => { onChange(o); setOpen(false) }}
-                      className={`min-h-[44px] rounded-ctrl text-[15px] font-extrabold tabular-nums transition-colors duration-fast disabled:cursor-not-allowed disabled:opacity-30 ${
-                        selected ? 'bg-ink-900 text-white' : 'border border-line bg-canvas text-ink-900 hover:bg-ink-50'
-                      }`}
-                    >
-                      {o}
-                    </button>
-                  )
-                })}
+          </div>
+        ) : (
+          // Telemóvel: folha em baixo.
+          <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink-900/50 animate-fade-in" onClick={() => setOpen(false)}>
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label={title}
+              className="flex max-h-[60vh] w-full flex-col overflow-hidden rounded-t-card bg-surface shadow-lift animate-pop"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex shrink-0 items-center justify-between px-5 pb-2 pt-5">
+                <h3 className="text-lg text-ink-900">{title}</h3>
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  aria-label={t('ui.close')}
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-muted transition-colors duration-fast hover:bg-ink-50 hover:text-ink-900"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              <div ref={listRef} role="listbox" className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-[calc(env(safe-area-inset-bottom)+16px)]">
+                {items(true)}
               </div>
             </div>
           </div>
-        </div>,
+        ),
         document.body
       )}
     </>
