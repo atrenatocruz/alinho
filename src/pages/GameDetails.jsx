@@ -255,18 +255,23 @@ export default function GameDetails() {
     loadGameDetails()
     loadAllUsers()
 
-    // Subscribe to updates
+    // Tempo real: entradas e saídas, resultados, duplas e o próprio mix.
+    // Os resultados (matches) e as duplas (teams) só chegam com a
+    // migration_mix_tempo_real.sql corrida (29 set) — antes não estavam na
+    // publicação e quem tinha o mix aberto não via o resultado de outro admin.
+    // Vários avisos seguidos (dois campos a gravar ao mesmo tempo, uma ronda
+    // nova com vários jogos) dão uma só leitura.
+    let reloadTimer = null
+    const reloadSoon = () => {
+      clearTimeout(reloadTimer)
+      reloadTimer = setTimeout(() => loadGameDetails(), 300)
+    }
     const subscription = supabase
       .channel(`game_${id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'participants', filter: `game_id=eq.${id}` }, () => {
-        loadGameDetails()
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'matches', filter: `game_id=eq.${id}` }, () => {
-        loadGameDetails()
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'games', filter: `id=eq.${id}` }, () => {
-        loadGameDetails()
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'participants', filter: `game_id=eq.${id}` }, reloadSoon)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'matches', filter: `game_id=eq.${id}` }, reloadSoon)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'teams', filter: `game_id=eq.${id}` }, reloadSoon)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'games', filter: `id=eq.${id}` }, reloadSoon)
       .subscribe()
 
     // O organizador muda de app a meio do mix (telemóvel): ao voltar, a
@@ -275,6 +280,7 @@ export default function GameDetails() {
     document.addEventListener('visibilitychange', onVisible)
 
     return () => {
+      clearTimeout(reloadTimer)
       subscription.unsubscribe()
       document.removeEventListener('visibilitychange', onVisible)
     }
