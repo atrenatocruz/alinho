@@ -35,7 +35,10 @@ export function hashPhone(digits) {
  * resolveProfileByPhoneJid on their very next message, exactly like a real
  * signup would.
  */
-export async function createGuestProfile(phoneJid, displayName, organizationId) {
+// gameId: o mix em que a pessoa fez «In» — decide o ponto de partida do
+// nível (guest_entry_rating). Sem mix (parceiro nomeado, etc.) fica NULL e a
+// função cai para o mínimo do clube.
+export async function createGuestProfile(phoneJid, displayName, organizationId, gameId = null) {
   const digits = phoneJid.split('@')[0]
   const hash = hashPhone(digits)
   const name = displayName?.trim() || 'Jogador'
@@ -50,21 +53,30 @@ export async function createGuestProfile(phoneJid, displayName, organizationId) 
     throw new Error(`Failed to create guest auth user: ${createError?.message}`)
   }
 
-  // A real signup picks a starting level on the "Escolher Nível" screen
-  // (Iniciado 700 / Regular 900 / Avançado 1100) before ever seeing the
-  // app; a WhatsApp guest never opens the app, so they'd otherwise sit at
-  // rating=NULL forever — showing as "sem ranking" and seeding as the
-  // weakest possible player in every dupla until their first result
-  // lands. complete_rating_onboarding's own fallback for "played before
-  // onboarding" is a 900 baseline (see migration_elo_rating.sql) — reuse
-  // that exact number here rather than inventing a new one.
+  // Ponto de partida do nível (Ruben, 29 set): um convidado não escolheu
+  // nível, por isso leva o mais conservador que não distorce os outros —
+  // a banda do mix em que entrou, ou o mínimo dos inscritos; 900 só em
+  // último caso (migration_convidados_nivel_do_mix.sql). Se a RPC falhar
+  // (migração por correr, rede), 900 como sempre — o «In» nunca bloqueia.
+  let entryRating = 900
+  try {
+    const { data, error } = await supabase.rpc('guest_entry_rating', {
+      p_game_id: gameId,
+      p_organization_id: organizationId,
+    })
+    if (error) throw error
+    if (Number.isFinite(Number(data)) && Number(data) > 0) entryRating = Math.round(Number(data))
+  } catch (err) {
+    console.error('guest_entry_rating falhou; convidado fica a 900:', err?.message || err)
+  }
+
   const { error: updateError } = await supabase
     .from('profiles')
     .update({
       phone_hash: hash,
       whatsapp_jid: phoneJid,
-      rating: 900,
-      rating_anchor: 900,
+      rating: entryRating,
+      rating_anchor: entryRating,
       rating_onboarded_at: new Date().toISOString(),
     })
     .eq('id', created.user.id)

@@ -438,3 +438,51 @@ test('o pedido cai se as duplas já foram sorteadas', async () => {
   assert.match(out, /já não vale/)
   assert.equal(db.participants.find((p) => p.id === 'solo').partner_id, null)
 })
+
+// Convidado novo: o ponto de partida do nível vem de guest_entry_rating
+// (migration_convidados_nivel_do_mix.sql) — a banda do mix, ou o mínimo dos
+// inscritos — e não dos 900 fixos. Se a RPC falhar, 900 como sempre.
+// O fake não tem o trigger que cria o perfil ao criar o utilizador Auth:
+// emula-se aqui, para o UPDATE do convidado ter linha onde escrever.
+function fakeAuthTrigger() {
+  const createUser = supabase.auth.admin.createUser
+  supabase.auth.admin.createUser = async (args) => {
+    const res = await createUser(args)
+    db.profiles.push({ id: res.data.user.id, name: args.user_metadata?.name, email: args.email, language: 'pt' })
+    return res
+  }
+  return () => { supabase.auth.admin.createUser = createUser }
+}
+
+test('«In» de um número sem conta cria o convidado com o nível que a RPC devolve', async () => {
+  const restore = fakeAuthTrigger()
+  const rpc = supabase.rpc
+  supabase.rpc = async (name, args) => {
+    if (name === 'guest_entry_rating') {
+      assert.equal(args.p_game_id, 'm')
+      assert.equal(args.p_organization_id, 'o')
+      return { data: 1300, error: null }
+    }
+    return rpc(name, args)
+  }
+  await say('in', '351977777777')
+  const guest = db.profiles.find((p) => /whatsapp\.alinho\.pt/.test(p.email || ''))
+  assert.ok(guest, 'criou o convidado')
+  assert.equal(guest.rating, 1300)
+  assert.equal(guest.rating_anchor, 1300)
+  supabase.rpc = rpc
+  restore()
+})
+
+test('«In» de um número sem conta: se guest_entry_rating falhar, o convidado fica a 900', async () => {
+  const restore = fakeAuthTrigger()
+  const rpc = supabase.rpc
+  supabase.rpc = async (name, args) => (name === 'guest_entry_rating'
+    ? { data: null, error: { message: 'function does not exist' } }
+    : rpc(name, args))
+  await say('in', '351977777777')
+  const guest = db.profiles.find((p) => /whatsapp\.alinho\.pt/.test(p.email || ''))
+  assert.equal(guest.rating, 900)
+  supabase.rpc = rpc
+  restore()
+})

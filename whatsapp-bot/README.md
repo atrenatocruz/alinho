@@ -70,3 +70,11 @@ Any small instance works — `t2.micro`/`t3.micro` (free-tier eligible), Ubuntu 
    Scan it with the bot's WhatsApp (Linked devices), then Ctrl+C — the container keeps running in the background regardless.
 
 `--restart unless-stopped` covers both crash recovery and instance reboots automatically (Docker's own service starts on boot and restarts anything with that flag) — no extra systemd setup needed.
+
+## Migrações de que o bot depende
+
+O bot chama RPCs que têm de existir na base antes do redeploy; correr no SQL Editor por esta ordem, se ainda não estiverem:
+
+- `supabase/migration_537_confirmar_numero.sql` — `confirm_phone_from_whatsapp`, `juntar_convidado`.
+- `supabase/migration_convidados_nivel_do_mix.sql` — `guest_entry_rating` (o nível de partida dos convidados). Sem ela o bot continua a funcionar e cria convidados a 900, com um `console.error`.
+

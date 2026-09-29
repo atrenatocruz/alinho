@@ -1894,6 +1894,7 @@
   "onboarding.confirm": "Confirm",
   "onboarding.gender_heading": "One thing missing: your gender",
   "onboarding.gender_hint": "Rankings and your level (M/F) are split by gender. Just this, and it stays saved.",
+  "onboarding.guest_note": "Already played as a WhatsApp guest? With 4 or more games, once you confirm your number your guest level takes precedence over this choice.",
   "onboarding.footnote": "This choice only sets your starting point — your public level (M6, M5…) evolves with your games.",
   "createprivatematch.back": "Back",
   "createprivatematch.title": "Game with friends",

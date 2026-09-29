@@ -6,7 +6,7 @@ Modelo em vigor desde `supabase/migration_elo_simples.sql` (28 set 2026). A part
 
 ## Parte 1 — O modelo, em 7 regras
 
-1. **Um rating global por pessoa** (`profiles.rating`). Começa no nível escolhido à entrada: N1 1900 · N2 1700 · N3 1500 · N4 1300 · N5 1100 · N6 850 · Iniciante 600 (`supabase/migration_elo_entry_levels.sql:140-170`); 900 para quem não escolheu.
+1. **Um rating global por pessoa** (`profiles.rating`). Começa no nível escolhido à entrada: N1 1900 · N2 1700 · N3 1500 · N4 1300 · N5 1100 · N6 850 · Iniciante 600 (`supabase/migration_elo_entry_levels.sql:140-170`); 900 para quem não escolheu. **Convidados criados pelo bot do WhatsApp** não escolhem: entram na banda do mix em que fizeram «In» (M4 → 1300…) ou, sem nível no mix, no mínimo dos inscritos com nível (`guest_entry_rating`, `migration_convidados_nivel_do_mix.sql`); não aparecem nos rankings até criarem conta; e, ao confirmarem o número, se tiverem 4+ jogos como convidado é esse nível que fica, não o escolhido no registo.
 2. **Rating da dupla = média dos dois.** Esperado com a fórmula clássica: `E = 1 / (1 + 10^((R_adv − R_nós) / 400))`.
 3. **K = 20 para toda a gente.** Quem tem menos de 12 jogos contados usa K = 40, e isso só mexe no rating dele: os outros três no jogo movem pelo K 20 deles.
 4. **Cada um da dupla leva o mesmo.** Ganharam juntos, ganham o mesmo; perderam juntos, perdem o mesmo. Chão em 0, sem teto.

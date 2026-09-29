@@ -205,6 +205,12 @@ export default function EscolherNivel() {
           <p className="text-xs text-muted mt-1.5">{t('profile.nationality_optional_hint')}</p>
         </div>
 
+        {/* Quem jogou como convidado pelo WhatsApp (4+ jogos) fica com esse
+            nível quando confirmar o número — a escolha aqui não conta para
+            eles (migration_convidados_nivel_do_mix.sql). Dito antes, para
+            ninguém ser apanhado de surpresa. */}
+        <p className="text-xs text-muted text-center mb-4">{t('onboarding.guest_note')}</p>
+
         {error && <p className="text-danger text-sm text-center mb-4">{error}</p>}
 
         <PrimaryButton

@@ -381,7 +381,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
   // a WhatsApp-only person becomes a real (is_guest) profile+membership right
   // then, so they can play without registering first, while still being
   // nudged to sign up for their history/friends/rewards (Trello #19).
-  async function requireProfileOrCreateGuest(profile, senderPnForGuest) {
+  async function requireProfileOrCreateGuest(profile, senderPnForGuest, gameIdForGuest = null) {
     // #537: já tem conta (número confirmado) mas não é deste clube → passa a
     // membro com a conta dele, em vez de ganhar um convidado.
     if (profile?.notMember) {
@@ -396,7 +396,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     }
     if (profile) return { profile, isNewGuest: false }
     try {
-      const created = await createGuestProfile(senderPnForGuest, message?.pushName, organizationId)
+      const created = await createGuestProfile(senderPnForGuest, message?.pushName, organizationId, gameIdForGuest)
       return { profile: created, isNewGuest: true }
     } catch (err) {
       console.error('Failed to create guest profile:', err)
@@ -447,7 +447,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
         return
       }
 
-      const { profile, isNewGuest } = await requireProfileOrCreateGuest(resolvedProfile, senderPn)
+      const { profile, isNewGuest } = await requireProfileOrCreateGuest(resolvedProfile, senderPn, game.id)
       if (!profile) return
 
       const { error: insertError } = await supabase
@@ -587,7 +587,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
         const guestName = partnerRequest.name
           ? shownName()
           : t('partner_guest_default_name', lang, { name: profile.name })
-        const created = await createGuestProfile(pn, guestName, organizationId)
+        const created = await createGuestProfile(pn, guestName, organizationId, game?.id ?? null)
         return { partner: created, isNewGuest: true }
       } catch (err) {
         console.error('Failed to create partner guest profile:', err)
@@ -743,7 +743,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
       await reply(adding ? 'mix_full_add_partner' : capacity - people.length <= 0 ? 'mix_full_pair' : 'mix_one_spot_pair')
       return
     }
-    const { profile, isNewGuest } = await requireProfileOrCreateGuest(resolvedProfile, senderPn)
+    const { profile, isNewGuest } = await requireProfileOrCreateGuest(resolvedProfile, senderPn, game.id)
     if (!profile) return
     if (adding) {
       // A inscrição sozinha tem de continuar lá, ser desta pessoa e sem parceiro.
@@ -1039,7 +1039,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
 
     let isNewGuest = false
     if (action === 'in') {
-      ;({ profile, isNewGuest } = await requireProfileOrCreateGuest(profile, senderPn))
+      ;({ profile, isNewGuest } = await requireProfileOrCreateGuest(profile, senderPn, game.id))
     } else {
       profile = await requireProfile(profile)
     }
