@@ -1080,6 +1080,8 @@
   "gamedetails.drag_player_hint": "Drag a player to <1>another dupla</1> to swap them.",
   "gamedetails.dupla_number": "Dupla {{number}}",
   "gamedetails.points_suffix": "pts",
+  "gamedetails.roster_range": "Points: {{min}}\u2013{{max}} \u00b7 average {{avg}}",
+  "gamedetails.pair_avg": "avg {{avg}} pts",
   "gamedetails.court_number": "Court {{number}}",
   "gamedetails.vs": "vs",
   "gamedetails.share_duplas_title": "Share Duplas",
