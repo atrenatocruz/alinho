@@ -2749,6 +2749,8 @@
   "mixlogic.phase_semi": "Meias-finais",
   "mixlogic.phase_final": "Final",
   "mixlogic.phase_third": "3.º lugar",
+  "mixlogic.phase_placement": "Classificação",
+  "mixlogic.phase_place_n": "{{n}}.º lugar",
   "mixlogic.format_sobe_desce": "Sobe e desce",
   "mixlogic.format_todos_contra_todos": "Todos contra todos",
   "mixlogic.format_grupos_eliminatorias": "Grupos + Eliminatórias",

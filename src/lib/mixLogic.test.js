@@ -5,7 +5,7 @@ import {
   generateAmericanoSchedule, americanoStandings,
   computeMixWinnerTeamId, formDuplas,
   nextSobeDesceRotating, splitPartnerRows, rotatingPlacar,
-  thirdPlaceMatch, PHASE_LABEL_KEY,
+  thirdPlaceMatch, lowerPlacementMatches, placementOfCourt, PHASE_LABEL_KEY,
 } from './mixLogic'
 
 describe('splitIntoPools', () => {
@@ -766,5 +766,31 @@ describe('thirdPlaceMatch — 3.º lugar na ronda da final (Renato, 29 set)', ()
 
   it('a fase tem nome para o ecrã', () => {
     expect(PHASE_LABEL_KEY.third).toBe('mixlogic.phase_third')
+  })
+})
+
+describe('lowerPlacementMatches — 5.º, 7.º… lugar nos campos 3, 4… (Renato, 29 set)', () => {
+  it('com 4 campos: 5.º contra 6.º no campo 3 e 7.º contra 8.º no campo 4', () => {
+    expect(lowerPlacementMatches({ orderedTeamIds: ['e', 'f', 'g', 'h'], numCourts: 4 })).toEqual([
+      { court_number: 3, team_a_id: 'e', team_b_id: 'f' },
+      { court_number: 4, team_a_id: 'g', team_b_id: 'h' },
+    ])
+  })
+
+  it('só abre os campos que existem', () => {
+    expect(lowerPlacementMatches({ orderedTeamIds: ['e', 'f', 'g', 'h'], numCourts: 3 }))
+      .toEqual([{ court_number: 3, team_a_id: 'e', team_b_id: 'f' }])
+    expect(lowerPlacementMatches({ orderedTeamIds: ['e', 'f'], numCourts: 2 })).toEqual([])
+  })
+
+  it('uma dupla que sobre fica de fora', () => {
+    expect(lowerPlacementMatches({ orderedTeamIds: ['e', 'f', 'g'], numCourts: 4 }))
+      .toEqual([{ court_number: 3, team_a_id: 'e', team_b_id: 'f' }])
+  })
+
+  it('o lugar de cada campo: campo 3 → 5.º, campo 4 → 7.º', () => {
+    expect(placementOfCourt(3)).toBe(5)
+    expect(placementOfCourt(4)).toBe(7)
+    expect(PHASE_LABEL_KEY.placement).toBe('mixlogic.phase_placement')
   })
 })
