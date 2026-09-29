@@ -7,7 +7,7 @@
 -- no dev (1ab8420) e usa estes campos quando vierem.
 --
 -- O QUE FAZ. No objeto 'match' do get_friend_match entram organization_id,
--- organization_name e organization_slug (null num jogo entre amigos sem
+-- organization_name, organization_slug e organization_kind (null num jogo entre amigos sem
 -- grupo). Troca só esse fragmento no corpo VIVO (1 vez; «já estava»).
 --
 -- Dev 3, 28 set 2026
@@ -35,6 +35,25 @@ BEGIN
   EXECUTE regexp_replace(v_def, c_mau, c_bom);
 END $$;
 
+-- E o tipo: 'club' ou 'group' (Dev 2, 28 set: num clube o editar diz «jogo
+-- em aberto»). À parte, para valer também se a parte de cima já correu.
+DO $$
+DECLARE
+  c_mau CONSTANT TEXT := '(''organization_slug'', \(SELECT og\.slug FROM organizations og WHERE og\.id = m\.organization_id\))';
+  c_bom CONSTANT TEXT := '\1,
+                ''organization_kind'', (SELECT og.kind FROM organizations og WHERE og.id = m.organization_id)';
+  v_def TEXT := pg_get_functiondef('public.get_friend_match(uuid)'::regprocedure);
+BEGIN
+  IF v_def LIKE '%''organization_kind''%' THEN
+    RAISE NOTICE 'get_friend_match (tipo): já estava';
+    RETURN;
+  END IF;
+  IF (SELECT count(*) FROM regexp_matches(v_def, c_mau, 'g')) <> 1 THEN
+    RAISE EXCEPTION 'get_friend_match: o organization_slug não aparece 1 vez. Parar e ler.';
+  END IF;
+  EXECUTE regexp_replace(v_def, c_mau, c_bom);
+END $$;
+
 REVOKE ALL ON FUNCTION public.get_friend_match(uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.get_friend_match(uuid) FROM anon;
 GRANT EXECUTE ON FUNCTION public.get_friend_match(uuid) TO authenticated;
@@ -42,5 +61,5 @@ GRANT EXECUTE ON FUNCTION public.get_friend_match(uuid) TO authenticated;
 COMMIT;
 
 -- Verificar depois de correr:
---   SELECT pg_get_functiondef('public.get_friend_match(uuid)'::regprocedure) LIKE '%''organization_slug''%';  -- true
+--   SELECT pg_get_functiondef('public.get_friend_match(uuid)'::regprocedure) LIKE '%''organization_kind''%';  -- true
 --   SELECT has_function_privilege('anon', 'public.get_friend_match(uuid)', 'EXECUTE');                         -- false
