@@ -17,6 +17,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowDown, Check, ChevronDown, ChevronUp } from 'lucide-react'
 import { LILAC } from './TournamentBits'
+import { MINE } from './MatchCard'
 import { sourceText } from './sourceText'
 import { matchTieBreak } from './tieBreak'
 import { hhmmInTz, TOURNAMENT_TZ } from '../../lib/tournamentDay'
@@ -155,7 +156,7 @@ export default function BracketTree({ rounds, entries, myIds = [], allMatches, g
             </span>
             <span className={`flex min-w-0 items-center gap-1 text-xs font-extrabold ${done || now ? 'text-ink-900' : 'text-ink-500'}`}>
               {done && <Check size={12} strokeWidth={3} className="shrink-0" aria-hidden />}
-              {now && <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-lime-400 ring-2 ring-ink-900" aria-hidden />}
+              {now && <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-danger" aria-hidden />}
               <span className="truncate">
                 {t(`tournament.draw.round_${c.round}`)}
                 {now ? ` · ${t('tournament.tree.now_short')}` : !done && first ? ` · ${hhmmInTz(first)}` : ''}
@@ -211,7 +212,13 @@ export default function BracketTree({ rounds, entries, myIds = [], allMatches, g
         <p className="pt-5 text-center text-xs text-ink-500">{t('tournament.tree.tap_hint')}</p>
       </div>
 
-      {/* Computador: da esquerda para a direita. */}
+      {/* Computador: da esquerda para a direita, com a legenda por cima
+          (SPEC quadro-horario-detalhe, ponto 5). */}
+      <div className="mb-3 hidden flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-ink-700 md:flex" aria-hidden>
+        <span className="inline-flex items-center gap-1.5"><span className="h-3 w-5 rounded" style={{ background: MINE }} />{t('tournament.tree.legend_mine')}</span>
+        <span className="inline-flex items-center gap-1.5"><span className="h-3 w-5 rounded border-[1.5px] border-dashed" style={{ borderColor: LILAC.border }} />{t('tournament.tree.legend_tbd')}</span>
+        <span className="inline-flex items-center gap-1.5"><span className="h-3 w-5 rounded border-[1.5px] border-ink-900" />{t('tournament.tree.legend_live')}</span>
+      </div>
       <Board columns={columns} card={(m, r) => card(m, r, true)} heading={heading} current={current} byeLine={byeLine}
         third={third && (
           <div className="mt-5 flex flex-wrap items-center gap-x-8 gap-y-3 border-t border-line pt-5">
@@ -235,6 +242,18 @@ export default function BracketTree({ rounds, entries, myIds = [], allMatches, g
 function Board({ columns, card, heading, current, byeLine, third }) {
   const scroller = useRef(null)
   const currentCol = useRef(null)
+  // Onde há mais para ver: esbate-se essa ponta.
+  const [edges, setEdges] = useState({ left: false, right: false })
+  const measure = () => {
+    const box = scroller.current
+    if (!box) return
+    setEdges({ left: box.scrollLeft > 4, right: box.scrollLeft + box.clientWidth < box.scrollWidth - 4 })
+  }
+  useEffect(() => {
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [columns.length])
   // As colunas crescem até 260 px para os nomes caberem inteiros (designer,
   // 28 set); abaixo de 13rem cada, desliza. Não cabe: abre na ronda a decorrer.
   useEffect(() => {
@@ -243,20 +262,22 @@ function Board({ columns, card, heading, current, byeLine, third }) {
     if (box && col && box.scrollWidth > box.clientWidth) {
       box.scrollLeft = col.offsetLeft - box.clientWidth / 2 + col.clientWidth / 2
     }
+    measure()
   }, [current])
 
   const line = LILAC.border
   const pairs = (list) => list.reduce((acc, m, i) => (i % 2 ? acc : [...acc, list.slice(i, i + 2)]), [])
-  // Só sai da coluna da página quando as rondas não cabem nela: a largura é a
-  // que as colunas pedem (260 px cada + 32 px entre elas), nunca menos do que
-  // a coluna, nunca mais do que 1100 px ou o ecrã. Com poucas rondas fica
-  // alinhado com o resto da página em vez de largo e encostado à esquerda.
-  const need = columns.length * 260 + Math.max(0, columns.length - 1) * 32
+  // Nunca sai da coluna da página (Francisco, 29 set: «isto não deveria sair:
+  // deveria ter scroll interno»). Com mais rondas do que cabem, desliza por
+  // dentro, com a barra à vista, e abre na ronda a decorrer.
+  const fade = (side) => `pointer-events-none absolute inset-y-0 ${side}-0 z-10 w-10 from-canvas to-transparent ${side === 'left' ? 'bg-gradient-to-r' : 'bg-gradient-to-l'}`
   return (
-    // Ao centro; com mais rondas do que cabem, desliza dentro dele.
-    <div className="relative left-1/2 hidden -translate-x-1/2 md:block"
-      style={{ width: `min(max(100%, ${need}px), 1100px, calc(100vw - 48px))` }}>
-      <div ref={scroller} className="overflow-x-auto pb-2">
+    <div className="hidden md:block">
+      {/* O esbatido só por cima do quadro, não do 3.º lugar por baixo. */}
+      <div className="relative">
+      {edges.left && <span aria-hidden className={fade('left')} />}
+      {edges.right && <span aria-hidden className={fade('right')} />}
+      <div ref={scroller} onScroll={measure} className="scroll-visible overflow-x-auto pb-3">
         <div className="flex items-stretch gap-8" style={{ minWidth: columns.length * 232 }}>
           {columns.map((c, i) => {
             const last = i === columns.length - 1
@@ -293,6 +314,7 @@ function Board({ columns, card, heading, current, byeLine, third }) {
             )
           })}
         </div>
+      </div>
       </div>
       {third}
     </div>

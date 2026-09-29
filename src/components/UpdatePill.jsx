@@ -26,7 +26,7 @@ export default function UpdatePill() {
         <button
           type="button"
           onClick={applyUpdate}
-          className="inline-flex min-h-[40px] items-center gap-1.5 rounded-full px-3 font-extrabold text-lime-400 transition-colors duration-fast hover:bg-white/10 active:scale-[0.98]"
+          className="inline-flex min-h-[40px] items-center gap-1.5 rounded-full px-3 font-extrabold text-white underline underline-offset-2 transition-colors duration-fast hover:bg-white/10 active:scale-[0.98]"
         >
           <RefreshCw size={15} strokeWidth={2.4} aria-hidden />
           {t('appupdate.update')}
