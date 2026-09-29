@@ -1094,6 +1094,8 @@
   "gamedetails.scorekeeper_badge": "Marcador",
   "gamedetails.make_scorekeeper": "Tornar marcador",
   "gamedetails.round_number": "Ronda {{number}}",
+  "gamedetails.round_done_summary_one": "1 jogo",
+  "gamedetails.round_done_summary_other": "{{count}} jogos",
   "gamedetails.save_score": "Guardar resultado",
   "gamedetails.score_tie_not_allowed": "Aqui não há empates, por isso a ronda não fecha com este resultado. Joguem um ponto de desempate (ou combinem quem ganha) e escrevam o resultado final — por exemplo 6-5.",
   "gamedetails.set_tie_not_allowed": "Um set não acaba empatado. Escrevam o resultado com que o set terminou — por exemplo 7-6.",

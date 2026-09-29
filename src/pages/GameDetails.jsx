@@ -204,6 +204,8 @@ export default function GameDetails() {
   const [historyOpen, setHistoryOpen] = useState(false)
   // Marcadores de resultado: dobrado por defeito (Renato, 29 set).
   const [scorekeepersOpen, setScorekeepersOpen] = useState(false)
+  // Rondas já jogadas que a pessoa abriu à mão (as outras ficam dobradas).
+  const [openRounds, setOpenRounds] = useState({})
   // Escolha de app de navegacao (Trello #34). Fica no dispositivo e nao no
   // perfil — ver a nota em lib/navigators.js.
   const [historyLoading, setHistoryLoading] = useState(false)
@@ -3041,17 +3043,43 @@ export default function GameDetails() {
             const ms = matches.filter(m => m.round_number === r)
             const phase = (ms.find(m => m.phase !== 'third') || ms[0])?.phase || 'group'
             const isCurrent = r === maxRound && game.status === 'in_progress'
+            // As rondas já jogadas dobram-se sozinhas quando começa a
+            // seguinte (Renato, 29 set); tocar no título abre-as outra vez.
+            const open = isCurrent || !!openRounds[r]
+            const title = (
+              <h3 className="text-lg text-ink-900">
+                {t('gamedetails.round_number', { number: r })}
+                {phase !== 'group' && (
+                  <span className="ml-2 text-xs font-extrabold uppercase tracking-wide bg-ink-900 text-white px-2.5 py-1 rounded-full">
+                    {t(PHASE_LABEL_KEY[phase])}
+                  </span>
+                )}
+              </h3>
+            )
             return (
               <div key={r} id={`mix-ronda-${r}`} className={`card scroll-mt-24 ${isCurrent ? 'ring-2 ring-ink-900' : ''}`}>
+                {!isCurrent && (
+                  <button
+                    type="button"
+                    onClick={() => setOpenRounds((o) => ({ ...o, [r]: !o[r] }))}
+                    aria-expanded={open}
+                    className={`w-full min-h-[44px] flex items-center justify-between gap-3 text-left ${open ? 'mb-3' : ''}`}
+                  >
+                    {title}
+                    <span className="flex shrink-0 items-center gap-1.5 text-xs font-extrabold text-muted">
+                      {!open && (
+                        <>
+                          <Check size={14} strokeWidth={3} className="text-ok" />
+                          {t('gamedetails.round_done_summary', { count: ms.length })}
+                        </>
+                      )}
+                      <ChevronDown size={20} className={`transition-transform duration-base ${open ? 'rotate-180' : ''}`} />
+                    </span>
+                  </button>
+                )}
+                {isCurrent && (
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-lg text-ink-900">
-                    {t('gamedetails.round_number', { number: r })}
-                    {phase !== 'group' && (
-                      <span className="ml-2 text-xs font-extrabold uppercase tracking-wide bg-ink-900 text-white px-2.5 py-1 rounded-full">
-                        {t(PHASE_LABEL_KEY[phase])}
-                      </span>
-                    )}
-                  </h3>
+                  {title}
                   {isCurrent && (
                     <RoundTimer
                       startedAt={game.round_started_at}
@@ -3061,6 +3089,7 @@ export default function GameDetails() {
                     />
                   )}
                 </div>
+                )}
 
                 {/* O alarme das rondas (27 set): no mix vem ligado; cada um
                     desliga no seu telemóvel. Com os resultados todos a ronda
@@ -3078,6 +3107,7 @@ export default function GameDetails() {
                   </div>
                 )}
 
+                {open && (
                 <div className="space-y-2.5">
                   {ms.map(m => {
                     const done = !!m.winner_team_id
@@ -3125,6 +3155,7 @@ export default function GameDetails() {
                     )
                   })}
                 </div>
+                )}
               </div>
             )
           })}
