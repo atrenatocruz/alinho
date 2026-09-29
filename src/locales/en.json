@@ -2209,7 +2209,7 @@
   "instructions.elo_b5": "Both mixes and friendly matches count; in friendlies the score must be confirmed by the opposing team.",
   "instructions.elo_b6": "In your first 12 games your level is provisional: it moves twice as much with each result (only yours — your partners and opponents move the normal amount), and shows as ~points with the NEW tag on your avatar.",
   "instructions.elo_b7": "Only winning, losing or drawing counts. The score in sets or points doesn't weigh in, and there are no extra prizes for winning the mix or the night — those give XP, not level.",
-  "instructions.elo_b8": "If you're 200 points (one level) above the opposing pair, winning earns nothing — losing still costs. To climb, play people at your level.",
+  "instructions.elo_b8": "When your pair is 150 points above the opposing pair, winning earns less and less — at 250 it earns nothing. Losing still costs. To climb, play people at your level.",
   "instructions.elo_note": "The fine details of the formula are tuned by the alinho team as the system matures.",
   "instructions.xp_title": "XP and shields (activity)",
   "instructions.xp_intro": "XP measures dedication, not skill — it only goes up, never down. You earn it like this:",

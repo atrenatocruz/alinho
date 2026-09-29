@@ -18,9 +18,10 @@
 --   · Um lugar sem conta (convidado por nome) não conta para a média nem
 --     recebe nada; os outros movem normalmente. Acaba a regra «dupla com
 --     convidado move metade».
---   · 200 ou mais acima da média da dupla adversária, ganhar dá 0 pontos
---     (perder custa o normal). Trava quem só ganha num grupo mais fraco de
---     subir sem fim; para subir, joga com o seu nível.
+--   · Quando a minha dupla está 150+ acima da média da adversária, ganhar
+--     vale cada vez menos, até 0 aos 250 (perder custa o normal). Trava
+--     quem só ganha num grupo mais fraco de subir sem fim; para subir, joga
+--     com o seu nível. Olha à dupla, não ao indivíduo (29 set).
 --   · Chão em 0. Sem teto absoluto. Arredondamento a 2 casas por pessoa.
 --
 -- O QUE NÃO MUDA
@@ -76,6 +77,7 @@ DECLARE
   v_s   NUMERIC;
   v_e   NUMERIC;
   v_d   NUMERIC;
+  v_gap NUMERIC;
   i     INTEGER;
 BEGIN
   -- Um lado sem ninguém com conta, ou sem resultado: não há o que medir.
@@ -95,12 +97,19 @@ BEGIN
     v_s := CASE WHEN i <= 2 THEN p_s_a ELSE 1 - p_s_a END;
     v_e := CASE WHEN i <= 2 THEN v_ea ELSE 1 - v_ea END;
     v_d := round(v_k * (v_s - v_e), 2);
-    -- Regra 7: 200 ou mais acima da média dos adversários, ganhar não dá
-    -- nada; perder continua a custar o normal. Sem isto, quem ganha sempre
-    -- num grupo mais fraco sobe sem fim (a média da dupla nunca deixa o
-    -- esperado chegar a 1). Só sobe jogando com o seu nível.
-    IF v_d > 0 AND p_r[i] - (CASE WHEN i <= 2 THEN v_rb ELSE v_ra END) >= 200 THEN
-      v_d := 0;
+    -- Regra 7: quando a minha DUPLA está 150+ acima da média da adversária,
+    -- ganhar vale cada vez menos, até 0 aos 250. Perder custa o normal.
+    -- Olha à dupla, não ao indivíduo, para os dois parceiros levarem sempre
+    -- o mesmo (regra 4) e nunca se cortar um jogo que o esperado dava como
+    -- disputado (29 set). Trava quem só ganha num grupo mais fraco de subir
+    -- sem fim: só sobe jogando com o seu nível.
+    IF v_d > 0 THEN
+      v_gap := CASE WHEN i <= 2 THEN v_ra - v_rb ELSE v_rb - v_ra END;
+      IF v_gap >= 250 THEN
+        v_d := 0;
+      ELSIF v_gap > 150 THEN
+        v_d := round(v_d * (250 - v_gap) / 100, 2);
+      END IF;
     END IF;
     -- Chão em 0: nunca se perde mais do que se tem.
     IF v_d < 0 THEN
@@ -319,7 +328,11 @@ REVOKE ALL ON FUNCTION apply_tournament_elo(UUID, UUID) FROM public, anon, authe
 --   SELECT elo_jogo_deltas(ARRAY[5,1800,500,500], ARRAY[30,30,30,30], 0);
 --     → {-5.00, -18.21, 18.21, 18.21}           (chão em 0 para quem tem 5)
 --   SELECT elo_jogo_deltas(ARRAY[1250,950,1000,1000], ARRAY[30,30,30,30], 1);
---     → {0.00, 7.20, -7.20, -7.20}              (1250 está 250 acima: ganha 0; o parceiro o normal)
---   SELECT elo_jogo_deltas(ARRAY[1250,950,1000,1000], ARRAY[30,30,30,30], 0);
---     → {-12.80, -12.80, 12.80, 12.80}          (perder custa na mesma)
+--     → {7.20, 7.20, -7.20, -7.20}              (dupla 1100 vs 1000, gap 100: normal — o 1250 sozinho não conta)
+--   SELECT elo_jogo_deltas(ARRAY[1300,1100,1000,1000], ARRAY[30,30,30,30], 1);
+--     → {2.40, 2.40, -4.81, -4.81}              (gap 200: metade)
+--   SELECT elo_jogo_deltas(ARRAY[1300,1200,1000,1000], ARRAY[30,30,30,30], 1);
+--     → {0.00, 0.00, -3.83, -3.83}              (gap 250: zero)
+--   SELECT elo_jogo_deltas(ARRAY[1300,1200,1000,1000], ARRAY[30,30,30,30], 0);
+--     → {-16.17, -16.17, 16.17, 16.17}          (perder custa na mesma)
 --   SELECT proname FROM pg_proc WHERE proname IN ('elo_opcoes','elo_k_factor');   -- vazio

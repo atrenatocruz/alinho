@@ -21,7 +21,8 @@ Modelos:
             da noite +1 % (+0,5 % noite perfeita) pago por surpresa, trava
   simples   migration_elo_simples.sql: K 20, K 40 nos primeiros 12 jogos só
             para o próprio, cada um da dupla leva o mesmo, sem prémio, e
-            ganho 0 a 200+ acima da média dos adversários (regra 7)
+            a dupla 150+ acima da adversária ganha cada vez menos, até 0
+            aos 250 (regra 7, rampa)
 """
 import random
 import statistics as st
@@ -63,15 +64,17 @@ def jogo_antigo(r, g, s_a):
     return out
 
 
-def jogo_simples(r, g, s_a, k_novo=40, janela=12, teto=200):
+def jogo_simples(r, g, s_a, k_novo=40, janela=12, teto_ini=150, teto_fim=250):
     ra, rb = (r[0] + r[1]) / 2, (r[2] + r[3]) / 2
     e = E(ra, rb)
     out = []
     for i in range(4):
         d = (k_novo if g[i] < janela else 20) * ((s_a - e) if i < 2 else (e - s_a))
-        # Regra 7: 200+ acima da média dos adversários, ganhar dá 0.
-        if teto and d > 0 and r[i] - (rb if i < 2 else ra) >= teto:
-            d = 0.0
+        # Regra 7: a DUPLA 150+ acima da média adversária ganha cada vez
+        # menos, até 0 aos 250 (rampa). teto_ini=0 desliga.
+        gap = (ra - rb) if i < 2 else (rb - ra)
+        if teto_ini and d > 0 and gap > teto_ini:
+            d *= max(0.0, (teto_fim - gap) / (teto_fim - teto_ini))
         out.append(d)
     return out
 
@@ -134,8 +137,8 @@ def declarado(t, rnd, p_acima=0.25):
 MODELOS = {
     'antigo (#440, com prémio)': (jogo_antigo, True),
     'antigo sem prémio': (jogo_antigo, False),
-    'simples (K20, K40×12, teto 200)': (jogo_simples, False),
-    'simples sem teto': (lambda r, g, s: jogo_simples(r, g, s, teto=0), False),
+    'simples (K20, K40×12, rampa 150→250)': (jogo_simples, False),
+    'simples sem teto': (lambda r, g, s: jogo_simples(r, g, s, teto_ini=0), False),
     'K20 puro': (lambda r, g, s: jogo_simples(r, g, s, 20, 0, 0), False),
 }
 
