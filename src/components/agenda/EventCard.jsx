@@ -416,7 +416,9 @@ export function FriendSessionCard({ event, userId, past = false }) {
     <div className={`relative overflow-hidden rounded-card p-3.5 ${to ? 'press' : ''} ${cardFrame(event, past)}`}>
       {to && <Link to={to} className="absolute inset-0" aria-label={title} />}
       <div className="flex items-start justify-between gap-2">
-        <KindTag kind="friends" past={past} suffix={t('agenda.session_rotating')} />
+        {/* Num clube é «Jogo em aberto · a rodar», com a cor do jogo em aberto;
+            num grupo, «Jogo entre amigos» (Francisco, 28 set). */}
+        <KindTag kind={event.kind === 'open' ? 'open' : 'friends'} past={past} suffix={t('agenda.session_rotating')} />
         {state}
       </div>
       {event.hasTime ? (

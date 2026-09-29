@@ -2005,6 +2005,9 @@ export default function GameDetails() {
     } else {
       lines.push('', t('gamedetails.share_join_cta'))
     }
+    // Todas as partilhas acabam assim (Marketing, MARKETING.md; PO 29 set);
+    // no WhatsApp, o «alinho.pt» fica um link.
+    lines.push('', t('gamedetails.share_signature'))
     return lines.join('\n')
   }
 
@@ -2042,6 +2045,7 @@ export default function GameDetails() {
       }))
     })
     leftover.forEach((team) => lines.push(duplaLabel(team)))
+    lines.push('', t('gamedetails.share_signature'))
     return lines.join('\n')
   }
 
