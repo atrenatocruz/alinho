@@ -5,6 +5,7 @@ import {
   generateAmericanoSchedule, americanoStandings,
   computeMixWinnerTeamId, formDuplas,
   nextSobeDesceRotating, splitPartnerRows, rotatingPlacar, shortName,
+  thirdPlaceMatch, PHASE_LABEL_KEY,
 } from './mixLogic'
 
 describe('splitIntoPools', () => {
@@ -741,5 +742,40 @@ describe('shortName', () => {
   it('ignores what is in brackets', () => {
     expect(shortName('Renato Cruz (superadmin)')).toBe('Renato C.')
     expect(shortName('Administrador (Dev)')).toBe('Administrador')
+  })
+})
+
+describe('thirdPlaceMatch — 3.º lugar na ronda da final (Renato, 29 set)', () => {
+  const semis = [
+    { court_number: 2, team_a_id: 't2', team_b_id: 't3', winner_team_id: 't3' },
+    { court_number: 1, team_a_id: 't1', team_b_id: 't4', winner_team_id: 't1' },
+  ]
+
+  it('depois das meias: os dois que perderam, no campo 2', () => {
+    expect(thirdPlaceMatch({ prevMatches: semis, numCourts: 2 }))
+      .toEqual([{ court_number: 2, team_a_id: 't4', team_b_id: 't2' }])
+  })
+
+  it('final logo a seguir aos grupos: o 3.º contra o 4.º da classificação', () => {
+    expect(thirdPlaceMatch({ orderedTeamIds: ['a', 'b', 'c', 'd', 'e'], numCourts: 3 }))
+      .toEqual([{ court_number: 2, team_a_id: 'c', team_b_id: 'd' }])
+  })
+
+  it('só com um campo não há 3.º lugar', () => {
+    expect(thirdPlaceMatch({ prevMatches: semis, numCourts: 1 })).toEqual([])
+    expect(thirdPlaceMatch({ orderedTeamIds: ['a', 'b', 'c', 'd'], numCourts: 1 })).toEqual([])
+  })
+
+  it('com menos de 4 duplas não há 3.º lugar', () => {
+    expect(thirdPlaceMatch({ orderedTeamIds: ['a', 'b', 'c'], numCourts: 2 })).toEqual([])
+  })
+
+  it('depois dos quartos (4 jogos) não é a final: não há 3.º lugar', () => {
+    const quarters = [1, 2, 3, 4].map((c) => ({ court_number: c, team_a_id: `a${c}`, team_b_id: `b${c}`, winner_team_id: `a${c}` }))
+    expect(thirdPlaceMatch({ prevMatches: quarters, numCourts: 4 })).toEqual([])
+  })
+
+  it('a fase tem nome para o ecrã', () => {
+    expect(PHASE_LABEL_KEY.third).toBe('mixlogic.phase_third')
   })
 })

@@ -622,6 +622,27 @@ export function nextElimMatches(prevMatches) {
   return next
 }
 
+/** O jogo do 3.º lugar, na mesma ronda da final e no campo 2 (Renato,
+    29 set: «para ninguém ficar parado»). Quem joga:
+      - depois das meias (prevMatches com 2 jogos): os dois que perderam,
+        pela ordem dos campos (quem perdeu no campo 1 fica do lado A);
+      - final logo a seguir aos grupos (orderedTeamIds): o 3.º contra o 4.º.
+    Nada quando só há um campo, menos de 4 duplas, ou a fase anterior não
+    são meias (quem sai dos quartos não joga o 3.º lugar). */
+export function thirdPlaceMatch({ prevMatches = null, orderedTeamIds = null, numCourts = 1 }) {
+  if (numCourts < 2) return []
+  if (prevMatches) {
+    if (prevMatches.length !== 2) return []
+    const losers = [...prevMatches]
+      .sort((a, b) => a.court_number - b.court_number)
+      .map(m => (m.winner_team_id === m.team_a_id ? m.team_b_id : m.team_a_id))
+    if (losers.some(id => !id)) return []
+    return [{ court_number: 2, team_a_id: losers[0], team_b_id: losers[1] }]
+  }
+  if (!orderedTeamIds || orderedTeamIds.length < 4) return []
+  return [{ court_number: 2, team_a_id: orderedTeamIds[2], team_b_id: orderedTeamIds[3] }]
+}
+
 /** Americano: builds every round's partner-rotated duplas and court
     pairings in one pass — unlike sobe_desce/todos_contra_todos, no round
     depends on a previous round's result (only on who has already
@@ -747,6 +768,8 @@ export const PHASE_LABEL_KEY = {
   quarter: 'mixlogic.phase_quarter',
   semi: 'mixlogic.phase_semi',
   final: 'mixlogic.phase_final',
+  // 3.º lugar: joga-se no campo 2, na mesma ronda da final (29 set).
+  third: 'mixlogic.phase_third',
 }
 
 export const FORMAT_LABEL_KEY = {
