@@ -265,7 +265,9 @@ export function DateField({ value, onChange, max, min, placeholder, hideToday = 
   )
 }
 
-export function DateTimeField({ value, onChange, placeholder }) {
+// min: Date (ou string) — dias anteriores ficam desligados no calendário;
+// a hora do próprio dia fica a cargo de quem valida o formulário.
+export function DateTimeField({ value, onChange, placeholder, min = null }) {
   const { t, i18n } = useTranslation()
   const resolvedPlaceholder = placeholder ?? t('ui.select_datetime_placeholder')
   const [open, setOpen] = useState(false)
@@ -362,7 +364,7 @@ export function DateTimeField({ value, onChange, placeholder }) {
               onNavigate={navigate}
               onJumpTo={jumpTo}
               onSelectDay={selectDay}
-              min={null}
+              min={min ? new Date(new Date(min).setHours(0, 0, 0, 0)) : null}
               max={null}
               showToday
               onToday={selectToday}

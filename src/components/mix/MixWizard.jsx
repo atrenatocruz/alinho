@@ -81,6 +81,12 @@ export default function MixWizard({
     if (step === 1 && !form.title.trim()) return t('mixwizard.missing_title')
     if (step === 2) {
       if (!form.date) return t('mixwizard.missing_date')
+      // Um mix não se marca para o passado (Ruben, 29 set). Ao editar, a
+      // data que o mix já tinha continua a servir — só se mexer é que conta.
+      if (new Date(form.date) < new Date()
+          && !(editingGame?.date && new Date(editingGame.date).getTime() === new Date(form.date).getTime())) {
+        return t('mixwizard.date_in_past')
+      }
       if (rec.enabled && !(parseInt(rec.launchDaysBefore, 10) >= 1)) return t('gerirclube.validate_launch_days_before')
       if (rec.enabled && rec.endsType === 'on_date' && !rec.endsOn) return t('gerirclube.validate_end_date')
       if (rec.enabled && rec.endsType === 'after_occurrences' && !(parseInt(rec.endsAfterOccurrences, 10) >= 1)) return t('gerirclube.validate_occurrences_count')
@@ -227,7 +233,7 @@ export default function MixWizard({
 
       <div className={step === 2 ? 'space-y-5' : 'hidden'}>
         <Field label={t('mixwizard.date_label')}>
-          <DateTimeField value={form.date} onChange={(v) => set({ date: v })} />
+          <DateTimeField value={form.date} onChange={(v) => set({ date: v })} min={new Date()} />
         </Field>
         {(!editingGame || !editingGame.recurrence || editingGame.recurrence.is_active) && (
           <Field label={t('mixwizard.repeat_label')}>

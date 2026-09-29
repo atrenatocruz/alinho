@@ -3442,6 +3442,7 @@
   "mixwizard.title_edit": "Edit mix",
   "mixwizard.missing_title": "The mix name is missing, at the top.",
   "mixwizard.missing_date": "The day and time are missing.",
+  "mixwizard.date_in_past": "That date and time have already passed — pick today or later.",
   "mixwizard.scope_label": "Where it shows",
   "mixwizard.who_label": "Who can join",
   "mixwizard.who_anyone": "Everyone",

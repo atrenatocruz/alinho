@@ -3443,6 +3443,7 @@
   "mixwizard.title_edit": "Editar mix",
   "mixwizard.missing_title": "Falta o nome do mix, lá em cima.",
   "mixwizard.missing_date": "Falta o dia e a hora.",
+  "mixwizard.date_in_past": "O dia e a hora já passaram — escolhe uma data de hoje para a frente.",
   "mixwizard.scope_label": "Onde aparece",
   "mixwizard.who_label": "Quem pode entrar",
   "mixwizard.who_anyone": "Toda a gente",
