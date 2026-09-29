@@ -2808,6 +2808,8 @@
   "mixlogic.phase_semi": "Semi-finals",
   "mixlogic.phase_final": "Final",
   "mixlogic.phase_third": "3rd place",
+  "mixlogic.phase_placement": "Placement",
+  "mixlogic.phase_place_n": "{{n}}th place",
   "mixlogic.format_sobe_desce": "Ladder",
   "mixlogic.format_todos_contra_todos": "Round robin",
   "mixlogic.format_grupos_eliminatorias": "Groups + Knockout",

@@ -643,6 +643,23 @@ export function thirdPlaceMatch({ prevMatches = null, orderedTeamIds = null, num
   return [{ court_number: 2, team_a_id: orderedTeamIds[2], team_b_id: orderedTeamIds[3] }]
 }
 
+/** Os jogos de classificação nos campos 3, 4… da ronda da final (Renato,
+    29 set: «se tivermos 3 campos, o 5.º e 6.º; se 4, o 7.º e 8.º»).
+    `orderedTeamIds` são as duplas que NÃO estão na final nem no 3.º lugar,
+    pela classificação dos grupos; emparelham-se duas a duas, uma por campo,
+    a começar no campo 3. Só os campos que existem; uma dupla que sobre fica
+    de fora. */
+export function lowerPlacementMatches({ orderedTeamIds = [], numCourts = 1 }) {
+  const out = []
+  for (let court = 3, i = 0; court <= numCourts && i + 1 < orderedTeamIds.length; court++, i += 2) {
+    out.push({ court_number: court, team_a_id: orderedTeamIds[i], team_b_id: orderedTeamIds[i + 1] })
+  }
+  return out
+}
+
+/** Que lugar se joga num campo de classificação: campo 3 → 5.º, 4 → 7.º. */
+export const placementOfCourt = (court) => 2 * court - 1
+
 /** Americano: builds every round's partner-rotated duplas and court
     pairings in one pass — unlike sobe_desce/todos_contra_todos, no round
     depends on a previous round's result (only on who has already
@@ -770,6 +787,8 @@ export const PHASE_LABEL_KEY = {
   final: 'mixlogic.phase_final',
   // 3.º lugar: joga-se no campo 2, na mesma ronda da final (29 set).
   third: 'mixlogic.phase_third',
+  // 5.º, 7.º… lugar: campos 3, 4…, na ronda da final (29 set).
+  placement: 'mixlogic.phase_placement',
 }
 
 export const FORMAT_LABEL_KEY = {
