@@ -2,7 +2,8 @@ import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ChevronRight, ChevronDown, ChevronLeft, Lock, Calendar, X, Share2, MessageCircle, Link2, ImageDown, Trophy, Users, Ticket, Building2, Search } from 'lucide-react'
+import { ChevronRight, ChevronDown, ChevronLeft, Lock, Calendar, X, Share2, MessageCircle, Link2, ImageDown, Trophy, Users, Ticket, Building2, Search, Clock } from 'lucide-react'
+import { timeOptions, toMin } from '../lib/timeSlots'
 import ShareCard, { CARD_W, CARD_H } from './ShareCard'
 import QRCode from 'qrcode'
 import { ratingBand, groupRatingBand } from '../lib/elo'
@@ -451,6 +452,95 @@ export function GroupLevelBadge({ rating, size = 'sm' }) {
   const band = groupRatingBand(rating)
   if (!band) return null
   return <BadgePill text={band.label} title={t(band.fullKey, band.fullVars)} size={size} />
+}
+
+/* ─── TimeField ───────────────────────────────────────────────────────────
+   A hora, sem o relógio nativo do browser (no computador era mau — Renato,
+   29 set). Abre uma folha com as horas de 30 em 30 min numa grelha; a
+   escolhida a preto. `min` (HH:MM) desliga as horas até ela, inclusive — é
+   o «Fim» a seguir ao «Início». Ao abrir, a lista desce até à escolhida, ou
+   à primeira que se pode escolher. `value` e `onChange` em «HH:MM». */
+export function TimeField({ value, onChange, hint, min = null, from = '07:00', to = '23:30', step = 30, disabled = false }) {
+  const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
+  const listRef = useRef(null)
+  const title = hint || t('ui.hour_label')
+  const options = timeOptions({ from, to, step, include: value })
+  const minM = toMin(min)
+  const off = (o) => minM != null && toMin(o) <= minM
+
+  useEffect(() => {
+    if (!open) return
+    const list = listRef.current
+    if (!list) return
+    const target = list.querySelector('[data-selected="true"]') || list.querySelector('button:not([disabled])')
+    target?.scrollIntoView({ block: 'center' })
+  }, [open])
+
+  return (
+    <>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen(true)}
+        aria-label={value ? `${title}: ${value}` : title}
+        className={`input-field flex w-full min-w-0 items-center justify-between text-left disabled:opacity-50 ${value ? 'text-ink-900' : 'text-muted'}`}
+      >
+        <span className="truncate tabular-nums">{value || title}</span>
+        <Clock size={18} className="ml-2 shrink-0 text-ink-700" />
+      </button>
+
+      {open && createPortal(
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-ink-900/50 animate-fade-in sm:items-center"
+          onClick={() => setOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={title}
+            className="flex max-h-[75vh] w-full flex-col overflow-hidden rounded-t-card bg-surface shadow-lift animate-pop sm:max-w-md sm:rounded-card"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex shrink-0 items-center justify-between px-5 pb-3 pt-5">
+              <h3 className="text-lg text-ink-900">{title}</h3>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label={t('ui.close')}
+                className="flex h-9 w-9 items-center justify-center rounded-full text-muted transition-colors duration-fast hover:bg-ink-50 hover:text-ink-900"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-[calc(env(safe-area-inset-bottom)+20px)]">
+              <div className="grid grid-cols-4 gap-2">
+                {options.map((o) => {
+                  const selected = o === value
+                  return (
+                    <button
+                      key={o}
+                      type="button"
+                      disabled={off(o)}
+                      data-selected={selected || undefined}
+                      aria-pressed={selected}
+                      onClick={() => { onChange(o); setOpen(false) }}
+                      className={`min-h-[44px] rounded-ctrl text-[15px] font-extrabold tabular-nums transition-colors duration-fast disabled:cursor-not-allowed disabled:opacity-30 ${
+                        selected ? 'bg-ink-900 text-white' : 'border border-line bg-canvas text-ink-900 hover:bg-ink-50'
+                      }`}
+                    >
+                      {o}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
+  )
 }
 
 /* ─── PrimaryButton ──────────────────────────────────────────────────────
