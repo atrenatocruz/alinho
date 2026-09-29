@@ -1494,7 +1494,8 @@ export default function GameDetails() {
     try {
       const numCourts = game.num_courts || 1
       const rows = isSobeDesce
-        ? seedCourts(ts, numCourts)
+        // Sobe e desce invertido: as mais fortes começam no último campo.
+        ? seedCourts(ts, numCourts, { reverse: !!game.seed_reverse })
         : roundRobinRound(orderedTeamIds(ts), numCourts, 0)
 
       const { error } = await supabase.from('matches').insert(
@@ -2529,7 +2530,7 @@ export default function GameDetails() {
           <p className="flex items-start gap-1.5">
             <Swords size={15} className="shrink-0 mt-0.5" />
             <span>
-              {(FORMAT_LABEL_KEY[game.format] ? t(FORMAT_LABEL_KEY[game.format]) : t('gamedetails.sobe_desce_label'))}{isRotating ? ` (${t('gamedetails.rotating_partners_short')})` : ''} · {t('gamedetails.court_count', { count: numCourts })} · {t('gamedetails.rounds_duration', { count: roundsTotal, minutes: game.game_time_minutes || 20 })}
+              {(FORMAT_LABEL_KEY[game.format] ? t(FORMAT_LABEL_KEY[game.format]) : t('gamedetails.sobe_desce_label'))}{isRotating ? ` (${t('gamedetails.rotating_partners_short')})` : ''}{isSobeDesce && game.seed_reverse ? ` ${t('gamedetails.seed_reverse_short')}` : ''} · {t('gamedetails.court_count', { count: numCourts })} · {t('gamedetails.rounds_duration', { count: roundsTotal, minutes: game.game_time_minutes || 20 })}
               {game.ranked === false && <> · {t('gamedetails.badge_friendly')}</>}
             </span>
           </p>

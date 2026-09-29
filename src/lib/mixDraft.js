@@ -63,6 +63,7 @@ export function pendingOccurrenceRow(game, { nextDate, launchAt, userId, recurre
     auto_start_hours_before: game.auto_start_hours_before,
     ...(game.pairing_mode && game.pairing_mode !== 'por_nivel' ? { pairing_mode: game.pairing_mode } : {}),
     ...(game.rotate_partners ? { rotate_partners: true } : {}),
+    ...(game.seed_reverse ? { seed_reverse: true } : {}),
     ...(game.ranked === false ? { ranked: false } : {}),
     ...(game.allow_pair_signup ? { allow_pair_signup: true } : {}),
     // A contagem, o tamanho dos grupos e o 8-8 (#580) — só quando não são

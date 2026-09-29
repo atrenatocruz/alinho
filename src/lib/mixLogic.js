@@ -271,15 +271,25 @@ export function formDuplas(participants, pointsById = {}, repeatPairKeys = new S
 }
 
 /** Sobe e desce ronda 1: melhores duplas no campo 1. */
-export function seedCourts(teams, numCourts) {
+// `reverse` — Sobe e desce invertido (Renato, 29 set, «king of the hill»):
+// os mesmos jogos, mas com os campos virados ao contrário — as duplas mais
+// fortes começam no último campo e têm de subir até ao Campo 1. Com menos
+// duplas do que campos, usam-se os campos de cima (o Campo 1 nunca fica
+// vazio).
+export function seedCourts(teams, numCourts, { reverse = false } = {}) {
   const sorted = [...teams].sort((a, b) => (b.seed_ranking ?? 0) - (a.seed_ranking ?? 0))
-  const matches = []
+  const pairs = []
   for (let c = 1; c <= numCourts; c++) {
     const a = sorted[(c - 1) * 2]
     const b = sorted[(c - 1) * 2 + 1]
-    if (a && b) matches.push({ court_number: c, team_a_id: a.id, team_b_id: b.id })
+    if (a && b) pairs.push([a, b])
   }
-  return matches
+  const matches = pairs.map(([a, b], i) => ({
+    court_number: reverse ? pairs.length - i : i + 1,
+    team_a_id: a.id,
+    team_b_id: b.id,
+  }))
+  return matches.sort((x, y) => x.court_number - y.court_number)
 }
 
 /** Snake-seeds items into `ceil(items.length / poolSize)` pools, spreading

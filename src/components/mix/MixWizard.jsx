@@ -369,7 +369,7 @@ export default function MixWizard({
             onChange={(v) => set({
               format: v,
               ...(v === 'americano' ? { scoring_format: 'pontos_simples' } : {}),
-              ...(v !== 'sobe_desce' ? { rotate_partners: false } : {}),
+              ...(v !== 'sobe_desce' ? { rotate_partners: false, seed_reverse: false } : {}),
             })} />
         </Field>
         {form.format === 'grupos_eliminatorias' && (
@@ -409,6 +409,19 @@ export default function MixWizard({
               options={[
                 { value: 'fixed', label: t('gerirclube.rotate_partners_fixed') },
                 { value: 'rotate', label: t('gerirclube.rotate_partners_rotate') },
+              ]} />
+          </Field>
+        )}
+        {/* Sobe e desce invertido (Renato, 29 set): as mais fortes começam
+            no último campo e têm de subir até ao Campo 1. */}
+        {form.format === 'sobe_desce' && (
+          <Field label={t('gerirclube.seed_reverse_label')}
+            hint={t(form.seed_reverse ? 'gerirclube.seed_reverse_reverse_help' : 'gerirclube.seed_reverse_normal_help')}>
+            <Chips label={t('gerirclube.seed_reverse_label')} value={form.seed_reverse ? 'reverse' : 'normal'}
+              onChange={(v) => set({ seed_reverse: v === 'reverse' })}
+              options={[
+                { value: 'normal', label: t('gerirclube.seed_reverse_normal') },
+                { value: 'reverse', label: t('gerirclube.seed_reverse_reverse') },
               ]} />
           </Field>
         )}
