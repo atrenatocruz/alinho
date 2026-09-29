@@ -12,6 +12,7 @@ import { TeamAvatars, LiveChip, MINE, shortName, teamLines } from './MatchCard'
 import { isDone } from './treeLayout'
 import { isThirdPlace, nextOf, previousOf } from './matchPath'
 import { matchTieBreak } from './tieBreak'
+import { groupPlaceOf, headToHead, recordOf } from './matchStats'
 import { hhmmInTz, TOURNAMENT_TZ } from '../../lib/tournamentDay'
 
 /** «Meia-final 2», «Quartos de final», «Grupo A», «🏆 Final». */
@@ -55,6 +56,35 @@ function FaceSide({ team, fallback, mine, seed, t }) {
         </span>
       ) : (
         <span className="text-sm italic text-ink-500">{fallback}</span>
+      )}
+    </div>
+  )
+}
+
+/** Uma linha de comparação, como num placar de TV: o valor de cada dupla
+ *  nas pontas e, por baixo, duas barras que crescem a partir do meio. A
+ *  maior fica a negro. Sem `bar`, só os dois valores. */
+function StatRow({ label, a, b, textA, textB, bar = true }) {
+  const max = Math.max(a ?? 0, b ?? 0)
+  const width = (v) => (max > 0 && v != null ? `${Math.max(4, Math.round((v / max) * 100))}%` : '0%')
+  const tone = (v, o) => (v != null && o != null && v > o ? 'bg-ink-900' : 'bg-ink-200')
+  const strong = (v, o) => (v != null && o != null && v > o ? 'text-ink-900' : 'text-ink-500')
+  return (
+    <div className="py-2">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className={`min-w-0 font-display text-[15px] font-extrabold tabular-nums ${strong(a, b)}`}>{textA}</span>
+        <span className="shrink-0 text-center text-[11px] text-ink-500">{label}</span>
+        <span className={`min-w-0 text-right font-display text-[15px] font-extrabold tabular-nums ${strong(b, a)}`}>{textB}</span>
+      </div>
+      {bar && (
+        <div className="mt-1.5 grid grid-cols-2 gap-1" aria-hidden>
+          <span className="flex h-1.5 justify-end overflow-hidden rounded-full bg-ink-50">
+            <span className={`h-full rounded-full ${tone(a, b)}`} style={{ width: width(a) }} />
+          </span>
+          <span className="flex h-1.5 overflow-hidden rounded-full bg-ink-50">
+            <span className={`h-full rounded-full ${tone(b, a)}`} style={{ width: width(b) }} />
+          </span>
+        </div>
       )}
     </div>
   )
@@ -128,6 +158,18 @@ export default function MatchSheet({ match, entries, matches, labels = {}, myIds
   }
   const after = [nextRow(win, false), nextRow(lose, true)].filter(Boolean)
 
+  // Estatísticas (29 set): só com as duas duplas conhecidas.
+  const both = match.entry_a_id && match.entry_b_id
+  const recA = both ? recordOf(match.entry_a_id, matches, match) : null
+  const recB = both ? recordOf(match.entry_b_id, matches, match) : null
+  const placeA = both ? groupPlaceOf(match.entry_a_id, groups, matches) : null
+  const placeB = both ? groupPlaceOf(match.entry_b_id, groups, matches) : null
+  const h2h = both ? headToHead(match.entry_a_id, match.entry_b_id, matches, match) : []
+  const hasStats = both && (recA.played || recB.played)
+  const num = (v) => new Intl.NumberFormat(i18n.language, { maximumFractionDigits: 1 }).format(v)
+  const diffText = (r) => (r.scored ? (r.gamesWon - r.gamesLost > 0 ? `+${r.gamesWon - r.gamesLost}` : String(r.gamesWon - r.gamesLost)) : '—')
+  const placeText = (p) => (p ? t('tournament.stats.group_place', { place: p.place, group: p.group, points: p.points }) : '—')
+
   return createPortal(
     <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/45 animate-fade-in sm:items-center sm:p-4" onClick={onClose}>
       <div
@@ -166,6 +208,53 @@ export default function MatchSheet({ match, entries, matches, labels = {}, myIds
           </div>
           <FaceSide team={teamB} fallback={labels.b} mine={!!teamB && myIds.includes(match.entry_b_id)} seed={teamB?.seed} t={t} />
         </div>
+
+        {both && (
+          <>
+            <p className="mb-1 mt-5 font-mono text-[11px] font-bold uppercase tracking-wide text-ink-500">{t('tournament.stats.title')}</p>
+            {hasStats ? (
+              <div className="divide-y divide-line rounded-ctrl border border-line px-3">
+                <StatRow label={t('tournament.stats.record')} a={recA.wins} b={recB.wins}
+                  textA={`${recA.wins}–${recA.losses}`} textB={`${recB.wins}–${recB.losses}`} />
+                <StatRow label={t('tournament.stats.win_pct')} a={recA.winPct} b={recB.winPct}
+                  textA={recA.winPct == null ? '—' : `${recA.winPct}%`} textB={recB.winPct == null ? '—' : `${recB.winPct}%`} />
+                <StatRow label={t('tournament.stats.avg_games')} a={recA.avgGames} b={recB.avgGames}
+                  textA={recA.avgGames == null ? '—' : num(recA.avgGames)} textB={recB.avgGames == null ? '—' : num(recB.avgGames)} />
+                <StatRow label={t('tournament.stats.diff')} bar={false}
+                  a={recA.scored ? recA.gamesWon - recA.gamesLost : null} b={recB.scored ? recB.gamesWon - recB.gamesLost : null}
+                  textA={diffText(recA)} textB={diffText(recB)} />
+                {(placeA || placeB) && (
+                  <StatRow label={t('tournament.stats.group')} bar={false}
+                    a={placeA ? -placeA.place : null} b={placeB ? -placeB.place : null}
+                    textA={<span className="text-[13px]">{placeText(placeA)}</span>} textB={<span className="text-[13px]">{placeText(placeB)}</span>} />
+                )}
+              </div>
+            ) : (
+              <p className="text-[13px] text-ink-500">{t('tournament.stats.no_games')}</p>
+            )}
+
+            <p className="mb-2 mt-5 font-mono text-[11px] font-bold uppercase tracking-wide text-ink-500">{t('tournament.stats.h2h')}</p>
+            {h2h.length ? (
+              <div className="divide-y divide-line rounded-ctrl border border-line">
+                {h2h.map((m) => {
+                  const wA = m.winner_entry_id === m.entry_a_id
+                  const score = m.score_a != null && m.score_b != null ? (wA ? `${m.score_a}-${m.score_b}` : `${m.score_b}-${m.score_a}`) : null
+                  return (
+                    <div key={m.id} className="flex items-center gap-2.5 px-3 py-2.5">
+                      <span className="w-[76px] shrink-0 truncate font-mono text-[10px] font-bold uppercase tracking-wide text-ink-500">{phaseShort(m, groups, t)}</span>
+                      <span className="min-w-0 flex-1 truncate text-[13px] text-ink-700">
+                        {m.winner_entry_id ? t('tournament.stats.won', { name: nameOf(m.winner_entry_id) }) : '—'}
+                      </span>
+                      {score && <span className="shrink-0 font-display text-[15px] font-extrabold tabular-nums text-ink-900">{score}</span>}
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <p className="text-[13px] text-ink-500">{t('tournament.stats.h2h_none')}</p>
+            )}
+          </>
+        )}
 
         {before.length > 0 && (
           <>

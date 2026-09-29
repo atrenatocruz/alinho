@@ -97,6 +97,12 @@ export function standingsOf(group, matches, tiebreak = TIEBREAK_DEFAULT) {
   return groupStandings(group.teams, mine, { tiebreak })
 }
 
+/** Os pontos de uma dupla na tabela do grupo: 3 por vitória, 0 por derrota
+ *  (Renato, 29 set). Não há empates no padel, por isso ordenar por pontos
+ *  é o mesmo que por vitórias — o desempate não muda. */
+export const POINTS_PER_WIN = 3
+export const groupPoints = (row) => (row?.wins || 0) * POINTS_PER_WIN
+
 /** Estados de um jogo em que ele já acabou (terminado normalmente, por falta
     de comparência ou por desistência). */
 const FINISHED = new Set(['terminado', 'falta', 'desistencia'])
