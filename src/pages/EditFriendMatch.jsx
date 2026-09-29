@@ -31,6 +31,6 @@ export default function EditFriendMatch() {
   // Jogo de grupo (#586): juntar pessoas procura só nos membros do grupo,
   // como no criar. O grupo vem na get_friend_match (Dev 3); sem ele, como antes.
   const m = data.match || {}
-  const group = m.organization_id ? { id: m.organization_id, slug: m.organization_slug, name: m.organization_name } : null
+  const group = m.organization_id ? { id: m.organization_id, slug: m.organization_slug, name: m.organization_name, kind: m.organization_kind } : null
   return <CreateFriendMatch edit={data} group={group} />
 }

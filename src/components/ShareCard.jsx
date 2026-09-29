@@ -153,6 +153,8 @@ function LogoFooter({ tagline }) {
   return (
     <div className="mt-auto flex flex-col items-center gap-2.5 pt-8">
       <img src={logoWordmark} alt="alinho" style={{ height: 24 }} />
+      {/* O endereço em tudo o que vai para fora (Francisco, 29 set). */}
+      <p className="-mt-1 text-[12px] font-semibold text-ink-200">alinho.pt</p>
       <p className="text-[11px] font-mono font-extrabold tracking-[0.2em] uppercase text-ink-200">
         {resolvedTagline}
       </p>
@@ -173,7 +175,7 @@ function InviteCard({ game, people, capacity, formattedDate }) {
         {game.title}
       </h1>
       <div className="space-y-2 text-[15px] text-ink-200 font-semibold mb-10">
-        <p className="capitalize">{formattedDate}</p>
+        <p>{formattedDate}</p>
         {game.location && <p>{game.location}</p>}
       </div>
       <div className="flex items-center gap-2 flex-wrap mb-3">
