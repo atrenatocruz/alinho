@@ -265,12 +265,27 @@ export default function GameDetails() {
       })
       .subscribe()
 
+    // O organizador muda de app a meio do mix (telemóvel): ao voltar, a
+    // página lê outra vez — o tempo real pode ter falhado entretanto.
+    const onVisible = () => { if (document.visibilityState === 'visible') loadGameDetails() }
+    document.addEventListener('visibilitychange', onVisible)
+
     return () => {
       subscription.unsubscribe()
+      document.removeEventListener('visibilitychange', onVisible)
     }
   }, [id])
 
+  // Várias leituras correm ao mesmo tempo (depois de guardar, e o tempo real
+  // a cada mudança em matches/games): só a mais recente mexe no ecrã. Sem
+  // isto, uma leitura antiga que acabasse por último punha o jogo outra vez
+  // sem resultado e o «Terminar Ronda» não aparecia até recarregar (QA, 28
+  // set, mix 8-8 com tie-break; o «não encontrou como passar à ronda 2» de
+  // Carcavelos).
+  const loadSeqRef = useRef(0)
   const loadGameDetails = async () => {
+    const seq = ++loadSeqRef.current
+    const stale = () => seq !== loadSeqRef.current
     try {
       const { data: gameData, error: gameError } = await supabase
         .from('games')
@@ -279,6 +294,7 @@ export default function GameDetails() {
         .single()
 
       if (gameError) throw gameError
+      if (stale()) return
       setGame(gameData)
 
       // level/is_guest live on `memberships` now (per-org) — fetch this
@@ -347,6 +363,7 @@ export default function GameDetails() {
         .from('game_scorekeepers')
         .select('user_id')
         .eq('game_id', id)
+      if (stale()) return
       setScorekeeperIds((scorekeeperRows || []).map((r) => r.user_id))
 
       // Elo rating shown next to each player instead of/alongside their
@@ -361,6 +378,7 @@ export default function GameDetails() {
         console.error('Error loading global points:', error)
       }
 
+      if (stale()) return
       setParticipants((confirmedRows || []).map((p) => ({
         ...p,
         user: attachMembership(p.user),
@@ -397,6 +415,7 @@ export default function GameDetails() {
           .order('rating_after', { ascending: false, nullsFirst: false })
           .order('points_earned', { ascending: false })
           .order('matches_won', { ascending: false })
+        if (stale()) return
         setMixStats(statsData || [])
       } else {
         setMixStats([])
@@ -1524,7 +1543,9 @@ export default function GameDetails() {
 
       setScores(prev => ({ ...prev, [match.id]: undefined }))
       setEditingMatchId(current => (current === match.id ? null : current))
-      loadGameDetails()
+      // Espera pela leitura: é a mais recente, e é ela que mostra o
+      // «Terminar Ronda».
+      await loadGameDetails()
     } catch (error) {
       console.error('Error saving score:', error)
       setMixError(describeError(t, error, 'gamedetails.error_save_score'))
@@ -3337,9 +3358,11 @@ export default function GameDetails() {
                   )}
                   {/* O passo seguinte também aqui, por baixo da ronda, onde está quem
                       marca (Francisco, 27 set, mix real em Carcavelos: «tem de estar
-                      aqui»): o mesmo botão preto da barra de cima — «Terminar Ronda
-                      N» ou, na última, «Terminar e dar os pontos». */}
-                  {roundsStarted && (canAdvance || canFinalize) && barPrimary && (
+                      aqui»): o mesmo botão preto da barra de cima, SEMPRE que ela o
+                      tem — «Iniciar Ronda 1» (Francisco, 28 set, Mix M5 do A2N: «O
+                      começar ronda não pode estar só em cima… Como estava»),
+                      «Terminar Ronda N» ou, na última, «Terminar e dar os pontos». */}
+                  {barPrimary && (
                     <button type="button" onClick={barPrimary.onClick} disabled={barPrimary.disabled}
                       className="press inline-flex min-h-[52px] w-full items-center justify-center gap-1.5 rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold leading-tight text-white disabled:opacity-50">
                       {barPrimary.label}
