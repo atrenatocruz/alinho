@@ -141,3 +141,16 @@ Não fiz sozinho (ficam para quando quiseres avançar, não são urgentes):
 - **CSP** em #6 — precisa de testar num preview deploy antes de ativar.
 - **#5 resto** — bump major de vite/vite-plugin-pwa.
 - **#9** — deixado como estava, por recomendação do próprio relatório original.
+
+## 🔵 Procedimento em caso de violação de dados (RGPD, arts. 33.º e 34.º)
+
+Acrescentado a 2026-09-29 (Ruben). Vale para qualquer acesso, perda ou divulgação de dados pessoais não autorizados: chave de serviço exposta, base de dados acessível sem RLS, sessão do WhatsApp do bot copiada, email enviado para a pessoa errada com dados de outra, etc.
+
+1. **Conter** (imediato): rodar a chave comprometida (Supabase → API keys; `PHONE_HASH_SECRET`; API key do Resend; sessão do bot), fechar o acesso, guardar logs.
+2. **Avaliar** (até 24 h): que dados, quantas pessoas, que risco para elas. Registar por escrito num ficheiro `.superpowers/sdd/incidentes/YYYY-MM-DD-<slug>.md` (não público): o que aconteceu, quando se soube, o que se fez.
+3. **Notificar a CNPD** (até **72 h** depois de se saber), salvo se for improvável que haja risco para as pessoas. Formulário em cnpd.pt. Se falharem as 72 h, notificar na mesma com a justificação do atraso.
+4. **Avisar os titulares** sem demora, se o risco for elevado (ex.: telefones, emails e nomes expostos juntos; sessão do WhatsApp roubada). Por email, em linguagem simples: o que aconteceu, o que podem fazer, o contacto.
+5. **Registar** todas as violações, notificadas ou não, no mesmo diretório (art. 33.º/5).
+
+Quem decide: o responsável pelo tratamento (por definir — ver `PRIVACY_ROPA.md`); até lá, Renato + Ruben em conjunto.
+

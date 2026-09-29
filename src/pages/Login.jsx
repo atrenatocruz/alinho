@@ -10,6 +10,7 @@ import { hashPhone } from '../lib/hashPhone'
 import i18n from '../lib/i18n'
 import { describeError } from '../lib/errors'
 import { ACCOUNT_DELETION_GRACE_DAYS } from '../lib/account'
+import { MIN_SIGNUP_AGE, isAtLeast } from '../lib/age'
 import { safeInternalPath } from '../lib/loginLinks'
 
 // Same pattern as Layout.jsx's header toggle, minus the profile persistence
@@ -161,6 +162,14 @@ export default function Login() {
     // so the checks have to happen here instead.
     if (!signupBirthday) {
       setError(t('login.error_missing_birthday'))
+      setLoading(false)
+      return
+    }
+    // Menos de 13 anos não pode consentir sozinho num serviço online
+    // (Lei 58/2019, art. 16.º): o registo recusa. Sem consentimento parental
+    // por agora — decisão de 29 set (Ruben).
+    if (!isAtLeast(signupBirthday, MIN_SIGNUP_AGE)) {
+      setError(t('login.error_under_age', { age: MIN_SIGNUP_AGE }))
       setLoading(false)
       return
     }
