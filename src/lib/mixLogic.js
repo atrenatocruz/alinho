@@ -815,10 +815,30 @@ export const PHASE_LABEL_KEY = {
 
 export const FORMAT_LABEL_KEY = {
   sobe_desce: 'mixlogic.format_sobe_desce',
+  // Escalada (Renato, 29 set): um modo à parte no ecrã; na base de dados é
+  // o Sobe e desce com seed_reverse (ver uiFormatOf).
+  escalada: 'mixlogic.format_escalada',
   todos_contra_todos: 'mixlogic.format_todos_contra_todos',
   grupos_eliminatorias: 'mixlogic.format_grupos_eliminatorias',
   americano: 'mixlogic.format_americano',
 }
+
+/** O modo que se mostra e se escolhe. A Escalada (29 set) é, por dentro,
+    o Sobe e desce com as mais fortes a começar no último campo
+    (seed_reverse) — assim o bot, o arranque automático e a escolha do
+    vencedor tratam-na como Sobe e desce, sem mudar nada. */
+export const uiFormatOf = (game) => {
+  const format = game?.format || 'sobe_desce'
+  return format === 'sobe_desce' && game?.seed_reverse ? 'escalada' : format
+}
+
+/** O que se grava para o modo escolhido. */
+export const formatFieldsFor = (uiFormat) => (uiFormat === 'escalada'
+  ? { format: 'sobe_desce', seed_reverse: true, rotate_partners: false }
+  : { format: uiFormat, seed_reverse: false })
+
+/** A chave do nome do modo de um mix («Escalada», «Sobe e desce»…). */
+export const formatLabelKey = (game) => FORMAT_LABEL_KEY[uiFormatOf(game)] || FORMAT_LABEL_KEY.sobe_desce
 
 export const SCORING_FORMAT_LABEL_KEY = {
   pontos_simples: 'mixlogic.scoring_pontos_simples',

@@ -4,7 +4,7 @@ import { MapPin, CheckCircle2, Lock, Play, Trophy, Euro, Swords, Users, Shuffle,
 import { supabase } from '../../lib/supabase'
 import { PlayerAvatarRow, GroupLevelBadge, PrimaryButton } from '../ui'
 import { formatTime, formatCurrency } from '../../lib/formatDate'
-import { FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, mixCapacity, isGenderMismatch, isAgeIneligible } from '../../lib/mixLogic'
+import { GENDER_RESTRICTION_LABEL_KEY, mixCapacity, isGenderMismatch, isAgeIneligible, formatLabelKey } from '../../lib/mixLogic'
 import { AGE_LABEL_KEY } from '../../lib/ageCategories'
 import { ratingBand } from '../../lib/elo'
 import { parseLevel, levelNumber } from '../../lib/mixLevels'
@@ -191,7 +191,7 @@ function GameFacts({ game, distance }) {
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-ink-700 text-[13px] mt-1.5">
         <span className="inline-flex items-center gap-1">
           <Swords size={14} className="shrink-0" />
-          {t(FORMAT_LABEL_KEY[game.format] || FORMAT_LABEL_KEY.sobe_desce)} · {t('gamedetails.court_count', { count: game.num_courts || 1 })}
+          {t(formatLabelKey(game))} · {t('gamedetails.court_count', { count: game.num_courts || 1 })}
           {game.ranked === false && <> · {t('gamedetails.badge_friendly')}</>}
         </span>
         {game.price_per_player > 0 && (

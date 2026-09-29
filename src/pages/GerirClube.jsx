@@ -14,7 +14,7 @@ import { formatRating } from '../lib/elo'
 import { formatDate as formatDateLib, formatTime as formatTimeLib } from '../lib/formatDate'
 import { DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal, ConfirmSheet, OrgKindBadge, PlanBadge, PLAN_TIERS, planName, Tabs, BackBar } from '../components/ui'
 import { planLimitMessage, isMixLimitError, isMemberLimitError, limitsFor, nextPlanTier } from '../lib/plans'
-import { totalRounds, reverseClimbWarning, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, SCORING_FORMAT_LABEL_KEY } from '../lib/mixLogic'
+import { totalRounds, reverseClimbWarning, uiFormatOf, formatFieldsFor, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, SCORING_FORMAT_LABEL_KEY } from '../lib/mixLogic'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
 import { AGE_RESTRICTIONS } from '../lib/ageCategories'
 import PlayerSearch from '../components/PlayerSearch'
@@ -74,6 +74,8 @@ const GAME_TIMES = [
 // instead of drifting into two different English labels for one value.
 const FORMATS = [
   { value: 'sobe_desce', labelKey: FORMAT_LABEL_KEY.sobe_desce },
+  // Escalada (29 set): gravada como Sobe e desce com seed_reverse (uiFormatOf).
+  { value: 'escalada', labelKey: FORMAT_LABEL_KEY.escalada },
   { value: 'todos_contra_todos', labelKey: FORMAT_LABEL_KEY.todos_contra_todos },
   { value: 'grupos_eliminatorias', labelKey: FORMAT_LABEL_KEY.grupos_eliminatorias },
   { value: 'americano', labelKey: FORMAT_LABEL_KEY.americano },
@@ -2637,12 +2639,12 @@ export default function GerirClube() {
                       </label>
                       <Segmented
                         options={translatedFormats}
-                        value={gameForm.format}
+                        value={uiFormatOf(gameForm)}
                         onChange={(v) => setGameForm({
                           ...gameForm,
-                          format: v,
+                          ...formatFieldsFor(v),
                           ...(v === 'americano' ? { scoring_format: 'pontos_simples' } : {}),
-                          ...(v !== 'sobe_desce' ? { rotate_partners: false, seed_reverse: false } : {}),
+                          ...(v !== 'sobe_desce' ? { rotate_partners: false } : {}),
                         })}
                       />
                       {/* Cada formato explica-se, com o foco em QUEM GANHA —
@@ -2650,8 +2652,19 @@ export default function GerirClube() {
                           Americano dá a vitória a um jogador, não a uma
                           dupla, e ele próprio não sabia). */}
                       <p className="text-sm text-muted mt-1.5">
-                        {t(`mixlogic.format_help_${gameForm.format === 'sobe_desce' && gameForm.rotate_partners ? 'sobe_desce_rotate' : gameForm.format}`)}
+                        {t(`mixlogic.format_help_${uiFormatOf(gameForm) === 'sobe_desce' && gameForm.rotate_partners ? 'sobe_desce_rotate' : uiFormatOf(gameForm)}`)}
                       </p>
+                      {/* Escalada: dá tempo para subir? (29 set) — sobem um campo por ronda. */}
+                      {uiFormatOf(gameForm) === 'escalada' && (() => {
+                        const courts = parseInt(gameForm.num_courts, 10) || 1
+                        const rounds = totalRounds(gameForm)
+                        const warn = reverseClimbWarning({ numCourts: courts, rounds })
+                        return warn ? (
+                          <p role="status" className={`mt-2 rounded-ctrl px-3 py-2 text-sm font-bold ${warn === 'cant_reach' ? 'bg-warning/10 text-[#92400E]' : 'bg-ink-50 text-ink-700'}`}>
+                            {t(`gerirclube.seed_reverse_warn_${warn}`, { courts, rounds })}
+                          </p>
+                        ) : null
+                      })()}
                     </div>
 
                     {/* Conta para o ranking (Trello #267) — mesmas palavras do
@@ -2683,8 +2696,8 @@ export default function GerirClube() {
                     </div>
 
                     {/* Sobe e desce com parceiros que trocam (Trello #262,
-                        parte B) — só existe neste formato. */}
-                    {gameForm.format === 'sobe_desce' && (
+                        parte B) — só existe neste formato (não na Escalada). */}
+                    {uiFormatOf(gameForm) === 'sobe_desce' && (
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           {t('gerirclube.rotate_partners_label')}
@@ -2700,38 +2713,6 @@ export default function GerirClube() {
                         <p className="text-sm text-muted mt-1.5">
                           {t(gameForm.rotate_partners ? 'gerirclube.rotate_partners_rotate_help' : 'gerirclube.rotate_partners_fixed_help')}
                         </p>
-                      </div>
-                    )}
-
-                    {/* Sobe e desce invertido (Renato, 29 set): as mais fortes
-                        começam no último campo e têm de subir até ao Campo 1. */}
-                    {gameForm.format === 'sobe_desce' && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          {t('gerirclube.seed_reverse_label')}
-                        </label>
-                        <Segmented
-                          options={[
-                            { value: 'normal', label: t('gerirclube.seed_reverse_normal') },
-                            { value: 'reverse', label: t('gerirclube.seed_reverse_reverse') },
-                          ]}
-                          value={gameForm.seed_reverse ? 'reverse' : 'normal'}
-                          onChange={(v) => setGameForm({ ...gameForm, seed_reverse: v === 'reverse' })}
-                        />
-                        <p className="text-sm text-muted mt-1.5">
-                          {t(gameForm.seed_reverse ? 'gerirclube.seed_reverse_reverse_help' : 'gerirclube.seed_reverse_normal_help')}
-                        </p>
-                        {/* Dá tempo para subir? (29 set) — sobem um campo por ronda. */}
-                        {gameForm.seed_reverse && (() => {
-                          const courts = parseInt(gameForm.num_courts, 10) || 1
-                          const rounds = totalRounds(gameForm)
-                          const warn = reverseClimbWarning({ numCourts: courts, rounds })
-                          return warn ? (
-                            <p role="status" className={`mt-2 rounded-ctrl px-3 py-2 text-sm font-bold ${warn === 'cant_reach' ? 'bg-warning/10 text-[#92400E]' : 'bg-ink-50 text-ink-700'}`}>
-                              {t(`gerirclube.seed_reverse_warn_${warn}`, { courts, rounds })}
-                            </p>
-                          ) : null
-                        })()}
                       </div>
                     )}
 

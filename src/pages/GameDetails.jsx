@@ -17,14 +17,7 @@ import { KIND_STYLE, KindTag, StateTag, Owner } from '../components/agenda/Event
 import PoolGroupStage from '../components/PoolGroupStage'
 import PreviousEditions from '../components/agenda/PreviousEditions'
 import ScoreEntry from '../components/ScoreEntry'
-import {
-  countPeople, totalRounds, formDuplas, seedCourts, nextSobeDesce,
-  nextSobeDesceRotating, splitPartnerRows, rotatingPlacar,
-  roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches, thirdPlaceMatch, lowerPlacementMatches, placementOfCourt,
-  PHASE_LABEL_KEY, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY,
-  mixCapacity, isGenderMismatch, isMissingGender, isMissingBirthday, isAgeIneligible, splitIntoPools,
-  generateAmericanoSchedule, americanoStandings, computeMixWinnerTeamId,
-} from '../lib/mixLogic'
+import { countPeople, totalRounds, formDuplas, seedCourts, nextSobeDesce, nextSobeDesceRotating, splitPartnerRows, rotatingPlacar, roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches, thirdPlaceMatch, lowerPlacementMatches, placementOfCourt, PHASE_LABEL_KEY, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, mixCapacity, isGenderMismatch, isMissingGender, isMissingBirthday, isAgeIneligible, splitIntoPools, generateAmericanoSchedule, americanoStandings, computeMixWinnerTeamId, formatLabelKey } from '../lib/mixLogic'
 import { isProvisional, formatRatingMaybeProvisional } from '../lib/elo'
 import { AGE_LABEL_KEY, meetsAgeRestriction } from '../lib/ageCategories'
 import { winRatePct, firstLastName } from '../lib/statsLogic'
@@ -2530,7 +2523,7 @@ export default function GameDetails() {
           <p className="flex items-start gap-1.5">
             <Swords size={15} className="shrink-0 mt-0.5" />
             <span>
-              {(FORMAT_LABEL_KEY[game.format] ? t(FORMAT_LABEL_KEY[game.format]) : t('gamedetails.sobe_desce_label'))}{isRotating ? ` (${t('gamedetails.rotating_partners_short')})` : ''}{isSobeDesce && game.seed_reverse ? ` ${t('gamedetails.seed_reverse_short')}` : ''} · {t('gamedetails.court_count', { count: numCourts })} · {t('gamedetails.rounds_duration', { count: roundsTotal, minutes: game.game_time_minutes || 20 })}
+              {t(formatLabelKey(game))}{isRotating ? ` (${t('gamedetails.rotating_partners_short')})` : ''} · {t('gamedetails.court_count', { count: numCourts })} · {t('gamedetails.rounds_duration', { count: roundsTotal, minutes: game.game_time_minutes || 20 })}
               {game.ranked === false && <> · {t('gamedetails.badge_friendly')}</>}
             </span>
           </p>

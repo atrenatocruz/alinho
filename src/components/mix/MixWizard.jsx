@@ -19,7 +19,7 @@ import StepPage from '../steps/StepPage'
 import LaunchDayPicker from '../LaunchDayPicker'
 import { Chips, DateField, DateTimeField, Select } from '../ui'
 import { advanceByFrequency } from '../../lib/mixDraft'
-import { totalRounds, reverseClimbWarning } from '../../lib/mixLogic'
+import { totalRounds, reverseClimbWarning, uiFormatOf, formatFieldsFor } from '../../lib/mixLogic'
 import { AGE_RESTRICTIONS } from '../../lib/ageCategories'
 import { formatDate, formatTime } from '../../lib/formatDate'
 import { LEVEL_SCALES, LEVEL_NUMBERS, parseLevel, scaleForGender, GENDER_FOR_SCALE } from '../../lib/mixLevels'
@@ -364,13 +364,24 @@ export default function MixWizard({
 
       <div className={step === 4 ? 'space-y-5' : 'hidden'}>
         <Field label={t('gerirclube.format_label')}
-          hint={t(`mixlogic.format_help_${form.format === 'sobe_desce' && form.rotate_partners ? 'sobe_desce_rotate' : form.format}`)}>
-          <Chips label={t('gerirclube.format_label')} value={form.format} options={options.formats}
+          hint={t(`mixlogic.format_help_${uiFormatOf(form) === 'sobe_desce' && form.rotate_partners ? 'sobe_desce_rotate' : uiFormatOf(form)}`)}>
+          <Chips label={t('gerirclube.format_label')} value={uiFormatOf(form)} options={options.formats}
             onChange={(v) => set({
-              format: v,
+              ...formatFieldsFor(v),
               ...(v === 'americano' ? { scoring_format: 'pontos_simples' } : {}),
-              ...(v !== 'sobe_desce' ? { rotate_partners: false, seed_reverse: false } : {}),
+              ...(v !== 'sobe_desce' ? { rotate_partners: false } : {}),
             })} />
+          {/* Escalada: dá tempo para subir? (29 set) — sobem um campo por ronda. */}
+          {uiFormatOf(form) === 'escalada' && (() => {
+            const courts = parseInt(form.num_courts, 10) || 1
+            const rounds = totalRounds(form)
+            const warn = reverseClimbWarning({ numCourts: courts, rounds })
+            return warn ? (
+              <p role="status" className={`mt-2 rounded-ctrl px-3 py-2 text-sm font-bold ${warn === 'cant_reach' ? 'bg-warning/10 text-[#92400E]' : 'bg-ink-50 text-ink-700'}`}>
+                {t(`gerirclube.seed_reverse_warn_${warn}`, { courts, rounds })}
+              </p>
+            ) : null
+          })()}
         </Field>
         {form.format === 'grupos_eliminatorias' && (
           <Field label={t('gerirclube.pool_size_label')} hint={t('gerirclube.pool_size_help')}>
@@ -401,7 +412,7 @@ export default function MixWizard({
               ]} />
           </Field>
         )}
-        {form.format === 'sobe_desce' && (
+        {uiFormatOf(form) === 'sobe_desce' && (
           <Field label={t('mixwizard.pairs_label')}
             hint={t(form.rotate_partners ? 'gerirclube.rotate_partners_rotate_help' : 'gerirclube.rotate_partners_fixed_help')}>
             <Chips label={t('mixwizard.pairs_label')} value={form.rotate_partners ? 'rotate' : 'fixed'}
@@ -410,30 +421,6 @@ export default function MixWizard({
                 { value: 'fixed', label: t('gerirclube.rotate_partners_fixed') },
                 { value: 'rotate', label: t('gerirclube.rotate_partners_rotate') },
               ]} />
-          </Field>
-        )}
-        {/* Sobe e desce invertido (Renato, 29 set): as mais fortes começam
-            no último campo e têm de subir até ao Campo 1. */}
-        {form.format === 'sobe_desce' && (
-          <Field label={t('gerirclube.seed_reverse_label')}
-            hint={t(form.seed_reverse ? 'gerirclube.seed_reverse_reverse_help' : 'gerirclube.seed_reverse_normal_help')}>
-            <Chips label={t('gerirclube.seed_reverse_label')} value={form.seed_reverse ? 'reverse' : 'normal'}
-              onChange={(v) => set({ seed_reverse: v === 'reverse' })}
-              options={[
-                { value: 'normal', label: t('gerirclube.seed_reverse_normal') },
-                { value: 'reverse', label: t('gerirclube.seed_reverse_reverse') },
-              ]} />
-            {/* Dá tempo para subir? (29 set) — sobem um campo por ronda. */}
-            {form.seed_reverse && (() => {
-              const courts = parseInt(form.num_courts, 10) || 1
-              const rounds = totalRounds(form)
-              const warn = reverseClimbWarning({ numCourts: courts, rounds })
-              return warn ? (
-                <p role="status" className={`mt-2 rounded-ctrl px-3 py-2 text-sm font-bold ${warn === 'cant_reach' ? 'bg-warning/10 text-[#92400E]' : 'bg-ink-50 text-ink-700'}`}>
-                  {t(`gerirclube.seed_reverse_warn_${warn}`, { courts, rounds })}
-                </p>
-              ) : null
-            })()}
           </Field>
         )}
         <Field label={t('mixwizard.pairing_label')}
