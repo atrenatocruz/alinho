@@ -726,7 +726,10 @@ export function Chips({ options, value, onChange, label, className = '' }) {
   return (
     // -my-0.5: o botão tem 44 px e a pastilha 40 — a margem devolve os 2 px
     // de cada lado, e o espaço entre filas fica o mesmo.
-    <div role="group" aria-label={label} className={`-mx-1 -my-0.5 flex gap-2 overflow-x-auto px-1 no-scrollbar ${className}`}>
+    // No telemóvel, uma fila que desliza para o lado (o dedo faz scroll);
+    // no computador não há como deslizar sem barra, e as pastilhas ficavam
+    // cortadas (Ruben, 29 set) — a partir de sm embrulham em várias filas.
+    <div role="group" aria-label={label} className={`-mx-1 -my-0.5 flex gap-2 overflow-x-auto px-1 no-scrollbar sm:flex-wrap sm:overflow-visible ${className}`}>
       {options.map((o) => {
         const on = o.value === value
         return (
