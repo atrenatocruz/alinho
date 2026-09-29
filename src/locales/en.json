@@ -2744,6 +2744,7 @@
   "mixlogic.phase_quarter": "Quarter-finals",
   "mixlogic.phase_semi": "Semi-finals",
   "mixlogic.phase_final": "Final",
+  "mixlogic.phase_third": "3rd place",
   "mixlogic.format_sobe_desce": "Ladder",
   "mixlogic.format_todos_contra_todos": "Round robin",
   "mixlogic.format_grupos_eliminatorias": "Groups + Knockout",

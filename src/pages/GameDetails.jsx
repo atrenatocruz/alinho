@@ -19,7 +19,7 @@ import ScoreEntry from '../components/ScoreEntry'
 import {
   countPeople, totalRounds, formDuplas, seedCourts, nextSobeDesce,
   nextSobeDesceRotating, splitPartnerRows, rotatingPlacar,
-  roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches,
+  roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches, thirdPlaceMatch,
   PHASE_LABEL_KEY, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY,
   mixCapacity, isGenderMismatch, isMissingGender, isMissingBirthday, isAgeIneligible, splitIntoPools,
   generateAmericanoSchedule, americanoStandings, computeMixWinnerTeamId,
@@ -1711,6 +1711,7 @@ export default function GameDetails() {
     setMixError('')
     try {
       let rows, phase
+      let third = []
       if (inGroupPhase && isRotating) {
         // Duplas novas em cada campo — nextSobeDesceRotating decide quem
         // sobe/desce e com quem joga; aqui só se gravam as equipas desta
@@ -1750,14 +1751,28 @@ export default function GameDetails() {
         if (existingElim.length === 0) {
           const orderedIds = standings(teams, matches).map(s => s.team.id)
           rows = firstElimMatches(phase, orderedIds)
+          // 3.º lugar ao lado da final, no campo 2 (Renato, 29 set: «para
+          // ninguém ficar parado»): aqui, o 3.º contra o 4.º dos grupos.
+          if (phase === 'final') third = thirdPlaceMatch({ orderedTeamIds: orderedIds, numCourts })
         } else {
           const prevPhase = existingElim[existingElim.length - 1]
-          rows = nextElimMatches(matches.filter(m => m.phase === prevPhase))
+          const prev = matches.filter(m => m.phase === prevPhase)
+          rows = nextElimMatches(prev)
+          // Depois das meias: quem as perdeu joga o 3.º lugar.
+          if (phase === 'final') third = thirdPlaceMatch({ prevMatches: prev, numCourts })
         }
       }
-      const { error } = await supabase.from('matches').insert(
-        rows.map(m => ({ ...m, game_id: id, round_number: maxRound + 1, phase }))
-      )
+      const main = rows.map(m => ({ ...m, game_id: id, round_number: maxRound + 1, phase }))
+      let { error } = await supabase.from('matches').insert([
+        ...main,
+        ...third.map(m => ({ ...m, game_id: id, round_number: maxRound + 1, phase: 'third' })),
+      ])
+      // Enquanto a migration_mix_terceiro_lugar.sql não correr, a base de
+      // dados recusa a fase 'third' (CHECK, 23514): grava-se só a final,
+      // como antes, em vez de a ronda não avançar.
+      if (error?.code === '23514' && third.length) {
+        ({ error } = await supabase.from('matches').insert(main))
+      }
       if (error) throw error
 
       const { error: timerError } = await supabase
@@ -3054,7 +3069,7 @@ export default function GameDetails() {
           {/* Rondas */}
           {rounds.map(r => {
             const ms = matches.filter(m => m.round_number === r)
-            const phase = ms[0]?.phase || 'group'
+            const phase = (ms.find(m => m.phase !== 'third') || ms[0])?.phase || 'group'
             const isCurrent = r === maxRound && game.status === 'in_progress'
             return (
               <div key={r} id={`mix-ronda-${r}`} className={`card scroll-mt-24 ${isCurrent ? 'ring-2 ring-ink-900' : ''}`}>
@@ -3103,7 +3118,7 @@ export default function GameDetails() {
                       <div key={m.id} className="rounded-ctrl bg-canvas p-2.5">
                         <div className="flex items-center justify-between mb-2 px-1">
                           <p className="font-mono text-[11px] font-extrabold uppercase tracking-widest text-ink-500">
-                            {t('gamedetails.court_number', { number: m.court_number })}
+                            {t('gamedetails.court_number', { number: m.court_number })}{m.phase === 'third' && ` · ${t('mixlogic.phase_third')}`}
                           </p>
                           {canEditScores && done && !isCorrecting && (
                             <button
@@ -3234,7 +3249,7 @@ export default function GameDetails() {
                   {/* Rondas */}
                   {rounds.map(r => {
                     const ms = matches.filter(m => m.round_number === r)
-                    const phase = ms[0]?.phase || 'group'
+                    const phase = (ms.find(m => m.phase !== 'third') || ms[0])?.phase || 'group'
                     const isCurrent = r === maxRound && game.status === 'in_progress'
                     return (
                       <div key={r} id={`mix-ronda-${r}`} className={`card ${isCurrent ? 'ring-2 ring-ink-900' : ''}`}>
@@ -3267,7 +3282,7 @@ export default function GameDetails() {
                               <div key={m.id} className="rounded-ctrl bg-canvas p-2.5">
                                 <div className="flex items-center justify-between mb-2 px-1">
                                   <p className="font-mono text-[11px] font-extrabold uppercase tracking-widest text-ink-500">
-                                    {t('gamedetails.court_number', { number: m.court_number })}
+                                    {t('gamedetails.court_number', { number: m.court_number })}{m.phase === 'third' && ` · ${t('mixlogic.phase_third')}`}
                                   </p>
                                   {canEditScores && done && !isCorrecting && (
                                     <button
