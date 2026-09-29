@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation, Trans } from 'react-i18next'
@@ -5,9 +6,35 @@ import { ArrowLeft, HelpCircle, Users, Calendar, Trophy, Settings, TrendingUp, S
 import { Wordmark } from '../components/Layout'
 import { XP_TIERS, formatXp } from '../lib/xp'
 
+const FAQ_COUNT = 6
+
+/* FAQ (SEO, 29 set): perguntas em linguagem simples, com FAQPage em JSON-LD,
+   para os resumos do Google terem de onde citar. Uma fonte só — as chaves
+   instructions.faq_q1..6 / faq_a1..6 — para a página e o JSON-LD dizerem o
+   mesmo. O <script> entra e sai com a página. */
+function useFaqJsonLd(t) {
+  useEffect(() => {
+    const el = document.createElement('script')
+    el.type = 'application/ld+json'
+    el.id = 'faq-jsonld'
+    el.text = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: Array.from({ length: FAQ_COUNT }, (_, i) => ({
+        '@type': 'Question',
+        name: t(`instructions.faq_q${i + 1}`),
+        acceptedAnswer: { '@type': 'Answer', text: t(`instructions.faq_a${i + 1}`) },
+      })),
+    })
+    document.head.appendChild(el)
+    return () => el.remove()
+  }, [t])
+}
+
 export default function Instructions() {
   const goBack = useGoBack('/')
   const { t } = useTranslation()
+  useFaqJsonLd(t)
   return (
     <div className="min-h-screen bg-canvas">
       {/* Header */}
@@ -326,6 +353,18 @@ export default function Instructions() {
           <p className="text-gray-600">
             {t('instructions.contact_help')}
           </p>
+        </div>
+        <div id="faq" className="card scroll-mt-20">
+          <HelpCircle size={32} className="text-ink-700 mb-3" />
+          <h3 className="text-xl font-bold text-ink-900 mb-3">{t('instructions.faq_title')}</h3>
+          <dl className="space-y-4">
+            {Array.from({ length: FAQ_COUNT }, (_, i) => (
+              <div key={i}>
+                <dt className="font-extrabold text-ink-900">{t(`instructions.faq_q${i + 1}`)}</dt>
+                <dd className="text-gray-700 leading-relaxed mt-1">{t(`instructions.faq_a${i + 1}`)}</dd>
+              </div>
+            ))}
+          </dl>
         </div>
       </main>
     </div>
