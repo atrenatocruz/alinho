@@ -308,6 +308,33 @@ function AfterLogin() {
   return <Navigate to={safeInternalPath(searchParams.get('redirect'))} replace />
 }
 
+// SEO (29 set): o index.html traz título, descrição e canónico da landing;
+// nas páginas públicas que o Google indexa (/ e /instrucoes) cada uma põe o
+// seu canónico e título, e no resto da app o canónico sai — as páginas da
+// app estão fora do índice (robots.txt) e não devem apontar para a landing.
+const PUBLIC_HEAD = {
+  '/': { title: 'alinho — mixes, rankings e clubes de padel', canonical: 'https://www.alinho.pt/' },
+  '/instrucoes': { title: 'Como funciona o alinho — mixes, níveis e WhatsApp', canonical: 'https://www.alinho.pt/instrucoes' },
+}
+function useRouteHead() {
+  const location = useLocation()
+  useEffect(() => {
+    const head = PUBLIC_HEAD[location.pathname]
+    let link = document.querySelector('link[rel="canonical"]')
+    if (head) {
+      if (!link) {
+        link = document.createElement('link')
+        link.rel = 'canonical'
+        document.head.appendChild(link)
+      }
+      link.href = head.canonical
+      document.title = head.title
+    } else if (link) {
+      link.remove()
+    }
+  }, [location.pathname])
+}
+
 function AppRoutes() {
   const { user, loading: authLoading } = useAuth()
   // Versão nova à espera (app instalada): mudar de página é um momento
@@ -315,6 +342,7 @@ function AppRoutes() {
   const { pathname } = useLocation()
   useEffect(() => { notifyRouteChange() }, [pathname])
   const [minDurationElapsed, setMinDurationElapsed] = useState(false)
+  useRouteHead()
 
   useEffect(() => {
     const timer = setTimeout(() => setMinDurationElapsed(true), 700)
