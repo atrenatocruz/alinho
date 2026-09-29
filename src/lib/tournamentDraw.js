@@ -56,6 +56,13 @@ export async function getCategoryBoard(categoryId) {
       id: e.id,
       name: e.team_name || [e.player1_name, e.player2_name].filter(Boolean).join(' / ') || '?',
       players: [e.player1_name, e.player2_name].filter(Boolean),
+      // Com a foto de cada um, para os cartões do quadro e do horário
+      // (28 set). Quem não tem foto (ou é convidado) fica com a inicial.
+      people: [
+        { name: e.player1_name, avatar_url: e.player1_avatar || null },
+        { name: e.player2_name, avatar_url: e.player2_avatar || null },
+      ].filter((p) => p.name),
+      team_name: e.team_name || null,
       seed: e.seed_number || null,
       status: e.status,
       hides_results: hiding.has(e.id),
@@ -89,6 +96,12 @@ export function standingsOf(group, matches, tiebreak = TIEBREAK_DEFAULT) {
     })
   return groupStandings(group.teams, mine, { tiebreak })
 }
+
+/** Os pontos de uma dupla na tabela do grupo: 3 por vitória, 0 por derrota
+ *  (Renato, 29 set). Não há empates no padel, por isso ordenar por pontos
+ *  é o mesmo que por vitórias — o desempate não muda. */
+export const POINTS_PER_WIN = 3
+export const groupPoints = (row) => (row?.wins || 0) * POINTS_PER_WIN
 
 /** Estados de um jogo em que ele já acabou (terminado normalmente, por falta
     de comparência ou por desistência). */

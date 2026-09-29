@@ -191,6 +191,7 @@ export const LESSON_RPC_MOCKS = {
     }
   },
   create_lesson_series: () => 'ser-created',
+  update_lesson_series: () => null,
   resolve_enrolment: () => null,
   mark_lesson_absence: () => null,
   cancel_lesson: () => null,
@@ -360,6 +361,21 @@ export const LESSON_TABLE_MOCKS = {
     return on() && !empty() ? PRICES() : []
   },
   club_peak_hours: () => (on() && !empty() ? PEAK_HOURS() : []),
+  // «Editar turma»: a turma como está gravada (a de terça já começou, com promoção).
+  lesson_series: (url = '') => {
+    const id = (url.match(/id=eq\.([^&]+)/) || [])[1]
+    const s = SERIES.find((x) => x.series_id === id)
+    if (!on() || !s) return []
+    const started = s.series_id !== 'ser-new'
+    const d = new Date(); d.setDate(d.getDate() + (started ? -21 : 9))
+    const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    // Com a página de clube de exemplo, o professor é o único dessa lista.
+    return [{ id: s.series_id, teacher_profile_id: localStorage.getItem('mockClubPage') === 'club' ? 'tp-1' : s.teacher_profile_id, organization_id: 'o1', day_of_week: s.weekday,
+      start_time: `${s.start_time}:00`, duration_minutes: s.duration_minutes, lesson_type: s.lesson_type,
+      level_from: s.level_from, level_to: s.level_to, gender_restriction: s.gender_restriction, visibility: s.visibility,
+      close_hours_before: 24, accepts_trial: true, trial_free: true, announce_whatsapp: false, price_peak: true,
+      promo_price_month: s.series_id === 'ser-ter' ? 50 : null, promo_until: null, starts_on: day, status: s.status, whatsapp_post_times: null }]
+  },
   // A aula privada com o Tiago (les-2) nasceu de um pedido meu (cadeado do «Mudar pedido»).
   lesson_requests: (url = '') => (on() && /lesson_id=eq\.les-2(&|$)/.test(url) ? [{ id: 'rq-acc' }] : []),
 }
@@ -369,6 +385,14 @@ export const LESSON_TABLE_MOCKS = {
 export const LESSON_NOTICES = () => (localStorage.getItem('mockLessonNotices') === 'dissolved' ? [
   { id: 'ln-d1', kind: 'lesson_merge_dissolved', game_id: null, created_at: new Date().toISOString(),
     data: { teacher_name: 'Ana Moreira', teacher_profile_id: 'tp-ana', lesson_date: at(dayOffset(3), '11:00'), starts_at: at(dayOffset(3), '10:30') } },
+] : localStorage.getItem('mockLessonNotices') === 'series' ? [
+  // A turma mudou (Editar turma): dia e hora, só o professor, as duas coisas.
+  { id: 'ln-s1', kind: 'lesson_series_changed', game_id: null, created_at: new Date().toISOString(),
+    data: { series_id: 'ser-ter', series_label: 'quinta 20:00', old_label: 'quarta 19:00', changes: ['day', 'time'], teacher_name: 'Ana Moreira' } },
+  { id: 'ln-s2', kind: 'lesson_series_changed', game_id: null, created_at: new Date().toISOString(),
+    data: { series_id: 'ser-ter', series_label: 'quarta 19:00', old_label: 'quarta 19:00', changes: ['teacher'], teacher_name: 'Tiago Lopes' } },
+  { id: 'ln-s3', kind: 'lesson_series_changed', game_id: null, created_at: new Date().toISOString(),
+    data: { series_id: 'ser-ter', series_label: 'quinta 20:00', old_label: 'quarta 19:00', changes: ['day', 'time', 'teacher'], teacher_name: 'Tiago Lopes' } },
 ] : localStorage.getItem('mockLessonNotices') === 'request' ? [
   { id: 'ln-r1', kind: 'lesson_request_new', game_id: null, created_at: new Date().toISOString(),
     data: { student_name: 'Ana Silva', starts_at: at(dayOffset(3), '10:30'), lesson_type: 'duo', org_name: 'Clube Exemplo' } },

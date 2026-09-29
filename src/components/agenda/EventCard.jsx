@@ -1,6 +1,7 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { MapPin, CheckCircle2, Lock, Play, Trophy, Euro, Swords, Users, Shuffle, CircleDot, Clock, ListOrdered, GraduationCap } from 'lucide-react'
+import { MapPin, CheckCircle2, Lock, Play, Trophy, Euro, Swords, Users, Shuffle, CircleDot, Clock, ListOrdered, GraduationCap, Building2, ChevronRight } from 'lucide-react'
+import { supabase } from '../../lib/supabase'
 import { PlayerAvatarRow, GroupLevelBadge, PrimaryButton } from '../ui'
 import { formatTime, formatCurrency } from '../../lib/formatDate'
 import { FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, mixCapacity, isGenderMismatch, isAgeIneligible } from '../../lib/mixLogic'
@@ -82,8 +83,57 @@ export function StateTag({ tone, icon: Icon, children }) {
   )
 }
 
-/** Linha do dono: logótipo (quadrado = clube, redondo = grupo) + nome + tipo. */
-export function Owner({ event, fallbackKey }) {
+/** Abre o perfil do clube ou grupo de um evento (design-handoff/2026-09-28-
+    cartao-com-organizador). Os eventos da Home trazem o id e nem sempre o
+    endereço: pede-se o endereço ao tocar, para não mexer nas consultas da Home. */
+export function useOpenOrg(event) {
+  const navigate = useNavigate()
+  if (!event?.orgName || (!event.orgSlug && !event.orgId)) return null
+  return async (e) => {
+    e?.preventDefault?.()
+    e?.stopPropagation?.()
+    let slug = event.orgSlug
+    if (!slug) {
+      const { data } = await supabase.from('organizations').select('slug').eq('id', event.orgId).maybeSingle()
+      slug = data?.slug
+    }
+    if (slug) navigate(`/clube/${slug}`)
+  }
+}
+
+/** Em cima de cada cartão da Home: o logótipo redondo de quem organiza, o
+    nome com «›» e «Grupo organizador» / «Clube organizador». Tocar aqui abre
+    o perfil; o resto do cartão abre o evento (sugestão do Ruben, aprovada
+    pelo Francisco a 28 set). */
+export function OrgHeader({ event, past = false }) {
+  const { t } = useTranslation()
+  const open = useOpenOrg(event)
+  if (!event.orgName) return null
+  const isGroup = event.orgKind === 'group'
+  const Tag = open ? 'button' : 'div'
+  return (
+    <Tag {...(open ? { type: 'button', onClick: open } : {})}
+      className={`relative z-[1] mb-2.5 flex w-full min-w-0 items-center gap-3 text-left ${past ? 'opacity-70' : ''}`}>
+      {event.orgLogo
+        ? <img src={event.orgLogo} alt="" className="h-[52px] w-[52px] shrink-0 rounded-full object-cover" />
+        : <span className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full bg-ink-900 text-[15px] font-extrabold text-lime-400">{initials(event.orgName)}</span>}
+      <span className="min-w-0">
+        <span className="flex min-w-0 items-center gap-0.5 text-[17px] font-extrabold leading-tight text-ink-900">
+          <span className="truncate">{event.orgName}</span>{open && <ChevronRight size={18} strokeWidth={2.75} className="shrink-0" />}
+        </span>
+        <span className="mt-0.5 flex items-center gap-1 text-[13px] text-ink-700">
+          {isGroup ? <Users size={13} className="shrink-0" /> : <Building2 size={13} className="shrink-0" />}
+          {t(isGroup ? 'agenda.org_group_organizer' : 'agenda.org_club_organizer')}
+        </span>
+      </span>
+    </Tag>
+  )
+}
+
+/** Linha do dono: logótipo (quadrado = clube, redondo = grupo) + nome + tipo.
+    Com `link`, abre o perfil do clube ou grupo, com «›» (página do evento). */
+export function Owner({ event, fallbackKey, link = false }) {
+  const open = useOpenOrg(link ? event : null)
   const { t } = useTranslation()
   if (!event.orgName) {
     return (
@@ -95,14 +145,19 @@ export function Owner({ event, fallbackKey }) {
   }
   const isGroup = event.orgKind === 'group'
   const shape = isGroup ? 'rounded-full bg-ink-700 text-white' : 'rounded-[5px] bg-ink-900 text-lime-400'
-  return (
-    <p className="flex items-center gap-1.5 text-sm text-ink-700 min-w-0">
+  const inner = (
+    <>
       {event.orgLogo
         ? <img src={event.orgLogo} alt="" className={`w-5 h-5 object-cover shrink-0 ${isGroup ? 'rounded-full' : 'rounded-[5px]'}`} />
         : <span className={`w-5 h-5 text-[8px] font-extrabold flex items-center justify-center shrink-0 ${shape}`}>{initials(event.orgName)}</span>}
       <span className="truncate">{event.orgName} · {t(isGroup ? 'agenda.owner_group' : 'agenda.owner_club')}</span>
-    </p>
+      {open && <ChevronRight size={16} className="shrink-0" />}
+    </>
   )
+  if (open) {
+    return <button type="button" onClick={open} className="flex max-w-full items-center gap-1.5 text-left text-sm text-ink-700 min-w-0 hover:text-ink-900">{inner}</button>
+  }
+  return <p className="flex items-center gap-1.5 text-sm text-ink-700 min-w-0">{inner}</p>
 }
 
 function cardFrame(event, past) {
@@ -202,6 +257,7 @@ export function GameEventCard({ event, profile, friendIds = null, action = null,
   return (
     <div className={`relative overflow-hidden rounded-card p-3.5 press ${cardFrame(event, past)}`}>
       <Link to={`/jogo/${game.id}`} className="absolute inset-0" aria-label={`${game.title} — ${time}`} />
+      <OrgHeader event={event} past={past} />
 
       <div className="flex items-start justify-between gap-2">
         <div className="flex flex-wrap gap-1">
@@ -219,7 +275,7 @@ export function GameEventCard({ event, profile, friendIds = null, action = null,
 
       <p className={`text-[22px] font-extrabold leading-none mt-2.5 ${past ? 'text-muted' : 'text-ink-900'}`}>{time}</p>
       <h3 className={`text-base leading-snug mt-1.5 ${past ? 'text-muted' : 'text-ink-900'}`}>{game.title}</h3>
-      <div className="mt-1"><Owner event={event} fallbackKey="agenda.owner_none" /></div>
+      {!event.orgName && <div className="mt-1"><Owner event={event} fallbackKey="agenda.owner_none" /></div>}
 
       <GameFacts game={game} distance={distance} />
 
@@ -297,6 +353,7 @@ export function ExploreEventCard({ event, profile, distance = null, onJoin = nul
 
   return (
     <div className={`relative overflow-hidden rounded-card p-3.5 border ${KIND_STYLE[event.kind].card}`}>
+      <OrgHeader event={event} />
       <div className="flex items-start justify-between gap-2">
         <div className="flex flex-wrap gap-1">
           <KindTag kind={event.kind} />
@@ -313,7 +370,7 @@ export function ExploreEventCard({ event, profile, distance = null, onJoin = nul
 
       <p className="text-[22px] font-extrabold leading-none mt-2.5 text-ink-900">{time}</p>
       <h3 className="text-base leading-snug mt-1.5 text-ink-900">{game.title}</h3>
-      <div className="mt-1"><Owner event={event} fallbackKey="agenda.owner_none" /></div>
+      {!event.orgName && <div className="mt-1"><Owner event={event} fallbackKey="agenda.owner_none" /></div>}
 
       <GameFacts game={game} distance={distance} />
 
@@ -415,6 +472,7 @@ export function FriendSessionCard({ event, userId, past = false }) {
   return (
     <div className={`relative overflow-hidden rounded-card p-3.5 ${to ? 'press' : ''} ${cardFrame(event, past)}`}>
       {to && <Link to={to} className="absolute inset-0" aria-label={title} />}
+      <OrgHeader event={event} past={past} />
       <div className="flex items-start justify-between gap-2">
         <KindTag kind="friends" past={past} suffix={t('agenda.session_rotating')} />
         {state}
@@ -427,7 +485,7 @@ export function FriendSessionCard({ event, userId, past = false }) {
         <p className="flex items-center gap-1 text-xs font-extrabold text-muted mt-2.5"><Clock size={12} /> {t('agenda.no_time')}</p>
       )}
       <h3 className={`text-base leading-snug mt-1.5 ${past ? 'text-muted' : 'text-ink-900'}`}>{title}</h3>
-      <div className="mt-1"><Owner event={event} fallbackKey="agenda.owner_friends" /></div>
+      {!event.orgName && <div className="mt-1"><Owner event={event} fallbackKey="agenda.owner_friends" /></div>}
       {m.location && (
         <p className="flex items-center gap-1.5 text-ink-700 text-[13px] mt-1.5">
           <MapPin size={14} className="shrink-0" /> <span className="truncate">{m.location}</span>
@@ -475,6 +533,7 @@ export function FriendsEventCard({ event, userId, orgSlug = null, invite = null,
     <div className={`relative overflow-hidden rounded-card p-3.5 ${to ? 'press' : ''} ${cardFrame(event, past)}`}>
       {to && <Link to={to} className="absolute inset-0" aria-label={title} />}
 
+      <OrgHeader event={event} past={past} />
       <div className="flex items-start justify-between gap-2">
         <KindTag kind="friends" past={past} />
         {state}
@@ -488,7 +547,7 @@ export function FriendsEventCard({ event, userId, orgSlug = null, invite = null,
         <p className="flex items-center gap-1 text-xs font-extrabold text-muted mt-2.5"><Clock size={12} /> {t('agenda.no_time')}</p>
       )}
       <h3 className={`text-base leading-snug mt-1.5 ${past ? 'text-muted' : 'text-ink-900'}`}>{title}</h3>
-      <div className="mt-1"><Owner event={event} fallbackKey="agenda.owner_friends" /></div>
+      {!event.orgName && <div className="mt-1"><Owner event={event} fallbackKey="agenda.owner_friends" /></div>}
 
       {m.location && (
         <p className="flex items-center gap-1.5 text-ink-700 text-[13px] mt-1.5">

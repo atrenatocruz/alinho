@@ -10,7 +10,7 @@ import { Users } from 'lucide-react'
 import { EmptyState } from '../ui'
 import { Me } from './TournamentBits'
 import useCategoryBoard from './useCategoryBoard'
-import { standingsOf, qualifiersPerGroup } from '../../lib/tournamentDraw'
+import { standingsOf, qualifiersPerGroup, groupPoints } from '../../lib/tournamentDraw'
 
 /** Uma tabela de grupo. As duplas que passam ficam marcadas à esquerda e
  *  com o lugar em destaque — é o que se lê de relance no telemóvel. */
@@ -56,6 +56,10 @@ function GroupTable({ group, matches, entries, qualifiers, myEntryId, t }) {
             <th className="w-9 py-1.5 text-center font-semibold" title={t('tournament.draw.col_games_won_full')}>
               {t('tournament.draw.col_games_won')}
             </th>
+            {/* Pontos: 3 por vitória, 0 por derrota (Renato, 29 set). */}
+            <th className="w-10 py-1.5 pr-2 text-center font-semibold text-ink-900" title={t('tournament.draw.col_points_full')}>
+              {t('tournament.draw.col_points')}
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -89,11 +93,12 @@ function GroupTable({ group, matches, entries, qualifiers, myEntryId, t }) {
                   {mine ? <Me>{t('tournament.draw.you')}</Me> : null}
                 </td>
                 <td className="py-1.5 text-center font-mono text-xs text-muted">{row.played}</td>
-                <td className="py-1.5 text-center font-mono text-xs font-bold text-ink-900">{row.wins}</td>
+                <td className="py-1.5 text-center font-mono text-xs text-muted">{row.wins}</td>
                 <td className="py-1.5 text-center font-mono text-xs text-muted">
                   {row.diff > 0 ? `+${row.diff}` : row.diff}
                 </td>
                 <td className="py-1.5 text-center font-mono text-xs text-muted">{row.gamesWon}</td>
+                <td className="py-1.5 pr-2 text-center font-mono text-sm font-extrabold text-ink-900">{groupPoints(row)}</td>
               </tr>
             )
           })}

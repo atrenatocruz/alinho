@@ -14,7 +14,7 @@ import BracketTree from './BracketTree'
 
 export default function DrawPanel({ category, myEntries }) {
   const { t } = useTranslation()
-  const { entries, matches, loading } = useCategoryBoard(category?.id)
+  const { entries, matches, groups, loading } = useCategoryBoard(category?.id)
 
   if (loading) {
     return <p className="py-6 text-center text-xs text-muted">{t('common.loading')}</p>
@@ -42,7 +42,7 @@ export default function DrawPanel({ category, myEntries }) {
   const Bracket = ({ rounds, label }) => (
     <div className="mb-5">
       {secondary.length > 0 && <MonoLabel className="mb-1">{label}</MonoLabel>}
-      <BracketTree rounds={rounds} entries={entries} myIds={myIds} />
+      <BracketTree rounds={rounds} entries={entries} myIds={myIds} allMatches={matches} groups={groups} />
     </div>
   )
 

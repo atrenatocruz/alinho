@@ -626,6 +626,15 @@ function AppRoutes() {
             </Guard>
           }
         />
+        {/* «Editar turma»: os mesmos 3 passos, já preenchidos (AUDITORIA, ponto 6). */}
+        <Route
+          path="/gerir/:slug/editar/turma/:seriesId"
+          element={
+            <Guard require="lessons" showSplash={showSplash}>
+              <CreateSeries />
+            </Guard>
+          }
+        />
         <Route
           path="/gerir/:slug/criar/em-aberto"
           element={

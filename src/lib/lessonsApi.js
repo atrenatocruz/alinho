@@ -118,6 +118,24 @@ export async function createLessonSeries(fields) {
   return data
 }
 
+/** A turma como está gravada, para o «Editar turma» (AUDITORIA, ponto 6):
+    quem a gere lê-a pela regra «See series». */
+export async function getLessonSeries(seriesId) {
+  const { data, error } = await supabase.from('lesson_series')
+    .select('id, teacher_profile_id, organization_id, day_of_week, start_time, duration_minutes, lesson_type, level_from, level_to, gender_restriction, visibility, close_hours_before, accepts_trial, trial_free, announce_whatsapp, price_peak, promo_price_month, promo_until, starts_on, status, whatsapp_post_times')
+    .eq('id', seriesId).maybeSingle()
+  if (error) throw error
+  return data
+}
+
+/** Muda uma turma (Dev 3, migration_lessons_editar_turma): só os campos que
+    vêm em fields; o resto fica. Com inscritos, as aulas futuras mudam e os
+    alunos recebem um aviso (lesson_series_changed). */
+export async function updateLessonSeries(seriesId, fields) {
+  const { error } = await supabase.rpc('update_lesson_series', { p_series_id: seriesId, p_fields: fields })
+  if (error) throw error
+}
+
 /** O preço de uma turma (migration_lessons_7): price null = tabela;
     price sem until = «Outro preço» para sempre; com until = promoção. */
 export async function setLessonSeriesPrice(seriesId, price, until) {
