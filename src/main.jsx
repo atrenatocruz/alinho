@@ -5,7 +5,7 @@ import './index.css'
 import './lib/i18n'
 import { installDevMockNetwork } from './lib/devMockNetwork'
 import { reloadOnceForChunk } from './lib/chunkReload'
-import { registerSW } from 'virtual:pwa-register'
+import { Workbox } from 'workbox-window'
 import { setupAppUpdate } from './lib/appUpdate'
 import { IS_TEST_ENV } from './lib/appEnv'
 import TestEnvBanner from './components/TestEnvBanner'
@@ -13,7 +13,9 @@ import UpdatePill from './components/UpdatePill'
 
 // A versão nova: avisa com a app à frente (UpdatePill) e só entra sozinha
 // ao voltar à app depois de algum tempo fora (#569, revisto a 29 set).
-if (import.meta.env.PROD) setupAppUpdate(registerSW)
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  setupAppUpdate(() => new Workbox('/sw.js', { scope: '/' }))
+}
 
 // O Vite avisa quando um ficheiro pré-carregado de uma página já não existe
 // (publicação nova com a app aberta, #569): recarrega-se uma vez em vez de

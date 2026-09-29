@@ -16,41 +16,47 @@ const fakeDoc = ({ form = false, active = null, script = '/assets/index-OLD.js' 
   }
 }
 // `served` = o index.html que o servidor tem agora; `null` = sem rede.
-const fakeWin = ({ controller = true, served = '/assets/index-NEW.js' } = {}) => {
-  const swListeners = {}
+const fakeWin = ({ served = '/assets/index-NEW.js' } = {}) => ({
+  setInterval: vi.fn(),
+  fetch: vi.fn(() => (served == null
+    ? Promise.reject(new Error('offline'))
+    : Promise.resolve({ ok: true, text: () => Promise.resolve(`<script type="module" crossorigin src="${served}"></script>`) }))),
+  location: { reload: vi.fn() },
+  navigator: { onLine: true },
+})
+// O Workbox (workbox-window): eventos, registo e o «ativa a que está à espera».
+const fakeWb = () => {
+  const listeners = {}
+  const registration = { update: vi.fn(() => Promise.resolve()) }
   return {
-    setInterval: vi.fn(),
-    fetch: vi.fn(() => (served == null
-      ? Promise.reject(new Error('offline'))
-      : Promise.resolve({ ok: true, text: () => Promise.resolve(`<script type="module" crossorigin src="${served}"></script>`) }))),
-    location: { reload: vi.fn() },
-    navigator: {
-      onLine: true,
-      serviceWorker: { controller: controller ? {} : null, addEventListener: (ev, fn) => { swListeners[ev] = fn } },
-    },
-    swFire: (ev) => swListeners[ev]?.(),
+    registration,
+    addEventListener: (ev, fn) => { listeners[ev] = fn },
+    register: vi.fn(() => Promise.resolve(registration)),
+    messageSkipWaiting: vi.fn(),
+    fire: (ev, data = {}) => listeners[ev]?.(data),
   }
 }
 
 const flush = () => new Promise((r) => setTimeout(r, 0))
 
-/** Liga tudo com um relógio que o teste controla. */
-function setup({ win = fakeWin(), doc = fakeDoc() } = {}) {
+async function setup({ win = fakeWin(), doc = fakeDoc() } = {}) {
   let t = 1_000_000
   const clock = { now: () => t, advance: (ms) => { t += ms } }
-  const registration = { update: vi.fn(() => Promise.resolve()) }
-  let opts
-  const api = setupAppUpdate((o) => { opts = o }, { win, doc, now: clock.now })
-  opts.onRegisteredSW('/sw.js', registration)
+  const wb = fakeWb()
+  const api = setupAppUpdate(() => wb, { win, doc, now: clock.now })
+  await flush() // o registo
   const seen = []
   api.subscribe((available) => seen.push(available))
-  // Sai da app durante `ms` e volta.
+  // O service worker novo ficou instalado, à espera.
+  const waiting = async () => { wb.fire('waiting'); await flush() }
+  // Tomou conta da página.
+  const controlling = () => wb.fire('controlling', { isUpdate: true })
   const awayFor = (ms) => {
     doc.visibilityState = 'hidden'; doc.fire('visibilitychange')
     clock.advance(ms)
     doc.visibilityState = 'visible'; doc.fire('visibilitychange')
   }
-  return { win, doc, api, seen, registration, awayFor, clock }
+  return { win, doc, wb, api, seen, waiting, controlling, awayFor, clock }
 }
 
 describe('appUpdate — versão nova sem refreshes a meio (Renato, 29 set)', () => {
@@ -61,95 +67,93 @@ describe('appUpdate — versão nova sem refreshes a meio (Renato, 29 set)', () 
     expect(isSafeToReload(fakeDoc({ active: { tagName: 'BUTTON' } }))).toBe(true)
   })
 
-  it('versão nova com a app à frente: NÃO recarrega, avisa uma vez', async () => {
-    const { win, seen, api } = setup()
-    win.swFire('controllerchange')
-    win.swFire('controllerchange')
-    await flush()
+  it('versão nova com a app à frente: não troca nada, avisa uma vez', async () => {
+    const { win, wb, seen, api, waiting } = await setup()
+    await waiting()
+    await waiting()
+    expect(wb.messageSkipWaiting).not.toHaveBeenCalled()
     expect(win.location.reload).not.toHaveBeenCalled()
     expect(seen).toEqual([true])
     expect(api.available()).toBe(true)
   })
 
-  it('tocar em «Atualizar» recarrega', async () => {
-    const { win, api } = setup()
-    win.swFire('controllerchange')
-    await flush()
+  it('tocar em «Atualizar» ativa a versão nova e recarrega quando ela toma conta', async () => {
+    const { win, wb, api, waiting, controlling } = await setup()
+    await waiting()
     api.apply()
+    expect(wb.messageSkipWaiting).toHaveBeenCalledTimes(1)
+    controlling()
     expect(win.location.reload).toHaveBeenCalledTimes(1)
   })
 
-  // O «refresh estranho» do dev.alinho.pt (28 set): a página acabada de abrir
-  // já vem da rede com a versão nova.
-  it('página acabada de abrir, já na versão nova: nem recarrega nem avisa', async () => {
-    const { win, seen } = setup({ win: fakeWin(), doc: fakeDoc({ script: '/assets/index-NEW.js' }) })
-    win.swFire('controllerchange')
-    await flush()
+  // Refresh logo a seguir a publicar: a página já é a nova, a versão nova do
+  // service worker está à espera. Ativa-se calada — sem recarregar — para os
+  // ficheiros da página ficarem guardados na versão certa.
+  it('página já na versão nova: ativa a que está à espera SEM recarregar e sem aviso', async () => {
+    const { win, wb, seen, waiting, controlling } = await setup({ doc: fakeDoc({ script: '/assets/index-NEW.js' }) })
+    await waiting()
+    expect(wb.messageSkipWaiting).toHaveBeenCalledTimes(1)
+    controlling()
     expect(win.location.reload).not.toHaveBeenCalled()
     expect(seen).toEqual([])
   })
 
-  it('sem rede para confirmar: nem recarrega nem avisa', async () => {
-    const { win, seen } = setup({ win: fakeWin({ served: null }) })
-    win.swFire('controllerchange')
-    await flush()
+  it('sem rede para confirmar: não faz nada', async () => {
+    const { win, wb, seen, waiting } = await setup({ win: fakeWin({ served: null }) })
+    await waiting()
+    expect(seen).toEqual([])
+    expect(wb.messageSkipWaiting).not.toHaveBeenCalled()
     expect(win.location.reload).not.toHaveBeenCalled()
-    expect(seen).toEqual([])
   })
 
-  it('primeira instalação (sem versão velha): nem recarrega nem avisa', async () => {
-    const { win, seen } = setup({ win: fakeWin({ controller: false }) })
-    win.swFire('controllerchange')
-    await flush()
-    expect(seen).toEqual([])
-  })
-
-  it('volta à app depois de muito tempo com a versão nova à espera: recarrega sozinha', async () => {
-    const { win, awayFor } = setup()
-    win.swFire('controllerchange')
-    await flush()
+  it('volta à app depois de muito tempo com a versão nova à espera: entra sozinha', async () => {
+    const { wb, waiting, awayFor } = await setup()
+    await waiting()
     awayFor(AWAY_MS + 1000)
-    expect(win.location.reload).toHaveBeenCalledTimes(1)
+    expect(wb.messageSkipWaiting).toHaveBeenCalledTimes(1)
   })
 
-  it('volta depois de muito tempo e a versão nova chega logo a seguir: recarrega sozinha', async () => {
-    const { win, awayFor, clock } = setup()
+  it('volta depois de muito tempo e a versão nova chega logo a seguir: entra sozinha', async () => {
+    const { wb, waiting, awayFor, clock } = await setup()
     awayFor(AWAY_MS + 1000)
-    clock.advance(3000) // o service worker novo demora uns segundos a instalar
-    win.swFire('controllerchange')
-    await flush()
-    expect(win.location.reload).toHaveBeenCalledTimes(1)
+    clock.advance(3000)
+    await waiting()
+    expect(wb.messageSkipWaiting).toHaveBeenCalledTimes(1)
   })
 
-  it('volta depois de pouco tempo: não recarrega, fica só o aviso', async () => {
-    const { win, awayFor } = setup()
-    win.swFire('controllerchange')
-    await flush()
+  it('volta depois de pouco tempo: não troca, fica só o aviso', async () => {
+    const { wb, waiting, awayFor } = await setup()
+    await waiting()
     awayFor(60 * 1000)
-    expect(win.location.reload).not.toHaveBeenCalled()
+    expect(wb.messageSkipWaiting).not.toHaveBeenCalled()
   })
 
-  it('volta depois de muito tempo mas com um formulário aberto: não recarrega', async () => {
-    const doc = fakeDoc({ form: true })
-    const { win, awayFor } = setup({ doc })
-    win.swFire('controllerchange')
-    await flush()
+  it('volta depois de muito tempo mas com um formulário aberto: não troca', async () => {
+    const { wb, waiting, awayFor } = await setup({ doc: fakeDoc({ form: true }) })
+    await waiting()
     awayFor(AWAY_MS + 1000)
-    expect(win.location.reload).not.toHaveBeenCalled()
+    expect(wb.messageSkipWaiting).not.toHaveBeenCalled()
   })
 
-  it('a versão nova que chega muito depois do regresso já não recarrega', async () => {
-    const { win, awayFor, clock } = setup()
+  it('a versão nova que chega muito depois do regresso já não entra sozinha', async () => {
+    const { wb, waiting, awayFor, clock } = await setup()
     awayFor(AWAY_MS + 1000)
     clock.advance(5 * 60 * 1000)
-    win.swFire('controllerchange')
-    await flush()
-    expect(win.location.reload).not.toHaveBeenCalled()
+    await waiting()
+    expect(wb.messageSkipWaiting).not.toHaveBeenCalled()
   })
 
-  it('ao voltar à app pergunta se há versão nova', () => {
-    const { registration, awayFor } = setup()
+  it('outra aba ativou a versão nova: esta não recarrega sozinha, avisa', async () => {
+    const { win, seen, wb } = await setup()
+    wb.fire('controlling', { isUpdate: true, isExternal: true })
+    await flush()
+    expect(win.location.reload).not.toHaveBeenCalled()
+    expect(seen).toEqual([true])
+  })
+
+  it('ao voltar à app pergunta se há versão nova', async () => {
+    const { wb, awayFor } = await setup()
     awayFor(1000)
-    expect(registration.update).toHaveBeenCalled()
+    expect(wb.registration.update).toHaveBeenCalled()
   })
 })

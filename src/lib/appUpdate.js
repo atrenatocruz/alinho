@@ -1,26 +1,29 @@
 /* A app apanha a versão nova sem refreshes a meio (#569; revisto a 29 set).
 
    A necessidade (Francisco, 26 set): não ter de fazer refresh sempre que se
-   publica. A primeira resposta recarregava a página sozinha no primeiro
-   «momento seguro» — incluindo ao mudar de página, o que no dev.alinho.pt
-   (várias publicações por hora) dava refreshes estranhos a meio do uso.
-   O Renato (29 set): «este refresh também não é solução».
+   publica. A primeira resposta ativava o service worker novo logo
+   (skipWaiting) e recarregava a página sozinha. Isso dava refreshes
+   estranhos a meio do uso, por dois caminhos: o recarregar automático, e o
+   chunkReload — o service worker novo apagava os ficheiros da versão
+   anterior, e a página aberta, ao mudar de ecrã, pedia um que já não
+   existia. O Renato (29 set): «este refresh também não é solução».
 
-   Agora:
-   1. vite.config.js: a página (index.html) nunca vem da cache do service
-      worker — vem da rede. Um refresh (ou abrir a app) traz logo a versão nova.
-   2. vite.config.js: o service worker novo ativa logo (skipWaiting +
-      clientsClaim).
-   3. Aqui: sempre que se volta à app (e de 30 em 30 min com ela à frente)
-      pergunta-se se há versão nova. Se a página aberta corre código antigo:
-        · com a app à frente, NUNCA recarrega — avisa (UpdatePill: «Nova
-          versão · Atualizar») e a pessoa escolhe;
-        · só recarrega sozinha ao voltar à app depois de pelo menos AWAY_MS
-          fora (como as apps nativas: ninguém dá por isso), e só sem um
-          formulário aberto nem um campo a ser escrito.
-   Uma página acabada de abrir já é a versão nova: nem recarrega nem avisa
-   (ver runningOldCode). O recarregar quando falta um ficheiro depois de
-   publicar é outra coisa e continua em chunkReload.js. */
+   Agora a versão nova FICA À ESPERA (vite.config.js: sem skipWaiting):
+   enquanto espera, o service worker antigo continua a servir os ficheiros da
+   versão aberta, e nada falha. Ela entra:
+     · quando a pessoa toca em «Atualizar» (UpdatePill);
+     · sozinha, ao voltar à app depois de pelo menos AWAY_MS fora (como as
+       apps nativas: ninguém dá por isso) — e só sem um formulário aberto
+       nem um campo a ser escrito;
+     · ao fechar a app de todo e abrir outra vez (o browser troca-a quando
+       já não há páginas da versão antiga).
+   A página (index.html) vem sempre da rede (vite.config.js): um refresh, ou
+   abrir a app, traz logo a versão nova — e aí não há aviso nenhum, porque a
+   página já é a nova (ver runningOldCode); a versão à espera ativa-se
+   calada, sem recarregar.
+   O registo é feito aqui com o workbox-window (main.jsx), e não com o
+   registerSW do plugin: esse recarregava a página sempre que a versão nova
+   tomava conta, também quando a página já era a nova. */
 
 /** Pode-se recarregar sem estragar nada? `doc` é o document (para testar). */
 export function isSafeToReload(doc = typeof document !== 'undefined' ? document : null) {
@@ -44,8 +47,8 @@ const RESUME_WINDOW_MS = 20 * 1000
 export const mainScriptOf = (html) => String(html || '').match(/\/assets\/index-[\w-]+\.js/)?.[0] || null
 
 /** A página aberta corre código de uma versão que já não é a do servidor?
- *  Uma página acabada de abrir NÃO: o index.html vem sempre da rede (peça 1),
- *  por isso já traz a versão nova. Sem rede para confirmar: não. */
+ *  Uma página acabada de abrir NÃO: o index.html vem sempre da rede, por
+ *  isso já traz a versão nova. Sem rede para confirmar: null. */
 async function runningOldCode(win, doc) {
   const mine = doc.querySelector?.('script[type="module"][src*="/assets/index-"]')?.getAttribute('src')
   if (!mine) return true
@@ -54,7 +57,7 @@ async function runningOldCode(win, doc) {
     const served = mainScriptOf(await res.text())
     return !!served && !mine.endsWith(served)
   } catch {
-    return false
+    return null
   }
 }
 
@@ -65,69 +68,92 @@ export const applyUpdate = () => current.apply()
 export const subscribeUpdate = (fn) => current.subscribe(fn)
 
 /**
- * Liga a verificação. `registerSW` é o de 'virtual:pwa-register'.
+ * Liga a verificação. `createWorkbox` devolve o Workbox (workbox-window) do
+ * /sw.js — injetado para os testes.
  * Devolve { available, apply, subscribe } (o mesmo que os exports acima).
  */
-export function setupAppUpdate(registerSW, { win = window, doc = document, now = () => Date.now() } = {}) {
-  const sw = win.navigator?.serviceWorker
-  // Sem service worker a controlar, é a primeira instalação: o clientsClaim
-  // também dispara o «controllerchange», mas aí não há versão velha a trocar.
-  const hadController = !!sw?.controller
+export function setupAppUpdate(createWorkbox, { win = window, doc = document, now = () => Date.now() } = {}) {
+  const wb = createWorkbox()
   let available = false
   let applying = false
+  let checking = false
+  let reloadOnControl = false
   let hiddenAt = null
   let resumedLongAwayAt = null
   const listeners = new Set()
 
-  const reload = () => {
+  const announce = () => {
+    if (available) return
+    available = true
+    listeners.forEach((fn) => fn(true))
+  }
+  // Ativa a versão à espera e recarrega quando ela tomar conta.
+  const apply = () => {
     if (applying) return
     applying = true
-    win.location.reload()
+    reloadOnControl = true
+    wb.messageSkipWaiting()
   }
   const justBackFromLongAway = () => resumedLongAwayAt != null && now() - resumedLongAwayAt <= RESUME_WINDOW_MS
 
-  let checking = false
-  sw?.addEventListener('controllerchange', async () => {
-    if (!hadController || available || checking) return
+  // Há uma versão nova instalada, à espera.
+  const onWaiting = async () => {
+    if (available || checking || applying) return
     checking = true
     const old = await runningOldCode(win, doc)
     checking = false
-    if (!old) return
-    available = true
-    listeners.forEach((fn) => fn(true))
-    // Acabou de voltar depois de muito tempo fora: entra já, ninguém dá por isso.
-    if (justBackFromLongAway() && isSafeToReload(doc)) reload()
+    if (old === null) return // sem rede para confirmar
+    if (!old) {
+      // A página já é a nova (refresh logo a seguir a publicar): ativa-se a
+      // versão à espera calada, sem recarregar — assim os ficheiros desta
+      // página ficam guardados na versão certa, e um deploy seguinte não os
+      // tira debaixo dela.
+      wb.messageSkipWaiting()
+      return
+    }
+    announce()
+    // Acabou de voltar depois de muito tempo fora: entra já.
+    if (justBackFromLongAway() && isSafeToReload(doc)) apply()
+  }
+  wb.addEventListener('waiting', onWaiting)
+  wb.addEventListener('externalwaiting', onWaiting)
+
+  wb.addEventListener('controlling', async (event) => {
+    if (!event?.isUpdate) return
+    if (reloadOnControl) {
+      win.location.reload()
+      return
+    }
+    // Outra aba ativou a versão nova: esta não recarrega sozinha, avisa.
+    if (event.isExternal && (await runningOldCode(win, doc))) announce()
   })
 
-  registerSW({
-    immediate: true,
-    onRegisteredSW(_url, registration) {
-      if (!registration) return
-      const check = () => {
-        if (doc.visibilityState !== 'visible' || win.navigator?.onLine === false) return
-        registration.update().catch(() => { /* sem rede: tenta-se da próxima vez */ })
+  wb.register({ immediate: true }).then((registration) => {
+    if (!registration) return
+    const check = () => {
+      if (doc.visibilityState !== 'visible' || win.navigator?.onLine === false) return
+      registration.update().catch(() => { /* sem rede: tenta-se da próxima vez */ })
+    }
+    doc.addEventListener('visibilitychange', () => {
+      if (doc.visibilityState !== 'visible') {
+        hiddenAt = now()
+        return
       }
-      doc.addEventListener('visibilitychange', () => {
-        if (doc.visibilityState !== 'visible') {
-          hiddenAt = now()
-          return
-        }
-        const longAway = hiddenAt != null && now() - hiddenAt >= AWAY_MS
-        hiddenAt = null
-        resumedLongAwayAt = longAway ? now() : null
-        if (longAway && available && isSafeToReload(doc)) {
-          reload()
-          return
-        }
-        check()
-      })
-      win.setInterval(check, UPDATE_CHECK_INTERVAL_MS)
-    },
-  })
+      const longAway = hiddenAt != null && now() - hiddenAt >= AWAY_MS
+      hiddenAt = null
+      resumedLongAwayAt = longAway ? now() : null
+      if (longAway && available && isSafeToReload(doc)) {
+        apply()
+        return
+      }
+      check()
+    })
+    win.setInterval(check, UPDATE_CHECK_INTERVAL_MS)
+  }).catch(() => { /* sem service worker: a app funciona na mesma */ })
 
   current = {
     available: () => available,
-    apply: reload,
+    apply,
     subscribe: (fn) => {
       listeners.add(fn)
       return () => listeners.delete(fn)
