@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation, Trans } from 'react-i18next'
 import { BackBar } from '../components/ui'
@@ -164,6 +164,13 @@ export default function GameDetails() {
   const [restartOpen, setRestartOpen] = useState(false)
   // A tira preta de 3 s depois de uma ação da folha (ex.: «Mudar só este mix»).
   const [doneNotice, setDoneNotice] = useState('')
+  // Chegou pelo «Entrar no clube» do cartão da Home (bug de 29 set): a faixa
+  // diz porque está aqui — entrou no clube, ainda não está inscrito.
+  const location = useLocation()
+  useEffect(() => {
+    if (location.state?.notice) setDoneNotice(location.state.notice)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.key])
   useEffect(() => {
     if (!doneNotice) return undefined
     const timer = setTimeout(() => setDoneNotice(''), 3000)

@@ -206,6 +206,7 @@
   "agenda.explore_private": "Privado",
   "agenda.state_request_sent": "Pedido enviado",
   "agenda.explore_join_club": "Entrar no clube",
+  "agenda.explore_joined": "Entraste no {{name}}.",
   "agenda.explore_request": "Pedir para entrar",
   "agenda.explore_join_error": "Não foi possível entrar no clube. Tenta novamente.",
   "agenda.friend_member_one": "{{name}} é membro",
