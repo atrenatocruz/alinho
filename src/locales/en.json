@@ -4369,5 +4369,10 @@
   "gerirclube.kind_open": "Open games",
   "gerirclube.kind_series": "Classes",
   "gerirclube.kind_friends": "Friends' games",
-  "lessons.past_person_missed": "Missed"
+  "lessons.past_person_missed": "Missed",
+  "steps.save_changes": "Save changes",
+  "steps.saving": "Saving…",
+  "steps.leave_title": "Leave without saving the changes?",
+  "steps.keep_editing": "Keep editing",
+  "steps.leave_without_saving": "Leave without saving"
 }

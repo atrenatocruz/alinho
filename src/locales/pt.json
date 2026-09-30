@@ -4381,5 +4381,10 @@
   "gerirclube.kind_open": "Jogos em aberto",
   "gerirclube.kind_series": "Turmas",
   "gerirclube.kind_friends": "Jogos entre amigos",
-  "lessons.past_person_missed": "Faltou"
+  "lessons.past_person_missed": "Faltou",
+  "steps.save_changes": "Guardar alterações",
+  "steps.saving": "A guardar…",
+  "steps.leave_title": "Sair sem guardar as alterações?",
+  "steps.keep_editing": "Continuar a editar",
+  "steps.leave_without_saving": "Sair sem guardar"
 }
