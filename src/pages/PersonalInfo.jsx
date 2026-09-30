@@ -11,6 +11,7 @@ import { countryOptions, countryName } from '../lib/countries'
 import { AGE_LABEL_KEY, ageCategory } from '../lib/ageCategories'
 import { formatDate as formatDateLib } from '../lib/formatDate'
 import { describeError } from '../lib/errors'
+import ConfirmPhoneCard from '../components/ConfirmPhoneCard'
 
 const SIDE_LABEL_KEY = { left: 'gamedetails.side_left', right: 'gamedetails.side_right', both: 'gamedetails.side_both' }
 const GENDER_LABEL_KEY = { masculino: 'login.gender_male', feminino: 'login.gender_female' }
@@ -372,7 +373,16 @@ export default function PersonalInfo() {
 
             <div>
               <p className={fieldLabel}>{t('profile.phone_label')}</p>
-              <p className={fieldValue}>{profile?.phone_hash ? t('profile.phone_linked') : t('profile.phone_not_linked')}</p>
+              <p className={fieldValue}>
+                {profile?.phone_hash
+                  ? profile?.phone_verified_at
+                    ? t('profile.phone_linked')
+                    : t('profile.phone_pending_confirm')
+                  : t('profile.phone_not_linked')}
+              </p>
+              <div className="mt-2">
+                <ConfirmPhoneCard compact />
+              </div>
             </div>
 
             <div>

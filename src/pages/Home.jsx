@@ -29,6 +29,7 @@ import { loadTournamentEvents } from '../lib/tournamentAgenda'
 import LessonEventCard from '../components/lessons/LessonEventCard'
 import TournamentEventCard from '../components/agenda/TournamentEventCard'
 import { useHeaderActions } from '../contexts/HeaderActionsContext'
+import ConfirmPhoneCard from '../components/ConfirmPhoneCard'
 import {
   toDayKey, eventFromGame, eventFromGroupMatch, eventsFromPrivateMatches, eventFromExplore, eventFromLesson, eventFromLessonRequest, isAgendaGame,
   applyFilters, groupByDay, countByDay, eventDistance, normalizeFilters, isPastEvent, eventsToPins, DEFAULT_FILTERS, EVENT_KINDS,
@@ -833,6 +834,11 @@ export default function Home() {
         <FilterChips filters={filters} orgs={orgs} onOpenFilters={(part) => setFiltersOpen(part)} onOpenSearch={viewMode === 'list' ? openSearch : undefined} />
       </div>
 
+
+      {/* Número associado mas por confirmar: sem confirmação, o «In» no
+          WhatsApp entra como convidado sem conta — o banner só aparece a
+          quem tem mesmo de agir (migration_mix_guest_sem_conta.sql). */}
+      {viewMode === 'list' && <div className="mt-3"><ConfirmPhoneCard compact /></div>}
 
       {viewMode === 'map' ? (
         <MapView pins={pins} location={location} onSelectPin={setSelectedPin} />

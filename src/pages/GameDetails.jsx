@@ -33,7 +33,7 @@ import JoinPartnerSheet from '../components/mix/JoinPartnerSheet'
 import { Sheet } from '../components/agenda/AgendaControls'
 import { whatsappLookalikeInGame, rememberWhatsappGuest, rememberedWhatsappGuest } from '../lib/whatsappGuest'
 import { MonoLabel } from '../components/tournament/TournamentBits'
-import { joinWithNamedPartner, listGameInvites, inviteLink, whatsappShare } from '../lib/partnerInvite'
+import { listGameInvites, inviteLink, whatsappShare } from '../lib/partnerInvite'
 import MixAdminBar from '../components/mix/MixAdminBar'
 import ChangeOneMixSheet from '../components/mix/ChangeOneMixSheet'
 import EventActionsSheet from '../components/EventActionsSheet'
@@ -356,12 +356,17 @@ export default function GameDetails() {
         return { ...p, level: m?.level, is_guest: m?.is_guest ?? false, is_test: m?.is_test ?? false }
       }
 
+      // Convidados sem conta (migration_mix_guest_sem_conta.sql): a linha
+      // aponta para game_guests em vez de profiles. Colunas enumeradas —
+      // phone_hash/whatsapp_jid são só do service-role (grants por coluna).
       const { data: participantsData, error: participantsError } = await supabase
         .from('participants')
         .select(`
           *,
           user:profiles!participants_user_id_fkey (id, name, preferred_side, avatar_url, xp, last_played_at, rating_games),
-          partner:profiles!participants_partner_id_fkey (id, name, preferred_side, avatar_url, xp, last_played_at, rating_games)
+          partner:profiles!participants_partner_id_fkey (id, name, preferred_side, avatar_url, xp, last_played_at, rating_games),
+          guest:game_guests!participants_guest_id_fkey (id, name),
+          partner_guest:game_guests!participants_partner_guest_id_fkey (id, name)
         `)
         .eq('game_id', id)
         .in('status', ['confirmed', 'waitlisted'])
@@ -387,7 +392,9 @@ export default function GameDetails() {
         .select(`
           *,
           player1:profiles!teams_player1_id_fkey (id, name, avatar_url, preferred_side),
-          player2:profiles!teams_player2_id_fkey (id, name, avatar_url, preferred_side)
+          player2:profiles!teams_player2_id_fkey (id, name, avatar_url, preferred_side),
+          guest1:game_guests!teams_player1_guest_id_fkey (id, name),
+          guest2:game_guests!teams_player2_guest_id_fkey (id, name)
         `)
         .eq('game_id', id)
         .order('created_at')
@@ -413,9 +420,25 @@ export default function GameDetails() {
       // level, and summed per dupla once the mix has started — same source
       // handleStartMix uses to pair solos, kept in state here so it
       // survives re-renders.
+      // Convidado sem conta → "perfil" sintético: o id é o game_guests.id
+      // (uuid, estável dentro do jogo — flui por duplas/drag-and-drop como
+      // um profiles.id), is_guest liga o badge/sem-link que a UI já tem, e
+      // no_account distingue-o de um guest com conta (legado) na hora de
+      // GRAVAR teams (playerX_guest_id em vez de playerX_id).
+      const guestAsProfile = (g) =>
+        g ? { id: g.id, name: g.name, preferred_side: 'both', avatar_url: null, is_guest: true, no_account: true } : null
+
       try {
         const globalRankings = await getGlobalRankings()
-        setPointsById(Object.fromEntries(globalRankings.map((r) => [r.user_id, Math.round(r.rating || 0)])))
+        const guestIds = (participantsData || [])
+          .flatMap((p) => [p.guest?.id, p.partner_guest?.id])
+          .filter(Boolean)
+        setPointsById({
+          ...Object.fromEntries(globalRankings.map((r) => [r.user_id, Math.round(r.rating || 0)])),
+          // Convidados emparelham com o baseline de sempre (900); o seed da
+          // dupla herda o parceiro (ver buildTeamRows).
+          ...Object.fromEntries(guestIds.map((gid) => [gid, 900])),
+        })
         setRatingInfoById(Object.fromEntries(globalRankings.map((r) => [r.user_id, { rating: r.rating, gender: r.gender }])))
       } catch (error) {
         console.error('Error loading global points:', error)
@@ -424,17 +447,22 @@ export default function GameDetails() {
       if (stale()) return
       setParticipants((confirmedRows || []).map((p) => ({
         ...p,
-        user: attachMembership(p.user),
-        partner: attachMembership(p.partner),
+        user: attachMembership(p.user) ?? guestAsProfile(p.guest),
+        partner: attachMembership(p.partner) ?? guestAsProfile(p.partner_guest),
       })))
       setWaitlist((waitlistRows || []).map((p) => ({
         ...p,
-        user: attachMembership(p.user),
+        user: attachMembership(p.user) ?? guestAsProfile(p.guest),
       })))
+      // Nas duplas, o estado guarda o id EFETIVO em playerX_id (conta ou
+      // convidado) — é o que o drag-and-drop, o mixEdit e o seedCourts
+      // esperam; o saveEditedPairs volta a separar as colunas ao gravar.
       setTeams((teamsData || []).map((team) => ({
         ...team,
-        player1: attachMembership(team.player1),
-        player2: attachMembership(team.player2),
+        player1_id: team.player1_id ?? team.player1_guest_id,
+        player2_id: team.player2_id ?? team.player2_guest_id,
+        player1: attachMembership(team.player1) ?? guestAsProfile(team.guest1),
+        player2: attachMembership(team.player2) ?? guestAsProfile(team.guest2),
       })))
       setMatches(matchesData || [])
 
@@ -579,8 +607,11 @@ export default function GameDetails() {
         }])
         if (error) throw error
       } else {
-        const result = await joinWithNamedPartner({ gameId: id, name: choice.name, email: choice.email })
-        setFreshInvite({ name: choice.name, email: choice.email, token: result.token })
+        // Parceiro sem conta = convidado só por nome (game_guests) — sem
+        // conta por reclamar nem convite por link (decisão Ruben, 30 set;
+        // substitui o fluxo partner_invites/#339).
+        const { error } = await supabase.rpc('join_with_guest_partner', { p_game_id: id, p_guest_name: choice.name })
+        if (error) throw error
       }
       setPartnerSheet(false)
       celebrate()
@@ -785,7 +816,7 @@ export default function GameDetails() {
         // partner slot only: detach, keep the row owner in the game
         const { error } = await supabase
           .from('participants')
-          .update({ partner_id: null, joined_alone: true })
+          .update({ partner_id: null, partner_guest_id: null, joined_alone: true })
           .eq('id', person.rowId)
         if (error) throw error
         // reopen manually — the reopen trigger only fires on DELETE
@@ -914,9 +945,17 @@ export default function GameDetails() {
     setBusy(true)
     setMixError('')
     try {
+      // No estado, playerX_id é o id EFETIVO (conta ou convidado) — ao
+      // gravar, cada lado volta para a coluna certa pelo objeto que viajou
+      // com o drag (no_account = game_guests).
       const results = await Promise.all(
         changed.map(et => supabase.from('teams')
-          .update({ player1_id: et.player1_id, player2_id: et.player2_id })
+          .update({
+            player1_id: et.player1?.no_account ? null : et.player1_id,
+            player1_guest_id: et.player1?.no_account ? et.player1_id : null,
+            player2_id: et.player2?.no_account ? null : et.player2_id,
+            player2_guest_id: et.player2?.no_account ? et.player2_id : null,
+          })
           .eq('id', et.id))
       )
       const failed = results.find(r => r.error)
@@ -1012,12 +1051,31 @@ export default function GameDetails() {
       forcedRepeats,
       teamRows: pooledDuplas.map(d => ({
         game_id: id,
-        player1_id: d.player1.id,
-        player2_id: d.player2.id,
-        seed_ranking: d.seed,
+        ...teamSlotCols(d.player1, d.player2),
+        seed_ranking: guestAwareSeed(d, points),
         ...(isGruposEliminatorias ? { pool_number: d.pool_number } : {}),
       })),
     }
+  }
+
+  // Cada lado da dupla vai para a coluna certa: conta → playerX_id,
+  // convidado sem conta → playerX_guest_id (CHECK XOR na BD).
+  const teamSlotCols = (p1, p2) => ({
+    player1_id: p1.no_account ? null : p1.id,
+    player1_guest_id: p1.no_account ? p1.id : null,
+    player2_id: p2.no_account ? null : p2.id,
+    player2_guest_id: p2.no_account ? p2.id : null,
+  })
+
+  // seed_ranking com convidados: o convidado HERDA o rating do parceiro (a
+  // mesma regra do Elo — a dupla vale a média de quem tem conta); dupla
+  // 100% convidados fica a 0. Sem convidados, o seed do formDuplas.
+  const guestAwareSeed = (d, points) => {
+    const g1 = d.player1.no_account
+    const g2 = d.player2.no_account
+    if (!g1 && !g2) return d.seed
+    const pts = (p) => points[p.id] ?? 0
+    return !g1 ? pts(d.player1) * 2 : !g2 ? pts(d.player2) * 2 : 0
   }
 
   // Só forma as duplas — as rondas arrancam depois, uma a uma, por decisão do admin.
@@ -1035,6 +1093,10 @@ export default function GameDetails() {
       // on court 1 down to the weakest on the last court (see seedCourts).
       const globalRankings = await getGlobalRankings()
       const pointsById = Object.fromEntries(globalRankings.map(r => [r.user_id, Math.round(r.rating || 0)]))
+      // Convidados sem conta emparelham com o baseline de sempre (900).
+      for (const p of participants.flatMap((x) => [x.user, x.partner])) {
+        if (p?.no_account) pointsById[p.id] = 900
+      }
 
       // Americano has no "one fixed dupla per player" concept — partners
       // rotate every round — so it skips formDuplas/repeatPairKeys
@@ -1069,9 +1131,8 @@ export default function GameDetails() {
               const dupla = m[side]
               teamRows.push({
                 game_id: id,
-                player1_id: dupla.player1.id,
-                player2_id: dupla.player2.id,
-                seed_ranking: dupla.seed,
+                ...teamSlotCols(dupla.player1, dupla.player2),
+                seed_ranking: guestAwareSeed(dupla, pointsById),
               })
               slots.push({ roundIdx, court_number: m.court_number, side })
             }
@@ -1175,11 +1236,11 @@ export default function GameDetails() {
   const confirmedPeopleNow = async () => {
     const { data, error } = await supabase
       .from('participants')
-      .select('partner_id')
+      .select('partner_id, partner_guest_id')
       .eq('game_id', id)
       .eq('status', 'confirmed')
     if (error) throw error
-    return (data || []).reduce((n, row) => n + 1 + (row.partner_id ? 1 : 0), 0)
+    return (data || []).reduce((n, row) => n + 1 + (row.partner_id || row.partner_guest_id ? 1 : 0), 0)
   }
 
   // Lê tudo fresco (quem está, campos, pontos), calcula as duplas novas e só
@@ -1194,23 +1255,35 @@ export default function GameDetails() {
         .select(`
           *,
           user:profiles!participants_user_id_fkey (id, name, preferred_side, avatar_url),
-          partner:profiles!participants_partner_id_fkey (id, name, preferred_side, avatar_url)
+          partner:profiles!participants_partner_id_fkey (id, name, preferred_side, avatar_url),
+          guest:game_guests!participants_guest_id_fkey (id, name),
+          partner_guest:game_guests!participants_partner_guest_id_fkey (id, name)
         `)
         .eq('game_id', id)
         .eq('status', 'confirmed')
         .order('created_at', { ascending: true })
         .order('id', { ascending: true }),
-      supabase.from('teams').select('player1_id, player2_id, seed_ranking, pool_number').eq('game_id', id),
+      supabase.from('teams').select('player1_id, player2_id, player1_guest_id, player2_guest_id, seed_ranking, pool_number').eq('game_id', id),
     ])
     if (gameError) throw gameError
     if (rowsError) throw rowsError
     if (oldError) throw oldError
 
+    // Convidados sem conta → o mesmo perfil sintético do loadGameDetails.
+    const freshRows = (rows || []).map((p) => ({
+      ...p,
+      user: p.user ?? (p.guest ? { id: p.guest.id, name: p.guest.name, preferred_side: 'both', is_guest: true, no_account: true } : null),
+      partner: p.partner ?? (p.partner_guest ? { id: p.partner_guest.id, name: p.partner_guest.name, preferred_side: 'both', is_guest: true, no_account: true } : null),
+    }))
+
     const globalRankings = await getGlobalRankings()
     const points = Object.fromEntries(globalRankings.map(r => [r.user_id, Math.round(r.rating || 0)]))
+    for (const p of freshRows.flatMap((x) => [x.user, x.partner])) {
+      if (p?.no_account) points[p.id] = 900
+    }
     // À última da hora não se pergunta pelas repetições: aceita-se a melhor
     // formação possível, como o formDuplas já garante.
-    const { teamRows } = buildTeamRows(rows || [], await loadRepeatPairKeys(), points, freshGame)
+    const { teamRows } = buildTeamRows(freshRows, await loadRepeatPairKeys(), points, freshGame)
 
     const { error: deleteError } = await supabase.from('teams').delete().eq('game_id', id)
     if (deleteError) throw deleteError
@@ -1222,6 +1295,8 @@ export default function GameDetails() {
           game_id: id,
           player1_id: team.player1_id,
           player2_id: team.player2_id,
+          player1_guest_id: team.player1_guest_id ?? null,
+          player2_guest_id: team.player2_guest_id ?? null,
           seed_ranking: team.seed_ranking,
           ...(team.pool_number != null ? { pool_number: team.pool_number } : {}),
         })))
@@ -1325,7 +1400,7 @@ export default function GameDetails() {
     const person = people.find((p) => p.id === player?.id)
     if (!person) return
     const suplente = waitlist[0]
-    const suplenteSize = suplente ? 1 + (suplente.partner_id ? 1 : 0) : 0
+    const suplenteSize = suplente ? 1 + (suplente.partner_id || suplente.partner_guest_id ? 1 : 0) : 0
     const suplenteFits = suplente && peopleCount - 1 + suplenteSize <= capacity
     const msg = [
       t('mixedit.confirm_remove', { name: person.name }),
@@ -1349,8 +1424,10 @@ export default function GameDetails() {
         // quem de facto entrou e saiu, e o apagar promove o suplente só se
         // ainda houver lugar.
         const row = participants.find((r) => r.id === person.rowId)
+        // O parceiro que fica pode ser uma conta ou um convidado sem conta.
+        const stays = row.partner_id ? { user_id: row.partner_id } : { guest_id: row.partner_guest_id }
         const { error: insertError } = await supabase.from('participants').insert([{
-          game_id: id, user_id: row.partner_id, partner_id: null, status: 'confirmed', joined_alone: true,
+          game_id: id, ...stays, partner_id: null, status: 'confirmed', joined_alone: true,
         }])
         if (insertError) throw insertError
         const { error } = await supabase.from('participants').delete().eq('id', person.rowId)
@@ -1359,7 +1436,7 @@ export default function GameDetails() {
         // Sai só o parceiro; quem inscreveu fica, agora sozinho.
         const { error } = await supabase
           .from('participants')
-          .update({ partner_id: null, joined_alone: true })
+          .update({ partner_id: null, partner_guest_id: null, joined_alone: true })
           .eq('id', person.rowId)
         if (error) throw error
         // Uma atualização não dispara a promoção automática (só o apagar).
@@ -3885,6 +3962,15 @@ export default function GameDetails() {
           onConfirm={handleLastMinuteAdd}
           onClose={() => setAddPlayerOpen(false)}
           beforeStart={!mixStarted}
+          onGuestAdded={async () => {
+            setAddPlayerOpen(false)
+            // A decorrer (antes da ronda 1), um convidado novo refaz as
+            // duplas como qualquer outra entrada à última da hora.
+            if (mixStarted) {
+              try { await reformDuplas(people.map((p) => p.id)) } catch (error) { console.error('Error reforming duplas after adding a guest:', error) }
+            }
+            loadGameDetails()
+          }}
         />
       )}
 

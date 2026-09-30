@@ -39,9 +39,12 @@ CREATE TABLE IF NOT EXISTS game_guests (
   created_at TIMESTAMPTZ NOT NULL DEFAULT TIMEZONE('utc', NOW())
 );
 
--- O mesmo número só entra uma vez por jogo (anti-duplo-In do bot).
+-- O mesmo número só entra uma vez por jogo (anti-duplo-In do bot). Índice
+-- COMPLETO e não parcial: o upsert do bot usa ON CONFLICT (game_id,
+-- phone_hash), que não sabe apontar a índices parciais — e com phone_hash
+-- NULL (convidados só por nome) os NULLs nunca colidem entre si.
 CREATE UNIQUE INDEX IF NOT EXISTS game_guests_game_phone_key
-  ON game_guests (game_id, phone_hash) WHERE phone_hash IS NOT NULL;
+  ON game_guests (game_id, phone_hash);
 CREATE INDEX IF NOT EXISTS idx_game_guests_game ON game_guests (game_id);
 
 ALTER TABLE game_guests ENABLE ROW LEVEL SECURITY;
@@ -133,6 +136,16 @@ CREATE TRIGGER participants_guest_gc
   AFTER DELETE ON participants
   FOR EACH ROW
   WHEN (OLD.guest_id IS NOT NULL OR OLD.partner_guest_id IS NOT NULL)
+  EXECUTE FUNCTION game_guests_gc();
+-- Também quando a linha DEIXA de apontar para o convidado (tirar o parceiro
+-- na app, adoção na confirmação do número) — um UPDATE não passa pelo
+-- trigger de DELETE.
+DROP TRIGGER IF EXISTS participants_guest_gc_upd ON participants;
+CREATE TRIGGER participants_guest_gc_upd
+  AFTER UPDATE OF guest_id, partner_guest_id ON participants
+  FOR EACH ROW
+  WHEN ((OLD.guest_id IS NOT NULL AND NEW.guest_id IS DISTINCT FROM OLD.guest_id)
+     OR (OLD.partner_guest_id IS NOT NULL AND NEW.partner_guest_id IS DISTINCT FROM OLD.partner_guest_id))
   EXECUTE FUNCTION game_guests_gc();
 
 -- ── 3. Contagem de vagas: parceiro-convidado também ocupa lugar ─────────
@@ -547,7 +560,9 @@ BEGIN
   SELECT organization_id, status INTO v_org, v_status FROM games WHERE id = p_game_id;
   IF v_org IS NULL THEN RAISE EXCEPTION 'game_not_found'; END IF;
   IF NOT is_org_admin(v_org) THEN RAISE EXCEPTION 'not_admin'; END IF;
-  IF v_status NOT IN ('open', 'closed') THEN RAISE EXCEPTION 'mix_already_started'; END IF;
+  -- in_progress incluído: o AddPlayerSheet também serve o «mix à última da
+  -- hora» (#292), antes da ronda 1 — a janela é validada pela UI/refazer.
+  IF v_status NOT IN ('open', 'closed', 'in_progress') THEN RAISE EXCEPTION 'mix_already_started'; END IF;
 
   INSERT INTO game_guests (game_id, name) VALUES (p_game_id, btrim(p_name))
   RETURNING id INTO v_guest;

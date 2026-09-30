@@ -21,10 +21,14 @@ export const canEditBeforeRound1 = (game, matchesCount) =>
 export const canAddBeforeStart = (game, _teamsCount) =>
   ['open', 'closed'].includes(game?.status)
 
+// O id "efetivo" de um lugar da dupla: conta (playerX_id) ou convidado sem
+// conta (playerX_guest_id — migration_mix_guest_sem_conta.sql).
+const slotId = (team, n) => team[`player${n}_id`] ?? team[`player${n}_guest_id`] ?? null
+
 /** Quem está inscrito (confirmado) mas não ficou em nenhuma dupla — o caso
     do número ímpar. `people` é a lista plana de pessoas ({ id, name }). */
 export function unpairedPeople(people = [], teams = []) {
-  const inTeams = new Set(teams.flatMap((team) => [team.player1_id, team.player2_id]))
+  const inTeams = new Set(teams.flatMap((team) => [slotId(team, 1), slotId(team, 2)]))
   return people.filter((p) => p?.id && !inTeams.has(p.id))
 }
 
@@ -33,15 +37,15 @@ const pairKey = (a, b) => [a, b].sort().join('|')
 /** Quantas duplas novas há depois de refazer — para dizer ao admin quem
     trocou de parceiro. */
 export function changedPairKeys(before = [], after = []) {
-  const old = new Set(before.map((team) => pairKey(team.player1_id, team.player2_id)))
+  const old = new Set(before.map((team) => pairKey(slotId(team, 1), slotId(team, 2))))
   return new Set(
     after
-      .map((team) => pairKey(team.player1_id, team.player2_id))
+      .map((team) => pairKey(slotId(team, 1), slotId(team, 2)))
       .filter((key) => !old.has(key))
   )
 }
 
-export const teamPairKey = (team) => pairKey(team.player1_id, team.player2_id)
+export const teamPairKey = (team) => pairKey(slotId(team, 1), slotId(team, 2))
 
 /** O que acontece a quem entra: cabe, cabe abrindo mais um campo, ou só
     como suplente. `maxCourts` é o limite do plano (null = sem limite). */

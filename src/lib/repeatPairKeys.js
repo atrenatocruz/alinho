@@ -18,9 +18,14 @@ export async function loadRepeatPairKeys(db, game) {
   if (!previousGames?.length) return new Set()
   const { data: previousTeams } = await db
     .from('teams')
-    .select('player1_id, player2_id')
+    .select('player1_id, player2_id, player1_guest_id, player2_guest_id')
     .in('game_id', previousGames.map((g) => g.id))
+  // Convidados sem conta: o id efetivo do lugar é o guest_id — sem o
+  // COALESCE, dois lugares-convidado davam a chave «null|null» e qualquer
+  // dupla com convidado contava como repetição de outra.
   return new Set(
-    (previousTeams || []).map((team) => [team.player1_id, team.player2_id].sort().join('|'))
+    (previousTeams || []).map((team) =>
+      [team.player1_id ?? team.player1_guest_id, team.player2_id ?? team.player2_guest_id].sort().join('|')
+    )
   )
 }

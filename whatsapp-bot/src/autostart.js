@@ -147,9 +147,12 @@ export async function loadRepeatPairKeys(game) {
   if (!previousGames?.length) return new Set()
   const { data: previousTeams } = await supabase
     .from('teams')
-    .select('player1_id, player2_id')
+    .select('player1_id, player2_id, player1_guest_id, player2_guest_id')
     .in('game_id', previousGames.map((g) => g.id))
-  return new Set((previousTeams || []).map((team) => pairKey(team.player1_id, team.player2_id)))
+  // COALESCE dos convidados: sem isto, duas duplas com convidado davam
+  // ambas «null|…» e contavam como o mesmo par.
+  return new Set((previousTeams || []).map((team) =>
+    pairKey(team.player1_id ?? team.player1_guest_id, team.player2_id ?? team.player2_guest_id)))
 }
 
 async function autoStartMix(game, { sendText }) {
