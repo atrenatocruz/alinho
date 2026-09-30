@@ -361,6 +361,23 @@ export const LESSON_TABLE_MOCKS = {
     return on() && !empty() ? PRICES() : []
   },
   club_peak_hours: () => (on() && !empty() ? PEAK_HOURS() : []),
+  // Histórico no Gerir: as aulas já dadas das turmas (a mais recente primeiro).
+  lessons: (url = '') => {
+    if (!on() || !/series_id=in\./.test(url)) return []
+    return ['ser-ter', 'ser-qui'].filter((id) => url.includes(id)).flatMap((sid) => {
+      const s = SERIES.find((x) => x.series_id === sid)
+      return [1, 2, 3, 4].map((w) => {
+        const d = new Date(); d.setDate(d.getDate() - 7 * w + ((s.weekday - ((d.getDay() + 6) % 7 + 1) + 7) % 7) - 7)
+        const [h, m] = s.start_time.split(':'); d.setHours(+h, +m, 0, 0)
+        const cancelled = w === 2
+        return { id: `past-${sid}-${w}`, series_id: sid, starts_at: d.toISOString(), status: cancelled ? 'cancelled' : 'confirmed',
+          lesson_attendees: cancelled ? [] : [
+            { user_id: 'u-fb', guest_name: null, status: 'confirmed', marked_note: null },
+            { user_id: 'u-ms', guest_name: null, status: w === 3 ? 'absent' : 'confirmed', marked_note: w === 3 ? 'ligou' : null },
+          ] }
+      })
+    })
+  },
   // «Editar turma»: a turma como está gravada (a de terça já começou, com promoção).
   lesson_series: (url = '') => {
     const id = (url.match(/id=eq\.([^&]+)/) || [])[1]
