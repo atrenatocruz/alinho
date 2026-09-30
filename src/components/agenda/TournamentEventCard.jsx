@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Trophy, MapPin, Clock, Megaphone } from 'lucide-react'
-import { Avatar } from '../ui'
+import { OrgHeader } from './EventCard'
 
 /* O torneio na agenda da Home (Trello #363).
 
@@ -37,18 +37,18 @@ export default function TournamentEventCard({ event, past, footer = null }) {
   const to = `/torneio/${event.slug || event.id}`
   const frame = { background: LILAC.bg, borderColor: LILAC.border, borderWidth: 2 }
 
-  if (footer) {
-    return (
-      <div className={`card ${past ? 'opacity-60' : ''}`} style={frame}>
-        <Link to={to} className="press block">{body()}</Link>
-        {footer}
-      </div>
-    )
-  }
+  // Cartão com organizador (design-handoff/2026-09-28-cartao-com-organizador,
+  // o do Dev 4 no b26fc07a): em cima quem organiza, que abre o perfil do
+  // clube; o resto do cartão abre o torneio. O cartão já não é um <Link> por
+  // fora — um botão dentro de um link não é válido —, é um Link por baixo de
+  // tudo, como no GameEventCard.
   return (
-    <Link to={to} className={`card press block hover:shadow-lift ${past ? 'opacity-60' : ''}`} style={frame}>
+    <div className={`card relative press hover:shadow-lift ${past ? 'opacity-60' : ''}`} style={frame}>
+      <Link to={to} className="absolute inset-0 rounded-[inherit]" aria-label={event.raw?.name || event.orgName || ''} />
+      <OrgHeader event={event} past={past} />
       {body()}
-    </Link>
+      {footer && <div className="relative z-[1]">{footer}</div>}
+    </div>
   )
 
   function body() {
@@ -112,18 +112,13 @@ export default function TournamentEventCard({ event, past, footer = null }) {
         </p>
       )}
 
-      <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted">
-        <Avatar name={event.orgName} url={event.orgLogo} size="w-[18px] h-[18px] text-[8px]" />
-        <span className="min-w-0 truncate">
-          {[
-            event.orgName,
-            isMatch ? event.courtName : null,
-            !isMatch && event.raw?.category_count
-              ? t('tagenda.categories', { count: event.raw.category_count })
-              : null,
-          ].filter(Boolean).join(' · ')}
-        </span>
-      </div>
+      {/* Quem organiza passou para cima (OrgHeader); aqui fica o campo ou
+          o número de categorias. */}
+      {(isMatch ? event.courtName : event.raw?.category_count) ? (
+        <p className="mt-1.5 truncate text-xs text-muted">
+          {isMatch ? event.courtName : t('tagenda.categories', { count: event.raw.category_count })}
+        </p>
+      ) : null}
 
       {/* Hora prevista, nunca garantida — a regra da Federação que o
           desenho manda repetir no cartão (SPEC §6). */}
