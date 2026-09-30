@@ -469,20 +469,46 @@ export const AuthProvider = ({ children }) => {
       return { error: null }
     }
 
+    // «Sair» sai sempre deste telemóvel. Se o servidor recusar — a sessão já
+    // não existe lá (403 session_not_found, depois de trocar a palavra-passe,
+    // de «sair de todos» ou de igualar a base), ou não há rede —, apaga-se a
+    // sessão só aqui. Antes a chave ficava guardada e a pessoa ficava presa na
+    // conta (QA/Francisco, 30 set).
     const { error } = await supabase.auth.signOut()
-    if (!error) {
-      setUser(null)
-      setProfile(null)
-      setMemberships([])
-      setCurrentOrganizationId(null)
-      i18n.changeLanguage('pt')
+    let forced = false
+    if (error) {
+      console.error('Sign out failed on the server, clearing this device only:', error)
+      // O «local» ainda fala com o servidor e, se falhar, também não apaga
+      // nada: por isso, no fim, apaga-se a chave à mão.
+      const local = await supabase.auth.signOut({ scope: 'local' }).catch((e) => ({ error: e }))
+      const key = supabase.auth.storageKey
       try {
-        localStorage.removeItem('preferredLanguage')
+        if (local?.error || (key && localStorage.getItem(key))) {
+          if (key) {
+            localStorage.removeItem(key)
+            localStorage.removeItem(`${key}-code-verifier`)
+            localStorage.removeItem(`${key}-user`)
+          }
+          forced = true
+        }
       } catch {
         // ignore — localStorage can throw in some contexts
       }
     }
-    return { error }
+    setUser(null)
+    setProfile(null)
+    setMemberships([])
+    setCurrentOrganizationId(null)
+    i18n.changeLanguage('pt')
+    try {
+      localStorage.removeItem('preferredLanguage')
+    } catch {
+      // ignore — localStorage can throw in some contexts
+    }
+    // Com a chave apagada à mão, o cliente ainda tem a sessão em memória:
+    // recarrega-se no ecrã de entrar, já sem ela.
+    if (forced) window.location.assign('/login')
+    return { error: null }
   }
 
   const updateProfile = async (updates) => {

@@ -2303,6 +2303,14 @@ export default function GerirClube() {
             }}
             editExtras={extras}
             organizationId={mixScopeId || currentOrganizationId}
+            // «Cancelar o mix» / «Eliminar o mix» no Editar (30 set): o mesmo
+            // cancelMixDate do «Mais ⋯» da página do mix.
+            onDestroy={editingGame ? async () => {
+              const { outcome } = await cancelMixDate(editingGame)
+              setDoneNotice(t(outcome === 'cancel' ? 'gerirclube.mix_cancelled' : 'gerirclube.mix_deleted'))
+              fecharMix()
+              loadGames()
+            } : null}
           />
         )}
         {deleteSheet}
