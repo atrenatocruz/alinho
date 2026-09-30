@@ -14,9 +14,14 @@ import { tieBreakProblem, matchTieBreak } from './tournament/tieBreak'
 // por defeito) ou super tie-break a 10, se quem organiza o escolheu
 // (games.tiebreak_8_8) — como no torneio. O resultado valida-se com a mesma
 // regra do torneio (tieBreakProblem) e os pontos gravam-se no set.
+// allowDraw (mix, Francisco 30 set, REGRAS.md ponto 4 — «não bloqueamos,
+// simplesmente avisamos»): um empate grava-se com «Este jogo está
+// empatado.»; o que fica travado é o passo seguinte, no GameDetails. Nos
+// pontos, qualquer empate; no pro set, até 8-8 (o tie-break do 8-8 continua
+// lá, para quem o jogou). O torneio não o passa e fica como estava.
 export default function ScoreEntry({
   match, scoringFormat, editable, teamAName, teamBName,
-  initialScores, onScoreChange, onSave, saving, tieBreakTarget = 7,
+  initialScores, onScoreChange, onSave, saving, tieBreakTarget = 7, allowDraw = false,
 }) {
   const { t } = useTranslation()
   // Must be called unconditionally on every render (rules-of-hooks) — even
@@ -83,14 +88,21 @@ export default function ScoreEntry({
           finalScore = { ...score, sets: [{ ...score, tiebreak_a: ba, tiebreak_b: bb, is_super_tiebreak: tieBreakTarget === 10 }] }
         }
       }
+      // Empate no pro set (até 8-8), sem tie-break escrito: grava-se assim.
+      const breakerEmpty = breakerScore.a === '' && breakerScore.b === ''
+      if (!readyToSave && allowDraw && aNum === bNum && aNum <= 8 && breakerEmpty) {
+        readyToSave = true
+        finalScore = { score_a: aNum, score_b: bNum }
+      }
     }
   } else {
-    // pontos_simples: unchanged rule — any two non-equal non-negative ints.
-    if (bothEntered && aNum !== bNum) {
+    // pontos_simples: two non-negative ints, equal only with allowDraw.
+    if (bothEntered && (aNum !== bNum || allowDraw)) {
       readyToSave = true
       finalScore = { score_a: aNum, score_b: bNum }
     }
   }
+  const isDrawEntry = bothEntered && aNum === bNum
 
   // Shared read-only row (both editable and non-editable states use it for
   // a team once that team's own score isn't being typed into right now) —
@@ -123,6 +135,9 @@ export default function ScoreEntry({
       <div className="space-y-1.5 animate-fade-in">
         {readOnlyRow(teamAName, match.team_a_id, match.score_a)}
         {readOnlyRow(teamBName, match.team_b_id, match.score_b)}
+        {allowDraw && !match.winner_team_id && match.score_a != null && match.score_a === match.score_b && (
+          <p className="px-3 text-xs font-bold text-warning" role="status">{t('gamedetails.score_tied')}</p>
+        )}
         {tb?.tb && (
           <p className="px-3 text-xs font-extrabold text-muted">
             {t(tb.super ? 'gamedetails.super_tiebreak_result' : 'gamedetails.tiebreak_result', { score: tb.tb })}
@@ -183,7 +198,10 @@ export default function ScoreEntry({
 
       {/* Empate: o botão de gravar não aparece, e antes não se dizia porquê —
           um 5-5 encravou uma ronda a sério (Trello #420). Diz-se o que fazer. */}
-      {bothEntered && aNum === bNum && !needsBreaker && (
+      {isDrawEntry && allowDraw && (
+        <p className="text-xs font-bold text-warning" role="status">{t('gamedetails.score_tied')}</p>
+      )}
+      {isDrawEntry && !allowDraw && !needsBreaker && (
         <p className="text-xs font-extrabold text-ink-700" role="status">{t('gamedetails.score_tie_not_allowed')}</p>
       )}
 
