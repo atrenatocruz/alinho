@@ -8,6 +8,8 @@ import { config } from './config.js'
 import { helpText, helpFooter } from './messages.js'
 import { t } from './locales.js'
 import { startTimer } from './timing.js'
+import { partnerFromTypedNames, isOnlySenderName } from './partnerNames.js'
+import { rememberName, seenName, usablePushName, notePlaceholder, renameDefaultPartner, renamePlaceholderFor } from './seenNames.js'
 import { repostHooks, cardSentRecently, noteCardSent } from './sync.js'
 
 function stripAccents(str) {
@@ -320,6 +322,12 @@ function matchOpenMixesByText(openMixes, rest, { glued }) {
 // que passaram o filtro (a conversa normal do grupo não escreve nada).
 export async function handleGroupMessage(payload, deps) {
   const ctx = { timer: startTimer('cmd'), action: null }
+  // O nome de quem escreve, para quando for mencionado («In @Gonçalo»):
+  // só memória, a conversa normal do grupo continua sem ir à BD.
+  const pushName = payload.message?.pushName
+  rememberName(payload.senderPn, pushName)
+  rememberName(payload.senderJid, pushName)
+  await renamePlaceholderFor(payload.senderPn, pushName)
   try {
     return await handleGroupMessageInner(payload, deps, ctx)
   } finally {
@@ -342,6 +350,9 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
   // a conversa normal nunca vai à base de dados).
   const pairAnswer = !parsed && [...pairRequests.values()].some((r) => r.groupJid === groupJid) ? parsePairAnswer(text) : null
   if (!pending && !parsed && !pairAnswer) return
+  // Declarado já aqui: o «Sim» a um parceiro sem conta (lá em baixo, no
+  // pending) pode voltar ao caminho do «In com …» (confirmPairWithUnregistered).
+  let partnerRequest = null
   ctx.action = copied ? 'copied_list' : pairAnswer && !pending ? 'pair_answer' : (parsed?.action ?? 'pending')
 
   // Multi-grupo: o grupo de onde a mensagem veio determina o clube (e o
@@ -364,6 +375,9 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
   const resolvedProfile = await resolveProfileByPhoneJid(senderPn, organizationId)
   timer.mark('perfil')
   const lang = resolvedProfile?.language ?? 'pt'
+  // Convidado que ficou com o nome por defeito («Parceiro de Macedo») e
+  // agora escreve: passa a ter o nome do WhatsApp.
+  if (await renameDefaultPartner(resolvedProfile, message?.pushName)) resolvedProfile.name = usablePushName(message.pushName)
 
   // Quote the sender's own message so a reply is unambiguous even when
   // several people send commands close together. Every reply also points
@@ -503,7 +517,6 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     if (outRequest) rest = r.replace(/(^|\s)dupla(?=\s|$)/g, ' ').replace(/\s+/g, ' ').trim() || null
   }
 
-  let partnerRequest = null
   if (action === 'in') {
     const split = splitPartner(rest)
     if (split.partnerName || mentionedJids.length > 0) {
@@ -534,6 +547,31 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
   if (copied) {
     await handleCopiedList(copied, openMixes)
     return
+  }
+
+  // Nomes depois do «In» sem o «com» (grupo de teste, 30 set): «In Miguel
+  // Oliveira Marco Silva», «In Miguel Oliveira e Marco Silva», «In Marco
+  // Silva». Se o texto não diz que mix (ou se responde ao cartão, onde o
+  // texto não conta para o mix), lê-se como nomes: o de quem escreveu sai,
+  // o que sobra é o parceiro (partnerNames.js). E «In Miguel Oliveira com
+  // Marco Silva» — o nome de quem escreveu antes do «com» não é um mix.
+  if (action === 'in' && rest && !glued) {
+    const repliedToCard = quotedStanzaId ? Boolean(gameIdForMessage(quotedStanzaId)) : false
+    const namesAMix = !repliedToCard && matchOpenMixesByText(openMixes, rest, { glued }).matched.length > 0
+    if (!namesAMix) {
+      const senderNames = [resolvedProfile?.name, message?.pushName]
+      if (partnerRequest) {
+        if (isOnlySenderName(rest, senderNames)) rest = null
+      } else {
+        // O texto como foi escrito (acentos, maiúsculas): as últimas palavras.
+        const typed = text.trim().replace(/\s+/g, ' ').split(' ').slice(-rest.split(' ').length).join(' ')
+        const partner = partnerFromTypedNames(typed, senderNames)
+        if (partner !== undefined) {
+          rest = null
+          if (partner) partnerRequest = { name: stripAccents(partner.toLowerCase()), typedName: partner, mentionedPns: [] }
+        }
+      }
+    }
   }
 
   // #552 — «mix» mostra o cartão completo de cada mix aberto (o mesmo do
@@ -568,6 +606,19 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
    */
   const shownName = () => titleCase(partnerRequest.typedName || partnerRequest.name)
 
+  /** Os membros do clube com este nome (tirando quem escreveu): o igual, se só houver um, senão os parecidos. */
+  async function membersNamed(profile, name) {
+    const { data: rows, error } = await supabase
+      .from('memberships')
+      .select('user_id, profile:profiles!inner(id, name)')
+      .eq('organization_id', organizationId)
+    if (error) throw new Error(`Failed to load members for partner lookup: ${error.message}`)
+    const query = stripAccents(name.toLowerCase()).replace(/\s+/g, ' ').trim()
+    const people = rows.map((r) => ({ id: r.user_id, name: r.profile.name })).filter((x) => !isMine(profile, x.id))
+    const exact = people.filter((x) => stripAccents((x.name || '').toLowerCase()) === query)
+    return exact.length === 1 ? exact : people.filter((x) => nameMatches(x.name, query))
+  }
+
   async function resolvePartner(profile, game = null, { addToRowId = null } = {}) {
     if ((partnerRequest.mentionedPns || []).length > 1) {
       await reply('partner_one_mention')
@@ -584,10 +635,13 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
       }
       if (found) return { partner: found, isNewGuest: false }
       try {
-        const guestName = partnerRequest.name
-          ? shownName()
-          : t('partner_guest_default_name', lang, { name: profile.name })
+        // O nome: o escrito («In @João com João Silva»), o do WhatsApp se a
+        // pessoa já escreveu no grupo, ou por defeito — e esse muda para o
+        // do WhatsApp quando ela escrever (seenNames.js).
+        const known = partnerRequest.name ? shownName() : seenName(pn)
+        const guestName = known || t('partner_guest_default_name', lang, { name: profile.name })
         const created = await createGuestProfile(pn, guestName, organizationId)
+        if (!known) notePlaceholder(pn, created)
         return { partner: created, isNewGuest: true }
       } catch (err) {
         console.error('Failed to create partner guest profile:', err)
@@ -600,15 +654,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
       await reply('partner_mention_unreadable')
       return null
     }
-    const { data: rows, error } = await supabase
-      .from('memberships')
-      .select('user_id, profile:profiles!inner(id, name)')
-      .eq('organization_id', organizationId)
-    if (error) throw new Error(`Failed to load members for partner lookup: ${error.message}`)
-    const query = stripAccents(partnerRequest.name.toLowerCase())
-    const people = rows.map((r) => ({ id: r.user_id, name: r.profile.name })).filter((x) => !isMine(profile, x.id))
-    const exact = people.filter((x) => stripAccents((x.name || '').toLowerCase()) === query)
-    const matches = exact.length === 1 ? exact : people.filter((x) => nameMatches(x.name, query))
+    const matches = await membersNamed(profile, partnerRequest.name)
     if (matches.length === 1) return { partner: matches[0], isNewGuest: false }
     if (matches.length === 0) {
       // Pode ser alguém que não está na app nem no grupo (não dá para o
@@ -738,22 +784,31 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
       return
     }
     const adding = Boolean(pending.addToRowId)
-    const needed = adding ? 1 : 2
-    if (capacity - people.length < needed) {
-      await reply(adding ? 'mix_full_add_partner' : capacity - people.length <= 0 ? 'mix_full_pair' : 'mix_one_spot_pair')
-      return
-    }
     const { profile, isNewGuest } = await requireProfileOrCreateGuest(resolvedProfile, senderPn)
     if (!profile) return
+    const own = adding ? rows.find((row) => row.id === pending.addToRowId) : null
     if (adding) {
       // A inscrição sozinha tem de continuar lá, ser desta pessoa e sem parceiro.
-      const own = rows.find((row) => row.id === pending.addToRowId)
       if (!own || own.status !== 'confirmed' || own.partner_id || !isMine(profile, own.user_id)) {
         await reply('mix_no_longer_available')
         return
       }
     } else if (rows.some((row) => isMine(profile, row.user_id) || isMine(profile, row.partner_id))) {
       await reply('already_joined')
+      return
+    }
+    // Entre a pergunta e o «Sim» a pessoa pode ter entrado no clube (30 set:
+    // o Paulo deu «In» enquanto o Mike respondia, e ficaram dois «Paulo
+    // Duarte»). Se agora há um membro com esse nome, segue o «In com …» normal.
+    if ((await membersNamed(profile, pending.name)).length === 1) {
+      partnerRequest = { name: stripAccents(pending.name.toLowerCase()), typedName: pending.name, mentionedPns: [] }
+      if (adding) await addPartnerToRow({ game, people, capacity, profile, row: own, existingRows: rows })
+      else await joinAsPair({ game, people, capacity, profile, isNewGuest, existingRows: rows })
+      return
+    }
+    const needed = adding ? 1 : 2
+    if (capacity - people.length < needed) {
+      await reply(adding ? 'mix_full_add_partner' : capacity - people.length <= 0 ? 'mix_full_pair' : 'mix_one_spot_pair')
       return
     }
     let token
