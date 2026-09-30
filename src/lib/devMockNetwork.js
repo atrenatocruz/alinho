@@ -256,6 +256,8 @@ const RPC_MOCKS = {
   // mesmo dia.
   // Cancelar/apagar da lista (Dev 3, migration_amigos_apagar_da_lista).
   delete_friend_match: () => 'deleted',
+  // Gravar o resultado do mix de uma vez (Dev 3, 29 set).
+  save_mix_match_result: (params) => ({ match_id: params?.p_match_id, winner_team_id: null }),
   finish_friend_session: () => ({ removed: 2, notified: 1 }),
   get_my_private_matches: () => localStorage.getItem('mockHomeSession') ? (() => {
     const mode = localStorage.getItem('mockHomeSession')

@@ -1541,34 +1541,27 @@ export default function GameDetails() {
     setMixError('')
     setSavingMatchId(match.id)
     try {
-      const { error } = await supabase
-        .from('matches')
-        .update({
-          score_a: a,
-          score_b: b,
-          winner_team_id: a > b ? match.team_a_id : match.team_b_id,
-        })
-        .eq('id', match.id)
-      if (error) throw error
-
-      if (sets) {
-        // Corrections re-save all sets — delete-then-insert keeps this
-        // idempotent rather than needing per-set upsert logic.
-        const { error: deleteError } = await supabase.from('match_sets').delete().eq('match_id', match.id)
-        if (deleteError) throw deleteError
-        const { error: setsError } = await supabase.from('match_sets').insert(
-          sets.map((s, i) => ({
-            match_id: match.id,
-            set_number: i + 1,
+      // Tudo de uma vez (Dev 3, migration_mix_gravar_resultado.sql): o
+      // resultado e os sets gravam-se juntos ou não se grava nada. Antes eram
+      // 3 passos soltos (matches → apagar sets → inserir sets): se a trava do
+      // #588 recusasse o tie-break, o 9-8 com vencedor já tinha ficado
+      // gravado, sem sets, com o ecrã a dizer «recusado» (QA, 28 set).
+      // Sem sets (pontos simples), os sets ficam como estão.
+      const { error } = await supabase.rpc('save_mix_match_result', {
+        p_match_id: match.id,
+        p_score_a: a,
+        p_score_b: b,
+        p_sets: sets
+          ? sets.map((s) => ({
             score_a: s.score_a,
             score_b: s.score_b,
             is_super_tiebreak: !!s.is_super_tiebreak,
             // Os pontos do tie-break do 8-8 (#580) — só quando há.
             ...(s.tiebreak_a != null ? { tiebreak_a: s.tiebreak_a, tiebreak_b: s.tiebreak_b } : {}),
           }))
-        )
-        if (setsError) throw setsError
-      }
+          : null,
+      })
+      if (error) throw error
 
       // O resultado aparece logo, antes de a leitura voltar (Renato, 29 set:
       // «desaparece tudo e depois volta a aparecer os pontos»). Antes,
