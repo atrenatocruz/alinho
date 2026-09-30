@@ -1902,6 +1902,8 @@
   "friends.invite_email_sent": "Invite sent by email",
   "friends.guest_tag": "Guest",
   "live.title": "Happening now",
+  "live.prev": "Previous",
+  "live.next": "Next",
   "live.title_club": "Happening now at the club",
   "live.title_group": "Happening now in the group",
   "live.mix_tag": "Mix · round {{n}} of {{total}}",
@@ -4380,5 +4382,13 @@
   "steps.saving": "Saving…",
   "steps.leave_title": "Leave without saving the changes?",
   "steps.keep_editing": "Keep editing",
-  "steps.leave_without_saving": "Leave without saving"
+  "steps.leave_without_saving": "Leave without saving",
+  "agenda.filter_show_hint": "Tap one and the Home changes right away.",
+  "agenda.org_kind_club": "Club",
+  "agenda.org_kind_group": "Group",
+  "agenda.filter_org_none_hint": "With none picked, you see events from all your clubs and groups.",
+  "agenda.filter_org_picked": "Picked",
+  "agenda.filter_org_remove": "Remove {{name}}",
+  "agenda.filter_org_clear": "Clear",
+  "agenda.filter_org_many": "{{count}} clubs/groups"
 }
