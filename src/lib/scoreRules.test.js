@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { tiebreakProblem, setProblem, proSetProblem, pointsProblem, matchProblem, setsWon, friendSetProblem, friendMatchResult } from './scoreRules'
+import { tiebreakProblem, setProblem, proSetProblem, pointsProblem, matchProblem, setsWon, friendSetProblem, friendMatchResult, mixProSetProblem } from './scoreRules'
 
 const s = (a, b, extra = {}) => ({ score_a: a, score_b: b, ...extra })
 
@@ -96,6 +96,21 @@ describe('amigos: sets por acabar (Francisco, 28 set)', () => {
   it('sem sets, ou um set acima de 7-6', () => {
     expect(friendMatchResult([]).problem).toBe('empty')
     expect(friendMatchResult([s(6, 4), s(8, 6)])).toMatchObject({ problem: 'set_invalid', winner: null })
+  })
+})
+
+describe('mix: pro set por acabar (Francisco, 30 set)', () => {
+  it('aceita o que ficou quando acabou o tempo, e o empate', () => {
+    for (const [a, b] of [[7, 3], [5, 5], [0, 0], [8, 8], [9, 7], [3, 7]]) expect(mixProSetProblem(s(a, b))).toBeNull()
+  })
+  it('recusa passar de 9 e o 9-9', () => {
+    for (const [a, b] of [[10, 8], [9, 9], [12, 3]]) expect(mixProSetProblem(s(a, b))).toBe('proset_invalid')
+    expect(mixProSetProblem(s(-1, 3))).toBe('negative')
+  })
+  it('no 9-8 pede e valida os pontos do desempate, como no oficial', () => {
+    expect(mixProSetProblem(s(9, 8))).toBe('proset_breaker_needed')
+    expect(mixProSetProblem(s(9, 8, { tiebreak_a: 7, tiebreak_b: 5 }))).toBeNull()
+    expect(mixProSetProblem(s(9, 8, { tiebreak_a: 7, tiebreak_b: 6 }))).toBe('tiebreak_invalid')
   })
 })
 

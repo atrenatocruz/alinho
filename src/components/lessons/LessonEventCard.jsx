@@ -88,13 +88,14 @@ export default function LessonEventCard({ event, past = false, onAttendance = nu
   return (
     <div className={`relative overflow-hidden rounded-card p-3.5 press ${frame}`} style={frameStyle}>
       <Link to={isRequest ? `/professor/${base.teacher_profile_id}/pedir` : `/aula/${l.lesson_id}`} className="absolute inset-0" aria-label={title} />
-      <OrgHeader event={event} past={past} />
+      {/* O estado ao canto, com quem organiza (Francisco, 30 set: «em todos»). */}
+      <OrgHeader event={event} past={past} right={state} />
       <div className="flex items-start justify-between gap-2">
         <span className="flex flex-wrap gap-1">
           <TealTag icon={GraduationCap}>{typeLabel}</TealTag>
           {isSeries && !cancelled && <TealTag icon={Repeat}>{t(`lessons.wd_plural_${((event.startsAt.getDay() + 6) % 7) + 1}`)}</TealTag>}
         </span>
-        {state}
+        {!event.orgName && state}
       </div>
 
       <p className={`font-display text-[22px] font-extrabold leading-none mt-2.5 ${past ? 'text-muted' : 'text-ink-900'}`}>

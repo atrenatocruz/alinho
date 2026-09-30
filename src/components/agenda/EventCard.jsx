@@ -104,22 +104,30 @@ export function useOpenOrg(event) {
 /** Em cima de cada cartão da Home: o logótipo redondo de quem organiza, o
     nome com «›» e «Grupo organizador» / «Clube organizador». Tocar aqui abre
     o perfil; o resto do cartão abre o evento (sugestão do Ruben, aprovada
-    pelo Francisco a 28 set). */
-export function OrgHeader({ event, past = false }) {
+    pelo Francisco a 28 set). `right`: o estado do cartão («A decorrer»,
+    «Inscrito»…) no canto de cima, à direita — sem espaço vazio ao lado do
+    logótipo (Francisco, 30 set). */
+export function OrgHeader({ event, past = false, right = null }) {
   const { t } = useTranslation()
   const open = useOpenOrg(event)
   if (!event.orgName) return null
   const isGroup = event.orgKind === 'group'
   const Tag = open ? 'button' : 'div'
-  return (
+  const cut = event.orgName.lastIndexOf(' ')
+  const nameHead = cut > 0 ? event.orgName.slice(0, cut + 1) : ''
+  const nameTail = cut > 0 ? event.orgName.slice(cut + 1) : event.orgName
+  const header = (
     <Tag {...(open ? { type: 'button', onClick: open } : {})}
-      className={`relative z-[1] mb-2.5 flex w-full min-w-0 items-center gap-3 text-left ${past ? 'opacity-70' : ''}`}>
+      className={`relative z-[1] flex min-w-0 items-center gap-3 text-left ${right ? 'flex-1' : 'mb-2.5 w-full'} ${past ? 'opacity-70' : ''}`}>
       {event.orgLogo
         ? <img src={event.orgLogo} alt="" className="h-[52px] w-[52px] shrink-0 rounded-full object-cover" />
         : <span className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full bg-ink-900 text-[15px] font-extrabold text-lime-400">{initials(event.orgName)}</span>}
       <span className="min-w-0">
-        <span className="flex min-w-0 items-center gap-0.5 text-[17px] font-extrabold leading-tight text-ink-900">
-          <span className="truncate">{event.orgName}</span>{open && <ChevronRight size={18} strokeWidth={2.75} className="shrink-0" />}
+        {/* O nome em até duas linhas, com o «›» logo a seguir — cortado, o «›»
+            ficava solto longe do nome (UX, 30 set). */}
+        <span className="line-clamp-2 break-words text-[17px] font-extrabold leading-tight text-ink-900">
+          {/* A última palavra e o «›» não se separam: o «›» nunca fica sozinho numa linha. */}
+          {nameHead}<span className="whitespace-nowrap">{nameTail}{open && <ChevronRight size={18} strokeWidth={2.75} className="ml-0.5 inline align-[-3px]" />}</span>
         </span>
         <span className="mt-0.5 flex items-center gap-1 text-[13px] text-ink-700">
           {isGroup ? <Users size={13} className="shrink-0" /> : <Building2 size={13} className="shrink-0" />}
@@ -128,6 +136,8 @@ export function OrgHeader({ event, past = false }) {
       </span>
     </Tag>
   )
+  if (!right) return header
+  return <div className="mb-2.5 flex items-start justify-between gap-2">{header}<span className="shrink-0">{right}</span></div>
 }
 
 /** Linha do dono: logótipo (quadrado = clube, redondo = grupo) + nome + tipo.
@@ -257,7 +267,7 @@ export function GameEventCard({ event, profile, friendIds = null, action = null,
   return (
     <div className={`relative overflow-hidden rounded-card p-3.5 press ${cardFrame(event, past)}`}>
       <Link to={`/jogo/${game.id}`} className="absolute inset-0" aria-label={`${game.title} — ${time}`} />
-      <OrgHeader event={event} past={past} />
+      <OrgHeader event={event} past={past} right={state} />
 
       <div className="flex items-start justify-between gap-2">
         <div className="flex flex-wrap gap-1">
@@ -270,7 +280,7 @@ export function GameEventCard({ event, profile, friendIds = null, action = null,
             event.kind === 'mix' && parseLevel(game.level) ? `${parseLevel(game.level).scale}${parseLevel(game.level).num}` : null,
           ].filter(Boolean).join(' · ') || null} />
         </div>
-        {state}
+        {!event.orgName && state}
       </div>
 
       <p className={`text-[22px] font-extrabold leading-none mt-2.5 ${past ? 'text-muted' : 'text-ink-900'}`}>{time}</p>
@@ -357,9 +367,13 @@ export function ExploreEventCard({ event, profile, distance = null, onJoin = nul
     }
   }
 
+  // O estado ao canto, com quem organiza (Francisco, 30 set: «em todos»).
+  const exploreState = pending
+    ? <StateTag tone="grey" icon={Clock}>{t('agenda.state_request_sent')}</StateTag>
+    : mismatchKey ? <StateTag tone="grey">{t(mismatchKey)}</StateTag> : null
   return (
     <div className={`relative overflow-hidden rounded-card p-3.5 border ${KIND_STYLE[event.kind].card}`}>
-      <OrgHeader event={event} />
+      <OrgHeader event={event} right={exploreState} />
       <div className="flex items-start justify-between gap-2">
         <div className="flex flex-wrap gap-1">
           <KindTag kind={event.kind} />
@@ -369,9 +383,7 @@ export function ExploreEventCard({ event, profile, distance = null, onJoin = nul
             </span>
           )}
         </div>
-        {pending
-          ? <StateTag tone="grey" icon={Clock}>{t('agenda.state_request_sent')}</StateTag>
-          : mismatchKey && <StateTag tone="grey">{t(mismatchKey)}</StateTag>}
+        {!event.orgName && exploreState}
       </div>
 
       <p className="text-[22px] font-extrabold leading-none mt-2.5 text-ink-900">{time}</p>
@@ -481,12 +493,12 @@ export function FriendSessionCard({ event, userId, past = false }) {
   return (
     <div className={`relative overflow-hidden rounded-card p-3.5 ${to ? 'press' : ''} ${cardFrame(event, past)}`}>
       {to && <Link to={to} className="absolute inset-0" aria-label={title} />}
-      <OrgHeader event={event} past={past} />
+      <OrgHeader event={event} past={past} right={state} />
       <div className="flex items-start justify-between gap-2">
         {/* Num clube é «Jogo em aberto · a rodar», com a cor do jogo em aberto;
             num grupo, «Jogo entre amigos» (Francisco, 28 set). */}
         <KindTag kind={event.kind === 'open' ? 'open' : 'friends'} past={past} suffix={t('agenda.session_rotating')} />
-        {state}
+        {!event.orgName && state}
       </div>
       {event.hasTime ? (
         <p className={`text-[22px] font-extrabold leading-none mt-2.5 ${past ? 'text-muted' : 'text-ink-900'}`}>
@@ -544,10 +556,10 @@ export function FriendsEventCard({ event, userId, orgSlug = null, invite = null,
     <div className={`relative overflow-hidden rounded-card p-3.5 ${to ? 'press' : ''} ${cardFrame(event, past)}`}>
       {to && <Link to={to} className="absolute inset-0" aria-label={title} />}
 
-      <OrgHeader event={event} past={past} />
+      <OrgHeader event={event} past={past} right={state} />
       <div className="flex items-start justify-between gap-2">
         <KindTag kind="friends" past={past} />
-        {state}
+        {!event.orgName && state}
       </div>
 
       {event.hasTime ? (
