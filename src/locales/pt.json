@@ -4350,5 +4350,21 @@
   "agenda.org_club_organizer": "Clube organizador",
   "appupdate.new_version": "Nova versão",
   "appupdate.update": "Atualizar",
-  "appupdate.later": "Agora não"
+  "appupdate.later": "Agora não",
+  "gerir.search_placeholder": "Procurar clube ou grupo",
+  "gerir.filter_all": "Todos",
+  "gerir.filter_clubs": "Clubes · {{count}}",
+  "gerir.filter_groups": "Grupos · {{count}}",
+  "gerir.recent": "Abertos há pouco",
+  "gerir.results_one": "{{count}} resultado",
+  "gerir.results_other": "{{count}} resultados",
+  "gerir.no_results": "Nenhum clube ou grupo com essas letras.",
+  "gerir.see_all_clubs": "Ver os {{count}} clubes",
+  "gerir.see_all_groups": "Ver os {{count}} grupos",
+  "gerir.row_club": "Clube · Plano {{plan}}",
+  "gerir.row_group": "Grupo · Plano {{plan}}",
+  "gerir.row_club_group": "Grupo do clube · {{plan}}",
+  "gerir.row_group_of": "Grupo do {{club}} · {{plan}}",
+  "ui.clear": "Limpar",
+  "gerir.groups_count_inside": "{{count}} · e {{inside}} dentro de clubes"
 }
