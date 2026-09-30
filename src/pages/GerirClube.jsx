@@ -47,7 +47,6 @@ import { weekdayShort, launchDate } from '../lib/launchDay'
 import EventActionsSheet from '../components/EventActionsSheet'
 import { cancelMixDate } from '../lib/mixCancel'
 
-const sanitizeSlug = (value) => value.toLowerCase().replace(/[^a-z0-9-]/g, '')
 
 // datetime-local <-> stored timestamptz helpers (keeps Portugal wall-clock)
 const toLocalInput = (d) => {
@@ -334,7 +333,6 @@ export default function GerirClube() {
   const [transferError, setTransferError] = useState('')
   const [showCreateGroup, setShowCreateGroup] = useState(false)
   const [groupName, setGroupName] = useState('')
-  const [groupSlug, setGroupSlug] = useState('')
   const [creatingGroup, setCreatingGroup] = useState(false)
   const [groupError, setGroupError] = useState('')
   // Nomes repetidos (27 set): avisa enquanto se escreve.
@@ -1967,7 +1965,7 @@ export default function GerirClube() {
     setGroupError('')
     setCreatingGroup(true)
     try {
-      await createGroup(groupName.trim(), groupSlug.trim(), org.id, currentUser.id)
+      await createGroup(groupName.trim(), org.id, currentUser.id)
       // create_group inserts the caller's admin membership server-side — pull
       // it into the client before the admin can navigate to /gerir/<slug>,
       // otherwise the org resolver there sees a stale memberships array and
@@ -1977,18 +1975,12 @@ export default function GerirClube() {
       setCreatedGroupName(groupName.trim())
       setShowCreateGroup(false)
       setGroupName('')
-      setGroupSlug('')
     } catch (error) {
       console.error('Error creating group:', error)
       const message = error?.message || ''
-      if (message.toLowerCase().includes('duplicate key value violates unique constraint') || message.toLowerCase().includes('slug')) {
-        setGroupError(describeError(t, error, 'gerirclube.error_duplicate_group_slug'))
-      } else {
-        // The RPC's own RAISE EXCEPTION messages are already pt-PT, so show
-        // them verbatim rather than hiding the real reason behind a generic
-        // "tenta novamente" the admin can't act on.
-        setGroupError(message || t('gerirclube.error_create_group_fallback'))
-      }
+      // Nome repetido tem frase própria; o resto das mensagens da RPC já vem
+      // em pt-PT e mostra-se tal e qual, em vez de um «tenta novamente» genérico.
+      setGroupError(message && !error?.code?.startsWith?.('23') ? message : describeError(t, error, 'gerirclube.error_create_group_fallback'))
     } finally {
       setCreatingGroup(false)
     }
@@ -3936,13 +3928,6 @@ export default function GerirClube() {
                         placeholder={t('gerirclube.group_name_placeholder')}
                       />
                       <OrgNameTakenHint taken={newGroupNameTaken} className="!mt-0" />
-                      <input
-                        type="text"
-                        value={groupSlug}
-                        onChange={(e) => setGroupSlug(sanitizeSlug(e.target.value))}
-                        className="input-field"
-                        placeholder={t('gerirclube.group_slug_placeholder')}
-                      />
                       {groupError && (
                         <p className="text-danger text-sm font-extrabold">{groupError}</p>
                       )}
@@ -3950,7 +3935,7 @@ export default function GerirClube() {
                         <button
                           type="button"
                           onClick={handleCreateGroup}
-                          disabled={!groupName.trim() || !groupSlug.trim() || creatingGroup || newGroupNameTaken}
+                          disabled={!groupName.trim() || creatingGroup || newGroupNameTaken}
                           className="btn-primary flex-1"
                         >
                           {creatingGroup ? t('gerirclube.creating_group_label') : t('gerirclube.create_group_submit')}
