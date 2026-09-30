@@ -14,6 +14,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { CalendarDays } from 'lucide-react'
 import { Chips, EmptyState } from '../ui'
+import RuleHint from '../RuleHint'
 import { MonoLabel } from './TournamentBits'
 import useCategoryBoard from './useCategoryBoard'
 import { byDayAndTime, unscheduled } from '../../lib/tournamentDraw'
@@ -126,10 +127,10 @@ export default function CalendarPanel({ category, myEntries }) {
 
   const nowLine = (
     <div className="mb-3.5 flex items-center gap-2" aria-label={t('tournament.schedule.now_aria', { time: nowTime })}>
-      <span className="w-14 shrink-0 font-mono text-[11px] font-bold uppercase tracking-wide text-ink-900">{t('tournament.schedule.now')}</span>
-      <span className="-ml-1 h-2 w-2 shrink-0 rounded-full bg-ink-900" />
-      <span className="h-[1.5px] flex-1 bg-ink-900" />
-      <span className="font-mono text-[11px] font-bold text-ink-900">{nowTime}</span>
+      {/* Vermelha, «AGORA · 10:42» (SPEC quadro-horario-detalhe, ponto 3). */}
+      <span className="shrink-0 font-mono text-[11px] font-bold uppercase tracking-wide text-danger">{t('tournament.schedule.now')} · {nowTime}</span>
+      <span className="h-2 w-2 shrink-0 rounded-full bg-danger" />
+      <span className="h-[1.5px] flex-1 bg-danger" />
     </div>
   )
 
@@ -143,7 +144,7 @@ export default function CalendarPanel({ category, myEntries }) {
           onChange={setPickedDay}
           options={days.map((d) => ({
             value: d.date,
-            label: `${dayChip(d.date, i18n.language)} · ${d.slots.reduce((n, s) => n + s.matches.length, 0)}`,
+            label: `${dayChip(d.date, i18n.language)} · ${t('tournament.tree.n_games', { count: d.slots.reduce((n, s) => n + s.matches.length, 0) })}`,
           }))}
         />
       ) : day ? (
@@ -174,7 +175,8 @@ export default function CalendarPanel({ category, myEntries }) {
         </section>
       ) : null}
 
-      <p className="px-1 pb-2 text-xs text-muted">{t('tournament.draw.time_warning')}</p>
+      {/* Explicações de regras, sempre recolhidas num «?» (Francisco, 28 set). */}
+      <RuleHint className="px-1 pb-2" label={t('tournament.schedule.why_planned')} note={t('tournament.draw.time_warning')} />
 
       <MatchSheet match={opened} entries={entries} matches={matches} labels={opened ? labelsOf(opened) : {}}
         myIds={myIds} groups={groups || []} onClose={() => setOpenId(null)} />

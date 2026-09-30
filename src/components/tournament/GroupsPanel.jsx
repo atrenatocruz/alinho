@@ -8,6 +8,7 @@
 import { useTranslation } from 'react-i18next'
 import { Users } from 'lucide-react'
 import { EmptyState } from '../ui'
+import RuleHint from '../RuleHint'
 import { Me } from './TournamentBits'
 import useCategoryBoard from './useCategoryBoard'
 import { standingsOf, qualifiersPerGroup, groupPoints } from '../../lib/tournamentDraw'
@@ -108,6 +109,8 @@ function GroupTable({ group, matches, entries, qualifiers, myEntryId, t }) {
       <p className="border-t border-ink-50 px-3 py-1.5 text-xs text-muted">
         {t(done ? 'tournament.draw.qualify_note' : 'tournament.draw.qualify_note_running', { count: qualifiers })}
       </p>
+      {/* O que é «Pts», recolhido num «?» (Francisco, 28 set). */}
+      <RuleHint className="px-3 pb-1.5" label={t('tournament.draw.points_hint')} note={t('tournament.draw.points_hint_note')} />
     </section>
   )
 }

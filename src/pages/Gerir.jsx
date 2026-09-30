@@ -15,6 +15,7 @@ import { describeError } from '../lib/errors'
 import { planName } from '../lib/plans'
 import { useHeaderActions } from '../contexts/HeaderActionsContext'
 import AppFeaturesPanel from '../components/AppFeaturesPanel'
+import OrgFinder from '../components/gerir/OrgFinder'
 
 const sanitizeSlug = (value) => value.toLowerCase().replace(/[^a-z0-9-]/g, '')
 
@@ -418,10 +419,14 @@ export default function Gerir() {
 
       {createGroupPanel}
 
+      {/* Mais de 5: procurar, pastilhas e linhas curtas (design-handoff/
+          2026-09-28-gerir-lista-de-clubes). Até 5, fica como estava. */}
+      {clubsToShow.length > 5 && <OrgFinder orgs={clubsToShow} joinRequestsByOrg={joinRequestsByOrg} />}
+
       {/* Clubes and Grupos never share a list: someone who manages a friends
           group and a club at the same time has to see at a glance which is
           which (Francisco, 15 set 2026 — Trello #177). */}
-      {[
+      {clubsToShow.length <= 5 && [
         { key: 'clubs', label: t('gerir.section_clubs'), orgs: clubsToShow.filter((o) => o.kind !== 'group') },
         { key: 'groups', label: t('gerir.section_groups'), orgs: clubsToShow.filter((o) => o.kind === 'group') },
       ].filter((section) => section.orgs.length > 0).map((section) => (

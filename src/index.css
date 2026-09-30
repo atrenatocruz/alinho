@@ -159,6 +159,16 @@
 }
 
 @layer utilities {
+  /* A barra de deslizar à vista (quadro do torneio no computador, 29 set):
+     sem isto o Mac esconde-a e ninguém percebe que o quadro continua. */
+  .scroll-visible {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--ink-200)) transparent;
+  }
+  .scroll-visible::-webkit-scrollbar { height: 8px; }
+  .scroll-visible::-webkit-scrollbar-thumb { background: rgb(var(--ink-200)); border-radius: 9999px; }
+  .scroll-visible::-webkit-scrollbar-track { background: transparent; }
+
   /* Hides the scrollbar on an overflow-x-auto row while keeping it
      scrollable — used as the bottom nav's overflow safety net so a
      narrow viewport with many items scrolls instead of clipping. */
