@@ -438,3 +438,79 @@ test('o pedido cai se as duplas já foram sorteadas', async () => {
   assert.match(out, /já não vale/)
   assert.equal(db.participants.find((p) => p.id === 'solo').partner_id, null)
 })
+
+// ── Grupo de teste (30 set): nomes sem «com», «In @» sem nome, corrida no «Sim» ──
+const { _clearSeenNamesForTests } = await import('../src/seenNames.js')
+async function sayAs(text, { pn = '351911111111', pushName, mentionPns = [] } = {}) {
+  const sent = []
+  await handleGroupMessage(
+    { groupJid: 'g@g.us', senderPn: `${pn}@s.whatsapp.net`, text, message: { pushName }, quotedStanzaId: null,
+      mentionedJids: mentionPns.map((p) => `${p}@s.whatsapp.net`), mentionedPns: mentionPns.map((p) => `${p}@s.whatsapp.net`) },
+    { sendText: async (_g, t) => { sent.push(t) } },
+  )
+  return sent.join('\n')
+}
+
+test('«In <eu> <parceiro>» sem «com» inscreve a dupla', async () => {
+  const out = await sayAs('In Afonso Dias Bernardo Ramos', { pn: '351922222222' })
+  assert.doesNotMatch(out, /Não encontrei nenhum mix/)
+  assert.deepEqual(db.participants.map((p) => [p.user_id, p.partner_id]), [['b', 'a']])
+})
+
+test('«In <eu> e <parceiro>» inscreve a dupla', async () => {
+  await sayAs('In Afonso Dias e Bernardo', { pn: '351922222222' })
+  assert.deepEqual(db.participants.map((p) => [p.user_id, p.partner_id]), [['b', 'a']])
+})
+
+test('«In <eu> com <parceiro>»: o nome antes do «com» não é tratado como mix', async () => {
+  const out = await sayAs('In Bernardo Ramos com Afonso')
+  assert.doesNotMatch(out, /Não encontrei nenhum mix/)
+  assert.deepEqual(db.participants.map((p) => [p.user_id, p.partner_id]), [['a', 'b']])
+})
+
+test('«In <só o meu nome>» entra sozinho', async () => {
+  assert.equal(await sayAs('In Bernardo Ramos'), '')
+  assert.deepEqual(db.participants.map((p) => [p.user_id, p.partner_id ?? null]), [['a', null]])
+})
+
+test('«In <parceiro sem conta>» sem «com» pergunta se inscreve a dupla', async () => {
+  assert.match(await sayAs('In Marco Silva', { pn: '351922222222' }), /Não encontrei o \*Marco Silva\*.*Queres inscrever a dupla/s)
+})
+
+test('«In @X» usa o nome do WhatsApp do X se ele já escreveu no grupo', async () => {
+  _clearSeenNamesForTests()
+  await sayAs('bora jogar', { pn: '351944444444', pushName: 'Gonçalo Parreira' })
+  const out = await sayAs('in @351944444444', { mentionPns: ['351944444444'] })
+  assert.match(out, /\*Gonçalo Parreira\*/)
+  assert.doesNotMatch(out, /Parceiro de/)
+})
+
+test('«In @X» sem nome conhecido fica «Parceiro de …» e muda quando o X escreve', async () => {
+  _clearSeenNamesForTests()
+  const out = await sayAs('in @351955555555', { mentionPns: ['351955555555'] })
+  assert.match(out, /Parceiro de Bernardo Ramos/)
+  const guestId = db.participants[0].partner_id
+  db.profiles.push({ id: guestId, name: 'Parceiro de Bernardo Ramos', phone_hash: 'x', language: 'pt' })
+  await sayAs('boas', { pn: '351955555555', pushName: 'Gonçalo' })
+  assert.equal(db.profiles.find((p) => p.id === guestId).name, 'Gonçalo')
+})
+
+test('«Sim» a parceiro sem conta, mas entretanto entrou alguém com esse nome → pede-lhe a dupla, sem criar outro', async () => {
+  db.profiles.push({ id: 'k', name: 'Miguel Almeida', phone_hash: hash('977777777'), language: 'pt' })
+  db.memberships.push({ user_id: 'k', organization_id: 'o' })
+  assert.match(await sayAs('in com paulo duarte', { pn: '351977777777', pushName: 'Mike' }), /Queres inscrever a dupla/)
+  db.profiles.push({ id: 'p', name: 'Paulo Duarte#12', phone_hash: hash('966666666'), language: 'pt' })
+  db.memberships.push({ user_id: 'p', organization_id: 'o', is_guest: true })
+  db.participants.push({ id: 'prow', game_id: 'm', user_id: 'p', partner_id: null, status: 'confirmed', joined_alone: true, created_at: '2026-09-30T16:16:00Z' })
+  const out = await sayAs('sim', { pn: '351977777777', pushName: 'Mike' })
+  assert.doesNotMatch(out, /convite\//)
+  assert.match(out, /quer fazer dupla contigo/)
+  assert.equal(db.partner_invites.length, 0)
+})
+
+test('responder ao cartão com «In <eu> e <parceiro>» inscreve a dupla (antes: entrava sozinho)', async () => {
+  sync._resetGroupStateForTests()
+  const cards = await sayWithIds('mix')
+  await sayWithIds('In Bernardo Ramos e Afonso Dias', cards[0].id)
+  assert.deepEqual(db.participants.map((p) => [p.game_id, p.user_id, p.partner_id]), [['m', 'a', 'b']])
+})

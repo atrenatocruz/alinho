@@ -830,7 +830,7 @@ export default function Home() {
           </div>
         </div>
         {viewMode === 'list' && <DayHeader dayKey={visibleDay} onOpenMonth={() => setMonthOpen(true)} onToday={() => scrollToDay(today)} />}
-        <FilterChips filters={filters} onOpenFilters={() => setFiltersOpen(true)} onOpenSearch={viewMode === 'list' ? openSearch : undefined} />
+        <FilterChips filters={filters} orgs={orgs} onOpenFilters={(part) => setFiltersOpen(part)} onOpenSearch={viewMode === 'list' ? openSearch : undefined} />
       </div>
 
 
@@ -988,6 +988,7 @@ export default function Home() {
       )}
       {filtersOpen && (
         <FilterSheet
+          part={filtersOpen}
           filters={filters}
           orgs={orgs}
           countFor={(f) => applyFilters(events, f, location).length}

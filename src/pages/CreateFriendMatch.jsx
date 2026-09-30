@@ -4,7 +4,7 @@ import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
 import { Users, Lock } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { createFriendMatch, updateFriendMatch, addFriendMatchInvitees, removeFriendMatchInvitee } from '../lib/privateMatches'
+import { createFriendMatch, updateFriendMatch, addFriendMatchInvitees, removeFriendMatchInvitee, cancelFriendMatch } from '../lib/privateMatches'
 import { FORMAT_DB, formatKey } from '../components/friends/friendScoring'
 import { listOrganizationMembers } from '../lib/clubProfile'
 import { contemTexto } from '../lib/semAcentos'
@@ -259,6 +259,13 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
         onSave: handleSave, onCancel: goBack, dirty: initialSnap != null && snapshot() !== initialSnap,
         saving, saveDisabled: missing > 0 || !scheduledDate,
         saveHint: missing > 0 ? t('friends.missing_people', { count: missing }) : !scheduledDate ? t('createprivatematch.date_missing') : null,
+        // «Cancelar o jogo» (30 set), com a mesma pergunta da página da sessão.
+        danger: {
+          label: t('friends.cancel_game'), title: t('friends.cancel_title'), message: t('friends.cancel_message'),
+          confirmLabel: t('friends.cancel_confirm'), cancelLabel: t('friends.cancel_keep'),
+          onConfirm: async () => { await cancelFriendMatch(m.id); navigate('/jogos-privados') },
+          errorOf: (err) => (String(err?.message || '').includes('has_counted') ? t('friends.cancel_error_has_counted') : describeError(t, err)),
+        },
       } : null}
       footer={step === 4 ? (edit ? (
         <PrimaryButton onClick={handleSave} disabled={saving} className="w-full">
