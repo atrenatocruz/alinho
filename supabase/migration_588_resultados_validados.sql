@@ -144,12 +144,17 @@ BEGIN
    WHERE m.id = NEW.match_id;
   IF g IS NULL OR NOT g.results_validated THEN RETURN NEW; END IF;
 
-  -- Empates gravam-se (Francisco, 30 set, REGRAS.md ponto 4): um pro set
-  -- empatado (até 8-8) passa; o que não avança é o passo seguinte, no ecrã.
-  IF g.scoring_format = 'pro_set_9' AND NEW.score_a = NEW.score_b AND NEW.score_a BETWEEN 0 AND 8 THEN
-    v_p := NULL;
-  ELSIF g.scoring_format = 'pro_set_9' THEN
-    v_p := score_proset_problem(NEW.score_a, NEW.score_b, v_tba, v_tbb, COALESCE(g.tb88, 'tiebreak'));
+  -- Mix (Francisco, 30 set): o pro set pode ficar por acabar quando acaba o
+  -- tempo (7-3) ou empatado (5-5); só não passa de 9 nem fica 9-9. Os pontos
+  -- do desempate só contam no 9-8, e aí validam-se.
+  IF g.scoring_format = 'pro_set_9' THEN
+    IF least(NEW.score_a, NEW.score_b) < 0 THEN
+      v_p := 'negative';
+    ELSIF greatest(NEW.score_a, NEW.score_b) > 9 OR (NEW.score_a = 9 AND NEW.score_b = 9) THEN
+      v_p := 'proset_invalid';
+    ELSIF greatest(NEW.score_a, NEW.score_b) = 9 AND least(NEW.score_a, NEW.score_b) = 8 THEN
+      v_p := score_proset_problem(NEW.score_a, NEW.score_b, v_tba, v_tbb, COALESCE(g.tb88, 'tiebreak'));
+    END IF;
   ELSIF g.scoring_format IN ('melhor_2_sets', 'melhor_3_sets') THEN
     IF NEW.set_number = 3 AND g.scoring_format = 'melhor_2_sets' THEN
       v_p := score_tiebreak_problem(NEW.score_a, NEW.score_b, 10);   -- o super tie-break
@@ -190,14 +195,16 @@ BEGIN
   IF g IS NULL OR NOT g.results_validated THEN RETURN NEW; END IF;
   IF NEW.score_a < 0 OR NEW.score_b < 0 THEN
     v_p := 'negative';
-  -- Empates gravam-se (Francisco, 30 set, REGRAS.md ponto 4): 5-5 no pro set,
-  -- 1-1 em sets. O ecrã não deixa terminar a ronda com um jogo empatado.
-  ELSIF NEW.score_a = NEW.score_b AND (
-          (g.scoring_format = 'pro_set_9' AND NEW.score_a <= 8)
-       OR (g.scoring_format IN ('melhor_2_sets', 'melhor_3_sets') AND NEW.score_a <= 1)) THEN
-    v_p := NULL;
+  -- Mix (Francisco, 30 set): o pro set pode ficar por acabar (7-3) ou empatado
+  -- (5-5); só não passa de 9 nem fica 9-9.
   ELSIF g.scoring_format = 'pro_set_9' THEN
-    v_p := score_proset_problem(NEW.score_a, NEW.score_b, NULL, NULL);
+    IF greatest(NEW.score_a, NEW.score_b) > 9 OR (NEW.score_a = 9 AND NEW.score_b = 9) THEN
+      v_p := 'proset_invalid';
+    END IF;
+  -- Empates gravam-se (Francisco, 30 set, REGRAS.md ponto 4): 1-1 em sets.
+  -- O ecrã não deixa terminar a ronda com um jogo empatado.
+  ELSIF g.scoring_format IN ('melhor_2_sets', 'melhor_3_sets') AND NEW.score_a = NEW.score_b AND NEW.score_a <= 1 THEN
+    v_p := NULL;
   ELSIF g.scoring_format IN ('melhor_2_sets', 'melhor_3_sets') THEN
     -- o resultado do jogo são os sets ganhos: 2-0 ou 2-1
     IF greatest(NEW.score_a, NEW.score_b) <> 2 OR least(NEW.score_a, NEW.score_b) > 1 THEN
