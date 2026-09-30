@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
-import { ChevronLeft, ChevronRight, ChevronDown, X, MapPin, LocateFixed, Map, List, Search } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronDown, X, MapPin, LocateFixed, Map, List, Search, Check } from 'lucide-react'
 import { useGooglePlacesAutocomplete } from '../../lib/useGooglePlacesAutocomplete'
 import { RADIUS_OPTIONS } from '../../lib/explore'
 import { formatDate } from '../../lib/formatDate'
@@ -9,6 +9,7 @@ import { toDayKey, fromDayKey, addDays, monthGrid, EVENT_KINDS, SHOW_OPTIONS, DE
 import { KIND_STYLE } from './EventCard'
 import { Chips } from '../ui'
 import TodayButton from '../TodayButton'
+import SearchField, { Realce, matchesQuery } from '../SearchField'
 import { useAuth } from '../../contexts/AuthContext'
 
 /* Controlos da agenda da Home (Trello #258, Fase 1): o dia em cima com setas,
@@ -160,86 +161,136 @@ export const SHOW_LABEL_KEY = { all: 'agenda.show_all', enrolled: 'agenda.show_e
 
 export const KIND_FILTER_KEY = { mix: 'agenda.filter_kind_mix', open: 'agenda.filter_kind_open', friends: 'agenda.filter_kind_friends', lesson: 'agenda.filter_kind_lesson', tournament: 'agenda.filter_kind_tournament' }
 
-export function FilterSheet({ filters, orgs, countFor, onApply, onClose }) {
+/* Filtros da Home — cada pastilha abre só a sua parte (design-handoff/
+   2026-09-27-filtros-da-home-separados; aprovado pelo Francisco a 27 set):
+   part = 'show' | 'kind' | 'org'.
+   · «Mostrar»: escolhe-se uma e a Home muda logo, sem botão.
+   · «Tipo»: vários, com «Ver N eventos»; «Todos» volta a mostrar tudo.
+   · «Clube/grupo»: só um campo de procurar (nada de parede de pastilhas);
+     escolhe-se mais do que um, os escolhidos ficam em pastilhas pretas com ✕,
+     «Limpar» tira todos. */
+export function FilterSheet({ part = 'show', filters, orgs, countFor, onApply, onClose }) {
   const { t } = useTranslation()
   // Aulas escondidas (flag 'lessons'): o chip «Aulas» nao aparece.
   const { isLessonsEnabled } = useAuth()
   const [draft, setDraft] = useState(filters)
+  const [query, setQuery] = useState('')
   const chip = (on) => `inline-flex items-center gap-1.5 px-3 min-h-[40px] rounded-full text-sm font-extrabold border transition-colors duration-fast ${
     on ? 'bg-ink-900 text-white border-ink-900' : 'bg-canvas text-ink-700 border-line'
   }`
+  const n = countFor(draft)
+  const apply = (
+    <button type="button" onClick={() => onApply(draft)} disabled={n === 0} className="w-full mt-5 py-3 rounded-ctrl bg-lime-400 text-ink-900 text-sm font-extrabold disabled:opacity-40">
+      {t('agenda.filters_apply', { count: n })}
+    </button>
+  )
 
-  // «Todos» e os cinco ligados sao o mesmo estado, por isso a fila do tipo
-  // passa a funcionar como a do clube/grupo aqui ao lado (Trello #428):
-  // com «Todos» ligado, tocar num tipo mostra SO esse -- um toque em vez de
-  // quatro. Desligar o ultimo volta a «Todos», para nunca ficar ecra vazio.
-  const todosOsTipos = draft.kinds.length === EVENT_KINDS.length
-  const toggleKind = (k) => setDraft((d) => {
-    if (d.kinds.length === EVENT_KINDS.length) return { ...d, kinds: [k] }
-    const has = d.kinds.includes(k)
-    const kinds = has ? d.kinds.filter((x) => x !== k) : [...d.kinds, k]
-    return { ...d, kinds: kinds.length ? kinds : [...EVENT_KINDS] }
-  })
+  if (part === 'show') {
+    return (
+      <Sheet title={t('agenda.filter_show')} onClose={onClose}>
+        <Chips
+          value={filters.show}
+          onChange={(opt) => onApply({ ...filters, show: opt })}
+          options={SHOW_OPTIONS.map((opt) => ({ value: opt, label: t(SHOW_LABEL_KEY[opt]) }))}
+          className="flex-wrap"
+        />
+        <p className="mt-3 text-xs text-muted">{t('agenda.filter_show_hint')}</p>
+      </Sheet>
+    )
+  }
+
+  if (part === 'kind') {
+    // «Todos» e os cinco ligados sao o mesmo estado (Trello #428): com
+    // «Todos» ligado, tocar num tipo mostra SO esse; desligar o ultimo volta
+    // a «Todos», para nunca ficar ecra vazio.
+    const todosOsTipos = draft.kinds.length === EVENT_KINDS.length
+    const toggleKind = (k) => setDraft((d) => {
+      if (d.kinds.length === EVENT_KINDS.length) return { ...d, kinds: [k] }
+      const has = d.kinds.includes(k)
+      const kinds = has ? d.kinds.filter((x) => x !== k) : [...d.kinds, k]
+      return { ...d, kinds: kinds.length ? kinds : [...EVENT_KINDS] }
+    })
+    return (
+      <Sheet title={t('agenda.filter_kind')} onClose={onClose}>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => setDraft((d) => ({ ...d, kinds: [...EVENT_KINDS] }))} className={chip(todosOsTipos)}>
+            {t('agenda.filter_kind_all')}
+          </button>
+          {EVENT_KINDS.filter((k) => k !== 'lesson' || isLessonsEnabled).map((k) => {
+            const Icon = KIND_STYLE[k].icon
+            return (
+              <button key={k} type="button" onClick={() => toggleKind(k)} className={chip(!todosOsTipos && draft.kinds.includes(k))}>
+                <Icon size={14} /> {t(KIND_FILTER_KEY[k])}
+              </button>
+            )
+          })}
+        </div>
+        {apply}
+      </Sheet>
+    )
+  }
+
+  // «Clube/grupo»
+  const picked = draft.orgIds || []
   const toggleOrg = (id) => setDraft((d) => {
     const cur = d.orgIds || []
     const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]
     return { ...d, orgIds: next.length ? next : null }
   })
-  const n = countFor(draft)
-
+  const found = query.trim() ? orgs.filter((o) => matchesQuery(o.name, query)).slice(0, 8) : []
+  const kindWord = (o) => t(o.kind === 'group' ? 'agenda.org_kind_group' : 'agenda.org_kind_club')
   return (
-    <Sheet title={t('agenda.filters_title')} onClose={onClose}>
-      <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mb-2">{t('agenda.filter_show')}</p>
-      <Chips
-        value={draft.show}
-        onChange={(opt) => setDraft((d) => ({ ...d, show: opt }))}
-        options={SHOW_OPTIONS.map((opt) => ({ value: opt, label: t(SHOW_LABEL_KEY[opt]) }))}
-      />
-
-      <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mt-4 mb-2">{t('agenda.filter_kind')}</p>
-      <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={() => setDraft((d) => ({ ...d, kinds: [...EVENT_KINDS] }))} className={chip(todosOsTipos)}>
-          {t('agenda.filter_kind_all')}
-        </button>
-        {EVENT_KINDS.filter((k) => k !== 'lesson' || isLessonsEnabled).map((k) => {
-          const Icon = KIND_STYLE[k].icon
-          // Com «Todos» ligado nenhum tipo aparece aceso, como na fila do
-          // clube/grupo: dois sitios a dizer a mesma coisa confundem.
-          return (
-            <button key={k} type="button" onClick={() => toggleKind(k)} className={chip(!todosOsTipos && draft.kinds.includes(k))}>
-              <Icon size={14} /> {t(KIND_FILTER_KEY[k])}
-            </button>
+    <Sheet title={t('agenda.filter_org')} onClose={onClose}>
+      <SearchField value={query} onChange={setQuery} placeholder={t('gerir.search_placeholder')} />
+      {query.trim() ? (
+        found.length === 0
+          ? <p className="mt-2 text-sm text-muted">{t('gerir.no_results')}</p>
+          : (
+            <div className="mt-2 overflow-hidden rounded-ctrl border border-line bg-white">
+              {found.map((o) => {
+                const on = picked.includes(o.id)
+                return (
+                  <button key={o.id} type="button" onClick={() => toggleOrg(o.id)} aria-pressed={on}
+                    className="flex w-full items-center gap-3 border-b border-line px-3 py-2.5 text-left last:border-b-0 hover:bg-ink-50">
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-extrabold text-ink-900"><Realce text={o.name} query={query} /></span>
+                      <span className="block text-xs text-muted">{kindWord(o)}</span>
+                    </span>
+                    <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-[1.5px] ${on ? 'border-ink-900 bg-ink-900 text-white' : 'border-ink-200 bg-white'}`}>
+                      {on && <Check size={15} strokeWidth={3} />}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
           )
-        })}
-      </div>
-
-      {orgs.length > 0 && (
+      ) : picked.length === 0 && (
+        <p className="mt-2 text-xs text-muted">{t('agenda.filter_org_none_hint')}</p>
+      )}
+      {picked.length > 0 && (
         <>
-          <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mt-4 mb-2">{t('agenda.filter_org')}</p>
+          <p className="mt-4 mb-2 text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('agenda.filter_org_picked')}</p>
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => setDraft((d) => ({ ...d, orgIds: null }))} className={chip(draft.orgIds == null)}>
-              {t('agenda.filter_org_all')}
-            </button>
-            {orgs.map((o) => (
-              <button key={o.id} type="button" onClick={() => toggleOrg(o.id)} className={chip(draft.orgIds?.includes(o.id))}>
-                <span className="truncate max-w-[12rem]">{o.name}</span>
-              </button>
-            ))}
+            {picked.map((id) => {
+              const o = orgs.find((x) => x.id === id)
+              if (!o) return null
+              return (
+                <button key={id} type="button" onClick={() => toggleOrg(id)} aria-label={t('agenda.filter_org_remove', { name: o.name })}
+                  className="inline-flex min-h-[40px] max-w-full items-center gap-1.5 rounded-full bg-ink-900 pl-3.5 pr-2.5 text-sm font-extrabold text-white">
+                  <span className="truncate max-w-[12rem]">{o.name}</span> <X size={15} />
+                </button>
+              )
+            })}
           </div>
         </>
       )}
-
-      {/* Com zero resultados não se aplica às cegas; repor aplica logo, sem
-          segundo toque (Trello #415). */}
-      <button type="button" onClick={() => onApply(draft)} disabled={n === 0} className="w-full mt-5 py-3 rounded-ctrl bg-lime-400 text-ink-900 text-sm font-extrabold disabled:opacity-40">
-        {t('agenda.filters_apply', { count: n })}
-      </button>
-      {/* Era texto cinzento por baixo do botao verde e o Francisco nem dava
-          por ele (Trello #428). Passa a botao a serio, e o nome diz o que
-          faz: repunha TUDO LIGADO, nao limpava nada. */}
-      <button type="button" onClick={() => onApply(DEFAULT_FILTERS)} className="w-full mt-2 py-3 rounded-ctrl bg-canvas border border-line text-sm font-extrabold text-ink-900">
-        {t('agenda.filters_reset')}
-      </button>
+      {apply}
+      {picked.length > 0 && (
+        <button type="button" onClick={() => setDraft((d) => ({ ...d, orgIds: null }))}
+          className="w-full mt-2 py-3 rounded-ctrl bg-canvas border border-line text-sm font-extrabold text-ink-900">
+          {t('agenda.filter_org_clear')}
+        </button>
+      )}
     </Sheet>
   )
 }
@@ -365,7 +416,7 @@ export function LocationSheet({ location, onSave, onClose }) {
 
 // onOpenSearch (Home, #547): a lupa é a primeira pastilha da fila, redonda e
 // do tamanho das outras — abre a pesquisa por cima da Home.
-export function FilterChips({ filters, onOpenFilters, onOpenSearch }) {
+export function FilterChips({ filters, orgs = [], onOpenFilters, onOpenSearch }) {
   const { t } = useTranslation()
   const kindsOn = filters.kinds.length < EVENT_KINDS.length
   const orgsOn = filters.orgIds != null
@@ -384,14 +435,17 @@ export function FilterChips({ filters, onOpenFilters, onOpenSearch }) {
         </button>
       )}
       {/* "Todos" é o normal: só fica escuro quando se escolhe outra opção. */}
-      <button type="button" onClick={onOpenFilters} className={chip(filters.show !== 'all')}>
+      <button type="button" onClick={() => onOpenFilters('show')} className={chip(filters.show !== 'all')}>
         {t(SHOW_LABEL_KEY[filters.show] || SHOW_LABEL_KEY.all)} <ChevronDown size={14} />
       </button>
-      <button type="button" onClick={onOpenFilters} className={chip(kindsOn)}>
+      <button type="button" onClick={() => onOpenFilters('kind')} className={chip(kindsOn)}>
         {t('agenda.filter_kind')} <ChevronDown size={14} />
       </button>
-      <button type="button" onClick={onOpenFilters} className={chip(orgsOn)}>
-        {t('agenda.filter_org')} <ChevronDown size={14} />
+      {/* Um escolhido: o nome; vários: «N clubes/grupos» (SPEC, ponto 4). */}
+      <button type="button" onClick={() => onOpenFilters('org')} className={`${chip(orgsOn)} max-w-[14rem]`}>
+        <span className="truncate">{!orgsOn ? t('agenda.filter_org')
+          : filters.orgIds.length === 1 ? (orgs.find((o) => o.id === filters.orgIds[0])?.name || t('agenda.filter_org'))
+            : t('agenda.filter_org_many', { count: filters.orgIds.length })}</span> <ChevronDown size={14} className="shrink-0" />
       </button>
     </div>
   )

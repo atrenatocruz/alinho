@@ -4390,5 +4390,13 @@
   "steps.saving": "A guardar…",
   "steps.leave_title": "Sair sem guardar as alterações?",
   "steps.keep_editing": "Continuar a editar",
-  "steps.leave_without_saving": "Sair sem guardar"
+  "steps.leave_without_saving": "Sair sem guardar",
+  "agenda.filter_show_hint": "Toca numa e a Home muda logo.",
+  "agenda.org_kind_club": "Clube",
+  "agenda.org_kind_group": "Grupo",
+  "agenda.filter_org_none_hint": "Sem nenhum escolhido, vês os eventos de todos os teus clubes e grupos.",
+  "agenda.filter_org_picked": "Escolhidos",
+  "agenda.filter_org_remove": "Tirar {{name}}",
+  "agenda.filter_org_clear": "Limpar",
+  "agenda.filter_org_many": "{{count}} clubes/grupos"
 }

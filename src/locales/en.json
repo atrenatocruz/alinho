@@ -4378,5 +4378,13 @@
   "steps.saving": "Saving…",
   "steps.leave_title": "Leave without saving the changes?",
   "steps.keep_editing": "Keep editing",
-  "steps.leave_without_saving": "Leave without saving"
+  "steps.leave_without_saving": "Leave without saving",
+  "agenda.filter_show_hint": "Tap one and the Home changes right away.",
+  "agenda.org_kind_club": "Club",
+  "agenda.org_kind_group": "Group",
+  "agenda.filter_org_none_hint": "With none picked, you see events from all your clubs and groups.",
+  "agenda.filter_org_picked": "Picked",
+  "agenda.filter_org_remove": "Remove {{name}}",
+  "agenda.filter_org_clear": "Clear",
+  "agenda.filter_org_many": "{{count}} clubs/groups"
 }
