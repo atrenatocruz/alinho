@@ -3,12 +3,11 @@ import i18n from '../lib/i18n'
 
 // Cloudflare Turnstile — the captcha Supabase Auth verifies on signup, login
 // and password recovery once "Attack Protection → Captcha" is on in the
-// dashboard. Free. Appearance "always", light, as wide as the fields: the
-// Cloudflare box with the "Sucesso ✓" seal stays above the submit button —
-// the visible sign that the form is protected (Ruben, 28 set; Renato chose
-// it back over "interaction-only" the same day, keeping the light theme).
-// The check itself still runs on its own; a real challenge only appears
-// when Cloudflare distrusts the browser.
+// dashboard. Free. Appearance "always": the small Cloudflare box with the
+// "Success ✓" seal sits above the submit button (Ruben, 28 set — he wants
+// the visible sign that the form is protected). The check itself still runs
+// on its own; a real challenge only appears when Cloudflare distrusts the
+// browser.
 //
 // Motivation is the email quota, not fake accounts (Trello #—): with
 // "Confirm email" on, every signup and every "esqueci a password" sends an
@@ -25,11 +24,7 @@ import i18n from '../lib/i18n'
 // Tokens are single-use, so a failed login has to call reset() before the
 // person tries again.
 
-// Em dev, localStorage.mockTurnstileKey troca a chave por uma das chaves de
-// teste públicas da Cloudflare (ex.: 3x00000000000000000000FF obriga a
-// carregar), para ver a caixa sem mexer no .env.
-const devKey = () => { try { return import.meta.env.DEV ? localStorage.getItem('mockTurnstileKey') : null } catch { return null } }
-export const TURNSTILE_SITE_KEY = devKey() || import.meta.env.VITE_TURNSTILE_SITE_KEY || ''
+export const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || ''
 
 const SCRIPT_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
 let scriptPromise = null
@@ -111,8 +106,7 @@ const TurnstileWidget = forwardRef(function TurnstileWidget({ onToken, action, c
   }, [])
 
   if (!TURNSTILE_SITE_KEY) return null
-  // A largura dos campos e os cantos deles (designer, 28 set).
-  return <div ref={containerRef} className={`overflow-hidden rounded-ctrl ${className}`} />
+  return <div ref={containerRef} className={className} />
 })
 
 export default TurnstileWidget
