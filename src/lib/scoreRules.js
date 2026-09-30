@@ -99,6 +99,21 @@ export function proSetProblem(set, breaker = 'tiebreak') {
   return 'proset_invalid'
 }
 
+/** Pro set a 9 no MIX (Francisco, 30 set): quando acaba o tempo pode ficar
+ *  por acabar (7-3) ou empatado (5-5) — ganha quem tem mais jogos, e o
+ *  empate grava-se sem vencedor. Só não passa de 9 nem fica 9-9. No 9-8 os
+ *  pontos do desempate são pedidos e validados como no pro set oficial. O
+ *  torneio fica com `proSetProblem`. Espelhado na trava do servidor (588). */
+export function mixProSetProblem(set, breaker = 'tiebreak') {
+  const a = num(set?.score_a)
+  const b = num(set?.score_b)
+  if (!isInt(a) || !isInt(b)) return 'empty'
+  if (a < 0 || b < 0) return 'negative'
+  if (Math.max(a, b) > 9 || (a === 9 && b === 9)) return 'proset_invalid'
+  if (Math.max(a, b) === 9 && Math.min(a, b) === 8) return proSetProblem(set, breaker)
+  return null
+}
+
 /** Pontos: inteiros ≥ 0. Empate só com allowDraw (jogos entre amigos). */
 export function pointsProblem(a, b, { allowDraw = false } = {}) {
   a = num(a)

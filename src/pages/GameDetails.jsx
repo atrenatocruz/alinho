@@ -17,7 +17,7 @@ import { KIND_STYLE, KindTag, StateTag, Owner } from '../components/agenda/Event
 import PoolGroupStage from '../components/PoolGroupStage'
 import PreviousEditions from '../components/agenda/PreviousEditions'
 import ScoreEntry from '../components/ScoreEntry'
-import { countPeople, totalRounds, formDuplas, seedCourts, nextSobeDesce, nextSobeDesceRotating, splitPartnerRows, rotatingPlacar, roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches, thirdPlaceMatch, lowerPlacementMatches, placementOfCourt, PHASE_LABEL_KEY, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, mixCapacity, isGenderMismatch, isMissingGender, isMissingBirthday, isAgeIneligible, splitIntoPools, generateAmericanoSchedule, americanoStandings, computeMixWinnerTeamId, formatLabelKey } from '../lib/mixLogic'
+import { countPeople, totalRounds, formDuplas, seedCourts, nextSobeDesce, nextSobeDesceRotating, splitPartnerRows, rotatingPlacar, roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches, thirdPlaceMatch, lowerPlacementMatches, placementOfCourt, PHASE_LABEL_KEY, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, mixCapacity, isGenderMismatch, isMissingGender, isMissingBirthday, isAgeIneligible, splitIntoPools, generateAmericanoSchedule, americanoStandings, computeMixWinnerTeamId, formatLabelKey, hasResult, isTie } from '../lib/mixLogic'
 import { isProvisional, formatRatingMaybeProvisional } from '../lib/elo'
 import { AGE_LABEL_KEY, meetsAgeRestriction } from '../lib/ageCategories'
 import { winRatePct, firstLastName } from '../lib/statsLogic'
@@ -80,6 +80,18 @@ const HISTORY_SOURCE_LABEL_KEY = {
   app: 'gamedetails.history_source_app',
   bot: 'gamedetails.history_source_bot',
   system: 'gamedetails.history_source_system',
+}
+
+/* Empate no mix (Francisco, 30 set, REGRAS.md ponto 4): o passo seguinte
+   fica apagado com esta frase, e tocar nela leva ao jogo empatado. */
+function TieHint({ onGo }) {
+  const { t } = useTranslation()
+  return (
+    <button type="button" onClick={onGo}
+      className="block w-full text-center text-xs font-extrabold text-ink-700 underline underline-offset-2 min-h-[32px]">
+      {t('gamedetails.tie_blocks_next')}
+    </button>
+  )
 }
 
 export default function GameDetails() {
@@ -207,6 +219,12 @@ export default function GameDetails() {
   const [scorekeepersOpen, setScorekeepersOpen] = useState(false)
   // Rondas já jogadas que a pessoa abriu à mão (as outras ficam dobradas).
   const [openRounds, setOpenRounds] = useState({})
+  // O toque no aviso do empate: abre a ronda desse jogo e leva até ele.
+  const goToMatch = (matchId) => {
+    const m = matches.find((x) => x.id === matchId)
+    if (m) setOpenRounds((prev) => ({ ...prev, [m.round_number]: true }))
+    requestAnimationFrame(() => document.getElementById(`jogo-${matchId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  }
   // Escolha de app de navegacao (Trello #34). Fica no dispositivo e nao no
   // perfil — ver a nota em lib/navigators.js.
   const [historyLoading, setHistoryLoading] = useState(false)
@@ -1567,7 +1585,7 @@ export default function GameDetails() {
       // «desaparece tudo e depois volta a aparecer os pontos»). Antes,
       // limpavam-se os números escritos com o jogo ainda por jogar no ecrã:
       // durante a leitura ficavam os campos vazios, sem botão.
-      const winnerId = a > b ? match.team_a_id : match.team_b_id
+      const winnerId = a > b ? match.team_a_id : a < b ? match.team_b_id : null
       setMatches(prev => prev.map(m => (m.id === match.id
         ? { ...m, score_a: a, score_b: b, winner_team_id: winnerId, ...(sets ? { sets: sets.map((st, i) => ({ ...st, set_number: i + 1 })) } : {}) }
         : m)))
@@ -1693,8 +1711,11 @@ export default function GameDetails() {
   const roundsStarted = matches.length > 0
   const maxRound = matches.length ? Math.max(...matches.map(m => m.round_number)) : 0
   const currentRoundMatches = matches.filter(m => m.round_number === maxRound)
-  const currentRoundDone = currentRoundMatches.length > 0 && currentRoundMatches.every(m => m.winner_team_id)
-  const allDone = matches.length > 0 && matches.every(m => m.winner_team_id)
+  // Um jogo com resultado é um jogo com pontos gravados, com ou sem
+  // vencedor: um empate grava-se (Francisco, 30 set, REGRAS.md ponto 4 —
+  // «não bloqueamos, simplesmente avisamos») e fica com winner_team_id null.
+  const currentRoundDone = currentRoundMatches.length > 0 && currentRoundMatches.every(hasResult)
+  const allDone = matches.length > 0 && matches.every(hasResult)
   const isSobeDesce = (game?.format || 'sobe_desce') === 'sobe_desce'
   const isGruposEliminatorias = game?.format === 'grupos_eliminatorias'
   const isAmericano = game?.format === 'americano'
@@ -1732,8 +1753,18 @@ export default function GameDetails() {
 
   // The admin ends the current round manually — no timer, no auto-advance.
   // Ending a round also draws the next one (group round or elim phase) in the same tap.
-  const canAdvance = currentRoundDone && (inGroupPhase || !!nextPhase)
-  const canFinalize = roundsStarted && allDone && !canAdvance
+  // O que fica travado por um empate é o passo seguinte: «Terminar Ronda
+  // N», passar de fase e «Terminar e dar os pontos». No Americano não: aí
+  // conta a soma dos pontos de cada um, e um 12-12 é um resultado normal.
+  const tiedMatches = isAmericano ? [] : matches.filter(isTie)
+  const tieInRound = tiedMatches.find((m) => m.round_number === maxRound) || null
+  const roundCanAdvance = currentRoundDone && (inGroupPhase || !!nextPhase)
+  const canAdvance = roundCanAdvance && !tieInRound
+  const canFinalize = roundsStarted && allDone && !roundCanAdvance && tiedMatches.length === 0
+  // O jogo empatado que trava o passo seguinte — só depois de a ronda ter
+  // os resultados todos (antes disso, diz-se o que falta).
+  const blockingTie = !roundsStarted || !currentRoundDone ? null
+    : tieInRound || (!roundCanAdvance && tiedMatches[0]) || null
   // grupos_eliminatorias is still in its pool stage exactly until the
   // first elimination-phase match exists — PoolGroupStage owns everything
   // before that point, this file's existing round/elim rendering owns
@@ -1745,12 +1776,12 @@ export default function GameDetails() {
   // Format-aware winner derivation, shared with the post-close correction
   // flow (Trello #257) — see computeMixWinnerTeamId in mixLogic.js.
   const currentWinnerTeamId = computeMixWinnerTeamId(game, teams, matches)
-  const anyScoreSaved = matches.some(m => m.winner_team_id)
+  const anyScoreSaved = matches.some(hasResult)
   // «Terminar Mix» antes do fim: a base de dados (finalize_mix) recusa com
   // «Há jogos sem resultado registado» enquanto houver um jogo já sorteado
   // sem vencedor. O botão fica desligado e diz porquê, em vez de deixar
   // carregar e dar erro. No Americano a regra não existe.
-  const missingResults = isAmericano ? 0 : matches.filter(m => !m.winner_team_id).length
+  const missingResults = isAmericano ? 0 : matches.filter(m => !hasResult(m)).length
 
   const handleAdvance = async () => {
     setBusy(true)
@@ -2228,7 +2259,7 @@ export default function GameDetails() {
   // aparecia solto mais abaixo, agora só aqui.
   const showAdminBar = isAdmin && ['pending', 'open', 'closed', 'in_progress'].includes(game?.status) && !isDraftMix(game)
   const isSeriesDate = !!game?.recurrence_id
-  const missingNow = currentRoundMatches.filter((m) => !m.winner_team_id).length
+  const missingNow = currentRoundMatches.filter((m) => !hasResult(m)).length
   // «Sortear duplas» antes de «Começar o Mix» (27 set): só com duplas fixas
   // formadas pela app — com toda a gente inscrita em dupla, ou com parceiros
   // que trocam a cada ronda / Americano, não há nada para sortear.
@@ -2264,6 +2295,17 @@ export default function GameDetails() {
       }
     } else if (canFinalize) {
       barPrimary = { label: busy ? t('gamedetails.finalizing') : t('gamedetails.finalize_mix'), onClick: () => handleFinalize(false), disabled: busy }
+    } else if (blockingTie) {
+      // Empate: o botão fica à vista mas apagado, e o aviso leva ao jogo.
+      barPrimary = {
+        label: roundCanAdvance
+          ? (inGroupPhase ? t('gamedetails.end_round', { number: maxRound })
+            : t('gamedetails.end_round_and_draw', { number: maxRound, phase: PHASE_LABEL_KEY[nextPhase] ? t(PHASE_LABEL_KEY[nextPhase]).toLowerCase() : '' }))
+          : t('gamedetails.finalize_mix'),
+        onClick: () => {},
+        disabled: true,
+        hint: <TieHint onGo={() => goToMatch(blockingTie.id)} />,
+      }
     }
   }
   const barState = game?.status === 'pending' ? t('eventactions.state_pending')
@@ -2274,6 +2316,7 @@ export default function GameDetails() {
   const barLine = game?.status === 'pending' ? null
     : game?.status === 'in_progress'
       ? (!roundsStarted ? t('eventactions.line_duplas_ready')
+        : blockingTie ? null
         : canAdvance || canFinalize ? t('eventactions.line_round_done')
         : missingNow > 0 ? t('eventactions.line_missing', { count: missingNow })
         : null)
@@ -3175,7 +3218,7 @@ export default function GameDetails() {
                 {isCurrent && game.round_started_at && game.round_duration_minutes > 0 && (
                   <div className="mb-3">
                     <RoundAlarm
-                      roundKey={ms.length > 0 && ms.every((m) => m.winner_team_id) ? null : `${id}:${game.round_started_at}`}
+                      roundKey={ms.length > 0 && ms.every(hasResult) ? null : `${id}:${game.round_started_at}`}
                       endsAt={new Date(game.round_started_at).getTime() + game.round_duration_minutes * 60000}
                       roundNumber={r}
                       eventName={game.title}
@@ -3188,12 +3231,12 @@ export default function GameDetails() {
                 {open && (
                 <div className="space-y-2.5">
                   {ms.map(m => {
-                    const done = !!m.winner_team_id
+                    const done = hasResult(m)
                     const isCorrecting = editingMatchId === m.id
                     const canEditScores = (isAdmin || isScorekeeper) && game.status === 'in_progress'
                     const editable = canEditScores && (!done || isCorrecting)
                     return (
-                      <div key={m.id} className="rounded-ctrl bg-canvas p-2.5">
+                      <div key={m.id} id={`jogo-${m.id}`} className="rounded-ctrl bg-canvas p-2.5 scroll-mt-24">
                         <div className="flex items-center justify-between mb-2 px-1">
                           <p className="font-mono text-[11px] font-extrabold uppercase tracking-widest text-ink-500">
                             {t('gamedetails.court_number', { number: m.court_number })}{m.phase === 'third' && ` · ${t('mixlogic.phase_third')}`}{m.phase === 'placement' && ` · ${t('mixlogic.phase_place_n', { n: placementOfCourt(m.court_number) })}`}
@@ -3213,6 +3256,7 @@ export default function GameDetails() {
                           match={m}
                           scoringFormat={game.scoring_format || 'pontos_simples'}
                           tieBreakTarget={game.tiebreak_8_8 === 'super_tiebreak' ? 10 : 7}
+                          allowDraw
                           editable={editable}
                           teamAName={teamName(m.team_a_id)}
                           teamBName={teamName(m.team_b_id)}
@@ -3353,7 +3397,7 @@ export default function GameDetails() {
 
                         <div className="space-y-2.5">
                           {ms.map(m => {
-                            const done = !!m.winner_team_id
+                            const done = hasResult(m)
                             const isCorrecting = editingMatchId === m.id
                             const canEditScores = isAdmin && game.status === 'finished'
                             const editable = canEditScores && (!done || isCorrecting)
@@ -3421,15 +3465,15 @@ export default function GameDetails() {
           {isAdmin && game.status === 'in_progress' && !inPoolStage && (
             <div className="space-y-3">
                 <>
-                  {roundsStarted && !canAdvance && !canFinalize && (
+                  {roundsStarted && !canAdvance && !canFinalize && !blockingTie && (
                     <p className="text-muted text-sm text-center">
                       {isAmericano
                         ? t('gamedetails.register_americano_results')
                         : t('gamedetails.register_round_results', { number: maxRound })}
                       {/* Diz o que falta para a ronda fechar — nunca um mix
                           encravado sem explicação (Trello #420). */}
-                      {!isAmericano && currentRoundMatches.some((m) => !m.winner_team_id) && (
-                        <> {t('gamedetails.round_results_missing', { count: currentRoundMatches.filter((m) => !m.winner_team_id).length })}</>
+                      {!isAmericano && currentRoundMatches.some((m) => !hasResult(m)) && (
+                        <> {t('gamedetails.round_results_missing', { count: currentRoundMatches.filter((m) => !hasResult(m)).length })}</>
                       )}
                     </p>
                   )}
@@ -3445,10 +3489,11 @@ export default function GameDetails() {
                       {barPrimary.label}
                     </button>
                   )}
+                  {blockingTie && <TieHint onGo={() => goToMatch(blockingTie.id)} />}
                   {/* Sair mais cedo — disponível assim que houver pelo menos um resultado guardado */}
                   {roundsStarted && !canFinalize && anyScoreSaved && (
                     <>
-                      <PrimaryButton variant="danger" onClick={() => handleFinalize(true)} disabled={busy || missingResults > 0} className="w-full">
+                      <PrimaryButton variant="danger" onClick={() => handleFinalize(true)} disabled={busy || missingResults > 0 || tiedMatches.length > 0} className="w-full">
                         <Trophy size={20} />
                         {busy ? t('gamedetails.finalizing') : t('gamedetails.end_mix')}
                       </PrimaryButton>
