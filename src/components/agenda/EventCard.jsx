@@ -220,8 +220,8 @@ export function GameEventCard({ event, profile, friendIds = null, action = null,
   const players = (game.participants || [])
     .filter((p) => p.status === 'confirmed')
     .flatMap((p) => [
-      { id: p.user_id, name: p.user?.name, rating: p.user?.rating, isGuest: p.user?.is_guest, avatar_url: p.user?.avatar_url },
-      ...(p.partner_id ? [{ id: p.partner_id, name: p.partner?.name, rating: p.partner?.rating, isGuest: p.partner?.is_guest, avatar_url: p.partner?.avatar_url }] : []),
+      { id: p.user_id, name: p.user?.name, rating: p.user?.rating, gender: p.user?.gender, isGuest: p.user?.is_guest, avatar_url: p.user?.avatar_url },
+      ...(p.partner_id ? [{ id: p.partner_id, name: p.partner?.name, rating: p.partner?.rating, gender: p.partner?.gender, isGuest: p.partner?.is_guest, avatar_url: p.partner?.avatar_url }] : []),
     ])
   // Convidados contam como jogadores mas não entram na média de nível.
   const rated = players.filter((p) => !p.isGuest && p.rating != null)
@@ -296,7 +296,7 @@ export function GameEventCard({ event, profile, friendIds = null, action = null,
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2 pt-2.5 mt-2.5 border-t border-ink-900/10">
         <div className="flex items-center gap-2.5 min-w-0">
           <PlayerAvatarRow players={players} max={capacity} size="sm" />
-          <GroupLevelBadge rating={avgRating} />
+          <GroupLevelBadge rating={avgRating} genders={rated.map((p) => p.gender)} />
         </div>
         {past ? (
           result && (
@@ -333,10 +333,16 @@ export function GameEventCard({ event, profile, friendIds = null, action = null,
    a página do mix e a do clube são só para membros — por isso tudo o que
    ajuda a decidir está aqui, e o botão é entrar no clube ou pedir para entrar. */
 
+const exploreGenders = (avgGender, restriction) => {
+  if (avgGender === 'misto') return ['masculino', 'feminino']
+  const g = avgGender || restriction
+  return g === 'masculino' || g === 'feminino' ? [g] : []
+}
+
 export function ExploreEventCard({ event, profile, distance = null, onJoin = null, busy = false }) {
   const { t, i18n } = useTranslation()
   const game = event.raw
-  const { openJoin, requestStatus, peopleCount, avgRating, friendsInOrg } = event.explore
+  const { openJoin, requestStatus, peopleCount, avgRating, avgGender, friendsInOrg } = event.explore
   const capacity = mixCapacity(game)
   const time = formatTime(event.startsAt, i18n.language, { hour: '2-digit', minute: '2-digit' })
   const pending = requestStatus === 'pending'
@@ -390,7 +396,10 @@ export function ExploreEventCard({ event, profile, distance = null, onJoin = nul
           <span className="inline-flex items-center gap-1 text-sm text-ink-700 tabular-nums">
             <Users size={14} /> <span className="font-extrabold text-ink-900">{peopleCount}</span>/{capacity}
           </span>
-          <GroupLevelBadge rating={avgRating} />
+          {/* A letra vem do género de quem entra na média (avg_gender, pedido
+              ao Dev 3). Enquanto não vier, de quem o mix aceita; misto ou
+              aberto a todos, não se sabe — sem pastilha (UX, 29 set). */}
+          <GroupLevelBadge rating={avgRating} genders={exploreGenders(avgGender, game.gender_restriction)} />
         </div>
         {!pending && onJoin && (
           <PrimaryButton

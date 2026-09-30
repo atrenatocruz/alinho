@@ -35,6 +35,18 @@ export default function FriendSetSheet({ game, roundNumber, format, onClose, onS
   // a mesma frase verde do resultado (28 set).
   const st = setsState(rows.filter((r) => r.a !== '' && r.b !== ''), 'free')
   const lead = st.winner === 'a' ? pair(game.team_a) : pair(game.team_b)
+  // A frase de quem ganha (ou do empate) só quando o jogo ACABA (UX, 30 set;
+  // com 6-4, 4-6 e o 3.º por jogar aparecia «Empate»): em «Melhor de 3»,
+  // quando alguém ganha 2 sets; em qualquer modo, na pergunta do «O jogo
+  // acabou assim». Com 1-1 em «Melhor de 3», só a linha cinzenta a dizer que
+  // segue para o 3.º set. Com um set a meio, nada.
+  const allRowsFilled = rows.length > 0 && rows.every((r) => r.a !== '' && r.b !== '')
+  const endedBest3 = format === 'best3' && allRowsFilled && Math.max(st.winsA, st.winsB) >= 2
+  const oneSetEach = format === 'best3' && allRowsFilled && rows.length === 2 && st.winsA === 1 && st.winsB === 1
+  const [askFinish, setAskFinish] = useState(false)
+  const resultLine = !st.winner ? t('friends.result_draw')
+    : st.bySets ? t('friends.winner_line', { team: lead, count: Math.max(st.winsA, st.winsB), a: Math.max(st.winsA, st.winsB), b: Math.min(st.winsA, st.winsB) })
+      : t('friends.winner_games_line', { team: lead, a: Math.max(st.gamesA, st.gamesB), b: Math.min(st.gamesA, st.gamesB) })
 
   const persist = async () => {
     for (let i = 0; i < rows.length; i += 1) {
@@ -83,13 +95,10 @@ export default function FriendSetSheet({ game, roundNumber, format, onClose, onS
           </div>
         ))}
         {setProb && <p className="text-xs font-extrabold text-danger" role="status">{t(`friends.set_problem_${setProb}`)}</p>}
-        {!setProb && st.filled && (
-          <p className="rounded-ctrl bg-lime-100 px-3 py-2.5 text-sm text-ink-900">
-            {!st.winner ? t('friends.result_draw')
-              : st.bySets ? t('friends.winner_line', { team: lead, count: Math.max(st.winsA, st.winsB), a: Math.max(st.winsA, st.winsB), b: Math.min(st.winsA, st.winsB) })
-                : t('friends.winner_games_line', { team: lead, a: Math.max(st.gamesA, st.gamesB), b: Math.min(st.gamesA, st.gamesB) })}
-          </p>
+        {!setProb && endedBest3 && (
+          <p className="rounded-ctrl bg-lime-100 px-3 py-2.5 text-sm text-ink-900">{resultLine}</p>
         )}
+        {!setProb && oneSetEach && <p className="text-sm text-muted">{t('friends.one_set_each')}</p>}
         {error && <p className="rounded-ctrl border border-danger/30 bg-danger/10 px-3 py-2 text-sm font-extrabold text-danger">{error}</p>}
         <button type="button" disabled={busy || !!setProb || (!newFilled && !changed)} onClick={() => run(false)}
           className="press min-h-[52px] w-full rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold text-white disabled:opacity-40">
@@ -97,14 +106,31 @@ export default function FriendSetSheet({ game, roundNumber, format, onClose, onS
         </button>
         {/* Em «Melhor de 3» também (Francisco, 28 set): um jogo pode acabar
             em 6-4 · 4-4 por falta de tempo. Com 2 sets ganhos já fechou. */}
-        {!decided && (
-          <button type="button" disabled={busy || !!setProb || (saved.length === 0 && !newFilled)} onClick={() => run(true)}
+        {/* Com 2 sets ganhos o jogo já acabou: sai (SPEC das rondas editáveis). */}
+        {!decided && !endedBest3 && (
+          <button type="button" disabled={busy || !!setProb || (saved.length === 0 && !newFilled)} onClick={() => setAskFinish(true)}
             className="press min-h-[52px] w-full rounded-ctrl border-[1.5px] border-line bg-white px-4 text-[15px] font-extrabold text-ink-900 disabled:opacity-40">
             {t('friends.game_ended_like_this')}
           </button>
         )}
         <p className="text-xs text-muted">{t('friends.set_correct_note')}</p>
       </div>
+      {/* «O jogo acabou assim»: pergunta antes de fechar, com quem ganha. */}
+      {askFinish && (
+        <Sheet title={t('friends.finish_as_is_title')} onClose={() => { if (!busy) setAskFinish(false) }}>
+          {st.filled && <p className="text-[15px] leading-snug text-ink-500">{resultLine}</p>}
+          <div className="mt-4 space-y-2.5">
+            <button type="button" disabled={busy} onClick={async () => { await run(true); setAskFinish(false) }}
+              className="press min-h-[52px] w-full rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold text-white disabled:opacity-40">
+              {t('friends.finish_as_is_yes')}
+            </button>
+            <button type="button" disabled={busy} onClick={() => setAskFinish(false)}
+              className="press min-h-[52px] w-full rounded-ctrl border-[1.5px] border-line bg-white px-4 text-[15px] font-extrabold text-ink-900 disabled:opacity-40">
+              {t('friends.finish_as_is_keep')}
+            </button>
+          </div>
+        </Sheet>
+      )}
     </Sheet>
   )
 }

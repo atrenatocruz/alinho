@@ -232,6 +232,11 @@ export default function CreateSeries() {
       total={3}
       stepLabel={stepLabels[step - 1]}
       onBack={() => { setError(''); if (step === 1) goBack(); else setStep(step - 1) }}
+      edit={editing ? {
+        onSave: submit, onCancel: goBack, saving: busy,
+        dirty: !!orig && JSON.stringify(f) !== JSON.stringify(orig.form),
+        saveDisabled: !f.teacher_profile_id || !levelOk || !step2Ok || !priceOk || !org,
+      } : null}
       onNext={() => { setError(''); setStep(step + 1) }}
       nextDisabled={step === 1 ? !f.teacher_profile_id || !levelOk : !step2Ok}
       error={error}

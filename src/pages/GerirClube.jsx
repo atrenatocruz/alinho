@@ -12,7 +12,7 @@ import { createGroup } from '../lib/platformAdmin'
 import { listClubGroups, getOrganizationDeleteBlocker, deleteSelfServeGroup, transferOrganizationOwnership, setOrganizationPlan } from '../lib/organizations'
 import { formatRating } from '../lib/elo'
 import { formatDate as formatDateLib, formatTime as formatTimeLib } from '../lib/formatDate'
-import { DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal, ConfirmSheet, OrgKindBadge, PlanBadge, PLAN_TIERS, planName, Tabs, BackBar } from '../components/ui'
+import { Chips, DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal, ConfirmSheet, OrgKindBadge, PlanBadge, PLAN_TIERS, planName, Tabs, BackBar } from '../components/ui'
 import { planLimitMessage, isMixLimitError, isMemberLimitError, limitsFor, nextPlanTier } from '../lib/plans'
 import { totalRounds, reverseClimbWarning, uiFormatOf, formatFieldsFor, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, SCORING_FORMAT_LABEL_KEY } from '../lib/mixLogic'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
@@ -30,7 +30,7 @@ import { ClubTeachers } from '../components/lessons/ClubLessonsPanel'
 import { SeriesManage } from '../components/lessons/ClubSeriesPanel'
 import { lessonTypeLabel, seriesWhen } from '../components/lessons/LessonBits'
 import { listClubTournaments } from '../lib/tournamentApi'
-import { lessonsAvailable, listClubSeries } from '../lib/lessonsApi'
+import { lessonsAvailable, listClubSeries, listSeriesPastLessons } from '../lib/lessonsApi'
 import { KIND_STYLE } from '../components/agenda/EventCard'
 import { tournamentsAvailable } from '../lib/tournamentApi'
 import { describeError, errorKind } from '../lib/errors'
@@ -47,7 +47,6 @@ import { weekdayShort, launchDate } from '../lib/launchDay'
 import EventActionsSheet from '../components/EventActionsSheet'
 import { cancelMixDate } from '../lib/mixCancel'
 
-const sanitizeSlug = (value) => value.toLowerCase().replace(/[^a-z0-9-]/g, '')
 
 // datetime-local <-> stored timestamptz helpers (keeps Portugal wall-clock)
 const toLocalInput = (d) => {
@@ -294,6 +293,10 @@ export default function GerirClube() {
     if (editingGame) formMixRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [editingGame?.id])
   const [gameFilter, setGameFilter] = useState('upcoming')
+  // «Ver o que já passou» com pastilhas por tipo (Histórico no Gerir, 27 set).
+  const [pastKind, setPastKind] = useState('all')
+  // As aulas já dadas de cada turma: series_id → { count, last }.
+  const [turmasDadas, setTurmasDadas] = useState(new Map())
   const [savingPlan, setSavingPlan] = useState(false)
   const [planMessage, setPlanMessage] = useState(null)
   const [editingName, setEditingName] = useState(false)
@@ -334,7 +337,6 @@ export default function GerirClube() {
   const [transferError, setTransferError] = useState('')
   const [showCreateGroup, setShowCreateGroup] = useState(false)
   const [groupName, setGroupName] = useState('')
-  const [groupSlug, setGroupSlug] = useState('')
   const [creatingGroup, setCreatingGroup] = useState(false)
   const [groupError, setGroupError] = useState('')
   // Nomes repetidos (27 set): avisa enquanto se escreve.
@@ -415,9 +417,17 @@ export default function GerirClube() {
         quando: proximaVez(turma.weekday, turma.start_time), row: turma, terminado: false,
       })
     }
+    // No que já passou, a turma aparece com as aulas dadas (Histórico no
+    // Gerir, 27 set): «Todas as quintas · 3 aulas dadas».
+    for (const turma of turmas) {
+      const dadas = turmasDadas.get(turma.series_id)
+      if (!dadas?.count) continue
+      itens.push({ tipo: 'turma', chave: `turma-dada-${turma.series_id}`, quando: dadas.last, row: turma, terminado: true, aulas: dadas.count })
+    }
     const passados = gameFilter === 'finished'
     return itens
       .filter((i) => (passados ? i.terminado : !i.terminado))
+      .filter((i) => !passados || pastKind === 'all' || i.tipo === pastKind)
       .sort((a, b) => {
         const x = a.quando ? new Date(a.quando).getTime() : 0
         const y = b.quando ? new Date(b.quando).getTime() : 0
@@ -775,6 +785,21 @@ export default function GerirClube() {
     if (error) { console.error('Error loading open games:', error); return }
     setOpenGames(data || [])
   }
+
+  useEffect(() => {
+    if (gameFilter !== 'finished' || turmas.length === 0) return
+    listSeriesPastLessons(turmas.map((x) => x.series_id))
+      .then((rows) => {
+        const m = new Map()
+        for (const l of rows) {
+          if (l.status === 'cancelled') continue
+          const cur = m.get(l.series_id) || { count: 0, last: l.starts_at }
+          m.set(l.series_id, { count: cur.count + 1, last: cur.last > l.starts_at ? cur.last : l.starts_at })
+        }
+        setTurmasDadas(m)
+      })
+      .catch((error) => console.error('Error loading past lessons:', error))
+  }, [gameFilter, turmas])
 
   const loadTurmas = async () => {
     try {
@@ -1967,7 +1992,7 @@ export default function GerirClube() {
     setGroupError('')
     setCreatingGroup(true)
     try {
-      await createGroup(groupName.trim(), groupSlug.trim(), org.id, currentUser.id)
+      await createGroup(groupName.trim(), org.id, currentUser.id)
       // create_group inserts the caller's admin membership server-side — pull
       // it into the client before the admin can navigate to /gerir/<slug>,
       // otherwise the org resolver there sees a stale memberships array and
@@ -1977,18 +2002,12 @@ export default function GerirClube() {
       setCreatedGroupName(groupName.trim())
       setShowCreateGroup(false)
       setGroupName('')
-      setGroupSlug('')
     } catch (error) {
       console.error('Error creating group:', error)
       const message = error?.message || ''
-      if (message.toLowerCase().includes('duplicate key value violates unique constraint') || message.toLowerCase().includes('slug')) {
-        setGroupError(describeError(t, error, 'gerirclube.error_duplicate_group_slug'))
-      } else {
-        // The RPC's own RAISE EXCEPTION messages are already pt-PT, so show
-        // them verbatim rather than hiding the real reason behind a generic
-        // "tenta novamente" the admin can't act on.
-        setGroupError(message || t('gerirclube.error_create_group_fallback'))
-      }
+      // Nome repetido tem frase própria; o resto das mensagens da RPC já vem
+      // em pt-PT e mostra-se tal e qual, em vez de um «tenta novamente» genérico.
+      setGroupError(message && !error?.code?.startsWith?.('23') ? message : describeError(t, error, 'gerirclube.error_create_group_fallback'))
     } finally {
       setCreatingGroup(false)
     }
@@ -3127,6 +3146,21 @@ export default function GerirClube() {
                   passou fica num botao no fim (desenho de 23 set). */}
               <div className="card space-y-4">
 
+              {/* Pastilhas por tipo no que já passou (filtro, regra única): no
+                  clube há jogos em aberto e turmas; no grupo, jogos entre amigos. */}
+              {gameFilter === 'finished' && (
+                <Chips label={t('gerirclube.see_past')} value={pastKind} onChange={setPastKind}
+                  options={[
+                    { value: 'all', label: t('gerirclube.kind_all') },
+                    { value: 'mix', label: t('gerirclube.kind_mixes') },
+                    { value: 'torneio', label: t('gerirclube.kind_tournaments') },
+                    ...(org?.kind === 'group' ? [] : [
+                      { value: 'aberto', label: t('gerirclube.kind_open') },
+                      { value: 'turma', label: t('gerirclube.kind_series') },
+                    ]),
+                  ]} />
+              )}
+
               <div className="space-y-3">
                 {eventosPorData().length === 0 && (
                   <p className="text-sm text-muted text-center py-6">
@@ -3151,7 +3185,10 @@ export default function GerirClube() {
                     detalhe = [lessonTypeLabel(t, row.lesson_type, { series: true }), row.teacher_name, t('gerirclube.spots_of', { count: row.taken, max: row.capacity })]
                       .filter(Boolean).join(' · ')
                     abrir = () => setTurmaAberta(row.series_id)
-                    if (row.status === 'pending_teacher') marca = t('lessons.pending_teacher')
+                    if (item.terminado) {
+                      cinzento = true
+                      detalhe = t('gerirclube.past_series_line', { days: t(`lessons.wd_plural_${row.weekday}`).toLowerCase(), count: item.aulas })
+                    } else if (row.status === 'pending_teacher') marca = t('lessons.pending_teacher')
                     else if (row.pending_requests > 0) marca = t('lessons.requests_count', { count: row.pending_requests })
                   } else {
                     const confirmados = (row.participants || [])
@@ -3942,13 +3979,6 @@ export default function GerirClube() {
                         placeholder={t('gerirclube.group_name_placeholder')}
                       />
                       <OrgNameTakenHint taken={newGroupNameTaken} className="!mt-0" />
-                      <input
-                        type="text"
-                        value={groupSlug}
-                        onChange={(e) => setGroupSlug(sanitizeSlug(e.target.value))}
-                        className="input-field"
-                        placeholder={t('gerirclube.group_slug_placeholder')}
-                      />
                       {groupError && (
                         <p className="text-danger text-sm font-extrabold">{groupError}</p>
                       )}
@@ -3956,7 +3986,7 @@ export default function GerirClube() {
                         <button
                           type="button"
                           onClick={handleCreateGroup}
-                          disabled={!groupName.trim() || !groupSlug.trim() || creatingGroup || newGroupNameTaken}
+                          disabled={!groupName.trim() || creatingGroup || newGroupNameTaken}
                           className="btn-primary flex-1"
                         >
                           {creatingGroup ? t('gerirclube.creating_group_label') : t('gerirclube.create_group_submit')}

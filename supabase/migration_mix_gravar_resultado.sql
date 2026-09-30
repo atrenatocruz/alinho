@@ -16,7 +16,7 @@
 --   · Quem pode: o mesmo que as regras da tabela deixam — admin do clube
 --     do jogo, ou quem marca resultados com o mix a decorrer
 --     ('not_allowed').
---   · Vencedor: como a app fazia (quem tem mais; senão a dupla B).
+--   · Vencedor: quem tem mais; num empate, nenhum (winner_team_id null).
 --   · p_sets (opcional): [{score_a, score_b, is_super_tiebreak?,
 --     tiebreak_a?, tiebreak_b?}] — substitui os sets do jogo; null deixa
 --     os sets como estão.
@@ -56,7 +56,10 @@ BEGIN
   IF p_score_a IS NULL OR p_score_b IS NULL THEN RAISE EXCEPTION 'empty'; END IF;
   IF p_sets IS NOT NULL AND jsonb_typeof(p_sets) <> 'array' THEN RAISE EXCEPTION 'bad_score'; END IF;
 
-  v_winner := CASE WHEN p_score_a > p_score_b THEN v_m.team_a_id ELSE v_m.team_b_id END;
+  -- Empate (Francisco, 30 set): grava-se sem vencedor; o ecrã não deixa
+  -- terminar a ronda enquanto houver um jogo empatado.
+  v_winner := CASE WHEN p_score_a > p_score_b THEN v_m.team_a_id
+                   WHEN p_score_b > p_score_a THEN v_m.team_b_id END;
   UPDATE matches SET score_a = p_score_a, score_b = p_score_b, winner_team_id = v_winner
    WHERE id = p_match_id;
 
