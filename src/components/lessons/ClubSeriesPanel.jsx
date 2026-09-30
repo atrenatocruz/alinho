@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ChevronLeft, GraduationCap, Plus, Repeat } from 'lucide-react'
 import { Avatar, EmptyState, PrimaryButton, DateField } from '../ui'
-import { cancelLesson, cancelLessonPeriod, getSeriesRoster, listClubSeries, markLessonAbsence, resolveEnrolment } from '../../lib/lessonsApi'
+import { cancelLesson, cancelLessonPeriod, getSeriesRoster, listClubSeries, listSeriesPastLessons, markLessonAbsence, resolveEnrolment } from '../../lib/lessonsApi'
 import { weekdayCountBetween } from '../../lib/lessons'
 import { describeError } from '../../lib/errors'
 import CreateSeriesForm from './CreateSeriesForm'
@@ -201,9 +201,93 @@ export function SeriesManage({ seriesId, onBack }) {
       </div>
       )}
 
-      {data.next_lesson && s.status !== 'pending_teacher' && (
-        <NextLesson series={s} lesson={data.next_lesson} />
-      )}
+      {/* Ordem (designer, 30 set): pedidos → próxima aula → aulas dadas →
+          cancelar. O que cancela fica sempre em último. */}
+      {data.next_lesson && s.status !== 'pending_teacher'
+        ? <NextLesson series={s} lesson={data.next_lesson} past={<PastLessons series={s} students={data.students} />} />
+        : <PastLessons series={s} students={data.students} />}
+    </div>
+  )
+}
+
+/** «AULAS DADAS» (Histórico no Gerir, 27 set): data, «N de M alunos · N
+    falta(s)», «Dada» / «Cancelada». Tocar numa aula mostra quem veio e quem
+    faltou, com o «Marcar falta» de sempre. */
+function PastLessons({ series, students }) {
+  const { t } = useTranslation()
+  const [lessons, setLessons] = useState(null)
+  const [open, setOpen] = useState(null)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    listSeriesPastLessons([series.series_id], { withAttendees: true })
+      .then(setLessons).catch((error) => { console.error('Error loading past lessons:', error); setLessons([]) })
+  }, [series.series_id])
+  if (!lessons || lessons.length === 0) return null
+  const nameOf = (a) => students.find((st) => st.user_id === a.user_id)?.name || a.guest_name || t('lessons.former_student')
+  const people = (l) => (l.lesson_attendees || []).filter((a) => ['confirmed', 'accepted', 'absent', 'not_going'].includes(a.status))
+  const missed = (a) => a.status === 'absent' || a.status === 'not_going'
+
+  const markAbsent = async (l, a) => {
+    const note = window.prompt(t('lessons.absence_note_prompt', { name: nameOf(a) }), '')
+    if (note === null) return
+    setBusy(true)
+    try {
+      await markLessonAbsence(l.id, a.user_id, note)
+      setLessons((list) => list.map((x) => (x.id !== l.id ? x : {
+        ...x, lesson_attendees: x.lesson_attendees.map((y) => (y.user_id === a.user_id ? { ...y, status: 'absent', marked_note: note } : y)),
+      })))
+    } catch (error) {
+      alert(describeError(t, error, 'lessons.error_attendance'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div>
+      <MonoLabel className="mb-2">{t('lessons.past_lessons')}</MonoLabel>
+      <div className="rounded-2xl border border-line bg-canvas divide-y divide-line">
+        {lessons.map((l) => {
+          const d = new Date(l.starts_at)
+          const cancelled = l.status === 'cancelled'
+          const all = people(l)
+          const faltas = all.filter(missed).length
+          const isOpen = open === l.id
+          return (
+            <div key={l.id}>
+              <button type="button" disabled={cancelled} onClick={() => setOpen(isOpen ? null : l.id)}
+                className="flex w-full items-center gap-3 px-3 py-3 text-left disabled:cursor-default">
+                <span className="w-16 shrink-0 font-extrabold text-ink-900">{t(`lessons.wd_short_${series.weekday}`)} {d.getDate()}</span>
+                <span className="min-w-0 flex-1 truncate text-sm text-ink-900">
+                  {cancelled ? '—' : [t('lessons.past_came', { count: all.length - faltas, total: all.length }), faltas ? t('lessons.past_missed', { count: faltas }) : null].filter(Boolean).join(' · ')}
+                </span>
+                <span className={`shrink-0 rounded-full px-2 py-[3px] text-[11px] font-extrabold ${cancelled ? 'bg-danger/10 text-danger' : 'bg-ink-50 text-ink-700'}`}>
+                  {t(cancelled ? 'lessons.past_cancelled' : 'lessons.past_given')}
+                </span>
+              </button>
+              {isOpen && (
+                <div className="space-y-1.5 px-3 pb-3">
+                  {all.map((a) => (
+                    <div key={a.user_id || a.guest_name} className="flex items-center gap-2.5">
+                      <Avatar name={nameOf(a)} size="w-7 h-7 text-[10px]" colorClass="bg-ink-50 text-ink-500" />
+                      <span className="min-w-0 flex-1 truncate text-sm text-ink-900">{nameOf(a)}</span>
+                      {missed(a)
+                        ? <span className="shrink-0 text-xs" style={{ color: '#9A5B00' }}>{t('lessons.past_person_missed')}{a.marked_note ? ` · ${a.marked_note}` : ''}</span>
+                        : (
+                          <button type="button" disabled={busy || !a.user_id} onClick={() => markAbsent(l, a)}
+                            className="shrink-0 rounded-full border border-line bg-canvas px-2.5 py-1 text-[11px] font-bold text-ink-700 hover:bg-ink-50 disabled:opacity-40">
+                            {t('lessons.mark_absence')}
+                          </button>
+                        )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+      <p className="mt-1.5 px-1 text-xs text-muted">{t('lessons.past_hint')}</p>
     </div>
   )
 }
@@ -212,7 +296,7 @@ const pad2 = (n) => String(n).padStart(2, '0')
 const isoOf = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
 
 /** Próxima aula da turma (print 07, 2.º): faltas e cancelamentos. */
-function NextLesson({ series, lesson }) {
+function NextLesson({ series, lesson, past = null }) {
   const { t } = useTranslation()
   const [attendees, setAttendees] = useState(lesson.attendees || [])
   const [busy, setBusy] = useState(false)
@@ -295,6 +379,8 @@ function NextLesson({ series, lesson }) {
           ))}
         </div>
       </div>}
+
+      {past}
 
       <div className="space-y-2">
         <MonoLabel>{t('lessons.cancel_title')}</MonoLabel>
