@@ -555,6 +555,15 @@ export function standings(teams, matches) {
     formats prefer a decided `phase === 'final'` match before the same
     fallback. Americano has no single winning team (individual scoring
     across rotating partners) and always returns null. */
+/** Um jogo com resultado: pontos gravados dos dois lados, com ou sem
+    vencedor. Um empate grava-se (Francisco, 30 set, REGRAS.md ponto 4) e
+    fica com winner_team_id null — o save_mix_match_result do Dev 3. */
+export const hasResult = (m) => !!m && (!!m.winner_team_id || (m.score_a != null && m.score_b != null))
+
+/** Jogo empatado: com resultado e sem vencedor. Trava o passo seguinte do
+    mix («Terminar Ronda N», passar de fase, «Terminar e dar os pontos»). */
+export const isTie = (m) => hasResult(m) && !m.winner_team_id
+
 export function computeMixWinnerTeamId(game, teams, matches) {
   if (game?.format === 'americano') return null
   if (!matches.some(m => m.winner_team_id)) return null
