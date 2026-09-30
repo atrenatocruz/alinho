@@ -111,13 +111,14 @@ AS $$
   END;
 $$;
 
--- As três são contas puras: ficam para todos (servem também de consulta).
+-- As três são contas puras: ficam para quem tem sessão; fechadas a anon, também
+-- pelo PUBLIC, de onde o anon as herdava (SI, 29 set).
 GRANT EXECUTE ON FUNCTION public.score_tiebreak_problem(INTEGER, INTEGER, INTEGER) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.score_set_problem(INTEGER, INTEGER, INTEGER, INTEGER, INTEGER) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.score_proset_problem(INTEGER, INTEGER, INTEGER, INTEGER, TEXT) TO authenticated;
-REVOKE ALL ON FUNCTION public.score_tiebreak_problem(INTEGER, INTEGER, INTEGER) FROM anon;
-REVOKE ALL ON FUNCTION public.score_set_problem(INTEGER, INTEGER, INTEGER, INTEGER, INTEGER) FROM anon;
-REVOKE ALL ON FUNCTION public.score_proset_problem(INTEGER, INTEGER, INTEGER, INTEGER, TEXT) FROM anon;
+REVOKE ALL ON FUNCTION public.score_tiebreak_problem(INTEGER, INTEGER, INTEGER) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.score_set_problem(INTEGER, INTEGER, INTEGER, INTEGER, INTEGER) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.score_proset_problem(INTEGER, INTEGER, INTEGER, INTEGER, TEXT) FROM PUBLIC, anon;
 
 -- ── 3. Mix: cada set ────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.mix_match_sets_guard()
