@@ -31,7 +31,6 @@ import { notifyMixChanges } from '../lib/notifications'
 import AddPlayerSheet from '../components/mix/AddPlayerSheet'
 import JoinPartnerSheet from '../components/mix/JoinPartnerSheet'
 import { Sheet } from '../components/agenda/AgendaControls'
-import ConfirmPhoneCard from '../components/ConfirmPhoneCard'
 import { whatsappLookalikeInGame, rememberWhatsappGuest, rememberedWhatsappGuest } from '../lib/whatsappGuest'
 import { MonoLabel } from '../components/tournament/TournamentBits'
 import { joinWithNamedPartner, listGameInvites, inviteLink, whatsappShare } from '../lib/partnerInvite'
@@ -2604,16 +2603,10 @@ export default function GameDetails() {
         </PrimaryButton>
       ) : !mixStarted && !isUserJoined && waGuestName ? (
         // Disse que sim, que é o convidado do WhatsApp: não se inscreve outra
-        // vez. Liga a conta ao número (#537) e as inscrições juntam-se.
-        <div className="card space-y-3">
+        // vez. Sem confirmação por agora (Francisco, 29 set: sai o código ao
+        // robô do #537; a validação vai ser por SMS, mais tarde).
+        <div className="card">
           <p className="text-sm text-ink-900">{t('gamedetails.wa_guest_in', { name: waGuestName })}</p>
-          {profile?.phone_hash && profile.phone_hash !== 'dev-bypass'
-            ? <ConfirmPhoneCard />
-            : (
-              <Link to="/perfil/informacao" className="btn-secondary inline-flex w-full items-center justify-center">
-                {t('gamedetails.wa_add_number')}
-              </Link>
-            )}
         </div>
       ) : !mixStarted && canJoin && !joinMode && !ageIneligible && !missingBirthday ? (
         <div className="space-y-2">
