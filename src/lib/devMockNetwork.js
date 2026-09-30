@@ -751,7 +751,10 @@ const EV_MATCHES = () => [
     // para se ver o «Terminar Ronda 2» na barra de quem organiza (26 set).
     ...(localStorage.getItem('mockRoundDone') === 'true' ? [
       { id: 'em3', game_id: 'fake-game-1', round_number: 2, court_number: 1, phase: 'group', team_a_id: 'et1', team_b_id: 'et3', score_a: 6, score_b: 3, winner_team_id: 'et1' },
-      { id: 'em4', game_id: 'fake-game-1', round_number: 2, court_number: 2, phase: 'group', team_a_id: 'et2', team_b_id: 'et4', score_a: 6, score_b: 5, winner_team_id: 'et2' },
+      // + mockRoundTie = 'true': o campo 2 acabou empatado (5-5, sem vencedor).
+      localStorage.getItem('mockRoundTie') === 'true'
+        ? { id: 'em4', game_id: 'fake-game-1', round_number: 2, court_number: 2, phase: 'group', team_a_id: 'et2', team_b_id: 'et4', score_a: 5, score_b: 5, winner_team_id: null }
+        : { id: 'em4', game_id: 'fake-game-1', round_number: 2, court_number: 2, phase: 'group', team_a_id: 'et2', team_b_id: 'et4', score_a: 6, score_b: 5, winner_team_id: 'et2' },
     ] : [
       { id: 'em3', game_id: 'fake-game-1', round_number: 2, court_number: 1, phase: 'group', team_a_id: 'et1', team_b_id: 'et3', score_a: null, score_b: null, winner_team_id: null },
       { id: 'em4', game_id: 'fake-game-1', round_number: 2, court_number: 2, phase: 'group', team_a_id: 'et2', team_b_id: 'et4', score_a: null, score_b: null, winner_team_id: null },
