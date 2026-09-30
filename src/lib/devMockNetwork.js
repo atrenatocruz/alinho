@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { LESSON_RPC_MOCKS, LESSON_TABLE_MOCKS, LESSON_NOTICES } from './devMockLessons'
+import { withManyOrgs } from './devMockGerir'
 import {
   TOURNAMENT_RPC_MOCKS, TOURNAMENT_TABLE_MOCKS, TOURNAMENT_CLOSE_RPC_MOCKS, TOURNAMENT_CLOSE_TABLE_MOCKS,
   TOURNAMENT_SCORE_TODAY_TABLE_MOCKS, TOURNAMENT_REOPEN_RPC_MOCKS, TOURNAMENT_GROUPS_DONE_TABLE_MOCKS, TOURNAMENT_PROMOTED_TABLE_MOCKS, TOURNAMENT_PROMOTED_RPC_MOCKS,
@@ -1506,6 +1507,9 @@ const wantsSingle = (init) => {
   const accept = typeof headers.get === 'function' ? headers.get('Accept') : headers['Accept'] || headers['accept']
   return !!accept && accept.includes('vnd.pgrst.object')
 }
+
+// Gerir com muitos clubes e grupos (localStorage.mockManyOrgs = 'true').
+TABLE_MOCKS.organizations = withManyOrgs(TABLE_MOCKS.organizations)
 
 export function installDevMockNetwork() {
   if (!import.meta.env.DEV) return

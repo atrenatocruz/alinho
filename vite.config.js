@@ -14,7 +14,7 @@ const TEST_ORANGE = '#EA580C'
 const testEnvHtml = (isTest) => ({
   name: 'alinho-test-env-html',
   transformIndexHtml: (html) => (!isTest ? html : html
-    .replace('<title>alinho — mixes, rankings e clubes de padel</title>', '<title>alinho TESTE</title>')
+    .replace('<title>alinho.pt — mixes, rankings e clubes de padel</title>', '<title>alinho TESTE</title>')
     .replace('href="/favicon.ico"', 'href="/favicon-teste.ico"')
     .replace('href="/apple-touch-icon.png"', 'href="/apple-touch-icon-teste.png"')
     .replace('<meta name="theme-color" content="#040404" />', `<meta name="theme-color" content="${TEST_ORANGE}" />`)
