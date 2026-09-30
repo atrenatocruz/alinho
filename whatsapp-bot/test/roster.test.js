@@ -37,9 +37,9 @@ test('o « (convidado)» não se repete se o nome já o traz', () => {
   assert.equal(rosterName({ name: 'Ana', guest: false }), 'Ana')
 })
 
-test('a resposta a um convidado novo é o texto do Francisco', () => {
-  const text = t('guest_joined', 'pt', { name: 'Paulo Henriques' })
-  assert.ok(text.startsWith('Olá Paulo Henriques! Acabaste de entrar num mix como *convidado*'))
-  assert.match(text, /Regista-te em https:\/\/alinho\.pt e confirma o teu número de telefone/)
-  assert.match(text, /\n\n⚠️ \*Não voltes a fazer In na app\* antes de confirmar o número/)
+test('a resposta a um convidado novo explica o modelo sem conta', () => {
+  const text = t('guest_joined', 'pt', { name: 'Paulo Henriques', appUrl: 'https://alinho.pt' })
+  assert.ok(text.startsWith('Olá Paulo Henriques! Entraste como *convidado*'))
+  assert.match(text, /sem conta não tens ranking nem histórico/)
+  assert.match(text, /Regista-te em https:\/\/alinho\.pt e confirma o teu número/)
 })

@@ -1,8 +1,7 @@
 import { supabase } from './supabase.js'
 import { getGroupByJid, mixVisibleToGroup } from './groups.js'
 import { loadGame, getOpenMixes, formatDateTime, weekdayKeyPt, mixLocalParts, gameIdForMessage, labelableMixes, mixLabel, buildMixMessage, recordMixMessage } from './roster.js'
-import { resolveProfileByPhoneJid, createGuestProfile, ensureMembership } from './phone.js'
-import { joinWithUnregisteredPartner, createNamedGuest } from './partnerInvite.js'
+import { resolveProfileByPhoneJid, guestIdentity, ensureMembership, hashPhone } from './phone.js'
 import { parseCopiedRoster, extraNames, isSenderName, normName, nameMatches as copiedNameMatches } from './copiedRoster.js'
 import { config } from './config.js'
 import { helpText, helpFooter } from './messages.js'
@@ -176,6 +175,18 @@ function nameMatches(fullName, query) {
  *  (convidado do bot + conta registada), qualquer uma conta — phone.js,
  *  aliasIds. */
 const isMine = (profile, id) => id != null && (id === profile?.id || (profile?.aliasIds ?? []).includes(id))
+
+// A MESMA pergunta, ao nível da linha de participants, cobrindo também os
+// convidados sem conta (a identidade deles é o hash do número — o `myHash`
+// de quem escreve compara-se com o da inscrição). Uma conta também apanha a
+// SUA linha-convidado (feita antes de se registar): mesma pessoa, mesmo
+// número.
+const rowOwnerIsMine = (identity, myHash, row) =>
+  isMine(identity, row.user_id) || (row.guestPhoneHash != null && row.guestPhoneHash === myHash)
+const rowPartnerIsMine = (identity, myHash, row) =>
+  isMine(identity, row.partner_id) || (row.partnerGuestPhoneHash != null && row.partnerGuestPhoneHash === myHash)
+const rowIsMine = (identity, myHash, row) =>
+  rowOwnerIsMine(identity, myHash, row) || rowPartnerIsMine(identity, myHash, row)
 
 const OPEN_STATUSES = new Set(['open', 'closed'])
 
@@ -375,6 +386,10 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
   const resolvedProfile = await resolveProfileByPhoneJid(senderPn, organizationId)
   timer.mark('perfil')
   const lang = resolvedProfile?.language ?? 'pt'
+  // O hash do número de quem escreve — a identidade de um convidado sem
+  // conta, e a ponte entre uma conta e a linha-convidado que ela possa ter
+  // deixado antes de existir (rowOwnerIsMine).
+  const myHash = hashPhone(senderPn.split('@')[0])
   // Convidado que ficou com o nome por defeito («Parceiro de Macedo») e
   // agora escreve: passa a ter o nome do WhatsApp.
   if (await renameDefaultPartner(resolvedProfile, message?.pushName)) resolvedProfile.name = usablePushName(message.pushName)
@@ -384,20 +399,13 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
   // back to /help, except the help listing itself.
   const reply = (key, vars) => sendText(groupJid, `${t(key, lang, vars)}${helpFooter(lang)}`, { quoted: message })
 
-  // Same check a plain resolveProfileByPhoneJid result needs before use —
-  // avoids a redundant query.
-  async function requireProfile(profile) {
-    if (!profile) await reply('not_found', { appUrl: config.appUrl })
-    return profile
-  }
-
-  // Only called on an actual join attempt (not "out", not disambiguation) —
-  // a WhatsApp-only person becomes a real (is_guest) profile+membership right
-  // then, so they can play without registering first, while still being
-  // nudged to sign up for their history/friends/rewards (Trello #19).
+  // Only called on an actual join attempt (not "out", not disambiguation).
+  // Conta = email (Ruben, 30 set): um número desconhecido NÃO ganha conta —
+  // entra como convidado sem conta (game_guests), com o nudge para se
+  // registar (histórico/ranking só com conta).
   async function requireProfileOrCreateGuest(profile, senderPnForGuest) {
     // #537: já tem conta (número confirmado) mas não é deste clube → passa a
-    // membro com a conta dele, em vez de ganhar um convidado.
+    // membro com a conta dele, em vez de entrar como convidado.
     if (profile?.notMember) {
       try {
         await ensureMembership(profile.id, organizationId)
@@ -409,14 +417,45 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
       }
     }
     if (profile) return { profile, isNewGuest: false }
-    try {
-      const created = await createGuestProfile(senderPnForGuest, message?.pushName, organizationId)
-      return { profile: created, isNewGuest: true }
-    } catch (err) {
-      console.error('Failed to create guest profile:', err)
-      await reply('not_found', { appUrl: config.appUrl })
-      return { profile: null, isNewGuest: false }
+    return { profile: guestIdentity(senderPnForGuest, usablePushName(message?.pushName)), isNewGuest: true }
+  }
+
+  /** Garante a linha do convidado deste jogo (upsert pelo número: o mesmo
+   *  número nunca duplica; o nome atualiza-se para o do WhatsApp) e
+   *  inscreve-a. Devolve o erro do INSERT de participants (para os
+   *  tratamentos de mix cheio/duplicado dos chamadores), lançando nos
+   *  restantes. */
+  async function insertGuestParticipant(gameId, identity, status) {
+    const { data: g, error: guestError } = await supabase
+      .from('game_guests')
+      .upsert(
+        { game_id: gameId, name: identity.name, phone_hash: identity.phoneHash, whatsapp_jid: identity.jid },
+        { onConflict: 'game_id,phone_hash' }
+      )
+      .select('id')
+      .single()
+    if (guestError) throw new Error(`Failed to upsert game guest: ${guestError.message}`)
+    const { error } = await supabase
+      .from('participants')
+      .insert([{ game_id: gameId, guest_id: g.id, status, joined_alone: true }])
+    if (error) {
+      // Linha órfã só se o convidado não estava já inscrito (23505 = já está).
+      if (error.code !== '23505') await supabase.from('game_guests').delete().eq('id', g.id)
+      return error
     }
+    return null
+  }
+
+  /** Convidado só por nome (parceiro «com Fulano», lista copiada): sem
+   *  número, sem «Out» pelo bot — só o admin o tira. */
+  async function createNamedGameGuest(gameId, name) {
+    const { data: g, error } = await supabase
+      .from('game_guests')
+      .insert({ game_id: gameId, name: name.trim() })
+      .select('id')
+      .single()
+    if (error) throw new Error(`Failed to create named game guest: ${error.message}`)
+    return g.id
   }
 
   if (pairAnswer && resolvedProfile && await answerPairRequest(pairAnswer)) return
@@ -464,9 +503,11 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
       const { profile, isNewGuest } = await requireProfileOrCreateGuest(resolvedProfile, senderPn)
       if (!profile) return
 
-      const { error: insertError } = await supabase
-        .from('participants')
-        .insert([{ game_id: pending.gameId, user_id: profile.id, status: 'waitlisted', joined_alone: true }])
+      const insertError = profile.guest
+        ? await insertGuestParticipant(pending.gameId, profile, 'waitlisted')
+        : (await supabase
+            .from('participants')
+            .insert([{ game_id: pending.gameId, user_id: profile.id, status: 'waitlisted', joined_alone: true }])).error
 
       if (insertError) {
         if (insertError.code === '23505') {
@@ -634,20 +675,18 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
         return { partner: { ...found, notMember: false }, isNewGuest: false }
       }
       if (found) return { partner: found, isNewGuest: false }
-      try {
-        // O nome: o escrito («In @João com João Silva»), o do WhatsApp se a
-        // pessoa já escreveu no grupo, ou por defeito — e esse muda para o
-        // do WhatsApp quando ela escrever (seenNames.js).
-        const known = partnerRequest.name ? shownName() : seenName(pn)
-        const guestName = known || t('partner_guest_default_name', lang, { name: profile.name })
-        const created = await createGuestProfile(pn, guestName, organizationId)
-        if (!known) notePlaceholder(pn, created)
-        return { partner: created, isNewGuest: true }
-      } catch (err) {
-        console.error('Failed to create partner guest profile:', err)
-        await reply('partner_not_found_app', { appUrl: config.appUrl })
-        return null
-      }
+      // Número sem conta: o parceiro entra como convidado sem conta
+      // (game_guests), com o número — o «Out» dele funciona e, se criar
+      // conta e confirmar o número, a inscrição é adotada. O nome: o
+      // escrito («In @João com João Silva»), o do WhatsApp se a pessoa já
+      // escreveu no grupo, ou por defeito.
+      const known = partnerRequest.name ? shownName() : seenName(pn)
+      const guestName = known || t('partner_guest_default_name', lang, { name: profile.name })
+      const partner = guestIdentity(pn, guestName)
+      // Sem nome conhecido: quando esta pessoa escrever no grupo, o nome
+      // por defeito dá lugar ao do WhatsApp (seenNames.js).
+      if (!known) notePlaceholder(pn, { phoneHash: partner.phoneHash, name: partner.name })
+      return { partner, isNewGuest: true }
     }
     if (!partnerRequest.name) {
       // Houve menção, mas o WhatsApp não deu o número (grupo com LID).
@@ -786,14 +825,20 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     const adding = Boolean(pending.addToRowId)
     const { profile, isNewGuest } = await requireProfileOrCreateGuest(resolvedProfile, senderPn)
     if (!profile) return
+    // Quem não tem conta não inicia duplas (o pedido/aceitação e a gestão
+    // na app precisam de conta) — entra sozinho ou o parceiro escreve ele.
+    if (profile.guest) {
+      await reply('guest_pair_need_account', { appUrl: config.appUrl })
+      return
+    }
     const own = adding ? rows.find((row) => row.id === pending.addToRowId) : null
     if (adding) {
       // A inscrição sozinha tem de continuar lá, ser desta pessoa e sem parceiro.
-      if (!own || own.status !== 'confirmed' || own.partner_id || !isMine(profile, own.user_id)) {
+      if (!own || own.status !== 'confirmed' || own.partner_id || own.partner_guest_id || !isMine(profile, own.user_id)) {
         await reply('mix_no_longer_available')
         return
       }
-    } else if (rows.some((row) => isMine(profile, row.user_id) || isMine(profile, row.partner_id))) {
+    } else if (rows.some((row) => rowIsMine(profile, myHash, row))) {
       await reply('already_joined')
       return
     }
@@ -811,27 +856,41 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
       await reply(adding ? 'mix_full_add_partner' : capacity - people.length <= 0 ? 'mix_full_pair' : 'mix_one_spot_pair')
       return
     }
-    let token
+    // Convidado sem conta, só com o nome — substitui o convite por link
+    // (partner_invites/#339) no bot: sem conta por reclamar, sem token
+    // (decisão Ruben, 30 set). Se a pessoa criar conta e confirmar o número
+    // não há adoção automática (não temos o número dela) — o admin troca na
+    // app se for preciso.
+    let guestId
     try {
-      token = await joinWithUnregisteredPartner({
-        gameId: game.id, organizationId, callerId: profile.id, name: pending.name,
-        existingParticipantId: pending.addToRowId ?? null,
-      })
+      guestId = await createNamedGameGuest(game.id, pending.name)
     } catch (err) {
-      if (isGameFull(err)) {
-        await reply(pending.addToRowId ? 'mix_full_add_partner' : 'mix_full_pair')
-        return
-      }
-      console.error('Failed to join with unregistered partner:', err)
+      console.error('Failed to create named guest partner:', err)
       await reply('partner_not_found_app', { appUrl: config.appUrl })
       return
     }
+    const { error: pairError } = adding
+      ? await supabase
+          .from('participants')
+          .update({ partner_guest_id: guestId, joined_alone: false })
+          .eq('id', pending.addToRowId)
+      : await supabase
+          .from('participants')
+          .insert([{ game_id: game.id, user_id: profile.id, partner_guest_id: guestId, status: 'confirmed', joined_alone: false }])
+    if (pairError) {
+      await supabase.from('game_guests').delete().eq('id', guestId)
+      if (isGameFull(pairError)) {
+        await reply(adding ? 'mix_full_add_partner' : 'mix_full_pair')
+        return
+      }
+      if (pairError.code === '23505') {
+        await reply('already_joined')
+        return
+      }
+      throw new Error(`Failed to join with named guest partner: ${pairError.message}`)
+    }
     repostHooks.requestRepostForGame(organizationId, game.id)
-    await reply('pair_partner_invite_created', {
-      partner: pending.name,
-      link: `${config.appUrl}/convite/${token}`,
-    })
-    if (isNewGuest) await reply('guest_joined', { name: profile.name, appUrl: config.appUrl })
+    await reply('pair_partner_guest_created', { partner: pending.name, appUrl: config.appUrl })
   }
 
   /**
@@ -858,11 +917,30 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     const resolved = await resolvePartner(profile, game, { addToRowId: row.id })
     if (!resolved) return
     const { partner, isNewGuest: partnerIsNewGuest } = resolved
-    if (isMine(profile, partner.id)) {
+    if (isMine(profile, partner.id) || (partner.guest && partner.phoneHash === myHash)) {
       await reply('partner_is_you')
       return
     }
-    const partnerSolo = existingRows.find((r) => r.status === 'confirmed' && r.user_id === partner.id && !r.partner_id)
+    if (partner.guest) {
+      // Convidado (com número, via menção) já inscrito neste jogo?
+      if (existingRows.some((r) => r.guestPhoneHash === partner.phoneHash || r.partnerGuestPhoneHash === partner.phoneHash)) {
+        await reply('partner_already_in', { name: partner.name })
+        return
+      }
+      const insertError = await attachGuestPartner(game.id, row.id, partner)
+      timer.mark('gravar')
+      if (insertError) {
+        if (isGameFull(insertError)) {
+          await reply('mix_full_add_partner')
+          return
+        }
+        throw new Error(`Failed to add guest partner: ${insertError.message}`)
+      }
+      repostHooks.requestRepostForGame(organizationId, game.id)
+      await reply('pair_partner_guest_created', { partner: partner.name, appUrl: config.appUrl })
+      return
+    }
+    const partnerSolo = existingRows.find((r) => r.status === 'confirmed' && r.user_id === partner.id && !r.partner_id && !r.partner_guest_id)
     if (partnerSolo) {
       await askPairRequest(game, profile, partner)
       return
@@ -890,6 +968,43 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     }
   }
 
+  /** Junta um parceiro-convidado (com número) a uma inscrição existente. */
+  async function attachGuestPartner(gameId, rowId, partner) {
+    const { data: g, error: guestError } = await supabase
+      .from('game_guests')
+      .upsert(
+        { game_id: gameId, name: partner.name, phone_hash: partner.phoneHash, whatsapp_jid: partner.jid },
+        { onConflict: 'game_id,phone_hash' }
+      )
+      .select('id')
+      .single()
+    if (guestError) throw new Error(`Failed to upsert guest partner: ${guestError.message}`)
+    const { error } = await supabase
+      .from('participants')
+      .update({ partner_guest_id: g.id, joined_alone: false })
+      .eq('id', rowId)
+    if (error) await supabase.from('game_guests').delete().eq('id', g.id)
+    return error
+  }
+
+  /** Dupla nova: quem escreveu (conta) + parceiro-convidado (com número). */
+  async function insertPairWithGuestPartner(gameId, profile, partner) {
+    const { data: g, error: guestError } = await supabase
+      .from('game_guests')
+      .upsert(
+        { game_id: gameId, name: partner.name, phone_hash: partner.phoneHash, whatsapp_jid: partner.jid },
+        { onConflict: 'game_id,phone_hash' }
+      )
+      .select('id')
+      .single()
+    if (guestError) throw new Error(`Failed to upsert guest partner: ${guestError.message}`)
+    const { error } = await supabase
+      .from('participants')
+      .insert([{ game_id: gameId, user_id: profile.id, partner_guest_id: g.id, status: 'confirmed', joined_alone: false }])
+    if (error) await supabase.from('game_guests').delete().eq('id', g.id)
+    return error
+  }
+
   // Entrar em dupla: as mesmas regras da app (GameDetails, «Entrar com
   // parceiro»): só em duplas fixas, uma linha em participants com o
   // partner_id, e a dupla ocupa dois lugares. Sem lista de suplentes para
@@ -915,8 +1030,34 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     const resolved = await resolvePartner(profile, game)
     if (!resolved) return
     const { partner, isNewGuest: partnerIsNewGuest } = resolved
-    if (isMine(profile, partner.id)) {
+    if (isMine(profile, partner.id) || (partner.guest && partner.phoneHash === myHash)) {
       await reply('partner_is_you')
+      return
+    }
+    if (partner.guest) {
+      if (existingRows.some((r) => r.guestPhoneHash === partner.phoneHash || r.partnerGuestPhoneHash === partner.phoneHash)) {
+        await reply('partner_already_in', { name: partner.name })
+        return
+      }
+      if (left < 2) {
+        await reply('mix_one_spot_pair')
+        return
+      }
+      const insertError = await insertPairWithGuestPartner(game.id, profile, partner)
+      timer.mark('gravar')
+      if (insertError) {
+        if (insertError.code === '23505') {
+          await reply('already_joined')
+          return
+        }
+        if (isGameFull(insertError)) {
+          await reply('mix_full_pair')
+          return
+        }
+        throw new Error(`Failed to insert pair with guest partner: ${insertError.message}`)
+      }
+      repostHooks.requestRepostForGame(organizationId, game.id)
+      await reply('pair_partner_guest_created', { partner: partner.name, appUrl: config.appUrl })
       return
     }
     // O parceiro já está inscrito (A2N, M4, 27 set: «in com Diogo» com o
@@ -926,8 +1067,10 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     // quem, e que pode entrar sozinho.
     const partnerRow = existingRows.find((row) => row.status === 'confirmed' && (row.user_id === partner.id || row.partner_id === partner.id))
     if (partnerRow) {
-      if (partnerRow.partner_id) {
-        const otherId = partnerRow.user_id === partner.id ? partnerRow.partner_id : partnerRow.user_id
+      if (partnerRow.partner_id || partnerRow.partner_guest_id) {
+        const otherId = partnerRow.user_id === partner.id
+          ? (partnerRow.partner_id ?? partnerRow.partner_guest_id)
+          : (partnerRow.user_id ?? partnerRow.guest_id)
         const other = people.find((p) => p.id === otherId)?.name || '?'
         await reply('partner_in_pair', { name: partner.name, other })
         return
@@ -997,10 +1140,30 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
    * link), sai a dupla toda: não fica um lugar só com um convite.
    */
   async function leavePair({ game, pairRow, profile, rows, suplentes, choice = null }) {
-    const mineInRow = isMine(profile, pairRow.user_id) ? pairRow.user_id : pairRow.partner_id
-    const otherId = mineInRow === pairRow.user_id ? pairRow.partner_id : pairRow.user_id
-    const { data: others } = await supabase.from('profiles').select('id, name, claim_pending').eq('id', otherId)
-    const other = others?.[0] ?? { id: otherId, name: '?', claim_pending: false }
+    // De que lado da linha estou (titular ou parceiro) — por conta OU pelo
+    // hash do número (a minha linha-convidado de antes de ter conta).
+    const iAmOwner = rowOwnerIsMine(profile, myHash, pairRow)
+    const mySide = iAmOwner
+      ? { user: pairRow.user_id, guest: pairRow.guest_id }
+      : { user: pairRow.partner_id, guest: pairRow.partner_guest_id }
+    const otherSide = iAmOwner
+      ? { user: pairRow.partner_id, guest: pairRow.partner_guest_id }
+      : { user: pairRow.user_id, guest: pairRow.guest_id }
+
+    // O outro: conta (profiles) ou convidado sem conta (dados já na linha).
+    let other
+    if (otherSide.guest) {
+      other = {
+        id: otherSide.guest,
+        name: (iAmOwner ? pairRow.partnerGuestName : pairRow.guestName) || '?',
+        guest: true,
+        phoneHash: iAmOwner ? pairRow.partnerGuestPhoneHash : pairRow.guestPhoneHash,
+        claim_pending: false,
+      }
+    } else {
+      const { data: others } = await supabase.from('profiles').select('id, name, claim_pending').eq('id', otherSide.user)
+      other = others?.[0] ?? { id: otherSide.user, name: '?', claim_pending: false }
+    }
 
     if (!choice && outRequest?.kind === 'pair') choice = 'pair'
     if (!choice && outRequest?.kind === 'mention') {
@@ -1009,16 +1172,23 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
         await reply('partner_one_mention')
         return
       }
-      const mentioned = pns.length === 1 ? await resolveProfileByPhoneJid(pns[0], organizationId) : null
-      if (!mentioned) {
-        await reply('out_mention_unreadable')
-        return
-      }
-      if (isMine(profile, mentioned.id)) choice = 'me'
-      else if (mentioned.id === otherId) choice = 'partner'
+      // Primeiro pelo número (também funciona quando o mencionado é um
+      // convidado sem conta — não há perfil para resolver).
+      const mentionedHash = pns.length === 1 ? hashPhone(pns[0].split('@')[0]) : null
+      if (mentionedHash && mentionedHash === myHash) choice = 'me'
+      else if (mentionedHash && other.guest && other.phoneHash && mentionedHash === other.phoneHash) choice = 'partner'
       else {
-        await reply('out_not_your_partner', { name: mentioned.name })
-        return
+        const mentioned = pns.length === 1 ? await resolveProfileByPhoneJid(pns[0], organizationId) : null
+        if (!mentioned) {
+          await reply('out_mention_unreadable')
+          return
+        }
+        if (isMine(profile, mentioned.id)) choice = 'me'
+        else if (mentioned.id === otherSide.user) choice = 'partner'
+        else {
+          await reply('out_not_your_partner', { name: mentioned.name })
+          return
+        }
       }
     }
     if (!choice) {
@@ -1030,7 +1200,10 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
       return
     }
 
-    if (choice === 'pair' || (choice === 'me' && other.claim_pending)) {
+    // Sai a dupla inteira quando é pedido — ou quando quem ficaria não pode
+    // gerir o lugar sozinho: um convite por reclamar (legado #339) ou um
+    // convidado só por nome (sem número, o bot não o reconhece num «Out»).
+    if (choice === 'pair' || (choice === 'me' && (other.claim_pending || (other.guest && !other.phoneHash)))) {
       const { error } = await supabase.from('participants').delete().eq('id', pairRow.id)
       timer.mark('gravar')
       if (error) throw new Error(`Failed to remove pair: ${error.message}`)
@@ -1039,16 +1212,25 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
       return
     }
 
-    // Fica uma pessoa: a que não sai. A linha mantém a posição na lista.
-    // Fica a conta que já estava na linha (pode ser o convidado do mesmo número).
-    const stayId = choice === 'me' ? otherId : mineInRow
+    // Fica um: o lado que não sai (conta ou convidado), na mesma linha —
+    // mantém a posição na lista.
+    const staying = choice === 'me' ? otherSide : mySide
+    const leaving = choice === 'me' ? mySide : otherSide
     const { error } = await supabase
       .from('participants')
-      .update({ user_id: stayId, partner_id: null, joined_alone: true })
+      .update({
+        user_id: staying.user ?? null,
+        guest_id: staying.guest ?? null,
+        partner_id: null,
+        partner_guest_id: null,
+        joined_alone: true,
+      })
       .eq('id', pairRow.id)
     timer.mark('gravar')
     if (error) throw new Error(`Failed to shrink pair: ${error.message}`)
-    // O convite por link de quem saiu deixa de ter lugar.
+    // Quem saiu era convidado → a linha dele em game_guests já não serve.
+    if (leaving.guest) await supabase.from('game_guests').delete().eq('id', leaving.guest)
+    // O convite por link de quem saiu deixa de ter lugar (legado #339).
     if (choice === 'partner' && other.claim_pending) {
       await supabase.from('partner_invites').delete().eq('participant_id', pairRow.id)
     }
@@ -1063,11 +1245,10 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
   // Resposta ao menu 1/2/3: o mix e a dupla podem ter mudado nos minutos da
   // pergunta — volta-se a carregar e a confirmar.
   async function confirmOutPair(pending, choice) {
-    const profile = await requireProfile(resolvedProfile)
-    if (!profile) return
+    const profile = resolvedProfile ?? guestIdentity(senderPn, usablePushName(message?.pushName))
     const { game, rows, suplentes } = await loadGame(pending.gameId)
-    const pairRow = rows.find((row) => row.id === pending.rowId && row.status === 'confirmed' && row.partner_id
-      && (isMine(profile, row.user_id) || isMine(profile, row.partner_id)))
+    const pairRow = rows.find((row) => row.id === pending.rowId && row.status === 'confirmed'
+      && (row.partner_id || row.partner_guest_id) && rowIsMine(profile, myHash, row))
     if (!OPEN_STATUSES.has(game.status) || new Date(game.date).getTime() <= Date.now() || !pairRow) {
       await reply('mix_no_longer_available')
       return
@@ -1095,22 +1276,30 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     let isNewGuest = false
     if (action === 'in') {
       ;({ profile, isNewGuest } = await requireProfileOrCreateGuest(profile, senderPn))
-    } else {
-      profile = await requireProfile(profile)
+    } else if (!profile) {
+      // «Out» de quem não tem conta: a identidade é o número — se houver
+      // uma inscrição-convidado dele, sai; senão cai no «not_joined».
+      profile = guestIdentity(senderPn, usablePushName(message?.pushName))
     }
     if (!profile) return
 
     // Os inscritos já vieram com o loadGame — sem outra ida à BD.
     const existingRows = rows
 
-    const ownConfirmedRow = existingRows.find((row) => isMine(profile, row.user_id) && row.status === 'confirmed')
-    const ownWaitlistRow = existingRows.find((row) => isMine(profile, row.user_id) && row.status === 'waitlisted')
-    const asPartnerRow = existingRows.find((row) => isMine(profile, row.partner_id))
+    const ownConfirmedRow = existingRows.find((row) => rowOwnerIsMine(profile, myHash, row) && row.status === 'confirmed')
+    const ownWaitlistRow = existingRows.find((row) => rowOwnerIsMine(profile, myHash, row) && row.status === 'waitlisted')
+    const asPartnerRow = existingRows.find((row) => rowPartnerIsMine(profile, myHash, row))
 
     if (action === 'in') {
+      // Sem conta não se iniciam duplas (o pedido/aceitação precisa de
+      // conta) — entra sozinho, ou o parceiro escreve ele próprio.
+      if (profile.guest && partnerRequest) {
+        await reply('guest_pair_need_account', { appUrl: config.appUrl })
+        return
+      }
       // #554: já inscrito sozinho e agora «In com …» → junta o parceiro à
       // inscrição que já tem, em vez de «Já estás inscrito».
-      if (ownConfirmedRow && !ownConfirmedRow.partner_id && partnerRequest) {
+      if (ownConfirmedRow && !ownConfirmedRow.partner_id && !ownConfirmedRow.partner_guest_id && partnerRequest) {
         await addPartnerToRow({ game, people, capacity, profile, row: ownConfirmedRow, existingRows })
         return
       }
@@ -1136,9 +1325,11 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
         return
       }
 
-      const { error: insertError } = await supabase
-        .from('participants')
-        .insert([{ game_id: game.id, user_id: profile.id, status: 'confirmed', joined_alone: true }])
+      const insertError = profile.guest
+        ? await insertGuestParticipant(game.id, profile, 'confirmed')
+        : (await supabase
+            .from('participants')
+            .insert([{ game_id: game.id, user_id: profile.id, status: 'confirmed', joined_alone: true }])).error
       timer.mark('gravar')
 
       if (insertError) {
@@ -1169,8 +1360,8 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     }
 
     // action === 'out'
-    const pairRow = existingRows.find((row) => row.status === 'confirmed' && row.partner_id
-      && (isMine(profile, row.user_id) || isMine(profile, row.partner_id)))
+    const pairRow = existingRows.find((row) => row.status === 'confirmed' && (row.partner_id || row.partner_guest_id)
+      && rowIsMine(profile, myHash, row))
     if (pairRow) {
       await leavePair({ game, pairRow, profile, rows, suplentes })
       return
@@ -1252,25 +1443,31 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
         continue
       }
       let who = matches[0] ?? null
-      let guest = null
+      let guestRowId = null
       if (!who) {
-        guest = await createNamedGuest({ organizationId, name: extra, createdBy: resolvedProfile?.id ?? null })
-        who = guest
+        // Ninguém do clube com este nome → convidado sem conta, só por nome
+        // (substitui a antiga conta por reclamar — decisão Ruben, 30 set).
+        guestRowId = await createNamedGameGuest(mix.id, extra)
+        who = { id: null, name: extra }
       }
       const { error: insertError } = await supabase
         .from('participants')
-        .insert([{ game_id: mix.id, user_id: who.id, status: 'confirmed', joined_alone: true }])
+        .insert([guestRowId
+          ? { game_id: mix.id, guest_id: guestRowId, status: 'confirmed', joined_alone: true }
+          : { game_id: mix.id, user_id: who.id, status: 'confirmed', joined_alone: true }])
       if (insertError) {
-        if (guest) await guest.remove()
+        if (guestRowId) await supabase.from('game_guests').delete().eq('id', guestRowId)
         if (isGameFull(insertError)) { spots = 0; full.push(extra); continue }
         if (insertError.code === '23505') continue
         throw new Error(`Failed to insert copied-list participant: ${insertError.message}`)
       }
       spots -= 1
-      enrolledIds.add(who.id)
-      members = members.filter((x) => x.id !== who.id)
+      if (who.id) {
+        enrolledIds.add(who.id)
+        members = members.filter((x) => x.id !== who.id)
+      }
       repostHooks.requestRepostForGame(organizationId, mix.id)
-      await reply(guest ? 'copied_list_added_guest' : 'copied_list_added_member', { name: who.name })
+      await reply(guestRowId ? 'copied_list_added_guest' : 'copied_list_added_member', { name: who.name })
     }
     if (full.length > 0) await reply('copied_list_full', { names: full.join(', ') })
   }
@@ -1349,52 +1546,50 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     return
   }
 
+  // As inscrições de quem escreve nos mixes abertos — por conta ou pelo
+  // hash do número (inscrições-convidado).
+  async function myGameIds(identity) {
+    const { data: rows, error } = await supabase
+      .from('participants')
+      .select('game_id, user_id, partner_id, guest:game_guests!participants_guest_id_fkey(phone_hash), partner_guest:game_guests!participants_partner_guest_id_fkey(phone_hash)')
+      .in('game_id', openMixes.map((m) => m.id))
+      .eq('status', 'confirmed')
+    if (error) throw new Error(`Failed to check existing participants: ${error.message}`)
+    return new Set(
+      rows
+        .filter((row) =>
+          isMine(identity, row.user_id) || isMine(identity, row.partner_id) ||
+          row.guest?.phone_hash === myHash || row.partner_guest?.phone_hash === myHash)
+        .map((row) => row.game_id)
+    )
+  }
+
   // 3) Bare "in"/"out", no identifier, no (resolvable) reply.
   if (action === 'in') {
     // Already joined every open mix but one? A bare "in" then means "the
-    // one I'm missing" — no need to ask (Francisco, 2026-09-14).
+    // one I'm missing" — no need to ask (Francisco, 2026-09-14). Também
+    // para convidados sem conta: as inscrições deles contam pelo número.
+    const memberGameIds = await myGameIds(resolvedProfile)
     let candidates = openMixes
-    if (resolvedProfile) {
-      const { data: rows, error } = await supabase
-        .from('participants')
-        .select('game_id, user_id, partner_id')
-        .in('game_id', openMixes.map((m) => m.id))
-        .eq('status', 'confirmed')
-      if (error) throw new Error(`Failed to check existing participants: ${error.message}`)
-      const memberGameIds = new Set(
-        rows.filter((row) => isMine(resolvedProfile, row.user_id) || isMine(resolvedProfile, row.partner_id)).map((row) => row.game_id)
-      )
-      const notJoined = openMixes.filter((m) => !memberGameIds.has(m.id))
-      if (notJoined.length === 1) {
-        await actOnGame(notJoined[0], resolvedProfile)
-        return
-      }
-      if (notJoined.length > 0) candidates = notJoined
-      // Already in ALL open mixes: nothing left to auto-resolve to, so
-      // fall through and show the full list — asking is the least-wrong
-      // option there.
+    const notJoined = openMixes.filter((m) => !memberGameIds.has(m.id))
+    if (notJoined.length === 1) {
+      await actOnGame(notJoined[0], resolvedProfile)
+      return
     }
+    if (notJoined.length > 0) candidates = notJoined
+    // Already in ALL open mixes: nothing left to auto-resolve to, so
+    // fall through and show the full list — asking is the least-wrong
+    // option there.
     const list = formatMixListForReply(candidates, openMixes, lang)
     await reply(partnerRequest ? 'disambiguate_in_pair' : 'disambiguate_in', { list })
     return
   }
 
-  // action === 'out': check the sender first so an unknown sender still
-  // gets the existing rejection instead of a confusing "which mix?" prompt.
-  const profile = await requireProfile(resolvedProfile)
-  if (!profile) return
+  // action === 'out': sem conta, a identidade é o número — as
+  // inscrições-convidado dele contam como dele.
+  const profile = resolvedProfile ?? guestIdentity(senderPn, usablePushName(message?.pushName))
 
-  const { data: rows, error } = await supabase
-    .from('participants')
-    .select('game_id, user_id, partner_id')
-    .in('game_id', openMixes.map((m) => m.id))
-    .eq('status', 'confirmed')
-
-  if (error) throw new Error(`Failed to check existing participants: ${error.message}`)
-
-  const memberGameIds = new Set(
-    rows.filter((row) => isMine(profile, row.user_id) || isMine(profile, row.partner_id)).map((row) => row.game_id)
-  )
+  const memberGameIds = await myGameIds(profile)
   const memberMixes = openMixes.filter((m) => memberGameIds.has(m.id))
 
   if (memberMixes.length === 0) {

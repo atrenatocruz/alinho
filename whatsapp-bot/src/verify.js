@@ -5,8 +5,9 @@
 // PRIVADA, a partir do próprio telemóvel. O bot vê de que número veio a
 // mensagem, e a base de dados (confirm_phone_from_whatsapp) só confirma se
 // esse número for o que a pessoa tem no perfil e o código bater. Com o
-// número confirmado, o histórico do convidado do bot com esse número passa
-// para a conta registada.
+// número confirmado, o match do «In» passa a apontar para esta conta e as
+// inscrições-convidado dela em mixes ainda abertos são adotadas
+// (migration_mix_guest_sem_conta.sql — o antigo merge de contas acabou).
 //
 // O bot NÃO responde em privado — só escreve nos grupos (Renato, 28 set). O
 // resultado vê-se na app («Já enviei»). Mensagens privadas que não são um

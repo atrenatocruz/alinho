@@ -70,7 +70,7 @@ Para veres esta lista:
   mix_no_longer_available: '🤖 Este mix já não está disponível para inscrições.',
   already_waitlisted: '🤖 Já estás na lista de suplentes deste mix! 🎾',
   waitlisted: '🤖 Estás na lista de suplentes! Quando alguém sair, entras automaticamente. 🎾',
-  guest_waitlisted: '🤖 Fixe, {{name}}! Ficas na lista de suplentes como convidado 🎾 Entras automaticamente quando alguém sair. Regista-te em {{appUrl}} e confirma o teu número no perfil: o que jogaste como convidado passa para a tua conta.',
+  guest_waitlisted: '🤖 Fixe, {{name}}! Ficas na lista de suplentes como convidado 🎾 Entras automaticamente quando alguém sair. Sem conta não há ranking nem histórico — regista-te em {{appUrl}} e confirma o teu número no perfil, e as tuas inscrições passam para a tua conta.',
   waitlist_declined: '🤖 Sem problema, não entraste na lista de suplentes. Inscreve-te para o próximo mix! 🎾',
   did_not_understand_yes_no: '🤖 Não percebi 🤔 Responde só com *Sim* ou *Não*.',
   no_open_mixes: '🤖 Não há nenhum mix com inscrições abertas neste momento.',
@@ -84,7 +84,7 @@ Para veres esta lista:
   copied_list_full: '🤖 O mix já está cheio: não inscrevi {{names}}. Para ficar como suplente, a pessoa escreve In.',
   // Texto do Francisco, 27 set (palavra por palavra). Vai no grupo, como
   // antes — nunca em privado (risco de o WhatsApp banir o robô).
-  guest_joined: 'Olá {{name}}! Acabaste de entrar num mix como *convidado* — podes jogar assim, mas os jogos ficam numa conta temporária.\nRegista-te em https://alinho.pt e confirma o teu número de telefone para associares a tua conta temporária à tua conta principal\n\n⚠️ *Não voltes a fazer In na app* antes de confirmar o número — se a conta nova e a de convidado estiverem no mesmo mix, não consigo juntá-las e ficas com duas contas.',
+  guest_joined: 'Olá {{name}}! Entraste como *convidado* — podes jogar assim, mas sem conta não tens ranking nem histórico.\nRegista-te em {{appUrl}} e confirma o teu número no perfil: as tuas inscrições em mixes ainda abertos passam logo para a tua conta.',
   partner_joined_use_app: '🤖 Estás inscrito em dupla por outra pessoa — quem inscreveu a dupla pode tirá-la com *Out*, ou sai tu pela app 📱',
   out_pair_menu: '🤖 Estás inscrito em dupla com *{{partner}}*. Queres sair como?\n\n1. Dupla (saem os dois)\n2. Só tu ({{partner}} fica)\n3. Parceiro (sai {{partner}}, tu ficas)\n\nEscreve *1*, *2* ou *3*.',
   out_pair_reprompt: '🤖 Não percebi 🤔 Responde com *1* (dupla), *2* (só tu) ou *3* (parceiro).',
@@ -129,7 +129,8 @@ Para veres esta lista:
   partner_offer_unregistered: '🤖 Não encontrei o *{{name}}* no clube. Queres inscrever a dupla com ele na mesma? Responde *Sim* ou *Não*.\n\n(Se ele já está na app com outro nome, responde *Não* e escreve o nome como aparece lá.)',
   partner_offer_declined: '🤖 Ok, não inscrevi a dupla. Podes tentar *In com* e o nome como está na app, ou *In @parceiro* se ele estiver no grupo.',
   pair_partner_invite_created: '🤖 🤝 Dupla inscrita com *{{partner}}*! Envia-lhe este link para ele ficar com o lugar e ter o histórico e o ranking:\n{{link}}',
-  pair_partner_guest_created: '🤖 🤝 Dupla inscrita! Criei um perfil de convidado para *{{partner}}* — para ter o histórico e o ranking, pode registar-se em {{appUrl}} com este número.',
+  pair_partner_guest_created: '🤖 🤝 Dupla inscrita! *{{partner}}* entra como convidado, sem conta — para ter ranking e histórico, pode registar-se em {{appUrl}} e confirmar o número no perfil.',
+  guest_pair_need_account: '🤖 Para te inscreveres em dupla precisas de conta — regista-te em {{appUrl}}. Entretanto podes entrar sozinho com *In*, ou o teu parceiro escreve *In* por ele.',
 }
 
 const en = {
@@ -187,7 +188,7 @@ To see this list:
   mix_no_longer_available: '🤖 This mix is no longer open for sign-ups.',
   already_waitlisted: "🤖 You're already on the waitlist for this mix! 🎾",
   waitlisted: "🤖 You're on the waitlist! When a spot opens up, you'll join automatically. 🎾",
-  guest_waitlisted: "🤖 Nice one, {{name}}! You're on the waitlist as a guest 🎾 You'll join automatically when a spot opens up. Sign up at {{appUrl}} and confirm your number in your profile: what you played as a guest moves to your account.",
+  guest_waitlisted: "🤖 Nice one, {{name}}! You're on the waitlist as a guest 🎾 You'll join automatically when a spot opens up. Without an account there's no ranking or history — sign up at {{appUrl}} and confirm your number in your profile, and your signups move to your account.",
   waitlist_declined: "🤖 No problem, you weren't added to the waitlist. Sign up for the next mix! 🎾",
   did_not_understand_yes_no: "🤖 Sorry, I didn't catch that 🤔 Reply with just *Sim* or *Não*.",
   no_open_mixes: "🤖 There's no mix open for sign-ups right now.",
@@ -199,7 +200,7 @@ To see this list:
   copied_list_added_member: '✅ I signed {{name}} up. To remove them, ask the admin.',
   copied_list_ambiguous: '🤖 I didn\'t sign up «{{name}}»: there\'s more than one person with that name in the club:\n{{list}}\n\nTo join, the person writes In.',
   copied_list_full: '🤖 The mix is already full: I didn\'t sign up {{names}}. To go on the waiting list, the person writes In.',
-  guest_joined: "Hi {{name}}! You've just joined a mix as a *guest* — you can play like this, but your games are kept in a temporary account.\nSign up at https://alinho.pt and confirm your phone number to link your temporary account to your main account\n\n⚠️ *Don't join again in the app* before confirming your number — if the new account and the guest one are in the same mix, I can't merge them and you'll end up with two accounts.",
+  guest_joined: "Hi {{name}}! You've joined as a *guest* — you can play like this, but without an account there's no ranking or history.\nSign up at {{appUrl}} and confirm your number in your profile: your signups in still-open mixes move straight to your account.",
   partner_joined_use_app: '🤖 Someone else signed you up as a pair — whoever signed up the pair can take it off with *Out*, or leave through the app 📱',
   out_pair_menu: '🤖 You are signed up as a pair with *{{partner}}*. How do you want to leave?\n\n1. Pair (both leave)\n2. Just you ({{partner}} stays)\n3. Partner ({{partner}} leaves, you stay)\n\nType *1*, *2* or *3*.',
   out_pair_reprompt: "🤖 I didn't get that 🤔 Reply with *1* (pair), *2* (just you) or *3* (partner).",
@@ -243,7 +244,8 @@ To see this list:
   partner_offer_unregistered: "🤖 I couldn't find *{{name}}* in the club. Do you want to sign up the pair anyway? Reply *Sim* or *Não*.\n\n(If they're already on the app under another name, reply *Não* and type the name as it appears there.)",
   partner_offer_declined: "🤖 Ok, I didn't sign up the pair. Try *In com* and the name as it appears in the app, or *In @partner* if they're in the group.",
   pair_partner_invite_created: '🤖 🤝 Pair signed up with *{{partner}}*! Send them this link so they claim the spot and keep their history and ranking:\n{{link}}',
-  pair_partner_guest_created: '🤖 🤝 Pair signed up! I created a guest profile for *{{partner}}* — to keep their history and ranking, they can sign up at {{appUrl}} with this number.',
+  pair_partner_guest_created: '🤖 🤝 Pair signed up! *{{partner}}* joins as a guest, no account — for ranking and history they can sign up at {{appUrl}} and confirm their number.',
+  guest_pair_need_account: '🤖 To sign up as a pair you need an account — register at {{appUrl}}. Meanwhile you can join solo with *In*, or your partner writes *In* themselves.',
 }
 
 const DICTS = { pt, en }
