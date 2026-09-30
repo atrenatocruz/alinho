@@ -107,6 +107,28 @@ export default function TournamentPage() {
     return () => { alive = false; window.removeEventListener('tournament:reload', reload) }
   }, [id])
 
+  // O formulário de editar carrega-se pelo endereço (?admin=editar): assim
+  // abre do botão da barra e também do «Editar» da linha do torneio no Gerir
+  // (ações do evento, 30 set), com o botão de trás a funcionar.
+  const tourId = data?.tournament?.id
+  const wantsEdit = params.get('admin') === 'editar'
+  useEffect(() => {
+    if (!wantsEdit || !tourId || editing) return undefined
+    let alive = true
+    getTournamentForEdit(tourId)
+      .then((d) => {
+        if (!alive) return
+        if (!d?.tournament) throw new Error('not ready')
+        setEditing(d)
+      })
+      .catch((err) => {
+        if (errorKind(err) !== 'not_ready') console.error('Error loading tournament:', err)
+        if (alive) setAdminError(describeError(t, err, 'tournament.admin.edit_error'))
+      })
+    return () => { alive = false }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wantsEdit, tourId])
+
   const categories = data?.categories || []
   // A categoria e o separador vivem no endereço: o link que se partilha no
   // WhatsApp tem de abrir no mesmo sítio para quem o recebe.
@@ -194,16 +216,8 @@ export default function TournamentPage() {
 
   const openAdmin = async (modo) => {
     setAdminError('')
+    // O «editar» carrega-se no efeito do endereço (lá em cima).
     const next = new URLSearchParams(params); next.set('admin', modo); setParams(next)
-    if (modo !== 'editar') return
-    try {
-      const d = await getTournamentForEdit(tour.id)
-      if (!d?.tournament) throw new Error('not ready')
-      setEditing(d)
-    } catch (err) {
-      if (errorKind(err) !== 'not_ready') console.error('Error loading tournament:', err)
-      setAdminError(describeError(t, err, 'tournament.admin.edit_error'))
-    }
   }
 
   const closeAdmin = () => {

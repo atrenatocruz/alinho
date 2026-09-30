@@ -48,9 +48,17 @@ export default function PublicInfo({ tournament, categories = [], entriesOpen = 
 
       {/* «O formato é anunciado depois das inscrições» uma vez só, e não em
           cada categoria (designer, 27 set). */}
-      {categories.some((c) => formatWords(c).key === 'tpublic.format_unknown') && (
-        <p className="text-sm text-muted">{t('tpublic.format_unknown_once')}</p>
-      )}
+      {/* Com umas categorias já sorteadas e outras não, diz quais faltam —
+          senão, depois do sorteio da M4, lia-se que o formato ainda não era
+          conhecido (ensaio do QA, 30 set). */}
+      {(() => {
+        const unknown = categories.filter((c) => formatWords(c).key === 'tpublic.format_unknown')
+        if (!unknown.length) return null
+        const text = unknown.length === categories.length
+          ? t('tpublic.format_unknown_once')
+          : t('tpublic.format_unknown_some', { codes: unknown.map((c) => c.code || c.name).join(', ') })
+        return <p className="text-sm text-muted">{text}</p>
+      })()}
 
       {/* Categorias: dia, hora e vagas — é o que decide se me inscrevo. */}
       <div className="space-y-1.5">

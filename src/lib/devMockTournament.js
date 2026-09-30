@@ -136,6 +136,8 @@ const categories = () => {
     entry_count: empty() ? 0 : c.entry_count,
     // Quadro de teste (devMockBracket): a M4 só com eliminatórias.
     ...(c.code === 'M4' && localStorage.getItem('mockTBracket') ? { format: { groups: 0 } } : {}),
+    // Sorteio feito numa só categoria (ensaio do QA, 30 set): a M5 com formato.
+    ...(c.code === 'M5' && localStorage.getItem('mockTDraw') === 'true' ? { format: { key: 'grupos', groups: 2, qualifiers: 4, qualifiers_per_group: 2 } } : {}),
   }))
 }
 

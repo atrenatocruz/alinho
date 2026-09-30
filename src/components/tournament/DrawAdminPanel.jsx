@@ -295,14 +295,19 @@ function DrawStep({ category, onDone, onChangeFormat, t }) {
     setSwapIndex(null)
   }
 
+  // O «Jogo de 3.º e 4.º lugar» escolhido no passo do formato fica no
+  // formato gravado (format.third_place); a coluna antiga só vale sem ele.
+  // Lia-se só a coluna, e a pré-visualização dizia «3 jogos de quadro» quando
+  // o sorteio criava 4 (ensaio do QA, 30 set).
+  const thirdPlace = Boolean(category.format?.third_place ?? category.third_place_match)
   const payload = useMemo(() => {
     if (!teams) return null
-    if (knockoutOnly) return buildKnockoutPayload(teams, { thirdPlace: Boolean(category.third_place_match) })
+    if (knockoutOnly) return buildKnockoutPayload(teams, { thirdPlace })
     if (teams.length < groupCount) return null
     return buildDrawPayload(teams, {
-      groupCount, perGroup, seeds, seed, thirdPlace: Boolean(category.third_place_match),
+      groupCount, perGroup, seeds, seed, thirdPlace,
     })
-  }, [teams, knockoutOnly, groupCount, perGroup, seeds, seed, category.third_place_match])
+  }, [teams, knockoutOnly, groupCount, perGroup, seeds, seed, thirdPlace])
 
   const byId = useMemo(() => Object.fromEntries((teams || []).map((x) => [x.id, x])), [teams])
 
@@ -450,7 +455,8 @@ function DrawStep({ category, onDone, onChangeFormat, t }) {
       <p className="mb-2 text-xs text-muted">
         {t('tournament.draw.preview_summary', {
           groupMatches: payload.group_matches.length,
-          bracket: payload.bracket.length,
+          // O jogo do 3.º lugar não vem na lista do quadro: cria-o o servidor.
+          bracket: payload.bracket.length + (payload.third_place ? 1 : 0),
           guaranteed: Math.min(...payload.groups.map((g) => g.teams.length)) - 1,
         })}
       </p>

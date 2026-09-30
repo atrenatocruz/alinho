@@ -3175,6 +3175,12 @@ export default function GerirClube() {
                     // Ações do evento (assunto 2): o mix que se repete aparece
                     // uma vez e abre a página da série; o que não se repete abre
                     // a folha com «Abrir este mix» e «Cancelar este mix».
+                    // Torneio: «Editar» à direita, igual ao mix (ações do evento,
+                    // assunto 1 — os mesmos nomes em todos os eventos, 30 set).
+                    // Abre o Editar do torneio na página dele.
+                    if (tipo === 'torneio' && row.status !== 'terminado') {
+                      acao = { texto: t('gerirclube.edit_action'), fazer: () => navigate(`/torneio/${row.slug || row.id}?admin=editar`), perigo: false }
+                    }
                     if (tipo === 'mix' && !isDraftMix(row)) {
                       abrir = row.recurrence_id
                         ? () => navigate(`/gerir/${org.slug}/serie/${row.recurrence_id}`, { state: { fromGerir: true } })
