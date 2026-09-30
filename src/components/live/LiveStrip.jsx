@@ -6,9 +6,10 @@
 // tipo: etiqueta, nome, clube e jogadores, e quem vai à frente (no torneio,
 // o último resultado — liveTournamentCard, Dev 1). Os dados vêm do
 // list_live_events (Dev 3), que já esconde quem esconde os resultados.
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { KIND_STYLE } from '../agenda/EventCard'
 import { listLiveEvents } from '../../lib/liveEvents'
 import { liveTournamentCard } from '../tournament/liveTournament'
@@ -58,12 +59,42 @@ function LiveCard({ c, wide }) {
   )
 }
 
+/* No computador a faixa arrasta-se com o rato e tem setas (Francisco, 30 set:
+   «não consigo mexer nisto com o rato»). No telemóvel continua a deslizar
+   com o dedo, como estava. Um arrasto não abre o cartão; um toque abre.
+   No computador o 1.º cartão alinha com a coluna e só a ponta direita
+   desliza e esbate (UX, 30 set). */
+function useMouseDrag() {
+  const ref = useRef(null)
+  const drag = useRef(null)
+  const onPointerDown = (e) => {
+    if (e.pointerType !== 'mouse' || e.button !== 0) return
+    drag.current = { x: e.clientX, left: ref.current.scrollLeft, moved: false }
+  }
+  const onPointerMove = (e) => {
+    const d = drag.current
+    if (!d) return
+    const dx = e.clientX - d.x
+    if (Math.abs(dx) > 5) d.moved = true
+    if (d.moved) ref.current.scrollLeft = d.left - dx
+  }
+  const end = () => { setTimeout(() => { drag.current = null }, 0) }
+  // Depois de arrastar, o clique que o rato solta não abre o cartão.
+  const onClickCapture = (e) => { if (drag.current?.moved) { e.preventDefault(); e.stopPropagation() } }
+  const by = (dir) => {
+    const el = ref.current
+    if (el) el.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: 'smooth' })
+  }
+  return { ref, by, handlers: { onPointerDown, onPointerMove, onPointerUp: end, onPointerLeave: end, onClickCapture, onDragStart: (e) => e.preventDefault() } }
+}
+
 /** `organizationId`: a página do clube/grupo (cartões a toda a largura);
  *  sem ele, a Home (os meus clubes e grupos, a deslizar). `onCount` diz à Home
  *  quantos há, para abrir em Hoje. */
 export default function LiveStrip({ organizationId = null, orgKind = 'club', onCount }) {
   const { t } = useTranslation()
   const [rows, setRows] = useState([])
+  const strip = useMouseDrag()
   useEffect(() => {
     let alive = true
     listLiveEvents(organizationId)
@@ -76,14 +107,26 @@ export default function LiveStrip({ organizationId = null, orgKind = 'club', onC
   const cards = rows.map((r) => cardFields(r, t, wide))
   return (
     <section aria-label={t('live.title')}>
-      <p className="mb-2 flex items-center gap-1.5 font-mono text-[11px] font-extrabold uppercase tracking-widest text-ink-900">
-        <span aria-hidden className="h-2 w-2 rounded-full bg-danger" />
-        {wide ? t(orgKind === 'group' ? 'live.title_group' : 'live.title_club') : `${t('live.title')} · ${rows.length}`}
-      </p>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="flex items-center gap-1.5 font-mono text-[11px] font-extrabold uppercase tracking-widest text-ink-900">
+          <span aria-hidden className="h-2 w-2 rounded-full bg-danger" />
+          {wide ? t(orgKind === 'group' ? 'live.title_group' : 'live.title_club') : `${t('live.title')} · ${rows.length}`}
+        </p>
+        {!wide && rows.length > 1 && (
+          <span className="hidden gap-1.5 md:flex">
+            {[[-1, ChevronLeft, 'live.prev'], [1, ChevronRight, 'live.next']].map(([dir, Icon, key]) => (
+              <button key={key} type="button" onClick={() => strip.by(dir)} aria-label={t(key)}
+                className="press flex h-8 w-8 items-center justify-center rounded-full border border-line bg-white text-ink-900">
+                <Icon size={16} />
+              </button>
+            ))}
+          </span>
+        )}
+      </div>
       {wide ? (
         <div className="space-y-2.5">{cards.map((c, i) => <LiveCard key={i} c={c} wide />)}</div>
       ) : (
-        <div className="-mx-4 flex snap-x gap-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
+        <div ref={strip.ref} {...strip.handlers} className="-mx-4 flex snap-x scroll-pl-4 gap-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:ml-0 md:scroll-pl-0 md:pl-0 md:cursor-grab md:select-none md:[mask-image:linear-gradient(to_right,black_88%,transparent)]">
           {cards.map((c, i) => <LiveCard key={i} c={c} />)}
         </div>
       )}

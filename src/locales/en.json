@@ -1900,6 +1900,8 @@
   "friends.invite_email_sent": "Invite sent by email",
   "friends.guest_tag": "Guest",
   "live.title": "Happening now",
+  "live.prev": "Previous",
+  "live.next": "Next",
   "live.title_club": "Happening now at the club",
   "live.title_group": "Happening now in the group",
   "live.mix_tag": "Mix · round {{n}} of {{total}}",

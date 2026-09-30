@@ -563,14 +563,30 @@ export default function Layout({ children }) {
     // it is still short and cannot be scrolled down yet. Keep asking until the
     // content is tall enough to honour the offset, then stop. The cap keeps a
     // page that legitimately got shorter from retrying forever.
-    let frames = 0
+    // A Home carrega aos bocados (clubes, grupos, Comunidade, aulas) e num
+    // telemóvel demora mais do que os ~0,7 s que isto esperava: voltava-se de
+    // um mix e ficava-se no topo (Francisco, 30 set). Agora espera até ~6 s,
+    // e pára logo que a pessoa mexa — nunca lhe tira a lista da mão.
+    const started = performance.now()
     let raf = 0
+    let stopped = false
+    const stop = () => { stopped = true; cancelAnimationFrame(raf) }
+    const opts = { passive: true }
+    el.addEventListener('touchstart', stop, opts)
+    el.addEventListener('wheel', stop, opts)
+    el.addEventListener('keydown', stop)
     const restore = () => {
+      if (stopped) return
       el.scrollTo(0, target)
-      if (el.scrollTop < target && frames++ < 40) raf = requestAnimationFrame(restore)
+      if (el.scrollTop < target && performance.now() - started < 6000) raf = requestAnimationFrame(restore)
     }
     raf = requestAnimationFrame(restore)
-    return () => cancelAnimationFrame(raf)
+    return () => {
+      stop()
+      el.removeEventListener('touchstart', stop, opts)
+      el.removeEventListener('wheel', stop, opts)
+      el.removeEventListener('keydown', stop)
+    }
   }, [locationKey, navigationType])
 
   const needsPhone = profile && !isGuest && !profile.phone_hash && !phonePromptDismissed
