@@ -233,6 +233,8 @@ export function eventFromExplore(row) {
       requestStatus: row.my_request_status || null,
       peopleCount: row.people_count || 0,
       avgRating: row.avg_rating == null ? null : Number(row.avg_rating),
+      // Género de quem entra na média (Dev 3, por fazer): masculino, feminino, misto.
+      avgGender: row.avg_gender || null,
       friendsInOrg: row.friends_in_org || [],
     },
     latitude,

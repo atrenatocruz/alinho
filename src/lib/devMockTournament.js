@@ -649,7 +649,7 @@ export const TOURNAMENT_SCORE_TODAY_TABLE_MOCKS = {
   tournament_public: (url) => {
     if (!scoreTodayOn() || !/status=in\./.test(decodeURIComponent(url))) return undefined
     return [
-      { id: scoreTodayId(), slug: 'smash-open-2026', name: 'Smash Open 2026', club_name: 'Smash Padel',
+      { id: scoreTodayId(), slug: 'smash-open-2026', name: 'Smash Open 2026', club_name: 'Smash Padel', organization_id: '00000000-0000-0000-0000-0000000000dd',
         starts_on: lisbonDay(-1), ends_on: lisbonDay(1), status: 'a_decorrer', category_count: 5, location: 'Smash Padel · Almada' },
       { id: 'tour-amanha', slug: 'torneio-de-amanha', name: 'Torneio de amanhã', club_name: 'Smash Padel',
         starts_on: lisbonDay(1), ends_on: lisbonDay(2), status: 'sorteado' },

@@ -17,7 +17,6 @@ import { useHeaderActions } from '../contexts/HeaderActionsContext'
 import AppFeaturesPanel from '../components/AppFeaturesPanel'
 import OrgFinder from '../components/gerir/OrgFinder'
 
-const sanitizeSlug = (value) => value.toLowerCase().replace(/[^a-z0-9-]/g, '')
 
 export default function Gerir() {
   const { t } = useTranslation()
@@ -29,7 +28,6 @@ export default function Gerir() {
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [name, setName] = useState('')
   const clubNameTaken = useOrgNameTaken(name, { enabled: showCreateForm })
-  const [slug, setSlug] = useState('')
   const [selectedAdmin, setSelectedAdmin] = useState(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -108,7 +106,6 @@ export default function Gerir() {
   const ownsAGroup = adminOrganizations.some((o) => o.owner_id === profile?.id && !o.parent_organization_id)
   const [showGroupForm, setShowGroupForm] = useState(false)
   const [groupName, setGroupName] = useState('')
-  const [groupSlug, setGroupSlug] = useState('')
   const [creatingGroup, setCreatingGroup] = useState(false)
   const [groupError, setGroupError] = useState('')
   const groupNameTaken = useOrgNameTaken(groupName, { enabled: showGroupForm })
@@ -123,19 +120,17 @@ export default function Gerir() {
     setGroupError('')
     setCreatingGroup(true)
     try {
-      await createSelfServeGroup(groupName.trim(), groupSlug.trim())
+      const { slug: newGroupSlug } = await createSelfServeGroup(groupName.trim())
       // create_self_serve_group insere a membership de admin do lado do
       // servidor — puxá-la antes de navegar, senão o GerirClube lê
       // memberships antigas e mostra "Sem acesso" até recarregar.
       await refreshMemberships()
-      navigate(`/gerir/${groupSlug.trim()}`)
+      navigate(`/gerir/${newGroupSlug}`)
     } catch (err) {
       console.error('Error creating self-serve group:', err)
       const message = err?.message || ''
       if (message.includes('Já tens um grupo')) {
         setGroupError(describeError(t, err, 'gerir.create_group_error_has_cheap_group'))
-      } else if (message.toLowerCase().includes('duplicate key value violates unique constraint') || message.toLowerCase().includes('slug')) {
-        setGroupError(describeError(t, err, 'comunidade.create_group_error_duplicate_slug'))
       } else {
         setGroupError(describeError(t, err, 'comunidade.create_group_error_generic'))
       }
@@ -178,30 +173,20 @@ export default function Gerir() {
             />
             <OrgNameTakenHint taken={groupNameTaken} />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">{t('comunidade.slug_label')}</label>
-            <input
-              type="text"
-              value={groupSlug}
-              onChange={(e) => setGroupSlug(sanitizeSlug(e.target.value))}
-              className="input-field"
-              placeholder={t('comunidade.group_slug_placeholder')}
-            />
-          </div>
           {groupError && (
             <div className="bg-danger/10 text-danger px-4 py-3 rounded-ctrl text-sm font-extrabold">{groupError}</div>
           )}
           <div className="flex gap-3">
             <PrimaryButton
               onClick={handleCreateGroup}
-              disabled={!groupName.trim() || !groupSlug.trim() || creatingGroup || groupNameTaken}
+              disabled={!groupName.trim() || creatingGroup || groupNameTaken}
               className="flex-1"
             >
               {creatingGroup ? t('comunidade.creating_group') : t('comunidade.create_group_submit')}
             </PrimaryButton>
             <PrimaryButton
               variant="ghost"
-              onClick={() => { setShowGroupForm(false); setGroupName(''); setGroupSlug(''); setGroupError('') }}
+              onClick={() => { setShowGroupForm(false); setGroupName(''); setGroupError('') }}
               disabled={creatingGroup}
               className="flex-1"
             >
@@ -216,7 +201,6 @@ export default function Gerir() {
   const resetCreateForm = () => {
     setShowCreateForm(false)
     setName('')
-    setSlug('')
     setSelectedAdmin(null)
     setError('')
   }
@@ -225,11 +209,10 @@ export default function Gerir() {
     setError('')
     setSaving(true)
     try {
-      const newSlug = slug.trim()
       // Nasce sempre grupo, em Free: o tipo segue o plano e é a base de
       // dados que o decide (migration_kind_follows_plan.sql). Passa a
       // clube quando o plano mudar para Club, nas Definições.
-      await createOrganization(name.trim(), newSlug, selectedAdmin.id)
+      const { slug: newSlug } = await createOrganization(name.trim(), selectedAdmin.id)
       // The appointed admin gets the only membership create_organization
       // creates (see migration_platform_admin_create_organization.sql) — if
       // that's someone else, the platform admin has no membership to land
@@ -248,11 +231,7 @@ export default function Gerir() {
     } catch (err) {
       console.error('Error creating organization:', err)
       const message = err?.message || ''
-      if (message.toLowerCase().includes('duplicate key value violates unique constraint') || message.toLowerCase().includes('slug')) {
-        setError(describeError(t, err, 'gerir.error_duplicate_slug'))
-      } else {
-        setError(describeError(t, err, 'gerir.error_create_club'))
-      }
+      setError(describeError(t, err, 'gerir.error_create_club'))
     } finally {
       setSaving(false)
     }
@@ -283,16 +262,6 @@ export default function Gerir() {
             <OrgNameTakenHint taken={clubNameTaken} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">{t('gerir.slug_label')}</label>
-            <input
-              type="text"
-              value={slug}
-              onChange={(e) => setSlug(sanitizeSlug(e.target.value))}
-              className="input-field"
-              placeholder={t('comunidade.group_slug_placeholder')}
-            />
-          </div>
-          <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">{t('gerir.admin_label')}</label>
             <PlayerSearch
               label={t('gerir.search_admin_placeholder')}
@@ -310,7 +279,7 @@ export default function Gerir() {
           <div className="flex gap-3">
             <PrimaryButton
               onClick={handleCreate}
-              disabled={!name.trim() || !slug.trim() || !selectedAdmin || saving}
+              disabled={!name.trim() || !selectedAdmin || saving}
               className="flex-1"
             >
               {saving ? t('gerir.creating') : t('gerir.create_group_button')}
