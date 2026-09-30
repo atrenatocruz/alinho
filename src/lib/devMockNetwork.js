@@ -538,6 +538,17 @@ const RPC_MOCKS = {
     }
   },
   record_friend_match_result: () => 'pending',
+  // «A decorrer agora» (27 set): mockLive = 'true'.
+  list_live_events: (params) => (localStorage.getItem('mockLive') === 'true' ? [
+    { kind: 'mix', id: 'fake-game-1', title: 'Mix de terça', organization_id: 'dev-org', org_name: 'Clube Exemplo', org_kind: 'club', round_number: 2, rounds_total: 4, players_count: 16, courts: 4,
+      leader: { label: 'Rita F. / Tiago L.', wins: 2, anonymous: false, team_number: 1 } },
+    ...(params?.p_organization_id ? [] : [
+      { kind: 'tournament', id: 'tour-1', slug: 'smash-open-2026', tournament_id: 'tour-1', name: 'Smash Open 2026', title: 'Smash Open 2026', org_name: 'Clube Exemplo', category_code: 'M4', stage: 'knockout', round: 'QF', matches_live: 4,
+        last_result: { a_name: 'Admin D. / Pedro S.', b_name: 'Lima / Pinto', score: '9-7', a_won: true } },
+      { kind: 'friends', id: 'fs-1', title: null, organization_id: 'dev-org', org_name: 'Jota Padeleiros', org_kind: 'group', creator_name: 'Renato Cruz', game_number: 2, games_total: 5, players_count: 6,
+        leader: { label: 'Renato C.', wins: 1, anonymous: false } },
+    ]),
+  ] : []),
   save_friend_match_set: () => ({ sets: [], sets_a: 1, sets_b: 1, finished: false, status: 'pending' }),
   finish_friend_match_game: () => 'pending',
   set_friend_match_round_teams: () => null,

@@ -20,5 +20,5 @@ export default function CreateGroupMatch() {
   if (loading || (on && !org)) {
     return <div className="flex justify-center py-10"><div className="h-8 w-8 animate-spin rounded-full border-[3px] border-ink-50 border-t-ink-700" /></div>
   }
-  return on ? <CreateFriendMatch group={{ id: org.id, slug, name: org.name }} /> : <CreateGroupMatchSlots />
+  return on ? <CreateFriendMatch group={{ id: org.id, slug, name: org.name, kind: org.kind }} /> : <CreateGroupMatchSlots />
 }

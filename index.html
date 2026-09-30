@@ -1,20 +1,87 @@
 <!doctype html>
-<html lang="pt">
+<html lang="pt-PT">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="A comunidade de jogadores, grupos e clubes de padel." />
     <meta name="theme-color" content="#040404" />
     <!-- -precomposed stops iOS Safari's "Add to Home Screen" from adding
          its own glossy shine/gradient overlay on top of this icon. -->
     <link rel="apple-touch-icon-precomposed" href="/apple-touch-icon.png" />
-    <title>alinho.pt</title>
+
+    <!-- SEO (29 set): o Google já indexava as duas páginas públicas mas o
+         título era só «alinho» e o HTML ia vazio — para a palavra do
+         dicionário ganhar sempre. Título com o que a app é, descrição com
+         as palavras que as pessoas procuram, canónico no www (o apex faz
+         308 para lá), Open Graph para partilhas e JSON-LD a dizer ao Google
+         que «alinho» é uma marca/app. As páginas da app estão fora do
+         índice pelo robots.txt; isto só importa na landing e /instrucoes. -->
+    <title>alinho.pt — mixes, rankings e clubes de padel</title>
+    <meta name="description" content="A app dos grupos e clubes de padel: cria mixes, inscreve-te pelo WhatsApp com um «In», joga torneios e vê o teu nível subir a cada jogo. Grátis, em português." />
+    <link rel="canonical" href="https://www.alinho.pt/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="alinho" />
+    <meta property="og:title" content="alinho.pt — mixes, rankings e clubes de padel" />
+    <meta property="og:description" content="Os teus jogos de padel, finalmente organizados. Mixes, inscrições pelo WhatsApp, rankings por nível e torneios." />
+    <meta property="og:url" content="https://www.alinho.pt/" />
+    <meta property="og:image" content="https://www.alinho.pt/pwa-512x512.png" />
+    <meta property="og:locale" content="pt_PT" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="alinho.pt — mixes, rankings e clubes de padel" />
+    <meta name="twitter:description" content="Os teus jogos de padel, finalmente organizados." />
+    <meta name="twitter:image" content="https://www.alinho.pt/pwa-512x512.png" />
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://www.alinho.pt/#org",
+          "name": "alinho",
+          "url": "https://www.alinho.pt/",
+          "logo": "https://www.alinho.pt/pwa-512x512.png",
+          "description": "O alinho é uma app gratuita para grupos e clubes de padel em Portugal. Os organizadores criam mixes e torneios; os jogadores inscrevem-se pela app ou respondendo «In» no WhatsApp; os resultados alimentam um ranking por nível. Funciona no telemóvel, sem instalação.",
+          "areaServed": "PT",
+          "email": "support@alinho.pt",
+          "sameAs": ["https://www.instagram.com/alinhopt/", "https://github.com/atrenatocruz/alinho"]
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://www.alinho.pt/#site",
+          "name": "alinho",
+          "alternateName": "alinho padel",
+          "url": "https://www.alinho.pt/",
+          "inLanguage": "pt-PT",
+          "publisher": { "@id": "https://www.alinho.pt/#org" }
+        },
+        {
+          "@type": "SoftwareApplication",
+          "name": "alinho",
+          "url": "https://www.alinho.pt/",
+          "applicationCategory": "SportsApplication",
+          "operatingSystem": "Web, iOS, Android",
+          "inLanguage": "pt-PT",
+          "description": "App para grupos e clubes de padel: mixes, inscrições pelo WhatsApp, rankings por nível e torneios.",
+          "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
+          "publisher": { "@id": "https://www.alinho.pt/#org" }
+        }
+      ]
+    }
+    </script>
   </head>
   <body>
-    <div id="root"></div>
+    <!-- O que o crawler vê antes de o JavaScript correr: o mesmo cabeçalho
+         da landing (Landing.jsx). O React substitui isto ao montar. -->
+    <div id="root">
+      <main style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;padding:48px 24px;max-width:640px;margin:0 auto;color:#040404;">
+        <p style="font-weight:800;font-size:26px;margin:0 0 24px;">alinho<span style="color:#C5DD01;">.</span></p>
+        <h1 style="font-size:32px;line-height:1.1;margin:0 0 12px;">Os teus jogos de padel, finalmente organizados.</h1>
+        <p style="font-size:16px;line-height:1.5;margin:0 0 8px;color:#374151;">Entra nos mixes, joga torneios e vê o teu nível subir a cada jogo.</p>
+        <h2 style="font-size:20px;margin:24px 0 8px;">O que é o alinho?</h2>
+        <p style="font-size:15px;line-height:1.5;margin:0 0 16px;color:#374151;">O alinho é uma app gratuita para grupos e clubes de padel em Portugal. Os organizadores criam mixes e torneios; os jogadores inscrevem-se pela app ou respondendo «In» no WhatsApp; os resultados alimentam um ranking por nível. Funciona no telemóvel, sem instalação.</p>
+        <p style="font-size:14px;line-height:1.5;margin:0;color:#6B7280;">Para grupos e clubes de padel: mixes com inscrição pelo WhatsApp («In»), rankings por nível, jogos entre amigos e torneios. <a href="/login?mode=signup" style="color:#040404;font-weight:800;">Criar conta</a> · <a href="/instrucoes" style="color:#040404;font-weight:800;">Como funciona</a></p>
+      </main>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
-
-
