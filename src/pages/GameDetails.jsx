@@ -290,7 +290,25 @@ export default function GameDetails() {
   // set, mix 8-8 com tie-break; o «não encontrou como passar à ronda 2» de
   // Carcavelos).
   const loadSeqRef = useRef(0)
-  const loadGameDetails = async () => {
+  // A leitura mais recente, para quem precisa de esperar que o ecrã já
+  // mostre o que acabou de gravar (settleLoads, 30 set).
+  const latestLoadRef = useRef(null)
+  const loadGameDetails = () => {
+    const p = runLoadGameDetails()
+    latestLoadRef.current = p
+    return p
+  }
+  // Espera até não haver leitura mais nova do que a que terminou: o tempo
+  // real pode ter começado outra entretanto, e só a última mexe no ecrã.
+  const settleLoads = async () => {
+    let p
+    do {
+      p = latestLoadRef.current
+      // eslint-disable-next-line no-await-in-loop
+      await p
+    } while (p !== latestLoadRef.current)
+  }
+  const runLoadGameDetails = async () => {
     const seq = ++loadSeqRef.current
     const stale = () => seq !== loadSeqRef.current
     try {
@@ -1501,7 +1519,10 @@ export default function GameDetails() {
         .eq('id', id)
       if (timerError) throw timerError
 
+      // O botão fica ocupado até a ronda nova aparecer (QA, 30 set: sumia e
+      // voltava ~1 s e dava para carregar duas vezes).
       loadGameDetails()
+      await settleLoads()
     } catch (error) {
       console.error('Error starting round 1:', error)
       setMixError(describeError(t, error, 'gamedetails.error_start_round1'))
@@ -1827,7 +1848,10 @@ export default function GameDetails() {
         .eq('id', id)
       if (timerError) throw timerError
 
+      // O botão fica ocupado até a ronda nova aparecer (QA, 30 set: sumia e
+      // voltava ~1 s e dava para carregar duas vezes).
       loadGameDetails()
+      await settleLoads()
     } catch (error) {
       console.error('Error ending round:', error)
       setMixError(describeError(t, error, 'gamedetails.error_end_round'))
@@ -2196,8 +2220,11 @@ export default function GameDetails() {
   const canPairSolos = isAdmin && !mixStarted && !mixPaused && game?.status !== 'cancelled'
     && game?.allow_pair_signup && !game?.rotate_partners
     && participants.filter((r) => r.user?.id && !r.partner?.id).length >= 2
-  const canStart = isAdmin && !mixStarted && showClosed && !mixPaused
-  const canStartGames = isAdmin && mixPaused
+  // Um mix cancelado não se começa (QA, 30 set: um mix cancelado sozinho
+  // continuava a mostrar «Começar o Mix — Sorteia a ronda 1…»).
+  const mixCancelled = game?.status === 'cancelled'
+  const canStart = isAdmin && !mixStarted && showClosed && !mixPaused && !mixCancelled
+  const canStartGames = isAdmin && mixPaused && !mixCancelled
   const canRedoDuplas = canStartGames && matches.length === 0
 
   // Barra de quem organiza (ações do evento, desenho de 26 set): onde se
@@ -3157,6 +3184,7 @@ export default function GameDetails() {
                       roundNumber={r}
                       eventName={game.title}
                       defaultOn
+                      isLast={!inGroupPhase && !nextPhase}
                     />
                   </div>
                 )}
