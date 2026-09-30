@@ -6,7 +6,7 @@ import { ChevronRight, ChevronDown, ChevronLeft, Lock, Calendar, X, Share2, Mess
 import { timeOptions, toMin } from '../lib/timeSlots'
 import ShareCard, { CARD_W, CARD_H } from './ShareCard'
 import QRCode from 'qrcode'
-import { ratingBand, groupRatingBand } from '../lib/elo'
+import { ratingBand, groupRatingBand, peopleRatingBand } from '../lib/elo'
 import { planName } from '../lib/plans'
 import { achievementIcon, RARITY_META } from '../lib/achievements'
 import { formatDate } from '../lib/formatDate'
@@ -448,10 +448,12 @@ export function RatingBadge({ rating, gender, me = false, size = 'sm', onDark = 
 
 /* ─── GroupLevelBadge ────────────────────────────────────────────────────
    Mesmo visual do RatingBadge, mas para a média de um clube/grupo (prefixo
-   N em vez de M/F — ver groupRatingBand). Não renderiza nada sem rating. */
-export function GroupLevelBadge({ rating, size = 'sm' }) {
+   N em vez de M/F — ver groupRatingBand). Não renderiza nada sem rating.
+   Num mix, `genders` (o género de quem conta para a média) dá a letra M, F
+   ou MX — ver peopleRatingBand. */
+export function GroupLevelBadge({ rating, genders = null, size = 'sm' }) {
   const { t } = useTranslation()
-  const band = groupRatingBand(rating)
+  const band = genders ? peopleRatingBand(rating, genders) : groupRatingBand(rating)
   if (!band) return null
   return <BadgePill text={band.label} title={t(band.fullKey, band.fullVars)} size={size} />
 }

@@ -2013,6 +2013,9 @@ export default function GameDetails() {
   // soltas. Sem pontos individuais na linha do jogador. O teu par fica
   // destacado na cor do tipo, com "· tu".
   const teamPoints = (team) => (pointsById[team?.player1?.id] ?? 0) + (pointsById[team?.player2?.id] ?? 0)
+  // A comparação de pontos só diz alguma coisa com os quatro jogadores com
+  // pontos: os convidados não têm, e «1900 vs 0 pts» enganava (QA, 29 set).
+  const teamHasPoints = (team) => [team?.player1?.id, team?.player2?.id].every((id) => id && pointsById[id] > 0)
   const renderDuplaBlock = (team, { showPoints = true } = {}) => {
     const isMine = team?.player1?.id === user.id || team?.player2?.id === user.id
     return (
@@ -2584,7 +2587,7 @@ export default function GameDetails() {
             max={capacity}
             size="sm"
           />
-          <span className="ml-auto"><GroupLevelBadge rating={heroAvgRating} /></span>
+          <span className="ml-auto"><GroupLevelBadge rating={heroAvgRating} genders={heroRated.map((p) => ratingInfoById[p.id]?.gender)} /></span>
         </div>
         {game.status === 'open' && (
           <p className="text-xs text-muted mt-2">
@@ -2954,7 +2957,7 @@ export default function GameDetails() {
                               <div key={m.court_number} className="rounded-ctrl p-3 bg-canvas">
                                 <div className="flex items-center justify-between gap-2 mb-2 font-mono text-[11px] font-extrabold uppercase tracking-widest text-ink-500">
                                   <span>{t('gamedetails.court_number', { number: m.court_number })}</span>
-                                  {a && b && (
+                                  {a && b && teamHasPoints(a) && teamHasPoints(b) && (
                                     <span className="tabular-nums normal-case tracking-normal">
                                       {t('gamedetails.court_points_vs', { a: teamPoints(a), b: teamPoints(b) })}
                                     </span>

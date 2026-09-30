@@ -246,8 +246,8 @@ export default function Home() {
         organization:organizations (name, kind, group_logo_url),
         participants (
           id, user_id, partner_id, status,
-          user:profiles!participants_user_id_fkey (name, avatar_url, rating),
-          partner:profiles!participants_partner_id_fkey (name, avatar_url, rating)
+          user:profiles!participants_user_id_fkey (name, avatar_url, rating, gender),
+          partner:profiles!participants_partner_id_fkey (name, avatar_url, rating, gender)
         )
       `)
       .in('organization_id', orgIds)
