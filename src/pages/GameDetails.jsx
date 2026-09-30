@@ -31,7 +31,6 @@ import { notifyMixChanges } from '../lib/notifications'
 import AddPlayerSheet from '../components/mix/AddPlayerSheet'
 import JoinPartnerSheet from '../components/mix/JoinPartnerSheet'
 import { Sheet } from '../components/agenda/AgendaControls'
-import ConfirmPhoneCard from '../components/ConfirmPhoneCard'
 import { whatsappLookalikeInGame, rememberWhatsappGuest, rememberedWhatsappGuest } from '../lib/whatsappGuest'
 import { MonoLabel } from '../components/tournament/TournamentBits'
 import { joinWithNamedPartner, listGameInvites, inviteLink, whatsappShare } from '../lib/partnerInvite'
@@ -291,7 +290,25 @@ export default function GameDetails() {
   // set, mix 8-8 com tie-break; o «não encontrou como passar à ronda 2» de
   // Carcavelos).
   const loadSeqRef = useRef(0)
-  const loadGameDetails = async () => {
+  // A leitura mais recente, para quem precisa de esperar que o ecrã já
+  // mostre o que acabou de gravar (settleLoads, 30 set).
+  const latestLoadRef = useRef(null)
+  const loadGameDetails = () => {
+    const p = runLoadGameDetails()
+    latestLoadRef.current = p
+    return p
+  }
+  // Espera até não haver leitura mais nova do que a que terminou: o tempo
+  // real pode ter começado outra entretanto, e só a última mexe no ecrã.
+  const settleLoads = async () => {
+    let p
+    do {
+      p = latestLoadRef.current
+      // eslint-disable-next-line no-await-in-loop
+      await p
+    } while (p !== latestLoadRef.current)
+  }
+  const runLoadGameDetails = async () => {
     const seq = ++loadSeqRef.current
     const stale = () => seq !== loadSeqRef.current
     try {
@@ -1502,7 +1519,10 @@ export default function GameDetails() {
         .eq('id', id)
       if (timerError) throw timerError
 
+      // O botão fica ocupado até a ronda nova aparecer (QA, 30 set: sumia e
+      // voltava ~1 s e dava para carregar duas vezes).
       loadGameDetails()
+      await settleLoads()
     } catch (error) {
       console.error('Error starting round 1:', error)
       setMixError(describeError(t, error, 'gamedetails.error_start_round1'))
@@ -1521,34 +1541,27 @@ export default function GameDetails() {
     setMixError('')
     setSavingMatchId(match.id)
     try {
-      const { error } = await supabase
-        .from('matches')
-        .update({
-          score_a: a,
-          score_b: b,
-          winner_team_id: a > b ? match.team_a_id : match.team_b_id,
-        })
-        .eq('id', match.id)
-      if (error) throw error
-
-      if (sets) {
-        // Corrections re-save all sets — delete-then-insert keeps this
-        // idempotent rather than needing per-set upsert logic.
-        const { error: deleteError } = await supabase.from('match_sets').delete().eq('match_id', match.id)
-        if (deleteError) throw deleteError
-        const { error: setsError } = await supabase.from('match_sets').insert(
-          sets.map((s, i) => ({
-            match_id: match.id,
-            set_number: i + 1,
+      // Tudo de uma vez (Dev 3, migration_mix_gravar_resultado.sql): o
+      // resultado e os sets gravam-se juntos ou não se grava nada. Antes eram
+      // 3 passos soltos (matches → apagar sets → inserir sets): se a trava do
+      // #588 recusasse o tie-break, o 9-8 com vencedor já tinha ficado
+      // gravado, sem sets, com o ecrã a dizer «recusado» (QA, 28 set).
+      // Sem sets (pontos simples), os sets ficam como estão.
+      const { error } = await supabase.rpc('save_mix_match_result', {
+        p_match_id: match.id,
+        p_score_a: a,
+        p_score_b: b,
+        p_sets: sets
+          ? sets.map((s) => ({
             score_a: s.score_a,
             score_b: s.score_b,
             is_super_tiebreak: !!s.is_super_tiebreak,
             // Os pontos do tie-break do 8-8 (#580) — só quando há.
             ...(s.tiebreak_a != null ? { tiebreak_a: s.tiebreak_a, tiebreak_b: s.tiebreak_b } : {}),
           }))
-        )
-        if (setsError) throw setsError
-      }
+          : null,
+      })
+      if (error) throw error
 
       // O resultado aparece logo, antes de a leitura voltar (Renato, 29 set:
       // «desaparece tudo e depois volta a aparecer os pontos»). Antes,
@@ -1828,7 +1841,10 @@ export default function GameDetails() {
         .eq('id', id)
       if (timerError) throw timerError
 
+      // O botão fica ocupado até a ronda nova aparecer (QA, 30 set: sumia e
+      // voltava ~1 s e dava para carregar duas vezes).
       loadGameDetails()
+      await settleLoads()
     } catch (error) {
       console.error('Error ending round:', error)
       setMixError(describeError(t, error, 'gamedetails.error_end_round'))
@@ -1997,6 +2013,9 @@ export default function GameDetails() {
   // soltas. Sem pontos individuais na linha do jogador. O teu par fica
   // destacado na cor do tipo, com "· tu".
   const teamPoints = (team) => (pointsById[team?.player1?.id] ?? 0) + (pointsById[team?.player2?.id] ?? 0)
+  // A comparação de pontos só diz alguma coisa com os quatro jogadores com
+  // pontos: os convidados não têm, e «1900 vs 0 pts» enganava (QA, 29 set).
+  const teamHasPoints = (team) => [team?.player1?.id, team?.player2?.id].every((id) => id && pointsById[id] > 0)
   const renderDuplaBlock = (team, { showPoints = true } = {}) => {
     const isMine = team?.player1?.id === user.id || team?.player2?.id === user.id
     return (
@@ -2197,8 +2216,11 @@ export default function GameDetails() {
   const canPairSolos = isAdmin && !mixStarted && !mixPaused && game?.status !== 'cancelled'
     && game?.allow_pair_signup && !game?.rotate_partners
     && participants.filter((r) => r.user?.id && !r.partner?.id).length >= 2
-  const canStart = isAdmin && !mixStarted && showClosed && !mixPaused
-  const canStartGames = isAdmin && mixPaused
+  // Um mix cancelado não se começa (QA, 30 set: um mix cancelado sozinho
+  // continuava a mostrar «Começar o Mix — Sorteia a ronda 1…»).
+  const mixCancelled = game?.status === 'cancelled'
+  const canStart = isAdmin && !mixStarted && showClosed && !mixPaused && !mixCancelled
+  const canStartGames = isAdmin && mixPaused && !mixCancelled
   const canRedoDuplas = canStartGames && matches.length === 0
 
   // Barra de quem organiza (ações do evento, desenho de 26 set): onde se
@@ -2565,7 +2587,7 @@ export default function GameDetails() {
             max={capacity}
             size="sm"
           />
-          <span className="ml-auto"><GroupLevelBadge rating={heroAvgRating} /></span>
+          <span className="ml-auto"><GroupLevelBadge rating={heroAvgRating} genders={heroRated.map((p) => ratingInfoById[p.id]?.gender)} /></span>
         </div>
         {game.status === 'open' && (
           <p className="text-xs text-muted mt-2">
@@ -2604,16 +2626,10 @@ export default function GameDetails() {
         </PrimaryButton>
       ) : !mixStarted && !isUserJoined && waGuestName ? (
         // Disse que sim, que é o convidado do WhatsApp: não se inscreve outra
-        // vez. Liga a conta ao número (#537) e as inscrições juntam-se.
-        <div className="card space-y-3">
+        // vez. Sem confirmação por agora (Francisco, 29 set: sai o código ao
+        // robô do #537; a validação vai ser por SMS, mais tarde).
+        <div className="card">
           <p className="text-sm text-ink-900">{t('gamedetails.wa_guest_in', { name: waGuestName })}</p>
-          {profile?.phone_hash && profile.phone_hash !== 'dev-bypass'
-            ? <ConfirmPhoneCard />
-            : (
-              <Link to="/perfil/informacao" className="btn-secondary inline-flex w-full items-center justify-center">
-                {t('gamedetails.wa_add_number')}
-              </Link>
-            )}
         </div>
       ) : !mixStarted && canJoin && !joinMode && !ageIneligible && !missingBirthday ? (
         <div className="space-y-2">
@@ -2941,7 +2957,7 @@ export default function GameDetails() {
                               <div key={m.court_number} className="rounded-ctrl p-3 bg-canvas">
                                 <div className="flex items-center justify-between gap-2 mb-2 font-mono text-[11px] font-extrabold uppercase tracking-widest text-ink-500">
                                   <span>{t('gamedetails.court_number', { number: m.court_number })}</span>
-                                  {a && b && (
+                                  {a && b && teamHasPoints(a) && teamHasPoints(b) && (
                                     <span className="tabular-nums normal-case tracking-normal">
                                       {t('gamedetails.court_points_vs', { a: teamPoints(a), b: teamPoints(b) })}
                                     </span>
@@ -3164,6 +3180,7 @@ export default function GameDetails() {
                       roundNumber={r}
                       eventName={game.title}
                       defaultOn
+                      isLast={!inGroupPhase && !nextPhase}
                     />
                   </div>
                 )}

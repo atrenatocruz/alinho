@@ -58,6 +58,20 @@ export function groupRatingBand(rating) {
   return { label, fullKey: 'ui.level_band', fullVars: { label } }
 }
 
+/** Nível médio de quem está num mix: a letra vem de quem lá está — só
+    homens M, só mulheres F, os dois MX (só há M, F e MX, Francisco, #577;
+    designer, 29 set). Quem não tem género não conta para a letra; sem
+    ninguém com género, null (a pastilha não aparece). */
+export function peopleRatingBand(rating, genders = []) {
+  if (rating == null) return null
+  const known = new Set(genders.filter((g) => g === 'masculino' || g === 'feminino'))
+  if (!known.size) return null
+  const prefix = known.size === 2 ? 'MX' : known.has('feminino') ? 'F' : 'M'
+  const band = BANDS.find((b) => rating >= b.min)
+  const label = band ? `${prefix}${band.num}` : `${prefix}INI`
+  return band ? { label, fullKey: 'ui.level_band', fullVars: { label } } : { label, fullKey: 'ui.group_level_beginner' }
+}
+
 export const formatRating = (rating) => (rating == null ? '—' : String(Math.round(rating)))
 
 // Provisório: menos de 12 jogos contados (3 mixes) — o rating ainda é uma

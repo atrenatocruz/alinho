@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { LESSON_RPC_MOCKS, LESSON_TABLE_MOCKS, LESSON_NOTICES } from './devMockLessons'
+import { withManyOrgs } from './devMockGerir'
 import {
   TOURNAMENT_RPC_MOCKS, TOURNAMENT_TABLE_MOCKS, TOURNAMENT_CLOSE_RPC_MOCKS, TOURNAMENT_CLOSE_TABLE_MOCKS,
   TOURNAMENT_SCORE_TODAY_TABLE_MOCKS, TOURNAMENT_REOPEN_RPC_MOCKS, TOURNAMENT_GROUPS_DONE_TABLE_MOCKS, TOURNAMENT_PROMOTED_TABLE_MOCKS, TOURNAMENT_PROMOTED_RPC_MOCKS,
@@ -160,7 +161,8 @@ const RPC_MOCKS = {
   })).concat(Array.from({ length: 55 }, (_, i) => ({
     user_id: `fake-${i}`, name: MOCK_NAMES[i % MOCK_NAMES.length], rating: 2000 - i * 10, rating_games: i === 2 ? 4 : 30,
     gender: i % 3 ? 'masculino' : 'feminino', mix_wins: (55 - i) % 7, mixes_played: 10,
-  }))).concat([{
+  // localStorage.mockEventGuests = 'true': os convidados não têm pontos.
+  })).filter((r) => !(localStorage.getItem('mockEventGuests') === 'true' && ['fake-2', 'fake-5'].includes(r.user_id)))).concat([{
     user_id: MOCK_ADMIN_USER_ID, name: 'Admin (Dev)', rating: 1605, rating_games: 30, gender: 'masculino', mix_wins: 4, mixes_played: 9,
   }]).concat(lastMinute() ? LM_PEOPLE.map((p) => ({
     user_id: p.id, name: p.name, rating: p.rating, rating_games: 30, gender: 'masculino', mix_wins: 1, mixes_played: 5,
@@ -255,6 +257,8 @@ const RPC_MOCKS = {
   // mesmo dia.
   // Cancelar/apagar da lista (Dev 3, migration_amigos_apagar_da_lista).
   delete_friend_match: () => 'deleted',
+  // Gravar o resultado do mix de uma vez (Dev 3, 29 set).
+  save_mix_match_result: (params) => ({ match_id: params?.p_match_id, winner_team_id: null }),
   finish_friend_session: () => ({ removed: 2, notified: 1 }),
   get_my_private_matches: () => localStorage.getItem('mockHomeSession') ? (() => {
     const mode = localStorage.getItem('mockHomeSession')
@@ -717,7 +721,8 @@ const rotating = () => localStorage.getItem('mockRotatingMix') === 'true'
 const eventState = () => localStorage.getItem('mockEventState')
 const EV_NAMES = ['Diogo Alexandre', 'Renato Cruz', 'João Jesus', 'Ana Moreira', 'André Sousa', 'Beatriz Faria', 'Rui Costa']
 const EV_PEOPLE = [
-  { id: MOCK_ADMIN_USER_ID, name: 'Francisco Barros', avatar_url: null, preferred_side: 'left' },
+  // localStorage.mockNotPlaying = 'true': quem entra não joga neste mix (o marcador que só marca, 29 set).
+  { id: localStorage.getItem('mockNotPlaying') === 'true' ? 'fake-francisco' : MOCK_ADMIN_USER_ID, name: 'Francisco Barros', avatar_url: null, preferred_side: 'left' },
   ...EV_NAMES.map((name, i) => ({ id: `fake-${i}`, name, avatar_url: null, preferred_side: i % 2 ? 'both' : 'right' })),
 ]
 const evPeople = () => (eventState() === 'open' ? EV_PEOPLE.slice(1) : EV_PEOPLE)
@@ -772,9 +777,9 @@ const dayOnly = (offset) => {
   const d = atDay(offset, 12)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
-const person = (id) => ({ name: FAKE_PEOPLE[id].name, avatar_url: FAKE_PEOPLE[id].avatar_url, rating: FAKE_PEOPLE[id].rating })
-const ADMIN_PERSON = { name: 'Admin (Dev)', avatar_url: null, rating: 1450 }
-const extra = (i) => ({ name: ['Ana Ribeiro', 'Bruno Sá', 'Carla Nunes', 'Duarte Lopes', 'Eva Matos', 'Filipe Reis'][i], avatar_url: null, rating: 1300 + i * 40 })
+const person = (id) => ({ name: FAKE_PEOPLE[id].name, avatar_url: FAKE_PEOPLE[id].avatar_url, rating: FAKE_PEOPLE[id].rating, gender: FAKE_PEOPLE[id].gender })
+const ADMIN_PERSON = { name: 'Admin (Dev)', avatar_url: null, rating: 1450, gender: 'masculino' }
+const extra = (i) => ({ name: ['Ana Ribeiro', 'Bruno Sá', 'Carla Nunes', 'Duarte Lopes', 'Eva Matos', 'Filipe Reis'][i], avatar_url: null, rating: 1300 + i * 40, gender: i % 2 ? 'masculino' : 'feminino' })
 const AGENDA_GAMES = () => [
   {
     id: 'ag-mine-today', organization_id: MOCK_CLUB_ID, title: 'Mix de terça', date: atDay(0, 19).toISOString(),
@@ -1002,6 +1007,8 @@ function lastMinuteRequest(table, url, method, body) {
 }
 
 const TABLE_MOCKS = {
+  // localStorage.mockScorekeeper = 'true': quem entra é marcador deste mix (29 set).
+  game_scorekeepers: () => (localStorage.getItem('mockScorekeeper') === 'true' ? [{ user_id: MOCK_ADMIN_USER_ID, game_id: 'fake-game-1' }] : []),
   // Os sets do jogo solto «pm-sets» do mockHomeSession (Editar resultado).
   private_match_sets: (url) => {
     const u = decodeURIComponent(url)
@@ -1276,6 +1283,8 @@ const TABLE_MOCKS = {
     ...(eventState() ? {
       title: '+1 Mix de Quinta-feira', recurrence_id: 'rec-ev', num_courts: 2, max_players: 8, price_per_player: 11.5,
       prize: 'Voucher 1h30 para a dupla vencedora', location: 'Smash Padel Almada, Av. do Cristo Rei', game_time_minutes: 20,
+      // localStorage.mockFormat = 'todos_contra_todos' | 'americano' …: outra fórmula (29 set).
+      ...(localStorage.getItem('mockFormat') ? { format: localStorage.getItem('mockFormat') } : {}),
       // localStorage.mockLastRound = 'true': só 2 rondas (a 2 é a última) — o «Terminar e dar os pontos» por baixo da ronda (27 set).
       ...(localStorage.getItem('mockLastRound') === 'true' ? { court_time_minutes: 40 } : {}),
       // 'paused': o mix parado do #448 — as duplas ficam, os jogos e os
@@ -1500,6 +1509,9 @@ const wantsSingle = (init) => {
   const accept = typeof headers.get === 'function' ? headers.get('Accept') : headers['Accept'] || headers['accept']
   return !!accept && accept.includes('vnd.pgrst.object')
 }
+
+// Gerir com muitos clubes e grupos (localStorage.mockManyOrgs = 'true').
+TABLE_MOCKS.organizations = withManyOrgs(TABLE_MOCKS.organizations)
 
 export function installDevMockNetwork() {
   if (!import.meta.env.DEV) return
