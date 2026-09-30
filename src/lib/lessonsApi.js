@@ -205,6 +205,20 @@ export async function getLesson(lessonId) {
 }
 
 /** Professor/clube marca a falta de um aluno nessa aula ("ligou"). */
+/** As aulas já dadas (ou canceladas) de uma ou mais turmas, da mais recente
+    para a mais antiga, com quem lá estava (Histórico no Gerir, 27 set).
+    Quem gere lê-as pelas regras «See lessons» e «Own attendance». */
+export async function listSeriesPastLessons(seriesIds, { withAttendees = false } = {}) {
+  if (!seriesIds?.length) return []
+  const cols = withAttendees
+    ? 'id, series_id, starts_at, status, lesson_attendees(user_id, guest_name, status, marked_note)'
+    : 'id, series_id, starts_at, status'
+  const { data, error } = await supabase.from('lessons').select(cols)
+    .in('series_id', seriesIds).lt('starts_at', new Date().toISOString()).order('starts_at', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+
 export async function markLessonAbsence(lessonId, userId, note) {
   const { error } = await supabase.rpc('mark_lesson_absence', { p_lesson_id: lessonId, p_user_id: userId, p_note: note || null })
   if (error) throw error

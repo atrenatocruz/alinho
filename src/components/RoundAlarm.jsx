@@ -16,12 +16,13 @@ import {
  * - endsAt: quando acaba a ronda (ms). Mudou com a mesma roundKey (o ± do
  *   cronómetro) → a faixa recomeça com o tempo que falta.
  * - roundNumber: a ronda a decorrer (ou a última); a seguinte é +1.
+ * - isLast: é a última ronda (a final) — não há seguinte de que falar (QA, 30 set).
  * - eventName: para o ecrã bloqueado, «Ronda N · <nome>».
  * - defaultOn: como vem a quem nunca mexeu no interruptor — ligado nos mixes,
  *   desligado no resto (Francisco, 27 set).
  * - unit: 'round' («Ronda N», o mix) ou 'game' («Jogo N», o jogo entre amigos).
  */
-export default function RoundAlarm({ roundKey, endsAt, roundNumber, eventName, defaultOn = false, unit = 'round' }) {
+export default function RoundAlarm({ roundKey, endsAt, roundNumber, eventName, defaultOn = false, unit = 'round', isLast = false }) {
   const { t: tr } = useTranslation()
   // Os textos com «ronda» têm a versão «_game» ao lado (jogo entre amigos).
   const UNIT_KEYS = ['title', 'waiting', 'started', 'tap_to_ring', 'turn_on_round', 'media_title']
@@ -182,7 +183,7 @@ export default function RoundAlarm({ roundKey, endsAt, roundNumber, eventName, d
         </button>
       </div>
       {!prefs.on && <p className="mt-1 text-xs text-muted">{t('roundalarm.off_hint')}</p>}
-      {prefs.on && !running && (
+      {prefs.on && !running && !isLast && (
         <p className="mt-1 text-xs font-bold text-ok">{t('roundalarm.waiting', { number: (roundNumber || 0) + 1 })}</p>
       )}
       {prefs.on && running && (

@@ -319,3 +319,8 @@ html.test-env {
 html.test-env .fixed.inset-0 {
   top: var(--tb-h);
 }
+
+/* Nas páginas por passos (criar e editar um evento) a barra de baixo não
+   aparece: tapava o «Guardar alterações» e o «Seguinte» (designer, 30 set).
+   O StepPage põe data-steps no body enquanto está aberto. */
+body[data-steps] .app-nav { display: none; }

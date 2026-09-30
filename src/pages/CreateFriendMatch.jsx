@@ -125,6 +125,11 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
     }
   }
 
+  // Editar: «Cancelar» pergunta se há alterações por guardar (30 set).
+  const snapshot = () => JSON.stringify([people.map((p) => p.inviteeId || p.user_id || p.name), rankedIntent, when, location, court, format, teamsMode, gameMinutes, showLive])
+  const [initialSnap, setInitialSnap] = useState(null)
+  useEffect(() => { if (edit && initialSnap == null) setInitialSnap(snapshot()) }) // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleSave = async () => {
     setError('')
     if (!scheduledDate) { setError(t('createprivatematch.error_date_required')); setStep(2); return }
@@ -250,6 +255,11 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
       nextDisabled={(step === 1 && missing > 0) || (step === 2 && !scheduledDate)}
       nextHint={step === 1 ? t('friends.missing_people', { count: missing }) : t('createprivatematch.date_missing')}
       error={error}
+      edit={edit ? {
+        onSave: handleSave, onCancel: goBack, dirty: initialSnap != null && snapshot() !== initialSnap,
+        saving, saveDisabled: missing > 0 || !scheduledDate,
+        saveHint: missing > 0 ? t('friends.missing_people', { count: missing }) : !scheduledDate ? t('createprivatematch.date_missing') : null,
+      } : null}
       footer={step === 4 ? (edit ? (
         <PrimaryButton onClick={handleSave} disabled={saving} className="w-full">
           {saving ? t('privatematches.saving') : t('friends.save_changes')}

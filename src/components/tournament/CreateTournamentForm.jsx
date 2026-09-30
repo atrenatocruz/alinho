@@ -246,6 +246,9 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
     fn()
   }
   const firstDay = draft.days.length ? [...draft.days].map((d) => d.date).sort()[0] : null
+  // Editar: «Guardar» em qualquer passo (30 set) — vê o que falta em todos.
+  const [initialDraft] = useState(() => JSON.stringify(draft))
+  const anyProblem = locked ? finalProblem : ([1, 2, 3, 4].map((n) => stepProblem(n, draft, checkOpts)).find(Boolean) || finalProblem)
 
   const addDay = (date) => {
     if (!date || draft.days.some((d) => d.date === date)) return
@@ -430,6 +433,10 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
       footer={footer}
       error={error}
       busy={saving}
+      edit={editing_existing ? {
+        onSave: save, onCancel, dirty: JSON.stringify(draft) !== initialDraft || openingChanged,
+        saving, saveDisabled: !!anyProblem, saveHint: anyProblem ? t(`tournament.create.problem_${anyProblem}`) : null,
+      } : null}
     >
       {locked && <p className="text-xs text-ink-500">{t('tournament.create.edit_locked')}</p>}
 
