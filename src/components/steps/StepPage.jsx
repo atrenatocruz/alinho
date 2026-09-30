@@ -24,20 +24,22 @@
 //               muda-o quem chama, com nextLabel)
 //   Sem passos (total ≤ 1, ou sem total): não se desenha a barra — é o
 //   formulário de uma página só, como editar um torneio com inscrições.
-//   edit        — só no EDITAR (LEIA-PRIMEIRO, 30 set, aprovado pelo Francisco):
-//               { onSave, onCancel, dirty, saving, saveDisabled, saveHint, extra }.
-//               Em todos os passos: «Cancelar» na barra de cima (com alterações
-//               por guardar pergunta «Sair sem guardar as alterações?»), o
-//               «‹» para o passo anterior na barra de progresso, e em baixo
-//               «Guardar alterações» (preto) + «Seguinte» (contorno); no último
-//               passo só «Guardar alterações». `extra` fica por baixo (ex.: as
-//               ações do mix no último passo). No criar, nada disto muda.
+//   edit        — só no EDITAR (LEIA-PRIMEIRO, «30 SET (2.ª versão) — NO
+//               EDITAR: AÇÕES TODAS EM BAIXO», aprovado pelo Francisco):
+//               { onSave, onCancel, dirty, saving, saveDisabled, saveHint, danger }.
+//               Em cima só a seta ‹ (sai; com alterações por guardar pergunta
+//               «Sair sem guardar as alterações?»); o «‹» da barra de progresso
+//               volta ao passo anterior. Em baixo, empilhados a toda a largura:
+//               «Seguinte» (preto), «Guardar alterações» (contorno; no último
+//               passo passa a preto) e o destrutivo (contorno vermelho).
+//               danger = { label, title, message, confirmLabel, cancelLabel,
+//               onConfirm, errorOf } — a pergunta é a folha da app.
 //
 // Espaço da versão final (26 set): título → nome/barra 24 px, barra → 1.ª
 // pergunta 24 px, entre perguntas 24 px, rótulo → campo 8 px (o mb-2 do
 // rótulo), último campo → botão 32 px. Nada fica tapado pelo menu de baixo
 // (pb-28, pedido do Bugs e da designer).
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { BackBar, ConfirmSheet } from '../ui'
 import { ChevronLeft } from 'lucide-react'
@@ -50,6 +52,17 @@ export default function StepPage({
   const { t } = useTranslation()
   const stepped = total > 1
   const [asking, setAsking] = useState(false)
+  const [askingDanger, setAskingDanger] = useState(false)
+  // Editar: barra de cima com fundo branco sólido e a linha fina quando o
+  // título já passou por baixo dela (designer, 30 set).
+  const titleRef = useRef(null)
+  const [scrolled, setScrolled] = useState(false)
+  useEffect(() => {
+    if (!edit || !titleRef.current || typeof IntersectionObserver === 'undefined') return undefined
+    const io = new IntersectionObserver(([e]) => setScrolled(!e.isIntersecting), { rootMargin: '-64px 0px 0px 0px' })
+    io.observe(titleRef.current)
+    return () => io.disconnect()
+  }, [!!edit]) // eslint-disable-line react-hooks/exhaustive-deps
   // Sem a barra de baixo enquanto se cria ou edita por passos (30 set).
   useEffect(() => {
     document.body.dataset.steps = '1'
@@ -57,28 +70,28 @@ export default function StepPage({
   }, [])
   const cancelEdit = () => (edit?.dirty ? setAsking(true) : edit.onCancel())
   const last = !stepped || step >= total
+  const black = 'w-full min-h-[52px] rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold text-white'
+  const outline = 'w-full min-h-[52px] rounded-ctrl border-[1.5px] border-line bg-white px-4 text-[15px] font-extrabold text-ink-900'
   return (
     <div className="mx-auto max-w-lg pb-28">
       {/* «Cancelar / Voltar» sempre visível ao deslizar (27 set). No editar,
           «Cancelar» em todos os passos e o nome do passo no meio (30 set). */}
       {edit
         ? (
-          // A mesma barra do BackBar, mas com «Cancelar» escrito (o desenho
-          // de 30 set pede a palavra, não só a seta) e o passo no meio.
-          <div className="sticky top-0 z-10 -mx-4 -mt-6 mb-1 bg-white/70 px-4 backdrop-blur-md" style={{ paddingTop: 'var(--safe-top, env(safe-area-inset-top))' }}>
-            <div className="grid h-16 grid-cols-[1fr_auto_1fr] items-center gap-3">
-              <button type="button" onClick={cancelEdit}
-                className="h-11 justify-self-start rounded-full bg-white/95 px-4 text-sm font-extrabold text-ink-900 shadow-card">
-                {t('steps.cancel')}
+          <div className={`sticky top-0 z-10 -mx-4 -mt-6 mb-1 bg-white px-4 ${scrolled ? 'border-b border-line' : ''}`} style={{ paddingTop: 'var(--safe-top, env(safe-area-inset-top))' }}>
+            <div className="grid h-16 grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-3">
+              <button type="button" onClick={cancelEdit} aria-label={t('common.back')}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-ink-900 shadow-card">
+                <ChevronLeft size={22} />
               </button>
-              <p className="min-w-0 truncate text-center text-base font-extrabold text-ink-900">{stepped ? stepLabel : ''}</p>
+              <p className={`min-w-0 truncate text-center text-base font-extrabold text-ink-900 transition-opacity duration-fast ${scrolled ? 'opacity-100' : 'opacity-0'}`}>{title}</p>
               <span aria-hidden />
             </div>
           </div>
         )
         : <BackBar onBack={onBack} label={step === 1 ? t('steps.cancel') : t('common.back')} title={title} />}
 
-      <h2 className="mt-2 text-3xl text-ink-900">{title}</h2>
+      <h2 ref={titleRef} className="mt-2 text-3xl text-ink-900">{title}</h2>
       {/* «No <grupo>» por baixo de «Novo jogo entre amigos» (27 set). */}
       {subtitle && <p className="mt-0.5 text-sm text-muted">{subtitle}</p>}
       {top && <div className="mt-6">{top}</div>}
@@ -107,19 +120,26 @@ export default function StepPage({
 
       {edit ? (
         <div className="mt-8 space-y-2.5">
-          <button type="button" onClick={edit.onSave} disabled={edit.saving || edit.saveDisabled}
-            className="w-full min-h-[52px] rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold text-white disabled:opacity-40">
-            {edit.saving ? t('steps.saving') : t('steps.save_changes')}
-          </button>
-          {edit.saveDisabled && edit.saveHint && <p className="text-center text-xs text-muted">{edit.saveHint}</p>}
           {!last && (
             <button type="button" onClick={onNext} disabled={nextDisabled || busy}
-              className="w-full min-h-[52px] rounded-ctrl border-[1.5px] border-line bg-white px-4 text-[15px] font-extrabold text-ink-900 disabled:opacity-40">
+              className={`${black} disabled:opacity-40`}>
               {nextLabel || t('steps.next')}
             </button>
           )}
           {!last && nextDisabled && nextHint && <p className="text-center text-xs text-muted">{nextHint}</p>}
-          {edit.extra && <div className="pt-4">{edit.extra}</div>}
+          <button type="button" onClick={edit.onSave} disabled={edit.saving || edit.saveDisabled}
+            className={`${last ? black : outline} disabled:opacity-40`}>
+            {edit.saving ? t('steps.saving') : t('steps.save_changes')}
+          </button>
+          {edit.saveDisabled && edit.saveHint && <p className="text-center text-xs text-muted">{edit.saveHint}</p>}
+          {edit.danger && (
+            <div className="pt-4">
+              <button type="button" onClick={() => setAskingDanger(true)}
+                className="w-full min-h-[52px] rounded-ctrl border-[1.5px] border-danger bg-white px-4 text-[15px] font-extrabold text-danger">
+                {edit.danger.label}
+              </button>
+            </div>
+          )}
         </div>
       ) : footer ? <div className="mt-8">{footer}</div> : (
         <div className="mt-8">
@@ -130,6 +150,11 @@ export default function StepPage({
         </div>
       )}
 
+      {edit?.danger && (
+        <ConfirmSheet open={askingDanger} danger title={edit.danger.title} message={edit.danger.message}
+          cancelLabel={edit.danger.cancelLabel} confirmLabel={edit.danger.confirmLabel}
+          onConfirm={edit.danger.onConfirm} onClose={() => setAskingDanger(false)} errorOf={edit.danger.errorOf} />
+      )}
       {edit && (
         <ConfirmSheet open={asking} outline title={t('steps.leave_title')}
           cancelLabel={t('steps.keep_editing')} confirmLabel={t('steps.leave_without_saving')}

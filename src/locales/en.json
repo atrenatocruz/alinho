@@ -4388,5 +4388,13 @@
   "agenda.filter_org_picked": "Picked",
   "agenda.filter_org_remove": "Remove {{name}}",
   "agenda.filter_org_clear": "Clear",
-  "agenda.filter_org_many": "{{count}} clubs/groups"
+  "agenda.filter_org_many": "{{count}} clubs/groups",
+  "mixwizard.danger_cancel": "Cancel the mix",
+  "mixwizard.danger_delete": "Delete the mix",
+  "friends.danger_delete": "Delete the game",
+  "gerirclube.mix_cancelled": "Mix cancelled.",
+  "gerirclube.mix_deleted": "Mix deleted.",
+  "mixwizard.delete_title": "Delete {{name}}?",
+  "mixwizard.delete_message": "Nobody signed up. The mix disappears.",
+  "mixwizard.delete_confirm": "Yes, delete"
 }

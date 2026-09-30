@@ -13,6 +13,7 @@
    pertence (o grupo onde aparece → Pessoas; arranque automático → Quando;
    pontuação e tamanho dos grupos → Regras), sempre com o valor de hoje. */
 import { useState } from 'react'
+import { describeError } from '../../lib/errors'
 import { useTranslation } from 'react-i18next'
 import { Minus, Plus } from 'lucide-react'
 import StepPage from '../steps/StepPage'
@@ -55,7 +56,7 @@ function Field({ label, children, hint }) {
  */
 export default function MixWizard({
   form, setForm, editingGame, options, mixScopeId, setMixScopeId, maxCourts, locationInputRef,
-  launchDayError, clearLaunchDayError, error, onCancel, onSubmit, editExtras = null, organizationId = null,
+  launchDayError, clearLaunchDayError, error, onCancel, onSubmit, editExtras = null, organizationId = null, onDestroy = null,
 }) {
   const { t, i18n } = useTranslation()
   const [step, setStep] = useState(1)
@@ -167,6 +168,20 @@ export default function MixWizard({
       edit={editingGame ? {
         onSave: () => submit(false), onCancel, dirty: JSON.stringify(form) !== initialForm,
         saving: busy, saveDisabled: !!missingAny, saveHint: missingAny,
+        // «Cancelar o mix» com inscritos, «Eliminar o mix» sem ninguém (30 set);
+        // a pergunta usa as frases do «Mais ⋯» da página do mix.
+        danger: onDestroy ? (() => {
+          const people = (editingGame.participants || []).filter((p) => ['confirmed', 'waitlisted'].includes(p.status)).length
+          const series = !!editingGame.recurrence_id
+          return {
+            label: t(people ? 'mixwizard.danger_cancel' : 'mixwizard.danger_delete'),
+            // Sem ninguém, a pergunta diz o mesmo que o botão (designer, 30 set).
+            title: t(people ? 'mixcancel.confirm_title' : 'mixwizard.delete_title', { name: editingGame.title || '' }),
+            message: people ? t(series ? 'eventactions.cancel_one_hint_series' : 'eventactions.cancel_one_hint') : t('mixwizard.delete_message'),
+            cancelLabel: t('mixcancel.keep'), confirmLabel: t(people ? 'mixcancel.confirm' : 'mixwizard.delete_confirm'),
+            onConfirm: onDestroy, errorOf: (err) => describeError(t, err, 'mixcancel.error'),
+          }
+        })() : null,
       } : null}
     >
       {/* Os 4 passos ficam montados e só se mostra um: o autocompletar do
