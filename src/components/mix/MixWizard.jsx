@@ -94,6 +94,20 @@ export default function MixWizard({
     return null
   })()
 
+  // Editar: «Guardar» em qualquer passo (30 set) — por isso vê o que falta
+  // em TODOS os passos, não só no que está à vista.
+  const [initialForm] = useState(() => JSON.stringify(form))
+  const missingAny = (() => {
+    if (!form.title.trim()) return t('mixwizard.missing_title')
+    if (!form.date) return t('mixwizard.missing_date')
+    if (new Date(form.date) < new Date()
+        && !(editingGame?.date && new Date(editingGame.date).getTime() === new Date(form.date).getTime())) return t('mixwizard.date_in_past')
+    if (rec.enabled && !(parseInt(rec.launchDaysBefore, 10) >= 1)) return t('gerirclube.validate_launch_days_before')
+    if (rec.enabled && rec.endsType === 'on_date' && !rec.endsOn) return t('gerirclube.validate_end_date')
+    if (rec.enabled && rec.endsType === 'after_occurrences' && !(parseInt(rec.endsAfterOccurrences, 10) >= 1)) return t('gerirclube.validate_occurrences_count')
+    return null
+  })()
+
   const back = () => (step === 1 ? onCancel() : setStep(step - 1))
   const next = () => { if (!missing) { setStep(step + 1); window.scrollTo?.(0, 0) } }
   const submit = async (asDraft) => {
@@ -149,7 +163,11 @@ export default function MixWizard({
       nextDisabled={!!missing}
       nextHint={missing}
       footer={footer}
-      error={step === 4 ? error : ''}
+      error={editingGame ? error : step === 4 ? error : ''}
+      edit={editingGame ? {
+        onSave: () => submit(false), onCancel, dirty: JSON.stringify(form) !== initialForm,
+        saving: busy, saveDisabled: !!missingAny, saveHint: missingAny,
+      } : null}
     >
       {/* Os 4 passos ficam montados e só se mostra um: o autocompletar do
           local liga-se ao campo mal a página abre, e nada se perde a voltar. */}

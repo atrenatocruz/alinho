@@ -82,6 +82,10 @@ export default function FriendRounds({ match, games, invitees, players, iAmCreat
           </div>
         ))}
         {line && <p className="mt-1.5 text-xs tabular-nums text-ink-700">{line}</p>}
+        {/* Um empate grava-se e fica como amigável, sem pontos (Francisco, 30 set, REGRAS.md ponto 4). */}
+        {hasResult(g) && g.winner_team === 'draw' && (
+          <span className="mt-1.5 inline-block rounded-full bg-ink-50 px-2 py-0.5 text-[11px] font-extrabold text-ink-700">{t('gamedetails.badge_friendly')}</span>
+        )}
         {hasAnon(g) ? <p className="mt-1 text-xs text-muted">{t('friends.anon_no_ranking')}</p>
           : hasResult(g) && !g.counts && g.waiting_for?.length > 0 && (
             <p className="mt-1 text-xs text-muted">{t('friends.counts_when', { names: g.waiting_for.map((w) => String(w.name || '').split(/\s+/)[0]).join(', ') })}</p>

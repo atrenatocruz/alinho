@@ -106,6 +106,10 @@ export default function CreateOpenSlots({ edit = null }) {
     navigate(`/gerir/${slug}`)
   }
 
+  // Editar: «Cancelar» pergunta se há alterações por guardar (30 set).
+  const [initialSnap] = useState(() => JSON.stringify([initial?.date || '', initial?.ranges || [], initial?.price || '']))
+  const dirty = edit && (JSON.stringify([date, ranges, price]) !== initialSnap)
+
   const saveEdit = async () => {
     setError('')
     let slots
@@ -149,6 +153,10 @@ export default function CreateOpenSlots({ edit = null }) {
       nextDisabled={!date || validRanges.length === 0}
       nextHint={t('open_slots.error_missing_fields')}
       error={error}
+      edit={edit ? {
+        onSave: saveEdit, onCancel: goBack, dirty, saving,
+        saveDisabled: !date || validRanges.length === 0, saveHint: t('open_slots.error_missing_fields'),
+      } : null}
       footer={step === 2 ? (
         edit ? (
           <PrimaryButton onClick={saveEdit} disabled={saving} className="w-full">{t('open_slots.edit_save')}</PrimaryButton>

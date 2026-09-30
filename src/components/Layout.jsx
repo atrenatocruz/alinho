@@ -839,8 +839,10 @@ export default function Layout({ children }) {
           — see the app-shell comment above — so it still overlaps the
           bottom of the scrolled content instead of sitting in a blank strip
           below it. */}
+      {/* app-nav: some nas páginas por passos (criar e editar; designer, 30 set)
+          — o StepPage marca o body com data-steps enquanto está aberto. */}
       <nav
-        className="absolute inset-x-0 bottom-0 z-20 flex justify-center pointer-events-none px-4 pt-2"
+        className="app-nav absolute inset-x-0 bottom-0 z-20 flex justify-center pointer-events-none px-4 pt-2"
         style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
       >
         <div
