@@ -262,25 +262,17 @@ function PodiumCard({ game, duplas, winnerTeamId }) {
 // typical mix's worth of duplas.
 const DUPLAS_COMPACT_THRESHOLD = 5
 
-// align="end" (the team on the left of "vs") reverses each row so the
-// avatar — fixed-size, unlike the name — sits flush against "vs" at a
-// constant offset. Right-justifying the row as a whole instead (an
-// earlier attempt) broke down here: a two-line wrapped name gives that
-// row a different total cluster width than a one-line row, so the
-// avatars stopped lining up vertically between the two rows of the same
-// team. Anchoring on the avatar side keeps both rows' avatars at the
-// same x regardless of how the name wraps.
-function DuplaPlayers({ team, compact, avatarSize, align = 'start' }) {
+function DuplaPlayers({ team, compact, avatarSize }) {
   return (
     <div className={`${compact ? 'space-y-1' : 'space-y-1.5'} w-full`}>
       {[team?.player1, team?.player2].map((player, idx) => (
         <div
           key={player?.id || idx}
-          className={`flex items-center gap-2 min-w-0 w-full ${align === 'end' ? 'flex-row-reverse' : ''}`}
+          className="flex items-center gap-2 min-w-0 w-full"
         >
           <CardAvatar name={player?.name} url={player?.avatar_url} size={avatarSize} />
           <span
-            className={`text-white font-extrabold leading-tight min-w-0 ${compact ? 'text-[12px]' : 'text-sm'} ${align === 'end' ? 'text-right' : ''}`}
+            className={`text-white font-extrabold leading-tight min-w-0 ${compact ? 'text-[12px]' : 'text-sm'}`}
           >
             {player?.name || '?'}
           </span>
@@ -290,24 +282,15 @@ function DuplaPlayers({ team, compact, avatarSize, align = 'start' }) {
   )
 }
 
-// Grouped by court by list position (1st & 2nd dupla → court 1, 3rd & 4th
-// → court 2, ...) rather than seed_ranking — seed_ranking is set once when
-// duplas are formed and never updated by a manual admin swap, so sorting by
-// it here would show a different (stale) pairing than the app's own Duplas
-// view, which pairs the same way. A leftover unpaired dupla (odd count) is
-// dropped, since the card can't show a dupla with no opponent.
+// Só a lista das duplas, pela ordem do ecrã (Francisco, 1 out): Dupla 1,
+// Dupla 2… com os dois nomes, sem campos nem «vs». Os jogos são os da
+// Ronda 1, sorteados à parte (seedCourts/roundRobin); pôr as duplas em
+// campos pela ordem da lista anunciava jogos que não eram esses (A2N M3).
+// Com número ímpar de duplas aparecem todas.
 function DuplasCard({ game, duplas }) {
   const { t } = useTranslation()
   const compact = duplas.length >= DUPLAS_COMPACT_THRESHOLD
   const avatarSize = compact ? 22 : 34
-  const numCourts = game.num_courts || Math.ceil(duplas.length / 2)
-  const teamById = Object.fromEntries(duplas.map(d => [d.id, d]))
-  const courtMatches = []
-  for (let c = 1; c <= numCourts; c++) {
-    const a = duplas[(c - 1) * 2]
-    const b = duplas[(c - 1) * 2 + 1]
-    if (a && b) courtMatches.push({ court_number: c, team_a_id: a.id, team_b_id: b.id })
-  }
 
   return (
     <CardShell autoHeight>
@@ -321,26 +304,14 @@ function DuplasCard({ game, duplas }) {
         <p className="text-[15px] text-ink-200 font-semibold">{game.location}</p>
       )}
       <div className={`${compact ? 'space-y-1.5 mt-4' : 'space-y-3 mt-8'} flex-1 overflow-hidden`}>
-        {courtMatches.map((m) => {
-          const a = teamById[m.team_a_id]
-          const b = teamById[m.team_b_id]
-          return (
-            <div key={m.court_number} className={`rounded-2xl bg-white/5 ${compact ? 'px-3 py-2.5' : 'px-4 py-3.5'}`}>
-              <p className={`font-mono font-extrabold uppercase tracking-wide text-lime-400 ${compact ? 'text-[9px] mb-1.5' : 'text-[11px] mb-2'}`}>
-                {t('sharecard.court_label', { number: m.court_number })}
-              </p>
-              <div className="flex items-center">
-                <div className="flex-1 min-w-0">
-                  <DuplaPlayers team={a} compact={compact} avatarSize={avatarSize} align="end" />
-                </div>
-                <p className={`shrink-0 font-extrabold text-ink-200 ${compact ? 'text-[10px] px-1.5' : 'text-xs px-2'}`}>{t('sharecard.vs')}</p>
-                <div className="flex-1 min-w-0">
-                  <DuplaPlayers team={b} compact={compact} avatarSize={avatarSize} />
-                </div>
-              </div>
-            </div>
-          )
-        })}
+        {duplas.map((d, i) => (
+          <div key={d.id} className={`rounded-2xl bg-white/5 ${compact ? 'px-3 py-2.5' : 'px-4 py-3.5'}`}>
+            <p className={`font-mono font-extrabold uppercase tracking-wide text-lime-400 ${compact ? 'text-[9px] mb-1.5' : 'text-[11px] mb-2'}`}>
+              {t('gamedetails.dupla_number', { number: i + 1 })}
+            </p>
+            <DuplaPlayers team={d} compact={compact} avatarSize={avatarSize} />
+          </div>
+        ))}
       </div>
       <LogoFooter />
     </CardShell>
