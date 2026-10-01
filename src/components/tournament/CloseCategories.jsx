@@ -13,6 +13,8 @@
 //   · NÃO há botão de fechar o torneio: fecha sozinho quando fecha a última
 //     categoria, e a barra di-lo.
 import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { tiedMatch } from '../../lib/tournamentScore'
 import { useTranslation } from 'react-i18next'
 import { finishCategory } from '../../lib/tournamentApi'
 import {
@@ -22,6 +24,7 @@ import {
 import { describeError } from '../../lib/errors'
 import { ConfirmSheet, Select } from '../ui'
 import { MonoLabel } from './TournamentBits'
+import { boardChanged } from './useCategoryBoard'
 
 const DRAWN = ['sorteada', 'a_decorrer']
 const OPEN_MATCH = ['marcado', 'a_decorrer']
@@ -42,6 +45,9 @@ export function closeStatus(category, board) {
   const { groups = [], matches = [] } = board || {}
   const pending = matches.filter((m) => m.entry_a_id && m.entry_b_id && OPEN_MATCH.includes(m.status)).length
   if (pending > 0) return { kind: 'pending', pending }
+  // Um jogo empatado: grava-se, mas não se fecha a categoria (30 set).
+  const tie = tiedMatch(matches)
+  if (tie) return { kind: 'tied', matchId: tie.id }
 
   const final = matches
     .filter((m) => m.stage === 'principal' && m.round === 'F')
@@ -87,6 +93,9 @@ export function bracketStatus(category, board) {
   const started = matches.some((m) => m.stage !== 'grupo' && (FINISHED.includes(m.status) || m.winner_entry_id))
   if (slots.every(Boolean)) return { kind: 'filled', canUndo: !started }
   if (!q.ready) return { kind: 'groups_running', pending: q.pending }
+  // Um jogo de grupo empatado: não se passa ao quadro (30 set).
+  const tie = tiedMatch(matches.filter((m) => m.stage === 'grupo'))
+  if (tie) return { kind: 'tied', matchId: tie.id }
   // Empate que as regras não desfazem, e que mexe em quem passa: não se
   // passa ninguém ao acaso (`ties`, Dev 3 — sem o campo, não há empates).
   return { kind: 'to_fill', qualified: q.qualified, ties: q.ties || [] }
@@ -134,7 +143,7 @@ function PodiumPicker({ value, onChange, entries, t }) {
   )
 }
 
-function CategoryRow({ category, board, onClosed }) {
+function CategoryRow({ category, board, slug, onClosed }) {
   const { t } = useTranslation()
   const status = closeStatus(category, board)
   const bracket = bracketStatus(category, board)
@@ -156,6 +165,7 @@ function CategoryRow({ category, board, onClosed }) {
         champion: podium[0], runnerUp: podium[1], third: podium[2],
       })
       setOpen(false)
+      boardChanged(category.id)
       onClosed?.()
     } catch (err) {
       console.error('Error closing category:', err)
@@ -167,10 +177,12 @@ function CategoryRow({ category, board, onClosed }) {
 
   const fill = async () => {
     await fillBracketFromGroups(category.id, bracket.qualified)
+    boardChanged(category.id)
     onClosed?.()
   }
   const undo = async () => {
     await clearBracketFromGroups(category.id)
+    boardChanged(category.id)
     onClosed?.()
   }
   const toFill = bracket?.kind === 'to_fill'
@@ -185,6 +197,7 @@ function CategoryRow({ category, board, onClosed }) {
     not_drawn: <span className="text-xs text-ink-500">{t('tournament.close.not_drawn')}</span>,
     pending: <span className="text-xs text-ink-500">{t('tournament.close.pending', { count: status.pending })}</span>,
     final_unplayed: <span className="text-xs text-ink-500">{t('tournament.close.final_unplayed')}</span>,
+    tied: null,
     ready: !open && (
       <button type="button" onClick={() => setOpen(true)}
         className="inline-flex min-h-[48px] items-center justify-center gap-1.5 rounded-ctrl bg-ink-900 px-5 text-base font-extrabold text-white">
@@ -201,6 +214,15 @@ function CategoryRow({ category, board, onClosed }) {
         </span>
         {right}
       </div>
+
+      {/* Um jogo empatado grava-se, mas trava o passo seguinte; o toque leva a
+          esse jogo no ecrã de marcar (REGRAS.md ponto 4, Francisco, 30 set). */}
+      {status.kind === 'tied' && (
+        <Link to={`/torneio/${slug}/marcar?jogo=${status.matchId}`}
+          className="mt-0.5 flex min-h-[44px] items-center text-xs font-bold text-warning underline underline-offset-2">
+          {t('tournament.close.tied')}
+        </Link>
+      )}
 
       {/* Quadro já preenchido: diz-se, e desfaz-se até ao 1.º resultado. */}
       {bracket?.kind === 'filled' && status.kind !== 'closed' && (
@@ -326,7 +348,7 @@ export default function CloseCategories({ tournament, onChanged, onReady }) {
       <MonoLabel>{t('tournament.close.title')}</MonoLabel>
       <ul className="divide-y divide-line">
         {rows.map(({ category, board }) => (
-          <CategoryRow key={category.id} category={category} board={board}
+          <CategoryRow key={category.id} category={category} board={board} slug={tournament.slug || tournament.id}
             onClosed={() => { load(); onChanged?.() }} />
         ))}
       </ul>

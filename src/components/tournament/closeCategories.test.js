@@ -95,3 +95,10 @@ describe('bracketStatus — grupos para o quadro (#484)', () => {
     expect(bracketStatus(cat, { groups, matches: [...groupMatches, ...played] })).toEqual({ kind: 'filled', canUndo: false })
   })
 })
+
+describe('um jogo empatado trava o fecho (30 set)', () => {
+  it('closeStatus diz tied e aponta o jogo', () => {
+    const board = { groups: [{ id: 'g1' }], matches: [m({ id: 'x1' }), m({ id: 'x2', score_a: 5, score_b: 5, winner_entry_id: null })] }
+    expect(closeStatus(drawn, board)).toEqual({ kind: 'tied', matchId: 'x2' })
+  })
+})

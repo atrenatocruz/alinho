@@ -104,3 +104,26 @@ describe('o terceiro set', () => {
     expect(needsDecider([set(6, 4), set(3, 6), set(10, 8)])).toBe(true)
   })
 })
+
+// REGRAS.md ponto 4 (Francisco, 30 set): «não bloqueamos, simplesmente
+// avisamos» — o empate grava-se e trava só o passo seguinte.
+describe('empates no torneio', () => {
+  it('o empate é aviso, não bloqueio', async () => {
+    const { blocksSave } = await import('./tournamentScore')
+    expect(resultProblem('pro_set_9', { score_a: 5, score_b: 5 })).toBe('tie')
+    expect(resultProblem('melhor_3_sets', { score_a: 1, score_b: 1 })).toBe('tie')
+    expect(blocksSave('tie')).toBe(false)
+    expect(blocksSave('short')).toBe(true)
+    expect(blocksSave(null)).toBe(false)
+  })
+  it('tiedMatch encontra o jogo acabado empatado', async () => {
+    const { tiedMatch } = await import('./tournamentScore')
+    const list = [
+      { id: 1, status: 'terminado', score_a: 9, score_b: 5 },
+      { id: 2, status: 'marcado', score_a: null, score_b: null },
+      { id: 3, status: 'terminado', score_a: 5, score_b: 5 },
+    ]
+    expect(tiedMatch(list)?.id).toBe(3)
+    expect(tiedMatch(list.slice(0, 2))).toBe(null)
+  })
+})

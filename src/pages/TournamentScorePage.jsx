@@ -6,7 +6,7 @@
 // É usado de pé, no clube, com uma mão: os números são grandes, os botões
 // são três, e não há menus escondidos.
 import { useCallback, useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { BackBar } from '../components/ui'
 import { sourceText } from '../components/tournament/sourceText'
@@ -14,7 +14,7 @@ import { ArrowLeft, Trophy } from 'lucide-react'
 import { useGoBack } from '../lib/useGoBack'
 import { getTournamentPage, getTournamentForEdit, listMatchesToScore, markWalkover, saveMatchResult, undoWalkover, resolveMatchCorrection } from '../lib/tournamentApi'
 import { saveMatchSchedule } from '../lib/tournamentDraw'
-import { needsDecider, resultProblem } from '../lib/tournamentScore'
+import { blocksSave, needsDecider, resultProblem } from '../lib/tournamentScore'
 import { computeSetsResult } from '../lib/scoringLogic'
 import { describeError, errorKind } from '../lib/errors'
 import { dayKeyInTz, msUntilNextDay, hhmmInTz } from '../lib/tournamentDay'
@@ -200,6 +200,14 @@ function CourtCard({ match, scoring, tieTarget = 7, onSave, onWalkover, onUndoWa
   }
 
   const save = () => {
+    // 8-8 sem tie-break (acabou o tempo): grava-se empatado, com o aviso
+    // (UX, 30 set — «não bloqueamos, simplesmente avisamos»).
+    if (eightAll && tbA === '' && tbB === '') {
+      setProblem(null)
+      onSave(match, { score_a: 8, score_b: 8 }, finished)
+      setEditing(false)
+      return
+    }
     const tb = tieProblem()
     if (tb) { setProblem(tb); return }
     const input = bySets
@@ -218,8 +226,9 @@ function CourtCard({ match, scoring, tieTarget = 7, onSave, onWalkover, onUndoWa
     // 9-8 com o tie-break escrito é um fim válido de pro set.
     // #588: por sets, cada set com a regra única (um 9-2 já não passa).
     const p = askTieBreak ? null : bySets ? setsResultProblem(scoring, input) : resultProblem(scoring, input)
-    setProblem(p)
-    if (p) return
+    // O empate grava-se; o aviso fica no cartão do jogo (REGRAS.md ponto 4).
+    setProblem(blocksSave(p) ? p : null)
+    if (blocksSave(p)) return
     onSave(match, input, finished)
     setEditing(false)
   }
@@ -236,6 +245,9 @@ function CourtCard({ match, scoring, tieTarget = 7, onSave, onWalkover, onUndoWa
             : <StatePill tone={finished ? 'grey' : 'dark'}>{t(`tournament.score.status_${match.status}`)}</StatePill>}
       </div>
       <p className="mt-0.5 text-xs text-ink-500">{match.team_a?.name} × {match.team_b?.name}</p>
+      {finished && match.score_a != null && match.score_a === match.score_b && (
+        <p className="mt-1 text-xs font-bold text-warning">{t('tournament.score.problem_tie')}</p>
+      )}
 
       {editing ? (
         <>
@@ -475,6 +487,15 @@ export default function TournamentScorePage() {
   }, [id, today])
 
   useEffect(() => { load() }, [load])
+  const [searchParams] = useSearchParams()
+  const wanted = searchParams.get('jogo')
+  useEffect(() => {
+    const m = wanted && (allMatches || []).find((x) => String(x.match_id) === wanted)
+    if (!m) return undefined
+    if (m.scheduled_at) setDay(dayKeyInTz(new Date(m.scheduled_at)))
+    const timer = setTimeout(() => document.getElementById(`jogo-${m.match_id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 200)
+    return () => clearTimeout(timer)
+  }, [wanted, allMatches])
 
   const scoring = tournament?.rules?.scoring || 'pro_set_9'
   const tieTarget = proSetTieBreakTarget(tournament?.rules)
