@@ -323,6 +323,13 @@ const RPC_MOCKS = {
   },
   // Confirmar o número pelo WhatsApp (#537): um código de teste.
   start_phone_verification: () => [{ code: '482917', expires_at: new Date(Date.now() + 15 * 60000).toISOString() }],
+  // O código do mock é sempre 482917; confirmar marca o perfil mock como
+  // confirmado (localStorage) para o cartão desaparecer.
+  confirm_phone_with_code: (args) => {
+    if ((args?.p_code || '') !== '482917') return { ok: false, reason: 'code' }
+    try { localStorage.setItem('mockPhoneConfirmed', 'true') } catch { /* modo privado */ }
+    return { ok: true, adopted: 0, via: 'sms' }
+  },
   // Convidados sem conta (migration_mix_guest_sem_conta.sql): no modo dev
   // devolve-se só um id — a lista não reflete o convidado, mas o fluxo
   // fecha sem erro.
@@ -1607,6 +1614,13 @@ export function installDevMockNetwork() {
         return jsonResponse({ created: [], existing: [{ name: p.name, status: 'invited' }], failed: [] })
       }
       return jsonResponse({ created: [{ name: p.name, user_id: 'ffffffff-ffff-ffff-ffff-ffffffffffff' }], existing: [], failed: [] })
+    }
+
+    // OTP por SMS (migration_otp_sms.sql): em localhost não há Twilio — o
+    // envio «funciona» sempre e o código certo é o 482917 (o mesmo do mock
+    // do start_phone_verification).
+    if (url && url.includes('/functions/v1/send-otp')) {
+      return jsonResponse({ ok: true, expires_at: new Date(Date.now() + 15 * 60000).toISOString() })
     }
 
     if (url && url.includes('/functions/v1/join-with-named-partner')) {

@@ -3,22 +3,22 @@ import { useTranslation } from 'react-i18next'
 import { MessageCircle, CheckCircle2, RefreshCw, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { hashPhone } from '../lib/hashPhone'
-import { WHATSAPP_NUMBER } from '../lib/contacts'
 
-/* Associar e confirmar o número pelo WhatsApp, num cartão só (#537 na base
-   de dados; workflow completo desde migration_mix_guest_sem_conta.sql).
+/* Associar e confirmar o número por SMS, num cartão só (OTP clássico —
+   decisão Ruben, 1 out 2026; substitui o fluxo invertido do #537 de mandar
+   o código ao robô, que fica como alternativa só no lado do bot).
 
-   Porquê: só números CONFIRMADOS contam para o match do «In» no bot. Quem
-   associou o número antes da migração ficou confirmado de raiz
-   (grandfathering); uma conta nova tem de associar E confirmar — senão o
-   «In» dela entra como convidado sem conta (e só é adotado ao confirmar).
+   Porquê: só números CONFIRMADOS contam para o match do «In» no bot
+   (migration_mix_guest_sem_conta.sql). Quem associou antes da migração
+   ficou confirmado de raiz; uma conta nova associa e confirma aqui.
 
-   Dois passos no mesmo cartão:
-   1. Sem número: escreve-o aqui (só o hash é guardado — hash-phone edge fn).
-   2. Por confirmar: pede um código (start_phone_verification, 15 min, 5/h),
-      manda-o numa mensagem PRIVADA ao robô a partir do próprio telemóvel
-      (deep-link wa.me já com o código escrito) e carrega em «Já enviei».
+   Dois passos:
+   1. Número → edge function send-otp: grava só o hash (o número cru nunca
+      é guardado), gera o código (start_phone_verification, 15 min, 5/h) e
+      envia-o por SMS — o código nunca passa pelo browser.
+   2. Código de 6 dígitos → RPC confirm_phone_with_code (máx. 5 tentativas
+      por pedido) → confirmado, e as inscrições-convidado em mixes abertos
+      feitas com este número passam para a conta.
 
    `dismissible`: na Home o cartão é um lembrete — dá para fechar até à
    próxima sessão. Na Informação Pessoal fica sempre. */
@@ -26,12 +26,12 @@ const DISMISS_KEY = 'confirmPhoneCard.dismissed'
 
 export default function ConfirmPhoneCard({ compact = false, dismissible = false }) {
   const { t } = useTranslation()
-  const { profile, updateProfile, retryProfile } = useAuth()
+  const { profile, retryProfile } = useAuth()
+  const [step, setStep] = useState('phone') // 'phone' | 'code'
   const [phone, setPhone] = useState('')
-  const [code, setCode] = useState(null)
+  const [code, setCode] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  const [notYet, setNotYet] = useState(false)
   const [dismissed, setDismissed] = useState(() => {
     try { return sessionStorage.getItem(DISMISS_KEY) === 'true' } catch { return false }
   })
@@ -40,69 +40,68 @@ export default function ConfirmPhoneCard({ compact = false, dismissible = false 
   if (!profile || profile.phone_verified_at || profile.phone_hash === 'dev-bypass') return null
   if (dismissible && dismissed) return null
 
-  const hasNumber = Boolean(profile.phone_hash)
-
   const dismiss = () => {
     setDismissed(true)
     try { sessionStorage.setItem(DISMISS_KEY, 'true') } catch { /* modo privado */ }
   }
 
-  const savePhone = async () => {
+  const sendCode = async () => {
     if (phone.replace(/\D/g, '').length < 9) {
       setError(t('login.error_invalid_phone'))
       return
     }
     setBusy(true)
     setError('')
-    let step = 'hash-phone'
     try {
-      const hash = await hashPhone(phone)
-      step = 'perfil'
-      const { error: updateError } = await updateProfile({ phone_hash: hash })
-      if (updateError) throw updateError
-      // O perfil do contexto recarrega com o hash → o cartão passa ao
-      // passo 2 sozinho; pede-se já o código para poupar um toque.
-      await askCode()
-      retryProfile()
+      const { error: fnError } = await supabase.functions.invoke('send-otp', { body: { phone } })
+      if (fnError) {
+        // O corpo da resposta diz porquê (invalid_phone, sms_failed, a
+        // mensagem do limite 5/h do RPC…) — o FunctionsHttpError esconde-o
+        // em context.
+        let reason = null
+        try { reason = (await fnError.context?.json())?.error ?? null } catch { /* sem corpo */ }
+        console.error('send-otp failed:', reason || fnError)
+        if (reason === 'invalid_phone') setError(t('login.error_invalid_phone'))
+        else if (reason && /código|codigo|espera/i.test(reason)) setError(reason)
+        else setError(t('phoneconfirm.error_send') + (reason ? ` (${reason})` : ''))
+        return
+      }
+      setCode('')
+      setStep('code')
     } catch (err) {
-      console.error(`Error saving phone number (${step}):`, err)
-      // O detalhe entre parêntesis é curto e raro — vale mais para o
-      // suporte do que a estética de o esconder (ex.: «hash-phone: Edge
-      // Function returned a non-2xx status code» aponta logo ao segredo
-      // PHONE_HASH_SECRET em falta no projeto Supabase).
-      const detail = err?.message ? ` (${step}: ${err.message})` : ` (${step})`
-      setError(t('phoneconfirm.error_generic') + detail)
+      console.error('send-otp failed:', err)
+      setError(t('phoneconfirm.error_send'))
     } finally {
       setBusy(false)
     }
   }
 
-  const askCode = async () => {
+  const confirmCode = async () => {
+    if (code.trim().length !== 6) {
+      setError(t('phoneconfirm.error_wrong_code'))
+      return
+    }
     setBusy(true)
     setError('')
-    setNotYet(false)
     try {
-      const { data, error: rpcError } = await supabase.rpc('start_phone_verification')
+      const { data, error: rpcError } = await supabase.rpc('confirm_phone_with_code', { p_code: code.trim() })
       if (rpcError) throw rpcError
-      setCode(data?.[0]?.code ?? null)
-    } catch (err) {
-      console.error('Error starting phone verification:', err)
-      setError(err?.message || t('phoneconfirm.error_generic'))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const checkConfirmed = async () => {
-    setBusy(true)
-    setNotYet(false)
-    try {
-      const { data } = await supabase.from('profiles').select('phone_verified_at').eq('id', profile.id).single()
-      if (data?.phone_verified_at) {
+      if (data?.ok) {
         retryProfile()
-      } else {
-        setNotYet(true)
+        return
       }
+      if (data?.reason === 'too_many') {
+        setError(t('phoneconfirm.error_too_many'))
+        setStep('phone')
+      } else if (data?.reason === 'phone_changed') {
+        setError(t('phoneconfirm.error_phone_changed'))
+        setStep('phone')
+      } else {
+        setError(t('phoneconfirm.error_wrong_code'))
+      }
+    } catch (err) {
+      console.error('confirm_phone_with_code failed:', err)
+      setError(t('phoneconfirm.error_generic'))
     } finally {
       setBusy(false)
     }
@@ -123,12 +122,13 @@ export default function ConfirmPhoneCard({ compact = false, dismissible = false 
         </button>
       )}
       <p className="flex items-center gap-2 text-sm font-extrabold text-ink-900 pr-7">
-        <MessageCircle size={16} className="text-lime-600" />
-        {hasNumber ? t('phoneconfirm.title') : t('phoneconfirm.title_link')}
+        <MessageCircle size={16} className="text-lime-600" /> {t('phoneconfirm.title_sms')}
       </p>
-      <p className="mt-1 text-xs text-muted">{hasNumber ? t('phoneconfirm.body') : t('phoneconfirm.body_link')}</p>
+      <p className="mt-1 text-xs text-muted">
+        {step === 'phone' ? t('phoneconfirm.body_sms') : t('phoneconfirm.body_code')}
+      </p>
 
-      {!hasNumber && !code ? (
+      {step === 'phone' ? (
         <div className="mt-2.5 flex flex-wrap items-center gap-2">
           <input
             type="tel"
@@ -138,33 +138,31 @@ export default function ConfirmPhoneCard({ compact = false, dismissible = false 
             placeholder={t('login.phone_placeholder')}
             className="input-field flex-1 min-w-[12rem]"
           />
-          <button onClick={savePhone} disabled={busy} className={`${pillButton} bg-lime-400 text-ink-900 hover:bg-lime-600`}>
-            {busy ? <RefreshCw size={14} className="animate-spin" /> : null} {t('phoneconfirm.save_number')}
+          <button onClick={sendCode} disabled={busy} className={`${pillButton} bg-lime-400 text-ink-900 hover:bg-lime-600`}>
+            {busy ? <RefreshCw size={14} className="animate-spin" /> : <MessageCircle size={14} />} {t('phoneconfirm.send_code')}
           </button>
         </div>
-      ) : !code ? (
-        <button onClick={askCode} disabled={busy} className={`mt-2.5 ${pillButton} bg-lime-400 text-ink-900 hover:bg-lime-600`}>
-          {t('phoneconfirm.get_code')}
-        </button>
       ) : (
         <div className="mt-2.5 space-y-2">
-          <p className="text-xs text-ink-700">
-            {t('phoneconfirm.code_ready')} <span className="font-mono font-extrabold text-ink-900 tabular-nums">{code}</span>
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <a
-              href={`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(code)}`}
-              target="_blank"
-              rel="noreferrer"
-              className={`${pillButton} bg-lime-400 text-ink-900 hover:bg-lime-600`}
-            >
-              <MessageCircle size={14} /> {t('phoneconfirm.send_whatsapp')}
-            </a>
-            <button onClick={checkConfirmed} disabled={busy} className={`${pillButton} bg-white border border-line text-ink-900 hover:bg-ink-200/40`}>
-              {busy ? <RefreshCw size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} {t('phoneconfirm.sent')}
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+              placeholder={t('phoneconfirm.code_placeholder')}
+              className="input-field w-32 font-mono tracking-[0.3em] text-center tabular-nums"
+              autoFocus
+            />
+            <button onClick={confirmCode} disabled={busy || code.length !== 6} className={`${pillButton} bg-lime-400 text-ink-900 hover:bg-lime-600`}>
+              {busy ? <RefreshCw size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} {t('phoneconfirm.confirm_code')}
             </button>
           </div>
-          {notYet && <p className="text-xs text-muted">{t('phoneconfirm.not_yet')}</p>}
+          <button type="button" onClick={sendCode} disabled={busy} className="text-xs font-extrabold text-muted hover:text-ink-900">
+            {t('phoneconfirm.resend')}
+          </button>
         </div>
       )}
       {error && <p className="mt-2 text-xs text-danger font-extrabold">{error}</p>}
