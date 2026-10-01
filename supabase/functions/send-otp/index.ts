@@ -110,13 +110,19 @@ Deno.serve(async (req) => {
   // e o cartão preenche-o sozinho. Devolver o código ao browser anula a
   // prova de posse do número, por isso isto NUNCA se liga em produção.
   const devMode = Deno.env.get('OTP_DEV_MODE') === 'true'
+  // Fornecedor escolhido pelos secrets presentes: Vonage (trial com texto
+  // livre — €2 de crédito, 5 números whitelisted) ou Twilio (produção).
+  const vonageKey = Deno.env.get('VONAGE_API_KEY')
+  const vonageSecret = Deno.env.get('VONAGE_API_SECRET')
+  const vonageFrom = Deno.env.get('VONAGE_FROM') || 'Alinho'
+  const useVonage = Boolean(vonageKey && vonageSecret)
   const twilioSid = Deno.env.get('TWILIO_ACCOUNT_SID')
   const twilioToken = Deno.env.get('TWILIO_AUTH_TOKEN')
   const twilioFrom = Deno.env.get('TWILIO_FROM')
-  if (!secret || (!devMode && (!twilioSid || !twilioToken || !twilioFrom))) {
+  if (!secret || (!devMode && !useVonage && (!twilioSid || !twilioToken || !twilioFrom))) {
     console.error('send-otp misconfigured: faltam secrets', {
-      PHONE_HASH_SECRET: !secret, OTP_DEV_MODE: devMode, TWILIO_ACCOUNT_SID: !twilioSid,
-      TWILIO_AUTH_TOKEN: !twilioToken, TWILIO_FROM: !twilioFrom,
+      PHONE_HASH_SECRET: !secret, OTP_DEV_MODE: devMode, VONAGE: useVonage,
+      TWILIO_ACCOUNT_SID: !twilioSid, TWILIO_AUTH_TOKEN: !twilioToken, TWILIO_FROM: !twilioFrom,
     })
     return jsonResponse({ error: 'server_misconfigured' }, 500)
   }
@@ -162,8 +168,33 @@ Deno.serve(async (req) => {
     return jsonResponse({ ok: true, expires_at: expiresAt, dev_code: code })
   }
 
-  // SMS via Twilio Messages API (form-encoded, Basic auth).
   const smsBody = `${code} é o teu código alinho. Expira em 15 minutos.`
+
+  if (useVonage) {
+    // Vonage SMS API (JSON; `to` em dígitos E.164 SEM o +). No trial o
+    // destino tem de estar na lista de test numbers e a mensagem leva o
+    // sufixo «[FREE SMS DEMO, TEST MESSAGE]» — cosmético.
+    const vonageResponse = await fetch('https://rest.nexmo.com/sms/json', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        api_key: vonageKey,
+        api_secret: vonageSecret,
+        from: vonageFrom,
+        to: toE164(body.phone || '').slice(1),
+        text: smsBody,
+      }),
+    })
+    const result = await vonageResponse.json().catch(() => null)
+    const status = result?.messages?.[0]?.status
+    if (!vonageResponse.ok || status !== '0') {
+      console.error('send-otp: Vonage falhou:', vonageResponse.status, JSON.stringify(result)?.slice(0, 300))
+      return jsonResponse({ error: 'sms_failed' }, 502)
+    }
+    return jsonResponse({ ok: true, expires_at: expiresAt })
+  }
+
+  // SMS via Twilio Messages API (form-encoded, Basic auth).
   const twilioResponse = await fetch(
     `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`,
     {
