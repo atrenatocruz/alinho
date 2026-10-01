@@ -459,7 +459,7 @@
   "phoneconfirm.dev_code_notice": "Modo de teste: o código foi preenchido automaticamente (não saiu SMS nenhum).",
   "phoneconfirm.error_phone_taken": "Esse número já está confirmado noutra conta. Se o número é teu, fala com o suporte (support@alinho.pt).",
   "phoneconfirm.channel_sms": "Receber código por SMS",
-  "phoneconfirm.channel_group": "Confirmar no grupo — grátis",
+  "phoneconfirm.channel_group": "Confirmar no grupo do clube",
   "phoneconfirm.body_group": "No grupo de WhatsApp do teu clube (onde está o robô do alinho), envia a mensagem abaixo do teu telemóvel. O robô reage com ✅ e está feito.",
   "phoneconfirm.group_write": "Escreve no grupo:",
   "phoneconfirm.group_sent": "Já escrevi",

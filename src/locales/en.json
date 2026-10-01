@@ -458,7 +458,7 @@
   "phoneconfirm.dev_code_notice": "Test mode: the code was filled in automatically (no SMS was sent).",
   "phoneconfirm.error_phone_taken": "That number is already confirmed on another account. If it's yours, contact support (support@alinho.pt).",
   "phoneconfirm.channel_sms": "Get a code by SMS",
-  "phoneconfirm.channel_group": "Confirm in the group — free",
+  "phoneconfirm.channel_group": "Confirm in your club's group",
   "phoneconfirm.body_group": "In your club's WhatsApp group (where the alinho bot lives), send the message below from your phone. The bot reacts with ✅ and you're done.",
   "phoneconfirm.group_write": "Write in the group:",
   "phoneconfirm.group_sent": "Sent it",
