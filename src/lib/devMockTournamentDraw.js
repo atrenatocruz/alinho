@@ -68,6 +68,16 @@ const withTie = (list) => (localStorage.getItem('mockTTie') !== 'true' ? list : 
   m.id === 'm2' ? { ...m, score_a: 5, score_b: 5, winner_entry_id: null }
     : m.id === 'm3' ? { ...m, status: 'terminado', score_a: 9, score_b: 4, winner_entry_id: 'e2' } : m)))
 
+// O cartão «O teu próximo jogo» (1 out): mockTMyNext = 'opp' — a final já
+// tem adversário; 'done' — a final já se jogou (sem mais jogos, o cartão sai).
+const withMine = (list) => {
+  const v = localStorage.getItem('mockTMyNext')
+  if (!v || v === 'tbd') return list
+  return list.map((m) => (m.id !== 'm4' ? m
+    : v === 'opp' ? { ...m, entry_b_id: 'e2' }
+      : { ...m, entry_b_id: 'e2', status: 'terminado', score_a: 9, score_b: 5, winner_entry_id: 'e1' }))
+}
+
 const withTieBreaks = (list) => (localStorage.getItem('mockTTbShow') !== 'true' ? list : list.map((m) => (
   m.id === 'm1' ? { ...m, score_a: 9, score_b: 8, sets: [{ score_a: 9, score_b: 8, tiebreak_a: 7, tiebreak_b: 5, is_super_tiebreak: false }] }
     : m.id === 'm4' ? { ...m, entry_b_id: 'e2', status: 'terminado', score_a: 8, score_b: 9, winner_entry_id: 'e2',
@@ -77,7 +87,7 @@ const withTieBreaks = (list) => (localStorage.getItem('mockTTbShow') !== 'true' 
 
 export const TOURNAMENT_DRAW_TABLE_MOCKS = {
   tournament_public_groups: () => (on() ? GROUPS() : []),
-  tournament_public_matches: () => (on() ? withTie(withTieBreaks(MATCHES())) : []),
+  tournament_public_matches: () => (on() ? withMine(withTie(withTieBreaks(MATCHES()))) : []),
 }
 
 /* Os ecrãs do organizador (fechar inscrições, formato, sortear) leem por

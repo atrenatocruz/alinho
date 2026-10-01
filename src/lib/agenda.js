@@ -380,7 +380,10 @@ export function eventFromTournament(row, my = null) {
     endsOn: row.ends_on || null,
     orgId: row.organization_id || null,
     orgName: row.club_name || null,
-    orgKind: 'club',
+    // O tipo da organização, não o plano (Francisco, 30 set: um grupo dizia
+    // «Clube organizador»). Vem da base de dados quando a vista o trouxer;
+    // até lá a Home completa-o com as organizações de quem vê.
+    orgKind: row.club_kind || null,
     orgLogo: row.club_logo_url || null,
     mine: !!my,
     myState: my?.state || null,
@@ -407,7 +410,7 @@ export function eventFromTournamentMatch(match, context = {}) {
     dayKey: startsAt ? toDayKey(startsAt) : null,
     orgId: tournament.organization_id || null,
     orgName: tournament.club_name || null,
-    orgKind: 'club',
+    orgKind: tournament.club_kind || null,
     orgLogo: tournament.club_logo_url || null,
     mine: true,
     myState: done ? 'played' : 'playing',

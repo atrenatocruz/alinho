@@ -47,11 +47,17 @@ export function categoriesLeft(tournament, myEntries = []) {
   return Math.max(0, max - mine)
 }
 
-/* As inscrições estão abertas? Vale o estado do torneio, o da categoria e
-   o prazo — qualquer um deles fecha a porta. */
+/* As inscrições estão abertas? Com uma categoria, vale o estado DELA: o
+   sorteio anda categoria a categoria (#560) e o torneio passa a «sorteado»
+   logo com a primeira — as outras continuam abertas, e a base de dados
+   aceita-as (ensaio do QA, 30 set: o botão sumia nas que ainda estavam
+   abertas). Sem categoria, vale o torneio. O prazo fecha tudo. */
+const TOURNAMENT_TAKES_ENTRIES = ['inscricoes', 'sorteado', 'a_decorrer']
 export function entriesOpen(tournament, category, now = new Date()) {
-  if (tournament?.status !== 'inscricoes') return false
-  if (category && category.status !== 'inscricoes') return false
+  if (category) {
+    if (!TOURNAMENT_TAKES_ENTRIES.includes(tournament?.status)) return false
+    if (category.status !== 'inscricoes') return false
+  } else if (tournament?.status !== 'inscricoes') return false
   if (tournament?.entries_deadline && new Date(tournament.entries_deadline) < now) return false
   return true
 }

@@ -66,6 +66,9 @@ function usePendingCounts(rows) {
 
 export default function ScoreTodayCard({ rows = [], asLink = false }) {
   const { t } = useTranslation()
+  // Grupo ou clube, pelo tipo da organização (30 set).
+  const { memberships } = useAuth()
+  const kindOf = (orgId) => (memberships || []).find((ms) => ms.organization_id === orgId)?.organization?.kind || null
   const counts = usePendingCounts(rows)
   if (rows.length === 0) return null
   const cta = (x) => [t('tournament.score.link_cta'), counts[x.id] > 0 ? t('friends.to_mark', { count: counts[x.id] }) : null]
@@ -92,7 +95,7 @@ export default function ScoreTodayCard({ rows = [], asLink = false }) {
   return (
     <>
       {rows.map((x) => (
-        <TournamentEventCard key={x.id} event={eventFromTournament(x)} footer={(
+        <TournamentEventCard key={x.id} event={{ ...eventFromTournament(x), orgKind: x.club_kind || kindOf(x.organization_id) }} footer={(
           <>
             <Link to={`/torneio/${x.slug || x.id}/marcar`}
               className="press mt-3 flex min-h-[48px] w-full items-center justify-center rounded-ctrl bg-ink-900 px-4 text-sm font-extrabold text-white">
