@@ -14,7 +14,11 @@ export const SUPPORT_EMAIL_READY = true
 // O número do robô (decisão do Francisco, 25 set). O robô ignora as
 // mensagens privadas que não são um código, por isso quem escreve espera por
 // uma pessoa da equipa — a página diz isso por baixo dos botões.
-export const WHATSAPP_NUMBER = '351931386496'
+// Configurável por ambiente (1 out): o dev tem BD e robô próprios — o
+// «Enviar ao robô» da confirmação do número tem de apontar ao robô LIGADO
+// À MESMA BD, senão o código morre em silêncio na BD errada. Em produção
+// a variável não existe e fica o número de sempre.
+export const WHATSAPP_NUMBER = import.meta.env.VITE_WHATSAPP_BOT_NUMBER || '351931386496'
 
 export const mailtoLink = (subject) =>
   `mailto:${SUPPORT_EMAIL}${subject ? `?subject=${encodeURIComponent(subject)}` : ''}`
