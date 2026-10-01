@@ -54,8 +54,10 @@ export default function ConfirmPhoneCard({ compact = false, dismissible = false 
     }
     setBusy(true)
     setError('')
+    let step = 'hash-phone'
     try {
       const hash = await hashPhone(phone)
+      step = 'perfil'
       const { error: updateError } = await updateProfile({ phone_hash: hash })
       if (updateError) throw updateError
       // O perfil do contexto recarrega com o hash → o cartão passa ao
@@ -63,8 +65,13 @@ export default function ConfirmPhoneCard({ compact = false, dismissible = false 
       await askCode()
       retryProfile()
     } catch (err) {
-      console.error('Error saving phone number:', err)
-      setError(t('phoneconfirm.error_generic'))
+      console.error(`Error saving phone number (${step}):`, err)
+      // O detalhe entre parêntesis é curto e raro — vale mais para o
+      // suporte do que a estética de o esconder (ex.: «hash-phone: Edge
+      // Function returned a non-2xx status code» aponta logo ao segredo
+      // PHONE_HASH_SECRET em falta no projeto Supabase).
+      const detail = err?.message ? ` (${step}: ${err.message})` : ` (${step})`
+      setError(t('phoneconfirm.error_generic') + detail)
     } finally {
       setBusy(false)
     }
