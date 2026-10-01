@@ -12,6 +12,7 @@ import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
 import { listIncomingOrganizationInvites, acceptOrganizationInvite, declineOrganizationInvite } from '../lib/orgInvites'
 import { getMyPrivateMatches, privateMatchActions, claimFriendMatchInvitesByEmail } from '../lib/privateMatches'
 import { describeError } from '../lib/errors'
+import ConfirmPhoneCard from './ConfirmPhoneCard'
 import { listMyUnreadNotifications, markNotificationsRead, MIX_NOTICE_KINDS } from '../lib/notifications'
 import { kudosVoters, joinNames, MAX_KUDOS_VOTERS } from '../lib/kudos'
 import { listMyInvites as listMyTournamentInvites } from '../lib/tournamentSignup'
@@ -164,6 +165,21 @@ export default function Layout({ children }) {
   // recuperar. `recovered` esconde-o logo ao recuperar, sem esperar pelo
   // perfil recarregado.
   const [deletionRecovered, setDeletionRecovered] = useState(false)
+
+  // Primeira entrada sem número confirmado (Ruben, 1 out): um modal a
+  // explicar porquê («usas o alinho nos grupos?») com o fluxo OTP embebido
+  // (ConfirmPhoneCard). «Agora não» cala-o PARA SEMPRE — a partir daí fica
+  // só o lembrete dispensável da Home. Guests de clube e o mock de dev não
+  // contam.
+  const [phonePromptDismissed, setPhonePromptDismissed] = useState(() => {
+    try { return localStorage.getItem('phoneConfirmPromptDismissed') === 'true' } catch { return true }
+  })
+  const dismissPhonePrompt = () => {
+    try { localStorage.setItem('phoneConfirmPromptDismissed', 'true') } catch { /* modo privado */ }
+    setPhonePromptDismissed(true)
+  }
+  const needsPhonePrompt = Boolean(profile) && !isGuest && !profile.phone_verified_at
+    && profile.phone_hash !== 'dev-bypass' && !phonePromptDismissed
 
 
   // Celebrações: troféus novos + kudos recebidos desde a última visita.
@@ -842,9 +858,34 @@ export default function Layout({ children }) {
       </nav>
 
 
-      {/* Celebrações depois do phone-prompt na ordem de render, mas só uma
+      {/* Primeira entrada: confirmar o número (uma vez; «Agora não» é
+          definitivo — o lembrete da Home continua lá). */}
+      {needsPhonePrompt && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-ink-900/70 animate-fade-in" onClick={dismissPhonePrompt}>
+          <div className="bg-surface rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-md p-6 animate-pop relative space-y-3" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={dismissPhonePrompt}
+              aria-label={t('layout.close')}
+              className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full text-muted hover:bg-ink-50 hover:text-ink-900 transition-colors duration-fast"
+            >
+              <X size={18} />
+            </button>
+            <h3 className="text-xl text-ink-900 pr-10">{t('layout.phone_prompt_title')}</h3>
+            <p className="text-sm text-muted">{t('layout.phone_prompt_body')}</p>
+            <ConfirmPhoneCard />
+            <button
+              onClick={dismissPhonePrompt}
+              className="w-full text-center text-sm font-extrabold text-muted hover:text-ink-900 min-h-[40px]"
+            >
+              {t('layout.phone_prompt_later')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Celebrações depois do phone-prompt na ordem de render — só uma
           aparece de cada vez na prática (o phone-prompt é dispensável). */}
-      {celebrations.length > 0 && (
+      {celebrations.length > 0 && !needsPhonePrompt && (
         <CelebrationModal items={celebrations} onClose={closeCelebrations} />
       )}
     </div>
