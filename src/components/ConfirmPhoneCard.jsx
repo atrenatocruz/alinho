@@ -23,7 +23,10 @@ import { useAuth } from '../contexts/AuthContext'
    próxima sessão. Na Informação Pessoal fica sempre. */
 const DISMISS_KEY = 'confirmPhoneCard.dismissed'
 
-export default function ConfirmPhoneCard({ compact = false, dismissible = false }) {
+// `bare`: dentro do modal de primeira entrada (Layout), que já tem título
+// e explicação próprios — o cartão larga o cabeçalho e a moldura para não
+// duplicar texto; as instruções dos passos código/grupo mantêm-se.
+export default function ConfirmPhoneCard({ compact = false, dismissible = false, bare = false }) {
   const { t } = useTranslation()
   const { profile, retryProfile } = useAuth()
   const [step, setStep] = useState('phone') // 'phone' | 'code' | 'group'
@@ -140,7 +143,7 @@ export default function ConfirmPhoneCard({ compact = false, dismissible = false 
   const pillButton = 'inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full transition-colors duration-fast disabled:opacity-40'
 
   return (
-    <div className={`relative rounded-ctrl border border-line ${compact ? 'bg-ink-50 p-3' : 'card'}`}>
+    <div className={bare ? 'relative' : `relative rounded-ctrl border border-line ${compact ? 'bg-ink-50 p-3' : 'card'}`}>
       {dismissible && (
         <button
           type="button"
@@ -151,14 +154,18 @@ export default function ConfirmPhoneCard({ compact = false, dismissible = false 
           <X size={14} />
         </button>
       )}
-      <p className="flex items-center gap-2 text-sm font-extrabold text-ink-900 pr-7">
-        <MessageCircle size={16} className="text-lime-600" /> {t('phoneconfirm.title_sms')}
-      </p>
-      <p className="mt-1 text-xs text-muted">
-        {step === 'phone' ? t('phoneconfirm.body_sms')
-          : step === 'code' ? t('phoneconfirm.body_code')
-          : t('phoneconfirm.body_group')}
-      </p>
+      {!bare && (
+        <p className="flex items-center gap-2 text-sm font-extrabold text-ink-900 pr-7">
+          <MessageCircle size={16} className="text-lime-600" /> {t('phoneconfirm.title_sms')}
+        </p>
+      )}
+      {(!bare || step !== 'phone') && (
+        <p className="mt-1 text-xs text-muted">
+          {step === 'phone' ? t('phoneconfirm.body_sms')
+            : step === 'code' ? t('phoneconfirm.body_code')
+            : t('phoneconfirm.body_group')}
+        </p>
+      )}
 
       {step === 'phone' && (
         <div className="mt-2.5 space-y-2">

@@ -872,7 +872,7 @@ export default function Layout({ children }) {
             </button>
             <h3 className="text-xl text-ink-900 pr-10">{t('layout.phone_prompt_title')}</h3>
             <p className="text-sm text-muted">{t('layout.phone_prompt_body')}</p>
-            <ConfirmPhoneCard />
+            <ConfirmPhoneCard bare />
             <button
               onClick={dismissPhonePrompt}
               className="w-full text-center text-sm font-extrabold text-muted hover:text-ink-900 min-h-[40px]"
