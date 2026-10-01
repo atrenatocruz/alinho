@@ -157,7 +157,7 @@ export function MonthSheet({ dayKey, counts, onPick, onClose }) {
   )
 }
 
-export const SHOW_LABEL_KEY = { all: 'agenda.show_all', enrolled: 'agenda.show_enrolled', open: 'agenda.show_open' }
+export const SHOW_LABEL_KEY = { all: 'agenda.show_all', enrolled: 'agenda.show_enrolled', open: 'agenda.show_open', played: 'agenda.show_played' }
 
 export const KIND_FILTER_KEY = { mix: 'agenda.filter_kind_mix', open: 'agenda.filter_kind_open', friends: 'agenda.filter_kind_friends', lesson: 'agenda.filter_kind_lesson', tournament: 'agenda.filter_kind_tournament' }
 
@@ -178,10 +178,12 @@ export function FilterSheet({ part = 'show', filters, orgs, countFor, onApply, o
   const chip = (on) => `inline-flex items-center gap-1.5 px-3 min-h-[40px] rounded-full text-sm font-extrabold border transition-colors duration-fast ${
     on ? 'bg-ink-900 text-white border-ink-900' : 'bg-canvas text-ink-700 border-line'
   }`
-  const n = countFor(draft)
+  // Em «Já jogados» a contagem da agenda não serve (a lista vem do servidor).
+  const played = draft.show === 'played'
+  const n = played ? 1 : countFor(draft)
   const apply = (
     <button type="button" onClick={() => onApply(draft)} disabled={n === 0} className="w-full mt-5 py-3 rounded-ctrl bg-lime-400 text-ink-900 text-sm font-extrabold disabled:opacity-40">
-      {t('agenda.filters_apply', { count: n })}
+      {played ? t('agenda.filters_apply_played') : t('agenda.filters_apply', { count: n })}
     </button>
   )
 
@@ -192,9 +194,10 @@ export function FilterSheet({ part = 'show', filters, orgs, countFor, onApply, o
           value={filters.show}
           onChange={(opt) => onApply({ ...filters, show: opt })}
           options={SHOW_OPTIONS.map((opt) => ({ value: opt, label: t(SHOW_LABEL_KEY[opt]) }))}
-          className="flex-wrap"
         />
-        <p className="mt-3 text-xs text-muted">{t('agenda.filter_show_hint')}</p>
+        {/* O que é «Já jogados», por baixo das pastilhas (proposta-2-filtro). */}
+        <p className="mt-3 text-xs text-muted">{t('agenda.show_played_hint')}</p>
+        <p className="mt-1.5 text-xs text-muted">{t('agenda.filter_show_hint')}</p>
       </Sheet>
     )
   }

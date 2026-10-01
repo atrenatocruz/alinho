@@ -437,8 +437,10 @@ export const isAgendaGame = (game) => !HIDDEN_GAME.includes(game.status)
  * - 'all'      tudo onde estou + tudo o que ainda está em aberto (por omissão)
  * - 'enrolled' só onde estou dentro, em espera ou convidado
  * - 'open'     só o que ainda está em aberto e onde não estou
+ * - 'played'   «Já jogados» (27 set): o que já se jogou nos meus clubes e grupos,
+ *              também onde não joguei — a Home troca a lista pela PlayedList
  */
-export const SHOW_OPTIONS = ['all', 'enrolled', 'open']
+export const SHOW_OPTIONS = ['all', 'enrolled', 'open', 'played']
 export const DEFAULT_FILTERS = { show: 'all', kinds: EVENT_KINDS, orgIds: null }
 
 /** Filtros guardados antes da mudança (com onlyMine) voltam ao início. */

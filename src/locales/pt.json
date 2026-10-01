@@ -4425,5 +4425,20 @@
   "open_slots.danger_cancel_confirm": "Sim, cancelar",
   "open_slots.danger_delete_confirm": "Sim, eliminar",
   "open_slots.cancelled_all": "Jogo em aberto cancelado.",
-  "open_slots.deleted_all": "Jogo em aberto eliminado."
+  "open_slots.deleted_all": "Jogo em aberto eliminado.",
+  "agenda.show_played": "Já jogados",
+  "agenda.show_played_hint": "«Já jogados»: os mixes, os torneios e os jogos entre amigos que já se jogaram nos teus clubes e grupos, também onde não jogaste.",
+  "agenda.played_empty": "Ainda não se jogou nada nos teus clubes e grupos.",
+  "agenda.played_error": "Não foi possível carregar os jogos já jogados. Tenta outra vez.",
+  "agenda.played_more": "Ver mais",
+  "agenda.played_friends_title": "{{name}} e amigos",
+  "agenda.played_friends_title_anon": "Jogo entre amigos",
+  "agenda.played_players_one": "1 jogador",
+  "agenda.played_players_other": "{{count}} jogadores",
+  "agenda.played_people_one": "1 pessoa",
+  "agenda.played_people_other": "{{count}} pessoas",
+  "agenda.played_teams_one": "1 dupla",
+  "agenda.played_teams_other": "{{count}} duplas",
+  "agenda.played_points": "{{points}} pontos",
+  "agenda.filters_apply_played": "Ver os jogos"
 }

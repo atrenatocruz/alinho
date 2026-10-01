@@ -12,7 +12,7 @@ import { BackBar } from '../components/ui'
 import { useGoBack } from '../lib/useGoBack'
 import { MapPin, MoreHorizontal, Pencil, Share2, X, Plus } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { getFriendMatch, respondFriendMatchInvite, setFriendMatchTeams, addFriendMatchGame, addFriendMatchRound, listMyFriendMatchInvites, cancelFriendMatch, playFriendMatchWithoutName, keepFriendMatchSeat, removeFriendMatchInvitee } from '../lib/privateMatches'
+import { getFriendMatch, getFriendMatchReadonly, respondFriendMatchInvite, setFriendMatchTeams, addFriendMatchGame, addFriendMatchRound, listMyFriendMatchInvites, cancelFriendMatch, playFriendMatchWithoutName, keepFriendMatchSeat, removeFriendMatchInvitee } from '../lib/privateMatches'
 import AddPersonSheet from '../components/friends/AddPersonSheet'
 import { balancedSplit, rotatingGame, followingGames, planRounds, roundsFor, courtsFor } from '../lib/friendTeams'
 import { describeError } from '../lib/errors'
@@ -72,7 +72,10 @@ export default function FriendSession() {
     listMyFriendMatchInvites()
       .then((rows) => setInvitedHere(rows.some((r) => r.match_id === id)))
       .catch(() => setInvitedHere(false))
+    // Quem não jogou mas é do grupo (ou o grupo é público) abre-o só para ler,
+    // vindo dos «Já jogados» (27/28 set).
     getFriendMatch(id)
+      .catch((err) => (err?.code === '42501' ? getFriendMatchReadonly(id) : Promise.reject(err)))
       .then((d) => { setData(d); setLoadError('') })
       .catch((err) => {
         console.error('Error loading friend match:', err)
