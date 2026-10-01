@@ -334,7 +334,8 @@ const RPC_MOCKS = {
   // Entrar por link num grupo cheio (#447): localStorage.mockJoinPending =
   // 'true' — a função devolve o grupo e a pessoa não fica membro (pedido).
   approve_membership_request: () => (localStorage.getItem('mockGroupFull') === 'true' ? { __error: 'Grupo já atingiu o limite de 40 membros do plano' } : null),
-  join_organization: () => (localStorage.getItem('mockJoinPending') === 'true' ? 'org-cheio' : MOCK_ADMIN_ORG_ID),
+  // mockJoinPending: fica pedido; mockJoinOpen: grupo de entrada livre (entra logo) — o convite do grupo, 1 out.
+  join_organization: () => (localStorage.getItem('mockJoinPending') === 'true' ? 'org-cheio' : localStorage.getItem('mockJoinOpen') === 'true' ? 'org-aberto' : MOCK_ADMIN_ORG_ID),
   // Apagar conta (Trello #306). localStorage.mockDeletionRequestedAt =
   // '2026-09-18' mostra o ecrã de recuperar a conta.
   request_account_deletion: () => new Date().toISOString(),
@@ -1159,12 +1160,12 @@ const TABLE_MOCKS = {
   // A organização do Admin(Dev). Sem esta linha o separador Definições do
   // Gerir ficava em branco (loadSettings nunca recebia nada). Marcada como
   // grupo criado na Comunidade para se poder validar o "Eliminar grupo".
-  organizations: () => [{
+  organizations: (url) => (/org-(cheio|aberto)/.test(url || '') ? [{ name: 'Jota Padeleiros' }] : [{
     id: MOCK_ADMIN_ORG_ID, name: 'Dev Org', slug: 'dev-org', kind: localStorage.getItem('mockOrgKind') || 'group', self_serve: true,
     is_global: false, open_join: false, group_logo_url: null, description: '', location: '',
     ...(community() ? { searchable: true } : {}),
     owner_id: MOCK_ADMIN_USER_ID, plan_tier: localStorage.getItem('mockPlanTier') || 'pro',
-  }],
+  }]),
   // localStorage.mockTeacherFollowed = 'true' — já sigo o professor (#418, assunto 4).
   follows: () => (localStorage.getItem('mockTeacherFollowed') === 'true'
     ? [{ id: 'f-teacher', status: 'accepted', followed_id: 'u-ana' }, { id: 'f-tiago', status: 'accepted', followed_id: 'fake-t2' }] : []),
@@ -1334,7 +1335,7 @@ const TABLE_MOCKS = {
   }],
   // Gerir > Membros: o Admin(Dev) é o dono, a Marta é um segundo admin e o
   // Tiago é membro — os três casos da regra do dono (Trello #261).
-  memberships: () => [
+  memberships: (url) => (/org-aberto/.test(url || '') ? [{ id: 'm-aberto' }] : /org-cheio/.test(url || '') ? [] : [
     { user_id: MOCK_ADMIN_USER_ID, organization_id: MOCK_ADMIN_ORG_ID, level: 'avançado', is_guest: false, is_admin: true, profile: { name: 'Admin (Dev)', avatar_url: null } },
     { user_id: FAKE_MEMBER_ID, organization_id: MOCK_ADMIN_ORG_ID, level: 'avançado', is_guest: false, is_admin: true, profile: { name: FAKE_PEOPLE[FAKE_MEMBER_ID].name, avatar_url: FAKE_PEOPLE[FAKE_MEMBER_ID].avatar_url, gender: FAKE_PEOPLE[FAKE_MEMBER_ID].gender } },
     // mockPartnerInvite: o Tiago passa a ser a conta por reclamar do parceiro
@@ -1342,7 +1343,7 @@ const TABLE_MOCKS = {
     { user_id: FAKE_PARTNER_ID, organization_id: MOCK_ADMIN_ORG_ID, level: 'avançado', is_guest: localStorage.getItem('mockPartnerInvite') === 'true', is_admin: false, profile: { name: FAKE_PEOPLE[FAKE_PARTNER_ID].name, avatar_url: FAKE_PEOPLE[FAKE_PARTNER_ID].avatar_url, gender: FAKE_PEOPLE[FAKE_PARTNER_ID].gender } },
     // mockMixMen: alguém sem género no perfil, para se ver a marca na folha do parceiro (26 set).
     ...(localStorage.getItem('mockMixMen') === 'true' ? [{ user_id: 'caso-sem-genero', organization_id: MOCK_ADMIN_ORG_ID, level: 'intermédio', is_guest: false, is_admin: false, profile: { name: 'Sam Lopes', avatar_url: null, gender: null } }] : []),
-  ],
+  ]),
 }
 
 // O Gerir pede os mixes (origin=eq.admin) e os jogos em aberto

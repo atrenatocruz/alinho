@@ -11,7 +11,7 @@ import i18n from '../lib/i18n'
 import { describeError } from '../lib/errors'
 import { ACCOUNT_DELETION_GRACE_DAYS } from '../lib/account'
 import { MIN_SIGNUP_AGE, isAtLeast } from '../lib/age'
-import { safeInternalPath } from '../lib/loginLinks'
+import { safeInternalPath, savePendingOrgSlug } from '../lib/loginLinks'
 
 // Same pattern as Layout.jsx's header toggle, minus the profile persistence
 // (there's no profile yet pre-auth) — just the instant UI flip plus a
@@ -78,15 +78,13 @@ export default function Login() {
   // -site levava a pessoa para fora da app ja com sessao iniciada.
   const redirectTo = safeInternalPath(searchParams.get('redirect'))
 
-  // Capture ?org=<slug> into sessionStorage immediately on mount — it has
-  // to survive both a full-page Google OAuth redirect and App.jsx's
-  // instant client-side redirect away from /login once logged in, so
-  // reading it lazily later (e.g. inside an auth-state-change handler)
-  // isn't reliable. AuthContext consumes and clears it once a session exists.
+  // O ?org=<endereço> guarda-se logo ao abrir (savePendingOrgSlug, 24 h em
+  // localStorage): tem de sobreviver à ida ao Google e ao separador do email
+  // de «Confirmar email». A Home lê-o, pede para entrar e mostra o aviso.
   useEffect(() => {
     const orgSlug = searchParams.get('org')
     if (orgSlug) {
-      sessionStorage.setItem('pendingOrgSlug', orgSlug)
+      savePendingOrgSlug(orgSlug)
     }
   }, [searchParams])
 

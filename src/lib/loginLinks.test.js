@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { signUpBackLink, safeInternalPath } from './loginLinks'
+import { signUpBackLink, safeInternalPath, savePendingOrgSlug, takePendingOrgSlug, afterLoginPath, PENDING_ORG_TTL_MS } from './loginLinks'
 
 const back = (link) => decodeURIComponent(new URLSearchParams(link.split('?').slice(1).join('?')).get('redirect'))
 const BARRA = '/' + String.fromCharCode(92)
@@ -68,5 +68,29 @@ describe('safeInternalPath — a trava do ?redirect= (#378)', () => {
 
   it('aceita outro destino de recurso quando quem chama o indica', () => {
     expect(safeInternalPath('//mau', '/entrar')).toBe('/entrar')
+  })
+})
+
+describe('convite de grupo (QA, 1 out)', () => {
+  const mem = () => {
+    const m = new Map()
+    return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k) }
+  }
+  it('guarda o grupo e lê-o uma vez', () => {
+    const st = mem()
+    savePendingOrgSlug('jota-padeleiros', 1000, st)
+    expect(takePendingOrgSlug(2000, st)).toBe('jota-padeleiros')
+    expect(takePendingOrgSlug(3000, st)).toBeNull()
+  })
+  it('passadas 24 h já não vale', () => {
+    const st = mem()
+    savePendingOrgSlug('qa-testes', 0, st)
+    expect(takePendingOrgSlug(PENDING_ORG_TTL_MS + 1, st)).toBeNull()
+  })
+  it('com sessão, o /login?org= vai para a Home com o grupo; o redirect manda', () => {
+    expect(afterLoginPath(new URLSearchParams('org=qa-testes'))).toBe('/?org=qa-testes')
+    expect(afterLoginPath(new URLSearchParams('redirect=/jogo/1&org=qa-testes'))).toBe('/jogo/1')
+    expect(afterLoginPath(new URLSearchParams(''))).toBe('/')
+    expect(afterLoginPath(new URLSearchParams('redirect=//fora.com'))).toBe('/')
   })
 })
