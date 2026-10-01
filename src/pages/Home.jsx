@@ -842,7 +842,7 @@ export default function Home() {
       {/* Número associado mas por confirmar: sem confirmação, o «In» no
           WhatsApp entra como convidado sem conta — o banner só aparece a
           quem tem mesmo de agir (migration_mix_guest_sem_conta.sql). */}
-      {viewMode === 'list' && <div className="mt-3"><ConfirmPhoneCard compact /></div>}
+      {viewMode === 'list' && <div className="mt-3"><ConfirmPhoneCard compact dismissible /></div>}
 
       {viewMode === 'map' ? (
         <MapView pins={pins} location={location} onSelectPin={setSelectedPin} />
