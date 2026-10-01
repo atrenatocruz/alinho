@@ -7,7 +7,6 @@ import { useAuth } from '../contexts/AuthContext'
 import { HeaderActionsProvider } from '../contexts/HeaderActionsContext'
 import { PrimaryButton, Avatar, AchievementCard } from './ui'
 import { supabase } from '../lib/supabase'
-import { hashPhone } from '../lib/hashPhone'
 import { listIncomingFollowRequests, acceptFollowRequest, removeFollow } from '../lib/follows'
 import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
 import { listIncomingOrganizationInvites, acceptOrganizationInvite, declineOrganizationInvite } from '../lib/orgInvites'
@@ -23,7 +22,6 @@ import { formatDate } from '../lib/formatDate'
 import AccountDeletionPending from './AccountDeletionPending'
 
 // Re-prompt at most once per day once dismissed — a nudge, not a gate.
-const PHONE_PROMPT_DISMISSED_KEY = 'phonePromptDismissedDate'
 
 // Celebrações — verificar uma vez por sessão de browser, não a cada
 // navegação (o modal reaparece de qualquer forma na próxima sessão se
@@ -116,78 +114,6 @@ function CelebrationModal({ items, onClose }) {
    it to recognize them in the group. Phone is optional — this never blocks
    using the app, it's just a reminder that can always be skipped and the
    number added later from the Profile page. */
-function PhoneRequiredModal({ onSave, onDismiss }) {
-  const { t } = useTranslation()
-  const [phone, setPhone] = useState('')
-  const [error, setError] = useState('')
-  const [saving, setSaving] = useState(false)
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    if (phone.replace(/\D/g, '').length < 9) {
-      setError(t('layout.invalid_phone_number'))
-      return
-    }
-    setSaving(true)
-    setError('')
-    try {
-      const hash = await hashPhone(phone)
-      const { error: saveError } = await onSave(hash)
-      if (saveError) throw saveError
-      // on success the parent's `profile.phone_hash` updates and this modal unmounts
-    } catch {
-      setError(t('layout.save_failed_retry'))
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-ink-900/70 animate-fade-in" onClick={onDismiss}>
-      <div className="bg-surface rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-md p-6 animate-pop relative" onClick={(e) => e.stopPropagation()}>
-        <button
-          onClick={onDismiss}
-          aria-label={t('layout.close')}
-          className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full text-muted hover:bg-ink-50 hover:text-ink-900 transition-colors duration-fast"
-        >
-          <X size={18} />
-        </button>
-        <div className="w-11 h-11 rounded-full bg-lime-400/15 text-lime-600 flex items-center justify-center mb-4">
-          <Phone size={20} />
-        </div>
-        <h3 className="text-lg text-ink-900 mb-1.5 pr-8">{t('layout.phone_prompt_title')}</h3>
-        <p className="text-sm text-muted mb-5">
-          {t('layout.phone_prompt_body')}
-        </p>
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <input
-            type="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            className="input-field"
-            placeholder={t('layout.phone_placeholder')}
-            autoFocus
-          />
-          {error && (
-            <div className="bg-danger/10 text-danger px-4 py-3 rounded-ctrl text-sm font-extrabold">
-              {error}
-            </div>
-          )}
-          <PrimaryButton type="submit" disabled={saving} className="w-full">
-            {saving ? t('layout.saving') : t('layout.save')}
-          </PrimaryButton>
-          <button
-            type="button"
-            onClick={onDismiss}
-            className="w-full text-center text-ink-700 font-extrabold text-sm py-2"
-          >
-            {t('layout.not_now')}
-          </button>
-        </form>
-      </div>
-    </div>
-  )
-}
-
 /* Brand wordmark — the real alinho logo, inlined (no SVGR/asset-import
    tooling in this project — Vite would otherwise only give us the file's
    URL, not a component). Path data is extracted from src/logo/*.svg:
@@ -239,10 +165,6 @@ export default function Layout({ children }) {
   // perfil recarregado.
   const [deletionRecovered, setDeletionRecovered] = useState(false)
 
-  const today = new Date().toISOString().slice(0, 10)
-  const [phonePromptDismissed, setPhonePromptDismissed] = useState(
-    () => typeof window !== 'undefined' && localStorage.getItem(PHONE_PROMPT_DISMISSED_KEY) === today
-  )
 
   // Celebrações: troféus novos + kudos recebidos desde a última visita.
   // Uma verificação por sessão de browser; fail-soft em qualquer erro.
@@ -589,13 +511,6 @@ export default function Layout({ children }) {
     }
   }, [locationKey, navigationType])
 
-  const needsPhone = profile && !isGuest && !profile.phone_hash && !phonePromptDismissed
-
-  const dismissPhonePrompt = () => {
-    localStorage.setItem(PHONE_PROMPT_DISMISSED_KEY, today)
-    setPhonePromptDismissed(true)
-  }
-
   const handleSignOut = async () => {
     await signOut()
     navigate('/login')
@@ -926,16 +841,10 @@ export default function Layout({ children }) {
         </div>
       </nav>
 
-      {needsPhone && (
-        <PhoneRequiredModal
-          onSave={(phone_hash) => updateProfile({ phone_hash })}
-          onDismiss={dismissPhonePrompt}
-        />
-      )}
 
       {/* Celebrações depois do phone-prompt na ordem de render, mas só uma
           aparece de cada vez na prática (o phone-prompt é dispensável). */}
-      {celebrations.length > 0 && !needsPhone && (
+      {celebrations.length > 0 && (
         <CelebrationModal items={celebrations} onClose={closeCelebrations} />
       )}
     </div>

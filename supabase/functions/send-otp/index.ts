@@ -1,12 +1,14 @@
-// Supabase Edge Function: associa o número ao perfil e envia o código de
-// verificação por SMS (Twilio) — OTP clássico (decisão Ruben, 1 out 2026),
-// em vez do fluxo invertido do #537 (mandar o código ao robô).
+// Supabase Edge Function: envia o código de verificação do número por SMS
+// — OTP clássico (decisão Ruben, 1 out 2026), em vez do fluxo invertido do
+// #537 (mandar o código ao robô). SEM estado «associado»: o perfil não é
+// tocado aqui — o número só entra na conta na confirmação, quando a posse
+// fica provada (migration_numero_numa_conta_so.sql).
 //
 // É a ÚNICA peça que vê o número cru neste fluxo (como a hash-phone): o
-// número nunca é guardado — grava-se só o HMAC em profiles.phone_hash — e o
-// código nunca passa pelo browser: é gerado pelo start_phone_verification
-// (validade 15 min, limite 5/h — reutilizado tal-e-qual do #537) chamado
-// AQUI com o JWT do utilizador, e segue direto no SMS.
+// que segue para a base de dados é só o HMAC, guardado na linha de
+// phone_verifications pelo start_phone_verification_for_hash (validade 15
+// min, limite 5/h, recusa números de outra conta real) chamado AQUI com o
+// JWT do utilizador — o código nunca passa pelo browser e segue no SMS.
 //
 // Secrets necessários (por ambiente): PHONE_HASH_SECRET (o MESMO da
 // hash-phone e do robô), TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN,
@@ -142,20 +144,18 @@ Deno.serve(async (req) => {
   }
 
   const hash = await hmacSha256Hex(normalized, secret)
-  const { error: updateError } = await supabase
-    .from('profiles')
-    .update({ phone_hash: hash })
-    .eq('id', userData.user.id)
-  if (updateError) {
-    console.error('send-otp: falha a gravar phone_hash:', updateError)
-    return jsonResponse({ error: 'profile_update_failed' }, 500)
-  }
 
-  const { data: ver, error: verError } = await supabase.rpc('start_phone_verification')
+  // Sem estado «associado» (Ruben, 1 out): o perfil NÃO é tocado aqui — o
+  // número só entra na conta quando a posse fica provada (confirmação). O
+  // RPC guarda o alvo na linha de verificação, aplica o rate-limit de 5/h
+  // e recusa números já confirmados noutra conta real (phone_taken).
+  const { data: ver, error: verError } = await supabase.rpc('start_phone_verification_for_hash', { p_hash: hash })
   if (verError) {
+    console.error('send-otp: start_phone_verification_for_hash falhou:', verError)
+    const message = verError.message || 'verification_failed'
+    if (message.includes('phone_taken')) return jsonResponse({ error: 'phone_taken' }, 409)
     // Ex.: o limite de 5/h — a mensagem do RPC é legível e vai para a app.
-    console.error('send-otp: start_phone_verification falhou:', verError)
-    return jsonResponse({ error: verError.message || 'verification_failed' }, 429)
+    return jsonResponse({ error: message }, 429)
   }
   const code = ver?.[0]?.code
   const expiresAt = ver?.[0]?.expires_at ?? null

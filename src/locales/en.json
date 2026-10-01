@@ -456,6 +456,7 @@
   "gamedetails.partner_error_already_has_partner": "You already have a partner in this mix.",
   "gamedetails.partner_error_age_restricted": "This mix has an age restriction — you can't sign up.",
   "phoneconfirm.dev_code_notice": "Test mode: the code was filled in automatically (no SMS was sent).",
+  "phoneconfirm.error_phone_taken": "That number is already confirmed on another account. If it's yours, contact support (support@alinho.pt).",
   "phoneconfirm.title_sms": "Confirm your number",
   "phoneconfirm.body_sms": "With your number confirmed, an In in the WhatsApp group lands straight on your account. We'll text you a code — we only store a fingerprint of the number, never the number itself.",
   "phoneconfirm.body_code": "Type the 6-digit code we sent you by SMS.",

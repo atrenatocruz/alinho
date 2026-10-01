@@ -64,6 +64,7 @@ export default function ConfirmPhoneCard({ compact = false, dismissible = false 
         try { reason = (await fnError.context?.json())?.error ?? null } catch { /* sem corpo */ }
         console.error('send-otp failed:', reason || fnError)
         if (reason === 'invalid_phone') setError(t('login.error_invalid_phone'))
+        else if (reason === 'phone_taken') setError(t('phoneconfirm.error_phone_taken'))
         else if (reason && /código|codigo|espera/i.test(reason)) setError(reason)
         else setError(t('phoneconfirm.error_send') + (reason ? ` (${reason})` : ''))
         return
