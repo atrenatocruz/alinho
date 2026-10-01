@@ -4398,5 +4398,17 @@
   "gerirclube.mix_deleted": "Mix deleted.",
   "mixwizard.delete_title": "Delete {{name}}?",
   "mixwizard.delete_message": "Nobody signed up. The mix disappears.",
-  "mixwizard.delete_confirm": "Yes, delete"
+  "mixwizard.delete_confirm": "Yes, delete",
+  "open_slots.danger_cancel": "Cancel the open game",
+  "open_slots.danger_delete": "Delete the open game",
+  "open_slots.danger_cancel_title": "Cancel the open game?",
+  "open_slots.danger_delete_title": "Delete the open game?",
+  "open_slots.danger_cancel_message_one": "Every slot in this open game is cancelled. We'll let the confirmed person know.",
+  "open_slots.danger_cancel_message_other": "Every slot in this open game is cancelled. We'll let the {{count}} confirmed people know.",
+  "open_slots.danger_delete_message": "Nobody signed up. The slots disappear.",
+  "open_slots.danger_keep": "Keep the game",
+  "open_slots.danger_cancel_confirm": "Yes, cancel",
+  "open_slots.danger_delete_confirm": "Yes, delete",
+  "open_slots.cancelled_all": "Open game cancelled.",
+  "open_slots.deleted_all": "Open game deleted."
 }

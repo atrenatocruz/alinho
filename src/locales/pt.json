@@ -4410,5 +4410,17 @@
   "gerirclube.mix_deleted": "Mix eliminado.",
   "mixwizard.delete_title": "Eliminar o {{name}}?",
   "mixwizard.delete_message": "Ninguém se inscreveu. O mix desaparece.",
-  "mixwizard.delete_confirm": "Sim, eliminar"
+  "mixwizard.delete_confirm": "Sim, eliminar",
+  "open_slots.danger_cancel": "Cancelar o jogo em aberto",
+  "open_slots.danger_delete": "Eliminar o jogo em aberto",
+  "open_slots.danger_cancel_title": "Cancelar o jogo em aberto?",
+  "open_slots.danger_delete_title": "Eliminar o jogo em aberto?",
+  "open_slots.danger_cancel_message_one": "Todos os horários deste jogo em aberto ficam cancelados. Vamos avisar a pessoa confirmada.",
+  "open_slots.danger_cancel_message_other": "Todos os horários deste jogo em aberto ficam cancelados. Vamos avisar as {{count}} pessoas confirmadas.",
+  "open_slots.danger_delete_message": "Ninguém se inscreveu. Os horários desaparecem.",
+  "open_slots.danger_keep": "Manter o jogo",
+  "open_slots.danger_cancel_confirm": "Sim, cancelar",
+  "open_slots.danger_delete_confirm": "Sim, eliminar",
+  "open_slots.cancelled_all": "Jogo em aberto cancelado.",
+  "open_slots.deleted_all": "Jogo em aberto eliminado."
 }
