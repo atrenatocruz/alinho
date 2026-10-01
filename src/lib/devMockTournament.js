@@ -84,6 +84,8 @@ const TOURNAMENT = () => {
     name: 'Smash Open 2026',
     organization_id: '00000000-0000-0000-0000-0000000000aa',
     club_name: 'Smash Padel',
+    // mockTGroupOrg = 'true': o torneio é de um grupo (Francisco, 30 set: dizia «Clube organizador»).
+    club_kind: localStorage.getItem('mockTGroupOrg') === 'true' ? 'group' : 'club',
     club_logo_url: null,
     location: 'Smash Padel · Almada',
     starts_on: iso(fri),
@@ -470,10 +472,13 @@ export const TOURNAMENT_SCORE_RPC_MOCKS = {
     return null
   },
   // Procurar marcadores (Trello #518): só id, nome e foto.
-  search_people_basic: () => [
+  // Filtra pelo que se escreve, como a real (o parceiro do torneio, 1 out).
+  search_people_basic: (params) => [
     { id: 'u-marta', name: 'Marta Costa', avatar_url: null },
     { id: 'u-tiago', name: 'Tiago Ferreira', avatar_url: null },
-  ],
+    { id: 'u-joana', name: 'Joana Martins', avatar_url: null },
+    { id: 'u-martim', name: 'Martim Sousa', avatar_url: null },
+  ].filter((p) => !params?.p_query || p.name.toLowerCase().includes(String(params.p_query).trim().toLowerCase())),
   // Desfazer falta (Trello #491): o jogo volta a estar por jogar.
   undo_walkover: (params) => {
     if (!MATCHES) resetMatches()
@@ -651,7 +656,7 @@ export const TOURNAMENT_SCORE_TODAY_TABLE_MOCKS = {
   tournament_public: (url) => {
     if (!scoreTodayOn() || !/status=in\./.test(decodeURIComponent(url))) return undefined
     return [
-      { id: scoreTodayId(), slug: 'smash-open-2026', name: 'Smash Open 2026', club_name: 'Smash Padel', organization_id: '00000000-0000-0000-0000-0000000000dd',
+      { id: scoreTodayId(), slug: 'smash-open-2026', name: 'Smash Open 2026', club_name: 'Smash Padel', club_kind: localStorage.getItem('mockTGroupOrg') === 'true' ? 'group' : 'club', organization_id: '00000000-0000-0000-0000-0000000000dd',
         starts_on: lisbonDay(-1), ends_on: lisbonDay(1), status: 'a_decorrer', category_count: 5, location: 'Smash Padel · Almada' },
       { id: 'tour-amanha', slug: 'torneio-de-amanha', name: 'Torneio de amanhã', club_name: 'Smash Padel',
         starts_on: lisbonDay(1), ends_on: lisbonDay(2), status: 'sorteado' },

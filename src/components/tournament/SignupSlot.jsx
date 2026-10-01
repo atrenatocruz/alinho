@@ -36,7 +36,7 @@ const STATE_KEY = {
   suplente: 'tsignup.state_waitlist',
 }
 
-export default function SignupSlot({ tournament, categories, category, my: firstEntry, myEntries = [], publicView = false }) {
+export default function SignupSlot({ tournament, categories, category, my: firstEntry, myEntries = [], publicView = false, hasGames = false }) {
   const { t, i18n } = useTranslation()
   const { user, profile, updateProfile } = useAuth()
   const [genderSheet, setGenderSheet] = useState(false)
@@ -77,7 +77,9 @@ export default function SignupSlot({ tournament, categories, category, my: first
     return () => { cancelled = true }
   }, [user, tournament.id, scoringOpen])
 
-  const open = entriesOpen(tournament, null)
+  // A categoria escolhida manda (ensaio do QA, 30 set).
+  const open = entriesOpen(tournament, category)
+  const anyOpen = categories.some((c) => entriesOpen(tournament, c))
   const left = categoriesLeft(tournament, myEntries)
   // A inscrição que se mostra é a da categoria escolhida. Se não estou
   // nela e ainda posso ir a mais uma, aparece o botão de inscrever; se já
@@ -240,7 +242,9 @@ export default function SignupSlot({ tournament, categories, category, my: first
           )}
         </div>
       ) : open && user ? (
-        <PrimaryButton onClick={startSignUp} disabled={left === 0} className="w-full">
+        // Quem já tem jogos tem o lima no «Os meus jogos»: este passa a
+        // contorno, por baixo (um lima por ecrã, UX 1 out).
+        <PrimaryButton variant={hasGames ? 'ghost' : 'lime'} onClick={startSignUp} disabled={left === 0} className="w-full">
           {left === 0 ? t('tsignup.max_categories') : t('tsignup.cta')}
         </PrimaryButton>
       ) : open && !user ? (
@@ -267,7 +271,7 @@ export default function SignupSlot({ tournament, categories, category, my: first
           organiza — SEMPRE, também em rascunho (pré-visualização) e depois
           do fecho, que é quando se joga (QA, 26 set). Só as vagas e o botão
           de inscrever dependem das inscrições abertas. */}
-      <PublicInfo tournament={tournament} categories={categories} entriesOpen={open} />
+      <PublicInfo tournament={tournament} categories={categories} entriesOpen={anyOpen} />
 
       {genderSheet && (
         <Sheet title={t('tsignup.gender_title')} onClose={() => setGenderSheet(false)}>

@@ -71,6 +71,8 @@ export default function Gerir() {
   // Pedidos para dar aulas — só o super admin aprova (Francisco, 16 set).
   const [teacherRequests, setTeacherRequests] = useState([])
   const [actingTeacherId, setActingTeacherId] = useState(null)
+  // O erro de um pedido fica por baixo desse pedido (nunca alert(), 30 set).
+  const [teacherError, setTeacherError] = useState(null) // { id, text }
   const loadTeacherRequests = () => listAllPendingTeacherRequests()
     .then(setTeacherRequests)
     .catch((err) => console.error('Error loading teacher requests:', err))
@@ -80,12 +82,13 @@ export default function Gerir() {
   }, [isPlatformAdmin])
   const handleTeacherRequest = async (id, approve) => {
     setActingTeacherId(id)
+    setTeacherError(null)
     try {
       await (approve ? approveTeacherProfile(id) : rejectTeacherProfile(id))
       await loadTeacherRequests()
     } catch (err) {
       console.error('Error resolving teacher request:', err)
-      alert(describeError(t, err, approve ? 'gerirclube.error_approve_teacher_request' : 'gerirclube.error_reject_teacher_request'))
+      setTeacherError({ id, text: describeError(t, err, approve ? 'gerirclube.error_approve_teacher_request' : 'gerirclube.error_reject_teacher_request') })
     } finally {
       setActingTeacherId(null)
     }
@@ -334,6 +337,7 @@ export default function Gerir() {
             </button>
           </div>
           )}
+          {teacherError?.id === req.id && <p role="alert" className="text-sm font-extrabold text-danger">{teacherError.text}</p>}
         </div>
       ))}
     </div>
