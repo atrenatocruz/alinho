@@ -30,6 +30,7 @@ export default function ConfirmPhoneCard({ compact = false, dismissible = false 
   const [step, setStep] = useState('phone') // 'phone' | 'code'
   const [phone, setPhone] = useState('')
   const [code, setCode] = useState('')
+  const [devCode, setDevCode] = useState(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [dismissed, setDismissed] = useState(() => {
@@ -52,8 +53,9 @@ export default function ConfirmPhoneCard({ compact = false, dismissible = false 
     }
     setBusy(true)
     setError('')
+    setDevCode(null)
     try {
-      const { error: fnError } = await supabase.functions.invoke('send-otp', { body: { phone } })
+      const { data, error: fnError } = await supabase.functions.invoke('send-otp', { body: { phone } })
       if (fnError) {
         // O corpo da resposta diz porquê (invalid_phone, sms_failed, a
         // mensagem do limite 5/h do RPC…) — o FunctionsHttpError esconde-o
@@ -66,7 +68,10 @@ export default function ConfirmPhoneCard({ compact = false, dismissible = false 
         else setError(t('phoneconfirm.error_send') + (reason ? ` (${reason})` : ''))
         return
       }
-      setCode('')
+      // OTP_DEV_MODE (só em ambientes de teste): a função devolve o código
+      // em vez de enviar SMS — preenche-se sozinho, falta só o Confirmar.
+      setCode(data?.dev_code || '')
+      setDevCode(data?.dev_code || null)
       setStep('code')
     } catch (err) {
       console.error('send-otp failed:', err)
@@ -163,6 +168,7 @@ export default function ConfirmPhoneCard({ compact = false, dismissible = false 
           <button type="button" onClick={sendCode} disabled={busy} className="text-xs font-extrabold text-muted hover:text-ink-900">
             {t('phoneconfirm.resend')}
           </button>
+          {devCode && <p className="text-[11px] text-muted">{t('phoneconfirm.dev_code_notice')}</p>}
         </div>
       )}
       {error && <p className="mt-2 text-xs text-danger font-extrabold">{error}</p>}

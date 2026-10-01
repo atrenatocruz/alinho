@@ -453,6 +453,7 @@
   "gamedetails.partner_error_not_a_member": "Só quem é do grupo se pode inscrever neste mix.",
   "gamedetails.partner_error_already_has_partner": "Já tens parceiro neste mix.",
   "gamedetails.partner_error_age_restricted": "Este mix tem restrição de idade — não podes inscrever-te.",
+  "phoneconfirm.dev_code_notice": "Modo de teste: o código foi preenchido automaticamente (não saiu SMS nenhum).",
   "phoneconfirm.title_sms": "Confirma o teu número",
   "phoneconfirm.body_sms": "Com o número confirmado, um In no grupo de WhatsApp fica logo na tua conta. Enviamos-te um código por SMS — guardamos só uma impressão digital do número, nunca o número em si.",
   "phoneconfirm.body_code": "Escreve o código de 6 dígitos que te enviámos por SMS.",
