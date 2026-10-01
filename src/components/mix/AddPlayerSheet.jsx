@@ -28,7 +28,7 @@ import { describeError } from '../../lib/errors'
    admin-bulk-create-participants em modo create_only; depois a inscrição
    segue o caminho de sempre (vagas, suplente, mais um campo). */
 
-export default function AddPlayerSheet({ game, excludeIds, peopleCount, capacity, maxCourts, ratingInfoById, busy, onConfirm, onClose, beforeStart = false }) {
+export default function AddPlayerSheet({ game, excludeIds, peopleCount, capacity, maxCourts, ratingInfoById, busy, onConfirm, onClose, beforeStart = false, onGuestAdded = null }) {
   const { t } = useTranslation()
   const [members, setMembers] = useState([])
   const [loadError, setLoadError] = useState(false)
@@ -99,13 +99,34 @@ export default function AddPlayerSheet({ game, excludeIds, peopleCount, capacity
     setStep('full')
   }
 
-  // Quem não está na app: primeiro a conta (ou a que já existe com esse
-  // email), depois a inscrição pelo caminho de sempre.
+  // Quem não está na app:
+  // • SEM email → convidado sem conta (game_guests, RPC add_game_guest) —
+  //   fica logo inscrito, sem criar conta nenhuma (decisão Ruben, 30 set;
+  //   substitui as contas bulk-* sem email).
+  // • COM email → o caminho de sempre: conta real criada/encontrada por
+  //   email (pré-registo legítimo), e a inscrição segue as regras das vagas.
   const criarEInscrever = async () => {
     setCreating(true)
     setCreateError('')
     setCreateInfo('')
     try {
+      if (!newEmail.trim()) {
+        // O RPC inscreve logo (confirmado) e o guard das vagas não trava
+        // admins — valida-se aqui o que o caminho com conta valida no passo
+        // «cheio»: tem de haver vaga, e a RPC não sabe duplas.
+        if (withPartner) {
+          setCreateError(t('mixedit.guest_no_partner'))
+          return
+        }
+        if (peopleCount >= capacity) {
+          setCreateError(t('mixedit.guest_needs_spot'))
+          return
+        }
+        const { error } = await supabase.rpc('add_game_guest', { p_game_id: game.id, p_name: newName.trim() })
+        if (error) throw error
+        onGuestAdded?.()
+        return
+      }
       const { data, error } = await supabase.functions.invoke('admin-bulk-create-participants', {
         body: { organization_id: game.organization_id, create_only: true, players: [{ name: newName.trim(), email: newEmail.trim() }] },
       })

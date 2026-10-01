@@ -31,6 +31,7 @@ import { loadTournamentEvents } from '../lib/tournamentAgenda'
 import LessonEventCard from '../components/lessons/LessonEventCard'
 import TournamentEventCard from '../components/agenda/TournamentEventCard'
 import { useHeaderActions } from '../contexts/HeaderActionsContext'
+import ConfirmPhoneCard from '../components/ConfirmPhoneCard'
 import {
   toDayKey, eventFromGame, eventFromGroupMatch, eventsFromPrivateMatches, eventFromExplore, eventFromLesson, eventFromLessonRequest, isAgendaGame,
   applyFilters, groupByDay, countByDay, eventDistance, normalizeFilters, isPastEvent, eventsToPins, DEFAULT_FILTERS, EVENT_KINDS,
@@ -255,9 +256,11 @@ export default function Home() {
         *,
         organization:organizations (name, kind, group_logo_url),
         participants (
-          id, user_id, partner_id, status,
+          id, user_id, partner_id, guest_id, partner_guest_id, status,
           user:profiles!participants_user_id_fkey (name, avatar_url, rating, gender),
-          partner:profiles!participants_partner_id_fkey (name, avatar_url, rating, gender)
+          partner:profiles!participants_partner_id_fkey (name, avatar_url, rating, gender),
+          guest:game_guests!participants_guest_id_fkey (id, name),
+          partner_guest:game_guests!participants_partner_guest_id_fkey (id, name)
         )
       `)
       .in('organization_id', orgIds)
@@ -454,9 +457,9 @@ export default function Home() {
     const iAmSomeonesPartner = rows.some((p) => p.partner_id === user.id)
 
     if (myRow?.status === 'confirmed') {
-      // Com parceiro na mesma linha, sair leva os dois — decisão para a
-      // página do mix, onde se vê quem vai abaixo junto.
-      if (myRow.partner_id) return null
+      // Com parceiro na mesma linha (conta OU convidado), sair leva os dois
+      // — decisão para a página do mix, onde se vê quem vai abaixo junto.
+      if (myRow.partner_id || myRow.partner_guest_id) return null
       if (game.status !== 'open' && game.status !== 'closed') return null
       return { kind: 'leave' }
     }
@@ -844,6 +847,11 @@ export default function Home() {
         <FilterChips filters={filters} orgs={orgs} onOpenFilters={(part) => setFiltersOpen(part)} onOpenSearch={viewMode === 'list' ? openSearch : undefined} />
       </div>
 
+
+      {/* Número associado mas por confirmar: sem confirmação, o «In» no
+          WhatsApp entra como convidado sem conta — o banner só aparece a
+          quem tem mesmo de agir (migration_mix_guest_sem_conta.sql). */}
+      {viewMode === 'list' && <div className="mt-3"><ConfirmPhoneCard compact dismissible /></div>}
 
       {viewMode === 'map' ? (
         <MapView pins={pins} location={location} onSelectPin={setSelectedPin} />

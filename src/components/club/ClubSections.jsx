@@ -4,11 +4,12 @@
 // grupo: cabeçalho · o que vem aí · pessoas · (grupos do clube) · jogos
 // entre membros · sobre. O clube só ACRESCENTA professores, grupos, local e
 // contactos — não é outra página.
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Check, ChevronRight, Clock, Globe, Heart, Instagram, Lock, MapPin, Phone, Plus } from 'lucide-react'
-import { Avatar, ConfirmSheet, PrimaryButton } from '../ui'
+import { Check, CheckCircle2, ChevronRight, Clock, Globe, Heart, Instagram, Lock, MapPin, Phone, Plus } from 'lucide-react'
+import { Avatar, ConfirmSheet, PrimaryButton, Tabs } from '../ui'
+import { supabase } from '../../lib/supabase'
 import { describeError, errorKind } from '../../lib/errors'
 import { KIND_STYLE, KindTag, StateTag } from '../agenda/EventCard'
 
@@ -188,18 +189,31 @@ export function ClubEvents({ club, events, isAdmin, gerirHref }) {
   const member = club.my_status === 'member'
   const shown = all ? events : events.slice(0, SHOW)
   const blockedGames = !member && events.some((e) => !e.tournament)
+  // «Eventos» com o separador «O que vem aí · Já jogados» (design-handoff/
+  // 2026-09-27-jogos-jogados-do-clube, proposta-3; Francisco, 27 set). Abre
+  // sempre em «O que vem aí». Grupo fechado visto de fora: só o de hoje.
+  const canSeePast = member || club.is_global
+  const [tab, setTab] = useState('upcoming')
 
   return (
     <section>
       <div className="mb-2 flex items-center justify-between gap-2">
-        <h3 className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('clubprofile.upcoming')}</h3>
-        {events.length > SHOW && !all && (
+        <h3 className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t(canSeePast ? 'clubprofile.events' : 'clubprofile.upcoming')}</h3>
+        {tab === 'upcoming' && events.length > SHOW && !all && (
           <button type="button" onClick={() => setAll(true)} className="inline-flex min-h-[44px] items-center gap-0.5 text-sm font-extrabold text-ink-900">
             {t('clubprofile.see_all')} <ChevronRight size={15} />
           </button>
         )}
       </div>
 
+      {canSeePast && (
+        <Tabs className="mb-3" label={t('clubprofile.events')} value={tab} onChange={setTab} options={[
+          { value: 'upcoming', label: t('clubprofile.upcoming') },
+          { value: 'played', label: t('agenda.show_played') },
+        ]} />
+      )}
+
+      {tab === 'played' ? <ClubPlayed club={club} /> : <>
       {blockedGames && (
         <p className="mb-2 text-[13px] text-ink-700">
           {t(club.open_join ? kk('clubprofile.members_only_open') : 'clubprofile.members_only_closed')}
@@ -226,7 +240,78 @@ export function ClubEvents({ club, events, isAdmin, gerirHref }) {
           {shown.map((e) => <EventRow key={e.key} event={e} member={member} />)}
         </div>
       )}
+      </>}
     </section>
+  )
+}
+
+/* «Já jogados» do clube/grupo: as mesmas regras do filtro da Home —
+   list_played_events (Dev 3) só deste clube; cinzentos com «Terminado», o
+   meu com contorno verde e os meus pontos; mostra 4 e «Ver mais (N)». */
+const PLAYED_FIRST = 4
+function ClubPlayed({ club }) {
+  const { t, i18n } = useTranslation()
+  const [data, setData] = useState(null)
+  const [all, setAll] = useState(false)
+  useEffect(() => {
+    let alive = true
+    supabase.rpc('list_played_events', { p_organization_id: club.id, p_before: null, p_limit: 100 })
+      .then(({ data: res, error }) => {
+        if (error) throw error
+        if (alive) setData(res || { rows: [], total: 0 })
+      })
+      .catch((err) => { console.error('Error loading played events:', err); if (alive) setData({ rows: [], total: 0 }) })
+    return () => { alive = false }
+  }, [club.id])
+  if (!data) return <div className="flex justify-center py-6"><div className="h-7 w-7 animate-spin rounded-full border-[3px] border-ink-50 border-t-ink-700" /></div>
+  const rows = data.rows || []
+  if (rows.length === 0) {
+    return (
+      <div className="rounded-card border border-dashed border-line bg-canvas px-3.5 py-3 text-center">
+        <p className="text-sm text-ink-700">{t(club.kind === 'group' ? 'clubprofile.played_empty_group' : 'clubprofile.played_empty')}</p>
+        <p className="text-[13px] text-muted">{t(club.kind === 'group' ? 'clubprofile.played_empty_hint_group' : 'clubprofile.played_empty_hint')}</p>
+      </div>
+    )
+  }
+  const shown = all ? rows : rows.slice(0, PLAYED_FIRST)
+  const dayOf = (iso) => new Date(iso).toLocaleDateString(i18n.language, { weekday: 'short', day: 'numeric', month: 'short' }).replace(/\./g, '').replace(',', '')
+  const timeOf = (iso) => new Date(iso).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' })
+  return (
+    <div className="space-y-2.5">
+      {shown.map((r) => {
+        // Num clube, a sessão entre amigos é «Jogo em aberto» (Francisco, 28 set).
+        const kind = r.kind === 'tournament' ? 'tournament' : r.kind === 'friends' ? (r.org_kind === 'group' ? 'friends' : 'open') : 'mix'
+        const to = r.kind === 'mix' ? `/jogo/${r.id}` : r.kind === 'tournament' ? `/torneio/${r.slug || r.id}` : `/jogos-privados/sessao/${r.id}`
+        const title = r.kind === 'friends' && kind === 'open' ? t('agenda.played_open_title')
+          : r.kind === 'friends'
+          ? (r.creator_name ? t('agenda.played_friends_title', { name: r.creator_name.split(' ')[0] }) : t('agenda.played_friends_title_anon'))
+          : r.title
+        const people = r.kind === 'tournament'
+          ? (r.entries_count != null ? t('agenda.played_teams', { count: Number(r.entries_count) }) : null)
+          : r.players_count != null ? t(r.kind === 'mix' ? 'agenda.played_players' : 'agenda.played_people', { count: Number(r.players_count) }) : null
+        const line = [dayOf(r.date), r.kind === 'tournament' ? null : timeOf(r.date), people].filter(Boolean).join(' · ')
+        const points = r.i_played && r.my_points != null ? Math.round(Number(r.my_points)) : null
+        return (
+          <Link key={`${r.kind}-${r.id}`} to={to} className={`press block rounded-card bg-surface p-3.5 ${r.i_played ? 'border-2 border-ok' : 'border border-line'}`}>
+            <div className="flex items-start justify-between gap-2">
+              <KindTag kind={kind} past />
+              <StateTag tone="grey" icon={CheckCircle2}>{t('agenda.state_finished')}</StateTag>
+            </div>
+            <div className="mt-2 flex items-baseline justify-between gap-2">
+              <h4 className="text-base font-extrabold leading-snug text-muted [overflow-wrap:anywhere]">{title}</h4>
+              {points != null && <b className="shrink-0 text-sm font-extrabold text-ink-900">{t('agenda.played_points', { points: `${points > 0 ? '+' : ''}${points}` })}</b>}
+            </div>
+            <p className="mt-0.5 text-[13px] text-ink-700">{line}</p>
+          </Link>
+        )
+      })}
+      {!all && rows.length > PLAYED_FIRST && (
+        <button type="button" onClick={() => setAll(true)}
+          className="w-full min-h-[48px] rounded-ctrl border border-line bg-white text-sm font-extrabold text-ink-900">
+          {t('clubprofile.played_more', { count: rows.length - PLAYED_FIRST })}
+        </button>
+      )}
+    </div>
   )
 }
 

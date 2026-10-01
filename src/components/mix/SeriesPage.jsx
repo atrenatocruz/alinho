@@ -29,7 +29,7 @@ const PAST_SHOWN = 2
 
 const people = (g) => (g.participants || [])
   .filter((p) => p.status === 'confirmed')
-  .reduce((n, p) => n + 1 + (p.partner_id ? 1 : 0), 0)
+  .reduce((n, p) => n + 1 + (p.partner_id || p.partner_guest_id ? 1 : 0), 0)
 const signedUp = (g) => (g.participants || []).some((p) => ['confirmed', 'waitlisted'].includes(p.status))
 
 const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()

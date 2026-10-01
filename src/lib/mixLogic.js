@@ -37,11 +37,13 @@ export function shortName(name, maxLen = 16) {
   return `${parts[0]} ${last.charAt(0).toUpperCase()}.`
 }
 
-/** People occupying slots: a row with partner counts as 2. */
+/** People occupying slots: a row with partner counts as 2. O parceiro pode
+    ser uma conta (partner_id) ou um convidado sem conta (partner_guest_id —
+    migration_mix_guest_sem_conta.sql). */
 export const countPeople = (participants = []) =>
   participants
     .filter(p => p.status === 'confirmed')
-    .reduce((n, p) => n + 1 + (p.partner_id ? 1 : 0), 0)
+    .reduce((n, p) => n + 1 + (p.partner_id || p.partner_guest_id ? 1 : 0), 0)
 
 /** Capacidade de um mix: max_players explicito, senao 4 por campo. Era
     calculado in-line em duplicado (ui.jsx, Home.jsx, GameDetails.jsx) —
@@ -222,7 +224,7 @@ export function formDuplas(participants, pointsById = {}, repeatPairKeys = new S
   let solos = []
 
   for (const row of participants.filter(p => p.status === 'confirmed')) {
-    if (row.partner_id && row.partner) duplas.push([row.user, row.partner])
+    if ((row.partner_id || row.partner_guest_id) && row.partner) duplas.push([row.user, row.partner])
     else if (row.user) solos.push(row.user)
   }
 

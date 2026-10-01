@@ -326,14 +326,15 @@ test('#554 mix sem «Inscrição em dupla»: recusa', async () => {
   assert.equal(solo().partner_id, null)
 })
 
-test('#554 parceiro que não está na app: «Sim» junta-o à inscrição que já existe, com link', async () => {
+test('#554 parceiro que não está na app: «Sim» junta-o como convidado sem conta', async () => {
   soloIn()
   assert.match(await say('in com rui costa'), /Queres inscrever a dupla/)
   const out = await say('sim')
-  assert.match(out, /convite\//)
+  assert.match(out, /convidado, sem conta/)
   assert.equal(db.participants.length, 1)
-  assert.ok(solo().partner_id, 'o parceiro fica na linha que já existia')
-  assert.equal(db.partner_invites[0].participant_id, 'solo')
+  assert.ok(solo().partner_guest_id, 'o parceiro-convidado fica na linha que já existia')
+  assert.equal(db.game_guests[0].name, 'Rui Costa')
+  assert.equal(db.game_guests[0].phone_hash ?? null, null, 'convidado por nome não tem número')
 })
 
 // ── #552: «mix» mostra o cartão completo de cada mix aberto ────────────────
@@ -489,10 +490,10 @@ test('«In @X» sem nome conhecido fica «Parceiro de …» e muda quando o X es
   _clearSeenNamesForTests()
   const out = await sayAs('in @351955555555', { mentionPns: ['351955555555'] })
   assert.match(out, /Parceiro de Bernardo Ramos/)
-  const guestId = db.participants[0].partner_id
-  db.profiles.push({ id: guestId, name: 'Parceiro de Bernardo Ramos', phone_hash: 'x', language: 'pt' })
+  const guestId = db.participants[0].partner_guest_id
+  assert.equal(db.game_guests.find((g) => g.id === guestId)?.name, 'Parceiro de Bernardo Ramos')
   await sayAs('boas', { pn: '351955555555', pushName: 'Gonçalo' })
-  assert.equal(db.profiles.find((p) => p.id === guestId).name, 'Gonçalo')
+  assert.equal(db.game_guests.find((g) => g.id === guestId)?.name, 'Gonçalo')
 })
 
 test('«Sim» a parceiro sem conta, mas entretanto entrou alguém com esse nome → pede-lhe a dupla, sem criar outro', async () => {
@@ -513,4 +514,54 @@ test('responder ao cartão com «In <eu> e <parceiro>» inscreve a dupla (antes:
   const cards = await sayWithIds('mix')
   await sayWithIds('In Bernardo Ramos e Afonso Dias', cards[0].id)
   assert.deepEqual(db.participants.map((p) => [p.game_id, p.user_id, p.partner_id]), [['m', 'a', 'b']])
+})
+
+// ── Convidados sem conta (conta = email; Ruben, 30 set) ────────────────────
+// Um número desconhecido nunca ganha conta: entra como linha em game_guests.
+
+test('«In» de número desconhecido → convidado sem conta, com nudge', async () => {
+  const sent = []
+  await handleGroupMessage(
+    { groupJid: 'g@g.us', senderPn: '351955555555@s.whatsapp.net', text: 'in', message: { pushName: 'Gonçalo Novo' }, quotedStanzaId: null, mentionedJids: [], mentionedPns: [] },
+    { sendText: async (_g, t) => { sent.push(t) } },
+  )
+  assert.match(sent.join('\n'), /Entraste como \*convidado\*/)
+  const guest = db.game_guests[0]
+  assert.equal(guest.name, 'Gonçalo Novo')
+  assert.equal(guest.phone_hash, hash('955555555'))
+  assert.deepEqual(db.participants.map((p) => [p.user_id ?? null, p.guest_id, p.status]), [[null, guest.id, 'confirmed']])
+  assert.equal(db.profiles.length, 2, 'não se cria conta nenhuma')
+})
+
+test('«Out» do mesmo número desconhecido tira a inscrição-convidado', async () => {
+  await say('in', '351955555555')
+  assert.equal(db.participants.length, 1)
+  assert.equal(await say('out', '351955555555'), '')
+  assert.equal(db.participants.length, 0)
+  // A linha em game_guests é limpa pelo trigger participants_guest_gc
+  // (migration_mix_guest_sem_conta.sql) — o fake não simula triggers.
+})
+
+test('conta com número ASSOCIADO mas não verificado entra como convidado (verificação primeiro)', async () => {
+  db.profiles.push({ id: 'n', name: 'Nuno Novo', phone_hash: hash('966666666'), phone_verified_at: null, language: 'pt' })
+  db.memberships.push({ user_id: 'n', organization_id: 'o' })
+  await say('in', '351966666666')
+  assert.deepEqual(db.participants.map((p) => [p.user_id ?? null, Boolean(p.guest_id)]), [[null, true]])
+})
+
+test('«In» com conta quando já existe a minha linha-convidado no jogo → adota a linha, sem duplicar', async () => {
+  await say('in', '351955555555')
+  const guestId = db.participants[0].guest_id
+  db.profiles.push({ id: 'n', name: 'Gonçalo Registado', phone_hash: hash('955555555'), language: 'pt' })
+  db.memberships.push({ user_id: 'n', organization_id: 'o' })
+  const out = await say('in', '351955555555')
+  assert.match(out, /Já estás inscrito/)
+  assert.equal(db.participants.length, 1)
+  assert.equal(db.participants[0].guest_id, guestId, 'a linha-convidado fica (a adoção é na confirmação do número)')
+})
+
+test('convidado sem conta não inicia duplas', async () => {
+  const out = await say('in com afonso dias', '351955555555')
+  assert.match(out, /precisas de conta/)
+  assert.equal(db.participants.length, 0)
 })

@@ -404,16 +404,18 @@ export function startSync({ sendText, getGroupMentions }) {
         return
       }
 
-      const { data: promotedProfile } = await supabase
-        .from('profiles')
-        .select('name, language')
-        .eq('id', payload.new.user_id)
-        .single()
+      // A linha promovida pode ser de um convidado sem conta (user_id
+      // nulo, guest_id em game_guests) — o nome vem de lá.
+      const promoted = payload.new.user_id
+        ? (await supabase.from('profiles').select('name, language').eq('id', payload.new.user_id).single()).data
+        : payload.new.guest_id
+          ? (await supabase.from('game_guests').select('name').eq('id', payload.new.guest_id).single()).data
+          : null
 
       await scheduleRepostForOrg(sendText, getGroupMentions, orgId, {
         gameIds: [payload.new.game_id],
         promotedNames: [
-          { gameId: payload.new.game_id, name: promotedProfile?.name || 'Jogador', lang: promotedProfile?.language ?? 'pt' },
+          { gameId: payload.new.game_id, name: promoted?.name || 'Jogador', lang: promoted?.language ?? 'pt' },
         ],
       })
     })

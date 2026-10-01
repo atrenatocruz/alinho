@@ -26,56 +26,23 @@ export function hashPhone(digits) {
 }
 
 /**
- * Creates a real (but never-logged-into) Supabase Auth user + profile +
- * is_guest membership for a WhatsApp sender who has no registered profile
- * yet — same shape as supabase/functions/admin-create-test-user, minus the
- * caller-is-admin check (there's no admin caller here, the bot itself is
- * the trusted actor via its service-role key). phone_hash/whatsapp_jid are
- * set right after creation so this same sender resolves via
- * resolveProfileByPhoneJid on their very next message, exactly like a real
- * signup would.
+ * Identidade-convidado de um remetente sem conta (decisão Ruben, 30 set:
+ * conta = email — o bot NUNCA mais cria contas). Não toca na base de dados:
+ * é só o par (hash do número, JID) + um nome para mostrar. As inscrições
+ * destas pessoas vivem em game_guests + participants.guest_id, sem
+ * profiles, sem rank (o Elo trata o lugar como NULL —
+ * migration_elo_simples.sql). Substitui o createGuestProfile que fabricava
+ * contas guest-*@whatsapp.alinho.pt (git history).
  */
-export async function createGuestProfile(phoneJid, displayName, organizationId) {
-  const digits = phoneJid.split('@')[0]
-  const hash = hashPhone(digits)
-  const name = displayName?.trim() || 'Jogador'
-
-  const { data: created, error: createError } = await supabase.auth.admin.createUser({
-    email: `guest-${crypto.randomUUID()}@whatsapp.alinho.pt`,
-    email_confirm: true,
-    password: crypto.randomUUID(),
-    user_metadata: { name },
-  })
-  if (createError || !created?.user) {
-    throw new Error(`Failed to create guest auth user: ${createError?.message}`)
+export function guestIdentity(phoneJid, displayName) {
+  return {
+    guest: true,
+    id: null,
+    phoneHash: hashPhone(phoneJid.split('@')[0]),
+    jid: phoneJid,
+    name: displayName?.trim() || 'Jogador',
+    language: 'pt',
   }
-
-  // A real signup picks a starting level on the "Escolher Nível" screen
-  // (Iniciado 700 / Regular 900 / Avançado 1100) before ever seeing the
-  // app; a WhatsApp guest never opens the app, so they'd otherwise sit at
-  // rating=NULL forever — showing as "sem ranking" and seeding as the
-  // weakest possible player in every dupla until their first result
-  // lands. complete_rating_onboarding's own fallback for "played before
-  // onboarding" is a 900 baseline (see migration_elo_rating.sql) — reuse
-  // that exact number here rather than inventing a new one.
-  const { error: updateError } = await supabase
-    .from('profiles')
-    .update({
-      phone_hash: hash,
-      whatsapp_jid: phoneJid,
-      rating: 900,
-      rating_anchor: 900,
-      rating_onboarded_at: new Date().toISOString(),
-    })
-    .eq('id', created.user.id)
-  if (updateError) throw new Error(`Failed to set guest profile phone: ${updateError.message}`)
-
-  const { error: membershipError } = await supabase
-    .from('memberships')
-    .insert({ user_id: created.user.id, organization_id: organizationId, is_guest: true })
-  if (membershipError) throw new Error(`Failed to create guest membership: ${membershipError.message}`)
-
-  return { id: created.user.id, name }
 }
 
 /**
@@ -96,11 +63,17 @@ export async function resolveProfileByPhoneJid(phoneJid, organizationId) {
   // do bot e a conta registada). Com .maybeSingle() isso dava erro, a pessoa
   // passava por desconhecida e cada «In» criava mais um convidado. Agora
   // lêem-se todas e escolhe-se a melhor.
+  // Só números VERIFICADOS contam para o match (Ruben, 1 out). O stock
+  // existente foi todo carimbado pela migração (grandfathering:
+  // migration_mix_guest_sem_conta.sql); daqui para a frente, associar um
+  // número na app só conta depois de confirmado (#537) — até lá, o «In»
+  // dessa pessoa entra como convidado sem conta e é adotado ao confirmar.
   const { data: rows, error } = await supabase
     .from('memberships')
     .select('user_id, is_test, profile:profiles!inner(id, name, email, phone_hash, phone_verified_at, whatsapp_jid, language)')
     .eq('organization_id', organizationId)
     .eq('profile.phone_hash', hash)
+    .not('profile.phone_verified_at', 'is', null)
 
   if (error) {
     console.error('Failed to look up membership by phone hash:', error)

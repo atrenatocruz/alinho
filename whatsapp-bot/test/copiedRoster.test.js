@@ -97,14 +97,14 @@ test('alguém cola a lista com o nome de outra pessoa do clube → inscreve essa
   assert.match(out, /✅ Inscrevi Joana Lopes\. Para o tirar, pede ao admin\./)
 })
 
-test('nome de quem não está no clube → entra como convidado, e a lista mostra «(convidado)»', async () => {
+test('nome de quem não está no clube → convidado sem conta (game_guests)', async () => {
   const out = await post(copiedList(['3. 🎾 Paulo Henriques']), '351911111111')
   assert.match(out, /✅ Inscrevi Paulo Henriques como convidado\./)
-  const guest = db.profiles.find((p) => p.name === 'Paulo Henriques')
-  assert.ok(guest?.claim_pending)
-  assert.match(guest.email, /^sem-conta\+.*@invalid\.alinho\.pt$/)
-  assert.ok(db.memberships.some((m) => m.user_id === guest.id && m.is_guest))
-  assert.deepEqual(enrolled(), ['a', 'b', guest.id])
+  const guest = db.game_guests.find((g) => g.name === 'Paulo Henriques')
+  assert.ok(guest, 'linha em game_guests')
+  assert.ok(!db.profiles.some((p) => p.name === 'Paulo Henriques'), 'não se cria conta nenhuma')
+  assert.deepEqual(enrolled(), ['a', 'b', undefined])
+  assert.ok(db.participants.some((p) => p.guest_id === guest.id && p.status === 'confirmed'))
 })
 
 test('dois nomes a mais → inscreve os dois pela mesma regra', async () => {

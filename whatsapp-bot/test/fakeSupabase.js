@@ -9,12 +9,17 @@ export const calls = []
 export function installFakeSupabase(supabase, db) {
   const embed = (row, select) => {
     const out = { ...row }
-    const re = /(\w+):profiles(?:!(\w+))?\s*\(/g
+    const re = /(\w+):(profiles|game_guests)(?:!(\w+))?\s*\(/g
     let m
     while ((m = re.exec(select))) {
       const alias = m[1]
-      const col = m[2]?.includes('partner') ? 'partner_id' : 'user_id'
-      out[alias] = db.profiles.find((p) => p.id === row[col]) ?? null
+      if (m[2] === 'game_guests') {
+        const col = m[3]?.includes('partner') || alias.includes('partner') ? 'partner_guest_id' : 'guest_id'
+        out[alias] = (db.game_guests ?? []).find((g) => g.id === row[col]) ?? null
+      } else {
+        const col = m[3]?.includes('partner') || alias === 'partner' ? 'partner_id' : 'user_id'
+        out[alias] = db.profiles.find((p) => p.id === row[col]) ?? null
+      }
     }
     return out
   }
@@ -23,6 +28,14 @@ export function installFakeSupabase(supabase, db) {
     const get = (r, c) => c.split('.').reduce((o, k) => o?.[k], r)
     const exec = () => {
       calls.push(table)
+      db[table] ??= []
+      // Grandfathering da migração (migration_mix_guest_sem_conta.sql):
+      // quem tem número associado conta como verificado — como em produção
+      // depois da migração. Um teste que queira um número POR verificar
+      // põe phone_verified_at: null explicitamente.
+      for (const p of db.profiles ?? []) {
+        if (p.phone_hash && !('phone_verified_at' in p)) p.phone_verified_at = '2026-10-01T00:00:00Z'
+      }
       if (q.op === 'insert' || q.op === 'upsert') {
         if (db.failInsert?.table === table) {
           const { code, message } = db.failInsert
@@ -31,6 +44,17 @@ export function installFakeSupabase(supabase, db) {
         }
         const out = []
         for (const r of q.rows) {
+          // Upsert com onConflict (ex.: game_guests por (game_id,
+          // phone_hash)): a linha existente é atualizada, como no Postgres.
+          const conflictCols = q.op === 'upsert' && q.onConflict ? q.onConflict.split(',') : null
+          const existing = conflictCols && conflictCols.every((c) => r[c] != null)
+            ? db[table].find((x) => conflictCols.every((c) => x[c] === r[c]))
+            : null
+          if (existing) {
+            Object.assign(existing, r)
+            out.push(existing)
+            continue
+          }
           const row = { id: r.id || crypto.randomUUID(), created_at: new Date().toISOString(), ...r }
           if (q.op === 'upsert') db[table] = db[table].filter((x) => x.id !== row.id)
           db[table].push(row)
@@ -73,7 +97,7 @@ export function installFakeSupabase(supabase, db) {
     const api = {
       select: (s = '*') => { if (q.op === 'select') q.select = s; return api },
       insert: (r) => { q.op = 'insert'; q.rows = [].concat(r); return api },
-      upsert: (r) => { q.op = 'upsert'; q.rows = [].concat(r); return api },
+      upsert: (r, opts = {}) => { q.op = 'upsert'; q.rows = [].concat(r); q.onConflict = opts.onConflict ?? null; return api },
       update: (patch) => { q.op = 'update'; q.patch = patch; return api },
       delete: () => { q.op = 'delete'; return api },
       eq: (c, v) => { q.filters.push((r) => get(r, c) === v); return api },

@@ -33,8 +33,9 @@ export const seenName = (jid) => (jid ? names.get(jid) ?? null : null)
 /** O nome por defeito do parceiro mencionado (locales.js, partner_guest_default_name). */
 export const isDefaultPartnerName = (name) => /^Parceiro de \S|\S's partner$/.test(String(name || ''))
 
-export function notePlaceholder(pn, profile) {
-  if (pn && profile?.id) placeholders.set(pn, { id: profile.id, name: profile.name })
+export function notePlaceholder(pn, entry) {
+  // Convidado sem conta: { phoneHash, name }. Legado (perfil): { id, name }.
+  if (pn && (entry?.id || entry?.phoneHash)) placeholders.set(pn, { id: entry.id ?? null, phoneHash: entry.phoneHash ?? null, name: entry.name })
 }
 
 /**
@@ -56,8 +57,20 @@ export async function renameDefaultPartner(profile, rawName) {
 /** Quem escreveu é um convidado criado há pouco com o nome por defeito? Dá-lhe o nome. */
 export async function renamePlaceholderFor(pn, rawName) {
   const placeholder = pn ? placeholders.get(pn) : null
-  if (!placeholder || !usablePushName(rawName)) return
+  const name = usablePushName(rawName)
+  if (!placeholder || !name) return
   placeholders.delete(pn)
+  if (placeholder.phoneHash) {
+    // Convidado sem conta: as linhas dele em game_guests (pelo número),
+    // só as que ainda têm o nome por defeito.
+    const { error } = await supabase
+      .from('game_guests')
+      .update({ name })
+      .eq('phone_hash', placeholder.phoneHash)
+      .eq('name', placeholder.name)
+    if (error) console.error('Failed to rename default guest:', error.message)
+    return
+  }
   await renameDefaultPartner(placeholder, rawName)
 }
 

@@ -1,3 +1,9 @@
+-- ⛔⛔⛔ NÃO CORRER — RECUSADA PELO FRANCISCO (1 out 2026) ⛔⛔⛔
+-- «Um perfil nunca, mas nunca desaparece para ninguém. Mas para aceder a todas
+-- as informações da pessoa tem de seguir e ser seguida para serem amigos.»
+-- Fica no Git só como registo. O bloco logo a seguir ao BEGIN pára o ficheiro
+-- se alguém o correr por engano. Ver migration_membros_todos_visiveis.sql.
+
 -- ═════════════════════════════════════════════════════════════════════════
 -- Pesquisa de pessoas: os perfis privados não aparecem
 --
@@ -26,6 +32,8 @@
 -- ═════════════════════════════════════════════════════════════════════════
 
 BEGIN;
+
+DO $$ BEGIN RAISE EXCEPTION 'NÃO CORRER: recusada pelo Francisco a 1 out (os perfis nunca se escondem).'; END $$;
 
 DO $$
 DECLARE
