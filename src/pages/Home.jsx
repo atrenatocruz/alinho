@@ -405,7 +405,8 @@ export default function Home() {
       ...lessonRows.map(eventFromLesson),
       ...lessonRequests.map(eventFromLessonRequest),
       // Já vêm montados: um cartão do torneio, ou um por jogo meu.
-      ...tournamentEvents.filter((e) => e.dayKey),
+      ...tournamentEvents.filter((e) => e.dayKey)
+        .map((e) => (e.orgKind ? e : { ...e, orgKind: (memberships || []).find((ms) => ms.organization_id === e.orgId)?.organization?.kind || null })),
     ]
   }, [games, groupMatches, privateMatches, exploreRows, lessonRows, lessonRequests, tournamentEvents, user, memberships])
 

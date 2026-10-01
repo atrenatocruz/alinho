@@ -150,6 +150,10 @@ export default function TournamentPage() {
   // (revisão de 28 set). «Os meus jogos» abre-se pelo botão lima de quem
   // joga — não é separador; sem inscrição, cai no Quadro.
   const entered = activeEntries(data).length > 0
+  // «Os meus jogos» só com jogos (depois do sorteio da minha categoria): antes
+  // abria vazio, e ficava um segundo lima ao lado do «Inscrever a minha
+  // dupla» (Francisco, 1 out: «dois botões verdes????»).
+  const hasGames = (data?.my_matches || []).length > 0
   const tabs = TOURNAMENT_TABS
   const asked = LEGACY_TABS[tabParam] || tabParam
   const tab = tabs.includes(asked) || (asked === 'my_games' && entered) ? asked : tabs[0]
@@ -202,6 +206,7 @@ export default function TournamentPage() {
     : null
   const waiting = categories.reduce((n, c) => n + (c.slots ? Math.max(0, (c.entry_count || 0) - c.slots) : 0) + (c.waitlist_count || 0), 0)
   const panelProps = {
+    hasGames: hasGames && !publicView,
     tournament: tour,
     categories,
     category,
@@ -363,7 +368,7 @@ export default function TournamentPage() {
 
       {/* O botão lima de quem joga (bloco 3 da página do evento): abre os
           seus jogos e o seu caminho. Quem não joga não o tem. */}
-      {entered && !publicView && (
+      {hasGames && !publicView && (
         <div>
           {/* Com a categoria terminada, o lima é o «Partilhar os campeões»:
               este passa a contorno (um lima por ecrã, designer, 28 set). */}

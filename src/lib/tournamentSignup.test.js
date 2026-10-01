@@ -59,7 +59,8 @@ describe('categoriesLeft', () => {
 describe('entriesOpen', () => {
   const now = new Date('2026-10-01T12:00:00Z')
   it('aberto', () => expect(entriesOpen(tour(), cat(), now)).toBe(true))
-  it('torneio já fechado', () => expect(entriesOpen(tour({ status: 'sorteado' }), cat(), now)).toBe(false))
+  // Com o torneio sorteado, fecha a categoria que foi sorteada (30 set).
+  it('torneio já fechado', () => expect(entriesOpen(tour({ status: 'sorteado' }), cat({ status: 'sorteada' }), now)).toBe(false))
   it('categoria já fechada', () => expect(entriesOpen(tour(), cat({ status: 'fechada' }), now)).toBe(false))
   it('prazo passou', () => {
     expect(entriesOpen(tour({ entries_deadline: '2026-09-30T23:59:00Z' }), cat(), now)).toBe(false)
@@ -69,7 +70,7 @@ describe('entriesOpen', () => {
   })
   it('desistir segue a mesma regra', () => {
     expect(canWithdraw(tour(), cat(), now)).toBe(true)
-    expect(canWithdraw(tour({ status: 'sorteado' }), cat(), now)).toBe(false)
+    expect(canWithdraw(tour({ status: 'sorteado' }), cat({ status: 'sorteada' }), now)).toBe(false)
   })
 })
 
@@ -112,5 +113,21 @@ describe('whoIsAlreadyIn — o nome de quem já está na categoria (#480)', () =
     expect(whoIsAlreadyIn([], ['rui'])).toBe(null)
     expect(whoIsAlreadyIn(entries, [])).toBe(null)
     expect(whoIsAlreadyIn(undefined, undefined)).toBe(null)
+  })
+})
+
+// Ensaio do QA, 30 set: com uma categoria sorteada o torneio passa a
+// «sorteado», e as outras categorias continuam abertas.
+describe('inscrições por categoria', () => {
+  const now = new Date('2026-10-01T10:00:00Z')
+  it('categoria aberta num torneio já sorteado', () => {
+    expect(entriesOpen({ status: 'sorteado' }, { status: 'inscricoes' }, now)).toBe(true)
+    expect(entriesOpen({ status: 'a_decorrer' }, { status: 'inscricoes' }, now)).toBe(true)
+  })
+  it('categoria sorteada fecha', () => {
+    expect(entriesOpen({ status: 'sorteado' }, { status: 'sorteada' }, now)).toBe(false)
+  })
+  it('torneio em rascunho, fechado ou terminado não recebe', () => {
+    for (const status of ['rascunho', 'fechado', 'terminado']) expect(entriesOpen({ status }, { status: 'inscricoes' }, now)).toBe(false)
   })
 })

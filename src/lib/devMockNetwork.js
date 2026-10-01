@@ -245,7 +245,10 @@ const RPC_MOCKS = {
     id: FAKE_MEMBER_ID, name: 'Marta Costa', avatar_url: null, rating: 1380,
     gender: 'feminino', preferred_side: 'left', club_names: 'Dev Org',
   }],
-  search_people_basic: () => [{ id: FAKE_MEMBER_ID, name: 'Marta Costa', avatar_url: null }, { id: 'fake-invite-1', name: 'Rui Pinto', avatar_url: null }],
+  // Filtra pelo que se escreve, como a real (parceiro do torneio, 1 out).
+  search_people_basic: (params) => [{ id: FAKE_MEMBER_ID, name: 'Marta Costa', avatar_url: null }, { id: 'fake-invite-1', name: 'Rui Pinto', avatar_url: null },
+    { id: 'fake-joana', name: 'Joana Martins', avatar_url: null }, { id: 'fake-martim', name: 'Martim Sousa', avatar_url: null }]
+    .filter((p) => !params?.p_query || p.name.toLowerCase().includes(String(params.p_query).trim().toLowerCase())),
   list_players: () => [{
     id: FAKE_MEMBER_ID, name: longNames() ? 'Marta Sofia Costa de Vasconcelos Rodrigues' : 'Marta Costa', avatar_url: null, rating: 1380,
     gender: 'feminino', preferred_side: 'left', club_names: 'Dev Org',

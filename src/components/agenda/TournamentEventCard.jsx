@@ -36,6 +36,11 @@ export default function TournamentEventCard({ event, past, footer = null }) {
   const isMatch = event.source === 'tournament_match'
   const to = `/torneio/${event.slug || event.id}`
   const frame = { background: LILAC.bg, borderColor: LILAC.border, borderWidth: 2 }
+  const stateTag = !isMatch && event.myState ? (
+    <span className="rounded-full bg-white px-2.5 py-1 text-xs font-extrabold" style={{ color: LILAC.ink }}>
+      {t(STATE_KEY[event.myState] || 'tsignup.state_in')}
+    </span>
+  ) : null
 
   // Cartão com organizador (design-handoff/2026-09-28-cartao-com-organizador,
   // o do Dev 4 no b26fc07a): em cima quem organiza, que abre o perfil do
@@ -45,7 +50,9 @@ export default function TournamentEventCard({ event, past, footer = null }) {
   return (
     <div className={`card relative press hover:shadow-lift ${past ? 'opacity-60' : ''}`} style={frame}>
       <Link to={to} className="absolute inset-0 rounded-[inherit]" aria-label={event.raw?.name || event.orgName || ''} />
-      <OrgHeader event={event} past={past} />
+      {/* O estado vai para o canto, ao lado de quem organiza, como no mix
+          (457bfaf, Francisco 30 set). */}
+      <OrgHeader event={event} past={past} right={stateTag} />
       {body()}
       {footer && <div className="relative z-[1]">{footer}</div>}
     </div>
@@ -73,11 +80,7 @@ export default function TournamentEventCard({ event, past, footer = null }) {
             ? `${t('agenda.kind_tournament')} · ${event.categoryCode}`
             : t('agenda.kind_tournament')}
         </span>
-        {!isMatch && event.myState && (
-          <span className="rounded-full bg-white px-2.5 py-1 text-xs font-extrabold" style={{ color: LILAC.ink }}>
-            {t(STATE_KEY[event.myState] || 'tsignup.state_in')}
-          </span>
-        )}
+        {!event.orgName && stateTag}
       </div>
 
       {/* A hora só existe depois do sorteio; antes é um evento de dias. */}
