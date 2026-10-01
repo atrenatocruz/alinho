@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: 'Unauthorized' }, 401)
   }
 
-  let body: { phone?: string }
+  let body: { phone?: string; channel?: string }
   try {
     body = await req.json()
   } catch {
@@ -105,6 +105,11 @@ Deno.serve(async (req) => {
   if (normalized.length < 9) {
     return jsonResponse({ error: 'invalid_phone' }, 400)
   }
+  // Canal «whatsapp» (grátis): o código volta à app para a pessoa o
+  // ESCREVER no grupo do clube («Confirmar 482917») — a prova de posse é a
+  // mensagem sair do número dela, não a receção; mostrar o código ao
+  // browser não enfraquece nada nesta direção. Sem canal, SMS.
+  const groupChannel = body.channel === 'whatsapp'
 
   const secret = Deno.env.get('PHONE_HASH_SECRET')
   // Modo de teste (SÓ para ambientes sem utilizadores reais, ex. dev): com
@@ -121,7 +126,7 @@ Deno.serve(async (req) => {
   const twilioSid = Deno.env.get('TWILIO_ACCOUNT_SID')
   const twilioToken = Deno.env.get('TWILIO_AUTH_TOKEN')
   const twilioFrom = Deno.env.get('TWILIO_FROM')
-  if (!secret || (!devMode && !useVonage && (!twilioSid || !twilioToken || !twilioFrom))) {
+  if (!secret || (!devMode && !groupChannel && !useVonage && (!twilioSid || !twilioToken || !twilioFrom))) {
     console.error('send-otp misconfigured: faltam secrets', {
       PHONE_HASH_SECRET: !secret, OTP_DEV_MODE: devMode, VONAGE: useVonage,
       TWILIO_ACCOUNT_SID: !twilioSid, TWILIO_AUTH_TOKEN: !twilioToken, TWILIO_FROM: !twilioFrom,
@@ -161,6 +166,10 @@ Deno.serve(async (req) => {
   const expiresAt = ver?.[0]?.expires_at ?? null
   if (!code) {
     return jsonResponse({ error: 'verification_failed' }, 500)
+  }
+
+  if (groupChannel) {
+    return jsonResponse({ ok: true, expires_at: expiresAt, code, channel: 'whatsapp' })
   }
 
   if (devMode) {
