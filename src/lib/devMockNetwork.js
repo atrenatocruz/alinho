@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 import { LESSON_RPC_MOCKS, LESSON_TABLE_MOCKS, LESSON_NOTICES } from './devMockLessons'
-import { withManyOrgs } from './devMockGerir'
+import { withManyOrgs, PLAYED_EVENTS } from './devMockGerir'
 import {
   TOURNAMENT_RPC_MOCKS, TOURNAMENT_TABLE_MOCKS, TOURNAMENT_CLOSE_RPC_MOCKS, TOURNAMENT_CLOSE_TABLE_MOCKS,
   TOURNAMENT_SCORE_TODAY_TABLE_MOCKS, TOURNAMENT_REOPEN_RPC_MOCKS, TOURNAMENT_GROUPS_DONE_TABLE_MOCKS, TOURNAMENT_PROMOTED_TABLE_MOCKS, TOURNAMENT_PROMOTED_RPC_MOCKS,
@@ -722,13 +722,24 @@ const rotating = () => localStorage.getItem('mockRotatingMix') === 'true'
 // página do evento): não inscrito, inscrito antes de começar, inscrito a
 // decorrer (com duplas e o meu par) e terminado. 8 jogadores, 2 campos.
 const eventState = () => localStorage.getItem('mockEventState')
-const EV_NAMES = ['Diogo Alexandre', 'Renato Cruz', 'João Jesus', 'Ana Moreira', 'André Sousa', 'Beatriz Faria', 'Rui Costa']
+// localStorage.mockLongNames = 'true': nomes compridos (prints das duplas, 1 out).
+const EV_NAMES = localStorage.getItem('mockLongNames') === 'true'
+  ? ['Maria Inês Albuquerque de Vasconcelos', 'João Pedro Figueiredo Cardoso', 'Ana Catarina Sampaio Rodrigues', 'Francisco Xavier Magalhães', 'Beatriz Alexandra Fonseca Pinto', 'Rui Miguel Carvalho Teixeira', 'Leonor Sofia Bettencourt Alves']
+  : ['Diogo Alexandre', 'Renato Cruz', 'João Jesus', 'Ana Moreira', 'André Sousa', 'Beatriz Faria', 'Rui Costa']
 const EV_PEOPLE = [
   // localStorage.mockNotPlaying = 'true': quem entra não joga neste mix (o marcador que só marca, 29 set).
   { id: localStorage.getItem('mockNotPlaying') === 'true' ? 'fake-francisco' : MOCK_ADMIN_USER_ID, name: 'Francisco Barros', avatar_url: null, preferred_side: 'left' },
   ...EV_NAMES.map((name, i) => ({ id: `fake-${i}`, name, avatar_url: null, preferred_side: i % 2 ? 'both' : 'right' })),
 ]
-const evPeople = () => (eventState() === 'open' ? EV_PEOPLE.slice(1) : EV_PEOPLE)
+// localStorage.mockEventSize = '12': 3 campos, 12 lugares (4 nomes a mais);
+// mockEventCount = 'N': só os N primeiros inscritos (0 = ninguém) — para a
+// revisão do mix com a designer (30 set).
+const EV_EXTRA = ['Marta Costa', 'Tiago Ferreira', 'Inês Lopes', 'Pedro Nunes'].map((name, i) => ({ id: `fake-x${i}`, name, avatar_url: null, preferred_side: 'both' }))
+const evPeople = () => {
+  const all = [...(eventState() === 'open' ? EV_PEOPLE.slice(1) : EV_PEOPLE), ...(localStorage.getItem('mockEventSize') === '12' ? EV_EXTRA : [])]
+  const n = localStorage.getItem('mockEventCount')
+  return n != null ? all.slice(0, Number(n)) : all
+}
 // localStorage.mockAllPairs = 'true': toda a gente inscrita em dupla (o
 // «Sortear duplas» não aparece — sortear-duplas, 27 set).
 const EV_PARTICIPANTS = () => (localStorage.getItem('mockAllPairs') === 'true'
@@ -742,7 +753,10 @@ const EV_PARTICIPANTS = () => (localStorage.getItem('mockAllPairs') === 'true'
   })))
 const evTeam = (id, a, b, seed) => ({ id, game_id: 'fake-game-1', player1_id: a.id, player2_id: b.id, player1: a, player2: b, seed_ranking: seed, created_at: new Date().toISOString() })
 const [e0, e1, e2, e3, e4, e5, e6, e7] = EV_PEOPLE
-const EV_TEAMS = [evTeam('et1', e1, e0, 4), evTeam('et2', e2, e3, 3), evTeam('et3', e4, e5, 2), evTeam('et4', e6, e7, 1)]
+const EV_TEAMS_BASE = [evTeam('et1', e1, e0, 4), evTeam('et2', e2, e3, 3), evTeam('et3', e4, e5, 2), evTeam('et4', e6, e7, 1)]
+// localStorage.mockTeams = '5' | '6': mais duplas (com os nomes de EV_EXTRA) — número ímpar de duplas (1 out).
+const EV_TEAMS = [...EV_TEAMS_BASE, evTeam('et5', EV_EXTRA[0], EV_EXTRA[1], 0), evTeam('et6', EV_EXTRA[2], EV_EXTRA[3], -1)]
+  .slice(0, Number(localStorage.getItem('mockTeams') || 4))
 const EV_MATCHES = () => [
   localStorage.getItem('mockProSet')
     ? { id: 'em1', game_id: 'fake-game-1', round_number: 1, court_number: 1, phase: 'group', team_a_id: 'et1', team_b_id: 'et2', score_a: 9, score_b: 8, winner_team_id: 'et1',
@@ -1296,7 +1310,10 @@ const TABLE_MOCKS = {
       // 'paused': o mix parado do #448 — as duplas ficam, os jogos e os
       // resultados foram apagados.
       // 'ready': o mix começou (duplas feitas), a Ronda 1 ainda não (28 set).
-      status: { open: 'open', joined: 'closed', live: 'in_progress', finished: 'finished', paused: 'closed', ready: 'in_progress' }[eventState()],
+      status: { open: 'open', joined: 'closed', live: 'in_progress', finished: 'finished', paused: 'closed', ready: 'in_progress', cancelled: 'cancelled' }[eventState()],
+      ...(localStorage.getItem('mockEventSize') === '12' ? { num_courts: 3, max_players: 12 } : {}),
+      // mockEventPast = 'true': a hora do mix já passou (há 1 h).
+      ...(localStorage.getItem('mockEventPast') === 'true' ? { date: new Date(Date.now() - 3600000).toISOString() } : {}),
       ...(eventState() === 'finished' ? { winner_team_id: 'et1' } : {}),
       // localStorage.mockRoundAgoMin = '7' | '21': a ronda começou há N min
       // (21 = o tempo acabou, entre rondas) — o alarme das rondas, 27 set.
@@ -1518,6 +1535,28 @@ const wantsSingle = (init) => {
 
 // Gerir com muitos clubes e grupos (localStorage.mockManyOrgs = 'true').
 TABLE_MOCKS.organizations = withManyOrgs(TABLE_MOCKS.organizations)
+// «Já jogados» na Home.
+RPC_MOCKS.list_played_events = () => PLAYED_EVENTS()
+// Só para ler (quem não jogou): a sessão de 6 por rondas, toda jogada, com a
+// Joana no lugar de quem vê — a conta de teste não está no jogo.
+const FULL_FRIEND_MATCH = RPC_MOCKS.get_friend_match
+RPC_MOCKS.get_friend_match_readonly = (params) => {
+  const keep = [localStorage.getItem('mockFriendSession'), localStorage.getItem('mockFriendStarted')]
+  localStorage.setItem('mockFriendSession', 'rounds6'); localStorage.setItem('mockFriendStarted', 'done')
+  const d = FULL_FRIEND_MATCH(params)
+  ;['mockFriendSession', 'mockFriendStarted'].forEach((k, i) => (keep[i] == null ? localStorage.removeItem(k) : localStorage.setItem(k, keep[i])))
+  const out = JSON.parse(JSON.stringify(d).split(MOCK_ADMIN_USER_ID).join('u-jc').split('Admin (Dev)').join('Joana Costa'))
+  out.games.forEach((g) => { g.waiting_for = [] })
+  return out
+}
+// localStorage.mockFriendNotMine = 'true': abrir a sessão como quem não jogou.
+{
+  const full = RPC_MOCKS.get_friend_match
+  RPC_MOCKS.get_friend_match = (params) => {
+    if (localStorage.getItem('mockFriendNotMine') === 'true') return { __error: 'not yours', __code: '42501' }
+    return full(params)
+  }
+}
 
 export function installDevMockNetwork() {
   if (!import.meta.env.DEV) return

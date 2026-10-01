@@ -9,6 +9,7 @@ import { ConfirmSheet } from '../components/ui'
 import { GameEventCard, FriendsEventCard, ExploreEventCard } from '../components/agenda/EventCard'
 import { DayHeader, MonthSheet, FilterSheet, FilterChips, LocationChip, LocationSheet, ViewToggle, Sheet, dayLabel, KIND_FILTER_KEY, SHOW_LABEL_KEY } from '../components/agenda/AgendaControls'
 import HomeSearch from '../components/agenda/HomeSearch'
+import PlayedList from '../components/agenda/PlayedList'
 import { MapView } from '../components/agenda/MapView'
 import { listExploreEvents, getSavedLocation, saveLocation } from '../lib/explore'
 import { countPeople, mixCapacity, isGenderMismatch, isMissingGender, isAgeIneligible, isMissingBirthday } from '../lib/mixLogic'
@@ -837,6 +838,10 @@ export default function Home() {
 
       {viewMode === 'map' ? (
         <MapView pins={pins} location={location} onSelectPin={setSelectedPin} />
+      ) : filters.show === 'played' ? (
+        // «Já jogados» (27 set): a lista do que já se jogou, do mais recente
+        // para trás, em vez da agenda por dias.
+        <PlayedList orgIds={filters.orgIds} kinds={filters.kinds} />
       ) : (
         <div className="mt-3 space-y-5">
           {days.map(({ dayKey, events: dayEvents }) => (

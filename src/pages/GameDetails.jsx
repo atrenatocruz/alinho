@@ -2137,38 +2137,14 @@ export default function GameDetails() {
 
   const duplaLabel = (team) => `${team?.player1?.name || '?'} & ${team?.player2?.name || '?'}`
 
-  // Pairs duplas into courts by their position in the list (1st & 2nd →
-  // court 1, 3rd & 4th → court 2, ...) rather than by seed_ranking. Used
-  // for the "Duplas" preview (screen + share text) only — NOT for the
-  // actual Round 1 draw (handleStartRound1 still uses seedCourts there,
-  // seeding real matches by strength). seed_ranking is set once when
-  // duplas are formed and never updated by a manual admin swap, so
-  // sorting this preview by it would silently re-shuffle a dupla the
-  // admin just dragged into a specific spot into a different court.
-  const pairIntoCourts = (teamsArray, maxCourts) => {
-    const matches = []
-    for (let c = 1; c <= maxCourts; c++) {
-      const a = teamsArray[(c - 1) * 2]
-      const b = teamsArray[(c - 1) * 2 + 1]
-      if (a && b) matches.push({ court_number: c, team_a_id: a.id, team_b_id: b.id })
-    }
-    return matches
-  }
-
+  // Só a lista das duplas, pela ordem do ecrã (Francisco, 1 out): os jogos
+  // são os da Ronda 1, sorteados à parte (seedCourts/roundRobin). Antes
+  // punha-as em campos pela ordem da lista, com «vs» — jogos que não eram
+  // os da Ronda 1 (A2N M3: «estes dois sorteios são completamente
+  // diferentes»).
   const buildDuplasShareMessage = () => {
-    const courtMatches = pairIntoCourts(teams, numCourts)
-    const pairedIds = new Set(courtMatches.flatMap(m => [m.team_a_id, m.team_b_id]))
-    const leftover = teams.filter(team => !pairedIds.has(team.id))
-
     const lines = [t('gamedetails.share_duplas_title_line', { title: game?.title || t('gamedetails.share_default_title') }), '']
-    courtMatches.forEach((m) => {
-      lines.push(t('gamedetails.share_duplas_court_line', {
-        number: m.court_number,
-        teamA: duplaLabel(teamById[m.team_a_id]),
-        teamB: duplaLabel(teamById[m.team_b_id]),
-      }))
-    })
-    leftover.forEach((team) => lines.push(duplaLabel(team)))
+    teams.forEach((team, i) => lines.push(t('gamedetails.share_duplas_line', { number: i + 1, team: duplaLabel(team) })))
     lines.push('', t('gamedetails.share_signature'))
     return lines.join('\n')
   }
@@ -2987,43 +2963,17 @@ export default function GameDetails() {
                   renderPairsEditor()
                 ) : (
                   <div className="space-y-2">
-                    {(() => {
-                      const courtMatches = pairIntoCourts(teams, numCourts)
-                      const pairedIds = new Set(courtMatches.flatMap(m => [m.team_a_id, m.team_b_id]))
-                      const leftover = teams.filter(team => !pairedIds.has(team.id))
-                      return (
-                        <>
-                          {courtMatches.map((m) => {
-                            const a = teamById[m.team_a_id]
-                            const b = teamById[m.team_b_id]
-                            return (
-                              <div key={m.court_number} className="rounded-ctrl p-3 bg-canvas">
-                                <div className="flex items-center justify-between gap-2 mb-2 font-mono text-[11px] font-extrabold uppercase tracking-widest text-ink-500">
-                                  <span>{t('gamedetails.court_number', { number: m.court_number })}</span>
-                                  {a && b && teamHasPoints(a) && teamHasPoints(b) && (
-                                    <span className="tabular-nums normal-case tracking-normal">
-                                      {t('gamedetails.court_points_vs', { a: teamPoints(a), b: teamPoints(b) })}
-                                    </span>
-                                  )}
-                                </div>
-                                {renderDuplaBlock(a, { showPoints: false })}
-                                <div className="flex items-center gap-2 py-2">
-                                  <div className="flex-1 h-px bg-line" />
-                                  <span className="text-[11px] font-extrabold text-muted uppercase tracking-wide">{t('gamedetails.vs')}</span>
-                                  <div className="flex-1 h-px bg-line" />
-                                </div>
-                                {renderDuplaBlock(b, { showPoints: false })}
-                              </div>
-                            )
-                          })}
-                          {leftover.map((team) => (
-                            <div key={team.id} className="rounded-ctrl p-3 bg-canvas">
-                              {renderDuplaBlock(team)}
-                            </div>
-                          ))}
-                        </>
-                      )
-                    })()}
+                    {/* Só as duplas, sem campos nem «vs» (Francisco, 1 out): os
+                        jogos são os da Ronda 1. Os pontos são os da dupla. */}
+                    {teams.map((team, i) => (
+                      <div key={team.id} className="rounded-ctrl p-3 bg-canvas">
+                        <p className="mb-2 font-mono text-[11px] font-extrabold uppercase tracking-widest text-ink-500">
+                          {t('gamedetails.dupla_number', { number: i + 1 })}
+                          {teamHasPoints(team) && <span className="normal-case tracking-normal"> · {teamPoints(team)} {t('gamedetails.points_suffix')}</span>}
+                        </p>
+                        {renderDuplaBlock(team, { showPoints: false })}
+                      </div>
+                    ))}
                   </div>
                 )}
               </>
