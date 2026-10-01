@@ -7,6 +7,7 @@ import LocationOpenWith from '../LocationOpenWith'
 import { whatsappShare } from '../../lib/partnerInvite'
 import { formatWords, categoryWhen, slotsWords, tournamentUrl, shareMessage } from '../../lib/tournamentPublic'
 import { pricePerPlayer } from '../../lib/tournaments'
+import { entriesOpen as categoryOpen } from '../../lib/tournamentSignup'
 
 /** Metade, para o preço dizer as duas coisas: o cartaz do clube anuncia por
  *  jogador e o campo é por dupla (decisão de 23 set — a unidade não muda). */
@@ -72,7 +73,7 @@ export default function PublicInfo({ tournament, categories = [], entriesOpen = 
                 <p className="font-extrabold text-ink-900 truncate">
                   {c.code} · {c.name}
                 </p>
-                {entriesOpen && slots && (
+                {entriesOpen && categoryOpen(tournament, c) && slots && (
                   <span className={`shrink-0 text-xs font-extrabold ${slots.key === 'tsignup.category_full' ? 'text-muted' : 'text-ok-700'}`}>
                     {t(slots.key, slots.values)}
                   </span>

@@ -29,6 +29,7 @@ import { TOURNAMENT_PANELS, TOURNAMENT_TABS, TOURNAMENT_TAB_OWNER } from '../com
 import AdminBar from '../components/tournament/AdminBar'
 import CreateTournamentForm from '../components/tournament/CreateTournamentForm'
 import ChampionsBlock from '../components/tournament/ChampionsBlock'
+import NextGameCard, { useMyNextGame } from '../components/tournament/NextGameCard'
 import DrawAdminPanel from '../components/tournament/DrawAdminPanel'
 import TournamentCalendarGrid from '../components/tournament/TournamentCalendarGrid'
 import { drawProgress, statusKey } from '../components/tournament/drawProgress'
@@ -58,19 +59,6 @@ const STATE_PILL = {
   sorteado: 'dark',
   a_decorrer: 'live',
   terminado: 'grey',
-}
-
-/** O botão lima de quem joga: «A decorrer · o meu jogo», ou «O teu próximo
- *  jogo · sáb 12:00», ou, sem nenhum por jogar, «Os meus jogos». */
-function nextGameLabel(myMatches, t, lang) {
-  const open = myMatches.filter((m) => !['terminado', 'falta', 'desistencia'].includes(m.status))
-  if (open.some((m) => m.status === 'a_decorrer')) return t('tournament.my_game_live')
-  const when = (m) => (m.date ? new Date(`${m.date}T${m.time || '00:00'}`) : null)
-  const next = open.filter((m) => when(m)).sort((a, b) => when(a) - when(b))[0]
-  if (!next) return t('tournament.tab_my_games')
-  const d = when(next)
-  const day = d.toLocaleDateString(lang, { weekday: 'short' }).replace('.', '').slice(0, 3).toLowerCase()
-  return t('tournament.my_next_game', { when: next.time ? `${day} ${next.time.slice(0, 5)}` : day })
 }
 
 export default function TournamentPage() {
@@ -130,6 +118,8 @@ export default function TournamentPage() {
   }, [wantsEdit, tourId])
 
   const categories = data?.categories || []
+  // O meu próximo jogo, do quadro da minha categoria sorteada (1 out).
+  const myGame = useMyNextGame(activeEntries(data), categories, data?.my_matches || [])
   // A categoria e o separador vivem no endereço: o link que se partilha no
   // WhatsApp tem de abrir no mesmo sítio para quem o recebe.
   const catParam = params.get('cat')
@@ -150,6 +140,12 @@ export default function TournamentPage() {
   // (revisão de 28 set). «Os meus jogos» abre-se pelo botão lima de quem
   // joga — não é separador; sem inscrição, cai no Quadro.
   const entered = activeEntries(data).length > 0
+  // «Os meus jogos» só com jogos (depois do sorteio da minha categoria): antes
+  // abria vazio, e ficava um segundo lima ao lado do «Inscrever a minha
+  // dupla» (Francisco, 1 out: «dois botões verdes????»). Os jogos vêm do
+  // quadro: o `my_matches` da página nunca veio da base de dados (#508).
+  const hasGames = myGame.hasGames
+  // Só 2 ou 3 separadores (regra de 24 set): «Os meus jogos» não é um deles.
   const tabs = TOURNAMENT_TABS
   const asked = LEGACY_TABS[tabParam] || tabParam
   const tab = tabs.includes(asked) || (asked === 'my_games' && entered) ? asked : tabs[0]
@@ -202,6 +198,7 @@ export default function TournamentPage() {
     : null
   const waiting = categories.reduce((n, c) => n + (c.slots ? Math.max(0, (c.entry_count || 0) - c.slots) : 0) + (c.waitlist_count || 0), 0)
   const panelProps = {
+    hasGames: hasGames && !publicView,
     tournament: tour,
     categories,
     category,
@@ -361,19 +358,15 @@ export default function TournamentPage() {
       {/* Campeões da categoria, quando termina (peça 2, 28 set). */}
       <ChampionsBlock tournament={tour} category={category} />
 
-      {/* O botão lima de quem joga (bloco 3 da página do evento): abre os
-          seus jogos e o seu caminho. Quem não joga não o tem. */}
-      {entered && !publicView && (
-        <div>
-          {/* Com a categoria terminada, o lima é o «Partilhar os campeões»:
-              este passa a contorno (um lima por ecrã, designer, 28 set). */}
-          <button type="button" onClick={() => setParam('tab', 'my_games')}
-            className={`press flex min-h-[52px] w-full items-center justify-center gap-1 rounded-ctrl px-4 text-[15px] font-extrabold text-ink-900 ${
-              category?.status === 'terminada' || tour.status === 'terminado' ? 'border-[1.5px] border-line bg-white' : 'bg-lime-400 shadow-card'}`}>
-            {nextGameLabel(data.my_matches || [], t, i18n.language)} ›
-          </button>
-          <p className="mt-1.5 text-xs text-muted">{t('tournament.my_games_hint')}</p>
-        </div>
+      {/* «O teu próximo jogo»: um cartão com o jogo à vista, no lugar do lima
+          que só mudava o separador lá em baixo (Francisco, 1 out). Sem mais
+          jogos, sai. */}
+      {hasGames && !publicView && (
+        <NextGameCard game={myGame} onOpenList={() => {
+          setParam('tab', 'my_games')
+          // Desce até lá: sem isto não se via nada a mudar (Francisco, 1 out).
+          setTimeout(() => document.getElementById('tournament-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150)
+        }} />
       )}
 
       {UnderHeader && <Suspense fallback={null}><UnderHeader {...panelProps} /></Suspense>}
@@ -390,6 +383,7 @@ export default function TournamentPage() {
 
       {/* O separador único da app (Trello #528): muda o que o ecrã mostra,
           por isso é pílula cinzenta — não pastilhas pretas, que são filtro. */}
+      <div id="tournament-tabs" className="scroll-mt-20" />
       <Tabs
         options={tabs.map((key) => ({ value: key, label: t(`tournament.tab_${key}`) }))}
         value={tab}
