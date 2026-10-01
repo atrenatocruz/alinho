@@ -1516,7 +1516,14 @@ const wantsSingle = (init) => {
 // Gerir com muitos clubes e grupos (localStorage.mockManyOrgs = 'true').
 TABLE_MOCKS.organizations = withManyOrgs(TABLE_MOCKS.organizations)
 // «Já jogados» na Home.
-RPC_MOCKS.list_played_events = () => PLAYED_EVENTS()
+// localStorage.mockPlayedEmpty = 'true': nada jogado ainda (o caso vazio).
+RPC_MOCKS.list_played_events = (params) => {
+  if (localStorage.getItem('mockPlayedEmpty') === 'true') return { rows: [], total: 0 }
+  const all = PLAYED_EVENTS()
+  // Página de um clube: só as linhas desse clube (no mock, as do «Clube Exemplo»).
+  if (params?.p_organization_id && localStorage.getItem('mockClubPage') === 'club') all.rows = all.rows.filter((r) => r.org_kind === 'club')
+  return all
+}
 // Só para ler (quem não jogou): a sessão de 6 por rondas, toda jogada, com a
 // Joana no lugar de quem vê — a conta de teste não está no jogo.
 const FULL_FRIEND_MATCH = RPC_MOCKS.get_friend_match

@@ -17,6 +17,8 @@ import { dayLabel } from './AgendaControls'
 
 const PAGE = 20
 const KIND = { mix: 'mix', tournament: 'tournament', friends: 'friends' }
+// Num clube, a sessão entre amigos é «Jogo em aberto» (Francisco, 28 set).
+const kindOf = (r) => (r.kind === 'friends' && r.org_kind !== 'group' ? 'open' : KIND[r.kind])
 
 async function listPlayed(orgId, before) {
   const { data, error } = await supabase.rpc('list_played_events', { p_organization_id: orgId, p_before: before, p_limit: PAGE })
@@ -54,7 +56,7 @@ export default function PlayedList({ orgIds = null, kinds }) {
   if (rows === null) {
     return <div className="flex justify-center py-10"><div className="h-8 w-8 animate-spin rounded-full border-[3px] border-ink-50 border-t-ink-700" /></div>
   }
-  const shown = rows.filter((r) => kinds.includes(KIND[r.kind]) && (!orgIds || orgIds.includes(r.organization_id)))
+  const shown = rows.filter((r) => kinds.includes(kindOf(r)) && (!orgIds || orgIds.includes(r.organization_id)))
   const days = []
   for (const r of shown) {
     const key = toDayKey(new Date(r.date))
@@ -89,11 +91,12 @@ export default function PlayedList({ orgIds = null, kinds }) {
 
 function PlayedCard({ row }) {
   const { t, i18n } = useTranslation()
-  const kind = KIND[row.kind]
+  const kind = kindOf(row)
   const to = row.kind === 'mix' ? `/jogo/${row.id}`
     : row.kind === 'tournament' ? `/torneio/${row.slug || row.id}`
     : `/jogos-privados/sessao/${row.id}`
-  const title = row.kind === 'friends'
+  const title = row.kind === 'friends' && kind === 'open' ? t('agenda.played_open_title')
+    : row.kind === 'friends'
     ? (row.creator_name ? t('agenda.played_friends_title', { name: row.creator_name.split(' ')[0] }) : t('agenda.played_friends_title_anon'))
     : row.title
   const people = row.kind === 'tournament'

@@ -4428,5 +4428,12 @@
   "agenda.played_teams_one": "1 pair",
   "agenda.played_teams_other": "{{count}} pairs",
   "agenda.played_points": "{{points}} points",
-  "agenda.filters_apply_played": "See the games"
+  "agenda.filters_apply_played": "See the games",
+  "clubprofile.events": "Events",
+  "clubprofile.played_empty": "Nothing has been played in this club yet.",
+  "clubprofile.played_empty_group": "Nothing has been played in this group yet.",
+  "clubprofile.played_empty_hint": "Mixes and tournaments show up here once played.",
+  "clubprofile.played_more": "See more ({{count}})",
+  "clubprofile.played_empty_hint_group": "Mixes, tournaments and friends' games show up here once played.",
+  "agenda.played_open_title": "Open game"
 }

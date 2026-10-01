@@ -4440,5 +4440,12 @@
   "agenda.played_teams_one": "1 dupla",
   "agenda.played_teams_other": "{{count}} duplas",
   "agenda.played_points": "{{points}} pontos",
-  "agenda.filters_apply_played": "Ver os jogos"
+  "agenda.filters_apply_played": "Ver os jogos",
+  "clubprofile.events": "Eventos",
+  "clubprofile.played_empty": "Ainda não se jogou nada neste clube.",
+  "clubprofile.played_empty_group": "Ainda não se jogou nada neste grupo.",
+  "clubprofile.played_empty_hint": "Os mixes e os torneios aparecem aqui depois de jogados.",
+  "clubprofile.played_more": "Ver mais ({{count}})",
+  "clubprofile.played_empty_hint_group": "Os mixes, os torneios e os jogos entre amigos aparecem aqui depois de jogados.",
+  "agenda.played_open_title": "Jogo em aberto"
 }
