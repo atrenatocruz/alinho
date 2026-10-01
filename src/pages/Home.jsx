@@ -4,6 +4,7 @@ import { Link, useSearchParams, useNavigationType, useNavigate } from 'react-rou
 import { useTranslation } from 'react-i18next'
 import { Search, X, Check } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { takePendingOrgSlug } from '../lib/loginLinks'
 import { useAuth } from '../contexts/AuthContext'
 import { ConfirmSheet } from '../components/ui'
 import { GameEventCard, FriendsEventCard, ExploreEventCard } from '../components/agenda/EventCard'
@@ -178,17 +179,23 @@ export default function Home() {
   const handleJoin = async (slugOverride) => {
     const slug = (slugOverride ?? joinSlug).trim()
     if (!slug) return
+    const wasMember = memberships.some((m) => m.organization?.slug === slug)
     setJoining(true)
     setJoinError('')
     try {
       const { data: orgId, error } = await joinOrganization(slug)
       if (error) throw error
       // Entrou ou ficou com um pedido? A função devolve o grupo nos dois
-      // casos; quem não ficou membro ficou à espera do admin.
-      if (orgId && user) {
-        const { data: mine } = await supabase.from('memberships').select('id')
-          .eq('organization_id', orgId).eq('user_id', user.id).maybeSingle()
-        if (!mine) setJoinNotice(t('home.join_request_sent'))
+      // casos; quem não ficou membro ficou à espera do admin. O aviso diz o
+      // nome do grupo (QA, 1 out); sem o conseguir ler, a frase sem nome.
+      if (orgId && user && !wasMember) {
+        const [{ data: mine }, { data: org }] = await Promise.all([
+          supabase.from('memberships').select('id').eq('organization_id', orgId).eq('user_id', user.id).maybeSingle(),
+          supabase.from('organizations').select('name').eq('id', orgId).maybeSingle(),
+        ])
+        const name = org?.name
+        if (!mine) setJoinNotice(name ? t('home.join_request_sent_named', { name }) : t('home.join_request_sent'))
+        else setJoinNotice(name ? t('home.join_joined_named', { name }) : t('home.join_joined'))
       }
     } catch (error) {
       console.error('Error joining organization:', error)
@@ -201,12 +208,14 @@ export default function Home() {
     }
   }
 
-  // Links de convite trazem ?org=<slug>. Quem já tem sessão salta o /login e
-  // chega aqui direto, por isso o convite é lido também aqui.
+  // Links de convite trazem ?org=<slug>: quem já tem sessão chega aqui pelo
+  // AfterLogin (/?org=…); quem entrou ou criou conta pelo /login traz o grupo
+  // guardado (takePendingOrgSlug, 24 h). Pede-se aqui para o aviso aparecer.
   useEffect(() => {
-    const orgSlug = searchParams.get('org')
-    if (orgSlug) {
-      handleJoin(orgSlug)
+    const pending = takePendingOrgSlug()
+    const orgSlug = searchParams.get('org') || pending
+    if (orgSlug) handleJoin(orgSlug)
+    if (searchParams.get('org')) {
       setSearchParams((prev) => {
         const next = new URLSearchParams(prev)
         next.delete('org')

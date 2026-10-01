@@ -29,7 +29,7 @@ import TournamentScorePage from './pages/TournamentScorePage'
 import TournamentPrint from './pages/TournamentPrint'
 import CookieConsentBanner from './components/CookieConsentBanner'
 import ErrorBoundary from './components/ErrorBoundary'
-import { safeInternalPath } from './lib/loginLinks'
+import { afterLoginPath, savePendingOrgSlug } from './lib/loginLinks'
 import { reloadOnceForChunk, clearChunkReload } from './lib/chunkReload'
 
 // Route-level splitting (impeccable audit, P3 perf finding): these are all
@@ -305,7 +305,10 @@ const Guard = ({ require, showSplash, children }) => {
    alguem da pagina de entrada para fora, ja com sessao iniciada. */
 function AfterLogin() {
   const [searchParams] = useSearchParams()
-  return <Navigate to={safeInternalPath(searchParams.get('redirect'))} replace />
+  // Convite de grupo com um ?redirect= também: vai-se para onde o redirect
+  // manda, e o grupo fica guardado para a Home pedir mais tarde.
+  if (searchParams.get('org') && searchParams.get('redirect')) savePendingOrgSlug(searchParams.get('org'))
+  return <Navigate to={afterLoginPath(searchParams)} replace />
 }
 
 // SEO (29 set): o index.html traz título, descrição e canónico da landing;
