@@ -227,11 +227,19 @@ function GameFacts({ game, distance }) {
 export function GameEventCard({ event, profile, friendIds = null, action = null, result = null, past = false, distance = null }) {
   const { t, i18n } = useTranslation()
   const game = event.raw
+  // Convidados sem conta (game_guests): titular ou parceiro sem profile —
+  // nome vem da linha do convidado, sempre marcados como guest.
   const players = (game.participants || [])
     .filter((p) => p.status === 'confirmed')
     .flatMap((p) => [
-      { id: p.user_id, name: p.user?.name, rating: p.user?.rating, gender: p.user?.gender, isGuest: p.user?.is_guest, avatar_url: p.user?.avatar_url },
-      ...(p.partner_id ? [{ id: p.partner_id, name: p.partner?.name, rating: p.partner?.rating, gender: p.partner?.gender, isGuest: p.partner?.is_guest, avatar_url: p.partner?.avatar_url }] : []),
+      p.user_id
+        ? { id: p.user_id, name: p.user?.name, rating: p.user?.rating, gender: p.user?.gender, isGuest: p.user?.is_guest, avatar_url: p.user?.avatar_url }
+        : { id: p.guest_id ?? null, name: p.guest?.name || 'Jogador', rating: null, gender: null, isGuest: true, avatar_url: null },
+      ...(p.partner_id
+        ? [{ id: p.partner_id, name: p.partner?.name, rating: p.partner?.rating, gender: p.partner?.gender, isGuest: p.partner?.is_guest, avatar_url: p.partner?.avatar_url }]
+        : p.partner_guest_id
+          ? [{ id: p.partner_guest_id, name: p.partner_guest?.name || 'Jogador', rating: null, gender: null, isGuest: true, avatar_url: null }]
+          : []),
     ])
   // Convidados contam como jogadores mas não entram na média de nível.
   const rated = players.filter((p) => !p.isGuest && p.rating != null)

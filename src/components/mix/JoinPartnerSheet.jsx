@@ -4,18 +4,19 @@ import { Search, UserPlus } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { Sheet } from '../agenda/AgendaControls'
 import { Avatar, PrimaryButton } from '../ui'
-import { partnerNameError, partnerEmailError, PARTNER_NAME_MAX } from '../../lib/partnerInvite'
+import { partnerNameError, PARTNER_NAME_MAX } from '../../lib/partnerInvite'
 import { contemTexto } from '../../lib/semAcentos'
 import { isGenderMismatch, isMissingGender } from '../../lib/mixLogic'
 
-/* Entrar num mix de duplas fixas com parceiro (Trello #339).
+/* Entrar num mix de duplas fixas com parceiro (Trello #339; convidados sem
+   conta desde migration_mix_guest_sem_conta.sql).
    Desenho: design-handoff/2026-09-19-torneios/wireframes/inscricoes.html,
    secção «Inscrever a dupla, não só a mim».
 
    Duas portas na mesma folha:
    • escolher alguém do grupo que já está na app;
-   • «Não está na app?» — escrever o nome (e o email, se quiser), que cria
-     uma conta por reclamar e manda-lhe um convite.
+   • «Não está na app?» — escrever o nome: entra como convidado sem conta
+     (sem conta por reclamar, sem convite — decisão Ruben, 30 set).
 
    Quem grava é o GameDetails (onConfirm), como no AddPlayerSheet. */
 
@@ -27,7 +28,6 @@ export default function JoinPartnerSheet({ game, excludeIds, busy, error, onConf
   const [partnerId, setPartnerId] = useState(null)
   const [mode, setMode] = useState('member') // 'member' | 'named'
   const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
   const [touched, setTouched] = useState(false)
 
   useEffect(() => {
@@ -57,8 +57,7 @@ export default function JoinPartnerSheet({ game, excludeIds, busy, error, onConf
   const shown = (q ? available.filter((m) => contemTexto(m.name, q)) : available).slice(0, 8)
 
   const nameError = partnerNameError(name)
-  const emailError = partnerEmailError(email)
-  const ready = mode === 'member' ? !!partnerId : !nameError && !emailError
+  const ready = mode === 'member' ? !!partnerId : !nameError
 
   const confirm = () => {
     setTouched(true)
@@ -66,7 +65,7 @@ export default function JoinPartnerSheet({ game, excludeIds, busy, error, onConf
     const partner = members.find((m) => m.id === partnerId)
     onConfirm(mode === 'member'
       ? { kind: 'member', partnerId, mismatchName: isGenderMismatch(game, partner) ? partner.name : null }
-      : { kind: 'named', name: name.trim(), email: email.trim() })
+      : { kind: 'named', name: name.trim() })
   }
 
   return (
@@ -135,23 +134,10 @@ export default function JoinPartnerSheet({ game, excludeIds, busy, error, onConf
                   <p className="mt-1 text-sm text-red-600 font-extrabold">{t(`partner.name_error_${nameError}`)}</p>
                 )}
               </div>
-              <div>
-                <input
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  type="email"
-                  inputMode="email"
-                  placeholder={t('partner.email_placeholder')}
-                  className="input-field"
-                />
-                {touched && emailError && (
-                  <p className="mt-1 text-sm text-red-600 font-extrabold">{t('partner.email_error_invalid')}</p>
-                )}
-                {/* Enquanto o envio de emails não existir, dizer a verdade:
-                    o convite vai por link. (Renato está a construir o envio,
-                    21 set — quando existir, este texto cai.) */}
-                <p className="mt-1 text-xs text-muted">{t('partner.email_hint')}</p>
-              </div>
+              {/* Sem email nem convite: o parceiro entra como convidado sem
+                  conta — se criar conta e confirmar o número, as inscrições
+                  futuras ficam logo na conta dele. */}
+              <p className="text-xs text-muted">{t('partner.guest_hint')}</p>
             </div>
           ) : (
             <button onClick={() => { setMode('named'); setPartnerId(null) }} className="press w-full text-left">

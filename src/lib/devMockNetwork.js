@@ -323,6 +323,11 @@ const RPC_MOCKS = {
   },
   // Confirmar o número pelo WhatsApp (#537): um código de teste.
   start_phone_verification: () => [{ code: '482917', expires_at: new Date(Date.now() + 15 * 60000).toISOString() }],
+  // Convidados sem conta (migration_mix_guest_sem_conta.sql): no modo dev
+  // devolve-se só um id — a lista não reflete o convidado, mas o fluxo
+  // fecha sem erro.
+  add_game_guest: () => 'mock-guest-id',
+  join_with_guest_partner: () => 'mock-guest-id',
   // Pedidos de entrada por responder, como o Gerir os lê (a RPC, não a
   // tabela): localStorage.mockJoinRequests = 'true'. Mostra o número no
   // separador «Pessoas» (Trello #528).

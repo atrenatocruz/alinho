@@ -753,6 +753,7 @@ export default function GerirClube() {
             id,
             user_id,
             partner_id,
+            partner_guest_id,
             status
           ),
           recurrence:game_recurrences (
@@ -788,7 +789,7 @@ export default function GerirClube() {
   const loadOpenGames = async () => {
     const { data, error } = await supabase
       .from('games')
-      .select('id, title, date, location, status, max_players, num_courts, open_batch_id, participants(id, user_id, partner_id, status)')
+      .select('id, title, date, location, status, max_players, num_courts, open_batch_id, participants(id, user_id, partner_id, partner_guest_id, status)')
       .eq('organization_id', currentOrganizationId)
       .eq('origin', 'open_slot')
       .order('date', { ascending: false })
@@ -3251,7 +3252,7 @@ export default function GerirClube() {
                   } else {
                     const confirmados = (row.participants || [])
                       .filter((p) => p.status === 'confirmed')
-                      .reduce((n, p) => n + 1 + (p.partner_id ? 1 : 0), 0)
+                      .reduce((n, p) => n + 1 + (p.partner_id || p.partner_guest_id ? 1 : 0), 0)
                     const max = tipo === 'mix' ? (row.max_players || (row.num_courts || 1) * 4) : row.max_players
                     const lugares = tipo === 'torneio' || !max ? null : t('gerirclube.spots_of', { count: confirmados, max })
                     // Torneio: duplas e, enquanto esta aberto, ate quando.
