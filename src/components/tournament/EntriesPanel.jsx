@@ -56,12 +56,25 @@ function noAccountTag(e, t) {
 
 /* O bloco «Não está na app?» — nome e email de quem entra sem conta. O mesmo
    para o jogador 1 e para o 2 (Trello #515). */
-function NotInApp({ t, name, setName, email, setEmail }) {
+function NotInApp({ t, name, setName, email, setEmail, gender, setGender }) {
   return (
     <div className="rounded-ctrl border-2 border-line p-3 space-y-2">
       <p className="text-sm font-extrabold text-ink-900">{t('partner.not_in_app_title')}</p>
       <input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('tentries.admin_name_placeholder')} className="input-field" />
       <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder={t('partner.email_placeholder')} className="input-field" />
+      {/* O sexo de quem entra sem conta (ensaio do QA, 30 set): numa dupla
+          mista não se perguntava a nenhum. Opcional, como a quem tem conta
+          sem o sexo no perfil — serve para o «tens a certeza?» da categoria. */}
+      <p className="text-xs text-ink-700">{t('tentries.admin_guest_gender')}</p>
+      <div className="flex gap-1.5">
+        {[['masculino', t('login.gender_male')], ['feminino', t('login.gender_female')]].map(([g, label]) => (
+          <button key={g} type="button" onClick={() => setGender(gender === g ? null : g)} aria-pressed={gender === g}
+            className={`press flex-1 rounded-full border px-3 py-1.5 text-sm font-extrabold ${
+              gender === g ? 'border-ink-900 bg-ink-900 text-white' : 'border-line bg-canvas text-ink-900'}`}>
+            {label}
+          </button>
+        ))}
+      </div>
       {/* Dizer a verdade a quem passa as inscricoes do formulario para a
           app: o email fica guardado mas NAO sai daqui nenhum email — o
           convite vai pelo link (Trello #479). */}
@@ -90,6 +103,8 @@ function AdminEntrySheet({ organizationId, categories = [], categoryId: initialC
   const [email, setEmail] = useState('')
   // Jogador 1 sem conta, pelo nome (Trello #515).
   const [name1, setName1] = useState('')
+  const [guestGender1, setGuestGender1] = useState(null)
+  const [guestGender2, setGuestGender2] = useState(null)
   const [email1, setEmail1] = useState('')
   // «Sozinho, à espera de parceiro» (Trello #515): fica sem_parceiro.
   const [solo, setSolo] = useState(false)
@@ -153,6 +168,9 @@ function AdminEntrySheet({ organizationId, categories = [], categoryId: initialC
   // O sexo nunca bloqueia (Francisco, 26 set): escolhê-lo é opcional, e se
   // não bater com a categoria pergunta-se antes de gravar.
   const genderOf = (p) => (p ? genders[p.id] || chosenGender[p.id] || null : null)
+  // Quem entra sem conta: o sexo que o admin escolheu no bloco dele.
+  const sexOf1 = player1 ? genderOf(player1) : guestGender1
+  const sexOf2 = partner ? genderOf(partner) : guestGender2
   const [genderAsk, setGenderAsk] = useState(null) // { key, then }
 
   const nameError = name ? partnerNameError(name) : null
@@ -238,7 +256,7 @@ function AdminEntrySheet({ organizationId, categories = [], categoryId: initialC
         {newEntry && (
           <>
             {picker({ label: t('tentries.admin_player1'), q: q1, setQ: setQ1, picked: player1, setPicked: setPlayer1, exclude: partner?.id, slot: 1 })}
-            {!player1 && NotInApp({ t, name: name1, setName: setName1, email: email1, setEmail: setEmail1 })}
+            {!player1 && NotInApp({ t, name: name1, setName: setName1, email: email1, setEmail: setEmail1, gender: guestGender1, setGender: setGuestGender1 })}
 
             {/* Com parceiro, ou sozinho à espera de um (Trello #515). É uma
                 escolha num formulário: pastilhas, não separador (#528). */}
@@ -256,7 +274,7 @@ function AdminEntrySheet({ organizationId, categories = [], categoryId: initialC
         {(!newEntry || !solo) && (
           <>
             {picker({ label: pickerLabel || t('tentries.admin_player2'), q: q2, setQ: setQ2, picked: partner, setPicked: setPartner, exclude: player1?.id || excludeId, slot: 2 })}
-            {!partner && NotInApp({ t, name, setName, email, setEmail })}
+            {!partner && NotInApp({ t, name, setName, email, setEmail, gender: guestGender2, setGender: setGuestGender2 })}
           </>
         )}
 
@@ -288,7 +306,7 @@ function AdminEntrySheet({ organizationId, categories = [], categoryId: initialC
               if (key) setGenderAsk({ key, then: () => onConfirm(payload) })
               else onConfirm(payload)
             }
-            if (!newEntry) { ask(second, [genderOf(partner)]); return }
+            if (!newEntry) { ask(second, [sexOf2]); return }
             ask({
               categoryId,
               player1Id: player1?.id || null,
@@ -297,7 +315,7 @@ function AdminEntrySheet({ organizationId, categories = [], categoryId: initialC
               player1Gender: needsGender(player1) ? chosenGender[player1.id] : null,
               ...(solo ? { partnerId: null, partnerGender: null, guestName: null, guestEmail: null } : second),
               paid,
-            }, [genderOf(player1), solo ? null : genderOf(partner)])
+            }, [sexOf1, solo ? null : sexOf2])
           }}
           disabled={!ready || busy}
           className="w-full"

@@ -56,6 +56,17 @@ function Field({ label, children, hint, error, className = '' }) {
 // min-h 44: alvo de toque para o dedo, à beira do campo (Trello #558).
 const inputClass = 'input-field'
 
+/** Os nomes dos campos: tantos como o dia com mais campos (QA, 30 set). Com
+ *  2 campos por dia e um só nome escrito, o torneio ficava só com o «Campo 1»
+ *  e o «Propor horas» punha todos os jogos nele. Os que faltam levam o nome
+ *  base («Campo 2»); os que a pessoa escreveu ficam como estão. */
+export function courtNames(names = [], days = [], base = (n) => `Campo ${n}`) {
+  const need = Math.max(0, ...days.map((d) => Number(d.courts) || 0))
+  const list = [...names]
+  for (let i = list.length; i < need; i += 1) list.push(base(i + 1))
+  return list
+}
+
 // Só para os botões de acrescentar (+ dia, + campo, + categoria). As
 // escolhas usam <Chips>, a pastilha única da app (Trello #528).
 function Chip({ onClick, children }) {
@@ -305,8 +316,10 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
     ? draft.opens_day : null
   const opensAt = opensDay && draft.opens_time ? localInputToIso(`${opensDay}T${draft.opens_time}`) : null
 
+  const courtBase = (n) => t('tournament.create.court_n', { n })
   const outgoing = (d) => ({
     ...d,
+    courts: courtNames(d.courts, d.days, courtBase),
     entries_close_at: localInputToIso(d.entries_close_at),
     draw_at: d.draw_at || null,
   })
@@ -656,7 +669,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
           ))}
           <Field label={t('tournament.create.court_names')} hint={t('tournament.create.court_names_hint')}>
             <div className="flex flex-wrap gap-1.5">
-              {draft.courts.map((name, i) => (
+              {courtNames(draft.courts, draft.days, courtBase).map((name, i, shown) => (
                 <span key={i} className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-sm focus-within:border-ink-900">
                   {/* O nome edita-se no próprio chip — antes só dava para apagar
                       e voltar a juntar, e «Campo 1 · KIA» ficava impossível
@@ -665,17 +678,20 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
                     value={name}
                     size={Math.max(String(name).length, 6)}
                     aria-label={t('tournament.create.court_rename', { n: i + 1 })}
-                    onChange={(e) => set({ courts: draft.courts.map((c, k) => (k === i ? e.target.value : c)) })}
+                    onChange={(e) => set({ courts: shown.map((c, k) => (k === i ? e.target.value : c)) })}
                     onBlur={(e) => {
                       const clean = e.target.value.trim()
-                      set({ courts: draft.courts.map((c, k) => (k === i ? (clean || t('tournament.create.court_n', { n: i + 1 })) : c)) })
+                      set({ courts: shown.map((c, k) => (k === i ? (clean || courtBase(i + 1)) : c)) })
                     }}
                     className="min-w-0 bg-transparent text-sm text-ink-900 outline-none"
                   />
-                  <button type="button" aria-label={t('tournament.create.remove')} onClick={() => set({ courts: draft.courts.filter((_, k) => k !== i) })} className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center -my-3 -mx-2"><X size={13} /></button>
+                  <button type="button" aria-label={t('tournament.create.remove')} onClick={() => set({ courts: shown.filter((_, k) => k !== i) })} className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center -my-3 -mx-2"><X size={13} /></button>
                 </span>
               ))}
-              <Chip onClick={() => set({ courts: [...draft.courts, t('tournament.create.court_n', { n: draft.courts.length + 1 })] })}>
+              <Chip onClick={() => {
+                const shown = courtNames(draft.courts, draft.days, courtBase)
+                set({ courts: [...shown, courtBase(shown.length + 1)] })
+              }}>
                 <Plus size={13} /> {t('tournament.create.add_court')}
               </Chip>
             </div>

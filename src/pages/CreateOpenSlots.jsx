@@ -110,6 +110,23 @@ export default function CreateOpenSlots({ edit = null }) {
   const [initialSnap] = useState(() => JSON.stringify([initial?.date || '', initial?.ranges || [], initial?.price || '']))
   const dirty = edit && (JSON.stringify([date, ranges, price]) !== initialSnap)
 
+  // «Cancelar o jogo em aberto» (regra do PO, 30 set, pela do Francisco para o
+  // torneio: «cancelar sempre»): cancela TODOS os horários da publicação,
+  // também os que têm gente — quem estava confirmado é avisado pela base de
+  // dados (games_notify_mix_cancelled). Sem ninguém confirmado, apaga.
+  const liveGames = edit ? edit.games.filter((g) => !['cancelled', 'finished', 'completed'].includes(g.status)) : []
+  const confirmedPeople = liveGames.reduce((n, g) => n + (g.participants || []).filter((x) => x.status === 'confirmed').length, 0)
+  const destroyAll = async () => {
+    const ids = liveGames.map((g) => g.id)
+    const { error: err } = confirmedPeople > 0
+      ? await supabase.from('games').update({ status: 'cancelled' }).in('id', ids)
+      : await supabase.from('games').delete().in('id', ids)
+    if (err) throw err
+    const notice = t(confirmedPeople > 0 ? 'open_slots.cancelled_all' : 'open_slots.deleted_all')
+    try { sessionStorage.setItem('gerir.notice', notice) } catch { /* sem sessão */ }
+    navigate(`/gerir/${slug}`, { replace: true, state: { notice } })
+  }
+
   const saveEdit = async () => {
     setError('')
     let slots
@@ -156,6 +173,13 @@ export default function CreateOpenSlots({ edit = null }) {
       edit={edit ? {
         onSave: saveEdit, onCancel: goBack, dirty, saving,
         saveDisabled: !date || validRanges.length === 0, saveHint: t('open_slots.error_missing_fields'),
+        danger: liveGames.length ? {
+          label: t(confirmedPeople ? 'open_slots.danger_cancel' : 'open_slots.danger_delete'),
+          title: t(confirmedPeople ? 'open_slots.danger_cancel_title' : 'open_slots.danger_delete_title'),
+          message: confirmedPeople ? t('open_slots.danger_cancel_message', { count: confirmedPeople, slots: liveGames.length }) : t('open_slots.danger_delete_message'),
+          cancelLabel: t('open_slots.danger_keep'), confirmLabel: t(confirmedPeople ? 'open_slots.danger_cancel_confirm' : 'open_slots.danger_delete_confirm'),
+          onConfirm: destroyAll, errorOf: (err) => describeError(t, err, 'open_slots.error_cancel'),
+        } : null,
       } : null}
       footer={step === 2 ? (
         edit ? (

@@ -15,6 +15,8 @@ const TO_TOURNAMENT = {
 /** O jogo por sets ('melhor_2_sets' | 'melhor_3_sets'): null se estiver
  *  certo e acabado, ou a chave da frase. */
 export function setsResultProblem(scoring, input) {
-  const { problem } = matchProblem(scoring, input)
+  const { problem, setsA, setsB } = matchProblem(scoring, input)
+  // Sets empatados (acabou o tempo): 'tie' — grava-se com aviso (30 set).
+  if (problem === 'match_open' && setsA === setsB && setsA > 0) return 'tie'
   return problem ? (TO_TOURNAMENT[problem] || problem) : null
 }

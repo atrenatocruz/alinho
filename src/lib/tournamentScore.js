@@ -37,11 +37,14 @@ export function resultProblem(scoring, input) {
     // os sets ganhos, e o jogo só fecha quando alguém chega a 2.
     if (input.sets?.length) {
       const { setsA, setsB, decided } = computeSetsResult(input.sets)
-      if (!decided) return 'sets_open'
+      // Sets empatados (acabou o tempo): grava-se, com aviso (Francisco,
+      // 30 set: «não bloqueamos, simplesmente avisamos»).
+      if (!decided) return setsA === setsB && setsA > 0 ? 'tie' : 'sets_open'
       return setsA === setsB ? 'tie' : null
     }
+    if (a === b && a > 0) return 'tie'
     if (Math.max(a, b) !== 2 || Math.min(a, b) > 1) return 'sets_open'
-    return a === b ? 'tie' : null
+    return null
   }
   // A regra do pro set é a única (scoreRules.js, #588). O aviso diz o que
   // está mal, em vez de um «não fecha o jogo» para tudo. Aqui chega só o
@@ -65,8 +68,17 @@ export function needsDecider(sets = []) {
   return !computeSetsResult(firstTwo).decided
 }
 
-/** Quem ganhou, a partir do resultado guardado. null se estiver empatado
- *  (não deve acontecer num torneio). */
+/** Quem ganhou, a partir do resultado guardado. null se estiver empatado.
+ *  Um empate grava-se com aviso e trava o passo seguinte (REGRAS.md ponto 4,
+ *  Francisco, 30 set). */
+
+/** O único aviso que NÃO impede de guardar: o empate. */
+export const blocksSave = (problem) => !!problem && problem !== 'tie'
+
+/** O primeiro jogo acabado empatado de uma lista, ou null. Com ele não se
+ *  passa de fase nem se fecha a categoria. */
+export const tiedMatch = (matches = []) => matches.find((m) => m.status === 'terminado'
+  && m.score_a != null && m.score_b != null && Number(m.score_a) === Number(m.score_b)) || null
 export const winnerSide = (scoreA, scoreB) => (scoreA > scoreB ? 'a' : scoreB > scoreA ? 'b' : null)
 
 /** Arruma os jogos do dia por campo: o que está a decorrer e o que vem a

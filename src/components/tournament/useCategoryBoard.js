@@ -14,6 +14,12 @@ import { errorKind } from '../../lib/errors'
 
 export const REFRESH_MS = 30 * 1000
 
+/** Quem muda o quadro na própria página (passar ao quadro, desfazer, fechar
+ *  a categoria) avisa, e o quadro relê logo — antes só se via na releitura
+ *  seguinte, ~8 s depois (ensaio do QA, 30 set). */
+export const BOARD_CHANGED = 'tournament:board-changed'
+export const boardChanged = (categoryId) => window.dispatchEvent(new CustomEvent(BOARD_CHANGED, { detail: { categoryId } }))
+
 export default function useCategoryBoard(categoryId) {
   const [board, setBoard] = useState({ groups: [], entries: {}, matches: [] })
   const [loading, setLoading] = useState(Boolean(categoryId))
@@ -52,10 +58,13 @@ export default function useCategoryBoard(categoryId) {
     }
     const timer = setInterval(tick, REFRESH_MS)
     document.addEventListener('visibilitychange', tick)
+    const changed = (e) => { if (!e.detail?.categoryId || e.detail.categoryId === categoryId) load(false) }
+    window.addEventListener(BOARD_CHANGED, changed)
     return () => {
       cancelled = true
       clearInterval(timer)
       document.removeEventListener('visibilitychange', tick)
+      window.removeEventListener(BOARD_CHANGED, changed)
     }
   }, [categoryId])
 

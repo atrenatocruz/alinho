@@ -14,7 +14,7 @@
 //     (`tournament.score.problem_<problem>`).
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { needsDecider, resultProblem } from '../../lib/tournamentScore'
+import { blocksSave, needsDecider, resultProblem } from '../../lib/tournamentScore'
 import { computeSetsResult } from '../../lib/scoringLogic'
 import { tieBreakProblem } from './tieBreak'
 import { setsResultProblem } from './scoreProblem'
@@ -99,6 +99,8 @@ export function useScoreEntry({ scoring = 'pro_set_9', tieTarget = 7 } = {}) {
   }
 
   const build = () => {
+    // 8-8 sem tie-break: empate, grava-se com aviso (UX, 30 set).
+    if (eightAll && tbA === '' && tbB === '') return { input: { score_a: 8, score_b: 8 }, warning: 'tie' }
     const tb = tieProblem()
     if (tb) return { problem: tb }
     if (bySets) {
@@ -107,7 +109,7 @@ export function useScoreEntry({ scoring = 'pro_set_9', tieTarget = 7 } = {}) {
       const input = { score_a: setsA, score_b: setsB, sets: rows.map((r, i) => ({ ...r, is_super_tiebreak: i === 2 && decider })) }
       // #588: cada set com a regra única (um 9-2 já não passa por set).
       const p = setsResultProblem(scoring, input)
-      return p ? { problem: p } : { input }
+      return blocksSave(p) ? { problem: p } : { input, warning: p }
     }
     if (askTieBreak) {
       const aWon = Number(tbA) > Number(tbB)
@@ -116,7 +118,7 @@ export function useScoreEntry({ scoring = 'pro_set_9', tieTarget = 7 } = {}) {
     }
     const input = { score_a: a === '' ? NaN : Number(a), score_b: b === '' ? NaN : Number(b) }
     const p = resultProblem(scoring, input)
-    return p ? { problem: p } : { input }
+    return blocksSave(p) ? { problem: p } : { input, warning: p }
   }
 
   const render = ({ teamA, teamB }) => (

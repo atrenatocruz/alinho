@@ -17,3 +17,12 @@ describe('#588 — resultados do torneio e dos amigos com a regra única', () =>
     expect(setsResultProblem('melhor_2_sets', { sets: [{ score_a: 6, score_b: 4 }, { score_a: 3, score_b: 6 }, { score_a: 10, score_b: 9, is_super_tiebreak: true }] })).toBe('tb_margin')
   })
 })
+
+describe('sets empatados (30 set): grava-se com aviso', () => {
+  it('6-4 · 4-6 sem 3.º set é empate', () => {
+    expect(setsResultProblem('melhor_3_sets', sets([6, 4], [4, 6]))).toBe('tie')
+  })
+  it('um set só, ainda por acabar o jogo, continua em aberto', () => {
+    expect(setsResultProblem('melhor_3_sets', sets([6, 4]))).toBe('sets_open')
+  })
+})

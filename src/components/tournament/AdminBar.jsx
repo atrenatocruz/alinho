@@ -174,7 +174,8 @@ export default function AdminBar({ tournament, categories = [], onChanged, onEdi
         )}
         {/* Abre AQUI, onde a pessoa já está (o formulário não tem rota própria). */}
         <button type="button" onClick={() => onEdit?.()} className={`${SECONDARY} ${next || canDraw ? '' : 'flex-1'}`}>
-          <Pencil size={14} /> {preview ? t('tournament.admin.keep_editing') : t('eventactions.edit')}
+          <Pencil size={14} /> {/* «Editar» em todos os estados, o nome aprovado das ações do evento
+              (UX, 30 set) — «Continuar a editar» não cabia com «Abrir inscrições». */}{t('eventactions.edit')}
         </button>
         <button type="button" onClick={() => setMoreOpen(true)} aria-haspopup="dialog" className={`${SECONDARY} ${next || canDraw ? '' : 'flex-1'}`}>
           {t('eventactions.more')} <MoreHorizontal size={16} />
