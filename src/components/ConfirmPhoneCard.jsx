@@ -71,7 +71,14 @@ export default function ConfirmPhoneCard({ compact = false, dismissible = false 
         return
       }
       if (channel === 'whatsapp') {
-        setGroupCode(data?.code ?? null)
+        // Sem código não há instrução que valha — acontece quando a
+        // send-otp no ar ainda é uma versão sem o canal 'whatsapp'.
+        if (!data?.code) {
+          console.error('send-otp sem code no canal whatsapp — redeploy da função?', data)
+          setError(t('phoneconfirm.error_send') + ' (send-otp desatualizada)')
+          return
+        }
+        setGroupCode(data.code)
         setStep('group')
         return
       }
