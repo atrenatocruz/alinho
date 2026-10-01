@@ -11,6 +11,7 @@ import { FieldLabel } from './TournamentBits'
 import { partnerNameError, partnerEmailError, PARTNER_NAME_MAX } from '../../lib/partnerInvite'
 import { slotsLeft, isCategoryFull } from '../../lib/tournamentSignup'
 import { contemTexto } from '../../lib/semAcentos'
+import { searchPlayers } from '../../lib/privateMatches'
 
 /** «25 €» e «12,50 €», nunca «25.00 €»: as casas decimais só aparecem
  *  quando existem, e a vírgula é a do idioma de quem lê. */
@@ -78,10 +79,29 @@ export default function TournamentSignupSheet({ tournament, categories, category
 
   // Sem contar acentos: «goncalves» encontra «Gonçalves».
   const q = query.trim()
-  const shown = useMemo(
-    () => (q ? members.filter((m) => contemTexto(m.name, q)) : members).slice(0, 6),
-    [members, q],
-  )
+  // Torneio público: o parceiro procura-se em toda a app, não só nos membros
+  // do clube — quem não era membro não encontrava o parceiro e tinha de o
+  // pôr à mão, e ele não recebia o convite (ensaio do QA, 1 out). A procura
+  // geral (search_people_basic, Dev 3) esconde os perfis privados a quem não
+  // partilha uma organização. Torneio privado: só os membros, como antes.
+  const isPublic = tournament?.is_public !== false
+  const [found, setFound] = useState([])
+  useEffect(() => {
+    if (!isPublic || q.length < 2) { setFound([]); return undefined }
+    let alive = true
+    const timer = setTimeout(() => {
+      searchPlayers(q)
+        .then((rows) => { if (alive) setFound(rows.filter((r) => r.id !== user?.id)) })
+        .catch((err) => { console.error('Error searching players:', err); if (alive) setFound([]) })
+    }, 250)
+    return () => { alive = false; clearTimeout(timer) }
+  }, [q, isPublic, user?.id])
+  const shown = useMemo(() => {
+    const mine = q ? members.filter((m) => contemTexto(m.name, q)) : members
+    if (!q) return mine.slice(0, 6)
+    const seen = new Set(mine.map((m) => m.id))
+    return [...mine, ...found.filter((p) => !seen.has(p.id))].slice(0, 8)
+  }, [members, found, q])
 
   const chosen = categories.find((c) => c.id === categoryId)
   const nameError = partnerNameError(name)
@@ -149,6 +169,9 @@ export default function TournamentSignupSheet({ tournament, categories, category
           </div>
 
           <div className="space-y-1.5">
+            {q.length >= 2 && shown.length === 0 && (
+              <p className="px-1 text-xs text-muted">{t('tsignup.search_empty')}</p>
+            )}
             {shown.map((m) => {
               const picked = mode === 'partner' && partnerId === m.id
               return (

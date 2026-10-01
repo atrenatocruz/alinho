@@ -346,6 +346,16 @@ export default function GerirClube() {
   // Limites do plano: a mensagem fica no ecrã, junto do que falhou, em vez
   // de um alert do browser que não diz em que plano estamos (Trello #265).
   const [gameError, setGameError] = useState('')
+  // Perguntas com a peça da app, nunca o confirm() do navegador (regra da UX,
+  // 30 set): askConfirm({ title, message, confirmLabel, cancelLabel, danger })
+  // devolve true (sim) ou false (a segura, fechar).
+  const [ask, setAsk] = useState(null)
+  const askConfirm = (opts) => new Promise((resolve) => setAsk({ ...opts, resolve }))
+  const [settingsError, setSettingsError] = useState('')
+  const [renameError, setRenameError] = useState('')
+  // O erro de admin/tirar fica por baixo dessa pessoa: numa lista comprida,
+  // a caixa do topo não se via (UX, 30 set).
+  const [memberError, setMemberError] = useState(null) // { id, text }
   const [membersError, setMembersError] = useState('')
   // Regra das janelas (24 set): o que falha fica escrito junto ao sítio,
   // nunca na caixa do telemóvel. Um estado por zona do Gerir.
@@ -743,6 +753,7 @@ export default function GerirClube() {
             id,
             user_id,
             partner_id,
+            partner_guest_id,
             status
           ),
           recurrence:game_recurrences (
@@ -778,7 +789,7 @@ export default function GerirClube() {
   const loadOpenGames = async () => {
     const { data, error } = await supabase
       .from('games')
-      .select('id, title, date, location, status, max_players, num_courts, open_batch_id, participants(id, user_id, partner_id, status)')
+      .select('id, title, date, location, status, max_players, num_courts, open_batch_id, participants(id, user_id, partner_id, partner_guest_id, status)')
       .eq('organization_id', currentOrganizationId)
       .eq('origin', 'open_slot')
       .order('date', { ascending: false })
@@ -1115,7 +1126,7 @@ export default function GerirClube() {
 
     if (recurrenceError) {
       console.error('Error creating recurrence:', recurrenceError)
-      alert(recurrenceErrorText(recurrenceError, 'gerirclube.error_recurrence_activate_failed'))
+      setGameError(recurrenceErrorText(recurrenceError, 'gerirclube.error_recurrence_activate_failed'))
       return
     }
 
@@ -1126,7 +1137,7 @@ export default function GerirClube() {
 
     if (linkError) {
       console.error('Error linking game to recurrence:', linkError)
-      alert(recurrenceErrorText(linkError, 'gerirclube.error_recurrence_link_failed'))
+      setGameError(recurrenceErrorText(linkError, 'gerirclube.error_recurrence_link_failed'))
       return
     }
 
@@ -1170,7 +1181,7 @@ export default function GerirClube() {
 
     if (pendingError) {
       console.error('Error pre-creating next occurrence:', pendingError)
-      alert(recurrenceErrorText(pendingError, 'gerirclube.error_recurrence_precreate_failed'))
+      setGameError(recurrenceErrorText(pendingError, 'gerirclube.error_recurrence_precreate_failed'))
       return
     }
 
@@ -1196,7 +1207,7 @@ export default function GerirClube() {
     // Date used to be enforced by DateTimeField's underlying native
     // input's `required` attribute — it's a fully custom component now.
     if (!gameForm.date) {
-      alert(t('gerirclube.validate_date_required'))
+      setGameError(t('gerirclube.validate_date_required'))
       return
     }
 
@@ -1420,7 +1431,7 @@ export default function GerirClube() {
       loadGames()
     } catch (error) {
       console.error('Error toggling recurrence pause:', error)
-      alert(describeError(t, error, 'gerirclube.error_update_recurrence'))
+      setGameError(describeError(t, error, 'gerirclube.error_update_recurrence'))
     }
   }
 
@@ -1429,7 +1440,7 @@ export default function GerirClube() {
     setGameError('')
 
     if (!gameForm.date) {
-      alert(t('gerirclube.validate_date_required'))
+      setGameError(t('gerirclube.validate_date_required'))
       return
     }
 
@@ -1512,7 +1523,13 @@ export default function GerirClube() {
         // already pre-created pending occurrence. Confirmed explicitly —
         // this is destructive and easy to trigger by accident (e.g. a stray
         // click on the checkbox before an unrelated edit).
-        if (confirm(t('gerirclube.confirm_deactivate_recurrence'))) {
+        if (await askConfirm({
+          title: t('gerirclube.confirm_deactivate_recurrence_title'),
+          message: t('gerirclube.confirm_deactivate_recurrence'),
+          cancelLabel: t('gerirclube.keep_repeating'),
+          confirmLabel: t('gerirclube.confirm_deactivate_recurrence_yes'),
+          danger: true,
+        })) {
           await deactivateRecurrence(editingGame.recurrence.id)
         }
       } else if (!hadActiveRecurrence && recurrence.enabled) {
@@ -1686,22 +1703,32 @@ export default function GerirClube() {
     || describeError(t, error, 'mixdraft.publish_error')
 
   const handleStopRecurrence = async (recurrenceId) => {
-    if (!confirm(t('gerirclube.confirm_stop_recurrence'))) return
+    if (!await askConfirm({
+      title: t('gerirclube.confirm_stop_recurrence_title'),
+      message: t('gerirclube.confirm_stop_recurrence'),
+      cancelLabel: t('gerirclube.keep_repeating'),
+      confirmLabel: t('gerirclube.confirm_stop_recurrence_yes'),
+      danger: true,
+    })) return
 
     try {
       await deactivateRecurrence(recurrenceId)
       loadGames()
     } catch (error) {
       console.error('Error stopping recurrence:', error)
-      alert(describeError(t, error, 'gerirclube.error_stop_recurrence'))
+      setGameError(describeError(t, error, 'gerirclube.error_stop_recurrence'))
     }
   }
 
   const handleToggleAdmin = async (userId, currentStatus) => {
-    const confirmMessage = currentStatus
-      ? t('gerirclube.confirm_revoke_admin')
-      : t(kk('gerirclube.confirm_grant_admin'))
-    if (!confirm(confirmMessage)) return
+    const name = members.find((m) => m.id === userId)?.name || ''
+    const yes = await askConfirm(currentStatus
+      ? { title: t('gerirclube.confirm_revoke_admin_title', { name }), message: t(kk('gerirclube.confirm_revoke_admin')),
+        cancelLabel: t('gerirclube.keep_admin'), confirmLabel: t('gerirclube.confirm_revoke_admin_yes'), danger: true }
+      : { title: t('gerirclube.confirm_grant_admin_title', { name }), message: t(kk('gerirclube.confirm_grant_admin')),
+        cancelLabel: t('gerirclube.cancel'), confirmLabel: t('gerirclube.confirm_grant_admin_yes'), outline: true })
+    if (!yes) return
+    setMemberError(null)
 
     try {
       const { error } = await supabase.rpc('admin_set_membership_admin', {
@@ -1712,16 +1739,23 @@ export default function GerirClube() {
 
       if (error) throw error
 
-      alert(t('gerirclube.admin_permissions_updated'))
+      setDoneNotice(t(currentStatus ? 'gerirclube.admin_removed_done' : 'gerirclube.admin_made_done', { name }))
       loadMembers()
     } catch (error) {
       console.error('Error updating admin status:', error)
-      alert(describeError(t, error, 'gerirclube.error_update_permissions'))
+      setMemberError({ id: userId, text: describeError(t, error, 'gerirclube.error_update_permissions') })
     }
   }
 
   const handleDeleteUser = async (member) => {
-    if (!confirm(t(kk('gerirclube.confirm_remove_member'), { name: member.name }))) return
+    if (!await askConfirm({
+      title: t(kk('gerirclube.confirm_remove_member_title'), { name: member.name }),
+      message: t(kk('gerirclube.confirm_remove_member')),
+      cancelLabel: t(kk('gerirclube.keep_member')),
+      confirmLabel: t('gerirclube.confirm_remove_member_yes'),
+      danger: true,
+    })) return
+    setMemberError(null)
 
     try {
       const { error } = await supabase.rpc('admin_remove_member', {
@@ -1732,7 +1766,7 @@ export default function GerirClube() {
       loadMembers()
     } catch (error) {
       console.error('Error removing member:', error)
-      alert(describeError(t, error, 'gerirclube.error_remove_member'))
+      setMemberError({ id: member.id, text: describeError(t, error, 'gerirclube.error_remove_member').replace('{{name}}', member.name) })
     }
   }
 
@@ -1850,6 +1884,7 @@ export default function GerirClube() {
     e.preventDefault()
     // Nome de outro grupo ou clube: a frase já está por baixo do campo.
     if (settingsNameTaken) return
+    setSettingsError('')
 
     try {
       const { error } = await supabase
@@ -1875,10 +1910,10 @@ export default function GerirClube() {
       if (error) throw error
 
       setOrg((o) => ({ ...o, name: settings.name }))
-      alert(t('gerirclube.settings_updated_success'))
+      setDoneNotice(t('gerirclube.settings_updated_success'))
     } catch (error) {
       console.error('Error updating settings:', error)
-      alert(describeError(t, error, 'gerirclube.error_update_settings'))
+      setSettingsError(describeError(t, error, 'gerirclube.error_update_settings'))
     }
   }
 
@@ -1894,6 +1929,7 @@ export default function GerirClube() {
     }
     // Nome de outro grupo ou clube: fica a editar, com a frase por baixo.
     if (renameTaken) return
+    setRenameError('')
     setRenamingOrg(true)
     try {
       const { error } = await supabase.from('organizations').update({ name: trimmed }).eq('id', org.id)
@@ -1904,7 +1940,7 @@ export default function GerirClube() {
     } catch (error) {
       console.error('Error renaming organization:', error)
       if (errorKind(error) === 'org_name_taken') return // a frase já está por baixo do campo
-      alert(describeError(t, error, 'gerirclube.error_rename_org'))
+      setRenameError(describeError(t, error, 'gerirclube.error_rename_org'))
     } finally {
       setRenamingOrg(false)
     }
@@ -2182,8 +2218,22 @@ export default function GerirClube() {
           ecrã — a mesma causa da lupa da Home. */}
     </>
   )
+  const askSheet = (
+    <ConfirmSheet
+      open={!!ask}
+      title={ask?.title || ''}
+      message={ask?.message || ''}
+      confirmLabel={ask?.confirmLabel || ''}
+      cancelLabel={ask?.cancelLabel || ''}
+      danger={!!ask?.danger}
+      outline={!!ask?.outline}
+      onConfirm={() => { ask?.resolve(true) }}
+      onClose={() => { ask?.resolve(false); setAsk(null) }}
+    />
+  )
   const doneStrip = (
     <>
+      {askSheet}
       {doneNotice && createPortal(
         <div role="status" className="fixed left-4 right-4 bottom-[104px] z-50 mx-auto max-w-md bg-ink-900 text-white px-4 py-3 rounded-ctrl text-sm font-extrabold flex items-center gap-2 animate-fade-up">
           <Check size={16} className="shrink-0" />
@@ -2358,6 +2408,7 @@ export default function GerirClube() {
                 />
               </div>
               <OrgNameTakenHint taken={renameTaken} />
+              {renameError && <p role="alert" className="mt-1.5 text-sm font-extrabold text-danger">{renameError}</p>}
               </>
             ) : (
               <h2 className="text-3xl font-bold text-ink-900 min-w-0 break-words">
@@ -3201,7 +3252,7 @@ export default function GerirClube() {
                   } else {
                     const confirmados = (row.participants || [])
                       .filter((p) => p.status === 'confirmed')
-                      .reduce((n, p) => n + 1 + (p.partner_id ? 1 : 0), 0)
+                      .reduce((n, p) => n + 1 + (p.partner_id || p.partner_guest_id ? 1 : 0), 0)
                     const max = tipo === 'mix' ? (row.max_players || (row.num_courts || 1) * 4) : row.max_players
                     const lugares = tipo === 'torneio' || !max ? null : t('gerirclube.spots_of', { count: confirmados, max })
                     // Torneio: duplas e, enquanto esta aberto, ate quando.
@@ -3562,6 +3613,7 @@ export default function GerirClube() {
                       </button>
                     </div>
                   )}
+                  {memberError?.id === member.id && <p role="alert" className="mt-2.5 text-sm font-extrabold text-danger">{memberError.text}</p>}
                 </div>
               ))}
 
@@ -3801,6 +3853,7 @@ export default function GerirClube() {
                   )}
                 </div>
 
+                {settingsError && <p role="alert" className="text-sm font-extrabold text-danger">{settingsError}</p>}
                 <button type="submit" className="btn-primary w-full">
                   {t('gerirclube.save_settings_button')}
                 </button>

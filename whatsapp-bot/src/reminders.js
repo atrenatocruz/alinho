@@ -24,24 +24,29 @@ function mentionToken(jid) {
 async function loadConfirmedParticipantProfiles(gameId) {
   const { data: rows, error } = await supabase
     .from('participants')
-    .select('user_id, partner_id')
+    .select('user_id, partner_id, guest:game_guests!participants_guest_id_fkey(name, whatsapp_jid), partner_guest:game_guests!participants_partner_guest_id_fkey(name, whatsapp_jid)')
     .eq('game_id', gameId)
     .eq('status', 'confirmed')
   if (error) throw new Error(`Failed to load participants for reminder: ${error.message}`)
 
   const ids = new Set()
+  // Convidados sem conta: nome/JID já vêm na linha (game_guests) — entram
+  // na lista como pseudo-perfis, mencionáveis quando o JID é conhecido.
+  const guests = []
   for (const row of rows) {
-    ids.add(row.user_id)
+    if (row.user_id) ids.add(row.user_id)
+    else if (row.guest) guests.push({ id: null, name: row.guest.name, whatsapp_jid: row.guest.whatsapp_jid, language: 'pt' })
     if (row.partner_id) ids.add(row.partner_id)
+    else if (row.partner_guest) guests.push({ id: null, name: row.partner_guest.name, whatsapp_jid: row.partner_guest.whatsapp_jid, language: 'pt' })
   }
-  if (ids.size === 0) return []
+  if (ids.size === 0) return guests
 
   const { data: profiles, error: profilesError } = await supabase
     .from('profiles')
     .select('id, name, whatsapp_jid, language')
     .in('id', Array.from(ids))
   if (profilesError) throw new Error(`Failed to load participant profiles for reminder: ${profilesError.message}`)
-  return profiles
+  return [...(profiles || []), ...guests]
 }
 
 /**

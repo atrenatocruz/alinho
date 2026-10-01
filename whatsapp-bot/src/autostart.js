@@ -62,9 +62,13 @@ function matchWithoutRepeats(remaining, repeatPairKeys, sidesFit, sameSideLeft, 
 export function formDuplas(participants, pointsById, repeatPairKeys, sideById = {}) {
   const duplas = []
   const solos = []
+  // Convidados sem conta: a chave é o game_guests.id (guest_id /
+  // partner_guest_id) — o algoritmo não distingue, são UUIDs como os outros.
   for (const row of participants) {
-    if (row.partner_id) duplas.push([row.user_id, row.partner_id])
-    else solos.push(row.user_id)
+    const owner = row.user_id ?? row.guest_id
+    const partner = row.partner_id ?? row.partner_guest_id
+    if (partner) duplas.push([owner, partner])
+    else solos.push(owner)
   }
 
   const pointsOf = (id) => pointsById[id] ?? 0
@@ -143,9 +147,12 @@ export async function loadRepeatPairKeys(game) {
   if (!previousGames?.length) return new Set()
   const { data: previousTeams } = await supabase
     .from('teams')
-    .select('player1_id, player2_id')
+    .select('player1_id, player2_id, player1_guest_id, player2_guest_id')
     .in('game_id', previousGames.map((g) => g.id))
-  return new Set((previousTeams || []).map((team) => pairKey(team.player1_id, team.player2_id)))
+  // COALESCE dos convidados: sem isto, duas duplas com convidado davam
+  // ambas «null|…» e contavam como o mesmo par.
+  return new Set((previousTeams || []).map((team) =>
+    pairKey(team.player1_id ?? team.player1_guest_id, team.player2_id ?? team.player2_guest_id)))
 }
 
 async function autoStartMix(game, { sendText }) {
@@ -156,7 +163,7 @@ async function autoStartMix(game, { sendText }) {
 
   const { data: participants, error: pErr } = await supabase
     .from('participants')
-    .select('user_id, partner_id')
+    .select('user_id, partner_id, guest_id, partner_guest_id')
     .eq('game_id', game.id)
     .eq('status', 'confirmed')
   if (pErr) throw new Error(`Failed to load participants for auto-start: ${pErr.message}`)
@@ -168,17 +175,22 @@ async function autoStartMix(game, { sendText }) {
   // way to cleanly undo it short of an admin "Parar Mix" (Trello #293).
   // Leave status alone and retry on the next poll.
   const capacity = game.max_players || (game.num_courts || 1) * 4
-  const peopleCount = (participants || []).reduce((n, p) => n + 1 + (p.partner_id ? 1 : 0), 0)
+  const peopleCount = (participants || []).reduce((n, p) => n + 1 + (p.partner_id || p.partner_guest_id ? 1 : 0), 0)
   if (peopleCount < capacity) return
+
+  // Convidados sem conta: ids de game_guests — emparelham com 900 (o
+  // baseline de sempre) e lado 'both' (o default do sideOf).
+  const guestIds = new Set((participants || []).flatMap((p) => [p.guest_id, p.partner_guest_id]).filter(Boolean))
 
   const { data: rankings, error: rErr } = await supabase.rpc('get_global_rankings')
   if (rErr) throw new Error(`Failed to load rankings for auto-start: ${rErr.message}`)
   const pointsById = Object.fromEntries((rankings || []).map((r) => [r.user_id, Math.round(r.rating || 0)]))
+  for (const id of guestIds) pointsById[id] = 900
 
   const repeatPairKeys = await loadRepeatPairKeys(game)
 
   // O lado preferido de cada um, para não formar duplas do mesmo lado.
-  const soloIds = (participants || []).filter((p) => !p.partner_id).map((p) => p.user_id)
+  const soloIds = (participants || []).filter((p) => !p.partner_id && !p.partner_guest_id && p.user_id).map((p) => p.user_id)
   let sideById = {}
   if (soloIds.length) {
     const { data: sideRows, error: sideErr } = await supabase
@@ -199,10 +211,29 @@ async function autoStartMix(game, { sendText }) {
     return
   }
 
+  // Cada lado vai para a coluna certa (conta vs convidado). seed_ranking:
+  // o convidado HERDA o rating do parceiro (a regra do Elo —
+  // migration_elo_simples.sql: a dupla vale a média de quem tem conta);
+  // dupla 100% convidados fica a 0.
+  const teamRow = ({ player1_id: p1, player2_id: p2 }) => {
+    const g1 = guestIds.has(p1)
+    const g2 = guestIds.has(p2)
+    const pts = (id) => pointsById[id] ?? 0
+    const seed = !g1 && !g2 ? pts(p1) + pts(p2) : !g1 ? pts(p1) * 2 : !g2 ? pts(p2) * 2 : 0
+    return {
+      game_id: game.id,
+      player1_id: g1 ? null : p1,
+      player1_guest_id: g1 ? p1 : null,
+      player2_id: g2 ? null : p2,
+      player2_guest_id: g2 ? p2 : null,
+      seed_ranking: seed,
+    }
+  }
+
   const { data: insertedTeams, error: teamsError } = await supabase
     .from('teams')
-    .insert(duplas.map((d) => ({ game_id: game.id, ...d })))
-    .select('id, player1_id, player2_id')
+    .insert(duplas.map(teamRow))
+    .select('id, player1_id, player2_id, player1_guest_id, player2_guest_id')
   if (teamsError) throw new Error(`Failed to insert teams for auto-start: ${teamsError.message}`)
 
   const { error: statusError } = await supabase.from('games').update({ status: 'in_progress' }).eq('id', game.id)
@@ -216,9 +247,12 @@ async function autoStartMix(game, { sendText }) {
   // call in this bot (see Task 19) — unused below since the pairings
   // announcement is one shared broadcast to the whole group, not a message
   // for any single player, so it stays 'pt' (see locales.js scope note).
-  const profileIds = insertedTeams.flatMap((team) => [team.player1_id, team.player2_id])
+  const profileIds = insertedTeams.flatMap((team) => [team.player1_id, team.player2_id]).filter(Boolean)
   const { data: profiles } = await supabase.from('profiles').select('id, name, whatsapp_jid, language').in('id', profileIds)
   const profileById = new Map((profiles || []).map((p) => [p.id, p]))
+  // Convidados sem conta: nome e JID vêm de game_guests (service-role).
+  const { data: guests } = await supabase.from('game_guests').select('id, name, whatsapp_jid').eq('game_id', game.id)
+  const guestById = new Map((guests || []).map((g) => [g.id, g]))
 
   const mentions = []
   const label = (profile) => {
@@ -229,8 +263,9 @@ async function autoStartMix(game, { sendText }) {
     return profile?.name || 'Jogador'
   }
 
+  const slot = (userId, guestId) => label(userId ? profileById.get(userId) : guestById.get(guestId))
   const lines = insertedTeams.map(
-    (team, i) => `${i + 1}. ${label(profileById.get(team.player1_id))} 🤝 ${label(profileById.get(team.player2_id))}`
+    (team, i) => `${i + 1}. ${slot(team.player1_id, team.player1_guest_id)} 🤝 ${slot(team.player2_id, team.player2_guest_id)}`
   )
 
   // Pairings announcement — a shared broadcast to the whole group, stays

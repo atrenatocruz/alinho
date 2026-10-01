@@ -17,12 +17,20 @@ export function rosterName(person) {
 /** Loads a game plus its confirmed participants (flattened to one entry per person, partners included — mirrors GameDetails.jsx's `people` derivation), the suplentes, and the raw `rows` (confirmed + waitlisted) so callers don't re-query them. */
 export async function loadGame(gameId) {
   const PROFILE = 'id, name, language, rating, gender, email'
-  const participantsSelect = (profile) =>
-    `id, user_id, partner_id, status, created_at, user:profiles!participants_user_id_fkey(${profile}), partner:profiles!participants_partner_id_fkey(${profile})`
-  const fetchRows = (profile) =>
+  // Convidados sem conta (migration_mix_guest_sem_conta.sql): a linha pode
+  // apontar para game_guests em vez de profiles. O phone_hash vem para o
+  // «Out» reconhecer a inscrição pelo número (service-role: a app não lê
+  // esta coluna).
+  const GUEST = 'id, name, phone_hash, whatsapp_jid'
+  const participantsSelect = (profile, withGuests) =>
+    `id, user_id, partner_id, status, created_at, user:profiles!participants_user_id_fkey(${profile}), partner:profiles!participants_partner_id_fkey(${profile})` +
+    (withGuests
+      ? `, guest_id, partner_guest_id, guest:game_guests!participants_guest_id_fkey(${GUEST}), partner_guest:game_guests!participants_partner_guest_id_fkey(${GUEST})`
+      : '')
+  const fetchRows = (profile, withGuests = true) =>
     supabase
       .from('participants')
-      .select(participantsSelect(profile))
+      .select(participantsSelect(profile, withGuests))
       .eq('game_id', gameId)
       .in('status', ['confirmed', 'waitlisted'])
       // Ordem de inscrição (como o GameDetails) — sem ORDER BY o Postgres
@@ -36,8 +44,13 @@ export async function loadGame(gameId) {
     supabase.from('games').select('*').eq('id', gameId).single(),
     fetchRows(PROFILE),
   ])
+  // A migração dos convidados ainda não correu (42703 coluna em falta,
+  // PGRST200 relação em falta): tenta sem os joins de game_guests.
+  if (rowsResult.error?.code === '42703' || rowsResult.error?.code === 'PGRST200') {
+    rowsResult = await fetchRows(PROFILE, false)
+  }
   // 42703: a migração do Elo ainda não correu — nomes sem banda.
-  if (rowsResult.error?.code === '42703') rowsResult = await fetchRows('id, name, language, email')
+  if (rowsResult.error?.code === '42703') rowsResult = await fetchRows('id, name, language, email', false)
 
   const { data: game, error: gameError } = gameResult
   if (gameError) throw new Error(`Failed to load game ${gameId}: ${gameError.message}`)
@@ -50,15 +63,29 @@ export async function loadGame(gameId) {
   // Quem entrou em dupla leva o número da dupla (1, 2, …) — o «(1)» à frente
   // dos dois nomes (A2N, 24 set). Quem entrou sozinho não leva nada.
   let pairNumber = 0
-  // `guest`: entrou pelo robô sem conta — a lista mostra « (convidado)».
+  // `guest`: sem conta — a lista mostra « (convidado)». Cobre as contas
+  // fantasma antigas (pelo email) e os convidados novos (game_guests).
   const person = (p) => (p ? { ...p, guest: isGuestEmail(p.email) || isPlaceholderEmail(p.email) } : FALLBACK_PERSON)
+  const guestPerson = (g) =>
+    g ? { id: g.id, name: g.name, language: 'pt', rating: null, gender: null, guest: true, phoneHash: g.phone_hash ?? null } : FALLBACK_PERSON
+  const owner = (row) => (row.user_id ? person(row.user) : guestPerson(row.guest))
+  const partnerOf = (row) => (row.partner_id ? person(row.partner) : guestPerson(row.partner_guest))
   for (const row of confirmed) {
-    const pair = row.partner_id ? ++pairNumber : null
-    people.push({ ...person(row.user), pair })
-    if (row.partner_id) people.push({ ...person(row.partner), pair })
+    const hasPartner = Boolean(row.partner_id || row.partner_guest_id)
+    const pair = hasPartner ? ++pairNumber : null
+    people.push({ ...owner(row), pair })
+    if (hasPartner) people.push({ ...partnerOf(row), pair })
   }
-  const suplentes = all.filter((r) => r.status === 'waitlisted').map((r) => person(r.user))
-  const rows = all.map(({ id, user_id, partner_id, status }) => ({ id, user_id, partner_id, status }))
+  const suplentes = all.filter((r) => r.status === 'waitlisted').map((r) => owner(r))
+  const rows = all.map(({ id, user_id, partner_id, status, guest_id, partner_guest_id, guest, partner_guest }) => ({
+    id, user_id, partner_id, status,
+    guest_id: guest_id ?? null,
+    partner_guest_id: partner_guest_id ?? null,
+    guestPhoneHash: guest?.phone_hash ?? null,
+    partnerGuestPhoneHash: partner_guest?.phone_hash ?? null,
+    guestName: guest?.name ?? null,
+    partnerGuestName: partner_guest?.name ?? null,
+  }))
   const capacity = game.max_players || game.num_courts * 4
   return { game, people, capacity, suplentes, rows }
 }

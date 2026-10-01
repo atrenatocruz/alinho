@@ -27,15 +27,19 @@ async function announceUpdatedDuplas(game, changedIds, { sendText }) {
 
   const { data: teams, error } = await supabase
     .from('teams')
-    .select('player1_id, player2_id, seed_ranking')
+    .select('player1_id, player2_id, player1_guest_id, player2_guest_id, seed_ranking')
     .eq('game_id', game.id)
     .order('seed_ranking', { ascending: false })
   if (error) throw new Error(`Failed to load teams for updated pairings: ${error.message}`)
   if (!teams?.length) return
 
-  const ids = teams.flatMap((team) => [team.player1_id, team.player2_id])
+  const ids = teams.flatMap((team) => [team.player1_id, team.player2_id]).filter(Boolean)
   const { data: profiles } = await supabase.from('profiles').select('id, name, whatsapp_jid').in('id', ids)
   const byId = new Map((profiles || []).map((p) => [p.id, p]))
+  // Convidados sem conta (nunca estão em changedIds — os avisos são por
+  // conta): só o nome, sem @.
+  const { data: guests } = await supabase.from('game_guests').select('id, name').eq('game_id', game.id)
+  const guestById = new Map((guests || []).map((g) => [g.id, g]))
 
   // Só se marca (@) quem mudou — marcar o mix inteiro outra vez seria barulho.
   const mentions = []
@@ -47,7 +51,8 @@ async function announceUpdatedDuplas(game, changedIds, { sendText }) {
     }
     return p?.name || 'Jogador'
   }
-  const lines = teams.map((team, i) => `${i + 1}. ${label(team.player1_id)} 🤝 ${label(team.player2_id)}`)
+  const slot = (userId, guestId) => (userId ? label(userId) : guestById.get(guestId)?.name || 'Jogador')
+  const lines = teams.map((team, i) => `${i + 1}. ${slot(team.player1_id, team.player1_guest_id)} 🤝 ${slot(team.player2_id, team.player2_guest_id)}`)
 
   // Mensagem para o grupo inteiro — fica em 'pt' (ver nota em locales.js).
   const text = t('duplas_updated', 'pt', { title: game.title, lines: lines.join('\n') }) + helpFooter('pt')
