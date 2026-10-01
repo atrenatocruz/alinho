@@ -27,3 +27,15 @@ export const withManyOrgs = (before) => (url) => {
   if (localStorage.getItem('mockManyOrgs') === 'true' && !/[?&](id|slug)=eq\./.test(decodeURIComponent(url || ''))) return MANY()
   return before ? before(url) : []
 }
+
+// «Já jogados» (list_played_events): mixes, um torneio e um jogo entre amigos.
+const daysAgo = (n, h) => { const d = new Date(); d.setDate(d.getDate() - n); d.setHours(h, 0, 0, 0); return d.toISOString() }
+export const PLAYED_EVENTS = () => ({
+  total: 4,
+  rows: [
+    { kind: 'mix', id: 'fake-game-1', title: 'Padel domingueiro', date: daysAgo(1, 10), organization_id: 'o-smash', org_name: 'Clube Exemplo', org_kind: 'club', org_logo: null, players_count: 8, i_played: true, my_points: 12 },
+    { kind: 'mix', id: 'fake-game-1', title: 'Mix de sábado', date: daysAgo(2, 18), organization_id: 'o-smash', org_name: 'Clube Exemplo', org_kind: 'club', org_logo: null, players_count: 16, i_played: false, my_points: null },
+    { kind: 'tournament', id: 't-1', slug: 'open-de-teste', title: 'Open de Teste', date: daysAgo(2, 23), organization_id: 'o-smash', org_name: 'Clube Exemplo', org_kind: 'club', org_logo: null, entries_count: 24, i_played: false, my_points: null },
+    { kind: 'friends', id: 'fm-1', title: null, date: daysAgo(4, 19), organization_id: 'o-mais1', org_name: 'Grupo das 5.as', org_kind: 'group', org_logo: null, creator_name: 'Rita Ferreira', players_count: 6, i_played: true, my_points: -4 },
+  ],
+})

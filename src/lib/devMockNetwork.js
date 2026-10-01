@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 import { LESSON_RPC_MOCKS, LESSON_TABLE_MOCKS, LESSON_NOTICES } from './devMockLessons'
-import { withManyOrgs } from './devMockGerir'
+import { withManyOrgs, PLAYED_EVENTS } from './devMockGerir'
 import {
   TOURNAMENT_RPC_MOCKS, TOURNAMENT_TABLE_MOCKS, TOURNAMENT_CLOSE_RPC_MOCKS, TOURNAMENT_CLOSE_TABLE_MOCKS,
   TOURNAMENT_SCORE_TODAY_TABLE_MOCKS, TOURNAMENT_REOPEN_RPC_MOCKS, TOURNAMENT_GROUPS_DONE_TABLE_MOCKS, TOURNAMENT_PROMOTED_TABLE_MOCKS, TOURNAMENT_PROMOTED_RPC_MOCKS,
@@ -1532,6 +1532,28 @@ const wantsSingle = (init) => {
 
 // Gerir com muitos clubes e grupos (localStorage.mockManyOrgs = 'true').
 TABLE_MOCKS.organizations = withManyOrgs(TABLE_MOCKS.organizations)
+// «Já jogados» na Home.
+RPC_MOCKS.list_played_events = () => PLAYED_EVENTS()
+// Só para ler (quem não jogou): a sessão de 6 por rondas, toda jogada, com a
+// Joana no lugar de quem vê — a conta de teste não está no jogo.
+const FULL_FRIEND_MATCH = RPC_MOCKS.get_friend_match
+RPC_MOCKS.get_friend_match_readonly = (params) => {
+  const keep = [localStorage.getItem('mockFriendSession'), localStorage.getItem('mockFriendStarted')]
+  localStorage.setItem('mockFriendSession', 'rounds6'); localStorage.setItem('mockFriendStarted', 'done')
+  const d = FULL_FRIEND_MATCH(params)
+  ;['mockFriendSession', 'mockFriendStarted'].forEach((k, i) => (keep[i] == null ? localStorage.removeItem(k) : localStorage.setItem(k, keep[i])))
+  const out = JSON.parse(JSON.stringify(d).split(MOCK_ADMIN_USER_ID).join('u-jc').split('Admin (Dev)').join('Joana Costa'))
+  out.games.forEach((g) => { g.waiting_for = [] })
+  return out
+}
+// localStorage.mockFriendNotMine = 'true': abrir a sessão como quem não jogou.
+{
+  const full = RPC_MOCKS.get_friend_match
+  RPC_MOCKS.get_friend_match = (params) => {
+    if (localStorage.getItem('mockFriendNotMine') === 'true') return { __error: 'not yours', __code: '42501' }
+    return full(params)
+  }
+}
 
 export function installDevMockNetwork() {
   if (!import.meta.env.DEV) return

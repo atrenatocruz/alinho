@@ -242,6 +242,14 @@ export const getFriendMatch = async (matchId) => {
   return data
 }
 
+/** O mesmo que getFriendMatch, só de leitura, para quem não jogou: membros do
+    grupo, ou toda a gente num grupo público (Dev 3, migration_ja_jogados). */
+export const getFriendMatchReadonly = async (matchId) => {
+  const { data, error } = await supabase.rpc('get_friend_match_readonly', { p_match_id: matchId })
+  if (error) throw error
+  return data
+}
+
 export const listMyFriendMatchInvites = async () => {
   const { data, error } = await supabase.rpc('list_my_friend_match_invites')
   if (error) {
