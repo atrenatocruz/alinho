@@ -246,9 +246,11 @@ export default function Home() {
         *,
         organization:organizations (name, kind, group_logo_url),
         participants (
-          id, user_id, partner_id, status,
+          id, user_id, partner_id, guest_id, partner_guest_id, status,
           user:profiles!participants_user_id_fkey (name, avatar_url, rating, gender),
-          partner:profiles!participants_partner_id_fkey (name, avatar_url, rating, gender)
+          partner:profiles!participants_partner_id_fkey (name, avatar_url, rating, gender),
+          guest:game_guests!participants_guest_id_fkey (id, name),
+          partner_guest:game_guests!participants_partner_guest_id_fkey (id, name)
         )
       `)
       .in('organization_id', orgIds)
@@ -444,9 +446,9 @@ export default function Home() {
     const iAmSomeonesPartner = rows.some((p) => p.partner_id === user.id)
 
     if (myRow?.status === 'confirmed') {
-      // Com parceiro na mesma linha, sair leva os dois — decisão para a
-      // página do mix, onde se vê quem vai abaixo junto.
-      if (myRow.partner_id) return null
+      // Com parceiro na mesma linha (conta OU convidado), sair leva os dois
+      // — decisão para a página do mix, onde se vê quem vai abaixo junto.
+      if (myRow.partner_id || myRow.partner_guest_id) return null
       if (game.status !== 'open' && game.status !== 'closed') return null
       return { kind: 'leave' }
     }

@@ -65,10 +65,13 @@ export function addPlan({ capacity, peopleCount, needed, numCourts, maxPlayers, 
   }
 }
 
+// Ids efetivos (slotId): o parceiro pode ser um convidado sem conta — sem
+// isto, «mudou de convidado A para convidado B» comparava null === null e
+// o aviso perdia-se.
 const partnerIn = (teams, userId) => {
-  const team = teams.find((tm) => tm.player1_id === userId || tm.player2_id === userId)
+  const team = teams.find((tm) => slotId(tm, 1) === userId || slotId(tm, 2) === userId)
   if (!team) return null
-  return team.player1_id === userId ? team.player2_id : team.player1_id
+  return slotId(team, 1) === userId ? slotId(team, 2) : slotId(team, 1)
 }
 
 /** O que mudou para cada jogador entre antes e depois de uma alteração —

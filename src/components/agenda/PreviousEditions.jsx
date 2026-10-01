@@ -25,7 +25,7 @@ export default function PreviousEditions({ gameId, recurrenceId, userId }) {
     try {
       const { data: games, error: gamesError } = await supabase
         .from('games')
-        .select('id, date, winner_team_id, participants (user_id, partner_id, status)')
+        .select('id, date, winner_team_id, participants (user_id, partner_id, partner_guest_id, status)')
         .eq('recurrence_id', recurrenceId)
         .neq('id', gameId)
         .in('status', ['finished', 'completed'])
@@ -37,10 +37,10 @@ export default function PreviousEditions({ gameId, recurrenceId, userId }) {
       if (winnerIds.length) {
         const { data: teams, error: teamsError } = await supabase
           .from('teams')
-          .select('id, player1:profiles!teams_player1_id_fkey (name), player2:profiles!teams_player2_id_fkey (name)')
+          .select('id, player1:profiles!teams_player1_id_fkey (name), player2:profiles!teams_player2_id_fkey (name), guest1:game_guests!teams_player1_guest_id_fkey (name), guest2:game_guests!teams_player2_guest_id_fkey (name)')
           .in('id', winnerIds)
         if (teamsError) throw teamsError
-        winners = new Map((teams || []).map((tm) => [tm.id, [tm.player1?.name, tm.player2?.name].filter(Boolean).join(` ${t('agenda.and')} `)]))
+        winners = new Map((teams || []).map((tm) => [tm.id, [tm.player1?.name ?? tm.guest1?.name, tm.player2?.name ?? tm.guest2?.name].filter(Boolean).join(` ${t('agenda.and')} `)]))
       }
 
       setEditions((games || []).map((g) => {
@@ -48,7 +48,7 @@ export default function PreviousEditions({ gameId, recurrenceId, userId }) {
         return {
           id: g.id,
           date: g.date,
-          players: confirmed.reduce((n, p) => n + 1 + (p.partner_id ? 1 : 0), 0),
+          players: confirmed.reduce((n, p) => n + 1 + (p.partner_id || p.partner_guest_id ? 1 : 0), 0),
           winners: winners.get(g.winner_team_id) || null,
           played: confirmed.some((p) => p.user_id === userId || p.partner_id === userId),
         }

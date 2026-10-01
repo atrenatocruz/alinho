@@ -1322,7 +1322,7 @@ export default function GameDetails() {
   }
 
   const handleLastMinuteAdd = async ({ playerId, partnerId, choice, plan, names, newPlayer = null }) => {
-    const beforeIds = people.map((p) => p.id)
+    const beforeIds = people.filter((p) => !p.no_account).map((p) => p.id)
     setBusy(true)
     setMixError('')
     setEditNotice('')
@@ -1408,7 +1408,7 @@ export default function GameDetails() {
     ].filter(Boolean).join(' ')
     if (!confirm(msg)) return
 
-    const beforeIds = people.map((p) => p.id)
+    const beforeIds = people.filter((p) => !p.no_account).map((p) => p.id)
     setBusy(true)
     setMixError('')
     setEditNotice('')
@@ -1882,11 +1882,16 @@ export default function GameDetails() {
         const globalRankings = await getGlobalRankings()
         const pointsById = Object.fromEntries(globalRankings.map(r => [r.user_id, Math.round(r.rating || 0)]))
         const courts = nextSobeDesceRotating(currentRoundMatches, teamsById, numCourts, { partnerPairs, rankOf })
+        // teamSlotCols/guestAwareSeed: convidados sem conta vão para
+        // playerX_guest_id (FK para game_guests) — escrevê-los em
+        // playerX_id violava a FK para profiles e bloqueava a ronda.
         const teamRows = courts.flatMap((c) => [c.duplaA, c.duplaB]).map(([p1, p2]) => ({
           game_id: id,
-          player1_id: p1.id,
-          player2_id: p2.id,
-          seed_ranking: (pointsById[p1.id] ?? 0) + (pointsById[p2.id] ?? 0),
+          ...teamSlotCols(p1, p2),
+          seed_ranking: guestAwareSeed(
+            { player1: p1, player2: p2, seed: (pointsById[p1.id] ?? 0) + (pointsById[p2.id] ?? 0) },
+            pointsById
+          ),
         }))
         const { data: insertedTeams, error: teamsError } = await supabase.from('teams').insert(teamRows).select()
         if (teamsError) throw teamsError
@@ -3670,8 +3675,10 @@ export default function GameDetails() {
                       </Link>
                     )}
                     {/* Sozinho num mix em dupla: o admin junta-lhe um parceiro de
-                        entre os outros sozinhos (Francisco, 27 set). */}
-                    {canPairSolos && !person.hasPartner && (
+                        entre os outros sozinhos (Francisco, 27 set). Convidados
+                        sem conta ficam de fora — a RPC admin_pair_solos só
+                        conhece user_id. */}
+                    {canPairSolos && !person.hasPartner && !person.no_account && (
                       <button type="button" onClick={() => { setPairWith(null); setPairFor(person) }} disabled={busy}
                         className="press shrink-0 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-extrabold text-ink-900">
                         {t('mixpairs.join')}
@@ -3967,7 +3974,7 @@ export default function GameDetails() {
             // A decorrer (antes da ronda 1), um convidado novo refaz as
             // duplas como qualquer outra entrada à última da hora.
             if (mixStarted) {
-              try { await reformDuplas(people.map((p) => p.id)) } catch (error) { console.error('Error reforming duplas after adding a guest:', error) }
+              try { await reformDuplas(people.filter((p) => !p.no_account).map((p) => p.id)) } catch (error) { console.error('Error reforming duplas after adding a guest:', error) }
             }
             loadGameDetails()
           }}
@@ -4186,7 +4193,7 @@ export default function GameDetails() {
             errorOf={(error) => mixPairErrorMessage(t, error)}
           >
             <div className="space-y-2">
-              {people.filter((x) => !x.hasPartner && x.id !== pairFor?.id).map((x) => (
+              {people.filter((x) => !x.hasPartner && !x.no_account && x.id !== pairFor?.id).map((x) => (
                 <button key={x.id} type="button" onClick={() => setPairWith(x.id)}
                   className={`press flex min-h-[48px] w-full items-center gap-3 rounded-ctrl border px-3 py-2 text-left ${pairWith === x.id ? 'border-ink-900 bg-ink-900 text-white' : 'border-line bg-white text-ink-900'}`}>
                   <Avatar name={x.name} url={x.avatar_url} size="w-8 h-8 text-[11px]" />

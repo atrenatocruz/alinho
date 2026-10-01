@@ -210,12 +210,12 @@ async function formatMixListWithSpots(openMixes, lang, allOpenMixes = openMixes)
   const labelable = labelableMixes(allOpenMixes)
   const { data: rows, error } = await supabase
     .from('participants')
-    .select('game_id, partner_id')
+    .select('game_id, partner_id, partner_guest_id')
     .in('game_id', openMixes.map((m) => m.id))
     .eq('status', 'confirmed')
   if (error) throw new Error(`Failed to count participants: ${error.message}`)
   const taken = new Map()
-  for (const row of rows) taken.set(row.game_id, (taken.get(row.game_id) || 0) + (row.partner_id ? 2 : 1))
+  for (const row of rows) taken.set(row.game_id, (taken.get(row.game_id) || 0) + (row.partner_id || row.partner_guest_id ? 2 : 1))
   return openMixes.map((mix) => {
     const capacity = mix.max_players || mix.num_courts * 4
     const spots = t('mix_list_spots', lang, { filled: taken.get(mix.id) || 0, capacity })
@@ -440,10 +440,23 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
       .insert([{ game_id: gameId, guest_id: g.id, status, joined_alone: true }])
     if (error) {
       // Linha órfã só se o convidado não estava já inscrito (23505 = já está).
-      if (error.code !== '23505') await supabase.from('game_guests').delete().eq('id', g.id)
+      if (error.code !== '23505') await deleteGuestIfOrphan(g.id)
       return error
     }
     return null
+  }
+
+  /** Apaga uma linha de game_guests só se nada a referencia — o upsert
+   *  pode ter REUTILIZADO uma linha existente (mesmo número), e apagá-la
+   *  às cegas no caminho de erro levava atrás inscrições de outros
+   *  (CASCADE no guest_id, SET NULL no partner_guest_id). */
+  async function deleteGuestIfOrphan(guestId) {
+    const { data } = await supabase
+      .from('participants')
+      .select('id')
+      .or(`guest_id.eq.${guestId},partner_guest_id.eq.${guestId}`)
+      .limit(1)
+    if (!data?.length) await supabase.from('game_guests').delete().eq('id', guestId)
   }
 
   /** Convidado só por nome (parceiro «com Fulano», lista copiada): sem
@@ -493,7 +506,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     if (normalized === 'sim') {
       pendingSuplenteConfirmations.delete(key)
 
-      const { game } = await loadGame(pending.gameId)
+      const { game, rows: waitRows } = await loadGame(pending.gameId)
       const gameIsFuture = new Date(game.date).getTime() > Date.now()
       if (!OPEN_STATUSES.has(game.status) || !gameIsFuture) {
         await reply('mix_no_longer_available')
@@ -502,6 +515,13 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
 
       const { profile, isNewGuest } = await requireProfileOrCreateGuest(resolvedProfile, senderPn)
       if (!profile) return
+
+      // Entre a pergunta e o «Sim» passaram até 10 minutos — a pessoa pode
+      // ter entrado entretanto (ex.: como parceiro de alguém).
+      if (waitRows.some((row) => row.status === 'confirmed' && rowIsMine(profile, myHash, row))) {
+        await reply('already_joined')
+        return
+      }
 
       const insertError = profile.guest
         ? await insertGuestParticipant(pending.gameId, profile, 'waitlisted')
@@ -773,8 +793,11 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     // ainda inscritos sozinhos.
     const { game, rows } = await loadGame(req.gameId)
     const { data: drawn } = await supabase.from('teams').select('id').eq('game_id', req.gameId)
-    const requesterRow = rows.find((r) => r.status === 'confirmed' && r.user_id === req.requesterId && !r.partner_id)
-    const partnerRow = rows.find((r) => r.status === 'confirmed' && isMine(resolvedProfile, r.user_id) && !r.partner_id)
+    // «Sozinho» = sem parceiro NENHUM — nem conta nem convidado (senão um
+    // «Sim» tardio cancelava a linha de quem entretanto juntou um convidado
+    // e o gc apagava-o do jogo).
+    const requesterRow = rows.find((r) => r.status === 'confirmed' && r.user_id === req.requesterId && !r.partner_id && !r.partner_guest_id)
+    const partnerRow = rows.find((r) => r.status === 'confirmed' && isMine(resolvedProfile, r.user_id) && !r.partner_id && !r.partner_guest_id)
     if (!OPEN_STATUSES.has(game.status) || new Date(game.date).getTime() <= Date.now() || (drawn || []).length > 0 || !requesterRow || !partnerRow) {
       await reply('pair_request_expired')
       return true
@@ -833,8 +856,10 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     }
     const own = adding ? rows.find((row) => row.id === pending.addToRowId) : null
     if (adding) {
-      // A inscrição sozinha tem de continuar lá, ser desta pessoa e sem parceiro.
-      if (!own || own.status !== 'confirmed' || own.partner_id || own.partner_guest_id || !isMine(profile, own.user_id)) {
+      // A inscrição sozinha tem de continuar lá, ser desta pessoa (por
+      // conta OU pelo hash — pode ser a linha-convidado de antes da conta)
+      // e sem parceiro.
+      if (!own || own.status !== 'confirmed' || own.partner_id || own.partner_guest_id || !rowOwnerIsMine(profile, myHash, own)) {
         await reply('mix_no_longer_available')
         return
       }
@@ -983,7 +1008,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
       .from('participants')
       .update({ partner_guest_id: g.id, joined_alone: false })
       .eq('id', rowId)
-    if (error) await supabase.from('game_guests').delete().eq('id', g.id)
+    if (error) await deleteGuestIfOrphan(g.id)
     return error
   }
 
@@ -1001,7 +1026,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     const { error } = await supabase
       .from('participants')
       .insert([{ game_id: gameId, user_id: profile.id, partner_guest_id: g.id, status: 'confirmed', joined_alone: false }])
-    if (error) await supabase.from('game_guests').delete().eq('id', g.id)
+    if (error) await deleteGuestIfOrphan(g.id)
     return error
   }
 
@@ -1229,7 +1254,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     timer.mark('gravar')
     if (error) throw new Error(`Failed to shrink pair: ${error.message}`)
     // Quem saiu era convidado → a linha dele em game_guests já não serve.
-    if (leaving.guest) await supabase.from('game_guests').delete().eq('id', leaving.guest)
+    if (leaving.guest) await deleteGuestIfOrphan(leaving.guest)
     // O convite por link de quem saiu deixa de ter lugar (legado #339).
     if (choice === 'partner' && other.claim_pending) {
       await supabase.from('partner_invites').delete().eq('participant_id', pairRow.id)

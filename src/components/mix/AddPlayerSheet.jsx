@@ -111,6 +111,17 @@ export default function AddPlayerSheet({ game, excludeIds, peopleCount, capacity
     setCreateInfo('')
     try {
       if (!newEmail.trim()) {
+        // O RPC inscreve logo (confirmado) e o guard das vagas não trava
+        // admins — valida-se aqui o que o caminho com conta valida no passo
+        // «cheio»: tem de haver vaga, e a RPC não sabe duplas.
+        if (withPartner) {
+          setCreateError(t('mixedit.guest_no_partner'))
+          return
+        }
+        if (peopleCount >= capacity) {
+          setCreateError(t('mixedit.guest_needs_spot'))
+          return
+        }
         const { error } = await supabase.rpc('add_game_guest', { p_game_id: game.id, p_name: newName.trim() })
         if (error) throw error
         onGuestAdded?.()

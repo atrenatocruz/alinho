@@ -23,8 +23,17 @@
 -- TUDO ADITIVO para o código no ar: o bot velho e a web velha continuam a
 -- funcionar com este schema (só inserem linhas com user_id). Correr este
 -- ficheiro inteiro no Supabase → SQL Editor ANTES de qualquer deploy do
--- branch feat/guests-sem-conta.
+-- branch feat/guests-sem-conta, e DEPOIS de todas as migrações do dev
+-- (usa meets_age_restriction, participants_pair_signup_guard,
+-- participants_reset_drawn_teams, list_explore_events/get_club_profile).
+--
+-- PRÉ-FLIGHT (o CHECK novo valida as linhas existentes):
+--   SELECT count(*) FROM participants WHERE user_id IS NULL;   -- tem de dar 0
+-- Se não der 0, limpar essas linhas primeiro. Transação única: se algo
+-- falhar, nada fica meio-migrado.
 -- ════════════════════════════════════════════════════════════════════════
+
+BEGIN;
 
 -- ── 1. game_guests: a identidade de um convidado DENTRO de um jogo ──────
 -- Um UUID por convidado por jogo — flui por participants → teams →
@@ -97,6 +106,11 @@ ALTER TABLE participants ADD CONSTRAINT participants_partner_one
 -- UNIQUE(game_id, user_id) não deduplica NULLs — o convidado tem o seu.
 CREATE UNIQUE INDEX IF NOT EXISTS participants_game_guest_key
   ON participants (game_id, guest_id) WHERE guest_id IS NOT NULL;
+-- E o mesmo convidado não pode ser parceiro de duas inscrições (o upsert
+-- do bot reutiliza a linha de game_guests pelo número — sem isto, a adoção
+-- na confirmação podia pôr a mesma conta em duas duplas).
+CREATE UNIQUE INDEX IF NOT EXISTS participants_partner_guest_key
+  ON participants (partner_guest_id) WHERE partner_guest_id IS NOT NULL;
 
 ALTER TABLE teams
   ALTER COLUMN player1_id DROP NOT NULL,
@@ -257,6 +271,52 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
+-- ── 3b. Guardas de dupla e de sorteio aprendem o parceiro-convidado ─────
+
+-- Base: migration_mix_pair_signup.sql. Sem isto, join_with_guest_partner
+-- (e qualquer UPDATE de partner_guest_id) contornava o «Inscrição em
+-- dupla: Não» — o guard antigo só olhava a partner_id e o trigger nem
+-- disparava no UPDATE da coluna nova (achado da revisão, 1 out).
+CREATE OR REPLACE FUNCTION participants_pair_signup_guard()
+RETURNS TRIGGER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  v_allow BOOLEAN;
+  v_org   UUID;
+BEGIN
+  IF (NEW.partner_id IS NULL AND NEW.partner_guest_id IS NULL)
+     OR (TG_OP = 'UPDATE' AND (OLD.partner_id IS NOT NULL OR OLD.partner_guest_id IS NOT NULL)) THEN
+    RETURN NEW;
+  END IF;
+  IF auth.uid() IS NULL THEN RETURN NEW; END IF;
+  SELECT allow_pair_signup, organization_id INTO v_allow, v_org FROM games WHERE id = NEW.game_id;
+  IF NOT COALESCE(v_allow, FALSE) AND NOT is_org_admin(v_org) THEN
+    RAISE EXCEPTION 'pair_signup_disabled';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+REVOKE ALL ON FUNCTION participants_pair_signup_guard() FROM public, anon, authenticated;
+
+DROP TRIGGER IF EXISTS participants_pair_signup_guard ON participants;
+CREATE TRIGGER participants_pair_signup_guard
+  BEFORE INSERT OR UPDATE OF partner_id, partner_guest_id ON participants
+  FOR EACH ROW EXECUTE FUNCTION participants_pair_signup_guard();
+
+-- Base: migration_mix_duplas_sorteadas_reset.sql. Mudar um parceiro-
+-- convidado (ou a adoção trocar guest_id→user_id) num mix sorteado e por
+-- começar também tem de desfazer as duplas — senão ficavam obsoletas.
+DROP TRIGGER IF EXISTS participants_reset_drawn_teams_upd ON participants;
+CREATE TRIGGER participants_reset_drawn_teams_upd
+  AFTER UPDATE OF status, partner_id, partner_guest_id, user_id, guest_id ON participants
+  FOR EACH ROW
+  WHEN (OLD.status IS DISTINCT FROM NEW.status
+     OR OLD.partner_id IS DISTINCT FROM NEW.partner_id
+     OR OLD.partner_guest_id IS DISTINCT FROM NEW.partner_guest_id
+     OR OLD.user_id IS DISTINCT FROM NEW.user_id
+     OR OLD.guest_id IS DISTINCT FROM NEW.guest_id)
+  EXECUTE FUNCTION participants_reset_drawn_teams();
+
 -- ── 4. Arranque automático com convidados ───────────────────────────────
 -- Base: migration_auto_start_respeita_lados.sql (Trello #404). Novidades:
 -- chave do jogador = COALESCE(user_id, guest_id); convidado emparelha com
@@ -337,11 +397,12 @@ BEGIN
        AND (p.partner_id IS NOT NULL OR p.partner_guest_id IS NOT NULL);
     GET DIAGNOSTICS v_duplas = ROW_COUNT;
 
-    -- Solos por pontos (convidado = 900, lado 'both').
-    SELECT COALESCE(array_agg(x.pid  ORDER BY x.pts DESC), '{}'),
-           COALESCE(array_agg(x.lado ORDER BY x.pts DESC), '{}'),
-           COALESCE(array_agg(x.eh_convidado ORDER BY x.pts DESC), '{}'),
-           COALESCE(array_agg(x.pts  ORDER BY x.pts DESC), '{}')
+    -- Solos por pontos (convidado = 900, lado 'both'). O desempate por pid
+    -- garante a MESMA permutação nos quatro arrays paralelos.
+    SELECT COALESCE(array_agg(x.pid  ORDER BY x.pts DESC, x.pid), '{}'),
+           COALESCE(array_agg(x.lado ORDER BY x.pts DESC, x.pid), '{}'),
+           COALESCE(array_agg(x.eh_convidado ORDER BY x.pts DESC, x.pid), '{}'),
+           COALESCE(array_agg(x.pts  ORDER BY x.pts DESC, x.pid), '{}')
       INTO v_solos, v_lados, v_guest, v_pontos
       FROM (
         SELECT COALESCE(p.user_id, p.guest_id) AS pid,
@@ -593,11 +654,22 @@ BEGIN
   IF auth.uid() IS NULL THEN RAISE EXCEPTION 'no_session'; END IF;
   SELECT organization_id, status INTO v_org, v_status FROM games WHERE id = p_game_id;
   IF v_org IS NULL THEN RAISE EXCEPTION 'game_not_found'; END IF;
+  -- Mensagens alinhadas com as chaves gamedetails.partner_error_* da app.
   IF NOT EXISTS (SELECT 1 FROM memberships m
                   WHERE m.organization_id = v_org AND m.user_id = auth.uid()) THEN
-    RAISE EXCEPTION 'not_member';
+    RAISE EXCEPTION 'not_a_member';
   END IF;
-  IF v_status NOT IN ('open', 'closed') THEN RAISE EXCEPTION 'mix_already_started'; END IF;
+  IF v_status NOT IN ('open', 'closed') THEN RAISE EXCEPTION 'game_not_open'; END IF;
+  -- SECURITY DEFINER não passa pela RLS — o escalão etário do mix tem de
+  -- ser verificado aqui, como a policy de INSERT o faz para o caminho
+  -- normal (migration_mix_join_policy_sem_sexo.sql). O convidado não tem
+  -- perfil/idade — verifica-se só quem inscreve, como nos torneios.
+  IF NOT meets_age_restriction(auth.uid(), (SELECT age_restriction FROM games WHERE games.id = p_game_id)) THEN
+    RAISE EXCEPTION 'age_restricted';
+  END IF;
+  -- «Inscrição em dupla: Não» é garantido pelo participants_pair_signup_guard
+  -- (secção 3b), que dispara nos INSERT/UPDATE abaixo com o auth.uid() do
+  -- jogador.
 
   INSERT INTO game_guests (game_id, name) VALUES (p_game_id, btrim(p_guest_name))
   RETURNING id INTO v_guest;
@@ -631,6 +703,163 @@ UPDATE profiles SET phone_verified_at = TIMEZONE('utc', NOW())
  WHERE phone_hash IS NOT NULL
    AND phone_hash <> 'dev-bypass'
    AND phone_verified_at IS NULL;
+
+-- ── 9. Contagens de vagas públicas (explorar / perfil de clube) ─────────
+-- Cópias fiéis das versões vivas (migration_explore_events.sql e
+-- migration_searchable_orgs.sql) com UMA mudança cada: o parceiro-convidado
+-- também ocupa lugar na contagem mostrada.
+
+CREATE OR REPLACE FUNCTION list_explore_events(p_from TIMESTAMPTZ)
+RETURNS TABLE (
+  game JSONB,
+  organization JSONB,
+  people_count INTEGER,
+  avg_rating NUMERIC,
+  friends_in_org TEXT[],
+  my_request_status TEXT
+)
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+STABLE
+AS $$
+  WITH me AS (SELECT auth.uid() AS id),
+  my_orgs AS (
+    SELECT m.organization_id FROM memberships m, me WHERE m.user_id = me.id
+  ),
+  last_request AS (
+    SELECT DISTINCT ON (r.organization_id) r.organization_id, r.status
+    FROM membership_requests r, me
+    WHERE r.user_id = me.id
+    ORDER BY r.organization_id, r.created_at DESC
+  ),
+  explore_orgs AS (
+    SELECT o.*
+    FROM organizations o
+    WHERE o.is_global
+      AND o.id NOT IN (SELECT organization_id FROM my_orgs)
+      AND (o.parent_organization_id IS NULL OR o.parent_organization_id IN (SELECT organization_id FROM my_orgs))
+      AND NOT EXISTS (
+        SELECT 1 FROM last_request lr WHERE lr.organization_id = o.id AND lr.status = 'rejected'
+      )
+  )
+  SELECT
+    to_jsonb(g) - 'created_by',
+    jsonb_build_object(
+      'id', o.id,
+      'name', o.name,
+      'slug', o.slug,
+      'kind', o.kind,
+      'group_logo_url', o.group_logo_url,
+      'open_join', o.open_join,
+      'latitude', to_jsonb(o) -> 'latitude',
+      'longitude', to_jsonb(o) -> 'longitude'
+    ),
+    COALESCE((
+      SELECT SUM(1 + CASE WHEN p.partner_id IS NOT NULL OR p.partner_guest_id IS NOT NULL THEN 1 ELSE 0 END)::INTEGER
+      FROM participants p WHERE p.game_id = g.id AND p.status = 'confirmed'
+    ), 0),
+    (
+      SELECT AVG(pr.rating)
+      FROM participants p
+      JOIN profiles pr ON pr.id IN (p.user_id, p.partner_id)
+      LEFT JOIN memberships mm ON mm.user_id = pr.id AND mm.organization_id = g.organization_id
+      WHERE p.game_id = g.id AND p.status = 'confirmed'
+        AND pr.rating IS NOT NULL AND COALESCE(mm.is_guest, false) = false
+    ),
+    COALESCE((
+      SELECT ARRAY_AGG(fp.name ORDER BY fp.name)
+      FROM follows f
+      JOIN memberships fm ON fm.user_id = f.followed_id AND fm.organization_id = o.id
+      JOIN profiles fp ON fp.id = f.followed_id
+      WHERE f.follower_id = (SELECT id FROM me) AND f.status = 'accepted'
+    ), ARRAY[]::TEXT[]),
+    (SELECT lr.status FROM last_request lr WHERE lr.organization_id = o.id)
+  FROM games g
+  JOIN explore_orgs o ON o.id = g.organization_id
+  WHERE g.date >= p_from
+    AND g.status IN ('open', 'closed', 'in_progress')
+  ORDER BY g.date;
+$$;
+
+REVOKE ALL ON FUNCTION list_explore_events(TIMESTAMPTZ) FROM public, anon;
+GRANT EXECUTE ON FUNCTION list_explore_events(TIMESTAMPTZ) TO authenticated;
+
+CREATE OR REPLACE FUNCTION get_club_profile(p_slug TEXT)
+RETURNS TABLE (
+  id UUID,
+  name TEXT,
+  slug TEXT,
+  description TEXT,
+  location TEXT,
+  phone TEXT,
+  instagram TEXT,
+  website TEXT,
+  group_logo_url TEXT,
+  kind TEXT,
+  parent_organization_id UUID,
+  parent_name TEXT,
+  parent_slug TEXT,
+  open_join BOOLEAN,
+  member_count BIGINT,
+  my_status TEXT,
+  open_games JSONB
+)
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+STABLE
+AS $$
+  SELECT
+    o.id, o.name, o.slug, o.description, o.location, o.phone, o.instagram, o.website,
+    o.group_logo_url, o.kind, o.parent_organization_id, parent.name, parent.slug,
+    o.open_join,
+    CASE WHEN org_stats_visible(o)
+      THEN (SELECT COUNT(*) FROM memberships m WHERE m.organization_id = o.id)
+    END,
+    CASE
+      WHEN EXISTS (SELECT 1 FROM memberships m WHERE m.organization_id = o.id AND m.user_id = auth.uid()) THEN 'member'
+      WHEN EXISTS (SELECT 1 FROM membership_requests r WHERE r.organization_id = o.id AND r.user_id = auth.uid() AND r.status = 'pending') THEN 'pending'
+      ELSE 'none'
+    END,
+    CASE
+      WHEN NOT (
+        is_org_admin(o.id) OR EXISTS (
+          SELECT 1 FROM memberships m WHERE m.organization_id = o.id AND m.user_id = auth.uid()
+        )
+      ) AND (o.kind = 'group' OR NOT o.is_global) THEN '[]'::jsonb
+      ELSE COALESCE((
+        SELECT json_agg(json_build_object(
+          'id', g.id,
+          'title', g.title,
+          'date', g.date,
+          'location', g.location,
+          'max_players', COALESCE(g.max_players, g.num_courts * 4),
+          'confirmed_count', (
+            SELECT COALESCE(SUM(1 + (p.partner_id IS NOT NULL OR p.partner_guest_id IS NOT NULL)::int), 0)
+            FROM participants p WHERE p.game_id = g.id AND p.status = 'confirmed'
+          )
+        ) ORDER BY g.date)
+        FROM games g
+        WHERE g.organization_id = o.id AND g.status NOT IN ('finished', 'completed', 'cancelled', 'pending')
+      ), '[]'::json)::jsonb
+    END
+  FROM organizations o
+  LEFT JOIN organizations parent ON parent.id = o.parent_organization_id
+  WHERE o.slug = p_slug
+    AND (
+      org_is_findable(o)
+      OR is_org_admin(o.id)
+      OR EXISTS (SELECT 1 FROM memberships m WHERE m.organization_id = o.id AND m.user_id = auth.uid())
+      OR (o.kind = 'club' AND o.is_global = TRUE)
+      OR (o.kind = 'group' AND o.self_serve)
+    );
+$$;
+
+REVOKE ALL ON FUNCTION get_club_profile(TEXT) FROM public;
+GRANT EXECUTE ON FUNCTION get_club_profile(TEXT) TO authenticated;
+
+COMMIT;
 
 -- ── Verificação pós-migração ─────────────────────────────────────────────
 -- SELECT to_regclass('public.game_guests');                          -- não-nulo
