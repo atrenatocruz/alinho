@@ -72,7 +72,9 @@ test('o interruptor do clube chega ao grupo; sem ele, mensagens de sempre', asyn
   assert.equal((await getGroupByJid('g@g.us')).newMessages, false)
 })
 
-test('o cartão novo: curto, a dupla numa linha, sem níveis nem calendário, e o /help só aqui', () => {
+test('o cartão novo: curto, a dupla numa linha, com os pontos Elo, sem calendário, e o /help só aqui', () => {
+  // «sem níveis» (1 out) deu lugar aos pontos Elo entre parênteses para
+  // quem tem conta e rating (Ruben, 3 out) — convidados ficam só o nome.
   const people = [person('Ana Costa', { pair: 1 }), person('Rui Lopes', { pair: 1 }), person('Marta Silva'), person('João Pires'), person('Tiago Reis')]
   const card = buildMixMessage(state(people), { label: '01', fresh: true })
   assert.equal(card, [
@@ -80,10 +82,10 @@ test('o cartão novo: curto, a dupla numa linha, sem níveis nem calendário, e 
     'Ter 5 out · 22h30 · A2N Padel Academy',
     '11 € · Prémio: cerveja ou água + voucher 1h30',
     '',
-    '1–2. Ana Costa e Rui Lopes',
-    '3. Marta Silva',
-    '4. João Pires',
-    '5. Tiago Reis',
+    '1–2. Ana Costa (1300) e Rui Lopes (1300)',
+    '3. Marta Silva (1300)',
+    '4. João Pires (1300)',
+    '5. Tiago Reis (1300)',
     '6. —',
     '7. —',
     '8. —',
