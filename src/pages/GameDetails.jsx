@@ -1258,8 +1258,11 @@ export default function GameDetails() {
           .update({ status: 'in_progress' })
           .eq('id', id)
         if (statusError) throw statusError
-        // Com duplas fixas, «Começar o Mix» já sorteia a ronda 1 (27 set).
-        if (!isGruposEliminatorias && !game?.rotate_partners && insertedTeams?.length) {
+        // «Começar o Mix» já sorteia a Ronda 1, «por começar» (27 set; ponto 11).
+        // Também com parceiros que trocam: as duplas da Ronda 1 são as acabadas
+        // de formar — antes ficava sem jogos e sem duplas à vista (Francisco,
+        // 2 out, «Mix de Sábado»).
+        if (!isGruposEliminatorias && insertedTeams?.length) {
           setBusy(false)
           await handleStartRound1({ teamsOverride: insertedTeams })
           return
@@ -3326,7 +3329,7 @@ export default function GameDetails() {
           {/* Classificação dobrada numa linha, com o teu lugar (pacote do mix,
               ponto 15, proposta para o Francisco ver): em todos os formatos,
               só com o nome «Classificação». Abre-se ao tocar. */}
-          {classif.rows.length > 0 && !inPoolStage && (
+          {classif.rows.length > 0 && anyScoreSaved && !inPoolStage && (
             <div className="card">
               <button type="button" onClick={() => setClassifOpen((v) => !v)} aria-expanded={classifOpen}
                 className={`w-full min-h-[44px] flex items-center justify-between gap-3 text-left ${classifOpen ? 'mb-3' : ''}`}>

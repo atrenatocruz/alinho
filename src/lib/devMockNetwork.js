@@ -1335,7 +1335,7 @@ const TABLE_MOCKS = {
     ...(rotating() ? {
       status: 'in_progress', rotate_partners: true, pairing_mode: 'aleatorio',
       game_time_minutes: 20, court_time_minutes: 60, scoring_format: 'pontos_simples',
-      round_started_at: new Date().toISOString(), round_duration_minutes: 20,
+      round_started_at: localStorage.getItem('mockRoundPending') ? null : new Date().toISOString(), round_duration_minutes: 20,
     } : {}),
     id: 'fake-game-1',
     organization_id: MOCK_ADMIN_ORG_ID,
