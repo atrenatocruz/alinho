@@ -483,6 +483,7 @@ export default function Home() {
     return full ? { kind: 'waitlist' } : { kind: 'join' }
   }
 
+  const [leaveAsk, setLeaveAsk] = useState(null) // o evento de onde se quer sair
   const markPending = (key, on) => setPendingKeys((prev) => {
     const next = new Set(prev)
     if (on) next.add(key)
@@ -490,8 +491,9 @@ export default function Home() {
     return next
   })
 
-  const handleGameAction = async (event, kind, { genderConfirmed = false } = {}) => {
-    if (kind === 'leave' && !confirm(t('gamedetails.confirm_leave_game'))) return
+  const handleGameAction = async (event, kind, { genderConfirmed = false, leaveConfirmed = false } = {}) => {
+    // Sair pergunta na folha da app (janelas → peças da app, 2 out).
+    if (kind === 'leave' && !leaveConfirmed) { setLeaveAsk(event); return }
     if ((kind === 'join' || kind === 'waitlist') && !genderConfirmed && isGenderMismatch(event.raw, profile)) {
       setGenderConfirm({ event, kind })
       return
@@ -986,6 +988,10 @@ export default function Home() {
         </Sheet>
       )}
 
+      <ConfirmSheet open={!!leaveAsk} outline title={t('dialogs.leave_game_title')}
+        cancelLabel={t('dialogs.leave_game_keep')} confirmLabel={t('dialogs.leave_game_confirm')}
+        onConfirm={() => { const ev = leaveAsk; setLeaveAsk(null); if (ev) handleGameAction(ev, 'leave', { leaveConfirmed: true }) }}
+        onClose={() => setLeaveAsk(null)} />
       <ConfirmSheet
         open={!!genderConfirm}
         title={genderConfirm?.event.raw.gender_restriction === 'feminino' ? t('gamedetails.gender_confirm_title_feminino') : t('gamedetails.gender_confirm_title_masculino')}

@@ -49,6 +49,8 @@ export default function PersonalInfo() {
   const [isPrivate, setIsPrivate] = useState(profile?.is_private || false)
   const [loading, setLoading] = useState(false)
   const [saved, setSaved] = useState(false)
+  // Erro ao guardar, junto ao botão (janelas → peças da app, 2 out).
+  const [saveError, setSaveError] = useState('')
 
   const inputLabel = 'block text-sm font-extrabold text-ink-900 mb-2'
   const fieldLabel = 'text-[11px] font-extrabold uppercase tracking-widest text-muted'
@@ -71,6 +73,7 @@ export default function PersonalInfo() {
 
   const handleSave = async (e) => {
     e.preventDefault()
+    setSaveError('')
     setLoading(true)
     try {
       const updates = {
@@ -109,7 +112,7 @@ export default function PersonalInfo() {
       setTimeout(() => setSaved(false), 2000)
     } catch (error) {
       console.error('Error updating profile:', error)
-      alert(describeError(t, error, 'profile.error_update_profile'))
+      setSaveError(describeError(t, error, 'dialogs.save_error'))
     } finally {
       setLoading(false)
     }
@@ -293,6 +296,7 @@ export default function PersonalInfo() {
               </div>
             </div>
 
+            {saveError && <p role="alert" className="text-xs font-extrabold text-danger">{saveError}</p>}
             <div className="flex gap-3 pt-2">
               <PrimaryButton type="submit" disabled={loading} className="flex-1">
                 {loading ? t('layout.saving') : t('layout.save')}

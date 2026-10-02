@@ -12,7 +12,7 @@ import { cancelEnrolment, getLesson, lessonFromMyRequest, setLessonAttendance } 
 import { enrolmentEndDate } from '../lib/lessons'
 import { describeError, errorKind } from '../lib/errors'
 import { formatDate } from '../lib/formatDate'
-import { Avatar, EmptyState } from '../components/ui'
+import { Avatar, ConfirmSheet, EmptyState } from '../components/ui'
 import { StateTag } from '../components/agenda/EventCard'
 import { LevelPill, MonoLabel, TEAL, TealTag, bandLabel, euros, hhmm, lessonTypeLabel, levelRange } from '../components/lessons/LessonBits'
 
@@ -27,6 +27,9 @@ export default function LessonPage() {
   const [failed, setFailed] = useState(false)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
+  // Janelas do navegador → peças da app (parte 2, 2 out).
+  const [actionError, setActionError] = useState('')
+  const [askCancel, setAskCancel] = useState(false)
   const [fromRequest, setFromRequest] = useState(false)
 
   useEffect(() => {
@@ -66,25 +69,26 @@ export default function LessonPage() {
   const attendance = async (going) => {
     setBusy(true)
     setNotice('')
+    setActionError('')
     try {
       await setLessonAttendance(l.lesson_id, going)
       setData((d) => ({ ...d, my_status: going ? 'confirmed' : 'not_going' }))
     } catch (error) {
-      alert(describeError(t, error, 'lessons.error_attendance'))
+      setActionError(describeError(t, error, 'dialogs.save_error'))
     } finally {
       setBusy(false)
     }
   }
 
-  const cancelSeries = async () => {
-    const until = formatDate(`${enrolmentEndDate(localIso(new Date()))}T12:00:00`, i18n.language, { day: 'numeric', month: 'long' })
-    if (!confirm(t('lessons.confirm_cancel_enrolment', { date: until }))) return
+  const until = formatDate(`${enrolmentEndDate(localIso(new Date()))}T12:00:00`, i18n.language, { day: 'numeric', month: 'long' })
+  const cancelSeries = () => { setActionError(''); setAskCancel(true) }
+  const cancelSeriesNow = async () => {
     setBusy(true)
     try {
       await cancelEnrolment(data.my_enrolment_id)
       setNotice(t('lessons.enrolment_cancelled', { date: until }))
     } catch (error) {
-      alert(describeError(t, error, 'lessons.error_request'))
+      setActionError(describeError(t, error, 'dialogs.enrolment_cancel_error'))
     } finally {
       setBusy(false)
     }
@@ -184,6 +188,10 @@ export default function LessonPage() {
           {t('lessons.cancel_enrolment')}
         </button>
       )}
+      {actionError && <p role="alert" className="text-xs font-extrabold text-danger">{actionError}</p>}
+      <ConfirmSheet open={askCancel} danger title={t('dialogs.enrolment_cancel_title')} message={t('dialogs.enrolment_cancel_message', { date: until })}
+        cancelLabel={t('dialogs.enrolment_cancel_keep')} confirmLabel={t('dialogs.enrolment_cancel_confirm')}
+        onConfirm={cancelSeriesNow} onClose={() => setAskCancel(false)} />
     </div>
   )
 }

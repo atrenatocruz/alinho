@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ChevronLeft, GraduationCap, Plus, Repeat } from 'lucide-react'
-import { Avatar, EmptyState, PrimaryButton, DateField } from '../ui'
+import { Avatar, ConfirmSheet, EmptyState, PrimaryButton, DateField } from '../ui'
 import { cancelLesson, cancelLessonPeriod, getSeriesRoster, listClubSeries, listSeriesPastLessons, markLessonAbsence, resolveEnrolment } from '../../lib/lessonsApi'
 import { weekdayCountBetween } from '../../lib/lessons'
 import { describeError } from '../../lib/errors'
@@ -101,6 +101,7 @@ export function SeriesManage({ seriesId, onBack }) {
   const [data, setData] = useState(null)
   const [acting, setActing] = useState(null)
   const [answered, setAnswered] = useState({})
+  const [answerError, setAnswerError] = useState(null) // { id, text } (janelas → app, 2 out)
 
   useEffect(() => {
     getSeriesRoster(seriesId).then(setData).catch((error) => console.error('Error loading series roster:', error))
@@ -111,12 +112,13 @@ export function SeriesManage({ seriesId, onBack }) {
   const when = seriesWhen(t, s)
 
   const answer = async (req, accept) => {
+    setAnswerError(null)
     setActing(req.enrolment_id)
     try {
       await resolveEnrolment(req.enrolment_id, accept)
       setAnswered((a) => ({ ...a, [req.enrolment_id]: accept ? 'accepted' : 'rejected' }))
     } catch (error) {
-      alert(describeError(t, error, 'lessons.error_resolve'))
+      setAnswerError({ id: req.enrolment_id, text: describeError(t, error, 'lessons.error_resolve') })
     } finally {
       setActing(null)
     }
@@ -173,6 +175,7 @@ export function SeriesManage({ seriesId, onBack }) {
                       className="rounded-full border border-ink-900 bg-canvas px-3.5 py-1.5 text-xs font-bold text-ink-900 hover:bg-ink-50 disabled:opacity-40">{t('lessons.reject')}</button>
                   </div>
                 )}
+                {answerError?.id === r.enrolment_id && <p role="alert" className="mt-2 text-xs font-extrabold text-danger">{answerError.text}</p>}
               </div>
             ))}
           </div>
@@ -218,6 +221,8 @@ function PastLessons({ series, students }) {
   const [lessons, setLessons] = useState(null)
   const [open, setOpen] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [noteFor, setNoteFor] = useState(null) // { l, a }
+  const [pastError, setPastError] = useState('')
   useEffect(() => {
     listSeriesPastLessons([series.series_id], { withAttendees: true })
       .then(setLessons).catch((error) => { console.error('Error loading past lessons:', error); setLessons([]) })
@@ -227,9 +232,9 @@ function PastLessons({ series, students }) {
   const people = (l) => (l.lesson_attendees || []).filter((a) => ['confirmed', 'accepted', 'absent', 'not_going'].includes(a.status))
   const missed = (a) => a.status === 'absent' || a.status === 'not_going'
 
-  const markAbsent = async (l, a) => {
-    const note = window.prompt(t('lessons.absence_note_prompt', { name: nameOf(a) }), '')
-    if (note === null) return
+  const markAbsent = (l, a) => { setPastError(''); setNoteFor({ l, a }) }
+  const markAbsentNow = async (note) => {
+    const { l, a } = noteFor
     setBusy(true)
     try {
       await markLessonAbsence(l.id, a.user_id, note)
@@ -237,7 +242,7 @@ function PastLessons({ series, students }) {
         ...x, lesson_attendees: x.lesson_attendees.map((y) => (y.user_id === a.user_id ? { ...y, status: 'absent', marked_note: note } : y)),
       })))
     } catch (error) {
-      alert(describeError(t, error, 'lessons.error_attendance'))
+      setPastError(describeError(t, error, 'dialogs.absence_error'))
     } finally {
       setBusy(false)
     }
@@ -288,6 +293,8 @@ function PastLessons({ series, students }) {
         })}
       </div>
       <p className="mt-1.5 px-1 text-xs text-muted">{t('lessons.past_hint')}</p>
+      {pastError && <p role="alert" className="mt-1.5 px-1 text-xs font-extrabold text-danger">{pastError}</p>}
+      <AbsenceNoteSheet person={noteFor ? nameOf(noteFor.a) : null} onSave={markAbsentNow} onClose={() => setNoteFor(null)} />
     </div>
   )
 }
@@ -307,43 +314,46 @@ function NextLesson({ series, lesson, past = null }) {
   const dayLabel = `${t(`lessons.wd_short_${series.weekday}`)} ${date.getDate()} ${t(`lessons.month_short_${date.getMonth() + 1}`)}`
   const periodCount = weekdayCountBetween(period.from, period.to, series.weekday)
 
-  const markAbsent = async (a) => {
-    const note = window.prompt(t('lessons.absence_note_prompt', { name: a.name }), '')
-    if (note === null) return
+  // Janelas do navegador → peças da app (parte 2, 2 out): a nota da falta numa
+  // folha com campo, as perguntas de cancelar na folha da app, o erro à vista.
+  const [noteFor, setNoteFor] = useState(null) // a pessoa
+  const [ask, setAsk] = useState(null) // 'one' | 'period'
+  const [err, setErr] = useState('')
+  const markAbsent = (a) => { setErr(''); setNoteFor(a) }
+  const markAbsentNow = async (note) => {
+    const a = noteFor
     setBusy(true)
     try {
       await markLessonAbsence(lesson.lesson_id, a.user_id, note)
       setAttendees((list) => list.map((x) => (x.user_id === a.user_id ? { ...x, status: 'absent', marked_by_name: t('lessons.you_lower'), marked_note: note } : x)))
     } catch (error) {
-      alert(describeError(t, error, 'lessons.error_attendance'))
+      setErr(describeError(t, error, 'dialogs.absence_error'))
     } finally {
       setBusy(false)
     }
   }
 
-  const cancelOne = async () => {
-    if (!confirm(t('lessons.confirm_cancel_one', { day: dayLabel }))) return
+  const cancelOne = () => { setErr(''); setMsg(''); setAsk('one') }
+  const cancelOneNow = async () => {
     setBusy(true)
-    setMsg('')
     try {
       await cancelLesson(lesson.lesson_id, oneReason)
       setMsg(t('lessons.cancelled_one', { day: dayLabel }))
     } catch (error) {
-      alert(describeError(t, error, 'lessons.error_cancel'))
+      setErr(describeError(t, error, 'dialogs.cancel_error'))
     } finally {
       setBusy(false)
     }
   }
 
-  const cancelPeriod = async () => {
-    if (!confirm(t('lessons.confirm_cancel_period', { count: periodCount }))) return
+  const cancelPeriod = () => { setErr(''); setMsg(''); setAsk('period') }
+  const cancelPeriodNow = async () => {
     setBusy(true)
-    setMsg('')
     try {
       await cancelLessonPeriod(series.series_id, period.from, period.to, period.reason)
       setMsg(t('lessons.cancelled_period', { count: periodCount }))
     } catch (error) {
-      alert(describeError(t, error, 'lessons.error_cancel'))
+      setErr(describeError(t, error, 'dialogs.cancel_error'))
     } finally {
       setBusy(false)
     }
@@ -411,7 +421,32 @@ function NextLesson({ series, lesson, past = null }) {
             className="rounded-full border border-danger px-3.5 py-1.5 text-xs font-bold text-danger hover:bg-danger/10 disabled:opacity-40">{t('lessons.cancel_period_button')}</button>
         </div>
         {msg && <p className="text-sm font-semibold text-ok">{msg}</p>}
+        {err && <p role="alert" className="text-xs font-extrabold text-danger">{err}</p>}
+        <AbsenceNoteSheet person={noteFor?.name || null} onSave={markAbsentNow} onClose={() => setNoteFor(null)} />
+        <ConfirmSheet open={ask === 'one'} danger title={t('dialogs.cancel_lesson_title', { day: dayLabel })} message={t('dialogs.cancel_lesson_message')}
+          cancelLabel={t('dialogs.cancel_lesson_keep')} confirmLabel={t('dialogs.cancel_lesson_confirm')}
+          onConfirm={cancelOneNow} onClose={() => setAsk(null)} />
+        <ConfirmSheet open={ask === 'period'} danger title={t('dialogs.cancel_period_title', { count: periodCount })} message={t('dialogs.cancel_lesson_message')}
+          cancelLabel={t('dialogs.cancel_period_keep')} confirmLabel={t('dialogs.cancel_lesson_confirm')}
+          onConfirm={cancelPeriodNow} onClose={() => setAsk(null)} />
       </div>
     </>
+  )
+}
+
+/** A nota da falta (era um prompt do navegador; parte 2 das janelas, 2 out):
+    folha da app com um campo opcional. */
+function AbsenceNoteSheet({ person, onSave, onClose }) {
+  const { t } = useTranslation()
+  const [note, setNote] = useState('')
+  useEffect(() => { if (person) setNote('') }, [person])
+  return (
+    <ConfirmSheet open={!!person} title={t('dialogs.absence_title', { name: person || '' })}
+      confirmLabel={t('dialogs.absence_confirm')} cancelLabel={t('dialogs.absence_cancel')}
+      onConfirm={() => onSave(note.trim())} onClose={onClose}>
+      <label className="mt-3 block text-sm font-extrabold text-ink-900">{t('dialogs.absence_label')}</label>
+      <input type="text" value={note} onChange={(e) => setNote(e.target.value)} placeholder={t('dialogs.absence_placeholder')}
+        className="input-field mt-1.5" maxLength={120} />
+    </ConfirmSheet>
   )
 }

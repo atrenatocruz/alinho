@@ -12,7 +12,7 @@ import { groupFriendGames, friendGameFacts, beforeStart } from '../lib/friendGam
 import { dayText } from '../components/friends/dayText'
 import { loadSetsByGame } from '../lib/friendMatchDelete'
 import FriendGameRow from '../components/friends/FriendGameRow'
-import { PrimaryButton, EmptyState } from '../components/ui'
+import { PrimaryButton, EmptyState, ConfirmSheet } from '../components/ui'
 import { formatDate } from '../lib/formatDate'
 import { describeError } from '../lib/errors'
 import FriendSessionsList from '../components/friends/FriendSessionsList'
@@ -207,7 +207,13 @@ export default function PrivateMatches() {
 
   useEffect(() => { load() }, [load])
 
+  // Janelas do navegador → peças da app (parte 2, 2 out): o erro fica no
+  // cartão do jogo, o «Eliminar» pergunta na folha da app.
+  const [matchError, setMatchError] = useState(null) // { id, text }
+  const [deleting, setDeleting] = useState(null) // id do jogo
+
   const handleSubmitScore = async (matchId, finalScore) => {
+    setMatchError(null)
     setSubmittingId(matchId)
     try {
       await submitPrivateMatchScore(matchId, finalScore)
@@ -220,45 +226,39 @@ export default function PrivateMatches() {
       await load()
     } catch (error) {
       console.error('Error submitting score:', error)
-      alert(describeError(t, error, 'privatematches.error_submit_score'))
+      setMatchError({ id: matchId, text: describeError(t, error, 'privatematches.error_submit_score') })
     } finally {
       setSubmittingId(null)
     }
   }
 
   const handleConfirm = async (matchId) => {
+    setMatchError(null)
     try {
       await confirmPrivateMatch(matchId)
       await load()
     } catch (error) {
       console.error('Error confirming match:', error)
-      alert(describeError(t, error, 'privatematches.error_confirm'))
+      setMatchError({ id: matchId, text: describeError(t, error, 'privatematches.error_confirm') })
     }
   }
 
   const handleRespond = async (matchId, response) => {
+    setMatchError(null)
     setRespondingId(matchId)
     try {
       await respondToPrivateMatch(matchId, response)
       await load()
     } catch (error) {
       console.error('Error responding to private match:', error)
-      alert(describeError(t, error, 'privatematches.error_respond'))
+      setMatchError({ id: matchId, text: describeError(t, error, 'privatematches.error_respond') })
     } finally {
       setRespondingId(null)
     }
   }
 
-  const handleDelete = async (matchId) => {
-    if (!confirm(t('privatematches.confirm_delete'))) return
-    try {
-      await deletePrivateMatch(matchId)
-      await load()
-    } catch (error) {
-      console.error('Error deleting match:', error)
-      alert(describeError(t, error, 'privatematches.error_delete'))
-    }
-  }
+  const handleDelete = (matchId) => { setMatchError(null); setDeleting(matchId) }
+  const deleteNow = async () => { await deletePrivateMatch(deleting); await load() }
 
   // Um cartão por jogo entre amigos (REGRAS.md ponto 1, Francisco, 28 set):
   // os do desenho novo (têm session_id) abrem no ecrã deles, com editar,
@@ -441,12 +441,16 @@ export default function PrivateMatches() {
                     </PrimaryButton>
                   )}
                   <InviteLinks match={m} />
+                  {matchError?.id === m.id && <p role="alert" className="mt-3 text-xs font-extrabold text-danger">{matchError.text}</p>}
                 </div>
               )
             })}
           </div>
         </div>
       )}
+      <ConfirmSheet open={!!deleting} danger title={t('dialogs.delete_game_title')} message={t('dialogs.delete_game_message')}
+        cancelLabel={t('dialogs.delete_game_keep')} confirmLabel={t('dialogs.delete_game_confirm')}
+        onConfirm={deleteNow} onClose={() => setDeleting(null)} errorOf={(err) => describeError(t, err, 'privatematches.error_delete')} />
 
       <div>
         <h3 className="text-lg text-ink-900 mb-3">{t('privatematches.history')}</h3>
