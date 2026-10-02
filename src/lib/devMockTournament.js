@@ -715,6 +715,9 @@ export const TOURNAMENT_PROMOTED_TABLE_MOCKS = {
       { id: 'tp2', kind: 'tournament_promoted', game_id: null, created_at: new Date().toISOString(),
         data: { ...base, entry_id: 'e-2', status: 'convite', category_id: 'cat-mx4', category_code: 'MX4', category_name: 'Mistos 4', partner_name: 'Ana Costa', partner_pending: true, respond_by: respondBy } },
       // Prémio mudado com inscritos (AUDITORIA editar-tem-tudo, ponto 2).
+      // Torneio cancelado (1 out, Dev 3).
+      { id: 'tp5', kind: 'tournament_cancelled', game_id: null, created_at: new Date().toISOString(),
+        data: { ...base } },
       { id: 'tp3', kind: 'tournament_prize_changed', game_id: null, created_at: new Date().toISOString(),
         data: { ...base, category_id: 'cat-m5', category_code: 'M5', category_name: 'Masculinos 5', prize_first: '200 € + troféu', prize_second: '80 €' } },
       { id: 'tp4', kind: 'tournament_prize_changed', game_id: null, created_at: new Date().toISOString(),

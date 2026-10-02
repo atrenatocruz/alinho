@@ -150,6 +150,16 @@ export async function renameTournamentEntry(entryId, teamName) {
 }
 
 /** Só enquanto for rascunho e ninguém se tiver inscrito (cartão #361). */
+/** Cancelar o torneio (Dev 3, migration_cancelar_torneio.sql): fica
+ *  'cancelado', ninguém ganha pontos e quem está inscrito recebe o aviso
+ *  'tournament_cancelled'. Devolve { notified }. Erros: not_allowed,
+ *  already_finished, category_finished. */
+export async function cancelTournament(tournamentId) {
+  const { data, error } = await supabase.rpc('cancel_tournament', { p_tournament_id: tournamentId })
+  if (error) throw error
+  return data
+}
+
 export async function deleteTournament(tournamentId) {
   const { error } = await supabase.rpc('delete_tournament', { p_tournament_id: tournamentId })
   if (error) throw error

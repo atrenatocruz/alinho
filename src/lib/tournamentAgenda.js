@@ -40,6 +40,8 @@ export async function loadTournamentEvents({ userId, orgIds = [], today }) {
     .select('id, slug, name, organization_id, club_name, club_logo_url, starts_on, ends_on, status, entries_deadline, entry_fee_cents, category_count')
     .in('organization_id', orgIds)
     .gte('ends_on', today)
+    // Cancelado (1 out) sai da agenda; o aviso chega pelo sino.
+    .neq('status', 'cancelado')
   if (tError) return quiet(tError, 'tournaments')
   if (!tournaments?.length) return []
 

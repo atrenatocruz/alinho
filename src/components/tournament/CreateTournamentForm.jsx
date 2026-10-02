@@ -192,7 +192,7 @@ function Locked({ title, reason, children }) {
   )
 }
 
-export default function CreateTournamentForm({ club, initial = null, locked = false, onCancel, onCreate, saving, error }) {
+export default function CreateTournamentForm({ club, initial = null, locked = false, onCancel, onCreate, saving, error, danger = null }) {
   const { t, i18n } = useTranslation()
   const [step, setStep] = useState(1)
   const [addingDay, setAddingDay] = useState(false)
@@ -449,6 +449,8 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
       edit={editing_existing ? {
         onSave: save, onCancel, dirty: JSON.stringify(draft) !== initialDraft || openingChanged,
         saving, saveDisabled: !!anyProblem, saveHint: anyProblem ? t(`tournament.create.problem_${anyProblem}`) : null,
+        // «Cancelar o torneio» / apagar, a mesma pergunta do «Mais ⋯» (1 out).
+        danger,
       } : null}
     >
       {locked && <p className="text-xs text-ink-500">{t('tournament.create.edit_locked')}</p>}
