@@ -2302,7 +2302,7 @@ export default function GameDetails() {
   // ranking individual. O delta/rating de cada um mantém-se; só a ordem e o
   // número mudam. Fora do sobe e desce de duplas fixas fica a ordem da query.
   const duplaPosByPlayer = (() => {
-    if (!isSobeDesce || isRotating || game.status !== 'finished') return {}
+    if (!isSobeDesce || isRotating || game?.status !== 'finished') return {}
     const pos = {}
     sobeDesceStandings(matches).forEach((teamId, i) => {
       const team = teams.find((tm) => tm.id === teamId)
