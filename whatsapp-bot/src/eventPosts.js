@@ -11,6 +11,7 @@
 import { supabase } from './supabase.js'
 import { config } from './config.js'
 import { helpFooter } from './messages.js'
+import { shortLink } from './roster.js'
 
 const LOCALE = 'pt-PT'
 const TAKEN_ENTRY_STATUSES = ['convite', 'sem_parceiro', 'por_validar', 'validada', 'selecionada']
@@ -88,7 +89,8 @@ function shortDay(date) {
 const dateOnly = (d) => new Date(`${d}T12:00:00Z`)
 
 /** O cartão do torneio: nome, dias, sítio, categorias com vagas, prazo e o link. */
-export function buildTournamentMessage({ tournament, openCodes }) {
+export function buildTournamentMessage({ tournament, openCodes }, { fresh = false } = {}) {
+  if (fresh) return buildTournamentMessageNew({ tournament, openCodes })
   const lines = [`🏆 *${tournament.name}*`]
   const from = shortDay(dateOnly(tournament.starts_on))
   const to = tournament.ends_on && tournament.ends_on !== tournament.starts_on ? shortDay(dateOnly(tournament.ends_on)) : null
@@ -103,6 +105,37 @@ export function buildTournamentMessage({ tournament, openCodes }) {
   lines.push('')
   lines.push(`👉 Inscreve-te na app: ${config.appUrl}/torneio/${tournament.slug || tournament.id}`)
   return lines.join('\n') + helpFooter('pt')
+}
+
+// «23h59», «19h».
+function hourOf(date) {
+  const [h, m] = new Intl.DateTimeFormat(LOCALE, { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: TZ }).format(date).split(':')
+  return m === '00' ? `${Number(h)}h` : `${Number(h)}h${m}`
+}
+
+// «9 a 11 out», «30 set a 2 out», «9 out».
+function dayRange(startsOn, endsOn) {
+  const day = (d) => new Intl.DateTimeFormat(LOCALE, { day: 'numeric', timeZone: TZ }).format(d)
+  const month = (d) => new Intl.DateTimeFormat(LOCALE, { month: 'short', timeZone: TZ }).format(d).replace('.', '')
+  const from = dateOnly(startsOn)
+  if (!endsOn || endsOn === startsOn) return `${day(from)} ${month(from)}`
+  const to = dateOnly(endsOn)
+  return month(from) === month(to) ? `${day(from)} a ${day(to)} ${month(to)}` : `${day(from)} ${month(from)} a ${day(to)} ${month(to)}`
+}
+
+/** Mensagens novas (design-handoff/2026-10-01-mensagens-whatsapp): sem os
+ *  emojis repetidos, o link curto e sem o rodapé do /help. */
+function buildTournamentMessageNew({ tournament, openCodes }) {
+  const lines = [`🏆 *${tournament.name}*`]
+  lines.push(`${dayRange(tournament.starts_on, tournament.ends_on)}${tournament.location ? ` · ${tournament.location}` : ''}`)
+  lines.push(`Categorias com vagas: ${openCodes.join(', ')}`)
+  if (tournament.entries_deadline) {
+    const d = new Date(tournament.entries_deadline)
+    lines.push(`Inscrições até ${shortDay(d)}, ${hourOf(d)}`)
+  }
+  lines.push('')
+  lines.push(`👉 Inscreve-te em ${shortLink(`/torneio/${tournament.slug || tournament.id}`)}`)
+  return lines.join('\n')
 }
 
 /** Os jogos em aberto destes clubes com inscrições abertas (para as horas de cada um). */
@@ -182,7 +215,8 @@ export async function loadLessonSeriesToPost(orgIds, now = new Date()) {
 }
 
 /** O cartão da turma: tipo e professor, dia e hora, nível, lugares e o link. */
-export function buildLessonSeriesMessage({ series, free, teacherName }) {
+export function buildLessonSeriesMessage({ series, free, teacherName }, { fresh = false } = {}) {
+  if (fresh) return buildLessonSeriesMessageNew({ series, free, teacherName })
   const type = SERIES_TYPE[series.lesson_type] || 'Turma'
   const lines = [`🎓 *${type}${teacherName ? ` com ${teacherName}` : ''}*`]
   const day = WEEKDAY[(series.day_of_week || 1) - 1]
@@ -199,4 +233,27 @@ export function buildLessonSeriesMessage({ series, free, teacherName }) {
   lines.push('')
   lines.push(`👉 Pede para entrar na app: ${config.appUrl}/professor/${series.teacher_profile_id}/disponibilidade`)
   return lines.join('\n') + helpFooter('pt')
+}
+
+const WEEKDAY_PLURAL = ['Segundas', 'Terças', 'Quartas', 'Quintas', 'Sextas', 'Sábados', 'Domingos']
+
+/** Mensagens novas: «Terças às 19h · nível M5 a M4», sem a hora repetida
+ *  e sem o rodapé do /help. */
+function buildLessonSeriesMessageNew({ series, free, teacherName }) {
+  const type = SERIES_TYPE[series.lesson_type] || 'Turma'
+  const lines = [`🎓 *${type}${teacherName ? ` com ${teacherName}` : ''}*`]
+  const [h, m] = String(series.start_time || '').split(':')
+  const time = !h ? '' : m && m !== '00' ? `${Number(h)}h${m}` : `${Number(h)}h`
+  const when = `${WEEKDAY_PLURAL[(series.day_of_week || 1) - 1]}${time ? ` às ${time}` : ''}`
+  if (series.level_from || series.level_to) {
+    const lv = series.level_from && series.level_to && series.level_from !== series.level_to
+      ? `${series.level_from} a ${series.level_to}` : String(series.level_from || series.level_to)
+    lines.push(`${when} · nível ${lv}`)
+  } else {
+    lines.push(when)
+  }
+  lines.push(free === 1 ? '1 lugar livre' : `${free} lugares livres`)
+  lines.push('')
+  lines.push(`👉 Pede lugar em ${shortLink(`/professor/${series.teacher_profile_id}/disponibilidade`)}`)
+  return lines.join('\n')
 }

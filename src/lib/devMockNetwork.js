@@ -1562,6 +1562,17 @@ const wantsSingle = (init) => {
 
 // Gerir com muitos clubes e grupos (localStorage.mockManyOrgs = 'true').
 TABLE_MOCKS.organizations = withManyOrgs(TABLE_MOCKS.organizations)
+// localStorage.mockRobotMessages = 'true' — mensagens novas do robô ligadas
+// no clube do Admin(Dev) (1 out; o interruptor só aparece ao super admin).
+{
+  const orgsBase = TABLE_MOCKS.organizations
+  TABLE_MOCKS.organizations = (url) => {
+    const rows = orgsBase(url)
+    return Array.isArray(rows)
+      ? rows.map((o) => (o.id === MOCK_ADMIN_ORG_ID ? { ...o, whatsapp_new_messages: localStorage.getItem('mockRobotMessages') === 'true' } : o))
+      : rows
+  }
+}
 // «Já jogados» na Home.
 // localStorage.mockPlayedEmpty = 'true': nada jogado ainda (o caso vazio).
 RPC_MOCKS.list_played_events = (params) => {
@@ -1682,6 +1693,13 @@ export function installDevMockNetwork() {
         notready: { code: 'PGRST204', message: "Could not find the 'pairing_mode' column of 'games' in the schema cache" },
       }[errorCase]
       if (body) return jsonResponse(body, 400)
+    }
+
+    // localStorage.mockRobotMessagesError = 'true' — mudar o interruptor das
+    // mensagens do robô falha como a trava da base de dados (not_allowed).
+    if (localStorage.getItem('mockRobotMessagesError') === 'true' && /\/rest\/v1\/organizations\?/.test(url)
+        && (init?.method || input?.method || 'GET').toUpperCase() === 'PATCH' && String(init?.body || '').includes('whatsapp_new_messages')) {
+      return jsonResponse({ code: '42501', message: 'not_allowed' }, 403)
     }
 
     // localStorage.mockDeleteHasResults = 'true' — apagar um mix falha como
