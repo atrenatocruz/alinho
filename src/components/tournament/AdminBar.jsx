@@ -55,7 +55,7 @@ const STATE_PILL = {
   sorteado: 'dark', a_decorrer: 'live', terminado: 'grey',
 }
 
-export default function AdminBar({ tournament, categories = [], onChanged, onEdit, onDraw, onSchedule, onEntries }) {
+export default function AdminBar({ tournament, categories = [], onChanged, onEdit, onDraw, onSchedule, onEntries, onScorekeepers }) {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const [busy, setBusy] = useState(false)
@@ -192,6 +192,7 @@ export default function AdminBar({ tournament, categories = [], onChanged, onEdi
             onClick: () => navigate(`/torneio/${tournament.slug || tournament.id}/marcar`) },
           live && { key: 'schedule', label: t('tournament.admin.schedule'), hint: t('tournament.admin.more_schedule_hint'), onClick: () => onSchedule?.() },
           { key: 'entries', label: t('tournament.admin.more_entries'), hint: t('tournament.admin.more_entries_hint'), onClick: () => onEntries?.() },
+          { key: 'scorekeepers', label: t('tournament.admin.more_scorekeepers'), hint: t('tournament.admin.more_scorekeepers_hint'), onClick: () => onScorekeepers?.() },
           { key: 'notice', label: t('tournament.admin.more_notice'), hint: t('tournament.admin.more_notice_hint'),
             onClick: () => window.dispatchEvent(new CustomEvent('tournament:new-notice')) },
           live && { key: 'finish', label: t('tournament.admin.more_finish'), hint: t('tournament.admin.more_finish_hint'),
