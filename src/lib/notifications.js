@@ -17,7 +17,10 @@ export const MIX_NOTICE_KINDS = ['mix_joined', 'mix_removed', 'mix_partner_chang
   'mix_promoted', 'mix_moved_to_waitlist', 'mix_not_filled', 'mix_cancelled_not_filled',
   // Ponto 17 (trocar uma pessoa): mix_slot_open (a quem organiza: há uma vaga
   // numa dupla) e mix_swapped_out (a quem foi trocado).
-  'mix_slot_open', 'mix_swapped_out']
+  'mix_slot_open', 'mix_swapped_out',
+  // Aprovar quem entra (2 out, Dev 3): o pedido a quem organiza, e a resposta
+  // a quem pediu.
+  'mix_join_request', 'mix_request_accepted', 'mix_request_declined']
 
 export async function listMyUnreadNotifications(limit = 20) {
   const { data, error } = await supabase

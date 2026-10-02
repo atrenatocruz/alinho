@@ -118,6 +118,9 @@ const ACHIEVEMENTS_CATALOG = [
 ]
 
 const RPC_MOCKS = {
+  // Aprovar quem entra (2 out): o mix tem 8 lugares — com o mix cheio fica suplente.
+  accept_mix_request: () => (localStorage.getItem('mockEventCount') && Number(localStorage.getItem('mockEventCount')) < 8 ? 'confirmed' : 'waitlisted'),
+  decline_mix_request: () => null,
   ...LESSON_RPC_MOCKS,
   // Professores na Comunidade pela RPC (#392 entrega 2): os mesmos do mock
   // da tabela, já achatados.
@@ -803,6 +806,16 @@ const EV_PARTICIPANTS = () => (localStorage.getItem('mockAllPairs') === 'true'
     id: 'ev-w1', game_id: 'fake-game-1', user_id: 'fake-ze', partner_id: null, status: 'waitlisted',
     created_at: new Date().toISOString(), user: { id: 'fake-ze', name: 'Zé Pinto', avatar_url: null, preferred_side: 'both' }, partner: null,
   }] : []))
+  // Aprovar quem entra (2 out): localStorage.mockRequests = 'N' — N pedidos
+  // por decidir; mockMyRequest = 'requested' | 'declined' — o meu pedido.
+  .concat(['Rita Fonseca', 'Tiago Lopes', 'Marta Costa'].slice(0, Number(localStorage.getItem('mockRequests') || 0)).map((name, i) => ({
+    id: `ev-r${i}`, game_id: 'fake-game-1', user_id: `fake-${40 + i}`, partner_id: null, status: 'requested',
+    created_at: new Date().toISOString(), user: { id: `fake-${40 + i}`, name, avatar_url: null, preferred_side: 'both', rating_games: [23, 41, 9][i] }, partner: null,
+  })))
+  .concat(localStorage.getItem('mockMyRequest') ? [{
+    id: 'ev-mine', game_id: 'fake-game-1', user_id: MOCK_ADMIN_USER_ID, partner_id: null, status: localStorage.getItem('mockMyRequest'),
+    created_at: new Date().toISOString(), user: { id: MOCK_ADMIN_USER_ID, name: 'Francisco Barros', avatar_url: null, preferred_side: 'left' }, partner: null,
+  }] : [])
 const evTeam = (id, a, b, seed) => ({ id, game_id: 'fake-game-1', player1_id: a.id, player2_id: b.id, player1: a, player2: b, seed_ranking: seed, created_at: new Date().toISOString() })
 const [e0, e1, e2, e3, e4, e5, e6, e7] = EV_PEOPLE
 const EV_TEAMS_BASE = [evTeam('et1', e1, e0, 4), evTeam('et2', e2, e3, 3), evTeam('et3', e4, e5, 2), evTeam('et4', e6, e7, 1)]
@@ -1211,6 +1224,16 @@ const TABLE_MOCKS = {
       data: { game_title: 'Mix de Sábado', game_date: tomorrow8pm.toISOString(), partner_name: 'Rui Oliveira Gomes', actor_name: 'Marta Costa' } },
     { id: 'n3', kind: 'mix_removed', game_id: 'fake-game-1', created_at: new Date().toISOString(),
       data: { game_title: 'Mix de Terça', game_date: tomorrow8pm.toISOString() } },
+  ] : localStorage.getItem('mockNotices') === 'requests' ? [
+    // Aprovar quem entra (2 out): as três respostas e o pedido a quem organiza.
+    { id: 'nr1', kind: 'mix_request_accepted', game_id: 'fake-game-1', created_at: new Date().toISOString(),
+      data: { game_title: 'Mix de Sábado', game_date: tomorrow8pm.toISOString(), status: 'confirmed' } },
+    { id: 'nr2', kind: 'mix_request_accepted', game_id: 'fake-game-1', created_at: new Date().toISOString(),
+      data: { game_title: 'Mix de Domingo', game_date: tomorrow8pm.toISOString(), status: 'waitlisted' } },
+    { id: 'nr3', kind: 'mix_request_declined', game_id: 'fake-game-1', created_at: new Date().toISOString(),
+      data: { game_title: 'Mix de Terça', game_date: tomorrow8pm.toISOString() } },
+    { id: 'nr4', kind: 'mix_join_request', game_id: 'fake-game-1', created_at: new Date().toISOString(),
+      data: { game_title: 'Mix de Sábado', game_date: tomorrow8pm.toISOString(), requester_name: 'Rita Fonseca', participant_id: 'ev-r0' } },
   ] : []).concat(LESSON_NOTICES()).concat(localStorage.getItem('mockFriendSession') === 'left' ? [
     { id: 'fd1', kind: 'friend_match_declined', game_id: null, created_at: new Date().toISOString(),
       data: { match_id: 'fs-1', name: 'Ana Marques', scheduled_date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), scheduled_time: '10:00:00' } },
@@ -1390,6 +1413,8 @@ const TABLE_MOCKS = {
       // mockUnfilled = 'true': à hora do jogo não encheu e voltou a rascunho (ponto 7).
       ...(localStorage.getItem('mockUnfilled') === 'true' || (eventState() === 'cancelled' && localStorage.getItem('mockUnfilledCancel') === 'true') ? { unfilled_at: new Date().toISOString() } : {}),
       ...(localStorage.getItem('mockEventSize') === '12' ? { num_courts: 3, max_players: 12 } : {}),
+      // mockJoinApproval = 'true': quem organiza aceita quem entra pela app (2 out).
+      ...(localStorage.getItem('mockJoinApproval') === 'true' ? { join_approval: true } : {}),
       // mockEventPast = 'true': a hora do mix já passou (há 1 h).
       ...(localStorage.getItem('mockEventPast') === 'true' ? { date: new Date(Date.now() - 3600000).toISOString() } : {}),
       ...(eventState() === 'finished' ? { winner_team_id: 'et1' } : {}),

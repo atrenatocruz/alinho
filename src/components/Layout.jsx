@@ -439,7 +439,11 @@ export default function Layout({ children }) {
       title: d.game_title || d.title || t('layout.mix_notice_fallback_title'),
       when: (d.game_date || d.date) ? formatDate(d.game_date || d.date, i18n.language, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '',
       partner: d.partner_name,
+      name: d.requester_name,
     }
+    if (notice.kind === 'mix_join_request') return t('layout.mix_join_request', vars)
+    if (notice.kind === 'mix_request_accepted') return t(d.status === 'waitlisted' ? 'layout.mix_request_accepted_waitlist' : 'layout.mix_request_accepted', vars)
+    if (notice.kind === 'mix_request_declined') return t('layout.mix_request_declined', vars)
     if (notice.kind === 'mix_removed') return t('layout.mix_notice_removed', vars)
     if (notice.kind === 'mix_cancelled') return t('layout.mix_notice_cancelled', vars)
     if (['mix_promoted', 'mix_moved_to_waitlist', 'mix_not_filled', 'mix_cancelled_not_filled', 'mix_slot_open', 'mix_swapped_out'].includes(notice.kind)) {
@@ -635,7 +639,7 @@ export default function Layout({ children }) {
                       onClick={() => openMixNotice(notice)}
                       className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50"
                     >
-                      <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${['mix_removed', 'mix_cancelled', 'mix_moved_to_waitlist', 'mix_cancelled_not_filled', 'mix_not_filled', 'mix_slot_open', 'mix_swapped_out'].includes(notice.kind) ? 'bg-danger/10 text-danger' : 'bg-lime-400/20 text-ink-900'}`}>
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${['mix_removed', 'mix_cancelled', 'mix_moved_to_waitlist', 'mix_cancelled_not_filled', 'mix_not_filled', 'mix_slot_open', 'mix_swapped_out', 'mix_request_declined'].includes(notice.kind) ? 'bg-danger/10 text-danger' : 'bg-lime-400/20 text-ink-900'}`}>
                         <Shuffle size={16} />
                       </div>
                       <p className="flex-1 min-w-0 text-sm text-ink-900">{mixNoticeText(notice)}</p>

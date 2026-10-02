@@ -171,6 +171,8 @@ const EMPTY_GAME_FORM = {
   // Sobe e desce invertido (29 set): as mais fortes começam no último campo.
   seed_reverse: false,
   allow_pair_signup: false,
+  // Aprovar quem entra pela app (2 out). Por omissão entra logo.
+  join_approval: false,
   // Conta para o ranking (Trello #267). Por omissão sim.
   ranked: true,
   gender_restriction: 'indiferente',
@@ -1028,6 +1030,9 @@ export default function GerirClube() {
     // sempre (também «Não», para editar Sim→Não chegar à recorrência); antes
     // da migração o campo não vem e não se manda nada.
     ...(typeof game.allow_pair_signup === 'boolean' ? { allow_pair_signup: game.allow_pair_signup } : {}),
+    // Aprovar quem entra (2 out): a série guarda a escolha e cada data nova
+    // herda-a (gatilho do Dev 3). Mesmo truque: só com a coluna.
+    ...(typeof game.join_approval === 'boolean' ? { join_approval: game.join_approval } : {}),
     // #580: a série guarda a contagem, os grupos e o 8-8 — cada nova data
     // herda-os (recurrence_insert_pending). O `game` é a linha da base de
     // dados: com as colunas, vão sempre (também para voltar a «pontos
@@ -1219,7 +1224,7 @@ export default function GerirClube() {
     // pairing_mode sai pelo mesmo motivo: só é enviado quando não é o valor
     // por omissão, para criar/editar mixes não rebentar antes de
     // migration_mix_pairing_mode.sql correr.
-    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, seed_reverse: _seedReverse, ranked: _ranked, allow_pair_signup: _allowPairSignup, launch, whatsapp_post_times: postTimes, tiebreak_8_8: tieBreak88, ...gameFields } = gameForm
+    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, seed_reverse: _seedReverse, ranked: _ranked, allow_pair_signup: _allowPairSignup, join_approval: _joinApproval, launch, whatsapp_post_times: postTimes, tiebreak_8_8: tieBreak88, ...gameFields } = gameForm
 
     const recurrenceError = validateRecurrence(recurrence)
     if (recurrenceError) {
@@ -1281,6 +1286,9 @@ export default function GerirClube() {
             // duplas são fixas — antes de migration_mix_pair_signup.sql a
             // coluna não existe, e «Não» é o valor por omissão.
             ...(gameForm.allow_pair_signup && pairsAreFixed(gameForm) ? { allow_pair_signup: true } : {}),
+            // Aprovar quem entra (2 out): só vai quando está ligado — antes da
+            // migração do Dev 3 a coluna não existe.
+            ...(gameForm.join_approval ? { join_approval: true } : {}),
             // Só vai quando é amigável — antes de migration_mix_ranked.sql
             // correr, a coluna não existe.
             ...(gameForm.ranked === false ? { ranked: false } : {}),
@@ -1452,7 +1460,7 @@ export default function GerirClube() {
     // pairing_mode sai pelo mesmo motivo: só é enviado quando não é o valor
     // por omissão, para criar/editar mixes não rebentar antes de
     // migration_mix_pairing_mode.sql correr.
-    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, seed_reverse: _seedReverse, ranked: _ranked, allow_pair_signup: _allowPairSignup, launch: _launch, whatsapp_post_times: postTimes, tiebreak_8_8: tieBreak88, ...gameFields } = gameForm
+    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, seed_reverse: _seedReverse, ranked: _ranked, allow_pair_signup: _allowPairSignup, join_approval: _joinApproval, launch: _launch, whatsapp_post_times: postTimes, tiebreak_8_8: tieBreak88, ...gameFields } = gameForm
     // Any mix in an active recurring series shares the same underlying
     // game_recurrences row (via recurrence_id) — not just the origin — so
     // recurrence management works from any of them, not only the one that
@@ -1498,6 +1506,7 @@ export default function GerirClube() {
           ...((gameForm.rotate_partners || editingGame.rotate_partners) ? { rotate_partners: !!gameForm.rotate_partners && gameForm.format === 'sobe_desce' } : {}),
           ...((gameForm.seed_reverse || editingGame.seed_reverse) ? { seed_reverse: !!gameForm.seed_reverse && gameForm.format === 'sobe_desce' } : {}),
           ...((gameForm.allow_pair_signup || editingGame.allow_pair_signup) ? { allow_pair_signup: !!gameForm.allow_pair_signup && pairsAreFixed(gameForm) } : {}),
+          ...((gameForm.join_approval || editingGame.join_approval) ? { join_approval: !!gameForm.join_approval } : {}),
           ...((gameForm.ranked === false || editingGame.ranked === false) ? { ranked: gameForm.ranked !== false } : {}),
           level: gameForm.level || null,
           ...((tieBreak88 === 'super_tiebreak' || editingGame.tiebreak_8_8) ? { tiebreak_8_8: gameForm.scoring_format === 'pro_set_9' && tieBreak88 === 'super_tiebreak' ? 'super_tiebreak' : null } : {}),
@@ -2112,6 +2121,7 @@ export default function GerirClube() {
       rotate_partners: !!game.rotate_partners,
       seed_reverse: !!game.seed_reverse,
       allow_pair_signup: !!game.allow_pair_signup,
+      join_approval: !!game.join_approval,
       ranked: game.ranked !== false,
       gender_restriction: game.gender_restriction || 'indiferente',
       age_restriction: game.age_restriction ?? null,
