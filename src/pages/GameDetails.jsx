@@ -9,6 +9,7 @@ import { DndContext, useDraggable, useDroppable, PointerSensor, TouchSensor, use
 import { CSS } from '@dnd-kit/utilities'
 import { supabase, supabaseUrl } from '../lib/supabase'
 import { getGameOrgHint } from '../lib/gameOrgHint'
+import { listWhatsappGroups } from '../lib/whatsappGroups'
 import GroupOnlyNotice from '../components/GroupOnlyNotice'
 import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton, GuestBadge, PlayerAvatarRow, EmptyState, ShareModal, RoundTimer, Avatar, Select, RatingBadge, DateField, GroupLevelBadge, Tabs, ConfirmSheet } from '../components/ui'
@@ -19,7 +20,7 @@ import { KIND_STYLE, KindTag, StateTag, Owner } from '../components/agenda/Event
 import PoolGroupStage from '../components/PoolGroupStage'
 import PreviousEditions from '../components/agenda/PreviousEditions'
 import ScoreEntry from '../components/ScoreEntry'
-import { countPeople, totalRounds, formDuplas, seedCourts, nextSobeDesce, nextSobeDesceRotating, splitPartnerRows, rotatingPlacar, roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches, thirdPlaceMatch, lowerPlacementMatches, placementOfCourt, PHASE_LABEL_KEY, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, mixCapacity, isGenderMismatch, isMissingGender, isMissingBirthday, isAgeIneligible, splitIntoPools, generateAmericanoSchedule, americanoStandings, computeMixWinnerTeamId, formatLabelKey, hasResult, isTie } from '../lib/mixLogic'
+import { countPeople, totalRounds, formDuplas, seedCourts, nextSobeDesce, nextSobeDesceRotating, splitPartnerRows, rotatingPlacar, roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches, thirdPlaceMatch, lowerPlacementMatches, placementOfCourt, PHASE_LABEL_KEY, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, mixCapacity, isGenderMismatch, isMissingGender, isMissingBirthday, isAgeIneligible, splitIntoPools, generateAmericanoSchedule, americanoStandings, computeMixWinnerTeamId, formatLabelKey, hasResult, isTie, sobeDesceStandings } from '../lib/mixLogic'
 import { isProvisional, formatRatingMaybeProvisional } from '../lib/elo'
 import { AGE_LABEL_KEY, meetsAgeRestriction } from '../lib/ageCategories'
 import { winRatePct, firstLastName } from '../lib/statsLogic'
@@ -31,6 +32,7 @@ import { limitsFor } from '../lib/plans'
 import { canEditBeforeRound1, canAddBeforeStart, unpairedPeople, changedPairKeys, teamPairKey, mixChanges } from '../lib/mixEdit'
 import { notifyMixChanges } from '../lib/notifications'
 import AddPlayerSheet from '../components/mix/AddPlayerSheet'
+import AddScorekeeperSheet from '../components/mix/AddScorekeeperSheet'
 import JoinPartnerSheet from '../components/mix/JoinPartnerSheet'
 import { Sheet } from '../components/agenda/AgendaControls'
 import { whatsappLookalikeInGame, rememberWhatsappGuest, rememberedWhatsappGuest } from '../lib/whatsappGuest'
@@ -165,6 +167,10 @@ export default function GameDetails() {
   const [publishOpen, setPublishOpen] = useState(false)
   // Cancelar um mix que correu mal (Trello #464) — a pergunta aberta.
   const [cancelOpen, setCancelOpen] = useState(false)
+  const [draftAskOpen, setDraftAskOpen] = useState(false)
+  // O clube/grupo tem o robô do WhatsApp? Num mix já aberto, o robô já o
+  // anunciou e «Voltar a rascunho» fica apagado (UX, 2 out).
+  const [hasBot, setHasBot] = useState(false)
   // Ações do evento (desenho de 26 set): a folha do «Mais ⋯», o «Mudar só
   // este mix» e a pergunta do «Recomeçar».
   const [moreOpen, setMoreOpen] = useState(false)
@@ -197,7 +203,12 @@ export default function GameDetails() {
   const [activeDragChip, setActiveDragChip] = useState(null) // { teamId, slot, player } — for the drag overlay
   const [justSwappedId, setJustSwappedId] = useState(null) // chip id that just received a dragged player — brief lime confirmation
   const [showShare, setShowShare] = useState(false)
-  const [duplasExpanded, setDuplasExpanded] = useState(true)
+  // null = segue a regra (ponto 10); true/false = quem vê abriu ou fechou.
+  const [duplasToggle, setDuplasToggle] = useState(null)
+  // Ponto 9: com as duplas sorteadas, os inscritos ficam dobrados.
+  const [inscritosOpen, setInscritosOpen] = useState(false)
+  const [finalizeAsk, setFinalizeAsk] = useState(null) // { early } | null
+  const [classifOpen, setClassifOpen] = useState(false)
   const [showDuplasShare, setShowDuplasShare] = useState(false)
   const [mixStats, setMixStats] = useState([])
   const [addingTestUser, setAddingTestUser] = useState(false)
@@ -219,11 +230,37 @@ export default function GameDetails() {
   const [historyOpen, setHistoryOpen] = useState(false)
   // Marcadores de resultado: dobrado por defeito (Renato, 29 set).
   const [scorekeepersOpen, setScorekeepersOpen] = useState(false)
+  const [addScorekeeperOpen, setAddScorekeeperOpen] = useState(false)
+  // Os membros do clube/grupo, para quem organiza juntar marcadores de fora do
+  // mix e para os nomes do «marcado por».
+  const [clubMembers, setClubMembers] = useState([])
   // Rondas já jogadas que a pessoa abriu à mão (as outras ficam dobradas).
   const [openRounds, setOpenRounds] = useState({})
   // Jogo que não abre: de que grupo é (undefined = a perguntar; null = não
   // se sabe — fica o «Jogo não encontrado»).
   const [orgHint, setOrgHint] = useState(undefined)
+  useEffect(() => {
+    if (!isAdmin || !game?.organization_id || game.status !== 'in_progress') return undefined
+    let alive = true
+    supabase.from('memberships').select('user_id, is_admin, is_guest, profile:profiles(id, name, avatar_url)')
+      .eq('organization_id', game.organization_id)
+      .then(({ data, error }) => {
+        if (!alive) return
+        if (error) { console.error('Error loading club members for scorekeepers:', error); return }
+        setClubMembers((data || []).filter((m) => m.profile && !m.is_guest)
+          .map((m) => ({ id: m.user_id, name: m.profile.name || '?', avatar_url: m.profile.avatar_url, is_admin: !!m.is_admin }))
+          .sort((a, b) => a.name.localeCompare(b.name, 'pt')))
+      })
+    return () => { alive = false }
+  }, [isAdmin, game?.organization_id, game?.status])
+  useEffect(() => {
+    if (!isAdmin || !game?.organization_id) return undefined
+    let alive = true
+    listWhatsappGroups(game.organization_id)
+      .then((groups) => { if (alive) setHasBot((groups || []).length > 0) })
+      .catch(() => { /* sem a lista, conta como sem robô: a base de dados recusa à mesma (already_announced) */ })
+    return () => { alive = false }
+  }, [isAdmin, game?.organization_id])
   useEffect(() => {
     if (loading || game) return undefined
     let alive = true
@@ -1296,9 +1333,16 @@ export default function GameDetails() {
     // formação possível, como o formDuplas já garante.
     const { teamRows } = buildTeamRows(freshRows, await loadRepeatPairKeys(), points, freshGame)
 
+    // Com a Ronda 1 sorteada e por começar (ponto 11), os jogos apontam para
+    // as duplas antigas: saem antes, e a ronda volta a sortear-se no fim.
+    const redrawRound1 = round1Pending
+    if (redrawRound1) {
+      const { error: matchesError } = await supabase.from('matches').delete().eq('game_id', id)
+      if (matchesError) throw matchesError
+    }
     const { error: deleteError } = await supabase.from('teams').delete().eq('game_id', id)
     if (deleteError) throw deleteError
-    const { error: insertError } = await supabase.from('teams').insert(teamRows)
+    const { data: newTeams, error: insertError } = await supabase.from('teams').insert(teamRows).select()
     if (insertError) {
       // Repõe as duplas que estavam, para o mix não ficar sem nenhuma.
       if (oldTeams?.length) {
@@ -1316,6 +1360,15 @@ export default function GameDetails() {
     }
     const changed = changedPairKeys(oldTeams || [], teamRows)
     setChangedKeys(changed)
+    if (redrawRound1 && newTeams?.length) {
+      const courts = freshGame.num_courts || 1
+      const rows = (freshGame.format || 'sobe_desce') === 'sobe_desce'
+        ? seedCourts(newTeams, courts, { reverse: !!freshGame.seed_reverse })
+        : roundRobinRound(orderedTeamIds(newTeams), courts, 0)
+      const { error: redrawError } = await supabase.from('matches').insert(
+        rows.map((m) => ({ ...m, game_id: id, round_number: 1, phase: 'group' })))
+      if (redrawError) throw redrawError
+    }
 
     // Avisos no sino e no WhatsApp (migration_mix_notices.sql). Um aviso que
     // falha não desfaz a mudança nem a esconde ao admin — fica só no log.
@@ -1602,6 +1655,30 @@ export default function GameDetails() {
   const orderedTeamIds = (list = teams) =>
     [...list].sort((a, b) => (b.seed_ranking ?? 0) - (a.seed_ranking ?? 0)).map(team => team.id)
 
+  // Ponto 11 do pacote do mix (Francisco, 1 out): cada ronda tem o seu
+  // «Começar Ronda N». Os jogos aparecem «por começar» e o relógio só arranca
+  // aqui — antes, «Começar o Mix» e «Terminar Ronda N» punham logo o tempo a
+  // contar. round_started_at null = ronda sorteada, por começar.
+  const handleStartRound = async () => {
+    setBusy(true)
+    setMixError('')
+    try {
+      const { error } = await supabase
+        .from('games')
+        .update({ round_started_at: new Date().toISOString(), round_duration_minutes: game.game_time_minutes })
+        .eq('id', id)
+      if (error) throw error
+      loadGameDetails()
+      await settleLoads()
+    } catch (error) {
+      console.error('Error starting round:', error)
+      setMixError(describeError(t, error, 'gamedetails.error_start_round1'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // Sorteia a Ronda 1 pelos campos, «por começar» (sem relógio).
   // `teamsOverride`: as duplas acabadas de gravar (o estado ainda não as tem).
   const handleStartRound1 = async ({ teamsOverride = null } = {}) => {
     const ts = teamsOverride || teams
@@ -1621,7 +1698,7 @@ export default function GameDetails() {
 
       const { error: timerError } = await supabase
         .from('games')
-        .update({ round_started_at: new Date().toISOString(), round_duration_minutes: game.game_time_minutes })
+        .update({ round_started_at: null, round_duration_minutes: game.game_time_minutes })
         .eq('id', id)
       if (timerError) throw timerError
 
@@ -1799,6 +1876,17 @@ export default function GameDetails() {
   const roundsStarted = matches.length > 0
   const maxRound = matches.length ? Math.max(...matches.map(m => m.round_number)) : 0
   const currentRoundMatches = matches.filter(m => m.round_number === maxRound)
+  // A ronda atual está sorteada mas o relógio não arrancou (ponto 11).
+  // O Americano sorteia o mix inteiro de uma vez e conta à parte: fica fora.
+  const roundPending = game?.status === 'in_progress' && game?.format !== 'americano' && matches.length > 0
+    && !game?.round_started_at && !currentRoundMatches.some(hasResult)
+  // A Ronda 1 sorteada e por começar ainda é «antes da Ronda 1»: as duplas
+  // mexem-se (e a ronda volta a sortear-se).
+  const round1Pending = roundPending && maxRound === 1
+  // Ponto 10 do pacote do mix: quando a ronda começa, «Duplas» dobra-se e
+  // ficam só as rondas (abre-se ao tocar).
+  // Acerto do Francisco (2 out): dobra-se logo que aparecem os jogos da Ronda 1.
+  const duplasExpanded = duplasToggle ?? !(game?.status === 'in_progress' && matches.length > 0)
   // Um jogo com resultado é um jogo com pontos gravados, com ou sem
   // vencedor: um empate grava-se (Francisco, 30 set, REGRAS.md ponto 4 —
   // «não bloqueamos, simplesmente avisamos») e fica com winner_team_id null.
@@ -1959,9 +2047,11 @@ export default function GameDetails() {
       }
       if (error) throw error
 
+      // A ronda seguinte fica «por começar»: sem contar o tempo até
+      // «Começar Ronda N+1» (ponto 11).
       const { error: timerError } = await supabase
         .from('games')
-        .update({ round_started_at: new Date().toISOString(), round_duration_minutes: game.game_time_minutes })
+        .update({ round_started_at: null, round_duration_minutes: game.game_time_minutes })
         .eq('id', id)
       if (timerError) throw timerError
 
@@ -2013,12 +2103,13 @@ export default function GameDetails() {
     }
   }
 
-  const handleFinalize = async (early = false) => {
+  // «Terminar e dar os pontos» pergunta na folha da app, nunca na caixa do
+  // navegador (pacote do mix, ponto 16). O erro fica escrito na folha.
+  const handleFinalize = (early = false) => {
     if (!isAmericano && !currentWinnerTeamId) return
-    const msg = early
-      ? t('gamedetails.confirm_finalize_early')
-      : t('gamedetails.confirm_finalize')
-    if (!confirm(msg)) return
+    setFinalizeAsk({ early })
+  }
+  const doFinalize = async () => {
     setBusy(true)
     setMixError('')
     try {
@@ -2030,9 +2121,6 @@ export default function GameDetails() {
       await supabase.from('games').update({ round_started_at: null }).eq('id', id)
 
       loadGameDetails()
-    } catch (error) {
-      console.error('Error finalizing mix:', error)
-      setMixError(describeError(t, error, 'gamedetails.error_finalize_mix'))
     } finally {
       setBusy(false)
     }
@@ -2140,8 +2228,8 @@ export default function GameDetails() {
   // A comparação de pontos só diz alguma coisa com os quatro jogadores com
   // pontos: os convidados não têm, e «1900 vs 0 pts» enganava (QA, 29 set).
   const teamHasPoints = (team) => [team?.player1?.id, team?.player2?.id].every((id) => id && pointsById[id] > 0)
-  const renderDuplaBlock = (team, { showPoints = true } = {}) => {
-    const isMine = team?.player1?.id === user.id || team?.player2?.id === user.id
+  const renderDuplaBlock = (team, { showPoints = true, highlightMine = true } = {}) => {
+    const isMine = highlightMine && (team?.player1?.id === user.id || team?.player2?.id === user.id)
     return (
       <div
         key={team.id}
@@ -2189,9 +2277,9 @@ export default function GameDetails() {
                 <span className="flex items-center gap-1.5 text-xs text-muted shrink-0">
                   <RatingBadge rating={ratingInfoById[player?.id]?.rating} gender={ratingInfoById[player?.id]?.gender} />
                   {/* A editar à última da hora, o ✕ precisa do espaço do lado. */}
-                  {!lastMinuteEditable && sideLabel(player?.preferred_side)}
+                  {!duplaRemovable && sideLabel(player?.preferred_side)}
                 </span>
-                {lastMinuteEditable && player?.id && (
+                {duplaRemovable && player?.id && (
                   <button
                     type="button"
                     onClick={() => handleLastMinuteRemove(player)}
@@ -2241,6 +2329,27 @@ export default function GameDetails() {
     lines.push('', t('gamedetails.share_signature'))
     return lines.join('\n')
   }
+
+  // Um só desenho das duplas, antes e depois de «Começar o Mix» (pacote do
+  // mix, ponto 8, 2 out): um cartão por dupla com «DUPLA N · pts» e os dois
+  // nomes com o nível; a dupla de quem vê, a verde. Os botões (×, «Editar
+  // duplas», «Sortear outra vez») são de quem organiza.
+  const renderDuplasList = () => (
+    <div className="space-y-2">
+      {teams.map((team, i) => {
+        const mine = team.player1?.id === user.id || team.player2?.id === user.id
+        return (
+          <div key={team.id} className={`rounded-ctrl p-3 ${mine ? KIND_STYLE[kindOf(game)].bg : 'bg-canvas'}`}>
+            <p className="mb-2 font-mono text-[11px] font-extrabold uppercase tracking-widest text-ink-500">
+              {t('gamedetails.dupla_number', { number: i + 1 })}
+              {teamHasPoints(team) && <span className="normal-case tracking-normal"> · {teamPoints(team)} {t('gamedetails.points_suffix')}</span>}
+            </p>
+            {renderDuplaBlock(team, { showPoints: false, highlightMine: false })}
+          </div>
+        )
+      })}
+    </div>
+  )
 
   // Every person in the game (rows + partners), for list + capacity
   const people = participants.flatMap(p => [
@@ -2299,7 +2408,7 @@ export default function GameDetails() {
   const missingBirthday = isMissingBirthday(game, profile)
   const ageIneligible = isAgeIneligible(game, profile)
   const mixStarted = game?.status === 'in_progress' || game?.status === 'finished'
-  const lastMinuteEditable = isAdmin && canEditBeforeRound1(game, matches.length)
+  const lastMinuteEditable = isAdmin && canEditBeforeRound1(game, round1Pending ? 0 : matches.length)
   const addBeforeStart = isAdmin && canAddBeforeStart(game, teams.length)
   const unpaired = lastMinuteEditable ? unpairedPeople(people, teams) : []
   const planMaxCourts = limitsFor(gameMembership?.organization?.plan_tier).courts
@@ -2322,13 +2431,16 @@ export default function GameDetails() {
   const canStart = isAdmin && !mixStarted && showClosed && !mixPaused && !mixCancelled
   const canStartGames = isAdmin && mixPaused && !mixCancelled
   const canRedoDuplas = canStartGames && matches.length === 0
+  // O × nas duplas (ponto 8): também com as duplas sorteadas e o mix por
+  // começar — tira a pessoa e as duplas refazem-se com a mesma regra.
+  const duplaRemovable = lastMinuteEditable || (canRedoDuplas && !editingPairs)
 
   // Barra de quem organiza (ações do evento, desenho de 26 set): onde se
   // está, o que falta, e UM botão para o passo seguinte — o mesmo que antes
   // aparecia solto mais abaixo, agora só aqui.
-  const showAdminBar = isAdmin && ['pending', 'open', 'closed', 'in_progress'].includes(game?.status) && !isDraftMix(game)
+  // O mix que não encheu (rascunho com unfilled_at) também tem «Editar» e «Mais ⋯» (ponto 7).
+  const showAdminBar = isAdmin && (['pending', 'open', 'closed', 'in_progress'].includes(game?.status) || (isDraftMix(game) && !!game?.unfilled_at))
   const isSeriesDate = !!game?.recurrence_id
-  const missingNow = currentRoundMatches.filter((m) => !hasResult(m)).length
   // «Sortear duplas» antes de «Começar o Mix» (27 set): só com duplas fixas
   // formadas pela app — com toda a gente inscrita em dupla, ou com parceiros
   // que trocam a cada ronda / Americano, não há nada para sortear.
@@ -2353,7 +2465,15 @@ export default function GameDetails() {
     barPrimary = { label: t('gamedetails.start_mix'), onClick: handleStartDrawnMix, disabled: busy, hint: t('eventactions.start_hint') }
   } else if (game?.status === 'in_progress' && !inPoolStage) {
     if (!roundsStarted && !isAmericano) {
-      barPrimary = { label: busy ? t('gamedetails.drawing') : t('gamedetails.start_round1'), onClick: handleStartRound1, disabled: busy || unpaired.length > 0 }
+      // Sem a ronda sorteada (parceiros que rodam, ou um mix começado antes
+      // do ponto 11): sorteia e começa de uma vez.
+      barPrimary = {
+        label: busy ? t('gamedetails.drawing') : t('gamedetails.start_round_n', { number: 1 }),
+        onClick: async () => { await handleStartRound1(); await handleStartRound() },
+        disabled: busy || unpaired.length > 0,
+      }
+    } else if (roundPending) {
+      barPrimary = { label: busy ? t('gamedetails.processing') : t('gamedetails.start_round_n', { number: maxRound }), onClick: handleStartRound, disabled: busy || unpaired.length > 0, hint: t('gamedetails.start_round_hint') }
     } else if (roundsStarted && canAdvance) {
       barPrimary = {
         label: busy ? t('gamedetails.processing')
@@ -2361,6 +2481,9 @@ export default function GameDetails() {
           : t('gamedetails.end_round_and_draw', { number: maxRound, phase: PHASE_LABEL_KEY[nextPhase] ? t(PHASE_LABEL_KEY[nextPhase]).toLowerCase() : '' }),
         onClick: handleAdvance,
         disabled: busy,
+        // O que o botão faz (desenho «como fica», 2 out): mostra os jogos da
+        // ronda seguinte, sem pôr o relógio a andar.
+        hint: inGroupPhase ? t(isSobeDesce && !isRotating ? 'gamedetails.end_round_hint_sobe' : 'gamedetails.end_round_hint', { number: maxRound + 1 }) : null,
       }
     } else if (canFinalize) {
       barPrimary = { label: busy ? t('gamedetails.finalizing') : t('gamedetails.finalize_mix'), onClick: () => handleFinalize(false), disabled: busy }
@@ -2377,26 +2500,62 @@ export default function GameDetails() {
       }
     }
   }
-  const barState = game?.status === 'pending' ? t('eventactions.state_pending')
-    : game?.status === 'in_progress' ? (roundsStarted && !isAmericano ? t('eventactions.state_round', { number: maxRound }) : t('eventactions.state_running'))
-    : mixPaused ? t('eventactions.state_drawn')
-    : showClosed ? t('eventactions.state_closed')
-    : t('eventactions.state_open')
-  const barLine = game?.status === 'pending' ? null
-    : game?.status === 'in_progress'
-      ? (!roundsStarted ? t('eventactions.line_duplas_ready')
-        : blockingTie ? null
-        : canAdvance || canFinalize ? t('eventactions.line_round_done')
-        : missingNow > 0 ? t('eventactions.line_missing', { count: missingNow })
-        : null)
-    : mixPaused ? null
-    : peopleCount === 0 ? t('eventactions.line_nobody')
-    : t('eventactions.line_signed', { count: peopleCount, max: capacity })
+  // Pacote da revisão do mix (ponto 2, 1 out): o botão preto de quem
+  // organiza aparece UMA vez, em baixo — antes das duplas no fim do cartão
+  // do mix, com duplas por baixo da secção «Duplas», com rondas por baixo das
+  // rondas. Saiu da barra de cima e o lima repetido também.
+  const stepSlot = !barPrimary ? null
+    : matches.length > 0 ? 'rounds'
+    : teams.length > 0 ? 'duplas'
+    : 'hero'
+  const renderStepButton = () => (
+    <div className="space-y-1.5">
+      <button type="button" onClick={barPrimary.onClick} disabled={barPrimary.disabled}
+        className="press inline-flex min-h-[52px] w-full items-center justify-center gap-1.5 rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold leading-tight text-white disabled:opacity-50">
+        {barPrimary.label}
+      </button>
+      {barPrimary.hint && (typeof barPrimary.hint === 'string'
+        ? <p className="px-1 text-center text-xs text-muted">{barPrimary.hint}</p>
+        : barPrimary.hint)}
+      {mixError && <p role="alert" className="text-center text-sm font-extrabold text-danger">{mixError}</p>}
+    </div>
+  )
+  // Quem joga (ponto 3 e 13; SPEC 2026-09-29-mix-botao-a-decorrer): o lima é
+  // só de quem joga — «O teu jogo · Campo N ↓» na ronda; quem descansa tem uma
+  // linha; quem não joga (ou só organiza) não tem botão.
+  // Nomes de quem joga e do clube/grupo (os membros só se leem para quem organiza).
+  const nameById = Object.fromEntries([...clubMembers, ...people].map((p) => [p.id, p.name]))
+  const avatarById = Object.fromEntries([...clubMembers, ...people].map((p) => [p.id, p.avatar_url]))
+  const orgKindOfGame = gameMembership?.organization?.kind || 'group'
+  // «Carlos N.»: o nome e a inicial do último.
+  const shortPersonName = (name) => {
+    const parts = String(name || '').trim().split(/\s+/).filter(Boolean)
+    return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0]}.` : parts[0] || ''
+  }
+  const myTeamIds = new Set(teams.filter((tm) => tm.player1_id === user.id || tm.player2_id === user.id).map((tm) => tm.id))
+  const myMatch = currentRoundMatches.find((m) => myTeamIds.has(m.team_a_id) || myTeamIds.has(m.team_b_id)) || null
   const orgSlug = gameMembership?.organization?.slug
   const rounds =[...new Set(matches.map(m => m.round_number))].sort((a, b) => a - b)
   const tctStandings = !isSobeDesce && teams.length ? standings(teams, matches) : []
   const americanoStandingsResult = isAmericano && teams.length ? americanoStandings(matches, teams) : []
   const placarResult = isRotating && teams.length ? rotatingPlacar(matches, teams) : []
+  // Uma lista só para a linha «Classificação · tu: N.º» (ponto 15).
+  const classif = (() => {
+    let rows = []
+    if (isAmericano) {
+      rows = americanoStandingsResult.map((s) => ({ key: s.player.id, name: s.player.name, mine: s.player.id === user.id,
+        extra: `${s.wins}${t('gamedetails.wins_abbrev')} · ${s.points} ${t('gamedetails.points_suffix')}` }))
+    } else if (isRotating) {
+      rows = placarResult.map((s) => ({ key: s.player.id, name: s.player.name, mine: s.player.id === user.id,
+        extra: `${s.wins}${t('gamedetails.wins_abbrev')}` }))
+    } else if (isSobeDesce) {
+      rows = sobeDesceStandings(matches).map((teamId) => ({ key: teamId, name: teamName(teamId), mine: myTeamIds.has(teamId) }))
+    } else if (!isGruposEliminatorias && roundsStarted) {
+      rows = tctStandings.map((s) => ({ key: s.team.id, name: teamName(s.team.id), mine: myTeamIds.has(s.team.id),
+        extra: `${s.wins}${t('gamedetails.wins_abbrev')} · ${s.diff > 0 ? '+' : ''}${s.diff}` }))
+    }
+    return { rows, myPos: rows.findIndex((r) => r.mine) + 1 }
+  })()
   // "Ganhou no campo 1" / "Perdeu no campo 1" — o resultado que decide a
   // ordem do Placar (Francisco, 18 set). Sem jogos com resultado: "Campo 1".
   const placarCourtLabel = (s) => !s.hasResult
@@ -2552,10 +2711,6 @@ export default function GameDetails() {
 
       {showAdminBar && (
         <MixAdminBar
-          stateLabel={barState}
-          line={barLine}
-          error={mixError}
-          primary={barPrimary}
           onEdit={orgSlug ? () => navigate(`/gerir/${orgSlug}/editar/mix/${game.id}`) : null}
           onMore={() => setMoreOpen(true)}
         />
@@ -2563,6 +2718,14 @@ export default function GameDetails() {
 
       {/* Mix em rascunho (Trello #544): só os admins chegam aqui (a base de
           dados esconde-o dos outros). Faixa a tracejado com «Publicar». */}
+      {/* Mix que não encheu (pacote do mix, ponto 7): à hora do jogo a base
+          de dados pô-lo em rascunho (games.unfilled_at, Dev 3) e avisou quem
+          organiza. Sem resposta até ao fim do dia, cancela-se sozinho. */}
+      {isDraftMix(game) && isAdmin && game.unfilled_at && (
+        <div role="status" className="rounded-card bg-warning/10 px-4 py-3 text-sm text-[#92400E]">
+          <b>{t('mixdraft.unfilled_title')}</b> {t('mixdraft.unfilled_text')}
+        </div>
+      )}
       {isDraftMix(game) && isAdmin && (
         <div className="rounded-card border-2 border-dashed border-ink-200 bg-surface p-4 space-y-3">
           <div>
@@ -2589,8 +2752,16 @@ export default function GameDetails() {
           quem lá esteve chega aqui pelo link ou pelo grupo. */}
       {game.status === 'cancelled' && (
         <div className="rounded-card border border-line bg-surface p-4">
-          <p className="font-extrabold text-ink-900">{t('mixcancel.banner_title')}</p>
-          <p className="text-sm text-muted mt-0.5">{t('mixcancel.banner_text')}</p>
+          {/* Cancelado sozinho por não encher: só «Cancelado porque não encheu.»,
+              nunca «Quem organiza cancelou» (ponto 7; UX, 2 out). */}
+          {game.unfilled_at ? (
+            <p className="font-extrabold text-ink-900">{t('mixcancel.banner_text_unfilled')}</p>
+          ) : (
+            <>
+              <p className="font-extrabold text-ink-900">{t('mixcancel.banner_title')}</p>
+              <p className="text-sm text-muted mt-0.5">{t('mixcancel.banner_text')}</p>
+            </>
+          )}
         </div>
       )}
 
@@ -2729,27 +2900,19 @@ export default function GameDetails() {
           duplas» / «Começar o Mix») também aqui, no lugar do botão principal —
           não só na barra pequena de cima (Renato, 29 set). É o mesmo botão
           da barra (barPrimary), por isso fazem sempre o mesmo. */}
-      {game.status !== 'in_progress' && barPrimary && (
-        <div className="space-y-1.5">
-          <PrimaryButton onClick={barPrimary.onClick} disabled={barPrimary.disabled} className="w-full">
-            <Play size={18} /> {barPrimary.label}
-          </PrimaryButton>
-          {barPrimary.hint && <p className="px-1 text-center text-xs text-muted">{barPrimary.hint}</p>}
-        </div>
-      )}
+      {stepSlot === 'hero' && renderStepButton()}
 
       {/* Botão principal por baixo do topo (SPEC §5.9). Sem sino: seguir
           ainda não existe. Os outros caminhos (suplente, escalão etário,
           admin) continuam em "Ações de inscrição" mais abaixo. */}
       {game.status === 'in_progress' ? (
-        <PrimaryButton
-          // Antes da Ronda 1 (mix começado, ainda sem jogos) não há ronda: leva
-          // às duplas — é aí que o admin mexe à última da hora (Trello #292).
-          onClick={() => document.getElementById(maxRound > 0 ? `mix-ronda-${maxRound}` : 'mix-duplas')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-          className="w-full"
-        >
-          <Play size={18} /> {t('gamedetails.live_see_round')}
-        </PrimaryButton>
+        myMatch ? (
+          <PrimaryButton onClick={() => goToMatch(myMatch.id)} className="w-full">
+            <Play size={18} /> {t('gamedetails.your_game_court', { number: myMatch.court_number })}
+          </PrimaryButton>
+        ) : isUserJoined && maxRound > 0 ? (
+          <p className="card !shadow-none py-3.5 text-center text-sm font-extrabold text-ink-700">{t('gamedetails.resting_this_round')}</p>
+        ) : null
       ) : !mixStarted && !isUserJoined && waGuestName ? (
         // Disse que sim, que é o convidado do WhatsApp: não se inscreve outra
         // vez. Sem confirmação por agora (Francisco, 29 set: sai o código ao
@@ -2757,7 +2920,9 @@ export default function GameDetails() {
         <div className="card">
           <p className="text-sm text-ink-900">{t('gamedetails.wa_guest_in', { name: waGuestName })}</p>
         </div>
-      ) : !mixStarted && canJoin && !joinMode && !ageIneligible && !missingBirthday ? (
+      // Quem organiza só vê o verde de jogador enquanto não tiver um botão
+      // preto para carregar (UX, 2 out: dois botões grandes, não).
+      ) : !mixStarted && canJoin && !joinMode && !ageIneligible && !missingBirthday && !(isAdmin && barPrimary) ? (
         <div className="space-y-2">
           <PrimaryButton onClick={withGender(handleJoinAlone)} disabled={joining} className="w-full">
             {joining ? t('gamedetails.joining') : t('gamedetails.join_mix')}
@@ -2778,6 +2943,16 @@ export default function GameDetails() {
         <PrimaryButton variant="ghost" onClick={handleLeaveGame} className="w-full !bg-white !border-ink-900">
           {t('gamedetails.leave_mix')}
         </PrimaryButton>
+      ) : !mixStarted && !mixPaused && isFull && !isUserJoined && !isUserWaitlisted && !ageIneligible && !missingBirthday && !mixCancelled && !(isAdmin && barPrimary) ? (
+        // Mix cheio (pacote do mix, ponto 4): o verde passa a «Ficar
+        // suplente», por ordem de chegada; se alguém sair, entra o 1.º e
+        // recebe aviso (base de dados).
+        <div className="space-y-1.5">
+          <PrimaryButton onClick={withGender(handleJoinAsSuplente)} disabled={joining} className="w-full">
+            {joining ? t('gamedetails.joining') : t('gamedetails.stay_suplente')}
+          </PrimaryButton>
+          <p className="px-1 text-center text-xs text-muted">{t('gamedetails.stay_suplente_hint')}</p>
+        </div>
       ) : null}
 
       {/* Winner (mix finalizado) */}
@@ -2943,7 +3118,7 @@ export default function GameDetails() {
       )}
 
       {/* Com a barra de quem organiza, o erro aparece nela, junto ao botão. */}
-      {mixError && !showAdminBar && (
+      {mixError && !(showAdminBar && barPrimary) && (
         <div className="bg-danger/10 text-danger px-4 py-3 rounded-ctrl text-sm font-extrabold animate-fade-up">
           {mixError}
         </div>
@@ -2983,17 +3158,11 @@ export default function GameDetails() {
               </div>
             )}
           </div>
-          {editingPairs ? renderPairsEditor() : <div className="space-y-2">
-            {[...teams].sort((a, b) => (b.seed_ranking ?? 0) - (a.seed_ranking ?? 0)).map((team, i) => (
-              <div key={team.id} className="rounded-ctrl bg-canvas px-3 py-2.5">
-                <p className="font-mono text-[11px] font-extrabold uppercase tracking-widest text-ink-500">{t('gamedetails.dupla_number', { number: i + 1 })}</p>
-                <p className="text-[15px] font-extrabold text-ink-900">{team.player1?.name || '?'} / {team.player2?.name || '?'}</p>
-              </div>
-            ))}
-          </div>}
+          {editingPairs ? renderPairsEditor() : renderDuplasList()}
           <p className="mt-2 text-xs text-muted">{t('eventactions.drawn_everyone_sees')}</p>
         </div>
       )}
+      {mixPaused && stepSlot === 'duplas' && renderStepButton()}
 
       {/* ─── Mix board ─────────────────────────────────────────────── */}
       {mixStarted && (
@@ -3007,9 +3176,9 @@ export default function GameDetails() {
           <div id="mix-duplas" className="card scroll-mt-24">
             <div
               className="flex items-center justify-between mb-3 cursor-pointer"
-              onClick={() => setDuplasExpanded(v => !v)}
+              onClick={() => setDuplasToggle(!duplasExpanded)}
             >
-              <h3 className="text-lg text-ink-900">{t('gamedetails.duplas')}</h3>
+              <h3 className="text-lg text-ink-900">{duplasExpanded ? t('gamedetails.duplas') : t('gamedetails.duplas_count', { count: teams.length })}</h3>
               <div className="flex items-center gap-1">
                 {duplasExpanded && !editingPairs && (
                   <>
@@ -3069,27 +3238,17 @@ export default function GameDetails() {
                 {editingPairs ? (
                   renderPairsEditor()
                 ) : (
-                  <div className="space-y-2">
-                    {/* Só as duplas, sem campos nem «vs» (Francisco, 1 out): os
-                        jogos são os da Ronda 1. Os pontos são os da dupla. */}
-                    {teams.map((team, i) => (
-                      <div key={team.id} className="rounded-ctrl p-3 bg-canvas">
-                        <p className="mb-2 font-mono text-[11px] font-extrabold uppercase tracking-widest text-ink-500">
-                          {t('gamedetails.dupla_number', { number: i + 1 })}
-                          {teamHasPoints(team) && <span className="normal-case tracking-normal"> · {teamPoints(team)} {t('gamedetails.points_suffix')}</span>}
-                        </p>
-                        {renderDuplaBlock(team, { showPoints: false })}
-                      </div>
-                    ))}
-                  </div>
+                  // Só as duplas, sem campos nem «vs» (Francisco, 1 out).
+                  renderDuplasList()
                 )}
               </>
             )}
           </div>
           )}
 
-          {/* Mix à última da hora (Trello #292) — só admin, só antes da Ronda 1. */}
-          {lastMinuteEditable && (
+          {/* Mix à última da hora (Trello #292) — só admin, só antes da Ronda 1.
+              Com as duplas dobradas (ponto 10) fica escondido com elas. */}
+          {lastMinuteEditable && (duplasExpanded || showIndividualStandings) && (
             <div className="space-y-2.5">
               {editNotice && (
                 <div className="bg-ink-900 text-white px-4 py-3 rounded-ctrl text-sm font-extrabold flex items-center gap-2 animate-fade-up">
@@ -3134,6 +3293,7 @@ export default function GameDetails() {
               </p>
             </div>
           )}
+          {!mixPaused && stepSlot === 'duplas' && renderStepButton()}
 
 
           {showDuplasShare && (
@@ -3151,25 +3311,6 @@ export default function GameDetails() {
             />
           )}
 
-          {/* Classificação (todos contra todos) — never for grupos_eliminatorias, which gets its own per-pool standings from PoolGroupStage below */}
-          {!isSobeDesce && !isGruposEliminatorias && !isAmericano && roundsStarted && tctStandings.length > 0 && (
-            <div className="card">
-              <h3 className="text-lg text-ink-900 mb-3">{t('gamedetails.group_standings_title')}</h3>
-              <div className="space-y-1.5">
-                {tctStandings.map((s, i) => (
-                  <div key={s.team.id} className="flex items-center gap-3 text-sm py-1.5 border-b border-line last:border-0">
-                    <span className="w-6 font-extrabold text-ink-900 tabular-nums">{i + 1}</span>
-                    <span className="flex-1 font-extrabold text-ink-900 truncate">{teamName(s.team.id)}</span>
-                    <span className="text-muted tabular-nums" title={t('gamedetails.wins_title')}>{s.wins}{t('gamedetails.wins_abbrev')}</span>
-                    <span className="text-muted tabular-nums w-12 text-right" title={t('gamedetails.points_diff_title')}>
-                      {s.diff > 0 ? '+' : ''}{s.diff}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {inPoolStage && (
             <PoolGroupStage
               teams={teams}
@@ -3182,36 +3323,30 @@ export default function GameDetails() {
             />
           )}
 
-          {isRotating && placarResult.length > 0 && (
+          {/* Classificação dobrada numa linha, com o teu lugar (pacote do mix,
+              ponto 15, proposta para o Francisco ver): em todos os formatos,
+              só com o nome «Classificação». Abre-se ao tocar. */}
+          {classif.rows.length > 0 && !inPoolStage && (
             <div className="card">
-              <h3 className="text-lg text-ink-900">{t('gamedetails.placar_title')}</h3>
-              <p className="text-sm text-muted mb-3">{t('gamedetails.placar_hint')} {t(game.ranked === false ? 'gamedetails.placar_ranking_friendly' : 'gamedetails.placar_ranking_ranked')}</p>
-              <div className="space-y-1.5">
-                {placarResult.map((s, i) => (
-                  <div key={s.player.id} className="flex items-center gap-3 text-sm py-1.5 border-b border-line last:border-0">
-                    <span className="w-6 font-extrabold text-ink-900 tabular-nums">{i + 1}</span>
-                    <span className="flex-1 font-extrabold text-ink-900 truncate">{s.player.name}</span>
-                    <span className={`text-xs font-extrabold whitespace-nowrap ${s.hasResult && s.wonLast ? 'text-ok' : 'text-muted'}`}>{placarCourtLabel(s)}</span>
-                    <span className="text-muted tabular-nums w-10 text-right" title={t('gamedetails.wins_title')}>{s.wins}{t('gamedetails.wins_abbrev')}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {isAmericano && americanoStandingsResult.length > 0 && (
-            <div className="card">
-              <h3 className="text-lg text-ink-900 mb-3">{t('gamedetails.americano_ranking_title')}</h3>
-              <div className="space-y-1.5">
-                {americanoStandingsResult.map((s, i) => (
-                  <div key={s.player.id} className="flex items-center gap-3 text-sm py-1.5 border-b border-line last:border-0">
-                    <span className="w-6 font-extrabold text-ink-900 tabular-nums">{i + 1}</span>
-                    <span className="flex-1 font-extrabold text-ink-900 truncate">{s.player.name}</span>
-                    <span className="text-muted tabular-nums" title={t('gamedetails.wins_title')}>{s.wins}{t('gamedetails.wins_abbrev')}</span>
-                    <span className="text-muted tabular-nums w-12 text-right">{s.points} {t('gamedetails.points_suffix')}</span>
-                  </div>
-                ))}
-              </div>
+              <button type="button" onClick={() => setClassifOpen((v) => !v)} aria-expanded={classifOpen}
+                className={`w-full min-h-[44px] flex items-center justify-between gap-3 text-left ${classifOpen ? 'mb-3' : ''}`}>
+                <h3 className="text-lg text-ink-900">{t('gamedetails.classif_title')}</h3>
+                <span className="flex shrink-0 items-center gap-1.5 text-xs font-extrabold text-ink-700">
+                  {classif.myPos > 0 && t('gamedetails.classif_you', { pos: classif.myPos })}
+                  <ChevronDown size={20} className={`text-muted transition-transform duration-base ${classifOpen ? 'rotate-180' : ''}`} />
+                </span>
+              </button>
+              {classifOpen && (
+                <div className="space-y-1.5">
+                  {classif.rows.map((row, i) => (
+                    <div key={row.key} className={`flex items-center gap-3 text-sm py-1.5 border-b border-line last:border-0 ${row.mine ? 'font-extrabold' : ''}`}>
+                      <span className="w-6 font-extrabold text-ink-900 tabular-nums">{i + 1}</span>
+                      <span className="flex-1 font-extrabold text-ink-900 truncate">{row.name}</span>
+                      {row.extra && <span className="text-muted tabular-nums text-right whitespace-nowrap">{row.extra}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -3221,8 +3356,16 @@ export default function GameDetails() {
             const phase = (ms.find(m => m.phase !== 'third' && m.phase !== 'placement') || ms[0])?.phase || 'group'
             const isCurrent = r === maxRound && game.status === 'in_progress'
             // As rondas já jogadas dobram-se sozinhas quando começa a
-            // seguinte (Renato, 29 set); tocar no título abre-as outra vez.
-            const open = isCurrent || !!openRounds[r]
+            // seguinte (Renato, 29 set), todas numa linha só — «Rondas 1 e 2 ·
+            // ✓ 4 jogos» (desenho «como fica», 2 out); tocar abre-as todas.
+            const pastRounds = rounds.filter((x) => !(x === maxRound && game.status === 'in_progress'))
+            const isFirstPast = !isCurrent && r === pastRounds[0]
+            const open = isCurrent || !!openRounds.past
+            if (!isCurrent && !open && !isFirstPast) return null
+            const pastLabel = pastRounds.length === 1 ? t('gamedetails.round_number', { number: pastRounds[0] })
+              : pastRounds.length === 2 ? t('gamedetails.rounds_two', { a: pastRounds[0], b: pastRounds[1] })
+              : t('gamedetails.rounds_range', { a: pastRounds[0], b: pastRounds[pastRounds.length - 1] })
+            const pastGames = matches.filter((m) => pastRounds.includes(m.round_number)).length
             const title = (
               <h3 className="text-lg text-ink-900">
                 {t('gamedetails.round_number', { number: r })}
@@ -3235,28 +3378,33 @@ export default function GameDetails() {
             )
             return (
               <div key={r} id={`mix-ronda-${r}`} className={`card scroll-mt-24 ${isCurrent ? 'ring-2 ring-ink-900' : ''}`}>
-                {!isCurrent && (
+                {isFirstPast && (
                   <button
                     type="button"
-                    onClick={() => setOpenRounds((o) => ({ ...o, [r]: !o[r] }))}
+                    onClick={() => setOpenRounds((o) => ({ ...o, past: !o.past }))}
                     aria-expanded={open}
                     className={`w-full min-h-[44px] flex items-center justify-between gap-3 text-left ${open ? 'mb-3' : ''}`}
                   >
-                    {title}
+                    {open ? title : <h3 className="text-lg text-ink-900">{pastLabel}</h3>}
                     <span className="flex shrink-0 items-center gap-1.5 text-xs font-extrabold text-muted">
                       {!open && (
                         <>
                           <Check size={14} strokeWidth={3} className="text-ok" />
-                          {t('gamedetails.round_done_summary', { count: ms.length })}
+                          {t('gamedetails.round_done_summary', { count: pastGames })}
                         </>
                       )}
                       <ChevronDown size={20} className={`transition-transform duration-base ${open ? 'rotate-180' : ''}`} />
                     </span>
                   </button>
                 )}
+                {!isCurrent && !isFirstPast && <div className="mb-3 min-h-[44px] flex items-center">{title}</div>}
                 {isCurrent && (
                 <div className="flex items-center justify-between mb-3">
                   {title}
+                  {/* Sorteada e à espera de «Começar Ronda N» (ponto 11). */}
+                  {roundPending && (
+                    <span className="rounded-full border border-line bg-surface px-2.5 py-1 text-xs font-extrabold text-ink-700">{t('gamedetails.round_pending_min', { minutes: game.game_time_minutes || 20 })}</span>
+                  )}
                   {isCurrent && (
                     <RoundTimer
                       startedAt={game.round_started_at}
@@ -3290,13 +3438,17 @@ export default function GameDetails() {
                   {ms.map(m => {
                     const done = hasResult(m)
                     const isCorrecting = editingMatchId === m.id
-                    const canEditScores = (isAdmin || isScorekeeper) && game.status === 'in_progress'
+                    // Uma ronda por começar ainda não se marca (ponto 11).
+                    // Uma ronda por começar não se marca: só os nomes, até
+                    // «Começar Ronda N» (UX, 2 out).
+                    const canEditScores = (isAdmin || isScorekeeper) && game.status === 'in_progress' && !(isCurrent && roundPending)
                     const editable = canEditScores && (!done || isCorrecting)
                     return (
-                      <div key={m.id} id={`jogo-${m.id}`} className="rounded-ctrl bg-canvas p-2.5 scroll-mt-24">
+                      <div key={m.id} id={`jogo-${m.id}`} className={`rounded-ctrl p-2.5 scroll-mt-24 ${myTeamIds.has(m.team_a_id) || myTeamIds.has(m.team_b_id) ? 'bg-[#E3F6EA] ring-1 ring-ok' : 'bg-canvas'}`}>
                         <div className="flex items-center justify-between mb-2 px-1">
                           <p className="font-mono text-[11px] font-extrabold uppercase tracking-widest text-ink-500">
                             {t('gamedetails.court_number', { number: m.court_number })}{m.phase === 'third' && ` · ${t('mixlogic.phase_third')}`}{m.phase === 'placement' && ` · ${t('mixlogic.phase_place_n', { n: placementOfCourt(m.court_number) })}`}
+                            {isCurrent && (myTeamIds.has(m.team_a_id) || myTeamIds.has(m.team_b_id)) && <span className="text-ok"> · {t('gamedetails.your_game_label')}</span>}
                           </p>
                           {canEditScores && done && !isCorrecting && (
                             <button
@@ -3304,7 +3456,7 @@ export default function GameDetails() {
                               className="inline-flex items-center gap-1 text-[11px] font-extrabold text-muted hover:text-ink-900 min-h-[28px] px-1"
                             >
                               <Pencil size={12} />
-                              {t('gamedetails.edit_score')}
+                              {t('gamedetails.edit_short')}
                             </button>
                           )}
                         </div>
@@ -3322,6 +3474,12 @@ export default function GameDetails() {
                           onSave={(finalScore) => handleSaveScore(m, finalScore)}
                           saving={savingMatchId === m.id}
                         />
+                        {/* «marcado por <nome>» numa linha pequena por baixo dos
+                            resultados (UX, 2 out): matches.scored_by_name, gravado
+                            pelo save_mix_match_result (Dev 3); jogos antigos não têm. */}
+                        {done && !isCorrecting && (m.scored_by_name || nameById[m.scored_by]) && (
+                          <p className="mt-1.5 px-1 text-[11px] font-bold text-muted">{t('scorekeepers.scored_by', { name: shortPersonName(m.scored_by_name || nameById[m.scored_by]) })}</p>
+                        )}
                         {isCorrecting && (
                           <button
                             onClick={() => cancelEditingScore(m.id)}
@@ -3522,7 +3680,7 @@ export default function GameDetails() {
           {isAdmin && game.status === 'in_progress' && !inPoolStage && (
             <div className="space-y-3">
                 <>
-                  {roundsStarted && !canAdvance && !canFinalize && !blockingTie && (
+                  {roundsStarted && !roundPending && !canAdvance && !canFinalize && !blockingTie && (
                     <p className="text-muted text-sm text-center">
                       {isAmericano
                         ? t('gamedetails.register_americano_results')
@@ -3540,15 +3698,11 @@ export default function GameDetails() {
                       tem — «Iniciar Ronda 1» (Francisco, 28 set, Mix M5 do A2N: «O
                       começar ronda não pode estar só em cima… Como estava»),
                       «Terminar Ronda N» ou, na última, «Terminar e dar os pontos». */}
-                  {barPrimary && (
-                    <button type="button" onClick={barPrimary.onClick} disabled={barPrimary.disabled}
-                      className="press inline-flex min-h-[52px] w-full items-center justify-center gap-1.5 rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold leading-tight text-white disabled:opacity-50">
-                      {barPrimary.label}
-                    </button>
-                  )}
-                  {blockingTie && <TieHint onGo={() => goToMatch(blockingTie.id)} />}
+                  {stepSlot === 'rounds' && renderStepButton()}
                   {/* Sair mais cedo — disponível assim que houver pelo menos um resultado guardado */}
-                  {roundsStarted && !canFinalize && anyScoreSaved && (
+                  {/* Só na última ronda (ponto 16): antes, aparecia desde a 2.ª e
+                      acabava o mix a meio. */}
+                  {roundsStarted && !canFinalize && anyScoreSaved && !inGroupPhase && !nextPhase && (
                     <>
                       <PrimaryButton variant="danger" onClick={() => handleFinalize(true)} disabled={busy || missingResults > 0 || tiedMatches.length > 0} className="w-full">
                         <Trophy size={20} />
@@ -3565,11 +3719,82 @@ export default function GameDetails() {
         </>
       )}
 
+      {/* Suplentes, por cima dos inscritos (pacote do mix, ponto 4). */}
+      {!mixStarted && waitlistPeople.length > 0 && (
+        <div className="card">
+          <h3 className="text-lg text-ink-900 mb-4">{t('gamedetails.waitlist_title')}</h3>
+          <div className="space-y-2.5">
+            {waitlistPeople.map((person, idx) => (
+              <div
+                key={`${person.id}-${idx}`}
+                className={`rounded-ctrl p-3.5 flex items-center gap-3 ${
+                  person.id === user.id ? 'bg-ink-50' : 'bg-canvas'
+                }`}
+              >
+                <span className="w-6 text-center font-extrabold text-muted text-sm shrink-0">{ordinal(idx + 1)}</span>
+                {person.is_guest ? (
+                  <>
+                    <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" provisional={isProvisional(person.rating_games)} />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-extrabold text-ink-900 truncate">
+                        {person.name}
+                        {person.id === user.id && (
+                          <span className="text-muted font-normal text-sm">{t('gamedetails.you_suffix')}</span>
+                        )}
+                      </p>
+                      <div className="mt-1">
+                        <GuestBadge label={person.is_test ? t('gamedetails.test_badge') : t('gamedetails.guest_badge')} isTest={person.is_test} />
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <Link to={`/jogador/${person.id}`} className="flex items-center gap-3 flex-1 min-w-0">
+                    <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" provisional={isProvisional(person.rating_games)} />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-extrabold text-ink-900 truncate">
+                        {person.name}
+                        {person.id === user.id && (
+                          <span className="text-muted font-normal text-sm">{t('gamedetails.you_suffix')}</span>
+                        )}
+                      </p>
+                      <p className="text-xs text-muted truncate">
+                        <span className="font-extrabold text-ink-900">{pointsById[person.id] ?? 0} {t('gamedetails.points_suffix')}</span> · {sideLabel(person.preferred_side)}
+                      </p>
+                    </div>
+                  </Link>
+                )}
+                {isAdmin && (
+                  <button
+                    onClick={() => handleRemovePerson(person)}
+                    disabled={busy}
+                    title={t('gamedetails.remove_person_title', { name: person.name })}
+                    className="w-9 h-9 flex items-center justify-center rounded-full text-muted hover:text-danger hover:bg-danger/10 transition-colors duration-fast shrink-0"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Jogadores (antes do sorteio). Num rascunho não há inscritos nem
           inscrições (#544): o «sê o primeiro» enganava. */}
-      {!mixStarted && !isDraftMix(game) && (
+      {!mixStarted && (!isDraftMix(game) || !!game.unfilled_at) && (
         <div className="card">
-          <h3 className="text-lg text-ink-900 mb-1">{t('gamedetails.players_title', { count: people.length, max: capacity })}</h3>
+          {/* Ponto 9: com as duplas sorteadas, «Inscritos · N/N» fica dobrado
+              (as duplas já dizem quem joga); abre-se ao tocar. */}
+          {mixPaused ? (
+            <button type="button" onClick={() => setInscritosOpen((v) => !v)} aria-expanded={inscritosOpen}
+              className={`w-full min-h-[44px] flex items-center justify-between gap-3 text-left ${inscritosOpen ? 'mb-1' : ''}`}>
+              <h3 className="text-lg text-ink-900">{t('gamedetails.players_title', { count: people.length, max: capacity })}</h3>
+              <ChevronDown size={20} className={`text-muted shrink-0 transition-transform duration-base ${inscritosOpen ? 'rotate-180' : ''}`} />
+            </button>
+          ) : (
+            <h3 className="text-lg text-ink-900 mb-1">{t('gamedetails.players_title', { count: people.length, max: capacity })}</h3>
+          )}
+          {(!mixPaused || inscritosOpen) && (<>
           {/* Intervalo de pontos dos inscritos com nível (Ruben, 29 set):
               responde ao «que nível é que este mix tem?» sem abrir perfis. */}
           {(() => {
@@ -3740,68 +3965,10 @@ export default function GameDetails() {
               </PrimaryButton>
             </div>
           )}
+          </>)}
         </div>
       )}
 
-      {/* Suplentes (lista de espera) */}
-      {!mixStarted && waitlistPeople.length > 0 && (
-        <div className="card">
-          <h3 className="text-lg text-ink-900 mb-4">{t('gamedetails.waitlist_title')}</h3>
-          <div className="space-y-2.5">
-            {waitlistPeople.map((person, idx) => (
-              <div
-                key={`${person.id}-${idx}`}
-                className={`rounded-ctrl p-3.5 flex items-center gap-3 ${
-                  person.id === user.id ? 'bg-ink-50' : 'bg-canvas'
-                }`}
-              >
-                <span className="w-6 text-center font-extrabold text-muted text-sm shrink-0">{ordinal(idx + 1)}</span>
-                {person.is_guest ? (
-                  <>
-                    <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" provisional={isProvisional(person.rating_games)} />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-extrabold text-ink-900 truncate">
-                        {person.name}
-                        {person.id === user.id && (
-                          <span className="text-muted font-normal text-sm">{t('gamedetails.you_suffix')}</span>
-                        )}
-                      </p>
-                      <div className="mt-1">
-                        <GuestBadge label={person.is_test ? t('gamedetails.test_badge') : t('gamedetails.guest_badge')} isTest={person.is_test} />
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <Link to={`/jogador/${person.id}`} className="flex items-center gap-3 flex-1 min-w-0">
-                    <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" provisional={isProvisional(person.rating_games)} />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-extrabold text-ink-900 truncate">
-                        {person.name}
-                        {person.id === user.id && (
-                          <span className="text-muted font-normal text-sm">{t('gamedetails.you_suffix')}</span>
-                        )}
-                      </p>
-                      <p className="text-xs text-muted truncate">
-                        <span className="font-extrabold text-ink-900">{pointsById[person.id] ?? 0} {t('gamedetails.points_suffix')}</span> · {sideLabel(person.preferred_side)}
-                      </p>
-                    </div>
-                  </Link>
-                )}
-                {isAdmin && (
-                  <button
-                    onClick={() => handleRemovePerson(person)}
-                    disabled={busy}
-                    title={t('gamedetails.remove_person_title', { name: person.name })}
-                    className="w-9 h-9 flex items-center justify-center rounded-full text-muted hover:text-danger hover:bg-danger/10 transition-colors duration-fast shrink-0"
-                  >
-                    <X size={16} />
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Edições anteriores de um mix recorrente (Trello #258) — substitui,
           com "Os meus jogos" no Perfil, a aba "Terminados" da Home. */}
@@ -3893,10 +4060,7 @@ export default function GameDetails() {
           >
             <h3 className="text-lg text-ink-900 flex items-center gap-2 min-w-0">
               <Pencil size={18} className="text-muted shrink-0" />
-              <span className="truncate">{t('gamedetails.scorekeepers_title')}</span>
-              {scorekeeperIds.length > 0 && (
-                <span className="shrink-0 rounded-full bg-ink-900 px-2 py-0.5 text-xs font-extrabold text-white tabular-nums">{scorekeeperIds.length}</span>
-              )}
+              <span className="truncate">{scorekeeperIds.length > 0 ? t('scorekeepers.title_count', { count: scorekeeperIds.length }) : t('gamedetails.scorekeepers_title')}</span>
             </h3>
             <ChevronDown
               size={20}
@@ -3904,34 +4068,75 @@ export default function GameDetails() {
             />
           </button>
 
+          {/* Só quem marca (SPEC 2026-09-30-mix-marcadores): quem organiza
+              marca sempre; cada marcador diz se joga ou é do clube/grupo, e
+              tira-se com «Tirar». «＋ Juntar marcador» abre a folha. */}
           {scorekeepersOpen && (
-            <div className="mt-3 space-y-3">
-              <p className="text-sm text-muted">
-                {t('gamedetails.scorekeepers_description')}
-              </p>
-              <div className="space-y-2">
-                {people.filter((p, i, arr) => arr.findIndex((x) => x.id === p.id) === i).map((p) => (
-                  <div key={p.id} className="flex items-center gap-3">
-                    <Avatar name={p.name} url={p.avatar_url} size="w-8 h-8 text-xs" />
-                    <p className="flex-1 min-w-0 text-sm font-extrabold text-ink-900 truncate">{p.name}</p>
-                    <button
-                      onClick={() => handleToggleScorekeeper(p.id)}
-                      disabled={scorekeeperBusy === p.id}
-                      className={`text-xs font-extrabold px-3 py-2 min-h-[36px] rounded-full transition-colors duration-fast disabled:opacity-40 ${
-                        scorekeeperIds.includes(p.id) ? 'bg-ink-900 text-white' : 'bg-ink-50 text-ink-700 hover:bg-ink-200'
-                      }`}
-                    >
-                      {scorekeeperIds.includes(p.id) ? t('gamedetails.scorekeeper_badge') : t('gamedetails.make_scorekeeper')}
-                    </button>
-                  </div>
-                ))}
-              </div>
+            <div className="mt-1">
+              <p className="text-sm text-muted mb-2">{t('scorekeepers.subtitle')}</p>
+              {game.created_by && (
+                <div className="flex items-center gap-3 border-b border-line py-2.5">
+                  <Avatar name={nameById[game.created_by]} url={avatarById[game.created_by]} size="w-10 h-10 text-sm" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[15px] font-extrabold text-ink-900">{nameById[game.created_by] || '?'}</span>
+                    <span className="block text-xs text-muted">{t('scorekeepers.organizer_always')}</span>
+                  </span>
+                </div>
+              )}
+              {scorekeeperIds.filter((uid) => uid !== game.created_by).map((uid) => (
+                <div key={uid} className="flex items-center gap-3 border-b border-line py-2.5">
+                  <Avatar name={nameById[uid]} url={avatarById[uid]} size="w-10 h-10 text-sm" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[15px] font-extrabold text-ink-900">{nameById[uid] || '?'}</span>
+                    <span className="block text-xs text-muted">
+                      {people.some((p) => p.id === uid) ? t('scorekeepers.plays_here')
+                        : t(orgKindOfGame === 'group' ? 'scorekeepers.from_group' : 'scorekeepers.from_club')}
+                    </span>
+                  </span>
+                  <button type="button" onClick={() => handleToggleScorekeeper(uid)} disabled={scorekeeperBusy === uid}
+                    className="shrink-0 min-h-[44px] px-2 text-sm font-extrabold text-ink-900 disabled:opacity-40">
+                    {t('scorekeepers.remove')}
+                  </button>
+                </div>
+              ))}
+              <button type="button" onClick={() => setAddScorekeeperOpen(true)}
+                className="mt-3 w-full min-h-[48px] rounded-ctrl border-2 border-dashed border-line bg-white px-4 text-[15px] font-extrabold text-ink-900">
+                {t('scorekeepers.add')}
+              </button>
             </div>
           )}
         </div>
       )}
+      {addScorekeeperOpen && (
+        <AddScorekeeperSheet
+          orgName={gameMembership?.organization?.name}
+          orgKind={orgKindOfGame}
+          inMix={people.filter((p, i, arr) => !p.no_account && arr.findIndex((x) => x.id === p.id) === i
+            && p.id !== game.created_by && !scorekeeperIds.includes(p.id))}
+          fromClub={clubMembers.filter((m) => m.id !== game.created_by && !scorekeeperIds.includes(m.id) && !people.some((p) => p.id === m.id))}
+          onConfirm={async (ids) => {
+            const { error } = await supabase.from('game_scorekeepers').insert(ids.map((uid) => ({ game_id: id, user_id: uid })))
+            if (error) throw error
+            await loadGameDetails()
+          }}
+          onClose={() => setAddScorekeeperOpen(false)}
+        />
+      )}
 
       {/* A folha do «Adicionar jogador» serve o mix a decorrer (#292) e antes de começar (#534). */}
+      {/* «Terminar e dar os pontos»: a pergunta na folha da app (ponto 16). */}
+      <ConfirmSheet
+        open={!!finalizeAsk}
+        title={t('gamedetails.finalize_ask_title')}
+        message={t(finalizeAsk?.early ? 'gamedetails.confirm_finalize_early' : 'gamedetails.finalize_ask_text')}
+        confirmLabel={t('gamedetails.finalize_mix')}
+        cancelLabel={t('gamedetails.finalize_ask_not_yet')}
+        // Regra das janelas: o seguro («Ainda não») a preto, terminar em contorno.
+        outline
+        onConfirm={doFinalize}
+        onClose={() => setFinalizeAsk(null)}
+        errorOf={(error) => describeError(t, error, 'gamedetails.error_finalize_mix')}
+      />
       {addPlayerOpen && (
         <AddPlayerSheet
           game={game}
@@ -4047,17 +4252,6 @@ export default function GameDetails() {
             )
           )}
 
-          {isFull && !isUserJoined && !isUserWaitlisted && !ageIneligible && !missingBirthday && (
-            <PrimaryButton
-              variant="ghost"
-              onClick={withGender(handleJoinAsSuplente)}
-              disabled={joining}
-              className="w-full"
-            >
-              <UserPlus size={20} />
-              {joining ? t('gamedetails.joining') : t('gamedetails.join_as_waitlist')}
-            </PrimaryButton>
-          )}
 
           {/* Modal da data de nascimento (Trello #212). Mesma folha que o
               DateField ja usa — sobe de baixo no telemovel, centrada no
@@ -4307,13 +4501,21 @@ export default function GameDetails() {
         const part = (o) => formatDateLib(game.date, i18n.language, o).replace(/\./g, '').toLocaleLowerCase(i18n.language)
         const shortDay = `${weekdayShort(new Date(game.date), i18n.language)} ${new Date(game.date).getDate()} ${part({ month: 'short' })}`
         const time = formatTime(game.date, i18n.language, { hour: '2-digit', minute: '2-digit' })
-        const notStarted = ['pending', 'open', 'closed'].includes(game.status) && !mixPaused
+        const notStarted = (['pending', 'open', 'closed'].includes(game.status) || (isDraftMix(game) && !!game.unfilled_at)) && !mixPaused
+        const nobody = peopleCount === 0 && waitlist.length === 0 && !anyScoreSaved
         const actions = [
           isSeriesDate && notStarted && { key: 'change', label: t('eventactions.change_one'), hint: t('eventactions.change_one_hint'), onClick: () => setChangeOneOpen(true) },
+          // Pacote do mix, ponto 6: «Voltar a rascunho» (unpublish_mix, Dev 3)
+          // — por omissão só antes da 1.ª hora de anúncio do robô; quem
+          // decide é a base de dados (already_announced).
+          ['pending', 'open'].includes(game.status) && !mixPaused && (game.status === 'open' && hasBot
+            ? { key: 'draft', label: t('eventactions.to_draft'), hint: t('eventactions.to_draft_announced'), disabled: true, onClick: () => {} }
+            : { key: 'draft', label: t('eventactions.to_draft'), hint: t('eventactions.to_draft_hint'), onClick: () => setDraftAskOpen(true) }),
           game.status === 'in_progress' && { key: 'restart', label: t('eventactions.restart'), hint: t('eventactions.restart_hint'), onClick: () => setRestartOpen(true) },
-          { key: 'cancel', danger: true, label: t('eventactions.cancel_one'), hint: t(isSeriesDate ? 'eventactions.cancel_one_hint_series' : 'eventactions.cancel_one_hint'), onClick: () => setCancelOpen(true) },
+          // Sem ninguém inscrito o mix desaparece: chama-se «Eliminar o mix».
+          { key: 'cancel', danger: true, label: t(nobody ? 'eventactions.delete_mix' : 'eventactions.cancel_one'),
+            hint: t(nobody ? 'eventactions.delete_mix_hint' : isSeriesDate ? 'eventactions.cancel_one_hint_series' : 'eventactions.cancel_one_hint'), onClick: () => setCancelOpen(true) },
         ].filter(Boolean)
-        const nobody = peopleCount === 0 && waitlist.length === 0 && !anyScoreSaved
         const dateTitle = isSeriesDate ? `${game.title} · ${shortDay}` : game.title
         return (
           <>
@@ -4328,8 +4530,28 @@ export default function GameDetails() {
               open={changeOneOpen}
               game={game}
               title={t('eventactions.change_one_title', { name: dateTitle })}
+              people={peopleCount}
+              maxCourts={planMaxCourts ?? 6}
               onClose={() => setChangeOneOpen(false)}
               onSaved={() => { setDoneNotice(t('eventactions.change_one_done')); loadGameDetails() }}
+            />
+            <ConfirmSheet
+              open={draftAskOpen}
+              title={t('eventactions.to_draft_title')}
+              message={t('eventactions.to_draft_message')}
+              confirmLabel={t('eventactions.to_draft')}
+              cancelLabel={t('eventactions.not_now')}
+              onConfirm={async () => {
+                const { error } = await supabase.rpc('unpublish_mix', { p_game_id: game.id })
+                if (error) throw error
+                setDoneNotice(t('eventactions.to_draft_done'))
+                loadGameDetails()
+              }}
+              onClose={() => setDraftAskOpen(false)}
+              errorOf={(error) => {
+                const code = ['already_announced', 'has_players', 'already_started', 'not_published'].find((c) => (error?.message || '').includes(c))
+                return code ? t(`eventactions.to_draft_error_${code}`) : describeError(t, error, 'eventactions.to_draft_error')
+              }}
             />
             <ConfirmSheet
               open={restartOpen}

@@ -3,6 +3,10 @@
 // só na linha deste mix; a série continua a contar a partir das suas
 // próprias datas, por isso as seguintes não mudam.
 //
+// Pacote do mix (ponto 5, 1 out): muda também o número de campos. Com menos
+// lugares do que inscritos, a base de dados passa os últimos a entrar a
+// suplentes e avisa-os (Dev 3); com mais, sobem suplentes.
+//
 // Folha própria (z-50) e não a ConfirmSheet (z-60): o calendário do campo
 // da data abre por cima dela, e com a ConfirmSheet ficava escondido.
 import { useEffect, useState } from 'react'
@@ -10,6 +14,7 @@ import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { supabase } from '../../lib/supabase'
 import { describeError } from '../../lib/errors'
+import { Minus, Plus } from 'lucide-react'
 import { DateTimeField } from '../ui'
 
 const toLocalInput = (d) => {
@@ -17,10 +22,11 @@ const toLocalInput = (d) => {
   return new Date(dt.getTime() - dt.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
 }
 
-export default function ChangeOneMixSheet({ open, game, title, onClose, onSaved }) {
+export default function ChangeOneMixSheet({ open, game, title, onClose, onSaved, people = 0, maxCourts = 6 }) {
   const { t } = useTranslation()
   const [date, setDate] = useState('')
   const [location, setLocation] = useState('')
+  const [courts, setCourts] = useState(1)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -28,6 +34,7 @@ export default function ChangeOneMixSheet({ open, game, title, onClose, onSaved 
     if (!open || !game) return
     setDate(toLocalInput(game.date))
     setLocation(game.location || '')
+    setCourts(game.num_courts || 1)
     setBusy(false); setError('')
   }, [open, game])
 
@@ -35,9 +42,13 @@ export default function ChangeOneMixSheet({ open, game, title, onClose, onSaved 
 
   const dateChanged = date && date !== toLocalInput(game.date)
   const placeChanged = location.trim() !== (game.location || '').trim()
+  const courtsChanged = courts !== (game.num_courts || 1)
+  const seats = courts * 4
+  const extra = Math.max(0, people - seats)
+  const courtsMax = Math.max(maxCourts, game.num_courts || 1)
 
   const save = async () => {
-    if (new Date(date) <= new Date()) { setError(t('eventactions.change_one_past')); return }
+    if (dateChanged && new Date(date) <= new Date()) { setError(t('eventactions.change_one_past')); return }
     setBusy(true); setError('')
     const patch = {}
     if (dateChanged) patch.date = new Date(date).toISOString()
@@ -46,6 +57,10 @@ export default function ChangeOneMixSheet({ open, game, title, onClose, onSaved 
       patch.location = location.trim() || null
       patch.latitude = null
       patch.longitude = null
+    }
+    if (courtsChanged) {
+      patch.num_courts = courts
+      patch.max_players = seats
     }
     const { error: err } = await supabase.from('games').update(patch).eq('id', game.id)
     if (err) {
@@ -86,11 +101,26 @@ export default function ChangeOneMixSheet({ open, game, title, onClose, onSaved 
           className="w-full min-h-[48px] rounded-ctrl border border-line bg-white px-3.5 text-[15px] text-ink-900"
         />
 
+        <p className="mt-4 mb-1.5 text-sm font-extrabold text-ink-900">{t('eventactions.change_one_courts')}</p>
+        <div className="flex items-center gap-3">
+          <div className="inline-flex items-center rounded-ctrl border border-line bg-canvas">
+            <button type="button" aria-label="−" onClick={() => setCourts((c) => Math.max(1, c - 1))}
+              className="w-11 h-11 flex items-center justify-center text-ink-900"><Minus size={16} /></button>
+            <span className="w-8 text-center font-extrabold tabular-nums">{courts}</span>
+            <button type="button" aria-label="+" onClick={() => setCourts((c) => Math.min(courtsMax, c + 1))}
+              className="w-11 h-11 flex items-center justify-center text-ink-900"><Plus size={16} /></button>
+          </div>
+        </div>
+        <p className="mt-1.5 text-xs text-ink-500">
+          {t('eventactions.change_one_courts_seats', { count: courts, seats })}
+          {extra > 0 && <> {t('eventactions.change_one_courts_extra', { count: extra, people })}</>}
+        </p>
+
         {error && (
           <p role="alert" className="mt-3 rounded-ctrl border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-sm font-bold text-danger">{error}</p>
         )}
         <div className="mt-5 space-y-2.5">
-          <button type="button" onClick={save} disabled={busy || !(dateChanged || placeChanged)}
+          <button type="button" onClick={save} disabled={busy || !(dateChanged || placeChanged || courtsChanged)}
             className="w-full min-h-[52px] rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold text-white disabled:opacity-40">
             {t('eventactions.change_one_save')}
           </button>

@@ -776,14 +776,29 @@ const EV_PARTICIPANTS = () => (localStorage.getItem('mockAllPairs') === 'true'
   : evPeople().map((u, i) => ({
     id: `ev-p${i}`, game_id: 'fake-game-1', user_id: u.id, partner_id: null, status: 'confirmed',
     created_at: new Date(Date.now() - (10 - i) * 60000).toISOString(), user: u, partner: null,
-  })))
+  })).concat(localStorage.getItem('mockEventWaitlist') === 'true' ? [{
+    // mockEventWaitlist = 'true': o Zé Pinto é o 1.º suplente (pacote do mix, ponto 4).
+    id: 'ev-w1', game_id: 'fake-game-1', user_id: 'fake-ze', partner_id: null, status: 'waitlisted',
+    created_at: new Date().toISOString(), user: { id: 'fake-ze', name: 'Zé Pinto', avatar_url: null, preferred_side: 'both' }, partner: null,
+  }] : []))
 const evTeam = (id, a, b, seed) => ({ id, game_id: 'fake-game-1', player1_id: a.id, player2_id: b.id, player1: a, player2: b, seed_ranking: seed, created_at: new Date().toISOString() })
 const [e0, e1, e2, e3, e4, e5, e6, e7] = EV_PEOPLE
 const EV_TEAMS_BASE = [evTeam('et1', e1, e0, 4), evTeam('et2', e2, e3, 3), evTeam('et3', e4, e5, 2), evTeam('et4', e6, e7, 1)]
 // localStorage.mockTeams = '5' | '6': mais duplas (com os nomes de EV_EXTRA) — número ímpar de duplas (1 out).
 const EV_TEAMS = [...EV_TEAMS_BASE, evTeam('et5', EV_EXTRA[0], EV_EXTRA[1], 0), evTeam('et6', EV_EXTRA[2], EV_EXTRA[3], -1)]
   .slice(0, Number(localStorage.getItem('mockTeams') || 4))
-const EV_MATCHES = () => [
+// Pacote do mix (ponto 11, 2 out): localStorage.mockRoundPending = '1' — só a
+// Ronda 1 sorteada, por começar; = '2' — a Ronda 2 sorteada, por começar.
+// Nos dois, o relógio ainda não arrancou (round_started_at null).
+// mockResting = 'true' (+ mockTeams = '5'): na Ronda 2 a dupla do Francisco
+// (et1) descansa.
+const EV_MATCHES = () => (localStorage.getItem('mockRoundPending') === '1' ? [
+  { id: 'em1', game_id: 'fake-game-1', round_number: 1, court_number: 1, phase: 'group', team_a_id: 'et1', team_b_id: 'et2', score_a: null, score_b: null, winner_team_id: null },
+  { id: 'em2', game_id: 'fake-game-1', round_number: 1, court_number: 2, phase: 'group', team_a_id: 'et3', team_b_id: 'et4', score_a: null, score_b: null, winner_team_id: null },
+] : EV_MATCHES_ALL().map((m) => (localStorage.getItem('mockResting') === 'true' && m.id === 'em3' ? { ...m, team_a_id: 'et5' } : m))
+  // mockScoredBy = 'true': os resultados foram marcados pela Marta (marcadores, 30 set).
+  .map((m) => (localStorage.getItem('mockScoredBy') === 'true' && m.score_a != null ? { ...m, scored_by: FAKE_MEMBER_ID, scored_by_name: 'Marta Costa' } : m)))
+const EV_MATCHES_ALL = () => [
   localStorage.getItem('mockProSet')
     ? { id: 'em1', game_id: 'fake-game-1', round_number: 1, court_number: 1, phase: 'group', team_a_id: 'et1', team_b_id: 'et2', score_a: 9, score_b: 8, winner_team_id: 'et1',
         sets: [{ set_number: 1, score_a: 9, score_b: 8, tiebreak_a: 7, tiebreak_b: 5, is_super_tiebreak: false }] }
@@ -1054,7 +1069,10 @@ function lastMinuteRequest(table, url, method, body) {
 
 const TABLE_MOCKS = {
   // localStorage.mockScorekeeper = 'true': quem entra é marcador deste mix (29 set).
-  game_scorekeepers: () => (localStorage.getItem('mockScorekeeper') === 'true' ? [{ user_id: MOCK_ADMIN_USER_ID, game_id: 'fake-game-1' }] : []),
+  // mockScorekeepers = '2' (pacote do mix, 2 out): o Diogo (joga) e a Marta (do grupo, não joga).
+  game_scorekeepers: () => (localStorage.getItem('mockScorekeepers') === '2'
+    ? [{ user_id: 'fake-0', game_id: 'fake-game-1' }, { user_id: FAKE_MEMBER_ID, game_id: 'fake-game-1' }]
+    : localStorage.getItem('mockScorekeeper') === 'true' ? [{ user_id: MOCK_ADMIN_USER_ID, game_id: 'fake-game-1' }] : []),
   // Os sets do jogo solto «pm-sets» do mockHomeSession (Editar resultado).
   private_match_sets: (url) => {
     const u = decodeURIComponent(url)
@@ -1337,14 +1355,17 @@ const TABLE_MOCKS = {
       // 'paused': o mix parado do #448 — as duplas ficam, os jogos e os
       // resultados foram apagados.
       // 'ready': o mix começou (duplas feitas), a Ronda 1 ainda não (28 set).
-      status: { open: 'open', joined: 'closed', live: 'in_progress', finished: 'finished', paused: 'closed', ready: 'in_progress', cancelled: 'cancelled' }[eventState()],
+      status: localStorage.getItem('mockUnfilled') === 'true' ? 'draft' : { open: 'open', joined: 'closed', live: 'in_progress', finished: 'finished', paused: 'closed', ready: 'in_progress', cancelled: 'cancelled' }[eventState()],
+      created_by: MOCK_ADMIN_USER_ID,
+      // mockUnfilled = 'true': à hora do jogo não encheu e voltou a rascunho (ponto 7).
+      ...(localStorage.getItem('mockUnfilled') === 'true' || (eventState() === 'cancelled' && localStorage.getItem('mockUnfilledCancel') === 'true') ? { unfilled_at: new Date().toISOString() } : {}),
       ...(localStorage.getItem('mockEventSize') === '12' ? { num_courts: 3, max_players: 12 } : {}),
       // mockEventPast = 'true': a hora do mix já passou (há 1 h).
       ...(localStorage.getItem('mockEventPast') === 'true' ? { date: new Date(Date.now() - 3600000).toISOString() } : {}),
       ...(eventState() === 'finished' ? { winner_team_id: 'et1' } : {}),
       // localStorage.mockRoundAgoMin = '7' | '21': a ronda começou há N min
       // (21 = o tempo acabou, entre rondas) — o alarme das rondas, 27 set.
-      ...(eventState() === 'live' ? { round_started_at: new Date(Date.now() - Number(localStorage.getItem('mockRoundAgoMin') || 0) * 60000).toISOString(), round_duration_minutes: 20 } : {}),
+      ...(eventState() === 'live' ? { round_started_at: localStorage.getItem('mockRoundPending') ? null : new Date(Date.now() - Number(localStorage.getItem('mockRoundAgoMin') || 0) * 60000).toISOString(), round_duration_minutes: 20 } : {}),
       // localStorage.mockProSet = '7' | '10' — o mix em pro set a 9, com o 8-8
       // a tie-break a 7 ou a super tie-break a 10 (#580).
       ...(localStorage.getItem('mockProSet') ? { scoring_format: 'pro_set_9', tiebreak_8_8: localStorage.getItem('mockProSet') === '10' ? 'super_tiebreak' : null } : {}),
