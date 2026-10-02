@@ -20,7 +20,7 @@ import StepPage from '../steps/StepPage'
 import LaunchDayPicker from '../LaunchDayPicker'
 import { Chips, DateField, DateTimeField, Select } from '../ui'
 import { advanceByFrequency } from '../../lib/mixDraft'
-import { totalRounds, reverseClimbWarning, uiFormatOf, formatFieldsFor } from '../../lib/mixLogic'
+import { totalRounds, reverseClimbWarning, uiFormatOf, formatFieldsFor, countPeople } from '../../lib/mixLogic'
 import { AGE_RESTRICTIONS } from '../../lib/ageCategories'
 import { formatDate, formatTime } from '../../lib/formatDate'
 import { LEVEL_SCALES, LEVEL_NUMBERS, parseLevel, scaleForGender, GENDER_FOR_SCALE } from '../../lib/mixLevels'
@@ -388,6 +388,18 @@ export default function MixWizard({
             </p>
           </div>
           {numCourts >= maxCourts && <p className="text-sm text-muted mt-1.5">{t('mixwizard.courts_plan_max', { max: maxCourts })}</p>}
+          {/* Tirar campos com o mix cheio: diz antes de guardar quem desce a
+              suplente, com a frase do «Mudar só este mix» (PO, 2 out). Quem
+              desce e o aviso são da base de dados (migration_mix_suplentes). */}
+          {(() => {
+            if (!editingGame) return null
+            const people = countPeople(editingGame.participants || [])
+            const before = editingGame.max_players || (editingGame.num_courts || 1) * 4
+            const extra = people - numCourts * 4
+            return numCourts * 4 < before && extra > 0
+              ? <p className="text-sm text-muted mt-1.5">{t('eventactions.change_one_courts_extra', { count: extra, people })}</p>
+              : null
+          })()}
         </Field>
         <Field label={t('mixwizard.court_time_label')} hint={t('mixwizard.court_time_hint')}>
           <Chips label={t('mixwizard.court_time_label')} value={form.court_time_minutes}
