@@ -1,12 +1,14 @@
-// Supabase Edge Function: associa o número ao perfil e envia o código de
-// verificação por SMS (Twilio) — OTP clássico (decisão Ruben, 1 out 2026),
-// em vez do fluxo invertido do #537 (mandar o código ao robô).
+// Supabase Edge Function: envia o código de verificação do número por SMS
+// — OTP clássico (decisão Ruben, 1 out 2026), em vez do fluxo invertido do
+// #537 (mandar o código ao robô). SEM estado «associado»: o perfil não é
+// tocado aqui — o número só entra na conta na confirmação, quando a posse
+// fica provada (migration_numero_numa_conta_so.sql).
 //
 // É a ÚNICA peça que vê o número cru neste fluxo (como a hash-phone): o
-// número nunca é guardado — grava-se só o HMAC em profiles.phone_hash — e o
-// código nunca passa pelo browser: é gerado pelo start_phone_verification
-// (validade 15 min, limite 5/h — reutilizado tal-e-qual do #537) chamado
-// AQUI com o JWT do utilizador, e segue direto no SMS.
+// que segue para a base de dados é só o HMAC, guardado na linha de
+// phone_verifications pelo start_phone_verification_for_hash (validade 15
+// min, limite 5/h, recusa números de outra conta real) chamado AQUI com o
+// JWT do utilizador — o código nunca passa pelo browser e segue no SMS.
 //
 // Secrets necessários (por ambiente): PHONE_HASH_SECRET (o MESMO da
 // hash-phone e do robô), TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN,
@@ -92,7 +94,7 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: 'Unauthorized' }, 401)
   }
 
-  let body: { phone?: string }
+  let body: { phone?: string; channel?: string }
   try {
     body = await req.json()
   } catch {
@@ -103,6 +105,11 @@ Deno.serve(async (req) => {
   if (normalized.length < 9) {
     return jsonResponse({ error: 'invalid_phone' }, 400)
   }
+  // Canal «whatsapp» (grátis): o código volta à app para a pessoa o
+  // ESCREVER no grupo do clube («Confirmar 482917») — a prova de posse é a
+  // mensagem sair do número dela, não a receção; mostrar o código ao
+  // browser não enfraquece nada nesta direção. Sem canal, SMS.
+  const groupChannel = body.channel === 'whatsapp'
 
   const secret = Deno.env.get('PHONE_HASH_SECRET')
   // Modo de teste (SÓ para ambientes sem utilizadores reais, ex. dev): com
@@ -110,13 +117,19 @@ Deno.serve(async (req) => {
   // e o cartão preenche-o sozinho. Devolver o código ao browser anula a
   // prova de posse do número, por isso isto NUNCA se liga em produção.
   const devMode = Deno.env.get('OTP_DEV_MODE') === 'true'
+  // Fornecedor escolhido pelos secrets presentes: Vonage (trial com texto
+  // livre — €2 de crédito, 5 números whitelisted) ou Twilio (produção).
+  const vonageKey = Deno.env.get('VONAGE_API_KEY')
+  const vonageSecret = Deno.env.get('VONAGE_API_SECRET')
+  const vonageFrom = Deno.env.get('VONAGE_FROM') || 'Alinho'
+  const useVonage = Boolean(vonageKey && vonageSecret)
   const twilioSid = Deno.env.get('TWILIO_ACCOUNT_SID')
   const twilioToken = Deno.env.get('TWILIO_AUTH_TOKEN')
   const twilioFrom = Deno.env.get('TWILIO_FROM')
-  if (!secret || (!devMode && (!twilioSid || !twilioToken || !twilioFrom))) {
+  if (!secret || (!devMode && !groupChannel && !useVonage && (!twilioSid || !twilioToken || !twilioFrom))) {
     console.error('send-otp misconfigured: faltam secrets', {
-      PHONE_HASH_SECRET: !secret, OTP_DEV_MODE: devMode, TWILIO_ACCOUNT_SID: !twilioSid,
-      TWILIO_AUTH_TOKEN: !twilioToken, TWILIO_FROM: !twilioFrom,
+      PHONE_HASH_SECRET: !secret, OTP_DEV_MODE: devMode, VONAGE: useVonage,
+      TWILIO_ACCOUNT_SID: !twilioSid, TWILIO_AUTH_TOKEN: !twilioToken, TWILIO_FROM: !twilioFrom,
     })
     return jsonResponse({ error: 'server_misconfigured' }, 500)
   }
@@ -136,20 +149,18 @@ Deno.serve(async (req) => {
   }
 
   const hash = await hmacSha256Hex(normalized, secret)
-  const { error: updateError } = await supabase
-    .from('profiles')
-    .update({ phone_hash: hash })
-    .eq('id', userData.user.id)
-  if (updateError) {
-    console.error('send-otp: falha a gravar phone_hash:', updateError)
-    return jsonResponse({ error: 'profile_update_failed' }, 500)
-  }
 
-  const { data: ver, error: verError } = await supabase.rpc('start_phone_verification')
+  // Sem estado «associado» (Ruben, 1 out): o perfil NÃO é tocado aqui — o
+  // número só entra na conta quando a posse fica provada (confirmação). O
+  // RPC guarda o alvo na linha de verificação, aplica o rate-limit de 5/h
+  // e recusa números já confirmados noutra conta real (phone_taken).
+  const { data: ver, error: verError } = await supabase.rpc('start_phone_verification_for_hash', { p_hash: hash })
   if (verError) {
+    console.error('send-otp: start_phone_verification_for_hash falhou:', verError)
+    const message = verError.message || 'verification_failed'
+    if (message.includes('phone_taken')) return jsonResponse({ error: 'phone_taken' }, 409)
     // Ex.: o limite de 5/h — a mensagem do RPC é legível e vai para a app.
-    console.error('send-otp: start_phone_verification falhou:', verError)
-    return jsonResponse({ error: verError.message || 'verification_failed' }, 429)
+    return jsonResponse({ error: message }, 429)
   }
   const code = ver?.[0]?.code
   const expiresAt = ver?.[0]?.expires_at ?? null
@@ -157,13 +168,42 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: 'verification_failed' }, 500)
   }
 
+  if (groupChannel) {
+    return jsonResponse({ ok: true, expires_at: expiresAt, code, channel: 'whatsapp' })
+  }
+
   if (devMode) {
     console.warn(`send-otp em OTP_DEV_MODE: código devolvido na resposta (sem SMS) para ${userData.user.id}`)
     return jsonResponse({ ok: true, expires_at: expiresAt, dev_code: code })
   }
 
-  // SMS via Twilio Messages API (form-encoded, Basic auth).
   const smsBody = `${code} é o teu código alinho. Expira em 15 minutos.`
+
+  if (useVonage) {
+    // Vonage SMS API (JSON; `to` em dígitos E.164 SEM o +). No trial o
+    // destino tem de estar na lista de test numbers e a mensagem leva o
+    // sufixo «[FREE SMS DEMO, TEST MESSAGE]» — cosmético.
+    const vonageResponse = await fetch('https://rest.nexmo.com/sms/json', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        api_key: vonageKey,
+        api_secret: vonageSecret,
+        from: vonageFrom,
+        to: toE164(body.phone || '').slice(1),
+        text: smsBody,
+      }),
+    })
+    const result = await vonageResponse.json().catch(() => null)
+    const status = result?.messages?.[0]?.status
+    if (!vonageResponse.ok || status !== '0') {
+      console.error('send-otp: Vonage falhou:', vonageResponse.status, JSON.stringify(result)?.slice(0, 300))
+      return jsonResponse({ error: 'sms_failed' }, 502)
+    }
+    return jsonResponse({ ok: true, expires_at: expiresAt })
+  }
+
+  // SMS via Twilio Messages API (form-encoded, Basic auth).
   const twilioResponse = await fetch(
     `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`,
     {

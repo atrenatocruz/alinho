@@ -6,12 +6,11 @@ import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton, DateField, Select, Tabs } from '../components/ui'
 import { Wordmark } from '../components/Layout'
 import TurnstileWidget from '../components/TurnstileWidget'
-import { hashPhone } from '../lib/hashPhone'
 import i18n from '../lib/i18n'
 import { describeError } from '../lib/errors'
 import { ACCOUNT_DELETION_GRACE_DAYS } from '../lib/account'
 import { MIN_SIGNUP_AGE, isAtLeast } from '../lib/age'
-import { safeInternalPath } from '../lib/loginLinks'
+import { safeInternalPath, savePendingOrgSlug } from '../lib/loginLinks'
 
 // Same pattern as Layout.jsx's header toggle, minus the profile persistence
 // (there's no profile yet pre-auth) — just the instant UI flip plus a
@@ -78,15 +77,13 @@ export default function Login() {
   // -site levava a pessoa para fora da app ja com sessao iniciada.
   const redirectTo = safeInternalPath(searchParams.get('redirect'))
 
-  // Capture ?org=<slug> into sessionStorage immediately on mount — it has
-  // to survive both a full-page Google OAuth redirect and App.jsx's
-  // instant client-side redirect away from /login once logged in, so
-  // reading it lazily later (e.g. inside an auth-state-change handler)
-  // isn't reliable. AuthContext consumes and clears it once a session exists.
+  // O ?org=<endereço> guarda-se logo ao abrir (savePendingOrgSlug, 24 h em
+  // localStorage): tem de sobreviver à ida ao Google e ao separador do email
+  // de «Confirmar email». A Home lê-o, pede para entrar e mostra o aviso.
   useEffect(() => {
     const orgSlug = searchParams.get('org')
     if (orgSlug) {
-      sessionStorage.setItem('pendingOrgSlug', orgSlug)
+      savePendingOrgSlug(orgSlug)
     }
   }, [searchParams])
 
@@ -120,7 +117,6 @@ export default function Login() {
   // Signup form state
   const [signupEmail, setSignupEmail] = useState('')
   const [signupName, setSignupName] = useState('')
-  const [signupPhone, setSignupPhone] = useState('')
   const [signupBirthday, setSignupBirthday] = useState('')
   const [signupGender, setSignupGender] = useState('')
   const [signupPassword, setSignupPassword] = useState('')
@@ -194,14 +190,6 @@ export default function Login() {
       return
     }
 
-    // Phone is optional — only validate if the person actually entered one
-    // (tolerant of spaces/dashes/country code, just needs a real number in there)
-    if (signupPhone && signupPhone.replace(/\D/g, '').length < 9) {
-      setError(t('login.error_invalid_phone'))
-      setLoading(false)
-      return
-    }
-
     try {
       const { data, error } = await signUp(signupEmail, signupPassword, {
         name: signupName,
@@ -222,16 +210,8 @@ export default function Login() {
       }
 
       // No session means the address has to be confirmed first — signing in
-      // now would just fail with "email not confirmed". AuthContext hashes
-      // the stashed phone once the confirmation link produces a session.
+      // now would just fail with "email not confirmed".
       if (!data?.session) {
-        if (signupPhone) {
-          try {
-            localStorage.setItem('pendingSignupPhone', signupPhone)
-          } catch {
-            // ignore — the phone is optional and can be added in Perfil
-          }
-        }
         setConfirmationSent(true)
         return
       }
@@ -239,16 +219,9 @@ export default function Login() {
       // With "Confirm email" off, signUp already returns the session and
       // the client is signed in — no second call needed (and none possible
       // once captcha is on: the token above was single-use).
-
-      // Hashing needs an authenticated session (the Edge Function rejects
-      // the anon key on purpose), so this can only happen after sign-in —
-      // still reads as one step to the user behind the single loading state.
-      // Phone is optional now, so skip entirely if left blank.
-      if (signupPhone) {
-        const hash = await hashPhone(signupPhone)
-        const { error: profileError } = await updateProfile({ phone_hash: hash })
-        if (profileError) throw profileError
-      }
+      // O telemóvel já não se pede no registo (Ruben, 1 out): sem estado
+      // «associado», o número entra na conta pelo cartão de confirmação
+      // por SMS (ConfirmPhoneCard), com prova de posse.
 
       navigate(redirectTo)
     } catch (err) {
@@ -420,19 +393,6 @@ export default function Login() {
                   autoComplete="email"
                   required
                 />
-              </div>
-
-              <div>
-                <label className={inputLabel}>{t('login.phone_label')}</label>
-                <input
-                  type="tel"
-                  value={signupPhone}
-                  onChange={(e) => setSignupPhone(e.target.value)}
-                  className="input-field"
-                  placeholder={t('login.phone_placeholder')}
-                  autoComplete="tel"
-                />
-                <p className="text-xs text-muted mt-1.5">{t('login.phone_help')}</p>
               </div>
 
               <div>

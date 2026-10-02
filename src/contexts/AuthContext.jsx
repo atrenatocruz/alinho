@@ -2,7 +2,6 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import i18n from '../lib/i18n'
 import { installDevMockNetwork } from '../lib/devMockNetwork'
-import { hashPhone } from '../lib/hashPhone'
 
 const AuthContext = createContext({})
 
@@ -164,49 +163,6 @@ export const AuthProvider = ({ children }) => {
     return () => subscription.unsubscribe()
   }, [])
 
-  // Consumes a pending org slug (if any) by attaching the now-authenticated
-  // user to that organization. Read from sessionStorage, NOT the live URL —
-  // App.jsx redirects away from /login the instant `user` is set, and for
-  // Google sign-in the auth-state-change → loadProfile chain races that
-  // client-side navigation, so by the time this runs window.location.search
-  // may already have been stripped. sessionStorage survives both that route
-  // change and the full-page OAuth redirect itself (Login.jsx writes it on
-  // mount, before anything can navigate away). Idempotent (DB-side ON
-  // CONFLICT DO NOTHING) and a no-op when nothing is pending.
-  const consumePendingOrgSlug = async () => {
-    const slug = sessionStorage.getItem('pendingOrgSlug')
-    if (!slug) return
-    sessionStorage.removeItem('pendingOrgSlug')
-
-    const { error } = await supabase.rpc('join_organization', { p_slug: slug })
-    if (error) console.error('Failed to join organization from pending slug:', error)
-  }
-
-  // With "Confirm email" on, signUp returns no session, so Login.jsx can't
-  // hash the phone right away (hash-phone rejects the anon key). It stashes
-  // the number instead and this picks it up on the first real session —
-  // localStorage rather than sessionStorage because the confirmation link
-  // usually opens in a new tab. Best-effort: the phone is optional and can
-  // still be added later in Perfil.
-  const consumePendingSignupPhone = async (userId) => {
-    let phone = null
-    try {
-      phone = localStorage.getItem('pendingSignupPhone')
-      if (phone) localStorage.removeItem('pendingSignupPhone')
-    } catch {
-      return
-    }
-    if (!phone) return
-
-    try {
-      const hash = await hashPhone(phone)
-      const { error } = await supabase.from('profiles').update({ phone_hash: hash }).eq('id', userId)
-      if (error) throw error
-    } catch (error) {
-      console.error('Failed to save pending signup phone:', error)
-    }
-  }
-
   // Welcome email on the first session. Strictly `=== null`: the column only
   // exists once migration_welcome_email.sql has run (undefined before that,
   // and in the dev mock), and that migration marks every existing account
@@ -294,7 +250,7 @@ export const AuthProvider = ({ children }) => {
         // regardless of what was picked pre-auth) and a returning user
         // logging in on a browser where they'd earlier switched language.
         // Fire-and-forget, matching this function's other best-effort
-        // side calls (consumePendingOrgSlug, loadFeatureFlags) — never
+        // side calls (loadFeatureFlags) — never
         // await/block the profile load on it.
         try {
           const storedLanguagePref = localStorage.getItem('preferredLanguage')
@@ -305,8 +261,6 @@ export const AuthProvider = ({ children }) => {
           // ignore — localStorage can throw in some contexts
         }
 
-        await consumePendingOrgSlug()
-        await consumePendingSignupPhone(userId)
         // After the language reconciliation above, so a pre-auth EN choice
         // has usually landed by the time the function reads profiles.language.
         sendWelcomeEmail(profileData)
