@@ -3729,6 +3729,7 @@
   "tournament.admin.keep_editing": "Keep editing",
   "tournament.admin.state_rascunho": "Only you can see it. Open entries whenever you want.",
   "tournament.admin.state_inscricoes": "Until {{deadline}}.",
+  "tournament.admin.state_deadline_passed": "Entries closed on {{deadline}}. Close entries to run the draw.",
   "tournament.admin.state_fechado": "The draw is still to be made.",
   "tournament.admin.state_sorteado": "{{matches}} matches scheduled.",
   "tournament.admin.state_draw_partial": "{{drawn}} of {{total}} categories drawn.",

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { drawProgress, statusKey } from './drawProgress'
+import { deadlinePassed, drawProgress, statusKey } from './drawProgress'
 
 const cat = (code, status) => ({ id: code, code, status })
 
@@ -28,5 +28,20 @@ describe('sorteio categoria a categoria (#560)', () => {
 
   it('sem categorias não parte', () => {
     expect(drawProgress(undefined)).toMatchObject({ total: 0, drawn: 0, partial: false })
+  })
+})
+
+describe('prazo das inscrições passado (QA, 2 out)', () => {
+  const now = new Date('2026-10-02T12:00:00Z')
+  it('só conta quando há prazo e já passou', () => {
+    expect(deadlinePassed(null, now)).toBe(false)
+    expect(deadlinePassed('2026-10-01T22:59:00Z', now)).toBe(true)
+    expect(deadlinePassed('2026-10-05T22:59:00Z', now)).toBe(false)
+  })
+  it('em «inscrições» com o prazo passado diz «Inscrições fechadas»', () => {
+    const p = drawProgress([])
+    expect(statusKey('inscricoes', p, '2020-01-01T00:00:00Z')).toBe('tournament.status_fechado')
+    expect(statusKey('inscricoes', p, '2999-01-01T00:00:00Z')).toBe('tournament.status_inscricoes')
+    expect(statusKey('inscricoes', p)).toBe('tournament.status_inscricoes')
   })
 })
