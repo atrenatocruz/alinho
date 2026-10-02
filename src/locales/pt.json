@@ -4446,6 +4446,7 @@
   "eventactions.to_draft": "Voltar a rascunho",
   "eventactions.to_draft_hint": "Deixa de se ver. Só antes de o robô anunciar o mix.",
   "eventactions.to_draft_announced": "Já foi anunciado no grupo de WhatsApp. Para o tirar, cancela-o.",
+  "eventactions.to_draft_has_players": "Já há inscritos: cancela o mix em vez disso.",
   "eventactions.to_draft_title": "Voltar a rascunho?",
   "eventactions.to_draft_message": "O mix deixa de se ver e sai da Home. Publicas outra vez quando quiseres.",
   "eventactions.to_draft_done": "O mix voltou a rascunho. Só tu o vês.",
