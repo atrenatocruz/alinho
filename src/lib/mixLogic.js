@@ -566,6 +566,21 @@ export const hasResult = (m) => !!m && (!!m.winner_team_id || (m.score_a != null
     mix («Terminar Ronda N», passar de fase, «Terminar e dar os pontos»). */
 export const isTie = (m) => hasResult(m) && !m.winner_team_id
 
+/** Classificação no Sobe e desce (duplas fixas), para a linha
+    «Classificação · tu: 3.º» (pacote do mix, ponto 15): pela última ronda com
+    os resultados todos — campo 1 à frente; em cada campo quem ganhou antes de
+    quem perdeu. Devolve os ids das duplas por ordem; sem ronda acabada, []. */
+export function sobeDesceStandings(matches) {
+  const rounds = [...new Set(matches.map((m) => m.round_number))].sort((a, b) => b - a)
+  for (const r of rounds) {
+    const ms = matches.filter((m) => m.round_number === r)
+    if (!ms.length || !ms.every(hasResult)) continue
+    return ms.sort((a, b) => a.court_number - b.court_number).flatMap((m) => (
+      m.winner_team_id === m.team_b_id ? [m.team_b_id, m.team_a_id] : [m.team_a_id, m.team_b_id]))
+  }
+  return []
+}
+
 export function computeMixWinnerTeamId(game, teams, matches) {
   if (game?.format === 'americano') return null
   if (!matches.some(m => m.winner_team_id)) return null
