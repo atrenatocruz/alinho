@@ -1,8 +1,8 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation, Trans } from 'react-i18next'
-import { ArrowLeft, HelpCircle, Users, Calendar, Trophy, Settings, TrendingUp, Shield } from 'lucide-react'
+import { ArrowLeft, HelpCircle, Users, Calendar, Trophy, Settings, TrendingUp, Shield, MessageCircle, ChevronDown } from 'lucide-react'
 import { Wordmark } from '../components/Layout'
 import { XP_TIERS, formatXp } from '../lib/xp'
 
@@ -31,10 +31,41 @@ function useFaqJsonLd(t) {
   }, [t])
 }
 
+/* «Como usar o robô do WhatsApp» (/instrucoes#whatsapp, 1 out): texto do
+   Marketing aprovado pelo Francisco e pelo Renato. As perguntas sobre o
+   convidado (parceiro sem conta, ainda sem conta) ficam de fora até o Renato
+   decidir o que fica do convidado (PO, 1 out). **assim** = o que se escreve
+   no WhatsApp, a negrito. */
+const WA_KEYS = ['join', 'leave', 'several', 'pair', 'pair_leave', 'full', 'list', 'help']
+const boldWa = (text) => text.split('**').map((part, i) => (i % 2 ? <b key={i} className="font-extrabold text-ink-900">{part}</b> : part))
+
+/* Cada pergunta fechada numa linha, com ⌄; a resposta abre ao tocar. Só a
+   primeira vem aberta (designer, 1 out: regra das explicações recolhidas). */
+function WaQuestion({ q, a, first }) {
+  const [open, setOpen] = useState(first)
+  return (
+    <div className="border-b border-line last:border-b-0">
+      <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open}
+        className="flex w-full min-h-[48px] items-center justify-between gap-3 py-2 text-left font-extrabold text-ink-900">
+        {q} <ChevronDown size={18} className={`shrink-0 text-ink-700 transition-transform duration-fast ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && <p className="pb-3 text-gray-700 leading-relaxed">{a}</p>}
+    </div>
+  )
+}
+
 export default function Instructions() {
   const goBack = useGoBack('/')
   const { t } = useTranslation()
   useFaqJsonLd(t)
+  // Vindo de um link com #whatsapp (ou #faq…): a página desenha-se depois do
+  // salto do navegador, por isso desce-se aqui.
+  useEffect(() => {
+    const id = window.location.hash.slice(1)
+    if (!id) return
+    const tm = setTimeout(() => document.getElementById(id)?.scrollIntoView({ block: 'start' }), 50)
+    return () => clearTimeout(tm)
+  }, [])
   return (
     <div className="min-h-screen bg-canvas">
       {/* Header */}
@@ -353,6 +384,17 @@ export default function Instructions() {
           <p className="text-gray-600">
             {t('instructions.contact_help')}
           </p>
+        </div>
+        {/* Sem sombra (regra de 28 set): contorno fino. */}
+        <div id="whatsapp" className="scroll-mt-20 rounded-card border border-line bg-white p-5">
+          <MessageCircle size={32} className="text-ink-700 mb-3" />
+          <h3 className="text-xl font-bold text-ink-900 mb-1">{t('instructions.wa_title')}</h3>
+          <p className="text-gray-700 leading-relaxed mb-2">{t('instructions.wa_intro')}</p>
+          <div>
+            {WA_KEYS.map((k, i) => (
+              <WaQuestion key={k} first={i === 0} q={t(`instructions.wa_q_${k}`)} a={boldWa(t(`instructions.wa_a_${k}`))} />
+            ))}
+          </div>
         </div>
         <div id="faq" className="card scroll-mt-20">
           <HelpCircle size={32} className="text-ink-700 mb-3" />
