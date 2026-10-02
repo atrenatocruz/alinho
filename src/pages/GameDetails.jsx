@@ -20,7 +20,7 @@ import { KIND_STYLE, KindTag, StateTag, Owner } from '../components/agenda/Event
 import PoolGroupStage from '../components/PoolGroupStage'
 import PreviousEditions from '../components/agenda/PreviousEditions'
 import ScoreEntry from '../components/ScoreEntry'
-import { countPeople, totalRounds, formDuplas, seedCourts, nextSobeDesce, nextSobeDesceRotating, splitPartnerRows, rotatingPlacar, roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches, thirdPlaceMatch, lowerPlacementMatches, placementOfCourt, PHASE_LABEL_KEY, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, mixCapacity, isGenderMismatch, isMissingGender, isMissingBirthday, isAgeIneligible, splitIntoPools, generateAmericanoSchedule, americanoStandings, computeMixWinnerTeamId, formatLabelKey, hasResult, isTie, sobeDesceStandings } from '../lib/mixLogic'
+import { countPeople, guestVirtualRating, totalRounds, formDuplas, seedCourts, nextSobeDesce, nextSobeDesceRotating, splitPartnerRows, rotatingPlacar, roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches, thirdPlaceMatch, lowerPlacementMatches, placementOfCourt, PHASE_LABEL_KEY, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, mixCapacity, isGenderMismatch, isMissingGender, isMissingBirthday, isAgeIneligible, splitIntoPools, generateAmericanoSchedule, americanoStandings, computeMixWinnerTeamId, formatLabelKey, hasResult, isTie, sobeDesceStandings } from '../lib/mixLogic'
 import { isProvisional, formatRatingMaybeProvisional } from '../lib/elo'
 import { AGE_LABEL_KEY, meetsAgeRestriction } from '../lib/ageCategories'
 import { winRatePct, firstLastName } from '../lib/statsLogic'
@@ -481,11 +481,18 @@ export default function GameDetails() {
         const guestIds = (participantsData || [])
           .flatMap((p) => [p.guest?.id, p.partner_guest?.id])
           .filter(Boolean)
+        const ratingByUser = new Map(globalRankings.map((r) => [r.user_id, r.rating]))
+        // Rating virtual dos convidados (Ruben, 2 out): média dos jogadores
+        // com conta do mix, senão a banda do nível — espelha mix_guest_rating.
+        const accountRatings = (participantsData || [])
+          .filter((p) => p.status === 'confirmed')
+          .flatMap((p) => [p.user_id, p.partner_id])
+          .filter(Boolean)
+          .map((uid) => ratingByUser.get(uid))
+        const guestPts = guestVirtualRating(accountRatings, gameData.level)
         setPointsById({
           ...Object.fromEntries(globalRankings.map((r) => [r.user_id, Math.round(r.rating || 0)])),
-          // Convidados emparelham com o baseline de sempre (900); o seed da
-          // dupla herda o parceiro (ver buildTeamRows).
-          ...Object.fromEntries(guestIds.map((gid) => [gid, 900])),
+          ...Object.fromEntries(guestIds.map((gid) => [gid, guestPts])),
         })
         setRatingInfoById(Object.fromEntries(globalRankings.map((r) => [r.user_id, { rating: r.rating, gender: r.gender }])))
       } catch (error) {
@@ -1100,7 +1107,8 @@ export default function GameDetails() {
       teamRows: pooledDuplas.map(d => ({
         game_id: id,
         ...teamSlotCols(d.player1, d.player2),
-        seed_ranking: guestAwareSeed(d, points),
+        // O seed do formDuplas já soma o virtual dos convidados.
+        seed_ranking: d.seed,
         ...(isGruposEliminatorias ? { pool_number: d.pool_number } : {}),
       })),
     }
@@ -1114,17 +1122,6 @@ export default function GameDetails() {
     player2_id: p2.no_account ? null : p2.id,
     player2_guest_id: p2.no_account ? p2.id : null,
   })
-
-  // seed_ranking com convidados: o convidado HERDA o rating do parceiro (a
-  // mesma regra do Elo — a dupla vale a média de quem tem conta); dupla
-  // 100% convidados fica a 0. Sem convidados, o seed do formDuplas.
-  const guestAwareSeed = (d, points) => {
-    const g1 = d.player1.no_account
-    const g2 = d.player2.no_account
-    if (!g1 && !g2) return d.seed
-    const pts = (p) => points[p.id] ?? 0
-    return !g1 ? pts(d.player1) * 2 : !g2 ? pts(d.player2) * 2 : 0
-  }
 
   // Só forma as duplas — as rondas arrancam depois, uma a uma, por decisão do admin.
   // `start: false` = «Sortear duplas» (Francisco, 27 set,
@@ -1141,9 +1138,13 @@ export default function GameDetails() {
       // on court 1 down to the weakest on the last court (see seedCourts).
       const globalRankings = await getGlobalRankings()
       const pointsById = Object.fromEntries(globalRankings.map(r => [r.user_id, Math.round(r.rating || 0)]))
-      // Convidados sem conta emparelham com o baseline de sempre (900).
+      // Convidados sem conta valem o rating virtual do mix (Ruben, 2 out).
+      const guestPts = guestVirtualRating(
+        participants.flatMap((x) => [x.user, x.partner]).filter((pl) => pl && !pl.no_account).map((pl) => pointsById[pl.id]),
+        game.level
+      )
       for (const p of participants.flatMap((x) => [x.user, x.partner])) {
-        if (p?.no_account) pointsById[p.id] = 900
+        if (p?.no_account) pointsById[p.id] = guestPts
       }
 
       // Americano has no "one fixed dupla per player" concept — partners
@@ -1180,7 +1181,8 @@ export default function GameDetails() {
               teamRows.push({
                 game_id: id,
                 ...teamSlotCols(dupla.player1, dupla.player2),
-                seed_ranking: guestAwareSeed(dupla, pointsById),
+                // O seed já soma o virtual dos convidados (pointsById).
+                seed_ranking: dupla.seed,
               })
               slots.push({ roundIdx, court_number: m.court_number, side })
             }
@@ -1326,8 +1328,12 @@ export default function GameDetails() {
 
     const globalRankings = await getGlobalRankings()
     const points = Object.fromEntries(globalRankings.map(r => [r.user_id, Math.round(r.rating || 0)]))
+    const guestPts = guestVirtualRating(
+      freshRows.flatMap((x) => [x.user, x.partner]).filter((pl) => pl && !pl.no_account).map((pl) => points[pl.id]),
+      freshGame.level
+    )
     for (const p of freshRows.flatMap((x) => [x.user, x.partner])) {
-      if (p?.no_account) points[p.id] = 900
+      if (p?.no_account) points[p.id] = guestPts
     }
     // À última da hora não se pergunta pelas repetições: aceita-se a melhor
     // formação possível, como o formDuplas já garante.
@@ -1981,16 +1987,14 @@ export default function GameDetails() {
         const globalRankings = await getGlobalRankings()
         const pointsById = Object.fromEntries(globalRankings.map(r => [r.user_id, Math.round(r.rating || 0)]))
         const courts = nextSobeDesceRotating(currentRoundMatches, teamsById, numCourts, { partnerPairs, rankOf })
-        // teamSlotCols/guestAwareSeed: convidados sem conta vão para
-        // playerX_guest_id (FK para game_guests) — escrevê-los em
-        // playerX_id violava a FK para profiles e bloqueava a ronda.
+        // teamSlotCols: convidados sem conta vão para playerX_guest_id
+        // (FK para game_guests) — escrevê-los em playerX_id violava a FK
+        // para profiles e bloqueava a ronda. O pointsById do estado já
+        // traz o rating virtual dos convidados (Ruben, 2 out).
         const teamRows = courts.flatMap((c) => [c.duplaA, c.duplaB]).map(([p1, p2]) => ({
           game_id: id,
           ...teamSlotCols(p1, p2),
-          seed_ranking: guestAwareSeed(
-            { player1: p1, player2: p2, seed: (pointsById[p1.id] ?? 0) + (pointsById[p2.id] ?? 0) },
-            pointsById
-          ),
+          seed_ranking: (pointsById[p1.id] ?? 0) + (pointsById[p2.id] ?? 0),
         }))
         const { data: insertedTeams, error: teamsError } = await supabase.from('teams').insert(teamRows).select()
         if (teamsError) throw teamsError
