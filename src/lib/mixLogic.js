@@ -519,6 +519,26 @@ export function standings(teams, matches) {
   )
 }
 
+/** Um jogo com resultado: pontos gravados dos dois lados, com ou sem
+    vencedor. Um empate grava-se (Francisco, 30 set, REGRAS.md ponto 4) e
+    fica com winner_team_id null — o save_mix_match_result do Dev 3. */
+export const hasResult = (m) => !!m && (!!m.winner_team_id || (m.score_a != null && m.score_b != null))
+
+/** Classificação no Sobe e desce (duplas fixas), para a linha
+    «Classificação · tu: 3.º» (pacote do mix, ponto 15): pela última ronda com
+    os resultados todos — campo 1 à frente; em cada campo quem ganhou antes de
+    quem perdeu. Devolve os ids das duplas por ordem; sem ronda acabada, []. */
+export function sobeDesceStandings(matches) {
+  const rounds = [...new Set(matches.map((m) => m.round_number))].sort((a, b) => b - a)
+  for (const r of rounds) {
+    const ms = matches.filter((m) => m.round_number === r)
+    if (!ms.length || !ms.every(hasResult)) continue
+    return ms.sort((a, b) => a.court_number - b.court_number).flatMap((m) => (
+      m.winner_team_id === m.team_b_id ? [m.team_b_id, m.team_a_id] : [m.team_a_id, m.team_b_id]))
+  }
+  return []
+}
+
 /** Derives the mix's current/implied winning team id from its matches —
     used both while a mix is still open (GameDetails.jsx's own
     `currentWinnerTeamId`, to preview who finalize_mix would crown) and
