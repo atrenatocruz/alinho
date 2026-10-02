@@ -1,3 +1,7 @@
+-- ⛔ NÃO CORRER (PO, 2 out 2026) — fica só como registo. O aviso do #598
+-- caiu: o Francisco aceitou a regra do Ruben («um número numa conta só»,
+-- por SMS). Ninguém chama esta função. O SI tirou-a do lote.
+
 -- ═════════════════════════════════════════════════════════════════════════
 -- Telemóvel repetido: só avisar (#598)
 --
@@ -19,6 +23,8 @@
 -- ═════════════════════════════════════════════════════════════════════════
 
 BEGIN;
+
+DO $$ BEGIN RAISE EXCEPTION 'NÃO CORRER: o aviso do #598 caiu (regra do SMS, 2 out).'; END $$;
 
 CREATE OR REPLACE FUNCTION public.my_phone_in_other_account()
 RETURNS BOOLEAN
