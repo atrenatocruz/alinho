@@ -1741,6 +1741,13 @@ export function installDevMockNetwork() {
         && (init?.method || input?.method || 'GET').toUpperCase() === 'PATCH' && String(init?.body || '').includes('whatsapp_new_messages')) {
       return jsonResponse({ code: '42501', message: 'not_allowed' }, 403)
     }
+    // Caminho feliz: grava em localStorage.mockRobotMessages e devolve a linha
+    // (o interruptor pede .select('id') e trata 0 linhas como erro).
+    if (/\/rest\/v1\/organizations\?/.test(url)
+        && (init?.method || input?.method || 'GET').toUpperCase() === 'PATCH' && String(init?.body || '').includes('whatsapp_new_messages')) {
+      try { localStorage.setItem('mockRobotMessages', String(JSON.parse(init.body).whatsapp_new_messages === true)) } catch { /* ignore */ }
+      return jsonResponse([{ id: MOCK_ADMIN_ORG_ID }])
+    }
 
     // localStorage.mockDeleteHasResults = 'true' — apagar um mix falha como
     // quando já tem resultados (23503), para ver a razão na folha.

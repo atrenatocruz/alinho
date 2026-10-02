@@ -20,12 +20,16 @@ export default function RobotMessagesSwitch({ organizationId, value, onChange })
     setSaving(true)
     setError('')
     onChange(next)
-    const { error: updateError } = await supabase
+    // .select() para saber se gravou: a policy de UPDATE da organizations é
+    // só para admins do clube, e um super admin que não o seja não dá erro —
+    // passa 0 linhas.
+    const { data, error: updateError } = await supabase
       .from('organizations')
       .update({ whatsapp_new_messages: next })
       .eq('id', organizationId)
-    if (updateError) {
-      console.error('Error switching robot messages:', updateError)
+      .select('id')
+    if (updateError || !data?.length) {
+      console.error('Error switching robot messages:', updateError || 'no row updated')
       onChange(!next)
       setError(t('gerirclube.robot_messages_error'))
     }
