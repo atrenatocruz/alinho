@@ -10,7 +10,7 @@ const { t } = await import('../src/locales.js')
 
 const mixDb = () => ({
   profiles: [
-    { id: 'a', name: 'Ana Moreira', email: 'ana@exemplo.pt', language: 'pt' },
+    { id: 'a', name: 'Ana Moreira', email: 'ana@exemplo.pt', language: 'pt', rating: 912.4 },
     { id: 'g', name: 'Paulo Henriques', email: 'guest-1@whatsapp.alinho.pt', language: 'pt' },
     { id: 'w', name: 'Rui Costa', email: 'guest-2@whatsapp.alinho.pt', language: 'pt' },
   ],
@@ -23,18 +23,19 @@ const mixDb = () => ({
     date: new Date(Date.now() + 864e5).toISOString(), num_courts: 1, max_players: 4, rotate_partners: false }],
 })
 
-test('a lista do grupo marca quem entrou sem conta com « (convidado)»', async () => {
+test('a lista do grupo: sem conta é só o nome, com conta e rating leva « (912)»', async () => {
   installFakeSupabase(supabase, mixDb())
   const state = await loadGame('m')
   const text = buildMixMessage(state)
-  assert.match(text, /2\. 🎾 Paulo Henriques \(convidado\)/)
-  assert.match(text, /1\. 🎾 Ana Moreira(?! \(convidado\))/)
-  assert.match(text, /Suplentes:\* Rui Costa \(convidado\)/)
+  assert.match(text, /2\. 🎾 Paulo Henriques(?! \((convidado|\d+)\))/)
+  assert.match(text, /1\. 🎾 Ana Moreira \(912\)/)
+  assert.match(text, /Suplentes:\* Rui Costa(?! \((convidado|\d+)\))/)
 })
 
-test('o « (convidado)» não se repete se o nome já o traz', () => {
-  assert.equal(rosterName({ name: 'Bernardo (convidado)', guest: true }), 'Bernardo (convidado)')
+test('rosterName: convidado nunca leva rating; conta sem rating fica só o nome', () => {
+  assert.equal(rosterName({ name: 'Bernardo', guest: true, rating: 850 }), 'Bernardo')
   assert.equal(rosterName({ name: 'Ana', guest: false }), 'Ana')
+  assert.equal(rosterName({ name: 'Rui', guest: false, rating: 1003.6 }), 'Rui (1004)')
 })
 
 test('a resposta a um convidado novo explica o modelo sem conta', () => {
