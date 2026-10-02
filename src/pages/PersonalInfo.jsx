@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { hashPhone } from '../lib/hashPhone'
 import { PrimaryButton, DateField, Select, RatingBadge } from '../components/ui'
 import ChangePasswordSection from '../components/ChangePasswordSection'
 import { formatRating } from '../lib/elo'
@@ -48,8 +47,6 @@ export default function PersonalInfo() {
   // «Aulas (onde e com quem treinas)» (Francisco, 27 set): Privado por omissão.
   const [lessonsVisibility, setLessonsVisibility] = useState(profile?.lessons_visibility || 'private')
   const [isPrivate, setIsPrivate] = useState(profile?.is_private || false)
-  const [phone, setPhone] = useState('')
-  const [phoneError, setPhoneError] = useState('')
   const [loading, setLoading] = useState(false)
   const [saved, setSaved] = useState(false)
 
@@ -70,19 +67,10 @@ export default function PersonalInfo() {
     setClubsVisibility(profile?.clubs_visibility || 'public')
     setLessonsVisibility(profile?.lessons_visibility || 'private')
     setIsPrivate(profile?.is_private || false)
-    setPhone('')
-    setPhoneError('')
   }
 
   const handleSave = async (e) => {
     e.preventDefault()
-    setPhoneError('')
-
-    if (phone && phone.replace(/\D/g, '').length < 9) {
-      setPhoneError(t('login.error_invalid_phone'))
-      return
-    }
-
     setLoading(true)
     try {
       const updates = {
@@ -107,9 +95,6 @@ export default function PersonalInfo() {
       if ((dominantHand || null) !== (profile?.dominant_hand || null)) {
         updates.dominant_hand = dominantHand || null
       }
-      if (phone) {
-        updates.phone_hash = await hashPhone(phone)
-      }
       const { error: profileError } = await updateProfile(updates)
       if (profileError) throw profileError
 
@@ -119,7 +104,6 @@ export default function PersonalInfo() {
       } catch {
         // ignore — best-effort
       }
-      setPhone('')
       setEditing(false)
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
@@ -197,20 +181,6 @@ export default function PersonalInfo() {
               />
             </div>
 
-            <div>
-              <label className={inputLabel}>{t('profile.phone_label')}</label>
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="input-field"
-                placeholder={profile?.phone_hash ? t('profile.phone_placeholder_existing') : t('login.phone_placeholder')}
-              />
-              {phoneError && <p className="text-xs text-danger mt-1.5">{phoneError}</p>}
-              <p className="text-xs text-muted mt-1.5">
-                {profile?.phone_hash ? t('profile.phone_hint_existing') : t('profile.phone_hint_new')}
-              </p>
-            </div>
 
             <div>
               <label className={inputLabel}>{t('profile.preferred_side_label')}</label>

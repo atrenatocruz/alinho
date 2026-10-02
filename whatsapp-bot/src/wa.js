@@ -223,6 +223,13 @@ export async function connectWhatsApp({ onGroupMessage, onDirectMessage }) {
       const sent = await sock.sendMessage(groupJid, content, options.quoted ? { quoted: options.quoted } : undefined)
       return sent?.key?.id ?? null
     },
+    // Reação a uma mensagem (ex.: ✅ ao «Confirmar 123456») — feedback sem
+    // encher o grupo de mensagens do robô (regra do Renato: o bot não
+    // conversa; uma reação não é conversa).
+    sendReaction: async (groupJid, messageKey, emoji) => {
+      if (!sock) throw new Error('WhatsApp socket not connected yet')
+      await sock.sendMessage(groupJid, { react: { text: emoji, key: messageKey } })
+    },
     // Participant JIDs for the group, used to build a silent "@all" tag
     // (mentioning everyone pings them even though the visible text just
     // says "@all" rather than spelling out each name).
