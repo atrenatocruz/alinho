@@ -250,12 +250,72 @@ To see this list:
 
 const DICTS = { pt, en }
 
+// Mensagens novas (design-handoff/2026-10-01-mensagens-whatsapp, aprovadas
+// pelo Renato e pelo Francisco a 1 out). Só para os clubes com o interruptor
+// organizations.whatsapp_new_messages ligado (groups.js, `newMessages`); os
+// outros continuam com os textos de cima. Quando todos estiverem nas novas,
+// as antigas saem de vez. As de convidado (guest_joined, guest_waitlisted,
+// voucher_guest_won, not_found) ficam iguais: esperam pela decisão do Renato.
+// Sem rodapé do /help: nas novas ele só vai no cartão do mix.
+const ptNew = {
+  promoted_to_confirmed: '✅ {{name}}, entraste no mix: saiu alguém e o lugar é teu.',
+  mix_cancelled: '❌ @all O *{{title}}* de {{when}}, foi cancelado.',
+  reminder_roster_line: 'Inscritos: {{names}}.\n',
+  reminder_group: '⏰ *{{title}}* é {{day}} às {{time}}{{location}}.\n{{roster}}Não podes ir? Responde *Out* ao cartão do mix.',
+  duplas_formed: '🎾 *Duplas do {{title}}*\n{{lines}}\nBom jogo!',
+  duplas_updated: '🔄 *As duplas do {{title}} mudaram*\n{{lines}}',
+  mix_full_offer_waitlist: '🤖 O mix está cheio. Queres ficar como suplente? Responde *Sim*.',
+  waitlisted: '🤖 Ficaste como suplente. Se alguém sair, entras logo.',
+  already_joined: '🤖 Já estás neste mix.',
+  disambiguate_in: '🤖 Há {{count}} mixes abertos. Em qual queres entrar?\n{{list}}\n\nResponde {{options}}.',
+  pair_request_ask: '🤝 {{partner}}, {{requester}} quer jogar em dupla contigo neste mix. Responde *Sim* a esta mensagem para aceitar.',
+  partner_offer_unregistered: '🤖 Não encontrei {{name}} no clube. Inscrevo a dupla na mesma? Responde *Sim*.\nSe estiver na app com outro nome, escreve *In com* e o nome como aparece lá.',
+  out_pair_menu: '🤖 Estás em dupla com {{partner}}. Quem sai?\n1. Os dois\n2. Só tu\n3. Só {{partner}}\nResponde *1*, *2* ou *3*.',
+  waitlist_left: '🤖 Saíste da lista de suplentes.',
+  mix_already_started_out: '🤖 Este mix já começou. Para sair, fala com quem organiza.',
+  // /help montado conforme os mixes abertos do grupo (commands.js, buildHelp).
+  help_title: '🤖 *Como usar o robô*',
+  help_in: '*In* — entrar no mix',
+  help_out: '*Out* — sair',
+  help_pair: '*In com* e o nome — entrar em dupla',
+  help_yes: '*Sim* — aceitar (suplente ou dupla)',
+  help_numbers: 'Vários mixes abertos? Cada cartão tem um número (01, 02…): responde ao cartão do mix que queres, ou escreve *In 01*.',
+  help_more: 'Tudo explicado em {{link}}',
+  or: 'ou',
+}
+
+const enNew = {
+  promoted_to_confirmed: "✅ {{name}}, you're in the mix: someone left and the spot is yours.",
+  mix_full_offer_waitlist: '🤖 The mix is full. Do you want to be a substitute? Reply *Sim*.',
+  waitlisted: "🤖 You're a substitute now. If someone leaves, you're in straight away.",
+  already_joined: "🤖 You're already in this mix.",
+  disambiguate_in: '🤖 There are {{count}} open mixes. Which one do you want to join?\n{{list}}\n\nReply {{options}}.',
+  pair_request_ask: '🤝 {{partner}}, {{requester}} wants to play as a pair with you in this mix. Reply *Sim* to this message to accept.',
+  partner_offer_unregistered: "🤖 I couldn't find {{name}} in the club. Sign up the pair anyway? Reply *Sim*.\nIf they're on the app under another name, type *In com* and the name as it appears there.",
+  out_pair_menu: "🤖 You're in a pair with {{partner}}. Who's leaving?\n1. Both of you\n2. Just you\n3. Just {{partner}}\nReply *1*, *2* or *3*.",
+  waitlist_left: '🤖 You left the substitutes list.',
+  mix_already_started_out: '🤖 This mix has already started. To leave, talk to the organiser.',
+  help_title: '🤖 *How to use the bot*',
+  help_in: '*In* — join the mix',
+  help_out: '*Out* — leave',
+  help_pair: '*In com* and the name — join as a pair',
+  help_yes: '*Sim* — accept (substitute or pair)',
+  help_numbers: 'Several mixes open? Each card has a number (01, 02…): reply to the card of the mix you want, or type *In 01*.',
+  help_more: 'Everything explained at {{link}}',
+  or: 'or',
+}
+
+const NEW_DICTS = { pt: ptNew, en: enNew }
+
 // {{var}} interpolation, no library — this bot's message surface is small
 // enough that hand-rolling matches the web app's i18next approach in spirit
 // without a new dependency in a process that already has few of them.
-export function t(key, lang, vars = {}) {
+// `fresh`: o clube tem as mensagens novas ligadas — usa o texto novo quando
+// existe (na língua da pessoa, senão em pt), e o de sempre quando não há.
+export function t(key, lang, vars = {}, fresh = false) {
   const dict = DICTS[lang] || DICTS.pt
-  let str = dict[key] ?? DICTS.pt[key] ?? key
+  const newDict = NEW_DICTS[lang] || NEW_DICTS.pt
+  let str = (fresh ? newDict[key] ?? NEW_DICTS.pt[key] : null) ?? dict[key] ?? DICTS.pt[key] ?? key
   for (const [k, v] of Object.entries(vars)) {
     str = str.replaceAll(`{{${k}}}`, v)
   }

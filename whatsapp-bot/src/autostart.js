@@ -264,17 +264,18 @@ async function autoStartMix(game, { sendText }) {
   }
 
   const slot = (userId, guestId) => label(userId ? profileById.get(userId) : guestById.get(guestId))
-  const lines = insertedTeams.map(
-    (team, i) => `${i + 1}. ${slot(team.player1_id, team.player1_guest_id)} 🤝 ${slot(team.player2_id, team.player2_guest_id)}`
-  )
+  const pairs = insertedTeams.map((team) => [slot(team.player1_id, team.player1_guest_id), slot(team.player2_id, team.player2_guest_id)])
+  const lines = pairs.map(([a, b], i) => `${i + 1}. ${a} 🤝 ${b}`)
 
   // Pairings announcement — a shared broadcast to the whole group, stays
   // 'pt' (see locales.js scope note).
   const announceLang = 'pt'
   const text = t('duplas_formed', announceLang, { title: game.title, lines: lines.join('\n') }) + helpFooter(announceLang)
+  // Mensagens novas (1 out): «A e B», sem o rodapé do /help.
+  const newText = t('duplas_formed', announceLang, { title: game.title, lines: pairs.map(([a, b], i) => `${i + 1}. ${a} e ${b}`).join('\n') }, true)
   for (const group of groups) {
     try {
-      await sendText(group.groupJid, text, { mentions })
+      await sendText(group.groupJid, group.newMessages ? newText : text, { mentions })
     } catch (err) {
       console.error(`Failed to announce pairings to ${group.groupJid}:`, err)
     }

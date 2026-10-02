@@ -1,7 +1,7 @@
 import { supabase } from './supabase.js'
 import { helpFooter } from './messages.js'
 import { nameWithBand } from './elo.js'
-import { formatCurrency } from './roster.js'
+import { formatCurrency, relativeDay, shortHour, shortPrice } from './roster.js'
 
 /** Loads every game in one "jogos em aberto" batch plus its confirmed participants, in the same flattened shape roster.js's loadGame uses (partners included). One combined message covers the whole batch (see buildOpenSlotsMessage), so this loads all its games in two queries instead of one per game. */
 export async function loadOpenSlotBatch(batchId) {
@@ -80,7 +80,8 @@ function formatBatchDateHeader(date) {
  * function only renders, it never assigns numeric labels (see roster.js's
  * labelableMixes/mixLabel, Task 3).
  */
-export function buildOpenSlotsMessage(batch) {
+export function buildOpenSlotsMessage(batch, { fresh = false } = {}) {
+  if (fresh) return buildOpenSlotsMessageNew(batch)
   const [first] = batch.games
   const lines = [`🟡 *JOGOS ABERTOS* — ${formatBatchDateHeader(first.game.date)}`]
   if (first.game.price_per_player > 0) {
@@ -103,4 +104,29 @@ export function buildOpenSlotsMessage(batch) {
   lines.push('')
   lines.push('🙋 Escreve *In* seguido da hora para entrares (ex: *In 18*), *Out* + hora para saíres.')
   return lines.join('\n') + helpFooter('pt')
+}
+
+/**
+ * Mensagens novas (design-handoff/2026-10-01-mensagens-whatsapp): uma linha
+ * por jogo, com quem já está e sem níveis ao lado dos nomes; sem o rodapé
+ * do /help.
+ */
+function buildOpenSlotsMessageNew(batch) {
+  const [first] = batch.games
+  const lines = [`🟡 *Jogos em aberto — ${relativeDay(first.game.date)}*`]
+  let example = null
+  for (const { game, people } of batch.games) {
+    const capacity = game.max_players || game.num_courts * 4
+    const missing = capacity - people.length
+    const parts = [shortHour(game.date)]
+    if (game.level) parts.push(game.level)
+    parts.push(missing <= 0 ? 'completo' : missing === 1 ? 'falta 1' : `faltam ${missing}`)
+    const who = people.length > 0 ? ` (${people.map((person) => person.name).join(', ')})` : ''
+    lines.push(`${parts.join(' · ')}${who}`)
+    if (missing > 0 && !example) example = shortHour(game.date).replace(/h$/, '')
+  }
+  if (first.game.price_per_player > 0) lines.push(`${shortPrice(first.game.price_per_player)} por jogador`)
+  lines.push('')
+  lines.push(`👉 Escreve *In* e a hora: *In ${example || shortHour(first.game.date).replace(/h$/, '')}*.`)
+  return lines.join('\n')
 }

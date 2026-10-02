@@ -8,8 +8,9 @@ import { isGuestEmail, isPlaceholderEmail } from './phone.js'
 // Quem entrou pelo robô sem conta (e-mail guest-…@whatsapp.alinho.pt) leva
 // « (convidado)» no fim do nome, na lista do grupo (Francisco, 27 set).
 // Se o nome já o traz, não se repete.
-export function rosterName(person) {
-  const base = nameWithBand(person)
+// `fresh` (mensagens novas, 1 out): sem o nível ao lado do nome.
+export function rosterName(person, fresh = false) {
+  const base = fresh ? person?.name || 'Jogador' : nameWithBand(person)
   if (!person?.guest || /\(convidado\)/i.test(person.name || '')) return base
   return `${base} (convidado)`
 }
@@ -197,6 +198,115 @@ export function mixLocalParts(isoDate) {
   return { hour: get('hour'), minute: get('minute'), day: get('day'), month: get('month') }
 }
 
+// ── Mensagens novas (design-handoff/2026-10-01-mensagens-whatsapp) ──────
+// Datas curtas («Ter 6 out · 22h30»), o sítio sem a morada, o preço sem
+// cêntimos quando é redondo e o link sem «https://».
+const TZ = 'Europe/Lisbon'
+const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1)
+
+/** «22h30», «18h». */
+export function shortHour(isoDate) {
+  const { hour, minute } = mixLocalParts(isoDate)
+  return minute ? `${hour}h${String(minute).padStart(2, '0')}` : `${hour}h`
+}
+
+/** «Ter» — o dia da semana curto, com maiúscula. */
+export function shortWeekday(isoDate) {
+  return capitalize(new Date(isoDate).toLocaleDateString('pt-PT', { weekday: 'short', timeZone: TZ }).replace('.', '').slice(0, 3))
+}
+
+/** «Ter 6 out». */
+export function shortDate(isoDate) {
+  const d = new Date(isoDate)
+  const day = d.toLocaleDateString('pt-PT', { day: 'numeric', timeZone: TZ })
+  const month = d.toLocaleDateString('pt-PT', { month: 'short', timeZone: TZ }).replace('.', '')
+  return `${shortWeekday(isoDate)} ${day} ${month}`
+}
+
+/** «terça, 6 out». */
+export function longDayDate(isoDate) {
+  const d = new Date(isoDate)
+  const weekday = d.toLocaleDateString('pt-PT', { weekday: 'long', timeZone: TZ }).replace('-feira', '')
+  const day = d.toLocaleDateString('pt-PT', { day: 'numeric', timeZone: TZ })
+  const month = d.toLocaleDateString('pt-PT', { month: 'short', timeZone: TZ }).replace('.', '')
+  return `${weekday}, ${day} ${month}`
+}
+
+/** «hoje», «amanhã» ou «terça, 6 out» (dias de Lisboa). */
+export function relativeDay(isoDate, now = new Date()) {
+  const key = (d) => d.toLocaleDateString('en-CA', { timeZone: TZ })
+  if (key(new Date(isoDate)) === key(now)) return 'hoje'
+  if (key(new Date(isoDate)) === key(new Date(now.getTime() + 864e5))) return 'amanhã'
+  return longDayDate(isoDate)
+}
+
+/** «A2N Padel Academy» de «A2N Padel Academy - Av. Vieira da Silva, …». */
+export function shortPlace(location) {
+  if (!location) return ''
+  return String(location).split(/\s[-–]\s|,/)[0].trim()
+}
+
+/** «11 €», «7,50 €». */
+export function shortPrice(value) {
+  const n = Number(value) || 0
+  return Number.isInteger(n) ? `${n} €` : formatCurrency(n)
+}
+
+/** «alinho.pt/jogo/…» — o WhatsApp faz o link sozinho. */
+export function shortLink(path) {
+  return `${config.appUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')}${path}`
+}
+
+/** O cartão do mix nas mensagens novas: curto, uma dupla por linha, sem
+ *  morada, campos nem calendário; o /help só aqui. */
+function buildMixMessageNew({ game, people, capacity, suplentes = [] }, { label }) {
+  const isCancelled = game.status === 'cancelled'
+  const lines = [`🎾 *${game.title}*${label ? ` (${label})` : ''}`]
+  const place = shortPlace(game.location)
+  lines.push(`${shortDate(game.date)} · ${shortHour(game.date)}${place ? ` · ${place}` : ''}`)
+  const extras = []
+  if (game.price_per_player > 0) extras.push(shortPrice(game.price_per_player))
+  if (game.prize) extras.push(`Prémio: ${game.prize}`)
+  if (extras.length > 0) lines.push(extras.join(' · '))
+  lines.push('')
+
+  if (isCancelled) {
+    lines.push('❌ *Mix cancelado.*')
+  } else {
+    for (let i = 0; i < capacity; ) {
+      const person = people[i]
+      const next = people[i + 1]
+      if (!person) {
+        lines.push(`${i + 1}. —`)
+        i++
+      } else if (person.pair && next?.pair === person.pair) {
+        lines.push(`${i + 1}–${i + 2}. ${rosterName(person, true)} e ${rosterName(next, true)}`)
+        i += 2
+      } else {
+        lines.push(`${i + 1}. ${rosterName(person, true)}`)
+        i++
+      }
+    }
+    if (suplentes.length > 0) lines.push(`Suplentes: ${suplentes.map((p) => rosterName(p, true)).join(', ')}`)
+    lines.push('')
+    const orNumber = label ? ` (ou escreve *In ${label}*)` : ''
+    if (people.length >= capacity) {
+      lines.push('✅ Mix cheio.')
+      lines.push(`👉 Responde a esta mensagem com *In* para ficar como suplente, ou *Out* para sair${orNumber}.`)
+    } else {
+      const missing = (4 - (people.length % 4)) % 4 || 4
+      lines.push(missing === 1 ? 'Falta 1 para fechar o próximo campo.' : `Faltam ${missing} para fechar o próximo campo.`)
+      lines.push(`👉 Responde a esta mensagem com *In* para entrar ou *Out* para sair${orNumber}.`)
+    }
+    if (game.allow_pair_signup && !game.rotate_partners && capacity - people.length >= 2) {
+      lines.push('Em dupla: *In com* e o nome do parceiro.')
+    }
+    lines.push('Dúvidas? Escreve */help*.')
+  }
+  lines.push(shortLink(`/jogo/${game.id}`))
+  return lines.join('\n')
+}
+
 /**
  * Builds one mix's own WhatsApp message — each open mix is now its own
  * message (2026-09-14 redesign; used to be one giant message with every
@@ -206,7 +316,8 @@ export function mixLocalParts(isoDate) {
  * the open-mixes list order — null when this is the only mix open (nothing
  * to disambiguate, so the label and the identifier hint drop out).
  */
-export function buildMixMessage({ game, people, capacity, suplentes = [] }, { label = null } = {}) {
+export function buildMixMessage({ game, people, capacity, suplentes = [] }, { label = null, fresh = false } = {}) {
+  if (fresh) return buildMixMessageNew({ game, people, capacity, suplentes }, { label })
   const isCancelled = game.status === 'cancelled'
   const lines = []
 
@@ -267,7 +378,7 @@ export function buildMixMessage({ game, people, capacity, suplentes = [] }, { la
       lines.push(`🚪 Sair em dupla: *Out${n} dupla* (os dois), *Out${n} @parceiro* (só ele), ou *Out${n}* e o bot pergunta`)
     }
     if (suplentes.length > 0) {
-      lines.push(`👥 *Suplentes:* ${suplentes.map(rosterName).join(', ')}`)
+      lines.push(`👥 *Suplentes:* ${suplentes.map((p) => rosterName(p)).join(', ')}`)
     }
   }
 
