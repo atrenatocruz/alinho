@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Trophy, RotateCcw, Share2, Download } from 'lucide-react'
 import { Wordmark } from '../components/Layout'
-import { PrimaryButton, ShareModal } from '../components/ui'
+import { PrimaryButton, ShareModal, ConfirmSheet } from '../components/ui'
 import { formDuplas, seedCourts, nextSobeDesce, standings } from '../lib/mixLogic'
 
 const STORAGE_KEY = 'alinho-mix-offline-v1'
@@ -52,6 +52,7 @@ function slugify(text) {
    itself is failing. State is persisted to localStorage so an accidental
    refresh mid-game doesn't lose the draw. */
 export default function MixOffline() {
+  const [ask, setAsk] = useState(null) // 'finish' | 'reset' (folha da app)
   const { t } = useTranslation()
   const saved = loadSaved()
   const [namesText, setNamesText] = useState(saved?.namesText ?? '')
@@ -144,15 +145,10 @@ export default function MixOffline() {
 
   const finalStandings = teams ? standings(teams, rounds.flat()) : []
 
-  const handleFinalize = () => {
-    const early = !currentRoundDone
-    const msg = early ? t('mixoffline.finalize_confirm_early') : t('mixoffline.finalize_confirm')
-    if (!confirm(msg)) return
-    setFinished(true)
-  }
-
-  const handleReset = () => {
-    if (teams && !confirm(t('mixoffline.reset_confirm'))) return
+  // Perguntas na folha da app (janelas → peças da app, 2 out).
+  const handleFinalize = () => setAsk('finish')
+  const handleReset = () => { if (teams) setAsk('reset'); else resetNow() }
+  const resetNow = () => {
     setTeams(null)
     setRounds([])
     setFinished(false)
@@ -466,6 +462,13 @@ export default function MixOffline() {
           />
         )}
       </div>
+      <ConfirmSheet open={ask === 'finish'} outline title={t('dialogs.mix_finish_title')}
+        message={t(currentRoundDone ? 'dialogs.mix_finish_message' : 'dialogs.mix_finish_message_early')}
+        cancelLabel={t('dialogs.mix_finish_keep')} confirmLabel={t('dialogs.mix_finish_confirm')}
+        onConfirm={() => setFinished(true)} onClose={() => setAsk(null)} />
+      <ConfirmSheet open={ask === 'reset'} danger title={t('dialogs.mix_reset_title')} message={t('dialogs.mix_reset_message')}
+        cancelLabel={t('dialogs.mix_reset_keep')} confirmLabel={t('dialogs.mix_reset_confirm')}
+        onConfirm={resetNow} onClose={() => setAsk(null)} />
     </div>
   )
 }

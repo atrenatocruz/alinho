@@ -13,7 +13,7 @@ import {
   submitGroupMatchResult, proposeGroupMatchCorrection, acceptGroupMatchCorrection, deleteGroupMatch,
 } from '../lib/groupMatches'
 import { formatDate as formatDateLib } from '../lib/formatDate'
-import { Avatar, EmptyState, PrimaryButton } from '../components/ui'
+import { Avatar, ConfirmSheet, EmptyState, PrimaryButton } from '../components/ui'
 import { describeError } from '../lib/errors'
 
 const SLOTS = ['team_a_player1', 'team_a_player2', 'team_b_player1', 'team_b_player2']
@@ -63,6 +63,10 @@ function MatchCard({ match, org, currentUser, isOrgAdmin, onChanged, t, i18n }) 
   const [enteringResult, setEnteringResult] = useState(false)
   const [correcting, setCorrecting] = useState(false)
   const [busy, setBusy] = useState(false)
+  // Janelas do navegador → peças da app (parte 2, 2 out): o erro fica no
+  // cartão, as perguntas na folha da app.
+  const [cardError, setCardError] = useState('')
+  const [ask, setAsk] = useState(null) // 'leave' | 'delete'
 
   const mySlot = SLOTS.find((s) => match[`${s}_id`] === currentUser?.id)
   const isParticipant = !!mySlot
@@ -73,6 +77,7 @@ function MatchCard({ match, org, currentUser, isOrgAdmin, onChanged, t, i18n }) 
   const alreadyAcceptedCorrection = (match.pending_correction_accepted_by || []).includes(currentUser?.id)
 
   const withBusy = (fn) => async (...args) => {
+    setCardError('')
     setBusy(true)
     try {
       await fn(...args)
@@ -86,40 +91,36 @@ function MatchCard({ match, org, currentUser, isOrgAdmin, onChanged, t, i18n }) 
     try {
       await claimGroupMatchSlot(match.id, slot)
     } catch (err) {
-      alert(describeError(t, err, 'groupmatches.error_join'))
+      setCardError(describeError(t, err, 'groupmatches.error_join'))
     }
   })
 
-  const handleLeave = withBusy(async () => {
-    if (!confirm(t('groupmatches.confirm_leave'))) return
-    try {
-      await leaveGroupMatchSlot(match.id)
-    } catch (err) {
-      alert(describeError(t, err, 'groupmatches.error_leave'))
-    }
-  })
+  const handleLeave = () => { setCardError(''); setAsk('leave') }
+  const leaveNow = async () => { await leaveGroupMatchSlot(match.id); await onChanged() }
 
   const handleSubmitResult = async (a, b) => {
+    setCardError('')
     setBusy(true)
     try {
       await submitGroupMatchResult(match.id, a, b)
       setEnteringResult(false)
       await onChanged()
     } catch (err) {
-      alert(describeError(t, err, 'groupmatches.error_result'))
+      setCardError(describeError(t, err, 'groupmatches.error_result'))
     } finally {
       setBusy(false)
     }
   }
 
   const handleProposeCorrection = async (a, b) => {
+    setCardError('')
     setBusy(true)
     try {
       await proposeGroupMatchCorrection(match.id, a, b)
       setCorrecting(false)
       await onChanged()
     } catch (err) {
-      alert(describeError(t, err, 'groupmatches.error_correction'))
+      setCardError(describeError(t, err, 'groupmatches.error_correction'))
     } finally {
       setBusy(false)
     }
@@ -129,18 +130,12 @@ function MatchCard({ match, org, currentUser, isOrgAdmin, onChanged, t, i18n }) 
     try {
       await acceptGroupMatchCorrection(match.id)
     } catch (err) {
-      alert(describeError(t, err, 'groupmatches.error_accept_correction'))
+      setCardError(describeError(t, err, 'groupmatches.error_accept_correction'))
     }
   })
 
-  const handleDelete = withBusy(async () => {
-    if (!confirm(t('groupmatches.confirm_delete'))) return
-    try {
-      await deleteGroupMatch(match.id)
-    } catch (err) {
-      alert(describeError(t, err, 'groupmatches.error_delete'))
-    }
-  })
+  const handleDelete = () => { setCardError(''); setAsk('delete') }
+  const deleteNow = async () => { await deleteGroupMatch(match.id); await onChanged() }
 
   const canDelete = (isCreator || isOrgAdmin) && !hasResult
   const canCorrect = isParticipant || isOrgAdmin
@@ -242,6 +237,14 @@ function MatchCard({ match, org, currentUser, isOrgAdmin, onChanged, t, i18n }) 
           ) : null}
         </div>
       )}
+
+      {cardError && <p role="alert" className="text-xs font-extrabold text-danger">{cardError}</p>}
+      <ConfirmSheet open={ask === 'leave'} outline title={t('dialogs.leave_game_title')}
+        cancelLabel={t('dialogs.leave_game_keep')} confirmLabel={t('dialogs.leave_game_confirm')}
+        onConfirm={leaveNow} onClose={() => setAsk(null)} errorOf={(err) => describeError(t, err, 'groupmatches.error_leave')} />
+      <ConfirmSheet open={ask === 'delete'} danger title={t('dialogs.delete_game_title')} message={t('dialogs.delete_game_message')}
+        cancelLabel={t('dialogs.delete_game_keep')} confirmLabel={t('dialogs.delete_game_confirm')}
+        onConfirm={deleteNow} onClose={() => setAsk(null)} errorOf={(err) => describeError(t, err, 'groupmatches.error_delete')} />
     </div>
   )
 }
@@ -256,6 +259,7 @@ export default function GroupMatches() {
   // Os jogos de grupo do desenho novo (#342) — outra tabela, outra lista.
   const [friendGames, setFriendGames] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
 
   const isOrgAdmin = !!memberships.find((m) => m.organization?.slug === slug)?.is_admin
 
@@ -273,7 +277,7 @@ export default function GroupMatches() {
       }
     } catch (err) {
       console.error('Error loading group matches:', err)
-      alert(describeError(t, err, 'groupmatches.error_load'))
+      setLoadError(describeError(t, err, 'groupmatches.error_load'))
     } finally {
       setLoading(false)
     }
@@ -303,6 +307,8 @@ export default function GroupMatches() {
         <div className="flex items-center justify-center py-16">
           <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
         </div>
+      ) : loadError ? (
+        <p role="alert" className="rounded-ctrl border border-danger/30 bg-danger/10 px-3 py-2 text-sm font-extrabold text-danger">{loadError}</p>
       ) : matches.length === 0 && friendGames.length === 0 ? (
         <EmptyState title={t('groupmatches.empty_title')} subtitle={t('groupmatches.empty_subtitle')} />
       ) : (

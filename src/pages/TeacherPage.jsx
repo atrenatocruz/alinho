@@ -349,15 +349,17 @@ function Availability({ teacher, prices, items, day, setDay, goBack, today }) {
   const [mine, setMine] = useState({})
   const [enrolItem, setEnrolItem] = useState(null)
   const [acting, setActing] = useState(null)
+  const [actError, setActError] = useState(null) // { id, text } (janelas → app, 2 out)
   const statusOf = (it) => (it.series_id in mine ? mine[it.series_id] : { status: it.my_status, id: it.my_enrolment_id })
   const act = async (it, fn, next) => {
     const { id } = statusOf(it)
+    setActError(null)
     setActing(it.series_id)
     try {
       await fn(id)
       setMine((m) => ({ ...m, [it.series_id]: next === null ? { status: null, id: null } : { status: next, id } }))
     } catch (error) {
-      alert(describeError(t, error, 'lessons.error_request'))
+      setActError({ id: it.series_id, text: describeError(t, error, 'dialogs.request_error') })
     } finally {
       setActing(null)
     }
@@ -483,6 +485,7 @@ function Availability({ teacher, prices, items, day, setDay, goBack, today }) {
                         </>
                       )}
                     </div>
+                    {actError?.id === it.series_id && <p role="alert" className="mt-2 text-xs font-extrabold text-danger">{actError.text}</p>}
                   </div>
                 )
               }
