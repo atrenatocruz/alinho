@@ -32,6 +32,7 @@ import ChampionsBlock from '../components/tournament/ChampionsBlock'
 import NextGameCard, { useMyNextGame } from '../components/tournament/NextGameCard'
 import DrawAdminPanel from '../components/tournament/DrawAdminPanel'
 import TournamentCalendarGrid from '../components/tournament/TournamentCalendarGrid'
+import ScorekeepersPanel from '../components/tournament/ScorekeepersPanel'
 import { drawProgress, statusKey } from '../components/tournament/drawProgress'
 
 /** "9–11 out" quando é tudo no mesmo mês, "30 set – 2 out" quando não é. */
@@ -252,6 +253,11 @@ export default function TournamentPage() {
   if (isAdmin && adminMode === 'horario') {
     return <div className="space-y-4"><TournamentCalendarGrid tournament={tour} onBack={closeAdmin} /></div>
   }
+  // Quem marca os resultados (#365): o painel existia mas não estava em lado
+  // nenhum; abre do «Mais ⋯» de quem organiza (PO, 2 out).
+  if (isAdmin && adminMode === 'marcadores') {
+    return <div className="space-y-4"><ScorekeepersPanel tournament={tour} onBack={closeAdmin} /></div>
+  }
   if (isAdmin && adminMode === 'editar' && editing) {
     return (
       <div className="space-y-4">
@@ -302,6 +308,7 @@ export default function TournamentPage() {
             onEdit={() => openAdmin('editar')}
             onDraw={() => openAdmin('sorteio')}
             onSchedule={() => openAdmin('horario')}
+            onScorekeepers={() => openAdmin('marcadores')}
             onEntries={() => setParam('tab', 'entries')}
           />
           {adminError && <p className="text-sm text-danger">{adminError}</p>}
@@ -365,7 +372,22 @@ export default function TournamentPage() {
         <NextGameCard game={myGame} onOpenList={() => {
           setParam('tab', 'my_games')
           // Desce até lá: sem isto não se via nada a mudar (Francisco, 1 out).
-          setTimeout(() => document.getElementById('tournament-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150)
+          // A lista carrega aos bocados (o painel é preguiçoso e lê o quadro):
+          // uma descida suave ficava a meio (~117 px, QA 2 out). Desce de uma
+          // vez e repete até a posição assentar.
+          let tries = 0
+          let last = null
+          const settle = () => {
+            const el = document.getElementById('tournament-tabs')
+            if (el) {
+              el.scrollIntoView({ block: 'start' })
+              const top = Math.round(el.getBoundingClientRect().top)
+              if (top === last) return
+              last = top
+            }
+            if (++tries < 20) setTimeout(settle, 150)
+          }
+          setTimeout(settle, 50)
         }} />
       )}
 

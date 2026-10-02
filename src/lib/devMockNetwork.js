@@ -650,6 +650,11 @@ const RPC_MOCKS = {
       player1_id: 'p5', player1_name: 'Ana Moreira', player1_avatar: null,
       player2_id: null, player2_name: null, player2_avatar: null,
       guest_name: null, guest_email: null, invite_token: null, respond_by: null },
+    // Outra pessoa sozinha (ensaio do QA, 2 out): juntar as duas numa dupla.
+    { entry_id: 'e8', status: 'sem_parceiro', team_name: null, waitlist_order: null, created_at: null, validated_at: null,
+      player1_id: MOCK_ADMIN_USER_ID, player1_name: 'Admin (Dev)', player1_avatar: null,
+      player2_id: null, player2_name: null, player2_avatar: null,
+      guest_name: null, guest_email: null, invite_token: null, respond_by: null },
     // Nenhum dos dois tem conta (Trello #515): os dois entraram pelo nome.
     { entry_id: 'e7', status: 'por_validar', team_name: null, waitlist_order: null, created_at: null, validated_at: null,
       player1_id: null, player1_name: 'Carla Nunes', player1_avatar: null,
