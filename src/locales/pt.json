@@ -1208,6 +1208,8 @@
   "gamedetails.drawing": "A sortear…",
   "gamedetails.start_round1": "Iniciar Ronda 1",
   "gamedetails.start_round_n": "Começar Ronda {{number}}",
+  "gamedetails.draw_round1": "Pôr as duplas nos campos",
+  "gamedetails.draw_round1_hint": "Mostra os jogos da Ronda 1. O relógio só começa depois, com «Começar Ronda 1».",
   "gamedetails.your_game_label": "O teu jogo",
   "gamedetails.round_pending_min": "por começar · {{minutes}} min",
   "gamedetails.duplas_count": "Duplas · {{count}}",

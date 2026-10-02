@@ -2472,12 +2472,15 @@ export default function GameDetails() {
     barPrimary = { label: t('gamedetails.start_mix'), onClick: handleStartDrawnMix, disabled: busy, hint: t('eventactions.start_hint') }
   } else if (game?.status === 'in_progress' && !inPoolStage) {
     if (!roundsStarted && !isAmericano) {
-      // Sem a ronda sorteada (parceiros que rodam, ou um mix começado antes
-      // do ponto 11): sorteia e começa de uma vez.
+      // Mix começado sem a Ronda 1 sorteada (começado antes do ponto 11):
+      // põe as duplas nos campos e mostra os jogos «por começar»; o relógio
+      // só arranca depois, com «Começar Ronda 1» (Francisco, 2 out: quem
+      // organiza tem de ver as duplas e os jogos antes de começar).
       barPrimary = {
-        label: busy ? t('gamedetails.drawing') : t('gamedetails.start_round_n', { number: 1 }),
-        onClick: async () => { await handleStartRound1(); await handleStartRound() },
+        label: busy ? t('gamedetails.drawing') : t('gamedetails.draw_round1'),
+        onClick: handleStartRound1,
         disabled: busy || unpaired.length > 0,
+        hint: t('gamedetails.draw_round1_hint'),
       }
     } else if (roundPending) {
       barPrimary = { label: busy ? t('gamedetails.processing') : t('gamedetails.start_round_n', { number: maxRound }), onClick: handleStartRound, disabled: busy || unpaired.length > 0, hint: t('gamedetails.start_round_hint') }
