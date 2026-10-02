@@ -223,6 +223,16 @@ const RPC_MOCKS = {
   // grupo) e um pedido pendente.
   list_global_organizations: () => (community() ? COMMUNITY_ORGS : []),
   // Página de um grupo/clube onde ainda não estou (bug do botão, 17 set).
+  // localStorage.mockGameClosed = 'group' | 'club' | 'private' | 'gone': de que
+  // grupo é o /jogo/fake-closed (SPEC 2026-10-01-jogo-de-grupo-fechado).
+  get_game_org_hint: () => {
+    const k = localStorage.getItem('mockGameClosed')
+    if (!k || k === 'gone') return []
+    if (k === 'private') return [{ org_name: null, org_slug: null, org_kind: 'group', org_logo_url: null, org_visible: false }]
+    return [k === 'club'
+      ? { org_name: 'Smash Padel Almada', org_slug: 'smash-padel', org_kind: 'club', org_logo_url: null, org_visible: true }
+      : { org_name: 'Jota Padeleiros', org_slug: 'jota-padeleiros', org_kind: 'group', org_logo_url: null, org_visible: true }]
+  },
   // O convite do grupo (1 out): o nome e o estado de quem acabou de pedir/entrar.
   get_club_profile: (params) => (['mockJoinPending', 'mockJoinOpen'].some((k) => localStorage.getItem(k) === 'true') && params?.p_slug === 'jota-padeleiros'
     ? [{ name: 'Jota Padeleiros', slug: 'jota-padeleiros', my_status: localStorage.getItem('mockJoinOpen') === 'true' ? 'member' : 'pending' }]
@@ -638,6 +648,11 @@ const RPC_MOCKS = {
       guest_name: null, guest_email: null, invite_token: null, respond_by: null },
     { entry_id: 'e4', status: 'sem_parceiro', team_name: null, waitlist_order: null, created_at: null, validated_at: null,
       player1_id: 'p5', player1_name: 'Ana Moreira', player1_avatar: null,
+      player2_id: null, player2_name: null, player2_avatar: null,
+      guest_name: null, guest_email: null, invite_token: null, respond_by: null },
+    // Outra pessoa sozinha (ensaio do QA, 2 out): juntar as duas numa dupla.
+    { entry_id: 'e8', status: 'sem_parceiro', team_name: null, waitlist_order: null, created_at: null, validated_at: null,
+      player1_id: MOCK_ADMIN_USER_ID, player1_name: 'Admin (Dev)', player1_avatar: null,
       player2_id: null, player2_name: null, player2_avatar: null,
       guest_name: null, guest_email: null, invite_token: null, respond_by: null },
     // Nenhum dos dois tem conta (Trello #515): os dois entraram pelo nome.
@@ -1275,7 +1290,8 @@ const TABLE_MOCKS = {
   // lugares), para se ver o cartão no estado "aberto/junto-te" na Home.
   // localStorage.mockGerirPast = 'true': no Gerir, um mix a seguir, um
   // acabado e um cancelado (acerto de 27 set, «Ver o que já passou»).
-  games: (url) => localStorage.getItem('mockGerirPast') === 'true' && !/[?&]id=eq./.test(url) ? (() => {
+  // /jogo/fake-closed: um jogo que não abre (de um grupo onde não estou) — 2 out.
+  games: (url) => url.includes('id=eq.fake-closed') ? [] : localStorage.getItem('mockGerirPast') === 'true' && !/[?&]id=eq./.test(url) ? (() => {
     const base = { organization_id: 'dev-org', format: 'sobe_desce', num_courts: 2, max_players: 8, game_time_minutes: 20, court_time_minutes: 80, recurrence_id: null, recurrence: null, level: null, location: 'Smash Padel Almada' }
     const day = (n) => new Date(Date.now() + n * 86400000).toISOString()
     const pp = (n) => Array.from({ length: n }, (_, i) => ({ id: `gp${i}`, user_id: `u${i}`, partner_id: null, status: 'confirmed' }))

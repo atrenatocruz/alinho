@@ -6,7 +6,7 @@ import { BackBar } from '../components/ui'
 import { sharePageLink } from '../lib/shareImage'
 import { ArrowLeft, Award, Swords, ChevronDown, UserPlus, UserCheck, Clock, Lock, ShieldCheck, ThumbsUp } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { PrimaryButton, EmptyState, Avatar, RatingBadge, PhotoViewerModal, FollowListModal, AchievementCard } from '../components/ui'
+import { PrimaryButton, EmptyState, Avatar, RatingBadge, PhotoViewerModal, FollowListModal, AchievementCard, ConfirmSheet } from '../components/ui'
 import { countryName } from '../lib/countries'
 import { AGE_LABEL_KEY } from '../lib/ageCategories'
 import { formatRatingMaybeProvisional, isProvisional, bandProgress, ratingBand } from '../lib/elo'
@@ -131,7 +131,11 @@ export default function PlayerDetails() {
   // Patches local state instead of calling loadPlayer() — that sets
   // loading=true, which the top-level render guard turns into replacing
   // the whole page with a spinner just to flip one button.
+  // Janelas do navegador → peças da app (parte 2, 2 out).
+  const [followError, setFollowError] = useState('')
+  const [askUnfollow, setAskUnfollow] = useState(false)
   const handleFollow = async () => {
+    setFollowError('')
     setFriendActing(true)
     try {
       const status = await followPlayer(id)
@@ -142,7 +146,7 @@ export default function PlayerDetails() {
       }))
     } catch (error) {
       console.error('Error following player:', error)
-      alert(describeError(t, error, 'playerdetails.update_failed'))
+      setFollowError(describeError(t, error, 'dialogs.follow_error'))
     } finally {
       setFriendActing(false)
     }
@@ -151,8 +155,8 @@ export default function PlayerDetails() {
   // Covers both unfollowing an accepted follow and cancelling your own
   // pending request — same row (player.follow_request_id) either way,
   // see get_player_profile's doc comment on that column.
-  const handleRemoveFollow = async (confirmMessage) => {
-    if (confirmMessage && !confirm(confirmMessage)) return
+  const handleRemoveFollow = async () => {
+    setFollowError('')
     setFriendActing(true)
     try {
       await removeFollow(player.follow_request_id)
@@ -164,7 +168,7 @@ export default function PlayerDetails() {
       }))
     } catch (error) {
       console.error('Error removing follow:', error)
-      alert(describeError(t, error, 'playerdetails.update_failed'))
+      setFollowError(describeError(t, error, 'dialogs.unfollow_error'))
     } finally {
       setFriendActing(false)
     }
@@ -389,7 +393,7 @@ export default function PlayerDetails() {
             {!player.my_profile && (
               player.follow_status === 'following' ? (
                 <button
-                  onClick={() => handleRemoveFollow(t('playerdetails.unfollow_confirm', { name: player.name }))}
+                  onClick={() => { setFollowError(''); setAskUnfollow(true) }}
                   disabled={friendActing}
                   className="inline-flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-2 min-h-[36px] rounded-full border border-line bg-ink-50 text-ink-900 hover:bg-ink-200/60 transition-colors duration-fast disabled:opacity-40 whitespace-nowrap"
                 >
@@ -420,6 +424,10 @@ export default function PlayerDetails() {
             )}
           </div>
         )}
+        {followError && <p role="alert" className="mt-2 text-xs font-extrabold text-danger">{followError}</p>}
+        <ConfirmSheet open={askUnfollow} outline title={t('playerdetails.unfollow_confirm', { name: player.name })}
+          cancelLabel={t('dialogs.unfollow_keep')} confirmLabel={t('dialogs.unfollow_confirm')}
+          onConfirm={() => handleRemoveFollow()} onClose={() => setAskUnfollow(false)} />
 
         {!resultsHidden && (
           <div className="mt-4 pt-3.5 border-t border-line grid grid-cols-3 divide-x divide-line text-center">

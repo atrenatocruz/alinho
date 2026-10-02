@@ -1314,6 +1314,10 @@ export function FollowListModal({ userId, initialTab = 'followers', onClose, man
   const [following, setFollowing] = useState(null)
   // id da pessoa cuja linha está a ser apagada, para travar duplo-toque.
   const [removingId, setRemovingId] = useState(null)
+  // Janelas do navegador → peças da app (parte 2, 2 out): a pergunta na
+  // folha da app e o erro por baixo da pessoa.
+  const [asking, setAsking] = useState(null) // a pessoa
+  const [rowError, setRowError] = useState(null) // { id, text }
 
   useEffect(() => {
     let cancelled = false
@@ -1341,12 +1345,9 @@ export function FollowListModal({ userId, initialTab = 'followers', onClose, man
   // Só no próprio perfil (manageable). Confirmação deliberada: apagar um
   // follow não tem volta pela app — quem foi removido tem de voltar a
   // seguir (e a pedir, se a conta for privada).
-  const endFollow = async (person) => {
+  const endFollow = (person) => { setRowError(null); setAsking(person) }
+  const endFollowNow = async (person) => {
     const isFollower = tab === 'followers'
-    const question = isFollower
-      ? t('followlist.confirm_remove_follower', { name: person.name })
-      : t('followlist.confirm_unfollow', { name: person.name })
-    if (!window.confirm(question)) return
     setRemovingId(person.id)
     try {
       if (isFollower) await removeFollower(person.id, userId)
@@ -1355,7 +1356,7 @@ export function FollowListModal({ userId, initialTab = 'followers', onClose, man
       else setFollowing((prev) => prev.filter((p) => p.id !== person.id))
     } catch (error) {
       console.error('Error ending follow:', error)
-      window.alert(describeError(error))
+      setRowError({ id: person.id, text: describeError(t, error, isFollower ? 'dialogs.remove_follower_error' : 'dialogs.unfollow_error') })
     } finally {
       setRemovingId(null)
     }
@@ -1399,7 +1400,8 @@ export function FollowListModal({ userId, initialTab = 'followers', onClose, man
           ) : (
             <div className="divide-y divide-line">
               {rows.map((p) => (
-                <div key={p.id} className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50">
+                <div key={p.id}>
+                <div className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50">
                   <Link to={`/jogador/${p.id}`} onClick={onClose} className="flex items-center gap-3 flex-1 min-w-0">
                     <Avatar name={p.name} url={p.avatar_url} size="w-10 h-10 text-sm" />
                     <p className="flex-1 min-w-0 font-extrabold text-ink-900 text-sm truncate">{p.name}</p>
@@ -1416,11 +1418,22 @@ export function FollowListModal({ userId, initialTab = 'followers', onClose, man
                     </button>
                   )}
                 </div>
+                {rowError?.id === p.id && <p role="alert" className="px-4 pb-3 -mt-1 text-xs font-extrabold text-danger">{rowError.text}</p>}
+                </div>
               ))}
             </div>
           )}
         </div>
       </div>
+      {asking && (tab === 'followers' ? (
+        <ConfirmSheet open danger title={t('dialogs.remove_follower_title', { name: asking.name })} message={t('dialogs.remove_follower_message')}
+          cancelLabel={t('dialogs.remove_follower_keep')} confirmLabel={t('dialogs.remove_follower_confirm')}
+          onConfirm={() => endFollowNow(asking)} onClose={() => setAsking(null)} />
+      ) : (
+        <ConfirmSheet open outline title={t('followlist.confirm_unfollow', { name: asking.name })}
+          cancelLabel={t('dialogs.unfollow_keep')} confirmLabel={t('dialogs.unfollow_confirm')}
+          onConfirm={() => endFollowNow(asking)} onClose={() => setAsking(null)} />
+      ))}
     </div>,
     document.body
   )
