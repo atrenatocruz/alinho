@@ -104,3 +104,18 @@ test('mix que não se repete: os 4 anteriores do grupo, como antes', async () =>
   assert.ok(keys.has(key('a', 'da')))
   assert.ok(!keys.has(key('f', 'rd')))
 })
+
+// 2 out (Francisco): com duplas já sorteadas à mão, o arranque automático
+// começa com essas em vez de sortear outras por cima (ficavam a dobrar).
+test('duplas já sorteadas: usa-as; com um lugar vazio, espera', async () => {
+  const { drawnTeamsToUse } = await import('../src/autostart.js')
+  const full = [
+    { id: 't1', player1_id: 'a', player2_id: 'b', player1_guest_id: null, player2_guest_id: null },
+    { id: 't2', player1_id: 'c', player2_id: null, player1_guest_id: null, player2_guest_id: 'g' },
+  ]
+  assert.equal(drawnTeamsToUse([]), null)
+  assert.equal(drawnTeamsToUse(null), null)
+  assert.deepEqual(drawnTeamsToUse(full), full)
+  assert.equal(drawnTeamsToUse([full[0]]), 'wait')
+  assert.equal(drawnTeamsToUse([full[0], { ...full[1], player2_guest_id: null }]), 'wait')
+})
