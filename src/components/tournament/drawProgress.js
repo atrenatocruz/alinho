@@ -23,8 +23,15 @@ export function drawProgress(categories = []) {
   }
 }
 
+/** O prazo das inscrições já passou? (hora de Lisboa vem já no timestamp) */
+export const deadlinePassed = (deadline, now = new Date()) => !!deadline && new Date(deadline) < now
+
 /** A chave do texto do estado do torneio: «Sorteio feito» só quando está
- *  mesmo feito em todas; a meio, diz quantas. */
-export const statusKey = (status, progress) => (
-  status === 'sorteado' && progress?.partial ? 'tournament.status_sorteado_partial' : `tournament.status_${status}`
+ *  mesmo feito em todas; a meio, diz quantas. Com o prazo passado e o
+ *  torneio ainda em «inscrições», diz «Inscrições fechadas» — ninguém se
+ *  consegue inscrever, e o topo dizia «abertas» (ensaio do QA, 2 out). */
+export const statusKey = (status, progress, deadline = null) => (
+  status === 'sorteado' && progress?.partial ? 'tournament.status_sorteado_partial'
+    : status === 'inscricoes' && deadlinePassed(deadline) ? 'tournament.status_fechado'
+      : `tournament.status_${status}`
 )

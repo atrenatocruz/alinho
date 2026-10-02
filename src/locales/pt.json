@@ -3692,6 +3692,7 @@
   "tournament.admin.keep_editing": "Continuar a editar",
   "tournament.admin.state_rascunho": "Só tu o vês. Abre as inscrições quando quiseres.",
   "tournament.admin.state_inscricoes": "Até {{deadline}}.",
+  "tournament.admin.state_deadline_passed": "O prazo acabou a {{deadline}}. Fecha as inscrições para fazer o sorteio.",
   "tournament.admin.state_fechado": "Falta fazer o sorteio.",
   "tournament.admin.state_sorteado": "{{matches}} jogos marcados.",
   "tournament.admin.state_draw_partial": "{{drawn}} de {{total}} categorias sorteadas.",

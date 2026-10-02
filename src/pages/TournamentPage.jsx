@@ -332,7 +332,7 @@ export default function TournamentPage() {
           <TourTag>{t('tournament.label')}</TourTag>
           {['validada', 'selecionada'].includes(activeMy(data)?.state)
             ? <StatePill tone="in">{t('tournament.state_entered')}</StatePill>
-            : <StatePill tone={STATE_PILL[tour.status] || 'grey'}>{t(statusKey(tour.status, drawProgress(categories)), drawProgress(categories))}</StatePill>}
+            : <StatePill tone={STATE_PILL[tour.status] || 'grey'}>{t(statusKey(tour.status, drawProgress(categories), tour.entries_deadline), drawProgress(categories))}</StatePill>}
         </div>
         <h1 className="mt-2.5 font-display text-2xl leading-tight text-ink-900">{tour.name}</h1>
         <div className="mt-1 flex items-center gap-1.5 text-xs text-ink-500">
@@ -361,6 +361,19 @@ export default function TournamentPage() {
         </div>
         </div>
       </div>
+
+      {/* O passo seguinte de quem organiza, uma só vez, por baixo do cartão do
+          torneio — como o preto do mix (Francisco, 2 out). Em cima ficam só
+          «Editar» e «Mais ⋯». */}
+      {isAdmin && (
+        <AdminBar
+          part="bottom"
+          tournament={tour}
+          categories={categories}
+          onChanged={() => window.dispatchEvent(new Event('tournament:reload'))}
+          onDraw={() => openAdmin('sorteio')}
+        />
+      )}
 
       {/* Campeões da categoria, quando termina (peça 2, 28 set). */}
       <ChampionsBlock tournament={tour} category={category} />
