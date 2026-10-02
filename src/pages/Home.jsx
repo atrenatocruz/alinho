@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { Search, X, Check } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { takePendingOrgSlug } from '../lib/loginLinks'
+import { getClubProfile } from '../lib/clubProfile'
 import { useAuth } from '../contexts/AuthContext'
 import { ConfirmSheet } from '../components/ui'
 import { GameEventCard, FriendsEventCard, ExploreEventCard } from '../components/agenda/EventCard'
@@ -113,13 +114,15 @@ export default function Home() {
   const [joinError, setJoinError] = useState('')
   // «Pedido enviado» (Trello #447): o link de um grupo cheio, ou de um grupo
   // que aprova quem entra, deixa um pedido à espera do admin em vez de erro.
-  // Tira preta de 3 s (regra das janelas).
+  // A tira preta da regra das janelas, mas 8 s: quem chega de um link do
+  // WhatsApp precisa de tempo para ler se pediu ou entrou (QA + UX, 1 out).
   const [joinNotice, setJoinNotice] = useState('')
+  // Conta só com a Home à vista: durante o «a carregar» a tira não aparece.
   useEffect(() => {
-    if (!joinNotice) return undefined
-    const timer = setTimeout(() => setJoinNotice(''), 3000)
+    if (!joinNotice || loading) return undefined
+    const timer = setTimeout(() => setJoinNotice(''), 8000)
     return () => clearTimeout(timer)
-  }, [joinNotice])
+  }, [joinNotice, loading])
 
   const [filters, setFilters] = useState(() => normalizeFilters(readSession(FILTERS_KEY, null)))
   // Procurar um evento (Trello #547). Desde a mudança de 25 set: uma lupa na
@@ -186,15 +189,14 @@ export default function Home() {
       const { data: orgId, error } = await joinOrganization(slug)
       if (error) throw error
       // Entrou ou ficou com um pedido? A função devolve o grupo nos dois
-      // casos; quem não ficou membro ficou à espera do admin. O aviso diz o
-      // nome do grupo (QA, 1 out); sem o conseguir ler, a frase sem nome.
+      // casos; quem não ficou membro ficou à espera do admin. O nome e o
+      // estado vêm do get_club_profile, que procura pelo endereço — a tabela
+      // organizations esconde o grupo a quem ainda não é membro (QA, 1 out:
+      // a tira saía sem nome). Sem o conseguir ler, a frase sem nome.
       if (orgId && user && !wasMember) {
-        const [{ data: mine }, { data: org }] = await Promise.all([
-          supabase.from('memberships').select('id').eq('organization_id', orgId).eq('user_id', user.id).maybeSingle(),
-          supabase.from('organizations').select('name').eq('id', orgId).maybeSingle(),
-        ])
-        const name = org?.name
-        if (!mine) setJoinNotice(name ? t('home.join_request_sent_named', { name }) : t('home.join_request_sent'))
+        const club = await getClubProfile(slug).catch(() => null)
+        const name = club?.name
+        if (club?.my_status !== 'member') setJoinNotice(name ? t('home.join_request_sent_named', { name }) : t('home.join_request_sent'))
         else setJoinNotice(name ? t('home.join_joined_named', { name }) : t('home.join_joined'))
       }
     } catch (error) {

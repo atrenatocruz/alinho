@@ -371,8 +371,33 @@ export async function handleGroupMessage(payload, deps) {
   }
 }
 
-async function handleGroupMessageInner({ groupJid, senderPn, text, message, quotedStanzaId, mentionedJids = [], mentionedPns = [] }, { sendText }, ctx) {
+async function handleGroupMessageInner({ groupJid, senderPn, text, message, key, quotedStanzaId, mentionedJids = [], mentionedPns = [] }, { sendText, sendReaction }, ctx) {
   const timer = ctx.timer
+
+  // «Confirmar 482917» no grupo (Ruben, 1 out): valida o número sem SMS —
+  // aqui o robô é um contacto conhecido (publica as listas todos os dias),
+  // ao contrário de uma DM a um número estranho. O código de 6 dígitos
+  // continua obrigatório: liga a sessão da app ao telemóvel, e vindo do
+  // número errado não faz nada (por isso ser visível no grupo é inócuo).
+  // Única resposta: reação ✅ — o bot não conversa (Renato, 28 set).
+  const confirmMatch = stripAccents(text.trim().toLowerCase()).match(/^\/?(confirmar|validar|registar)\s+(\d{6})$/)
+  if (confirmMatch) {
+    ctx.action = 'confirmar_numero'
+    if (!senderPn) return
+    const { data, error } = await supabase.rpc('confirm_phone_from_whatsapp', {
+      p_phone_hash: hashPhone(senderPn.split('@')[0]),
+      p_code: confirmMatch[2],
+    })
+    if (error) {
+      console.error('Confirmar número no grupo falhou:', error)
+      return
+    }
+    // Código errado/expirado: silêncio — a app diz «ainda não chegou».
+    if (data?.ok && sendReaction && key) {
+      await sendReaction(groupJid, key, '✅').catch((err) => console.error('Falha a reagir ao Confirmar:', err))
+    }
+    return
+  }
   // Gate on hardcoded, in-memory checks first — normal group chatter never
   // matches either of these, so it never touches the DB (the group lookup
   // used to run unconditionally here, costing every message a query).

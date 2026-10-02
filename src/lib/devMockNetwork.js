@@ -223,7 +223,10 @@ const RPC_MOCKS = {
   // grupo) e um pedido pendente.
   list_global_organizations: () => (community() ? COMMUNITY_ORGS : []),
   // Página de um grupo/clube onde ainda não estou (bug do botão, 17 set).
-  get_club_profile: (params) => (community() ? [{
+  // O convite do grupo (1 out): o nome e o estado de quem acabou de pedir/entrar.
+  get_club_profile: (params) => (['mockJoinPending', 'mockJoinOpen'].some((k) => localStorage.getItem(k) === 'true') && params?.p_slug === 'jota-padeleiros'
+    ? [{ name: 'Jota Padeleiros', slug: 'jota-padeleiros', my_status: localStorage.getItem('mockJoinOpen') === 'true' ? 'member' : 'pending' }]
+    : community() ? [{
     ...(COMMUNITY_ORGS.find((o) => o.slug === params?.p_slug) || COMMUNITY_ORGS[2]),
     description: 'Grupo de amigos para teste do Alinho 😎', phone: null, instagram: null, website: null,
     parent_slug: null,
