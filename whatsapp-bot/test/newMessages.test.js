@@ -141,7 +141,7 @@ test('sem o interruptor, o suplente continua a ser mandado para a app', async ()
 test('vários mixes abertos: a pergunta curta, com as respostas possíveis', async () => {
   db.games.push({ ...db.games[0], id: 'm2', title: 'Mix M5 · Quarta', date: new Date(Date.now() + 2 * 864e5).toISOString() })
   const out = await say('in')
-  assert.match(out, /^🤖 Há 2 mixes abertos\. Em qual queres entrar\?\n01 · Mix M4 · Terça · \w{3} \d+h(\d\d)?\n02 · Mix M5 · Quarta · /)
+  assert.match(out, /^🤖 Há 2 mixes abertos\. Em qual queres entrar\?\n01 · Mix M4 · Terça · \S{3} \d+h(\d\d)?\n02 · Mix M5 · Quarta · /)
   assert.match(out, /\n\nResponde \*In 01\* ou \*In 02\*\.$/)
 })
 
