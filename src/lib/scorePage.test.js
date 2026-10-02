@@ -152,3 +152,39 @@ describe('proposeSchedule — propor as horas', () => {
     expect(courtNames([{ name: 'Campo 1' }, {}, null])).toEqual(['Campo 1'])
   })
 })
+
+// O dia da categoria já passou (ensaio do QA, 2 out): a proposta não marca
+// horas para ontem.
+describe('dia da categoria que já passou', () => {
+  const campos = [{ name: 'Campo 1' }, { name: 'Campo 2' }]
+  const dias = [
+    { date: '2026-10-02', starts_at: '18:00:00', ends_at: '23:00:00', courts: 2 },
+    { date: '2026-10-03', starts_at: '09:00:00', ends_at: '21:00:00', courts: 2 },
+  ]
+  const jogos = [
+    m({ id: 'a', category_id: 'M4', category_code: 'M4', team_a: pair('a1', 'a2'), team_b: pair('b1', 'b2') }),
+    m({ id: 'b', category_id: 'M4', category_code: 'M4', team_a: pair('c1', 'c2'), team_b: pair('d1', 'd2') }),
+  ]
+  const categories = [{ id: 'M4', code: 'M4', day_date: '2026-10-02', start_time: '18:00:00' }]
+
+  it('passa para o próximo dia do torneio e diz porquê', () => {
+    const r = proposeSchedule({ days: dias, courts: campos, categories, matches: jogos, durationMaxMin: 60, today: '2026-10-03' })
+    expect(r.moved).toEqual([{ code: 'M4', from: '2026-10-02', to: '2026-10-03' }])
+    expect(r.stuck).toEqual([])
+    expect(r.slots).toHaveLength(2)
+    for (const s of r.slots) expect(dayKeyInTz(s.starts_at)).toBe('2026-10-03')
+  })
+
+  it('sem dias por passar não propõe nada e diz porquê', () => {
+    const r = proposeSchedule({ days: dias, courts: campos, categories, matches: jogos, durationMaxMin: 60, today: '2026-10-05' })
+    expect(r.slots).toEqual([])
+    expect(r.moved).toEqual([])
+    expect(r.stuck).toEqual([{ code: 'M4', from: '2026-10-02' }])
+  })
+
+  it('no próprio dia fica como estava', () => {
+    const r = proposeSchedule({ days: dias, courts: campos, categories, matches: jogos, durationMaxMin: 60, today: '2026-10-02' })
+    expect(r.moved).toEqual([])
+    for (const s of r.slots) expect(dayKeyInTz(s.starts_at)).toBe('2026-10-02')
+  })
+})

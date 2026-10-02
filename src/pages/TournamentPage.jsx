@@ -20,7 +20,8 @@ import { whatsappShare } from '../lib/partnerInvite'
 import { ArrowLeft, Eye, Trophy } from 'lucide-react'
 import { useGoBack } from '../lib/useGoBack'
 import { useAuth } from '../contexts/AuthContext'
-import { getTournamentForEdit, getTournamentPage, scheduleTournamentOpening, updateTournament } from '../lib/tournamentApi'
+import { getTournamentForEdit, getTournamentOrgHint, getTournamentPage, scheduleTournamentOpening, updateTournament } from '../lib/tournamentApi'
+import GroupOnlyNotice from '../components/GroupOnlyNotice'
 import { setEventWhatsappPostTimes } from '../lib/whatsappHours'
 import { describeError, errorKind } from '../lib/errors'
 import { Avatar, EmptyState, Tabs } from '../components/ui'
@@ -68,10 +69,19 @@ export default function TournamentPage() {
   const { id } = useParams()
   const goBack = useGoBack('/')
   const navigate = useNavigate()
-  const { memberships } = useAuth()
+  const { user, memberships } = useAuth()
   const [params, setParams] = useSearchParams()
   const [data, setData] = useState(null)
   const [failed, setFailed] = useState(false)
+  // Torneio de um grupo onde não estou: diz de que grupo é, em vez de «não
+  // encontrado» (SPEC 2026-10-01-jogo-de-grupo-fechado, ponto 7).
+  const [orgHint, setOrgHint] = useState(null)
+  useEffect(() => {
+    if (!failed || !user || !id) { setOrgHint(null); return undefined }
+    let alive = true
+    getTournamentOrgHint(id).then((h) => { if (alive) setOrgHint(h) }).catch(() => {})
+    return () => { alive = false }
+  }, [failed, user, id])
   // Editar e sortear abrem AQUI. O formulário de editar não tem rota própria
   // — vive em estado do painel do Gerir — por isso não havia para onde
   // navegar, e a versão de hoje mandava para `/gerir`, que é o ecrã de
@@ -167,6 +177,14 @@ export default function TournamentPage() {
   }
   const back = <BackBar onBack={goBack} title={data?.tournament?.name} onShare={data?.tournament?.status === 'rascunho' ? undefined : shareTournament} />
 
+  if (failed && orgHint) {
+    return (
+      <div className="space-y-5">
+        <BackBar onBack={goBack} />
+        <GroupOnlyNotice hint={orgHint} keyPrefix="tournament.closed" />
+      </div>
+    )
+  }
   if (failed) {
     return (
       <div className="space-y-5">
