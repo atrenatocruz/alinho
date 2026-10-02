@@ -52,13 +52,16 @@ async function announceUpdatedDuplas(game, changedIds, { sendText }) {
     return p?.name || 'Jogador'
   }
   const slot = (userId, guestId) => (userId ? label(userId) : guestById.get(guestId)?.name || 'Jogador')
-  const lines = teams.map((team, i) => `${i + 1}. ${slot(team.player1_id, team.player1_guest_id)} 🤝 ${slot(team.player2_id, team.player2_guest_id)}`)
+  const pairs = teams.map((team) => [slot(team.player1_id, team.player1_guest_id), slot(team.player2_id, team.player2_guest_id)])
+  const lines = pairs.map(([a, b], i) => `${i + 1}. ${a} 🤝 ${b}`)
 
   // Mensagem para o grupo inteiro — fica em 'pt' (ver nota em locales.js).
   const text = t('duplas_updated', 'pt', { title: game.title, lines: lines.join('\n') }) + helpFooter('pt')
+  // Mensagens novas (1 out): «A e B», sem o rodapé do /help.
+  const newText = t('duplas_updated', 'pt', { title: game.title, lines: pairs.map(([a, b], i) => `${i + 1}. ${a} e ${b}`).join('\n') }, true)
   for (const group of groups) {
     try {
-      await sendText(group.groupJid, text, { mentions })
+      await sendText(group.groupJid, group.newMessages ? newText : text, { mentions })
     } catch (err) {
       console.error(`Failed to announce updated pairings to ${group.groupJid}:`, err)
     }

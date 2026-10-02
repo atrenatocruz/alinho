@@ -23,9 +23,9 @@ async function main() {
   // paralelo entre grupos.
   const enqueue = createKeyedQueue()
 
-  const { sendText, getGroupMentions, getParticipatingGroupJids } = await connectWhatsApp({
+  const { sendText, sendReaction, getGroupMentions, getParticipatingGroupJids } = await connectWhatsApp({
     onGroupMessage: (payload) => {
-      enqueue(payload.groupJid, () => handleGroupMessage(payload, { sendText }))
+      enqueue(payload.groupJid, () => handleGroupMessage(payload, { sendText, sendReaction }))
     },
     // Confirmar o número pelo WhatsApp (#537): mensagens privadas, cada
     // conversa na sua fila (não atrasam os grupos).

@@ -565,3 +565,20 @@ test('convidado sem conta não inicia duplas', async () => {
   assert.match(out, /precisas de conta/)
   assert.equal(db.participants.length, 0)
 })
+
+test('«Confirmar 482917» no grupo valida o número pelo robô, sem mensagens', async () => {
+  const out = await say('confirmar 482917')
+  assert.equal(out, '', 'o bot não conversa — no máximo reage à mensagem')
+  const call = db.rpcCalls?.at(-1)
+  assert.equal(call?.[0], 'confirm_phone_from_whatsapp')
+  assert.equal(call?.[1]?.p_code, '482917')
+  assert.equal(call?.[1]?.p_phone_hash, hash('911111111'))
+})
+
+test('sinónimos e barra: «/validar 123456» também conta; conversa normal não', async () => {
+  await say('/validar 123456')
+  assert.equal(db.rpcCalls?.at(-1)?.[0], 'confirm_phone_from_whatsapp')
+  const before = db.rpcCalls?.length ?? 0
+  await say('vamos confirmar a hora do jogo?')
+  assert.equal(db.rpcCalls?.length ?? 0, before, 'texto livre não dispara o comando')
+})

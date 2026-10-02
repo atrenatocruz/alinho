@@ -19,6 +19,7 @@ import { groupGamesBySeries } from '../lib/recurrenceGrouping'
 import { AGE_RESTRICTIONS } from '../lib/ageCategories'
 import PlayerSearch from '../components/PlayerSearch'
 import WhatsappGroupsSection from '../components/WhatsappGroupsSection'
+import RobotMessagesSwitch from '../components/RobotMessagesSwitch'
 import { searchPlayers } from '../lib/privateMatches'
 import { inviteToOrganization } from '../lib/orgInvites'
 import { listPendingClubTeachers } from '../lib/teachers'
@@ -3891,6 +3892,16 @@ export default function GerirClube() {
               </div>
 
               <WhatsappGroupsSection organizationId={currentOrganizationId} />
+
+              {/* Mensagens novas do robô (1 out): só o super admin vê. Sem a
+                  migração a coluna não vem no select('*') e não aparece. */}
+              {currentUser?.is_platform_admin && settings.whatsapp_new_messages !== undefined && (
+                <RobotMessagesSwitch
+                  organizationId={settings.id}
+                  value={settings.whatsapp_new_messages}
+                  onChange={(on) => setSettings((s) => ({ ...s, whatsapp_new_messages: on }))}
+                />
+              )}
 
               {/* Precos das aulas e horas de maior procura: sao configuracao
                   do clube, por isso vivem aqui e nao no meio dos eventos

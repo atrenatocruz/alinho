@@ -8,6 +8,8 @@ import { Calendar, ArrowLeft, UserPlus, Check, Trophy, Play, ChevronRight, Sword
 import { DndContext, useDraggable, useDroppable, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { supabase, supabaseUrl } from '../lib/supabase'
+import { getGameOrgHint } from '../lib/gameOrgHint'
+import GroupOnlyNotice from '../components/GroupOnlyNotice'
 import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton, GuestBadge, PlayerAvatarRow, EmptyState, ShareModal, RoundTimer, Avatar, Select, RatingBadge, DateField, GroupLevelBadge, Tabs, ConfirmSheet } from '../components/ui'
 import { isDraftMix } from '../lib/mixDraft'
@@ -219,6 +221,15 @@ export default function GameDetails() {
   const [scorekeepersOpen, setScorekeepersOpen] = useState(false)
   // Rondas já jogadas que a pessoa abriu à mão (as outras ficam dobradas).
   const [openRounds, setOpenRounds] = useState({})
+  // Jogo que não abre: de que grupo é (undefined = a perguntar; null = não
+  // se sabe — fica o «Jogo não encontrado»).
+  const [orgHint, setOrgHint] = useState(undefined)
+  useEffect(() => {
+    if (loading || game) return undefined
+    let alive = true
+    getGameOrgHint(id).then((h) => { if (alive) setOrgHint(h) }).catch(() => { if (alive) setOrgHint(null) })
+    return () => { alive = false }
+  }, [loading, game, id])
   // O toque no aviso do empate: abre a ronda desse jogo e leva até ele.
   const goToMatch = (matchId) => {
     const m = matches.find((x) => x.id === matchId)
@@ -2460,11 +2471,25 @@ export default function GameDetails() {
 
   if (loading) {
     return (
+      <div className="flex items-center justify-center py-16" data-loading-game>
+        <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
+      </div>
+    )
+  }
+
+  if (!game && orgHint === undefined) {
+    return (
       <div className="flex items-center justify-center py-16">
         <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
       </div>
     )
   }
+
+  // O jogo existe mas é de um grupo onde a pessoa não está (SPEC
+  // 2026-10-01-jogo-de-grupo-fechado): diz-se de que grupo é — ou, num grupo
+  // privado, nem isso — e nada do jogo. «Jogo não encontrado» fica para o
+  // jogo apagado.
+  if (!game && orgHint) return <GroupOnlyNotice hint={orgHint} />
 
   if (!game) {
     return (

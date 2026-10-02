@@ -1,6 +1,6 @@
 import { supabase } from './supabase.js'
 import { getGroupByJid, mixVisibleToGroup } from './groups.js'
-import { loadGame, getOpenMixes, formatDateTime, weekdayKeyPt, mixLocalParts, gameIdForMessage, labelableMixes, mixLabel, buildMixMessage, recordMixMessage } from './roster.js'
+import { loadGame, getOpenMixes, formatDateTime, weekdayKeyPt, mixLocalParts, gameIdForMessage, labelableMixes, mixLabel, buildMixMessage, recordMixMessage, shortWeekday, shortHour, shortLink } from './roster.js'
 import { resolveProfileByPhoneJid, guestIdentity, ensureMembership, hashPhone } from './phone.js'
 import { parseCopiedRoster, extraNames, isSenderName, normName, nameMatches as copiedNameMatches } from './copiedRoster.js'
 import { config } from './config.js'
@@ -190,22 +190,47 @@ const rowIsMine = (identity, myHash, row) =>
 
 const OPEN_STATUSES = new Set(['open', 'closed'])
 
-function formatMixLine(mix, lang, label) {
+// `fresh` (mensagens novas, 1 out): «01 · Mix M4 · Ter 22h30», sem a morada.
+function formatMixLine(mix, lang, label, fresh = false) {
+  if (fresh) return `${label ? `${label} · ` : '🎾 '}${mix.title} · ${shortWeekday(mix.date)} ${shortHour(mix.date)}`
   const location = mix.location ? `, ${mix.location}` : ''
   const idPart = label ? `🔢 *${label}*` : '🎾'
   return `${idPart} — ${mix.title}, ${formatDateTime(mix.date, lang)}${location}`
 }
 
 /** Formats `matches` (a subset of `allOpenMixes`) for a disambiguation reply — labels come from each mix's position in the FULL open list (excluding jogos em aberto, which are never numbered — see mixLabel), so they match what's printed on that mix's own WhatsApp message. */
-function formatMixListForReply(matches, allOpenMixes, lang) {
+function formatMixListForReply(matches, allOpenMixes, lang, fresh = false) {
   const labelable = labelableMixes(allOpenMixes)
-  return matches.map((mix) => formatMixLine(mix, lang, mixLabel(mix, labelable))).join('\n')
+  return matches.map((mix) => formatMixLine(mix, lang, mixLabel(mix, labelable), fresh)).join('\n')
+}
+
+/** As variáveis da pergunta «em qual mix?»: a lista, quantos são e, nas
+ *  mensagens novas, as respostas possíveis («*In 01* ou *In 02*»). */
+function disambiguateVars(matches, allOpenMixes, lang, fresh) {
+  const labelable = labelableMixes(allOpenMixes)
+  const labels = matches.map((mix) => mixLabel(mix, labelable)).filter(Boolean).map((label) => `*In ${label}*`)
+  const options = labels.length > 1 ? `${labels.slice(0, -1).join(', ')} ${t('or', lang, {}, true)} ${labels[labels.length - 1]}` : labels[0] || '*In*'
+  return { list: formatMixListForReply(matches, allOpenMixes, lang, fresh), count: matches.length, options }
+}
+
+/** O /help das mensagens novas (Francisco, 1 out): curto e conforme os mixes
+ *  abertos do grupo — a linha da dupla só se algum aceita duplas, a dos
+ *  números só com 2 ou mais abertos. In, Out e Sim sempre. */
+export function buildHelp(openMixes, lang) {
+  const numbered = labelableMixes(openMixes)
+  const lines = [t('help_title', lang, {}, true), t('help_in', lang, {}, true), t('help_out', lang, {}, true)]
+  if (openMixes.some((mix) => mix.allow_pair_signup && !mix.rotate_partners)) lines.push(t('help_pair', lang, {}, true))
+  lines.push(t('help_yes', lang, {}, true))
+  if (numbered.length >= 2) lines.push(t('help_numbers', lang, {}, true))
+  lines.push('')
+  lines.push(t('help_more', lang, { link: shortLink('/instrucoes') }, true))
+  return lines.join('\n')
 }
 
 /** A lista do «/mix»: além do número, dia e local, as vagas de cada um e se
  *  é de duplas fixas (onde se pode entrar em dupla). Uma consulta só para
  *  todos os mixes. */
-async function formatMixListWithSpots(openMixes, lang, allOpenMixes = openMixes) {
+async function formatMixListWithSpots(openMixes, lang, allOpenMixes = openMixes, fresh = false) {
   // A numeração vem da lista TODA dos abertos (a mesma dos cartões).
   const labelable = labelableMixes(allOpenMixes)
   const { data: rows, error } = await supabase
@@ -220,7 +245,7 @@ async function formatMixListWithSpots(openMixes, lang, allOpenMixes = openMixes)
     const capacity = mix.max_players || mix.num_courts * 4
     const spots = t('mix_list_spots', lang, { filled: taken.get(mix.id) || 0, capacity })
     const pairs = mix.allow_pair_signup && !mix.rotate_partners ? t('mix_list_fixed_pairs', lang) : ''
-    return `${formatMixLine(mix, lang, mixLabel(mix, labelable))}\n   ${spots}${pairs}`
+    return `${formatMixLine(mix, lang, mixLabel(mix, labelable), fresh)}\n   ${spots}${pairs}`
   }).join('\n')
 }
 
@@ -346,8 +371,33 @@ export async function handleGroupMessage(payload, deps) {
   }
 }
 
-async function handleGroupMessageInner({ groupJid, senderPn, text, message, quotedStanzaId, mentionedJids = [], mentionedPns = [] }, { sendText }, ctx) {
+async function handleGroupMessageInner({ groupJid, senderPn, text, message, key, quotedStanzaId, mentionedJids = [], mentionedPns = [] }, { sendText, sendReaction }, ctx) {
   const timer = ctx.timer
+
+  // «Confirmar 482917» no grupo (Ruben, 1 out): valida o número sem SMS —
+  // aqui o robô é um contacto conhecido (publica as listas todos os dias),
+  // ao contrário de uma DM a um número estranho. O código de 6 dígitos
+  // continua obrigatório: liga a sessão da app ao telemóvel, e vindo do
+  // número errado não faz nada (por isso ser visível no grupo é inócuo).
+  // Única resposta: reação ✅ — o bot não conversa (Renato, 28 set).
+  const confirmMatch = stripAccents(text.trim().toLowerCase()).match(/^\/?(confirmar|validar|registar)\s+(\d{6})$/)
+  if (confirmMatch) {
+    ctx.action = 'confirmar_numero'
+    if (!senderPn) return
+    const { data, error } = await supabase.rpc('confirm_phone_from_whatsapp', {
+      p_phone_hash: hashPhone(senderPn.split('@')[0]),
+      p_code: confirmMatch[2],
+    })
+    if (error) {
+      console.error('Confirmar número no grupo falhou:', error)
+      return
+    }
+    // Código errado/expirado: silêncio — a app diz «ainda não chegou».
+    if (data?.ok && sendReaction && key) {
+      await sendReaction(groupJid, key, '✅').catch((err) => console.error('Falha a reagir ao Confirmar:', err))
+    }
+    return
+  }
   // Gate on hardcoded, in-memory checks first — normal group chatter never
   // matches either of these, so it never touches the DB (the group lookup
   // used to run unconditionally here, costing every message a query).
@@ -373,6 +423,9 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
   timer.mark('grupo')
   if (!group) return
   const organizationId = group.organizationId
+  // Mensagens novas do robô (interruptor do clube, groups.js): textos novos
+  // e sem o rodapé do /help nas respostas.
+  const fresh = Boolean(group.newMessages)
 
   // Resolved once, up front, and reused for the rest of this handler — every
   // reply below is addressed to this one sender specifically (unlike the
@@ -397,7 +450,8 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
   // Quote the sender's own message so a reply is unambiguous even when
   // several people send commands close together. Every reply also points
   // back to /help, except the help listing itself.
-  const reply = (key, vars) => sendText(groupJid, `${t(key, lang, vars)}${helpFooter(lang)}`, { quoted: message })
+  const reply = (key, vars) =>
+    sendText(groupJid, fresh ? t(key, lang, vars, true) : `${t(key, lang, vars)}${helpFooter(lang)}`, { quoted: message })
 
   // Only called on an actual join attempt (not "out", not disambiguation).
   // Conta = email (Ruben, 30 set): um número desconhecido NÃO ganha conta —
@@ -590,7 +644,13 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
   }
 
   if (action === 'help') {
-    await sendText(groupJid, helpText(lang), { quoted: message })
+    if (!fresh) {
+      await sendText(groupJid, helpText(lang), { quoted: message })
+      return
+    }
+    // Conforme os mixes abertos que este grupo vê.
+    const visible = await openMixesPromise.then((mixes) => mixes.filter((mix) => mixVisibleToGroup(mix, group)), () => [])
+    await sendText(groupJid, buildHelp(visible, lang), { quoted: message })
     return
   }
 
@@ -653,7 +713,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     const freshIds = new Set(fresh.map((mix) => mix.id))
     const rest = openMixes.filter((mix) => !freshIds.has(mix.id))
     if (rest.length > 0) {
-      const list = await formatMixListWithSpots(rest, lang, openMixes)
+      const list = await formatMixListWithSpots(rest, lang, openMixes, fresh)
       await reply(states.length > 0 ? 'mix_list_more' : 'mix_list_recent', { count: rest.length, list })
     }
     return
@@ -752,7 +812,8 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
       pn = data?.[0]?.whatsapp_jid || null
     }
     const who = pn ? `@${String(pn).split('@')[0]}` : partner.name
-    const messageId = await sendText(groupJid, `${t('pair_request_ask', lang, { partner: who, requester: requester.name })}${helpFooter(lang)}`, { mentions: pn ? [pn] : [] })
+    const ask = t('pair_request_ask', lang, { partner: who, requester: requester.name }, fresh)
+    const messageId = await sendText(groupJid, fresh ? ask : `${ask}${helpFooter(lang)}`, { mentions: pn ? [pn] : [] })
     pairRequests.set(`${groupJid}|${game.id}|${requester.id}`, {
       groupJid, gameId: game.id, requesterId: requester.id, requesterName: requester.name,
       partnerId: partner.id, partnerName: partner.name, messageId: messageId || null, createdAt: Date.now(),
@@ -1400,7 +1461,18 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
       return
     }
     if (ownWaitlistRow) {
-      await reply('waitlisted_use_app')
+      // Mensagens novas (1 out): o suplente sai pelo WhatsApp, em vez de
+      // ser mandado para a app.
+      if (!fresh) {
+        await reply('waitlisted_use_app')
+        return
+      }
+      const { error: leaveError } = await supabase.from('participants').delete().eq('id', ownWaitlistRow.id)
+      timer.mark('gravar')
+      if (leaveError) throw new Error(`Failed to remove waitlisted participant: ${leaveError.message}`)
+      await reply('waitlist_left')
+      // O cartão mostra os suplentes: volta a sair sem este.
+      repostHooks.requestRepostForGame(organizationId, game.id)
       return
     }
     if (!ownConfirmedRow) {
@@ -1563,8 +1635,10 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
       return
     }
     if (matched.length > 1) {
-      const list = formatMixListForReply(matched, openMixes, lang)
-      await reply(action === 'in' ? (partnerRequest ? 'disambiguate_in_pair' : 'disambiguate_in') : 'disambiguate_out', { list })
+      await reply(
+        action === 'in' ? (partnerRequest ? 'disambiguate_in_pair' : 'disambiguate_in') : 'disambiguate_out',
+        disambiguateVars(matched, openMixes, lang, fresh)
+      )
       return
     }
     await reply('mix_identifier_not_found')
@@ -1573,12 +1647,12 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
 
   // As inscrições de quem escreve nos mixes abertos — por conta ou pelo
   // hash do número (inscrições-convidado).
-  async function myGameIds(identity) {
+  async function myGameIds(identity, { withWaitlist = false } = {}) {
     const { data: rows, error } = await supabase
       .from('participants')
       .select('game_id, user_id, partner_id, guest:game_guests!participants_guest_id_fkey(phone_hash), partner_guest:game_guests!participants_partner_guest_id_fkey(phone_hash)')
       .in('game_id', openMixes.map((m) => m.id))
-      .eq('status', 'confirmed')
+      .in('status', withWaitlist ? ['confirmed', 'waitlisted'] : ['confirmed'])
     if (error) throw new Error(`Failed to check existing participants: ${error.message}`)
     return new Set(
       rows
@@ -1605,8 +1679,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     // Already in ALL open mixes: nothing left to auto-resolve to, so
     // fall through and show the full list — asking is the least-wrong
     // option there.
-    const list = formatMixListForReply(candidates, openMixes, lang)
-    await reply(partnerRequest ? 'disambiguate_in_pair' : 'disambiguate_in', { list })
+    await reply(partnerRequest ? 'disambiguate_in_pair' : 'disambiguate_in', disambiguateVars(candidates, openMixes, lang, fresh))
     return
   }
 
@@ -1614,7 +1687,8 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
   // inscrições-convidado dele contam como dele.
   const profile = resolvedProfile ?? guestIdentity(senderPn, usablePushName(message?.pushName))
 
-  const memberGameIds = await myGameIds(profile)
+  // Nas mensagens novas, um suplente também pode sair com Out.
+  const memberGameIds = await myGameIds(profile, { withWaitlist: fresh })
   const memberMixes = openMixes.filter((m) => memberGameIds.has(m.id))
 
   if (memberMixes.length === 0) {
@@ -1622,8 +1696,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, quot
     return
   }
   if (memberMixes.length > 1) {
-    const list = formatMixListForReply(memberMixes, openMixes, lang)
-    await reply('disambiguate_out', { list })
+    await reply('disambiguate_out', disambiguateVars(memberMixes, openMixes, lang, fresh))
     return
   }
 

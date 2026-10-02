@@ -223,7 +223,20 @@ const RPC_MOCKS = {
   // grupo) e um pedido pendente.
   list_global_organizations: () => (community() ? COMMUNITY_ORGS : []),
   // Página de um grupo/clube onde ainda não estou (bug do botão, 17 set).
-  get_club_profile: (params) => (community() ? [{
+  // localStorage.mockGameClosed = 'group' | 'club' | 'private' | 'gone': de que
+  // grupo é o /jogo/fake-closed (SPEC 2026-10-01-jogo-de-grupo-fechado).
+  get_game_org_hint: () => {
+    const k = localStorage.getItem('mockGameClosed')
+    if (!k || k === 'gone') return []
+    if (k === 'private') return [{ org_name: null, org_slug: null, org_kind: 'group', org_logo_url: null, org_visible: false }]
+    return [k === 'club'
+      ? { org_name: 'Smash Padel Almada', org_slug: 'smash-padel', org_kind: 'club', org_logo_url: null, org_visible: true }
+      : { org_name: 'Jota Padeleiros', org_slug: 'jota-padeleiros', org_kind: 'group', org_logo_url: null, org_visible: true }]
+  },
+  // O convite do grupo (1 out): o nome e o estado de quem acabou de pedir/entrar.
+  get_club_profile: (params) => (['mockJoinPending', 'mockJoinOpen'].some((k) => localStorage.getItem(k) === 'true') && params?.p_slug === 'jota-padeleiros'
+    ? [{ name: 'Jota Padeleiros', slug: 'jota-padeleiros', my_status: localStorage.getItem('mockJoinOpen') === 'true' ? 'member' : 'pending' }]
+    : community() ? [{
     ...(COMMUNITY_ORGS.find((o) => o.slug === params?.p_slug) || COMMUNITY_ORGS[2]),
     description: 'Grupo de amigos para teste do Alinho 😎', phone: null, instagram: null, website: null,
     parent_slug: null,
@@ -1277,7 +1290,8 @@ const TABLE_MOCKS = {
   // lugares), para se ver o cartão no estado "aberto/junto-te" na Home.
   // localStorage.mockGerirPast = 'true': no Gerir, um mix a seguir, um
   // acabado e um cancelado (acerto de 27 set, «Ver o que já passou»).
-  games: (url) => localStorage.getItem('mockGerirPast') === 'true' && !/[?&]id=eq./.test(url) ? (() => {
+  // /jogo/fake-closed: um jogo que não abre (de um grupo onde não estou) — 2 out.
+  games: (url) => url.includes('id=eq.fake-closed') ? [] : localStorage.getItem('mockGerirPast') === 'true' && !/[?&]id=eq./.test(url) ? (() => {
     const base = { organization_id: 'dev-org', format: 'sobe_desce', num_courts: 2, max_players: 8, game_time_minutes: 20, court_time_minutes: 80, recurrence_id: null, recurrence: null, level: null, location: 'Smash Padel Almada' }
     const day = (n) => new Date(Date.now() + n * 86400000).toISOString()
     const pp = (n) => Array.from({ length: n }, (_, i) => ({ id: `gp${i}`, user_id: `u${i}`, partner_id: null, status: 'confirmed' }))
@@ -1553,6 +1567,17 @@ const wantsSingle = (init) => {
 
 // Gerir com muitos clubes e grupos (localStorage.mockManyOrgs = 'true').
 TABLE_MOCKS.organizations = withManyOrgs(TABLE_MOCKS.organizations)
+// localStorage.mockRobotMessages = 'true' — mensagens novas do robô ligadas
+// no clube do Admin(Dev) (1 out; o interruptor só aparece ao super admin).
+{
+  const orgsBase = TABLE_MOCKS.organizations
+  TABLE_MOCKS.organizations = (url) => {
+    const rows = orgsBase(url)
+    return Array.isArray(rows)
+      ? rows.map((o) => (o.id === MOCK_ADMIN_ORG_ID ? { ...o, whatsapp_new_messages: localStorage.getItem('mockRobotMessages') === 'true' } : o))
+      : rows
+  }
+}
 // «Já jogados» na Home.
 // localStorage.mockPlayedEmpty = 'true': nada jogado ainda (o caso vazio).
 RPC_MOCKS.list_played_events = (params) => {
@@ -1673,6 +1698,13 @@ export function installDevMockNetwork() {
         notready: { code: 'PGRST204', message: "Could not find the 'pairing_mode' column of 'games' in the schema cache" },
       }[errorCase]
       if (body) return jsonResponse(body, 400)
+    }
+
+    // localStorage.mockRobotMessagesError = 'true' — mudar o interruptor das
+    // mensagens do robô falha como a trava da base de dados (not_allowed).
+    if (localStorage.getItem('mockRobotMessagesError') === 'true' && /\/rest\/v1\/organizations\?/.test(url)
+        && (init?.method || input?.method || 'GET').toUpperCase() === 'PATCH' && String(init?.body || '').includes('whatsapp_new_messages')) {
+      return jsonResponse({ code: '42501', message: 'not_allowed' }, 403)
     }
 
     // localStorage.mockDeleteHasResults = 'true' — apagar um mix falha como
