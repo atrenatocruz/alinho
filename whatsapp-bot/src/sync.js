@@ -1,5 +1,5 @@
 import { supabase } from './supabase.js'
-import { loadGame, getOpenMixes, buildMixMessage, recordMixMessage } from './roster.js'
+import { loadGame, getOpenMixes, buildMixMessage, recordMixMessage, longDayDate, shortHour } from './roster.js'
 import { loadOpenSlotBatch, buildOpenSlotsMessage } from './openSlots.js'
 import { getGroups, getGroupsForOrg, mixVisibleToGroup } from './groups.js'
 import { helpFooter } from './messages.js'
@@ -144,13 +144,13 @@ async function postGroupRoster(sendText, getGroupMentions, group, { tagAll = fal
     // later reconcile tick never carries a promo, so hashing the
     // promo-prefixed text would make that tick look "different" from an
     // otherwise-unchanged mix and re-send it minus the callout.
-    const baseText = buildMixMessage(state, { label })
+    const baseText = buildMixMessage(state, { label, fresh: group.newMessages })
     const nextHash = hash(baseText)
     const prev = st.mixes.get(gameId)
     if (prev && prev.hash === nextHash) continue
 
     const promo = promotedByGameId.get(gameId)
-    const promoText = promo ? `${t('promoted_to_confirmed', promo.lang ?? 'pt', { name: promo.name })}\n\n` : ''
+    const promoText = promo ? `${t('promoted_to_confirmed', promo.lang ?? 'pt', { name: promo.name }, group.newMessages)}\n\n` : ''
     const text = promoText + baseText
     const shouldTagThis = tagAll && !taggedThisFlush
     const fullText = shouldTagThis ? `📢 @all\n\n${text}` : text
@@ -178,7 +178,7 @@ async function postGroupRoster(sendText, getGroupMentions, group, { tagAll = fal
     seenBatchIds.add(batchId)
     const batch = await loadOpenSlotBatch(batchId)
     if (batch.games.length === 0) continue
-    const baseText = buildOpenSlotsMessage(batch)
+    const baseText = buildOpenSlotsMessage(batch, { fresh: group.newMessages })
     const nextHash = hash(baseText)
     const prev = st.openSlotBatches.get(batchId)
     if (prev && prev.hash === nextHash) continue
@@ -349,11 +349,12 @@ export function startSync({ sendText, getGroupMentions }) {
           if (!mixVisibleToGroup(payload.new, group)) continue
           try {
             const mentions = await getGroupMentions(group.groupJid)
-            await sendText(
-              group.groupJid,
-              `${t('mix_cancelled', 'pt', { title: payload.new.title })}${helpFooter('pt')}`,
-              { mentions }
-            )
+            // Nas mensagens novas, com o dia e a hora (para não se confundir
+            // com o da semana seguinte) e sem o rodapé do /help.
+            const text = group.newMessages
+              ? t('mix_cancelled', 'pt', { title: payload.new.title, when: `${longDayDate(payload.new.date)}, às ${shortHour(payload.new.date)}` }, true)
+              : `${t('mix_cancelled', 'pt', { title: payload.new.title })}${helpFooter('pt')}`
+            await sendText(group.groupJid, text, { mentions })
           } catch (err) {
             console.error(`Failed to announce cancellation to ${group.groupJid}:`, err)
           }

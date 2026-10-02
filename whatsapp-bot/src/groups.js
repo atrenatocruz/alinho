@@ -100,14 +100,42 @@ async function loadGroups() {
   }))
 }
 
+/**
+ * Mensagens novas do robô (organizations.whatsapp_new_messages, interruptor
+ * por clube que só o super admin vê — 1 out): cada grupo leva
+ * `newMessages`. Lido junto com os grupos (mesma cache de 60 s), para não
+ * custar uma ida à BD por mensagem. Sem a migração (42703), ou se a leitura
+ * falhar, ficam todos com as mensagens de sempre.
+ */
+async function withMessageFlags(groups) {
+  const orgIds = [...new Set(groups.map((g) => g.organizationId))]
+  let on = new Set()
+  if (orgIds.length > 0) {
+    try {
+      const { data, error } = await supabase.from('organizations').select('id, whatsapp_new_messages').in('id', orgIds)
+      if (error) {
+        if (error.code !== '42703') console.error('Failed to load whatsapp_new_messages:', error)
+      } else {
+        on = new Set((data || []).filter((org) => org.whatsapp_new_messages === true).map((org) => org.id))
+      }
+    } catch (err) {
+      console.error('Failed to load whatsapp_new_messages:', err)
+    }
+  }
+  return groups.map((g) => ({ ...g, newMessages: on.has(g.organizationId) }))
+}
+
 /** Todos os grupos servidos por este processo (cache 60 s): as linhas de
     whatsapp_groups cuja conta WhatsApp deste processo está mesmo no grupo. */
 export async function getGroups() {
   if (cached && Date.now() - cachedAt < CACHE_TTL_MS) return cached
-  cached = await filterToParticipating(await loadGroups())
+  cached = await withMessageFlags(await filterToParticipating(await loadGroups()))
   cachedAt = Date.now()
   return cached
 }
+
+/** Só para testes. */
+export function _clearGroupsCacheForTests() { cached = null }
 
 /** O grupo de onde veio uma mensagem, ou null (grupo não configurado → ignorar). */
 export async function getGroupByJid(groupJid) {

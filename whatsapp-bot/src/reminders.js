@@ -1,7 +1,7 @@
 import { supabase } from './supabase.js'
 import { config } from './config.js'
 import { getGroups, getGroupsForOrg, getServedOrgIds, mixVisibleToGroup } from './groups.js'
-import { getOpenMixes, loadGame, formatDateTime, buildMixMessage, recordMixMessage, labelableMixes, mixLabel } from './roster.js'
+import { getOpenMixes, loadGame, formatDateTime, buildMixMessage, recordMixMessage, labelableMixes, mixLabel, relativeDay, shortHour, shortPlace } from './roster.js'
 import { cardSentRecently, noteCardSent } from './sync.js'
 import { dueMixes, postKey, slotFor, mixPostTimes } from './postSchedule.js'
 import { loadTournamentsToPost, buildTournamentMessage, loadOpenSlotGames, loadLessonSeriesToPost, buildLessonSeriesMessage } from './eventPosts.js'
@@ -81,9 +81,19 @@ async function sendGameDayReminder(game, { sendText }) {
   const groupText =
     t('reminder_group', groupLang, { title: game.title, hours: hoursLeft, when: whenGroup, location: locationLine, roster: rosterLine }) +
     helpFooter(groupLang)
+  // Mensagens novas (1 out): a hora a que é em vez de «daqui a 3h», o sítio
+  // sem a morada e o que fazer se não puderes ir.
+  const place = shortPlace(game.location)
+  const newText = t('reminder_group', groupLang, {
+    title: game.title,
+    day: relativeDay(game.date),
+    time: shortHour(game.date),
+    location: place ? `, no ${place}` : '',
+    roster: rosterNames.length > 0 ? t('reminder_roster_line', groupLang, { names: rosterNames.join(', ') }, true) : '',
+  }, true)
   for (const group of groups) {
     try {
-      await sendText(group.groupJid, groupText, { mentions: rosterMentions })
+      await sendText(group.groupJid, group.newMessages ? newText : groupText, { mentions: rosterMentions })
     } catch (err) {
       console.error(`Failed to post game-day reminder to ${group.groupJid}:`, err)
     }
@@ -166,7 +176,7 @@ export async function publishOrgCards(orgId, { sendText, getGroupMentions }, { o
       const mentions = await getGroupMentions(group.groupJid)
       for (let i = 0; i < withSpots.length; i++) {
         const state = withSpots[i]
-        const card = buildMixMessage(state, { label: mixLabel(state.game, labelable) })
+        const card = buildMixMessage(state, { label: mixLabel(state.game, labelable), fresh: group.newMessages })
         const text = i === 0 ? `📢 @all\n\n${card}` : card
         const messageId = await sendText(group.groupJid, text, i === 0 ? { mentions } : {})
         recordMixMessage(messageId, state.game.id)
@@ -216,12 +226,14 @@ export async function checkScheduledPosts({ sendText, getGroupMentions }, now = 
   await publishOtherEvents({ sendText, getGroupMentions }, { orgIds, hoursByOrg, slot, dayKey })
 }
 
-/** Uma mensagem em todos os grupos do clube, com @all (como os cartões dos mixes). */
-async function sendToOrgGroups(orgId, text, { sendText, getGroupMentions }) {
+/** Uma mensagem em todos os grupos do clube, com @all (como os cartões dos
+ *  mixes). `buildText(fresh)` dá o texto de cada grupo: as mensagens novas
+ *  ou as de sempre, conforme o interruptor do clube. */
+async function sendToOrgGroups(orgId, buildText, { sendText, getGroupMentions }) {
   for (const group of await getGroupsForOrg(orgId)) {
     try {
       const mentions = await getGroupMentions(group.groupJid)
-      await sendText(group.groupJid, `📢 @all\n\n${text}`, { mentions })
+      await sendText(group.groupJid, `📢 @all\n\n${buildText(group.newMessages)}`, { mentions })
     } catch (err) {
       console.error(`Failed to publish event to ${group.groupJid}:`, err)
     }
@@ -241,7 +253,7 @@ async function publishOtherEvents(deps, { orgIds, hoursByOrg, slot, dayKey }) {
       const key = `t:${item.tournament.id}`
       if (!isDue(item.tournament, key)) continue
       sentPosts.add(postKey(key, dayKey, slot))
-      await sendToOrgGroups(item.tournament.organization_id, buildTournamentMessage(item), deps)
+      await sendToOrgGroups(item.tournament.organization_id, (fresh) => buildTournamentMessage(item, { fresh }), deps)
     }
   } catch (err) {
     console.error('Failed to publish scheduled tournaments:', err)
@@ -252,7 +264,7 @@ async function publishOtherEvents(deps, { orgIds, hoursByOrg, slot, dayKey }) {
       const key = `l:${item.series.id}`
       if (!isDue(item.series, key)) continue
       sentPosts.add(postKey(key, dayKey, slot))
-      await sendToOrgGroups(item.series.organization_id, buildLessonSeriesMessage(item), deps)
+      await sendToOrgGroups(item.series.organization_id, (fresh) => buildLessonSeriesMessage(item, { fresh }), deps)
     }
   } catch (err) {
     console.error('Failed to publish scheduled lesson series:', err)
@@ -272,7 +284,7 @@ async function publishOtherEvents(deps, { orgIds, hoursByOrg, slot, dayKey }) {
       const batch = await loadOpenSlotBatch(batchId)
       const hasSpot = batch.games.some(({ game, people }) => people.length < (game.max_players || game.num_courts * 4))
       if (!hasSpot) continue
-      await sendToOrgGroups(orgId, buildOpenSlotsMessage(batch), deps)
+      await sendToOrgGroups(orgId, (fresh) => buildOpenSlotsMessage(batch, { fresh }), deps)
     }
   } catch (err) {
     console.error('Failed to publish scheduled open slots:', err)
