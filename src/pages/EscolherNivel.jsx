@@ -4,7 +4,7 @@ import { CheckCircle2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton, RatingBadge, Select, DateField } from '../components/ui'
-import { MIN_SIGNUP_AGE, ADULT_AGE, isAtLeast } from '../lib/age'
+import { MIN_SIGNUP_AGE, ADULT_AGE, isAtLeast, maxSignupBirthday } from '../lib/age'
 import { Wordmark } from '../components/Layout'
 import { ONBOARDING_LEVELS } from '../lib/elo'
 import { countryOptions } from '../lib/countries'
@@ -144,7 +144,7 @@ export default function EscolherNivel() {
             <label className="block text-sm font-extrabold text-ink-900 mb-2">
               {t('login.birthday_label')}
             </label>
-            <DateField value={birthday} onChange={setBirthday} max={new Date().toISOString().slice(0, 10)} hideToday />
+            <DateField value={birthday} onChange={setBirthday} max={maxSignupBirthday()} hideToday />
             {birthdayTooYoung && (
               <p className="text-xs text-danger mt-1.5">{t('login.error_under_age', { age: MIN_SIGNUP_AGE })}</p>
             )}

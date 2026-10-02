@@ -22,3 +22,13 @@ export const isAtLeast = (birthday, years, today = new Date()) => {
   const age = ageOn(birthday, today)
   return age != null && age >= years
 }
+
+/** O dia mais recente que uma data de nascimento pode ter no registo:
+    hoje menos MIN_SIGNUP_AGE anos. Serve de `max` aos DateField de
+    nascimento — não vale a pena o calendário abrir em 2026 quando só se
+    aceita 13+ (Ruben, 2 out). */
+export const maxSignupBirthday = (today = new Date()) => {
+  const d = new Date(today.getFullYear() - MIN_SIGNUP_AGE, today.getMonth(), today.getDate())
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
