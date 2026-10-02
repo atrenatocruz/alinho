@@ -2296,6 +2296,29 @@ export default function GameDetails() {
       ...duplaStats.filter((d) => !order.includes(d.id)),
     ]
   })()
+  // As Estatísticas do Mix espelham a mesma classificação (Ruben, 2 out):
+  // dupla a dupla, pela fotografia final dos campos, com os dois jogadores
+  // da dupla a partilharem a posição (1,1,2,2…) — o sobe e desce não produz
+  // ranking individual. O delta/rating de cada um mantém-se; só a ordem e o
+  // número mudam. Fora do sobe e desce de duplas fixas fica a ordem da query.
+  const duplaPosByPlayer = (() => {
+    if (!isSobeDesce || isRotating || game.status !== 'finished') return {}
+    const pos = {}
+    sobeDesceStandings(matches).forEach((teamId, i) => {
+      const team = teams.find((tm) => tm.id === teamId)
+      if (team?.player1_id) pos[team.player1_id] = i
+      if (team?.player2_id) pos[team.player2_id] = i
+    })
+    return pos
+  })()
+  const orderedMixStats = Object.keys(duplaPosByPlayer).length
+    ? [...mixStats].sort((a, b) => {
+        const pa = duplaPosByPlayer[a.user_id] ?? Infinity
+        const pb = duplaPosByPlayer[b.user_id] ?? Infinity
+        if (pa !== pb) return pa < pb ? -1 : 1
+        return (b.rating_delta ?? 0) - (a.rating_delta ?? 0)
+      })
+    : mixStats
 
   // O editor de arrastar jogadores entre duplas (Trello #292). Serve durante
   // o mix antes da ronda 1 e, desde 27 set, com as duplas sorteadas antes de
@@ -2751,7 +2774,10 @@ export default function GameDetails() {
         <div id="mix-stats" className="card scroll-mt-24">
           <h3 className="text-lg text-ink-900 mb-3">{t('gamedetails.mix_stats_title')}</h3>
           <div className="space-y-1.5">
-            {mixStats.map((s, i) => {
+            {orderedMixStats.map((s, i) => {
+              // Posição da dupla na fotografia final; sem mapa (outros
+              // formatos), a numeração corrida de sempre.
+              const pos = duplaPosByPlayer[s.user_id] != null ? duplaPosByPlayer[s.user_id] + 1 : i + 1
               // rating_delta/rating_after only exist from the Elo rollout
               // (2026-08-25) onward — older finished mixes fall back to the
               // legacy points_earned they were actually finalized with.
@@ -2779,9 +2805,9 @@ export default function GameDetails() {
               return (
                 <div key={s.id} className="flex items-center gap-3 py-2 border-b border-line last:border-0">
                   <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-extrabold tabular-nums shrink-0 ${
-                    i === 0 ? 'bg-ink-900 text-white' : 'bg-ink-50 text-ink-700'
+                    pos === 1 ? 'bg-ink-900 text-white' : 'bg-ink-50 text-ink-700'
                   }`}>
-                    {i + 1}
+                    {pos}
                   </span>
                   {isGuestById[s.user_id] ? nameBlock : (
                     <Link to={`/jogador/${s.user_id}`} className="flex-1 min-w-0">
