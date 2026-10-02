@@ -574,6 +574,16 @@ export function standings(teams, matches) {
 /** Um jogo com resultado: pontos gravados dos dois lados, com ou sem
     vencedor. Um empate grava-se (Francisco, 30 set, REGRAS.md ponto 4) e
     fica com winner_team_id null — o save_mix_match_result do Dev 3. */
+/** «Carlos N.» para o «marcado por»: o primeiro nome e a inicial do último.
+    O que está entre parênteses e o que não tem letras não conta — com
+    «Francisco (QA)» saía «Francisco (.» (Francisco, 2 out). */
+export function shortPersonName(name) {
+  const parts = String(name || '').replace(/\([^)]*\)?/g, ' ').trim().split(/\s+/).filter((p) => /\p{L}/u.test(p))
+  if (parts.length === 0) return ''
+  const last = parts[parts.length - 1].match(/\p{L}/u)[0]
+  return parts.length > 1 ? `${parts[0]} ${last.toUpperCase()}.` : parts[0]
+}
+
 export const hasResult = (m) => !!m && (!!m.winner_team_id || (m.score_a != null && m.score_b != null))
 
 /** Jogo empatado: com resultado e sem vencedor. Trava o passo seguinte do

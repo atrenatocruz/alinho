@@ -20,7 +20,7 @@ import { KIND_STYLE, KindTag, StateTag, Owner } from '../components/agenda/Event
 import PoolGroupStage from '../components/PoolGroupStage'
 import PreviousEditions from '../components/agenda/PreviousEditions'
 import ScoreEntry from '../components/ScoreEntry'
-import { countPeople, guestVirtualRating, totalRounds, formDuplas, seedCourts, nextSobeDesce, nextSobeDesceRotating, splitPartnerRows, rotatingPlacar, roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches, thirdPlaceMatch, lowerPlacementMatches, placementOfCourt, PHASE_LABEL_KEY, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, mixCapacity, isGenderMismatch, isMissingGender, isMissingBirthday, isAgeIneligible, splitIntoPools, generateAmericanoSchedule, americanoStandings, computeMixWinnerTeamId, formatLabelKey, hasResult, isTie, sobeDesceStandings } from '../lib/mixLogic'
+import { countPeople, guestVirtualRating, totalRounds, formDuplas, seedCourts, nextSobeDesce, nextSobeDesceRotating, splitPartnerRows, rotatingPlacar, roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches, thirdPlaceMatch, lowerPlacementMatches, placementOfCourt, PHASE_LABEL_KEY, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, mixCapacity, isGenderMismatch, isMissingGender, isMissingBirthday, isAgeIneligible, splitIntoPools, generateAmericanoSchedule, americanoStandings, computeMixWinnerTeamId, formatLabelKey, hasResult, isTie, sobeDesceStandings, shortPersonName } from '../lib/mixLogic'
 import { isProvisional, formatRatingMaybeProvisional } from '../lib/elo'
 import { AGE_LABEL_KEY, meetsAgeRestriction } from '../lib/ageCategories'
 import { winRatePct, firstLastName } from '../lib/statsLogic'
@@ -2538,10 +2538,6 @@ export default function GameDetails() {
   const avatarById = Object.fromEntries([...clubMembers, ...people].map((p) => [p.id, p.avatar_url]))
   const orgKindOfGame = gameMembership?.organization?.kind || 'group'
   // «Carlos N.»: o nome e a inicial do último.
-  const shortPersonName = (name) => {
-    const parts = String(name || '').trim().split(/\s+/).filter(Boolean)
-    return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0]}.` : parts[0] || ''
-  }
   const myTeamIds = new Set(teams.filter((tm) => tm.player1_id === user.id || tm.player2_id === user.id).map((tm) => tm.id))
   const myMatch = currentRoundMatches.find((m) => myTeamIds.has(m.team_a_id) || myTeamIds.has(m.team_b_id)) || null
   const orgSlug = gameMembership?.organization?.slug
