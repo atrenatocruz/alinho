@@ -13,6 +13,20 @@ function mentionToken(jid) {
   return `@${jid.split('@')[0]}`
 }
 
+
+// Rating virtual de um convidado sem conta (Ruben, 2 out): a média dos
+// jogadores com conta do mix (≥ 2), senão o ponto médio da banda do nível
+// do mix, senão 900. Espelha mix_guest_rating
+// (migration_guest_rank_virtual.sql) e src/lib/mixLogic.js — mudar lá →
+// mudar aqui (duplicação pequena aceite neste repo, como o mentionToken).
+const GUEST_BAND_POINTS = { 1: 1900, 2: 1700, 3: 1500, 4: 1300, 5: 1100, 6: 850 }
+export function guestVirtualRating(accountRatings = [], gameLevel = null) {
+  const rated = accountRatings.filter((r) => r != null)
+  if (rated.length >= 2) return Math.round(rated.reduce((sum, r) => sum + r, 0) / rated.length)
+  const band = Number(String(gameLevel || '').match(/[1-6]$/)?.[0])
+  return GUEST_BAND_POINTS[band] ?? 900
+}
+
 function pairKey(a, b) {
   return [a, b].sort().join('|')
 }
@@ -107,6 +121,22 @@ export function formDuplas(participants, pointsById, repeatPairKeys, sideById = 
   return rows
 }
 
+/**
+ * Duplas já sorteadas à mão por quem organiza (2 out, Francisco: «mexe e
+ * corrige isso»). Antes o arranque automático sorteava por cima e ficavam
+ * duplas a dobrar. Devolve:
+ *   · null — não há duplas: sorteia-se como sempre;
+ *   · 'wait' — há duplas mas falta alguém num lugar («Falta 1») ou são
+ *     menos de 2: não arranca, espera por quem organiza;
+ *   · a lista — arranca com estas, sem sortear outra vez.
+ */
+export function drawnTeamsToUse(teams) {
+  if (!teams?.length) return null
+  const empty = (id, guestId) => !id && !guestId
+  if (teams.length < 2 || teams.some((t) => empty(t.player1_id, t.player1_guest_id) || empty(t.player2_id, t.player2_guest_id))) return 'wait'
+  return teams
+}
+
 // O bot só sabe conduzir o que consegue formar: duplas fixas em "Sobe e
 // desce" ou "Todos contra todos", por nível. Não sabe Americano (troca de
 // parceiro a cada ronda), Grupos + Eliminatórias (fase de grupos e quadro),
@@ -178,63 +208,79 @@ async function autoStartMix(game, { sendText }) {
   const peopleCount = (participants || []).reduce((n, p) => n + 1 + (p.partner_id || p.partner_guest_id ? 1 : 0), 0)
   if (peopleCount < capacity) return
 
-  // Convidados sem conta: ids de game_guests — emparelham com 900 (o
-  // baseline de sempre) e lado 'both' (o default do sideOf).
+  // Duplas já sorteadas por quem organiza: começa com essas.
+  const { data: drawnRows, error: drawnErr } = await supabase
+    .from('teams')
+    .select('id, player1_id, player2_id, player1_guest_id, player2_guest_id')
+    .eq('game_id', game.id)
+    .order('created_at')
+  if (drawnErr) throw new Error(`Failed to load drawn teams for auto-start: ${drawnErr.message}`)
+  const drawn = drawnTeamsToUse(drawnRows)
+  if (drawn === 'wait') return
+
+  // Convidados sem conta: ids de game_guests — valem o rating virtual do
+  // mix (Ruben, 2 out) e lado 'both' (o default do sideOf).
   const guestIds = new Set((participants || []).flatMap((p) => [p.guest_id, p.partner_guest_id]).filter(Boolean))
 
-  const { data: rankings, error: rErr } = await supabase.rpc('get_global_rankings')
-  if (rErr) throw new Error(`Failed to load rankings for auto-start: ${rErr.message}`)
-  const pointsById = Object.fromEntries((rankings || []).map((r) => [r.user_id, Math.round(r.rating || 0)]))
-  for (const id of guestIds) pointsById[id] = 900
+  let insertedTeams = drawn
+  if (!drawn) {
+    const { data: rankings, error: rErr } = await supabase.rpc('get_global_rankings')
+    if (rErr) throw new Error(`Failed to load rankings for auto-start: ${rErr.message}`)
+    const pointsById = Object.fromEntries((rankings || []).map((r) => [r.user_id, Math.round(r.rating || 0)]))
+    const guestPts = guestVirtualRating(
+      (participants || []).flatMap((p) => [p.user_id, p.partner_id]).filter(Boolean).map((uid) => pointsById[uid]),
+      game.level
+    )
+    for (const id of guestIds) pointsById[id] = guestPts
 
-  const repeatPairKeys = await loadRepeatPairKeys(game)
+    const repeatPairKeys = await loadRepeatPairKeys(game)
 
-  // O lado preferido de cada um, para não formar duplas do mesmo lado.
-  const soloIds = (participants || []).filter((p) => !p.partner_id && !p.partner_guest_id && p.user_id).map((p) => p.user_id)
-  let sideById = {}
-  if (soloIds.length) {
-    const { data: sideRows, error: sideErr } = await supabase
-      .from('profiles')
-      .select('id, preferred_side')
-      .in('id', soloIds)
-    if (sideErr) throw new Error(`Failed to load preferred sides for auto-start: ${sideErr.message}`)
-    sideById = Object.fromEntries((sideRows || []).map((r) => [r.id, r.preferred_side || 'both']))
-  }
-
-  const duplas = formDuplas(participants || [], pointsById, repeatPairKeys, sideById)
-  if (duplas.forcedRepeats.length) {
-    console.warn(`Auto-start do mix ${game.id}: ${duplas.forcedRepeats.length} dupla(s) repetida(s) por não haver alternativa`)
-  }
-  if (duplas.length < 2) {
-    // Not enough confirmed players yet — leave status alone, try again
-    // next tick (mirrors "São precisas pelo menos 2 duplas" client-side).
-    return
-  }
-
-  // Cada lado vai para a coluna certa (conta vs convidado). seed_ranking:
-  // o convidado HERDA o rating do parceiro (a regra do Elo —
-  // migration_elo_simples.sql: a dupla vale a média de quem tem conta);
-  // dupla 100% convidados fica a 0.
-  const teamRow = ({ player1_id: p1, player2_id: p2 }) => {
-    const g1 = guestIds.has(p1)
-    const g2 = guestIds.has(p2)
-    const pts = (id) => pointsById[id] ?? 0
-    const seed = !g1 && !g2 ? pts(p1) + pts(p2) : !g1 ? pts(p1) * 2 : !g2 ? pts(p2) * 2 : 0
-    return {
-      game_id: game.id,
-      player1_id: g1 ? null : p1,
-      player1_guest_id: g1 ? p1 : null,
-      player2_id: g2 ? null : p2,
-      player2_guest_id: g2 ? p2 : null,
-      seed_ranking: seed,
+    // O lado preferido de cada um, para não formar duplas do mesmo lado.
+    const soloIds = (participants || []).filter((p) => !p.partner_id && !p.partner_guest_id && p.user_id).map((p) => p.user_id)
+    let sideById = {}
+    if (soloIds.length) {
+      const { data: sideRows, error: sideErr } = await supabase
+        .from('profiles')
+        .select('id, preferred_side')
+        .in('id', soloIds)
+      if (sideErr) throw new Error(`Failed to load preferred sides for auto-start: ${sideErr.message}`)
+      sideById = Object.fromEntries((sideRows || []).map((r) => [r.id, r.preferred_side || 'both']))
     }
-  }
 
-  const { data: insertedTeams, error: teamsError } = await supabase
-    .from('teams')
-    .insert(duplas.map(teamRow))
-    .select('id, player1_id, player2_id, player1_guest_id, player2_guest_id')
-  if (teamsError) throw new Error(`Failed to insert teams for auto-start: ${teamsError.message}`)
+    const duplas = formDuplas(participants || [], pointsById, repeatPairKeys, sideById)
+    if (duplas.forcedRepeats.length) {
+      console.warn(`Auto-start do mix ${game.id}: ${duplas.forcedRepeats.length} dupla(s) repetida(s) por não haver alternativa`)
+    }
+    if (duplas.length < 2) {
+      // Not enough confirmed players yet — leave status alone, try again
+      // next tick (mirrors "São precisas pelo menos 2 duplas" client-side).
+      return
+    }
+
+    // Cada lado vai para a coluna certa (conta vs convidado). O seed soma
+    // os pontos dos dois — o pointsById já traz o virtual dos convidados.
+    const teamRow = ({ player1_id: p1, player2_id: p2 }) => {
+      const g1 = guestIds.has(p1)
+      const g2 = guestIds.has(p2)
+      const pts = (id) => pointsById[id] ?? 0
+      const seed = pts(p1) + pts(p2)
+      return {
+        game_id: game.id,
+        player1_id: g1 ? null : p1,
+        player1_guest_id: g1 ? p1 : null,
+        player2_id: g2 ? null : p2,
+        player2_guest_id: g2 ? p2 : null,
+        seed_ranking: seed,
+      }
+    }
+
+    const { data: newTeams, error: teamsError } = await supabase
+      .from('teams')
+      .insert(duplas.map(teamRow))
+      .select('id, player1_id, player2_id, player1_guest_id, player2_guest_id')
+    if (teamsError) throw new Error(`Failed to insert teams for auto-start: ${teamsError.message}`)
+    insertedTeams = newTeams
+  }
 
   const { error: statusError } = await supabase.from('games').update({ status: 'in_progress' }).eq('id', game.id)
   if (statusError) throw new Error(`Failed to flip game to in_progress for auto-start: ${statusError.message}`)

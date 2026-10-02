@@ -9,7 +9,7 @@ import TurnstileWidget from '../components/TurnstileWidget'
 import i18n from '../lib/i18n'
 import { describeError } from '../lib/errors'
 import { ACCOUNT_DELETION_GRACE_DAYS } from '../lib/account'
-import { MIN_SIGNUP_AGE, isAtLeast } from '../lib/age'
+import { MIN_SIGNUP_AGE, isAtLeast, maxSignupBirthday } from '../lib/age'
 import { safeInternalPath, savePendingOrgSlug } from '../lib/loginLinks'
 
 // Same pattern as Layout.jsx's header toggle, minus the profile persistence
@@ -400,7 +400,7 @@ export default function Login() {
                 <DateField
                   value={signupBirthday}
                   onChange={setSignupBirthday}
-                  max={new Date().toISOString().slice(0, 10)}
+                  max={maxSignupBirthday()}
                   hideToday
                   required
                 />

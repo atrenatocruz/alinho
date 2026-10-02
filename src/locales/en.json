@@ -1207,6 +1207,8 @@
   "gamedetails.drawing": "Drawing…",
   "gamedetails.start_round1": "Start Round 1",
   "gamedetails.start_round_n": "Start Round {{number}}",
+  "gamedetails.draw_round1": "Put the pairs on the courts",
+  "gamedetails.draw_round1_hint": "Shows the Round 1 games. The clock starts later, with «Start Round 1».",
   "gamedetails.your_game_label": "Your game",
   "gamedetails.round_pending_min": "not started · {{minutes}} min",
   "gamedetails.duplas_count": "Pairs · {{count}}",
