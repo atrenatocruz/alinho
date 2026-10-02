@@ -417,7 +417,8 @@ export default function GerirClube() {
       itens.push({
         tipo: 'torneio', chave: `torneio-${torneio.id}`,
         quando: torneio.starts_on ? `${torneio.starts_on}T12:00` : null, row: torneio,
-        terminado: torneio.status === 'finished' || (!!fim && new Date(`${fim}T23:59`) < new Date()),
+        terminado: torneio.status === 'finished' || torneio.status === 'terminado' || torneio.status === 'cancelado'
+          || (!!fim && new Date(`${fim}T23:59`) < new Date()),
       })
     }
     // Uma turma repete-se todas as semanas: entra pela proxima vez que
@@ -3275,8 +3276,14 @@ export default function GerirClube() {
                     // Torneio: «Editar» à direita, igual ao mix (ações do evento,
                     // assunto 1 — os mesmos nomes em todos os eventos, 30 set).
                     // Abre o Editar do torneio na página dele.
-                    if (tipo === 'torneio' && row.status !== 'terminado') {
+                    if (tipo === 'torneio' && row.status !== 'terminado' && row.status !== 'cancelado') {
                       acao = { texto: t('gerirclube.edit_action'), fazer: () => navigate(`/torneio/${row.slug || row.id}?admin=editar`), perigo: false }
+                    }
+                    // Cancelado (1 out): como o mix cancelado — cinzento, «Cancelado»,
+                    // não abre.
+                    if (tipo === 'torneio' && row.status === 'cancelado') {
+                      cinzento = true; acao = null; abrir = null
+                      detalhe = [item.quando ? quandoCurto(item.quando, false) : null, t('gerirclube.status_cancelled')].filter(Boolean).join(' · ')
                     }
                     if (tipo === 'mix' && !isDraftMix(row)) {
                       abrir = row.recurrence_id

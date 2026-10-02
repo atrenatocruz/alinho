@@ -11,13 +11,13 @@
 //   · UM botão para o passo seguinte, com o nome do que faz;
 //   · nunca um ícone sozinho — cada acção diz-se por extenso;
 //   · um botão que desaparece deixa no lugar a RAZÃO, não um espaço vazio.
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { MoreHorizontal, Pencil } from 'lucide-react'
-import { deleteTournament, setTournamentStatus } from '../../lib/tournamentApi'
+import { getTournamentForEdit, setTournamentStatus } from '../../lib/tournamentApi'
+import { canCancel, cancelDanger } from './cancelTournament'
 import { describeError } from '../../lib/errors'
-import { canDelete } from '../../lib/tournaments'
 import { TOURNAMENT_TZ } from '../../lib/tournamentDay'
 import CloseCategories from './CloseCategories'
 import { deadlinePassed, drawProgress, statusKey } from './drawProgress'
@@ -66,19 +66,27 @@ export default function AdminBar({ tournament, categories = [], onChanged, onEdi
   // enquanto houver uma categoria fechada e por sortear, e o estado diz
   // quantas faltam — o torneio já está «sorteado» desde a primeira.
   const progress = drawProgress(categories)
-  const canDraw = status !== 'rascunho' && (status === 'fechado' || progress.toDraw.length > 0)
+  // Cancelado (1 out): não se sorteia mais nada.
+  const canDraw = !['rascunho', 'cancelado'].includes(status) && (status === 'fechado' || progress.toDraw.length > 0)
   // Com inscrições feitas há coisas que deixam de se poder fazer. Quando
   // isso acontece, o lugar do botão fica com a RAZÃO escrita — nunca um
   // espaço vazio, que é o que deixa quem monta sem saber se a acção não
   // existe, se está noutro sítio, ou se está trancada.
 
-  const deletable = canDelete(tournament)
-
-  // Se apagar falhar, o erro fica na folha (ConfirmSheet), junto ao botão.
-  const remove = async () => {
-    await deleteTournament(tournament.id)
-    navigate('/gerir')
-  }
+  // Cancelar (ou, em rascunho sem inscritos, apagar): a pergunta é a mesma do
+  // Editar por passos (cancelTournament.js). Se falhar, o erro fica na folha.
+  // Já houve inscrições, mesmo desistidas? A conta da base de dados decide
+  // entre «Eliminar» e «Cancelar» antes do toque (UX, 1 out).
+  const [everEntered, setEverEntered] = useState(null)
+  useEffect(() => {
+    if (!tournament?.id) return undefined
+    let alive = true
+    getTournamentForEdit(tournament.id)
+      .then((d) => { if (alive) setEverEntered(d ? !!d.has_entries : null) })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [tournament?.id, tournament?.entry_count])
+  const cancel = cancelDanger(tournament, t, (deleted) => (deleted ? navigate('/gerir') : onChanged?.()), { everEntered })
 
   const go = async (to) => {
     setBusy(true); setError(null)
@@ -134,21 +142,21 @@ export default function AdminBar({ tournament, categories = [], onChanged, onEdi
               url.searchParams.set('ver', 'publico')
               navigate(`${url.pathname}${url.search}`)
             } },
-            // Sempre em último; sem se poder apagar, apagado e com a razão.
-            { key: 'delete', danger: true, disabled: !deletable, label: t('tournament.admin.delete_tournament'),
-              hint: deletable ? null : t('tournament.admin.cannot_delete'), onClick: () => setAsk('delete') },
+            // «Cancelar o torneio» em todos os estados até terminar (Francisco,
+            // 1 out: «cancelar sempre»); sem inscritos, em rascunho, apaga.
+            canCancel(tournament) && { key: 'cancel', danger: true, label: cancel.label, hint: cancel.hint, onClick: () => setAsk('cancel') },
           ].filter(Boolean)}
         />
         <ConfirmSheet
-          open={ask === 'delete'}
+          open={ask === 'cancel'}
           danger
-          title={t('tournament.admin.delete_title_named', { name: tournament?.name })}
-          message={t('tournament.admin.delete_consequence')}
-          cancelLabel={t('tournament.admin.delete_keep')}
-          confirmLabel={t('tournament.admin.delete_yes')}
-          onConfirm={remove}
+          title={cancel.title}
+          message={cancel.message}
+          cancelLabel={cancel.cancelLabel}
+          confirmLabel={cancel.confirmLabel}
+          onConfirm={cancel.onConfirm}
           onClose={() => setAsk(null)}
-          errorOf={(err) => describeError(t, err)}
+          errorOf={cancel.errorOf}
         />
       </div>
     )

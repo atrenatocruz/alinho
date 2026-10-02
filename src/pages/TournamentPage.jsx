@@ -30,6 +30,7 @@ import AdminBar from '../components/tournament/AdminBar'
 import CreateTournamentForm from '../components/tournament/CreateTournamentForm'
 import ChampionsBlock from '../components/tournament/ChampionsBlock'
 import NextGameCard, { useMyNextGame } from '../components/tournament/NextGameCard'
+import { canCancel, cancelDanger } from '../components/tournament/cancelTournament'
 import DrawAdminPanel from '../components/tournament/DrawAdminPanel'
 import TournamentCalendarGrid from '../components/tournament/TournamentCalendarGrid'
 import ScorekeepersPanel from '../components/tournament/ScorekeepersPanel'
@@ -265,6 +266,11 @@ export default function TournamentPage() {
           club={clubForForm}
           initial={editing}
           locked={!!editing.has_entries}
+          danger={canCancel(tour) ? cancelDanger(tour, t, (deleted) => {
+            if (deleted) { navigate('/gerir'); return }
+            closeAdmin()
+            window.dispatchEvent(new CustomEvent('tournament:reload'))
+          }, { everEntered: !!editing.has_entries }) : null}
           saving={savingEdit}
           error={adminError}
           onCancel={closeAdmin}

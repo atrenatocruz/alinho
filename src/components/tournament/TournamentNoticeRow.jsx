@@ -19,7 +19,8 @@ import { TOURNAMENT_TZ } from '../../lib/tournamentDay'
 // 'tournament_prize_changed' (AUDITORIA editar-tem-tudo, ponto 2; Francisco,
 // 28 set): o organizador mudou o prémio da categoria onde estou inscrito.
 // Sai da base de dados (Dev 3) quando o prize_first/prize_second muda.
-export const TOURNAMENT_NOTICE_KINDS = ['tournament_promoted', 'tournament_correction_requested', 'tournament_prize_changed']
+// 'tournament_cancelled' (1 out, Dev 3): o organizador cancelou o torneio.
+export const TOURNAMENT_NOTICE_KINDS = ['tournament_promoted', 'tournament_correction_requested', 'tournament_prize_changed', 'tournament_cancelled']
 
 /** «150 € + troféu» ou, com os dois, «1.º 150 € · 2.º 50 €». */
 export function prizeText(first, second, t) {
@@ -55,6 +56,8 @@ export default function TournamentNoticeRow({ notice, onOpen }) {
   // Texto aprovado pelo Francisco (via PO, 25 set) — não mudar.
   const text = correction
     ? t('tournament.notice_correction_requested', vars)
+    : notice.kind === 'tournament_cancelled'
+    ? t('tournament.notice_cancelled', vars)
     : notice.kind === 'tournament_prize_changed'
     ? (prize ? t('tournament.notice_prize_changed', { ...vars, prize }) : t('tournament.notice_prize_removed', vars))
     : d.partner_pending
