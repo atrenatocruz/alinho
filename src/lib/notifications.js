@@ -9,7 +9,12 @@ import { errorKind } from './errors'
 
 // mix_cancelled: quem organiza cancelou um mix onde estavas inscrito (ações do
 // evento, 26 set) — nasce na base de dados (migration_eventos_aviso_mix_cancelado.sql).
-export const MIX_NOTICE_KINDS = ['mix_joined', 'mix_removed', 'mix_partner_changed', 'mix_cancelled']
+// Pacote do mix (2 out, Dev 3): mix_promoted (subiste de suplente),
+// mix_moved_to_waitlist (o mix ficou com menos campos e passaste a suplente),
+// mix_not_filled (a quem organiza: não encheu e voltou a rascunho) e
+// mix_cancelled_not_filled (aos inscritos: cancelado porque não encheu).
+export const MIX_NOTICE_KINDS = ['mix_joined', 'mix_removed', 'mix_partner_changed', 'mix_cancelled',
+  'mix_promoted', 'mix_moved_to_waitlist', 'mix_not_filled', 'mix_cancelled_not_filled']
 
 export async function listMyUnreadNotifications(limit = 20) {
   const { data, error } = await supabase

@@ -97,8 +97,10 @@ function TeachersOrder({ organizationId, teachers, setTeachers, loading }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const [saving, setSaving] = useState(false)
+  const [orderError, setOrderError] = useState('')
 
   const move = async (index, delta) => {
+    setOrderError('')
     const next = [...teachers]
     const [row] = next.splice(index, 1)
     next.splice(index + delta, 0, row)
@@ -109,7 +111,7 @@ function TeachersOrder({ organizationId, teachers, setTeachers, loading }) {
       await saveTeacherOrder(organizationId, next.map((x) => x.teacher_profile_id))
     } catch (error) {
       setTeachers(before)
-      alert(describeError(t, error, 'lessons.error_save_order'))
+      setOrderError(describeError(t, error, 'dialogs.save_order_error'))
     } finally {
       setSaving(false)
     }
@@ -156,6 +158,7 @@ function TeachersOrder({ organizationId, teachers, setTeachers, loading }) {
           )
         })}
       </div>
+      {orderError && <p role="alert" className="text-xs font-extrabold text-danger">{orderError}</p>}
     </div>
   )
 }

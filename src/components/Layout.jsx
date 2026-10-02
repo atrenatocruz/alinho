@@ -429,12 +429,15 @@ export default function Layout({ children }) {
   const mixNoticeText = (notice) => {
     const d = notice.data || {}
     const vars = {
-      title: d.game_title || t('layout.mix_notice_fallback_title'),
-      when: d.game_date ? formatDate(d.game_date, i18n.language, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '',
+      title: d.game_title || d.title || t('layout.mix_notice_fallback_title'),
+      when: (d.game_date || d.date) ? formatDate(d.game_date || d.date, i18n.language, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '',
       partner: d.partner_name,
     }
     if (notice.kind === 'mix_removed') return t('layout.mix_notice_removed', vars)
     if (notice.kind === 'mix_cancelled') return t('layout.mix_notice_cancelled', vars)
+    if (['mix_promoted', 'mix_moved_to_waitlist', 'mix_not_filled', 'mix_cancelled_not_filled'].includes(notice.kind)) {
+      return t(`layout.${notice.kind}`, vars)
+    }
     const partnerLine = d.partner_name ? t('layout.mix_notice_partner', vars) : t('layout.mix_notice_no_partner')
     // Quem inscreveu (Trello #534): o aviso guarda o nome do admin.
     const joinedKey = d.actor_name ? 'layout.mix_notice_added_by' : 'layout.mix_notice_joined'
@@ -625,7 +628,7 @@ export default function Layout({ children }) {
                       onClick={() => openMixNotice(notice)}
                       className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50"
                     >
-                      <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${['mix_removed', 'mix_cancelled'].includes(notice.kind) ? 'bg-danger/10 text-danger' : 'bg-lime-400/20 text-ink-900'}`}>
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${['mix_removed', 'mix_cancelled', 'mix_moved_to_waitlist', 'mix_cancelled_not_filled', 'mix_not_filled'].includes(notice.kind) ? 'bg-danger/10 text-danger' : 'bg-lime-400/20 text-ink-900'}`}>
                         <Shuffle size={16} />
                       </div>
                       <p className="flex-1 min-w-0 text-sm text-ink-900">{mixNoticeText(notice)}</p>

@@ -209,17 +209,25 @@ export default function Profile() {
     }
   }
 
-  const handleMarkVoucherUsed = async (voucherId) => {
-    if (!confirm(t('profile.voucher_mark_used_confirm'))) return
+  // Janelas do navegador → peças da app (parte 2, 2 out): pergunta na folha,
+  // erro por baixo do voucher, «✓» numa tira que some sozinha.
+  const [markingVoucher, setMarkingVoucher] = useState(null) // id
+  const [voucherError, setVoucherError] = useState(null) // { id, text }
+  const [voucherDone, setVoucherDone] = useState('')
+  const handleMarkVoucherUsed = (voucherId) => { setVoucherError(null); setMarkingVoucher(voucherId) }
+  const markVoucherUsedNow = async () => {
+    const voucherId = markingVoucher
     const { error } = await supabase.rpc('mark_voucher_used', { p_voucher_id: voucherId })
     if (error) {
       console.error('Error marking voucher used:', error)
-      alert(describeError(t, error, 'profile.voucher_error_mark_used'))
+      setVoucherError({ id: voucherId, text: describeError(t, error, 'dialogs.voucher_error') })
       return
     }
     setVouchers((prev) => prev.map((v) => (
       v.id === voucherId ? { ...v, status: 'usado', used_at: new Date().toISOString() } : v
     )))
+    setVoucherDone(t('dialogs.voucher_done'))
+    setTimeout(() => setVoucherDone(''), 3000)
   }
 
   // Only a por_usar voucher ever has a QR to show — VoucherCard itself
@@ -842,6 +850,16 @@ export default function Profile() {
 
       <Tabs value={tab} onChange={setTab} options={TABS.map((d) => ({ value: d.key, label: t(d.labelKey) }))} />
 
+      {/* Voucher usado (parte 2 das janelas, 2 out): fora dos separadores, para abrir em qualquer um. */}
+      <ConfirmSheet open={!!markingVoucher} outline title={t('dialogs.voucher_title')} message={t('dialogs.voucher_message')}
+          cancelLabel={t('dialogs.voucher_keep')} confirmLabel={t('dialogs.voucher_confirm')}
+          onConfirm={markVoucherUsedNow} onClose={() => setMarkingVoucher(null)} />
+        {voucherDone && (
+          <div role="status" className="fixed left-4 right-4 bottom-[104px] z-50 mx-auto max-w-md rounded-ctrl bg-ink-900 px-4 py-3 text-sm font-extrabold text-white animate-fade-up">
+            {voucherDone}
+          </div>
+        )}
+
       {tab === 'perfil' && (
         <>
         {/* Entrada para jogos entre amigos: agora um dos dois cards em
@@ -1042,8 +1060,8 @@ export default function Profile() {
           ) : (
             <div className="space-y-3">
               {sortVouchersForWallet(vouchers).map((v) => (
+                <div key={v.id}>
                 <VoucherCard
-                  key={v.id}
                   prizeText={v.game?.prize || ''}
                   gameTitle={v.game?.title || ''}
                   gameDate={v.game?.date ? formatDateLib(v.game.date, i18n.language, { day: '2-digit', month: 'short', year: 'numeric' }) : ''}
@@ -1057,6 +1075,8 @@ export default function Profile() {
                   onAccept={() => setShareFor(v)}
                   onUnshare={() => setUnshareFor(v)}
                 />
+                {voucherError?.id === v.id && <p role="alert" className="mt-1.5 text-xs font-extrabold text-danger">{voucherError.text}</p>}
+                </div>
               ))}
             </div>
           )

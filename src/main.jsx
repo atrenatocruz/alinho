@@ -32,8 +32,16 @@ installDevMockNetwork()
 // espaço à faixa «Ambiente de testes».
 if (IS_TEST_ENV) document.documentElement.classList.add('test-env')
 
+// O ecrã de arranque do index.html sai depois de a app desenhar o primeiro
+// ecrã (o SplashScreen tem o mesmo fundo, por isso a troca não se nota).
+function BootGone() {
+  React.useEffect(() => { document.getElementById('boot')?.remove() }, [])
+  return null
+}
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
+    <BootGone />
     <TestEnvBanner />
     <App />
     <UpdatePill />

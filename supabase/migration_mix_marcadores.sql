@@ -15,9 +15,13 @@
 -- O QUE FAZ
 --   1. Um marcador tem de ser membro do clube ou grupo do mix (ou do clube
 --      de cima): gatilho em game_scorekeepers, erro 'not_member'.
---   2. «marcado por <nome>»: matches.scored_by e matches.scored_at, que o
---      save_mix_match_result passa a preencher com quem grava (troca no
---      corpo VIVO, 1 vez; «já estava»). Os jogos antigos ficam sem.
+--   2. «marcado por <nome>»: matches.scored_by, scored_by_name e
+--      scored_at, que o save_mix_match_result passa a preencher com quem
+--      grava (troca no corpo VIVO, 1 vez; «já estava»). Os jogos antigos
+--      ficam sem. O nome vai guardado no jogo (Dev 2, 2 out): quem só joga
+--      nem sempre consegue ler o perfil de um marcador de fora do mix (a
+--      regra dos perfis só mostra quem partilha clube, e o marcador pode
+--      ser só do clube de cima).
 --
 -- Dev 3, 30 set 2026 · ecrã: Dev 2
 -- Run this whole file in Supabase → SQL Editor → New query → Run.
@@ -60,16 +64,29 @@ CREATE TRIGGER game_scorekeepers_member_guard_trigger
 -- ── 2. Quem marcou ──────────────────────────────────────────────────────
 ALTER TABLE matches ADD COLUMN IF NOT EXISTS scored_by UUID REFERENCES profiles(id) ON DELETE SET NULL;
 ALTER TABLE matches ADD COLUMN IF NOT EXISTS scored_at TIMESTAMPTZ;
+ALTER TABLE matches ADD COLUMN IF NOT EXISTS scored_by_name TEXT;
 
 DO $$
 DECLARE
   c_mau CONSTANT TEXT := '(UPDATE matches SET score_a = p_score_a, score_b = p_score_b, winner_team_id = v_winner)';
   c_bom CONSTANT TEXT := '\1,
-         scored_by = auth.uid(), scored_at = NOW()';
+         scored_by = auth.uid(), scored_at = NOW(),
+         scored_by_name = (SELECT name FROM profiles WHERE id = auth.uid())';
+  -- Se a versão de 30 set (sem o nome) já tiver corrido: junta só o nome.
+  c_v1_mau CONSTANT TEXT := '(scored_by = auth\.uid\(\), scored_at = NOW\(\))';
+  c_v1_bom CONSTANT TEXT := '\1,
+         scored_by_name = (SELECT name FROM profiles WHERE id = auth.uid())';
   v_def TEXT := pg_get_functiondef('public.save_mix_match_result(uuid, integer, integer, jsonb)'::regprocedure);
 BEGIN
-  IF v_def LIKE '%scored_by%' THEN
+  IF v_def LIKE '%scored_by_name%' THEN
     RAISE NOTICE 'save_mix_match_result: já estava';
+    RETURN;
+  END IF;
+  IF v_def LIKE '%scored_by%' THEN
+    IF (SELECT count(*) FROM regexp_matches(v_def, c_v1_mau, 'g')) <> 1 THEN
+      RAISE EXCEPTION 'save_mix_match_result: o scored_by não aparece 1 vez. Parar e ler.';
+    END IF;
+    EXECUTE regexp_replace(v_def, c_v1_mau, c_v1_bom);
     RETURN;
   END IF;
   IF (SELECT count(*) FROM regexp_matches(v_def, c_mau, 'g')) <> 1 THEN
@@ -86,7 +103,7 @@ COMMIT;
 
 -- Verificar depois de correr:
 --   SELECT count(*) FROM pg_trigger WHERE tgname = 'game_scorekeepers_member_guard_trigger';  -- 1
---   SELECT pg_get_functiondef('public.save_mix_match_result(uuid,integer,integer,jsonb)'::regprocedure) LIKE '%scored_by%';  -- true
+--   SELECT pg_get_functiondef('public.save_mix_match_result(uuid,integer,integer,jsonb)'::regprocedure) LIKE '%scored_by_name%';  -- true
 --   SELECT count(*) FROM game_scorekeepers gs JOIN games g ON g.id = gs.game_id JOIN organizations o ON o.id = g.organization_id
 --    WHERE NOT EXISTS (SELECT 1 FROM memberships m WHERE m.user_id = gs.user_id AND m.organization_id IN (o.id, o.parent_organization_id));
 --    -- marcadores antigos que não são membros (ficam; só os novos são travados)
