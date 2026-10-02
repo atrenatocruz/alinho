@@ -2586,6 +2586,21 @@ export default function GameDetails() {
       points: (pointsByUser[team.player1_id] || 0) + (pointsByUser[team.player2_id] || 0),
     }))
     .sort((a, b) => b.points - a.points)
+  // Num sobe e desce com duplas fixas, o cartão ordena pela fotografia final
+  // dos campos (sobeDesceStandings, a mesma regra da Classificação) — os
+  // points_earned são pontos de assiduidade e empatam quase sempre (4 rondas:
+  // qualquer dupla com 2 vitórias soma 24), e o desempate acabava por ser o
+  // seed inicial, não os resultados (mix de 1 out, Ruben).
+  const shareDuplas = (() => {
+    if (!isSobeDesce || isRotating) return duplaStats
+    const order = sobeDesceStandings(matches)
+    if (!order.length) return duplaStats
+    const byId = new Map(duplaStats.map((d) => [d.id, d]))
+    return [
+      ...order.map((teamId) => byId.get(teamId)).filter(Boolean),
+      ...duplaStats.filter((d) => !order.includes(d.id)),
+    ]
+  })()
 
   // O editor de arrastar jogadores entre duplas (Trello #292). Serve durante
   // o mix antes da ronda 1 e, desde 27 set, com as duplas sorteadas antes de
@@ -2705,11 +2720,11 @@ export default function GameDetails() {
           url={shareUrl}
           onClose={() => setShowShare(false)}
           imageCard={{
-            variant: !isAmericano && game.status === 'finished' && duplaStats.length > 0 ? 'podium' : 'invite',
+            variant: !isAmericano && game.status === 'finished' && shareDuplas.length > 0 ? 'podium' : 'invite',
             game,
             people,
             capacity,
-            duplas: duplaStats,
+            duplas: shareDuplas,
             formattedDate: formatDate(game.date),
             winnerTeamId: game.winner_team_id,
           }}
