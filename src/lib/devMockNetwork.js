@@ -1300,7 +1300,13 @@ const TABLE_MOCKS = {
   mix_player_stats: () => (agenda()
     ? [{ game_id: 'ag-finished-yesterday', user_id: MOCK_ADMIN_USER_ID, mix_won: false, rating_delta: 18, points_earned: 14,
         game: { id: 'ag-finished-yesterday', title: 'Mix de segunda', date: atDay(-1, 19).toISOString(), location: 'Smash Padel, Parque das Nações' } }]
-    : longNames() ? LONG_STATS : []),
+    : longNames() ? LONG_STATS
+    // mockEventState = 'finished': as estatísticas do mix terminado (o desenho do Ruben, 2 out).
+    : eventState() === 'finished' ? EV_PEOPLE.map((p, i) => ({
+      id: `ev-s${i}`, game_id: 'fake-game-1', user_id: p.id, user: { name: p.name },
+      matches_won: 4 - Math.floor(i / 2), matches_played: 4, mix_won: i < 2,
+      rating_delta: [18, 18, 9, 9, -6, -6, -14, -14][i], rating_after: 1700 - i * 40, points_earned: 20 - i * 2,
+    })) : []),
   teams: (url) => (agenda() && url.includes('ag-winner') ? AGENDA_WINNER_TEAMS() : ['live', 'finished', 'paused', 'ready'].includes(eventState()) ? EV_TEAMS : rotating() ? ROT_TEAMS : []),
   participants: () => (eventState() ? EV_PARTICIPANTS() : []),
   matches: () => (['live', 'finished'].includes(eventState()) ? EV_MATCHES() : rotating() ? ROT_MATCHES_FN() : []),
