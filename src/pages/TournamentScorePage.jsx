@@ -6,7 +6,7 @@
 // É usado de pé, no clube, com uma mão: os números são grandes, os botões
 // são três, e não há menus escondidos.
 import { useCallback, useEffect, useState } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { BackBar } from '../components/ui'
 import { sourceText } from '../components/tournament/sourceText'
@@ -33,7 +33,6 @@ const hhmm = (iso) => hhmmInTz(iso)
 // Botões para usar com o dedo, de pé, à beira do campo: os da app — 48 px,
 // rounded-ctrl, extrabold (revisão da designer de 26 set, «parece outra app»).
 const BTN = 'inline-flex min-h-[48px] items-center justify-center gap-2 rounded-ctrl px-5 text-base font-extrabold transition-all duration-fast active:scale-[0.98] disabled:opacity-40'
-const LIME = 'bg-lime-400 text-ink-900 hover:bg-lime-600 shadow-card'
 const GHOST = 'bg-surface text-ink-900 border border-line hover:bg-ink-50'
 // Numa lista, a ação que se repete em cada cartão é preta — a lima fica
 // para o estado vivo (designer, 26 set: um lima por ecrã).
@@ -419,6 +418,7 @@ function WalkoverSheet({ match, kind, onClose, onConfirm, error, t }) {
 export default function TournamentScorePage() {
   const { t, i18n } = useTranslation()
   const { id } = useParams()
+  const navigate = useNavigate()
   const goBack = useGoBack('/')
   const { memberships } = useAuth()
   const [tournament, setTournament] = useState(null)
@@ -518,6 +518,7 @@ export default function TournamentScorePage() {
         // O dia e a hora de início de cada categoria (#502, Dev 3): a
         // proposta não põe uma categoria fora do dia dela.
         categories: edit?.categories || [],
+        today,
       }))
     } catch (err) {
       setError(describeError(t, err))
@@ -603,6 +604,17 @@ export default function TournamentScorePage() {
   }
   const labelFor = (iso) => new Date(`${iso}T12:00`).toLocaleDateString(i18n.language, { weekday: 'short', day: 'numeric', month: 'short' }).replace(/\./g, '')
   const dayLabel = labelFor(day)
+  // «M4 e da F4» / «M4, F4 e MX4» (UX, 2 out).
+  const joinCodes = (codes) => (codes.length === 2
+    ? codes.join(t('tournament.score.codes_pair_joiner'))
+    : codes.length > 2 ? `${codes.slice(0, -1).join(', ')}${t('tournament.score.codes_last_joiner')}${codes[codes.length - 1]}` : codes[0] || '')
+  // «sex, 2 out» — a frase do dia que passou (UX, 2 out).
+  const dayWithComma = (iso) => {
+    const d = new Date(`${iso}T12:00`)
+    const wd = d.toLocaleDateString(i18n.language, { weekday: 'short' }).replace(/\./g, '')
+    const dm = d.toLocaleDateString(i18n.language, { day: 'numeric', month: 'short' }).replace(/\./g, '').replace(' de ', ' ')
+    return `${wd}, ${dm}`
+  }
   const shortDay = (iso) => new Date(`${iso}T12:00`).toLocaleDateString(i18n.language, { weekday: 'short', day: 'numeric' }).replace(/\./g, '')
 
   return (
@@ -634,7 +646,7 @@ export default function TournamentScorePage() {
           {!proposal ? (
             <>
               <p className="mt-1 text-sm text-ink-700">{t('tournament.score.unscheduled_body')}</p>
-              <button type="button" disabled={busy} onClick={propose} className={`${BTN} ${LIME} mt-2`}>
+              <button type="button" disabled={busy} onClick={propose} className={`${BTN} ${DARK} mt-2`}>
                 {t('tournament.score.propose')}
               </button>
             </>
@@ -642,6 +654,23 @@ export default function TournamentScorePage() {
             <p className="mt-1 text-sm text-ink-900">{t('tournament.score.no_courts')}</p>
           ) : (
             <>
+              {/* O dia da categoria já passou (QA, 2 out): diz para onde vão
+                  as horas, ou — sem dias por passar — porquê e onde se
+                  marcam à mão. */}
+              {proposal.moved?.map((mv) => (
+                <p key={mv.code} className="mt-2 text-sm font-semibold text-ink-900">
+                  {t('tournament.score.day_moved', { code: mv.code, from: dayWithComma(mv.from), to: dayWithComma(mv.to) })}
+                </p>
+              ))}
+              {/* Uma frase só para todas (UX, 2 out): «O dia da M4 e da F4…». */}
+              {proposal.stuck?.length > 0 && (
+                <p className="mt-2 text-sm font-semibold text-ink-900">{t('tournament.score.day_gone', { codes: joinCodes(proposal.stuck.map((st) => st.code)) })}</p>
+              )}
+              {proposal.stuck?.length > 0 && (
+                <button type="button" onClick={() => navigate(`/torneio/${id}?admin=horario`)} className={`${BTN} mt-2 border border-line bg-surface text-ink-900`}>
+                  {t('tournament.score.open_grid')}
+                </button>
+              )}
               <div className="mt-2">
                 {[...proposal.preview].sort((x, y) => String(x.scheduled_at).localeCompare(String(y.scheduled_at))).map((m) => (
                   <div key={m.match_id} className="grid grid-cols-[104px_minmax(0,1fr)] items-center gap-2 border-t border-line py-2 text-xs">
@@ -656,9 +685,12 @@ export default function TournamentScorePage() {
                 <p className="mt-1.5 text-xs text-danger">{t('tournament.score.schedule_left', { count: proposal.left.length })}</p>
               )}
               <div className="mt-2.5 flex flex-wrap gap-2">
-                <button type="button" disabled={busy || !proposal.slots.length} onClick={saveSchedule} className={`${BTN} ${LIME}`}>
-                  {t('tournament.score.save_schedule')}
-                </button>
+                {/* Sem nada para gravar (o dia já passou), não há «Guardar». */}
+                {(proposal.slots.length > 0 || !proposal.stuck?.length) && (
+                  <button type="button" disabled={busy || !proposal.slots.length} onClick={saveSchedule} className={`${BTN} ${DARK}`}>
+                    {t('tournament.score.save_schedule')}
+                  </button>
+                )}
                 <button type="button" onClick={() => setProposal(null)} className="min-h-[44px] px-3 text-sm text-ink-500 hover:underline">
                   {t('tournament.create.cancel')}
                 </button>

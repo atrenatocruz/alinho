@@ -233,6 +233,15 @@ const RPC_MOCKS = {
       ? { org_name: 'Smash Padel Almada', org_slug: 'smash-padel', org_kind: 'club', org_logo_url: null, org_visible: true }
       : { org_name: 'Jota Padeleiros', org_slug: 'jota-padeleiros', org_kind: 'group', org_logo_url: null, org_visible: true }]
   },
+  // O mesmo para um torneio (mockTClosed = 'group' | 'club' | 'private').
+  get_tournament_org_hint: () => {
+    const k = localStorage.getItem('mockTClosed')
+    if (!k) return []
+    if (k === 'private') return [{ org_name: null, org_slug: null, org_kind: 'group', org_logo_url: null, org_visible: false }]
+    return [k === 'club'
+      ? { org_name: 'Smash Padel Almada', org_slug: 'smash-padel', org_kind: 'club', org_logo_url: null, org_visible: true }
+      : { org_name: 'Jota Padeleiros', org_slug: 'jota-padeleiros', org_kind: 'group', org_logo_url: null, org_visible: true }]
+  },
   // O convite do grupo (1 out): o nome e o estado de quem acabou de pedir/entrar.
   get_club_profile: (params) => (['mockJoinPending', 'mockJoinOpen'].some((k) => localStorage.getItem(k) === 'true') && params?.p_slug === 'jota-padeleiros'
     ? [{ name: 'Jota Padeleiros', slug: 'jota-padeleiros', my_status: localStorage.getItem('mockJoinOpen') === 'true' ? 'member' : 'pending' }]

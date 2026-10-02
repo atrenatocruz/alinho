@@ -12,6 +12,7 @@
 // O torneio é uma ENTIDADE NOVA: nada aqui toca em `games` (o mix).
 import { supabase } from './supabase'
 import { isMatchDone } from './myTournamentMatches'
+import { normalizeGameOrgHint } from './gameOrgHint'
 
 /** Cabeçalho da página do torneio + categorias, numa só chamada.
  *
@@ -416,4 +417,17 @@ export async function entryHasPlayedMatches(entryId) {
     .or(`entry_a_id.eq.${entryId},entry_b_id.eq.${entryId}`)
   if (error) { console.error('Error loading the pair matches:', error); return false }
   return (data || []).some(isMatchDone)
+}
+
+/** De que grupo é um torneio que a pessoa não pode ver (SPEC
+ *  2026-10-01-jogo-de-grupo-fechado; get_tournament_org_hint do Dev 3).
+ *  Aceita o slug ou o id. Devolve null (não existe, apagado, rascunho, sem
+ *  sessão, ou a função ainda por correr — fica o «Torneio não encontrado»),
+ *  ou { visible, name, slug, kind, logoUrl }. */
+export async function getTournamentOrgHint(key) {
+  const { data, error } = await supabase.rpc('get_tournament_org_hint', { p_tournament: key })
+  if (error) return null
+  const hint = normalizeGameOrgHint(data)
+  // Visível sem endereço não leva a lado nenhum: trata-se como privado.
+  return hint && hint.visible && !hint.slug ? { ...hint, visible: false, name: null } : hint
 }
