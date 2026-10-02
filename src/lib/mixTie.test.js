@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { hasResult, isTie } from './mixLogic'
+import { hasResult, isTie, shortPersonName } from './mixLogic'
 
 describe('empates no mix (Francisco, 30 set, REGRAS.md ponto 4)', () => {
   it('um empate gravado conta como jogo com resultado', () => {
@@ -16,5 +16,16 @@ describe('empates no mix (Francisco, 30 set, REGRAS.md ponto 4)', () => {
     const jogo = { score_a: null, score_b: null, winner_team_id: null }
     expect(hasResult(jogo)).toBe(false)
     expect(isTie(jogo)).toBe(false)
+  })
+})
+
+describe('«marcado por» (2 out)', () => {
+  it('nome e inicial do último, sem parênteses soltos', () => {
+    expect(shortPersonName('Carlos Nunes')).toBe('Carlos N.')
+    expect(shortPersonName('Francisco (QA)')).toBe('Francisco')
+    expect(shortPersonName('Francisco Barros (QA)')).toBe('Francisco B.')
+    expect(shortPersonName('Francisco (')).toBe('Francisco')
+    expect(shortPersonName('Ana')).toBe('Ana')
+    expect(shortPersonName('')).toBe('')
   })
 })

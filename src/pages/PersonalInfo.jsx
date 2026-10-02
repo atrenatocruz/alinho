@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { maxSignupBirthday } from '../lib/age'
 import { PrimaryButton, DateField, Select, RatingBadge } from '../components/ui'
 import ChangePasswordSection from '../components/ChangePasswordSection'
 import { formatRating } from '../lib/elo'
@@ -166,7 +167,7 @@ export default function PersonalInfo() {
               <DateField
                 value={birthday}
                 onChange={setBirthday}
-                max={new Date().toISOString().slice(0, 10)}
+                max={maxSignupBirthday()}
                 hideToday
               />
             </div>

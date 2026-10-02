@@ -13,6 +13,20 @@ function mentionToken(jid) {
   return `@${jid.split('@')[0]}`
 }
 
+
+// Rating virtual de um convidado sem conta (Ruben, 2 out): a média dos
+// jogadores com conta do mix (≥ 2), senão o ponto médio da banda do nível
+// do mix, senão 900. Espelha mix_guest_rating
+// (migration_guest_rank_virtual.sql) e src/lib/mixLogic.js — mudar lá →
+// mudar aqui (duplicação pequena aceite neste repo, como o mentionToken).
+const GUEST_BAND_POINTS = { 1: 1900, 2: 1700, 3: 1500, 4: 1300, 5: 1100, 6: 850 }
+export function guestVirtualRating(accountRatings = [], gameLevel = null) {
+  const rated = accountRatings.filter((r) => r != null)
+  if (rated.length >= 2) return Math.round(rated.reduce((sum, r) => sum + r, 0) / rated.length)
+  const band = Number(String(gameLevel || '').match(/[1-6]$/)?.[0])
+  return GUEST_BAND_POINTS[band] ?? 900
+}
+
 function pairKey(a, b) {
   return [a, b].sort().join('|')
 }
@@ -204,8 +218,8 @@ async function autoStartMix(game, { sendText }) {
   const drawn = drawnTeamsToUse(drawnRows)
   if (drawn === 'wait') return
 
-  // Convidados sem conta: ids de game_guests — emparelham com 900 (o
-  // baseline de sempre) e lado 'both' (o default do sideOf).
+  // Convidados sem conta: ids de game_guests — valem o rating virtual do
+  // mix (Ruben, 2 out) e lado 'both' (o default do sideOf).
   const guestIds = new Set((participants || []).flatMap((p) => [p.guest_id, p.partner_guest_id]).filter(Boolean))
 
   let insertedTeams = drawn
@@ -213,7 +227,11 @@ async function autoStartMix(game, { sendText }) {
     const { data: rankings, error: rErr } = await supabase.rpc('get_global_rankings')
     if (rErr) throw new Error(`Failed to load rankings for auto-start: ${rErr.message}`)
     const pointsById = Object.fromEntries((rankings || []).map((r) => [r.user_id, Math.round(r.rating || 0)]))
-    for (const id of guestIds) pointsById[id] = 900
+    const guestPts = guestVirtualRating(
+      (participants || []).flatMap((p) => [p.user_id, p.partner_id]).filter(Boolean).map((uid) => pointsById[uid]),
+      game.level
+    )
+    for (const id of guestIds) pointsById[id] = guestPts
 
     const repeatPairKeys = await loadRepeatPairKeys(game)
 
@@ -239,15 +257,13 @@ async function autoStartMix(game, { sendText }) {
       return
     }
 
-    // Cada lado vai para a coluna certa (conta vs convidado). seed_ranking:
-    // o convidado HERDA o rating do parceiro (a regra do Elo —
-    // migration_elo_simples.sql: a dupla vale a média de quem tem conta);
-    // dupla 100% convidados fica a 0.
+    // Cada lado vai para a coluna certa (conta vs convidado). O seed soma
+    // os pontos dos dois — o pointsById já traz o virtual dos convidados.
     const teamRow = ({ player1_id: p1, player2_id: p2 }) => {
       const g1 = guestIds.has(p1)
       const g2 = guestIds.has(p2)
       const pts = (id) => pointsById[id] ?? 0
-      const seed = !g1 && !g2 ? pts(p1) + pts(p2) : !g1 ? pts(p1) * 2 : !g2 ? pts(p2) * 2 : 0
+      const seed = pts(p1) + pts(p2)
       return {
         game_id: game.id,
         player1_id: g1 ? null : p1,

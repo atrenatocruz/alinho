@@ -45,6 +45,20 @@ export const countPeople = (participants = []) =>
     .filter(p => p.status === 'confirmed')
     .reduce((n, p) => n + 1 + (p.partner_id || p.partner_guest_id ? 1 : 0), 0)
 
+
+/** Rating virtual de um convidado sem conta (Ruben, 2 out): a média dos
+    jogadores com conta do mix (≥ 2), senão o ponto médio da banda do nível
+    do mix (M6→850 … M1→1900), senão 900. Espelha mix_guest_rating
+    (migration_guest_rank_virtual.sql) — mudar lá → mudar aqui. Serve o
+    emparelhamento e o seed; o Elo usa a função SQL. */
+const GUEST_BAND_POINTS = { 1: 1900, 2: 1700, 3: 1500, 4: 1300, 5: 1100, 6: 850 }
+export function guestVirtualRating(accountRatings = [], gameLevel = null) {
+  const rated = accountRatings.filter((r) => r != null)
+  if (rated.length >= 2) return Math.round(rated.reduce((sum, r) => sum + r, 0) / rated.length)
+  const band = Number(String(gameLevel || '').match(/[1-6]$/)?.[0])
+  return GUEST_BAND_POINTS[band] ?? 900
+}
+
 /** Capacidade de um mix: max_players explicito, senao 4 por campo. Era
     calculado in-line em duplicado (ui.jsx, Home.jsx, GameDetails.jsx) —
     ver achado #5 da code review do Trello #51. */
@@ -560,6 +574,16 @@ export function standings(teams, matches) {
 /** Um jogo com resultado: pontos gravados dos dois lados, com ou sem
     vencedor. Um empate grava-se (Francisco, 30 set, REGRAS.md ponto 4) e
     fica com winner_team_id null — o save_mix_match_result do Dev 3. */
+/** «Carlos N.» para o «marcado por»: o primeiro nome e a inicial do último.
+    O que está entre parênteses e o que não tem letras não conta — com
+    «Francisco (QA)» saía «Francisco (.» (Francisco, 2 out). */
+export function shortPersonName(name) {
+  const parts = String(name || '').replace(/\([^)]*\)?/g, ' ').trim().split(/\s+/).filter((p) => /\p{L}/u.test(p))
+  if (parts.length === 0) return ''
+  const last = parts[parts.length - 1].match(/\p{L}/u)[0]
+  return parts.length > 1 ? `${parts[0]} ${last.toUpperCase()}.` : parts[0]
+}
+
 export const hasResult = (m) => !!m && (!!m.winner_team_id || (m.score_a != null && m.score_b != null))
 
 /** Jogo empatado: com resultado e sem vencedor. Trava o passo seguinte do

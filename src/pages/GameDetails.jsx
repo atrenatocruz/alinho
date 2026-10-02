@@ -20,7 +20,7 @@ import { KIND_STYLE, KindTag, StateTag, Owner } from '../components/agenda/Event
 import PoolGroupStage from '../components/PoolGroupStage'
 import PreviousEditions from '../components/agenda/PreviousEditions'
 import ScoreEntry from '../components/ScoreEntry'
-import { countPeople, totalRounds, formDuplas, seedCourts, nextSobeDesce, nextSobeDesceRotating, splitPartnerRows, rotatingPlacar, roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches, thirdPlaceMatch, lowerPlacementMatches, placementOfCourt, PHASE_LABEL_KEY, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, mixCapacity, isGenderMismatch, isMissingGender, isMissingBirthday, isAgeIneligible, splitIntoPools, generateAmericanoSchedule, americanoStandings, computeMixWinnerTeamId, formatLabelKey, hasResult, isTie, sobeDesceStandings } from '../lib/mixLogic'
+import { countPeople, guestVirtualRating, totalRounds, formDuplas, seedCourts, nextSobeDesce, nextSobeDesceRotating, splitPartnerRows, rotatingPlacar, roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches, thirdPlaceMatch, lowerPlacementMatches, placementOfCourt, PHASE_LABEL_KEY, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, mixCapacity, isGenderMismatch, isMissingGender, isMissingBirthday, isAgeIneligible, splitIntoPools, generateAmericanoSchedule, americanoStandings, computeMixWinnerTeamId, formatLabelKey, hasResult, isTie, sobeDesceStandings, shortPersonName } from '../lib/mixLogic'
 import { isProvisional, formatRatingMaybeProvisional } from '../lib/elo'
 import { AGE_LABEL_KEY, meetsAgeRestriction } from '../lib/ageCategories'
 import { winRatePct, firstLastName } from '../lib/statsLogic'
@@ -481,11 +481,18 @@ export default function GameDetails() {
         const guestIds = (participantsData || [])
           .flatMap((p) => [p.guest?.id, p.partner_guest?.id])
           .filter(Boolean)
+        const ratingByUser = new Map(globalRankings.map((r) => [r.user_id, r.rating]))
+        // Rating virtual dos convidados (Ruben, 2 out): média dos jogadores
+        // com conta do mix, senão a banda do nível — espelha mix_guest_rating.
+        const accountRatings = (participantsData || [])
+          .filter((p) => p.status === 'confirmed')
+          .flatMap((p) => [p.user_id, p.partner_id])
+          .filter(Boolean)
+          .map((uid) => ratingByUser.get(uid))
+        const guestPts = guestVirtualRating(accountRatings, gameData.level)
         setPointsById({
           ...Object.fromEntries(globalRankings.map((r) => [r.user_id, Math.round(r.rating || 0)])),
-          // Convidados emparelham com o baseline de sempre (900); o seed da
-          // dupla herda o parceiro (ver buildTeamRows).
-          ...Object.fromEntries(guestIds.map((gid) => [gid, 900])),
+          ...Object.fromEntries(guestIds.map((gid) => [gid, guestPts])),
         })
         setRatingInfoById(Object.fromEntries(globalRankings.map((r) => [r.user_id, { rating: r.rating, gender: r.gender }])))
       } catch (error) {
@@ -1100,7 +1107,8 @@ export default function GameDetails() {
       teamRows: pooledDuplas.map(d => ({
         game_id: id,
         ...teamSlotCols(d.player1, d.player2),
-        seed_ranking: guestAwareSeed(d, points),
+        // O seed do formDuplas já soma o virtual dos convidados.
+        seed_ranking: d.seed,
         ...(isGruposEliminatorias ? { pool_number: d.pool_number } : {}),
       })),
     }
@@ -1114,17 +1122,6 @@ export default function GameDetails() {
     player2_id: p2.no_account ? null : p2.id,
     player2_guest_id: p2.no_account ? p2.id : null,
   })
-
-  // seed_ranking com convidados: o convidado HERDA o rating do parceiro (a
-  // mesma regra do Elo — a dupla vale a média de quem tem conta); dupla
-  // 100% convidados fica a 0. Sem convidados, o seed do formDuplas.
-  const guestAwareSeed = (d, points) => {
-    const g1 = d.player1.no_account
-    const g2 = d.player2.no_account
-    if (!g1 && !g2) return d.seed
-    const pts = (p) => points[p.id] ?? 0
-    return !g1 ? pts(d.player1) * 2 : !g2 ? pts(d.player2) * 2 : 0
-  }
 
   // Só forma as duplas — as rondas arrancam depois, uma a uma, por decisão do admin.
   // `start: false` = «Sortear duplas» (Francisco, 27 set,
@@ -1141,9 +1138,13 @@ export default function GameDetails() {
       // on court 1 down to the weakest on the last court (see seedCourts).
       const globalRankings = await getGlobalRankings()
       const pointsById = Object.fromEntries(globalRankings.map(r => [r.user_id, Math.round(r.rating || 0)]))
-      // Convidados sem conta emparelham com o baseline de sempre (900).
+      // Convidados sem conta valem o rating virtual do mix (Ruben, 2 out).
+      const guestPts = guestVirtualRating(
+        participants.flatMap((x) => [x.user, x.partner]).filter((pl) => pl && !pl.no_account).map((pl) => pointsById[pl.id]),
+        game.level
+      )
       for (const p of participants.flatMap((x) => [x.user, x.partner])) {
-        if (p?.no_account) pointsById[p.id] = 900
+        if (p?.no_account) pointsById[p.id] = guestPts
       }
 
       // Americano has no "one fixed dupla per player" concept — partners
@@ -1180,7 +1181,8 @@ export default function GameDetails() {
               teamRows.push({
                 game_id: id,
                 ...teamSlotCols(dupla.player1, dupla.player2),
-                seed_ranking: guestAwareSeed(dupla, pointsById),
+                // O seed já soma o virtual dos convidados (pointsById).
+                seed_ranking: dupla.seed,
               })
               slots.push({ roundIdx, court_number: m.court_number, side })
             }
@@ -1258,8 +1260,11 @@ export default function GameDetails() {
           .update({ status: 'in_progress' })
           .eq('id', id)
         if (statusError) throw statusError
-        // Com duplas fixas, «Começar o Mix» já sorteia a ronda 1 (27 set).
-        if (!isGruposEliminatorias && !game?.rotate_partners && insertedTeams?.length) {
+        // «Começar o Mix» já sorteia a Ronda 1, «por começar» (27 set; ponto 11).
+        // Também com parceiros que trocam: as duplas da Ronda 1 são as acabadas
+        // de formar — antes ficava sem jogos e sem duplas à vista (Francisco,
+        // 2 out, «Mix de Sábado»).
+        if (!isGruposEliminatorias && insertedTeams?.length) {
           setBusy(false)
           await handleStartRound1({ teamsOverride: insertedTeams })
           return
@@ -1326,8 +1331,12 @@ export default function GameDetails() {
 
     const globalRankings = await getGlobalRankings()
     const points = Object.fromEntries(globalRankings.map(r => [r.user_id, Math.round(r.rating || 0)]))
+    const guestPts = guestVirtualRating(
+      freshRows.flatMap((x) => [x.user, x.partner]).filter((pl) => pl && !pl.no_account).map((pl) => points[pl.id]),
+      freshGame.level
+    )
     for (const p of freshRows.flatMap((x) => [x.user, x.partner])) {
-      if (p?.no_account) points[p.id] = 900
+      if (p?.no_account) points[p.id] = guestPts
     }
     // À última da hora não se pergunta pelas repetições: aceita-se a melhor
     // formação possível, como o formDuplas já garante.
@@ -1981,16 +1990,14 @@ export default function GameDetails() {
         const globalRankings = await getGlobalRankings()
         const pointsById = Object.fromEntries(globalRankings.map(r => [r.user_id, Math.round(r.rating || 0)]))
         const courts = nextSobeDesceRotating(currentRoundMatches, teamsById, numCourts, { partnerPairs, rankOf })
-        // teamSlotCols/guestAwareSeed: convidados sem conta vão para
-        // playerX_guest_id (FK para game_guests) — escrevê-los em
-        // playerX_id violava a FK para profiles e bloqueava a ronda.
+        // teamSlotCols: convidados sem conta vão para playerX_guest_id
+        // (FK para game_guests) — escrevê-los em playerX_id violava a FK
+        // para profiles e bloqueava a ronda. O pointsById do estado já
+        // traz o rating virtual dos convidados (Ruben, 2 out).
         const teamRows = courts.flatMap((c) => [c.duplaA, c.duplaB]).map(([p1, p2]) => ({
           game_id: id,
           ...teamSlotCols(p1, p2),
-          seed_ranking: guestAwareSeed(
-            { player1: p1, player2: p2, seed: (pointsById[p1.id] ?? 0) + (pointsById[p2.id] ?? 0) },
-            pointsById
-          ),
+          seed_ranking: (pointsById[p1.id] ?? 0) + (pointsById[p2.id] ?? 0),
         }))
         const { data: insertedTeams, error: teamsError } = await supabase.from('teams').insert(teamRows).select()
         if (teamsError) throw teamsError
@@ -2465,12 +2472,15 @@ export default function GameDetails() {
     barPrimary = { label: t('gamedetails.start_mix'), onClick: handleStartDrawnMix, disabled: busy, hint: t('eventactions.start_hint') }
   } else if (game?.status === 'in_progress' && !inPoolStage) {
     if (!roundsStarted && !isAmericano) {
-      // Sem a ronda sorteada (parceiros que rodam, ou um mix começado antes
-      // do ponto 11): sorteia e começa de uma vez.
+      // Mix começado sem a Ronda 1 sorteada (começado antes do ponto 11):
+      // põe as duplas nos campos e mostra os jogos «por começar»; o relógio
+      // só arranca depois, com «Começar Ronda 1» (Francisco, 2 out: quem
+      // organiza tem de ver as duplas e os jogos antes de começar).
       barPrimary = {
-        label: busy ? t('gamedetails.drawing') : t('gamedetails.start_round_n', { number: 1 }),
-        onClick: async () => { await handleStartRound1(); await handleStartRound() },
+        label: busy ? t('gamedetails.drawing') : t('gamedetails.draw_round1'),
+        onClick: handleStartRound1,
         disabled: busy || unpaired.length > 0,
+        hint: t('gamedetails.draw_round1_hint'),
       }
     } else if (roundPending) {
       barPrimary = { label: busy ? t('gamedetails.processing') : t('gamedetails.start_round_n', { number: maxRound }), onClick: handleStartRound, disabled: busy || unpaired.length > 0, hint: t('gamedetails.start_round_hint') }
@@ -2528,10 +2538,6 @@ export default function GameDetails() {
   const avatarById = Object.fromEntries([...clubMembers, ...people].map((p) => [p.id, p.avatar_url]))
   const orgKindOfGame = gameMembership?.organization?.kind || 'group'
   // «Carlos N.»: o nome e a inicial do último.
-  const shortPersonName = (name) => {
-    const parts = String(name || '').trim().split(/\s+/).filter(Boolean)
-    return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0]}.` : parts[0] || ''
-  }
   const myTeamIds = new Set(teams.filter((tm) => tm.player1_id === user.id || tm.player2_id === user.id).map((tm) => tm.id))
   const myMatch = currentRoundMatches.find((m) => myTeamIds.has(m.team_a_id) || myTeamIds.has(m.team_b_id)) || null
   const orgSlug = gameMembership?.organization?.slug
@@ -2579,6 +2585,30 @@ export default function GameDetails() {
       points: (pointsByUser[team.player1_id] || 0) + (pointsByUser[team.player2_id] || 0),
     }))
     .sort((a, b) => b.points - a.points)
+  // Num sobe e desce com duplas fixas, o cartão ordena pela fotografia final
+  // dos campos (sobeDesceStandings, a mesma regra da Classificação) — os
+  // points_earned são pontos de assiduidade e empatam quase sempre (4 rondas:
+  // qualquer dupla com 2 vitórias soma 24), e o desempate acabava por ser o
+  // seed inicial, não os resultados (mix de 1 out, Ruben).
+  const shareDuplas = (() => {
+    if (!isSobeDesce || isRotating) return duplaStats
+    const order = sobeDesceStandings(matches)
+    if (!order.length) return duplaStats
+    const byId = new Map(duplaStats.map((d) => [d.id, d]))
+    return [
+      ...order.map((teamId) => byId.get(teamId)).filter(Boolean),
+      ...duplaStats.filter((d) => !order.includes(d.id)),
+    ]
+  })()
+  // As Estatísticas do Mix espelham a mesma classificação (Ruben, 2 out):
+  // um bloco por dupla, pela fotografia final dos campos — o sobe e desce
+  // não produz ranking individual. O delta/rating de cada um mantém-se.
+  // Fora do sobe e desce de duplas fixas fica a lista corrida da query.
+  const sobeDesceOrder = isSobeDesce && !isRotating && game?.status === 'finished'
+    ? sobeDesceStandings(matches)
+    : []
+  const statsByUser = Object.fromEntries(mixStats.map((s) => [s.user_id, s]))
+  const personById = Object.fromEntries(people.map((p) => [p.id, p]))
 
   // O editor de arrastar jogadores entre duplas (Trello #292). Serve durante
   // o mix antes da ronda 1 e, desde 27 set, com as duplas sorteadas antes de
@@ -2698,11 +2728,11 @@ export default function GameDetails() {
           url={shareUrl}
           onClose={() => setShowShare(false)}
           imageCard={{
-            variant: !isAmericano && game.status === 'finished' && duplaStats.length > 0 ? 'podium' : 'invite',
+            variant: !isAmericano && game.status === 'finished' && shareDuplas.length > 0 ? 'podium' : 'invite',
             game,
             people,
             capacity,
-            duplas: duplaStats,
+            duplas: shareDuplas,
             formattedDate: formatDate(game.date),
             winnerTeamId: game.winner_team_id,
           }}
@@ -3052,70 +3082,132 @@ export default function GameDetails() {
       )}
 
       {/* Estatísticas do mix — classificação final por pontos */}
-      {game.status === 'finished' && finishedTab === 'stats' && mixStats.length > 0 && (
-        <div id="mix-stats" className="card scroll-mt-24">
-          <h3 className="text-lg text-ink-900 mb-3">{t('gamedetails.mix_stats_title')}</h3>
-          <div className="space-y-1.5">
-            {mixStats.map((s, i) => {
-              // rating_delta/rating_after only exist from the Elo rollout
-              // (2026-08-25) onward — older finished mixes fall back to the
-              // legacy points_earned they were actually finalized with.
-              const hasRating = s.rating_delta != null
-              const nameBlock = (
-                <div className="flex-1 min-w-0">
-                  {/* Só o nome encolhe (reticências); nível e troféu ficam
-                      sempre visíveis — com o truncate na linha toda, um nome
-                      grande empurrava o 🏆 para fora (Francisco, 16 set 2026). */}
-                  <p className="font-extrabold text-ink-900 flex items-center gap-1.5 min-w-0">
-                    <span className="truncate min-w-0">{firstLastName(s.user?.name)}</span>
-                    <span className="shrink-0 flex">
-                      <RatingBadge
-                        rating={hasRating ? s.rating_after : ratingInfoById[s.user_id]?.rating}
-                        gender={ratingInfoById[s.user_id]?.gender}
-                      />
-                    </span>
-                    {s.mix_won && <span className="shrink-0">🏆</span>}
-                  </p>
-                  <p className="text-[11px] text-muted">
-                    {s.matches_won}/{s.matches_played} {t('gamedetails.games_suffix')} • {winRatePct(s.matches_won, s.matches_played)}% {t('gamedetails.win_rate_suffix')}
-                  </p>
-                </div>
-              )
-              return (
-                <div key={s.id} className="flex items-center gap-3 py-2 border-b border-line last:border-0">
-                  <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-extrabold tabular-nums shrink-0 ${
-                    i === 0 ? 'bg-ink-900 text-white' : 'bg-ink-50 text-ink-700'
-                  }`}>
-                    {i + 1}
-                  </span>
-                  {isGuestById[s.user_id] ? nameBlock : (
-                    <Link to={`/jogador/${s.user_id}`} className="flex-1 min-w-0">
-                      {nameBlock}
-                    </Link>
-                  )}
-                  <div className="text-right shrink-0">
-                    {hasRating ? (
-                      <p className="flex items-center justify-end gap-1.5">
-                        <span className={`text-xs font-extrabold tabular-nums ${s.rating_delta >= 0 ? 'text-ok' : 'text-danger'}`}>
-                          {s.rating_delta >= 0 ? '+' : ''}{Math.round(s.rating_delta)}
-                        </span>
-                        {s.rating_after != null && (
-                          <span className="text-lg font-extrabold text-ink-900 tabular-nums">{Math.round(s.rating_after)}</span>
-                        )}
-                      </p>
-                    ) : (
-                      <p className="text-lg font-extrabold text-ink-900 tabular-nums">{s.points_earned}</p>
-                    )}
-                    <p className="text-[11px] text-muted">
-                      {hasRating ? t('gamedetails.rating_label') : t('gamedetails.points_label')}
+      {game.status === 'finished' && finishedTab === 'stats' && mixStats.length > 0 && (() => {
+        // A linha de um jogador, partilhada pelas duas vistas: avatar com a
+        // pill NOVO (como no ranking e nas listas de participantes), nome +
+        // nível + 🏆, jogos/% e, à direita, o delta + rating do mix.
+        // rating_delta/rating_after only exist from the Elo rollout
+        // (2026-08-25) onward — older finished mixes fall back to the
+        // legacy points_earned they were actually finalized with.
+        const statsPlayerRow = ({ id, name, avatarUrl, isGuest, won }) => {
+          const s = statsByUser[id]
+          const hasRating = s?.rating_delta != null
+          const nameBlock = (
+            <div className="flex-1 min-w-0">
+              {/* Só o nome encolhe (reticências); nível e troféu ficam
+                  sempre visíveis — com o truncate na linha toda, um nome
+                  grande empurrava o 🏆 para fora (Francisco, 16 set 2026). */}
+              <p className="font-extrabold text-ink-900 flex items-center gap-1.5 min-w-0">
+                <span className="truncate min-w-0">{firstLastName(name)}</span>
+                <span className="shrink-0 flex">
+                  {isGuest
+                    ? <GuestBadge />
+                    : <RatingBadge
+                        rating={hasRating ? s.rating_after : ratingInfoById[id]?.rating}
+                        gender={ratingInfoById[id]?.gender}
+                      />}
+                </span>
+                {won && <span className="shrink-0">🏆</span>}
+              </p>
+              {s && (
+                <p className="text-[11px] text-muted">
+                  {s.matches_won}/{s.matches_played} {t('gamedetails.games_suffix')} • {winRatePct(s.matches_won, s.matches_played)}% {t('gamedetails.win_rate_suffix')}
+                </p>
+              )}
+            </div>
+          )
+          return (
+            <div key={id} className="flex items-center gap-2.5 min-w-0">
+              <Avatar name={name} url={avatarUrl} size="w-10 h-10 text-sm" provisional={isProvisional(personById[id]?.rating_games)} />
+              {isGuest ? nameBlock : (
+                <Link to={`/jogador/${id}`} className="flex-1 min-w-0">
+                  {nameBlock}
+                </Link>
+              )}
+              {s && (
+                <div className="text-right shrink-0">
+                  {hasRating ? (
+                    <p className="flex items-center justify-end gap-1.5">
+                      <span className={`text-xs font-extrabold tabular-nums ${s.rating_delta >= 0 ? 'text-ok' : 'text-danger'}`}>
+                        {s.rating_delta >= 0 ? '+' : ''}{Math.round(s.rating_delta)}
+                      </span>
+                      {s.rating_after != null && (
+                        <span className="text-lg font-extrabold text-ink-900 tabular-nums">{Math.round(s.rating_after)}</span>
+                      )}
                     </p>
-                  </div>
+                  ) : (
+                    <p className="text-lg font-extrabold text-ink-900 tabular-nums">{s.points_earned}</p>
+                  )}
+                  <p className="text-[11px] text-muted">
+                    {hasRating ? t('gamedetails.rating_label') : t('gamedetails.points_label')}
+                  </p>
                 </div>
-              )
-            })}
+              )}
+            </div>
+          )
+        }
+        return (
+          <div id="mix-stats" className="card scroll-mt-24">
+            <h3 className="text-lg text-ink-900 mb-3">{t('gamedetails.mix_stats_title')}</h3>
+            {sobeDesceOrder.length > 0 ? (
+              // Sobe e desce de duplas fixas: um bloco por dupla, pela
+              // fotografia final dos campos (a ordem do cartão de partilha),
+              // posição partilhada pelos dois jogadores. Convidados aparecem
+              // na dupla com o badge, sem stats (não têm linha).
+              <div className="space-y-2">
+                {sobeDesceOrder.map((teamId, i) => {
+                  const team = teams.find((tm) => tm.id === teamId)
+                  if (!team) return null
+                  const won = teamId === game.winner_team_id
+                  const members = [
+                    team.player1 ? { ...team.player1, isGuest: false } : team.guest1 ? { ...team.guest1, isGuest: true } : null,
+                    team.player2 ? { ...team.player2, isGuest: false } : team.guest2 ? { ...team.guest2, isGuest: true } : null,
+                  ].filter(Boolean)
+                  return (
+                    <div key={teamId} className={`flex items-center gap-3 rounded-ctrl p-3 ${i === 0 ? 'bg-ink-50' : 'bg-canvas'}`}>
+                      <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-extrabold tabular-nums shrink-0 ${
+                        i === 0 ? 'bg-ink-900 text-white' : 'bg-surface text-ink-700'
+                      }`}>
+                        {i + 1}
+                      </span>
+                      <div className="flex-1 min-w-0 space-y-2">
+                        {members.map((member) => statsPlayerRow({
+                          id: member.id,
+                          name: member.name,
+                          avatarUrl: member.avatar_url,
+                          isGuest: member.isGuest || !!personById[member.id]?.is_guest,
+                          won,
+                        }))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                {mixStats.map((s, i) => (
+                  <div key={s.id} className="flex items-center gap-3 py-2 border-b border-line last:border-0">
+                    <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-extrabold tabular-nums shrink-0 ${
+                      i === 0 ? 'bg-ink-900 text-white' : 'bg-ink-50 text-ink-700'
+                    }`}>
+                      {i + 1}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      {statsPlayerRow({
+                        id: s.user_id,
+                        name: s.user?.name,
+                        avatarUrl: personById[s.user_id]?.avatar_url,
+                        isGuest: !!isGuestById[s.user_id],
+                        won: s.mix_won,
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* Com a barra de quem organiza, o erro aparece nela, junto ao botão. */}
       {mixError && !(showAdminBar && barPrimary) && (
@@ -3326,7 +3418,7 @@ export default function GameDetails() {
           {/* Classificação dobrada numa linha, com o teu lugar (pacote do mix,
               ponto 15, proposta para o Francisco ver): em todos os formatos,
               só com o nome «Classificação». Abre-se ao tocar. */}
-          {classif.rows.length > 0 && !inPoolStage && (
+          {classif.rows.length > 0 && anyScoreSaved && !inPoolStage && (
             <div className="card">
               <button type="button" onClick={() => setClassifOpen((v) => !v)} aria-expanded={classifOpen}
                 className={`w-full min-h-[44px] flex items-center justify-between gap-3 text-left ${classifOpen ? 'mb-3' : ''}`}>

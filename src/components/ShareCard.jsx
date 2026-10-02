@@ -197,13 +197,14 @@ function InviteCard({ game, people, capacity, formattedDate }) {
 function PodiumCard({ game, duplas, winnerTeamId }) {
   const { t } = useTranslation()
   // Highlight the mix's actual declared winner (winner_team_id), not just
-  // whichever dupla has the highest combined player points — those diverge
-  // in elimination-format mixes, where the final match decides the winner
-  // regardless of aggregate points. Falls back to points-sort order when no
-  // winner is known (shouldn't happen for a finished mix, but keeps the
-  // card from crashing if it ever is).
+  // whichever dupla the caller put first — those diverge in
+  // elimination-format mixes, where the final match decides the winner
+  // regardless of aggregate points. The rest keep the caller's order: it's
+  // the ranking that makes sense for the format (final court photo in sobe
+  // e desce, combined points otherwise) — re-sorting by points here would
+  // undo it.
   const ordered = winnerTeamId
-    ? [...duplas].sort((a, b) => (a.id === winnerTeamId ? -1 : b.id === winnerTeamId ? 1 : b.points - a.points))
+    ? [...duplas.filter((d) => d.id === winnerTeamId), ...duplas.filter((d) => d.id !== winnerTeamId)]
     : duplas
   const top = ordered.slice(0, 3)
   const rest = ordered.slice(3)

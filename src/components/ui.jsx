@@ -191,7 +191,11 @@ export function DateField({ value, onChange, max, min, placeholder, hideToday = 
     : resolvedPlaceholder
 
   const openPicker = () => {
-    setViewDate(selectedDate || new Date())
+    // Sem data escolhida, abre no mês mais recente SELECIONÁVEL — num
+    // nascimento com max de há 13 anos, abrir em 2026 mostrava um mês
+    // inteiro desativado e obrigava a recuar 13 anos à mão.
+    const hoje = new Date()
+    setViewDate(selectedDate || (maxDate && maxDate < hoje ? maxDate : hoje))
     setOpen(true)
   }
 
