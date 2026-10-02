@@ -708,6 +708,14 @@ const RPC_MOCKS = {
         organization_logo_url: null, invited_by_name: 'Marta Costa', created_at: new Date().toISOString(), as_admin: true,
       }]
     : []),
+  // localStorage.mockFollowRequest = 'true' — um pedido para seguir no sino.
+  list_incoming_follow_requests: () => (localStorage.getItem('mockFollowRequest') === 'true'
+    ? [{ id: 'mock-follow-1', follower_id: FAKE_MEMBER_ID, follower_name: 'Marta Costa', follower_avatar_url: null, created_at: new Date().toISOString() }]
+    : []),
+  // localStorage.mockBellError = 'true' — aceitar no sino falha, para se ver
+  // a frase de erro por baixo da linha (em vez da janela do navegador).
+  accept_organization_invite: () => (localStorage.getItem('mockBellError') === 'true' ? { __error: 'mock_bell_error', __code: 'XX000' } : null),
+  accept_follow_request: () => (localStorage.getItem('mockBellError') === 'true' ? { __error: 'mock_bell_error', __code: 'XX000' } : null),
 }
 
 // localStorage.mockRotatingMix = 'true' — um Sobe e desce com parceiros
