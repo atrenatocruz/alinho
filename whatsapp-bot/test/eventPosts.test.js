@@ -75,7 +75,7 @@ test('às 18:30 saem o torneio e a turma com essa hora — com o link, e não o 
   assert.match(tournament, /^📢 @all/)
   assert.match(tournament, /Categorias com vagas: MX4/, 'o M5 está cheio; o suplente não ocupa lugar')
   assert.doesNotMatch(tournament, /M5/)
-  assert.match(tournament, /alinho\.pt\/torneio\/smash-cup-by-wfit/)
+  assert.match(tournament, /https:\/\/alinho\.pt\/torneio\/smash-cup-by-wfit/)
   assert.ok(!sent.some((x) => x.includes('Privado')), 'o privado não se anuncia')
   const lesson = sent.find((x) => x.includes('Turma a 4'))
   assert.ok(lesson, 'a turma sai')

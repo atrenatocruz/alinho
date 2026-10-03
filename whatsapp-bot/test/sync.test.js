@@ -65,8 +65,8 @@ test('se a lista de mixes abertos mudou, recarrega todos (Review Focus 5)', asyn
   sent.length = 0
   repostHooks.requestRepostForGame('o', 'm1')
   await wait(4500)
-  assert.ok(sent.some((m) => m.includes('*Mix m0* (01)')), 'o mix novo passa a ser o 01')
-  assert.ok(sent.some((m) => m.includes('*Mix m1* (02)')), 'o m1 passa a 02')
+  assert.ok(sent.some((m) => m.includes('*Mix m0*') && m.includes('🔢 Nº: 01')), 'o mix novo passa a ser o 01')
+  assert.ok(sent.some((m) => m.includes('*Mix m1*') && m.includes('🔢 Nº: 02')), 'o m1 passa a 02')
   assert.ok(sent.length === 3, `devia reenviar os 3 (numeração nova), foram ${sent.length}`)
 })
 

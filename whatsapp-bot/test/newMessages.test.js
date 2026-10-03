@@ -61,15 +61,15 @@ const state = (people, game = {}) => ({
   people, capacity: 8, suplentes: [],
 })
 
-test('o formato novo é para todos os grupos — o interruptor do clube morreu (Ruben, 3 out)', async () => {
+test('o interruptor do clube chega ao grupo; sem ele, mensagens de sempre', async () => {
   assert.equal((await getGroupByJid('g@g.us')).newMessages, true)
   freshDb(false)
-  assert.equal((await getGroupByJid('g@g.us')).newMessages, true)
-  // Mesmo sem a linha do clube: formato novo na mesma.
+  assert.equal((await getGroupByJid('g@g.us')).newMessages, false)
+  // Sem a coluna (migração por correr) ou sem a linha do clube: as de sempre.
   freshDb(true)
   db.organizations = []
   _clearGroupsCacheForTests()
-  assert.equal((await getGroupByJid('g@g.us')).newMessages, true)
+  assert.equal((await getGroupByJid('g@g.us')).newMessages, false)
 })
 
 test('o cartão novo: curto, a dupla numa linha, com os pontos Elo, sem calendário, e o /help só aqui', () => {
@@ -133,11 +133,20 @@ test('um suplente sai com Out', async () => {
   assert.deepEqual(db.participants.map((p) => p.user_id), ['a'])
 })
 
-test('o suplente sai com Out mesmo no clube que tinha o interruptor desligado', async () => {
+test('sem o interruptor, o suplente continua a ser mandado para a app', async () => {
   freshDb(false)
   db.participants.push({ id: 'p2', game_id: 'm', user_id: 'b', partner_id: null, status: 'waitlisted', created_at: '2026-10-01T10:01:00Z' })
-  assert.equal(await say('out', '351922222222'), '🤖 Saíste da lista de suplentes.')
-  assert.equal(db.participants.length, 0)
+  assert.match(await say('out', '351922222222'), /para sair, usa a app/)
+  assert.equal(db.participants.length, 1)
+})
+
+test('«mix» com o interruptor ligado envia o cartão novo — não o clássico (duplicado de 3 out)', async () => {
+  // O «mix» tem de usar o MESMO formato que os reposts, senão o hash do
+  // noteCardSent não bate e a reconciliação manda o cartão outra vez.
+  const out = await say('mix')
+  assert.match(out, /🎾 \*Mix M4 · Terça\*\n/)
+  assert.doesNotMatch(out, /Nº:/)
+  assert.doesNotMatch(out, /vaga livre/)
 })
 
 test('vários mixes abertos: a pergunta curta, com as respostas possíveis', async () => {

@@ -74,7 +74,7 @@ test('publica o cartão completo de cada mix com vagas, com @all na 1.ª mensage
   assert.equal(sent.length, 1, 'o mix cheio não sai')
   assert.match(sent[0].text, /^📢 @all/)
   assert.match(sent[0].text, /Mix com vagas/)
-  assert.match(sent[0].text, /3\. —/)
+  assert.match(sent[0].text, /\(vaga livre\)/)
   assert.deepEqual(sent[0].opts.mentions, ['111@s.whatsapp.net', '222@s.whatsapp.net'])
   assert.equal(gameIdForMessage('id-1'), 'vagas')
 })
