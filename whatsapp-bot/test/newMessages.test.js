@@ -61,15 +61,15 @@ const state = (people, game = {}) => ({
   people, capacity: 8, suplentes: [],
 })
 
-test('o interruptor do clube chega ao grupo; sem ele, mensagens de sempre', async () => {
+test('o formato novo é para todos os grupos — o interruptor do clube morreu (Ruben, 3 out)', async () => {
   assert.equal((await getGroupByJid('g@g.us')).newMessages, true)
   freshDb(false)
-  assert.equal((await getGroupByJid('g@g.us')).newMessages, false)
-  // Sem a coluna (migração por correr) ou sem a linha do clube: as de sempre.
+  assert.equal((await getGroupByJid('g@g.us')).newMessages, true)
+  // Mesmo sem a linha do clube: formato novo na mesma.
   freshDb(true)
   db.organizations = []
   _clearGroupsCacheForTests()
-  assert.equal((await getGroupByJid('g@g.us')).newMessages, false)
+  assert.equal((await getGroupByJid('g@g.us')).newMessages, true)
 })
 
 test('o cartão novo: curto, a dupla numa linha, com os pontos Elo, sem calendário, e o /help só aqui', () => {
@@ -133,11 +133,11 @@ test('um suplente sai com Out', async () => {
   assert.deepEqual(db.participants.map((p) => p.user_id), ['a'])
 })
 
-test('sem o interruptor, o suplente continua a ser mandado para a app', async () => {
+test('o suplente sai com Out mesmo no clube que tinha o interruptor desligado', async () => {
   freshDb(false)
   db.participants.push({ id: 'p2', game_id: 'm', user_id: 'b', partner_id: null, status: 'waitlisted', created_at: '2026-10-01T10:01:00Z' })
-  assert.match(await say('out', '351922222222'), /para sair, usa a app/)
-  assert.equal(db.participants.length, 1)
+  assert.equal(await say('out', '351922222222'), '🤖 Saíste da lista de suplentes.')
+  assert.equal(db.participants.length, 0)
 })
 
 test('vários mixes abertos: a pergunta curta, com as respostas possíveis', async () => {

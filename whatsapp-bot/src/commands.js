@@ -684,7 +684,11 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
     const labelable = labelableMixes(openMixes)
     const states = await Promise.all(openMixes.map((mix) => loadGame(mix.id)))
     for (const state of states) {
-      const text = buildMixMessage(state, { label: mixLabel(state.game, labelable) })
+      // O MESMO formato que os reposts/lembretes usam (fresh segue o
+      // interruptor do clube) — senão o hash do noteCardSent não bate com
+      // o que a reconciliação calcula e ela manda o cartão outra vez no
+      // outro formato: era o duplicado que o Ruben viu a 3 out.
+      const text = buildMixMessage(state, { label: mixLabel(state.game, labelable), fresh: group.newMessages })
       if (cardUnchangedRecently(groupJid, state.game.id, text)) continue
       const messageId = await sendText(groupJid, text)
       recordMixMessage(messageId, state.game.id)

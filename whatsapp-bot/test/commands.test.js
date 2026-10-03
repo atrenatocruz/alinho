@@ -51,7 +51,7 @@ test('«In» sozinho inscreve', async () => {
 test('«In» recusado pelo trigger das vagas → oferece suplente', async () => {
   db.failInsert = { table: 'participants', code: 'P0001', message: 'game_full' }
   const out = await say('in')
-  assert.match(out, /Queres entrar como suplente/)
+  assert.match(out, /Queres ficar como suplente/)
 })
 
 test('«In com» recusado pelo trigger das vagas → diz que não cabe a dupla', async () => {
@@ -140,7 +140,7 @@ test('«Out @alguém» que não é o parceiro: não mexe e explica', async () =>
 test('«Out» sozinho em dupla pergunta 1/2/3; «2» = só tu', async () => {
   pairIn()
   const menu = await say('out')
-  assert.match(menu, /1\. Dupla[\s\S]*2\. Só tu[\s\S]*3\. /)
+  assert.match(menu, /1\. Os dois[\s\S]*2\. Só tu[\s\S]*3\. /)
   assert.deepEqual([row().user_id, row().partner_id], ['a', 'b'])
   await say('2')
   assert.deepEqual([row().user_id, row().partner_id], ['b', null])
@@ -271,14 +271,14 @@ test('«In» não inscreve outra vez quem já está com o convidado do mesmo nú
   twoAccounts()
   db.participants.push({ id: 'pg', game_id: 'm', user_id: 'g', status: 'confirmed', created_at: '2026-09-25T22:17:00Z' })
   const out = await say('in')
-  assert.match(out, /Já estás inscrito/)
+  assert.match(out, /Já estás neste mix/)
   assert.equal(db.participants.length, 1)
 })
 
 test('dupla inscrita com o convidado: «Out» abre o menu e «3» deixa o convidado sozinho', async () => {
   twoAccounts()
   db.participants.push({ id: 'row', game_id: 'm', user_id: 'g', partner_id: 'b', status: 'confirmed', created_at: '2026-09-25T22:17:00Z' })
-  assert.match(await say('out'), /1\. Dupla/)
+  assert.match(await say('out'), /1\. Os dois/)
   await say('3')
   assert.deepEqual([row().user_id, row().partner_id], ['g', null])
 })
@@ -297,7 +297,7 @@ const solo = () => db.participants.find((p) => p.id === 'solo')
 test('#554 «In com» já inscrito sozinho junta o parceiro na mesma linha (mantém o lugar)', async () => {
   soloIn()
   const out = await say('in com afonso')
-  assert.doesNotMatch(out, /Já estás inscrito/)
+  assert.doesNotMatch(out, /Já estás neste mix/)
   assert.deepEqual([solo().partner_id, solo().joined_alone, solo().created_at], ['b', false, '2026-09-25T15:54:00Z'])
   assert.equal(db.participants.length, 1)
 })
@@ -314,7 +314,7 @@ test('#554 parceiro já inscrito: recusa', async () => {
   db.participants.push({ id: 'pb', game_id: 'm', user_id: 'b', status: 'confirmed', created_at: '2026-09-25T16:00:00Z' })
   const out = await say('in com afonso')
   // Desde 27 set (Francisco): o Afonso tem de aceitar — pergunta-se-lhe.
-  assert.match(out, /quer fazer dupla contigo neste mix/)
+  assert.match(out, /quer jogar em dupla contigo neste mix/)
   assert.equal(solo().partner_id, null)
 })
 
@@ -328,7 +328,7 @@ test('#554 mix sem «Inscrição em dupla»: recusa', async () => {
 
 test('#554 parceiro que não está na app: «Sim» junta-o como convidado sem conta', async () => {
   soloIn()
-  assert.match(await say('in com rui costa'), /Queres inscrever a dupla/)
+  assert.match(await say('in com rui costa'), /Inscrevo a dupla na mesma/)
   const out = await say('sim')
   assert.match(out, /convidado, sem conta/)
   assert.equal(db.participants.length, 1)
@@ -358,8 +358,8 @@ test('#552 «mix» com 1 mix aberto: envia o cartão completo', async () => {
   sync._resetGroupStateForTests()
   const sent = await sayWithIds('mix')
   assert.equal(sent.length, 1)
-  assert.match(sent[0].text, /\*Mix\*/)
-  assert.match(sent[0].text, /\(vaga livre\)/)
+  assert.match(sent[0].text, /🎾 \*Mix\*\n/)
+  assert.match(sent[0].text, /1\. —/)
 })
 
 test('#552 «mix» com 3 mixes: 3 cartões completos; igual há <5 min não repete, com alteração volta a sair', async () => {
@@ -370,16 +370,16 @@ test('#552 «mix» com 3 mixes: 3 cartões completos; igual há <5 min não repe
   threeMixes()
   const first = await sayWithIds('mix')
   assert.equal(first.length, 3)
-  assert.match(first[0].text, /Nº: 01/)
-  assert.match(first[2].text, /Nº: 03/)
-  assert.match(first[0].text, /\(vaga livre\)/)
+  assert.match(first[0].text, /\(01\)/)
+  assert.match(first[2].text, /\(03\)/)
+  assert.match(first[0].text, /1\. —/)
   const again = await sayWithIds('/mix')
   assert.equal(again.length, 0, 'nada mudou: nenhum cartão se repete')
   // Alguém entrou no m2: só esse cartão mudou e só esse volta a sair.
   db.participants.push({ id: 'px', game_id: 'm2', user_id: 'b', partner_id: null, status: 'confirmed', created_at: '2026-09-27T10:00:00Z' })
   const after = await sayWithIds('mix')
   assert.equal(after.length, 1)
-  assert.match(after[0].text, /Nº: 02/)
+  assert.match(after[0].text, /\(02\)/)
   assert.match(after[0].text, /Afonso Dias/)
 })
 
@@ -398,7 +398,7 @@ const xSolo = () => db.participants.push({ id: 'solo', game_id: 'm', user_id: 'b
 test('«In com X» com o X sozinho: quem escreve entra sozinho e o robô pergunta ao X', async () => {
   xSolo()
   const out = await say('in com afonso')
-  assert.match(out, /Afonso Dias, o Bernardo Ramos quer fazer dupla contigo neste mix\. Responde "Sim" para aceitar\./)
+  assert.match(out, /Afonso Dias, Bernardo Ramos quer jogar em dupla contigo neste mix\. Responde \*Sim\* a esta mensagem para aceitar\./)
   assert.equal(db.participants.find((p) => p.id === 'solo').partner_id, null, 'ainda não há dupla')
   assert.ok(db.participants.some((p) => p.user_id === 'a' && p.status === 'confirmed' && !p.partner_id), 'o Bernardo entra sozinho')
 })
@@ -483,7 +483,7 @@ test('«In <só o meu nome>» entra sozinho', async () => {
 })
 
 test('«In <parceiro sem conta>» sem «com» pergunta se inscreve a dupla', async () => {
-  assert.match(await sayAs('In Marco Silva', { pn: '351922222222' }), /Não encontrei o \*Marco Silva\*.*Queres inscrever a dupla/s)
+  assert.match(await sayAs('In Marco Silva', { pn: '351922222222' }), /Não encontrei Marco Silva no clube[\s\S]*Inscrevo a dupla na mesma/)
 })
 
 test('«In @X» usa o nome do WhatsApp do X se ele já escreveu no grupo', async () => {
@@ -507,13 +507,13 @@ test('«In @X» sem nome conhecido fica «Parceiro de …» e muda quando o X es
 test('«Sim» a parceiro sem conta, mas entretanto entrou alguém com esse nome → pede-lhe a dupla, sem criar outro', async () => {
   db.profiles.push({ id: 'k', name: 'Miguel Almeida', phone_hash: hash('977777777'), language: 'pt' })
   db.memberships.push({ user_id: 'k', organization_id: 'o' })
-  assert.match(await sayAs('in com paulo duarte', { pn: '351977777777', pushName: 'Mike' }), /Queres inscrever a dupla/)
+  assert.match(await sayAs('in com paulo duarte', { pn: '351977777777', pushName: 'Mike' }), /Inscrevo a dupla na mesma/)
   db.profiles.push({ id: 'p', name: 'Paulo Duarte#12', phone_hash: hash('966666666'), language: 'pt' })
   db.memberships.push({ user_id: 'p', organization_id: 'o', is_guest: true })
   db.participants.push({ id: 'prow', game_id: 'm', user_id: 'p', partner_id: null, status: 'confirmed', joined_alone: true, created_at: '2026-09-30T16:16:00Z' })
   const out = await sayAs('sim', { pn: '351977777777', pushName: 'Mike' })
   assert.doesNotMatch(out, /convite\//)
-  assert.match(out, /quer fazer dupla contigo/)
+  assert.match(out, /quer jogar em dupla contigo/)
   assert.equal(db.partner_invites.length, 0)
 })
 
@@ -563,7 +563,7 @@ test('«In» com conta quando já existe a minha linha-convidado no jogo → ado
   db.profiles.push({ id: 'n', name: 'Gonçalo Registado', phone_hash: hash('955555555'), language: 'pt' })
   db.memberships.push({ user_id: 'n', organization_id: 'o' })
   const out = await say('in', '351955555555')
-  assert.match(out, /Já estás inscrito/)
+  assert.match(out, /Já estás neste mix/)
   assert.equal(db.participants.length, 1)
   assert.equal(db.participants[0].guest_id, guestId, 'a linha-convidado fica (a adoção é na confirmação do número)')
 })

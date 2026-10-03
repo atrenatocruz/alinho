@@ -101,28 +101,13 @@ async function loadGroups() {
 }
 
 /**
- * Mensagens novas do robô (organizations.whatsapp_new_messages, interruptor
- * por clube que só o super admin vê — 1 out): cada grupo leva
- * `newMessages`. Lido junto com os grupos (mesma cache de 60 s), para não
- * custar uma ida à BD por mensagem. Sem a migração (42703), ou se a leitura
- * falhar, ficam todos com as mensagens de sempre.
+ * Mensagens novas do robô: o formato reduzido passou a ser O formato, para
+ * todos os clubes (Ruben, 3 out) — o interruptor por clube
+ * organizations.whatsapp_new_messages (1 out) deixou de se ler e pode ser
+ * retirado numa limpeza futura, junto com os textos clássicos.
  */
 async function withMessageFlags(groups) {
-  const orgIds = [...new Set(groups.map((g) => g.organizationId))]
-  let on = new Set()
-  if (orgIds.length > 0) {
-    try {
-      const { data, error } = await supabase.from('organizations').select('id, whatsapp_new_messages').in('id', orgIds)
-      if (error) {
-        if (error.code !== '42703') console.error('Failed to load whatsapp_new_messages:', error)
-      } else {
-        on = new Set((data || []).filter((org) => org.whatsapp_new_messages === true).map((org) => org.id))
-      }
-    } catch (err) {
-      console.error('Failed to load whatsapp_new_messages:', err)
-    }
-  }
-  return groups.map((g) => ({ ...g, newMessages: on.has(g.organizationId) }))
+  return groups.map((g) => ({ ...g, newMessages: true }))
 }
 
 /** Todos os grupos servidos por este processo (cache 60 s): as linhas de
