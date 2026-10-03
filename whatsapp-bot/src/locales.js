@@ -51,7 +51,7 @@ Para veres esta lista:
   promoted_to_confirmed: '🎉 {{name}} subiu da lista de suplentes!',
 
   // sync.js — cancelled-mix group broadcast
-  mix_cancelled: '📢 @all\n\n🤖 O mix "{{title}}" foi cancelado ❌',
+  mix_cancelled: '🤖 O mix "{{title}}" foi cancelado ❌',
 
   // reminders.js
   reminder_roster_line: 'Inscritos: {{names}}\n\n',
@@ -60,7 +60,7 @@ Para veres esta lista:
   voucher_guest_won: '🎁 {{who}}, ganhaste um voucher! Usa-o na receção. Queres guardar este e os próximos prémios? Cria conta em alinho.pt com este número e confirma-o no perfil.',
   duplas_updated: '🤖 🔄 *Duplas atualizadas — {{title}}*\n\n{{lines}}',
   digest_mix_line: '🎾 *{{title}}* — {{when}}{{location}}\n👥 {{filled}}/{{capacity}} (faltam {{vagas}})',
-  digest_text: '🤖 📢 @all *Mixes ainda em aberto!*\n\n{{lines}}\n\nAinda há vagas — inscrevam-se antes que feche! 🎾',
+  digest_text: '🤖 *Mixes ainda em aberto!*\n\n{{lines}}\n\nAinda há vagas — inscrevam-se antes que feche! 🎾',
 
   // autostart.js
   duplas_formed: '🤖 🎾 *Duplas formadas para o mix {{title}}!*\n\n{{lines}}\n\nBoa sorte! 🏆',
@@ -165,7 +165,7 @@ To see this list:
   promoted_to_confirmed: '🎉 {{name}} moved up from the waitlist!',
 
   // sync.js — cancelled-mix group broadcast
-  mix_cancelled: '📢 @all\n\n🤖 The mix "{{title}}" was cancelled ❌',
+  mix_cancelled: '🤖 The mix "{{title}}" was cancelled ❌',
 
   // reminders.js
   reminder_roster_line: 'Signed up: {{names}}\n\n',
@@ -174,7 +174,7 @@ To see this list:
   voucher_guest_won: '🎁 {{who}}, you won a voucher! Use it at the front desk. Want to keep this and future prizes? Sign up at alinho.pt with this number and confirm it in your profile.',
   duplas_updated: '🤖 🔄 *Pairs updated — {{title}}*\n\n{{lines}}',
   digest_mix_line: '🎾 *{{title}}* — {{when}}{{location}}\n👥 {{filled}}/{{capacity}} ({{vagas}} spot(s) left)',
-  digest_text: '🤖 📢 @all *Mixes still open!*\n\n{{lines}}\n\nStill spots open — sign up before it closes! 🎾',
+  digest_text: '🤖 *Mixes still open!*\n\n{{lines}}\n\nStill spots open — sign up before it closes! 🎾',
 
   // autostart.js
   duplas_formed: '🤖 🎾 *Pairs are set for the {{title}} mix!*\n\n{{lines}}\n\nGood luck! 🏆',
@@ -251,7 +251,7 @@ const DICTS = { pt, en }
 // Sem rodapé do /help: nas novas ele só vai no cartão do mix.
 const ptNew = {
   promoted_to_confirmed: '✅ {{name}}, entraste no mix: saiu alguém e o lugar é teu.',
-  mix_cancelled: '❌ @all O *{{title}}* de {{when}}, foi cancelado.',
+  mix_cancelled: '❌ O *{{title}}* de {{when}}, foi cancelado.',
   reminder_roster_line: 'Inscritos: {{names}}.\n',
   reminder_group: '⏰ *{{title}}* é {{day}} às {{time}}{{location}}.\n{{roster}}Não podes ir? Responde *Out* ao cartão do mix.',
   duplas_formed: '🎾 *Duplas do {{title}}*\n{{lines}}\nBom jogo!',

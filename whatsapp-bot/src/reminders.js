@@ -173,12 +173,13 @@ export async function publishOrgCards(orgId, { sendText, getGroupMentions }, { o
       const withSpots = states.filter(({ people, capacity }) => people.length < capacity).slice(0, MAX_CARDS_PER_POST)
       if (withSpots.length === 0) continue
 
-      const mentions = await getGroupMentions(group.groupJid)
-      for (let i = 0; i < withSpots.length; i++) {
-        const state = withSpots[i]
+      // Sem «📢 @all» nem menções em massa (Ruben, 3 out, depois do ban do
+      // número: marcar o grupo inteiro em cada publicação é padrão de spam
+      // para o WhatsApp). O cartão fala por si; menções só às pessoas
+      // certas (lembrete do dia, duplas do arranque).
+      for (const state of withSpots) {
         const card = buildMixMessage(state, { label: mixLabel(state.game, labelable), fresh: group.newMessages })
-        const text = i === 0 ? `📢 @all\n\n${card}` : card
-        const messageId = await sendText(group.groupJid, text, i === 0 ? { mentions } : {})
+        const messageId = await sendText(group.groupJid, card)
         recordMixMessage(messageId, state.game.id)
         noteCardSent(group.groupJid, state.game.id, card, messageId)
       }
@@ -226,14 +227,14 @@ export async function checkScheduledPosts({ sendText, getGroupMentions }, now = 
   await publishOtherEvents({ sendText, getGroupMentions }, { orgIds, hoursByOrg, slot, dayKey })
 }
 
-/** Uma mensagem em todos os grupos do clube, com @all (como os cartões dos
- *  mixes). `buildText(fresh)` dá o texto de cada grupo: as mensagens novas
- *  ou as de sempre, conforme o interruptor do clube. */
-async function sendToOrgGroups(orgId, buildText, { sendText, getGroupMentions }) {
+/** Uma mensagem em todos os grupos do clube. Sem «📢 @all» nem menções em
+ *  massa (Ruben, 3 out, depois do ban do número). `buildText(fresh)` dá o
+ *  texto de cada grupo: as mensagens novas ou as de sempre, conforme o
+ *  interruptor do clube. */
+async function sendToOrgGroups(orgId, buildText, { sendText }) {
   for (const group of await getGroupsForOrg(orgId)) {
     try {
-      const mentions = await getGroupMentions(group.groupJid)
-      await sendText(group.groupJid, `📢 @all\n\n${buildText(group.newMessages)}`, { mentions })
+      await sendText(group.groupJid, buildText(group.newMessages))
     } catch (err) {
       console.error(`Failed to publish event to ${group.groupJid}:`, err)
     }

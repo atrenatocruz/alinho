@@ -64,7 +64,7 @@ function setup() {
   return db
 }
 
-test('publica o cartão completo de cada mix com vagas, com @all na 1.ª mensagem; responder «In» funciona', async () => {
+test('publica o cartão completo de cada mix com vagas, sem @all nem menções em massa; responder «In» funciona', async () => {
   setup()
   const sent = []
   await publishOrgCards('o', {
@@ -72,10 +72,10 @@ test('publica o cartão completo de cada mix com vagas, com @all na 1.ª mensage
     getGroupMentions: async () => ['111@s.whatsapp.net', '222@s.whatsapp.net'],
   })
   assert.equal(sent.length, 1, 'o mix cheio não sai')
-  assert.match(sent[0].text, /^📢 @all/)
+  assert.doesNotMatch(sent[0].text, /@all/)
   assert.match(sent[0].text, /Mix com vagas/)
   assert.match(sent[0].text, /\(vaga livre\)/)
-  assert.deepEqual(sent[0].opts.mentions, ['111@s.whatsapp.net', '222@s.whatsapp.net'])
+  assert.equal(sent[0].opts.mentions, undefined, 'sem menções em massa (Ruben, 3 out)')
   assert.equal(gameIdForMessage('id-1'), 'vagas')
 })
 
