@@ -140,6 +140,15 @@ test('sem o interruptor, o suplente continua a ser mandado para a app', async ()
   assert.equal(db.participants.length, 1)
 })
 
+test('«mix» com o interruptor ligado envia o cartão novo — não o clássico (duplicado de 3 out)', async () => {
+  // O «mix» tem de usar o MESMO formato que os reposts, senão o hash do
+  // noteCardSent não bate e a reconciliação manda o cartão outra vez.
+  const out = await say('mix')
+  assert.match(out, /🎾 \*Mix M4 · Terça\*\n/)
+  assert.doesNotMatch(out, /Nº:/)
+  assert.doesNotMatch(out, /vaga livre/)
+})
+
 test('vários mixes abertos: a pergunta curta, com as respostas possíveis', async () => {
   db.games.push({ ...db.games[0], id: 'm2', title: 'Mix M5 · Quarta', date: new Date(Date.now() + 2 * 864e5).toISOString() })
   const out = await say('in')
