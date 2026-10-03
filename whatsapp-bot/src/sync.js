@@ -45,6 +45,16 @@ export function cardSentRecently(groupJid, gameId, now = Date.now()) {
   return Boolean(entry?.sentAt && now - entry.sentAt < CARD_COOLDOWN_MS)
 }
 
+// «mix» (Ruben, 3 out): um cartão que saiu há menos de 5 min e não mudou
+// nada não se reenvia; qualquer alteração (um In, uma vaga) reenvia.
+const CARD_UNCHANGED_MS = 5 * 60 * 1000
+
+/** Este cartão saiu há menos de 5 min com EXATAMENTE este texto? */
+export function cardUnchangedRecently(groupJid, gameId, text, now = Date.now()) {
+  const entry = groupState.get(groupJid)?.mixes.get(gameId)
+  return Boolean(entry?.sentAt && now - entry.sentAt < CARD_UNCHANGED_MS && entry.hash === hash(text))
+}
+
 /** O «mix» acabou de enviar este cartão: conta como o último anúncio do mix
  *  (mesmo hash que o repost calcula), para a reconciliação não o repetir. */
 export function noteCardSent(groupJid, gameId, text, messageId) {

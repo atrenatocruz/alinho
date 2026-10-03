@@ -9,7 +9,7 @@ import { t } from './locales.js'
 import { startTimer } from './timing.js'
 import { partnerFromTypedNames, isOnlySenderName } from './partnerNames.js'
 import { rememberName, seenName, usablePushName, notePlaceholder, renameDefaultPartner, renamePlaceholderFor } from './seenNames.js'
-import { repostHooks, noteCardSent } from './sync.js'
+import { repostHooks, noteCardSent, cardUnchangedRecently } from './sync.js'
 
 function stripAccents(str) {
   return str.normalize('NFD').replace(/[̀-ͯ]/g, '')
@@ -677,12 +677,15 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
   // anúncio: vagas numeradas, inscritos, «Escreve In»), e responder «In» a
   // um cartão inscreve nesse mix. Sempre um cartão por mix: a lista curta
   // «saíram há pouco» do anti-bloqueio escondia quem está inscrito e caiu
-  // (Ruben, 3 out).
+  // (Ruben, 3 out). Única exceção: um cartão igualzinho ao que saiu há
+  // menos de 5 min não se repete — mudou alguma coisa (um In, uma vaga),
+  // volta a sair.
   if (action === 'mix') {
     const labelable = labelableMixes(openMixes)
     const states = await Promise.all(openMixes.map((mix) => loadGame(mix.id)))
     for (const state of states) {
       const text = buildMixMessage(state, { label: mixLabel(state.game, labelable) })
+      if (cardUnchangedRecently(groupJid, state.game.id, text)) continue
       const messageId = await sendText(groupJid, text)
       recordMixMessage(messageId, state.game.id)
       noteCardSent(groupJid, state.game.id, text, messageId)
