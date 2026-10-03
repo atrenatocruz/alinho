@@ -9,7 +9,7 @@ import { t } from './locales.js'
 import { startTimer } from './timing.js'
 import { partnerFromTypedNames, isOnlySenderName } from './partnerNames.js'
 import { rememberName, seenName, usablePushName, notePlaceholder, renameDefaultPartner, renamePlaceholderFor } from './seenNames.js'
-import { repostHooks, cardSentRecently, noteCardSent } from './sync.js'
+import { repostHooks, noteCardSent } from './sync.js'
 
 function stripAccents(str) {
   return str.normalize('NFD').replace(/[̀-ͯ]/g, '')
@@ -225,28 +225,6 @@ export function buildHelp(openMixes, lang) {
   lines.push('')
   lines.push(t('help_more', lang, { link: shortLink('/instrucoes') }, true))
   return lines.join('\n')
-}
-
-/** A lista do «/mix»: além do número, dia e local, as vagas de cada um e se
- *  é de duplas fixas (onde se pode entrar em dupla). Uma consulta só para
- *  todos os mixes. */
-async function formatMixListWithSpots(openMixes, lang, allOpenMixes = openMixes, fresh = false) {
-  // A numeração vem da lista TODA dos abertos (a mesma dos cartões).
-  const labelable = labelableMixes(allOpenMixes)
-  const { data: rows, error } = await supabase
-    .from('participants')
-    .select('game_id, partner_id, partner_guest_id')
-    .in('game_id', openMixes.map((m) => m.id))
-    .eq('status', 'confirmed')
-  if (error) throw new Error(`Failed to count participants: ${error.message}`)
-  const taken = new Map()
-  for (const row of rows) taken.set(row.game_id, (taken.get(row.game_id) || 0) + (row.partner_id || row.partner_guest_id ? 2 : 1))
-  return openMixes.map((mix) => {
-    const capacity = mix.max_players || mix.num_courts * 4
-    const spots = t('mix_list_spots', lang, { filled: taken.get(mix.id) || 0, capacity })
-    const pairs = mix.allow_pair_signup && !mix.rotate_partners ? t('mix_list_fixed_pairs', lang) : ''
-    return `${formatMixLine(mix, lang, mixLabel(mix, labelable), fresh)}\n   ${spots}${pairs}`
-  }).join('\n')
 }
 
 /** Does this one identifier token single out `mix`? `label` is that mix's own "01"/"02" (null when it's the only mix open — nothing to number). Independent checks, not mutually exclusive — a token can validly hit more than one field of the same mix. */
@@ -697,24 +675,17 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
 
   // #552 — «mix» mostra o cartão completo de cada mix aberto (o mesmo do
   // anúncio: vagas numeradas, inscritos, «Escreve In»), e responder «In» a
-  // um cartão inscreve nesse mix. Anti-bloqueio: um mix cujo cartão saiu há
-  // menos de 10 min vai só na lista curta; no máximo 5 cartões por «mix».
+  // um cartão inscreve nesse mix. Sempre um cartão por mix: a lista curta
+  // «saíram há pouco» do anti-bloqueio escondia quem está inscrito e caiu
+  // (Ruben, 3 out).
   if (action === 'mix') {
-    const MAX_CARDS = 5
     const labelable = labelableMixes(openMixes)
-    const fresh = openMixes.filter((mix) => !cardSentRecently(groupJid, mix.id)).slice(0, MAX_CARDS)
-    const states = await Promise.all(fresh.map((mix) => loadGame(mix.id)))
+    const states = await Promise.all(openMixes.map((mix) => loadGame(mix.id)))
     for (const state of states) {
       const text = buildMixMessage(state, { label: mixLabel(state.game, labelable) })
       const messageId = await sendText(groupJid, text)
       recordMixMessage(messageId, state.game.id)
       noteCardSent(groupJid, state.game.id, text, messageId)
-    }
-    const freshIds = new Set(fresh.map((mix) => mix.id))
-    const rest = openMixes.filter((mix) => !freshIds.has(mix.id))
-    if (rest.length > 0) {
-      const list = await formatMixListWithSpots(rest, lang, openMixes, fresh)
-      await reply(states.length > 0 ? 'mix_list_more' : 'mix_list_recent', { count: rest.length, list })
     }
     return
   }

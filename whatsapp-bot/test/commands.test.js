@@ -362,7 +362,9 @@ test('#552 «mix» com 1 mix aberto: envia o cartão completo', async () => {
   assert.match(sent[0].text, /\(vaga livre\)/)
 })
 
-test('#552 «mix» com 3 mixes: 3 cartões numerados; «mix» repetido logo a seguir só dá a lista curta', async () => {
+test('#552 «mix» com 3 mixes: 3 cartões numerados, e repetir dá os cartões completos outra vez', async () => {
+  // A lista curta «saíram há pouco» caiu (Ruben, 3 out): escondia quem
+  // está inscrito. «mix» responde sempre com um cartão completo por mix.
   sync._resetGroupStateForTests()
   threeMixes()
   const first = await sayWithIds('mix')
@@ -370,9 +372,8 @@ test('#552 «mix» com 3 mixes: 3 cartões numerados; «mix» repetido logo a se
   assert.match(first[0].text, /Nº: 01/)
   assert.match(first[2].text, /Nº: 03/)
   const again = await sayWithIds('/mix')
-  assert.equal(again.length, 1)
-  assert.match(again[0].text, /saíram há pouco/)
-  assert.doesNotMatch(again[0].text, /\(vaga livre\)/)
+  assert.equal(again.length, 3)
+  assert.match(again[0].text, /\(vaga livre\)/)
 })
 
 test('#552 responder «In» a um cartão do «mix» inscreve nesse mix', async () => {
