@@ -362,18 +362,25 @@ test('#552 «mix» com 1 mix aberto: envia o cartão completo', async () => {
   assert.match(sent[0].text, /\(vaga livre\)/)
 })
 
-test('#552 «mix» com 3 mixes: 3 cartões numerados, e repetir dá os cartões completos outra vez', async () => {
+test('#552 «mix» com 3 mixes: 3 cartões completos; igual há <5 min não repete, com alteração volta a sair', async () => {
   // A lista curta «saíram há pouco» caiu (Ruben, 3 out): escondia quem
-  // está inscrito. «mix» responde sempre com um cartão completo por mix.
+  // está inscrito. «mix» responde sempre com um cartão completo por mix —
+  // exceto um cartão igualzinho ao que saiu há menos de 5 minutos.
   sync._resetGroupStateForTests()
   threeMixes()
   const first = await sayWithIds('mix')
   assert.equal(first.length, 3)
   assert.match(first[0].text, /Nº: 01/)
   assert.match(first[2].text, /Nº: 03/)
+  assert.match(first[0].text, /\(vaga livre\)/)
   const again = await sayWithIds('/mix')
-  assert.equal(again.length, 3)
-  assert.match(again[0].text, /\(vaga livre\)/)
+  assert.equal(again.length, 0, 'nada mudou: nenhum cartão se repete')
+  // Alguém entrou no m2: só esse cartão mudou e só esse volta a sair.
+  db.participants.push({ id: 'px', game_id: 'm2', user_id: 'b', partner_id: null, status: 'confirmed', created_at: '2026-09-27T10:00:00Z' })
+  const after = await sayWithIds('mix')
+  assert.equal(after.length, 1)
+  assert.match(after[0].text, /Nº: 02/)
+  assert.match(after[0].text, /Afonso Dias/)
 })
 
 test('#552 responder «In» a um cartão do «mix» inscreve nesse mix', async () => {
