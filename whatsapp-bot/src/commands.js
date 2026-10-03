@@ -683,6 +683,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
   if (action === 'mix') {
     const labelable = labelableMixes(openMixes)
     const states = await Promise.all(openMixes.map((mix) => loadGame(mix.id)))
+    let sentCards = 0
     for (const state of states) {
       // O MESMO formato que os reposts/lembretes usam (fresh segue o
       // interruptor do clube) — senão o hash do noteCardSent não bate com
@@ -693,6 +694,13 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
       const messageId = await sendText(groupJid, text)
       recordMixMessage(messageId, state.game.id)
       noteCardSent(groupJid, state.game.id, text, messageId)
+      sentCards++
+    }
+    // Tudo recente e sem alterações: nada para reenviar. A reação 👆 diz
+    // «os cartões estão mesmo aqui em cima» sem encher o grupo de texto —
+    // sem ela parecia que o robô não tinha ouvido (Ruben, 3 out).
+    if (sentCards === 0 && sendReaction && key) {
+      await sendReaction(groupJid, key, '👆').catch((err) => console.error('Falha a reagir ao «mix»:', err))
     }
     return
   }
