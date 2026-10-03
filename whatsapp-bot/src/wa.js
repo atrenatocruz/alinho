@@ -100,6 +100,18 @@ export async function connectWhatsApp({ onGroupMessage, onDirectMessage }) {
           )
           return
         }
+        // 403 (forbidden) é o WhatsApp a recusar a CONTA — ban ou bloqueio,
+        // não um soluço de rede. Reconectar em loop só agrava a avaliação
+        // (visto no ban do 351931386496, 3 out 2026): para de vez e diz o
+        // que fazer. O processo fica vivo mas inerte até intervenção humana.
+        if (statusCode === DisconnectReason.forbidden) {
+          logger.error(
+            'WhatsApp recusou a conta (403 forbidden — conta banida/bloqueada?). ' +
+            'NÃO se tenta reconectar. Verifica a conta na app do telemóvel ' +
+            `(«Pedir revisão» se banida); para re-emparelhar, apaga ${config.authDir} e reinicia.`
+          )
+          return
+        }
         // Back off instead of hammering an immediate retry: rapid repeated
         // connection attempts on the same account (e.g. during a flaky
         // network spell) look like abusive/bot-like linking behaviour to
