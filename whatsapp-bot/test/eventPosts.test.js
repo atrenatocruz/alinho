@@ -72,7 +72,7 @@ test('às 18:30 saem o torneio e a turma com essa hora — com o link, e não o 
   const sent = await run(18, 32)
   const tournament = sent.find((x) => x.includes('Smash Cup'))
   assert.ok(tournament, 'o torneio sai')
-  assert.match(tournament, /^📢 @all/)
+  assert.doesNotMatch(tournament, /@all/) // menções em massa removidas (Ruben, 3 out)
   assert.match(tournament, /Categorias com vagas: MX4/, 'o M5 está cheio; o suplente não ocupa lugar')
   assert.doesNotMatch(tournament, /M5/)
   assert.match(tournament, /https:\/\/alinho\.pt\/torneio\/smash-cup-by-wfit/)

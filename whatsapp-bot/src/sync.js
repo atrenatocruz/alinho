@@ -139,12 +139,12 @@ async function postGroupRoster(sendText, getGroupMentions, group, { tagAll = fal
   const mixStates = await Promise.all(toLoad.map((mix) => loadGame(mix.id)))
   const indexOf = new Map(openMixes.map((m, i) => [m.id, i]))
   timer.mark('carregar')
-  const mentions = tagAll && (total > 0 || openSlotMixes.length > 0) ? await getGroupMentions(group.groupJid) : null
-  // At most one @all per flush, however many mixes' messages (or the open-
-  // slot batch message) end up resent in it — shared across both loops
-  // below so a brand-new mix and a brand-new open-slot batch in the same
-  // flush don't each carry their own @all.
-  let taggedThisFlush = false
+  // «📢 @all» e menções em massa removidos (Ruben, 3 out, depois do ban do
+  // número): marcar o grupo inteiro é padrão de spam para o WhatsApp. O
+  // tagAll continua a circular pelos callers (mix novo → repost imediato),
+  // mas já não acrescenta prefixo nem menções. void: só para o lint.
+  void tagAll
+  void getGroupMentions
 
   for (const state of mixStates) {
     const gameId = state.game.id
@@ -162,12 +162,9 @@ async function postGroupRoster(sendText, getGroupMentions, group, { tagAll = fal
     const promo = promotedByGameId.get(gameId)
     const promoText = promo ? `${t('promoted_to_confirmed', promo.lang ?? 'pt', { name: promo.name }, group.newMessages)}\n\n` : ''
     const text = promoText + baseText
-    const shouldTagThis = tagAll && !taggedThisFlush
-    const fullText = shouldTagThis ? `📢 @all\n\n${text}` : text
 
-    const messageId = await sendText(group.groupJid, fullText, shouldTagThis ? { mentions } : {})
+    const messageId = await sendText(group.groupJid, text)
     sent++
-    if (shouldTagThis) taggedThisFlush = true
     st.mixes.set(gameId, { hash: nextHash, messageId, sentAt: Date.now() })
     if (messageId) recordMixMessage(messageId, gameId)
   }
@@ -193,11 +190,8 @@ async function postGroupRoster(sendText, getGroupMentions, group, { tagAll = fal
     const prev = st.openSlotBatches.get(batchId)
     if (prev && prev.hash === nextHash) continue
 
-    const shouldTagThis = tagAll && !taggedThisFlush
-    const fullText = shouldTagThis ? `📢 @all\n\n${baseText}` : baseText
-    const messageId = await sendText(group.groupJid, fullText, shouldTagThis ? { mentions } : {})
+    const messageId = await sendText(group.groupJid, baseText)
     sent++
-    if (shouldTagThis) taggedThisFlush = true
     st.openSlotBatches.set(batchId, { hash: nextHash, messageId })
   }
 
@@ -358,13 +352,13 @@ export function startSync({ sendText, getGroupMentions }) {
         for (const group of groups) {
           if (!mixVisibleToGroup(payload.new, group)) continue
           try {
-            const mentions = await getGroupMentions(group.groupJid)
             // Nas mensagens novas, com o dia e a hora (para não se confundir
-            // com o da semana seguinte) e sem o rodapé do /help.
+            // com o da semana seguinte) e sem o rodapé do /help. Sem menções
+            // em massa (Ruben, 3 out) — o texto deixa de levar o @all.
             const text = group.newMessages
               ? t('mix_cancelled', 'pt', { title: payload.new.title, when: `${longDayDate(payload.new.date)}, às ${shortHour(payload.new.date)}` }, true)
               : `${t('mix_cancelled', 'pt', { title: payload.new.title })}${helpFooter('pt')}`
-            await sendText(group.groupJid, text, { mentions })
+            await sendText(group.groupJid, text)
           } catch (err) {
             console.error(`Failed to announce cancellation to ${group.groupJid}:`, err)
           }
