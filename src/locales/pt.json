@@ -3753,6 +3753,7 @@
   "tournament.admin.more_schedule_hint": "Muda a hora e o campo dos jogos.",
   "tournament.admin.more_entries": "Duplas inscritas",
   "tournament.admin.more_entries_hint": "Valida, inscreve à mão e troca jogadores.",
+  "tournament.admin.more_entries_hint_cancelled": "Vê quem estava inscrito.",
   "tournament.admin.more_scorekeepers": "Quem marca resultados",
   "tournament.admin.more_scorekeepers_hint": "Escolhe quem pode marcar os resultados no dia, além de quem organiza.",
   "tournament.admin.more_notice": "Publicar aviso",
