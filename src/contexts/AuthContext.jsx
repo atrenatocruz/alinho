@@ -391,8 +391,13 @@ export const AuthProvider = ({ children }) => {
       provider: 'google',
       options: {
         redirectTo: window.location.href,
+        // A ida ao Google substitui o /login no histórico, em vez de o
+        // empilhar: de volta à app, o «voltar» não cai outra vez no login
+        // (Francisco, 4 out). Na volta, o AfterLogin também usa replace.
+        skipBrowserRedirect: true,
       },
     })
+    if (!error && data?.url) window.location.replace(data.url)
     return { data, error }
   }
 
