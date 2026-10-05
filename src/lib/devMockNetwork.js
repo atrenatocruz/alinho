@@ -809,6 +809,8 @@ const EV_TEAMS_BASE = [evTeam('et1', e1, e0, 4), evTeam('et2', e2, e3, 3), evTea
 // localStorage.mockTeams = '5' | '6': mais duplas (com os nomes de EV_EXTRA) — número ímpar de duplas (1 out).
 const EV_TEAMS = [...EV_TEAMS_BASE, evTeam('et5', EV_EXTRA[0], EV_EXTRA[1], 0), evTeam('et6', EV_EXTRA[2], EV_EXTRA[3], -1)]
   .slice(0, Number(localStorage.getItem('mockTeams') || 4))
+  // mockSlotOpen = 'true': o João saiu depois do sorteio e não havia suplentes — «Falta 1» na Dupla 2 (ponto 17).
+  .map((tm) => (localStorage.getItem('mockSlotOpen') === 'true' && tm.id === 'et2' ? { ...tm, player2_id: null, player2: null } : tm))
 // Pacote do mix (ponto 11, 2 out): localStorage.mockRoundPending = '1' — só a
 // Ronda 1 sorteada, por começar; = '2' — a Ronda 2 sorteada, por começar.
 // Nos dois, o relógio ainda não arrancou (round_started_at null).
