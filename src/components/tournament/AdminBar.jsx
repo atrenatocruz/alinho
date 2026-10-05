@@ -110,14 +110,19 @@ export default function AdminBar({ tournament, categories = [], onChanged, onEdi
 
   // Em cima, como no mix (pacote da revisão, ponto 1): só «Editar» e
   // «Mais ⋯». Saem «ORGANIZAÇÃO · <estado>» e a frase do estado.
+  // Cancelado: cada ação só aparece quando faz sentido, como no mix
+  // cancelado — sem «Editar», e no «Mais ⋯» só ver e inscritos (UX, 5 out).
+  const cancelled = status === 'cancelado'
   if (part === 'top') {
     return (
       <div>
         <div className="flex gap-1.5">
           {/* Abre AQUI, onde a pessoa já está (o formulário não tem rota própria). */}
-          <button type="button" onClick={() => onEdit?.()} className={SECONDARY}>
-            <Pencil size={14} /> {t('eventactions.edit')}
-          </button>
+          {!cancelled && (
+            <button type="button" onClick={() => onEdit?.()} className={SECONDARY}>
+              <Pencil size={14} /> {t('eventactions.edit')}
+            </button>
+          )}
           <button type="button" onClick={() => setMoreOpen(true)} aria-haspopup="dialog" className={SECONDARY}>
             {t('eventactions.more')} <MoreHorizontal size={16} />
           </button>
@@ -132,8 +137,8 @@ export default function AdminBar({ tournament, categories = [], onChanged, onEdi
               onClick: () => navigate(`/torneio/${tournament.slug || tournament.id}/marcar`) },
             live && { key: 'schedule', label: t('tournament.admin.schedule'), hint: t('tournament.admin.more_schedule_hint'), onClick: () => onSchedule?.() },
             { key: 'entries', label: t('tournament.admin.more_entries'), hint: t('tournament.admin.more_entries_hint'), onClick: () => onEntries?.() },
-            { key: 'scorekeepers', label: t('tournament.admin.more_scorekeepers'), hint: t('tournament.admin.more_scorekeepers_hint'), onClick: () => onScorekeepers?.() },
-            { key: 'notice', label: t('tournament.admin.more_notice'), hint: t('tournament.admin.more_notice_hint'),
+            !cancelled && { key: 'scorekeepers', label: t('tournament.admin.more_scorekeepers'), hint: t('tournament.admin.more_scorekeepers_hint'), onClick: () => onScorekeepers?.() },
+            !cancelled && { key: 'notice', label: t('tournament.admin.more_notice'), hint: t('tournament.admin.more_notice_hint'),
               onClick: () => window.dispatchEvent(new CustomEvent('tournament:new-notice')) },
             live && { key: 'finish', label: t('tournament.admin.more_finish'), hint: t('tournament.admin.more_finish_hint'),
               onClick: () => document.getElementById('tournament-close-categories')?.scrollIntoView({ behavior: 'smooth', block: 'center' }) },
