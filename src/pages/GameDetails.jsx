@@ -209,6 +209,9 @@ export default function GameDetails() {
   // Ponto 9: com as duplas sorteadas, os inscritos ficam dobrados.
   const [inscritosOpen, setInscritosOpen] = useState(false)
   const [finalizeAsk, setFinalizeAsk] = useState(null) // { early } | null
+  // «×» de um inscrito: a pergunta é uma ConfirmSheet, não a janela do
+  // navegador (Francisco, 4 out). A pessoa a tirar, ou null.
+  const [removeAsk, setRemoveAsk] = useState(null)
   const [classifOpen, setClassifOpen] = useState(false)
   const [showDuplasShare, setShowDuplasShare] = useState(false)
   const [mixStats, setMixStats] = useState([])
@@ -852,14 +855,15 @@ export default function GameDetails() {
 
   /* ─── Admin: remove a player from the mix (before it starts) ─────── */
 
-  const handleRemovePerson = async (person) => {
-    const msg = person.rowOwner && person.hasPartner
-      ? t('gamedetails.confirm_remove_with_partner', { name: person.name })
-      : t('gamedetails.confirm_remove_person', { name: person.name })
-    if (!confirm(msg)) return
-
-    setBusy(true)
+  const handleRemovePerson = (person) => {
     setMixError('')
+    setRemoveAsk(person)
+  }
+
+  // Lança o erro: quem o mostra é a ConfirmSheet, junto ao botão.
+  const doRemovePerson = async () => {
+    const person = removeAsk
+    setBusy(true)
     try {
       if (person.rowOwner) {
         // remove the whole participation row (owner + partner, if any)
@@ -882,9 +886,6 @@ export default function GameDetails() {
         }
       }
       loadGameDetails()
-    } catch (error) {
-      console.error('Error removing player:', error)
-      setMixError(describeError(t, error, 'gamedetails.error_remove_player'))
     } finally {
       setBusy(false)
     }
@@ -4269,6 +4270,23 @@ export default function GameDetails() {
 
       {/* A folha do «Adicionar jogador» serve o mix a decorrer (#292) e antes de começar (#534). */}
       {/* «Terminar e dar os pontos»: a pergunta na folha da app (ponto 16). */}
+      <ConfirmSheet
+        open={!!removeAsk}
+        title={t('gamedetails.remove_ask_title', { name: removeAsk?.name || '' })}
+        message={[
+          t(removeAsk?.rowOwner && removeAsk?.hasPartner ? 'gamedetails.remove_ask_with_partner' : 'gamedetails.remove_ask_text'),
+          // Sai um inscrito e há suplentes: a base de dados põe o 1.º no
+          // lugar — quem organiza tem de o saber antes (UX, 5 out).
+          removeAsk?.rowOwner && waitlist.length > 0 && !waitlist.some((w) => w.id === removeAsk.rowId) ? t('gamedetails.remove_ask_waitlist') : '',
+        ].filter(Boolean).join(' ')}
+        confirmLabel={t('gamedetails.remove_ask_confirm')}
+        cancelLabel={t('gamedetails.remove_ask_keep')}
+        // Regra das janelas: o seguro («Manter») a preto, tirar a vermelho.
+        danger
+        onConfirm={doRemovePerson}
+        onClose={() => setRemoveAsk(null)}
+        errorOf={(error) => describeError(t, error, 'gamedetails.remove_ask_error')}
+      />
       <ConfirmSheet
         open={!!finalizeAsk}
         title={t('gamedetails.finalize_ask_title')}
