@@ -136,7 +136,7 @@ export default function AdminBar({ tournament, categories = [], onChanged, onEdi
             live && { key: 'score', label: t('tournament.score.link_cta'), hint: t('tournament.admin.more_score_hint'),
               onClick: () => navigate(`/torneio/${tournament.slug || tournament.id}/marcar`) },
             live && { key: 'schedule', label: t('tournament.admin.schedule'), hint: t('tournament.admin.more_schedule_hint'), onClick: () => onSchedule?.() },
-            { key: 'entries', label: t('tournament.admin.more_entries'), hint: t('tournament.admin.more_entries_hint'), onClick: () => onEntries?.() },
+            { key: 'entries', label: t('tournament.admin.more_entries'), hint: t(cancelled ? 'tournament.admin.more_entries_hint_cancelled' : 'tournament.admin.more_entries_hint'), onClick: () => onEntries?.() },
             !cancelled && { key: 'scorekeepers', label: t('tournament.admin.more_scorekeepers'), hint: t('tournament.admin.more_scorekeepers_hint'), onClick: () => onScorekeepers?.() },
             !cancelled && { key: 'notice', label: t('tournament.admin.more_notice'), hint: t('tournament.admin.more_notice_hint'),
               onClick: () => window.dispatchEvent(new CustomEvent('tournament:new-notice')) },

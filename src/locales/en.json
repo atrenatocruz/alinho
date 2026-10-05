@@ -3781,6 +3781,7 @@
   "tournament.admin.more_schedule_hint": "Change match times and courts.",
   "tournament.admin.more_entries": "Entered teams",
   "tournament.admin.more_entries_hint": "Validate, add by hand and swap players.",
+  "tournament.admin.more_entries_hint_cancelled": "See who was entered.",
   "tournament.admin.more_scorekeepers": "Who enters results",
   "tournament.admin.more_scorekeepers_hint": "Choose who can enter results on the day, besides the organisers.",
   "tournament.admin.more_notice": "Post a notice",
