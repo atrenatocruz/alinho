@@ -12,7 +12,7 @@
 // Enquanto a migração do torneio não correr, a RPC não existe: a página
 // mostra o estado vazio em vez de rebentar.
 import { Suspense, useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { BackBar } from '../components/ui'
 import { shareMessage, tournamentUrl } from '../lib/tournamentPublic'
@@ -67,6 +67,7 @@ const STATE_PILL = {
 export default function TournamentPage() {
   const { t, i18n } = useTranslation()
   const { id } = useParams()
+  const location = useLocation()
   const goBack = useGoBack('/')
   const navigate = useNavigate()
   const { user, memberships } = useAuth()
@@ -112,8 +113,16 @@ export default function TournamentPage() {
   // (ações do evento, 30 set), com o botão de trás a funcionar.
   const tourId = data?.tournament?.id
   const wantsEdit = params.get('admin') === 'editar'
+  // Um torneio cancelado não abre o editar sozinho: o ?admin=editar que
+  // ficou no endereço sai sem deixar rasto (bug do Francisco, 5 out).
+  const cancelled = data?.tournament?.status === 'cancelado'
   useEffect(() => {
-    if (!wantsEdit || !tourId || editing) return undefined
+    if (!wantsEdit || !cancelled) return
+    const next = new URLSearchParams(params); next.delete('admin'); setParams(next, { replace: true })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wantsEdit, cancelled])
+  useEffect(() => {
+    if (!wantsEdit || !tourId || editing || cancelled) return undefined
     let alive = true
     getTournamentForEdit(tourId)
       .then((d) => {
@@ -234,12 +243,18 @@ export default function TournamentPage() {
   const openAdmin = async (modo) => {
     setAdminError('')
     // O «editar» carrega-se no efeito do endereço (lá em cima).
-    const next = new URLSearchParams(params); next.set('admin', modo); setParams(next)
+    // Marca que veio da página: ao fechar volta-se atrás, em vez de empilhar
+    // outra página por cima — senão o «voltar» da página reabria o editar,
+    // num ciclo sem saída (bug do Francisco, 5 out).
+    const next = new URLSearchParams(params); next.set('admin', modo); setParams(next, { state: { adminFromPage: true } })
   }
 
   const closeAdmin = () => {
-    const next = new URLSearchParams(params); next.delete('admin'); setParams(next)
     setEditing(null); setAdminError('')
+    if (location.state?.adminFromPage) { navigate(-1); return }
+    // Chegou direto ao ?admin=… (do Gerir, de um link): troca-se a entrada,
+    // para o ?admin não ficar no histórico.
+    const next = new URLSearchParams(params); next.delete('admin'); setParams(next, { replace: true })
   }
 
   const saveEdit = async (draft) => {
@@ -405,7 +420,7 @@ export default function TournamentPage() {
       {/* «O teu próximo jogo»: um cartão com o jogo à vista, no lugar do lima
           que só mudava o separador lá em baixo (Francisco, 1 out). Sem mais
           jogos, sai. */}
-      {hasGames && !publicView && (
+      {hasGames && !publicView && tour.status !== 'cancelado' && (
         <NextGameCard game={myGame} onOpenList={() => {
           setParam('tab', 'my_games')
           // Desce até lá: sem isto não se via nada a mudar (Francisco, 1 out).
