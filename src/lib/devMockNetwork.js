@@ -717,6 +717,14 @@ const RPC_MOCKS = {
         organization_logo_url: null, invited_by_name: 'Marta Costa', created_at: new Date().toISOString(), as_admin: true,
       }]
     : []),
+  // localStorage.mockFollowRequest = 'true' — um pedido para seguir no sino.
+  list_incoming_follow_requests: () => (localStorage.getItem('mockFollowRequest') === 'true'
+    ? [{ id: 'mock-follow-1', follower_id: FAKE_MEMBER_ID, follower_name: 'Marta Costa', follower_avatar_url: null, created_at: new Date().toISOString() }]
+    : []),
+  // localStorage.mockBellError = 'true' — aceitar no sino falha, para se ver
+  // a frase de erro por baixo da linha (em vez da janela do navegador).
+  accept_organization_invite: () => (localStorage.getItem('mockBellError') === 'true' ? { __error: 'mock_bell_error', __code: 'XX000' } : null),
+  accept_follow_request: () => (localStorage.getItem('mockBellError') === 'true' ? { __error: 'mock_bell_error', __code: 'XX000' } : null),
 }
 
 // localStorage.mockRotatingMix = 'true' — um Sobe e desce com parceiros
@@ -1309,7 +1317,13 @@ const TABLE_MOCKS = {
   mix_player_stats: () => (agenda()
     ? [{ game_id: 'ag-finished-yesterday', user_id: MOCK_ADMIN_USER_ID, mix_won: false, rating_delta: 18, points_earned: 14,
         game: { id: 'ag-finished-yesterday', title: 'Mix de segunda', date: atDay(-1, 19).toISOString(), location: 'Smash Padel, Parque das Nações' } }]
-    : longNames() ? LONG_STATS : []),
+    : longNames() ? LONG_STATS
+    // mockEventState = 'finished': as estatísticas do mix terminado (o desenho do Ruben, 2 out).
+    : eventState() === 'finished' ? EV_PEOPLE.map((p, i) => ({
+      id: `ev-s${i}`, game_id: 'fake-game-1', user_id: p.id, user: { name: p.name },
+      matches_won: 4 - Math.floor(i / 2), matches_played: 4, mix_won: i < 2,
+      rating_delta: [18, 18, 9, 9, -6, -6, -14, -14][i], rating_after: 1700 - i * 40, points_earned: 20 - i * 2,
+    })) : []),
   teams: (url) => (agenda() && url.includes('ag-winner') ? AGENDA_WINNER_TEAMS() : ['live', 'finished', 'paused', 'ready'].includes(eventState()) ? EV_TEAMS : rotating() ? ROT_TEAMS : []),
   participants: () => (eventState() ? EV_PARTICIPANTS() : []),
   matches: () => (['live', 'finished'].includes(eventState()) ? EV_MATCHES() : rotating() ? ROT_MATCHES_FN() : []),
@@ -1735,6 +1749,13 @@ export function installDevMockNetwork() {
     if (localStorage.getItem('mockRobotMessagesError') === 'true' && /\/rest\/v1\/organizations\?/.test(url)
         && (init?.method || input?.method || 'GET').toUpperCase() === 'PATCH' && String(init?.body || '').includes('whatsapp_new_messages')) {
       return jsonResponse({ code: '42501', message: 'not_allowed' }, 403)
+    }
+    // Caminho feliz: grava em localStorage.mockRobotMessages e devolve a linha
+    // (o interruptor pede .select('id') e trata 0 linhas como erro).
+    if (/\/rest\/v1\/organizations\?/.test(url)
+        && (init?.method || input?.method || 'GET').toUpperCase() === 'PATCH' && String(init?.body || '').includes('whatsapp_new_messages')) {
+      try { localStorage.setItem('mockRobotMessages', String(JSON.parse(init.body).whatsapp_new_messages === true)) } catch { /* ignore */ }
+      return jsonResponse([{ id: MOCK_ADMIN_ORG_ID }])
     }
 
     // localStorage.mockDeleteHasResults = 'true' — apagar um mix falha como

@@ -2,17 +2,16 @@ import { supabase } from './supabase.js'
 import { config } from './config.js'
 import { helpFooter } from './messages.js'
 import { t } from './locales.js'
-import { nameWithBand } from './elo.js'
 import { isGuestEmail, isPlaceholderEmail } from './phone.js'
 
-// Quem entrou pelo robô sem conta (e-mail guest-…@whatsapp.alinho.pt) leva
-// « (convidado)» no fim do nome, na lista do grupo (Francisco, 27 set).
-// Se o nome já o traz, não se repete.
-// `fresh` (mensagens novas, 1 out): sem o nível ao lado do nome.
-export function rosterName(person, fresh = false) {
-  const base = fresh ? person?.name || 'Jogador' : nameWithBand(person)
-  if (!person?.guest || /\(convidado\)/i.test(person.name || '')) return base
-  return `${base} (convidado)`
+// Lista do grupo (Ruben, 3 out): quem não tem conta aparece só com o nome
+// — caiu o « (convidado)» de 27 set — e quem tem conta com rating leva os
+// pontos Elo entre parênteses: «Ana Moreira (912)». Substitui a banda (M6)
+// e o modo `fresh` sem nível: a mesma cara em todas as listas.
+export function rosterName(person) {
+  const name = person?.name || 'Jogador'
+  if (person?.guest || person?.rating == null) return name
+  return `${name} (${Math.round(person.rating)})`
 }
 
 /** Loads a game plus its confirmed participants (flattened to one entry per person, partners included — mirrors GameDetails.jsx's `people` derivation), the suplentes, and the raw `rows` (confirmed + waitlisted) so callers don't re-query them. */

@@ -340,10 +340,12 @@ test('#554 parceiro que não está na app: «Sim» junta-o como convidado sem co
 // ── #552: «mix» mostra o cartão completo de cada mix aberto ────────────────
 async function sayWithIds(text, quotedStanzaId = null, pn = '351911111111') {
   const sent = []
+  sent.reactions = []
   let n = 0
   await handleGroupMessage(
-    { groupJid: 'g@g.us', senderPn: `${pn}@s.whatsapp.net`, text, message: {}, quotedStanzaId },
-    { sendText: async (_g, t) => { sent.push({ id: `card-${Date.now()}-${++n}`, text: t }); return sent.at(-1).id } },
+    { groupJid: 'g@g.us', senderPn: `${pn}@s.whatsapp.net`, text, message: {}, key: { id: 'msg-mix' }, quotedStanzaId },
+    { sendText: async (_g, t) => { sent.push({ id: `card-${Date.now()}-${++n}`, text: t }); return sent.at(-1).id },
+      sendReaction: async (_g, _key, emoji) => { sent.reactions.push(emoji) } },
   )
   return sent
 }
@@ -362,17 +364,26 @@ test('#552 «mix» com 1 mix aberto: envia o cartão completo', async () => {
   assert.match(sent[0].text, /\(vaga livre\)/)
 })
 
-test('#552 «mix» com 3 mixes: 3 cartões numerados; «mix» repetido logo a seguir só dá a lista curta', async () => {
+test('#552 «mix» com 3 mixes: 3 cartões completos; igual há <5 min não repete, com alteração volta a sair', async () => {
+  // A lista curta «saíram há pouco» caiu (Ruben, 3 out): escondia quem
+  // está inscrito. «mix» responde sempre com um cartão completo por mix —
+  // exceto um cartão igualzinho ao que saiu há menos de 5 minutos.
   sync._resetGroupStateForTests()
   threeMixes()
   const first = await sayWithIds('mix')
   assert.equal(first.length, 3)
   assert.match(first[0].text, /Nº: 01/)
   assert.match(first[2].text, /Nº: 03/)
+  assert.match(first[0].text, /\(vaga livre\)/)
   const again = await sayWithIds('/mix')
-  assert.equal(again.length, 1)
-  assert.match(again[0].text, /saíram há pouco/)
-  assert.doesNotMatch(again[0].text, /\(vaga livre\)/)
+  assert.equal(again.length, 0, 'nada mudou: nenhum cartão se repete')
+  assert.deepEqual(again.reactions, ['👆'], 'sem nada para reenviar, reage 👆 à mensagem')
+  // Alguém entrou no m2: só esse cartão mudou e só esse volta a sair.
+  db.participants.push({ id: 'px', game_id: 'm2', user_id: 'b', partner_id: null, status: 'confirmed', created_at: '2026-09-27T10:00:00Z' })
+  const after = await sayWithIds('mix')
+  assert.equal(after.length, 1)
+  assert.match(after[0].text, /Nº: 02/)
+  assert.match(after[0].text, /Afonso Dias/)
 })
 
 test('#552 responder «In» a um cartão do «mix» inscreve nesse mix', async () => {

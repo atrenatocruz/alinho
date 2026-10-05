@@ -2446,7 +2446,8 @@ export default function GameDetails() {
   // está, o que falta, e UM botão para o passo seguinte — o mesmo que antes
   // aparecia solto mais abaixo, agora só aqui.
   // O mix que não encheu (rascunho com unfilled_at) também tem «Editar» e «Mais ⋯» (ponto 7).
-  const showAdminBar = isAdmin && (['pending', 'open', 'closed', 'in_progress'].includes(game?.status) || (isDraftMix(game) && !!game?.unfilled_at))
+  // Um rascunho também tem «Editar» e «Mais ⋯» (QA/PO, 2 out), como os outros.
+  const showAdminBar = isAdmin && (['pending', 'open', 'closed', 'in_progress'].includes(game?.status) || isDraftMix(game))
   const isSeriesDate = !!game?.recurrence_id
   // «Sortear duplas» antes de «Começar o Mix» (27 set): só com duplas fixas
   // formadas pela app — com toda a gente inscrita em dupla, ou com parceiros
@@ -4600,7 +4601,11 @@ export default function GameDetails() {
           // Pacote do mix, ponto 6: «Voltar a rascunho» (unpublish_mix, Dev 3)
           // — por omissão só antes da 1.ª hora de anúncio do robô; quem
           // decide é a base de dados (already_announced).
-          ['pending', 'open'].includes(game.status) && !mixPaused && (game.status === 'open' && hasBot
+          // Apagado logo no menu, com o porquê (QA, 2 out): com inscritos, ou
+          // já anunciado pelo robô.
+          ['pending', 'open'].includes(game.status) && !mixPaused && (peopleCount > 0 || waitlist.length > 0
+            ? { key: 'draft', label: t('eventactions.to_draft'), hint: t('eventactions.to_draft_has_players'), disabled: true, onClick: () => {} }
+            : game.status === 'open' && hasBot
             ? { key: 'draft', label: t('eventactions.to_draft'), hint: t('eventactions.to_draft_announced'), disabled: true, onClick: () => {} }
             : { key: 'draft', label: t('eventactions.to_draft'), hint: t('eventactions.to_draft_hint'), onClick: () => setDraftAskOpen(true) }),
           game.status === 'in_progress' && { key: 'restart', label: t('eventactions.restart'), hint: t('eventactions.restart_hint'), onClick: () => setRestartOpen(true) },

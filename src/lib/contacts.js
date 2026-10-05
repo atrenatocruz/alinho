@@ -18,7 +18,9 @@ export const SUPPORT_EMAIL_READY = true
 // «Enviar ao robô» da confirmação do número tem de apontar ao robô LIGADO
 // À MESMA BD, senão o código morre em silêncio na BD errada. Em produção
 // a variável não existe e fica o número de sempre.
-export const WHATSAPP_NUMBER = import.meta.env.VITE_WHATSAPP_BOT_NUMBER || '351931386496'
+// 351923538245 desde 3 out 2026 — o número anterior (351931386496) foi
+// banido pelo WhatsApp; em dev o VITE_WHATSAPP_BOT_NUMBER aponta ao bot de QA.
+export const WHATSAPP_NUMBER = import.meta.env.VITE_WHATSAPP_BOT_NUMBER || '351923538245'
 
 export const mailtoLink = (subject) =>
   `mailto:${SUPPORT_EMAIL}${subject ? `?subject=${encodeURIComponent(subject)}` : ''}`

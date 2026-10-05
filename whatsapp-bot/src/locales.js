@@ -51,7 +51,7 @@ Para veres esta lista:
   promoted_to_confirmed: '🎉 {{name}} subiu da lista de suplentes!',
 
   // sync.js — cancelled-mix group broadcast
-  mix_cancelled: '📢 @all\n\n🤖 O mix "{{title}}" foi cancelado ❌',
+  mix_cancelled: '🤖 O mix "{{title}}" foi cancelado ❌',
 
   // reminders.js
   reminder_roster_line: 'Inscritos: {{names}}\n\n',
@@ -60,7 +60,7 @@ Para veres esta lista:
   voucher_guest_won: '🎁 {{who}}, ganhaste um voucher! Usa-o na receção. Queres guardar este e os próximos prémios? Cria conta em alinho.pt com este número e confirma-o no perfil.',
   duplas_updated: '🤖 🔄 *Duplas atualizadas — {{title}}*\n\n{{lines}}',
   digest_mix_line: '🎾 *{{title}}* — {{when}}{{location}}\n👥 {{filled}}/{{capacity}} (faltam {{vagas}})',
-  digest_text: '🤖 📢 @all *Mixes ainda em aberto!*\n\n{{lines}}\n\nAinda há vagas — inscrevam-se antes que feche! 🎾',
+  digest_text: '🤖 *Mixes ainda em aberto!*\n\n{{lines}}\n\nAinda há vagas — inscrevam-se antes que feche! 🎾',
 
   // autostart.js
   duplas_formed: '🤖 🎾 *Duplas formadas para o mix {{title}}!*\n\n{{lines}}\n\nBoa sorte! 🏆',
@@ -103,10 +103,6 @@ Para veres esta lista:
   not_in_any_open_mix: '🤖 Não estás inscrito em nenhum mix aberto.',
   disambiguate_out: '🤖 Estás inscrito em vários mixes! De qual queres sair?\n\n{{list}}\n\nResponde à mensagem do mix que queres com *Out*, ou escreve *Out* seguido do número, dia, hora ou nível (ex.: *Out 01*).',
   // commands.js — «/mix» e entrar em dupla (A2N, 24 set)
-  mix_list_spots: '👥 {{filled}}/{{capacity}}',
-  mix_list_recent: '🤖 Os cartões destes mixes saíram há pouco aqui no grupo — responde a esse cartão com *In*, ou escreve *In* e o número:\n\n{{list}}',
-  mix_list_more: '🤖 E mais {{count}}:\n\n{{list}}\n\nEscreve *In* e o número para entrares.',
-  mix_list_fixed_pairs: ' · aceita duplas 🤝',
   pair_signup_off: '🤖 Este mix é só de inscrição individual — entra sozinho com *In* 🎾 As duplas são formadas no início.',
   disambiguate_in_pair: '🤖 Há vários mixes abertos! Em qual querem entrar?\n\n{{list}}\n\nEscreve o número e o parceiro outra vez (ex.: *In 01 com João* ou *In 01 @João*).',
   partner_not_fixed_pairs: '🤖 Neste mix os parceiros trocam a cada ronda — não há duplas fixas. Entra sozinho com *In* 🎾',
@@ -169,7 +165,7 @@ To see this list:
   promoted_to_confirmed: '🎉 {{name}} moved up from the waitlist!',
 
   // sync.js — cancelled-mix group broadcast
-  mix_cancelled: '📢 @all\n\n🤖 The mix "{{title}}" was cancelled ❌',
+  mix_cancelled: '🤖 The mix "{{title}}" was cancelled ❌',
 
   // reminders.js
   reminder_roster_line: 'Signed up: {{names}}\n\n',
@@ -178,7 +174,7 @@ To see this list:
   voucher_guest_won: '🎁 {{who}}, you won a voucher! Use it at the front desk. Want to keep this and future prizes? Sign up at alinho.pt with this number and confirm it in your profile.',
   duplas_updated: '🤖 🔄 *Pairs updated — {{title}}*\n\n{{lines}}',
   digest_mix_line: '🎾 *{{title}}* — {{when}}{{location}}\n👥 {{filled}}/{{capacity}} ({{vagas}} spot(s) left)',
-  digest_text: '🤖 📢 @all *Mixes still open!*\n\n{{lines}}\n\nStill spots open — sign up before it closes! 🎾',
+  digest_text: '🤖 *Mixes still open!*\n\n{{lines}}\n\nStill spots open — sign up before it closes! 🎾',
 
   // autostart.js
   duplas_formed: '🤖 🎾 *Pairs are set for the {{title}} mix!*\n\n{{lines}}\n\nGood luck! 🏆',
@@ -218,10 +214,6 @@ To see this list:
   disambiguate_in: '🤖 There are several mixes open! Which one?\n\n{{list}}\n\nReply to the mix you want with *In*, or type *In* followed by the number, weekday, time or level (e.g. *In 01*, *In segunda m4*).',
   not_in_any_open_mix: "🤖 You're not signed up for any open mix.",
   disambiguate_out: "🤖 You're signed up for several mixes! Which one do you want to leave?\n\n{{list}}\n\nReply to the mix you want with *Out*, or type *Out* followed by the number, weekday, time or level (e.g. *Out 01*).",
-  mix_list_spots: '👥 {{filled}}/{{capacity}}',
-  mix_list_recent: "🤖 These mixes' cards went out here a moment ago — reply *In* to that card, or type *In* and the number:\n\n{{list}}",
-  mix_list_more: '🤖 And {{count}} more:\n\n{{list}}\n\nType *In* and the number to join.',
-  mix_list_fixed_pairs: ' · pairs welcome 🤝',
   pair_signup_off: '🤖 This mix is individual sign-up only — join on your own with *In* 🎾 Pairs are formed when it starts.',
   disambiguate_in_pair: '🤖 There are several mixes open! Which one do you both want to join?\n\n{{list}}\n\nType the number and your partner again (e.g. *In 01 com João* or *In 01 @João*).',
   partner_not_fixed_pairs: '🤖 In this mix partners rotate every round — there are no fixed pairs. Join on your own with *In* 🎾',
@@ -259,7 +251,7 @@ const DICTS = { pt, en }
 // Sem rodapé do /help: nas novas ele só vai no cartão do mix.
 const ptNew = {
   promoted_to_confirmed: '✅ {{name}}, entraste no mix: saiu alguém e o lugar é teu.',
-  mix_cancelled: '❌ @all O *{{title}}* de {{when}}, foi cancelado.',
+  mix_cancelled: '❌ O *{{title}}* de {{when}}, foi cancelado.',
   reminder_roster_line: 'Inscritos: {{names}}.\n',
   reminder_group: '⏰ *{{title}}* é {{day}} às {{time}}{{location}}.\n{{roster}}Não podes ir? Responde *Out* ao cartão do mix.',
   duplas_formed: '🎾 *Duplas do {{title}}*\n{{lines}}\nBom jogo!',
