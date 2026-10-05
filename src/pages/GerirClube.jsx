@@ -787,7 +787,7 @@ export default function GerirClube() {
   }
 
   // Os jogos em aberto (origin 'open_slot') nao vem no loadGames, que so
-  // pede os do admin. Sao os mesmos que o OpenSlotsPanel mostra.
+  // pede os do admin. Sao os do ecra «Jogos em aberto» (CreateOpenSlots).
   const loadOpenGames = async () => {
     const { data, error } = await supabase
       .from('games')

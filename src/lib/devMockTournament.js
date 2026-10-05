@@ -35,6 +35,10 @@ const iso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate(
 const nextFriday = () => {
   const d = new Date()
   d.setHours(0, 0, 0, 0)
+  // mockTDayGone (QA, 2 out): o torneio já começou. 'moved' = começou
+  // anteontem (o sábado já passou, o domingo é hoje); 'stuck' = acabou.
+  const gone = localStorage.getItem('mockTDayGone')
+  if (gone) { d.setDate(d.getDate() - (gone === 'stuck' ? 5 : 2)); return d }
   d.setDate(d.getDate() + ((5 - ((d.getDay() + 6) % 7) - 1 + 7) % 7 || 7))
   return d
 }

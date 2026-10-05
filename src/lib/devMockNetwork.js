@@ -233,6 +233,15 @@ const RPC_MOCKS = {
       ? { org_name: 'Smash Padel Almada', org_slug: 'smash-padel', org_kind: 'club', org_logo_url: null, org_visible: true }
       : { org_name: 'Jota Padeleiros', org_slug: 'jota-padeleiros', org_kind: 'group', org_logo_url: null, org_visible: true }]
   },
+  // O mesmo para um torneio (mockTClosed = 'group' | 'club' | 'private').
+  get_tournament_org_hint: () => {
+    const k = localStorage.getItem('mockTClosed')
+    if (!k) return []
+    if (k === 'private') return [{ org_name: null, org_slug: null, org_kind: 'group', org_logo_url: null, org_visible: false }]
+    return [k === 'club'
+      ? { org_name: 'Smash Padel Almada', org_slug: 'smash-padel', org_kind: 'club', org_logo_url: null, org_visible: true }
+      : { org_name: 'Jota Padeleiros', org_slug: 'jota-padeleiros', org_kind: 'group', org_logo_url: null, org_visible: true }]
+  },
   // O convite do grupo (1 out): o nome e o estado de quem acabou de pedir/entrar.
   get_club_profile: (params) => (['mockJoinPending', 'mockJoinOpen'].some((k) => localStorage.getItem(k) === 'true') && params?.p_slug === 'jota-padeleiros'
     ? [{ name: 'Jota Padeleiros', slug: 'jota-padeleiros', my_status: localStorage.getItem('mockJoinOpen') === 'true' ? 'member' : 'pending' }]
@@ -708,6 +717,14 @@ const RPC_MOCKS = {
         organization_logo_url: null, invited_by_name: 'Marta Costa', created_at: new Date().toISOString(), as_admin: true,
       }]
     : []),
+  // localStorage.mockFollowRequest = 'true' — um pedido para seguir no sino.
+  list_incoming_follow_requests: () => (localStorage.getItem('mockFollowRequest') === 'true'
+    ? [{ id: 'mock-follow-1', follower_id: FAKE_MEMBER_ID, follower_name: 'Marta Costa', follower_avatar_url: null, created_at: new Date().toISOString() }]
+    : []),
+  // localStorage.mockBellError = 'true' — aceitar no sino falha, para se ver
+  // a frase de erro por baixo da linha (em vez da janela do navegador).
+  accept_organization_invite: () => (localStorage.getItem('mockBellError') === 'true' ? { __error: 'mock_bell_error', __code: 'XX000' } : null),
+  accept_follow_request: () => (localStorage.getItem('mockBellError') === 'true' ? { __error: 'mock_bell_error', __code: 'XX000' } : null),
 }
 
 // localStorage.mockRotatingMix = 'true' — um Sobe e desce com parceiros
@@ -792,6 +809,8 @@ const EV_TEAMS_BASE = [evTeam('et1', e1, e0, 4), evTeam('et2', e2, e3, 3), evTea
 // localStorage.mockTeams = '5' | '6': mais duplas (com os nomes de EV_EXTRA) — número ímpar de duplas (1 out).
 const EV_TEAMS = [...EV_TEAMS_BASE, evTeam('et5', EV_EXTRA[0], EV_EXTRA[1], 0), evTeam('et6', EV_EXTRA[2], EV_EXTRA[3], -1)]
   .slice(0, Number(localStorage.getItem('mockTeams') || 4))
+  // mockSlotOpen = 'true': o João saiu depois do sorteio e não havia suplentes — «Falta 1» na Dupla 2 (ponto 17).
+  .map((tm) => (localStorage.getItem('mockSlotOpen') === 'true' && tm.id === 'et2' ? { ...tm, player2_id: null, player2: null } : tm))
 // Pacote do mix (ponto 11, 2 out): localStorage.mockRoundPending = '1' — só a
 // Ronda 1 sorteada, por começar; = '2' — a Ronda 2 sorteada, por começar.
 // Nos dois, o relógio ainda não arrancou (round_started_at null).
@@ -1732,6 +1751,13 @@ export function installDevMockNetwork() {
     if (localStorage.getItem('mockRobotMessagesError') === 'true' && /\/rest\/v1\/organizations\?/.test(url)
         && (init?.method || input?.method || 'GET').toUpperCase() === 'PATCH' && String(init?.body || '').includes('whatsapp_new_messages')) {
       return jsonResponse({ code: '42501', message: 'not_allowed' }, 403)
+    }
+    // Caminho feliz: grava em localStorage.mockRobotMessages e devolve a linha
+    // (o interruptor pede .select('id') e trata 0 linhas como erro).
+    if (/\/rest\/v1\/organizations\?/.test(url)
+        && (init?.method || input?.method || 'GET').toUpperCase() === 'PATCH' && String(init?.body || '').includes('whatsapp_new_messages')) {
+      try { localStorage.setItem('mockRobotMessages', String(JSON.parse(init.body).whatsapp_new_messages === true)) } catch { /* ignore */ }
+      return jsonResponse([{ id: MOCK_ADMIN_ORG_ID }])
     }
 
     // localStorage.mockDeleteHasResults = 'true' — apagar um mix falha como

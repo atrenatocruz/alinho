@@ -1,5 +1,5 @@
 // Pure builder for a batch of "jogo em aberto" games rows — no Supabase
-// calls here, so the admin UI (OpenSlotsPanel.jsx) can preview/validate a
+// calls here, so the admin UI (CreateOpenSlots.jsx) can preview/validate a
 // batch before publishing it. num_courts/max_players/format are left out
 // of each row deliberately: their schema defaults (1 court, 4 players,
 // 'sobe_desce') are already exactly right for a single 4-player slot.

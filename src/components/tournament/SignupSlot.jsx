@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Copy, Pencil } from 'lucide-react'
+import { Check, Copy, Pencil } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { Chips, ConfirmSheet, PrimaryButton } from '../ui'
@@ -48,11 +48,14 @@ export default function SignupSlot({ tournament, categories, category, my: first
   const [askLeave, setAskLeave] = useState(false)
   const [renaming, setRenaming] = useState(false)
   const [toast, setToast] = useState('')
+  // Quem chega de um link precisa de mais tempo para ler: 8 s, como no
+  // convite de grupo (UX, 2 out). O resto fica nos 3 s.
+  const [toastLong, setToastLong] = useState(false)
   useEffect(() => {
     if (!toast) return undefined
-    const id = setTimeout(() => setToast(''), 3000)
+    const id = setTimeout(() => { setToast(''); setToastLong(false) }, toastLong ? 8000 : 3000)
     return () => clearTimeout(id)
-  }, [toast])
+  }, [toast, toastLong])
   // O sexo não bate com a categoria: pergunta-se, não se bloqueia (26 set).
   const [genderAsk, setGenderAsk] = useState(null) // { key, then }
 
@@ -98,6 +101,22 @@ export default function SignupSlot({ tournament, categories, category, my: first
       })
   }
   useEffect(loadMyRow, [my?.entry_id])
+
+  // Cheguei pelo link do convite (ClaimInvite): diz com quem fiquei, uma
+  // vez só — sem isto o link juntava a dupla em silêncio (QA, 2 out).
+  const location = useLocation()
+  const navigate = useNavigate()
+  useEffect(() => {
+    if (!location.state?.claimed || !myRow) return
+    const names = [myRow.player1_name, myRow.player2_name].filter(Boolean)
+    const partner = names.find((n) => n !== profile?.name) || names[0]
+    const code = categories.find((c) => c.id === my?.category_id)?.code
+    if (partner) {
+      setToastLong(true)
+      setToast(code ? t('tsignup.claimed_with_in', { name: partner, code }) : t('tsignup.claimed_with', { name: partner }))
+    }
+    navigate(`${location.pathname}${location.search}`, { replace: true, state: null })
+  }, [location.state, myRow]) // eslint-disable-line react-hooks/exhaustive-deps
     || (left === 0 ? firstEntry : null)
   // Quem chega do WhatsApp sem conta carrega em «Criar conta para me
   // inscrever» e tem de aterrar no separador de CRIAR CONTA — e voltar a
@@ -262,6 +281,7 @@ export default function SignupSlot({ tournament, categories, category, my: first
       )}
       {toast && createPortal(
         <div role="status" className="fixed top-4 left-1/2 z-[60] -translate-x-1/2 w-max max-w-[calc(100vw-32px)] rounded-full bg-ink-900 px-4 py-2.5 text-sm font-extrabold text-white shadow-lift animate-fade-in">
+          {toastLong && <Check size={16} className="-mt-0.5 mr-1.5 inline shrink-0" />}
           {toast}
         </div>,
         document.body,
@@ -303,6 +323,7 @@ export default function SignupSlot({ tournament, categories, category, my: first
           categories={categories}
           category={category}
           categoriesLeft={left}
+          takenIds={myEntries.map((e) => e.category_id)}
           busy={busy}
           error={error}
           onConfirm={trySignUp}

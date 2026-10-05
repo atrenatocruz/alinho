@@ -210,6 +210,9 @@ export default function Layout({ children }) {
   // full reload — cheap since it's just a small pending-requests list.
   const [followRequests, setFollowRequests] = useState([])
   const [followRequestActing, setFollowRequestActing] = useState(null)
+  // Erro de aceitar/recusar no sino: frase por baixo da linha, em vez da
+  // janela do navegador (regra da UX). { key: 'follow:<id>' | 'org:<id>', text }.
+  const [rowError, setRowError] = useState(null)
   const [showNotifications, setShowNotifications] = useState(false)
   useEffect(() => {
     if (!profile?.id || isGuest) {
@@ -229,12 +232,13 @@ export default function Layout({ children }) {
 
   const handleAcceptFollowRequest = async (requestId) => {
     setFollowRequestActing(requestId)
+    setRowError(null)
     try {
       await acceptFollowRequest(requestId)
       setFollowRequests((reqs) => reqs.filter((r) => r.id !== requestId))
     } catch (error) {
       console.error('Error accepting follow request:', error)
-      alert(describeError(t, error, 'layout.action_failed'))
+      setRowError({ key: `follow:${requestId}`, text: describeError(t, error, 'layout.follow_accept_failed') })
     } finally {
       setFollowRequestActing(null)
     }
@@ -242,12 +246,13 @@ export default function Layout({ children }) {
 
   const handleDeclineFollowRequest = async (requestId) => {
     setFollowRequestActing(requestId)
+    setRowError(null)
     try {
       await removeFollow(requestId)
       setFollowRequests((reqs) => reqs.filter((r) => r.id !== requestId))
     } catch (error) {
       console.error('Error declining follow request:', error)
-      alert(describeError(t, error, 'layout.action_failed'))
+      setRowError({ key: `follow:${requestId}`, text: describeError(t, error, 'layout.follow_decline_failed') })
     } finally {
       setFollowRequestActing(null)
     }
@@ -274,13 +279,14 @@ export default function Layout({ children }) {
 
   const handleAcceptOrgInvite = async (inviteId) => {
     setOrgInviteActing(inviteId)
+    setRowError(null)
     try {
       await acceptOrganizationInvite(inviteId)
       setOrgInvites((invs) => invs.filter((i) => i.id !== inviteId))
       await refreshMemberships()
     } catch (error) {
       console.error('Error accepting organization invite:', error)
-      alert(describeError(t, error, 'layout.action_failed'))
+      setRowError({ key: `org:${inviteId}`, text: describeError(t, error, 'layout.invite_accept_failed') })
     } finally {
       setOrgInviteActing(null)
     }
@@ -288,12 +294,13 @@ export default function Layout({ children }) {
 
   const handleDeclineOrgInvite = async (inviteId) => {
     setOrgInviteActing(inviteId)
+    setRowError(null)
     try {
       await declineOrganizationInvite(inviteId)
       setOrgInvites((invs) => invs.filter((i) => i.id !== inviteId))
     } catch (error) {
       console.error('Error declining organization invite:', error)
-      alert(describeError(t, error, 'layout.action_failed'))
+      setRowError({ key: `org:${inviteId}`, text: describeError(t, error, 'layout.invite_decline_failed') })
     } finally {
       setOrgInviteActing(null)
     }
@@ -435,7 +442,7 @@ export default function Layout({ children }) {
     }
     if (notice.kind === 'mix_removed') return t('layout.mix_notice_removed', vars)
     if (notice.kind === 'mix_cancelled') return t('layout.mix_notice_cancelled', vars)
-    if (['mix_promoted', 'mix_moved_to_waitlist', 'mix_not_filled', 'mix_cancelled_not_filled'].includes(notice.kind)) {
+    if (['mix_promoted', 'mix_moved_to_waitlist', 'mix_not_filled', 'mix_cancelled_not_filled', 'mix_slot_open', 'mix_swapped_out'].includes(notice.kind)) {
       return t(`layout.${notice.kind}`, vars)
     }
     const partnerLine = d.partner_name ? t('layout.mix_notice_partner', vars) : t('layout.mix_notice_no_partner')
@@ -628,7 +635,7 @@ export default function Layout({ children }) {
                       onClick={() => openMixNotice(notice)}
                       className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50"
                     >
-                      <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${['mix_removed', 'mix_cancelled', 'mix_moved_to_waitlist', 'mix_cancelled_not_filled', 'mix_not_filled'].includes(notice.kind) ? 'bg-danger/10 text-danger' : 'bg-lime-400/20 text-ink-900'}`}>
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${['mix_removed', 'mix_cancelled', 'mix_moved_to_waitlist', 'mix_cancelled_not_filled', 'mix_not_filled', 'mix_slot_open', 'mix_swapped_out'].includes(notice.kind) ? 'bg-danger/10 text-danger' : 'bg-lime-400/20 text-ink-900'}`}>
                         <Shuffle size={16} />
                       </div>
                       <p className="flex-1 min-w-0 text-sm text-ink-900">{mixNoticeText(notice)}</p>
@@ -679,51 +686,61 @@ export default function Layout({ children }) {
                     </Link>
                   ))}
                   {orgInvites.map((inv) => (
-                    <div key={inv.id} className="flex items-center gap-3 px-4 py-3">
-                      <Avatar name={inv.organization_name} url={inv.organization_logo_url} size="w-9 h-9 text-sm" />
-                      <p className="flex-1 min-w-0 text-sm text-ink-900">
-                        {inv.as_admin ? t('layout.invited_to_admin') : t('layout.invited_to_join')} <span className="font-extrabold">{inv.organization_name}</span>
-                      </p>
-                      <button
-                        onClick={() => handleAcceptOrgInvite(inv.id)}
-                        disabled={orgInviteActing === inv.id}
-                        aria-label={t('layout.accept_invite_aria')}
-                        className="w-8 h-8 shrink-0 rounded-full bg-lime-400 text-ink-900 flex items-center justify-center hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
-                      >
-                        <UserCheck size={14} />
-                      </button>
-                      <button
-                        onClick={() => handleDeclineOrgInvite(inv.id)}
-                        disabled={orgInviteActing === inv.id}
-                        aria-label={t('layout.decline_invite_aria')}
-                        className="w-8 h-8 shrink-0 rounded-full bg-ink-50 text-ink-700 flex items-center justify-center hover:bg-ink-200 transition-colors duration-fast disabled:opacity-40"
-                      >
-                        <X size={14} />
-                      </button>
+                    <div key={inv.id} className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <Avatar name={inv.organization_name} url={inv.organization_logo_url} size="w-9 h-9 text-sm" />
+                        <p className="flex-1 min-w-0 text-sm text-ink-900">
+                          {inv.as_admin ? t('layout.invited_to_admin') : t('layout.invited_to_join')} <span className="font-extrabold">{inv.organization_name}</span>
+                        </p>
+                        <button
+                          onClick={() => handleAcceptOrgInvite(inv.id)}
+                          disabled={orgInviteActing === inv.id}
+                          aria-label={t('layout.accept_invite_aria')}
+                          className="w-8 h-8 shrink-0 rounded-full bg-lime-400 text-ink-900 flex items-center justify-center hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
+                        >
+                          <UserCheck size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleDeclineOrgInvite(inv.id)}
+                          disabled={orgInviteActing === inv.id}
+                          aria-label={t('layout.decline_invite_aria')}
+                          className="w-8 h-8 shrink-0 rounded-full bg-ink-50 text-ink-700 flex items-center justify-center hover:bg-ink-200 transition-colors duration-fast disabled:opacity-40"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                      {rowError?.key === `org:${inv.id}` && (
+                        <p role="alert" className="mt-1.5 pl-12 text-sm font-extrabold text-danger">{rowError.text}</p>
+                      )}
                     </div>
                   ))}
                   {followRequests.map((req) => (
-                    <div key={req.id} className="flex items-center gap-3 px-4 py-3">
-                      <Avatar name={req.follower_name} url={req.follower_avatar_url} size="w-9 h-9 text-sm" />
-                      <p className="flex-1 min-w-0 text-sm text-ink-900">
-                        <span className="font-extrabold">{req.follower_name}</span> {t('layout.follow_wants_to_follow')}
-                      </p>
-                      <button
-                        onClick={() => handleAcceptFollowRequest(req.id)}
-                        disabled={followRequestActing === req.id}
-                        aria-label={t('layout.accept_follow_aria')}
-                        className="w-8 h-8 shrink-0 rounded-full bg-lime-400 text-ink-900 flex items-center justify-center hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
-                      >
-                        <UserCheck size={14} />
-                      </button>
-                      <button
-                        onClick={() => handleDeclineFollowRequest(req.id)}
-                        disabled={followRequestActing === req.id}
-                        aria-label={t('layout.decline_follow_aria')}
-                        className="w-8 h-8 shrink-0 rounded-full bg-ink-50 text-ink-700 flex items-center justify-center hover:bg-ink-200 transition-colors duration-fast disabled:opacity-40"
-                      >
-                        <X size={14} />
-                      </button>
+                    <div key={req.id} className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <Avatar name={req.follower_name} url={req.follower_avatar_url} size="w-9 h-9 text-sm" />
+                        <p className="flex-1 min-w-0 text-sm text-ink-900">
+                          <span className="font-extrabold">{req.follower_name}</span> {t('layout.follow_wants_to_follow')}
+                        </p>
+                        <button
+                          onClick={() => handleAcceptFollowRequest(req.id)}
+                          disabled={followRequestActing === req.id}
+                          aria-label={t('layout.accept_follow_aria')}
+                          className="w-8 h-8 shrink-0 rounded-full bg-lime-400 text-ink-900 flex items-center justify-center hover:bg-lime-600 transition-colors duration-fast disabled:opacity-40"
+                        >
+                          <UserCheck size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleDeclineFollowRequest(req.id)}
+                          disabled={followRequestActing === req.id}
+                          aria-label={t('layout.decline_follow_aria')}
+                          className="w-8 h-8 shrink-0 rounded-full bg-ink-50 text-ink-700 flex items-center justify-center hover:bg-ink-200 transition-colors duration-fast disabled:opacity-40"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                      {rowError?.key === `follow:${req.id}` && (
+                        <p role="alert" className="mt-1.5 pl-12 text-sm font-extrabold text-danger">{rowError.text}</p>
+                      )}
                     </div>
                   ))}
                 </div>

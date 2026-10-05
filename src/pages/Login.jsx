@@ -76,6 +76,10 @@ export default function Login() {
   // (entrar por email, criar conta), e sem isto um /login?redirect=//outro
   // -site levava a pessoa para fora da app ja com sessao iniciada.
   const redirectTo = safeInternalPath(searchParams.get('redirect'))
+  // Depois de entrar, o /login sai do histórico (Francisco, 4 out): o
+  // «voltar» do destino vai para onde a pessoa estava antes do link, e não
+  // outra vez para o login.
+  const goAfterLogin = () => navigate(redirectTo, { replace: true })
 
   // O ?org=<endereço> guarda-se logo ao abrir (savePendingOrgSlug, 24 h em
   // localStorage): tem de sobreviver à ida ao Google e ao separador do email
@@ -89,7 +93,7 @@ export default function Login() {
 
   const handleAdminBypass = () => {
     signInAsAdmin()
-    navigate(redirectTo)
+    goAfterLogin()
   }
 
   const [googleLoading, setGoogleLoading] = useState(false)
@@ -139,7 +143,7 @@ export default function Login() {
     try {
       const { error } = await signIn(loginEmail, loginPassword, captchaToken)
       if (error) throw error
-      navigate(redirectTo)
+      goAfterLogin()
     } catch (err) {
       resetCaptcha()
       setError(describeError(t, err, 'login.error_invalid_email_password'))
@@ -223,7 +227,7 @@ export default function Login() {
       // «associado», o número entra na conta pelo cartão de confirmação
       // por SMS (ConfirmPhoneCard), com prova de posse.
 
-      navigate(redirectTo)
+      goAfterLogin()
     } catch (err) {
       resetCaptcha()
       setError(describeError(t, err, 'login.error_signup_failed'))

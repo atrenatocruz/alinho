@@ -73,7 +73,10 @@ export default function ClaimInvite() {
     ;(isTournament ? claimEntry(token) : isFriends ? claimFriendMatchInvite(token) : claimPartnerInvite(token))
       .then((id) => {
         if (cancelled) return
-        navigate(isTournament ? `/torneio/${id}` : isFriends ? `/jogos-privados/sessao/${id}` : `/jogo/${id}`, { replace: true })
+        // Torneio: a página diz «Ficaste em dupla com …» — antes juntava a
+        // dupla sem dizer nada (ensaio do QA, 2 out).
+        navigate(isTournament ? `/torneio/${id}` : isFriends ? `/jogos-privados/sessao/${id}` : `/jogo/${id}`,
+          { replace: true, state: isTournament ? { claimed: true } : undefined })
       })
       .catch((err) => {
         if (cancelled) return

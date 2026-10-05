@@ -31,13 +31,17 @@ const euroWords = (v, locale) => Number(v).toLocaleString(locale, {
    conta entra pelo nome e recebe um link. Quem grava é a página
    (onConfirm). */
 
-export default function TournamentSignupSheet({ tournament, categories, category, categoriesLeft, busy, error, onConfirm, onClose }) {
+export default function TournamentSignupSheet({ tournament, categories: allCategories, category: pageCategory, categoriesLeft, takenIds = [], busy, error, onConfirm, onClose }) {
   const { t, i18n } = useTranslation()
   const { user, profile } = useAuth()
   // As que servem à pessoa primeiro — o género dela (ou misto) e o nível
   // mais perto do dela —, depois as outras, pela ordem do torneio. Com as
   // pastilhas numa fila que desliza, a que interessa fica quase sempre nas
   // três primeiras (designer, 26 set).
+  // As categorias onde já estou não entram na lista: a t1 viu a M4 em 1.º
+  // lugar, já inscrita nela, e inscrever outra vez ali é recusado (QA, 2 out).
+  const categories = allCategories.filter((c) => !takenIds.includes(c.id))
+  const category = categories.find((c) => c.id === pageCategory?.id) || null
   const myNum = Number(String(ratingBand(profile?.rating, profile?.gender)?.label || '').replace(/\D/g, '')) || null
   const fitsGender = (c) => !profile?.gender || c.gender === 'misto' || c.gender === profile.gender
   const ordered = [...categories].sort((a, b) => {
@@ -49,7 +53,7 @@ export default function TournamentSignupSheet({ tournament, categories, category
     }
     return (a.position ?? 0) - (b.position ?? 0)
   })
-  const [categoryId, setCategoryId] = useState(category?.id || categories[0]?.id || null)
+  const [categoryId, setCategoryId] = useState(category?.id || ordered[0]?.id || null)
   const [mode, setMode] = useState('partner') // 'partner' | 'named' | 'alone'
   const [members, setMembers] = useState([])
   const [query, setQuery] = useState('')
