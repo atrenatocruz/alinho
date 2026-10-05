@@ -1225,6 +1225,8 @@
   "gamedetails.saving_score": "Saving…",
   "gamedetails.score_tie_not_allowed": "There are no draws here, so the round can't close with this score. Play a tie-break point (or agree on a winner) and enter the final score — e.g. 6-5.",
   "gamedetails.score_tied": "This game is a draw.",
+  "gamedetails.proset_problem_invalid": "Up to 9 games, and it can't end 9-9. If time ran out, enter it as it stood (e.g. 7-3).",
+  "gamedetails.proset_problem_negative": "Games can't be negative.",
   "gamedetails.tie_blocks_next": "There is a drawn game: break the tie to continue.",
   "gamedetails.set_tie_not_allowed": "A set can't end level. Enter the score the set finished on — e.g. 7-6.",
   "gamedetails.edit_score": "Edit result",
