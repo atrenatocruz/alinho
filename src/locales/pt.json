@@ -1226,6 +1226,8 @@
   "gamedetails.saving_score": "A guardar…",
   "gamedetails.score_tie_not_allowed": "Aqui não há empates, por isso a ronda não fecha com este resultado. Joguem um ponto de desempate (ou combinem quem ganha) e escrevam o resultado final — por exemplo 6-5.",
   "gamedetails.score_tied": "Este jogo está empatado.",
+  "gamedetails.proset_problem_invalid": "Máximo 9 jogos, e não acaba 9-9. Se acabou o tempo, escreve como ficou (ex.: 7-3).",
+  "gamedetails.proset_problem_negative": "Os jogos não podem ser negativos.",
   "gamedetails.tie_blocks_next": "Há um jogo empatado: desempata-o para continuar.",
   "gamedetails.set_tie_not_allowed": "Um set não acaba empatado. Escrevam o resultado com que o set terminou — por exemplo 7-6.",
   "gamedetails.edit_score": "Editar resultado",
