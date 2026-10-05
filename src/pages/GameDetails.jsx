@@ -4,7 +4,7 @@ import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation, Trans } from 'react-i18next'
 import { BackBar } from '../components/ui'
-import { Calendar, ArrowLeft, UserPlus, Check, Trophy, Play, ChevronRight, Swords, X, Repeat, Share2, ChevronDown, RotateCcw, Euro, GripVertical, Pencil, History, ThumbsUp, Users, Copy } from 'lucide-react'
+import { Calendar, ArrowLeft, UserPlus, Check, Trophy, Play, ChevronRight, Swords, X, Repeat, Share2, ChevronDown, RotateCcw, Euro, GripVertical, Pencil, History, ThumbsUp, Users, Copy, ArrowLeftRight } from 'lucide-react'
 import { DndContext, useDraggable, useDroppable, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { supabase, supabaseUrl } from '../lib/supabase'
@@ -33,6 +33,7 @@ import { canEditBeforeRound1, canAddBeforeStart, unpairedPeople, changedPairKeys
 import { notifyMixChanges } from '../lib/notifications'
 import AddPlayerSheet from '../components/mix/AddPlayerSheet'
 import AddScorekeeperSheet from '../components/mix/AddScorekeeperSheet'
+import SwapPlayerSheet from '../components/mix/SwapPlayerSheet'
 import JoinPartnerSheet from '../components/mix/JoinPartnerSheet'
 import { Sheet } from '../components/agenda/AgendaControls'
 import { whatsappLookalikeInGame, rememberWhatsappGuest, rememberedWhatsappGuest } from '../lib/whatsappGuest'
@@ -234,13 +235,14 @@ export default function GameDetails() {
   // Os membros do clube/grupo, para quem organiza juntar marcadores de fora do
   // mix e para os nomes do «marcado por».
   const [clubMembers, setClubMembers] = useState([])
+  const [swapFor, setSwapFor] = useState(null) // { team, player, slot } | null
   // Rondas já jogadas que a pessoa abriu à mão (as outras ficam dobradas).
   const [openRounds, setOpenRounds] = useState({})
   // Jogo que não abre: de que grupo é (undefined = a perguntar; null = não
   // se sabe — fica o «Jogo não encontrado»).
   const [orgHint, setOrgHint] = useState(undefined)
   useEffect(() => {
-    if (!isAdmin || !game?.organization_id || game.status !== 'in_progress') return undefined
+    if (!isAdmin || !game?.organization_id || !['closed', 'in_progress'].includes(game.status)) return undefined
     let alive = true
     supabase.from('memberships').select('user_id, is_admin, is_guest, profile:profiles(id, name, avatar_url)')
       .eq('organization_id', game.organization_id)
@@ -1625,7 +1627,7 @@ export default function GameDetails() {
       return true
     } catch (error) {
       console.error('Error starting games:', error)
-      setMixError(describeError(t, error, 'gamedetails.error_start_games'))
+      setMixError((error?.message || '').includes('team_incomplete') ? t('mixswap.error_team_incomplete') : describeError(t, error, 'gamedetails.error_start_games'))
       return false
     } finally {
       setBusy(false)
@@ -1681,7 +1683,8 @@ export default function GameDetails() {
       await settleLoads()
     } catch (error) {
       console.error('Error starting round:', error)
-      setMixError(describeError(t, error, 'gamedetails.error_start_round1'))
+      // Uma dupla com lugar vazio não começa (Dev 3, team_incomplete).
+      setMixError((error?.message || '').includes('team_incomplete') ? t('mixswap.error_team_incomplete') : describeError(t, error, 'gamedetails.error_start_round1'))
     } finally {
       setBusy(false)
     }
@@ -2261,8 +2264,8 @@ export default function GameDetails() {
             // quem é convidado»): o nome encurta, a etiqueta fica sempre à vista.
             const name = (
               <span className="flex-1 min-w-0 flex items-center gap-1.5">
-                <span className="min-w-0 text-sm font-extrabold text-ink-900 truncate">
-                  {player?.name || '?'}
+                <span className={`min-w-0 text-sm font-extrabold truncate ${player ? 'text-ink-900' : 'text-[#92400E]'}`}>
+                  {player ? (player.name || '?') : t('mixswap.missing_one')}
                   {player?.id === user.id && <span className="font-normal text-muted"> · {t('agenda.you').toLowerCase()}</span>}
                 </span>
                 {player?.is_guest && <span className="shrink-0"><GuestBadge isTest={player.is_test} /></span>}
@@ -2286,16 +2289,18 @@ export default function GameDetails() {
                   {/* A editar à última da hora, o ✕ precisa do espaço do lado. */}
                   {!duplaRemovable && sideLabel(player?.preferred_side)}
                 </span>
-                {duplaRemovable && player?.id && (
+                {/* Ponto 17 (Francisco, 2 out): no lugar do ×, «⇄» — troca a
+                    pessoa sem desfazer as duplas (swap_mix_player, Dev 3). */}
+                {duplaRemovable && (
                   <button
                     type="button"
-                    onClick={() => handleLastMinuteRemove(player)}
+                    onClick={() => setSwapFor({ team, player: player || null, slot: idx })}
                     disabled={busy}
-                    title={t('gamedetails.remove_person_title', { name: player.name })}
-                    aria-label={t('gamedetails.remove_person_title', { name: player.name })}
-                    className="w-8 h-8 flex items-center justify-center rounded-full text-muted hover:text-danger hover:bg-danger/10 shrink-0"
+                    title={t('mixswap.button_title', { name: player?.name || t('mixswap.empty_slot') })}
+                    aria-label={t('mixswap.button_title', { name: player?.name || t('mixswap.empty_slot') })}
+                    className="w-8 h-8 flex items-center justify-center rounded-full text-ink-700 hover:bg-ink-50 shrink-0"
                   >
-                    <X size={15} />
+                    <ArrowLeftRight size={15} />
                   </button>
                 )}
               </div>
@@ -2346,7 +2351,7 @@ export default function GameDetails() {
       {teams.map((team, i) => {
         const mine = team.player1?.id === user.id || team.player2?.id === user.id
         return (
-          <div key={team.id} className={`rounded-ctrl p-3 ${mine ? KIND_STYLE[kindOf(game)].bg : 'bg-canvas'}`}>
+          <div key={team.id} id={`dupla-${team.id}`} className={`rounded-ctrl p-3 scroll-mt-24 ${mine ? KIND_STYLE[kindOf(game)].bg : 'bg-canvas'}`}>
             <p className="mb-2 font-mono text-[11px] font-extrabold uppercase tracking-widest text-ink-500">
               {t('gamedetails.dupla_number', { number: i + 1 })}
               {teamHasPoints(team) && <span className="normal-case tracking-normal"> · {teamPoints(team)} {t('gamedetails.points_suffix')}</span>}
@@ -2454,6 +2459,19 @@ export default function GameDetails() {
   // que trocam a cada ronda / Americano, não há nada para sortear.
   const fixedPairsFormat = !isAmericano && !game?.rotate_partners
   const someoneAlone = participants.some((p) => !p.partner_id && !p.partner)
+  // Uma dupla com «Falta 1» (ponto 17): o passo seguinte fica apagado, com a
+  // frase que leva à vaga — a mesma lógica do empate.
+  const openSlotIndex = isAmericano || game?.rotate_partners ? -1 : teams.findIndex((tm) => !tm.player1 || !tm.player2)
+  const openSlotHint = openSlotIndex >= 0 && (
+    <button type="button" onClick={() => {
+      const tm = teams[openSlotIndex]
+      document.getElementById(`dupla-${tm.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      setSwapFor({ team: tm, player: null, slot: tm.player1 ? 1 : 0 })
+    }}
+      className="block w-full text-center text-xs font-extrabold text-ink-700 underline underline-offset-2 min-h-[32px]">
+      {t('mixswap.slot_blocks_start', { number: openSlotIndex + 1 })}
+    </button>
+  )
   let barPrimary = null
   if (canStart && fixedPairsFormat && someoneAlone) {
     barPrimary = {
@@ -2470,7 +2488,9 @@ export default function GameDetails() {
       hint: fixedPairsFormat ? t('eventactions.all_pairs_hint') : null,
     }
   } else if (canStartGames) {
-    barPrimary = { label: t('gamedetails.start_mix'), onClick: handleStartDrawnMix, disabled: busy, hint: t('eventactions.start_hint') }
+    barPrimary = openSlotHint
+      ? { label: t('gamedetails.start_mix'), onClick: () => {}, disabled: true, hint: openSlotHint }
+      : { label: t('gamedetails.start_mix'), onClick: handleStartDrawnMix, disabled: busy, hint: t('eventactions.start_hint') }
   } else if (game?.status === 'in_progress' && !inPoolStage) {
     if (!roundsStarted && !isAmericano) {
       // Mix começado sem a Ronda 1 sorteada (começado antes do ponto 11):
@@ -2484,7 +2504,9 @@ export default function GameDetails() {
         hint: t('gamedetails.draw_round1_hint'),
       }
     } else if (roundPending) {
-      barPrimary = { label: busy ? t('gamedetails.processing') : t('gamedetails.start_round_n', { number: maxRound }), onClick: handleStartRound, disabled: busy || unpaired.length > 0, hint: t('gamedetails.start_round_hint') }
+      barPrimary = openSlotHint && maxRound === 1
+        ? { label: t('gamedetails.start_round_n', { number: 1 }), onClick: () => {}, disabled: true, hint: openSlotHint }
+        : { label: busy ? t('gamedetails.processing') : t('gamedetails.start_round_n', { number: maxRound }), onClick: handleStartRound, disabled: busy || unpaired.length > 0, hint: t('gamedetails.start_round_hint') }
     } else if (roundsStarted && canAdvance) {
       barPrimary = {
         label: busy ? t('gamedetails.processing')
@@ -4200,6 +4222,35 @@ export default function GameDetails() {
           )}
         </div>
       )}
+      {swapFor && (() => {
+        const teamIndex = teams.findIndex((tm) => tm.id === swapFor.team.id)
+        const partner = swapFor.slot === 0 ? swapFor.team.player2 : swapFor.team.player1
+        const inMixIds = new Set([...people, ...waitlistPeople].map((p) => p.id))
+        return (
+          <SwapPlayerSheet
+            outName={swapFor.player?.name}
+            duplaNumber={teamIndex + 1}
+            partnerName={partner?.name}
+            orgKind={orgKindOfGame}
+            suplentes={waitlistPeople}
+            members={clubMembers.filter((m) => !inMixIds.has(m.id))}
+            ratingInfoById={ratingInfoById}
+            onConfirm={async (pick) => {
+              const { error } = await supabase.rpc('swap_mix_player', {
+                p_game_id: id,
+                p_team_id: swapFor.team.id,
+                p_out_id: swapFor.player?.id ?? null,
+                p_in_user_id: pick?.id ?? null,
+                p_in_guest_name: pick?.guestName ?? null,
+              })
+              if (error) throw error
+              setEditNotice(t('mixswap.done', { name: pick?.guestName || pick?.name || '' }))
+              await loadGameDetails()
+            }}
+            onClose={() => setSwapFor(null)}
+          />
+        )
+      })()}
       {addScorekeeperOpen && (
         <AddScorekeeperSheet
           orgName={gameMembership?.organization?.name}

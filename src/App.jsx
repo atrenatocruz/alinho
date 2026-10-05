@@ -268,7 +268,9 @@ const Guard = ({ require, showSplash, children }) => {
     // by people with no session yet — bouncing them to a bare /login lost
     // the match id and slot, so Login sends them back here after auth.
     const redirectTo = encodeURIComponent(location.pathname + location.search)
-    return <Navigate to={`/login?redirect=${redirectTo}`} />
+    // replace: a página fechada não fica no histórico a mandar outra vez
+    // para o login quando se carrega em «voltar» (Francisco, 4 out).
+    return <Navigate to={`/login?redirect=${redirectTo}`} replace />
   }
 
   // Members-only: guests are redirected to Jogos
