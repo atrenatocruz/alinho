@@ -1279,7 +1279,9 @@ export default function GameDetails() {
           .from('games')
           .update({
             status: 'in_progress',
-            round_started_at: new Date().toISOString(),
+            // A Ronda 1 fica «por começar»: o relógio só arranca com
+            // «Começar Ronda 1» (QA, 6 out — como nos outros formatos).
+            round_started_at: null,
             round_duration_minutes: game.game_time_minutes,
           })
           .eq('id', id)
@@ -1938,10 +1940,26 @@ export default function GameDetails() {
   const numCourts = game?.num_courts || 1
   const roundsStarted = matches.length > 0
   const maxRound = matches.length ? Math.max(...matches.map(m => m.round_number)) : 0
-  const currentRoundMatches = matches.filter(m => m.round_number === maxRound)
-  // A ronda atual está sorteada mas o relógio não arrancou (ponto 11).
-  // O Americano sorteia o mix inteiro de uma vez e conta à parte: fica fora.
-  const roundPending = game?.status === 'in_progress' && game?.format !== 'americano' && matches.length > 0
+  // A ronda em que se está. O Americano sorteia o mix inteiro de uma vez:
+  // a ronda atual é a primeira com jogos por marcar, não a última sorteada
+  // (QA, 6 out: «Começar o Mix» saltava para a Ronda 3 com o relógio a
+  // correr). Nos outros formatos a ronda seguinte só nasce ao terminar a
+  // atual, por isso é a última.
+  const firstOpenRound = matches.filter((m) => !hasResult(m)).reduce((min, m) => Math.min(min, m.round_number), Infinity)
+  let currentRound = game?.format === 'americano' && Number.isFinite(firstOpenRound) ? firstOpenRound : maxRound
+  // …mas a ronda que acabou de ficar toda marcada continua a ser a atual
+  // até «Terminar Ronda N»: o relógio dela ainda corre (os resultados foram
+  // gravados depois de ela começar). Depois de «Começar Ronda N+1», o
+  // relógio é mais novo do que esses resultados.
+  if (currentRound === firstOpenRound && game?.format === 'americano' && game?.round_started_at && firstOpenRound > 1
+    && !matches.some((m) => m.round_number === firstOpenRound && hasResult(m))) {
+    const lastScored = matches.filter((m) => m.round_number === firstOpenRound - 1).map((m) => m.scored_at).filter(Boolean).sort().pop()
+    if (lastScored && new Date(lastScored) > new Date(game.round_started_at)) currentRound = firstOpenRound - 1
+  }
+  const currentRoundMatches = matches.filter(m => m.round_number === currentRound)
+  // A ronda atual está sorteada mas o relógio não arrancou (ponto 11) — no
+  // Americano também, ronda a ronda, como nos outros formatos.
+  const roundPending = game?.status === 'in_progress' && matches.length > 0
     && !game?.round_started_at && !currentRoundMatches.some(hasResult)
   // A Ronda 1 sorteada e por começar ainda é «antes da Ronda 1»: as duplas
   // mexem-se (e a ronda volta a sortear-se).
@@ -1996,8 +2014,10 @@ export default function GameDetails() {
   // N», passar de fase e «Terminar e dar os pontos». No Americano não: aí
   // conta a soma dos pontos de cada um, e um 12-12 é um resultado normal.
   const tiedMatches = isAmericano ? [] : matches.filter(isTie)
-  const tieInRound = tiedMatches.find((m) => m.round_number === maxRound) || null
-  const roundCanAdvance = currentRoundDone && (inGroupPhase || !!nextPhase)
+  const tieInRound = tiedMatches.find((m) => m.round_number === currentRound) || null
+  // Americano: as rondas seguintes já estão sorteadas; terminar a ronda só
+  // para o relógio e passa à seguinte.
+  const roundCanAdvance = currentRoundDone && (inGroupPhase || !!nextPhase || (isAmericano && currentRound < maxRound))
   const canAdvance = roundCanAdvance && !tieInRound
   const canFinalize = roundsStarted && allDone && !roundCanAdvance && tiedMatches.length === 0
   // O jogo empatado que trava o passo seguinte — só depois de a ronda ter
@@ -2023,6 +2043,22 @@ export default function GameDetails() {
   const missingResults = isAmericano ? 0 : matches.filter(m => !hasResult(m)).length
 
   const handleAdvance = async () => {
+    if (isAmericano) {
+      // A ronda seguinte já existe: fica «por começar», como nos outros.
+      setBusy(true)
+      setMixError('')
+      try {
+        const { error } = await supabase.from('games').update({ round_started_at: null }).eq('id', id)
+        if (error) throw error
+        await loadGameDetails()
+      } catch (error) {
+        console.error('Error ending an americano round:', error)
+        setMixError(describeError(t, error, 'gamedetails.error_start_mix'))
+      } finally {
+        setBusy(false)
+      }
+      return
+    }
     setBusy(true)
     setMixError('')
     try {
@@ -2561,19 +2597,19 @@ export default function GameDetails() {
         hint: t('gamedetails.draw_round1_hint'),
       }
     } else if (roundPending) {
-      barPrimary = openSlotHint && maxRound === 1
+      barPrimary = openSlotHint && currentRound === 1
         ? { label: t('gamedetails.start_round_n', { number: 1 }), onClick: () => {}, disabled: true, hint: openSlotHint }
-        : { label: busy ? t('gamedetails.processing') : t('gamedetails.start_round_n', { number: maxRound }), onClick: handleStartRound, disabled: busy || unpaired.length > 0, hint: t('gamedetails.start_round_hint') }
+        : { label: busy ? t('gamedetails.processing') : t('gamedetails.start_round_n', { number: currentRound }), onClick: handleStartRound, disabled: busy || unpaired.length > 0, hint: t('gamedetails.start_round_hint') }
     } else if (roundsStarted && canAdvance) {
       barPrimary = {
         label: busy ? t('gamedetails.processing')
-          : inGroupPhase ? t('gamedetails.end_round', { number: maxRound })
-          : t('gamedetails.end_round_and_draw', { number: maxRound, phase: PHASE_LABEL_KEY[nextPhase] ? t(PHASE_LABEL_KEY[nextPhase]).toLowerCase() : '' }),
+          : (inGroupPhase || isAmericano) ? t('gamedetails.end_round', { number: currentRound })
+          : t('gamedetails.end_round_and_draw', { number: currentRound, phase: PHASE_LABEL_KEY[nextPhase] ? t(PHASE_LABEL_KEY[nextPhase]).toLowerCase() : '' }),
         onClick: handleAdvance,
         disabled: busy,
         // O que o botão faz (desenho «como fica», 2 out): mostra os jogos da
         // ronda seguinte, sem pôr o relógio a andar.
-        hint: inGroupPhase ? t(isSobeDesce && !isRotating ? 'gamedetails.end_round_hint_sobe' : 'gamedetails.end_round_hint', { number: maxRound + 1 }) : null,
+        hint: (inGroupPhase || isAmericano) ? t(isSobeDesce && !isRotating ? 'gamedetails.end_round_hint_sobe' : 'gamedetails.end_round_hint', { number: currentRound + 1 }) : null,
       }
     } else if (canFinalize) {
       barPrimary = { label: busy ? t('gamedetails.finalizing') : t('gamedetails.finalize_mix'), onClick: () => handleFinalize(false), disabled: busy }
@@ -2581,8 +2617,8 @@ export default function GameDetails() {
       // Empate: o botão fica à vista mas apagado, e o aviso leva ao jogo.
       barPrimary = {
         label: roundCanAdvance
-          ? (inGroupPhase ? t('gamedetails.end_round', { number: maxRound })
-            : t('gamedetails.end_round_and_draw', { number: maxRound, phase: PHASE_LABEL_KEY[nextPhase] ? t(PHASE_LABEL_KEY[nextPhase]).toLowerCase() : '' }))
+          ? ((inGroupPhase || isAmericano) ? t('gamedetails.end_round', { number: currentRound })
+            : t('gamedetails.end_round_and_draw', { number: currentRound, phase: PHASE_LABEL_KEY[nextPhase] ? t(PHASE_LABEL_KEY[nextPhase]).toLowerCase() : '' }))
           : t('gamedetails.finalize_mix'),
         onClick: () => {},
         disabled: true,
@@ -3537,11 +3573,14 @@ export default function GameDetails() {
           {rounds.map(r => {
             const ms = matches.filter(m => m.round_number === r)
             const phase = (ms.find(m => m.phase !== 'third' && m.phase !== 'placement') || ms[0])?.phase || 'group'
-            const isCurrent = r === maxRound && game.status === 'in_progress'
+            const isCurrent = r === currentRound && game.status === 'in_progress'
+            // No Americano as rondas que aí vêm já estão sorteadas: só
+            // aparecem quando chega a vez delas.
+            if (game.status === 'in_progress' && r > currentRound) return null
             // As rondas já jogadas dobram-se sozinhas quando começa a
             // seguinte (Renato, 29 set), todas numa linha só — «Rondas 1 e 2 ·
             // ✓ 4 jogos» (desenho «como fica», 2 out); tocar abre-as todas.
-            const pastRounds = rounds.filter((x) => !(x === maxRound && game.status === 'in_progress'))
+            const pastRounds = rounds.filter((x) => !(game.status === 'in_progress' && x >= currentRound))
             const isFirstPast = !isCurrent && r === pastRounds[0]
             const open = isCurrent || !!openRounds.past
             if (!isCurrent && !open && !isFirstPast) return null
@@ -3771,7 +3810,7 @@ export default function GameDetails() {
                   {rounds.map(r => {
                     const ms = matches.filter(m => m.round_number === r)
                     const phase = (ms.find(m => m.phase !== 'third' && m.phase !== 'placement') || ms[0])?.phase || 'group'
-                    const isCurrent = r === maxRound && game.status === 'in_progress'
+                    const isCurrent = r === currentRound && game.status === 'in_progress'
                     return (
                       <div key={r} id={`mix-ronda-${r}`} className={`card ${isCurrent ? 'ring-2 ring-ink-900' : ''}`}>
                         <div className="flex items-center justify-between mb-3">
@@ -3867,7 +3906,7 @@ export default function GameDetails() {
                     <p className="text-muted text-sm text-center">
                       {isAmericano
                         ? t('gamedetails.register_americano_results')
-                        : t('gamedetails.register_round_results', { number: maxRound })}
+                        : t('gamedetails.register_round_results', { number: currentRound })}
                       {/* Diz o que falta para a ronda fechar — nunca um mix
                           encravado sem explicação (Trello #420). */}
                       {!isAmericano && currentRoundMatches.some((m) => !hasResult(m)) && (
