@@ -851,7 +851,10 @@ const EV_MATCHES_ALL = () => [
         ? { id: 'em4', game_id: 'fake-game-1', round_number: 2, court_number: 2, phase: 'group', team_a_id: 'et2', team_b_id: 'et4', score_a: 5, score_b: 5, winner_team_id: null }
         : { id: 'em4', game_id: 'fake-game-1', round_number: 2, court_number: 2, phase: 'group', team_a_id: 'et2', team_b_id: 'et4', score_a: 6, score_b: 5, winner_team_id: 'et2' },
     ] : [
-      { id: 'em3', game_id: 'fake-game-1', round_number: 2, court_number: 1, phase: 'group', team_a_id: 'et1', team_b_id: 'et3', score_a: null, score_b: null, winner_team_id: null },
+      // + mockRoundOneLeft = 'true': na ronda 2 só falta marcar o campo 2 (fim do mix, 6 out).
+      localStorage.getItem('mockRoundOneLeft') === 'true'
+        ? { id: 'em3', game_id: 'fake-game-1', round_number: 2, court_number: 1, phase: 'group', team_a_id: 'et1', team_b_id: 'et3', score_a: 6, score_b: 3, winner_team_id: 'et1' }
+        : { id: 'em3', game_id: 'fake-game-1', round_number: 2, court_number: 1, phase: 'group', team_a_id: 'et1', team_b_id: 'et3', score_a: null, score_b: null, winner_team_id: null },
       { id: 'em4', game_id: 'fake-game-1', round_number: 2, court_number: 2, phase: 'group', team_a_id: 'et2', team_b_id: 'et4', score_a: null, score_b: null, winner_team_id: null },
     ]),
   ]),

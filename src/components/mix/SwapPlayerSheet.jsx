@@ -1,3 +1,7 @@
+// «Tirar <nome>» (forma nova, design-handoff/2026-10-05-mix-tirar-pessoa —
+// Francisco, 6 out: «não está nada claro» com as setas). Com suplente, a
+// 1.ª opção já vem escolhida («Pôr <suplente> no lugar»); «Escolher outra
+// pessoa» abre a procura. A regra é a mesma do ponto 17.
 // «Trocar <nome>» (pacote do mix, ponto 17 — Francisco, 2 out: «sim aprovo»;
 // página 9 do «como fica»): com as duplas feitas, quem organiza troca uma
 // pessoa sem desfazer as duplas. Quem entra fica no mesmo lugar, na mesma
@@ -7,14 +11,19 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Sheet } from '../agenda/AgendaControls'
+import { Search } from 'lucide-react'
 import { Avatar, RatingBadge } from '../ui'
+import { ratingBand } from '../../lib/elo'
 import SearchField, { matchesQuery, Realce } from '../SearchField'
 import { MonoLabel } from '../tournament/TournamentBits'
 
-export default function SwapPlayerSheet({ outName, duplaNumber, partnerName, orgKind = 'group', suplentes = [], members = [], ratingInfoById = {}, onConfirm, onClose }) {
+export default function SwapPlayerSheet({ outName, duplaNumber, partnerName, orgKind = 'group', suplentes = [], members = [], ratingInfoById = {}, onConfirm, onRemove = null, onClose }) {
   const { t } = useTranslation()
   const [query, setQuery] = useState('')
-  const [pick, setPick] = useState(null) // { id, name } | { guestName }
+  const firstSuplente = suplentes[0] || null
+  // Com suplente, ele já vem escolhido; «Escolher outra pessoa» muda o modo.
+  const [mode, setMode] = useState(firstSuplente ? 'suplente' : 'other')
+  const [pick, setPick] = useState(firstSuplente ? { id: firstSuplente.id, name: firstSuplente.name } : null) // { id, name } | { guestName }
   const [writing, setWriting] = useState(false)
   const [guestName, setGuestName] = useState('')
   const [busy, setBusy] = useState(false)
@@ -53,48 +62,84 @@ export default function SwapPlayerSheet({ outName, duplaNumber, partnerName, org
     )
   }
 
+  const suplenteSub = (p, i) => (
+    <>
+      {t('mixswap.suplente_n', { n: i + 1 })}
+      {/* O «·» só com o nível ao lado (UX, 2 out). */}
+      {ratingBand(ratingInfoById[p.id]?.rating, ratingInfoById[p.id]?.gender) && <> · <RatingBadge rating={ratingInfoById[p.id].rating} gender={ratingInfoById[p.id].gender} /></>}
+    </>
+  )
+  // As duas opções em cartão (com suplente): a escolhida com o contorno preto.
+  const option = (key, icon, title, sub, onPick) => (
+    <button type="button" onClick={onPick} aria-pressed={mode === key}
+      className={`flex w-full items-center gap-3 rounded-ctrl border-2 bg-white px-3 py-3 text-left ${mode === key ? 'border-ink-900' : 'border-line'}`}>
+      {icon}
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[15px] font-extrabold text-ink-900">{title}</span>
+        <span className="flex items-center gap-1.5 text-xs text-muted">{sub}</span>
+      </span>
+    </button>
+  )
+
   return (
-    <Sheet title={t('mixswap.title', { name: outName || t('mixswap.empty_slot') })} onClose={onClose}>
+    <Sheet title={outName ? t('mixswap.title', { name: outName }) : t('mixswap.title_empty')} onClose={onClose}>
       <p className="text-sm text-ink-500">
         {partnerName ? t('mixswap.hint', { number: duplaNumber, partner: partnerName }) : t('mixswap.hint_alone', { number: duplaNumber })}
       </p>
 
-      {suplentes.length > 0 && (
-        <>
-          <MonoLabel className="mt-4 mb-2">{t('mixswap.section_suplentes')}</MonoLabel>
-          <div className="space-y-2">
-            {suplentes.map((p, i) => row(p, <>
-              {t('mixswap.suplente_n', { n: i + 1 })}
-              {/* O «·» só com o nível ao lado (UX, 2 out). */}
-              {ratingInfoById[p.id]?.rating != null && <> · <RatingBadge rating={ratingInfoById[p.id].rating} gender={ratingInfoById[p.id].gender} /></>}
-            </>))}
-          </div>
-        </>
+      {firstSuplente && (
+        <div className="mt-3 space-y-2">
+          {option('suplente', <Avatar name={firstSuplente.name} url={firstSuplente.avatar_url} size="w-10 h-10 text-sm" />,
+            t('mixswap.put_suplente', { name: firstSuplente.name }), suplenteSub(firstSuplente, 0),
+            () => { setMode('suplente'); setWriting(false); setPick({ id: firstSuplente.id, name: firstSuplente.name }) })}
+          {option('other', <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-line bg-white text-ink-900"><Search size={16} /></span>,
+            t('mixswap.choose_other'), t('mixswap.choose_other_sub'),
+            () => { setMode('other'); setPick(null) })}
+        </div>
       )}
 
-      <MonoLabel className="mt-4 mb-2">{t(isClub ? 'mixswap.section_club' : 'mixswap.section_group')}</MonoLabel>
-      <SearchField value={query} onChange={setQuery} placeholder={t(isClub ? 'mixswap.search_club' : 'mixswap.search_group')} />
-      {shownMembers.length > 0 && <div className="mt-2 space-y-2">{shownMembers.map((p) => row(p, null))}</div>}
-      {query.trim() && shownMembers.length === 0 && <p className="mt-2 text-sm text-muted">{t('mixswap.nobody_found')}</p>}
+      {mode === 'other' && (
+        <>
+          {suplentes.length > 1 && (
+            <>
+              <MonoLabel className="mt-4 mb-2">{t('mixswap.section_suplentes')}</MonoLabel>
+              <div className="space-y-2">
+                {suplentes.slice(1).map((p, i) => row(p, suplenteSub(p, i + 1)))}
+              </div>
+            </>
+          )}
+          <MonoLabel className="mt-4 mb-2">{t('mixswap.who_comes_in')}</MonoLabel>
+          <SearchField value={query} onChange={setQuery} placeholder={t(isClub ? 'mixswap.search_club' : 'mixswap.search_group')} />
+          {shownMembers.length > 0 && <div className="mt-2 space-y-2">{shownMembers.map((p) => row(p, null))}</div>}
+          {query.trim() && shownMembers.length === 0 && <p className="mt-2 text-sm text-muted">{t('mixswap.nobody_found')}</p>}
 
-      {writing ? (
-        <input type="text" value={guestName} autoFocus maxLength={60}
-          onChange={(e) => { setGuestName(e.target.value); setPick(e.target.value.trim() ? { guestName: e.target.value.trim() } : null) }}
-          placeholder={t('mixswap.guest_placeholder')} className="input-field mt-3" />
-      ) : (
-        <p className="mt-3 text-sm text-ink-500">
-          {t('mixswap.not_in_app')}{' '}
-          <button type="button" onClick={() => { setWriting(true); setPick(null) }} className="font-extrabold text-ink-900 underline underline-offset-2">
-            {t('mixswap.write_name')}
-          </button>
-        </p>
+          {writing ? (
+            <input type="text" value={guestName} autoFocus maxLength={60}
+              onChange={(e) => { setGuestName(e.target.value); setPick(e.target.value.trim() ? { guestName: e.target.value.trim() } : null) }}
+              placeholder={t('mixswap.guest_placeholder')} className="input-field mt-3" />
+          ) : (
+            <p className="mt-3 text-sm text-ink-500">
+              {t('mixswap.not_in_app')}{' '}
+              <button type="button" onClick={() => { setWriting(true); setPick(null) }} className="font-extrabold text-ink-900 underline underline-offset-2">
+                {t('mixswap.write_name')}
+              </button>
+            </p>
+          )}
+        </>
       )}
 
       {error && <p role="alert" className="mt-3 text-sm font-extrabold text-danger">{error}</p>}
       <button type="button" onClick={confirm} disabled={busy || !pick}
         className="mt-4 w-full min-h-[52px] rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold text-white disabled:opacity-40">
-        {chosenName ? t('mixswap.confirm', { name: chosenName }) : t('mixswap.confirm_empty')}
+        {chosenName ? t(outName ? 'mixswap.confirm' : 'mixswap.confirm_put', { name: chosenName }) : t('mixswap.confirm_empty')}
       </button>
+      {/* «Tirar sem pôr ninguém» (UX, 5 out): a dupla fica com «Falta 1». */}
+      {onRemove && (
+        <button type="button" onClick={onRemove} disabled={busy}
+          className="mt-3 w-full min-h-[44px] text-center text-sm font-extrabold text-ink-900 underline underline-offset-2 disabled:opacity-40">
+          {t('mixswap.remove_only')}
+        </button>
+      )}
     </Sheet>
   )
 }

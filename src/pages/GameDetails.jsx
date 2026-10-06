@@ -4,7 +4,7 @@ import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation, Trans } from 'react-i18next'
 import { BackBar } from '../components/ui'
-import { Calendar, ArrowLeft, UserPlus, Check, Trophy, Play, ChevronRight, Swords, X, Repeat, Share2, ChevronDown, RotateCcw, Euro, GripVertical, Pencil, History, ThumbsUp, Users, Copy, ArrowLeftRight, Clock } from 'lucide-react'
+import { Calendar, ArrowLeft, UserPlus, Check, Trophy, Play, ChevronRight, Swords, X, ChevronDown, RotateCcw, Euro, GripVertical, Pencil, History, ThumbsUp, Users, Copy, Clock } from 'lucide-react'
 import { DndContext, useDraggable, useDroppable, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { supabase, supabaseUrl } from '../lib/supabase'
@@ -242,6 +242,7 @@ export default function GameDetails() {
   // mix e para os nomes do «marcado por».
   const [clubMembers, setClubMembers] = useState([])
   const [swapFor, setSwapFor] = useState(null) // { team, player, slot } | null
+  const [removeSlotAsk, setRemoveSlotAsk] = useState(null) // { person, duplaNumber } | null
   // Rondas já jogadas que a pessoa abriu à mão (as outras ficam dobradas).
   const [openRounds, setOpenRounds] = useState({})
   // Jogo que não abre: de que grupo é (undefined = a perguntar; null = não
@@ -2339,18 +2340,19 @@ export default function GameDetails() {
                   {/* A editar à última da hora, o ✕ precisa do espaço do lado. */}
                   {!duplaRemovable && sideLabel(player?.preferred_side)}
                 </span>
-                {/* Ponto 17 (Francisco, 2 out): no lugar do ×, «⇄» — troca a
-                    pessoa sem desfazer as duplas (swap_mix_player, Dev 3). */}
+                {/* Ponto 17, forma nova (Francisco, 6 out — SPEC
+                    2026-10-05-mix-tirar-pessoa): «Tirar», pequeno e sublinhado,
+                    no lugar das setas; troca a pessoa sem desfazer as duplas
+                    (swap_mix_player, Dev 3). No lugar vazio, «Pôr alguém». */}
                 {duplaRemovable && (
                   <button
                     type="button"
                     onClick={() => setSwapFor({ team, player: player || null, slot: idx })}
                     disabled={busy}
-                    title={t('mixswap.button_title', { name: player?.name || t('mixswap.empty_slot') })}
-                    aria-label={t('mixswap.button_title', { name: player?.name || t('mixswap.empty_slot') })}
-                    className="w-8 h-8 flex items-center justify-center rounded-full text-ink-700 hover:bg-ink-50 shrink-0"
+                    aria-label={player ? t('mixswap.button_title', { name: player.name }) : t('mixswap.title_empty')}
+                    className="shrink-0 min-h-[32px] px-0.5 text-[13px] font-extrabold text-ink-900 underline underline-offset-2 whitespace-nowrap disabled:opacity-40"
                   >
-                    <ArrowLeftRight size={15} />
+                    {player ? t('mixswap.remove_short') : t('mixswap.put_short')}
                   </button>
                 )}
               </div>
@@ -3367,17 +3369,15 @@ export default function GameDetails() {
                   <>
                     <button
                       onClick={(e) => { e.stopPropagation(); setShowDuplasShare(true) }}
-                      className="inline-flex items-center gap-1.5 text-ink-700 text-sm font-extrabold min-h-[44px] px-2"
+                      className="inline-flex items-center gap-1.5 text-ink-700 text-sm font-extrabold underline underline-offset-2 min-h-[44px] px-2"
                     >
-                      <Share2 size={16} />
                       {t('gamedetails.share')}
                     </button>
                     {isAdmin && game.status === 'in_progress' && (
                       <button
                         onClick={(e) => { e.stopPropagation(); startEditingPairs() }}
-                        className="inline-flex items-center gap-1.5 text-ink-700 text-sm font-extrabold min-h-[44px] px-2"
+                        className="inline-flex items-center gap-1.5 text-ink-700 text-sm font-extrabold underline underline-offset-2 min-h-[44px] px-2"
                       >
-                        <Repeat size={16} />
                         {t('gamedetails.edit_duplas')}
                       </button>
                     )}
@@ -4339,6 +4339,11 @@ export default function GameDetails() {
         const teamIndex = teams.findIndex((tm) => tm.id === swapFor.team.id)
         const partner = swapFor.slot === 0 ? swapFor.team.player2 : swapFor.team.player1
         const inMixIds = new Set([...people, ...waitlistPeople].map((p) => p.id))
+        // «Tirar sem pôr ninguém» (UX, 5 out): só para quem se inscreveu
+        // sozinho e sem suplentes — com suplente, a base de dados senta-o no
+        // lugar, e a troca já o oferece.
+        const outPerson = swapFor.player ? people.find((p) => p.id === swapFor.player.id) : null
+        const canRemoveOnly = !!outPerson?.rowOwner && !outPerson.hasPartner && waitlistPeople.length === 0
         return (
           <SwapPlayerSheet
             outName={swapFor.player?.name}
@@ -4360,10 +4365,28 @@ export default function GameDetails() {
               setEditNotice(t('mixswap.done', { name: pick?.guestName || pick?.name || '' }))
               await loadGameDetails()
             }}
+            onRemove={canRemoveOnly ? () => { setRemoveSlotAsk({ person: outPerson, duplaNumber: teamIndex + 1 }); setSwapFor(null) } : null}
             onClose={() => setSwapFor(null)}
           />
         )
       })()}
+      <ConfirmSheet
+        open={!!removeSlotAsk}
+        title={t('mixswap.remove_title', { name: removeSlotAsk?.person?.name || '' })}
+        message={t('mixswap.remove_text', { number: removeSlotAsk?.duplaNumber || '' })}
+        cancelLabel={t('mixswap.remove_keep')}
+        confirmLabel={t('mixswap.remove_confirm')}
+        danger
+        onConfirm={async () => {
+          // A base de dados deixa o lugar vazio e avisa quem organiza
+          // (migration_mix_trocar_sem_sortear.sql); as outras duplas ficam.
+          const { error } = await supabase.from('participants').delete().eq('id', removeSlotAsk.person.rowId)
+          if (error) throw error
+          await loadGameDetails()
+        }}
+        onClose={() => setRemoveSlotAsk(null)}
+        errorOf={(error) => describeError(t, error, 'gamedetails.error_remove_player')}
+      />
       {addScorekeeperOpen && (
         <AddScorekeeperSheet
           orgName={gameMembership?.organization?.name}
