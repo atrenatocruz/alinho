@@ -9,7 +9,6 @@ import { DndContext, useDraggable, useDroppable, PointerSensor, TouchSensor, use
 import { CSS } from '@dnd-kit/utilities'
 import { supabase, supabaseUrl } from '../lib/supabase'
 import { getGameOrgHint } from '../lib/gameOrgHint'
-import { listWhatsappGroups } from '../lib/whatsappGroups'
 import GroupOnlyNotice from '../components/GroupOnlyNotice'
 import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton, GuestBadge, PlayerAvatarRow, EmptyState, ShareModal, RoundTimer, Avatar, Select, RatingBadge, DateField, GroupLevelBadge, Tabs, ConfirmSheet } from '../components/ui'
@@ -169,9 +168,6 @@ export default function GameDetails() {
   // Cancelar um mix que correu mal (Trello #464) — a pergunta aberta.
   const [cancelOpen, setCancelOpen] = useState(false)
   const [draftAskOpen, setDraftAskOpen] = useState(false)
-  // O clube/grupo tem o robô do WhatsApp? Num mix já aberto, o robô já o
-  // anunciou e «Voltar a rascunho» fica apagado (UX, 2 out).
-  const [hasBot, setHasBot] = useState(false)
   // Ações do evento (desenho de 26 set): a folha do «Mais ⋯», o «Mudar só
   // este mix» e a pergunta do «Recomeçar».
   const [moreOpen, setMoreOpen] = useState(false)
@@ -258,14 +254,6 @@ export default function GameDetails() {
       })
     return () => { alive = false }
   }, [isAdmin, game?.organization_id, game?.status])
-  useEffect(() => {
-    if (!isAdmin || !game?.organization_id) return undefined
-    let alive = true
-    listWhatsappGroups(game.organization_id)
-      .then((groups) => { if (alive) setHasBot((groups || []).length > 0) })
-      .catch(() => { /* sem a lista, conta como sem robô: a base de dados recusa à mesma (already_announced) */ })
-    return () => { alive = false }
-  }, [isAdmin, game?.organization_id])
   useEffect(() => {
     if (loading || game) return undefined
     let alive = true
@@ -4667,16 +4655,12 @@ export default function GameDetails() {
         const nobody = peopleCount === 0 && waitlist.length === 0 && !anyScoreSaved
         const actions = [
           isSeriesDate && notStarted && { key: 'change', label: t('eventactions.change_one'), hint: t('eventactions.change_one_hint'), onClick: () => setChangeOneOpen(true) },
-          // Pacote do mix, ponto 6: «Voltar a rascunho» (unpublish_mix, Dev 3)
-          // — por omissão só antes da 1.ª hora de anúncio do robô; quem
-          // decide é a base de dados (already_announced).
-          // Apagado logo no menu, com o porquê (QA, 2 out): com inscritos, ou
-          // já anunciado pelo robô.
-          ['pending', 'open'].includes(game.status) && !mixPaused && (peopleCount > 0 || waitlist.length > 0
-            ? { key: 'draft', label: t('eventactions.to_draft'), hint: t('eventactions.to_draft_has_players'), disabled: true, onClick: () => {} }
-            : game.status === 'open' && hasBot
-            ? { key: 'draft', label: t('eventactions.to_draft'), hint: t('eventactions.to_draft_announced'), disabled: true, onClick: () => {} }
-            : { key: 'draft', label: t('eventactions.to_draft'), hint: t('eventactions.to_draft_hint'), onClick: () => setDraftAskOpen(true) }),
+          // «Voltar a rascunho» (unpublish_mix, Dev 3) — regra nova do
+          // Francisco (6 out): sempre, até o mix terminar, também com
+          // inscritos e depois de o robô o anunciar. Quem está inscrito sai e
+          // recebe um aviso; o mix fica em rascunho no Gerir.
+          ['pending', 'open', 'closed', 'in_progress'].includes(game.status)
+            && { key: 'draft', label: t('eventactions.to_draft'), hint: t('eventactions.to_draft_hint'), onClick: () => setDraftAskOpen(true) },
           game.status === 'in_progress' && { key: 'restart', label: t('eventactions.restart'), hint: t('eventactions.restart_hint'), onClick: () => setRestartOpen(true) },
           // Sem ninguém inscrito o mix desaparece: chama-se «Eliminar o mix».
           { key: 'cancel', danger: true, label: t(nobody ? 'eventactions.delete_mix' : 'eventactions.cancel_one'),
@@ -4701,24 +4685,33 @@ export default function GameDetails() {
               onClose={() => setChangeOneOpen(false)}
               onSaved={() => { setDoneNotice(t('eventactions.change_one_done')); loadGameDetails() }}
             />
-            <ConfirmSheet
-              open={draftAskOpen}
-              title={t('eventactions.to_draft_title')}
-              message={t('eventactions.to_draft_message')}
-              confirmLabel={t('eventactions.to_draft')}
-              cancelLabel={t('eventactions.not_now')}
-              onConfirm={async () => {
-                const { error } = await supabase.rpc('unpublish_mix', { p_game_id: game.id })
-                if (error) throw error
-                setDoneNotice(t('eventactions.to_draft_done'))
-                loadGameDetails()
-              }}
-              onClose={() => setDraftAskOpen(false)}
-              errorOf={(error) => {
-                const code = ['already_announced', 'has_players', 'already_started', 'not_published'].find((c) => (error?.message || '').includes(c))
-                return code ? t(`eventactions.to_draft_error_${code}`) : describeError(t, error, 'eventactions.to_draft_error')
-              }}
-            />
+            {(() => {
+              // Quem sai e é avisado: inscritos (com parceiros) e suplentes.
+              const leaving = peopleCount + waitlist.length
+              return (
+                <ConfirmSheet
+                  open={draftAskOpen}
+                  title={t('eventactions.to_draft_title')}
+                  message={leaving > 0
+                    ? `${t('eventactions.to_draft_people', { count: leaving })} ${t('eventactions.to_draft_message')}`
+                    : t('eventactions.to_draft_message')}
+                  confirmLabel={t('eventactions.to_draft_confirm')}
+                  cancelLabel={t('eventactions.to_draft_keep')}
+                  dangerFirst
+                  onConfirm={async () => {
+                    const { error } = await supabase.rpc('unpublish_mix', { p_game_id: game.id })
+                    if (error) throw error
+                    setDoneNotice(leaving > 0 ? t('eventactions.to_draft_done_people', { count: leaving }) : t('eventactions.to_draft_done'))
+                    loadGameDetails()
+                  }}
+                  onClose={() => setDraftAskOpen(false)}
+                  errorOf={(error) => {
+                    const code = ['not_allowed', 'not_published'].find((c) => (error?.message || '').includes(c))
+                    return code ? t(`eventactions.to_draft_error_${code}`) : describeError(t, error, 'eventactions.to_draft_error')
+                  }}
+                />
+              )
+            })()}
             <ConfirmSheet
               open={restartOpen}
               danger

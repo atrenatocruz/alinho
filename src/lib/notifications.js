@@ -13,7 +13,9 @@ import { errorKind } from './errors'
 // mix_moved_to_waitlist (o mix ficou com menos campos e passaste a suplente),
 // mix_not_filled (a quem organiza: não encheu e voltou a rascunho) e
 // mix_cancelled_not_filled (aos inscritos: cancelado porque não encheu).
-export const MIX_NOTICE_KINDS = ['mix_joined', 'mix_removed', 'mix_partner_changed', 'mix_cancelled',
+// mix_unpublished (6 out, Dev 3): o mix voltou a rascunho e quem estava
+// inscrito saiu.
+export const MIX_NOTICE_KINDS = ['mix_joined', 'mix_unpublished', 'mix_removed', 'mix_partner_changed', 'mix_cancelled',
   'mix_promoted', 'mix_moved_to_waitlist', 'mix_not_filled', 'mix_cancelled_not_filled',
   // Ponto 17 (trocar uma pessoa): mix_slot_open (a quem organiza: há uma vaga
   // numa dupla) e mix_swapped_out (a quem foi trocado).
