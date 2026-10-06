@@ -462,7 +462,7 @@ export default function MixOffline() {
           />
         )}
       </div>
-      <ConfirmSheet open={ask === 'finish'} outline title={t('dialogs.mix_finish_title')}
+      <ConfirmSheet open={ask === 'finish'} title={t('dialogs.mix_finish_title')}
         message={t(currentRoundDone ? 'dialogs.mix_finish_message' : 'dialogs.mix_finish_message_early')}
         cancelLabel={t('dialogs.mix_finish_keep')} confirmLabel={t('dialogs.mix_finish_confirm')}
         onConfirm={() => setFinished(true)} onClose={() => setAsk(null)} />

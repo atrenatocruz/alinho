@@ -101,11 +101,10 @@ export default function TeacherRequestCard({ req, organizationId, onResolved }) 
         errorOf={(err) => describeError(t, err, 'gerirclube.error_reject_teacher_request')}
       />
 
-      {/* Depois de «Aceitar»: a aceitação já está feita, por isso «Agora não»
-          vem primeiro e a preto, e fechar (tocar fora, Esc) é o mesmo. */}
+      {/* Depois de «Aceitar»: a aceitação já está feita; fechar (tocar fora,
+          Esc) é o mesmo que «Agora não». */}
       <ConfirmSheet
         open={asking === 'admin'}
-        outline
         title={t(female ? 'gerirclube.teacher_admin_title_f' : 'gerirclube.teacher_admin_title', { name })}
         message={g('gerirclube.teacher_admin_text')}
         cancelLabel={t('gerirclube.teacher_admin_no')}
