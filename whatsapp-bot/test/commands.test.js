@@ -48,16 +48,15 @@ test('«In» sozinho inscreve', async () => {
   assert.deepEqual(db.participants.map((p) => [p.user_id, p.status]), [['a', 'confirmed']])
 })
 
-test('«In» recusado pelo trigger das vagas → oferece suplente', async () => {
+test('«In» recusado pelo trigger das vagas → fica logo como suplente', async () => {
   db.failInsert = { table: 'participants', code: 'P0001', message: 'game_full' }
   const out = await say('in')
-  assert.match(out, /Queres entrar como suplente/)
+  assert.match(out, /lista de suplentes/)
+  assert.deepEqual(db.participants.map((p) => [p.user_id, p.status]), [['a', 'waitlisted']])
 })
 
 test('«In com» recusado pelo trigger das vagas → diz que não cabe a dupla', async () => {
   db.failInsert = { table: 'participants', code: 'P0001', message: 'game_full' }
-  // Outro remetente: a pergunta de suplente do teste anterior fica pendente
-  // (em memória, por remetente+grupo) para o Bernardo.
   const out = await say('in com bernardo', '351922222222')
   assert.match(out, /não há vagas para uma dupla|não cabe uma dupla/)
 })

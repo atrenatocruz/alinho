@@ -42,7 +42,7 @@ Se houver mais do que um mix aberto ao mesmo tempo, cada um tem a sua própria m
 • Responde à mensagem desse mix com *In* ou *Out*
 • Ou escreve *In 01*, *In segunda*, *In m4* (nível: m, f ou mx + 1–6) — dá para combinar, ex.: *In segunda m4* ou *In 01 com João*
 
-Se o mix estiver cheio, o bot pergunta se queres entrar como suplente — responde *Sim* ou *Não*. Quando alguém sair, o primeiro suplente entra automaticamente. (Em dupla não há suplentes: a dupla precisa de duas vagas livres.)
+Se o mix estiver cheio, o *In* põe-te logo como suplente. Quando alguém sair, o primeiro suplente entra automaticamente. (Em dupla não há suplentes: a dupla precisa de duas vagas livres.)
 
 Para veres esta lista:
 • */help*`,
@@ -69,14 +69,12 @@ Para veres esta lista:
   not_found: '🤖 Não te encontrei na app 😅 Regista-te primeiro em {{appUrl}} e confirma o teu número de telemóvel no perfil.',
   mix_no_longer_available: '🤖 Este mix já não está disponível para inscrições.',
   already_waitlisted: '🤖 Já estás na lista de suplentes deste mix! 🎾',
-  waitlisted: '🤖 Estás na lista de suplentes! Quando alguém sair, entras automaticamente. 🎾',
-  guest_waitlisted: '🤖 Fixe, {{name}}! Ficas na lista de suplentes como convidado 🎾 Entras automaticamente quando alguém sair. Sem conta não há ranking nem histórico — regista-te em {{appUrl}} e confirma o teu número no perfil, e as tuas inscrições passam para a tua conta.',
-  waitlist_declined: '🤖 Sem problema, não entraste na lista de suplentes. Inscreve-te para o próximo mix! 🎾',
+  waitlisted: '🤖 Mix cheio! Ficaste na lista de suplentes — quando alguém sair, entras automaticamente. 🎾',
+  guest_waitlisted: '🤖 Fixe, {{name}}! O mix está cheio: ficas na lista de suplentes como convidado 🎾 Entras automaticamente quando alguém sair. Sem conta não há ranking nem histórico — regista-te em {{appUrl}} e confirma o teu número no perfil, e as tuas inscrições passam para a tua conta.',
   did_not_understand_yes_no: '🤖 Não percebi 🤔 Responde só com *Sim* ou *Não*.',
   no_open_mixes: '🤖 Não há nenhum mix com inscrições abertas neste momento.',
   mix_already_started_out: '🤖 Este mix já começou/terminou — já não é possível sair por aqui.',
   already_joined: '🤖 Já estás inscrito neste mix! 🎾',
-  mix_full_offer_waitlist: '🤖 Mix cheio! Queres entrar como suplente? Responde com *Sim* ou *Não*.',
   copied_list_joined: '✅ Inscrevi-te, {{name}}. Para a próxima basta escrever In.',
   copied_list_added_guest: '✅ Inscrevi {{name}} como convidado. Para o tirar, pede ao admin.',
   copied_list_added_member: '✅ Inscrevi {{name}}. Para o tirar, pede ao admin.',
@@ -156,7 +154,7 @@ If more than one mix is open at the same time, each one gets its own message and
 • Reply to that mix's message with *In* or *Out*
 • Or type *In 01*, *In segunda* (weekday), *In m4* (level: m, f or mx + 1–6) — you can combine them, e.g. *In segunda m4* or *In 01 com João*
 
-If the mix is full, the bot asks if you want to join as a substitute — reply *Sim* or *Não*. When someone leaves, the first substitute joins automatically. (Pairs have no substitute list: a pair needs two free spots.)
+If the mix is full, *In* puts you straight on the substitutes list. When someone leaves, the first substitute joins automatically. (Pairs have no substitute list: a pair needs two free spots.)
 
 To see this list:
 • */help*`,
@@ -183,14 +181,12 @@ To see this list:
   not_found: "🤖 I couldn't find you in the app 😅 Sign up first at {{appUrl}} and confirm your phone number in your profile.",
   mix_no_longer_available: '🤖 This mix is no longer open for sign-ups.',
   already_waitlisted: "🤖 You're already on the waitlist for this mix! 🎾",
-  waitlisted: "🤖 You're on the waitlist! When a spot opens up, you'll join automatically. 🎾",
-  guest_waitlisted: "🤖 Nice one, {{name}}! You're on the waitlist as a guest 🎾 You'll join automatically when a spot opens up. Without an account there's no ranking or history — sign up at {{appUrl}} and confirm your number in your profile, and your signups move to your account.",
-  waitlist_declined: "🤖 No problem, you weren't added to the waitlist. Sign up for the next mix! 🎾",
+  waitlisted: "🤖 Mix is full! You're on the waitlist — when a spot opens up, you'll join automatically. 🎾",
+  guest_waitlisted: "🤖 Nice one, {{name}}! The mix is full: you're on the waitlist as a guest 🎾 You'll join automatically when a spot opens up. Without an account there's no ranking or history — sign up at {{appUrl}} and confirm your number in your profile, and your signups move to your account.",
   did_not_understand_yes_no: "🤖 Sorry, I didn't catch that 🤔 Reply with just *Sim* or *Não*.",
   no_open_mixes: "🤖 There's no mix open for sign-ups right now.",
   mix_already_started_out: "🤖 This mix has already started or finished — you can't leave here anymore.",
   already_joined: "🤖 You're already signed up for this mix! 🎾",
-  mix_full_offer_waitlist: '🤖 Mix is full! Want to join the waitlist? Reply *Sim* or *Não*.',
   copied_list_joined: '✅ You\'re in, {{name}}. Next time just write In.',
   copied_list_added_guest: '✅ I signed {{name}} up as a guest. To remove them, ask the admin.',
   copied_list_added_member: '✅ I signed {{name}} up. To remove them, ask the admin.',
@@ -256,8 +252,7 @@ const ptNew = {
   reminder_group: '⏰ *{{title}}* é {{day}} às {{time}}{{location}}.\n{{roster}}Não podes ir? Responde *Out* ao cartão do mix.',
   duplas_formed: '🎾 *Duplas do {{title}}*\n{{lines}}\nBom jogo!',
   duplas_updated: '🔄 *As duplas do {{title}} mudaram*\n{{lines}}',
-  mix_full_offer_waitlist: '🤖 O mix está cheio. Queres ficar como suplente? Responde *Sim*.',
-  waitlisted: '🤖 Ficaste como suplente. Se alguém sair, entras logo.',
+  waitlisted: '🤖 O mix está cheio. Ficaste como suplente. Se alguém sair, entras logo.',
   already_joined: '🤖 Já estás neste mix.',
   disambiguate_in: '🤖 Há {{count}} mixes abertos. Em qual queres entrar?\n{{list}}\n\nResponde {{options}}.',
   pair_request_ask: '🤝 {{partner}}, {{requester}} quer jogar em dupla contigo neste mix. Responde *Sim* a esta mensagem para aceitar.',
@@ -270,7 +265,7 @@ const ptNew = {
   help_in: '*In* — entrar no mix',
   help_out: '*Out* — sair',
   help_pair: '*In com* e o nome — entrar em dupla',
-  help_yes: '*Sim* — aceitar (suplente ou dupla)',
+  help_yes: '*Sim* — aceitar (dupla)',
   help_numbers: 'Vários mixes abertos? Cada cartão tem um número (01, 02…): responde ao cartão do mix que queres, ou escreve *In 01*.',
   help_more: 'Tudo explicado em {{link}}',
   or: 'ou',
@@ -278,8 +273,7 @@ const ptNew = {
 
 const enNew = {
   promoted_to_confirmed: "✅ {{name}}, you're in the mix: someone left and the spot is yours.",
-  mix_full_offer_waitlist: '🤖 The mix is full. Do you want to be a substitute? Reply *Sim*.',
-  waitlisted: "🤖 You're a substitute now. If someone leaves, you're in straight away.",
+  waitlisted: "🤖 The mix is full. You're a substitute now. If someone leaves, you're in straight away.",
   already_joined: "🤖 You're already in this mix.",
   disambiguate_in: '🤖 There are {{count}} open mixes. Which one do you want to join?\n{{list}}\n\nReply {{options}}.',
   pair_request_ask: '🤝 {{partner}}, {{requester}} wants to play as a pair with you in this mix. Reply *Sim* to this message to accept.',
@@ -291,7 +285,7 @@ const enNew = {
   help_in: '*In* — join the mix',
   help_out: '*Out* — leave',
   help_pair: '*In com* and the name — join as a pair',
-  help_yes: '*Sim* — accept (substitute or pair)',
+  help_yes: '*Sim* — accept (pair)',
   help_numbers: 'Several mixes open? Each card has a number (01, 02…): reply to the card of the mix you want, or type *In 01*.',
   help_more: 'Everything explained at {{link}}',
   or: 'or',

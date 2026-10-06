@@ -54,9 +54,10 @@ const SUPLENTE_CONFIRM_TTL_MS = 10 * 60 * 1000
  *  um instante antes. */
 const isGameFull = (error) => /(^|\W)game_full$/.test(String(error?.message || '').trim())
 
-// Tracks "we asked sender X whether they want to join mix Y as a
-// suplente" so their very next message is interpreted as that answer
-// instead of a fresh command. In-memory only, keyed by sender+group —
+// Tracks a question the bot asked sender X (out_pair menu, pair with someone
+// not on the app) so their very next message is interpreted as that answer
+// instead of a fresh command. (The old "queres entrar como suplente?" is
+// gone since 6 Oct: a full mix now waitlists straight away.) In-memory only, keyed by sender+group —
 // lost on bot restart, which is an acceptable trade-off since restarts
 // are rare and the worst case is the person just retries "in".
 const pendingSuplenteConfirmations = new Map()
@@ -309,9 +310,8 @@ function matchOpenMixesByText(openMixes, rest, { glued }) {
 
 /**
  * Handles one incoming group message. First checks whether the sender has
- * a live "queres entrar como suplente?" question pending (see
- * `pendingSuplenteConfirmations`) — if so, this message is treated as the
- * Sim/Não answer, not a fresh command. Otherwise, only acts on exact
+ * a live question pending (see `pendingSuplenteConfirmations`) — if so,
+ * this message is treated as the answer, not a fresh command. Otherwise, only acts on exact
  * "in"/"out"/"help"/"mix" text, optionally followed by identifier text used
  * to pick a mix when several are open (see parseCommand); everything else
  * — including all normal group chatter — is silently ignored.
@@ -532,54 +532,6 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
     if (normalized === 'nao' && pending.kind === 'pair_unregistered') {
       pendingSuplenteConfirmations.delete(key)
       await reply('partner_offer_declined')
-      return
-    }
-
-    if (normalized === 'sim') {
-      pendingSuplenteConfirmations.delete(key)
-
-      const { game, rows: waitRows } = await loadGame(pending.gameId)
-      const gameIsFuture = new Date(game.date).getTime() > Date.now()
-      if (!OPEN_STATUSES.has(game.status) || !gameIsFuture) {
-        await reply('mix_no_longer_available')
-        return
-      }
-
-      const { profile, isNewGuest } = await requireProfileOrCreateGuest(resolvedProfile, senderPn)
-      if (!profile) return
-
-      // Entre a pergunta e o «Sim» passaram até 10 minutos — a pessoa pode
-      // ter entrado entretanto (ex.: como parceiro de alguém).
-      if (waitRows.some((row) => row.status === 'confirmed' && rowIsMine(profile, myHash, row))) {
-        await reply('already_joined')
-        return
-      }
-
-      const insertError = profile.guest
-        ? await insertGuestParticipant(pending.gameId, profile, 'waitlisted')
-        : (await supabase
-            .from('participants')
-            .insert([{ game_id: pending.gameId, user_id: profile.id, status: 'waitlisted', joined_alone: true }])).error
-
-      if (insertError) {
-        if (insertError.code === '23505') {
-          await reply('already_waitlisted')
-          return
-        }
-        throw new Error(`Failed to insert waitlisted participant: ${insertError.message}`)
-      }
-      repostHooks.requestRepostForGame(organizationId, pending.gameId)
-      if (isNewGuest) {
-        await reply('guest_waitlisted', { name: profile.name, appUrl: config.appUrl })
-      } else {
-        await reply('waitlisted')
-      }
-      return
-    }
-
-    if (normalized === 'nao') {
-      pendingSuplenteConfirmations.delete(key)
-      await reply('waitlist_declined')
       return
     }
 
@@ -1328,6 +1280,28 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
     await leavePair({ game, pairRow, profile, rows, suplentes, choice })
   }
 
+  /** «In» num mix cheio: entra logo na lista de suplentes (já não pergunta «Sim/Não»). */
+  async function joinWaitlist(gameId, profile, isNewGuest) {
+    const insertError = profile.guest
+      ? await insertGuestParticipant(gameId, profile, 'waitlisted')
+      : (await supabase
+          .from('participants')
+          .insert([{ game_id: gameId, user_id: profile.id, status: 'waitlisted', joined_alone: true }])).error
+    if (insertError) {
+      if (insertError.code === '23505') {
+        await reply('already_waitlisted')
+        return
+      }
+      throw new Error(`Failed to insert waitlisted participant: ${insertError.message}`)
+    }
+    repostHooks.requestRepostForGame(organizationId, gameId)
+    if (isNewGuest) {
+      await reply('guest_waitlisted', { name: profile.name, appUrl: config.appUrl })
+    } else {
+      await reply('waitlisted')
+    }
+  }
+
   // Joins/leaves a specific, already-resolved mix — the same logic
   // regardless of how that mix got picked (explicit code, the only-one-open
   // shortcut, or being the one mix the sender is in for a bare "out").
@@ -1387,13 +1361,9 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
         await joinAsPair({ game, people, capacity, profile, isNewGuest, existingRows })
         return
       }
+      // Mix cheio: fica logo como suplente, sem perguntar (Renato, 6 out).
       if (people.length >= capacity) {
-        pendingSuplenteConfirmations.set(pendingKey(senderPn, groupJid), {
-          gameId: game.id,
-          expiresAt: Date.now() + SUPLENTE_CONFIRM_TTL_MS,
-          reprompted: false,
-        })
-        await reply('mix_full_offer_waitlist')
+        await joinWaitlist(game.id, profile, isNewGuest)
         return
       }
 
@@ -1410,10 +1380,7 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
           return
         }
         if (isGameFull(insertError)) {
-          pendingSuplenteConfirmations.set(pendingKey(senderPn, groupJid), {
-            gameId: game.id, expiresAt: Date.now() + SUPLENTE_CONFIRM_TTL_MS, reprompted: false,
-          })
-          await reply('mix_full_offer_waitlist')
+          await joinWaitlist(game.id, profile, isNewGuest)
           return
         }
         throw new Error(`Failed to insert participant: ${insertError.message}`)

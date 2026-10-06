@@ -222,6 +222,9 @@ export function eventFromExplore(row) {
     hasTime: true,
     dayKey: toDayKey(startsAt),
     orgId: org.id,
+    // O slug vem do RPC: quem não é membro não lê a tabela organizations
+    // (RLS), e sem ele o «›» do cartão não abria a página do clube.
+    orgSlug: org.slug || null,
     orgName: org.name || null,
     orgKind: org.kind || null,
     orgLogo: org.group_logo_url || null,

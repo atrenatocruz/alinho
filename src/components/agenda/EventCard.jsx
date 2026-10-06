@@ -347,9 +347,9 @@ export function GameEventCard({ event, profile, friendIds = null, action = null,
 
 /* ─── Evento de um clube da Comunidade onde ainda não estou (Fase 2) ───────
    Sem nomes de jogadores (decisão do Francisco, 16 set): só quantos vão, o
-   nível médio e que um amigo que sigo é membro do clube. Não abre página —
-   a página do mix e a do clube são só para membros — por isso tudo o que
-   ajuda a decidir está aqui, e o botão é entrar no clube ou pedir para entrar. */
+   nível médio e que um amigo que sigo é membro do clube. O cartão não abre o
+   mix (só para membros), mas o cabeçalho abre a página do clube, que se vê
+   de fora; o botão é entrar no clube ou pedir para entrar. */
 
 const exploreGenders = (avgGender, restriction) => {
   if (avgGender === 'misto') return ['masculino', 'feminino']
