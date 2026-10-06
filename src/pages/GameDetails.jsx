@@ -4,7 +4,7 @@ import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation, Trans } from 'react-i18next'
 import { BackBar } from '../components/ui'
-import { Calendar, ArrowLeft, UserPlus, Check, Trophy, Play, ChevronRight, Swords, X, Repeat, Share2, ChevronDown, RotateCcw, Euro, GripVertical, Pencil, History, ThumbsUp, Users, Copy, ArrowLeftRight } from 'lucide-react'
+import { Calendar, ArrowLeft, UserPlus, Check, Trophy, Play, ChevronRight, Swords, X, Repeat, Share2, ChevronDown, RotateCcw, Euro, GripVertical, Pencil, History, ThumbsUp, Users, Copy, ArrowLeftRight, Clock } from 'lucide-react'
 import { DndContext, useDraggable, useDroppable, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { supabase, supabaseUrl } from '../lib/supabase'
@@ -119,6 +119,13 @@ export default function GameDetails() {
   const gameOrganizationId = game?.organization_id ?? null
   const [participants, setParticipants] = useState([])
   const [waitlist, setWaitlist] = useState([])
+  // Aprovar quem entra pela app (SPEC 2026-10-02-mix-aprovar-quem-entra):
+  // os pedidos por decidir, o estado do meu pedido e a pergunta do recusar.
+  const [requests, setRequests] = useState([])
+  const [myRequestState, setMyRequestState] = useState(null) // 'requested' | 'declined' | null
+  const [declineAsk, setDeclineAsk] = useState(null) // o pedido a recusar
+  const [requestBusy, setRequestBusy] = useState(null)
+  const [requestNotice, setRequestNotice] = useState(null) // { ok, text }
   const [teams, setTeams] = useState([])
   const [matches, setMatches] = useState([])
   const [loading, setLoading] = useState(true)
@@ -209,6 +216,9 @@ export default function GameDetails() {
   // Ponto 9: com as duplas sorteadas, os inscritos ficam dobrados.
   const [inscritosOpen, setInscritosOpen] = useState(false)
   const [finalizeAsk, setFinalizeAsk] = useState(null) // { early } | null
+  // «×» de um inscrito: a pergunta é uma ConfirmSheet, não a janela do
+  // navegador (Francisco, 4 out). A pessoa a tirar, ou null.
+  const [removeAsk, setRemoveAsk] = useState(null)
   const [classifOpen, setClassifOpen] = useState(false)
   const [showDuplasShare, setShowDuplasShare] = useState(false)
   const [mixStats, setMixStats] = useState([])
@@ -419,7 +429,7 @@ export default function GameDetails() {
           partner_guest:game_guests!participants_partner_guest_id_fkey (id, name)
         `)
         .eq('game_id', id)
-        .in('status', ['confirmed', 'waitlisted'])
+        .in('status', ['confirmed', 'waitlisted', 'requested', 'declined'])
         .order('created_at', { ascending: true })
         .order('id', { ascending: true })
 
@@ -427,6 +437,10 @@ export default function GameDetails() {
 
       const confirmedRows = (participantsData || []).filter((p) => p.status === 'confirmed')
       const waitlistRows = (participantsData || []).filter((p) => p.status === 'waitlisted')
+      // Pedidos (Dev 3): 'requested' não ocupa vaga; 'declined' só interessa
+      // a quem pediu. Todos os membros leem as linhas — o ecrã é que filtra.
+      const requestRows = (participantsData || []).filter((p) => p.status === 'requested')
+      const myRequestRow = (participantsData || []).find((p) => p.user_id === user?.id && ['requested', 'declined'].includes(p.status))
 
       // Mix data (duplas + jogos sorteados). All of a game's teams are
       // bulk-inserted in one statement (handleStartMix), so they share the
@@ -511,6 +525,12 @@ export default function GameDetails() {
         ...p,
         user: attachMembership(p.user) ?? guestAsProfile(p.guest),
       })))
+      setRequests(requestRows.map((p) => ({
+        ...p,
+        user: attachMembership(p.user) ?? guestAsProfile(p.guest),
+        partner: attachMembership(p.partner) ?? guestAsProfile(p.partner_guest),
+      })))
+      setMyRequestState(myRequestRow?.status ?? null)
       // Nas duplas, o estado guarda o id EFETIVO em playerX_id (conta ou
       // convidado) — é o que o drag-and-drop, o mixEdit e o seedCourts
       // esperam; o saveEditedPairs volta a separar as colunas ao gravar.
@@ -617,7 +637,7 @@ export default function GameDetails() {
         ])
 
       if (error) throw error
-      celebrate()
+      if (!awaitsApproval) celebrate()
       loadGameDetails()
     } catch (error) {
       console.error('Error joining game:', error)
@@ -671,7 +691,7 @@ export default function GameDetails() {
         if (error) throw error
       }
       setPartnerSheet(false)
-      celebrate()
+      if (!awaitsApproval) celebrate()
       loadGameDetails()
     } catch (error) {
       console.error('Error joining game with a partner:', error)
@@ -702,7 +722,7 @@ export default function GameDetails() {
       if (error) throw error
       setJoinMode(null)
       setSelectedPartner('')
-      celebrate()
+      if (!awaitsApproval) celebrate()
       loadGameDetails()
     } catch (error) {
       console.error('Error joining game:', error)
@@ -833,6 +853,50 @@ export default function GameDetails() {
     }
   }
 
+  // «Cancelar pedido»: apaga o próprio pedido (Dev 3: a RLS deixa).
+  const handleCancelRequest = async () => {
+    setJoining(true)
+    setJoinError('')
+    try {
+      const { error } = await supabase
+        .from('participants')
+        .delete()
+        .eq('game_id', id)
+        .eq('user_id', user.id)
+        .eq('status', 'requested')
+      if (error) throw error
+      loadGameDetails()
+    } catch (error) {
+      console.error('Error cancelling join request:', error)
+      setJoinError(describeError(t, error, 'mixrequest.error_cancel'))
+    } finally {
+      setJoining(false)
+    }
+  }
+
+  // Quem organiza: aceitar entra (ou fica suplente, com o mix cheio) — a
+  // base de dados decide e devolve 'confirmed' ou 'waitlisted'.
+  const requestErrorText = (error) => {
+    const code = ['not_requested', 'not_allowed'].find((c) => (error?.message || '').includes(c))
+    return code ? t(`mixrequest.error_${code}`) : describeError(t, error, 'mixrequest.error_generic')
+  }
+  const handleAcceptRequest = async (r) => {
+    setRequestBusy(r.id)
+    setRequestNotice(null)
+    try {
+      const { data, error } = await supabase.rpc('accept_mix_request', { p_participant_id: r.id })
+      if (error) throw error
+      setRequestNotice({ ok: true, text: t(data === 'waitlisted' ? 'mixrequest.accepted_suplente' : 'mixrequest.accepted', { name: r.user?.name || '' }) })
+      await loadGameDetails()
+    } catch (error) {
+      console.error('Error accepting join request:', error)
+      setRequestNotice({ ok: false, text: requestErrorText(error) })
+      loadGameDetails()
+    } finally {
+      setRequestBusy(null)
+    }
+  }
+
   const handleLeaveWaitlist = async () => {
     try {
       const { error } = await supabase
@@ -852,14 +916,15 @@ export default function GameDetails() {
 
   /* ─── Admin: remove a player from the mix (before it starts) ─────── */
 
-  const handleRemovePerson = async (person) => {
-    const msg = person.rowOwner && person.hasPartner
-      ? t('gamedetails.confirm_remove_with_partner', { name: person.name })
-      : t('gamedetails.confirm_remove_person', { name: person.name })
-    if (!confirm(msg)) return
-
-    setBusy(true)
+  const handleRemovePerson = (person) => {
     setMixError('')
+    setRemoveAsk(person)
+  }
+
+  // Lança o erro: quem o mostra é a ConfirmSheet, junto ao botão.
+  const doRemovePerson = async () => {
+    const person = removeAsk
+    setBusy(true)
     try {
       if (person.rowOwner) {
         // remove the whole participation row (owner + partner, if any)
@@ -882,9 +947,6 @@ export default function GameDetails() {
         }
       }
       loadGameDetails()
-    } catch (error) {
-      console.error('Error removing player:', error)
-      setMixError(describeError(t, error, 'gamedetails.error_remove_player'))
     } finally {
       setBusy(false)
     }
@@ -2376,7 +2438,12 @@ export default function GameDetails() {
   const heroAvgRating = heroRated.length ? heroRated.reduce((sum, p) => sum + ratingInfoById[p.id].rating, 0) / heroRated.length : null
   const waitlistPeople = waitlist.map(w => ({ ...w.user, rowOwner: true, rowId: w.id, hasPartner: false }))
   const isUserWaitlisted = waitlist.some(w => w.user_id === user.id)
-  const canJoin = game?.status === 'open' && peopleCount < capacity && !isUserJoined
+  const isUserRequested = myRequestState === 'requested'
+  const isUserDeclined = myRequestState === 'declined'
+  // Mix com aprovação: o que quem joga faz pela app é um pedido (quem organiza
+  // e o robô inscrevem logo — base de dados, Dev 3).
+  const awaitsApproval = !!game?.join_approval && !isAdmin
+  const canJoin = game?.status === 'open' && peopleCount < capacity && !isUserJoined && !isUserRequested && !isUserDeclined
   // O sexo nunca bloqueia (Francisco, 26 set): a base de dados deixou de o
   // verificar (migration_mix_join_policy_sem_sexo.sql). Com o sexo que não
   // bate, pergunta-se «tens a certeza?»; o admin tira a pessoa se for caso.
@@ -2844,6 +2911,9 @@ export default function GameDetails() {
             <StateTag tone="in" icon={Check}>{t('gamedetails.joined_badge')}</StateTag>
           ) : isUserWaitlisted ? (
             <StateTag tone="wait">{t('agenda.state_waitlist')}</StateTag>
+          ) : isUserRequested ? (
+            // «Pedido enviado», a palavra que a app já usa nos grupos.
+            <StateTag tone="grey" icon={Clock}>{t('agenda.state_request_sent')}</StateTag>
           ) : null}
         </div>
 
@@ -2978,8 +3048,9 @@ export default function GameDetails() {
       ) : !mixStarted && canJoin && !joinMode && !ageIneligible && !missingBirthday && !(isAdmin && barPrimary) ? (
         <div className="space-y-2">
           <PrimaryButton onClick={withGender(handleJoinAlone)} disabled={joining} className="w-full">
-            {joining ? t('gamedetails.joining') : t('gamedetails.join_mix')}
+            {joining ? t('gamedetails.joining') : t(awaitsApproval ? 'mixrequest.ask' : 'gamedetails.join_mix')}
           </PrimaryButton>
+          {awaitsApproval && <p className="px-1 text-center text-xs text-muted">{t('mixrequest.ask_hint')}</p>}
           {/* Duplas fixas: entrar já com o parceiro combinado — tenha ele
               conta ou não (Trello #339). Num mix que roda parceiros a dupla
               desfazia-se na ronda seguinte, por isso não aparece lá. */}
@@ -2989,6 +3060,15 @@ export default function GameDetails() {
             </PrimaryButton>
           )}
         </div>
+      ) : !mixStarted && isUserRequested && !mixCancelled ? (
+        // Pedido enviado: não ocupa vaga e não aparece nos inscritos até
+        // quem organiza aceitar.
+        <div className="space-y-2">
+          <p className="rounded-card bg-white px-4 py-3.5 text-sm text-ink-700">{t('mixrequest.sent_line')}</p>
+          <PrimaryButton variant="ghost" onClick={handleCancelRequest} disabled={joining} className="w-full !bg-white !border-ink-900">
+            {t('mixrequest.cancel')}
+          </PrimaryButton>
+        </div>
       ) : isUserJoined && !mixPaused && (game.status === 'open' || game.status === 'closed') ? (
         // Com o mix parado (Trello #416) as duplas ja estao formadas: sair
         // deixaria uma dupla com quem ja nao esta no mix. Retoma-se ou
@@ -2996,15 +3076,15 @@ export default function GameDetails() {
         <PrimaryButton variant="ghost" onClick={handleLeaveGame} className="w-full !bg-white !border-ink-900">
           {t('gamedetails.leave_mix')}
         </PrimaryButton>
-      ) : !mixStarted && !mixPaused && isFull && !isUserJoined && !isUserWaitlisted && !ageIneligible && !missingBirthday && !mixCancelled && !(isAdmin && barPrimary) ? (
+      ) : !mixStarted && !mixPaused && isFull && !isUserJoined && !isUserWaitlisted && !isUserRequested && !isUserDeclined && !ageIneligible && !missingBirthday && !mixCancelled && !(isAdmin && barPrimary) ? (
         // Mix cheio (pacote do mix, ponto 4): o verde passa a «Ficar
         // suplente», por ordem de chegada; se alguém sair, entra o 1.º e
         // recebe aviso (base de dados).
         <div className="space-y-1.5">
           <PrimaryButton onClick={withGender(handleJoinAsSuplente)} disabled={joining} className="w-full">
-            {joining ? t('gamedetails.joining') : t('gamedetails.stay_suplente')}
+            {joining ? t('gamedetails.joining') : t(awaitsApproval ? 'mixrequest.ask' : 'gamedetails.stay_suplente')}
           </PrimaryButton>
-          <p className="px-1 text-center text-xs text-muted">{t('gamedetails.stay_suplente_hint')}</p>
+          <p className="px-1 text-center text-xs text-muted">{t(awaitsApproval ? 'mixrequest.ask_hint' : 'gamedetails.stay_suplente_hint')}</p>
         </div>
       ) : null}
 
@@ -3894,6 +3974,51 @@ export default function GameDetails() {
         </div>
       )}
 
+      {/* «Pedidos para entrar · N» (aprovar quem entra, 2 out): só quem
+          organiza, por cima dos inscritos. Os pedidos não caducam. */}
+      {isAdmin && !mixStarted && !mixCancelled && requests.length > 0 && (
+        <div className="card">
+          <h3 className="text-lg text-ink-900">{t('mixrequest.list_title', { count: requests.length })}</h3>
+          <p className="text-xs text-muted mt-1 mb-3">{t('mixrequest.list_hint')}</p>
+          {requestNotice && (
+            <p role={requestNotice.ok ? 'status' : 'alert'} className={`mb-3 text-sm font-extrabold ${requestNotice.ok ? 'text-ok' : 'text-danger'}`}>{requestNotice.text}</p>
+          )}
+          <div className="space-y-2">
+            {requests.map((r) => {
+              const size = r.partner_id || r.partner_guest_id ? 2 : 1
+              const asSuplente = peopleCount + size > capacity
+              const person = r.user || {}
+              return (
+                <div key={r.id} className="rounded-ctrl bg-canvas p-3">
+                  <div className="flex items-center gap-3">
+                    <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" provisional={isProvisional(person.rating_games)} />
+                    <div className="flex-1 min-w-0">
+                      <Link to={`/jogador/${r.user_id}`} className="block truncate font-extrabold text-ink-900">{person.name || '?'} ›</Link>
+                      {r.partner && <p className="text-xs text-muted truncate">{t('mixrequest.with_partner', { name: r.partner.name })}</p>}
+                      <p className="text-xs text-muted truncate flex items-center gap-1.5">
+                        <RatingBadge rating={ratingInfoById[r.user_id]?.rating} gender={ratingInfoById[r.user_id]?.gender} />
+                        <span className="font-extrabold text-ink-900">{pointsById[r.user_id] ?? 0} {t('gamedetails.points_suffix')}</span>
+                        <span>· {t('mixrequest.games', { count: person.rating_games || 0 })}</span>
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-2.5 flex gap-2">
+                    <button type="button" onClick={() => handleAcceptRequest(r)} disabled={requestBusy === r.id}
+                      className="flex-1 min-h-[44px] rounded-ctrl bg-ink-900 px-2 text-[13px] font-extrabold text-white whitespace-nowrap disabled:opacity-40">
+                      {t(asSuplente ? 'mixrequest.accept_suplente' : 'mixrequest.accept')}
+                    </button>
+                    <button type="button" onClick={() => { setRequestNotice(null); setDeclineAsk(r) }} disabled={requestBusy === r.id}
+                      className="flex-1 min-h-[44px] rounded-ctrl border-2 border-line bg-white px-2 text-[13px] font-extrabold text-ink-900 whitespace-nowrap disabled:opacity-40">
+                      {t('mixrequest.decline')}
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Jogadores (antes do sorteio). Num rascunho não há inscritos nem
           inscrições (#544): o «sê o primeiro» enganava. */}
       {!mixStarted && (!isDraftMix(game) || !!game.unfilled_at) && (
@@ -4270,6 +4395,23 @@ export default function GameDetails() {
       {/* A folha do «Adicionar jogador» serve o mix a decorrer (#292) e antes de começar (#534). */}
       {/* «Terminar e dar os pontos»: a pergunta na folha da app (ponto 16). */}
       <ConfirmSheet
+        open={!!removeAsk}
+        title={t('gamedetails.remove_ask_title', { name: removeAsk?.name || '' })}
+        message={[
+          t(removeAsk?.rowOwner && removeAsk?.hasPartner ? 'gamedetails.remove_ask_with_partner' : 'gamedetails.remove_ask_text'),
+          // Sai um inscrito e há suplentes: a base de dados põe o 1.º no
+          // lugar — quem organiza tem de o saber antes (UX, 5 out).
+          removeAsk?.rowOwner && waitlist.length > 0 && !waitlist.some((w) => w.id === removeAsk.rowId) ? t('gamedetails.remove_ask_waitlist') : '',
+        ].filter(Boolean).join(' ')}
+        confirmLabel={t('gamedetails.remove_ask_confirm')}
+        cancelLabel={t('gamedetails.remove_ask_keep')}
+        // Regra das janelas: o seguro («Manter») a preto, tirar a vermelho.
+        danger
+        onConfirm={doRemovePerson}
+        onClose={() => setRemoveAsk(null)}
+        errorOf={(error) => describeError(t, error, 'gamedetails.remove_ask_error')}
+      />
+      <ConfirmSheet
         open={!!finalizeAsk}
         title={t('gamedetails.finalize_ask_title')}
         message={t(finalizeAsk?.early ? 'gamedetails.confirm_finalize_early' : 'gamedetails.finalize_ask_text')}
@@ -4280,6 +4422,22 @@ export default function GameDetails() {
         onConfirm={doFinalize}
         onClose={() => setFinalizeAsk(null)}
         errorOf={(error) => describeError(t, error, 'gamedetails.error_finalize_mix')}
+      />
+      <ConfirmSheet
+        open={!!declineAsk}
+        title={t('mixrequest.decline_title', { name: declineAsk?.user?.name || '' })}
+        message={t('mixrequest.decline_text', { name: declineAsk?.user?.name || '' })}
+        cancelLabel={t('mixrequest.decline_keep')}
+        confirmLabel={t('mixrequest.decline_confirm')}
+        // O seguro («Manter o pedido») a preto; «Sim, recusar» a vermelho.
+        danger
+        onConfirm={async () => {
+          const { error } = await supabase.rpc('decline_mix_request', { p_participant_id: declineAsk.id })
+          if (error) throw error
+          await loadGameDetails()
+        }}
+        onClose={() => setDeclineAsk(null)}
+        errorOf={requestErrorText}
       />
       {addPlayerOpen && (
         <AddPlayerSheet

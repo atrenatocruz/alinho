@@ -250,6 +250,19 @@ export default function MixWizard({
             options={[{ value: '', label: t('gerirclube.age_any') }, ...AGE_RESTRICTIONS.map((a) => ({ value: a.value, label: t(a.labelKey) }))]}
           />
         </Field>
+        {/* Aprovar quem entra pela app (SPEC 2026-10-02): por omissão entra
+            logo, como sempre. O robô do WhatsApp inscreve logo à mesma. */}
+        <Field label={t('mixwizard.approval_label')} hint={form.join_approval ? t('mixwizard.approval_hint') : null}>
+          <Chips
+            label={t('mixwizard.approval_label')}
+            value={form.join_approval ? 'approve' : 'open'}
+            onChange={(v) => set({ join_approval: v === 'approve' })}
+            options={[
+              { value: 'open', label: t('mixwizard.approval_open') },
+              { value: 'approve', label: t('mixwizard.approval_approve') },
+            ]}
+          />
+        </Field>
         <Field label={t('mixwizard.signup_label')} hint={form.allow_pair_signup && !pairsAreFixed(form) ? t('mixwizard.signup_needs_fixed') : null}>
           <Chips
             label={t('mixwizard.signup_label')}

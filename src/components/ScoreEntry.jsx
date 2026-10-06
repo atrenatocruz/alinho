@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { validateProSetScore, computeProSetFinalScore, computeSetsResult } from '../lib/scoringLogic'
+import { computeProSetFinalScore, computeSetsResult } from '../lib/scoringLogic'
+import { mixProSetProblem } from '../lib/scoreRules'
 import { tieBreakProblem, matchTieBreak } from './tournament/tieBreak'
 
 /** Renders the score-input UI for one match, branching on the mix's
@@ -58,6 +59,7 @@ export default function ScoreEntry({
   let readyToSave = false
   let finalScore = null
   let breakerProblem = null
+  let proSetProblem = null
 
   if (scoringFormat === 'pro_set_9') {
     if (bothEntered) {
@@ -70,12 +72,18 @@ export default function ScoreEntry({
       // running it through validateProSetScore, which would otherwise
       // report it invalid with no breaker prompt — a dead end.
       const isBreakerProducedPair = (aNum === 9 && bNum === 8) || (aNum === 8 && bNum === 9)
-      const check = isBreakerProducedPair ? { valid: false, needsBreaker: true } : validateProSetScore(aNum, bNum)
-      needsBreaker = check.needsBreaker
-      if (check.valid) {
-        readyToSave = true
-        finalScore = { score_a: aNum, score_b: bNum }
-      } else if (needsBreaker) {
+      // Pro set por acabar (Francisco, REGRAS.md ponto 2; trava 588): quando
+      // acaba o tempo grava-se como ficou — 7-3, 7-6, 8-5 —, ganha quem tem
+      // mais jogos. Só não passa de 9 nem fica 9-9. O 9-8 e o 8-8 pedem o
+      // desempate, como antes. Antes só 9-0…9-7 passava e o botão sumia.
+      needsBreaker = isBreakerProducedPair || (aNum === 8 && bNum === 8)
+      if (!needsBreaker) {
+        proSetProblem = mixProSetProblem({ score_a: aNum, score_b: bNum })
+        if (!proSetProblem && (aNum !== bNum || allowDraw)) {
+          readyToSave = true
+          finalScore = { score_a: aNum, score_b: bNum }
+        }
+      } else {
         const ba = parseInt(breakerScore.a, 10)
         const bb = parseInt(breakerScore.b, 10)
         const breakerBothEntered = breakerScore.a !== '' && breakerScore.b !== '' && !Number.isNaN(ba) && !Number.isNaN(bb)
@@ -196,12 +204,17 @@ export default function ScoreEntry({
         </div>
       )}
 
+      {/* O botão não aparece: diz-se sempre porquê (PO, 3 out). */}
+      {proSetProblem && (
+        <p className="text-xs font-extrabold text-danger" role="status">{t(`gamedetails.proset_problem_${proSetProblem === 'negative' ? 'negative' : 'invalid'}`)}</p>
+      )}
+
       {/* Empate: o botão de gravar não aparece, e antes não se dizia porquê —
           um 5-5 encravou uma ronda a sério (Trello #420). Diz-se o que fazer. */}
-      {isDrawEntry && allowDraw && (
+      {isDrawEntry && allowDraw && !proSetProblem && (
         <p className="text-xs font-bold text-warning" role="status">{t('gamedetails.score_tied')}</p>
       )}
-      {isDrawEntry && !allowDraw && !needsBreaker && (
+      {isDrawEntry && !allowDraw && !needsBreaker && !proSetProblem && (
         <p className="text-xs font-extrabold text-ink-700" role="status">{t('gamedetails.score_tie_not_allowed')}</p>
       )}
 

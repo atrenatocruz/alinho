@@ -66,6 +66,7 @@ export function pendingOccurrenceRow(game, { nextDate, launchAt, userId, recurre
     ...(game.seed_reverse ? { seed_reverse: true } : {}),
     ...(game.ranked === false ? { ranked: false } : {}),
     ...(game.allow_pair_signup ? { allow_pair_signup: true } : {}),
+    ...(game.join_approval ? { join_approval: true } : {}),
     // A contagem, o tamanho dos grupos e o 8-8 (#580) — só quando não são
     // os de omissão, como os outros acima.
     ...(game.scoring_format && game.scoring_format !== 'pontos_simples' ? { scoring_format: game.scoring_format } : {}),
