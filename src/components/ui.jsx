@@ -1186,10 +1186,11 @@ export function DangerConfirmModal({ open, title, message, emphasis, confirmLabe
      · `title` é a pergunta COM o nome da coisa («Desistir de Masculinos 4?»),
        `message` é UMA linha com a consequência real;
      · os botões dizem a ação — nunca «OK», nunca «Tens a certeza?»;
-     · `danger` (estraga): o que NÃO estraga vem primeiro, a preto e a toda
-       a largura («Não desisto»), e o risco por baixo, a vermelho com
-       contorno («Sim, desisto»);
-     · sem `danger`: a ação a preto e, por baixo, «Agora não» em texto.
+     · REGRA DOS BOTÕES (Francisco, 6 out — design-handoff/2026-10-06-regra-
+       confirmacoes): em cima, cheio, a ação que a pessoa veio fazer — preta,
+       ou VERMELHA com `danger` (apaga, cancela, tira, recusa); por baixo, em
+       contorno, ficar como está («Ainda não», «Manter…»). Vale para todas;
+       não se troca a ordem à mão.
 
    `children` entra por baixo da consequência, quando é preciso ver o que
    se vai confirmar (uma lista, um pódio).
@@ -1200,13 +1201,7 @@ export function DangerConfirmModal({ open, title, message, emphasis, confirmLabe
 
    A DangerConfirmModal (acima) é a janela antiga: os sítios que a usam
    passam para esta quando chegar a vez deles (mix, Gerir, resto). */
-// outline: a ação vai em segundo, com contorno, e o preto (primeiro) é o
-// «não» — para quando o que já aconteceu não se desfaz e a pergunta é só um
-// extra (ex.: depois de aceitar um professor, «Agora não» · «Sim, tornar
-// admin»; desenho aprovado 25 set, professores, assunto 2).
-// dangerFirst (6 out, «Voltar a rascunho» com inscritos): o vermelho cheio em
-// cima a confirmar, e o «Manter» em contorno por baixo.
-export function ConfirmSheet({ open, title, message, confirmLabel, cancelLabel, danger = false, outline = false, dangerFirst = false, onConfirm, onClose, errorOf, children, confirmDisabled = false }) {
+export function ConfirmSheet({ open, title, message, confirmLabel, cancelLabel, danger = false, onConfirm, onClose, errorOf, children, confirmDisabled = false }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   useEffect(() => { if (!open) { setBusy(false); setError('') } }, [open])
@@ -1232,25 +1227,16 @@ export function ConfirmSheet({ open, title, message, confirmLabel, cancelLabel, 
     }
   }
 
-  const safe = dangerFirst
-    ? <button type="button" onClick={confirm} disabled={busy || confirmDisabled}
-        className="w-full min-h-[52px] rounded-ctrl bg-danger px-4 text-[15px] font-extrabold text-white disabled:opacity-40">{confirmLabel}</button>
-    : danger || outline
-    ? <button type="button" onClick={onClose} disabled={busy}
-        className="w-full min-h-[52px] rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold text-white disabled:opacity-40">{cancelLabel}</button>
-    : <button type="button" onClick={confirm} disabled={busy || confirmDisabled}
-        className="w-full min-h-[52px] rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold text-white disabled:opacity-40">{confirmLabel}</button>
-  const second = dangerFirst
-    ? <button type="button" onClick={onClose} disabled={busy}
-        className="w-full min-h-[52px] rounded-ctrl border-[1.5px] border-line bg-white px-4 text-[15px] font-extrabold text-ink-900 disabled:opacity-40">{cancelLabel}</button>
-    : outline
-    ? <button type="button" onClick={confirm} disabled={busy || confirmDisabled}
-        className="w-full min-h-[52px] rounded-ctrl border-[1.5px] border-line bg-white px-4 text-[15px] font-extrabold text-ink-900 disabled:opacity-40">{confirmLabel}</button>
-    : danger
-    ? <button type="button" onClick={confirm} disabled={busy || confirmDisabled}
-        className="w-full min-h-[52px] rounded-ctrl border-2 border-danger bg-white px-4 text-[15px] font-extrabold text-danger disabled:opacity-40">{confirmLabel}</button>
-    : <button type="button" onClick={onClose} disabled={busy}
-        className="w-full min-h-[44px] px-4 text-[15px] font-extrabold text-ink-700 disabled:opacity-40">{cancelLabel}</button>
+  // Em cima, cheio: a ação (preta, ou vermelha se `danger`). Por baixo, em
+  // contorno: ficar como está.
+  const action = (
+    <button type="button" onClick={confirm} disabled={busy || confirmDisabled}
+      className={`w-full min-h-[52px] rounded-ctrl px-4 text-[15px] font-extrabold text-white disabled:opacity-40 ${danger ? 'bg-danger' : 'bg-ink-900'}`}>{confirmLabel}</button>
+  )
+  const stay = (
+    <button type="button" onClick={onClose} disabled={busy}
+      className="w-full min-h-[52px] rounded-ctrl border-[1.5px] border-line bg-white px-4 text-[15px] font-extrabold text-ink-900 disabled:opacity-40">{cancelLabel}</button>
+  )
 
   return createPortal(
     <div
@@ -1274,8 +1260,8 @@ export function ConfirmSheet({ open, title, message, confirmLabel, cancelLabel, 
           <p role="alert" className="mt-3 rounded-ctrl border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-sm font-bold text-danger">{error}</p>
         )}
         <div className="mt-5 space-y-2.5">
-          {safe}
-          {second}
+          {action}
+          {stay}
         </div>
       </div>
     </div>,
@@ -1442,7 +1428,7 @@ export function FollowListModal({ userId, initialTab = 'followers', onClose, man
           cancelLabel={t('dialogs.remove_follower_keep')} confirmLabel={t('dialogs.remove_follower_confirm')}
           onConfirm={() => endFollowNow(asking)} onClose={() => setAsking(null)} />
       ) : (
-        <ConfirmSheet open outline title={t('followlist.confirm_unfollow', { name: asking.name })}
+        <ConfirmSheet open title={t('followlist.confirm_unfollow', { name: asking.name })}
           cancelLabel={t('dialogs.unfollow_keep')} confirmLabel={t('dialogs.unfollow_confirm')}
           onConfirm={() => endFollowNow(asking)} onClose={() => setAsking(null)} />
       ))}

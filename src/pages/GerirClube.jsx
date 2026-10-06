@@ -1750,7 +1750,7 @@ export default function GerirClube() {
       ? { title: t('gerirclube.confirm_revoke_admin_title', { name }), message: t(kk('gerirclube.confirm_revoke_admin')),
         cancelLabel: t('gerirclube.keep_admin'), confirmLabel: t('gerirclube.confirm_revoke_admin_yes'), danger: true }
       : { title: t('gerirclube.confirm_grant_admin_title', { name }), message: t(kk('gerirclube.confirm_grant_admin')),
-        cancelLabel: t('gerirclube.cancel'), confirmLabel: t('gerirclube.confirm_grant_admin_yes'), outline: true })
+        cancelLabel: t('gerirclube.cancel'), confirmLabel: t('gerirclube.confirm_grant_admin_yes') })
     if (!yes) return
     setMemberError(null)
 
@@ -2251,7 +2251,6 @@ export default function GerirClube() {
       confirmLabel={ask?.confirmLabel || ''}
       cancelLabel={ask?.cancelLabel || ''}
       danger={!!ask?.danger}
-      outline={!!ask?.outline}
       onConfirm={() => { ask?.resolve(true) }}
       onClose={() => { ask?.resolve(false); setAsk(null) }}
     />

@@ -4455,7 +4455,7 @@ export default function GameDetails() {
         ].filter(Boolean).join(' ')}
         confirmLabel={t('gamedetails.remove_ask_confirm')}
         cancelLabel={t('gamedetails.remove_ask_keep')}
-        // Regra das janelas: o seguro («Manter») a preto, tirar a vermelho.
+        // Regra das confirmações (6 out): «Sim, tirar» em cima, a vermelho.
         danger
         onConfirm={doRemovePerson}
         onClose={() => setRemoveAsk(null)}
@@ -4467,8 +4467,6 @@ export default function GameDetails() {
         message={t(finalizeAsk?.early ? 'gamedetails.confirm_finalize_early' : 'gamedetails.finalize_ask_text')}
         confirmLabel={t('gamedetails.finalize_mix')}
         cancelLabel={t('gamedetails.finalize_ask_not_yet')}
-        // Regra das janelas: o seguro («Ainda não») a preto, terminar em contorno.
-        outline
         onConfirm={doFinalize}
         onClose={() => setFinalizeAsk(null)}
         errorOf={(error) => describeError(t, error, 'gamedetails.error_finalize_mix')}
@@ -4479,7 +4477,7 @@ export default function GameDetails() {
         message={t('mixrequest.decline_text', { name: declineAsk?.user?.name || '' })}
         cancelLabel={t('mixrequest.decline_keep')}
         confirmLabel={t('mixrequest.decline_confirm')}
-        // O seguro («Manter o pedido») a preto; «Sim, recusar» a vermelho.
+        // Regra das confirmações (6 out): «Sim, recusar» em cima, a vermelho.
         danger
         onConfirm={async () => {
           const { error } = await supabase.rpc('decline_mix_request', { p_participant_id: declineAsk.id })
@@ -4730,9 +4728,7 @@ export default function GameDetails() {
             message={t('mixpairs.split_message', { names: splitFor?.names || '' })}
             confirmLabel={t('mixpairs.split_confirm')}
             cancelLabel={t('mixpairs.split_keep')}
-            // Regra das janelas (UX, 27 set): o seguro primeiro e a preto;
-            // separar vai em contorno, não vermelho — volta-se a juntar.
-            outline
+            // Separar não é vermelho: volta-se a juntar.
             onConfirm={async () => { await adminSplitPair(id, splitFor.userId); loadGameDetails() }}
             onClose={() => setSplitFor(null)}
             errorOf={(error) => mixPairErrorMessage(t, error)}
@@ -4899,7 +4895,7 @@ export default function GameDetails() {
                     : t('eventactions.to_draft_message')}
                   confirmLabel={t('eventactions.to_draft_confirm')}
                   cancelLabel={t('eventactions.to_draft_keep')}
-                  dangerFirst
+                  danger
                   onConfirm={async () => {
                     const { error } = await supabase.rpc('unpublish_mix', { p_game_id: game.id })
                     if (error) throw error

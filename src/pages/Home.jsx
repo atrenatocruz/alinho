@@ -991,7 +991,7 @@ export default function Home() {
         </Sheet>
       )}
 
-      <ConfirmSheet open={!!leaveAsk} outline title={t('dialogs.leave_game_title')}
+      <ConfirmSheet open={!!leaveAsk} title={t('dialogs.leave_game_title')}
         cancelLabel={t('dialogs.leave_game_keep')} confirmLabel={t('dialogs.leave_game_confirm')}
         onConfirm={() => { const ev = leaveAsk; setLeaveAsk(null); if (ev) handleGameAction(ev, 'leave', { leaveConfirmed: true }) }}
         onClose={() => setLeaveAsk(null)} />

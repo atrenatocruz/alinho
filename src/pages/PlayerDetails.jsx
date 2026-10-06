@@ -425,7 +425,7 @@ export default function PlayerDetails() {
           </div>
         )}
         {followError && <p role="alert" className="mt-2 text-xs font-extrabold text-danger">{followError}</p>}
-        <ConfirmSheet open={askUnfollow} outline title={t('playerdetails.unfollow_confirm', { name: player.name })}
+        <ConfirmSheet open={askUnfollow} title={t('playerdetails.unfollow_confirm', { name: player.name })}
           cancelLabel={t('dialogs.unfollow_keep')} confirmLabel={t('dialogs.unfollow_confirm')}
           onConfirm={() => handleRemoveFollow()} onClose={() => setAskUnfollow(false)} />
 

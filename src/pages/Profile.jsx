@@ -851,7 +851,7 @@ export default function Profile() {
       <Tabs value={tab} onChange={setTab} options={TABS.map((d) => ({ value: d.key, label: t(d.labelKey) }))} />
 
       {/* Voucher usado (parte 2 das janelas, 2 out): fora dos separadores, para abrir em qualquer um. */}
-      <ConfirmSheet open={!!markingVoucher} outline title={t('dialogs.voucher_title')} message={t('dialogs.voucher_message')}
+      <ConfirmSheet open={!!markingVoucher} title={t('dialogs.voucher_title')} message={t('dialogs.voucher_message')}
           cancelLabel={t('dialogs.voucher_keep')} confirmLabel={t('dialogs.voucher_confirm')}
           onConfirm={markVoucherUsedNow} onClose={() => setMarkingVoucher(null)} />
         {voucherDone && (
@@ -1100,7 +1100,6 @@ export default function Profile() {
         message={t('vouchers.unshare_body', { club: unshareFor?.game?.organization?.name || '' })}
         confirmLabel={t('vouchers.unshare')}
         cancelLabel={t('common.back')}
-        outline
         errorOf={(err) => describeError(t, err)}
         onConfirm={async () => {
           await unshareVoucherContact(unshareFor.id)
