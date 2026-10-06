@@ -364,8 +364,8 @@ const RPC_MOCKS = {
   // tabela): localStorage.mockJoinRequests = 'true'. Mostra o número no
   // separador «Pessoas» (Trello #528).
   list_membership_requests: () => (localStorage.getItem('mockJoinRequests') === 'true' ? [
-    { id: 'jr1', user_id: 'fake-1', name: 'Marta Costa', avatar_url: null, created_at: new Date().toISOString() },
-    { id: 'jr2', user_id: 'fake-2', name: 'Tiago Ferreira', avatar_url: null, created_at: new Date().toISOString() },
+    { id: 'jr1', user_id: FAKE_MEMBER_ID, name: 'Marta Costa', avatar_url: null, created_at: new Date().toISOString() },
+    { id: 'jr2', user_id: FAKE_PARTNER_ID, name: 'Tiago Ferreira', avatar_url: null, created_at: new Date().toISOString() },
   ] : []),
   delete_self_serve_group: () => null,
   // Entrar por link num grupo cheio (#447): localStorage.mockJoinPending =

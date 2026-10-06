@@ -225,6 +225,19 @@ function Segmented({ options, value, onChange }) {
   )
 }
 
+// Quem pede para entrar: a foto e o nome abrem o perfil (Francisco, 6 out),
+// como na página do mix (aprovar quem entra, ponto 5). O «voltar» do perfil
+// regressa aqui: o separador vive no endereço (?tab=members). Um perfil
+// privado abre na mesma — só mostra o que se pode ver.
+function RequestPerson({ req, fallbackName }) {
+  return (
+    <Link to={`/jogador/${req.user_id}`} className="flex flex-1 min-w-0 items-center gap-3">
+      <Avatar name={req.name} url={req.avatar_url} size="w-9 h-9 text-sm" />
+      <span className="min-w-0 truncate font-extrabold text-ink-900">{req.name || fallbackName} ›</span>
+    </Link>
+  )
+}
+
 export default function GerirClube() {
   const { t, i18n } = useTranslation()
   const { slug, editId, serieId } = useParams()
@@ -3469,8 +3482,7 @@ export default function GerirClube() {
                   )}
                   {requests.map((req) => (
                     <div key={req.id} className="card flex items-center gap-3">
-                      <Avatar name={req.name} url={req.avatar_url} size="w-9 h-9 text-sm" />
-                      <p className="flex-1 min-w-0 font-extrabold text-ink-900 truncate">{req.name || t('gerirclube.fallback_player_name')}</p>
+                      <RequestPerson req={req} fallbackName={t('gerirclube.fallback_player_name')} />
                       <button
                         onClick={() => handleApproveRequest(req.id)}
                         className="w-9 h-9 flex items-center justify-center rounded-full bg-ok/10 text-ok hover:bg-ok/20 transition-colors duration-fast"
@@ -3498,8 +3510,7 @@ export default function GerirClube() {
                   </h3>
                   {pedidos.map((req) => (
                     <div key={req.id} className="card flex items-center gap-3">
-                      <Avatar name={req.name} url={req.avatar_url} size="w-9 h-9 text-sm" />
-                      <p className="flex-1 min-w-0 font-extrabold text-ink-900 truncate">{req.name || t('gerirclube.fallback_player_name')}</p>
+                      <RequestPerson req={req} fallbackName={t('gerirclube.fallback_player_name')} />
                       <button
                         onClick={async () => { await handleApproveGroupRequest(req.id, group.id); loadPedidosDosGrupos() }}
                         className="w-9 h-9 flex items-center justify-center rounded-full bg-ok/10 text-ok hover:bg-ok/20 transition-colors duration-fast"
