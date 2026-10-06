@@ -1204,7 +1204,9 @@ export function DangerConfirmModal({ open, title, message, emphasis, confirmLabe
 // «não» — para quando o que já aconteceu não se desfaz e a pergunta é só um
 // extra (ex.: depois de aceitar um professor, «Agora não» · «Sim, tornar
 // admin»; desenho aprovado 25 set, professores, assunto 2).
-export function ConfirmSheet({ open, title, message, confirmLabel, cancelLabel, danger = false, outline = false, onConfirm, onClose, errorOf, children, confirmDisabled = false }) {
+// dangerFirst (6 out, «Voltar a rascunho» com inscritos): o vermelho cheio em
+// cima a confirmar, e o «Manter» em contorno por baixo.
+export function ConfirmSheet({ open, title, message, confirmLabel, cancelLabel, danger = false, outline = false, dangerFirst = false, onConfirm, onClose, errorOf, children, confirmDisabled = false }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   useEffect(() => { if (!open) { setBusy(false); setError('') } }, [open])
@@ -1230,12 +1232,18 @@ export function ConfirmSheet({ open, title, message, confirmLabel, cancelLabel, 
     }
   }
 
-  const safe = danger || outline
+  const safe = dangerFirst
+    ? <button type="button" onClick={confirm} disabled={busy || confirmDisabled}
+        className="w-full min-h-[52px] rounded-ctrl bg-danger px-4 text-[15px] font-extrabold text-white disabled:opacity-40">{confirmLabel}</button>
+    : danger || outline
     ? <button type="button" onClick={onClose} disabled={busy}
         className="w-full min-h-[52px] rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold text-white disabled:opacity-40">{cancelLabel}</button>
     : <button type="button" onClick={confirm} disabled={busy || confirmDisabled}
         className="w-full min-h-[52px] rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold text-white disabled:opacity-40">{confirmLabel}</button>
-  const second = outline
+  const second = dangerFirst
+    ? <button type="button" onClick={onClose} disabled={busy}
+        className="w-full min-h-[52px] rounded-ctrl border-[1.5px] border-line bg-white px-4 text-[15px] font-extrabold text-ink-900 disabled:opacity-40">{cancelLabel}</button>
+    : outline
     ? <button type="button" onClick={confirm} disabled={busy || confirmDisabled}
         className="w-full min-h-[52px] rounded-ctrl border-[1.5px] border-line bg-white px-4 text-[15px] font-extrabold text-ink-900 disabled:opacity-40">{confirmLabel}</button>
     : danger
