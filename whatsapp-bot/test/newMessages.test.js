@@ -120,8 +120,8 @@ test('mix cheio, suplente e já inscrito: respostas novas, sem rodapé', async (
   assert.equal(await say('in'), '🤖 Já estás neste mix.')
   db.games[0].max_players = 1
   _clearOpenMixesCacheForTests()
-  assert.equal(await say('in', '351922222222'), '🤖 O mix está cheio. Queres ficar como suplente? Responde *Sim*.')
-  assert.equal(await say('sim', '351922222222'), '🤖 Ficaste como suplente. Se alguém sair, entras logo.')
+  assert.equal(await say('in', '351922222222'), '🤖 O mix está cheio. Ficaste como suplente. Se alguém sair, entras logo.')
+  assert.equal(db.participants.find((p) => p.user_id === 'b')?.status, 'waitlisted')
 })
 
 test('um suplente sai com Out', async () => {
