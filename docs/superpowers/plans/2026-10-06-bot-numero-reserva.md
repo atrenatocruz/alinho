@@ -599,7 +599,7 @@ export async function sendAlert(text) {
 
 ```js
   // Robô de reserva (spec 2026-10-06): 'principal' ou 'reserva'. Cada um
-  // com o seu número e a sua AUTH_DIR, em máquinas diferentes.
+  // com o seu número e a sua AUTH_DIR (dois contentores no mesmo EC2).
   botInstance: process.env.BOT_INSTANCE || 'principal',
   // O pool do lease: 'prod' em produção, 'dev' no robô de QA.
   leasePool: process.env.LEASE_POOL || 'prod',
@@ -961,7 +961,8 @@ Conteúdo (em pt, curto):
 ```markdown
 ## Número de reserva (desde 6 out 2026)
 
-Correm dois robôs, cada um com o seu número e em máquinas diferentes. Só um
+Correm dois robôs no mesmo EC2, em dois contentores, cada um com o seu
+número e a sua pasta de sessão. Só um
 fala de cada vez (tabela `bot_lease`). Se o ativo for banido (403) ou cair,
 o outro assume em ≤ 20 s e diz uma vez em cada grupo que o robô mudou de
 número.
@@ -1039,7 +1040,10 @@ Atualizar também o teste de `newMessages.test.js` que faz `assert.match(buildMi
 
 1. SIM português físico para a reserva; WhatsApp num telemóvel real, nome «Alinho 🤖» e foto; uso normal 7–10 dias.
 2. Admins adicionam o número de reserva a cada grupo, com uma linha a explicar.
-3. Máquina da reserva com outro IP — de preferência em casa (IP residencial PT).
+3. No EC2, 2.º contentor para a reserva (mesma imagem, outra pasta de sessão):
+   `docker run -d --name alinho-wa-bot-reserva --restart unless-stopped --env-file .env -e BOT_INSTANCE=reserva -e AUTH_DIR=/app/baileys-auth -e PORT=8081 -v $(pwd)/baileys-auth-reserva:/app/baileys-auth alinho-wa-bot`
+   e emparelhar o número de reserva pelo QR (`docker logs -f alinho-wa-bot-reserva`).
+   O contentor principal passa a ter `-e BOT_INSTANCE=principal`.
 4. Correr `migration_bot_lease.sql` em produção; depois deploy dos dois robôs.
 5. Webhook do Slack para os alertas (#dev-updates ou canal próprio).
 6. Pedir revisão do 351931386496 na app; se voltar, aquece e fica como próxima reserva.

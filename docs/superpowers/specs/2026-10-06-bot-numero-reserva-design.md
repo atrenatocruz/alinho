@@ -36,9 +36,11 @@ Queremos duas coisas:
 ### 1. Dois processos, um só ativo (lease na BD)
 
 - Dois processos do robô, cada um com o seu número e a sua pasta de sessão:
-  `BOT_INSTANCE=principal` e `BOT_INSTANCE=reserva`. **Em máquinas/IPs
-  diferentes** — se o IP do principal for marcado, a reserva não pode cair
-  com ele (ver «Infraestrutura»).
+  `BOT_INSTANCE=principal` e `BOT_INSTANCE=reserva`. Os dois correm no
+  **mesmo EC2**, em dois contentores Docker (decisão do Renato, 6 out). Risco
+  aceite: se o WhatsApp marcar o IP do servidor, os dois podem cair juntos —
+  nesse caso a reserva muda de máquina, sem mudar código (ver
+  «Infraestrutura»).
 - Os dois números estão em todos os grupos. Os dois ficam ligados ao
   WhatsApp. **Só o que tem o lease fala**: responde a comandos, publica,
   lembra, arranca mixes. O outro fica calado (recebe as mensagens e ignora).
@@ -118,10 +120,12 @@ variável, só log.
 - **Entrar nos grupos**: o admin de cada grupo adiciona o número de reserva.
   Avisar no grupo que é o número de reserva do robô (evita denúncias de um
   número desconhecido).
-- **Onde corre a reserva**: noutra máquina, com outro IP. Recomendado: um
-  computador/mini-PC ou Raspberry Pi em casa de alguém da equipa (IP
-  residencial português — o melhor sinal para um número PT). Alternativa:
-  2.º EC2 noutra região (continua a ser datacenter).
+- **Onde corre a reserva**: no mesmo EC2 do principal, num 2.º contentor
+  (`alinho-wa-bot-reserva`) com a sua própria pasta de sessão. Grátis e sem
+  ninguém a manter uma máquina em casa. Cobre o caso mais provável (ban de um
+  número de cada vez, como a 3 out). Se um dia caírem os dois juntos (IP do
+  servidor marcado), a reserva passa para outra máquina — idealmente com IP
+  residencial português —, só mudando onde o contentor corre.
 - **O principal**: idealmente também sair do EC2 para um IP residencial PT a
   prazo. Fora deste trabalho; registar como decisão pendente.
 - **Número banido (931…)**: pedir revisão na app. Se voltar, pode ser a
