@@ -18,6 +18,11 @@
 --      convidado antes de os passar — um voucher sem conta nunca chega a
 --      uma conta.
 --   5. list_club_vouchers: também quem não tem conta, e has_account.
+--
+-- ROBÔ. O WhatsApp bot precisa de redeploy manual na EC2 para a alteração
+-- em voucherNotices.js (vouchers sem conta são ignorados no aviso). A ordem
+-- não importa: com o robô antigo e esta migração, os avisos a convidados
+-- ficam simplesmente desligados até ao redeploy.
 --   Os anulados a 30 set ficam como estão. Os torneios continuam sem vouchers.
 --
 -- CORRER PRIMEIRO: migration_mix_guest_sem_conta.sql,
