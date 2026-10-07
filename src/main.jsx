@@ -33,9 +33,24 @@ installDevMockNetwork()
 if (IS_TEST_ENV) document.documentElement.classList.add('test-env')
 
 // O ecrã de arranque do index.html sai depois de a app desenhar o primeiro
-// ecrã (o SplashScreen tem o mesmo fundo, por isso a troca não se nota).
+// ecrã (o SplashScreen tem o mesmo fundo, por isso a troca não se nota) —
+// mas, quando está a animar, só depois de a animação acabar (~2,1 s desde
+// o início da página).
+const BOOT_ANIMATION_MS = 2100
 function BootGone() {
-  React.useEffect(() => { document.getElementById('boot')?.remove() }, [])
+  React.useEffect(() => {
+    const boot = document.getElementById('boot')
+    if (!boot) return
+    const animating = !boot.classList.contains('boot-static')
+      && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    if (!animating) { boot.remove(); return }
+    let removeTimer
+    const leaveTimer = setTimeout(() => {
+      boot.classList.add('boot-leave')
+      removeTimer = setTimeout(() => boot.remove(), 300)
+    }, Math.max(0, BOOT_ANIMATION_MS - performance.now()))
+    return () => { clearTimeout(leaveTimer); clearTimeout(removeTimer) }
+  }, [])
   return null
 }
 
