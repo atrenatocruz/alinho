@@ -55,6 +55,8 @@
   "notfound.title": "Esta página não existe",
   "notfound.subtitle": "O endereço pode ter um erro, ou a página já não está disponível.",
   "notfound.go_home": "Ir para o início",
+  "shortlink.invalid_title": "Este link já não é válido",
+  "shortlink.invalid_subtitle": "O mix pode já não existir, ou o link chegou incompleto.",
   "landing.free_google": "Grátis · entra com o Google",
   "landing.illustrative": "Imagem ilustrativa",
   "landing.phone_alt": "A Home da alinho numa conta de exemplo",
