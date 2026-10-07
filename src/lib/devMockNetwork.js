@@ -1554,6 +1554,9 @@ RPC_MOCKS.skip_recurrence_game = () => { const d = new Date(); d.setDate(d.getDa
 // tem grupos (devMockTournament.js); as horas do «último mix» são 10:00 e 18:30.
 RPC_MOCKS.default_whatsapp_post_times = () => ['10:00', '18:30']
 RPC_MOCKS.set_event_whatsapp_post_times = (params) => [...(params?.p_times || [])].sort()
+// As do próprio evento no Editar (Dev 3, 7 out): diferentes das do «último
+// mix», para se ver que o Editar não as troca.
+RPC_MOCKS.get_event_whatsapp_post_times = () => ['09:00', '19:30']
 RPC_MOCKS.ensure_recurrence_successor = () => localStorage.getItem('mockEnsureStatus') || 'created'
 // A regra da série do rascunho (mockMixDraft = 'serie'): semanal, abre 3
 // dias antes às 10:00 (o mix é às 19:00).

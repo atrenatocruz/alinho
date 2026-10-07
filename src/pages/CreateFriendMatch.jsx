@@ -323,11 +323,10 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
 
       {step === 4 && (
         <>
-          {!edit && (<>
+          {/* A mesma ordem no criar e no editar (auditoria «Editar tem
+              tudo», 7 out). */}
           {teamsBlock}
           {rankedBlock}
-          </>)}
-          {edit && durationBlock}
           <div>
             <p className={label}>{t('steps.how_counted')}</p>
             <div className={scoringLocked ? 'pointer-events-none opacity-50' : ''} aria-disabled={scoringLocked || undefined}>
@@ -348,9 +347,7 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
               </p>
             )}
           </div>
-          {edit && teamsBlock}
-          {edit && rankedBlock}
-          {!edit && durationBlock}
+          {durationBlock}
           <div>
             <p className={label}>{t('friends.show_live_label')}</p>
             <Chips

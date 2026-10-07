@@ -28,6 +28,18 @@ function GroupTable({ group, matches, entries, qualifiers, myEntryId, t }) {
   const done = total > 0 && matches
     .filter((m) => m.stage === 'grupo' && m.group_id === group.id)
     .every((m) => ['terminado', 'falta', 'desistencia'].includes(m.status) || m.winner_entry_id)
+  // Empatadas por agora (#592): a meio do grupo, duas duplas que ainda não
+  // jogaram entre si não se separam — a diferença geral já não conta. Ficam
+  // com a mesma posição, «2=», até o jogo entre elas decidir (UX, 7 out). O
+  // sorteio só se fala quando o grupo acaba.
+  const firstOf = {}
+  rows.forEach((row, i) => {
+    const tie = !done && row.tiedWith?.length ? [row.id, ...row.tiedWith] : null
+    if (!tie) return
+    const first = Math.min(...tie.map((id) => rows.findIndex((r) => r.id === id)).filter((n) => n >= 0))
+    firstOf[row.id] = first
+  })
+  const anyTie = Object.keys(firstOf).length > 0
 
   return (
     <section className="card mb-3 !p-0 overflow-hidden">
@@ -75,11 +87,11 @@ function GroupTable({ group, matches, entries, qualifiers, myEntryId, t }) {
               >
                 <td className="py-1.5 text-center">
                   <span
-                    className={`inline-flex h-5 w-5 items-center justify-center rounded-full font-mono text-xs font-bold ${
+                    className={`inline-flex h-5 min-w-[20px] px-0.5 items-center justify-center rounded-full font-mono text-xs font-bold ${
                       passes ? 'bg-[#E9E7FB] text-[#4338A8]' : 'text-muted'
                     }`}
                   >
-                    {i + 1}
+                    {row.id in firstOf ? `${firstOf[row.id] + 1}=` : i + 1}
                   </span>
                 </td>
                 <td className="py-1.5 pr-2">
@@ -109,6 +121,7 @@ function GroupTable({ group, matches, entries, qualifiers, myEntryId, t }) {
       <p className="border-t border-ink-50 px-3 py-1.5 text-xs text-muted">
         {t(done ? 'tournament.draw.qualify_note' : 'tournament.draw.qualify_note_running', { count: qualifiers })}
       </p>
+      {anyTie && <p className="px-3 pb-1.5 text-xs text-muted">{t('tournament.draw.tied_for_now')}</p>}
       {/* O que é «Pts», recolhido num «?» (Francisco, 28 set). */}
       <RuleHint className="px-3 pb-1.5" label={t('tournament.draw.points_hint')} note={t('tournament.draw.points_hint_note')} />
       {/* Como se desempata (#592, FPP; texto aprovado a 28 set,
