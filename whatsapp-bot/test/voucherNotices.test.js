@@ -75,3 +75,24 @@ test('convidado sem WhatsApp ligado: vai pelo nome, sem menção', async () => {
   assert.ok(nuno)
   assert.deepEqual(nuno.opts.mentions, [])
 })
+
+test('voucher sem conta (user_id nulo) não estraga o aviso aos outros', async () => {
+  db.vouchers.push({ id: 'v4', game_id: 'g1', user_id: null, guest_id: 'gg1', guest_name: 'Sem App', organization_id: 'o', created_at: ago(1), guest_notice_sent_at: null })
+  // O PostgREST rejeita null em .in('id', [...]) (22P02): o fake regista os
+  // ids pedidos a profiles para o teste poder afirmar que nenhum é nulo.
+  const profileIds = []
+  const realFrom = supabase.from.bind(supabase)
+  supabase.from = (table) => {
+    const q = realFrom(table)
+    if (table !== 'profiles') return q
+    const realIn = q.in.bind(q)
+    q.in = (col, ids) => { if (col === 'id') profileIds.push(...ids); return realIn(col, ids) }
+    return q
+  }
+  const sent = await run()
+  assert.ok(profileIds.length > 0, 'a query a profiles aconteceu')
+  assert.ok(!profileIds.includes(null) && !profileIds.includes(undefined), 'user_id nulo não vai para .in(id)')
+  assert.equal(sent.length, 1)
+  assert.ok(sent[0].text.includes('351911111111'))
+  assert.equal(db.vouchers.find((v) => v.id === 'v4').guest_notice_sent_at, null)
+})

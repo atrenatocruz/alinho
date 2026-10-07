@@ -59,6 +59,13 @@ export async function listClubVouchers(organizationId) {
   })) }
 }
 
+// Voucher de quem ganhou sem estar na app (Renato, 7 out). Só com a
+// migration_vouchers_para_todos.sql a lista traz has_account; antes disso
+// vem undefined e não se mostra nada.
+export function voucherWithoutAccount(v) {
+  return v?.has_account === false
+}
+
 export async function redeemVoucher(voucherId) {
   const { error } = await supabase.rpc('admin_redeem_voucher', { p_voucher_id: voucherId })
   if (error) throw error
