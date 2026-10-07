@@ -72,9 +72,9 @@ export async function getCategoryBoard(categoryId) {
   return { groups, entries, matches: matchRows.data || [] }
 }
 
-/** A tabela de um grupo, já ordenada pelo desempate do plano (vitórias,
- *  confronto direto, diferença de jogos, jogos ganhos). `matches` são as
- *  linhas da vista; aqui só se traduz para o que as contas esperam. */
+/** A tabela de um grupo, já ordenada pelo desempate da FPP
+ *  (`TIEBREAK_DEFAULT`, #592). `matches` são as linhas da vista; aqui só se
+ *  traduz para o que as contas esperam. */
 export function standingsOf(group, matches, tiebreak = TIEBREAK_DEFAULT) {
   const mine = matches
     .filter((m) => m.stage === 'grupo' && m.group_id === group.id)
@@ -82,6 +82,9 @@ export function standingsOf(group, matches, tiebreak = TIEBREAK_DEFAULT) {
       // Um jogo ainda a decorrer pode já ter resultado escrito, mas não
       // conta para a tabela até acabar.
       const open = m.status && !FINISHED.has(m.status) && !m.winner_entry_id
+      const winnerSide = m.winner_entry_id == null ? null
+        : m.winner_entry_id === m.entry_a_id ? 'a'
+          : m.winner_entry_id === m.entry_b_id ? 'b' : null
       return {
         a: m.entry_a_id,
         b: m.entry_b_id,
@@ -89,9 +92,10 @@ export function standingsOf(group, matches, tiebreak = TIEBREAK_DEFAULT) {
         scoreB: open ? null : m.score_b,
         // O vencedor gravado manda: numa desistência o resultado pode estar
         // empatado, e numa falta pode não haver resultado (Trello #484).
-        winner: m.winner_entry_id == null ? null
-          : m.winner_entry_id === m.entry_a_id ? 'a'
-            : m.winner_entry_id === m.entry_b_id ? 'b' : null,
+        winner: winnerSide,
+        // Quem faltou ou desistiu: 6-0 6-0 e último entre as empatadas (#592).
+        forfeit: (m.status === 'falta' || m.status === 'desistencia') && winnerSide
+          ? (winnerSide === 'a' ? 'b' : 'a') : null,
       }
     })
   return groupStandings(group.teams, mine, { tiebreak })
