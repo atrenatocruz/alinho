@@ -1418,18 +1418,33 @@ export default function GerirClube() {
     }
   }
 
-  // Pauses/resumes a recurring series without touching its configuration —
-  // unlike deactivateRecurrence, the pending occurrence is left alone
-  // (process_due_game_recurrences skips paused series entirely, so it
-  // simply never launches while paused instead of being deleted).
+  // Pausar a série põe-na em rascunho (Francisco, 7 out — bug para o main):
+  // as datas futuras por jogar passam a rascunho e os inscritos saem com
+  // aviso; nada novo sai até se retomar. Retomar reabre as datas futuras.
+  // As contas são da base de dados (migration_serie_em_rascunho.sql, Dev 3).
   const handleTogglePauseRecurrence = async (recurrenceId, currentlyPaused) => {
+    setGameError('')
     try {
-      const { error } = await supabase
-        .from('game_recurrences')
-        .update({ is_paused: !currentlyPaused, updated_at: new Date().toISOString() })
-        .eq('id', recurrenceId)
-      if (error) throw error
-      setEditingGame((g) => ({ ...g, recurrence: { ...g.recurrence, is_paused: !currentlyPaused } }))
+      if (!currentlyPaused) {
+        // Sem números por agora (PO, 7 out): entram com a pré-visualização
+        // do Dev 3, que conta sem mudar nada.
+        if (!await askConfirm({
+          title: t('series.draft_title'),
+          message: t('series.draft_message_plain'),
+          cancelLabel: t('series.draft_keep'),
+          confirmLabel: t('series.draft_yes'),
+          danger: true,
+        })) return
+        setAsk(null)
+        const { error } = await supabase.rpc('pause_recurrence_to_draft', { p_recurrence_id: recurrenceId })
+        if (error) throw error
+        setDoneNotice(t('series.draft_done'))
+      } else {
+        const { data: resumed, error } = await supabase.rpc('resume_recurrence', { p_recurrence_id: recurrenceId })
+        if (error) throw error
+        setDoneNotice(t('series.resumed_done', { count: Number(resumed?.dates) || 0 }))
+      }
+      setEditingGame((g) => (g ? { ...g, recurrence: { ...g.recurrence, is_paused: !currentlyPaused } } : g))
       loadGames()
     } catch (error) {
       console.error('Error toggling recurrence pause:', error)
