@@ -731,7 +731,10 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
               ]}
             />
           </Field>
-          <Field label={t('tournament.create.scoring')}>
+          {/* «2 sets + super tie-break» diz o que acontece no 1-1 — o mesmo
+              nome e a mesma frase no mix (UX, 7 out). */}
+          <Field label={t('tournament.create.scoring')}
+            hint={draft.rules.scoring === 'melhor_2_sets' ? t('tournament.create.scoring_melhor_2_sets_hint') : null}>
             <Chips value={draft.rules.scoring} onChange={(v) => setRule('scoring', v)}
               label={t('tournament.create.scoring')}
               options={SCORINGS.map((s) => ({ value: s, label: t(`tournament.create.scoring_${s}`) }))} />

@@ -487,7 +487,10 @@ export default function MixWizard({
             onChange={(v) => set({ game_time_minutes: v })} options={options.gameTimes} />
         </Field>
         {form.format !== 'americano' && (
-          <Field label={t('gerirclube.scoring_label')}>
+          // «2 sets + super tie-break»: o mesmo nome e a mesma frase do torneio
+          // (UX, 7 out).
+          <Field label={t('gerirclube.scoring_label')}
+            hint={form.scoring_format === 'melhor_2_sets' ? t('tournament.create.scoring_melhor_2_sets_hint') : null}>
             <Chips label={t('gerirclube.scoring_label')} value={form.scoring_format}
               onChange={(v) => set({ scoring_format: v })} options={options.scoringFormats} />
           </Field>
