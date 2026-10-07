@@ -14,10 +14,21 @@
      último classificado quando os grupos têm tamanhos diferentes;
    - "cabe com folga" = sobra pelo menos 10% do tempo de campo. */
 
-/** Ordem do desempate, num só sítio (decisão do Francisco, 21 set).
-    Mudar aqui muda a app inteira — é o parâmetro que o Smash Padel pode
-    querer diferente. */
-export const TIEBREAK_DEFAULT = ['vitorias', 'confronto_direto', 'diferenca_jogos', 'jogos_ganhos']
+/** Ordem do desempate, num só sítio — como a FPP (Francisco, 28 set,
+    «#592»; substitui a de 21 set). Mudar aqui muda a app inteira.
+      1. vitórias;
+      2. quem faltou ou desistiu fica em último entre as empatadas;
+      3. entre DUAS: o confronto direto;
+      4. entre TRÊS OU MAIS: só os jogos entre elas — diferença de sets,
+         depois de jogos;
+      5. o resto é sorteio: fica `tiedWith`, e escolhe o organizador.
+    Quando um critério separa parte das empatadas, as que ficam recomeçam do
+    primeiro critério (duas que sobram de três vão ao confronto direto). */
+export const TIEBREAK_DEFAULT = ['vitorias', 'faltas', 'confronto_direto', 'diferenca_sets_entre', 'diferenca_jogos_entre']
+
+/** Entre grupos diferentes (melhores terceiros) não há jogos entre elas:
+    compara-se o que cada uma fez no seu grupo. */
+export const TIEBREAK_BETWEEN_GROUPS = ['vitorias', 'faltas', 'diferenca_sets', 'diferenca_jogos', 'jogos_ganhos']
 
 export const GROUP_SIZE_MIN = 3
 export const GROUP_SIZE_MAX = 7
@@ -297,17 +308,49 @@ export function matchWinner(m) {
     lados. */
 const isPlayed = (m) => m.winner === 'a' || m.winner === 'b' || (m.scoreA != null && m.scoreB != null)
 
+/** O grupo joga pro set (o resultado são jogos, 9-7) ou a sets (o resultado
+    são os sets ganhos, 2-1)? Um pro set acabado passa sempre de 2. */
+export const isGamesScoring = (matches) =>
+  matches.some((m) => Math.max(Number(m.scoreA) || 0, Number(m.scoreB) || 0) > 2)
+
+/** Sets e jogos de cada lado num jogo, para o desempate (#592).
+    · Pro set: um set, de quem ganhou; os jogos são o resultado.
+    · A sets: os sets são o resultado; os jogos de cada set ainda não se
+      guardam (#564), por isso ficam null e esse critério não separa.
+    · Falta ou desistência (`forfeit` = o lado que faltou): 6-0 6-0, 2 sets
+      e 12 jogos, em qualquer forma de contar — também no pro set (FPP RG
+      2026, 10.10.4; BA, 28 set). */
+export function matchUnits(m, gamesScoring) {
+  const w = matchWinner(m)
+  if (m.forfeit === 'a' || m.forfeit === 'b') {
+    return m.forfeit === 'b'
+      ? { setsA: 2, setsB: 0, gamesA: 12, gamesB: 0 }
+      : { setsA: 0, setsB: 2, gamesA: 0, gamesB: 12 }
+  }
+  if (gamesScoring) {
+    return {
+      setsA: w === 'a' ? 1 : 0,
+      setsB: w === 'b' ? 1 : 0,
+      gamesA: m.scoreA ?? 0,
+      gamesB: m.scoreB ?? 0,
+    }
+  }
+  return { setsA: m.scoreA ?? (w === 'a' ? 2 : 0), setsB: m.scoreB ?? (w === 'b' ? 2 : 0), gamesA: null, gamesB: null }
+}
+
 /** Linhas da tabela de um grupo, já ordenadas.
-    `matches`: [{ a, b, scoreA, scoreB, winner? }] — a e b são ids; `winner`
-    é 'a' ou 'b' quando se sabe (ver `matchWinner`).
+    `matches`: [{ a, b, scoreA, scoreB, winner?, forfeit? }] — a e b são
+    ids; `winner` é 'a' ou 'b' quando se sabe (ver `matchWinner`);
+    `forfeit` é o lado que faltou ou desistiu.
     Faltas e desistências contam para a classificação do grupo (o adversário
     ganha), mas não mexem no ranking da app: isso é decidido noutro sítio. */
 export function groupStandings(teamIds, matches, { tiebreak = TIEBREAK_DEFAULT } = {}) {
   const rows = new Map(teamIds.map((id) => ({
-    id, played: 0, wins: 0, losses: 0, gamesWon: 0, gamesLost: 0,
+    id, played: 0, wins: 0, losses: 0, gamesWon: 0, gamesLost: 0, setsWon: 0, setsLost: 0, forfeits: 0,
   })).map((r) => [r.id, r]))
 
   const played = matches.filter(isPlayed)
+  const gamesScoring = isGamesScoring(played)
   for (const m of played) {
     const a = rows.get(m.a)
     const b = rows.get(m.b)
@@ -317,6 +360,11 @@ export function groupStandings(teamIds, matches, { tiebreak = TIEBREAK_DEFAULT }
     const sb = m.scoreB ?? 0
     a.gamesWon += sa; a.gamesLost += sb
     b.gamesWon += sb; b.gamesLost += sa
+    const u = matchUnits(m, gamesScoring)
+    a.setsWon += u.setsA; a.setsLost += u.setsB
+    b.setsWon += u.setsB; b.setsLost += u.setsA
+    if (m.forfeit === 'a') a.forfeits++
+    if (m.forfeit === 'b') b.forfeits++
     const w = matchWinner(m)
     if (w === 'a') { a.wins++; b.losses++ } else if (w === 'b') { b.wins++; a.losses++ }
   }
@@ -341,12 +389,19 @@ export function groupStandings(teamIds, matches, { tiebreak = TIEBREAK_DEFAULT }
     organizador que decide (sorteio, moeda) — as contas não inventam uma
     ordem (Trello #484). Sem empate destes, `tiedWith` não aparece. */
 export function sortWithTiebreak(rows, matches, tiebreak = TIEBREAK_DEFAULT) {
+  const gamesScoring = isGamesScoring(matches)
   const value = (row, criterion, tiedIds) => {
     switch (criterion) {
       case 'vitorias': return row.wins
+      case 'faltas': return -(row.forfeits || 0)
       case 'diferenca_jogos': return row.diff
+      case 'diferenca_sets': return (row.setsWon || 0) - (row.setsLost || 0)
       case 'jogos_ganhos': return row.gamesWon
-      case 'confronto_direto': return headToHeadWins(row.id, tiedIds, matches)
+      // Entre três ou mais, o confronto direto não se usa: contam os jogos
+      // entre elas, nos critérios a seguir (FPP, #592).
+      case 'confronto_direto': return tiedIds.length === 2 ? headToHeadWins(row.id, tiedIds, matches) : 0
+      case 'diferenca_sets_entre': return diffAmong(row.id, tiedIds, matches, gamesScoring).sets
+      case 'diferenca_jogos_entre': return diffAmong(row.id, tiedIds, matches, gamesScoring).games
       default: return 0
     }
   }
@@ -387,10 +442,28 @@ export function headToHeadWins(id, tiedIds, matches) {
   return wins
 }
 
+/** Diferença de sets e de jogos de `id` só nos jogos contra as duplas de
+    `tiedIds` (a mini-tabela da FPP). Nos torneios a sets os jogos não se
+    sabem: a diferença de jogos é 0 para todas e não separa ninguém. */
+export function diffAmong(id, tiedIds, matches, gamesScoring = isGamesScoring(matches)) {
+  const tied = new Set(tiedIds)
+  let sets = 0
+  let games = 0
+  for (const m of matches) {
+    if (!tied.has(m.a) || !tied.has(m.b) || !isPlayed(m)) continue
+    if (m.a !== id && m.b !== id) continue
+    const u = matchUnits(m, gamesScoring)
+    const sign = m.a === id ? 1 : -1
+    sets += sign * (u.setsA - u.setsB)
+    if (gamesScoring) games += sign * (u.gamesA - u.gamesB)
+  }
+  return { sets, games }
+}
+
 /** Melhores terceiros (ou melhores k-ésimos) entre grupos de tamanhos
     diferentes: compara-se só o que é comparável — ignoram-se os jogos contra
     o último classificado dos grupos maiores. SUPOSIÇÃO, por confirmar. */
-export function bestOfPosition(groups, position, { tiebreak = TIEBREAK_DEFAULT } = {}) {
+export function bestOfPosition(groups, position, { tiebreak = TIEBREAK_BETWEEN_GROUPS } = {}) {
   const smallest = Math.min(...groups.map((g) => g.teamIds.length))
   const rows = []
   for (const g of groups) {
