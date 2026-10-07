@@ -55,6 +55,8 @@
   "notfound.title": "This page doesn't exist",
   "notfound.subtitle": "The address may have a typo, or the page is no longer available.",
   "notfound.go_home": "Go to the start",
+  "shortlink.invalid_title": "This link is no longer valid",
+  "shortlink.invalid_subtitle": "The mix may no longer exist, or the link arrived incomplete.",
   "landing.free_google": "Free · sign in with Google",
   "landing.illustrative": "Illustrative image",
   "landing.phone_alt": "The alinho Home in an example account",

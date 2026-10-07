@@ -2385,6 +2385,16 @@ export default function GerirClube() {
               fecharMix()
               loadGames()
             } : null}
+            // «Voltar a rascunho» no Editar (Francisco, 6 out): o mesmo
+            // unpublish_mix do «Mais ⋯» — até o mix terminar, também com
+            // inscritos (saem e recebem um aviso). Num rascunho não aparece.
+            onUnpublish={editingGame && ['pending', 'open', 'closed', 'in_progress'].includes(editingGame.status) ? async (leaving) => {
+              const { error } = await supabase.rpc('unpublish_mix', { p_game_id: editingGame.id })
+              if (error) throw error
+              setDoneNotice(leaving > 0 ? t('eventactions.to_draft_done_people', { count: leaving }) : t('eventactions.to_draft_done'))
+              fecharMix()
+              loadGames()
+            } : null}
           />
         )}
         {deleteSheet}
