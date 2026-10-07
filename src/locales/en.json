@@ -4219,6 +4219,7 @@
   "tournament.draw.tiebreak_hint_4": "Three or more: only the matches between them count — set difference, then game difference. If two are still tied, go back to point 3.",
   "tournament.draw.tiebreak_hint_5": "If still tied, there is a draw and the organiser sets the order.",
   "tournament.draw.tiebreak_hint_note": "A forfeit counts as 6-0 6-0.",
+  "tournament.draw.tied_for_now": "= tied for now: the match between them decides.",
   "tournament.stats.title": "Stats",
   "tournament.stats.record": "Won–lost",
   "tournament.stats.win_pct": "Win %",
