@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useParams, useSearchParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
-import { Plus, Calendar, Trash2, Edit2, Check, X, UserX, Clock, ArrowLeft, Camera, Settings, Copy, QrCode, GraduationCap, Trophy, Lock, ChevronRight } from 'lucide-react'
+import { Plus, Calendar, Trash2, Edit2, Check, X, UserX, Clock, ArrowLeft, Camera, Settings, Copy, GraduationCap, Trophy, Lock, ChevronRight } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
@@ -26,6 +26,7 @@ import { listPendingClubTeachers } from '../lib/teachers'
 import TeacherRequestCard from '../components/TeacherRequestCard'
 import VoucherScanner from '../components/VoucherScanner'
 import VouchersAdmin from '../components/vouchers/VouchersAdmin'
+import { listClubVouchers, voucherTotals } from '../lib/vouchers'
 import { isValidVoucherId, normalizeScannedVoucherId } from '../lib/vouchers'
 import { ClubTeachers } from '../components/lessons/ClubLessonsPanel'
 import { SeriesManage } from '../components/lessons/ClubSeriesPanel'
@@ -322,6 +323,19 @@ export default function GerirClube() {
   // #406: o ícone do QR abre a lista «Vouchers»; o validar de hoje fica atrás
   // do «Ler QR code» (voucherScan).
   const [voucherScan, setVoucherScan] = useState(false)
+  // Quantos vouchers estão por usar, para o número no botão «🎁 Vouchers» do
+  // topo (Francisco, 7 out). null = ainda não se sabe (ou falhou): o botão
+  // fica só com o texto.
+  const [unusedVouchers, setUnusedVouchers] = useState(null)
+  // O número: recarrega ao voltar da lista ao voltar da lista (pode ter-se dado baixa a algum).
+  useEffect(() => {
+    if (!org?.id || activeTab === 'redeem') return undefined
+    let cancelled = false
+    listClubVouchers(org.id)
+      .then(({ rows }) => { if (!cancelled) setUnusedVouchers(voucherTotals(rows).unused) })
+      .catch((err) => { console.error('Error counting vouchers:', err); if (!cancelled) setUnusedVouchers(null) })
+    return () => { cancelled = true }
+  }, [org?.id, activeTab])
   const [scanLookupState, setScanLookupState] = useState('idle') // 'idle' | 'loading' | 'not_found' | 'found'
   const [scannedVoucher, setScannedVoucher] = useState(null)
   const [cameraActive, setCameraActive] = useState(false)
@@ -2423,6 +2437,25 @@ export default function GerirClube() {
     )
   }
 
+  // «🎁 Vouchers» na linha do «‹», do lado oposto (design-handoff/2026-10-07-
+  // vouchers-no-gerir): o número só quando há vouchers por usar.
+  const vouchersButton = (
+    <button
+      type="button"
+      onClick={() => { setVoucherScan(false); setActiveTab('redeem') }}
+      aria-label={unusedVouchers ? t('gerirclube.vouchers_button_aria', { count: unusedVouchers }) : t('vouchers.title')}
+      className="inline-flex h-11 shrink-0 items-center gap-2 rounded-full bg-white/95 px-4 text-[15px] font-extrabold text-ink-900 shadow-card"
+    >
+      <span aria-hidden>🎁</span>
+      {t('vouchers.title')}
+      {unusedVouchers > 0 && (
+        <span className="inline-flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-ink-900 px-1.5 text-xs font-extrabold text-lime-400">
+          {unusedVouchers}
+        </span>
+      )}
+    </button>
+  )
+
   return (
     <div className="space-y-6">
       {/* Um só "Voltar", sempre no topo (Francisco, 15 set 2026) — e sempre
@@ -2433,8 +2466,14 @@ export default function GerirClube() {
         <BackBar
           onBack={() => { handleResetRedeem(); if (voucherScan) setVoucherScan(false); else setActiveTab('events') }}
           label={t('gerirclube.back_button')} title={org?.name} />
-      ) : (adminOrganizations.length > 1 || currentUser?.is_platform_admin) && (
-        <BackBar onBack={goBack} title={org?.name} />
+      ) : (
+        // A barra fica sempre, por causa do «Vouchers»; o «‹» só para quem
+        // tem mais de um clube/grupo, como antes.
+        <BackBar
+          onBack={(adminOrganizations.length > 1 || currentUser?.is_platform_admin) ? goBack : undefined}
+          title={org?.name}
+          right={vouchersButton}
+        />
       )}
       <div>
         {/* "Gerir" as a small label above, so the title is the group's name
@@ -2490,15 +2529,6 @@ export default function GerirClube() {
               <div className="mt-2"><PlanBadge tier={org.plan_tier} /></div>
             )}
           </div>
-          <button
-            type="button"
-            onClick={() => { setVoucherScan(false); setActiveTab('redeem') }}
-            title={t('vouchers.title')}
-            aria-label={t('vouchers.title')}
-            className="shrink-0 -mt-1 w-11 h-11 flex items-center justify-center rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast"
-          >
-            <QrCode size={20} />
-          </button>
         </div>
       </div>
 
@@ -4195,7 +4225,7 @@ export default function GerirClube() {
               docs/superpowers/specs/2026-09-14-voucher-qr-redemption-design.md,
               Key Decisions). */}
           {activeTab === 'redeem' && !voucherScan && (
-            <VouchersAdmin organizationId={org?.id} onScan={() => setVoucherScan(true)} />
+            <VouchersAdmin organizationId={org?.id} onScan={() => setVoucherScan(true)} initialFilter="por_usar" />
           )}
           {activeTab === 'redeem' && voucherScan && (
             <div>

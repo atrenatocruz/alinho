@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { sortVouchersForWallet, isValidVoucherId, normalizeScannedVoucherId } from './vouchers'
+import { sortVouchersForWallet, isValidVoucherId, normalizeScannedVoucherId, voucherWithoutAccount } from './vouchers'
 
 describe('sortVouchersForWallet', () => {
   it('sorts por_usar vouchers before usado ones', () => {
@@ -93,5 +93,20 @@ describe('normalizeScannedVoucherId', () => {
   it('returns an empty string for non-string input', () => {
     expect(normalizeScannedVoucherId(null)).toBe('')
     expect(normalizeScannedVoucherId(undefined)).toBe('')
+  })
+})
+
+describe('voucherWithoutAccount', () => {
+  it('is true when the list says the player has no account', () => {
+    expect(voucherWithoutAccount({ has_account: false })).toBe(true)
+  })
+
+  it('is false when the player has an account', () => {
+    expect(voucherWithoutAccount({ has_account: true })).toBe(false)
+  })
+
+  it('is false before the migration runs (column missing)', () => {
+    expect(voucherWithoutAccount({ player_name: 'Rita' })).toBe(false)
+    expect(voucherWithoutAccount(null)).toBe(false)
   })
 })

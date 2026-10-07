@@ -24,7 +24,7 @@ import { describeError } from '../lib/errors'
 import { PrimaryButton, DateField, TimeField } from '../components/ui'
 import StepPage from '../components/steps/StepPage'
 import WhatsappHoursField from '../components/WhatsappHoursField'
-import { setEventWhatsappPostTimes } from '../lib/whatsappHours'
+import { setEventWhatsappPostTimes, getEventWhatsappPostTimes } from '../lib/whatsappHours'
 
 const EMPTY_RANGE = () => ({ start: '', end: '' })
 
@@ -49,8 +49,23 @@ export default function CreateOpenSlots({ edit = null }) {
   const [ranges, setRanges] = useState(initial?.ranges.length ? initial.ranges : [EMPTY_RANGE()])
   const [price, setPrice] = useState(initial?.price || '')
   // Horas do WhatsApp (27 set): null = vem com as do último jogo em aberto
-  // do clube; [] = sem lembretes. No editar só se gravam se mudarem.
-  const [horas, setHoras] = useState(null)
+  // do clube; [] = sem lembretes. No editar vêm as da própria publicação e
+  // só se gravam se mudarem (auditoria «Editar tem tudo», 7 out). Sem horas
+  // escolhidas, o que o campo traz conta como ponto de partida.
+  const [horas, setHoras] = useState(initial?.horas ?? null)
+  const [horasBase, setHorasBase] = useState(initial?.horas ?? null)
+  const onHoras = (v) => { if (horas == null) setHorasBase(v); setHoras(v) }
+  const horasChanged = JSON.stringify(horas) !== JSON.stringify(horasBase)
+  // No editar, as horas com que o robô vai mesmo publicar esta publicação.
+  const firstLiveId = initial?.ranges[0]?.gameId || null
+  useEffect(() => {
+    if (!firstLiveId) return undefined
+    let cancelled = false
+    getEventWhatsappPostTimes('open_slot', firstLiveId)
+      .then((v) => { if (!cancelled && v) { setHoras(v); setHorasBase(v) } })
+      .catch((e) => console.error('Error loading WhatsApp hours:', e))
+    return () => { cancelled = true }
+  }, [firstLiveId])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -108,7 +123,7 @@ export default function CreateOpenSlots({ edit = null }) {
 
   // Editar: «Cancelar» pergunta se há alterações por guardar (30 set).
   const [initialSnap] = useState(() => JSON.stringify([initial?.date || '', initial?.ranges || [], initial?.price || '']))
-  const dirty = edit && (JSON.stringify([date, ranges, price]) !== initialSnap)
+  const dirty = edit && (JSON.stringify([date, ranges, price]) !== initialSnap || horasChanged)
 
   // «Cancelar o jogo em aberto» (regra do PO, 30 set, pela do Francisco para o
   // torneio: «cancelar sempre»): cancela TODOS os horários da publicação,
@@ -140,8 +155,12 @@ export default function CreateOpenSlots({ edit = null }) {
     setSaving(true)
     try {
       const ids = await updateOpenSlotBatch(edit.batchId, { price: price === '' ? null : parseFloat(price), slots })
+      // Mudaram: em todos os horários. Não mudaram: só nos horários novos,
+      // para ficarem iguais aos outros da publicação.
       if (Array.isArray(horas)) {
-        await Promise.all(ids.map((id) => setEventWhatsappPostTimes('open_slot', id, horas)))
+        const before = new Set(edit.games.map((g) => g.id))
+        const targets = horasChanged ? ids : ids.filter((id) => !before.has(id))
+        await Promise.all(targets.map((id) => setEventWhatsappPostTimes('open_slot', id, horas)))
           .catch((e) => console.error('Error saving WhatsApp hours:', e))
       }
       navigate(`/gerir/${slug}`)
@@ -254,7 +273,7 @@ export default function CreateOpenSlots({ edit = null }) {
                 o de antes (base de dados do Dev 3, decisão do PO, 28 set). */}
             {anyLocked && <LockLine>{t('open_slots.locked_price')}</LockLine>}
           </div>
-          <WhatsappHoursField organizationId={org?.id} kind="open_slot" value={horas} onChange={setHoras} />
+          <WhatsappHoursField organizationId={org?.id} kind="open_slot" value={horas} onChange={onHoras} editing={!!edit} />
         </>
       )}
     </StepPage>

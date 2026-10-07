@@ -182,6 +182,14 @@ export default function GameDetails() {
   const [restartOpen, setRestartOpen] = useState(false)
   // A tira preta de 3 s depois de uma ação da folha (ex.: «Mudar só este mix»).
   const [doneNotice, setDoneNotice] = useState('')
+  // Regra das janelas (parte 3, 7 out): as perguntas vão à folha da app
+  // (ConfirmSheet, regra das confirmações de 6 out) e os erros ficam
+  // escritos junto ao sítio — nunca alert()/confirm() do navegador.
+  const [ask, setAsk] = useState(null) // { title, message, confirmLabel, cancelLabel, danger, resolve }
+  const askConfirm = (opts) => new Promise((resolve) => setAsk({ ...opts, resolve }))
+  const [kudosError, setKudosError] = useState('')
+  const [leaveError, setLeaveError] = useState('')
+  const [scorekeeperError, setScorekeeperError] = useState(null) // { id, text }
   // Chegou pelo «Entrar no clube» do cartão da Home (bug de 29 set): a faixa
   // diz porque está aqui — entrou no clube, ainda não está inscrito.
   const location = useLocation()
@@ -191,7 +199,7 @@ export default function GameDetails() {
   }, [location.key])
   useEffect(() => {
     if (!doneNotice) return undefined
-    const timer = setTimeout(() => setDoneNotice(''), 3000)
+    const timer = setTimeout(() => setDoneNotice(''), doneNotice.length > 60 ? 7000 : 3000)
     return () => clearTimeout(timer)
   }, [doneNotice])
   const [changedKeys, setChangedKeys] = useState(() => new Set())
@@ -295,6 +303,7 @@ export default function GameDetails() {
 
   const handleGiveKudos = async (recipientId) => {
     setKudosGiving(true)
+    setKudosError('')
     try {
       const { error } = await supabase.rpc('give_mix_kudos', { p_game_id: id, p_recipient_id: recipientId })
       if (error) throw error
@@ -304,7 +313,7 @@ export default function GameDetails() {
       // As RAISE EXCEPTION do RPC já vêm em português e explicam a causa
       // ("Já deste o teu kudos…", "Só quem jogou…") — mostrar isso em vez
       // de um genérico que esconde o problema.
-      alert(describeError(t, error, 'gamedetails.kudos_error'))
+      setKudosError(describeError(t, error, 'gamedetails.kudos_error'))
     } finally {
       setKudosGiving(false)
     }
@@ -805,7 +814,14 @@ export default function GameDetails() {
   }
 
   const handleLeaveGame = async () => {
-    if (!confirm(t('gamedetails.confirm_leave_game'))) return
+    setLeaveError('')
+    const ok = await askConfirm({
+      title: t('gamedetails.leave_ask_title'),
+      message: t('gamedetails.leave_ask_text'),
+      confirmLabel: t('gamedetails.leave_ask_confirm'),
+      cancelLabel: t('gamedetails.leave_ask_keep'),
+    })
+    if (!ok) return
 
     try {
       const { error } = await supabase
@@ -820,7 +836,7 @@ export default function GameDetails() {
       loadGameDetails()
     } catch (error) {
       console.error('Error leaving game:', error)
-      alert(describeError(t, error, 'gamedetails.error_leave_game'))
+      setLeaveError(describeError(t, error, 'gamedetails.error_leave_game'))
     }
   }
 
@@ -887,6 +903,7 @@ export default function GameDetails() {
   }
 
   const handleLeaveWaitlist = async () => {
+    setLeaveError('')
     try {
       const { error } = await supabase
         .from('participants')
@@ -899,7 +916,7 @@ export default function GameDetails() {
       loadGameDetails()
     } catch (error) {
       console.error('Error leaving waitlist:', error)
-      alert(describeError(t, error, 'gamedetails.error_leave_waitlist'))
+      setLeaveError(describeError(t, error, 'gamedetails.error_leave_waitlist'))
     }
   }
 
@@ -1297,7 +1314,13 @@ export default function GameDetails() {
         const pairsList = forcedRepeats
           .map(({ player1, player2 }) => `${firstLastName(player1?.name)} + ${firstLastName(player2?.name)}`)
           .join(', ')
-        if (!confirm(t('gamedetails.confirm_repeat_pairing', { pairs: pairsList }))) {
+        const ok = await askConfirm({
+          title: t('gamedetails.repeat_ask_title'),
+          message: t('gamedetails.repeat_ask_text', { pairs: pairsList }),
+          confirmLabel: t('gamedetails.repeat_ask_confirm'),
+          cancelLabel: t('gamedetails.ask_not_yet'),
+        })
+        if (!ok) {
           setBusy(false)
           return
         }
@@ -1530,11 +1553,17 @@ export default function GameDetails() {
     const suplente = waitlist[0]
     const suplenteSize = suplente ? 1 + (suplente.partner_id || suplente.partner_guest_id ? 1 : 0) : 0
     const suplenteFits = suplente && peopleCount - 1 + suplenteSize <= capacity
-    const msg = [
-      t('mixedit.confirm_remove', { name: person.name }),
-      suplenteFits ? t('mixedit.confirm_remove_suplente', { name: suplente.user?.name || '?' }) : '',
-    ].filter(Boolean).join(' ')
-    if (!confirm(msg)) return
+    const ok = await askConfirm({
+      title: t('gamedetails.remove_ask_title', { name: person.name }),
+      message: [
+        t('mixedit.remove_ask_text'),
+        suplenteFits ? t('mixedit.confirm_remove_suplente', { name: suplente.user?.name || '?' }) : '',
+      ].filter(Boolean).join(' '),
+      confirmLabel: t('gamedetails.remove_ask_confirm'),
+      cancelLabel: t('gamedetails.remove_ask_keep'),
+      danger: true,
+    })
+    if (!ok) return
 
     const beforeIds = people.filter((p) => !p.no_account).map((p) => p.id)
     setBusy(true)
@@ -1699,7 +1728,13 @@ export default function GameDetails() {
   // vez quando sairam mal. So aparece enquanto nao houver nenhum jogo criado
   // - assim nunca pode apagar um resultado.
   const handleRedoDuplas = async () => {
-    if (!confirm(t('gamedetails.confirm_redo_duplas'))) return
+    const ok = await askConfirm({
+      title: t('gamedetails.redo_ask_title'),
+      message: t('gamedetails.redo_ask_text'),
+      confirmLabel: t('gamedetails.redo_ask_confirm'),
+      cancelLabel: t('gamedetails.ask_not_yet'),
+    })
+    if (!ok) return
     setBusy(true)
     setMixError('')
     try {
@@ -1857,9 +1892,13 @@ export default function GameDetails() {
       return
     }
 
-    if (!confirm(t('gamedetails.confirm_correct_finished_score', {
-      team: teamName(match.team_a_id), a, other: teamName(match.team_b_id), b,
-    }))) return
+    const ok = await askConfirm({
+      title: t('gamedetails.correct_ask_title', { team: teamName(match.team_a_id), a, other: teamName(match.team_b_id), b }),
+      message: t('gamedetails.correct_ask_text'),
+      confirmLabel: t('gamedetails.correct_ask_confirm'),
+      cancelLabel: t('gamedetails.ask_not_yet'),
+    })
+    if (!ok) return
 
     setMixError('')
     setSavingMatchId(match.id)
@@ -1890,7 +1929,7 @@ export default function GameDetails() {
       if (data.voucher_not_reverted) {
         parts.push(t('gamedetails.correction_voucher_not_reverted'))
       }
-      alert(parts.join(' '))
+      setDoneNotice(parts.join(' '))
     } catch (error) {
       console.error('Error correcting finished mix score:', error)
       setMixError(describeError(t, error, 'gamedetails.error_correct_finished_score'))
@@ -1918,6 +1957,7 @@ export default function GameDetails() {
   // (migration_game_scorekeepers.sql), this just toggles membership.
   const handleToggleScorekeeper = async (playerId) => {
     setScorekeeperBusy(playerId)
+    setScorekeeperError(null)
     try {
       if (scorekeeperIds.includes(playerId)) {
         const { error } = await supabase.from('game_scorekeepers').delete().eq('game_id', id).eq('user_id', playerId)
@@ -1929,7 +1969,7 @@ export default function GameDetails() {
       await loadGameDetails()
     } catch (error) {
       console.error('Error toggling scorekeeper:', error)
-      alert(describeError(t, error, 'gamedetails.error_update_generic'))
+      setScorekeeperError({ id: playerId, text: describeError(t, error, 'gamedetails.error_scorekeeper') })
     } finally {
       setScorekeeperBusy(null)
     }
@@ -3099,9 +3139,12 @@ export default function GameDetails() {
         // Com o mix parado (Trello #416) as duplas ja estao formadas: sair
         // deixaria uma dupla com quem ja nao esta no mix. Retoma-se ou
         // refazem-se as duplas primeiro.
-        <PrimaryButton variant="ghost" onClick={handleLeaveGame} className="w-full !bg-white !border-ink-900">
-          {t('gamedetails.leave_mix')}
-        </PrimaryButton>
+        <div className="space-y-1.5">
+          <PrimaryButton variant="ghost" onClick={handleLeaveGame} className="w-full !bg-white !border-ink-900">
+            {t('gamedetails.leave_mix')}
+          </PrimaryButton>
+          {leaveError && <p role="alert" className="text-center text-sm font-extrabold text-danger">{leaveError}</p>}
+        </div>
       ) : !mixStarted && !mixPaused && isFull && !isUserJoined && !isUserWaitlisted && !isUserRequested && !isUserDeclined && !ageIneligible && !missingBirthday && !mixCancelled && !(isAdmin && barPrimary) ? (
         // Mix cheio (pacote do mix, ponto 4): o verde passa a «Ficar
         // suplente», por ordem de chegada; se alguém sair, entra o 1.º e
@@ -3191,6 +3234,7 @@ export default function GameDetails() {
                 )
               })}
             </div>
+            {kudosError && <p role="alert" className="mt-2 text-sm font-extrabold text-danger">{kudosError}</p>}
           </div>
         )
       })()}
@@ -4351,7 +4395,7 @@ export default function GameDetails() {
                 </div>
               )}
               {scorekeeperIds.filter((uid) => uid !== game.created_by).map((uid) => (
-                <div key={uid} className="flex items-center gap-3 border-b border-line py-2.5">
+                <div key={uid} className="flex flex-wrap items-center gap-3 border-b border-line py-2.5">
                   <Avatar name={nameById[uid]} url={avatarById[uid]} size="w-10 h-10 text-sm" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[15px] font-extrabold text-ink-900">{nameById[uid] || '?'}</span>
@@ -4364,6 +4408,9 @@ export default function GameDetails() {
                     className="shrink-0 min-h-[44px] px-2 text-sm font-extrabold text-ink-900 disabled:opacity-40">
                     {t('scorekeepers.remove')}
                   </button>
+                  {scorekeeperError?.id === uid && (
+                    <p role="alert" className="basis-full text-sm font-extrabold text-danger">{scorekeeperError.text}</p>
+                  )}
                 </div>
               ))}
               <button type="button" onClick={() => setAddScorekeeperOpen(true)}
@@ -4831,9 +4878,12 @@ export default function GameDetails() {
           )}
 
           {isUserWaitlisted && (
-            <PrimaryButton variant="danger" onClick={handleLeaveWaitlist} className="w-full">
-              {t('gamedetails.leave_waitlist')}
-            </PrimaryButton>
+            <div className="space-y-1.5">
+              <PrimaryButton variant="danger" onClick={handleLeaveWaitlist} className="w-full">
+                {t('gamedetails.leave_waitlist')}
+              </PrimaryButton>
+              {leaveError && <p role="alert" className="text-center text-sm font-extrabold text-danger">{leaveError}</p>}
+            </div>
           )}
         </div>
       )}
@@ -4944,6 +4994,16 @@ export default function GameDetails() {
           </>
         )
       })()}
+      <ConfirmSheet
+        open={!!ask}
+        title={ask?.title}
+        message={ask?.message}
+        confirmLabel={ask?.confirmLabel}
+        cancelLabel={ask?.cancelLabel}
+        danger={!!ask?.danger}
+        onConfirm={() => { ask?.resolve(true) }}
+        onClose={() => { ask?.resolve(false); setAsk(null) }}
+      />
       {doneNotice && createPortal(
         <div role="status" className="fixed left-4 right-4 bottom-[104px] z-50 mx-auto max-w-md bg-ink-900 text-white px-4 py-3 rounded-ctrl text-sm font-extrabold flex items-center gap-2 animate-fade-up">
           <Check size={16} className="shrink-0" />

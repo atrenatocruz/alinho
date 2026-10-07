@@ -12,7 +12,7 @@
    Os campos de hoje que o desenho não mostra vão para o passo onde a pergunta
    pertence (o grupo onde aparece → Pessoas; arranque automático → Quando;
    pontuação e tamanho dos grupos → Regras), sempre com o valor de hoje. */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { describeError } from '../../lib/errors'
 import { useTranslation } from 'react-i18next'
 import { Minus, Plus } from 'lucide-react'
@@ -25,6 +25,7 @@ import { AGE_RESTRICTIONS } from '../../lib/ageCategories'
 import { formatDate, formatTime } from '../../lib/formatDate'
 import { LEVEL_SCALES, LEVEL_NUMBERS, parseLevel, scaleForGender, GENDER_FOR_SCALE } from '../../lib/mixLevels'
 import WhatsappHoursField from '../WhatsappHoursField'
+import { getEventWhatsappPostTimes } from '../../lib/whatsappHours'
 import PlacesUnavailableHint from '../PlacesUnavailableHint'
 
 const pairsAreFixed = (form) => form.format !== 'americano' && !(form.rotate_partners && form.format === 'sobe_desce')
@@ -97,7 +98,23 @@ export default function MixWizard({
 
   // Editar: «Guardar» em qualquer passo (30 set) — por isso vê o que falta
   // em TODOS os passos, não só no que está à vista.
-  const [initialForm] = useState(() => JSON.stringify(form))
+  const [initialForm, setInitialForm] = useState(() => JSON.stringify(form))
+  // Editar um mix sem horas do WhatsApp escolhidas: o campo vem com as que o
+  // robô vai mesmo usar (as do clube) e não com as do último mix, e isso não
+  // conta como alteração (auditoria «Editar tem tudo», 7 out).
+  const editId = editingGame?.id || null
+  useEffect(() => {
+    if (!editId || form.whatsapp_post_times != null) return undefined
+    let cancelled = false
+    getEventWhatsappPostTimes('mix', editId)
+      .then((v) => {
+        if (cancelled || !v) return
+        set({ whatsapp_post_times: v })
+        setInitialForm((prev) => JSON.stringify({ ...JSON.parse(prev), whatsapp_post_times: v }))
+      })
+      .catch((e) => console.error('Error loading WhatsApp hours:', e))
+    return () => { cancelled = true }
+  }, [editId]) // eslint-disable-line react-hooks/exhaustive-deps
   const missingAny = (() => {
     if (!form.title.trim()) return t('mixwizard.missing_title')
     if (!form.date) return t('mixwizard.missing_date')
@@ -538,6 +555,7 @@ export default function MixWizard({
             kind="mix"
             value={form.whatsapp_post_times ?? null}
             onChange={(v) => set({ whatsapp_post_times: v })}
+            editing={!!editingGame}
           />
         )}
       </div>
