@@ -1496,7 +1496,9 @@ export function PlayerAvatarRow({ players = [], max = 4, size = 'md', cap = 6 })
    Como no iPhone: o nome só aparece na barra quando o topo da página (o
    que vem logo a seguir à barra — o título grande, o cartão do evento…)
    sai do ecrã ao deslizar; com a página no topo, só a seta e a partilha. */
-export function BackBar({ onBack, to, label, title, onShare }) {
+// `right`: o que vai do lado direito em vez do «Partilhar» (ex.: o «🎁
+// Vouchers» do Gerir, 7 out). Sem `onBack` nem `to`, o lugar do «‹» fica vazio.
+export function BackBar({ onBack, to, label, title, onShare, right }) {
   const { t } = useTranslation()
   const barRef = useRef(null)
   const [showTitle, setShowTitle] = useState(false)
@@ -1514,14 +1516,17 @@ export function BackBar({ onBack, to, label, title, onShare }) {
   const round = 'flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/95 text-ink-900 shadow-card'
   return (
     <div ref={barRef} className="sticky top-0 z-10 -mx-4 -mt-6 mb-1 bg-white/70 px-4 backdrop-blur-md" style={{ paddingTop: 'var(--safe-top, env(safe-area-inset-top))' }}>
-      <div className="grid h-16 grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-3">
+      <div className={`grid h-16 items-center gap-3 ${right ? 'grid-cols-[minmax(44px,auto)_minmax(0,1fr)_auto]' : 'grid-cols-[44px_minmax(0,1fr)_44px]'}`}>
         {to
           ? <Link to={to} aria-label={label || t('common.back')} className={round}><ChevronLeft size={22} /></Link>
-          : <button type="button" onClick={onBack} aria-label={label || t('common.back')} className={round}><ChevronLeft size={22} /></button>}
-        <p aria-hidden={!showTitle} className={`min-w-0 truncate text-center text-base font-extrabold text-ink-900 transition-opacity duration-fast ${showTitle ? 'opacity-100' : 'opacity-0'}`}>{title}</p>
-        {onShare
-          ? <button type="button" onClick={onShare} aria-label={t('ui.share')} className={round}><Share2 size={18} /></button>
+          : onBack
+          ? <button type="button" onClick={onBack} aria-label={label || t('common.back')} className={round}><ChevronLeft size={22} /></button>
           : <span aria-hidden />}
+        <p aria-hidden={!showTitle} className={`min-w-0 truncate text-center text-base font-extrabold text-ink-900 transition-opacity duration-fast ${showTitle ? 'opacity-100' : 'opacity-0'}`}>{title}</p>
+        {right
+          || (onShare
+            ? <button type="button" onClick={onShare} aria-label={t('ui.share')} className={round}><Share2 size={18} /></button>
+            : <span aria-hidden />)}
       </div>
     </div>
   )

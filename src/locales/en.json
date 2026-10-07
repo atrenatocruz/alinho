@@ -1675,6 +1675,7 @@
   "whatsapp_hours.help_lesson": "Comes with the times of the club's last class. At each time, the bot posts the class again in the groups and mentions everyone. Up to 3 per day.",
   "whatsapp_hours.none_lesson": "No reminders: the class is posted on WhatsApp once, when published.",
   "vouchers.title": "Vouchers",
+  "gerirclube.vouchers_button_aria": "Vouchers, {{count}} unused",
   "vouchers.total_given": "given",
   "vouchers.total_unused": "unused",
   "vouchers.total_used": "used",

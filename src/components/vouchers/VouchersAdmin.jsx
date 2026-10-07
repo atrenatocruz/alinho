@@ -15,12 +15,14 @@ import { describeError } from '../../lib/errors'
 
 const FILTERS = ['all', 'por_usar', 'usado']
 
-export default function VouchersAdmin({ organizationId, onScan }) {
+// `initialFilter`: o botão «Vouchers» do topo do Gerir abre já em «Por usar»
+// (Francisco, 7 out).
+export default function VouchersAdmin({ organizationId, onScan, initialFilter = 'all' }) {
   const { t, i18n } = useTranslation()
   const [rows, setRows] = useState(null) // null = a carregar
   const [consent, setConsent] = useState(false)
   const [error, setError] = useState('')
-  const [filter, setFilter] = useState('all')
+  const [filter, setFilter] = useState(initialFilter)
   const [mix, setMix] = useState('all')
   const [ask, setAsk] = useState(null) // o voucher a dar baixa
   const [toast, setToast] = useState('')

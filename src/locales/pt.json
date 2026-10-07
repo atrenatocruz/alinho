@@ -1676,6 +1676,7 @@
   "whatsapp_hours.help_lesson": "Vem com as horas da última turma do clube. A cada hora, o robô volta a publicar a turma nos grupos e menciona toda a gente. Até 3 por dia.",
   "whatsapp_hours.none_lesson": "Sem lembretes: a turma sai no WhatsApp uma vez, ao publicar.",
   "vouchers.title": "Vouchers",
+  "gerirclube.vouchers_button_aria": "Vouchers, {{count}} por usar",
   "vouchers.total_given": "dados",
   "vouchers.total_unused": "por usar",
   "vouchers.total_used": "usados",
