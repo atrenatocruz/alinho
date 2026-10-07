@@ -1447,11 +1447,16 @@ export default function GerirClube() {
     setGameError('')
     try {
       if (!currentlyPaused) {
-        // Sem números por agora (PO, 7 out): entram com a pré-visualização
-        // do Dev 3, que conta sem mudar nada.
+        // Os números antes de perguntar: preview_recurrence_pause (Dev 3,
+        // af879dcc) conta com a mesma regra da pausa, sem mudar nada. Se
+        // falhar (ainda por correr), a pergunta sai sem números.
+        const { data: preview, error: previewError } = await supabase.rpc('preview_recurrence_pause', { p_recurrence_id: recurrenceId })
+        const counted = !previewError && preview && preview.dates != null
         if (!await askConfirm({
           title: t('series.draft_title'),
-          message: t('series.draft_message_plain'),
+          message: counted
+            ? t('series.draft_message', { dates: t('series.n_dates', { count: Number(preview.dates) || 0 }), people: t('series.n_people', { count: Number(preview.people) || 0 }) })
+            : t('series.draft_message_plain'),
           cancelLabel: t('series.draft_keep'),
           confirmLabel: t('series.draft_yes'),
           danger: true,

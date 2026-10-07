@@ -239,6 +239,7 @@ const RPC_MOCKS = {
   // Série em rascunho (7 out): pausar põe as datas futuras em rascunho.
   pause_recurrence_to_draft: () => ({ dates: 3, people: 5 }),
   resume_recurrence: () => ({ dates: 3 }),
+  preview_recurrence_pause: () => ({ dates: 3, people: 5 }),
   // O mesmo para um torneio (mockTClosed = 'group' | 'club' | 'private').
   get_tournament_org_hint: () => {
     const k = localStorage.getItem('mockTClosed')
