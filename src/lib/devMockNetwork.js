@@ -368,6 +368,8 @@ const RPC_MOCKS = {
     { id: 'jr2', user_id: FAKE_PARTNER_ID, name: 'Tiago Ferreira', avatar_url: null, created_at: new Date().toISOString() },
   ] : []),
   delete_self_serve_group: () => null,
+  // Link curto do mix (/m/<código>): «fa4e0001» abre o mix de teste; o resto não serve.
+  resolve_game_link: (params) => (String(params?.p_code || '').toLowerCase() === 'fa4e0001' ? 'fake-game-1' : null),
   // Entrar por link num grupo cheio (#447): localStorage.mockJoinPending =
   // 'true' — a função devolve o grupo e a pessoa não fica membro (pedido).
   approve_membership_request: () => (localStorage.getItem('mockGroupFull') === 'true' ? { __error: 'Grupo já atingiu o limite de 40 membros do plano' } : null),

@@ -722,6 +722,9 @@ export const TOURNAMENT_PROMOTED_TABLE_MOCKS = {
       // Torneio cancelado (1 out, Dev 3).
       { id: 'tp5', kind: 'tournament_cancelled', game_id: null, created_at: new Date().toISOString(),
         data: { ...base } },
+      // As inscrições fecharam sozinhas no fim do prazo (6 out).
+      { id: 'tp6', kind: 'tournament_entries_closed', game_id: null, created_at: new Date().toISOString(),
+        data: { ...base, entry_count: 84 } },
       { id: 'tp3', kind: 'tournament_prize_changed', game_id: null, created_at: new Date().toISOString(),
         data: { ...base, category_id: 'cat-m5', category_code: 'M5', category_name: 'Masculinos 5', prize_first: '200 € + troféu', prize_second: '80 €' } },
       { id: 'tp4', kind: 'tournament_prize_changed', game_id: null, created_at: new Date().toISOString(),
