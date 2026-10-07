@@ -34,6 +34,9 @@
 //               passo passa a preto) e o destrutivo (contorno vermelho).
 //               danger = { label, title, message, confirmLabel, cancelLabel,
 //               onConfirm, errorOf } — a pergunta é a folha da app.
+//               extra = { …o mesmo } — uma ação em contorno por cima do
+//               destrutivo (ex.: «Voltar a rascunho», Francisco 6 out), com a
+//               pergunta de vermelho cheio (danger).
 //
 // Espaço da versão final (26 set): título → nome/barra 24 px, barra → 1.ª
 // pergunta 24 px, entre perguntas 24 px, rótulo → campo 8 px (o mb-2 do
@@ -53,6 +56,7 @@ export default function StepPage({
   const stepped = total > 1
   const [asking, setAsking] = useState(false)
   const [askingDanger, setAskingDanger] = useState(false)
+  const [askingExtra, setAskingExtra] = useState(false)
   // Editar: barra de cima com fundo branco sólido e a linha fina quando o
   // título já passou por baixo dela (designer, 30 set).
   const titleRef = useRef(null)
@@ -132,12 +136,22 @@ export default function StepPage({
             {edit.saving ? t('steps.saving') : t('steps.save_changes')}
           </button>
           {edit.saveDisabled && edit.saveHint && <p className="text-center text-xs text-muted">{edit.saveHint}</p>}
-          {edit.danger && (
-            <div className="pt-4">
-              <button type="button" onClick={() => setAskingDanger(true)}
-                className="w-full min-h-[52px] rounded-ctrl border-[1.5px] border-danger bg-white px-4 text-[15px] font-extrabold text-danger">
-                {edit.danger.label}
-              </button>
+          {/* As saídas juntas, longe do guardar (designer, 6 out), uma por
+              baixo da outra a toda a largura — lado a lado não (Francisco). */}
+          {(edit.extra || edit.danger) && (
+            <div className="space-y-2.5 pt-4">
+              {edit.extra && (
+                <button type="button" onClick={() => setAskingExtra(true)}
+                  className="w-full min-h-[52px] rounded-ctrl border-[1.5px] border-line bg-white px-4 text-[15px] font-extrabold text-ink-900">
+                  {edit.extra.label}
+                </button>
+              )}
+              {edit.danger && (
+                <button type="button" onClick={() => setAskingDanger(true)}
+                  className="w-full min-h-[52px] rounded-ctrl border-[1.5px] border-danger bg-white px-4 text-[15px] font-extrabold text-danger">
+                  {edit.danger.label}
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -150,6 +164,11 @@ export default function StepPage({
         </div>
       )}
 
+      {edit?.extra && (
+        <ConfirmSheet open={askingExtra} danger title={edit.extra.title} message={edit.extra.message}
+          cancelLabel={edit.extra.cancelLabel} confirmLabel={edit.extra.confirmLabel}
+          onConfirm={edit.extra.onConfirm} onClose={() => setAskingExtra(false)} errorOf={edit.extra.errorOf} />
+      )}
       {edit?.danger && (
         <ConfirmSheet open={askingDanger} danger title={edit.danger.title} message={edit.danger.message}
           cancelLabel={edit.danger.cancelLabel} confirmLabel={edit.danger.confirmLabel}
