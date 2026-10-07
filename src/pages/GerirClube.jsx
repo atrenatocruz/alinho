@@ -2465,7 +2465,8 @@ export default function GerirClube() {
       {activeTab === 'redeem' ? (
         <BackBar
           onBack={() => { handleResetRedeem(); if (voucherScan) setVoucherScan(false); else setActiveTab('events') }}
-          label={t('gerirclube.back_button')} title={org?.name} />
+          label={t('gerirclube.back_button')} title={org?.name}
+          right={vouchersButton} solid />
       ) : (
         // A barra fica sempre, por causa do «Vouchers»; o «‹» só para quem
         // tem mais de um clube/grupo, como antes.
@@ -2473,6 +2474,7 @@ export default function GerirClube() {
           onBack={(adminOrganizations.length > 1 || currentUser?.is_platform_admin) ? goBack : undefined}
           title={org?.name}
           right={vouchersButton}
+          solid
         />
       )}
       <div>
@@ -4225,7 +4227,7 @@ export default function GerirClube() {
               docs/superpowers/specs/2026-09-14-voucher-qr-redemption-design.md,
               Key Decisions). */}
           {activeTab === 'redeem' && !voucherScan && (
-            <VouchersAdmin organizationId={org?.id} onScan={() => setVoucherScan(true)} initialFilter="por_usar" />
+            <VouchersAdmin organizationId={org?.id} onScan={() => setVoucherScan(true)} initialFilter="por_usar" onUnusedChange={setUnusedVouchers} />
           )}
           {activeTab === 'redeem' && voucherScan && (
             <div>
