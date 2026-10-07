@@ -74,15 +74,14 @@
          primeira abertura de cada sessão aparece a bola ao centro e depois
          as letras «alinh» abrem em slide para a esquerda enquanto a bola vai
          para o lugar do «o». Nas aberturas seguintes da mesma sessão (e com
-         «reduzir movimento») aparece logo o logótipo parado. main.jsx
-         (BootGone) tira-o quando a app arranca, mas nunca antes de a animação
-         acabar. Se o JavaScript nunca chegar, some sozinho aos 15 s e fica o
-         texto. O SplashScreen da app tem o mesmo fundo, para a troca não se
-         notar. -->
+         «reduzir movimento») aparece logo o logótipo parado. É o único
+         splash: src/lib/boot.js tira-o quando a sessão está resolvida, mas
+         nunca antes de a animação acabar. Se o JavaScript nunca chegar, some
+         sozinho aos 15 s e fica o texto. -->
     <style>
       #boot{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;background:#040404;animation:boot-out .4s ease 15s forwards;transition:opacity .3s ease}
       #boot.boot-leave{opacity:0}
-      #boot p{margin:0;color:rgba(255,255,255,.7);font:600 14px -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;opacity:0;animation:boot-in .3s ease 4s forwards}
+      #boot p{position:absolute;bottom:calc(env(safe-area-inset-bottom,0px) + 48px);margin:0;color:rgba(255,255,255,.7);font:600 14px -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;opacity:0;animation:boot-in .3s ease 4s forwards}
       #boot svg{height:40px;width:auto;overflow:visible}
       #boot .bletters{transform-box:fill-box;clip-path:inset(0 0 0 100%);transform:translateX(24px);animation:boot-open .6s cubic-bezier(.5,0,.2,1) .75s forwards}
       #boot .bball{transform-box:fill-box;transform-origin:center;transform:translate(-56.4px,-3px) scale(.4);opacity:0;animation:boot-pop .45s cubic-bezier(.3,1.5,.5,1) .1s forwards,boot-slide .6s cubic-bezier(.5,0,.2,1) .75s forwards}

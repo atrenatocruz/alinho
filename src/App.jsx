@@ -5,7 +5,7 @@ import { WifiOff, Compass } from 'lucide-react'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { PrimaryButton, EmptyState } from './components/ui'
 import Layout, { Wordmark } from './components/Layout'
-import SplashScreen from './components/SplashScreen'
+import { hideBoot } from './lib/boot'
 import Login from './pages/Login'
 import Landing from './pages/Landing'
 import Plans from './pages/Plans'
@@ -177,7 +177,7 @@ function PublicShell({ children }) {
 function NotFound({ showSplash, title, subtitle }) {
   const { user } = useAuth()
   const { t } = useTranslation()
-  if (showSplash) return <SplashScreen />
+  if (showSplash) return null
   const pagina = (
     <EmptyState
       icon={Compass}
@@ -223,7 +223,7 @@ function ShortGameLink({ showSplash }) {
       })
     return () => { cancelled = true }
   }, [code])
-  if (showSplash || gameId === undefined) return <SplashScreen />
+  if (showSplash || gameId === undefined) return null
   if (gameId) return <Navigate to={`/jogo/${gameId}`} replace />
   return <NotFound title={t('shortlink.invalid_title')} subtitle={t('shortlink.invalid_subtitle')} />
 }
@@ -232,9 +232,7 @@ const Guard = ({ require, showSplash, children }) => {
   const { user, profile, isGuest, isAdmin, isPrivateMatchesEnabled, isLessonsEnabled, profileError, retryProfile } = useAuth()
   const location = useLocation()
 
-  if (showSplash) {
-    return <SplashScreen />
-  }
+  if (showSplash) return null
 
   if (user && profileError) {
     return <LoadErrorScreen onRetry={retryProfile} />
@@ -376,6 +374,8 @@ function AppRoutes() {
   }, [])
 
   const showSplash = authLoading || !minDurationElapsed
+  // Enquanto showSplash, quem cobre o ecrã é o #boot do index.html.
+  useEffect(() => { if (!showSplash) hideBoot() }, [showSplash])
 
   return (
     // Rede de seguranca: sem ela, um erro em qualquer pagina da ecra branco.
