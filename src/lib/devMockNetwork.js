@@ -236,6 +236,9 @@ const RPC_MOCKS = {
       ? { org_name: 'Smash Padel Almada', org_slug: 'smash-padel', org_kind: 'club', org_logo_url: null, org_visible: true }
       : { org_name: 'Jota Padeleiros', org_slug: 'jota-padeleiros', org_kind: 'group', org_logo_url: null, org_visible: true }]
   },
+  // Série em rascunho (7 out): pausar põe as datas futuras em rascunho.
+  pause_recurrence_to_draft: () => ({ dates: 3, people: 5 }),
+  resume_recurrence: () => ({ dates: 3 }),
   // O mesmo para um torneio (mockTClosed = 'group' | 'club' | 'private').
   get_tournament_org_hint: () => {
     const k = localStorage.getItem('mockTClosed')
