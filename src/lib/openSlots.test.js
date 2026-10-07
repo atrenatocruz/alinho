@@ -66,10 +66,16 @@ describe('editar jogo em aberto', () => {
     const f = batchToForm(games)
     expect(f.date).toBe('2026-10-03')
     expect(f.price).toBe('8')
+    expect(f.horas).toBe(null)
     expect(f.ranges).toEqual([
       { gameId: 'g1', start: '18:00', end: '19:30', locked: true },
       { gameId: 'g2', start: '19:30', end: '21:00', locked: false },
     ])
+  })
+  it('as horas do WhatsApp vêm da própria publicação', () => {
+    const withTimes = games.map((g) => ({ ...g, whatsapp_post_times: ['19:00:00', '10:00:00'] }))
+    expect(batchToForm(withTimes).horas).toEqual(['10:00', '19:00'])
+    expect(batchToForm(games.map((g) => ({ ...g, whatsapp_post_times: [] }))).horas).toEqual([])
   })
   it('grava cada horário com o id (os novos sem), e ignora os em branco', () => {
     const p = batchSlotsPayload('2026-10-03', [

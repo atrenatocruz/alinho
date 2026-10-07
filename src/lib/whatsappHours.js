@@ -26,6 +26,19 @@ export async function defaultWhatsappPostTimes(organizationId, kind) {
   return Array.isArray(data) ? data.map((h) => String(h).slice(0, 5)) : []
 }
 
+/** As horas com que o robô vai mesmo publicar ESTE evento, para o Editar
+ *  (Dev 3, get_event_whatsapp_post_times, 7 out): as guardadas; [] sem
+ *  lembretes; nunca escolhidas, as do clube. null = sem resposta (a função
+ *  ainda não existe, PGRST202, ou não és do clube): fica o que já havia. */
+export async function getEventWhatsappPostTimes(kind, id) {
+  const { data, error } = await supabase.rpc('get_event_whatsapp_post_times', { p_kind: kind, p_id: id })
+  if (error) {
+    if (error.code === 'PGRST202') return null
+    throw error
+  }
+  return Array.isArray(data) ? sortHours(data.map((h) => String(h).slice(0, 5))) : null
+}
+
 /** Guarda as horas de um evento, logo depois de o criar e ao gravar a
  *  edição (Dev 3, set_event_whatsapp_post_times). [] = sem lembretes.
  *  Devolve o que ficou gravado, por ordem. Erros: not_allowed, invalid_times. */

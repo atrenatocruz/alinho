@@ -4821,5 +4821,7 @@
   "dialogs.enrolment_cancel_confirm": "Sim, cancelar",
   "dialogs.enrolment_cancel_error": "N\u00e3o foi poss\u00edvel cancelar a inscri\u00e7\u00e3o.",
   "dialogs.request_error": "N\u00e3o foi poss\u00edvel enviar.",
-  "dialogs.save_order_error": "N\u00e3o foi poss\u00edvel guardar a ordem."
+  "dialogs.save_order_error": "N\u00e3o foi poss\u00edvel guardar a ordem.",
+  "whatsapp_hours.help_edit_mix": "S\u00e3o as horas a que o rob\u00f4 publica este mix. A cada hora, volta a public\u00e1-lo nos grupos e menciona toda a gente. At\u00e9 3 por dia.",
+  "whatsapp_hours.help_edit_open_slot": "S\u00e3o as horas a que o rob\u00f4 publica este jogo. A cada hora, volta a public\u00e1-lo nos grupos e menciona toda a gente. At\u00e9 3 por dia."
 }

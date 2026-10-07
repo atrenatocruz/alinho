@@ -4809,5 +4809,7 @@
   "dialogs.enrolment_cancel_confirm": "Yes, cancel",
   "dialogs.enrolment_cancel_error": "Couldn't cancel the enrolment.",
   "dialogs.request_error": "Couldn't send.",
-  "dialogs.save_order_error": "Couldn't save the order."
+  "dialogs.save_order_error": "Couldn't save the order.",
+  "whatsapp_hours.help_edit_mix": "These are the times the bot posts this mix. At each time, it posts it again in the groups and mentions everyone. Up to 3 per day.",
+  "whatsapp_hours.help_edit_open_slot": "These are the times the bot posts this game. At each time, it posts it again in the groups and mentions everyone. Up to 3 per day."
 }

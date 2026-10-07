@@ -19,7 +19,7 @@ import { Select } from './ui'
 import { listWhatsappGroups } from '../lib/whatsappGroups'
 import { defaultWhatsappPostTimes, HOURS_MAX, HALF_HOURS, sortHours } from '../lib/whatsappHours'
 
-export default function WhatsappHoursField({ organizationId, kind = 'mix', value, onChange }) {
+export default function WhatsappHoursField({ organizationId, kind = 'mix', value, onChange, editing = false }) {
   const { t } = useTranslation()
   const [hasGroups, setHasGroups] = useState(false)
   const [picking, setPicking] = useState(false)
@@ -51,7 +51,7 @@ export default function WhatsappHoursField({ organizationId, kind = 'mix', value
   if (!hasGroups || !live) return null
   const hours = value || []
   const full = hours.length >= HOURS_MAX
-  const help = full ? t('whatsapp_hours.full') : hours.length === 0 ? t(`whatsapp_hours.none_${kind}`) : t(`whatsapp_hours.help_${kind}`)
+  const help = full ? t('whatsapp_hours.full') : hours.length === 0 ? t(`whatsapp_hours.none_${kind}`) : t(`whatsapp_hours.${editing ? 'help_edit' : 'help'}_${kind}`)
 
   return (
     <div>
