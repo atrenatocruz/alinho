@@ -10,7 +10,7 @@ import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { QrCode } from 'lucide-react'
 import { Chips, ConfirmSheet, Select } from '../ui'
-import { listClubVouchers, redeemVoucher, voucherTotals } from '../../lib/vouchers'
+import { listClubVouchers, redeemVoucher, voucherTotals, voucherWithoutAccount } from '../../lib/vouchers'
 import { describeError } from '../../lib/errors'
 
 const FILTERS = ['all', 'por_usar', 'usado']
@@ -98,6 +98,7 @@ export default function VouchersAdmin({ organizationId, onScan }) {
           <div className="space-y-2">
             {shown.map((v) => {
               const used = v.status === 'usado'
+              const noAccount = voucherWithoutAccount(v)
               const contact = [v.email, v.phone].filter(Boolean).join(' · ')
               return (
                 <div key={v.voucher_id} className="card space-y-2">
@@ -105,12 +106,13 @@ export default function VouchersAdmin({ organizationId, onScan }) {
                     <div className="min-w-0">
                       <p className="truncate font-extrabold text-ink-900">{v.player_name || '—'}</p>
                       <p className="truncate text-xs text-muted">{[v.game_title, day(v.game_date)].filter(Boolean).join(' · ')}</p>
+                      {noAccount && <p className="mt-1 text-xs text-warning">{t('vouchers.no_account')}</p>}
                     </div>
                     {used
                       ? <span className="shrink-0 rounded-full bg-ink-50 px-2 py-[3px] text-[11px] font-extrabold text-muted">{t('vouchers.used_on', { date: shortDay(v.used_at) })}</span>
                       : <span className="shrink-0 rounded-full bg-ink-900 px-2 py-[3px] text-[11px] font-extrabold text-white">{t('vouchers.unused')}</span>}
                   </div>
-                  {consent && (
+                  {consent && !noAccount && (
                     <div className="border-t border-line pt-2">
                       {v.contact_shared_at ? (
                         <>

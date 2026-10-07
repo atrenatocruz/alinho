@@ -1675,6 +1675,7 @@
   "vouchers.used_on": "Usado a {{date}}",
   "vouchers.shared_on": "Contacto partilhado a {{date}}",
   "vouchers.not_shared": "Ainda não aceitou partilhar o contacto.",
+  "vouchers.no_account": "Este jogador não está na app. Confirma quem é na receção antes de dar baixa.",
   "vouchers.redeem": "Dar baixa",
   "vouchers.redeem_title": "Dar baixa ao voucher de {{name}}?",
   "vouchers.redeem_body": "Fica usado, e não dá para desfazer.",

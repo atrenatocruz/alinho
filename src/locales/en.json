@@ -1674,6 +1674,7 @@
   "vouchers.used_on": "Used on {{date}}",
   "vouchers.shared_on": "Contact shared on {{date}}",
   "vouchers.not_shared": "Has not agreed to share their contact yet.",
+  "vouchers.no_account": "This player isn't on the app. Check who they are at reception before redeeming.",
   "vouchers.redeem": "Redeem",
   "vouchers.redeem_title": "Redeem {{name}}’s voucher?",
   "vouchers.redeem_body": "It becomes used, and this cannot be undone.",
