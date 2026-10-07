@@ -30,6 +30,9 @@ export async function checkGuestVoucherNotices({ sendText }, { now = Date.now() 
     .from('vouchers')
     .select('id, game_id, user_id, organization_id, created_at')
     .is('guest_notice_sent_at', null)
+    // Vouchers sem conta (user_id nulo, migration_vouchers_para_todos.sql) não
+    // são deste aviso; um null na lista de ids do passo seguinte partia tudo.
+    .not('user_id', 'is', null)
     .gt('created_at', new Date(now - WINDOW_MS).toISOString())
     .in('organization_id', orgIds)
   if (error) {

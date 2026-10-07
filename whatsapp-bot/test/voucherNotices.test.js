@@ -75,3 +75,11 @@ test('convidado sem WhatsApp ligado: vai pelo nome, sem menção', async () => {
   assert.ok(nuno)
   assert.deepEqual(nuno.opts.mentions, [])
 })
+
+test('voucher sem conta (user_id nulo) não estraga o aviso aos outros', async () => {
+  db.vouchers.push({ id: 'v4', game_id: 'g1', user_id: null, guest_id: 'gg1', guest_name: 'Sem App', organization_id: 'o', created_at: ago(1), guest_notice_sent_at: null })
+  const sent = await run()
+  assert.equal(sent.length, 1)
+  assert.ok(sent[0].text.includes('351911111111'))
+  assert.equal(db.vouchers.find((v) => v.id === 'v4').guest_notice_sent_at, null)
+})
