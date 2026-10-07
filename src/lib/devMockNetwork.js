@@ -236,6 +236,10 @@ const RPC_MOCKS = {
       ? { org_name: 'Smash Padel Almada', org_slug: 'smash-padel', org_kind: 'club', org_logo_url: null, org_visible: true }
       : { org_name: 'Jota Padeleiros', org_slug: 'jota-padeleiros', org_kind: 'group', org_logo_url: null, org_visible: true }]
   },
+  // Série em rascunho (7 out): pausar põe as datas futuras em rascunho.
+  pause_recurrence_to_draft: () => ({ dates: 3, people: 5 }),
+  resume_recurrence: () => ({ dates: 3 }),
+  preview_recurrence_pause: () => ({ dates: 3, people: 5 }),
   // O mesmo para um torneio (mockTClosed = 'group' | 'club' | 'private').
   get_tournament_org_hint: () => {
     const k = localStorage.getItem('mockTClosed')
@@ -368,6 +372,8 @@ const RPC_MOCKS = {
     { id: 'jr2', user_id: FAKE_PARTNER_ID, name: 'Tiago Ferreira', avatar_url: null, created_at: new Date().toISOString() },
   ] : []),
   delete_self_serve_group: () => null,
+  // Link curto do mix (/m/<código>): «fa4e0001» abre o mix de teste; o resto não serve.
+  resolve_game_link: (params) => (String(params?.p_code || '').toLowerCase() === 'fa4e0001' ? 'fake-game-1' : null),
   // Entrar por link num grupo cheio (#447): localStorage.mockJoinPending =
   // 'true' — a função devolve o grupo e a pessoa não fica membro (pedido).
   approve_membership_request: () => (localStorage.getItem('mockGroupFull') === 'true' ? { __error: 'Grupo já atingiu o limite de 40 membros do plano' } : null),

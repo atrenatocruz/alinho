@@ -6,7 +6,7 @@ import {
   computeMixWinnerTeamId, formDuplas,
   nextSobeDesceRotating, splitPartnerRows, rotatingPlacar, shortName,
   thirdPlaceMatch, lowerPlacementMatches, placementOfCourt, PHASE_LABEL_KEY, seedCourts, reverseClimbWarning,
-  uiFormatOf, formatFieldsFor, formatLabelKey,
+  uiFormatOf, formatFieldsFor, formatLabelKey, standings,
 } from './mixLogic'
 
 describe('splitIntoPools', () => {
@@ -865,5 +865,36 @@ describe('Escalada — modo à parte, gravado como Sobe e desce invertido (29 se
   it('o nome do modo', () => {
     expect(formatLabelKey({ format: 'sobe_desce', seed_reverse: true })).toBe('mixlogic.format_escalada')
     expect(formatLabelKey({ format: 'sobe_desce' })).toBe('mixlogic.format_sobe_desce')
+  })
+})
+
+describe('standings — desempates como a FPP (Francisco, 28 set, #592)', () => {
+  const T = ['A', 'B', 'C', 'D'].map((id) => ({ id }))
+  const m = (a, b, sa, sb) => ({ phase: 'group', team_a_id: a, team_b_id: b, score_a: sa, score_b: sb, winner_team_id: sa > sb ? a : b })
+  const ids = (rows) => rows.map((r) => r.team.id)
+
+  it('entre duas com as mesmas vitórias, o confronto direto passa à frente da diferença', () => {
+    // A e B com 2 vitórias; B ganhou ao A por 6-5, mas o A tem muito melhor diferença.
+    const jogos = [m('A', 'B', 5, 6), m('A', 'C', 6, 0), m('A', 'D', 6, 0), m('B', 'C', 6, 5), m('B', 'D', 5, 6), m('C', 'D', 6, 4)]
+    expect(ids(standings(T, jogos)).slice(0, 2)).toEqual(['B', 'A'])
+  })
+
+  it('entre três, contam as vitórias nos jogos entre elas; depois a diferença de todos os jogos', () => {
+    // A, B e C com 2 vitórias. Entre elas: A ganhou a B e a C (2), B ganhou a C (1), C nenhuma.
+    // O D ganhou a A e a B para que tenham 2 vitórias cada.
+    const jogos = [m('A', 'B', 6, 4), m('A', 'C', 6, 4), m('B', 'C', 6, 4), m('D', 'A', 6, 4), m('D', 'B', 6, 4), m('C', 'D', 6, 0)]
+    // Vitórias: A 2, B 1, C 1, D 2 → A e D a 2; B e C a 1.
+    expect(ids(standings(T, jogos))).toEqual(['D', 'A', 'B', 'C'])
+  })
+
+  it('três em ciclo entre elas: decide a diferença de todos os jogos; as duas que ficam voltam ao confronto direto', () => {
+    // A>B, B>C, C>A, todos ganham ao D. A diferença geral separa o A (ganhou ao D por 6-0);
+    // B e C ficam iguais (+3) e o jogo entre elas manda: B ganhou a C.
+    const jogos = [m('A', 'B', 6, 5), m('B', 'C', 6, 5), m('C', 'A', 6, 5), m('A', 'D', 6, 0), m('B', 'D', 6, 3), m('C', 'D', 6, 3)]
+    expect(ids(standings([{ id: 'C' }, { id: 'B' }, { id: 'A' }, { id: 'D' }], jogos))).toEqual(['A', 'B', 'C', 'D'])
+  })
+
+  it('sem jogos, fica a ordem de entrada', () => {
+    expect(ids(standings(T, []))).toEqual(['A', 'B', 'C', 'D'])
   })
 })

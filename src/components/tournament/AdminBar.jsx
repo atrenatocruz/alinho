@@ -40,7 +40,7 @@ function whenDeadline(iso, locale) {
   if (!iso) return ''
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
-  const day = d.toLocaleDateString(locale, { day: 'numeric', month: 'short', timeZone: TOURNAMENT_TZ }).replace('.', '')
+  const day = d.toLocaleDateString(locale, { day: 'numeric', month: 'short', timeZone: TOURNAMENT_TZ }).replace('.', '').replace(' de ', ' ')
   const time = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', timeZone: TOURNAMENT_TZ })
   return `${day}, ${time}`
 }
@@ -95,7 +95,11 @@ export default function AdminBar({ tournament, categories = [], onChanged, onEdi
       onChanged?.()
     } catch (err) {
       console.error('Error changing tournament status:', err)
-      setError(describeError(t, err))
+      // Abrir com o prazo já passado é recusado (as inscrições fechavam
+      // sozinhas no minuto seguinte, Dev 3, 6 out): diz o que fazer.
+      setError(String(err?.message || '').includes('deadline_passed')
+        ? t('tournament.admin.error_deadline_passed')
+        : describeError(t, err))
     } finally {
       setBusy(false)
     }
@@ -106,7 +110,9 @@ export default function AdminBar({ tournament, categories = [], onChanged, onEdi
   // Perguntar duas vezes ensina a carregar em «sim» sem ler.
   const draw = () => onDraw?.()
 
-  const deadlineGone = status === 'inscricoes' && deadlinePassed(tournament?.entries_deadline)
+  // As inscrições fecham sozinhas no fim do prazo (6 out): antes dele, a
+  // linha cinzenta diz quando — quem organiza não precisa de carregar.
+  const closesAlone = status === 'inscricoes' && !!tournament?.entries_deadline && !deadlinePassed(tournament.entries_deadline)
 
   // Em cima, como no mix (pacote da revisão, ponto 1): só «Editar» e
   // «Mais ⋯». Saem «ORGANIZAÇÃO · <estado>» e a frase do estado.
@@ -173,9 +179,6 @@ export default function AdminBar({ tournament, categories = [], onChanged, onEdi
   if (!next && !canDraw && !live) return null
   return (
     <div className="space-y-1.5">
-      {deadlineGone && (
-        <p className="text-xs text-ink-700">{t('tournament.admin.state_deadline_passed', { deadline: whenDeadline(tournament?.entries_deadline, i18n.language) })}</p>
-      )}
       {next && (
         <button type="button" disabled={busy}
           // Fechar as inscrições pergunta antes (Trello #500): um toque por
@@ -184,6 +187,9 @@ export default function AdminBar({ tournament, categories = [], onChanged, onEdi
           className={`${PRIMARY} w-full`}>
           {t(`tournament.admin.to_${next}`)}
         </button>
+      )}
+      {next === 'fechado' && closesAlone && (
+        <p className="text-xs text-ink-500">{t('tournament.admin.closes_alone', { deadline: whenDeadline(tournament.entries_deadline, i18n.language) })}</p>
       )}
       {canDraw && (
         <button type="button" disabled={busy} onClick={draw} className={`${PRIMARY} w-full`}>

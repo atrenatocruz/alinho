@@ -111,6 +111,10 @@ function GroupTable({ group, matches, entries, qualifiers, myEntryId, t }) {
       </p>
       {/* O que é «Pts», recolhido num «?» (Francisco, 28 set). */}
       <RuleHint className="px-3 pb-1.5" label={t('tournament.draw.points_hint')} note={t('tournament.draw.points_hint_note')} />
+      {/* Como se desempata (#592, FPP; texto aprovado a 28 set,
+          design-handoff/2026-09-28-avisos-desempate, ponto 2). */}
+      <RuleHint className="px-3 pb-1.5" label={t('tournament.draw.tiebreak_hint')}
+        items={[1, 2, 3, 4, 5].map((n) => t(`tournament.draw.tiebreak_hint_${n}`))} note={t('tournament.draw.tiebreak_hint_note')} />
     </section>
   )
 }
@@ -150,7 +154,6 @@ export default function GroupsPanel({ category, my }) {
           t={t}
         />
       ))}
-      <p className="px-1 pb-2 text-xs text-muted">{t('tournament.draw.tiebreak_note')}</p>
     </div>
   )
 }

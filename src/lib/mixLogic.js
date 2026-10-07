@@ -539,25 +539,53 @@ export function poolRoundsPlayed(matches, poolTeamIds) {
   return poolRoundNumbers(matches, poolTeamIds).length
 }
 
-/** Classificação da fase de grupos: vitórias → diferença de pontos → pontos. */
+/** Classificação da fase de grupos (Francisco, 28 set, «#592», como a
+ *  FPP): vitórias → confronto direto → diferença de pontos → pontos
+ *  marcados. O confronto direto são as vitórias nos jogos entre as
+ *  empatadas (entre duas, o jogo entre elas; entre três ou mais, a
+ *  mini-tabela). A diferença e os pontos são de todos os jogos. Quando um
+ *  critério separa parte das empatadas, as que ficam recomeçam pelas
+ *  vitórias (FPP RG 2026, 10.10.2). Quem continua empatado fica na ordem em
+ *  que veio. */
 export function standings(teams, matches) {
   const table = Object.fromEntries(
     teams.map(t => [t.id, { team: t, wins: 0, diff: 0, scored: 0, played: 0 }])
   )
+  const counted = []
   for (const m of matches) {
     if (m.phase !== 'group' || !m.winner_team_id) continue
     const a = table[m.team_a_id]
     const b = table[m.team_b_id]
     if (!a || !b) continue
+    counted.push(m)
     a.played += 1; b.played += 1
     a.scored += m.score_a ?? 0; b.scored += m.score_b ?? 0
     a.diff += (m.score_a ?? 0) - (m.score_b ?? 0)
     b.diff += (m.score_b ?? 0) - (m.score_a ?? 0)
     table[m.winner_team_id].wins += 1
   }
-  return Object.values(table).sort(
-    (x, y) => y.wins - x.wins || y.diff - x.diff || y.scored - x.scored
-  )
+
+  const headToHead = (row, tied) => counted.filter(m =>
+    m.winner_team_id === row.team.id && tied.has(m.team_a_id) && tied.has(m.team_b_id)).length
+  const criteria = [
+    (r) => r.wins,
+    (r, tied) => headToHead(r, tied),
+    (r) => r.diff,
+    (r) => r.scored,
+  ]
+  const order = (group, depth) => {
+    if (group.length <= 1 || depth >= criteria.length) return group
+    const tied = new Set(group.map(r => r.team.id))
+    const byValue = new Map()
+    for (const r of group) {
+      const v = criteria[depth](r, tied)
+      if (!byValue.has(v)) byValue.set(v, [])
+      byValue.get(v).push(r)
+    }
+    if (byValue.size === 1) return order(group, depth + 1)
+    return [...byValue.entries()].sort((x, y) => y[0] - x[0]).flatMap(([, sub]) => order(sub, 0))
+  }
+  return order(Object.values(table), 0)
 }
 
 /** Derives the mix's current/implied winning team id from its matches —

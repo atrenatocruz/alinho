@@ -8,7 +8,7 @@ import {
   courtHours, availableCourtHours, formatOptions, recommendFormat, groupsWords,
   pickSeeds, drawGroups, groupRoundRobin, groupStandings, headToHeadWins,
   bestOfPosition, buildFirstRound, noSameGroupClash, seededRandom,
-  TIEBREAK_DEFAULT,
+  TIEBREAK_DEFAULT, TIEBREAK_BETWEEN_GROUPS, diffAmong,
 } from './tournamentFormat'
 
 const teams = (n, points = null) => Array.from({ length: n }, (_, i) => ({
@@ -260,8 +260,10 @@ describe('classificação do grupo', () => {
       { a: 't3', b: 't4', scoreA: 9, scoreB: 6 },
     ]
     const tabela = groupStandings(['t1', 't2', 't3', 't4'], ciclo)
-    // Entre elas está 1V-1V-1V: passa-se ao critério seguinte (diferença).
+    // Entre elas está 1V-1V-1V e tudo igual nos jogos entre elas (os jogos
+    // contra o t4 não contam, #592): é sorteio, fica a ordem de entrada.
     expect(tabela.map((r) => r.id)).toEqual(['t1', 't2', 't3', 't4'])
+    expect(tabela[0].tiedWith).toEqual(['t2', 't3'])
     expect(tabela[3].id).toBe('t4')
     // E o confronto direto entre as três é mesmo 1 vitória para cada.
     expect(headToHeadWins('t1', ['t1', 't2', 't3'], ciclo)).toBe(1)
@@ -292,22 +294,24 @@ describe('classificação do grupo', () => {
     expect(tabela.every((r) => r.played === 0)).toBe(true)
   })
 
-  // Trello #484 — o caso do Renato. A, B e C com 2 vitórias em ciclo
-  // (A>C, C>B, B>A, todos 6-4) e todos ganham ao D; o A ganha ao D por mais.
-  // A diferença de jogos separa o A; B e C continuam empatados (+3 cada).
-  // Entre DUAS, volta-se ao confronto direto: C ganhou a B, logo C é 2.º.
-  it('empate a três: quando um critério separa uma dupla, as que ficam voltam ao confronto direto entre elas (#484)', () => {
+  // Trello #484 — o caso do Renato, com a regra da FPP (#592). A, B e C com 2
+  // vitórias em ciclo (A>C 9-7, C>B 9-6, B>A 9-5) e todos ganham ao D. Entre
+  // elas os sets estão 1-1; nos jogos entre elas o A fica a -2 e B e C a +1.
+  // O A sai para 3.º; B e C continuam empatados — entre DUAS, volta-se ao
+  // confronto direto (FPP RG 10.10.2): C ganhou a B, logo C é 1.º.
+  it('empate a três: quando um critério separa uma dupla, as que ficam voltam ao confronto direto entre elas (#484, #592)', () => {
     const renato = [
-      { a: 't1', b: 't3', scoreA: 6, scoreB: 4 }, // A > C
-      { a: 't3', b: 't2', scoreA: 6, scoreB: 4 }, // C > B
-      { a: 't2', b: 't1', scoreA: 6, scoreB: 4 }, // B > A
-      { a: 't1', b: 't4', scoreA: 6, scoreB: 0 }, // A ganha ao D por mais
-      { a: 't2', b: 't4', scoreA: 6, scoreB: 3 },
-      { a: 't3', b: 't4', scoreA: 6, scoreB: 3 },
+      { a: 't1', b: 't3', scoreA: 9, scoreB: 7 }, // A > C
+      { a: 't3', b: 't2', scoreA: 9, scoreB: 6 }, // C > B
+      { a: 't2', b: 't1', scoreA: 9, scoreB: 5 }, // B > A
+      { a: 't1', b: 't4', scoreA: 9, scoreB: 0 }, // A ganha ao D por mais: não conta
+      { a: 't2', b: 't4', scoreA: 9, scoreB: 3 },
+      { a: 't3', b: 't4', scoreA: 9, scoreB: 3 },
     ]
     // A ordem de entrada põe B antes de C — só o confronto direto os troca.
     const tabela = groupStandings(['t1', 't2', 't3', 't4'], renato)
-    expect(tabela.map((r) => r.id)).toEqual(['t1', 't3', 't2', 't4'])
+    expect(tabela.map((r) => r.id)).toEqual(['t3', 't2', 't1', 't4'])
+    expect(tabela.some((r) => r.tiedWith)).toBe(false)
   })
 
   // Trello #484 — desistência a meio com o resultado empatado (3-3): quem
@@ -329,6 +333,86 @@ describe('classificação do grupo', () => {
     const tabela = groupStandings(['t1', 't2'], falta)
     expect(tabela[0]).toMatchObject({ id: 't2', wins: 1, played: 1 })
     expect(tabela[1]).toMatchObject({ id: 't1', losses: 1, played: 1 })
+  })
+})
+
+describe('desempates como a FPP (#592, RG 2026 10.10)', () => {
+  // A, B e C com 2 vitórias em ciclo e D sem vitórias.
+  const base = (ab, bc, ca, extra = []) => [
+    { a: 'A', b: 'B', ...ab }, { a: 'B', b: 'C', ...bc }, { a: 'C', b: 'A', ...ca },
+    { a: 'A', b: 'D', scoreA: 9, scoreB: 0 }, { a: 'B', b: 'D', scoreA: 9, scoreB: 0 }, { a: 'C', b: 'D', scoreA: 9, scoreB: 0 },
+    ...extra,
+  ]
+
+  it('entre três, só contam os jogos entre elas: quem arrasou o D não ganha nada com isso', () => {
+    const jogos = base({ scoreA: 9, scoreB: 7 }, { scoreA: 9, scoreB: 3 }, { scoreA: 9, scoreB: 8 })
+    // Diferença entre elas: A 9-7 e 8-9 → +1; B 7-9 e 9-3 → +4; C 3-9 e 9-8 → -5.
+    expect(groupStandings(['A', 'B', 'C', 'D'], jogos).map((r) => r.id)).toEqual(['B', 'A', 'C', 'D'])
+  })
+
+  it('a sets: primeiro a diferença de sets entre elas; sem os jogos de cada set, o resto é sorteio', () => {
+    const jogos = [
+      { a: 'A', b: 'B', scoreA: 2, scoreB: 0 }, { a: 'B', b: 'C', scoreA: 2, scoreB: 1 }, { a: 'C', b: 'A', scoreA: 2, scoreB: 1 },
+      { a: 'A', b: 'D', scoreA: 2, scoreB: 0 }, { a: 'B', b: 'D', scoreA: 2, scoreB: 0 }, { a: 'C', b: 'D', scoreA: 2, scoreB: 0 },
+    ]
+    // Sets entre elas: A 2-0 e 1-2 → +1; B 0-2 e 2-1 → -1; C 1-2 e 2-1 → 0.
+    expect(groupStandings(['A', 'B', 'C', 'D'], jogos).map((r) => r.id)).toEqual(['A', 'C', 'B', 'D'])
+    // Tudo 2-1 entre elas: sets iguais, jogos desconhecidos → sorteio.
+    const iguais = [
+      { a: 'A', b: 'B', scoreA: 2, scoreB: 1 }, { a: 'B', b: 'C', scoreA: 2, scoreB: 1 }, { a: 'C', b: 'A', scoreA: 2, scoreB: 1 },
+      { a: 'A', b: 'D', scoreA: 2, scoreB: 0 }, { a: 'B', b: 'D', scoreA: 2, scoreB: 1 }, { a: 'C', b: 'D', scoreA: 2, scoreB: 0 },
+    ]
+    const t = groupStandings(['A', 'B', 'C', 'D'], iguais)
+    expect(t.slice(0, 3).every((r) => r.tiedWith?.length === 2)).toBe(true)
+  })
+
+  it('entre duas, o confronto direto — mesmo com pior diferença geral', () => {
+    // A e B com 2 vitórias; o B ganhou ao A por 9-8, o A tem +17 e o B +1.
+    const jogos = [
+      { a: 'A', b: 'B', scoreA: 8, scoreB: 9 },
+      { a: 'A', b: 'C', scoreA: 9, scoreB: 0 }, { a: 'B', b: 'C', scoreA: 9, scoreB: 8 },
+      { a: 'A', b: 'D', scoreA: 9, scoreB: 0 }, { a: 'B', b: 'D', scoreA: 8, scoreB: 9 },
+    ]
+    expect(groupStandings(['A', 'B', 'C', 'D'], jogos).map((r) => r.id).slice(0, 2)).toEqual(['B', 'A'])
+  })
+
+  it('de quatro empatadas separam-se duas; as duas que ficam voltam ao confronto direto (10.10.2)', () => {
+    // Todas com 1 vitória: A>B, B>C, C>D, D>A. Entre as quatro, sets 1-1
+    // para todas.
+    const jogos = [
+      { a: 'A', b: 'B', scoreA: 9, scoreB: 5 }, // A +4
+      { a: 'B', b: 'C', scoreA: 9, scoreB: 5 }, // B +4
+      { a: 'C', b: 'D', scoreA: 9, scoreB: 7 }, // C +2
+      { a: 'D', b: 'A', scoreA: 9, scoreB: 7 }, // D +2
+    ]
+    // Jogos entre as quatro: A +4-2 = +2; B -4+4 = 0; C -4+2 = -2; D -2+2 = 0.
+    // B e D empatados a 0 → entre duas, confronto direto: não jogaram → sorteio.
+    const t = groupStandings(['A', 'B', 'C', 'D'], jogos)
+    expect(t.map((r) => r.id)).toEqual(['A', 'B', 'D', 'C'])
+    expect(t[1].tiedWith).toEqual(['D'])
+    expect(t[0].tiedWith).toBeUndefined()
+  })
+
+  it('quem faltou fica em último entre as empatadas, e a falta conta 6-0 6-0 para as outras', () => {
+    // A, B e C com 2 vitórias. O B ganhou ao A por falta do A; o C ganhou
+    // ao B; o A ganhou ao C.
+    const jogos = base(
+      { scoreA: 0, scoreB: 9, winner: 'b', forfeit: 'a' },
+      { scoreA: 7, scoreB: 9 },
+      { scoreA: 7, scoreB: 9 },
+    )
+    const t = groupStandings(['A', 'B', 'C', 'D'], jogos)
+    // O A sai para último das empatadas; B e C decidem-se pelo jogo entre
+    // elas (o C ganhou).
+    expect(t.map((r) => r.id)).toEqual(['C', 'B', 'A', 'D'])
+    expect(t.find((r) => r.id === 'A')).toMatchObject({ forfeits: 1 })
+    // A falta vale 2 sets e 12 jogos para o B, também no pro set.
+    expect(diffAmong('B', ['A', 'B'], jogos)).toEqual({ sets: 2, games: 12 })
+  })
+
+  it('os melhores terceiros comparam-se pelo que fizeram no grupo', () => {
+    expect(TIEBREAK_BETWEEN_GROUPS).toEqual(['vitorias', 'faltas', 'diferenca_sets', 'diferenca_jogos', 'jogos_ganhos'])
+    expect(TIEBREAK_DEFAULT).toEqual(['vitorias', 'faltas', 'confronto_direto', 'diferenca_sets_entre', 'diferenca_jogos_entre'])
   })
 })
 
