@@ -1704,6 +1704,28 @@ RPC_MOCKS.set_event_whatsapp_post_times = (params) => [...(params?.p_times || []
 // As do próprio evento no Editar (Dev 3, 7 out): diferentes das do «último
 // mix», para se ver que o Editar não as troca.
 RPC_MOCKS.get_event_whatsapp_post_times = () => ['09:00', '19:30']
+// Preço especial (Dev 3, migration_preco_especial.sql — 7 out). Por omissão
+// responde como antes da migração (PGRST202: o bloco não aparece);
+// localStorage.mockSpecialPrice = 'members' | 'list' — já existe e há um
+// preço especial guardado (grátis para os membros, ou para 3 pessoas
+// escolhidas, de que o Admin(Dev) faz parte). 'off' — existe, sem nenhum.
+const SP_MODE = () => localStorage.getItem('mockSpecialPrice')
+const SP_NONE = { __error: 'Could not find the function', __code: 'PGRST202' }
+const SP_PEOPLE = [{ id: MOCK_ADMIN_USER_ID, name: 'Admin (Dev)', avatar_url: null }, { id: 'u-rf', name: 'Rita Fonseca', avatar_url: null }, { id: 'u-tl', name: 'Tiago Lopes', avatar_url: null }]
+// 'members_out' — grátis para os membros, visto por quem é de fora (o cartão).
+const SP_SAVED = () => (['members', 'members_out', 'list'].includes(SP_MODE()) ? { price: 0, audience: SP_MODE() === 'list' ? 'list' : 'members', from_series: false, people: SP_MODE() === 'list' ? SP_PEOPLE : [] } : null)
+RPC_MOCKS.get_event_special_price = () => (SP_MODE() ? SP_SAVED() : SP_NONE)
+RPC_MOCKS.set_event_special_price = (p) => (SP_MODE() ? (p?.p_price == null ? null : { price: p.p_price, audience: p.p_audience, from_series: false, people: SP_PEOPLE.filter((x) => (p.p_user_ids || []).includes(x.id)) }) : SP_NONE)
+RPC_MOCKS.prices_for_me = (p) => (SP_MODE() ? (p?.p_ids || []).map((id) => {
+  const sp = SP_SAVED()
+  const mine = !!sp && SP_MODE() !== 'members_out'
+  return { id, normal_price: 8, my_price: mine ? 0 : 8, is_special: mine, members_price: sp?.audience === 'members' ? 0 : null }
+}) : SP_NONE)
+// Na lista do mix do evento (mockEventState), os três primeiros têm o preço especial.
+RPC_MOCKS.event_price_roster = () => (SP_MODE() ? [MOCK_ADMIN_USER_ID, 'fake-0', 'fake-1', 'fake-2', 'fake-3', 'fake-4', 'fake-5', 'fake-6'].map((u, i) => ({ user_id: u, price: i < 3 && SP_SAVED() ? 0 : 8, is_special: i < 3 && !!SP_SAVED() })) : SP_NONE)
+// Com o preço especial ligado no mock, o clube tem membros para «Escolher pessoas».
+const LOM_BEFORE = RPC_MOCKS.list_organization_members
+RPC_MOCKS.list_organization_members = (p) => (SP_MODE() ? [...SP_PEOPLE.slice(1), { id: 'u-am', name: 'Ana Moreira', avatar_url: null }, { id: 'u-rc', name: 'Rui Costa', avatar_url: null }, { id: 'u-mr', name: 'Marta Rocha', avatar_url: null }] : LOM_BEFORE?.(p) ?? [])
 RPC_MOCKS.ensure_recurrence_successor = () => localStorage.getItem('mockEnsureStatus') || 'created'
 // A regra da série do rascunho (mockMixDraft = 'serie'): semanal, abre 3
 // dias antes às 10:00 (o mix é às 19:00).

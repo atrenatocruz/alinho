@@ -39,6 +39,7 @@ import { whatsappLookalikeInGame, rememberWhatsappGuest, rememberedWhatsappGuest
 import { MonoLabel } from '../components/tournament/TournamentBits'
 import { listGameInvites, inviteLink, whatsappShare } from '../lib/partnerInvite'
 import MixAdminBar from '../components/mix/MixAdminBar'
+import { usePriceRoster, PriceRosterSummary, PriceRosterTag, useSpecialPriceLine } from '../components/SpecialPriceRoster'
 import ChangeOneMixSheet from '../components/mix/ChangeOneMixSheet'
 import EventActionsSheet from '../components/EventActionsSheet'
 import RoundAlarm from '../components/RoundAlarm'
@@ -116,6 +117,9 @@ export default function GameDetails() {
   // necessarily this mix's club.
   const gameMembership = game ? memberships.find((m) => m.organization_id === game.organization_id) : null
   const isAdmin = gameMembership?.is_admin ?? false
+  // Preço especial (7 out): o preço de cada inscrito, só para quem organiza.
+  const specialPriceText = useSpecialPriceLine(game?.origin === 'open_slot' ? 'open_slot' : 'mix', game?.price_per_player > 0 ? game.id : null)
+  const priceRoster = usePriceRoster(isAdmin && game?.price_per_player > 0 ? (game.origin === 'open_slot' ? 'open_slot' : 'mix') : null, game?.id, game?.participants?.length)
   const [scorekeeperIds, setScorekeeperIds] = useState([])
   const [scorekeeperBusy, setScorekeeperBusy] = useState(null)
   const isScorekeeper = scorekeeperIds.includes(user.id)
@@ -3086,7 +3090,7 @@ export default function GameDetails() {
           {game.price_per_player > 0 && (
             <p className="flex items-center gap-1.5">
               <Euro size={15} className="shrink-0" />
-              {t('gamedetails.price_per_player', { price: formatCurrency(game.price_per_player, i18n.language) })}
+              {specialPriceText || t('gamedetails.price_per_player', { price: formatCurrency(game.price_per_player, i18n.language) })}
             </p>
           )}
           {game.prize && (
@@ -4237,6 +4241,7 @@ export default function GameDetails() {
               </p>
             )
           })()}
+          <PriceRosterSummary roster={priceRoster} ids={people.map((x) => x.id)} normalPrice={game.price_per_player} className="-mt-2 mb-3" />
 
           {people.length === 0 ? (
             <p className="text-muted text-sm text-center py-4">
@@ -4314,6 +4319,7 @@ export default function GameDetails() {
                     )}
                     {/* Mix parado: mexer na lista partiria as duplas ja formadas (#416).
                         Cancelado (#464): a lista fica como estava, sem mexer. */}
+                    <PriceRosterTag roster={priceRoster} userId={person.id} normalPrice={game.price_per_player} />
                     {isAdmin && !mixPaused && game.status !== 'cancelled' && (
                       <button
                         onClick={() => handleRemovePerson(person)}

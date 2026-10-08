@@ -4,6 +4,7 @@ import { MapPin, CheckCircle2, Lock, Play, Trophy, Euro, Swords, Users, Shuffle,
 import { supabase } from '../../lib/supabase'
 import { PlayerAvatarRow, GroupLevelBadge, PrimaryButton } from '../ui'
 import { formatTime, formatCurrency } from '../../lib/formatDate'
+import { useSpecialPriceLine } from '../SpecialPriceRoster'
 import { GENDER_RESTRICTION_LABEL_KEY, mixCapacity, isGenderMismatch, isAgeIneligible, formatLabelKey } from '../../lib/mixLogic'
 import { AGE_LABEL_KEY } from '../../lib/ageCategories'
 import { ratingBand } from '../../lib/elo'
@@ -215,6 +216,7 @@ function cardFrame(event, past) {
     meus clubes e nos de explorar, para um mix não se descrever de duas formas. */
 function GameFacts({ game, distance }) {
   const { t, i18n } = useTranslation()
+  const specialLine = useSpecialPriceLine(game.origin === 'open_slot' ? 'open_slot' : 'mix', game.price_per_player > 0 ? game.id : null)
   const genderRestricted = game.gender_restriction && !['indiferente', 'misto'].includes(game.gender_restriction)
   return (
     <>
@@ -236,7 +238,9 @@ function GameFacts({ game, distance }) {
         {game.price_per_player > 0 && (
           <span className="inline-flex items-center gap-1">
             <Euro size={14} className="shrink-0" />
-            {t('gamedetails.price_per_player', { price: formatCurrency(game.price_per_player, i18n.language) })}
+            {/* Preço especial (7 out): o preço de quem vê; sem nada que lhe
+                diga respeito, a linha de sempre. */}
+            {specialLine || t('gamedetails.price_per_player', { price: formatCurrency(game.price_per_player, i18n.language) })}
           </span>
         )}
         {game.prize && (
