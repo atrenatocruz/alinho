@@ -40,9 +40,12 @@ export function slotsLeft(category, entries = []) {
 export const isCategoryFull = (category, entries) => slotsLeft(category, entries) === 0
 
 /* Quantas categorias já tenho neste torneio, e se ainda posso mais.
-   O máximo vem das regras do torneio (2 por defeito). */
+   O máximo vem das regras do torneio (2 por defeito). O criar e o editar
+   gravam `max_categories`; `max_categories_per_person` é o nome antigo, que
+   fica de reserva — a mesma ordem do servidor (Dev 3, 8 out). Antes só se
+   lia o antigo, e quem escolhia 1 ou 3 ficava sempre com 2. */
 export function categoriesLeft(tournament, myEntries = []) {
-  const max = Number(tournament?.rules?.max_categories_per_person ?? 2)
+  const max = Number(tournament?.rules?.max_categories ?? tournament?.rules?.max_categories_per_person ?? 2)
   const mine = myEntries.filter((e) => e.status !== 'desistiu').length
   return Math.max(0, max - mine)
 }
