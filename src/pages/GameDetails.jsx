@@ -2060,6 +2060,10 @@ export default function GameDetails() {
   const roundCanAdvance = currentRoundDone && (inGroupPhase || !!nextPhase || (isAmericano && currentRound < maxRound))
   const canAdvance = roundCanAdvance && !tieInRound
   const canFinalize = roundsStarted && allDone && !roundCanAdvance && tiedMatches.length === 0
+  // Na última ronda (já não há outra para sortear), quantos jogos faltam
+  // marcar para se poder terminar o mix (proposta da UX, 6 out).
+  const lastRoundOpen = roundsStarted && !roundCanAdvance && !inGroupPhase && !nextPhase && !(isAmericano && currentRound < maxRound)
+    ? matches.filter((m) => !hasResult(m)).length : 0
   // O jogo empatado que trava o passo seguinte — só depois de a ronda ter
   // os resultados todos (antes disso, diz-se o que falta).
   const blockingTie = !roundsStarted || !currentRoundDone ? null
@@ -2652,7 +2656,7 @@ export default function GameDetails() {
         hint: (inGroupPhase || isAmericano) ? t(isSobeDesce && !isRotating ? 'gamedetails.end_round_hint_sobe' : 'gamedetails.end_round_hint', { number: currentRound + 1 }) : null,
       }
     } else if (canFinalize) {
-      barPrimary = { label: busy ? t('gamedetails.finalizing') : t('gamedetails.finalize_mix'), onClick: () => handleFinalize(false), disabled: busy }
+      barPrimary = { label: t('gamedetails.finalize_mix'), onClick: () => handleFinalize(false), disabled: busy }
     } else if (blockingTie) {
       // Empate: o botão fica à vista mas apagado, e o aviso leva ao jogo.
       barPrimary = {
@@ -3946,7 +3950,12 @@ export default function GameDetails() {
           {isAdmin && game.status === 'in_progress' && !inPoolStage && (
             <div className="space-y-3">
                 <>
-                  {roundsStarted && !roundPending && !canAdvance && !canFinalize && !blockingTie && (
+                  {/* Fim do mix (proposta da UX, 6 out): na última ronda, antes de
+                      tudo marcado, não há botão — só esta linha, no lugar dele. */}
+                  {roundsStarted && !roundPending && !canAdvance && !canFinalize && !blockingTie && lastRoundOpen > 0 && (
+                    <p className="text-muted text-sm text-center">{t('gamedetails.finish_missing', { count: lastRoundOpen })}</p>
+                  )}
+                  {roundsStarted && !roundPending && !canAdvance && !canFinalize && !blockingTie && lastRoundOpen === 0 && (
                     <p className="text-muted text-sm text-center">
                       {isAmericano
                         ? t('gamedetails.register_americano_results')
@@ -3965,20 +3974,6 @@ export default function GameDetails() {
                       começar ronda não pode estar só em cima… Como estava»),
                       «Terminar Ronda N» ou, na última, «Terminar e dar os pontos». */}
                   {stepSlot === 'rounds' && renderStepButton()}
-                  {/* Sair mais cedo — disponível assim que houver pelo menos um resultado guardado */}
-                  {/* Só na última ronda (ponto 16): antes, aparecia desde a 2.ª e
-                      acabava o mix a meio. */}
-                  {roundsStarted && !canFinalize && anyScoreSaved && !inGroupPhase && !nextPhase && (
-                    <>
-                      <PrimaryButton variant="danger" onClick={() => handleFinalize(true)} disabled={busy || missingResults > 0 || tiedMatches.length > 0} className="w-full">
-                        <Trophy size={20} />
-                        {busy ? t('gamedetails.finalizing') : t('gamedetails.end_mix')}
-                      </PrimaryButton>
-                      {missingResults > 0 && (
-                        <p className="text-xs text-muted text-center">{t('gamedetails.end_mix_blocked', { count: missingResults })}</p>
-                      )}
-                    </>
-                  )}
                 </>
             </div>
           )}
@@ -4511,7 +4506,7 @@ export default function GameDetails() {
       <ConfirmSheet
         open={!!finalizeAsk}
         title={t('gamedetails.finalize_ask_title')}
-        message={t(finalizeAsk?.early ? 'gamedetails.confirm_finalize_early' : 'gamedetails.finalize_ask_text')}
+        message={t('gamedetails.finalize_ask_text')}
         confirmLabel={t('gamedetails.finalize_mix')}
         cancelLabel={t('gamedetails.finalize_ask_not_yet')}
         onConfirm={doFinalize}

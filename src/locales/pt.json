@@ -1293,6 +1293,8 @@
   "gamedetails.finalizing": "A finalizar…",
   "gamedetails.finalize_mix": "Terminar e dar os pontos",
   "gamedetails.register_round_results": "Regista os resultados da ronda {{number}} para continuar",
+  "gamedetails.finish_missing_one": "Falta o resultado de 1 jogo para terminar o mix.",
+  "gamedetails.finish_missing_other": "Falta o resultado de {{count}} jogos para terminar o mix.",
   "gamedetails.round_results_missing_one": "— falta 1 jogo.",
   "gamedetails.round_results_missing_other": "— faltam {{count}} jogos.",
   "gamedetails.end_mix_blocked_one": "Para terminar o mix, falta o resultado de 1 jogo já sorteado.",

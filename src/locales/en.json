@@ -1292,6 +1292,8 @@
   "gamedetails.finalizing": "Finalizing…",
   "gamedetails.finalize_mix": "Finish and award points",
   "gamedetails.register_round_results": "Record round {{number}}'s results to continue",
+  "gamedetails.finish_missing_one": "1 game result is missing to finish the mix.",
+  "gamedetails.finish_missing_other": "{{count}} game results are missing to finish the mix.",
   "gamedetails.round_results_missing_one": "— 1 game left.",
   "gamedetails.round_results_missing_other": "— {{count}} games left.",
   "gamedetails.end_mix_blocked_one": "To end the mix, 1 game already drawn still needs a result.",
