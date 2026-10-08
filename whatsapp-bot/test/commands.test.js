@@ -330,7 +330,7 @@ test('#554 parceiro que não está na app: «Sim» junta-o como convidado sem co
   soloIn()
   assert.match(await say('in com rui costa'), /Queres inscrever a dupla/)
   const out = await say('sim')
-  assert.match(out, /convidado, sem conta/)
+  assert.match(out, /convidado deste mix, sem conta/)
   assert.equal(db.participants.length, 1)
   assert.ok(solo().partner_guest_id, 'o parceiro-convidado fica na linha que já existia')
   assert.equal(db.game_guests[0].name, 'Rui Costa')
@@ -575,4 +575,23 @@ test('sinónimos e barra: «/validar 123456» também conta; conversa normal nã
   const before = db.rpcCalls?.length ?? 0
   await say('vamos confirmar a hora do jogo?')
   assert.equal(db.rpcCalls?.length ?? 0, before, 'texto livre não dispara o comando')
+})
+
+// Renato, 8 out: «In com Guilherme Ameixa» respondia «Há mais do que uma
+// pessoa» — a conta verdadeira e uma conta-convidado antiga com o mesmo
+// nome. As contas-convidado antigas já não são identidade de ninguém.
+test('«In com X»: conta-convidado antiga com o mesmo nome não torna o nome ambíguo', async () => {
+  db.profiles.push(
+    { id: 'c', name: 'Guilherme Ameixa', language: 'pt' },
+    { id: 'c2', name: 'Guilherme Ameixa', email: 'guest-123@whatsapp.alinho.pt', language: 'pt' },
+    { id: 'c3', name: 'Guilherme Ameixa', email: 'sem-conta+x@invalid.alinho.pt', claim_pending: true, language: 'pt' },
+  )
+  db.memberships.push(
+    { user_id: 'c', organization_id: 'o' },
+    { user_id: 'c2', organization_id: 'o' },
+    { user_id: 'c3', organization_id: 'o' },
+  )
+  const out = await say('in com Guilherme Ameixa')
+  assert.doesNotMatch(out, /mais do que uma pessoa/)
+  assert.deepEqual(db.participants.map((p) => [p.user_id, p.partner_id]), [['a', 'c']])
 })

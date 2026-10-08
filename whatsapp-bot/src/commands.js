@@ -1,7 +1,7 @@
 import { supabase } from './supabase.js'
 import { getGroupByJid, mixVisibleToGroup } from './groups.js'
 import { loadGame, getOpenMixes, formatDateTime, weekdayKeyPt, mixLocalParts, gameIdForMessage, labelableMixes, mixLabel, buildMixMessage, recordMixMessage, shortWeekday, shortHour, shortLink } from './roster.js'
-import { resolveProfileByPhoneJid, guestIdentity, ensureMembership, hashPhone } from './phone.js'
+import { resolveProfileByPhoneJid, guestIdentity, ensureMembership, hashPhone, isLegacyGuestProfile } from './phone.js'
 import { parseCopiedRoster, extraNames, isSenderName, normName, nameMatches as copiedNameMatches } from './copiedRoster.js'
 import { config } from './config.js'
 import { helpText, helpFooter } from './messages.js'
@@ -698,11 +698,14 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
   async function membersNamed(profile, name) {
     const { data: rows, error } = await supabase
       .from('memberships')
-      .select('user_id, profile:profiles!inner(id, name)')
+      .select('user_id, profile:profiles!inner(id, name, email, claim_pending)')
       .eq('organization_id', organizationId)
     if (error) throw new Error(`Failed to load members for partner lookup: ${error.message}`)
     const query = stripAccents(name.toLowerCase()).replace(/\s+/g, ' ').trim()
-    const people = rows.map((r) => ({ id: r.user_id, name: r.profile.name })).filter((x) => !isMine(profile, x.id))
+    const people = rows
+      .filter((r) => !isLegacyGuestProfile(r.profile))
+      .map((r) => ({ id: r.user_id, name: r.profile.name }))
+      .filter((x) => !isMine(profile, x.id))
     const exact = people.filter((x) => stripAccents((x.name || '').toLowerCase()) === query)
     return exact.length === 1 ? exact : people.filter((x) => nameMatches(x.name, query))
   }
@@ -1438,10 +1441,13 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
       if (!members) {
         const { data, error } = await supabase
           .from('memberships')
-          .select('user_id, profile:profiles!inner(id, name)')
+          .select('user_id, profile:profiles!inner(id, name, email, claim_pending)')
           .eq('organization_id', organizationId)
         if (error) throw new Error(`Failed to load members for copied list: ${error.message}`)
-        members = data.map((r) => ({ id: r.user_id, name: r.profile.name })).filter((x) => !enrolledIds.has(x.id))
+        members = data
+          .filter((r) => !isLegacyGuestProfile(r.profile))
+          .map((r) => ({ id: r.user_id, name: r.profile.name }))
+          .filter((x) => !enrolledIds.has(x.id))
       }
       const exact = members.filter((x) => normName(x.name) === normName(extra))
       const matches = exact.length === 1 ? exact : members.filter((x) => copiedNameMatches(x.name, extra))

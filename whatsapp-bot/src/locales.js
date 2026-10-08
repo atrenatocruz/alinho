@@ -57,7 +57,7 @@ Para veres esta lista:
   reminder_roster_line: 'Inscritos: {{names}}\n\n',
   reminder_group: '🤖 ⏰ *Lembrete!* O mix *{{title}}* começa daqui a {{hours}}h.\n📅 {{when}}{{location}}\n\n{{roster}}Não faltes! 🎾',
   // voucherNotices.js — um convidado do WhatsApp ganhou um voucher (27 set, texto do Francisco).
-  voucher_guest_won: '🎁 {{who}}, ganhaste um voucher! Usa-o na receção. Queres guardar este e os próximos prémios? Cria conta em alinho.pt com este número e confirma-o no perfil.',
+  voucher_guest_won: '🎁 {{who}}, ganhaste um voucher! Usa-o na receção. Queres ter ranking e guardar os próximos prémios? Cria conta em alinho.pt.',
   duplas_updated: '🤖 🔄 *Duplas atualizadas — {{title}}*\n\n{{lines}}',
   digest_mix_line: '🎾 *{{title}}* — {{when}}{{location}}\n👥 {{filled}}/{{capacity}} (faltam {{vagas}})',
   digest_text: '🤖 *Mixes ainda em aberto!*\n\n{{lines}}\n\nAinda há vagas — inscrevam-se antes que feche! 🎾',
@@ -70,7 +70,7 @@ Para veres esta lista:
   mix_no_longer_available: '🤖 Este mix já não está disponível para inscrições.',
   already_waitlisted: '🤖 Já estás na lista de suplentes deste mix! 🎾',
   waitlisted: '🤖 Estás na lista de suplentes! Quando alguém sair, entras automaticamente. 🎾',
-  guest_waitlisted: '🤖 Fixe, {{name}}! Ficas na lista de suplentes como convidado 🎾 Entras automaticamente quando alguém sair. Sem conta não há ranking nem histórico — regista-te em {{appUrl}} e confirma o teu número no perfil, e as tuas inscrições passam para a tua conta.',
+  guest_waitlisted: '🤖 Fixe, {{name}}! Ficas na lista de suplentes como convidado 🎾 Entras automaticamente quando alguém sair. És convidado só deste mix: sem conta não há ranking nem histórico — para isso, regista-te em {{appUrl}}.',
   waitlist_declined: '🤖 Sem problema, não entraste na lista de suplentes. Inscreve-te para o próximo mix! 🎾',
   did_not_understand_yes_no: '🤖 Não percebi 🤔 Responde só com *Sim* ou *Não*.',
   no_open_mixes: '🤖 Não há nenhum mix com inscrições abertas neste momento.',
@@ -84,7 +84,7 @@ Para veres esta lista:
   copied_list_full: '🤖 O mix já está cheio: não inscrevi {{names}}. Para ficar como suplente, a pessoa escreve In.',
   // Texto do Francisco, 27 set (palavra por palavra). Vai no grupo, como
   // antes — nunca em privado (risco de o WhatsApp banir o robô).
-  guest_joined: 'Olá {{name}}! Entraste como *convidado* — podes jogar assim, mas sem conta não tens ranking nem histórico.\nRegista-te em {{appUrl}} e confirma o teu número no perfil: as tuas inscrições em mixes ainda abertos passam logo para a tua conta.',
+  guest_joined: 'Olá {{name}}! Entraste como *convidado* deste mix — podes jogar assim, mas sem conta não tens ranking nem histórico.\nPara isso, regista-te em {{appUrl}}.',
   partner_joined_use_app: '🤖 Estás inscrito em dupla por outra pessoa — quem inscreveu a dupla pode tirá-la com *Out*, ou sai tu pela app 📱',
   out_pair_menu: '🤖 Estás inscrito em dupla com *{{partner}}*. Queres sair como?\n\n1. Dupla (saem os dois)\n2. Só tu ({{partner}} fica)\n3. Parceiro (sai {{partner}}, tu ficas)\n\nEscreve *1*, *2* ou *3*.',
   out_pair_reprompt: '🤖 Não percebi 🤔 Responde com *1* (dupla), *2* (só tu) ou *3* (parceiro).',
@@ -120,7 +120,7 @@ Para veres esta lista:
   partner_offer_unregistered: '🤖 Não encontrei o *{{name}}* no clube. Queres inscrever a dupla com ele na mesma? Responde *Sim* ou *Não*.\n\n(Se ele já está na app com outro nome, responde *Não* e escreve o nome como aparece lá.)',
   partner_offer_declined: '🤖 Ok, não inscrevi a dupla. Podes tentar *In com* e o nome como está na app, ou *In @parceiro* se ele estiver no grupo.',
   pair_partner_invite_created: '🤖 🤝 Dupla inscrita com *{{partner}}*! Envia-lhe este link para ele ficar com o lugar e ter o histórico e o ranking:\n{{link}}',
-  pair_partner_guest_created: '🤖 🤝 Dupla inscrita! *{{partner}}* entra como convidado, sem conta — para ter ranking e histórico, pode registar-se em {{appUrl}} e confirmar o número no perfil.',
+  pair_partner_guest_created: '🤖 🤝 Dupla inscrita! *{{partner}}* entra como convidado deste mix, sem conta — para ter ranking e histórico, pode registar-se em {{appUrl}}.',
   guest_pair_need_account: '🤖 Para te inscreveres em dupla precisas de conta — regista-te em {{appUrl}}. Entretanto podes entrar sozinho com *In*, ou o teu parceiro escreve *In* por ele.',
 }
 
@@ -166,7 +166,7 @@ To see this list:
   reminder_roster_line: 'Signed up: {{names}}\n\n',
   reminder_group: "🤖 ⏰ *Reminder!* *{{title}}* starts in {{hours}}h.\n📅 {{when}}{{location}}\n\n{{roster}}Don't miss it! 🎾",
   // mixNotices.js — the admin changed a mix that already started (Trello #292).
-  voucher_guest_won: '🎁 {{who}}, you won a voucher! Use it at the front desk. Want to keep this and future prizes? Sign up at alinho.pt with this number and confirm it in your profile.',
+  voucher_guest_won: '🎁 {{who}}, you won a voucher! Use it at the front desk. Want a ranking and to keep future prizes? Sign up at alinho.pt.',
   duplas_updated: '🤖 🔄 *Pairs updated — {{title}}*\n\n{{lines}}',
   digest_mix_line: '🎾 *{{title}}* — {{when}}{{location}}\n👥 {{filled}}/{{capacity}} ({{vagas}} spot(s) left)',
   digest_text: '🤖 *Mixes still open!*\n\n{{lines}}\n\nStill spots open — sign up before it closes! 🎾',
@@ -179,7 +179,7 @@ To see this list:
   mix_no_longer_available: '🤖 This mix is no longer open for sign-ups.',
   already_waitlisted: "🤖 You're already on the waitlist for this mix! 🎾",
   waitlisted: "🤖 You're on the waitlist! When a spot opens up, you'll join automatically. 🎾",
-  guest_waitlisted: "🤖 Nice one, {{name}}! You're on the waitlist as a guest 🎾 You'll join automatically when a spot opens up. Without an account there's no ranking or history — sign up at {{appUrl}} and confirm your number in your profile, and your signups move to your account.",
+  guest_waitlisted: "🤖 Nice one, {{name}}! You're on the waitlist as a guest 🎾 You'll join automatically when a spot opens up. You're a guest of this mix only: without an account there's no ranking or history — for that, sign up at {{appUrl}}.",
   waitlist_declined: "🤖 No problem, you weren't added to the waitlist. Sign up for the next mix! 🎾",
   did_not_understand_yes_no: "🤖 Sorry, I didn't catch that 🤔 Reply with just *Sim* or *Não*.",
   no_open_mixes: "🤖 There's no mix open for sign-ups right now.",
@@ -191,7 +191,7 @@ To see this list:
   copied_list_added_member: '✅ I signed {{name}} up. To remove them, ask the admin.',
   copied_list_ambiguous: '🤖 I didn\'t sign up «{{name}}»: there\'s more than one person with that name in the club:\n{{list}}\n\nTo join, the person writes In.',
   copied_list_full: '🤖 The mix is already full: I didn\'t sign up {{names}}. To go on the waiting list, the person writes In.',
-  guest_joined: "Hi {{name}}! You've joined as a *guest* — you can play like this, but without an account there's no ranking or history.\nSign up at {{appUrl}} and confirm your number in your profile: your signups in still-open mixes move straight to your account.",
+  guest_joined: "Hi {{name}}! You've joined as a *guest* of this mix — you can play like this, but without an account there's no ranking or history.\nFor that, sign up at {{appUrl}}.",
   partner_joined_use_app: '🤖 Someone else signed you up as a pair — whoever signed up the pair can take it off with *Out*, or leave through the app 📱',
   out_pair_menu: '🤖 You are signed up as a pair with *{{partner}}*. How do you want to leave?\n\n1. Pair (both leave)\n2. Just you ({{partner}} stays)\n3. Partner ({{partner}} leaves, you stay)\n\nType *1*, *2* or *3*.',
   out_pair_reprompt: "🤖 I didn't get that 🤔 Reply with *1* (pair), *2* (just you) or *3* (partner).",
@@ -226,7 +226,7 @@ To see this list:
   partner_offer_unregistered: "🤖 I couldn't find *{{name}}* in the club. Do you want to sign up the pair anyway? Reply *Sim* or *Não*.\n\n(If they're already on the app under another name, reply *Não* and type the name as it appears there.)",
   partner_offer_declined: "🤖 Ok, I didn't sign up the pair. Try *In com* and the name as it appears in the app, or *In @partner* if they're in the group.",
   pair_partner_invite_created: '🤖 🤝 Pair signed up with *{{partner}}*! Send them this link so they claim the spot and keep their history and ranking:\n{{link}}',
-  pair_partner_guest_created: '🤖 🤝 Pair signed up! *{{partner}}* joins as a guest, no account — for ranking and history they can sign up at {{appUrl}} and confirm their number.',
+  pair_partner_guest_created: '🤖 🤝 Pair signed up! *{{partner}}* joins as a guest of this mix, no account — for ranking and history they can sign up at {{appUrl}}.',
   guest_pair_need_account: '🤖 To sign up as a pair you need an account — register at {{appUrl}}. Meanwhile you can join solo with *In*, or your partner writes *In* themselves.',
 }
 
@@ -237,7 +237,9 @@ const DICTS = { pt, en }
 // organizations.whatsapp_new_messages ligado (groups.js, `newMessages`); os
 // outros continuam com os textos de cima. Quando todos estiverem nas novas,
 // as antigas saem de vez. As de convidado (guest_joined, guest_waitlisted,
-// voucher_guest_won, not_found) ficam iguais: esperam pela decisão do Renato.
+// voucher_guest_won, not_found) ficam iguais nos dois formatos. Desde 8 out
+// (Renato) dizem «convidado deste mix» e já não prometem passar nada para
+// uma conta (migration_convidados_so_para_o_jogo.sql).
 // Sem rodapé do /help: nas novas ele só vai no cartão do mix.
 const ptNew = {
   promoted_to_confirmed: '✅ {{name}}, entraste no mix: saiu alguém e o lugar é teu.',

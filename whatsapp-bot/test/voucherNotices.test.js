@@ -47,7 +47,7 @@ test('o convidado que ganhou é mencionado no grupo do mix, com o texto do Franc
   const sent = await run()
   assert.equal(sent.length, 1, 'só o grupo que vê o mix M5, e só o convidado')
   assert.equal(sent[0].jid, 'm5@g.us')
-  assert.equal(sent[0].text, '🎁 @351911111111, ganhaste um voucher! Usa-o na receção. Queres guardar este e os próximos prémios? Cria conta em alinho.pt com este número e confirma-o no perfil.')
+  assert.equal(sent[0].text, '🎁 @351911111111, ganhaste um voucher! Usa-o na receção. Queres ter ranking e guardar os próximos prémios? Cria conta em alinho.pt.')
   assert.deepEqual(sent[0].opts.mentions, ['351911111111@s.whatsapp.net'])
 })
 
