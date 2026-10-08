@@ -4578,6 +4578,7 @@
   "eventactions.to_draft_done_people_other": "Voltou a rascunho. Avisámos {{count}} pessoas.",
   "eventactions.to_draft_error_not_allowed": "Só quem organiza pode pôr o mix em rascunho.",
   "layout.mix_unpublished": "O {{title}} ({{when}}) foi retirado por quem organiza.",
+  "layout.mix_not_finished": "O {{title}} ainda não está terminado. Marca o que falta e fecha.",
   "eventactions.delete_mix": "Eliminar o mix",
   "eventactions.delete_mix_hint": "Ainda ninguém se inscreveu: o mix desaparece.",
   "eventactions.cancel_done_removed": "{{name}} cancelado.",

@@ -4566,6 +4566,7 @@
   "eventactions.to_draft_done_people_other": "Back to draft. We notified {{count}} people.",
   "eventactions.to_draft_error_not_allowed": "Only the organizer can put the mix back to draft.",
   "layout.mix_unpublished": "{{title}} ({{when}}) was withdrawn by the organizer.",
+  "layout.mix_not_finished": "{{title}} isn't finished yet. Enter what's missing and close it.",
   "eventactions.delete_mix": "Delete the mix",
   "eventactions.delete_mix_hint": "Nobody has signed up yet: the mix disappears.",
   "eventactions.cancel_done_removed": "{{name}} cancelled.",
