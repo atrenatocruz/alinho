@@ -1466,14 +1466,21 @@ export default function GerirClube() {
         // falhar (ainda por correr), a pergunta sai sem números.
         const { data: preview, error: previewError } = await supabase.rpc('preview_recurrence_pause', { p_recurrence_id: recurrenceId })
         const counted = !previewError && preview && preview.dates != null
+        // Em português o 0 cai na forma do «1» (ensaio do QA, 8 out): sem
+        // datas ou sem inscritos, a frase diz isso mesmo.
+        const nDates = Number(preview?.dates) || 0
+        const nPeople = Number(preview?.people) || 0
         if (!await askConfirm({
           title: t('series.draft_title'),
-          message: counted
-            ? t('series.draft_message', { dates: t('series.n_dates', { count: Number(preview.dates) || 0 }), people: t('series.n_people', { count: Number(preview.people) || 0 }) })
-            : t('series.draft_message_plain'),
+          message: !counted ? t('series.draft_message_plain')
+            : nDates === 0 ? t('series.draft_message_no_dates')
+            : nPeople === 0 ? t('series.draft_message_nobody', { dates: t('series.n_dates', { count: nDates }) })
+            : t('series.draft_message', { dates: t('series.n_dates', { count: nDates }), people: t('series.n_people', { count: nPeople }) }),
           cancelLabel: t('series.draft_keep'),
           confirmLabel: t('series.draft_yes'),
-          danger: true,
+          // Vermelho só quando pausar tira pessoas (UX, 8 out); sem
+          // inscritos fica a preto. Sem os números, pode haver: vermelho.
+          danger: !counted || (nDates > 0 && nPeople > 0),
         })) return
         setAsk(null)
         const { error } = await supabase.rpc('pause_recurrence_to_draft', { p_recurrence_id: recurrenceId })
@@ -1482,7 +1489,8 @@ export default function GerirClube() {
       } else {
         const { data: resumed, error } = await supabase.rpc('resume_recurrence', { p_recurrence_id: recurrenceId })
         if (error) throw error
-        setDoneNotice(t('series.resumed_done', { count: Number(resumed?.dates) || 0 }))
+        const reopened = Number(resumed?.dates) || 0
+        setDoneNotice(reopened ? t('series.resumed_done', { count: reopened }) : t('series.resumed_done_none'))
       }
       setEditingGame((g) => (g ? { ...g, recurrence: { ...g.recurrence, is_paused: !currentlyPaused } } : g))
       loadGames()
