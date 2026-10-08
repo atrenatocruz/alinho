@@ -16,7 +16,7 @@ export default function Plans() {
   const { t } = useTranslation()
   const loginHref = useLoginHref()
   usePageTop()
-  const contact = 'inline-flex flex-1 items-center justify-center gap-2 min-h-[48px] rounded-ctrl px-4 font-extrabold'
+  const contact = 'inline-flex w-full items-center justify-center gap-2 min-h-[48px] rounded-ctrl px-4 font-extrabold'
   return (
     <div className="min-h-screen bg-[#F7F7F4]">
       <Nav />
@@ -34,16 +34,17 @@ export default function Plans() {
           <p className="text-ink-700 mt-1">{t(SUPPORT_EMAIL_READY ? 'plans.club_text' : 'plans.club_text_whatsapp')}</p>
           {/* «Quem escreve escolhe» (Francisco): os dois iguais, só com
               contorno. O verde do WhatsApp é uma cor fora da marca. */}
-          <div className="mt-4 flex gap-3">
+          {/* Empilhados, a toda a largura, e iguais aos da página inicial (UX, 8 out). */}
+          <div className="mt-4 flex flex-col gap-3">
+            <a href={whatsappContactLink(t('plans.whatsapp_text'))} target="_blank" rel="noopener noreferrer"
+               className={`${contact} border border-ink-900 bg-white text-ink-900 hover:bg-ink-50`}>
+              <MessageCircle size={18} /> {t('landing.organizers_whatsapp')}
+            </a>
             {SUPPORT_EMAIL_READY && (
               <a href={mailtoLink(t('plans.email_subject'))} className={`${contact} border border-ink-900 bg-white text-ink-900 hover:bg-ink-50`}>
                 <Mail size={18} /> {t('plans.email')}
               </a>
             )}
-            <a href={whatsappContactLink(t('plans.whatsapp_text'))} target="_blank" rel="noopener noreferrer"
-               className={`${contact} border border-ink-900 bg-white text-ink-900 hover:bg-ink-50`}>
-              <MessageCircle size={18} /> {t('plans.whatsapp')}
-            </a>
           </div>
           {/* Para ninguém estranhar o silêncio: o robô não responde a isto,
               responde uma pessoa (SPEC, «Contactos», 25 set). */}
