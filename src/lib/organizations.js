@@ -60,6 +60,16 @@ export const setOrganizationPlan = async (orgId, planTier) => {
   if (error) throw error
 }
 
+/** «Cancelar pedido» (8 out): apaga o MEU pedido pendente de entrada num
+ *  clube/grupo fechado — sai dos «Pedidos de entrada» do admin, e pode-se
+ *  pedir outra vez. Devolve 'cancelled', ou 'not_pending' se entretanto já
+ *  foi respondido (supabase/migration_cancelar_pedido_de_entrada.sql). */
+export const cancelMembershipRequest = async (organizationId) => {
+  const { data, error } = await supabase.rpc('cancel_membership_request', { p_organization_id: organizationId })
+  if (error) throw error
+  return data
+}
+
 // RLS on membership_requests already scopes SELECT to: rows the caller owns
 // (user_id = auth.uid()) OR rows for an org the caller admins (is_org_admin).
 // Excluding the caller's own outgoing requests leaves exactly the incoming

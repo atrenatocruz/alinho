@@ -254,6 +254,8 @@ const RPC_MOCKS = {
     ? [{ name: 'Jota Padeleiros', slug: 'jota-padeleiros', my_status: localStorage.getItem('mockJoinOpen') === 'true' ? 'member' : 'pending' }]
     : community() ? [{
     ...(COMMUNITY_ORGS.find((o) => o.slug === params?.p_slug) || COMMUNITY_ORGS[2]),
+    ...(params?.p_slug === 'lobos' && localStorage.getItem('mockPendingGroup') === 'true' ? { my_status: 'pending' } : {}),
+    ...(localStorage.getItem('mockRequestCancelled') === 'true' ? { my_status: 'none' } : {}),
     description: 'Grupo de amigos para teste do Alinho 😎', phone: null, instagram: null, website: null,
     parent_slug: null,
     // localStorage.mockClubMixes = 'true' — um mix aberto na página do clube
@@ -269,6 +271,10 @@ const RPC_MOCKS = {
     ? COMMUNITY_ORGS.filter((o) => o.name.toLowerCase().includes(String(params?.p_query || '').trim().toLowerCase()))
     : []),
   follow_organization: (params) => (params?.p_organization_id === 'ag-org-open' ? 'joined' : 'pending'),
+  // «Cancelar pedido» de entrada (8 out). Com mockCommunity, o Racket Club
+  // (clube) e, com mockPendingGroup = 'true', os Lobos (grupo) estão pendentes.
+  // Depois de cancelar, a página volta a mostrar «Pedir para entrar».
+  cancel_membership_request: () => { localStorage.setItem('mockRequestCancelled', 'true'); return 'cancelled' },
   get_group_matches: (params) => (agenda() && params?.p_organization_id === MOCK_ADMIN_ORG_ID ? AGENDA_GROUP_MATCHES() : []),
   search_players: () => [{
     id: FAKE_MEMBER_ID, name: 'Marta Costa', avatar_url: null, rating: 1380,

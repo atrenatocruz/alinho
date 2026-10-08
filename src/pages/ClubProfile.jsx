@@ -6,15 +6,16 @@
 //   jogos entre membros · sobre
 // As secções vivem em components/club/ClubSections.jsx.
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useParams, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
 import { BackBar } from '../components/ui'
-import { ArrowLeft, Building2, ChevronRight } from 'lucide-react'
+import { ArrowLeft, Building2, Check, ChevronRight } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { getClubProfile, listOrganizationMembers } from '../lib/clubProfile'
-import { listClubGroups } from '../lib/organizations'
+import { listClubGroups, cancelMembershipRequest } from '../lib/organizations'
 import { listClubTournaments } from '../lib/tournamentApi'
 import { followPlayer, removeFollow } from '../lib/follows'
 import { Avatar, EmptyState } from '../components/ui'
@@ -35,6 +36,13 @@ export default function ClubProfile() {
   const [acting, setActing] = useState(false)
   const [favoriting, setFavoriting] = useState(false)
   const [error, setError] = useState('')
+  // A tira de 3 s depois de uma ação (UX, 8 out: «✓ Pedido cancelado.»).
+  const [doneNotice, setDoneNotice] = useState('')
+  useEffect(() => {
+    if (!doneNotice) return undefined
+    const timer = setTimeout(() => setDoneNotice(''), 3000)
+    return () => clearTimeout(timer)
+  }, [doneNotice])
   const [groups, setGroups] = useState([])
   const [members, setMembers] = useState([])
   const [teachers, setTeachers] = useState([])
@@ -158,6 +166,14 @@ export default function ClubProfile() {
     await load()
   }
 
+  // «Cancelar pedido» (8 out), também chamado pela pergunta. Se entretanto
+  // já foi respondido ('not_pending'), o recarregar mostra o estado certo.
+  const handleCancelRequest = async () => {
+    const result = await cancelMembershipRequest(club.id)
+    await load()
+    if (result === 'cancelled') setDoneNotice(t('clubprofile.request_cancelled'))
+  }
+
   const handleToggleFavorite = async () => {
     setFavoriting(true); setError('')
     try {
@@ -244,6 +260,7 @@ export default function ClubProfile() {
         favoriting={favoriting}
         onFollow={handleFollow}
         onUnfollow={handleUnfollow}
+        onCancelRequest={handleCancelRequest}
         onToggleFavorite={handleToggleFavorite}
       />
       {error && <p role="alert" className="rounded-ctrl bg-danger/10 px-4 py-3 text-sm font-extrabold text-danger">{error}</p>}
@@ -309,6 +326,13 @@ export default function ClubProfile() {
       )}
 
       <ClubAbout club={club} isAdmin={isAdmin} gerirHref={gerirHref} />
+      {doneNotice && createPortal(
+        <div role="status" className="fixed left-4 right-4 bottom-[104px] z-50 mx-auto max-w-md bg-ink-900 text-white px-4 py-3 rounded-ctrl text-sm font-extrabold flex items-center gap-2 animate-fade-up">
+          <Check size={16} className="shrink-0" />
+          {doneNotice}
+        </div>,
+        document.body,
+      )}
     </div>
   )
 }
