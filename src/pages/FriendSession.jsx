@@ -3,8 +3,10 @@
 // ou recusa aqui; quem criou vê quem falta responder e, quando todos
 // aceitaram, forma as equipas: à mão (toca-se numa pessoa para a trocar de
 // equipa) ou «A app faz». Com mais de 4, quem sobra descansa e roda.
-// Ao confirmar, gravam-se o jogo 1 e os seguintes; a partir daí cada jogo é
-// um jogo entre amigos como os outros (resultado e confirmação de sempre).
+// Ao confirmar, grava-se a ronda 1; as seguintes nascem ao marcar cada uma
+// (SPEC 2026-10-07-amigos-a-jogar). Quem disse «Vou» com o nome tem os mesmos
+// poderes de quem criou (SPEC 2026-10-07-amigos-convidado): a mesma página,
+// «Editar · Mais», e no «Mais» também «Sair do jogo».
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -12,19 +14,18 @@ import { BackBar } from '../components/ui'
 import { useGoBack } from '../lib/useGoBack'
 import { MapPin, MoreHorizontal, Pencil, Share2, X, Plus } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { getFriendMatch, getFriendMatchReadonly, respondFriendMatchInvite, setFriendMatchTeams, addFriendMatchGame, addFriendMatchRound, listMyFriendMatchInvites, cancelFriendMatch, playFriendMatchWithoutName, keepFriendMatchSeat, removeFriendMatchInvitee } from '../lib/privateMatches'
+import { getFriendMatch, getFriendMatchReadonly, respondFriendMatchInvite, setFriendMatchTeams, addFriendMatchRound, listMyFriendMatchInvites, cancelFriendMatch, playFriendMatchWithoutName, keepFriendMatchSeat, removeFriendMatchInvitee, leaveFriendMatch } from '../lib/privateMatches'
 import AddPersonSheet from '../components/friends/AddPersonSheet'
-import { balancedSplit, rotatingGame, followingGames, planRounds, roundsFor, courtsFor } from '../lib/friendTeams'
+import { balancedSplit, rotatingGame, planRounds, courtsFor } from '../lib/friendTeams'
 import { describeError } from '../lib/errors'
 import { Avatar, Chips, PrimaryButton, EmptyState, ConfirmSheet } from '../components/ui'
 import { Sheet } from '../components/agenda/AgendaControls'
 import { shareWithMissing, sessionLink } from '../components/friends/friendShare'
 import { dayText } from '../components/friends/dayText'
-import FriendGameNow, { currentGame } from '../components/friends/FriendGameNow'
+import { beforeStart } from '../lib/friendGames'
+import { currentGame } from '../components/friends/FriendGameNow'
 import { ShareMissingButton } from '../components/friends/FriendSessionGames'
 import FriendRounds from '../components/friends/FriendRounds'
-import { formatKey } from '../components/friends/friendScoring'
-import FriendResultSheet from '../components/friends/FriendResultSheet'
 
 // «Vai» / «Por responder» (amigos sem bloquear, 27 set).
 const STATUS_KEY = { accepted: 'friends.tag_going', pending: 'friends.status_pending', declined: 'friends.tag_declined', guest: 'friends.guest_tag' }
@@ -59,6 +60,7 @@ export default function FriendSession() {
   // A folha de ações de quem criou (editar e juntar sets, 27 set).
   const [actionsOpen, setActionsOpen] = useState(false)
   const [askCancel, setAskCancel] = useState(false)
+  const [askLeave, setAskLeave] = useState(false)
   const [data, setData] = useState(null)
   const [loadError, setLoadError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -83,16 +85,18 @@ export default function FriendSession() {
       })
   }, [id, t])
   useEffect(() => { load() }, [load])
-  // Jogo com tempo a decorrer ou por começar: os outros telemóveis veem o
-  // «Começar» e o ± de quem criou (não há realtime aqui; Dev 3, 27 set).
-  const timedNow = !!data?.match?.game_minutes && !!currentGame(data?.games)
+  // Com uma ronda por marcar, a página atualiza-se sozinha: dois ou mais
+  // podem marcar ao mesmo tempo, como nos mixes, e o que um grava aparece
+  // aos outros (SPEC amigos-convidado; não há realtime aqui). Também traz o
+  // «Começar» e o ± do relógio.
+  const playingNow = !!currentGame(data?.games)
   useEffect(() => {
-    if (!timedNow) return undefined
+    if (!playingNow) return undefined
     const i = setInterval(() => {
       getFriendMatch(id).then(setData).catch((err) => console.error('Error refreshing friend match:', err))
     }, 10000)
     return () => clearInterval(i)
-  }, [timedNow, id])
+  }, [playingNow, id])
 
   const match = data?.match
   const invitees = data?.invitees || []
@@ -100,6 +104,9 @@ export default function FriendSession() {
   const me = invitees.find((i) => i.user_id && i.user_id === profile?.id)
   const creator = invitees.find((i) => i.is_creator)
   const iAmCreator = !!me?.is_creator
+  // Quem organiza: quem criou, ou quem disse «Vou» com o nome (Dev 3:
+  // friend_match_is_organizer). «Vou, mas sem o meu nome» não conta.
+  const iOrganize = iAmCreator || (me?.status === 'accepted' && !me?.is_anonymous)
   // Quem joga: todos menos quem recusou — quem está por responder também pode
   // ir para uma equipa; quem criou nunca fica à espera (amigos sem bloquear,
   // aprovado pelo Francisco a 27 set; base de dados do Dev 3).
@@ -111,8 +118,7 @@ export default function FriendSession() {
   const pending = invitees.filter((i) => i.status === 'pending').length
   const [formNow, setFormNow] = useState(false)
   const canForm = games.length === 0 && players.length >= 4
-  const ready = canForm && !!me?.is_creator && (pending === 0 || formNow)
-  const [resultFor, setResultFor] = useState(null) // o jogo da folha «Resultado»
+  const ready = canForm && iOrganize && (pending === 0 || formNow)
 
   // As equipas do jogo 1, no ecrã. 'a' | 'b' | 'rest' por invitee_id.
   const [side, setSide] = useState({})
@@ -151,21 +157,10 @@ export default function FriendSession() {
       const ids = (team) => team.map((p) => p.id)
       const rotating = courts === 2 || mode === 'rotating'
       await setFriendMatchTeams(match.id, { pairingMode: rotating ? 'rotating' : mode, teamA: ids(teamA), teamB: ids(teamB) })
-      if (!rotating) {
-        for (const g of followingGames(players, { teamA, teamB, resting }, mode)) {
-          // eslint-disable-next-line no-await-in-loop
-          await addFriendMatchGame(match.id, { teamA: ids(g.teamA), teamB: ids(g.teamB) })
-        }
-      } else {
-        // Por rondas (como no mix): o campo 2 da ronda 1, e depois as rondas
-        // seguintes, sem repetir duplas nem jogos (Dev 3: add_friend_match_round).
-        if (courts === 2) await addFriendMatchRound(match.id, [{ team_a: ids(teamC), team_b: ids(teamD) }], 1)
-        const round1 = { courts: [{ teamA, teamB }, ...(courts === 2 ? [{ teamA: teamC, teamB: teamD }] : [])], resting }
-        for (const r of planRounds(players, [round1], courts, roundsFor(players.length, courts) - 1)) {
-          // eslint-disable-next-line no-await-in-loop
-          await addFriendMatchRound(match.id, r.courts.map((c) => ({ team_a: ids(c.teamA), team_b: ids(c.teamB) })))
-        }
-      }
+      // Só a ronda 1 (com o campo 2, se houver): as seguintes nascem ao marcar
+      // cada uma, iguais ou, a rodar, com as duplas previstas (SPEC
+      // amigos-a-jogar, ponto 4; Dev 3: save_friend_match_round).
+      if (courts === 2) await addFriendMatchRound(match.id, [{ team_a: ids(teamC), team_b: ids(teamD) }], 1)
       // Fica-se aqui: os jogos e os resultados marcam-se na sessão.
       load()
     } catch (err) {
@@ -210,19 +205,17 @@ export default function FriendSession() {
   }
 
   // A barra de cima mostra o nome da página ao deslizar (faltava: ficava em
-  // branco, visto pelo Francisco a 27 set): o dia e a hora, ou «Jogo N de M».
-  const liveGame = match?.game_minutes ? currentGame(games) : null
-  const barTitle = !match ? '' : liveGame
-    ? t('friends.game_of', { n: liveGame.n, total: games.length })
-    : [match.scheduled_date ? dayText(match.scheduled_date, i18n.language) : null, match.scheduled_time ? match.scheduled_time.slice(0, 5) : null].filter(Boolean).join(' · ')
+  // branco, visto pelo Francisco a 27 set): o dia e a hora.
+  const barTitle = !match ? '' : [match.scheduled_date ? dayText(match.scheduled_date, i18n.language) : null, match.scheduled_time ? match.scheduled_time.slice(0, 5) : null].filter(Boolean).join(' · ')
   // Voltar para onde se veio, não para a lista: com um link fixo, a lista
   // voltava ao jogo e o jogo à lista, sem nunca sair dali (Francisco, 28 set:
   // «estou num loop… não volto ao perfil»).
   const back = <BackBar onBack={goBack} label={t('createprivatematch.title')} title={barTitle} />
-  // Quem criou: «✎ Editar» e «Mais ⋯», como no mix (MixAdminBar). O ⋯ não
+  // Quem organiza: «✎ Editar» e «Mais ⋯», como no mix (MixAdminBar). O ⋯ não
   // vai na barra de cima — a BackBar não tem menu (Francisco, 27 set).
+  const sheetButton = 'press inline-flex min-h-[52px] w-full items-center justify-center gap-2 rounded-ctrl border-[1.5px] border-line bg-white px-4 text-[15px] font-extrabold text-ink-900'
   const pill = 'inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-ctrl border border-line bg-surface px-2.5 text-sm font-extrabold text-ink-900 whitespace-nowrap'
-  const creatorBar = iAmCreator && match && (
+  const creatorBar = iOrganize && match && (
     <div className="mt-3 flex gap-1.5">
       <Link to={`/jogos-privados/sessao/${match.id}/editar`} className={pill}><Pencil size={14} /> {t('friends.edit_short')}</Link>
       <button type="button" onClick={() => setActionsOpen(true)} className={pill} aria-haspopup="dialog">
@@ -230,25 +223,47 @@ export default function FriendSession() {
       </button>
     </div>
   )
-  // «✎ Editar o jogo» · «↗ Partilhar com quem falta» · «Cancelar o jogo».
+  // Quem aceitou e não criou: a linha verde (SPEC amigos-convidado, ponto 2).
+  const organizerLine = iOrganize && !iAmCreator && (
+    <p className="mt-3 rounded-card border border-[#BBF7D0] bg-[#DCFCE7] px-3.5 py-2.5 text-sm text-[#14532D]">{t('friends.organizer_line')}</p>
+  )
+  // «Sair do jogo»: só quem aceitou e não criou, e nunca depois de o jogo
+  // contar para o ranking (Dev 3: already_counted).
+  const canLeave = iOrganize && !iAmCreator && !games.some((g) => g.counts)
+  // «Avisamos a Rita, o Tiago e a Ana» — quem criou e quem disse «Vou».
+  const leaveNames = (() => {
+    const list = invitees.filter((i) => i.user_id && i.user_id !== profile?.id && !i.is_anonymous && (i.is_creator || i.status === 'accepted'))
+      .map((i) => {
+        const first = String(i.name || '').split(/\s+/)[0]
+        const art = i.gender === 'feminino' ? 'a' : i.gender === 'masculino' ? 'o' : ''
+        return art ? `${art} ${first}` : first
+      })
+    return list.length > 1 ? `${list.slice(0, -1).join(', ')} ${t('friends.and')} ${list[list.length - 1]}` : list[0] || ''
+  })()
+  // «✎ Editar o jogo» · «↗ Partilhar com quem falta» · «Sair do jogo» ·
+  // «Cancelar o jogo», empilhados em contorno (SPEC amigos-convidado, ponto 5).
   const actions = match && (
     <>
       {actionsOpen && (
-        <Sheet title={t('friends.actions_title')} onClose={() => setActionsOpen(false)}>
-          <div className="divide-y divide-line overflow-hidden rounded-card border border-line">
-            <Link to={`/jogos-privados/sessao/${match.id}/editar`}
-              className="press flex min-h-[52px] items-center gap-2 bg-white px-4 text-[15px] font-extrabold text-ink-900">
+        <Sheet title={t('friends.more')} onClose={() => setActionsOpen(false)}>
+          <div className="space-y-2.5">
+            <Link to={`/jogos-privados/sessao/${match.id}/editar`} className={sheetButton}>
               <Pencil size={16} /> {t('friends.edit_game')}
             </Link>
             {pending > 0 && (
               <button type="button" onClick={() => { setActionsOpen(false); shareWithMissing(t('friends.share_text', {
                 name: creator?.name || '', day: dayText(match.scheduled_date, i18n.language), link: sessionLink(match.id) })) }}
-                className="press flex min-h-[52px] w-full items-center gap-2 bg-white px-4 text-left text-[15px] font-extrabold text-ink-900">
+                className={sheetButton}>
                 <Share2 size={16} /> {t('friends.share_missing')}
               </button>
             )}
+            {canLeave && (
+              <button type="button" onClick={() => { setActionsOpen(false); setAskLeave(true) }} className={sheetButton}>
+                {t('friends.leave_game')}
+              </button>
+            )}
             <button type="button" onClick={() => { setActionsOpen(false); setAskCancel(true) }}
-              className="press flex min-h-[52px] w-full items-center bg-white px-4 text-left text-[15px] font-extrabold text-danger">
+              className={`${sheetButton} !border-danger/40 !text-danger`}>
               {t('friends.cancel_game')}
             </button>
           </div>
@@ -264,6 +279,20 @@ export default function FriendSession() {
         onConfirm={async () => { await cancelFriendMatch(match.id); navigate('/jogos-privados') }}
         onClose={() => setAskCancel(false)}
         errorOf={(err) => (String(err?.message || '').includes('has_counted') ? t('friends.cancel_error_has_counted') : describeError(t, err))}
+      />
+      <ConfirmSheet
+        open={askLeave}
+        danger
+        title={t('friends.leave_title')}
+        message={leaveNames ? t('friends.leave_message', { names: leaveNames }) : t('friends.leave_message_nobody')}
+        confirmLabel={t('friends.leave_game')}
+        cancelLabel={t('friends.leave_keep')}
+        onConfirm={async () => { await leaveFriendMatch(match.id); navigate('/jogos-privados', { replace: true }) }}
+        onClose={() => setAskLeave(false)}
+        errorOf={(err) => {
+          const code = ['already_counted', 'creator_cannot_leave', 'not_allowed'].find((k) => String(err?.message || '').includes(k))
+          return code ? t(`friends.leave_error_${code}`) : describeError(t, err)
+        }}
       />
     </>
   )
@@ -295,38 +324,20 @@ export default function FriendSession() {
     </div>
   )
 
-  // Com tempo, depois das equipas: o jogo a decorrer, com o cronómetro.
-  const nowGame = match.game_minutes ? currentGame(games) : null
-  if (nowGame) {
-    return (
-      <div className="mx-auto max-w-lg pb-28">
-        {back}
-        <FriendGameNow match={match} games={games} game={nowGame} invitees={invitees} iAmCreator={iAmCreator} onChanged={load}
-          onMarkResult={() => setResultFor(nowGame)}
-          dayPlace={[match.scheduled_date ? dayText(match.scheduled_date, i18n.language) : null, match.location].filter(Boolean).join(' · ')} />
-        {resultFor && (
-          <FriendResultSheet match={match} game={resultFor} onClose={() => setResultFor(null)}
-            onSaved={() => { setResultFor(null); load() }} />
-        )}
-        {creatorBar}
-        {actions}
-      </div>
-    )
-  }
-
   return (
     <div className="mx-auto max-w-lg pb-28">
       {back}
       <h1 className="mt-2 font-display text-2xl text-ink-900">{whenText}</h1>
       {actions}
       {games.length > 0 ? (
-        // «6 pessoas · 1 campo · a rodar · Melhor de 3» (por rondas, 27 set).
+        // «6 pessoas · 1 campo · a rodar · 20 min por ronda» (SPEC amigos-a-
+        // jogar: o tipo é de cada ronda, já não vai aqui).
         <p className="mt-1 text-sm text-muted">
           {[t('friends.people_count', { count: players.length }),
             t('friends.courts_count', { count: Math.max(1, ...games.map((g) => g.court_number || 1)) }),
-            match.pairing_mode === 'fixed' ? t('friends.pairs_fixed_short') : t('friends.pairs_rotating_short'),
-            t({ best3: 'friends.format_best3', free: 'friends.format_free', points: 'createprivatematch.format_points' }[formatKey(match.scoring_format, match.num_sets)]),
-          ].join(' · ')}
+            match.pairing_mode === 'rotating' ? t('friends.pairs_rotating_short') : null,
+            match.game_minutes ? t('friends.minutes_per_round', { count: match.game_minutes }) : null,
+          ].filter(Boolean).join(' · ')}
         </p>
       ) : (match.location || players.length > 0) && (
         <p className="mt-1 inline-flex items-center gap-1 text-sm text-muted">
@@ -335,6 +346,7 @@ export default function FriendSession() {
         </p>
       )}
       {creatorBar}
+      {organizerLine}
 
       {/* Convidado por responder: «Vou» · «Vou, mas sem o meu nome» · «Não vou». */}
       {(me?.status === 'pending' || invitedHere) && (
@@ -355,9 +367,9 @@ export default function FriendSession() {
         </div>
       )}
 
-      {/* Alguém saiu («Não vou»): quem criou convida outra pessoa ou mantém o
+      {/* Alguém saiu («Não vou»): quem organiza convida outra pessoa ou mantém o
           lugar como «Jogador sem nome» (quem recusa, 27 set). */}
-      {iAmCreator && invitees.some((i) => i.status === 'declined' && i.left_name) && (() => {
+      {iOrganize && invitees.some((i) => i.status === 'declined' && i.left_name) && (() => {
         const left = invitees.filter((i) => i.status === 'declined' && i.left_name)
         const missing = Math.max(0, 4 - players.length)
         return (
@@ -382,7 +394,7 @@ export default function FriendSession() {
         )
       })()}
 
-      {ready && iAmCreator ? (
+      {ready ? (
         <div className="mt-6 space-y-6">
           {pending === 0 && <p className="text-sm text-ink-900">{t('friends.all_accepted', { count: players.length })}</p>}
           {courts === 1 && (
@@ -421,16 +433,17 @@ export default function FriendSession() {
       ) : (
         <div className="mt-6 space-y-6">
           {games.length > 0 ? (
-            <FriendRounds match={match} games={games} invitees={invitees} players={players} iAmCreator={iAmCreator}
-              myUserId={profile?.id} onChanged={load} />
-          ) : iAmCreator && canForm && pending > 0 ? null : (
+            <FriendRounds match={match} games={games} invitees={invitees} players={players} iOrganize={iOrganize} onChanged={load} />
+          ) : iOrganize && canForm && pending > 0 ? null : (
             <p className="text-sm text-ink-900">
               {pending > 0 ? t('friends.waiting_answers', { count: pending })
                 : players.length < 4 ? t('friends.not_enough', { count: players.length })
                   : t('friends.waiting_creator', { name: creator?.name || '' })}
             </p>
           )}
-          {games.length === 0 && (
+          {/* Antes de começar, «Quem joga» fica por baixo da moldura (SPEC
+              amigos-convidado, ponto 3). */}
+          {(games.length === 0 || beforeStart(match.scheduled_date, match.scheduled_time)) && (
           <div>
             <p className={label}>{t('friends.who_plays', { count: invitees.filter((i) => i.status !== 'declined').length })}</p>
             <div className="space-y-2">
@@ -448,8 +461,8 @@ export default function FriendSession() {
                       {t(STATUS_KEY[i.status] || 'friends.status_pending')}
                     </span>
                   )}
-                  {/* Quem criou tira quem ainda não jogou (Francisco, 27 set). */}
-                  {iAmCreator && !i.is_creator && !i.has_results && (
+                  {/* Quem organiza tira quem ainda não jogou (Francisco, 27 set). */}
+                  {iOrganize && !i.is_creator && i.user_id !== profile?.id && !i.has_results && (
                     <button type="button" onClick={() => removePerson(i)} disabled={busy}
                       aria-label={t('friends.remove_person', { name: i.name })}
                       className="press -mr-1.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted">
@@ -459,7 +472,7 @@ export default function FriendSession() {
                 </div>
               ))}
             </div>
-            {iAmCreator && (
+            {iOrganize && (
               <button type="button" onClick={() => setAddingPerson(true)}
                 className="press mt-2 flex min-h-[48px] w-full items-center justify-center gap-1.5 rounded-ctrl border border-dashed border-line bg-white text-sm font-extrabold text-ink-900">
                 <Plus size={16} /> {t('friends.add_person_button')}
@@ -471,8 +484,8 @@ export default function FriendSession() {
             )}
           </div>
           )}
-          {/* Quem criou, com pessoas por responder: não fica à espera. */}
-          {games.length === 0 && iAmCreator && canForm && pending > 0 && (
+          {/* Quem organiza, com pessoas por responder: não fica à espera. */}
+          {games.length === 0 && iOrganize && canForm && pending > 0 && (
             <div className="space-y-3">
               <p className="rounded-card bg-ink-50 p-3.5 text-sm text-ink-700">
                 <b className="text-ink-900">{t('friends.no_need_to_wait_bold')}</b> {t('friends.no_need_to_wait_rest')}

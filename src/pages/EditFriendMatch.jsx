@@ -26,7 +26,9 @@ export default function EditFriendMatch() {
   if (!data) {
     return <div className="flex justify-center py-10"><div className="h-8 w-8 animate-spin rounded-full border-[3px] border-ink-50 border-t-ink-700" /></div>
   }
-  const mine = (data.invitees || []).some((i) => i.is_creator && i.user_id === profile?.id)
+  // Quem criou, ou quem disse «Vou» com o nome (SPEC 2026-10-07-amigos-convidado).
+  const mine = (data.invitees || []).some((i) => i.user_id && i.user_id === profile?.id
+    && (i.is_creator || (i.status === 'accepted' && !i.is_anonymous)))
   if (!mine) return <EmptyState title={t('friends.edit_error_not_allowed')} />
   // Jogo de grupo (#586): juntar pessoas procura só nos membros do grupo,
   // como no criar. O grupo vem na get_friend_match (Dev 3); sem ele, como antes.
