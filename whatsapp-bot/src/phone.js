@@ -129,6 +129,12 @@ const GUEST_EMAIL_LIKE = 'guest-%@whatsapp.alinho.pt'
 export const isGuestEmail = (email) => /^guest-.*@whatsapp\.alinho\.pt$/.test(email || '')
 // Conta por reclamar criada pelo nome (parceiro sem conta, lista copiada).
 export const isPlaceholderEmail = (email) => /^sem-conta\+.*@invalid\.alinho\.pt$/.test(email || '')
+// Conta-convidado antiga (do robô ou «por reclamar»): já não é identidade
+// de ninguém — quem não tem conta é convidado de UM jogo (game_guests).
+// Fica fora da procura por nome, senão aparece ao lado da conta verdadeira
+// da mesma pessoa («Há mais do que uma pessoa com Guilherme Ameixa»).
+export const isLegacyGuestProfile = (profile) =>
+  Boolean(profile?.claim_pending) || isGuestEmail(profile?.email) || isPlaceholderEmail(profile?.email)
 
 /**
  * Entre várias contas com o mesmo telemóvel no clube (#537), prefere a

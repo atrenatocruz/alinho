@@ -42,5 +42,6 @@ test('a resposta a um convidado novo explica o modelo sem conta', () => {
   const text = t('guest_joined', 'pt', { name: 'Paulo Henriques', appUrl: 'https://alinho.pt' })
   assert.ok(text.startsWith('Olá Paulo Henriques! Entraste como *convidado*'))
   assert.match(text, /sem conta não tens ranking nem histórico/)
-  assert.match(text, /Regista-te em https:\/\/alinho\.pt e confirma o teu número/)
+  assert.match(text, /regista-te em https:\/\/alinho\.pt/)
+  assert.doesNotMatch(text, /para a tua conta/)
 })

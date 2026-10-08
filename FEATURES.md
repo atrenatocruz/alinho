@@ -78,7 +78,7 @@ What alinho actually does today, and what's explicitly not built yet. Kept in sy
 - One bot process per club (its own WhatsApp number/session, scoped to one `organization_id`).
 - Roster shows **full player names and Elo band**, keeps signup order, and reposts immediately on the first In. Incoming group messages are processed in a **FIFO queue** so simultaneous replies can't race.
 - Mix announcements carry a **calendar (.ics) link**.
-- An **unregistered WhatsApp number can join a mix as a guest**, without an account. Guest profiles get the same 900-rating baseline as everyone else.
+- An **unregistered WhatsApp number can join a mix as a guest of that mix only** — no account is created (`game_guests`, no ranking). Two days after the game a daily job clears the guest's number/WhatsApp id and keeps only the name for history; the same applies to guest emails and claim links in tournaments and friend games (`migration_convidados_so_para_o_jogo.sql`). Old guest accounts (`guest-*@whatsapp.alinho.pt`, unclaimed partner accounts) with no games were deleted by that migration; ones with history stay, without phone data, and the bot ignores them when matching names.
 - Bot messages respect the player's `profiles.language`.
 
 ## UI/UX
