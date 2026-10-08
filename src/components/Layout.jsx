@@ -450,6 +450,7 @@ export default function Layout({ children }) {
       return t(`layout.${notice.kind}`, vars)
     }
     if (notice.kind === 'mix_unpublished') return t('layout.mix_unpublished', vars)
+    if (notice.kind === 'mix_not_finished') return t('layout.mix_not_finished', vars)
     const partnerLine = d.partner_name ? t('layout.mix_notice_partner', vars) : t('layout.mix_notice_no_partner')
     // Quem inscreveu (Trello #534): o aviso guarda o nome do admin.
     const joinedKey = d.actor_name ? 'layout.mix_notice_added_by' : 'layout.mix_notice_joined'
