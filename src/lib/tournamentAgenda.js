@@ -39,7 +39,8 @@ export async function loadTournamentEvents({ userId, orgIds = [], today }) {
     .from('tournament_public')
     .select('id, slug, name, organization_id, club_name, club_logo_url, starts_on, ends_on, status, entries_deadline, entry_fee_cents, category_count')
     .in('organization_id', orgIds)
-    .gte('ends_on', today)
+    // Sem corte por data (Trello #508): os torneios que já acabaram ficam no
+    // dia em que foram jogados — mas só os meus (filtro mais abaixo).
     // Cancelado (1 out) sai da agenda; o aviso chega pelo sino.
     .neq('status', 'cancelado')
   if (tError) return quiet(tError, 'tournaments')
@@ -69,6 +70,9 @@ export async function loadTournamentEvents({ userId, orgIds = [], today }) {
     const cat = catById.get(entry.category_id)
     if (cat) myByTournament.set(cat.tournament_id, { state: entry.status, entry_id: entry.id, category_id: entry.category_id })
   }
+  // Um torneio que já acabou só fica se joguei nele (#508): antes saía da
+  // Home no dia a seguir, e com ele os meus jogos e os resultados.
+  const kept = tournaments.filter((t) => !t.ends_on || t.ends_on >= today || myByTournament.has(t.id))
 
   // Os meus jogos, se já houve sorteio.
   let matches = []
@@ -101,14 +105,18 @@ export async function loadTournamentEvents({ userId, orgIds = [], today }) {
       .from('tournament_public_notices')
       .select('id, tournament_id, body, created_at, expires_at')
       .in('tournament_id', [...myByTournament.keys()])
+    // Com o torneio acabado, o aviso («M4 atrasado 20 min») já não diz
+    // nada: deixa de aparecer (UX e PO, 7 out — os acabados ficam na Home).
+    const over = new Set(tournaments.filter((t) => t.status === 'terminado' || (t.ends_on && t.ends_on < today)).map((t) => t.id))
     for (const id of myByTournament.keys()) {
+      if (over.has(id)) continue
       const mineNotices = (data || []).filter((n) => n.tournament_id === id)
       const newest = latestNotice(mineNotices)
       if (newest) noticeByTournament.set(id, newest.body)
     }
   }
 
-  const tourById = new Map(tournaments.map((t) => [t.id, t]))
+  const tourById = new Map(kept.map((t) => [t.id, t]))
   const withMatches = new Set()
   const events = []
 
@@ -133,7 +141,7 @@ export async function loadTournamentEvents({ userId, orgIds = [], today }) {
     }))
   }
 
-  for (const tour of tournaments) {
+  for (const tour of kept) {
     // Feito o sorteio, o cartão do torneio dá lugar aos jogos.
     if (withMatches.has(tour.id)) continue
     // Um torneio onde não estou só aparece enquanto der para entrar.

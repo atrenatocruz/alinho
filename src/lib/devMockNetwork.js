@@ -1187,6 +1187,8 @@ const TABLE_MOCKS = {
       const d = new Date(); d.setDate(d.getDate() + n)
       return d.toISOString().slice(0, 10)
     }
+    // mockTHome = 'past': o torneio acabou há dois dias e joguei (#508).
+    if (mode === 'past') return [{ ...tour, starts_on: day(-3), ends_on: day(-2), status: 'terminado', category_count: 5 }]
     const d0 = localStorage.getItem('mockTHomeToday') === 'true' ? 0 : 1
     return [{ ...tour, starts_on: day(d0), ends_on: day(d0 + 2), status: d0 === 0 ? 'a_decorrer' : 'inscricoes', category_count: 5 }]
   },
@@ -1201,6 +1203,15 @@ const TABLE_MOCKS = {
     // jogou, e a folha de trocar jogador avisa (Trello #434).
     if (localStorage.getItem('mockTReplacePlayed') === 'true') {
       return [{ id: 'rp1', category_id: 'cat-m4', entry_a_id: 'e1', entry_b_id: 'e3', status: 'terminado', winner_entry_id: 'e1', score_a: 9, score_b: 6 }]
+    }
+    if (localStorage.getItem('mockTHome') === 'past') {
+      const ago = (days, hour) => { const d = new Date(); d.setDate(d.getDate() - days); d.setHours(hour, 0, 0, 0); return d.toISOString() }
+      return [
+        { id: 'tp1', category_id: 'cat-m4', stage: 'grupos', round: null, entry_a_id: 'my-entry', entry_b_id: 'rival-1',
+          scheduled_at: ago(3, 10), previous_scheduled_at: null, court_name: 'Campo 2', status: 'terminado', score_a: 9, score_b: 6, winner_entry_id: 'my-entry' },
+        { id: 'tp2', category_id: 'cat-m4', stage: 'quartos', round: 'QF', entry_a_id: 'rival-2', entry_b_id: 'my-entry',
+          scheduled_at: ago(2, 16), previous_scheduled_at: null, court_name: 'Campo 3', status: 'terminado', score_a: 9, score_b: 4, winner_entry_id: 'rival-2' },
+      ]
     }
     if (localStorage.getItem('mockTHome') !== 'matches') return []
     // localStorage.mockTHomeToday = 'true': os meus jogos são hoje (para ver
