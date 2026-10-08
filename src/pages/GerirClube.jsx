@@ -2348,7 +2348,9 @@ export default function GerirClube() {
     const extras = editingGame?.recurrence?.is_active && (
       <div className="pt-4 border-t border-line space-y-4">
         {editingGame.recurrence?.is_active && (
-          <div className="flex items-center justify-between gap-3 p-3 rounded-ctrl bg-ink-50">
+          // Um só preto por ecrã (UX, 8 out): o da série fica em contorno, a
+          // toda a largura, por baixo do texto — o preto é o «Guardar».
+          <div className="space-y-2.5 p-3 rounded-ctrl bg-ink-50">
             <div>
               <p className="text-sm font-extrabold text-ink-900">
                 {editingGame.recurrence.is_paused ? t('gerirclube.recurrence_paused_label') : t('gerirclube.recurrence_active_label')}
@@ -2358,7 +2360,7 @@ export default function GerirClube() {
               </p>
             </div>
             <button type="button" onClick={() => handleTogglePauseRecurrence(editingGame.recurrence.id, editingGame.recurrence.is_paused)}
-              className="shrink-0 text-xs font-extrabold px-3.5 py-2 min-h-[44px] rounded-full bg-ink-900 text-lime-400">
+              className="w-full min-h-[48px] rounded-ctrl border border-line bg-white px-4 text-sm font-extrabold text-ink-900">
               {editingGame.recurrence.is_paused ? t('gerirclube.resume_button') : t('gerirclube.pause_button')}
             </button>
           </div>
@@ -3058,7 +3060,7 @@ export default function GerirClube() {
                     {(!editingGame || !editingGame.recurrence || editingGame.recurrence.is_active) && (
                       <div className="border-t border-line pt-4 space-y-4">
                         {editingGame?.recurrence?.is_active && (
-                          <div className="flex items-center justify-between gap-3 p-3 rounded-ctrl bg-ink-50">
+                          <div className="space-y-2.5 p-3 rounded-ctrl bg-ink-50">
                             <div>
                               <p className="text-sm font-extrabold text-ink-900">
                                 {editingGame.recurrence.is_paused ? t('gerirclube.recurrence_paused_label') : t('gerirclube.recurrence_active_label')}
@@ -3072,7 +3074,7 @@ export default function GerirClube() {
                             <button
                               type="button"
                               onClick={() => handleTogglePauseRecurrence(editingGame.recurrence.id, editingGame.recurrence.is_paused)}
-                              className="shrink-0 text-xs font-extrabold px-3.5 py-2 min-h-[44px] rounded-full bg-ink-900 text-lime-400"
+                              className="w-full min-h-[48px] rounded-ctrl border border-line bg-white px-4 text-sm font-extrabold text-ink-900"
                             >
                               {editingGame.recurrence.is_paused ? t('gerirclube.resume_button') : t('gerirclube.pause_button')}
                             </button>
