@@ -11,7 +11,7 @@ process.env.APP_URL = 'https://alinho.pt'
 
 const { supabase } = await import('../src/supabase.js')
 const { installFakeSupabase } = await import('./fakeSupabase.js')
-const { handleGroupMessage, buildHelp, _clearPairRequestsForTests } = await import('../src/commands.js')
+const { handleGroupMessage, buildHelp } = await import('../src/commands.js')
 const { buildMixMessage, shortPlace, shortPrice, _clearOpenMixesCacheForTests } = await import('../src/roster.js')
 const { buildOpenSlotsMessage } = await import('../src/openSlots.js')
 const { buildTournamentMessage, buildLessonSeriesMessage } = await import('../src/eventPosts.js')
@@ -40,7 +40,6 @@ function freshDb(newMessages) {
   installFakeSupabase(supabase, db)
   _clearGroupsCacheForTests()
   _clearOpenMixesCacheForTests()
-  _clearPairRequestsForTests()
 }
 beforeEach(() => freshDb(true))
 
@@ -158,7 +157,7 @@ test('vários mixes abertos: a pergunta curta, com as respostas possíveis', asy
 
 test('o /help muda conforme os mixes abertos', async () => {
   const one = await say('/help')
-  assert.match(one, /^🤖 \*Como usar o robô\*\n\*In\* — entrar no mix\n\*Out\* — sair\n\*In com\* e o nome — entrar em dupla\n\*Sim\* — aceitar/)
+  assert.match(one, /^🤖 \*Como usar o robô\*\n\*In\* — entrar no mix\n\*Out\* — sair\n\*In com\* e o nome — entrar em dupla\n\*Sim\* — confirmar o que o robô pergunta/)
   assert.doesNotMatch(one, /Vários mixes/)
   assert.match(one, /Tudo explicado em alinho\.pt\/instrucoes$/)
   const solo = { allow_pair_signup: false, rotate_partners: false, origin: 'manual', id: 'x' }

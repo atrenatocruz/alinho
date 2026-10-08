@@ -62,24 +62,10 @@ const isGameFull = (error) => /(^|\W)game_full$/.test(String(error?.message || '
 // are rare and the worst case is the person just retries "in".
 const pendingSuplenteConfirmations = new Map()
 
-// Pedidos de dupla à espera de resposta (Francisco, 27 set: «Prefiro que
-// tenha de aceitar. Senão qualquer pessoa pode aceitar.»). Quem escreve
-// «In com X», com o X inscrito sozinho, entra sozinho e o robô pergunta ao X;
-// só o X (pelo número, com as contas do mesmo número) aceita com «Sim». Em
-// memória: um reinício do robô deixa cair os pedidos, e os dois ficam
-// inscritos sozinhos — o mesmo que um «Não».
-const pairRequests = new Map() // `${groupJid}|${gameId}|${requesterId}` → pedido
-
-/** Só para testes. */
-export function _clearPairRequestsForTests() { pairRequests.clear() }
-
-/** «Sim» / «Não» (com ou sem @) — a resposta a um pedido de dupla. */
-function parsePairAnswer(text) {
-  const n = stripAccents(String(text || '').trim().toLowerCase()).replace(/@\S+/g, ' ').replace(/[!.]+/g, ' ').replace(/\s+/g, ' ').trim()
-  if (['sim', 'aceito', 'sim aceito'].includes(n)) return 'yes'
-  if (['nao', 'nao aceito'].includes(n)) return 'no'
-  return null
-}
+// «In com X» com o X inscrito sozinho junta logo os dois em dupla, sem o X
+// ter de responder «Sim» (Francisco, 8 out). O pedido de aceitação de 27 set
+// caiu: no M5 da A2N quem respondeu «Sim» foi quem pediu, e a dupla ficou à
+// espera.
 
 function pendingKey(senderPn, groupJid) {
   return `${senderPn}:${groupJid}`
@@ -385,14 +371,11 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
   // como um «In» — de quem enviou, ou das pessoas que acrescentou.
   const copied = !pending && !parsed ? parseCopiedRoster(text) : null
   if (copied) parsed = { action: 'in', rest: null, glued: false }
-  // Uma resposta a um pedido de dupla deste grupo (só se houver algum:
-  // a conversa normal nunca vai à base de dados).
-  const pairAnswer = !parsed && [...pairRequests.values()].some((r) => r.groupJid === groupJid) ? parsePairAnswer(text) : null
-  if (!pending && !parsed && !pairAnswer) return
+  if (!pending && !parsed) return
   // Declarado já aqui: o «Sim» a um parceiro sem conta (lá em baixo, no
   // pending) pode voltar ao caminho do «In com …» (confirmPairWithUnregistered).
   let partnerRequest = null
-  ctx.action = copied ? 'copied_list' : pairAnswer && !pending ? 'pair_answer' : (parsed?.action ?? 'pending')
+  ctx.action = copied ? 'copied_list' : (parsed?.action ?? 'pending')
 
   // Multi-grupo: o grupo de onde a mensagem veio determina o clube (e o
   // filtro de nível) de TUDO o resto deste handler. Grupo não mapeado em
@@ -502,8 +485,6 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
     if (error) throw new Error(`Failed to create named game guest: ${error.message}`)
     return g.id
   }
-
-  if (pairAnswer && resolvedProfile && await answerPairRequest(pairAnswer)) return
 
   if (pending) {
     const normalized = stripAccents(text.trim().toLowerCase())
@@ -740,91 +721,29 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
   }
 
   /**
-   * Pede ao parceiro (inscrito sozinho) que aceite a dupla. Quem pediu já
-   * está inscrito sozinho. O robô menciona o parceiro, se souber o número.
+   * Junta duas inscrições sozinhas numa dupla (Francisco, 8 out: sem pedir
+   * «Sim»). Fica a linha `keepRow` (o lugar dela na lista), com o outro como
+   * parceiro, e sai a `freeRow` — sem deixar entrar um suplente pelo meio: a
+   * `freeRow` fica 'cancelled' (um UPDATE não promove ninguém — só o DELETE
+   * corre o promote_waitlist), a `keepRow` ganha o partner_id, e só então se
+   * apaga a `freeRow` (com a dupla já a ocupar os dois lugares). Devolve o
+   * erro de vagas, se houver.
    */
-  async function askPairRequest(game, requester, partner) {
-    let pn = (partnerRequest?.mentionedPns || [])[0] || null
-    if (!pn) {
-      const { data } = await supabase.from('profiles').select('whatsapp_jid').eq('id', partner.id)
-      pn = data?.[0]?.whatsapp_jid || null
-    }
-    const who = pn ? `@${String(pn).split('@')[0]}` : partner.name
-    const ask = t('pair_request_ask', lang, { partner: who, requester: requester.name }, fresh)
-    const messageId = await sendText(groupJid, fresh ? ask : `${ask}${helpFooter(lang)}`, { mentions: pn ? [pn] : [] })
-    pairRequests.set(`${groupJid}|${game.id}|${requester.id}`, {
-      groupJid, gameId: game.id, requesterId: requester.id, requesterName: requester.name,
-      partnerId: partner.id, partnerName: partner.name, messageId: messageId || null, createdAt: Date.now(),
-    })
-  }
-
-  /**
-   * «Sim» / «Não» de quem recebeu um pedido de dupla. Só conta se quem
-   * responde for o parceiro pedido (isMine: o número, com as contas do
-   * mesmo número). Devolve true se a mensagem era mesmo uma resposta.
-   */
-  async function answerPairRequest(answer) {
-    let mine = [...pairRequests.values()].filter((r) => r.groupJid === groupJid && isMine(resolvedProfile, r.partnerId))
-    if (mine.length === 0) return false
-    if (quotedStanzaId && mine.some((r) => r.messageId === quotedStanzaId)) mine = mine.filter((r) => r.messageId === quotedStanzaId)
-    else if (mentionedPns.length > 0) {
-      const ids = []
-      for (const pn of mentionedPns) {
-        const found = await resolveProfileByPhoneJid(pn, organizationId)
-        if (found) ids.push(found.id, ...(found.aliasIds || []))
-      }
-      const byMention = mine.filter((r) => ids.includes(r.requesterId))
-      if (byMention.length > 0) mine = byMention
-    }
-    if (mine.length > 1) {
-      await reply('pair_request_which')
-      return true
-    }
-    const req = mine[0]
-    const key = `${req.groupJid}|${req.gameId}|${req.requesterId}`
-    pairRequests.delete(key)
-    if (answer === 'no') {
-      await reply('pair_request_declined', { partner: req.partnerName, requester: req.requesterName })
-      return true
-    }
-
-    // Vale até o mix começar ou as duplas serem sorteadas, e com os dois
-    // ainda inscritos sozinhos.
-    const { game, rows } = await loadGame(req.gameId)
-    const { data: drawn } = await supabase.from('teams').select('id').eq('game_id', req.gameId)
-    // «Sozinho» = sem parceiro NENHUM — nem conta nem convidado (senão um
-    // «Sim» tardio cancelava a linha de quem entretanto juntou um convidado
-    // e o gc apagava-o do jogo).
-    const requesterRow = rows.find((r) => r.status === 'confirmed' && r.user_id === req.requesterId && !r.partner_id && !r.partner_guest_id)
-    const partnerRow = rows.find((r) => r.status === 'confirmed' && isMine(resolvedProfile, r.user_id) && !r.partner_id && !r.partner_guest_id)
-    if (!OPEN_STATUSES.has(game.status) || new Date(game.date).getTime() <= Date.now() || (drawn || []).length > 0 || !requesterRow || !partnerRow) {
-      await reply('pair_request_expired')
-      return true
-    }
-
-    // Juntar sem deixar entrar um suplente pelo meio: a inscrição de quem
-    // pediu fica 'cancelled' (um UPDATE não promove ninguém — só o DELETE
-    // corre o promote_waitlist), a do parceiro ganha o partner_id, e só então
-    // se apaga a de quem pediu (com a dupla já a ocupar os dois lugares).
-    const { error: freeError } = await supabase.from('participants').update({ status: 'cancelled' }).eq('id', requesterRow.id)
-    if (freeError) throw new Error(`Failed to free requester row: ${freeError.message}`)
+  async function joinSoloRows(keepRow, freeRow, partnerId) {
+    const { error: freeError } = await supabase.from('participants').update({ status: 'cancelled' }).eq('id', freeRow.id)
+    if (freeError) throw new Error(`Failed to free solo row: ${freeError.message}`)
     const { error: joinError } = await supabase
       .from('participants')
-      .update({ partner_id: req.requesterId, joined_alone: false })
-      .eq('id', partnerRow.id)
+      .update({ partner_id: partnerId, joined_alone: false })
+      .eq('id', keepRow.id)
     if (joinError) {
-      await supabase.from('participants').update({ status: 'confirmed' }).eq('id', requesterRow.id)
-      if (isGameFull(joinError)) {
-        await reply('pair_request_expired')
-        return true
-      }
-      throw new Error(`Failed to form requested pair: ${joinError.message}`)
+      await supabase.from('participants').update({ status: 'confirmed' }).eq('id', freeRow.id)
+      if (isGameFull(joinError)) return joinError
+      throw new Error(`Failed to join solo rows: ${joinError.message}`)
     }
-    const { error: delError } = await supabase.from('participants').delete().eq('id', requesterRow.id)
-    if (delError) console.error('Failed to remove the requester row after pairing:', delError)
-    repostHooks.requestRepostForGame(organizationId, req.gameId)
-    await reply('pair_request_accepted', { partner: req.partnerName, requester: req.requesterName })
-    return true
+    const { error: delError } = await supabase.from('participants').delete().eq('id', freeRow.id)
+    if (delError) console.error('Failed to remove the freed row after pairing:', delError)
+    return null
   }
 
   // «Sim» à pergunta «inscrever a dupla com quem não está na app?». Entre a
@@ -964,9 +883,17 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
       await reply('pair_partner_guest_created', { partner: partner.name, appUrl: config.appUrl })
       return
     }
+    // O X também está inscrito sozinho: ficam logo em dupla, na inscrição do
+    // X (Francisco, 8 out — antes o X tinha de responder «Sim»).
     const partnerSolo = existingRows.find((r) => r.status === 'confirmed' && r.user_id === partner.id && !r.partner_id && !r.partner_guest_id)
     if (partnerSolo) {
-      await askPairRequest(game, profile, partner)
+      const fullError = await joinSoloRows(partnerSolo, row, profile.id)
+      timer.mark('gravar')
+      if (fullError) {
+        await reply('mix_full_add_partner')
+        return
+      }
+      repostHooks.requestRepostForGame(organizationId, game.id)
       return
     }
     if (existingRows.some((r) => r.user_id === partner.id || r.partner_id === partner.id)) {
@@ -1099,25 +1026,22 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
         await reply('partner_in_pair', { name: partner.name, other })
         return
       }
-      // O X tem de aceitar (Francisco, 27 set). Quem escreveu entra já
-      // sozinho, para não perder a vaga, e o robô pergunta ao X.
+      // O X sozinho: quem escreveu entra logo na inscrição dele e ficam em
+      // dupla, sem o X ter de responder «Sim» (Francisco, 8 out). Só precisa
+      // de 1 vaga (a de cima já o garante); mix cheio → suplente com «In».
       const { error } = await supabase
         .from('participants')
-        .insert([{ game_id: game.id, user_id: profile.id, status: 'confirmed', joined_alone: true }])
+        .update({ partner_id: profile.id, joined_alone: false })
+        .eq('id', partnerRow.id)
       timer.mark('gravar')
       if (error) {
-        if (error.code === '23505') {
-          await reply('already_joined')
-          return
-        }
         if (isGameFull(error)) {
           await reply('mix_full_pair')
           return
         }
-        throw new Error(`Failed to insert requester: ${error.message}`)
+        throw new Error(`Failed to join the partner's row: ${error.message}`)
       }
       repostHooks.requestRepostForGame(organizationId, game.id)
-      await askPairRequest(game, profile, partner)
       if (isNewGuest) await reply('guest_joined', { name: profile.name, appUrl: config.appUrl })
       return
     }
