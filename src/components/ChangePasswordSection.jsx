@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { KeyRound } from 'lucide-react'
+import { CheckCircle2, KeyRound } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { PrimaryButton } from './ui'
@@ -83,8 +83,10 @@ export default function ChangePasswordSection() {
       setCurrent('')
       setNext('')
       setConfirm('')
+      // Fica à vista até se mexer nos campos (PO, 9 out): a linha que sumia
+      // ao fim de 4 s passava despercebida, e o Francisco achou que a
+      // password não tinha mudado.
       setDone(true)
-      setTimeout(() => setDone(false), 4000)
     } catch (err) {
       console.error('Error changing password:', err)
       setError(describeError(t, err, 'profile.password_error_generic'))
@@ -112,7 +114,7 @@ export default function ChangePasswordSection() {
               id="password-atual"
               autoComplete="current-password"
               value={current}
-              onChange={(e) => setCurrent(e.target.value)}
+              onChange={(e) => { setCurrent(e.target.value); setDone(false) }}
               placeholder={t('login.password_placeholder')}
               required
             />
@@ -126,7 +128,7 @@ export default function ChangePasswordSection() {
               id="password-nova"
               autoComplete="new-password"
               value={next}
-              onChange={(e) => setNext(e.target.value)}
+              onChange={(e) => { setNext(e.target.value); setDone(false) }}
               placeholder={t('login.password_placeholder')}
               required
             />
@@ -141,14 +143,18 @@ export default function ChangePasswordSection() {
               id="password-confirmar"
               autoComplete="new-password"
               value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
+              onChange={(e) => { setConfirm(e.target.value); setDone(false) }}
               placeholder={t('login.password_placeholder')}
               required
             />
           </div>
 
           {error && <p className="text-sm text-danger">{error}</p>}
-          {done && <p className="text-sm text-ink-900 font-extrabold">{t('profile.password_changed')}</p>}
+          {done && (
+            <p role="status" className="flex items-start gap-2 rounded-ctrl border border-[#BBF7D0] bg-[#DCFCE7] px-3.5 py-3 text-sm font-extrabold text-[#14532D]">
+              <CheckCircle2 size={18} className="mt-px shrink-0" /> {t('profile.password_changed')}
+            </p>
+          )}
 
           <TurnstileWidget ref={captchaRef} action="change_password" onToken={setCaptchaToken} />
 
