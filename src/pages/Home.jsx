@@ -2,15 +2,15 @@ import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useSearchParams, useNavigationType, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Search, X, Check } from 'lucide-react'
+import { X, Check, ChevronLeft } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { takePendingOrgSlug } from '../lib/loginLinks'
 import { getClubProfile } from '../lib/clubProfile'
 import { useAuth } from '../contexts/AuthContext'
 import { ConfirmSheet } from '../components/ui'
 import { GameEventCard, FriendsEventCard, ExploreEventCard } from '../components/agenda/EventCard'
-import { DayHeader, MonthSheet, FilterSheet, FilterChips, LocationChip, LocationSheet, ViewToggle, Sheet, dayLabel, KIND_FILTER_KEY, SHOW_LABEL_KEY } from '../components/agenda/AgendaControls'
-import HomeSearch from '../components/agenda/HomeSearch'
+import { MonthSheet, HomeBar, HomeFiltersSheet, LocationChip, LocationSheet, ViewToggle, Sheet, dayLabel } from '../components/agenda/AgendaControls'
+import HomeSearch, { rememberSearch } from '../components/agenda/HomeSearch'
 import PlayedList from '../components/agenda/PlayedList'
 import { MapView } from '../components/agenda/MapView'
 import { listExploreEvents, getSavedLocation, saveLocation } from '../lib/explore'
@@ -426,10 +426,6 @@ export default function Home() {
   }, [games, groupMatches, privateMatches, exploreRows, lessonRows, lessonRequests, tournamentEvents, user, memberships])
 
   const visible = useMemo(() => applyFilters(events, filters, location), [events, filters, location])
-  const searchEvents = useMemo(
-    () => (searchState.all ? applyFilters(events, DEFAULT_FILTERS, location) : visible),
-    [searchState.all, events, location, visible],
-  )
   const counts = useMemo(() => countByDay(visible), [visible])
   const today = toDayKey(new Date())
   const days = useMemo(() => groupByDay(visible, today), [visible, today])
@@ -439,13 +435,6 @@ export default function Home() {
     || filters.orgIds != null
     || EVENT_KINDS.some((k) => !filters.kinds.includes(k))
   const emptyByFilters = filtersActive && visible.length === 0 && events.length > 0
-  const searching = search.trim().length > 0
-  // «A procurar só em …»: os filtros ligados, com as palavras dos próprios filtros.
-  const filtersLabel = [
-    filters.show !== DEFAULT_FILTERS.show ? t(SHOW_LABEL_KEY[filters.show]) : null,
-    ...(EVENT_KINDS.some((k) => !filters.kinds.includes(k)) ? filters.kinds.map((k) => t(KIND_FILTER_KEY[k])) : []),
-    ...(filters.orgIds ? orgs.filter((o) => filters.orgIds.includes(o.id)).map((o) => o.name) : []),
-  ].filter(Boolean).join(', ')
   // O mapa só mostra o que ainda vem à frente — pins de eventos passados não
   // ajudam a decidir onde jogar a seguir.
   const pins = useMemo(() => eventsToPins(visible.filter((e) => !isPastEvent(e, today))), [visible, today])
@@ -617,6 +606,52 @@ export default function Home() {
     return () => main.removeEventListener('scroll', updateVisibleDay)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [days])
+
+  /* Topo que encolhe (Home do futuro, SPEC-1, ponto 3): a deslizar para
+     baixo, a linha do sítio, do mapa e do sino sobe e fica só a barra; a
+     deslizar para cima, mesmo pouco, volta. Sobe com transform — a altura do
+     cabeçalho não muda, por isso a lista não pula. */
+  const topRowRef = useRef(null)
+  const [collapsed, setCollapsed] = useState(false)
+  useEffect(() => {
+    const main = scroller()
+    if (!main) return undefined
+    let last = main.scrollTop
+    // Só quando é a pessoa a deslizar: o salto da Home para o dia de hoje,
+    // ao abrir, não encolhe o topo.
+    let touchedAt = 0
+    const touched = () => { touchedAt = Date.now() }
+    const onScroll = () => {
+      const top = main.scrollTop
+      const delta = top - last
+      last = top
+      if (top < 40) { setCollapsed(false); return }
+      if (Date.now() - touchedAt > 1200) return
+      if (delta > 4) setCollapsed(true)
+      else if (delta < -2) setCollapsed(false)
+    }
+    const inputs = ['wheel', 'touchmove', 'pointerdown', 'keydown']
+    inputs.forEach((ev) => main.addEventListener(ev, touched, { passive: true }))
+    main.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      inputs.forEach((ev) => main.removeEventListener(ev, touched))
+      main.removeEventListener('scroll', onScroll)
+    }
+  }, [])
+  // A pesquisa abre por baixo da linha do sítio (que volta a aparecer).
+  const searchTop = searchOpen ? Math.max(0, Math.round(topRowRef.current?.getBoundingClientRect().bottom ?? 64) + 4) : 0
+  useEffect(() => { if (searchOpen) setCollapsed(false) }, [searchOpen])
+  const allEvents = useMemo(() => applyFilters(events, DEFAULT_FILTERS, location), [events, location])
+  const topRowH = collapsed ? (topRowRef.current?.offsetHeight || 0) + 6 : 0
+  // A altura que fica à vista, para quem prende coisas por baixo (Dev 2).
+  useEffect(() => {
+    const header = headerRef.current
+    if (!header) return undefined
+    const set = () => document.documentElement.style.setProperty('--home-bar-h', `${Math.max(0, Math.round(header.getBoundingClientRect().bottom))}px`)
+    set()
+    const tm = setTimeout(set, 220)
+    return () => clearTimeout(tm)
+  }, [collapsed])
 
   // Abre no dia do próximo evento, com o passado por cima. Os eventos chegam
   // aos bocados (clubes, grupos, Comunidade), por isso volta a encostar a cada
@@ -840,8 +875,11 @@ export default function Home() {
           desse grupo (Francisco, 19 set — a Home fica só com a agenda). */}
       {/* Cabeçalho fixo: fica em cima enquanto a lista passa por baixo. Sem
           data nem calendário na vista de mapa — não há "dia no topo" lá. */}
-      <div ref={headerRef} className="sticky top-0 z-10 -mx-4 px-4 -mt-6 pt-4 pb-2.5 bg-canvas space-y-1.5 border-b border-line/70">
-        <div className="flex items-center justify-between gap-2">
+      {/* Home do futuro (SPEC-1): a linha do sítio, do mapa e do sino; por
+          baixo, uma barra só. O dia é a pastilha «Hoje ⌄» da barra. */}
+      <div ref={headerRef} style={{ transform: `translateY(-${topRowH}px)` }}
+        className="sticky top-0 z-10 -mx-4 px-4 -mt-6 pt-4 pb-2 bg-white space-y-1.5 border-b border-line/70 transition-transform duration-200 ease-out">
+        <div ref={topRowRef} className={`flex items-center justify-between gap-2 transition-opacity duration-200 ${collapsed ? 'opacity-0 pointer-events-none' : ''}`} aria-hidden={collapsed || undefined}>
           <LocationChip location={location} onOpen={() => setLocationOpen(true)} />
           <div className="flex items-center gap-1 shrink-0">
             {GOOGLE_MAPS_API_KEY && (
@@ -850,8 +888,14 @@ export default function Home() {
             {headerActions}
           </div>
         </div>
-        {viewMode === 'list' && <DayHeader dayKey={visibleDay} onOpenMonth={() => setMonthOpen(true)} onToday={() => scrollToDay(today)} />}
-        <FilterChips filters={filters} orgs={orgs} onOpenFilters={(part) => setFiltersOpen(part)} onOpenSearch={viewMode === 'list' ? openSearch : undefined} />
+        <HomeBar
+          filters={filters}
+          dayKey={visibleDay}
+          onOpenSearch={viewMode === 'list' ? openSearch : undefined}
+          onOpenDay={viewMode === 'list' ? () => setMonthOpen(true) : undefined}
+          onOpenFilters={() => setFiltersOpen(true)}
+          onKinds={(kinds) => setFilters((f) => ({ ...f, kinds }))}
+        />
       </div>
 
 
@@ -913,18 +957,24 @@ export default function Home() {
           `fixed` ficava preso a ele, e ao abrir a Home já com a pesquisa
           aberta o salto para «hoje» levava-a para fora do ecrã. */}
       {searchOpen && createPortal(
-        <div className="fixed inset-0 z-50 bg-canvas overflow-y-auto">
-          <div className="max-w-lg mx-auto px-4 pt-4 pb-10">
-            <div className="flex items-center gap-2">
-              <label className="flex-1 min-w-0 flex items-center gap-2 input-field !border-2 !border-ink-900">
-                <Search size={16} className="text-muted shrink-0" />
+        // A pesquisa (Home do futuro, SPEC-1, ponto 4): a barra dá lugar a
+        // «‹» e à caixa de texto, por baixo da linha do sítio, do mapa e do
+        // sino, e a lista dá lugar às sugestões ou aos resultados.
+        <div className="fixed inset-x-0 bottom-0 z-40 bg-white overflow-y-auto" style={{ top: searchTop }}>
+          <div className="max-w-lg mx-auto px-4">
+            <div className="sticky top-0 z-10 -mx-4 flex items-center gap-2 border-b border-line/70 bg-white px-4 py-2">
+              <button type="button" onClick={closeSearch} aria-label={t('common.back')}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-line bg-white text-ink-900">
+                <ChevronLeft size={18} />
+              </button>
+              <label className="flex-1 min-w-0 flex items-center gap-2 input-field !min-h-[44px] !border-[1.5px] !border-ink-900 !bg-white">
                 <input
                   type="text"
                   value={search}
                   autoFocus
                   onChange={(e) => setSearch(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
-                  placeholder={t('agenda.search_placeholder_short')}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { rememberSearch(search); e.currentTarget.blur() } }}
+                  placeholder={t('homesearch.placeholder')}
                   className="flex-1 min-w-0 bg-transparent outline-none text-base"
                 />
                 {search && (
@@ -933,46 +983,40 @@ export default function Home() {
                   </button>
                 )}
               </label>
-              <button type="button" onClick={closeSearch} className="shrink-0 px-2 min-h-[44px] text-sm font-extrabold text-ink-900">
-                {t('agenda.search_close')}
-              </button>
             </div>
-            {searching ? (
-              <HomeSearch
-                events={searchEvents}
-                query={search}
-                todayKey={today}
-                filtersActive={filtersActive && !searchState.all}
-                filtersLabel={filtersLabel}
-                onSearchAll={() => setSearchState((st) => ({ ...st, all: true }))}
-                onClear={() => setSearch('')}
-                results={myMixResults}
-                userId={user.id}
-                linkFor={(e) => (
-                  e.source === 'game' || e.source === 'explore' ? `/jogo/${e.id}`
-                    : e.kind === 'tournament' ? (e.slug || e.id ? `/torneio/${e.slug || e.id}` : null)
-                      : e.source === 'lesson' ? `/aula/${e.id}`
-                        : e.source === 'group_match' ? (orgSlugById.get(e.orgId) ? `/clube/${orgSlugById.get(e.orgId)}/jogos` : null)
-                          : e.source === 'friend_session' ? (e.id ? `/jogos-privados/sessao/${e.id}` : '/jogos-privados')
-                          : e.source === 'private_match' ? '/jogos-privados'
-                            : null
-                )}
-              />
-            ) : (
-              <div className="mt-4 space-y-3">
-                <p className="text-sm text-muted">{t('agenda.search_help')}</p>
-                {orgs.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {orgs.map((o) => (
-                      <button key={o.id} type="button" onClick={() => setSearch(o.name)}
-                        className="inline-flex items-center px-3 min-h-[40px] rounded-full border border-line bg-canvas text-sm font-extrabold text-ink-900">
-                        {o.name}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+            <HomeSearch
+              events={allEvents}
+              query={search}
+              todayKey={today}
+              location={location}
+              onQuery={setSearch}
+              // O «Entrar» da pesquisa faz o mesmo que o do cartão (UX, 9 out):
+              // inscreve logo e passa a «✓ Dentro». Sem ação no cartão, nada.
+              actionFor={(e) => {
+                if (e.finished || e.dayKey < today) return null
+                const busy = pendingKeys.has(e.key)
+                if (e.source === 'explore') {
+                  // Como no cartão: «Entrar no clube» ou «Pedir para entrar»; com o pedido feito, nada.
+                  if (e.explore?.requestStatus === 'pending') return null
+                  return e.explore?.openJoin
+                    ? { kind: 'join', label: t('agenda.explore_join_club'), busy, onAction: () => handleExploreJoin(e) }
+                    : { kind: 'request', label: t('agenda.explore_request', { name: e.orgName }), busy, onAction: () => handleExploreJoin(e) }
+                }
+                if (e.source !== 'game') return null
+                const a = cardAction(e.raw)
+                return a && (a.kind === 'join' || a.kind === 'waitlist') ? { kind: a.kind, busy, onAction: () => handleGameAction(e, a.kind) } : null
+              }}
+              errorFor={(e) => (cardError?.key === e.key ? cardError.message : null)}
+              linkFor={(e) => (
+                e.source === 'game' || e.source === 'explore' ? `/jogo/${e.id}`
+                  : e.kind === 'tournament' ? (e.slug || e.id ? `/torneio/${e.slug || e.id}` : null)
+                    : e.source === 'lesson' ? `/aula/${e.id}`
+                      : e.source === 'group_match' ? (orgSlugById.get(e.orgId) ? `/clube/${orgSlugById.get(e.orgId)}/jogos` : null)
+                        : e.source === 'friend_session' ? (e.id ? `/jogos-privados/sessao/${e.id}` : '/jogos-privados')
+                        : e.source === 'private_match' ? '/jogos-privados'
+                          : null
+              )}
+            />
           </div>
         </div>,
         document.body,
@@ -1021,11 +1065,9 @@ export default function Home() {
         />
       )}
       {filtersOpen && (
-        <FilterSheet
-          part={filtersOpen}
+        <HomeFiltersSheet
           filters={filters}
           orgs={orgs}
-          countFor={(f) => applyFilters(events, f, location).length}
           onApply={(f) => { setFilters(f); setFiltersOpen(false) }}
           onClose={() => setFiltersOpen(false)}
         />

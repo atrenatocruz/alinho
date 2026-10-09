@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { eventMatches } from './HomeSearch'
+import { eventMatches } from './homeSearchMatch'
 
 const ev = (title, orgName, location) => ({ raw: { title, location }, orgName })
 

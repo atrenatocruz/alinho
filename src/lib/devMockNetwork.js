@@ -225,6 +225,13 @@ const RPC_MOCKS = {
   // fechado, grupo dentro de um clube (sem nº de membros para quem não é do
   // grupo) e um pedido pendente.
   list_global_organizations: () => (community() ? COMMUNITY_ORGS : []),
+  // Pessoas que talvez conheças (Home do futuro, 9 out; função do Dev 3 por
+  // fazer): com mockCommunity, três pessoas; sem ele, como antes da função.
+  suggest_people: () => (community() ? [
+    { id: 'sp-rf', name: 'Rita Figueira', avatar_url: null, rating: 1450, gender: 'feminino', follow_status: 'none', reason: 'jogaram_juntos' },
+    { id: 'sp-rc', name: 'Rui Costa', avatar_url: null, rating: null, gender: null, follow_status: 'none', reason: 'mesmo_clube' },
+    { id: 'sp-am', name: 'Ana Moreira', avatar_url: null, rating: 1380, gender: 'feminino', follow_status: 'following', reason: 'mesmo_clube' },
+  ] : { __error: 'Could not find the function', __code: 'PGRST202' }),
   // Página de um grupo/clube onde ainda não estou (bug do botão, 17 set).
   // localStorage.mockGameClosed = 'group' | 'club' | 'private' | 'gone': de que
   // grupo é o /jogo/fake-closed (SPEC 2026-10-01-jogo-de-grupo-fechado).
