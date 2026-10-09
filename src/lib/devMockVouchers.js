@@ -5,15 +5,17 @@
 //                                 = 'plain'   ← antes do acordo (a função
 //                                               ainda não existe): sem contactos
 //                                 = 'empty'   ← clube sem vouchers
+// v4 = vencedor sem conta (nota «não está na app», sem a parte do contacto).
 //   localStorage.mockWalletVouchers = 'consent' | 'shared' | 'plain' ← a carteira
 //     do jogador (Perfil › Vouchers): um por usar por aceitar / já aceite, e
 //     um usado; 'plain' = antes da coluna contact_shared_at existir
 const mode = () => localStorage.getItem('mockClubVouchers')
 
 const ROWS = [
-  { voucher_id: 'v1', status: 'por_usar', created_at: '2026-09-29T21:00:00Z', used_at: null, game_id: 'g1', game_title: 'Mix de terça', game_date: '2026-09-29T19:00:00Z', prize: 'Uma bebida no bar', player_name: 'Rita Figueira', contact_shared_at: '2026-09-30T10:00:00Z', email: 'rita@exemplo.pt', phone: null },
-  { voucher_id: 'v2', status: 'por_usar', created_at: '2026-09-29T21:00:00Z', used_at: null, game_id: 'g1', game_title: 'Mix de terça', game_date: '2026-09-29T19:00:00Z', prize: 'Uma bebida no bar', player_name: 'Tiago Lopes', contact_shared_at: null, email: null, phone: null },
-  { voucher_id: 'v3', status: 'usado', created_at: '2026-09-17T21:00:00Z', used_at: '2026-09-18T12:00:00Z', game_id: 'g2', game_title: 'Mix de quinta', game_date: '2026-09-17T19:00:00Z', prize: 'Uma bebida no bar', player_name: 'Ana Marques', contact_shared_at: '2026-09-17T22:00:00Z', email: 'ana@exemplo.pt', phone: null },
+  { voucher_id: 'v1', status: 'por_usar', created_at: '2026-09-29T21:00:00Z', used_at: null, game_id: 'g1', game_title: 'Mix de terça', game_date: '2026-09-29T19:00:00Z', prize: 'Uma bebida no bar', player_name: 'Rita Figueira', contact_shared_at: '2026-09-30T10:00:00Z', email: 'rita@exemplo.pt', phone: null, has_account: true },
+  { voucher_id: 'v2', status: 'por_usar', created_at: '2026-09-29T21:00:00Z', used_at: null, game_id: 'g1', game_title: 'Mix de terça', game_date: '2026-09-29T19:00:00Z', prize: 'Uma bebida no bar', player_name: 'Tiago Lopes', contact_shared_at: null, email: null, phone: null, has_account: true },
+  { voucher_id: 'v3', status: 'usado', created_at: '2026-09-17T21:00:00Z', used_at: '2026-09-18T12:00:00Z', game_id: 'g2', game_title: 'Mix de quinta', game_date: '2026-09-17T19:00:00Z', prize: 'Uma bebida no bar', player_name: 'Ana Marques', contact_shared_at: '2026-09-17T22:00:00Z', email: 'ana@exemplo.pt', phone: null, has_account: true },
+  { voucher_id: 'v4', status: 'por_usar', created_at: '2026-09-29T21:00:00Z', used_at: null, game_id: 'g1', game_title: 'Mix de terça', game_date: '2026-09-29T19:00:00Z', prize: 'Uma bebida no bar', player_name: 'Zé (sem conta)', contact_shared_at: null, email: null, phone: null, has_account: false },
 ]
 
 export const VOUCHER_RPC_MOCKS = {

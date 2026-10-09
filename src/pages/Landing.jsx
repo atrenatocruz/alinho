@@ -303,22 +303,23 @@ function About() {
 
 function OrganizersBar() {
   const { t } = useTranslation()
-  const contact = 'inline-flex flex-1 items-center justify-center gap-2 min-h-[48px] rounded-ctrl px-4 font-extrabold border border-ink-900 bg-white text-ink-900 hover:bg-ink-50'
+  const contact = 'inline-flex w-full items-center justify-center gap-2 min-h-[48px] rounded-ctrl px-4 font-extrabold border border-ink-900 bg-white text-ink-900 hover:bg-ink-50'
   return (
     <section className="bg-white border-y border-line">
       <div className="max-w-5xl mx-auto px-5 py-8">
         <div className="max-w-md">
           <h2 className="text-2xl text-ink-900">{t('landing.organizers_text')}</h2>
           <p className="text-ink-700 mt-1">{t('landing.organizers_contact_text')}</p>
-          <div className="mt-4 flex gap-3">
+          {/* Empilhados, a toda a largura, e iguais aos dos Planos (UX, 8 out). */}
+          <div className="mt-4 flex flex-col gap-3">
+            <a href={whatsappContactLink(t('plans.whatsapp_text'))} target="_blank" rel="noopener noreferrer" className={contact}>
+              <MessageCircle size={18} /> {t('landing.organizers_whatsapp')}
+            </a>
             {SUPPORT_EMAIL_READY && (
               <a href={mailtoLink(t('plans.email_subject'))} className={contact}>
                 <Mail size={18} /> {t('plans.email')}
               </a>
             )}
-            <a href={whatsappContactLink(t('plans.whatsapp_text'))} target="_blank" rel="noopener noreferrer" className={contact}>
-              <MessageCircle size={18} /> {t('landing.organizers_whatsapp')}
-            </a>
           </div>
           <Link to="/planos" className="mt-3 inline-flex items-center gap-1 min-h-[44px] text-sm font-extrabold text-ink-900 hover:underline">
             {t('landing.organizers_link')} <ChevronRight size={16} />

@@ -46,9 +46,13 @@ export function batchToForm(games = []) {
     .filter((g) => !['cancelled', 'finished', 'completed'].includes(g.status))
     .sort((a, b) => new Date(a.date) - new Date(b.date))
   const first = live[0] ? new Date(live[0].date) : null
+  // As horas do WhatsApp da própria publicação ('HH:MM'); null = nunca
+  // escolhidas (o robô usa as do clube) — auditoria «Editar tem tudo», 7 out.
+  const times = live.find((g) => Array.isArray(g.whatsapp_post_times))?.whatsapp_post_times
   return {
     date: first ? localDate(first) : '',
     price: live[0]?.price_per_player != null ? String(live[0].price_per_player) : '',
+    horas: times ? [...new Set(times.map((h) => String(h).slice(0, 5)))].sort() : null,
     ranges: live.map((g) => {
       const start = new Date(g.date)
       const end = new Date(start.getTime() + (g.court_time_minutes || 0) * 60000)

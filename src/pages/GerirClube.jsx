@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useParams, useSearchParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
-import { Plus, Calendar, Trash2, Edit2, Check, X, UserX, Clock, ArrowLeft, Camera, Settings, Copy, QrCode, GraduationCap, Trophy, Lock, ChevronRight } from 'lucide-react'
+import { Plus, Calendar, Trash2, Edit2, Check, X, UserX, Clock, ArrowLeft, Camera, Settings, Copy, GraduationCap, Trophy, Lock, ChevronRight } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
@@ -26,6 +26,7 @@ import { listPendingClubTeachers } from '../lib/teachers'
 import TeacherRequestCard from '../components/TeacherRequestCard'
 import VoucherScanner from '../components/VoucherScanner'
 import VouchersAdmin from '../components/vouchers/VouchersAdmin'
+import { listClubVouchers, voucherTotals } from '../lib/vouchers'
 import { isValidVoucherId, normalizeScannedVoucherId } from '../lib/vouchers'
 import { ClubTeachers } from '../components/lessons/ClubLessonsPanel'
 import { SeriesManage } from '../components/lessons/ClubSeriesPanel'
@@ -171,6 +172,8 @@ const EMPTY_GAME_FORM = {
   // Sobe e desce invertido (29 set): as mais fortes começam no último campo.
   seed_reverse: false,
   allow_pair_signup: false,
+  // Aprovar quem entra pela app (2 out). Por omissão entra logo.
+  join_approval: false,
   // Conta para o ranking (Trello #267). Por omissão sim.
   ranked: true,
   gender_restriction: 'indiferente',
@@ -220,6 +223,19 @@ function Segmented({ options, value, onChange }) {
         </button>
       ))}
     </div>
+  )
+}
+
+// Quem pede para entrar: a foto e o nome abrem o perfil (Francisco, 6 out),
+// como na página do mix (aprovar quem entra, ponto 5). O «voltar» do perfil
+// regressa aqui: o separador vive no endereço (?tab=members). Um perfil
+// privado abre na mesma — só mostra o que se pode ver.
+function RequestPerson({ req, fallbackName }) {
+  return (
+    <Link to={`/jogador/${req.user_id}`} className="flex flex-1 min-w-0 items-center gap-3">
+      <Avatar name={req.name} url={req.avatar_url} size="w-9 h-9 text-sm" />
+      <span className="min-w-0 truncate font-extrabold text-ink-900">{req.name || fallbackName} ›</span>
+    </Link>
   )
 }
 
@@ -307,6 +323,19 @@ export default function GerirClube() {
   // #406: o ícone do QR abre a lista «Vouchers»; o validar de hoje fica atrás
   // do «Ler QR code» (voucherScan).
   const [voucherScan, setVoucherScan] = useState(false)
+  // Quantos vouchers estão por usar, para o número no botão «🎁 Vouchers» do
+  // topo (Francisco, 7 out). null = ainda não se sabe (ou falhou): o botão
+  // fica só com o texto.
+  const [unusedVouchers, setUnusedVouchers] = useState(null)
+  // O número: recarrega ao voltar da lista ao voltar da lista (pode ter-se dado baixa a algum).
+  useEffect(() => {
+    if (!org?.id || activeTab === 'redeem') return undefined
+    let cancelled = false
+    listClubVouchers(org.id)
+      .then(({ rows }) => { if (!cancelled) setUnusedVouchers(voucherTotals(rows).unused) })
+      .catch((err) => { console.error('Error counting vouchers:', err); if (!cancelled) setUnusedVouchers(null) })
+    return () => { cancelled = true }
+  }, [org?.id, activeTab])
   const [scanLookupState, setScanLookupState] = useState('idle') // 'idle' | 'loading' | 'not_found' | 'found'
   const [scannedVoucher, setScannedVoucher] = useState(null)
   const [cameraActive, setCameraActive] = useState(false)
@@ -1028,6 +1057,9 @@ export default function GerirClube() {
     // sempre (também «Não», para editar Sim→Não chegar à recorrência); antes
     // da migração o campo não vem e não se manda nada.
     ...(typeof game.allow_pair_signup === 'boolean' ? { allow_pair_signup: game.allow_pair_signup } : {}),
+    // Aprovar quem entra (2 out): a série guarda a escolha e cada data nova
+    // herda-a (gatilho do Dev 3). Mesmo truque: só com a coluna.
+    ...(typeof game.join_approval === 'boolean' ? { join_approval: game.join_approval } : {}),
     // #580: a série guarda a contagem, os grupos e o 8-8 — cada nova data
     // herda-os (recurrence_insert_pending). O `game` é a linha da base de
     // dados: com as colunas, vão sempre (também para voltar a «pontos
@@ -1219,7 +1251,7 @@ export default function GerirClube() {
     // pairing_mode sai pelo mesmo motivo: só é enviado quando não é o valor
     // por omissão, para criar/editar mixes não rebentar antes de
     // migration_mix_pairing_mode.sql correr.
-    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, seed_reverse: _seedReverse, ranked: _ranked, allow_pair_signup: _allowPairSignup, launch, whatsapp_post_times: postTimes, tiebreak_8_8: tieBreak88, ...gameFields } = gameForm
+    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, seed_reverse: _seedReverse, ranked: _ranked, allow_pair_signup: _allowPairSignup, join_approval: _joinApproval, launch, whatsapp_post_times: postTimes, tiebreak_8_8: tieBreak88, ...gameFields } = gameForm
 
     const recurrenceError = validateRecurrence(recurrence)
     if (recurrenceError) {
@@ -1281,6 +1313,9 @@ export default function GerirClube() {
             // duplas são fixas — antes de migration_mix_pair_signup.sql a
             // coluna não existe, e «Não» é o valor por omissão.
             ...(gameForm.allow_pair_signup && pairsAreFixed(gameForm) ? { allow_pair_signup: true } : {}),
+            // Aprovar quem entra (2 out): só vai quando está ligado — antes da
+            // migração do Dev 3 a coluna não existe.
+            ...(gameForm.join_approval ? { join_approval: true } : {}),
             // Só vai quando é amigável — antes de migration_mix_ranked.sql
             // correr, a coluna não existe.
             ...(gameForm.ranked === false ? { ranked: false } : {}),
@@ -1426,14 +1461,26 @@ export default function GerirClube() {
     setGameError('')
     try {
       if (!currentlyPaused) {
-        // Sem números por agora (PO, 7 out): entram com a pré-visualização
-        // do Dev 3, que conta sem mudar nada.
+        // Os números antes de perguntar: preview_recurrence_pause (Dev 3,
+        // af879dcc) conta com a mesma regra da pausa, sem mudar nada. Se
+        // falhar (ainda por correr), a pergunta sai sem números.
+        const { data: preview, error: previewError } = await supabase.rpc('preview_recurrence_pause', { p_recurrence_id: recurrenceId })
+        const counted = !previewError && preview && preview.dates != null
+        // Em português o 0 cai na forma do «1» (ensaio do QA, 8 out): sem
+        // datas ou sem inscritos, a frase diz isso mesmo.
+        const nDates = Number(preview?.dates) || 0
+        const nPeople = Number(preview?.people) || 0
         if (!await askConfirm({
           title: t('series.draft_title'),
-          message: t('series.draft_message_plain'),
+          message: !counted ? t('series.draft_message_plain')
+            : nDates === 0 ? t('series.draft_message_no_dates')
+            : nPeople === 0 ? t('series.draft_message_nobody', { dates: t('series.n_dates', { count: nDates }) })
+            : t('series.draft_message', { dates: t('series.n_dates', { count: nDates }), people: t('series.n_people', { count: nPeople }) }),
           cancelLabel: t('series.draft_keep'),
           confirmLabel: t('series.draft_yes'),
-          danger: true,
+          // Vermelho só quando pausar tira pessoas (UX, 8 out); sem
+          // inscritos fica a preto. Sem os números, pode haver: vermelho.
+          danger: !counted || (nDates > 0 && nPeople > 0),
         })) return
         setAsk(null)
         const { error } = await supabase.rpc('pause_recurrence_to_draft', { p_recurrence_id: recurrenceId })
@@ -1442,7 +1489,8 @@ export default function GerirClube() {
       } else {
         const { data: resumed, error } = await supabase.rpc('resume_recurrence', { p_recurrence_id: recurrenceId })
         if (error) throw error
-        setDoneNotice(t('series.resumed_done', { count: Number(resumed?.dates) || 0 }))
+        const reopened = Number(resumed?.dates) || 0
+        setDoneNotice(reopened ? t('series.resumed_done', { count: reopened }) : t('series.resumed_done_none'))
       }
       setEditingGame((g) => (g ? { ...g, recurrence: { ...g.recurrence, is_paused: !currentlyPaused } } : g))
       loadGames()
@@ -1467,7 +1515,7 @@ export default function GerirClube() {
     // pairing_mode sai pelo mesmo motivo: só é enviado quando não é o valor
     // por omissão, para criar/editar mixes não rebentar antes de
     // migration_mix_pairing_mode.sql correr.
-    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, seed_reverse: _seedReverse, ranked: _ranked, allow_pair_signup: _allowPairSignup, launch: _launch, whatsapp_post_times: postTimes, tiebreak_8_8: tieBreak88, ...gameFields } = gameForm
+    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, seed_reverse: _seedReverse, ranked: _ranked, allow_pair_signup: _allowPairSignup, join_approval: _joinApproval, launch: _launch, whatsapp_post_times: postTimes, tiebreak_8_8: tieBreak88, ...gameFields } = gameForm
     // Any mix in an active recurring series shares the same underlying
     // game_recurrences row (via recurrence_id) — not just the origin — so
     // recurrence management works from any of them, not only the one that
@@ -1513,6 +1561,7 @@ export default function GerirClube() {
           ...((gameForm.rotate_partners || editingGame.rotate_partners) ? { rotate_partners: !!gameForm.rotate_partners && gameForm.format === 'sobe_desce' } : {}),
           ...((gameForm.seed_reverse || editingGame.seed_reverse) ? { seed_reverse: !!gameForm.seed_reverse && gameForm.format === 'sobe_desce' } : {}),
           ...((gameForm.allow_pair_signup || editingGame.allow_pair_signup) ? { allow_pair_signup: !!gameForm.allow_pair_signup && pairsAreFixed(gameForm) } : {}),
+          ...((gameForm.join_approval || editingGame.join_approval) ? { join_approval: !!gameForm.join_approval } : {}),
           ...((gameForm.ranked === false || editingGame.ranked === false) ? { ranked: gameForm.ranked !== false } : {}),
           level: gameForm.level || null,
           ...((tieBreak88 === 'super_tiebreak' || editingGame.tiebreak_8_8) ? { tiebreak_8_8: gameForm.scoring_format === 'pro_set_9' && tieBreak88 === 'super_tiebreak' ? 'super_tiebreak' : null } : {}),
@@ -1743,7 +1792,7 @@ export default function GerirClube() {
       ? { title: t('gerirclube.confirm_revoke_admin_title', { name }), message: t(kk('gerirclube.confirm_revoke_admin')),
         cancelLabel: t('gerirclube.keep_admin'), confirmLabel: t('gerirclube.confirm_revoke_admin_yes'), danger: true }
       : { title: t('gerirclube.confirm_grant_admin_title', { name }), message: t(kk('gerirclube.confirm_grant_admin')),
-        cancelLabel: t('gerirclube.cancel'), confirmLabel: t('gerirclube.confirm_grant_admin_yes'), outline: true })
+        cancelLabel: t('gerirclube.cancel'), confirmLabel: t('gerirclube.confirm_grant_admin_yes') })
     if (!yes) return
     setMemberError(null)
 
@@ -2127,6 +2176,7 @@ export default function GerirClube() {
       rotate_partners: !!game.rotate_partners,
       seed_reverse: !!game.seed_reverse,
       allow_pair_signup: !!game.allow_pair_signup,
+      join_approval: !!game.join_approval,
       ranked: game.ranked !== false,
       gender_restriction: game.gender_restriction || 'indiferente',
       age_restriction: game.age_restriction ?? null,
@@ -2243,7 +2293,6 @@ export default function GerirClube() {
       confirmLabel={ask?.confirmLabel || ''}
       cancelLabel={ask?.cancelLabel || ''}
       danger={!!ask?.danger}
-      outline={!!ask?.outline}
       onConfirm={() => { ask?.resolve(true) }}
       onClose={() => { ask?.resolve(false); setAsk(null) }}
     />
@@ -2307,7 +2356,9 @@ export default function GerirClube() {
     const extras = editingGame?.recurrence?.is_active && (
       <div className="pt-4 border-t border-line space-y-4">
         {editingGame.recurrence?.is_active && (
-          <div className="flex items-center justify-between gap-3 p-3 rounded-ctrl bg-ink-50">
+          // Um só preto por ecrã (UX, 8 out): o da série fica em contorno, a
+          // toda a largura, por baixo do texto — o preto é o «Guardar».
+          <div className="space-y-2.5 p-3 rounded-ctrl bg-ink-50">
             <div>
               <p className="text-sm font-extrabold text-ink-900">
                 {editingGame.recurrence.is_paused ? t('gerirclube.recurrence_paused_label') : t('gerirclube.recurrence_active_label')}
@@ -2317,7 +2368,7 @@ export default function GerirClube() {
               </p>
             </div>
             <button type="button" onClick={() => handleTogglePauseRecurrence(editingGame.recurrence.id, editingGame.recurrence.is_paused)}
-              className="shrink-0 text-xs font-extrabold px-3.5 py-2 min-h-[44px] rounded-full bg-ink-900 text-lime-400">
+              className="w-full min-h-[48px] rounded-ctrl border border-line bg-white px-4 text-sm font-extrabold text-ink-900">
               {editingGame.recurrence.is_paused ? t('gerirclube.resume_button') : t('gerirclube.pause_button')}
             </button>
           </div>
@@ -2396,6 +2447,25 @@ export default function GerirClube() {
     )
   }
 
+  // «🎁 Vouchers» na linha do «‹», do lado oposto (design-handoff/2026-10-07-
+  // vouchers-no-gerir): o número só quando há vouchers por usar.
+  const vouchersButton = (
+    <button
+      type="button"
+      onClick={() => { setVoucherScan(false); setActiveTab('redeem') }}
+      aria-label={unusedVouchers ? t('gerirclube.vouchers_button_aria', { count: unusedVouchers }) : t('vouchers.title')}
+      className="inline-flex h-11 shrink-0 items-center gap-2 rounded-full bg-white/95 px-4 text-[15px] font-extrabold text-ink-900 shadow-card"
+    >
+      <span aria-hidden>🎁</span>
+      {t('vouchers.title')}
+      {unusedVouchers > 0 && (
+        <span className="inline-flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-ink-900 px-1.5 text-xs font-extrabold text-lime-400">
+          {unusedVouchers}
+        </span>
+      )}
+    </button>
+  )
+
   return (
     <div className="space-y-6">
       {/* Um só "Voltar", sempre no topo (Francisco, 15 set 2026) — e sempre
@@ -2405,9 +2475,17 @@ export default function GerirClube() {
       {activeTab === 'redeem' ? (
         <BackBar
           onBack={() => { handleResetRedeem(); if (voucherScan) setVoucherScan(false); else setActiveTab('events') }}
-          label={t('gerirclube.back_button')} title={org?.name} />
-      ) : (adminOrganizations.length > 1 || currentUser?.is_platform_admin) && (
-        <BackBar onBack={goBack} title={org?.name} />
+          label={t('gerirclube.back_button')} title={org?.name}
+          right={vouchersButton} solid />
+      ) : (
+        // A barra fica sempre, por causa do «Vouchers»; o «‹» só para quem
+        // tem mais de um clube/grupo, como antes.
+        <BackBar
+          onBack={(adminOrganizations.length > 1 || currentUser?.is_platform_admin) ? goBack : undefined}
+          title={org?.name}
+          right={vouchersButton}
+          solid
+        />
       )}
       <div>
         {/* "Gerir" as a small label above, so the title is the group's name
@@ -2463,15 +2541,6 @@ export default function GerirClube() {
               <div className="mt-2"><PlanBadge tier={org.plan_tier} /></div>
             )}
           </div>
-          <button
-            type="button"
-            onClick={() => { setVoucherScan(false); setActiveTab('redeem') }}
-            title={t('vouchers.title')}
-            aria-label={t('vouchers.title')}
-            className="shrink-0 -mt-1 w-11 h-11 flex items-center justify-center rounded-full bg-ink-50 text-ink-700 hover:bg-ink-200 transition-colors duration-fast"
-          >
-            <QrCode size={20} />
-          </button>
         </div>
       </div>
 
@@ -2999,7 +3068,7 @@ export default function GerirClube() {
                     {(!editingGame || !editingGame.recurrence || editingGame.recurrence.is_active) && (
                       <div className="border-t border-line pt-4 space-y-4">
                         {editingGame?.recurrence?.is_active && (
-                          <div className="flex items-center justify-between gap-3 p-3 rounded-ctrl bg-ink-50">
+                          <div className="space-y-2.5 p-3 rounded-ctrl bg-ink-50">
                             <div>
                               <p className="text-sm font-extrabold text-ink-900">
                                 {editingGame.recurrence.is_paused ? t('gerirclube.recurrence_paused_label') : t('gerirclube.recurrence_active_label')}
@@ -3013,7 +3082,7 @@ export default function GerirClube() {
                             <button
                               type="button"
                               onClick={() => handleTogglePauseRecurrence(editingGame.recurrence.id, editingGame.recurrence.is_paused)}
-                              className="shrink-0 text-xs font-extrabold px-3.5 py-2 min-h-[44px] rounded-full bg-ink-900 text-lime-400"
+                              className="w-full min-h-[48px] rounded-ctrl border border-line bg-white px-4 text-sm font-extrabold text-ink-900"
                             >
                               {editingGame.recurrence.is_paused ? t('gerirclube.resume_button') : t('gerirclube.pause_button')}
                             </button>
@@ -3484,8 +3553,7 @@ export default function GerirClube() {
                   )}
                   {requests.map((req) => (
                     <div key={req.id} className="card flex items-center gap-3">
-                      <Avatar name={req.name} url={req.avatar_url} size="w-9 h-9 text-sm" />
-                      <p className="flex-1 min-w-0 font-extrabold text-ink-900 truncate">{req.name || t('gerirclube.fallback_player_name')}</p>
+                      <RequestPerson req={req} fallbackName={t('gerirclube.fallback_player_name')} />
                       <button
                         onClick={() => handleApproveRequest(req.id)}
                         className="w-9 h-9 flex items-center justify-center rounded-full bg-ok/10 text-ok hover:bg-ok/20 transition-colors duration-fast"
@@ -3513,8 +3581,7 @@ export default function GerirClube() {
                   </h3>
                   {pedidos.map((req) => (
                     <div key={req.id} className="card flex items-center gap-3">
-                      <Avatar name={req.name} url={req.avatar_url} size="w-9 h-9 text-sm" />
-                      <p className="flex-1 min-w-0 font-extrabold text-ink-900 truncate">{req.name || t('gerirclube.fallback_player_name')}</p>
+                      <RequestPerson req={req} fallbackName={t('gerirclube.fallback_player_name')} />
                       <button
                         onClick={async () => { await handleApproveGroupRequest(req.id, group.id); loadPedidosDosGrupos() }}
                         className="w-9 h-9 flex items-center justify-center rounded-full bg-ok/10 text-ok hover:bg-ok/20 transition-colors duration-fast"
@@ -4170,7 +4237,7 @@ export default function GerirClube() {
               docs/superpowers/specs/2026-09-14-voucher-qr-redemption-design.md,
               Key Decisions). */}
           {activeTab === 'redeem' && !voucherScan && (
-            <VouchersAdmin organizationId={org?.id} onScan={() => setVoucherScan(true)} />
+            <VouchersAdmin organizationId={org?.id} onScan={() => setVoucherScan(true)} initialFilter="por_usar" onUnusedChange={setUnusedVouchers} />
           )}
           {activeTab === 'redeem' && voucherScan && (
             <div>

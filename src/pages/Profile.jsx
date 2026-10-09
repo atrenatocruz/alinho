@@ -185,14 +185,16 @@ export default function Profile() {
       // #556: com a coluna contact_shared_at (Dev 3) o voucher só se usa
       // depois do sim. Enquanto ela não existir em produção, lê-se como
       // antes e tudo fica como hoje.
+      // Anulados não se usam (migration_vouchers_so_com_conta.sql e
+      // juntar_convidado em migration_vouchers_para_todos.sql): ficam fora.
       const select = 'id, status, used_at, created_at, game:games (id, title, date, prize, organization:organizations (name))'
       let { data, error } = await supabase.from('vouchers').select(`${select}, contact_shared_at`)
-        .eq('user_id', profile.id).order('created_at', { ascending: false })
+        .eq('user_id', profile.id).neq('status', 'anulado').order('created_at', { ascending: false })
       let consent = true
       if (error && (error.code === '42703' || /contact_shared_at/.test(error.message || ''))) {
         consent = false
         ;({ data, error } = await supabase.from('vouchers').select(select)
-          .eq('user_id', profile.id).order('created_at', { ascending: false }))
+          .eq('user_id', profile.id).neq('status', 'anulado').order('created_at', { ascending: false }))
       }
       if (error) throw error
       setVoucherConsent(consent)
@@ -851,7 +853,7 @@ export default function Profile() {
       <Tabs value={tab} onChange={setTab} options={TABS.map((d) => ({ value: d.key, label: t(d.labelKey) }))} />
 
       {/* Voucher usado (parte 2 das janelas, 2 out): fora dos separadores, para abrir em qualquer um. */}
-      <ConfirmSheet open={!!markingVoucher} outline title={t('dialogs.voucher_title')} message={t('dialogs.voucher_message')}
+      <ConfirmSheet open={!!markingVoucher} title={t('dialogs.voucher_title')} message={t('dialogs.voucher_message')}
           cancelLabel={t('dialogs.voucher_keep')} confirmLabel={t('dialogs.voucher_confirm')}
           onConfirm={markVoucherUsedNow} onClose={() => setMarkingVoucher(null)} />
         {voucherDone && (
@@ -1100,7 +1102,6 @@ export default function Profile() {
         message={t('vouchers.unshare_body', { club: unshareFor?.game?.organization?.name || '' })}
         confirmLabel={t('vouchers.unshare')}
         cancelLabel={t('common.back')}
-        outline
         errorOf={(err) => describeError(t, err)}
         onConfirm={async () => {
           await unshareVoucherContact(unshareFor.id)

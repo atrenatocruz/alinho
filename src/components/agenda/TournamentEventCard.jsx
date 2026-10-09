@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Trophy, MapPin, Clock, Megaphone } from 'lucide-react'
-import { OrgHeader } from './EventCard'
+import { Trophy, MapPin, Clock, Megaphone, CheckCircle2 } from 'lucide-react'
+import { OrgHeader, StateTag } from './EventCard'
 
 /* O torneio na agenda da Home (Trello #363).
 
@@ -36,7 +36,11 @@ export default function TournamentEventCard({ event, past, footer = null }) {
   const isMatch = event.source === 'tournament_match'
   const to = `/torneio/${event.slug || event.id}`
   const frame = { background: LILAC.bg, borderColor: LILAC.border, borderWidth: 2 }
-  const stateTag = !isMatch && event.myState ? (
+  // Acabado (jogo com resultado, ou o dia já passou): «Terminado», como nos
+  // outros cartões da Home (#508).
+  const stateTag = past || event.finished ? (
+    <StateTag tone="grey" icon={CheckCircle2}>{t('agenda.state_finished')}</StateTag>
+  ) : !isMatch && event.myState ? (
     <span className="rounded-full bg-white px-2.5 py-1 text-xs font-extrabold" style={{ color: LILAC.ink }}>
       {t(STATE_KEY[event.myState] || 'tsignup.state_in')}
     </span>

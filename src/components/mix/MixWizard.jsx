@@ -12,7 +12,7 @@
    Os campos de hoje que o desenho não mostra vão para o passo onde a pergunta
    pertence (o grupo onde aparece → Pessoas; arranque automático → Quando;
    pontuação e tamanho dos grupos → Regras), sempre com o valor de hoje. */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { describeError } from '../../lib/errors'
 import { useTranslation } from 'react-i18next'
 import { Minus, Plus } from 'lucide-react'
@@ -25,6 +25,7 @@ import { AGE_RESTRICTIONS } from '../../lib/ageCategories'
 import { formatDate, formatTime } from '../../lib/formatDate'
 import { LEVEL_SCALES, LEVEL_NUMBERS, parseLevel, scaleForGender, GENDER_FOR_SCALE } from '../../lib/mixLevels'
 import WhatsappHoursField from '../WhatsappHoursField'
+import { getEventWhatsappPostTimes } from '../../lib/whatsappHours'
 import PlacesUnavailableHint from '../PlacesUnavailableHint'
 
 const pairsAreFixed = (form) => form.format !== 'americano' && !(form.rotate_partners && form.format === 'sobe_desce')
@@ -97,7 +98,23 @@ export default function MixWizard({
 
   // Editar: «Guardar» em qualquer passo (30 set) — por isso vê o que falta
   // em TODOS os passos, não só no que está à vista.
-  const [initialForm] = useState(() => JSON.stringify(form))
+  const [initialForm, setInitialForm] = useState(() => JSON.stringify(form))
+  // Editar um mix sem horas do WhatsApp escolhidas: o campo vem com as que o
+  // robô vai mesmo usar (as do clube) e não com as do último mix, e isso não
+  // conta como alteração (auditoria «Editar tem tudo», 7 out).
+  const editId = editingGame?.id || null
+  useEffect(() => {
+    if (!editId || form.whatsapp_post_times != null) return undefined
+    let cancelled = false
+    getEventWhatsappPostTimes('mix', editId)
+      .then((v) => {
+        if (cancelled || !v) return
+        set({ whatsapp_post_times: v })
+        setInitialForm((prev) => JSON.stringify({ ...JSON.parse(prev), whatsapp_post_times: v }))
+      })
+      .catch((e) => console.error('Error loading WhatsApp hours:', e))
+    return () => { cancelled = true }
+  }, [editId]) // eslint-disable-line react-hooks/exhaustive-deps
   const missingAny = (() => {
     if (!form.title.trim()) return t('mixwizard.missing_title')
     if (!form.date) return t('mixwizard.missing_date')
@@ -133,7 +150,6 @@ export default function MixWizard({
         <button type="button" disabled={busy} onClick={() => submit(false)} className="btn-primary w-full disabled:opacity-40">
           {t('mixwizard.save_changes')}
         </button>
-        {editExtras}
       </div>
     ) : (
       <div className="space-y-2">
@@ -265,6 +281,19 @@ export default function MixWizard({
             value={form.age_restriction || ''}
             onChange={(v) => set({ age_restriction: v || null })}
             options={[{ value: '', label: t('gerirclube.age_any') }, ...AGE_RESTRICTIONS.map((a) => ({ value: a.value, label: t(a.labelKey) }))]}
+          />
+        </Field>
+        {/* Aprovar quem entra pela app (SPEC 2026-10-02): por omissão entra
+            logo, como sempre. O robô do WhatsApp inscreve logo à mesma. */}
+        <Field label={t('mixwizard.approval_label')} hint={form.join_approval ? t('mixwizard.approval_hint') : null}>
+          <Chips
+            label={t('mixwizard.approval_label')}
+            value={form.join_approval ? 'approve' : 'open'}
+            onChange={(v) => set({ join_approval: v === 'approve' })}
+            options={[
+              { value: 'open', label: t('mixwizard.approval_open') },
+              { value: 'approve', label: t('mixwizard.approval_approve') },
+            ]}
           />
         </Field>
         <Field label={t('mixwizard.signup_label')} hint={form.allow_pair_signup && !pairsAreFixed(form) ? t('mixwizard.signup_needs_fixed') : null}>
@@ -457,7 +486,10 @@ export default function MixWizard({
             onChange={(v) => set({ game_time_minutes: v })} options={options.gameTimes} />
         </Field>
         {form.format !== 'americano' && (
-          <Field label={t('gerirclube.scoring_label')}>
+          // «2 sets + super tie-break»: o mesmo nome e a mesma frase do torneio
+          // (UX, 7 out).
+          <Field label={t('gerirclube.scoring_label')}
+            hint={form.scoring_format === 'melhor_2_sets' ? t('tournament.create.scoring_melhor_2_sets_hint') : null}>
             <Chips label={t('gerirclube.scoring_label')} value={form.scoring_format}
               onChange={(v) => set({ scoring_format: v })} options={options.scoringFormats} />
           </Field>
@@ -525,8 +557,13 @@ export default function MixWizard({
             kind="mix"
             value={form.whatsapp_post_times ?? null}
             onChange={(v) => set({ whatsapp_post_times: v })}
+            editing={!!editingGame}
           />
         )}
+        {/* O bloco da série («Pôr em rascunho» / «Retomar», do GerirClube).
+            Ia no `footer`, que o StepPage ignora a editar — o botão não se via
+            (ensaio do QA, 8 out). Fica no fim das Regras. */}
+        {editingGame && editExtras}
       </div>
     </StepPage>
   )

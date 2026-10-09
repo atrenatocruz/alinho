@@ -18,7 +18,9 @@ import { dayLabel } from './AgendaControls'
 const PAGE = 20
 const KIND = { mix: 'mix', tournament: 'tournament', friends: 'friends' }
 // Num clube, a sessão entre amigos é «Jogo em aberto» (Francisco, 28 set).
-const kindOf = (r) => (r.kind === 'friends' && r.org_kind !== 'group' ? 'open' : KIND[r.kind])
+// Um mix que é um jogo em aberto (origin 'open_slot', #508) também é «Jogo em
+// aberto» — a list_played_events devolve o origin (Dev 3).
+const kindOf = (r) => ((r.kind === 'friends' && r.org_kind !== 'group') || (r.kind === 'mix' && r.origin === 'open_slot') ? 'open' : KIND[r.kind])
 
 async function listPlayed(orgId, before) {
   const { data, error } = await supabase.rpc('list_played_events', { p_organization_id: orgId, p_before: before, p_limit: PAGE })
@@ -95,7 +97,9 @@ function PlayedCard({ row }) {
   const to = row.kind === 'mix' ? `/jogo/${row.id}`
     : row.kind === 'tournament' ? `/torneio/${row.slug || row.id}`
     : `/jogos-privados/sessao/${row.id}`
-  const title = row.kind === 'friends' && kind === 'open' ? t('agenda.played_open_title')
+  // O jogo em aberto leva o nome da app («Jogo em aberto»), e não o título
+  // guardado no jogo («Jogo em Aberto», com maiúscula) — UX, 7 out.
+  const title = kind === 'open' ? t('agenda.played_open_title')
     : row.kind === 'friends'
     ? (row.creator_name ? t('agenda.played_friends_title', { name: row.creator_name.split(' ')[0] }) : t('agenda.played_friends_title_anon'))
     : row.title

@@ -471,6 +471,9 @@ export default function Home() {
     }
     // Inscrito como parceiro de outra pessoa: a linha é dela.
     if (iAmSomeonesPartner) return null
+    // Pedido enviado ou recusado, e mixes com aprovação (2 out): pede-se na
+    // página do mix, onde se diz que é um pedido.
+    if (myRow || game.join_approval) return null
     // Cheio, o mix passa a 'closed' (trigger das vagas) — e é aí que mais
     // interessa entrar como suplente, como na página do mix. Fechado sem
     // estar cheio (fechado à mão, ou parado com as duplas feitas) não.
@@ -988,7 +991,7 @@ export default function Home() {
         </Sheet>
       )}
 
-      <ConfirmSheet open={!!leaveAsk} outline title={t('dialogs.leave_game_title')}
+      <ConfirmSheet open={!!leaveAsk} title={t('dialogs.leave_game_title')}
         cancelLabel={t('dialogs.leave_game_keep')} confirmLabel={t('dialogs.leave_game_confirm')}
         onConfirm={() => { const ev = leaveAsk; setLeaveAsk(null); if (ev) handleGameAction(ev, 'leave', { leaveConfirmed: true }) }}
         onClose={() => setLeaveAsk(null)} />

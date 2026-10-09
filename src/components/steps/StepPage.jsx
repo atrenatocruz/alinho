@@ -175,7 +175,7 @@ export default function StepPage({
           onConfirm={edit.danger.onConfirm} onClose={() => setAskingDanger(false)} errorOf={edit.danger.errorOf} />
       )}
       {edit && (
-        <ConfirmSheet open={asking} outline title={t('steps.leave_title')}
+        <ConfirmSheet open={asking} title={t('steps.leave_title')}
           cancelLabel={t('steps.keep_editing')} confirmLabel={t('steps.leave_without_saving')}
           onConfirm={() => edit.onCancel()} onClose={() => setAsking(false)} />
       )}

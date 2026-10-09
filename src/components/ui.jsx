@@ -1186,10 +1186,11 @@ export function DangerConfirmModal({ open, title, message, emphasis, confirmLabe
      · `title` é a pergunta COM o nome da coisa («Desistir de Masculinos 4?»),
        `message` é UMA linha com a consequência real;
      · os botões dizem a ação — nunca «OK», nunca «Tens a certeza?»;
-     · `danger` (estraga): o que NÃO estraga vem primeiro, a preto e a toda
-       a largura («Não desisto»), e o risco por baixo, a vermelho com
-       contorno («Sim, desisto»);
-     · sem `danger`: a ação a preto e, por baixo, «Agora não» em texto.
+     · REGRA DOS BOTÕES (Francisco, 6 out — design-handoff/2026-10-06-regra-
+       confirmacoes): em cima, cheio, a ação que a pessoa veio fazer — preta,
+       ou VERMELHA com `danger` (apaga, cancela, tira, recusa); por baixo, em
+       contorno, ficar como está («Ainda não», «Manter…»). Vale para todas;
+       não se troca a ordem à mão.
 
    `children` entra por baixo da consequência, quando é preciso ver o que
    se vai confirmar (uma lista, um pódio).
@@ -1200,13 +1201,7 @@ export function DangerConfirmModal({ open, title, message, emphasis, confirmLabe
 
    A DangerConfirmModal (acima) é a janela antiga: os sítios que a usam
    passam para esta quando chegar a vez deles (mix, Gerir, resto). */
-// outline: a ação vai em segundo, com contorno, e o preto (primeiro) é o
-// «não» — para quando o que já aconteceu não se desfaz e a pergunta é só um
-// extra (ex.: depois de aceitar um professor, «Agora não» · «Sim, tornar
-// admin»; desenho aprovado 25 set, professores, assunto 2).
-// dangerFirst (6 out, «Voltar a rascunho» com inscritos): o vermelho cheio em
-// cima a confirmar, e o «Manter» em contorno por baixo.
-export function ConfirmSheet({ open, title, message, confirmLabel, cancelLabel, danger = false, outline = false, dangerFirst = false, onConfirm, onClose, errorOf, children, confirmDisabled = false }) {
+export function ConfirmSheet({ open, title, message, confirmLabel, cancelLabel, danger = false, onConfirm, onClose, errorOf, children, confirmDisabled = false }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   useEffect(() => { if (!open) { setBusy(false); setError('') } }, [open])
@@ -1232,25 +1227,16 @@ export function ConfirmSheet({ open, title, message, confirmLabel, cancelLabel, 
     }
   }
 
-  const safe = dangerFirst
-    ? <button type="button" onClick={confirm} disabled={busy || confirmDisabled}
-        className="w-full min-h-[52px] rounded-ctrl bg-danger px-4 text-[15px] font-extrabold text-white disabled:opacity-40">{confirmLabel}</button>
-    : danger || outline
-    ? <button type="button" onClick={onClose} disabled={busy}
-        className="w-full min-h-[52px] rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold text-white disabled:opacity-40">{cancelLabel}</button>
-    : <button type="button" onClick={confirm} disabled={busy || confirmDisabled}
-        className="w-full min-h-[52px] rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold text-white disabled:opacity-40">{confirmLabel}</button>
-  const second = dangerFirst
-    ? <button type="button" onClick={onClose} disabled={busy}
-        className="w-full min-h-[52px] rounded-ctrl border-[1.5px] border-line bg-white px-4 text-[15px] font-extrabold text-ink-900 disabled:opacity-40">{cancelLabel}</button>
-    : outline
-    ? <button type="button" onClick={confirm} disabled={busy || confirmDisabled}
-        className="w-full min-h-[52px] rounded-ctrl border-[1.5px] border-line bg-white px-4 text-[15px] font-extrabold text-ink-900 disabled:opacity-40">{confirmLabel}</button>
-    : danger
-    ? <button type="button" onClick={confirm} disabled={busy || confirmDisabled}
-        className="w-full min-h-[52px] rounded-ctrl border-2 border-danger bg-white px-4 text-[15px] font-extrabold text-danger disabled:opacity-40">{confirmLabel}</button>
-    : <button type="button" onClick={onClose} disabled={busy}
-        className="w-full min-h-[44px] px-4 text-[15px] font-extrabold text-ink-700 disabled:opacity-40">{cancelLabel}</button>
+  // Em cima, cheio: a ação (preta, ou vermelha se `danger`). Por baixo, em
+  // contorno: ficar como está.
+  const action = (
+    <button type="button" onClick={confirm} disabled={busy || confirmDisabled}
+      className={`w-full min-h-[52px] rounded-ctrl px-4 text-[15px] font-extrabold text-white disabled:opacity-40 ${danger ? 'bg-danger' : 'bg-ink-900'}`}>{confirmLabel}</button>
+  )
+  const stay = (
+    <button type="button" onClick={onClose} disabled={busy}
+      className="w-full min-h-[52px] rounded-ctrl border-[1.5px] border-line bg-white px-4 text-[15px] font-extrabold text-ink-900 disabled:opacity-40">{cancelLabel}</button>
+  )
 
   return createPortal(
     <div
@@ -1274,8 +1260,8 @@ export function ConfirmSheet({ open, title, message, confirmLabel, cancelLabel, 
           <p role="alert" className="mt-3 rounded-ctrl border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-sm font-bold text-danger">{error}</p>
         )}
         <div className="mt-5 space-y-2.5">
-          {safe}
-          {second}
+          {action}
+          {stay}
         </div>
       </div>
     </div>,
@@ -1442,7 +1428,7 @@ export function FollowListModal({ userId, initialTab = 'followers', onClose, man
           cancelLabel={t('dialogs.remove_follower_keep')} confirmLabel={t('dialogs.remove_follower_confirm')}
           onConfirm={() => endFollowNow(asking)} onClose={() => setAsking(null)} />
       ) : (
-        <ConfirmSheet open outline title={t('followlist.confirm_unfollow', { name: asking.name })}
+        <ConfirmSheet open title={t('followlist.confirm_unfollow', { name: asking.name })}
           cancelLabel={t('dialogs.unfollow_keep')} confirmLabel={t('dialogs.unfollow_confirm')}
           onConfirm={() => endFollowNow(asking)} onClose={() => setAsking(null)} />
       ))}
@@ -1510,7 +1496,11 @@ export function PlayerAvatarRow({ players = [], max = 4, size = 'md', cap = 6 })
    Como no iPhone: o nome só aparece na barra quando o topo da página (o
    que vem logo a seguir à barra — o título grande, o cartão do evento…)
    sai do ecrã ao deslizar; com a página no topo, só a seta e a partilha. */
-export function BackBar({ onBack, to, label, title, onShare }) {
+// `right`: o que vai do lado direito em vez do «Partilhar» (ex.: o «🎁
+// Vouchers» do Gerir, 7 out). Sem `onBack` nem `to`, o lugar do «‹» fica vazio.
+// `solid`: fundo branco opaco em vez do vidro — no Gerir via-se o texto a
+// passar por trás da barra presa (UX, 7 out).
+export function BackBar({ onBack, to, label, title, onShare, right, solid = false }) {
   const { t } = useTranslation()
   const barRef = useRef(null)
   const [showTitle, setShowTitle] = useState(false)
@@ -1527,15 +1517,18 @@ export function BackBar({ onBack, to, label, title, onShare }) {
   }, [title])
   const round = 'flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/95 text-ink-900 shadow-card'
   return (
-    <div ref={barRef} className="sticky top-0 z-10 -mx-4 -mt-6 mb-1 bg-white/70 px-4 backdrop-blur-md" style={{ paddingTop: 'var(--safe-top, env(safe-area-inset-top))' }}>
-      <div className="grid h-16 grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-3">
+    <div ref={barRef} className={`sticky top-0 z-10 -mx-4 -mt-6 mb-1 px-4 ${solid ? 'bg-white' : 'bg-white/70 backdrop-blur-md'}`} style={{ paddingTop: 'var(--safe-top, env(safe-area-inset-top))' }}>
+      <div className={`grid h-16 items-center gap-3 ${right ? 'grid-cols-[minmax(44px,auto)_minmax(0,1fr)_auto]' : 'grid-cols-[44px_minmax(0,1fr)_44px]'}`}>
         {to
           ? <Link to={to} aria-label={label || t('common.back')} className={round}><ChevronLeft size={22} /></Link>
-          : <button type="button" onClick={onBack} aria-label={label || t('common.back')} className={round}><ChevronLeft size={22} /></button>}
-        <p aria-hidden={!showTitle} className={`min-w-0 truncate text-center text-base font-extrabold text-ink-900 transition-opacity duration-fast ${showTitle ? 'opacity-100' : 'opacity-0'}`}>{title}</p>
-        {onShare
-          ? <button type="button" onClick={onShare} aria-label={t('ui.share')} className={round}><Share2 size={18} /></button>
+          : onBack
+          ? <button type="button" onClick={onBack} aria-label={label || t('common.back')} className={round}><ChevronLeft size={22} /></button>
           : <span aria-hidden />}
+        <p aria-hidden={!showTitle} className={`min-w-0 truncate text-center text-base font-extrabold text-ink-900 transition-opacity duration-fast ${showTitle ? 'opacity-100' : 'opacity-0'}`}>{title}</p>
+        {right
+          || (onShare
+            ? <button type="button" onClick={onShare} aria-label={t('ui.share')} className={round}><Share2 size={18} /></button>
+            : <span aria-hidden />)}
       </div>
     </div>
   )

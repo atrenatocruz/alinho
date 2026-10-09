@@ -66,6 +66,10 @@ export default function Instructions() {
     const tm = setTimeout(() => document.getElementById(id)?.scrollIntoView({ block: 'start' }), 50)
     return () => clearTimeout(tm)
   }, [])
+  // As perguntas frequentes são o último bloco: num ecrã alto não havia página
+  // por baixo para o título subir até à barra e ficava a meio (Francisco,
+  // 8 out). Só quando se chega pelo #faq, um espaço por baixo deixa-o subir.
+  const [faqRoom] = useState(() => window.location.hash === '#faq')
   return (
     <div className="min-h-screen bg-canvas">
       {/* Header */}
@@ -408,6 +412,7 @@ export default function Instructions() {
             ))}
           </dl>
         </div>
+        {faqRoom && <div aria-hidden="true" className="h-[calc(100dvh-8rem)]" />}
       </main>
     </div>
   )

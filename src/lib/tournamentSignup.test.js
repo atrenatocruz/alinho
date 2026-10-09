@@ -48,6 +48,10 @@ describe('categoriesLeft', () => {
   it('duas por defeito', () => expect(categoriesLeft(tour(), [])).toBe(2))
   it('desconta as minhas', () => expect(categoriesLeft(tour(), [entry('validada')])).toBe(1))
   it('desistências não contam', () => expect(categoriesLeft(tour(), [entry('desistiu')])).toBe(2))
+  it('lê o max_categories que o criar grava, antes do nome antigo (8 out)', () => {
+    expect(categoriesLeft(tour({ rules: { max_categories: 1, max_categories_per_person: 2 } }), [])).toBe(1)
+    expect(categoriesLeft(tour({ rules: { max_categories: 3 } }), [entry('validada')])).toBe(2)
+  })
   it('o torneio pode mudar o máximo', () => {
     expect(categoriesLeft(tour({ rules: { max_categories_per_person: 3 } }), [entry('validada')])).toBe(2)
   })

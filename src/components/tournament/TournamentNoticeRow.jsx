@@ -20,7 +20,9 @@ import { TOURNAMENT_TZ } from '../../lib/tournamentDay'
 // 28 set): o organizador mudou o prémio da categoria onde estou inscrito.
 // Sai da base de dados (Dev 3) quando o prize_first/prize_second muda.
 // 'tournament_cancelled' (1 out, Dev 3): o organizador cancelou o torneio.
-export const TOURNAMENT_NOTICE_KINDS = ['tournament_promoted', 'tournament_correction_requested', 'tournament_prize_changed', 'tournament_cancelled']
+// 'tournament_entries_closed' (6 out, Dev 3): o prazo acabou e as inscrições
+// fecharam sozinhas; vai a quem organiza, que já pode sortear.
+export const TOURNAMENT_NOTICE_KINDS = ['tournament_promoted', 'tournament_correction_requested', 'tournament_prize_changed', 'tournament_cancelled', 'tournament_entries_closed']
 
 /** «150 € + troféu» ou, com os dois, «1.º 150 € · 2.º 50 €». */
 export function prizeText(first, second, t) {
@@ -58,6 +60,10 @@ export default function TournamentNoticeRow({ notice, onOpen }) {
     ? t('tournament.notice_correction_requested', vars)
     : notice.kind === 'tournament_cancelled'
     ? t('tournament.notice_cancelled', vars)
+    : notice.kind === 'tournament_entries_closed'
+    ? (d.entry_count != null
+      ? t('tournament.notice_entries_closed_count', { ...vars, count: Number(d.entry_count) })
+      : t('tournament.notice_entries_closed', vars))
     : notice.kind === 'tournament_prize_changed'
     ? (prize ? t('tournament.notice_prize_changed', { ...vars, prize }) : t('tournament.notice_prize_removed', vars))
     : d.partner_pending

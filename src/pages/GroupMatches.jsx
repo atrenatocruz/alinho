@@ -239,7 +239,7 @@ function MatchCard({ match, org, currentUser, isOrgAdmin, onChanged, t, i18n }) 
       )}
 
       {cardError && <p role="alert" className="text-xs font-extrabold text-danger">{cardError}</p>}
-      <ConfirmSheet open={ask === 'leave'} outline title={t('dialogs.leave_game_title')}
+      <ConfirmSheet open={ask === 'leave'} title={t('dialogs.leave_game_title')}
         cancelLabel={t('dialogs.leave_game_keep')} confirmLabel={t('dialogs.leave_game_confirm')}
         onConfirm={leaveNow} onClose={() => setAsk(null)} errorOf={(err) => describeError(t, err, 'groupmatches.error_leave')} />
       <ConfirmSheet open={ask === 'delete'} danger title={t('dialogs.delete_game_title')} message={t('dialogs.delete_game_message')}

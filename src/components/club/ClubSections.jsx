@@ -35,11 +35,15 @@ function Symbol({ club, size = 'w-14 h-14 text-lg' }) {
    O nome nunca é cortado (passa a duas linhas) e o botão fica SEMPRE por
    baixo, a toda a largura. Lima só no «Seguir»/«Pedir para entrar» — a
    única coisa lima do ecrã. «A seguir» abre a pergunta das janelas de 24
-   set: «Continuar a seguir» a preto primeiro, o risco a vermelho por baixo. */
-export function ClubHeader({ club, isFavorite, acting, favoriting, onFollow, onUnfollow, onToggleFavorite }) {
+   set: «Continuar a seguir» a preto primeiro, o risco a vermelho por baixo.
+   «Pedido enviado» tem saída (Francisco, 8 out: «deveria dar para cancelar
+   pedido»): «Cancelar pedido» em contorno por baixo, com a pergunta das
+   aulas (LessonEventCard). */
+export function ClubHeader({ club, isFavorite, acting, favoriting, onFollow, onUnfollow, onCancelRequest, onToggleFavorite }) {
   const { t } = useTranslation()
   const kk = (key) => (club.kind === 'group' ? `${key}_group` : key)
   const [asking, setAsking] = useState(false)
+  const [askingCancel, setAskingCancel] = useState(false)
   // A terra pode ser uma morada inteira (A2N, 26 set): essa parte pode partir
   // a linha; «Clube» e «N membros» nunca partem. Nada pode empurrar a página
   // para o lado.
@@ -82,6 +86,12 @@ export function ClubHeader({ club, isFavorite, acting, favoriting, onFollow, onU
             <Clock size={16} /> {t('clubprofile.request_sent')}
           </span>
           <p className="mt-1.5 text-center text-[13px] text-muted">{t(kk('clubprofile.request_waiting'))}</p>
+          {onCancelRequest && (
+            <button type="button" onClick={() => setAskingCancel(true)} disabled={acting}
+              className="mt-3 flex min-h-[48px] w-full items-center justify-center rounded-ctrl border-[1.5px] border-ink-900 bg-white text-base font-extrabold text-ink-900 disabled:opacity-40">
+              {t('lessons.cancel_request')}
+            </button>
+          )}
         </div>
       ) : (
         <PrimaryButton onClick={onFollow} disabled={acting} className="w-full">
@@ -102,6 +112,19 @@ export function ClubHeader({ club, isFavorite, acting, favoriting, onFollow, onU
         // nunca a mensagem técnica da base de dados.
         errorOf={(err) => (['offline', 'session'].includes(errorKind(err)) ? describeError(t, err) : t(kk('clubprofile.error_unfollow')))}
       />
+      {onCancelRequest && (
+        <ConfirmSheet
+          open={askingCancel}
+          danger
+          title={t('booking.cancel_title')}
+          message={t(kk('clubprofile.cancel_request_text'))}
+          confirmLabel={t('booking.cancel_confirm')}
+          cancelLabel={t('booking.cancel_keep')}
+          onConfirm={onCancelRequest}
+          onClose={() => setAskingCancel(false)}
+          errorOf={(err) => (['offline', 'session'].includes(errorKind(err)) ? describeError(t, err) : t('clubprofile.error_cancel_request'))}
+        />
+      )}
     </div>
   )
 }

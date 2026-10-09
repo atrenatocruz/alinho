@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, Suspense, lazy } from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation, useNavigate, useSearchParams, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { WifiOff, Compass } from 'lucide-react'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { PrimaryButton, EmptyState } from './components/ui'
 import Layout, { Wordmark } from './components/Layout'
-import SplashScreen from './components/SplashScreen'
+import { hideBoot } from './lib/boot'
 import Login from './pages/Login'
 import Landing from './pages/Landing'
 import Plans from './pages/Plans'
@@ -28,6 +28,7 @@ import TournamentPage from './pages/TournamentPage'
 import TournamentScorePage from './pages/TournamentScorePage'
 import TournamentPrint from './pages/TournamentPrint'
 import CookieConsentBanner from './components/CookieConsentBanner'
+import { resolveShortGameLink } from './lib/shortGameLink'
 import ErrorBoundary from './components/ErrorBoundary'
 import { afterLoginPath, savePendingOrgSlug } from './lib/loginLinks'
 import { reloadOnceForChunk, clearChunkReload } from './lib/chunkReload'
@@ -173,15 +174,15 @@ function PublicShell({ children }) {
 // index.html. Uma página curta, no estilo do EmptyState, com «Ir para o
 // início» e, sem sessão, «Entrar». Com sessão aparece dentro da app, com
 // a barra de baixo.
-function NotFound({ showSplash }) {
+function NotFound({ showSplash, title, subtitle }) {
   const { user } = useAuth()
   const { t } = useTranslation()
-  if (showSplash) return <SplashScreen />
+  if (showSplash) return null
   const pagina = (
     <EmptyState
       icon={Compass}
-      title={t('notfound.title')}
-      subtitle={t('notfound.subtitle')}
+      title={title || t('notfound.title')}
+      subtitle={subtitle || t('notfound.subtitle')}
       action={
         <div className="flex flex-col gap-2 max-w-xs mx-auto">
           <Link to="/" className="btn-primary w-full inline-flex items-center justify-center">{t('notfound.go_home')}</Link>
@@ -203,13 +204,35 @@ function NotFound({ showSplash }) {
   )
 }
 
+/* Link curto do mix (alinho.pt/m/<8 caracteres>, o que o robô manda):
+   descobre o jogo e segue para /jogo/<id> com replace — a mesma página, com
+   ou sem sessão (sem sessão, o Guard do /jogo leva ao login e devolve). O
+   /m não fica no histórico. Sem um só jogo: «Este link já não é válido»,
+   nunca outro jogo (Francisco, 6 out). */
+function ShortGameLink({ showSplash }) {
+  const { code } = useParams()
+  const { t } = useTranslation()
+  const [gameId, setGameId] = useState(undefined) // undefined = a procurar; null = não serve
+  useEffect(() => {
+    let cancelled = false
+    resolveShortGameLink(code)
+      .then((id) => { if (!cancelled) setGameId(id) })
+      .catch((error) => {
+        console.error('Error resolving short game link:', error)
+        if (!cancelled) setGameId(null)
+      })
+    return () => { cancelled = true }
+  }, [code])
+  if (showSplash || gameId === undefined) return null
+  if (gameId) return <Navigate to={`/jogo/${gameId}`} replace />
+  return <NotFound title={t('shortlink.invalid_title')} subtitle={t('shortlink.invalid_subtitle')} />
+}
+
 const Guard = ({ require, showSplash, children }) => {
   const { user, profile, isGuest, isAdmin, isPrivateMatchesEnabled, isLessonsEnabled, profileError, retryProfile } = useAuth()
   const location = useLocation()
 
-  if (showSplash) {
-    return <SplashScreen />
-  }
+  if (showSplash) return null
 
   if (user && profileError) {
     return <LoadErrorScreen onRetry={retryProfile} />
@@ -351,6 +374,8 @@ function AppRoutes() {
   }, [])
 
   const showSplash = authLoading || !minDurationElapsed
+  // Enquanto showSplash, quem cobre o ecrã é o #boot do index.html.
+  useEffect(() => { if (!showSplash) hideBoot() }, [showSplash])
 
   return (
     // Rede de seguranca: sem ela, um erro em qualquer pagina da ecra branco.
@@ -379,6 +404,7 @@ function AppRoutes() {
             </Guard>
           }
         />
+        <Route path="/m/:code" element={<ShortGameLink showSplash={showSplash} />} />
         <Route
           path="/jogo/:id"
           element={

@@ -6,7 +6,7 @@ import { supabase } from './supabase'
 export async function loadOpenSlotBatch(batchId) {
   const { data, error } = await supabase
     .from('games')
-    .select('id, organization_id, date, court_time_minutes, price_per_player, status, open_batch_id, participants(id, status)')
+    .select('id, organization_id, date, court_time_minutes, price_per_player, status, open_batch_id, whatsapp_post_times, participants(id, status)')
     .eq('open_batch_id', batchId)
     .eq('origin', 'open_slot')
   if (error) throw error

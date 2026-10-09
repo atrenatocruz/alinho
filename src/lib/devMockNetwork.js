@@ -118,6 +118,9 @@ const ACHIEVEMENTS_CATALOG = [
 ]
 
 const RPC_MOCKS = {
+  // Aprovar quem entra (2 out): o mix tem 8 lugares — com o mix cheio fica suplente.
+  accept_mix_request: () => (localStorage.getItem('mockEventCount') && Number(localStorage.getItem('mockEventCount')) < 8 ? 'confirmed' : 'waitlisted'),
+  decline_mix_request: () => null,
   ...LESSON_RPC_MOCKS,
   // Professores na Comunidade pela RPC (#392 entrega 2): os mesmos do mock
   // da tabela, já achatados.
@@ -236,6 +239,8 @@ const RPC_MOCKS = {
   // Série em rascunho (7 out): pausar põe as datas futuras em rascunho.
   pause_recurrence_to_draft: () => ({ dates: 3, people: 5 }),
   resume_recurrence: () => ({ dates: 3 }),
+  // mockSeriesNobody = 'true': datas sem ninguém inscrito (ensaio do QA, 8 out).
+  preview_recurrence_pause: () => ({ dates: 2, people: localStorage.getItem('mockSeriesNobody') === 'true' ? 0 : 5 }),
   // O mesmo para um torneio (mockTClosed = 'group' | 'club' | 'private').
   get_tournament_org_hint: () => {
     const k = localStorage.getItem('mockTClosed')
@@ -250,6 +255,8 @@ const RPC_MOCKS = {
     ? [{ name: 'Jota Padeleiros', slug: 'jota-padeleiros', my_status: localStorage.getItem('mockJoinOpen') === 'true' ? 'member' : 'pending' }]
     : community() ? [{
     ...(COMMUNITY_ORGS.find((o) => o.slug === params?.p_slug) || COMMUNITY_ORGS[2]),
+    ...(params?.p_slug === 'lobos' && localStorage.getItem('mockPendingGroup') === 'true' ? { my_status: 'pending' } : {}),
+    ...(localStorage.getItem('mockRequestCancelled') === 'true' ? { my_status: 'none' } : {}),
     description: 'Grupo de amigos para teste do Alinho 😎', phone: null, instagram: null, website: null,
     parent_slug: null,
     // localStorage.mockClubMixes = 'true' — um mix aberto na página do clube
@@ -265,6 +272,10 @@ const RPC_MOCKS = {
     ? COMMUNITY_ORGS.filter((o) => o.name.toLowerCase().includes(String(params?.p_query || '').trim().toLowerCase()))
     : []),
   follow_organization: (params) => (params?.p_organization_id === 'ag-org-open' ? 'joined' : 'pending'),
+  // «Cancelar pedido» de entrada (8 out). Com mockCommunity, o Racket Club
+  // (clube) e, com mockPendingGroup = 'true', os Lobos (grupo) estão pendentes.
+  // Depois de cancelar, a página volta a mostrar «Pedir para entrar».
+  cancel_membership_request: () => { localStorage.setItem('mockRequestCancelled', 'true'); return 'cancelled' },
   get_group_matches: (params) => (agenda() && params?.p_organization_id === MOCK_ADMIN_ORG_ID ? AGENDA_GROUP_MATCHES() : []),
   search_players: () => [{
     id: FAKE_MEMBER_ID, name: 'Marta Costa', avatar_url: null, rating: 1380,
@@ -364,10 +375,12 @@ const RPC_MOCKS = {
   // tabela): localStorage.mockJoinRequests = 'true'. Mostra o número no
   // separador «Pessoas» (Trello #528).
   list_membership_requests: () => (localStorage.getItem('mockJoinRequests') === 'true' ? [
-    { id: 'jr1', user_id: 'fake-1', name: 'Marta Costa', avatar_url: null, created_at: new Date().toISOString() },
-    { id: 'jr2', user_id: 'fake-2', name: 'Tiago Ferreira', avatar_url: null, created_at: new Date().toISOString() },
+    { id: 'jr1', user_id: FAKE_MEMBER_ID, name: 'Marta Costa', avatar_url: null, created_at: new Date().toISOString() },
+    { id: 'jr2', user_id: FAKE_PARTNER_ID, name: 'Tiago Ferreira', avatar_url: null, created_at: new Date().toISOString() },
   ] : []),
   delete_self_serve_group: () => null,
+  // Link curto do mix (/m/<código>): «fa4e0001» abre o mix de teste; o resto não serve.
+  resolve_game_link: (params) => (String(params?.p_code || '').toLowerCase() === 'fa4e0001' ? 'fake-game-1' : null),
   // Entrar por link num grupo cheio (#447): localStorage.mockJoinPending =
   // 'true' — a função devolve o grupo e a pessoa não fica membro (pedido).
   approve_membership_request: () => (localStorage.getItem('mockGroupFull') === 'true' ? { __error: 'Grupo já atingiu o limite de 40 membros do plano' } : null),
@@ -482,6 +495,59 @@ const RPC_MOCKS = {
     // localStorage.mockFriendCounted = 'true': a ronda 1 já contou para o
     // ranking (os 4 confirmaram) — «Contou», o cadeado, e o ranking trancado
     // no editar (rondas editáveis, 27 set).
+    // Rondas com tipo (SPEC amigos-a-jogar, 7 out): 'kinds' = 4 pessoas, a
+    // ronda 1 set 6-4, a 2 set 3-6, a 3 super tie-break 10-8 (as mesmas
+    // duplas) e a 4 a decorrer com duplas novas; 'kinds6' = 6 a rodar, a 3
+    // a decorrer em super tie-break. Outras chaves: mockFriendAs = 'guest'
+    // (sou quem aceitou, não quem criou — SPEC amigos-convidado),
+    // mockFriendTimed = 'running' | 'idle' (20 min por ronda), mockFriendKinds
+    // = 'points' (a ronda 2 em pontos até 21), mockFriendStarted = 'false'
+    // (por começar, só a ronda 1), mockFriendCounted = 'true'.
+    if (mode === 'kinds' || mode === 'kinds6') {
+      const me = MOCK_ADMIN_USER_ID
+      const six = mode === 'kinds6'
+      const base = six
+        ? [['Admin (Dev)', 'masculino'], ['Rita Figueira', 'feminino'], ['Tiago Lopes', 'masculino'], ['Ana Marques', 'feminino'], ['Rui Costa', 'masculino'], ['Zé Pinto', 'masculino']]
+        : [['Rita Figueira', 'feminino'], ['Tiago Lopes', 'masculino'], ['Ana Marques', 'feminino'], ['Rui Costa', 'masculino']]
+      const meIdx = localStorage.getItem('mockFriendAs') === 'guest' ? base.length - 1 : 0
+      const P = base.map(([name, gender], i) => ({ uid: i === meIdx ? me : `u-k${i}`, name, gender }))
+      const notStarted = localStorage.getItem('mockFriendStarted') === 'false'
+      const counted = localStorage.getItem('mockFriendCounted') === 'true'
+      const timed = localStorage.getItem('mockFriendTimed')
+      const invitees = P.map((p, i) => ({ invitee_id: `i-${p.uid}`, user_id: p.uid, name: p.name, avatar_url: null, rating: 1000 + i * 40, gender: p.gender,
+        status: notStarted && i === 2 ? 'pending' : 'accepted', is_guest: false, is_creator: i === 0, has_results: !notStarted, is_anonymous: false }))
+      const sl = (i) => ({ user_id: P[i].uid, name: P[i].name, invitee_id: `i-${P[i].uid}`, slot_status: 'accepted' })
+      const g = (k, a, b, kind, score, to = null) => ({ id: k === 1 ? 'fs-1' : `fs-g${k}`, n: k, round_number: k, court_number: 1,
+        team_a: a.map(sl), team_b: b.map(sl), resting: [], round_kind: kind, round_points_to: to, sets: [],
+        score_a: score ? score[0] : null, score_b: score ? score[1] : null,
+        winner_team: score ? (score[0] > score[1] ? 'a' : score[1] > score[0] ? 'b' : 'draw') : null,
+        status: 'pending', counts: false, waiting_for: [], started_at: null, ends_at: null })
+      let games = six ? [
+        g(1, [1, 2], [3, 4], 'set', [6, 2]),
+        g(2, [5, 1], [0, 2], 'set', [4, 6]),
+        g(3, [3, 0], [4, 5], 'super_tiebreak', null),
+      ] : [
+        g(1, [0, 1], [2, 3], 'set', [6, 4]),
+        g(2, [0, 1], [2, 3], 'set', [3, 6]),
+        g(3, [0, 1], [2, 3], 'super_tiebreak', [10, 8]),
+        g(4, [0, 2], [1, 3], 'set', null),
+      ]
+      if (!six && localStorage.getItem('mockFriendKinds') === 'points') {
+        games = [g(1, [0, 1], [2, 3], 'set', [6, 3]), g(2, [0, 2], [1, 3], 'pontos', [17, 21], 21), g(3, [0, 3], [1, 2], 'tiebreak', null)]
+      }
+      if (notStarted) games = [g(1, [0, 1], [2, 3], 'set', null)]
+      const cur = games[games.length - 1]
+      if (timed === 'running' && !notStarted) {
+        Object.assign(cur, { started_at: new Date(Date.now() - 444000).toISOString(), ends_at: new Date(Date.now() + 756000).toISOString() })
+      }
+      if (counted) games[0].counts = true
+      return {
+        match: { id: 'fs-1', scheduled_date: new Date(Date.now() + (notStarted ? 6 : -1) * 86400000).toISOString().slice(0, 10), scheduled_time: '10:00:00',
+          location: 'Clube Exemplo', court: 'Campo 1', teams_mode: 'app', pairing_mode: six ? 'rotating' : 'fixed', scoring_format: 'sets', num_sets: 3,
+          game_minutes: timed ? 20 : null, teams_set_at: new Date().toISOString(), ranked_intent: true, ranking_locked: counted },
+        invitees, games,
+      }
+    }
     if (mode === 'rounds6' || mode === 'rounds8') {
       const me = MOCK_ADMIN_USER_ID
       const P = [[me, 'Admin (Dev)'], ['u-rf', 'Rita Figueira'], ['u-tl', 'Tiago Lopes'], ['u-am', 'Ana Marques'], ['u-rc', 'Rui Costa'], ['u-zp', 'Zé Pinto'],
@@ -595,6 +661,10 @@ const RPC_MOCKS = {
     ]),
   ] : []),
   save_friend_match_set: () => ({ sets: [], sets_a: 1, sets_b: 1, finished: false, status: 'pending' }),
+  // Rondas com tipo e «Sair do jogo» (Dev 3, 7 e 8 out): no ecrã só se vê o pedido a sair.
+  save_friend_match_round: () => ({ status: 'pending', next_ids: ['fs-new'] }),
+  set_friend_match_round_kind: () => null,
+  leave_friend_match: () => 'left',
   finish_friend_match_game: () => 'pending',
   set_friend_match_round_teams: () => null,
   remove_friend_match_game: () => null,
@@ -806,6 +876,16 @@ const EV_PARTICIPANTS = () => (localStorage.getItem('mockAllPairs') === 'true'
     id: 'ev-w1', game_id: 'fake-game-1', user_id: 'fake-ze', partner_id: null, status: 'waitlisted',
     created_at: new Date().toISOString(), user: { id: 'fake-ze', name: 'Zé Pinto', avatar_url: null, preferred_side: 'both' }, partner: null,
   }] : []))
+  // Aprovar quem entra (2 out): localStorage.mockRequests = 'N' — N pedidos
+  // por decidir; mockMyRequest = 'requested' | 'declined' — o meu pedido.
+  .concat(['Rita Fonseca', 'Tiago Lopes', 'Marta Costa'].slice(0, Number(localStorage.getItem('mockRequests') || 0)).map((name, i) => ({
+    id: `ev-r${i}`, game_id: 'fake-game-1', user_id: `fake-${40 + i}`, partner_id: null, status: 'requested',
+    created_at: new Date().toISOString(), user: { id: `fake-${40 + i}`, name, avatar_url: null, preferred_side: 'both', rating_games: [23, 41, 9][i] }, partner: null,
+  })))
+  .concat(localStorage.getItem('mockMyRequest') ? [{
+    id: 'ev-mine', game_id: 'fake-game-1', user_id: MOCK_ADMIN_USER_ID, partner_id: null, status: localStorage.getItem('mockMyRequest'),
+    created_at: new Date().toISOString(), user: { id: MOCK_ADMIN_USER_ID, name: 'Francisco Barros', avatar_url: null, preferred_side: 'left' }, partner: null,
+  }] : [])
 const evTeam = (id, a, b, seed) => ({ id, game_id: 'fake-game-1', player1_id: a.id, player2_id: b.id, player1: a, player2: b, seed_ranking: seed, created_at: new Date().toISOString() })
 const [e0, e1, e2, e3, e4, e5, e6, e7] = EV_PEOPLE
 const EV_TEAMS_BASE = [evTeam('et1', e1, e0, 4), evTeam('et2', e2, e3, 3), evTeam('et3', e4, e5, 2), evTeam('et4', e6, e7, 1)]
@@ -819,7 +899,17 @@ const EV_TEAMS = [...EV_TEAMS_BASE, evTeam('et5', EV_EXTRA[0], EV_EXTRA[1], 0), 
 // Nos dois, o relógio ainda não arrancou (round_started_at null).
 // mockResting = 'true' (+ mockTeams = '5'): na Ronda 2 a dupla do Francisco
 // (et1) descansa.
-const EV_MATCHES = () => (localStorage.getItem('mockRoundPending') === '1' ? [
+// Americano sorteado de uma vez (QA, 6 out): localStorage.mockAmericanoDone =
+// 'N' — 3 rondas × 2 campos, com as N primeiras marcadas.
+const AMERICANO_MATCHES = () => [1, 2, 3].flatMap((r) => [1, 2].map((c) => {
+  const done = r <= Number(localStorage.getItem('mockAmericanoDone'))
+  return { id: `am${r}${c}`, game_id: 'fake-game-1', round_number: r, court_number: c, phase: 'group',
+    team_a_id: c === 1 ? 'et1' : 'et3', team_b_id: c === 1 ? 'et2' : 'et4',
+    score_a: done ? 15 : null, score_b: done ? 9 : null, winner_team_id: done ? (c === 1 ? 'et1' : 'et3') : null,
+    // mockAmericanoNext = 'true': marcados antes de a ronda seguinte começar.
+    scored_at: done ? new Date(Date.now() + (localStorage.getItem('mockAmericanoNext') === 'true' ? -3600000 : 60000)).toISOString() : null }
+}))
+const EV_MATCHES = () => (localStorage.getItem('mockAmericanoDone') != null ? AMERICANO_MATCHES() : localStorage.getItem('mockRoundPending') === '1' ? [
   { id: 'em1', game_id: 'fake-game-1', round_number: 1, court_number: 1, phase: 'group', team_a_id: 'et1', team_b_id: 'et2', score_a: null, score_b: null, winner_team_id: null },
   { id: 'em2', game_id: 'fake-game-1', round_number: 1, court_number: 2, phase: 'group', team_a_id: 'et3', team_b_id: 'et4', score_a: null, score_b: null, winner_team_id: null },
 ] : EV_MATCHES_ALL().map((m) => (localStorage.getItem('mockResting') === 'true' && m.id === 'em3' ? { ...m, team_a_id: 'et5' } : m))
@@ -841,7 +931,10 @@ const EV_MATCHES_ALL = () => [
         ? { id: 'em4', game_id: 'fake-game-1', round_number: 2, court_number: 2, phase: 'group', team_a_id: 'et2', team_b_id: 'et4', score_a: 5, score_b: 5, winner_team_id: null }
         : { id: 'em4', game_id: 'fake-game-1', round_number: 2, court_number: 2, phase: 'group', team_a_id: 'et2', team_b_id: 'et4', score_a: 6, score_b: 5, winner_team_id: 'et2' },
     ] : [
-      { id: 'em3', game_id: 'fake-game-1', round_number: 2, court_number: 1, phase: 'group', team_a_id: 'et1', team_b_id: 'et3', score_a: null, score_b: null, winner_team_id: null },
+      // + mockRoundOneLeft = 'true': na ronda 2 só falta marcar o campo 2 (fim do mix, 6 out).
+      localStorage.getItem('mockRoundOneLeft') === 'true'
+        ? { id: 'em3', game_id: 'fake-game-1', round_number: 2, court_number: 1, phase: 'group', team_a_id: 'et1', team_b_id: 'et3', score_a: 6, score_b: 3, winner_team_id: 'et1' }
+        : { id: 'em3', game_id: 'fake-game-1', round_number: 2, court_number: 1, phase: 'group', team_a_id: 'et1', team_b_id: 'et3', score_a: null, score_b: null, winner_team_id: null },
       { id: 'em4', game_id: 'fake-game-1', round_number: 2, court_number: 2, phase: 'group', team_a_id: 'et2', team_b_id: 'et4', score_a: null, score_b: null, winner_team_id: null },
     ]),
   ]),
@@ -1158,6 +1251,8 @@ const TABLE_MOCKS = {
       const d = new Date(); d.setDate(d.getDate() + n)
       return d.toISOString().slice(0, 10)
     }
+    // mockTHome = 'past': o torneio acabou há dois dias e joguei (#508).
+    if (mode === 'past') return [{ ...tour, starts_on: day(-3), ends_on: day(-2), status: 'terminado', category_count: 5 }]
     const d0 = localStorage.getItem('mockTHomeToday') === 'true' ? 0 : 1
     return [{ ...tour, starts_on: day(d0), ends_on: day(d0 + 2), status: d0 === 0 ? 'a_decorrer' : 'inscricoes', category_count: 5 }]
   },
@@ -1172,6 +1267,15 @@ const TABLE_MOCKS = {
     // jogou, e a folha de trocar jogador avisa (Trello #434).
     if (localStorage.getItem('mockTReplacePlayed') === 'true') {
       return [{ id: 'rp1', category_id: 'cat-m4', entry_a_id: 'e1', entry_b_id: 'e3', status: 'terminado', winner_entry_id: 'e1', score_a: 9, score_b: 6 }]
+    }
+    if (localStorage.getItem('mockTHome') === 'past') {
+      const ago = (days, hour) => { const d = new Date(); d.setDate(d.getDate() - days); d.setHours(hour, 0, 0, 0); return d.toISOString() }
+      return [
+        { id: 'tp1', category_id: 'cat-m4', stage: 'grupos', round: null, entry_a_id: 'my-entry', entry_b_id: 'rival-1',
+          scheduled_at: ago(3, 10), previous_scheduled_at: null, court_name: 'Campo 2', status: 'terminado', score_a: 9, score_b: 6, winner_entry_id: 'my-entry' },
+        { id: 'tp2', category_id: 'cat-m4', stage: 'quartos', round: 'QF', entry_a_id: 'rival-2', entry_b_id: 'my-entry',
+          scheduled_at: ago(2, 16), previous_scheduled_at: null, court_name: 'Campo 3', status: 'terminado', score_a: 9, score_b: 4, winner_entry_id: 'rival-2' },
+      ]
     }
     if (localStorage.getItem('mockTHome') !== 'matches') return []
     // localStorage.mockTHomeToday = 'true': os meus jogos são hoje (para ver
@@ -1214,6 +1318,16 @@ const TABLE_MOCKS = {
       data: { game_title: 'Mix de Sábado', game_date: tomorrow8pm.toISOString(), partner_name: 'Rui Oliveira Gomes', actor_name: 'Marta Costa' } },
     { id: 'n3', kind: 'mix_removed', game_id: 'fake-game-1', created_at: new Date().toISOString(),
       data: { game_title: 'Mix de Terça', game_date: tomorrow8pm.toISOString() } },
+  ] : localStorage.getItem('mockNotices') === 'requests' ? [
+    // Aprovar quem entra (2 out): as três respostas e o pedido a quem organiza.
+    { id: 'nr1', kind: 'mix_request_accepted', game_id: 'fake-game-1', created_at: new Date().toISOString(),
+      data: { game_title: 'Mix de Sábado', game_date: tomorrow8pm.toISOString(), status: 'confirmed' } },
+    { id: 'nr2', kind: 'mix_request_accepted', game_id: 'fake-game-1', created_at: new Date().toISOString(),
+      data: { game_title: 'Mix de Domingo', game_date: tomorrow8pm.toISOString(), status: 'waitlisted' } },
+    { id: 'nr3', kind: 'mix_request_declined', game_id: 'fake-game-1', created_at: new Date().toISOString(),
+      data: { game_title: 'Mix de Terça', game_date: tomorrow8pm.toISOString() } },
+    { id: 'nr4', kind: 'mix_join_request', game_id: 'fake-game-1', created_at: new Date().toISOString(),
+      data: { game_title: 'Mix de Sábado', game_date: tomorrow8pm.toISOString(), requester_name: 'Rita Fonseca', participant_id: 'ev-r0' } },
   ] : []).concat(LESSON_NOTICES()).concat(localStorage.getItem('mockFriendSession') === 'left' ? [
     { id: 'fd1', kind: 'friend_match_declined', game_id: null, created_at: new Date().toISOString(),
       data: { match_id: 'fs-1', name: 'Ana Marques', scheduled_date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), scheduled_time: '10:00:00' } },
@@ -1393,6 +1507,8 @@ const TABLE_MOCKS = {
       // mockUnfilled = 'true': à hora do jogo não encheu e voltou a rascunho (ponto 7).
       ...(localStorage.getItem('mockUnfilled') === 'true' || (eventState() === 'cancelled' && localStorage.getItem('mockUnfilledCancel') === 'true') ? { unfilled_at: new Date().toISOString() } : {}),
       ...(localStorage.getItem('mockEventSize') === '12' ? { num_courts: 3, max_players: 12 } : {}),
+      // mockJoinApproval = 'true': quem organiza aceita quem entra pela app (2 out).
+      ...(localStorage.getItem('mockJoinApproval') === 'true' ? { join_approval: true } : {}),
       // mockEventPast = 'true': a hora do mix já passou (há 1 h).
       ...(localStorage.getItem('mockEventPast') === 'true' ? { date: new Date(Date.now() - 3600000).toISOString() } : {}),
       ...(eventState() === 'finished' ? { winner_team_id: 'et1' } : {}),
@@ -1513,6 +1629,9 @@ RPC_MOCKS.skip_recurrence_game = () => { const d = new Date(); d.setDate(d.getDa
 // tem grupos (devMockTournament.js); as horas do «último mix» são 10:00 e 18:30.
 RPC_MOCKS.default_whatsapp_post_times = () => ['10:00', '18:30']
 RPC_MOCKS.set_event_whatsapp_post_times = (params) => [...(params?.p_times || [])].sort()
+// As do próprio evento no Editar (Dev 3, 7 out): diferentes das do «último
+// mix», para se ver que o Editar não as troca.
+RPC_MOCKS.get_event_whatsapp_post_times = () => ['09:00', '19:30']
 RPC_MOCKS.ensure_recurrence_successor = () => localStorage.getItem('mockEnsureStatus') || 'created'
 // A regra da série do rascunho (mockMixDraft = 'serie'): semanal, abre 3
 // dias antes às 10:00 (o mix é às 19:00).
@@ -1754,6 +1873,13 @@ export function installDevMockNetwork() {
     if (localStorage.getItem('mockRobotMessagesError') === 'true' && /\/rest\/v1\/organizations\?/.test(url)
         && (init?.method || input?.method || 'GET').toUpperCase() === 'PATCH' && String(init?.body || '').includes('whatsapp_new_messages')) {
       return jsonResponse({ code: '42501', message: 'not_allowed' }, 403)
+    }
+    // Caminho feliz: grava em localStorage.mockRobotMessages e devolve a linha
+    // (o interruptor pede .select('id') e trata 0 linhas como erro).
+    if (/\/rest\/v1\/organizations\?/.test(url)
+        && (init?.method || input?.method || 'GET').toUpperCase() === 'PATCH' && String(init?.body || '').includes('whatsapp_new_messages')) {
+      try { localStorage.setItem('mockRobotMessages', String(JSON.parse(init.body).whatsapp_new_messages === true)) } catch { /* ignore */ }
+      return jsonResponse([{ id: MOCK_ADMIN_ORG_ID }])
     }
 
     // localStorage.mockDeleteHasResults = 'true' — apagar um mix falha como

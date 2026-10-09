@@ -4,7 +4,7 @@ import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation, Trans } from 'react-i18next'
 import { BackBar } from '../components/ui'
-import { Calendar, ArrowLeft, UserPlus, Check, Trophy, Play, ChevronRight, Swords, X, Repeat, Share2, ChevronDown, RotateCcw, Euro, GripVertical, Pencil, History, ThumbsUp, Users, Copy, ArrowLeftRight } from 'lucide-react'
+import { Calendar, ArrowLeft, UserPlus, Check, Trophy, Play, ChevronRight, Swords, X, ChevronDown, RotateCcw, Euro, GripVertical, Pencil, History, ThumbsUp, Users, Copy, Clock } from 'lucide-react'
 import { DndContext, useDraggable, useDroppable, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { supabase, supabaseUrl } from '../lib/supabase'
@@ -118,6 +118,13 @@ export default function GameDetails() {
   const gameOrganizationId = game?.organization_id ?? null
   const [participants, setParticipants] = useState([])
   const [waitlist, setWaitlist] = useState([])
+  // Aprovar quem entra pela app (SPEC 2026-10-02-mix-aprovar-quem-entra):
+  // os pedidos por decidir, o estado do meu pedido e a pergunta do recusar.
+  const [requests, setRequests] = useState([])
+  const [myRequestState, setMyRequestState] = useState(null) // 'requested' | 'declined' | null
+  const [declineAsk, setDeclineAsk] = useState(null) // o pedido a recusar
+  const [requestBusy, setRequestBusy] = useState(null)
+  const [requestNotice, setRequestNotice] = useState(null) // { ok, text }
   const [teams, setTeams] = useState([])
   const [matches, setMatches] = useState([])
   const [loading, setLoading] = useState(true)
@@ -175,6 +182,14 @@ export default function GameDetails() {
   const [restartOpen, setRestartOpen] = useState(false)
   // A tira preta de 3 s depois de uma ação da folha (ex.: «Mudar só este mix»).
   const [doneNotice, setDoneNotice] = useState('')
+  // Regra das janelas (parte 3, 7 out): as perguntas vão à folha da app
+  // (ConfirmSheet, regra das confirmações de 6 out) e os erros ficam
+  // escritos junto ao sítio — nunca alert()/confirm() do navegador.
+  const [ask, setAsk] = useState(null) // { title, message, confirmLabel, cancelLabel, danger, resolve }
+  const askConfirm = (opts) => new Promise((resolve) => setAsk({ ...opts, resolve }))
+  const [kudosError, setKudosError] = useState('')
+  const [leaveError, setLeaveError] = useState('')
+  const [scorekeeperError, setScorekeeperError] = useState(null) // { id, text }
   // Chegou pelo «Entrar no clube» do cartão da Home (bug de 29 set): a faixa
   // diz porque está aqui — entrou no clube, ainda não está inscrito.
   const location = useLocation()
@@ -184,7 +199,7 @@ export default function GameDetails() {
   }, [location.key])
   useEffect(() => {
     if (!doneNotice) return undefined
-    const timer = setTimeout(() => setDoneNotice(''), 3000)
+    const timer = setTimeout(() => setDoneNotice(''), doneNotice.length > 60 ? 7000 : 3000)
     return () => clearTimeout(timer)
   }, [doneNotice])
   const [changedKeys, setChangedKeys] = useState(() => new Set())
@@ -235,6 +250,7 @@ export default function GameDetails() {
   // mix e para os nomes do «marcado por».
   const [clubMembers, setClubMembers] = useState([])
   const [swapFor, setSwapFor] = useState(null) // { team, player, slot } | null
+  const [removeSlotAsk, setRemoveSlotAsk] = useState(null) // { person, duplaNumber } | null
   // Rondas já jogadas que a pessoa abriu à mão (as outras ficam dobradas).
   const [openRounds, setOpenRounds] = useState({})
   // Jogo que não abre: de que grupo é (undefined = a perguntar; null = não
@@ -287,6 +303,7 @@ export default function GameDetails() {
 
   const handleGiveKudos = async (recipientId) => {
     setKudosGiving(true)
+    setKudosError('')
     try {
       const { error } = await supabase.rpc('give_mix_kudos', { p_game_id: id, p_recipient_id: recipientId })
       if (error) throw error
@@ -296,7 +313,7 @@ export default function GameDetails() {
       // As RAISE EXCEPTION do RPC já vêm em português e explicam a causa
       // ("Já deste o teu kudos…", "Só quem jogou…") — mostrar isso em vez
       // de um genérico que esconde o problema.
-      alert(describeError(t, error, 'gamedetails.kudos_error'))
+      setKudosError(describeError(t, error, 'gamedetails.kudos_error'))
     } finally {
       setKudosGiving(false)
     }
@@ -410,7 +427,7 @@ export default function GameDetails() {
           partner_guest:game_guests!participants_partner_guest_id_fkey (id, name)
         `)
         .eq('game_id', id)
-        .in('status', ['confirmed', 'waitlisted'])
+        .in('status', ['confirmed', 'waitlisted', 'requested', 'declined'])
         .order('created_at', { ascending: true })
         .order('id', { ascending: true })
 
@@ -418,6 +435,10 @@ export default function GameDetails() {
 
       const confirmedRows = (participantsData || []).filter((p) => p.status === 'confirmed')
       const waitlistRows = (participantsData || []).filter((p) => p.status === 'waitlisted')
+      // Pedidos (Dev 3): 'requested' não ocupa vaga; 'declined' só interessa
+      // a quem pediu. Todos os membros leem as linhas — o ecrã é que filtra.
+      const requestRows = (participantsData || []).filter((p) => p.status === 'requested')
+      const myRequestRow = (participantsData || []).find((p) => p.user_id === user?.id && ['requested', 'declined'].includes(p.status))
 
       // Mix data (duplas + jogos sorteados). All of a game's teams are
       // bulk-inserted in one statement (handleStartMix), so they share the
@@ -502,6 +523,12 @@ export default function GameDetails() {
         ...p,
         user: attachMembership(p.user) ?? guestAsProfile(p.guest),
       })))
+      setRequests(requestRows.map((p) => ({
+        ...p,
+        user: attachMembership(p.user) ?? guestAsProfile(p.guest),
+        partner: attachMembership(p.partner) ?? guestAsProfile(p.partner_guest),
+      })))
+      setMyRequestState(myRequestRow?.status ?? null)
       // Nas duplas, o estado guarda o id EFETIVO em playerX_id (conta ou
       // convidado) — é o que o drag-and-drop, o mixEdit e o seedCourts
       // esperam; o saveEditedPairs volta a separar as colunas ao gravar.
@@ -608,7 +635,7 @@ export default function GameDetails() {
         ])
 
       if (error) throw error
-      celebrate()
+      if (!awaitsApproval) celebrate()
       loadGameDetails()
     } catch (error) {
       console.error('Error joining game:', error)
@@ -662,7 +689,7 @@ export default function GameDetails() {
         if (error) throw error
       }
       setPartnerSheet(false)
-      celebrate()
+      if (!awaitsApproval) celebrate()
       loadGameDetails()
     } catch (error) {
       console.error('Error joining game with a partner:', error)
@@ -693,7 +720,7 @@ export default function GameDetails() {
       if (error) throw error
       setJoinMode(null)
       setSelectedPartner('')
-      celebrate()
+      if (!awaitsApproval) celebrate()
       loadGameDetails()
     } catch (error) {
       console.error('Error joining game:', error)
@@ -787,7 +814,14 @@ export default function GameDetails() {
   }
 
   const handleLeaveGame = async () => {
-    if (!confirm(t('gamedetails.confirm_leave_game'))) return
+    setLeaveError('')
+    const ok = await askConfirm({
+      title: t('gamedetails.leave_ask_title'),
+      message: t('gamedetails.leave_ask_text'),
+      confirmLabel: t('gamedetails.leave_ask_confirm'),
+      cancelLabel: t('gamedetails.leave_ask_keep'),
+    })
+    if (!ok) return
 
     try {
       const { error } = await supabase
@@ -802,7 +836,7 @@ export default function GameDetails() {
       loadGameDetails()
     } catch (error) {
       console.error('Error leaving game:', error)
-      alert(describeError(t, error, 'gamedetails.error_leave_game'))
+      setLeaveError(describeError(t, error, 'gamedetails.error_leave_game'))
     }
   }
 
@@ -824,7 +858,52 @@ export default function GameDetails() {
     }
   }
 
+  // «Cancelar pedido»: apaga o próprio pedido (Dev 3: a RLS deixa).
+  const handleCancelRequest = async () => {
+    setJoining(true)
+    setJoinError('')
+    try {
+      const { error } = await supabase
+        .from('participants')
+        .delete()
+        .eq('game_id', id)
+        .eq('user_id', user.id)
+        .eq('status', 'requested')
+      if (error) throw error
+      loadGameDetails()
+    } catch (error) {
+      console.error('Error cancelling join request:', error)
+      setJoinError(describeError(t, error, 'mixrequest.error_cancel'))
+    } finally {
+      setJoining(false)
+    }
+  }
+
+  // Quem organiza: aceitar entra (ou fica suplente, com o mix cheio) — a
+  // base de dados decide e devolve 'confirmed' ou 'waitlisted'.
+  const requestErrorText = (error) => {
+    const code = ['not_requested', 'not_allowed'].find((c) => (error?.message || '').includes(c))
+    return code ? t(`mixrequest.error_${code}`) : describeError(t, error, 'mixrequest.error_generic')
+  }
+  const handleAcceptRequest = async (r) => {
+    setRequestBusy(r.id)
+    setRequestNotice(null)
+    try {
+      const { data, error } = await supabase.rpc('accept_mix_request', { p_participant_id: r.id })
+      if (error) throw error
+      setRequestNotice({ ok: true, text: t(data === 'waitlisted' ? 'mixrequest.accepted_suplente' : 'mixrequest.accepted', { name: r.user?.name || '' }) })
+      await loadGameDetails()
+    } catch (error) {
+      console.error('Error accepting join request:', error)
+      setRequestNotice({ ok: false, text: requestErrorText(error) })
+      loadGameDetails()
+    } finally {
+      setRequestBusy(null)
+    }
+  }
+
   const handleLeaveWaitlist = async () => {
+    setLeaveError('')
     try {
       const { error } = await supabase
         .from('participants')
@@ -837,7 +916,7 @@ export default function GameDetails() {
       loadGameDetails()
     } catch (error) {
       console.error('Error leaving waitlist:', error)
-      alert(describeError(t, error, 'gamedetails.error_leave_waitlist'))
+      setLeaveError(describeError(t, error, 'gamedetails.error_leave_waitlist'))
     }
   }
 
@@ -1217,7 +1296,9 @@ export default function GameDetails() {
           .from('games')
           .update({
             status: 'in_progress',
-            round_started_at: new Date().toISOString(),
+            // A Ronda 1 fica «por começar»: o relógio só arranca com
+            // «Começar Ronda 1» (QA, 6 out — como nos outros formatos).
+            round_started_at: null,
             round_duration_minutes: game.game_time_minutes,
           })
           .eq('id', id)
@@ -1233,7 +1314,13 @@ export default function GameDetails() {
         const pairsList = forcedRepeats
           .map(({ player1, player2 }) => `${firstLastName(player1?.name)} + ${firstLastName(player2?.name)}`)
           .join(', ')
-        if (!confirm(t('gamedetails.confirm_repeat_pairing', { pairs: pairsList }))) {
+        const ok = await askConfirm({
+          title: t('gamedetails.repeat_ask_title'),
+          message: t('gamedetails.repeat_ask_text', { pairs: pairsList }),
+          confirmLabel: t('gamedetails.repeat_ask_confirm'),
+          cancelLabel: t('gamedetails.ask_not_yet'),
+        })
+        if (!ok) {
           setBusy(false)
           return
         }
@@ -1466,11 +1553,17 @@ export default function GameDetails() {
     const suplente = waitlist[0]
     const suplenteSize = suplente ? 1 + (suplente.partner_id || suplente.partner_guest_id ? 1 : 0) : 0
     const suplenteFits = suplente && peopleCount - 1 + suplenteSize <= capacity
-    const msg = [
-      t('mixedit.confirm_remove', { name: person.name }),
-      suplenteFits ? t('mixedit.confirm_remove_suplente', { name: suplente.user?.name || '?' }) : '',
-    ].filter(Boolean).join(' ')
-    if (!confirm(msg)) return
+    const ok = await askConfirm({
+      title: t('gamedetails.remove_ask_title', { name: person.name }),
+      message: [
+        t('mixedit.remove_ask_text'),
+        suplenteFits ? t('mixedit.confirm_remove_suplente', { name: suplente.user?.name || '?' }) : '',
+      ].filter(Boolean).join(' '),
+      confirmLabel: t('gamedetails.remove_ask_confirm'),
+      cancelLabel: t('gamedetails.remove_ask_keep'),
+      danger: true,
+    })
+    if (!ok) return
 
     const beforeIds = people.filter((p) => !p.no_account).map((p) => p.id)
     setBusy(true)
@@ -1635,7 +1728,13 @@ export default function GameDetails() {
   // vez quando sairam mal. So aparece enquanto nao houver nenhum jogo criado
   // - assim nunca pode apagar um resultado.
   const handleRedoDuplas = async () => {
-    if (!confirm(t('gamedetails.confirm_redo_duplas'))) return
+    const ok = await askConfirm({
+      title: t('gamedetails.redo_ask_title'),
+      message: t('gamedetails.redo_ask_text'),
+      confirmLabel: t('gamedetails.redo_ask_confirm'),
+      cancelLabel: t('gamedetails.ask_not_yet'),
+    })
+    if (!ok) return
     setBusy(true)
     setMixError('')
     try {
@@ -1793,9 +1892,13 @@ export default function GameDetails() {
       return
     }
 
-    if (!confirm(t('gamedetails.confirm_correct_finished_score', {
-      team: teamName(match.team_a_id), a, other: teamName(match.team_b_id), b,
-    }))) return
+    const ok = await askConfirm({
+      title: t('gamedetails.correct_ask_title', { team: teamName(match.team_a_id), a, other: teamName(match.team_b_id), b }),
+      message: t('gamedetails.correct_ask_text'),
+      confirmLabel: t('gamedetails.correct_ask_confirm'),
+      cancelLabel: t('gamedetails.ask_not_yet'),
+    })
+    if (!ok) return
 
     setMixError('')
     setSavingMatchId(match.id)
@@ -1826,7 +1929,7 @@ export default function GameDetails() {
       if (data.voucher_not_reverted) {
         parts.push(t('gamedetails.correction_voucher_not_reverted'))
       }
-      alert(parts.join(' '))
+      setDoneNotice(parts.join(' '))
     } catch (error) {
       console.error('Error correcting finished mix score:', error)
       setMixError(describeError(t, error, 'gamedetails.error_correct_finished_score'))
@@ -1854,6 +1957,7 @@ export default function GameDetails() {
   // (migration_game_scorekeepers.sql), this just toggles membership.
   const handleToggleScorekeeper = async (playerId) => {
     setScorekeeperBusy(playerId)
+    setScorekeeperError(null)
     try {
       if (scorekeeperIds.includes(playerId)) {
         const { error } = await supabase.from('game_scorekeepers').delete().eq('game_id', id).eq('user_id', playerId)
@@ -1865,7 +1969,7 @@ export default function GameDetails() {
       await loadGameDetails()
     } catch (error) {
       console.error('Error toggling scorekeeper:', error)
-      alert(describeError(t, error, 'gamedetails.error_update_generic'))
+      setScorekeeperError({ id: playerId, text: describeError(t, error, 'gamedetails.error_scorekeeper') })
     } finally {
       setScorekeeperBusy(null)
     }
@@ -1876,10 +1980,26 @@ export default function GameDetails() {
   const numCourts = game?.num_courts || 1
   const roundsStarted = matches.length > 0
   const maxRound = matches.length ? Math.max(...matches.map(m => m.round_number)) : 0
-  const currentRoundMatches = matches.filter(m => m.round_number === maxRound)
-  // A ronda atual está sorteada mas o relógio não arrancou (ponto 11).
-  // O Americano sorteia o mix inteiro de uma vez e conta à parte: fica fora.
-  const roundPending = game?.status === 'in_progress' && game?.format !== 'americano' && matches.length > 0
+  // A ronda em que se está. O Americano sorteia o mix inteiro de uma vez:
+  // a ronda atual é a primeira com jogos por marcar, não a última sorteada
+  // (QA, 6 out: «Começar o Mix» saltava para a Ronda 3 com o relógio a
+  // correr). Nos outros formatos a ronda seguinte só nasce ao terminar a
+  // atual, por isso é a última.
+  const firstOpenRound = matches.filter((m) => !hasResult(m)).reduce((min, m) => Math.min(min, m.round_number), Infinity)
+  let currentRound = game?.format === 'americano' && Number.isFinite(firstOpenRound) ? firstOpenRound : maxRound
+  // …mas a ronda que acabou de ficar toda marcada continua a ser a atual
+  // até «Terminar Ronda N»: o relógio dela ainda corre (os resultados foram
+  // gravados depois de ela começar). Depois de «Começar Ronda N+1», o
+  // relógio é mais novo do que esses resultados.
+  if (currentRound === firstOpenRound && game?.format === 'americano' && game?.round_started_at && firstOpenRound > 1
+    && !matches.some((m) => m.round_number === firstOpenRound && hasResult(m))) {
+    const lastScored = matches.filter((m) => m.round_number === firstOpenRound - 1).map((m) => m.scored_at).filter(Boolean).sort().pop()
+    if (lastScored && new Date(lastScored) > new Date(game.round_started_at)) currentRound = firstOpenRound - 1
+  }
+  const currentRoundMatches = matches.filter(m => m.round_number === currentRound)
+  // A ronda atual está sorteada mas o relógio não arrancou (ponto 11) — no
+  // Americano também, ronda a ronda, como nos outros formatos.
+  const roundPending = game?.status === 'in_progress' && matches.length > 0
     && !game?.round_started_at && !currentRoundMatches.some(hasResult)
   // A Ronda 1 sorteada e por começar ainda é «antes da Ronda 1»: as duplas
   // mexem-se (e a ronda volta a sortear-se).
@@ -1934,10 +2054,16 @@ export default function GameDetails() {
   // N», passar de fase e «Terminar e dar os pontos». No Americano não: aí
   // conta a soma dos pontos de cada um, e um 12-12 é um resultado normal.
   const tiedMatches = isAmericano ? [] : matches.filter(isTie)
-  const tieInRound = tiedMatches.find((m) => m.round_number === maxRound) || null
-  const roundCanAdvance = currentRoundDone && (inGroupPhase || !!nextPhase)
+  const tieInRound = tiedMatches.find((m) => m.round_number === currentRound) || null
+  // Americano: as rondas seguintes já estão sorteadas; terminar a ronda só
+  // para o relógio e passa à seguinte.
+  const roundCanAdvance = currentRoundDone && (inGroupPhase || !!nextPhase || (isAmericano && currentRound < maxRound))
   const canAdvance = roundCanAdvance && !tieInRound
   const canFinalize = roundsStarted && allDone && !roundCanAdvance && tiedMatches.length === 0
+  // Na última ronda (já não há outra para sortear), quantos jogos faltam
+  // marcar para se poder terminar o mix (proposta da UX, 6 out).
+  const lastRoundOpen = roundsStarted && !roundCanAdvance && !inGroupPhase && !nextPhase && !(isAmericano && currentRound < maxRound)
+    ? matches.filter((m) => !hasResult(m)).length : 0
   // O jogo empatado que trava o passo seguinte — só depois de a ronda ter
   // os resultados todos (antes disso, diz-se o que falta).
   const blockingTie = !roundsStarted || !currentRoundDone ? null
@@ -1961,6 +2087,22 @@ export default function GameDetails() {
   const missingResults = isAmericano ? 0 : matches.filter(m => !hasResult(m)).length
 
   const handleAdvance = async () => {
+    if (isAmericano) {
+      // A ronda seguinte já existe: fica «por começar», como nos outros.
+      setBusy(true)
+      setMixError('')
+      try {
+        const { error } = await supabase.from('games').update({ round_started_at: null }).eq('id', id)
+        if (error) throw error
+        await loadGameDetails()
+      } catch (error) {
+        console.error('Error ending an americano round:', error)
+        setMixError(describeError(t, error, 'gamedetails.error_start_mix'))
+      } finally {
+        setBusy(false)
+      }
+      return
+    }
     setBusy(true)
     setMixError('')
     try {
@@ -2278,18 +2420,19 @@ export default function GameDetails() {
                   {/* A editar à última da hora, o ✕ precisa do espaço do lado. */}
                   {!duplaRemovable && sideLabel(player?.preferred_side)}
                 </span>
-                {/* Ponto 17 (Francisco, 2 out): no lugar do ×, «⇄» — troca a
-                    pessoa sem desfazer as duplas (swap_mix_player, Dev 3). */}
+                {/* Ponto 17, forma nova (Francisco, 6 out — SPEC
+                    2026-10-05-mix-tirar-pessoa): «Tirar», pequeno e sublinhado,
+                    no lugar das setas; troca a pessoa sem desfazer as duplas
+                    (swap_mix_player, Dev 3). No lugar vazio, «Pôr alguém». */}
                 {duplaRemovable && (
                   <button
                     type="button"
                     onClick={() => setSwapFor({ team, player: player || null, slot: idx })}
                     disabled={busy}
-                    title={t('mixswap.button_title', { name: player?.name || t('mixswap.empty_slot') })}
-                    aria-label={t('mixswap.button_title', { name: player?.name || t('mixswap.empty_slot') })}
-                    className="w-8 h-8 flex items-center justify-center rounded-full text-ink-700 hover:bg-ink-50 shrink-0"
+                    aria-label={player ? t('mixswap.button_title', { name: player.name }) : t('mixswap.title_empty')}
+                    className="shrink-0 min-h-[32px] px-0.5 text-[13px] font-extrabold text-ink-900 underline underline-offset-2 whitespace-nowrap disabled:opacity-40"
                   >
-                    <ArrowLeftRight size={15} />
+                    {player ? t('mixswap.remove_short') : t('mixswap.put_short')}
                   </button>
                 )}
               </div>
@@ -2365,7 +2508,12 @@ export default function GameDetails() {
   const heroAvgRating = heroRated.length ? heroRated.reduce((sum, p) => sum + ratingInfoById[p.id].rating, 0) / heroRated.length : null
   const waitlistPeople = waitlist.map(w => ({ ...w.user, rowOwner: true, rowId: w.id, hasPartner: false }))
   const isUserWaitlisted = waitlist.some(w => w.user_id === user.id)
-  const canJoin = game?.status === 'open' && peopleCount < capacity && !isUserJoined
+  const isUserRequested = myRequestState === 'requested'
+  const isUserDeclined = myRequestState === 'declined'
+  // Mix com aprovação: o que quem joga faz pela app é um pedido (quem organiza
+  // e o robô inscrevem logo — base de dados, Dev 3).
+  const awaitsApproval = !!game?.join_approval && !isAdmin
+  const canJoin = game?.status === 'open' && peopleCount < capacity && !isUserJoined && !isUserRequested && !isUserDeclined
   // O sexo nunca bloqueia (Francisco, 26 set): a base de dados deixou de o
   // verificar (migration_mix_join_policy_sem_sexo.sql). Com o sexo que não
   // bate, pergunta-se «tens a certeza?»; o admin tira a pessoa se for caso.
@@ -2493,28 +2641,28 @@ export default function GameDetails() {
         hint: t('gamedetails.draw_round1_hint'),
       }
     } else if (roundPending) {
-      barPrimary = openSlotHint && maxRound === 1
+      barPrimary = openSlotHint && currentRound === 1
         ? { label: t('gamedetails.start_round_n', { number: 1 }), onClick: () => {}, disabled: true, hint: openSlotHint }
-        : { label: busy ? t('gamedetails.processing') : t('gamedetails.start_round_n', { number: maxRound }), onClick: handleStartRound, disabled: busy || unpaired.length > 0, hint: t('gamedetails.start_round_hint') }
+        : { label: busy ? t('gamedetails.processing') : t('gamedetails.start_round_n', { number: currentRound }), onClick: handleStartRound, disabled: busy || unpaired.length > 0, hint: t('gamedetails.start_round_hint') }
     } else if (roundsStarted && canAdvance) {
       barPrimary = {
         label: busy ? t('gamedetails.processing')
-          : inGroupPhase ? t('gamedetails.end_round', { number: maxRound })
-          : t('gamedetails.end_round_and_draw', { number: maxRound, phase: PHASE_LABEL_KEY[nextPhase] ? t(PHASE_LABEL_KEY[nextPhase]).toLowerCase() : '' }),
+          : (inGroupPhase || isAmericano) ? t('gamedetails.end_round', { number: currentRound })
+          : t('gamedetails.end_round_and_draw', { number: currentRound, phase: PHASE_LABEL_KEY[nextPhase] ? t(PHASE_LABEL_KEY[nextPhase]).toLowerCase() : '' }),
         onClick: handleAdvance,
         disabled: busy,
         // O que o botão faz (desenho «como fica», 2 out): mostra os jogos da
         // ronda seguinte, sem pôr o relógio a andar.
-        hint: inGroupPhase ? t(isSobeDesce && !isRotating ? 'gamedetails.end_round_hint_sobe' : 'gamedetails.end_round_hint', { number: maxRound + 1 }) : null,
+        hint: (inGroupPhase || isAmericano) ? t(isSobeDesce && !isRotating ? 'gamedetails.end_round_hint_sobe' : 'gamedetails.end_round_hint', { number: currentRound + 1 }) : null,
       }
     } else if (canFinalize) {
-      barPrimary = { label: busy ? t('gamedetails.finalizing') : t('gamedetails.finalize_mix'), onClick: () => handleFinalize(false), disabled: busy }
+      barPrimary = { label: t('gamedetails.finalize_mix'), onClick: () => handleFinalize(false), disabled: busy }
     } else if (blockingTie) {
       // Empate: o botão fica à vista mas apagado, e o aviso leva ao jogo.
       barPrimary = {
         label: roundCanAdvance
-          ? (inGroupPhase ? t('gamedetails.end_round', { number: maxRound })
-            : t('gamedetails.end_round_and_draw', { number: maxRound, phase: PHASE_LABEL_KEY[nextPhase] ? t(PHASE_LABEL_KEY[nextPhase]).toLowerCase() : '' }))
+          ? ((inGroupPhase || isAmericano) ? t('gamedetails.end_round', { number: currentRound })
+            : t('gamedetails.end_round_and_draw', { number: currentRound, phase: PHASE_LABEL_KEY[nextPhase] ? t(PHASE_LABEL_KEY[nextPhase]).toLowerCase() : '' }))
           : t('gamedetails.finalize_mix'),
         onClick: () => {},
         disabled: true,
@@ -2833,6 +2981,9 @@ export default function GameDetails() {
             <StateTag tone="in" icon={Check}>{t('gamedetails.joined_badge')}</StateTag>
           ) : isUserWaitlisted ? (
             <StateTag tone="wait">{t('agenda.state_waitlist')}</StateTag>
+          ) : isUserRequested ? (
+            // «Pedido enviado», a palavra que a app já usa nos grupos.
+            <StateTag tone="grey" icon={Clock}>{t('agenda.state_request_sent')}</StateTag>
           ) : null}
         </div>
 
@@ -2967,8 +3118,9 @@ export default function GameDetails() {
       ) : !mixStarted && canJoin && !joinMode && !ageIneligible && !missingBirthday && !(isAdmin && barPrimary) ? (
         <div className="space-y-2">
           <PrimaryButton onClick={withGender(handleJoinAlone)} disabled={joining} className="w-full">
-            {joining ? t('gamedetails.joining') : t('gamedetails.join_mix')}
+            {joining ? t('gamedetails.joining') : t(awaitsApproval ? 'mixrequest.ask' : 'gamedetails.join_mix')}
           </PrimaryButton>
+          {awaitsApproval && <p className="px-1 text-center text-xs text-muted">{t('mixrequest.ask_hint')}</p>}
           {/* Duplas fixas: entrar já com o parceiro combinado — tenha ele
               conta ou não (Trello #339). Num mix que roda parceiros a dupla
               desfazia-se na ronda seguinte, por isso não aparece lá. */}
@@ -2978,22 +3130,34 @@ export default function GameDetails() {
             </PrimaryButton>
           )}
         </div>
+      ) : !mixStarted && isUserRequested && !mixCancelled ? (
+        // Pedido enviado: não ocupa vaga e não aparece nos inscritos até
+        // quem organiza aceitar.
+        <div className="space-y-2">
+          <p className="rounded-card bg-white px-4 py-3.5 text-sm text-ink-700">{t('mixrequest.sent_line')}</p>
+          <PrimaryButton variant="ghost" onClick={handleCancelRequest} disabled={joining} className="w-full !bg-white !border-ink-900">
+            {t('mixrequest.cancel')}
+          </PrimaryButton>
+        </div>
       ) : isUserJoined && !mixPaused && (game.status === 'open' || game.status === 'closed') ? (
         // Com o mix parado (Trello #416) as duplas ja estao formadas: sair
         // deixaria uma dupla com quem ja nao esta no mix. Retoma-se ou
         // refazem-se as duplas primeiro.
-        <PrimaryButton variant="ghost" onClick={handleLeaveGame} className="w-full !bg-white !border-ink-900">
-          {t('gamedetails.leave_mix')}
-        </PrimaryButton>
-      ) : !mixStarted && !mixPaused && isFull && !isUserJoined && !isUserWaitlisted && !ageIneligible && !missingBirthday && !mixCancelled && !(isAdmin && barPrimary) ? (
+        <div className="space-y-1.5">
+          <PrimaryButton variant="ghost" onClick={handleLeaveGame} className="w-full !bg-white !border-ink-900">
+            {t('gamedetails.leave_mix')}
+          </PrimaryButton>
+          {leaveError && <p role="alert" className="text-center text-sm font-extrabold text-danger">{leaveError}</p>}
+        </div>
+      ) : !mixStarted && !mixPaused && isFull && !isUserJoined && !isUserWaitlisted && !isUserRequested && !isUserDeclined && !ageIneligible && !missingBirthday && !mixCancelled && !(isAdmin && barPrimary) ? (
         // Mix cheio (pacote do mix, ponto 4): o verde passa a «Ficar
         // suplente», por ordem de chegada; se alguém sair, entra o 1.º e
         // recebe aviso (base de dados).
         <div className="space-y-1.5">
           <PrimaryButton onClick={withGender(handleJoinAsSuplente)} disabled={joining} className="w-full">
-            {joining ? t('gamedetails.joining') : t('gamedetails.stay_suplente')}
+            {joining ? t('gamedetails.joining') : t(awaitsApproval ? 'mixrequest.ask' : 'gamedetails.stay_suplente')}
           </PrimaryButton>
-          <p className="px-1 text-center text-xs text-muted">{t('gamedetails.stay_suplente_hint')}</p>
+          <p className="px-1 text-center text-xs text-muted">{t(awaitsApproval ? 'mixrequest.ask_hint' : 'gamedetails.stay_suplente_hint')}</p>
         </div>
       ) : null}
 
@@ -3074,6 +3238,7 @@ export default function GameDetails() {
                 )
               })}
             </div>
+            {kudosError && <p role="alert" className="mt-2 text-sm font-extrabold text-danger">{kudosError}</p>}
           </div>
         )
       })()}
@@ -3288,17 +3453,15 @@ export default function GameDetails() {
                   <>
                     <button
                       onClick={(e) => { e.stopPropagation(); setShowDuplasShare(true) }}
-                      className="inline-flex items-center gap-1.5 text-ink-700 text-sm font-extrabold min-h-[44px] px-2"
+                      className="inline-flex items-center gap-1.5 text-ink-700 text-sm font-extrabold underline underline-offset-2 min-h-[44px] px-2"
                     >
-                      <Share2 size={16} />
                       {t('gamedetails.share')}
                     </button>
                     {isAdmin && game.status === 'in_progress' && (
                       <button
                         onClick={(e) => { e.stopPropagation(); startEditingPairs() }}
-                        className="inline-flex items-center gap-1.5 text-ink-700 text-sm font-extrabold min-h-[44px] px-2"
+                        className="inline-flex items-center gap-1.5 text-ink-700 text-sm font-extrabold underline underline-offset-2 min-h-[44px] px-2"
                       >
-                        <Repeat size={16} />
                         {t('gamedetails.edit_duplas')}
                       </button>
                     )}
@@ -3458,11 +3621,14 @@ export default function GameDetails() {
           {rounds.map(r => {
             const ms = matches.filter(m => m.round_number === r)
             const phase = (ms.find(m => m.phase !== 'third' && m.phase !== 'placement') || ms[0])?.phase || 'group'
-            const isCurrent = r === maxRound && game.status === 'in_progress'
+            const isCurrent = r === currentRound && game.status === 'in_progress'
+            // No Americano as rondas que aí vêm já estão sorteadas: só
+            // aparecem quando chega a vez delas.
+            if (game.status === 'in_progress' && r > currentRound) return null
             // As rondas já jogadas dobram-se sozinhas quando começa a
             // seguinte (Renato, 29 set), todas numa linha só — «Rondas 1 e 2 ·
             // ✓ 4 jogos» (desenho «como fica», 2 out); tocar abre-as todas.
-            const pastRounds = rounds.filter((x) => !(x === maxRound && game.status === 'in_progress'))
+            const pastRounds = rounds.filter((x) => !(game.status === 'in_progress' && x >= currentRound))
             const isFirstPast = !isCurrent && r === pastRounds[0]
             const open = isCurrent || !!openRounds.past
             if (!isCurrent && !open && !isFirstPast) return null
@@ -3692,7 +3858,7 @@ export default function GameDetails() {
                   {rounds.map(r => {
                     const ms = matches.filter(m => m.round_number === r)
                     const phase = (ms.find(m => m.phase !== 'third' && m.phase !== 'placement') || ms[0])?.phase || 'group'
-                    const isCurrent = r === maxRound && game.status === 'in_progress'
+                    const isCurrent = r === currentRound && game.status === 'in_progress'
                     return (
                       <div key={r} id={`mix-ronda-${r}`} className={`card ${isCurrent ? 'ring-2 ring-ink-900' : ''}`}>
                         <div className="flex items-center justify-between mb-3">
@@ -3784,11 +3950,16 @@ export default function GameDetails() {
           {isAdmin && game.status === 'in_progress' && !inPoolStage && (
             <div className="space-y-3">
                 <>
-                  {roundsStarted && !roundPending && !canAdvance && !canFinalize && !blockingTie && (
+                  {/* Fim do mix (proposta da UX, 6 out): na última ronda, antes de
+                      tudo marcado, não há botão — só esta linha, no lugar dele. */}
+                  {roundsStarted && !roundPending && !canAdvance && !canFinalize && !blockingTie && lastRoundOpen > 0 && (
+                    <p className="text-muted text-sm text-center">{t('gamedetails.finish_missing', { count: lastRoundOpen })}</p>
+                  )}
+                  {roundsStarted && !roundPending && !canAdvance && !canFinalize && !blockingTie && lastRoundOpen === 0 && (
                     <p className="text-muted text-sm text-center">
                       {isAmericano
                         ? t('gamedetails.register_americano_results')
-                        : t('gamedetails.register_round_results', { number: maxRound })}
+                        : t('gamedetails.register_round_results', { number: currentRound })}
                       {/* Diz o que falta para a ronda fechar — nunca um mix
                           encravado sem explicação (Trello #420). */}
                       {!isAmericano && currentRoundMatches.some((m) => !hasResult(m)) && (
@@ -3803,20 +3974,6 @@ export default function GameDetails() {
                       começar ronda não pode estar só em cima… Como estava»),
                       «Terminar Ronda N» ou, na última, «Terminar e dar os pontos». */}
                   {stepSlot === 'rounds' && renderStepButton()}
-                  {/* Sair mais cedo — disponível assim que houver pelo menos um resultado guardado */}
-                  {/* Só na última ronda (ponto 16): antes, aparecia desde a 2.ª e
-                      acabava o mix a meio. */}
-                  {roundsStarted && !canFinalize && anyScoreSaved && !inGroupPhase && !nextPhase && (
-                    <>
-                      <PrimaryButton variant="danger" onClick={() => handleFinalize(true)} disabled={busy || missingResults > 0 || tiedMatches.length > 0} className="w-full">
-                        <Trophy size={20} />
-                        {busy ? t('gamedetails.finalizing') : t('gamedetails.end_mix')}
-                      </PrimaryButton>
-                      {missingResults > 0 && (
-                        <p className="text-xs text-muted text-center">{t('gamedetails.end_mix_blocked', { count: missingResults })}</p>
-                      )}
-                    </>
-                  )}
                 </>
             </div>
           )}
@@ -3879,6 +4036,51 @@ export default function GameDetails() {
                 )}
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* «Pedidos para entrar · N» (aprovar quem entra, 2 out): só quem
+          organiza, por cima dos inscritos. Os pedidos não caducam. */}
+      {isAdmin && !mixStarted && !mixCancelled && requests.length > 0 && (
+        <div className="card">
+          <h3 className="text-lg text-ink-900">{t('mixrequest.list_title', { count: requests.length })}</h3>
+          <p className="text-xs text-muted mt-1 mb-3">{t('mixrequest.list_hint')}</p>
+          {requestNotice && (
+            <p role={requestNotice.ok ? 'status' : 'alert'} className={`mb-3 text-sm font-extrabold ${requestNotice.ok ? 'text-ok' : 'text-danger'}`}>{requestNotice.text}</p>
+          )}
+          <div className="space-y-2">
+            {requests.map((r) => {
+              const size = r.partner_id || r.partner_guest_id ? 2 : 1
+              const asSuplente = peopleCount + size > capacity
+              const person = r.user || {}
+              return (
+                <div key={r.id} className="rounded-ctrl bg-canvas p-3">
+                  <div className="flex items-center gap-3">
+                    <Avatar name={person.name} url={person.avatar_url} size="w-10 h-10 text-sm" provisional={isProvisional(person.rating_games)} />
+                    <div className="flex-1 min-w-0">
+                      <Link to={`/jogador/${r.user_id}`} className="block truncate font-extrabold text-ink-900">{person.name || '?'} ›</Link>
+                      {r.partner && <p className="text-xs text-muted truncate">{t('mixrequest.with_partner', { name: r.partner.name })}</p>}
+                      <p className="text-xs text-muted truncate flex items-center gap-1.5">
+                        <RatingBadge rating={ratingInfoById[r.user_id]?.rating} gender={ratingInfoById[r.user_id]?.gender} />
+                        <span className="font-extrabold text-ink-900">{pointsById[r.user_id] ?? 0} {t('gamedetails.points_suffix')}</span>
+                        <span>· {t('mixrequest.games', { count: person.rating_games || 0 })}</span>
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-2.5 flex gap-2">
+                    <button type="button" onClick={() => handleAcceptRequest(r)} disabled={requestBusy === r.id}
+                      className="flex-1 min-h-[44px] rounded-ctrl bg-ink-900 px-2 text-[13px] font-extrabold text-white whitespace-nowrap disabled:opacity-40">
+                      {t(asSuplente ? 'mixrequest.accept_suplente' : 'mixrequest.accept')}
+                    </button>
+                    <button type="button" onClick={() => { setRequestNotice(null); setDeclineAsk(r) }} disabled={requestBusy === r.id}
+                      className="flex-1 min-h-[44px] rounded-ctrl border-2 border-line bg-white px-2 text-[13px] font-extrabold text-ink-900 whitespace-nowrap disabled:opacity-40">
+                      {t('mixrequest.decline')}
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
@@ -4188,7 +4390,7 @@ export default function GameDetails() {
                 </div>
               )}
               {scorekeeperIds.filter((uid) => uid !== game.created_by).map((uid) => (
-                <div key={uid} className="flex items-center gap-3 border-b border-line py-2.5">
+                <div key={uid} className="flex flex-wrap items-center gap-3 border-b border-line py-2.5">
                   <Avatar name={nameById[uid]} url={avatarById[uid]} size="w-10 h-10 text-sm" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[15px] font-extrabold text-ink-900">{nameById[uid] || '?'}</span>
@@ -4201,6 +4403,9 @@ export default function GameDetails() {
                     className="shrink-0 min-h-[44px] px-2 text-sm font-extrabold text-ink-900 disabled:opacity-40">
                     {t('scorekeepers.remove')}
                   </button>
+                  {scorekeeperError?.id === uid && (
+                    <p role="alert" className="basis-full text-sm font-extrabold text-danger">{scorekeeperError.text}</p>
+                  )}
                 </div>
               ))}
               <button type="button" onClick={() => setAddScorekeeperOpen(true)}
@@ -4215,6 +4420,11 @@ export default function GameDetails() {
         const teamIndex = teams.findIndex((tm) => tm.id === swapFor.team.id)
         const partner = swapFor.slot === 0 ? swapFor.team.player2 : swapFor.team.player1
         const inMixIds = new Set([...people, ...waitlistPeople].map((p) => p.id))
+        // «Tirar sem pôr ninguém» (UX, 5 out): só para quem se inscreveu
+        // sozinho e sem suplentes — com suplente, a base de dados senta-o no
+        // lugar, e a troca já o oferece.
+        const outPerson = swapFor.player ? people.find((p) => p.id === swapFor.player.id) : null
+        const canRemoveOnly = !!outPerson?.rowOwner && !outPerson.hasPartner && waitlistPeople.length === 0
         return (
           <SwapPlayerSheet
             outName={swapFor.player?.name}
@@ -4236,10 +4446,28 @@ export default function GameDetails() {
               setEditNotice(t('mixswap.done', { name: pick?.guestName || pick?.name || '' }))
               await loadGameDetails()
             }}
+            onRemove={canRemoveOnly ? () => { setRemoveSlotAsk({ person: outPerson, duplaNumber: teamIndex + 1 }); setSwapFor(null) } : null}
             onClose={() => setSwapFor(null)}
           />
         )
       })()}
+      <ConfirmSheet
+        open={!!removeSlotAsk}
+        title={t('mixswap.remove_title', { name: removeSlotAsk?.person?.name || '' })}
+        message={t('mixswap.remove_text', { number: removeSlotAsk?.duplaNumber || '' })}
+        cancelLabel={t('mixswap.remove_keep')}
+        confirmLabel={t('mixswap.remove_confirm')}
+        danger
+        onConfirm={async () => {
+          // A base de dados deixa o lugar vazio e avisa quem organiza
+          // (migration_mix_trocar_sem_sortear.sql); as outras duplas ficam.
+          const { error } = await supabase.from('participants').delete().eq('id', removeSlotAsk.person.rowId)
+          if (error) throw error
+          await loadGameDetails()
+        }}
+        onClose={() => setRemoveSlotAsk(null)}
+        errorOf={(error) => describeError(t, error, 'gamedetails.error_remove_player')}
+      />
       {addScorekeeperOpen && (
         <AddScorekeeperSheet
           orgName={gameMembership?.organization?.name}
@@ -4269,7 +4497,7 @@ export default function GameDetails() {
         ].filter(Boolean).join(' ')}
         confirmLabel={t('gamedetails.remove_ask_confirm')}
         cancelLabel={t('gamedetails.remove_ask_keep')}
-        // Regra das janelas: o seguro («Manter») a preto, tirar a vermelho.
+        // Regra das confirmações (6 out): «Sim, tirar» em cima, a vermelho.
         danger
         onConfirm={doRemovePerson}
         onClose={() => setRemoveAsk(null)}
@@ -4278,14 +4506,28 @@ export default function GameDetails() {
       <ConfirmSheet
         open={!!finalizeAsk}
         title={t('gamedetails.finalize_ask_title')}
-        message={t(finalizeAsk?.early ? 'gamedetails.confirm_finalize_early' : 'gamedetails.finalize_ask_text')}
+        message={t('gamedetails.finalize_ask_text')}
         confirmLabel={t('gamedetails.finalize_mix')}
         cancelLabel={t('gamedetails.finalize_ask_not_yet')}
-        // Regra das janelas: o seguro («Ainda não») a preto, terminar em contorno.
-        outline
         onConfirm={doFinalize}
         onClose={() => setFinalizeAsk(null)}
         errorOf={(error) => describeError(t, error, 'gamedetails.error_finalize_mix')}
+      />
+      <ConfirmSheet
+        open={!!declineAsk}
+        title={t('mixrequest.decline_title', { name: declineAsk?.user?.name || '' })}
+        message={t('mixrequest.decline_text', { name: declineAsk?.user?.name || '' })}
+        cancelLabel={t('mixrequest.decline_keep')}
+        confirmLabel={t('mixrequest.decline_confirm')}
+        // Regra das confirmações (6 out): «Sim, recusar» em cima, a vermelho.
+        danger
+        onConfirm={async () => {
+          const { error } = await supabase.rpc('decline_mix_request', { p_participant_id: declineAsk.id })
+          if (error) throw error
+          await loadGameDetails()
+        }}
+        onClose={() => setDeclineAsk(null)}
+        errorOf={requestErrorText}
       />
       {addPlayerOpen && (
         <AddPlayerSheet
@@ -4528,9 +4770,7 @@ export default function GameDetails() {
             message={t('mixpairs.split_message', { names: splitFor?.names || '' })}
             confirmLabel={t('mixpairs.split_confirm')}
             cancelLabel={t('mixpairs.split_keep')}
-            // Regra das janelas (UX, 27 set): o seguro primeiro e a preto;
-            // separar vai em contorno, não vermelho — volta-se a juntar.
-            outline
+            // Separar não é vermelho: volta-se a juntar.
             onConfirm={async () => { await adminSplitPair(id, splitFor.userId); loadGameDetails() }}
             onClose={() => setSplitFor(null)}
             errorOf={(error) => mixPairErrorMessage(t, error)}
@@ -4633,9 +4873,12 @@ export default function GameDetails() {
           )}
 
           {isUserWaitlisted && (
-            <PrimaryButton variant="danger" onClick={handleLeaveWaitlist} className="w-full">
-              {t('gamedetails.leave_waitlist')}
-            </PrimaryButton>
+            <div className="space-y-1.5">
+              <PrimaryButton variant="danger" onClick={handleLeaveWaitlist} className="w-full">
+                {t('gamedetails.leave_waitlist')}
+              </PrimaryButton>
+              {leaveError && <p role="alert" className="text-center text-sm font-extrabold text-danger">{leaveError}</p>}
+            </div>
           )}
         </div>
       )}
@@ -4697,7 +4940,7 @@ export default function GameDetails() {
                     : t('eventactions.to_draft_message')}
                   confirmLabel={t('eventactions.to_draft_confirm')}
                   cancelLabel={t('eventactions.to_draft_keep')}
-                  dangerFirst
+                  danger
                   onConfirm={async () => {
                     const { error } = await supabase.rpc('unpublish_mix', { p_game_id: game.id })
                     if (error) throw error
@@ -4746,6 +4989,16 @@ export default function GameDetails() {
           </>
         )
       })()}
+      <ConfirmSheet
+        open={!!ask}
+        title={ask?.title}
+        message={ask?.message}
+        confirmLabel={ask?.confirmLabel}
+        cancelLabel={ask?.cancelLabel}
+        danger={!!ask?.danger}
+        onConfirm={() => { ask?.resolve(true) }}
+        onClose={() => { ask?.resolve(false); setAsk(null) }}
+      />
       {doneNotice && createPortal(
         <div role="status" className="fixed left-4 right-4 bottom-[104px] z-50 mx-auto max-w-md bg-ink-900 text-white px-4 py-3 rounded-ctrl text-sm font-extrabold flex items-center gap-2 animate-fade-up">
           <Check size={16} className="shrink-0" />
