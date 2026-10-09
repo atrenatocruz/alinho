@@ -75,11 +75,13 @@ export default function FriendRoundSheet({ match, game, roundNumber, games, next
   const filled = a !== '' && b !== ''
 
   const save = async (last) => {
-    await saveFriendMatchRound(game.id, Number(a), Number(b), {
+    // A ronda grava sempre; se a seguinte não puder nascer, vem next_error
+    // (Dev 3, 9 out) — quem chama mostra o aviso dela, não um erro desta.
+    const result = await saveFriendMatchRound(game.id, Number(a), Number(b), {
       kind, pointsTo: kind === 'pontos' && pointsTo ? Number(pointsTo) : null,
       nextCourts: editing || last ? null : nextCourts, last,
     })
-    onSaved()
+    onSaved(result)
   }
   const run = async () => {
     setBusy(true); setError('')

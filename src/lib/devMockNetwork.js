@@ -541,6 +541,17 @@ const RPC_MOCKS = {
         Object.assign(cur, { started_at: new Date(Date.now() - 444000).toISOString(), ends_at: new Date(Date.now() + 756000).toISOString() })
       }
       if (counted) games[0].counts = true
+      // Depois de guardar com a seguinte por nascer: a última ronda já marcada.
+      if (localStorage.getItem('mockFriendLastDone') === 'true') Object.assign(cur, { score_a: 10, score_b: 7, winner_team: 'a' })
+      // mockFriendGuest = 'some' (o Zé, sem conta, joga as rondas 2 e 3) |
+      // 'all' (sem conta em todas as rondas): a caixa do ranking muda.
+      const guestMode = localStorage.getItem('mockFriendGuest')
+      if (guestMode) {
+        const guestUid = P[six ? 5 : 3].uid
+        for (const g of games) for (const s of [...g.team_a, ...g.team_b]) if (s.user_id === guestUid) s.user_id = null
+        if (guestMode === 'all') for (const g of games) { const s = g.team_b[g.team_b.length - 1]; s.user_id = null }
+        invitees.forEach((i) => { if (i.user_id === guestUid) Object.assign(i, { user_id: null, is_guest: true, status: 'guest' }) })
+      }
       return {
         match: { id: 'fs-1', scheduled_date: new Date(Date.now() + (notStarted ? 6 : -1) * 86400000).toISOString().slice(0, 10), scheduled_time: '10:00:00',
           location: 'Clube Exemplo', court: 'Campo 1', teams_mode: 'app', pairing_mode: six ? 'rotating' : 'fixed', scoring_format: 'sets', num_sets: 3,
@@ -662,7 +673,13 @@ const RPC_MOCKS = {
   ] : []),
   save_friend_match_set: () => ({ sets: [], sets_a: 1, sets_b: 1, finished: false, status: 'pending' }),
   // Rondas com tipo e «Sair do jogo» (Dev 3, 7 e 8 out): no ecrã só se vê o pedido a sair.
-  save_friend_match_round: () => ({ status: 'pending', next_ids: ['fs-new'] }),
+  // mockFriendNextError = 'true': a ronda grava, mas a seguinte não nasce
+  // (Dev 3, 9 out — raro).
+  save_friend_match_round: () => {
+    if (localStorage.getItem('mockFriendNextError') !== 'true') return { status: 'pending', next_ids: ['fs-new'], next_error: null }
+    localStorage.setItem('mockFriendLastDone', 'true')
+    return { status: 'pending', next_ids: [], next_error: 'erro inesperado' }
+  },
   set_friend_match_round_kind: () => null,
   leave_friend_match: () => 'left',
   finish_friend_match_game: () => 'pending',
