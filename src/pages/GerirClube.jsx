@@ -2517,7 +2517,10 @@ export default function GerirClube() {
             // «Voltar a rascunho» no Editar (Francisco, 6 out): o mesmo
             // unpublish_mix do «Mais ⋯» — até o mix terminar, também com
             // inscritos (saem e recebem um aviso). Num rascunho não aparece.
-            onUnpublish={editingGame && ['pending', 'open', 'closed', 'in_progress'].includes(editingGame.status) ? async (leaving) => {
+            // Com a série em pausa, as datas já estão em rascunho (Dev 1, 9 out):
+            // lê-se o estado fresco da lista, e não o do mix que abriu o Editar.
+            onUnpublish={editingGame && !editingGame.recurrence?.is_paused
+              && ['pending', 'open', 'closed', 'in_progress'].includes((games.find((g) => g.id === editingGame.id) || editingGame).status) ? async (leaving) => {
               const { error } = await supabase.rpc('unpublish_mix', { p_game_id: editingGame.id })
               if (error) throw error
               setDoneNotice(leaving > 0 ? t('eventactions.to_draft_done_people', { count: leaving }) : t('eventactions.to_draft_done'))
