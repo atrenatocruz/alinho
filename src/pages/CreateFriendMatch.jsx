@@ -37,11 +37,14 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
   // podem ser mais de 4; as equipas fazem-se depois de todos aceitarem, na
   // página do jogo (base de dados do Dev 3: create_friend_match).
   const [step, setStep] = useState(1)
-  const original = (edit?.invitees || []).filter((i) => !i.is_creator && i.status !== 'declined')
-  const [people, setPeople] = useState(() => original.map(personFrom)) // sem o criador
+  // Sem mim (vou na linha «· tu»). Quem aceitou também edita (SPEC 2026-10-
+  // 07-amigos-convidado): aí quem criou aparece na lista, e não sai.
+  const original = (edit?.invitees || []).filter((i) => i.status !== 'declined' && !(i.user_id && i.user_id === profile?.id))
+  const [people, setPeople] = useState(() => original.map(personFrom))
   // No editar: quem já tem resultados não sai; com resultados, a forma de
   // contar não muda (a base de dados tranca com format_locked).
-  const lockedKeys = edit ? new Set(original.filter((i) => i.has_results).map((i) => i.invitee_id)) : null
+  const lockedKeys = edit ? new Set(original.filter((i) => i.has_results && !i.is_creator).map((i) => i.invitee_id)) : null
+  const creatorKey = original.find((i) => i.is_creator)?.invitee_id || null
   const scoringLocked = !!edit?.games?.some((g) => g.score_a != null && g.score_b != null)
 
   // «Conta para o ranking?» e «Equipas» também no editar (27 set: «o editar
@@ -283,7 +286,7 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
           {...(group ? { searchFn: searchMembers, searchPlaceholder: t(isClubGame ? 'friends.search_club_placeholder' : 'friends.search_group_placeholder') } : {})}
           me={profile}
           people={people}
-          {...(edit ? { lockedKeys, collapsedSearch: true } : {})}
+          {...(edit ? { lockedKeys, creatorKey, collapsedSearch: true } : {})}
           onAdd={(p) => setPeople((list) => (list.some((x) => x.key === p.key) ? list : [...list, p]))}
           onRemove={(key) => setPeople((list) => list.filter((x) => x.key !== key))}
         />
