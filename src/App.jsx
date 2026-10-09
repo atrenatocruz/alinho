@@ -728,6 +728,8 @@ function AppRoutes() {
         <Route path="/gerir/:slug/editar/mix/:editId" element={<Guard require="protected" showSplash={showSplash}><GerirClube /></Guard>} />
         {/* A página de um mix que se repete (ações do evento, 26 set). */}
         <Route path="/gerir/:slug/serie/:serieId" element={<Guard require="protected" showSplash={showSplash}><GerirClube /></Guard>} />
+        {/* «Já passaram»: tudo o que já passou, por mês (Gerir, 9 out). */}
+        <Route path="/gerir/:slug/ja-passaram" element={<Guard require="protected" showSplash={showSplash}><GerirClube /></Guard>} />
         {/* Tudo o que não é uma página da app. Tem de ficar em último. */}
         <Route path="*" element={<NotFound showSplash={showSplash} />} />
       </Routes>

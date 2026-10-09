@@ -38,6 +38,7 @@ import { tournamentsAvailable } from '../lib/tournamentApi'
 import { describeError, errorKind } from '../lib/errors'
 import { isDraftMix, advanceByFrequency, pendingOccurrenceRow } from '../lib/mixDraft'
 import PublishDraftSheet from '../components/mix/PublishDraftSheet'
+import { PastByMonth, PastSection, SectionLabel } from '../components/gerir/PastEvents'
 import LaunchDayPicker from '../components/LaunchDayPicker'
 import MixWizard from '../components/mix/MixWizard'
 import { useOrgNameTaken, OrgNameTakenHint } from '../components/OrgNameTaken'
@@ -468,12 +469,64 @@ export default function GerirClube() {
     const passados = gameFilter === 'finished'
     return itens
       .filter((i) => (passados ? i.terminado : !i.terminado))
-      .filter((i) => !passados || pastKind === 'all' || i.tipo === pastKind)
+      .filter((i) => pastKind === 'all' || i.tipo === pastKind)
       .sort((a, b) => {
         const x = a.quando ? new Date(a.quando).getTime() : 0
         const y = b.quando ? new Date(b.quando).getTime() : 0
         return passados ? y - x : x - y
       })
+  }
+
+  /* «Já passaram» (SPEC 2026-10-09-gerir-jogos-antigos): TODAS as datas que
+     já passaram, de uma série ou soltas, juntas e por data — o mais recente
+     primeiro. Antes, as datas passadas de uma série só se viam dentro da
+     página da série. `serie`: só as de um mix (a página da série liga cá). */
+  const passadosPorData = (serie = null) => {
+    const itens = []
+    const quandoHora = (iso) => {
+      const d = new Date(iso)
+      // «Sex · 12:30», como no desenho: três letras.
+      const semana = formatDateLib(d, i18n.language, { weekday: 'short' }).replace('.', '').slice(0, 3)
+      return `${semana.charAt(0).toUpperCase()}${semana.slice(1)} · ${formatTimeLib(d, i18n.language, { hour: '2-digit', minute: '2-digit' })}`
+    }
+    const pessoas = (row) => (row.participants || [])
+      .filter((p) => p.status === 'confirmed')
+      .reduce((n, p) => n + 1 + (p.partner_id || p.partner_guest_id ? 1 : 0), 0)
+    for (const g of games) {
+      if (isDraftMix(g) || !DONE_STATUSES.includes(g.status)) continue
+      if (serie && g.recurrence_id !== serie) continue
+      const acabou = g.status !== 'cancelled'
+      itens.push({ tipo: 'mix', chave: `mix-${g.id}`, quando: g.date, nome: g.title, quandoLinha: quandoHora(g.date),
+        jogadores: acabou ? pessoas(g) : null, estado: acabou ? 'finished' : 'cancelled', abrir: acabou ? () => navigate(`/jogo/${g.id}`) : null })
+    }
+    if (!serie) {
+      for (const jogo of openGames) {
+        if (!DONE_STATUSES.includes(jogo.status)) continue
+        const acabou = jogo.status !== 'cancelled'
+        itens.push({ tipo: 'aberto', chave: `aberto-${jogo.id}`, quando: jogo.date, nome: jogo.title || t('gerirclube.event_label_open'), quandoLinha: quandoHora(jogo.date),
+          jogadores: acabou ? pessoas(jogo) : null, estado: acabou ? 'finished' : 'cancelled', abrir: acabou ? () => navigate(`/jogo/${jogo.id}`) : null })
+      }
+      for (const torneio of tournaments) {
+        const fim = torneio.ends_on || torneio.starts_on
+        const cancelado = torneio.status === 'cancelado'
+        const acabou = torneio.status === 'finished' || torneio.status === 'terminado' || (!!fim && new Date(`${fim}T23:59`) < new Date())
+        if (!cancelado && !acabou) continue
+        const quando = torneio.starts_on ? `${torneio.starts_on}T12:00` : null
+        itens.push({ tipo: 'torneio', chave: `torneio-${torneio.id}`, quando, nome: torneio.name,
+          quandoLinha: quando ? quandoCurto(quando, false) : null, jogadores: null, estado: cancelado ? 'cancelled' : 'finished',
+          abrir: cancelado ? null : () => navigate(`/torneio/${torneio.slug || torneio.id}`) })
+      }
+      for (const turma of turmas) {
+        const dadas = turmasDadas.get(turma.series_id)
+        if (!dadas?.count) continue
+        itens.push({ tipo: 'turma', chave: `turma-dada-${turma.series_id}`, quando: dadas.last, nome: turma.name || t('gerirclube.event_label_series'),
+          quandoLinha: t('gerirclube.past_series_line', { days: t(`lessons.wd_plural_${turma.weekday}`).toLowerCase(), count: dadas.count }),
+          jogadores: null, estado: null, abrir: () => setTurmaAberta(turma.series_id) })
+      }
+    }
+    return itens
+      .filter((i) => pastKind === 'all' || i.tipo === pastKind)
+      .sort((a, b) => (b.quando ? new Date(b.quando).getTime() : 0) - (a.quando ? new Date(a.quando).getTime() : 0))
   }
 
   useEffect(() => { setFormLevelScale('') }, [showCreateGame, editingGame?.id])
@@ -829,7 +882,8 @@ export default function GerirClube() {
   }
 
   useEffect(() => {
-    if (gameFilter !== 'finished' || turmas.length === 0) return
+    // As aulas dadas entram em «Já passaram», que agora está sempre à vista.
+    if (turmas.length === 0) return
     listSeriesPastLessons(turmas.map((x) => x.series_id))
       .then((rows) => {
         const m = new Map()
@@ -2337,7 +2391,38 @@ export default function GerirClube() {
         onChanged={loadGames}
         onStopSeries={deactivateRecurrence}
         onDeleted={(notice) => { loadGames(); voltar(notice) }}
+        pastCount={passadosPorData(serieId).length}
+        onSeePast={() => navigate(`/gerir/${org.slug}/ja-passaram?serie=${serieId}`, { state: { fromGerir: true } })}
       />
+    )
+  }
+
+  // «Já passaram» (SPEC 9 out): tudo o que já passou, por mês. Com ?serie=,
+  // só as datas desse mix (vem do «Ver as que já passaram» da página da série).
+  if (location.pathname.endsWith('/ja-passaram') && org) {
+    const serie = searchParams.get('serie')
+    return (
+      <div className="space-y-4">
+        <BackBar onBack={() => (location.state?.fromGerir ? navigate(-1) : navigate(`/gerir/${org.slug}`, { replace: true }))} />
+        <div>
+          <h1 className="font-display text-2xl leading-tight text-ink-900">{t('pastevents.page_title')}</h1>
+          {/* Vinda da série, diz de que mix é a lista (UX, 9 out). */}
+          <p className="text-sm text-muted">{[serie ? games.find((g) => g.recurrence_id === serie)?.title : null, org.name].filter(Boolean).join(' · ')}</p>
+        </div>
+        {!serie && (
+          <Chips label={t('pastevents.page_title')} value={pastKind} onChange={setPastKind}
+            options={[
+              { value: 'all', label: t('gerirclube.kind_all') },
+              { value: 'mix', label: t('gerirclube.kind_mixes') },
+              ...(canPlanEvents && tournamentsReady ? [{ value: 'torneio', label: t('gerirclube.kind_tournaments') }] : []),
+              ...(org?.kind === 'group' ? [] : [
+                { value: 'aberto', label: t('gerirclube.kind_open') },
+                ...(lessonsReady ? [{ value: 'turma', label: t('gerirclube.kind_series') }] : []),
+              ]),
+            ]} />
+        )}
+        <PastByMonth items={passadosPorData(serie)} />
+      </div>
     )
   }
 
@@ -3301,9 +3386,9 @@ export default function GerirClube() {
                   passou fica num botao no fim (desenho de 23 set). */}
               <div className="card space-y-4">
 
-              {/* Pastilhas por tipo no que já passou (filtro, regra única): no
-                  clube há jogos em aberto e turmas; no grupo, jogos entre amigos. */}
-              {gameFilter === 'finished' && (
+              {/* Pastilhas por tipo (filtro, regra única), por cima de «A seguir»
+                  e de «Já passaram» (SPEC 9 out). */}
+              {(
                 <Chips label={t('gerirclube.see_past')} value={pastKind} onChange={setPastKind}
                   options={[
                     { value: 'all', label: t('gerirclube.kind_all') },
@@ -3317,6 +3402,8 @@ export default function GerirClube() {
               )}
 
               <div className="space-y-3">
+                {/* «A SEGUIR · N», à vista (sai o «Ver o que vem aí»). */}
+                <SectionLabel count={eventosPorData().length}>{t('pastevents.upcoming')}</SectionLabel>
                 {eventosPorData().length === 0 && (
                   <p className="text-sm text-muted text-center py-6">
                     {t(gameFilter === 'finished' ? 'gerirclube.no_past_events' : 'gerirclube.no_upcoming_events')}
@@ -3481,15 +3568,9 @@ export default function GerirClube() {
                 })}
               </div>
 
-              {/* «Ver o que ja passou» no fim, em vez de uma aba no topo:
-                  o que interessa a quem gere e o que vem ai. */}
-              <button
-                type="button"
-                onClick={() => setGameFilter(gameFilter === 'finished' ? 'upcoming' : 'finished')}
-                className="w-full py-3 rounded-ctrl bg-canvas border border-line text-sm font-extrabold text-ink-900"
-              >
-                {t(gameFilter === 'finished' ? 'gerirclube.see_upcoming' : 'gerirclube.see_past')}
-              </button>
+              {/* «JÁ PASSARAM · N»: os 3 mais recentes e o resto numa página
+                  (SPEC 9 out). Datas de uma série e eventos soltos, juntos. */}
+              <PastSection items={passadosPorData()} onSeeAll={() => navigate(`/gerir/${org.slug}/ja-passaram`, { state: { fromGerir: true } })} />
               </div>
 
               {/* Publicar pergunta uma vez: a mensagem do robô não se apaga
