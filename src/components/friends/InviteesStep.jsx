@@ -18,9 +18,7 @@ export const MIN_PEOPLE = 4
 // No editar (27 set): `lockedKeys` = quem já tem resultados (🔒 em vez do ✕,
 // com a frase por baixo) e `collapsedSearch` = a pesquisa só abre com
 // «＋ Juntar pessoa», como no desenho.
-// `creatorKey`: quem criou, quando quem edita é quem aceitou (SPEC 2026-10-07-
-// amigos-convidado) — fica com «Criou o jogo» e não sai.
-export default function InviteesStep({ me, people, onAdd, onRemove, searchFn = searchPlayers, searchPlaceholder, lockedKeys = null, creatorKey = null, collapsedSearch = false }) {
+export default function InviteesStep({ me, people, onAdd, onRemove, searchFn = searchPlayers, searchPlaceholder, lockedKeys = null, collapsedSearch = false }) {
   const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [searchOpen, setSearchOpen] = useState(!collapsedSearch)
@@ -105,9 +103,7 @@ export default function InviteesStep({ me, people, onAdd, onRemove, searchFn = s
               {p.guest && (
                 <span className="shrink-0 rounded-full border border-line bg-ink-50 px-2.5 py-0.5 text-xs font-semibold text-ink-700">{t('friends.guest_tag')}</span>
               )}
-              {creatorKey && p.key === creatorKey ? (
-                <span className="shrink-0 rounded-full bg-ink-50 px-2.5 py-0.5 text-xs font-semibold text-ink-700">{t('friends.creator_tag')}</span>
-              ) : lockedKeys?.has(p.key) ? (
+              {lockedKeys?.has(p.key) ? (
                 <span className="flex h-11 w-11 shrink-0 items-center justify-center text-warning" aria-label={t('friends.locked_person')}>
                   <Lock size={16} />
                 </span>

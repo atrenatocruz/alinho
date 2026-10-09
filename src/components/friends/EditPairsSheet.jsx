@@ -1,19 +1,20 @@
 // «⇄ Editar duplas · ronda N» (SPEC amigos-por-rondas, 27 set): Equipa 1 /
 // Equipa 2 de cada campo e Descansam (tracejado). Toca numa pessoa e depois
-// noutra para trocarem de lugar, também com quem descansa. Muda só esta
-// ronda: as seguintes nascem com as duplas dela até nova troca (SPEC
-// 2026-10-07-amigos-a-jogar, ponto 6).
+// noutra para trocarem de lugar, também com quem descansa. Os sets já
+// marcados ficam com as duplas novas; as rondas seguintes (ainda por jogar)
+// voltam a ser feitas para todos jogarem o mesmo.
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Sheet } from '../agenda/AgendaControls'
 import { Avatar } from '../ui'
-import { setFriendMatchRoundTeams } from '../../lib/privateMatches'
+import { setFriendMatchRoundTeams, removeFriendMatchGame, addFriendMatchRound } from '../../lib/privateMatches'
+import { planRounds } from '../../lib/friendTeams'
 import { describeError } from '../../lib/errors'
-import { setsOf } from './roundsData'
+import { hasResult, setsOf } from './roundsData'
 
 const ERRORS = ['already_counted', 'same_person_twice', 'bad_courts', 'has_results']
 
-export default function EditPairsSheet({ match, round, players, onClose, onSaved }) {
+export default function EditPairsSheet({ match, round, rounds, players, onClose, onSaved }) {
   const { t } = useTranslation()
   const byId = new Map(players.map((p) => [p.invitee_id, p]))
   const person = (x) => byId.get(x.invitee_id) || { invitee_id: x.invitee_id, name: x.name }
@@ -45,6 +46,26 @@ export default function EditPairsSheet({ match, round, players, onClose, onSaved
       await setFriendMatchRoundTeams(match.id, round.number, round.courts.map((g, c) => ({
         game_id: g.id, team_a: ids(slots[c][0]), team_b: ids(slots[c][1]),
       })))
+      // As rondas seguintes, se ainda nenhuma foi jogada, voltam a ser feitas.
+      const later = rounds.filter((r) => r.number > round.number)
+      const untouched = later.every((r) => r.courts.every((g) => !hasResult(g) && !setsOf(g).length))
+      if (later.length && untouched) {
+        for (const r of later) {
+          for (const g of r.courts) {
+            // eslint-disable-next-line no-await-in-loop
+            await removeFriendMatchGame(g.id)
+          }
+        }
+        const asPeople = (team) => team.map((x) => ({ id: x.invitee_id, rating: byId.get(x.invitee_id)?.rating ?? null }))
+        const history = rounds.filter((r) => r.number <= round.number).map((r) => (r.number === round.number
+          ? { courts: slots.map(([a, b]) => ({ teamA: asPeople(a), teamB: asPeople(b) })), resting: asPeople(resting) }
+          : { courts: r.courts.map((g) => ({ teamA: asPeople(g.team_a || []), teamB: asPeople(g.team_b || []) })), resting: asPeople(r.resting) }))
+        const everyone = players.map((p) => ({ id: p.invitee_id, rating: p.rating ?? null }))
+        for (const nr of planRounds(everyone, history, round.courts.length, later.length)) {
+          // eslint-disable-next-line no-await-in-loop
+          await addFriendMatchRound(match.id, nr.courts.map((c) => ({ team_a: c.teamA.map((p) => p.id), team_b: c.teamB.map((p) => p.id) })))
+        }
+      }
       onSaved()
     } catch (err) {
       console.error('Error editing friend match pairs:', err)
@@ -80,7 +101,7 @@ export default function EditPairsSheet({ match, round, players, onClose, onSaved
         ))}
         {resting.length > 0 && box(t('friends.resting_plural'), resting.map((p, i) => row(p, { rest: i })), true)}
         <p className="text-xs text-muted">
-          {setsDone.length ? `${t('friends.edit_pairs_note_sets', { sets: setsDone.join(', ') })} ` : ''}{t('friends.edit_pairs_note_this_round')}
+          {setsDone.length ? t('friends.edit_pairs_note_sets', { sets: setsDone.join(', ') }) : ''} {t('friends.edit_pairs_note_next')}
         </p>
         {error && <p className="rounded-ctrl border border-danger/30 bg-danger/10 px-3 py-2 text-sm font-extrabold text-danger">{error}</p>}
         <button type="button" disabled={busy} onClick={save}

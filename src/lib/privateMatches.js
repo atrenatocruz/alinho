@@ -414,42 +414,6 @@ export const saveFriendMatchSet = async (gameId, setNumber, scoreA, scoreB) => {
   return data
 }
 
-// ── Rondas com tipo (Dev 3, 7 out — SPEC amigos-a-jogar) ─────────────────
-// Cada ronda é uma parte do jogo: 'set' | 'tiebreak' | 'super_tiebreak' |
-// 'pontos' (com «até N» opcional).
-
-/** «Guardar ronda N» (last = false) ou «O jogo acabou assim» (last = true).
- *  O resultado é desta parte (6-4, 7-5, 21-18). A ronda seguinte nasce
- *  sozinha com as mesmas duplas e o mesmo tipo, ou com `nextCourts`
- *  ([{ team_a, team_b }] em ids de convite) quando o jogo é a rodar.
- *  Devolve { status, next_ids }. Erros: not_allowed, too_early, bad_kind,
- *  bad_score, already_counted. */
-export const saveFriendMatchRound = async (gameId, scoreA, scoreB, { kind = null, pointsTo = null, nextCourts = null, last = false } = {}) => {
-  const { data, error } = await supabase.rpc('save_friend_match_round', {
-    p_match_id: gameId, p_score_a: scoreA, p_score_b: scoreB,
-    p_kind: kind, p_points_to: pointsTo, p_next_courts: nextCourts, p_last: last,
-  })
-  if (error) throw error
-  return data
-}
-
-/** Muda o tipo de uma ronda, também já marcada, enquanto não contou.
- *  Erros: bad_kind, bad_score (o resultado não cabe no tipo novo),
- *  already_counted, not_allowed. */
-export const setFriendMatchRoundKind = async (gameId, kind, pointsTo = null) => {
-  const { error } = await supabase.rpc('set_friend_match_round_kind', { p_match_id: gameId, p_kind: kind, p_points_to: pointsTo })
-  if (error) throw error
-}
-
-/** «Sair do jogo» (Dev 3, 8 out): para quem disse «Vou» e não criou. O lugar
- *  fica «Jogador sem nome» e os outros são avisados. Erros: not_allowed,
- *  creator_cannot_leave, already_counted. */
-export const leaveFriendMatch = async (matchId) => {
-  const { data, error } = await supabase.rpc('leave_friend_match', { p_match_id: matchId })
-  if (error) throw error
-  return data
-}
-
 /** «O jogo acabou assim»: fecha com os sets marcados. */
 export const finishFriendMatchGame = async (gameId) => {
   const { data, error } = await supabase.rpc('finish_friend_match_game', { p_game_id: gameId })

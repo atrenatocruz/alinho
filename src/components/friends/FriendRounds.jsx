@@ -1,55 +1,57 @@
-// O jogo entre amigos a jogar (SPEC 2026-10-07-amigos-a-jogar, aprovado pelo
-// Francisco a 7 out: «sim, assim faz sentido»). É tudo um jogo só: uma
-// moldura por campo, «CAMPO 1 · UM JOGO SÓ», com as rondas por ordem. Cada
-// ronda é uma parte do jogo — Set, Tie-break, Super tie-break ou Pontos — com
-// o estado à direita (Acabou · A decorrer · A seguir), o tipo numa etiqueta
-// e as duas duplas com o resultado (quem perdeu a cinzento).
+// O jogo entre amigos por rondas, como no mix (SPEC amigos-por-rondas,
+// aprovado pelo Francisco a 27 set): substitui a lista «Jogo 1 … Jogo N».
+// Cada ronda num bloco — «Ronda N» e o estado (Acabou · A decorrer · set N ·
+// A seguir), por campo as duas duplas com os sets ganhos à direita e os sets
+// por baixo, e «Descansam». A ronda a decorrer tem contorno preto, com
+// «⇄ Editar duplas» e «Marcar set N». Em «Pontos» marca-se o resultado de
+// uma vez, como antes.
 //
-// A ronda a decorrer tem a moldura preta, o tipo com ⌄, o relógio e o alarme
-// (se o jogo tem tempo), «Marcar ronda N» (preto) e «⇆ Trocar duplas»
-// (contorno). Ao guardar, a seguinte nasce sozinha com as mesmas duplas e o
-// mesmo tipo (a rodar, com as duplas previstas). Nas acabadas, «Editar»:
-// Editar duplas · Mudar o resultado · Apagar ronda. O tipo muda-se na própria
-// linha. Tudo só enquanto a ronda não contou para o ranking.
-//
-// Quem organiza (quem criou, ou quem disse «Vou» com o nome — SPEC 2026-10-
-// 07-amigos-convidado) vê e faz o mesmo.
+// Rondas editáveis (27 set, SPEC amigos-por-rondas, fim — «o mais editável
+// possível»): quem criou junta rondas («＋ Ronda»), remove qualquer ronda
+// (também jogadas e a que decorre, com pergunta) e muda-as de lugar (↑ ↓).
+// O único cadeado é a ronda que já contou para o ranking.
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeftRight, ChevronDown } from 'lucide-react'
+import { ArrowDown, ArrowLeftRight, ArrowUp, Lock, Plus } from 'lucide-react'
 import { shortName } from './friendShare'
-import { roundsOf, hasResult, roundResults } from './roundsData'
-import { kindOf, pointsToOf } from './roundKinds'
-import FriendRoundSheet, { RoundKindSheet, kindLabel, roundSaveError } from './FriendRoundSheet'
-import SwapPairsSheet from './SwapPairsSheet'
+import { roundsOf, hasResult, setsOf, setsWon, canMove, roundResults } from './roundsData'
+import { formatKey } from './friendScoring'
+import FriendSetSheet from './FriendSetSheet'
+import FriendResultSheet from './FriendResultSheet'
 import EditPairsSheet from './EditPairsSheet'
-import RoundClock from './RoundClock'
 import { ShareMissingButton } from './FriendSessionGames'
 import { ConfirmSheet } from '../ui'
-import { Sheet } from '../agenda/AgendaControls'
-import { removeFriendMatchRound } from '../../lib/privateMatches'
-import { planRounds } from '../../lib/friendTeams'
+import { addFriendMatchRound, moveFriendMatchRound, removeFriendMatchRound } from '../../lib/privateMatches'
+import { planRounds, courtsFor } from '../../lib/friendTeams'
+import { describeError } from '../../lib/errors'
 import { beforeStart } from '../../lib/friendGames'
 import { dayText } from './dayText'
 
-const pairKey = (team) => (team || []).map((p) => p.invitee_id).sort().join('+')
-const samePairs = (g, h) => !!g && !!h && [pairKey(g.team_a), pairKey(g.team_b)].sort().join('|') === [pairKey(h.team_a), pairKey(h.team_b)].sort().join('|')
+// Os erros das funções novas (Dev 3). Sem a função em produção, describeError
+// já diz «ainda não disponível» (not_ready).
+const roundError = (t, err) => (String(err?.message || '').includes('already_counted')
+  ? t('friends.round_error_counted') : describeError(t, err))
 
-export default function FriendRounds({ match, games, invitees, players, iOrganize, onChanged }) {
+export default function FriendRounds({ match, games, invitees, players, iAmCreator, myUserId, onChanged }) {
   const { t, i18n } = useTranslation()
-  const [markFor, setMarkFor] = useState(null) // { game, round, editing }
-  const [kindFor, setKindFor] = useState(null) // { game, round }
-  const [editFor, setEditFor] = useState(null) // { game, round } — a folha «Editar»
-  const [pairsFor, setPairsFor] = useState(null) // a ronda — «Editar duplas»
-  const [swapFor, setSwapFor] = useState(null) // a ronda — «Trocar duplas»
+  const [setFor, setSetFor] = useState(null) // { game, round }
+  const [resultFor, setResultFor] = useState(null)
+  const [editFor, setEditFor] = useState(null) // a ronda
   const [removeFor, setRemoveFor] = useState(null) // a ronda
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const format = formatKey(match.scoring_format, match.num_sets)
+  const bySets = format !== 'points'
   const rounds = roundsOf(games, players)
-  const courtsN = Math.max(1, ...games.map((g) => g.court_number || 1))
   const anon = new Set(invitees.filter((i) => i.is_anonymous).map((i) => i.invitee_id))
+  const me = invitees.find((i) => i.user_id && i.user_id === myUserId)
   const pending = invitees.filter((i) => i.status === 'pending').length
   const creator = invitees.find((i) => i.is_creator)
+  const canRecord = (g) => iAmCreator || (me?.status === 'accepted'
+    && [...(g.team_a || []), ...(g.team_b || [])].some((p) => p.user_id === myUserId))
   const name = (p) => (anon.has(p.invitee_id) ? <i key={p.invitee_id} className="font-semibold text-muted">{t('friends.anon_name')}</i> : shortName(p.name))
   const pair = (team) => (team || []).map((p, i) => <span key={p.invitee_id || i}>{i > 0 && ' / '}{name(p)}</span>)
+  const hasAnon = (g) => [...(g.team_a || []), ...(g.team_b || [])].some((p) => anon.has(p.invitee_id))
   // O resultado marca-se a partir da hora do jogo, durante ou depois
   // (Francisco, 28 set): antes, «Marcar» fica apagado, com a frase.
   const early = beforeStart(match.scheduled_date, match.scheduled_time)
@@ -57,25 +59,74 @@ export default function FriendRounds({ match, games, invitees, players, iOrganiz
     time: match.scheduled_time ? String(match.scheduled_time).slice(0, 5) : '00:00',
     day: match.scheduled_date ? dayText(match.scheduled_date, i18n.language).toLocaleLowerCase(i18n.language) : '',
   })
+  const open = (g, round) => { if (!early) (bySets ? setSetFor({ game: g, round: round.number }) : setResultFor(g)) }
 
-  // As rondas até esta, como a conta das duplas as quer (friendTeams).
-  const byId = new Map(players.map((p) => [p.invitee_id, p]))
-  const person = (x) => byId.get(x.invitee_id) || { ...x, id: x.invitee_id }
-  const historyTo = (n) => rounds.filter((r) => r.number <= n).map((r) => ({
-    courts: r.courts.map((g) => ({ teamA: (g.team_a || []).map(person), teamB: (g.team_b || []).map(person) })),
-    resting: r.resting,
-  }))
-  // As duplas que a app propõe a seguir a esta ronda, sem repetir parceiros.
-  const proposalAfter = (round) => planRounds(players, historyTo(round.number), round.courts.length, 1)[0] || null
-  // A rodar, a ronda seguinte nasce com as duplas previstas (ponto 4).
-  const nextCourtsFor = (round) => {
-    if (match.pairing_mode !== 'rotating') return null
-    const next = proposalAfter(round)
-    const ids = (team) => team.map((p) => p.id)
-    return next ? next.courts.map((c) => ({ team_a: ids(c.teamA), team_b: ids(c.teamB) })) : null
+  const court = (g, round) => {
+    const [wa, wb] = setsWon(g)
+    const s = setsOf(g)
+    const live = round.current && !hasResult(g)
+    const tappable = canRecord(g) && !g.counts && (hasResult(g) || s.length > 0)
+    const line = s.length
+      ? `${s.map((x) => `${x.score_a}-${x.score_b}`).join(' · ')}${live ? ` · ${t('friends.set_to_play', { n: s.length + 1 })}` : ''}`
+      : null
+    const showNumbers = hasResult(g) || s.length > 0
+    return (
+      <div key={g.id} className={`rounded-ctrl border border-line bg-white p-3 ${tappable ? 'press cursor-pointer' : ''}`}
+        {...(tappable ? { role: 'button', tabIndex: 0, onClick: () => open(g, round), onKeyDown: (e) => { if (e.key === 'Enter') open(g, round) },
+          'aria-label': t('friends.correct_result', { n: g.n }) } : {})}>
+        <p className="mb-1.5 font-mono text-[11px] font-extrabold uppercase tracking-wider text-ink-500">{t('friends.court_n', { n: g.court_number || 1 })}</p>
+        {[[g.team_a, wa, wa >= wb], [g.team_b, wb, wb > wa]].map(([team, n, ahead], k) => (
+          <div key={k} className={`flex items-center justify-between gap-2 text-sm ${showNumbers && !ahead ? 'text-muted' : 'text-ink-900'} ${k ? 'mt-1' : ''}`}>
+            <span className="min-w-0 truncate font-extrabold">{pair(team)}</span>
+            {showNumbers && <b className="tabular-nums text-ink-900">{n}</b>}
+          </div>
+        ))}
+        {line && <p className="mt-1.5 text-xs tabular-nums text-ink-700">{line}</p>}
+        {/* Um empate grava-se e fica como amigável, sem pontos (Francisco, 30 set, REGRAS.md ponto 4). */}
+        {hasResult(g) && g.winner_team === 'draw' && (
+          <span className="mt-1.5 inline-block rounded-full bg-ink-50 px-2 py-0.5 text-[11px] font-extrabold text-ink-700">{t('gamedetails.badge_friendly')}</span>
+        )}
+        {hasAnon(g) ? <p className="mt-1 text-xs text-muted">{t('friends.anon_no_ranking')}</p>
+          : hasResult(g) && !g.counts && g.waiting_for?.length > 0 && (
+            <p className="mt-1 text-xs text-muted">{t('friends.counts_when', { names: g.waiting_for.map((w) => String(w.name || '').split(/\s+/)[0]).join(', ') })}</p>
+          )}
+        {/* Dois campos: cada um marca o seu. */}
+        {round.current && round.courts.length > 1 && canRecord(g) && !hasResult(g) && (
+          <button type="button" onClick={(e) => { e.stopPropagation(); open(g, round) }} disabled={early}
+            className="press mt-2.5 min-h-[44px] w-full rounded-ctrl bg-ink-900 px-3 text-sm font-extrabold text-white disabled:bg-ink-200 disabled:text-ink-500">
+            {bySets ? t('friends.mark_set', { n: s.length + 1 }) : t('friends.mark_result')}
+          </button>
+        )}
+      </div>
+    )
   }
 
-  // «Apagar a ronda N?» — diz o que se perde: o resultado, ou as duplas.
+  // Só quem criou, e à vez: mexem na ordem das rondas.
+  const act = async (fn) => {
+    setBusy(true); setError('')
+    try { await fn(); onChanged() } catch (err) {
+      console.error('Error editing friend match rounds:', err)
+      setError(roundError(t, err))
+    } finally { setBusy(false) }
+  }
+  const move = (r, dir) => act(() => moveFriendMatchRound(match.id, r.number, dir === 'up' ? r.number - 1 : r.number + 1))
+
+  // «＋ Ronda»: a app faz a ronda seguinte — quem joga e quem descansa — sem
+  // repetir duplas nem jogos das que já existem (a mesma conta do formar).
+  const addRound = () => act(async () => {
+    const byId = new Map(players.map((p) => [p.invitee_id, p]))
+    const person = (x) => byId.get(x.invitee_id) || { ...x, id: x.invitee_id }
+    const done = rounds.map((r) => ({
+      courts: r.courts.map((g) => ({ teamA: (g.team_a || []).map(person), teamB: (g.team_b || []).map(person) })),
+      resting: r.resting,
+    }))
+    const courts = Math.min(Math.max(1, ...rounds.map((r) => r.courts.length)), courtsFor(players.length))
+    const [next] = planRounds(players, done, courts, 1)
+    const ids = (team) => team.map((p) => p.id)
+    await addFriendMatchRound(match.id, next.courts.map((c) => ({ team_a: ids(c.teamA), team_b: ids(c.teamB) })))
+  })
+
+  // «Remover a ronda N?» — diz o que se perde: os resultados, ou as duplas.
   const names = (team) => (team || []).map((p) => shortName(p.name)).join(' / ')
   const removeMessage = (r) => {
     const res = roundResults(r)
@@ -90,154 +141,114 @@ export default function FriendRounds({ match, games, invitees, players, iOrganiz
     return t('friends.remove_round_no_results', { pairs, count: r.courts.length })
   }
 
-  const chip = 'inline-flex min-h-[26px] items-center gap-0.5 rounded-full border border-line bg-white px-2.5 text-[11px] font-extrabold text-ink-900'
-  const outline = 'press inline-flex min-h-[52px] w-full items-center justify-center gap-1.5 rounded-ctrl border-[1.5px] border-line bg-white px-4 text-[15px] font-extrabold text-ink-900 disabled:opacity-40'
+  const tag = (r) => (r.counted
+    ? <span className="rounded-full bg-[#DCFCE7] px-2.5 py-0.5 text-xs font-extrabold text-[#14532D]">{t('friends.round_counted')}</span>
+    : r.done
+    ? <span className="rounded-full bg-[#DCFCE7] px-2.5 py-0.5 text-xs font-extrabold text-[#14532D]">{t('friends.round_done')}</span>
+    // Antes da hora do jogo nenhuma ronda está «A decorrer» (UX, 28 set).
+    : r.current && !early
+      ? <span className="rounded-full bg-danger/10 px-2.5 py-0.5 text-xs font-extrabold text-danger">
+        {bySets ? t('friends.round_live_set', { n: Math.max(1, ...r.courts.map((g) => setsOf(g).length + 1)) }) : t('friends.round_live')}
+      </span>
+      : <span className="rounded-full bg-ink-50 px-2.5 py-0.5 text-xs font-extrabold text-ink-700">{t('friends.round_next')}</span>)
 
-  const item = (g, r, prev) => {
-    const done = hasResult(g)
-    const live = r.current && !done
-    // Antes da hora, a ronda 1 fica cinzenta, com o «Marcar» apagado (SPEC
-    // amigos-convidado, ponto 3).
-    const framed = live && !early
-    const canEdit = iOrganize && !g.counts
-    const kind = kindOf(g, match)
-    const [sa, sb] = done ? [g.score_a, g.score_b] : [null, null]
-    // O jogo conta para o ranking uma vez, no fim (Francisco e Ruben, 8 out —
-    // TEXTOS-RANKING.md): a ronda acabada diz só «Acabou», nunca «Contou».
-    const tag = done
-      ? <span className="rounded-full bg-[#DCFCE7] px-2.5 py-0.5 text-xs font-extrabold text-[#14532D]">{t('friends.round_done')}</span>
-      // Antes da hora do jogo nenhuma ronda está «A decorrer» (UX, 28 set).
-      : live && !early
-        ? <span className="rounded-full bg-danger/10 px-2.5 py-0.5 text-xs font-extrabold text-danger">{t('friends.round_live')}</span>
-        : <span className="text-xs font-extrabold text-ink-700">{t('friends.round_next')}</span>
-    const kindText = kindLabel(t, kind, pointsToOf(g))
-    return (
-      <div key={g.id} className={`rounded-card p-3 ${framed ? 'border-2 border-ink-900 bg-white' : 'bg-surface'}`}>
-        <div className="flex items-center justify-between gap-2">
-          <h3 className="font-display text-base font-extrabold text-ink-900">{t('friends.round_n', { n: r.number })}</h3>
-          {tag}
-        </div>
-        <div className="mt-1.5 flex items-center justify-between gap-2">
-          {canEdit ? (
-            <button type="button" onClick={() => setKindFor({ game: g, round: r })} className={`press ${chip}`}
-              aria-label={t('friends.kind_change_aria', { n: r.number, kind: kindText })}>
-              {kindText}{framed && <ChevronDown size={12} />}
-            </button>
-          ) : <span className={chip}>{kindText}</span>}
-          {done && canEdit && (
-            <button type="button" onClick={() => setEditFor({ game: g, round: r })}
-              className="press min-h-[32px] px-1 text-xs font-extrabold text-ink-900 underline underline-offset-2">
-              {t('friends.edit_short')}
-            </button>
-          )}
-        </div>
-        <div className="mt-2 rounded-ctrl border border-line bg-white px-3 py-2.5">
-          {[[g.team_a, sa, sb], [g.team_b, sb, sa]].map(([team, mine, other], k) => (
-            <div key={k} className={`flex items-center justify-between gap-2 text-sm ${done && mine < other ? 'text-muted' : 'text-ink-900'} ${k ? 'mt-1' : ''}`}>
-              <span className="min-w-0 truncate font-extrabold">{pair(team)}</span>
-              {done && <b className="tabular-nums">{mine}</b>}
-            </div>
-          ))}
-        </div>
-        {(g.court_number || 1) === 1 && r.resting.length > 0 && (
-          <p className="mt-2 text-xs text-muted">{t('friends.resting_line_plural', { names: r.resting.map((p) => (p.is_anonymous ? t('friends.anon_name') : shortName(p.name))).join(', ') })}</p>
-        )}
-        {samePairs(g, prev) && <p className="mt-2 text-xs text-muted">{t('friends.same_pairs_as_before')}</p>}
-        {live && iOrganize && (
-          <div className="mt-3 space-y-2.5">
-            {match.game_minutes ? <RoundClock match={match} game={g} roundNumber={r.number} canTimer={iOrganize} onChanged={onChanged} /> : null}
-            <button type="button" onClick={() => setMarkFor({ game: g, round: r, editing: false })} disabled={early}
-              className="press min-h-[52px] w-full rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold text-white disabled:bg-ink-200 disabled:text-ink-500">
-              {t('friends.mark_round', { n: r.number })}
-            </button>
-            {early && <p className="text-xs text-muted">{earlyText}</p>}
-            {!early && (
-              <button type="button" onClick={() => setSwapFor(r)} className={outline}>
-                <ArrowLeftRight size={15} /> {t('friends.swap_pairs')}
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  const time = match.scheduled_time ? String(match.scheduled_time).slice(0, 5) : null
-  // Não conta: «Não, só amigável» no Criar, ou joga alguém sem conta (BA,
-  // 8 out). Com mais do que um par de duplas, junta-se a frase das trocas.
-  const pairSets = new Set(games.map((g) => [pairKey(g.team_a), pairKey(g.team_b)].sort().join('|')))
-  const rankingText = match.ranked_intent === false ? t('friends.ranking_box_friendly')
-    : players.some((p) => !p.user_id) ? t('friends.ranking_box_no_account')
-      : [t('friends.ranking_box_once'), pairSets.size > 1 ? t('friends.ranking_box_each_pair') : null].filter(Boolean).join(' ')
   return (
     <div className="space-y-3">
-      {Array.from({ length: courtsN }, (_, c) => c + 1).map((court) => {
-        const list = rounds.map((r) => ({ r, g: r.courts.find((x) => (x.court_number || 1) === court) })).filter((x) => x.g)
+      {rounds.map((r, i) => {
+        const single = r.courts.length === 1 ? r.courts[0] : null
+        const canEdit = iAmCreator && !r.counted
+        const canMark = r.current && single && canRecord(single) && !hasResult(single)
+        const arrow = 'press inline-flex h-9 w-9 items-center justify-center rounded-full border border-line bg-white text-ink-900 disabled:opacity-30'
         return (
-          <section key={court} className="rounded-card border border-line bg-white p-3">
-            <p className="font-mono text-[11px] font-extrabold uppercase tracking-wider text-ink-900">{t('friends.court_one_game', { n: court })}</p>
-            <p className="mb-3 text-xs text-muted">{[time, t('friends.rounds_count', { count: list.length })].filter(Boolean).join(' · ')}</p>
-            <div className="space-y-2.5">{list.map(({ r, g }, i) => item(g, r, i > 0 ? list[i - 1].g : null))}</div>
+          <section key={r.number} className={`rounded-card p-3 ${r.current ? 'border-2 border-ink-900 bg-white' : 'bg-surface'}`}>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <h3 className="mr-1 font-display text-base text-ink-900">{t('friends.round_n', { n: r.number })}</h3>
+                {/* ↑ ↓: a de cima sem ↑, a de baixo sem ↓; a que contou sem nenhuma. */}
+                {canEdit && i > 0 && (
+                  <button type="button" onClick={() => move(r, 'up')} disabled={busy || !canMove(rounds, i, 'up')}
+                    aria-label={t('friends.round_move_up', { n: r.number })} className={arrow}><ArrowUp size={16} /></button>
+                )}
+                {canEdit && i < rounds.length - 1 && (
+                  <button type="button" onClick={() => move(r, 'down')} disabled={busy || !canMove(rounds, i, 'down')}
+                    aria-label={t('friends.round_move_down', { n: r.number })} className={arrow}><ArrowDown size={16} /></button>
+                )}
+              </div>
+              {tag(r)}
+            </div>
+            <div className="space-y-2">{r.courts.map((g) => court(g, r))}</div>
+            {r.resting.length > 0 && (
+              <p className="mt-2 text-xs text-muted">{t('friends.resting_line_plural', { names: r.resting.map((p) => (p.is_anonymous ? t('friends.anon_name') : shortName(p.name))).join(', ') })}</p>
+            )}
+            {r.counted && iAmCreator && (
+              <p className="mt-2.5 flex items-start gap-1.5 text-xs text-muted">
+                <Lock size={12} className="mt-0.5 shrink-0 text-warning" /> {t('friends.round_counted_lock')}
+              </p>
+            )}
+            {canEdit && (
+              <div className="mt-2.5 flex gap-2">
+                <button type="button" onClick={() => setEditFor(r)}
+                  className="press inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-ctrl border-[1.5px] border-line bg-white px-3 text-sm font-extrabold text-ink-900">
+                  <ArrowLeftRight size={15} /> {t('friends.edit_pairs')}
+                </button>
+                <button type="button" onClick={() => setRemoveFor(r)} disabled={busy}
+                  className="press min-h-[44px] flex-1 rounded-ctrl border-[1.5px] border-danger/40 bg-white px-3 text-sm font-extrabold text-danger">
+                  {t('friends.remove_round')}
+                </button>
+              </div>
+            )}
+            {/* Na ronda a decorrer, «Marcar set» a toda a largura, por baixo
+                (designer, 27 set: o Remover também está nesta ronda). */}
+            {canMark && (
+              <button type="button" onClick={() => open(single, r)} disabled={early}
+                className="press mt-2 min-h-[44px] w-full rounded-ctrl bg-ink-900 px-3 text-sm font-extrabold text-white disabled:bg-ink-200 disabled:text-ink-500">
+                {bySets ? t('friends.mark_set', { n: setsOf(single).length + 1 }) : t('friends.mark_result')}
+              </button>
+            )}
+            {early && r.current && <p className="mt-1.5 text-xs text-muted">{earlyText}</p>}
           </section>
         )
       })}
 
-      {games.some((g) => [...(g.team_a || []), ...(g.team_b || [])].some((p) => anon.has(p.invitee_id))) && (
+      {games.some(hasAnon) && (
         <p className="rounded-card bg-ink-50 p-3.5 text-sm text-ink-700">{t('friends.anon_box_before')} <b className="text-ink-900">«{t('friends.anon_name')}»</b>{t('friends.anon_box_after')}</p>
       )}
-      {/* A caixa do ranking (TEXTOS-RANKING.md, ponto 2): conta uma vez, no
-          fim; com trocas, cada par de duplas é um jogo. Por cima, quem falta
-          responder. */}
-      <p className="rounded-card bg-ink-50 p-3.5 text-sm text-ink-700">
-        {pending > 0 && <><b className="text-ink-900">{t('friends.not_answered_bold', { count: pending })}</b> </>}
-        {rankingText}
-      </p>
-      {pending > 0 && iOrganize && <ShareMissingButton match={match} creatorName={creator?.name} />}
-
-      {markFor && (
-        <FriendRoundSheet match={match} game={markFor.game} roundNumber={markFor.round.number} games={games} editing={markFor.editing}
-          nextCourts={markFor.editing ? null : nextCourtsFor(markFor.round)}
-          onClose={() => setMarkFor(null)} onSaved={() => { setMarkFor(null); onChanged() }} />
+      {pending > 0 && (
+        <p className="rounded-card bg-ink-50 p-3.5 text-sm text-ink-700">
+          <b className="text-ink-900">{t('friends.not_answered_bold', { count: pending })}</b> {t('friends.not_answered_rest')}
+        </p>
       )}
-      {kindFor && (
-        <RoundKindSheet match={match} game={kindFor.game} roundNumber={kindFor.round.number} games={games}
-          onClose={() => setKindFor(null)} onSaved={() => { setKindFor(null); onChanged() }} />
+      {pending > 0 && iAmCreator && <ShareMissingButton match={match} creatorName={creator?.name} />}
+      {error && <p className="rounded-ctrl border border-danger/30 bg-danger/10 px-3 py-2 text-sm font-extrabold text-danger">{error}</p>}
+      {iAmCreator && (
+        <button type="button" onClick={addRound} disabled={busy}
+          className="press inline-flex min-h-[52px] w-full items-center justify-center gap-1.5 rounded-ctrl border-[1.5px] border-dashed border-ink-200 bg-white px-4 text-[15px] font-extrabold text-ink-900 disabled:opacity-40">
+          <Plus size={16} /> {t('friends.add_round')}
+        </button>
+      )}
+
+      {setFor && (
+        <FriendSetSheet game={setFor.game} roundNumber={setFor.round} format={format}
+          onClose={() => setSetFor(null)} onSaved={() => { setSetFor(null); onChanged() }} />
+      )}
+      {resultFor && (
+        <FriendResultSheet match={match} game={resultFor} onClose={() => setResultFor(null)}
+          onSaved={() => { setResultFor(null); onChanged() }} />
       )}
       {editFor && (
-        <Sheet title={t('friends.round_n', { n: editFor.round.number })} onClose={() => setEditFor(null)}>
-          <div className="space-y-2.5">
-            <button type="button" onClick={() => { setPairsFor(editFor.round); setEditFor(null) }} className={outline}>
-              <ArrowLeftRight size={15} /> {t('friends.edit_pairs')}
-            </button>
-            <button type="button" onClick={() => { setMarkFor({ ...editFor, editing: true }); setEditFor(null) }} className={outline}>
-              {t('friends.change_result')}
-            </button>
-            <button type="button" onClick={() => { setRemoveFor(editFor.round); setEditFor(null) }}
-              className="press min-h-[52px] w-full rounded-ctrl border-[1.5px] border-danger/40 bg-white px-4 text-[15px] font-extrabold text-danger">
-              {t('friends.delete_round')}
-            </button>
-          </div>
-        </Sheet>
-      )}
-      {swapFor && (
-        <SwapPairsSheet match={match} round={swapFor} proposal={proposalAfter(swapFor)}
-          onEdit={() => { setPairsFor(swapFor); setSwapFor(null) }}
-          onClose={() => setSwapFor(null)} onSaved={() => { setSwapFor(null); onChanged() }} />
-      )}
-      {pairsFor && (
-        <EditPairsSheet match={match} round={pairsFor} players={players}
-          onClose={() => setPairsFor(null)} onSaved={() => { setPairsFor(null); onChanged() }} />
+        <EditPairsSheet match={match} round={editFor} rounds={rounds} players={players}
+          onClose={() => setEditFor(null)} onSaved={() => { setEditFor(null); onChanged() }} />
       )}
       <ConfirmSheet
         open={!!removeFor}
         danger
-        title={removeFor ? t('friends.delete_round_title', { n: removeFor.number }) : ''}
+        title={removeFor ? t('friends.remove_round_title', { n: removeFor.number }) : ''}
         message={removeFor ? removeMessage(removeFor) : ''}
         cancelLabel={t('friends.remove_round_keep')}
-        confirmLabel={t('friends.delete_round')}
+        confirmLabel={t('friends.remove_round_yes')}
         onConfirm={async () => { await removeFriendMatchRound(match.id, removeFor.number); onChanged() }}
         onClose={() => setRemoveFor(null)}
-        errorOf={(err) => roundSaveError(t, err)}
+        errorOf={(err) => roundError(t, err)}
       />
     </div>
   )

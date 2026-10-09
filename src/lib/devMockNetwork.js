@@ -495,59 +495,6 @@ const RPC_MOCKS = {
     // localStorage.mockFriendCounted = 'true': a ronda 1 já contou para o
     // ranking (os 4 confirmaram) — «Contou», o cadeado, e o ranking trancado
     // no editar (rondas editáveis, 27 set).
-    // Rondas com tipo (SPEC amigos-a-jogar, 7 out): 'kinds' = 4 pessoas, a
-    // ronda 1 set 6-4, a 2 set 3-6, a 3 super tie-break 10-8 (as mesmas
-    // duplas) e a 4 a decorrer com duplas novas; 'kinds6' = 6 a rodar, a 3
-    // a decorrer em super tie-break. Outras chaves: mockFriendAs = 'guest'
-    // (sou quem aceitou, não quem criou — SPEC amigos-convidado),
-    // mockFriendTimed = 'running' | 'idle' (20 min por ronda), mockFriendKinds
-    // = 'points' (a ronda 2 em pontos até 21), mockFriendStarted = 'false'
-    // (por começar, só a ronda 1), mockFriendCounted = 'true'.
-    if (mode === 'kinds' || mode === 'kinds6') {
-      const me = MOCK_ADMIN_USER_ID
-      const six = mode === 'kinds6'
-      const base = six
-        ? [['Admin (Dev)', 'masculino'], ['Rita Figueira', 'feminino'], ['Tiago Lopes', 'masculino'], ['Ana Marques', 'feminino'], ['Rui Costa', 'masculino'], ['Zé Pinto', 'masculino']]
-        : [['Rita Figueira', 'feminino'], ['Tiago Lopes', 'masculino'], ['Ana Marques', 'feminino'], ['Rui Costa', 'masculino']]
-      const meIdx = localStorage.getItem('mockFriendAs') === 'guest' ? base.length - 1 : 0
-      const P = base.map(([name, gender], i) => ({ uid: i === meIdx ? me : `u-k${i}`, name, gender }))
-      const notStarted = localStorage.getItem('mockFriendStarted') === 'false'
-      const counted = localStorage.getItem('mockFriendCounted') === 'true'
-      const timed = localStorage.getItem('mockFriendTimed')
-      const invitees = P.map((p, i) => ({ invitee_id: `i-${p.uid}`, user_id: p.uid, name: p.name, avatar_url: null, rating: 1000 + i * 40, gender: p.gender,
-        status: notStarted && i === 2 ? 'pending' : 'accepted', is_guest: false, is_creator: i === 0, has_results: !notStarted, is_anonymous: false }))
-      const sl = (i) => ({ user_id: P[i].uid, name: P[i].name, invitee_id: `i-${P[i].uid}`, slot_status: 'accepted' })
-      const g = (k, a, b, kind, score, to = null) => ({ id: k === 1 ? 'fs-1' : `fs-g${k}`, n: k, round_number: k, court_number: 1,
-        team_a: a.map(sl), team_b: b.map(sl), resting: [], round_kind: kind, round_points_to: to, sets: [],
-        score_a: score ? score[0] : null, score_b: score ? score[1] : null,
-        winner_team: score ? (score[0] > score[1] ? 'a' : score[1] > score[0] ? 'b' : 'draw') : null,
-        status: 'pending', counts: false, waiting_for: [], started_at: null, ends_at: null })
-      let games = six ? [
-        g(1, [1, 2], [3, 4], 'set', [6, 2]),
-        g(2, [5, 1], [0, 2], 'set', [4, 6]),
-        g(3, [3, 0], [4, 5], 'super_tiebreak', null),
-      ] : [
-        g(1, [0, 1], [2, 3], 'set', [6, 4]),
-        g(2, [0, 1], [2, 3], 'set', [3, 6]),
-        g(3, [0, 1], [2, 3], 'super_tiebreak', [10, 8]),
-        g(4, [0, 2], [1, 3], 'set', null),
-      ]
-      if (!six && localStorage.getItem('mockFriendKinds') === 'points') {
-        games = [g(1, [0, 1], [2, 3], 'set', [6, 3]), g(2, [0, 2], [1, 3], 'pontos', [17, 21], 21), g(3, [0, 3], [1, 2], 'tiebreak', null)]
-      }
-      if (notStarted) games = [g(1, [0, 1], [2, 3], 'set', null)]
-      const cur = games[games.length - 1]
-      if (timed === 'running' && !notStarted) {
-        Object.assign(cur, { started_at: new Date(Date.now() - 444000).toISOString(), ends_at: new Date(Date.now() + 756000).toISOString() })
-      }
-      if (counted) games[0].counts = true
-      return {
-        match: { id: 'fs-1', scheduled_date: new Date(Date.now() + (notStarted ? 6 : -1) * 86400000).toISOString().slice(0, 10), scheduled_time: '10:00:00',
-          location: 'Clube Exemplo', court: 'Campo 1', teams_mode: 'app', pairing_mode: six ? 'rotating' : 'fixed', scoring_format: 'sets', num_sets: 3,
-          game_minutes: timed ? 20 : null, teams_set_at: new Date().toISOString(), ranked_intent: true, ranking_locked: counted },
-        invitees, games,
-      }
-    }
     if (mode === 'rounds6' || mode === 'rounds8') {
       const me = MOCK_ADMIN_USER_ID
       const P = [[me, 'Admin (Dev)'], ['u-rf', 'Rita Figueira'], ['u-tl', 'Tiago Lopes'], ['u-am', 'Ana Marques'], ['u-rc', 'Rui Costa'], ['u-zp', 'Zé Pinto'],
@@ -661,10 +608,6 @@ const RPC_MOCKS = {
     ]),
   ] : []),
   save_friend_match_set: () => ({ sets: [], sets_a: 1, sets_b: 1, finished: false, status: 'pending' }),
-  // Rondas com tipo e «Sair do jogo» (Dev 3, 7 e 8 out): no ecrã só se vê o pedido a sair.
-  save_friend_match_round: () => ({ status: 'pending', next_ids: ['fs-new'] }),
-  set_friend_match_round_kind: () => null,
-  leave_friend_match: () => 'left',
   finish_friend_match_game: () => 'pending',
   set_friend_match_round_teams: () => null,
   remove_friend_match_game: () => null,

@@ -10,9 +10,6 @@
 //     scheduled_date, scheduled_time, teams }: «<Nome> cancelou o jogo de
 //     <dia>, <hora>.» / «<Nome> apagou o jogo de <dia> (<duplas>).» O jogo
 //     já não existe: levam à lista.
-//   'friend_match_left' («Sair do jogo», 8 out) — para quem organiza e quem
-//     disse «Vou»; data = { match_id, name, scheduled_date, scheduled_time }:
-//     «<Nome> saiu do jogo de <dia>, <hora>.» / o lugar fica livre.
 // Levam à página do jogo; responder marca o aviso como lido do lado da base
 // de dados.
 import { Link } from 'react-router-dom'
@@ -20,15 +17,14 @@ import { useTranslation } from 'react-i18next'
 import { Users, UserMinus } from 'lucide-react'
 import { dayText } from './dayText'
 
-export const FRIEND_NOTICE_KINDS = ['friend_match_invite', 'friend_match_declined', 'friend_match_cancelled', 'friend_match_deleted', 'friend_match_left']
+export const FRIEND_NOTICE_KINDS = ['friend_match_invite', 'friend_match_declined', 'friend_match_cancelled', 'friend_match_deleted']
 
 export default function FriendInviteRow({ notice, onOpen }) {
   const { t, i18n } = useTranslation()
   const d = notice.data || {}
   const day = dayText(d.scheduled_date, i18n.language)
   const when = [day, d.scheduled_time ? String(d.scheduled_time).slice(0, 5) : null].filter(Boolean).join(', ')
-  const declined = notice.kind === 'friend_match_declined' || notice.kind === 'friend_match_left'
-  const left = notice.kind === 'friend_match_left'
+  const declined = notice.kind === 'friend_match_declined'
   const gone = notice.kind === 'friend_match_cancelled' || notice.kind === 'friend_match_deleted'
   if (gone) {
     const deleted = notice.kind === 'friend_match_deleted'
@@ -55,9 +51,9 @@ export default function FriendInviteRow({ notice, onOpen }) {
       {declined ? (
         <span className="min-w-0 flex-1">
           <span className="block text-sm text-ink-900">
-            <b>{t(left ? 'friends.notice_left_bold' : 'friends.notice_declined_bold', { name: d.name || '' })}</b> {t(left ? 'friends.notice_left_rest' : 'friends.notice_declined_rest', { when })}
+            <b>{t('friends.notice_declined_bold', { name: d.name || '' })}</b> {t('friends.notice_declined_rest', { when })}
           </span>
-          <span className="block text-xs text-muted">{t(left ? 'friends.notice_left_hint' : 'friends.notice_declined_hint')}</span>
+          <span className="block text-xs text-muted">{t('friends.notice_declined_hint')}</span>
         </span>
       ) : (
         <p className="min-w-0 flex-1 text-sm text-ink-900">
