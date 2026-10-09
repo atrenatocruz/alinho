@@ -532,6 +532,7 @@ export default function MixWizard({
               options={[{ value: 'yes', label: t('gerirclube.ranked_yes') }, { value: 'no', label: t('gerirclube.ranked_no') }]} />
           )}
         </Field>
+        {/* No Americano ganha uma pessoa (UX, 8 out): a ajuda do prémio diz isso. */}
         <Field label={t('mixwizard.price_label')}>
           <div className="grid grid-cols-2 gap-2">
             <label className="flex items-center gap-2 input-field">
@@ -543,6 +544,7 @@ export default function MixWizard({
             <input type="text" value={form.prize} onChange={(e) => set({ prize: e.target.value })}
               className="input-field" placeholder={t('mixwizard.prize_placeholder')} />
           </div>
+          {form.format === 'americano' && <p className="text-sm text-muted mt-1.5">{t('mixwizard.prize_hint_americano')}</p>}
           <label className="flex items-center gap-3 cursor-pointer mt-3">
             <input type="checkbox" checked={form.has_voucher} onChange={(e) => set({ has_voucher: e.target.checked })} className="w-5 h-5" />
             <span className="text-sm text-ink-900">{t('gerirclube.has_voucher_label')}</span>

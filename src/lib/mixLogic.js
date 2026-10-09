@@ -843,8 +843,10 @@ export function generateAmericanoSchedule(players, numCourts, numRounds, pointsB
 /** Americano's individual ranking: each player's points are the sum of
     the score their side got in every match they took part in (across
     whichever different teams row they were on each round) — not the
-    team's win/loss. wins is a secondary sort key (breaks a points tie),
-    never the primary one — see the design spec's "Ranking" decision.
+    team's win/loss. A points tie breaks on the points DIFFERENCE (scored
+    minus conceded) — Francisco, 8 out (design-handoff/2026-10-08-americano-
+    voucher): the same rule the voucher and «ganhou o mix» use, so the screen
+    never shows a different 1st place. wins is kept for display.
     `teams` must have embedded player1/player2 profile objects (same
     shape GameDetails.jsx's `teams` state already carries). */
 export function americanoStandings(matches, teams) {
@@ -852,7 +854,7 @@ export function americanoStandings(matches, teams) {
   const table = {}
   const rowFor = (player) => {
     if (!player) return null
-    if (!table[player.id]) table[player.id] = { player, points: 0, wins: 0, played: 0 }
+    if (!table[player.id]) table[player.id] = { player, points: 0, diff: 0, wins: 0, played: 0 }
     return table[player.id]
   }
 
@@ -866,6 +868,7 @@ export function americanoStandings(matches, teams) {
       if (!row) continue
       row.played += 1
       row.points += m.score_a ?? 0
+      row.diff += (m.score_a ?? 0) - (m.score_b ?? 0)
       if (m.winner_team_id === teamA.id) row.wins += 1
     }
     for (const player of [teamB.player1, teamB.player2]) {
@@ -873,11 +876,12 @@ export function americanoStandings(matches, teams) {
       if (!row) continue
       row.played += 1
       row.points += m.score_b ?? 0
+      row.diff += (m.score_b ?? 0) - (m.score_a ?? 0)
       if (m.winner_team_id === teamB.id) row.wins += 1
     }
   }
 
-  return Object.values(table).sort((x, y) => y.points - x.points || y.wins - x.wins)
+  return Object.values(table).sort((x, y) => y.points - x.points || y.diff - x.diff)
 }
 
 export const PHASE_LABEL_KEY = {
