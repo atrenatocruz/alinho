@@ -1180,6 +1180,8 @@
   "gamedetails.americano_points_other": "{{count}} pontos",
   "gamedetails.americano_voucher_one": "🎁 Ganhou o voucher",
   "gamedetails.americano_voucher_many": "🎁 Ganharam o voucher",
+  "gamedetails.americano_voucher_one_named": "🎁 Ganhou o voucher: {{names}}",
+  "gamedetails.americano_voucher_many_named": "🎁 Ganharam o voucher: {{names}}",
   "gamedetails.americano_voucher_no_account": "Sem voucher: não tem conta na app.",
   "gamedetails.tab_stats": "Estatísticas",
   "gamedetails.tab_duplas": "Duplas",

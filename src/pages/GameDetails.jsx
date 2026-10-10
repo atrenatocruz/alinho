@@ -3203,7 +3203,12 @@ export default function GameDetails() {
                 : t('gamedetails.americano_first', { count: americanoStandingsResult.length, points: top.points })}
             </p>
             {game.has_voucher && (withAccount.length > 0 ? (
-              <p className="mt-1.5 text-sm font-extrabold text-white">{t(withAccount.length > 1 ? 'gamedetails.americano_voucher_many' : 'gamedetails.americano_voucher_one')}</p>
+              <p className="mt-1.5 text-sm font-extrabold text-white">
+                {firsts.length > 1
+                  // Com empate, diz-se quem o ganhou: só quem tem conta o recebe.
+                  ? t(withAccount.length > 1 ? 'gamedetails.americano_voucher_many_named' : 'gamedetails.americano_voucher_one_named', { names: new Intl.ListFormat(i18n.language === 'en' ? 'en' : 'pt-PT', { type: 'conjunction' }).format(withAccount.map((r) => firstLastName(r.player.name))) })
+                  : t('gamedetails.americano_voucher_one')}
+              </p>
             ) : (
               <p className="mt-1.5 text-sm text-ink-200">{t('gamedetails.americano_voucher_no_account')}</p>
             ))}
@@ -3308,7 +3313,9 @@ export default function GameDetails() {
         // rating_delta/rating_after only exist from the Elo rollout
         // (2026-08-25) onward — older finished mixes fall back to the
         // legacy points_earned they were actually finalized with.
-        const statsPlayerRow = ({ id, name, avatarUrl, isGuest, won }) => {
+        // `points`: no americano, os pontos do mix (os mesmos do cartão do
+        // vencedor), em vez do points_earned da tabela (QA, 10 out: 24 em vez de 48).
+        const statsPlayerRow = ({ id, name, avatarUrl, isGuest, won, points = null }) => {
           const s = statsByUser[id]
           const hasRating = s?.rating_delta != null
           const nameBlock = (
@@ -3355,7 +3362,7 @@ export default function GameDetails() {
                       )}
                     </p>
                   ) : (
-                    <p className="text-lg font-extrabold text-ink-900 tabular-nums">{s.points_earned}</p>
+                    <p className="text-lg font-extrabold text-ink-900 tabular-nums">{points ?? s.points_earned}</p>
                   )}
                   <p className="text-[11px] text-muted">
                     {hasRating ? t('gamedetails.rating_label') : t('gamedetails.points_label')}
@@ -3426,6 +3433,7 @@ export default function GameDetails() {
                           avatarUrl: personById[r.player.id]?.avatar_url,
                           isGuest: !!isGuestById[r.player.id],
                           won: americanoFirstIds.has(r.player.id),
+                          points: r.points,
                         }) : (
                           <div className="flex items-center gap-2.5 min-w-0">
                             <Avatar name={r.player.name} url={null} size="w-10 h-10 text-sm" />
@@ -3929,9 +3937,10 @@ export default function GameDetails() {
                     <div className="card">
                       <h3 className="text-lg text-ink-900 mb-3">{t('gamedetails.americano_ranking_title')}</h3>
                       <div className="space-y-1.5">
-                        {americanoStandingsResult.map((s, i) => (
+                        {americanoStandingsResult.map((s, i, all) => (
                           <div key={s.player.id} className="flex items-center gap-3 text-sm py-1.5 border-b border-line last:border-0">
-                            <span className="w-6 font-extrabold text-ink-900 tabular-nums">{i + 1}</span>
+                            {/* Os empatados (pontos e diferença) partilham o lugar, como nas Estatísticas (QA, 10 out). */}
+                            <span className="w-6 font-extrabold text-ink-900 tabular-nums">{all.findIndex((x) => x.points === s.points && x.diff === s.diff) + 1}</span>
                             <span className="flex-1 font-extrabold text-ink-900 truncate">{s.player.name}</span>
                             <span className="text-muted tabular-nums" title={t('gamedetails.wins_title')}>{s.wins}{t('gamedetails.wins_abbrev')}</span>
                             <span className="text-muted tabular-nums w-12 text-right">{s.points} {t('gamedetails.points_suffix')}</span>
