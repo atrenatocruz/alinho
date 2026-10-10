@@ -3752,6 +3752,7 @@
   "mixwizard.launch_past": "That day and time have already passed. Pick another day, or «Now».",
   "mixwizard.notice_scheduled": "Mix saved. {{when}}.",
   "mixwizard.hours_not_saved": "Mix saved, but the WhatsApp times weren't saved. Open the mix and try again.",
+  "mixwizard.special_price_not_saved": "Mix saved, but the special price was not. Open the mix and try again.",
   "mixwizard.opens_now_hint": "Sign-ups open when you publish.",
   "mixwizard.ends_label": "Ends",
   "mixwizard.ends_never": "Never",

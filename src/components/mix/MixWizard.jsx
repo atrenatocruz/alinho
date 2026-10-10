@@ -27,6 +27,8 @@ import { formatDate, formatTime } from '../../lib/formatDate'
 import { LEVEL_SCALES, LEVEL_NUMBERS, parseLevel, scaleForGender, GENDER_FOR_SCALE } from '../../lib/mixLevels'
 import WhatsappHoursField from '../WhatsappHoursField'
 import { getEventWhatsappPostTimes } from '../../lib/whatsappHours'
+import SpecialPriceField, { specialPriceMissing } from '../SpecialPriceField'
+import { getEventSpecialPrice } from '../../lib/specialPrice'
 import PlacesUnavailableHint from '../PlacesUnavailableHint'
 
 const pairsAreFixed = (form) => form.format !== 'americano' && !(form.rotate_partners && form.format === 'sobe_desce')
@@ -59,6 +61,7 @@ function Field({ label, children, hint }) {
 export default function MixWizard({
   form, setForm, editingGame, options, mixScopeId, setMixScopeId, maxCourts, locationInputRef,
   launchDayError, clearLaunchDayError, error, onCancel, onSubmit, editExtras = null, organizationId = null, onDestroy = null, onUnpublish = null,
+  orgName = '', orgKind = 'club',
 }) {
   const { t, i18n } = useTranslation()
   const [step, setStep] = useState(1)
@@ -94,6 +97,7 @@ export default function MixWizard({
       if (rec.enabled && rec.endsType === 'on_date' && !rec.endsOn) return t('gerirclube.validate_end_date')
       if (rec.enabled && rec.endsType === 'after_occurrences' && !(parseInt(rec.endsAfterOccurrences, 10) >= 1)) return t('gerirclube.validate_occurrences_count')
     }
+    if (step === 4 && specialPriceMissing(t, form.special)) return specialPriceMissing(t, form.special)
     return null
   })()
 
@@ -116,6 +120,20 @@ export default function MixWizard({
       .catch((e) => console.error('Error loading WhatsApp hours:', e))
     return () => { cancelled = true }
   }, [editId]) // eslint-disable-line react-hooks/exhaustive-deps
+  // O preço especial (Dev 4, cf1c4a5f): ao editar, vem o que está gravado
+  // (do mix, ou herdado da série); não conta como alteração.
+  useEffect(() => {
+    if (!editId || form.special !== undefined) return undefined
+    let cancelled = false
+    getEventSpecialPrice('mix', editId)
+      .then((v) => {
+        if (cancelled) return
+        set({ special: v })
+        setInitialForm((prev) => JSON.stringify({ ...JSON.parse(prev), special: v }))
+      })
+      .catch((e) => console.error('Error loading special price:', e))
+    return () => { cancelled = true }
+  }, [editId]) // eslint-disable-line react-hooks/exhaustive-deps
   const missingAny = (() => {
     if (!form.title.trim()) return t('mixwizard.missing_title')
     if (!form.date) return t('mixwizard.missing_date')
@@ -124,6 +142,7 @@ export default function MixWizard({
     if (rec.enabled && !(parseInt(rec.launchDaysBefore, 10) >= 1)) return t('gerirclube.validate_launch_days_before')
     if (rec.enabled && rec.endsType === 'on_date' && !rec.endsOn) return t('gerirclube.validate_end_date')
     if (rec.enabled && rec.endsType === 'after_occurrences' && !(parseInt(rec.endsAfterOccurrences, 10) >= 1)) return t('gerirclube.validate_occurrences_count')
+    if (specialPriceMissing(t, form.special)) return specialPriceMissing(t, form.special)
     return null
   })()
 
@@ -558,6 +577,10 @@ export default function MixWizard({
             <span className="text-sm text-ink-900">{t('gerirclube.has_voucher_label')}</span>
           </label>
         </Field>
+        {/* Preço especial (design-handoff/2026-10-07-preco-especial): por baixo
+            do «Preço e prémio»; só aparece com um preço normal. */}
+        <SpecialPriceField value={form.special || null} onChange={(v) => set({ special: v })} normalPrice={form.price_per_player}
+          orgId={editingGame?.organization_id || organizationId} orgName={orgName} orgKind={orgKind} />
         {/* Lembretes no WhatsApp dentro do evento (design-handoff/
             2026-09-27-whatsapp-no-evento): no último passo, por cima do botão
             final. Sempre kind="mix" — é daí que vêm os textos e as horas do

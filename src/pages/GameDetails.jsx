@@ -3239,7 +3239,7 @@ export default function GameDetails() {
               <p className="mt-1.5 text-sm font-extrabold text-white">
                 {firsts.length > 1
                   // Com empate, diz-se quem o ganhou: só quem tem conta o recebe.
-                  ? t(withAccount.length > 1 ? 'gamedetails.americano_voucher_many_named' : 'gamedetails.americano_voucher_one_named', { names: new Intl.ListFormat(i18n.language === 'en' ? 'en' : 'pt-PT', { type: 'conjunction' }).format(withAccount.map((r) => firstLastName(r.player.name))) })
+                  ? t(withAccount.length > 1 ? 'gamedetails.americano_voucher_many_named' : 'gamedetails.americano_voucher_one_named', { names: new Intl.ListFormat(i18n.language === 'en' ? 'en' : 'pt-PT', { type: 'conjunction' }).format(withAccount.map((r) => r.player.name)) })
                   : t('gamedetails.americano_voucher_one')}
               </p>
             ) : (

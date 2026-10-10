@@ -3753,6 +3753,7 @@
   "mixwizard.launch_past": "Esse dia e hora já passaram. Escolhe outro dia, ou «Já».",
   "mixwizard.notice_scheduled": "Mix guardado. {{when}}.",
   "mixwizard.hours_not_saved": "Mix guardado, mas as horas do WhatsApp não ficaram gravadas. Abre o mix e tenta outra vez.",
+  "mixwizard.special_price_not_saved": "Mix guardado, mas o preço especial não ficou gravado. Abre o mix e tenta outra vez.",
   "mixwizard.opens_now_hint": "Abre as inscrições ao publicar.",
   "mixwizard.ends_label": "Acaba",
   "mixwizard.ends_never": "Nunca",

@@ -43,6 +43,8 @@ import OpenDayCard from '../components/gerir/OpenDayCard'
 import LaunchDayPicker from '../components/LaunchDayPicker'
 import MixWizard from '../components/mix/MixWizard'
 import MixImageField from '../components/mix/MixImageField'
+import SpecialPriceField, { specialPriceMissing } from '../components/SpecialPriceField'
+import { saveEventSpecialPrice } from '../lib/specialPrice'
 import { useOrgNameTaken, OrgNameTakenHint } from '../components/OrgNameTaken'
 import PlacesUnavailableHint from '../components/PlacesUnavailableHint'
 import { LEVEL_SCALES, LEVEL_NUMBERS, parseLevel } from '../lib/mixLevels'
@@ -167,6 +169,9 @@ const EMPTY_GAME_FORM = {
   // A imagem opcional (SPEC-3, 9 out): só vai à base de dados quando há uma
   // (ou quando se tira) — antes da migration_mix_imagem.sql a coluna não existe.
   image_url: null,
+  // Preço especial (Dev 4): grava-se à parte, depois do mix existir. Ao
+  // editar fica undefined até o MixWizard o ir buscar.
+  special: null,
   num_courts: 1,
   court_time_minutes: 90,
   game_time_minutes: 20,
@@ -1233,6 +1238,26 @@ export default function GerirClube() {
   // numa série, a regra da série — que também muda as datas já criadas por
   // começar. null = o campo não apareceu (sem grupos): não se grava nada.
   // Devolve o aviso para a tira, ou null.
+  // O preço especial do mix (Dev 4, cf1c4a5f): depois do mix existir. Numa
+  // série vai também para a série, para as datas seguintes o herdarem.
+  // Sem preço normal, não há preço especial. `undefined` = não mexer (ao
+  // editar, antes de se saber o que estava gravado).
+  const saveMixSpecialPrice = async (gameId, isSeries, value, normalPrice) => {
+    if (value === undefined) return null
+    const v = Number(String(normalPrice ?? '').replace(',', '.')) > 0 ? value : null
+    try {
+      await saveEventSpecialPrice('mix', gameId, v)
+      if (isSeries) {
+        const { data: row } = await supabase.from('games').select('recurrence_id').eq('id', gameId).maybeSingle()
+        if (row?.recurrence_id) await saveEventSpecialPrice('mix_series', row.recurrence_id, v)
+      }
+      return null
+    } catch (err) {
+      console.error('Error saving special price:', err)
+      return t('mixwizard.special_price_not_saved')
+    }
+  }
+
   const saveMixPostTimes = async (gameId, isSeries, times) => {
     if (times == null) return null
     try {
@@ -1355,7 +1380,7 @@ export default function GerirClube() {
     // pairing_mode sai pelo mesmo motivo: só é enviado quando não é o valor
     // por omissão, para criar/editar mixes não rebentar antes de
     // migration_mix_pairing_mode.sql correr.
-    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, seed_reverse: _seedReverse, ranked: _ranked, allow_pair_signup: _allowPairSignup, join_approval: _joinApproval, launch, whatsapp_post_times: postTimes, tiebreak_8_8: tieBreak88, image_url: imageUrl, ...gameFields } = gameForm
+    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, seed_reverse: _seedReverse, ranked: _ranked, allow_pair_signup: _allowPairSignup, join_approval: _joinApproval, launch, whatsapp_post_times: postTimes, tiebreak_8_8: tieBreak88, image_url: imageUrl, special, ...gameFields } = gameForm
 
     const recurrenceError = validateRecurrence(recurrence)
     if (recurrenceError) {
@@ -1449,7 +1474,8 @@ export default function GerirClube() {
       // As horas do WhatsApp deste mix (e da série, que as passa às datas
       // seguintes). O mix já está criado: se isto falhar, fica com as horas
       // do clube, como antes, e diz-se na tira.
-      const hoursWarning = await saveMixPostTimes(data[0].id, recurrence.enabled, postTimes)
+      const hoursWarning = (await saveMixPostTimes(data[0].id, recurrence.enabled, postTimes))
+        || (await saveMixSpecialPrice(data[0].id, recurrence.enabled, special, gameForm.price_per_player))
 
       const scopedGroup = mixScopeId ? clubGroups.find((g) => g.id === mixScopeId) : null
       saidaNotice.current = hoursWarning || asDraft ? (hoursWarning || t('mixwizard.notice_draft'))
@@ -1621,7 +1647,7 @@ export default function GerirClube() {
     // pairing_mode sai pelo mesmo motivo: só é enviado quando não é o valor
     // por omissão, para criar/editar mixes não rebentar antes de
     // migration_mix_pairing_mode.sql correr.
-    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, seed_reverse: _seedReverse, ranked: _ranked, allow_pair_signup: _allowPairSignup, join_approval: _joinApproval, launch: _launch, whatsapp_post_times: postTimes, tiebreak_8_8: tieBreak88, image_url: imageUrl, ...gameFields } = gameForm
+    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, seed_reverse: _seedReverse, ranked: _ranked, allow_pair_signup: _allowPairSignup, join_approval: _joinApproval, launch: _launch, whatsapp_post_times: postTimes, tiebreak_8_8: tieBreak88, image_url: imageUrl, special, ...gameFields } = gameForm
     // Any mix in an active recurring series shares the same underlying
     // game_recurrences row (via recurrence_id) — not just the origin — so
     // recurrence management works from any of them, not only the one that
@@ -1713,7 +1739,8 @@ export default function GerirClube() {
       }
 
       // As horas do WhatsApp: numa série ativa, da série inteira.
-      const hoursWarning = await saveMixPostTimes(editingGame.id, recurrence.enabled, postTimes)
+      const hoursWarning = (await saveMixPostTimes(editingGame.id, recurrence.enabled, postTimes))
+        || (await saveMixSpecialPrice(editingGame.id, hadActiveRecurrence && recurrence.enabled, special, gameForm.price_per_player))
       if (hoursWarning) saidaNotice.current = hoursWarning
       if (!saidaNotice.current) saidaNotice.current = t('mixwizard.notice_saved')
       setEditingGame(null)
@@ -2561,6 +2588,8 @@ export default function GerirClube() {
             }}
             editExtras={extras}
             organizationId={mixScopeId || currentOrganizationId}
+            orgName={(mixScopeId && clubGroups.find((g) => g.id === mixScopeId)?.name) || org?.name || ''}
+            orgKind={mixScopeId ? 'group' : (org?.kind || 'club')}
             // «Cancelar o mix» / «Eliminar o mix» no Editar (30 set): o mesmo
             // cancelMixDate do «Mais ⋯» da página do mix.
             onDestroy={editingGame ? async () => {
@@ -2887,6 +2916,12 @@ export default function GerirClube() {
                         <p className="text-[11px] text-muted mt-1">{t('gerirclube.has_voucher_hint')}</p>
                       )}
                     </div>
+
+                    <SpecialPriceField value={gameForm.special || null} onChange={(v) => setGameForm((f) => ({ ...f, special: v }))}
+                      normalPrice={gameForm.price_per_player} orgId={editingGame?.organization_id || mixScopeId || currentOrganizationId}
+                      orgName={(mixScopeId && clubGroups.find((g) => g.id === mixScopeId)?.name) || org?.name || ''}
+                      orgKind={mixScopeId ? 'group' : (org?.kind || 'club')} />
+                    {specialPriceMissing(t, gameForm.special) && <p className="text-sm text-danger">{specialPriceMissing(t, gameForm.special)}</p>}
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
