@@ -20,7 +20,7 @@ import { whatsappShare } from '../lib/partnerInvite'
 import { ArrowLeft, Eye, Trophy } from 'lucide-react'
 import { useGoBack } from '../lib/useGoBack'
 import { useAuth } from '../contexts/AuthContext'
-import { getTournamentForEdit, getTournamentOrgHint, getTournamentPage, scheduleTournamentOpening, updateTournament } from '../lib/tournamentApi'
+import { getTournamentForEdit, getTournamentOrgHint, getTournamentPage, scheduleTournamentOpening, setTournamentStatus, updateTournament } from '../lib/tournamentApi'
 import GroupOnlyNotice from '../components/GroupOnlyNotice'
 import { setEventWhatsappPostTimes } from '../lib/whatsappHours'
 import { describeError, errorKind } from '../lib/errors'
@@ -304,6 +304,13 @@ export default function TournamentPage() {
             closeAdmin()
             window.dispatchEvent(new CustomEvent('tournament:reload'))
           }, { everEntered: !!editing.has_entries }) : null}
+          // «Voltar a rascunho» (Francisco, 10 out): o formulário só o deixa
+          // carregar sem inscrições.
+          unpublish={async () => {
+            await setTournamentStatus(tour.id, 'rascunho')
+            closeAdmin()
+            window.dispatchEvent(new Event('tournament:reload'))
+          }}
           saving={savingEdit}
           error={adminError}
           onCancel={closeAdmin}

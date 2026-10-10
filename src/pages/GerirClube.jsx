@@ -31,7 +31,7 @@ import { isValidVoucherId, normalizeScannedVoucherId } from '../lib/vouchers'
 import { ClubTeachers } from '../components/lessons/ClubLessonsPanel'
 import { SeriesManage } from '../components/lessons/ClubSeriesPanel'
 import { lessonTypeLabel, seriesWhen } from '../components/lessons/LessonBits'
-import { listClubTournaments } from '../lib/tournamentApi'
+import { listClubTournaments, setTournamentStatus } from '../lib/tournamentApi'
 import { lessonsAvailable, listClubSeries, listSeriesPastLessons } from '../lib/lessonsApi'
 import { KIND_STYLE } from '../components/agenda/EventCard'
 import { tournamentsAvailable } from '../lib/tournamentApi'
@@ -39,6 +39,7 @@ import { describeError, errorKind } from '../lib/errors'
 import { isDraftMix, advanceByFrequency, pendingOccurrenceRow } from '../lib/mixDraft'
 import PublishDraftSheet from '../components/mix/PublishDraftSheet'
 import { PastByMonth, PastSection, SectionLabel } from '../components/gerir/PastEvents'
+import OpenDayCard from '../components/gerir/OpenDayCard'
 import LaunchDayPicker from '../components/LaunchDayPicker'
 import MixWizard from '../components/mix/MixWizard'
 import MixImageField from '../components/mix/MixImageField'
@@ -398,6 +399,7 @@ export default function GerirClube() {
   const [groupsError, setGroupsError] = useState('')
   const [inviteError, setInviteError] = useState('')
   const [cancelOpenAsk, setCancelOpenAsk] = useState(null) // o jogo em aberto a cancelar
+  const [publishTourError, setPublishTourError] = useState('') // «Publicar» de um torneio em rascunho
   const [createdGroupName, setCreatedGroupName] = useState(null)
   const [clubGroups, setClubGroups] = useState([])
   const [groupsLoading, setGroupsLoading] = useState(false)
@@ -430,6 +432,7 @@ export default function GerirClube() {
      quando acontece (o mais proximo primeiro); o que ja passou, ao
      contrario, do mais recente para tras. Os paineis continuam donos de
      criar e gerir -- aqui so se juntam as listas. */
+  const diaLocal = (iso) => { const d = new Date(iso); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}` }
   const eventosPorData = () => {
     const itens = []
     for (const entry of groupGamesBySeries(games)) {
@@ -438,11 +441,24 @@ export default function GerirClube() {
         terminado: DONE_STATUSES.includes(entry.game.status),
       })
     }
+    // Jogo em aberto (SPEC 2026-10-07, ponto 1): os horários do mesmo dia
+    // e da mesma publicação juntam-se num cartão só, com uma pastilha por
+    // hora. Os que já acabaram seguem um a um (vão para «Já passaram»).
+    const dias = new Map()
     for (const jogo of openGames) {
-      itens.push({
-        tipo: 'aberto', chave: `aberto-${jogo.id}`, quando: jogo.date, row: jogo,
-        terminado: DONE_STATUSES.includes(jogo.status),
-      })
+      if (DONE_STATUSES.includes(jogo.status)) {
+        itens.push({ tipo: 'aberto', chave: `aberto-${jogo.id}`, quando: jogo.date, row: jogo, terminado: true })
+        continue
+      }
+      const chave = `aberto-${diaLocal(jogo.date)}-${jogo.open_batch_id || jogo.id}`
+      if (!dias.has(chave)) dias.set(chave, { tipo: 'aberto', chave, quando: jogo.date, row: jogo, jogos: [], terminado: false })
+      dias.get(chave).jogos.push(jogo)
+    }
+    for (const dia of dias.values()) {
+      dia.jogos.sort((a, b) => new Date(a.date) - new Date(b.date))
+      dia.quando = dia.jogos[0].date
+      dia.row = dia.jogos[0]
+      itens.push(dia)
     }
     for (const torneio of tournaments) {
       // Um torneio tem dias, nao uma hora: o meio-dia evita que o fuso o
@@ -504,11 +520,23 @@ export default function GerirClube() {
         jogadores: acabou ? pessoas(g) : null, estado: acabou ? 'finished' : 'cancelled', abrir: acabou ? () => navigate(`/jogo/${g.id}`) : null })
     }
     if (!serie) {
+      // Jogo em aberto: também um por dia (SPEC 2026-10-07, ponto 1). Abre o
+      // primeiro horário que se jogou; com todos cancelados, «Cancelado».
+      const dias = new Map()
       for (const jogo of openGames) {
         if (!DONE_STATUSES.includes(jogo.status)) continue
-        const acabou = jogo.status !== 'cancelled'
-        itens.push({ tipo: 'aberto', chave: `aberto-${jogo.id}`, quando: jogo.date, nome: jogo.title || t('gerirclube.event_label_open'), quandoLinha: quandoHora(jogo.date),
-          jogadores: acabou ? pessoas(jogo) : null, estado: acabou ? 'finished' : 'cancelled', abrir: acabou ? () => navigate(`/jogo/${jogo.id}`) : null })
+        const chave = `aberto-${diaLocal(jogo.date)}-${jogo.open_batch_id || jogo.id}`
+        if (!dias.has(chave)) dias.set(chave, [])
+        dias.get(chave).push(jogo)
+      }
+      for (const [chave, jogos] of dias) {
+        jogos.sort((a, b) => new Date(a.date) - new Date(b.date))
+        const jogados = jogos.filter((j) => j.status !== 'cancelled')
+        const semana = quandoHora(jogos[0].date).split(' · ')[0]
+        const linha = jogos.length > 1 ? `${semana} · ${t('openday.slots', { count: jogos.length })}` : quandoHora(jogos[0].date)
+        itens.push({ tipo: 'aberto', chave, quando: jogos[0].date, nome: t('gerirclube.event_label_open'), quandoLinha: linha,
+          jogadores: jogados.length ? jogados.reduce((n, j) => n + pessoas(j), 0) : null,
+          estado: jogados.length ? 'finished' : 'cancelled', abrir: jogados.length ? () => navigate(`/jogo/${jogados[0].id}`) : null })
       }
       for (const torneio of tournaments) {
         const cancelado = torneio.status === 'cancelado'
@@ -914,6 +942,22 @@ export default function GerirClube() {
   // Pergunta na folha da app; o erro fica na folha (lança), o sucesso vai
   // para a tira de 3 s.
   const handleCancelOpenGame = (gameId) => setCancelOpenAsk(openGames.find((g) => g.id === gameId) || { id: gameId })
+  // Torneio em rascunho no Gerir (Francisco, 10 out: «porque não está igual
+  // aos mixes em modo draft?»): «Publicar» é o «Abrir inscrições» da página
+  // do torneio — o mesmo set_tournament_status, sem pergunta, como lá.
+  const publishTournament = async (row) => {
+    setPublishTourError('')
+    try {
+      await setTournamentStatus(row.id, 'inscricoes')
+      setDoneNotice(t('gerirclube.tournament_published', { name: row.name }))
+      loadTournaments()
+    } catch (err) {
+      setPublishTourError(String(err?.message || '').includes('deadline_passed')
+        ? t('tournament.admin.error_deadline_passed')
+        : describeError(t, err))
+    }
+  }
+
   const cancelOpenGameNow = async (gameId) => {
     const { error } = await supabase.from('games').update({ status: 'cancelled' }).eq('id', gameId)
     if (error) {
@@ -3421,12 +3465,20 @@ export default function GerirClube() {
               <div className="space-y-3">
                 {/* «A SEGUIR · N», à vista (sai o «Ver o que vem aí»). */}
                 <SectionLabel count={eventosPorData().length}>{t('pastevents.upcoming')}</SectionLabel>
+                {publishTourError && <p role="alert" className="rounded-ctrl bg-danger/10 p-3.5 text-sm font-extrabold text-danger">{publishTourError}</p>}
                 {eventosPorData().length === 0 && (
                   <p className="text-sm text-muted text-center py-6">
                     {t(gameFilter === 'finished' ? 'gerirclube.no_past_events' : 'gerirclube.no_upcoming_events')}
                   </p>
                 )}
                 {eventosPorData().map(item => {
+                  if (item.tipo === 'aberto' && item.jogos) {
+                    return (
+                      <OpenDayCard key={item.chave} titulo={quandoCurto(item.quando, false)} jogos={item.jogos}
+                        onOpen={(g) => navigate(`/jogo/${g.id}`)}
+                        onEdit={item.row.open_batch_id ? () => navigate(`/gerir/${org.slug}/editar/em-aberto/${item.row.open_batch_id}`) : null} />
+                    )
+                  }
                   // Jogos em aberto e torneios: cartao simples, com a
                   // etiqueta do tipo. O mix continua com o cartao completo
                   // que ja tinha, logo a seguir.
@@ -3477,6 +3529,14 @@ export default function GerirClube() {
                     if (tipo === 'torneio' && row.status !== 'terminado' && row.status !== 'cancelado') {
                       acao = { texto: t('gerirclube.edit_action'), fazer: () => navigate(`/torneio/${row.slug || row.id}?admin=editar`), perigo: false }
                     }
+                    // Rascunho (Francisco, 10 out): igual ao mix em rascunho —
+                    // tracejado, «Torneio · Rascunho», «só tu vês», «Editar» e
+                    // «Publicar». O «Privado» não diz nada enquanto só tu vês.
+                    if (tipo === 'torneio' && row.status === 'rascunho') {
+                      sufixo = t('mixdraft.draft')
+                      detalhe = [item.quando ? quandoCurto(item.quando, false) : null, t('mixdraft.only_you')].filter(Boolean).join(' · ')
+                      acao = { ...acao, publicar: () => publishTournament(row) }
+                    }
                     // Cancelado (1 out): como o mix cancelado — cinzento, «Cancelado»,
                     // não abre.
                     if (tipo === 'torneio' && row.status === 'cancelado') {
@@ -3490,13 +3550,16 @@ export default function GerirClube() {
                     }
                     // Torneio privado (Trello #482): não aparece na Home nem na
                     // Comunidade, e o link só abre a quem gere. Tem de se ler aqui.
-                    privado = tipo === 'torneio' && row.is_public === false
+                    privado = tipo === 'torneio' && row.is_public === false && row.status !== 'rascunho'
                     // «Por terminar» (UX, 9 out): o dia já acabou e ainda não foi
                     // dado como terminado. Fica no topo de «A seguir» (a data é a
                     // mais antiga), abre e mantém o «Editar».
                     const ultimoDia = tipo === 'torneio' ? (row.ends_on || row.starts_on) : (row.date ? String(row.date).slice(0, 10) : null)
                     porTerminar = (tipo === 'torneio' || (tipo === 'mix' && !isDraftMix(row))) && !item.terminado
                       && !!ultimoDia && new Date(`${ultimoDia.slice(0, 10)}T23:59`) < new Date()
+                    // Um estado por cartão (UX, 9 out): com «Por terminar», a
+                    // linha deixa de dizer «A decorrer».
+                    if (porTerminar && aDecorrer) detalhe = detalhe.replace(` · ${aDecorrer}`, '')
                     if (tipo === 'mix') {
                       // «MIX · RECORRENTE», colado a etiqueta como na pagina do
                       // evento e na Home (#383) -- nunca numa etiqueta a parte.
@@ -3535,7 +3598,7 @@ export default function GerirClube() {
                   // etiqueta branca com o texto na cor.
                   const cor = KIND_STYLE[{ mix: 'mix', aberto: 'open', torneio: 'tournament', turma: 'lesson' }[tipo]]
                   // O rascunho fica sem cor e a tracejado até ser publicado.
-                  const rascunho = tipo === 'mix' && isDraftMix(row)
+                  const rascunho = (tipo === 'mix' && isDraftMix(row)) || (tipo === 'torneio' && row.status === 'rascunho')
                   return (
                     <div key={item.chave} className={`flex ${rascunho ? 'flex-col' : 'items-stretch'} rounded-ctrl border transition-[filter] duration-fast ${abrir ? 'hover:brightness-[0.98]' : ''} ${
                       rascunho ? 'bg-white border-2 border-dashed border-ink-200' : cinzento ? 'bg-surface border-line' : cor.card

@@ -192,7 +192,7 @@ function Locked({ title, reason, children }) {
   )
 }
 
-export default function CreateTournamentForm({ club, initial = null, locked = false, onCancel, onCreate, saving, error, danger = null }) {
+export default function CreateTournamentForm({ club, initial = null, locked = false, onCancel, onCreate, saving, error, danger = null, unpublish = null }) {
   const { t, i18n } = useTranslation()
   const [step, setStep] = useState(1)
   const [addingDay, setAddingDay] = useState(false)
@@ -449,10 +449,31 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
       edit={editing_existing ? {
         onSave: save, onCancel, dirty: JSON.stringify(draft) !== initialDraft || openingChanged,
         saving, saveDisabled: !!anyProblem, saveHint: anyProblem ? t(`tournament.create.problem_${anyProblem}`) : null,
+        // «Voltar a rascunho», como no mix (Francisco, 10 out) — mas só sem
+        // inscrições; com elas fica apagado e diz porquê.
+        extra: unpublish && ['inscricoes', 'fechado'].includes(initial?.tournament?.status) ? {
+          label: t('eventactions.to_draft'),
+          // Sem inscrições ninguém sai prejudicado: a pergunta é a preto.
+          danger: false,
+          disabled: !!initial?.has_entries,
+          hint: t('tournament.edit.to_draft_has_entries'),
+          title: t('eventactions.to_draft_title'),
+          message: t('tournament.edit.to_draft_message'),
+          confirmLabel: t('eventactions.to_draft_confirm'), cancelLabel: t('tournament.edit.to_draft_keep'),
+          onConfirm: unpublish,
+          // A base de dados também recusa com inscrições (Dev 3, has_entries).
+          errorOf: (err) => (String(err?.message || '').includes('has_entries') ? t('tournament.edit.to_draft_has_entries') : describeError(t, err)),
+        } : null,
         // «Cancelar o torneio» / apagar, a mesma pergunta do «Mais ⋯» (1 out).
         danger,
       } : null}
     >
+      {/* Em rascunho, o Editar diz que ninguém o vê (Francisco, 10 out). */}
+      {editing_existing && initial?.tournament?.status === 'rascunho' && (
+        <p className="rounded-ctrl border-2 border-dashed border-ink-200 bg-white px-3 py-2.5 text-sm text-ink-700">
+          <b className="font-extrabold text-ink-900">{t('mixdraft.draft')}</b> · {t('tournament.edit.draft_notice')}
+        </p>
+      )}
       {locked && <p className="text-xs text-ink-500">{t('tournament.create.edit_locked')}</p>}
 
       {/* Com inscrições feitas, só se mexe no que não as estraga — é a mesma

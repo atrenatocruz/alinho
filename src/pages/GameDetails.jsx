@@ -20,7 +20,7 @@ import PoolGroupStage from '../components/PoolGroupStage'
 import PreviousEditions from '../components/agenda/PreviousEditions'
 import ScoreEntry from '../components/ScoreEntry'
 import { countPeople, guestVirtualRating, totalRounds, formDuplas, seedCourts, nextSobeDesce, nextSobeDesceRotating, splitPartnerRows, rotatingPlacar, roundRobinRound, standings, eliminationPhases, firstElimMatches, nextElimMatches, thirdPlaceMatch, lowerPlacementMatches, placementOfCourt, PHASE_LABEL_KEY, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, mixCapacity, isGenderMismatch, isMissingGender, isMissingBirthday, isAgeIneligible, splitIntoPools, generateAmericanoSchedule, americanoStandings, computeMixWinnerTeamId, formatLabelKey, hasResult, isTie, sobeDesceStandings, shortPersonName } from '../lib/mixLogic'
-import { isProvisional, formatRatingMaybeProvisional } from '../lib/elo'
+import { isProvisional, formatRatingMaybeProvisional, peopleRatingBand } from '../lib/elo'
 import { AGE_LABEL_KEY, meetsAgeRestriction } from '../lib/ageCategories'
 import { winRatePct, firstLastName } from '../lib/statsLogic'
 import { getGlobalRankings } from '../lib/privateMatches'
@@ -39,6 +39,7 @@ import { whatsappLookalikeInGame, rememberWhatsappGuest, rememberedWhatsappGuest
 import { MonoLabel } from '../components/tournament/TournamentBits'
 import { listGameInvites, inviteLink, whatsappShare } from '../lib/partnerInvite'
 import MixAdminBar from '../components/mix/MixAdminBar'
+import { usePriceRoster, PriceRosterSummary, PriceRosterTag, useSpecialPriceLine } from '../components/SpecialPriceRoster'
 import ChangeOneMixSheet from '../components/mix/ChangeOneMixSheet'
 import EventActionsSheet from '../components/EventActionsSheet'
 import RoundAlarm from '../components/RoundAlarm'
@@ -50,6 +51,10 @@ import { loadRepeatPairKeys as loadRepeatPairKeysFor } from '../lib/repeatPairKe
 // Tipo do evento como na Home (src/lib/agenda.js): um jogo em aberto é
 // "open" (salmão), o resto é "mix" (azul) — Trello #409.
 const kindOf = (g) => (g?.origin === 'open_slot' ? 'open' : 'mix')
+// Jogo em aberto (SPEC design-handoff/2026-10-07-jogo-em-aberto-passo-a-passo,
+// aprovado a 9 out): na página, nada de palavras do mix — é um jogo de 4.
+const isOpenGame = (g) => kindOf(g) === 'open'
+const hhmm = (d, lang) => formatTime(d, lang, { hour: '2-digit', minute: '2-digit' })
 
 const SIDE_LABEL_KEY = { left: 'gamedetails.side_left', right: 'gamedetails.side_right', both: 'gamedetails.side_both' }
 
@@ -112,6 +117,9 @@ export default function GameDetails() {
   // necessarily this mix's club.
   const gameMembership = game ? memberships.find((m) => m.organization_id === game.organization_id) : null
   const isAdmin = gameMembership?.is_admin ?? false
+  // Preço especial (7 out): o preço de cada inscrito, só para quem organiza.
+  const specialPriceText = useSpecialPriceLine(game?.origin === 'open_slot' ? 'open_slot' : 'mix', game?.price_per_player > 0 ? game.id : null)
+  const priceRoster = usePriceRoster(isAdmin && game?.price_per_player > 0 ? (game.origin === 'open_slot' ? 'open_slot' : 'mix') : null, game?.id, game?.participants?.length)
   const [scorekeeperIds, setScorekeeperIds] = useState([])
   const [scorekeeperBusy, setScorekeeperBusy] = useState(null)
   const isScorekeeper = scorekeeperIds.includes(user.id)
@@ -636,6 +644,8 @@ export default function GameDetails() {
 
       if (error) throw error
       if (!awaitsApproval) celebrate()
+      // Jogo em aberto (ponto 4): continua com um toque, e diz que entrou.
+      if (isOpenGame(game)) setDoneNotice(t('openday.joined', { time: hhmm(game.date, i18n.language) }))
       loadGameDetails()
     } catch (error) {
       console.error('Error joining game:', error)
@@ -815,7 +825,14 @@ export default function GameDetails() {
 
   const handleLeaveGame = async () => {
     setLeaveError('')
-    const ok = await askConfirm({
+    const ok = await askConfirm(isOpenGame(game) ? {
+      // Jogo em aberto (ponto 6): sair a vermelho, sem a frase dos suplentes.
+      title: t('openday.leave_title'),
+      message: t('openday.leave_text'),
+      confirmLabel: t('openday.leave'),
+      cancelLabel: t('openday.leave_keep'),
+      danger: true,
+    } : {
       title: t('gamedetails.leave_ask_title'),
       message: t('gamedetails.leave_ask_text'),
       confirmLabel: t('gamedetails.leave_ask_confirm'),
@@ -3046,6 +3063,16 @@ export default function GameDetails() {
         )}
 
         <div className="mt-3 space-y-1.5 text-[13px] text-ink-700">
+          {isOpenGame(game) ? (
+            // Jogo em aberto (ponto 2): «1 campo · 4 jogadores · 19:00–20:30».
+            <p className="flex items-start gap-1.5">
+              <Swords size={15} className="shrink-0 mt-0.5" />
+              <span>
+                {[t('gamedetails.court_count', { count: numCourts }), t('openday.players', { count: capacity }),
+                  `${hhmm(game.date, i18n.language)}–${hhmm(new Date(new Date(game.date).getTime() + (game.court_time_minutes || 90) * 60000), i18n.language)}`].join(' · ')}
+              </span>
+            </p>
+          ) : (<>
           <p className="flex items-start gap-1.5">
             <Swords size={15} className="shrink-0 mt-0.5" />
             <span>
@@ -3059,10 +3086,11 @@ export default function GameDetails() {
             <p className="text-sm text-muted mt-1">
               {t(`mixlogic.format_help_${isRotating ? 'sobe_desce_rotate' : (game.format || 'sobe_desce')}`)}
             </p>
+          </>)}
           {game.price_per_player > 0 && (
             <p className="flex items-center gap-1.5">
               <Euro size={15} className="shrink-0" />
-              {t('gamedetails.price_per_player', { price: formatCurrency(game.price_per_player, i18n.language) })}
+              {specialPriceText || t('gamedetails.price_per_player', { price: formatCurrency(game.price_per_player, i18n.language) })}
             </p>
           )}
           {game.prize && (
@@ -3089,7 +3117,12 @@ export default function GameDetails() {
           />
           <span className="ml-auto"><GroupLevelBadge rating={heroAvgRating} genders={heroRated.map((p) => ratingInfoById[p.id]?.gender)} /></span>
         </div>
-        {game.status === 'open' && (
+        {isOpenGame(game) && ['open', 'closed'].includes(game.status) ? (
+          // Jogo em aberto (ponto 2): «Faltam 3 para fechar o jogo.»
+          <p className={`text-xs font-extrabold mt-2 ${KIND_STYLE.open.text}`}>
+            {peopleCount >= capacity ? t('openday.closed') : t('openday.missing', { count: capacity - peopleCount })}
+          </p>
+        ) : game.status === 'open' && (
           <p className="text-xs text-muted mt-2">
             🔒 {Math.floor(peopleCount / 4)}/{numCourts} {t('gamedetails.courts_locked_suffix')}
             {peopleCount < capacity && (
@@ -3128,7 +3161,7 @@ export default function GameDetails() {
       ) : !mixStarted && canJoin && !joinMode && !ageIneligible && !missingBirthday && !(isAdmin && barPrimary) ? (
         <div className="space-y-2">
           <PrimaryButton onClick={withGender(handleJoinAlone)} disabled={joining} className="w-full">
-            {joining ? t('gamedetails.joining') : t(awaitsApproval ? 'mixrequest.ask' : 'gamedetails.join_mix')}
+            {joining ? t('gamedetails.joining') : t(awaitsApproval ? 'mixrequest.ask' : isOpenGame(game) ? 'openday.join' : 'gamedetails.join_mix')}
           </PrimaryButton>
           {awaitsApproval && <p className="px-1 text-center text-xs text-muted">{t('mixrequest.ask_hint')}</p>}
           {/* Duplas fixas: entrar já com o parceiro combinado — tenha ele
@@ -3155,7 +3188,7 @@ export default function GameDetails() {
         // refazem-se as duplas primeiro.
         <div className="space-y-1.5">
           <PrimaryButton variant="ghost" onClick={handleLeaveGame} className="w-full !bg-white !border-ink-900">
-            {t('gamedetails.leave_mix')}
+            {t(isOpenGame(game) ? 'openday.leave' : 'gamedetails.leave_mix')}
           </PrimaryButton>
           {leaveError && <p role="alert" className="text-center text-sm font-extrabold text-danger">{leaveError}</p>}
         </div>
@@ -4200,6 +4233,12 @@ export default function GameDetails() {
           {/* Intervalo de pontos dos inscritos com nível (Ruben, 29 set):
               responde ao «que nível é que este mix tem?» sem abrir perfis. */}
           {(() => {
+            // Jogo em aberto (ponto 5): o nível do jogo explicado, sem os
+            // números do ranking.
+            if (isOpenGame(game)) {
+              const band = heroAvgRating != null ? peopleRatingBand(heroAvgRating, heroRated.map((p) => ratingInfoById[p.id]?.gender)) : null
+              return band ? <p className="text-xs text-muted mb-4">{t('openday.level', { level: band.label })}</p> : <div className="mb-3" />
+            }
             const rated = people.map((x) => ratingInfoById[x.id]?.rating).filter((v) => v != null)
             if (rated.length < 2) return <div className="mb-3" />
             const min = Math.round(Math.min(...rated))
@@ -4211,6 +4250,7 @@ export default function GameDetails() {
               </p>
             )
           })()}
+          <PriceRosterSummary roster={priceRoster} ids={people.map((x) => x.id)} normalPrice={game.price_per_player} className="-mt-2 mb-3" />
 
           {people.length === 0 ? (
             <p className="text-muted text-sm text-center py-4">
@@ -4288,6 +4328,7 @@ export default function GameDetails() {
                     )}
                     {/* Mix parado: mexer na lista partiria as duplas ja formadas (#416).
                         Cancelado (#464): a lista fica como estava, sem mexer. */}
+                    <PriceRosterTag roster={priceRoster} userId={person.id} normalPrice={game.price_per_player} />
                     {isAdmin && !mixPaused && game.status !== 'cancelled' && (
                       <button
                         onClick={() => handleRemovePerson(person)}
@@ -5002,8 +5043,11 @@ export default function GameDetails() {
             && { key: 'draft', label: t('eventactions.to_draft'), hint: t('eventactions.to_draft_hint'), onClick: () => setDraftAskOpen(true) },
           game.status === 'in_progress' && { key: 'restart', label: t('eventactions.restart'), hint: t('eventactions.restart_hint'), onClick: () => setRestartOpen(true) },
           // Sem ninguém inscrito o mix desaparece: chama-se «Eliminar o mix».
-          { key: 'cancel', danger: true, label: t(nobody ? 'eventactions.delete_mix' : 'eventactions.cancel_one'),
-            hint: t(nobody ? 'eventactions.delete_mix_hint' : isSeriesDate ? 'eventactions.cancel_one_hint_series' : 'eventactions.cancel_one_hint'), onClick: () => setCancelOpen(true) },
+          // Jogo em aberto (ponto 3): «Cancelar este jogo», só este horário.
+          isOpenGame(game)
+            ? { key: 'cancel', danger: true, label: t('openday.cancel'), hint: t('openday.cancel_hint'), onClick: () => setCancelOpen(true) }
+            : { key: 'cancel', danger: true, label: t(nobody ? 'eventactions.delete_mix' : 'eventactions.cancel_one'),
+              hint: t(nobody ? 'eventactions.delete_mix_hint' : isSeriesDate ? 'eventactions.cancel_one_hint_series' : 'eventactions.cancel_one_hint'), onClick: () => setCancelOpen(true) },
         ].filter(Boolean)
         const dateTitle = isSeriesDate ? `${game.title} · ${shortDay}` : game.title
         return (
@@ -5065,17 +5109,17 @@ export default function GameDetails() {
             <ConfirmSheet
               open={cancelOpen}
               danger
-              title={t('mixcancel.confirm_title', { name: dateTitle || '' })}
-              message={nobody
+              title={isOpenGame(game) ? t('openday.cancel_title') : t('mixcancel.confirm_title', { name: dateTitle || '' })}
+              message={isOpenGame(game) ? t('openday.cancel_hint') : nobody
                 ? t(isSeriesDate ? 'eventactions.cancel_nobody_series' : 'eventactions.cancel_nobody')
                 : t(isSeriesDate ? 'eventactions.cancel_one_hint_series' : 'eventactions.cancel_one_hint')}
-              cancelLabel={t('mixcancel.keep')}
-              confirmLabel={t('mixcancel.confirm')}
+              cancelLabel={isOpenGame(game) ? t('openday.cancel_keep') : t('mixcancel.keep')}
+              confirmLabel={isOpenGame(game) ? t('openday.cancel') : t('mixcancel.confirm')}
               onConfirm={async () => {
                 const { outcome } = await cancelMixDate(game)
                 if (outcome === 'cancel') { loadGameDetails(); return }
                 // Desapareceu: volta ao Gerir, com a tira a dizer o que aconteceu.
-                const notice = t('eventactions.cancel_done_removed', { name: dateTitle })
+                const notice = isOpenGame(game) ? t('openday.cancel_done', { time }) : t('eventactions.cancel_done_removed', { name: dateTitle })
                 if (orgSlug) navigate(`/gerir/${orgSlug}`, { replace: true, state: { notice } })
                 else navigate('/', { replace: true })
               }}

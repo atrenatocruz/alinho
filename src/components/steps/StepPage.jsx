@@ -36,7 +36,9 @@
 //               onConfirm, errorOf } — a pergunta é a folha da app.
 //               extra = { …o mesmo } — uma ação em contorno por cima do
 //               destrutivo (ex.: «Voltar a rascunho», Francisco 6 out), com a
-//               pergunta de vermelho cheio (danger).
+//               pergunta de vermelho cheio (danger). Com `disabled`, fica à
+//               vista e apagado, com `hint` (a razão) por baixo. `danger: false` pergunta
+//               a preto (quando ninguém sai prejudicado).
 //
 // Espaço da versão final (26 set): título → nome/barra 24 px, barra → 1.ª
 // pergunta 24 px, entre perguntas 24 px, rótulo → campo 8 px (o mb-2 do
@@ -141,10 +143,13 @@ export default function StepPage({
           {(edit.extra || edit.danger) && (
             <div className="space-y-2.5 pt-4">
               {edit.extra && (
-                <button type="button" onClick={() => setAskingExtra(true)}
-                  className="w-full min-h-[52px] rounded-ctrl border-[1.5px] border-line bg-white px-4 text-[15px] font-extrabold text-ink-900">
-                  {edit.extra.label}
-                </button>
+                <div className="space-y-1.5">
+                  <button type="button" onClick={() => setAskingExtra(true)} disabled={!!edit.extra.disabled}
+                    className="w-full min-h-[52px] rounded-ctrl border-[1.5px] border-line bg-white px-4 text-[15px] font-extrabold text-ink-900 disabled:opacity-40">
+                    {edit.extra.label}
+                  </button>
+                  {edit.extra.disabled && edit.extra.hint && <p className="text-center text-xs text-muted">{edit.extra.hint}</p>}
+                </div>
               )}
               {edit.danger && (
                 <button type="button" onClick={() => setAskingDanger(true)}
@@ -165,7 +170,7 @@ export default function StepPage({
       )}
 
       {edit?.extra && (
-        <ConfirmSheet open={askingExtra} danger title={edit.extra.title} message={edit.extra.message}
+        <ConfirmSheet open={askingExtra} danger={edit.extra.danger ?? true} title={edit.extra.title} message={edit.extra.message}
           cancelLabel={edit.extra.cancelLabel} confirmLabel={edit.extra.confirmLabel}
           onConfirm={edit.extra.onConfirm} onClose={() => setAskingExtra(false)} errorOf={edit.extra.errorOf} />
       )}

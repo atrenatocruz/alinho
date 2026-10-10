@@ -24,6 +24,8 @@ import { describeError } from '../lib/errors'
 import { PrimaryButton, DateField, TimeField } from '../components/ui'
 import StepPage from '../components/steps/StepPage'
 import WhatsappHoursField from '../components/WhatsappHoursField'
+import SpecialPriceField, { specialPriceMissing } from '../components/SpecialPriceField'
+import { getEventSpecialPrice, saveEventSpecialPrice } from '../lib/specialPrice'
 import { setEventWhatsappPostTimes, getEventWhatsappPostTimes } from '../lib/whatsappHours'
 
 const EMPTY_RANGE = () => ({ start: '', end: '' })
@@ -58,6 +60,23 @@ export default function CreateOpenSlots({ edit = null }) {
   const horasChanged = JSON.stringify(horas) !== JSON.stringify(horasBase)
   // No editar, as horas com que o robô vai mesmo publicar esta publicação.
   const firstLiveId = initial?.ranges[0]?.gameId || null
+
+  // Preço especial (design-handoff/2026-10-07-preco-especial): null =
+  // desligado. Grava-se num horário e vale para a publicação inteira.
+  const [special, setSpecial] = useState(null)
+  const [specialBase, setSpecialBase] = useState('null')
+  // Sem preço normal o bloco não aparece, e o preço especial não conta.
+  const specialEff = Number(String(price).replace(',', '.')) > 0 ? special : null
+  const specialChanged = JSON.stringify(specialEff) !== specialBase
+  const specialMissing = specialPriceMissing(t, specialEff)
+  useEffect(() => {
+    if (!firstLiveId) return undefined
+    let cancelled = false
+    getEventSpecialPrice('open_slot', firstLiveId)
+      .then((v) => { if (!cancelled) { setSpecial(v); setSpecialBase(JSON.stringify(v)) } })
+      .catch((e) => console.error('Error loading special price:', e))
+    return () => { cancelled = true }
+  }, [firstLiveId])
   useEffect(() => {
     if (!firstLiveId) return undefined
     let cancelled = false
@@ -117,13 +136,24 @@ export default function CreateOpenSlots({ edit = null }) {
       await Promise.all((created || []).map((g) => setEventWhatsappPostTimes('open_slot', g.id, horas)))
         .catch((e) => console.error('Error saving WhatsApp hours:', e))
     }
+    // O preço especial num horário vale para todos os da publicação.
+    if (specialEff && created?.[0]?.id) {
+      try {
+        await saveEventSpecialPrice('open_slot', created[0].id, specialEff)
+      } catch (e) {
+        console.error('Error saving special price:', e)
+        setSaving(false)
+        navigate(`/gerir/${slug}`, { state: { notice: t('special_price.error_save') } })
+        return
+      }
+    }
     setSaving(false)
     navigate(`/gerir/${slug}`)
   }
 
   // Editar: «Cancelar» pergunta se há alterações por guardar (30 set).
   const [initialSnap] = useState(() => JSON.stringify([initial?.date || '', initial?.ranges || [], initial?.price || '']))
-  const dirty = edit && (JSON.stringify([date, ranges, price]) !== initialSnap || horasChanged)
+  const dirty = edit && (JSON.stringify([date, ranges, price]) !== initialSnap || horasChanged || specialChanged)
 
   // «Cancelar o jogo em aberto» (regra do PO, 30 set, pela do Francisco para o
   // torneio: «cancelar sempre»): cancela TODOS os horários da publicação,
@@ -163,6 +193,8 @@ export default function CreateOpenSlots({ edit = null }) {
         await Promise.all(targets.map((id) => setEventWhatsappPostTimes('open_slot', id, horas)))
           .catch((e) => console.error('Error saving WhatsApp hours:', e))
       }
+      // O preço especial: num horário que fica, vale para a publicação toda.
+      if (specialChanged && ids[0]) await saveEventSpecialPrice('open_slot', ids[0], specialEff)
       navigate(`/gerir/${slug}`)
     } catch (err) {
       console.error('Error editing open slots:', err)
@@ -191,7 +223,7 @@ export default function CreateOpenSlots({ edit = null }) {
       error={error}
       edit={edit ? {
         onSave: saveEdit, onCancel: goBack, dirty, saving,
-        saveDisabled: !date || validRanges.length === 0, saveHint: t('open_slots.error_missing_fields'),
+        saveDisabled: !date || validRanges.length === 0 || !!specialMissing, saveHint: specialMissing || t('open_slots.error_missing_fields'),
         danger: liveGames.length ? {
           label: t(confirmedPeople ? 'open_slots.danger_cancel' : 'open_slots.danger_delete'),
           title: t(confirmedPeople ? 'open_slots.danger_cancel_title' : 'open_slots.danger_delete_title'),
@@ -202,13 +234,13 @@ export default function CreateOpenSlots({ edit = null }) {
       } : null}
       footer={step === 2 ? (
         edit ? (
-          <PrimaryButton onClick={saveEdit} disabled={saving} className="w-full">{t('open_slots.edit_save')}</PrimaryButton>
+          <PrimaryButton onClick={saveEdit} disabled={saving || !!specialMissing} className="w-full">{t('open_slots.edit_save')}</PrimaryButton>
         ) : (
           <div>
-            <PrimaryButton onClick={publish} disabled={saving || !org} className="w-full">
+            <PrimaryButton onClick={publish} disabled={saving || !org || !!specialMissing} className="w-full">
               {t('open_slots.publish_step')}
             </PrimaryButton>
-            <p className="mt-1.5 text-center text-xs text-muted">{t('open_slots.publish_hint')}</p>
+            <p className="mt-1.5 text-center text-xs text-muted">{specialMissing || t('open_slots.publish_hint')}</p>
           </div>
         )
       ) : null}
@@ -273,6 +305,8 @@ export default function CreateOpenSlots({ edit = null }) {
                 o de antes (base de dados do Dev 3, decisão do PO, 28 set). */}
             {anyLocked && <LockLine>{t('open_slots.locked_price')}</LockLine>}
           </div>
+          <SpecialPriceField value={special} onChange={setSpecial} normalPrice={price}
+            orgId={org?.id} orgName={org?.name} orgKind={org?.kind === 'group' ? 'group' : 'club'} />
           <WhatsappHoursField organizationId={org?.id} kind="open_slot" value={horas} onChange={onHoras} editing={!!edit} />
         </>
       )}
