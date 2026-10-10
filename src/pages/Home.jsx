@@ -152,6 +152,7 @@ export default function Home() {
   // O topo da Home (SPEC-2, 9 out): o que a pessoa escondeu no «Personalizar».
   const homeSections = useHomeSections(user?.id)
   const [customizeOpen, setCustomizeOpen] = useState(false)
+  const [phoneOpen, setPhoneOpen] = useState(false)
   // O bloco do topo (próximos, a decorrer, para ti): é para lá que a Home abre.
   const topBlockRef = useRef(null)
   useEffect(() => {
@@ -745,7 +746,12 @@ export default function Home() {
               : null
   )
   // O topo da Home (SPEC-2): os teus próximos → a decorrer → para ti → os dias.
-  const forYou = forYouItems({ privateMatches, userId: user?.id, friendInvites, scoreToday, todayKey: today, t, lang: i18n.language })
+  // O número por confirmar (sem ele, o «In» no WhatsApp entra como convidado
+  // sem conta — migration_mix_guest_sem_conta.sql) é uma linha do «Para ti»
+  // que abre a caixa de sempre numa folha (UX, 10 out).
+  const phoneToConfirm = !!profile && !profile.phone_verified_at && profile.phone_hash !== 'dev-bypass'
+  const forYou = forYouItems({ privateMatches, userId: user?.id, friendInvites, scoreToday, todayKey: today, t, lang: i18n.language,
+    onConfirmPhone: phoneToConfirm ? () => setPhoneOpen(true) : null })
   const firstUpcomingDay = days.find((d) => d.dayKey >= today)?.dayKey
   const topBlock = (
     <div ref={topBlockRef} className="space-y-4">
@@ -926,11 +932,6 @@ export default function Home() {
       </div>
 
 
-      {/* Número associado mas por confirmar: sem confirmação, o «In» no
-          WhatsApp entra como convidado sem conta — o banner só aparece a
-          quem tem mesmo de agir (migration_mix_guest_sem_conta.sql). */}
-      {viewMode === 'list' && <div className="mt-3"><ConfirmPhoneCard compact dismissible /></div>}
-
       {viewMode === 'map' ? (
         <MapView pins={pins} location={location} onSelectPin={setSelectedPin} />
       ) : filters.show === 'played' ? (
@@ -1041,6 +1042,12 @@ export default function Home() {
       )}
 
       {joinStrip}
+
+      {phoneOpen && phoneToConfirm && (
+        <Sheet title={t('phoneconfirm.title')} onClose={() => setPhoneOpen(false)}>
+          <ConfirmPhoneCard bare />
+        </Sheet>
+      )}
 
       {customizeOpen && (
         <PersonalizeHomeSheet hidden={homeSections.hidden} onToggle={homeSections.toggle} onClose={() => setCustomizeOpen(false)} />

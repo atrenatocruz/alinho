@@ -327,6 +327,8 @@
   "home.customize_done": "Feito",
   "home.live_sheet_text": "Toca num para veres os resultados em direto.",
   "home.foryou_title": "Para ti",
+  "home.foryou_phone": "Confirma o teu número",
+  "home.foryou_phone_sub": "Para entrares nos grupos de WhatsApp pelo robô",
   "home.foryou_confirm": "Confirma o resultado de {{when}}",
   "home.foryou_confirm_plain": "Confirma o resultado do teu jogo",
   "home.foryou_invite_at": "{{name}} convidou-te para {{when}} às {{time}}",
