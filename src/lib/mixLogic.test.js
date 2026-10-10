@@ -282,6 +282,27 @@ describe('americanoStandings', () => {
     expect(result.map((r) => r.player.id)).toEqual(['p2', 'p1', 'p4', 'p3'])
   })
 
+  it('breaks a points tie on the points difference, not on wins (Francisco, 8 out)', () => {
+    const teams = [teamAB, teamCD, teamAC, teamBD]
+    const matches = [
+      // p1: 21 (diff +11); p2: 21 (+11); p3: 10 (-11); p4: 10 (-11)
+      { team_a_id: 't-ab', team_b_id: 't-cd', score_a: 21, score_b: 10, winner_team_id: 't-ab' },
+      // p1: +15 (diff -4) → 36, +7; p3: +15 → 25; p2: +19 (diff +4) → 40; p4: +19 → 29
+      { team_a_id: 't-ac', team_b_id: 't-bd', score_a: 15, score_b: 19, winner_team_id: 't-bd' },
+    ]
+    const result = americanoStandings(matches, teams)
+    const byId = Object.fromEntries(result.map((r) => [r.player.id, r]))
+    expect(byId.p1.diff).toBe(7)
+    expect(byId.p2.diff).toBe(15)
+    const tie2 = americanoStandings([
+      { team_a_id: 't-ab', team_b_id: 't-cd', score_a: 12, score_b: 10, winner_team_id: 't-ab' },
+      { team_a_id: 't-ac', team_b_id: 't-bd', score_a: 10, score_b: 12, winner_team_id: 't-bd' },
+    ], teams)
+    // p1: 22 (diff 0, 1 win); p2: 24 (+4); p3: 20 (-4); p4: 22 (diff 0, 1 win) — p1 and p4 fully tied
+    expect(tie2[0].player.id).toBe('p2')
+    expect(tie2.slice(1, 3).map((r) => r.points)).toEqual([22, 22])
+  })
+
   it('ignores matches with no winner_team_id yet', () => {
     const teams = [teamAB, teamCD]
     const matches = [

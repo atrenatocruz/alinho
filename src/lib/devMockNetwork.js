@@ -933,7 +933,26 @@ const AMERICANO_MATCHES = () => [1, 2, 3].flatMap((r) => [1, 2].map((c) => {
     // mockAmericanoNext = 'true': marcados antes de a ronda seguinte começar.
     scored_at: done ? new Date(Date.now() + (localStorage.getItem('mockAmericanoNext') === 'true' ? -3600000 : 60000)).toISOString() : null }
 }))
-const EV_MATCHES = () => (localStorage.getItem('mockAmericanoDone') != null ? AMERICANO_MATCHES() : localStorage.getItem('mockRoundPending') === '1' ? [
+// Americano terminado (vencedor por pessoa, UX 8 out): localStorage.mockAmericanoFinal
+// = 'solo' (um 1.º) | 'tie' (dois empatados em 1.º); parceiros a rodar.
+const AM_FINAL = () => localStorage.getItem('mockAmericanoFinal')
+const AM_PAIRS = [[[0, 1], [2, 3], 15, 9], [[4, 5], [6, 7], 15, 11], [[0, 2], [1, 3], 15, 10], [[4, 6], [5, 7], 12, 15], [[0, 3], [1, 2], 15, 9], [[4, 7], [5, 6], 15, 13]]
+// mockAmericanoGuest = 'true': a pessoa 0 (o 1.º) e a 7 (4.ª) são convidados sem conta.
+const AM_GUESTS = { 0: { id: 'g-am0', name: 'Zé Convidado' }, 7: { id: 'g-am7', name: 'Rita Convidada' } }
+const amTeam = (id, a, b) => {
+  let tm = evTeam(id, EV_PEOPLE[a], EV_PEOPLE[b], 0)
+  if (localStorage.getItem('mockAmericanoGuest') !== 'true') return tm
+  if (AM_GUESTS[a]) tm = { ...tm, player1_id: null, player1: null, player1_guest_id: AM_GUESTS[a].id, guest1: AM_GUESTS[a] }
+  if (AM_GUESTS[b]) tm = { ...tm, player2_id: null, player2: null, player2_guest_id: AM_GUESTS[b].id, guest2: AM_GUESTS[b] }
+  return tm
+}
+const AMERICANO_FINAL_TEAMS = () => AM_PAIRS.flatMap(([a, b], i) => [amTeam(`at${i}a`, a[0], a[1]), amTeam(`at${i}b`, b[0], b[1])])
+const AMERICANO_FINAL_MATCHES = () => AM_PAIRS.map(([, , x, y], i) => {
+  const [sa, sb] = i === 4 && ['tie', 'tietotal'].includes(AM_FINAL()) ? [13, 15] : i === 1 && AM_FINAL() === 'tietotal' ? [15, 7] : [x, y]
+  return { id: `amf${i}`, game_id: 'fake-game-1', round_number: Math.floor(i / 2) + 1, court_number: (i % 2) + 1, phase: 'group',
+    team_a_id: `at${i}a`, team_b_id: `at${i}b`, score_a: sa, score_b: sb, winner_team_id: sa > sb ? `at${i}a` : `at${i}b` }
+})
+const EV_MATCHES = () => (AM_FINAL() ? AMERICANO_FINAL_MATCHES() : localStorage.getItem('mockAmericanoDone') != null ? AMERICANO_MATCHES() : localStorage.getItem('mockRoundPending') === '1' ? [
   { id: 'em1', game_id: 'fake-game-1', round_number: 1, court_number: 1, phase: 'group', team_a_id: 'et1', team_b_id: 'et2', score_a: null, score_b: null, winner_team_id: null },
   { id: 'em2', game_id: 'fake-game-1', round_number: 1, court_number: 2, phase: 'group', team_a_id: 'et3', team_b_id: 'et4', score_a: null, score_b: null, winner_team_id: null },
 ] : EV_MATCHES_ALL().map((m) => (localStorage.getItem('mockResting') === 'true' && m.id === 'em3' ? { ...m, team_a_id: 'et5' } : m))
@@ -1472,12 +1491,30 @@ const TABLE_MOCKS = {
         game: { id: 'ag-finished-yesterday', title: 'Mix de segunda', date: atDay(-1, 19).toISOString(), location: 'Smash Padel, Parque das Nações' } }]
     : longNames() ? LONG_STATS
     // mockEventState = 'finished': as estatísticas do mix terminado (o desenho do Ruben, 2 out).
+    : eventState() === 'finished' && AM_FINAL() ? (() => {
+      const pts = {}
+      const teams = Object.fromEntries(AMERICANO_FINAL_TEAMS().map((x) => [x.id, x]))
+      for (const m of AMERICANO_FINAL_MATCHES()) {
+        for (const [tid, sc] of [[m.team_a_id, m.score_a], [m.team_b_id, m.score_b]]) {
+          for (const pl of [teams[tid].player1 || teams[tid].guest1, teams[tid].player2 || teams[tid].guest2]) {
+            pts[pl.id] = pts[pl.id] || { p: pl, points: 0, wins: 0 }
+            pts[pl.id].points += sc
+            if (m.winner_team_id === tid) pts[pl.id].wins += 1
+          }
+        }
+      }
+      // Só quem tem conta tem linha (mix_player_stats.user_id é obrigatório).
+      return Object.values(pts).filter((r) => !String(r.p.id).startsWith('g-')).sort((a, b) => b.points - a.points || b.wins - a.wins).map((r, i) => ({
+        id: `am-s${i}`, game_id: 'fake-game-1', user_id: r.p.id, user: { name: r.p.name },
+        matches_won: r.wins, matches_played: 3, mix_won: false, rating_delta: 12 - i * 3, rating_after: 1700 - i * 40, points_earned: r.points,
+      }))
+    })()
     : eventState() === 'finished' ? EV_PEOPLE.map((p, i) => ({
       id: `ev-s${i}`, game_id: 'fake-game-1', user_id: p.id, user: { name: p.name },
       matches_won: 4 - Math.floor(i / 2), matches_played: 4, mix_won: i < 2,
       rating_delta: [18, 18, 9, 9, -6, -6, -14, -14][i], rating_after: 1700 - i * 40, points_earned: 20 - i * 2,
     })) : []),
-  teams: (url) => (agenda() && url.includes('ag-winner') ? AGENDA_WINNER_TEAMS() : ['live', 'finished', 'paused', 'ready'].includes(eventState()) ? EV_TEAMS : rotating() ? ROT_TEAMS : []),
+  teams: (url) => (agenda() && url.includes('ag-winner') ? AGENDA_WINNER_TEAMS() : AM_FINAL() ? AMERICANO_FINAL_TEAMS() : ['live', 'finished', 'paused', 'ready'].includes(eventState()) ? EV_TEAMS : rotating() ? ROT_TEAMS : []),
   participants: () => (eventState() ? EV_PARTICIPANTS() : []),
   matches: () => (['live', 'finished'].includes(eventState()) ? EV_MATCHES() : rotating() ? ROT_MATCHES_FN() : []),
   // Mix em aberto — 1 dupla já confirmada, a segunda por preencher (2 de 4
@@ -1545,7 +1582,8 @@ const TABLE_MOCKS = {
       ...(localStorage.getItem('mockJoinApproval') === 'true' ? { join_approval: true } : {}),
       // mockEventPast = 'true': a hora do mix já passou (há 1 h).
       ...(localStorage.getItem('mockEventPast') === 'true' ? { date: new Date(Date.now() - 3600000).toISOString() } : {}),
-      ...(eventState() === 'finished' ? { winner_team_id: 'et1' } : {}),
+      ...(eventState() === 'finished' && !AM_FINAL() ? { winner_team_id: 'et1' } : {}),
+      ...(AM_FINAL() ? { has_voucher: true } : {}),
       // localStorage.mockRoundAgoMin = '7' | '21': a ronda começou há N min
       // (21 = o tempo acabou, entre rondas) — o alarme das rondas, 27 set.
       ...(eventState() === 'live' ? { round_started_at: localStorage.getItem('mockRoundPending') ? null : new Date(Date.now() - Number(localStorage.getItem('mockRoundAgoMin') || 0) * 60000).toISOString(), round_duration_minutes: 20 } : {}),
