@@ -28,7 +28,9 @@ export const specialPriceMissing = (t, value) => {
   return null
 }
 
-export default function SpecialPriceField({ value, onChange, normalPrice, orgId, orgName, orgKind = 'club' }) {
+// howMuchLabel: outro título para «Quanto pagam» (torneio: «por pessoa»,
+// porque o preço da categoria é por dupla — Dev 1, 10 out).
+export default function SpecialPriceField({ value, onChange, normalPrice, orgId, orgName, orgKind = 'club', howMuchLabel = null }) {
   const { t } = useTranslation()
   const [available, setAvailable] = useState(false)
   const [picking, setPicking] = useState(false)
@@ -77,7 +79,7 @@ export default function SpecialPriceField({ value, onChange, normalPrice, orgId,
       {on && (
         <div className="mt-4 space-y-4">
           <div>
-            <p className="mb-1.5 text-sm font-extrabold text-ink-900">{t('special_price.how_much')}</p>
+            <p className="mb-1.5 text-sm font-extrabold text-ink-900">{howMuchLabel || t('special_price.how_much')}</p>
             <div className="relative">
               <input type="number" min="0" step="0.5" inputMode="decimal" value={value.price}
                 onChange={(e) => set({ price: e.target.value })} className="input-field pr-24" />
@@ -98,7 +100,10 @@ export default function SpecialPriceField({ value, onChange, normalPrice, orgId,
             </div>
             {value.audience === 'members' && (
               <p className="mt-2 text-xs text-muted">
-                {t('special_price.members_line', { org: orgName || '', price: eurosText(value.price || 0), normal: eurosText(normal) })}
+                {/* Com 0, «não paga» em vez de «paga 0 €» (UX, 10 out). */}
+                {Number(String(value.price || 0).replace(',', '.')) === 0
+                  ? t('special_price.members_line_free', { org: orgName || '', normal: eurosText(normal) })
+                  : t('special_price.members_line', { org: orgName || '', price: eurosText(value.price || 0), normal: eurosText(normal) })}
               </p>
             )}
           </div>

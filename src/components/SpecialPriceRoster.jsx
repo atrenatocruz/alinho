@@ -56,5 +56,6 @@ export function PriceRosterTag({ roster, userId, normalPrice }) {
   if (row?.is_special) {
     return <span className="shrink-0 rounded-full bg-[#DCFCE7] px-2 py-0.5 text-[11px] font-extrabold text-[#14532D]">{priceText(t, row.price)}</span>
   }
-  return <span className="shrink-0 text-xs font-semibold text-muted tabular-nums">{priceText(t, row?.price ?? normalPrice)}</span>
+  // O preço normal sem destaque: só o especial se vê (UX, 10 out).
+  return <span className="shrink-0 text-xs font-normal text-muted tabular-nums">{priceText(t, row?.price ?? normalPrice)}</span>
 }

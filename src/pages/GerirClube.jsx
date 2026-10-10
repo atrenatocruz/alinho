@@ -2725,7 +2725,9 @@ export default function GerirClube() {
                   ['turma', 'gerirclube.event_label_series', !isGroupOrg && lessonsReady],
                 ].filter(([, , mostra]) => mostra)
                 return (
-              <div className={`grid gap-2 ${botoes.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+              // Um por linha, a toda a largura (UX, 10 out: a regra dos botões
+              // empilhados, de 6 out, vale também aqui).
+              <div className="grid grid-cols-1 gap-2">
                 {botoes.map(([tipo, texto]) => (
                   <button
                     key={tipo}
@@ -3609,21 +3611,23 @@ export default function GerirClube() {
                         <p className="text-sm text-muted mt-0.5">{detalhe}</p>
                       </button>
                       {acao && acao.publicar ? (
-                        // Por baixo do texto, para o nome não ficar cortado.
-                        <span className="flex items-center justify-end gap-1 px-3 pb-3 -mt-2">
-                          <button
-                            type="button"
-                            onClick={acao.fazer}
-                            className="min-h-[44px] px-2 text-sm font-extrabold text-ink-900 hover:underline"
-                          >
-                            {acao.texto}
-                          </button>
+                        // Empilhados a toda a largura (UX, 10 out — botões nunca
+                        // lado a lado, também nos cartões do Gerir): «Publicar» a
+                        // preto em cima, «Editar» em contorno por baixo.
+                        <span className="flex flex-col gap-2 px-4 pb-4 -mt-1">
                           <button
                             type="button"
                             onClick={acao.publicar}
-                            className="min-h-[44px] rounded-full bg-ink-900 px-4 text-sm font-extrabold text-white"
+                            className="min-h-[44px] w-full rounded-ctrl bg-ink-900 px-4 text-sm font-extrabold text-white"
                           >
                             {t('mixdraft.publish')}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={acao.fazer}
+                            className="min-h-[44px] w-full rounded-ctrl border border-line bg-white px-4 text-sm font-extrabold text-ink-900"
+                          >
+                            {acao.texto}
                           </button>
                         </span>
                       ) : acao && (
