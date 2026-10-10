@@ -256,6 +256,11 @@ export function shortLink(path) {
   return `${config.appUrl.replace(/^https?:\/\//, '').replace(/\/$/, '')}${path}`
 }
 
+/** O link curto do mix, «/m/» e os 8 primeiros caracteres do id (Francisco,
+ *  6 out; o resolve_game_link do Dev 3 só abre se houver um jogo só com esse
+ *  começo — senão «Este link já não é válido», nunca o jogo errado). */
+export const gamePath = (gameId) => `/m/${String(gameId).slice(0, 8)}`
+
 /** O cartão do mix nas mensagens novas: curto, uma dupla por linha, sem
  *  morada, campos nem calendário; o /help só aqui. */
 function buildMixMessageNew({ game, people, capacity, suplentes = [] }, { label }) {
@@ -302,7 +307,7 @@ function buildMixMessageNew({ game, people, capacity, suplentes = [] }, { label 
     }
     lines.push('Dúvidas? Escreve */help*.')
   }
-  lines.push(shortLink(`/jogo/${game.id}`))
+  lines.push(shortLink(gamePath(game.id)))
   return lines.join('\n')
 }
 
@@ -381,7 +386,7 @@ export function buildMixMessage({ game, people, capacity, suplentes = [] }, { la
     }
   }
 
-  lines.push(`🔗 ${config.appUrl}/jogo/${game.id}`)
+  lines.push(`🔗 ${config.appUrl.replace(/\/$/, '')}${gamePath(game.id)}`)
   if (!isCancelled) {
     lines.push(`📆 Adicionar ao calendário: ${config.supabaseUrl}/functions/v1/game-ics?id=${game.id}`)
   }
