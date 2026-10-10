@@ -3,7 +3,7 @@
 //   1 quando e onde · 2 campos e horas · 3 categorias · 4 regras
 // O formato só se escolhe depois de fechadas as inscrições (outro cartão) —
 // aqui não aparece, porque nesta altura ainda não se sabe quantas duplas há.
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ImagePlus, Lock, Plus, Trash2, X } from 'lucide-react'
 import { Chips, DateField, PrimaryButton } from '../ui'
@@ -17,6 +17,8 @@ import StepPage from '../steps/StepPage'
 import WhatsappHoursField from '../WhatsappHoursField'
 import OpensPicker, { openingDays } from './OpensPicker'
 import { weekdayLong, isMasculineWeekday } from '../../lib/launchDay'
+import SpecialPriceField, { specialPriceMissing } from '../SpecialPriceField'
+import { getEventSpecialPrice } from '../../lib/specialPrice'
 
 const DEFAULT_RULES = {
   entry_mode: 'dupla',        // dupla | sozinho | as_duas
@@ -223,6 +225,10 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
     })),
     courts: (initial?.courts || []).map((c) => c.name),
     categories: (initial?.categories || []).map((c) => ({
+      // id: só para ler o preço especial; special: o bloco «Preço especial»
+      // (design-handoff/2026-10-07-preco-especial). Nenhum dos dois vai no
+      // update_tournament — gravam-se à parte, depois (outgoing).
+      id: c.id, special: null, had_special: false,
       code: c.code, name: c.name, gender: c.gender, level: c.level,
       day: c.day_date, start_time: (c.start_time || '').slice(0, 5),
       slots: c.slots, price: Math.round((c.price_cents || 0) / 100),
@@ -258,7 +264,26 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
   }
   const firstDay = draft.days.length ? [...draft.days].map((d) => d.date).sort()[0] : null
   // Editar: «Guardar» em qualquer passo (30 set) — vê o que falta em todos.
-  const [initialDraft] = useState(() => JSON.stringify(draft))
+  const [initialDraft, setInitialDraft] = useState(() => JSON.stringify(draft))
+  // O preço especial de cada categoria, a editar: lê-se à parte (uma chamada
+  // por categoria) e entra no rascunho sem o dar por mudado.
+  useEffect(() => {
+    const ids = (initial?.categories || []).map((c) => c.id).filter(Boolean)
+    if (!ids.length) return undefined
+    let cancelled = false
+    Promise.all(ids.map((id) => getEventSpecialPrice('tournament_category', id).catch(() => null))).then((rows) => {
+      if (cancelled) return
+      const byId = new Map(ids.map((id, k) => [id, rows[k]]))
+      if (![...byId.values()].some(Boolean)) return
+      const patch = (d) => ({ ...d, categories: d.categories.map((c) => (byId.get(c.id) ? { ...c, special: byId.get(c.id), had_special: true } : c)) })
+      setDraft((d) => patch(d))
+      setInitialDraft((json) => JSON.stringify(patch(JSON.parse(json))))
+    })
+    return () => { cancelled = true }
+  }, [initial])
+  // O preço especial de uma categoria por acabar (sem valor, ou «Pessoas
+  // escolhidas» sem ninguém) não deixa guardar.
+  const specialProblem = draft.categories.map((c) => (Number(c.price) > 0 ? specialPriceMissing(t, c.special || null) : null)).find(Boolean) || null
   const anyProblem = locked ? finalProblem : ([1, 2, 3, 4].map((n) => stepProblem(n, draft, checkOpts)).find(Boolean) || finalProblem)
 
   const addDay = (date) => {
@@ -317,8 +342,13 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
   const opensAt = opensDay && draft.opens_time ? localInputToIso(`${opensDay}T${draft.opens_time}`) : null
 
   const courtBase = (n) => t('tournament.create.court_n', { n })
+  // O preço especial de cada categoria vai à parte (special_prices, pelo
+  // código): o update_tournament apaga e recria as categorias, e quem o
+  // chama grava-os depois, já com os ids novos.
   const outgoing = (d) => ({
     ...d,
+    categories: d.categories.map(({ id: _id, special: _special, had_special: _had, ...c }) => c),
+    special_prices: d.categories.filter((c) => c.special || c.had_special).map((c) => ({ code: c.code, value: Number(c.price) > 0 ? (c.special || null) : null })),
     courts: courtNames(d.courts, d.days, courtBase),
     entries_close_at: localInputToIso(d.entries_close_at),
     draw_at: d.draw_at || null,
@@ -330,7 +360,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
     status,
     // Com um dia escolhido, abre sozinho a essa hora (schedule_tournament_opening).
     opens_at: status === 'inscricoes' ? opensAt : null,
-    categories: draft.categories.map((c) => ({
+    categories: outgoing(draft).categories.map((c) => ({
       ...c, slots: Number(c.slots), price: Number(c.price) || 0,
       prize_first: (c.prize_first || '').trim() || null,
       prize_second: (c.prize_second || '').trim() || null,
@@ -448,7 +478,8 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
       busy={saving}
       edit={editing_existing ? {
         onSave: save, onCancel, dirty: JSON.stringify(draft) !== initialDraft || openingChanged,
-        saving, saveDisabled: !!anyProblem, saveHint: anyProblem ? t(`tournament.create.problem_${anyProblem}`) : null,
+        saving, saveDisabled: !!anyProblem || !!specialProblem,
+        saveHint: anyProblem ? t(`tournament.create.problem_${anyProblem}`) : specialProblem,
         // «Voltar a rascunho», como no mix (Francisco, 10 out) — mas só sem
         // inscrições; com elas fica apagado e diz porquê.
         extra: unpublish && ['inscricoes', 'fechado'].includes(initial?.tournament?.status) ? {
@@ -567,6 +598,24 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
           })}
         </div>
       )}
+      {/* O preço especial também se muda com inscritos (SPEC 2026-10-07: o que
+          cada um vê muda logo): um bloco por categoria com preço. */}
+      {locked && draft.categories.some((c) => Number(c.price) > 0) && (
+        <div className="card space-y-3">
+          {draft.categories.map((c, i) => (Number(c.price) > 0 ? (
+            <div key={c.code || i} className={`space-y-2 ${i ? 'border-t border-line pt-3' : ''}`}>
+              <p className="flex items-center gap-2">
+                <span className="rounded-md bg-ink-900 px-1.5 py-0.5 font-mono text-xs font-bold text-white">{c.code}</span>
+                <span className="min-w-0 truncate text-sm font-extrabold text-ink-900">{c.name}</span>
+              </p>
+              <SpecialPriceField value={c.special || null}
+                onChange={(v) => set({ categories: draft.categories.map((x, j) => (j === i ? { ...x, special: v } : x)) })}
+                normalPrice={Number(c.price) / 2} orgId={club?.id} orgName={club?.name} orgKind={club?.kind || 'club'}
+                howMuchLabel={t('tournament.create.special_how_much')} />
+            </div>
+          ) : null))}
+        </div>
+      )}
       {!locked && step === 1 && (
         <>
           {/* A lista das categorias é um bloco só: as linhas ficam coladas. */}
@@ -597,6 +646,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
               dayLabel={dayLabel}
               onCancel={() => setEditing(null)}
               onSave={saveCategory}
+              club={club}
             />
           ) : (
             <div>
@@ -823,7 +873,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
 /** A ficha de uma categoria: género e nível dão o código (M5, MX4), e o dia
  *  e a hora são os que aparecem a quem chega de fora («sábado, a partir das
  *  12h»). */
-function CategoryEditor({ value, taken = [], days, dayLabel, onCancel, onSave }) {
+function CategoryEditor({ value, taken = [], days, dayLabel, onCancel, onSave, club = null }) {
   const { t, i18n } = useTranslation()
   const [cat, setCat] = useState(value || {
     gender: 'masculino', level: 5, name: '', day: days[0]?.date || '', start_time: days[0]?.starts_at || '', slots: 16, price: 25, prize_first: '', prize_second: '',
@@ -835,6 +885,7 @@ function CategoryEditor({ value, taken = [], days, dayLabel, onCancel, onSave })
   // 22 set). Dois «M5» davam o mesmo código e a base de dados recusa-os —
   // mais vale dizê-lo aqui, em português, do que deixar o admin sem saída.
   const repeated = taken.includes(code)
+  const specialMissing = Number(cat.price) > 0 ? specialPriceMissing(t, cat.special || null) : null
 
   return (
     <div className="card">
@@ -881,6 +932,15 @@ function CategoryEditor({ value, taken = [], days, dayLabel, onCancel, onSave })
           )}
         </div>
       </div>
+      {/* Preço especial (design-handoff/2026-10-07-preco-especial): o mesmo
+          bloco do mix, por baixo do preço da categoria. O preço é por
+          pessoa, como no cartaz. */}
+      <div className="mt-3">
+        <SpecialPriceField value={cat.special || null} onChange={(v) => set({ special: v })}
+          normalPrice={Number(cat.price) > 0 ? Number(cat.price) / 2 : 0}
+          orgId={club?.id} orgName={club?.name} orgKind={club?.kind || 'club'}
+          howMuchLabel={t('tournament.create.special_how_much')} />
+      </div>
       {/* Prémios: texto livre, porque nem sempre é dinheiro («2 garrafas de
           bolas · voucher» no desenho, print 12). São por categoria — no Smash
           Cup cada uma tem o seu. Aparecem no pódio quando o torneio acaba, e
@@ -900,7 +960,8 @@ function CategoryEditor({ value, taken = [], days, dayLabel, onCancel, onSave })
       </div>
       <p className="mt-1.5 text-xs text-ink-500">{t('tournament.create.prize_hint')}</p>
       {repeated && <p className="mt-3 text-xs text-danger">{t('tournament.create.category_repeated', { name: categoryName(t, cat.gender, cat.level) })}</p>}
-      <PrimaryButton className="mt-3 w-full" disabled={repeated || !cat.slots || Number(cat.slots) < 2} onClick={() => onSave({ ...cat, code, name })}>
+      {specialMissing && <p className="mt-3 text-xs text-danger">{specialMissing}</p>}
+      <PrimaryButton className="mt-3 w-full" disabled={repeated || !cat.slots || Number(cat.slots) < 2 || !!specialMissing} onClick={() => onSave({ ...cat, code, name })}>
         {t('tournament.create.save')}
       </PrimaryButton>
     </div>

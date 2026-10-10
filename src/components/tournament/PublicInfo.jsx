@@ -8,6 +8,7 @@ import { whatsappShare } from '../../lib/partnerInvite'
 import { formatWords, categoryWhen, slotsWords, tournamentUrl, shareMessage } from '../../lib/tournamentPublic'
 import { pricePerPlayer } from '../../lib/tournaments'
 import { entriesOpen as categoryOpen } from '../../lib/tournamentSignup'
+import { CategoryPriceText } from './CategorySpecialPrice'
 
 /** Metade, para o preço dizer as duas coisas: o cartaz do clube anuncia por
  *  jogador e o campo é por dupla (decisão de 23 set — a unidade não muda). */
@@ -83,8 +84,12 @@ export default function PublicInfo({ tournament, categories = [], entriesOpen = 
                 {[
                   when && (typeof when === 'string' ? when : t('tpublic.when', when)),
                   fmt.key === 'tpublic.format_unknown' ? null : t(fmt.key, fmt.values),
-                  c.price_cents != null ? t('tsignup.price', { price: (c.price_cents / 100).toFixed(0), each: eachOf(c.price_cents, i18n.language) }) : null,
                 ].filter(Boolean).join(' · ')}
+                {/* O preço de quem vê, com o preço especial (7 out). */}
+                {c.price_cents != null && (
+                  <>{when || fmt.key !== 'tpublic.format_unknown' ? ' · ' : ''}<CategoryPriceText category={c}
+                    fallback={t('tsignup.price', { price: (c.price_cents / 100).toFixed(0), each: eachOf(c.price_cents, i18n.language) })} /></>
+                )}
               </p>
             </div>
           )

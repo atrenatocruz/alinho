@@ -11,7 +11,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { createTournament, scheduleTournamentOpening, setTournamentStatus } from '../lib/tournamentApi'
+import { createTournament, saveCategorySpecialPrices, scheduleTournamentOpening, setTournamentStatus } from '../lib/tournamentApi'
 import { setEventWhatsappPostTimes } from '../lib/whatsappHours'
 import { describeError } from '../lib/errors'
 import CreateTournamentForm from '../components/tournament/CreateTournamentForm'
@@ -61,8 +61,18 @@ export default function CreateTournamentPage() {
           else await setTournamentStatus(id, 'inscricoes')
         } catch (err) { console.error('Error opening entries:', err) }
       }
+      // O preço especial de cada categoria, já com as categorias criadas. Se
+      // falhar, o torneio existe na mesma: a página diz que ficou por gravar
+      // (Dev 3, 10 out: o organizador não pode julgar que ficou).
+      let notice = null
+      if (id && draft.special_prices?.length) {
+        try { await saveCategorySpecialPrices(id, draft.special_prices) } catch (err) {
+          console.error('Error saving special prices:', err)
+          notice = t('tournament.create.special_failed')
+        }
+      }
       // Guardar abre a página do torneio criado (revisão de 26 set, ponto 0).
-      navigate(id ? `/torneio/${id}` : `/gerir/${slug}?tab=events`, { replace: true })
+      navigate(id ? `/torneio/${id}` : `/gerir/${slug}?tab=events`, { replace: true, state: notice ? { notice } : undefined })
     } catch (err) {
       setError(describeError(t, err))
     } finally {

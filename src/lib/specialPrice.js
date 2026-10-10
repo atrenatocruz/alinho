@@ -13,10 +13,12 @@ import { supabase } from './supabase'
 
 const missing = (error) => error?.code === 'PGRST202'
 
-/** Euros sem casas quando são redondos: 15 → «15 €», 7.5 → «7,50 €». */
+/** Euros sem casas quando são redondos: 15 → «15 €», 7.5 → «7,50 €». Entre
+ *  o número e o € vai um espaço que não parte: o € nunca fica sozinho na
+ *  linha de baixo (UX, 10 out). */
 export const eurosText = (v) => {
   const n = Number(v)
-  return `${Number.isInteger(n) ? n : n.toFixed(2).replace('.', ',')} €`
+  return `${Number.isInteger(n) ? n : n.toFixed(2).replace('.', ',')} €`
 }
 
 /** «Grátis» para 0, senão o valor em euros. */

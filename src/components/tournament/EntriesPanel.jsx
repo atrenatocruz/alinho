@@ -14,6 +14,7 @@ import { whatsappShare } from '../../lib/partnerInvite'
 import { signupErrorMessage, errorCode } from '../../lib/tournamentError'
 import { replaceTournamentPlayer, entryHasPlayedMatches } from '../../lib/tournamentApi'
 import { categoryGenderQuestion } from './genderCheck'
+import { usePriceRoster, PriceRosterSummary, PriceRosterTag } from '../SpecialPriceRoster'
 
 /* Separador «Inscritos» (Trello #362).
    Desenho: print 08 (lista por categoria, Validar a um toque) e a regra
@@ -328,6 +329,11 @@ export default function EntriesPanel({ tournament, categories = [], category, pu
   const [renameFor, setRenameFor] = useState(null)
   const [swap, setSwap] = useState(null) // { entry, slot, played }
   const [toast, setToast] = useState('')
+  // Preço especial (design-handoff/2026-10-07-preco-especial, ponto 3): o
+  // preço de cada jogador, só para quem organiza. Por pessoa: a categoria
+  // tem o preço da dupla (Dev 3, 10 out).
+  const normalEach = (category?.price_cents || 0) / 200
+  const roster = usePriceRoster(isAdmin && normalEach > 0 ? 'tournament_category' : null, category?.id, rows.length)
   useEffect(() => {
     if (!toast) return undefined
     const id = setTimeout(() => setToast(''), 3000)
@@ -496,6 +502,10 @@ export default function EntriesPanel({ tournament, categories = [], category, pu
         })}
         {category.slots ? ` · ${t('tentries.count_slots', { count: category.slots })}` : ''}
       </p>}
+      {!searching && (
+        <PriceRosterSummary roster={roster} normalPrice={normalEach} className="-mt-2"
+          ids={rows.filter((r) => r.status !== 'desistiu' && !r.withdrawn).flatMap((r) => [r.player1_id, r.player2_id])} />
+      )}
 
       {searching && allRows !== null && shown.length === 0 ? (
         <p className="py-6 text-center text-sm text-muted">{t('tentries.search_none')}</p>
@@ -540,6 +550,17 @@ export default function EntriesPanel({ tournament, categories = [], category, pu
                     e.created_at ? t('tentries.signed_up_on', { date: signedUpOn(e.created_at) }) : null,
                   ].filter(Boolean).join(' · ')}
                 </p>
+                {/* O preço de cada um, quando alguém na categoria tem o especial. */}
+                {roster && !searching && e.status !== 'desistiu' && (
+                  // Uma pessoa por linha, sempre (UX, 10 out): não depende da largura.
+                  <span className="mt-1 flex flex-col items-start gap-1">
+                    {[[e.player1_id, e.player1_name], [e.player2_id, e.player2_name || e.guest_name]].filter(([, n]) => n).map(([id, n], k) => (
+                      <span key={k} className="inline-flex items-center gap-1.5 text-xs text-muted">
+                        {String(n).split(' ')[0]} <PriceRosterTag roster={roster} userId={id} normalPrice={normalEach} />
+                      </span>
+                    ))}
+                  </span>
+                )}
               </div>
 
               <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-extrabold ${STATE_TONE[e.status] || 'bg-ink-50 text-muted'}`}>

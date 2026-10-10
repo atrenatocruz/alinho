@@ -12,6 +12,7 @@ import { partnerNameError, partnerEmailError, PARTNER_NAME_MAX } from '../../lib
 import { slotsLeft, isCategoryFull } from '../../lib/tournamentSignup'
 import { contemTexto } from '../../lib/semAcentos'
 import { searchPlayers } from '../../lib/privateMatches'
+import { CategorySpecialLine } from './CategorySpecialPrice'
 
 /** «25 €» e «12,50 €», nunca «25.00 €»: as casas decimais só aparecem
  *  quando existem, e a vírgula é a do idioma de quem lê. */
@@ -261,6 +262,8 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
           <Euro size={16} className="mt-0.5 shrink-0 text-muted" />
           <div>
             {price != null && <p className="font-extrabold">{t('tsignup.price', { price: euroWords(price / 100, i18n.language), each: pricePerPlayer(price / 100, i18n.language) })}</p>}
+            {/* Preço especial de quem se inscreve (7 out): «Grátis para ti · …». */}
+            <CategorySpecialLine category={chosen} className="font-extrabold text-ok-700" />
             <p className="text-muted">{tournament.organizer_text || t('tsignup.payment_default')}</p>
           </div>
         </div>

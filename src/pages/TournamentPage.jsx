@@ -268,7 +268,7 @@ export default function TournamentPage() {
       closeAdmin()
       window.dispatchEvent(new Event('tournament:reload'))
     } catch (err) {
-      setAdminError(describeError(t, err))
+      setAdminError(err?.code === 'special_prices_failed' ? t('tournament.edit.special_failed') : describeError(t, err))
     } finally {
       setSavingEdit(false)
     }
@@ -325,6 +325,10 @@ export default function TournamentPage() {
   return (
     <div className="space-y-4">
       {back}
+      {/* O que ficou por gravar ao criar (preço especial, 10 out). */}
+      {location.state?.notice && (
+        <p role="alert" className="rounded-ctrl bg-danger/10 p-3.5 text-sm font-extrabold text-danger">{location.state.notice}</p>
+      )}
 
       {/* A faixa do modo público é a ÚNICA coisa que um visitante a sério não
           vê. Em rascunho diz a verdade em vez de dar a entender que já está

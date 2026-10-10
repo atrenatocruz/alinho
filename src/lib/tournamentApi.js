@@ -13,6 +13,7 @@
 import { supabase } from './supabase'
 import { isMatchDone } from './myTournamentMatches'
 import { normalizeGameOrgHint } from './gameOrgHint'
+import { saveEventSpecialPrice } from './specialPrice'
 
 /** Cabeçalho da página do torneio + categorias, numa só chamada.
  *
@@ -69,11 +70,29 @@ export async function listClubTournaments(organizationId) {
  *  pessoa, como se escolhe quem entra) — guardado em jsonb, para não serem
  *  dez colunas que ninguém consulta. */
 export async function createTournament(organizationId, draft) {
+  const { special_prices: _specials, ...rest } = draft
   const { data, error } = await supabase.rpc('create_tournament', {
-    p_organization_id: organizationId, p_draft: draft,
+    p_organization_id: organizationId, p_draft: rest,
   })
   if (error) throw error
+  // O preço especial de cada categoria grava-se depois de ela existir: quem
+  // cria chama saveCategorySpecialPrices com o que vem em special_prices.
   return data
+}
+
+/** O preço especial de cada categoria (design-handoff/2026-10-07-preco-
+ *  especial; base de dados do Dev 3). specials: [{ code, value }] — value
+ *  null desliga. Liga-se pelo código, porque o update_tournament apaga e
+ *  recria as categorias (os ids mudam e o preço especial vai com elas). */
+export async function saveCategorySpecialPrices(tournamentId, specials) {
+  if (!specials?.length) return
+  const { data, error } = await supabase.rpc('get_tournament_for_edit', { p_tournament_id: tournamentId })
+  if (error) throw error
+  const idOf = new Map((data?.categories || []).map((c) => [c.code, c.id]))
+  for (const { code, value } of specials) {
+    const id = idOf.get(code)
+    if (id) await saveEventSpecialPrice('tournament_category', id, value)
+  }
 }
 
 /** O torneio inteiro para o ecrã de editar: ao contrário do
@@ -107,8 +126,14 @@ export async function getTournamentForEdit(tournamentId) {
  *  organizador, prazo, data do sorteio e se é público) — é o próprio
  *  update_tournament que ignora o resto. */
 export async function updateTournament(tournamentId, draft) {
-  const { error } = await supabase.rpc('update_tournament', { p_tournament_id: tournamentId, p_draft: draft })
+  const { special_prices: specials, ...rest } = draft
+  const { error } = await supabase.rpc('update_tournament', { p_tournament_id: tournamentId, p_draft: rest })
   if (error) throw error
+  // O torneio já ficou gravado: um erro aqui diz só que o preço especial não.
+  try { await saveCategorySpecialPrices(tournamentId, specials) } catch (err) {
+    console.error('Error saving special prices:', err)
+    const e = new Error('special_prices_failed'); e.code = 'special_prices_failed'; throw e
+  }
 }
 
 /** Abrir/fechar inscrições e voltar atrás (rascunho ↔ inscrições ↔
