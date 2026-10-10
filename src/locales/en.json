@@ -4932,5 +4932,6 @@
   "homesearch.join": "Join",
   "homesearch.inside": "In",
   "homesearch.none_title": "Nothing for \u00ab{{q}}\u00bb.",
-  "homesearch.none_hint": "Try the name of a club, a person or \u00abmix\u00bb."
+  "homesearch.none_hint": "Try the name of a club, a person or \u00abmix\u00bb.",
+  "agenda.filter_kind_friends_short": "Friends"
 }
