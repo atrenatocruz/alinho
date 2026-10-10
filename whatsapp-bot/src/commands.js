@@ -1379,7 +1379,9 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
    */
   async function handleCopiedList(copied, openMixes) {
     const labelable = labelableMixes(openMixes)
-    let mix = copied.gameId ? openMixes.find((m) => m.id === copied.gameId) : null
+    // O link curto só traz o começo do id: serve se só um mix aberto começar assim.
+    const byLink = copied.gameId ? openMixes.filter((m) => String(m.id).toLowerCase().startsWith(copied.gameId)) : []
+    let mix = byLink.length === 1 ? byLink[0] : null
     if (!mix && copied.label) mix = openMixes.find((m) => mixLabel(m, labelable) === copied.label)
     if (!mix && copied.title) mix = openMixes.find((m) => normName(m.title) === normName(copied.title))
     if (!mix && openMixes.length === 1) mix = openMixes[0]
