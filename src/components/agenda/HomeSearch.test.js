@@ -14,6 +14,13 @@ describe('eventMatches (Home, Trello #547)', () => {
     expect(eventMatches(ev('Mix m4', 'Clube X', 'IPC Lisboa'), 'ipc')).toBe(true)
   })
 
+  it('encontra pelo tipo: «mix» encontra um mix chamado «Viva»', () => {
+    expect(eventMatches({ ...ev('Viva', 'Boavista FC'), kind: 'mix' }, 'mix')).toBe(true)
+    expect(eventMatches({ ...ev('Outono Open', 'Clube Norte'), kind: 'tournament' }, 'torneio')).toBe(true)
+    expect(eventMatches({ ...ev('Rita abriu', 'A2N'), kind: 'open' }, 'jogo em aberto')).toBe(true)
+    expect(eventMatches({ ...ev('Viva', 'Boavista FC'), kind: 'mix' }, 'torneio')).toBe(false)
+  })
+
   it('não encontra o que não está lá', () => {
     expect(eventMatches(ev('Mix de Quinta', 'Smash'), 'quarta')).toBe(false)
   })
