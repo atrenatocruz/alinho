@@ -17,6 +17,7 @@ import { describeError } from '../../lib/errors'
 import { useTranslation } from 'react-i18next'
 import { Minus, Plus } from 'lucide-react'
 import StepPage from '../steps/StepPage'
+import MixImageField from './MixImageField'
 import LaunchDayPicker from '../LaunchDayPicker'
 import { Chips, DateField, DateTimeField, Select } from '../ui'
 import { advanceByFrequency } from '../../lib/mixDraft'
@@ -133,15 +134,23 @@ export default function MixWizard({
     try { await onSubmit(asDraft) } finally { setBusy(false) }
   }
 
+  // Por baixo do nome, a imagem opcional (SPEC-3, 9 out), como o «Cartaz
+  // (opcional)» do torneio. Vai para a pasta do clube do próprio mix.
   const nameTop = (
-    <input
-      type="text"
-      value={form.title}
-      onChange={(e) => set({ title: e.target.value })}
-      className="input-field text-base font-extrabold"
-      placeholder={t('gerirclube.title_placeholder')}
-      aria-label={t('gerirclube.title_label')}
-    />
+    <div className="space-y-5">
+      <input
+        type="text"
+        value={form.title}
+        onChange={(e) => set({ title: e.target.value })}
+        className="input-field text-base font-extrabold"
+        placeholder={t('gerirclube.title_placeholder')}
+        aria-label={t('gerirclube.title_label')}
+      />
+      {step === 1 && (
+        <MixImageField value={form.image_url || null} onChange={(url) => set({ image_url: url })}
+          organizationId={editingGame?.organization_id || organizationId} />
+      )}
+    </div>
   )
 
   const footer = step === 4 ? (

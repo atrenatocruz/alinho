@@ -41,6 +41,7 @@ import PublishDraftSheet from '../components/mix/PublishDraftSheet'
 import { PastByMonth, PastSection, SectionLabel } from '../components/gerir/PastEvents'
 import LaunchDayPicker from '../components/LaunchDayPicker'
 import MixWizard from '../components/mix/MixWizard'
+import MixImageField from '../components/mix/MixImageField'
 import { useOrgNameTaken, OrgNameTakenHint } from '../components/OrgNameTaken'
 import PlacesUnavailableHint from '../components/PlacesUnavailableHint'
 import { LEVEL_SCALES, LEVEL_NUMBERS, parseLevel } from '../lib/mixLevels'
@@ -162,6 +163,9 @@ const EMPTY_GAME_FORM = {
   price_per_player: '',
   prize: '',
   has_voucher: false,
+  // A imagem opcional (SPEC-3, 9 out): só vai à base de dados quando há uma
+  // (ou quando se tira) — antes da migration_mix_imagem.sql a coluna não existe.
+  image_url: null,
   num_courts: 1,
   court_time_minutes: 90,
   game_time_minutes: 20,
@@ -1113,6 +1117,9 @@ export default function GerirClube() {
     // Aprovar quem entra (2 out): a série guarda a escolha e cada data nova
     // herda-a (gatilho do Dev 3). Mesmo truque: só com a coluna.
     ...(typeof game.join_approval === 'boolean' ? { join_approval: game.join_approval } : {}),
+    // A imagem (SPEC-3): a série guarda-a e as datas novas herdam-na
+    // (migration_mix_imagem.sql). Só com a coluna; também null, para tirar.
+    ...('image_url' in game ? { image_url: game.image_url ?? null } : {}),
     // #580: a série guarda a contagem, os grupos e o 8-8 — cada nova data
     // herda-os (recurrence_insert_pending). O `game` é a linha da base de
     // dados: com as colunas, vão sempre (também para voltar a «pontos
@@ -1304,7 +1311,7 @@ export default function GerirClube() {
     // pairing_mode sai pelo mesmo motivo: só é enviado quando não é o valor
     // por omissão, para criar/editar mixes não rebentar antes de
     // migration_mix_pairing_mode.sql correr.
-    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, seed_reverse: _seedReverse, ranked: _ranked, allow_pair_signup: _allowPairSignup, join_approval: _joinApproval, launch, whatsapp_post_times: postTimes, tiebreak_8_8: tieBreak88, ...gameFields } = gameForm
+    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, seed_reverse: _seedReverse, ranked: _ranked, allow_pair_signup: _allowPairSignup, join_approval: _joinApproval, launch, whatsapp_post_times: postTimes, tiebreak_8_8: tieBreak88, image_url: imageUrl, ...gameFields } = gameForm
 
     const recurrenceError = validateRecurrence(recurrence)
     if (recurrenceError) {
@@ -1379,6 +1386,8 @@ export default function GerirClube() {
             ...(gameForm.scoring_format === 'pro_set_9' && tieBreak88 === 'super_tiebreak' ? { tiebreak_8_8: 'super_tiebreak' } : {}),
             status: asDraft ? 'draft' : launchAt ? 'pending' : 'open',
             ...(launchAt ? { launch_at: launchAt.toISOString() } : {}),
+            // A imagem só vai quando há uma (antes da migração a coluna não existe).
+            ...(imageUrl ? { image_url: imageUrl } : {}),
           }
         ])
         .select()
@@ -1568,7 +1577,7 @@ export default function GerirClube() {
     // pairing_mode sai pelo mesmo motivo: só é enviado quando não é o valor
     // por omissão, para criar/editar mixes não rebentar antes de
     // migration_mix_pairing_mode.sql correr.
-    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, seed_reverse: _seedReverse, ranked: _ranked, allow_pair_signup: _allowPairSignup, join_approval: _joinApproval, launch: _launch, whatsapp_post_times: postTimes, tiebreak_8_8: tieBreak88, ...gameFields } = gameForm
+    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, seed_reverse: _seedReverse, ranked: _ranked, allow_pair_signup: _allowPairSignup, join_approval: _joinApproval, launch: _launch, whatsapp_post_times: postTimes, tiebreak_8_8: tieBreak88, image_url: imageUrl, ...gameFields } = gameForm
     // Any mix in an active recurring series shares the same underlying
     // game_recurrences row (via recurrence_id) — not just the origin — so
     // recurrence management works from any of them, not only the one that
@@ -1618,6 +1627,8 @@ export default function GerirClube() {
           ...((gameForm.ranked === false || editingGame.ranked === false) ? { ranked: gameForm.ranked !== false } : {}),
           level: gameForm.level || null,
           ...((tieBreak88 === 'super_tiebreak' || editingGame.tiebreak_8_8) ? { tiebreak_8_8: gameForm.scoring_format === 'pro_set_9' && tieBreak88 === 'super_tiebreak' ? 'super_tiebreak' : null } : {}),
+          // A imagem: vai quando há uma ou quando se tirou a que havia.
+          ...((imageUrl || editingGame.image_url) ? { image_url: imageUrl || null } : {}),
           ...pendingLaunchUpdate,
         })
         .eq('id', editingGame.id)
@@ -2219,6 +2230,7 @@ export default function GerirClube() {
       price_per_player: game.price_per_player ?? '',
       prize: game.prize || '',
       has_voucher: game.has_voucher || false,
+      image_url: game.image_url || null,
       num_courts: game.num_courts || 1,
       court_time_minutes: game.court_time_minutes || 90,
       game_time_minutes: game.game_time_minutes || 20,
@@ -2758,6 +2770,9 @@ export default function GerirClube() {
                         required
                       />
                     </div>
+
+                    <MixImageField value={gameForm.image_url || null} onChange={(url) => setGameForm((f) => ({ ...f, image_url: url }))}
+                      organizationId={editingGame?.organization_id || mixScopeId || currentOrganizationId} />
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
