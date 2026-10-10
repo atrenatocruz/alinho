@@ -4,7 +4,8 @@
 // agora junta três (UX, 9 out): os resultados de jogos entre amigos por
 // confirmar, os convites para jogos entre amigos e os torneios onde marco
 // resultados hoje. Cada linha abre o que já abria (sem folha nova). Sem nada
-// para ti, a linha não aparece.
+// para ti, a linha não aparece. O lembrete de confirmar o número também vem
+// para aqui (UX, 10 out): a linha abre a caixa de sempre numa folha.
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -30,8 +31,11 @@ function whenWord(dayKey, todayKey, t, lang) {
 const hhmm = (time) => (time ? String(time).slice(0, 5) : null)
 
 /** As coisas «para ti», pela ordem: confirmar, convites, marcar resultados. */
-export function forYouItems({ privateMatches = [], userId, friendInvites = [], scoreToday = [], todayKey, t, lang }) {
+export function forYouItems({ privateMatches = [], userId, friendInvites = [], scoreToday = [], todayKey, t, lang, onConfirmPhone = null }) {
   const items = []
+  if (onConfirmPhone) {
+    items.push({ key: 'phone', icon: '📱', bg: '#E0F2FE', title: t('home.foryou_phone'), sub: t('home.foryou_phone_sub'), onClick: onConfirmPhone })
+  }
   for (const { match: m } of privateMatchActions(privateMatches, userId).filter((a) => a.kind === 'confirm')) {
     const day = m.scheduled_date || (m.played_at ? toDayKey(new Date(m.played_at)) : null)
     items.push({
@@ -75,15 +79,18 @@ const Icon = ({ item, size = 'h-8 w-8 rounded-[10px] text-sm' }) => (
 )
 
 function Row({ item }) {
+  const cls = 'press flex w-full items-center gap-2.5 border-t border-[#F3F4F6] bg-white px-3 py-2.5 text-left first:border-t-0'
+  const Tag = item.onClick ? 'button' : Link
+  const props = item.onClick ? { type: 'button', onClick: item.onClick } : { to: item.to }
   return (
-    <Link to={item.to} className="press flex w-full items-center gap-2.5 border-t border-[#F3F4F6] bg-white px-3 py-2.5 text-left first:border-t-0">
+    <Tag {...props} className={cls}>
       <Icon item={item} />
       <span className="min-w-0 flex-1">
         <b className="line-clamp-2 block text-[13.5px] font-extrabold leading-snug text-ink-900">{item.title}</b>
         {item.sub && <small className="block truncate text-[11.5px] text-muted">{item.sub}</small>}
       </span>
       <ChevronRight size={16} className="shrink-0 text-[#9CA3AF]" />
-    </Link>
+    </Tag>
   )
 }
 

@@ -112,7 +112,8 @@ export default function MyNextGames({ events, todayKey, userId, linkFor, onCusto
   if (!show) return <div className="flex justify-end">{pill}</div>
   const narrow = narrowBy(filters)
   const rows = myNextEvents(events, todayKey).filter((e) => !narrow || narrow(e))
-  if (narrow && rows.length === 0) return <div className="flex justify-end">{pill}</div>
+  // Vazio por causa de um filtro: nada em cima; chega o «Personalizar a Home» do fim (UX, 10 out).
+  if (narrow && rows.length === 0) return null
   return (
     <section aria-label={t('home.next_title')}>
       <SectionTitle right={pill}>{t('home.next_title')}</SectionTitle>

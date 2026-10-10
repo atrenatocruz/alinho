@@ -326,6 +326,8 @@
   "home.customize_done": "Done",
   "home.live_sheet_text": "Tap one to see live results.",
   "home.foryou_title": "For you",
+  "home.foryou_phone": "Confirm your number",
+  "home.foryou_phone_sub": "To join the WhatsApp groups through the bot",
   "home.foryou_confirm": "Confirm the result from {{when}}",
   "home.foryou_confirm_plain": "Confirm your game result",
   "home.foryou_invite_at": "{{name}} invited you for {{when}} at {{time}}",
