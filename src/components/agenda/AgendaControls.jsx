@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
-import { ChevronLeft, ChevronRight, ChevronDown, X, MapPin, LocateFixed, Map, List, Search, Check } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronDown, X, MapPin, LocateFixed, Map, List, Search, Check, CalendarDays, SlidersHorizontal } from 'lucide-react'
 import { useGooglePlacesAutocomplete } from '../../lib/useGooglePlacesAutocomplete'
 import { RADIUS_OPTIONS } from '../../lib/explore'
 import { formatDate } from '../../lib/formatDate'
@@ -451,5 +451,154 @@ export function FilterChips({ filters, orgs = [], onOpenFilters, onOpenSearch })
             : t('agenda.filter_org_many', { count: filters.orgIds.length })}</span> <ChevronDown size={14} className="shrink-0" />
       </button>
     </div>
+  )
+}
+
+/* ─── Home do futuro, 1/4 (design-handoff/2026-10-08-home-do-futuro, SPEC-1,
+   opção D da barra-filtros; aprovado pelo Francisco a 9 out) ───────────────
+   Uma barra só, que desliza para o lado: 🔍 · «📅 Hoje ⌄» · «⚙ Filtros» · um
+   traço · os tipos. O dia passa a ser a pastilha «Hoje ⌄» (abre o mês);
+   «Mostrar» e «Clube/grupo» passam para a folha «Filtros». */
+
+/** Quantos filtros da folha estão diferentes do normal (a bolinha preta). */
+export const filtersBadge = (filters) => (filters.show !== 'all' ? 1 : 0) + (filters.orgIds != null ? 1 : 0)
+
+/** «Hoje» · «Amanhã» · «Sex 10 out» — curto, para caber na pastilha. */
+export function dayChipLabel(dayKey, t, lang) {
+  const today = toDayKey(new Date())
+  if (dayKey === today) return t('ui.today')
+  if (dayKey === addDays(today, 1)) return t('ui.tomorrow')
+  if (dayKey === addDays(today, -1)) return t('agenda.yesterday')
+  const d = fromDayKey(dayKey)
+  const part = (opts) => formatDate(d, lang, opts).replace(/\./g, '').replace(/-feira$/, '')
+  return capitalize(`${part({ weekday: 'short' })} ${d.getDate()} ${part({ month: 'short' })}`)
+}
+
+/** Arrastar com o rato as filas que deslizam, como o dedo no telemóvel
+ *  (SPEC-1, ponto 5). Um arrasto não conta como toque no que está por baixo. */
+export function useDragScroll() {
+  const ref = useRef(null)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return undefined
+    let down = null
+    let moved = false
+    const onDown = (e) => { if (e.pointerType !== 'mouse' || e.button !== 0) return; down = { x: e.clientX, left: el.scrollLeft }; moved = false }
+    const onMove = (e) => {
+      if (!down) return
+      const dx = e.clientX - down.x
+      if (Math.abs(dx) > 4) moved = true
+      if (moved) el.scrollLeft = down.left - dx
+    }
+    const onUp = () => { down = null }
+    const onClick = (e) => { if (moved) { e.preventDefault(); e.stopPropagation(); moved = false } }
+    el.addEventListener('pointerdown', onDown)
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    el.addEventListener('click', onClick, true)
+    return () => {
+      el.removeEventListener('pointerdown', onDown)
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      el.removeEventListener('click', onClick, true)
+    }
+  }, [])
+  return ref
+}
+
+const TAP = "relative before:absolute before:inset-x-0 before:-inset-y-1 before:content-['']"
+
+// Pela ordem da SPEC-1 (Tudo · Mixes · Jogos em aberto · Horários livres ·
+// Torneios · Liga · Aulas · Amigos), só os que existem. «Aulas» segue a mesma
+// bandeira que mostra as aulas no resto da Home (UX, 9 out).
+const BAR_KINDS = ['mix', 'open', 'tournament', 'lesson', 'friends']
+const BAR_LABEL_KEY = { ...KIND_FILTER_KEY, friends: 'agenda.filter_kind_friends_short' }
+
+export function HomeBar({ filters, dayKey, onOpenSearch, onOpenDay, onOpenFilters, onKinds }) {
+  const { t, i18n } = useTranslation()
+  const { isLessonsEnabled } = useAuth()
+  const ref = useDragScroll()
+  const kinds = BAR_KINDS.filter((k) => k !== 'lesson' || isLessonsEnabled)
+  const all = filters.kinds.length >= EVENT_KINDS.length
+  const badge = filtersBadge(filters)
+  const pill = (on) => `${TAP} shrink-0 inline-flex items-center gap-1.5 px-3 min-h-[36px] rounded-full text-[13px] font-extrabold border whitespace-nowrap select-none ${
+    on ? 'bg-ink-900 text-white border-ink-900' : 'bg-white text-ink-900 border-line'
+  }`
+  // Um tipo de cada vez; tocar no escolhido, ou em «Tudo», volta a tudo.
+  const pick = (k) => onKinds(k === null || (filters.kinds.length === 1 && filters.kinds[0] === k) ? [...EVENT_KINDS] : [k])
+  return (
+    <div ref={ref} className="flex items-center gap-1.5 overflow-x-auto no-scrollbar -mx-4 px-4 py-1 cursor-grab active:cursor-grabbing">
+      {onOpenSearch && (
+        <button type="button" onClick={onOpenSearch} aria-label={t('agenda.search_open')} title={t('agenda.search_open')}
+          className={`${TAP} shrink-0 inline-flex items-center justify-center w-9 min-h-[36px] rounded-full border bg-white text-ink-900 border-line`}>
+          <Search size={16} />
+        </button>
+      )}
+      {onOpenDay && (
+        <button type="button" onClick={onOpenDay} className={pill(false)}>
+          <CalendarDays size={15} className="text-[#075985]" /> {dayChipLabel(dayKey, t, i18n.language)} <ChevronDown size={14} className="text-muted" />
+        </button>
+      )}
+      <button type="button" onClick={onOpenFilters} className={pill(false)} aria-label={badge ? t('agenda.filters_on', { count: badge }) : undefined}>
+        <SlidersHorizontal size={14} /> {t('agenda.filters')}
+        {badge > 0 && <span className="ml-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-ink-900 px-1 text-[11px] text-white">{badge}</span>}
+      </button>
+      <span aria-hidden="true" className="mx-0.5 h-6 w-px shrink-0 bg-line" />
+      <button type="button" onClick={() => pick(null)} aria-pressed={all} className={pill(all)}>{t('agenda.kind_everything')}</button>
+      {kinds.map((k) => {
+        const on = !all && filters.kinds.includes(k)
+        return (
+          <button key={k} type="button" onClick={() => pick(k)} aria-pressed={on} className={pill(on)}>
+            <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: KIND_STYLE[k].color, opacity: on ? 1 : 0.55 }} />
+            {t(BAR_LABEL_KEY[k])}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+/** A folha «Filtros»: «Mostrar» (Todos · Os meus · Já jogados) e «Clube/grupo»
+ *  (a lista, com ✓). «Ver os jogos» aplica. */
+export const HOME_SHOW_OPTIONS = ['all', 'enrolled', 'played']
+export function HomeFiltersSheet({ filters, orgs, onApply, onClose }) {
+  const { t } = useTranslation()
+  const [draft, setDraft] = useState({ ...filters, show: HOME_SHOW_OPTIONS.includes(filters.show) ? filters.show : 'all' })
+  const ids = orgs.map((o) => o.id)
+  const on = (id) => draft.orgIds == null || draft.orgIds.includes(id)
+  const toggle = (id) => setDraft((d) => {
+    const cur = d.orgIds == null ? ids : d.orgIds
+    const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]
+    // Todos ligados é o mesmo que nenhum filtro; nenhum ligado não faz sentido.
+    return { ...d, orgIds: next.length === 0 || next.length === ids.length ? null : next }
+  })
+  const initials = (name) => (name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase()
+  return (
+    <Sheet title={t('agenda.filters')} onClose={onClose}>
+      <p className="mb-2 text-sm font-extrabold text-ink-900">{t('agenda.filter_show')}</p>
+      <Chips value={draft.show} onChange={(v) => setDraft((d) => ({ ...d, show: v }))}
+        options={HOME_SHOW_OPTIONS.map((v) => ({ value: v, label: t(v === 'enrolled' ? 'agenda.show_mine' : SHOW_LABEL_KEY[v]) }))} />
+      {draft.show === 'played' && <p className="mt-2 text-xs text-muted">{t('agenda.show_played_hint')}</p>}
+      {orgs.length > 1 && (
+        <>
+          <p className="mt-5 mb-1 text-sm font-extrabold text-ink-900">{t('agenda.filter_org')}</p>
+          <div className="divide-y divide-line">
+            {orgs.map((o) => (
+              <button key={o.id} type="button" onClick={() => toggle(o.id)} aria-pressed={on(o.id)}
+                className="flex w-full min-h-[52px] items-center gap-3 py-2 text-left">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ink-900 text-[11px] font-extrabold text-lime-400">{initials(o.name)}</span>
+                <span className="min-w-0 flex-1 truncate text-[15px] font-extrabold text-ink-900">{o.name}</span>
+                <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-[1.5px] ${on(o.id) ? 'border-ink-900 bg-ink-900 text-white' : 'border-ink-200 bg-white'}`}>
+                  {on(o.id) && <Check size={14} strokeWidth={3} />}
+                </span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+      <button type="button" onClick={() => onApply(draft)} className="mt-5 w-full min-h-[52px] rounded-ctrl bg-ink-900 text-[15px] font-extrabold text-white">
+        {t('agenda.filters_see')}
+      </button>
+    </Sheet>
   )
 }

@@ -150,7 +150,6 @@ export default function MixWizard({
         <button type="button" disabled={busy} onClick={() => submit(false)} className="btn-primary w-full disabled:opacity-40">
           {t('mixwizard.save_changes')}
         </button>
-        {editExtras}
       </div>
     ) : (
       <div className="space-y-2">
@@ -563,6 +562,10 @@ export default function MixWizard({
             editing={!!editingGame}
           />
         )}
+        {/* O bloco da série («Pôr em rascunho» / «Retomar», do GerirClube).
+            Ia no `footer`, que o StepPage ignora a editar — o botão não se via
+            (ensaio do QA, 8 out). Fica no fim das Regras. */}
+        {editingGame && editExtras}
       </div>
     </StepPage>
   )

@@ -38,6 +38,7 @@ import { tournamentsAvailable } from '../lib/tournamentApi'
 import { describeError, errorKind } from '../lib/errors'
 import { isDraftMix, advanceByFrequency, pendingOccurrenceRow } from '../lib/mixDraft'
 import PublishDraftSheet from '../components/mix/PublishDraftSheet'
+import { PastByMonth, PastSection, SectionLabel } from '../components/gerir/PastEvents'
 import LaunchDayPicker from '../components/LaunchDayPicker'
 import MixWizard from '../components/mix/MixWizard'
 import { useOrgNameTaken, OrgNameTakenHint } from '../components/OrgNameTaken'
@@ -441,13 +442,13 @@ export default function GerirClube() {
     }
     for (const torneio of tournaments) {
       // Um torneio tem dias, nao uma hora: o meio-dia evita que o fuso o
-      // empurre para a vespera.
-      const fim = torneio.ends_on || torneio.starts_on
+      // empurre para a vespera. So passa para «Ja passaram» quando e dado
+      // como terminado (ou cancelado): com a data passada e jogos por marcar
+      // fica em «A seguir», com «Por terminar» (UX, 9 out).
       itens.push({
         tipo: 'torneio', chave: `torneio-${torneio.id}`,
         quando: torneio.starts_on ? `${torneio.starts_on}T12:00` : null, row: torneio,
-        terminado: torneio.status === 'finished' || torneio.status === 'terminado' || torneio.status === 'cancelado'
-          || (!!fim && new Date(`${fim}T23:59`) < new Date()),
+        terminado: torneio.status === 'finished' || torneio.status === 'terminado' || torneio.status === 'cancelado',
       })
     }
     // Uma turma repete-se todas as semanas: entra pela proxima vez que
@@ -468,12 +469,63 @@ export default function GerirClube() {
     const passados = gameFilter === 'finished'
     return itens
       .filter((i) => (passados ? i.terminado : !i.terminado))
-      .filter((i) => !passados || pastKind === 'all' || i.tipo === pastKind)
+      .filter((i) => pastKind === 'all' || i.tipo === pastKind)
       .sort((a, b) => {
         const x = a.quando ? new Date(a.quando).getTime() : 0
         const y = b.quando ? new Date(b.quando).getTime() : 0
         return passados ? y - x : x - y
       })
+  }
+
+  /* «Já passaram» (SPEC 2026-10-09-gerir-jogos-antigos): TODAS as datas que
+     já passaram, de uma série ou soltas, juntas e por data — o mais recente
+     primeiro. Antes, as datas passadas de uma série só se viam dentro da
+     página da série. `serie`: só as de um mix (a página da série liga cá). */
+  const passadosPorData = (serie = null) => {
+    const itens = []
+    const quandoHora = (iso) => {
+      const d = new Date(iso)
+      // «Sex · 12:30», como no desenho: três letras.
+      const semana = formatDateLib(d, i18n.language, { weekday: 'short' }).replace('.', '').slice(0, 3)
+      return `${semana.charAt(0).toUpperCase()}${semana.slice(1)} · ${formatTimeLib(d, i18n.language, { hour: '2-digit', minute: '2-digit' })}`
+    }
+    const pessoas = (row) => (row.participants || [])
+      .filter((p) => p.status === 'confirmed')
+      .reduce((n, p) => n + 1 + (p.partner_id || p.partner_guest_id ? 1 : 0), 0)
+    for (const g of games) {
+      if (isDraftMix(g) || !DONE_STATUSES.includes(g.status)) continue
+      if (serie && g.recurrence_id !== serie) continue
+      const acabou = g.status !== 'cancelled'
+      itens.push({ tipo: 'mix', chave: `mix-${g.id}`, quando: g.date, nome: g.title, quandoLinha: quandoHora(g.date),
+        jogadores: acabou ? pessoas(g) : null, estado: acabou ? 'finished' : 'cancelled', abrir: acabou ? () => navigate(`/jogo/${g.id}`) : null })
+    }
+    if (!serie) {
+      for (const jogo of openGames) {
+        if (!DONE_STATUSES.includes(jogo.status)) continue
+        const acabou = jogo.status !== 'cancelled'
+        itens.push({ tipo: 'aberto', chave: `aberto-${jogo.id}`, quando: jogo.date, nome: jogo.title || t('gerirclube.event_label_open'), quandoLinha: quandoHora(jogo.date),
+          jogadores: acabou ? pessoas(jogo) : null, estado: acabou ? 'finished' : 'cancelled', abrir: acabou ? () => navigate(`/jogo/${jogo.id}`) : null })
+      }
+      for (const torneio of tournaments) {
+        const cancelado = torneio.status === 'cancelado'
+        const acabou = torneio.status === 'finished' || torneio.status === 'terminado'
+        if (!cancelado && !acabou) continue
+        const quando = torneio.starts_on ? `${torneio.starts_on}T12:00` : null
+        itens.push({ tipo: 'torneio', chave: `torneio-${torneio.id}`, quando, nome: torneio.name,
+          quandoLinha: quando ? quandoCurto(quando, false) : null, jogadores: null, estado: cancelado ? 'cancelled' : 'finished',
+          abrir: cancelado ? null : () => navigate(`/torneio/${torneio.slug || torneio.id}`) })
+      }
+      for (const turma of turmas) {
+        const dadas = turmasDadas.get(turma.series_id)
+        if (!dadas?.count) continue
+        itens.push({ tipo: 'turma', chave: `turma-dada-${turma.series_id}`, quando: dadas.last, nome: turma.name || t('gerirclube.event_label_series'),
+          quandoLinha: t('gerirclube.past_series_line', { days: t(`lessons.wd_plural_${turma.weekday}`).toLowerCase(), count: dadas.count }),
+          jogadores: null, estado: null, abrir: () => setTurmaAberta(turma.series_id) })
+      }
+    }
+    return itens
+      .filter((i) => pastKind === 'all' || i.tipo === pastKind)
+      .sort((a, b) => (b.quando ? new Date(b.quando).getTime() : 0) - (a.quando ? new Date(a.quando).getTime() : 0))
   }
 
   useEffect(() => { setFormLevelScale('') }, [showCreateGame, editingGame?.id])
@@ -829,7 +881,8 @@ export default function GerirClube() {
   }
 
   useEffect(() => {
-    if (gameFilter !== 'finished' || turmas.length === 0) return
+    // As aulas dadas entram em «Já passaram», que agora está sempre à vista.
+    if (turmas.length === 0) return
     listSeriesPastLessons(turmas.map((x) => x.series_id))
       .then((rows) => {
         const m = new Map()
@@ -1466,14 +1519,21 @@ export default function GerirClube() {
         // falhar (ainda por correr), a pergunta sai sem números.
         const { data: preview, error: previewError } = await supabase.rpc('preview_recurrence_pause', { p_recurrence_id: recurrenceId })
         const counted = !previewError && preview && preview.dates != null
+        // Em português o 0 cai na forma do «1» (ensaio do QA, 8 out): sem
+        // datas ou sem inscritos, a frase diz isso mesmo.
+        const nDates = Number(preview?.dates) || 0
+        const nPeople = Number(preview?.people) || 0
         if (!await askConfirm({
           title: t('series.draft_title'),
-          message: counted
-            ? t('series.draft_message', { dates: t('series.n_dates', { count: Number(preview.dates) || 0 }), people: t('series.n_people', { count: Number(preview.people) || 0 }) })
-            : t('series.draft_message_plain'),
+          message: !counted ? t('series.draft_message_plain')
+            : nDates === 0 ? t('series.draft_message_no_dates')
+            : nPeople === 0 ? t('series.draft_message_nobody', { dates: t('series.n_dates', { count: nDates }) })
+            : t('series.draft_message', { dates: t('series.n_dates', { count: nDates }), people: t('series.n_people', { count: nPeople }) }),
           cancelLabel: t('series.draft_keep'),
           confirmLabel: t('series.draft_yes'),
-          danger: true,
+          // Vermelho só quando pausar tira pessoas (UX, 8 out); sem
+          // inscritos fica a preto. Sem os números, pode haver: vermelho.
+          danger: !counted || (nDates > 0 && nPeople > 0),
         })) return
         setAsk(null)
         const { error } = await supabase.rpc('pause_recurrence_to_draft', { p_recurrence_id: recurrenceId })
@@ -1482,7 +1542,8 @@ export default function GerirClube() {
       } else {
         const { data: resumed, error } = await supabase.rpc('resume_recurrence', { p_recurrence_id: recurrenceId })
         if (error) throw error
-        setDoneNotice(t('series.resumed_done', { count: Number(resumed?.dates) || 0 }))
+        const reopened = Number(resumed?.dates) || 0
+        setDoneNotice(reopened ? t('series.resumed_done', { count: reopened }) : t('series.resumed_done_none'))
       }
       setEditingGame((g) => (g ? { ...g, recurrence: { ...g.recurrence, is_paused: !currentlyPaused } } : g))
       loadGames()
@@ -2329,7 +2390,38 @@ export default function GerirClube() {
         onChanged={loadGames}
         onStopSeries={deactivateRecurrence}
         onDeleted={(notice) => { loadGames(); voltar(notice) }}
+        pastCount={passadosPorData(serieId).length}
+        onSeePast={() => navigate(`/gerir/${org.slug}/ja-passaram?serie=${serieId}`, { state: { fromGerir: true } })}
       />
+    )
+  }
+
+  // «Já passaram» (SPEC 9 out): tudo o que já passou, por mês. Com ?serie=,
+  // só as datas desse mix (vem do «Ver as que já passaram» da página da série).
+  if (location.pathname.endsWith('/ja-passaram') && org) {
+    const serie = searchParams.get('serie')
+    return (
+      <div className="space-y-4">
+        <BackBar onBack={() => (location.state?.fromGerir ? navigate(-1) : navigate(`/gerir/${org.slug}`, { replace: true }))} />
+        <div>
+          <h1 className="font-display text-2xl leading-tight text-ink-900">{t('pastevents.page_title')}</h1>
+          {/* Vinda da série, diz de que mix é a lista (UX, 9 out). */}
+          <p className="text-sm text-muted">{[serie ? games.find((g) => g.recurrence_id === serie)?.title : null, org.name].filter(Boolean).join(' · ')}</p>
+        </div>
+        {!serie && (
+          <Chips label={t('pastevents.page_title')} value={pastKind} onChange={setPastKind}
+            options={[
+              { value: 'all', label: t('gerirclube.kind_all') },
+              { value: 'mix', label: t('gerirclube.kind_mixes') },
+              ...(canPlanEvents && tournamentsReady ? [{ value: 'torneio', label: t('gerirclube.kind_tournaments') }] : []),
+              ...(org?.kind === 'group' ? [] : [
+                { value: 'aberto', label: t('gerirclube.kind_open') },
+                ...(lessonsReady ? [{ value: 'turma', label: t('gerirclube.kind_series') }] : []),
+              ]),
+            ]} />
+        )}
+        <PastByMonth items={passadosPorData(serie)} />
+      </div>
     )
   }
 
@@ -2348,7 +2440,9 @@ export default function GerirClube() {
     const extras = editingGame?.recurrence?.is_active && (
       <div className="pt-4 border-t border-line space-y-4">
         {editingGame.recurrence?.is_active && (
-          <div className="flex items-center justify-between gap-3 p-3 rounded-ctrl bg-ink-50">
+          // Um só preto por ecrã (UX, 8 out): o da série fica em contorno, a
+          // toda a largura, por baixo do texto — o preto é o «Guardar».
+          <div className="space-y-2.5 p-3 rounded-ctrl bg-ink-50">
             <div>
               <p className="text-sm font-extrabold text-ink-900">
                 {editingGame.recurrence.is_paused ? t('gerirclube.recurrence_paused_label') : t('gerirclube.recurrence_active_label')}
@@ -2358,7 +2452,7 @@ export default function GerirClube() {
               </p>
             </div>
             <button type="button" onClick={() => handleTogglePauseRecurrence(editingGame.recurrence.id, editingGame.recurrence.is_paused)}
-              className="shrink-0 text-xs font-extrabold px-3.5 py-2 min-h-[44px] rounded-full bg-ink-900 text-lime-400">
+              className="w-full min-h-[48px] rounded-ctrl border border-line bg-white px-4 text-sm font-extrabold text-ink-900">
               {editingGame.recurrence.is_paused ? t('gerirclube.resume_button') : t('gerirclube.pause_button')}
             </button>
           </div>
@@ -2422,7 +2516,10 @@ export default function GerirClube() {
             // «Voltar a rascunho» no Editar (Francisco, 6 out): o mesmo
             // unpublish_mix do «Mais ⋯» — até o mix terminar, também com
             // inscritos (saem e recebem um aviso). Num rascunho não aparece.
-            onUnpublish={editingGame && ['pending', 'open', 'closed', 'in_progress'].includes(editingGame.status) ? async (leaving) => {
+            // Com a série em pausa, as datas já estão em rascunho (Dev 1, 9 out):
+            // lê-se o estado fresco da lista, e não o do mix que abriu o Editar.
+            onUnpublish={editingGame && !editingGame.recurrence?.is_paused
+              && ['pending', 'open', 'closed', 'in_progress'].includes((games.find((g) => g.id === editingGame.id) || editingGame).status) ? async (leaving) => {
               const { error } = await supabase.rpc('unpublish_mix', { p_game_id: editingGame.id })
               if (error) throw error
               setDoneNotice(leaving > 0 ? t('eventactions.to_draft_done_people', { count: leaving }) : t('eventactions.to_draft_done'))
@@ -3058,7 +3155,7 @@ export default function GerirClube() {
                     {(!editingGame || !editingGame.recurrence || editingGame.recurrence.is_active) && (
                       <div className="border-t border-line pt-4 space-y-4">
                         {editingGame?.recurrence?.is_active && (
-                          <div className="flex items-center justify-between gap-3 p-3 rounded-ctrl bg-ink-50">
+                          <div className="space-y-2.5 p-3 rounded-ctrl bg-ink-50">
                             <div>
                               <p className="text-sm font-extrabold text-ink-900">
                                 {editingGame.recurrence.is_paused ? t('gerirclube.recurrence_paused_label') : t('gerirclube.recurrence_active_label')}
@@ -3072,7 +3169,7 @@ export default function GerirClube() {
                             <button
                               type="button"
                               onClick={() => handleTogglePauseRecurrence(editingGame.recurrence.id, editingGame.recurrence.is_paused)}
-                              className="shrink-0 text-xs font-extrabold px-3.5 py-2 min-h-[44px] rounded-full bg-ink-900 text-lime-400"
+                              className="w-full min-h-[48px] rounded-ctrl border border-line bg-white px-4 text-sm font-extrabold text-ink-900"
                             >
                               {editingGame.recurrence.is_paused ? t('gerirclube.resume_button') : t('gerirclube.pause_button')}
                             </button>
@@ -3291,9 +3388,9 @@ export default function GerirClube() {
                   passou fica num botao no fim (desenho de 23 set). */}
               <div className="card space-y-4">
 
-              {/* Pastilhas por tipo no que já passou (filtro, regra única): no
-                  clube há jogos em aberto e turmas; no grupo, jogos entre amigos. */}
-              {gameFilter === 'finished' && (
+              {/* Pastilhas por tipo (filtro, regra única), por cima de «A seguir»
+                  e de «Já passaram» (SPEC 9 out). */}
+              {(
                 <Chips label={t('gerirclube.see_past')} value={pastKind} onChange={setPastKind}
                   options={[
                     { value: 'all', label: t('gerirclube.kind_all') },
@@ -3307,6 +3404,8 @@ export default function GerirClube() {
               )}
 
               <div className="space-y-3">
+                {/* «A SEGUIR · N», à vista (sai o «Ver o que vem aí»). */}
+                <SectionLabel count={eventosPorData().length}>{t('pastevents.upcoming')}</SectionLabel>
                 {eventosPorData().length === 0 && (
                   <p className="text-sm text-muted text-center py-6">
                     {t(gameFilter === 'finished' ? 'gerirclube.no_past_events' : 'gerirclube.no_upcoming_events')}
@@ -3321,7 +3420,7 @@ export default function GerirClube() {
                   // evento; a direita, uma acao so, escrita por extenso.
                   const tipo = item.tipo
                   const row = tipo === 'mix' ? item.entry.game : item.row
-                  let etiqueta, Icone, linha, detalhe, abrir, marca = null, acao = null, sufixo = null, privado = false, cinzento = false
+                  let etiqueta, Icone, linha, detalhe, abrir, marca = null, acao = null, sufixo = null, privado = false, cinzento = false, porTerminar = false
                   if (tipo === 'turma') {
                     const quando = seriesWhen(t, row)
                     etiqueta = 'gerirclube.event_label_series'
@@ -3377,6 +3476,12 @@ export default function GerirClube() {
                     // Torneio privado (Trello #482): não aparece na Home nem na
                     // Comunidade, e o link só abre a quem gere. Tem de se ler aqui.
                     privado = tipo === 'torneio' && row.is_public === false
+                    // «Por terminar» (UX, 9 out): o dia já acabou e ainda não foi
+                    // dado como terminado. Fica no topo de «A seguir» (a data é a
+                    // mais antiga), abre e mantém o «Editar».
+                    const ultimoDia = tipo === 'torneio' ? (row.ends_on || row.starts_on) : (row.date ? String(row.date).slice(0, 10) : null)
+                    porTerminar = (tipo === 'torneio' || (tipo === 'mix' && !isDraftMix(row))) && !item.terminado
+                      && !!ultimoDia && new Date(`${ultimoDia.slice(0, 10)}T23:59`) < new Date()
                     if (tipo === 'mix') {
                       // «MIX · RECORRENTE», colado a etiqueta como na pagina do
                       // evento e na Home (#383) -- nunca numa etiqueta a parte.
@@ -3433,6 +3538,9 @@ export default function GerirClube() {
                           {marca && (
                             <span className="rounded-full bg-ink-900 px-2 py-[3px] text-[11px] font-semibold text-white">{marca}</span>
                           )}
+                          {porTerminar && (
+                            <span className="shrink-0 rounded-full border border-warning px-2 py-[2px] text-[11px] font-extrabold text-warning">{t('pastevents.unfinished')}</span>
+                          )}
                         </span>
                         <p className={`text-lg font-semibold mt-1 truncate ${cinzento ? 'text-muted' : 'text-ink-900'}`}>{linha}</p>
                         <p className="text-sm text-muted mt-0.5">{detalhe}</p>
@@ -3471,15 +3579,9 @@ export default function GerirClube() {
                 })}
               </div>
 
-              {/* «Ver o que ja passou» no fim, em vez de uma aba no topo:
-                  o que interessa a quem gere e o que vem ai. */}
-              <button
-                type="button"
-                onClick={() => setGameFilter(gameFilter === 'finished' ? 'upcoming' : 'finished')}
-                className="w-full py-3 rounded-ctrl bg-canvas border border-line text-sm font-extrabold text-ink-900"
-              >
-                {t(gameFilter === 'finished' ? 'gerirclube.see_upcoming' : 'gerirclube.see_past')}
-              </button>
+              {/* «JÁ PASSARAM · N»: os 3 mais recentes e o resto numa página
+                  (SPEC 9 out). Datas de uma série e eventos soltos, juntos. */}
+              <PastSection items={passadosPorData()} onSeeAll={() => navigate(`/gerir/${org.slug}/ja-passaram`, { state: { fromGerir: true } })} />
               </div>
 
               {/* Publicar pergunta uma vez: a mensagem do robô não se apaga

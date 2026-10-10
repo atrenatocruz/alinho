@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { KeyRound } from 'lucide-react'
+import { CheckCircle2, KeyRound } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { PrimaryButton } from './ui'
+import TurnstileWidget from './TurnstileWidget'
+import { PasswordField } from '../pages/Login'
 import { describeError } from '../lib/errors'
 
 // Alterar password com a sessão aberta (Trello «Alterar password no
@@ -17,6 +19,16 @@ import { describeError } from '../lib/errors'
 // signInWithPassword sobre a própria conta, que devolve erro se estiver
 // errada e não estraga a sessão atual se estiver certa.
 //
+// Esse «entrar» passa pela verificação anti-robôs (Turnstile) como o login:
+// com ela ligada (alinho-dev, 8 out), sem o token o Supabase recusava
+// sempre e a app dizia «A password atual não está certa.» mesmo com a
+// certa. Agora vai o token, e essa frase só aparece quando a password está
+// mesmo errada (invalid_credentials); o resto (verificação, ligação,
+// demasiadas tentativas) tem a frase própria.
+//
+// Os três campos têm o olho de «Mostrar password», como no login
+// (Francisco, 8 out).
+//
 // Contas do Google não têm password no alinho: mostram a explicação em vez
 // do formulário, para ninguém ficar à procura de uma password que nunca
 // definiu.
@@ -29,6 +41,9 @@ export default function ChangePasswordSection() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)
+  // O token é de uso único: depois de cada tentativa pede-se outro.
+  const [captchaToken, setCaptchaToken] = useState(null)
+  const captchaRef = useRef(null)
 
   const providers = user?.app_metadata?.providers || (user?.app_metadata?.provider ? [user.app_metadata.provider] : [])
   const hasPassword = providers.length === 0 || providers.includes('email')
@@ -47,13 +62,19 @@ export default function ChangePasswordSection() {
 
     setBusy(true)
     try {
-      const { error: wrongCurrent } = await supabase.auth.signInWithPassword({
+      const { error: checkError } = await supabase.auth.signInWithPassword({
         email: user.email,
         password: current,
+        ...(captchaToken ? { options: { captchaToken } } : {}),
       })
-      if (wrongCurrent) {
-        setError(t('profile.password_error_current_wrong'))
-        return
+      captchaRef.current?.reset()
+      if (checkError) {
+        const wrong = checkError.code === 'invalid_credentials' || /invalid login credentials/i.test(checkError.message || '')
+        if (wrong) {
+          setError(t('profile.password_error_current_wrong'))
+          return
+        }
+        throw checkError
       }
 
       const { error: updateError } = await supabase.auth.updateUser({ password: next })
@@ -62,8 +83,10 @@ export default function ChangePasswordSection() {
       setCurrent('')
       setNext('')
       setConfirm('')
+      // Fica à vista até se mexer nos campos (PO, 9 out): a linha que sumia
+      // ao fim de 4 s passava despercebida, e o Francisco achou que a
+      // password não tinha mudado.
       setDone(true)
-      setTimeout(() => setDone(false), 4000)
     } catch (err) {
       console.error('Error changing password:', err)
       setError(describeError(t, err, 'profile.password_error_generic'))
@@ -87,13 +110,11 @@ export default function ChangePasswordSection() {
             <label className="block text-sm font-extrabold text-ink-900 mb-1.5" htmlFor="password-atual">
               {t('profile.password_current_label')}
             </label>
-            <input
+            <PasswordField
               id="password-atual"
-              type="password"
               autoComplete="current-password"
               value={current}
-              onChange={(e) => setCurrent(e.target.value)}
-              className="input-field"
+              onChange={(e) => { setCurrent(e.target.value); setDone(false) }}
               placeholder={t('login.password_placeholder')}
               required
             />
@@ -103,13 +124,11 @@ export default function ChangePasswordSection() {
             <label className="block text-sm font-extrabold text-ink-900 mb-1.5" htmlFor="password-nova">
               {t('profile.password_new_label')}
             </label>
-            <input
+            <PasswordField
               id="password-nova"
-              type="password"
               autoComplete="new-password"
               value={next}
-              onChange={(e) => setNext(e.target.value)}
-              className="input-field"
+              onChange={(e) => { setNext(e.target.value); setDone(false) }}
               placeholder={t('login.password_placeholder')}
               required
             />
@@ -120,20 +139,24 @@ export default function ChangePasswordSection() {
             <label className="block text-sm font-extrabold text-ink-900 mb-1.5" htmlFor="password-confirmar">
               {t('login.confirm_password_label')}
             </label>
-            <input
+            <PasswordField
               id="password-confirmar"
-              type="password"
               autoComplete="new-password"
               value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              className="input-field"
+              onChange={(e) => { setConfirm(e.target.value); setDone(false) }}
               placeholder={t('login.password_placeholder')}
               required
             />
           </div>
 
           {error && <p className="text-sm text-danger">{error}</p>}
-          {done && <p className="text-sm text-ink-900 font-extrabold">{t('profile.password_changed')}</p>}
+          {done && (
+            <p role="status" className="flex items-start gap-2 rounded-ctrl border border-[#BBF7D0] bg-[#DCFCE7] px-3.5 py-3 text-sm font-extrabold text-[#14532D]">
+              <CheckCircle2 size={18} className="mt-px shrink-0" /> {t('profile.password_changed')}
+            </p>
+          )}
+
+          <TurnstileWidget ref={captchaRef} action="change_password" onToken={setCaptchaToken} />
 
           <PrimaryButton type="submit" disabled={busy} className="w-full">
             {busy ? t('layout.saving') : t('profile.password_submit')}

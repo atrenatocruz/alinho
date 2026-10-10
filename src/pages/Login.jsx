@@ -30,12 +30,13 @@ function toggleLanguage() {
 // Module scope, not nested in Login: an inline component would be recreated
 // (and remounted — dropping focus and its own `visible` state) on every
 // keystroke in any field, since every keystroke re-renders the parent.
-export function PasswordField({ value, onChange, placeholder, autoComplete, minLength, required }) {
+export function PasswordField({ id, value, onChange, placeholder, autoComplete, minLength, required }) {
   const { t } = useTranslation()
   const [visible, setVisible] = useState(false)
   return (
     <div className="relative">
       <input
+        id={id}
         type={visible ? 'text' : 'password'}
         value={value}
         onChange={onChange}
