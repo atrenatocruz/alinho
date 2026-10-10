@@ -50,7 +50,8 @@ export function parseCopiedRoster(text) {
     .filter((s) => !/^\(?vaga livre\)?$/i.test(s.trim()))
     .map(cleanRosterName)
     .filter(Boolean)
-  const gameId = text.match(/\/jogo\/([0-9a-f-]{8,})/i)?.[1] ?? null
+  // O link do cartão: o curto «/m/<8>» (desde 9 out) ou o comprido de antes.
+  const gameId = text.match(/\/(?:jogo|m)\/([0-9a-f-]{8,})/i)?.[1]?.toLowerCase() ?? null
   // Primeira linha do cartão: «🎾 *Mix de segunda M5*» (ou «🎾 *01 · …*»).
   const title = lines.map((l) => l.match(/^\s*🎾\s*\*(.+?)\*\s*$/u)?.[1]).find(Boolean) ?? null
   // «🔢 Nº: 01» — o número do mix, quando há vários abertos.

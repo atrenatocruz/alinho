@@ -433,7 +433,9 @@ export default function Home() {
   const visible = useMemo(() => applyFilters(events, filters, location), [events, filters, location])
   const counts = useMemo(() => countByDay(visible), [visible])
   const today = toDayKey(new Date())
-  const days = useMemo(() => groupByDay(visible, today), [visible, today])
+  // A Home abre em «Hoje» e por cima não há dias passados: esses vivem em
+  // «Filtros › Já jogados» (UX, 9 out — Home do futuro, SPEC-1).
+  const days = useMemo(() => groupByDay(visible.filter((e) => e.dayKey >= today), today), [visible, today])
   // Lista vazia por causa dos filtros (não do dia): diz-se isso e limpa-se
   // num toque (Trello #415).
   const filtersActive = filters.show !== DEFAULT_FILTERS.show

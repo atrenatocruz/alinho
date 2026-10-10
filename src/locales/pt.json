@@ -4965,5 +4965,6 @@
   "homesearch.join": "Entrar",
   "homesearch.inside": "Dentro",
   "homesearch.none_title": "Nada com \u00ab{{q}}\u00bb.",
-  "homesearch.none_hint": "Experimenta o nome de um clube, de uma pessoa ou \u00abmix\u00bb."
+  "homesearch.none_hint": "Experimenta o nome de um clube, de uma pessoa ou \u00abmix\u00bb.",
+  "agenda.filter_kind_friends_short": "Amigos"
 }

@@ -93,7 +93,7 @@ test('o cartão novo: curto, a dupla numa linha, com os pontos Elo, sem calendá
     '👉 Responde a esta mensagem com *In* para entrar ou *Out* para sair (ou escreve *In 01*).',
     'Em dupla: *In com* e o nome do parceiro.',
     'Dúvidas? Escreve */help*.',
-    'alinho.pt/jogo/3f2a',
+    'alinho.pt/m/3f2a',
   ].join('\n'))
 })
 
