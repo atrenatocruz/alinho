@@ -5,10 +5,10 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { CheckCircle2, Clock, GraduationCap, Repeat } from 'lucide-react'
-import { OrgHeader, Owner, StateTag } from '../agenda/EventCard'
+import { CheckCircle2, Clock } from 'lucide-react'
+import { KindLine, OrgHeader, Owner, StateTag } from '../agenda/EventCard'
 import { ConfirmSheet } from '../ui'
-import { LevelPill, TEAL, TealTag, bandLabel, euros, hhmm, lessonTypeLabel } from './LessonBits'
+import { LevelPill, TEAL, bandLabel, euros, hhmm, lessonTypeLabel } from './LessonBits'
 
 // «qua 30/9 · 11:00–12:00» — a mesma forma do pedir aula.
 const whenLine = (t, iso, minutes) => {
@@ -49,6 +49,8 @@ export default function LessonEventCard({ event, past = false, onAttendance = nu
     : l.form === 'trial' ? t('lessons.form_trial')
       : l.form === 'free_invite' ? t('lessons.form_free_invite')
         : lessonTypeLabel(t, l.lesson_type)
+  const kindLine = <KindLine kind="lesson" past={past} label={typeLabel}
+    suffix={isSeries && !cancelled ? t(`lessons.wd_plural_${((event.startsAt.getDay() + 6) % 7) + 1}`) : null} />
 
   let state = null
   if (cancelled) state = <span className="rounded-full bg-[#FBE3E3] px-2 py-1 text-[11px] font-extrabold text-danger">{t('lessons.state_cancelled')}</span>
@@ -89,14 +91,9 @@ export default function LessonEventCard({ event, past = false, onAttendance = nu
     <div className={`relative overflow-hidden rounded-card p-3.5 press ${frame}`} style={frameStyle}>
       <Link to={isRequest ? `/professor/${base.teacher_profile_id}/pedir` : `/aula/${l.lesson_id}`} className="absolute inset-0" aria-label={title} />
       {/* O estado ao canto, com quem organiza (Francisco, 30 set: «em todos»). */}
-      <OrgHeader event={event} past={past} right={state} />
-      <div className="flex items-start justify-between gap-2">
-        <span className="flex flex-wrap gap-1">
-          <TealTag icon={GraduationCap}>{typeLabel}</TealTag>
-          {isSeries && !cancelled && <TealTag icon={Repeat}>{t(`lessons.wd_plural_${((event.startsAt.getDay() + 6) % 7) + 1}`)}</TealTag>}
-        </span>
-        {!event.orgName && state}
-      </div>
+      {/* O tipo por baixo do clube, sem pastilha (Home do futuro, SPEC-3). */}
+      <OrgHeader event={event} past={past} right={state} kind={kindLine} />
+      {!event.orgName && <div className="flex items-start justify-between gap-2">{kindLine}{state}</div>}
 
       <p className={`font-display text-[22px] font-extrabold leading-none mt-2.5 ${past ? 'text-muted' : 'text-ink-900'}`}>
         {hhmm(l.starts_at)}<span className="text-sm font-bold text-ink-500">–{hhmm(l.ends_at)}</span>

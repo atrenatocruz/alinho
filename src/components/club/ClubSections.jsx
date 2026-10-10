@@ -11,7 +11,7 @@ import { Check, CheckCircle2, ChevronRight, Clock, Globe, Heart, Instagram, Lock
 import { Avatar, ConfirmSheet, PrimaryButton, Tabs } from '../ui'
 import { supabase } from '../../lib/supabase'
 import { describeError, errorKind } from '../../lib/errors'
-import { KIND_STYLE, KindTag, StateTag } from '../agenda/EventCard'
+import { KIND_STYLE, KindLine, StateLine, StateTag } from '../agenda/EventCard'
 
 const asWebsiteUrl = (value) => (/^https?:\/\//i.test(value) ? value : `https://${value}`)
 const asInstagramUrl = (value) => (/^https?:\/\//i.test(value)
@@ -181,20 +181,20 @@ function EventRow({ event, member }) {
     ].filter(Boolean).join(' · ')
   }
 
-  const state = event.myState === 'in' ? <StateTag tone="in" icon={Check}>{t('agenda.state_in')}</StateTag>
-    : event.myState === 'waitlist' ? <StateTag tone="wait">{t('agenda.state_waitlist')}</StateTag>
-      : null
+  // O tipo sem pastilha e «Suplente» numa linha por baixo, como na Home (SPEC-3, UX 10 out).
+  const state = event.myState === 'in' ? <StateTag tone="in" icon={Check}>{t('agenda.state_in')}</StateTag> : null
   const frame = event.myState === 'in' ? `${KIND_STYLE[event.kind].bg} border-2 border-ok`
     : event.myState === 'waitlist' ? `${KIND_STYLE[event.kind].bg} border-2 border-dashed border-[#B86E00]`
       : `${KIND_STYLE[event.kind].card} border`
   const body = (
     <>
       <div className="flex items-start justify-between gap-2">
-        <KindTag kind={event.kind} suffix={event.recurring ? t('ui.recurring') : null} />
+        <KindLine kind={event.kind} suffix={event.recurring ? t('ui.recurring') : null} />
         {event.locked ? <Lock size={15} className="mt-1 text-muted" /> : state}
       </div>
       <h4 className="mt-2 text-base font-extrabold leading-snug text-ink-900 [overflow-wrap:anywhere]">{event.title}</h4>
       <p className="mt-0.5 text-[13px] text-ink-700">{line}</p>
+      {event.myState === 'waitlist' && <StateLine kind={event.kind}>{t('agenda.state_line_waitlist')}</StateLine>}
     </>
   )
   const cls = `block rounded-card p-3.5 ${frame}`
@@ -317,7 +317,7 @@ function ClubPlayed({ club }) {
         return (
           <Link key={`${r.kind}-${r.id}`} to={to} className={`press block rounded-card bg-surface p-3.5 ${r.i_played ? 'border-2 border-ok' : 'border border-line'}`}>
             <div className="flex items-start justify-between gap-2">
-              <KindTag kind={kind} past />
+              <KindLine kind={kind} past />
               <StateTag tone="grey" icon={CheckCircle2}>{t('agenda.state_finished')}</StateTag>
             </div>
             <div className="mt-2 flex items-baseline justify-between gap-2">

@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Trophy, MapPin, Clock, Megaphone, CheckCircle2 } from 'lucide-react'
-import { OrgHeader, StateTag } from './EventCard'
+import { MapPin, Clock, Megaphone, CheckCircle2 } from 'lucide-react'
+import { KindLine, OrgHeader, StateLine, StateTag } from './EventCard'
 
 /* O torneio na agenda da Home (Trello #363).
 
@@ -16,13 +16,14 @@ import { OrgHeader, StateTag } from './EventCard'
 
 const LILAC = { bg: '#E9E7FB', border: '#C9C3F3', ink: '#4338A8' }
 
-const STATE_KEY = {
-  convite: 'tsignup.state_waiting_partner',
-  sem_parceiro: 'tsignup.state_alone',
-  por_validar: 'tsignup.state_to_validate',
-  validada: 'tsignup.state_in',
-  selecionada: 'tsignup.state_in',
-  suplente: 'tsignup.state_waitlist',
+// A inscrição feita fica no canto, curta («✓ Inscrito»); os outros pontos
+// da inscrição são compridos e vão numa linha por baixo do nome, sem
+// pastilha (UX, 10 out — «Esta tag não dá», Francisco).
+const LINE_KEY = {
+  convite: 'agenda.state_line_waiting_partner',
+  sem_parceiro: 'agenda.state_line_alone',
+  por_validar: 'agenda.state_line_to_validate',
+  suplente: 'agenda.state_line_waitlist',
 }
 
 const hhmm = (date, language) =>
@@ -40,11 +41,12 @@ export default function TournamentEventCard({ event, past, footer = null }) {
   // outros cartões da Home (#508).
   const stateTag = past || event.finished ? (
     <StateTag tone="grey" icon={CheckCircle2}>{t('agenda.state_finished')}</StateTag>
-  ) : !isMatch && event.myState ? (
-    <span className="rounded-full bg-white px-2.5 py-1 text-xs font-extrabold" style={{ color: LILAC.ink }}>
-      {t(STATE_KEY[event.myState] || 'tsignup.state_in')}
-    </span>
+  ) : !isMatch && event.myState && !LINE_KEY[event.myState] ? (
+    <StateTag tone="in" icon={CheckCircle2}>{t('agenda.state_in')}</StateTag>
   ) : null
+  const stateLine = !past && !event.finished && !isMatch && LINE_KEY[event.myState] ? t(LINE_KEY[event.myState]) : null
+  // O tipo por baixo do clube (SPEC-3): «Torneio», ou «Torneio · M4» no jogo.
+  const kindLine = <KindLine kind="tournament" past={past} suffix={isMatch && event.categoryCode ? event.categoryCode : null} />
 
   // Cartão com organizador (design-handoff/2026-09-28-cartao-com-organizador,
   // o do Dev 4 no b26fc07a): em cima quem organiza, que abre o perfil do
@@ -56,7 +58,7 @@ export default function TournamentEventCard({ event, past, footer = null }) {
       <Link to={to} className="absolute inset-0 rounded-[inherit]" aria-label={event.raw?.name || event.orgName || ''} />
       {/* O estado vai para o canto, ao lado de quem organiza, como no mix
           (457bfaf, Francisco 30 set). */}
-      <OrgHeader event={event} past={past} right={stateTag} />
+      <OrgHeader event={event} past={past} right={stateTag} kind={kindLine} />
       {body()}
       {footer && <div className="relative z-[1]">{footer}</div>}
     </div>
@@ -74,18 +76,7 @@ export default function TournamentEventCard({ event, past, footer = null }) {
         </p>
       )}
 
-      <div className="flex items-center justify-between gap-2">
-        <span
-          className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-extrabold"
-          style={{ color: LILAC.ink }}
-        >
-          <Trophy size={13} />
-          {isMatch && event.categoryCode
-            ? `${t('agenda.kind_tournament')} · ${event.categoryCode}`
-            : t('agenda.kind_tournament')}
-        </span>
-        {!event.orgName && stateTag}
-      </div>
+      {!event.orgName && <div className="flex items-center justify-between gap-2">{kindLine}{stateTag}</div>}
 
       {/* A hora só existe depois do sorteio; antes é um evento de dias. */}
       {isMatch && event.startsAt ? (
@@ -126,6 +117,7 @@ export default function TournamentEventCard({ event, past, footer = null }) {
           {isMatch ? event.courtName : t('tagenda.categories', { count: event.raw.category_count })}
         </p>
       ) : null}
+      {stateLine && <StateLine kind="tournament">{stateLine}</StateLine>}
 
       {/* Hora prevista, nunca garantida — a regra da Federação que o
           desenho manda repetir no cartão (SPEC §6). */}

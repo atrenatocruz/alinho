@@ -12,7 +12,7 @@ import { CheckCircle2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { toDayKey } from '../../lib/agenda'
 import { formatTime } from '../../lib/formatDate'
-import { KindTag, OrgHeader, StateTag } from './EventCard'
+import { KindLine, OrgHeader, StateTag } from './EventCard'
 import { dayLabel } from './AgendaControls'
 
 const PAGE = 20
@@ -113,11 +113,9 @@ function PlayedCard({ row }) {
     <div className={`relative overflow-hidden rounded-card bg-surface p-3.5 press ${row.i_played ? 'border-2 border-ok' : 'border border-line'}`}>
       <Link to={to} className="absolute inset-0" aria-label={title || ''} />
       {/* O estado ao canto, à direita de quem organiza (como nos outros cartões da Home). */}
-      <OrgHeader event={event} past right={state} />
-      <div className="flex items-start justify-between gap-2">
-        <KindTag kind={kind} past />
-        {!event.orgName && state}
-      </div>
+      {/* O tipo por baixo de quem organiza, sem pastilha (Home do futuro, SPEC-3). */}
+      <OrgHeader event={event} past right={state} kind={<KindLine kind={kind} past />} />
+      {!event.orgName && <div className="flex items-start justify-between gap-2"><KindLine kind={kind} past />{state}</div>}
       {row.kind !== 'tournament' && (
         <p className="mt-2.5 text-[22px] font-extrabold leading-none text-muted">{formatTime(row.date, i18n.language, { hour: '2-digit', minute: '2-digit' })}</p>
       )}

@@ -991,7 +991,7 @@ const AGENDA_GAMES = () => [
     location: 'Smash Padel, Parque das Nações', status: 'open', origin: 'admin', format: 'sobe_desce', num_courts: 4,
     max_players: 16, price_per_player: 8, prize: 'Bolas Head', gender_restriction: 'masculino', age_restriction: 'plus35',
     // localStorage.mockMixLevels = 'true': os níveis novos (#577), um Misto 4 e um F3.
-    level: localStorage.getItem('mockMixLevels') === 'true' ? 'MX4' : 'M3', recurrence_id: 'rec-1', organization: { name: 'Smash Padel Almada', kind: 'club', group_logo_url: null },
+    level: localStorage.getItem('mockMixLevels') === 'true' ? 'MX4' : 'M3', recurrence_id: 'rec-1', organization: { name: localStorage.getItem('mockLongClub') === 'true' ? 'Clube de Padel Quinta da Marinha' : 'Smash Padel Almada', kind: 'club', group_logo_url: null },
     participants: [
       { id: 'p1', user_id: MOCK_ADMIN_USER_ID, partner_id: null, status: 'confirmed', user: ADMIN_PERSON },
       { id: 'p2', user_id: FAKE_MEMBER_ID, partner_id: FAKE_PARTNER_ID, status: 'confirmed', user: person(FAKE_MEMBER_ID), partner: person(FAKE_PARTNER_ID) },
@@ -1287,12 +1287,13 @@ const TABLE_MOCKS = {
     // mockTHome = 'past': o torneio acabou há dois dias e joguei (#508).
     if (mode === 'past') return [{ ...tour, starts_on: day(-3), ends_on: day(-2), status: 'terminado', category_count: 5 }]
     const d0 = localStorage.getItem('mockTHomeToday') === 'true' ? 0 : 1
-    return [{ ...tour, starts_on: day(d0), ends_on: day(d0 + 2), status: d0 === 0 ? 'a_decorrer' : 'inscricoes', category_count: 5 }]
+    return [{ ...tour, starts_on: day(d0), ends_on: day(d0 + 2), status: d0 === 0 ? 'a_decorrer' : 'inscricoes', category_count: 5,
+      ...(localStorage.getItem('mockLongClub') === 'true' ? { club_name: 'Clube de Padel Quinta da Marinha' } : {}) }]
   },
   tournament_entries: () => (localStorage.getItem('mockTMyGamesReal') === 'true'
     ? [{ id: 'e1', category_id: 'cat-m4', status: 'validada' }]
     : localStorage.getItem('mockTHome')
-      ? [{ id: 'my-entry', category_id: 'cat-m4', status: 'validada' }] : []),
+      ? [{ id: 'my-entry', category_id: 'cat-m4', status: localStorage.getItem('mockTEntryStatus') || 'validada' }] : []),
   tournament_public_categories: () => (localStorage.getItem('mockTHome')
     ? [{ id: 'cat-m4', tournament_id: 'tour-smash-open', code: 'M4', name: 'Masculinos 4' }] : []),
   tournament_public_matches: () => {
