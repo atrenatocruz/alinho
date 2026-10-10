@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { Fragment, useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useSearchParams, useNavigationType, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -19,9 +19,11 @@ import { listFollowing } from '../lib/follows'
 import { isMemberLimitError } from '../lib/plans'
 import { listOpenTournaments } from '../lib/tournamentApi'
 import OpenTournamentRow from '../components/tournament/OpenTournamentRow'
-import ScoreTodayCard, { useTournamentsToScoreToday } from '../components/tournament/ScoreTodayCard'
-import FriendInviteCard from '../components/friends/FriendInviteCard'
-import LiveStrip from '../components/live/LiveStrip'
+import { useTournamentsToScoreToday } from '../components/tournament/ScoreTodayCard'
+import MyNextGames, { CustomizePill } from '../components/home/MyNextGames'
+import LiveNowLine from '../components/home/LiveNowLine'
+import ForYouLine, { forYouItems } from '../components/home/ForYouLine'
+import PersonalizeHomeSheet, { useHomeSections } from '../components/home/PersonalizeHomeSheet'
 import { listMyFriendMatchInvites } from '../lib/privateMatches'
 import { describeError, errorKind, isGameFull } from '../lib/errors'
 import { getGroupMatches } from '../lib/groupMatches'
@@ -147,8 +149,12 @@ export default function Home() {
   // Jogos entre amigos com resultados à espera de mim (amigos sem bloquear,
   // 27 set): o convite âmbar em hoje, como no desenho aprovado.
   const [friendInvites, setFriendInvites] = useState([])
-  // «A decorrer agora» (27 set): quantos há, para abrir em Hoje.
-  const [liveCount, setLiveCount] = useState(0)
+  // O topo da Home (SPEC-2, 9 out): o que a pessoa escondeu no «Personalizar».
+  const homeSections = useHomeSections(user?.id)
+  const [customizeOpen, setCustomizeOpen] = useState(false)
+  const [phoneOpen, setPhoneOpen] = useState(false)
+  // O bloco do topo (próximos, a decorrer, para ti): é para lá que a Home abre.
+  const topBlockRef = useRef(null)
   useEffect(() => {
     listMyFriendMatchInvites()
       .then((rows) => setFriendInvites(rows.filter((r) => r.teams_set)))
@@ -428,7 +434,9 @@ export default function Home() {
   const visible = useMemo(() => applyFilters(events, filters, location), [events, filters, location])
   const counts = useMemo(() => countByDay(visible), [visible])
   const today = toDayKey(new Date())
-  const days = useMemo(() => groupByDay(visible, today), [visible, today])
+  // A Home abre em «Hoje» e por cima não há dias passados: esses vivem em
+  // «Filtros › Já jogados» (UX, 9 out — Home do futuro, SPEC-1).
+  const days = useMemo(() => groupByDay(visible.filter((e) => e.dayKey >= today), today), [visible, today])
   // Lista vazia por causa dos filtros (não do dia): diz-se isso e limpa-se
   // num toque (Trello #415).
   const filtersActive = filters.show !== DEFAULT_FILTERS.show
@@ -580,8 +588,10 @@ export default function Home() {
     if (!header) return
     const line = header.getBoundingClientRect().bottom + 12
     let current = null
+    // O bloco do topo conta como o 1.º dia de hoje em diante: está por cima dele.
+    const firstUpcoming = days.find((d) => d.dayKey >= today)?.dayKey
     for (const { dayKey } of days) {
-      const el = dayRefs.current.get(dayKey)
+      const el = (dayKey === firstUpcoming && topBlockRef.current) || dayRefs.current.get(dayKey)
       if (!el) continue
       if (el.getBoundingClientRect().top <= line) current = dayKey
       else break
@@ -593,7 +603,8 @@ export default function Home() {
     const main = scroller()
     const header = headerRef.current
     const target = days.find((d) => d.dayKey >= dayKey) || days[days.length - 1]
-    const el = target && dayRefs.current.get(target.dayKey)
+    const firstUpcoming = days.find((d) => d.dayKey >= today)
+    const el = target && (target === firstUpcoming && topBlockRef.current ? topBlockRef.current : dayRefs.current.get(target.dayKey))
     if (!main || !header || !el) return
     main.scrollTop += el.getBoundingClientRect().top - header.getBoundingClientRect().bottom - 8
     updateVisibleDay()
@@ -682,15 +693,11 @@ export default function Home() {
       updateVisibleDay()
       return
     }
-    // O próximo evento que ainda não acabou, com o filtro que estiver
-    // escolhido (em "Todos", inscrito ou não) — a Home nunca abre em branco.
-    // Dia de torneio em que marco resultados, ou um convite de jogo entre
-    // amigos à espera de mim: abre em Hoje, onde está o botão.
-    const next = scoreToday.length > 0 || friendInvites.length > 0 || liveCount > 0 ? null
-      : days.find((d) => d.dayKey >= today && d.events.some((e) => !e.finished))
-    scrollToDay(next ? next.dayKey : today)
+    // Abre no topo de hoje: os teus próximos jogos, o que está a decorrer e
+    // o que é para ti, e por baixo os dias (Home do futuro, SPEC-2, 9 out).
+    scrollToDay(today)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, days, scoreToday.length, friendInvites.length, liveCount])
+  }, [loading, days])
 
   // Alternar de mapa para lista, ou tocar outra vez no separador "Jogos" da
   // barra de baixo (aviso do Layout — ver home:reset-scroll), volta sempre
@@ -728,6 +735,32 @@ export default function Home() {
   }
 
   const orgSlugById = new Map(orgs.map((o) => [o.id, o.slug]))
+  // O caminho de cada evento: o mesmo na pesquisa e nos próximos jogos.
+  const eventLink = (e) => (
+    e.source === 'game' || e.source === 'explore' ? `/jogo/${e.id}`
+      : e.kind === 'tournament' ? (e.slug || e.id ? `/torneio/${e.slug || e.id}` : null)
+        : e.source === 'lesson' ? `/aula/${e.id}`
+          : e.source === 'group_match' ? (orgSlugById.get(e.orgId) ? `/clube/${orgSlugById.get(e.orgId)}/jogos` : null)
+            : e.source === 'friend_session' ? (e.id ? `/jogos-privados/sessao/${e.id}` : '/jogos-privados')
+            : e.source === 'private_match' ? '/jogos-privados'
+              : null
+  )
+  // O topo da Home (SPEC-2): os teus próximos → a decorrer → para ti → os dias.
+  // O número por confirmar (sem ele, o «In» no WhatsApp entra como convidado
+  // sem conta — migration_mix_guest_sem_conta.sql) é uma linha do «Para ti»
+  // que abre a caixa de sempre numa folha (UX, 10 out).
+  const phoneToConfirm = !!profile && !profile.phone_verified_at && profile.phone_hash !== 'dev-bypass'
+  const forYou = forYouItems({ privateMatches, userId: user?.id, friendInvites, scoreToday, todayKey: today, t, lang: i18n.language,
+    onConfirmPhone: phoneToConfirm ? () => setPhoneOpen(true) : null })
+  const firstUpcomingDay = days.find((d) => d.dayKey >= today)?.dayKey
+  const topBlock = (
+    <div ref={topBlockRef} className="space-y-4">
+      <MyNextGames events={events} todayKey={today} userId={user?.id} linkFor={eventLink} filters={filters}
+        onCustomize={() => setCustomizeOpen(true)} show={!homeSections.hidden.has('mine')} />
+      <LiveNowLine filters={filters} show={!homeSections.hidden.has('live')} />
+      <ForYouLine items={forYou} show={!homeSections.hidden.has('foryou')} />
+    </div>
+  )
   const hasAnyEvents = events.length > 0
 
   // Quem ainda não está em nenhum clube nem grupo (Francisco, 28 set:
@@ -899,11 +932,6 @@ export default function Home() {
       </div>
 
 
-      {/* Número associado mas por confirmar: sem confirmação, o «In» no
-          WhatsApp entra como convidado sem conta — o banner só aparece a
-          quem tem mesmo de agir (migration_mix_guest_sem_conta.sql). */}
-      {viewMode === 'list' && <div className="mt-3"><ConfirmPhoneCard compact dismissible /></div>}
-
       {viewMode === 'map' ? (
         <MapView pins={pins} location={location} onSelectPin={setSelectedPin} />
       ) : filters.show === 'played' ? (
@@ -913,22 +941,18 @@ export default function Home() {
       ) : (
         <div className="mt-3 space-y-5">
           {days.map(({ dayKey, events: dayEvents }) => (
+            <Fragment key={dayKey}>
+            {dayKey === firstUpcomingDay && topBlock}
             <section
-              key={dayKey}
               ref={(el) => { if (el) dayRefs.current.set(dayKey, el); else dayRefs.current.delete(dayKey) }}
               className="space-y-2.5"
             >
               <p className={`text-[11px] font-extrabold uppercase tracking-widest ${dayKey === today ? 'text-ink-900' : 'text-muted'}`}>
                 {dayLabel(dayKey, t, i18n.language)}
               </p>
-              {dayKey === today && <LiveStrip onCount={setLiveCount} />}
-              {dayKey === today && friendInvites.map((inv) => <FriendInviteCard key={inv.match_id} invite={inv} />)}
-              {/* Quem só marca: o cartão do torneio com «Marcar resultados».
-                  Quem também joga hoje: vem por baixo dos jogos, como ligação
-                  (28 set). */}
-              {dayKey === today && <ScoreTodayCard rows={scoreToday.filter((x) => !dayEvents.some((e) => e.kind === 'tournament' && e.mine && e.id === x.id))} />}
-              {dayKey === today && (scoreToday.length > 0 || friendInvites.length > 0 || liveCount > 0) && dayEvents.length === 0 ? null
-                : dayEvents.length === 0 && emptyByFilters
+              {/* «A decorrer agora», o convite dos amigos e o «Marcar resultados»
+                  passaram para o topo da Home (SPEC-2, 9 out). */}
+              {dayEvents.length === 0 && emptyByFilters
                 ? (
                   <div className="text-sm text-muted py-3 px-3 rounded-card border border-dashed border-line flex items-center justify-between gap-3">
                     <span>{t('agenda.filters_empty')}</span>
@@ -940,12 +964,15 @@ export default function Home() {
                 : dayEvents.length === 0
                 ? <p className="text-sm text-muted py-3 px-3 rounded-card border border-dashed border-line">{t(noClubs && dayKey === today ? 'home.no_clubs_today_empty' : 'agenda.today_empty')}</p>
                 : dayEvents.map(renderEventWithError)}
-              {dayKey === today && <ScoreTodayCard asLink rows={scoreToday.filter((x) => dayEvents.some((e) => e.kind === 'tournament' && e.mine && e.id === x.id))} />}
               {/* Os torneios abertos a quem chega (não pedem clube) e o convite. */}
               {dayKey === today && noClubs && openTournaments.map((x) => <OpenTournamentRow key={x.id} tournament={x} />)}
               {dayKey === today && noClubsCard}
             </section>
+            </Fragment>
           ))}
+          {/* Sem dias de hoje em diante: o topo vem no fim. */}
+          {!firstUpcomingDay && topBlock}
+          <CustomizePill long onClick={() => setCustomizeOpen(true)} />
           {/* Espaço no fim para o último dia poder subir até ao cabeçalho. */}
           <div className="h-[40vh]" aria-hidden="true" />
         </div>
@@ -1007,15 +1034,7 @@ export default function Home() {
                 return a && (a.kind === 'join' || a.kind === 'waitlist') ? { kind: a.kind, busy, onAction: () => handleGameAction(e, a.kind) } : null
               }}
               errorFor={(e) => (cardError?.key === e.key ? cardError.message : null)}
-              linkFor={(e) => (
-                e.source === 'game' || e.source === 'explore' ? `/jogo/${e.id}`
-                  : e.kind === 'tournament' ? (e.slug || e.id ? `/torneio/${e.slug || e.id}` : null)
-                    : e.source === 'lesson' ? `/aula/${e.id}`
-                      : e.source === 'group_match' ? (orgSlugById.get(e.orgId) ? `/clube/${orgSlugById.get(e.orgId)}/jogos` : null)
-                        : e.source === 'friend_session' ? (e.id ? `/jogos-privados/sessao/${e.id}` : '/jogos-privados')
-                        : e.source === 'private_match' ? '/jogos-privados'
-                          : null
-              )}
+              linkFor={eventLink}
             />
           </div>
         </div>,
@@ -1023,6 +1042,16 @@ export default function Home() {
       )}
 
       {joinStrip}
+
+      {phoneOpen && phoneToConfirm && (
+        <Sheet title={t('phoneconfirm.title')} onClose={() => setPhoneOpen(false)}>
+          <ConfirmPhoneCard bare />
+        </Sheet>
+      )}
+
+      {customizeOpen && (
+        <PersonalizeHomeSheet hidden={homeSections.hidden} onToggle={homeSections.toggle} onClose={() => setCustomizeOpen(false)} />
+      )}
 
       {selectedPin && (
         <Sheet

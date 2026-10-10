@@ -14,7 +14,7 @@ import { KIND_STYLE } from '../agenda/EventCard'
 import { listLiveEvents } from '../../lib/liveEvents'
 import { liveTournamentCard } from '../tournament/liveTournament'
 
-function cardFields(row, t, wide) {
+export function cardFields(row, t, wide) {
   if (row.kind === 'tournament') return { ...liveTournamentCard(row, t), kind: 'tournament' }
   const lead = row.leader?.label || ''
   const wins = wide && row.leader?.wins != null ? ` · ${t('live.wins', { count: Number(row.leader.wins) })}` : ''
@@ -41,7 +41,7 @@ function cardFields(row, t, wide) {
   }
 }
 
-function LiveCard({ c, wide }) {
+export function LiveCard({ c, wide }) {
   const style = KIND_STYLE[c.kind] || KIND_STYLE.mix
   return (
     <Link to={c.to} className={`press block rounded-card border p-3.5 ${style.card} ${wide ? 'w-full' : 'w-[78%] max-w-[300px] shrink-0 snap-start'}`}>

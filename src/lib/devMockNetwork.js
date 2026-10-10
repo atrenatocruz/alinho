@@ -1092,7 +1092,16 @@ const AGENDA_PRIVATE_MATCHES = () => [{
   team_a_player2_id: MOCK_ADMIN_USER_ID, team_a_player2_name: 'Admin (Dev)', team_a_player2_status: 'pending',
   team_b_player1_id: FAKE_MEMBER_ID, team_b_player1_name: FAKE_PEOPLE[FAKE_MEMBER_ID].name, team_b_player1_status: 'accepted_all',
   team_b_player2_id: null, team_b_player2_status: 'pending',
-}]
+}, ...(localStorage.getItem('mockForYouConfirm') === 'true' ? [{
+  // «Para ti» (SPEC-2, 9 out): um resultado de ontem à espera que eu o confirme.
+  id: 'ag-confirm-yesterday', status: 'pending', ranked_intent: true, is_creator: false,
+  scheduled_date: dayOnly(-1), scheduled_time: '19:00:00', location: 'Smash Padel, Lisboa', played_at: atDay(-1, 19).toISOString(),
+  team_a_player1_id: MOCK_ADMIN_USER_ID, team_a_player1_name: 'Admin (Dev)', team_a_player1_status: 'accepted_all',
+  team_a_player2_id: FAKE_PARTNER_ID, team_a_player2_name: 'Rui Costa', team_a_player2_status: 'accepted_all',
+  team_b_player1_id: FAKE_MEMBER_ID, team_b_player1_name: FAKE_PEOPLE[FAKE_MEMBER_ID].name, team_b_player1_status: 'accepted_all',
+  team_b_player2_id: null, team_b_player2_guest_name: 'Zé Pinto', team_b_player2_status: 'guest',
+  score_a: 6, score_b: 4, score_submitted_by: FAKE_MEMBER_ID,
+}] : [])]
 
 // localStorage.mockLongNames = 'true' — mix terminado e Comunidade com nomes
 // muito grandes, para ver o corte do nome ao lado do nível e do troféu.

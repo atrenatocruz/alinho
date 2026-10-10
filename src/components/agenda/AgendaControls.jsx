@@ -508,11 +508,17 @@ export function useDragScroll() {
 
 const TAP = "relative before:absolute before:inset-x-0 before:-inset-y-1 before:content-['']"
 
+// Pela ordem da SPEC-1 (Tudo · Mixes · Jogos em aberto · Horários livres ·
+// Torneios · Liga · Aulas · Amigos), só os que existem. «Aulas» segue a mesma
+// bandeira que mostra as aulas no resto da Home (UX, 9 out).
+const BAR_KINDS = ['mix', 'open', 'tournament', 'lesson', 'friends']
+const BAR_LABEL_KEY = { ...KIND_FILTER_KEY, friends: 'agenda.filter_kind_friends_short' }
+
 export function HomeBar({ filters, dayKey, onOpenSearch, onOpenDay, onOpenFilters, onKinds }) {
   const { t, i18n } = useTranslation()
   const { isLessonsEnabled } = useAuth()
   const ref = useDragScroll()
-  const kinds = EVENT_KINDS.filter((k) => k !== 'lesson' || isLessonsEnabled)
+  const kinds = BAR_KINDS.filter((k) => k !== 'lesson' || isLessonsEnabled)
   const all = filters.kinds.length >= EVENT_KINDS.length
   const badge = filtersBadge(filters)
   const pill = (on) => `${TAP} shrink-0 inline-flex items-center gap-1.5 px-3 min-h-[36px] rounded-full text-[13px] font-extrabold border whitespace-nowrap select-none ${
@@ -544,7 +550,7 @@ export function HomeBar({ filters, dayKey, onOpenSearch, onOpenDay, onOpenFilter
         return (
           <button key={k} type="button" onClick={() => pick(k)} aria-pressed={on} className={pill(on)}>
             <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: KIND_STYLE[k].color, opacity: on ? 1 : 0.55 }} />
-            {t(KIND_FILTER_KEY[k])}
+            {t(BAR_LABEL_KEY[k])}
           </button>
         )
       })}
