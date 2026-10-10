@@ -442,13 +442,13 @@ export default function GerirClube() {
     }
     for (const torneio of tournaments) {
       // Um torneio tem dias, nao uma hora: o meio-dia evita que o fuso o
-      // empurre para a vespera.
-      const fim = torneio.ends_on || torneio.starts_on
+      // empurre para a vespera. So passa para «Ja passaram» quando e dado
+      // como terminado (ou cancelado): com a data passada e jogos por marcar
+      // fica em «A seguir», com «Por terminar» (UX, 9 out).
       itens.push({
         tipo: 'torneio', chave: `torneio-${torneio.id}`,
         quando: torneio.starts_on ? `${torneio.starts_on}T12:00` : null, row: torneio,
-        terminado: torneio.status === 'finished' || torneio.status === 'terminado' || torneio.status === 'cancelado'
-          || (!!fim && new Date(`${fim}T23:59`) < new Date()),
+        terminado: torneio.status === 'finished' || torneio.status === 'terminado' || torneio.status === 'cancelado',
       })
     }
     // Uma turma repete-se todas as semanas: entra pela proxima vez que
@@ -507,9 +507,8 @@ export default function GerirClube() {
           jogadores: acabou ? pessoas(jogo) : null, estado: acabou ? 'finished' : 'cancelled', abrir: acabou ? () => navigate(`/jogo/${jogo.id}`) : null })
       }
       for (const torneio of tournaments) {
-        const fim = torneio.ends_on || torneio.starts_on
         const cancelado = torneio.status === 'cancelado'
-        const acabou = torneio.status === 'finished' || torneio.status === 'terminado' || (!!fim && new Date(`${fim}T23:59`) < new Date())
+        const acabou = torneio.status === 'finished' || torneio.status === 'terminado'
         if (!cancelado && !acabou) continue
         const quando = torneio.starts_on ? `${torneio.starts_on}T12:00` : null
         itens.push({ tipo: 'torneio', chave: `torneio-${torneio.id}`, quando, nome: torneio.name,
@@ -3421,7 +3420,7 @@ export default function GerirClube() {
                   // evento; a direita, uma acao so, escrita por extenso.
                   const tipo = item.tipo
                   const row = tipo === 'mix' ? item.entry.game : item.row
-                  let etiqueta, Icone, linha, detalhe, abrir, marca = null, acao = null, sufixo = null, privado = false, cinzento = false
+                  let etiqueta, Icone, linha, detalhe, abrir, marca = null, acao = null, sufixo = null, privado = false, cinzento = false, porTerminar = false
                   if (tipo === 'turma') {
                     const quando = seriesWhen(t, row)
                     etiqueta = 'gerirclube.event_label_series'
@@ -3477,6 +3476,12 @@ export default function GerirClube() {
                     // Torneio privado (Trello #482): não aparece na Home nem na
                     // Comunidade, e o link só abre a quem gere. Tem de se ler aqui.
                     privado = tipo === 'torneio' && row.is_public === false
+                    // «Por terminar» (UX, 9 out): o dia já acabou e ainda não foi
+                    // dado como terminado. Fica no topo de «A seguir» (a data é a
+                    // mais antiga), abre e mantém o «Editar».
+                    const ultimoDia = tipo === 'torneio' ? (row.ends_on || row.starts_on) : (row.date ? String(row.date).slice(0, 10) : null)
+                    porTerminar = (tipo === 'torneio' || (tipo === 'mix' && !isDraftMix(row))) && !item.terminado
+                      && !!ultimoDia && new Date(`${ultimoDia.slice(0, 10)}T23:59`) < new Date()
                     if (tipo === 'mix') {
                       // «MIX · RECORRENTE», colado a etiqueta como na pagina do
                       // evento e na Home (#383) -- nunca numa etiqueta a parte.
@@ -3532,6 +3537,9 @@ export default function GerirClube() {
                           )}
                           {marca && (
                             <span className="rounded-full bg-ink-900 px-2 py-[3px] text-[11px] font-semibold text-white">{marca}</span>
+                          )}
+                          {porTerminar && (
+                            <span className="shrink-0 rounded-full border border-warning px-2 py-[2px] text-[11px] font-extrabold text-warning">{t('pastevents.unfinished')}</span>
                           )}
                         </span>
                         <p className={`text-lg font-semibold mt-1 truncate ${cinzento ? 'text-muted' : 'text-ink-900'}`}>{linha}</p>
