@@ -4,7 +4,13 @@
 // repete, os últimos 4 mixes do grupo, como antes. A mesma regra do robô
 // (whatsapp-bot/src/autostart.js, loadRepeatPairKeys).
 //
+// Só contam os mixes que se jogaram mesmo (Francisco, 10 out): cancelados,
+// rascunhos e por jogar ficam de fora. Na série do Jota, 2 dos 4 eram
+// cancelados, e só se evitavam as duplas de 2 mixes.
+//
 // `db` é o cliente Supabase (passado de fora, para os testes).
+export const PLAYED_STATUSES = ['in_progress', 'finished']
+
 export async function loadRepeatPairKeys(db, game) {
   if (!game?.date) return new Set()
   let query = db.from('games').select('id')
@@ -12,6 +18,7 @@ export async function loadRepeatPairKeys(db, game) {
     ? query.eq('recurrence_id', game.recurrence_id)
     : query.eq('organization_id', game.organization_id)
   const { data: previousGames } = await query
+    .in('status', PLAYED_STATUSES)
     .lt('date', game.date)
     .order('date', { ascending: false })
     .limit(4)

@@ -2717,6 +2717,16 @@ export default function GameDetails() {
   const rounds =[...new Set(matches.map(m => m.round_number))].sort((a, b) => a - b)
   const tctStandings = !isSobeDesce && teams.length ? standings(teams, matches) : []
   const americanoStandingsResult = isAmericano && teams.length ? americanoStandings(matches, teams) : []
+  // Americano: quem ganhou é o 1.º por pessoa — o cartão do vencedor, o 🏆
+  // da lista e o voucher (Francisco, 8 out, design-handoff/2026-10-08-
+  // americano-voucher): mais pontos; com empate, a diferença de pontos
+  // (marcados menos sofridos); só com as duas iguais é que empatam.
+  // americanoStandings já ordena por pontos e, no empate, pela diferença.
+  const americanoTop = americanoStandingsResult[0] || null
+  const americanoFirsts = americanoTop
+    ? americanoStandingsResult.filter((r) => r.points === americanoTop.points && r.diff === americanoTop.diff)
+    : []
+  const americanoFirstIds = new Set(americanoFirsts.map((r) => r.player.id))
   const placarResult = isRotating && teams.length ? rotatingPlacar(matches, teams) : []
   // Uma lista só para a linha «Classificação · tu: N.º» (ponto 15).
   const classif = (() => {
@@ -3197,6 +3207,38 @@ export default function GameDetails() {
           <p className="text-2xl font-extrabold text-white">{teamName(game.winner_team_id)}</p>
         </div>
       )}
+      {/* Americano (UX, 8 out): ganha uma pessoa, não uma dupla — o mesmo
+          cartão, com o 1.º da classificação por pessoa; com empate no 1.º,
+          os nomes lado a lado e «Empatados em 1.º». */}
+      {game.status === 'finished' && isAmericano && !game.winner_team_id && americanoStandingsResult.length > 0 && (() => {
+        const top = americanoTop
+        const firsts = americanoFirsts
+        // O voucher (regra de 30 set: sem conta, sem voucher).
+        const withAccount = firsts.filter((r) => !r.player.no_account)
+        return (
+          <div className="card bg-ink-900 text-center">
+            <p className="text-ink-200 text-xs font-extrabold uppercase tracking-widest mb-3">{t(firsts.length > 1 ? 'gamedetails.mix_winners_label' : 'gamedetails.mix_winner_label')}</p>
+            <div className="flex justify-center gap-5">
+              {firsts.map((r) => (
+                <div key={r.player.id} className="flex min-w-0 flex-col items-center gap-2">
+                  <Avatar name={r.player.name} url={r.player.avatar_url} size="w-14 h-14 text-lg" />
+                  <p className="max-w-[10rem] break-words text-xl font-extrabold leading-tight text-white">{r.player.name}</p>
+                </div>
+              ))}
+            </div>
+            <p className="mt-2 text-sm text-ink-200">
+              {firsts.length > 1
+                ? t('gamedetails.americano_tied_first', { points: top.points })
+                : t('gamedetails.americano_first', { count: americanoStandingsResult.length, points: top.points })}
+            </p>
+            {game.has_voucher && (withAccount.length > 0 ? (
+              <p className="mt-1.5 text-sm font-extrabold text-white">{t(withAccount.length > 1 ? 'gamedetails.americano_voucher_many' : 'gamedetails.americano_voucher_one')}</p>
+            ) : (
+              <p className="mt-1.5 text-sm text-ink-200">{t('gamedetails.americano_voucher_no_account')}</p>
+            ))}
+          </div>
+        )
+      })()}
 
       {/* 👍 da noite — cada participante dá 1 kudos a um colega do mix
           (+1 XP para quem recebe; guardas todas no RPC). Janela: 48h após
@@ -3390,13 +3432,57 @@ export default function GameDetails() {
                 })}
               </div>
             ) : (
+              isAmericano && americanoStandingsResult.length > 0 ? (
+              // Americano (UX, 8 out): a lista segue a classificação por pessoa
+              // e o número é o lugar no mix (empates partilham o lugar). Quem
+              // não tem conta entra a cinzento, «sem conta», só com os pontos.
+              <div className="space-y-1.5">
+                {americanoStandingsResult.map((r, i, all) => {
+                  const place = all.findIndex((x) => x.points === r.points && x.diff === r.diff) + 1
+                  const s = statsByUser[r.player.id]
+                  const first = place === 1
+                  return (
+                    <div key={r.player.id} className="flex items-center gap-3 py-2 border-b border-line last:border-0">
+                      <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-extrabold tabular-nums shrink-0 ${
+                        first ? 'bg-ink-900 text-white' : 'bg-ink-50 text-ink-700'
+                      }`}>
+                        {place}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        {s && !r.player.no_account ? statsPlayerRow({
+                          id: r.player.id,
+                          name: s.user?.name || r.player.name,
+                          avatarUrl: personById[r.player.id]?.avatar_url,
+                          isGuest: !!isGuestById[r.player.id],
+                          won: americanoFirstIds.has(r.player.id),
+                        }) : (
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <Avatar name={r.player.name} url={null} size="w-10 h-10 text-sm" />
+                            <div className="min-w-0 flex-1">
+                              <p className="flex items-center gap-1.5 min-w-0 font-extrabold text-muted">
+                                <span className="truncate min-w-0">{firstLastName(r.player.name)}</span>
+                                {americanoFirstIds.has(r.player.id) && <span className="shrink-0">🏆</span>}
+                              </p>
+                              <p className="text-[11px] text-muted">{t('gamedetails.americano_no_account')}</p>
+                            </div>
+                            <span className="shrink-0 text-sm text-muted tabular-nums">{t('gamedetails.americano_points', { count: r.points })}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              ) : (
               <div className="space-y-1.5">
                 {mixStats.map((s, i) => (
                   <div key={s.id} className="flex items-center gap-3 py-2 border-b border-line last:border-0">
+                    {/* Americano com empate no 1.º (UX, 8 out): «1» nos dois, e quem
+                        vem a seguir fica «3», como no desporto. */}
                     <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-extrabold tabular-nums shrink-0 ${
-                      i === 0 ? 'bg-ink-900 text-white' : 'bg-ink-50 text-ink-700'
+                      i === 0 || (isAmericano && americanoFirstIds.has(s.user_id)) ? 'bg-ink-900 text-white' : 'bg-ink-50 text-ink-700'
                     }`}>
-                      {i + 1}
+                      {isAmericano && americanoFirstIds.has(s.user_id) ? 1 : i + 1}
                     </span>
                     <div className="flex-1 min-w-0">
                       {statsPlayerRow({
@@ -3404,12 +3490,13 @@ export default function GameDetails() {
                         name: s.user?.name,
                         avatarUrl: personById[s.user_id]?.avatar_url,
                         isGuest: !!isGuestById[s.user_id],
-                        won: s.mix_won,
+                        won: isAmericano ? americanoFirstIds.has(s.user_id) : s.mix_won,
                       })}
                     </div>
                   </div>
                 ))}
               </div>
+              )
             )}
           </div>
         )

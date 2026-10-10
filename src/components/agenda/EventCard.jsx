@@ -68,6 +68,30 @@ export function KindTag({ kind, past, suffix = null }) {
   )
 }
 
+/** O tipo na linha por baixo do nome do clube (Home do futuro, SPEC-3 —
+ *  aprovado pelo Francisco a 9 out): sem pastilha, a negrito pequeno e na
+ *  cor do tipo, «⤮ Mix · Recorrente». `label` troca o nome do tipo (ex.:
+ *  o tipo da aula). */
+export function KindLine({ kind, past = false, suffix = null, label = null }) {
+  const { t } = useTranslation()
+  const style = KIND_STYLE[kind]
+  const Icon = style.icon
+  return (
+    <span className={`flex min-w-0 items-center gap-1 text-[13px] font-extrabold leading-tight ${past ? 'text-muted' : style.text}`}>
+      <Icon size={13} className="shrink-0" />
+      <span className="truncate">{label || t(style.labelKey)}{suffix && <> · {suffix}</>}</span>
+    </span>
+  )
+}
+
+/** Os estados compridos («⏳ Falta o parceiro aceitar», «⏳ Pedido enviado»,
+ *  «Suplente») numa linha por baixo do nome do evento, sem pastilha, a
+ *  negrito pequeno na cor do tipo. No canto só ficam os curtos (UX, 10 out). */
+export function StateLine({ kind, children }) {
+  const style = KIND_STYLE[kind] || KIND_STYLE.mix
+  return <p className={`mt-1.5 text-[12.5px] font-extrabold ${style.text}`}>{children}</p>
+}
+
 export function StateTag({ tone, icon: Icon, children }) {
   const tones = {
     in: 'bg-ok text-white',
@@ -77,8 +101,8 @@ export function StateTag({ tone, icon: Icon, children }) {
     grey: 'bg-surface text-ink-700',
   }
   return (
-    <span className={`inline-flex items-center gap-1 text-[11px] font-extrabold px-2 py-1 rounded-full whitespace-nowrap ${tones[tone]}`}>
-      {Icon && <Icon size={12} />} {children}
+    <span className={`inline-flex max-w-full items-center gap-1 text-[11px] font-extrabold px-2 py-1 rounded-full whitespace-nowrap ${tones[tone]}`}>
+      {Icon && <Icon size={12} className="shrink-0" />} <span className="truncate">{children}</span>
     </span>
   )
 }
@@ -106,8 +130,11 @@ export function useOpenOrg(event) {
     o perfil; o resto do cartão abre o evento (sugestão do Ruben, aprovada
     pelo Francisco a 28 set). `right`: o estado do cartão («A decorrer»,
     «Inscrito»…) no canto de cima, à direita — sem espaço vazio ao lado do
-    logótipo (Francisco, 30 set). */
-export function OrgHeader({ event, past = false, right = null }) {
+    logótipo (Francisco, 30 set). `kind`: a linha do tipo, que fica no lugar
+    de «Clube organizador» (SPEC-3, 9 out). O nome do clube manda: até duas
+    linhas e nunca partido letra a letra; o que está no canto é que cede
+    (UX, 10 out). */
+export function OrgHeader({ event, past = false, right = null, kind = null }) {
   const { t } = useTranslation()
   const open = useOpenOrg(event)
   if (!event.orgName) return null
@@ -125,19 +152,21 @@ export function OrgHeader({ event, past = false, right = null }) {
       <span className="min-w-0">
         {/* O nome em até duas linhas, com o «›» logo a seguir — cortado, o «›»
             ficava solto longe do nome (UX, 30 set). */}
-        <span className="line-clamp-2 break-words text-[17px] font-extrabold leading-tight text-ink-900">
+        <span className="line-clamp-2 break-normal text-[17px] font-extrabold leading-tight text-ink-900">
           {/* A última palavra e o «›» não se separam: o «›» nunca fica sozinho numa linha. */}
           {nameHead}<span className="whitespace-nowrap">{nameTail}{open && <ChevronRight size={18} strokeWidth={2.75} className="ml-0.5 inline align-[-3px]" />}</span>
         </span>
-        <span className="mt-0.5 flex items-center gap-1 text-[13px] text-ink-700">
-          {isGroup ? <Users size={13} className="shrink-0" /> : <Building2 size={13} className="shrink-0" />}
-          {t(isGroup ? 'agenda.org_group_organizer' : 'agenda.org_club_organizer')}
-        </span>
+        {kind ? <span className="mt-0.5 block">{kind}</span> : (
+          <span className="mt-0.5 flex items-center gap-1 text-[13px] text-ink-700">
+            {isGroup ? <Users size={13} className="shrink-0" /> : <Building2 size={13} className="shrink-0" />}
+            {t(isGroup ? 'agenda.org_group_organizer' : 'agenda.org_club_organizer')}
+          </span>
+        )}
       </span>
     </Tag>
   )
   if (!right) return header
-  return <div className="mb-2.5 flex items-start justify-between gap-2">{header}<span className="shrink-0">{right}</span></div>
+  return <div className="mb-2.5 flex items-start justify-between gap-2">{header}<span className="flex min-w-0 max-w-[42%] shrink justify-end">{right}</span></div>
 }
 
 /** Linha do dono: logótipo (quadrado = clube, redondo = grupo) + nome + tipo.
@@ -269,30 +298,27 @@ export function GameEventCard({ event, profile, friendIds = null, action = null,
   if (past || event.finished) state = <StateTag tone="grey" icon={CheckCircle2}>{t('agenda.state_finished')}</StateTag>
   else if (isLive) state = <StateTag tone="live" icon={Play}>{t('ui.status_live')}</StateTag>
   else if (event.myState === 'in') state = <StateTag tone="in" icon={CheckCircle2}>{t('agenda.state_in')}</StateTag>
-  else if (event.myState === 'waitlist') state = <StateTag tone="wait">{t('agenda.state_waitlist')}</StateTag>
-  else if (mismatchKey) state = <StateTag tone="grey">{t(mismatchKey)}</StateTag>
+  else if (mismatchKey && event.myState !== 'waitlist') state = <StateTag tone="grey">{t(mismatchKey)}</StateTag>
+  // Suplente: estado comprido, numa linha por baixo do nome (UX, 10 out).
+  const stateLine = !past && !event.finished && !isLive && event.myState === 'waitlist' ? t('agenda.state_line_waitlist') : null
+
+  // Recorrência e nível (#577) como sufixo do tipo, «Mix · Recorrente · MX4»,
+  // igual à página do evento (Trello #383). O nível não vai numa pastilha
+  // preta: a de baixo, «N4», é o nível médio dos inscritos (designer, 26 set).
+  const kindLine = <KindLine kind={event.kind} past={past} suffix={[
+    game.recurrence_id ? t('ui.recurring') : null,
+    event.kind === 'mix' && parseLevel(game.level) ? `${parseLevel(game.level).scale}${parseLevel(game.level).num}` : null,
+  ].filter(Boolean).join(' · ') || null} />
 
   return (
     <div className={`relative overflow-hidden rounded-card p-3.5 press ${cardFrame(event, past)}`}>
       <Link to={`/jogo/${game.id}`} className="absolute inset-0" aria-label={`${game.title} — ${time}`} />
-      <OrgHeader event={event} past={past} right={state} />
-
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex flex-wrap gap-1">
-          {/* Recorrência e nível (#577) como sufixo da etiqueta, «Mix · Recorrente
-              · MX4», igual à página do evento (Trello #383). O nível não vai numa
-              pastilha preta: a de baixo, «N4», é o nível médio dos inscritos
-              (designer, 26 set). Sem nível escolhido, só o que já havia. */}
-          <KindTag kind={event.kind} past={past} suffix={[
-            game.recurrence_id ? t('ui.recurring') : null,
-            event.kind === 'mix' && parseLevel(game.level) ? `${parseLevel(game.level).scale}${parseLevel(game.level).num}` : null,
-          ].filter(Boolean).join(' · ') || null} />
-        </div>
-        {!event.orgName && state}
-      </div>
+      <OrgHeader event={event} past={past} right={state} kind={kindLine} />
+      {!event.orgName && <div className="flex items-start justify-between gap-2">{kindLine}{state}</div>}
 
       <p className={`text-[22px] font-extrabold leading-none mt-2.5 ${past ? 'text-muted' : 'text-ink-900'}`}>{time}</p>
       <h3 className={`text-base leading-snug mt-1.5 ${past ? 'text-muted' : 'text-ink-900'}`}>{game.title}</h3>
+      {stateLine && <StateLine kind={event.kind}>{stateLine}</StateLine>}
       {!event.orgName && <div className="mt-1"><Owner event={event} fallbackKey="agenda.owner_none" /></div>}
 
       <GameFacts game={game} distance={distance} />
@@ -376,26 +402,17 @@ export function ExploreEventCard({ event, profile, distance = null, onJoin = nul
   }
 
   // O estado ao canto, com quem organiza (Francisco, 30 set: «em todos»).
-  const exploreState = pending
-    ? <StateTag tone="grey" icon={Clock}>{t('agenda.state_request_sent')}</StateTag>
-    : mismatchKey ? <StateTag tone="grey">{t(mismatchKey)}</StateTag> : null
+  // «Pedido enviado» é comprido: vai numa linha por baixo do nome (UX, 10 out).
+  const exploreState = !pending && mismatchKey ? <StateTag tone="grey">{t(mismatchKey)}</StateTag> : null
+  const kindLine = <KindLine kind={event.kind} suffix={!openJoin ? t('agenda.explore_private') : null} />
   return (
     <div className={`relative overflow-hidden rounded-card p-3.5 border ${KIND_STYLE[event.kind].card}`}>
-      <OrgHeader event={event} right={exploreState} />
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex flex-wrap gap-1">
-          <KindTag kind={event.kind} />
-          {!openJoin && (
-            <span className="inline-flex items-center gap-1 bg-white/80 text-[11px] font-extrabold px-2 py-1 rounded-full text-muted">
-              <Lock size={12} /> {t('agenda.explore_private')}
-            </span>
-          )}
-        </div>
-        {!event.orgName && exploreState}
-      </div>
+      <OrgHeader event={event} right={exploreState} kind={kindLine} />
+      {!event.orgName && <div className="flex items-start justify-between gap-2">{kindLine}{exploreState}</div>}
 
       <p className="text-[22px] font-extrabold leading-none mt-2.5 text-ink-900">{time}</p>
       <h3 className="text-base leading-snug mt-1.5 text-ink-900">{game.title}</h3>
+      {pending && <StateLine kind={event.kind}>{t('agenda.state_line_request_sent')}</StateLine>}
       {!event.orgName && <div className="mt-1"><Owner event={event} fallbackKey="agenda.owner_none" /></div>}
 
       <GameFacts game={game} distance={distance} />
@@ -497,17 +514,15 @@ export function FriendSessionCard({ event, userId, past = false }) {
   if (past || event.finished) state = <StateTag tone="grey" icon={CheckCircle2}>{t('agenda.state_finished')}</StateTag>
   else if (running) state = <StateTag tone="live" icon={Play}>{t('ui.status_live')}</StateTag>
   else if (inSession) state = <StateTag tone="in" icon={CheckCircle2}>{t('agenda.state_in')}</StateTag>
+  const sessionKind = <KindLine kind={event.kind === 'open' ? 'open' : 'friends'} past={past} suffix={t('agenda.session_rotating')} />
 
   return (
     <div className={`relative overflow-hidden rounded-card p-3.5 ${to ? 'press' : ''} ${cardFrame(event, past)}`}>
       {to && <Link to={to} className="absolute inset-0" aria-label={title} />}
-      <OrgHeader event={event} past={past} right={state} />
-      <div className="flex items-start justify-between gap-2">
-        {/* Num clube é «Jogo em aberto · a rodar», com a cor do jogo em aberto;
-            num grupo, «Jogo entre amigos» (Francisco, 28 set). */}
-        <KindTag kind={event.kind === 'open' ? 'open' : 'friends'} past={past} suffix={t('agenda.session_rotating')} />
-        {!event.orgName && state}
-      </div>
+      {/* Num clube é «Jogo em aberto · a rodar», com a cor do jogo em aberto;
+          num grupo, «Jogo entre amigos» (Francisco, 28 set). */}
+      <OrgHeader event={event} past={past} right={state} kind={sessionKind} />
+      {!event.orgName && <div className="flex items-start justify-between gap-2">{sessionKind}{state}</div>}
       {event.hasTime ? (
         <p className={`text-[22px] font-extrabold leading-none mt-2.5 ${past ? 'text-muted' : 'text-ink-900'}`}>
           {formatTime(event.startsAt, i18n.language, { hour: '2-digit', minute: '2-digit' })}
@@ -564,11 +579,8 @@ export function FriendsEventCard({ event, userId, orgSlug = null, invite = null,
     <div className={`relative overflow-hidden rounded-card p-3.5 ${to ? 'press' : ''} ${cardFrame(event, past)}`}>
       {to && <Link to={to} className="absolute inset-0" aria-label={title} />}
 
-      <OrgHeader event={event} past={past} right={state} />
-      <div className="flex items-start justify-between gap-2">
-        <KindTag kind="friends" past={past} />
-        {!event.orgName && state}
-      </div>
+      <OrgHeader event={event} past={past} right={state} kind={<KindLine kind="friends" past={past} />} />
+      {!event.orgName && <div className="flex items-start justify-between gap-2"><KindLine kind="friends" past={past} />{state}</div>}
 
       {event.hasTime ? (
         <p className={`text-[22px] font-extrabold leading-none mt-2.5 ${past ? 'text-muted' : 'text-ink-900'}`}>
