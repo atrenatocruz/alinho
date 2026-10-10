@@ -990,6 +990,8 @@ const EV_MATCHES_ALL = () => [
 // amanhã um mix cheio de outro nível; ontem um mix meu terminado; daqui a
 // 3 dias um jogo entre amigos no grupo.
 const agenda = () => localStorage.getItem('mockAgenda') === 'true'
+// Uma imagem de mix inventada (mockMixImage), sem ir buscar nada à rede.
+const MOCK_MIX_IMAGE = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="700" height="200"><defs><linearGradient id="g" x2="1" y2="1"><stop offset="0" stop-color="#0B5C8E"/><stop offset="1" stop-color="#7CC1EE"/></linearGradient></defs><rect width="700" height="200" fill="url(#g)"/><circle cx="560" cy="60" r="90" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="18"/><text x="34" y="150" font-family="Arial" font-weight="800" font-size="44" fill="#fff">Mix de terça</text></svg>')}`
 const MOCK_CLUB_ID = '00000000-0000-0000-0000-0000000000dd' // mesmo valor de AuthContext.jsx
 const atDay = (offset, h, m = 0) => {
   const d = new Date()
@@ -1010,6 +1012,7 @@ const AGENDA_GAMES = () => [
     location: 'Smash Padel, Parque das Nações', status: 'open', origin: 'admin', format: 'sobe_desce', num_courts: 4,
     max_players: 16, price_per_player: 8, prize: 'Bolas Head', gender_restriction: 'masculino', age_restriction: 'plus35',
     // localStorage.mockMixLevels = 'true': os níveis novos (#577), um Misto 4 e um F3.
+    ...(localStorage.getItem('mockMixImage') === 'true' ? { image_url: MOCK_MIX_IMAGE } : {}),
     level: localStorage.getItem('mockMixLevels') === 'true' ? 'MX4' : 'M3', recurrence_id: 'rec-1', organization: { name: localStorage.getItem('mockLongClub') === 'true' ? 'Clube de Padel Quinta da Marinha' : 'Smash Padel Almada', kind: 'club', group_logo_url: null },
     participants: [
       { id: 'p1', user_id: MOCK_ADMIN_USER_ID, partner_id: null, status: 'confirmed', user: ADMIN_PERSON },

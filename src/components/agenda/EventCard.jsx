@@ -93,6 +93,14 @@ export function StateLine({ kind, children }) {
   return <p className={`mt-1.5 text-[12.5px] font-extrabold ${style.text}`}>{children}</p>
 }
 
+/** A imagem do mix numa faixa de ~88 px, entre o clube e a hora (SPEC-3).
+ *  Só quando quem organiza a carregou; sem imagem, nada no lugar. O jogo em
+ *  aberto não tem imagem. */
+function MixImageBand({ url, past = false }) {
+  if (!url) return null
+  return <img src={url} alt="" loading="lazy" className={`mt-1 h-[88px] w-full rounded-xl object-cover ${past ? 'opacity-70' : ''}`} />
+}
+
 export function StateTag({ tone, icon: Icon, children }) {
   const tones = {
     in: 'bg-ok text-white',
@@ -319,6 +327,7 @@ export function GameEventCard({ event, profile, friendIds = null, action = null,
       <Link to={`/jogo/${game.id}`} className="absolute inset-0" aria-label={`${game.title} — ${time}`} />
       <OrgHeader event={event} past={past} right={state} kind={kindLine} />
       {!event.orgName && <div className="flex items-start justify-between gap-2">{kindLine}{state}</div>}
+      <MixImageBand url={game.image_url} past={past} />
 
       <p className={`text-[22px] font-extrabold leading-none mt-2.5 ${past ? 'text-muted' : 'text-ink-900'}`}>{time}</p>
       <h3 className={`text-base leading-snug mt-1.5 ${past ? 'text-muted' : 'text-ink-900'}`}>{game.title}</h3>
@@ -413,6 +422,7 @@ export function ExploreEventCard({ event, profile, distance = null, onJoin = nul
     <div className={`relative overflow-hidden rounded-card p-3.5 border ${KIND_STYLE[event.kind].card}`}>
       <OrgHeader event={event} right={exploreState} kind={kindLine} />
       {!event.orgName && <div className="flex items-start justify-between gap-2">{kindLine}{exploreState}</div>}
+      <MixImageBand url={game.image_url} />
 
       <p className="text-[22px] font-extrabold leading-none mt-2.5 text-ink-900">{time}</p>
       <h3 className="text-base leading-snug mt-1.5 text-ink-900">{game.title}</h3>
