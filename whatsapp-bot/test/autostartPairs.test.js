@@ -66,14 +66,14 @@ const day = (d) => `2026-${d}T20:00:00+00:00`
 function seriesDb() {
   // Segundas (série S) e quintas (série Q) no mesmo grupo, e um mix solto.
   const games = [
-    { id: 's1', organization_id: 'o', recurrence_id: 'S', date: day('08-31') },
-    { id: 's2', organization_id: 'o', recurrence_id: 'S', date: day('09-07') },
-    { id: 's3', organization_id: 'o', recurrence_id: 'S', date: day('09-14') },
-    { id: 's4', organization_id: 'o', recurrence_id: 'S', date: day('09-21') },
-    { id: 'q1', organization_id: 'o', recurrence_id: 'Q', date: day('09-17') },
-    { id: 'q2', organization_id: 'o', recurrence_id: 'Q', date: day('09-24') },
-    { id: 'x1', organization_id: 'o', recurrence_id: null, date: day('09-25') },
-    { id: 's0', organization_id: 'o', recurrence_id: 'S', date: day('08-24') },
+    { id: 's1', organization_id: 'o', recurrence_id: 'S', date: day('08-31'), status: 'finished' },
+    { id: 's2', organization_id: 'o', recurrence_id: 'S', date: day('09-07'), status: 'finished' },
+    { id: 's3', organization_id: 'o', recurrence_id: 'S', date: day('09-14'), status: 'finished' },
+    { id: 's4', organization_id: 'o', recurrence_id: 'S', date: day('09-21'), status: 'finished' },
+    { id: 'q1', organization_id: 'o', recurrence_id: 'Q', date: day('09-17'), status: 'finished' },
+    { id: 'q2', organization_id: 'o', recurrence_id: 'Q', date: day('09-24'), status: 'finished' },
+    { id: 'x1', organization_id: 'o', recurrence_id: null, date: day('09-25'), status: 'finished' },
+    { id: 's0', organization_id: 'o', recurrence_id: 'S', date: day('08-24'), status: 'finished' },
   ]
   const teams = [
     { game_id: 's1', player1_id: 'f', player2_id: 'rd' },
@@ -87,7 +87,7 @@ function seriesDb() {
 
 test('série: conta só os 4 mixes anteriores da mesma série', async () => {
   installFakeSupabase(supabase, seriesDb())
-  const keys = await loadRepeatPairKeys({ id: 'today', organization_id: 'o', recurrence_id: 'S', date: day('09-28') })
+  const keys = await loadRepeatPairKeys({ id: 'today', organization_id: 'o', recurrence_id: 'S', date: day('09-28'), status: 'finished' })
   assert.ok(keys.has(key('f', 'rd')), '31 ago é da série e está nos 4 anteriores')
   assert.ok(keys.has(key('a', 'da')))
   assert.ok(!keys.has(key('f', 'c')), 'a quinta é outra série')
@@ -95,9 +95,34 @@ test('série: conta só os 4 mixes anteriores da mesma série', async () => {
   assert.ok(!keys.has(key('old', 'pair')), 'o 5.º para trás já não conta')
 })
 
+test('só contam os mixes jogados: cancelados, rascunhos e por jogar ficam de fora (10 out)', async () => {
+  installFakeSupabase(supabase, {
+    games: [
+      { id: 'j1', organization_id: 'o', recurrence_id: 'J', date: day('09-01'), status: 'finished' },
+      { id: 'j2', organization_id: 'o', recurrence_id: 'J', date: day('09-08'), status: 'finished' },
+      { id: 'j3', organization_id: 'o', recurrence_id: 'J', date: day('09-15'), status: 'cancelled' },
+      { id: 'j4', organization_id: 'o', recurrence_id: 'J', date: day('09-22'), status: 'finished' },
+      { id: 'j5', organization_id: 'o', recurrence_id: 'J', date: day('09-29'), status: 'cancelled' },
+      { id: 'j6', organization_id: 'o', recurrence_id: 'J', date: day('10-06'), status: 'in_progress' },
+      { id: 'j7', organization_id: 'o', recurrence_id: 'J', date: day('10-07'), status: 'draft' },
+    ],
+    teams: [
+      { game_id: 'j1', player1_id: 'p1', player2_id: 'q1' },
+      { game_id: 'j2', player1_id: 'p2', player2_id: 'q2' },
+      { game_id: 'j3', player1_id: 'p3', player2_id: 'q3' },
+      { game_id: 'j4', player1_id: 'p4', player2_id: 'q4' },
+      { game_id: 'j6', player1_id: 'p6', player2_id: 'q6' },
+      { game_id: 'j7', player1_id: 'p7', player2_id: 'q7' },
+    ],
+    profiles: [],
+  })
+  const keys = await loadRepeatPairKeys({ id: 'hoje', organization_id: 'o', recurrence_id: 'J', date: day('10-13') })
+  assert.deepEqual([...keys].sort(), [key('p1', 'q1'), key('p2', 'q2'), key('p4', 'q4'), key('p6', 'q6')].sort())
+})
+
 test('mix que não se repete: os 4 anteriores do grupo, como antes', async () => {
   installFakeSupabase(supabase, seriesDb())
-  const keys = await loadRepeatPairKeys({ id: 'solto', organization_id: 'o', recurrence_id: null, date: day('09-26') })
+  const keys = await loadRepeatPairKeys({ id: 'solto', organization_id: 'o', recurrence_id: null, date: day('09-26'), status: 'finished' })
   // Os 4 do grupo antes de 26 set: x1 (25), q2 (24), s4 (21), q1 (17).
   assert.ok(keys.has(key('n', 'j')))
   assert.ok(keys.has(key('f', 'c')))

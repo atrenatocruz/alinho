@@ -32,14 +32,14 @@ const day = (d) => `2026-${d}T20:00:00+00:00`
 const key = (a, b) => [a, b].sort().join('|')
 const db = fakeDb({
   games: [
-    { id: 's0', organization_id: 'o', recurrence_id: 'S', date: day('08-24') },
-    { id: 's1', organization_id: 'o', recurrence_id: 'S', date: day('08-31') },
-    { id: 's2', organization_id: 'o', recurrence_id: 'S', date: day('09-07') },
-    { id: 's3', organization_id: 'o', recurrence_id: 'S', date: day('09-14') },
-    { id: 's4', organization_id: 'o', recurrence_id: 'S', date: day('09-21') },
-    { id: 'q1', organization_id: 'o', recurrence_id: 'Q', date: day('09-17') },
-    { id: 'q2', organization_id: 'o', recurrence_id: 'Q', date: day('09-24') },
-    { id: 'x1', organization_id: 'o', recurrence_id: null, date: day('09-25') },
+    { id: 's0', organization_id: 'o', recurrence_id: 'S', date: day('08-24'), status: 'finished' },
+    { id: 's1', organization_id: 'o', recurrence_id: 'S', date: day('08-31'), status: 'finished' },
+    { id: 's2', organization_id: 'o', recurrence_id: 'S', date: day('09-07'), status: 'finished' },
+    { id: 's3', organization_id: 'o', recurrence_id: 'S', date: day('09-14'), status: 'finished' },
+    { id: 's4', organization_id: 'o', recurrence_id: 'S', date: day('09-21'), status: 'finished' },
+    { id: 'q1', organization_id: 'o', recurrence_id: 'Q', date: day('09-17'), status: 'finished' },
+    { id: 'q2', organization_id: 'o', recurrence_id: 'Q', date: day('09-24'), status: 'finished' },
+    { id: 'x1', organization_id: 'o', recurrence_id: null, date: day('09-25'), status: 'finished' },
   ],
   teams: [
     { game_id: 's0', player1_id: 'old', player2_id: 'pair' },
@@ -66,6 +66,33 @@ describe('loadRepeatPairKeys — regra da série (28 set)', () => {
     expect(keys.has(key('f', 'c'))).toBe(true)
     expect(keys.has(key('a', 'da'))).toBe(true)
     expect(keys.has(key('f', 'rd'))).toBe(false)
+  })
+
+  it('só contam os mixes jogados: cancelados, rascunhos e por jogar ficam de fora (10 out)', async () => {
+    const jota = fakeDb({
+      games: [
+        { id: 'j1', organization_id: 'o', recurrence_id: 'J', date: day('09-01'), status: 'finished' },
+        { id: 'j2', organization_id: 'o', recurrence_id: 'J', date: day('09-08'), status: 'finished' },
+        { id: 'j3', organization_id: 'o', recurrence_id: 'J', date: day('09-15'), status: 'cancelled' },
+        { id: 'j4', organization_id: 'o', recurrence_id: 'J', date: day('09-22'), status: 'finished' },
+        { id: 'j5', organization_id: 'o', recurrence_id: 'J', date: day('09-29'), status: 'cancelled' },
+        { id: 'j6', organization_id: 'o', recurrence_id: 'J', date: day('10-06'), status: 'in_progress' },
+        { id: 'j7', organization_id: 'o', recurrence_id: 'J', date: day('10-07'), status: 'draft' },
+        { id: 'j8', organization_id: 'o', recurrence_id: 'J', date: day('10-08'), status: 'open' },
+      ],
+      teams: [
+        { game_id: 'j1', player1_id: 'p1', player2_id: 'q1' },
+        { game_id: 'j2', player1_id: 'p2', player2_id: 'q2' },
+        { game_id: 'j3', player1_id: 'p3', player2_id: 'q3' },
+        { game_id: 'j4', player1_id: 'p4', player2_id: 'q4' },
+        { game_id: 'j6', player1_id: 'p6', player2_id: 'q6' },
+        { game_id: 'j7', player1_id: 'p7', player2_id: 'q7' },
+        { game_id: 'j8', player1_id: 'p8', player2_id: 'q8' },
+      ],
+    })
+    const keys = await loadRepeatPairKeys(jota, { organization_id: 'o', recurrence_id: 'J', date: day('10-13') })
+    // Os 4 jogados: j6, j4, j2 e j1 — os cancelados não ocupam lugar.
+    expect([...keys].sort()).toEqual([key('p1', 'q1'), key('p2', 'q2'), key('p4', 'q4'), key('p6', 'q6')].sort())
   })
 
   it('sem mixes anteriores, nada a evitar', async () => {

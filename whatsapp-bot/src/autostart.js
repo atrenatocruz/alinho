@@ -165,12 +165,18 @@ function botConsegueComecar(game) {
  * últimos 4 mixes do grupo, como antes. A mesma regra do botão da app
  * (GameDetails.jsx, loadRepeatPairKeys).
  */
+// Só contam os mixes que se jogaram mesmo (Francisco, 10 out): cancelados,
+// rascunhos e por jogar ficam de fora — a mesma regra da app
+// (src/lib/repeatPairKeys.js).
+const PLAYED_STATUSES = ['in_progress', 'finished']
+
 export async function loadRepeatPairKeys(game) {
   let query = supabase.from('games').select('id')
   query = game.recurrence_id
     ? query.eq('recurrence_id', game.recurrence_id)
     : query.eq('organization_id', game.organization_id)
   const { data: previousGames } = await query
+    .in('status', PLAYED_STATUSES)
     .lt('date', game.date)
     .order('date', { ascending: false })
     .limit(4)
