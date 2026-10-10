@@ -27,7 +27,7 @@ import RoundClock from './RoundClock'
 import { ShareMissingButton } from './FriendSessionGames'
 import { ConfirmSheet } from '../ui'
 import { Sheet } from '../agenda/AgendaControls'
-import { removeFriendMatchRound } from '../../lib/privateMatches'
+import { addFriendMatchRound, removeFriendMatchRound } from '../../lib/privateMatches'
 import { planRounds } from '../../lib/friendTeams'
 import { beforeStart } from '../../lib/friendGames'
 import { dayText } from './dayText'
@@ -43,6 +43,10 @@ export default function FriendRounds({ match, games, invitees, players, iOrganiz
   const [pairsFor, setPairsFor] = useState(null) // a ronda — «Editar duplas»
   const [swapFor, setSwapFor] = useState(null) // a ronda — «Trocar duplas»
   const [removeFor, setRemoveFor] = useState(null) // a ronda
+  // A ronda seguinte não nasceu (next_error do save, Dev 3, 9 out — raro):
+  // { n, after }. Some quando a ronda n aparece.
+  const [nextIssue, setNextIssue] = useState(null)
+  const [retrying, setRetrying] = useState(false)
   const rounds = roundsOf(games, players)
   const courtsN = Math.max(1, ...games.map((g) => g.court_number || 1))
   const anon = new Set(invitees.filter((i) => i.is_anonymous).map((i) => i.invitee_id))
@@ -163,12 +167,35 @@ export default function FriendRounds({ match, games, invitees, players, iOrganiz
   }
 
   const time = match.scheduled_time ? String(match.scheduled_time).slice(0, 5) : null
-  // Não conta: «Não, só amigável» no Criar, ou joga alguém sem conta (BA,
-  // 8 out). Com mais do que um par de duplas, junta-se a frase das trocas.
-  const pairSets = new Set(games.map((g) => [pairKey(g.team_a), pairKey(g.team_b)].sort().join('|')))
+  // O aviso da ronda que não nasceu (UX, 9 out), enquanto ela não existir.
+  const missing = nextIssue && iOrganize && !rounds.some((r) => r.number === nextIssue.n) ? nextIssue : null
+  // «Tentar outra vez»: as mesmas duplas (ou, a rodar, as previstas).
+  const retryMissing = async () => {
+    const after = rounds.find((r) => r.number === missing.after) || rounds[rounds.length - 1]
+    setRetrying(true)
+    try {
+      const ids = (team) => (team || []).map((p) => p.invitee_id)
+      const courts = nextCourtsFor(after) || after.courts.map((g) => ({ team_a: ids(g.team_a), team_b: ids(g.team_b) }))
+      await addFriendMatchRound(match.id, courts, missing.n)
+      setNextIssue(null); onChanged()
+    } catch (err) {
+      console.error('Error adding the missing friend match round:', err)
+    } finally { setRetrying(false) }
+  }
+  // A caixa do ranking (TEXTOS-RANKING.md): conta por par de duplas, e um
+  // par só conta com os quatro com conta (BA e Dev 3, 9 out). «Não, só
+  // amigável» no Criar nunca conta. Quando a base de dados mandar
+  // pairs[].counts (o «O fim»), a frase passa a vir daí.
+  const pairCounts = new Map()
+  for (const g of games) {
+    const four = [...(g.team_a || []), ...(g.team_b || [])]
+    pairCounts.set([pairKey(g.team_a), pairKey(g.team_b)].sort().join('|'), four.length === 4 && four.every((p) => p.user_id))
+  }
+  const counting = [...pairCounts.values()].filter(Boolean).length
   const rankingText = match.ranked_intent === false ? t('friends.ranking_box_friendly')
-    : players.some((p) => !p.user_id) ? t('friends.ranking_box_no_account')
-      : [t('friends.ranking_box_once'), pairSets.size > 1 ? t('friends.ranking_box_each_pair') : null].filter(Boolean).join(' ')
+    : pairCounts.size > 0 && counting === 0 ? t('friends.ranking_box_no_account')
+      : counting < pairCounts.size ? t('friends.ranking_box_only_some')
+        : [t('friends.ranking_box_once'), pairCounts.size > 1 ? t('friends.ranking_box_each_pair') : null].filter(Boolean).join(' ')
   return (
     <div className="space-y-3">
       {Array.from({ length: courtsN }, (_, c) => c + 1).map((court) => {
@@ -181,6 +208,15 @@ export default function FriendRounds({ match, games, invitees, players, iOrganiz
           </section>
         )
       })}
+
+      {missing && (
+        <div role="status" className="space-y-2.5 rounded-card border border-warning/40 bg-warning/10 p-3.5">
+          <p className="text-sm text-ink-900">{t('friends.next_missing_other', { n: missing.n })}</p>
+          <button type="button" onClick={retryMissing} disabled={retrying} className={outline}>
+            {t('friends.next_missing_retry')}
+          </button>
+        </div>
+      )}
 
       {games.some((g) => [...(g.team_a || []), ...(g.team_b || [])].some((p) => anon.has(p.invitee_id))) && (
         <p className="rounded-card bg-ink-50 p-3.5 text-sm text-ink-700">{t('friends.anon_box_before')} <b className="text-ink-900">«{t('friends.anon_name')}»</b>{t('friends.anon_box_after')}</p>
@@ -197,7 +233,11 @@ export default function FriendRounds({ match, games, invitees, players, iOrganiz
       {markFor && (
         <FriendRoundSheet match={match} game={markFor.game} roundNumber={markFor.round.number} games={games} editing={markFor.editing}
           nextCourts={markFor.editing ? null : nextCourtsFor(markFor.round)}
-          onClose={() => setMarkFor(null)} onSaved={() => { setMarkFor(null); onChanged() }} />
+          onClose={() => setMarkFor(null)}
+          onSaved={(res) => {
+            if (res?.next_error) setNextIssue({ n: markFor.round.number + 1, after: markFor.round.number })
+            setMarkFor(null); onChanged()
+          }} />
       )}
       {kindFor && (
         <RoundKindSheet match={match} game={kindFor.game} roundNumber={kindFor.round.number} games={games}
