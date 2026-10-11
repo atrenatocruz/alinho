@@ -753,6 +753,9 @@ export const TOURNAMENT_PROMOTED_TABLE_MOCKS = {
       // As inscrições fecharam sozinhas no fim do prazo (6 out).
       { id: 'tp6', kind: 'tournament_entries_closed', game_id: null, created_at: new Date().toISOString(),
         data: { ...base, entry_count: 84 } },
+      // Com duplas por validar (pending_count, Dev 3, 11 out).
+      { id: 'tp7', kind: 'tournament_entries_closed', game_id: null, created_at: new Date().toISOString(),
+        data: { ...base, entry_count: 80, pending_count: 4 } },
       { id: 'tp3', kind: 'tournament_prize_changed', game_id: null, created_at: new Date().toISOString(),
         data: { ...base, category_id: 'cat-m5', category_code: 'M5', category_name: 'Masculinos 5', prize_first: '200 € + troféu', prize_second: '80 €' } },
       { id: 'tp4', kind: 'tournament_prize_changed', game_id: null, created_at: new Date().toISOString(),

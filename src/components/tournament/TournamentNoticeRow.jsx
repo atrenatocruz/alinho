@@ -61,8 +61,14 @@ export default function TournamentNoticeRow({ notice, onOpen }) {
     : notice.kind === 'tournament_cancelled'
     ? t('tournament.notice_cancelled', vars)
     : notice.kind === 'tournament_entries_closed'
+    // pending_count (Dev 3, 11 out): as duplas por validar, à parte das
+    // validadas. Os avisos antigos não o trazem: conta como 0.
     ? (d.entry_count != null
-      ? t('tournament.notice_entries_closed_count', { ...vars, count: Number(d.entry_count) })
+      ? (Number(d.pending_count) > 0
+        // O total e a ação numa frase só (UX, 11 out): «…fecharam com 84
+        // duplas. Valida as 4 que faltam antes do sorteio.»
+        ? `${t('tournament.notice_entries_closed_total', { ...vars, count: Number(d.entry_count) + Number(d.pending_count) })} ${t('tournament.notice_entries_closed_validate', { count: Number(d.pending_count) })}`
+        : t('tournament.notice_entries_closed_count', { ...vars, count: Number(d.entry_count) }))
       : t('tournament.notice_entries_closed', vars))
     : notice.kind === 'tournament_prize_changed'
     ? (prize ? t('tournament.notice_prize_changed', { ...vars, prize }) : t('tournament.notice_prize_removed', vars))

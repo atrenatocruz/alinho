@@ -643,7 +643,10 @@ export default function DrawAdminPanel({ tournament, onBack, onEdit }) {
                 </span>
               </span>
               <StatePill tone={c.status === 'sorteada' ? 'dark' : 'grey'}>
-                {t(`tournament.draw.cat_status_${c.status}`)}
+                {/* O torneio já fechou (prazo ou à mão) e a categoria ainda não
+                    escolheu quem entra: «inscrições fechadas», e não «abertas»
+                    (QA, 9 out). */}
+                {t(`tournament.draw.cat_status_${c.status === 'inscricoes' && (tournament.status !== 'inscricoes' || deadlinePassed) ? 'fechada' : c.status}`)}
               </StatePill>
             </button>
           ))

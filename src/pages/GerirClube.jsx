@@ -3765,15 +3765,19 @@ export default function GerirClube() {
                       <RequestPerson req={req} fallbackName={t('gerirclube.fallback_player_name')} />
                       <button
                         onClick={() => handleApproveRequest(req.id)}
-                        className="w-9 h-9 flex items-center justify-center rounded-full bg-ok/10 text-ok hover:bg-ok/20 transition-colors duration-fast"
+                        type="button"
+                        className="w-11 h-11 shrink-0 flex items-center justify-center rounded-full bg-ok/10 text-ok hover:bg-ok/20 transition-colors duration-fast"
                         title={t('gerirclube.approve_action')}
+                        aria-label={t('gerirclube.approve_action')}
                       >
                         <Check size={18} />
                       </button>
                       <button
                         onClick={() => handleRejectRequest(req.id)}
-                        className="w-9 h-9 flex items-center justify-center rounded-full text-danger hover:bg-danger/10 transition-colors duration-fast"
+                        type="button"
+                        className="w-11 h-11 shrink-0 flex items-center justify-center rounded-full text-danger hover:bg-danger/10 transition-colors duration-fast"
                         title={t('gerirclube.reject_action')}
+                        aria-label={t('gerirclube.reject_action')}
                       >
                         <X size={18} />
                       </button>
@@ -3793,15 +3797,19 @@ export default function GerirClube() {
                       <RequestPerson req={req} fallbackName={t('gerirclube.fallback_player_name')} />
                       <button
                         onClick={async () => { await handleApproveGroupRequest(req.id, group.id); loadPedidosDosGrupos() }}
-                        className="w-9 h-9 flex items-center justify-center rounded-full bg-ok/10 text-ok hover:bg-ok/20 transition-colors duration-fast"
+                        type="button"
+                        className="w-11 h-11 shrink-0 flex items-center justify-center rounded-full bg-ok/10 text-ok hover:bg-ok/20 transition-colors duration-fast"
                         title={t('gerirclube.approve_action')}
+                        aria-label={t('gerirclube.approve_action')}
                       >
                         <Check size={18} />
                       </button>
                       <button
                         onClick={async () => { await handleRejectGroupRequest(req.id, group.id); loadPedidosDosGrupos() }}
-                        className="w-9 h-9 flex items-center justify-center rounded-full text-danger hover:bg-danger/10 transition-colors duration-fast"
+                        type="button"
+                        className="w-11 h-11 shrink-0 flex items-center justify-center rounded-full text-danger hover:bg-danger/10 transition-colors duration-fast"
                         title={t('gerirclube.reject_action')}
+                        aria-label={t('gerirclube.reject_action')}
                       >
                         <X size={18} />
                       </button>
@@ -4309,15 +4317,19 @@ export default function GerirClube() {
                                             <p className="flex-1 min-w-0 text-sm font-extrabold text-ink-900 truncate">{req.name || t('gerirclube.fallback_player_name')}</p>
                                             <button
                                               onClick={() => handleApproveGroupRequest(req.id, group.id)}
-                                              className="w-8 h-8 flex items-center justify-center rounded-full bg-ok/10 text-ok hover:bg-ok/20 transition-colors duration-fast"
+                                              type="button"
+                                              className="w-11 h-11 shrink-0 flex items-center justify-center rounded-full bg-ok/10 text-ok hover:bg-ok/20 transition-colors duration-fast"
                                               title={t('gerirclube.approve_action')}
+                                              aria-label={t('gerirclube.approve_action')}
                                             >
                                               <Check size={16} />
                                             </button>
                                             <button
                                               onClick={() => handleRejectGroupRequest(req.id, group.id)}
-                                              className="w-8 h-8 flex items-center justify-center rounded-full text-danger hover:bg-danger/10 transition-colors duration-fast"
+                                              type="button"
+                                              className="w-11 h-11 shrink-0 flex items-center justify-center rounded-full text-danger hover:bg-danger/10 transition-colors duration-fast"
                                               title={t('gerirclube.reject_action')}
+                                              aria-label={t('gerirclube.reject_action')}
                                             >
                                               <X size={16} />
                                             </button>
