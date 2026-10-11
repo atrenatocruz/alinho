@@ -108,7 +108,11 @@ function PlayedCard({ row }) {
     : row.players_count != null ? t(row.kind === 'mix' ? 'agenda.played_players' : 'agenda.played_people', { count: Number(row.players_count) }) : null
   const points = row.i_played && row.my_points != null ? Number(row.my_points) : null
   const event = { orgName: row.org_name, orgKind: row.org_kind, orgLogo: row.org_logo, orgId: row.organization_id }
-  const state = <StateTag tone="grey" icon={CheckCircle2}>{t('agenda.state_finished')}</StateTag>
+  // Quem ganhou vê «🏆 Venceste» no canto, no lugar de «Terminado» (UX,
+  // 10 out). i_won vem do list_played_events (Dev 3); sem ele, «Terminado».
+  const state = row.i_won
+    ? <StateTag tone="live">{t('agenda.result_won')}</StateTag>
+    : <StateTag tone="grey" icon={CheckCircle2}>{t('agenda.state_finished')}</StateTag>
   return (
     <div className={`relative overflow-hidden rounded-card bg-surface p-3.5 press ${row.i_played ? 'border-2 border-ok' : 'border border-line'}`}>
       <Link to={to} className="absolute inset-0" aria-label={title || ''} />
