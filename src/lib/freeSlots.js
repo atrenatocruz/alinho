@@ -6,20 +6,28 @@
 // vazios.»
 import { countPeople } from './mixLogic'
 
-/** Um horário livre: jogo em aberto, ainda sem ninguém, que não é meu nem acabou. */
-export function isFreeSlot(e) {
+/** Jogo em aberto ainda sem ninguém, que não é meu nem acabou. */
+function isEmptyOpenSlot(e) {
   if (e.kind !== 'open' || e.mine || e.finished) return false
   if (e.source === 'game') return e.raw?.origin === 'open_slot' && countPeople(e.raw?.participants || []) === 0
   if (e.source === 'explore') return e.raw?.origin === 'open_slot' && (e.explore?.peopleCount || 0) === 0
   return false
 }
 
+/** Um horário livre: vazio e ainda por acontecer. Um vazio cuja hora já
+ *  passou não serve a ninguém e sai da Home (relatório do QA, 9 out). */
+export function isFreeSlot(e, now = Date.now()) {
+  return isEmptyOpenSlot(e) && !(e.startsAt instanceof Date && e.startsAt.getTime() <= now)
+}
+
 /** Os eventos de um dia com os horários livres juntos num evento só
  *  (source 'free'), por clube e pela hora do primeiro. `dayEvents` já vem
  *  pela ordem da hora. */
-export function groupFreeSlots(dayEvents, dayKey) {
-  const free = dayEvents.filter(isFreeSlot)
-  if (free.length === 0) return dayEvents
+export function groupFreeSlots(allDayEvents, dayKey, now = Date.now()) {
+  // Os vazios cuja hora já passou saem do dia.
+  const dayEvents = allDayEvents.filter((e) => !(isEmptyOpenSlot(e) && !isFreeSlot(e, now)))
+  const free = dayEvents.filter((e) => isFreeSlot(e, now))
+  if (free.length === 0) return dayEvents.length === allDayEvents.length ? allDayEvents : dayEvents
   const byOrg = new Map()
   for (const e of free) {
     const k = e.orgId || e.orgName || '?'
@@ -35,7 +43,7 @@ export function groupFreeSlots(dayEvents, dayKey) {
   // Na folha de abrir, as horas do clube nesse dia: as livres e as já
   // ocupadas (riscadas).
   for (const c of clubs) {
-    c.taken = dayEvents.filter((e) => e.kind === 'open' && !isFreeSlot(e) && (e.orgId || e.orgName) === (c.orgId || c.orgName) && e.raw?.origin === 'open_slot')
+    c.taken = dayEvents.filter((e) => e.kind === 'open' && !isFreeSlot(e, now) && (e.orgId || e.orgName) === (c.orgId || c.orgName) && e.raw?.origin === 'open_slot')
     c.price = c.slots.find((s) => s.raw?.price_per_player != null)?.raw?.price_per_player ?? null
     c.location = c.slots[0]?.raw?.location || ''
   }
@@ -53,7 +61,7 @@ export function groupFreeSlots(dayEvents, dayKey) {
     clubs,
     count: free.length,
   }
-  const rest = dayEvents.filter((e) => !isFreeSlot(e))
+  const rest = dayEvents.filter((e) => !isFreeSlot(e, now))
   const at = rest.findIndex((e) => e.hasTime && e.startsAt > first.startsAt)
   return at === -1 ? [...rest, merged] : [...rest.slice(0, at), merged, ...rest.slice(at)]
 }

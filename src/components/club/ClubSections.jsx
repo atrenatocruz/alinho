@@ -150,7 +150,11 @@ const localDayKey = (iso) => {
 
 export function buildClubEvents(club, tournaments = []) {
   const today = todayKey()
-  const games = (club.open_games || []).filter((g) => g.date && localDayKey(g.date) >= today && g.status !== 'cancelled').map((g) => ({
+  const now = Date.now()
+  // Um jogo em aberto cuja hora já passou também sai (relatório do QA, 9 out):
+  // só fica o que ainda vai acontecer. Os mixes de hoje ficam (a decorrer).
+  const games = (club.open_games || []).filter((g) => g.date && localDayKey(g.date) >= today && g.status !== 'cancelled'
+    && !(g.origin === 'open_slot' && new Date(g.date).getTime() <= now)).map((g) => ({
     key: `g-${g.id}`,
     kind: g.origin === 'open_slot' ? 'open' : 'mix',
     when: g.date,
