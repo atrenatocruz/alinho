@@ -1017,6 +1017,12 @@ const dayOnly = (offset) => {
 const person = (id) => ({ name: FAKE_PEOPLE[id].name, avatar_url: FAKE_PEOPLE[id].avatar_url, rating: FAKE_PEOPLE[id].rating, gender: FAKE_PEOPLE[id].gender })
 const ADMIN_PERSON = { name: 'Admin (Dev)', avatar_url: null, rating: 1450, gender: 'masculino' }
 const extra = (i) => ({ name: ['Ana Ribeiro', 'Bruno Sá', 'Carla Nunes', 'Duarte Lopes', 'Eva Matos', 'Filipe Reis'][i], avatar_url: null, rating: 1300 + i * 40, gender: i % 2 ? 'masculino' : 'feminino' })
+const freeSlot = (id, orgId, orgName, day, h, kind = 'club') => ({
+  id, organization_id: orgId, title: 'Jogo em aberto', date: atDay(day, h).toISOString(),
+  location: 'Smash Padel, Parque das Nações', status: 'open', origin: 'open_slot', format: 'sobe_desce', num_courts: 1,
+  max_players: 4, price_per_player: 10, prize: null, gender_restriction: 'indiferente', level: null, recurrence_id: null,
+  organization: { name: orgName, kind, group_logo_url: null }, participants: [],
+})
 const AGENDA_GAMES = () => [
   {
     id: 'ag-mine-today', organization_id: MOCK_CLUB_ID, title: 'Mix de terça', date: atDay(0, 19).toISOString(),
@@ -1062,6 +1068,16 @@ const AGENDA_GAMES = () => [
       ...[0, 1, 2].map((i) => ({ id: `py${i + 1}`, user_id: `y${i}`, partner_id: `z${i}`, status: 'confirmed', user: extra(i), partner: extra(i + 3) })),
     ],
   },
+  // Horários livres (SPEC-4): mockFreeSlots = 'true' — jogos em aberto sem
+  // ninguém, hoje em dois clubes e amanhã num só, e um ocupado.
+  ...(localStorage.getItem('mockFreeSlots') === 'true' ? [
+    ...[14, 15, 16, 17, 18, 19, 21, 22].map((h) => freeSlot(`fs-a${h}`, MOCK_CLUB_ID, 'Smash Padel Almada', 0, h)),
+    ...[17, 18].map((h) => freeSlot(`fs-b${h}`, MOCK_ADMIN_ORG_ID, 'Dev Org', 0, h, 'group')),
+    ...[9, 10, 11].map((h) => freeSlot(`fs-c${h}`, MOCK_CLUB_ID, 'Smash Padel Almada', 1, h)),
+    // Um jogo que eu abri às 20:00 (só eu lá dentro): «Abriste este jogo».
+    { ...freeSlot('fs-me', MOCK_CLUB_ID, 'Smash Padel Almada', 0, 20),
+      participants: [{ id: 'pme', user_id: MOCK_ADMIN_USER_ID, partner_id: null, status: 'confirmed', created_at: new Date().toISOString(), user: ADMIN_PERSON }] },
+  ] : []),
 ]
 const AGENDA_GROUP_MATCHES = () => [{
   id: 'ag-group-match', ranked: true, scheduled_date: dayOnly(3), scheduled_time: '18:30:00', location: 'Clube VII, Lisboa',

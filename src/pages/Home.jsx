@@ -24,6 +24,11 @@ import MyNextGames, { CustomizePill } from '../components/home/MyNextGames'
 import LiveNowLine from '../components/home/LiveNowLine'
 import ForYouLine, { forYouItems } from '../components/home/ForYouLine'
 import PersonalizeHomeSheet, { useHomeSections } from '../components/home/PersonalizeHomeSheet'
+import FreeSlotsCard from '../components/home/FreeSlotsCard'
+import OpenSlotSheet from '../components/home/OpenSlotSheet'
+import { groupFreeSlots } from '../lib/freeSlots'
+import { ratingBand } from '../lib/elo'
+import { formatTime } from '../lib/formatDate'
 import { listMyFriendMatchInvites } from '../lib/privateMatches'
 import { describeError, errorKind, isGameFull } from '../lib/errors'
 import { getGroupMatches } from '../lib/groupMatches'
@@ -151,6 +156,10 @@ export default function Home() {
   const homeSections = useHomeSections(user?.id)
   const [customizeOpen, setCustomizeOpen] = useState(false)
   const [phoneOpen, setPhoneOpen] = useState(false)
+  // «Abrir um jogo no <clube>» (SPEC-4): { club, slot } | null.
+  const [openSlot, setOpenSlot] = useState(null)
+  const [openBusy, setOpenBusy] = useState(false)
+  const [openError, setOpenError] = useState('')
   // O bloco do topo (próximos, a decorrer, para ti): é para lá que a Home abre.
   const topBlockRef = useRef(null)
   useEffect(() => {
@@ -262,7 +271,7 @@ export default function Home() {
         *,
         organization:organizations (name, kind, group_logo_url),
         participants (
-          id, user_id, partner_id, guest_id, partner_guest_id, status,
+          id, user_id, partner_id, guest_id, partner_guest_id, status, created_at,
           user:profiles!participants_user_id_fkey (name, avatar_url, rating, gender),
           partner:profiles!participants_partner_id_fkey (name, avatar_url, rating, gender),
           guest:game_guests!participants_guest_id_fkey (id, name),
@@ -434,7 +443,10 @@ export default function Home() {
   const today = toDayKey(new Date())
   // A Home abre em «Hoje» e por cima não há dias passados: esses vivem em
   // «Filtros › Já jogados» (UX, 9 out — Home do futuro, SPEC-1).
-  const days = useMemo(() => groupByDay(visible.filter((e) => e.dayKey >= today), today), [visible, today])
+  // Horários livres (SPEC-4, 9 out): os jogos em aberto sem ninguém de um
+  // dia juntam-se numa linha só (FreeSlotsCard); com alguém, cartão normal.
+  const days = useMemo(() => groupByDay(visible.filter((e) => e.dayKey >= today), today)
+    .map((d) => ({ ...d, events: groupFreeSlots(d.events, d.dayKey) })), [visible, today])
   // Lista vazia por causa dos filtros (não do dia): diz-se isso e limpa-se
   // num toque (Trello #415).
   const filtersActive = filters.show !== DEFAULT_FILTERS.show
@@ -828,7 +840,46 @@ export default function Home() {
     }
   }
 
+  // Abrir um jogo a partir de um horário livre: é entrar nesse jogo em
+  // aberto, como o «Entrar» de hoje (SPEC-4, ponto 4). O parceiro e o nível
+  // esperam pelos dados do Dev 3.
+  const openFreeSlot = async (slot) => {
+    setOpenBusy(true)
+    setOpenError('')
+    try {
+      const { error } = await supabase.from('participants').insert([{
+        game_id: slot.raw.id, user_id: user.id, status: 'confirmed', joined_alone: true,
+      }])
+      if (error) throw error
+      setOpenSlot(null)
+      setJoinNotice(t('home.free_opened', { time: formatTime(slot.startsAt, i18n.language, { hour: '2-digit', minute: '2-digit' }) }))
+      await loadGames()
+    } catch (error) {
+      console.error('Error opening a game from a free slot:', error)
+      setOpenError(isGameFull(error) ? t('home.free_taken_now') : describeError(t, error, 'home.card_action_error'))
+      if (isGameFull(error)) loadGames()
+    } finally {
+      setOpenBusy(false)
+    }
+  }
+  // O nível do jogo, a partir do meu (ex.: M3 → M2–M3 · M3–M4 · Qualquer).
+  const myBand = ratingBand(profile?.rating, profile?.gender)
+  const levelOptions = myBand?.fullVars?.num ? (() => {
+    const n = myBand.fullVars.num
+    const pre = myBand.label.replace(/\d+$/, '')
+    return [n > 1 ? `${pre}${n - 1}–${pre}${n}` : null, n < 6 ? `${pre}${n}–${pre}${n + 1}` : null, t('home.open_any_level')].filter(Boolean)
+  })() : []
+
   const renderEvent = (event) => {
+    if (event.source === 'free') {
+      return (
+        <FreeSlotsCard key={event.key} event={event} isToday={event.dayKey === today}
+          onPick={(club, slot) => (club.outside
+            // De um clube onde não estou: abre a página do clube, onde estão os horários.
+            ? (club.orgSlug ? navigate(`/clube/${club.orgSlug}`) : null)
+            : (setOpenError(''), setOpenSlot({ club, slot })))} />
+      )
+    }
     const past = event.finished || event.dayKey < today
     const distance = eventDistance(event, location)
     if (event.source === 'explore') {
@@ -1045,6 +1096,12 @@ export default function Home() {
         <Sheet title={t('phoneconfirm.title')} onClose={() => setPhoneOpen(false)}>
           <ConfirmPhoneCard bare />
         </Sheet>
+      )}
+
+      {openSlot && (
+        <OpenSlotSheet key={openSlot.slot.key} club={openSlot.club} picked={openSlot.slot} busy={openBusy} error={openError}
+          levelOptions={levelOptions}
+          onOpen={(slot) => openFreeSlot(slot)} onClose={() => setOpenSlot(null)} />
       )}
 
       {customizeOpen && (

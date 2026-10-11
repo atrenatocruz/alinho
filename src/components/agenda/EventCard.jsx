@@ -2,6 +2,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { MapPin, CheckCircle2, Lock, Play, Trophy, Euro, Swords, Users, Shuffle, CircleDot, Clock, ListOrdered, GraduationCap, Building2, ChevronRight } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { sharePageLink } from '../../lib/shareImage'
 import { PlayerAvatarRow, GroupLevelBadge, PrimaryButton } from '../ui'
 import { formatTime, formatCurrency } from '../../lib/formatDate'
 import { useSpecialPriceLine } from '../SpecialPriceRoster'
@@ -54,6 +55,12 @@ const ACTION_VARIANT = {
   // Sair: contorno preto, como no desenho aprovado (cores.png).
   leave: 'ghost',
   leave_waitlist: 'ghost',
+}
+
+// «Rita Figueira» → «Rita F.» (o nome de quem abriu um jogo em aberto).
+const shortPersonName = (name) => {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean)
+  return parts.length > 1 && /\p{L}/u.test(parts[parts.length - 1]) ? `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.` : parts.join(' ')
 }
 
 const initials = (name) => (name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase()
@@ -290,6 +297,18 @@ export function GameEventCard({ event, profile, friendIds = null, action = null,
   const isClosed = game.status === 'closed' || (game.status === 'open' && isFull)
   const isLive = game.status === 'in_progress'
   const friendsIn = friendIds ? players.filter((p) => p.id && friendIds.has(p.id)) : []
+  // Jogo em aberto aberto por alguém (SPEC-4, ponto 5): «Abriste este jogo»
+  // para quem o abriu, «<Nome> abriu este jogo» para os outros, e o que falta
+  // («Falta 1 dupla», «Faltam 3 pessoas»). Quem o abriu é a 1.ª inscrição.
+  const isOpenSlot = game.origin === 'open_slot'
+  const opener = isOpenSlot
+    ? [...(game.participants || [])].filter((p) => p.status === 'confirmed' && p.user_id)
+      .sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')))[0] || null
+    : null
+  const iOpened = !!opener && opener.user_id === profile?.id
+  const openerName = opener?.user?.name ? shortPersonName(opener.user.name) : ''
+  const openTitle = opener ? (iOpened ? t('home.open_you_opened') : openerName ? t('home.open_x_opened', { name: openerName }) : null) : null
+  const missing = isOpenSlot && !past && !event.finished ? Math.max(0, capacity - players.length) : 0
   const time = formatTime(event.startsAt, i18n.language, { hour: '2-digit', minute: '2-digit' })
 
   // "Outro nível, género ou idade: aparece, marcado" (Francisco, 16 set).
@@ -330,8 +349,13 @@ export function GameEventCard({ event, profile, friendIds = null, action = null,
       <MixImageBand url={game.image_url} past={past} />
 
       <p className={`text-[22px] font-extrabold leading-none mt-2.5 ${past ? 'text-muted' : 'text-ink-900'}`}>{time}</p>
-      <h3 className={`text-base leading-snug mt-1.5 ${past ? 'text-muted' : 'text-ink-900'}`}>{game.title}</h3>
+      <h3 className={`text-base leading-snug mt-1.5 ${past ? 'text-muted' : 'text-ink-900'}`}>{openTitle || game.title}</h3>
       {stateLine && <StateLine kind={event.kind}>{stateLine}</StateLine>}
+      {missing > 0 && opener && (
+        <p className="mt-1.5 text-[12.5px] font-extrabold text-[#9A3A17]">
+          {missing === 2 && players.length === 2 ? t('home.open_missing_pair') : t('home.open_missing', { count: missing })}
+        </p>
+      )}
       {!event.orgName && <div className="mt-1"><Owner event={event} fallbackKey="agenda.owner_none" /></div>}
 
       <GameFacts game={game} distance={distance} />
@@ -365,6 +389,12 @@ export function GameEventCard({ event, profile, friendIds = null, action = null,
                   : null}
             </span>
           )
+        ) : iOpened ? (
+          // Quem abriu partilha para encher (contorno); sair faz-se no jogo.
+          <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); sharePageLink({ title: game.title, text: t('home.open_share_text', { time, club: event.orgName || '' }), url: `${window.location.origin}/jogo/${game.id}` }) }}
+            className="press relative ml-auto min-h-[40px] rounded-full border-[1.5px] border-ink-900 bg-white px-4 text-sm font-extrabold text-ink-900">
+            {t('home.open_share')}
+          </button>
         ) : action ? (
           <PrimaryButton
             variant={ACTION_VARIANT[action.kind]}
