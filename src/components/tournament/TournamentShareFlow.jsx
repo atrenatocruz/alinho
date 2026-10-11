@@ -8,14 +8,19 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Camera, Image as ImageIcon } from 'lucide-react'
-import TournamentShareCard, { T_CARD_H, T_CARD_W, bakePhoto } from './TournamentShareCard'
+import TournamentShareCard, { T_CARD_H, T_CARD_W, bakePhoto, bakeImageUrl } from './TournamentShareCard'
 import { qrDataUrl, readLocalPhoto, shareFilename, shareOrSaveImage } from '../../lib/shareImage'
 import { tournamentUrl } from '../../lib/tournamentPublic'
 import { useAuth } from '../../contexts/AuthContext'
 
 const PREVIEW_SCALE = 0.62
 
-export default function TournamentShareFlow({ tournament, variant, data, text, filenameParts = [], onClose }) {
+/* #622 (vencedores em todos os jogos), tudo opcional: `qrUrl` (o QR vai para
+   a página do clube/grupo, ou alinho.pt; sem ele, a página do torneio),
+   `shareTitle`, `org` e `children` (passam ao cartão) e `fallbackImage` (a
+   imagem do mix, que entra no lugar da foto quando se escolhe «Sem foto»). */
+export default function TournamentShareFlow({ tournament, variant, data, text, filenameParts = [], onClose,
+  qrUrl = null, shareTitle = null, org = null, fallbackImage = null, children = null }) {
   const { t } = useTranslation()
   const { profile } = useAuth()
   const [step, setStep] = useState('photo') // 'photo' | 'preview'
@@ -29,11 +34,20 @@ export default function TournamentShareFlow({ tournament, variant, data, text, f
   const cameraRef = useRef(null)
   const galleryRef = useRef(null)
 
-  // O QR: a página do torneio, com a referência de quem partilhou.
+  // O QR: a página do torneio (ou a que vier em qrUrl), com a referência de
+  // quem partilhou.
   useEffect(() => {
-    const url = `${tournamentUrl(tournament, window.location.origin)}${profile?.id ? `?ref=${profile.id}` : ''}`
+    const base = qrUrl || tournamentUrl(tournament, window.location.origin)
+    const url = `${base}${profile?.id ? `${base.includes('?') ? '&' : '?'}ref=${profile.id}` : ''}`
     qrDataUrl(url, { size: 240 }).then(setQr).catch((err) => console.error('Error making the QR:', err))
-  }, [tournament, profile?.id])
+  }, [tournament, qrUrl, profile?.id])
+  // A imagem do mix, já cortada como a foto, para o «Sem foto».
+  const [fallback, setFallback] = useState(null)
+  useEffect(() => {
+    let alive = true
+    bakeImageUrl(fallbackImage).then((v) => { if (alive) setFallback(v) })
+    return () => { alive = false }
+  }, [fallbackImage])
 
   const onFile = async (e) => {
     const file = e.target.files?.[0]
@@ -54,7 +68,7 @@ export default function TournamentShareFlow({ tournament, variant, data, text, f
     setBusy(true); setError(''); setSaved(false)
     try {
       const blob = await cardRef.current.exportPng()
-      const out = await shareOrSaveImage(blob, { filename: shareFilename(...filenameParts), title: tournament?.name || '', text: caption })
+      const out = await shareOrSaveImage(blob, { filename: shareFilename(...filenameParts), title: shareTitle ?? tournament?.name ?? '', text: caption })
       if (out === 'saved') setSaved(true)
     } catch (err) {
       console.error('Error sharing the card:', err)
@@ -112,7 +126,7 @@ export default function TournamentShareFlow({ tournament, variant, data, text, f
         {/* O cartão a sério, reduzido só no ecrã: o que se exporta é o de 360 × 640. */}
         <div className="mx-auto overflow-hidden rounded-[14px] shadow-lift" style={{ width: T_CARD_W * PREVIEW_SCALE, height: T_CARD_H * PREVIEW_SCALE }}>
           <div style={{ transform: `scale(${PREVIEW_SCALE})`, transformOrigin: 'top left' }}>
-            <TournamentShareCard ref={cardRef} variant={variant} data={data} photo={photo} qr={qr} />
+            <TournamentShareCard ref={cardRef} variant={variant} data={data} photo={photo || fallback} qr={qr} org={org}>{children}</TournamentShareCard>
           </div>
         </div>
         <div>

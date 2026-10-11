@@ -33,6 +33,10 @@ import { notifyMixChanges } from '../lib/notifications'
 import AddPlayerSheet from '../components/mix/AddPlayerSheet'
 import AddScorekeeperSheet from '../components/mix/AddScorekeeperSheet'
 import SwapPlayerSheet from '../components/mix/SwapPlayerSheet'
+import MixWinnersBlock from '../components/mix/MixWinnersBlock'
+import TournamentShareFlow from '../components/tournament/TournamentShareFlow'
+import { bakeCircle } from '../components/tournament/TournamentShareCard'
+import { duplasWinners, americanoWinners } from '../lib/mixWinners'
 import JoinPartnerSheet from '../components/mix/JoinPartnerSheet'
 import { Sheet } from '../components/agenda/AgendaControls'
 import { whatsappLookalikeInGame, rememberWhatsappGuest, rememberedWhatsappGuest } from '../lib/whatsappGuest'
@@ -262,6 +266,16 @@ export default function GameDetails() {
   const [clubMembers, setClubMembers] = useState([])
   const [swapFor, setSwapFor] = useState(null) // { team, player, slot } | null
   const [removeSlotAsk, setRemoveSlotAsk] = useState(null) // { person, duplaNumber } | null
+  // Partilhar os vencedores (#622): o logótipo do clube já cortado em círculo.
+  const [winnersShareOpen, setWinnersShareOpen] = useState(false)
+  const [orgLogoBaked, setOrgLogoBaked] = useState(null)
+  const orgLogoUrl = gameMembership?.organization?.group_logo_url || null
+  useEffect(() => {
+    if (!winnersShareOpen || !orgLogoUrl) return undefined
+    let alive = true
+    bakeCircle(orgLogoUrl).then((v) => { if (alive) setOrgLogoBaked(v) })
+    return () => { alive = false }
+  }, [winnersShareOpen, orgLogoUrl])
   // Rondas já jogadas que a pessoa abriu à mão (as outras ficam dobradas).
   const [openRounds, setOpenRounds] = useState({})
   // Jogo que não abre: de que grupo é (undefined = a perguntar; null = não
@@ -2798,6 +2812,50 @@ export default function GameDetails() {
     ? sobeDesceStandings(matches)
     : []
   const statsByUser = Object.fromEntries(mixStats.map((s) => [s.user_id, s]))
+  // Os vencedores (#622). Mix de duplas: o vencedor em 1.º e as outras pela
+  // ordem da classificação. Americano: por pessoa, com o desempate.
+  const winnersOrg = gameMembership?.organization ? {
+    name: gameMembership.organization.name,
+    logo: orgLogoBaked,
+    initials: (gameMembership.organization.name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase(),
+    sub: [game?.title, isAmericano ? t('mixwinners.sub_americano') : null].filter(Boolean).join(' · '),
+  } : null
+  const winnersInfo = (() => {
+    if (game?.status !== 'finished') return null
+    const myStats = statsByUser[user?.id]
+    const record = myStats ? { won: myStats.matches_won || 0, played: myStats.matches_played || 0 } : null
+    if (game.winner_team_id) {
+      const winnerTeam = teamById[game.winner_team_id]
+      if (!winnerTeam) return null
+      const ordered = [winnerTeam, ...shareDuplas.filter((d) => d.id !== game.winner_team_id).map((d) => teamById[d.id]).filter(Boolean)]
+      return duplasWinners({ teams: ordered, myId: user?.id, record, game, org: winnersOrg, t, lang: i18n.language })
+    }
+    if (isAmericano && americanoStandingsResult.length > 0) {
+      const w = americanoWinners({ standings: americanoStandingsResult, firsts: americanoFirsts, myId: user?.id, game, org: winnersOrg, t, lang: i18n.language })
+      if (!w) return null
+      const firsts = americanoFirsts
+      // O voucher (regra de 30 set: sem conta, sem voucher).
+      const withAccount = firsts.filter((r) => !r.player.no_account)
+      const note = firsts.length > 1
+        ? t('gamedetails.americano_tied_first', { points: americanoTop.points })
+        : t('gamedetails.americano_first', { count: americanoStandingsResult.length, points: americanoTop.points })
+      const extra = game.has_voucher ? (withAccount.length > 0 ? (
+        <p className="mt-1.5 text-sm font-extrabold text-white">
+          {firsts.length > 1
+            // Com empate, diz-se quem o ganhou: só quem tem conta o recebe.
+            ? t(withAccount.length > 1 ? 'gamedetails.americano_voucher_many_named' : 'gamedetails.americano_voucher_one_named', { names: new Intl.ListFormat(i18n.language === 'en' ? 'en' : 'pt-PT', { type: 'conjunction' }).format(withAccount.map((r) => r.player.name)) })
+            : t('gamedetails.americano_voucher_one')}
+        </p>
+      ) : (
+        <p className="mt-1.5 text-sm text-ink-200">{t('gamedetails.americano_voucher_no_account')}</p>
+      )) : null
+      return { ...w, note, extra }
+    }
+    return null
+  })()
+  // Quem jogou e tem conta, e quem organizou (SPEC, ponto 5).
+  const canShareWinners = !!winnersInfo?.share && (isAdmin || game?.created_by === user?.id
+    || (!!statsByUser[user?.id] && !profile?.is_guest))
   const personById = Object.fromEntries(people.map((p) => [p.id, p]))
 
   // O editor de arrastar jogadores entre duplas (Trello #292). Serve durante
@@ -2909,7 +2967,9 @@ export default function GameDetails() {
       {/* «← Voltar» sempre visível; o «Partilhar» fica na faixa (27 set).
           Um rascunho não se partilha: quem recebesse o link não o abria (#544). */}
       <BackBar onBack={goBack} label={t('gamedetails.back')} title={game?.title}
-        onShare={isDraftMix(game) ? undefined : () => setShowShare(true)} />
+        // Mix acabado: o mesmo «Partilhar os vencedores» do bloco (#622: um
+        // botão de partilhar só); para os outros, o link de sempre.
+        onShare={isDraftMix(game) ? undefined : () => (canShareWinners ? setWinnersShareOpen(true) : setShowShare(true))} />
 
       {showShare && (
         <ShareModal
@@ -2926,6 +2986,33 @@ export default function GameDetails() {
             formattedDate: formatDate(game.date),
             winnerTeamId: game.winner_team_id,
           }}
+        />
+      )}
+
+      {/* Os vencedores no fim (#622, design-handoff/2026-10-11-vencedores-em-
+          todos-os-jogos): em cima da página do mix acabado, o vencedor e o
+          pódio, e «↗ Partilhar os vencedores» para quem jogou e tem conta, e
+          para quem organizou. O voucher do americano vem para aqui. */}
+      {winnersInfo && (
+        <MixWinnersBlock
+          winner={winnersInfo.winner}
+          rows={winnersInfo.rows}
+          note={winnersInfo.note}
+          extra={winnersInfo.extra}
+          onShare={canShareWinners ? () => setWinnersShareOpen(true) : null}
+        />
+      )}
+      {winnersShareOpen && winnersInfo?.share && (
+        <TournamentShareFlow
+          variant={winnersInfo.share.variant}
+          data={winnersInfo.share.data}
+          text={winnersInfo.share.text}
+          filenameParts={winnersInfo.share.filenameParts}
+          shareTitle={game.title}
+          qrUrl={orgSlug ? `${window.location.origin}/clube/${orgSlug}` : window.location.origin}
+          org={winnersOrg}
+          fallbackImage={game.image_url || null}
+          onClose={() => setWinnersShareOpen(false)}
         />
       )}
 
@@ -3206,51 +3293,6 @@ export default function GameDetails() {
           <p className="px-1 text-center text-xs text-muted">{t(awaitsApproval ? 'mixrequest.ask_hint' : 'gamedetails.stay_suplente_hint')}</p>
         </div>
       ) : null}
-
-      {/* Winner (mix finalizado) */}
-      {game.status === 'finished' && game.winner_team_id && (
-        <div className="card bg-ink-900 text-center">
-          <p className="text-ink-200 text-xs font-extrabold uppercase tracking-widest mb-2">{t('gamedetails.mix_winners_label')}</p>
-          <p className="text-2xl font-extrabold text-white">{teamName(game.winner_team_id)}</p>
-        </div>
-      )}
-      {/* Americano (UX, 8 out): ganha uma pessoa, não uma dupla — o mesmo
-          cartão, com o 1.º da classificação por pessoa; com empate no 1.º,
-          os nomes lado a lado e «Empatados em 1.º». */}
-      {game.status === 'finished' && isAmericano && !game.winner_team_id && americanoStandingsResult.length > 0 && (() => {
-        const top = americanoTop
-        const firsts = americanoFirsts
-        // O voucher (regra de 30 set: sem conta, sem voucher).
-        const withAccount = firsts.filter((r) => !r.player.no_account)
-        return (
-          <div className="card bg-ink-900 text-center">
-            <p className="text-ink-200 text-xs font-extrabold uppercase tracking-widest mb-3">{t(firsts.length > 1 ? 'gamedetails.mix_winners_label' : 'gamedetails.mix_winner_label')}</p>
-            <div className="flex justify-center gap-5">
-              {firsts.map((r) => (
-                <div key={r.player.id} className="flex min-w-0 flex-col items-center gap-2">
-                  <Avatar name={r.player.name} url={r.player.avatar_url} size="w-14 h-14 text-lg" />
-                  <p className="max-w-[10rem] break-words text-xl font-extrabold leading-tight text-white">{r.player.name}</p>
-                </div>
-              ))}
-            </div>
-            <p className="mt-2 text-sm text-ink-200">
-              {firsts.length > 1
-                ? t('gamedetails.americano_tied_first', { points: top.points })
-                : t('gamedetails.americano_first', { count: americanoStandingsResult.length, points: top.points })}
-            </p>
-            {game.has_voucher && (withAccount.length > 0 ? (
-              <p className="mt-1.5 text-sm font-extrabold text-white">
-                {firsts.length > 1
-                  // Com empate, diz-se quem o ganhou: só quem tem conta o recebe.
-                  ? t(withAccount.length > 1 ? 'gamedetails.americano_voucher_many_named' : 'gamedetails.americano_voucher_one_named', { names: new Intl.ListFormat(i18n.language === 'en' ? 'en' : 'pt-PT', { type: 'conjunction' }).format(withAccount.map((r) => r.player.name)) })
-                  : t('gamedetails.americano_voucher_one')}
-              </p>
-            ) : (
-              <p className="mt-1.5 text-sm text-ink-200">{t('gamedetails.americano_voucher_no_account')}</p>
-            ))}
-          </div>
-        )
-      })()}
 
       {/* 👍 da noite — cada participante dá 1 kudos a um colega do mix
           (+1 XP para quem recebe; guardas todas no RPC). Janela: 48h após
