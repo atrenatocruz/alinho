@@ -1021,6 +1021,7 @@ const freeSlot = (id, orgId, orgName, day, h, kind = 'club') => ({
   id, organization_id: orgId, title: 'Jogo em aberto', date: atDay(day, h).toISOString(),
   location: 'Smash Padel, Parque das Nações', status: 'open', origin: 'open_slot', format: 'sobe_desce', num_courts: 1,
   max_players: 4, price_per_player: 10, prize: null, gender_restriction: 'indiferente', level: null, recurrence_id: null,
+  allow_pair_signup: kind === 'club',
   organization: { name: orgName, kind, group_logo_url: null }, participants: [],
 })
 const AGENDA_GAMES = () => [
@@ -1753,6 +1754,10 @@ const SP_NONE = { __error: 'Could not find the function', __code: 'PGRST202' }
 const SP_PEOPLE = [{ id: MOCK_ADMIN_USER_ID, name: 'Admin (Dev)', avatar_url: null }, { id: 'u-rf', name: 'Rita Fonseca', avatar_url: null }, { id: 'u-tl', name: 'Tiago Lopes', avatar_url: null }]
 // 'members_out' — grátis para os membros, visto por quem é de fora (o cartão).
 const SP_SAVED = () => (['members', 'members_out', 'list'].includes(SP_MODE()) ? { price: 0, audience: SP_MODE() === 'list' ? 'list' : 'members', from_series: false, people: SP_MODE() === 'list' ? SP_PEOPLE : [] } : null)
+// open_slot_join (SPEC-4, Dev 2): com mockFreeSlots existe; sem jogo dá not_open.
+RPC_MOCKS.open_slot_join = (p) => (localStorage.getItem('mockFreeSlots') === 'true'
+  ? (p?.p_game_id ? 'joined' : { __error: 'not_open' })
+  : { __error: 'Could not find the function', __code: 'PGRST202' })
 RPC_MOCKS.get_event_special_price = () => (SP_MODE() ? SP_SAVED() : SP_NONE)
 RPC_MOCKS.set_event_special_price = (p) => (SP_MODE() ? (p?.p_price == null ? null : { price: p.p_price, audience: p.p_audience, from_series: false, people: SP_PEOPLE.filter((x) => (p.p_user_ids || []).includes(x.id)) }) : SP_NONE)
 RPC_MOCKS.prices_for_me = (p) => (SP_MODE() ? (p?.p_ids || []).map((id) => {

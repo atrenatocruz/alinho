@@ -160,6 +160,15 @@ export default function Home() {
   const [openSlot, setOpenSlot] = useState(null)
   const [openBusy, setOpenBusy] = useState(false)
   const [openError, setOpenError] = useState('')
+  // O nível ao abrir só aparece com o open_slot_join na base de dados
+  // (sem ele, entra-se como antes e o nível ficava por gravar).
+  const [openJoinReady, setOpenJoinReady] = useState(false)
+  useEffect(() => {
+    let alive = true
+    supabase.rpc('open_slot_join', { p_game_id: null, p_level: null, p_partner_id: null })
+      .then(({ error }) => { if (alive) setOpenJoinReady(!!error && error.code !== 'PGRST202') })
+    return () => { alive = false }
+  }, [])
   // O bloco do topo (próximos, a decorrer, para ti): é para lá que a Home abre.
   const topBlockRef = useRef(null)
   useEffect(() => {
@@ -843,14 +852,21 @@ export default function Home() {
   // Abrir um jogo a partir de um horário livre: é entrar nesse jogo em
   // aberto, como o «Entrar» de hoje (SPEC-4, ponto 4). O parceiro e o nível
   // esperam pelos dados do Dev 3.
-  const openFreeSlot = async (slot) => {
+  const openFreeSlot = async (slot, { level = null, partnerId = null } = {}) => {
     setOpenBusy(true)
     setOpenError('')
     try {
-      const { error } = await supabase.from('participants').insert([{
-        game_id: slot.raw.id, user_id: user.id, status: 'confirmed', joined_alone: true,
-      }])
-      if (error) throw error
+      // open_slot_join (migration_open_slot_join.sql): entra e, sendo o 1.º,
+      // deixa o jogo com o nível escolhido (null = «Qualquer»). Sem a função
+      // na base de dados, entra como antes.
+      const { error: rpcError } = await supabase.rpc('open_slot_join', { p_game_id: slot.raw.id, p_level: level, p_partner_id: partnerId })
+      if (rpcError && rpcError.code !== 'PGRST202') throw rpcError
+      if (rpcError) {
+        const { error } = await supabase.from('participants').insert([{
+          game_id: slot.raw.id, user_id: user.id, status: 'confirmed', joined_alone: true,
+        }])
+        if (error) throw error
+      }
       setOpenSlot(null)
       setJoinNotice(t('home.free_opened', { time: formatTime(slot.startsAt, i18n.language, { hour: '2-digit', minute: '2-digit' }) }))
       await loadGames()
@@ -862,12 +878,18 @@ export default function Home() {
       setOpenBusy(false)
     }
   }
-  // O nível do jogo, a partir do meu (ex.: M3 → M2–M3 · M3–M4 · Qualquer).
+  // O nível do jogo (UX, 11 out): «M3 (o teu)» · «M2» · «M4» · «Qualquer».
+  // Só com género M/F e nível calculado — senão só se abre com «Qualquer».
   const myBand = ratingBand(profile?.rating, profile?.gender)
-  const levelOptions = myBand?.fullVars?.num ? (() => {
+  const levelOptions = myBand?.fullVars?.num && /^[MF]\d$/.test(myBand.label) ? (() => {
     const n = myBand.fullVars.num
-    const pre = myBand.label.replace(/\d+$/, '')
-    return [n > 1 ? `${pre}${n - 1}–${pre}${n}` : null, n < 6 ? `${pre}${n}–${pre}${n + 1}` : null, t('home.open_any_level')].filter(Boolean)
+    const pre = myBand.label[0]
+    return [
+      { value: `${pre}${n}`, label: t('home.open_level_mine', { level: `${pre}${n}` }) },
+      ...(n > 1 ? [{ value: `${pre}${n - 1}`, label: `${pre}${n - 1}` }] : []),
+      ...(n < 6 ? [{ value: `${pre}${n + 1}`, label: `${pre}${n + 1}` }] : []),
+      { value: null, label: t('home.open_any_level') },
+    ]
   })() : []
 
   const renderEvent = (event) => {
@@ -1101,7 +1123,8 @@ export default function Home() {
       {openSlot && (
         <OpenSlotSheet key={openSlot.slot.key} club={openSlot.club} picked={openSlot.slot} busy={openBusy} error={openError}
           levelOptions={levelOptions}
-          onOpen={(slot) => openFreeSlot(slot)} onClose={() => setOpenSlot(null)} />
+          levelReady={openJoinReady} partnerReady={openJoinReady}
+          onOpen={(slot, opts) => openFreeSlot(slot, opts)} onClose={() => setOpenSlot(null)} />
       )}
 
       {customizeOpen && (
