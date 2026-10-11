@@ -448,6 +448,9 @@ export default function Layout({ children }) {
     // e não «Saíste» (UX, 8 out).
     if (notice.kind === 'mix_removed') return t(d.actor_name ? 'layout.mix_notice_removed_by' : 'layout.mix_notice_removed', vars)
     if (notice.kind === 'mix_cancelled') return t('layout.mix_notice_cancelled', vars)
+    // #622 (Dev 3, migration_mix_aviso_terminou.sql): «🏆 <Evento> terminou.
+    // Ganharam <vencedores>.» — sem vencedores com nome, só «terminou».
+    if (notice.kind === 'mix_finished') return t(d.winners ? 'layout.mix_finished' : 'layout.mix_finished_plain', { ...vars, winners: d.winners })
     if (['mix_promoted', 'mix_moved_to_waitlist', 'mix_not_filled', 'mix_cancelled_not_filled', 'mix_slot_open', 'mix_swapped_out'].includes(notice.kind)) {
       return t(`layout.${notice.kind}`, vars)
     }

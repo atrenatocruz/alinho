@@ -1386,6 +1386,9 @@ const TABLE_MOCKS = {
     // Tirado por quem organiza e trocado por outra pessoa (8 out): o sino diz quem tirou.
     { id: 'n5', kind: 'mix_removed', game_id: 'fake-game-1', created_at: new Date().toISOString(),
       data: { game_title: 'Mix de Quarta', game_date: tomorrow8pm.toISOString(), actor_name: 'Marta Costa' } },
+    // #622: o mix terminou e quem ganhou (Dev 3).
+    { id: 'n7', kind: 'mix_finished', game_id: 'fake-game-1', created_at: new Date().toISOString(),
+      data: { game_title: 'Mix de Terça', game_date: tomorrow8pm.toISOString(), winners: 'Rita F. / Tiago L.' } },
     { id: 'n6', kind: 'mix_swapped_out', game_id: 'fake-game-1', created_at: new Date().toISOString(),
       data: { game_title: 'Mix de Sexta', game_date: tomorrow8pm.toISOString(), actor_name: 'Marta Costa' } },
   ] : localStorage.getItem('mockNotices') === 'requests' ? [
@@ -1601,6 +1604,7 @@ const TABLE_MOCKS = {
       ...(localStorage.getItem('mockEventPast') === 'true' ? { date: new Date(Date.now() - 3600000).toISOString() } : {}),
       ...(eventState() === 'finished' && !AM_FINAL() ? { winner_team_id: 'et1' } : {}),
       ...(AM_FINAL() ? { has_voucher: true } : {}),
+      ...(localStorage.getItem('mockMixImage') === 'true' ? { image_url: MOCK_MIX_IMAGE } : {}),
       // localStorage.mockRoundAgoMin = '7' | '21': a ronda começou há N min
       // (21 = o tempo acabou, entre rondas) — o alarme das rondas, 27 set.
       ...(eventState() === 'live' ? { round_started_at: localStorage.getItem('mockRoundPending') ? null : new Date(Date.now() - Number(localStorage.getItem('mockRoundAgoMin') || 0) * 60000).toISOString(), round_duration_minutes: 20 } : {}),

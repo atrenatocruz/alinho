@@ -22,6 +22,8 @@ export const MIX_NOTICE_KINDS = ['mix_joined', 'mix_unpublished', 'mix_not_finis
   // Ponto 17 (trocar uma pessoa): mix_slot_open (a quem organiza: há uma vaga
   // numa dupla) e mix_swapped_out (a quem foi trocado).
   'mix_slot_open', 'mix_swapped_out',
+  // #622: o mix terminou e quem ganhou (Dev 3, migration_mix_aviso_terminou.sql).
+  'mix_finished',
   // Aprovar quem entra (2 out, Dev 3): o pedido a quem organiza, e a resposta
   // a quem pediu.
   'mix_join_request', 'mix_request_accepted', 'mix_request_declined']
