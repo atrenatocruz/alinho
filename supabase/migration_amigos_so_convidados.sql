@@ -191,4 +191,5 @@ COMMIT;
 
 -- Verificar depois de correr:
 --   SELECT is_nullable FROM information_schema.columns WHERE table_name = 'private_matches' AND column_name = 'team_a_player1_id';  -- YES
---   SELECT count(*) FROM pg_proc WHERE pg_get_functiondef(oid) LIKE '%team_a_player1_guest_name%';  -- 18 ou mais
+--   SELECT count(*) FROM pg_proc WHERE prokind = 'f' AND pronamespace = 'public'::regnamespace
+--      AND pg_get_functiondef(oid) LIKE '%team_a_player1_guest_name%';  -- 17 (a friend_match_slots muda sem escrever o nome da coluna)
