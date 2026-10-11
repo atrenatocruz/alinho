@@ -8,16 +8,24 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Sheet } from '../agenda/AgendaControls'
+import PlayerSearch from '../PlayerSearch'
 import { formatTime } from '../../lib/formatDate'
 
 export default function OpenSlotSheet({ club, picked, busy = false, error = '', onOpen, onClose, partnerReady = false, levelReady = false, levelOptions = [] }) {
   const { t, i18n } = useTranslation()
   const [slot, setSlot] = useState(picked)
-  const [withPartner, setWithPartner] = useState(false)
-  const [level, setLevel] = useState(levelOptions[1] || levelOptions[0] || null)
+  // O parceiro (UX, 11 out): «Com parceiro» abre a pesquisa de pessoas numa
+  // folha por cima; escolhido, a pastilha fica «Com <Nome>». Só nos jogos em
+  // que o clube deixa inscrição em dupla (allow_pair_signup).
+  const [partner, setPartner] = useState(null)
+  const [picking, setPicking] = useState(false)
+  // O meu nível vem escolhido (o 1.º da lista); «Qualquer» é value null.
+  const [level, setLevel] = useState(levelOptions.length ? levelOptions[0].value : null)
   const hhmm = (d) => formatTime(d, i18n.language, { hour: '2-digit', minute: '2-digit' })
   const all = [...club.slots.map((s) => ({ s, free: true })), ...club.taken.map((s) => ({ s, free: false }))]
     .sort((a, b) => a.s.startsAt - b.s.startsAt)
+  const pairsOk = partnerReady && !!slot?.raw?.allow_pair_signup
+  const firstName = (name) => String(name || '').split(/\s+/)[0]
   const chip = (on, disabled = false) => `min-h-[40px] rounded-full border px-3.5 text-sm font-extrabold ${on ? 'border-ink-900 bg-ink-900 text-white' : 'border-line bg-white text-ink-900'} ${disabled ? 'opacity-40' : ''}`
 
   return (
@@ -36,12 +44,14 @@ export default function OpenSlotSheet({ club, picked, busy = false, error = '', 
         })}
       </div>
 
-      {partnerReady && (
+      {pairsOk && (
         <>
           <p className="mt-4 text-[13px] font-semibold text-ink-700">{t('home.open_with')}</p>
           <div className="mt-2 flex flex-wrap gap-1.5">
-            <button type="button" onClick={() => setWithPartner(false)} className={chip(!withPartner)}>{t('home.open_alone')}</button>
-            <button type="button" onClick={() => setWithPartner(true)} className={chip(withPartner)}>{t('home.open_partner')}</button>
+            <button type="button" onClick={() => setPartner(null)} className={chip(!partner)}>{t('home.open_alone')}</button>
+            <button type="button" onClick={() => setPicking(true)} className={chip(!!partner)}>
+              {partner ? t('home.open_with_name', { name: firstName(partner.name) }) : t('home.open_partner')}
+            </button>
           </div>
         </>
       )}
@@ -51,7 +61,7 @@ export default function OpenSlotSheet({ club, picked, busy = false, error = '', 
           <p className="mt-4 text-[13px] font-semibold text-ink-700">{t('home.open_level')}</p>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {levelOptions.map((l) => (
-              <button key={l} type="button" disabled={!levelReady} onClick={() => setLevel(l)} className={chip(level === l, !levelReady)}>{l}</button>
+              <button key={l.value || 'any'} type="button" onClick={() => setLevel(l.value)} className={chip(level === l.value)}>{l.label}</button>
             ))}
           </div>
         </>
@@ -59,15 +69,22 @@ export default function OpenSlotSheet({ club, picked, busy = false, error = '', 
 
       {error && <p className="mt-3 rounded-ctrl bg-danger/10 px-3 py-2 text-sm font-extrabold text-danger">{error}</p>}
       <div className="mt-5 space-y-2">
-        <button type="button" disabled={busy || !slot} onClick={() => onOpen(slot, { withPartner, level })}
+        <button type="button" disabled={busy || !slot} onClick={() => onOpen(slot, { level: levelReady && levelOptions.length ? level : null, partnerId: pairsOk ? partner?.id || null : null })}
           className="press flex min-h-[52px] w-full items-center justify-center rounded-ctrl bg-lime-400 px-4 text-[15px] font-extrabold text-ink-900 disabled:opacity-40">
-          {t('home.open_cta', { time: slot ? hhmm(slot.startsAt) : '' })}
+          {pairsOk && partner
+            ? t('home.open_cta_with', { time: slot ? hhmm(slot.startsAt) : '', name: firstName(partner.name) })
+            : t('home.open_cta', { time: slot ? hhmm(slot.startsAt) : '' })}
         </button>
         <button type="button" onClick={onClose}
           className="press flex min-h-[52px] w-full items-center justify-center rounded-ctrl border-[1.5px] border-ink-900 bg-white px-4 text-[15px] font-extrabold text-ink-900">
           {t('home.open_not_yet')}
         </button>
       </div>
+      {picking && (
+        <Sheet title={t('home.open_pick_partner')} onClose={() => setPicking(false)}>
+          <PlayerSearch onSelect={(p) => { setPartner(p); setPicking(false) }} />
+        </Sheet>
+      )}
     </Sheet>
   )
 }
