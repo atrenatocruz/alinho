@@ -15,6 +15,8 @@ import { signupErrorMessage, errorCode } from '../../lib/tournamentError'
 import { replaceTournamentPlayer, entryHasPlayedMatches } from '../../lib/tournamentApi'
 import { categoryGenderQuestion } from './genderCheck'
 import { usePriceRoster, PriceRosterSummary, PriceRosterTag } from '../SpecialPriceRoster'
+import { TshirtSummaryCard, PairShirts } from './TshirtAdmin'
+import { tshirtOn, shirtRulesOf } from './tshirt'
 
 /* Separador «Inscritos» (Trello #362).
    Desenho: print 08 (lista por categoria, Validar a um toque) e a regra
@@ -490,6 +492,8 @@ export default function EntriesPanel({ tournament, categories = [], category, pu
               <UserPlus size={18} /> {t('tentries.admin_add_title')}
             </button>
           )}
+          {/* As t-shirts do torneio todo (SPEC t-shirts, ponto 4). */}
+          <TshirtSummaryCard tournament={tournament} />
         </>
       )}
 
@@ -565,6 +569,9 @@ export default function EntriesPanel({ tournament, categories = [], category, pu
                       </span>
                     ))}
                   </span>
+                )}
+                {isAdmin && tshirtOn(shirtRulesOf(tournament)) && e.status !== 'desistiu' && (
+                  <p className="mt-1"><PairShirts entry={e} /></p>
                 )}
               </div>
 
