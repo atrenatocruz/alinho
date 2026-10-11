@@ -132,11 +132,12 @@ test('um suplente sai com Out', async () => {
   assert.deepEqual(db.participants.map((p) => p.user_id), ['a'])
 })
 
-test('sem o interruptor, o suplente continua a ser mandado para a app', async () => {
+// Desde 11 out (PO): também sem o interruptor o suplente sai pelo WhatsApp.
+test('sem o interruptor, o suplente também sai com Out', async () => {
   freshDb(false)
   db.participants.push({ id: 'p2', game_id: 'm', user_id: 'b', partner_id: null, status: 'waitlisted', created_at: '2026-10-01T10:01:00Z' })
-  assert.match(await say('out', '351922222222'), /para sair, usa a app/)
-  assert.equal(db.participants.length, 1)
+  assert.match(await say('out', '351922222222'), /Saíste da lista de suplentes/)
+  assert.equal(db.participants.length, 0)
 })
 
 test('«mix» com o interruptor ligado envia o cartão novo — não o clássico (duplicado de 3 out)', async () => {

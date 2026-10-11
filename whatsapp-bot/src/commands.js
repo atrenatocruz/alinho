@@ -1341,12 +1341,9 @@ async function handleGroupMessageInner({ groupJid, senderPn, text, message, key,
       return
     }
     if (ownWaitlistRow) {
-      // Mensagens novas (1 out): o suplente sai pelo WhatsApp, em vez de
-      // ser mandado para a app.
-      if (!fresh) {
-        await reply('waitlisted_use_app')
-        return
-      }
+      // O suplente sai pelo WhatsApp, em vez de ser mandado para a app —
+      // com as mensagens novas (1 out) e, desde 11 out (PO), em todos os
+      // grupos.
       const { error: leaveError } = await supabase.from('participants').delete().eq('id', ownWaitlistRow.id)
       timer.mark('gravar')
       if (leaveError) throw new Error(`Failed to remove waitlisted participant: ${leaveError.message}`)

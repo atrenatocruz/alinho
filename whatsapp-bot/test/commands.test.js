@@ -107,6 +107,18 @@ test('«Out» com suplentes: o repost já leva quem subiu (sem esperar pelo Real
   assert.deepEqual(asked[0][1].map((p) => [p.gameId, p.name]), [['m', 'Sofia Suplente']])
 })
 
+// «Out» de quem é suplente (PO, 11 out): sai da lista em todos os grupos,
+// também sem as mensagens novas — antes mandava-o para a app.
+test('«Out» de um suplente tira-o da lista, sem as mensagens novas', async () => {
+  db.participants.push(
+    { id: 'pb', game_id: 'm', user_id: 'b', status: 'confirmed', created_at: '2026-09-01T10:00:00Z' },
+    { id: 'pa', game_id: 'm', user_id: 'a', status: 'waitlisted', created_at: '2026-09-01T11:00:00Z' },
+  )
+  const out = await say('out')
+  assert.deepEqual(db.participants.map((p) => p.id), ['pb'])
+  assert.match(out, /Saíste da lista de suplentes/)
+})
+
 // ── Sair de uma dupla (Renato, 25 set) ────────────────────────────────────
 // Bernardo (a, 911…) inscreveu a dupla com Afonso (b, 922…).
 function pairIn() {
