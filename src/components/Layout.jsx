@@ -1,11 +1,11 @@
-import { useState, useEffect, useLayoutEffect, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, lazy, Suspense } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useLocation, useNavigate, useNavigationType } from 'react-router-dom'
 import { Home, Users, Trophy, ClipboardList, LogOut, Phone, X, Bell, UserCheck, Swords, Shuffle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
 import { HeaderActionsProvider } from '../contexts/HeaderActionsContext'
-import { PrimaryButton, Avatar, AchievementCard } from './ui'
+import { PrimaryButton, Avatar } from './ui'
 import { supabase } from '../lib/supabase'
 import { listIncomingFollowRequests, acceptFollowRequest, removeFollow } from '../lib/follows'
 import { listPendingMembershipRequestsForAdmin } from '../lib/organizations'
@@ -15,6 +15,7 @@ import { describeError } from '../lib/errors'
 import ConfirmPhoneCard from './ConfirmPhoneCard'
 import { listMyUnreadNotifications, markNotificationsRead, MIX_NOTICE_KINDS } from '../lib/notifications'
 import { kudosVoters, joinNames, MAX_KUDOS_VOTERS } from '../lib/kudos'
+import { useNoOverlayOpen } from '../lib/useNoOverlayOpen'
 import { listMyInvites as listMyTournamentInvites } from '../lib/tournamentSignup'
 import LessonNoticeRow, { LESSON_NOTICE_KINDS } from './lessons/LessonNoticeRow'
 import TournamentNoticeRow, { TOURNAMENT_NOTICE_KINDS } from './tournament/TournamentNoticeRow'
@@ -29,38 +30,24 @@ import AccountDeletionPending from './AccountDeletionPending'
 // ainda houver novidades por marcar como vistas).
 const CELEBRATIONS_CHECKED_KEY = 'celebrationsChecked'
 
-/* Modal de celebração: troféus novos e kudos recebidos desde a última
-   visita (RPC get_unseen_celebrations; "visto" via mark_celebrations_seen).
+// As conquistas novas abrem logo no cartão animado (design-handoff/2026-10-12-
+// conquistas-animadas); só se carrega quando há uma para mostrar.
+const AchievementViewer = lazy(() => import('./achievements/AchievementViewer'))
+
+/* Modal de celebração: kudos recebidos desde a última visita (RPC
+   get_unseen_celebrations; "visto" via mark_celebrations_seen). As
+   conquistas novas já não vêm aqui: abrem antes, no cartão animado
+   (AchievementViewer); esta folha fica só com os kudos, se os houver.
    Fail-soft — qualquer erro e simplesmente não aparece. */
 function CelebrationModal({ items, onClose }) {
   const { t } = useTranslation()
-  const trophies = items.filter((i) => i.kind === 'trophy')
   const kudos = items.filter((i) => i.kind === 'kudos')
-  const shownTrophies = trophies.slice(0, 6)
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-ink-900/70 animate-fade-in" onClick={onClose}>
       <div className="bg-surface rounded-t-card sm:rounded-card shadow-lift w-full sm:max-w-md p-6 animate-pop relative max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-xl font-extrabold text-ink-900 text-center mb-1">🎉 {t('layout.celebrations_title')}</h2>
         <p className="text-sm text-muted text-center mb-4">{t('layout.celebrations_subtitle')}</p>
-
-        {trophies.length > 0 && (
-          <div className="mb-4">
-            <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mb-2">
-              {t('layout.celebrations_trophies', { count: trophies.length })}
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              {shownTrophies.map((tr) => (
-                <AchievementCard key={tr.trophy_key} achievementKey={tr.trophy_key} rarity={tr.rarity} earned />
-              ))}
-            </div>
-            {trophies.length > shownTrophies.length && (
-              <p className="mt-2 text-[11px] text-muted text-center">
-                {t('layout.celebrations_more_trophies', { count: trophies.length - shownTrophies.length })}
-              </p>
-            )}
-          </div>
-        )}
 
         {kudos.length > 0 && (
           <div className="mb-4 space-y-2">
@@ -197,6 +184,27 @@ export default function Layout({ children }) {
       if (data?.length) setCelebrations(data)
     })
   }, [profile?.id])
+
+  // Primeiro as conquistas novas, no cartão animado; ao fechar, os kudos
+  // (se os houver) na folha de sempre. O cartão nunca abre por cima de outra
+  // folha (ex.: a pergunta de fim do mix): espera que não haja nenhuma, e
+  // depois de aberto fica aberto.
+  const newTrophies = celebrations
+    .filter((c) => c.kind === 'trophy')
+    .map((c) => ({ key: c.trophy_key, rarity: c.rarity }))
+  const [trophiesDone, setTrophiesDone] = useState(false)
+  const [trophiesShown, setTrophiesShown] = useState(false)
+  const trophiesPending = newTrophies.length > 0 && !trophiesDone && !needsPhonePrompt
+  const noOverlay = useNoOverlayOpen(trophiesPending && !trophiesShown)
+  useEffect(() => {
+    if (trophiesPending && noOverlay && !trophiesShown) setTrophiesShown(true)
+  }, [trophiesPending, noOverlay, trophiesShown])
+  const kudosPending = celebrations.some((c) => c.kind === 'kudos')
+  const closeTrophies = () => {
+    setTrophiesDone(true)
+    setTrophiesShown(false)
+    if (!kudosPending) closeCelebrations()
+  }
 
   const closeCelebrations = () => {
     setCelebrations([])
@@ -923,7 +931,12 @@ export default function Layout({ children }) {
 
       {/* Celebrações depois do phone-prompt na ordem de render — só uma
           aparece de cada vez na prática (o phone-prompt é dispensável). */}
-      {celebrations.length > 0 && !needsPhonePrompt && (
+      {trophiesShown && !trophiesDone && (
+        <Suspense fallback={null}>
+          <AchievementViewer items={newTrophies} onClose={closeTrophies} />
+        </Suspense>
+      )}
+      {kudosPending && !needsPhonePrompt && (newTrophies.length === 0 || trophiesDone) && (
         <CelebrationModal items={celebrations} onClose={closeCelebrations} />
       )}
     </div>

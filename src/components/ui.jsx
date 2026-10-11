@@ -935,7 +935,7 @@ function AchievementMedal({ url, locked, name }) {
   return (
     <span className="relative mx-auto block h-[84px] w-[84px]">
       <img src={url} alt={name} loading="lazy" decoding="async" width="84" height="84"
-        className={`h-full w-full object-contain ${locked ? 'opacity-80 [filter:grayscale(1)_brightness(0.92)]' : ''}`} />
+        className={`h-full w-full object-contain ${locked ? 'opacity-[.55] [filter:grayscale(1)]' : ''}`} />
       {locked && (
         <span className="absolute bottom-0.5 right-0.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-ink-900">
           <Lock size={11} className="text-lime-400" />

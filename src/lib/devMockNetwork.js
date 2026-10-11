@@ -189,7 +189,16 @@ const RPC_MOCKS = {
   get_player_xp: () => [{ xp: 320, kudos: 12 }],
   // As 14 conquistas ganhas pela conta de exemplo (Trello #551, imagem do
   // Marketing a 7 out) — espalhadas pelas categorias, com raridades reais.
+  // localStorage.mockRareAchievements = '1' junta 4 raras/épicas/lendárias,
+  // as mais recentes (conquistas animadas, 11 out). awarded_at: a 1.ª da
+  // lista é a mais recente.
   get_player_achievements: () => [
+    ...(localStorage.getItem('mockRareAchievements') ? [
+      { achievement_key: 'dinastia', category: 'torneio', rarity: 'lendario', rarity_pct: 1.2 },
+      { achievement_key: 'hat_trick', category: 'jogo', rarity: 'epico', rarity_pct: 4.8 },
+      { achievement_key: 'residente', category: 'jogo', rarity: 'raro', rarity_pct: 14.0 },
+      { achievement_key: 'campeao', category: 'torneio', rarity: 'epico', rarity_pct: 6.3 },
+    ] : []),
     { achievement_key: 'primeira_bola', category: 'jogo', rarity: 'comum', rarity_pct: 72.4 },
     { achievement_key: 'areia_nos_tenis', category: 'jogo', rarity: 'comum', rarity_pct: 58.1 },
     { achievement_key: 'cliente_da_casa', category: 'jogo', rarity: 'comum', rarity_pct: 41.0 },
@@ -204,7 +213,7 @@ const RPC_MOCKS = {
     { achievement_key: 'primeiro_escudo', category: 'xp', rarity: 'comum', rarity_pct: 66.0 },
     { achievement_key: 'primeiro_aplauso', category: 'kudos', rarity: 'comum', rarity_pct: 52.3 },
     { achievement_key: 'meio_ano_de_casa', category: 'antiguidade', rarity: 'comum', rarity_pct: 25.1 },
-  ],
+  ].map((a, i) => ({ ...a, awarded_at: new Date(Date.now() - i * 86400000).toISOString() })),
   get_player_public_extras: (params) => {
     const person = FAKE_PEOPLE[params?.p_user_id] || FAKE_PEOPLE[FAKE_PLAYER_ID]
     return [{ nationality: 'PT', gender: person.gender, age_category: 'senior' }]
@@ -785,14 +794,15 @@ const RPC_MOCKS = {
   //   'old'     — base de dados sem a migração: só o número, como hoje
   // localStorage.mockTrophies = 'N' — N conquistas novas (a folha mostra 6 e
   // «+ N conquistas novas» com o resto; com 7, «+ 1 conquista nova»).
+  // Com mockTrophies e mockKudos juntos, vêm as duas coisas (as conquistas
+  // abrem primeiro no cartão animado, depois a folha dos kudos).
   get_unseen_celebrations: () => {
     const nTrophies = Number(localStorage.getItem('mockTrophies') || 0)
-    if (nTrophies) {
-      const keys = ['primeira_bola', 'areia_nos_tenis', 'cliente_da_casa', 'residente', 'meio_cento', 'centuriao_do_vidro', 'semana_cheia', 'mes_cheio', 'ritual_de_segunda', 'coruja_do_padel']
-      return keys.slice(0, nTrophies).map((k) => ({ kind: 'trophy', trophy_key: k, rarity: 'comum', happened_at: new Date().toISOString() }))
-    }
+    const RAR = { residente: 'raro', meio_cento: 'epico', centuriao_do_vidro: 'lendario', semana_cheia: 'raro', mes_cheio: 'epico' }
+    const keys = ['residente', 'primeira_bola', 'centuriao_do_vidro', 'areia_nos_tenis', 'meio_cento', 'cliente_da_casa', 'semana_cheia', 'mes_cheio', 'ritual_de_segunda', 'coruja_do_padel']
+    const trophies = keys.slice(0, nTrophies).map((k) => ({ kind: 'trophy', trophy_key: k, rarity: RAR[k] || 'comum', happened_at: new Date().toISOString() }))
     const mode = localStorage.getItem('mockKudos')
-    if (!mode) return []
+    if (!mode) return trophies
     const voter = (id, name, avatar_url = null) => ({ id, name, avatar_url })
     const rows = {
       one: [voter(FAKE_PLAYER_ID, 'Rui Oliveira Gomes')],
@@ -804,7 +814,7 @@ const RPC_MOCKS = {
       removed: [voter(FAKE_PLAYER_ID, 'Rui Oliveira Gomes'), voter('v9', null)],
       old: null,
     }[mode]
-    return [{
+    return [...trophies, {
       kind: 'kudos', trophy_key: null, rarity: null,
       kudos_count: rows ? rows.length : 2,
       game_title: 'Mix de quinta',

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -13,7 +13,6 @@ import { KindTag } from '../components/agenda/EventCard'
 import { getFollowCounts } from '../lib/follows'
 import { PrimaryButton, GuestBadge, Avatar, EmptyState, RatingBadge, PhotoViewerModal, FollowListModal, AchievementCard, VoucherCard, VoucherQRModal, PageHeader, Tabs, ConfirmSheet } from '../components/ui'
 import { useHeaderActions } from '../contexts/HeaderActionsContext'
-import { CATEGORY_ORDER } from '../lib/achievements'
 import TeacherSection from '../components/TeacherSection'
 import DeleteAccountSection from '../components/DeleteAccountSection'
 import { formatRating, formatRatingMaybeProvisional, isProvisional, bandProgress, ratingBand } from '../lib/elo'
@@ -25,6 +24,10 @@ import { sortVouchersForWallet, shareVoucherContact, unshareVoucherContact } fro
 import ShareContactSheet from '../components/vouchers/ShareContactSheet'
 import { describeError } from '../lib/errors'
 import { useFeatureFlag } from '../lib/useFeatureFlag'
+
+// A coleção animada das conquistas (2026-10-12): só se carrega ao abrir
+// «Ver todos» — imagens e animações fora do arranque.
+const AchievementCollection = lazy(() => import('../components/achievements/AchievementCollection'))
 
 const SIDE_LABEL_KEY = { left: 'gamedetails.side_left', right: 'gamedetails.side_right', both: 'gamedetails.side_both' }
 const HAND_LABEL_KEY = { right: 'profile.dominant_hand_right', left: 'profile.dominant_hand_left' }
@@ -898,46 +901,9 @@ export default function Profile() {
                 </div>
               )
             ) : (
-              <div className="space-y-4">
-                {/* Progresso global da estante */}
-                <div>
-                  <div className="h-1.5 rounded-full bg-ink-50 overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-lime-400"
-                      style={{ width: `${Math.round((myTrophies.length / Math.max(trophyCatalog.length, 1)) * 100)}%` }}
-                    />
-                  </div>
-                  <p className="mt-1 text-[11px] text-muted text-right tabular-nums">
-                    {t('achievements.progress', { earned: myTrophies.length, total: trophyCatalog.length })}
-                  </p>
-                </div>
-                {CATEGORY_ORDER.map((cat) => {
-                  const earnedByKey = new Map(myTrophies.map((tr) => [tr.achievement_key, tr]))
-                  // Ganhos primeiro dentro da categoria — a colheita à
-                  // frente, o "por conquistar" a seguir.
-                  const inCat = trophyCatalog
-                    .filter((c) => c.category === cat)
-                    .sort((a, b) => (earnedByKey.has(b.key) ? 1 : 0) - (earnedByKey.has(a.key) ? 1 : 0) || a.sort - b.sort)
-                  if (inCat.length === 0) return null
-                  const earnedInCat = inCat.filter((c) => earnedByKey.has(c.key)).length
-                  return (
-                    <div key={cat}>
-                      <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mb-2">
-                        {t(`achievements.cat_${cat}`)}
-                        <span className="ml-1.5 normal-case tracking-normal font-mono">{earnedInCat}/{inCat.length}</span>
-                      </p>
-                      <div className="grid grid-cols-2 gap-2">
-                        {inCat.map((c) => {
-                          const mine = earnedByKey.get(c.key)
-                          return (
-                            <AchievementCard key={c.key} achievementKey={c.key} category={c.category} rarity={c.rarity} earned={!!mine} rarityPct={mine?.rarity_pct} />
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
+              <Suspense fallback={<div className="h-40" />}>
+                <AchievementCollection catalog={trophyCatalog} mine={myTrophies} />
+              </Suspense>
             )}
           </div>
         )}
