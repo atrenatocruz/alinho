@@ -238,7 +238,14 @@ const TournamentShareCard = forwardRef(function TournamentShareCard({ variant, d
     exportPng: async () => {
       const node = nodeRef.current
       if (!node) throw new Error('Card not ready')
-      const dataUrl = await toPng(node, { width: T_CARD_W, height: T_CARD_H, pixelRatio: RATIO, cacheBust: true })
+      const opts = { width: T_CARD_W, height: T_CARD_H, pixelRatio: RATIO, cacheBust: true }
+      // No iPhone (WebKit), a foto grande saía preta: o html-to-image desenha
+      // antes de ela estar descodificada (QA, 11 out). Espera-se pela
+      // descodificação de todas as imagens e faz-se uma primeira passagem
+      // que se deita fora; a segunda já leva a foto.
+      await Promise.all([...node.querySelectorAll('img')].map((img) => (img.decode ? img.decode().catch(() => {}) : null)))
+      await toPng(node, opts).catch(() => {})
+      const dataUrl = await toPng(node, opts)
       return (await fetch(dataUrl)).blob()
     },
   }))

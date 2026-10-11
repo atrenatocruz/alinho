@@ -77,6 +77,8 @@ const Gerir = lazyPage(() => import('./pages/Gerir'))
 const CreateTournamentPage = lazyPage(() => import('./pages/CreateTournamentPage'))
 const GerirClube = lazyPage(() => import('./pages/GerirClube'))
 const Instructions = lazyPage(() => import('./pages/Instructions'))
+const HowItWorks = lazyPage(() => import('./pages/HowItWorks'))
+const Novidades = lazyPage(() => import('./pages/Novidades'))
 const PrivacyPolicy = lazyPage(() => import('./pages/PrivacyPolicy'))
 const TermsOfService = lazyPage(() => import('./pages/TermsOfService'))
 const MixOffline = lazyPage(() => import('./pages/MixOffline'))
@@ -342,6 +344,17 @@ function AfterLogin() {
 const PUBLIC_HEAD = {
   '/': { title: 'alinho — mixes, rankings e clubes de padel', canonical: 'https://www.alinho.pt/' },
   '/instrucoes': { title: 'Como funciona o alinho — mixes, níveis e WhatsApp', canonical: 'https://www.alinho.pt/instrucoes' },
+  // Páginas do site (#619, 10 out): título e descrição próprios, no mesmo estilo.
+  '/como-funciona': {
+    title: 'Como funciona a alinho.pt — mixes, nível, torneios e WhatsApp',
+    canonical: 'https://www.alinho.pt/como-funciona',
+    description: 'Como funciona a alinho.pt: entra num mix pela app ou pelo WhatsApp, vê o teu nível subir, joga torneios e organiza o teu grupo de padel sem confusão.',
+  },
+  '/novidades': {
+    title: 'Novidades da alinho.pt — o que mudou em cada versão',
+    canonical: 'https://www.alinho.pt/novidades',
+    description: 'As mudanças de cada versão da alinho.pt, a mais recente em cima.',
+  },
 }
 function useRouteHead() {
   const location = useLocation()
@@ -358,6 +371,13 @@ function useRouteHead() {
       document.title = head.title
     } else if (link) {
       link.remove()
+    }
+    // A descrição só muda nas páginas que a trazem; ao sair, volta a do
+    // index.html (a do Ruben, SEO de 29 set).
+    const meta = document.querySelector('meta[name="description"]')
+    if (meta) {
+      if (meta.dataset.base == null) meta.dataset.base = meta.getAttribute('content') || ''
+      meta.setAttribute('content', head?.description || meta.dataset.base)
     }
   }, [location.pathname])
 }
@@ -394,6 +414,9 @@ function AppRoutes() {
         <Route path="/termos" element={<TermsOfService />} />
         {/* Página pública dos planos (Trello #327). */}
         <Route path="/planos" element={<Plans />} />
+        {/* Páginas do site (#619): «Como funciona» e «Novidades». */}
+        <Route path="/como-funciona" element={<HowItWorks />} />
+        <Route path="/novidades" element={<Novidades />} />
         <Route path="/mix-offline" element={<MixOffline />} />
         <Route
           path="/"

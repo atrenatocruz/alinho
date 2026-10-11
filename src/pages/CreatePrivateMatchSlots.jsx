@@ -10,7 +10,7 @@ import { PrimaryButton, Avatar, DateTimeField, Select, Chips } from '../componen
 import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
 import PlayerSearch from '../components/PlayerSearch'
 import { describeError } from '../lib/errors'
-import StepPage from '../components/steps/StepPage'
+import StepPage, { StepMissingNote } from '../components/steps/StepPage'
 
 const NUM_SETS_OPTIONS = Array.from({ length: 8 }, (_, i) => i + 2) // 2..9
 
@@ -155,6 +155,7 @@ export default function CreatePrivateMatchSlots() {
       onBack={() => { setError(''); if (step === 1) goBack(); else setStep(step - 1) }}
       onNext={() => { setError(''); setStep(step + 1) }}
       nextDisabled={step === 2 && !scheduledDate}
+      nextMissingField={step === 2 && !scheduledDate ? 'step-private-date' : null}
       nextHint={t('createprivatematch.date_missing')}
       error={error}
       footer={step === 4 ? (
@@ -215,7 +216,7 @@ export default function CreatePrivateMatchSlots() {
         <>
           <div>
             <p className={label}>{t('steps.datetime_label')}</p>
-            <DateTimeField value={when} onChange={setWhen} />
+            <div id="step-private-date"><DateTimeField value={when} onChange={setWhen} /><StepMissingNote field="step-private-date" /></div>
             <p className="mt-2 text-xs text-muted">{t('createprivatematch.when_hint')}</p>
           </div>
         </>

@@ -8,6 +8,9 @@ export function shortName(name) {
   // «Renato C.», não «Renato D.» (revisão dos torneios, 28 set).
   const parts = String(name || '').replace(/\([^)]*\)/g, ' ').trim().split(/\s+/).filter(Boolean)
   if (parts.length < 2) return parts[0] || ''
+  // Um nome que acaba num número («QA 01», «Jogador 7») fica inteiro: sem
+  // ele, «QA 01» e «QA 02» davam os dois «QA» (QA, 11 out).
+  if (!/\p{L}/u.test(parts[parts.length - 1])) return parts.join(' ')
   const initialOf = (parts[parts.length - 1].match(/\p{L}/u) || [''])[0]
   return initialOf ? `${parts[0]} ${initialOf.toUpperCase()}.` : parts[0]
 }

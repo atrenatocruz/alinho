@@ -22,6 +22,23 @@ describe('buildClubEvents — «O que vem aí» (QA, 11 out)', () => {
     expect(buildClubEvents(club).map((e) => e.game.id)).toEqual(['hoje', 'amanha'])
   })
 
+  it('um jogo em aberto de hoje cuja hora já passou sai; um mix de hoje fica (QA, 9 out)', () => {
+    const past = new Date(Date.now() - 2 * 3600e3)
+    const later = new Date(Date.now() + 2 * 3600e3)
+    const sameDay = (d) => d.toDateString() === new Date().toDateString()
+    const club = {
+      open_games: [
+        { id: 'aberto-passou', title: 'Jogo em aberto', date: past.toISOString(), origin: 'open_slot' },
+        { id: 'mix-hoje', title: 'Mix', date: past.toISOString(), origin: 'admin', status: 'in_progress' },
+        { id: 'aberto-mais-logo', title: 'Jogo em aberto', date: later.toISOString(), origin: 'open_slot' },
+      ],
+    }
+    const ids = buildClubEvents(club).map((e) => e.game.id)
+    expect(ids).not.toContain('aberto-passou')
+    if (sameDay(past)) expect(ids).toContain('mix-hoje')
+    if (sameDay(later)) expect(ids).toContain('aberto-mais-logo')
+  })
+
   it('não leva torneios cancelados, terminados ou que já acabaram', () => {
     const tours = [
       { id: 'canc', name: 'Ensaio Boavista', status: 'cancelado', starts_on: key(day(3)), ends_on: key(day(3)) },
