@@ -10,6 +10,9 @@ const MOCK_ADMIN_KEY = 'mockAdminSession'
 const MOCK_ADMIN_USER = {
   id: '00000000-0000-0000-0000-000000000000',
   email: 'admin@dev.local',
+  // localStorage.mockNewAccount = 'true' → conta criada agora (o ecrã de
+  // consentimento com a frase das contas novas, #360).
+  created_at: typeof localStorage !== 'undefined' && localStorage.getItem('mockNewAccount') === 'true' ? new Date().toISOString() : '2026-08-01T00:00:00Z',
 }
 const MOCK_ADMIN_PROFILE = {
   id: '00000000-0000-0000-0000-000000000000',
@@ -25,6 +28,9 @@ const MOCK_ADMIN_PROFILE = {
   // fica sempre vazio ("— pontos") em localhost. Ver devMockNetwork.js
   // para o resto dos dados fictícios (troféus, XP, ranking, etc.).
   rating: 1450,
+  // localStorage.mockConsentPending = 'true' → ainda sem aceitar a Política
+  // (o ecrã de consentimento, #360).
+  consent_accepted_at: typeof localStorage !== 'undefined' && localStorage.getItem('mockConsentPending') === 'true' ? null : '2026-09-01T00:00:00Z',
   // localStorage.mockDeletionRequestedAt = '2026-09-18' → ecrã de recuperar
   // a conta (apagar conta, Trello #306).
   deletion_requested_at: typeof localStorage !== 'undefined' ? localStorage.getItem('mockDeletionRequestedAt') : null,

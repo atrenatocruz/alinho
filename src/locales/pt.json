@@ -5104,5 +5104,6 @@
   "special_price.roster_summary_one": "{{special}} com pre\u00e7o especial \u00b7 {{count}} paga {{normal}}",
   "special_price.roster_summary_other": "{{special}} com pre\u00e7o especial \u00b7 {{count}} pagam {{normal}}",
   "special_price.roster_summary_all": "Todos com pre\u00e7o especial",
-  "special_price.error_save": "O evento ficou guardado, mas n\u00e3o foi poss\u00edvel guardar o pre\u00e7o especial. Tenta outra vez no Editar."
+  "special_price.error_save": "O evento ficou guardado, mas n\u00e3o foi poss\u00edvel guardar o pre\u00e7o especial. Tenta outra vez no Editar.",
+  "consentgate.body_updated": "Atualiz\u00e1mos os <terms>Termos de Servi\u00e7o</terms> e a <privacy>Pol\u00edtica de Privacidade</privacy>. Para continuares a usar o alinho, precisamos que os aceites."
 }
