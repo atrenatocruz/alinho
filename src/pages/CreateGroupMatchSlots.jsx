@@ -9,7 +9,7 @@ import { listOrganizationMembers } from '../lib/clubProfile'
 import { createGroupMatch } from '../lib/groupMatches'
 import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
 import { DateTimeField, Select, PrimaryButton, Chips } from '../components/ui'
-import StepPage from '../components/steps/StepPage'
+import StepPage, { StepMissingNote } from '../components/steps/StepPage'
 import { describeError } from '../lib/errors'
 
 /* O jogo de grupo da 1.ª entrega (#342), com os 3 lugares de hoje — o que
@@ -108,6 +108,7 @@ export default function CreateGroupMatchSlots() {
       onBack={() => { setError(''); if (step === 1) goBack(); else setStep(step - 1) }}
       onNext={() => { setError(''); setStep(step + 1) }}
       nextDisabled={step === 2 && !scheduledDate}
+      nextMissingField={step === 2 && !scheduledDate ? 'step-group-date' : null}
       nextHint={t('createprivatematch.date_missing')}
       error={error}
       footer={step === 4 ? (
@@ -129,7 +130,7 @@ export default function CreateGroupMatchSlots() {
         <>
           <div>
             <p className={label}>{t('steps.datetime_label')}</p>
-            <DateTimeField value={when} onChange={setWhen} />
+            <div id="step-group-date"><DateTimeField value={when} onChange={setWhen} /><StepMissingNote field="step-group-date" /></div>
             <p className="mt-2 text-xs text-muted">{t('createprivatematch.when_hint')}</p>
           </div>
         </>
