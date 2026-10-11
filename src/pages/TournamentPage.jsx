@@ -22,6 +22,7 @@ import { useGoBack } from '../lib/useGoBack'
 import { useAuth } from '../contexts/AuthContext'
 import { getTournamentForEdit, getTournamentOrgHint, getTournamentPage, scheduleTournamentOpening, setTournamentStatus, updateTournament } from '../lib/tournamentApi'
 import GroupOnlyNotice from '../components/GroupOnlyNotice'
+import { StickyTabs } from '../components/tournament/StickyBar'
 import { setEventWhatsappPostTimes } from '../lib/whatsappHours'
 import { describeError, errorKind } from '../lib/errors'
 import { Avatar, EmptyState, Tabs } from '../components/ui'
@@ -238,7 +239,8 @@ export default function TournamentPage() {
     // organiza ou marca (revisão dos torneios, 28 set).
     publicView,
   }
-  const clubForForm = { id: tour.organization_id, name: tour.club_name, location: tour.location }
+  // kind: num grupo, o preço especial diz «Membros do grupo» (QA, 11 out).
+  const clubForForm = { id: tour.organization_id, name: tour.club_name, location: tour.location, kind: tour.club_kind }
 
   const openAdmin = async (modo) => {
     setAdminError('')
@@ -456,6 +458,10 @@ export default function TournamentPage() {
 
       {UnderHeader && <Suspense fallback={null}><UnderHeader {...panelProps} /></Suspense>}
 
+      {/* A categoria e os separadores ficam presos por baixo do título ao
+          descer (Francisco, 11 out, para experimentar — StickyBar). */}
+      <div id="tournament-tabs" className="scroll-mt-20" />
+      <StickyTabs resetKey={`${category?.id || ''}:${tab}`} shadow={tab !== 'schedule'}>
       {categories.length > 0 && (
         <CategorySelect
           categories={categories}
@@ -468,13 +474,13 @@ export default function TournamentPage() {
 
       {/* O separador único da app (Trello #528): muda o que o ecrã mostra,
           por isso é pílula cinzenta — não pastilhas pretas, que são filtro. */}
-      <div id="tournament-tabs" className="scroll-mt-20" />
       <Tabs
         options={tabs.map((key) => ({ value: key, label: t(`tournament.tab_${key}`) }))}
         value={tab}
         onChange={(next) => setParam('tab', next)}
         label={t('tournament.tabs_label')}
       />
+      </StickyTabs>
 
       <div>
         {/* O pódio vive DENTRO de «Os meus jogos», em cima — é onde o desenho

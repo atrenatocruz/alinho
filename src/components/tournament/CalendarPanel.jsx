@@ -26,6 +26,7 @@ import { isThirdPlace } from './matchPath'
 import MatchCard from './MatchCard'
 import MatchSheet from './MatchSheet'
 import { footOf } from './BracketTree'
+import { StickyDays } from './StickyBar'
 
 /** «Sáb 10 out» — o dia no filtro. */
 function dayChip(date, locale) {
@@ -137,16 +138,19 @@ export default function CalendarPanel({ category, myEntries }) {
   return (
     <div>
       {days.length > 1 ? (
-        <Chips
-          className="mb-4"
-          label={t('tournament.schedule.day_filter')}
-          value={openDay}
-          onChange={setPickedDay}
-          options={days.map((d) => ({
-            value: d.date,
-            label: `${dayChip(d.date, i18n.language)} · ${t('tournament.tree.n_games', { count: d.slots.reduce((n, s) => n + s.matches.length, 0) })}`,
-          }))}
-        />
+        // Os dias também ficam presos, por baixo da categoria e dos
+        // separadores (Francisco, 11 out — StickyBar).
+        <StickyDays resetKey={openDay}>
+          <Chips
+            label={t('tournament.schedule.day_filter')}
+            value={openDay}
+            onChange={setPickedDay}
+            options={days.map((d) => ({
+              value: d.date,
+              label: `${dayChip(d.date, i18n.language)} · ${t('tournament.tree.n_games', { count: d.slots.reduce((n, s) => n + s.matches.length, 0) })}`,
+            }))}
+          />
+        </StickyDays>
       ) : day ? (
         <MonoLabel className="mb-3">{dayLabel(day.date, i18n.language)}</MonoLabel>
       ) : null}
