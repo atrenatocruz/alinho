@@ -783,7 +783,14 @@ const RPC_MOCKS = {
   //   'many'    — cinco (mostra "e mais 2")
   //   'removed' — quem deu apagou a conta
   //   'old'     — base de dados sem a migração: só o número, como hoje
+  // localStorage.mockTrophies = 'N' — N conquistas novas (a folha mostra 6 e
+  // «+ N conquistas novas» com o resto; com 7, «+ 1 conquista nova»).
   get_unseen_celebrations: () => {
+    const nTrophies = Number(localStorage.getItem('mockTrophies') || 0)
+    if (nTrophies) {
+      const keys = ['primeira_bola', 'areia_nos_tenis', 'cliente_da_casa', 'residente', 'meio_cento', 'centuriao_do_vidro', 'semana_cheia', 'mes_cheio', 'ritual_de_segunda', 'coruja_do_padel']
+      return keys.slice(0, nTrophies).map((k) => ({ kind: 'trophy', trophy_key: k, rarity: 'comum', happened_at: new Date().toISOString() }))
+    }
     const mode = localStorage.getItem('mockKudos')
     if (!mode) return []
     const voter = (id, name, avatar_url = null) => ({ id, name, avatar_url })
