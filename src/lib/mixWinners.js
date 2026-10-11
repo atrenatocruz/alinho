@@ -31,8 +31,14 @@ export function duplasWinners({ teams, myId, record, game, org, t, lang }) {
         date: shortDate(game.date, lang),
         place,
         title: !place ? t('mixwinners.winners_title') : place <= 3 ? t('tshare.place', { n: place }) : null,
-        rows: !place || place <= 3 ? teams.slice(0, 3).map((team, i) => ({ place: i + 1, pair: pairOf(team), title: t(TITLES[i]), mine: hasPlayer(team, myId) })) : [],
-        record: record && record.played > 0 ? t('mixwinners.record_mix', { won: record.won, played: record.played }) : null,
+        // Do 4.º para baixo: o pódio à vista (nenhum a lima) e, por baixo, a
+        // dupla de quem partilha com o lugar e a moldura lima (UX, 11 out).
+        rows: !place || place <= 3
+          ? teams.slice(0, 3).map((team, i) => ({ place: i + 1, pair: pairOf(team), title: t(TITLES[i]), mine: hasPlayer(team, myId) }))
+          : [...teams.slice(0, 3).map((team, i) => ({ place: i + 1, pair: pairOf(team), title: t(TITLES[i]), mine: false })),
+            { place, pair: pairOf(teams[myIndex]), title: null, mine: true }],
+        // Com 0 vitórias, a pastilha não aparece (UX, 11 out).
+        record: record && record.won > 0 ? t('mixwinners.record_mix', { won: record.won, played: record.played }) : null,
       },
       text: suggested(t, { place, partner: partnerOf(teams[myIndex], myId), mix: game.title, record, solo: false, winners: rows[0].name }),
       filenameParts: [org?.name, game.title, place ? `${place}o-lugar` : 'vencedores'],
@@ -61,8 +67,12 @@ export function americanoWinners({ standings, firsts, myId, game, org, t, lang }
         date: shortDate(game.date, lang),
         place,
         title: !place ? t('mixwinners.winners_title') : place <= 3 ? t('tshare.place', { n: place }) : null,
-        rows: !place || place <= 3 ? standings.slice(0, 3).map((r) => ({ place: placeOf(r), pair: r.player.id === myId ? r.player.name : shortName(r.player.name), title: t(TITLES[placeOf(r) - 1]), score: r.points, mine: r.player.id === myId })) : [],
-        record: record?.played ? t('mixwinners.record_americano', { won: record.won, played: record.played }) : null,
+        rows: [
+          ...standings.slice(0, 3).map((r) => ({ place: placeOf(r), pair: r.player.id === myId ? r.player.name : shortName(r.player.name), title: t(TITLES[placeOf(r) - 1]), score: r.points, mine: r.player.id === myId })),
+          // Do 4.º para baixo, a minha linha por baixo do pódio (UX, 11 out).
+          ...(place > 3 ? [{ place, pair: me.player.name, title: null, score: me.points, mine: true }] : []),
+        ],
+        record: record?.won > 0 ? t('mixwinners.record_americano', { won: record.won, played: record.played }) : null,
       },
       text: suggested(t, { place, mix: game.title, record, solo: true, winners: firsts.map((r) => r.player.name).join(' e ') }),
       filenameParts: [org?.name, game.title, place ? `${place}o-lugar` : 'vencedores'],
@@ -76,5 +86,6 @@ function suggested(t, { place, partner, mix, record, solo, winners }) {
   if (!place) return t('mixwinners.text_org', v)
   const who = solo ? 'solo' : 'pair'
   if (place >= 1 && place <= 3) return t(`mixwinners.text_${who}_${place}`, v)
-  return t(`mixwinners.text_${who}_place`, { ...v, place })
+  // Com 0 vitórias, sem o «0 de 3» (UX, 11 out: ninguém partilha um zero).
+  return t(`mixwinners.text_${who}_place${v.won > 0 ? '' : '_no_wins'}`, { ...v, place })
 }
