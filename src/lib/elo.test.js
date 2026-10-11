@@ -31,7 +31,7 @@ describe('peopleRatingBand — média de quem está num mix (#577)', () => {
     expect(peopleRatingBand(null, ['masculino'])).toBeNull()
   })
   it('nunca usa o N', () => {
-    expect(peopleRatingBand(500, ['masculino']).label).toBe('MINI')
+    expect(peopleRatingBand(500, ['masculino']).label).toBe('INI')
     expect(peopleRatingBand(1300, ['masculino']).label.startsWith('N')).toBe(false)
   })
 })

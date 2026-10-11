@@ -36,7 +36,12 @@ export function TshirtSummaryCard({ tournament }) {
           </button>
         </div>
         <p className="text-xs text-muted">
-          {t('tshirt.admin_counts', { requested: Number(counts.requested) || 0, declined: Number(counts.declined) || 0, pending: Number(counts.pending) || 0 })}
+          {/* Cada parte com o seu plural: «1 não quer», «3 não querem» (QA, 11 out). */}
+          {[
+            t('tshirt.count_requested', { count: Number(counts.requested) || 0 }),
+            t('tshirt.count_declined', { count: Number(counts.declined) || 0 }),
+            t('tshirt.count_pending', { count: Number(counts.pending) || 0 }),
+          ].join(' · ')}
         </p>
         <div className="grid grid-cols-6 gap-1.5">
           {sizesOf(shirtRulesOf(tournament)).map((s) => (
