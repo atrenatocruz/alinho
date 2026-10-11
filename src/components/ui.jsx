@@ -9,6 +9,7 @@ import QRCode from 'qrcode'
 import { ratingBand, groupRatingBand, peopleRatingBand } from '../lib/elo'
 import { planName } from '../lib/plans'
 import { achievementIcon, RARITY_META } from '../lib/achievements'
+import { medalUrl } from '../lib/achievementMedals'
 import { formatDate } from '../lib/formatDate'
 import { listFollowers, listFollowing, removeFollower, unfollowPlayer } from '../lib/follows'
 import { describeError } from '../lib/errors'
@@ -926,10 +927,31 @@ export function PlanBadge({ tier, className = '' }) {
    ícone por key (achievementIcon), nome/descrição dos locales. Bloqueado =
    silhueta com cadeado e o critério visível (a descrição É o critério) —
    o "para onde subir". rarityPct = % de jogadores que o têm (PSN-style). */
+/* A medalha pintada (design-handoff/2026-10-11-medalhas-conquistas, aprovado
+   pelo Francisco a 11 out), ~84 px. Por conquistar: a mesma medalha a
+   cinzento, com um cadeado num círculo preto no canto de baixo. Sem medalha
+   (ou se a imagem falhar), o ícone redondo de sempre. */
+function AchievementMedal({ url, locked, name }) {
+  return (
+    <span className="relative mx-auto block h-[84px] w-[84px]">
+      <img src={url} alt={name} loading="lazy" decoding="async" width="84" height="84"
+        className={`h-full w-full object-contain ${locked ? 'opacity-80 [filter:grayscale(1)_brightness(0.92)]' : ''}`} />
+      {locked && (
+        <span className="absolute bottom-0.5 right-0.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-ink-900">
+          <Lock size={11} className="text-lime-400" />
+        </span>
+      )}
+    </span>
+  )
+}
+
 export function AchievementCard({ achievementKey, category, rarity, earned = false, rarityPct = null }) {
   const { t } = useTranslation()
   const Icon = achievementIcon(achievementKey, category)
   const meta = RARITY_META[rarity] || RARITY_META.comum
+  const [medalFailed, setMedalFailed] = useState(false)
+  const medal = medalFailed ? null : medalUrl(achievementKey)
+  const name = t(`achievements.${achievementKey}_name`)
 
   // GANHO grita, BLOQUEADO sussurra: o ganho tem medalhão preenchido da
   // cor da raridade, borda sólida e brilho nos tiers altos; o bloqueado é
@@ -937,10 +959,12 @@ export function AchievementCard({ achievementKey, category, rarity, earned = fal
   // confunde os dois numa grelha mista.
   if (!earned) {
     return (
-      <div className="rounded-ctrl border border-dashed border-ink-200 bg-canvas p-3 text-center">
-        <span className="inline-flex w-11 h-11 rounded-full bg-ink-50 items-center justify-center">
-          <Lock size={16} className="text-ink-200" />
-        </span>
+      <div className="rounded-ctrl border border-dashed border-ink-200 bg-canvas p-3 text-center" onErrorCapture={() => setMedalFailed(true)}>
+        {medal ? <AchievementMedal url={medal} locked name={name} /> : (
+          <span className="inline-flex w-11 h-11 rounded-full bg-ink-50 items-center justify-center">
+            <Lock size={16} className="text-ink-200" />
+          </span>
+        )}
         <p className="mt-1.5 text-[12px] font-extrabold text-muted leading-tight">{t(`achievements.${achievementKey}_name`)}</p>
         <p className="mt-0.5 text-[10px] text-ink-200 leading-tight">{t(`achievements.${achievementKey}_desc`)}</p>
         <div className="mt-1.5">
@@ -953,10 +977,12 @@ export function AchievementCard({ achievementKey, category, rarity, earned = fal
   }
 
   return (
-    <div className={`rounded-ctrl border-2 p-3 text-center bg-surface ${meta.frame} ${meta.glow}`}>
-      <span className={`inline-flex w-11 h-11 rounded-full items-center justify-center ${meta.medal}`}>
-        <Icon size={22} className={meta.icon} />
-      </span>
+    <div className={`rounded-ctrl border-2 p-3 text-center bg-surface ${meta.frame} ${meta.glow}`} onErrorCapture={() => setMedalFailed(true)}>
+      {medal ? <AchievementMedal url={medal} name={name} /> : (
+        <span className={`inline-flex w-11 h-11 rounded-full items-center justify-center ${meta.medal}`}>
+          <Icon size={22} className={meta.icon} />
+        </span>
+      )}
       <p className="mt-1.5 text-[12px] font-extrabold text-ink-900 leading-tight">{t(`achievements.${achievementKey}_name`)}</p>
       <p className="mt-0.5 text-[10px] text-muted leading-tight">{t(`achievements.${achievementKey}_desc`)}</p>
       <div className="mt-1.5 flex items-center justify-center gap-1.5">
