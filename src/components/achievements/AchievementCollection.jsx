@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Lock } from 'lucide-react'
 import { medalUrl } from '../../lib/achievementMedals'
 import { RARITY_META } from '../../lib/achievements'
+import { supabase } from '../../lib/supabase'
 import AchievementViewer from './AchievementViewer'
 import './achievementsFx.css'
 
@@ -23,6 +24,17 @@ export default function AchievementCollection({ catalog, mine }) {
   const { t } = useTranslation()
   const [filled, setFilled] = useState(false)
   const [open, setOpen] = useState(null) // { items, start, locked }
+  // A «% têm» das que ainda não tenho (get_achievement_rarity, migração de
+  // 11 out). Fail-soft: sem a função, o cartão por ganhar fica sem ela.
+  const [pctByKey, setPctByKey] = useState(() => new Map())
+  useEffect(() => {
+    let alive = true
+    supabase.rpc('get_achievement_rarity').then(({ data, error }) => {
+      if (!alive || error || !data) return
+      setPctByKey(new Map(data.map((r) => [r.achievement_key, r.rarity_pct])))
+    })
+    return () => { alive = false }
+  }, [])
 
   useEffect(() => {
     const id = setTimeout(() => setFilled(true), 120)
@@ -38,16 +50,16 @@ export default function AchievementCollection({ catalog, mine }) {
       .filter((m) => sortOf.has(m.achievement_key))
       .slice()
       .sort((x, y) => String(y.awarded_at || '').localeCompare(String(x.awarded_at || '')))
-      .map((m) => ({ key: m.achievement_key, rarity: rarityOf(m.rarity) }))
+      .map((m) => ({ key: m.achievement_key, rarity: rarityOf(m.rarity), pct: m.rarity_pct ?? pctByKey.get(m.achievement_key) }))
     const grouped = RARITY_ORDER.map((r) => {
       const list = catalog
         .filter((c) => rarityOf(c.rarity) === r)
         .sort((x, y) => (byKey.has(y.key) ? 1 : 0) - (byKey.has(x.key) ? 1 : 0) || x.sort - y.sort)
-        .map((c) => ({ key: c.key, rarity: r, earned: byKey.has(c.key) }))
+        .map((c) => ({ key: c.key, rarity: r, earned: byKey.has(c.key), pct: byKey.get(c.key)?.rarity_pct ?? pctByKey.get(c.key) }))
       return { rarity: r, list, got: list.filter((c) => c.earned).length }
     }).filter((g) => g.list.length > 0)
     return { earned: earnedList, recent: earnedList.slice(0, RECENT), groups: grouped }
-  }, [catalog, mine])
+  }, [catalog, mine, pctByKey])
 
   const openEarned = (key) => {
     const start = earned.findIndex((e) => e.key === key)

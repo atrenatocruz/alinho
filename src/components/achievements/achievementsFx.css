@@ -102,7 +102,7 @@
 .achv-ov {
   position: fixed; inset: 0; z-index: 60; overflow: hidden;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  background: rgba(5, 7, 10, .86); color: #F4F6F8;
+  background: rgba(5, 7, 10, .97); color: #F4F6F8;
   animation: achv-fade .35s ease-out both;
   padding: 16px;
 }

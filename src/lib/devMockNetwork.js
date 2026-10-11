@@ -214,6 +214,10 @@ const RPC_MOCKS = {
     { achievement_key: 'primeiro_aplauso', category: 'kudos', rarity: 'comum', rarity_pct: 52.3 },
     { achievement_key: 'meio_ano_de_casa', category: 'antiguidade', rarity: 'comum', rarity_pct: 25.1 },
   ].map((a, i) => ({ ...a, awarded_at: new Date(Date.now() - i * 86400000).toISOString() })),
+  // A «% têm» de todas (conquistas animadas, 11 out): um número inventado
+  // por chave, estável entre recargas.
+  get_achievement_rarity: () => [...'aluno_aplicado anfitriao ano_sem_falhar residente campeao dinastia hat_trick primeira_bola centuriao_do_vidro ar_rarefeito gigante'.split(' ')]
+    .map((k, i) => ({ achievement_key: k, rarity_pct: [9.4, 3.1, 0.8, 14.0, 6.3, 1.2, 4.8, 72.4, 0.6, 2.2, 1.9][i] })),
   get_player_public_extras: (params) => {
     const person = FAKE_PEOPLE[params?.p_user_id] || FAKE_PEOPLE[FAKE_PLAYER_ID]
     return [{ nationality: 'PT', gender: person.gender, age_category: 'senior' }]

@@ -28,6 +28,7 @@ import { useFeatureFlag } from '../lib/useFeatureFlag'
 // A coleção animada das conquistas (2026-10-12): só se carrega ao abrir
 // «Ver todos» — imagens e animações fora do arranque.
 const AchievementCollection = lazy(() => import('../components/achievements/AchievementCollection'))
+const AchievementViewer = lazy(() => import('../components/achievements/AchievementViewer'))
 
 const SIDE_LABEL_KEY = { left: 'gamedetails.side_left', right: 'gamedetails.side_right', both: 'gamedetails.side_both' }
 const HAND_LABEL_KEY = { right: 'profile.dominant_hand_right', left: 'profile.dominant_hand_left' }
@@ -75,6 +76,9 @@ export default function Profile() {
   const [trophyCatalog, setTrophyCatalog] = useState([])
   const [myTrophies, setMyTrophies] = useState([])
   const [trophiesExpanded, setTrophiesExpanded] = useState(false)
+  // Tocar num dos 4 cartões do Perfil abre o cartão animado, a deslizar
+  // entre as ganhas, da mais recente à mais antiga (Francisco, 11 out).
+  const [trophyOpen, setTrophyOpen] = useState(null)
   const [loading, setLoading] = useState(false)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [showPhoto, setShowPhoto] = useState(false)
@@ -896,7 +900,8 @@ export default function Profile() {
               ) : (
                 <div className="grid grid-cols-2 gap-2">
                   {myTrophies.slice(0, 4).map((tr) => (
-                    <AchievementCard key={tr.achievement_key} achievementKey={tr.achievement_key} category={tr.category} rarity={tr.rarity} earned rarityPct={tr.rarity_pct} />
+                    <AchievementCard key={tr.achievement_key} achievementKey={tr.achievement_key} category={tr.category} rarity={tr.rarity} earned rarityPct={tr.rarity_pct}
+                      onOpen={() => setTrophyOpen(tr.achievement_key)} />
                   ))}
                 </div>
               )
@@ -905,6 +910,14 @@ export default function Profile() {
                 <AchievementCollection catalog={trophyCatalog} mine={myTrophies} />
               </Suspense>
             )}
+            {trophyOpen && (() => {
+              const items = myTrophies.map((tr) => ({ key: tr.achievement_key, rarity: tr.rarity, pct: tr.rarity_pct }))
+              return (
+                <Suspense fallback={null}>
+                  <AchievementViewer items={items} start={Math.max(0, items.findIndex((x) => x.key === trophyOpen))} onClose={() => setTrophyOpen(null)} />
+                </Suspense>
+              )
+            })()}
           </div>
         )}
 
