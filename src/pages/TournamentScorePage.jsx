@@ -1,11 +1,14 @@
-// Ecrã do marcador (Trello #365, «Torneio 5/6») — print 11, 2.º telemóvel.
-// Um cartão por campo: o que está a decorrer e o que vem a seguir. Guardar
-// o resultado atualiza o quadro, as classificações e as horas seguintes —
-// isso é do servidor; aqui só se marca.
+// Ecrã do marcador (Trello #365, «Torneio 5/6»). Desde 11 out (design-handoff/
+// 2026-10-11-torneio-marcar-nao-desaparece, «Muito melhor»): «Por marcar» e
+// «Já marcados» num separador; todos os jogos do dia são o mesmo cartão
+// (ScoreCard), por hora; o que se guarda fica no sítio, a verde, até se mudar
+// de separador, de dia ou de página. Guardar o resultado atualiza o quadro,
+// as classificações e as horas seguintes — isso é do servidor.
 //
 // É usado de pé, no clube, com uma mão: os números são grandes, os botões
 // são três, e não há menus escondidos.
 import { useCallback, useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { BackBar } from '../components/ui'
@@ -14,17 +17,16 @@ import { ArrowLeft, Trophy } from 'lucide-react'
 import { useGoBack } from '../lib/useGoBack'
 import { getTournamentPage, getTournamentForEdit, listMatchesToScore, markWalkover, saveMatchResult, undoWalkover, resolveMatchCorrection } from '../lib/tournamentApi'
 import { saveMatchSchedule } from '../lib/tournamentDraw'
-import { blocksSave, needsDecider, resultProblem } from '../lib/tournamentScore'
-import { computeSetsResult } from '../lib/scoringLogic'
 import { describeError, errorKind } from '../lib/errors'
 import { dayKeyInTz, msUntilNextDay, hhmmInTz } from '../lib/tournamentDay'
-import { cardsByCourt, unscheduledMatches, proposeSchedule, courtNames } from '../lib/scorePage'
+import { unscheduledMatches, proposeSchedule } from '../lib/scorePage'
 import { useAuth } from '../contexts/AuthContext'
-import { Chips, ConfirmSheet, EmptyState, PrimaryButton } from '../components/ui'
+import { Chips, ConfirmSheet, EmptyState, NeedsYou, Tabs } from '../components/ui'
 import { Sheet } from '../components/agenda/AgendaControls'
-import { FieldLabel, MonoLabel, StatePill } from '../components/tournament/TournamentBits'
-import { proSetTieBreakTarget, tieBreakProblem, setText } from '../components/tournament/tieBreak'
-import { setsResultProblem } from '../components/tournament/scoreProblem'
+import { FieldLabel, MonoLabel } from '../components/tournament/TournamentBits'
+import { proSetTieBreakTarget } from '../components/tournament/tieBreak'
+import ScoreCard, { FINISHED } from '../components/tournament/ScoreCard'
+import { StickyTabs } from '../components/tournament/StickyBar'
 
 // Hora de Portugal, nunca cortada do texto da base de dados (vinha em UTC:
 // 17:00 onde o resto da app dizia 18:00 — Trello #487).
@@ -38,345 +40,12 @@ const GHOST = 'bg-surface text-ink-900 border border-line hover:bg-ink-50'
 // para o estado vivo (designer, 26 set: um lima por ecrã).
 const DARK = 'bg-ink-900 text-white hover:bg-ink-700'
 
-const SETS_FORMATS = ['melhor_2_sets', 'melhor_3_sets']
-
-/** Um set a 6 que acabou 7-6: teve tie-break. */
-const isSevenSix = (s) => s.a !== '' && s.b !== '' && Math.max(Number(s.a), Number(s.b)) === 7 && Math.min(Number(s.a), Number(s.b)) === 6
-
-/** O resultado do tie-break: duas caixas, uma por dupla (pedido do
- *  Francisco, 25 set — antes só se escolhia quem ganhou). */
-function TieBreakBoxes({ title, label, a, b, onA, onB, teamA, teamB }) {
-  const box = 'h-11 w-[56px] rounded-md border border-line bg-surface px-2 text-center font-display text-lg font-extrabold text-ink-900'
-  return (
-    <div className="mt-1.5 rounded-ctrl bg-ink-50 p-2.5">
-      <p className="text-sm font-semibold text-ink-900">{title}</p>
-      <div className="mt-1.5 grid grid-cols-[minmax(0,1fr)_56px_56px] items-center gap-2">
-        <span />
-        <span className="truncate text-center text-xs font-semibold text-ink-500">{teamA}</span>
-        <span className="truncate text-center text-xs font-semibold text-ink-500">{teamB}</span>
-        <span className="text-xs text-ink-700">{label}</span>
-        <input type="number" inputMode="numeric" min="0" max="99" aria-label={`${title} · ${teamA}`} value={a} onChange={(e) => onA(e.target.value)} className={box} />
-        <input type="number" inputMode="numeric" min="0" max="99" aria-label={`${title} · ${teamB}`} value={b} onChange={(e) => onB(e.target.value)} className={box} />
-      </div>
-    </div>
-  )
-}
-
-/** Nos formatos por sets, o jogo já acabou quando alguém marca: escrevem-se
- *  os sets todos de uma vez, não um a um (é o contrário do mix, onde se
- *  marca set a set ao longo do jogo). O 3.º só aparece quando os dois
- *  primeiros ficam 1-1 — e no «2 sets + super tie-break» esse 3.º é o
- *  super tie-break. */
-function SetRows({ sets, onChange, teamA, teamB, decider, t }) {
-  // Atualização em função do estado anterior: escrever nas duas caixas de
-  // um set uma logo a seguir à outra, sem o ecrã redesenhar pelo meio,
-  // perdia a primeira.
-  const setOne = (i, side, value) => {
-    onChange((prev) => prev.map((x, k) => (k === i ? { ...x, [side]: value } : x)))
-  }
-  return (
-    <div className="mt-2">
-      <div className="grid grid-cols-[minmax(0,1fr)_56px_56px] items-center gap-2 pb-1">
-        <span />
-        <span className="text-center text-xs font-semibold text-ink-500">{teamA}</span>
-        <span className="text-center text-xs font-semibold text-ink-500">{teamB}</span>
-      </div>
-      {sets.map((s, i) => (
-        <div key={i} className="grid grid-cols-[minmax(0,1fr)_56px_56px] items-center gap-2 py-1">
-          <span className="text-xs text-ink-700">
-            {i === 2 && decider ? t('tournament.score.super_tiebreak') : t('tournament.score.set_number', { number: i + 1 })}
-          </span>
-          {['a', 'b'].map((side) => (
-            <input
-              key={side}
-              type="number"
-              inputMode="numeric"
-              min="0"
-              max="99"
-              aria-label={`${t('tournament.score.set_number', { number: i + 1 })} · ${side === 'a' ? teamA : teamB}`}
-              value={s[side]}
-              onChange={(e) => setOne(i, side, e.target.value)}
-              className="h-11 w-full rounded-md border border-line px-2 text-center font-display text-lg font-extrabold text-ink-900"
-            />
-          ))}
-          {/* 7-6: o set foi ao tie-break (a 7) — escreve-se o resultado dele.
-              O super tie-break do 3.º set já é os próprios pontos. */}
-          {!(i === 2 && decider) && isSevenSix(s) && (
-            <div className="col-span-3 -mt-1">
-              <TieBreakBoxes title={t('tournament.score.set_tiebreak', { number: i + 1 })} label={t('tournament.score.tiebreak_label')}
-                a={s.ta ?? ''} b={s.tb ?? ''} onA={(v) => setOne(i, 'ta', v)} onB={(v) => setOne(i, 'tb', v)}
-                teamA={teamA} teamB={teamB} />
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-  )
-}
-
-const emptySets = (n) => Array.from({ length: n }, () => ({ a: '', b: '' }))
-/** Os sets escritos que já estão completos, na forma que o servidor espera. */
-const filledSets = (sets) => sets
-  .filter((s) => s.a !== '' && s.b !== '' && Number(s.a) !== Number(s.b))
-  .map((s) => ({
-    score_a: Number(s.a),
-    score_b: Number(s.b),
-    ...(isSevenSix(s) && s.ta !== undefined && s.ta !== '' && s.tb !== undefined && s.tb !== ''
-      ? { tiebreak_a: Number(s.ta), tiebreak_b: Number(s.tb) } : {}),
-  }))
-
-/** O cartão de um campo: quem está a jogar, o resultado e os três botões. */
-function CourtCard({ match, scoring, tieTarget = 7, onSave, onWalkover, onUndoWalkover, onResolve, busy, error, t }) {
-  const finished = ['terminado', 'falta', 'desistencia'].includes(match.status)
-  const bySets = SETS_FORMATS.includes(scoring)
-  const [editing, setEditing] = useState(!finished)
-  const [a, setA] = useState(match.score_a ?? '')
-  const [b, setB] = useState(match.score_b ?? '')
-  const [sets, setSets] = useState(() => emptySets(2))
-  const [problem, setProblem] = useState(null)
-  // Pro set a 9 que chega a 8-8 decide-se no super tie-break (Trello #487).
-  // Antes não havia saída: 8-8 dizia «decide-se no super tie-break» sem
-  // deixar escolher quem ganhou, e 9-8 dizia «não fecha o jogo». O servidor
-  // sempre aceitou 9-8. Agora: 8-8 pergunta quem ganhou e grava 9-8; e 9-8
-  // escrito diretamente — que é o que as pessoas escrevem — também vale.
-  // 25 set (Francisco): em 8-8 escreve-se o resultado do tie-break (a 7) ou
-  // do super tie-break (a 10, se o torneio o escolheu) — não só quem ganhou.
-  // Grava 9-8 e os pontos do tie-break no set. 9-8 escrito diretamente
-  // também pede o tie-break, que tem de dar a vitória a quem tem 9.
-  const [tbA, setTbA] = useState('')
-  const [tbB, setTbB] = useState('')
-  const eightAll = !SETS_FORMATS.includes(scoring) && Number(a) === 8 && Number(b) === 8 && a !== '' && b !== ''
-  const nineEight = !SETS_FORMATS.includes(scoring)
-    && Math.max(Number(a), Number(b)) === 9 && Math.min(Number(a), Number(b)) === 8
-  const askTieBreak = eightAll || nineEight
-
-  useEffect(() => { setA(match.score_a ?? ''); setB(match.score_b ?? '') }, [match.score_a, match.score_b])
-
-  // A fase por extenso — «M5 · Meia-final», não «M5 SF» (revisão dos
-  // torneios, 28 set). Uma ronda sem tradução passa como veio.
-  const round = match.round_label
-  const roundText = round && t(`tournament.score.round_${round}`, { defaultValue: round })
-  const label = [match.category_code, match.group_label || roundText].filter(Boolean).join(' · ')
-
-  // Um terceiro set só faz sentido depois de os DOIS PRIMEIROS ficarem 1-1
-  // — e a conta é só sobre esses dois. Com os três, o jogo já está decidido
-  // e a conta dava "não é preciso terceiro", o que fazia a linha do super
-  // tie-break desaparecer no momento em que se acabava de a escrever.
-  const done = filledSets(sets)
-  const needThird = needsDecider(done)
-  const thirdIsEmpty = sets.length === 3 && sets[2].a === '' && sets[2].b === ''
-  useEffect(() => {
-    if (!bySets) return
-    if (needThird && sets.length === 2) setSets((prev) => [...prev, { a: '', b: '' }])
-    // Só se tira a linha se ainda não tiver nada escrito: nunca se apaga o
-    // que o marcador já lá pôs.
-    if (!needThird && thirdIsEmpty) setSets((prev) => prev.slice(0, 2))
-  }, [bySets, needThird, thirdIsEmpty, sets.length])
-
-  /** O problema do tie-break, se houver (pro set em 8-8/9-8, ou sets 7-6). */
-  const tieProblem = () => {
-    if (bySets) {
-      // «2 sets + super tie-break»: o 3.º set é um super tie-break — acaba
-      // aos 10, com 2 de vantagem (decisão do Francisco, 25 set, via BA).
-      const third = sets[2]
-      if (scoring === 'melhor_2_sets' && third && third.a !== '' && third.b !== '') {
-        const p = tieBreakProblem(third.a, third.b, 10)
-        if (p) return p
-      }
-      for (const [i, s] of sets.entries()) {
-        if ((i === 2 && scoring === 'melhor_2_sets') || !isSevenSix(s)) continue
-        const p = tieBreakProblem(s.ta ?? '', s.tb ?? '', 7)
-        if (p) return p
-        if ((Number(s.ta) > Number(s.tb)) !== (Number(s.a) > Number(s.b))) return 'tb_winner'
-      }
-      return null
-    }
-    if (!askTieBreak) return null
-    const p = tieBreakProblem(tbA, tbB, tieTarget)
-    if (p) return p
-    if (nineEight && (Number(tbA) > Number(tbB)) !== (Number(a) > Number(b))) return 'tb_winner'
-    return null
-  }
-
-  const save = () => {
-    // 8-8 sem tie-break (acabou o tempo): grava-se empatado, com o aviso
-    // (UX, 30 set — «não bloqueamos, simplesmente avisamos»).
-    if (eightAll && tbA === '' && tbB === '') {
-      setProblem(null)
-      onSave(match, { score_a: 8, score_b: 8 }, finished)
-      setEditing(false)
-      return
-    }
-    const tb = tieProblem()
-    if (tb) { setProblem(tb); return }
-    const input = bySets
-      ? (() => {
-        const rows = filledSets(sets)
-        const { setsA, setsB } = computeSetsResult(rows)
-        return { score_a: setsA, score_b: setsB, sets: rows.map((r, i) => ({ ...r, is_super_tiebreak: i === 2 && scoring === 'melhor_2_sets' })) }
-      })()
-      : askTieBreak
-        ? (() => {
-          const aWon = Number(tbA) > Number(tbB)
-          const score = { score_a: aWon ? 9 : 8, score_b: aWon ? 8 : 9 }
-          return { ...score, sets: [{ ...score, tiebreak_a: Number(tbA), tiebreak_b: Number(tbB), is_super_tiebreak: tieTarget === 10 }] }
-        })()
-        : { score_a: Number(a), score_b: Number(b) }
-    // 9-8 com o tie-break escrito é um fim válido de pro set.
-    // #588: por sets, cada set com a regra única (um 9-2 já não passa).
-    const p = askTieBreak ? null : bySets ? setsResultProblem(scoring, input) : resultProblem(scoring, input)
-    // O empate grava-se; o aviso fica no cartão do jogo (REGRAS.md ponto 4).
-    setProblem(blocksSave(p) ? p : null)
-    if (blocksSave(p)) return
-    onSave(match, input, finished)
-    setEditing(false)
-  }
-
-  const ask = match.correction_request
-  return (
-    <div id={`jogo-${match.match_id}`} className="card scroll-mt-20">
-      <div className="flex items-center justify-between gap-2">
-        <b className="text-sm text-ink-900">{match.court} · {label}</b>
-        {match.status === 'a_decorrer'
-          ? <StatePill tone="live">● {hhmm(match.scheduled_at)}</StatePill>
-          : match.status === 'marcado' && match.scheduled_at
-            ? <StatePill tone="dark">{hhmm(match.scheduled_at)}</StatePill>
-            : <StatePill tone={finished ? 'grey' : 'dark'}>{t(`tournament.score.status_${match.status}`)}</StatePill>}
-      </div>
-      <p className="mt-0.5 text-xs text-ink-500">{match.team_a?.name} × {match.team_b?.name}</p>
-      {finished && match.score_a != null && match.score_a === match.score_b && (
-        <p className="mt-1 text-xs font-bold text-warning">{t('tournament.score.problem_tie')}</p>
-      )}
-
-      {editing ? (
-        <>
-          {bySets ? (
-            <SetRows
-              sets={sets}
-              onChange={setSets}
-              teamA={match.team_a?.name}
-              teamB={match.team_b?.name}
-              decider={scoring === 'melhor_2_sets'}
-              t={t}
-            />
-          ) : [['a', match.team_a, a, setA], ['b', match.team_b, b, setB]].map(([side, team, value, set]) => (
-            <div key={side} className="mt-1.5 flex items-center justify-between gap-2 rounded-ctrl border border-line px-3 py-1.5">
-              <span className="min-w-0 truncate text-xs text-ink-900">{team?.name}</span>
-              <input
-                type="number"
-                inputMode="numeric"
-                min="0"
-                max="99"
-                aria-label={team?.name}
-                value={value}
-                onChange={(e) => set(e.target.value)}
-                className="h-11 w-[64px] rounded-md border border-line px-2 text-right font-display text-xl font-extrabold text-ink-900"
-              />
-            </div>
-          ))}
-          {bySets && <p className="mt-1 text-xs text-ink-500">{t('tournament.score.sets_hint')}</p>}
-          {askTieBreak && (
-            <TieBreakBoxes
-              title={t(tieTarget === 10 ? 'tournament.score.super_tiebreak_title' : 'tournament.score.tiebreak_title', { a, b })}
-              label={t(tieTarget === 10 ? 'tournament.score.super_tiebreak' : 'tournament.score.tiebreak_label')}
-              a={tbA} b={tbB} onA={setTbA} onB={setTbB} teamA={match.team_a?.name} teamB={match.team_b?.name} />
-          )}
-          {problem && <p className="mt-1.5 text-xs text-danger">{t(`tournament.score.problem_${problem}`)}</p>}
-          <div className="mt-2.5 flex flex-wrap gap-2">
-            <button type="button" disabled={busy} onClick={save} className={`${BTN} ${DARK}`}>
-              {t('tournament.score.save')}
-            </button>
-            {/* Falta e desistência só num jogo com as duas duplas e ainda por
-                jogar (Trello #491): num jogo «a definir» não há quem falte, e
-                num jogo acabado corrige-se o resultado — não se marca falta. */}
-            {!finished && match.team_a && match.team_b && (
-              <>
-                <button type="button" disabled={busy} onClick={() => onWalkover(match, 'falta')} className={`${BTN} ${GHOST}`}>
-                  {t('tournament.score.walkover')}
-                </button>
-                <button type="button" disabled={busy} onClick={() => onWalkover(match, 'desistencia')} className={`${BTN} ${GHOST}`}>
-                  {t('tournament.score.retirement')}
-                </button>
-              </>
-            )}
-            {finished && (
-              <button type="button" onClick={() => setEditing(false)} className="min-h-[44px] px-3 text-sm text-ink-500 hover:underline">
-                {t('tournament.create.cancel')}
-              </button>
-            )}
-          </div>
-          {!finished && match.team_a && match.team_b && (
-            <p className="mt-1.5 text-xs text-ink-500">{t('tournament.score.walkover_hint')}</p>
-          )}
-        </>
-      ) : (
-        <div className="mt-2 flex items-center justify-between gap-2">
-          <span className="min-w-0">
-            <b className="block font-display text-xl font-extrabold text-ink-900">{match.score_a}-{match.score_b}</b>
-            {match.sets?.length > 0 && (
-              <span className="block text-xs text-ink-500">
-                {/* Pro set: só o tie-break (o 9-8 já está em cima). Por sets:
-                    os sets, com o tie-break de cada 7-6. */}
-                {match.sets.length === 1 && match.sets[0].tiebreak_a != null
-                  ? t(match.sets[0].is_super_tiebreak ? 'tournament.score.super_tiebreak_result' : 'tournament.score.tiebreak_result',
-                    { a: match.sets[0].tiebreak_a, b: match.sets[0].tiebreak_b })
-                  : match.sets.map(setText).join(' · ')}
-              </span>
-            )}
-          </span>
-          <div className="flex items-center gap-2">
-            {match.corrected_by_name && (
-              <span className="text-xs text-ink-500">{t('tournament.score.corrected_by', { name: match.corrected_by_name })}</span>
-            )}
-            {/* Falta marcada por engano: desfaz-se (Trello #491). O jogo volta
-                a estar por jogar; o servidor recusa se o jogo seguinte da
-                categoria já tiver resultado. */}
-            {/* Só o organizador desfaz: o marcador corrige resultados, não
-                apaga faltas (Trello #491). */}
-            {['falta', 'desistencia'].includes(match.status) ? (onUndoWalkover && (
-              <button type="button" disabled={busy} onClick={() => onUndoWalkover(match)} className={`${BTN} ${GHOST}`}>
-                {t(match.status === 'falta' ? 'tournament.score.undo_walkover' : 'tournament.score.undo_retirement')}
-              </button>
-            )) : (
-              <button type="button" onClick={() => setEditing(true)} className={`${BTN} ${GHOST}`}>
-                {t('tournament.score.correct')}
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Pedido de correção de quem jogou (Trello #485): quem pediu, o
-          resultado que pede e a nota, com Aceitar e Recusar. */}
-      {ask && onResolve && (
-        <NeedsYou className="mt-2.5">
-          <span className="block">
-            {t('tcorrection.card_line', { name: ask.by_name || '?', a: ask.score_a, b: ask.score_b })}
-          </span>
-          {ask.note && <span className="mt-0.5 block font-normal text-ink-700">«{ask.note}»</span>}
-          <span className="mt-2 flex flex-wrap gap-2">
-            <button type="button" disabled={busy} onClick={() => onResolve(match, true)} className={`${BTN} ${DARK}`}>
-              {t('tcorrection.accept')}
-            </button>
-            <button type="button" disabled={busy} onClick={() => onResolve(match, false)} className={`${BTN} ${GHOST}`}>
-              {t('tcorrection.reject')}
-            </button>
-          </span>
-        </NeedsYou>
-      )}
-      {/* O erro junto ao jogo que falhou, não no topo da página (designer,
-          26 set: «correu mal» fica junto ao que falhou). */}
-      {error && (
-        <p role="alert" className="mt-2.5 rounded-ctrl border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-sm font-bold text-danger">{error}</p>
-      )}
-    </div>
-  )
-}
-
 /** A folha que pergunta quem faltou (ou desistiu) e, na falta, se foi
  *  justificada. A sem justificação fica no histórico do jogador, visível
  *  só aos admins (SPEC §7). */
-function WalkoverSheet({ match, kind, onClose, onConfirm, error, t }) {
+function WalkoverSheet({ match, kind: askedKind = null, onClose, onConfirm, error, t }) {
+  // «Falta ou desistência» é um botão só (11 out): a folha pergunta qual.
+  const [kind, setKind] = useState(askedKind)
   const [loser, setLoser] = useState(null)
   const [justified, setJustified] = useState(null)
   // Desistir é perder o jogo inteiro: o resultado até ali não conta
@@ -386,8 +55,12 @@ function WalkoverSheet({ match, kind, onClose, onConfirm, error, t }) {
   // A folha da app (Sheet), como as outras — e já vai para o body, o que
   // resolvia o `fixed` preso à página (#458).
   return (
-    <Sheet title={t(`tournament.score.${kind}_title`)} onClose={onClose}>
-      <FieldLabel>{t(`tournament.score.${kind}_who`)}</FieldLabel>
+    <Sheet title={t('tournament.score.walkover_or_retirement')} onClose={onClose}>
+      <FieldLabel>{t('tournament.score.which_kind')}</FieldLabel>
+      <Chips label={t('tournament.score.which_kind')} value={kind} onChange={(k) => { setKind(k); setJustified(null) }}
+        options={[{ value: 'falta', label: t('tournament.score.walkover') }, { value: 'desistencia', label: t('tournament.score.retirement') }]} />
+      {kind && <>
+      <FieldLabel className="mt-4">{t(`tournament.score.${kind}_who`)}</FieldLabel>
       <Chips label={t(`tournament.score.${kind}_who`)} value={loser} onChange={setLoser}
         options={[{ value: 'a', label: match.team_a?.name }, { value: 'b', label: match.team_b?.name }]} />
 
@@ -402,13 +75,17 @@ function WalkoverSheet({ match, kind, onClose, onConfirm, error, t }) {
 
       {/* O que isto faz: explicação, não um aviso — texto normal (designer). */}
       <p className="mt-4 text-sm text-ink-500">{t(`tournament.score.${kind}_effect`)}</p>
+      </>}
 
       {error && <p role="alert" className="mt-3 rounded-ctrl border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-sm font-bold text-danger">{error}</p>}
 
-      <PrimaryButton className="mt-4 w-full" disabled={!ready} onClick={() => onConfirm(loser, justified)}>
-        {t(`tournament.score.${kind}_confirm`)}
-      </PrimaryButton>
-      <button type="button" onClick={onClose} className="mt-2 min-h-[48px] w-full text-base font-extrabold text-ink-700">
+      {/* Quem marca é quem organiza: preto, não lima; cinzento até estar tudo
+          escolhido. «Cancelar» em contorno por baixo (UX, 11 out). */}
+      <button type="button" disabled={!ready} onClick={() => onConfirm(kind, loser, justified)}
+        className={`${BTN} mt-4 w-full disabled:opacity-100 ${ready ? DARK : 'bg-line text-ink-500'}`}>
+        {kind ? t(`tournament.score.${kind}_confirm`) : t('tournament.score.walkover_or_retirement')}
+      </button>
+      <button type="button" onClick={onClose} className={`${BTN} mt-2 w-full border border-line bg-white text-ink-900`}>
         {t('tournament.create.cancel')}
       </button>
     </Sheet>
@@ -433,6 +110,16 @@ export default function TournamentScorePage() {
   const [accepting, setAccepting] = useState(null) // o pedido de correção a aceitar (#485)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  // «Por marcar» / «Já marcados» (11 out). O que se guarda em «Por marcar»
+  // fica lá, a verde, até se mudar de separador, de dia ou de página.
+  const [view, setView] = useState('todo')
+  const [justSaved, setJustSaved] = useState(() => new Set())
+  const [toast, setToast] = useState('')
+  useEffect(() => {
+    if (!toast) return undefined
+    const timer = setTimeout(() => setToast(''), 3000)
+    return () => clearTimeout(timer)
+  }, [toast])
   // O jogo onde o erro aconteceu — é aí que ele aparece.
   const [errorFor, setErrorFor] = useState(null)
 
@@ -493,6 +180,7 @@ export default function TournamentScorePage() {
     const m = wanted && (allMatches || []).find((x) => String(x.match_id) === wanted)
     if (!m) return undefined
     if (m.scheduled_at) setDay(dayKeyInTz(new Date(m.scheduled_at)))
+    setView(FINISHED.includes(m.status) ? 'done' : 'todo')
     const timer = setTimeout(() => document.getElementById(`jogo-${m.match_id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 200)
     return () => clearTimeout(timer)
   }, [wanted, allMatches])
@@ -548,16 +236,23 @@ export default function TournamentScorePage() {
     setError(''); setErrorFor(null)
     try {
       await saveMatchResult(match.match_id, input)
+      // Fica no sítio, a verde (11 out); sai de «Por marcar» ao mudar de vista.
+      if (view === 'todo') {
+        setJustSaved((prev) => new Set(prev).add(match.match_id))
+        setToast(t('tournament.score.saved_stays'))
+      }
       load()
+      return true
     } catch (err) {
       setError(describeError(t, err)); setErrorFor(match.match_id)
+      return false
     } finally {
       setBusy(false)
     }
   }
 
-  const confirmWalkover = async (loser, justified) => {
-    const { match, kind } = sheet
+  const confirmWalkover = async (kind, loser, justified) => {
+    const { match } = sheet
     setBusy(true)
     setError(''); setErrorFor(null)
     try {
@@ -572,6 +267,8 @@ export default function TournamentScorePage() {
     }
   }
 
+  useEffect(() => { setJustSaved(new Set()) }, [day, view])
+
   const back = <BackBar onBack={goBack} title={tournament?.name} />
 
   if (allMatches === null) {
@@ -580,11 +277,21 @@ export default function TournamentScorePage() {
 
   // Os jogos do dia escolhido, contado em hora de Portugal (igual ao servidor).
   const matches = allMatches.filter((m) => m.scheduled_at && dayKeyInTz(new Date(m.scheduled_at)) === day)
-  const courts = cardsByCourt(matches)
-  const cards = courts.filter((c) => c.card)
-  const upcoming = courts.flatMap((c) => c.rest)
-    .sort((x, y) => String(x.scheduled_at).localeCompare(String(y.scheduled_at)))
-  const done = matches.filter((m) => ['terminado', 'falta', 'desistencia'].includes(m.status))
+  const done = matches.filter((m) => FINISHED.includes(m.status))
+  const todoCount = matches.length - done.length
+  // Por hora: «Por marcar» pela ordem do dia; «Já marcados», os mais recentes
+  // em cima (SPEC, pontos 2 e 5).
+  const shown = (view === 'todo'
+    ? matches.filter((m) => !FINISHED.includes(m.status) || justSaved.has(m.match_id))
+    : done)
+    .slice()
+    .sort((x, y) => (view === 'todo' ? 1 : -1) * (String(x.scheduled_at).localeCompare(String(y.scheduled_at)) || String(x.court).localeCompare(String(y.court), 'pt', { numeric: true })))
+  const byHour = []
+  for (const m of shown) {
+    const h = hhmm(m.scheduled_at)
+    if (!byHour.length || byHour[byHour.length - 1].h !== h) byHour.push({ h, list: [] })
+    byHour[byHour.length - 1].list.push(m)
+  }
   const noTime = unscheduledMatches(allMatches)
   // Pedidos de correção à espera (Trello #485), de todos os dias: o aviso
   // leva ao primeiro, trocando de dia se for preciso.
@@ -593,6 +300,7 @@ export default function TournamentScorePage() {
     const first = asks[0]
     if (!first) return
     if (first.scheduled_at) setDay(dayKeyInTz(new Date(first.scheduled_at)))
+    setView('done')
     setTimeout(() => document.getElementById(`jogo-${first.match_id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 150)
   }
   const resolve = async (match, accept) => {
@@ -627,10 +335,18 @@ export default function TournamentScorePage() {
         </p>
       </div>
 
-      {days.length > 1 && (
-        <Chips label={t('tournament.score.day_picker')} value={day} onChange={setDay}
-          options={days.map((d) => ({ value: d, label: `${labelFor(d)}${d === today ? ` · ${t('tournament.score.today')}` : ''}` }))} />
-      )}
+      {/* Os dias e o separador ficam presos ao descer (topo preso, 11 out). */}
+      <StickyTabs resetKey={`${day}:${view}`}>
+        {days.length > 1 && (
+          <Chips label={t('tournament.score.day_picker')} value={day} onChange={setDay}
+            options={days.map((d) => ({ value: d, label: `${labelFor(d)}${d === today ? ` · ${t('tournament.score.today')}` : ''}` }))} />
+        )}
+        <Tabs label={t('tournament.score.view_label')} value={view} onChange={setView}
+          options={[
+            { value: 'todo', label: t('tournament.score.tab_todo', { count: todoCount }) },
+            { value: 'done', label: t('tournament.score.tab_done', { count: done.length }) },
+          ]} />
+      </StickyTabs>
 
       {error && !errorFor && <p role="alert" className="rounded-ctrl border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-sm font-bold text-danger">{error}</p>}
 
@@ -702,47 +418,19 @@ export default function TournamentScorePage() {
 
       {matches.length === 0 ? (
         <EmptyState icon={Trophy} title={t('tournament.score.empty_title')} subtitle={t('tournament.score.empty_subtitle')} />
-      ) : (
-        <>
-          {cards.length > 0 && (
-            <>
-              <MonoLabel>{t('tournament.score.to_score')}</MonoLabel>
-              <div className="space-y-2">
-                {cards.map((c) => (
-                  <CourtCard key={c.card.match_id} match={c.card} scoring={scoring} tieTarget={tieTarget} busy={busy} t={t}
-                    onSave={save} onWalkover={(match, kind) => setSheet({ match, kind })} onUndoWalkover={isAdmin ? setUndoing : null}
-                    error={errorFor === c.card.match_id && !sheet ? error : null} />
-                ))}
-              </div>
-            </>
-          )}
-
-          {upcoming.length > 0 && <MonoLabel className="pt-2">{t('tournament.score.next')}</MonoLabel>}
-          <div>
-            {upcoming.map((m) => (
-              <div key={m.match_id} className="grid grid-cols-[52px_minmax(0,1fr)] items-center gap-2 border-t border-line py-2 text-xs">
-                <b className="font-mono text-xs text-ink-900">{hhmm(m.scheduled_at)}</b>
-                <span className="min-w-0 text-ink-700">
-                  {m.court} · {m.category_code} · {m.team_a?.name} × {m.team_b?.name}
-                </span>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-
-      {done.length > 0 && (
-        <>
-          <MonoLabel className="pt-2">{t('tournament.score.finished')}</MonoLabel>
-          <div className="space-y-2">
-            {done.map((m) => (
-              <CourtCard key={m.match_id} match={m} scoring={scoring} tieTarget={tieTarget} busy={busy} t={t}
-                onSave={save} onWalkover={(match, kind) => setSheet({ match, kind })} onUndoWalkover={isAdmin ? setUndoing : null}
-                onResolve={resolve} error={errorFor === m.match_id && !sheet ? error : null} />
-            ))}
-          </div>
-        </>
-      )}
+      ) : shown.length === 0 ? (
+        <p className="py-8 text-center text-sm text-muted">{t(view === 'todo' ? 'tournament.score.none_todo' : 'tournament.score.none_done')}</p>
+      ) : byHour.map(({ h, list }) => (
+        <section key={h} className="space-y-2.5">
+          <MonoLabel>{h}</MonoLabel>
+          {list.map((m) => (
+            <ScoreCard key={m.match_id} match={m} scoring={scoring} tieTarget={tieTarget} busy={busy} t={t}
+              saved={view === 'todo' && justSaved.has(m.match_id)}
+              onSave={save} onWalkover={(match) => setSheet({ match })} onUndoWalkover={isAdmin ? setUndoing : null}
+              onResolve={resolve} error={errorFor === m.match_id && !sheet ? error : null} />
+          ))}
+        </section>
+      ))}
 
       {/* Aceitar mexe no resultado e, com a categoria fechada, nos pontos:
           pergunta uma vez, sem vermelho (regra das janelas). */}
@@ -761,7 +449,7 @@ export default function TournamentScorePage() {
       />
 
       {sheet && (
-        <WalkoverSheet match={sheet.match} kind={sheet.kind} t={t}
+        <WalkoverSheet match={sheet.match} t={t}
           error={errorFor === sheet.match.match_id ? error : null}
           onClose={() => { setSheet(null); setError(''); setErrorFor(null) }} onConfirm={confirmWalkover} />
       )}
@@ -777,6 +465,15 @@ export default function TournamentScorePage() {
           onClose={() => setUndoing(null)}
           errorOf={(err) => describeError(t, err)}
         />
+      )}
+
+      {/* No body, como as tiras da página do mix: dentro da página, o
+          «fixed» ficava preso a ela e a tira ia para o fundo. */}
+      {toast && createPortal(
+        <div role="status" className="fixed inset-x-4 bottom-[104px] z-50 mx-auto max-w-md rounded-ctrl bg-ink-900 px-4 py-3 text-sm font-extrabold text-white animate-fade-up">
+          {toast}
+        </div>,
+        document.body,
       )}
     </div>
   )

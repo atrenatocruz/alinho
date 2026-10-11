@@ -504,7 +504,12 @@ export default function EntriesPanel({ tournament, categories = [], category, pu
       </p>}
       {!searching && (
         <PriceRosterSummary roster={roster} normalPrice={normalEach} className="-mt-2"
-          ids={rows.filter((r) => r.status !== 'desistiu' && !r.withdrawn).flatMap((r) => [r.player1_id, r.player2_id])} />
+          // Quem entrou sem conta também conta, e paga o normal (QA, 11 out:
+          // contava a dupla e dizia «Todos com preço especial»).
+          ids={rows.filter((r) => r.status !== 'desistiu' && !r.withdrawn).flatMap((r) => [
+            r.player1_id || (r.player1_name ? `sem-conta-1-${r.entry_id}` : null),
+            r.player2_id || (r.player2_name || r.guest_name ? `sem-conta-2-${r.entry_id}` : null),
+          ])} />
       )}
 
       {searching && allRows !== null && shown.length === 0 ? (

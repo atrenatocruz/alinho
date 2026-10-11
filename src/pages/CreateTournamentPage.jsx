@@ -88,7 +88,7 @@ export default function CreateTournamentPage() {
   }
   return (
     <CreateTournamentForm
-      club={{ id: org.id, name: org.name, location: org.location }}
+      club={{ id: org.id, name: org.name, location: org.location, kind: org.kind }}
       saving={saving}
       error={error}
       onCancel={back}
