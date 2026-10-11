@@ -136,8 +136,21 @@ export function ClubHeader({ club, isFavorite, acting, favoriting, onFollow, onU
    dizer (`locked` vem da base de dados, Dev 3). */
 const SHOW = 5
 
+// «O que vem aí» só leva o que ainda não aconteceu, e nunca os cancelados
+// (QA, 11 out): um mix que ficou «a decorrer» de outro dia e um torneio
+// cancelado apareciam lá. Os de hoje ficam (um mix a decorrer hoje também).
+const todayKey = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+const localDayKey = (iso) => {
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 export function buildClubEvents(club, tournaments = []) {
-  const games = (club.open_games || []).map((g) => ({
+  const today = todayKey()
+  const games = (club.open_games || []).filter((g) => g.date && localDayKey(g.date) >= today && g.status !== 'cancelled').map((g) => ({
     key: `g-${g.id}`,
     kind: g.origin === 'open_slot' ? 'open' : 'mix',
     when: g.date,
@@ -148,7 +161,7 @@ export function buildClubEvents(club, tournaments = []) {
     recurring: !!g.recurrence_id,
   }))
   const tours = tournaments
-    .filter((x) => x.status !== 'terminado')
+    .filter((x) => !['terminado', 'cancelado'].includes(x.status) && (x.ends_on || x.starts_on || today) >= today)
     .map((x) => ({
       key: `t-${x.id}`,
       kind: 'tournament',
