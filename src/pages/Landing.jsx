@@ -1,5 +1,5 @@
 import { useState, useEffect, useLayoutEffect } from 'react'
-import { Link, useSearchParams, useNavigationType } from 'react-router-dom'
+import { Link, useSearchParams, useNavigationType, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { CheckCircle2, Trophy, Shuffle, ChevronRight, Mail, MessageCircle } from 'lucide-react'
 import { Wordmark } from '../components/Layout'
@@ -84,6 +84,7 @@ export function Nav() {
   const { t } = useTranslation()
   const [scrolled, setScrolled] = useState(false)
   const loginHref = useLoginHref()
+  const { pathname } = useLocation()
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8)
@@ -92,19 +93,23 @@ export function Nav() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  const link = 'inline-flex items-center min-h-[44px] px-1 text-ink-700 hover:text-ink-900 font-extrabold text-sm transition-colors duration-fast'
+  const link = 'inline-flex items-center min-h-[44px] sm:px-1 whitespace-nowrap text-ink-700 hover:text-ink-900 font-extrabold text-[13px] sm:text-sm transition-colors duration-fast'
   return (
     <header
       className={`fixed top-0 inset-x-0 z-20 transition-colors duration-base ${
         scrolled ? 'bg-[#F7F7F4]/95 backdrop-blur-xl border-b border-line' : 'bg-transparent'
       }`}
     >
-      <div className="max-w-5xl mx-auto px-5 h-16 flex items-center justify-between">
-        <Link to="/" className="leading-none">
-          <Wordmark variant="light" />
+      <div className="max-w-5xl mx-auto px-4 sm:px-5 h-16 flex items-center justify-between gap-2">
+        <Link to="/" className="leading-none shrink-0">
+          <Wordmark variant="light" className="!h-[22px] sm:!h-6" />
         </Link>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-1.5 sm:gap-4">
           <LanguageToggle className="text-ink-700 hover:text-ink-900" />
+          {/* «Como funciona» ao lado de «Planos» (#619, 10 out); sublinhado
+              na própria página. */}
+          <Link to="/como-funciona" className={`${link} ${pathname === '/como-funciona' ? 'underline underline-offset-4 text-ink-900' : ''}`}
+            onClick={() => { if (pathname === '/como-funciona') window.scrollTo(0, 0) }}>{t('hiw.nav_link')}</Link>
           <Link to="/planos" className={link} onClick={() => { if (window.location.pathname === '/planos') window.scrollTo(0, 0) }}>{t('landing.pricing_nav_link')}</Link>
           <Link to={loginHref()} className={link}>{t('landing.login_link')}</Link>
         </div>
@@ -443,10 +448,14 @@ export function Footer() {
     <footer className="bg-ink-900 border-t border-white/10 py-6 px-5">
       <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
         <div className="flex flex-wrap items-center justify-center gap-x-5">
-          <Link to={loginHref()} className={link}>{t('landing.login_link')}</Link>
+          {/* Rodapé das páginas públicas (#619, 10 out): Como funciona · Planos
+              · Instruções · Novidades · Privacidade (+ Termos). */}
+          <Link to="/como-funciona" className={link}>{t('hiw.nav_link')}</Link>
+          <Link to="/planos" className={link}>{t('landing.pricing_nav_link')}</Link>
           <Link to="/instrucoes" className={link}>{t('landing.instructions_link')}</Link>
-          <Link to="/termos" className={link}>{t('landing.terms_link')}</Link>
+          <Link to="/novidades" className={link}>{t('nov.footer_link')}</Link>
           <Link to="/privacidade" className={link}>{t('landing.privacy_link')}</Link>
+          <Link to="/termos" className={link}>{t('landing.terms_link')}</Link>
         </div>
         <p className="text-white/50 text-xs">&copy; {year} alinho</p>
       </div>
