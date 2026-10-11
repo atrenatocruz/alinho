@@ -10,14 +10,16 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown } from 'lucide-react'
 import { Sheet } from '../agenda/AgendaControls'
-import { Chips, ConfirmSheet } from '../ui'
+import { Chips } from '../ui'
 import { saveFriendMatchRound, setFriendMatchRoundKind } from '../../lib/privateMatches'
 import { describeError } from '../../lib/errors'
 import { shortName } from './friendShare'
-import { KINDS, kindOf, pointsToOf, lastPointsTo, roundScoreProblem } from './roundKinds'
+import { KINDS, kindOf, pointsToOf, lastPointsTo, roundScoreProblem, roundScoreNotice } from './roundKinds'
 
 const pair = (team) => (team || []).map((p) => shortName(p.name)).join(' / ')
-const ERRORS = ['too_early', 'bad_kind', 'bad_score', 'already_counted', 'not_allowed']
+// «O fim» (Dev 3, 11 out): already_sent, nothing_played, not_sent, bad_input;
+// e 'finished' — depois de enviado, as rondas já não mudam.
+const ERRORS = ['too_early', 'bad_kind', 'bad_score', 'already_counted', 'not_allowed', 'already_sent', 'nothing_played', 'not_sent', 'bad_input', 'finished']
 const clean = (v) => String(v).replace(/\D/g, '').slice(0, 3)
 
 /** O texto de um erro das funções das rondas. */
@@ -70,8 +72,8 @@ export default function FriendRoundSheet({ match, game, roundNumber, games, next
   const [b, setB] = useState(has ? String(game.score_b) : '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [askLast, setAskLast] = useState(false)
   const problem = roundScoreProblem(kind, a, b)
+  const notice = roundScoreNotice(kind, a, b)
   const filled = a !== '' && b !== ''
 
   const save = async (last) => {
@@ -81,11 +83,14 @@ export default function FriendRoundSheet({ match, game, roundNumber, games, next
       kind, pointsTo: kind === 'pontos' && pointsTo ? Number(pointsTo) : null,
       nextCourts: editing || last ? null : nextCourts, last,
     })
-    onSaved(result)
+    onSaved(result, { finish: last })
   }
-  const run = async () => {
+  // «Guardar e terminar o jogo» (UX, 10 out — era «O jogo acabou assim»):
+  // guarda sem nascer a seguinte e quem chama abre logo «Terminar o jogo e
+  // enviar?». Com «Continuar a jogar», a ronda fica guardada.
+  const run = async (last = false) => {
     setBusy(true); setError('')
-    try { await save(false) } catch (err) {
+    try { await save(last) } catch (err) {
       console.error('Error saving a friend match round:', err)
       setError(roundSaveError(t, err))
     } finally { setBusy(false) }
@@ -108,28 +113,19 @@ export default function FriendRoundSheet({ match, game, roundNumber, games, next
             aria-label={t('friends.round_score_aria', { team: pair(game.team_b) })} className={`${cell} border-ink-900 bg-white`} />
         </div>
         {problem && <p className="text-xs font-extrabold text-danger" role="status">{t(`friends.round_problem_${problem}`)}</p>}
+        {!problem && notice && <p className="text-xs font-extrabold text-[#9A5B00]" role="status">{t(`friends.round_notice_${notice}`)}</p>}
         {error && <p className="rounded-ctrl border border-danger/30 bg-danger/10 px-3 py-2 text-sm font-extrabold text-danger">{error}</p>}
-        <button type="button" disabled={busy || !filled || !!problem} onClick={run}
+        <button type="button" disabled={busy || !filled || !!problem} onClick={() => run(false)}
           className="press min-h-[52px] w-full rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold text-white disabled:opacity-40">
           {t('friends.save_round', { n: roundNumber })}
         </button>
         {!editing && (
-          <button type="button" disabled={busy || !filled || !!problem} onClick={() => setAskLast(true)}
+          <button type="button" disabled={busy || !filled || !!problem} onClick={() => run(true)}
             className="press min-h-[52px] w-full rounded-ctrl border-[1.5px] border-line bg-white px-4 text-[15px] font-extrabold text-ink-900 disabled:opacity-40">
-            {t('friends.game_ended_like_this')}
+            {t('friends.save_and_finish')}
           </button>
         )}
       </div>
-      <ConfirmSheet
-        open={askLast}
-        title={t('friends.finish_as_is_title')}
-        message={t('friends.finish_round_text', { n: roundNumber })}
-        confirmLabel={t('friends.finish_as_is_yes')}
-        cancelLabel={t('friends.finish_as_is_keep')}
-        onConfirm={() => save(true)}
-        onClose={() => setAskLast(false)}
-        errorOf={(err) => roundSaveError(t, err)}
-      />
     </Sheet>
   )
 }

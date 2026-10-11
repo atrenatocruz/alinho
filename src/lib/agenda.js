@@ -177,6 +177,11 @@ export function eventsFromPrivateMatches(rows, userId, orgsById = new Map()) {
     const startsAt = first.scheduled_date ? scheduledAt(first.scheduled_date, first.scheduled_time) : new Date(first.played_at)
     const org = first.organization_id ? orgsById.get(first.organization_id) : null
     const done = (g) => g.score_a != null && g.score_b != null
+    // «Terminado» é o jogo enviado (session_finished_at: o finished_at da
+    // raiz, em cada linha — Dev 3), não as rondas marcadas: com uma ronda
+    // marcada e a seguinte por nascer, a Home já dizia «Terminado» (QA,
+    // 9 out). Sem o campo, como antes.
+    const finished = 'session_finished_at' in first ? Boolean(first.session_finished_at) : games.every(done)
     out.push({
       key: `friend_session:${first.session_id || first.id}`,
       source: 'friend_session',
@@ -192,7 +197,7 @@ export function eventsFromPrivateMatches(rows, userId, orgsById = new Map()) {
       orgLogo: org?.logo || null,
       mine: true,
       myState: 'in',
-      finished: games.every(done),
+      finished,
       raw: { ...first, games },
     })
   }

@@ -16,6 +16,7 @@ import { PrimaryButton, EmptyState, ConfirmSheet } from '../components/ui'
 import { formatDate } from '../lib/formatDate'
 import { describeError } from '../lib/errors'
 import FriendSessionsList from '../components/friends/FriendSessionsList'
+import FriendSessionCard from '../components/friends/FriendSessionCard'
 import { ScoreEntrySimple, ScoreEntrySets } from '../components/friends/FriendScoreEntry'
 
 // The 3 slots that can be empty, filled by an app player, or filled by a
@@ -277,6 +278,18 @@ export default function PrivateMatches() {
   const finishedGroups = groups.filter(isPast)
   const pending = matches.filter((m) => m.status === 'pending' && !m.session_id)
   const reload = () => { load() }
+  // «O fim» (SPEC 2026-10-09-amigos-o-fim, ponto 8): com a lista nova do Dev 3
+  // (list_my_friend_sessions com finished_at), os jogos entre amigos ficam em
+  // «Por enviar» e «Histórico», um cartão simples cada. Os jogos soltos
+  // antigos (sem sessão) continuam com o cartão de sempre.
+  const newList = noTeams.some((s) => s && 'finished_at' in s)
+  const toSend = newList ? noTeams.filter((s) => !s.finished_at)
+    .sort((a, b) => `${a.scheduled_date}${a.scheduled_time}`.localeCompare(`${b.scheduled_date}${b.scheduled_time}`)) : []
+  const sentList = newList ? noTeams.filter((s) => s.finished_at)
+    .sort((a, b) => `${b.scheduled_date}${b.scheduled_time}`.localeCompare(`${a.scheduled_date}${a.scheduled_time}`)) : []
+  const legacyUpcoming = upcoming.filter((g) => !g.isSession)
+  const legacyFinished = finishedGroups.filter((g) => !g.isSession)
+  const sectionTitle = 'mb-2.5 font-mono text-[11px] font-extrabold uppercase tracking-widest text-muted'
   const noTeamsLine = (s) => (s.pending > 0
     ? t('friends.waiting_answers', { count: s.pending })
     : s.is_creator ? t('friends.form_teams_now') : t('friends.waiting_teams'))
@@ -305,7 +318,21 @@ export default function PrivateMatches() {
       {/* Convites por responder (#342). */}
       <FriendSessionsList sessions={false} />
 
-      {(noTeams.length > 0 || upcoming.length > 0) && (
+      {newList && (toSend.length > 0 || legacyUpcoming.length > 0) && (
+        <div>
+          <h3 className={sectionTitle}>{t('friends.list_to_send')}</h3>
+          <div className="space-y-2.5">
+            {toSend.map((s) => <FriendSessionCard key={s.match_id} s={s} fallbackLine={noTeamsLine(s)} />)}
+            {legacyUpcoming.map((g) => (
+              <FriendGameRow key={g.id} id={g.id} to={null} facts={g.facts}
+                line={g.facts.ranked ? t('agenda.friends_ranked') : t('gamedetails.badge_friendly')}
+                creatorName={profile?.name || ''} onChanged={reload} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!newList && (noTeams.length > 0 || upcoming.length > 0) && (
         <div>
           <h3 className="text-lg text-ink-900 mb-3">{t('friends.upcoming')}</h3>
           <div className="space-y-2.5">
@@ -452,6 +479,21 @@ export default function PrivateMatches() {
         cancelLabel={t('dialogs.delete_game_keep')} confirmLabel={t('dialogs.delete_game_confirm')}
         onConfirm={deleteNow} onClose={() => setDeleting(null)} errorOf={(err) => describeError(t, err, 'privatematches.error_delete')} />
 
+      {newList ? (
+        <div>
+          <h3 className={sectionTitle}>{t('friends.list_history')}</h3>
+          {sentList.length === 0 && legacyFinished.length === 0 ? (
+            <EmptyState icon={Trophy} title={t('privatematches.empty_title')} subtitle={t('privatematches.empty_subtitle')} />
+          ) : (
+            <div className="space-y-2.5">
+              {sentList.map((s) => <FriendSessionCard key={s.match_id} s={s} />)}
+              {legacyFinished.map((g) => (
+                <FriendGameRow key={g.id} id={g.id} to={null} facts={g.facts} creatorName={profile?.name || ''} onChanged={reload} />
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
       <div>
         <h3 className="text-lg text-ink-900 mb-3">{t('privatematches.history')}</h3>
         {finishedGroups.length === 0 ? (
@@ -469,6 +511,7 @@ export default function PrivateMatches() {
           </div>
         )}
       </div>
+      )}
     </div>
   )
 }

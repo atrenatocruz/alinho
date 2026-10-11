@@ -6,6 +6,7 @@ import {
   eventsToPins, eventFromLesson,
   eventFromTournament,
   eventFromTournamentMatch,
+  eventsFromPrivateMatches,
   EVENT_KINDS,
 } from './agenda'
 
@@ -319,5 +320,20 @@ describe('torneios na agenda (Trello #363)', () => {
 
   it('o filtro Tipo passa a conhecer os torneios', () => {
     expect(EVENT_KINDS).toContain('tournament')
+  })
+})
+
+describe('eventsFromPrivateMatches — «terminado» de um jogo entre amigos', () => {
+  const row = (id, extra = {}) => ({ id, session_id: 'root', scheduled_date: '2026-10-09', scheduled_time: '16:00:00', game_number: 1, team_a_player1_id: 'me', team_a_player1_status: 'accepted_all', ...extra })
+  it('com o session_finished_at, só está terminado depois de enviado', () => {
+    const scored = { score_a: 6, score_b: 4 }
+    const [open] = eventsFromPrivateMatches([row('root', { ...scored, session_finished_at: null })], 'me')
+    expect(open.finished).toBe(false)
+    const [sent] = eventsFromPrivateMatches([row('root', { ...scored, session_finished_at: '2026-10-09T18:00:00Z' })], 'me')
+    expect(sent.finished).toBe(true)
+  })
+  it('sem o campo (antes da base nova), conta pelas rondas marcadas', () => {
+    const [ev] = eventsFromPrivateMatches([row('root', { score_a: 6, score_b: 4 })], 'me')
+    expect(ev.finished).toBe(true)
   })
 })
