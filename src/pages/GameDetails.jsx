@@ -119,13 +119,16 @@ export default function GameDetails() {
   const isAdmin = gameMembership?.is_admin ?? false
   // Preço especial (7 out): o preço de cada inscrito, só para quem organiza.
   const specialPriceText = useSpecialPriceLine(game?.origin === 'open_slot' ? 'open_slot' : 'mix', game?.price_per_player > 0 ? game.id : null)
-  const priceRoster = usePriceRoster(isAdmin && game?.price_per_player > 0 ? (game.origin === 'open_slot' ? 'open_slot' : 'mix') : null, game?.id, game?.participants?.length)
   const [scorekeeperIds, setScorekeeperIds] = useState([])
   const [scorekeeperBusy, setScorekeeperBusy] = useState(null)
   const isScorekeeper = scorekeeperIds.includes(user.id)
   const gameOrganizationId = game?.organization_id ?? null
   const [participants, setParticipants] = useState([])
   const [waitlist, setWaitlist] = useState([])
+  // Volta a pedir sempre que a lista de inscritos muda (QA, 10 out: depois de
+  // «Adicionar jogador» as etiquetas só apareciam ao recarregar).
+  const rosterKey = [...participants, ...waitlist].map((p) => `${p.id}:${p.status}`).join(',')
+  const priceRoster = usePriceRoster(isAdmin && game?.price_per_player > 0 ? (game.origin === 'open_slot' ? 'open_slot' : 'mix') : null, game?.id, rosterKey)
   // Aprovar quem entra pela app (SPEC 2026-10-02-mix-aprovar-quem-entra):
   // os pedidos por decidir, o estado do meu pedido e a pergunta do recusar.
   const [requests, setRequests] = useState([])

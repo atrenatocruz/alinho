@@ -33,7 +33,7 @@ const daysAgo = (n, h) => { const d = new Date(); d.setDate(d.getDate() - n); d.
 export const PLAYED_EVENTS = () => ({
   total: 5,
   rows: [
-    { kind: 'mix', id: 'fake-game-1', title: 'Padel domingueiro', date: daysAgo(1, 10), organization_id: 'o-smash', org_name: 'Clube Exemplo', org_kind: 'club', org_logo: null, players_count: 8, i_played: true, my_points: 12 },
+    { kind: 'mix', id: 'fake-game-1', title: 'Padel domingueiro', date: daysAgo(1, 10), organization_id: 'o-smash', org_name: 'Clube Exemplo', org_kind: 'club', org_logo: null, players_count: 8, i_played: true, my_points: 12, i_won: true },
     { kind: 'tournament', id: 't-1', slug: 'open-de-teste', title: 'Open de Teste', date: daysAgo(2, 23), organization_id: 'o-smash', org_name: 'Clube Exemplo', org_kind: 'club', org_logo: null, entries_count: 24, i_played: false, my_points: null },
     { kind: 'mix', id: 'fake-game-1', title: 'Mix de sábado', date: daysAgo(2, 18), organization_id: 'o-smash', org_name: 'Clube Exemplo', org_kind: 'club', org_logo: null, players_count: 16, i_played: false, my_points: null },
     // Um jogo em aberto já jogado (#508): vem como 'mix' com o origin.
