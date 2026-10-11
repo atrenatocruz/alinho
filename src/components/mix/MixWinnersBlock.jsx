@@ -17,8 +17,10 @@ export default function MixWinnersBlock({ winner, rows, note = null, extra = nul
         <div className="mt-3 border-t border-white/10">
           {rows.map((r, i) => (
             <div key={`${r.place}-${i}`} className="flex items-center justify-between gap-3 border-b border-white/10 py-2 last:border-0">
-              <p className={`min-w-0 truncate text-sm ${r.mine ? 'font-extrabold text-lime-400' : 'text-white'}`}>{r.place}.º {r.name}</p>
-              <span className={`shrink-0 text-sm font-extrabold ${r.place === 1 ? 'text-lime-400' : 'text-white'}`}>{r.short}</span>
+              {/* Sem lugar (jogo em aberto, um jogo só): só as duplas, a
+                  vencedora a lima (UX, 11 out). */}
+              <p className={`min-w-0 truncate text-sm ${r.mine ? 'font-extrabold text-lime-400' : 'text-white'}`}>{r.place != null ? `${r.place}.º ` : ''}{r.name}</p>
+              <span className={`shrink-0 text-sm font-extrabold ${(r.top ?? r.place === 1) ? 'text-lime-400' : 'text-white'}`}>{r.short}</span>
             </div>
           ))}
         </div>

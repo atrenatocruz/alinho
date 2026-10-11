@@ -34,6 +34,7 @@ import AddPlayerSheet from '../components/mix/AddPlayerSheet'
 import AddScorekeeperSheet from '../components/mix/AddScorekeeperSheet'
 import SwapPlayerSheet from '../components/mix/SwapPlayerSheet'
 import MixWinnersBlock from '../components/mix/MixWinnersBlock'
+import { openGameWinners } from '../lib/openGameWinners'
 import TournamentShareFlow from '../components/tournament/TournamentShareFlow'
 import { bakeCircle } from '../components/tournament/TournamentShareCard'
 import { duplasWinners, americanoWinners } from '../lib/mixWinners'
@@ -268,6 +269,19 @@ export default function GameDetails() {
   const [removeSlotAsk, setRemoveSlotAsk] = useState(null) // { person, duplaNumber } | null
   // Partilhar os vencedores (#622): o logótipo do clube já cortado em círculo.
   const [winnersShareOpen, setWinnersShareOpen] = useState(false)
+  // As vitórias gerais de quem vê, as do perfil (get_player_profile): a
+  // pastilha do cartão do jogo em aberto (#622, UX 11 out).
+  const [overallRecord, setOverallRecord] = useState(null)
+  const wantsOverall = game?.status === 'finished' && game?.origin === 'open_slot' && !!user?.id
+  useEffect(() => {
+    if (!wantsOverall) return undefined
+    let cancelled = false
+    supabase.rpc('get_player_profile', { p_user_id: user.id }).then(({ data }) => {
+      const row = data?.[0]
+      if (!cancelled && row) setOverallRecord({ won: row.game_wins || 0, played: (row.game_wins || 0) + (row.game_losses || 0) })
+    })
+    return () => { cancelled = true }
+  }, [wantsOverall, user?.id])
   const [orgLogoBaked, setOrgLogoBaked] = useState(null)
   const orgLogoUrl = gameMembership?.organization?.group_logo_url || null
   useEffect(() => {
@@ -2818,12 +2832,24 @@ export default function GameDetails() {
     name: gameMembership.organization.name,
     logo: orgLogoBaked,
     initials: (gameMembership.organization.name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase(),
-    sub: [game?.title, isAmericano ? t('mixwinners.sub_americano') : null].filter(Boolean).join(' · '),
+    // Jogo em aberto (#622): «Jogo em aberto · 19:30».
+    sub: game && isOpenGame(game)
+      ? [t('gerirclube.event_label_open'), hhmm(game.date, i18n.language)].join(' · ')
+      : [game?.title, isAmericano ? t('mixwinners.sub_americano') : null].filter(Boolean).join(' · '),
   } : null
   const winnersInfo = (() => {
     if (game?.status !== 'finished') return null
     const myStats = statsByUser[user?.id]
     const record = myStats ? { won: myStats.matches_won || 0, played: myStats.matches_played || 0 } : null
+    // Jogo em aberto (#622, parte do Dev 1): «Ganharam», com o resultado do
+    // jogo que decidiu e a outra dupla apagada.
+    if (isOpenGame(game) && game.winner_team_id) {
+      const winner = teamById[game.winner_team_id]
+      if (!winner) return null
+      const decided = [...matches].reverse().find((m) => m.winner_team_id && (m.team_a_id === winner.id || m.team_b_id === winner.id))
+      const other = decided ? teamById[decided.team_a_id === winner.id ? decided.team_b_id : decided.team_a_id] : null
+      return openGameWinners({ winner, other, match: decided, myId: user?.id, record: overallRecord, game, org: winnersOrg, t, lang: i18n.language })
+    }
     if (game.winner_team_id) {
       const winnerTeam = teamById[game.winner_team_id]
       if (!winnerTeam) return null
