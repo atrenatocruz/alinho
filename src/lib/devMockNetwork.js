@@ -149,7 +149,9 @@ const RPC_MOCKS = {
       game_wins: 24,
       game_losses: 16,
       mix_wins: 3,
-      activity_visibility: 'public',
+      // localStorage.mockActivityFriends = 'true': atividade só para amigos
+      // (os confrontos diretos veem-se na mesma, 10 out).
+      activity_visibility: localStorage.getItem('mockActivityFriends') === 'true' ? 'friends' : 'public',
       clubs_visibility: 'public',
       my_profile: false,
       is_mutual_follow: false,
@@ -1374,6 +1376,11 @@ const TABLE_MOCKS = {
       data: { game_title: 'Mix de Sábado', game_date: tomorrow8pm.toISOString(), partner_name: 'Rui Oliveira Gomes', actor_name: 'Marta Costa' } },
     { id: 'n3', kind: 'mix_removed', game_id: 'fake-game-1', created_at: new Date().toISOString(),
       data: { game_title: 'Mix de Terça', game_date: tomorrow8pm.toISOString() } },
+    // Tirado por quem organiza e trocado por outra pessoa (8 out): o sino diz quem tirou.
+    { id: 'n5', kind: 'mix_removed', game_id: 'fake-game-1', created_at: new Date().toISOString(),
+      data: { game_title: 'Mix de Quarta', game_date: tomorrow8pm.toISOString(), actor_name: 'Marta Costa' } },
+    { id: 'n6', kind: 'mix_swapped_out', game_id: 'fake-game-1', created_at: new Date().toISOString(),
+      data: { game_title: 'Mix de Sexta', game_date: tomorrow8pm.toISOString(), actor_name: 'Marta Costa' } },
   ] : localStorage.getItem('mockNotices') === 'requests' ? [
     // Aprovar quem entra (2 out): as três respostas e o pedido a quem organiza.
     { id: 'nr1', kind: 'mix_request_accepted', game_id: 'fake-game-1', created_at: new Date().toISOString(),

@@ -16,19 +16,19 @@ const t = (key, o = {}) => {
 
 describe('preço especial: textos', () => {
   it('euros redondos sem casas, os outros com vírgula', () => {
-    expect(eurosText(15)).toBe('15 €')
-    expect(eurosText('7.5')).toBe('7,50 €')
+    expect(eurosText(15)).toBe('15 €')
+    expect(eurosText('7.5')).toBe('7,50 €')
     expect(priceText(t, 0)).toBe('Grátis')
   })
   it('quem tem o preço especial vê o seu e o dos outros', () => {
     expect(specialPriceLine(t, { normal_price: 15, my_price: 0, is_special: true, members_price: 0 }))
-      .toBe('Grátis para ti · 15 € para os outros')
+      .toBe('Grátis para ti · 15 € para os outros')
     expect(specialPriceLine(t, { normal_price: 15, my_price: 5, is_special: true, members_price: null }))
-      .toBe('5 € para ti · 15 € para os outros')
+      .toBe('5 € para ti · 15 € para os outros')
   })
   it('de fora, com «membros», vê o preço dos membros', () => {
     expect(specialPriceLine(t, { normal_price: 15, my_price: 15, is_special: false, members_price: 0 }))
-      .toBe('15 € / jogador · Grátis para membros')
+      .toBe('15 € / jogador · Grátis para membros')
   })
   it('de fora, com pessoas escolhidas, só o preço normal (a linha de hoje)', () => {
     expect(specialPriceLine(t, { normal_price: 15, my_price: 15, is_special: false, members_price: null })).toBe(null)
@@ -42,8 +42,8 @@ describe('preço especial: textos', () => {
 describe('preço especial: lista de inscritos', () => {
   const roster = new Map([['a', { is_special: true }], ['b', { is_special: true }], ['c', { is_special: false }]])
   it('soma quem tem especial e quem paga o normal (convidados contam como normal)', () => {
-    expect(rosterSummary(t, roster, ['a', 'b', 'c', 'guest-1'], 15)).toBe('2 com preço especial · 2 pagam 15 €')
-    expect(rosterSummary(t, roster, ['a', 'c'], 15)).toBe('1 com preço especial · 1 paga 15 €')
+    expect(rosterSummary(t, roster, ['a', 'b', 'c', 'guest-1'], 15)).toBe('2 com preço especial · 2 pagam 15 €')
+    expect(rosterSummary(t, roster, ['a', 'c'], 15)).toBe('1 com preço especial · 1 paga 15 €')
     expect(rosterSummary(t, roster, ['a', 'b'], 15)).toBe('Todos com preço especial')
   })
   it('sem ninguém com especial, ou sem a função, não há linha', () => {
