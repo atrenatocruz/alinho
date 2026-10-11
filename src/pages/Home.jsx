@@ -59,7 +59,6 @@ import {
    ════════════════════════════════════════════════════════════════════════ */
 
 const FILTERS_KEY = 'home.agenda.filters'
-const SEARCH_KEY = 'home.agenda.search'
 const VIEW_MODE_KEY = 'home.agenda.view'
 let homeShownBefore = false
 
@@ -133,15 +132,14 @@ export default function Home() {
   // limpa e volta à Home tal como estava.
   // `all`: «Procurar em tudo» só dentro da pesquisa — os filtros da Home
   // ficam como estavam para quando se fecha (designer, 25 set).
-  const [searchState, setSearchState] = useState(() => readSession(SEARCH_KEY, { open: false, q: '', all: false }))
+  // A pesquisa abre sempre fechada (UX, 10 out): o que se procurou fica só
+  // nas «Pesquisas recentes».
+  const [searchState, setSearchState] = useState({ open: false, q: '', all: false })
   const search = searchState.q || ''
   const searchOpen = !!searchState.open
   const setSearch = (q) => setSearchState((st) => ({ ...st, q }))
   const openSearch = () => setSearchState({ open: true, q: '', all: false })
   const closeSearch = () => setSearchState({ open: false, q: '', all: false })
-  useEffect(() => {
-    try { sessionStorage.setItem(SEARCH_KEY, JSON.stringify(searchState)) } catch { /* sem sessão, sem memória */ }
-  }, [searchState])
   // O dia que está no topo da lista — é o que a data do cabeçalho mostra.
   const [visibleDay, setVisibleDay] = useState(() => toDayKey(new Date()))
   // Dia de torneio: quem marca resultados tem o botão em «Hoje» (#505).

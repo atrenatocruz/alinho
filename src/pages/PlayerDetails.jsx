@@ -591,14 +591,13 @@ export default function PlayerDetails() {
       <div>
         <h3 className="text-lg text-ink-900 mb-3">{t('playerdetails.head_to_head')}</h3>
 
+        {/* Os confrontos diretos veem-se sempre: são os MEUS jogos contra esta
+            pessoa, mesmo com a atividade dela só para amigos (Francisco,
+            10 out; migration_confrontos_diretos_sempre.sql, Dev 3). O
+            cadeado fica só no resto da atividade. */}
         {h2hLoading ? (
           <div className="flex items-center justify-center py-10">
             <div className="animate-spin rounded-full h-8 w-8 border-[3px] border-ink-50 border-t-ink-700"></div>
-          </div>
-        ) : activityHidden ? (
-          <div className="card text-center py-6 text-muted">
-            <Lock size={18} className="mx-auto mb-1.5" />
-            <p className="text-sm">{t('playerdetails.activity_private')}</p>
           </div>
         ) : !h2h || h2h.matches_played === 0 ? (
           <EmptyState

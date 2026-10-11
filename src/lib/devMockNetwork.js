@@ -149,7 +149,9 @@ const RPC_MOCKS = {
       game_wins: 24,
       game_losses: 16,
       mix_wins: 3,
-      activity_visibility: 'public',
+      // localStorage.mockActivityFriends = 'true': atividade só para amigos
+      // (os confrontos diretos veem-se na mesma, 10 out).
+      activity_visibility: localStorage.getItem('mockActivityFriends') === 'true' ? 'friends' : 'public',
       clubs_visibility: 'public',
       my_profile: false,
       is_mutual_follow: false,
