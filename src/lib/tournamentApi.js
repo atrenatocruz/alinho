@@ -456,3 +456,36 @@ export async function getTournamentOrgHint(key) {
   // Visível sem endereço não leva a lado nenhum: trata-se como privado.
   return hint && hint.visible && !hint.slug ? { ...hint, visible: false, name: null } : hint
 }
+
+// T-shirts do torneio (SPEC 2026-10-08-torneio-t-shirts; dados do Dev 3).
+// O tamanho é 'XS'…'XXL', 'none' («Não quero») ou null (por escolher).
+
+/** O próprio jogador muda o seu tamanho, até as inscrições fecharem. Com
+ *  `forGuest`, quem inscreveu muda o do parceiro sem conta. */
+export async function setMyTshirtSize(entryId, size, { forGuest = false } = {}) {
+  const { error } = await supabase.rpc('set_my_tournament_tshirt', { p_entry_id: entryId, p_size: size, ...(forGuest ? { p_for_guest: true } : {}) })
+  if (error) throw error
+}
+
+/** Quem organiza muda o tamanho de qualquer jogador, mesmo depois do prazo.
+ *  `slot` 1 ou 2: o jogador da inscrição. */
+export async function adminSetTshirtSize(entryId, slot, size) {
+  const { error } = await supabase.rpc('admin_set_tournament_tshirt', { p_entry_id: entryId, p_slot: slot, p_size: size })
+  if (error) throw error
+}
+
+/** A contagem do torneio todo, só para quem organiza:
+ *  { sizes: [{ size, count }], requested, declined, pending }. Sem a função
+ *  (migração por correr), null — o cartão não aparece. */
+export async function getTshirtCounts(tournamentId) {
+  const { data, error } = await supabase.rpc('tournament_tshirt_counts', { p_tournament_id: tournamentId })
+  if (error) { if (error.code === 'PGRST202') return null; throw error }
+  return Array.isArray(data) ? data[0] || null : data || null
+}
+
+/** Uma linha por pessoa: [{ entry_id, slot, name, category_code, size }]. */
+export async function getTshirtPeople(tournamentId) {
+  const { data, error } = await supabase.rpc('tournament_tshirt_people', { p_tournament_id: tournamentId })
+  if (error) { if (error.code === 'PGRST202') return []; throw error }
+  return data || []
+}

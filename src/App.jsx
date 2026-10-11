@@ -241,10 +241,9 @@ const Guard = ({ require, showSplash, children }) => {
   // Consent gate (Trello #154): brand-new accounts (email/password or
   // Google) must accept the Privacy Policy/Terms once before reaching the
   // app — checked BEFORE rating-onboarding so no profile data (like a
-  // self-selected rating) gets written before consent is on file. Existing
-  // pilot accounts are grandfathered — the migration backfills
-  // consent_accepted_at = NOW() for every profile that existed before this
-  // shipped, so only genuinely new signups see this screen.
+  // self-selected rating) gets written before consent is on file. Desde o
+  // #360 (10 out) também as contas que já existiam passam por aqui uma vez:
+  // a migração do Dev 3 deixa de as dar como aceites.
   if (user && profile && profile.consent_accepted_at === null) {
     return <ConsentGate />
   }

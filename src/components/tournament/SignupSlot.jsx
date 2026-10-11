@@ -18,6 +18,8 @@ import {
 import { signUpBackLink } from '../../lib/loginLinks'
 import { signupErrorMessage } from '../../lib/tournamentError'
 import { categoryGenderQuestion } from './genderCheck'
+import { TshirtPicker, tshirtOn, tshirtPriceLabel, NO_TSHIRT, shirtRulesOf } from './tshirt'
+import { setMyTshirtSize } from '../../lib/tournamentApi'
 
 /* O que fica por cima de tudo na página do torneio (Trello #362):
    inscrever a minha dupla, em que ponto está a minha inscrição, e o
@@ -171,10 +173,31 @@ export default function SignupSlot({ tournament, categories, category, my: first
     else doSignUp(choice)
   }
 
+  // A t-shirt de quem aceita (SPEC t-shirts, ponto 3): «Aceitar» só fica
+  // ativo depois de escolher, «Não quero» incluído.
+  const shirts = tshirtOn(shirtRulesOf(tournament))
+  const [inviteShirt, setInviteShirt] = useState({})
+  // «👕 A tua t-shirt: L · Mudar» (SPEC t-shirts, ponto 6).
+  // A segunda linha é a do convidado sem conta que eu inscrevi (UX, 8 out):
+  // a folha promete «Podes mudar os dois». shirtSheet: 'mine' | 'guest'.
+  const [shirtSheet, setShirtSheet] = useState(null)
+  const [shirtError, setShirtError] = useState('')
+  const changeShirt = async (size) => {
+    setBusy(true); setShirtError('')
+    try {
+      await setMyTshirtSize(my.entry_id, size, { forGuest: shirtSheet === 'guest' })
+      setShirtSheet(null)
+      window.dispatchEvent(new CustomEvent('tournament:reload'))
+    } catch (err) { console.error('Error changing t-shirt:', err); setShirtError(signupErrorMessage(t, err)) }
+    finally { setBusy(false) }
+  }
+  const deadlineDay = tournament.entries_deadline
+    ? new Intl.DateTimeFormat(i18n.language, { day: 'numeric', month: 'short', timeZone: 'Europe/Lisbon' }).format(new Date(tournament.entries_deadline)).replace('.', '').replace(' de ', ' ')
+    : ''
   const answer = async (entryId, accept) => {
     setBusy(true)
     try {
-      await respondToInvite(entryId, accept)
+      await respondToInvite(entryId, accept, shirts ? { tshirtSize: inviteShirt[entryId] } : {})
       reloadInvites()
       window.dispatchEvent(new CustomEvent('tournament:reload'))
     } catch (err) { console.error('Error answering tournament invite:', err); say(err) }
@@ -212,16 +235,61 @@ export default function SignupSlot({ tournament, categories, category, my: first
             {[inv.category_code, inv.respond_by ? t('tsignup.invite_deadline', { date: new Date(inv.respond_by).toLocaleDateString('pt-PT', { day: 'numeric', month: 'short' }) }) : null]
               .filter(Boolean).join(' · ')}
           </p>
-          <div className="flex gap-2">
-            <PrimaryButton onClick={() => answer(inv.entry_id, true)} disabled={busy} className="flex-1">
+          {shirts && (
+            <div>
+              <p className="mb-1.5 text-sm font-extrabold text-ink-900">{t('tshirt.mine_label', { price: tshirtPriceLabel(shirtRulesOf(tournament), t, i18n.language) })}</p>
+              <TshirtPicker rules={shirtRulesOf(tournament)} value={inviteShirt[inv.entry_id] || null}
+                onChange={(v) => setInviteShirt((m) => ({ ...m, [inv.entry_id]: v }))} label={t('tshirt.mine_label', { price: '' })} />
+            </div>
+          )}
+          {/* Empilhados, a ação em cima (regra de 6 out): nunca lado a lado. */}
+          <div className="space-y-2">
+            <PrimaryButton onClick={() => answer(inv.entry_id, true)} disabled={busy || (shirts && !inviteShirt[inv.entry_id])} className="w-full">
               {t('tsignup.invite_accept')}
             </PrimaryButton>
-            <PrimaryButton variant="ghost" onClick={() => answer(inv.entry_id, false)} disabled={busy} className="flex-1">
+            <PrimaryButton variant="ghost" onClick={() => answer(inv.entry_id, false)} disabled={busy} className="w-full">
               {t('tsignup.invite_decline')}
             </PrimaryButton>
           </div>
         </div>
       ))}
+
+      {/* A minha t-shirt, por cima da inscrição (SPEC t-shirts, ponto 6), e
+          a do convidado sem conta que eu inscrevi. */}
+      {shirts && my && (
+        <div className="card space-y-2">
+          {[
+            { key: 'mine', label: t('tshirt.my_line'), size: my.tshirt },
+            ...(my.guest_name ? [{ key: 'guest', label: t('tshirt.guest_line', { name: String(my.guest_name).split(/\s+/)[0] }), size: my.guest_tshirt }] : []),
+          ].map((row) => (
+            <div key={row.key} className="flex items-start gap-3">
+              <span aria-hidden="true" className="text-lg leading-6">👕</span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm text-ink-900">
+                  {row.label} <b>{row.size === NO_TSHIRT ? t('tshirt.no_thanks') : row.size || t('tshirt.not_chosen')}</b>
+                </p>
+                <p className="text-xs text-muted">{open ? t('tshirt.change_until_short', { date: deadlineDay }) : t('tshirt.closed_line', { date: deadlineDay })}</p>
+              </div>
+              {open && (
+                <button type="button" onClick={() => setShirtSheet(row.key)} className="-my-2 inline-flex min-h-[44px] shrink-0 items-center text-sm font-extrabold text-ink-900 underline underline-offset-2">
+                  {t('tshirt.change')}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {shirtSheet && my && (
+        <Sheet title={shirtSheet === 'guest'
+          ? t('tshirt.guest_label', { name: String(my.guest_name || '').split(/\s+/)[0], price: tshirtPriceLabel(shirtRulesOf(tournament), t, i18n.language) })
+          : t('tshirt.mine_label', { price: tshirtPriceLabel(shirtRulesOf(tournament), t, i18n.language) })} onClose={() => setShirtSheet(null)}>
+          <div className="space-y-3">
+            <TshirtPicker rules={shirtRulesOf(tournament)} value={(shirtSheet === 'guest' ? my.guest_tshirt : my.tshirt) || null} onChange={changeShirt} disabled={busy} label={t('tshirt.mine_label', { price: '' })} />
+            <p className="text-xs text-muted">{t('tshirt.change_until', { date: deadlineDay })}</p>
+            {shirtError && <p className="text-sm font-extrabold text-danger">{shirtError}</p>}
+          </div>
+        </Sheet>
+      )}
 
       {/* A minha inscrição, ou o convite para me inscrever. O nome da
           dupla em destaque, e «Mudar o nome» até as inscrições fecharem

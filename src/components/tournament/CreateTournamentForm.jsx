@@ -11,6 +11,7 @@ import { TIEBREAK_RULES } from './tieBreak'
 import { categoryCode, categoryName, categoryOutsideDay, stepProblem, saveProblem, totalCourtHours, totalSlots, pricePerPlayer } from '../../lib/tournaments'
 import { localInputToIso, isoToLocalInput } from '../../lib/tournamentDay'
 import { FieldLabel, MonoLabel } from './TournamentBits'
+import { TshirtField } from './tshirt'
 import { removeTournamentPoster, uploadTournamentPoster } from '../../lib/tournamentPosterStorage'
 import { describeError } from '../../lib/errors'
 import StepPage from '../steps/StepPage'
@@ -568,6 +569,13 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
           aos inscritos»; AUDITORIA editar-tem-tudo, ponto 2): saem do cadeado
           das categorias. O update_tournament já os grava; o aviso a cada
           dupla da categoria sai da base de dados (Dev 3). */}
+      {/* Com inscritos, a t-shirt muda-se enquanto as inscrições estiverem
+          abertas (SPEC t-shirts, ponto 1). */}
+      {locked && ['rascunho', 'inscricoes'].includes(initial?.tournament?.status) && (
+        <div className="card">
+          <TshirtField rules={draft.rules} onChange={(v) => setRule('tshirt', v)} FieldLabel={FieldLabel} />
+        </div>
+      )}
       {locked && draft.categories.length > 0 && (
         <div className="card space-y-3">
           <div>
@@ -659,6 +667,9 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
               label={t('tournament.create.max_categories')}
               options={[1, 2, 3].map((n) => ({ value: n, label: String(n) }))} />
           </Field>
+
+          {/* T-shirt do torneio inteiro, não da categoria (SPEC t-shirts, 8 out). */}
+          <TshirtField rules={draft.rules} onChange={(v) => setRule('tshirt', v)} FieldLabel={FieldLabel} />
 
           {/* Só com dias e campos: antes disso a conta dava «0 h de campo» (QA,
               26 set). É uma explicação, por isso texto normal. */}

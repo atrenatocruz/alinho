@@ -32,6 +32,8 @@ const euroWords = (v, locale) => Number(v).toLocaleString(locale, {
    conta entra pelo nome e recebe um link. Quem grava é a página
    (onConfirm). */
 
+import { TshirtPicker, tshirtOn, tshirtPriceLabel, pairTotalLine, shirtRulesOf } from './tshirt'
+
 export default function TournamentSignupSheet({ tournament, categories: allCategories, category: pageCategory, categoriesLeft, takenIds = [], busy, error, onConfirm, onClose }) {
   const { t, i18n } = useTranslation()
   const { user, profile } = useAuth()
@@ -63,6 +65,11 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
   const [email, setEmail] = useState('')
   const [teamName, setTeamName] = useState('')
   const [touched, setTouched] = useState(false)
+  // A t-shirt de cada um (SPEC t-shirts, ponto 2): «Não quero» também é
+  // escolha; sem escolha não se envia. A do convidado sem conta escolhe-a
+  // quem inscreve.
+  const [myShirt, setMyShirt] = useState(null)
+  const [guestShirt, setGuestShirt] = useState(null)
 
   useEffect(() => {
     if (!tournament?.organization_id) return
@@ -111,7 +118,9 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
   const chosen = categories.find((c) => c.id === categoryId)
   const nameError = partnerNameError(name)
   const emailError = partnerEmailError(email)
-  const ready = categoryId && (
+  const shirts = tshirtOn(shirtRulesOf(tournament))
+  const shirtsReady = !shirts || (!!myShirt && (mode !== 'named' || !!guestShirt))
+  const ready = categoryId && shirtsReady && (
     mode === 'alone' ? true : mode === 'partner' ? !!partnerId : !nameError && !emailError
   )
 
@@ -126,6 +135,7 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
       guestName: mode === 'named' ? name.trim() : null,
       guestEmail: mode === 'named' ? email.trim() : null,
       teamName: teamName.trim() || null,
+      ...(shirts ? { tshirtSize: myShirt, partnerTshirtSize: mode === 'named' ? guestShirt : null } : {}),
     })
   }
 
@@ -257,11 +267,39 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
           />
         </div>
 
+        {/* A t-shirt do torneio (SPEC t-shirts, ponto 2). */}
+        {shirts && (
+          <div className="space-y-3">
+            <div>
+              <FieldLabel>{t('tshirt.mine_label', { price: tshirtPriceLabel(shirtRulesOf(tournament), t, i18n.language) })}</FieldLabel>
+              <TshirtPicker rules={shirtRulesOf(tournament)} value={myShirt} onChange={setMyShirt} label={t('tshirt.mine_label', { price: '' })} />
+            </div>
+            {mode === 'named' && name.trim() && (
+              <div>
+                <FieldLabel>{t('tshirt.guest_label', { name: name.trim().split(/\s+/)[0], price: tshirtPriceLabel(shirtRulesOf(tournament), t, i18n.language) })}</FieldLabel>
+                <TshirtPicker rules={shirtRulesOf(tournament)} value={guestShirt} onChange={setGuestShirt} label={t('tshirt.guest_label', { name: name.trim(), price: '' })} />
+              </div>
+            )}
+            <div className="text-xs text-ink-500">
+              {mode === 'partner' && partnerId && (
+                <p>{t('tshirt.partner_chooses', { name: (members.find((m) => m.id === partnerId) || found.find((m) => m.id === partnerId))?.name?.split(/\s+/)[0] || '' })}</p>
+              )}
+              {tournament.entries_deadline && (
+                <p>{t(mode === 'named' ? 'tshirt.change_until_both' : 'tshirt.change_until', { date: new Intl.DateTimeFormat(i18n.language, { day: 'numeric', month: 'short', timeZone: 'Europe/Lisbon' }).format(new Date(tournament.entries_deadline)).replace('.', '').replace(' de ', ' ') })}</p>
+              )}
+            </div>
+            {touched && !shirtsReady && <p className="text-sm text-danger font-extrabold">{t('tshirt.choose_error')}</p>}
+          </div>
+        )}
+
         {/* Pagamento — fora da app, texto do organizador */}
         <div className="rounded-ctrl bg-ink-50 px-3 py-2.5 text-sm text-ink-900 flex gap-2">
           <Euro size={16} className="mt-0.5 shrink-0 text-muted" />
           <div>
-            {price != null && <p className="font-extrabold">{t('tsignup.price', { price: euroWords(price / 100, i18n.language), each: pricePerPlayer(price / 100, i18n.language) })}</p>}
+            {/* Com t-shirts à venda pedidas, o total é da dupla (SPEC, ponto 2). */}
+            {price != null && (pairTotalLine(price / 100, shirtRulesOf(tournament), [myShirt, mode === 'named' ? guestShirt : null], t, i18n.language)
+              ? <p className="font-extrabold">{pairTotalLine(price / 100, shirtRulesOf(tournament), [myShirt, mode === 'named' ? guestShirt : null], t, i18n.language)}</p>
+              : <p className="font-extrabold">{t('tsignup.price', { price: euroWords(price / 100, i18n.language), each: pricePerPlayer(price / 100, i18n.language) })}</p>)}
             {/* Preço especial de quem se inscreve (7 out): «Grátis para ti · …». */}
             <CategorySpecialLine category={chosen} className="font-extrabold text-ok-700" />
             <p className="text-muted">{tournament.organizer_text || t('tsignup.payment_default')}</p>
