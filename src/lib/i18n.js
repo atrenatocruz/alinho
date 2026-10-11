@@ -29,4 +29,11 @@ i18n
     interpolation: { escapeValue: false }, // React already escapes
   })
 
+// O plural de Portugal: «0 seguidores», «0 duplas». Com o código «pt» o
+// browser usa a regra do Brasil, em que o zero conta como um («0 seguidor»,
+// relatório do QA de 9 out). As traduções continuam em «pt».
+const plurals = i18n.services.pluralResolver
+const baseRule = plurals.getRule.bind(plurals)
+plurals.getRule = (code, options) => baseRule(code === 'pt' ? 'pt-PT' : code, options)
+
 export default i18n

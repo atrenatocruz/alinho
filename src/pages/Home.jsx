@@ -618,6 +618,9 @@ export default function Home() {
     setVisibleDay(current || days[0]?.dayKey || today)
   }
 
+  // Os saltos feitos pela própria Home (abrir em «hoje», a cada bocado de
+  // eventos que chega) não contam como deslizar: não encolhem o topo.
+  const autoScrollAt = useRef(0)
   const scrollToDay = (dayKey) => {
     const main = scroller()
     const header = headerRef.current
@@ -625,7 +628,11 @@ export default function Home() {
     const firstUpcoming = days.find((d) => d.dayKey >= today)
     const el = target && (target === firstUpcoming && topBlockRef.current ? topBlockRef.current : dayRefs.current.get(target.dayKey))
     if (!main || !header || !el) return
-    main.scrollTop += el.getBoundingClientRect().top - header.getBoundingClientRect().bottom - 8
+    // O fundo do cabeçalho sem o «encolher» (translateY): senão cada salto
+    // dependia de o topo estar subido ou não, e os dois puxavam um pelo outro.
+    const shift = new DOMMatrixReadOnly(getComputedStyle(header).transform).m42 || 0
+    autoScrollAt.current = Date.now()
+    main.scrollTop += el.getBoundingClientRect().top - (header.getBoundingClientRect().bottom - shift) - 8
     updateVisibleDay()
   }
 
@@ -643,29 +650,36 @@ export default function Home() {
      cabeçalho não muda, por isso a lista não pula. */
   const topRowRef = useRef(null)
   const [collapsed, setCollapsed] = useState(false)
+  // Sem animações no topo até a pessoa mexer na lista: ao abrir, nada desliza.
+  const [moved, setMoved] = useState(false)
   useEffect(() => {
-    const main = scroller()
-    if (!main) return undefined
-    let last = main.scrollTop
-    // Só quando é a pessoa a deslizar: o salto da Home para o dia de hoje,
-    // ao abrir, não encolhe o topo.
+    // Ouve no documento, não no <main> do momento: ao abrir, o <main> ainda
+    // pode não ser o definitivo, e o topo ficava sem ouvir nada.
+    let last = scroller()?.scrollTop || 0
+    // Só arrastar com o dedo, a roda do rato ou as teclas contam: um toque
+    // no ecrã enquanto a Home carrega (a abrir a app instalada) não, nem os
+    // saltos da própria Home para «hoje» (bug do iPhone, 11 out: o topo subia
+    // e descia sozinho a cada salto).
     let touchedAt = 0
-    const touched = () => { touchedAt = Date.now() }
-    const onScroll = () => {
+    const touched = () => { touchedAt = Date.now(); setMoved(true) }
+    const onScroll = (e) => {
+      const main = scroller()
+      if (!main || e.target !== main) return
       const top = main.scrollTop
       const delta = top - last
       last = top
+      if (Date.now() - autoScrollAt.current < 250) return
       if (top < 40) { setCollapsed(false); return }
       if (Date.now() - touchedAt > 1200) return
       if (delta > 4) setCollapsed(true)
       else if (delta < -2) setCollapsed(false)
     }
-    const inputs = ['wheel', 'touchmove', 'pointerdown', 'keydown']
-    inputs.forEach((ev) => main.addEventListener(ev, touched, { passive: true }))
-    main.addEventListener('scroll', onScroll, { passive: true })
+    const inputs = ['wheel', 'touchmove', 'keydown']
+    inputs.forEach((ev) => window.addEventListener(ev, touched, { passive: true }))
+    document.addEventListener('scroll', onScroll, { passive: true, capture: true })
     return () => {
-      inputs.forEach((ev) => main.removeEventListener(ev, touched))
-      main.removeEventListener('scroll', onScroll)
+      inputs.forEach((ev) => window.removeEventListener(ev, touched))
+      document.removeEventListener('scroll', onScroll, { capture: true })
     }
   }, [])
   // A pesquisa abre por baixo da linha do sítio (que volta a aparecer).
@@ -982,8 +996,8 @@ export default function Home() {
       {/* Home do futuro (SPEC-1): a linha do sítio, do mapa e do sino; por
           baixo, uma barra só. O dia é a pastilha «Hoje ⌄» da barra. */}
       <div ref={headerRef} style={{ transform: `translateY(-${topRowH}px)` }}
-        className="sticky top-0 z-10 -mx-4 px-4 -mt-6 pt-4 pb-2 bg-white space-y-1.5 border-b border-line/70 transition-transform duration-200 ease-out">
-        <div ref={topRowRef} className={`flex items-center justify-between gap-2 transition-opacity duration-200 ${collapsed ? 'opacity-0 pointer-events-none' : ''}`} aria-hidden={collapsed || undefined}>
+        className={`sticky top-0 z-10 -mx-4 px-4 -mt-6 pt-4 pb-2 bg-white space-y-1.5 border-b border-line/70 ${moved ? 'transition-transform duration-200 ease-out' : ''}`}>
+        <div ref={topRowRef} className={`flex items-center justify-between gap-2 ${moved ? 'transition-opacity duration-200' : ''} ${collapsed ? 'opacity-0 pointer-events-none' : ''}`} aria-hidden={collapsed || undefined}>
           <LocationChip location={location} onOpen={() => setLocationOpen(true)} />
           <div className="flex items-center gap-1 shrink-0">
             {GOOGLE_MAPS_API_KEY && (
