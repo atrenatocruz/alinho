@@ -444,7 +444,9 @@ export default function Layout({ children }) {
     if (notice.kind === 'mix_join_request') return t('layout.mix_join_request', vars)
     if (notice.kind === 'mix_request_accepted') return t(d.status === 'waitlisted' ? 'layout.mix_request_accepted_waitlist' : 'layout.mix_request_accepted', vars)
     if (notice.kind === 'mix_request_declined') return t('layout.mix_request_declined', vars)
-    if (notice.kind === 'mix_removed') return t('layout.mix_notice_removed', vars)
+    // Tirado por quem organiza (o aviso guarda o nome dele): diz-se quem tirou,
+    // e não «Saíste» (UX, 8 out).
+    if (notice.kind === 'mix_removed') return t(d.actor_name ? 'layout.mix_notice_removed_by' : 'layout.mix_notice_removed', vars)
     if (notice.kind === 'mix_cancelled') return t('layout.mix_notice_cancelled', vars)
     if (['mix_promoted', 'mix_moved_to_waitlist', 'mix_not_filled', 'mix_cancelled_not_filled', 'mix_slot_open', 'mix_swapped_out'].includes(notice.kind)) {
       return t(`layout.${notice.kind}`, vars)

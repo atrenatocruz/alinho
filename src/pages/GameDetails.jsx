@@ -4600,6 +4600,18 @@ export default function GameDetails() {
           // (migration_mix_trocar_sem_sortear.sql); as outras duplas ficam.
           const { error } = await supabase.from('participants').delete().eq('id', removeSlotAsk.person.rowId)
           if (error) throw error
+          // O aviso a quem foi tirado (QA e UX, 8 out): «Quem organiza tirou-te
+          // do <mix>…», no sino e no WhatsApp (notify_mix_changes guarda quem
+          // tirou). Quem não tem conta não tem onde o receber. Um aviso que
+          // falha não desfaz a mudança — fica só no log.
+          const out = removeSlotAsk.person
+          if (out?.id && !out.is_guest) {
+            try {
+              await notifyMixChanges(id, [{ user_id: out.id, kind: 'mix_removed' }])
+            } catch (notifyError) {
+              console.error('Error notifying the removed player:', notifyError)
+            }
+          }
           await loadGameDetails()
         }}
         onClose={() => setRemoveSlotAsk(null)}

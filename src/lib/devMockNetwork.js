@@ -1374,6 +1374,11 @@ const TABLE_MOCKS = {
       data: { game_title: 'Mix de Sábado', game_date: tomorrow8pm.toISOString(), partner_name: 'Rui Oliveira Gomes', actor_name: 'Marta Costa' } },
     { id: 'n3', kind: 'mix_removed', game_id: 'fake-game-1', created_at: new Date().toISOString(),
       data: { game_title: 'Mix de Terça', game_date: tomorrow8pm.toISOString() } },
+    // Tirado por quem organiza e trocado por outra pessoa (8 out): o sino diz quem tirou.
+    { id: 'n5', kind: 'mix_removed', game_id: 'fake-game-1', created_at: new Date().toISOString(),
+      data: { game_title: 'Mix de Quarta', game_date: tomorrow8pm.toISOString(), actor_name: 'Marta Costa' } },
+    { id: 'n6', kind: 'mix_swapped_out', game_id: 'fake-game-1', created_at: new Date().toISOString(),
+      data: { game_title: 'Mix de Sexta', game_date: tomorrow8pm.toISOString(), actor_name: 'Marta Costa' } },
   ] : localStorage.getItem('mockNotices') === 'requests' ? [
     // Aprovar quem entra (2 out): as três respostas e o pedido a quem organiza.
     { id: 'nr1', kind: 'mix_request_accepted', game_id: 'fake-game-1', created_at: new Date().toISOString(),
