@@ -197,7 +197,10 @@ export default function SignupSlot({ tournament, categories, category, my: first
   const answer = async (entryId, accept) => {
     setBusy(true)
     try {
-      await respondToInvite(entryId, accept, shirts ? { tshirtSize: inviteShirt[entryId] } : {})
+      // Já com t-shirt neste torneio (uma por pessoa, 11 out): não se pergunta;
+      // a base de dados dá-lhe a que já tem.
+      const inv = invites.find((x) => x.entry_id === entryId)
+      await respondToInvite(entryId, accept, shirts && !inv?.my_tshirt ? { tshirtSize: inviteShirt[entryId] } : {})
       reloadInvites()
       window.dispatchEvent(new CustomEvent('tournament:reload'))
     } catch (err) { console.error('Error answering tournament invite:', err); say(err) }
@@ -235,7 +238,9 @@ export default function SignupSlot({ tournament, categories, category, my: first
             {[inv.category_code, inv.respond_by ? t('tsignup.invite_deadline', { date: new Date(inv.respond_by).toLocaleDateString('pt-PT', { day: 'numeric', month: 'short' }) }) : null]
               .filter(Boolean).join(' · ')}
           </p>
-          {shirts && (
+          {shirts && inv.my_tshirt ? (
+            <p className="text-sm text-ink-900">👕 {t('tshirt.my_line')} <b>{inv.my_tshirt === NO_TSHIRT ? t('tshirt.no_thanks') : inv.my_tshirt}</b> · {t('tshirt.already_chosen')}</p>
+          ) : shirts && (
             <div>
               <p className="mb-1.5 text-sm font-extrabold text-ink-900">{t('tshirt.mine_label', { price: tshirtPriceLabel(shirtRulesOf(tournament), t, i18n.language) })}</p>
               <TshirtPicker rules={shirtRulesOf(tournament)} value={inviteShirt[inv.entry_id] || null}
@@ -244,7 +249,7 @@ export default function SignupSlot({ tournament, categories, category, my: first
           )}
           {/* Empilhados, a ação em cima (regra de 6 out): nunca lado a lado. */}
           <div className="space-y-2">
-            <PrimaryButton onClick={() => answer(inv.entry_id, true)} disabled={busy || (shirts && !inviteShirt[inv.entry_id])} className="w-full">
+            <PrimaryButton onClick={() => answer(inv.entry_id, true)} disabled={busy || (shirts && !inv.my_tshirt && !inviteShirt[inv.entry_id])} className="w-full">
               {t('tsignup.invite_accept')}
             </PrimaryButton>
             <PrimaryButton variant="ghost" onClick={() => answer(inv.entry_id, false)} disabled={busy} className="w-full">
@@ -301,8 +306,14 @@ export default function SignupSlot({ tournament, categories, category, my: first
               {myCategory?.code && <span className="shrink-0 rounded-md bg-ink-900 px-1.5 py-0.5 font-mono text-xs font-bold text-white">{myCategory.code}</span>}
               <b className="truncate text-sm font-extrabold text-ink-900">{myCategory?.name}</b>
             </p>
-            <span className="shrink-0 rounded-full bg-[#DCFCE7] px-2 py-[3px] text-[11px] font-extrabold text-ok-700">{t(STATE_KEY[my.state] || 'tsignup.state_in')}</span>
+            {/* No canto só estados curtos (regra dos cartões, 10 out): o do
+                pagamento passa a uma linha por baixo, e o nome da categoria
+                nunca fica tapado (UX, 11 out). */}
+            {my.state !== 'por_validar' && (
+              <span className="shrink-0 rounded-full bg-[#DCFCE7] px-2 py-[3px] text-[11px] font-extrabold text-ok-700">{t(STATE_KEY[my.state] || 'tsignup.state_in')}</span>
+            )}
           </div>
+          {my.state === 'por_validar' && <p className="text-xs font-extrabold text-ink-900">⏳ {t('tsignup.state_to_validate_line')}</p>}
           {my.state === 'suplente' && <p className="text-sm text-muted">{t('tsignup.state_waitlist_hint')}</p>}
           {myRow && (
             <div>
@@ -392,6 +403,8 @@ export default function SignupSlot({ tournament, categories, category, my: first
           category={category}
           categoriesLeft={left}
           takenIds={myEntries.map((e) => e.category_id)}
+          // A t-shirt que já tenho neste torneio (uma por pessoa, 11 out).
+          myExistingShirt={myEntries.find((e) => e.state !== 'desistiu' && e.tshirt)?.tshirt || null}
           busy={busy}
           error={error}
           onConfirm={trySignUp}

@@ -32,9 +32,10 @@ const euroWords = (v, locale) => Number(v).toLocaleString(locale, {
    conta entra pelo nome e recebe um link. Quem grava é a página
    (onConfirm). */
 
-import { TshirtPicker, tshirtOn, tshirtPriceLabel, pairTotalLine, shirtRulesOf } from './tshirt'
+import { NO_TSHIRT, TshirtPicker, tshirtOn, tshirtPriceLabel, pairTotalLine, shirtRulesOf } from './tshirt'
+import { getPlayerTshirt } from '../../lib/tournamentApi'
 
-export default function TournamentSignupSheet({ tournament, categories: allCategories, category: pageCategory, categoriesLeft, takenIds = [], busy, error, onConfirm, onClose }) {
+export default function TournamentSignupSheet({ tournament, categories: allCategories, category: pageCategory, categoriesLeft, takenIds = [], myExistingShirt = null, busy, error, onConfirm, onClose }) {
   const { t, i18n } = useTranslation()
   const { user, profile } = useAuth()
   // As que servem à pessoa primeiro — o género dela (ou misto) e o nível
@@ -68,7 +69,12 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
   // A t-shirt de cada um (SPEC t-shirts, ponto 2): «Não quero» também é
   // escolha; sem escolha não se envia. A do convidado sem conta escolhe-a
   // quem inscreve.
-  const [myShirt, setMyShirt] = useState(null)
+  // Uma t-shirt por pessoa no torneio (Francisco, 11 out): numa 2.ª
+  // categoria já vem escolhida, «Mudar» abre as pastilhas, e não se soma.
+  const [myShirt, setMyShirt] = useState(myExistingShirt)
+  const [changingMine, setChangingMine] = useState(false)
+  // O parceiro com conta que já tem t-shirt noutra categoria.
+  const [partnerShirt, setPartnerShirt] = useState(null)
   const [guestShirt, setGuestShirt] = useState(null)
 
   useEffect(() => {
@@ -120,6 +126,15 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
   const emailError = partnerEmailError(email)
   const shirts = tshirtOn(shirtRulesOf(tournament))
   const shirtsReady = !shirts || (!!myShirt && (mode !== 'named' || !!guestShirt))
+  useEffect(() => {
+    setPartnerShirt(null)
+    if (!shirts || mode !== 'partner' || !partnerId) return undefined
+    let cancelled = false
+    getPlayerTshirt(tournament.id, partnerId).then((s) => { if (!cancelled) setPartnerShirt(s) }).catch(() => {})
+    return () => { cancelled = true }
+  }, [shirts, mode, partnerId, tournament.id])
+  // O que se paga agora: a minha só se ainda não a tinha.
+  const payingShirts = [myExistingShirt ? null : myShirt, mode === 'named' ? guestShirt : null]
   const ready = categoryId && shirtsReady && (
     mode === 'alone' ? true : mode === 'partner' ? !!partnerId : !nameError && !emailError
   )
@@ -270,10 +285,17 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
         {/* A t-shirt do torneio (SPEC t-shirts, ponto 2). */}
         {shirts && (
           <div className="space-y-3">
-            <div>
-              <FieldLabel>{t('tshirt.mine_label', { price: tshirtPriceLabel(shirtRulesOf(tournament), t, i18n.language) })}</FieldLabel>
-              <TshirtPicker rules={shirtRulesOf(tournament)} value={myShirt} onChange={setMyShirt} label={t('tshirt.mine_label', { price: '' })} />
-            </div>
+            {myExistingShirt && !changingMine ? (
+              <p className="flex items-center justify-between gap-2 text-sm text-ink-900">
+                <span>👕 {t('tshirt.my_line')} <b>{myShirt === NO_TSHIRT ? t('tshirt.no_thanks') : myShirt}</b> · {t('tshirt.already_chosen')}</span>
+                <button type="button" onClick={() => setChangingMine(true)} className="min-h-[44px] shrink-0 text-sm font-extrabold underline underline-offset-2">{t('tshirt.change')}</button>
+              </p>
+            ) : (
+              <div>
+                <FieldLabel>{t('tshirt.mine_label', { price: myExistingShirt ? '' : tshirtPriceLabel(shirtRulesOf(tournament), t, i18n.language) })}</FieldLabel>
+                <TshirtPicker rules={shirtRulesOf(tournament)} value={myShirt} onChange={setMyShirt} label={t('tshirt.mine_label', { price: '' })} />
+              </div>
+            )}
             {mode === 'named' && name.trim() && (
               <div>
                 <FieldLabel>{t('tshirt.guest_label', { name: name.trim().split(/\s+/)[0], price: tshirtPriceLabel(shirtRulesOf(tournament), t, i18n.language) })}</FieldLabel>
@@ -281,9 +303,11 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
               </div>
             )}
             <div className="text-xs text-ink-500">
-              {mode === 'partner' && partnerId && (
+              {mode === 'partner' && partnerId && (partnerShirt ? (
+                <p className="text-sm text-ink-900">{t(partnerShirt.size ? 'tshirt.partner_has' : 'tshirt.partner_has_nosize', { name: (members.find((m) => m.id === partnerId) || found.find((m) => m.id === partnerId))?.name?.split(/\s+/)[0] || '', size: partnerShirt.size === NO_TSHIRT ? t('tshirt.no_thanks') : partnerShirt.size })}</p>
+              ) : (
                 <p>{t('tshirt.partner_chooses', { name: (members.find((m) => m.id === partnerId) || found.find((m) => m.id === partnerId))?.name?.split(/\s+/)[0] || '' })}</p>
-              )}
+              ))}
               {tournament.entries_deadline && (
                 <p>{t(mode === 'named' ? 'tshirt.change_until_both' : 'tshirt.change_until', { date: new Intl.DateTimeFormat(i18n.language, { day: 'numeric', month: 'short', timeZone: 'Europe/Lisbon' }).format(new Date(tournament.entries_deadline)).replace('.', '').replace(' de ', ' ') })}</p>
               )}
@@ -297,8 +321,8 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
           <Euro size={16} className="mt-0.5 shrink-0 text-muted" />
           <div>
             {/* Com t-shirts à venda pedidas, o total é da dupla (SPEC, ponto 2). */}
-            {price != null && (pairTotalLine(price / 100, shirtRulesOf(tournament), [myShirt, mode === 'named' ? guestShirt : null], t, i18n.language)
-              ? <p className="font-extrabold">{pairTotalLine(price / 100, shirtRulesOf(tournament), [myShirt, mode === 'named' ? guestShirt : null], t, i18n.language)}</p>
+            {price != null && (pairTotalLine(price / 100, shirtRulesOf(tournament), payingShirts, t, i18n.language)
+              ? <p className="font-extrabold">{pairTotalLine(price / 100, shirtRulesOf(tournament), payingShirts, t, i18n.language)}</p>
               : <p className="font-extrabold">{t('tsignup.price', { price: euroWords(price / 100, i18n.language), each: pricePerPlayer(price / 100, i18n.language) })}</p>)}
             {/* Preço especial de quem se inscreve (7 out): «Grátis para ti · …». */}
             <CategorySpecialLine category={chosen} className="font-extrabold text-ok-700" />

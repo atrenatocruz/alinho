@@ -63,7 +63,15 @@ function TshirtPeopleSheet({ tournament, counts, onClose, onChanged }) {
   const ts = tshirtOf(shirtRulesOf(tournament))
   const load = useCallback(() => {
     getTshirtPeople(tournament.id)
-      .then((rows) => setPeople([...rows].sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'pt'))))
+      // Uma t-shirt por pessoa no torneio (Francisco, 11 out): uma linha por
+      // pessoa, com as categorias juntas. Serve também a forma antiga (uma
+      // linha por inscrição), até os dados do Dev 3 chegarem.
+      .then((rows) => setPeople([...rows].map((p) => ({
+        ...p,
+        entry_id: p.entry_id ?? p.entry_ids?.[0],
+        slot: p.slot ?? p.slots?.[0] ?? 1,
+        codes: Array.isArray(p.category_codes) ? p.category_codes : [p.category_code].filter(Boolean),
+      })).sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'pt'))))
       .catch((err) => { console.error('Error loading t-shirt people:', err); setPeople([]) })
   }, [tournament.id])
   useEffect(load, [load])
@@ -88,7 +96,7 @@ function TshirtPeopleSheet({ tournament, counts, onClose, onChanged }) {
           <button type="button" onClick={() => setEditing(null)} className="-ml-1 inline-flex min-h-[44px] items-center gap-1 text-sm font-semibold text-ink-500">
             <ChevronLeft size={16} /> {t('tshirt.admin_back')}
           </button>
-          <p className="text-sm font-extrabold text-ink-900">{editing.name}{editing.category_code ? ` · ${editing.category_code}` : ''}</p>
+          <p className="text-sm font-extrabold text-ink-900">{[editing.name, ...editing.codes].join(' · ')}</p>
           <TshirtPicker rules={shirtRulesOf(tournament)} value={editing.size || null} onChange={change} disabled={busy} label={editing.name} />
           {error && <p className="text-sm font-extrabold text-danger">{error}</p>}
         </div>
@@ -107,10 +115,10 @@ function TshirtPeopleSheet({ tournament, counts, onClose, onChanged }) {
             <>
               <div>
                 {people.map((p) => (
-                  <button key={`${p.entry_id}-${p.slot}`} type="button" onClick={() => { setError(''); setEditing(p) }}
+                  <button key={`${p.user_id || p.entry_id}-${p.slot}`} type="button" onClick={() => { setError(''); setEditing(p) }}
                     className="flex min-h-[44px] w-full items-center gap-2 border-t border-line py-2 text-left">
-                    <span className="min-w-0 flex-1 truncate text-sm text-ink-900">
-                      {p.name}{p.category_code ? <span className="text-muted"> · {p.category_code}</span> : null}
+                    <span className="min-w-0 flex-1 text-sm text-ink-900">
+                      {p.name}{p.codes.length ? <span className="text-muted"> · {p.codes.join(' · ')}</span> : null}
                     </span>
                     <b className="font-mono text-sm text-ink-900">{sizeMark(p.size)}</b>
                     <ChevronRight size={16} className="shrink-0 text-muted" />

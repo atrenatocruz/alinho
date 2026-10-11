@@ -489,3 +489,13 @@ export async function getTshirtPeople(tournamentId) {
   if (error) { if (error.code === 'PGRST202') return []; throw error }
   return data || []
 }
+
+/** Se uma pessoa já tem t-shirt neste torneio (uma por pessoa, 11 out; Dev
+ *  3): { chosen, size }. O tamanho só vem para o próprio e para quem
+ *  organiza; aos outros, só o «chosen». null sem a função. */
+export async function getPlayerTshirt(tournamentId, userId) {
+  const { data, error } = await supabase.rpc('tournament_player_tshirt', { p_tournament_id: tournamentId, p_user_id: userId })
+  if (error) { if (error.code === 'PGRST202') return null; throw error }
+  const row = Array.isArray(data) ? data[0] : data
+  return row?.chosen ? { chosen: true, size: row.size || null } : null
+}

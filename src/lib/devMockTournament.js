@@ -334,8 +334,9 @@ export const TOURNAMENT_RPC_MOCKS = {
       // localStorage.mockTMyGamesReal = 'true' (+ mockTDraw): sou a dupla e1
       // do M4 e «Os meus jogos» lê as vistas, como em produção (Trello #508).
       ...(myGamesReal()
-        ? { my: { category_id: 'cat-m4', state: 'validada', entry_id: 'e1' },
-            my_entries: [{ category_id: 'cat-m4', status: 'validada', state: 'validada', entry_id: 'e1', tshirt: localStorage.getItem('mockTShirt') ? 'L' : null, ...(localStorage.getItem('mockTShirtGuest') ? { guest_name: 'João Ferreira', guest_tshirt: 'M' } : {}) }],
+        // mockTMyState = 'por_validar' …: o estado da minha inscrição.
+        ? { my: { category_id: 'cat-m4', state: localStorage.getItem('mockTMyState') || 'validada', entry_id: 'e1' },
+            my_entries: [{ category_id: 'cat-m4', status: 'validada', state: localStorage.getItem('mockTMyState') || 'validada', entry_id: 'e1', tshirt: localStorage.getItem('mockTShirt') ? 'L' : null, ...(localStorage.getItem('mockTShirtGuest') ? { guest_name: 'João Ferreira', guest_tshirt: 'M' } : {}) }],
             my_matches: [] }
         // localStorage.mockTNotEntered = 'true': vejo o torneio sem estar
         // inscrito — sem «Os meus jogos» (separadores, 28 set).
@@ -709,10 +710,12 @@ const promotedRead = new Set()
 // out): tamanhos na lista de quem organiza, a contagem e a lista por pessoa.
 const shirtOn = () => !!localStorage.getItem('mockTShirt')
 const SHIRT_SIZES = ['L', 'M', 'S', null, 'XL', 'none', 'M', 'L', 'XS', 'M', 'L', 'XXL', null, 'S', 'M', 'L']
+// Uma linha por pessoa, com as categorias juntas (uma t-shirt por pessoa,
+// 11 out; Dev 3: category_codes[], entry_ids[], slots[]).
 const SHIRT_PEOPLE = () => [
-  ['Ana Moreira', 'F4', 'S'], ['Carla Nunes', 'F3', 'M'], ['Inês Rocha', 'MX4', 'none'], ['João Ferreira', 'M4', 'M'],
-  ['Marta Costa', 'M4', 'S'], ['Nuno Alves', 'M5', null], ['Pedro Lima', 'M5', 'XL'], ['Rui Oliveira Gomes', 'M4', 'L'], ['Tiago Ferreira', 'M4', 'M'],
-].map(([name, category_code, size], i) => ({ entry_id: `sp-${i}`, slot: 1, name, category_code, size }))
+  ['Ana Moreira', ['F4', 'MX4'], 'S'], ['Carla Nunes', ['F3'], 'M'], ['Inês Rocha', ['MX4'], 'none'], ['João Ferreira', ['M4'], 'M'],
+  ['Marta Costa', ['M4', 'MX4'], 'S'], ['Nuno Alves', ['M5'], null], ['Pedro Lima', ['M5'], 'XL'], ['Rui Oliveira Gomes', ['M3', 'M4', 'M5'], 'L'], ['Tiago Ferreira', ['M4'], 'M'],
+].map(([name, category_codes, size], i) => ({ user_id: `u-sp-${i}`, name, category_codes, entry_ids: category_codes.map((c, k) => `sp-${i}-${k}`), slots: category_codes.map(() => 1), size }))
 export const TOURNAMENT_PROMOTED_RPC_MOCKS = {
   list_tournament_entries: (params, before) => (shirtOn() && before
     ? (before(params) || []).map((e, i) => ({ ...e, player1_tshirt: SHIRT_SIZES[(2 * i) % SHIRT_SIZES.length], player2_tshirt: SHIRT_SIZES[(2 * i + 1) % SHIRT_SIZES.length] }))
@@ -720,6 +723,12 @@ export const TOURNAMENT_PROMOTED_RPC_MOCKS = {
   tournament_tshirt_counts: () => (shirtOn() ? [{ sizes: [{ size: 'XS', count: 1 }, { size: 'S', count: 4 }, { size: 'M', count: 9 }, { size: 'L', count: 11 }, { size: 'XL', count: 5 }, { size: 'XXL', count: 1 }], requested: 31, declined: 6, pending: 3 }] : undefined),
   tournament_tshirt_people: () => (shirtOn() ? SHIRT_PEOPLE() : undefined),
   admin_set_tournament_tshirt: () => (shirtOn() ? null : undefined),
+  // mockTShirtMine = 'L': já tenho t-shirt neste torneio (o convite não pergunta).
+  list_my_tournament_invites: (params, before) => (shirtOn() && localStorage.getItem('mockTShirtMine') && before
+    ? (before(params) || []).map((i) => ({ ...i, my_tshirt: localStorage.getItem('mockTShirtMine') })) : undefined),
+  // O parceiro escolhido já tem t-shirt (mockTShirtPartner = 'M' | 'chosen').
+  tournament_player_tshirt: () => (shirtOn() && localStorage.getItem('mockTShirtPartner')
+    ? { chosen: true, size: localStorage.getItem('mockTShirtPartner') === 'chosen' ? null : localStorage.getItem('mockTShirtPartner') } : shirtOn() ? { chosen: false, size: null } : undefined),
   set_my_tournament_tshirt: () => (shirtOn() ? null : undefined),
   mark_notifications_read: (params) => {
     if (localStorage.getItem('mockTPromoted') !== 'true') return undefined

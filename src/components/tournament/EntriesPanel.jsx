@@ -43,6 +43,8 @@ const plain = (s) => String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').
 function pairName(e, t) {
   const second = e.player2_name || e.guest_name
   if (!second) return e.player1_name || '?'
+  // Parceiro ainda por aceitar: «Francisco Barros / à espera de Ana» (UX, 11 out).
+  if (e.status === 'convite') return `${e.player1_name} / ${t('tentries.waiting_for', { name: String(second).split(/\s+/)[0] })}`
   return `${e.player1_name} / ${second}`
 }
 
@@ -539,7 +541,9 @@ export default function EntriesPanel({ tournament, categories = [], category, pu
               <div className="min-w-0 flex-1">
                 {/* Até duas linhas: com os botões ao lado, «Carla N…» não
                     dizia quem era (Trello #515). */}
-                <p className="font-extrabold text-ink-900 line-clamp-2 break-words">
+                {/* O nome inteiro, em duas linhas se for preciso, sem «…»: cortado
+                    não se via o parceiro (QA/UX, 11 out). */}
+                <p className="font-extrabold text-ink-900 break-words">
                   {/* A procurar em todas as categorias: a pastilha diz de qual. */}
                   {searching && e.category_code && (
                     <span className="mr-1.5 rounded-md bg-ink-900 px-1.5 py-0.5 align-[1px] font-mono text-xs font-bold text-white">{e.category_code}</span>
