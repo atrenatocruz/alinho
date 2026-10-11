@@ -15,8 +15,14 @@
 //   onBack      — chamado por «← Cancelar» (passo 1) e «← Voltar» (outros)
 //   top         — opcional: o que fica por cima da barra (o nome do mix)
 //   children    — o passo
-//   onNext, nextLabel = «Seguinte», nextDisabled, nextHint (frase por baixo
-//               quando o Seguinte está apagado)
+//   onNext, nextLabel = «Seguinte», nextDisabled, nextHint (o que falta)
+//   nextMissingField — opcional: o id do campo em falta (ou do bloco à volta
+//               dele). Francisco, 11 out: «Seguinte» já não fica só apagado
+//               sem dizer nada — com o que falta (nextHint), carregar leva ao
+//               campo, marca-o a vermelho e diz o que falta por baixo dele
+//               (<StepMissingNote field="…" /> logo a seguir ao campo). Sem
+//               campo, a frase aparece a vermelho por cima do botão.
+//               «Seguinte» (e «Voltar») abrem sempre o passo novo no topo.
 //   footer      — opcional: substitui o botão de baixo (ex.: «Publicar mix»
 //               + «Guardar como rascunho» no último passo)
 //   error       — frase de erro por cima do botão
@@ -44,17 +50,61 @@
 // pergunta 24 px, entre perguntas 24 px, rótulo → campo 8 px (o mb-2 do
 // rótulo), último campo → botão 32 px. Nada fica tapado pelo menu de baixo
 // (pb-28, pedido do Bugs e da designer).
-import { useEffect, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { BackBar, ConfirmSheet } from '../ui'
 import { ChevronLeft } from 'lucide-react'
 import { PrimaryButton } from '../ui'
 
+const MissingContext = createContext(null)
+
+/** O que falta, por baixo do campo (no estilo de erro da app), só depois de
+ *  se carregar em «Seguinte» com esse campo em falta. */
+export function StepMissingNote({ field }) {
+  const c = useContext(MissingContext)
+  if (!c?.shown || c.field !== field || !c.message) return null
+  return <p role="alert" className="mt-2 rounded-ctrl border border-danger/30 bg-danger/10 px-3 py-2 text-sm font-extrabold text-danger">{c.message}</p>
+}
+
+const clearMarks = () => {
+  if (typeof document === 'undefined') return
+  document.querySelectorAll('[data-step-missing]').forEach((el) => { delete el.dataset.stepMissing })
+}
+
 export default function StepPage({
   title, subtitle = null, step, total, stepLabel, onBack, top = null, children,
-  onNext, nextLabel, nextDisabled = false, nextHint = null, footer = null, error = '', busy = false, edit = null,
+  onNext, nextLabel, nextDisabled = false, nextHint = null, nextMissingField = null, footer = null, error = '', busy = false, edit = null,
 }) {
   const { t } = useTranslation()
+  // «Seguinte» com alguma coisa em falta: mostra o quê, e onde.
+  const [missingShown, setMissingShown] = useState(false)
+  const [missingAtField, setMissingAtField] = useState(false)
+  const canExplain = nextDisabled && !!nextHint
+  const tryNext = () => {
+    if (!nextDisabled) { onNext?.(); return }
+    setMissingShown(true)
+    clearMarks()
+    const el = nextMissingField ? document.getElementById(nextMissingField) : null
+    setMissingAtField(!!el)
+    if (el) {
+      el.dataset.stepMissing = 'true'
+      el.scrollIntoView?.({ block: 'center', behavior: 'smooth' })
+      const focusable = el.matches('input, select, textarea') ? el : el.querySelector('input, select, textarea, button')
+      focusable?.focus?.({ preventScroll: true })
+    }
+  }
+  useEffect(() => { if (!nextDisabled) { setMissingShown(false); clearMarks() } }, [nextDisabled])
+  useEffect(() => () => clearMarks(), [])
+  // O passo novo abre no topo (Francisco, 11 out: «abre a meio»). Quem
+  // desliza é o <main> da app, não a janela.
+  const firstStep = useRef(true)
+  useEffect(() => {
+    if (firstStep.current) { firstStep.current = false; return }
+    setMissingShown(false)
+    clearMarks()
+    document.querySelector('main')?.scrollTo?.({ top: 0 })
+    window.scrollTo?.(0, 0)
+  }, [step])
   const stepped = total > 1
   const [asking, setAsking] = useState(false)
   const [askingDanger, setAskingDanger] = useState(false)
@@ -78,7 +128,11 @@ export default function StepPage({
   const last = !stepped || step >= total
   const black = 'w-full min-h-[52px] rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold text-white'
   const outline = 'w-full min-h-[52px] rounded-ctrl border-[1.5px] border-line bg-white px-4 text-[15px] font-extrabold text-ink-900'
+  const missingBox = missingShown && canExplain && !missingAtField && (
+    <p role="alert" className="mb-2.5 rounded-ctrl border border-danger/30 bg-danger/10 px-3 py-2 text-sm font-extrabold text-danger">{nextHint}</p>
+  )
   return (
+    <MissingContext.Provider value={{ shown: missingShown && canExplain, field: nextMissingField, message: nextHint }}>
     <div className="mx-auto max-w-lg pb-28">
       {/* «Cancelar / Voltar» sempre visível ao deslizar (27 set). No editar,
           «Cancelar» em todos os passos e o nome do passo no meio (30 set). */}
@@ -126,13 +180,13 @@ export default function StepPage({
 
       {edit ? (
         <div className="mt-8 space-y-2.5">
+          {!last && missingBox}
           {!last && (
-            <button type="button" onClick={onNext} disabled={nextDisabled || busy}
+            <button type="button" onClick={tryNext} disabled={(nextDisabled && !canExplain) || busy}
               className={`${black} disabled:opacity-40`}>
               {nextLabel || t('steps.next')}
             </button>
           )}
-          {!last && nextDisabled && nextHint && <p className="text-center text-xs text-muted">{nextHint}</p>}
           <button type="button" onClick={edit.onSave} disabled={edit.saving || edit.saveDisabled}
             className={`${last ? black : outline} disabled:opacity-40`}>
             {edit.saving ? t('steps.saving') : t('steps.save_changes')}
@@ -162,10 +216,10 @@ export default function StepPage({
         </div>
       ) : footer ? <div className="mt-8">{footer}</div> : (
         <div className="mt-8">
-          <PrimaryButton onClick={onNext} disabled={nextDisabled || busy} className="w-full">
+          {missingBox}
+          <PrimaryButton onClick={tryNext} disabled={(nextDisabled && !canExplain) || busy} className="w-full">
             {nextLabel || t('steps.next')}
           </PrimaryButton>
-          {nextDisabled && nextHint && <p className="mt-1.5 text-center text-xs text-muted">{nextHint}</p>}
         </div>
       )}
 
@@ -185,5 +239,6 @@ export default function StepPage({
           onConfirm={() => edit.onCancel()} onClose={() => setAsking(false)} />
       )}
     </div>
+    </MissingContext.Provider>
   )
 }

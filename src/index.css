@@ -152,6 +152,12 @@
            outline-none transition-all duration-fast min-h-[48px];
   }
 
+  /* O campo em falta depois de «Seguinte» (StepPage, 11 out). */
+  .input-field[data-step-missing='true'],
+  [data-step-missing='true'] .input-field {
+    @apply border-danger ring-2 ring-danger/15;
+  }
+
   /* Pressable card affordance */
   .press {
     @apply transition-transform duration-fast active:scale-[0.985];

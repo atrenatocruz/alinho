@@ -11,7 +11,7 @@ import { contemTexto } from '../lib/semAcentos'
 import { PrimaryButton, DateTimeField, Chips } from '../components/ui'
 import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
 import { describeError } from '../lib/errors'
-import StepPage from '../components/steps/StepPage'
+import StepPage, { StepMissingNote } from '../components/steps/StepPage'
 import InviteesStep, { MIN_PEOPLE } from '../components/friends/InviteesStep'
 
 /* `group` ({ id, slug, name }): o jogo de grupo — o mesmo desenho, com a
@@ -256,6 +256,7 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
       onBack={() => { setError(''); if (step === 1) goBack(); else setStep(step - 1) }}
       onNext={() => { setError(''); setStep(step + 1) }}
       nextDisabled={(step === 1 && missing > 0) || (step === 2 && !scheduledDate)}
+      nextMissingField={step === 2 && !scheduledDate ? 'step-friends-date' : null}
       nextHint={step === 1 ? t('friends.missing_people', { count: missing }) : t('createprivatematch.date_missing')}
       error={error}
       edit={edit ? {
@@ -295,7 +296,7 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
       {step === 2 && (
         <div>
           <p className={label}>{t('steps.datetime_label')}</p>
-          <DateTimeField value={when} onChange={setWhen} />
+          <div id="step-friends-date"><DateTimeField value={when} onChange={setWhen} /><StepMissingNote field="step-friends-date" /></div>
           <p className="mt-2 text-xs text-muted">{t('createprivatematch.when_hint')}</p>
         </div>
       )}

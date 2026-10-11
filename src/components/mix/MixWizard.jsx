@@ -16,7 +16,7 @@ import { useEffect, useState } from 'react'
 import { describeError } from '../../lib/errors'
 import { useTranslation } from 'react-i18next'
 import { Minus, Plus } from 'lucide-react'
-import StepPage from '../steps/StepPage'
+import StepPage, { StepMissingNote } from '../steps/StepPage'
 import MixImageField from './MixImageField'
 import LaunchDayPicker from '../LaunchDayPicker'
 import { Chips, DateField, DateTimeField, Select } from '../ui'
@@ -24,7 +24,7 @@ import { advanceByFrequency } from '../../lib/mixDraft'
 import { totalRounds, reverseClimbWarning, uiFormatOf, formatFieldsFor, countPeople } from '../../lib/mixLogic'
 import { AGE_RESTRICTIONS } from '../../lib/ageCategories'
 import { formatDate, formatTime } from '../../lib/formatDate'
-import { LEVEL_SCALES, LEVEL_NUMBERS, parseLevel, scaleForGender, GENDER_FOR_SCALE } from '../../lib/mixLevels'
+import { LEVEL_SCALES, LEVEL_NUMBERS, parseLevel, scaleForGender } from '../../lib/mixLevels'
 import WhatsappHoursField from '../WhatsappHoursField'
 import { getEventWhatsappPostTimes } from '../../lib/whatsappHours'
 import SpecialPriceField, { specialPriceMissing } from '../SpecialPriceField'
@@ -81,6 +81,8 @@ export default function MixWizard({
   // «Quem pode entrar» (só mulheres → F, misto → MX) e pode mudar-se.
   const [levelScale, setLevelScale] = useState(parseLevel(form.level)?.scale || scaleForGender(form.gender_restriction))
   const levelNum = parseLevel(form.level)?.num
+  // O escalão que vale: o de «Quem pode entrar», quando respondido.
+  const shownScale = form.gender_restriction && form.gender_restriction !== 'indiferente' ? scaleForGender(form.gender_restriction) : levelScale
 
   // O que falta em cada passo para o «Seguinte» andar.
   const missing = (() => {
@@ -147,7 +149,7 @@ export default function MixWizard({
   })()
 
   const back = () => (step === 1 ? onCancel() : setStep(step - 1))
-  const next = () => { if (!missing) { setStep(step + 1); window.scrollTo?.(0, 0) } }
+  const next = () => { if (!missing) setStep(step + 1) }
   const submit = async (asDraft) => {
     setBusy(true)
     try { await onSubmit(asDraft) } finally { setBusy(false) }
@@ -157,14 +159,18 @@ export default function MixWizard({
   // (opcional)» do torneio. Vai para a pasta do clube do próprio mix.
   const nameTop = (
     <div className="space-y-5">
-      <input
-        type="text"
-        value={form.title}
-        onChange={(e) => set({ title: e.target.value })}
-        className="input-field text-base font-extrabold"
-        placeholder={t('gerirclube.title_placeholder')}
-        aria-label={t('gerirclube.title_label')}
-      />
+      <div>
+        <input
+          id="step-mix-title"
+          type="text"
+          value={form.title}
+          onChange={(e) => set({ title: e.target.value })}
+          className="input-field text-base font-extrabold"
+          placeholder={t('gerirclube.title_placeholder')}
+          aria-label={t('gerirclube.title_label')}
+        />
+        <StepMissingNote field="step-mix-title" />
+      </div>
       {step === 1 && (
         <MixImageField value={form.image_url || null} onChange={(url) => set({ image_url: url })}
           organizationId={editingGame?.organization_id || organizationId} />
@@ -207,6 +213,7 @@ export default function MixWizard({
       onNext={next}
       nextDisabled={!!missing}
       nextHint={missing}
+      nextMissingField={step === 1 && !form.title.trim() ? 'step-mix-title' : step === 2 && !form.date ? 'step-mix-date' : null}
       footer={footer}
       error={editingGame ? error : step === 4 ? error : ''}
       edit={editingGame ? {
@@ -289,16 +296,23 @@ export default function MixWizard({
           />
           {pickLevel && (
             <div className="mt-2">
+              {/* Com «Quem pode entrar» já respondido (Masculino, Feminino ou
+                  Misto), o escalão do nível é esse: a fila sai, ficam só os
+                  números (Francisco, 11 out: «já escolhemos masculino em
+                  cima»). Com «Toda a gente», escolhe-se aqui. */}
+              {(!form.gender_restriction || form.gender_restriction === 'indiferente') && (
               <Chips label={t('mixlevels.scale_label')} value={levelScale}
                 onChange={(s) => {
-                  // …e o contrário: escolher o escalão acerta «Quem pode entrar».
+                  // Só aparece com «Toda a gente»: escolher o escalão já não
+                  // muda «Quem pode entrar» (a fila sumia logo a seguir).
                   setLevelScale(s)
-                  set({ gender_restriction: GENDER_FOR_SCALE[s], ...(levelNum ? { level: `${s}${levelNum}` } : {}) })
+                  set({ ...(levelNum ? { level: `${s}${levelNum}` } : {}) })
                 }}
                 options={LEVEL_SCALES.map((s) => ({ value: s, label: t(`mixlevels.scale_${s.toLowerCase()}`) }))} />
-              <div className="mt-2">
+              )}
+              <div className={!form.gender_restriction || form.gender_restriction === 'indiferente' ? 'mt-2' : ''}>
                 <Chips label={t('mixwizard.level_label')} value={form.level} onChange={(v) => set({ level: v })}
-                  options={LEVEL_NUMBERS.map((n) => ({ value: `${levelScale}${n}`, label: String(n) }))} />
+                  options={LEVEL_NUMBERS.map((n) => ({ value: `${shownScale}${n}`, label: String(n) }))} />
               </div>
             </div>
           )}
@@ -340,7 +354,10 @@ export default function MixWizard({
 
       <div className={step === 2 ? 'space-y-5' : 'hidden'}>
         <Field label={t('mixwizard.date_label')}>
-          <DateTimeField value={form.date} onChange={(v) => set({ date: v })} min={new Date()} />
+          <div id="step-mix-date">
+            <DateTimeField value={form.date} onChange={(v) => set({ date: v })} min={new Date()} />
+            <StepMissingNote field="step-mix-date" />
+          </div>
         </Field>
         {(!editingGame || !editingGame.recurrence || editingGame.recurrence.is_active) && (
           <Field label={t('mixwizard.repeat_label')}>
