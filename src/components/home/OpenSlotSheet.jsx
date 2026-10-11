@@ -30,7 +30,10 @@ export default function OpenSlotSheet({ club, picked, busy = false, error = '', 
 
   return (
     <Sheet title={t('home.open_title', { club: club.orgName })} onClose={onClose}>
-      <p className="-mt-1 text-[13px] text-ink-700">{[club.location, t('home.open_sub')].filter(Boolean).join(' · ')}</p>
+      <p className="-mt-1 text-[13px] text-ink-700">{club.location
+        ? `${club.location} · ${t('home.open_sub')}`
+        // Sem morada, a frase começa a linha: maiúscula (QA, 11 out).
+        : t('home.open_sub').replace(/^./, (c) => c.toUpperCase())}</p>
       <div className="mt-3 grid grid-cols-4 gap-1.5">
         {all.map(({ s, free }) => {
           const on = free && slot?.key === s.key

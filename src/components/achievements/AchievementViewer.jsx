@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { Lock } from 'lucide-react'
 import { medalUrl } from '../../lib/achievementMedals'
-import { RARITY_META } from '../../lib/achievements'
+import { RARITY_META, formatRarityPct } from '../../lib/achievements'
 import './achievementsFx.css'
 
 /* O cartão de uma conquista no meio do ecrã (design-handoff/2026-10-12-
@@ -12,7 +12,7 @@ import './achievementsFx.css'
    espreitam e desliza-se entre as ganhas. Por ganhar: a cinzento, sem
    confetis nem lados, «Fechar». Fecha com o botão, tocando fora ou Esc.
 
-   items: [{ key, rarity }] (as ganhas, pela ordem a percorrer), start: o
+   items: [{ key, rarity, pct? }] (as ganhas, pela ordem a percorrer), start: o
    índice a abrir. locked: abre uma só, por ganhar. */
 
 const CONFETTI_COLORS = {
@@ -55,7 +55,7 @@ function runConfetti(canvas, rarity) {
 }
 
 export default function AchievementViewer({ items, start = 0, locked = false, onClose }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [i, setI] = useState(start)
   const canvasRef = useRef(null)
   const swipeX = useRef(null)
@@ -135,6 +135,13 @@ export default function AchievementViewer({ items, start = 0, locked = false, on
             )}
             <h3>{name}</h3>
             <p>{t(`achievements.${a.key}_desc`)}</p>
+            {/* «12,5% têm» (Francisco, 11 out: não perder a percentagem; UX: na
+                cor da raridade, também nas por ganhar). */}
+            {a.pct != null && (
+              <span className={`mt-2.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-extrabold tabular-nums ${locked ? 'bg-white/10 text-white/70' : RARITY_META[rarity].pill}`}>
+                {t('achievements.rarity_pct', { pct: formatRarityPct(a.pct, i18n.language) })}
+              </span>
+            )}
           </div>
         </div>
         </div>

@@ -8,7 +8,7 @@ import ShareCard, { CARD_W, CARD_H } from './ShareCard'
 import QRCode from 'qrcode'
 import { ratingBand, groupRatingBand, peopleRatingBand } from '../lib/elo'
 import { planName } from '../lib/plans'
-import { achievementIcon, RARITY_META } from '../lib/achievements'
+import { achievementIcon, RARITY_META, formatRarityPct } from '../lib/achievements'
 import { medalUrl } from '../lib/achievementMedals'
 import { formatDate } from '../lib/formatDate'
 import { listFollowers, listFollowing, removeFollower, unfollowPlayer } from '../lib/follows'
@@ -945,8 +945,8 @@ function AchievementMedal({ url, locked, name }) {
   )
 }
 
-export function AchievementCard({ achievementKey, category, rarity, earned = false, rarityPct = null }) {
-  const { t } = useTranslation()
+export function AchievementCard({ achievementKey, category, rarity, earned = false, rarityPct = null, onOpen = null }) {
+  const { t, i18n } = useTranslation()
   const Icon = achievementIcon(achievementKey, category)
   const meta = RARITY_META[rarity] || RARITY_META.comum
   const [medalFailed, setMedalFailed] = useState(false)
@@ -977,7 +977,12 @@ export function AchievementCard({ achievementKey, category, rarity, earned = fal
   }
 
   return (
-    <div className={`rounded-ctrl border-2 p-3 text-center bg-surface ${meta.frame} ${meta.glow}`} onErrorCapture={() => setMedalFailed(true)}>
+    // onOpen: tocar abre o cartão animado (Perfil, pedido do Francisco a 11 out).
+    <div
+      className={`rounded-ctrl border-2 p-3 text-center bg-surface ${meta.frame} ${meta.glow} ${onOpen ? 'press cursor-pointer' : ''}`}
+      onErrorCapture={() => setMedalFailed(true)}
+      {...(onOpen ? { role: 'button', tabIndex: 0, onClick: onOpen, onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() } } } : {})}
+    >
       {medal ? <AchievementMedal url={medal} name={name} /> : (
         <span className={`inline-flex w-11 h-11 rounded-full items-center justify-center ${meta.medal}`}>
           <Icon size={22} className={meta.icon} />
@@ -990,7 +995,7 @@ export function AchievementCard({ achievementKey, category, rarity, earned = fal
           {t(meta.labelKey)}
         </span>
         {rarityPct != null && (
-          <span className="text-[9px] text-muted tabular-nums">{t('achievements.rarity_pct', { pct: rarityPct })}</span>
+          <span className="text-[9px] text-muted tabular-nums">{t('achievements.rarity_pct', { pct: formatRarityPct(rarityPct, i18n.language) })}</span>
         )}
       </div>
     </div>

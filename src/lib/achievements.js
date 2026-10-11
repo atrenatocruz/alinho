@@ -167,4 +167,8 @@ export const RARITY_META = {
   },
 }
 
+/** A «% têm» com a vírgula de cá («24,1»), e com o ponto em inglês. */
+export const formatRarityPct = (pct, lang = 'pt') =>
+  Number(pct).toLocaleString(String(lang).startsWith('en') ? 'en-GB' : 'pt-PT', { maximumFractionDigits: 1 })
+
 export const CATEGORY_ORDER = ['jogo', 'torneio', 'elo', 'xp', 'kudos', 'aulas', 'antiguidade', 'evento']
