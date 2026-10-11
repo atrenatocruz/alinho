@@ -229,6 +229,8 @@ function cardFrame(event, past) {
 
 /** Local (+ distância) e a linha de factos — igual nos cartões de mix dos
     meus clubes e nos de explorar, para um mix não se descrever de duas formas. */
+const HM = { hour: '2-digit', minute: '2-digit' }
+
 function GameFacts({ game, distance }) {
   const { t, i18n } = useTranslation()
   const specialLine = useSpecialPriceLine(game.origin === 'open_slot' ? 'open_slot' : 'mix', game.price_per_player > 0 ? game.id : null)
@@ -247,8 +249,15 @@ function GameFacts({ game, distance }) {
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-ink-700 text-[13px] mt-1.5">
         <span className="inline-flex items-center gap-1">
           <Swords size={14} className="shrink-0" />
-          {t(formatLabelKey(game))} · {t('gamedetails.court_count', { count: game.num_courts || 1 })}
-          {game.ranked === false && <> · {t('gamedetails.badge_friendly')}</>}
+          {game.origin === 'open_slot' ? (
+            // Jogo em aberto: a mesma linha da página do jogo, nunca o
+            // formato (UX, 11 out) — «1 campo · 4 jogadores · 19:30–21:00».
+            [t('gamedetails.court_count', { count: game.num_courts || 1 }), t('openday.players', { count: mixCapacity(game) }),
+              `${formatTime(game.date, i18n.language, HM)}–${formatTime(new Date(new Date(game.date).getTime() + (game.court_time_minutes || 90) * 60000), i18n.language, HM)}`].join(' · ')
+          ) : (<>
+            {t(formatLabelKey(game))} · {t('gamedetails.court_count', { count: game.num_courts || 1 })}
+            {game.ranked === false && <> · {t('gamedetails.badge_friendly')}</>}
+          </>)}
         </span>
         {game.price_per_player > 0 && (
           <span className="inline-flex items-center gap-1">
