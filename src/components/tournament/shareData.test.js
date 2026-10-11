@@ -7,6 +7,8 @@ describe('cartões de partilha do torneio', () => {
   it('apelido abreviado', () => {
     expect(shortName('Rita Figueira')).toBe('Rita F.')
     expect(shortName('Ana Maria Marques')).toBe('Ana M.')
+    // Acaba num número: fica inteiro (QA, 11 out).
+    expect(shortName('QA 01')).toBe('QA 01')
     expect(shortName('Rui')).toBe('Rui')
     // O que está entre parênteses não é apelido (revisão dos torneios, 28
     // set): «Renato Cruz (dummy)» dava «Renato D.».

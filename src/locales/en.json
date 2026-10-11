@@ -631,6 +631,8 @@
   "mixwinners.text_solo_2": "Padel Master 🥈 I came 2nd in {{mix}}. alinho.pt @alinhopt #alinhopadel",
   "mixwinners.text_solo_3": "Bronze Wall 🥉 I closed the podium of {{mix}}. alinho.pt @alinhopt #alinhopadel",
   "mixwinners.text_solo_place": "I finished {{place}} in {{mix}} 🎾 {{won}} of {{played}} games won. alinho.pt @alinhopt #alinhopadel",
+  "mixwinners.text_pair_place_no_wins": "{{partner}} and I finished {{place}} in {{mix}} 🎾 On to the next one! alinho.pt @alinhopt #alinhopadel",
+  "mixwinners.text_solo_place_no_wins": "I finished {{place}} in {{mix}} 🎾 On to the next one! alinho.pt @alinhopt #alinhopadel",
   "mixwinners.text_org": "🏆 {{winners}} won {{mix}}! Congratulations. alinho.pt @alinhopt #alinhopadel",
   "layout.mix_finished": "🏆 {{title}} is over. Won by {{winners}}.",
   "layout.mix_finished_plain": "🏆 {{title}} is over.",

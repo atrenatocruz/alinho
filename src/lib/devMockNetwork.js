@@ -957,7 +957,9 @@ const amTeam = (id, a, b) => {
 }
 const AMERICANO_FINAL_TEAMS = () => AM_PAIRS.flatMap(([a, b], i) => [amTeam(`at${i}a`, a[0], a[1]), amTeam(`at${i}b`, b[0], b[1])])
 const AMERICANO_FINAL_MATCHES = () => AM_PAIRS.map(([, , x, y], i) => {
-  const [sa, sb] = i === 4 && ['tie', 'tietotal'].includes(AM_FINAL()) ? [13, 15] : i === 1 && AM_FINAL() === 'tietotal' ? [15, 7] : [x, y]
+  // 'fourth': as partidas da pessoa 0 (eu) perdem — fico do 4.º para baixo (#622).
+  const meLoses = AM_FINAL() === 'fourth' && [0, 2, 4].includes(i)
+  const [sa, sb] = meLoses ? [6, 15] : i === 4 && ['tie', 'tietotal'].includes(AM_FINAL()) ? [13, 15] : i === 1 && AM_FINAL() === 'tietotal' ? [15, 7] : [x, y]
   return { id: `amf${i}`, game_id: 'fake-game-1', round_number: Math.floor(i / 2) + 1, court_number: (i % 2) + 1, phase: 'group',
     team_a_id: `at${i}a`, team_b_id: `at${i}b`, score_a: sa, score_b: sb, winner_team_id: sa > sb ? `at${i}a` : `at${i}b` }
 })
