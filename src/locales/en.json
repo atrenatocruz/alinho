@@ -5053,5 +5053,6 @@
   "special_price.roster_summary_one": "{{special}} with special price \u00b7 {{count}} pays {{normal}}",
   "special_price.roster_summary_other": "{{special}} with special price \u00b7 {{count}} pay {{normal}}",
   "special_price.roster_summary_all": "Everyone has the special price",
-  "special_price.error_save": "The event was saved, but the special price couldn't be. Try again in Edit."
+  "special_price.error_save": "The event was saved, but the special price couldn't be. Try again in Edit.",
+  "consentgate.body_updated": "We've updated our <terms>Terms of Service</terms> and <privacy>Privacy Policy</privacy>. To keep using alinho, we need you to accept them."
 }
