@@ -62,9 +62,17 @@ test('«In com» recusado pelo trigger das vagas → diz que não cabe a dupla',
 
 const sync = await import('../src/sync.js')
 
-test('«In» faz no máximo 4 idas à BD', async () => {
+// O «In» de quem já é conhecido (o número de WhatsApp já guardado no perfil:
+// a primeira mensagem de cada pessoa guarda-o uma vez, sem esperar).
+// 5 consultas em 3 esperas: os mixes ∥ o perfil, o jogo ∥ os inscritos
+// (loadGame, em paralelo — o jogo fresco por causa das vagas), e a
+// inscrição. O limite antigo (4) era de antes de o loadGame ler o jogo e os
+// inscritos em paralelo; o teste falhava desde então (PO, 10 out).
+test('«In» faz no máximo 5 consultas à BD (3 esperas)', async () => {
+  db.profiles.find((p) => p.id === 'a').whatsapp_jid = '351911111111@s.whatsapp.net'
   await say('in')
-  assert.ok(calls.length <= 4, `foram ${calls.length}: ${calls.join(', ')}`)
+  assert.ok(calls.length <= 5, `foram ${calls.length}: ${calls.join(', ')}`)
+  assert.ok(!calls.includes('profiles'), 'sem atualizar o perfil de quem já é conhecido')
 })
 
 test('«In» e «Out» pedem o repost logo', async (t) => {
