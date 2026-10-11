@@ -142,11 +142,14 @@ export default function BracketTree({ rounds, entries, myIds = [], allMatches, g
     if (EARLY_ROUNDS.includes(round)) setOpen((o) => ({ ...o, [round]: true }))
     requestAnimationFrame(() => document.getElementById(`tree-${round}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
   }
+  // Com jogos dos grupos por jogar, ainda nenhuma ronda do quadro está
+  // «agora» (QA, 9 out: «Meias-finais · agora» com os grupos a meio).
+  const groupsPending = matches.some((m) => m.group_id && !isDone(m))
   const progress = columns.length > 1 ? (
     <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }}>
       {columns.map((c) => {
         const done = c.matches.every(isDone)
-        const now = c.round === current
+        const now = c.round === current && !groupsPending
         const first = c.matches.map((m) => m.scheduled_at).filter(Boolean).sort()[0]
         const doneShare = c.matches.length ? c.matches.filter(isDone).length / c.matches.length : 0
         return (
