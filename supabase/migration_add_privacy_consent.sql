@@ -48,6 +48,12 @@ COMMENT ON TABLE consents IS
 
 ALTER TABLE consents ENABLE ROW LEVEL SECURITY;
 
+-- O registo que prova a aceitação não se muda nem se apaga, mesmo que um
+-- dia alguém junte uma política (SI, 12 out): os privilégios por omissão
+-- davam SELECT a anon e INSERT/UPDATE/DELETE a authenticated.
+REVOKE ALL ON consents FROM anon;
+REVOKE INSERT, UPDATE, DELETE ON consents FROM authenticated;
+
 DROP POLICY IF EXISTS "select own consents" ON consents;
 CREATE POLICY "select own consents" ON consents FOR SELECT
   USING (auth.uid() = user_id);
