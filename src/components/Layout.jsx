@@ -450,7 +450,14 @@ export default function Layout({ children }) {
     if (notice.kind === 'mix_cancelled') return t('layout.mix_notice_cancelled', vars)
     // #622 (Dev 3, migration_mix_aviso_terminou.sql): «🏆 <Evento> terminou.
     // Ganharam <vencedores>.» — sem vencedores com nome, só «terminou».
-    if (notice.kind === 'mix_finished') return t(d.winners ? 'layout.mix_finished' : 'layout.mix_finished_plain', { ...vars, winners: d.winners })
+    if (notice.kind === 'mix_finished') {
+      // Um nome só (americano): «Ganhou»; dupla ou empate: «Ganharam». Sem
+      // o ponto a mais quando o nome já acaba em «.» («X..», QA 11 out).
+      const winners = String(d.winners || '').replace(/\.+$/, '')
+      if (!winners) return t('layout.mix_finished_plain', vars)
+      const many = /\s\/\s|\se\s|\sand\s|,/.test(winners)
+      return t(many ? 'layout.mix_finished' : 'layout.mix_finished_one', { ...vars, winners })
+    }
     if (['mix_promoted', 'mix_moved_to_waitlist', 'mix_not_filled', 'mix_cancelled_not_filled', 'mix_slot_open', 'mix_swapped_out'].includes(notice.kind)) {
       return t(`layout.${notice.kind}`, vars)
     }

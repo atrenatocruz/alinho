@@ -636,6 +636,7 @@
   "mixwinners.text_solo_place_no_wins": "Acabei em {{place}}.º no {{mix}} 🎾 Siga para o próximo! alinho.pt @alinhopt #alinhopadel",
   "mixwinners.text_org": "🏆 {{winners}} ganharam o {{mix}}! Parabéns. alinho.pt @alinhopt #alinhopadel",
   "layout.mix_finished": "🏆 {{title}} terminou. Ganharam {{winners}}.",
+  "layout.mix_finished_one": "🏆 {{title}} terminou. Ganhou {{winners}}.",
   "layout.mix_finished_plain": "🏆 {{title}} terminou.",
   "tshare.phase_won_R32": "os 16-avos",
   "tshare.phase_won_R16": "os oitavos",

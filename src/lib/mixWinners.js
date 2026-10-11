@@ -11,7 +11,9 @@ const pairOf = (team) => [team?.player1?.name, team?.player2?.name].filter(Boole
 const hasPlayer = (team, id) => !!id && (team?.player1?.id === id || team?.player2?.id === id)
 const partnerOf = (team, id) => {
   const other = team?.player1?.id === id ? team?.player2 : team?.player1
-  return String(other?.name || '').split(/\s+/)[0] || ''
+  const name = String(other?.name || '').trim()
+  // Um nome que acaba num número fica inteiro, como no cartão («QA Viva 10»).
+  return /\d$/.test(name) ? name : name.split(/\s+/)[0] || ''
 }
 
 /** O pódio que a página mostra e o cartão leva, com o lugar de quem vê.
