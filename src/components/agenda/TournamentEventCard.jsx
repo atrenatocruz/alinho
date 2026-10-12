@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { MapPin, Clock, Megaphone, CheckCircle2 } from 'lucide-react'
 import { KindLine, OrgHeader, StateLine, StateTag } from './EventCard'
+import CardMascot, { mascotFor } from './CardMascot'
 
 /* O torneio na agenda da Home (Trello #363).
 
@@ -35,6 +36,8 @@ const hhmm = (date, language) =>
 export default function TournamentEventCard({ event, past, footer = null }) {
   const { t, i18n } = useTranslation()
   const isMatch = event.source === 'tournament_match'
+  // O boneco só com quem organiza em cima (o torneio tem sempre clube).
+  const mascot = event.orgName ? mascotFor('tournament') : null
   const to = `/torneio/${event.slug || event.id}`
   const frame = { background: LILAC.bg, borderColor: LILAC.border, borderWidth: 2 }
   // Acabado (jogo com resultado, ou o dia já passou): «Terminado», como nos
@@ -54,11 +57,12 @@ export default function TournamentEventCard({ event, past, footer = null }) {
   // fora — um botão dentro de um link não é válido —, é um Link por baixo de
   // tudo, como no GameEventCard.
   return (
-    <div className={`card relative press hover:shadow-lift ${past ? 'opacity-60' : ''}`} style={frame}>
+    <div className={`card relative press hover:shadow-lift ${mascot ? '!mt-5' : ''} ${past ? 'opacity-60' : ''}`} style={frame}>
       <Link to={to} className="absolute inset-0 rounded-[inherit]" aria-label={event.raw?.name || event.orgName || ''} />
+      <CardMascot type={mascot} />
       {/* O estado vai para o canto, ao lado de quem organiza, como no mix
           (457bfaf, Francisco 30 set). */}
-      <OrgHeader event={event} past={past} right={stateTag} kind={kindLine} />
+      <OrgHeader event={event} past={past} right={stateTag} kind={kindLine} mascot={!!mascot} pillPos={{ right: 'right-5', top: 'top-[80px]' }} />
       {body()}
       {footer && <div className="relative z-[1]">{footer}</div>}
     </div>

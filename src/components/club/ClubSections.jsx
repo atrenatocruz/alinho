@@ -12,6 +12,7 @@ import { Avatar, ConfirmSheet, PrimaryButton, Tabs } from '../ui'
 import { supabase } from '../../lib/supabase'
 import { describeError, errorKind } from '../../lib/errors'
 import { KIND_STYLE, KindLine, StateLine, StateTag } from '../agenda/EventCard'
+import CardMascot, { mascotFor, MascotPill } from '../agenda/CardMascot'
 
 const asWebsiteUrl = (value) => (/^https?:\/\//i.test(value) ? value : `https://${value}`)
 const asInstagramUrl = (value) => (/^https?:\/\//i.test(value)
@@ -203,18 +204,24 @@ function EventRow({ event, member }) {
   const frame = event.myState === 'in' ? `${KIND_STYLE[event.kind].bg} border-2 border-ok`
     : event.myState === 'waitlist' ? `${KIND_STYLE[event.kind].bg} border-2 border-dashed border-[#B86E00]`
       : `${KIND_STYLE[event.kind].card} border`
+  // O boneco do tipo (Dev 2, 12 out — o mesmo dos cartões da Home); um mix
+  // com imagem própria não leva.
+  const mascot = mascotFor(event.kind, event.game?.image_url)
+  const corner = event.locked ? <Lock size={15} className="mt-1 text-muted" /> : state
   const body = (
     <>
-      <div className="flex items-start justify-between gap-2">
+      <CardMascot type={mascot} small />
+      <div className={`flex items-start justify-between gap-2 ${mascot ? 'pr-[60px]' : ''}`}>
         <KindLine kind={event.kind} suffix={event.recurring ? t('ui.recurring') : null} />
-        {event.locked ? <Lock size={15} className="mt-1 text-muted" /> : state}
+        {!mascot && corner}
       </div>
-      <h4 className="mt-2 text-base font-extrabold leading-snug text-ink-900 [overflow-wrap:anywhere]">{event.title}</h4>
+      {mascot && <MascotPill top="top-[54px]">{corner}</MascotPill>}
+      <h4 className={`mt-2 text-base font-extrabold leading-snug text-ink-900 [overflow-wrap:anywhere] ${mascot ? 'pr-[100px]' : ''}`}>{event.title}</h4>
       <p className="mt-0.5 text-[13px] text-ink-700">{line}</p>
       {event.myState === 'waitlist' && <StateLine kind={event.kind}>{t('agenda.state_line_waitlist')}</StateLine>}
     </>
   )
-  const cls = `block rounded-card p-3.5 ${frame}`
+  const cls = `relative block rounded-card p-3.5 ${mascot ? '!mt-3' : ''} ${frame}`
   // O torneio abre a toda a gente (página pública). O mix só a membros: a
   // quem não é, a página do mix dava «não encontrado» (#535).
   if (event.tournament) return <Link to={`/torneio/${event.tournament.slug || event.tournament.id}`} className={`${cls} press`}>{body}</Link>
@@ -332,13 +339,15 @@ function ClubPlayed({ club }) {
         const line = [dayOf(r.date), r.kind === 'tournament' ? null : timeOf(r.date), people].filter(Boolean).join(' · ')
         const points = r.i_played && r.my_points != null ? Math.round(Number(r.my_points)) : null
         return (
-          <Link key={`${r.kind}-${r.id}`} to={to} className={`press block rounded-card bg-surface p-3.5 ${r.i_played ? 'border-2 border-ok' : 'border border-line'}`}>
-            <div className="flex items-start justify-between gap-2">
+          <Link key={`${r.kind}-${r.id}`} to={to} className={`press relative block rounded-card bg-surface p-3.5 ${mascotFor(kind) ? '!mt-3' : ''} ${r.i_played ? 'border-2 border-ok' : 'border border-line'}`}>
+            <CardMascot type={mascotFor(kind)} small />
+            <div className={`flex items-start justify-between gap-2 ${mascotFor(kind) ? 'pr-[60px]' : ''}`}>
               <KindLine kind={kind} past />
-              <StateTag tone="grey" icon={CheckCircle2}>{t('agenda.state_finished')}</StateTag>
+              {!mascotFor(kind) && <StateTag tone="grey" icon={CheckCircle2}>{t('agenda.state_finished')}</StateTag>}
             </div>
+            {mascotFor(kind) && <MascotPill top="top-[54px]"><StateTag tone="grey" icon={CheckCircle2}>{t('agenda.state_finished')}</StateTag></MascotPill>}
             <div className="mt-2 flex items-baseline justify-between gap-2">
-              <h4 className="text-base font-extrabold leading-snug text-muted [overflow-wrap:anywhere]">{title}</h4>
+              <h4 className={`text-base font-extrabold leading-snug text-muted [overflow-wrap:anywhere] ${mascotFor(kind) ? 'pr-[100px]' : ''}`}>{title}</h4>
               {points != null && <b className="shrink-0 text-sm font-extrabold text-ink-900">{t('agenda.played_points', { points: `${points > 0 ? '+' : ''}${points}` })}</b>}
             </div>
             <p className="mt-0.5 text-[13px] text-ink-700">{line}</p>

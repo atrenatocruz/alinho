@@ -13,6 +13,7 @@ import { supabase } from '../../lib/supabase'
 import { toDayKey } from '../../lib/agenda'
 import { formatTime } from '../../lib/formatDate'
 import { KindLine, OrgHeader, StateTag } from './EventCard'
+import CardMascot, { mascotFor, mascotCardClass, MascotPill } from './CardMascot'
 import { dayLabel } from './AgendaControls'
 
 const PAGE = 20
@@ -113,17 +114,21 @@ function PlayedCard({ row }) {
   const state = row.i_won
     ? <StateTag tone="live">{t('agenda.result_won')}</StateTag>
     : <StateTag tone="grey" icon={CheckCircle2}>{t('agenda.state_finished')}</StateTag>
+  const mascot = mascotFor(kind)
   return (
-    <div className={`relative overflow-hidden rounded-card bg-surface p-3.5 press ${row.i_played ? 'border-2 border-ok' : 'border border-line'}`}>
+    <div className={`relative ${mascotCardClass(mascot)} rounded-card bg-surface p-3.5 press ${row.i_played ? 'border-2 border-ok' : 'border border-line'}`}>
       <Link to={to} className="absolute inset-0" aria-label={title || ''} />
+      {/* O boneco do tipo (Dev 2, 12 out — o mesmo dos cartões da Home). */}
+      <CardMascot type={mascot} />
       {/* O estado ao canto, à direita de quem organiza (como nos outros cartões da Home). */}
       {/* O tipo por baixo de quem organiza, sem pastilha (Home do futuro, SPEC-3). */}
-      <OrgHeader event={event} past right={state} kind={<KindLine kind={kind} past />} />
-      {!event.orgName && <div className="flex items-start justify-between gap-2"><KindLine kind={kind} past />{state}</div>}
+      <OrgHeader event={event} past right={state} kind={<KindLine kind={kind} past />} mascot={!!mascot} />
+      {!event.orgName && <div className={`flex items-start justify-between gap-2 ${mascot ? 'pr-[80px]' : ''}`}><KindLine kind={kind} past />{!mascot && state}</div>}
+      {!event.orgName && mascot && <MascotPill top="top-[54px]">{state}</MascotPill>}
       {row.kind !== 'tournament' && (
         <p className="mt-2.5 text-[22px] font-extrabold leading-none text-muted">{formatTime(row.date, i18n.language, { hour: '2-digit', minute: '2-digit' })}</p>
       )}
-      <h3 className="mt-1.5 text-base leading-snug text-muted">{title}</h3>
+      <h3 className={`mt-1.5 text-base leading-snug text-muted ${!event.orgName && mascot ? 'pr-[100px]' : ''}`}>{title}</h3>
       {(people || points != null) && (
         <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-ink-900/10 pt-2.5 text-[13px]">
           <span className="text-ink-700">{people}</span>
