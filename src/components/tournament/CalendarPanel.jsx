@@ -28,6 +28,7 @@ import MatchSheet from './MatchSheet'
 import { footOf } from './BracketTree'
 import { StickyDays } from './StickyBar'
 import { listTournamentClashes } from '../../lib/tournamentApi'
+import { PanelSkeleton } from './TournamentSkeleton'
 
 /** «Sáb 10 out» — o dia no filtro. */
 function dayChip(date, locale) {
@@ -92,7 +93,7 @@ export default function CalendarPanel({ category, myEntries, tournament, isAdmin
   }
 
   if (loading) {
-    return <p className="py-6 text-center text-xs text-muted">{t('common.loading')}</p>
+    return <PanelSkeleton rows={2} />
   }
 
   // Pela ordem das fases (grupos, quartos, meias, 3.º lugar, final) e, dentro

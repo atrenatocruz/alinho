@@ -11,7 +11,7 @@
 //
 // Enquanto a migração do torneio não correr, a RPC não existe: a página
 // mostra o estado vazio em vez de rebentar.
-import { Suspense, useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { BackBar } from '../components/ui'
@@ -25,7 +25,7 @@ import GroupOnlyNotice from '../components/GroupOnlyNotice'
 import { StickyTabs } from '../components/tournament/StickyBar'
 import { setEventWhatsappPostTimes } from '../lib/whatsappHours'
 import { describeError, errorKind } from '../lib/errors'
-import { Avatar, EmptyState, Tabs } from '../components/ui'
+import { Avatar, EmptyState, LoadErrorState, Tabs } from '../components/ui'
 import { CategorySelect, LILAC, MonoLabel, StatePill, TourTag } from '../components/tournament/TournamentBits'
 import { TOURNAMENT_PANELS, TOURNAMENT_TABS, TOURNAMENT_TAB_OWNER } from '../components/tournament/panels'
 import AdminBar from '../components/tournament/AdminBar'
@@ -37,6 +37,8 @@ import DrawAdminPanel from '../components/tournament/DrawAdminPanel'
 import TournamentCalendarGrid from '../components/tournament/TournamentCalendarGrid'
 import ScorekeepersPanel from '../components/tournament/ScorekeepersPanel'
 import { drawProgress, statusKey } from '../components/tournament/drawProgress'
+import { TournamentPageSkeleton, PanelSkeleton } from '../components/tournament/TournamentSkeleton'
+import { useSkeleton, useLoadTimeout } from '../components/Skeleton'
 
 /** "9–11 out" quando é tudo no mesmo mês, "30 set – 2 out" quando não é. */
 function dateRange(startIso, endIso, locale) {
@@ -185,6 +187,10 @@ export default function TournamentPage() {
     if (navigator.share) { navigator.share({ title: tour.name, text, url: tournamentUrl(tour, window.location.origin) }).catch(() => {}); return }
     window.open(whatsappShare(text), '_blank')
   }
+  const showSkeleton = useSkeleton(!data && !failed)
+  const loadLate = useLoadTimeout(!data && !failed)
+  const skeletonShown = useRef(false)
+  if (showSkeleton) skeletonShown.current = true
   const back = <BackBar onBack={goBack} title={data?.tournament?.name} onShare={data?.tournament?.status === 'rascunho' ? undefined : shareTournament} />
 
   if (failed && orgHint) {
@@ -203,8 +209,18 @@ export default function TournamentPage() {
       </div>
     )
   }
+  // A carregar: o «‹» a sério e o resto a cinzento, só depois de 0,2 s; ao
+  // fim de 8 s, o erro de sempre (esqueletos, 12 out). O «⤴» só com os
+  // dados: antes não se sabe se é um rascunho, que não se partilha (#544).
   if (!data) {
-    return <div className="flex items-center justify-center py-16"><div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div></div>
+    return (
+      <div className="space-y-4">
+        <BackBar onBack={goBack} />
+        {loadLate
+          ? <LoadErrorState title={t('app.load_error_title')} />
+          : showSkeleton ? <TournamentPageSkeleton /> : null}
+      </div>
+    )
   }
 
   const tour = data.tournament
@@ -323,10 +339,10 @@ export default function TournamentPage() {
     )
   }
 
-  const spinner = <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-8 w-8 border-[3px] border-ink-50 border-t-ink-700" /></div>
+  const spinner = <PanelSkeleton />
 
   return (
-    <div className="space-y-4">
+    <div className={`space-y-4 ${skeletonShown.current ? 'animate-fill-in' : ''}`}>
       {back}
       {/* O que ficou por gravar ao criar (preço especial, 10 out). */}
       {location.state?.notice && (
