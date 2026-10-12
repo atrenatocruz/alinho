@@ -201,7 +201,7 @@ const clean = (v) => String(v).replace(/\D/g, '').slice(0, 3)
 
 /** As rondas marcadas, editáveis (pontos 6 e 7). `initial`: os resultados
  *  propostos por quem disse que não está certo, para quem corrige. */
-export function RoundsScoreSheet({ title, hint, match, games, initial = null, withNote = false, primaryLabel, primaryDanger = false, secondaryLabel, onPrimary, onSecondary, onClose }) {
+export function RoundsScoreSheet({ title, hint, match, games, initial = null, withNote = false, primaryLabel, primaryDanger = false, secondaryLabel, onPrimary, onSecondary, onClose, notAllowedKey = null }) {
   const { t } = useTranslation()
   const played = [...games].filter(hasScore).sort((a, b) => (a.round_number || a.n || 0) - (b.round_number || b.n || 0))
   const start = Object.fromEntries((initial || []).map((r) => [r.game_id, r]))
@@ -217,7 +217,8 @@ export function RoundsScoreSheet({ title, hint, match, games, initial = null, wi
     setBusy(true); setError('')
     try { await fn() } catch (err) {
       console.error('Error on friend match result:', err)
-      setError(roundSaveError(t, err))
+      // O 'not_allowed' de responder/corrigir não é o das rondas (Dev 3, 12 out).
+      setError(notAllowedKey && String(err?.message || '').includes('not_allowed') ? t(notAllowedKey) : roundSaveError(t, err))
     } finally { setBusy(false) }
   }
   const rounds = () => played.map((g) => ({ game_id: g.id, score_a: Number(vals[g.id].a), score_b: Number(vals[g.id].b) }))

@@ -36,7 +36,7 @@ export default function FriendResultNotice({ notice, onOpen }) {
   const confirm = async () => {
     setBusy(true); setError('')
     try { await confirmFriendMatchResult(d.match_id); onOpen(notice) }
-    catch (err) { console.error('Error confirming friend match result:', err); setError(roundSaveError(t, err)) }
+    catch (err) { console.error('Error confirming friend match result:', err); setError(String(err?.message || '').includes('not_allowed') ? t('friends.result_error_not_allowed') : roundSaveError(t, err)) }
     finally { setBusy(false) }
   }
   const openReject = async () => {
@@ -66,6 +66,7 @@ export default function FriendResultNotice({ notice, onOpen }) {
       </button>
       {sheet && (
         <RoundsScoreSheet
+          notAllowedKey="friends.result_error_not_allowed"
           title={t('friends.reject_title')}
           hint={t('friends.reject_hint')}
           match={sheet.match}

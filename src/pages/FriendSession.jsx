@@ -324,6 +324,7 @@ export default function FriendSession() {
       )}
       {correcting && (
         <RoundsScoreSheet
+          notAllowedKey="friends.correct_error_not_allowed"
           title={t('friends.correct_the_result')}
           hint={t('friends.correct_hint')}
           match={match}
