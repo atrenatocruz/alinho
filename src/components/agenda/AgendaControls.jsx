@@ -524,6 +524,23 @@ export function HomeBar({ filters, dayKey, onOpenSearch, onOpenDay, onOpenFilter
   const pill = (on) => `${TAP} shrink-0 inline-flex items-center gap-1.5 px-3 min-h-[36px] rounded-full text-[13px] font-extrabold border whitespace-nowrap select-none ${
     on ? 'bg-ink-900 text-white border-ink-900' : 'bg-white text-ink-900 border-line'
   }`
+  // A pastilha escolhida fica sempre à vista: a barra desliza até ela quando
+  // a escolha muda (UX, 12 out). Ao abrir, sem deslizar — salta logo.
+  const kindsKey = filters.kinds.join(',')
+  const shownOnce = useRef(false)
+  useEffect(() => {
+    const el = ref.current
+    const on = el?.querySelector('[data-kind][aria-pressed="true"]')
+    if (!el || !on) { shownOnce.current = true; return }
+    const box = el.getBoundingClientRect()
+    const r = on.getBoundingClientRect()
+    const pad = 16
+    let left = null
+    if (r.right > box.right - pad) left = el.scrollLeft + r.right - box.right + pad
+    else if (r.left < box.left + pad) left = el.scrollLeft - (box.left + pad - r.left)
+    if (left != null) el.scrollTo({ left, behavior: shownOnce.current ? 'smooth' : 'auto' })
+    shownOnce.current = true
+  }, [kindsKey, ref])
   // Um tipo de cada vez; tocar no escolhido, ou em «Tudo», volta a tudo.
   const pick = (k) => onKinds(k === null || (filters.kinds.length === 1 && filters.kinds[0] === k) ? [...EVENT_KINDS] : [k])
   return (
@@ -548,7 +565,7 @@ export function HomeBar({ filters, dayKey, onOpenSearch, onOpenDay, onOpenFilter
       {kinds.map((k) => {
         const on = !all && filters.kinds.includes(k)
         return (
-          <button key={k} type="button" onClick={() => pick(k)} aria-pressed={on} className={pill(on)}>
+          <button key={k} type="button" data-kind={k} onClick={() => pick(k)} aria-pressed={on} className={pill(on)}>
             {k === 'free'
               // Horários livres: só o contorno tracejado, como o cartão deles (UX, 11 out).
               ? <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-[3px] border-[1.5px] border-dashed" style={{ borderColor: on ? '#F2C2B1' : '#D9826A', opacity: on ? 1 : 0.55 }} />

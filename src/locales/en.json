@@ -5411,5 +5411,19 @@
   "nov.new": "New",
   "nov.end_title": "Don't have an account yet?",
   "nov.end_how": "How it works",
-  "agenda.filter_kind_free": "Free slots"
+  "agenda.filter_kind_free": "Free slots",
+  "landing.rank_eyebrow": "Ranking and achievements",
+  "landing.rank_title": "Every game counts. And earns medals.",
+  "landing.rank_text": "Your level goes up and down with your results, you see your place in your club's ranking and overall, and you unlock achievements along the way.",
+  "site.hl_achievements": "Over <n>100</n> achievements to unlock",
+  "site.hl_xp": "XP levels: Gold, Emerald, Diamond…",
+  "site.hl_kudos": "Kudos from fellow players after every mix",
+  "hiw.rank_eyebrow": "For players · Ranking and achievements",
+  "hiw.rank_title": "Play, climb, collect.",
+  "hiw.rank_p2_t": "Over 100 achievements",
+  "hiw.rank_p2_b": "From your first ball to the perfect night, there are over 100 achievements to unlock, each with its own medal. Each one shows how many players already have it, and some almost nobody has.",
+  "hiw.rank_p3_t": "XP and levels",
+  "hiw.rank_p3_b": "Every game earns XP. You level up, from Gold to Emerald and Diamond, and the ones who play the most stand out on their profile.",
+  "hiw.rank_p4_t": "Kudos",
+  "hiw.rank_p4_b": "At the end of the mix, you give kudos to whoever played well or made the night. There are achievements for those who get the most."
 }
