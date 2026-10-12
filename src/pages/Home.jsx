@@ -322,9 +322,14 @@ export default function Home() {
           partner:profiles!participants_partner_id_fkey (name, avatar_url, rating, gender),
           guest:game_guests!participants_guest_id_fkey (id, name),
           partner_guest:game_guests!participants_partner_guest_id_fkey (id, name)
-        )
+        ),
+        scored:matches (id)
       `)
       .in('organization_id', orgIds)
+      // «A decorrer» só com a ronda começada ou um resultado (mixLive, 12 out):
+      // basta saber se há um jogo com resultado.
+      .not('scored.score_a', 'is', null)
+      .limit(1, { referencedTable: 'scored' })
       .order('date', { ascending: true })
     if (error) throw error
 

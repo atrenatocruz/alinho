@@ -9,6 +9,7 @@
 //     jogados a cinzento, e «Ver os mais antigos (N)» no fim.
 // Tocar numa data abre a mesma folha do «Mais ⋯» da página desse mix, só
 // com o que mexe nesse dia.
+import { isMixLive } from '../../lib/mixLive'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { BackBar } from '../ui'
@@ -89,7 +90,9 @@ export default function SeriesPage({ games, onBack, onEditRules, onOpen, onChang
     if (g.status === 'cancelled') return t('series.date_cancelled')
     if (DONE.includes(g.status)) return t('series.date_finished', { count: people(g) })
     if (g.status === 'pending') return abreEm(g) || t('series.date_not_open')
-    if (g.status === 'in_progress') return `${time(g)} · ${t('gerirclube.status_in_progress')}`
+    // Duplas formadas e ronda por começar: ainda não está a decorrer (12 out).
+    if (isMixLive(g)) return `${time(g)} · ${t('gerirclube.status_in_progress')}`
+    if (g.status === 'in_progress') return `${time(g)} · ${t('series.date_signed', { count: people(g), max: mixCapacity(g) })}`
     return `${time(g)} · ${t('series.date_signed', { count: people(g), max: mixCapacity(g) })}`
   }
 

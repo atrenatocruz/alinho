@@ -9,6 +9,7 @@ import { useSpecialPriceLine } from '../SpecialPriceRoster'
 import { GENDER_RESTRICTION_LABEL_KEY, mixCapacity, isGenderMismatch, isAgeIneligible, formatLabelKey } from '../../lib/mixLogic'
 import { AGE_LABEL_KEY } from '../../lib/ageCategories'
 import CardMascot, { mascotFor, mascotCardClass, MascotPill } from './CardMascot'
+import { isMixLive } from '../../lib/mixLive'
 import { ratingBand } from '../../lib/elo'
 import { parseLevel, levelNumber } from '../../lib/mixLevels'
 
@@ -318,7 +319,8 @@ export function GameEventCard({ event, profile, friendIds = null, action = null,
   const capacity = mixCapacity(game)
   const isFull = players.length >= capacity
   const isClosed = game.status === 'closed' || (game.status === 'open' && isFull)
-  const isLive = game.status === 'in_progress'
+  // Só a decorrer com a ronda 1 começada (mixLive, 12 out).
+  const isLive = isMixLive(game)
   const friendsIn = friendIds ? players.filter((p) => p.id && friendIds.has(p.id)) : []
   // Jogo em aberto aberto por alguém (SPEC-4, ponto 5): «Abriste este jogo»
   // para quem o abriu, «<Nome> abriu este jogo» para os outros, e o que falta

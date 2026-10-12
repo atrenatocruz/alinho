@@ -1,3 +1,4 @@
+import { isMixLive } from '../lib/mixLive'
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useParams, useSearchParams, useNavigate, useLocation, Link } from 'react-router-dom'
@@ -885,10 +886,14 @@ export default function GerirClube() {
             ends_on,
             ends_after_occurrences,
             mix_offset_seconds
-          )
+          ),
+          scored:matches (id)
         `)
         .eq('organization_id', currentOrganizationId)
         .eq('origin', 'admin')
+        // «A decorrer» só com a ronda começada ou um resultado (mixLive, 12 out).
+        .not('scored.score_a', 'is', null)
+        .limit(1, { referencedTable: 'scored' })
         .order('date', { ascending: false })
 
       if (error) {
@@ -3549,7 +3554,7 @@ export default function GerirClube() {
                       ? t('gerirclube.entries_until', { date: quandoCurto(`${row.entries_deadline}T12:00`, false) })
                       : null
                     const duplas = tipo === 'torneio' && row.entry_count != null ? t('gerirclube.tournament_teams', { count: Number(row.entry_count) }) : null
-                    const aDecorrer = tipo === 'mix' && row.status === 'in_progress' ? t('gerirclube.status_in_progress') : null
+                    const aDecorrer = tipo === 'mix' && isMixLive(row) ? t('gerirclube.status_in_progress') : null
                     etiqueta = { mix: 'gerirclube.event_label_mix', aberto: 'gerirclube.event_label_open', torneio: 'gerirclube.event_label_tournament' }[tipo]
                     Icone = { mix: Calendar, aberto: Clock, torneio: Trophy }[tipo]
                     linha = tipo === 'torneio' ? row.name : row.title
