@@ -64,6 +64,7 @@ export function pendingOccurrenceRow(game, { nextDate, launchAt, userId, recurre
     ...(game.pairing_mode && game.pairing_mode !== 'por_nivel' ? { pairing_mode: game.pairing_mode } : {}),
     ...(game.rotate_partners ? { rotate_partners: true } : {}),
     ...(game.seed_reverse ? { seed_reverse: true } : {}),
+    ...(game.respect_sides ? { respect_sides: true } : {}),
     ...(game.ranked === false ? { ranked: false } : {}),
     ...(game.allow_pair_signup ? { allow_pair_signup: true } : {}),
     ...(game.join_approval ? { join_approval: true } : {}),

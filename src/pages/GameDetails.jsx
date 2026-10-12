@@ -180,6 +180,9 @@ export default function GameDetails() {
   const [birthdayError, setBirthdayError] = useState('')
   const [justBooked, setJustBooked] = useState(false)
   const [mixError, setMixError] = useState('')
+  // Pares quebrados (12 out): a ronda teve de repetir uma dupla dos últimos
+  // 4 mixes — a tira amarela, só para quem organiza (é quem sorteia a ronda).
+  const [roundRepeatNotice, setRoundRepeatNotice] = useState('')
   const [busy, setBusy] = useState(false)
   const [scores, setScores] = useState({}) // matchId -> {a, b}
   // 👍 da noite (kudos) — pódio do mix + o meu voto, lidos por RPC.
@@ -2176,7 +2179,21 @@ export default function GameDetails() {
         }
         const globalRankings = await getGlobalRankings()
         const pointsById = Object.fromEntries(globalRankings.map(r => [r.user_id, Math.round(r.rating || 0)]))
-        const courts = nextSobeDesceRotating(currentRoundMatches, teamsById, numCourts, { partnerPairs, rankOf })
+        // Pares quebrados (12 out): a regra dos últimos 4 mixes e, com
+        // «Respeitar os lados», esquerda com direita — sempre que der.
+        const historyPairs = await loadRepeatPairKeys()
+        const courts = nextSobeDesceRotating(currentRoundMatches, teamsById, numCourts, {
+          partnerPairs, rankOf, historyPairs, respectSides: !!game.respect_sides,
+        })
+        const forced = courts.filter((c) => c.forcedHistory)
+          .flatMap((c) => [c.duplaA, c.duplaB])
+          .filter(([x, y]) => historyPairs.has([x?.id, y?.id].sort().join('|')))
+        // Não havia outra forma: junta na mesma e avisa quem organiza.
+        setRoundRepeatNotice(forced.length > 0
+          ? t('gamedetails.repeat_forced_round', {
+            pairs: forced.map(([x, y]) => t('gamedetails.repeat_pair', { a: shortPersonName(x?.name), b: shortPersonName(y?.name) })).join('; '),
+          })
+          : '')
         // teamSlotCols: convidados sem conta vão para playerX_guest_id
         // (FK para game_guests) — escrevê-los em playerX_id violava a FK
         // para profiles e bloqueava a ronda. O pointsById do estado já
@@ -2775,7 +2792,9 @@ export default function GameDetails() {
       rows = americanoStandingsResult.map((s) => ({ key: s.player.id, name: s.player.name, mine: s.player.id === user.id,
         extra: `${s.wins}${t('gamedetails.wins_abbrev')} · ${s.points} ${t('gamedetails.points_suffix')}` }))
     } else if (isRotating) {
-      rows = placarResult.map((s) => ({ key: s.player.id, name: s.player.name, mine: s.player.id === user.id,
+      // Os dois do mesmo campo com o mesmo resultado partilham o lugar (pares quebrados, 12 out).
+      rows = placarResult.map((s, i, all) => ({ key: s.player.id, name: s.player.name, mine: s.player.id === user.id,
+        place: s.hasResult ? all.findIndex((x) => x.hasResult && x.court === s.court && x.wonLast === s.wonLast) + 1 : i + 1,
         extra: `${s.wins}${t('gamedetails.wins_abbrev')}` }))
     } else if (isSobeDesce) {
       rows = sobeDesceStandings(matches).map((teamId) => ({ key: teamId, name: teamName(teamId), mine: myTeamIds.has(teamId) }))
@@ -2783,7 +2802,8 @@ export default function GameDetails() {
       rows = tctStandings.map((s) => ({ key: s.team.id, name: teamName(s.team.id), mine: myTeamIds.has(s.team.id),
         extra: `${s.wins}${t('gamedetails.wins_abbrev')} · ${s.diff > 0 ? '+' : ''}${s.diff}` }))
     }
-    return { rows, myPos: rows.findIndex((r) => r.mine) + 1 }
+    const me = rows.findIndex((r) => r.mine)
+    return { rows, myPos: me === -1 ? 0 : (rows[me].place ?? me + 1) }
   })()
   // "Ganhou no campo 1" / "Perdeu no campo 1" — o resultado que decide a
   // ordem do Placar (Francisco, 18 set). Sem jogos com resultado: "Campo 1".
@@ -3618,6 +3638,9 @@ export default function GameDetails() {
         )
       })()}
 
+      {roundRepeatNotice && isAdmin && (
+        <p role="status" className="rounded-ctrl bg-warning/10 px-4 py-3 text-sm font-bold text-[#92400E]">{roundRepeatNotice}</p>
+      )}
       {/* Com a barra de quem organiza, o erro aparece nela, junto ao botão. */}
       {mixError && !(showAdminBar && barPrimary) && (
         <div className="bg-danger/10 text-danger px-4 py-3 rounded-ctrl text-sm font-extrabold animate-fade-up">
@@ -3839,7 +3862,7 @@ export default function GameDetails() {
                 <div className="space-y-1.5">
                   {classif.rows.map((row, i) => (
                     <div key={row.key} className={`flex items-center gap-3 text-sm py-1.5 border-b border-line last:border-0 ${row.mine ? 'font-extrabold' : ''}`}>
-                      <span className="w-6 font-extrabold text-ink-900 tabular-nums">{i + 1}</span>
+                      <span className="w-6 font-extrabold text-ink-900 tabular-nums">{row.place ?? i + 1}</span>
                       <span className="flex-1 font-extrabold text-ink-900 truncate">{row.name}</span>
                       {row.extra && <span className="text-muted tabular-nums text-right whitespace-nowrap">{row.extra}</span>}
                     </div>
@@ -4058,9 +4081,13 @@ export default function GameDetails() {
                           <h3 className="text-lg text-ink-900">{t('gamedetails.placar_title')}</h3>
                           <p className="text-sm text-muted mb-3">{t('gamedetails.placar_hint')} {t(game.ranked === false ? 'gamedetails.placar_ranking_friendly' : 'gamedetails.placar_ranking_ranked')}</p>
                           <div className="space-y-1.5">
-                            {placarResult.map((s, i) => (
+                            {placarResult.map((s, i, all) => (
                               <div key={s.player.id} className="flex items-center gap-3 text-sm py-1.5 border-b border-line last:border-0">
-                                <span className="w-6 font-extrabold text-ink-900 tabular-nums">{i + 1}</span>
+                                {/* Os dois do mesmo campo com o mesmo resultado partilham o lugar:
+                                    «1.º Rita e Tiago» (pares quebrados, 12 out — escolha A). */}
+                                <span className="w-6 font-extrabold text-ink-900 tabular-nums">{s.hasResult
+                                  ? all.findIndex((x) => x.hasResult && x.court === s.court && x.wonLast === s.wonLast) + 1
+                                  : i + 1}</span>
                                 <span className="flex-1 font-extrabold text-ink-900 truncate">{s.player.name}</span>
                                 <span className={`text-xs font-extrabold whitespace-nowrap ${s.hasResult && s.wonLast ? 'text-ok' : 'text-muted'}`}>{placarCourtLabel(s)}</span>
                                 <span className="text-muted tabular-nums w-10 text-right" title={t('gamedetails.wins_title')}>{s.wins}{t('gamedetails.wins_abbrev')}</span>

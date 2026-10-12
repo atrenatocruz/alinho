@@ -545,6 +545,57 @@ describe('nextSobeDesceRotating', () => {
     }
   })
 
+  // Pares quebrados (12 out): no campo 1 da ronda 2 ficam a, b, e, f; sem
+  // repetir parceiro deste mix há duas formas: a+e/b+f ou a+f/b+e.
+  const pairsOf = (court) => [court.duplaA, court.duplaB].map(([x, y]) => key(x.id, y.id)).sort()
+
+  it('regra dos 4 mixes (12 out): evita quem já foi dupla, havendo outra forma', () => {
+    for (const r of [0.05, 0.5, 0.95]) {
+      const [c1] = nextSobeDesceRotating(round1, teams, 2, { partnerPairs: playedPairs, random: () => r, historyPairs: new Set([key('a', 'e')]) })
+      expect(pairsOf(c1)).toEqual([key('a', 'f'), key('b', 'e')].sort())
+      expect(c1.forcedHistory).toBe(false)
+    }
+  })
+
+  it('regra dos 4 mixes: sem outra forma, junta na mesma e marca o campo', () => {
+    const [c1] = nextSobeDesceRotating(round1, teams, 2, { partnerPairs: playedPairs, random: () => 0.1,
+      historyPairs: new Set([key('a', 'e'), key('a', 'f')]) })
+    expect(c1.forcedHistory).toBe(true)
+  })
+
+  it('respeitar os lados (12 out): junta esquerda com direita, sempre que dá', () => {
+    const side = (id, s) => ({ id, name: id, preferred_side: s })
+    const sided = {
+      t1: { id: 't1', player1: side('a', 'left'), player2: side('b', 'right') },
+      t2: { id: 't2', player1: side('c', 'left'), player2: side('d', 'right') },
+      t3: { id: 't3', player1: side('e', 'left'), player2: side('f', 'right') },
+      t4: { id: 't4', player1: side('g', 'both'), player2: side('h', null) },
+    }
+    for (const r of [0.05, 0.5, 0.95]) {
+      const [c1, c2] = nextSobeDesceRotating(round1, sided, 2, { partnerPairs: playedPairs, random: () => r, respectSides: true })
+      // a e e são da esquerda: nunca juntos.
+      expect(pairsOf(c1)).toEqual([key('a', 'f'), key('b', 'e')].sort())
+      // Campo 2: c (esq.), d (dir.), g («os dois»), h (sem lado) — qualquer forma serve.
+      expect(pairsOf(c2).length).toBe(2)
+    }
+    // Sem o interruptor, os lados não contam: as duas formas aparecem.
+    const vistas = new Set()
+    for (const r of [0.05, 0.3, 0.55, 0.8, 0.95]) {
+      vistas.add(pairsOf(nextSobeDesceRotating(round1, sided, 2, { partnerPairs: playedPairs, random: () => r })[0]).join(','))
+    }
+    expect(vistas.size).toBe(2)
+  })
+
+  it('a regra dos 4 mixes vem antes dos lados', () => {
+    const side = (id, s) => ({ id, name: id, preferred_side: s })
+    const sided = { ...teams, t1: { id: 't1', player1: side('a', 'left'), player2: side('b', 'right') },
+      t3: { id: 't3', player1: side('e', 'left'), player2: side('f', 'right') } }
+    // a+f e b+e foram dupla há pouco: fica a+e/b+f, mesmo com os lados a chocar.
+    const [c1] = nextSobeDesceRotating(round1, sided, 2, { partnerPairs: playedPairs, random: () => 0.5, respectSides: true,
+      historyPairs: new Set([key('a', 'f'), key('b', 'e')]) })
+    expect(pairsOf(c1)).toEqual([key('a', 'e'), key('b', 'f')].sort())
+  })
+
   it('escolhe ao sorte entre as formas sem repetição', () => {
     const vistas = new Set()
     // Valores de sorteio espalhados de 0 a 1 — cobre as duas formas possíveis.

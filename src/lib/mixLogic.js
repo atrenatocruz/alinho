@@ -370,7 +370,18 @@ export function nextSobeDesce(roundMatches, numCourts) {
     partnerPairs: Set de "idA|idB" de todas as duplas já formadas no mix.
     rankOf(player): posição atual no mix (0 = primeiro).
     Devolve [{ court_number, duplaA: [p, p], duplaB: [p, p] }]. */
-export function nextSobeDesceRotating(roundMatches, teamsById, numCourts, { partnerPairs = new Set(), rankOf = () => 0, random = Math.random } = {}) {
+// Pares quebrados (Francisco, 12 out; design-handoff/2026-10-12-pares-
+// quebrados/REGRAS.md): nas rondas seguintes, entre as maneiras de juntar os
+// quatro de um campo sem repetir parceiro neste mix, prefere-se a que não
+// junta quem foi dupla num dos últimos 4 mixes em que estiveram os dois
+// (`historyPairs`, a regra de 12 out) e, com «Respeitar os lados» ligado
+// (`respectSides`), a que junta esquerda com direita. Quem diz «os dois», não
+// tem lado ou joga sem conta serve para qualquer lado. Nunca bloqueia: sem
+// maneira limpa, junta na mesma e marca o campo (`forcedHistory`).
+const sideOfPlayer = (u) => (u?.preferred_side === 'left' || u?.preferred_side === 'right') ? u.preferred_side : 'both'
+const sidesClash = (x, y) => { const a = sideOfPlayer(x); const b = sideOfPlayer(y); return a !== 'both' && a === b }
+
+export function nextSobeDesceRotating(roundMatches, teamsById, numCourts, { partnerPairs = new Set(), rankOf = () => 0, random = Math.random, historyPairs = new Set(), respectSides = false } = {}) {
   const pairKey = (a, b) => [a?.id, b?.id].sort().join('|')
   const byCourt = {}
   for (const m of roundMatches) {
@@ -393,15 +404,20 @@ export function nextSobeDesceRotating(roundMatches, teamsById, numCourts, { part
         [[a, d], [b, c]],
       ]
       const repeats = (opt) => opt.filter(([x, y]) => partnerPairs.has(pairKey(x, y))).length
+      const history = (opt) => opt.filter(([x, y]) => historyPairs.has(pairKey(x, y))).length
+      const clashes = (opt) => (respectSides ? opt.filter(([x, y]) => sidesClash(x, y)).length : 0)
       const fresh = options.filter((opt) => repeats(opt) === 0)
       let chosen
       if (fresh.length > 0) {
-        chosen = fresh[Math.floor(random() * fresh.length)]
+        // Primeiro a regra dos 4 mixes, depois os lados (prioridade do PO).
+        const best = Math.min(...fresh.map((o) => history(o) * 10 + clashes(o)))
+        const pick = fresh.filter((o) => history(o) * 10 + clashes(o) === best)
+        chosen = pick[Math.floor(random() * pick.length)]
       } else {
         const byPosition = [...players].sort((x, y) => rankOf(x) - rankOf(y))
         chosen = [[byPosition[0], byPosition[1]], [byPosition[2], byPosition[3]]]
       }
-      return { court_number: Number(court), duplaA: chosen[0], duplaB: chosen[1] }
+      return { court_number: Number(court), duplaA: chosen[0], duplaB: chosen[1], forcedHistory: history(chosen) > 0 }
     })
     .sort((x, y) => x.court_number - y.court_number)
 }

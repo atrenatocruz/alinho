@@ -560,6 +560,24 @@ export default function MixWizard({
                 { value: 'fixed', label: t('gerirclube.rotate_partners_fixed') },
                 { value: 'rotate', label: t('gerirclube.rotate_partners_rotate') },
               ]} />
+            {/* Pares quebrados (12 out): o aviso da Escalada quando quem começa
+                no último campo não chega ao 1 — avisa, não bloqueia. */}
+            {form.rotate_partners && (() => {
+              const courts = parseInt(form.num_courts, 10) || 1
+              const rounds = totalRounds(form)
+              return reverseClimbWarning({ numCourts: courts, rounds }) === 'cant_reach' ? (
+                <p role="status" className="mt-2 rounded-ctrl bg-warning/10 px-3 py-2 text-sm font-bold text-[#92400E]">
+                  {t('gerirclube.rotate_warn_cant_reach', { courts, rounds })}
+                </p>
+              ) : null
+            })()}
+          </Field>
+        )}
+        {uiFormatOf(form) === 'sobe_desce' && form.rotate_partners && (
+          <Field label={t('gerirclube.respect_sides_label')} hint={t('gerirclube.respect_sides_help')}>
+            <Chips label={t('gerirclube.respect_sides_label')} value={form.respect_sides ? 'yes' : 'no'}
+              onChange={(v) => set({ respect_sides: v === 'yes' })}
+              options={[{ value: 'yes', label: t('gerirclube.respect_sides_yes') }, { value: 'no', label: t('gerirclube.respect_sides_no') }]} />
           </Field>
         )}
         <Field label={t('mixwizard.pairing_label')}

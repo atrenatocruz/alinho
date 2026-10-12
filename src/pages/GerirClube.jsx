@@ -181,6 +181,8 @@ const EMPTY_GAME_FORM = {
   scoring_format: 'pontos_simples',
   pairing_mode: 'por_nivel',
   rotate_partners: false,
+  // Pares quebrados (12 out): no Sobe e desce a trocar, esquerda com direita.
+  respect_sides: false,
   // Sobe e desce invertido (29 set): as mais fortes começam no último campo.
   seed_reverse: false,
   allow_pair_signup: false,
@@ -1163,6 +1165,8 @@ export default function GerirClube() {
     // O `game` é a linha da base de dados: com a coluna vai sempre (também
     // «Não», para editar Sim→Não chegar à série); sem ela, não vai.
     ...(typeof game.seed_reverse === 'boolean' ? { seed_reverse: game.seed_reverse } : {}),
+    // «Respeitar os lados» (Dev 3, migration_mix_respeitar_lados.sql): o mesmo truque.
+    ...(typeof game.respect_sides === 'boolean' ? { respect_sides: game.respect_sides } : {}),
     ...(game.ranked === false ? { ranked: false } : {}),
     // O `game` aqui é a linha que a base de dados devolveu: com a coluna, vai
     // sempre (também «Não», para editar Sim→Não chegar à recorrência); antes
@@ -1385,7 +1389,7 @@ export default function GerirClube() {
     // pairing_mode sai pelo mesmo motivo: só é enviado quando não é o valor
     // por omissão, para criar/editar mixes não rebentar antes de
     // migration_mix_pairing_mode.sql correr.
-    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, seed_reverse: _seedReverse, ranked: _ranked, allow_pair_signup: _allowPairSignup, join_approval: _joinApproval, launch, whatsapp_post_times: postTimes, tiebreak_8_8: tieBreak88, image_url: imageUrl, special, ...gameFields } = gameForm
+    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, respect_sides: _respectSides, seed_reverse: _seedReverse, ranked: _ranked, allow_pair_signup: _allowPairSignup, join_approval: _joinApproval, launch, whatsapp_post_times: postTimes, tiebreak_8_8: tieBreak88, image_url: imageUrl, special, ...gameFields } = gameForm
 
     const recurrenceError = validateRecurrence(recurrence)
     if (recurrenceError) {
@@ -1443,6 +1447,8 @@ export default function GerirClube() {
             // Sobe e desce invertido: só vai quando está ligado (antes de
             // migration_mix_sobe_desce_invertido.sql a coluna não existe).
             ...(gameForm.seed_reverse && gameForm.format === 'sobe_desce' ? { seed_reverse: true } : {}),
+            // «Respeitar os lados»: só vai ligado, e só no Sobe e desce a trocar.
+            ...(gameForm.respect_sides && gameForm.rotate_partners && gameForm.format === 'sobe_desce' ? { respect_sides: true } : {}),
             // «Inscrição em dupla» (Renato, 24 set): só vai quando é «Sim» e as
             // duplas são fixas — antes de migration_mix_pair_signup.sql a
             // coluna não existe, e «Não» é o valor por omissão.
@@ -1652,7 +1658,7 @@ export default function GerirClube() {
     // pairing_mode sai pelo mesmo motivo: só é enviado quando não é o valor
     // por omissão, para criar/editar mixes não rebentar antes de
     // migration_mix_pairing_mode.sql correr.
-    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, seed_reverse: _seedReverse, ranked: _ranked, allow_pair_signup: _allowPairSignup, join_approval: _joinApproval, launch: _launch, whatsapp_post_times: postTimes, tiebreak_8_8: tieBreak88, image_url: imageUrl, special, ...gameFields } = gameForm
+    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, respect_sides: _respectSides, seed_reverse: _seedReverse, ranked: _ranked, allow_pair_signup: _allowPairSignup, join_approval: _joinApproval, launch: _launch, whatsapp_post_times: postTimes, tiebreak_8_8: tieBreak88, image_url: imageUrl, special, ...gameFields } = gameForm
     // Any mix in an active recurring series shares the same underlying
     // game_recurrences row (via recurrence_id) — not just the origin — so
     // recurrence management works from any of them, not only the one that
@@ -1697,6 +1703,7 @@ export default function GerirClube() {
           ...((gameForm.pairing_mode !== 'por_nivel' || editingGame.pairing_mode) ? { pairing_mode: gameForm.pairing_mode } : {}),
           ...((gameForm.rotate_partners || editingGame.rotate_partners) ? { rotate_partners: !!gameForm.rotate_partners && gameForm.format === 'sobe_desce' } : {}),
           ...((gameForm.seed_reverse || editingGame.seed_reverse) ? { seed_reverse: !!gameForm.seed_reverse && gameForm.format === 'sobe_desce' } : {}),
+          ...((gameForm.respect_sides || editingGame.respect_sides) ? { respect_sides: !!gameForm.respect_sides && !!gameForm.rotate_partners && gameForm.format === 'sobe_desce' } : {}),
           ...((gameForm.allow_pair_signup || editingGame.allow_pair_signup) ? { allow_pair_signup: !!gameForm.allow_pair_signup && pairsAreFixed(gameForm) } : {}),
           ...((gameForm.join_approval || editingGame.join_approval) ? { join_approval: !!gameForm.join_approval } : {}),
           ...((gameForm.ranked === false || editingGame.ranked === false) ? { ranked: gameForm.ranked !== false } : {}),
@@ -2315,6 +2322,7 @@ export default function GerirClube() {
       scoring_format: game.scoring_format || 'pontos_simples',
       pairing_mode: game.pairing_mode || 'por_nivel',
       rotate_partners: !!game.rotate_partners,
+      respect_sides: !!game.respect_sides,
       seed_reverse: !!game.seed_reverse,
       allow_pair_signup: !!game.allow_pair_signup,
       join_approval: !!game.join_approval,
@@ -3075,6 +3083,28 @@ export default function GerirClube() {
                         <p className="text-sm text-muted mt-1.5">
                           {t(gameForm.rotate_partners ? 'gerirclube.rotate_partners_rotate_help' : 'gerirclube.rotate_partners_fixed_help')}
                         </p>
+                      </div>
+                    )}
+                    {/* Pares quebrados (12 out): «Respeitar os lados», só no Sobe e desce a trocar. */}
+                    {uiFormatOf(gameForm) === 'sobe_desce' && gameForm.rotate_partners && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">{t('gerirclube.respect_sides_label')}</label>
+                        <Segmented
+                          options={[{ value: 'yes', label: t('gerirclube.respect_sides_yes') }, { value: 'no', label: t('gerirclube.respect_sides_no') }]}
+                          value={gameForm.respect_sides ? 'yes' : 'no'}
+                          onChange={(v) => setGameForm({ ...gameForm, respect_sides: v === 'yes' })}
+                        />
+                        <p className="text-sm text-muted mt-1.5">{t('gerirclube.respect_sides_help')}</p>
+                        {(() => {
+                          // Dá tempo para quem começa no último campo chegar ao 1? (aviso, não bloqueia)
+                          const courts = parseInt(gameForm.num_courts, 10) || 1
+                          const rounds = totalRounds(gameForm)
+                          return reverseClimbWarning({ numCourts: courts, rounds }) === 'cant_reach' ? (
+                            <p role="status" className="mt-2 rounded-ctrl bg-warning/10 px-3 py-2 text-sm font-bold text-[#92400E]">
+                              {t('gerirclube.rotate_warn_cant_reach', { courts, rounds })}
+                            </p>
+                          ) : null
+                        })()}
                       </div>
                     )}
 
