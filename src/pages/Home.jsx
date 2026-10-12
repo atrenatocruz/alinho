@@ -7,7 +7,9 @@ import { supabase } from '../lib/supabase'
 import { takePendingOrgSlug } from '../lib/loginLinks'
 import { getClubProfile } from '../lib/clubProfile'
 import { useAuth } from '../contexts/AuthContext'
-import { ConfirmSheet } from '../components/ui'
+import { ConfirmSheet, EmptyState, PrimaryButton } from '../components/ui'
+import HomeSkeleton from '../components/home/HomeSkeleton'
+import { useSkeleton, useLoadTimeout } from '../components/Skeleton'
 import { GameEventCard, FriendsEventCard, ExploreEventCard } from '../components/agenda/EventCard'
 import { MonthSheet, HomeBar, HomeFiltersSheet, LocationChip, LocationSheet, ViewToggle, Sheet, dayLabel } from '../components/agenda/AgendaControls'
 import HomeSearch, { rememberSearch } from '../components/agenda/HomeSearch'
@@ -79,6 +81,11 @@ const writeSession = (key, value) => {
   try { sessionStorage.setItem(key, JSON.stringify(value)) } catch { /* modo privado */ }
 }
 
+// O que a Home já mostrou, para ao voltar aparecer logo, sem cinzento (SPEC
+// 2026-10-12-home-esqueleto, ponto 6). Só na memória desta aba; os dados
+// voltam a pedir-se por trás e substituem estes quando chegam.
+let homeCache = null
+
 export default function Home() {
   const { t, i18n } = useTranslation()
   // Torneios com inscrições abertas, para quem ainda não é membro de nada
@@ -101,11 +108,18 @@ export default function Home() {
   const headerActions = useHeaderActions()
   const [searchParams, setSearchParams] = useSearchParams()
 
-  const [games, setGames] = useState([])
-  const [groupMatches, setGroupMatches] = useState([]) // [{ match, org }]
-  const [privateMatches, setPrivateMatches] = useState([])
-  const [myMixResults, setMyMixResults] = useState(new Map())
-  const [loading, setLoading] = useState(true)
+  const cached = homeCache && homeCache.userId === user?.id ? homeCache : null
+  const [games, setGames] = useState(() => cached?.games || [])
+  const [groupMatches, setGroupMatches] = useState(() => cached?.groupMatches || []) // [{ match, org }]
+  const [privateMatches, setPrivateMatches] = useState(() => cached?.privateMatches || [])
+  const [myMixResults, setMyMixResults] = useState(() => cached?.myMixResults || new Map())
+  const [loading, setLoading] = useState(() => !cached)
+  // Esqueleto (não o círculo a rodar): só se demorar mais de 0,2 s; ao fim
+  // de 8 s sem dados, o erro de sempre.
+  const showSkeleton = useSkeleton(loading)
+  const loadLate = useLoadTimeout(loading)
+  const skeletonShown = useRef(false)
+  if (showSkeleton) skeletonShown.current = true
   const [friendIds, setFriendIds] = useState(null)
   const [pendingKeys, setPendingKeys] = useState(() => new Set())
   // O erro de uma ação num cartão aparece por baixo desse cartão, não no
@@ -182,9 +196,9 @@ export default function Home() {
   const [exploreRows, setExploreRows] = useState([])
   // Aulas com professores (Trello #49): as minhas e as em aberto. Sem a
   // migração das aulas as RPCs não existem e isto fica vazio.
-  const [lessonRows, setLessonRows] = useState([])
+  const [lessonRows, setLessonRows] = useState(() => cached?.lessonRows || [])
   // Pedidos de aula por responder (#392): «Pedido enviado» na Home.
-  const [lessonRequests, setLessonRequests] = useState([])
+  const [lessonRequests, setLessonRequests] = useState(() => cached?.lessonRequests || [])
   // Torneios (Trello #363): o cartão de inscrição antes do sorteio, e os
   // meus jogos depois dele — é na Home que a malta vê a que horas joga.
   const [tournamentEvents, setTournamentEvents] = useState([])
@@ -382,6 +396,11 @@ export default function Home() {
       setLoading(false)
     }
   }
+  // O que já se mostrou fica para a próxima vez que se abre a Home.
+  useEffect(() => {
+    if (loading || !user?.id) return
+    homeCache = { userId: user.id, games, groupMatches, privateMatches, myMixResults, lessonRows, lessonRequests }
+  }, [loading, user?.id, games, groupMatches, privateMatches, myMixResults, lessonRows, lessonRequests])
 
   useEffect(() => {
     if (!user) return
@@ -760,14 +779,6 @@ export default function Home() {
     document.body,
   ) : null
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
-        {joinStrip}
-      </div>
-    )
-  }
 
   const orgSlugById = new Map(orgs.map((o) => [o.id, o.slug]))
   // O caminho de cada evento: o mesmo na pesquisa e nos próximos jogos.
@@ -1025,8 +1036,16 @@ export default function Home() {
         // «Já jogados» (27 set): a lista do que já se jogou, do mais recente
         // para trás, em vez da agenda por dias.
         <PlayedList orgIds={filters.orgIds} kinds={filters.kinds} />
+      ) : loading ? (
+        // A carregar: o topo e a barra já estão a sério; o conteúdo a cinzento.
+        loadLate ? (
+          <div className="mt-3">
+            <EmptyState title={t('app.load_error_title')} subtitle={t('app.load_error_body')}
+              action={<PrimaryButton onClick={() => { setLoading(true); loadAll() }}>{t('app.load_error_retry')}</PrimaryButton>} />
+          </div>
+        ) : showSkeleton ? <HomeSkeleton /> : null
       ) : (
-        <div className="mt-3 space-y-5">
+        <div className={`mt-3 space-y-5 ${skeletonShown.current ? 'animate-fill-in' : ''}`}>
           {days.map(({ dayKey, events: dayEvents }) => (
             <Fragment key={dayKey}>
             {dayKey === firstUpcomingDay && topBlock}
