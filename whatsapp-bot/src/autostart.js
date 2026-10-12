@@ -170,6 +170,30 @@ function botConsegueComecar(game) {
 // (src/lib/repeatPairKeys.js).
 const PLAYED_STATUSES = ['in_progress', 'finished']
 
+// Regra por par (Francisco, 12 out): «Não pode juntar duas pessoas nos
+// últimos 4 jogos em que estiveram juntas. Não contam os jogos em que não
+// estiveram.» A mesma da app (src/lib/repeatPairKeys.js, repeatPairsFrom).
+const PAIR_WINDOW = 4
+const HISTORY_LIMIT = 60
+const effectiveIds = (team) => [team.player1_id ?? team.player1_guest_id, team.player2_id ?? team.player2_guest_id]
+
+export function repeatPairsFrom(gamesNewestFirst, teams) {
+  const byGame = new Map(gamesNewestFirst.map((g) => [g.id, []]))
+  for (const team of teams || []) byGame.get(team.game_id)?.push(team)
+  const present = gamesNewestFirst.map((g) => new Set(byGame.get(g.id).flatMap(effectiveIds).filter(Boolean)))
+  const keys = new Set()
+  gamesNewestFirst.forEach((g, i) => {
+    for (const team of byGame.get(g.id)) {
+      const [a, b] = effectiveIds(team)
+      if (!a || !b) continue
+      let together = 0
+      for (let k = 0; k < i && together < PAIR_WINDOW; k++) if (present[k].has(a) && present[k].has(b)) together++
+      if (together < PAIR_WINDOW) keys.add(pairKey(a, b))
+    }
+  })
+  return keys
+}
+
 export async function loadRepeatPairKeys(game) {
   let query = supabase.from('games').select('id')
   query = game.recurrence_id
@@ -179,16 +203,15 @@ export async function loadRepeatPairKeys(game) {
     .in('status', PLAYED_STATUSES)
     .lt('date', game.date)
     .order('date', { ascending: false })
-    .limit(4)
+    .limit(HISTORY_LIMIT)
   if (!previousGames?.length) return new Set()
   const { data: previousTeams } = await supabase
     .from('teams')
-    .select('player1_id, player2_id, player1_guest_id, player2_guest_id')
+    .select('game_id, player1_id, player2_id, player1_guest_id, player2_guest_id')
     .in('game_id', previousGames.map((g) => g.id))
   // COALESCE dos convidados: sem isto, duas duplas com convidado davam
   // ambas «null|…» e contavam como o mesmo par.
-  return new Set((previousTeams || []).map((team) =>
-    pairKey(team.player1_id ?? team.player1_guest_id, team.player2_id ?? team.player2_guest_id)))
+  return repeatPairsFrom(previousGames, previousTeams)
 }
 
 async function autoStartMix(game, { sendText }) {
