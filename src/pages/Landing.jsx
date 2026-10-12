@@ -3,6 +3,7 @@ import { Link, useSearchParams, useNavigationType, useLocation } from 'react-rou
 import { useTranslation } from 'react-i18next'
 import { CheckCircle2, Trophy, Shuffle, ChevronRight, Mail, MessageCircle } from 'lucide-react'
 import { Wordmark } from '../components/Layout'
+import { MedalGrid, Highlights, SITE_DARK } from '../components/site/MedalShowcase'
 import i18n from '../lib/i18n'
 import { mailtoLink, whatsappContactLink, SUPPORT_EMAIL_READY } from '../lib/contacts'
 
@@ -208,26 +209,24 @@ function Point({ bg, eyebrowClass, eyebrow, title, text, back, children }) {
   )
 }
 
-function LevelPoint() {
+// Ranking e conquistas (12 out): o primeiro bloco a seguir ao topo, escuro
+// como os cartões das conquistas na app, para as medalhas brilharem. É o único
+// bloco escuro antes do fim. Sem botões (só há um lima por ecrã).
+function RankingPoint() {
   const { t } = useTranslation()
   return (
-    <Point
-      bg="bg-[#F4F8DC]"
-      eyebrowClass="text-[#5B6B00]"
-      eyebrow={t('landing.level_eyebrow')}
-      title={t('landing.level_title')}
-      text={t('landing.level_text')}
-      back={<span className="font-display text-[170px] font-extrabold text-ink-900/[0.07]">M4</span>}
-    >
-      {/* Só a etiqueta, sem números (SPEC, «Exemplos»). */}
-      <div className="inline-flex items-center gap-3 rounded-card bg-white px-4 py-3 shadow-card">
-        <span className="rounded-lg bg-ink-900 px-2.5 py-1.5 font-mono text-lg font-extrabold text-lime-400">M4</span>
-        <span>
-          <b className="block text-sm text-ink-900">{t('landing.level_chip_title')}</b>
-          <span className="block text-xs text-muted">{t('landing.level_chip_text')}</span>
-        </span>
+    <section className={`relative overflow-hidden ${SITE_DARK}`}>
+      <div className="relative max-w-5xl mx-auto px-5 py-14 lg:py-20 lg:flex lg:items-center lg:gap-12">
+        <div className="lg:flex-1">
+          <p className="font-mono text-[12px] font-bold uppercase tracking-widest text-lime-400">{t('landing.rank_eyebrow')}</p>
+          <h2 className="text-3xl lg:text-4xl text-white mt-2 max-w-md">{t('landing.rank_title')}</h2>
+          <p className="text-white/75 mt-3 max-w-md">{t('landing.rank_text')}</p>
+          <MedalGrid className="mt-8 lg:hidden" />
+          <div className="mt-7 max-w-md"><Highlights /></div>
+        </div>
+        <MedalGrid className="hidden lg:block lg:flex-1 max-w-sm" />
       </div>
-    </Point>
+    </section>
   )
 }
 
@@ -469,7 +468,7 @@ export default function Landing() {
     <div className="min-h-screen bg-[#F7F7F4]">
       <Nav />
       <Hero />
-      <LevelPoint />
+      <RankingPoint />
       <TournamentPoint />
       <MixPoint />
       <About />

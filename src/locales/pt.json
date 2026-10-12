@@ -5426,5 +5426,19 @@
   "nov.new": "Nova",
   "nov.end_title": "Ainda não tens conta?",
   "nov.end_how": "Como funciona",
-  "agenda.filter_kind_free": "Horários livres"
+  "agenda.filter_kind_free": "Horários livres",
+  "landing.rank_eyebrow": "Ranking e conquistas",
+  "landing.rank_title": "Cada jogo conta. E dá medalhas.",
+  "landing.rank_text": "O teu nível sobe e desce com os resultados, vês o teu lugar no ranking do clube e no geral, e desbloqueias conquistas pelo caminho.",
+  "site.hl_achievements": "Mais de <n>100</n> conquistas para desbloquear",
+  "site.hl_xp": "Níveis de XP: Ouro, Esmeralda, Diamante…",
+  "site.hl_kudos": "Kudos dos colegas no fim de cada mix",
+  "hiw.rank_eyebrow": "Para quem joga · Ranking e conquistas",
+  "hiw.rank_title": "Joga, sobe, coleciona.",
+  "hiw.rank_p2_t": "Mais de 100 conquistas",
+  "hiw.rank_p2_b": "Da primeira bola à noite perfeita, há mais de 100 conquistas para desbloquear, cada uma com a sua medalha. Cada uma diz quantos jogadores já a têm, e algumas quase ninguém tem.",
+  "hiw.rank_p3_t": "XP e níveis",
+  "hiw.rank_p3_b": "Cada jogo dá XP. Sobes de nível, do Ouro ao Esmeralda e ao Diamante, e quem joga mais vê-se no perfil.",
+  "hiw.rank_p4_t": "Kudos",
+  "hiw.rank_p4_b": "No fim do mix, dás kudos a quem jogou bem ou fez a noite. Há conquistas para quem recebe mais."
 }

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { ArrowDown, ChevronDown, Shuffle, Trophy } from 'lucide-react'
 import { Nav, Footer, useLoginHref, usePageTop, PRIMARY_CTA } from './Landing'
 import { whatsappContactLink } from '../lib/contacts'
+import { MedalGrid, SITE_DARK } from '../components/site/MedalShowcase'
 
 /* alinho.pt/como-funciona (Trello #619) — design-handoff/2026-10-10-site-
    como-funciona, aprovado pelo Francisco a 10 out. Textos do Marketing
@@ -57,6 +58,44 @@ function Section({ id, bg, eyebrowClass, prefix, n, back, image, children }) {
         <Points prefix={prefix} n={n} />
         {image && <Phone src={image} />}
         {children}
+      </div>
+    </section>
+  )
+}
+
+// Ranking e conquistas (12 out): secção própria, escura como na página de
+// entrada, no lugar da do nível. Os 4 pontos do Marketing, com a fila das
+// medalhas entre «Mais de 100 conquistas» e «XP e níveis».
+function RankingSection() {
+  const { t } = useTranslation()
+  const point = (title, body) => (
+    <div>
+      <h3 className="text-lg text-white">{title}</h3>
+      <p className="mt-1 text-white/75 leading-relaxed">{body}</p>
+    </div>
+  )
+  return (
+    <section className={`relative overflow-hidden ${SITE_DARK}`}>
+      <div className="relative max-w-2xl mx-auto px-5 py-14">
+        <p className="font-mono text-[12px] font-bold uppercase tracking-widest text-lime-400">{t('hiw.rank_eyebrow')}</p>
+        <h2 className="text-3xl lg:text-4xl text-white mt-2">{t('hiw.rank_title')}</h2>
+        <div className="mt-5 flex items-center gap-3 rounded-card bg-white px-4 py-3">
+          <span className="rounded-lg bg-ink-900 px-2.5 py-1.5 font-mono text-lg font-extrabold text-lime-400">F3</span>
+          <span>
+            <b className="block text-sm text-ink-900">{t('landing.level_chip_title')}</b>
+            <span className="block text-xs text-muted">{t('landing.level_chip_text')}</span>
+          </span>
+        </div>
+        <div className="mt-6 space-y-5">
+          {point(t('hiw.level_p1_t'), t('hiw.level_p1_b'))}
+          {point(t('hiw.level_p3_t'), t('hiw.level_p3_b'))}
+          {point(t('hiw.rank_p2_t'), t('hiw.rank_p2_b'))}
+        </div>
+        <MedalGrid className="my-7" />
+        <div className="space-y-5">
+          {point(t('hiw.rank_p3_t'), t('hiw.rank_p3_b'))}
+          {point(t('hiw.rank_p4_t'), t('hiw.rank_p4_b'))}
+        </div>
       </div>
     </section>
   )
@@ -118,8 +157,7 @@ export default function HowItWorks() {
 
       <Section id="para-quem-joga" bg="bg-[#FBE7DE]" eyebrowClass="text-[#9A3A17]" prefix="hiw.mix" n={3}
         back={<Shuffle size={150} strokeWidth={1.2} className="text-[#9A3A17]/10" />} image="/como-funciona/mix.webp" />
-      <Section bg="bg-[#F4F8DC]" eyebrowClass="text-[#5B6B00]" prefix="hiw.level" n={3}
-        back={<span className="font-display text-[150px] font-extrabold text-ink-900/[0.07]">F3</span>} image="/como-funciona/perfil-nivel.webp" />
+      <RankingSection />
       <Section bg="bg-white" eyebrowClass="text-ink-500" prefix="hiw.others" n={2} image="/como-funciona/home.webp" />
       <Section bg="bg-[#E9E7FB]" eyebrowClass="text-[#4338A8]" prefix="hiw.tour" n={1}
         back={<Trophy size={150} strokeWidth={1.2} className="text-[#4338A8]/10" />} />
