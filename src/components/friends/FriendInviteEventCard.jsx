@@ -42,19 +42,20 @@ export default function FriendInviteEventCard({ event, onDecline }) {
   const pill = <StateTag tone="invited">{t('agenda.state_invited')}</StateTag>
   const kindLine = <KindLine kind="friends" />
   return (
-    <div className={`relative rounded-card p-3.5 press !mt-5 border-2 border-ink-900 ${KIND_STYLE.friends.bg}`}>
+    <div className={`relative rounded-card p-3.5 press ${mascot ? '!mt-5' : ''} border-2 border-ink-900 ${KIND_STYLE.friends.bg}`}>
       <Link to={to} className="absolute inset-0" aria-label={t('home.invite_by', { name: r.creatorFirst })} />
       <CardMascot type={mascot} />
-      <OrgHeader event={event} right={pill} kind={kindLine} mascot />
-      {!event.orgName && <div className="pr-[80px]">{kindLine}</div>}
-      {!event.orgName && <MascotPill top="top-[54px]">{pill}</MascotPill>}
+      <OrgHeader event={event} right={pill} kind={kindLine} mascot={!!mascot} />
+      {!event.orgName && (mascot
+        ? <><div className="pr-[80px]">{kindLine}</div><MascotPill top="top-[54px]">{pill}</MascotPill></>
+        : <div className="flex items-start justify-between gap-2">{kindLine}{pill}</div>)}
 
       {event.hasTime && (
         <p className="mt-2.5 text-[22px] font-extrabold leading-none text-ink-900">
           {formatTime(event.startsAt, i18n.language, { hour: '2-digit', minute: '2-digit' })}
         </p>
       )}
-      <h3 className={`mt-1.5 text-base leading-snug text-ink-900 ${!event.orgName ? 'pr-[100px]' : ''}`}>
+      <h3 className={`mt-1.5 text-base leading-snug text-ink-900 ${!event.orgName && mascot ? 'pr-[100px]' : ''}`}>
         {t('agenda.played_friends_title', { name: r.creatorFirst })}
       </h3>
       {r.location && (

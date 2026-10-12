@@ -13,8 +13,14 @@
 
 const FILE_BY_KIND = { mix: 'mix', open: 'aberto', tournament: 'torneio', friends: 'amigos' }
 
-/** O boneco de um cartão, ou null (tipo sem boneco, ou mix com imagem). */
-export const mascotFor = (kind, imageUrl = null) => (imageUrl ? null : FILE_BY_KIND[kind] || null)
+// DESLIGADO (Francisco, 12 out à noite): «Sim tira, para não lançarmos isso
+// para a main na sexta… talvez em background… preciso de trabalhar com o
+// designer.» Os cartões voltam a ser como antes do aa05533e; o componente e
+// os webp ficam, sem uso, para a versão com o boneco em fundo.
+export const MASCOTS_ON = false
+
+/** O boneco de um cartão, ou null (desligado, tipo sem boneco, ou mix com imagem). */
+export const mascotFor = (kind, imageUrl = null) => (!MASCOTS_ON || imageUrl ? null : FILE_BY_KIND[kind] || null)
 
 /** As classes do cartão com boneco: não corta o que sai e abre espaço por cima
  *  (!mt: o space-y das listas ganharia a um mt normal). Sem boneco, o corte
