@@ -8,7 +8,7 @@
 // poderes de quem criou (SPEC 2026-10-07-amigos-convidado): a mesma página,
 // «Editar · Mais», e no «Mais» também «Sair do jogo».
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { BackBar } from '../components/ui'
 import { useGoBack } from '../lib/useGoBack'
@@ -67,6 +67,7 @@ export default function FriendSession() {
   // tira, ao enviar; sem ela, do «Partilhar o resultado») e «Corrigir».
   const [finishedPage, setFinishedPage] = useState(null) // { toast }
   const [correcting, setCorrecting] = useState(false)
+  const [searchParams] = useSearchParams()
   const [sharingWinners, setSharingWinners] = useState(false) // «↗ Partilhar os vencedores» (#622)
   const [data, setData] = useState(null)
   const [loadError, setLoadError] = useState('')
@@ -225,6 +226,9 @@ export default function FriendSession() {
   const pill = 'inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-ctrl border border-line bg-surface px-2.5 text-sm font-extrabold text-ink-900 whitespace-nowrap'
   // Depois de enviado sai o «Editar» de cima (ponto 4); fica o «Mais».
   const finished = !!match?.finished_at
+  useEffect(() => {
+    if (finished && searchParams.get('partilhar')) setSharingWinners(true)
+  }, [finished, searchParams])
   // «⏱ Usar relógio» (Francisco, 12 out): o relógio e o alarme só aparecem
   // depois de alguém o pedir neste telemóvel, ou se uma ronda já está a contar.
   const clockKey = match?.id ? `friendClock:${match.id}` : null
@@ -494,6 +498,7 @@ export default function FriendSession() {
           {games.length > 0 ? (
             <FriendRounds match={match} games={games} invitees={invitees} players={players} iOrganize={iOrganize} myUserId={profile?.id} onChanged={load}
               clockOn={useClock} onUseClock={turnClockOn} onHideClock={turnClockOff}
+              openOnLoad={searchParams.get('marcar') ? 'mark' : searchParams.get('enviar') ? 'send' : null}
               onSent={(res) => { setFinishedPage({ toast: sentToast(res) }); load() }}
               onCorrect={() => setCorrecting(true)}
               onShare={() => setSharingWinners(true)} />

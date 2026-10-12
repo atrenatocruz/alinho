@@ -16,7 +16,7 @@ import { PrimaryButton, EmptyState, ConfirmSheet } from '../components/ui'
 import { formatDate } from '../lib/formatDate'
 import { describeError } from '../lib/errors'
 import FriendSessionsList from '../components/friends/FriendSessionsList'
-import FriendSessionCard from '../components/friends/FriendSessionCard'
+import FriendSessionCard, { FriendsMonthLine, FriendsEmpty } from '../components/friends/FriendSessionCard'
 import { ScoreEntrySimple, ScoreEntrySets } from '../components/friends/FriendScoreEntry'
 
 // The 3 slots that can be empty, filled by an app player, or filled by a
@@ -41,7 +41,7 @@ const STATUS_META = {
 }
 
 function InviteLinks({ match }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [copied, setCopied] = useState('')
   const openSlots = OPEN_SLOTS.filter((s) => !isSlotFilled(match, s.key))
   if (openSlots.length === 0) return null
@@ -283,13 +283,27 @@ export default function PrivateMatches() {
   // «Por enviar» e «Histórico», um cartão simples cada. Os jogos soltos
   // antigos (sem sessão) continuam com o cartão de sempre.
   const newList = noTeams.some((s) => s && 'finished_at' in s)
-  const toSend = newList ? noTeams.filter((s) => !s.finished_at)
+  // A lista com vida (SPEC 2026-10-12-lista-jogos-amigos): a jogar agora,
+  // por fechar e o histórico por mês.
+  const liveNow = newList ? noTeams.filter((s) => s.live && !s.finished_at) : []
+  const toSend = newList ? noTeams.filter((s) => !s.finished_at && !s.live)
     .sort((a, b) => `${a.scheduled_date}${a.scheduled_time}`.localeCompare(`${b.scheduled_date}${b.scheduled_time}`)) : []
   const sentList = newList ? noTeams.filter((s) => s.finished_at)
     .sort((a, b) => `${b.scheduled_date}${b.scheduled_time}`.localeCompare(`${a.scheduled_date}${a.scheduled_time}`)) : []
   const legacyUpcoming = upcoming.filter((g) => !g.isSession)
   const legacyFinished = finishedGroups.filter((g) => !g.isSession)
   const sectionTitle = 'mb-2.5 font-mono text-[11px] font-extrabold uppercase tracking-widest text-muted'
+  // O histórico por mês, o mais recente primeiro: [['2026-10', [...]], …].
+  const historyMonths = (list) => {
+    const by = new Map()
+    for (const s of list) {
+      const k = String(s.scheduled_date || '').slice(0, 7)
+      if (!by.has(k)) by.set(k, [])
+      by.get(k).push(s)
+    }
+    return [...by.entries()]
+  }
+  const monthName = (ym) => (ym ? new Date(`${ym}-15T12:00`).toLocaleDateString(i18n.language, { month: 'long' }) : '')
   const noTeamsLine = (s) => (s.pending > 0
     ? t('friends.waiting_answers', { count: s.pending })
     : s.is_creator ? t('friends.form_teams_now') : t('friends.waiting_teams'))
@@ -318,11 +332,20 @@ export default function PrivateMatches() {
       {/* Convites por responder (#342). */}
       <FriendSessionsList sessions={false} />
 
+      {newList && <FriendsMonthLine sessions={noTeams} />}
+
+      {liveNow.length > 0 && (
+        <div>
+          <h3 className={sectionTitle}>{t('friends.list_playing_now')}</h3>
+          <div className="space-y-2.5">{liveNow.map((s) => <FriendSessionCard key={s.match_id} s={s} />)}</div>
+        </div>
+      )}
+
       {newList && (toSend.length > 0 || legacyUpcoming.length > 0) && (
         <div>
-          <h3 className={sectionTitle}>{t('friends.list_to_send')}</h3>
+          <h3 className={sectionTitle}>{t('friends.list_to_close')}</h3>
           <div className="space-y-2.5">
-            {toSend.map((s) => <FriendSessionCard key={s.match_id} s={s} fallbackLine={noTeamsLine(s)} />)}
+            {toSend.map((s) => <FriendSessionCard key={s.match_id} s={s} />)}
             {legacyUpcoming.map((g) => (
               <FriendGameRow key={g.id} id={g.id} to={null} facts={g.facts}
                 line={g.facts.ranked ? t('agenda.friends_ranked') : t('gamedetails.badge_friendly')}
@@ -479,20 +502,26 @@ export default function PrivateMatches() {
         cancelLabel={t('dialogs.delete_game_keep')} confirmLabel={t('dialogs.delete_game_confirm')}
         onConfirm={deleteNow} onClose={() => setDeleting(null)} errorOf={(err) => describeError(t, err, 'privatematches.error_delete')} />
 
-      {newList ? (
-        <div>
-          <h3 className={sectionTitle}>{t('friends.list_history')}</h3>
-          {sentList.length === 0 && legacyFinished.length === 0 ? (
-            <EmptyState icon={Trophy} title={t('privatematches.empty_title')} subtitle={t('privatematches.empty_subtitle')} />
-          ) : (
-            <div className="space-y-2.5">
-              {sentList.map((s) => <FriendSessionCard key={s.match_id} s={s} />)}
-              {legacyFinished.map((g) => (
-                <FriendGameRow key={g.id} id={g.id} to={null} facts={g.facts} creatorName={profile?.name || ''} onChanged={reload} />
-              ))}
-            </div>
-          )}
-        </div>
+      {/* Sem jogos nenhuns (também antes de a lista nova ter dados): o Alino. */}
+      {noTeams.length === 0 && groups.length === 0 && pending.length === 0 ? <FriendsEmpty /> : newList ? (
+          <>
+            {historyMonths(sentList).map(([month, list]) => (
+              <div key={month}>
+                <h3 className={sectionTitle}>{t('friends.list_history_month', { month: monthName(month) })}</h3>
+                <div className="space-y-2.5">{list.map((s) => <FriendSessionCard key={s.match_id} s={s} />)}</div>
+              </div>
+            ))}
+            {legacyFinished.length > 0 && (
+              <div>
+                <h3 className={sectionTitle}>{t('friends.list_history')}</h3>
+                <div className="space-y-2.5">
+                  {legacyFinished.map((g) => (
+                    <FriendGameRow key={g.id} id={g.id} to={null} facts={g.facts} creatorName={profile?.name || ''} onChanged={reload} />
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
       ) : (
       <div>
         <h3 className="text-lg text-ink-900 mb-3">{t('privatematches.history')}</h3>

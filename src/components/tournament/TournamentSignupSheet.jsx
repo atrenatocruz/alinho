@@ -151,6 +151,8 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
       partnerId: mode === 'partner' ? partnerId : null,
       // Só para a pergunta do sexo (SignupSlot); não vai para a base de dados.
       partnerGender: mode === 'partner' ? members.find((m) => m.id === partnerId)?.gender || null : null,
+      // Só para a frase do partner_max_categories_reached (Dev 3, 12 out).
+      partnerName: mode === 'partner' ? ((members.find((m) => m.id === partnerId) || found.find((m) => m.id === partnerId))?.name || '').split(/\s+/)[0] : null,
       guestName: mode === 'named' ? name.trim() : null,
       guestEmail: mode === 'named' ? email.trim() : null,
       teamName: teamName.trim() || null,
