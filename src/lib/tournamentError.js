@@ -21,7 +21,7 @@ export function errorCode(error) {
 
 /** A frase a mostrar. `t` é o tradutor; `prefix` permite reaproveitar isto
  *  noutros sítios sem lhes impor o prefixo do torneio. */
-export function signupErrorMessage(t, error, prefix = 'tsignup.error_') {
+export function signupErrorMessage(t, error, prefix = 'tsignup.error_', params = undefined) {
   const key = `${prefix}${errorCode(error)}`
-  return t(key) === key ? t(`${prefix}generic`) : t(key)
+  return t(key, params) === key ? t(`${prefix}generic`) : t(key, params)
 }

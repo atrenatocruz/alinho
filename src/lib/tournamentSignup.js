@@ -44,8 +44,10 @@ export const isCategoryFull = (category, entries) => slotsLeft(category, entries
    gravam `max_categories`; `max_categories_per_person` é o nome antigo, que
    fica de reserva — a mesma ordem do servidor (Dev 3, 8 out). Antes só se
    lia o antigo, e quem escolhia 1 ou 3 ficava sempre com 2. */
+export const maxCategories = (tournament) =>
+  Number(tournament?.rules?.max_categories ?? tournament?.rules?.max_categories_per_person ?? 2)
 export function categoriesLeft(tournament, myEntries = []) {
-  const max = Number(tournament?.rules?.max_categories ?? tournament?.rules?.max_categories_per_person ?? 2)
+  const max = maxCategories(tournament)
   const mine = myEntries.filter((e) => e.status !== 'desistiu').length
   return Math.max(0, max - mine)
 }

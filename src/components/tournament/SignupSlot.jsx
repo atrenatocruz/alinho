@@ -13,10 +13,10 @@ import TeamNameSheet from './TeamNameSheet'
 import { supabase } from '../../lib/supabase'
 import {
   signUp, respondToInvite, listMyInvites, withdrawEntry,
-  entriesOpen, categoriesLeft, tournamentInviteLink, canScoreTournament,
+  entriesOpen, categoriesLeft, maxCategories, tournamentInviteLink, canScoreTournament,
 } from '../../lib/tournamentSignup'
 import { signUpBackLink } from '../../lib/loginLinks'
-import { signupErrorMessage } from '../../lib/tournamentError'
+import { errorCode, signupErrorMessage } from '../../lib/tournamentError'
 import { categoryGenderQuestion } from './genderCheck'
 import { TshirtPicker, tshirtOn, tshirtPriceLabel, NO_TSHIRT, shirtRulesOf } from './tshirt'
 import { setMyTshirtSize } from '../../lib/tournamentApi'
@@ -149,7 +149,11 @@ export default function SignupSlot({ tournament, categories, category, my: first
   // `player1_gender_required` ficava-se por `_gender_required` — chave que
   // não existe — e quem se inscrevia sem género lia «Não foi possível. Tenta
   // outra vez.» em vez de «falta escolher o género» (Trello #476).
-  const say = (err) => setError(signupErrorMessage(t, err))
+  // O número vai na frase do máximo («Já estás no máximo de 2 categorias
+  // deste torneio», PO 12 out); as outras frases ignoram-no.
+  // e o nome de quem convido vai na do parceiro no máximo (Dev 3, 12 out).
+  const errorText = (err, name = '') => signupErrorMessage(t, err, undefined, { count: maxCategories(tournament), name })
+  const say = (err) => setError(errorText(err))
 
   const doSignUp = async (choice) => {
     setBusy(true); setError('')
@@ -158,7 +162,7 @@ export default function SignupSlot({ tournament, categories, category, my: first
       setSheet(false)
       if (result?.invite_token) setFresh({ name: choice.guestName, email: choice.guestEmail, token: result.invite_token, waitlist: result.status === 'suplente' })
       window.dispatchEvent(new CustomEvent('tournament:reload'))
-    } catch (err) { console.error('Error signing up for tournament:', err); say(err) }
+    } catch (err) { console.error('Error signing up for tournament:', err); setError(errorText(err, choice.partnerName || '')) }
     finally { setBusy(false) }
   }
 
@@ -205,8 +209,13 @@ export default function SignupSlot({ tournament, categories, category, my: first
   const deadlineDay = tournament.entries_deadline
     ? new Intl.DateTimeFormat(i18n.language, { day: 'numeric', month: 'short', timeZone: 'Europe/Lisbon' }).format(new Date(tournament.entries_deadline)).replace('.', '').replace(' de ', ' ')
     : ''
+  // O erro de responder a um convite fica no próprio cartão, junto ao botão:
+  // em baixo, depois da inscrição, ficava fora do ecrã e o «Aceitar» parecia
+  // não fazer nada (QA, 12 out: max_categories_reached no iPhone).
+  const [inviteError, setInviteError] = useState(null) // { entryId, text }
   const answer = async (entryId, accept) => {
     setBusy(true)
+    setInviteError(null)
     try {
       // Já com t-shirt neste torneio (uma por pessoa, 11 out): não se pergunta;
       // a base de dados dá-lhe a que já tem.
@@ -214,7 +223,10 @@ export default function SignupSlot({ tournament, categories, category, my: first
       await respondToInvite(entryId, accept, shirts && !inv?.my_tshirt ? { tshirtSize: inviteShirt[entryId] } : {})
       reloadInvites()
       window.dispatchEvent(new CustomEvent('tournament:reload'))
-    } catch (err) { console.error('Error answering tournament invite:', err); say(err) }
+    } catch (err) {
+      console.error('Error answering tournament invite:', err)
+      setInviteError({ entryId, text: errorText(err), code: errorCode(err) })
+    }
     finally { setBusy(false) }
   }
 
@@ -261,6 +273,20 @@ export default function SignupSlot({ tournament, categories, category, my: first
               <p className="mb-1.5 text-sm font-extrabold text-ink-900">{t('tshirt.mine_label', { price: tshirtPriceLabel(shirtRulesOf(tournament), t, i18n.language) })}</p>
               <TshirtPicker rules={shirtRulesOf(tournament)} value={inviteShirt[inv.entry_id] || null}
                 onChange={(v) => setInviteShirt((m) => ({ ...m, [inv.entry_id]: v }))} label={t('tshirt.mine_label', { price: '' })} />
+            </div>
+          )}
+          {inviteError?.entryId === inv.entry_id && (
+            <div role="alert" className="space-y-1">
+              <p className="text-sm font-extrabold text-danger">{inviteError.text}</p>
+              {/* No máximo, diz a saída: sair de uma (o «Desistir» está na
+                  minha inscrição, mais abaixo) para aceitar esta (UX/PO, 12 out). */}
+              {inviteError.code === 'max_categories_reached' && my && (
+                <p className="text-sm text-ink-900">
+                  {t('tsignup.invite_max_way_out')}{' '}
+                  <button type="button" onClick={() => document.getElementById('minha-inscricao')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+                    className="min-h-[44px] font-extrabold underline underline-offset-2">{t('tclash.see_my_entries')}</button>
+                </p>
+              )}
             </div>
           )}
           {/* Empilhados, a ação em cima (regra de 6 out): nunca lado a lado. */}
@@ -358,7 +384,8 @@ export default function SignupSlot({ tournament, categories, category, my: first
       ) : open && user ? (
         // Quem já tem jogos tem o lima no «Os meus jogos»: este passa a
         // contorno, por baixo (um lima por ecrã, UX 1 out).
-        <PrimaryButton variant={hasGames ? 'ghost' : 'lime'} onClick={startSignUp} disabled={left === 0} className="w-full">
+        // Com um convite por responder, o lima é o «Aceitar» (UX/PO, 12 out).
+        <PrimaryButton variant={hasGames || invites.length > 0 ? 'ghost' : 'lime'} onClick={startSignUp} disabled={left === 0} className="w-full">
           {left === 0 ? t('tsignup.max_categories') : t('tsignup.cta')}
         </PrimaryButton>
       ) : open && !user ? (
@@ -477,7 +504,7 @@ export default function SignupSlot({ tournament, categories, category, my: first
         confirmLabel={t('tsignup.withdraw_yes')}
         onConfirm={leave}
         onClose={() => setAskLeave(false)}
-        errorOf={(err) => signupErrorMessage(t, err)}
+        errorOf={errorText}
       />
     </div>
   )
