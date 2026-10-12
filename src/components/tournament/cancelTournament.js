@@ -24,16 +24,17 @@ export const canCancel = (tournament) => !!tournament && !['terminado', 'cancela
  *  (has_entries do get_tournament_for_edit). Com ela, nunca se mostra
  *  «Eliminar» a quem depois ouviria que não pode (UX, 1 out). */
 export function cancelCopy(tournament, t, everEntered = null) {
-  const count = Number(tournament?.entry_count) || 0
-  // As duplas por validar também recebem o aviso, e contam para não se
-  // «Eliminar» (QA, 9 out; pending_count do Dev 3 — sem ele, 0).
-  const pending = Number(tournament?.pending_count) || 0
+  // Quem o cancelamento avisa: todas as inscrições que não desistiram, com
+  // ou sem dupla, suplentes incluídas (cancel_tournament, Dev 3). O número
+  // é o notify_count, o mesmo que a função avisa; sem ele, as validadas e
+  // as por validar (UX, 12 out: «As 87 inscrições recebem um aviso»).
+  const count = tournament?.notify_count != null
+    ? Number(tournament.notify_count) || 0
+    : (Number(tournament?.entry_count) || 0) + (Number(tournament?.pending_count) || 0)
   const name = tournament?.name || ''
-  const none = count === 0 && pending === 0 && everEntered !== true
-  const key = none ? 'empty' : LIVE.includes(tournament?.status) ? 'live' : count === 0 && pending === 0 ? 'withdrawn' : 'entries'
-  const message = key === 'entries' && pending > 0
-    ? (count > 0 ? t('tournament.cancel.message_entries_pending', { count, pending }) : t('tournament.cancel.message_pending_only', { count: pending }))
-    : t(`tournament.cancel.message_${key}`, { count })
+  const none = count === 0 && everEntered !== true
+  const key = none ? 'empty' : LIVE.includes(tournament?.status) ? 'live' : count === 0 ? 'withdrawn' : 'entries'
+  const message = t(`tournament.cancel.message_${key}`, { count })
   return {
     key,
     title: t(key === 'empty' ? 'tournament.cancel.title_delete' : 'tournament.cancel.title', { name }),

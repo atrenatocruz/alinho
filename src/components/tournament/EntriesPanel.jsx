@@ -456,7 +456,9 @@ export default function EntriesPanel({ tournament, categories = [], category, pu
 
   const act = async (fn) => {
     setBusy(true); setError('')
-    try { await fn(); load(); if (searching) loadAll() }
+    // A página volta a ler os números (pending_count da pergunta de
+    // cancelar, contagens), sem ter de recarregar (QA, 12 out).
+    try { await fn(); load(); if (searching) loadAll(); window.dispatchEvent(new Event('tournament:reload')) }
     catch (err) { console.error('Error acting on a tournament entry:', err); say(err) }
     finally { setBusy(false) }
   }
