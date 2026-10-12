@@ -26,7 +26,7 @@ import ForYouLine, { forYouItems } from '../components/home/ForYouLine'
 import PersonalizeHomeSheet, { useHomeSections } from '../components/home/PersonalizeHomeSheet'
 import FreeSlotsCard from '../components/home/FreeSlotsCard'
 import OpenSlotSheet from '../components/home/OpenSlotSheet'
-import { groupFreeSlots } from '../lib/freeSlots'
+import { groupFreeSlots, markFreeSlots } from '../lib/freeSlots'
 import { ratingBand } from '../lib/elo'
 import { formatTime } from '../lib/formatDate'
 import { listMyFriendMatchInvites } from '../lib/privateMatches'
@@ -447,15 +447,17 @@ export default function Home() {
     ]
   }, [games, groupMatches, privateMatches, exploreRows, lessonRows, lessonRequests, tournamentEvents, user, memberships])
 
-  const visible = useMemo(() => applyFilters(events, filters, location), [events, filters, location])
+  const visible = useMemo(() => applyFilters(markFreeSlots(events), filters, location), [events, filters, location])
   const counts = useMemo(() => countByDay(visible), [visible])
   const today = toDayKey(new Date())
   // A Home abre em «Hoje» e por cima não há dias passados: esses vivem em
   // «Filtros › Já jogados» (UX, 9 out — Home do futuro, SPEC-1).
   // Horários livres (SPEC-4, 9 out): os jogos em aberto sem ninguém de um
   // dia juntam-se numa linha só (FreeSlotsCard); com alguém, cartão normal.
+  // Só «Horários livres» escolhido: um cartão por clube (SPEC-4).
+  const onlyFree = filters.kinds.length === 1 && filters.kinds[0] === 'free'
   const days = useMemo(() => groupByDay(visible.filter((e) => e.dayKey >= today), today)
-    .map((d) => ({ ...d, events: groupFreeSlots(d.events, d.dayKey) })), [visible, today])
+    .map((d) => ({ ...d, events: groupFreeSlots(d.events, d.dayKey, Date.now(), { perClub: onlyFree }) })), [visible, today, onlyFree])
   // Lista vazia por causa dos filtros (não do dia): diz-se isso e limpa-se
   // num toque (Trello #415).
   const filtersActive = filters.show !== DEFAULT_FILTERS.show

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { groupFreeSlots, isFreeSlot } from './freeSlots'
+import { groupFreeSlots, isFreeSlot, markFreeSlots } from './freeSlots'
+import { applyFilters, DEFAULT_FILTERS } from './agenda'
 
 const at = (h) => new Date(`2026-10-12T${String(h).padStart(2, '0')}:00:00`)
 const slot = (id, h, org, people = 0, extra = {}) => ({
@@ -37,5 +38,20 @@ describe('horários livres na Home (SPEC-4)', () => {
   it('sem horários livres, o dia fica igual', () => {
     const day = [slot('b', 15, 'a2n', 2), mix]
     expect(groupFreeSlots(day, '2026-10-12', at(8).getTime())).toBe(day)
+  })
+
+  it('os vazios passam a «free»: só «Jogos em aberto» mostra só os jogos com gente', () => {
+    const day = markFreeSlots([slot('a', 14, 'a2n'), slot('b', 15, 'a2n', 2), mix])
+    expect(day.map((e) => e.kind)).toEqual(['free', 'open', 'mix'])
+    const f = (kinds) => applyFilters(day, { ...DEFAULT_FILTERS, kinds }, null, '2026-10-12').map((e) => e.id)
+    expect(f(['open'])).toEqual(['b'])
+    expect(f(['free'])).toEqual(['a'])
+    expect(f(DEFAULT_FILTERS.kinds)).toEqual(['a', 'b', 'm'])
+  })
+
+  it('só «Horários livres»: um cartão por clube, cada um à hora do seu primeiro', () => {
+    const day = [slot('a', 14, 'a2n'), slot('c', 16, 'a2n'), slot('d', 15, 'smash')]
+    const out = groupFreeSlots(day, '2026-10-12', at(8).getTime(), { perClub: true })
+    expect(out.map((e) => [e.clubs.map((c) => c.orgId).join(), e.count, e.kind])).toEqual([['a2n', 2, 'free'], ['smash', 1, 'free']])
   })
 })
