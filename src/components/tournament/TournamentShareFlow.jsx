@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Camera, Image as ImageIcon } from 'lucide-react'
-import TournamentShareCard, { T_CARD_H, T_CARD_W, bakePhoto, bakeImageUrl } from './TournamentShareCard'
+import TournamentShareCard, { T_CARD_H, T_CARD_W, bakeCircle, bakePhoto, bakeImageUrl } from './TournamentShareCard'
 import { qrDataUrl, readLocalPhoto, shareFilename, shareOrSaveImage } from '../../lib/shareImage'
 import { tournamentUrl } from '../../lib/tournamentPublic'
 import { useAuth } from '../../contexts/AuthContext'
@@ -31,6 +31,22 @@ export default function TournamentShareFlow({ tournament, variant, data, text, f
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
   const cardRef = useRef(null)
+  // O clube por baixo do logótipo, como nos outros cartões (#622, UX 12
+  // out): o logótipo num círculo (ou as iniciais), o nome e, pequeno,
+  // «<torneio> · <categoria>». Quem passa `org` (o mix) manda no seu.
+  const [clubLogo, setClubLogo] = useState(null)
+  useEffect(() => {
+    if (org || !tournament?.club_logo_url) return undefined
+    let alive = true
+    bakeCircle(tournament.club_logo_url).then((v) => { if (alive) setClubLogo(v) })
+    return () => { alive = false }
+  }, [org, tournament?.club_logo_url])
+  const cardOrg = org || (tournament?.club_name ? {
+    name: tournament.club_name,
+    logo: clubLogo,
+    initials: tournament.club_name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase(),
+    sub: data?.orgSub || tournament.name || '',
+  } : null)
   const cameraRef = useRef(null)
   const galleryRef = useRef(null)
 
@@ -126,7 +142,7 @@ export default function TournamentShareFlow({ tournament, variant, data, text, f
         {/* O cartão a sério, reduzido só no ecrã: o que se exporta é o de 360 × 640. */}
         <div className="mx-auto overflow-hidden rounded-[14px] shadow-lift" style={{ width: T_CARD_W * PREVIEW_SCALE, height: T_CARD_H * PREVIEW_SCALE }}>
           <div style={{ transform: `scale(${PREVIEW_SCALE})`, transformOrigin: 'top left' }}>
-            <TournamentShareCard ref={cardRef} variant={variant} data={data} photo={photo || fallback} qr={qr} org={org}>{children}</TournamentShareCard>
+            <TournamentShareCard ref={cardRef} variant={variant} data={data} photo={photo || fallback} qr={qr} org={cardOrg}>{children}</TournamentShareCard>
           </div>
         </div>
         <div>

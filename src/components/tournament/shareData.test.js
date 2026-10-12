@@ -74,7 +74,8 @@ describe('imagem «Campeões» (28 set)', () => {
     const c = { code: 'M5', champion: team('Almeida / Sousa'), runner_up: team('Os do costume'), thirds: [team('Barros / Costa'), team('Gomes / Pais')] }
     const out = championsShare({ tournament: { name: 'Smash Open 2026' }, category: c, t, lang: 'pt' })
     expect(out.data.title).toBe('tshare.champions|')
-    expect(out.data.kicker).toBe('Smash Open 2026 · M5')
+    expect(out.data.kicker).toBe('')
+    expect(out.data.orgSub).toBe('Smash Open 2026 · M5')
     expect(out.data.rows.map((r) => r.place)).toEqual([1, 2, 3])
     expect(out.data.rows.some((r) => r.mine)).toBe(false)
     expect(out.data.rows[2].pair).toContain(' · ')
