@@ -21,6 +21,12 @@ const MEDAL_KEYS = new Set([
   'socio_fundador', 'subida_ao_vidro', 'suplente_de_luxo', 'tie_break', 'toda_a_gente', 'todos_os_formatos',
   'trimestre_de_ferro', 'turista', 'turno_da_noite', 'um_ano_de_casa', 'velha_guarda', 'world_class',
   'zona_nobre',
+  // As 27 do Marketing (#625, 12 out).
+  'desforra', 'ida_e_volta', 'golias_abaixo', 'outra_vez_voces', 'a_primeira', 'equilibrista',
+  'padel_ao_almoco', 'domingo_as_8', 'sexta_13_da_sorte', 'aplauso_geral', 'padel_de_natal', 'fecho_de_ano',
+  'ano_novo_padel_novo', 'par_perfeito', 'noite_de_santos', 'bronzeado_de_padel', 'esgotado', 'fecha_campo',
+  'a_malta_toda', 'casa_cheia', 'alma_do_grupo', 'fiel_ao_clube', 'sobrevivente', 'classico',
+  'batismo_de_campo', 'boca_a_boca', 'embaixador_da_bola',
 ])
 
 /** O endereço da medalha, ou null se esta conquista ainda não tem uma. */
