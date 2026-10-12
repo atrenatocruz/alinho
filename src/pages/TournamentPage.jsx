@@ -429,7 +429,7 @@ export default function TournamentPage() {
       )}
 
       {/* Campeões da categoria, quando termina (peça 2, 28 set). */}
-      <ChampionsBlock tournament={tour} category={category} />
+      <ChampionsBlock tournament={tour} category={category} isAdmin={isAdmin} />
 
       {/* «O teu próximo jogo»: um cartão com o jogo à vista, no lugar do lima
           que só mudava o separador lá em baixo (Francisco, 1 out). Sem mais
