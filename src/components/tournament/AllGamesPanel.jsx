@@ -55,8 +55,12 @@ export default function AllGamesPanel({ sections = SECTIONS, ...props }) {
 
   return (
     <div className="space-y-5">
-      {built.map((key) => {
+      {built.map((key, i) => {
         const Panel = TOURNAMENT_PANELS[key]
+        // Secções seguidas: só a primeira leva o Alino quando está vazia;
+        // as de baixo ficam com o ícone, para não haver dois ou três
+        // Alinos no mesmo separador (mascote, 12 out).
+        const emptyPose = i === 0 ? undefined : null
         return (
           <section key={key} ref={(el) => { refs.current[key] = el }} className="scroll-mt-20">
             <MonoLabel>{t(`tournament.section_${key}`)}</MonoLabel>
@@ -64,7 +68,7 @@ export default function AllGamesPanel({ sections = SECTIONS, ...props }) {
                 seguidas, o título sozinho não diz qual é qual a quem chega. */}
             {/* Sem inscrição não há «tua tabela» (designer, 28 set). */}
             <p className="mb-1.5 mt-0.5 text-xs text-ink-500">{t(key === 'groups' && !props.my ? 'tournament.section_groups_hint_open' : `tournament.section_${key}_hint`)}</p>
-            <Suspense fallback={spinner}><Panel {...props} /></Suspense>
+            <Suspense fallback={spinner}><Panel {...props} emptyPose={emptyPose} /></Suspense>
           </section>
         )
       })}

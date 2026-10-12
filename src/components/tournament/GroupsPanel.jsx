@@ -132,7 +132,7 @@ function GroupTable({ group, matches, entries, qualifiers, myEntryId, t }) {
   )
 }
 
-export default function GroupsPanel({ category, my }) {
+export default function GroupsPanel({ category, my , emptyPose }) {
   const { t } = useTranslation()
   const { groups, entries, matches, loading } = useCategoryBoard(category?.id)
 
@@ -144,6 +144,7 @@ export default function GroupsPanel({ category, my }) {
     return (
       <EmptyState
         icon={Users}
+        pose={emptyPose}
         title={t('tournament.draw.groups_empty_title')}
         subtitle={t('tournament.draw.groups_empty_subtitle')}
       />

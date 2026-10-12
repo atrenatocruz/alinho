@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, Suspense, lazy } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation, useNavigate, useSearchParams, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { WifiOff, Compass } from 'lucide-react'
+import { Compass } from 'lucide-react'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { PrimaryButton, EmptyState } from './components/ui'
+import Alino from './components/Alino'
 import Layout, { Wordmark } from './components/Layout'
 import { hideBoot } from './lib/boot'
 import Login from './pages/Login'
@@ -142,7 +143,8 @@ const LoadErrorScreen = ({ onRetry }) => {
     <div onClick={handleTap} className="min-h-screen flex items-center justify-center px-6 bg-canvas">
       <div className="text-center max-w-xs">
         <Wordmark variant="light" className="h-8 mx-auto mb-8" />
-        <WifiOff size={40} className="mx-auto mb-4 text-ink-700" />
+        {/* Sem rede: o Alino «ups» (mascote, 12 out). */}
+        <Alino pose="triste" size={120} className="mb-4" />
         <h1 className="text-lg text-ink-900 mb-1">{t('app.load_error_title')}</h1>
         <p className="text-muted text-sm mb-6">{t('app.load_error_body')}</p>
         <PrimaryButton onClick={onRetry} className="w-full">{t('app.load_error_retry')}</PrimaryButton>

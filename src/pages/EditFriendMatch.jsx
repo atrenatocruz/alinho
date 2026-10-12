@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
 import { getFriendMatch } from '../lib/privateMatches'
 import { describeError } from '../lib/errors'
-import { EmptyState } from '../components/ui'
+import { EmptyState, LoadErrorState } from '../components/ui'
 import CreateFriendMatch from './CreateFriendMatch'
 
 export default function EditFriendMatch() {
@@ -22,7 +22,7 @@ export default function EditFriendMatch() {
       .catch((err) => { console.error('Error loading friend match to edit:', err); setError(describeError(t, err)) })
   }, [id, t])
 
-  if (error) return <EmptyState title={error} />
+  if (error) return <LoadErrorState title={error} />
   if (!data) {
     return <div className="flex justify-center py-10"><div className="h-8 w-8 animate-spin rounded-full border-[3px] border-ink-50 border-t-ink-700" /></div>
   }

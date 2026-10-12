@@ -3,7 +3,7 @@ import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import Alino from '../components/Alino'
 import { claimPrivateMatchSlot } from '../lib/privateMatches'
-import { PrimaryButton } from '../components/ui'
+import { EmptyState, PrimaryButton } from '../components/ui'
 
 const SLOT_KEYS = {
   team_a_player2: 'slot_team_a',
@@ -40,9 +40,8 @@ export default function JoinPrivateMatch() {
 
   if (!slot || !SLOT_KEYS[slot]) {
     return (
-      <div className="card text-center py-8">
-        <p className="text-danger font-extrabold">{t('joinprivatematch.invalid_link')}</p>
-      </div>
+      <EmptyState pose="triste" title={t('joinprivatematch.invalid_link')} subtitle={t('joinprivatematch.invalid_link_hint')}
+        action={<PrimaryButton variant="ghost" onClick={() => navigate('/')} className="w-full">{t('notfound.go_home')}</PrimaryButton>} />
     )
   }
 

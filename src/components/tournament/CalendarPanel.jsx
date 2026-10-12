@@ -63,7 +63,7 @@ function useNow() {
   return now
 }
 
-export default function CalendarPanel({ category, myEntries, tournament, isAdmin = false }) {
+export default function CalendarPanel({ category, myEntries, tournament, isAdmin = false , emptyPose }) {
   const { t, i18n } = useTranslation()
   const { entries, matches, groups, loading } = useCategoryBoard(category?.id)
   const now = useNow()
@@ -105,6 +105,7 @@ export default function CalendarPanel({ category, myEntries, tournament, isAdmin
     return (
       <EmptyState
         icon={CalendarDays}
+        pose={emptyPose}
         title={t('tournament.draw.calendar_empty_title')}
         subtitle={t('tournament.draw.calendar_empty_subtitle')}
       />

@@ -51,6 +51,9 @@ export default class ErrorBoundary extends Component {
     return (
       <div className="min-h-screen flex items-center justify-center px-4 bg-canvas">
         <div className="card max-w-sm w-full text-center space-y-3">
+          {/* O Alino «ups» (mascote, 12 out): uma imagem simples, sem
+              componentes, como o resto desta rede de segurança. */}
+          <img src="/alino/alino-triste.webp" alt="" aria-hidden="true" width={60} height={120} className="mx-auto block" />
           <h1 className="text-lg text-ink-900">{t('errorboundary.title', 'Alguma coisa correu mal')}</h1>
           <p className="text-sm text-muted">
             {t('errorboundary.text', 'Não conseguimos mostrar esta página. Recarregar costuma resolver.')}

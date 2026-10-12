@@ -18,7 +18,7 @@ import { getFriendMatch, getFriendMatchReadonly, respondFriendMatchInvite, setFr
 import AddPersonSheet from '../components/friends/AddPersonSheet'
 import { balancedSplit, rotatingGame, planRounds, courtsFor } from '../lib/friendTeams'
 import { describeError } from '../lib/errors'
-import { Avatar, PrimaryButton, EmptyState, ConfirmSheet } from '../components/ui'
+import { Avatar, PrimaryButton, EmptyState, ConfirmSheet, LoadErrorState } from '../components/ui'
 import { Sheet } from '../components/agenda/AgendaControls'
 import { shareWithMissing, sessionLink } from '../components/friends/friendShare'
 import { dayText } from '../components/friends/dayText'
@@ -368,7 +368,7 @@ export default function FriendSession() {
     </>
   )
 
-  if (loadError) return <div className="mx-auto max-w-lg">{back}<EmptyState title={loadError} /></div>
+  if (loadError) return <div className="mx-auto max-w-lg">{back}<LoadErrorState title={loadError} /></div>
   if (!data) {
     return <div className="flex justify-center py-10"><div className="h-8 w-8 animate-spin rounded-full border-[3px] border-ink-50 border-t-ink-700" /></div>
   }

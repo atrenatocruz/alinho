@@ -15,6 +15,7 @@ import { formatTime } from '../../lib/formatDate'
 import { KindLine, OrgHeader, StateTag } from './EventCard'
 import CardMascot, { mascotFor, mascotCardClass, MascotPill } from './CardMascot'
 import { dayLabel } from './AgendaControls'
+import { EmptyState, LoadErrorState } from '../ui'
 
 const PAGE = 20
 const KIND = { mix: 'mix', tournament: 'tournament', friends: 'friends' }
@@ -70,10 +71,12 @@ export default function PlayedList({ orgIds = null, kinds }) {
 
   return (
     <div className="mt-3 space-y-5">
+      {/* O separador inteiro vazio (ou com erro): o Alino, como nas outras
+          páginas sem nada (mascote, 12 out). */}
       {shown.length === 0 && (
-        <p className="rounded-card border border-dashed border-line px-3 py-3 text-sm text-muted">
-          {error ? t('agenda.played_error') : t('agenda.played_empty')}
-        </p>
+        error
+          ? <LoadErrorState title={t('agenda.played_error')} />
+          : <EmptyState title={t('agenda.played_empty')} />
       )}
       {days.map((d) => (
         <section key={d.key} className="space-y-2.5">

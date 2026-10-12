@@ -235,6 +235,7 @@ export default function PlayerDetails() {
     return (
       <EmptyState
         icon={Award}
+        pose="triste"
         title={t('playerdetails.load_error_title')}
         subtitle={t('playerdetails.load_error_subtitle')}
         action={
@@ -566,6 +567,7 @@ export default function PlayerDetails() {
         ) : !player.clubs || player.clubs.length === 0 ? (
           <EmptyState
             icon={ShieldCheck}
+            pose={null}
             title={t('playerdetails.no_clubs_title')}
             subtitle={t('playerdetails.no_clubs_subtitle')}
           />
@@ -602,6 +604,7 @@ export default function PlayerDetails() {
         ) : !h2h || h2h.matches_played === 0 ? (
           <EmptyState
             icon={Swords}
+            pose={null}
             title={t('playerdetails.no_h2h_title')}
             subtitle={t('playerdetails.no_h2h_subtitle')}
           />
@@ -674,6 +677,7 @@ export default function PlayerDetails() {
         ) : matchHistory.length === 0 ? (
           <EmptyState
             icon={Swords}
+            pose={null}
             title={t('playerdetails.no_matches_title')}
             subtitle={t('playerdetails.no_matches_subtitle')}
           />

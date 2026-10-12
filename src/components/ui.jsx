@@ -13,6 +13,7 @@ import { medalUrl } from '../lib/achievementMedals'
 import { formatDate } from '../lib/formatDate'
 import { listFollowers, listFollowing, removeFollower, unfollowPlayer } from '../lib/follows'
 import { describeError } from '../lib/errors'
+import Alino from './Alino'
 
 /* ─── Date fields ────────────────────────────────────────────────────────
    Native <input type=date/datetime-local> pickers open reliably on iOS
@@ -1603,27 +1604,49 @@ export function NeedsYou({ children, action, className = '' }) {
   )
 }
 
-export function EmptyState({ icon: Icon, title, subtitle, action }) {
-  return (
-    <div className="card text-center py-12 px-6 animate-fade-up">
-      <div className="relative w-24 h-24 mx-auto mb-5">
-        {/* faint court-line motif */}
-        <svg viewBox="0 0 96 96" className="absolute inset-0 text-ink-50" fill="none">
-          <rect x="8" y="14" width="80" height="68" rx="10" stroke="currentColor" strokeWidth="2.5" />
-          <line x1="48" y1="14" x2="48" y2="82" stroke="currentColor" strokeWidth="2.5" />
-          <line x1="8" y1="48" x2="88" y2="48" stroke="currentColor" strokeWidth="2.5" strokeDasharray="4 5" />
-          {/* ball-ring accent, echoing the logo's lime ring glyph */}
-          <circle cx="76" cy="24" r="9" stroke="#C5DD01" strokeWidth="2.5" />
-        </svg>
-        {Icon && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Icon size={32} strokeWidth={2} className="text-ink-700" />
-          </div>
-        )}
+/* O vazio de uma página: o Alino «a pensar» por cima do título e da frase
+   (regra do Francisco, 12 out: «o avatar quando não temos nada em páginas
+   para mostrar»; design-handoff/2026-10-12-mascote). Nos erros vai o
+   «ups»: pose="triste" (ou o LoadErrorState, com a frase e o botão).
+   Uma secção vazia dentro de uma página com outras coisas não leva o
+   Alino (ficava pesado): pose={null} dá uma linha só, sem caixa nem
+   ícone — o título a negrito e a frase a cinzento (UX, 12 out). O `icon`
+   já não se desenha; fica aceite para não mexer em quem o passa. */
+export function EmptyState({ title, subtitle, action, pose = 'a-pensar' }) {
+  if (!pose) {
+    const stop = /[.!?…]$/.test(String(title || '').trim()) ? '' : '.'
+    return (
+      <div className="space-y-2 py-1">
+        <p className="text-sm text-muted">
+          <b className="font-extrabold text-ink-900">{title}{subtitle ? stop : ''}</b>{subtitle ? ` ${subtitle}` : ''}
+        </p>
+        {action}
       </div>
+    )
+  }
+  return (
+    <div className="card text-center py-10 px-6 animate-fade-up">
+      <Alino pose={pose} size={120} className="mb-4" />
       <h3 className="text-lg text-ink-900 mb-1">{title}</h3>
       {subtitle && <p className="text-muted text-sm mb-6">{subtitle}</p>}
       {action}
+    </div>
+  )
+}
+
+/* Erro a carregar uma página inteira: o Alino «ups», a frase do erro, o que
+   fazer, e o botão para sair dali (SPEC da mascote: os erros levam sempre
+   uma saída). Por omissão, «Tentar outra vez» recarrega a página. */
+export function LoadErrorState({ title, subtitle, onRetry }) {
+  const { t } = useTranslation()
+  return (
+    <div role="alert">
+      <EmptyState pose="triste" title={title} subtitle={subtitle ?? t('ui.load_error_hint')}
+        action={(
+          <PrimaryButton variant="ghost" onClick={onRetry || (() => window.location.reload())} className="w-full">
+            {t('ui.try_again')}
+          </PrimaryButton>
+        )} />
     </div>
   )
 }

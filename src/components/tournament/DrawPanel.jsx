@@ -12,7 +12,7 @@ import useCategoryBoard from './useCategoryBoard'
 import { bracketRounds } from '../../lib/tournamentDraw'
 import BracketTree from './BracketTree'
 
-export default function DrawPanel({ category, myEntries }) {
+export default function DrawPanel({ category, myEntries , emptyPose }) {
   const { t } = useTranslation()
   const { entries, matches, groups, loading } = useCategoryBoard(category?.id)
 
@@ -27,6 +27,7 @@ export default function DrawPanel({ category, myEntries }) {
     return (
       <EmptyState
         icon={Trophy}
+        pose={emptyPose}
         title={t('tournament.draw.bracket_empty_title')}
         subtitle={t('tournament.draw.bracket_empty_subtitle')}
       />

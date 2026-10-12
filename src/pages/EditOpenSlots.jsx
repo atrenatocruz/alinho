@@ -6,7 +6,7 @@ import { useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { loadOpenSlotBatch } from '../lib/openSlotsApi'
 import { describeError } from '../lib/errors'
-import { EmptyState } from '../components/ui'
+import { EmptyState, LoadErrorState } from '../components/ui'
 import CreateOpenSlots from './CreateOpenSlots'
 
 export default function EditOpenSlots() {
@@ -21,7 +21,7 @@ export default function EditOpenSlots() {
       .catch((err) => { console.error('Error loading open slots to edit:', err); setError(describeError(t, err)) })
   }, [batchId, t])
 
-  if (error) return <EmptyState title={error} />
+  if (error) return <LoadErrorState title={error} />
   if (!games) {
     return <div className="flex justify-center py-10"><div className="h-8 w-8 animate-spin rounded-full border-[3px] border-ink-50 border-t-ink-700" /></div>
   }
