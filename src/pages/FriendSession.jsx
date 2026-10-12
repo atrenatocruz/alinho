@@ -225,6 +225,23 @@ export default function FriendSession() {
   const pill = 'inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-ctrl border border-line bg-surface px-2.5 text-sm font-extrabold text-ink-900 whitespace-nowrap'
   // Depois de enviado sai o «Editar» de cima (ponto 4); fica o «Mais».
   const finished = !!match?.finished_at
+  // «⏱ Usar relógio» (Francisco, 12 out): o relógio e o alarme só aparecem
+  // depois de alguém o pedir neste telemóvel, ou se uma ronda já está a contar.
+  const clockKey = match?.id ? `friendClock:${match.id}` : null
+  const [clockAsked, setClockAsked] = useState(false)
+  useEffect(() => {
+    if (!clockKey) return
+    try { setClockAsked(localStorage.getItem(clockKey) === '1') } catch { /* sem armazenamento */ }
+  }, [clockKey])
+  const useClock = clockAsked || games.some((g) => g.started_at)
+  const turnClockOn = () => {
+    setClockAsked(true)
+    try { if (clockKey) localStorage.setItem(clockKey, '1') } catch { /* sem armazenamento */ }
+  }
+  const turnClockOff = () => {
+    setClockAsked(false)
+    try { if (clockKey) localStorage.removeItem(clockKey) } catch { /* sem armazenamento */ }
+  }
   const iSent = finished && !!profile?.id && match?.sent_by?.user_id === profile.id
   // Pelo ranking_state (Dev 3): num jogo «só amigável» o waiting_for também
   // vem cheio, e aí não conta para nada.
@@ -233,7 +250,7 @@ export default function FriendSession() {
       : t('friends.toast_sent_not_ranked'))
   const creatorBar = iOrganize && match && (
     <div className="mt-3 flex gap-1.5">
-      {!finished && <Link to={`/jogos-privados/sessao/${match.id}/editar`} className={pill}><Pencil size={14} /> {t('friends.edit_short')}</Link>}
+      {!finished && <Link to={`/jogos-privados/sessao/${match.id}/editar`} state={{ fromSession: true }} className={pill}><Pencil size={14} /> {t('friends.edit_short')}</Link>}
       {(!finished || iSent) && <button type="button" onClick={() => setActionsOpen(true)} className={pill} aria-haspopup="dialog">
         {t('friends.more')} <MoreHorizontal size={16} />
       </button>}
@@ -274,7 +291,7 @@ export default function FriendSession() {
             </div>
           ) : (
           <div className="space-y-2.5">
-            <Link to={`/jogos-privados/sessao/${match.id}/editar`} className={sheetButton}>
+            <Link to={`/jogos-privados/sessao/${match.id}/editar`} state={{ fromSession: true }} className={sheetButton}>
               <Pencil size={16} /> {t('friends.edit_game')}
             </Link>
             {pending > 0 && (
@@ -386,7 +403,7 @@ export default function FriendSession() {
           {[t('friends.people_count', { count: players.length }),
             t('friends.courts_count', { count: Math.max(1, ...games.map((g) => g.court_number || 1)) }),
             match.pairing_mode === 'rotating' ? t('friends.pairs_rotating_short') : null,
-            match.game_minutes && !finished ? t('friends.minutes_per_round', { count: match.game_minutes }) : null,
+            match.game_minutes && !finished && useClock ? t('friends.minutes_per_round', { count: match.game_minutes }) : null,
           ].filter(Boolean).join(' · ')}
           {finished && <span className="text-ink-900"> · <Check size={13} className="inline align-[-2px]" /> {t('friends.finished_tag')}</span>}
         </p>
@@ -430,7 +447,7 @@ export default function FriendSession() {
                 <b>{t('friends.left_bold', { name: i.left_name })}</b>{missing > 0 ? ` ${t('friends.left_missing', { count: missing })}` : ''}
               </p>
             ))}
-            <Link to={`/jogos-privados/sessao/${match.id}/editar`}
+            <Link to={`/jogos-privados/sessao/${match.id}/editar`} state={{ fromSession: true }}
               className="press flex min-h-[52px] w-full items-center justify-center rounded-ctrl bg-lime-400 px-4 text-[15px] font-extrabold text-ink-900">
               {t('friends.invite_another')}
             </Link>
@@ -476,6 +493,7 @@ export default function FriendSession() {
         <div className="mt-6 space-y-6">
           {games.length > 0 ? (
             <FriendRounds match={match} games={games} invitees={invitees} players={players} iOrganize={iOrganize} myUserId={profile?.id} onChanged={load}
+              clockOn={useClock} onUseClock={turnClockOn} onHideClock={turnClockOff}
               onSent={(res) => { setFinishedPage({ toast: sentToast(res) }); load() }}
               onCorrect={() => setCorrecting(true)}
               onShare={() => setSharingWinners(true)} />

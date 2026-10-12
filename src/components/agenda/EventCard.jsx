@@ -580,7 +580,17 @@ export function FriendSessionCard({ event, userId, past = false }) {
   if (past || event.finished) state = <StateTag tone="grey" icon={CheckCircle2}>{t('agenda.state_finished')}</StateTag>
   else if (running) state = <StateTag tone="live" icon={Play}>{t('ui.status_live')}</StateTag>
   else if (inSession) state = <StateTag tone="in" icon={CheckCircle2}>{t('agenda.state_in')}</StateTag>
-  const sessionKind = <KindLine kind={event.kind === 'open' ? 'open' : 'friends'} past={past} suffix={t('agenda.session_rotating')} />
+  // «a rodar» só quando as duplas rodam (QA, 12 out: aparecia com duplas fixas).
+  const sessionKind = <KindLine kind={event.kind === 'open' ? 'open' : 'friends'} past={past} suffix={m.pairing_mode === 'rotating' ? t('agenda.session_rotating') : null} />
+  // O ranking: antes de enviar, o que se escolheu ao criar; depois, o que
+  // aconteceu (session_ranking_state, Dev 3). Sem ele, não se diz nada — dizia
+  // «Conta para o ranking» num jogo com convidados que não contou (QA, 12 out).
+  const rankingState = m.session_ranking_state
+  const rankingText = !event.finished ? (m.ranked_intent ? t('agenda.friends_ranked') : t('gamedetails.badge_friendly'))
+    : rankingState === 'counted' ? t('friends.list_counted')
+      : rankingState === 'waiting' ? t('friends.list_waiting_some')
+        : rankingState === 'rejected' ? t('friends.list_rejected')
+          : rankingState === 'not_ranked' ? t('friends.list_friendly') : null
 
   return (
     <div className={`relative ${mascotCardClass(mascot)} rounded-card p-3.5 ${to ? 'press' : ''} ${cardFrame(event, past)}`}>
@@ -606,7 +616,7 @@ export function FriendSessionCard({ event, userId, past = false }) {
         </p>
       )}
       <p className="text-ink-700 text-[13px] mt-1.5">
-        {[m.ranked_intent ? t('agenda.friends_ranked') : t('gamedetails.badge_friendly'), facts].filter(Boolean).join(' · ')}
+        {[rankingText, facts].filter(Boolean).join(' · ')}
       </p>
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2 pt-2.5 mt-2.5 border-t border-ink-900/10">
         <div className="flex items-center gap-2 min-w-0">

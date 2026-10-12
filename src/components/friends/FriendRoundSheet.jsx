@@ -14,7 +14,7 @@ import { Chips } from '../ui'
 import { saveFriendMatchRound, setFriendMatchRoundKind } from '../../lib/privateMatches'
 import { describeError } from '../../lib/errors'
 import { shortName } from './friendShare'
-import { KINDS, kindOf, pointsToOf, lastPointsTo, roundScoreProblem, roundScoreNotice } from './roundKinds'
+import { KINDS, kindOf, pointsToOf, lastPointsTo, roundScoreProblem, roundClosedProblem } from './roundKinds'
 
 const pair = (team) => (team || []).map((p) => shortName(p.name)).join(' / ')
 // «O fim» (Dev 3, 11 out): already_sent, nothing_played, not_sent, bad_input;
@@ -34,7 +34,7 @@ export function kindLabel(t, kind, pointsTo) {
 }
 
 /** O tipo: a pastilha «Set ⌄», as quatro escolhas, a regra e o «até». */
-function KindPicker({ kind, setKind, pointsTo, setPointsTo, startOpen = false }) {
+function KindPicker({ kind, setKind, pointsTo, setPointsTo, startOpen = false, hideRule = false }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(startOpen)
   return (
@@ -47,7 +47,9 @@ function KindPicker({ kind, setKind, pointsTo, setPointsTo, startOpen = false })
         <>
           <Chips value={kind} onChange={setKind} label={t('friends.kind_label')} className="!flex-wrap !overflow-visible"
             options={KINDS.map((k) => ({ value: k, label: t(`friends.kind_${k}`) }))} />
-          <p className="text-xs text-muted">{t(`friends.kind_rule_${kind}`)}</p>
+          {/* Com a frase vermelha por baixo dos números, esta sai: diria o
+              mesmo duas vezes (UX, 12 out). */}
+          {!hideRule && <p className="text-xs text-muted">{t(`friends.kind_rule_${kind}`)}</p>}
         </>
       )}
       {kind === 'pontos' && (
@@ -73,14 +75,17 @@ export default function FriendRoundSheet({ match, game, roundNumber, games, next
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const problem = roundScoreProblem(kind, a, b)
-  const notice = roundScoreNotice(kind, a, b)
+  // Um resultado que não fecha o Set / tie-break não se guarda; o «Mudar
+  // para Pontos» guarda-o como está (PO, 12 out — substitui o aviso laranja
+  // «Podes guardar assim» de 10 out).
+  const open = roundClosedProblem(kind, a, b)
   const filled = a !== '' && b !== ''
 
-  const save = async (last) => {
+  const save = async (last, asKind = kind) => {
     // A ronda grava sempre; se a seguinte não puder nascer, vem next_error
     // (Dev 3, 9 out) — quem chama mostra o aviso dela, não um erro desta.
     const result = await saveFriendMatchRound(game.id, Number(a), Number(b), {
-      kind, pointsTo: kind === 'pontos' && pointsTo ? Number(pointsTo) : null,
+      kind: asKind, pointsTo: asKind === 'pontos' && pointsTo ? Number(pointsTo) : null,
       nextCourts: editing || last ? null : nextCourts, last,
     })
     onSaved(result, { finish: last })
@@ -88,9 +93,9 @@ export default function FriendRoundSheet({ match, game, roundNumber, games, next
   // «Guardar e terminar o jogo» (UX, 10 out — era «O jogo acabou assim»):
   // guarda sem nascer a seguinte e quem chama abre logo «Terminar o jogo e
   // enviar?». Com «Continuar a jogar», a ronda fica guardada.
-  const run = async (last = false) => {
+  const run = async (last = false, asKind = kind) => {
     setBusy(true); setError('')
-    try { await save(last) } catch (err) {
+    try { await save(last, asKind) } catch (err) {
       console.error('Error saving a friend match round:', err)
       setError(roundSaveError(t, err))
     } finally { setBusy(false) }
@@ -101,7 +106,7 @@ export default function FriendRoundSheet({ match, game, roundNumber, games, next
     <Sheet title={t('friends.set_sheet_title', { round: roundNumber, court: game.court_number || 1 })} onClose={onClose}>
       <div className="space-y-3">
         <p className="-mt-2 text-xs text-muted">{t('friends.round_sheet_hint')}</p>
-        <KindPicker kind={kind} setKind={setKind} pointsTo={pointsTo} setPointsTo={setPointsTo} />
+        <KindPicker kind={kind} setKind={setKind} pointsTo={pointsTo} setPointsTo={setPointsTo} hideRule={!!open} />
         <div className="grid grid-cols-[1fr_16px_1fr] items-end gap-2 text-center text-xs font-semibold text-muted">
           <span className="truncate">{pair(game.team_a)}</span><span /><span className="truncate">{pair(game.team_b)}</span>
         </div>
@@ -113,14 +118,22 @@ export default function FriendRoundSheet({ match, game, roundNumber, games, next
             aria-label={t('friends.round_score_aria', { team: pair(game.team_b) })} className={`${cell} border-ink-900 bg-white`} />
         </div>
         {problem && <p className="text-xs font-extrabold text-danger" role="status">{t(`friends.round_problem_${problem}`)}</p>}
-        {!problem && notice && <p className="text-xs font-extrabold text-[#9A5B00]" role="status">{t(`friends.round_notice_${notice}`)}</p>}
+        {open && (
+          <div className="space-y-2">
+            <p className="text-xs font-extrabold text-danger" role="status">{t(`friends.round_open_${open}`)}</p>
+            <button type="button" disabled={busy} onClick={() => { setKind('pontos'); run(false, 'pontos') }}
+              className="press min-h-[48px] w-full rounded-ctrl border-[1.5px] border-ink-900 bg-white px-4 text-sm font-extrabold text-ink-900 disabled:opacity-40">
+              {t('friends.round_open_to_points')}
+            </button>
+          </div>
+        )}
         {error && <p className="rounded-ctrl border border-danger/30 bg-danger/10 px-3 py-2 text-sm font-extrabold text-danger">{error}</p>}
-        <button type="button" disabled={busy || !filled || !!problem} onClick={() => run(false)}
+        <button type="button" disabled={busy || !filled || !!problem || !!open} onClick={() => run(false)}
           className="press min-h-[52px] w-full rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold text-white disabled:opacity-40">
           {t('friends.save_round', { n: roundNumber })}
         </button>
         {!editing && (
-          <button type="button" disabled={busy || !filled || !!problem} onClick={() => run(true)}
+          <button type="button" disabled={busy || !filled || !!problem || !!open} onClick={() => run(true)}
             className="press min-h-[52px] w-full rounded-ctrl border-[1.5px] border-line bg-white px-4 text-[15px] font-extrabold text-ink-900 disabled:opacity-40">
             {t('friends.save_and_finish')}
           </button>
@@ -137,6 +150,8 @@ export function RoundKindSheet({ match, game, roundNumber, games, onClose, onSav
   const [pointsTo, setPointsTo] = useState(() => String(pointsToOf(game) || lastPointsTo(games) || ''))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  // Com resultado, o tipo novo tem de o fechar (PO, 12 out).
+  const open = game.score_a != null && game.score_b != null ? roundClosedProblem(kind, String(game.score_a), String(game.score_b)) : null
   const save = async () => {
     setBusy(true); setError('')
     try {
@@ -150,9 +165,10 @@ export function RoundKindSheet({ match, game, roundNumber, games, onClose, onSav
   return (
     <Sheet title={t('friends.kind_sheet_title', { n: roundNumber })} onClose={onClose}>
       <div className="space-y-3">
-        <KindPicker kind={kind} setKind={setKind} pointsTo={pointsTo} setPointsTo={setPointsTo} startOpen />
+        <KindPicker kind={kind} setKind={setKind} pointsTo={pointsTo} setPointsTo={setPointsTo} startOpen hideRule={!!open} />
+        {open && <p className="text-xs font-extrabold text-danger" role="status">{t(`friends.round_open_${open}`)}</p>}
         {error && <p className="rounded-ctrl border border-danger/30 bg-danger/10 px-3 py-2 text-sm font-extrabold text-danger">{error}</p>}
-        <button type="button" disabled={busy} onClick={save}
+        <button type="button" disabled={busy || !!open} onClick={save}
           className="press min-h-[52px] w-full rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold text-white disabled:opacity-40">
           {t('friends.kind_save')}
         </button>

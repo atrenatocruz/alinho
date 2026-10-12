@@ -4,6 +4,7 @@
 // As regras do resultado são as da base de dados (Dev 3,
 // friend_match_round_score_ok): uma parte pode ficar por acabar (4-4 num set).
 import { formatKey } from './friendScoring'
+import { setProblem, tiebreakProblem } from '../../lib/scoreRules'
 
 export const KINDS = ['set', 'tiebreak', 'super_tiebreak', 'pontos']
 
@@ -39,6 +40,20 @@ export function roundScoreNotice(kind, a, b) {
   if (!to) return null
   const closed = Math.max(x, y) >= to && Math.abs(x - y) >= 2
   return closed ? null : `${kind}_open`
+}
+
+/** Um resultado que não fecha o tipo da ronda (PO, 12 out, caso do
+ *  Francisco: um Set 6-6 gravou): Set a 6 com 2 de diferença, 7-5 ou 7-6;
+ *  tie-break a 7 e super tie-break a 10, com 2 de diferença. As contas são
+ *  as do torneio (scoreRules). Não se guarda; a folha oferece «Mudar para
+ *  Pontos». Devolve 'set_open' | 'tiebreak_open' | 'super_tiebreak_open' | null. */
+export function roundClosedProblem(kind, a, b) {
+  if (a === '' || b === '' || a == null || b == null) return null
+  if (roundScoreProblem(kind, a, b)) return null
+  if (kind === 'set') return setProblem({ score_a: a, score_b: b }, 6) ? 'set_open' : null
+  if (kind === 'tiebreak') return tiebreakProblem(a, b, 7) ? 'tiebreak_open' : null
+  if (kind === 'super_tiebreak') return tiebreakProblem(a, b, 10) ? 'super_tiebreak_open' : null
+  return null
 }
 
 /** O que está mal no resultado, ou null. Vazio ainda não é problema. */

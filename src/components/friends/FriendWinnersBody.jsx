@@ -7,7 +7,7 @@
 import { useTranslation } from 'react-i18next'
 import { kindLabel } from './FriendRoundSheet'
 import { kindOf, pointsToOf } from './roundKinds'
-import { pairNames, winnersLine } from './friendResult'
+import { pairNames, winnersLine, durationLine } from './friendResult'
 
 const LIME = '#C5DD01'
 
@@ -44,6 +44,11 @@ export default function FriendWinnersBody({ match, games, pairs, compact }) {
             <p key={i} className={`font-extrabold leading-snug text-white ${compact ? 'text-[12px]' : 'text-[13.5px]'}`}>{winnersLine(t, p)}</p>
           ))}
         </div>
+      )}
+      {/* «⏱ 1h30 · 4 rondas»: por baixo de «contra …», por cima das rondas
+          (acerto de 12 out). */}
+      {durationLine(t, match, games) && (
+        <p className={`mt-1.5 font-semibold text-[#9CA3AF] ${compact ? 'text-[10.5px]' : 'text-[11.5px]'}`}>{durationLine(t, match, games)}</p>
       )}
       {!compact && played.length > 0 && (
         <div className="mt-3 space-y-1 rounded-[10px] bg-[#1A1A1D] px-3 py-2.5">

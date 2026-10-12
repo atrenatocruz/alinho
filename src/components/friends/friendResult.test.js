@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { pairsOf, myOutcome, pairCanCount } from './friendResult'
+import { pairsOf, myOutcome, pairCanCount, matchDuration, durationText } from './friendResult'
 
 const P = (id, account = true) => ({ invitee_id: id, user_id: account ? `u-${id}` : null, name: id })
 const g = (n, a, b, sa, sb) => ({ round_number: n, team_a: a, team_b: b, score_a: sa, score_b: sb })
@@ -54,5 +54,31 @@ describe('pairCanCount', () => {
     expect(pairCanCount({ ranked_intent: false }, four)).toBe(false)
     expect(pairCanCount({ ranked_intent: true }, { ...four, winner: 'draw' })).toBe(false)
     expect(pairCanCount({ ranked_intent: true }, { ...four, team_b: [{ user_id: 'c' }, { user_id: null, name: 'Convidado' }] })).toBe(false)
+  })
+})
+
+describe('matchDuration', () => {
+  const at = (min) => new Date(Date.UTC(2026, 9, 12, 10, 0) + min * 60000).toISOString()
+  const g = (min) => ({ score_a: 6, score_b: 4, result_at: at(min) })
+  it('da 1.ª ronda ao terminar, aos 15 min', () => {
+    expect(matchDuration({ finished_at: at(95) }, [g(10), g(40), g(70), g(92)])).toEqual({ minutes: 90, rounds: 4 })
+    expect(matchDuration({ finished_at: at(55) }, [g(10), g(30)])).toEqual({ minutes: 45, rounds: 2 })
+  })
+  it('esconde: menos de 15 min, mais de 4h, sem horas, ou tudo no fim', () => {
+    expect(matchDuration({ finished_at: at(20) }, [g(10), g(15)])).toBe(null)
+    expect(matchDuration({ finished_at: at(300) }, [g(0), g(30)])).toBe(null)
+    expect(matchDuration({ finished_at: at(60) }, [{ score_a: 6, score_b: 4 }])).toBe(null)
+    expect(matchDuration({ finished_at: at(100) }, [g(60), g(60.5), g(61)])).toBe(null)
+    expect(matchDuration({ finished_at: null }, [g(10), g(40)])).toBe(null)
+  })
+})
+
+describe('durationText', () => {
+  const t = (k, v) => ({ 'friends.duration_min': `${v.m} min`, 'friends.duration_h': `${v.h}h`, 'friends.duration_h_min': `${v.h}h${v.m}` }[k])
+  it('45 min, 1h, 1h15, 1h30', () => {
+    expect(durationText(t, 45)).toBe('45 min')
+    expect(durationText(t, 60)).toBe('1h')
+    expect(durationText(t, 75)).toBe('1h15')
+    expect(durationText(t, 90)).toBe('1h30')
   })
 })

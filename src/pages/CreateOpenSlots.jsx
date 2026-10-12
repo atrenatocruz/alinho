@@ -143,12 +143,13 @@ export default function CreateOpenSlots({ edit = null }) {
       } catch (e) {
         console.error('Error saving special price:', e)
         setSaving(false)
-        navigate(`/gerir/${slug}`, { state: { notice: t('special_price.error_save') } })
+        navigate(`/gerir/${slug}`, { replace: true, state: { notice: t('special_price.error_save') } })
         return
       }
     }
     setSaving(false)
-    navigate(`/gerir/${slug}`)
+    // replace: depois de publicar, o «voltar» não reabre o criar (12 out).
+    navigate(`/gerir/${slug}`, { replace: true })
   }
 
   // Editar: «Cancelar» pergunta se há alterações por guardar (30 set).
@@ -195,7 +196,7 @@ export default function CreateOpenSlots({ edit = null }) {
       }
       // O preço especial: num horário que fica, vale para a publicação toda.
       if (specialChanged && ids[0]) await saveEventSpecialPrice('open_slot', ids[0], specialEff)
-      navigate(`/gerir/${slug}`)
+      navigate(`/gerir/${slug}`, { replace: true })
     } catch (err) {
       console.error('Error editing open slots:', err)
       const msg = String(err?.message || '')

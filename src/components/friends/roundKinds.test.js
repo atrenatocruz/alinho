@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { kindOf, lastPointsTo, roundScoreProblem, roundScoreNotice } from './roundKinds'
+import { kindOf, lastPointsTo, roundScoreProblem, roundScoreNotice, roundClosedProblem } from './roundKinds'
 
 describe('kindOf', () => {
   it('usa o tipo da ronda quando vem da base de dados', () => {
@@ -50,5 +50,28 @@ describe('roundScoreNotice', () => {
     expect(roundScoreNotice('tiebreak', '7', '5')).toBe(null)
     expect(roundScoreNotice('tiebreak', '6', '4')).toBe('tiebreak_open')
     expect(roundScoreNotice('set', '4', '4')).toBe(null)
+  })
+})
+
+describe('roundClosedProblem', () => {
+  it('Set: só fecha a 6 com 2 de diferença, 7-5 ou 7-6', () => {
+    expect(roundClosedProblem('set', '6', '6')).toBe('set_open')
+    expect(roundClosedProblem('set', '4', '4')).toBe('set_open')
+    expect(roundClosedProblem('set', '6', '5')).toBe('set_open')
+    expect(roundClosedProblem('set', '6', '4')).toBe(null)
+    expect(roundClosedProblem('set', '7', '5')).toBe(null)
+    expect(roundClosedProblem('set', '6', '7')).toBe(null)
+  })
+  it('tie-break a 7 e super a 10, com 2 de diferença', () => {
+    expect(roundClosedProblem('tiebreak', '6', '4')).toBe('tiebreak_open')
+    expect(roundClosedProblem('tiebreak', '7', '5')).toBe(null)
+    expect(roundClosedProblem('super_tiebreak', '9', '0')).toBe('super_tiebreak_open')
+    expect(roundClosedProblem('super_tiebreak', '10', '9')).toBe('super_tiebreak_open')
+    expect(roundClosedProblem('super_tiebreak', '12', '10')).toBe(null)
+  })
+  it('pontos, vazio ou número errado: não é com ela', () => {
+    expect(roundClosedProblem('pontos', '6', '6')).toBe(null)
+    expect(roundClosedProblem('set', '', '6')).toBe(null)
+    expect(roundClosedProblem('set', '9', '6')).toBe(null)
   })
 })

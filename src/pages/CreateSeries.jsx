@@ -169,7 +169,7 @@ export default function CreateSeries() {
       }
       const notice = t('lessons.series_saved')
       try { sessionStorage.setItem('gerir.notice', notice) } catch { /* sem sessão */ }
-      navigate(`/gerir/${slug}`, { state: { notice } })
+      navigate(`/gerir/${slug}`, { replace: true, state: { notice } })
     } catch (err) {
       console.error('Error saving lesson series:', err)
       // Os códigos do update_lesson_series (Dev 3) têm frase própria.
@@ -201,7 +201,7 @@ export default function CreateSeries() {
       // histórico).
       const notice = forOther ? t('lessons.series_created_pending', { name: teacher.name }) : t('lessons.series_created')
       try { sessionStorage.setItem('gerir.notice', notice) } catch { /* sem sessão */ }
-      navigate(`/gerir/${slug}`, { state: { notice } })
+      navigate(`/gerir/${slug}`, { replace: true, state: { notice } })
     } catch (err) {
       console.error('Error creating lesson series:', err)
       setError(describeError(t, err, 'lessons.error_create_series'))

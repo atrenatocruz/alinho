@@ -25,7 +25,7 @@ import SwapPairsSheet from './SwapPairsSheet'
 import EditPairsSheet from './EditPairsSheet'
 import RoundClock from './RoundClock'
 import { FinishBlock, rankingState, toneClass } from './FriendFinish'
-import { pairsOf, winnersLine } from './friendResult'
+import { pairsOf, winnersLine, durationLine } from './friendResult'
 import { ShareMissingButton } from './FriendSessionGames'
 import { ConfirmSheet } from '../ui'
 import { Sheet } from '../agenda/AgendaControls'
@@ -40,7 +40,7 @@ const samePairs = (g, h) => !!g && !!h && [pairKey(g.team_a), pairKey(g.team_b)]
 // «O fim» (SPEC 2026-10-09-amigos-o-fim): `onSent` recebe o que o
 // finish_friend_match devolve; `onCorrect` abre «Corrigir o resultado».
 // Depois de enviado (match.finished_at), as rondas ficam só para ler.
-export default function FriendRounds({ match, games, invitees, players, iOrganize, myUserId, onChanged, onSent, onCorrect, onShare }) {
+export default function FriendRounds({ match, games, invitees, players, iOrganize, myUserId, onChanged, onSent, onCorrect, onShare, clockOn = false, onUseClock = null, onHideClock = null }) {
   const { t, i18n } = useTranslation()
   const [markFor, setMarkFor] = useState(null) // { game, round, editing }
   const [kindFor, setKindFor] = useState(null) // { game, round }
@@ -157,7 +157,18 @@ export default function FriendRounds({ match, games, invitees, players, iOrganiz
         {samePairs(g, prev) && <p className="mt-2 text-xs text-muted">{t('friends.same_pairs_as_before')}</p>}
         {live && iOrganize && !finished && (
           <div className="mt-3 space-y-2.5">
-            {match.game_minutes ? <RoundClock match={match} game={g} roundNumber={r.number} canTimer={iOrganize} onChanged={onChanged} /> : null}
+            {/* O relógio é opcional (Francisco, 12 out: «isto não é um mix… este
+                timer tem de ser opcional»): por omissão só a linha «⏱ Usar
+                relógio»; ligado (ou já a contar), o relógio e o alarme. */}
+            {match.game_minutes && (clockOn || g.started_at)
+              ? <RoundClock match={match} game={g} roundNumber={r.number} canTimer={iOrganize} onChanged={onChanged}
+                  onHide={!g.started_at && !games.some((x) => x.started_at) ? onHideClock : null} />
+              : match.game_minutes && onUseClock ? (
+                <button type="button" onClick={onUseClock}
+                  className="press inline-flex min-h-[44px] items-center text-sm font-extrabold text-ink-700 underline underline-offset-2">
+                  {t('friends.use_clock')}
+                </button>
+              ) : null}
             <button type="button" onClick={() => setMarkFor({ game: g, round: r, editing: false })} disabled={early}
               className="press min-h-[52px] w-full rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold text-white disabled:bg-ink-200 disabled:text-ink-500">
               {t('friends.mark_round', { n: r.number })}
@@ -243,6 +254,8 @@ export default function FriendRounds({ match, games, invitees, players, iOrganiz
                 {winnersLine(t, p)}
               </p>
             ))}
+            {/* A duração, pequena e a cinzento-claro (acerto de 12 out). */}
+            {durationLine(t, match, games) && <p className="text-xs font-semibold text-ink-200">{durationLine(t, match, games)}</p>}
           </div>
           {/* Com o resultado contestado não se partilha (UX, 11 out). */}
           {onShare && !rejected && (

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
 import { Users, Lock } from 'lucide-react'
@@ -31,6 +31,7 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
   const { t } = useTranslation()
   const { profile } = useAuth()
   const navigate = useNavigate()
+  const routeLocation = useLocation()
 
   // Quatro passos, como todos os eventos (#342, versão final de 26 set):
   // Pessoas · Quando · Onde joga · Regras. Primeiro as pessoas, sem duplas —
@@ -118,7 +119,9 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
           ? { guest_name: p.name, ...(p.email ? { guest_email: p.email } : {}) }
           : { user_id: p.user_id })),
       })
-      navigate(`/jogos-privados/sessao/${id}`)
+      // replace: o criar sai do histórico — o «voltar» do jogo não pode
+      // reabrir o «Novo jogo» no passo 1 (Francisco, 12 out).
+      navigate(`/jogos-privados/sessao/${id}`, { replace: true })
     } catch (err) {
       console.error('Error creating friend match:', err)
       // As funções do Dev 3 recusam com a frase já escrita (P0001).
@@ -163,7 +166,10 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
         teamsMode: teamsMode !== (m.teams_mode || 'manual') ? teamsMode : undefined,
         showLive,
       })
-      navigate(`/jogos-privados/sessao/${m.id}`)
+      // Vindo do jogo, volta para ele (sem o repetir no histórico); de outro
+      // lado (a lista), o editar troca de lugar com o jogo.
+      if (routeLocation.state?.fromSession) navigate(-1)
+      else navigate(`/jogos-privados/sessao/${m.id}`, { replace: true })
     } catch (err) {
       console.error('Error editing friend match:', err)
       const code = EDIT_ERRORS.find((k) => String(err?.message || '').includes(k))

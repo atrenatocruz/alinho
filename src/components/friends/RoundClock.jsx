@@ -18,7 +18,7 @@ const clock = (ms) => {
   return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
 }
 
-export default function RoundClock({ match, game, roundNumber, canTimer, onChanged }) {
+export default function RoundClock({ match, game, roundNumber, canTimer, onChanged, onHide = null }) {
   const { t } = useTranslation()
   const [now, setNow] = useState(Date.now())
   const [busy, setBusy] = useState(false)
@@ -67,6 +67,14 @@ export default function RoundClock({ match, game, roundNumber, canTimer, onChang
             <button type="button" disabled={busy} onClick={() => act(() => startFriendMatchGame(game.id))}
               className="press mt-3 min-h-[44px] w-full rounded-ctrl border-[1.5px] border-ink-900 bg-white px-4 text-sm font-extrabold text-ink-900 disabled:opacity-40">
               {t('friends.start_clock')}
+            </button>
+          )}
+          {/* Para quem tocou em «Usar relógio» sem querer (UX, 12 out): só
+              enquanto ainda não conta. */}
+          {onHide && (
+            <button type="button" onClick={onHide}
+              className="press mt-1.5 inline-flex min-h-[44px] items-center text-sm font-extrabold text-ink-700 underline underline-offset-2">
+              {t('friends.hide_clock')}
             </button>
           )}
         </div>
