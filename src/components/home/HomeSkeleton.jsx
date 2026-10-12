@@ -16,7 +16,8 @@ function SmallCard() {
   )
 }
 
-function BigCard() {
+/** O cartão grande de evento a cinzento (Home e «Já jogados»). */
+export function BigCard() {
   return (
     <SkCard className="space-y-2.5">
       <div className="flex items-center gap-2.5">

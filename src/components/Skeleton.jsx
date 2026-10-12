@@ -16,9 +16,13 @@
 //   useSkeleton(loading) → true só se a página demorar mais de 0,2 s (mais
 //     rápida, o cinzento nem chega a aparecer);
 //   useLoadTimeout(loading) → true ao fim de 8 s sem dados (o erro de sempre);
-//   <FillIn> — os dados entram no mesmo sítio com um fade de 0,35 s.
+//   <FillIn> — os dados entram no mesmo sítio com um fade de 0,35 s;
+//   <SkeletonGate> — para as páginas que fazem «if (loading) return …»: trata
+//     sozinha dos 0,2 s e dos 8 s, sem hooks novos na página.
 // Nada aqui tem texto nem números: o cinzento não inventa conteúdo.
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { EmptyState, PrimaryButton } from './ui'
 
 const LINE_H = { title: 22, text: 12, label: 9, big: 28 }
 
@@ -77,6 +81,58 @@ export function SkeletonPage({ label, children, className = '' }) {
   return (
     <div role="status" aria-busy="true" aria-label={label} className={className}>
       {children}
+    </div>
+  )
+}
+
+/** O erro de sempre, ao fim de 8 s sem dados («Tentar novamente»). */
+export function LoadError({ onRetry }) {
+  const { t } = useTranslation()
+  return (
+    <EmptyState title={t('app.load_error_title')} subtitle={t('app.load_error_body')}
+      action={<PrimaryButton onClick={onRetry || (() => window.location.reload())}>{t('app.load_error_retry')}</PrimaryButton>} />
+  )
+}
+
+/** Para pôr no lugar de um «if (loading) return <círculo>»: a moldura
+ *  (`frame`, a sério) logo; o esqueleto (`children`) só depois de 0,2 s; e,
+ *  aos 8 s, o erro de sempre. Vive enquanto a página está a carregar. */
+export function SkeletonGate({ frame = null, children, onRetry }) {
+  const { t } = useTranslation()
+  const show = useSkeleton(true)
+  const late = useLoadTimeout(true)
+  return (
+    <div>
+      {frame}
+      {late ? <div className="mt-3"><LoadError onRetry={onRetry} /></div>
+        : show ? <SkeletonPage label={t('common.loading')}>{children}</SkeletonPage> : null}
+    </div>
+  )
+}
+
+/** Uma linha de lista a cinzento: foto, 2 linhas e uma pastilha à direita. */
+export function SkRow() {
+  return (
+    <SkCard className="flex items-center gap-3">
+      <SkCircle size={40} />
+      <div className="min-w-0 flex-1 space-y-1.5">
+        <SkLine size="text" w="58%" />
+        <SkLine size="label" w="36%" />
+      </div>
+      <SkPill w={48} h={22} />
+    </SkCard>
+  )
+}
+
+/** Página genérica (enquanto chega o código de uma página carregada à
+ *  parte): o título e 3 cartões, a cinzento. */
+export function GenericPageSkeleton() {
+  return (
+    <div className="space-y-3 pt-4">
+      <SkLine size="title" w="48%" />
+      <SkRow />
+      <SkRow />
+      <SkRow />
     </div>
   )
 }

@@ -11,6 +11,7 @@ import Login from './pages/Login'
 import Landing from './pages/Landing'
 import Plans from './pages/Plans'
 import Home from './pages/Home'
+import { SkeletonGate, GenericPageSkeleton } from './components/Skeleton'
 import GameDetails from './pages/GameDetails'
 import Rankings from './pages/Rankings'
 import PlayerDetails from './pages/PlayerDetails'
@@ -90,9 +91,12 @@ const ConsentGate = lazyPage(() => import('./pages/ConsentGate'))
 // Same spinner used for every other in-app loading state (Home, Rankings,
 // etc.) — a lazy chunk on a fast connection resolves before this is even
 // visible; on a slow one it matches what players already see elsewhere.
+// Enquanto chega o código de uma página carregada à parte: sem círculo a
+// rodar (regra dos esqueletos, Francisco 12 out) — o fundo e, se demorar mais
+// de 0,2 s, uma página genérica a cinzento; aos 8 s, o erro de sempre.
 const RouteFallback = () => (
-  <div className="flex items-center justify-center py-16">
-    <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
+  <div className="mx-auto max-w-lg px-4">
+    <SkeletonGate><GenericPageSkeleton /></SkeletonGate>
   </div>
 )
 

@@ -4,6 +4,8 @@ import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation, Trans } from 'react-i18next'
 import { BackBar } from '../components/ui'
+import { SkeletonGate } from '../components/Skeleton'
+import GameDetailsSkeleton from '../components/mix/GameDetailsSkeleton'
 import { Calendar, ArrowLeft, UserPlus, Check, Trophy, Play, ChevronRight, Swords, X, ChevronDown, RotateCcw, Euro, GripVertical, Pencil, History, ThumbsUp, Users, Copy, Clock } from 'lucide-react'
 import { DndContext, useDraggable, useDroppable, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
@@ -2972,18 +2974,15 @@ export default function GameDetails() {
                   </DndContext>
   )
 
-  if (loading) {
+  // A carregar: o esqueleto da página (SPEC 2026-10-12-esqueletos-app), em
+  // vez do círculo a rodar — «‹» a sério, o resto a cinzento só depois de
+  // 0,2 s, e o erro de sempre aos 8 s.
+  if (loading || (!game && orgHint === undefined)) {
     return (
-      <div className="flex items-center justify-center py-16" data-loading-game>
-        <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
-      </div>
-    )
-  }
-
-  if (!game && orgHint === undefined) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
+      <div data-loading-game>
+        <SkeletonGate frame={<BackBar onBack={goBack} label={t('gamedetails.back')} />}>
+          <GameDetailsSkeleton />
+        </SkeletonGate>
       </div>
     )
   }

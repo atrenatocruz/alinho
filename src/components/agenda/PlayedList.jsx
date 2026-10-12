@@ -8,6 +8,8 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { SkLine } from '../Skeleton'
+import { BigCard } from '../home/HomeSkeleton'
 import { CheckCircle2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { toDayKey } from '../../lib/agenda'
@@ -57,8 +59,10 @@ export default function PlayedList({ orgIds = null, kinds }) {
   }
   useEffect(() => { setRows(null); load() }, [oneOrg]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // A carregar: a etiqueta do dia e 2 cartões grandes a cinzento, com a forma
+  // dos verdadeiros (regra dos esqueletos; UX, 12 out), não o círculo.
   if (rows === null) {
-    return <div className="flex justify-center py-10"><div className="h-8 w-8 animate-spin rounded-full border-[3px] border-ink-50 border-t-ink-700" /></div>
+    return <div className="mt-3 space-y-2.5"><SkLine size="label" w={150} /><BigCard /><BigCard /></div>
   }
   const shown = rows.filter((r) => kinds.includes(kindOf(r)) && (!orgIds || orgIds.includes(r.organization_id)))
   const days = []
