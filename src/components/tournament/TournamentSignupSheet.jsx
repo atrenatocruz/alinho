@@ -34,6 +34,7 @@ const euroWords = (v, locale) => Number(v).toLocaleString(locale, {
 
 import { NO_TSHIRT, TshirtPicker, tshirtOn, tshirtPriceLabel, pairTotalLine, shirtRulesOf } from './tshirt'
 import { getPlayerTshirt } from '../../lib/tournamentApi'
+import { categoriesClash, categoryWhen, ClashNotice } from './Clashes'
 
 export default function TournamentSignupSheet({ tournament, categories: allCategories, category: pageCategory, categoriesLeft, takenIds = [], myExistingShirt = null, busy, error, onConfirm, onClose }) {
   const { t, i18n } = useTranslation()
@@ -122,6 +123,9 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
   }, [members, found, q])
 
   const chosen = categories.find((c) => c.id === categoryId)
+  // Categorias que chocam (9 out): a escolhida começa quase à mesma hora que
+  // uma onde já estou. Avisa; não impede.
+  const clashWith = chosen ? allCategories.find((c) => takenIds.includes(c.id) && categoriesClash(c, chosen)) : null
   const nameError = partnerNameError(name)
   const emailError = partnerEmailError(email)
   const shirts = tshirtOn(shirtRulesOf(tournament))
@@ -182,6 +186,13 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
             })}
           />
           </div>
+          {clashWith && (
+            <div className="mt-2">
+              <ClashNotice>
+                <b>{t('tclash.signup_title', { code: clashWith.code, when: categoryWhen(clashWith, i18n.language) })}</b> {t('tclash.signup_body')}
+              </ClashNotice>
+            </div>
+          )}
         </div>
 
         {/* Com quem jogas? */}

@@ -22,7 +22,12 @@ import { TOURNAMENT_TZ } from '../../lib/tournamentDay'
 // 'tournament_cancelled' (1 out, Dev 3): o organizador cancelou o torneio.
 // 'tournament_entries_closed' (6 out, Dev 3): o prazo acabou e as inscrições
 // fecharam sozinhas; vai a quem organiza, que já pode sortear.
-export const TOURNAMENT_NOTICE_KINDS = ['tournament_promoted', 'tournament_correction_requested', 'tournament_prize_changed', 'tournament_cancelled', 'tournament_entries_closed']
+// Categorias que chocam (9 out, Dev 3): 'tournament_removed_clash' a quem
+// quem organiza tirou de uma categoria; 'tournament_partner_removed' ao
+// parceiro que ficou sem dupla; 'tournament_clash' quando o sorteio ou o
+// horário põem dois jogos da mesma pessoa quase à mesma hora.
+export const TOURNAMENT_NOTICE_KINDS = ['tournament_promoted', 'tournament_correction_requested', 'tournament_prize_changed', 'tournament_cancelled', 'tournament_entries_closed',
+  'tournament_removed_clash', 'tournament_partner_removed', 'tournament_clash']
 
 /** «150 € + troféu» ou, com os dois, «1.º 150 € · 2.º 50 €». */
 export function prizeText(first, second, t) {
@@ -51,7 +56,12 @@ export default function TournamentNoticeRow({ notice, onOpen }) {
     code: d.category_code || d.category_name || '',
     partner: d.partner_name || '',
     day: dayOf(d.respond_by, i18n.language),
-    name: d.requester_name || '',
+    name: d.requester_name || d.removed_name || '',
+    kept: d.kept_code || '',
+    a: d.code_a || '',
+    b: d.code_b || '',
+    ta: d.at_a ? new Date(d.at_a).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit', timeZone: TOURNAMENT_TZ }) : '',
+    tb: d.at_b ? new Date(d.at_b).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit', timeZone: TOURNAMENT_TZ }) : '',
   }
   const correction = notice.kind === 'tournament_correction_requested'
   const prize = notice.kind === 'tournament_prize_changed' ? prizeText(d.prize_first, d.prize_second, t) : null
@@ -60,6 +70,13 @@ export default function TournamentNoticeRow({ notice, onOpen }) {
     ? t('tournament.notice_correction_requested', vars)
     : notice.kind === 'tournament_cancelled'
     ? t('tournament.notice_cancelled', vars)
+    : notice.kind === 'tournament_removed_clash'
+    // Sem kept_code (tirado sem choque, Dev 3), sem o «Continuas no …».
+    ? t(vars.kept ? 'tclash.notice_removed' : 'tclash.notice_removed_plain', vars)
+    : notice.kind === 'tournament_partner_removed'
+    ? t('tclash.notice_partner_removed', vars)
+    : notice.kind === 'tournament_clash'
+    ? t('tclash.notice_clash', vars)
     : notice.kind === 'tournament_entries_closed'
     // pending_count (Dev 3, 11 out): as duplas por validar, à parte das
     // validadas. Os avisos antigos não o trazem: conta como 0.

@@ -159,7 +159,7 @@ export function MonthSheet({ dayKey, counts, onPick, onClose }) {
 
 export const SHOW_LABEL_KEY = { all: 'agenda.show_all', enrolled: 'agenda.show_enrolled', open: 'agenda.show_open', played: 'agenda.show_played' }
 
-export const KIND_FILTER_KEY = { mix: 'agenda.filter_kind_mix', open: 'agenda.filter_kind_open', friends: 'agenda.filter_kind_friends', lesson: 'agenda.filter_kind_lesson', tournament: 'agenda.filter_kind_tournament' }
+export const KIND_FILTER_KEY = { mix: 'agenda.filter_kind_mix', open: 'agenda.filter_kind_open', free: 'agenda.filter_kind_free', friends: 'agenda.filter_kind_friends', lesson: 'agenda.filter_kind_lesson', tournament: 'agenda.filter_kind_tournament' }
 
 /* Filtros da Home — cada pastilha abre só a sua parte (design-handoff/
    2026-09-27-filtros-da-home-separados; aprovado pelo Francisco a 27 set):
@@ -511,7 +511,7 @@ const TAP = "relative before:absolute before:inset-x-0 before:-inset-y-1 before:
 // Pela ordem da SPEC-1 (Tudo · Mixes · Jogos em aberto · Horários livres ·
 // Torneios · Liga · Aulas · Amigos), só os que existem. «Aulas» segue a mesma
 // bandeira que mostra as aulas no resto da Home (UX, 9 out).
-const BAR_KINDS = ['mix', 'open', 'tournament', 'lesson', 'friends']
+const BAR_KINDS = ['mix', 'open', 'free', 'tournament', 'lesson', 'friends']
 const BAR_LABEL_KEY = { ...KIND_FILTER_KEY, friends: 'agenda.filter_kind_friends_short' }
 
 export function HomeBar({ filters, dayKey, onOpenSearch, onOpenDay, onOpenFilters, onKinds }) {
@@ -549,7 +549,10 @@ export function HomeBar({ filters, dayKey, onOpenSearch, onOpenDay, onOpenFilter
         const on = !all && filters.kinds.includes(k)
         return (
           <button key={k} type="button" onClick={() => pick(k)} aria-pressed={on} className={pill(on)}>
-            <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: KIND_STYLE[k].color, opacity: on ? 1 : 0.55 }} />
+            {k === 'free'
+              // Horários livres: só o contorno tracejado, como o cartão deles (UX, 11 out).
+              ? <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-[3px] border-[1.5px] border-dashed" style={{ borderColor: on ? '#F2C2B1' : '#D9826A', opacity: on ? 1 : 0.55 }} />
+              : <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: KIND_STYLE[k].color, opacity: on ? 1 : 0.55 }} />}
             {t(BAR_LABEL_KEY[k])}
           </button>
         )

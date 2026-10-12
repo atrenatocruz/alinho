@@ -499,3 +499,38 @@ export async function getPlayerTshirt(tournamentId, userId) {
   const row = Array.isArray(data) ? data[0] : data
   return row?.chosen ? { chosen: true, size: row.size || null } : null
 }
+
+// ── Categorias que chocam (design-handoff/2026-10-09-torneio-categorias-
+// chocam; base de dados do Dev 3) ───────────────────────────────────────
+// Um choque: { user_id?, name?, category_a, category_b, code_a, code_b,
+// entry_id_a, entry_id_b, kind: 'near_start' | 'match_overlap', at_a, at_b }.
+// 'near_start': duas categorias da mesma pessoa a começar com menos de 1 hora
+// entre elas (antes do sorteio — resolve-se antes de sortear, e o servidor
+// recusa fechar/sortear com 'has_clashes'). 'match_overlap': dois jogos
+// quase à mesma hora (depois do sorteio, quando alguém muda horas à mão).
+// Sem as funções (PGRST202), não há choques — fica como hoje.
+const noClashFunction = (error) => error?.code === 'PGRST202'
+
+/** Os choques de quem está a ver, neste torneio. */
+export async function listMyClashes(tournamentId) {
+  const { data, error } = await supabase.rpc('my_category_clashes', { p_tournament_id: tournamentId })
+  if (error) { if (noClashFunction(error)) return []; throw error }
+  return data || []
+}
+
+/** Os choques de todos os jogadores do torneio (só quem organiza). */
+export async function listTournamentClashes(tournamentId) {
+  const { data, error } = await supabase.rpc('tournament_player_clashes', { p_tournament_id: tournamentId })
+  if (error) { if (noClashFunction(error)) return []; throw error }
+  return data || []
+}
+
+/** Tira uma pessoa de uma inscrição (o parceiro fica «sem_parceiro»).
+ *  Erros: not_admin, entry_not_found, not_in_entry, already_drawn. Quem
+ *  sai e o parceiro recebem o aviso (tournament_removed_clash /
+ *  tournament_partner_removed). */
+export async function removePlayerFromEntry(entryId, userId) {
+  const { data, error } = await supabase.rpc('admin_remove_player_from_entry', { p_entry_id: entryId, p_user_id: userId })
+  if (error) throw error
+  return data
+}

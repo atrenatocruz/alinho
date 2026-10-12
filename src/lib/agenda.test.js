@@ -6,6 +6,7 @@ import {
   eventsToPins, eventFromLesson,
   eventFromTournament,
   eventFromTournamentMatch,
+  eventsFromPrivateMatches,
   EVENT_KINDS,
 } from './agenda'
 
@@ -124,6 +125,13 @@ describe('filters and days', () => {
     expect(normalizeFilters({ onlyMine: true, kinds: ['mix'], orgIds: null })).toBe(DEFAULT_FILTERS)
     const ok = { show: 'open', kinds: ['mix'], orgIds: null }
     expect(normalizeFilters(ok)).toBe(ok)
+  })
+  it('keeps "everything" when the saved filters predate «Horários livres»', () => {
+    const before = { show: 'all', kinds: ['mix', 'open', 'friends', 'lesson', 'tournament'], orgIds: null }
+    expect(normalizeFilters(before).kinds).toEqual(EVENT_KINDS)
+    expect(isDefaultFilters(normalizeFilters(before))).toBe(true)
+    const onlyFree = { show: 'all', kinds: ['free'], orgIds: null }
+    expect(normalizeFilters(onlyFree)).toBe(onlyFree)
   })
   it('sorts a day by time', () => {
     expect(eventsForDay(events, '2026-09-16').map((e) => e.id)).toEqual(['other', 'mine'])
@@ -319,5 +327,20 @@ describe('torneios na agenda (Trello #363)', () => {
 
   it('o filtro Tipo passa a conhecer os torneios', () => {
     expect(EVENT_KINDS).toContain('tournament')
+  })
+})
+
+describe('eventsFromPrivateMatches — «terminado» de um jogo entre amigos', () => {
+  const row = (id, extra = {}) => ({ id, session_id: 'root', scheduled_date: '2026-10-09', scheduled_time: '16:00:00', game_number: 1, team_a_player1_id: 'me', team_a_player1_status: 'accepted_all', ...extra })
+  it('com o session_finished_at, só está terminado depois de enviado', () => {
+    const scored = { score_a: 6, score_b: 4 }
+    const [open] = eventsFromPrivateMatches([row('root', { ...scored, session_finished_at: null })], 'me')
+    expect(open.finished).toBe(false)
+    const [sent] = eventsFromPrivateMatches([row('root', { ...scored, session_finished_at: '2026-10-09T18:00:00Z' })], 'me')
+    expect(sent.finished).toBe(true)
+  })
+  it('sem o campo (antes da base nova), conta pelas rondas marcadas', () => {
+    const [ev] = eventsFromPrivateMatches([row('root', { score_a: 6, score_b: 4 })], 'me')
+    expect(ev.finished).toBe(true)
   })
 })
