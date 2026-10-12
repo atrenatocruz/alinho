@@ -769,6 +769,8 @@ export function PrimaryButton({ variant = 'lime', className = '', children, ...p
   const variants = {
     lime:     'bg-lime-400 text-ink-900 hover:bg-lime-600 shadow-card',
     navy:     'bg-ink-700 text-white hover:bg-ink-500 shadow-card',
+    // A preto: as ações de quem organiza (o lima é das de jogador).
+    ink:      'bg-ink-900 text-white hover:bg-ink-700 shadow-card',
     ghost:    'bg-surface text-ink-900 border border-line hover:bg-ink-50 hover:border-ink-200',
     danger:   'bg-danger/10 text-danger hover:bg-danger/15',
     whatsapp: 'bg-[#25D366] text-white hover:bg-[#20bd5a] shadow-card',

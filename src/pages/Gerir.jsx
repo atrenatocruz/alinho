@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Navigate, Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Settings, Plus, Check, X, GraduationCap } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
@@ -96,15 +96,16 @@ export default function Gerir() {
 
   const clubsToShow = isPlatformAdmin ? allOrganizations : adminOrganizations
 
-  // Criar grupo (Trello #279 — saiu da Comunidade). Só pode criar um grupo
-  // novo quem não é DONO de nenhum grupo em Free ou Squad; ser admin dos
-  // grupos de outros não conta (Francisco, 18 set). A regra a sério está em
-  // create_self_serve_group (migration_one_free_group_per_owner.sql) — aqui
-  // é só para mostrar a explicação em vez do botão.
+  // Criar grupo (Trello #279 — saiu da Comunidade). Cada dono pode ter UM
+  // grupo grátis; os pagos (Squad, Community, Club) não contam — quem tem
+  // um Squad pode criar um grátis (Francisco, 12 out; antes o Squad também
+  // bloqueava). Ser admin dos grupos de outros não conta. A regra a sério
+  // está em create_self_serve_group (Dev 3) — aqui é só para mostrar a
+  // explicação em vez do botão.
   const blockingGroup = adminOrganizations.find((o) =>
     o.owner_id === profile?.id
     && !o.parent_organization_id
-    && ['free', 'plus'].includes(o.plan_tier || 'free'))
+    && (o.plan_tier || 'free') === 'free')
   // Já tem grupos seus, todos em Community/Club → pode criar mais um.
   const ownsAGroup = adminOrganizations.some((o) => o.owner_id === profile?.id && !o.parent_organization_id)
   const [showGroupForm, setShowGroupForm] = useState(false)
@@ -113,11 +114,9 @@ export default function Gerir() {
   const [groupError, setGroupError] = useState('')
   const groupNameTaken = useOrgNameTaken(groupName, { enabled: showGroupForm })
 
-  // Só salta direto para o clube quando não há mais nada a fazer aqui: gere
-  // um só e já tem o seu grupo (senão tinha de ver "Criar grupo").
-  if (adminOrganizations.length === 1 && !isPlatformAdmin && blockingGroup) {
-    return <Navigate to={`/gerir/${adminOrganizations[0].slug}`} replace />
-  }
+  // Já não salta direto para o grupo de quem gere um só: assim nunca via o
+  // «Criar grupo» nem a explicação de porque não pode (o caso do Rui Gomes,
+  // 12 out). A explicação fica sempre à vista aqui.
 
   const handleCreateGroup = async () => {
     setGroupError('')
@@ -132,7 +131,8 @@ export default function Gerir() {
     } catch (err) {
       console.error('Error creating self-serve group:', err)
       const message = err?.message || ''
-      if (message.includes('Já tens um grupo')) {
+      // O código vem no hint (Dev 3, 12 out); a frase antiga fica de reserva.
+      if (err?.hint === 'already_has_free_group' || message.includes('Já tens um grupo')) {
         setGroupError(describeError(t, err, 'gerir.create_group_error_has_cheap_group'))
       } else {
         setGroupError(describeError(t, err, 'comunidade.create_group_error_generic'))
@@ -150,6 +150,10 @@ export default function Gerir() {
           <p className="text-sm text-muted mt-1">
             {t('gerir.create_group_blocked', { name: blockingGroup.name, plan: planName(blockingGroup.plan_tier) })}
           </p>
+          {/* O caminho: passar o grupo grátis a um plano pago (PO, 12 out). */}
+          <Link to="/planos" className="mt-1 inline-flex min-h-[44px] items-center text-sm font-extrabold text-ink-900 underline underline-offset-2">
+            {t('gerir.create_group_blocked_plans')}
+          </Link>
         </div>
       ) : !showGroupForm ? (
         <>
@@ -157,7 +161,7 @@ export default function Gerir() {
             <h3 className="font-extrabold text-ink-900">{t(ownsAGroup ? 'gerir.create_another_group_title' : 'gerir.create_group_title')}</h3>
             <p className="text-sm text-muted mt-1">{t(ownsAGroup ? 'gerir.create_another_group_description' : 'gerir.create_group_description')}</p>
           </div>
-          <PrimaryButton onClick={() => setShowGroupForm(true)} className="w-full">
+          <PrimaryButton variant="ink" onClick={() => setShowGroupForm(true)} className="w-full">
             <Plus size={18} />
             {t(ownsAGroup ? 'gerir.create_group_button' : 'comunidade.create_group_cta')}
           </PrimaryButton>
@@ -179,11 +183,13 @@ export default function Gerir() {
           {groupError && (
             <div className="bg-danger/10 text-danger px-4 py-3 rounded-ctrl text-sm font-extrabold">{groupError}</div>
           )}
-          <div className="flex gap-3">
+          {/* Empilhados, a ação em cima e a preto (regras de 6 out e da casa). */}
+          <div className="space-y-2">
             <PrimaryButton
+              variant="ink"
               onClick={handleCreateGroup}
               disabled={!groupName.trim() || creatingGroup || groupNameTaken}
-              className="flex-1"
+              className="w-full"
             >
               {creatingGroup ? t('comunidade.creating_group') : t('comunidade.create_group_submit')}
             </PrimaryButton>
@@ -191,7 +197,7 @@ export default function Gerir() {
               variant="ghost"
               onClick={() => { setShowGroupForm(false); setGroupName(''); setGroupError('') }}
               disabled={creatingGroup}
-              className="flex-1"
+              className="w-full"
             >
               {t('gerir.cancel')}
             </PrimaryButton>
@@ -390,8 +396,6 @@ export default function Gerir() {
       {createClubPanel}
       {isPlatformAdmin && <AdminDeleteAccountPanel />}
 
-      {createGroupPanel}
-
       {/* Mais de 5: procurar, pastilhas e linhas curtas (design-handoff/
           2026-09-28-gerir-lista-de-clubes). Até 5, fica como estava. */}
       {clubsToShow.length > 5 && <OrgFinder orgs={clubsToShow} joinRequestsByOrg={joinRequestsByOrg} />}
@@ -431,6 +435,10 @@ export default function Gerir() {
           })}
         </div>
       ))}
+
+      {/* O Gerir serve primeiro para escolher o grupo: o «Criar outro
+          grupo» vem por baixo da lista (UX, 12 out). */}
+      {createGroupPanel}
 
       {/* Interruptores da app toda — só a equipa Alinho (Francisco, 19 set). */}
       {isPlatformAdmin && <AppFeaturesPanel />}
