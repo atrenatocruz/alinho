@@ -83,7 +83,8 @@ export function americanoWinners({ standings, firsts, myId, game, org, t, lang }
 }
 
 function suggested(t, { place, partner, mix, record, solo, winners }) {
-  const v = { partner, mix, won: record?.won ?? 0, played: record?.played ?? 0, winners }
+  // O título pode vir com espaços no fim («Viva »): sem isso, «o Viva !» (QA, 12 out).
+  const v = { partner, mix: String(mix || '').trim(), won: record?.won ?? 0, played: record?.played ?? 0, winners }
   // Quem organizou e não jogou: o texto dos vencedores.
   if (!place) return t('mixwinners.text_org', v)
   const who = solo ? 'solo' : 'pair'
