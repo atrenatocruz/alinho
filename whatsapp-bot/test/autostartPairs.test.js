@@ -92,7 +92,8 @@ test('série: conta só os 4 mixes anteriores da mesma série', async () => {
   assert.ok(keys.has(key('a', 'da')))
   assert.ok(!keys.has(key('f', 'c')), 'a quinta é outra série')
   assert.ok(!keys.has(key('n', 'j')), 'o mix solto não conta para a série')
-  assert.ok(!keys.has(key('old', 'pair')), 'o 5.º para trás já não conta')
+  // Regra por par (12 out): o old e o pair não voltaram a jogar juntos.
+  assert.ok(keys.has(key('old', 'pair')), 'o 5.º para trás ainda conta: não estiveram juntos desde então')
 })
 
 test('só contam os mixes jogados: cancelados, rascunhos e por jogar ficam de fora (10 out)', async () => {
@@ -127,7 +128,32 @@ test('mix que não se repete: os 4 anteriores do grupo, como antes', async () =>
   assert.ok(keys.has(key('n', 'j')))
   assert.ok(keys.has(key('f', 'c')))
   assert.ok(keys.has(key('a', 'da')))
-  assert.ok(!keys.has(key('f', 'rd')))
+  // Regra por par (12 out): o f e o rd não voltaram a jogar juntos.
+  assert.ok(keys.has(key('f', 'rd')))
+})
+
+const tm = (g, p1, p2) => ({ game_id: g, player1_id: p1, player2_id: p2 })
+const fiveGames = ['m1', 'm2', 'm3', 'm4', 'm5'].map((id, i) => ({ id, organization_id: 'o', recurrence_id: 'R', date: day(`09-0${i + 1}`), status: 'finished' }))
+
+test('regra por par (12 out): o B faltou aos últimos 4 — a dupla A+B de há 5 mixes ainda conta', async () => {
+  installFakeSupabase(supabase, {
+    games: fiveGames,
+    teams: [tm('m1', 'A', 'B'), tm('m1', 'C', 'D'), ...['m2', 'm3', 'm4', 'm5'].flatMap((g) => [tm(g, 'A', 'C'), tm(g, 'D', 'E')])],
+    profiles: [],
+  })
+  const keys = await loadRepeatPairKeys({ id: 'hoje', organization_id: 'o', recurrence_id: 'R', date: day('09-10') })
+  assert.ok(keys.has(key('A', 'B')))
+})
+
+test('regra por par (12 out): juntos 4 vezes sem ser dupla — a dupla antiga já pode', async () => {
+  installFakeSupabase(supabase, {
+    games: fiveGames,
+    teams: [tm('m1', 'A', 'B'), tm('m1', 'C', 'D'), ...['m2', 'm3', 'm4', 'm5'].flatMap((g) => [tm(g, 'A', 'C'), tm(g, 'B', 'D')])],
+    profiles: [],
+  })
+  const keys = await loadRepeatPairKeys({ id: 'hoje', organization_id: 'o', recurrence_id: 'R', date: day('09-10') })
+  assert.ok(!keys.has(key('A', 'B')))
+  assert.ok(keys.has(key('A', 'C')))
 })
 
 // 2 out (Francisco): com duplas já sorteadas à mão, o arranque automático

@@ -57,7 +57,9 @@ describe('loadRepeatPairKeys — regra da série (28 set)', () => {
     expect(keys.has(key('a', 'da'))).toBe(true)
     expect(keys.has(key('f', 'c'))).toBe(false) // quinta: outra série
     expect(keys.has(key('n', 'j'))).toBe(false) // mix solto
-    expect(keys.has(key('old', 'pair'))).toBe(false) // 5.º para trás
+    // 5.º para trás, mas os dois não voltaram a jogar juntos: ainda conta
+    // (regra por par, 12 out).
+    expect(keys.has(key('old', 'pair'))).toBe(true)
   })
 
   it('num mix que não se repete conta os 4 anteriores do grupo', async () => {
@@ -65,7 +67,8 @@ describe('loadRepeatPairKeys — regra da série (28 set)', () => {
     expect(keys.has(key('n', 'j'))).toBe(true)
     expect(keys.has(key('f', 'c'))).toBe(true)
     expect(keys.has(key('a', 'da'))).toBe(true)
-    expect(keys.has(key('f', 'rd'))).toBe(false)
+    // Do grupo, o f e o rd não voltaram a estar juntos: ainda conta (12 out).
+    expect(keys.has(key('f', 'rd'))).toBe(true)
   })
 
   it('só contam os mixes jogados: cancelados, rascunhos e por jogar ficam de fora (10 out)', async () => {
@@ -98,5 +101,28 @@ describe('loadRepeatPairKeys — regra da série (28 set)', () => {
   it('sem mixes anteriores, nada a evitar', async () => {
     const keys = await loadRepeatPairKeys(db, { organization_id: 'o', recurrence_id: 'NOVA', date: day('09-28') })
     expect(keys.size).toBe(0)
+  })
+
+  it('regra por par (12 out): o B faltou aos últimos 4 — a dupla A+B de há 5 mixes ainda conta', async () => {
+    const t = (g, p1, p2) => ({ game_id: g, player1_id: p1, player2_id: p2 })
+    const games = ['m1', 'm2', 'm3', 'm4', 'm5'].map((id, i) => ({ id, organization_id: 'o', recurrence_id: 'R', date: day(`09-0${i + 1}`), status: 'finished' }))
+    const keys = await loadRepeatPairKeys(fakeDb({
+      games,
+      // m1: A+B dupla. m2..m5: o A joga, o B falta.
+      teams: [t('m1', 'A', 'B'), t('m1', 'C', 'D'), ...['m2', 'm3', 'm4', 'm5'].flatMap((g) => [t(g, 'A', 'C'), t(g, 'D', 'E')])],
+    }), { organization_id: 'o', recurrence_id: 'R', date: day('09-10') })
+    expect(keys.has(key('A', 'B'))).toBe(true)
+  })
+
+  it('regra por par (12 out): estiveram juntos 4 vezes sem ser dupla — a dupla antiga já pode', async () => {
+    const t = (g, p1, p2) => ({ game_id: g, player1_id: p1, player2_id: p2 })
+    const games = ['m1', 'm2', 'm3', 'm4', 'm5'].map((id, i) => ({ id, organization_id: 'o', recurrence_id: 'R', date: day(`09-0${i + 1}`), status: 'finished' }))
+    const keys = await loadRepeatPairKeys(fakeDb({
+      games,
+      // m1: A+B dupla. m2..m5: os dois jogam, em duplas diferentes.
+      teams: [t('m1', 'A', 'B'), t('m1', 'C', 'D'), ...['m2', 'm3', 'm4', 'm5'].flatMap((g) => [t(g, 'A', 'C'), t(g, 'B', 'D')])],
+    }), { organization_id: 'o', recurrence_id: 'R', date: day('09-10') })
+    expect(keys.has(key('A', 'B'))).toBe(false)
+    expect(keys.has(key('A', 'C'))).toBe(true)
   })
 })
