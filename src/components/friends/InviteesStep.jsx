@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next'
 import { Plus, Search, X, UserPlus, Lock } from 'lucide-react'
 import { Avatar } from '../ui'
 import { searchPlayers } from '../../lib/privateMatches'
+import PeopleSuggestions from '../people/PeopleSuggestions'
 import { partnerNameError, partnerEmailError, PARTNER_NAME_MAX } from '../../lib/partnerInvite'
 
 export const MIN_PEOPLE = 4
@@ -20,7 +21,9 @@ export const MIN_PEOPLE = 4
 // «＋ Juntar pessoa», como no desenho.
 // `creatorKey`: quem criou, quando quem edita é quem aceitou (SPEC 2026-10-07-
 // amigos-convidado) — fica com «Criou o jogo» e não sai.
-export default function InviteesStep({ me, people, onAdd, onRemove, searchFn = searchPlayers, searchPlaceholder, lockedKeys = null, creatorKey = null, collapsedSearch = false }) {
+// Sugestões antes de escrever (Francisco, 12 out): `suggestOrgId` /
+// `suggestOnlyIds` limitam-nas ao grupo num jogo de grupo.
+export default function InviteesStep({ me, people, onAdd, onRemove, searchFn = searchPlayers, searchPlaceholder, lockedKeys = null, creatorKey = null, collapsedSearch = false, suggestOrgId = null, suggestOnlyIds = null }) {
   const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [searchOpen, setSearchOpen] = useState(!collapsedSearch)
@@ -66,6 +69,10 @@ export default function InviteesStep({ me, people, onAdd, onRemove, searchFn = s
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={searchPlaceholder || t('partner.search_placeholder')}
             className="input-field pl-10" />
         </div>
+        {query.trim().length < 2 && (
+          <PeopleSuggestions exclude={[...inList]} orgId={suggestOrgId} onlyIds={suggestOnlyIds}
+            onPick={(r) => onAdd({ key: r.id, user_id: r.id, name: r.name, avatar_url: r.avatar_url })} />
+        )}
         {results.length > 0 && (
           <div className="mt-2 overflow-hidden rounded-ctrl border border-line bg-white shadow-card">
             {results.slice(0, 6).map((r) => (

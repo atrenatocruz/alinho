@@ -5485,5 +5485,12 @@
   "monthshare.org_sub": "Ranking do mês",
   "monthshare.and": "e",
   "monthshare.text": "👑 Pódio de {{month}} no {{club}}: {{names}}. Parabéns!",
-  "monthshare.text_global": "👑 Pódio de {{month}} na alinho.pt: {{names}}. Parabéns!"
+  "monthshare.text_global": "👑 Pódio de {{month}} na alinho.pt: {{names}}. Parabéns!",
+  "suggest.title": "Sugestões",
+  "suggest.played_together_one": "Jogaram juntos {{count}} vez",
+  "suggest.played_together_other": "Jogaram juntos {{count}} vezes",
+  "suggest.played_together_some": "Já jogaram juntos",
+  "suggest.follow_each_other": "Seguem-se",
+  "suggest.same_club": "Também em {{name}}",
+  "suggest.same_club_some": "Do teu grupo ou clube"
 }
