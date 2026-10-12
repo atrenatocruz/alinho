@@ -34,6 +34,7 @@ import AddPlayerSheet from '../components/mix/AddPlayerSheet'
 import AddScorekeeperSheet from '../components/mix/AddScorekeeperSheet'
 import SwapPlayerSheet from '../components/mix/SwapPlayerSheet'
 import MixWinnersBlock from '../components/mix/MixWinnersBlock'
+import ShareAsSheet from '../components/mix/ShareAsSheet'
 import { openGameWinners } from '../lib/openGameWinners'
 import TournamentShareFlow from '../components/tournament/TournamentShareFlow'
 import { bakeCircle } from '../components/tournament/TournamentShareCard'
@@ -269,6 +270,9 @@ export default function GameDetails() {
   const [removeSlotAsk, setRemoveSlotAsk] = useState(null) // { person, duplaNumber } | null
   // Partilhar os vencedores (#622): o logótipo do clube já cortado em círculo.
   const [winnersShareOpen, setWinnersShareOpen] = useState(false)
+  // «Partilhar em nome de quem?» (12 out): 'me' | 'club' — escolhido de cada vez.
+  const [shareAsAsk, setShareAsAsk] = useState(false)
+  const [shareAs, setShareAs] = useState('me')
   // As vitórias gerais de quem vê, as do perfil (get_player_profile): a
   // pastilha do cartão do jogo em aberto (#622, UX 11 out).
   const [overallRecord, setOverallRecord] = useState(null)
@@ -2837,9 +2841,11 @@ export default function GameDetails() {
       ? [t('gerirclube.event_label_open'), hhmm(game.date, i18n.language)].join(' · ')
       : [game?.title, isAmericano ? t('mixwinners.sub_americano') : null].filter(Boolean).join(' · '),
   } : null
-  const winnersInfo = (() => {
+  // myId: quem partilha; null = o cartão do clube, só com os vencedores
+  // («Em nome do clube», 12 out).
+  const buildWinners = (myId) => {
     if (game?.status !== 'finished') return null
-    const myStats = statsByUser[user?.id]
+    const myStats = myId ? statsByUser[myId] : null
     const record = myStats ? { won: myStats.matches_won || 0, played: myStats.matches_played || 0 } : null
     // Jogo em aberto (#622, parte do Dev 1): «Ganharam», com o resultado do
     // jogo que decidiu e a outra dupla apagada.
@@ -2848,16 +2854,16 @@ export default function GameDetails() {
       if (!winner) return null
       const decided = [...matches].reverse().find((m) => m.winner_team_id && (m.team_a_id === winner.id || m.team_b_id === winner.id))
       const other = decided ? teamById[decided.team_a_id === winner.id ? decided.team_b_id : decided.team_a_id] : null
-      return openGameWinners({ winner, other, match: decided, myId: user?.id, record: overallRecord, game, org: winnersOrg, t, lang: i18n.language })
+      return openGameWinners({ winner, other, match: decided, myId, record: overallRecord, game, org: winnersOrg, t, lang: i18n.language })
     }
     if (game.winner_team_id) {
       const winnerTeam = teamById[game.winner_team_id]
       if (!winnerTeam) return null
       const ordered = [winnerTeam, ...shareDuplas.filter((d) => d.id !== game.winner_team_id).map((d) => teamById[d.id]).filter(Boolean)]
-      return duplasWinners({ teams: ordered, myId: user?.id, record, game, org: winnersOrg, t, lang: i18n.language })
+      return duplasWinners({ teams: ordered, myId, record, game, org: winnersOrg, t, lang: i18n.language })
     }
     if (isAmericano && americanoStandingsResult.length > 0) {
-      const w = americanoWinners({ standings: americanoStandingsResult, firsts: americanoFirsts, myId: user?.id, game, org: winnersOrg, t, lang: i18n.language })
+      const w = americanoWinners({ standings: americanoStandingsResult, firsts: americanoFirsts, myId, game, org: winnersOrg, t, lang: i18n.language })
       if (!w) return null
       const firsts = americanoFirsts
       // O voucher (regra de 30 set: sem conta, sem voucher).
@@ -2878,7 +2884,20 @@ export default function GameDetails() {
       return { ...w, note, extra }
     }
     return null
-  })()
+  }
+  const winnersInfo = buildWinners(user?.id)
+  // Quem organizou (admin do clube ou do grupo, ou quem criou) e também jogou
+  // escolhe em nome de quem partilha. No jogo em aberto não há clube a
+  // organizar: não se pergunta (SPEC 2026-10-12-partilhar-em-nome-de-quem).
+  const askShareAs = (isAdmin || game?.created_by === user?.id)
+    && !!winnersInfo?.share?.data?.place && !(game && isOpenGame(game))
+  const openWinnersShare = () => {
+    if (askShareAs) { setShareAsAsk(true); return }
+    setShareAs('me')
+    setWinnersShareOpen(true)
+  }
+  const shownWinnersShare = shareAs === 'club' && askShareAs ? buildWinners(null)?.share : winnersInfo?.share
+
   // Quem jogou e tem conta, e quem organizou (SPEC, ponto 5).
   const canShareWinners = !!winnersInfo?.share && (isAdmin || game?.created_by === user?.id
     || (!!statsByUser[user?.id] && !profile?.is_guest))
@@ -2995,7 +3014,7 @@ export default function GameDetails() {
       <BackBar onBack={goBack} label={t('gamedetails.back')} title={game?.title}
         // Mix acabado: o mesmo «Partilhar os vencedores» do bloco (#622: um
         // botão de partilhar só); para os outros, o link de sempre.
-        onShare={isDraftMix(game) ? undefined : () => (canShareWinners ? setWinnersShareOpen(true) : setShowShare(true))} />
+        onShare={isDraftMix(game) ? undefined : () => (canShareWinners ? openWinnersShare() : setShowShare(true))} />
 
       {showShare && (
         <ShareModal
@@ -3025,15 +3044,30 @@ export default function GameDetails() {
           rows={winnersInfo.rows}
           note={winnersInfo.note}
           extra={winnersInfo.extra}
-          onShare={canShareWinners ? () => setWinnersShareOpen(true) : null}
+          onShare={canShareWinners ? openWinnersShare : null}
         />
       )}
-      {winnersShareOpen && winnersInfo?.share && (
+      {shareAsAsk && (
+        <ShareAsSheet
+          kind={isAmericano ? 'americano' : 'mix'}
+          place={winnersInfo?.share?.data?.place}
+          {...(() => {
+            // As vitórias verdadeiras: no americano, as da classificação.
+            const meA = isAmericano ? americanoStandingsResult.find((r) => r.player.id === user?.id) : null
+            return meA ? { won: meA.wins || 0, played: meA.played || 0 }
+              : { won: statsByUser[user?.id]?.matches_won || 0, played: statsByUser[user?.id]?.matches_played || 0 }
+          })()}
+          orgName={winnersOrg?.name || ''}
+          onPick={(who) => { setShareAs(who); setShareAsAsk(false); setWinnersShareOpen(true) }}
+          onClose={() => setShareAsAsk(false)}
+        />
+      )}
+      {winnersShareOpen && shownWinnersShare && (
         <TournamentShareFlow
-          variant={winnersInfo.share.variant}
-          data={winnersInfo.share.data}
-          text={winnersInfo.share.text}
-          filenameParts={winnersInfo.share.filenameParts}
+          variant={shownWinnersShare.variant}
+          data={shownWinnersShare.data}
+          text={shownWinnersShare.text}
+          filenameParts={shownWinnersShare.filenameParts}
           shareTitle={game.title}
           qrUrl={orgSlug ? `${window.location.origin}/clube/${orgSlug}` : window.location.origin}
           org={winnersOrg}
