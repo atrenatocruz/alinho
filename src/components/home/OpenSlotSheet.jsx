@@ -85,7 +85,7 @@ export default function OpenSlotSheet({ club, picked, busy = false, error = '', 
       </div>
       {picking && (
         <Sheet title={t('home.open_pick_partner')} onClose={() => setPicking(false)}>
-          <PlayerSearch onSelect={(p) => { setPartner(p); setPicking(false) }} />
+          <PlayerSearch label={t('partner.search_placeholder')} onSelect={(p) => { setPartner(p); setPicking(false) }} suggestions={{ orgId: club.orgId || null }} />
         </Sheet>
       )}
     </Sheet>
