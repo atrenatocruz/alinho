@@ -29,7 +29,9 @@ import OpenSlotSheet from '../components/home/OpenSlotSheet'
 import { groupFreeSlots, markFreeSlots } from '../lib/freeSlots'
 import { ratingBand } from '../lib/elo'
 import { formatTime } from '../lib/formatDate'
-import { listMyFriendMatchInvites } from '../lib/privateMatches'
+import { listMyFriendMatchInvites, getFriendMatch, respondFriendMatchInvite } from '../lib/privateMatches'
+import { loadFriendInviteEvents } from '../lib/friendInvites'
+import FriendInviteEventCard from '../components/friends/FriendInviteEventCard'
 import { describeError, errorKind, isGameFull } from '../lib/errors'
 import { getGroupMatches } from '../lib/groupMatches'
 import { getMyPrivateMatches, respondToPrivateMatch } from '../lib/privateMatches'
@@ -171,11 +173,32 @@ export default function Home() {
   }, [])
   // O bloco do topo (próximos, a decorrer, para ti): é para lá que a Home abre.
   const topBlockRef = useRef(null)
-  useEffect(() => {
-    listMyFriendMatchInvites()
-      .then((rows) => setFriendInvites(rows.filter((r) => r.teams_set)))
+  // Os convites da sessão nova de amigos: no «Para ti» os que já têm
+  // equipas, e na Home todos (cartão em «Os teus próximos jogos» e no dia —
+  // convite-amigos-na-home, 12 out).
+  const [friendInviteEvents, setFriendInviteEvents] = useState([])
+  const loadFriendInvites = () => {
+    const orgsById = new Map((memberships || []).map((ms) => [ms.organization_id,
+      { name: ms.organization?.name, kind: ms.organization?.kind, logo: ms.organization?.group_logo_url }]))
+    let rows = []
+    return loadFriendInviteEvents({
+      listInvites: async () => { rows = await listMyFriendMatchInvites(); return rows },
+      getDetail: getFriendMatch,
+      orgsById,
+    })
+      .then((evs) => { setFriendInvites(rows.filter((r) => r.teams_set)); setFriendInviteEvents(evs) })
       .catch((err) => console.error('Error loading friend invites:', err))
-  }, [])
+  }
+  useEffect(() => {
+    if (!user) return
+    loadFriendInvites()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, (memberships || []).length])
+  const declineFriendInvite = async (event) => {
+    await respondFriendMatchInvite(event.id, false)
+    setFriendInviteEvents((list) => list.filter((e) => e.key !== event.key))
+    setFriendInvites((list) => list.filter((i) => i.match_id !== event.id))
+  }
   const navigationType = useNavigationType()
   const [monthOpen, setMonthOpen] = useState(false)
   // Explorar (Fase 2): eventos de clubes da Comunidade onde ainda não estou.
@@ -444,8 +467,9 @@ export default function Home() {
       // Já vêm montados: um cartão do torneio, ou um por jogo meu.
       ...tournamentEvents.filter((e) => e.dayKey)
         .map((e) => (e.orgKind ? e : { ...e, orgKind: (memberships || []).find((ms) => ms.organization_id === e.orgId)?.organization?.kind || null })),
-    ]
-  }, [games, groupMatches, privateMatches, exploreRows, lessonRows, lessonRequests, tournamentEvents, user, memberships])
+      ...friendInviteEvents,
+    ].filter((e, _, all) => !(e.source === 'friend_session' && e.id && all.some((x) => x.key === `friend_invite:${e.id}`)))
+  }, [games, groupMatches, privateMatches, exploreRows, lessonRows, lessonRequests, tournamentEvents, friendInviteEvents, user, memberships])
 
   const visible = useMemo(() => applyFilters(markFreeSlots(events), filters, location), [events, filters, location])
   const counts = useMemo(() => countByDay(visible), [visible])
@@ -776,7 +800,7 @@ export default function Home() {
       : e.kind === 'tournament' ? (e.slug || e.id ? `/torneio/${e.slug || e.id}` : null)
         : e.source === 'lesson' ? `/aula/${e.id}`
           : e.source === 'group_match' ? (orgSlugById.get(e.orgId) ? `/clube/${orgSlugById.get(e.orgId)}/jogos` : null)
-            : e.source === 'friend_session' ? (e.id ? `/jogos-privados/sessao/${e.id}` : '/jogos-privados')
+            : e.source === 'friend_session' || e.source === 'friend_invite' ? (e.id ? `/jogos-privados/sessao/${e.id}` : '/jogos-privados')
             : e.source === 'private_match' ? '/jogos-privados'
               : null
   )
@@ -946,6 +970,9 @@ export default function Home() {
           onCancelRequest={event.raw.request_id ? () => handleCancelLessonRequest(event) : null}
         />
       )
+    }
+    if (event.source === 'friend_invite') {
+      return <FriendInviteEventCard key={event.key} event={event} onDecline={declineFriendInvite} />
     }
     if (event.source === 'game') {
       const a = past ? null : cardAction(event.raw)

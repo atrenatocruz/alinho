@@ -17,7 +17,7 @@
 // de dados.
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Users, UserMinus } from 'lucide-react'
+import { Users, UserMinus, ChevronRight } from 'lucide-react'
 import { dayText } from './dayText'
 import FriendResultNotice from './FriendResultNotice'
 
@@ -70,6 +70,22 @@ function FriendNoticeRow({ notice, onOpen }) {
             : t('friends.notice_cancelled_rest', { when })}
         </p>
         <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-lime-400" />
+      </Link>
+    )
+  }
+  // O convite por responder (convite-amigos-na-home, 12 out): sempre em cima,
+  // com fundo lima-claro, até se responder; abre logo o ecrã de responder.
+  if (notice.kind === 'friend_match_invite') {
+    const time = d.scheduled_time ? String(d.scheduled_time).slice(0, 5) : null
+    return (
+      <Link to={`/jogos-privados/sessao/${d.match_id}`} onClick={() => onOpen(notice)}
+        className="flex items-center gap-3 bg-lime-400/15 px-4 py-3 transition-colors duration-fast hover:bg-lime-400/25">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-ink-900"><Users size={16} /></div>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-extrabold text-ink-900">{t('friends.notice_invite_top', { name: d.creator_name || '' })}</span>
+          <span className="block text-xs text-ink-700">{[day, time, d.location].filter(Boolean).join(' · ')}</span>
+        </span>
+        <ChevronRight size={16} className="shrink-0 text-ink-700" />
       </Link>
     )
   }
