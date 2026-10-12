@@ -126,6 +126,13 @@ describe('filters and days', () => {
     const ok = { show: 'open', kinds: ['mix'], orgIds: null }
     expect(normalizeFilters(ok)).toBe(ok)
   })
+  it('keeps "everything" when the saved filters predate «Horários livres»', () => {
+    const before = { show: 'all', kinds: ['mix', 'open', 'friends', 'lesson', 'tournament'], orgIds: null }
+    expect(normalizeFilters(before).kinds).toEqual(EVENT_KINDS)
+    expect(isDefaultFilters(normalizeFilters(before))).toBe(true)
+    const onlyFree = { show: 'all', kinds: ['free'], orgIds: null }
+    expect(normalizeFilters(onlyFree)).toBe(onlyFree)
+  })
   it('sorts a day by time', () => {
     expect(eventsForDay(events, '2026-09-16').map((e) => e.id)).toEqual(['other', 'mine'])
   })

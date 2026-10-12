@@ -35,6 +35,8 @@ import { parseLevel, levelNumber } from '../../lib/mixLevels'
 export const KIND_STYLE = {
   mix:        { card: 'bg-[#E0F2FE] border-[#A5D8F5]', bg: 'bg-[#E0F2FE]', text: 'text-[#075985]', color: '#075985', icon: Shuffle,     labelKey: 'agenda.kind_mix' },
   open:       { card: 'bg-[#FBE7DE] border-[#F2BFA8]', bg: 'bg-[#FBE7DE]', text: 'text-[#9A3A17]', color: '#9A3A17', icon: CircleDot,   labelKey: 'agenda.kind_open' },
+  // Horários livres (SPEC-4): salmão claro, o mesmo do cartão tracejado.
+  free:       { card: 'bg-[#FFF8F5] border-[#F2BFA8]', bg: 'bg-[#FFF8F5]', text: 'text-[#9A3A17]', color: '#F2C2B1', icon: Clock,       labelKey: 'agenda.filter_kind_free' },
   friends:    { card: 'bg-[#F2EDE4] border-[#DCD1BF]', bg: 'bg-[#F2EDE4]', text: 'text-[#6B5B45]', color: '#6B5B45', icon: Users,       labelKey: 'agenda.kind_friends' },
   // Aulas com professores (Trello #49) — turquesa, SPEC das aulas §9.
   lesson:     { card: 'bg-[#CCFBF1] border-[#8FE3D6]', bg: 'bg-[#CCFBF1]', text: 'text-[#0F766E]', color: '#0F766E', icon: GraduationCap, labelKey: 'agenda.kind_lesson' },
