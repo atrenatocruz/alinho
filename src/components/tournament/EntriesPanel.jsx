@@ -17,6 +17,9 @@ import { categoryGenderQuestion } from './genderCheck'
 import { usePriceRoster, PriceRosterSummary, PriceRosterTag } from '../SpecialPriceRoster'
 import { TshirtSummaryCard, PairShirts } from './TshirtAdmin'
 import { tshirtOn, shirtRulesOf } from './tshirt'
+import { useNavigate } from 'react-router-dom'
+import { listTournamentClashes } from '../../lib/tournamentApi'
+import { ClashBanner, ClashCaseSheet, ClashListSheet, ClashSwapSheet, casesFor } from './Clashes'
 
 /* Separador «Inscritos» (Trello #362).
    Desenho: print 08 (lista por categoria, Validar a um toque) e a regra
@@ -338,6 +341,37 @@ export default function EntriesPanel({ tournament, categories = [], category, pu
   // tem o preço da dupla (Dev 3, 10 out).
   const normalEach = (category?.price_cents || 0) / 200
   const roster = usePriceRoster(isAdmin && normalEach > 0 ? 'tournament_category' : null, category?.id, rows.length)
+  // Categorias que chocam (9 out): quem organiza vê quem está em duas
+  // categorias à mesma hora, e resolve daqui (tirar de uma, ou mudar a hora).
+  const navigate = useNavigate()
+  const [clashes, setClashes] = useState([])
+  const [clashList, setClashList] = useState(false)
+  const [clashCase, setClashCase] = useState(null)
+  const [clashKey, setClashKey] = useState(0)
+  useEffect(() => {
+    if (!isAdmin || !tournament?.id) return undefined
+    let cancelled = false
+    listTournamentClashes(tournament.id)
+      .then((r) => { if (!cancelled) setClashes(r) })
+      .catch((err) => { console.error('Error loading clashes:', err); if (!cancelled) setClashes([]) })
+    return () => { cancelled = true }
+  }, [isAdmin, tournament?.id, clashKey, rows.length])
+  // Antes do sorteio contam as categorias a começar juntas; depois, os jogos
+  // quase à mesma hora (alguém mudou horas à mão — acerto de 9 out).
+  // Jogos quase juntos só existem depois do sorteio: se a categoria os tem,
+  // é esse o caso (e a saída é trocar, não tirar).
+  const drawn = ['sorteada', 'a_decorrer', 'terminada'].includes(category?.status)
+    || casesFor(clashes, category?.id, 'match_overlap').length > 0
+  const clashKind = drawn ? 'match_overlap' : 'near_start'
+  const clashPeople = new Set((clashes || []).filter((c) => c.kind === clashKind).map((c) => c.user_id)).size
+  const clashOf = new Map(casesFor(clashes, category?.id, clashKind).map((c) => [c.here.entry, c]))
+  // «Trocar jogador» de quem choca, já com a pessoa escolhida.
+  const swapClash = (c) => {
+    const e = rows.find((r) => r.entry_id === c.entry_id_a || r.entry_id === c.entry_id_b)
+    if (!e) return
+    setSwap({ entry: e, slot: e.player1_id === c.user_id ? 1 : 2, played: null })
+    entryHasPlayedMatches(e.entry_id).then((played) => setSwap((cur) => (cur?.entry === e ? { ...cur, played } : cur)))
+  }
   useEffect(() => {
     if (!toast) return undefined
     const id = setTimeout(() => setToast(''), 3000)
@@ -498,6 +532,11 @@ export default function EntriesPanel({ tournament, categories = [], category, pu
           )}
           {/* As t-shirts do torneio todo (SPEC t-shirts, ponto 4). */}
           <TshirtSummaryCard tournament={tournament} />
+          {clashPeople > 0 && (
+            <ClashBanner onResolve={() => setClashList(true)}>
+              <b>{t('tclash.entries_title', { count: clashPeople })}</b> {t('tclash.entries_body')}
+            </ClashBanner>
+          )}
         </>
       )}
 
@@ -574,6 +613,11 @@ export default function EntriesPanel({ tournament, categories = [], category, pu
                         {String(n).split(' ')[0]} <PriceRosterTag roster={roster} userId={id} normalPrice={normalEach} />
                       </span>
                     ))}
+                  </span>
+                )}
+                {isAdmin && clashOf.has(e.entry_id) && e.status !== 'desistiu' && (
+                  <span className="mt-1 block text-xs font-semibold text-[#9A5B00]">
+                    ⚠️ {t('tclash.also_in', { name: clashOf.get(e.entry_id).name, code: clashOf.get(e.entry_id).other.code })}
                   </span>
                 )}
                 {isAdmin && tshirtOn(shirtRulesOf(tournament)) && e.status !== 'desistiu' && (
@@ -886,6 +930,30 @@ export default function EntriesPanel({ tournament, categories = [], category, pu
           {toast}
         </div>,
         document.body,
+      )}
+      {clashList && !clashCase && (
+        <ClashListSheet clashes={(clashes || []).filter((c) => c.kind === clashKind)} onClose={() => setClashList(false)} onPick={(c) => setClashCase(c)}
+          onSchedule={drawn ? () => { setClashList(false); navigate(`/torneio/${tournament.slug || tournament.id}?admin=horario`) } : null} />
+      )}
+      {clashCase && drawn && (
+        <ClashSwapSheet clash={clashCase} hereId={category?.id}
+          onClose={() => setClashCase(null)}
+          onSwapHere={() => { const c = clashCase; setClashCase(null); setClashList(false); swapClash(c) }}
+          onSwapThere={() => {
+            const other = clashCase.category_a === category?.id ? clashCase.code_b : clashCase.code_a
+            setClashCase(null); setClashList(false)
+            navigate(`/torneio/${tournament.slug || tournament.id}?tab=entries&cat=${other}`)
+          }}
+          onSchedule={() => { setClashCase(null); setClashList(false); navigate(`/torneio/${tournament.slug || tournament.id}?admin=horario`) }} />
+      )}
+      {clashCase && !drawn && (
+        <ClashCaseSheet clash={clashCase} hereId={category?.id}
+          onClose={() => setClashCase(null)}
+          onChangeTime={() => { setClashCase(null); setClashList(false); navigate(`/torneio/${tournament.slug || tournament.id}?admin=editar`) }}
+          onRemoved={(from) => {
+            setToast(t('tclash.removed', { name: clashCase.name, code: from.code }))
+            setClashCase(null); setClashList(false); setClashKey((n) => n + 1); load()
+          }} />
       )}
     </div>
   )

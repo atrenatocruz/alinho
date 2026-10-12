@@ -343,6 +343,13 @@ export const TOURNAMENT_RPC_MOCKS = {
         : localStorage.getItem('mockTNotEntered') === 'true' ? { my: null, my_entries: [], my_matches: [] }
         : { my: empty() ? null : { category_id: 'cat-m5', state: 'validada', entry_id: 'en-me' },
             my_matches: empty() || state() === 'inscricoes' ? [] : MY_MATCHES() }),
+      // localStorage.mockTClashMine = 'true': estou no M4 e no MX4, que
+      // começam os dois sábado às 12:00 (categorias que chocam, 9 out).
+      ...(localStorage.getItem('mockTClashMine') === 'true' ? {
+        my: { category_id: 'cat-m4', state: 'validada', entry_id: 'e1' },
+        my_entries: [{ category_id: 'cat-m4', status: 'validada', state: 'validada', entry_id: 'e1' }, { category_id: 'cat-mx4', status: 'validada', state: 'validada', entry_id: 'm5-3' }],
+        my_matches: [],
+      } : {}),
     }
   },
 }
@@ -760,6 +767,12 @@ export const TOURNAMENT_PROMOTED_TABLE_MOCKS = {
         data: { ...base, category_id: 'cat-m5', category_code: 'M5', category_name: 'Masculinos 5', prize_first: '200 € + troféu', prize_second: '80 €' } },
       { id: 'tp4', kind: 'tournament_prize_changed', game_id: null, created_at: new Date().toISOString(),
         data: { ...base, category_id: 'cat-m4', category_code: 'M4', category_name: 'Masculinos 4', prize_first: '150 €', prize_second: null } },
+      // Categorias que chocam (9 out): os três avisos novos.
+      ...(localStorage.getItem('mockTClash') === 'true' ? [
+        { id: 'tc1', kind: 'tournament_removed_clash', game_id: null, created_at: new Date().toISOString(), data: { ...base, category_code: 'MX4', kept_code: 'M4' } },
+        { id: 'tc2', kind: 'tournament_partner_removed', game_id: null, created_at: new Date().toISOString(), data: { ...base, category_code: 'MX4', removed_name: 'Rui Mendes' } },
+        { id: 'tc3', kind: 'tournament_clash', game_id: null, created_at: new Date().toISOString(), data: { ...base, code_a: 'M4', code_b: 'MX4', at_a: '2026-10-10T13:00:00.000Z', at_b: '2026-10-10T13:30:00.000Z' } },
+      ] : []),
       ...((before && before(url)) || []),
     ].filter((n) => !promotedRead.has(n.id))
   },

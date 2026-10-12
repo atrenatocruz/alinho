@@ -20,6 +20,7 @@ import { signupErrorMessage } from '../../lib/tournamentError'
 import { categoryGenderQuestion } from './genderCheck'
 import { TshirtPicker, tshirtOn, tshirtPriceLabel, NO_TSHIRT, shirtRulesOf } from './tshirt'
 import { setMyTshirtSize } from '../../lib/tournamentApi'
+import { categoriesClash, categoryWhen, ClashNotice } from './Clashes'
 
 /* O que fica por cima de tudo na página do torneio (Trello #362):
    inscrever a minha dupla, em que ponto está a minha inscrição, e o
@@ -91,6 +92,16 @@ export default function SignupSlot({ tournament, categories, category, my: first
   // não posso, mostra-se a que tenho (Trello #451).
   const my = myEntries.find((e) => e.category_id === category?.id)
   const myCategory = categories.find((c) => c.id === my?.category_id)
+  // Categorias que chocam (9 out): duas das minhas começam quase à mesma
+  // hora, e ainda não houve sorteio. Some quando deixa de haver choque.
+  const myCats = myEntries.filter((e) => e.state !== 'desistiu').map((e) => categories.find((c) => c.id === e.category_id)).filter(Boolean)
+  const clashPair = (() => {
+    for (const [i, a] of myCats.entries()) {
+      const b = myCats.slice(i + 1).find((x) => categoriesClash(a, x))
+      if (b && a.status !== 'sorteada' && b.status !== 'sorteada') return [a, b]
+    }
+    return null
+  })()
   // O nome da dupla e os dois nomes vêm da lista pública de inscritos: a
   // página só traz o estado da minha inscrição.
   const [myRow, setMyRow] = useState(null)
@@ -220,6 +231,11 @@ export default function SignupSlot({ tournament, categories, category, my: first
 
   return (
     <div className="space-y-2.5">
+      {clashPair && !publicView && (
+        <ClashNotice action={{ label: t('tclash.see_my_entries'), onClick: () => document.getElementById('minha-inscricao')?.scrollIntoView({ behavior: 'smooth', block: 'center' }) }}>
+          <b>{t('tclash.page_title', { a: clashPair[0].code, b: clashPair[1].code, when: categoryWhen(clashPair[0], i18n.language) })}</b> {t('tclash.page_body')}
+        </ClashNotice>
+      )}
       {canScore && !publicView && (
         <div className="card flex items-center justify-between gap-3">
           <p className="min-w-0 text-sm font-semibold text-ink-900">{t('tournament.score.link_title')}</p>
@@ -300,7 +316,7 @@ export default function SignupSlot({ tournament, categories, category, my: first
           dupla em destaque, e «Mudar o nome» até as inscrições fecharem
           (nome-da-dupla, 27 set). */}
       {my ? (
-        <div className="card space-y-2">
+        <div id="minha-inscricao" className="card scroll-mt-40 space-y-2">
           <div className="flex items-center justify-between gap-2">
             <p className="flex min-w-0 items-center gap-2">
               {myCategory?.code && <span className="shrink-0 rounded-md bg-ink-900 px-1.5 py-0.5 font-mono text-xs font-bold text-white">{myCategory.code}</span>}

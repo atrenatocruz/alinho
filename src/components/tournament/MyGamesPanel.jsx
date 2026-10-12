@@ -2,12 +2,14 @@
 // o caminho todo, do primeiro jogo à final possível. Os jogos futuros
 // aparecem esbatidos até se saber o adversário; o jogo seguinte fica
 // destacado; a hora antecipada mostra também a antiga ("era 17:00").
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Trophy, Share2 } from 'lucide-react'
 import { EmptyState, PrimaryButton } from '../ui'
 import { Sheet } from '../agenda/AgendaControls'
-import { requestMatchCorrection } from '../../lib/tournamentApi'
+import { listMyClashes, requestMatchCorrection } from '../../lib/tournamentApi'
+import { hhmmInTz } from '../../lib/tournamentDay'
+import { ClashNotice } from './Clashes'
 import { MonoLabel } from './TournamentBits'
 import { useScoreEntry, toMatchOrder } from './ScoreEntry'
 import { proSetTieBreakTarget } from './tieBreak'
@@ -104,6 +106,19 @@ export default function MyGamesPanel({ tournament, category, myEntries = [], myM
   const [sharing, setSharing] = useState(null)
   const { profile } = useAuth()
   const [requested, setRequested] = useState(() => new Set())
+  // Categorias que chocam, depois do sorteio (9 out): dois jogos meus quase à
+  // mesma hora — ficam a amarelo, com a frase por baixo.
+  const [clashes, setClashes] = useState([])
+  useEffect(() => {
+    if (!tournament?.id) return undefined
+    let cancelled = false
+    listMyClashes(tournament.id)
+      .then((r) => { if (!cancelled) setClashes((r || []).filter((c) => c.kind === 'match_overlap')) })
+      .catch(() => { if (!cancelled) setClashes([]) })
+    return () => { cancelled = true }
+  }, [tournament?.id])
+  const mineClashes = clashes.filter((c) => c.category_a === category?.id || c.category_b === category?.id)
+  const clashTimes = new Set(mineClashes.map((c) => hhmmInTz(c.category_a === category?.id ? c.at_a : c.at_b)))
 
   if (board.loading && !rows.length) {
     return <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-8 w-8 border-[3px] border-ink-50 border-t-ink-700"></div></div>
@@ -140,16 +155,17 @@ export default function MyGamesPanel({ tournament, category, myEntries = [], myM
           : m.round_label || (m.round ? t(`tournament.draw.round_${m.round}`) : '')
         const unknown = !m.opponent
         const isNext = m.id === nextId
+        const clash = !(m.done ?? m.score) && clashTimes.has(m.time)
         return (
           <div
             key={m.id}
             className={`card mt-1.5 grid grid-cols-[62px_minmax(0,1fr)_auto] items-center gap-2 !py-2.5 text-xs ${
-              isNext ? '!bg-[#F0FDF4] !border-[#BBF7D0]' : ''
-            } ${unknown && !isNext ? 'opacity-55' : ''}`}
+              clash ? '!bg-warning/10 !border-warning/40' : isNext ? '!bg-[#F0FDF4] !border-[#BBF7D0]' : ''
+            } ${unknown && !isNext && !clash ? 'opacity-55' : ''}`}
           >
             <When date={m.date} time={m.time} locale={i18n.language} />
             <span className="min-w-0 text-ink-900">
-              {phase}{m.court ? ` · ${m.court}` : ''}
+              {clash && '⚠️ '}{phase}{m.court ? ` · ${m.court}` : ''}
               <br />
               <em className="not-italic text-ink-500">
                 {unknown ? t('tournament.my_games_if_you_win') : t('tournament.my_games_vs', { opponent: m.opponent })}
@@ -188,6 +204,13 @@ export default function MyGamesPanel({ tournament, category, myEntries = [], myM
           </div>
         )
       })}
+      {mineClashes.map((c) => (
+        <div key={`${c.category_a}-${c.category_b}-${c.at_a}`} className="mt-2">
+          <ClashNotice>
+            <b>{t('tclash.my_games_title')}</b> {t('tclash.my_games_body', { a: c.code_a, ta: hhmmInTz(c.at_a), b: c.code_b, tb: hhmmInTz(c.at_b) })}
+          </ClashNotice>
+        </div>
+      ))}
       {sharing && (() => {
         const myEntryId = myIds[0]
         const built = resultShare({ tournament, category, board, matchId: sharing.id, myEntryId, myName: profile?.name, t, lang: i18n.language })

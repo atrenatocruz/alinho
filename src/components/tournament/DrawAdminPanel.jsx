@@ -9,6 +9,7 @@
 // O sorteio só se grava quando ele carrega em «Confirmar»: até lá pode
 // mover duplas, trocar cabeças de série e voltar a sortear à vontade.
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Trans, useTranslation } from 'react-i18next'
 import { ChevronLeft, Shuffle, Check, AlertTriangle, RefreshCw, Printer } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -21,13 +22,16 @@ import {
   saveCategoryFormat, drawCategory, clearCategoryDraw, buildDrawPayload, buildKnockoutPayload,
 } from '../../lib/tournamentDraw'
 import { formatOptions, recommendFormat, availableCourtHours, pickSeeds, groupsWords } from '../../lib/tournamentFormat'
+import { listTournamentClashes } from '../../lib/tournamentApi'
+import { ClashBanner, ClashCaseSheet, ClashListSheet, casesFor, startClashes, whenText } from './Clashes'
 
 const euros = (c) => (c == null ? null : `${(c / 100).toFixed(0)} €`)
 
 /* ── Passo 1: quem entra ────────────────────────────────────────────────
    Chega quase sempre mais gente do que lugares. O organizador escolhe, e
    quem fica de fora fica SUPLENTE por ordem — não se apaga ninguém. */
-function CloseEntriesStep({ category, onDone, t }) {
+function CloseEntriesStep({ category, onDone, t, cases = [], onResolve = null, onCase = null }) {
+  const { i18n } = useTranslation()
   const [rows, setRows] = useState(null)
   const [chosen, setChosen] = useState([])
   const [busy, setBusy] = useState(false)
@@ -58,7 +62,8 @@ function CloseEntriesStep({ category, onDone, t }) {
       await closeCategoryEntries(category.id, chosen, waitlist)
       onDone()
     } catch (e) {
-      setError(e.message)
+      // Ainda há casos de categorias que chocam (Dev 3, has_clashes).
+      setError(String(e?.message || '').includes('has_clashes') ? t('tclash.has_clashes') : e.message)
     } finally {
       setBusy(false)
     }
@@ -72,28 +77,44 @@ function CloseEntriesStep({ category, onDone, t }) {
   }
 
   const over = category.slots ? chosen.length > category.slots : false
+  // Categorias que chocam (9 out, «MUDOU»): resolve-se antes de fechar —
+  // quem está em duas categorias à mesma hora não pode jogar as duas.
+  const caseOf = new Map(cases.map((c) => [c.here.entry, c]))
+  const pairsWithCase = rows.filter((r) => caseOf.has(r.entry_id)).length
+  const otherCodes = [...new Set(cases.map((c) => c.other.code))].join(', ')
 
   return (
     <div>
       <p className="mb-2 text-sm text-ink-700">
         {t('tournament.draw.close_intro', { teams: rows.length, slots: category.slots || rows.length })}
       </p>
+      {pairsWithCase > 0 && (
+        <ClashBanner onResolve={onResolve}>
+          <b>{t('tclash.pairs_title', { count: pairsWithCase, code: otherCodes })}</b> {t('tclash.pairs_body')}
+        </ClashBanner>
+      )}
 
       <div className="mb-2 card !p-0 overflow-hidden">
         {rows.map((row, i) => {
           const inside = chosen.includes(row.entry_id)
+          const clash = caseOf.get(row.entry_id)
           return (
             <button
               key={row.entry_id}
               type="button"
-              onClick={() => toggle(row.entry_id)}
-              className={`flex w-full items-center gap-2 border-t border-ink-50 px-3 py-2 text-left first:border-t-0 ${inside ? '' : 'bg-ink-50/60'}`}
+              onClick={() => (clash && onCase ? onCase(clash) : toggle(row.entry_id))}
+              className={`flex w-full items-center gap-2 border-t border-ink-50 px-3 py-2 text-left first:border-t-0 ${clash ? 'bg-warning/10' : inside ? '' : 'bg-ink-50/60'}`}
             >
               <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${inside ? 'border-ink-900 bg-ink-900 text-white' : 'border-ink-200 text-transparent'}`}>
                 <Check size={13} strokeWidth={3} />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm text-ink-900">{row.name}</span>
+                {clash && (
+                  <span className="block text-xs font-semibold text-[#9A5B00]">
+                    ⚠️ {t('tclash.also_plays', { name: clash.name, code: clash.other.code, when: whenText(clash.other.at, i18n.language, true) })}
+                  </span>
+                )}
                 <span className="font-mono text-xs text-muted">
                   {row.points_incomplete
                     ? t('tournament.draw.points_unknown')
@@ -118,9 +139,10 @@ function CloseEntriesStep({ category, onDone, t }) {
       <p className="mb-2 text-xs text-muted">{t('tournament.draw.close_waitlist_note')}</p>
       {error && <p className="mb-2 text-xs text-danger">{error}</p>}
 
-      <PrimaryButton onClick={close} disabled={busy || over || !chosen.length}>
+      <PrimaryButton onClick={close} disabled={busy || over || !chosen.length || pairsWithCase > 0}>
         {t('tournament.draw.close_confirm', { teams: t('tournament.n.teams', { count: chosen.length }) })}
       </PrimaryButton>
+      {pairsWithCase > 0 && <p className="mt-1.5 text-center text-xs text-muted">{t('tclash.close_blocked', { count: pairsWithCase })}</p>}
     </div>
   )
 }
@@ -318,7 +340,8 @@ function DrawStep({ category, onDone, onChangeFormat, t }) {
       await drawCategory(category.id, payload)
       onDone()
     } catch (e) {
-      setError(e.message)
+      // Ainda há casos de categorias que chocam (Dev 3, has_clashes).
+      setError(String(e?.message || '').includes('has_clashes') ? t('tclash.has_clashes') : e.message)
     } finally {
       setBusy(false)
     }
@@ -579,6 +602,10 @@ function DoneStep({ tournament, category, onDone, t }) {
 
 export default function DrawAdminPanel({ tournament, onBack, onEdit }) {
   const { t } = useTranslation()
+  const [clashes, setClashes] = useState([])
+  const [clashList, setClashList] = useState(false)
+  const [clashCase, setClashCase] = useState(null) // { clash, hereId }
+  const [clashToast, setClashToast] = useState('')
   const [data, setData] = useState(null)
   const [pickedId, setPickedId] = useState(null)
   const [error, setError] = useState(null)
@@ -596,6 +623,20 @@ export default function DrawAdminPanel({ tournament, onBack, onEdit }) {
       .catch((e) => { if (!cancelled) setError(e.message) })
     return () => { cancelled = true }
   }, [tournament.id, reload])
+  // Os choques (9 out): recarregam com a lista das categorias.
+  useEffect(() => {
+    let cancelled = false
+    listTournamentClashes(tournament.id)
+      .then((rows) => { if (!cancelled) setClashes(rows) })
+      .catch((e) => { console.error('Error loading clashes:', e); if (!cancelled) setClashes([]) })
+    return () => { cancelled = true }
+  }, [tournament.id, reload])
+  useEffect(() => {
+    if (!clashToast) return undefined
+    const id = setTimeout(() => setClashToast(''), 3000)
+    return () => clearTimeout(id)
+  }, [clashToast])
+  const people = new Set(startClashes(clashes).map((c) => c.user_id)).size
 
   const categories = data?.categories || null
   const picked = (categories || []).find((c) => c.id === pickedId) || null
@@ -620,6 +661,13 @@ export default function DrawAdminPanel({ tournament, onBack, onEdit }) {
 
       {error && <p className="mb-2 text-xs text-danger">{error}</p>}
 
+      {/* No topo do Sortear: o que falta resolver antes de sortear (9 out). */}
+      {!picked && people > 0 && (
+        <ClashBanner onResolve={() => setClashList(true)}>
+          <b>{t('tclash.people_title', { count: people })}</b> {t('tclash.people_body')}
+        </ClashBanner>
+      )}
+
       {!categories ? (
         <p className="py-6 text-center text-xs text-muted">{t('common.loading')}</p>
       ) : !picked ? (
@@ -642,12 +690,16 @@ export default function DrawAdminPanel({ tournament, onBack, onEdit }) {
                   {c.price_cents ? ` · ${euros(c.price_cents)}` : ''}
                 </span>
               </span>
-              <StatePill tone={c.status === 'sorteada' ? 'dark' : 'grey'}>
-                {/* O torneio já fechou (prazo ou à mão) e a categoria ainda não
-                    escolheu quem entra: «inscrições fechadas», e não «abertas»
-                    (QA, 9 out). */}
-                {t(`tournament.draw.cat_status_${c.status === 'inscricoes' && (tournament.status !== 'inscricoes' || deadlinePassed) ? 'fechada' : c.status}`)}
-              </StatePill>
+              {c.status !== 'sorteada' && casesFor(clashes, c.id).length > 0 ? (
+                <span className="shrink-0 text-xs font-extrabold text-[#9A5B00]">⚠️ {t('tclash.to_solve', { count: casesFor(clashes, c.id).length })}</span>
+              ) : (
+                <StatePill tone={c.status === 'sorteada' ? 'dark' : 'grey'}>
+                  {/* O torneio já fechou (prazo ou à mão) e a categoria ainda não
+                      escolheu quem entra: «inscrições fechadas», e não «abertas»
+                      (QA, 9 out). */}
+                  {t(`tournament.draw.cat_status_${c.status === 'inscricoes' && (tournament.status !== 'inscricoes' || deadlinePassed) ? 'fechada' : c.status}`)}
+                </StatePill>
+              )}
             </button>
           ))
         )
@@ -661,10 +713,16 @@ export default function DrawAdminPanel({ tournament, onBack, onEdit }) {
                 components={{ edit: <button type="button" onClick={onEdit} className="font-extrabold underline underline-offset-2" /> }} />
             </p>
           )}
-          <CloseEntriesStep category={picked} onDone={done} t={t} />
+          <CloseEntriesStep category={picked} onDone={done} t={t} cases={casesFor(clashes, picked.id)}
+            onResolve={() => setClashList(true)} onCase={(c) => setClashCase({ clash: c, hereId: picked.id })} />
         </>
       ) : picked.status === 'fechada' ? (
         <>
+          {casesFor(clashes, picked.id).length > 0 && (
+            <ClashBanner onResolve={() => setClashList(true)}>
+              <b>{t('tclash.pairs_title', { count: casesFor(clashes, picked.id).length, code: [...new Set(casesFor(clashes, picked.id).map((c) => c.other.code))].join(', ') })}</b> {t('tclash.pairs_body')}
+            </ClashBanner>
+          )}
           <ClosedBox category={picked} t={t}
             onReopened={(r) => { setReopenedLate(r?.deadline_passed ? picked.id : null); done() }} />
           {!picked.format || reformatId === picked.id
@@ -673,6 +731,28 @@ export default function DrawAdminPanel({ tournament, onBack, onEdit }) {
         </>
       ) : (
         <DoneStep tournament={tournament} category={picked} onDone={done} t={t} />
+      )}
+
+      {clashList && !clashCase && (
+        <ClashListSheet clashes={startClashes(clashes)} onClose={() => setClashList(false)}
+          onPick={(c) => setClashCase({ clash: c, hereId: picked?.id || null })} />
+      )}
+      {clashCase && (
+        <ClashCaseSheet clash={clashCase.clash} hereId={clashCase.hereId}
+          onClose={() => setClashCase(null)}
+          onChangeTime={() => { setClashCase(null); setClashList(false); onEdit?.() }}
+          onRemoved={(from) => {
+            setClashToast(t('tclash.removed', { name: clashCase.clash.name, code: from.code }))
+            setClashCase(null)
+            setClashList(false)
+            done()
+          }} />
+      )}
+      {clashToast && createPortal(
+        <p role="status" className="fixed inset-x-4 bottom-[104px] z-50 mx-auto max-w-md rounded-ctrl bg-ink-900 px-4 py-3 text-sm font-extrabold text-white">
+          ✓ {clashToast}
+        </p>,
+        document.body,
       )}
     </div>
   )

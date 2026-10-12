@@ -140,7 +140,41 @@ const DEZASSEIS = () => Array.from({ length: 16 }, (_, i) => ({
   created_at: '2026-09-01T10:00:00Z',
 }))
 
+// localStorage.mockTClash = 'true' — categorias que chocam (design-handoff/
+// 2026-10-09-torneio-categorias-chocam): o Rui Mendes e o Miguel Rosa estão
+// no M4 e no MX4, que começam os dois sábado às 12:00. «Tirar» tira-os da
+// lista (até recarregar a página).
+const clashOn = () => localStorage.getItem('mockTClash') === 'true'
+let clashGone = new Set()
+const CLASHES = () => [
+  { user_id: 'u-rui', name: 'Rui Mendes', category_a: 'cat-m4', category_b: 'cat-mx4', code_a: 'M4', code_b: 'MX4',
+    entry_id_a: 'e1', entry_id_b: 'm5-3', kind: 'near_start', at_a: '2026-10-10T11:00:00.000Z', at_b: '2026-10-10T11:00:00.000Z' },
+  { user_id: 'u-miguel', name: 'Miguel Rosa', category_a: 'cat-m4', category_b: 'cat-mx4', code_a: 'M4', code_b: 'MX4',
+    entry_id_a: 'e2', entry_id_b: 'm5-5', kind: 'near_start', at_a: '2026-10-10T11:00:00.000Z', at_b: '2026-10-10T11:00:00.000Z' },
+].filter((c) => !clashGone.has(c.user_id))
+
 export const TOURNAMENT_DRAW_RPC_MOCKS = {
+  tournament_player_clashes: () => [
+    ...(clashOn() ? CLASHES() : []),
+    // mockTClashAfter = 'true': depois do sorteio, alguém mudou horas e o Rui
+    // ficou com dois jogos quase juntos (com o mockTBracket = '32').
+    ...(localStorage.getItem('mockTClashAfter') === 'true' ? [{ user_id: 'u-rui', name: 'Rui Mendes', category_a: 'cat-m4', category_b: 'cat-mx4', code_a: 'M4', code_b: 'MX4',
+      entry_id_a: 'e5', entry_id_b: 'm5-3', kind: 'match_overlap', at_a: '2026-10-10T09:00:00.000Z', at_b: '2026-10-10T09:30:00.000Z' },
+    // E na M5 (já sorteada nos dados de teste): para as Duplas, com «Trocar jogador».
+    { user_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', name: 'Rui Oliveira Gomes', category_a: 'cat-m5', category_b: 'cat-mx4', code_a: 'M5', code_b: 'MX4',
+      entry_id_a: 'e1', entry_id_b: 'm5-4', kind: 'match_overlap', at_a: '2026-10-10T15:20:00.000Z', at_b: '2026-10-10T15:40:00.000Z' }] : []),
+  ],
+  // Quem joga (Admin Dev) também choca: está no M4 e no MX4.
+  my_category_clashes: () => (localStorage.getItem('mockTClashAfter') === 'true'
+    ? [{ category_a: 'cat-m4', category_b: 'cat-mx4', code_a: 'M4', code_b: 'MX4', entry_id_a: 'e1', entry_id_b: 'm5-3', kind: 'match_overlap', at_a: '2026-10-10T13:00:00.000Z', at_b: '2026-10-10T13:30:00.000Z' }]
+    : clashOn() && localStorage.getItem('mockTClashMine') === 'true'
+    ? [{ category_a: 'cat-m4', category_b: 'cat-mx4', code_a: 'M4', code_b: 'MX4', entry_id_a: 'e1', entry_id_b: 'm5-3', kind: 'near_start', at_a: '2026-10-10T11:00:00.000Z', at_b: '2026-10-10T11:00:00.000Z' }]
+    : []),
+  admin_remove_player_from_entry: (params) => {
+    const c = CLASHES().find((x) => [x.entry_id_a, x.entry_id_b].includes(params?.p_entry_id) && x.user_id === params?.p_user_id)
+    if (c) clashGone = new Set([...clashGone, c.user_id])
+    return 'sem_parceiro'
+  },
   list_tournament_categories_admin: () => (on() ? {
     rules: { duration_max: 60, duration_min: 30, scoring: 'pro_set_9' },
     days: [

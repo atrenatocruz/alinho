@@ -235,6 +235,7 @@ export default function TournamentPage() {
     my: activeMy(data),
     myEntries: activeEntries(data),
     myMatches: data.my_matches || [],
+    isAdmin,
     // «Ver como quem chega de fora»: os painéis escondem o que é de quem
     // organiza ou marca (revisão dos torneios, 28 set).
     publicView,
