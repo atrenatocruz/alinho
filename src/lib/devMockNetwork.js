@@ -247,6 +247,17 @@ const RPC_MOCKS = {
     { id: 'sp-rc', name: 'Rui Costa', avatar_url: null, rating: null, gender: null, follow_status: 'none', reason: 'mesmo_clube' },
     { id: 'sp-am', name: 'Ana Moreira', avatar_url: null, rating: 1380, gender: 'feminino', follow_status: 'following', reason: 'mesmo_clube' },
   ] : { __error: 'Could not find the function', __code: 'PGRST202' }),
+  // Sugestões para jogar (Francisco, 12 out; função do Dev 2). Sempre no modo
+  // de teste; localStorage.mockSuggestEmpty = 'true' → nenhuma (a secção some).
+  suggest_partners: () => (localStorage.getItem('mockSuggestEmpty') === 'true' ? [] : [
+    { id: 'sg-rf', name: 'Rita Figueira', avatar_url: null, rating: 1450, gender: 'feminino', reason: 'jogaram_juntos', reason_count: 7, org_name: null },
+    { id: 'sg-tl', name: 'Tiago Lopes', avatar_url: null, rating: 1310, gender: 'masculino', reason: 'jogaram_juntos', reason_count: 3, org_name: null },
+    { id: 'sg-am', name: 'Ana Marques', avatar_url: null, rating: 1180, gender: 'feminino', reason: 'jogaram_juntos', reason_count: 1, org_name: null },
+    { id: 'sg-rc', name: 'Rui Costa', avatar_url: null, rating: null, gender: null, reason: 'seguem_se', reason_count: null, org_name: null },
+    { id: 'sg-zp', name: 'Zé Pinto', avatar_url: null, rating: 990, gender: 'masculino', reason: 'mesmo_clube', reason_count: null, org_name: 'Smash Padel Almada' },
+    { id: 'sg-jl', name: 'Joana Lima', avatar_url: null, rating: 760, gender: 'feminino', reason: 'mesmo_clube', reason_count: null, org_name: 'Smash Padel Almada' },
+    { id: 'sg-pm', name: 'Pedro Martins', avatar_url: null, rating: 1020, gender: 'masculino', reason: 'mesmo_clube', reason_count: null, org_name: 'Jota Padeleiros' },
+  ]),
   // Página de um grupo/clube onde ainda não estou (bug do botão, 17 set).
   // localStorage.mockGameClosed = 'group' | 'club' | 'private' | 'gone': de que
   // grupo é o /jogo/fake-closed (SPEC 2026-10-01-jogo-de-grupo-fechado).

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
@@ -88,6 +88,8 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
   // Estável entre desenhos: a pesquisa do InviteesStep volta a correr quando
   // a função muda.
   const searchMembers = useCallback(async (q) => members.filter((m) => contemTexto(m.name, q)), [members])
+  // As sugestões num jogo de grupo: só quem é do grupo.
+  const memberIds = useMemo(() => (group ? new Set(members.map((m) => m.id)) : null), [group, members])
 
   const hasGuest = people.some((p) => p.guest)
   const missing = Math.max(0, MIN_PEOPLE - (people.length + 1))
@@ -290,7 +292,7 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
     >
       {step === 1 && (
         <InviteesStep
-          {...(group ? { searchFn: searchMembers, searchPlaceholder: t(isClubGame ? 'friends.search_club_placeholder' : 'friends.search_group_placeholder') } : {})}
+          {...(group ? { searchFn: searchMembers, searchPlaceholder: t(isClubGame ? 'friends.search_club_placeholder' : 'friends.search_group_placeholder'), suggestOrgId: group.id, suggestOnlyIds: memberIds } : {})}
           me={profile}
           people={people}
           {...(edit ? { lockedKeys, creatorKey, collapsedSearch: true } : {})}
