@@ -10,16 +10,22 @@ import { KIND_STYLE, friendsMatchTitle } from '../agenda/EventCard'
 import { eventTitle, eventPlace } from '../agenda/homeSearchMatch'
 import { fromDayKey, EVENT_KINDS } from '../../lib/agenda'
 import { formatDate, formatTime } from '../../lib/formatDate'
+import { InviteFaces } from '../friends/FriendInviteEventCard'
 
 // Os estados em que «estou dentro»: não os convites por responder, os pedidos,
 // a lista de suplentes nem o «não vou».
 const IN_STATES = new Set(['in', 'confirm', 'playing'])
 
-/** Os meus eventos ainda por jogar, por ordem de data e hora. */
+/** Os meus eventos ainda por jogar, por ordem de data e hora; os convites
+ *  por responder da sessão nova de amigos vêm primeiro (convite-amigos-na-
+ *  home, 12 out). Um jogo já começado continua até acabar. */
 export function myNextEvents(events, todayKey) {
-  return events
-    .filter((e) => e.mine && IN_STATES.has(e.myState) && !e.finished && e.dayKey >= todayKey)
+  const invites = events
+    .filter((e) => e.source === 'friend_invite' && !e.finished && e.dayKey >= todayKey)
     .sort((a, b) => a.startsAt - b.startsAt)
+  return [...invites, ...events
+    .filter((e) => e.mine && IN_STATES.has(e.myState) && !e.finished && e.dayKey >= todayKey)
+    .sort((a, b) => a.startsAt - b.startsAt)]
 }
 
 /** Com um tipo ou clube escolhido na barra, só os desses (UX, 9 out); sem
@@ -49,8 +55,34 @@ const SHORT_KIND = { friends: 'home.next_kind_friends' }
 // Nos jogos entre amigos, quem foi convidado lê «Aceitaste».
 const FRIEND_SOURCES = new Set(['private_match', 'friend_session'])
 
+/** O convite por responder: branco, borda preta de 2 px, «A Rita
+ *  convidou-te», as fotos de quem aceitou e os lugares que faltam;
+ *  «Responder» e «Novo» em baixo. Tocar abre o ecrã de responder. */
+function InviteNextCard({ event, todayKey, to }) {
+  const { t, i18n } = useTranslation()
+  const r = event.raw
+  const place = [event.orgName, r.location].filter(Boolean).filter((x, i, a) => a.indexOf(x) === i).join(' · ')
+  return (
+    <Link to={to} className="press flex w-[210px] shrink-0 snap-start flex-col rounded-2xl border-2 border-ink-900 bg-white px-[11px] py-2.5 text-left">
+      <p className="flex items-baseline whitespace-nowrap font-display text-[20px] font-extrabold leading-none text-ink-900">
+        {event.hasTime === false ? '—' : formatTime(event.startsAt, i18n.language, { hour: '2-digit', minute: '2-digit' })}
+        <small className="ml-[5px] font-sans text-[11px] font-bold text-[#4B5563]">{whenShort(event.dayKey, todayKey, t, i18n.language)}</small>
+        <span className={`ml-1 min-w-0 truncate font-sans text-[11px] font-extrabold ${KIND_STYLE.friends.text}`}>· {t(SHORT_KIND.friends)}</span>
+      </p>
+      <p className="mt-1 line-clamp-2 text-[13px] font-extrabold leading-[1.3] text-ink-900">{t('home.invite_by', { name: r.creatorFirst })}</p>
+      {place && <p className="mt-0.5 truncate text-[11px] text-[#4B5563]">{place}</p>}
+      <span className="mb-2.5 mt-1.5"><InviteFaces accepted={r.accepted} slots={r.slots} size="w-6 h-6 text-[9px]" /></span>
+      <p className="mt-auto flex items-center justify-between border-t border-black/[.08] pt-2 text-[11px] font-extrabold text-ink-700">
+        {t('home.invite_answer')}
+        <span className="rounded-full bg-lime-400 px-2 py-0.5 text-[10.5px] font-extrabold text-ink-900">{t('home.invite_new')}</span>
+      </p>
+    </Link>
+  )
+}
+
 function NextCard({ event, todayKey, userId, to }) {
   const { t, i18n } = useTranslation()
+  if (event.source === 'friend_invite') return <InviteNextCard event={event} todayKey={todayKey} to={to} />
   const style = KIND_STYLE[event.kind] || KIND_STYLE.mix
   const title = eventTitle(event)
     || (event.source === 'private_match' || event.source === 'group_match' ? friendsMatchTitle(event.raw || {}, userId, t) : '')

@@ -16,7 +16,7 @@
 // seguir mútuo); ninguém desaparece por ser privado.
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus } from 'lucide-react'
+import { Check, Plus } from 'lucide-react'
 import { Avatar, RatingBadge } from '../ui'
 import { suggestPartners } from '../../lib/suggestPartners'
 
@@ -29,7 +29,7 @@ export function reasonText(t, p) {
   return ''
 }
 
-export default function PeopleSuggestions({ onPick, exclude = [], orgId = null, onlyIds = null, limit = 6 }) {
+export default function PeopleSuggestions({ onPick, exclude = [], orgId = null, onlyIds = null, limit = 6, onCount = null, pickedId = null }) {
   const { t } = useTranslation()
   const [list, setList] = useState(null)
   useEffect(() => {
@@ -43,6 +43,8 @@ export default function PeopleSuggestions({ onPick, exclude = [], orgId = null, 
   const shown = (list || [])
     .filter((p) => !skip.has(p.id) && (!onlyIds || onlyIds.has(p.id)))
     .slice(0, limit)
+  // onCount (Dev 2): quantas se mostram, para quem chama saber se fica vazio.
+  useEffect(() => { if (list && onCount) onCount(shown.length) }, [list, shown.length]) // eslint-disable-line react-hooks/exhaustive-deps
   if (!shown.length) return null
   return (
     <div className="mt-3">
@@ -50,7 +52,9 @@ export default function PeopleSuggestions({ onPick, exclude = [], orgId = null, 
       <p className="mb-2 block text-sm font-medium text-gray-700">{t('suggest.title')}</p>
       <div className="overflow-hidden rounded-ctrl border border-line bg-white">
         {shown.map((p) => (
-          <div key={p.id} className="flex items-center gap-3 border-b border-line px-3 py-2 last:border-b-0">
+          // pickedId (Dev 2): quando só se escolhe uma pessoa (o parceiro do mix),
+          // a escolhida fica com ✓ e fundo lima-claro (UX, 12 out).
+          <div key={p.id} className={`flex items-center gap-3 border-b border-line px-3 py-2 last:border-b-0 ${pickedId === p.id ? 'bg-lime-400/15' : ''}`}>
             <Avatar name={p.name} url={p.avatar_url} size="w-9 h-9 text-[11px]" />
             <span className="min-w-0 flex-1">
               <span className="flex items-center gap-1.5">
@@ -61,8 +65,8 @@ export default function PeopleSuggestions({ onPick, exclude = [], orgId = null, 
             </span>
             <button type="button" aria-label={t('friends.add_person', { name: p.name })}
               onClick={() => onPick({ id: p.id, name: p.name, avatar_url: p.avatar_url, rating: p.rating, gender: p.gender })}
-              className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-ink-900 text-white">
-              <Plus size={18} />
+              className={`press flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${pickedId === p.id ? 'bg-lime-400 text-ink-900' : 'bg-ink-900 text-white'}`}>
+              {pickedId === p.id ? <Check size={18} strokeWidth={3} /> : <Plus size={18} />}
             </button>
           </div>
         ))}

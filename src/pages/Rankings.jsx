@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { Link, useLocation, useNavigationType } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useNavigationType } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Trophy, Award, HelpCircle, Search, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
@@ -15,6 +15,7 @@ import { useHeaderActions } from '../contexts/HeaderActionsContext'
 import { applyScale, defaultScale, rankedCount, SCALES } from '../lib/rankingScales'
 import MonthRanking from '../components/rankings/MonthRanking'
 import MonthPodiumShare from '../components/rankings/MonthPodiumShare'
+import RankPodium from '../components/rankings/RankPodium'
 
 /* ─── Rankings (épico «Comunidade vs. Rankings», Trello #271/#275) ───────────
    Comparar jogadores — só jogadores. Desenho:
@@ -46,6 +47,7 @@ export default function Rankings() {
   const { user, currentOrganizationId, memberships, profile } = useAuth()
   const location = useLocation()
   const navigationType = useNavigationType()
+  const navigate = useNavigate()
 
   // Quem chega com state.tab (Perfil → "Ranking global", links antigos)
   // abre no sítio equivalente.
@@ -249,7 +251,16 @@ export default function Rankings() {
   }, [rows, shownScale, byScale])
   const allScales = byScale && shownScale === 'all'
 
-  const visible = trimmed ? positioned.filter(matchesQuery) : positioned
+  // O pódio 1·2·3 também no Ranking e na Assiduidade (Francisco, 12 out):
+  // os três primeiros saem da lista e vão para o cartão. No «Todos» do
+  // Ranking não há lugares (cada um tem o da sua escala), e com pesquisa
+  // fica só a lista.
+  const podiumRows = mode !== 'month' && !trimmed && !allScales
+    ? positioned.filter((r) => r.ranked && r.position && r.position <= 3).sort((a, b) => a.position - b.position)
+    : []
+  const podiumIds = new Set(podiumRows.map((r) => r.user_id))
+  const podiumValue = (row) => ({ text: mode === 'xp' ? `${row.value} ${t('rankings.xp_label')}` : row.value, muted: false })
+  const visible = (trimmed ? positioned.filter(matchesQuery) : positioned).filter((r) => !podiumIds.has(r.user_id))
   // A tua linha: a tua posição na tua escala, mesmo quando se vê outra.
   const me = byScale
     ? applyScale(rows, 'all').find((r) => r.user_id === user.id)
@@ -427,7 +438,7 @@ export default function Rankings() {
         <div className="flex items-center justify-center py-16">
           <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
         </div>
-      ) : visible.length === 0 ? (
+      ) : visible.length === 0 && podiumRows.length === 0 ? (
         <EmptyState
           icon={trimmed ? Search : mode === 'xp' ? Award : Trophy}
           title={trimmed ? t('rankings.no_player_found_title') : t('rankings.empty_global_title')}
@@ -435,9 +446,18 @@ export default function Rankings() {
         />
       ) : (
         <>
+          {podiumRows.length > 0 && (
+            <RankPodium id="rank-podium" spots={[0, 1, 2].map((i) => podiumRows[i] || null)} value={podiumValue} meId={user.id}
+              onOpen={(id) => navigate(`/jogador/${id}`)}
+              onShare={() => setMonthShare({
+                kind: mode === 'xp' ? 'xp' : 'ranking',
+                title: mode === 'xp' ? t('monthshare.title_xp') : t(`rankings.scale_${shownScale}`),
+                podium: [0, 1, 2].map((i) => podiumRows[i] && { ...podiumRows[i], display: podiumValue(podiumRows[i]).text }),
+              })} />
+          )}
           {/* Quantas pessoas há na lista — com pesquisa, quantas a pesquisa encontrou. */}
           <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">
-            {t('rankings.players_found', { count: visible.length })}
+            {t('rankings.players_found', { count: visible.length + podiumRows.length })}
           </p>
           {allScales && !trimmed && (
             <p className="text-xs text-muted">{t('rankings.all_scales_hint')}</p>

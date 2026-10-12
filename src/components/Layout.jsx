@@ -630,13 +630,45 @@ export default function Layout({ children }) {
                 </div>
               ) : (
                 <div className="max-h-80 overflow-y-auto divide-y divide-line">
+                  {/* Os convites para jogos entre amigos por responder ficam
+                      sempre em cima (convite-amigos-na-home, 12 out). */}
+                  {friendNotices.filter((n) => n.kind === 'friend_match_invite').map((notice) => (
+                    <FriendInviteRow key={notice.id} notice={notice} onOpen={openFriendNotice} />
+                  ))}
+                  {/* Os convites do modelo antigo seguem a mesma regra (UX, 12 out). */}
+                  {privateMatchTodos.filter((x) => x.kind === 'respond').map(({ kind, match }) => (
+                    <Link
+                      key={`${kind}-${match.id}`}
+                      to={match.session_id ? `/jogos-privados/sessao/${match.session_id}` : '/jogos-privados'}
+                      onClick={() => setShowNotifications(false)}
+                      className="flex items-center gap-3 bg-lime-400/15 px-4 py-3 transition-colors duration-fast hover:bg-lime-400/25"
+                    >
+                      <div className="w-9 h-9 rounded-full bg-lime-400/20 text-ink-900 flex items-center justify-center shrink-0">
+                        <Swords size={16} />
+                      </div>
+                      <p className="flex-1 min-w-0 text-sm text-ink-900">
+                        {kind === 'respond' ? (
+                          <>
+                            <span className="font-extrabold">{match.team_a_player1_name || t('layout.someone')}</span>{' '}
+                            {t('layout.private_match_invited')}
+                          </>
+                        ) : (
+                          <>
+                            {t('layout.private_match_confirm_score')}{' '}
+                            <span className="font-extrabold tabular-nums">{match.score_a}-{match.score_b}</span>
+                          </>
+                        )}
+                      </p>
+                      <span aria-hidden="true" className="w-2 h-2 rounded-full bg-lime-400 shrink-0" />
+                    </Link>
+                  ))}
                   {lessonNotices.map((notice) => (
                     <LessonNoticeRow key={notice.id} notice={notice} onOpen={openLessonNotice} />
                   ))}
                   {tournamentNotices.map((notice) => (
                     <TournamentNoticeRow key={notice.id} notice={notice} onOpen={openTournamentNotice} />
                   ))}
-                  {friendNotices.map((notice) => (
+                  {friendNotices.filter((n) => n.kind !== 'friend_match_invite').map((notice) => (
                     <FriendInviteRow key={notice.id} notice={notice} onOpen={openFriendNotice} />
                   ))}
                   {tournamentInvites.map((inv) => (
@@ -670,7 +702,7 @@ export default function Layout({ children }) {
                       <span aria-hidden="true" className="w-2 h-2 rounded-full bg-lime-400 shrink-0" />
                     </Link>
                   ))}
-                  {privateMatchTodos.map(({ kind, match }) => (
+                  {privateMatchTodos.filter((x) => x.kind !== 'respond').map(({ kind, match }) => (
                     <Link
                       key={`${kind}-${match.id}`}
                       to={match.session_id ? `/jogos-privados/sessao/${match.session_id}` : '/jogos-privados'}

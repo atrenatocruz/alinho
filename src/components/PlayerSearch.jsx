@@ -3,11 +3,14 @@ import { Search, X, Check } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { searchPlayers } from '../lib/privateMatches'
 import { Avatar } from './ui'
+import PeopleSuggestions from './people/PeopleSuggestions'
 
 // disabledIds: aparecem na lista, com disabledLabel, mas não se escolhem —
 // ex.: quem já é membro, na pesquisa de convidar do Gerir. Esconder em
 // silêncio fazia parecer que a pesquisa estava avariada (Francisco, 24 set).
-export default function PlayerSearch({ label, selected, onSelect, onClear, excludeIds = [], disabledIds = [], disabledLabel = '', searchFn = searchPlayers }) {
+// suggestions: antes de escrever, as «Sugestões» (com quem mais jogo, quem
+// sigo, os meus clubes — PeopleSuggestions, 12 out). { orgId } só desse clube.
+export default function PlayerSearch({ label, selected, onSelect, onClear, excludeIds = [], disabledIds = [], disabledLabel = '', searchFn = searchPlayers, suggestions = null }) {
   const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
@@ -98,6 +101,9 @@ export default function PlayerSearch({ label, selected, onSelect, onClear, exclu
             ))
           )}
         </div>
+      )}
+      {suggestions && query.trim().length === 0 && (
+        <PeopleSuggestions onPick={onSelect} exclude={excludeIds} orgId={suggestions.orgId || null} limit={6} />
       )}
     </div>
   )
