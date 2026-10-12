@@ -269,8 +269,29 @@
 .animate-pulse-soft { animation: pulse-soft 1.6s ease-in-out infinite; }
 .animate-swap-confirm { animation: swap-confirm 900ms ease-out both; }
 
+/* Esqueletos (SPEC 2026-10-12-esqueletos-app): uma faixa clara passa devagar
+   pelo cinzento (1,6 s, só transform); os dados entram com um fade de 0,35 s. */
+@keyframes sk-shine {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
+}
+.sk::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  transform: translateX(-100%);
+  animation: sk-shine 1.6s ease-in-out infinite;
+}
+@keyframes fill-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.animate-fill-in { animation: fill-in 350ms ease-out both; }
+
 @media (prefers-reduced-motion: reduce) {
-  .animate-fade-up, .animate-pop, .animate-fade-in, .animate-pulse-soft, .animate-swap-confirm { animation: none; }
+  .animate-fade-up, .animate-pop, .animate-fade-in, .animate-pulse-soft, .animate-swap-confirm, .animate-fill-in { animation: none; }
+  .sk::after { animation: none; display: none; }
   .press { transition: none; }
 }
 
