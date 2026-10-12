@@ -579,6 +579,14 @@ const RPC_MOCKS = {
         ...(sent === 'not_ranked' ? { ranked_intent: false } : {}),
       }
       if (sent) games.forEach((x) => { if (x.score_a == null) Object.assign(x, { score_a: 6, score_b: 2, winner_team: 'a' }) })
+      // A hora de cada ronda (duração, 12 out): uma ronda a cada 22 min até
+      // ao envio. mockFriendDuration = 'end' → tudo metido no fim; 'none' → sem horas.
+      if (sent && localStorage.getItem('mockFriendDuration') !== 'none') {
+        const end = new Date(sentExtra.finished_at).getTime()
+        const marked = games.filter((x) => x.score_a != null)
+        const allAtEnd = localStorage.getItem('mockFriendDuration') === 'end'
+        marked.forEach((x, i) => { x.result_at = new Date(end - (allAtEnd ? (marked.length - i) * 20000 : (marked.length - i) * 22 * 60000 + 3 * 60000)).toISOString() })
+      }
       // mockFriendPending = 'true': a Ana ainda não aceitou (a pergunta diz «Conta quando…»).
       if (localStorage.getItem('mockFriendPending') === 'true') invitees[2].status = 'pending'
       // Depois de guardar com a seguinte por nascer: a última ronda já marcada.
@@ -767,6 +775,8 @@ const RPC_MOCKS = {
       { ...base, match_id: 'fs-1', scheduled_date: d(0), scheduled_time: '18:00:00', org_name: 'Smash Padel', live: true,
         pairs: [pair(['Rita Figueira', 'Tiago Lopes'], ['Ana Marques', 'Rui Costa'], 2, 1, 15, 12, 'a')] },
       { ...base, match_id: 'fs-2', scheduled_date: d(3), scheduled_time: '19:30:00', org_name: 'Clube Norte', people: 5, accepted: 4, pending: 1, pairs: [] },
+      { ...base, match_id: 'fs-7', scheduled_date: d(-2), scheduled_time: '19:00:00', org_name: 'Smash Padel',
+        pairs: [pair(['Rita Figueira', 'Tiago Lopes'], ['Ana Marques', 'Rui Costa'], 2, 0, 12, 7, 'a', false)] },
       { ...base, match_id: 'fs-3', scheduled_date: d(-4), scheduled_time: '10:00:00', org_name: 'Smash Padel', finished_at: new Date().toISOString(), ranking_state: 'counted', games_counted: 1,
         pairs: [pair(['Rita Figueira', 'Tiago Lopes'], ['Ana Marques', 'Rui Costa'], 3, 1, 25, 20, 'a')] },
       { ...base, match_id: 'fs-4', scheduled_date: d(-5), scheduled_time: '20:00:00', org_name: 'A2N Padel', finished_at: new Date().toISOString(), ranking_state: 'not_ranked',

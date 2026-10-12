@@ -87,7 +87,7 @@ export default function CreateGroupMatchSlots() {
         teamBPlayer1Id: teamBPlayer1Id || null,
         teamBPlayer2Id: teamBPlayer2Id || null,
       })
-      navigate(`/clube/${slug}/jogos`, { state: { createdMatchId: matchId } })
+      navigate(`/clube/${slug}/jogos`, { replace: true, state: { createdMatchId: matchId } })
     } catch (err) {
       console.error('Error creating group match:', err)
       setError(describeError(t, err, 'creategroupmatch.error_create'))

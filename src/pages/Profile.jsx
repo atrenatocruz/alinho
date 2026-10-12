@@ -463,7 +463,8 @@ export default function Profile() {
       return {
         key: `ps:${m.session_id || m.id}`,
         kind: 'friends',
-        suffix: t('agenda.session_rotating'),
+        // «a rodar» só quando as duplas rodam (QA, 12 out).
+        suffix: m.pairing_mode === 'rotating' ? t('agenda.session_rotating') : null,
         date: matchDate(m),
         title: t('agenda.session_done', { count: list.length, wins }),
         subtitle: t('agenda.owner_friends'),

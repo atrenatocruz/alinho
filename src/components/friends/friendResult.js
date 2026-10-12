@@ -93,6 +93,38 @@ export function myOutcome(pair, me) {
   return { outcome, mine, theirs }
 }
 
+/** A duração do jogo (SPEC «O fim», acerto de 12 out): desde que se
+ *  guardou a 1.ª ronda (games[].result_at, Dev 3) até ao «Terminar»
+ *  (match.finished_at), arredondada aos 15 min. null quando não se mostra:
+ *  sem as horas, menos de 15 min ou mais de 4h (alguém se esqueceu de
+ *  terminar), ou tudo metido de uma vez no fim (as rondas a menos de 2 min
+ *  umas das outras). Devolve { minutes, rounds }. */
+export function matchDuration(match, games) {
+  const end = match?.finished_at ? new Date(match.finished_at).getTime() : NaN
+  const times = (games || []).filter(hasScore).map((g) => (g.result_at ? new Date(g.result_at).getTime() : NaN))
+  if (!times.length || Number.isNaN(end) || times.some(Number.isNaN)) return null
+  const first = Math.min(...times)
+  const last = Math.max(...times)
+  if (times.length > 1 && last - first < 2 * 60000) return null
+  const raw = (end - first) / 60000
+  if (raw < 15 || raw > 240) return null
+  return { minutes: Math.round(raw / 15) * 15, rounds: times.length }
+}
+
+/** «45 min», «1h», «1h15», «1h30». */
+export function durationText(t, minutes) {
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  if (!h) return t('friends.duration_min', { m })
+  return m ? t('friends.duration_h_min', { h, m: String(m).padStart(2, '0') }) : t('friends.duration_h', { h })
+}
+
+/** «⏱ 1h30 · 4 rondas», ou null. */
+export function durationLine(t, match, games) {
+  const d = matchDuration(match, games)
+  return d ? `⏱ ${durationText(t, d.minutes)} · ${t('friends.rounds_count', { count: d.rounds })}` : null
+}
+
 /** «Ana M. e Rui C.» — sem artigos (SPEC «O fim»). */
 export function namesList(t, people) {
   const names = (people || []).map((p) => shortName(p.name)).filter(Boolean)

@@ -1,7 +1,8 @@
 // Um cartão da lista «Jogos entre amigos» (SPEC 2026-10-09-amigos-o-fim,
 // ponto 8). Mostra só: dia · hora · clube, as duas duplas (ou «A rodar · 6
 // pessoas» e «3 pares de duplas»), o resultado em grande («3 rondas a 1» /
-// «2 jogos contaram») e o estado numa palavra: «A decorrer», «✓ Contou»,
+// «2 jogos contaram») e o estado numa palavra: «A decorrer» / «Marcado» /
+// «Por enviar» (ainda não enviado), «✓ Contou»,
 // «À espera de <Nome>», «Fora do ranking», «Amigável». O resto (editar
 // resultado, apagar, quem respondeu) vive dentro do jogo.
 // Dados: list_my_friend_sessions (Dev 3, «O fim»).
@@ -17,8 +18,13 @@ const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() +
 function StateWord({ s }) {
   const { t } = useTranslation()
   const pill = 'shrink-0 whitespace-nowrap rounded-full px-2 py-[3px] text-[11px] font-extrabold'
+  // Por enviar (UX, 12 out): «A decorrer» com ronda em curso, «Marcado»
+  // antes da hora do jogo, «Por enviar» depois dela sem ninguém ter enviado.
   if (!s.finished_at) {
-    return s.live ? <span className={`${pill} bg-danger/10 text-danger`}>{t('friends.list_live')}</span> : null
+    if (s.live) return <span className={`${pill} bg-danger/10 text-danger`}>{t('friends.list_live')}</span>
+    const startsAt = s.scheduled_date ? new Date(`${s.scheduled_date}T${String(s.scheduled_time || '00:00').slice(0, 5)}`) : null
+    const before = startsAt && !Number.isNaN(startsAt.getTime()) && startsAt > new Date()
+    return <span className={`${pill} bg-white text-ink-700`}>{t(before ? 'friends.list_scheduled' : 'friends.list_not_sent')}</span>
   }
   if (s.ranking_state === 'counted') return <span className={`${pill} bg-[#DCFCE7] text-[#14532D]`}>{t('friends.list_counted')}</span>
   if (s.ranking_state === 'rejected') return <span className={`${pill} bg-danger/10 text-danger`}>{t('friends.list_rejected')}</span>

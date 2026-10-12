@@ -134,7 +134,7 @@ export default function CreatePrivateMatchSlots() {
         teamBPlayer2Id: teamBPlayer2?.id,
         teamBPlayer2GuestName: teamBPlayer2Guest.trim() || null,
       })
-      navigate('/jogos-privados')
+      navigate('/jogos-privados', { replace: true })
     } catch (err) {
       console.error('Error creating private match:', err)
       setError(describeError(t, err, 'createprivatematch.error_create'))
