@@ -111,6 +111,20 @@ export function matchDuration(match, games) {
   return { minutes: Math.round(raw / 15) * 15, rounds: times.length }
 }
 
+/** A duração de uma sessão da lista (list_my_friend_sessions): do
+ *  first_result_at ao finished_at (ou a agora, a decorrer), com as mesmas
+ *  regras do jogo. `live`: «1h05 até agora» sem o mínimo de «tudo no fim». */
+export function sessionDuration(s, { live = false } = {}) {
+  const first = s?.first_result_at ? new Date(s.first_result_at).getTime() : NaN
+  const last = s?.last_result_at ? new Date(s.last_result_at).getTime() : NaN
+  const end = live ? Date.now() : (s?.finished_at ? new Date(s.finished_at).getTime() : NaN)
+  if (Number.isNaN(first) || Number.isNaN(end)) return null
+  if (!live && (s.rounds_count || 0) > 1 && !Number.isNaN(last) && last - first < 2 * 60000) return null
+  const raw = (end - first) / 60000
+  if (raw < 15 || raw > 240) return null
+  return { minutes: Math.round(raw / 15) * 15 }
+}
+
 /** «45 min», «1h», «1h15», «1h30». */
 export function durationText(t, minutes) {
   const h = Math.floor(minutes / 60)

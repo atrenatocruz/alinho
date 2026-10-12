@@ -14,7 +14,7 @@
 //
 // Quem organiza (quem criou, ou quem disse «Vou» com o nome — SPEC 2026-10-
 // 07-amigos-convidado) vê e faz o mesmo.
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeftRight, ChevronDown } from 'lucide-react'
 import { shortName } from './friendShare'
@@ -40,7 +40,7 @@ const samePairs = (g, h) => !!g && !!h && [pairKey(g.team_a), pairKey(g.team_b)]
 // «O fim» (SPEC 2026-10-09-amigos-o-fim): `onSent` recebe o que o
 // finish_friend_match devolve; `onCorrect` abre «Corrigir o resultado».
 // Depois de enviado (match.finished_at), as rondas ficam só para ler.
-export default function FriendRounds({ match, games, invitees, players, iOrganize, myUserId, onChanged, onSent, onCorrect, onShare, clockOn = false, onUseClock = null, onHideClock = null }) {
+export default function FriendRounds({ match, games, invitees, players, iOrganize, myUserId, onChanged, onSent, onCorrect, onShare, clockOn = false, onUseClock = null, onHideClock = null, openOnLoad = null }) {
   const { t, i18n } = useTranslation()
   const [markFor, setMarkFor] = useState(null) // { game, round, editing }
   const [kindFor, setKindFor] = useState(null) // { game, round }
@@ -52,6 +52,9 @@ export default function FriendRounds({ match, games, invitees, players, iOrganiz
   // { n, after }. Some quando a ronda n aparece.
   const [nextIssue, setNextIssue] = useState(null)
   const [finishAsk, setFinishAsk] = useState(false) // a pergunta «Terminar o jogo e enviar?»
+  // Vindo da lista (SPEC 2026-10-12-lista-jogos-amigos): «Marcar a ronda N»
+  // abre a folha da ronda; «Enviar ›» abre a pergunta do fim. Uma vez só.
+  const [opened, setOpened] = useState(false)
   const [retrying, setRetrying] = useState(false)
   const rounds = roundsOf(games, players)
   const courtsN = Math.max(1, ...games.map((g) => g.court_number || 1))
@@ -224,6 +227,15 @@ export default function FriendRounds({ match, games, invitees, players, iOrganiz
   // sent_by: { user_id, name } (get_friend_match, Dev 3).
   const iSent = !!myUserId && match.sent_by?.user_id === myUserId
   const hasLive = !early && rounds.some((r) => r.current && r.courts.some((g) => !hasResult(g)))
+  useEffect(() => {
+    if (opened || !openOnLoad || finished) return
+    if (openOnLoad === 'mark') {
+      const r = rounds.find((x) => x.current)
+      const g = r?.courts.find((x) => !hasResult(x)) || r?.courts[0]
+      if (r && g && iOrganize) { setMarkFor({ game: g, round: r, editing: false }); setOpened(true) }
+    } else if (openOnLoad === 'send' && games.some(hasResult)) { setFinishAsk(true); setOpened(true) }
+  }, [openOnLoad, opened, finished, rounds, games, iOrganize])
+
   return (
     <div className="space-y-3">
       {rejected && (

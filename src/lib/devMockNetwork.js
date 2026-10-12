@@ -778,26 +778,43 @@ const RPC_MOCKS = {
   // «O fim» (Dev 3, 10 out): mockFriendList = 'true' — a lista nova, com
   // finished_at, ranking_state, pairs e live (SPEC amigos-o-fim, ponto 8).
   list_my_friend_sessions: () => (localStorage.getItem('mockFriendList') === 'true' ? (() => {
+    // A lista com vida (12 out): fotos, ronda em curso, rondas ganhas, horas,
+    // «Venceste», a rodar com a melhor dupla, e quem criou.
     const d = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10)
-    const p = (n) => ({ name: n, user_id: `u-${n}` })
+    const ago = (days, min = 0) => new Date(Date.now() - days * 86400000 - min * 60000).toISOString()
+    const p = (n) => ({ name: n, user_id: `u-${n}`, avatar_url: null })
     const pair = (a, b, ra, rb, ga, gb, w, counts = true) => ({ team_a: a.map(p), team_b: b.map(p), rounds_a: ra, rounds_b: rb, games_a: ga, games_b: gb, winner: w, counts })
-    const base = { is_creator: true, people: 4, accepted: 4, pending: 0, court: null, waiting_for: [], games_counted: 0, live: false, finished_at: null, ranking_state: null, pairing_mode: 'fixed' }
+    const pl = (names, pending = 0) => [...names.map((n) => ({ ...p(n), invitee_id: `i-${n}`, status: 'accepted' })), ...Array.from({ length: pending }, (_, i) => ({ name: `Pendente ${i}`, user_id: `u-p${i}`, avatar_url: null, invitee_id: `i-p${i}`, status: 'pending' }))]
+    const me = { name: 'Admin (Dev)', user_id: 'u-me' }
+    const base = { is_creator: true, creator: me, people: 4, accepted: 4, pending: 0, court: null, waiting_for: [], games_counted: 0, live: false, finished_at: null, ranking_state: null, pairing_mode: 'fixed',
+      rounds_count: 0, first_result_at: null, last_result_at: null, i_won: false, my_rounds_won: null, my_rounds_played: null, best_partner: null, current_round: null, live_pair: null, people_list: [] }
+    const other = { is_creator: false, creator: { name: 'Rita Figueira', user_id: 'u-Rita Figueira' } }
     return [
-      { ...base, match_id: 'fs-1', scheduled_date: d(0), scheduled_time: '18:00:00', org_name: 'Smash Padel', live: true,
-        pairs: [pair(['Rita Figueira', 'Tiago Lopes'], ['Ana Marques', 'Rui Costa'], 2, 1, 15, 12, 'a')] },
-      { ...base, match_id: 'fs-2', scheduled_date: d(3), scheduled_time: '19:30:00', org_name: 'Clube Norte', people: 5, accepted: 4, pending: 1, pairs: [] },
-      { ...base, match_id: 'fs-7', scheduled_date: d(-2), scheduled_time: '19:00:00', org_name: 'Smash Padel',
-        pairs: [pair(['Rita Figueira', 'Tiago Lopes'], ['Ana Marques', 'Rui Costa'], 2, 0, 12, 7, 'a', false)] },
-      { ...base, match_id: 'fs-3', scheduled_date: d(-4), scheduled_time: '10:00:00', org_name: 'Smash Padel', finished_at: new Date().toISOString(), ranking_state: 'counted', games_counted: 1,
+      { ...base, match_id: 'fs-1', scheduled_date: d(0), scheduled_time: '10:00:00', org_name: 'Serra Azul Padel', live: true, rounds_count: 2, first_result_at: ago(0, 65),
+        current_round: { number: 3, court_number: 1, round_kind: 'set', round_points_to: null, started_at: ago(0, 5) },
+        live_pair: { team_a: [p('Rita Figueira'), p('Tiago Lopes')], team_b: [p('Ana Marques'), p('Rui Costa')], rounds_a: 2, rounds_b: 1 },
+        pairs: [pair(['Rita Figueira', 'Tiago Lopes'], ['Ana Marques', 'Rui Costa'], 2, 1, 15, 12, 'a', false)] },
+      { ...base, ...other, match_id: 'fs-7', scheduled_date: d(-3), scheduled_time: '21:00:00', org_name: 'Maré Alta Padel', rounds_count: 2,
+        pairs: [pair(['Rita Figueira', 'Joana Silva'], ['Pedro Lopes', 'Inês Ramos'], 1, 1, 9, 9, 'draw', false)] },
+      { ...base, match_id: 'fs-2', scheduled_date: d(6), scheduled_time: '10:00:00', org_name: 'Serra Azul Padel', accepted: 3, pending: 1,
+        people_list: pl(['Admin (Dev)', 'Tiago Lopes', 'Ana Marques'], 1) },
+      { ...base, match_id: 'fs-3', scheduled_date: d(-4), scheduled_time: '10:00:00', org_name: 'Serra Azul Padel', finished_at: ago(4, -100), ranking_state: 'counted', games_counted: 1,
+        rounds_count: 4, first_result_at: ago(4, -10), last_result_at: ago(4, -95), i_won: true,
         pairs: [pair(['Rita Figueira', 'Tiago Lopes'], ['Ana Marques', 'Rui Costa'], 3, 1, 25, 20, 'a')] },
-      { ...base, match_id: 'fs-4', scheduled_date: d(-5), scheduled_time: '20:00:00', org_name: 'A2N Padel', finished_at: new Date().toISOString(), ranking_state: 'not_ranked',
-        pairs: [pair(['Admin (Dev)', 'Rui Costa'], ['Zé Pinto', 'Joana Lima'], 2, 2, 12, 12, 'draw', false)] },
-      { ...base, match_id: 'fs-5', scheduled_date: d(-6), scheduled_time: '18:00:00', org_name: 'Smash Padel', finished_at: new Date().toISOString(), ranking_state: 'waiting',
-        waiting_for: [{ name: 'Ana Marques' }], pairs: [pair(['Rita Figueira', 'Tiago Lopes'], ['Ana Marques', 'Rui Costa'], 1, 2, 14, 16, 'b')] },
-      { ...base, match_id: 'fs-6', scheduled_date: d(-7), scheduled_time: '11:00:00', org_name: 'Clube Norte', people: 6, pairing_mode: 'rotating', finished_at: new Date().toISOString(),
-        ranking_state: 'rejected', games_counted: 2,
-        pairs: [pair(['Rita Figueira', 'Tiago Lopes'], ['Ana Marques', 'Rui Costa'], 1, 0, 6, 4, 'a'), pair(['Zé Pinto', 'Rita Figueira'], ['Admin (Dev)', 'Tiago Lopes'], 0, 1, 4, 6, 'b'),
-          pair(['Ana Marques', 'Admin (Dev)'], ['Rui Costa', 'Zé Pinto'], 1, 1, 10, 10, 'draw', false)] },
+      { ...base, ...other, match_id: 'fs-5', scheduled_date: d(-5), scheduled_time: '18:00:00', org_name: 'Maré Alta Padel', finished_at: ago(5, -80), ranking_state: 'waiting',
+        rounds_count: 3, first_result_at: ago(5, -5), last_result_at: ago(5, -75),
+        waiting_for: [{ name: 'Ana Marques' }], pairs: [pair(['Pedro Lopes', 'Inês Ramos'], ['Rita Figueira', 'Joana Silva'], 2, 1, 14, 12, 'a')] },
+      { ...base, match_id: 'fs-4', scheduled_date: d(-6), scheduled_time: '20:00:00', org_name: 'Serra Azul Padel', finished_at: ago(6, -110), ranking_state: 'not_ranked',
+        rounds_count: 4, first_result_at: ago(6, -5), last_result_at: ago(6, -100),
+        pairs: [pair(['Rita Figueira', 'Tiago Lopes'], ['Marta Lima', 'Hugo Reis'], 2, 2, 12, 12, 'draw', false)] },
+      { ...base, match_id: 'fs-6', scheduled_date: d(-7), scheduled_time: '11:00:00', org_name: 'Serra Azul Padel', people: 6, pairing_mode: 'rotating', finished_at: ago(7, -125),
+        ranking_state: 'counted', games_counted: 3, rounds_count: 6, first_result_at: ago(7, -5), last_result_at: ago(7, -120), i_won: true,
+        my_rounds_won: 3, my_rounds_played: 4, best_partner: { name: 'Tiago Lopes', user_id: 'u-Tiago Lopes', avatar_url: null },
+        people_list: pl(['Admin (Dev)', 'Rita Figueira', 'Tiago Lopes', 'Ana Marques', 'Rui Costa', 'Zé Pinto']),
+        pairs: [pair(['Rita Figueira', 'Tiago Lopes'], ['Ana Marques', 'Rui Costa'], 1, 0, 6, 4, 'a'), pair(['Zé Pinto', 'Rita Figueira'], ['Admin (Dev)', 'Tiago Lopes'], 0, 1, 4, 6, 'b')] },
+      { ...base, ...other, match_id: 'fs-8', scheduled_date: d(-9), scheduled_time: '19:00:00', org_name: 'Maré Alta Padel', finished_at: ago(9, -3), ranking_state: 'rejected',
+        rounds_count: 1, first_result_at: ago(9, -1), last_result_at: ago(9, -1),
+        pairs: [pair(['Ana Marques', 'Rui Costa'], ['Rita Figueira', 'Tiago Lopes'], 1, 0, 6, 4, 'a')] },
     ]
   })() : (['ready', 'waiting', 'app'].includes(localStorage.getItem('mockFriendSession'))
     ? [{ match_id: 'fs-1', scheduled_date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), scheduled_time: '10:00:00', location: 'Clube Exemplo', court: 'Campo 3', is_creator: true, people: 5, accepted: localStorage.getItem('mockFriendSession') === 'waiting' ? 4 : 5, pending: localStorage.getItem('mockFriendSession') === 'waiting' ? 1 : 0 }] : [])),
