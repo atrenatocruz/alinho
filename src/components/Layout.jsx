@@ -434,9 +434,11 @@ export default function Layout({ children }) {
   // o «<Nome> não vai», «cancelou» e «apagou» são só para saber: tocar-lhes
   // tira-os, como os outros avisos. Antes ficavam lá para sempre (Francisco,
   // 28 set).
-  const openFriendNotice = (notice) => {
+  // `keep`: só abre o jogo, sem tirar o aviso (o resultado enviado tem
+  // «Está certo / Não está certo», que é o que o tira).
+  const openFriendNotice = (notice, { keep = false } = {}) => {
     setShowNotifications(false)
-    if (notice.kind === 'friend_match_invite') return
+    if (notice.kind === 'friend_match_invite' || keep) return
     setFriendNotices((list) => list.filter((n) => n.id !== notice.id))
     markNotificationsRead([notice.id]).catch((error) => console.error('Error marking notice as read:', error))
   }

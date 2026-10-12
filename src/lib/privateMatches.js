@@ -450,6 +450,39 @@ export const leaveFriendMatch = async (matchId) => {
   return data
 }
 
+// ── O fim (Dev 3, 9 out — SPEC 2026-10-09-amigos-o-fim) ──────────────────
+
+/** «Terminar e enviar»: fecha o jogo (as rondas sem resultado saem) e conta
+ *  uma vez para o ranking, ou fica à espera de quem falta aceitar. Devolve
+ *  { status: 'sent', counted, waiting_for: [{ invitee_id, name }], games_counted }. */
+export const finishFriendMatch = async (matchId) => {
+  const { data, error } = await supabase.rpc('finish_friend_match', { p_match_id: matchId })
+  if (error) throw error
+  return data
+}
+
+/** «Está certo» do aviso no sino. */
+export const confirmFriendMatchResult = async (matchId) => {
+  const { error } = await supabase.rpc('confirm_friend_match_result', { p_match_id: matchId })
+  if (error) throw error
+}
+
+/** «Dizer que não está certo»: as rondas como deviam estar ([{ game_id,
+ *  score_a, score_b }]) e o que aconteceu. O jogo sai do ranking até ser
+ *  corrigido. */
+export const rejectFriendMatchResult = async (matchId, note, rounds) => {
+  const { error } = await supabase.rpc('reject_friend_match_result', { p_match_id: matchId, p_note: note || null, p_rounds: rounds })
+  if (error) throw error
+}
+
+/** «Corrigir o resultado» (só quem enviou): acerta as rondas e volta a
+ *  enviar de uma vez — todos recebem outra vez o aviso. */
+export const correctFriendMatchResult = async (matchId, rounds) => {
+  const { data, error } = await supabase.rpc('correct_friend_match_result', { p_match_id: matchId, p_rounds: rounds })
+  if (error) throw error
+  return data
+}
+
 /** «O jogo acabou assim»: fecha com os sets marcados. */
 export const finishFriendMatchGame = async (gameId) => {
   const { data, error } = await supabase.rpc('finish_friend_match_game', { p_game_id: gameId })

@@ -26,6 +26,21 @@ export function lastPointsTo(games) {
 
 const num = (v) => (v === '' || v == null ? NaN : Number(v))
 
+/** Um tie-break que ainda não fechou: o resultado vale (uma parte pode
+ *  ficar por acabar), mas avisa-se (Francisco, 10 out: um super tie-break
+ *  9-0 gravou sem aviso). Tie-break até 7 e super até 10, com 2 de
+ *  diferença. Devolve 'tiebreak_open' | 'super_tiebreak_open' | null. */
+export function roundScoreNotice(kind, a, b) {
+  if (a === '' || b === '' || a == null || b == null) return null
+  const x = num(a)
+  const y = num(b)
+  if (!Number.isInteger(x) || !Number.isInteger(y)) return null
+  const to = kind === 'tiebreak' ? 7 : kind === 'super_tiebreak' ? 10 : null
+  if (!to) return null
+  const closed = Math.max(x, y) >= to && Math.abs(x - y) >= 2
+  return closed ? null : `${kind}_open`
+}
+
 /** O que está mal no resultado, ou null. Vazio ainda não é problema. */
 export function roundScoreProblem(kind, a, b) {
   if (a === '' || b === '' || a == null || b == null) return null

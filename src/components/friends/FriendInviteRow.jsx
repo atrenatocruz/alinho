@@ -19,16 +19,43 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Users, UserMinus } from 'lucide-react'
 import { dayText } from './dayText'
+import FriendResultNotice from './FriendResultNotice'
 
-export const FRIEND_NOTICE_KINDS = ['friend_match_invite', 'friend_match_declined', 'friend_match_cancelled', 'friend_match_deleted', 'friend_match_left']
+export const FRIEND_NOTICE_KINDS = ['friend_match_invite', 'friend_match_declined', 'friend_match_cancelled', 'friend_match_deleted', 'friend_match_left', 'friend_match_result_sent', 'friend_match_result_rejected']
 
 export default function FriendInviteRow({ notice, onOpen }) {
+  // O resultado enviado (o fim, 9 out) tem os seus botões: componente à parte.
+  if (notice.kind === 'friend_match_result_sent') return <FriendResultNotice notice={notice} onOpen={onOpen} />
+  return <FriendNoticeRow notice={notice} onOpen={onOpen} />
+}
+
+function FriendNoticeRow({ notice, onOpen }) {
   const { t, i18n } = useTranslation()
   const d = notice.data || {}
   const day = dayText(d.scheduled_date, i18n.language)
   const when = [day, d.scheduled_time ? String(d.scheduled_time).slice(0, 5) : null].filter(Boolean).join(', ')
   const declined = notice.kind === 'friend_match_declined' || notice.kind === 'friend_match_left'
   const left = notice.kind === 'friend_match_left'
+  // A quem enviou o resultado (o fim, 11 out): abre o jogo, com a caixa
+  // vermelha e «Corrigir o resultado».
+  if (notice.kind === 'friend_match_result_rejected') {
+    return (
+      <Link to={`/jogos-privados/sessao/${d.match_id}`} onClick={() => onOpen(notice)}
+        className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-danger/10 text-danger"><Users size={16} /></div>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm text-ink-900">
+            {/* «Ana Marques disse que o resultado do jogo de sáb 10 out não
+                está certo.» — o nome e «não está certo» a negrito (UX, 11 out). */}
+            <b>{d.name || ''}</b> {t('friends.notice_rejected_rest', { when: day })} <b>{t('friends.notice_rejected_bold')}</b>.
+          </span>
+          {d.note && <span className="block text-xs text-ink-700">«{d.note}»</span>}
+          <span className="block text-xs text-muted">{t('friends.notice_rejected_hint')}</span>
+        </span>
+        <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-lime-400" />
+      </Link>
+    )
+  }
   const gone = notice.kind === 'friend_match_cancelled' || notice.kind === 'friend_match_deleted'
   if (gone) {
     const deleted = notice.kind === 'friend_match_deleted'

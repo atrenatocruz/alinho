@@ -12,13 +12,13 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { BackBar } from '../components/ui'
 import { useGoBack } from '../lib/useGoBack'
-import { MapPin, MoreHorizontal, Pencil, Share2, X, Plus } from 'lucide-react'
+import { MapPin, MoreHorizontal, Pencil, Share2, X, Plus, Check } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { getFriendMatch, getFriendMatchReadonly, respondFriendMatchInvite, setFriendMatchTeams, addFriendMatchRound, listMyFriendMatchInvites, cancelFriendMatch, playFriendMatchWithoutName, keepFriendMatchSeat, removeFriendMatchInvitee, leaveFriendMatch } from '../lib/privateMatches'
+import { getFriendMatch, getFriendMatchReadonly, respondFriendMatchInvite, setFriendMatchTeams, addFriendMatchRound, listMyFriendMatchInvites, cancelFriendMatch, playFriendMatchWithoutName, keepFriendMatchSeat, removeFriendMatchInvitee, leaveFriendMatch, correctFriendMatchResult } from '../lib/privateMatches'
 import AddPersonSheet from '../components/friends/AddPersonSheet'
 import { balancedSplit, rotatingGame, planRounds, courtsFor } from '../lib/friendTeams'
 import { describeError } from '../lib/errors'
-import { Avatar, Chips, PrimaryButton, EmptyState, ConfirmSheet } from '../components/ui'
+import { Avatar, PrimaryButton, EmptyState, ConfirmSheet } from '../components/ui'
 import { Sheet } from '../components/agenda/AgendaControls'
 import { shareWithMissing, sessionLink } from '../components/friends/friendShare'
 import { dayText } from '../components/friends/dayText'
@@ -26,6 +26,8 @@ import { beforeStart } from '../lib/friendGames'
 import { currentGame } from '../components/friends/FriendGameNow'
 import { ShareMissingButton } from '../components/friends/FriendSessionGames'
 import FriendRounds from '../components/friends/FriendRounds'
+import { FinishedPage, RoundsScoreSheet, FriendWinnersShare } from '../components/friends/FriendFinish'
+import { namesList } from '../components/friends/friendResult'
 
 // «Vai» / «Por responder» (amigos sem bloquear, 27 set).
 const STATUS_KEY = { accepted: 'friends.tag_going', pending: 'friends.status_pending', declined: 'friends.tag_declined', guest: 'friends.guest_tag' }
@@ -61,6 +63,11 @@ export default function FriendSession() {
   const [actionsOpen, setActionsOpen] = useState(false)
   const [askCancel, setAskCancel] = useState(false)
   const [askLeave, setAskLeave] = useState(false)
+  // «O fim» (SPEC 2026-10-09-amigos-o-fim): a página «Jogo terminado» (com a
+  // tira, ao enviar; sem ela, do «Partilhar o resultado») e «Corrigir».
+  const [finishedPage, setFinishedPage] = useState(null) // { toast }
+  const [correcting, setCorrecting] = useState(false)
+  const [sharingWinners, setSharingWinners] = useState(false) // «↗ Partilhar os vencedores» (#622)
   const [data, setData] = useState(null)
   const [loadError, setLoadError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -122,12 +129,13 @@ export default function FriendSession() {
 
   // As equipas do jogo 1, no ecrã. 'a' | 'b' | 'rest' por invitee_id.
   const [side, setSide] = useState({})
-  const [mode, setMode] = useState(null) // 'rotating' | 'fixed'
   const courts = courtsFor(players.length)
+  // Já não se pergunta «Duplas: A rodar · Fixas» (Francisco, 11 out — SPEC
+  // amigos-o-fim, «Acerto»): com 4, as rondas repetem as duplas; com mais
+  // (ou dois campos), a app propõe-nas a rodar. «Trocar duplas» em cada ronda.
+  const mode = players.length > 4 || courts === 2 ? 'rotating' : 'fixed'
   useEffect(() => {
     if (!ready) return
-    // Dois campos só a rodar (as duplas fixas são com um campo).
-    setMode((m) => m || (players.length > 4 ? 'rotating' : 'fixed'))
     setSide((s) => {
       if (Object.keys(s).length) return s
       const g = match?.teams_mode === 'app'
@@ -215,12 +223,20 @@ export default function FriendSession() {
   // vai na barra de cima — a BackBar não tem menu (Francisco, 27 set).
   const sheetButton = 'press inline-flex min-h-[52px] w-full items-center justify-center gap-2 rounded-ctrl border-[1.5px] border-line bg-white px-4 text-[15px] font-extrabold text-ink-900'
   const pill = 'inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-ctrl border border-line bg-surface px-2.5 text-sm font-extrabold text-ink-900 whitespace-nowrap'
+  // Depois de enviado sai o «Editar» de cima (ponto 4); fica o «Mais».
+  const finished = !!match?.finished_at
+  const iSent = finished && !!profile?.id && match?.sent_by?.user_id === profile.id
+  // Pelo ranking_state (Dev 3): num jogo «só amigável» o waiting_for também
+  // vem cheio, e aí não conta para nada.
+  const sentToast = (res) => (res?.ranking_state === 'counted' || (!res?.ranking_state && res?.counted) ? t('friends.toast_sent_counted')
+    : res?.ranking_state === 'waiting' && res?.waiting_for?.length ? t('friends.toast_sent_waiting', { names: namesList(t, res.waiting_for), count: res.waiting_for.length })
+      : t('friends.toast_sent_not_ranked'))
   const creatorBar = iOrganize && match && (
     <div className="mt-3 flex gap-1.5">
-      <Link to={`/jogos-privados/sessao/${match.id}/editar`} className={pill}><Pencil size={14} /> {t('friends.edit_short')}</Link>
-      <button type="button" onClick={() => setActionsOpen(true)} className={pill} aria-haspopup="dialog">
+      {!finished && <Link to={`/jogos-privados/sessao/${match.id}/editar`} className={pill}><Pencil size={14} /> {t('friends.edit_short')}</Link>}
+      {(!finished || iSent) && <button type="button" onClick={() => setActionsOpen(true)} className={pill} aria-haspopup="dialog">
         {t('friends.more')} <MoreHorizontal size={16} />
-      </button>
+      </button>}
     </div>
   )
   // Quem aceitou e não criou: a linha verde (SPEC amigos-convidado, ponto 2).
@@ -246,6 +262,17 @@ export default function FriendSession() {
     <>
       {actionsOpen && (
         <Sheet title={t('friends.more')} onClose={() => setActionsOpen(false)}>
+          {finished ? (
+            // Depois de enviado, só «Corrigir o resultado» para quem enviou:
+            // partilhar passou para o bloco «Vencedores» (#622, UX, 11 out).
+            <div className="space-y-2.5">
+              {iSent && (
+                <button type="button" onClick={() => { setActionsOpen(false); setCorrecting(true) }} className={sheetButton}>
+                  {t('friends.correct_the_result')}
+                </button>
+              )}
+            </div>
+          ) : (
           <div className="space-y-2.5">
             <Link to={`/jogos-privados/sessao/${match.id}/editar`} className={sheetButton}>
               <Pencil size={16} /> {t('friends.edit_game')}
@@ -267,7 +294,30 @@ export default function FriendSession() {
               {t('friends.cancel_game')}
             </button>
           </div>
+          )}
         </Sheet>
+      )}
+      {sharingWinners && <FriendWinnersShare match={match} games={games} me={me} onClose={() => setSharingWinners(false)} />}
+      {finishedPage && (
+        <FinishedPage match={match} games={games} toast={finishedPage.toast} me={me} onClose={() => setFinishedPage(null)} />
+      )}
+      {correcting && (
+        <RoundsScoreSheet
+          title={t('friends.correct_the_result')}
+          hint={t('friends.correct_hint')}
+          match={match}
+          games={games}
+          initial={match.rejected_by?.rounds || null}
+          primaryLabel={t('friends.correct_send')}
+          secondaryLabel={t('gamedetails.ask_not_yet')}
+          onPrimary={async (rounds) => {
+            const res = await correctFriendMatchResult(match.id, rounds)
+            setCorrecting(false)
+            setFinishedPage({ toast: sentToast(res) })
+            load()
+          }}
+          onClose={() => setCorrecting(false)}
+        />
       )}
       <ConfirmSheet
         open={askCancel}
@@ -336,8 +386,9 @@ export default function FriendSession() {
           {[t('friends.people_count', { count: players.length }),
             t('friends.courts_count', { count: Math.max(1, ...games.map((g) => g.court_number || 1)) }),
             match.pairing_mode === 'rotating' ? t('friends.pairs_rotating_short') : null,
-            match.game_minutes ? t('friends.minutes_per_round', { count: match.game_minutes }) : null,
+            match.game_minutes && !finished ? t('friends.minutes_per_round', { count: match.game_minutes }) : null,
           ].filter(Boolean).join(' · ')}
+          {finished && <span className="text-ink-900"> · <Check size={13} className="inline align-[-2px]" /> {t('friends.finished_tag')}</span>}
         </p>
       ) : (match.location || players.length > 0) && (
         <p className="mt-1 inline-flex items-center gap-1 text-sm text-muted">
@@ -397,15 +448,6 @@ export default function FriendSession() {
       {ready ? (
         <div className="mt-6 space-y-6">
           {pending === 0 && <p className="text-sm text-ink-900">{t('friends.all_accepted', { count: players.length })}</p>}
-          {courts === 1 && (
-          <div>
-            <p className={label}>{t('friends.pairs_label')}</p>
-            <Chips value={mode} onChange={setMode} options={[
-              { value: 'rotating', label: t('friends.pairs_rotating') },
-              { value: 'fixed', label: t('friends.pairs_fixed') },
-            ]} />
-          </div>
-          )}
           <div className="space-y-3">
             <p className="block text-sm font-medium text-gray-700">{t('friends.round_n', { n: 1 })}</p>
             {courts === 2 && <p className="font-mono text-[11px] font-extrabold uppercase tracking-wider text-ink-700">{t('friends.court_n', { n: 1 })}</p>}
@@ -418,7 +460,7 @@ export default function FriendSession() {
             </>)}
             {players.length > 4 * courts && box(t('friends.resting_plural'), resting, true)}
             <p className="text-xs text-muted">
-              {t('friends.tap_to_move')}{mode === 'rotating' ? ` ${t('friends.rotation_note')}` : ''}
+              {t(mode === 'rotating' ? 'friends.teams_hint_rotating' : 'friends.teams_hint_same')}
             </p>
           </div>
           {error && <p className="rounded-ctrl border border-danger/30 bg-danger/10 px-3 py-2 text-sm font-extrabold text-danger">{error}</p>}
@@ -433,7 +475,10 @@ export default function FriendSession() {
       ) : (
         <div className="mt-6 space-y-6">
           {games.length > 0 ? (
-            <FriendRounds match={match} games={games} invitees={invitees} players={players} iOrganize={iOrganize} onChanged={load} />
+            <FriendRounds match={match} games={games} invitees={invitees} players={players} iOrganize={iOrganize} myUserId={profile?.id} onChanged={load}
+              onSent={(res) => { setFinishedPage({ toast: sentToast(res) }); load() }}
+              onCorrect={() => setCorrecting(true)}
+              onShare={() => setSharingWinners(true)} />
           ) : iOrganize && canForm && pending > 0 ? null : (
             <p className="text-sm text-ink-900">
               {pending > 0 ? t('friends.waiting_answers', { count: pending })
