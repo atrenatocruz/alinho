@@ -33,16 +33,20 @@ import { parseLevel, levelNumber } from '../../lib/mixLevels'
 
 // `color` = cor do texto da etiqueta, também usada nos pinos do mapa
 // (MapView.jsx, opção A escolhida pelo Francisco a 17 set).
+// Fundos dos cartões quase brancos (designer, 12 out — «aspeto premium»):
+// o tom do tipo fica na pastilha e no texto; o cartão é só um véu da cor.
+// A pastilha (`bg`) mantém o pastel cheio, senão desaparecia contra o
+// cartão e lavava-se nos filtros em fundo branco.
 export const KIND_STYLE = {
-  mix:        { card: 'bg-[#E0F2FE] border-[#A5D8F5]', bg: 'bg-[#E0F2FE]', text: 'text-[#075985]', color: '#075985', icon: Shuffle,     labelKey: 'agenda.kind_mix' },
-  open:       { card: 'bg-[#FBE7DE] border-[#F2BFA8]', bg: 'bg-[#FBE7DE]', text: 'text-[#9A3A17]', color: '#9A3A17', icon: CircleDot,   labelKey: 'agenda.kind_open' },
+  mix:        { card: 'bg-[#EFF4FA] border-[#D9E5F4]', bg: 'bg-[#E0F2FE]', text: 'text-[#075985]', color: '#075985', icon: Shuffle,     labelKey: 'agenda.kind_mix' },
+  open:       { card: 'bg-[#F5F7F9] border-[#E3E8ED]', bg: 'bg-[#FBE7DE]', text: 'text-[#9A3A17]', color: '#9A3A17', icon: CircleDot,   labelKey: 'agenda.kind_open' },
   // Horários livres (SPEC-4): salmão claro, o mesmo do cartão tracejado.
   free:       { card: 'bg-[#FFF8F5] border-[#F2BFA8]', bg: 'bg-[#FFF8F5]', text: 'text-[#9A3A17]', color: '#F2C2B1', icon: Clock,       labelKey: 'agenda.filter_kind_free' },
   friends:    { card: 'bg-[#F2EDE4] border-[#DCD1BF]', bg: 'bg-[#F2EDE4]', text: 'text-[#6B5B45]', color: '#6B5B45', icon: Users,       labelKey: 'agenda.kind_friends' },
   // Aulas com professores (Trello #49) — turquesa, SPEC das aulas §9.
   lesson:     { card: 'bg-[#CCFBF1] border-[#8FE3D6]', bg: 'bg-[#CCFBF1]', text: 'text-[#0F766E]', color: '#0F766E', icon: GraduationCap, labelKey: 'agenda.kind_lesson' },
   // Ainda não existem na app — só preparados para a cor (fora de âmbito).
-  tournament: { card: 'bg-[#E9E7FB] border-[#C9C3F3]', bg: 'bg-[#E9E7FB]', text: 'text-[#4338A8]', color: '#4338A8', icon: Trophy,      labelKey: 'agenda.kind_tournament' },
+  tournament: { card: 'bg-[#F4F0FA] border-[#E3DCF4]', bg: 'bg-[#E9E7FB]', text: 'text-[#4338A8]', color: '#4338A8', icon: Trophy,      labelKey: 'agenda.kind_tournament' },
   league:     { card: 'bg-[#FAE3EC] border-[#F0BCD1]', bg: 'bg-[#FAE3EC]', text: 'text-[#8C2350]', color: '#8C2350', icon: ListOrdered, labelKey: 'agenda.kind_league' },
 }
 

@@ -15,7 +15,8 @@ import CardMascot, { mascotFor } from './CardMascot'
 
    Lilás, como manda o sistema de cores (KIND_STYLE.tournament). */
 
-const LILAC = { bg: '#E9E7FB', border: '#C9C3F3', ink: '#4338A8' }
+// Fundo quase branco como o KIND_STYLE.tournament do EventCard (designer, 12 out).
+const LILAC = { bg: '#F4F0FA', border: '#E3DCF4', ink: '#4338A8' }
 
 // A inscrição feita fica no canto, curta («✓ Inscrito»); os outros pontos
 // da inscrição são compridos e vão numa linha por baixo do nome, sem
