@@ -8,6 +8,7 @@ import { formatTime, formatCurrency } from '../../lib/formatDate'
 import { useSpecialPriceLine } from '../SpecialPriceRoster'
 import { GENDER_RESTRICTION_LABEL_KEY, mixCapacity, isGenderMismatch, isAgeIneligible, formatLabelKey } from '../../lib/mixLogic'
 import { AGE_LABEL_KEY } from '../../lib/ageCategories'
+import CardMascot, { mascotFor, mascotCardClass, MascotPill } from './CardMascot'
 import { ratingBand } from '../../lib/elo'
 import { parseLevel, levelNumber } from '../../lib/mixLevels'
 
@@ -152,7 +153,7 @@ export function useOpenOrg(event) {
     de «Clube organizador» (SPEC-3, 9 out). O nome do clube manda: até duas
     linhas e nunca partido letra a letra; o que está no canto é que cede
     (UX, 10 out). */
-export function OrgHeader({ event, past = false, right = null, kind = null }) {
+export function OrgHeader({ event, past = false, right = null, kind = null, mascot = false, pillPos = null }) {
   const { t } = useTranslation()
   const open = useOpenOrg(event)
   if (!event.orgName) return null
@@ -163,7 +164,7 @@ export function OrgHeader({ event, past = false, right = null, kind = null }) {
   const nameTail = cut > 0 ? event.orgName.slice(cut + 1) : event.orgName
   const header = (
     <Tag {...(open ? { type: 'button', onClick: open } : {})}
-      className={`relative z-[1] flex min-w-0 items-center gap-3 text-left ${right ? 'flex-1' : 'mb-2.5 w-full'} ${past ? 'opacity-70' : ''}`}>
+      className={`relative z-[1] flex min-w-0 items-center gap-3 text-left ${right && !mascot ? 'flex-1' : 'mb-2.5 w-full'} ${past ? 'opacity-70' : ''}`}>
       {event.orgLogo
         ? <img src={event.orgLogo} alt="" className="h-[52px] w-[52px] shrink-0 rounded-full object-cover" />
         : <span className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full bg-ink-900 text-[15px] font-extrabold text-lime-400">{initials(event.orgName)}</span>}
@@ -183,6 +184,9 @@ export function OrgHeader({ event, past = false, right = null, kind = null }) {
       </span>
     </Tag>
   )
+  // Com o boneco (CardMascot): o nome nunca passa por baixo dele e a pastilha
+  // desce para por baixo, à altura da hora (12 out).
+  if (mascot) return <><div className="pr-[80px]">{header}</div><MascotPill {...(pillPos || {})}>{right}</MascotPill></>
   if (!right) return header
   return <div className="mb-2.5 flex items-start justify-between gap-2">{header}<span className="flex min-w-0 max-w-[42%] shrink justify-end">{right}</span></div>
 }
@@ -352,15 +356,18 @@ export function GameEventCard({ event, profile, friendIds = null, action = null,
     event.kind === 'mix' && parseLevel(game.level) ? `${parseLevel(game.level).scale}${parseLevel(game.level).num}` : null,
   ].filter(Boolean).join(' · ') || null} />
 
+  const mascot = mascotFor(event.kind, game.image_url)
   return (
-    <div className={`relative overflow-hidden rounded-card p-3.5 press ${cardFrame(event, past)}`}>
+    <div className={`relative ${mascotCardClass(mascot)} rounded-card p-3.5 press ${cardFrame(event, past)}`}>
       <Link to={`/jogo/${game.id}`} className="absolute inset-0" aria-label={`${game.title} — ${time}`} />
-      <OrgHeader event={event} past={past} right={state} kind={kindLine} />
-      {!event.orgName && <div className="flex items-start justify-between gap-2">{kindLine}{state}</div>}
+      <CardMascot type={mascot} />
+      <OrgHeader event={event} past={past} right={state} kind={kindLine} mascot={!!mascot} />
+      {!event.orgName && <div className={`flex items-start justify-between gap-2 ${mascot ? 'pr-[80px]' : ''}`}>{kindLine}{!mascot && state}</div>}
+      {!event.orgName && mascot && <MascotPill top="top-[54px]">{state}</MascotPill>}
       <MixImageBand url={game.image_url} past={past} />
 
       <p className={`text-[22px] font-extrabold leading-none mt-2.5 ${past ? 'text-muted' : 'text-ink-900'}`}>{time}</p>
-      <h3 className={`text-base leading-snug mt-1.5 ${past ? 'text-muted' : 'text-ink-900'}`}>{openTitle || game.title}</h3>
+      <h3 className={`text-base leading-snug mt-1.5 ${past ? 'text-muted' : 'text-ink-900'} ${!event.orgName && mascot ? 'pr-[100px]' : ''}`}>{openTitle || game.title}</h3>
       {stateLine && <StateLine kind={event.kind}>{stateLine}</StateLine>}
       {missing > 0 && opener && (
         <p className="mt-1.5 text-[12.5px] font-extrabold text-[#9A3A17]">
@@ -459,14 +466,17 @@ export function ExploreEventCard({ event, profile, distance = null, onJoin = nul
   // «Pedido enviado» é comprido: vai numa linha por baixo do nome (UX, 10 out).
   const exploreState = !pending && mismatchKey ? <StateTag tone="grey">{t(mismatchKey)}</StateTag> : null
   const kindLine = <KindLine kind={event.kind} suffix={!openJoin ? t('agenda.explore_private') : null} />
+  const mascot = mascotFor(event.kind, game.image_url)
   return (
-    <div className={`relative overflow-hidden rounded-card p-3.5 border ${KIND_STYLE[event.kind].card}`}>
-      <OrgHeader event={event} right={exploreState} kind={kindLine} />
-      {!event.orgName && <div className="flex items-start justify-between gap-2">{kindLine}{exploreState}</div>}
+    <div className={`relative ${mascotCardClass(mascot)} rounded-card p-3.5 border ${KIND_STYLE[event.kind].card}`}>
+      <CardMascot type={mascot} />
+      <OrgHeader event={event} right={exploreState} kind={kindLine} mascot={!!mascot} />
+      {!event.orgName && <div className={`flex items-start justify-between gap-2 ${mascot ? 'pr-[80px]' : ''}`}>{kindLine}{!mascot && exploreState}</div>}
+      {!event.orgName && mascot && <MascotPill top="top-[54px]">{exploreState}</MascotPill>}
       <MixImageBand url={game.image_url} />
 
       <p className="text-[22px] font-extrabold leading-none mt-2.5 text-ink-900">{time}</p>
-      <h3 className="text-base leading-snug mt-1.5 text-ink-900">{game.title}</h3>
+      <h3 className={`text-base leading-snug mt-1.5 text-ink-900 ${!event.orgName && mascot ? 'pr-[100px]' : ''}`}>{game.title}</h3>
       {pending && <StateLine kind={event.kind}>{t('agenda.state_line_request_sent')}</StateLine>}
       {!event.orgName && <div className="mt-1"><Owner event={event} fallbackKey="agenda.owner_none" /></div>}
 
@@ -528,6 +538,7 @@ export function friendsMatchTitle(m, userId, t) {
    Tocar abre a sessão. */
 export function FriendSessionCard({ event, userId, past = false }) {
   const { t, i18n } = useTranslation()
+  const mascot = mascotFor(event.kind === 'open' ? 'open' : 'friends')
   const games = event.raw.games
   const people = new Map()
   for (const g of games) {
@@ -572,12 +583,14 @@ export function FriendSessionCard({ event, userId, past = false }) {
   const sessionKind = <KindLine kind={event.kind === 'open' ? 'open' : 'friends'} past={past} suffix={t('agenda.session_rotating')} />
 
   return (
-    <div className={`relative overflow-hidden rounded-card p-3.5 ${to ? 'press' : ''} ${cardFrame(event, past)}`}>
+    <div className={`relative ${mascotCardClass(mascot)} rounded-card p-3.5 ${to ? 'press' : ''} ${cardFrame(event, past)}`}>
       {to && <Link to={to} className="absolute inset-0" aria-label={title} />}
+      <CardMascot type={mascot} />
       {/* Num clube é «Jogo em aberto · a rodar», com a cor do jogo em aberto;
           num grupo, «Jogo entre amigos» (Francisco, 28 set). */}
-      <OrgHeader event={event} past={past} right={state} kind={sessionKind} />
-      {!event.orgName && <div className="flex items-start justify-between gap-2">{sessionKind}{state}</div>}
+      <OrgHeader event={event} past={past} right={state} kind={sessionKind} mascot={!!mascot} />
+      {!event.orgName && <div className={`flex items-start justify-between gap-2 ${mascot ? 'pr-[80px]' : ''}`}>{sessionKind}{!mascot && state}</div>}
+      {!event.orgName && mascot && <MascotPill top="top-[54px]">{state}</MascotPill>}
       {event.hasTime ? (
         <p className={`text-[22px] font-extrabold leading-none mt-2.5 ${past ? 'text-muted' : 'text-ink-900'}`}>
           {formatTime(event.startsAt, i18n.language, { hour: '2-digit', minute: '2-digit' })}
@@ -585,7 +598,7 @@ export function FriendSessionCard({ event, userId, past = false }) {
       ) : (
         <p className="flex items-center gap-1 text-xs font-extrabold text-muted mt-2.5"><Clock size={12} /> {t('agenda.no_time')}</p>
       )}
-      <h3 className={`text-base leading-snug mt-1.5 ${past ? 'text-muted' : 'text-ink-900'}`}>{title}</h3>
+      <h3 className={`text-base leading-snug mt-1.5 ${past ? 'text-muted' : 'text-ink-900'} ${!event.orgName && mascot ? 'pr-[100px]' : ''}`}>{title}</h3>
       {!event.orgName && <div className="mt-1"><Owner event={event} fallbackKey="agenda.owner_friends" /></div>}
       {m.location && (
         <p className="flex items-center gap-1.5 text-ink-700 text-[13px] mt-1.5">
@@ -630,12 +643,15 @@ export function FriendsEventCard({ event, userId, orgSlug = null, invite = null,
   const draw = event.finished && m.winner_team === 'draw'
   const won = event.finished && myTeam && m.winner_team && !draw ? m.winner_team === myTeam : null
 
+  const mascot = mascotFor('friends')
   return (
-    <div className={`relative overflow-hidden rounded-card p-3.5 ${to ? 'press' : ''} ${cardFrame(event, past)}`}>
+    <div className={`relative ${mascotCardClass(mascot)} rounded-card p-3.5 ${to ? 'press' : ''} ${cardFrame(event, past)}`}>
       {to && <Link to={to} className="absolute inset-0" aria-label={title} />}
+      <CardMascot type={mascot} />
 
-      <OrgHeader event={event} past={past} right={state} kind={<KindLine kind="friends" past={past} />} />
-      {!event.orgName && <div className="flex items-start justify-between gap-2"><KindLine kind="friends" past={past} />{state}</div>}
+      <OrgHeader event={event} past={past} right={state} kind={<KindLine kind="friends" past={past} />} mascot={!!mascot} />
+      {!event.orgName && <div className={`flex items-start justify-between gap-2 ${mascot ? 'pr-[80px]' : ''}`}><KindLine kind="friends" past={past} />{!mascot && state}</div>}
+      {!event.orgName && mascot && <MascotPill top="top-[54px]">{state}</MascotPill>}
 
       {event.hasTime ? (
         <p className={`text-[22px] font-extrabold leading-none mt-2.5 ${past ? 'text-muted' : 'text-ink-900'}`}>
@@ -644,7 +660,7 @@ export function FriendsEventCard({ event, userId, orgSlug = null, invite = null,
       ) : (
         <p className="flex items-center gap-1 text-xs font-extrabold text-muted mt-2.5"><Clock size={12} /> {t('agenda.no_time')}</p>
       )}
-      <h3 className={`text-base leading-snug mt-1.5 ${past ? 'text-muted' : 'text-ink-900'}`}>{title}</h3>
+      <h3 className={`text-base leading-snug mt-1.5 ${past ? 'text-muted' : 'text-ink-900'} ${!event.orgName && mascot ? 'pr-[100px]' : ''}`}>{title}</h3>
       {!event.orgName && <div className="mt-1"><Owner event={event} fallbackKey="agenda.owner_friends" /></div>}
 
       {m.location && (
@@ -664,17 +680,21 @@ export function FriendsEventCard({ event, userId, orgSlug = null, invite = null,
           <span className="ml-auto text-xs font-extrabold text-ink-900 tabular-nums">
             {m.score_a}-{m.score_b}{draw ? <> · {t('agenda.result_draw')}</> : won != null && <> · {t(won ? 'agenda.result_win' : 'agenda.result_loss')}</>}
           </span>
-        ) : invite ? (
-          <div className="ml-auto flex items-center gap-1.5 relative">
-            <PrimaryButton variant="ghost" disabled={invite.busy} onClick={invite.onReject} className="!py-2 !px-3.5 !text-sm">
-              {t('agenda.invite_reject')}
-            </PrimaryButton>
-            <PrimaryButton disabled={invite.busy} onClick={invite.onAccept} className="!py-2 !px-3.5 !text-sm">
-              {t('agenda.invite_accept')}
-            </PrimaryButton>
-          </div>
         ) : null}
       </div>
+      {/* Convite: «Aceitar» a toda a largura e «Recusar» numa linha de texto
+          por baixo — botões nunca lado a lado (regra de 6 out; UX, 12 out). */}
+      {invite && !(event.finished && m.score_a != null) && (
+        <div className="relative z-[1] mt-2.5">
+          <PrimaryButton disabled={invite.busy} onClick={invite.onAccept} className="w-full">
+            {t('agenda.invite_accept')}
+          </PrimaryButton>
+          <button type="button" disabled={invite.busy} onClick={invite.onReject}
+            className="mt-1 w-full min-h-[40px] text-sm font-extrabold text-ink-700 hover:text-ink-900 disabled:opacity-40">
+            {t('agenda.invite_reject')}
+          </button>
+        </div>
+      )}
     </div>
   )
 }
