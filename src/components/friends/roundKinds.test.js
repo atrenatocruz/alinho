@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { kindOf, lastPointsTo, roundScoreProblem } from './roundKinds'
+import { kindOf, lastPointsTo, roundScoreProblem, roundScoreNotice } from './roundKinds'
 
 describe('kindOf', () => {
   it('usa o tipo da ronda quando vem da base de dados', () => {
@@ -39,5 +39,16 @@ describe('roundScoreProblem', () => {
   })
   it('vazio ainda não é problema', () => {
     expect(roundScoreProblem('set', '', '4')).toBe(null)
+  })
+})
+
+describe('roundScoreNotice', () => {
+  it('avisa o tie-break que não fechou, sem o recusar', () => {
+    expect(roundScoreNotice('super_tiebreak', '9', '0')).toBe('super_tiebreak_open')
+    expect(roundScoreNotice('super_tiebreak', '10', '9')).toBe('super_tiebreak_open')
+    expect(roundScoreNotice('super_tiebreak', '12', '10')).toBe(null)
+    expect(roundScoreNotice('tiebreak', '7', '5')).toBe(null)
+    expect(roundScoreNotice('tiebreak', '6', '4')).toBe('tiebreak_open')
+    expect(roundScoreNotice('set', '4', '4')).toBe(null)
   })
 })

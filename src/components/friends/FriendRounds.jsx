@@ -24,6 +24,8 @@ import FriendRoundSheet, { RoundKindSheet, kindLabel, roundSaveError } from './F
 import SwapPairsSheet from './SwapPairsSheet'
 import EditPairsSheet from './EditPairsSheet'
 import RoundClock from './RoundClock'
+import { FinishBlock, rankingState, toneClass } from './FriendFinish'
+import { pairsOf, winnersLine } from './friendResult'
 import { ShareMissingButton } from './FriendSessionGames'
 import { ConfirmSheet } from '../ui'
 import { Sheet } from '../agenda/AgendaControls'
@@ -35,7 +37,10 @@ import { dayText } from './dayText'
 const pairKey = (team) => (team || []).map((p) => p.invitee_id).sort().join('+')
 const samePairs = (g, h) => !!g && !!h && [pairKey(g.team_a), pairKey(g.team_b)].sort().join('|') === [pairKey(h.team_a), pairKey(h.team_b)].sort().join('|')
 
-export default function FriendRounds({ match, games, invitees, players, iOrganize, onChanged }) {
+// «O fim» (SPEC 2026-10-09-amigos-o-fim): `onSent` recebe o que o
+// finish_friend_match devolve; `onCorrect` abre «Corrigir o resultado».
+// Depois de enviado (match.finished_at), as rondas ficam só para ler.
+export default function FriendRounds({ match, games, invitees, players, iOrganize, myUserId, onChanged, onSent, onCorrect, onShare }) {
   const { t, i18n } = useTranslation()
   const [markFor, setMarkFor] = useState(null) // { game, round, editing }
   const [kindFor, setKindFor] = useState(null) // { game, round }
@@ -46,6 +51,7 @@ export default function FriendRounds({ match, games, invitees, players, iOrganiz
   // A ronda seguinte não nasceu (next_error do save, Dev 3, 9 out — raro):
   // { n, after }. Some quando a ronda n aparece.
   const [nextIssue, setNextIssue] = useState(null)
+  const [finishAsk, setFinishAsk] = useState(false) // a pergunta «Terminar o jogo e enviar?»
   const [retrying, setRetrying] = useState(false)
   const rounds = roundsOf(games, players)
   const courtsN = Math.max(1, ...games.map((g) => g.court_number || 1))
@@ -103,7 +109,7 @@ export default function FriendRounds({ match, games, invitees, players, iOrganiz
     // Antes da hora, a ronda 1 fica cinzenta, com o «Marcar» apagado (SPEC
     // amigos-convidado, ponto 3).
     const framed = live && !early
-    const canEdit = iOrganize && !g.counts
+    const canEdit = iOrganize && !g.counts && !finished
     const kind = kindOf(g, match)
     const [sa, sb] = done ? [g.score_a, g.score_b] : [null, null]
     // O jogo conta para o ranking uma vez, no fim (Francisco e Ruben, 8 out —
@@ -128,7 +134,9 @@ export default function FriendRounds({ match, games, invitees, players, iOrganiz
               {kindText}{framed && <ChevronDown size={12} />}
             </button>
           ) : <span className={chip}>{kindText}</span>}
-          {done && canEdit && (
+          {/* Também na ronda a decorrer, para a apagar (Francisco, 10 out:
+              «não tenho como eliminar uma ronda»). */}
+          {(done || framed) && canEdit && (
             <button type="button" onClick={() => setEditFor({ game: g, round: r })}
               className="press min-h-[32px] px-1 text-xs font-extrabold text-ink-900 underline underline-offset-2">
               {t('friends.edit_short')}
@@ -147,7 +155,7 @@ export default function FriendRounds({ match, games, invitees, players, iOrganiz
           <p className="mt-2 text-xs text-muted">{t('friends.resting_line_plural', { names: r.resting.map((p) => (p.is_anonymous ? t('friends.anon_name') : shortName(p.name))).join(', ') })}</p>
         )}
         {samePairs(g, prev) && <p className="mt-2 text-xs text-muted">{t('friends.same_pairs_as_before')}</p>}
-        {live && iOrganize && (
+        {live && iOrganize && !finished && (
           <div className="mt-3 space-y-2.5">
             {match.game_minutes ? <RoundClock match={match} game={g} roundNumber={r.number} canTimer={iOrganize} onChanged={onChanged} /> : null}
             <button type="button" onClick={() => setMarkFor({ game: g, round: r, editing: false })} disabled={early}
@@ -167,6 +175,7 @@ export default function FriendRounds({ match, games, invitees, players, iOrganiz
   }
 
   const time = match.scheduled_time ? String(match.scheduled_time).slice(0, 5) : null
+  const finished = !!match.finished_at
   // O aviso da ronda que não nasceu (UX, 9 out), enquanto ela não existir.
   const missing = nextIssue && iOrganize && !rounds.some((r) => r.number === nextIssue.n) ? nextIssue : null
   // «Tentar outra vez»: as mesmas duplas (ou, a rodar, as previstas).
@@ -196,14 +205,62 @@ export default function FriendRounds({ match, games, invitees, players, iOrganiz
     : pairCounts.size > 0 && counting === 0 ? t('friends.ranking_box_no_account')
       : counting < pairCounts.size ? t('friends.ranking_box_only_some')
         : [t('friends.ranking_box_once'), pairCounts.size > 1 ? t('friends.ranking_box_each_pair') : null].filter(Boolean).join(' ')
+  // Depois de enviado: quem ganhou por cima da moldura, e na moldura o
+  // estado do ranking (ponto 4; TEXTOS-RANKING.md, ponto 3).
+  const pairs = pairsOf(match, games)
+  const state = finished ? rankingState(t, match, pairs) : null
+  const rejected = finished && match.ranking_state === 'rejected' ? match.rejected_by || {} : null
+  // sent_by: { user_id, name } (get_friend_match, Dev 3).
+  const iSent = !!myUserId && match.sent_by?.user_id === myUserId
+  const hasLive = !early && rounds.some((r) => r.current && r.courts.some((g) => !hasResult(g)))
   return (
     <div className="space-y-3">
+      {rejected && (
+        <div className="space-y-3 rounded-card border border-danger/30 bg-danger/10 p-3.5">
+          <div>
+            <p className="text-sm font-extrabold text-danger">{t('friends.rejected_by', { name: shortName(rejected.name || '') })}</p>
+            {rejected.note && <p className="mt-0.5 text-sm text-ink-700">«{rejected.note}»</p>}
+          </div>
+          {iSent && onCorrect && (
+            <button type="button" onClick={onCorrect}
+              className="press min-h-[52px] w-full rounded-ctrl bg-ink-900 px-4 text-[15px] font-extrabold text-white">
+              {t('friends.correct_the_result')}
+            </button>
+          )}
+        </div>
+      )}
+      {/* «TERMINADO · VENCEDORES» (#622, SPEC 2026-10-11-vencedores-em-todos-
+          os-jogos, fim — UX, 11 out): no lugar do destaque do «O fim»; com
+          «Fora do ranking», a caixa vermelha fica por cima. */}
+      {finished && pairs.length > 0 && (
+        <div className="space-y-3 rounded-card bg-ink-900 p-4">
+          <p className="font-mono text-[11px] font-extrabold uppercase tracking-widest text-lime-400">
+            {t(pairs.every((p) => p.winner === 'draw') ? 'friends.winners_block_draw' : 'friends.winners_block')}
+          </p>
+          <div className="space-y-1.5">
+            {pairs.map((p, i) => (
+              <p key={i} className="text-[15px] font-extrabold leading-snug text-white">
+                {winnersLine(t, p)}
+              </p>
+            ))}
+          </div>
+          {/* Com o resultado contestado não se partilha (UX, 11 out). */}
+          {onShare && !rejected && (
+            <button type="button" onClick={onShare}
+              className="press min-h-[52px] w-full rounded-ctrl bg-lime-400 px-4 text-[15px] font-extrabold text-ink-900">
+              {t('friends.share_winners')}
+            </button>
+          )}
+        </div>
+      )}
       {Array.from({ length: courtsN }, (_, c) => c + 1).map((court) => {
         const list = rounds.map((r) => ({ r, g: r.courts.find((x) => (x.court_number || 1) === court) })).filter((x) => x.g)
         return (
           <section key={court} className="rounded-card border border-line bg-white p-3">
             <p className="font-mono text-[11px] font-extrabold uppercase tracking-wider text-ink-900">{t('friends.court_one_game', { n: court })}</p>
-            <p className="mb-3 text-xs text-muted">{[time, t('friends.rounds_count', { count: list.length })].filter(Boolean).join(' · ')}</p>
+            {state
+              ? <p className={`mb-3 text-xs font-extrabold ${toneClass[state.tone]}`}>{state.text}</p>
+              : <p className="mb-3 text-xs text-muted">{[time, t('friends.rounds_count', { count: list.length })].filter(Boolean).join(' · ')}</p>}
             <div className="space-y-2.5">{list.map(({ r, g }, i) => item(g, r, i > 0 ? list[i - 1].g : null))}</div>
           </section>
         )
@@ -224,19 +281,27 @@ export default function FriendRounds({ match, games, invitees, players, iOrganiz
       {/* A caixa do ranking (TEXTOS-RANKING.md, ponto 2): conta uma vez, no
           fim; com trocas, cada par de duplas é um jogo. Por cima, quem falta
           responder. */}
-      <p className="rounded-card bg-ink-50 p-3.5 text-sm text-ink-700">
-        {pending > 0 && <><b className="text-ink-900">{t('friends.not_answered_bold', { count: pending })}</b> </>}
-        {rankingText}
-      </p>
-      {pending > 0 && iOrganize && <ShareMissingButton match={match} creatorName={creator?.name} />}
+      {!finished && (
+        <p className="rounded-card bg-ink-50 p-3.5 text-sm text-ink-700">
+          {pending > 0 && <><b className="text-ink-900">{t('friends.not_answered_bold', { count: pending })}</b> </>}
+          {rankingText}
+        </p>
+      )}
+      {!finished && pending > 0 && iOrganize && <ShareMissingButton match={match} creatorName={creator?.name} />}
+      {/* «Terminar e enviar» (ponto 1), por baixo da moldura e da caixa. */}
+      {!finished && iOrganize && !early && onSent && (
+        <FinishBlock match={match} games={games} invitees={invitees} myUserId={myUserId} hasLive={hasLive} onSent={onSent}
+          asking={finishAsk} setAsking={setFinishAsk} />
+      )}
 
       {markFor && (
         <FriendRoundSheet match={match} game={markFor.game} roundNumber={markFor.round.number} games={games} editing={markFor.editing}
           nextCourts={markFor.editing ? null : nextCourtsFor(markFor.round)}
           onClose={() => setMarkFor(null)}
-          onSaved={(res) => {
-            if (res?.next_error) setNextIssue({ n: markFor.round.number + 1, after: markFor.round.number })
+          onSaved={(res, { finish } = {}) => {
+            if (res?.next_error && !finish) setNextIssue({ n: markFor.round.number + 1, after: markFor.round.number })
             setMarkFor(null); onChanged()
+            if (finish) setFinishAsk(true)
           }} />
       )}
       {kindFor && (
@@ -249,9 +314,11 @@ export default function FriendRounds({ match, games, invitees, players, iOrganiz
             <button type="button" onClick={() => { setPairsFor(editFor.round); setEditFor(null) }} className={outline}>
               <ArrowLeftRight size={15} /> {t('friends.edit_pairs')}
             </button>
-            <button type="button" onClick={() => { setMarkFor({ ...editFor, editing: true }); setEditFor(null) }} className={outline}>
-              {t('friends.change_result')}
-            </button>
+            {hasResult(editFor.game) && (
+              <button type="button" onClick={() => { setMarkFor({ ...editFor, editing: true }); setEditFor(null) }} className={outline}>
+                {t('friends.change_result')}
+              </button>
+            )}
             <button type="button" onClick={() => { setRemoveFor(editFor.round); setEditFor(null) }}
               className="press min-h-[52px] w-full rounded-ctrl border-[1.5px] border-danger/40 bg-white px-4 text-[15px] font-extrabold text-danger">
               {t('friends.delete_round')}
