@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { CheckCircle2 } from 'lucide-react'
+import Alino from '../components/Alino'
 import { claimPrivateMatchSlot } from '../lib/privateMatches'
 import { PrimaryButton } from '../components/ui'
 
@@ -49,7 +49,8 @@ export default function JoinPrivateMatch() {
   if (status === 'joined') {
     return (
       <div className="card text-center py-8 space-y-3">
-        <CheckCircle2 size={40} className="mx-auto text-ok" />
+        {/* O Alino em festa no lugar do ✓ verde (mascote, 12 out). */}
+        <Alino pose="festa" size={150} />
         <p className="font-extrabold text-ink-900">{t('joinprivatematch.joined_title')}</p>
         <PrimaryButton onClick={() => navigate('/jogos-privados')} className="w-full">
           {t('joinprivatematch.view_game')}
