@@ -1417,6 +1417,23 @@ RPC_MOCKS.get_month_ranking_months = () => {
   return [{ month: '2026-10-01', people: 15 }]
 }
 
+// Perfil › Jogos (Dev 3, migration_lugares_e_historico.sql): a lista com o
+// lugar verdadeiro e os títulos. localStorage.mockPlayedHistory = 'off' →
+// PGRST202 (fica a lista antiga).
+const playedOff = () => localStorage.getItem('mockPlayedHistory') === 'off'
+const playedAgo = (d, h = 20) => { const x = new Date(); x.setDate(x.getDate() - d); x.setHours(h, 0, 0, 0); return x.toISOString() }
+RPC_MOCKS.get_my_played_history = () => (playedOff() ? { __error: 'Could not find the function', __code: 'PGRST202' } : {
+  total: 5,
+  rows: [
+    { kind: 'friends', event_id: 'pm-1', session_id: 'ses-1', title: null, starts_at: playedAgo(0, 18), org_name: null, org_slug: null, place: null, total: null, won: true, rounds_won: 3, rounds_played: 5, rating_delta: 12 },
+    { kind: 'tournament', event_id: 'tor-1', session_id: null, title: 'Torneio de Outono', category_code: 'M4', starts_at: playedAgo(2, 10), org_name: 'Dev Org', org_slug: 'dev-org', place: 1, total: 8, won: true, rating_delta: 20 },
+    { kind: 'mix', event_id: 'ag-finished-yesterday', session_id: null, title: 'Mix de segunda', starts_at: playedAgo(1), org_name: 'Smash Padel Almada', org_slug: 'smash-padel', format: 'sobe_desce', place: 4, total: 6, won: false, rating_delta: -6 },
+    { kind: 'mix', event_id: 'mix-am', session_id: null, title: 'Americano de quinta', starts_at: playedAgo(6), org_name: 'Dev Org', org_slug: 'dev-org', format: 'americano', place: 1, total: 8, won: true, rating_delta: 15 },
+    { kind: 'friends', event_id: 'pm-2', session_id: null, title: null, starts_at: playedAgo(9), org_name: 'Dev Org', org_slug: 'dev-org', place: null, total: null, won: false, rounds_won: 0, rounds_played: 1, rating_delta: null },
+  ],
+})
+RPC_MOCKS.get_player_titles = () => (playedOff() ? { __error: 'Could not find the function', __code: 'PGRST202' } : { mixes: 1, tournaments: 1, total: 2 })
+
 const TABLE_MOCKS = {
   // localStorage.mockScorekeeper = 'true': quem entra é marcador deste mix (29 set).
   // mockScorekeepers = '2' (pacote do mix, 2 out): o Diogo (joga) e a Marta (do grupo, não joga).

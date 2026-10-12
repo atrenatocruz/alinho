@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ChevronRight, Check } from 'lucide-react'
+import { ChevronRight, Check, Trophy } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
-import { Avatar, RatingBadge } from '../ui'
+import { Avatar, RatingBadge, EmptyState } from '../ui'
 import { Sheet } from '../agenda/AgendaControls'
+import RankPodium from './RankPodium'
 import {
-  MONTH_MIN_GAMES, monthGender, shortName, monthPoints, monthPointsMuted, splitMonthRanking,
+  MONTH_MIN_GAMES, monthGender, monthPoints, monthPointsMuted, splitMonthRanking,
   monthKey, monthTitle, monthName, nextMonthKey,
 } from '../../lib/monthRanking'
 
@@ -19,40 +20,6 @@ import {
    - A lista do 4.º em diante; pontos a zero ou negativos a cinzento.
    - A tua linha presa em baixo, com «ver ›». */
 
-const RING = { 1: '#E8B23A', 2: '#B8BEC7', 3: '#C98B5E' }
-
-function PodiumSpot({ row, place, big, onOpen }) {
-  const { t } = useTranslation()
-  const size = big ? 'w-[60px] h-[60px] text-base' : 'w-12 h-12 text-sm'
-  if (!row) {
-    return (
-      <div className="flex flex-col items-center text-center min-w-0">
-        <div className={`relative ${big ? 'mt-0' : 'mt-3'}`}>
-          <span className={`flex ${size} items-center justify-center rounded-full border-2 border-dashed border-ink-200 font-extrabold text-muted`}>?</span>
-          <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-ink-900 text-[11px] font-extrabold text-white">{place}</span>
-        </div>
-        <p className="mt-2 text-[13px] font-extrabold text-muted">{t('month.free_spot')}</p>
-        <p className="text-[11px] text-muted">{t('month.free_hint')}</p>
-      </div>
-    )
-  }
-  const ring = row.is_me ? '#C5DD01' : RING[Math.min(row.place, 3)]
-  return (
-    <button type="button" onClick={() => onOpen(row.user_id)} className="flex flex-col items-center text-center min-w-0">
-      <div className={`relative ${big ? 'mt-0' : 'mt-3'}`}>
-        {big && <span aria-hidden="true" className="absolute -top-3 left-1/2 -translate-x-1/2 text-base leading-none">👑</span>}
-        <span className="block rounded-full p-[3px]" style={{ background: ring }}>
-          <span className="block rounded-full bg-white p-[2px]"><Avatar name={row.name} url={row.avatar_url} size={size} /></span>
-        </span>
-        <span className={`absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-extrabold ${row.place === 1 ? 'bg-lime-400 text-ink-900' : 'bg-ink-900 text-white'}`}>{row.place}</span>
-        {row.is_me && <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 rounded-full bg-lime-400 px-1.5 text-[10px] font-extrabold text-ink-900">{t('month.you')}</span>}
-      </div>
-      <p className="mt-2 w-full truncate text-[13px] font-extrabold text-ink-900">{shortName(row.name)}</p>
-      <p className={`text-[13px] font-extrabold tabular-nums ${monthPointsMuted(row.points) ? 'text-muted' : 'text-[#5B6B00]'}`}>{monthPoints(row.points)}</p>
-    </button>
-  )
-}
-
 export default function MonthRanking({ scope, scale, scopeLabel, onShare }) {
   const { t, i18n } = useTranslation()
   const lang = i18n.language?.startsWith('en') ? 'en' : 'pt'
@@ -64,6 +31,7 @@ export default function MonthRanking({ scope, scale, scopeLabel, onShare }) {
   const [monthsOpen, setMonthsOpen] = useState(false)
   const [highlight, setHighlight] = useState(null)
   const orgId = scope === 'global' ? null : scope
+  const navigate = useNavigate()
 
   useEffect(() => {
     let off = false
@@ -128,21 +96,17 @@ export default function MonthRanking({ scope, scale, scopeLabel, onShare }) {
           <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700" />
         </div>
       ) : failed ? (
-        <div className="rounded-card border border-dashed border-line p-4 text-sm text-muted">{t('month.unavailable')}</div>
+        // O separador inteiro falhou: a página vazia de erro (com o Alino triste, regra do Francisco via Dev 1).
+        <EmptyState icon={Trophy} pose="triste" title={t('month.unavailable')} />
       ) : (
         <>
           {/* O pódio: 1.º, 2.º, 3.º, da esquerda para a direita. */}
-          <div id="month-podium" className="card p-0 overflow-hidden">
-            <div className="grid grid-cols-3 gap-2 px-3 pt-5 pb-4">
-              {podium.map((row, i) => <PodiumSpot key={i} row={row} place={i + 1} big={i === 0} onOpen={openPlayer} />)}
-            </div>
-            {onShare && qualifiedCount > 0 && (
-              <button type="button" onClick={() => onShare({ podium, month, club })}
-                className="flex w-full min-h-[44px] items-center justify-center gap-1 border-t border-line text-[13px] font-extrabold text-ink-900">
-                ↗ {t('month.share')}
-              </button>
-            )}
-          </div>
+          <RankPodium id="month-podium" spots={podium} freeHint={t('month.free_hint')} onOpen={(id) => navigate(`/jogador/${id}`)}
+            value={(row) => ({ text: monthPoints(row.points), muted: monthPointsMuted(row.points) })}
+            onShare={onShare && qualifiedCount > 0 ? () => onShare({
+              kind: 'month', month, club,
+              podium: podium.map((r) => r && { ...r, display: monthPoints(r.points) }),
+            }) : null} />
 
           {/* Do 4.º em diante; ou, com menos de 4 pessoas, a caixa tracejada. */}
           {qualifiedCount <= 3 ? (
