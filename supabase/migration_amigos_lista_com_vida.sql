@@ -224,5 +224,6 @@ $function$;
 COMMIT;
 
 -- Verificar depois de correr:
---   SELECT pg_get_functiondef('public.list_my_friend_sessions()'::regprocedure) LIKE '%best_partner%';  -- true
+--   SELECT pg_get_functiondef('public.list_my_friend_sessions()'::regprocedure) LIKE '%friend_match_me_json%';  -- true
+--   SELECT pg_get_functiondef('public.friend_match_me_json(uuid,uuid)'::regprocedure) LIKE '%best_partner%';  -- true
 --   SELECT has_function_privilege('authenticated', 'public.friend_match_me_json(uuid,uuid)', 'EXECUTE');  -- false
