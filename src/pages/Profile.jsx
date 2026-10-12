@@ -460,13 +460,16 @@ export default function Profile() {
       const outcome = r.won == null ? null : t(r.won ? 'agenda.result_win' : 'agenda.result_loss')
       return {
         key: `pf:${r.session_id || r.event_id}`, kind: 'friends', date,
-        title: rounds > 1 ? t('agenda.session_done', { count: rounds, wins: r.rounds_won || 0 }) : (r.title || r.org_name || t('agenda.kind_friends')),
-        // Por baixo, o sítio: o grupo (se não for já o título) ou o sítio
-        // escrito no jogo. «Entre amigos» não, que repete a etiqueta (UX).
-        subtitle: (rounds > 1 || r.title ? r.org_name : null) || (r.org_name ? null : r.location) || null,
+        // Sempre «N rondas · ganhaste X», também com uma ronda: o nome
+        // «Jogo entre amigos» repetia a etiqueta de cima (QA, 12 out).
+        title: rounds > 0 ? t('agenda.session_done', { count: rounds, wins: r.rounds_won || 0 }) : (r.title || t('agenda.kind_friends')),
+        // Por baixo, o grupo ou o sítio escrito no jogo.
+        subtitle: r.org_name || r.location || null,
         to: r.session_id ? `/jogos-privados/sessao/${r.session_id}` : r.org_slug ? `/clube/${r.org_slug}/jogos` : '/jogos-privados',
-        result: points != null ? t('profile.session_points', { points: points > 0 ? `+${points}` : String(points) }) : outcome,
-        tone: points > 0 || (points == null && r.won) ? 'green' : null,
+        // Ainda não terminado (status 'pending', Dev 3): «Por fechar», nunca «Derrota».
+        result: r.status === 'pending' ? t('friends.list_to_close')
+          : points != null ? t('profile.session_points', { points: points > 0 ? `+${points}` : String(points) }) : outcome,
+        tone: r.status !== 'pending' && (points > 0 || (points == null && r.won)) ? 'green' : null,
       }
     }
     return {
