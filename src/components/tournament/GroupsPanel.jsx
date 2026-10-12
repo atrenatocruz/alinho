@@ -12,6 +12,7 @@ import RuleHint from '../RuleHint'
 import { Me } from './TournamentBits'
 import useCategoryBoard from './useCategoryBoard'
 import { standingsOf, qualifiersPerGroup, groupPoints } from '../../lib/tournamentDraw'
+import { PanelSkeleton } from './TournamentSkeleton'
 
 /** Uma tabela de grupo. As duplas que passam ficam marcadas à esquerda e
  *  com o lugar em destaque — é o que se lê de relance no telemóvel. */
@@ -137,7 +138,7 @@ export default function GroupsPanel({ category, my , emptyPose }) {
   const { groups, entries, matches, loading } = useCategoryBoard(category?.id)
 
   if (loading) {
-    return <p className="py-6 text-center text-xs text-muted">{t('common.loading')}</p>
+    return <PanelSkeleton rows={2} />
   }
 
   if (!groups.length) {

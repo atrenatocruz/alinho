@@ -18,6 +18,7 @@ import { myMatchesFromBoard } from '../../lib/myTournamentMatches'
 import TournamentShareFlow from './TournamentShareFlow'
 import { resultShare } from './shareData'
 import { useAuth } from '../../contexts/AuthContext'
+import { PanelSkeleton } from './TournamentSkeleton'
 
 /** Sáb 10:00 — dia curto + hora, em mono, como no desenho. */
 function When({ date, time, locale }) {
@@ -121,7 +122,7 @@ export default function MyGamesPanel({ tournament, category, myEntries = [], myM
   const clashTimes = new Set(mineClashes.map((c) => hhmmInTz(c.category_a === category?.id ? c.at_a : c.at_b)))
 
   if (board.loading && !rows.length) {
-    return <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-8 w-8 border-[3px] border-ink-50 border-t-ink-700"></div></div>
+    return <PanelSkeleton />
   }
 
   if (!rows.length) {

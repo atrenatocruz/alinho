@@ -10,6 +10,7 @@ import { Sheet } from '../agenda/AgendaControls'
 import { Tabs } from '../ui'
 import { adminSetTshirtSize, getTshirtCounts, getTshirtPeople } from '../../lib/tournamentApi'
 import { NO_TSHIRT, TshirtPicker, sizeMark, sizesOf, tshirtOf, tshirtOn, shirtRulesOf } from './tshirt'
+import { PanelSkeleton } from './TournamentSkeleton'
 
 const euros = (cents, locale) => (Number(cents || 0) / 100).toLocaleString(locale, { maximumFractionDigits: 2 })
 
@@ -115,7 +116,7 @@ function TshirtPeopleSheet({ tournament, counts, onClose, onChanged }) {
           <Tabs value={tab} onChange={setTab} label={t('tshirt.admin_sheet_title', { name: '' })}
             options={[{ value: 'size', label: t('tshirt.admin_by_size') }, { value: 'people', label: t('tshirt.admin_by_person') }]} />
           {people === null ? (
-            <p className="py-6 text-center text-xs text-muted">{t('common.loading')}</p>
+            <PanelSkeleton rows={2} />
           ) : tab === 'people' ? (
             <>
               <div>

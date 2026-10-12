@@ -21,12 +21,14 @@ import { describeError, errorKind } from '../lib/errors'
 import { dayKeyInTz, msUntilNextDay, hhmmInTz } from '../lib/tournamentDay'
 import { unscheduledMatches, proposeSchedule } from '../lib/scorePage'
 import { useAuth } from '../contexts/AuthContext'
-import { Chips, ConfirmSheet, EmptyState, NeedsYou, Tabs } from '../components/ui'
+import { Chips, ConfirmSheet, EmptyState, LoadErrorState, NeedsYou, Tabs } from '../components/ui'
 import { Sheet } from '../components/agenda/AgendaControls'
 import { FieldLabel, MonoLabel } from '../components/tournament/TournamentBits'
 import { proSetTieBreakTarget } from '../components/tournament/tieBreak'
 import ScoreCard, { FINISHED } from '../components/tournament/ScoreCard'
 import { StickyTabs } from '../components/tournament/StickyBar'
+import { ScoreSkeleton } from '../components/tournament/TournamentSkeleton'
+import { useSkeleton, useLoadTimeout } from '../components/Skeleton'
 
 // Hora de Portugal, nunca cortada do texto da base de dados (vinha em UTC:
 // 17:00 onde o resto da app dizia 18:00 — Trello #487).
@@ -270,9 +272,21 @@ export default function TournamentScorePage() {
   useEffect(() => { setJustSaved(new Set()) }, [day, view])
 
   const back = <BackBar onBack={goBack} title={tournament?.name} />
+  // A carregar: o cinzento só depois de 0,2 s; aos 8 s, o erro (esqueletos, 12 out).
+  const showSkeleton = useSkeleton(allMatches === null)
+  const loadLate = useLoadTimeout(allMatches === null)
 
   if (allMatches === null) {
-    return <div className="flex items-center justify-center py-16"><div className="h-10 w-10 animate-spin rounded-full border-[3px] border-ink-50 border-t-ink-700" /></div>
+    return (
+      <div className="space-y-4">
+        {back}
+        {/* O título é a sério desde o início: só depende do dia escolhido. */}
+        <h1 className="font-display text-2xl leading-tight text-ink-900">{t('tournament.score.title', { day: new Date(`${day}T12:00`).toLocaleDateString(i18n.language, { weekday: 'short', day: 'numeric', month: 'short' }).replace(/\./g, '') })}</h1>
+        {loadLate
+          ? <LoadErrorState title={t('app.load_error_title')} />
+          : showSkeleton ? <ScoreSkeleton /> : null}
+      </div>
+    )
   }
 
   // Os jogos do dia escolhido, contado em hora de Portugal (igual ao servidor).

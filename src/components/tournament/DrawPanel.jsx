@@ -11,13 +11,14 @@ import { MonoLabel } from './TournamentBits'
 import useCategoryBoard from './useCategoryBoard'
 import { bracketRounds } from '../../lib/tournamentDraw'
 import BracketTree from './BracketTree'
+import { PanelSkeleton } from './TournamentSkeleton'
 
 export default function DrawPanel({ category, myEntries , emptyPose }) {
   const { t } = useTranslation()
   const { entries, matches, groups, loading } = useCategoryBoard(category?.id)
 
   if (loading) {
-    return <p className="py-6 text-center text-xs text-muted">{t('common.loading')}</p>
+    return <PanelSkeleton rows={2} />
   }
 
   const main = bracketRounds(matches, 'principal')

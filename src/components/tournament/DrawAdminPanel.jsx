@@ -24,6 +24,7 @@ import {
 import { formatOptions, recommendFormat, availableCourtHours, pickSeeds, groupsWords } from '../../lib/tournamentFormat'
 import { listTournamentClashes } from '../../lib/tournamentApi'
 import { ClashBanner, ClashCaseSheet, ClashListSheet, casesFor, startClashes, whenText } from './Clashes'
+import { PanelSkeleton } from './TournamentSkeleton'
 
 const euros = (c) => (c == null ? null : `${(c / 100).toFixed(0)} €`)
 
@@ -70,7 +71,7 @@ function CloseEntriesStep({ category, onDone, t, cases = [], onResolve = null, o
   }
 
   if (error && !rows) return <p className="py-6 text-center text-xs text-danger">{error}</p>
-  if (!rows) return <p className="py-6 text-center text-xs text-muted">{t('common.loading')}</p>
+  if (!rows) return <PanelSkeleton rows={2} />
   if (!rows.length) {
     return <EmptyState icon={AlertTriangle} title={t('tournament.draw.close_nobody_title')}
       subtitle={t('tournament.draw.close_nobody_subtitle')} />
@@ -348,7 +349,7 @@ function DrawStep({ category, onDone, onChangeFormat, t }) {
   }
 
   if (error && !teams) return <p className="py-6 text-center text-xs text-danger">{error}</p>
-  if (!teams) return <p className="py-6 text-center text-xs text-muted">{t('common.loading')}</p>
+  if (!teams) return <PanelSkeleton rows={2} />
   if (!payload) {
     return (
       <div>
@@ -669,7 +670,7 @@ export default function DrawAdminPanel({ tournament, onBack, onEdit }) {
       )}
 
       {!categories ? (
-        <p className="py-6 text-center text-xs text-muted">{t('common.loading')}</p>
+        <PanelSkeleton rows={2} />
       ) : !picked ? (
         categories.length === 0 ? (
           <EmptyState icon={Shuffle} title={t('tournament.draw.no_categories_title')}

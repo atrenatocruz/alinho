@@ -14,6 +14,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { MonoLabel } from './TournamentBits'
 import { TOURNAMENT_PANELS } from './panels'
+import { PanelSkeleton } from './TournamentSkeleton'
 
 const SECTIONS = ['groups', 'draw', 'calendar']
 
@@ -22,7 +23,7 @@ export default function AllGamesPanel({ sections = SECTIONS, ...props }) {
   const [params] = useSearchParams()
   const target = params.get('sec')
   const refs = useRef({})
-  const spinner = <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-7 w-7 border-[3px] border-ink-50 border-t-ink-700" /></div>
+  const spinner = <PanelSkeleton rows={2} />
 
   // Só eliminatórias (formato com 0 grupos): a secção Grupos não aparece —
   // mostrava «Grupos ainda não sorteados» num torneio que nunca os terá
