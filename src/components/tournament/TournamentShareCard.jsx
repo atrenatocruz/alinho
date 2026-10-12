@@ -19,6 +19,7 @@ import { toPng } from 'html-to-image'
 import { useTranslation } from 'react-i18next'
 import { Trophy } from 'lucide-react'
 import logoWordmark from '../../logo/primary-dark-card.svg'
+import iconMark from '../../logo/icon-mark.svg'
 
 export const T_CARD_W = 360
 export const T_CARD_H = 640
@@ -109,7 +110,12 @@ const Mono = ({ children, className = '' }) => (
 function Header({ date }) {
   return (
     <div className="flex items-center justify-between">
-      <img src={logoWordmark} alt="alinho" className="h-[18px] w-auto" />
+      {/* «alinho.pt» em tudo o que sai da app (regra de 29 set; UX, 12 out):
+          o logótipo de sempre com «.pt» logo a seguir, branco, da altura das letras. */}
+      <span className="flex items-end gap-[1px]">
+        <img src={logoWordmark} alt="alinho" className="h-[18px] w-auto" />
+        <span className="font-sans text-[15px] font-medium leading-[14px] text-white">.pt</span>
+      </span>
       <span className="font-mono text-[8.5px] font-bold uppercase tracking-[0.12em] text-white">{date}</span>
     </div>
   )
@@ -122,6 +128,8 @@ function OrgLine({ org }) {
   if (!org) return null
   const circle = org.place
     ? <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-[#1A1A1D] text-[11px]">📍</span>
+    // Sem clube (o Ranking geral): a bola lima da alinho no lugar da inicial.
+    : org.mark ? <img src={iconMark} alt="" className="block h-[22px] w-[22px] shrink-0 rounded-full" />
     : org.logo
       ? <img src={org.logo} alt="" className="block h-[22px] w-[22px] shrink-0" />
       : <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border text-[8px] font-extrabold" style={{ borderColor: LIME, color: LIME }}>{org.initials}</span>
@@ -228,7 +236,7 @@ function PodiumBody({ d, compact }) {
  * data (result): { kicker, date, mine, teamName, theirs, myScore, theirScore, won, sets, record }
  * data (podium): { kicker, date, place, rows: [{ place, pair, title, mine }], record }
  * photo: data URL já cortado (bakePhoto), ou null · qr: data URL
- * org (#622, opcional): { name, logo (bakeCircle), initials, sub, place }
+ * org (#622, opcional): { name, logo (bakeCircle), initials, sub, place, mark (a bola da alinho) }
  * children (#622, opcional): um miolo próprio no lugar do pódio/resultado;
  *   como função, recebe { compact } (com foto, o miolo encolhe)
  */

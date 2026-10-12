@@ -13,6 +13,8 @@ import { getRankingHiddenIds, withoutHidden } from '../lib/rankingVisibility'
 import { errorKind } from '../lib/errors'
 import { useHeaderActions } from '../contexts/HeaderActionsContext'
 import { applyScale, defaultScale, rankedCount, SCALES } from '../lib/rankingScales'
+import MonthRanking from '../components/rankings/MonthRanking'
+import MonthPodiumShare from '../components/rankings/MonthPodiumShare'
 
 /* ─── Rankings (épico «Comunidade vs. Rankings», Trello #271/#275) ───────────
    Comparar jogadores — só jogadores. Desenho:
@@ -64,6 +66,14 @@ export default function Rankings() {
   const [scaleChoice, setScaleChoice] = useState(null)
   const scale = scaleChoice ?? defaultScale(profile?.gender)
 
+  // «Do mês» (#626): só aparece quando a função do Dev 3 existe.
+  const [monthReady, setMonthReady] = useState(false)
+  const [monthShare, setMonthShare] = useState(null)
+  useEffect(() => {
+    supabase.rpc('get_month_ranking_months', { p_organization_id: null })
+      .then(({ error }) => setMonthReady(!error || errorKind(error) !== 'not_ready'))
+  }, [])
+
   const scopeOptions = useMemo(() => [
     { value: 'global', label: t('rankings.scope_global') },
     ...memberships
@@ -81,6 +91,7 @@ export default function Rankings() {
   // ── Carregar ─────────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false
+    if (mode === 'month') return undefined
     setLoading(true)
 
     const load = async () => {
@@ -209,7 +220,7 @@ export default function Rankings() {
   // ── Posições ─────────────────────────────────────────────────────────
   // Com nível primeiro, pela ordem que veio; sem nível no fim, A–Z.
   // Ranking: por escala (lib/rankingScales). Assiduidade: lista única.
-  const byScale = mode === 'ranking'
+  const byScale = mode === 'ranking' || mode === 'month'
 
   // Pesquisa sem acentos: «goncalves» encontra «Gonçalves».
   const norm = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
@@ -360,7 +371,7 @@ export default function Rankings() {
         {headerActions}
       </PageHeader>
 
-      <div className="flex items-center gap-2 input-field focus-within:border-ink-500 focus-within:ring-2 focus-within:ring-ink-50">
+      {mode !== 'month' && <div className="flex items-center gap-2 input-field focus-within:border-ink-500 focus-within:ring-2 focus-within:ring-ink-50">
         <Search size={16} className="text-muted shrink-0" />
         <input
           type="text"
@@ -375,13 +386,14 @@ export default function Rankings() {
             <X size={16} />
           </button>
         )}
-      </div>
+      </div>}
 
       <Tabs
         value={mode}
         onChange={setMode}
         options={[
           { value: 'ranking', label: t('rankings.mode_ranking') },
+          ...(monthReady ? [{ value: 'month', label: t('rankings.tab_month') }] : []),
           { value: 'xp', label: t('rankings.tab_assiduity') },
         ]}
       />
@@ -409,7 +421,9 @@ export default function Rankings() {
         )}
       </div>
 
-      {loading ? (
+      {mode === 'month' ? (
+        <MonthRanking scope={scope} scale={shownScale} scopeLabel={scopeOptions.find((o) => o.value === scope)?.label} onShare={setMonthShare} />
+      ) : loading ? (
         <div className="flex items-center justify-center py-16">
           <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ink-50 border-t-ink-700"></div>
         </div>
@@ -435,7 +449,12 @@ export default function Rankings() {
       )}
 
       {/* A tua linha, sempre à vista por cima da barra de navegação. */}
-      {!loading && me && (
+      {monthShare && (
+        <MonthPodiumShare share={monthShare} onClose={() => setMonthShare(null)}
+          org={scope === 'global' ? null : (memberships.find((m) => m.organization_id === scope)?.organization || null)} />
+      )}
+
+      {mode !== 'month' && !loading && me && (
         <button
           type="button"
           onClick={() => scrollToPlayer(me.user_id)}

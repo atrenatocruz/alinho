@@ -1345,6 +1345,50 @@ function lastMinuteRequest(table, url, method, body) {
   return undefined
 }
 
+// Ranking do mês (#626, Dev 3). localStorage.mockMonthRanking:
+// 'full' (por omissão: tu em 14.º) · 'few' (só 2 com 4 jogos, tu ainda fora)
+// · 'podium' (tu em 2.º) · 'negative' (fim da lista, tu em 23.º com −12)
+// · 'empty' (ninguém jogou) · 'off' (sem a função, PGRST202: o separador
+// «Do mês» não aparece). Nomes e fotos inventados; o «tu» é o Admin (Dev).
+const MONTH_PEOPLE = [
+  ['Sofia Marques', 'feminino', 1540, 86, 8, 6], ['Miguel Almeida', 'masculino', 1610, 71, 9, 6], ['Inês Costa', 'feminino', 1480, 64, 7, 5],
+  ['Duarte Pires', 'masculino', 1500, 58, 7, 5], ['Carla Neves', 'feminino', 1460, 52, 6, 4], ['Hugo Ramos', 'masculino', 1320, 47, 9, 5],
+  ['Marta Lobo', 'feminino', 1400, 41, 6, 4], ['Tiago Lopes', 'masculino', 1450, 39, 5, 3], ['Joana Silva', 'feminino', 1380, 36, 8, 4],
+  ['Pedro Lima', 'masculino', 1520, 35, 6, 3], ['Ana Rocha', 'feminino', 1360, 34, 5, 3], ['Rui Faria', 'masculino', 1420, 33, 4, 3],
+  ['Bruno Sá', 'masculino', 1390, 33, 7, 3],
+]
+const monthRankingRows = () => {
+  const mode = localStorage.getItem('mockMonthRanking') || 'full'
+  if (mode === 'off') return { __error: 'Could not find the function', __code: 'PGRST202' }
+  if (mode === 'empty') return []
+  const row = (i, [name, gender, rating, points, games, wins], extra = {}) => ({
+    place: i + 1, user_id: `month-${i}`, name, avatar_url: null, rating, gender, points, games, wins, qualified: true, is_me: false, frame: null, ...extra,
+  })
+  const me = (extra) => ({ user_id: MOCK_ADMIN_USER_ID, name: 'Admin (Dev)', avatar_url: null, rating: 1605, gender: 'masculino', wins: 2, is_me: true, frame: null, ...extra })
+  if (mode === 'few') {
+    return [row(0, ['Sofia Marques', 'feminino', 1540, 54, 5, 3]), row(1, ['Miguel Almeida', 'masculino', 1610, 38, 4, 2]),
+      me({ place: null, points: 12, games: 2, qualified: false })]
+  }
+  if (mode === 'podium') {
+    const list = MONTH_PEOPLE.slice(0, 7).map((p, i) => row(i, p))
+    list.splice(1, 1, me({ place: 2, points: 71, games: 8, qualified: true }))
+    return list
+  }
+  if (mode === 'negative') {
+    const more = [['Paulo Sequeira', 'masculino', 1500, 0, 4, 2], ['Hugo Ramos', 'masculino', 1320, -5, 6, 2]]
+    const extra = Array.from({ length: 7 }, (_, k) => [`Jogador ${k + 14}`, k % 2 ? 'feminino' : 'masculino', 1400, 30 - k * 4, 5, 2])
+    const people = [...MONTH_PEOPLE, ...extra, ...more]
+    return [...people.map((p, i) => row(i, p)), me({ place: people.length + 1, points: -12, games: 5, qualified: true })]
+  }
+  const list = MONTH_PEOPLE.map((p, i) => row(i, p))
+  return [...list, me({ place: 14, points: 32, games: 6, qualified: true }), row(14, ['Vasco Reis', 'masculino', 1350, 18, 4, 2])]
+}
+RPC_MOCKS.get_month_ranking = () => monthRankingRows()
+RPC_MOCKS.get_month_ranking_months = () => {
+  if ((localStorage.getItem('mockMonthRanking') || 'full') === 'off') return { __error: 'Could not find the function', __code: 'PGRST202' }
+  return [{ month: '2026-10-01', people: 15 }]
+}
+
 const TABLE_MOCKS = {
   // localStorage.mockScorekeeper = 'true': quem entra é marcador deste mix (29 set).
   // mockScorekeepers = '2' (pacote do mix, 2 out): o Diogo (joga) e a Marta (do grupo, não joga).
