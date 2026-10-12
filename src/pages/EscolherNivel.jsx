@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { PrimaryButton, RatingBadge, Select, DateField } from '../components/ui'
 import { MIN_SIGNUP_AGE, ADULT_AGE, isAtLeast, maxSignupBirthday } from '../lib/age'
 import { Wordmark } from '../components/Layout'
+import Alino from '../components/Alino'
 import { ONBOARDING_LEVELS } from '../lib/elo'
 import { countryOptions } from '../lib/countries'
 import { describeError } from '../lib/errors'
@@ -97,9 +98,12 @@ export default function EscolherNivel() {
   if (!user) return null
 
   return (
-    <div className="min-h-screen bg-canvas flex flex-col items-center px-5 py-10">
+    <div className="min-h-screen bg-canvas flex flex-col items-center px-5 pt-6 pb-10">
       <div className="w-full max-w-md">
-        <Wordmark variant="light" className="h-7 mx-auto mb-8" />
+        <Wordmark variant="light" className="h-7 mx-auto mb-4" />
+        {/* Boas-vindas: o Alino a dizer olá, pequeno, para o primeiro nível
+            continuar à vista num ecrã pequeno (mascote, UX 12 out). */}
+        <Alino pose="ola" size={100} className="mb-2" />
 
         <h1 className="text-2xl text-ink-900 text-center mb-1.5">{t('onboarding.heading')}</h1>
         <p className="text-muted text-sm text-center mb-7">

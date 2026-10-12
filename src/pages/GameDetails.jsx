@@ -35,6 +35,7 @@ import AddScorekeeperSheet from '../components/mix/AddScorekeeperSheet'
 import SwapPlayerSheet from '../components/mix/SwapPlayerSheet'
 import MixWinnersBlock from '../components/mix/MixWinnersBlock'
 import ShareAsSheet from '../components/mix/ShareAsSheet'
+import Alino from '../components/Alino'
 import { openGameWinners } from '../lib/openGameWinners'
 import TournamentShareFlow from '../components/tournament/TournamentShareFlow'
 import { bakeCircle } from '../components/tournament/TournamentShareCard'
@@ -2998,10 +2999,8 @@ export default function GameDetails() {
       {justBooked && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/50 animate-fade-in" aria-hidden="true">
           <div className="bg-surface rounded-card shadow-lift px-10 py-8 text-center animate-pop">
-            {/* Verde = inscrito, como a pastilha e o contorno (SPEC 17 set). */}
-            <div className="w-16 h-16 rounded-full bg-ok flex items-center justify-center mx-auto mb-3">
-              <Check size={32} strokeWidth={2} className="text-white" />
-            </div>
+            {/* O Alino em festa no lugar do ✓ verde (mascote, 12 out). */}
+            <Alino pose="festa" size={150} className="mb-3" />
             <p className="font-extrabold text-lg text-ink-900">{t('gamedetails.joined_confirmation_title')}</p>
             <p className="text-muted text-sm">{t('gamedetails.joined_confirmation_subtitle')}</p>
           </div>

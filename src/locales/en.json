@@ -5470,5 +5470,12 @@
   "monthshare.org_sub": "Monthly ranking",
   "monthshare.and": "and",
   "monthshare.text": "👑 {{month}} podium at {{club}}: {{names}}. Congratulations!",
-  "monthshare.text_global": "👑 {{month}} podium on alinho.pt: {{names}}. Congratulations!"
+  "monthshare.text_global": "👑 {{month}} podium on alinho.pt: {{names}}. Congratulations!",
+  "suggest.title": "Suggestions",
+  "suggest.played_together_one": "Played together {{count}} time",
+  "suggest.played_together_other": "Played together {{count}} times",
+  "suggest.played_together_some": "You've played together",
+  "suggest.follow_each_other": "You follow each other",
+  "suggest.same_club": "Also in {{name}}",
+  "suggest.same_club_some": "From your group or club"
 }
