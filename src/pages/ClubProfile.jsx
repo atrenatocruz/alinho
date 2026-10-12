@@ -11,6 +11,7 @@ import { useParams, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
 import { BackBar } from '../components/ui'
+import { shareLinkOrCopy } from '../lib/shareImage'
 import { ArrowLeft, Building2, Check, ChevronRight } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -28,6 +29,7 @@ import LiveStrip from '../components/live/LiveStrip'
 export default function ClubProfile() {
   const { t } = useTranslation()
   const { slug } = useParams()
+  const [linkCopied, setLinkCopied] = useState(false)
   const goBack = useGoBack('/comunidade')
   const { user, memberships, followOrganization, leaveOrganization, toggleFavoriteOrganization } = useAuth()
   const [club, setClub] = useState(null)
@@ -227,7 +229,17 @@ export default function ClubProfile() {
     )
   }
 
-  const back = <BackBar onBack={goBack} title={club?.name} />
+  // ⤴ «Partilhar o link», para toda a gente (partilhar-link, 12 out): a
+  // frase com o link, ou copiá-lo com «✓ Link copiado» durante 2 s.
+  const shareClub = async () => {
+    const url = `${window.location.origin}/clube/${club.slug || slug}`
+    const text = t('clubprofile.share_text', { name: club.name, link: `${window.location.host}/clube/${club.slug || slug}` })
+    if (await shareLinkOrCopy({ title: club.name, text, url }) === 'copied') {
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2000)
+    }
+  }
+  const back = <BackBar onBack={goBack} title={club?.name} onShare={club ? shareClub : undefined} />
 
   if (notFound || !club) {
     return (
@@ -244,6 +256,12 @@ export default function ClubProfile() {
   return (
     <div className="space-y-5">
       {back}
+      {linkCopied && createPortal(
+        <div role="status" className="fixed left-4 right-4 bottom-[104px] z-[70] mx-auto max-w-md rounded-ctrl bg-ink-900 px-4 py-3 text-sm font-extrabold text-white animate-fade-up">
+          {t('clubprofile.link_copied')}
+        </div>,
+        document.body,
+      )}
       <div>
         {club.kind === 'group' && club.parent_slug && (
           <Link to={`/clube/${club.parent_slug}`}

@@ -2020,6 +2020,8 @@
   "clubprofile.member_count_other": "{{count}} members",
   "clubprofile.no_members_visible": "No visible members.",
   "clubprofile.not_found_subtitle": "This club or group doesn't exist or isn't public.",
+  "clubprofile.share_text": "Play with us at {{name}} 🎾 See the next games: {{link}}",
+  "clubprofile.link_copied": "✓ Link copied",
   "clubprofile.not_found_title": "Club not found",
   "clubprofile.players_ratio": "{{count}}/{{max}} players",
   "clubprofile.remove_favorite": "Remove from favorites",
