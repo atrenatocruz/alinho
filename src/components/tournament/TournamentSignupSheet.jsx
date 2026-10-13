@@ -36,7 +36,7 @@ import { NO_TSHIRT, TshirtPicker, tshirtOn, tshirtPriceLabel, pairTotalLine, shi
 import { getPlayerTshirt } from '../../lib/tournamentApi'
 import { categoriesClash, categoryWhen, ClashNotice } from './Clashes'
 
-export default function TournamentSignupSheet({ tournament, categories: allCategories, category: pageCategory, categoriesLeft, takenIds = [], myExistingShirt = null, busy, error, onConfirm, onClose }) {
+export default function TournamentSignupSheet({ tournament, categories: allCategories, category: pageCategory, categoriesLeft, takenIds = [], myExistingShirt = null, initialMode = 'partner', busy, error, onConfirm, onClose }) {
   const { t, i18n } = useTranslation()
   const { user, profile } = useAuth()
   // As que servem à pessoa primeiro — o género dela (ou misto) e o nível
@@ -59,7 +59,7 @@ export default function TournamentSignupSheet({ tournament, categories: allCateg
     return (a.position ?? 0) - (b.position ?? 0)
   })
   const [categoryId, setCategoryId] = useState(category?.id || ordered[0]?.id || null)
-  const [mode, setMode] = useState('partner') // 'partner' | 'named' | 'alone'
+  const [mode, setMode] = useState(initialMode) // 'partner' | 'named' | 'alone'
   const [members, setMembers] = useState([])
   const [query, setQuery] = useState('')
   const [partnerId, setPartnerId] = useState(null)

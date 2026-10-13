@@ -25,8 +25,8 @@ import GroupOnlyNotice from '../components/GroupOnlyNotice'
 import { StickyTabs } from '../components/tournament/StickyBar'
 import { setEventWhatsappPostTimes } from '../lib/whatsappHours'
 import { describeError, errorKind } from '../lib/errors'
-import { Avatar, EmptyState, LoadErrorState, Tabs } from '../components/ui'
-import { CategorySelect, LILAC, MonoLabel, StatePill, TourTag } from '../components/tournament/TournamentBits'
+import { EmptyState, LoadErrorState, Tabs } from '../components/ui'
+import { CategorySelect, MonoLabel } from '../components/tournament/TournamentBits'
 import { TOURNAMENT_PANELS, TOURNAMENT_TABS, TOURNAMENT_TAB_OWNER } from '../components/tournament/panels'
 import AdminBar from '../components/tournament/AdminBar'
 import CreateTournamentForm from '../components/tournament/CreateTournamentForm'
@@ -39,7 +39,10 @@ import ScorekeepersPanel from '../components/tournament/ScorekeepersPanel'
 import { drawProgress, statusKey } from '../components/tournament/drawProgress'
 import { TournamentPageSkeleton, PanelSkeleton } from '../components/tournament/TournamentSkeleton'
 import { useSkeleton, useLoadTimeout } from '../components/Skeleton'
-import { activeEntriesOf } from '../lib/tournamentSignup'
+import { activeEntriesOf, entriesOpen } from '../lib/tournamentSignup'
+import EventHero from '../components/event/EventHero'
+import EventFacts from '../components/event/EventFacts'
+import PublicInfo from '../components/tournament/PublicInfo'
 
 /** "9–11 out" quando é tudo no mesmo mês, "30 set – 2 out" quando não é. */
 function dateRange(startIso, endIso, locale) {
@@ -52,17 +55,21 @@ function dateRange(startIso, endIso, locale) {
   return `${a.getDate()} ${month(a)} – ${b.getDate()} ${month(b)}`
 }
 
+// «sábado, 17 de outubro» (o topo novo, R3).
+const longDate = (iso, locale) => new Date(`${iso}T12:00`).toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })
+// «15 out», no fuso de Lisboa.
+const shortDay = (when, locale) => new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', timeZone: 'Europe/Lisbon' }).format(new Date(when)).replace('.', '').replace(' de ', ' ')
+// Ao lado da hora grande: «sáb e dom», ou «sex a dom»; num dia só, nada.
+const daysAside = (startIso, endIso, locale, t) => {
+  if (!startIso || !endIso || startIso === endIso) return null
+  const wd = (iso) => new Date(`${iso}T12:00`).toLocaleDateString(locale, { weekday: 'short' }).replace('.', '')
+  const days = Math.round((new Date(`${endIso}T12:00`) - new Date(`${startIso}T12:00`)) / 86400000) + 1
+  return t(days === 2 ? 'tournament.hero_days_two' : 'tournament.hero_days_range', { a: wd(startIso), b: wd(endIso) })
+}
+
 // As minhas inscrições ativas: activeEntriesOf (tournamentSignup.js).
 const activeEntries = activeEntriesOf
 const activeMy = (data) => activeEntries(data)[0] || null
-
-const STATE_PILL = {
-  inscricoes: 'grey',
-  fechado: 'grey',
-  sorteado: 'dark',
-  a_decorrer: 'live',
-  terminado: 'grey',
-}
 
 export default function TournamentPage() {
   const { t, i18n } = useTranslation()
@@ -337,10 +344,53 @@ export default function TournamentPage() {
   }
 
   const spinner = <PanelSkeleton />
+  // O topo (R3): a hora da primeira categoria do primeiro dia, os dias ao
+  // lado («sáb e dom»), e os quadrados de dados.
+  const heroIn = ['validada', 'selecionada'].includes(activeMy(data)?.state)
+  const firstDayCats = categories.filter((c) => c.day_date && c.day_date === tour.starts_on && c.start_time)
+  const heroTime = firstDayCats.length ? firstDayCats.map((c) => String(c.start_time).slice(0, 5)).sort()[0] : null
+  const heroAside = daysAside(tour.starts_on, tour.ends_on, i18n.language, t)
+  const totalSlots = categories.reduce((n, c) => n + (Number(c.slots) || 0), 0)
+  const shirt = tour.rules?.tshirt
+  const euros = (cents) => (cents / 100).toLocaleString(i18n.language, { maximumFractionDigits: 2 })
+  const heroFacts = [
+    { key: 'days', label: t('tournament.fact_days'), value: dateRange(tour.starts_on, tour.ends_on, i18n.language) },
+    { key: 'courts', label: t('tournament.fact_courts'), value: tour.court_count || null },
+    { key: 'price', label: t('tournament.fact_price'), value: tour.entry_fee_cents ? t('tournament.fact_price_pair', { price: euros(tour.entry_fee_cents) }) : null },
+    { key: 'tshirt', label: t('tournament.fact_tshirt'), value: shirt?.mode === 'gift' ? t('tournament.fact_tshirt_gift') : shirt?.mode === 'sale' ? t('tournament.fact_tshirt_sale', { price: euros(shirt.price_cents || 0) }) : null },
+    { key: 'deadline', label: t('tournament.fact_entries'), value: tour.entries_deadline ? t('tournament.fact_until', { date: shortDay(tour.entries_deadline, i18n.language) }) : null },
+    { key: 'draw', label: t('tournament.fact_draw'), value: tour.draw_on ? shortDay(`${tour.draw_on}T12:00:00`, i18n.language) : null },
+  ]
 
   return (
     <div className={`space-y-4 ${skeletonShown.current ? 'animate-fill-in' : ''}`}>
-      {back}
+      {/* R3 — o topo novo (design-handoff/2026-10-13-redesign/R3): a capa com
+          o cartaz ou o Alino do torneio, o cartão branco por cima, a hora
+          grande, a faixa de estado e, logo por baixo, os botões da inscrição.
+          Só aspeto: as ações são as de antes. */}
+      <EventHero
+        kind="tournament"
+        imageUrl={tour.poster_url || null}
+        chip={[t('tournament.label'), categories.length ? t('tournament.hero_categories', { count: categories.length }) : null].filter(Boolean).join(' · ')}
+        org={tour.club_name ? { name: tour.club_name, kindLabel: t(tour.club_kind === 'group' ? 'tournament.hero_org_group' : 'tournament.hero_org_club'), logo: tour.club_logo_url } : null}
+        title={tour.name}
+        time={heroTime}
+        timeAside={heroAside}
+        dateLine={tour.starts_on ? longDate(tour.starts_on, i18n.language) : null}
+        onBack={goBack}
+        onShare={tour.status === 'rascunho' ? null : shareTournament}
+        status={{
+          text: heroIn
+            ? t('tournament.state_entered')
+            : t(statusKey(tour.status, drawProgress(categories), tour.entries_deadline), drawProgress(categories)),
+          tone: heroIn ? 'ok' : 'kind',
+          meta: totalSlots
+            ? t('tournament.hero_pairs_of', { n: teamsIn ?? tour.entry_count ?? 0, total: totalSlots })
+            : t('tournament.hero_pairs', { count: teamsIn ?? tour.entry_count ?? 0 }),
+        }}
+      >
+        {UnderHeader && <Suspense fallback={null}><UnderHeader {...panelProps} withInfo={false} /></Suspense>}
+      </EventHero>
       {/* O que ficou por gravar ao criar (preço especial, 10 out). */}
       {location.state?.notice && (
         <p role="alert" className="rounded-ctrl bg-danger/10 p-3.5 text-sm font-extrabold text-danger">{location.state.notice}</p>
@@ -384,49 +434,7 @@ export default function TournamentPage() {
       {/* Aviso do organizador — acima de tudo, e só quando há aviso. */}
       {TopSlot && <Suspense fallback={null}><TopSlot {...panelProps} /></Suspense>}
 
-      {/* Topo = cartão em grande, como nos mixes. O cartaz, quando o clube
-          o carrega, entra por cima — é a primeira coisa de quem chega pelo
-          WhatsApp (print 07, passo 1). */}
-      <div className="overflow-hidden rounded-card border" style={{ background: LILAC.bg, borderColor: LILAC.border }}>
-        {tour.poster_url && (
-          <img src={tour.poster_url} alt={tour.name} className="block max-h-56 w-full object-cover" />
-        )}
-        {/* Como o topo da página do mix: p-4 e o título grande (revisão
-            da designer de 26 set). */}
-        <div className="p-4">
-        <div className="flex items-center justify-between gap-2">
-          <TourTag>{t('tournament.label')}</TourTag>
-          {['validada', 'selecionada'].includes(activeMy(data)?.state)
-            ? <StatePill tone="in">{t('tournament.state_entered')}</StatePill>
-            : <StatePill tone={STATE_PILL[tour.status] || 'grey'}>{t(statusKey(tour.status, drawProgress(categories), tour.entries_deadline), drawProgress(categories))}</StatePill>}
-        </div>
-        <h1 className="mt-2.5 font-display text-2xl leading-tight text-ink-900">{tour.name}</h1>
-        <div className="mt-1 flex items-center gap-1.5 text-xs text-ink-500">
-          <Avatar name={tour.club_name} url={tour.club_logo_url} size="w-[18px] h-[18px] text-[8px]" />
-          <span className="min-w-0 truncate">
-            {[tour.club_name, dateRange(tour.starts_on, tour.ends_on, i18n.language), tour.court_count ? t('tournament.courts', { count: tour.court_count }) : null]
-              .filter(Boolean).join(' · ')}
-          </span>
-        </div>
-        <div className="mt-3 grid grid-cols-4 gap-1 text-center text-xs text-ink-500">
-          {[
-            [tour.category_count, t('tournament.kv_categories')],
-            // Só as duplas que estão dentro; as que passam das vagas são
-            // suplentes e dizem-se por baixo (designer, 27 set — simulação
-            // do QA: «100 duplas» para 62 lugares enganava).
-            [teamsIn ?? tour.entry_count, t('tournament.kv_teams'), waiting > 0 ? t('tournament.kv_waiting', { count: waiting }) : null],
-            [tour.match_count, t('tournament.kv_matches')],
-            [tour.day_count, t('tournament.kv_days')],
-          ].map(([value, label, extra]) => (
-            <div key={label}>
-              <b className="block font-display text-lg font-extrabold text-ink-900">{value ?? 0}</b>
-              {label}
-              {extra && <span className="block whitespace-nowrap">{extra}</span>}
-            </div>
-          ))}
-        </div>
-        </div>
-      </div>
+      <EventFacts items={heroFacts} />
 
       {/* O passo seguinte de quem organiza, uma só vez, por baixo do cartão do
           torneio — como o preto do mix (Francisco, 2 out). Em cima ficam só
@@ -470,7 +478,9 @@ export default function TournamentPage() {
         }} />
       )}
 
-      {UnderHeader && <Suspense fallback={null}><UnderHeader {...panelProps} /></Suspense>}
+      {/* O cartaz do torneio (categorias, pagamento, mapa, quem organiza),
+          depois dos quadrados de dados (R3, 13 out). */}
+      <PublicInfo tournament={tour} categories={categories} entriesOpen={categories.some((c) => entriesOpen(tour, c))} />
 
       {/* A categoria e os separadores ficam presos por baixo do título ao
           descer (Francisco, 11 out, para experimentar — StickyBar). */}

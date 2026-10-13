@@ -41,7 +41,7 @@ const STATE_KEY = {
 // Os que não cabem no canto sem tapar o nome da categoria.
 const LONG_STATES = ['por_validar', 'convite', 'sem_parceiro']
 
-export default function SignupSlot({ tournament, categories, category, my: firstEntry, myEntries = [], publicView = false, hasGames = false }) {
+export default function SignupSlot({ tournament, categories, category, my: firstEntry, myEntries = [], publicView = false, hasGames = false, withInfo = true }) {
   const { t, i18n } = useTranslation()
   const { user, profile, updateProfile } = useAuth()
   const [genderSheet, setGenderSheet] = useState(false)
@@ -170,8 +170,12 @@ export default function SignupSlot({ tournament, categories, category, my: first
 
   // Sem género no perfil pergunta-se ali mesmo, com «Agora não»: o sexo
   // nunca bloqueia (Francisco, 26 set; antes era obrigatório, #433).
-  const startSignUp = () => {
+  // «Ainda não tenho parceiro» (R3, 13 out) abre a mesma folha já em
+  // «Procuro parceiro»: é a escolha que já lá estava, um toque mais perto.
+  const [sheetMode, setSheetMode] = useState('partner')
+  const startSignUp = (mode = 'partner') => {
     setError('')
+    setSheetMode(mode === 'alone' ? 'alone' : 'partner')
     if (!profile?.gender) setGenderSheet(true)
     else setSheet(true)
   }
@@ -388,9 +392,17 @@ export default function SignupSlot({ tournament, categories, category, my: first
         // Quem já tem jogos tem o lima no «Os meus jogos»: este passa a
         // contorno, por baixo (um lima por ecrã, UX 1 out).
         // Com um convite por responder, o lima é o «Aceitar» (UX/PO, 12 out).
-        <PrimaryButton variant={hasGames || invites.length > 0 ? 'ghost' : 'lime'} onClick={startSignUp} disabled={left === 0} className="w-full">
-          {left === 0 ? t('tsignup.max_categories') : t('tsignup.cta')}
-        </PrimaryButton>
+        <div className="space-y-2.5">
+          <PrimaryButton variant={hasGames || invites.length > 0 ? 'ghost' : 'lime'} onClick={() => startSignUp()} disabled={left === 0} className="w-full">
+            {left === 0 ? t('tsignup.max_categories') : t('tsignup.cta')}
+          </PrimaryButton>
+          {/* O segundo botão, em contorno, por baixo (R3): nunca lado a lado. */}
+          {left > 0 && (
+            <PrimaryButton variant="ghost" onClick={() => startSignUp('alone')} className="w-full !border-ink-900 !bg-white">
+              {t('tsignup.no_partner_yet')}
+            </PrimaryButton>
+          )}
+        </div>
       ) : open && !user ? (
         // Sem conta vê-se tudo menos inscrever (SPEC §4.10).
         <PrimaryButton onClick={() => { window.location.href = signUpHref() }} className="w-full">
@@ -416,7 +428,9 @@ export default function SignupSlot({ tournament, categories, category, my: first
           organiza — SEMPRE, também em rascunho (pré-visualização) e depois
           do fecho, que é quando se joga (QA, 26 set). Só as vagas e o botão
           de inscrever dependem das inscrições abertas. */}
-      <PublicInfo tournament={tournament} categories={categories} entriesOpen={anyOpen} />
+      {/* No topo novo (R3, 13 out) a página põe o cartaz mais abaixo, depois
+          dos quadrados de dados: withInfo={false}. */}
+      {withInfo && <PublicInfo tournament={tournament} categories={categories} entriesOpen={anyOpen} />}
 
       {genderSheet && (
         <Sheet title={t('tsignup.gender_title')} onClose={() => setGenderSheet(false)}>
@@ -448,6 +462,7 @@ export default function SignupSlot({ tournament, categories, category, my: first
           categories={categories}
           category={category}
           categoriesLeft={left}
+          initialMode={sheetMode}
           takenIds={myEntries.map((e) => e.category_id)}
           // A t-shirt que já tenho neste torneio (uma por pessoa, 11 out).
           myExistingShirt={myEntries.find((e) => e.state !== 'desistiu' && e.tshirt)?.tshirt || null}
