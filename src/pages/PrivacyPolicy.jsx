@@ -3,17 +3,19 @@ import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Shield } from 'lucide-react'
 import { Wordmark } from '../components/Layout'
+import { founderNames, POLICY_VERSION, SUPPORT_EMAIL } from '../lib/contacts'
+import { formatDate } from '../lib/formatDate'
 
 // Order here is the order sections render in — matches
 // privacy.section_<key>_title / privacy.section_<key>_body in pt.json/en.json.
 const SECTIONS = [
   'intro', 'data_collected', 'purpose', 'visibility', 'sharing',
-  'cookies', 'retention', 'rights', 'changes', 'contact',
+  'cookies', 'retention', 'rights', 'changes', 'controller', 'contact',
 ]
 
 export default function PrivacyPolicy() {
   const goBack = useGoBack('/')
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   return (
     <div className="min-h-screen bg-canvas">
       <header className="bg-surface border-b border-line sticky top-0 z-10">
@@ -29,6 +31,10 @@ export default function PrivacyPolicy() {
         <div className="text-center mb-2">
           <Shield size={40} className="mx-auto text-ink-700 mb-3" />
           <Wordmark variant="light" className="h-7 mx-auto" />
+          {/* A mesma data que se aceita no ConsentGate (POLICY_VERSION). */}
+          <p className="mt-3 text-xs text-muted">
+            {t('legal.last_updated', { date: formatDate(`${POLICY_VERSION}T12:00:00`, i18n.language, { day: 'numeric', month: 'long', year: 'numeric' }) })}
+          </p>
         </div>
 
         {SECTIONS.map((key) => (
@@ -37,7 +43,7 @@ export default function PrivacyPolicy() {
               {t(`privacy.section_${key}_title`)}
             </h2>
             <p className="text-sm text-muted leading-relaxed">
-              {t(`privacy.section_${key}_body`)}
+              {t(`privacy.section_${key}_body`, { names: founderNames(i18n.language), email: SUPPORT_EMAIL })}
             </p>
           </section>
         ))}

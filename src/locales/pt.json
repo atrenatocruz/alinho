@@ -3314,7 +3314,7 @@
   "age.plus45": "+45",
   "privacy.title": "Política de Privacidade",
   "privacy.section_intro_title": "Introdução",
-  "privacy.section_intro_body": "Esta Política de Privacidade explica que dados pessoais o alinho recolhe, para quê, e quais são os teus direitos. O alinho é operado por Alinho (contacto: support@alinho.pt). Última atualização: 31 de agosto de 2026.",
+  "privacy.section_intro_body": "Esta Política de Privacidade explica que dados pessoais o alinho recolhe, para quê, e quais são os teus direitos. O alinho é gerido pelas pessoas indicadas em «Quem é responsável pelos teus dados».",
   "privacy.section_data_collected_title": "Que dados recolhemos",
   "privacy.section_data_collected_body": "Quando crias uma conta, recolhemos o teu nome, email, data de nascimento e género. Podes adicionar uma foto de perfil, a mão dominante e o lado preferido, e um número de telefone. O número de telefone é enviado uma única vez para o nosso servidor, que o transforma num hash irreversível — é esse hash que fica guardado, e serve apenas para ligar a tua conta ao bot de WhatsApp do teu clube. Se entras num mix pelo WhatsApp sem teres conta, não criamos conta nenhuma: ficas como convidado só desse mix, com o nome que tens no WhatsApp e o teu número (o identificador do WhatsApp, guardado para te poder responder e enviar lembretes). Dois dias depois do mix, o número e o identificador são apagados e fica só o nome, no histórico desse jogo. Se entrares com o Google, recebemos o nome, email e foto associados a essa conta Google. Enquanto usas a app, guardamos os jogos em que participas, os resultados, o teu nível/ranking, os kudos que dás e recebes, as conquistas, e a que clubes pertences. Para criar conta é preciso ter pelo menos 13 anos; entre os 13 e os 17 a conta nasce privada.",
   "privacy.section_purpose_title": "Para que usamos os teus dados",
@@ -3366,7 +3366,7 @@
   "privacy.section_contact_body": "Para qualquer questão sobre esta política ou sobre os teus dados, contacta-nos em support@alinho.pt.",
   "terms.title": "Termos de Serviço",
   "terms.section_intro_title": "Sobre o alinho",
-  "terms.section_intro_body": "O alinho é uma aplicação de gestão de jogos de padel: clubes criam jogos ('mixes'), jogadores inscrevem-se sozinhos ou com parceiro, os resultados alimentam um ranking, e um bot de WhatsApp opcional permite confirmar presença sem abrir a app. Ao usar o alinho, aceitas estes Termos de Serviço e a nossa Política de Privacidade. Última atualização: 31 de agosto de 2026.",
+  "terms.section_intro_body": "O alinho é uma aplicação de gestão de jogos de padel: clubes criam jogos ('mixes'), jogadores inscrevem-se sozinhos ou com parceiro, os resultados alimentam um ranking, e um bot de WhatsApp opcional permite confirmar presença sem abrir a app. Ao usar o alinho, aceitas estes Termos de Serviço e a nossa Política de Privacidade.",
   "terms.section_pilot_title": "Piloto gratuito",
   "terms.section_pilot_body": "O alinho está atualmente numa fase piloto gratuita, com um número limitado de clubes. Não há pagamentos nem subscrições. Reservamo-nos o direito de introduzir alterações ao serviço, incluindo funcionalidades pagas no futuro, com aviso prévio dentro da app.",
   "terms.section_responsibilities_title": "As tuas responsabilidades",
@@ -5641,5 +5641,9 @@
   "frames.place": "{{place}}.º lugar",
   "frames.sheet_title_other": "Molduras deste mês",
   "frames.sheet_body_other": "Ganhas no pódio do mês passado. Usa a melhor até ao fim deste mês.",
-  "frames.in_use": "A usar agora"
+  "frames.in_use": "A usar agora",
+  "privacy.section_controller_title": "Quem é responsável pelos teus dados",
+  "privacy.section_controller_body": "O alinho ainda não é uma empresa. Os responsáveis pelo tratamento dos teus dados são as pessoas que o gerem: {{names}}. Para qualquer pedido sobre os teus dados (ver, corrigir, apagar ou levar contigo), escreve para {{email}}. Quando a empresa for criada, esta secção passa a ter os dados dela, e avisamos-te.",
+  "terms.intro_founders": "O alinho é gerido por {{names}}, até à criação da empresa. Contacto: {{email}}.",
+  "legal.last_updated": "Última atualização: {{date}}"
 }

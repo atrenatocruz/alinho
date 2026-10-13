@@ -11,12 +11,16 @@ import { shortName } from '../../lib/monthRanking'
 export const PODIUM_RING = { 1: '#E8B23A', 2: '#B8BEC7', 3: '#C98B5E' }
 export const CROWN_SRC = '/podio/coroa.webp'
 
-/** A coroa inclinada por cima da foto do 1.º, a passar por cima do anel. */
-export function Crown({ width = 46, lift = 30 }) {
+/** A coroa do 1.º, a −44° (fica a 45° à vista), pousada no anel no canto de
+ *  cima à esquerda, com os dois cantos da base em cima do anel (Francisco,
+ *  13 out). Medidas da SPEC para um anel de 72 px de diâmetro (48 px de
+ *  largura, left −15, top −34); `ring` = o diâmetro do anel, e tudo escala. */
+export function Crown({ ring = 72 }) {
+  const s = ring / 72
   return (
-    <img src={CROWN_SRC} alt="" aria-hidden="true" width={width}
-      className="pointer-events-none absolute left-1/2 z-[1] max-w-none drop-shadow-[0_3px_4px_rgba(4,4,4,0.25)]"
-      style={{ width, top: -lift, transform: 'translateX(-50%) rotate(-12deg)' }} />
+    <img src={CROWN_SRC} alt="" aria-hidden="true" width={48 * s}
+      className="pointer-events-none absolute z-[1] max-w-none drop-shadow-[0_3px_4px_rgba(4,4,4,0.25)]"
+      style={{ width: 48 * s, left: -15 * s, top: -34 * s, transform: 'rotate(-44deg)', transformOrigin: 'center' }} />
   )
 }
 
@@ -40,7 +44,7 @@ function Spot({ row, place, big, value, isMe, freeHint, onOpen }) {
   return (
     <button type="button" onClick={() => onOpen?.(row.user_id)} className="flex flex-col items-center text-center min-w-0">
       <div className={`relative ${big ? 'mt-6' : 'mt-9'}`}>
-        {big && <Crown />}
+        {big && <Crown ring={70} />}
         <span className="block rounded-full p-[3px]" style={{ background: isMe ? '#C5DD01' : PODIUM_RING[Math.min(shown, 3)] }}>
           <span className="block rounded-full bg-white p-[2px]"><Avatar name={row.name} url={row.avatar_url} size={size} /></span>
         </span>
