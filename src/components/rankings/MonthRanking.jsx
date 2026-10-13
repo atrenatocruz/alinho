@@ -112,7 +112,7 @@ export default function MonthRanking({ scope, scale, scopeLabel, onShare }) {
           {qualifiedCount <= 3 ? (
             <div className="rounded-card border border-dashed border-ink-200 bg-white p-4 text-sm text-ink-700 leading-relaxed">{fewText}</div>
           ) : (
-            <div className="card p-0 overflow-hidden divide-y divide-line">
+            <div className="rounded-card border border-line bg-white overflow-hidden divide-y divide-line">
               {rest.map((row) => (
                 <Link key={row.user_id} id={`month-row-${row.user_id}`} to={`/jogador/${row.user_id}`}
                   className={`flex items-center gap-3 px-3.5 py-2.5 transition-colors duration-fast hover:bg-ink-50 ${
@@ -136,26 +136,32 @@ export default function MonthRanking({ scope, scale, scopeLabel, onShare }) {
             </div>
           )}
 
-          {/* A tua linha, presa por cima da barra de navegação. */}
+          {/* A tua linha, presa por cima da barra de navegação: preta, igual à
+              do Ranking (o Francisco escolheu a preta, 13 out). */}
           {isCurrent && (
             <button type="button" onClick={seeMe}
-              className="sticky bottom-24 z-10 flex w-full items-center gap-3 rounded-card border-2 border-lime-400 bg-white px-3.5 py-2.5 text-left shadow-lift">
-              <span className="shrink-0 rounded-full bg-lime-400 px-2 py-0.5 text-[11px] font-extrabold text-ink-900">{t('month.you')}</span>
-              {me && <Avatar name={me.name} url={me.avatar_url} size="w-8 h-8 text-xs" />}
-              {me?.qualified ? (
-                <p className="flex-1 min-w-0 truncate">
-                  <span className="font-display text-lg font-extrabold text-ink-900">{t('month.place', { place: me.place })}</span>
-                  <span className={`ml-2 text-sm font-extrabold ${monthPointsMuted(me.points) ? 'text-muted' : 'text-[#5B6B00]'}`}>
-                    {t('month.points_this_month', { points: monthPoints(me.points) })}
-                  </span>
-                </p>
-              ) : (
-                <p className="flex-1 min-w-0 truncate">
-                  <span className="font-display text-lg font-extrabold text-ink-900">{t('month.out')}</span>
-                  <span className="ml-2 text-sm font-extrabold text-[#5B6B00]">{t('month.out_games', { games: me?.games || 0, min: MONTH_MIN_GAMES })}</span>
-                </p>
+              className="sticky bottom-24 z-10 flex w-full items-center gap-3 rounded-card bg-ink-900 px-3.5 py-2.5 text-left text-white shadow-lift">
+              <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-ctrl text-sm font-extrabold tabular-nums ${me?.qualified ? 'bg-lime-400 text-ink-900' : 'bg-white/10 text-white'}`}>
+                {me?.qualified ? me.place : '—'}
+              </span>
+              <Avatar name={me?.name || '?'} url={me?.avatar_url} size="w-9 h-9 text-xs" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-extrabold">{t('rankings.you_row')}</p>
+                <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
+                  {me?.rating != null && <span className="flex shrink-0"><RatingBadge rating={me.rating} gender={me.gender} onDark /></span>}
+                  <p className="truncate text-[11px] text-white/60">
+                    {me?.qualified
+                      ? `${t('rankings.your_position', { position: me.place, total: qualifiedCount })} · ${t(`rankings.scale_${scale}`)}`
+                      : `${t('month.out')} · ${t('month.out_games', { games: me?.games || 0, min: MONTH_MIN_GAMES })}`}
+                  </p>
+                </div>
+              </div>
+              {me?.qualified && (
+                <div className="shrink-0 text-right">
+                  <p className={`text-lg font-extrabold leading-tight tabular-nums ${monthPointsMuted(me.points) ? 'text-white/60' : 'text-white'}`}>{monthPoints(me.points)}</p>
+                  <p className="text-[10px] text-white/60">{t('month.this_month')}</p>
+                </div>
               )}
-              {me?.qualified && <span className="shrink-0 inline-flex items-center text-[13px] font-extrabold text-ink-900">{t('month.see')} <ChevronRight size={14} /></span>}
             </button>
           )}
         </>

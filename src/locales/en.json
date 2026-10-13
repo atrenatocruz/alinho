@@ -5706,5 +5706,13 @@
   "privacy.section_controller_title": "Who is responsible for your data",
   "privacy.section_controller_body": "alinho is not yet a company. The controllers of your personal data are the people who run it: {{names}}. For any request about your data (access, correction, deletion or portability), write to {{email}}. Once the company is incorporated, this section will show its details, and we will let you know.",
   "terms.intro_founders": "alinho is run by {{names}} until the company is incorporated. Contact: {{email}}.",
-  "legal.last_updated": "Last updated: {{date}}"
+  "legal.last_updated": "Last updated: {{date}}",
+  "rankings.title_global": "Overall ranking",
+  "rankings.title_xp": "Attendance",
+  "rankings.sub_xp": "XP from every game · more games, more XP",
+  "rankings.sub_count_one": "{{count}} player · {{scale}}",
+  "rankings.sub_count_other": "{{count}} players · {{scale}}",
+  "rankings.sub_count_f_one": "{{count}} player · {{scale}}",
+  "rankings.sub_count_f_other": "{{count}} players · {{scale}}",
+  "rankings.empty_xp_title": "Nobody has XP here yet"
 }

@@ -5721,5 +5721,13 @@
   "privacy.section_controller_title": "Quem é responsável pelos teus dados",
   "privacy.section_controller_body": "O alinho ainda não é uma empresa. Os responsáveis pelo tratamento dos teus dados são as pessoas que o gerem: {{names}}. Para qualquer pedido sobre os teus dados (ver, corrigir, apagar ou levar contigo), escreve para {{email}}. Quando a empresa for criada, esta secção passa a ter os dados dela, e avisamos-te.",
   "terms.intro_founders": "O alinho é gerido por {{names}}, até à criação da empresa. Contacto: {{email}}.",
-  "legal.last_updated": "Última atualização: {{date}}"
+  "legal.last_updated": "Última atualização: {{date}}",
+  "rankings.title_global": "Ranking geral",
+  "rankings.title_xp": "Assiduidade",
+  "rankings.sub_xp": "XP de todos os jogos · mais jogos, mais XP",
+  "rankings.sub_count_one": "{{count}} jogador · {{scale}}",
+  "rankings.sub_count_other": "{{count}} jogadores · {{scale}}",
+  "rankings.sub_count_f_one": "{{count}} jogadora · {{scale}}",
+  "rankings.sub_count_f_other": "{{count}} jogadoras · {{scale}}",
+  "rankings.empty_xp_title": "Ainda ninguém tem XP aqui"
 }
