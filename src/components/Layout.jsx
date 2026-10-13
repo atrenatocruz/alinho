@@ -872,9 +872,11 @@ export default function Layout({ children }) {
         className="app-nav absolute inset-x-0 bottom-0 z-20 flex justify-center pointer-events-none px-4 pt-2"
         style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
       >
+        {/* A ilha ocupa a largura do ecrã (até ~480 px num ecrã largo), e os
+            cinco botões repartem o espaço por igual (Francisco, 13 out —
+            design-handoff/2026-10-13-menu-largura-toda). */}
         <div
-          className="pointer-events-auto flex items-center gap-0.5 p-1 rounded-full
-                        max-w-full overflow-x-auto no-scrollbar
+          className="pointer-events-auto flex w-full max-w-[480px] items-center gap-0.5 p-1 rounded-full
                         bg-ink-900/95 supports-[backdrop-filter]:bg-ink-900/90 backdrop-blur-xl
                         shadow-[0_8px_32px_rgba(11,37,69,0.35)]
                         ring-1 ring-white/10"
@@ -898,11 +900,11 @@ export default function Layout({ children }) {
                 }}
                 aria-current={isActive ? 'page' : undefined}
                 aria-label={label}
-                className={`relative flex flex-col items-center justify-center h-11 rounded-full shrink-0
-                            transition-all duration-base ${
+                className={`relative flex min-w-0 flex-1 flex-col items-center justify-center h-11 rounded-full
+                            transition-colors duration-base ${
                   isActive
-                    ? 'bg-white/15 text-lime-400 w-[92px]'
-                    : 'text-ink-200 hover:text-white w-11'
+                    ? 'bg-white/15 text-lime-400'
+                    : 'text-ink-200 hover:text-white'
                 }`}
               >
                 {isGerir && joinRequestsTotal > 0 && (
