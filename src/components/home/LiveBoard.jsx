@@ -8,13 +8,15 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Avatar } from '../ui'
 import { kindColorsOf } from '../agenda/HomeCard'
+import { shortPersonName } from '../../lib/mixLogic'
 
 const kindOf = (row) => (row.kind === 'friends' && row.org_kind && row.org_kind !== 'group' ? 'open' : row.kind)
 
 function Team({ team, score, lead, hidden = false }) {
   const { t } = useTranslation()
   // Quem esconde os resultados vem sem nomes (Dev 3): «—», sem caras.
-  const names = hidden ? [t('homecard.live_hidden')] : (team || []).map((p) => p.name).filter(Boolean)
+  // Nomes curtos, como no resto da app («Rita F.») — QA, 13 out.
+  const names = hidden ? [t('homecard.live_hidden')] : (team || []).map((p) => shortPersonName(p.name)).filter(Boolean)
   return (
     <div className="mt-2.5 flex items-center gap-2.5">
       <span className="flex">

@@ -22,6 +22,8 @@ import { Avatar, PrimaryButton, EmptyState, ConfirmSheet, LoadErrorState } from 
 import { Sheet } from '../components/agenda/AgendaControls'
 import { shareWithMissing, sessionLink } from '../components/friends/friendShare'
 import { dayText } from '../components/friends/dayText'
+import EventHero from '../components/event/EventHero'
+import { formatDate } from '../lib/formatDate'
 import { beforeStart } from '../lib/friendGames'
 import { currentGame } from '../components/friends/FriendGameNow'
 import { ShareMissingButton } from '../components/friends/FriendSessionGames'
@@ -403,10 +405,6 @@ export default function FriendSession() {
     return <div className="flex justify-center py-10"><div className="h-8 w-8 animate-spin rounded-full border-[3px] border-ink-50 border-t-ink-700" /></div>
   }
 
-  const whenText = [
-    match.scheduled_date ? dayText(match.scheduled_date, i18n.language) : null,
-    match.scheduled_time ? match.scheduled_time.slice(0, 5) : null,
-  ].filter(Boolean).join(' · ')
   const label = 'block text-sm font-medium text-gray-700 mb-2'
   const person = (p, onClick) => (
     <button key={p.id} type="button" onClick={onClick}
@@ -427,8 +425,42 @@ export default function FriendSession() {
 
   return (
     <div className="mx-auto max-w-lg pb-28">
-      {back}
-      <h1 className="mt-2 font-display text-2xl text-ink-900">{whenText}</h1>
+      {/* R3 (13 out): o topo do evento (EventHero, peça comum do Dev 1), com
+          o Alino dos amigos — num clube, o do jogo em aberto (Francisco, 28 set). */}
+      {(() => {
+        const inClub = match.organization_kind && match.organization_kind !== 'group'
+        const kind = inClub ? 'open' : 'friends'
+        const accepted = invitees.filter((i) => i.status === 'accepted' || i.status === 'guest')
+        const slots = Math.max(players.length, 4)
+        const firstName = (n) => (/\d$/.test(String(n || '').trim()) ? String(n).trim() : String(n || '').trim().split(/\s+/)[0])
+        let text = null
+        let tone = 'kind'
+        if (finished) text = t('friends.finished_tag')
+        else if (me?.status === 'pending' || invitedHere) text = t('home.invite_by', { name: firstName(creator?.name) })
+        else if (me) { text = t('home.next_in'); tone = 'ok' }
+        return (
+          <EventHero
+            kind={kind}
+            chip={[t(inClub ? 'agenda.kind_open' : 'agenda.kind_friends'), games.length ? t('homecard.rounds_count', { count: games.length }) : null].filter(Boolean).join(' · ')}
+            org={match.organization_name ? {
+              name: match.organization_name,
+              kindLabel: t(inClub ? 'tournament.hero_org_club' : 'tournament.hero_org_group'),
+              onOpen: match.organization_slug ? () => navigate(`/clube/${match.organization_slug}`) : null,
+            } : null}
+            title={t('agenda.played_friends_title', { name: iAmCreator ? t('agenda.you') : firstName(creator?.name) })}
+            time={match.scheduled_time ? match.scheduled_time.slice(0, 5) : null}
+            dateLine={match.scheduled_date ? formatDate(new Date(`${match.scheduled_date}T12:00`), i18n.language, { weekday: 'long', day: 'numeric', month: 'long' }).toLocaleLowerCase(i18n.language) : null}
+            onBack={goBack}
+            status={{
+              faces: accepted.map((i) => ({ id: i.invitee_id, name: i.name, avatar_url: i.avatar_url })),
+              slots: finished ? 0 : Math.max(0, slots - accepted.length),
+              text,
+              tone,
+              meta: t('homecard.hero_meta_accepted', { n: accepted.length, total: slots }),
+            }}
+          />
+        )
+      })()}
       {actions}
       {games.length > 0 ? (
         // «6 pessoas · 1 campo · a rodar · 20 min por ronda» (SPEC amigos-a-

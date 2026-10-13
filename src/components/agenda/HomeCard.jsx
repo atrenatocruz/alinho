@@ -47,7 +47,8 @@ export default function HomeCard({ colors = FALLBACK, label, pill = null, time, 
           <div className="relative h-[120px] bg-cover bg-center" style={{ backgroundImage: `url("${String(imageUrl).replace(/"/g, "%22")}")`, backgroundColor: band }}>
             <span className="absolute left-3 top-3 rounded-md px-2 py-[5px] font-mono text-[10.5px] font-medium uppercase leading-none tracking-[.1em] text-white"
               style={{ background: band }}>{label}</span>
-            {pill && <span className="absolute right-3 top-3">{pill}</span>}
+            {/* Por cima da foto, a pastilha escura ganha fundo para se ler (QA, 13 out). */}
+            {pill && <span className="absolute right-3 top-3 rounded-full bg-black/55">{pill}</span>}
           </div>
           <div className="px-3.5 py-[9px] text-white" style={{ background: band }}>{hourRow}</div>
         </>
