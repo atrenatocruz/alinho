@@ -656,6 +656,8 @@
   "partner.claim_error_invite_is_yours": "Este convite foi criado por ti. Manda o link à pessoa que vai jogar contigo.",
   "partner.claim_error_already_in_game": "Já estás inscrito neste mix. Este convite é para outra pessoa.",
   "partner.claim_error_invite_claimed": "Este convite já foi aceite.",
+  "partner.claim_claimed_title": "Este convite já foi aceite",
+  "partner.claim_claimed_sub": "Entra na tua conta para veres o teu lugar.",
   "partner.claim_go_home": "Ir para a app",
   "tsignup.cta": "Inscrever a minha dupla",
   "tsignup.cta_signed_out": "Criar conta para me inscrever",

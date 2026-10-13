@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams, useLocation, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
-import { PrimaryButton } from '../components/ui'
-import { claimPartnerInvite, getPartnerInvite } from '../lib/partnerInvite'
+import { PrimaryButton, EmptyState } from '../components/ui'
+import Alino from '../components/Alino'
+import { claimPartnerInvite, getPartnerInvite, getInviteLinkStatus } from '../lib/partnerInvite'
 import { claimEntry } from '../lib/tournamentSignup'
 import { claimFriendMatchInvite } from '../lib/privateMatches'
 import { signUpBackLink } from '../lib/loginLinks'
@@ -32,8 +33,21 @@ export default function ClaimInvite() {
   const { user } = useAuth()
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const [state, setState] = useState(user ? 'claiming' : 'signed_out')
+  // Sem sessão, primeiro vê-se se o link ainda vale ('peeking'): um código
+  // que não existe dizia «Guardaram-te um lugar» e «Criar conta» (PO, 13 out).
+  const [state, setState] = useState(user ? 'claiming' : 'peeking')
   const [error, setError] = useState('')
+  const [invalid, setInvalid] = useState(null) // 'not_found' | 'claimed' | 'expired'
+  useEffect(() => {
+    if (user || !token) return undefined
+    let cancelled = false
+    getInviteLinkStatus(isTournament ? 'tournament' : isFriends ? 'friends' : 'mix', token).then((status) => {
+      if (cancelled) return
+      if (status && status !== 'pending') { setInvalid(['claimed', 'expired'].includes(status) ? status : 'not_found'); setState('invalid') }
+      else setState('signed_out')
+    })
+    return () => { cancelled = true }
+  }, [user, token, isTournament, isFriends])
   // Convite de parceiro num mix: antes de aceitar, «É para X. És tu?»
   // (Francisco, 26 set). Aconteceu duas vezes: quem criou o convite aceitou-o
   // ele próprio, e um convite para o José foi aceite pelo João.
@@ -99,10 +113,32 @@ export default function ClaimInvite() {
     return () => { cancelled = true }
   }, [user, token, navigate, t, isTournament, isFriends, isMix, confirmed])
 
+  if (state === 'peeking') return null
+  // Link que já não vale, sem sessão: como o /m/ com um código errado —
+  // o Alino, «Este link já não é válido», «Ir para o início» e «Entrar».
+  // Já aceite (UX, 13 out): o link não está estragado e quem aceitou tem
+  // conta — «Este convite já foi aceite», com «Entrar» à frente.
+  if (state === 'invalid') {
+    const claimed = invalid === 'claimed'
+    const home = <Link to="/" className={`${claimed ? 'btn-secondary' : 'btn-primary'} w-full inline-flex items-center justify-center`}>{t('notfound.go_home')}</Link>
+    const login = <Link to="/login" className={`${claimed ? 'btn-primary' : 'btn-secondary'} w-full inline-flex items-center justify-center`}>{t('landing.login_link')}</Link>
+    return (
+      <div className="p-4 max-w-md mx-auto">
+        <EmptyState
+          title={t(claimed ? 'partner.claim_claimed_title' : 'shortlink.invalid_title')}
+          subtitle={t(claimed ? 'partner.claim_claimed_sub' : `partner.claim_error_invite_${invalid}`)}
+          action={<div className="flex flex-col gap-2 max-w-xs mx-auto">{claimed ? <>{login}{home}</> : <>{home}{login}</>}</div>}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="p-4 max-w-md mx-auto space-y-4">
       <div className="card space-y-3 text-center">
-        <p className="text-2xl">🎾</p>
+        {/* A bola da alinho, não um emoji (o 🎾 aparecia como raqueta de
+            badminton nalguns telemóveis — revisão do site, 13 out). */}
+        <div className="flex justify-center"><Alino pose="ola" size={88} /></div>
         <h1 className="text-xl text-ink-900">{t(isTournament ? 'tsignup.claim_title' : isFriends ? 'friends.claim_title' : 'partner.claim_title')}</h1>
 
         {state === 'signed_out' && (
