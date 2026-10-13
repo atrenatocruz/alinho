@@ -5430,8 +5430,6 @@
   "friends.reject_send": "Say it isn't right",
   "friends.reject_after_all_ok": "It's right after all",
   "friends.page_result_line": "<b>{{name}}</b> sent the score: <b>{{how}}</b> Is it right?",
-  "friends.page_result_line_f": "<b>{{name}}</b> sent the score: <b>{{how}}</b> Is it right?",
-  "friends.page_result_line_m": "<b>{{name}}</b> sent the score: <b>{{how}}</b> Is it right?",
   "friends.toast_result_ok": "Thanks. The result stays as it is.",
   "friends.toast_result_rejected": "Sent. {{name}} gets a notice to fix it.",
   "friends.next_missing_other": "Couldn't create round {{n}}. Try again.",
