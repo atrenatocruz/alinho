@@ -318,8 +318,9 @@ export function FilterSheet({ part = 'show', filters, orgs, countFor, onApply, o
 export function LocationChip({ location, onOpen }) {
   const { t } = useTranslation()
   return (
-    <button type="button" onClick={onOpen} className="inline-flex items-center gap-1.5 min-h-[40px] text-sm font-extrabold text-ink-700 max-w-full">
-      <MapPin size={15} className="shrink-0" />
+    // R2 (UX, 13 out): 13 px, peso 600, cinzento, logo por baixo da data.
+    <button type="button" onClick={onOpen} className="mt-1.5 inline-flex max-w-full items-center gap-1 py-1 text-[13px] font-semibold leading-none text-[#4F535A]">
+      <MapPin size={13} className="shrink-0" />
       <span className="truncate">
         {location ? t('agenda.location_chip', { place: location.label, km: location.radiusKm }) : t('agenda.location_choose')}
       </span>

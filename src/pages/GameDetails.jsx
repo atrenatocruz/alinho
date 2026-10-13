@@ -3063,9 +3063,13 @@ export default function GameDetails() {
         let text = null
         let tone = 'kind'
         // Terminado ou cancelado: a faixa a cinzento, como no torneio (UX, 13 out).
-        if (game.status === 'cancelled') { text = t('mixcancel.banner_title'); tone = 'grey' }
+        // Cancelado: só «Cancelado», com o ponto vermelho; a frase inteira fica
+        // no cartão logo a seguir (QA, 13 out: aparecia duas vezes).
+        let dot = null
+        if (game.status === 'cancelled') { text = t('homecard.cancelled'); tone = 'grey'; dot = '#DC2626' }
         else if (done) { text = t('agenda.state_finished'); tone = 'grey' }
-        else if (isUserJoined) { text = t('home.next_in'); tone = 'ok' }
+        // «Estás dentro · campo 1» quando já se sabe o campo (QA, 13 out).
+        else if (isUserJoined) { text = myMatch?.court_number ? t('homecard.in_court', { n: myMatch.court_number }) : t('home.next_in'); tone = 'ok' }
         else if (isUserWaitlisted) text = t('agenda.state_waitlist')
         else if (isUserRequested) text = t('agenda.state_request_sent')
         else if (isOpenGame(game)) text = free ? t('openday.missing', { count: free }) : t('openday.closed')
@@ -3085,7 +3089,10 @@ export default function GameDetails() {
             } : null}
             title={game.title}
             time={formatTime(game.date, i18n.language, { hour: '2-digit', minute: '2-digit' })}
-            timeAside={ends ? t('homecard.until', { time: formatTime(ends, i18n.language, { hour: '2-digit', minute: '2-digit' }) }) : null}
+            // Sempre o fim ao lado (UX, 13 out): «até 22:00» com tempo de campo;
+            // sem ele, «recorrente» numa série.
+            timeAside={ends ? t('homecard.until', { time: formatTime(ends, i18n.language, { hour: '2-digit', minute: '2-digit' }) })
+              : game.recurrence_id ? t('ui.recurring').toLowerCase() : null}
             dateLine={formatDateLib(game.date, i18n.language, { weekday: 'long', day: 'numeric', month: 'long' }).toLocaleLowerCase(i18n.language)}
             // Adicionar ao calendário (Trello #206) — escondido depois de o mix acabar.
             onAddToCalendar={!['finished', 'completed', 'cancelled'].includes(game.status)
@@ -3107,7 +3114,10 @@ export default function GameDetails() {
               slots: done ? 0 : free,
               text,
               tone,
-              meta: t('homecard.hero_meta', { n: peopleCount, total: capacity }),
+              dot,
+              // «· HOJE» quando é hoje, como no protótipo (QA, 13 out).
+              meta: [t('homecard.hero_meta', { n: peopleCount, total: capacity }),
+                new Date(game.date).toDateString() === new Date().toDateString() ? t('ui.today') : null].filter(Boolean).join(' · '),
             }}
           />
         )
@@ -3278,6 +3288,10 @@ export default function GameDetails() {
         // deixaria uma dupla com quem ja nao esta no mix. Retoma-se ou
         // refazem-se as duplas primeiro.
         <div className="space-y-1.5">
+          {/* R3: já dentro, a caixa verde-clara por cima do «Sair» (protótipo). */}
+          <p className="flex min-h-[52px] items-center justify-center rounded-ctrl bg-[#F4F8DC] px-4 font-display text-[15px] font-extrabold text-[#3F6212]">
+            ✓ {t('home.next_in')}
+          </p>
           <PrimaryButton variant="ghost" onClick={handleLeaveGame} className="w-full !bg-white !border-ink-900">
             {t(isOpenGame(game) ? 'openday.leave' : 'gamedetails.leave_mix')}
           </PrimaryButton>
@@ -3326,8 +3340,7 @@ export default function GameDetails() {
               </p>
             )}
             {game.location && (
-              <LocationOpenWith location={game.location} latitude={game.latitude} longitude={game.longitude}
-                className="rounded-[14px] bg-[#F4F4F0] px-3.5 py-3" />
+              <LocationOpenWith location={game.location} latitude={game.latitude} longitude={game.longitude} />
             )}
           </div>
         )

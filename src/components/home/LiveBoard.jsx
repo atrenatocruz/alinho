@@ -63,7 +63,8 @@ export default function LiveBoard({ row, card, onOpen }) {
           <i className="h-[7px] w-[7px] rounded-full bg-[#FF4D4D] motion-safe:animate-pulse" /> {t('ui.status_live')}
         </span>
         <span className="min-w-0 truncate font-display text-[12.5px] font-bold leading-[1.2] opacity-95">
-          {[card.title, row.org_name].filter(Boolean).join(' · ')}
+          {/* Nos amigos, «Entre amigos · <sítio>», como no protótipo (QA, 13 out). */}
+          {[row.kind === 'friends' ? t('agenda.kind_friends') : card.title, row.org_name].filter(Boolean).join(' · ')}
         </span>
       </div>
       <div className="px-3.5 pb-3.5 pt-3">
