@@ -839,7 +839,8 @@ export default function Layout({ children }) {
     // there's no document-level momentum scroll left to detach it from.
     // --app-h: no site de testes a faixa «Ambiente de testes» fica por cima e
     // o ecrã da app encolhe à medida (index.css, #585).
-    <div className="relative flex flex-col h-screen bg-canvas overflow-hidden" style={{ height: 'var(--app-h, 100dvh)' }}>
+    // Fundo cinzento-claro das páginas da app, com os cartões em branco (R12, 13 out).
+    <div className="relative flex flex-col h-screen bg-ground overflow-hidden" style={{ height: 'var(--app-h, 100dvh)' }}>
       {/* Main — the only scrolling region in the shell (see the app-shell
           comment above the root div). pb-28 keeps the last bit of content
           from hiding behind the nav overlay below. No dark header above it
