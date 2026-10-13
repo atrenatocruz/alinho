@@ -6,7 +6,7 @@ import { sharePageLink } from '../../lib/shareImage'
 import { PlayerAvatarRow, GroupLevelBadge, PrimaryButton } from '../ui'
 import { formatTime, formatCurrency } from '../../lib/formatDate'
 import { useSpecialPriceLine } from '../SpecialPriceRoster'
-import { GENDER_RESTRICTION_LABEL_KEY, mixCapacity, isGenderMismatch, isAgeIneligible, formatLabelKey } from '../../lib/mixLogic'
+import { GENDER_RESTRICTION_LABEL_KEY, mixCapacity, isGenderMismatch, isAgeIneligible, formatLabelKey, shortPersonName } from '../../lib/mixLogic'
 import { AGE_LABEL_KEY } from '../../lib/ageCategories'
 import CardMascot, { mascotFor, mascotCardClass, MascotPill } from './CardMascot'
 import { isMixLive } from '../../lib/mixLive'
@@ -69,11 +69,8 @@ const ACTION_VARIANT = {
   leave_waitlist: 'ghost',
 }
 
-// «Rita Figueira» → «Rita F.» (o nome de quem abriu um jogo em aberto).
-const shortPersonName = (name) => {
-  const parts = String(name || '').trim().split(/\s+/).filter(Boolean)
-  return parts.length > 1 && /\p{L}/u.test(parts[parts.length - 1]) ? `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.` : parts.join(' ')
-}
+// «Rita Figueira» → «Rita F.» (o nome de quem abriu um jogo em aberto): o
+// shortPersonName comum (mixLogic), com os números do fim (12 out).
 
 const initials = (name) => (name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase()
 

@@ -196,6 +196,27 @@ describe('generateAmericanoSchedule', () => {
     }
   })
 
+  it('regra dos 4 mixes (12 out): em todas as rondas evita quem já foi dupla, havendo outra forma', () => {
+    const k = (a, b) => [a, b].sort().join('|')
+    // Os 1+2, 1+3 e 5+6 jogaram juntos há pouco.
+    const historyPairs = new Set([k(1, 2), k(1, 3), k(5, 6)])
+    const schedule = generateAmericanoSchedule(eightPlayers, 2, 4, {}, { historyPairs })
+    for (const round of schedule) {
+      for (const m of round) {
+        for (const d of [m.duplaA, m.duplaB]) expect(historyPairs.has(k(d.player1.id, d.player2.id))).toBe(false)
+      }
+    }
+    expect(schedule.forcedHistory).toEqual([])
+  })
+
+  it('regra dos 4 mixes: com 4 pessoas que já foram todas dupla, junta na mesma e diz quais', () => {
+    const k = (a, b) => [a, b].sort().join('|')
+    const all = new Set([k(1, 2), k(1, 3), k(1, 4), k(2, 3), k(2, 4), k(3, 4)])
+    const schedule = generateAmericanoSchedule(fourPlayers, 1, 1, {}, { historyPairs: all })
+    expect(schedule).toHaveLength(1)
+    expect(schedule.forcedHistory.length).toBe(2)
+  })
+
   it('assigns court numbers 1..numCourts within each round', () => {
     const schedule = generateAmericanoSchedule(eightPlayers, 2, 1, {})
     expect(schedule[0].map(m => m.court_number).sort()).toEqual([1, 2])

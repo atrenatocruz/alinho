@@ -621,11 +621,20 @@ export function standings(teams, matches) {
 /** «Carlos N.» para o «marcado por»: o primeiro nome e a inicial do último.
     O que está entre parênteses e o que não tem letras não conta — com
     «Francisco (QA)» saía «Francisco (.» (Francisco, 2 out). */
+// Nome com número no fim (12 out, regra combinada com o Dev 3 — a mesma do
+// live_short_name): os números do fim ficam, e a inicial vem da última
+// palavra com letras. «Teste Xico 1» → «Teste X. 1» (antes «Teste»: a t1 e a
+// t2 ficavam iguais). Sem nenhuma palavra com letras, fica o nome inteiro.
 export function shortPersonName(name) {
-  const parts = String(name || '').replace(/\([^)]*\)?/g, ' ').trim().split(/\s+/).filter((p) => /\p{L}/u.test(p))
-  if (parts.length === 0) return ''
+  const raw = String(name || '').trim()
+  if (!raw) return ''
+  const tokens = raw.replace(/\([^)]*\)?/g, ' ').trim().split(/\s+/).filter(Boolean)
+  const tail = []
+  while (tokens.length && !/\p{L}/u.test(tokens[tokens.length - 1])) tail.unshift(tokens.pop())
+  const parts = tokens.filter((p) => /\p{L}/u.test(p))
+  if (parts.length === 0) return raw
   const last = parts[parts.length - 1].match(/\p{L}/u)[0]
-  return parts.length > 1 ? `${parts[0]} ${last.toUpperCase()}.` : parts[0]
+  return [parts[0], parts.length > 1 ? `${last.toUpperCase()}.` : null, ...tail].filter(Boolean).join(' ')
 }
 
 export const hasResult = (m) => !!m && (!!m.winner_team_id || (m.score_a != null && m.score_b != null))
@@ -798,13 +807,19 @@ export const placementOfCourt = (court) => 2 * court - 1
 
     Returns: numRounds entries, each an array of numCourts
     { court_number, duplaA: {player1, player2, seed}, duplaB: {...} }. */
-export function generateAmericanoSchedule(players, numCourts, numRounds, pointsById = {}, { mode = 'por_nivel', random = Math.random } = {}) {
+// A regra de 12 out em todas as rondas do Americano (Francisco, «quero o
+// mesmo em todos os modos»): ao formar as duplas de cada ronda, evita quem
+// foi dupla num dos últimos 4 mixes em que estiveram os dois
+// (`historyPairs`), depois de não repetir parceiro neste mix. Sem outra
+// forma, junta na mesma e devolve o par em `rounds.forcedHistory`.
+export function generateAmericanoSchedule(players, numCourts, numRounds, pointsById = {}, { mode = 'por_nivel', random = Math.random, historyPairs = new Set() } = {}) {
   const pairKey = (a, b) => [a.id, b.id].sort().join('|')
   const pointsOf = (p) => pointsById[p?.id] ?? 0
 
   const partnerHistory = new Set()
   const opponentHistory = new Set()
   const rounds = []
+  const forcedHistory = []
 
   for (let r = 0; r < numRounds; r++) {
     // ── Form this round's duplas ──────────────────────────────────────
@@ -820,9 +835,14 @@ export function generateAmericanoSchedule(players, numCourts, numRounds, pointsB
     const duplas = []
     while (pool.length >= 2) {
       const a = pool.shift()
-      let idx = pool.findIndex((cand) => !partnerHistory.has(pairKey(a, cand)))
+      // Primeiro sem repetir neste mix nem dos últimos 4 mixes; depois só sem
+      // repetir neste mix; depois só sem os últimos 4; por fim o mais próximo.
+      let idx = pool.findIndex((cand) => !partnerHistory.has(pairKey(a, cand)) && !historyPairs.has(pairKey(a, cand)))
+      if (idx === -1) idx = pool.findIndex((cand) => !partnerHistory.has(pairKey(a, cand)))
+      if (idx === -1) idx = pool.findIndex((cand) => !historyPairs.has(pairKey(a, cand)))
       if (idx === -1) idx = 0 // everyone left is a repeat partner — accept the closest rather than leave a gap
       const b = pool.splice(idx, 1)[0]
+      if (historyPairs.has(pairKey(a, b))) forcedHistory.push([a, b])
       partnerHistory.add(pairKey(a, b))
       duplas.push({ player1: a, player2: b, seed: pointsOf(a) + pointsOf(b) })
     }
@@ -853,6 +873,7 @@ export function generateAmericanoSchedule(players, numCourts, numRounds, pointsB
     rounds.push(courtDuplas.slice(0, numCourts).map((cm, idx) => ({ court_number: idx + 1, ...cm })))
   }
 
+  rounds.forcedHistory = forcedHistory
   return rounds
 }
 
