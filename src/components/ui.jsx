@@ -1627,7 +1627,9 @@ export function PlayerAvatarRow({ players = [], max = 4, size = 'md', cap = 6 })
   const empty = overflow > 0 ? 0 : Math.max(0, Math.min(max - players.length, cap - shown.length))
   return (
     <div className="flex items-center gap-2.5">
-      <div className="flex -space-x-2">
+      {/* isolate: a ordem das caras fica só dentro da fila, nunca por cima
+          das barras presas (13 out). */}
+      <div className="isolate flex -space-x-2">
         {shown.map((p, i) => (
           <div key={p.id || i} title={p.name} style={{ zIndex: cap - i }} className="relative">
             <Avatar name={p.name} url={p.avatar_url} size={`${dim} ring-2 ring-surface`} />

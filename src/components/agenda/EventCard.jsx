@@ -522,7 +522,9 @@ export function FriendSessionCard({ event, userId, past = false }) {
     }
   }
   const all = [...people.values()]
-  const others = all.filter((p) => !p.me).map((p) => String(p.name || '').split(/\s+/)[0]).filter(Boolean)
+  // Nomes curtos («Teste X. 1», «Rita F.»): só o primeiro nome deixava
+  // iguais duas pessoas com o mesmo (QA, 13 out).
+  const others = all.filter((p) => !p.me).map((p) => shortPersonName(p.name)).filter(Boolean)
   // Quem joga lê «Com Rita, Tiago e mais 3»; quem não joga (página do
   // grupo) lê «Rita, Tiago e mais 4», sem o «Com» (UX, 27 set).
   const inSession = all.some((p) => p.me)

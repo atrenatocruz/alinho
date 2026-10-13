@@ -275,7 +275,7 @@ export default function FriendSession() {
   // sumia sem dizer porquê (#586, 13 out).
   const creatorBar = iOrganize && match && (
     <>
-      <div className="mt-3 flex gap-1.5">
+      <div className="flex gap-1.5">
         {!finished
           ? <Link to={`/jogos-privados/sessao/${match.id}/editar`} state={{ fromSession: true }} className={pill}><Pencil size={14} /> {t('friends.edit_short')}</Link>
           : <span aria-disabled="true" className={`${pill} cursor-not-allowed text-ink-500 opacity-60`}><Lock size={14} /> {t('friends.edit_short')}</span>}
@@ -440,7 +440,8 @@ export default function FriendSession() {
         return (
           <EventHero
             kind={kind}
-            chip={[t(inClub ? 'agenda.kind_open' : 'agenda.kind_friends'), games.length ? t('homecard.rounds_count', { count: games.length }) : null].filter(Boolean).join(' · ')}
+            // «Entre amigos · <sítio>», como no protótipo (UX, 13 out).
+            chip={[t(inClub ? 'agenda.kind_open' : 'homecard.friends_short'), match.location ? String(match.location).split(',')[0].trim() : null].filter(Boolean).join(' · ')}
             org={match.organization_name ? {
               name: match.organization_name,
               kindLabel: t(inClub ? 'tournament.hero_org_club' : 'tournament.hero_org_group'),
@@ -450,6 +451,9 @@ export default function FriendSession() {
             time={match.scheduled_time ? match.scheduled_time.slice(0, 5) : null}
             dateLine={match.scheduled_date ? formatDate(new Date(`${match.scheduled_date}T12:00`), i18n.language, { weekday: 'long', day: 'numeric', month: 'long' }).toLocaleLowerCase(i18n.language) : null}
             onBack={goBack}
+            // «Editar · Mais ⋯» na primeira linha do cartão, como no mix e no
+            // torneio (QA e UX, 13 out).
+            manage={creatorBar || null}
             status={{
               faces: accepted.map((i) => ({ id: i.invitee_id, name: i.name, avatar_url: i.avatar_url })),
               slots: finished ? 0 : Math.max(0, slots - accepted.length),
@@ -478,7 +482,6 @@ export default function FriendSession() {
           {[match.location, match.court, t('friends.people_count', { count: players.length })].filter(Boolean).join(' · ')}
         </p>
       )}
-      {creatorBar}
       {organizerLine}
 
       {/* Convidado por responder: «Vou» · «Vou, mas sem o meu nome» · «Não vou». */}

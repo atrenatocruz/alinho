@@ -135,7 +135,8 @@ export function CustomizePill({ onClick, long = false }) {
 export function SectionTitle({ children, right = null }) {
   return (
     <div className="mb-2 flex min-h-[28px] items-center justify-between gap-2">
-      <p className="font-mono text-[10.5px] font-extrabold uppercase tracking-[.08em] text-ink-700">{children}</p>
+      {/* Mono 500 e cinzento, como no protótipo (UX, 13 out). */}
+      <p className="font-mono text-[10.5px] font-medium uppercase tracking-[.08em] text-[#4F535A]">{children}</p>
       {right}
     </div>
   )

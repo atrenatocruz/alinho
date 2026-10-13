@@ -1,5 +1,11 @@
 import { describe, it, expect, vi } from 'vitest'
 import { isChunkLoadError, reloadOnceForChunk, RELOAD_WINDOW_MS } from './chunkReload'
+// Importado aqui em cima e não dentro do teste: o ErrorBoundary traz os
+// ícones (lucide-react) e as duas línguas (i18n), e com a máquina carregada
+// carregá-lo dentro do it() passava os 5 s do vitest — o teste falhava às
+// vezes por tempo, não por comportamento (PO, 13 out). Aqui o carregamento
+// não conta para o tempo do teste; o que se verifica é o mesmo.
+import ErrorBoundary from '../components/ErrorBoundary'
 
 const memory = () => {
   const m = new Map()
@@ -45,8 +51,7 @@ describe('chunkReload (#569: falta um pedaço da app depois de publicar)', () =>
 })
 
 describe('ErrorBoundary (#569)', () => {
-  it('um pedaço em falta (ex.: painel do torneio) vai recarregar, não mostra o erro', async () => {
-    const { default: ErrorBoundary } = await import('../components/ErrorBoundary')
+  it('um pedaço em falta (ex.: painel do torneio) vai recarregar, não mostra o erro', () => {
     expect(ErrorBoundary.getDerivedStateFromError(new TypeError('Failed to fetch dynamically imported module: /assets/SignupSlot-x.js')))
       .toEqual({ failed: true, reloading: true })
     expect(ErrorBoundary.getDerivedStateFromError(new TypeError("Cannot read properties of undefined (reading 'x')")))

@@ -1053,7 +1053,7 @@ export default function Home() {
                 <>
                   <span className="block font-mono text-[10.5px] font-medium uppercase leading-none tracking-[.12em] text-[#5B6068]">{dh.weekday}</span>
                   <button type="button" onClick={() => setMonthOpen(true)}
-                    className="mt-1.5 flex items-baseline gap-1 font-display text-[30px] font-black leading-none tracking-[-.02em] text-ink-900">
+                    className="mt-1.5 flex items-baseline gap-1 font-display text-[24px] font-black leading-none tracking-[-.02em] text-ink-900">
                     {dh.date} <ChevronDown size={16} className="shrink-0 self-center text-muted" />
                   </button>
                 </>
@@ -1110,7 +1110,7 @@ export default function Home() {
                   <div className={`flex items-baseline gap-2 px-0.5 ${dayKey === firstUpcomingDay ? '' : 'border-t border-line pt-3.5'}`}>
                     <b className="font-display text-[22px] font-black leading-none tracking-[-.02em] text-ink-900">{dp.big}</b>
                     <span className="font-display text-[14px] font-semibold leading-none text-[#5B6068]">{dp.small}</span>
-                    {dayEvents.length > 0 && <em className="ml-auto font-mono text-[10.5px] not-italic leading-none tracking-[.06em] text-[#8A8E95]">{t('homecard.day_count', { count: dayEvents.length })}</em>}
+                    {dayEvents.length > 0 && <em className="ml-auto font-mono text-[10.5px] font-medium not-italic leading-none tracking-[.06em] text-[#8A8E95]">{t('homecard.day_count', { count: dayEvents.length })}</em>}
                   </div>
                 )
               })()}

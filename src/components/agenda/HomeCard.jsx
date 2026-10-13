@@ -104,7 +104,10 @@ export function CardFoot({ people = [], slots = 0, children }) {
   const empty = more > 0 ? 0 : Math.min(2, Math.max(0, slots - people.length))
   return (
     <div className="mt-3 flex items-center gap-2.5">
-      <div className="flex">
+      {/* isolate: a ordem das caras (zIndex 10 - i) fica só dentro da fila —
+          a primeira cara (z 10) aparecia por cima do topo preso da Home (z-10)
+          ao descer (Francisco, 13 out). */}
+      <div className="isolate flex">
         {shown.map((p, i) => (
           <span key={p.id || i} className="-mr-2 rounded-full border-2 border-white" style={{ zIndex: 10 - i }}>
             <Avatar name={p.name} url={p.avatar_url} size="w-7 h-7 text-[10px]" />
