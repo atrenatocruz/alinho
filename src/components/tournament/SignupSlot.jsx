@@ -38,6 +38,8 @@ const STATE_KEY = {
   selecionada: 'tsignup.state_in',
   suplente: 'tsignup.state_waitlist',
 }
+// Os que não cabem no canto sem tapar o nome da categoria.
+const LONG_STATES = ['por_validar', 'convite', 'sem_parceiro']
 
 export default function SignupSlot({ tournament, categories, category, my: firstEntry, myEntries = [], publicView = false, hasGames = false }) {
   const { t, i18n } = useTranslation()
@@ -348,14 +350,15 @@ export default function SignupSlot({ tournament, categories, category, my: first
               {myCategory?.code && <span className="shrink-0 rounded-md bg-ink-900 px-1.5 py-0.5 font-mono text-xs font-bold text-white">{myCategory.code}</span>}
               <b className="truncate text-sm font-extrabold text-ink-900">{myCategory?.name}</b>
             </p>
-            {/* No canto só estados curtos (regra dos cartões, 10 out): o do
-                pagamento passa a uma linha por baixo, e o nome da categoria
-                nunca fica tapado (UX, 11 out). */}
-            {my.state !== 'por_validar' && (
+            {/* No canto só estados curtos (regra dos cartões, 10 out): os
+                compridos passam a uma linha por baixo, e o nome da categoria
+                nunca fica tapado (UX, 11 out; QA, 13 out). */}
+            {!LONG_STATES.includes(my.state) && (
               <span className="shrink-0 rounded-full bg-[#DCFCE7] px-2 py-[3px] text-[11px] font-extrabold text-ok-700">{t(STATE_KEY[my.state] || 'tsignup.state_in')}</span>
             )}
           </div>
           {my.state === 'por_validar' && <p className="text-xs font-extrabold text-ink-900">⏳ {t('tsignup.state_to_validate_line')}</p>}
+          {['convite', 'sem_parceiro'].includes(my.state) && <p className="text-xs font-extrabold text-ink-900">⏳ {t(STATE_KEY[my.state])}</p>}
           {my.state === 'suplente' && <p className="text-sm text-muted">{t('tsignup.state_waitlist_hint')}</p>}
           {myRow && (
             <div>

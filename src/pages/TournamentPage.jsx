@@ -39,6 +39,7 @@ import ScorekeepersPanel from '../components/tournament/ScorekeepersPanel'
 import { drawProgress, statusKey } from '../components/tournament/drawProgress'
 import { TournamentPageSkeleton, PanelSkeleton } from '../components/tournament/TournamentSkeleton'
 import { useSkeleton, useLoadTimeout } from '../components/Skeleton'
+import { activeEntriesOf } from '../lib/tournamentSignup'
 
 /** "9–11 out" quando é tudo no mesmo mês, "30 set – 2 out" quando não é. */
 function dateRange(startIso, endIso, locale) {
@@ -51,12 +52,8 @@ function dateRange(startIso, endIso, locale) {
   return `${a.getDate()} ${month(a)} – ${b.getDate()} ${month(b)}`
 }
 
-// As minhas inscrições ativas. Uma desistida não conta — nem antes de a
-// base de dados deixar de a devolver (migration_tournaments_withdraw_resignup,
-// Trello #451). Sem `my_entries` (migração por correr), vale o `my`.
-const activeEntries = (data) =>
-  (data?.my_entries || (data?.my ? [{ ...data.my, status: data.my.state }] : []))
-    .filter((e) => (e.status ?? e.state) !== 'desistiu')
+// As minhas inscrições ativas: activeEntriesOf (tournamentSignup.js).
+const activeEntries = activeEntriesOf
 const activeMy = (data) => activeEntries(data)[0] || null
 
 const STATE_PILL = {
