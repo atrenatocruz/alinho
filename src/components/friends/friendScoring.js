@@ -15,6 +15,15 @@ export function formatKey(scoringFormat, numSets) {
   return Number(numSets) === 3 ? 'best3' : 'free'
 }
 
+/** A forma de contar a gravar no editar: a que o jogo já tinha, se a pessoa
+ *  não a mudou. Um jogo antigo com N sets (N ≠ 3) aparece como «Sets à
+ *  vontade»; mandar FORMAT_DB.free apagava o limite ou, com resultados,
+ *  fazia a base de dados recusar tudo com format_locked (#586, 12 out). */
+export function formatToSave(format, scoringFormat, numSets) {
+  if (format === formatKey(scoringFormat, numSets)) return { scoringFormat, numSets: numSets ?? null }
+  return FORMAT_DB[format]
+}
+
 /** O limite de sets de «à vontade»: os antigos com N fixo, até N. */
 export const maxSetsFor = (scoringFormat, numSets) =>
   (scoringFormat === 'sets' && numSets && Number(numSets) !== 3 ? Number(numSets) : null)

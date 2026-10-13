@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   takesSlot, slotsLeft, isCategoryFull, categoriesLeft,
-  entriesOpen, canWithdraw, inviteExpired, tournamentInviteLink, whoIsAlreadyIn,
+  entriesOpen, canWithdraw, inviteExpired, tournamentInviteLink, whoIsAlreadyIn, activeEntriesOf,
 } from './tournamentSignup'
 
 const cat = (o = {}) => ({ id: 'c1', slots: 16, status: 'inscricoes', entry_count: 0, ...o })
@@ -133,5 +133,23 @@ describe('inscrições por categoria', () => {
   })
   it('torneio em rascunho, fechado ou terminado não recebe', () => {
     for (const status of ['rascunho', 'fechado', 'terminado']) expect(entriesOpen({ status }, { status: 'inscricoes' }, now)).toBe(false)
+  })
+})
+
+
+describe('activeEntriesOf (QA, 13 out: convite por aceitar não é inscrição)', () => {
+  it('um convite que me fizeram (não fui eu a inscrever) não conta', () => {
+    const data = { my_entries: [
+      { entry_id: 'a', status: 'convite', registered_by_me: false },
+      { entry_id: 'b', status: 'validada', registered_by_me: true },
+    ] }
+    expect(activeEntriesOf(data).map((e) => e.entry_id)).toEqual(['b'])
+  })
+  it('o convite que eu fiz (à espera do parceiro) conta', () => {
+    expect(activeEntriesOf({ my_entries: [{ entry_id: 'a', status: 'convite', registered_by_me: true }] }).length).toBe(1)
+  })
+  it('sem registered_by_me (migração por correr), fica como antes; desistidas nunca contam', () => {
+    expect(activeEntriesOf({ my_entries: [{ entry_id: 'a', status: 'convite' }, { entry_id: 'b', status: 'desistiu' }] }).map((e) => e.entry_id)).toEqual(['a'])
+    expect(activeEntriesOf({ my: { state: 'convite', registered_by_me: false } })).toEqual([])
   })
 })

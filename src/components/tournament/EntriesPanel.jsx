@@ -949,7 +949,6 @@ export default function EntriesPanel({ tournament, categories = [], category, pu
       {clashCase && !drawn && (
         <ClashCaseSheet clash={clashCase} hereId={category?.id}
           onClose={() => setClashCase(null)}
-          onChangeTime={() => { setClashCase(null); setClashList(false); navigate(`/torneio/${tournament.slug || tournament.id}?admin=editar`) }}
           onRemoved={(from) => {
             setToast(t('tclash.removed', { name: clashCase.name, code: from.code }))
             setClashCase(null); setClashList(false); setClashKey((n) => n + 1); load()

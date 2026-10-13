@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { Users, Lock } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { createFriendMatch, updateFriendMatch, addFriendMatchInvitees, removeFriendMatchInvitee, cancelFriendMatch } from '../lib/privateMatches'
-import { FORMAT_DB, formatKey } from '../components/friends/friendScoring'
+import { FORMAT_DB, formatKey, formatToSave } from '../components/friends/friendScoring'
 import { listOrganizationMembers } from '../lib/clubProfile'
 import { contemTexto } from '../lib/semAcentos'
 import { PrimaryButton, DateTimeField, Chips } from '../components/ui'
@@ -162,7 +162,8 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
         locationLongitude: locationCoords.longitude,
         court: court.trim() || null,
         gameMinutes: people.length + 1 > MIN_PEOPLE ? gameMinutes || null : null,
-        ...FORMAT_DB[format],
+        // A forma de contar só vai mudada se a pessoa a mudou (#586, 12 out).
+        ...formatToSave(format, m.scoring_format, m.num_sets),
         // Só vão quando mudam (a função recusa com o cadeado).
         rankedIntent: rankedIntent !== (m.ranked_intent !== false) ? rankedIntent : undefined,
         teamsMode: teamsMode !== (m.teams_mode || 'manual') ? teamsMode : undefined,

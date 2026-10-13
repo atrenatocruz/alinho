@@ -80,10 +80,13 @@ export function ClashListSheet({ clashes, onPick, onClose, onSchedule = null }) 
   )
 }
 
-/** Um caso: «Tirar do MX4» (vermelho), «Tirar do M4» (contorno vermelho),
- *  «Mudar a hora do MX4» e «Ainda não». `hereId`: a categoria onde se está
- *  (é dessa que o vermelho cheio tira); sem ela, a segunda. */
-export function ClashCaseSheet({ clash, hereId = null, onRemoved, onChangeTime, onClose }) {
+/** Um caso: «Tirar do MX4» (vermelho), «Tirar do M4» (contorno vermelho) e
+ *  «Ainda não». `hereId`: a categoria onde se está (é dessa que o vermelho
+ *  cheio tira); sem ela, a segunda.
+ *  Saiu o «Mudar a hora do MX4» (#586, 12 out): com inscritos, a hora de uma
+ *  categoria não se muda em lado nenhum (o Editar tranca-a e a base de dados
+ *  também). Até o Dev 3 o permitir, a folha diz o que fazer. */
+export function ClashCaseSheet({ clash, hereId = null, onRemoved, onClose }) {
   const { t, i18n } = useTranslation()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -106,6 +109,8 @@ export function ClashCaseSheet({ clash, hereId = null, onRemoved, onChangeTime, 
       <p className="text-sm text-ink-700">
         {t('tclash.case_line', { a: clash.code_a, b: clash.code_b, when: whenText(clash.at_a, i18n.language) })}
       </p>
+      {/* Lê-se antes de escolher (UX, 12 out). */}
+      <p className="mt-2 text-sm text-ink-700">{t('tclash.time_locked_note')}</p>
       {error && <p role="alert" className="mt-3 rounded-ctrl border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-sm font-bold text-danger">{error}</p>}
       <div className="mt-4 space-y-2">
         <button type="button" disabled={busy} onClick={() => remove(first)} className={`${BTN} bg-danger text-white`}>
@@ -114,14 +119,12 @@ export function ClashCaseSheet({ clash, hereId = null, onRemoved, onChangeTime, 
         <button type="button" disabled={busy} onClick={() => remove(second)} className={`${BTN} border border-danger bg-white text-danger`}>
           {t('tclash.remove_from', { code: second.code })}
         </button>
-        <button type="button" disabled={busy} onClick={() => onChangeTime(first)} className={`${BTN} border border-line bg-white text-ink-900`}>
-          {t('tclash.change_time', { code: first.code })}
-        </button>
         <button type="button" onClick={onClose} className={`${BTN} border border-line bg-white text-ink-900`}>
           {t('tclash.not_now')}
         </button>
       </div>
       <p className="mt-3 text-xs text-muted">{t('tclash.case_note', { code: first.code })}</p>
+
     </Sheet>
   )
 }

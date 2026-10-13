@@ -230,3 +230,17 @@ export async function canScoreTournament(tournamentId) {
   if (error) throw error
   return !!data
 }
+
+/* As minhas inscrições ativas, a partir da página do torneio. Uma desistida
+   não conta — nem antes de a base de dados deixar de a devolver
+   (migration_tournaments_withdraw_resignup, Trello #451). Sem `my_entries`
+   (migração por correr), vale o `my`.
+   Um convite que me fizeram e que ainda não aceitei também não é inscrição
+   minha (QA, 13 out: com o convite caducado aparecia «À espera do teu
+   parceiro aceitar» e contava para as categorias que chocam). Sem o
+   `registered_by_me` (migração por correr), fica como antes. */
+export function activeEntriesOf(data) {
+  return (data?.my_entries || (data?.my ? [{ ...data.my, status: data.my.state }] : []))
+    .filter((e) => (e.status ?? e.state) !== 'desistiu')
+    .filter((e) => !((e.status ?? e.state) === 'convite' && e.registered_by_me === false))
+}

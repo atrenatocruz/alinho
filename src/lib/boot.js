@@ -5,7 +5,7 @@
 // o JavaScript já em cache, o browser às vezes só desenha o #boot depois de
 // correr o bundle, e a animação começa mais tarde do que o início da página.
 // Chamar mais do que uma vez não faz mal.
-const HOLD_MS = 600          // logótipo completo, parado, antes de sair
+const HOLD_MS = 400          // logótipo completo, parado, antes de sair («Rally»: ~1,9 s ao todo)
 const SAFETY_MS = 4000       // se as animações nunca chegarem a correr
 const nextFrame = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))
 const wait = ms => new Promise(r => setTimeout(r, ms))
@@ -24,6 +24,6 @@ export async function hideBoot() {
   await Promise.race([done, wait(SAFETY_MS)])
   await wait(HOLD_MS)
   boot.classList.add('boot-leave')
-  await wait(300)
+  await wait(450)
   boot.remove()
 }
