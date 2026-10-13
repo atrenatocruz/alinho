@@ -741,7 +741,6 @@ export default function DrawAdminPanel({ tournament, onBack, onEdit }) {
       {clashCase && (
         <ClashCaseSheet clash={clashCase.clash} hereId={clashCase.hereId}
           onClose={() => setClashCase(null)}
-          onChangeTime={() => { setClashCase(null); setClashList(false); onEdit?.() }}
           onRemoved={(from) => {
             setClashToast(t('tclash.removed', { name: clashCase.clash.name, code: from.code }))
             setClashCase(null)

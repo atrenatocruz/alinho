@@ -268,12 +268,21 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
   const [initialDraft, setInitialDraft] = useState(() => JSON.stringify(draft))
   // O preço especial de cada categoria, a editar: lê-se à parte (uma chamada
   // por categoria) e entra no rascunho sem o dar por mudado.
+  // Enquanto não se leu, ou se a leitura falhou, não se grava: o
+  // update_tournament recria as categorias e só se voltam a gravar os preços
+  // especiais que se leram — gravar antes apagava-os sem aviso (#586, 12 out).
+  const specialIds = (initial?.categories || []).map((c) => c.id).filter(Boolean)
+  const [specialLoad, setSpecialLoad] = useState(specialIds.length ? 'loading' : 'ok') // 'loading' | 'ok' | 'failed'
   useEffect(() => {
     const ids = (initial?.categories || []).map((c) => c.id).filter(Boolean)
-    if (!ids.length) return undefined
+    if (!ids.length) { setSpecialLoad('ok'); return undefined }
     let cancelled = false
-    Promise.all(ids.map((id) => getEventSpecialPrice('tournament_category', id).catch(() => null))).then((rows) => {
+    setSpecialLoad('loading')
+    const FAILED = Symbol('failed')
+    Promise.all(ids.map((id) => getEventSpecialPrice('tournament_category', id).catch(() => FAILED))).then((rows) => {
       if (cancelled) return
+      if (rows.includes(FAILED)) { setSpecialLoad('failed'); return }
+      setSpecialLoad('ok')
       const byId = new Map(ids.map((id, k) => [id, rows[k]]))
       if (![...byId.values()].some(Boolean)) return
       const patch = (d) => ({ ...d, categories: d.categories.map((c) => (byId.get(c.id) ? { ...c, special: byId.get(c.id), had_special: true } : c)) })
@@ -427,7 +436,9 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
   // abertas não se mexe — o campo mostra o cadeado.
   const openingEditable = editing_existing && initial?.tournament?.status === 'rascunho'
   const openingChanged = openingEditable && (opensAt || null) !== (scheduledOpening ? localInputToIso(scheduledOpening) : null)
-  const save = guarded(() => onCreate({ ...outgoing(draft), ...(openingChanged ? { schedule_opening: { at: opensAt || null } } : {}) }))
+  // Sem os preços especiais lidos não se grava (ver specialLoad).
+  const save = guarded(() => (specialLoad !== 'ok' ? undefined
+    : onCreate({ ...outgoing(draft), ...(openingChanged ? { schedule_opening: { at: opensAt || null } } : {}) })))
   /* Uma pergunta a sério, dois botões do tamanho dos normais, cada um com
      a consequência escrita por baixo — como os do mix (desenho de 23 set,
      ponto 4; versão final de 26 set).
@@ -479,8 +490,10 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
       busy={saving}
       edit={editing_existing ? {
         onSave: save, onCancel, dirty: JSON.stringify(draft) !== initialDraft || openingChanged,
-        saving, saveDisabled: !!anyProblem || !!specialProblem,
-        saveHint: anyProblem ? t(`tournament.create.problem_${anyProblem}`) : specialProblem,
+        saving, saveDisabled: !!anyProblem || !!specialProblem || specialLoad !== 'ok',
+        saveHint: anyProblem ? t(`tournament.create.problem_${anyProblem}`)
+          : specialLoad === 'failed' ? t('tournament.create.special_load_failed')
+          : specialLoad === 'loading' ? t('common.loading') : specialProblem,
         // «Voltar a rascunho», como no mix (Francisco, 10 out) — mas só sem
         // inscrições; com elas fica apagado e diz porquê.
         extra: unpublish && ['inscricoes', 'fechado'].includes(initial?.tournament?.status) ? {
@@ -682,8 +695,38 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
       )}
 
       {/* 2 · Quando — os dias do torneio e os prazos. */}
+      {/* Com inscritos, o «Quando» e o «Onde joga» aparecem trancados, com o
+          que lá está e o porquê — antes sumiam (#586, 12 out). */}
       {locked && (
-        <Locked title={t('tournament.create.step2')} reason={t('tournament.create.locked_days')} />
+        <Locked title={t('tournament.create.step2')} reason={t('tournament.create.locked_days')}>
+          <ul className="space-y-0.5 text-sm text-ink-900">
+            {[...draft.days].sort((a, b) => a.date.localeCompare(b.date)).map((d) => <li key={d.date}>{dayLabel(d.date)}</li>)}
+          </ul>
+          {/* O mesmo cadeado do título, em cinzento (UX, 12 out). */}
+          <p className="mt-1.5 flex items-center gap-1.5 text-xs text-ink-500">
+            <Lock size={12} className="shrink-0" /> {t('tournament.create.opens_already_open').replace(/^🔒\s*/u, '')}
+          </p>
+        </Locked>
+      )}
+      {locked && (
+        <Locked title={t('tournament.create.step3')} reason={t('tournament.create.locked_where')}>
+          <ul className="space-y-0.5 text-sm text-ink-900">
+            {[...draft.days].sort((a, b) => a.date.localeCompare(b.date)).map((d) => (
+              <li key={d.date}>{dayLabel(d.date)} · {t('tournament.create.day_open', { from: d.starts_at, to: d.ends_at, courts: Number(d.courts) || 0 })}</li>
+            ))}
+          </ul>
+          {/* Uma categoria por linha, com o código na pastilha preta (UX, 12 out). */}
+          {draft.categories.some((c) => c.day) && (
+            <ul className="mt-2 space-y-1">
+              {draft.categories.filter((c) => c.day).map((c) => (
+                <li key={c.code} className="flex items-center gap-2 text-sm text-ink-900">
+                  <span className="shrink-0 rounded-md bg-ink-900 px-1.5 py-0.5 font-mono text-xs font-bold text-white">{c.code}</span>
+                  <span>{dayLabel(c.day).toLowerCase()}{c.start_time ? `, ${c.start_time}` : ''}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Locked>
       )}
       {!locked && step === 2 && (
         <>
