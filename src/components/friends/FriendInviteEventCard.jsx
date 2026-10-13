@@ -1,20 +1,20 @@
 // O convite para um jogo entre amigos no dia do jogo, na Home (design-
 // handoff/2026-10-12-convite-amigos-na-home, ponto 2 — Francisco, 12 out).
-// O cartão de amigos de sempre, com o boneco e «Convidado»; por baixo das
-// fotos, a caixa branca «A Rita convidou-te.» com o que conta para o
-// ranking; «Aceitar» (lima, a toda a largura) abre o ecrã de responder de
-// hoje (nunca se entra no ranking sem escolher, #412); «Não posso ir» em
-// texto pergunta antes de recusar.
-// Depois do «Vou», enquanto não há equipas (QA e Dev 3, 13 out), o mesmo
-// cartão fica como os jogos onde estou: contorno verde, «Inscrito» e, no
-// lugar da caixa e dos botões, o que falta («À espera das equipas.»).
+// R1 (13 out): a moldura comum dos cartões da Home — a faixa dos amigos com
+// «Convidado» e as vagas («3/4 aceitaram»), e no corpo branco «A Rita
+// convidou-te» (ponto lima) e, à direita das caras, «Aceitar» (lima) com
+// «Não posso ir» em texto por baixo. «Aceitar» abre o ecrã de responder de
+// hoje (nunca se entra no ranking sem escolher, #412); «Não posso ir»
+// pergunta antes de recusar.
+// Depois do «Vou», enquanto não há equipas (QA e Dev 3, 13 out), fica como os
+// jogos onde estou: «✓ Estás dentro», a borda lima, o que falta («À espera
+// das equipas.») e «Ver».
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { CheckCircle2, MapPin } from 'lucide-react'
-import { Avatar, PrimaryButton, ConfirmSheet } from '../ui'
-import { KIND_STYLE, KindLine, OrgHeader, StateTag } from '../agenda/EventCard'
-import CardMascot, { mascotFor, MascotPill } from '../agenda/CardMascot'
+import { Avatar, ConfirmSheet } from '../ui'
+import { CardClub } from '../agenda/EventCard'
+import HomeCard, { BandPill, CardTitle, CardChips, CardState, CardFoot, CardButton, kindColorsOf } from '../agenda/HomeCard'
 import { formatTime } from '../../lib/formatDate'
 import { describeError } from '../../lib/errors'
 
@@ -41,59 +41,38 @@ export default function FriendInviteEventCard({ event, onDecline }) {
   const [asking, setAsking] = useState(false)
   const r = event.raw
   const to = `/jogos-privados/sessao/${event.id}`
-  const mascot = mascotFor('friends')
   const going = event.myState === 'in'
-  const pill = going
-    ? <StateTag tone="in" icon={CheckCircle2}>{t('agenda.state_in')}</StateTag>
-    : <StateTag tone="invited">{t('agenda.state_invited')}</StateTag>
+  const title = t('agenda.played_friends_title', { name: r.isCreator ? t('agenda.you') : r.creatorFirst })
   // A mesma frase da lista «Jogos entre amigos».
   const waitLine = r.pending > 0 ? t('friends.waiting_answers', { count: r.pending })
     : r.isCreator ? t('friends.form_teams_now') : t('friends.waiting_teams')
-  const kindLine = <KindLine kind="friends" />
+  const time = event.hasTime ? formatTime(event.startsAt, i18n.language, { hour: '2-digit', minute: '2-digit' }) : '—'
   return (
-    <div className={`relative rounded-card p-3.5 press ${mascot ? '!mt-5' : ''} border-2 ${going ? 'border-ok' : 'border-ink-900'} ${KIND_STYLE.friends.bg}`}>
-      <Link to={to} className="absolute inset-0" aria-label={going ? t('agenda.played_friends_title', { name: r.isCreator ? t('agenda.you') : r.creatorFirst }) : t('home.invite_by', { name: r.creatorFirst })} />
-      <CardMascot type={mascot} />
-      <OrgHeader event={event} right={pill} kind={kindLine} mascot={!!mascot} />
-      {!event.orgName && (mascot
-        ? <><div className="pr-[80px]">{kindLine}</div><MascotPill top="top-[54px]">{pill}</MascotPill></>
-        : <div className="flex items-start justify-between gap-2">{kindLine}{pill}</div>)}
-
-      {event.hasTime && (
-        <p className="mt-2.5 text-[22px] font-extrabold leading-none text-ink-900">
-          {formatTime(event.startsAt, i18n.language, { hour: '2-digit', minute: '2-digit' })}
-        </p>
-      )}
-      <h3 className={`mt-1.5 text-base leading-snug text-ink-900 ${!event.orgName && mascot ? 'pr-[100px]' : ''}`}>
-        {t('agenda.played_friends_title', { name: r.isCreator ? t('agenda.you') : r.creatorFirst })}
-      </h3>
-      {r.location && (
-        <p className="mt-1.5 flex items-center gap-1.5 text-[13px] text-ink-700">
-          <MapPin size={14} className="shrink-0" /> <span className="truncate">{r.location}</span>
-        </p>
-      )}
-
-      <div className="mt-2.5 flex items-center gap-2 border-t border-ink-900/10 pt-2.5">
-        <InviteFaces accepted={r.accepted} slots={r.slots} />
-        <span className="text-[13px] font-extrabold text-ink-900">{r.accepted.length}/{r.slots}</span>
-      </div>
-
-      {going ? (
-        <p className="mt-2 text-[13px] text-ink-700">{waitLine}</p>
-      ) : (<>
-      <div className="relative z-[1] mt-2.5 rounded-ctrl bg-white px-3 py-2.5 text-[13px] leading-snug text-ink-900">
-        <b>{t('home.invite_box_by', { name: r.creatorFirst })}</b>{' '}
-        {r.ranked === false ? t('home.invite_box_friendly') : t('home.invite_box_ranked')}
-      </div>
-      <div className="relative z-[1] mt-2.5">
-        <PrimaryButton onClick={() => navigate(to)} className="w-full">{t('agenda.invite_accept')}</PrimaryButton>
-        <button type="button" onClick={() => setAsking(true)}
-          className="mt-1 w-full min-h-[40px] text-sm font-extrabold text-ink-700 underline underline-offset-4 hover:text-ink-900">
-          {t('home.invite_cant_go')}
-        </button>
-      </div>
-      </>)}
-
+    <>
+      <HomeCard colors={kindColorsOf('friends')} label={t('agenda.kind_friends')}
+        pill={going ? <BandPill>✓ {t('home.next_in')}</BandPill> : <BandPill tone="dark">{t('agenda.state_invited')}</BandPill>}
+        time={time} count={{ n: r.accepted.length, of: r.slots, unit: t('homecard.unit_accepted') }}
+        mine={going} to={to} ariaLabel={going ? title : t('home.invite_by', { name: r.creatorFirst })}>
+        <CardClub event={event} place={r.location || null} />
+        <CardTitle>{title}</CardTitle>
+        <CardChips>{[event.orgName ? r.location : null, r.ranked === false ? t('gamedetails.badge_friendly') : t('home.invite_ranked_short')].filter(Boolean).join(' · ')}</CardChips>
+        {going
+          ? <CardState tone="ok">{waitLine}</CardState>
+          : <CardState tone="inv">{t('home.invite_by', { name: r.creatorFirst })}</CardState>}
+        <CardFoot people={r.accepted} slots={r.slots}>
+          {going ? (
+            <span className="pointer-events-none whitespace-nowrap rounded-[14px] border-[1.5px] border-[#CFD2D7] bg-white px-[18px] py-[11px] font-display text-[14.5px] font-extrabold leading-none text-ink-900">{t('homecard.see')}</span>
+          ) : (
+            <>
+              <CardButton onClick={() => navigate(to)}>{t('agenda.invite_accept')}</CardButton>
+              <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAsking(true) }}
+                className="relative p-1 font-display text-[12.5px] font-bold leading-none text-[#4F535A] underline underline-offset-[3px]">
+                {t('home.invite_cant_go')}
+              </button>
+            </>
+          )}
+        </CardFoot>
+      </HomeCard>
       <ConfirmSheet
         open={asking}
         title={t('home.invite_cant_go_title')}
@@ -105,6 +84,6 @@ export default function FriendInviteEventCard({ event, onDecline }) {
         errorOf={(err) => describeError(t, err, 'agenda.invite_error')}
         onClose={() => setAsking(false)}
       />
-    </div>
+    </>
   )
 }

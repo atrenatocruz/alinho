@@ -1,9 +1,9 @@
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { MapPin, Clock, Megaphone, CheckCircle2 } from 'lucide-react'
-import { KindLine, OrgHeader, StateLine, StateTag } from './EventCard'
-import CardMascot, { mascotFor } from './CardMascot'
-import { KIND_COLORS } from '../../lib/kindColors'
+import { Megaphone } from 'lucide-react'
+import { CardClub } from './EventCard'
+import HomeCard, { BandPill, CardTitle, CardChips, CardState, CardFoot, CardButton, kindColorsOf } from './HomeCard'
+import { formatDate } from '../../lib/formatDate'
 
 /* O torneio na agenda da Home (Trello #363).
 
@@ -14,14 +14,13 @@ import { KIND_COLORS } from '../../lib/kindColors'
      categoria e contra quem, com o "era 17:00" quando a hora foi
      antecipada.
 
-   Lilás, como manda o sistema de cores (KIND_STYLE.tournament). */
+   R1 (13 out): a moldura comum dos cartões da Home, na cor do torneio do R0.
+   Antes do sorteio não há hora: na faixa vão os dias («17–18 out», «sáb e
+   dom»). */
 
-// O fundo claro do torneio, como o KIND_STYLE.tournament do EventCard (R0, 13 out).
-const LILAC = { bg: KIND_COLORS.tournament.light, border: KIND_COLORS.tournament.line, ink: KIND_COLORS.tournament.strong }
-
-// A inscrição feita fica no canto, curta («✓ Inscrito»); os outros pontos
-// da inscrição são compridos e vão numa linha por baixo do nome, sem
-// pastilha (UX, 10 out — «Esta tag não dá», Francisco).
+// A inscrição feita fica no canto, curta («✓ Estás dentro»); os outros
+// pontos da inscrição são compridos e vão na linha de estado (UX, 10 out —
+// «Esta tag não dá», Francisco).
 const LINE_KEY = {
   convite: 'agenda.state_line_waiting_partner',
   sem_parceiro: 'agenda.state_line_alone',
@@ -32,112 +31,73 @@ const LINE_KEY = {
 const hhmm = (date, language) =>
   new Date(date).toLocaleTimeString(language === 'en' ? 'en-GB' : 'pt-PT', { hour: '2-digit', minute: '2-digit' })
 
+/** «17–18 out» e «sáb e dom» (ou «17 out» e «sáb», num dia só). */
+function daysOf(startsAt, endsOn, lang) {
+  const a = new Date(startsAt)
+  const b = endsOn ? new Date(`${String(endsOn).slice(0, 10)}T12:00:00`) : a
+  const mon = (d) => formatDate(d, lang, { month: 'short' }).replace(/\./g, '')
+  const wd = (d) => formatDate(d, lang, { weekday: 'short' }).replace(/\./g, '').replace(/-feira$/, '')
+  const same = a.toDateString() === b.toDateString()
+  const big = same ? `${a.getDate()} ${mon(a)}`
+    : a.getMonth() === b.getMonth() ? `${a.getDate()}–${b.getDate()} ${mon(b)}` : `${a.getDate()} ${mon(a)}–${b.getDate()} ${mon(b)}`
+  const days = Math.round((new Date(b.toDateString()) - new Date(a.toDateString())) / 86400000)
+  const aside = same ? wd(a) : days === 1 ? `${wd(a)} e ${wd(b)}` : `${wd(a)} a ${wd(b)}`
+  return { big, aside }
+}
+
 /* `footer`: o que vai no fundo do cartão, fora da ligação ao torneio — o
-   «Marcar resultados» de quem marca (ScoreTodayCard, 28 set). O corpo fica
-   exatamente o mesmo: foi o cartão mudar que o Francisco estranhou. */
+   «Marcar resultados» de quem marca (ScoreTodayCard, 28 set). */
 export default function TournamentEventCard({ event, past, footer = null }) {
   const { t, i18n } = useTranslation()
+  const navigate = useNavigate()
   const isMatch = event.source === 'tournament_match'
-  // O boneco só com quem organiza em cima (o torneio tem sempre clube).
-  const mascot = event.orgName ? mascotFor('tournament') : null
   const to = `/torneio/${event.slug || event.id}`
-  const frame = { background: LILAC.bg, borderColor: LILAC.border, borderWidth: 2 }
-  // Acabado (jogo com resultado, ou o dia já passou): «Terminado», como nos
-  // outros cartões da Home (#508).
-  const stateTag = past || event.finished ? (
-    <StateTag tone="grey" icon={CheckCircle2}>{t('agenda.state_finished')}</StateTag>
-  ) : !isMatch && event.myState && !LINE_KEY[event.myState] ? (
-    <StateTag tone="in" icon={CheckCircle2}>{t('agenda.state_in')}</StateTag>
-  ) : null
-  const stateLine = !past && !event.finished && !isMatch && LINE_KEY[event.myState] ? t(LINE_KEY[event.myState]) : null
-  // O tipo por baixo do clube (SPEC-3): «Torneio», ou «Torneio · M4» no jogo.
-  const kindLine = <KindLine kind="tournament" past={past} suffix={isMatch && event.categoryCode ? event.categoryCode : null} />
+  const done = past || event.finished
+  const lineKey = !done && !isMatch ? LINE_KEY[event.myState] : null
+  const inside = !isMatch && event.myState && !LINE_KEY[event.myState]
+  const pill = done ? <BandPill tone="dark">{t('agenda.state_finished')}</BandPill>
+    : inside ? <BandPill>✓ {t('home.next_in')}</BandPill> : null
+  const label = [t('agenda.kind_tournament'),
+    isMatch ? event.categoryCode : event.raw?.category_count ? t('tagenda.categories', { count: event.raw.category_count }) : null].filter(Boolean).join(' · ')
+  const when = isMatch && event.startsAt
+    ? { big: hhmm(event.startsAt, i18n.language), aside: event.previousAt ? t('tagenda.was_at', { time: hhmm(event.previousAt, i18n.language) }) : null }
+    : daysOf(event.startsAt, event.endsOn, i18n.language)
+  const title = isMatch ? (event.opponentName ? t('tagenda.against', { name: event.opponentName }) : event.raw?.name) : event.raw?.name
+  const chips = [
+    isMatch ? event.courtName : null,
+    !isMatch ? event.raw?.location : null,
+    isMatch && event.finished ? [event.myScore, event.won != null ? t(event.won ? 'agenda.result_win' : 'agenda.result_loss') : null].filter(Boolean).join(' · ') : null,
+  ].filter(Boolean)
+  const open = !isMatch && !done && !event.myState && event.raw?.status === 'inscricoes'
 
-  // Cartão com organizador (design-handoff/2026-09-28-cartao-com-organizador,
-  // o do Dev 4 no b26fc07a): em cima quem organiza, que abre o perfil do
-  // clube; o resto do cartão abre o torneio. O cartão já não é um <Link> por
-  // fora — um botão dentro de um link não é válido —, é um Link por baixo de
-  // tudo, como no GameEventCard.
   return (
-    <div className={`card relative press hover:shadow-lift ${mascot ? '!mt-5' : ''} ${past ? 'opacity-60' : ''}`} style={frame}>
-      <Link to={to} className="absolute inset-0 rounded-[inherit]" aria-label={event.raw?.name || event.orgName || ''} />
-      <CardMascot type={mascot} />
-      {/* O estado vai para o canto, ao lado de quem organiza, como no mix
-          (457bfaf, Francisco 30 set). */}
-      <OrgHeader event={event} past={past} right={stateTag} kind={kindLine} mascot={!!mascot} pillPos={{ right: 'right-5', top: 'top-[80px]' }} />
-      {body()}
+    <div className="space-y-2">
+      <HomeCard colors={kindColorsOf('tournament')} label={label} pill={pill} time={when.big} timeAside={when.aside}
+        mine={!!inside || (isMatch && !done)} past={past} to={to} ariaLabel={event.raw?.name || event.orgName || ''}>
+        {/* O aviso do organizador vem com o cartão, em cima (cartão #366). */}
+        {event.notice && (
+          <p className="mb-2 flex items-start gap-1.5 rounded-ctrl bg-[#F3EEFF] px-2.5 py-1.5 text-sm font-extrabold text-[#3F1784]">
+            <Megaphone size={15} className="mt-0.5 shrink-0" />
+            <span className="min-w-0">{event.notice}</span>
+          </p>
+        )}
+        <CardClub event={event} past={past} />
+        <CardTitle past={past}>{title}</CardTitle>
+        {chips.length > 0 && <CardChips>{chips.join(' · ')}</CardChips>}
+        {lineKey && <CardState tone="warn">{t(lineKey)}</CardState>}
+        {inside && <CardState tone="ok">{t('home.next_in')}</CardState>}
+        {open && <CardState tone="ok">{t('homecard.open')}</CardState>}
+        {/* Hora prevista, nunca garantida (SPEC §6). */}
+        {isMatch && !done && <p className="mt-2 text-xs text-[#3F1784]">{t('tagenda.may_start_earlier')}</p>}
+        {(open || inside) && (
+          <CardFoot>
+            {open
+              ? <CardButton onClick={() => navigate(to)}>{t('homecard.signup_pair')}</CardButton>
+              : <span className="pointer-events-none whitespace-nowrap rounded-[14px] border-[1.5px] border-[#CFD2D7] bg-white px-[18px] py-[11px] font-display text-[14.5px] font-extrabold leading-none text-ink-900">{t('homecard.see')}</span>}
+          </CardFoot>
+        )}
+      </HomeCard>
       {footer && <div className="relative z-[1]">{footer}</div>}
     </div>
   )
-
-  function body() {
-    return (<>
-      {/* O aviso do organizador vem com o cartão, em cima: quem está
-          inscrito vê-o na Home sem ter de ir procurar (cartão #366). */}
-      {event.notice && (
-        <p className="mb-2 flex items-start gap-1.5 rounded-ctrl bg-white/70 px-2.5 py-1.5 text-sm font-extrabold"
-           style={{ color: LILAC.ink }}>
-          <Megaphone size={15} className="mt-0.5 shrink-0" />
-          <span className="min-w-0">{event.notice}</span>
-        </p>
-      )}
-
-      {!event.orgName && <div className="flex items-center justify-between gap-2">{kindLine}{stateTag}</div>}
-
-      {/* A hora só existe depois do sorteio; antes é um evento de dias. */}
-      {isMatch && event.startsAt ? (
-        <p className="mt-2 font-display text-2xl font-extrabold leading-none text-ink-900">
-          {hhmm(event.startsAt, i18n.language)}
-          {event.previousAt && (
-            <span className="ml-2 align-middle text-sm font-semibold text-muted">
-              {t('tagenda.was_at', { time: hhmm(event.previousAt, i18n.language) })}
-            </span>
-          )}
-        </p>
-      ) : (
-        <p className="mt-2 font-display text-lg font-extrabold leading-tight text-ink-900">
-          {event.raw?.name}
-        </p>
-      )}
-
-      {isMatch && event.opponentName && (
-        <p className="mt-1 text-sm font-semibold text-ink-900">
-          {t('tagenda.against', { name: event.opponentName })}
-        </p>
-      )}
-
-      {/* Jogo acabado: o resultado, do meu lado primeiro (Trello #508). */}
-      {isMatch && event.finished && (event.myScore || event.won != null) && (
-        <p className="mt-1 text-sm font-extrabold text-ink-900 tabular-nums">
-          {[
-            event.myScore,
-            event.won != null ? t(event.won ? 'agenda.result_win' : 'agenda.result_loss') : null,
-          ].filter(Boolean).join(' · ')}
-        </p>
-      )}
-
-      {/* Quem organiza passou para cima (OrgHeader); aqui fica o campo ou
-          o número de categorias. */}
-      {(isMatch ? event.courtName : event.raw?.category_count) ? (
-        <p className="mt-1.5 truncate text-xs text-muted">
-          {isMatch ? event.courtName : t('tagenda.categories', { count: event.raw.category_count })}
-        </p>
-      ) : null}
-      {stateLine && <StateLine kind="tournament">{stateLine}</StateLine>}
-
-      {/* Hora prevista, nunca garantida — a regra da Federação que o
-          desenho manda repetir no cartão (SPEC §6). */}
-      {isMatch && !past && !event.finished && (
-        <p className="mt-2 flex items-center gap-1.5 text-xs" style={{ color: LILAC.ink }}>
-          <Clock size={13} /> {t('tagenda.may_start_earlier')}
-        </p>
-      )}
-
-      {!isMatch && event.raw?.location && (
-        <p className="mt-2 flex items-center gap-1.5 text-xs text-muted">
-          <MapPin size={13} /> {event.raw.location}
-        </p>
-      )}
-    </>)
-  }
 }

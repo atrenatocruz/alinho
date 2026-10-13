@@ -4,6 +4,9 @@
 // horas em pastilhas (com «+N» quando não cabem). Com vários clubes no mesmo
 // dia, «N horários livres hoje, em M clubes» e uma pastilha por clube: tocar
 // num clube mostra as horas dele.
+// R1 (13 out): o cartão branco com o tracejado salmão do protótipo, a faixa
+// «HORÁRIOS LIVRES · N HORAS» em cima, o clube, «Campos livres hoje», o preço
+// e uma pastilha por hora.
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { formatTime, formatCurrency } from '../../lib/formatDate'
@@ -34,16 +37,31 @@ function ClubHours({ club, onPick }) {
   )
 }
 
-function ClubHead({ club, count, sub }) {
+function ClubHead({ club, title, sub }) {
   return (
-    <div className="flex items-center gap-2.5">
-      {club.orgLogo
-        ? <img src={club.orgLogo} alt="" className="h-[30px] w-[30px] shrink-0 rounded-full object-cover" />
-        : <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-ink-900 text-[10px] font-extrabold text-lime-400">{initials(club.orgName)}</span>}
-      <span className="min-w-0">
-        <b className="block truncate text-[13.5px] font-extrabold text-ink-900">{club.orgName} · {count}</b>
-        {sub && <small className="block text-[11.5px] font-semibold text-muted">{sub}</small>}
+    <div>
+      <span className="inline-flex max-w-full items-center gap-2 py-1 font-display text-[13.5px] font-bold leading-none text-ink-900">
+        {club.orgLogo
+          ? <img src={club.orgLogo} alt="" className="h-6 w-6 flex-none rounded-full object-cover" />
+          : <span className="grid h-6 w-6 flex-none place-items-center rounded-full bg-ink-900 text-[9.5px] font-extrabold text-lime-400">{initials(club.orgName)}</span>}
+        <span className="truncate">{club.orgName}</span>
       </span>
+      {title && <b className="mt-1 block font-display text-[16px] font-extrabold leading-[1.2] text-ink-900">{title}</b>}
+      {sub && <small className="mt-[3px] block text-[12.5px] leading-[1.4] text-[#5B6068]">{sub}</small>}
+    </div>
+  )
+}
+
+/** O cartão branco com o tracejado e a faixa «HORÁRIOS LIVRES · N HORAS». */
+function Shell({ count, children }) {
+  const { t } = useTranslation()
+  return (
+    <div className="overflow-hidden rounded-[20px] border-[1.5px] border-dashed border-[#F2BFA8] bg-white">
+      <div className="flex justify-between bg-[#FFF1EA] px-3.5 py-[9px] font-mono text-[10.5px] font-medium uppercase leading-none tracking-[.1em] text-[#C2410C]">
+        <span>{t('homecard.free_band')}</span>
+        <span>{t('homecard.free_hours', { count })}</span>
+      </div>
+      <div className="px-3.5 pb-3.5 pt-2.5">{children}</div>
     </div>
   )
 }
@@ -52,21 +70,20 @@ export default function FreeSlotsCard({ event, isToday, onPick }) {
   const { t, i18n } = useTranslation()
   const [open, setOpen] = useState(null)
   const sub = (club) => [club.price != null ? t('home.free_price', { price: formatCurrency(club.price, i18n.language) }) : null, t('home.free_tap')].filter(Boolean).join(' · ')
-  const box = 'rounded-[18px] border-[1.5px] border-dashed border-[#F2BFA8] bg-kind-free-light p-3'
 
   if (event.clubs.length === 1) {
     const club = event.clubs[0]
     return (
-      <div className={box}>
-        <ClubHead club={club} count={t('home.free_count', { count: club.slots.length })} sub={sub(club)} />
+      <Shell count={club.slots.length}>
+        <ClubHead club={club} title={t(isToday ? 'homecard.free_title_today' : 'homecard.free_title')} sub={sub(club)} />
         <ClubHours club={club} onPick={onPick} />
-      </div>
+      </Shell>
     )
   }
   const chosen = event.clubs.find((c) => (c.orgId || c.orgName) === open) || null
   return (
-    <div className={box}>
-      <p className="text-[13.5px] font-extrabold text-ink-900">
+    <Shell count={event.count}>
+      <p className="font-display text-[16px] font-extrabold leading-[1.2] text-ink-900">
         {t(isToday ? 'home.free_many_today' : 'home.free_many_day', { count: event.count, clubs: event.clubs.length })}
       </p>
       <p className="text-[11.5px] font-semibold text-muted">{t('home.free_tap_club')}</p>
@@ -84,10 +101,10 @@ export default function FreeSlotsCard({ event, isToday, onPick }) {
       </div>
       {chosen && (
         <div className="mt-3 border-t border-[#F2BFA8]/60 pt-3">
-          <ClubHead club={chosen} count={t('home.free_count', { count: chosen.slots.length })} sub={sub(chosen)} />
+          <ClubHead club={chosen} sub={`${t('home.free_count', { count: chosen.slots.length })} · ${sub(chosen)}`} />
           <ClubHours club={chosen} onPick={onPick} />
         </div>
       )}
-    </div>
+    </Shell>
   )
 }
