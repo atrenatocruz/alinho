@@ -221,6 +221,13 @@ const RPC_MOCKS = {
   // as mais recentes (conquistas animadas, 11 out). awarded_at: a 1.ª da
   // lista é a mais recente.
   get_player_achievements: () => [
+    // localStorage.mockLongAchievements = 'true' — as de texto comprido primeiro
+    // (o cartão aberto cortava a «% têm» no bico, 13 out).
+    ...(localStorage.getItem('mockLongAchievements') ? [
+      { achievement_key: 'equilibrista', category: 'jogo', rarity: 'comum', rarity_pct: 41.4 },
+      { achievement_key: 'ida_e_volta', category: 'jogo', rarity: 'raro', rarity_pct: 8.2 },
+      { achievement_key: 'semana_sim_semana_sim', category: 'assiduidade', rarity: 'epico', rarity_pct: 5.1 },
+    ] : []),
     ...(localStorage.getItem('mockRareAchievements') ? [
       { achievement_key: 'dinastia', category: 'torneio', rarity: 'lendario', rarity_pct: 1.2 },
       { achievement_key: 'hat_trick', category: 'jogo', rarity: 'epico', rarity_pct: 4.8 },
@@ -926,7 +933,9 @@ const RPC_MOCKS = {
   get_unseen_celebrations: () => {
     const nTrophies = Number(localStorage.getItem('mockTrophies') || 0)
     const RAR = { residente: 'raro', meio_cento: 'epico', centuriao_do_vidro: 'lendario', semana_cheia: 'raro', mes_cheio: 'epico' }
-    const keys = ['residente', 'primeira_bola', 'centuriao_do_vidro', 'areia_nos_tenis', 'meio_cento', 'cliente_da_casa', 'semana_cheia', 'mes_cheio', 'ritual_de_segunda', 'coruja_do_padel']
+    // localStorage.mockTrophyKeys = 'equilibrista,ida_e_volta' — quais (para ver os textos compridos).
+    const keys = localStorage.getItem('mockTrophyKeys')?.split(',')
+      || ['residente', 'primeira_bola', 'centuriao_do_vidro', 'areia_nos_tenis', 'meio_cento', 'cliente_da_casa', 'semana_cheia', 'mes_cheio', 'ritual_de_segunda', 'coruja_do_padel']
     const trophies = keys.slice(0, nTrophies).map((k) => ({ kind: 'trophy', trophy_key: k, rarity: RAR[k] || 'comum', happened_at: new Date().toISOString() }))
     const mode = localStorage.getItem('mockKudos')
     if (!mode) return trophies
