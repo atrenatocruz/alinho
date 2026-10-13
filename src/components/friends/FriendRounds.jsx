@@ -16,7 +16,7 @@
 // 07-amigos-convidado) vê e faz o mesmo.
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowLeftRight, ChevronDown } from 'lucide-react'
+import { ArrowLeftRight, ChevronDown, Lock } from 'lucide-react'
 import { shortName } from './friendShare'
 import { roundsOf, hasResult, roundResults } from './roundsData'
 import { kindOf, pointsToOf } from './roundKinds'
@@ -145,7 +145,20 @@ export default function FriendRounds({ match, games, invitees, players, iOrganiz
               {t('friends.edit_short')}
             </button>
           )}
+          {/* Contada ou já enviada: o «Editar» fica à vista, apagado e com o
+              cadeado, em vez de sumir (#586, 13 out). Enviado, a razão está por
+              cima, junto do «Editar» do jogo; contada, vai por baixo. */}
+          {done && iOrganize && !canEdit && (
+            <span aria-disabled="true" className="inline-flex min-h-[32px] items-center gap-1 px-1 text-xs font-extrabold text-ink-500">
+              <Lock size={12} /> {t('friends.edit_short')}
+            </span>
+          )}
         </div>
+        {done && iOrganize && g.counts && !finished && (
+          <p className="mt-1.5 flex items-start gap-1.5 text-xs text-ink-500">
+            <Lock size={12} className="mt-0.5 shrink-0" /> {t('friends.round_locked_counted')}
+          </p>
+        )}
         <div className="mt-2 rounded-ctrl border border-line bg-white px-3 py-2.5">
           {[[g.team_a, sa, sb], [g.team_b, sb, sa]].map(([team, mine, other], k) => (
             <div key={k} className={`flex items-center justify-between gap-2 text-sm ${done && mine < other ? 'text-muted' : 'text-ink-900'} ${k ? 'mt-1' : ''}`}>

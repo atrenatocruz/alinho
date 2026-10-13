@@ -30,7 +30,7 @@ function Spot({ row, place, face, compact }) {
       {row ? (
         <>
           <div className="relative">
-            {place === 1 && <Crown width={compact ? 40 : 48} lift={compact ? 24 : 30} />}
+            {place === 1 && <Crown ring={size + 4} />}
             <div className="rounded-full p-[2px]" style={{ background: RING[place] }}>
               {face
                 ? <img src={face} alt="" className="block rounded-full" style={{ width: size, height: size }} />

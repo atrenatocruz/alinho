@@ -135,7 +135,7 @@ export default function InviteesStep({ me, people, onAdd, onRemove, searchFn = s
         )}
         {lockedKeys?.size > 0 && (
           <p className="mt-2 flex items-start gap-1.5 rounded-ctrl border border-dashed border-line px-3 py-2 text-xs text-muted">
-            <Lock size={12} className="mt-0.5 shrink-0 text-warning" /> {t('friends.locked_hint')}
+            <Lock size={12} className="mt-0.5 shrink-0 text-ink-500" /> {t('friends.locked_hint')}
           </p>
         )}
         {count > MIN_PEOPLE && <p className="mt-2 text-xs text-muted">{t('friends.rotating_line', { count })}</p>}

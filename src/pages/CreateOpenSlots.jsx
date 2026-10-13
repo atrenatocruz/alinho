@@ -33,7 +33,8 @@ const EMPTY_RANGE = () => ({ start: '', end: '' })
 function LockLine({ children }) {
   return (
     <p className="mt-1.5 flex items-start gap-1.5 text-xs text-muted">
-      <Lock size={12} className="mt-0.5 shrink-0 text-warning" /> {children}
+      {/* O cadeado em linha a cinzento, como nos Editar do torneio e do mix (UX, 13 out). */}
+      <Lock size={12} className="mt-0.5 shrink-0 text-ink-500" /> {children}
     </p>
   )
 }

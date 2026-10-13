@@ -704,7 +704,7 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
           </ul>
           {/* O mesmo cadeado do título, em cinzento (UX, 12 out). */}
           <p className="mt-1.5 flex items-center gap-1.5 text-xs text-ink-500">
-            <Lock size={12} className="shrink-0" /> {t('tournament.create.opens_already_open').replace(/^🔒\s*/u, '')}
+            <Lock size={12} className="shrink-0" /> {t('tournament.create.opens_already_open')}
           </p>
         </Locked>
       )}
@@ -751,7 +751,8 @@ export default function CreateTournamentForm({ club, initial = null, locked = fa
               set): «Já», ou o dia e a hora em que abre sozinho. */}
           <Field label={t('launchday.label')}>
             {editing_existing && !openingEditable ? (
-              <p className="text-sm text-muted">{t('tournament.create.opens_already_open')}</p>
+              // O cadeado em linha a cinzento, sem emoji no texto (UX, 13 out).
+              <p className="flex items-start gap-1.5 text-sm text-muted"><Lock size={14} className="mt-0.5 shrink-0" /> {t('tournament.create.opens_already_open')}</p>
             ) : (
               <OpensPicker value={draft.opens_day} time={draft.opens_time}
                 onChange={(v) => set({ opens_day: v })} onTime={(v) => set({ opens_time: v })}
