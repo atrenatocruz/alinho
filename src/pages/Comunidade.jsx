@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Search, Users, Clock, GraduationCap, X, MapPin, Lock, Check, Building2, Plus, ChevronRight } from 'lucide-react'
+import { Search, Users, Clock, GraduationCap, X, Lock, Check, Plus, ChevronRight } from 'lucide-react'
 import { searchOrganizations, listGlobalOrganizations } from '../lib/organizations'
 import { DAYS, listTeachersPublic, teacherClubName } from '../lib/teachers'
 import { scheduleFromRows, shortRange } from '../lib/teacherSchedule'
@@ -10,10 +10,12 @@ import { LevelPill, bandLabel } from '../components/lessons/LessonBits'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { followPlayer, removeFollow } from '../lib/follows'
-import { Avatar, Chips, ConfirmSheet, EmptyState, GroupLevelBadge, OrgKindBadge, orgAvatarShape, PageHeader } from '../components/ui'
+import { Avatar, Chips, ConfirmSheet, EmptyState, GroupLevelBadge, orgAvatarShape, PageHeader } from '../components/ui'
 import { describeError } from '../lib/errors'
 import { useHeaderActions } from '../contexts/HeaderActionsContext'
 import { semAcentos } from '../lib/semAcentos'
+import KindHero from '../components/KindHero'
+import { CLUB_HERO, GROUP_HERO, KIND_COLORS } from '../lib/kindColors'
 
 /* ─── Comunidade (épico «Comunidade vs. Rankings», Trello #271/#273) ─────────
    Encontrar clubes, grupos e professores — e só isso. Desenho:
@@ -145,7 +147,9 @@ export default function Comunidade() {
     const others = organizations.filter((o) => !myOrgIds.has(o.id) && !pendingOrgs.includes(o)).filter(matchesQuery)
     return [...mine, ...others]
   })()
-  const showMineRow = false
+  // «Os teus» (R8, 13 out): uma fila das fotos onde és membro, só em
+  // «Todos» e sem pesquisa.
+  const showMineRow = tab === 'all' && trimmed.length < 2 && myOrgs.length > 0
 
   // ── Professores ────────────────────────────────────────────────────────
   const approvedTeachers = teachers
@@ -226,76 +230,66 @@ export default function Comunidade() {
     }
   }
 
-  // ── Cartão de clube/grupo ──────────────────────────────────────────────
+  // ── Cartão de clube/grupo (R8 do redesign, 13 out) ───────────────────
+  // A toda a largura: em cima, o Alino do clube ou do grupo (R0; a foto do
+  // clube entra quando houver onde a guardar — dados novos, para 23), e
+  // «Por pedido» no canto quando a entrada não é livre; o logótipo a passar
+  // por cima, o nome em grande e «Clube · Lisboa · 48 membros · nível médio
+  // M4» (no grupo, «Grupo do <clube>»); em baixo, um botão a toda a largura.
   const renderOrgCard = (org) => {
     const status = myOrgIds.has(org.id) ? 'member' : org.my_status
     // Grupo dentro de um clube: entra-se sempre por pedido (follow_organization).
     const joinsDirectly = org.open_join && !org.parent_organization_id
+    const group = org.kind === 'group'
+    const sub = [
+      t(group ? 'clubprofile.kind_group' : 'clubprofile.kind_club'),
+      group && org.parent_name ? null : org.location,
+      org.member_count != null ? t('comunidade.member_count', { count: org.member_count }) : null,
+    ].filter(Boolean).join(' · ')
     return (
-      <Link
-        key={org.id}
-        to={`/clube/${org.slug}`}
-        className="card press p-3.5 flex flex-col gap-2 min-w-0 hover:shadow-lift"
-      >
-        <div className="flex items-start justify-between gap-2">
-          <Avatar name={org.name} url={org.group_logo_url} size="w-12 h-12 text-base" shape={orgAvatarShape(org.kind)} />
+      <Link key={org.id} to={`/clube/${org.slug}`} className="block overflow-hidden rounded-[22px] bg-white shadow-card press">
+        <KindHero kind="club" src={group ? GROUP_HERO : CLUB_HERO} className="relative h-[104px]">
           {org.open_join === false && (
-            <span className="w-7 h-7 rounded-full bg-ink-50 text-muted flex items-center justify-center shrink-0" title={t('comunidade.closed_aria')}>
-              <Lock size={13} aria-label={t('comunidade.closed_aria')} />
+            <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-black/55 px-2.5 py-1 text-xs font-extrabold text-white backdrop-blur-sm" title={t('comunidade.closed_aria')}>
+              <Lock size={12} /> {t('comunidade.by_request')}
             </span>
           )}
-        </div>
-        <div className="min-w-0">
-          <h3 className="font-extrabold text-ink-900 text-[15px] leading-tight line-clamp-2 break-words">{org.name}</h3>
-          <div className="mt-1.5"><OrgKindBadge kind={org.kind} /></div>
-        </div>
-        <div className="space-y-1 text-xs text-muted min-w-0">
-          {org.parent_name && (
-            <p className="flex items-center gap-1.5 min-w-0">
-              <Building2 size={12} className="shrink-0" />
-              <span className="truncate">{t('comunidade.group_of', { club: org.parent_name })}</span>
-            </p>
-          )}
-          {org.member_count != null && (
-            <p className="flex items-center gap-1.5">
-              <Users size={12} className="shrink-0" /> {t('comunidade.member_count', { count: org.member_count })}
-            </p>
-          )}
-          {org.location && (
-            <p className="flex items-center gap-1.5 min-w-0">
-              <MapPin size={12} className="shrink-0" /> <span className="truncate">{org.location}</span>
-            </p>
-          )}
-          {org.avg_rating != null && (
-            <p className="flex items-center gap-1.5">
-              {t('comunidade.avg_level')} <GroupLevelBadge rating={org.avg_rating} />
-            </p>
-          )}
-        </div>
-
-        <div className="mt-auto pt-1">
-          {status === 'member' ? (
-            <span className="w-full inline-flex items-center justify-center gap-1.5 min-h-[40px] rounded-full bg-ok/10 text-ok text-xs font-extrabold">
-              <Check size={14} /> {t('comunidade.member_label')}
-            </span>
-          ) : status === 'pending' ? (
-            <span className="w-full inline-flex items-center justify-center gap-1.5 min-h-[40px] rounded-full bg-ink-50 text-muted text-xs font-extrabold">
-              <Clock size={14} /> {t('comunidade.request_sent')}
-            </span>
-          ) : (
-            <button
-              onClick={(e) => { e.preventDefault(); handleFollow(org) }}
-              disabled={actingOn === org.id}
-              className={`w-full inline-flex items-center justify-center min-h-[40px] rounded-full text-xs font-extrabold transition-colors duration-fast disabled:opacity-40 ${
-                joinsDirectly
-                  ? 'bg-lime-400 text-ink-900 hover:bg-lime-600'
-                  : 'bg-canvas text-ink-900 border border-ink-900 hover:bg-ink-50'
-              }`}
-            >
-              {joinsDirectly ? t('comunidade.join_action') : t('comunidade.request_entry_action')}
-            </button>
-          )}
-          {cardError[org.id] && <p role="alert" className="mt-2 rounded-ctrl border border-danger/30 bg-danger/10 px-2.5 py-2 text-xs font-bold text-danger">{cardError[org.id]}</p>}
+        </KindHero>
+        <div className="px-4 pb-4">
+          <span className={`relative -mt-9 inline-block bg-white p-[3px] ${group ? "rounded-full" : "rounded-[15px]"}`}>
+            <Avatar name={org.name} url={org.group_logo_url} size="w-14 h-14 text-lg" shape={orgAvatarShape(org.kind)} colorClass="bg-ink-900 text-lime-400" />
+          </span>
+          <h3 className="mt-1 font-display text-xl font-extrabold leading-tight text-ink-900 break-words">{org.name}</h3>
+          <p className="mt-0.5 text-sm text-muted">
+            {sub}
+            {group && org.parent_name && <> · {t('comunidade.group_of', { club: org.parent_name })}</>}
+            {org.avg_rating != null && (
+              <span className="whitespace-nowrap"> · {t('comunidade.avg_level_inline')} <GroupLevelBadge rating={org.avg_rating} /></span>
+            )}
+          </p>
+          <div className="mt-3.5">
+            {status === 'member' ? (
+              <span className="flex min-h-[48px] w-full items-center justify-center gap-1.5 rounded-ctrl bg-[#F1F8D6] text-base font-extrabold text-[#3F5200]">
+                <Check size={17} /> {t('clubprofile.is_member')}
+              </span>
+            ) : status === 'pending' ? (
+              <span className="flex min-h-[48px] w-full items-center justify-center gap-1.5 rounded-ctrl bg-ink-50 text-base font-extrabold text-muted">
+                <Clock size={16} /> {t('comunidade.request_sent')}
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={(e) => { e.preventDefault(); handleFollow(org) }}
+                disabled={actingOn === org.id}
+                className={`flex min-h-[48px] w-full items-center justify-center rounded-ctrl text-base font-extrabold transition-colors duration-fast disabled:opacity-40 ${
+                  joinsDirectly ? 'bg-lime-400 text-ink-900 hover:bg-lime-600' : 'border-[1.5px] border-ink-900 bg-white text-ink-900 hover:bg-ink-50'
+                }`}
+              >
+                {joinsDirectly ? t('comunidade.join_action') : t('comunidade.request_entry_action')}
+              </button>
+            )}
+            {cardError[org.id] && <p role="alert" className="mt-2 rounded-ctrl border border-danger/30 bg-danger/10 px-2.5 py-2 text-xs font-bold text-danger">{cardError[org.id]}</p>}
+          </div>
         </div>
       </Link>
     )
@@ -311,70 +305,77 @@ export default function Comunidade() {
     const contact = teacherContact(teacher.contact)
     const female = teacher.user?.gender === 'feminino'
     const byDay = scheduleFromRows(teacher.availability || [])
-    const summary = DAYS.flatMap(({ value }, i) => byDay[value].map((sl) =>
+    const slots = DAYS.flatMap(({ value }, i) => byDay[value].map((sl) =>
       `${t(`lessons.wd_short_${i + 1}`).replace(/^./, (c) => c.toUpperCase())} ${shortRange(sl.start, sl.end)}`))
     const level = bandLabel(teacher.user?.rating, teacher.user?.gender)
-    const btn = 'flex-1 inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3 rounded-full text-sm font-extrabold transition-colors duration-fast disabled:opacity-40'
+    const firstName = (teacher.user?.name || '').split(/\s+/)[0]
+    const lesson = KIND_COLORS.lesson
+    const btn = 'flex w-full min-h-[48px] items-center justify-center gap-1.5 rounded-ctrl text-base font-extrabold transition-colors duration-fast disabled:opacity-40'
     return (
-      <div key={teacher.id} className="card p-3.5 space-y-3">
-        {/* A página de professor só existe quando o clube já o aceitou
-            (teacher_profile_active). Com o pedido ao clube por aceitar,
-            o nome abre o perfil normal da pessoa (#550 — o Francisco
-            caía em «Professor não encontrado»). */}
-        <Link
-          to={!teacher.organization_id || !teacher.club_status || teacher.club_status === 'accepted'
-            ? `/professor/${teacher.id}`
-            : `/jogador/${teacher.user_id}`}
-          className="flex items-center gap-3"
-        >
-          <Avatar name={teacher.user?.name} url={teacher.user?.avatar_url} size="w-12 h-12 text-base" />
-          <div className="flex-1 min-w-0">
-            <h3 className="font-extrabold text-ink-900 truncate">{teacher.user?.name}</h3>
-            <p className="text-xs text-muted truncate">
-              {[t(female ? 'comunidade.teacher_label_f' : 'comunidade.teacher_label'),
-                teacherClubName(teacher) || t('comunidade.teacher_no_club_short'), teacher.zone].filter(Boolean).join(' · ')}
-            </p>
-            <p className="text-xs flex items-center gap-1.5 mt-0.5 min-w-0">
-              {level && <LevelPill label={level} />}
-              {summary.length > 0
-                ? <span className="text-ink-700 truncate">{summary.join(' · ')}</span>
-                : <span className="text-muted">{t('comunidade.teacher_no_schedule')}</span>}
-            </p>
-          </div>
-          <ChevronRight size={18} className="text-muted shrink-0" />
-        </Link>
-        <div className="flex gap-2">
+      <div key={teacher.id} className="overflow-hidden rounded-[22px] bg-white shadow-card">
+        {/* A faixa na cor das aulas (R0). */}
+        <div className="px-4 py-2" style={{ background: lesson.strong }}>
+          <p className="font-mono text-[11px] font-bold uppercase tracking-widest text-white">{t(female ? 'comunidade.teacher_label_f' : 'comunidade.teacher_label')}</p>
+        </div>
+        <div className="space-y-3 p-4">
+          {/* A página de professor só existe quando o clube já o aceitou
+              (teacher_profile_active). Com o pedido ao clube por aceitar,
+              o nome abre o perfil normal da pessoa (#550). */}
+          <Link
+            to={!teacher.organization_id || !teacher.club_status || teacher.club_status === 'accepted'
+              ? `/professor/${teacher.id}`
+              : `/jogador/${teacher.user_id}`}
+            className="flex items-center gap-3"
+          >
+            <Avatar name={teacher.user?.name} url={teacher.user?.avatar_url} size="w-12 h-12 text-base" />
+            <div className="min-w-0 flex-1">
+              <h3 className="truncate text-lg font-extrabold text-ink-900">{teacher.user?.name}</h3>
+              <p className="flex min-w-0 items-center gap-1.5 text-sm text-muted">
+                <span className="truncate">{[teacherClubName(teacher) || t('comunidade.teacher_no_club_short'), teacher.zone].filter(Boolean).join(' · ')}</span>
+                {level && <LevelPill label={level} />}
+              </p>
+            </div>
+            <ChevronRight size={18} className="shrink-0 text-muted" />
+          </Link>
+          {slots.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {slots.map((sl) => (
+                <span key={sl} className="rounded-full px-2.5 py-1 text-xs font-extrabold" style={{ background: lesson.light, color: lesson.dark }}>{sl}</span>
+              ))}
+            </div>
+          ) : <p className="text-sm text-muted">{t('comunidade.teacher_no_schedule')}</p>}
           {teacher.user_id && (
             follow?.status === 'accepted' ? (
               <button type="button" disabled={followActing === teacher.user_id}
                 onClick={() => setAskUnfollow(teacher)}
                 className={`${btn} border-[1.5px] border-line bg-white text-ink-900`}>
-                <Check size={15} /> {t('playerdetails.following_button')}
+                <Check size={16} /> {t('playerdetails.following_button')}
               </button>
             ) : follow?.status === 'pending' ? (
               <button type="button" disabled={followActing === teacher.user_id}
                 onClick={() => handleTeacherUnfollow(teacher)}
                 className={`${btn} border-[1.5px] border-line bg-white text-muted`}>
-                <Clock size={15} /> {t('playerdetails.requested_button')}
+                <Clock size={16} /> {t('playerdetails.requested_button')}
               </button>
             ) : (
               <button type="button" disabled={followActing === teacher.user_id}
                 onClick={() => handleTeacherFollow(teacher)}
                 className={`${btn} bg-ink-900 text-white`}>
-                <Plus size={15} /> {t('playerdetails.follow_button')}
+                <Plus size={16} /> {t('playerdetails.follow_button')}
               </button>
             )
           )}
+          {/* «Falar com <nome>» em texto, por baixo (nunca dois botões lado a lado). */}
           {contact && (
             <a href={contact.href} target="_blank" rel="noopener noreferrer"
-              className={`${btn} border-[1.5px] border-line bg-white text-ink-900`}>
-              {t(`teacher.contact_${contact.kind}`)}
+              className="flex min-h-[44px] items-center justify-center text-sm font-extrabold text-ink-900 underline underline-offset-2">
+              {t('comunidade.talk_to', { name: firstName })}
             </a>
           )}
+          {cardError[teacher.id] && (
+            <p role="alert" className="rounded-ctrl border border-danger/30 bg-danger/10 px-3 py-2 text-sm font-bold text-danger">{cardError[teacher.id]}</p>
+          )}
         </div>
-        {cardError[teacher.id] && (
-          <p role="alert" className="rounded-ctrl border border-danger/30 bg-danger/10 px-3 py-2 text-sm font-bold text-danger">{cardError[teacher.id]}</p>
-        )}
       </div>
     )
   }
@@ -432,12 +433,14 @@ export default function Comunidade() {
         <>
           {showMineRow && (
             <section>
-              <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mb-2">{t('comunidade.mine_heading')}</p>
+              <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted mb-2">{t('comunidade.mine_heading')} · {myOrgs.length}</p>
               <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-1 px-1 pb-1">
                 {myOrgs.map((org) => (
-                  <Link key={org.id} to={`/clube/${org.slug}`} className="w-[72px] shrink-0 flex flex-col items-center gap-1.5 text-center">
-                    <Avatar name={org.name} url={org.group_logo_url} size="w-14 h-14 text-lg" shape={orgAvatarShape(org.kind)} />
-                    <span className="text-[11px] font-extrabold text-ink-900 leading-tight line-clamp-2 break-words">{org.name}</span>
+                  <Link key={org.id} to={`/clube/${org.slug}`} className="w-[84px] shrink-0 flex flex-col items-center gap-1.5 text-center">
+                    <span className="rounded-full p-[3px] ring-[3px] ring-lime-400">
+                      <Avatar name={org.name} url={org.group_logo_url} size="w-[62px] h-[62px] text-lg" colorClass="bg-ink-900 text-lime-400" />
+                    </span>
+                    <span className="text-[13px] font-extrabold text-ink-900 leading-tight line-clamp-2 break-words">{org.name}</span>
                   </Link>
                 ))}
               </div>
@@ -451,7 +454,7 @@ export default function Comunidade() {
                   ? t('comunidade.results_count', { count: shownOrgs.length + (showTeachers ? approvedTeachers.length : 0) })
                   : t({ clubs: 'comunidade.filter_clubs', groups: 'comunidade.filter_groups' }[tab] || 'comunidade.tab_orgs')}
               </p>
-              <div className="grid grid-cols-2 gap-3">{shownOrgs.map(renderOrgCard)}</div>
+              <div className="space-y-3">{shownOrgs.map(renderOrgCard)}</div>
             </section>
           )}
 
