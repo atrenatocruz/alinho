@@ -256,7 +256,6 @@ export default function FriendSession() {
   // Jogo acabado com um resultado por responder: quem está nas equipas vê
   // «Está certo» / «Não está certo» no sítio do «Vou» (UX, 13 out). A base de
   // dados já deixa responder a quem jogou, com ou sem o «Vou».
-  const senderGender = invitees.find((i) => i.user_id && i.user_id === match?.sent_by?.user_id)?.gender
   const inTeams = !!profile?.id && games.some((g) => [...(g.team_a || []), ...(g.team_b || [])].some((s) => s.user_id === profile.id))
   const [resultToAnswer, setResultToAnswer] = useState(null) // o aviso por responder
   useEffect(() => {
@@ -488,11 +487,11 @@ export default function FriendSession() {
       {/* Convidado por responder: «Vou» · «Vou, mas sem o meu nome» · «Não vou». */}
       {resultToAnswer && (
         <div className="mt-6 space-y-2.5">
-          {/* O que se está a confirmar, como no sino (UX, 13 out). */}
+          {/* O que se está a confirmar, como no sino (UX, 13 out). Sem artigo
+              antes do nome («Rita F. enviou…»), a regra do Francisco (QA). */}
           <p className="text-sm text-ink-900">
             <Trans i18nKey="friends.page_result_line"
               values={{ name: shortName(match.sent_by?.name || resultToAnswer.data?.sender_name || ''), how: resultHow(t, resultToAnswer.data || {}) }}
-              context={senderGender === 'feminino' ? 'f' : senderGender === 'masculino' ? 'm' : undefined}
               components={{ b: <b className="font-extrabold" /> }} />
           </p>
           <FriendResultButtons matchId={match.id} senderName={match.sent_by?.name} onDone={() => { setResultToAnswer(null); load() }} />

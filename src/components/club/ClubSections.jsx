@@ -7,14 +7,17 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Check, CheckCircle2, ChevronLeft, ChevronRight, Clock, Globe, Heart, Instagram, Lock, MapPin, Phone, Plus, Share2 } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Clock, Globe, Heart, Instagram, Lock, MapPin, Phone, Plus, Share2 } from 'lucide-react'
 import KindHero from '../KindHero'
 import { CLUB_HERO, GROUP_HERO } from '../../lib/kindColors'
 import { Avatar, ConfirmSheet, PrimaryButton, Tabs } from '../ui'
 import { supabase } from '../../lib/supabase'
 import { describeError, errorKind } from '../../lib/errors'
-import { KIND_STYLE, KindLine, StateLine, StateTag } from '../agenda/EventCard'
-import CardMascot, { mascotFor, MascotPill } from '../agenda/CardMascot'
+import { KIND_STYLE, CardClub } from '../agenda/EventCard'
+import HomeCard, { BandPill, CardTitle, CardChips, CardState, CardFoot, kindColorsOf } from '../agenda/HomeCard'
+import { toDayKey, fromDayKey, addDays } from '../../lib/agenda'
+import { formatDate } from '../../lib/formatDate'
+import { daysAside, shortDay } from '../event/heroDates'
 
 const asWebsiteUrl = (value) => (/^https?:\/\//i.test(value) ? value : `https://${value}`)
 const asInstagramUrl = (value) => (/^https?:\/\//i.test(value)
@@ -203,56 +206,104 @@ export function buildClubEvents(club, tournaments = []) {
   return [...games, ...tours].sort((a, b) => String(a.when || '9').localeCompare(String(b.when || '9')))
 }
 
+// R5 (13 out): os eventos do clube com o cartão do R1 (faixa na cor forte do
+// tipo e corpo branco), e o tipo no lugar do clube («Mix · recorrente»).
 function EventRow({ event, member }) {
   const { t, i18n } = useTranslation()
-  // «sáb 27 set» e «18:00» — como na Home, sem o ano nem a data repetida.
-  const dayOf = (iso, withWeekday) => new Date(iso).toLocaleDateString(i18n.language,
-    { ...(withWeekday ? { weekday: 'short' } : {}), day: 'numeric', month: 'short' }).replace(/\./g, '').replace(',', '')
-  const timeOf = (iso) => new Date(iso).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' })
-  let line = ''
+  const kindLabel = t(KIND_STYLE[event.kind]?.labelKey || 'agenda.kind_mix')
+  const recurring = event.recurring ? t('ui.recurring') : null
+  let time, timeAside = null, count = null, chips = null, stateRow = null
   if (event.tournament) {
     const x = event.tournament
-    const a = x.starts_on ? dayOf(`${x.starts_on}T12:00:00`) : ''
-    const b = x.ends_on && x.ends_on !== x.starts_on ? dayOf(`${x.ends_on}T12:00:00`) : ''
-    line = [b ? `${a} – ${b}` : a, t(`tournament.status_${x.status}`)].filter(Boolean).join(' · ')
+    const a = shortDay(x.starts_on, i18n.language)
+    const b = x.ends_on && String(x.ends_on).slice(0, 10) !== String(x.starts_on || '').slice(0, 10) ? shortDay(x.ends_on, i18n.language) : null
+    time = b ? `${a.split(' ')[0]}–${b}` : a || '—'
+    timeAside = daysAside(x.starts_on, x.ends_on, i18n.language, t)
+    chips = x.location || null
+    if (x.status === 'inscricoes') stateRow = <CardState tone="ok">{t('homecard.open')}</CardState>
   } else {
     const g = event.game
-    line = [
-      dayOf(event.when, true),
-      timeOf(event.when),
-      // Um evento fechado a quem não é membro não traz vagas nem inscritos.
-      !event.locked && g.max_players ? t('clubprofile.players_ratio', { count: g.confirmed_count || 0, max: g.max_players }) : null,
-    ].filter(Boolean).join(' · ')
+    time = new Date(event.when).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' })
+    timeAside = recurring ? recurring.toLowerCase() : null
+    // Um evento fechado a quem não é membro não traz vagas nem inscritos.
+    if (!event.locked && g.max_players) {
+      count = { n: g.confirmed_count || 0, of: g.max_players, unit: t(event.kind === 'open' ? 'homecard.unit_players' : 'homecard.unit_signed') }
+    }
+    chips = g.location || null
+    const free = g.max_players ? g.max_players - (g.confirmed_count || 0) : null
+    if (event.myState === 'in') stateRow = <CardState tone="ok">{t('home.next_in')}</CardState>
+    else if (event.myState === 'waitlist') stateRow = <CardState tone="warn">{t('agenda.state_line_waitlist')}</CardState>
+    else if (!event.locked && free === 0) stateRow = <CardState tone="warn">{t('homecard.full')}</CardState>
+    else if (!event.locked && free > 0) stateRow = <CardState tone="ok">{t('homecard.open')}</CardState>
   }
-
-  // O tipo sem pastilha e «Suplente» numa linha por baixo, como na Home (SPEC-3, UX 10 out).
-  const state = event.myState === 'in' ? <StateTag tone="in" icon={Check}>{t('agenda.state_in')}</StateTag> : null
-  const frame = event.myState === 'in' ? `${KIND_STYLE[event.kind].bg} border-2 border-ok`
-    : event.myState === 'waitlist' ? `${KIND_STYLE[event.kind].bg} border-2 border-dashed border-[#B86E00]`
-      : `${KIND_STYLE[event.kind].card} border`
-  // O boneco do tipo (Dev 2, 12 out — o mesmo dos cartões da Home); um mix
-  // com imagem própria não leva.
-  const mascot = mascotFor(event.kind, event.game?.image_url)
-  const corner = event.locked ? <Lock size={15} className="mt-1 text-muted" /> : state
-  const body = (
-    <>
-      <CardMascot type={mascot} small />
-      <div className={`flex items-start justify-between gap-2 ${mascot ? 'pr-[60px]' : ''}`}>
-        <KindLine kind={event.kind} suffix={event.recurring ? t('ui.recurring') : null} />
-        {!mascot && corner}
-      </div>
-      {mascot && <MascotPill top="top-[54px]">{corner}</MascotPill>}
-      <h4 className={`mt-2 text-base font-extrabold leading-snug text-ink-900 [overflow-wrap:anywhere] ${mascot ? 'pr-[100px]' : ''}`}>{event.title}</h4>
-      <p className="mt-0.5 text-[13px] text-ink-700">{line}</p>
-      {event.myState === 'waitlist' && <StateLine kind={event.kind}>{t('agenda.state_line_waitlist')}</StateLine>}
-    </>
-  )
-  const cls = `relative block rounded-card p-3.5 ${mascot ? '!mt-3' : ''} ${frame}`
+  const pill = event.locked
+    ? <BandPill tone="dark"><Lock size={11} className="inline align-[-1px]" aria-label={t('clubprofile.events')} /></BandPill>
+    : event.myState === 'in' ? <BandPill>✓ {t('home.next_in')}</BandPill> : null
   // O torneio abre a toda a gente (página pública). O mix só a membros: a
   // quem não é, a página do mix dava «não encontrado» (#535).
-  if (event.tournament) return <Link to={`/torneio/${event.tournament.slug || event.tournament.id}`} className={`${cls} press`}>{body}</Link>
-  if (member && !event.locked) return <Link to={`/jogo/${event.game.id}`} className={`${cls} press`}>{body}</Link>
-  return <div className={`${cls} opacity-60`} aria-disabled="true">{body}</div>
+  const to = event.tournament ? `/torneio/${event.tournament.slug || event.tournament.id}`
+    : member && !event.locked ? `/jogo/${event.game.id}` : null
+  const card = (
+    <HomeCard colors={kindColorsOf(event.kind)} label={kindLabel} pill={pill} time={time} timeAside={timeAside} count={count}
+      imageUrl={event.game?.image_url || null} mine={event.myState === 'in'} to={to} ariaLabel={`${event.title} — ${time}`}>
+      <CardClub event={{}} label={[kindLabel, recurring].filter(Boolean).join(' · ')} />
+      <CardTitle>{event.title}</CardTitle>
+      {chips && <CardChips>{chips}</CardChips>}
+      {stateRow}
+      {event.myState === 'in' && to && (
+        <CardFoot>
+          <span className="pointer-events-none whitespace-nowrap rounded-[14px] border-[1.5px] border-[#CFD2D7] bg-white px-[18px] py-[11px] font-display text-[14.5px] font-extrabold leading-none text-ink-900">{t('homecard.see')}</span>
+        </CardFoot>
+      )}
+    </HomeCard>
+  )
+  return to ? card : <div className="opacity-60" aria-disabled="true">{card}</div>
+}
+
+// O cabeçalho do dia como o da Home (dayParts, AgendaControls): «Hoje» e
+// «segunda, 12 out», ou «Sábado» e «17 out». Não se importa de lá porque
+// AgendaControls traz o Google Maps, que não corre nos testes.
+const capitalize = (x) => (x ? x[0].toUpperCase() + x.slice(1) : x)
+function dayParts(dayKey, t, lang) {
+  const today = toDayKey(new Date())
+  const d = fromDayKey(dayKey)
+  const part = (opts) => formatDate(d, lang, opts).replace(/\./g, '').replace(/-feira$/, '')
+  const date = `${d.getDate()} ${part({ month: 'short' })}`
+  const near = dayKey === today ? t('ui.today') : dayKey === addDays(today, 1) ? t('ui.tomorrow') : null
+  if (near) return { big: near, small: `${part({ weekday: 'long' })}, ${date}` }
+  return { big: capitalize(part({ weekday: 'long' })), small: date }
+}
+
+// Os eventos por dia, com o cabeçalho da Home (R1): «Hoje» em grande, a data
+// a cinzento e, à direita, «2 jogos».
+const eventDayKey = (e) => (e.tournament ? String(e.tournament.starts_on || '').slice(0, 10) : e.when ? localDayKey(e.when) : '')
+function EventDays({ events, member }) {
+  const { t, i18n } = useTranslation()
+  const days = []
+  for (const e of events) {
+    const k = eventDayKey(e)
+    if (days.length && days[days.length - 1].k === k) days[days.length - 1].list.push(e)
+    else days.push({ k, list: [e] })
+  }
+  return (
+    <div className="space-y-5">
+      {days.map(({ k, list }, i) => {
+        const dp = k ? dayParts(k, t, i18n.language) : null
+        return (
+          <section key={k || i} className="space-y-2.5">
+            {dp && (
+              <div className={`flex items-baseline gap-2 px-0.5 ${i === 0 ? '' : 'border-t border-line pt-3.5'}`}>
+                <b className="font-display text-[22px] font-black leading-none tracking-[-.02em] text-ink-900">{dp.big}</b>
+                <span className="font-display text-[14px] font-semibold leading-none text-[#5B6068]">{dp.small}</span>
+                <em className="ml-auto font-mono text-[10.5px] not-italic leading-none tracking-[.06em] text-[#8A8E95]">{t('homecard.day_count', { count: list.length })}</em>
+              </div>
+            )}
+            {list.map((e) => <EventRow key={e.key} event={e} member={member} />)}
+          </section>
+        )
+      })}
+    </div>
+  )
 }
 
 export function ClubEvents({ club, events, isAdmin, gerirHref }) {
@@ -309,9 +360,7 @@ export function ClubEvents({ club, events, isAdmin, gerirHref }) {
           </div>
         )
       ) : (
-        <div className="space-y-2.5">
-          {shown.map((e) => <EventRow key={e.key} event={e} member={member} />)}
-        </div>
+        <EventDays events={shown} member={member} />
       )}
       </>}
     </section>
@@ -362,22 +411,20 @@ function ClubPlayed({ club }) {
         const people = r.kind === 'tournament'
           ? (r.entries_count != null ? t('agenda.played_teams', { count: Number(r.entries_count) }) : null)
           : r.players_count != null ? t(r.kind === 'mix' ? 'agenda.played_players' : 'agenda.played_people', { count: Number(r.players_count) }) : null
-        const line = [dayOf(r.date), r.kind === 'tournament' ? null : timeOf(r.date), people].filter(Boolean).join(' · ')
+        // Na faixa já vai a hora (ou o dia, no torneio): por baixo, o dia e quantos jogaram.
+        const line = [dayOf(r.date), people].filter(Boolean).join(' · ')
         const points = r.i_played && r.my_points != null ? Math.round(Number(r.my_points)) : null
         return (
-          <Link key={`${r.kind}-${r.id}`} to={to} className={`press relative block rounded-card bg-surface p-3.5 ${mascotFor(kind) ? '!mt-3' : ''} ${r.i_played ? 'border-2 border-ok' : 'border border-line'}`}>
-            <CardMascot type={mascotFor(kind)} small />
-            <div className={`flex items-start justify-between gap-2 ${mascotFor(kind) ? 'pr-[60px]' : ''}`}>
-              <KindLine kind={kind} past />
-              {!mascotFor(kind) && <StateTag tone="grey" icon={CheckCircle2}>{t('agenda.state_finished')}</StateTag>}
+          // R5 (13 out): o cartão do R1, a cinzento por já ter passado.
+          <HomeCard key={`${r.kind}-${r.id}`} colors={kindColorsOf(kind)} label={t(KIND_STYLE[kind]?.labelKey || 'agenda.kind_mix')}
+            pill={<BandPill tone="dark">{t('agenda.state_finished')}</BandPill>}
+            time={r.kind === 'tournament' ? shortDay(r.date, i18n.language) : timeOf(r.date)} past to={to} ariaLabel={title}>
+            <div className="flex items-baseline justify-between gap-2">
+              <CardTitle past>{title}</CardTitle>
+              {points != null && <b className={`shrink-0 text-sm font-extrabold ${points > 0 ? 'text-[#3F6212]' : 'text-muted'}`}>{t('agenda.played_points', { points: `${points > 0 ? '+' : ''}${points}` })}</b>}
             </div>
-            {mascotFor(kind) && <MascotPill top="top-[54px]"><StateTag tone="grey" icon={CheckCircle2}>{t('agenda.state_finished')}</StateTag></MascotPill>}
-            <div className="mt-2 flex items-baseline justify-between gap-2">
-              <h4 className={`text-base font-extrabold leading-snug text-muted [overflow-wrap:anywhere] ${mascotFor(kind) ? 'pr-[100px]' : ''}`}>{title}</h4>
-              {points != null && <b className="shrink-0 text-sm font-extrabold text-ink-900">{t('agenda.played_points', { points: `${points > 0 ? '+' : ''}${points}` })}</b>}
-            </div>
-            <p className="mt-0.5 text-[13px] text-ink-700">{line}</p>
-          </Link>
+            <CardChips>{line}</CardChips>
+          </HomeCard>
         )
       })}
       {!all && rows.length > PLAYED_FIRST && (
