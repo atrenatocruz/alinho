@@ -18,12 +18,14 @@ import { SCHEDULE_DEFAULTS, canPlace, findConflicts } from '../../lib/tournament
 import { describeError, errorKind } from '../../lib/errors'
 import { Chips, EmptyState } from '../ui'
 import { MonoLabel } from './TournamentBits'
+import { KIND_COLORS } from '../../lib/kindColors'
 import { PanelSkeleton } from './TournamentSkeleton'
 
 // Uma cor por categoria, pela ordem em que aparecem — as três do desenho,
-// repetidas se houver mais categorias do que cores.
+// repetidas se houver mais categorias do que cores. A 1.ª é a do torneio
+// (R0, 13 out: o roxo novo em vez do lilás antigo — QA).
 const CATEGORY_COLORS = [
-  { bg: '#EDE9FE', text: '#4338A8' },
+  { bg: KIND_COLORS.tournament.light, text: KIND_COLORS.tournament.dark },
   { bg: '#FCE7F3', text: '#9D174D' },
   { bg: '#E0F2FE', text: '#075985' },
   { bg: '#DCFCE7', text: '#14532D' },
