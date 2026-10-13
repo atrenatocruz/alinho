@@ -11,6 +11,7 @@ import { Chips } from '../ui'
 import TodayButton from '../TodayButton'
 import SearchField, { Realce, matchesQuery } from '../SearchField'
 import { useAuth } from '../../contexts/AuthContext'
+import { useDragScroll } from '../../lib/useDragScroll'
 
 /* Controlos da agenda da Home (Trello #258, Fase 1): o dia em cima com setas,
    o mês numa folha que sobe de baixo, e os filtros noutra folha. Tudo
@@ -486,37 +487,9 @@ export function dayChipLabel(dayKey, t, lang) {
   return capitalize(`${part({ weekday: 'short' })} ${d.getDate()} ${part({ month: 'short' })}`)
 }
 
-/** Arrastar com o rato as filas que deslizam, como o dedo no telemóvel
- *  (SPEC-1, ponto 5). Um arrasto não conta como toque no que está por baixo. */
-export function useDragScroll() {
-  const ref = useRef(null)
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return undefined
-    let down = null
-    let moved = false
-    const onDown = (e) => { if (e.pointerType !== 'mouse' || e.button !== 0) return; down = { x: e.clientX, left: el.scrollLeft }; moved = false }
-    const onMove = (e) => {
-      if (!down) return
-      const dx = e.clientX - down.x
-      if (Math.abs(dx) > 4) moved = true
-      if (moved) el.scrollLeft = down.left - dx
-    }
-    const onUp = () => { down = null }
-    const onClick = (e) => { if (moved) { e.preventDefault(); e.stopPropagation(); moved = false } }
-    el.addEventListener('pointerdown', onDown)
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp)
-    el.addEventListener('click', onClick, true)
-    return () => {
-      el.removeEventListener('pointerdown', onDown)
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
-      el.removeEventListener('click', onClick, true)
-    }
-  }, [])
-  return ref
-}
+// Arrastar com o rato e a roda: src/lib/useDragScroll.js (partilhado com o
+// FilterBar do ui.jsx, R4). Continua a sair daqui para quem já o importa.
+export { useDragScroll }
 
 const TAP = "relative before:absolute before:inset-x-0 before:-inset-y-1 before:content-['']"
 
