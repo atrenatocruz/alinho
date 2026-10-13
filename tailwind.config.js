@@ -43,7 +43,8 @@ export default {
           600: 'rgb(var(--lime-600) / <alpha-value>)',
         },
         canvas: 'rgb(var(--canvas) / <alpha-value>)',    // pure-white app background (was: sand)
-        surface: 'rgb(var(--surface) / <alpha-value>)',  // light-gray cards (was: white cards)
+        surface: 'rgb(var(--surface) / <alpha-value>)',  // caixas claras dentro dos cartões (#F4F5F1, R12)
+        ground: 'rgb(var(--ground) / <alpha-value>)',    // o fundo das páginas da app (#F1F2EE, R12)
         line: 'rgb(var(--line) / <alpha-value>)',        // hairline borders
         muted: 'rgb(var(--muted) / <alpha-value>)',      // secondary text
         ok: 'rgb(var(--ok) / <alpha-value>)',

@@ -14,7 +14,8 @@ export function shortName(name) {
   if (parts.length < 2) return parts[0] || '—'
   // A inicial é a primeira letra do último nome: «Admin (Dev)» → «Admin D.».
   const initial = parts[parts.length - 1].match(/\p{L}/u)?.[0]
-  return initial ? `${parts[0]} ${initial.toUpperCase()}.` : parts[0]
+  // Sem letra no último nome («Teste 2»): fica o nome inteiro (UX, 13 out).
+  return initial ? `${parts[0]} ${initial.toUpperCase()}.` : parts.join(' ')
 }
 
 /** «+86», «−12» (sinal de menos a sério) e «0». */

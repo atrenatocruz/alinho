@@ -57,7 +57,11 @@
 
   /* Color — neutrals & semantics */
   --canvas:  255 255 255;   /* #FFFFFF — app background (was: card background) */
-  --surface: 243 244 246;   /* #F3F4F6 — cards (was: #FFFFFF; now the recessed light-gray card) */
+  --surface: 244 245 241;   /* #F4F5F1 — caixas claras dentro dos cartões, campos por trás (R12, 13 out; era #F3F4F6) */
+  /* O fundo das páginas da app (R12 do redesign, 13 out): cinzento-claro,
+     com os cartões em branco por cima. Só a app (Layout); o site de fora
+     fica no canvas. */
+  --ground:  241 242 238;   /* #F1F2EE */
   --line:    229 231 235;   /* #E5E7EB — hairline borders */
   --muted:   75 85 99;      /* #4B5563 — Dark Gray: "supporting body copy and
                                 secondary label values" per the style guide.
@@ -140,13 +144,15 @@
            min-h-[48px] text-base;
   }
 
+  /* Cartão: branco, sem contorno, sombra muito suave, sobre o fundo
+     cinzento-claro da app (R12, 13 out). */
   .card {
-    @apply bg-surface rounded-card shadow-card p-5
+    @apply bg-white rounded-card p-5 shadow-[0_1px_2px_rgba(17,17,17,0.06)]
            transition-shadow duration-base;
   }
 
   .input-field {
-    @apply w-full px-4 py-3.5 text-base rounded-ctrl bg-surface
+    @apply w-full px-4 py-3.5 text-base rounded-ctrl bg-white
            border border-line text-ink-900 placeholder:text-muted/60
            focus:border-ink-500 focus:ring-2 focus:ring-ink-50
            outline-none transition-all duration-fast min-h-[48px];
