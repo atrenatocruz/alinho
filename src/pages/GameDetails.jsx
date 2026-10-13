@@ -4,20 +4,23 @@ import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation, Trans } from 'react-i18next'
 import { BackBar } from '../components/ui'
+import { parseLevel } from '../lib/mixLevels'
+import EventHero from '../components/event/EventHero'
+import EventFacts from '../components/event/EventFacts'
 import { SkeletonGate } from '../components/Skeleton'
 import GameDetailsSkeleton from '../components/mix/GameDetailsSkeleton'
-import { Calendar, ArrowLeft, UserPlus, Check, Trophy, Play, ChevronRight, Swords, X, ChevronDown, RotateCcw, Euro, GripVertical, Pencil, History, ThumbsUp, Users, Copy, Clock } from 'lucide-react'
+import { Calendar, ArrowLeft, UserPlus, Check, Play, ChevronRight, X, ChevronDown, RotateCcw, GripVertical, Pencil, History, ThumbsUp, Users, Copy } from 'lucide-react'
 import { DndContext, useDraggable, useDroppable, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { supabase, supabaseUrl } from '../lib/supabase'
 import { getGameOrgHint } from '../lib/gameOrgHint'
 import GroupOnlyNotice from '../components/GroupOnlyNotice'
 import { useAuth } from '../contexts/AuthContext'
-import { PrimaryButton, GuestBadge, PlayerAvatarRow, EmptyState, ShareModal, RoundTimer, Avatar, Select, RatingBadge, DateField, GroupLevelBadge, Tabs, ConfirmSheet } from '../components/ui'
+import { PrimaryButton, GuestBadge, EmptyState, ShareModal, RoundTimer, Avatar, Select, RatingBadge, DateField, Tabs, ConfirmSheet } from '../components/ui'
 import { isDraftMix } from '../lib/mixDraft'
 import PublishDraftSheet from '../components/mix/PublishDraftSheet'
 import { isMixLimitError, planLimitMessage } from '../lib/plans'
-import { KIND_STYLE, KindTag, StateTag, Owner } from '../components/agenda/EventCard'
+import { KIND_STYLE } from '../components/agenda/EventCard'
 import PoolGroupStage from '../components/PoolGroupStage'
 import PreviousEditions from '../components/agenda/PreviousEditions'
 import ScoreEntry from '../components/ScoreEntry'
@@ -3039,12 +3042,76 @@ export default function GameDetails() {
         document.body
       )}
 
-      {/* «← Voltar» sempre visível; o «Partilhar» fica na faixa (27 set).
-          Um rascunho não se partilha: quem recebesse o link não o abria (#544). */}
-      <BackBar onBack={goBack} label={t('gamedetails.back')} title={game?.title}
-        // Mix acabado: o mesmo «Partilhar os vencedores» do bloco (#622: um
-        // botão de partilhar só); para os outros, o link de sempre.
-        onShare={isDraftMix(game) ? undefined : () => (canShareWinners ? openWinnersShare() : setShowShare(true))} />
+      {/* R3 (13 out): o topo do evento — a foto do mix ou o Alino do tipo, o
+          «‹» e partilhar, o cartão branco com o clube, o nome, a hora em
+          grande e a data, e a faixa do estado (EventHero, peça comum do Dev 1).
+          Um rascunho não se partilha: quem recebesse o link não o abria (#544).
+          Mix acabado: o mesmo «Partilhar os vencedores» do bloco (#622). */}
+      {(() => {
+        const kind = kindOf(game)
+        const lvl = parseLevel(game.level)
+        const chip = [
+          t(KIND_STYLE[kind].labelKey),
+          kind === 'mix' && lvl ? `${lvl.scale}${lvl.num}` : isOpenGame(game) ? t('gamedetails.court_count', { count: numCourts }) : null,
+          isDraftMix(game) ? t('mixdraft.draft') : game.recurrence_id ? t('ui.recurring').toLowerCase() : null,
+        ].filter(Boolean).join(' · ')
+        const org = gameMembership?.organization
+        const ends = game.court_time_minutes ? new Date(new Date(game.date).getTime() + game.court_time_minutes * 60000) : null
+        const free = Math.max(0, capacity - peopleCount)
+        const toClose = (4 - (peopleCount % 4)) % 4
+        const done = ['finished', 'completed'].includes(game.status)
+        let text = null
+        let tone = 'kind'
+        // Terminado ou cancelado: a faixa a cinzento, como no torneio (UX, 13 out).
+        if (game.status === 'cancelled') { text = t('mixcancel.banner_title'); tone = 'grey' }
+        else if (done) { text = t('agenda.state_finished'); tone = 'grey' }
+        else if (isUserJoined) { text = t('home.next_in'); tone = 'ok' }
+        else if (isUserWaitlisted) text = t('agenda.state_waitlist')
+        else if (isUserRequested) text = t('agenda.state_request_sent')
+        else if (isOpenGame(game)) text = free ? t('openday.missing', { count: free }) : t('openday.closed')
+        else if (free === 0) text = t('homecard.full')
+        else if (toClose > 0 && peopleCount > 0) text = t('homecard.to_close_court', { count: toClose, court: Math.floor(peopleCount / 4) + 1 })
+        else if (game.status === 'open') text = t('homecard.open')
+        return (
+          <EventHero
+            kind={kind}
+            imageUrl={game.image_url || null}
+            chip={chip}
+            org={org ? {
+              name: org.name,
+              kindLabel: t(org.kind === 'group' ? 'tournament.hero_org_group' : 'tournament.hero_org_club'),
+              logo: org.group_logo_url || null,
+              onOpen: org.slug ? () => navigate(`/clube/${org.slug}`) : null,
+            } : null}
+            title={game.title}
+            time={formatTime(game.date, i18n.language, { hour: '2-digit', minute: '2-digit' })}
+            timeAside={ends ? t('homecard.until', { time: formatTime(ends, i18n.language, { hour: '2-digit', minute: '2-digit' }) }) : null}
+            dateLine={formatDateLib(game.date, i18n.language, { weekday: 'long', day: 'numeric', month: 'long' }).toLocaleLowerCase(i18n.language)}
+            // Adicionar ao calendário (Trello #206) — escondido depois de o mix acabar.
+            onAddToCalendar={!['finished', 'completed', 'cancelled'].includes(game.status)
+              ? () => window.open(`${supabaseUrl}/functions/v1/game-ics?id=${game.id}`, '_blank', 'noopener') : null}
+            onBack={goBack}
+            onShare={isDraftMix(game) ? null : () => (canShareWinners ? openWinnersShare() : setShowShare(true))}
+            // Quem organiza (UX e Dev 1, 13 out — a regra do mix de 2 out):
+            // «Editar · Mais ⋯» na primeira linha do cartão e o passo seguinte
+            // («Sortear duplas») logo depois da hora, antes da faixa.
+            manage={showAdminBar ? (
+              <MixAdminBar
+                onEdit={orgSlug ? () => navigate(`/gerir/${orgSlug}/editar/mix/${game.id}`) : null}
+                onMore={() => setMoreOpen(true)}
+              />
+            ) : null}
+            nextStep={stepSlot === 'hero' ? renderStepButton() : null}
+            status={{
+              faces: people.map((p) => ({ id: p.id, name: p.name, avatar_url: p.avatar_url })),
+              slots: done ? 0 : free,
+              text,
+              tone,
+              meta: t('homecard.hero_meta', { n: peopleCount, total: capacity }),
+            }}
+          />
+        )
+      })()}
 
       {showShare && (
         <ShareModal
@@ -3107,12 +3174,6 @@ export default function GameDetails() {
         />
       )}
 
-      {showAdminBar && (
-        <MixAdminBar
-          onEdit={orgSlug ? () => navigate(`/gerir/${orgSlug}/editar/mix/${game.id}`) : null}
-          onMore={() => setMoreOpen(true)}
-        />
-      )}
 
       {/* Mix em rascunho (Trello #544): só os admins chegam aqui (a base de
           dados esconde-o dos outros). Faixa a tracejado com «Publicar». */}
@@ -3163,161 +3224,10 @@ export default function GameDetails() {
         </div>
       )}
 
-      {/* Topo = o cartão da Home em grande (SPEC 17 set, design-handoff/
-          2026-09-17-cores-e-pagina-do-evento): cor e etiqueta do tipo, dono,
-          hora grande, data em minúsculas, morada com "Abrir com…" na mesma
-          caixa. Inscrito = contorno verde + pastilha "Inscrito"; lista de
-          espera = âmbar tracejado. Saiu a barra lima. */}
-      <div className={`rounded-card p-4 ${
-        game.status === 'finished' || game.status === 'cancelled'
-          ? 'bg-surface border border-line'
-          // Rascunho: sem cor e a tracejado até ser publicado (#544).
-          : isDraftMix(game)
-          ? 'bg-white border-2 border-dashed border-ink-200'
-          : isUserJoined
-          ? `${KIND_STYLE[kindOf(game)].bg} border-2 border-ok`
-          : isUserWaitlisted
-            ? `${KIND_STYLE[kindOf(game)].bg} border-2 border-dashed border-[#B86E00]`
-            : `${KIND_STYLE[kindOf(game)].card} border`
-      }`}>
-        <div className="flex items-start justify-between gap-2">
-          <KindTag kind={kindOf(game)} suffix={isDraftMix(game) ? t('mixdraft.draft') : game.recurrence_id ? t('ui.recurring') : null} />
-          {/* Terminado: cinza, como o cartão passado na Home. */}
-          {game.status === 'finished' ? (
-            <StateTag tone="grey" icon={Check}>{t('agenda.state_finished')}</StateTag>
-          ) : isUserJoined ? (
-            <StateTag tone="in" icon={Check}>{t('gamedetails.joined_badge')}</StateTag>
-          ) : isUserWaitlisted ? (
-            <StateTag tone="wait">{t('agenda.state_waitlist')}</StateTag>
-          ) : isUserRequested ? (
-            // «Pedido enviado», a palavra que a app já usa nos grupos.
-            <StateTag tone="grey" icon={Clock}>{t('agenda.state_request_sent')}</StateTag>
-          ) : null}
-        </div>
-
-        <h1 className="font-display text-2xl text-ink-900 leading-tight mt-2.5">{game.title}</h1>
-        {gameMembership?.organization && (
-          <div className="mt-1">
-            <Owner
-              event={{
-                orgName: gameMembership.organization.name,
-                orgKind: gameMembership.organization.kind,
-                orgLogo: gameMembership.organization.group_logo_url,
-                orgSlug: gameMembership.organization.slug,
-                orgId: game.organization_id,
-              }}
-              fallbackKey="agenda.owner_none"
-              link
-            />
-          </div>
-        )}
-
-        <p className="font-display text-[28px] font-extrabold text-ink-900 leading-none mt-3">
-          {formatTime(game.date, i18n.language, { hour: '2-digit', minute: '2-digit' })}
-        </p>
-        <p className="text-[13px] text-ink-700 mt-1.5">
-          {formatDateLib(game.date, i18n.language, { weekday: 'long', day: 'numeric', month: 'long' }).toLocaleLowerCase(i18n.language)}
-          {/* Adicionar ao calendário (Trello #206) — escondido depois de o
-              mix acabar. */}
-          {!['finished', 'completed', 'cancelled'].includes(game.status) && (
-            <>
-              {' · '}
-              <a
-                href={`${supabaseUrl}/functions/v1/game-ics?id=${game.id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-extrabold text-ink-900 underline underline-offset-2"
-              >
-                {t('gamedetails.add_to_calendar')}
-              </a>
-            </>
-          )}
-        </p>
-
-        {game.location && (
-          <LocationOpenWith
-            location={game.location}
-            latitude={game.latitude}
-            longitude={game.longitude}
-            className="mt-3 bg-white/75 rounded-xl px-3 py-2"
-          />
-        )}
-
-        <div className="mt-3 space-y-1.5 text-[13px] text-ink-700">
-          {isOpenGame(game) ? (
-            // Jogo em aberto (ponto 2): «1 campo · 4 jogadores · 19:00–20:30».
-            <p className="flex items-start gap-1.5">
-              <Swords size={15} className="shrink-0 mt-0.5" />
-              <span>
-                {[t('gamedetails.court_count', { count: numCourts }), t('openday.players', { count: capacity }),
-                  `${hhmm(game.date, i18n.language)}–${hhmm(new Date(new Date(game.date).getTime() + (game.court_time_minutes || 90) * 60000), i18n.language)}`].join(' · ')}
-              </span>
-            </p>
-          ) : (<>
-          <p className="flex items-start gap-1.5">
-            <Swords size={15} className="shrink-0 mt-0.5" />
-            <span>
-              {t(formatLabelKey(game))}{isRotating ? ` (${t('gamedetails.rotating_partners_short')})` : ''} · {t('gamedetails.court_count', { count: numCourts })} · {t('gamedetails.rounds_duration', { count: roundsTotal, minutes: game.game_time_minutes || 20 })}
-              {game.ranked === false && <> · {t('gamedetails.badge_friendly')}</>}
-            </span>
-          </p>
-            {/* Quem ganha, em cada formato — o Americano dá a vitória a um
-                jogador e não a uma dupla, e isso não estava escrito em lado
-                nenhum (Francisco, 22 set 2026). */}
-            <p className="text-sm text-muted mt-1">
-              {t(`mixlogic.format_help_${isRotating ? 'sobe_desce_rotate' : (game.format || 'sobe_desce')}`)}
-            </p>
-          </>)}
-          {game.price_per_player > 0 && (
-            <p className="flex items-center gap-1.5">
-              <Euro size={15} className="shrink-0" />
-              {specialPriceText || t('gamedetails.price_per_player', { price: formatCurrency(game.price_per_player, i18n.language) })}
-            </p>
-          )}
-          {game.prize && (
-            <p className="flex items-center gap-1.5">
-              <Trophy size={15} className="shrink-0" />
-              {t('gamedetails.prize_label', { prize: game.prize })}
-            </p>
-          )}
-          {((game.gender_restriction && game.gender_restriction !== 'indiferente') || (game.age_restriction && AGE_LABEL_KEY[game.age_restriction])) && (
-            <p className="font-extrabold text-ink-900">
-              {[
-                game.gender_restriction && game.gender_restriction !== 'indiferente' ? t(GENDER_RESTRICTION_LABEL_KEY[game.gender_restriction]) : null,
-                game.age_restriction && AGE_LABEL_KEY[game.age_restriction] ? t(AGE_LABEL_KEY[game.age_restriction]) : null,
-              ].filter(Boolean).join(' · ')}
-            </p>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2.5 mt-3 pt-3 border-t border-ink-900/10">
-          <PlayerAvatarRow
-            players={people.map(p => ({ id: p.id, name: p.name, avatar_url: p.avatar_url }))}
-            max={capacity}
-            size="sm"
-          />
-          <span className="ml-auto"><GroupLevelBadge rating={heroAvgRating} genders={heroRated.map((p) => ratingInfoById[p.id]?.gender)} /></span>
-        </div>
-        {isOpenGame(game) && ['open', 'closed'].includes(game.status) ? (
-          // Jogo em aberto (ponto 2): «Faltam 3 para fechar o jogo.»
-          <p className={`text-xs font-extrabold mt-2 ${KIND_STYLE.open.text}`}>
-            {peopleCount >= capacity ? t('openday.closed') : t('openday.missing', { count: capacity - peopleCount })}
-          </p>
-        ) : game.status === 'open' && (
-          <p className="text-xs text-muted mt-2">
-            🔒 {Math.floor(peopleCount / 4)}/{numCourts} {t('gamedetails.courts_locked_suffix')}
-            {peopleCount < capacity && (
-              <> · {t('gamedetails.missing_to_close_court', { count: (4 - (peopleCount % 4)) % 4 || 4 })}</>
-            )}
-          </p>
-        )}
-      </div>
-
       {/* Quem organiza, antes de o mix começar: o passo seguinte («Sortear
           duplas» / «Começar o Mix») também aqui, no lugar do botão principal —
           não só na barra pequena de cima (Renato, 29 set). É o mesmo botão
           da barra (barPrimary), por isso fazem sempre o mesmo. */}
-      {stepSlot === 'hero' && renderStepButton()}
 
       {/* Botão principal por baixo do topo (SPEC §5.9). Sem sino: seguir
           ainda não existe. Os outros caminhos (suplente, escalão etário,
@@ -3384,6 +3294,44 @@ export default function GameDetails() {
           <p className="px-1 text-center text-xs text-muted">{t(awaitsApproval ? 'mixrequest.ask_hint' : 'gamedetails.stay_suplente_hint')}</p>
         </div>
       ) : null}
+
+      {/* R3 (13 out): depois dos botões, os dados do mix em quadrados (EventFacts, Dev 1) e, a
+          seguir, a morada com «Abrir com…». Quem ganha, em cada formato, fica
+          escrito por baixo (Francisco, 22 set). */}
+      {(() => {
+        const lvl = parseLevel(game.level)
+        const gender = game.gender_restriction && game.gender_restriction !== 'indiferente' ? t(GENDER_RESTRICTION_LABEL_KEY[game.gender_restriction]) : null
+        const age = game.age_restriction && AGE_LABEL_KEY[game.age_restriction] ? t(AGE_LABEL_KEY[game.age_restriction]) : null
+        const items = isOpenGame(game) ? [
+          { key: 'courts', label: t('homecard.fact_courts'), value: t('gamedetails.court_count', { count: numCourts }) },
+          { key: 'players', label: t('homecard.fact_players'), value: t('openday.players', { count: capacity }) },
+          { key: 'time', label: t('homecard.fact_time'), value: `${hhmm(game.date, i18n.language)}–${hhmm(new Date(new Date(game.date).getTime() + (game.court_time_minutes || 90) * 60000), i18n.language)}` },
+        ] : [
+          { key: 'format', label: t('homecard.fact_format'), value: <>{t(formatLabelKey(game))}{isRotating ? ` (${t('gamedetails.rotating_partners_short')})` : ''}</> },
+          { key: 'courts', label: t('homecard.fact_courts'), value: `${numCourts} · ${t('gamedetails.rounds_duration', { count: roundsTotal, minutes: game.game_time_minutes || 20 })}` },
+        ]
+        items.push(
+          { key: 'price', label: t('homecard.fact_price'), value: game.price_per_player > 0 ? (specialPriceText || t('gamedetails.price_per_player', { price: formatCurrency(game.price_per_player, i18n.language) })) : null },
+          { key: 'prize', label: t('homecard.fact_prize'), value: game.prize || null },
+          { key: 'who', label: t('homecard.fact_who'), value: [gender, age].filter(Boolean).join(' · ') || null },
+          { key: 'level', label: t('homecard.fact_level'), value: lvl ? <span className="inline-block rounded-md bg-ink-900 px-1.5 py-0.5 font-mono text-[12px] text-lime-400">{lvl.scale}{lvl.num}</span> : null },
+          { key: 'ranked', label: t('homecard.fact_ranking'), value: game.ranked === false ? t('gamedetails.badge_friendly') : null },
+        )
+        return (
+          <div className="space-y-2.5">
+            <EventFacts items={items} />
+            {!isOpenGame(game) && (
+              <p className="px-0.5 text-sm text-muted">
+                {t(`mixlogic.format_help_${isRotating ? 'sobe_desce_rotate' : (game.format || 'sobe_desce')}`)}
+              </p>
+            )}
+            {game.location && (
+              <LocationOpenWith location={game.location} latitude={game.latitude} longitude={game.longitude}
+                className="rounded-[14px] bg-[#F4F4F0] px-3.5 py-3" />
+            )}
+          </div>
+        )
+      })()}
 
       {/* 👍 da noite — cada participante dá 1 kudos a um colega do mix
           (+1 XP para quem recebe; guardas todas no RPC). Janela: 48h após

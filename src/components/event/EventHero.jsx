@@ -9,7 +9,11 @@
 //     muito grande, a data por extenso e «Adicionar ao calendário»;
 //   - a faixa de estado na cor clara do tipo (as caras, os lugares livres a
 //     tracejado, o estado e a linha em mono);
-//   - `children`: os botões empilhados de cada página, logo por baixo.
+//   - `children`: os botões empilhados de cada página, logo por baixo;
+//   - quem organiza (UX, 13 out — a regra do mix, Francisco 2 out): `manage`
+//     («Editar · Mais ⋯») na primeira linha do cartão branco, antes do
+//     clube; `nextStep` (o passo seguinte, preto) logo depois da hora e da
+//     data, antes da faixa de estado.
 // Só aspeto: as ações e os estados são os de cada página.
 import { useTranslation } from 'react-i18next'
 import { ChevronLeft, ChevronRight, Share2 } from 'lucide-react'
@@ -19,8 +23,11 @@ import { Avatar } from '../ui'
 
 const ROUND = 'flex h-11 w-11 items-center justify-center rounded-full bg-black/25 text-white backdrop-blur-sm'
 
-/** status: { faces: [{ id, name, avatar_url }], slots, text, tone: 'kind'|'ok', meta }.
- *  `slots`: quantos lugares livres se desenham a tracejado (no máximo 2). */
+/** status: { faces: [{ id, name, avatar_url }], slots, text, tone: 'kind'|'ok'|'grey', meta, dot, note }.
+ *  `slots`: quantos lugares livres se desenham a tracejado (no máximo 2).
+ *  'grey': o evento terminou ou foi cancelado (UX, 13 out); `dot`: a cor do
+ *  ponto antes do estado (vermelho no cancelado); `note`: uma frase por baixo
+ *  («A tua inscrição foi anulada.»). */
 function StatusBand({ kind, status }) {
   const c = KIND_COLORS[kind] || KIND_COLORS.mix
   const faces = status.faces || []
@@ -28,7 +35,7 @@ function StatusBand({ kind, status }) {
   const extra = faces.length - shown.length
   const empty = Math.min(2, Math.max(0, Number(status.slots) || 0))
   return (
-    <div className="mt-4 flex items-center gap-3 rounded-[16px] px-3.5 py-3" style={{ background: c.light }}>
+    <div className="mt-4 flex items-center gap-3 rounded-[16px] px-3.5 py-3" style={{ background: status.tone === 'grey' ? '#F1F2EE' : c.light }}>
       {(shown.length > 0 || empty > 0) && (
         <div className="flex shrink-0 items-center">
           {shown.map((p, i) => (
@@ -46,9 +53,13 @@ function StatusBand({ kind, status }) {
       )}
       <div className="min-w-0">
         {status.text && (
-          <p className="text-[15px] font-extrabold leading-tight" style={{ color: status.tone === 'ok' ? '#15803D' : c.dark }}>{status.text}</p>
+          <p className="flex items-center gap-1.5 text-[15px] font-extrabold leading-tight" style={{ color: status.tone === 'ok' ? '#15803D' : status.tone === 'grey' ? '#4F535A' : c.dark }}>
+            {status.dot && <i aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full" style={{ background: status.dot }} />}
+            {status.text}
+          </p>
         )}
         {status.meta && <p className="mt-0.5 font-mono text-[11px] font-bold uppercase tracking-wider text-ink-500">{status.meta}</p>}
+        {status.note && <p className="mt-1 text-sm text-ink-700">{status.note}</p>}
       </div>
     </div>
   )
@@ -59,6 +70,7 @@ function StatusBand({ kind, status }) {
 export default function EventHero({
   kind, imageUrl = null, chip = null, org = null, title, time = null, timeAside = null, dateLine = null,
   onAddToCalendar = null, onBack = null, onShare = null, status = null, children = null,
+  manage = null, nextStep = null,
 }) {
   const { t } = useTranslation()
   return (
@@ -82,6 +94,7 @@ export default function EventHero({
 
       {/* O cartão branco sobe uns 20 px por cima da capa. */}
       <div className="relative -mt-5 rounded-t-[22px] bg-white px-4 pb-4 pt-4">
+        {manage && <div className="mb-2 empty:hidden">{manage}</div>}
         {org && (
           <button type="button" onClick={org.onOpen || undefined} disabled={!org.onOpen}
             className="flex min-h-[32px] max-w-full items-center gap-2 text-sm text-ink-700">
@@ -109,6 +122,7 @@ export default function EventHero({
             )}
           </p>
         )}
+        {nextStep && <div className="mt-3 empty:hidden">{nextStep}</div>}
         {status && <StatusBand kind={kind} status={status} />}
         {children && <div className="mt-3 space-y-2.5">{children}</div>}
       </div>
