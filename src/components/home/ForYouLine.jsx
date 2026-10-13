@@ -109,7 +109,10 @@ export default function ForYouLine({ items, show = true }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   if (!show || !items.length) return null
-  const summary = items.map((it) => it.title).filter(Boolean).join(' · ')
+  // O resumo: sem repetidos e, com mais de duas coisas, a primeira e «e mais
+  // N» (QA, 13 out: com 10 avisos ocupava meio ecrã).
+  const titles = [...new Set(items.map((it) => it.title).filter(Boolean))]
+  const summary = items.length <= 2 ? titles.join(' · ') : `${titles[0]} ${t('home.foryou_more', { count: items.length - 1 })}`
   return (
     <section aria-label={t('home.foryou_title')}>
       <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open}
