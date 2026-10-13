@@ -7,7 +7,9 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Check, CheckCircle2, ChevronRight, Clock, Globe, Heart, Instagram, Lock, MapPin, Phone, Plus } from 'lucide-react'
+import { Check, CheckCircle2, ChevronLeft, ChevronRight, Clock, Globe, Heart, Instagram, Lock, MapPin, Phone, Plus, Share2 } from 'lucide-react'
+import KindHero from '../KindHero'
+import { CLUB_HERO, GROUP_HERO } from '../../lib/kindColors'
 import { Avatar, ConfirmSheet, PrimaryButton, Tabs } from '../ui'
 import { supabase } from '../../lib/supabase'
 import { describeError, errorKind } from '../../lib/errors'
@@ -32,73 +34,97 @@ function Symbol({ club, size = 'w-14 h-14 text-lg' }) {
   )
 }
 
-/* ── Cabeçalho ──────────────────────────────────────────────────────────
-   O nome nunca é cortado (passa a duas linhas) e o botão fica SEMPRE por
-   baixo, a toda a largura. Lima só no «Seguir»/«Pedir para entrar» — a
-   única coisa lima do ecrã. «A seguir» abre a pergunta das janelas de 24
-   set: «Continuar a seguir» a preto primeiro, o risco a vermelho por baixo.
-   «Pedido enviado» tem saída (Francisco, 8 out: «deveria dar para cancelar
-   pedido»): «Cancelar pedido» em contorno por baixo, com a pergunta das
-   aulas (LessonEventCard). */
-export function ClubHeader({ club, isFavorite, acting, favoriting, onFollow, onUnfollow, onCancelRequest, onToggleFavorite }) {
+/* ── Cabeçalho (R5 do redesign, 13 out) ────────────────────────────────
+   design-handoff/2026-10-13-redesign/R5-clube-e-grupo.md. O topo a toda a
+   largura com o Alino do clube ou do grupo (R0; a foto do clube entra
+   quando houver onde a guardar — dados novos, para 23), e nos cantos «‹»,
+   ♡ favorito (só para membros) e partilhar, em botões redondos. O cartão
+   branco sobe por cima, com o logótipo a passar por cima do topo, o nome e
+   «Clube · Lisboa · 48 membros». Por baixo, UM botão a toda a largura:
+   «Entrar» (lima) ou «Pedir para entrar» (contorno); dentro, a caixa
+   verde-clara «✓ És membro» (tocar pergunta se queres sair, como o «A
+   seguir» de antes); com o pedido feito, a cinzenta «⏳ Pedido enviado» e
+   «Cancelar pedido». O favorito saiu de ao lado do botão (nunca lado a
+   lado). Só aspeto: as ações são as de antes. */
+export function ClubHeader({ club, isFavorite, acting, favoriting, onFollow, onUnfollow, onCancelRequest, onToggleFavorite, onBack = null, onShare = null }) {
   const { t } = useTranslation()
   const kk = (key) => (club.kind === 'group' ? `${key}_group` : key)
   const [asking, setAsking] = useState(false)
   const [askingCancel, setAskingCancel] = useState(false)
+  const member = club.my_status === 'member'
   // A terra pode ser uma morada inteira (A2N, 26 set): essa parte pode partir
-  // a linha; «Clube» e «N membros» nunca partem. Nada pode empurrar a página
-  // para o lado.
+  // a linha; «Clube» e «N membros» nunca partem.
   const sub = [
     { text: t(club.kind === 'group' ? 'clubprofile.kind_group' : 'clubprofile.kind_club'), long: false },
     club.kind !== 'group' && club.location ? { text: club.location, long: true } : null,
     club.member_count != null ? { text: t('clubprofile.member_count', { count: club.member_count }), long: false } : null,
   ].filter(Boolean)
+  const round = 'flex h-11 w-11 items-center justify-center rounded-full bg-black/25 text-white backdrop-blur-sm disabled:opacity-50'
 
   return (
-    <div className="card space-y-3.5">
-      <div className="flex items-center gap-3.5">
-        <Symbol club={club} />
-        <div className="min-w-0 flex-1">
-          <h2 className="text-2xl leading-tight text-ink-900 [overflow-wrap:anywhere]">{club.name}</h2>
-          <p className="mt-0.5 text-sm text-muted">
-            {sub.map((part, i) => (
-              <span key={i} className={part.long ? '[overflow-wrap:anywhere]' : 'whitespace-nowrap'}>{i > 0 && ' · '}{part.text}</span>
-            ))}
-          </p>
+    // Sai das margens da página, como o topo dos eventos (R3).
+    <div className="-mx-4 -mt-6">
+      <KindHero kind="club" src={club.kind === 'group' ? GROUP_HERO : CLUB_HERO} className="relative h-40">
+        <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-2 px-4" style={{ paddingTop: 'calc(var(--safe-top, env(safe-area-inset-top)) + 12px)' }}>
+          {onBack
+            ? <button type="button" onClick={onBack} aria-label={t('common.back')} className={round}><ChevronLeft size={22} /></button>
+            : <span aria-hidden />}
+          <div className="flex items-center gap-2">
+            {member && (
+              <button type="button" onClick={onToggleFavorite} disabled={favoriting}
+                aria-label={isFavorite ? t('clubprofile.remove_favorite') : t('clubprofile.mark_favorite')}
+                title={isFavorite ? t('clubprofile.remove_favorite') : t(kk('clubprofile.mark_favorite_title'))}
+                aria-pressed={isFavorite} className={round}>
+                <Heart size={19} className={isFavorite ? 'fill-lime-400 text-lime-400' : ''} />
+              </button>
+            )}
+            {onShare && <button type="button" onClick={onShare} aria-label={t('ui.share')} className={round}><Share2 size={18} /></button>}
+          </div>
         </div>
-      </div>
+      </KindHero>
 
-      {club.my_status === 'member' ? (
-        <div className="flex gap-2.5">
-          <button type="button" onClick={() => setAsking(true)} disabled={acting}
-            className="flex min-h-[48px] flex-1 items-center justify-center gap-1.5 rounded-ctrl border border-line bg-canvas text-base font-extrabold text-ink-900 disabled:opacity-40">
-            <Check size={17} /> {t('clubprofile.following')}
-          </button>
-          <button type="button" onClick={onToggleFavorite} disabled={favoriting}
-            aria-label={isFavorite ? t('clubprofile.remove_favorite') : t('clubprofile.mark_favorite')}
-            title={isFavorite ? t('clubprofile.remove_favorite') : t(kk('clubprofile.mark_favorite_title'))}
-            className="flex h-12 w-14 shrink-0 items-center justify-center rounded-ctrl border-2 border-lime-400 bg-canvas disabled:opacity-40">
-            <Heart size={20} className={isFavorite ? 'fill-lime-600 text-lime-600' : 'text-ink-300'} />
-          </button>
-        </div>
-      ) : club.my_status === 'pending' ? (
-        <div>
-          <span className="flex min-h-[48px] w-full items-center justify-center gap-1.5 rounded-ctrl bg-ink-50 text-base font-extrabold text-muted">
-            <Clock size={16} /> {t('clubprofile.request_sent')}
+      <div className="relative -mt-5 rounded-t-[22px] bg-white px-4 pb-4">
+        <div className="flex items-end gap-3.5">
+          {/* O logótipo grande, a passar por cima do topo. */}
+          <span className="-mt-7 rounded-[16px] bg-white p-1 shadow-card">
+            <Symbol club={club} size="w-[58px] h-[58px] text-xl" />
           </span>
-          <p className="mt-1.5 text-center text-[13px] text-muted">{t(kk('clubprofile.request_waiting'))}</p>
-          {onCancelRequest && (
-            <button type="button" onClick={() => setAskingCancel(true)} disabled={acting}
-              className="mt-3 flex min-h-[48px] w-full items-center justify-center rounded-ctrl border-[1.5px] border-ink-900 bg-white text-base font-extrabold text-ink-900 disabled:opacity-40">
-              {t('lessons.cancel_request')}
+          <div className="min-w-0 flex-1 pt-3">
+            <h1 className="font-display text-2xl font-extrabold leading-tight text-ink-900 [overflow-wrap:anywhere]">{club.name}</h1>
+          </div>
+        </div>
+        <p className="mt-1 text-sm text-muted">
+          {sub.map((part, i) => (
+            <span key={i} className={part.long ? '[overflow-wrap:anywhere]' : 'whitespace-nowrap'}>{i > 0 && ' · '}{part.text}</span>
+          ))}
+        </p>
+
+        <div className="mt-4">
+          {member ? (
+            <button type="button" onClick={() => setAsking(true)} disabled={acting}
+              className="flex min-h-[48px] w-full items-center justify-center gap-1.5 rounded-ctrl bg-[#F1F8D6] text-base font-extrabold text-[#3F5200] disabled:opacity-40">
+              <Check size={17} /> {t('clubprofile.is_member')}
             </button>
+          ) : club.my_status === 'pending' ? (
+            <div>
+              <span className="flex min-h-[48px] w-full items-center justify-center gap-1.5 rounded-ctrl bg-ink-50 text-base font-extrabold text-muted">
+                <Clock size={16} /> {t('clubprofile.request_sent')}
+              </span>
+              <p className="mt-1.5 text-center text-[13px] text-muted">{t(kk('clubprofile.request_waiting'))}</p>
+              {onCancelRequest && (
+                <button type="button" onClick={() => setAskingCancel(true)} disabled={acting}
+                  className="mt-3 flex min-h-[48px] w-full items-center justify-center rounded-ctrl border-[1.5px] border-ink-900 bg-white text-base font-extrabold text-ink-900 disabled:opacity-40">
+                  {t('lessons.cancel_request')}
+                </button>
+              )}
+            </div>
+          ) : club.open_join ? (
+            <PrimaryButton onClick={onFollow} disabled={acting} className="w-full">{t('clubprofile.follow_button')}</PrimaryButton>
+          ) : (
+            <PrimaryButton variant="ghost" onClick={onFollow} disabled={acting} className="w-full !border-ink-900">{t('clubprofile.request_join_button')}</PrimaryButton>
           )}
         </div>
-      ) : (
-        <PrimaryButton onClick={onFollow} disabled={acting} className="w-full">
-          {club.open_join ? t('clubprofile.follow_button') : t('clubprofile.request_join_button')}
-        </PrimaryButton>
-      )}
+      </div>
 
       <ConfirmSheet
         open={asking}

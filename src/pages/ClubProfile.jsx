@@ -255,22 +255,13 @@ export default function ClubProfile() {
 
   return (
     <div className="space-y-5">
-      {back}
+      {/* R5: o «‹» e o partilhar passam para o topo novo, no ClubHeader. */}
       {linkCopied && createPortal(
         <div role="status" className="fixed left-4 right-4 bottom-[104px] z-[70] mx-auto max-w-md rounded-ctrl bg-ink-900 px-4 py-3 text-sm font-extrabold text-white animate-fade-up">
           {t('clubprofile.link_copied')}
         </div>,
         document.body,
       )}
-      <div>
-        {club.kind === 'group' && club.parent_slug && (
-          <Link to={`/clube/${club.parent_slug}`}
-            className="flex min-h-[44px] items-center gap-1.5 text-sm font-extrabold text-ink-900 hover:underline">
-            <Building2 size={14} /> {t('clubprofile.group_within', { name: club.parent_name })} <ChevronRight size={14} />
-          </Link>
-        )}
-      </div>
-
       <ClubHeader
         club={club}
         isFavorite={isFavorite}
@@ -280,7 +271,18 @@ export default function ClubProfile() {
         onUnfollow={handleUnfollow}
         onCancelRequest={handleCancelRequest}
         onToggleFavorite={handleToggleFavorite}
+        onBack={goBack}
+        onShare={shareClub}
       />
+      <div>
+        {club.kind === 'group' && club.parent_slug && (
+          <Link to={`/clube/${club.parent_slug}`}
+            className="flex min-h-[44px] items-center gap-1.5 text-sm font-extrabold text-ink-900 hover:underline">
+            <Building2 size={14} /> {t('clubprofile.group_within', { name: club.parent_name })} <ChevronRight size={14} />
+          </Link>
+        )}
+      </div>
+
       {error && <p role="alert" className="rounded-ctrl bg-danger/10 px-4 py-3 text-sm font-extrabold text-danger">{error}</p>}
 
       {/* «A decorrer agora no clube» por cima dos próximos (27 set). */}
