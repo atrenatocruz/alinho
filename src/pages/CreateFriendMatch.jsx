@@ -143,17 +143,6 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
     if (!scheduledDate) { setError(t('createprivatematch.error_date_required')); setStep(2); return }
     setSaving(true)
     try {
-      const keep = new Set(people.map((p) => p.inviteeId).filter(Boolean))
-      for (const i of original.filter((x) => !keep.has(x.invitee_id))) {
-        // eslint-disable-next-line no-await-in-loop
-        await removeFriendMatchInvitee(i.invitee_id)
-      }
-      const added = people.filter((p) => !p.inviteeId)
-      if (added.length) {
-        await addFriendMatchInvitees(m.id, added.map((p) => (p.guest
-          ? { guest_name: p.name, ...(p.email ? { guest_email: p.email } : {}) }
-          : { user_id: p.user_id })))
-      }
       await updateFriendMatch(m.id, {
         scheduledDate,
         scheduledTime: scheduledTime || null,
@@ -169,6 +158,20 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
         teamsMode: teamsMode !== (m.teams_mode || 'manual') ? teamsMode : undefined,
         showLive,
       })
+      // As pessoas gravam-se DEPOIS do resto (#586, 13 out): é o resto que
+      // pode ser recusado (format_locked, ranked_locked, teams_locked…), e
+      // antes as pessoas já ficavam mudadas quando ele falhava.
+      const keep = new Set(people.map((p) => p.inviteeId).filter(Boolean))
+      for (const i of original.filter((x) => !keep.has(x.invitee_id))) {
+        // eslint-disable-next-line no-await-in-loop
+        await removeFriendMatchInvitee(i.invitee_id)
+      }
+      const added = people.filter((p) => !p.inviteeId)
+      if (added.length) {
+        await addFriendMatchInvitees(m.id, added.map((p) => (p.guest
+          ? { guest_name: p.name, ...(p.email ? { guest_email: p.email } : {}) }
+          : { user_id: p.user_id })))
+      }
       // Vindo do jogo, volta para ele (sem o repetir no histórico); de outro
       // lado (a lista), o editar troca de lugar com o jogo.
       if (routeLocation.state?.fromSession) navigate(-1)
@@ -201,7 +204,7 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
       </div>
       {teamsLocked ? (
         <p className="mt-2 flex items-start gap-1.5 text-xs text-muted">
-          <Lock size={12} className="mt-0.5 shrink-0 text-warning" /> {t('friends.teams_locked_hint')}
+          <Lock size={12} className="mt-0.5 shrink-0 text-ink-500" /> {t('friends.teams_locked_hint')}
         </p>
       ) : <p className="mt-2 text-xs text-muted">{t('friends.teams_app_hint')}</p>}
     </div>
@@ -225,7 +228,7 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
           criar conta pelo convite passa a contar (QA/PO, 27 set). */}
       {rankedLocked ? (
         <p className="mt-2 flex items-start gap-1.5 text-xs text-muted">
-          <Lock size={12} className="mt-0.5 shrink-0 text-warning" /> {t('friends.ranked_locked_hint')}
+          <Lock size={12} className="mt-0.5 shrink-0 text-ink-500" /> {t('friends.ranked_locked_hint')}
         </p>
       ) : edit ? <p className="mt-2 text-xs text-muted">{t('friends.ranked_edit_hint')}</p>
         : rankedIntent && hasGuest && <p className="mt-2 text-xs text-muted">{t('friends.ranked_hint_guests')}</p>}
@@ -356,7 +359,7 @@ export default function CreateFriendMatch({ group = null, edit = null }) {
             {format !== 'points' && <p className="mt-2 text-xs text-muted">{t(`friends.format_${format}_hint`)}</p>}
             {scoringLocked && (
               <p className="mt-2 flex items-start gap-1.5 text-xs text-muted">
-                <Lock size={12} className="mt-0.5 shrink-0 text-warning" /> {t('friends.format_locked_hint')}
+                <Lock size={12} className="mt-0.5 shrink-0 text-ink-500" /> {t('friends.format_locked_hint')}
               </p>
             )}
           </div>

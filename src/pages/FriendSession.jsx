@@ -12,7 +12,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { BackBar } from '../components/ui'
 import { useGoBack } from '../lib/useGoBack'
-import { MapPin, MoreHorizontal, Pencil, Share2, X, Plus, Check } from 'lucide-react'
+import { Lock, MapPin, MoreHorizontal, Pencil, Share2, X, Plus, Check } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { getFriendMatch, getFriendMatchReadonly, respondFriendMatchInvite, setFriendMatchTeams, addFriendMatchRound, listMyFriendMatchInvites, cancelFriendMatch, playFriendMatchWithoutName, keepFriendMatchSeat, removeFriendMatchInvitee, leaveFriendMatch, correctFriendMatchResult } from '../lib/privateMatches'
 import AddPersonSheet from '../components/friends/AddPersonSheet'
@@ -252,13 +252,24 @@ export default function FriendSession() {
   const sentToast = (res) => (res?.ranking_state === 'counted' || (!res?.ranking_state && res?.counted) ? t('friends.toast_sent_counted')
     : res?.ranking_state === 'waiting' && res?.waiting_for?.length ? t('friends.toast_sent_waiting', { names: namesList(t, res.waiting_for), count: res.waiting_for.length })
       : t('friends.toast_sent_not_ranked'))
+  // Enviado, o «Editar» fica à vista, apagado e com a razão por baixo — antes
+  // sumia sem dizer porquê (#586, 13 out).
   const creatorBar = iOrganize && match && (
-    <div className="mt-3 flex gap-1.5">
-      {!finished && <Link to={`/jogos-privados/sessao/${match.id}/editar`} state={{ fromSession: true }} className={pill}><Pencil size={14} /> {t('friends.edit_short')}</Link>}
-      {(!finished || iSent) && <button type="button" onClick={() => setActionsOpen(true)} className={pill} aria-haspopup="dialog">
-        {t('friends.more')} <MoreHorizontal size={16} />
-      </button>}
-    </div>
+    <>
+      <div className="mt-3 flex gap-1.5">
+        {!finished
+          ? <Link to={`/jogos-privados/sessao/${match.id}/editar`} state={{ fromSession: true }} className={pill}><Pencil size={14} /> {t('friends.edit_short')}</Link>
+          : <span aria-disabled="true" className={`${pill} cursor-not-allowed text-ink-500 opacity-60`}><Lock size={14} /> {t('friends.edit_short')}</span>}
+        {(!finished || iSent) && <button type="button" onClick={() => setActionsOpen(true)} className={pill} aria-haspopup="dialog">
+          {t('friends.more')} <MoreHorizontal size={16} />
+        </button>}
+      </div>
+      {finished && (
+        <p className="mt-1.5 flex items-start gap-1.5 text-xs text-ink-500">
+          <Lock size={12} className="mt-0.5 shrink-0" /> {t('friends.edit_locked_sent')}
+        </p>
+      )}
+    </>
   )
   // Quem aceitou e não criou: a linha verde (SPEC amigos-convidado, ponto 2).
   const organizerLine = iOrganize && !iAmCreator && (
