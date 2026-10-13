@@ -5714,5 +5714,17 @@
   "rankings.sub_count_other": "{{count}} players · {{scale}}",
   "rankings.sub_count_f_one": "{{count}} player · {{scale}}",
   "rankings.sub_count_f_other": "{{count}} players · {{scale}}",
-  "rankings.empty_xp_title": "Nobody has XP here yet"
+  "rankings.empty_xp_title": "Nobody has XP here yet",
+  "profile.r7_games": "games",
+  "profile.r7_wins": "wins",
+  "profile.r7_titles": "titles",
+  "profile.r7_rank_line": "{{position}} of {{total}}",
+  "profile.r7_friends_line": "Set up a 2 vs 2 outside the club. It counts for the ranking if everyone accepts.",
+  "profile.r7_friends_cta": "Create a game with friends",
+  "vouchers.r7_strip": "Voucher · {{club}}",
+  "vouchers.r7_from": "You won it at {{game}}, on {{date}}.",
+  "vouchers.r7_show_qr": "Show the QR at reception.",
+  "vouchers.r7_see_qr": "Show the QR",
+  "vouchers.r7_mark_used": "I've used it",
+  "vouchers.r7_used_heading": "Already used"
 }

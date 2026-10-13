@@ -5729,5 +5729,17 @@
   "rankings.sub_count_other": "{{count}} jogadores · {{scale}}",
   "rankings.sub_count_f_one": "{{count}} jogadora · {{scale}}",
   "rankings.sub_count_f_other": "{{count}} jogadoras · {{scale}}",
-  "rankings.empty_xp_title": "Ainda ninguém tem XP aqui"
+  "rankings.empty_xp_title": "Ainda ninguém tem XP aqui",
+  "profile.r7_games": "jogos",
+  "profile.r7_wins": "vitórias",
+  "profile.r7_titles": "títulos",
+  "profile.r7_rank_line": "{{position}}.º de {{total}}",
+  "profile.r7_friends_line": "Marca um 2 contra 2 fora do clube. Conta para o ranking se todos aceitarem.",
+  "profile.r7_friends_cta": "Criar jogo entre amigos",
+  "vouchers.r7_strip": "Voucher · {{club}}",
+  "vouchers.r7_from": "Ganhaste no {{game}}, a {{date}}.",
+  "vouchers.r7_show_qr": "Mostra o QR na receção.",
+  "vouchers.r7_see_qr": "Ver o QR",
+  "vouchers.r7_mark_used": "Já o usei",
+  "vouchers.r7_used_heading": "Já usados"
 }
