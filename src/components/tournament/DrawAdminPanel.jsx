@@ -402,7 +402,7 @@ function DrawStep({ category, onDone, onChangeFormat, t }) {
           const byHand = seedIds && s.id !== proposed[i]?.id
           return (
             <div key={s.id} className={`flex min-h-[52px] items-center gap-2 border-t border-ink-50 px-3 py-1.5 first:border-t-0 ${byHand ? 'bg-lime-100/60' : ''}`}>
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#E9E7FB] font-mono text-xs font-bold text-[#4338A8]">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-kind-tournament-light font-mono text-xs font-bold text-kind-tournament-dark">
                 {i + 1}
               </span>
               <span className="min-w-0 flex-1 truncate text-sm font-bold text-ink-900">{s.name}</span>
@@ -440,7 +440,7 @@ function DrawStep({ category, onDone, onChangeFormat, t }) {
                   className={`flex min-h-[48px] w-full items-center gap-2 px-1 text-left ${on ? 'bg-ink-50' : ''}`}>
                   <span className="min-w-0 flex-1 truncate text-sm font-bold text-ink-900">{x.name}</span>
                   {seedAt >= 0 && (
-                    <span className="shrink-0 rounded-full bg-[#E9E7FB] px-2 py-0.5 font-mono text-xs font-bold text-[#4338A8]">
+                    <span className="shrink-0 rounded-full bg-kind-tournament-light px-2 py-0.5 font-mono text-xs font-bold text-kind-tournament-dark">
                       {t('tournament.draw.seed_tag')} {seedAt + 1}
                     </span>
                   )}
@@ -470,7 +470,7 @@ function DrawStep({ category, onDone, onChangeFormat, t }) {
           {g.teams.map((id, i) => (
             <p key={id} className="mt-0.5 flex items-center gap-1.5 text-xs text-ink-900">
               <span className="truncate">{byId[id]?.name || id}</span>
-              {i === 0 && <span className="shrink-0 rounded-full bg-[#E9E7FB] px-2 py-0.5 text-xs font-extrabold text-[#4338A8]">{t('tournament.draw.seed_tag')}</span>}
+              {i === 0 && <span className="shrink-0 rounded-full bg-kind-tournament-light px-2 py-0.5 text-xs font-extrabold text-kind-tournament-dark">{t('tournament.draw.seed_tag')}</span>}
             </p>
           ))}
         </div>

@@ -21,9 +21,9 @@ export default function DaySheet({ day, segments = [], requests = [], onClose, c
     return r ? `${t('calendar.lesson_with', { name: r.student?.name || '' })} · ${t(`lessons.price_row_${r.lesson_type}`)}` : null
   }
   const pill = {
-    free: 'bg-[#CCF3EC] text-[#0F766E]',
-    lesson: 'bg-[#0F766E] text-white',
-    request: 'border border-dashed border-[#5CC7B6] text-[#0F766E]',
+    free: 'bg-kind-lesson-light text-kind-lesson',
+    lesson: 'bg-kind-lesson text-white',
+    request: 'border border-dashed border-kind-lesson-line text-kind-lesson',
     closed: 'bg-ink-50 text-ink-500',
   }
   const rows = segments.filter((s) => !s.past)

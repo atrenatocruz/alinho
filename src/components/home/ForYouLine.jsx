@@ -15,6 +15,7 @@ import { fromDayKey, toDayKey } from '../../lib/agenda'
 import { formatDate } from '../../lib/formatDate'
 import { friendsMatchTitle } from '../agenda/EventCard'
 import { SectionTitle } from './MyNextGames'
+import { KIND_COLORS } from '../../lib/kindColors'
 
 /** «hoje», «ontem», «amanhã», «sexta», «sáb 18 out». */
 function whenWord(dayKey, todayKey, t, lang) {
@@ -52,7 +53,7 @@ export function forYouItems({ privateMatches = [], userId, friendInvites = [], s
     items.push({
       key: `invite:${inv.match_id}`,
       icon: '👥',
-      bg: '#F2EDE4',
+      bg: KIND_COLORS.friends.light,
       title: when.length === 2
         ? t('home.foryou_invite_at', { name: inv.creator_name || '', when: when[0], time: when[1] })
         : when.length === 1 ? t('home.foryou_invite_day', { name: inv.creator_name || '', when: when[0] })
@@ -65,7 +66,7 @@ export function forYouItems({ privateMatches = [], userId, friendInvites = [], s
     items.push({
       key: `score:${x.id}`,
       icon: '🏆',
-      bg: '#E9E7FB',
+      bg: KIND_COLORS.tournament.light,
       title: t('tournament.score.link_cta'),
       sub: x.name,
       to: `/torneio/${x.slug || x.id}/marcar`,

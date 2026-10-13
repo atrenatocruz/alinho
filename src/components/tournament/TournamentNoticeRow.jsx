@@ -97,7 +97,7 @@ export default function TournamentNoticeRow({ notice, onOpen }) {
   return (
     <Link to={to} onClick={() => onOpen(notice)}
       className="flex items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-ink-50">
-      <div className="w-9 h-9 rounded-full bg-[#E9E7FB] text-[#4338A8] flex items-center justify-center shrink-0">
+      <div className="w-9 h-9 rounded-full bg-kind-tournament-light text-kind-tournament-dark flex items-center justify-center shrink-0">
         <Trophy size={16} />
       </div>
       <p className="flex-1 min-w-0 text-sm text-ink-900">{text}</p>

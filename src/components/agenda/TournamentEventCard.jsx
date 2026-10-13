@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { MapPin, Clock, Megaphone, CheckCircle2 } from 'lucide-react'
 import { KindLine, OrgHeader, StateLine, StateTag } from './EventCard'
 import CardMascot, { mascotFor } from './CardMascot'
+import { KIND_COLORS } from '../../lib/kindColors'
 
 /* O torneio na agenda da Home (Trello #363).
 
@@ -15,8 +16,8 @@ import CardMascot, { mascotFor } from './CardMascot'
 
    Lilás, como manda o sistema de cores (KIND_STYLE.tournament). */
 
-// Fundo quase branco como o KIND_STYLE.tournament do EventCard (designer, 12 out).
-const LILAC = { bg: '#F4F0FA', border: '#E3DCF4', ink: '#6020B5' }
+// O fundo claro do torneio, como o KIND_STYLE.tournament do EventCard (R0, 13 out).
+const LILAC = { bg: KIND_COLORS.tournament.light, border: KIND_COLORS.tournament.line, ink: KIND_COLORS.tournament.strong }
 
 // A inscrição feita fica no canto, curta («✓ Inscrito»); os outros pontos
 // da inscrição são compridos e vão numa linha por baixo do nome, sem

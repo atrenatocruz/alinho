@@ -89,7 +89,7 @@ function GroupTable({ group, matches, entries, qualifiers, myEntryId, t }) {
                 <td className="py-1.5 text-center">
                   <span
                     className={`inline-flex h-5 min-w-[20px] px-0.5 items-center justify-center rounded-full font-mono text-xs font-bold ${
-                      passes ? 'bg-[#E9E7FB] text-[#4338A8]' : 'text-muted'
+                      passes ? 'bg-kind-tournament-light text-kind-tournament-dark' : 'text-muted'
                     }`}
                   >
                     {row.id in firstOf ? `${firstOf[row.id] + 1}=` : i + 1}

@@ -155,12 +155,12 @@ export default function HowItWorks() {
         </div>
       </section>
 
-      <Section id="para-quem-joga" bg="bg-[#FBE7DE]" eyebrowClass="text-[#9A3A17]" prefix="hiw.mix" n={3}
-        back={<Shuffle size={150} strokeWidth={1.2} className="text-[#9A3A17]/10" />} image="/como-funciona/mix.webp" />
+      <Section id="para-quem-joga" bg="bg-kind-mix-light" eyebrowClass="text-kind-mix-dark" prefix="hiw.mix" n={3}
+        back={<Shuffle size={150} strokeWidth={1.2} className="text-kind-mix-dark/10" />} image="/como-funciona/mix.webp" />
       <RankingSection />
       <Section bg="bg-white" eyebrowClass="text-ink-500" prefix="hiw.others" n={2} image="/como-funciona/home.webp" />
-      <Section bg="bg-[#E9E7FB]" eyebrowClass="text-[#4338A8]" prefix="hiw.tour" n={1}
-        back={<Trophy size={150} strokeWidth={1.2} className="text-[#4338A8]/10" />} />
+      <Section bg="bg-kind-tournament-light" eyebrowClass="text-kind-tournament-dark" prefix="hiw.tour" n={1}
+        back={<Trophy size={150} strokeWidth={1.2} className="text-kind-tournament-dark/10" />} />
       <Section id="para-quem-organiza" bg="bg-white" eyebrowClass="text-ink-500" prefix="hiw.org" n={6} image="/como-funciona/gerir.webp">
         <div className="mt-8">
           <h3 className="text-lg text-ink-900">{t('hiw.org_p7_t')}</h3>

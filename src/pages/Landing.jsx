@@ -234,19 +234,19 @@ function TournamentPoint() {
   const { t } = useTranslation()
   return (
     <Point
-      bg="bg-[#E9E7FB]"
-      eyebrowClass="text-[#4338A8]"
+      bg="bg-kind-tournament-light"
+      eyebrowClass="text-kind-tournament-dark"
       eyebrow={t('landing.tour_eyebrow')}
       title={t('landing.tour_title')}
       text={t('landing.tour_text')}
-      back={<Trophy size={170} strokeWidth={1.2} className="text-[#4338A8]/10" />}
+      back={<Trophy size={170} strokeWidth={1.2} className="text-kind-tournament-dark/10" />}
     >
-      <div className="rounded-card border-2 border-[#C9C3F3] bg-[#E9E7FB] p-4 shadow-card">
+      <div className="rounded-card border-2 border-kind-tournament-line bg-kind-tournament-light p-4 shadow-card">
         <div className="flex items-center justify-between gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-extrabold text-[#4338A8]">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-extrabold text-kind-tournament-dark">
             <Trophy size={13} /> {t('agenda.kind_tournament')}
           </span>
-          <span className="rounded-full bg-white px-2.5 py-1 text-xs font-extrabold text-[#4338A8]">{t('landing.tour_card_state')}</span>
+          <span className="rounded-full bg-white px-2.5 py-1 text-xs font-extrabold text-kind-tournament-dark">{t('landing.tour_card_state')}</span>
         </div>
         <p className="mt-2 font-display text-lg font-extrabold text-ink-900">{t('landing.tour_card_title')}</p>
         <p className="text-xs text-muted">{t('landing.tour_card_sub')}</p>
@@ -259,12 +259,12 @@ function MixPoint() {
   const { t } = useTranslation()
   return (
     <Point
-      bg="bg-[#FBE7DE]"
-      eyebrowClass="text-[#9A3A17]"
+      bg="bg-kind-mix-light"
+      eyebrowClass="text-kind-mix-dark"
       eyebrow={t('landing.mix_eyebrow')}
       title={t('landing.mix_title')}
       text={t('landing.mix_text')}
-      back={<Shuffle size={170} strokeWidth={1.2} className="text-[#9A3A17]/10" />}
+      back={<Shuffle size={170} strokeWidth={1.2} className="text-kind-mix-dark/10" />}
     >
       {/* A conversa no grupo — o mecanismo mostrado, não descrito. */}
       <div className="space-y-2" aria-hidden="true">

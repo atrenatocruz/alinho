@@ -52,7 +52,7 @@ export default function FreeSlotsCard({ event, isToday, onPick }) {
   const { t, i18n } = useTranslation()
   const [open, setOpen] = useState(null)
   const sub = (club) => [club.price != null ? t('home.free_price', { price: formatCurrency(club.price, i18n.language) }) : null, t('home.free_tap')].filter(Boolean).join(' · ')
-  const box = 'rounded-[18px] border-[1.5px] border-dashed border-[#F2BFA8] bg-[#FFF8F5] p-3'
+  const box = 'rounded-[18px] border-[1.5px] border-dashed border-[#F2BFA8] bg-kind-free-light p-3'
 
   if (event.clubs.length === 1) {
     const club = event.clubs[0]

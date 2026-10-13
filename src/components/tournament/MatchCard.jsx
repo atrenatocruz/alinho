@@ -58,7 +58,7 @@ export function shortName(team) {
 function Side({ team, fallback, score, won, lost, mine, compact, onLilac }) {
   const { t } = useTranslation()
   const { title, sub } = teamLines(team)
-  const ring = mine ? 'ring-2 ring-[#DCFCE7]' : onLilac ? 'ring-2 ring-[#E9E7FB]' : 'ring-2 ring-white'
+  const ring = mine ? 'ring-2 ring-[#DCFCE7]' : onLilac ? 'ring-2 ring-kind-tournament-light' : 'ring-2 ring-white'
   return (
     <span
       className={`flex items-center ${compact ? 'gap-2' : 'gap-2.5'} ${mine ? `-mx-2 rounded-[10px] px-2 ${compact ? 'py-1' : 'py-1.5'}` : compact ? 'py-1' : 'py-[5px]'}`}

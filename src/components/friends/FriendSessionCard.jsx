@@ -20,7 +20,7 @@ import { shortName } from './friendShare'
 import { dayText } from './dayText'
 
 const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-const BEGE = 'bg-[#F2EDE4] border-[#DCD1BF]'
+const BEGE = 'bg-kind-friends-light border-kind-friends-line'
 const pill = 'shrink-0 whitespace-nowrap rounded-full px-2 py-[3px] text-[11px] font-extrabold'
 
 function topLine(t, i18n, s) {
@@ -166,24 +166,24 @@ function HistoryCard({ s }) {
       <Link to={`/jogos-privados/sessao/${s.match_id}`} className="absolute inset-0 rounded-card" aria-label={topLine(t, i18n, s)} />
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-xs font-extrabold text-[#6B5B45]">{topLine(t, i18n, s)}</p>
-          {creatorText(t, s) && <p className="text-xs text-[#6B5B45]/80">{creatorText(t, s)}</p>}
+          <p className="text-xs font-extrabold text-kind-friends">{topLine(t, i18n, s)}</p>
+          {creatorText(t, s) && <p className="text-xs text-kind-friends/80">{creatorText(t, s)}</p>}
         </div>
         <StatePills s={s} />
       </div>
       {single ? (
         <div className="mt-2.5 flex items-center gap-3">
           <div className="min-w-0 flex-1 space-y-1.5">
-            <p className="flex items-center gap-2"><Faces people={top} ring="ring-[#F2EDE4]" />
+            <p className="flex items-center gap-2"><Faces people={top} ring="ring-kind-friends-light" />
               <span className="truncate text-sm font-extrabold text-ink-900">{draw ? '' : '🏆 '}{pairNames(top)}</span></p>
-            <p className="flex items-center gap-2"><Faces people={bottom} ring="ring-[#F2EDE4]" faded={!draw} />
+            <p className="flex items-center gap-2"><Faces people={bottom} ring="ring-kind-friends-light" faded={!draw} />
               <span className={`truncate text-sm font-extrabold ${draw ? 'text-ink-900' : 'text-muted'}`}>{pairNames(bottom)}</span></p>
           </div>
           <span className={`font-extrabold text-[34px] leading-none tabular-nums ${draw ? 'text-muted' : 'text-ink-900'}`}>{rTop}–{rBottom}</span>
         </div>
       ) : (
         <div className="mt-2.5">
-          <p className="flex items-center gap-2"><Faces people={people} ring="ring-[#F2EDE4]" />
+          <p className="flex items-center gap-2"><Faces people={people} ring="ring-kind-friends-light" />
             <span className="text-sm font-extrabold text-ink-900">{t('friends.list_rotating', { count: s.people || people.length })}</span></p>
           {s.my_rounds_played > 0 && (
             <p className="mt-1.5 text-sm text-ink-700">
@@ -193,8 +193,8 @@ function HistoryCard({ s }) {
           )}
         </div>
       )}
-      <div className="mt-3 flex items-center justify-between gap-2 border-t border-[#DCD1BF] pt-2.5">
-        <span className="text-xs text-[#6B5B45]">{foot || ''}</span>
+      <div className="mt-3 flex items-center justify-between gap-2 border-t border-kind-friends-line pt-2.5">
+        <span className="text-xs text-kind-friends">{foot || ''}</span>
         <Link to={`/jogos-privados/sessao/${s.match_id}?partilhar=1`} aria-label={t('friends.share_winners')}
           className="press relative flex h-11 w-11 items-center justify-center rounded-full bg-white text-ink-900">↗</Link>
       </div>
@@ -217,7 +217,7 @@ export function FriendsMonthLine({ sessions = [] }) {
   if (!month.length) return null
   const wins = month.filter((s) => s.i_won).length
   const minutes = month.reduce((n, s) => n + (sessionDuration(s)?.minutes || 0), 0)
-  const box = 'rounded-full bg-[#F2EDE4] px-3 py-1.5 text-sm text-ink-700'
+  const box = 'rounded-full bg-kind-friends-light px-3 py-1.5 text-sm text-ink-700'
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       <span className={box}><b className="text-ink-900">{month.length}</b> {t('friends.month_games', { count: month.length })}</span>

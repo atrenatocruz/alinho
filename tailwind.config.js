@@ -4,6 +4,14 @@
 // This config maps Tailwind utilities onto those CSS variables, so the whole
 // theme can be tweaked in ONE place: the token block at the top of index.css.
 
+import { KIND_COLORS } from './src/lib/kindColors.js'
+
+// As cores dos tipos de evento vêm de src/lib/kindColors.js (R0 do redesign,
+// 13 out): bg-kind-mix, text-kind-mix-dark, bg-kind-mix-light,
+// border-kind-mix-line… — um só sítio para o Tailwind e para o JavaScript.
+const kindColors = Object.fromEntries(Object.entries(KIND_COLORS).map(([k, c]) =>
+  [k, { DEFAULT: c.strong, dark: c.dark, light: c.light, line: c.line }]))
+
 export default {
   content: [
     "./index.html",
@@ -41,6 +49,7 @@ export default {
         ok: 'rgb(var(--ok) / <alpha-value>)',
         danger: 'rgb(var(--danger) / <alpha-value>)',
         warning: 'rgb(var(--warning) / <alpha-value>)',  // new, not yet consumed by any component
+        kind: kindColors,
       },
       borderRadius: {
         card: 'var(--radius-card)',   // 16px — cards

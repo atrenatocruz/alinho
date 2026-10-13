@@ -10,10 +10,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import TodayButton from '../TodayButton'
+import { KIND_COLORS } from '../../lib/kindColors'
 import { daySegments, isoDate, maxWeekOffset, pickTime, weekDays, weekHourRange } from '../../lib/teacherWeek'
 
 const HOUR_PX = 18
-const FREE = { background: '#99E2D6', borderColor: '#5CC7B6' }
+// As cores das aulas (R0, 13 out): MID é a forte a meio, para os contornos.
+const LESSON = KIND_COLORS.lesson
+const MID = `${LESSON.strong}80`
+const FREE = { background: `${LESSON.strong}40`, borderColor: MID }
 // Fechado pelo professor: às riscas (SPEC-calendario-2, assunto 2).
 const CLOSED = { background: 'repeating-linear-gradient(135deg, #F3F4F6 0 4px, #D1D5DB 4px 6px)', borderColor: '#D1D5DB' }
 const label = (m) => { const h = Math.floor(m / 60); const mm = m % 60; return mm ? `${h}:${String(mm).padStart(2, '0')}` : String(h) }
@@ -74,11 +78,11 @@ export default function RealWeekCalendar({ booking, mode = 'public', now = new D
   const look = (s, d) => {
     if (s.kind === 'free') return { style: FREE, cls: 'text-ink-900' }
     // Turma com lugar: contorno verde, fundo branco, «Turma» (assunto 4).
-    if (mode === 'public' && d && openSeries(d, s)) return { style: { background: '#fff', borderColor: '#0F766E', borderWidth: 1.5 }, cls: 'text-[#0F766E]', series: true }
+    if (mode === 'public' && d && openSeries(d, s)) return { style: { background: '#fff', borderColor: LESSON.strong, borderWidth: 1.5 }, cls: 'text-kind-lesson', series: true }
     if (mode === 'public') return { style: { background: '#D1D5DB', borderColor: '#9CA3AF' }, cls: 'text-transparent' }
     if (s.kind === 'closed') return { style: CLOSED, cls: 'text-ink-500' }
-    if (s.kind === 'lesson') return { style: { background: '#0F766E', borderColor: '#0F766E' }, cls: 'text-white' }
-    return { style: { background: '#CCF3EC', borderColor: '#5CC7B6', borderStyle: 'dashed' }, cls: 'text-[#0F766E]' }
+    if (s.kind === 'lesson') return { style: { background: LESSON.strong, borderColor: LESSON.strong }, cls: 'text-white' }
+    return { style: { background: LESSON.light, borderColor: MID, borderStyle: 'dashed' }, cls: 'text-kind-lesson' }
   }
   const tag = (s) => (mode !== 'teacher' ? null : s.kind === 'lesson' ? t('calendar.lesson_short') : s.kind === 'request' ? t('calendar.request_short') : s.kind === 'closed' ? t('calendar.closed') : null)
 
@@ -95,8 +99,8 @@ export default function RealWeekCalendar({ booking, mode = 'public', now = new D
     ? [['free', t('calendar.free')], ...(hasOpenSeries ? [['series', t('calendar.series_open')]] : []), ['busy', t('calendar.busy')], ['past', t('calendar.past')]]
     : [['free', t('calendar.free')], ['lesson', t('calendar.lesson')], ['request', t('calendar.request')], ['closed', t('calendar.closed')], ['past', t('calendar.past')]]
   const swatch = {
-    series: { background: '#fff', borderColor: '#0F766E' }, free: FREE, busy: { background: '#D1D5DB', borderColor: '#9CA3AF' }, lesson: { background: '#0F766E', borderColor: '#0F766E' },
-    request: { background: '#CCF3EC', borderColor: '#5CC7B6', borderStyle: 'dashed' }, closed: CLOSED, past: { background: '#fff', borderColor: '#E5E7EB' },
+    series: { background: '#fff', borderColor: LESSON.strong }, free: FREE, busy: { background: '#D1D5DB', borderColor: '#9CA3AF' }, lesson: { background: LESSON.strong, borderColor: LESSON.strong },
+    request: { background: LESSON.light, borderColor: MID, borderStyle: 'dashed' }, closed: CLOSED, past: { background: '#fff', borderColor: '#E5E7EB' },
   }
 
   return (

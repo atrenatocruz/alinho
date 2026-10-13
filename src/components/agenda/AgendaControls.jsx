@@ -568,7 +568,7 @@ export function HomeBar({ filters, dayKey, onOpenSearch, onOpenDay, onOpenFilter
           <button key={k} type="button" data-kind={k} onClick={() => pick(k)} aria-pressed={on} className={pill(on)}>
             {k === 'free'
               // Horários livres: só o contorno tracejado, como o cartão deles (UX, 11 out).
-              ? <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-[3px] border-[1.5px] border-dashed" style={{ borderColor: on ? '#F2C2B1' : '#D9826A', opacity: on ? 1 : 0.55 }} />
+              ? <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-[3px] border-[1.5px] border-dashed" style={{ borderColor: on ? KIND_STYLE.free.color : '#D9826A', opacity: on ? 1 : 0.55 }} />
               : <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: KIND_STYLE[k].color, opacity: on ? 1 : 0.55 }} />}
             {t(BAR_LABEL_KEY[k])}
           </button>

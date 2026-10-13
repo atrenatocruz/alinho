@@ -5,12 +5,13 @@
 // da app são cinzentos (no desenho o cartão era branco e as colunas cinzentas).
 import { useTranslation } from 'react-i18next'
 import { mergeSlots } from '../../lib/teacherSchedule'
+import { KIND_COLORS } from '../../lib/kindColors'
 
 const HOUR_PX = 18
 // Uma cor por clube: a das aulas e, no 2.º, lilás (SPEC ponto 5).
 const COLORS = [
-  { bg: '#99E2D6', border: '#5CC7B6' },
-  { bg: '#E9E7FB', border: '#B7AEF0' },
+  { bg: `${KIND_COLORS.lesson.strong}40`, border: `${KIND_COLORS.lesson.strong}80` },
+  { bg: KIND_COLORS.tournament.light, border: KIND_COLORS.tournament.line },
 ]
 const toMin = (hhmm) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m }
 // «18:00» → «18»; «18:30» → «18:30»

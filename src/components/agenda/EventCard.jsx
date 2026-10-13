@@ -12,6 +12,7 @@ import CardMascot, { mascotFor, mascotCardClass, MascotPill } from './CardMascot
 import { isMixLive } from '../../lib/mixLive'
 import { ratingBand } from '../../lib/elo'
 import { parseLevel, levelNumber } from '../../lib/mixLevels'
+import { KIND_COLORS } from '../../lib/kindColors'
 
 /* ════════════════════════════════════════════════════════════════════════
    Cartão da agenda da Home (Homepage unificada, Fase 1, Trello #258).
@@ -27,32 +28,30 @@ import { parseLevel, levelNumber } from '../../lib/mixLevels'
    2026-09-17-cores-e-pagina-do-evento/SPEC.md): o TIPO pinta o cartão
    (fundo claro + etiqueta branca com texto na cor); o ESTADO nunca pinta o
    cartão — é uma pastilha cheia e, quando estás inscrito, contorno verde.
-   Nenhum tipo usa verde, âmbar, lima ou preto. Lima só no botão principal e
+   Nenhum tipo usa âmbar, lima ou preto (desde o R0 de 13 out as aulas são
+   verde-escuro, #15803D). Lima só no botão principal e
    em "A decorrer". As classes são literais completos — o Tailwind não vê
    classes montadas.
    ════════════════════════════════════════════════════════════════════════ */
 
-// `color` = cor do texto da etiqueta, também usada nos pinos do mapa
-// (MapView.jsx, opção A escolhida pelo Francisco a 17 set).
-// Fundos dos cartões quase brancos (designer, 12 out — «aspeto premium»):
-// o tom do tipo fica saturado no texto/ícones/pinos (#C43D0A/#2050D6/#6020B5
-// — «as cores com mais detalhe», Ruben 12 out); o cartão é só um véu da cor.
-// A pastilha (`bg`) mantém o pastel cheio, senão desaparecia contra o
-// cartão e lavava-se nos filtros em fundo branco.
-// `chip`: pastilha do tipo CHEIA na cor saturada com texto branco (mockup
-// da designer, 12 out) — só nos três tipos do novo esquema; os outros
-// mantêm a pastilha branca com texto na cor (fallback no KindTag).
+// As cores vêm de src/lib/kindColors.js (R0 do redesign, aprovado pelo
+// Francisco a 13 out — cores fortes por tipo; saem os pastéis de 17 set).
+// `card` = o fundo claro do tipo com o contorno fino; `bg` = o fundo claro;
+// `chip` = a pastilha do tipo, cheia na cor forte com texto branco;
+// `text` = o tipo escrito na cor forte; `color` = a cor forte em hex (pontos
+// dos filtros e pinos do mapa, MapView.jsx). As classes são literais
+// completos — o Tailwind não vê classes montadas.
+// Horários livres: sem pastilha cheia (o salmão claro não aguenta texto
+// branco); o texto vai na cor escura do jogo em aberto.
 export const KIND_STYLE = {
-  mix:        { card: 'bg-[#EFF4FA] border-[#D9E5F4]', bg: 'bg-[#E0F2FE]', chip: 'bg-[#2050D6] text-white', text: 'text-[#2050D6]', color: '#2050D6', icon: Shuffle,     labelKey: 'agenda.kind_mix' },
-  open:       { card: 'bg-[#F5F7F9] border-[#E3E8ED]', bg: 'bg-[#FBE7DE]', chip: 'bg-[#C43D0A] text-white', text: 'text-[#C43D0A]', color: '#C43D0A', icon: CircleDot,   labelKey: 'agenda.kind_open' },
-  // Horários livres (SPEC-4): salmão claro, o mesmo do cartão tracejado.
-  free:       { card: 'bg-[#FFF8F5] border-[#F2BFA8]', bg: 'bg-[#FFF8F5]', text: 'text-[#9A3A17]', color: '#F2C2B1', icon: Clock,       labelKey: 'agenda.filter_kind_free' },
-  friends:    { card: 'bg-[#F2EDE4] border-[#DCD1BF]', bg: 'bg-[#F2EDE4]', text: 'text-[#6B5B45]', color: '#6B5B45', icon: Users,       labelKey: 'agenda.kind_friends' },
-  // Aulas com professores (Trello #49) — turquesa, SPEC das aulas §9.
-  lesson:     { card: 'bg-[#CCFBF1] border-[#8FE3D6]', bg: 'bg-[#CCFBF1]', text: 'text-[#0F766E]', color: '#0F766E', icon: GraduationCap, labelKey: 'agenda.kind_lesson' },
-  // Ainda não existem na app — só preparados para a cor (fora de âmbito).
-  tournament: { card: 'bg-[#F4F0FA] border-[#E3DCF4]', bg: 'bg-[#E9E7FB]', chip: 'bg-[#6020B5] text-white', text: 'text-[#6020B5]', color: '#6020B5', icon: Trophy,      labelKey: 'agenda.kind_tournament' },
-  league:     { card: 'bg-[#FAE3EC] border-[#F0BCD1]', bg: 'bg-[#FAE3EC]', text: 'text-[#8C2350]', color: '#8C2350', icon: ListOrdered, labelKey: 'agenda.kind_league' },
+  mix:        { card: 'bg-kind-mix-light border-kind-mix-line', bg: 'bg-kind-mix-light', chip: 'bg-kind-mix text-white', text: 'text-kind-mix', color: KIND_COLORS.mix.strong, icon: Shuffle, labelKey: 'agenda.kind_mix' },
+  open:       { card: 'bg-kind-open-light border-kind-open-line', bg: 'bg-kind-open-light', chip: 'bg-kind-open text-white', text: 'text-kind-open', color: KIND_COLORS.open.strong, icon: CircleDot, labelKey: 'agenda.kind_open' },
+  free:       { card: 'bg-kind-free-light border-kind-free-line', bg: 'bg-kind-free-light', text: 'text-kind-free-dark', color: KIND_COLORS.free.strong, icon: Clock, labelKey: 'agenda.filter_kind_free' },
+  friends:    { card: 'bg-kind-friends-light border-kind-friends-line', bg: 'bg-kind-friends-light', chip: 'bg-kind-friends text-white', text: 'text-kind-friends', color: KIND_COLORS.friends.strong, icon: Users, labelKey: 'agenda.kind_friends' },
+  // Aulas com professores (Trello #49).
+  lesson:     { card: 'bg-kind-lesson-light border-kind-lesson-line', bg: 'bg-kind-lesson-light', chip: 'bg-kind-lesson text-white', text: 'text-kind-lesson', color: KIND_COLORS.lesson.strong, icon: GraduationCap, labelKey: 'agenda.kind_lesson' },
+  tournament: { card: 'bg-kind-tournament-light border-kind-tournament-line', bg: 'bg-kind-tournament-light', chip: 'bg-kind-tournament text-white', text: 'text-kind-tournament', color: KIND_COLORS.tournament.strong, icon: Trophy, labelKey: 'agenda.kind_tournament' },
+  league:     { card: 'bg-kind-league-light border-kind-league-line', bg: 'bg-kind-league-light', chip: 'bg-kind-league text-white', text: 'text-kind-league', color: KIND_COLORS.league.strong, icon: ListOrdered, labelKey: 'agenda.kind_league' },
 }
 
 const ACTION_LABEL_KEY = {
