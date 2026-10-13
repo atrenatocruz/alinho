@@ -173,13 +173,17 @@ export default function AdminBar({ tournament, categories = [], onChanged, onEdi
     )
   }
 
-  // Em baixo, por baixo do cartão do torneio, como o preto do mix (ponto 2):
-  // o passo seguinte, uma só vez; a frase do prazo só quando já passou; e,
-  // com o sorteio feito, o terminar de cada categoria.
-  if (!next && !canDraw && !live) return null
+  // O passo seguinte, uma só vez, como o preto do mix (ponto 2); a frase do
+  // prazo só quando já passou; e, com o sorteio feito, o terminar de cada
+  // categoria. R3 (UX, 13 out): `part="next"` é só o passo seguinte, no topo
+  // logo depois da hora e da data; `part="live"` é só o terminar das
+  // categorias, mais abaixo. 'bottom' continua a dar tudo junto.
+  const showNext = part !== 'live'
+  const showLive = part !== 'next' && live
+  if (!(showNext && (next || canDraw)) && !showLive) return null
   return (
     <div className="space-y-1.5">
-      {next && (
+      {showNext && next && (
         <button type="button" disabled={busy}
           // Fechar as inscrições pergunta antes (Trello #500): um toque por
           // engano deixava toda a gente de fora. Sem vermelho — reabre-se.
@@ -188,17 +192,17 @@ export default function AdminBar({ tournament, categories = [], onChanged, onEdi
           {t(`tournament.admin.to_${next}`)}
         </button>
       )}
-      {next === 'fechado' && closesAlone && (
+      {showNext && next === 'fechado' && closesAlone && (
         <p className="text-xs text-ink-500">{t('tournament.admin.closes_alone', { deadline: whenDeadline(tournament.entries_deadline, i18n.language) })}</p>
       )}
-      {canDraw && (
+      {showNext && canDraw && (
         <button type="button" disabled={busy} onClick={draw} className={`${PRIMARY} w-full`}>
           {t('tournament.admin.do_draw')}
         </button>
       )}
       {/* Com o sorteio feito, o passo seguinte é fechar cada categoria — e
           o torneio fecha sozinho com a última (Trello #485). */}
-      {live && (
+      {showLive && (
         <div id="tournament-close-categories" className="card scroll-mt-20">
           <CloseCategories tournament={tournament} onChanged={onChanged} />
         </div>

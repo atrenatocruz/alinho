@@ -20,7 +20,8 @@ import { whatsappShare } from '../lib/partnerInvite'
 import { ArrowLeft, Eye, Trophy } from 'lucide-react'
 import { useGoBack } from '../lib/useGoBack'
 import { useAuth } from '../contexts/AuthContext'
-import { getTournamentForEdit, getTournamentOrgHint, getTournamentPage, scheduleTournamentOpening, setTournamentStatus, updateTournament } from '../lib/tournamentApi'
+import { supabase } from '../lib/supabase'
+import { getTournamentForEdit, getTournamentOrgHint, getTournamentPage, getTournamentResults, scheduleTournamentOpening, setTournamentStatus, updateTournament } from '../lib/tournamentApi'
 import GroupOnlyNotice from '../components/GroupOnlyNotice'
 import { StickyTabs } from '../components/tournament/StickyBar'
 import { setEventWhatsappPostTimes } from '../lib/whatsappHours'
@@ -67,7 +68,7 @@ export default function TournamentPage() {
   const location = useLocation()
   const goBack = useGoBack('/')
   const navigate = useNavigate()
-  const { user, memberships } = useAuth()
+  const { user, memberships, profile } = useAuth()
   const [params, setParams] = useSearchParams()
   const [data, setData] = useState(null)
   const [failed, setFailed] = useState(false)
@@ -113,6 +114,36 @@ export default function TournamentPage() {
   // Um torneio cancelado não abre o editar sozinho: o ?admin=editar que
   // ficou no endereço sai sem deixar rasto (bug do Francisco, 5 out).
   const cancelled = data?.tournament?.status === 'cancelado'
+  // Terminado: o meu lugar, para a faixa do topo («Terminado · ficaste em
+  // 2.º na F3», UX 13 out). Só se pede a quem esteve inscrito.
+  const ended = data?.tournament?.status === 'terminado'
+  // A minha dupla, para a faixa do topo de quem está inscrito («M3 · Tu e
+  // Ana Moreira», protótipo; QA 13 out). Os nomes vêm da lista pública de
+  // inscritos, como no SignupSlot.
+  const myEntryId = activeMy(data)?.entry_id || null
+  const [myPair, setMyPair] = useState(null)
+  useEffect(() => {
+    if (!myEntryId) { setMyPair(null); return undefined }
+    let alive = true
+    supabase.from('tournament_public_entries').select('player1_name, player2_name').eq('id', myEntryId).limit(1)
+      .then(({ data: rows, error }) => {
+        if (error) throw error
+        if (alive) setMyPair(rows?.[0] || null)
+      })
+      .catch(() => { if (alive) setMyPair(null) })
+    return () => { alive = false }
+  }, [myEntryId])
+  const hadEntry = !!activeMy(data)
+  const [myPlace, setMyPlace] = useState(null)
+  useEffect(() => {
+    const tr = data?.tournament
+    if (!ended || !hadEntry || !tr) { setMyPlace(null); return undefined }
+    let alive = true
+    getTournamentResults(tr.slug || tr.id)
+      .then((res) => { if (alive) setMyPlace(res?.my?.final_position ? { n: res.my.final_position, code: res.my.category_code } : null) })
+      .catch(() => { if (alive) setMyPlace(null) })
+    return () => { alive = false }
+  }, [ended, hadEntry, data?.tournament?.id]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!wantsEdit || !cancelled) return
     const next = new URLSearchParams(params); next.delete('admin'); setParams(next, { replace: true })
@@ -337,6 +368,15 @@ export default function TournamentPage() {
   // O topo (R3): a hora da primeira categoria do primeiro dia, os dias ao
   // lado («sáb e dom»), e os quadrados de dados.
   const heroIn = ['validada', 'selecionada'].includes(activeMy(data)?.state)
+  // «M3 · Tu e Ana Moreira»: a categoria e com quem vou. Sem os nomes, fica
+  // «Inscrição feita».
+  // Com várias categorias, a primeira e «+1» (UX, CONFORMIDADE-R3 n.º 11).
+  const heroMore = activeEntries(data).length - 1
+  const heroCode = [categories.find((c) => c.id === activeMy(data)?.category_id)?.code, heroMore > 0 ? `+${heroMore}` : null].filter(Boolean).join(' ') || null
+  const heroPartner = myPair ? [myPair.player1_name, myPair.player2_name].filter(Boolean).find((n) => n !== profile?.name) : null
+  const heroPair = heroIn && heroCode && heroPartner ? t('tournament.hero_entered_with', { code: heroCode, name: heroPartner }) : null
+  const todayIso = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Lisbon' })
+  const isToday = !!tour.starts_on && String(tour.starts_on).slice(0, 10) <= todayIso && String(tour.ends_on || tour.starts_on).slice(0, 10) >= todayIso
   const firstDayCats = categories.filter((c) => c.day_date && String(c.day_date).slice(0, 10) === String(tour.starts_on || '').slice(0, 10) && c.start_time)
   const heroTime = firstDayCats.length ? firstDayCats.map((c) => String(c.start_time).slice(0, 5)).sort()[0] : null
   const heroAside = daysAside(tour.starts_on, tour.ends_on, i18n.language, t)
@@ -369,17 +409,55 @@ export default function TournamentPage() {
         dateLine={longDate(tour.starts_on, i18n.language)}
         onBack={goBack}
         onShare={tour.status === 'rascunho' ? null : shareTournament}
-        status={{
+        // Quem organiza (UX, 13 out — a regra do mix, Francisco 2 out):
+        // «Editar · Mais ⋯» na primeira linha do cartão e o passo seguinte,
+        // preto, logo depois da data, antes da inscrição pessoal.
+        manage={isAdmin ? (
+          <AdminBar
+            tournament={tour}
+            categories={categories}
+            onChanged={() => window.dispatchEvent(new Event('tournament:reload'))}
+            onEdit={() => openAdmin('editar')}
+            onDraw={() => openAdmin('sorteio')}
+            onSchedule={() => openAdmin('horario')}
+            onScorekeepers={() => openAdmin('marcadores')}
+            onEntries={() => setParam('tab', 'entries')}
+          />
+        ) : null}
+        nextStep={isAdmin ? (
+          <AdminBar
+            part="next"
+            tournament={tour}
+            categories={categories}
+            onChanged={() => window.dispatchEvent(new Event('tournament:reload'))}
+            onDraw={() => openAdmin('sorteio')}
+          />
+        ) : null}
+        status={ended || cancelled ? {
+          // Terminado ou cancelado (UX, 13 out): faixa cinzenta com o estado do
+          // torneio, sem «Inscrição feita» nem vagas. Quem jogou vê o seu lugar.
+          text: [t(cancelled ? 'tournament.status_cancelado' : 'tournament.status_terminado'),
+            ended && myPlace ? t(myPlace.n === 1 ? 'tournament.hero_done_champions' : 'tournament.hero_done_place', { n: myPlace.n, code: myPlace.code }) : null,
+          ].filter(Boolean).join(' · '),
+          tone: 'grey',
+          dot: cancelled ? '#DC2626' : null,
+          meta: [ended ? t('tournament.hero_pairs', { count: teamsIn ?? tour.entry_count ?? 0 }) : null,
+            shortDay(tour.ends_on || tour.starts_on, i18n.language)].filter(Boolean).join(' · '),
+          note: cancelled && hadEntry ? t('tournament.hero_cancelled_entry') : null,
+        } : {
           text: heroIn
-            ? t('tournament.state_entered')
+            ? (heroPair || t('tournament.state_entered'))
             : t(statusKey(tour.status, drawProgress(categories), tour.entries_deadline), drawProgress(categories)),
           tone: heroIn ? 'ok' : 'kind',
-          meta: totalSlots
+          // «18/32 DUPLAS · HOJE» no dia do torneio (protótipo; QA 13 out).
+          meta: [totalSlots
             ? t('tournament.hero_pairs_of', { n: teamsIn ?? tour.entry_count ?? 0, total: totalSlots })
             : t('tournament.hero_pairs', { count: teamsIn ?? tour.entry_count ?? 0 }),
+          isToday ? t('ui.today') : null].filter(Boolean).join(' · '),
         }}
       >
-        {UnderHeader && <Suspense fallback={null}><UnderHeader {...panelProps} withInfo={false} /></Suspense>}
+        {/* Terminado ou cancelado, os botões da inscrição saem (UX, 13 out). */}
+        {UnderHeader && !ended && !cancelled && <Suspense fallback={null}><UnderHeader {...panelProps} withInfo={false} /></Suspense>}
       </EventHero>
       {/* O que ficou por gravar ao criar (preço especial, 10 out). */}
       {location.state?.notice && (
@@ -405,33 +483,18 @@ export default function TournamentPage() {
         </div>
       )}
 
-      {isAdmin && (
-        <>
-          <AdminBar
-            tournament={tour}
-            categories={categories}
-            onChanged={() => window.dispatchEvent(new Event('tournament:reload'))}
-            onEdit={() => openAdmin('editar')}
-            onDraw={() => openAdmin('sorteio')}
-            onSchedule={() => openAdmin('horario')}
-            onScorekeepers={() => openAdmin('marcadores')}
-            onEntries={() => setParam('tab', 'entries')}
-          />
-          {adminError && <p className="text-sm text-danger">{adminError}</p>}
-        </>
-      )}
+      {isAdmin && adminError && <p className="text-sm text-danger">{adminError}</p>}
 
       {/* Aviso do organizador — acima de tudo, e só quando há aviso. */}
       {TopSlot && <Suspense fallback={null}><TopSlot {...panelProps} /></Suspense>}
 
       <EventFacts items={heroFacts} />
 
-      {/* O passo seguinte de quem organiza, uma só vez, por baixo do cartão do
-          torneio — como o preto do mix (Francisco, 2 out). Em cima ficam só
-          «Editar» e «Mais ⋯». */}
+      {/* Com o sorteio feito, o terminar de cada categoria (o passo seguinte
+          de quem organiza foi para o topo, UX 13 out). */}
       {isAdmin && (
         <AdminBar
-          part="bottom"
+          part="live"
           tournament={tour}
           categories={categories}
           onChanged={() => window.dispatchEvent(new Event('tournament:reload'))}
