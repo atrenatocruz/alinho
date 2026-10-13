@@ -1,4 +1,5 @@
 import { whatsappShare } from '../../lib/partnerInvite'
+import { shortPersonName } from '../../lib/mixLogic'
 
 // «↗ Partilhar com quem falta» (amigos sem bloquear, 27 set): abre a folha de
 // partilha do telemóvel — escolhe-se um grupo ou uma pessoa (Francisco). Sem
@@ -14,10 +15,8 @@ export async function shareWithMissing(text) {
 
 export const sessionLink = (matchId) => `${window.location.origin}/jogos-privados/sessao/${matchId}`
 
-/** «Rita Figueira» → «Rita F.» */
-export const shortName = (name) => {
-  // O que está entre parênteses não é apelido («Renato Cruz (dev)» → «Renato C.»).
-  const parts = String(name || '').replace(/\([^)]*\)/g, ' ').trim().split(/\s+/)
-  const initial = parts.length > 1 ? parts[parts.length - 1].match(/\p{L}/u)?.[0] : null
-  return initial ? `${parts[0]} ${initial}.` : parts[0] || ''
-}
+/** «Rita Figueira» → «Rita F.»; «Teste 1» → «Teste 1». É a peça comum
+ *  (shortPersonName, mixLogic.js): o número do fim fica, senão duas contas
+ *  de teste («Teste 1», «Teste 2») apareciam iguais (QA, 13 out). O que está
+ *  entre parênteses não é apelido («Renato Cruz (dev)» → «Renato C.»). */
+export const shortName = (name) => shortPersonName(name)
