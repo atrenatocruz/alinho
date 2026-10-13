@@ -5725,5 +5725,8 @@
   "vouchers.r7_show_qr": "Show the QR at reception.",
   "vouchers.r7_see_qr": "Show the QR",
   "vouchers.r7_mark_used": "I've used it",
-  "vouchers.r7_used_heading": "Already used"
+  "vouchers.r7_used_heading": "Already used",
+  "profile.r7_xp_level": "{{name}} · level {{level}}",
+  "profile.r7_xp_missing": "{{missing}} XP to go for {{name}}.",
+  "profile.r7_view_all": "See all ({{earned}}/{{total}})"
 }

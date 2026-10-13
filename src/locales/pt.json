@@ -5740,5 +5740,8 @@
   "vouchers.r7_show_qr": "Mostra o QR na receção.",
   "vouchers.r7_see_qr": "Ver o QR",
   "vouchers.r7_mark_used": "Já o usei",
-  "vouchers.r7_used_heading": "Já usados"
+  "vouchers.r7_used_heading": "Já usados",
+  "profile.r7_xp_level": "{{name}} · nível {{level}}",
+  "profile.r7_xp_missing": "Faltam {{missing}} XP para {{name}}.",
+  "profile.r7_view_all": "Ver todas ({{earned}}/{{total}})"
 }

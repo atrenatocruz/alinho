@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { User, Award, Trophy, LogOut, Camera, HelpCircle, ThumbsUp, Trash2, ChevronRight, ArrowLeft, Eye, X, Ticket } from 'lucide-react'
+import { User, Trophy, LogOut, Camera, HelpCircle, ThumbsUp, Trash2, ChevronRight, ArrowLeft, Eye, X, Ticket } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { errorKind } from '../lib/errors'
@@ -907,6 +907,8 @@ export default function Profile() {
         const tier = tierFromXp(profile?.xp)
         const progress = tier ?? preTierProgress(profile?.xp)
         const missing = progress.nextMin != null ? progress.nextMin - (profile?.xp ?? 0) : null
+        // O nome do nível seguinte, para «Faltam N XP para Lenda.» (UX, R7).
+        const nextTier = XP_TIERS.find((x) => x.min === progress.nextMin) || null
         return (
           <button
             type="button"
@@ -927,27 +929,28 @@ export default function Profile() {
                 </span>
               )}
             </div>
-            <div className="mt-2 flex items-center justify-between text-[11px] font-extrabold text-ink-900">
-              <span>
+            {/* R7: o ícone e o nome do nível de atividade com o número; à direita
+                o XP; por baixo, quanto falta para o seguinte, pelo nome. */}
+            <div className="mt-2 flex items-center justify-between gap-2 text-ink-900">
+              <span className="flex min-w-0 items-center gap-1.5 text-[15px] font-extrabold">
                 {tier
-                  ? `${t('profile.xp_level', { level: tier.level })} · ${t(tier.labelKey)}`
+                  ? <><span aria-hidden="true" className={`h-2.5 w-2.5 shrink-0 rounded-full ${tier.dotClass}`} /> {t('profile.r7_xp_level', { name: t(tier.labelKey), level: tier.level })}</>
                   : t('profile.xp_no_shield')}
               </span>
-              <span className="tabular-nums">
+              <span className="shrink-0 font-mono text-[13px] font-extrabold tabular-nums">
                 {progress.nextMin != null
                   ? t('profile.xp_progress', { current: formatXp(profile?.xp), next: formatXp(progress.nextMin) })
                   : `${formatXp(profile?.xp)} XP`}
               </span>
             </div>
             <div className="mt-1.5 flex items-center gap-2">
-              <div className="flex-1 h-1.5 rounded-full bg-ink-200/50 overflow-hidden">
+              <div className="flex-1 h-2 rounded-full bg-ink-200/50 overflow-hidden">
                 <div className="h-full rounded-full bg-lime-400" style={{ width: `${progress.progressPct}%` }} />
               </div>
-              <span className="text-[10px] text-muted tabular-nums shrink-0">{progress.progressPct}%</span>
             </div>
             {missing != null && missing > 0 && (
-              <p className="mt-1 text-[10px] text-muted">
-                {t('profile.card_xp_missing', { missing: formatXp(missing) })}
+              <p className="mt-1.5 text-xs text-muted">
+                {nextTier ? t('profile.r7_xp_missing', { missing: formatXp(missing), name: t(nextTier.labelKey) }) : t('profile.card_xp_missing', { missing: formatXp(missing) })}
               </p>
             )}
           </button>
@@ -961,26 +964,25 @@ export default function Profile() {
             fica visível — é o "para onde subir"). Fail-soft: sem dados
             (migração por correr), sem secção. */}
         {trophyCatalog.length > 0 && (
-          <div className="rounded-card border border-line bg-white p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg text-ink-900 flex items-center gap-2">
-                <Award size={20} className="text-lime-600" /> {t('achievements.shelf_title')}
-              </h3>
+          <div>
+            {/* R7: sem o cartão grande à volta; o título sobre o fundo e cada
+                conquista no seu cartão branco. */}
+            <div className="flex items-center justify-between mb-2.5">
+              <h3 className="font-display text-lg font-extrabold text-ink-900">{t('achievements.shelf_title')}</h3>
               <button
                 type="button"
                 onClick={() => setTrophiesExpanded((v) => !v)}
-                className="text-xs font-extrabold text-ink-700 hover:text-ink-900"
+                className="text-[13px] font-extrabold text-ink-900"
               >
                 {trophiesExpanded
                   ? t('achievements.collapse')
-                  : t('achievements.view_all', { earned: myTrophies.length, total: trophyCatalog.length })}
+                  : `${t('profile.r7_view_all', { earned: myTrophies.length, total: trophyCatalog.length })} ›`}
               </button>
             </div>
             {!trophiesExpanded ? (
               myTrophies.length === 0 ? (
                 <p className="text-sm text-muted">{t('achievements.empty_own')}</p>
               ) : (
-                // R7: grelha de 3, com a «% têm» em cada uma.
                 <div className="grid grid-cols-3 gap-2">
                   {myTrophies.slice(0, 6).map((tr) => (
                     <AchievementCard key={tr.achievement_key} achievementKey={tr.achievement_key} category={tr.category} rarity={tr.rarity} earned rarityPct={tr.rarity_pct} compact

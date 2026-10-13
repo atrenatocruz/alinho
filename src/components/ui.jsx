@@ -1121,7 +1121,9 @@ export function AchievementCard({ achievementKey, category, rarity, earned = fal
   return (
     // onOpen: tocar abre o cartão animado (Perfil, pedido do Francisco a 11 out).
     <div
-      className={`rounded-ctrl border-2 p-3 text-center bg-surface ${meta.frame} ${meta.glow} ${onOpen ? 'press cursor-pointer' : ''}`}
+      // compact (Perfil, R7): cartão branco próprio, sem borda grossa — a
+      // raridade vê-se na moldura da medalha e na palavra colorida.
+      className={`p-3 text-center ${compact ? 'rounded-card border border-line bg-white' : `rounded-ctrl border-2 bg-surface ${meta.frame} ${meta.glow}`} ${onOpen ? 'press cursor-pointer' : ''}`}
       onErrorCapture={() => setMedalFailed(true)}
       {...(onOpen ? { role: 'button', tabIndex: 0, onClick: onOpen, onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() } } } : {})}
     >
