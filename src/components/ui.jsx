@@ -15,6 +15,7 @@ import { listFollowers, listFollowing, removeFollower, unfollowPlayer } from '..
 import { describeError } from '../lib/errors'
 import Alino from './Alino'
 import { frameInsideBox, frameSrc } from '../lib/frames'
+import { useDragScroll } from '../lib/useDragScroll'
 
 /* ─── Date fields ────────────────────────────────────────────────────────
    Native <input type=date/datetime-local> pickers open reliably on iOS
@@ -762,6 +763,118 @@ export function Chips({ options, value, onChange, label, className = '' }) {
           </button>
         )
       })}
+    </div>
+  )
+}
+
+/* ─── A barra de filtros e o bloco preso em cima (R4, 13 out) ───────────
+   design-handoff/2026-10-13-redesign/R4-barras-e-separadores.md.
+   A barra da Home em todo o lado: fundo branco, 🔍 redondo, `lead` (ex.:
+   «Out 2026 ⌄»), uma linha fina a separar e as pastilhas soltas (a
+   escolhida a preto, com o ponto da cor quando é um tipo). Desliza para o
+   lado sem barra à vista; no computador também com o rato e a roda.
+
+     <StickyTop>                       ← preso em cima ao descer, num bloco branco
+       <Tabs … />                      ← o separador (pílula cinzenta), se houver
+       <FilterBar
+         search={{ value, onChange, placeholder }}   ← 🔍 troca a barra pelo campo, «✕» volta
+         lead={<FilterPill chevron onClick={…}>Out 2026</FilterPill>}
+         options={[{ value: 'mix', label: 'Mixes', dot: KIND_COLORS.mix.strong, count: 2 }, …]}
+         value={kind} onChange={setKind} label="Tipo" />
+     </StickyTop>
+
+   Em vez de `options`, os filhos: <FilterPill on dot count chevron onClick>
+   ou um <Select variant="chip">. O título da página (PageHeader com
+   sticky={false}) e o que vem antes sobem e saem; o StickyTop fica. */
+
+const PILL_TAP = "before:absolute before:inset-x-0 before:-inset-y-1 before:content-['']"
+
+/** Uma pastilha da barra de filtros. `on` = escolhida (a preto); `dot` = a
+ *  cor do tipo; `count` = o número ao lado («Mixes · 2»); `chevron` = abre
+ *  uma escolha («Feminino ⌄»). */
+export function FilterPill({ on = false, dot = null, count = null, chevron = false, onClick, children, ...props }) {
+  return (
+    <button type="button" onClick={onClick} aria-pressed={chevron ? undefined : on} data-on={on || undefined} {...props}
+      className={`relative inline-flex min-h-[36px] shrink-0 select-none items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-[13px] font-extrabold transition-colors duration-fast ${PILL_TAP} ${
+        on ? 'border-ink-900 bg-ink-900 text-white' : 'border-line bg-white text-ink-900'}`}>
+      {/* O ponto do tipo: redondo, 8 px, sem transparência (protótipo). */}
+      {dot && <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full" style={{ background: dot }} />}
+      {children}
+      {count != null && <span className={`tabular-nums ${on ? 'text-white/75' : 'text-muted'}`}>· {count}</span>}
+      {chevron && <ChevronDown size={14} className={on ? 'text-white/75' : 'text-muted'} />}
+    </button>
+  )
+}
+
+/** A barra de filtros (ver acima). `search`: { value, onChange, placeholder }
+ *  — a lupa troca a barra pelo campo, «✕» limpa e volta. `onSearch`: em vez
+ *  do campo, a lupa chama isto (ex.: abre uma folha). Sem nenhum, sem lupa. */
+export function FilterBar({ search = null, onSearch = null, lead = null, options = null, value, onChange, label, children, className = '' }) {
+  const { t } = useTranslation()
+  const ref = useDragScroll()
+  const inputRef = useRef(null)
+  const [searching, setSearching] = useState(!!search?.value)
+  useEffect(() => { if (searching) inputRef.current?.focus() }, [searching])
+  // A pastilha escolhida fica sempre à vista: a barra desliza até ela.
+  useEffect(() => {
+    const el = ref.current
+    const on = el?.querySelector('[data-on]')
+    if (!el || !on || searching) return
+    const box = el.getBoundingClientRect()
+    const r = on.getBoundingClientRect()
+    if (r.right > box.right - 16) el.scrollLeft += r.right - box.right + 16
+    else if (r.left < box.left + 16) el.scrollLeft -= box.left + 16 - r.left
+  }, [value, searching, ref])
+  const close = () => { search?.onChange?.(''); setSearching(false) }
+  const hasLupa = !!(search || onSearch)
+  return (
+    <div ref={ref} role={searching ? undefined : 'group'} aria-label={searching ? undefined : label}
+      className={`no-scrollbar -mx-4 flex cursor-grab items-center gap-1.5 overflow-x-auto px-4 py-1 active:cursor-grabbing ${className}`}>
+      {searching ? (
+        <div className="flex min-h-[36px] w-full items-center gap-2 rounded-full border border-ink-900 bg-white pl-3 pr-1">
+          <Search size={16} className="shrink-0 text-muted" />
+          <input ref={inputRef} type="search" value={search?.value || ''} onChange={(e) => search?.onChange?.(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') close() }}
+            placeholder={search?.placeholder} aria-label={search?.placeholder || t('agenda.search_open')}
+            className="min-w-0 flex-1 bg-transparent text-base outline-none" />
+          <button type="button" onClick={close} aria-label={t('ui.close')}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-900 hover:bg-surface">
+            <X size={16} />
+          </button>
+        </div>
+      ) : (
+        <>
+          {hasLupa && (
+            <button type="button" onClick={() => (search ? setSearching(true) : onSearch())} aria-label={t('agenda.search_open')} title={t('agenda.search_open')}
+              className={`relative inline-flex min-h-[36px] w-9 shrink-0 items-center justify-center rounded-full border border-line bg-white text-ink-900 ${PILL_TAP}`}>
+              <Search size={16} />
+            </button>
+          )}
+          {lead}
+          {(hasLupa || lead) && <span aria-hidden="true" className="mx-0.5 h-6 w-px shrink-0 bg-line" />}
+          {options
+            ? options.map((o) => (
+              <FilterPill key={String(o.value)} on={o.value === value} dot={o.dot} count={o.count} onClick={() => onChange(o.value)}>{o.label}</FilterPill>
+            ))
+            : children}
+        </>
+      )}
+    </div>
+  )
+}
+
+/** O bloco que fica preso em cima ao descer: o separador e a barra de
+ *  filtros juntos, em branco, com uma linha fina por baixo. Tem de ser filho
+ *  direto do contentor da página (o sticky só prende dentro do pai). Tem
+ *  sempre o mesmo tamanho, preso ou solto — não treme ao descer.
+ *  `belowBackBar`: nas páginas com o «‹» preso (BackBar, 64 px + a margem do
+ *  telemóvel), prende-se logo por baixo dele em vez de no topo. */
+const BELOW_BACKBAR = 'calc(4rem + var(--safe-top, env(safe-area-inset-top, 0px)))'
+export function StickyTop({ children, belowBackBar = false, className = '' }) {
+  return (
+    <div style={belowBackBar ? { top: BELOW_BACKBAR } : undefined}
+      className={`sticky top-0 z-10 -mx-4 space-y-2 border-b border-line/70 bg-white px-4 pb-1.5 pt-2 ${className}`}>
+      {children}
     </div>
   )
 }
@@ -1591,9 +1704,11 @@ export function BackBar({ onBack, to, label, title, onShare, right, solid = fals
   )
 }
 
-export function PageHeader({ title, children }) {
+// `sticky={false}`: o título sobe e sai ao descer — nos ecrãs com o
+// StickyTop (separador e filtros presos em cima, R4), quem fica é ele.
+export function PageHeader({ title, children, sticky = true }) {
   return (
-    <div className="sticky top-0 z-10 -mx-4 px-4 -mt-6 pt-4 pb-3 bg-canvas flex items-center justify-between gap-2 border-b border-line/70">
+    <div className={`${sticky ? 'sticky top-0 z-10 border-b border-line/70' : ''} -mx-4 px-4 -mt-6 pt-4 pb-3 bg-canvas flex items-center justify-between gap-2`}>
       <h2 className="text-3xl text-ink-900 min-w-0 truncate">{title}</h2>
       {children && <div className="flex items-center gap-1 shrink-0">{children}</div>}
     </div>

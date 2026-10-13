@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Search, Users, Clock, GraduationCap, X, Lock, Check, Plus, ChevronRight } from 'lucide-react'
+import { Users, Clock, GraduationCap, Lock, Check, Plus, ChevronRight } from 'lucide-react'
 import { searchOrganizations, listGlobalOrganizations } from '../lib/organizations'
 import { DAYS, listTeachersPublic, teacherClubName } from '../lib/teachers'
 import { scheduleFromRows, shortRange } from '../lib/teacherSchedule'
@@ -10,7 +10,7 @@ import { LevelPill, bandLabel } from '../components/lessons/LessonBits'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { followPlayer, removeFollow } from '../lib/follows'
-import { Avatar, Chips, ConfirmSheet, EmptyState, GroupLevelBadge, orgAvatarShape, PageHeader } from '../components/ui'
+import { Avatar, ConfirmSheet, EmptyState, GroupLevelBadge, orgAvatarShape, PageHeader, StickyTop, FilterBar } from '../components/ui'
 import { describeError } from '../lib/errors'
 import { useHeaderActions } from '../contexts/HeaderActionsContext'
 import { semAcentos } from '../lib/semAcentos'
@@ -53,11 +53,13 @@ import { CLUB_HERO, GROUP_HERO, KIND_COLORS } from '../lib/kindColors'
    Todos · Clubes · Grupos · Professores (Francisco, 24 set: «Quero poder ver
    todos ou a cada um em separado. Tipo filtros.»), com as mesmas pastilhas
    dos filtros da Home. */
+// Os pontos de cor nas pastilhas (UX, 13 out): clubes a preto, grupos no
+// cinzento-escuro dos amigos e professores no verde das aulas.
 const TABS = [
   { key: 'all', labelKey: 'comunidade.filter_all' },
-  { key: 'clubs', labelKey: 'comunidade.filter_clubs' },
-  { key: 'groups', labelKey: 'comunidade.filter_groups' },
-  { key: 'teachers', labelKey: 'comunidade.tab_teachers' },
+  { key: 'clubs', labelKey: 'comunidade.filter_clubs', dot: '#040404' },
+  { key: 'groups', labelKey: 'comunidade.filter_groups', dot: KIND_COLORS.friends.strong },
+  { key: 'teachers', labelKey: 'comunidade.tab_teachers', dot: KIND_COLORS.lesson.strong },
 ]
 
 // A mesma regra de todas as pesquisas de nomes (src/lib/semAcentos.js).
@@ -387,36 +389,22 @@ export default function Comunidade() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title={t('comunidade.title')}>{headerActions}</PageHeader>
+      {/* O título sobe e sai; a barra fica presa em cima (R4, 13 out). */}
+      <PageHeader sticky={false} title={t('comunidade.title')}>{headerActions}</PageHeader>
 
-      <div className="flex items-center gap-2 input-field focus-within:border-ink-500 focus-within:ring-2 focus-within:ring-ink-50">
-        <Search size={16} className="text-muted shrink-0" />
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
-          placeholder={t('comunidade.search_placeholder_orgs')}
-          className="flex-1 min-w-0 bg-transparent outline-none text-base"
+      {/* A barra da Home: 🔍 | Todos · Clubes · Grupos · Professores. A lupa
+          troca a barra pelo campo de pesquisa; com a pesquisa a funcionar, o
+          filtro deixa de mandar e mostram-se os resultados de tudo. «✕»
+          limpa e volta às pastilhas. */}
+      <StickyTop>
+        <FilterBar
+          search={{ value: query, onChange: setQuery, placeholder: t('comunidade.search_placeholder_orgs') }}
+          options={TABS.map((f) => ({ value: f.key, label: t(f.labelKey), dot: f.dot }))}
+          value={tab}
+          onChange={setTab}
+          label={t('comunidade.title')}
         />
-        {query && (
-          <button type="button" onClick={() => setQuery('')} aria-label={t('ui.close')} className="text-muted shrink-0">
-            <X size={16} />
-          </button>
-        )}
-      </div>
-
-      {/* Filtros, com as pastilhas dos filtros da Home. Existem sempre,
-          mesmo vazios. Com a pesquisa a funcionar em cima, o filtro deixa de
-          mandar e mostram-se os resultados de tudo. */}
-      {!searching && (
-        // A fila vai até à beira do ecrã (Francisco, 26 set): num telemóvel
-        // pequeno a última pastilha aparece meio escondida, a mostrar que há
-        // mais para o lado, em vez de ser cortada pela margem da página.
-        <div className="-mx-4">
-          <Chips className="!mx-0 !px-4" options={TABS.map((f) => ({ value: f.key, label: t(f.labelKey) }))} value={tab} onChange={setTab} />
-        </div>
-      )}
+      </StickyTop>
 
       {busy ? (
         <div className="flex items-center justify-center py-16">

@@ -42,6 +42,7 @@ import { useSkeleton, useLoadTimeout } from '../components/Skeleton'
 import { activeEntriesOf, entriesOpen } from '../lib/tournamentSignup'
 import EventHero from '../components/event/EventHero'
 import EventFacts from '../components/event/EventFacts'
+import { daysAside, longDate, shortDay } from '../components/event/heroDates'
 import PublicInfo from '../components/tournament/PublicInfo'
 
 /** "9–11 out" quando é tudo no mesmo mês, "30 set – 2 out" quando não é. */
@@ -55,18 +56,7 @@ function dateRange(startIso, endIso, locale) {
   return `${a.getDate()} ${month(a)} – ${b.getDate()} ${month(b)}`
 }
 
-// «sábado, 17 de outubro» (o topo novo, R3).
-const longDate = (iso, locale) => new Date(`${iso}T12:00`).toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })
-// «15 out», no fuso de Lisboa.
-const shortDay = (when, locale) => new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', timeZone: 'Europe/Lisbon' }).format(new Date(when)).replace('.', '').replace(' de ', ' ')
-// Ao lado da hora grande: «sáb e dom», ou «sex a dom»; num dia só, nada.
-const daysAside = (startIso, endIso, locale, t) => {
-  if (!startIso || !endIso || startIso === endIso) return null
-  const wd = (iso) => new Date(`${iso}T12:00`).toLocaleDateString(locale, { weekday: 'short' }).replace('.', '')
-  const days = Math.round((new Date(`${endIso}T12:00`) - new Date(`${startIso}T12:00`)) / 86400000) + 1
-  return t(days === 2 ? 'tournament.hero_days_two' : 'tournament.hero_days_range', { a: wd(startIso), b: wd(endIso) })
-}
-
+// As datas do topo (R3): heroDates.js — aceitam data ou instante, e nunca rebentam.
 // As minhas inscrições ativas: activeEntriesOf (tournamentSignup.js).
 const activeEntries = activeEntriesOf
 const activeMy = (data) => activeEntries(data)[0] || null
@@ -347,7 +337,7 @@ export default function TournamentPage() {
   // O topo (R3): a hora da primeira categoria do primeiro dia, os dias ao
   // lado («sáb e dom»), e os quadrados de dados.
   const heroIn = ['validada', 'selecionada'].includes(activeMy(data)?.state)
-  const firstDayCats = categories.filter((c) => c.day_date && c.day_date === tour.starts_on && c.start_time)
+  const firstDayCats = categories.filter((c) => c.day_date && String(c.day_date).slice(0, 10) === String(tour.starts_on || '').slice(0, 10) && c.start_time)
   const heroTime = firstDayCats.length ? firstDayCats.map((c) => String(c.start_time).slice(0, 5)).sort()[0] : null
   const heroAside = daysAside(tour.starts_on, tour.ends_on, i18n.language, t)
   const totalSlots = categories.reduce((n, c) => n + (Number(c.slots) || 0), 0)
@@ -358,8 +348,8 @@ export default function TournamentPage() {
     { key: 'courts', label: t('tournament.fact_courts'), value: tour.court_count || null },
     { key: 'price', label: t('tournament.fact_price'), value: tour.entry_fee_cents ? t('tournament.fact_price_pair', { price: euros(tour.entry_fee_cents) }) : null },
     { key: 'tshirt', label: t('tournament.fact_tshirt'), value: shirt?.mode === 'gift' ? t('tournament.fact_tshirt_gift') : shirt?.mode === 'sale' ? t('tournament.fact_tshirt_sale', { price: euros(shirt.price_cents || 0) }) : null },
-    { key: 'deadline', label: t('tournament.fact_entries'), value: tour.entries_deadline ? t('tournament.fact_until', { date: shortDay(tour.entries_deadline, i18n.language) }) : null },
-    { key: 'draw', label: t('tournament.fact_draw'), value: tour.draw_on ? shortDay(`${tour.draw_on}T12:00:00`, i18n.language) : null },
+    { key: 'deadline', label: t('tournament.fact_entries'), value: shortDay(tour.entries_deadline, i18n.language) ? t('tournament.fact_until', { date: shortDay(tour.entries_deadline, i18n.language) }) : null },
+    { key: 'draw', label: t('tournament.fact_draw'), value: shortDay(tour.draw_on, i18n.language) },
   ]
 
   return (
@@ -376,7 +366,7 @@ export default function TournamentPage() {
         title={tour.name}
         time={heroTime}
         timeAside={heroAside}
-        dateLine={tour.starts_on ? longDate(tour.starts_on, i18n.language) : null}
+        dateLine={longDate(tour.starts_on, i18n.language)}
         onBack={goBack}
         onShare={tour.status === 'rascunho' ? null : shareTournament}
         status={{
