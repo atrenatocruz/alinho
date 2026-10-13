@@ -1084,7 +1084,10 @@ function AchievementMedal({ url, locked, name }) {
   )
 }
 
-export function AchievementCard({ achievementKey, category, rarity, earned = false, rarityPct = null, onOpen = null }) {
+// A cor do texto de cada raridade (coleção das conquistas; UX, 13 out).
+const RARITY_TEXT = { comum: '#0F9D8A', raro: '#2563EB', epico: '#7C3AED', lendario: '#B8860B' }
+
+export function AchievementCard({ achievementKey, category, rarity, earned = false, rarityPct = null, onOpen = null, compact = false }) {
   const { t, i18n } = useTranslation()
   const Icon = achievementIcon(achievementKey, category)
   const meta = RARITY_META[rarity] || RARITY_META.comum
@@ -1128,11 +1131,17 @@ export function AchievementCard({ achievementKey, category, rarity, earned = fal
         </span>
       )}
       <p className="mt-1.5 text-[12px] font-extrabold text-ink-900 leading-tight">{t(`achievements.${achievementKey}_name`)}</p>
-      <p className="mt-0.5 text-[10px] text-muted leading-tight">{t(`achievements.${achievementKey}_desc`)}</p>
-      <div className="mt-1.5 flex items-center justify-center gap-1.5">
-        <span className={`px-1.5 py-px rounded-full text-[9px] font-mono font-extrabold uppercase tracking-wide ${meta.pill}`}>
-          {t(meta.labelKey)}
-        </span>
+      {/* compact (Perfil, R7): sem a descrição; a raridade e, por baixo, a «% têm». */}
+      {!compact && <p className="mt-0.5 text-[10px] text-muted leading-tight">{t(`achievements.${achievementKey}_desc`)}</p>}
+      <div className={`mt-1.5 flex items-center justify-center ${compact ? 'flex-col gap-0.5' : 'gap-1.5'}`}>
+        {compact ? (
+          // A raridade na cor dela, sem pastilha, como na coleção (UX, R7).
+          <span className="text-[9px] font-mono font-extrabold uppercase tracking-wide" style={{ color: RARITY_TEXT[rarity] || RARITY_TEXT.comum }}>{t(meta.labelKey)}</span>
+        ) : (
+          <span className={`px-1.5 py-px rounded-full text-[9px] font-mono font-extrabold uppercase tracking-wide ${meta.pill}`}>
+            {t(meta.labelKey)}
+          </span>
+        )}
         {rarityPct != null && (
           <span className="text-[9px] text-muted tabular-nums">{t('achievements.rarity_pct', { pct: formatRarityPct(rarityPct, i18n.language) })}</span>
         )}

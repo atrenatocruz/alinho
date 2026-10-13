@@ -20,7 +20,9 @@ export function Crown({ ring = 72 }) {
   return (
     <img src={CROWN_SRC} alt="" aria-hidden="true" width={48 * s}
       className="pointer-events-none absolute z-[1] max-w-none drop-shadow-[0_3px_4px_rgba(4,4,4,0.25)]"
-      style={{ width: 48 * s, left: -15 * s, top: -34 * s, transform: 'rotate(-44deg)', transformOrigin: 'center' }} />
+      // A SPEC mede a partir da foto (64 px), e o anel fica 4 px para fora:
+      // aqui a caixa é a do anel, por isso −15/−34 passam a −11/−30.
+      style={{ width: 48 * s, left: -11 * s, top: -30 * s, transform: 'rotate(-44deg)', transformOrigin: 'center' }} />
   )
 }
 
@@ -65,7 +67,7 @@ function Spot({ row, place, big, value, isMe, freeHint, onOpen }) {
 export default function RankPodium({ spots, value, meId, freeHint = null, onOpen, onShare, id }) {
   const { t } = useTranslation()
   return (
-    <div id={id} className="card p-0 overflow-hidden">
+    <div id={id} className="rounded-card border border-line bg-white overflow-hidden">
       <div className="grid grid-cols-3 gap-2 px-3 pt-3 pb-4">
         {spots.map((row, i) => (
           <Spot key={i} row={row} place={i + 1} big={i === 0} value={value} isMe={!!row && (row.is_me || row.user_id === meId)} freeHint={freeHint} onOpen={onOpen} />

@@ -2,17 +2,17 @@ import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { User, Award, Trophy, LineChart, LogOut, Camera, HelpCircle, ThumbsUp, Trash2, Users, ChevronRight, ArrowLeft, Eye, X, Ticket } from 'lucide-react'
+import { User, Award, Trophy, LogOut, Camera, HelpCircle, ThumbsUp, Trash2, ChevronRight, ArrowLeft, Eye, X, Ticket } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { errorKind } from '../lib/errors'
 import { uploadAvatar, removeAvatar } from '../lib/avatarStorage'
 import { getMyPrivateMatches, getPublicRankings } from '../lib/privateMatches'
-import { positionOf } from '../lib/rankingScales'
+import { positionOf, rankedCount, scaleOf } from '../lib/rankingScales'
 import { getGroupMatches } from '../lib/groupMatches'
 import { KindTag } from '../components/agenda/EventCard'
 import { getFollowCounts } from '../lib/follows'
-import { PrimaryButton, GuestBadge, Avatar, EmptyState, RatingBadge, PhotoViewerModal, FollowListModal, AchievementCard, VoucherCard, VoucherQRModal, PageHeader, Tabs, ConfirmSheet } from '../components/ui'
+import { PrimaryButton, GuestBadge, Avatar, EmptyState, RatingBadge, PhotoViewerModal, FollowListModal, AchievementCard, VoucherQRModal, PageHeader, Tabs, ConfirmSheet, StickyTop } from '../components/ui'
 import { useHeaderActions } from '../contexts/HeaderActionsContext'
 import TeacherSection from '../components/TeacherSection'
 import DeleteAccountSection from '../components/DeleteAccountSection'
@@ -21,6 +21,7 @@ import { XP_TIERS, tierFromXp, preTierProgress, formatXp } from '../lib/xp'
 import { AGE_LABEL_KEY, ageCategory } from '../lib/ageCategories'
 import { formatDate as formatDateLib } from '../lib/formatDate'
 import { useFrameList, FrameAround, FrameTitle } from '../components/FrameBits'
+import VoucherTicket from '../components/vouchers/VoucherTicket'
 import { dayText } from '../components/friends/dayText'
 import { sortVouchersForWallet, shareVoucherContact, unshareVoucherContact } from '../lib/vouchers'
 import ShareContactSheet from '../components/vouchers/ShareContactSheet'
@@ -84,6 +85,8 @@ export default function Profile() {
   const frameList = useFrameList(isGuest ? null : profile?.id)
   const myFrame = frameList[0]?.frame || null
   const [globalRank, setGlobalRank] = useState(null)
+  // R7: a linha lima do ranking («6.º de 39 · Feminino · +64 este mês»).
+  const [rankInfo, setRankInfo] = useState(null)
   const [kudosTotal, setKudosTotal] = useState(0)
   const [trophyCatalog, setTrophyCatalog] = useState([])
   const [myTrophies, setMyTrophies] = useState([])
@@ -388,7 +391,15 @@ export default function Profile() {
       // ranking: só Masculino e Feminino, só depois do primeiro jogo, sem
       // contas de teste (Trello #422). Sem lugar → null.
       const data = await getPublicRankings()
-      setGlobalRank(positionOf(data.map((p) => ({ ...p, ranked: p.rating != null })), profile.id))
+      const rows = data.map((p) => ({ ...p, ranked: p.rating != null }))
+      const position = positionOf(rows, profile.id)
+      setGlobalRank(position)
+      const scale = scaleOf(profile.gender)
+      // Os pontos do mês, se a função do «Do mês» existir (#626).
+      let monthPts = null
+      const { data: month, error: monthErr } = await supabase.rpc('get_month_ranking', { p_organization_id: null, p_gender: scale === 'none' ? null : scale })
+      if (!monthErr) monthPts = (month || []).find((r) => r.is_me)?.points ?? null
+      setRankInfo(position ? { position, total: rankedCount(rows, scale), scale, monthPts } : null)
     } catch (error) {
       console.error('Error loading global points:', error)
     }
@@ -425,6 +436,12 @@ export default function Profile() {
     } finally {
       setUploadingPhoto(false)
     }
+  }
+
+  // «29 set», como no resto da app (UX, R7).
+  const shortDay = (date) => {
+    const d = new Date(date)
+    return `${d.getDate()} ${formatDateLib(d, i18n.language, { month: 'short' }).replace('.', '')}`
   }
 
   const formatMixDate = (dateString) =>
@@ -598,7 +615,7 @@ export default function Profile() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title={t('layout.nav_profile')}>{headerActions}</PageHeader>
+      <PageHeader sticky={false} title={t('layout.nav_profile')}>{headerActions}</PageHeader>
 
       {/* Hero — cartão claro. Aro de progresso à volta da foto (ideia do
           Renato, Trello, 11 set 2026) substitui a antiga barra horizontal de
@@ -606,7 +623,8 @@ export default function Profile() {
           quando ficavam empilhadas — agora só a de XP fica no painel de
           baixo, sozinha. O nível (M4/F4/N4) sobe para um crachá no topo do
           aro em vez de ficar em linha com os pontos. */}
-      <div className="card">
+      {/* R7: o cartão da pessoa, branco. */}
+      <div className="rounded-card border border-line bg-white p-4 shadow-card">
         <div className="flex items-start gap-4">
           {(() => {
             const bp = bandProgress(profile?.rating)
@@ -757,119 +775,28 @@ export default function Profile() {
         {/* Jogos · % Vitórias · Títulos */}
         <div className="mt-4 pt-3.5 border-t border-line grid grid-cols-3 divide-x divide-line text-center">
           <div className="px-1">
-            <p className="text-xl font-extrabold text-ink-900 tabular-nums leading-none">{stats?.game_wins || 0}/{gamesPlayed}</p>
-            <p className="mt-1 text-[11px] text-muted">{t('profile.stat_game_wins')}</p>
+            <p className="text-xl font-extrabold text-ink-900 tabular-nums leading-none">{gamesPlayed}</p>
+            <p className="mt-1 text-[11px] text-muted">{t('profile.r7_games')}</p>
           </div>
           <div className="px-1">
             <p className="text-xl font-extrabold text-ink-900 tabular-nums leading-none">{winRate}%</p>
-            <p className="mt-1 text-[11px] text-muted">{t('profile.card_winrate')}</p>
+            <p className="mt-1 text-[11px] text-muted">{t('profile.r7_wins')}</p>
           </div>
           <div className="px-1">
             <p className="text-xl font-extrabold text-ink-900 tabular-nums leading-none">{titles ?? stats?.mix_wins ?? 0}</p>
-            <p className="mt-1 text-[11px] text-muted">{t('profile.card_titles')}</p>
+            <p className="mt-1 text-[11px] text-muted">{t('profile.r7_titles')}</p>
           </div>
         </div>
       </div>
 
-      {/* Registar jogo + Ranking global — os dois cartões que Francisco
-          pediu com destaque desde o início desta iteração ("os cards não
-          estão iguais... o registar jogo tem de ter destaque e o ranking
-          global tb"). Ranking global reabre aqui (tinha saído por duplicar
-          o nº que ficava no canto do hero — agora esse nº mudou de sítio
-          para dentro deste cartão, já não há duplicação) e abre os
-          Rankings já na posição do próprio jogador. */}
-      {/* Com os jogos entre amigos desligados (interruptor no Gerir), a
-          página redireciona para a Home — por isso o cartão desaparece aqui
-          também, como já desaparecia na Home (bug do Francisco, 17 set). */}
-      <div className={`grid gap-2.5 ${isPrivateMatchesEnabled ? 'grid-cols-2' : 'grid-cols-1'}`}>
-        {isPrivateMatchesEnabled && (
-        <Link to="/jogos-privados" className="card press flex flex-col justify-between gap-2 min-h-[92px] bg-ink-900 text-white">
-          <Users size={20} className="text-lime-400" />
-          {/* min-h no título — "Jogo entre amigos" quebra para 2 linhas,
-              "Ranking global" cabe numa só; sem isto o subtítulo de cada
-              cartão começava a alturas diferentes (feedback do Francisco,
-              11 set 2026). */}
-          <div>
-            <p className="font-extrabold text-sm leading-tight min-h-[2.2em]">{t('home.friendly_match')}</p>
-            <p className="text-[10.5px] opacity-80 mt-0.5">{friendInvitesOn ? t('friends.profile_button_line') : t('home.friendly_match_subtitle')}</p>
-          </div>
-        </Link>
-        )}
-        <Link
-          to="/rankings"
-          state={{ tab: 'global', scrollToMe: true }}
-          className="card press flex flex-col justify-between gap-2 min-h-[92px] bg-lime-400 text-ink-900"
-        >
-          <LineChart size={20} />
-          <div>
-            <p className="font-extrabold text-sm leading-tight min-h-[2.2em]">{t('profile.ranking_cta_title')}</p>
-            <p className="text-[10.5px] opacity-80 mt-0.5 flex items-center gap-0.5">
-              {globalRank ? t('profile.ranking_cta_position', { position: globalRank }) : t('profile.ranking_cta_no_position')}
-              <ChevronRight size={12} />
-            </p>
-          </div>
-        </Link>
-      </div>
+      {/* R7: os separadores logo por baixo do cartão (antes estavam lá em baixo). */}
+      <StickyTop>
+        <Tabs value={tab} onChange={setTab} options={TABS.map((d) => ({ value: d.key, label: t(d.labelKey) }))} />
+      </StickyTop>
 
       {followListTab && (
         <FollowListModal userId={profile.id} initialTab={followListTab} onClose={() => setFollowListTab(null)} manageable />
       )}
-
-      {/* XP DE ATIVIDADE — painel separado, claro, sem iconografia de
-          ranking: envolvimento, não competição. O cartão inteiro abre a
-          explicação (antes era só o ícone (?), cujo popover ficava cortado
-          em ecrãs estreitos — feedback do Francisco, 11 set 2026). Abre
-          como um ecrã cheio com "Voltar" em vez de um popover pequeno. */}
-      {(() => {
-        const tier = tierFromXp(profile?.xp)
-        const progress = tier ?? preTierProgress(profile?.xp)
-        const missing = progress.nextMin != null ? progress.nextMin - (profile?.xp ?? 0) : null
-        return (
-          <button
-            type="button"
-            onClick={() => setXpHelpOpen(true)}
-            aria-label={t('profile.xp_help_aria')}
-            className="w-full text-left rounded-ctrl bg-ink-50 border border-line p-3"
-          >
-            <div className="flex items-center justify-between gap-2">
-              <p className="flex items-center gap-1.5 text-[9px] font-extrabold uppercase tracking-[0.18em] text-muted">
-                {t('profile.card_xp_heading')}
-                <HelpCircle size={10} className="text-muted/60" />
-              </p>
-              {/* Kudos vivem aqui e não no cartão de ranking: alimentam o
-                  XP e são envolvimento, não resultado. */}
-              {kudosTotal > 0 && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-ink-700 tabular-nums">
-                  <ThumbsUp size={11} className="text-lime-600" /> {kudosTotal} {t('profile.stat_kudos')}
-                </span>
-              )}
-            </div>
-            <div className="mt-2 flex items-center justify-between text-[11px] font-extrabold text-ink-900">
-              <span>
-                {tier
-                  ? `${t('profile.xp_level', { level: tier.level })} · ${t(tier.labelKey)}`
-                  : t('profile.xp_no_shield')}
-              </span>
-              <span className="tabular-nums">
-                {progress.nextMin != null
-                  ? t('profile.xp_progress', { current: formatXp(profile?.xp), next: formatXp(progress.nextMin) })
-                  : `${formatXp(profile?.xp)} XP`}
-              </span>
-            </div>
-            <div className="mt-1.5 flex items-center gap-2">
-              <div className="flex-1 h-1.5 rounded-full bg-ink-200/50 overflow-hidden">
-                <div className="h-full rounded-full bg-lime-400" style={{ width: `${progress.progressPct}%` }} />
-              </div>
-              <span className="text-[10px] text-muted tabular-nums shrink-0">{progress.progressPct}%</span>
-            </div>
-            {missing != null && missing > 0 && (
-              <p className="mt-1 text-[10px] text-muted">
-                {t('profile.card_xp_missing', { missing: formatXp(missing) })}
-              </p>
-            )}
-          </button>
-        )
-      })()}
 
       {/* Ecrã cheio da explicação de XP — substitui o antigo popover do (?),
           que ficava cortado nas larguras estreitas. Mesmo conteúdo de
@@ -924,7 +851,6 @@ export default function Profile() {
         </div>
       )}
 
-      <Tabs value={tab} onChange={setTab} options={TABS.map((d) => ({ value: d.key, label: t(d.labelKey) }))} />
 
       {/* Voucher usado (parte 2 das janelas, 2 out): fora dos separadores, para abrir em qualquer um. */}
       <ConfirmSheet open={!!markingVoucher} title={t('dialogs.voucher_title')} message={t('dialogs.voucher_message')}
@@ -938,15 +864,104 @@ export default function Profile() {
 
       {tab === 'perfil' && (
         <>
-        {/* Entrada para jogos entre amigos: agora um dos dois cards em
-            destaque logo abaixo do hero (ver acima) — não repetir aqui. */}
+        {/* R7 (13 out): o ranking numa linha lima, que abre os Rankings já na
+            tua posição. */}
+        <Link to="/rankings" state={{ tab: 'global', scrollToMe: true }}
+          className="press flex items-center gap-3 rounded-card bg-lime-400 px-3.5 py-3 text-ink-900">
+          <span className="flex h-10 min-w-[40px] shrink-0 items-center justify-center rounded-ctrl bg-ink-900 px-1.5 font-display text-base font-extrabold text-lime-400 tabular-nums">
+            {rankInfo ? `${rankInfo.position}.º` : '—'}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-extrabold leading-tight">{t('rankings.title_global')}</span>
+            <span className="block truncate text-xs">
+              {rankInfo
+                ? [t('profile.r7_rank_line', { position: rankInfo.position, total: rankInfo.total }), t(`rankings.scale_${rankInfo.scale}`), rankInfo.monthPts != null ? t('month.points_this_month', { points: rankInfo.monthPts > 0 ? `+${rankInfo.monthPts}` : String(rankInfo.monthPts) }) : null].filter(Boolean).join(' · ')
+                : t('profile.ranking_cta_no_position')}
+            </span>
+          </span>
+          <ChevronRight size={18} className="shrink-0" />
+        </Link>
+
+        {/* «Jogo entre amigos» com a imagem do Alino com o amigo (R0) e o
+            botão preto a toda a largura. Desligado no Gerir → não aparece. */}
+        {isPrivateMatchesEnabled && (
+          <div className="overflow-hidden rounded-card border border-line bg-white">
+            <img src="/topo/topo-amigos.webp" alt="" className="block h-32 w-full object-cover bg-[#2A2E35]"
+              onError={(e) => { e.currentTarget.style.display = 'none' }} />
+            <div className="p-3.5">
+              <p className="font-display text-lg font-extrabold text-ink-900">{t('home.friendly_match')}</p>
+              <p className="mt-0.5 text-sm text-muted">{friendInvitesOn ? t('friends.profile_button_line') : t('profile.r7_friends_line')}</p>
+              <Link to="/jogos-privados" className="mt-3 flex min-h-[48px] w-full items-center justify-center rounded-ctrl bg-ink-900 px-4 font-extrabold text-white">
+                {t('profile.r7_friends_cta')}
+              </Link>
+            </div>
+          </div>
+        )}
+
+      {/* XP DE ATIVIDADE — painel separado, claro, sem iconografia de
+          ranking: envolvimento, não competição. O cartão inteiro abre a
+          explicação (antes era só o ícone (?), cujo popover ficava cortado
+          em ecrãs estreitos — feedback do Francisco, 11 set 2026). Abre
+          como um ecrã cheio com "Voltar" em vez de um popover pequeno. */}
+      {(() => {
+        const tier = tierFromXp(profile?.xp)
+        const progress = tier ?? preTierProgress(profile?.xp)
+        const missing = progress.nextMin != null ? progress.nextMin - (profile?.xp ?? 0) : null
+        return (
+          <button
+            type="button"
+            onClick={() => setXpHelpOpen(true)}
+            aria-label={t('profile.xp_help_aria')}
+            className="w-full text-left rounded-card bg-white border border-line p-3.5"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <p className="flex items-center gap-1.5 text-[9px] font-extrabold uppercase tracking-[0.18em] text-muted">
+                {t('profile.card_xp_heading')}
+                <HelpCircle size={10} className="text-muted/60" />
+              </p>
+              {/* Kudos vivem aqui e não no cartão de ranking: alimentam o
+                  XP e são envolvimento, não resultado. */}
+              {kudosTotal > 0 && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-ink-700 tabular-nums">
+                  <ThumbsUp size={11} className="text-lime-600" /> {kudosTotal} {t('profile.stat_kudos')}
+                </span>
+              )}
+            </div>
+            <div className="mt-2 flex items-center justify-between text-[11px] font-extrabold text-ink-900">
+              <span>
+                {tier
+                  ? `${t('profile.xp_level', { level: tier.level })} · ${t(tier.labelKey)}`
+                  : t('profile.xp_no_shield')}
+              </span>
+              <span className="tabular-nums">
+                {progress.nextMin != null
+                  ? t('profile.xp_progress', { current: formatXp(profile?.xp), next: formatXp(progress.nextMin) })
+                  : `${formatXp(profile?.xp)} XP`}
+              </span>
+            </div>
+            <div className="mt-1.5 flex items-center gap-2">
+              <div className="flex-1 h-1.5 rounded-full bg-ink-200/50 overflow-hidden">
+                <div className="h-full rounded-full bg-lime-400" style={{ width: `${progress.progressPct}%` }} />
+              </div>
+              <span className="text-[10px] text-muted tabular-nums shrink-0">{progress.progressPct}%</span>
+            </div>
+            {missing != null && missing > 0 && (
+              <p className="mt-1 text-[10px] text-muted">
+                {t('profile.card_xp_missing', { missing: formatXp(missing) })}
+              </p>
+            )}
+          </button>
+        )
+      })()}
+
+
 
         {/* Estante de troféus — 4 recentes à Strava; expandir mostra a
             grelha completa por categoria, incluindo bloqueados (o critério
             fica visível — é o "para onde subir"). Fail-soft: sem dados
             (migração por correr), sem secção. */}
         {trophyCatalog.length > 0 && (
-          <div className="card">
+          <div className="rounded-card border border-line bg-white p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-lg text-ink-900 flex items-center gap-2">
                 <Award size={20} className="text-lime-600" /> {t('achievements.shelf_title')}
@@ -965,9 +980,10 @@ export default function Profile() {
               myTrophies.length === 0 ? (
                 <p className="text-sm text-muted">{t('achievements.empty_own')}</p>
               ) : (
-                <div className="grid grid-cols-2 gap-2">
-                  {myTrophies.slice(0, 4).map((tr) => (
-                    <AchievementCard key={tr.achievement_key} achievementKey={tr.achievement_key} category={tr.category} rarity={tr.rarity} earned rarityPct={tr.rarity_pct}
+                // R7: grelha de 3, com a «% têm» em cada uma.
+                <div className="grid grid-cols-3 gap-2">
+                  {myTrophies.slice(0, 6).map((tr) => (
+                    <AchievementCard key={tr.achievement_key} achievementKey={tr.achievement_key} category={tr.category} rarity={tr.rarity} earned rarityPct={tr.rarity_pct} compact
                       onOpen={() => setTrophyOpen(tr.achievement_key)} />
                   ))}
                 </div>
@@ -1107,15 +1123,19 @@ export default function Profile() {
             />
           ) : (
             <div className="space-y-3">
-              {sortVouchersForWallet(vouchers).map((v) => (
+              {sortVouchersForWallet(vouchers).map((v, i, all) => (
                 <div key={v.id}>
-                <VoucherCard
+                {/* «Já usados» por cima do primeiro usado (R7). */}
+                {v.status === 'usado' && all[i - 1]?.status !== 'usado' && (
+                  <p className="mb-2 mt-4 font-mono text-[11px] font-bold uppercase tracking-widest text-muted">{t('vouchers.r7_used_heading')}</p>
+                )}
+                <VoucherTicket
                   prizeText={v.game?.prize || ''}
                   gameTitle={v.game?.title || ''}
-                  gameDate={v.game?.date ? formatDateLib(v.game.date, i18n.language, { day: '2-digit', month: 'short', year: 'numeric' }) : ''}
+                  gameDate={v.game?.date ? shortDay(v.game.date) : ''}
                   organizationName={v.game?.organization?.name || ''}
                   status={v.status}
-                  usedAtLabel={v.used_at ? formatDateLib(v.used_at, i18n.language, { day: '2-digit', month: 'short', year: 'numeric' }) : ''}
+                  usedAtLabel={v.used_at ? shortDay(v.used_at) : ''}
                   onMarkUsed={() => handleMarkVoucherUsed(v.id)}
                   onShowQR={() => handleShowVoucherQR(v)}
                   needsConsent={voucherConsent && v.status === 'por_usar' && !v.contact_shared_at}

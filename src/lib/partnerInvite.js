@@ -62,6 +62,19 @@ export async function getPartnerInvite(token) {
   return data || null
 }
 
+/** O estado de um link de convite, sem sessão e sem dados de ninguém
+ *  (Dev 3, invite_link_status): 'pending' | 'claimed' | 'expired' |
+ *  'not_found'. kind: 'mix' | 'tournament' | 'friends'. null se a função
+ *  ainda não existir ou falhar — a página fica como antes. */
+export async function getInviteLinkStatus(kind, token) {
+  const { data, error } = await supabase.rpc('invite_link_status', { p_kind: kind, p_token: token })
+  if (error) {
+    if (!(error.code === 'PGRST202' || /invite_link_status/.test(error.message || ''))) console.error('Error reading invite link status:', error)
+    return null
+  }
+  return data || null
+}
+
 export async function claimPartnerInvite(token) {
   const { data, error } = await supabase.rpc('claim_partner_invite', { p_token: token })
   if (error) throw error
