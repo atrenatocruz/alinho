@@ -1780,7 +1780,12 @@ const TABLE_MOCKS = {
       matches_won: 4 - Math.floor(i / 2), matches_played: 4, mix_won: i < 2,
       rating_delta: [18, 18, 9, 9, -6, -6, -14, -14][i], rating_after: 1700 - i * 40, points_earned: 20 - i * 2,
     })) : []),
-  teams: (url) => (agenda() && url.includes('ag-winner') ? AGENDA_WINNER_TEAMS() : AM_FINAL() ? AMERICANO_FINAL_TEAMS() : ['live', 'finished', 'paused', 'ready'].includes(eventState()) ? EV_TEAMS : rotating() ? ROT_TEAMS : []),
+  teams: (url) => (agenda() && url.includes('ag-winner') ? AGENDA_WINNER_TEAMS() : AM_FINAL() ? AMERICANO_FINAL_TEAMS() : ['live', 'finished', 'paused', 'ready'].includes(eventState())
+    // mockEvGuest = 'true': o 2.º da última dupla é um convidado sem conta (13 out).
+    ? (localStorage.getItem('mockEvGuest') === 'true'
+      ? EV_TEAMS.map((tm, i, all) => (i === all.length - 1 ? { ...tm, player2_id: null, player2: null, player2_guest_id: 'g-ev', guest2: { id: 'g-ev', name: 'Zé Convidado' } } : tm))
+      : EV_TEAMS)
+    : rotating() ? ROT_TEAMS : []),
   participants: () => (eventState() ? EV_PARTICIPANTS() : []),
   matches: () => (['live', 'finished'].includes(eventState()) ? EV_MATCHES() : rotating() ? ROT_MATCHES_FN() : []),
   // Mix em aberto — 1 dupla já confirmada, a segunda por preencher (2 de 4

@@ -41,7 +41,7 @@ import Alino from '../components/Alino'
 import { openGameWinners } from '../lib/openGameWinners'
 import TournamentShareFlow from '../components/tournament/TournamentShareFlow'
 import { bakeCircle } from '../components/tournament/TournamentShareCard'
-import { duplasWinners, americanoWinners } from '../lib/mixWinners'
+import { duplasWinners, americanoWinners, rotatingWinners } from '../lib/mixWinners'
 import JoinPartnerSheet from '../components/mix/JoinPartnerSheet'
 import { Sheet } from '../components/agenda/AgendaControls'
 import { whatsappLookalikeInGame, rememberWhatsappGuest, rememberedWhatsappGuest } from '../lib/whatsappGuest'
@@ -2887,6 +2887,10 @@ export default function GameDetails() {
       const other = decided ? teamById[decided.team_a_id === winner.id ? decided.team_b_id : decided.team_a_id] : null
       return openGameWinners({ winner, other, match: decided, myId, record: overallRecord, game, org: winnersOrg, t, lang: i18n.language })
     }
+    // Pares quebrados: o pódio é por pessoa, pelo placar (QA, 13 out).
+    if (isRotating && placarResult.length > 0) {
+      return rotatingWinners({ placar: placarResult, myId, game, org: winnersOrg, t, lang: i18n.language })
+    }
     if (game.winner_team_id) {
       const winnerTeam = teamById[game.winner_team_id]
       if (!winnerTeam) return null
@@ -3049,7 +3053,8 @@ export default function GameDetails() {
           url={shareUrl}
           onClose={() => setShowShare(false)}
           imageCard={{
-            variant: !isAmericano && game.status === 'finished' && shareDuplas.length > 0 ? 'podium' : 'invite',
+            // Pares quebrados: as duplas não dizem o pódio (é por pessoa) — fica o convite.
+            variant: !isAmericano && !isRotating && game.status === 'finished' && shareDuplas.length > 0 ? 'podium' : 'invite',
             game,
             people,
             capacity,
@@ -3470,7 +3475,7 @@ export default function GameDetails() {
       )}
 
       {/* Estatísticas do mix — classificação final por pontos */}
-      {game.status === 'finished' && finishedTab === 'stats' && mixStats.length > 0 && (() => {
+      {game.status === 'finished' && finishedTab === 'stats' && (mixStats.length > 0 || (isRotating && placarResult.length > 0)) && (() => {
         // A linha de um jogador, partilhada pelas duas vistas: avatar com a
         // pill NOVO (como no ranking e nas listas de participantes), nome +
         // nível + 🏆, jogos/% e, à direita, o delta + rating do mix.
@@ -3518,7 +3523,8 @@ export default function GameDetails() {
                 <div className="text-right shrink-0">
                   {hasRating ? (
                     <p className="flex items-center justify-end gap-1.5">
-                      <span className={`text-xs font-extrabold tabular-nums ${s.rating_delta >= 0 ? 'text-ok' : 'text-danger'}`}>
+                      {/* Os pontos que descem a cinzento, nunca a vermelho (UX, 13 out — como nos Rankings). */}
+                      <span className={`text-xs font-extrabold tabular-nums ${s.rating_delta >= 0 ? 'text-ok' : 'text-muted'}`}>
                         {s.rating_delta >= 0 ? '+' : ''}{Math.round(s.rating_delta)}
                       </span>
                       {s.rating_after != null && (
@@ -3568,6 +3574,50 @@ export default function GameDetails() {
                           isGuest: member.isGuest || !!personById[member.id]?.is_guest,
                           won,
                         }))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : isRotating && placarResult.length > 0 ? (
+              // Pares quebrados (PO e QA, 13 out): a lista segue a
+              // Classificação por pessoa, com o lugar partilhado do pódio; quem
+              // não tem conta entra a cinzento, «sem conta» — nunca some.
+              <div className="space-y-1.5">
+                {placarResult.map((r, i, all) => {
+                  const place = r.hasResult ? all.findIndex((x) => x.hasResult && x.court === r.court && x.wonLast === r.wonLast) + 1 : i + 1
+                  const s = statsByUser[r.player.id]
+                  const won = place === 1
+                  return (
+                    <div key={r.player.id} className="flex items-center gap-3 py-2 border-b border-line last:border-0">
+                      <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-extrabold tabular-nums shrink-0 ${
+                        won ? 'bg-ink-900 text-white' : 'bg-ink-50 text-ink-700'
+                      }`}>
+                        {place}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        {s && !r.player.no_account ? statsPlayerRow({
+                          id: r.player.id,
+                          name: s.user?.name || r.player.name,
+                          avatarUrl: personById[r.player.id]?.avatar_url,
+                          isGuest: !!isGuestById[r.player.id],
+                          won,
+                        }) : (
+                          // Sem conta (UX, 13 out): tudo a cinzento, a mesma linha das
+                          // outras pessoas por baixo do nome e nada à direita (sem ranking).
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <span className="opacity-50 grayscale"><Avatar name={r.player.name} url={null} size="w-10 h-10 text-sm" /></span>
+                            <div className="min-w-0 flex-1">
+                              <p className="flex items-center gap-1.5 min-w-0 font-extrabold text-muted">
+                                <span className="truncate min-w-0">{firstLastName(r.player.name)}</span>
+                                {won && <span className="shrink-0">🏆</span>}
+                              </p>
+                              <p className="text-[11px] text-muted">
+                                {t('gamedetails.americano_no_account')} · {r.wins}/{r.played} {t('gamedetails.games_suffix')} • {winRatePct(r.wins, r.played)}% {t('gamedetails.win_rate_suffix')}
+                              </p>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )

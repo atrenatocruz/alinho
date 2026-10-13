@@ -82,6 +82,53 @@ export function americanoWinners({ standings, firsts, myId, game, org, t, lang }
   }
 }
 
+/** Sobe e desce com pares que trocam (pares quebrados, 12 out): o pódio é
+ *  por pessoa, pela ordem do placar (rotatingPlacar). Os dois que acabaram no
+ *  mesmo campo com o mesmo resultado partilham o lugar — «1.º Bruno L. /
+ *  Carla L.», «3.º …» (escolha A do Francisco). Antes ia pelas duplas da
+ *  1.ª ronda (QA, 13 out). `placar`: o rotatingPlacar do fim. */
+export function rotatingWinners({ placar, myId, game, org, t, lang }) {
+  if (!placar?.length) return null
+  const placeOf = (s, i) => (s.hasResult ? placar.findIndex((x) => x.hasResult && x.court === s.court && x.wonLast === s.wonLast) + 1 : i + 1)
+  const groups = []
+  placar.forEach((s, i) => {
+    const place = placeOf(s, i)
+    const g = groups.find((x) => x.place === place)
+    if (g) g.people.push(s)
+    else groups.push({ place, people: [s] })
+  })
+  const names = (g) => g.people.map((s) => shortName(s.player.name)).join(' / ')
+  const hasMe = (g) => !!myId && g.people.some((s) => s.player.id === myId)
+  const titleOf = (place, list) => (place <= 3 ? t(list[place - 1]) : null)
+  const rows = groups.slice(0, 3).map((g) => ({ place: g.place, name: names(g), short: titleOf(g.place, SHORT_TITLES), mine: hasMe(g) }))
+  const mine = groups.find(hasMe)
+  const meRow = mine?.people.find((s) => s.player.id === myId)
+  const place = mine ? mine.place : null
+  const record = meRow ? { won: meRow.wins || 0, played: meRow.played || 0 } : null
+  const partnerName = String(mine?.people.find((s) => s.player.id !== myId)?.player?.name || '').trim()
+  const partner = /\d$/.test(partnerName) ? partnerName : partnerName.split(/\s+/)[0] || ''
+  return {
+    winner: names(groups[0]),
+    rows,
+    share: {
+      variant: 'podium',
+      data: {
+        kicker: t('mixwinners.kicker_mix'),
+        date: shortDate(game.date, lang),
+        place,
+        title: !place ? t('mixwinners.winners_title') : place <= 3 ? t('tshare.place', { n: place }) : null,
+        rows: [
+          ...groups.slice(0, 3).map((g) => ({ place: g.place, pair: names(g), title: titleOf(g.place, TITLES), mine: hasMe(g) && place <= 3 })),
+          ...(place > 3 ? [{ place, pair: names(mine), title: null, mine: true }] : []),
+        ],
+        record: record && record.won > 0 ? t('mixwinners.record_mix', { won: record.won, played: record.played }) : null,
+      },
+      text: suggested(t, { place, partner, mix: game.title, record, solo: !partner, winners: names(groups[0]) }),
+      filenameParts: [org?.name, game.title, place ? `${place}o-lugar` : 'vencedores'],
+    },
+  }
+}
+
 function suggested(t, { place, partner, mix, record, solo, winners }) {
   // O título pode vir com espaços no fim («Viva »): sem isso, «o Viva !» (QA, 12 out).
   const v = { partner, mix: String(mix || '').trim(), won: record?.won ?? 0, played: record?.played ?? 0, winners }
