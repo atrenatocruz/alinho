@@ -715,7 +715,7 @@ const RPC_MOCKS = {
         // mockFriendPeople = '4' (sem o Zé) | '6' (mais a Marta): formar as equipas com 4 e com 6.
         ...(mode === 'left' || localStorage.getItem('mockFriendPeople') === '4' ? [] : [{ invitee_id: 'i-g1', user_id: null, name: 'Zé Pinto', avatar_url: null, rating: null, gender: null, status: 'guest', is_guest: true, is_creator: false, guest_email_sent: true }]),
         ...(localStorage.getItem('mockFriendPeople') === '6' ? [inv('u-mr', 'Marta Rocha', 1250, 'accepted', { gender: 'feminino' })] : []),
-        ...(creatorIsMe ? [] : [inv(me, 'Admin (Dev)', 1450, 'pending')]),
+        ...(creatorIsMe ? [] : [inv(me, 'Admin (Dev)', 1450, localStorage.getItem('mockInviteGoing') ? 'accepted' : 'pending')]),
       ],
       // Com tempo (27 set): 5 jogos, o 1 já com resultado, o 2 por começar
       // ('timed') ou a decorrer há 7:20 ('running').
@@ -802,7 +802,9 @@ const RPC_MOCKS = {
   ] : []),
   list_my_friend_match_invites: () => (['invited', 'invited_results'].includes(localStorage.getItem('mockFriendSession'))
     ? [{ match_id: 'fs-1', creator_name: 'Rita Figueira', scheduled_date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), scheduled_time: '10:00:00', location: 'Clube Exemplo', people: 6,
-      teams_set: localStorage.getItem('mockFriendSession') === 'invited_results', results_with_me: localStorage.getItem('mockFriendSession') === 'invited_results' ? 3 : 0 }] : []),
+      teams_set: localStorage.getItem('mockFriendSession') === 'invited_results', results_with_me: localStorage.getItem('mockFriendSession') === 'invited_results' ? 3 : 0,
+      // mockInviteGoing = 'true' | 'creator': já disse «Vou», sem equipas (13 out).
+      my_status: localStorage.getItem('mockInviteGoing') ? 'accepted' : 'pending', is_creator: localStorage.getItem('mockInviteGoing') === 'creator' }] : []),
   // «O fim» (Dev 3, 10 out): mockFriendList = 'true' — a lista nova, com
   // finished_at, ranking_state, pairs e live (SPEC amigos-o-fim, ponto 8).
   list_my_friend_sessions: () => (localStorage.getItem('mockFriendList') === 'true' ? (() => {
@@ -1418,7 +1420,8 @@ const monthRankingRows = () => {
   if (mode === 'off') return { __error: 'Could not find the function', __code: 'PGRST202' }
   if (mode === 'empty') return []
   const row = (i, [name, gender, rating, points, games, wins], extra = {}) => ({
-    place: i + 1, user_id: `month-${i}`, name, avatar_url: null, rating, gender, points, games, wins, qualified: true, is_me: false, frame: null, ...extra,
+    place: i + 1, user_id: `month-${i}`, name, avatar_url: null, rating, gender, points, games, wins, qualified: true, is_me: false,
+    frame: framesOff() ? null : (MOCK_FRAMES[`month-${i}`]?.find((f) => f.best)?.frame || null), ...extra,
   })
   const me = (extra) => ({ user_id: MOCK_ADMIN_USER_ID, name: 'Admin (Dev)', avatar_url: null, rating: 1605, gender: 'masculino', wins: 2, is_me: true, frame: null, ...extra })
   if (mode === 'few') {
@@ -1461,6 +1464,24 @@ RPC_MOCKS.get_my_played_history = () => (playedOff() ? { __error: 'Could not fin
   ],
 })
 RPC_MOCKS.get_player_titles = () => (playedOff() ? { __error: 'Could not find the function', __code: 'PGRST202' } : { mixes: 1, tournaments: 1, total: 2 })
+
+// Molduras do pódio do mês (#626). localStorage.mockFrames = 'off' → sem
+// moldura nenhuma; por omissão, o Admin (Dev) tem a de ouro do Dev Org e
+// também a de prata do geral (para «tocar na moldura mostra todas»), e
+// alguns do ranking do mês têm prata e bronze.
+const framesOff = () => localStorage.getItem('mockFrames') === 'off'
+const MOCK_FRAMES = {
+  [MOCK_ADMIN_USER_ID]: [
+    { frame: 'ouro', place: 1, organization_id: 'dev-org', scope_name: 'Dev Org', month: '2026-09-01', best: true },
+    { frame: 'prata', place: 2, organization_id: null, scope_name: null, month: '2026-09-01', best: false },
+  ],
+  'month-1': [{ frame: 'prata', place: 2, organization_id: null, scope_name: null, month: '2026-09-01', best: true }],
+  'month-4': [{ frame: 'bronze', place: 3, organization_id: 'dev-org', scope_name: 'Dev Org', month: '2026-09-01', best: true }],
+  'month-6': [{ frame: 'ouro', place: 1, organization_id: 'smash', scope_name: 'Smash Padel Almada', month: '2026-09-01', best: true }],
+}
+RPC_MOCKS.get_user_frames = ({ p_user_ids = [] } = {}) => (framesOff() ? [] : p_user_ids
+  .filter((id) => MOCK_FRAMES[id]).map((id) => ({ user_id: id, ...MOCK_FRAMES[id].find((f) => f.best) })))
+RPC_MOCKS.get_user_frame_list = ({ p_user_id } = {}) => (framesOff() ? [] : (MOCK_FRAMES[p_user_id] || []))
 
 const TABLE_MOCKS = {
   // localStorage.mockScorekeeper = 'true': quem entra é marcador deste mix (29 set).

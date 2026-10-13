@@ -1293,7 +1293,15 @@ export default function GameDetails() {
           throw new Error(t('gamedetails.error_americano_too_many_players', { count: players.length, courts: game.num_courts || 1 }))
         }
         const numRounds = totalRounds(game)
-        const schedule = generateAmericanoSchedule(players, numCourts, numRounds, pointsById, { mode: game.pairing_mode || 'por_nivel' })
+        // A regra dos últimos 4 mixes em todas as rondas (12 out).
+        const historyPairs = await loadRepeatPairKeys()
+        const schedule = generateAmericanoSchedule(players, numCourts, numRounds, pointsById, { mode: game.pairing_mode || 'por_nivel', historyPairs })
+        // Sem outra forma: junta na mesma e avisa quem organiza (a tira amarela).
+        setRoundRepeatNotice(schedule.forcedHistory?.length
+          ? t('gamedetails.repeat_forced_round', {
+            pairs: schedule.forcedHistory.map(([x, y]) => t('gamedetails.repeat_pair', { a: shortPersonName(x?.name), b: shortPersonName(y?.name) })).join('; '),
+          })
+          : '')
 
         // Flatten every round's duplas into one teams-insert payload,
         // tracking which (round, court, side) each row belongs to so the

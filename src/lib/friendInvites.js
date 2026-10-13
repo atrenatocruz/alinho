@@ -21,7 +21,10 @@ function startsAtOf(date, time) {
 }
 
 /**
- * Um evento da Home por convite por responder. `detail` é o get_friend_match
+ * Um evento da Home por convite por responder, ou por jogo aceite que ainda
+ * não tem equipas (my_status 'accepted' — QA e Dev 3, 13 out: sem isto o jogo
+ * desaparecia da Home depois do «Vou»; com equipas entra pelo
+ * get_my_private_matches). `detail` é o get_friend_match
  * (pode faltar: fica o que o convite traz). Um jogo que já acabou não entra
  * (o convite fica sem efeito, SPEC ponto 4).
  */
@@ -33,7 +36,11 @@ export function eventFromFriendInvite(invite, detail = null, orgsById = new Map(
   const orgId = m.organization_id || null
   const org = orgId ? orgsById.get(orgId) : null
   const invitees = (detail?.invitees || []).filter((i) => i.status !== 'declined')
-  const accepted = invitees.filter((i) => i.status === 'accepted')
+  // Quem já tem lugar: quem aceitou e os convidados sem conta (status
+  // 'guest'), como na lista «Jogos entre amigos» — um convidado sem conta
+  // não é um lugar vazio (UX, 13 out).
+  const accepted = invitees.filter((i) => i.status === 'accepted' || i.status === 'guest')
+  const going = invite.my_status === 'accepted'
   return {
     key: `friend_invite:${invite.match_id}`,
     source: 'friend_invite',
@@ -48,11 +55,14 @@ export function eventFromFriendInvite(invite, detail = null, orgsById = new Map(
     orgSlug: m.organization_slug || null,
     orgLogo: org?.logo || null,
     mine: true,
-    myState: 'invited',
+    myState: going ? 'in' : 'invited',
     finished: false,
     raw: {
       creatorName: invite.creator_name || m.creator_name || '',
       creatorFirst: firstName(invite.creator_name || m.creator_name),
+      isCreator: invite.is_creator === true,
+      // Quem ainda não respondeu (para «Faltam N pessoas por responder»).
+      pending: invitees.filter((i) => i.status === 'pending').length,
       location: invite.location || m.location || '',
       ranked: m.ranked_intent ?? null,
       accepted: accepted.map((i) => ({ id: i.user_id || i.invitee_id, name: i.name, avatar_url: i.avatar_url })),

@@ -29,3 +29,22 @@ describe('«marcado por» (2 out)', () => {
     expect(shortPersonName('')).toBe('')
   })
 })
+
+describe('nome curto com número (12 out, igual ao live_short_name do Dev 3)', () => {
+  it.each([
+    ['Teste Xico 1', 'Teste X. 1'],
+    ['Teste 2', 'Teste 2'],
+    ['QA Viva 01', 'QA V. 01'],
+    ['Ana Costa', 'Ana C.'],
+    ['Francisco (QA)', 'Francisco'],
+    ['Francisco Barros (superadmin)', 'Francisco B.'],
+    ['Rita (F3)', 'Rita'],
+    ['Ana 2 Costa', 'Ana C.'],
+    ['ana costa', 'ana C.'],
+    ['123', '123'],
+    ['(QA)', '(QA)'],
+    ['', ''],
+  ])('%s → %s', (name, short) => {
+    expect(shortPersonName(name)).toBe(short)
+  })
+})

@@ -14,6 +14,7 @@ import { formatDate } from '../lib/formatDate'
 import { listFollowers, listFollowing, removeFollower, unfollowPlayer } from '../lib/follows'
 import { describeError } from '../lib/errors'
 import Alino from './Alino'
+import { frameInsideBox, frameSrc } from '../lib/frames'
 
 /* ─── Date fields ────────────────────────────────────────────────────────
    Native <input type=date/datetime-local> pickers open reliably on iOS
@@ -852,7 +853,7 @@ export function GuestBadge({ size = 'sm', label, isTest = false }) {
    Default null = sem escudo, todos os call sites existentes intactos.
    Call sites que já passam um ring próprio no `size` (PlayerAvatarRow)
    não devem passar `xp` — dois rings sobrepõem-se. */
-export function Avatar({ name, url, size = 'w-10 h-10 text-sm', colorClass = 'bg-ink-700 text-white', provisional = false, shape = 'round' }) {
+export function Avatar({ name, url, size = 'w-10 h-10 text-sm', colorClass = 'bg-ink-700 text-white', provisional = false, shape = 'round', frame = null }) {
   // Nota: o aro de XP que aqui viveu foi removido a pedido do Ruben —
   // criava confusão com o ranking. O nível de XP mostra-se no painel do
   // perfil, no tab Assiduidade e nos troféus; no avatar só fica a pill
@@ -870,6 +871,13 @@ export function Avatar({ name, url, size = 'w-10 h-10 text-sm', colorClass = 'bg
     ? <img src={url} alt={name || ''} className={`${base} object-cover object-[50%_30%]`} />
     : <div className={`${base} ${colorClass}`}>{(name || '?').charAt(0).toUpperCase()}</div>
 
+  // Moldura do pódio do mês (design-handoff/2026-10-12-molduras-podio): cabe
+  // na mesma caixa da foto, e a foto encolhe para o buraco do meio — nada
+  // muda de sítio. `frame` = 'ouro' | 'prata' | 'bronze' (ou a linha da
+  // get_user_frames). Se a imagem não carregar, fica a foto sozinha.
+  const frameKind = typeof frame === 'string' ? frame : frame?.frame
+  if (frameKind && shape !== 'square') return <FramedAvatar kind={frameKind} name={name} url={url} size={size} colorClass={colorClass} />
+
   // Jogador provisório (<8 jogos de Elo): mini-pill "NOVO" sobre a borda
   // inferior — só quando pedido, para não mudar o layout dos ~40 call
   // sites existentes.
@@ -880,6 +888,21 @@ export function Avatar({ name, url, size = 'w-10 h-10 text-sm', colorClass = 'bg
       <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-px rounded-full bg-lime-400 text-ink-900 text-[8px] leading-tight font-mono font-extrabold tracking-wide uppercase whitespace-nowrap ring-1 ring-surface">
         {t('elo.provisional_short')}
       </span>
+    </span>
+  )
+}
+
+function FramedAvatar({ kind, name, url, size, colorClass }) {
+  const [failed, setFailed] = useState(false)
+  const box = frameInsideBox(kind)
+  if (failed || !box) return <Avatar name={name} url={url} size={size} colorClass={colorClass} />
+  return (
+    <span className={`${size} relative inline-block shrink-0`}>
+      <span className="absolute" style={{ left: `${box.left}%`, top: `${box.top}%`, width: `${box.size}%`, height: `${box.size}%` }}>
+        <Avatar name={name} url={url} size="w-full h-full text-[60%]" colorClass={colorClass} />
+      </span>
+      <img src={frameSrc(kind)} alt="" aria-hidden="true" onError={() => setFailed(true)}
+        className="pointer-events-none absolute inset-0 h-full w-full object-contain" />
     </span>
   )
 }

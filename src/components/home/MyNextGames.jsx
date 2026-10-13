@@ -3,7 +3,7 @@
 // baixo da barra: uma fila que desliza com um cartão pequeno por evento em
 // que estou (inscrito, aceitei), por ordem de data e hora. Cada cartão na cor
 // do tipo: a hora grande, o dia e o tipo na mesma linha; o nome; o sítio; e,
-// encostada em baixo, «✓ Estás dentro» / «✓ Aceitaste». Tocar abre o evento.
+// encostada em baixo, «✓ Estás dentro». Tocar abre o evento.
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { KIND_STYLE, friendsMatchTitle } from '../agenda/EventCard'
@@ -21,7 +21,7 @@ const IN_STATES = new Set(['in', 'confirm', 'playing'])
  *  home, 12 out). Um jogo já começado continua até acabar. */
 export function myNextEvents(events, todayKey) {
   const invites = events
-    .filter((e) => e.source === 'friend_invite' && !e.finished && e.dayKey >= todayKey)
+    .filter((e) => e.source === 'friend_invite' && e.myState === 'invited' && !e.finished && e.dayKey >= todayKey)
     .sort((a, b) => a.startsAt - b.startsAt)
   return [...invites, ...events
     .filter((e) => e.mine && IN_STATES.has(e.myState) && !e.finished && e.dayKey >= todayKey)
@@ -52,9 +52,6 @@ function whenShort(dayKey, todayKey, t, lang) {
 // O tipo ao lado da hora, curto para caber no cartão («19:00 sexta · Amigos»).
 const SHORT_KIND = { friends: 'home.next_kind_friends' }
 
-// Nos jogos entre amigos, quem foi convidado lê «Aceitaste».
-const FRIEND_SOURCES = new Set(['private_match', 'friend_session'])
-
 /** O convite por responder: branco, borda preta de 2 px, «A Rita
  *  convidou-te», as fotos de quem aceitou e os lugares que faltam;
  *  «Responder» e «Novo» em baixo. Tocar abre o ecrã de responder. */
@@ -82,13 +79,14 @@ function InviteNextCard({ event, todayKey, to }) {
 
 function NextCard({ event, todayKey, userId, to }) {
   const { t, i18n } = useTranslation()
-  if (event.source === 'friend_invite') return <InviteNextCard event={event} todayKey={todayKey} to={to} />
+  if (event.source === 'friend_invite' && event.myState === 'invited') return <InviteNextCard event={event} todayKey={todayKey} to={to} />
   const style = KIND_STYLE[event.kind] || KIND_STYLE.mix
   const title = eventTitle(event)
     || (event.source === 'private_match' || event.source === 'group_match' ? friendsMatchTitle(event.raw || {}, userId, t) : '')
+    // Um jogo entre amigos aceite, ainda sem equipas: «Rita e amigos».
+    || (event.source === 'friend_invite' ? t('agenda.played_friends_title', { name: event.raw.isCreator ? t('agenda.you') : event.raw.creatorFirst }) : '')
     || t(style.labelKey)
   const place = [event.orgName, eventPlace(event)].filter(Boolean).join(' · ')
-  const accepted = FRIEND_SOURCES.has(event.source) && event.raw && event.raw.is_creator === false
   const body = (
     <>
       <p className="flex items-baseline whitespace-nowrap font-display text-[20px] font-extrabold leading-none text-ink-900">
@@ -99,7 +97,8 @@ function NextCard({ event, todayKey, userId, to }) {
       <p className="mt-1 line-clamp-2 text-[13px] font-extrabold leading-[1.3] text-ink-900">{title}</p>
       {place && <p className="mb-3.5 mt-0.5 truncate text-[11px] text-[#4B5563]">{place}</p>}
       <p className="mt-auto border-t border-black/[.08] pt-2 text-[11px] font-bold text-ink-900">
-        ✓ {t(accepted ? 'home.next_accepted' : 'home.next_in')}
+        {/* «Estás dentro» para todos, também quem foi convidado e aceitou (UX, 13 out). */}
+        ✓ {t('home.next_in')}
       </p>
     </>
   )

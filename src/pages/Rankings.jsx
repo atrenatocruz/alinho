@@ -16,6 +16,7 @@ import { applyScale, defaultScale, rankedCount, SCALES } from '../lib/rankingSca
 import MonthRanking from '../components/rankings/MonthRanking'
 import MonthPodiumShare from '../components/rankings/MonthPodiumShare'
 import RankPodium from '../components/rankings/RankPodium'
+import { useFrames } from '../lib/frames'
 
 /* ─── Rankings (épico «Comunidade vs. Rankings», Trello #271/#275) ───────────
    Comparar jogadores — só jogadores. Desenho:
@@ -260,6 +261,8 @@ export default function Rankings() {
     : []
   const podiumIds = new Set(podiumRows.map((r) => r.user_id))
   const podiumValue = (row) => ({ text: mode === 'xp' ? `${row.value} ${t('rankings.xp_label')}` : row.value, muted: false })
+  // Molduras do pódio do mês (quem fechou o mês passado no pódio), na lista.
+  const frames = useFrames(rows.map((r) => r.user_id))
   const visible = (trimmed ? positioned.filter(matchesQuery) : positioned).filter((r) => !podiumIds.has(r.user_id))
   // A tua linha: a tua posição na tua escala, mesmo quando se vê outra.
   const me = byScale
@@ -333,7 +336,7 @@ export default function Rankings() {
               {row.position ?? '—'}
             </span>
           )}
-          <Avatar name={row.name} url={row.avatar_url} size="w-9 h-9 text-xs" />
+          <Avatar name={row.name} url={row.avatar_url} size="w-9 h-9 text-xs" frame={frames[row.user_id]} />
           <div className="flex-1 min-w-0">
             <p className="font-extrabold text-ink-900 text-sm flex items-center gap-1.5 min-w-0">
               <span className="truncate min-w-0">{row.name}</span>

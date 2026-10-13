@@ -200,7 +200,8 @@ export default function Home() {
       getDetail: getFriendMatch,
       orgsById,
     })
-      .then((evs) => { setFriendInvites(rows.filter((r) => r.teams_set)); setFriendInviteEvents(evs) })
+      // No «Para ti» só os por responder: um jogo aceite não pede nada.
+      .then((evs) => { setFriendInvites(rows.filter((r) => r.teams_set && r.my_status !== 'accepted')); setFriendInviteEvents(evs) })
       .catch((err) => console.error('Error loading friend invites:', err))
   }
   useEffect(() => {

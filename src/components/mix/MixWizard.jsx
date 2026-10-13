@@ -15,7 +15,7 @@
 import { useEffect, useState } from 'react'
 import { describeError } from '../../lib/errors'
 import { useTranslation } from 'react-i18next'
-import { Minus, Plus } from 'lucide-react'
+import { Lock, Minus, Plus } from 'lucide-react'
 import StepPage, { StepMissingNote } from '../steps/StepPage'
 import MixImageField from './MixImageField'
 import LaunchDayPicker from '../LaunchDayPicker'
@@ -30,10 +30,13 @@ import { getEventWhatsappPostTimes } from '../../lib/whatsappHours'
 import SpecialPriceField, { specialPriceMissing } from '../SpecialPriceField'
 import { getEventSpecialPrice } from '../../lib/specialPrice'
 import PlacesUnavailableHint from '../PlacesUnavailableHint'
+import { isMixLive } from '../../lib/mixLive'
 
 const pairsAreFixed = (form) => form.format !== 'americano' && !(form.rotate_partners && form.format === 'sobe_desce')
 
-function Field({ label, children, hint }) {
+/** `locked`: à vista, a cinzento e sem se poder tocar (o mix já começou). */
+function Field({ label, children, hint, locked = false }) {
+  if (locked) children = <div className="pointer-events-none opacity-50" aria-disabled="true">{children}</div>
   return (
     <div>
       <p className="text-sm font-medium text-gray-700 mb-2">{label}</p>
@@ -75,6 +78,18 @@ export default function MixWizard({
   const labels = [t('steps.people'), t('steps.when'), t('steps.where'), t('steps.rules')]
   const numCourts = parseInt(form.num_courts, 10) || 1
   const rankedLocked = editingGame && ['in_progress', 'finished'].includes(editingGame.status)
+  // #586, ponto 1.6 (Francisco, 13 out: «fecha depois de começar a ronda 1»):
+  // com a ronda 1 começada ou um resultado (a regra do «a decorrer»), o
+  // formato, as duplas, os campos e as regras de jogo ficam à vista mas
+  // trancados. O nome, a descrição e a imagem continuam livres. Antes da
+  // ronda 1 fica tudo como antes.
+  const started = !!editingGame && (isMixLive(editingGame) || editingGame.status === 'finished')
+  // O cadeado em linha, a cinzento, o do Editar do torneio (UX, 13 out).
+  const startedNote = started ? (
+    <p className="flex items-start gap-1.5 text-sm text-muted">
+      <Lock size={14} className="mt-[3px] shrink-0 text-ink-500" /> {t('mixwizard.started_locked')}
+    </p>
+  ) : null
   // O nível: «Qualquer nível» ou «Escolher» → aparecem os níveis de hoje.
   const [pickLevel, setPickLevel] = useState(!!form.level)
   // Masculino, Feminino ou Misto, de 1 a 6 (#577). O escalão começa pelo
@@ -453,6 +468,7 @@ export default function MixWizard({
       </div>
 
       <div className={step === 3 ? 'space-y-5' : 'hidden'}>
+        {startedNote}
         <Field label={t('gerirclube.location_label')}>
           <input
             ref={locationInputRef}
@@ -465,7 +481,7 @@ export default function MixWizard({
           />
           <PlacesUnavailableHint />
         </Field>
-        <Field label={t('mixwizard.courts_label')}>
+        <Field label={t('mixwizard.courts_label')} locked={started}>
           <div className="flex items-center gap-3">
             <div className="inline-flex items-center rounded-ctrl border border-line bg-canvas">
               <button type="button" aria-label="−" onClick={() => set({ num_courts: Math.max(1, numCourts - 1) })}
@@ -492,14 +508,15 @@ export default function MixWizard({
               : null
           })()}
         </Field>
-        <Field label={t('mixwizard.court_time_label')} hint={t('mixwizard.court_time_hint')}>
+        <Field label={t('mixwizard.court_time_label')} hint={t('mixwizard.court_time_hint')} locked={started}>
           <Chips label={t('mixwizard.court_time_label')} value={form.court_time_minutes}
             onChange={(v) => set({ court_time_minutes: v })} options={options.courtTimes} />
         </Field>
       </div>
 
       <div className={step === 4 ? 'space-y-5' : 'hidden'}>
-        <Field label={t('gerirclube.format_label')}
+        {startedNote}
+        <Field label={t('gerirclube.format_label')} locked={started}
           hint={t(`mixlogic.format_help_${uiFormatOf(form) === 'sobe_desce' && form.rotate_partners ? 'sobe_desce_rotate' : uiFormatOf(form)}`)}>
           <Chips label={t('gerirclube.format_label')} value={uiFormatOf(form)} options={options.formats}
             onChange={(v) => set({
@@ -520,12 +537,12 @@ export default function MixWizard({
           })()}
         </Field>
         {form.format === 'grupos_eliminatorias' && (
-          <Field label={t('gerirclube.pool_size_label')} hint={t('gerirclube.pool_size_help')}>
+          <Field label={t('gerirclube.pool_size_label')} hint={t('gerirclube.pool_size_help')} locked={started}>
             <input type="number" min="3" max="8" value={form.pool_size}
               onChange={(e) => set({ pool_size: e.target.value })} className="input-field" />
           </Field>
         )}
-        <Field label={t('mixwizard.game_time_label')}
+        <Field label={t('mixwizard.game_time_label')} locked={started}
           hint={t('mixwizard.rounds_in', { count: totalRounds(form), time: options.courtTimes.find((c) => c.value === form.court_time_minutes)?.label || `${form.court_time_minutes}min` })}>
           <Chips label={t('mixwizard.game_time_label')} value={form.game_time_minutes}
             onChange={(v) => set({ game_time_minutes: v })} options={options.gameTimes} />
@@ -533,7 +550,7 @@ export default function MixWizard({
         {form.format !== 'americano' && (
           // «2 sets + super tie-break»: o mesmo nome e a mesma frase do torneio
           // (UX, 7 out).
-          <Field label={t('gerirclube.scoring_label')}
+          <Field label={t('gerirclube.scoring_label')} locked={started}
             hint={form.scoring_format === 'melhor_2_sets' ? t('tournament.create.scoring_melhor_2_sets_hint') : null}>
             <Chips label={t('gerirclube.scoring_label')} value={form.scoring_format}
               onChange={(v) => set({ scoring_format: v })} options={options.scoringFormats} />
@@ -542,7 +559,7 @@ export default function MixWizard({
         {/* O 8-8 do pro set (#580), como no torneio: tie-break a 7 (FPP) ou
             super tie-break a 10. */}
         {form.format !== 'americano' && form.scoring_format === 'pro_set_9' && (
-          <Field label={t('tournament.create.tiebreak_8_8')}>
+          <Field label={t('tournament.create.tiebreak_8_8')} locked={started}>
             <Chips label={t('tournament.create.tiebreak_8_8')} value={form.tiebreak_8_8 || 'tiebreak'}
               onChange={(v) => set({ tiebreak_8_8: v })}
               options={[
@@ -552,7 +569,7 @@ export default function MixWizard({
           </Field>
         )}
         {uiFormatOf(form) === 'sobe_desce' && (
-          <Field label={t('mixwizard.pairs_label')}
+          <Field label={t('mixwizard.pairs_label')} locked={started}
             hint={t(form.rotate_partners ? 'gerirclube.rotate_partners_rotate_help' : 'gerirclube.rotate_partners_fixed_help')}>
             <Chips label={t('mixwizard.pairs_label')} value={form.rotate_partners ? 'rotate' : 'fixed'}
               onChange={(v) => set({ rotate_partners: v === 'rotate' })}
@@ -574,13 +591,13 @@ export default function MixWizard({
           </Field>
         )}
         {uiFormatOf(form) === 'sobe_desce' && form.rotate_partners && (
-          <Field label={t('gerirclube.respect_sides_label')} hint={t('gerirclube.respect_sides_help')}>
+          <Field label={t('gerirclube.respect_sides_label')} hint={t('gerirclube.respect_sides_help')} locked={started}>
             <Chips label={t('gerirclube.respect_sides_label')} value={form.respect_sides ? 'yes' : 'no'}
               onChange={(v) => set({ respect_sides: v === 'yes' })}
               options={[{ value: 'yes', label: t('gerirclube.respect_sides_yes') }, { value: 'no', label: t('gerirclube.respect_sides_no') }]} />
           </Field>
         )}
-        <Field label={t('mixwizard.pairing_label')}
+        <Field label={t('mixwizard.pairing_label')} locked={started}
           hint={t(options.pairingModes.find((o) => o.value === form.pairing_mode)?.helpKey || 'gerirclube.pairing_mode_por_nivel_help')}>
           <Chips label={t('mixwizard.pairing_label')} value={form.pairing_mode} onChange={(v) => set({ pairing_mode: v })}
             options={options.pairingModes.map((o) => ({ value: o.value, label: t(o.shortKey || o.labelKey) }))} />
@@ -588,7 +605,8 @@ export default function MixWizard({
         <Field label={t('mixwizard.ranked_label')}
           hint={rankedLocked ? null : t(form.ranked ? 'gerirclube.ranked_yes_help' : 'gerirclube.ranked_no_help')}>
           {rankedLocked ? (
-            <p className="text-sm text-muted">{t(form.ranked ? 'gerirclube.ranked_locked_yes' : 'gerirclube.ranked_locked_no')}</p>
+            // Com as duplas feitas e a ronda por começar, a razão é outra (UX, 13 out).
+            <p className="text-sm text-muted">{t(`gerirclube.ranked_locked_${form.ranked ? 'yes' : 'no'}${started ? '' : '_formed'}`)}</p>
           ) : (
             <Chips label={t('mixwizard.ranked_label')} value={form.ranked ? 'yes' : 'no'} onChange={(v) => set({ ranked: v === 'yes' })}
               options={[{ value: 'yes', label: t('gerirclube.ranked_yes') }, { value: 'no', label: t('gerirclube.ranked_no') }]} />
