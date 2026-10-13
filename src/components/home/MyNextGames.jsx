@@ -11,6 +11,7 @@ import { eventTitle, eventPlace } from '../agenda/homeSearchMatch'
 import { fromDayKey, EVENT_KINDS } from '../../lib/agenda'
 import { formatDate, formatTime } from '../../lib/formatDate'
 import { InviteFaces } from '../friends/FriendInviteEventCard'
+import { kindColorsOf } from '../agenda/HomeCard'
 
 // Os estados em que «estou dentro»: não os convites por responder, os pedidos,
 // a lista de suplentes nem o «não vou».
@@ -60,20 +61,29 @@ function InviteNextCard({ event, todayKey, to }) {
   const r = event.raw
   const place = [event.orgName, r.location].filter(Boolean).filter((x, i, a) => a.indexOf(x) === i).join(' · ')
   return (
-    <Link to={to} className="press flex w-[210px] shrink-0 snap-start flex-col rounded-2xl border-2 border-ink-900 bg-white px-[11px] py-2.5 text-left">
-      <p className="flex items-baseline whitespace-nowrap font-display text-[20px] font-extrabold leading-none text-ink-900">
-        {event.hasTime === false ? '—' : formatTime(event.startsAt, i18n.language, { hour: '2-digit', minute: '2-digit' })}
-        <small className="ml-[5px] font-sans text-[11px] font-bold text-[#4B5563]">{whenShort(event.dayKey, todayKey, t, i18n.language)}</small>
-        <span className={`ml-1 min-w-0 truncate font-sans text-[11px] font-extrabold ${KIND_STYLE.friends.text}`}>· {t(SHORT_KIND.friends)}</span>
-      </p>
-      <p className="mt-1 line-clamp-2 text-[13px] font-extrabold leading-[1.3] text-ink-900">{t('home.invite_by', { name: r.creatorFirst })}</p>
-      {place && <p className="mt-0.5 truncate text-[11px] text-[#4B5563]">{place}</p>}
-      <span className="mb-2.5 mt-1.5"><InviteFaces accepted={r.accepted} slots={r.slots} size="w-6 h-6 text-[9px]" /></span>
-      <p className="mt-auto flex items-center justify-between border-t border-black/[.08] pt-2 text-[11px] font-extrabold text-ink-700">
-        {t('home.invite_answer')}
-        <span className="rounded-full bg-lime-400 px-2 py-0.5 text-[10.5px] font-extrabold text-ink-900">{t('home.invite_new')}</span>
-      </p>
+    <Link to={to} className="press flex w-[208px] shrink-0 snap-start flex-col overflow-hidden rounded-2xl bg-white text-left shadow-[0_0_0_2px_#111111]">
+      <Band kind="friends" time={event.hasTime === false ? '—' : formatTime(event.startsAt, i18n.language, { hour: '2-digit', minute: '2-digit' })}
+        sub={`${whenShort(event.dayKey, todayKey, t, i18n.language)} · ${t(SHORT_KIND.friends)}`} />
+      <div className="flex flex-1 flex-col px-3 pb-2.5 pt-2">
+        <p className="line-clamp-2 font-display text-[14px] font-extrabold leading-[1.2] text-ink-900">{t('home.invite_by', { name: r.creatorFirst })}</p>
+        {place && <small className="block truncate text-[11.5px] leading-[1.3] text-[#5B6068]">{place}</small>}
+        <span className="mb-2 mt-1.5"><InviteFaces accepted={r.accepted} slots={r.slots} size="w-6 h-6 text-[9px]" /></span>
+        <p className="mt-auto flex items-center justify-between font-display text-[12px] font-bold text-ink-900">
+          {t('home.invite_answer')}
+          <span className="rounded-full bg-lime-400 px-2 py-0.5 text-[10.5px] font-extrabold text-ink-900">{t('home.invite_new')}</span>
+        </p>
+      </div>
     </Link>
+  )
+}
+
+/** R2 (13 out): a faixa da cor do tipo com a hora grande e «hoje · Mix». */
+function Band({ kind, time, sub }) {
+  return (
+    <div className="flex w-full items-baseline gap-2 px-3 py-2 text-white" style={{ background: kindColorsOf(kind).strong }}>
+      <b className="font-display text-[20px] font-extrabold leading-none tracking-[-.02em] tabular-nums">{time}</b>
+      <span className="truncate font-display text-[11.5px] font-medium leading-none opacity-90">{sub}</span>
+    </div>
   )
 }
 
@@ -89,20 +99,17 @@ function NextCard({ event, todayKey, userId, to }) {
   const place = [event.orgName, eventPlace(event)].filter(Boolean).join(' · ')
   const body = (
     <>
-      <p className="flex items-baseline whitespace-nowrap font-display text-[20px] font-extrabold leading-none text-ink-900">
-        {event.hasTime === false ? '—' : formatTime(event.startsAt, i18n.language, { hour: '2-digit', minute: '2-digit' })}
-        <small className="ml-[5px] font-sans text-[11px] font-bold text-[#4B5563]">{whenShort(event.dayKey, todayKey, t, i18n.language)}</small>
-        <span className={`ml-1 min-w-0 truncate font-sans text-[11px] font-extrabold ${style.text}`}>· {t(SHORT_KIND[event.kind] || style.labelKey)}</span>
-      </p>
-      <p className="mt-1 line-clamp-2 text-[13px] font-extrabold leading-[1.3] text-ink-900">{title}</p>
-      {place && <p className="mb-3.5 mt-0.5 truncate text-[11px] text-[#4B5563]">{place}</p>}
-      <p className="mt-auto border-t border-black/[.08] pt-2 text-[11px] font-bold text-ink-900">
+      <Band kind={event.kind} time={event.hasTime === false ? '—' : formatTime(event.startsAt, i18n.language, { hour: '2-digit', minute: '2-digit' })}
+        sub={`${whenShort(event.dayKey, todayKey, t, i18n.language)} · ${t(SHORT_KIND[event.kind] || style.labelKey)}`} />
+      <div className="flex flex-1 flex-col px-3 pb-2.5 pt-2">
+        <p className="line-clamp-2 font-display text-[14px] font-extrabold leading-[1.2] text-ink-900">{title}</p>
+        {place && <small className="block truncate text-[11.5px] leading-[1.3] text-[#5B6068]">{place}</small>}
         {/* «Estás dentro» para todos, também quem foi convidado e aceitou (UX, 13 out). */}
-        ✓ {t('home.next_in')}
-      </p>
+        <em className="mt-auto block pt-[7px] font-display text-[12px] font-bold not-italic leading-none text-[#3F6212]">✓ {t('home.next_in')}</em>
+      </div>
     </>
   )
-  const cls = `flex w-[210px] shrink-0 snap-start flex-col rounded-2xl border px-[11px] py-2.5 text-left ${style.card}`
+  const cls = 'flex w-[208px] shrink-0 snap-start flex-col overflow-hidden rounded-2xl bg-white text-left shadow-[0_1px_2px_rgba(17,17,17,.06)]'
   return to ? <Link to={to} className={`press ${cls}`}>{body}</Link> : <div className={cls}>{body}</div>
 }
 

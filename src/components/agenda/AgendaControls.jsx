@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
-import { ChevronLeft, ChevronRight, ChevronDown, X, MapPin, LocateFixed, Map, List, Search, Check, CalendarDays, SlidersHorizontal } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronDown, X, MapPin, LocateFixed, Map, List, Search, Check, SlidersHorizontal } from 'lucide-react'
 import { useGooglePlacesAutocomplete } from '../../lib/useGooglePlacesAutocomplete'
 import { RADIUS_OPTIONS } from '../../lib/explore'
 import { formatDate } from '../../lib/formatDate'
@@ -476,6 +476,17 @@ export function FilterChips({ filters, orgs = [], onOpenFilters, onOpenSearch })
 export const filtersBadge = (filters) => (filters.show !== 'all' ? 1 : 0) + (filters.orgIds != null ? 1 : 0)
 
 /** «Hoje» · «Amanhã» · «Sex 10 out» — curto, para caber na pastilha. */
+/** R2: o topo da Home — «segunda-feira» e «12 Outubro»; e a pastilha da
+ *  barra presa, «12 out». */
+export function dayHeading(dayKey, lang) {
+  const d = fromDayKey(dayKey || toDayKey(new Date()))
+  return {
+    weekday: formatDate(d, lang, { weekday: 'long' }),
+    date: `${d.getDate()} ${capitalize(formatDate(d, lang, { month: 'long' }))}`,
+    short: `${d.getDate()} ${formatDate(d, lang, { month: 'short' }).replace(/\./g, '')}`,
+  }
+}
+
 export function dayChipLabel(dayKey, t, lang) {
   const today = toDayKey(new Date())
   if (dayKey === today) return t('ui.today')
@@ -557,15 +568,16 @@ export function HomeBar({ filters, dayKey, onOpenSearch, onOpenDay, onOpenFilter
   const pick = (k) => onKinds(k === null || (filters.kinds.length === 1 && filters.kinds[0] === k) ? [...EVENT_KINDS] : [k])
   return (
     <div ref={ref} className="flex items-center gap-1.5 overflow-x-auto no-scrollbar -mx-4 px-4 py-1 cursor-grab active:cursor-grabbing">
+      {/* A pastilha do dia: só com a barra presa (R2, 13 out). */}
+      {onOpenDay && (
+        <button type="button" onClick={onOpenDay} className={pill(false)}>
+          {dayHeading(dayKey, i18n.language).short} <ChevronDown size={14} className="text-muted" />
+        </button>
+      )}
       {onOpenSearch && (
         <button type="button" onClick={onOpenSearch} aria-label={t('agenda.search_open')} title={t('agenda.search_open')}
           className={`${TAP} shrink-0 inline-flex items-center justify-center w-9 min-h-[36px] rounded-full border bg-white text-ink-900 border-line`}>
           <Search size={16} />
-        </button>
-      )}
-      {onOpenDay && (
-        <button type="button" onClick={onOpenDay} className={pill(false)}>
-          <CalendarDays size={15} className="text-[#075985]" /> {dayChipLabel(dayKey, t, i18n.language)} <ChevronDown size={14} className="text-muted" />
         </button>
       )}
       <button type="button" onClick={onOpenFilters} className={pill(false)} aria-label={badge ? t('agenda.filters_on', { count: badge }) : undefined}>
@@ -580,8 +592,8 @@ export function HomeBar({ filters, dayKey, onOpenSearch, onOpenDay, onOpenFilter
           <button key={k} type="button" data-kind={k} onClick={() => pick(k)} aria-pressed={on} className={pill(on)}>
             {k === 'free'
               // Horários livres: só o contorno tracejado, como o cartão deles (UX, 11 out).
-              ? <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-[3px] border-[1.5px] border-dashed" style={{ borderColor: on ? KIND_STYLE.free.color : '#D9826A', opacity: on ? 1 : 0.55 }} />
-              : <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: KIND_STYLE[k].color, opacity: on ? 1 : 0.55 }} />}
+              ? <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-full border-[1.5px] border-dashed" style={{ borderColor: on ? KIND_STYLE.free.color : '#D9826A' }} />
+              : <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: KIND_STYLE[k].color }} />}
             {t(BAR_LABEL_KEY[k])}
           </button>
         )

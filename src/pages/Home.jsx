@@ -2,7 +2,7 @@ import { Fragment, useState, useEffect, useLayoutEffect, useMemo, useRef } from 
 import { createPortal } from 'react-dom'
 import { Link, useSearchParams, useNavigationType, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { X, Check, ChevronLeft } from 'lucide-react'
+import { X, Check, ChevronLeft, ChevronDown } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { takePendingOrgSlug } from '../lib/loginLinks'
 import { getClubProfile } from '../lib/clubProfile'
@@ -11,7 +11,7 @@ import { ConfirmSheet, EmptyState, PrimaryButton } from '../components/ui'
 import HomeSkeleton from '../components/home/HomeSkeleton'
 import { useSkeleton, useLoadTimeout } from '../components/Skeleton'
 import { GameEventCard, FriendsEventCard, ExploreEventCard } from '../components/agenda/EventCard'
-import { MonthSheet, HomeBar, HomeFiltersSheet, LocationChip, LocationSheet, ViewToggle, Sheet, dayParts } from '../components/agenda/AgendaControls'
+import { MonthSheet, HomeBar, HomeFiltersSheet, LocationChip, LocationSheet, ViewToggle, Sheet, dayParts, dayHeading } from '../components/agenda/AgendaControls'
 import HomeSearch, { rememberSearch } from '../components/agenda/HomeSearch'
 import PlayedList from '../components/agenda/PlayedList'
 import { MapView } from '../components/agenda/MapView'
@@ -1043,8 +1043,24 @@ export default function Home() {
           baixo, uma barra só. O dia é a pastilha «Hoje ⌄» da barra. */}
       <div ref={headerRef} style={{ transform: `translateY(-${topRowH}px)` }}
         className={`sticky top-0 z-10 -mx-4 px-4 -mt-6 pt-4 pb-2 bg-white space-y-1.5 border-b border-line/70 ${moved ? 'transition-transform duration-200 ease-out' : ''}`}>
-        <div ref={topRowRef} className={`flex items-center justify-between gap-2 ${moved ? 'transition-opacity duration-200' : ''} ${collapsed ? 'opacity-0 pointer-events-none' : ''}`} aria-hidden={collapsed || undefined}>
-          <LocationChip location={location} onOpen={() => setLocationOpen(true)} />
+        {/* R2 (13 out): em cima o dia da semana, a data em grande (abre o
+            calendário) e o sítio; ao descer sai tudo e fica só a barra. */}
+        <div ref={topRowRef} className={`flex items-start justify-between gap-2 ${moved ? 'transition-opacity duration-200' : ''} ${collapsed ? 'opacity-0 pointer-events-none' : ''}`} aria-hidden={collapsed || undefined}>
+          <div className="min-w-0">
+            {viewMode === 'list' && (() => {
+              const dh = dayHeading(visibleDay, i18n.language)
+              return (
+                <>
+                  <span className="block font-mono text-[10.5px] font-medium uppercase leading-none tracking-[.12em] text-[#5B6068]">{dh.weekday}</span>
+                  <button type="button" onClick={() => setMonthOpen(true)}
+                    className="mt-1.5 flex items-baseline gap-1 font-display text-[30px] font-black leading-none tracking-[-.02em] text-ink-900">
+                    {dh.date} <ChevronDown size={16} className="shrink-0 self-center text-muted" />
+                  </button>
+                </>
+              )
+            })()}
+            <LocationChip location={location} onOpen={() => setLocationOpen(true)} />
+          </div>
           <div className="flex items-center gap-1 shrink-0">
             {GOOGLE_MAPS_API_KEY && (
               <ViewToggle mode={viewMode} onToggle={() => setViewMode((m) => (m === 'list' ? 'map' : 'list'))} />
@@ -1056,7 +1072,8 @@ export default function Home() {
           filters={filters}
           dayKey={visibleDay}
           onOpenSearch={viewMode === 'list' ? openSearch : undefined}
-          onOpenDay={viewMode === 'list' ? () => setMonthOpen(true) : undefined}
+          // A pastilha do dia só com a barra presa (R2): parado, a data está em cima.
+          onOpenDay={viewMode === 'list' && collapsed ? () => setMonthOpen(true) : undefined}
           onOpenFilters={() => setFiltersOpen(true)}
           onKinds={(kinds) => setFilters((f) => ({ ...f, kinds }))}
         />

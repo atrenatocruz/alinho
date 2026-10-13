@@ -11,7 +11,7 @@ import { AGE_LABEL_KEY } from '../../lib/ageCategories'
 import { MascotPill } from './CardMascot'
 import { isMixLive } from '../../lib/mixLive'
 import HomeCard, { BandPill, CardTitle, CardChips, CardState, CardFoot, CardButton, kindColorsOf } from './HomeCard'
-import { ratingBand } from '../../lib/elo'
+import { ratingBand, peopleRatingBand } from '../../lib/elo'
 import { parseLevel, levelNumber } from '../../lib/mixLevels'
 import { KIND_COLORS } from '../../lib/kindColors'
 
@@ -470,8 +470,14 @@ export function ExploreEventCard({ event, profile, distance = null, onJoin = nul
       )}
       {pending && <CardState tone="warn">{t('agenda.state_line_request_sent')}</CardState>}
       <div className="mt-3 flex items-center gap-2.5">
-        {/* A letra vem do género de quem entra na média (avg_gender). */}
-        <GroupLevelBadge rating={avgRating} genders={exploreGenders(avgGender, game.gender_restriction)} />
+        {/* O nível médio de quem vai, com o nome à frente (QA, 13 out: a
+            pastilha sozinha não se percebia). A letra vem do avg_gender. */}
+        {peopleRatingBand(avgRating, exploreGenders(avgGender, game.gender_restriction)) && (
+          <span className="flex items-center gap-1.5 font-display text-[12px] font-semibold text-[#5B6068]">
+            {t('homecard.avg_level')}
+            <GroupLevelBadge rating={avgRating} genders={exploreGenders(avgGender, game.gender_restriction)} />
+          </span>
+        )}
         {!pending && onJoin && (
           <div className="relative ml-auto">
             <CardButton variant={openJoin ? 'lime' : 'out'} disabled={busy} onClick={onJoin}>

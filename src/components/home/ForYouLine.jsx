@@ -6,15 +6,16 @@
 // resultados hoje. Cada linha abre o que já abria (sem folha nova). Sem nada
 // para ti, a linha não aparece. O lembrete de confirmar o número também vem
 // para aqui (UX, 10 out): a linha abre a caixa de sempre numa folha.
+// R2 (13 out): a linha branca com o Alino pequeno, «Para ti · N» e o resumo;
+// aberta, uma linha por coisa com o botão à direita, a preto (UX).
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ChevronDown, ChevronRight } from 'lucide-react'
+import { ChevronDown, ChevronUp } from 'lucide-react'
 import { privateMatchActions } from '../../lib/privateMatches'
 import { fromDayKey, toDayKey } from '../../lib/agenda'
 import { formatDate } from '../../lib/formatDate'
 import { friendsMatchTitle } from '../agenda/EventCard'
-import { SectionTitle } from './MyNextGames'
 import { KIND_COLORS } from '../../lib/kindColors'
 
 /** «hoje», «ontem», «amanhã», «sexta», «sáb 18 out». */
@@ -35,7 +36,7 @@ const hhmm = (time) => (time ? String(time).slice(0, 5) : null)
 export function forYouItems({ privateMatches = [], userId, friendInvites = [], scoreToday = [], todayKey, t, lang, onConfirmPhone = null }) {
   const items = []
   if (onConfirmPhone) {
-    items.push({ key: 'phone', icon: '📱', bg: '#E0F2FE', title: t('home.foryou_phone'), sub: t('home.foryou_phone_sub'), onClick: onConfirmPhone })
+    items.push({ key: 'phone', icon: '📱', bg: '#E0F2FE', title: t('home.foryou_phone'), sub: t('home.foryou_phone_sub'), onClick: onConfirmPhone, cta: t('home.foryou_cta_phone') })
   }
   for (const { match: m } of privateMatchActions(privateMatches, userId).filter((a) => a.kind === 'confirm')) {
     const day = m.scheduled_date || (m.played_at ? toDayKey(new Date(m.played_at)) : null)
@@ -46,6 +47,7 @@ export function forYouItems({ privateMatches = [], userId, friendInvites = [], s
       title: day ? t('home.foryou_confirm', { when: whenWord(day, todayKey, t, lang) }) : t('home.foryou_confirm_plain'),
       sub: [friendsMatchTitle(m, userId, t), m.score_a != null && m.score_b != null ? `${m.score_a}-${m.score_b}` : null].filter(Boolean).join(' · '),
       to: m.session_id ? `/jogos-privados/sessao/${m.session_id}` : '/jogos-privados',
+      cta: t('home.foryou_cta_confirm'),
     })
   }
   for (const inv of friendInvites) {
@@ -60,6 +62,7 @@ export function forYouItems({ privateMatches = [], userId, friendInvites = [], s
           : t('friends.invite_card_line', { name: inv.creator_name || '' }),
       sub: [inv.location, inv.results_with_me > 0 ? t('friends.invite_card_results', { count: inv.results_with_me }) : null].filter(Boolean).join(' · '),
       to: `/jogos-privados/sessao/${inv.match_id}`,
+      cta: t('home.foryou_cta_answer'),
     })
   }
   for (const x of scoreToday) {
@@ -70,28 +73,35 @@ export function forYouItems({ privateMatches = [], userId, friendInvites = [], s
       title: t('tournament.score.link_cta'),
       sub: x.name,
       to: `/torneio/${x.slug || x.id}/marcar`,
+      cta: t('home.foryou_cta_score'),
     })
   }
   return items
 }
 
-const Icon = ({ item, size = 'h-8 w-8 rounded-[10px] text-sm' }) => (
-  <span aria-hidden className={`flex shrink-0 items-center justify-center ${size}`} style={{ background: item.bg }}>{item.icon}</span>
+const Icon = ({ item }) => (
+  <span aria-hidden className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] text-[15px]" style={{ background: item.bg }}>{item.icon}</span>
 )
 
+/** Uma coisa: o ícone, o que é e, à direita, o botão (preto). */
 function Row({ item }) {
-  const cls = 'press flex w-full items-center gap-2.5 border-t border-[#F3F4F6] bg-white px-3 py-2.5 text-left first:border-t-0'
-  const Tag = item.onClick ? 'button' : Link
-  const props = item.onClick ? { type: 'button', onClick: item.onClick } : { to: item.to }
+  const navigate = useNavigate()
+  const go = () => (item.onClick ? item.onClick() : navigate(item.to))
   return (
-    <Tag {...props} className={cls}>
+    <div className="flex items-center gap-3 border-t border-[#F0F1EE] px-3.5 py-3">
       <Icon item={item} />
-      <span className="min-w-0 flex-1">
-        <b className="line-clamp-2 block text-[13.5px] font-extrabold leading-snug text-ink-900">{item.title}</b>
-        {item.sub && <small className="block truncate text-[11.5px] text-muted">{item.sub}</small>}
-      </span>
-      <ChevronRight size={16} className="shrink-0 text-[#9CA3AF]" />
-    </Tag>
+      <button type="button" onClick={go} className="min-w-0 flex-1 text-left">
+        <b className="line-clamp-2 block font-display text-[13.5px] font-extrabold leading-[1.25] text-ink-900">{item.title}</b>
+        {item.sub && <small className="mt-0.5 block truncate text-[12px] leading-[1.35] text-[#5B6068]">{item.sub}</small>}
+      </button>
+      {item.cta && (
+        <button type="button" onClick={go}
+          // A preto: o lima fica só no botão de cada cartão de evento (UX, 13 out).
+          className="press shrink-0 whitespace-nowrap rounded-[12px] bg-ink-900 px-3.5 py-2.5 font-display text-[13px] font-extrabold leading-none text-white">
+          {item.cta}
+        </button>
+      )}
+    </div>
   )
 }
 
@@ -99,36 +109,23 @@ export default function ForYouLine({ items, show = true }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   if (!show || !items.length) return null
-  const head = <SectionTitle right={<span className="text-[11px] font-bold text-[#9CA3AF]">{items.length}</span>}>{t('home.foryou_title')}</SectionTitle>
-  // Uma coisa só: a linha já é ela, toca e abre.
-  if (open || items.length === 1) {
-    return (
-      <section aria-label={t('home.foryou_title')}>
-        {head}
-        <div className="overflow-hidden rounded-[18px] border border-line bg-white">
-          {items.map((it) => <Row key={it.key} item={it} />)}
-        </div>
-      </section>
-    )
-  }
+  const summary = items.map((it) => it.title).filter(Boolean).join(' · ')
   return (
     <section aria-label={t('home.foryou_title')}>
-      {head}
-      <button type="button" onClick={() => setOpen(true)} aria-expanded={false}
-        className="press flex w-full items-center gap-2.5 rounded-2xl border border-line bg-white px-3 py-[9px] text-left">
-        <span className="flex shrink-0">
-          {items.slice(0, 4).map((it, i) => (
-            <span key={it.key} className={i ? '-ml-2' : ''}>
-              <Icon item={it} size="h-7 w-7 rounded-[9px] border-2 border-white text-[13px]" />
-            </span>
-          ))}
-        </span>
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open}
+        className={`press flex w-full items-center gap-3 bg-white px-3.5 py-3 text-left shadow-[0_1px_2px_rgba(17,17,17,.06)] ${open ? 'rounded-t-2xl' : 'rounded-2xl'}`}>
+        <img src="/alino/alino-ola.webp" alt="" aria-hidden="true" className="h-10 w-10 shrink-0 object-contain" />
         <span className="min-w-0 flex-1">
-          <b className="block truncate text-[13px] font-extrabold text-ink-900">{items[0].title}</b>
-          <small className="block truncate text-[11.5px] text-muted">{t('home.foryou_more', { count: items.length - 1 })}</small>
+          <b className="block font-display text-[15px] font-extrabold text-ink-900">{t('home.foryou_title')} · {items.length}</b>
+          <small className={`block text-[12.5px] leading-[1.35] text-[#5B6068] ${open ? '' : 'line-clamp-2'}`}>{summary}</small>
         </span>
-        <ChevronDown size={18} className="shrink-0 text-[#9CA3AF]" />
+        {open ? <ChevronUp size={18} className="shrink-0 text-[#9CA3AF]" /> : <ChevronDown size={18} className="shrink-0 text-[#9CA3AF]" />}
       </button>
+      {open && (
+        <div className="overflow-hidden rounded-b-2xl bg-white shadow-[0_1px_2px_rgba(17,17,17,.06)]">
+          {items.map((it) => <Row key={it.key} item={it} />)}
+        </div>
+      )}
     </section>
   )
 }

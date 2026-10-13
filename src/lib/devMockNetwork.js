@@ -763,12 +763,19 @@ const RPC_MOCKS = {
   // «A decorrer agora» (27 set): mockLive = 'true'.
   list_live_events: (params) => (localStorage.getItem('mockLive') === 'true' ? [
     { kind: 'mix', id: 'fake-game-1', title: 'Mix de terça', organization_id: 'dev-org', org_name: 'Clube Exemplo', org_kind: 'club', round_number: 2, rounds_total: 4, players_count: 16, courts: 4,
-      leader: { label: 'Rita F. / Tiago L.', wins: 2, anonymous: false, team_number: 1 } },
+      leader: { label: 'Rita F. / Tiago L.', wins: 2, anonymous: false, team_number: 1 },
+      // R2 (13 out): os campos da ronda (courts_now, Dev 3).
+      courts_now: [
+        { court: 1, a: [{ name: 'Rita F.' }, { name: 'Tiago L.' }], b: [{ name: 'Ana M.' }, { name: 'Zé Convidado' }], score_a: 5, score_b: 3 },
+        { court: 2, a: [{ name: 'Rui C.' }, { name: 'Inês R.' }], b: [{ name: 'Hugo R.' }, { name: 'Pedro S.' }], score_a: 4, score_b: 2 },
+        { court: 3, a: [], b: [{ name: 'Nuno F.' }, { name: 'Marta C.' }], a_hidden: true, score_a: null, score_b: null },
+      ] },
     ...(params?.p_organization_id ? [] : [
       { kind: 'tournament', id: 'tour-1', slug: 'smash-open-2026', tournament_id: 'tour-1', name: 'Smash Open 2026', title: 'Smash Open 2026', org_name: 'Clube Exemplo', category_code: 'M4', stage: 'knockout', round: 'QF', matches_live: 4,
         last_result: { a_name: 'Admin D. / Pedro S.', b_name: 'Lima / Pinto', score: '9-7', a_won: true } },
       { kind: 'friends', id: 'fs-1', title: null, organization_id: 'dev-org', org_name: 'Jota Padeleiros', org_kind: 'group', creator_name: 'Renato Cruz', game_number: 2, games_total: 5, players_count: 6,
-        leader: { label: 'Renato C.', wins: 1, anonymous: false } },
+        leader: { label: 'Renato C.', wins: 1, anonymous: false },
+        courts_now: [{ court: null, a: [{ name: 'Renato C.' }, { name: 'Joana S.' }], b: [{ name: 'Duarte P.' }, { name: 'Nuno F.' }], score_a: 4, score_b: 2 }] },
     ]),
   ] : []),
   save_friend_match_set: () => ({ sets: [], sets_a: 1, sets_b: 1, finished: false, status: 'pending' }),

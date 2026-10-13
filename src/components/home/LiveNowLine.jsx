@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next'
 import { ChevronRight } from 'lucide-react'
 import { listLiveEvents } from '../../lib/liveEvents'
 import { cardFields, LiveCard } from '../live/LiveStrip'
+import LiveBoard from './LiveBoard'
 import { Sheet } from '../agenda/AgendaControls'
 
 // O tipo de cada um, como na agenda: um jogo entre amigos num clube é
@@ -45,11 +46,12 @@ export default function LiveNowLine({ filters = null, onCount, show = true }) {
   return (
     <>
       <button type="button" onClick={() => setOpen(true)}
-        className="press flex w-full items-center gap-2.5 rounded-2xl border border-line bg-white px-3 py-[11px] text-left">
-        <span aria-hidden className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-danger" />
+        className="press flex w-full items-center gap-3 rounded-2xl bg-white px-3.5 py-3 text-left shadow-[0_1px_2px_rgba(17,17,17,.06)]">
+        {/* R2: o ponto vermelho com halo; com «reduzir movimento», não pisca. */}
+        <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-full bg-[#EF4444] shadow-[0_0_0_4px_rgba(239,68,68,.2)] motion-safe:animate-pulse" />
         <span className="min-w-0 flex-1">
-          <b className="block text-[13.5px] font-extrabold text-ink-900">{t('live.title')} · {rows.length}</b>
-          <small className="block truncate text-[11.5px] text-muted">{cards.map((c) => c.title).filter(Boolean).join(' · ')}</small>
+          <b className="block font-display text-[15px] font-extrabold text-ink-900">{t('live.title')} · {rows.length}</b>
+          <small className="block truncate text-[12.5px] text-[#5B6068]">{cards.map((c) => c.title).filter(Boolean).join(' · ')}</small>
         </span>
         <ChevronRight size={18} className="shrink-0 text-[#9CA3AF]" />
       </button>
@@ -57,7 +59,11 @@ export default function LiveNowLine({ filters = null, onCount, show = true }) {
         <Sheet title={t('live.title')} onClose={() => setOpen(false)}>
           <p className="-mt-1 mb-3 text-[13px] text-ink-700">{t('home.live_sheet_text')}</p>
           <div className="space-y-2.5">
-            {cards.map((c, i) => <LiveCard key={i} c={c} wide />)}
+            {/* R2 (13 out): o placar escuro por jogo; o torneio fica com o
+                cartão de sempre (o placar dele é do Dev 1). */}
+            {rows.map((r, i) => (r.kind === 'tournament'
+              ? <LiveCard key={i} c={cards[i]} wide />
+              : <LiveBoard key={i} row={r} card={cards[i]} onOpen={() => setOpen(false)} />))}
           </div>
           <button type="button" onClick={() => setOpen(false)}
             className="press mt-4 flex min-h-[52px] w-full items-center justify-center rounded-ctrl border-[1.5px] border-ink-900 bg-white px-4 text-[15px] font-extrabold text-ink-900">
