@@ -1159,15 +1159,18 @@ export default function GerirClube() {
     age_restriction: game.age_restriction ?? null,
     level: game.level,
     auto_start_hours_before: game.auto_start_hours_before,
-    // Só quando não é o valor por omissão — ver handleCreateGame.
-    ...(game.pairing_mode && game.pairing_mode !== 'por_nivel' ? { pairing_mode: game.pairing_mode } : {}),
-    ...(game.rotate_partners ? { rotate_partners: true } : {}),
+    // O `game` é a linha da base de dados: com a coluna vai sempre, também o
+    // valor por omissão — senão voltar a «por nível» ou a «Fixas» ao editar
+    // não chegava às datas seguintes (#586, ponto 1.5).
+    ...('pairing_mode' in game ? { pairing_mode: game.pairing_mode || 'por_nivel' } : {}),
+    ...(typeof game.rotate_partners === 'boolean' ? { rotate_partners: game.rotate_partners } : {}),
     // O `game` é a linha da base de dados: com a coluna vai sempre (também
     // «Não», para editar Sim→Não chegar à série); sem ela, não vai.
     ...(typeof game.seed_reverse === 'boolean' ? { seed_reverse: game.seed_reverse } : {}),
     // «Respeitar os lados» (Dev 3, migration_mix_respeitar_lados.sql): o mesmo truque.
     ...(typeof game.respect_sides === 'boolean' ? { respect_sides: game.respect_sides } : {}),
-    ...(game.ranked === false ? { ranked: false } : {}),
+    // O mesmo para o ranking: Não→Sim também tem de chegar à série (1.5).
+    ...(typeof game.ranked === 'boolean' ? { ranked: game.ranked } : {}),
     // O `game` aqui é a linha que a base de dados devolveu: com a coluna, vai
     // sempre (também «Não», para editar Sim→Não chegar à recorrência); antes
     // da migração o campo não vem e não se manda nada.
@@ -1290,7 +1293,9 @@ export default function GerirClube() {
       .insert([{
         ...recurrenceSnapshotAndRule(game, recurrence),
         mix_offset_seconds: mixOffsetSeconds,
-        organization_id: currentOrganizationId,
+        // A série fica onde o mix está: num grupo escolhido no Gerir do clube,
+        // as datas seguintes iam para o clube (#586, ponto 1.8).
+        organization_id: game.organization_id || currentOrganizationId,
         created_by: userId,
       }])
       .select()
@@ -1348,7 +1353,7 @@ export default function GerirClube() {
         launchAt: new Date(nextDate.getTime() - mixOffsetSeconds * 1000),
         userId,
         recurrenceId: newRecurrence.id,
-        organizationId: currentOrganizationId,
+        organizationId: game.organization_id || currentOrganizationId,
       })])
 
     if (pendingError) {
@@ -1658,7 +1663,7 @@ export default function GerirClube() {
     // pairing_mode sai pelo mesmo motivo: só é enviado quando não é o valor
     // por omissão, para criar/editar mixes não rebentar antes de
     // migration_mix_pairing_mode.sql correr.
-    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, respect_sides: _respectSides, seed_reverse: _seedReverse, ranked: _ranked, allow_pair_signup: _allowPairSignup, join_approval: _joinApproval, launch: _launch, whatsapp_post_times: postTimes, tiebreak_8_8: tieBreak88, image_url: imageUrl, special, ...gameFields } = gameForm
+    const { recurrence, pool_size: _poolSize, pairing_mode: _pairingMode, rotate_partners: _rotatePartners, respect_sides: _respectSides, seed_reverse: _seedReverse, ranked: _ranked, allow_pair_signup: _allowPairSignup, join_approval: _joinApproval, launch, whatsapp_post_times: postTimes, tiebreak_8_8: tieBreak88, image_url: imageUrl, special, ...gameFields } = gameForm
     // Any mix in an active recurring series shares the same underlying
     // game_recurrences row (via recurrence_id) — not just the origin — so
     // recurrence management works from any of them, not only the one that
@@ -1671,6 +1676,20 @@ export default function GerirClube() {
       else setGameError(recurrenceError.message)
       return
     }
+
+    // Um mix que não se repete e ainda não abriu (#586, ponto 1.2): o
+    // «Abrem as inscrições» grava-se, e conta a partir da data do mix — mudar
+    // a data leva a hora de abrir com ela. «Já» abre agora.
+    const singleScheduled = editingGame.status === 'pending' && !hadActiveRecurrence && !recurrence.enabled
+    const singleLaunchDays = singleScheduled ? parseInt(launch?.daysBefore, 10) || 0 : 0
+    const singleLaunchAt = singleLaunchDays >= 1 ? launchDate(new Date(gameForm.date), singleLaunchDays, launch?.time || '10:00') : null
+    if (singleLaunchAt && singleLaunchAt <= new Date()) {
+      setLaunchDayError(t('mixwizard.launch_past'))
+      return
+    }
+    const singleLaunchUpdate = !singleScheduled ? {}
+      : singleLaunchAt ? { launch_at: singleLaunchAt.toISOString() }
+        : { status: 'open', launch_at: null }
 
     try {
       // See handleCreateGame — num_courts is a raw string while typing,
@@ -1712,6 +1731,7 @@ export default function GerirClube() {
           // A imagem: vai quando há uma ou quando se tirou a que havia.
           ...((imageUrl || editingGame.image_url) ? { image_url: imageUrl || null } : {}),
           ...pendingLaunchUpdate,
+          ...singleLaunchUpdate,
         })
         .eq('id', editingGame.id)
         .select()
@@ -1752,7 +1772,9 @@ export default function GerirClube() {
 
       // As horas do WhatsApp: numa série ativa, da série inteira.
       const hoursWarning = (await saveMixPostTimes(editingGame.id, recurrence.enabled, postTimes))
-        || (await saveMixSpecialPrice(editingGame.id, hadActiveRecurrence && recurrence.enabled, special, gameForm.price_per_player))
+        // Também quando o «Repete?» se liga agora: a série acabou de nascer e
+        // as datas seguintes herdam o preço especial dela (#586, ponto 1.7).
+        || (await saveMixSpecialPrice(editingGame.id, recurrence.enabled, special, gameForm.price_per_player))
       if (hoursWarning) saidaNotice.current = hoursWarning
       if (!saidaNotice.current) saidaNotice.current = t('mixwizard.notice_saved')
       setEditingGame(null)
@@ -2335,6 +2357,14 @@ export default function GerirClube() {
       tiebreak_8_8: game.tiebreak_8_8 || 'tiebreak',
       whatsapp_post_times: Array.isArray(game.whatsapp_post_times) ? game.whatsapp_post_times.map((h) => String(h).slice(0, 5)) : null,
       auto_start_hours_before: game.auto_start_hours_before ?? '',
+      // «Abrem as inscrições» de um mix que não se repete e ainda não abriu:
+      // os dias antes e a hora, a partir do launch_at (#586, ponto 1.2).
+      launch: game.status === 'pending' && !hasActiveRecurrence && game.launch_at
+        ? (() => {
+            const f = deriveLaunchFields(game.date, (new Date(game.date).getTime() - new Date(game.launch_at).getTime()) / 1000)
+            return { daysBefore: String(f.daysBefore), time: f.launchTime }
+          })()
+        : { daysBefore: '0', time: '10:00' },
       recurrence: hasActiveRecurrence
         ? {
             enabled: true,

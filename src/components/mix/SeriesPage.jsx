@@ -13,7 +13,7 @@ import { isMixLive } from '../../lib/mixLive'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { BackBar } from '../ui'
-import { ArrowLeft, ChevronRight } from 'lucide-react'
+import { ArrowLeft, ChevronRight, Lock } from 'lucide-react'
 import { ConfirmSheet } from '../ui'
 import EventActionsSheet from '../EventActionsSheet'
 import ChangeOneMixSheet from './ChangeOneMixSheet'
@@ -150,19 +150,24 @@ export default function SeriesPage({ games, onBack, onEditRules, onOpen, onChang
         <p className="mt-1 text-[13px] text-ink-700">{rules}</p>
         {active && rec?.is_paused && <p className="mt-0.5 text-[13px] font-extrabold text-ink-900">{t('series.paused')}</p>}
         {active && !rec?.is_paused && opensLabel && <p className="mt-0.5 text-[13px] text-ink-700">{opensLabel}</p>}
-        {active && (
-          // Um por cima do outro, nunca lado a lado (regra de 6 out).
-          <div className="mt-3 space-y-2">
-            <button type="button" onClick={() => onEditRules(base)}
-              className="w-full min-h-[44px] rounded-ctrl border border-line bg-white px-3 text-sm font-extrabold text-ink-900">
-              {t('series.edit_rules')}
-            </button>
-            <button type="button" onClick={() => setDeleteAsk(true)}
-              className="w-full min-h-[44px] rounded-ctrl border-[1.5px] border-danger bg-white px-3 text-sm font-extrabold text-danger">
-              {t('series.delete')}
-            </button>
-          </div>
-        )}
+        {/* Um por cima do outro, nunca lado a lado (regra de 6 out). Numa
+            série acabada ficam à vista, apagados, com a razão — não
+            desaparecem (#586, ponto 1.4). */}
+        <div className="mt-3 space-y-2">
+          <button type="button" onClick={() => onEditRules(base)} disabled={!active}
+            className="w-full min-h-[44px] rounded-ctrl border border-line bg-white px-3 text-sm font-extrabold text-ink-900 disabled:opacity-40">
+            {t('series.edit_rules')}
+          </button>
+          <button type="button" onClick={() => setDeleteAsk(true)} disabled={!active}
+            className="w-full min-h-[44px] rounded-ctrl border-[1.5px] border-danger bg-white px-3 text-sm font-extrabold text-danger disabled:opacity-40">
+            {t('series.delete')}
+          </button>
+          {!active && (
+            <p className="flex items-start gap-1.5 text-sm text-muted">
+              <Lock size={14} className="mt-[3px] shrink-0 text-ink-500" /> {t('series.ended_locked')}
+            </p>
+          )}
+        </div>
       </div>
 
       {/* «PRÓXIMAS DATAS»: só as por jogar. As que já passaram ficam na
