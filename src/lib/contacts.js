@@ -11,6 +11,20 @@ export const SUPPORT_EMAIL = 'support@alinho.pt'
 // escondido para um clube não escrever para o vazio. Existe desde 28 set.
 export const SUPPORT_EMAIL_READY = true
 
+// Os responsáveis pelos dados até haver empresa (decisão do Francisco, 13 out;
+// texto da BA em design-handoff/2026-10-13-privacidade-responsaveis). Os
+// nomes completos dos fundadores, confirmados pelo Francisco a 13 out (o
+// David juntou-se no mesmo dia); todos aceitam aparecer antes de publicar.
+// Quando houver empresa, troca-se pelos dados dela.
+export const FOUNDERS = ['Francisco Barros', 'Renato Cruz', 'Ruben Bernardo', 'David Antunes']
+/** «Francisco Barros, Renato Cruz e Ruben Bernardo» (en: «… and …»). */
+export const founderNames = (lang) => `${FOUNDERS.slice(0, -1).join(', ')} ${lang?.startsWith('en') ? 'and' : 'e'} ${FOUNDERS[FOUNDERS.length - 1]}`
+
+// A data da Política e dos Termos em vigor: a que se aceita no ConsentGate
+// e a «Última atualização» das duas páginas — uma constante só, para nunca
+// ficarem diferentes (PO, 13 out). Se o texto mudar, a data muda com ele.
+export const POLICY_VERSION = '2026-10-16'
+
 // O número do robô (decisão do Francisco, 25 set). O robô ignora as
 // mensagens privadas que não são um código, por isso quem escreve espera por
 // uma pessoa da equipa — a página diz isso por baixo dos botões.

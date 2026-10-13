@@ -8,9 +8,10 @@ import { PrimaryButton } from '../components/ui'
 import { Wordmark } from '../components/Layout'
 import { describeError } from '../lib/errors'
 
-// A data da Política que se aceita: a última mudança ao texto foi a 8 out
-// (13724024, Renato). Se o texto mudar, a data muda com ele (Dev 3, 10 out).
-export const POLICY_VERSION = '2026-10-08'
+// A data da Política que se aceita vive em lib/contacts.js (é também a
+// «Última atualização» das páginas); fica exportada daqui como antes.
+import { POLICY_VERSION } from '../lib/contacts'
+export { POLICY_VERSION }
 
 /* ════════════════════════════════════════════════════════════════════════
    Consent gate (Trello #154, #360). Ecrã bloqueante mostrado UMA vez a
