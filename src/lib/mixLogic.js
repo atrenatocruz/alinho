@@ -415,7 +415,10 @@ export function nextSobeDesceRotating(roundMatches, teamsById, numCourts, { part
         chosen = pick[Math.floor(random() * pick.length)]
       } else {
         const byPosition = [...players].sort((x, y) => rankOf(x) - rankOf(y))
-        chosen = [[byPosition[0], byPosition[1]], [byPosition[2], byPosition[3]]]
+        const positional = [[byPosition[0], byPosition[1]], [byPosition[2], byPosition[3]]]
+        // Com «Respeitar os lados», também aqui «sempre que dá» (QA, 13 out):
+        // a de menos choques de lado; empatadas, fica a da posição.
+        chosen = [positional, ...options].reduce((best, o) => (clashes(o) < clashes(best) ? o : best))
       }
       return { court_number: Number(court), duplaA: chosen[0], duplaB: chosen[1], forcedHistory: history(chosen) > 0 }
     })

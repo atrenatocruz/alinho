@@ -617,6 +617,20 @@ describe('nextSobeDesceRotating', () => {
     expect(pairsOf(c1)).toEqual([key('a', 'e'), key('b', 'f')].sort())
   })
 
+  it('sem forma nova, os lados contam na mesma; empatadas, a da posição (QA, 13 out)', () => {
+    const side = (id, s) => ({ id, name: id, preferred_side: s })
+    const sided = { ...teams, t1: { id: 't1', player1: side('a', 'left'), player2: side('b', 'left') },
+      t3: { id: 't3', player1: side('e', 'right'), player2: side('f', 'right') } }
+    const all = new Set(['a', 'b', 'e', 'f'].flatMap((x, i, l) => l.slice(i + 1).map((y) => key(x, y))))
+    const rank = { a: 0, b: 1, e: 2, f: 3 }
+    const opts = { partnerPairs: all, rankOf: (p) => rank[p.id] ?? 9, random: () => 0.5 }
+    // Pela posição seria a+b / e+f — os dois pares chocam de lado.
+    expect(pairsOf(nextSobeDesceRotating(round1, sided, 2, opts)[0])).toEqual([key('a', 'b'), key('e', 'f')].sort())
+    const c1 = pairsOf(nextSobeDesceRotating(round1, sided, 2, { ...opts, respectSides: true })[0])
+    expect(c1).not.toContain(key('a', 'b'))
+    expect(c1).not.toContain(key('e', 'f'))
+  })
+
   it('escolhe ao sorte entre as formas sem repetição', () => {
     const vistas = new Set()
     // Valores de sorteio espalhados de 0 a 1 — cobre as duas formas possíveis.

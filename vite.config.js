@@ -17,7 +17,7 @@ const testEnvHtml = (isTest) => ({
     .replace('<title>alinho.pt — mixes, rankings e clubes de padel</title>', '<title>alinho TESTE</title>')
     .replace('href="/favicon.ico"', 'href="/favicon-teste.ico"')
     .replace('href="/apple-touch-icon.png"', 'href="/apple-touch-icon-teste.png"')
-    .replace('<meta name="theme-color" content="#040404" />', `<meta name="theme-color" content="${TEST_ORANGE}" />`)
+    .replace('<meta name="theme-color" content="#0E1A12" />', `<meta name="theme-color" content="${TEST_ORANGE}" />`)
     .replace('</head>', '  <meta name="apple-mobile-web-app-title" content="alinho TESTE" />\n  </head>')),
 })
 
@@ -41,8 +41,9 @@ export default defineConfig(({ mode }) => {
         name: isTest ? 'alinho TESTE' : 'alinho',
         short_name: isTest ? 'alinho TESTE' : 'alinho',
         description: 'A comunidade de jogadores, grupos e clubes de padel.',
-        theme_color: isTest ? TEST_ORANGE : '#040404',
-        background_color: '#FFFFFF',
+        // O verde do splash «Rally» (12 out): sem clarão de outra cor ao abrir.
+        theme_color: isTest ? TEST_ORANGE : '#0E1A12',
+        background_color: '#0E1A12',
         display: 'standalone',
         icons: [
           {

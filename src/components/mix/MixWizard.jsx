@@ -34,6 +34,15 @@ import { isMixLive } from '../../lib/mixLive'
 
 const pairsAreFixed = (form) => form.format !== 'americano' && !(form.rotate_partners && form.format === 'sobe_desce')
 
+/** Uma frase trancada: o cadeado em linha, a cinzento (UX, 13 out). */
+function LockNote({ children, className = '' }) {
+  return (
+    <p className={`flex items-start gap-1.5 text-sm text-muted ${className}`}>
+      <Lock size={14} className="mt-[3px] shrink-0 text-ink-500" /> {children}
+    </p>
+  )
+}
+
 /** `locked`: à vista, a cinzento e sem se poder tocar (o mix já começou). */
 function Field({ label, children, hint, locked = false }) {
   if (locked) children = <div className="pointer-events-none opacity-50" aria-disabled="true">{children}</div>
@@ -85,11 +94,7 @@ export default function MixWizard({
   // ronda 1 fica tudo como antes.
   const started = !!editingGame && (isMixLive(editingGame) || editingGame.status === 'finished')
   // O cadeado em linha, a cinzento, o do Editar do torneio (UX, 13 out).
-  const startedNote = started ? (
-    <p className="flex items-start gap-1.5 text-sm text-muted">
-      <Lock size={14} className="mt-[3px] shrink-0 text-ink-500" /> {t('mixwizard.started_locked')}
-    </p>
-  ) : null
+  const startedNote = started ? <LockNote>{t('mixwizard.started_locked')}</LockNote> : null
   // O nível: «Qualquer nível» ou «Escolher» → aparecem os níveis de hoje.
   const [pickLevel, setPickLevel] = useState(!!form.level)
   // Masculino, Feminino ou Misto, de 1 a 6 (#577). O escalão começa pelo
@@ -275,6 +280,18 @@ export default function MixWizard({
             <Select value={mixScopeId} onChange={setMixScopeId} options={options.scopes} />
           </Field>
         )}
+        {/* Ao editar, «Onde aparece» fica à vista e trancado, com a razão —
+            não desaparece (#586, ponto 1.1). Mudar o sítio mexia na série,
+            no preço especial e nos grupos de WhatsApp. */}
+        {options.scopes.length > 1 && editingGame && (
+          <div>
+            <Field label={t('mixwizard.scope_label')} locked>
+              <Select value={options.scopes.some((o) => o.value === editingGame.organization_id) ? editingGame.organization_id : ''}
+                onChange={() => {}} options={options.scopes} />
+            </Field>
+            <LockNote className="mt-1.5">{t('mixwizard.scope_locked')}</LockNote>
+          </div>
+        )}
         <Field label={t('mixwizard.who_label')}>
           <Chips
             label={t('mixwizard.who_label')}
@@ -390,6 +407,22 @@ export default function MixWizard({
             />
           </Field>
         )}
+        {/* Uma data de uma série parada ou acabada: o «Repete?» fica à vista,
+            trancado, com a razão (#586, ponto 1.3). */}
+        {editingGame?.recurrence && !editingGame.recurrence.is_active && (
+          <div>
+            <Field label={t('mixwizard.repeat_label')} locked>
+              <Chips label={t('mixwizard.repeat_label')} value={editingGame.recurrence.frequency || 'weekly'} onChange={() => {}}
+                options={[
+                  ...(editingGame.recurrence.frequency === 'daily' ? [{ value: 'daily', label: t('gerirclube.freq_daily') }] : []),
+                  { value: 'weekly', label: t('mixwizard.repeat_weekly') },
+                  { value: 'monthly', label: t('mixwizard.repeat_monthly') },
+                  ...(editingGame.recurrence.frequency === 'yearly' ? [{ value: 'yearly', label: t('gerirclube.freq_yearly') }] : []),
+                ]} />
+            </Field>
+            <LockNote className="mt-1.5">{t('mixwizard.repeat_stopped_locked')}</LockNote>
+          </div>
+        )}
         {/* Numa série, o dia escolhido é o dos mixes seguintes; o primeiro
             abre ao publicar — e isso tem de estar escrito (QA, 27 set). */}
         {rec.enabled && !editingGame && form.date && (
@@ -408,10 +441,20 @@ export default function MixWizard({
             onTime={(v) => setRec({ launchTime: v })}
             error={launchDayError}
           />
-        ) : !editingGame && (
+        ) : editingGame && !(editingGame.status === 'pending' && !editingGame.recurrence?.is_active) ? (
+          // Ao editar um mix que já abriu: à vista e trancado, com a razão
+          // (#586, ponto 1.2). Um rascunho abre-se ao publicar.
+          ['open', 'closed', 'in_progress', 'finished'].includes(editingGame.status) && (
+            <div>
+              <p className="text-sm font-medium text-gray-700">{t('launchday.label')}</p>
+              <LockNote className="mt-1.5">{t('mixwizard.opens_already_open')}</LockNote>
+            </div>
+          )
+        ) : (
           // Num mix que não se repete: «Já» (abre ao publicar) ou um dos dias
           // antes — o mix fica 'pending' com launch_at e abre sozinho a essa
-          // hora (migration_abrem_inscricoes.sql, Dev 3, 27 set).
+          // hora (migration_abrem_inscricoes.sql, Dev 3, 27 set). Ao editar
+          // um que ainda não abriu, também (#586, ponto 1.2).
           <LaunchDayPicker
             allowNow
             mixDate={form.date ? new Date(form.date) : null}
@@ -606,7 +649,8 @@ export default function MixWizard({
           hint={rankedLocked ? null : t(form.ranked ? 'gerirclube.ranked_yes_help' : 'gerirclube.ranked_no_help')}>
           {rankedLocked ? (
             // Com as duplas feitas e a ronda por começar, a razão é outra (UX, 13 out).
-            <p className="text-sm text-muted">{t(`gerirclube.ranked_locked_${form.ranked ? 'yes' : 'no'}${started ? '' : '_formed'}`)}</p>
+            // Com o cadeado em linha, como as outras frases trancadas (#586, 1.9).
+            <LockNote>{t(`gerirclube.ranked_locked_${form.ranked ? 'yes' : 'no'}${started ? '' : '_formed'}`)}</LockNote>
           ) : (
             <Chips label={t('mixwizard.ranked_label')} value={form.ranked ? 'yes' : 'no'} onChange={(v) => set({ ranked: v === 'yes' })}
               options={[{ value: 'yes', label: t('gerirclube.ranked_yes') }, { value: 'no', label: t('gerirclube.ranked_no') }]} />

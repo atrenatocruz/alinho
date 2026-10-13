@@ -328,7 +328,9 @@ const RPC_MOCKS = {
     }] : [],
   }] : []),
   list_organization_members: () => [],
-  list_club_groups: () => [],
+  // mockEditGroups = 'true': o clube tem um grupo que giro — o «Onde aparece» (#586, 1.1).
+  list_club_groups: () => (localStorage.getItem('mockEditGroups') === 'true'
+    ? [{ id: 'grp-manhas', name: 'Smash Manhãs', slug: 'smash-manhas', group_logo_url: null, member_count: 14, my_status: 'admin', can_manage: true }] : []),
   search_organizations: (params) => (community()
     ? COMMUNITY_ORGS.filter((o) => o.name.toLowerCase().includes(String(params?.p_query || '').trim().toLowerCase()))
     : []),
@@ -1793,7 +1795,8 @@ const TABLE_MOCKS = {
     // A página da série (/gerir/:slug/serie/rec-gp): as mesmas datas, da série.
     // mockGerirSeries = 'true': as três datas são da série rec-gp (a página da série).
     if (url.includes('recurrence_id=eq.') || localStorage.getItem('mockGerirSeries') === 'true') {
-      const rec = { id: 'rec-gp', is_active: true, is_paused: false, frequency: 'weekly', mix_offset_seconds: 3 * 86400 }
+      // mockGerirSeriesEnded = 'true': a série já acabou (#586, 1.4).
+      const rec = { id: 'rec-gp', is_active: localStorage.getItem('mockGerirSeriesEnded') !== 'true', is_paused: false, frequency: 'weekly', mix_offset_seconds: 3 * 86400 }
       return [
         { ...base, id: 'gp-next', title: 'Padel domingueiro', date: day(3), status: 'open', participants: pp(3), recurrence_id: 'rec-gp', recurrence: rec },
         { ...base, id: 'gp-done', title: 'Padel domingueiro', date: day(-4), status: 'finished', participants: pp(8), recurrence_id: 'rec-gp', recurrence: rec },
@@ -1855,6 +1858,15 @@ const TABLE_MOCKS = {
       // localStorage.mockProSet = '7' | '10' — o mix em pro set a 9, com o 8-8
       // a tie-break a 7 ou a super tie-break a 10 (#580).
       ...(localStorage.getItem('mockProSet') ? { scoring_format: 'pro_set_9', tiebreak_8_8: localStorage.getItem('mockProSet') === '10' ? 'super_tiebreak' : null } : {}),
+    } : {}),
+    // #586 (13 out): mockEditMix = 'pending' (mix único, abre daqui a uns
+    // dias) | 'stopped' (data de uma série parada).
+    ...(localStorage.getItem('mockEditMix') === 'pending' ? {
+      status: 'pending', recurrence_id: null, recurrence: null,
+      date: new Date(Date.now() + 6 * 86400000).toISOString(),
+      launch_at: (() => { const d = new Date(Date.now() + 4 * 86400000); d.setHours(10, 0, 0, 0); return d.toISOString() })(),
+    } : localStorage.getItem('mockEditMix') === 'stopped' ? {
+      recurrence_id: 'rec-stop', recurrence: { id: 'rec-stop', is_active: false, is_paused: false, frequency: 'weekly', mix_offset_seconds: 3 * 86400 },
     } : {}),
     organization: { name: 'Dev Org', group_logo_url: null },
     participants: [{
