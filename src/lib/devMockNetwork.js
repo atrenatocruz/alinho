@@ -715,7 +715,7 @@ const RPC_MOCKS = {
         // mockFriendPeople = '4' (sem o Zé) | '6' (mais a Marta): formar as equipas com 4 e com 6.
         ...(mode === 'left' || localStorage.getItem('mockFriendPeople') === '4' ? [] : [{ invitee_id: 'i-g1', user_id: null, name: 'Zé Pinto', avatar_url: null, rating: null, gender: null, status: 'guest', is_guest: true, is_creator: false, guest_email_sent: true }]),
         ...(localStorage.getItem('mockFriendPeople') === '6' ? [inv('u-mr', 'Marta Rocha', 1250, 'accepted', { gender: 'feminino' })] : []),
-        ...(creatorIsMe ? [] : [inv(me, 'Admin (Dev)', 1450, 'pending')]),
+        ...(creatorIsMe ? [] : [inv(me, 'Admin (Dev)', 1450, localStorage.getItem('mockInviteGoing') ? 'accepted' : 'pending')]),
       ],
       // Com tempo (27 set): 5 jogos, o 1 já com resultado, o 2 por começar
       // ('timed') ou a decorrer há 7:20 ('running').
@@ -802,7 +802,9 @@ const RPC_MOCKS = {
   ] : []),
   list_my_friend_match_invites: () => (['invited', 'invited_results'].includes(localStorage.getItem('mockFriendSession'))
     ? [{ match_id: 'fs-1', creator_name: 'Rita Figueira', scheduled_date: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10), scheduled_time: '10:00:00', location: 'Clube Exemplo', people: 6,
-      teams_set: localStorage.getItem('mockFriendSession') === 'invited_results', results_with_me: localStorage.getItem('mockFriendSession') === 'invited_results' ? 3 : 0 }] : []),
+      teams_set: localStorage.getItem('mockFriendSession') === 'invited_results', results_with_me: localStorage.getItem('mockFriendSession') === 'invited_results' ? 3 : 0,
+      // mockInviteGoing = 'true' | 'creator': já disse «Vou», sem equipas (13 out).
+      my_status: localStorage.getItem('mockInviteGoing') ? 'accepted' : 'pending', is_creator: localStorage.getItem('mockInviteGoing') === 'creator' }] : []),
   // «O fim» (Dev 3, 10 out): mockFriendList = 'true' — a lista nova, com
   // finished_at, ranking_state, pairs e live (SPEC amigos-o-fim, ponto 8).
   list_my_friend_sessions: () => (localStorage.getItem('mockFriendList') === 'true' ? (() => {

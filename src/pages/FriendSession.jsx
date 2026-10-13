@@ -80,7 +80,7 @@ export default function FriendSession() {
   const [invitedHere, setInvitedHere] = useState(false)
   const load = useCallback(() => {
     listMyFriendMatchInvites()
-      .then((rows) => setInvitedHere(rows.some((r) => r.match_id === id)))
+      .then((rows) => setInvitedHere(rows.some((r) => r.match_id === id && r.my_status !== 'accepted')))
       .catch(() => setInvitedHere(false))
     // Quem não jogou mas é do grupo (ou o grupo é público) abre-o só para ler,
     // vindo dos «Já jogados» (27/28 set).
