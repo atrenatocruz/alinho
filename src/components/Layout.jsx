@@ -22,6 +22,7 @@ import TournamentNoticeRow, { TOURNAMENT_NOTICE_KINDS } from './tournament/Tourn
 import FriendInviteRow, { FRIEND_NOTICE_KINDS } from './friends/FriendInviteRow'
 import { formatDate } from '../lib/formatDate'
 import AccountDeletionPending from './AccountDeletionPending'
+import AppToast from './AppToast'
 
 // Re-prompt at most once per day once dismissed — a nudge, not a gate.
 
@@ -845,6 +846,7 @@ export default function Layout({ children }) {
           any more — each main page (Home, Comunidade, Rankings, Gerir,
           Perfil) shows notifications/logout in its own sticky title
           (PageHeader in components/ui.jsx), read via HeaderActionsContext. */}
+      <AppToast />
       <main ref={mainRef} className="flex-1 overflow-y-auto">
         {/* O espaço reservado no fim tem de crescer com a barra (Trello #407).
             A nav acrescenta env(safe-area-inset-bottom) ao seu próprio fundo —

@@ -9,7 +9,7 @@
 // «Editar · Mais», e no «Mais» também «Sair do jogo».
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { useTranslation } from 'react-i18next'
+import { Trans, useTranslation } from 'react-i18next'
 import { BackBar } from '../components/ui'
 import { useGoBack } from '../lib/useGoBack'
 import { Lock, MapPin, MoreHorizontal, Pencil, Share2, X, Plus, Check } from 'lucide-react'
@@ -28,6 +28,10 @@ import { ShareMissingButton } from '../components/friends/FriendSessionGames'
 import FriendRounds from '../components/friends/FriendRounds'
 import { FinishedPage, RoundsScoreSheet, FriendWinnersShare } from '../components/friends/FriendFinish'
 import { namesList } from '../components/friends/friendResult'
+import FriendResultButtons from '../components/friends/FriendResultButtons'
+import { resultHow } from '../components/friends/FriendResultNotice'
+import { shortName } from '../components/friends/friendShare'
+import { unreadFriendResultNotice } from '../lib/notifications'
 
 // «Vai» / «Por responder» (amigos sem bloquear, 27 set).
 const STATUS_KEY = { accepted: 'friends.tag_going', pending: 'friends.status_pending', declined: 'friends.tag_declined', guest: 'friends.guest_tag' }
@@ -247,6 +251,20 @@ export default function FriendSession() {
     try { if (clockKey) localStorage.removeItem(clockKey) } catch { /* sem armazenamento */ }
   }
   const iSent = finished && !!profile?.id && match?.sent_by?.user_id === profile.id
+  // Jogo acabado com um resultado por responder: quem está nas equipas vê
+  // «Está certo» / «Não está certo» no sítio do «Vou» (UX, 13 out). A base de
+  // dados já deixa responder a quem jogou, com ou sem o «Vou».
+  const senderGender = invitees.find((i) => i.user_id && i.user_id === match?.sent_by?.user_id)?.gender
+  const inTeams = !!profile?.id && games.some((g) => [...(g.team_a || []), ...(g.team_b || [])].some((s) => s.user_id === profile.id))
+  const [resultToAnswer, setResultToAnswer] = useState(null) // o aviso por responder
+  useEffect(() => {
+    if (!finished || iSent || !inTeams || match?.rejected_by || !match?.id) { setResultToAnswer(null); return undefined }
+    let alive = true
+    unreadFriendResultNotice(match.id)
+      .then((n) => { if (alive) setResultToAnswer(n) })
+      .catch((err) => console.error('Error checking the friend result notice:', err))
+    return () => { alive = false }
+  }, [finished, iSent, inTeams, match?.rejected_by, match?.id])
   // Pelo ranking_state (Dev 3): num jogo «só amigável» o waiting_for também
   // vem cheio, e aí não conta para nada.
   const sentToast = (res) => (res?.ranking_state === 'counted' || (!res?.ranking_state && res?.counted) ? t('friends.toast_sent_counted')
@@ -433,7 +451,19 @@ export default function FriendSession() {
       {organizerLine}
 
       {/* Convidado por responder: «Vou» · «Vou, mas sem o meu nome» · «Não vou». */}
-      {(me?.status === 'pending' || invitedHere) && (
+      {resultToAnswer && (
+        <div className="mt-6 space-y-2.5">
+          {/* O que se está a confirmar, como no sino (UX, 13 out). */}
+          <p className="text-sm text-ink-900">
+            <Trans i18nKey="friends.page_result_line"
+              values={{ name: shortName(match.sent_by?.name || resultToAnswer.data?.sender_name || ''), how: resultHow(t, resultToAnswer.data || {}) }}
+              context={senderGender === 'feminino' ? 'f' : senderGender === 'masculino' ? 'm' : undefined}
+              components={{ b: <b className="font-extrabold" /> }} />
+          </p>
+          <FriendResultButtons matchId={match.id} senderName={match.sent_by?.name} onDone={() => { setResultToAnswer(null); load() }} />
+        </div>
+      )}
+      {!finished && (me?.status === 'pending' || invitedHere) && (
         <div className="mt-6 space-y-2.5">
           <p className="rounded-card border border-line bg-white p-3.5 text-sm text-ink-900">
             <b>{t('friends.invited_you', { name: creator?.name || '' })}</b> {t('friends.invited_you_rest', {

@@ -42,6 +42,23 @@ export async function listMyUnreadNotifications(limit = 20) {
   return data || []
 }
 
+/** O aviso «enviou o resultado» deste jogo entre amigos, ainda por
+    responder (null se já respondi ou se não o recebi). */
+export async function unreadFriendResultNotice(matchId) {
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('id, kind, data')
+    .eq('kind', 'friend_match_result_sent')
+    .is('read_at', null)
+    .eq('data->>match_id', matchId)
+    .limit(1)
+  if (error) {
+    if (errorKind(error) === 'not_ready') return null
+    throw error
+  }
+  return (data || []).find((n) => n.kind === 'friend_match_result_sent' && n.data?.match_id === matchId) || null
+}
+
 export async function markNotificationsRead(ids) {
   if (!ids?.length) return
   const { error } = await supabase.rpc('mark_notifications_read', { p_ids: ids })

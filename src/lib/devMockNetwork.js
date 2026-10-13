@@ -630,6 +630,8 @@ const RPC_MOCKS = {
       }
       // mockFriendPending = 'true': a Ana ainda não aceitou (a pergunta diz «Conta quando…»).
       if (localStorage.getItem('mockFriendPending') === 'true') invitees[2].status = 'pending'
+      // mockFriendPending = 'me': sou eu quem não disse «Vou» (mas jogo nas equipas).
+      if (localStorage.getItem('mockFriendPending') === 'me') invitees[meIdx].status = 'pending'
       // Depois de guardar com a seguinte por nascer: a última ronda já marcada.
       if (localStorage.getItem('mockFriendLastDone') === 'true') Object.assign(cur, { score_a: 6, score_b: 2, winner_team: 'a' })
       // mockFriendGuest = 'some' (o Zé, sem conta, joga as rondas 2 e 3) |
