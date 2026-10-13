@@ -1420,7 +1420,8 @@ const monthRankingRows = () => {
   if (mode === 'off') return { __error: 'Could not find the function', __code: 'PGRST202' }
   if (mode === 'empty') return []
   const row = (i, [name, gender, rating, points, games, wins], extra = {}) => ({
-    place: i + 1, user_id: `month-${i}`, name, avatar_url: null, rating, gender, points, games, wins, qualified: true, is_me: false, frame: null, ...extra,
+    place: i + 1, user_id: `month-${i}`, name, avatar_url: null, rating, gender, points, games, wins, qualified: true, is_me: false,
+    frame: framesOff() ? null : (MOCK_FRAMES[`month-${i}`]?.find((f) => f.best)?.frame || null), ...extra,
   })
   const me = (extra) => ({ user_id: MOCK_ADMIN_USER_ID, name: 'Admin (Dev)', avatar_url: null, rating: 1605, gender: 'masculino', wins: 2, is_me: true, frame: null, ...extra })
   if (mode === 'few') {
@@ -1463,6 +1464,24 @@ RPC_MOCKS.get_my_played_history = () => (playedOff() ? { __error: 'Could not fin
   ],
 })
 RPC_MOCKS.get_player_titles = () => (playedOff() ? { __error: 'Could not find the function', __code: 'PGRST202' } : { mixes: 1, tournaments: 1, total: 2 })
+
+// Molduras do pódio do mês (#626). localStorage.mockFrames = 'off' → sem
+// moldura nenhuma; por omissão, o Admin (Dev) tem a de ouro do Dev Org e
+// também a de prata do geral (para «tocar na moldura mostra todas»), e
+// alguns do ranking do mês têm prata e bronze.
+const framesOff = () => localStorage.getItem('mockFrames') === 'off'
+const MOCK_FRAMES = {
+  [MOCK_ADMIN_USER_ID]: [
+    { frame: 'ouro', place: 1, organization_id: 'dev-org', scope_name: 'Dev Org', month: '2026-09-01', best: true },
+    { frame: 'prata', place: 2, organization_id: null, scope_name: null, month: '2026-09-01', best: false },
+  ],
+  'month-1': [{ frame: 'prata', place: 2, organization_id: null, scope_name: null, month: '2026-09-01', best: true }],
+  'month-4': [{ frame: 'bronze', place: 3, organization_id: 'dev-org', scope_name: 'Dev Org', month: '2026-09-01', best: true }],
+  'month-6': [{ frame: 'ouro', place: 1, organization_id: 'smash', scope_name: 'Smash Padel Almada', month: '2026-09-01', best: true }],
+}
+RPC_MOCKS.get_user_frames = ({ p_user_ids = [] } = {}) => (framesOff() ? [] : p_user_ids
+  .filter((id) => MOCK_FRAMES[id]).map((id) => ({ user_id: id, ...MOCK_FRAMES[id].find((f) => f.best) })))
+RPC_MOCKS.get_user_frame_list = ({ p_user_id } = {}) => (framesOff() ? [] : (MOCK_FRAMES[p_user_id] || []))
 
 const TABLE_MOCKS = {
   // localStorage.mockScorekeeper = 'true': quem entra é marcador deste mix (29 set).

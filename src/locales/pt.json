@@ -5620,5 +5620,17 @@
   "monthshare.text_ranking_global": "👑 Pódio do ranking na alinho.pt: {{names}}. Parabéns!",
   "monthshare.text_xp": "👑 Pódio da assiduidade no {{club}}: {{names}}. Parabéns!",
   "monthshare.text_xp_global": "👑 Pódio da assiduidade na alinho.pt: {{names}}. Parabéns!",
-  "monthshare.title_xp": "XP"
+  "monthshare.title_xp": "XP",
+  "frames.title_ouro": "Padelista Lendário",
+  "frames.title_prata": "Master do Padel",
+  "frames.title_bronze": "Muralha de Bronze",
+  "frames.global": "Ranking geral",
+  "frames.more_one": "mais {{count}}",
+  "frames.more_other": "mais {{count}}",
+  "frames.sheet_title": "As tuas molduras",
+  "frames.sheet_body": "Ganhas no pódio do mês passado. Usas a melhor, até ao fim deste mês.",
+  "frames.place": "{{place}}.º lugar",
+  "frames.sheet_title_other": "Molduras deste mês",
+  "frames.sheet_body_other": "Ganhas no pódio do mês passado. Usa a melhor até ao fim deste mês.",
+  "frames.in_use": "A usar agora"
 }

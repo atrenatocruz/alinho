@@ -119,7 +119,7 @@ export default function MonthRanking({ scope, scale, scopeLabel, onShare }) {
                     highlight === row.user_id ? 'bg-lime-400/25' : row.is_me ? 'bg-lime-400/10 shadow-[inset_3px_0_0_#C5DD01]' : ''
                   }`}>
                   <span className="w-7 shrink-0 text-center text-sm font-extrabold tabular-nums text-ink-900">{row.place}</span>
-                  <Avatar name={row.name} url={row.avatar_url} size="w-9 h-9 text-xs" />
+                  <Avatar name={row.name} url={row.avatar_url} size="w-9 h-9 text-xs" frame={row.frame} />
                   <div className="flex-1 min-w-0">
                     <p className="truncate text-sm font-extrabold text-ink-900">{row.name}</p>
                     <div className="mt-0.5 flex items-center gap-1.5 min-w-0">

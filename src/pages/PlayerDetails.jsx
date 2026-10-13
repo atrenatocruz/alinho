@@ -16,6 +16,7 @@ import { followPlayer, removeFollow } from '../lib/follows'
 import { getGlobalRankings, getPublicRankings } from '../lib/privateMatches'
 import { positionOf, scaleOf } from '../lib/rankingScales'
 import { formatDate } from '../lib/formatDate'
+import { useFrameList, FrameAround, FrameTitle } from '../components/FrameBits'
 import { describeError } from '../lib/errors'
 
 const SIDE_LABEL_KEY = { left: 'gamedetails.side_left', right: 'gamedetails.side_right', both: 'gamedetails.side_both' }
@@ -37,6 +38,9 @@ export default function PlayerDetails() {
   const [loading, setLoading] = useState(true)
   const [friendActing, setFriendActing] = useState(false)
   const [showPhoto, setShowPhoto] = useState(false)
+  // A moldura do pódio do mês (#626): aparece como a foto, mesmo num perfil privado.
+  const frameList = useFrameList(id)
+  const myFrame = frameList[0]?.frame || null
   const [followListTab, setFollowListTab] = useState(null) // null = closed, else 'followers'|'following'
 
   const [h2h, setH2h] = useState(null)
@@ -309,8 +313,9 @@ export default function PlayerDetails() {
               const r = 35
               const circumference = 2 * Math.PI * r
               return (
-                <div className="relative w-20 h-20 shrink-0">
-                  <svg viewBox="0 0 80 80" width="80" height="80" className="absolute inset-0 -rotate-90">
+                <div className={`relative w-20 h-20 shrink-0 ${myFrame ? 'mt-5 mb-3' : ''}`}>
+                  <FrameAround frame={myFrame} photo={64} left={8} top={8} />
+                  {!myFrame && <svg viewBox="0 0 80 80" width="80" height="80" className="absolute inset-0 -rotate-90">
                     <circle cx="40" cy="40" r={r} fill="none" strokeWidth="4" className="stroke-ink-200/50" />
                     <circle
                       cx="40" cy="40" r={r} fill="none" strokeWidth="4" strokeLinecap="round"
@@ -318,7 +323,7 @@ export default function PlayerDetails() {
                       strokeDasharray={circumference}
                       strokeDashoffset={circumference * (1 - pct / 100)}
                     />
-                  </svg>
+                  </svg>}
                   <button
                     type="button"
                     onClick={() => player.avatar_url && setShowPhoto(true)}
@@ -327,7 +332,7 @@ export default function PlayerDetails() {
                   >
                     <Avatar name={player.name} url={player.avatar_url} size="w-16 h-16 text-2xl" colorClass="bg-lime-400 text-ink-900" provisional={isProvisional(globalEntry?.rating_games)} />
                   </button>
-                  {!resultsHidden && globalEntry?.rating != null && (
+                  {!resultsHidden && !myFrame && globalEntry?.rating != null && (
                     <span className="absolute -top-2 left-1/2 -translate-x-1/2 z-10">
                       <RatingBadge rating={globalEntry?.rating} gender={playerExtras?.gender ?? globalEntry?.gender} />
                     </span>
@@ -344,6 +349,7 @@ export default function PlayerDetails() {
           )}
           <div className="flex-1 min-w-0 pt-1">
             <h2 className="text-xl text-ink-900 truncate">{player.name}</h2>
+            <FrameTitle list={frameList} mine={false} />
             {/* Pontos em destaque, igual ao Perfil próprio (11 set 2026) —
                 antes ia tudo espremido numa linha pequena só; agora os
                 pontos ganham o mesmo peso visual, com o resto (próximo
@@ -355,6 +361,7 @@ export default function PlayerDetails() {
               return (
                 <>
                   <div className="mt-0.5 flex items-center gap-2">
+                    {myFrame && globalEntry?.rating != null && <RatingBadge rating={globalEntry?.rating} gender={playerExtras?.gender ?? globalEntry?.gender} />}
                     <span className="text-2xl font-extrabold text-ink-900 tabular-nums leading-none">
                       {formatRatingMaybeProvisional(globalEntry?.rating, globalEntry?.rating_games)}
                     </span>
