@@ -13,7 +13,7 @@ import { createGroup } from '../lib/platformAdmin'
 import { listClubGroups, getOrganizationDeleteBlocker, deleteSelfServeGroup, transferOrganizationOwnership, setOrganizationPlan } from '../lib/organizations'
 import { formatRating } from '../lib/elo'
 import { formatDate as formatDateLib, formatTime as formatTimeLib } from '../lib/formatDate'
-import { Chips, DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal, ConfirmSheet, OrgKindBadge, PlanBadge, PLAN_TIERS, planName, Tabs, BackBar } from '../components/ui'
+import { Chips, DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal, ConfirmSheet, OrgKindBadge, PlanBadge, PLAN_TIERS, planName, Tabs, BackBar, StickyTop } from '../components/ui'
 import { planLimitMessage, isMixLimitError, isMemberLimitError, limitsFor, nextPlanTier } from '../lib/plans'
 import { totalRounds, reverseClimbWarning, uiFormatOf, formatFieldsFor, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, SCORING_FORMAT_LABEL_KEY } from '../lib/mixLogic'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
@@ -2765,16 +2765,19 @@ export default function GerirClube() {
       {activeTab !== 'redeem' && (
         // O separador único da app (Trello #528). Três, só texto — a fila de
         // cinco que deslizava, com a seta a dizer que havia mais, acabou com
-        // a arrumação em Eventos · Pessoas · Clube (#419).
-        <Tabs
-          value={activeTab}
-          onChange={setActiveTab}
-          options={[
-            { value: 'events', label: t('gerirclube.tab_events') },
-            { value: 'members', label: t('gerirclube.tab_members'), badge: requests.length },
-            { value: 'settings', label: t(isGroupOrg ? 'gerirclube.tab_group' : 'gerirclube.tab_club') },
-          ]}
-        />
+        // a arrumação em Eventos · Pessoas · Clube (#419). Preso em cima, por
+        // baixo do «‹», ao descer (R4, 13 out).
+        <StickyTop belowBackBar>
+          <Tabs
+            value={activeTab}
+            onChange={setActiveTab}
+            options={[
+              { value: 'events', label: t('gerirclube.tab_events') },
+              { value: 'members', label: t('gerirclube.tab_members'), badge: requests.length },
+              { value: 'settings', label: t(isGroupOrg ? 'gerirclube.tab_group' : 'gerirclube.tab_club') },
+            ]}
+          />
+        </StickyTop>
       )}
 
       {loading ? (
