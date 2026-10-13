@@ -1,15 +1,16 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { MapPin, CheckCircle2, Lock, Play, Trophy, Euro, Swords, Users, Shuffle, CircleDot, Clock, ListOrdered, GraduationCap, Building2, ChevronRight } from 'lucide-react'
+import { MapPin, CheckCircle2, Lock, Play, Trophy, Users, Shuffle, CircleDot, Clock, ListOrdered, GraduationCap, Building2, ChevronRight } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { sharePageLink } from '../../lib/shareImage'
-import { PlayerAvatarRow, GroupLevelBadge, PrimaryButton } from '../ui'
+import { GroupLevelBadge } from '../ui'
 import { formatTime, formatCurrency } from '../../lib/formatDate'
 import { useSpecialPriceLine } from '../SpecialPriceRoster'
 import { GENDER_RESTRICTION_LABEL_KEY, mixCapacity, isGenderMismatch, isAgeIneligible, formatLabelKey, shortPersonName } from '../../lib/mixLogic'
 import { AGE_LABEL_KEY } from '../../lib/ageCategories'
-import CardMascot, { mascotFor, mascotCardClass, MascotPill } from './CardMascot'
+import { MascotPill } from './CardMascot'
 import { isMixLive } from '../../lib/mixLive'
+import HomeCard, { BandPill, CardTitle, CardChips, CardState, CardFoot, CardButton, kindColorsOf } from './HomeCard'
 import { ratingBand } from '../../lib/elo'
 import { parseLevel, levelNumber } from '../../lib/mixLevels'
 import { KIND_COLORS } from '../../lib/kindColors'
@@ -60,13 +61,6 @@ const ACTION_LABEL_KEY = {
   leave: 'ui.action_leave',
   leave_waitlist: 'ui.action_leave_waitlist',
 }
-const ACTION_VARIANT = {
-  join: 'lime',
-  waitlist: 'ghost',
-  // Sair: contorno preto, como no desenho aprovado (cores.png).
-  leave: 'ghost',
-  leave_waitlist: 'ghost',
-}
 
 // «Rita Figueira» → «Rita F.» (o nome de quem abriu um jogo em aberto): o
 // shortPersonName comum (mixLogic), com os números do fim (12 out).
@@ -108,13 +102,6 @@ export function StateLine({ kind, children }) {
   return <p className={`mt-1.5 text-[12.5px] font-extrabold ${style.text}`}>{children}</p>
 }
 
-/** A imagem do mix numa faixa de ~88 px, entre o clube e a hora (SPEC-3).
- *  Só quando quem organiza a carregou; sem imagem, nada no lugar. O jogo em
- *  aberto não tem imagem. */
-function MixImageBand({ url, past = false }) {
-  if (!url) return null
-  return <img src={url} alt="" loading="lazy" className={`mt-1 h-[88px] w-full rounded-xl object-cover ${past ? 'opacity-70' : ''}`} />
-}
 
 export function StateTag({ tone, icon: Icon, children }) {
   const tones = {
@@ -226,15 +213,6 @@ export function Owner({ event, fallbackKey, link = false }) {
   return <p className="flex items-center gap-1.5 text-sm text-ink-700 min-w-0">{inner}</p>
 }
 
-function cardFrame(event, past) {
-  if (past) return 'bg-surface border border-line'
-  // Contorno verde só quando estou mesmo dentro (ou em espera) — um convite
-  // por responder ainda não é "meu" nesse sentido.
-  // Lista de espera: âmbar tracejado — nunca verde (SPEC §3).
-  if (event.myState === 'in') return `${KIND_STYLE[event.kind].bg} border-2 border-ok`
-  if (event.myState === 'waitlist') return `${KIND_STYLE[event.kind].bg} border-2 border-dashed border-[#B86E00]`
-  return `${KIND_STYLE[event.kind].card} border`
-}
 
 /* ─── Mix e jogo em aberto ──────────────────────────────────────────────── */
 
@@ -242,55 +220,6 @@ function cardFrame(event, past) {
     meus clubes e nos de explorar, para um mix não se descrever de duas formas. */
 const HM = { hour: '2-digit', minute: '2-digit' }
 
-function GameFacts({ game, distance }) {
-  const { t, i18n } = useTranslation()
-  const specialLine = useSpecialPriceLine(game.origin === 'open_slot' ? 'open_slot' : 'mix', game.price_per_player > 0 ? game.id : null)
-  const genderRestricted = game.gender_restriction && !['indiferente', 'misto'].includes(game.gender_restriction)
-  return (
-    <>
-      {(game.location || distance != null) && (
-        <p className="flex items-center gap-1.5 text-ink-700 text-[13px] mt-1.5 min-w-0">
-          <MapPin size={14} className="shrink-0" />
-          <span className="truncate">{game.location}</span>
-          {distance != null && (
-            <span className="shrink-0 font-extrabold text-ink-900">{game.location ? '· ' : ''}{t('agenda.distance_km', { km: distance < 10 ? distance.toFixed(1).replace('.0', '') : Math.round(distance) })}</span>
-          )}
-        </p>
-      )}
-      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-ink-700 text-[13px] mt-1.5">
-        <span className="inline-flex items-center gap-1">
-          <Swords size={14} className="shrink-0" />
-          {game.origin === 'open_slot' ? (
-            // Jogo em aberto: a mesma linha da página do jogo, nunca o
-            // formato (UX, 11 out) — «1 campo · 4 jogadores · 19:30–21:00».
-            [t('gamedetails.court_count', { count: game.num_courts || 1 }), t('openday.players', { count: mixCapacity(game) }),
-              `${formatTime(game.date, i18n.language, HM)}–${formatTime(new Date(new Date(game.date).getTime() + (game.court_time_minutes || 90) * 60000), i18n.language, HM)}`].join(' · ')
-          ) : (<>
-            {t(formatLabelKey(game))} · {t('gamedetails.court_count', { count: game.num_courts || 1 })}
-            {game.ranked === false && <> · {t('gamedetails.badge_friendly')}</>}
-          </>)}
-        </span>
-        {game.price_per_player > 0 && (
-          <span className="inline-flex items-center gap-1">
-            <Euro size={14} className="shrink-0" />
-            {/* Preço especial (7 out): o preço de quem vê; sem nada que lhe
-                diga respeito, a linha de sempre. */}
-            {specialLine || t('gamedetails.price_per_player', { price: formatCurrency(game.price_per_player, i18n.language) })}
-          </span>
-        )}
-        {game.prize && (
-          <span className="inline-flex items-center gap-1 min-w-0">
-            <Trophy size={14} className="shrink-0" /> <span className="truncate">{game.prize}</span>
-          </span>
-        )}
-        {genderRestricted && <span className="font-extrabold text-ink-900">{t(GENDER_RESTRICTION_LABEL_KEY[game.gender_restriction])}</span>}
-        {game.age_restriction && AGE_LABEL_KEY[game.age_restriction] && (
-          <span className="font-extrabold text-ink-900">{t(AGE_LABEL_KEY[game.age_restriction])}</span>
-        )}
-      </div>
-    </>
-  )
-}
 
 export function GameEventCard({ event, profile, friendIds = null, action = null, result = null, past = false, distance = null }) {
   const { t, i18n } = useTranslation()
@@ -362,79 +291,119 @@ export function GameEventCard({ event, profile, friendIds = null, action = null,
     event.kind === 'mix' && parseLevel(game.level) ? `${parseLevel(game.level).scale}${parseLevel(game.level).num}` : null,
   ].filter(Boolean).join(' · ') || null} />
 
-  const mascot = mascotFor(event.kind, game.image_url)
+  // R1 — Cartões da Home (13 out): a faixa da cor do tipo e o corpo branco.
+  const level = event.kind === 'mix' && parseLevel(game.level) ? `${parseLevel(game.level).scale}${parseLevel(game.level).num}` : null
+  const label = [t(KIND_STYLE[event.kind]?.labelKey || 'agenda.kind_mix'),
+    isOpenSlot ? t('gamedetails.court_count', { count: game.num_courts || 1 }) : level].filter(Boolean).join(' · ')
+  const endsAt = game.court_time_minutes ? formatTime(new Date(new Date(game.date).getTime() + game.court_time_minutes * 60000), i18n.language, HM) : null
+  const timeAside = endsAt ? t('homecard.until', { time: endsAt }) : game.recurrence_id ? t('ui.recurring').toLowerCase() : null
+  let pill = null
+  if (past || event.finished) pill = <BandPill tone="dark">{t('agenda.state_finished')}</BandPill>
+  else if (isLive) pill = <BandPill tone="dark">▶ {t('ui.status_live')}</BandPill>
+  else if (event.myState === 'in') pill = <BandPill>✓ {t('home.next_in')}</BandPill>
+  else if (mismatchKey && event.myState !== 'waitlist') pill = <BandPill tone="dark">{t(mismatchKey)}</BandPill>
+  // A linha de estado: o que falta para fechar o campo, «Inscrições abertas»,
+  // «Estás dentro», «Suplente» ou «Completo».
+  const free = Math.max(0, capacity - players.length)
+  const courtNow = Math.floor(players.length / 4) + 1
+  const toClose = (4 - (players.length % 4)) % 4
+  let stateRow = null
+  if (!past && !event.finished && !isLive) {
+    if (event.myState === 'in') stateRow = <CardState tone="ok">{t('home.next_in')}</CardState>
+    else if (stateLine) stateRow = <CardState tone="warn">{stateLine}</CardState>
+    else if (missing > 0 && opener) stateRow = <CardState tone="warn">{missing === 2 && players.length === 2 ? t('home.open_missing_pair') : t('home.open_missing', { count: missing })}</CardState>
+    else if (free === 0) stateRow = <CardState tone="warn">{t('homecard.full')}</CardState>
+    else if (!isOpenSlot && toClose > 0 && players.length > 0) stateRow = <CardState tone="warn">{t('homecard.to_close_court', { count: toClose, court: courtNow })}</CardState>
+    else if (game.status === 'open') stateRow = <CardState tone="ok">{t('homecard.open')}</CardState>
+  }
+  const chips = [
+    isOpenSlot ? t('openday.players', { count: capacity }) : t(formatLabelKey(game)),
+    !isOpenSlot ? t('gamedetails.court_count', { count: game.num_courts || 1 }) : null,
+    game.ranked === false ? t('gamedetails.badge_friendly') : null,
+    // Quem pode entrar e a idade, quando restringem (como antes).
+    game.gender_restriction && !['indiferente', 'misto'].includes(game.gender_restriction) ? t(GENDER_RESTRICTION_LABEL_KEY[game.gender_restriction]) : null,
+    game.age_restriction && AGE_LABEL_KEY[game.age_restriction] ? t(AGE_LABEL_KEY[game.age_restriction]) : null,
+    distance != null ? t('agenda.distance_km', { km: distance < 10 ? distance.toFixed(1).replace('.0', '') : Math.round(distance) }) : null,
+  ].filter(Boolean)
+  let button = null
+  if (past) {
+    button = result && (result.mix_won || result.rating_delta != null) ? (
+      <span className="text-xs font-extrabold text-ink-900 tabular-nums">
+        {result.mix_won ? t('agenda.result_won') : t('agenda.result_rating_delta', { delta: `${result.rating_delta > 0 ? '+' : ''}${Math.round(result.rating_delta)}` })}
+      </span>
+    ) : null
+  } else if (iOpened) {
+    // Quem abriu partilha para encher (contorno); sair faz-se no jogo.
+    button = <CardButton variant="out" onClick={() => sharePageLink({ title: game.title, text: t('home.open_share_text', { time, club: event.orgName || '' }), url: `${window.location.origin}/jogo/${game.id}` })}>{t('home.open_share')}</CardButton>
+  } else if (action && (action.kind === 'join' || action.kind === 'waitlist')) {
+    button = <CardButton variant={action.kind === 'join' ? 'lime' : 'out'} disabled={action.busy} onClick={() => action.onAction()}>{t(ACTION_LABEL_KEY[action.kind])}</CardButton>
+  } else if (event.myState === 'in' || event.myState === 'waitlist') {
+    // Já dentro: «Ver» em contorno, que abre o evento (o «Sair» fica lá).
+    button = <span className="pointer-events-none whitespace-nowrap rounded-[14px] border-[1.5px] border-[#CFD2D7] bg-white px-[18px] py-[11px] font-display text-[14.5px] font-extrabold leading-none text-ink-900">{t('homecard.see')}</span>
+  } else if (isClosed && !isLive && !event.finished && !mismatchKey) {
+    button = <span className="inline-flex items-center gap-1.5 rounded-full bg-surface px-2.5 py-1 text-[11px] font-extrabold text-ink-700"><Lock size={13} className="shrink-0" /> {t('ui.court_reserved')}</span>
+  }
+
   return (
-    <div className={`relative ${mascotCardClass(mascot)} rounded-card p-3.5 press ${cardFrame(event, past)}`}>
-      <Link to={`/jogo/${game.id}`} className="absolute inset-0" aria-label={`${game.title} — ${time}`} />
-      <CardMascot type={mascot} />
-      <OrgHeader event={event} past={past} right={state} kind={kindLine} mascot={!!mascot} />
-      {!event.orgName && <div className={`flex items-start justify-between gap-2 ${mascot ? 'pr-[80px]' : ''}`}>{kindLine}{!mascot && state}</div>}
-      {!event.orgName && mascot && <MascotPill top="top-[54px]">{state}</MascotPill>}
-      <MixImageBand url={game.image_url} past={past} />
-
-      <p className={`text-[22px] font-extrabold leading-none mt-2.5 ${past ? 'text-muted' : 'text-ink-900'}`}>{time}</p>
-      <h3 className={`text-base leading-snug mt-1.5 ${past ? 'text-muted' : 'text-ink-900'} ${!event.orgName && mascot ? 'pr-[100px]' : ''}`}>{openTitle || game.title}</h3>
-      {stateLine && <StateLine kind={event.kind}>{stateLine}</StateLine>}
-      {missing > 0 && opener && (
-        <p className="mt-1.5 text-[12.5px] font-extrabold text-[#C43D0A]">
-          {missing === 2 && players.length === 2 ? t('home.open_missing_pair') : t('home.open_missing', { count: missing })}
-        </p>
-      )}
-      {!event.orgName && <div className="mt-1"><Owner event={event} fallbackKey="agenda.owner_none" /></div>}
-
-      <GameFacts game={game} distance={distance} />
-
+    <HomeCard colors={kindColorsOf(event.kind)} label={label} pill={pill} time={time} timeAside={timeAside}
+      count={{ n: players.length, of: capacity, unit: t(isOpenSlot ? 'homecard.unit_players' : 'homecard.unit_signed') }}
+      imageUrl={game.image_url || null} mine={event.myState === 'in'} past={past}
+      to={`/jogo/${game.id}`} ariaLabel={`${game.title} — ${time}`}>
+      <CardClub event={event} past={past} />
+      <CardTitle past={past}>{openTitle || game.title}</CardTitle>
+      <CardChips>
+        {chips.join(' · ')}
+        {game.price_per_player > 0 && <> · <PriceText game={game} /></>}
+      </CardChips>
       {/* Nomes completos de propósito — regra assente no produto. */}
       {friendsIn.length > 0 && (
-        <p className="inline-flex items-center gap-1.5 bg-lime-100 text-ink-900 rounded-full pl-2 pr-2.5 py-1 mt-2 max-w-full">
-          <Users size={13} className="text-lime-600 shrink-0" />
-          <span className="font-extrabold text-[11px] uppercase tracking-wider truncate">
-            {friendsIn.length === 1
-              ? t('ui.friend_in_mix_one', { name: friendsIn[0].name })
-              : friendsIn.length === 2
-                ? t('ui.friend_in_mix_two', { first: friendsIn[0].name, second: friendsIn[1].name })
-                : t('ui.friend_in_mix_many', { name: friendsIn[0].name, count: friendsIn.length - 1 })}
-          </span>
-        </p>
+        <span className="mt-2 inline-block max-w-full truncate rounded-full bg-lime-50 px-[9px] py-[5px] font-display text-[12px] font-bold leading-none text-[#4A5A00]">
+          {friendsIn.length === 1
+            ? t('ui.friend_in_mix_one', { name: friendsIn[0].name })
+            : friendsIn.length === 2
+              ? t('ui.friend_in_mix_two', { first: friendsIn[0].name, second: friendsIn[1].name })
+              : t('ui.friend_in_mix_many', { name: friendsIn[0].name, count: friendsIn.length - 1 })}
+        </span>
       )}
+      {stateRow}
+      <CardFoot people={players} slots={capacity}>{button}</CardFoot>
+    </HomeCard>
+  )
+}
 
-      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2 pt-2.5 mt-2.5 border-t border-ink-900/10">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <PlayerAvatarRow players={players} max={capacity} size="sm" />
-          <GroupLevelBadge rating={avgRating} genders={rated.map((p) => p.gender)} />
-        </div>
-        {past ? (
-          result && (
-            <span className="ml-auto text-xs font-extrabold text-ink-900 tabular-nums">
-              {result.mix_won
-                ? t('agenda.result_won')
-                : result.rating_delta != null
-                  ? t('agenda.result_rating_delta', { delta: `${result.rating_delta > 0 ? '+' : ''}${Math.round(result.rating_delta)}` })
-                  : null}
-            </span>
-          )
-        ) : iOpened ? (
-          // Quem abriu partilha para encher (contorno); sair faz-se no jogo.
-          <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); sharePageLink({ title: game.title, text: t('home.open_share_text', { time, club: event.orgName || '' }), url: `${window.location.origin}/jogo/${game.id}` }) }}
-            className="press relative ml-auto min-h-[40px] rounded-full border-[1.5px] border-ink-900 bg-white px-4 text-sm font-extrabold text-ink-900">
-            {t('home.open_share')}
-          </button>
-        ) : action ? (
-          <PrimaryButton
-            variant={ACTION_VARIANT[action.kind]}
-            disabled={action.busy}
-            onClick={() => action.onAction()}
-            className={`ml-auto relative !py-2 !px-4 !text-sm ${action.kind.startsWith('leave') ? '!bg-white !border-ink-900' : ''}`}
-          >
-            {t(ACTION_LABEL_KEY[action.kind])}
-          </PrimaryButton>
-        ) : isClosed && !isLive && !event.finished && !mismatchKey ? (
-          <span className="ml-auto inline-flex items-center gap-1.5 bg-surface text-ink-700 text-[11px] font-extrabold px-2.5 py-1 rounded-full">
-            <Lock size={13} className="shrink-0" /> {t('ui.court_reserved')}
-          </span>
-        ) : null}
-      </div>
-    </div>
+/** O preço da linha cinzenta: o especial de quem vê, ou o de sempre. */
+function PriceText({ game }) {
+  const { i18n } = useTranslation()
+  const specialLine = useSpecialPriceLine(game.origin === 'open_slot' ? 'open_slot' : 'mix', game.price_per_player > 0 ? game.id : null)
+  return specialLine || formatCurrency(game.price_per_player, i18n.language)
+}
+
+/** R1: o clube em cima do corpo — logótipo redondo pequeno, o nome e «›»
+ *  (abre o clube). Sem clube, quem organiza. `label`: dentro da página do
+ *  clube, o tipo em vez do clube. */
+export function CardClub({ event, past = false, label = null, place = undefined }) {
+  const open = useOpenOrg(event)
+  if (label) return <p className="py-1 font-display text-[13.5px] font-semibold leading-none text-[#4F535A]">{label}</p>
+  // Amigos sem clube (UX, 13 out): o lugar com o pino, sem «›»; sem lugar,
+  // nada — «Sem clube» não ajudava.
+  if (!event.orgName && place !== undefined) {
+    return place ? (
+      <p className={`flex min-w-0 items-center gap-1.5 py-1 font-display text-[13.5px] font-bold leading-none text-ink-900 ${past ? 'opacity-70' : ''}`}>
+        <MapPin size={14} className="shrink-0" /> <span className="truncate">{place}</span>
+      </p>
+    ) : null
+  }
+  if (!event.orgName) return <div className="py-1"><Owner event={event} fallbackKey="agenda.owner_none" /></div>
+  const Tag = open ? 'button' : 'span'
+  return (
+    <Tag {...(open ? { type: 'button', onClick: (e) => { e.preventDefault(); e.stopPropagation(); open(e) } } : {})}
+      className={`relative z-[1] inline-flex max-w-full items-center gap-2 py-1 text-left font-display text-[13.5px] font-bold leading-none text-ink-900 ${past ? 'opacity-70' : ''}`}>
+      {event.orgLogo
+        ? <img src={event.orgLogo} alt="" className="h-6 w-6 flex-none rounded-full object-cover" />
+        : <span className="grid h-6 w-6 flex-none place-items-center rounded-full bg-ink-900 text-[9.5px] font-extrabold text-lime-400">{initials(event.orgName)}</span>}
+      <span className="truncate">{event.orgName}</span>
+      {open && <span className="text-[#8A8E95]">›</span>}
+    </Tag>
   )
 }
 
@@ -468,59 +437,50 @@ export function ExploreEventCard({ event, profile, distance = null, onJoin = nul
     }
   }
 
-  // O estado ao canto, com quem organiza (Francisco, 30 set: «em todos»).
-  // «Pedido enviado» é comprido: vai numa linha por baixo do nome (UX, 10 out).
-  const exploreState = !pending && mismatchKey ? <StateTag tone="grey">{t(mismatchKey)}</StateTag> : null
-  const kindLine = <KindLine kind={event.kind} suffix={!openJoin ? t('agenda.explore_private') : null} />
-  const mascot = mascotFor(event.kind, game.image_url)
+  // R1 (13 out): a mesma moldura dos outros cartões. Sem nomes nem caras de
+  // quem vai (Francisco, 16 set): à direita da faixa, só quantos vão.
+  const level = event.kind === 'mix' && parseLevel(game.level) ? `${parseLevel(game.level).scale}${parseLevel(game.level).num}` : null
+  const label = [t(KIND_STYLE[event.kind]?.labelKey || 'agenda.kind_mix'), level, !openJoin ? t('agenda.explore_private') : null].filter(Boolean).join(' · ')
+  const endsAt = game.court_time_minutes ? formatTime(new Date(new Date(game.date).getTime() + game.court_time_minutes * 60000), i18n.language, HM) : null
+  const pill = !pending && mismatchKey ? <BandPill tone="dark">{t(mismatchKey)}</BandPill> : null
+  const chips = [
+    game.origin === 'open_slot' ? t('openday.players', { count: capacity }) : t(formatLabelKey(game)),
+    game.origin !== 'open_slot' ? t('gamedetails.court_count', { count: game.num_courts || 1 }) : null,
+    game.gender_restriction && !['indiferente', 'misto'].includes(game.gender_restriction) ? t(GENDER_RESTRICTION_LABEL_KEY[game.gender_restriction]) : null,
+    game.age_restriction && AGE_LABEL_KEY[game.age_restriction] ? t(AGE_LABEL_KEY[game.age_restriction]) : null,
+    distance != null ? t('agenda.distance_km', { km: distance < 10 ? distance.toFixed(1).replace('.0', '') : Math.round(distance) }) : null,
+  ].filter(Boolean)
   return (
-    <div className={`relative ${mascotCardClass(mascot)} rounded-card p-3.5 border ${KIND_STYLE[event.kind].card}`}>
-      <CardMascot type={mascot} />
-      <OrgHeader event={event} right={exploreState} kind={kindLine} mascot={!!mascot} />
-      {!event.orgName && <div className={`flex items-start justify-between gap-2 ${mascot ? 'pr-[80px]' : ''}`}>{kindLine}{!mascot && exploreState}</div>}
-      {!event.orgName && mascot && <MascotPill top="top-[54px]">{exploreState}</MascotPill>}
-      <MixImageBand url={game.image_url} />
-
-      <p className="text-[22px] font-extrabold leading-none mt-2.5 text-ink-900">{time}</p>
-      <h3 className={`text-base leading-snug mt-1.5 text-ink-900 ${!event.orgName && mascot ? 'pr-[100px]' : ''}`}>{game.title}</h3>
-      {pending && <StateLine kind={event.kind}>{t('agenda.state_line_request_sent')}</StateLine>}
-      {!event.orgName && <div className="mt-1"><Owner event={event} fallbackKey="agenda.owner_none" /></div>}
-
-      <GameFacts game={game} distance={distance} />
-
+    <HomeCard colors={kindColorsOf(event.kind)} label={label} pill={pill} time={time}
+      timeAside={endsAt ? t('homecard.until', { time: endsAt }) : null}
+      count={{ n: peopleCount, of: capacity, unit: t('homecard.unit_signed') }}
+      imageUrl={game.image_url || null}>
+      <CardClub event={event} />
+      <CardTitle>{game.title}</CardTitle>
+      <CardChips>
+        {chips.join(' · ')}
+        {game.price_per_player > 0 && <> · <PriceText game={game} /></>}
+      </CardChips>
       {friendsInOrg.length > 0 && (
-        <p className="inline-flex items-center gap-1.5 bg-lime-100 text-ink-900 rounded-full pl-2 pr-2.5 py-1 mt-2 max-w-full">
-          <Users size={13} className="text-lime-600 shrink-0" />
-          <span className="font-extrabold text-[11px] uppercase tracking-wider truncate">
-            {friendsInOrg.length === 1
-              ? t('agenda.friend_member_one', { name: friendsInOrg[0] })
-              : t('agenda.friend_member_many', { name: friendsInOrg[0], count: friendsInOrg.length - 1 })}
-          </span>
-        </p>
+        <span className="mt-2 inline-block max-w-full truncate rounded-full bg-lime-50 px-[9px] py-[5px] font-display text-[12px] font-bold leading-none text-[#4A5A00]">
+          {friendsInOrg.length === 1
+            ? t('agenda.friend_member_one', { name: friendsInOrg[0] })
+            : t('agenda.friend_member_many', { name: friendsInOrg[0], count: friendsInOrg.length - 1 })}
+        </span>
       )}
-
-      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2 pt-2.5 mt-2.5 border-t border-ink-900/10">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="inline-flex items-center gap-1 text-sm text-ink-700 tabular-nums">
-            <Users size={14} /> <span className="font-extrabold text-ink-900">{peopleCount}</span>/{capacity}
-          </span>
-          {/* A letra vem do género de quem entra na média (avg_gender, pedido
-              ao Dev 3). Enquanto não vier, de quem o mix aceita; misto ou
-              aberto a todos, não se sabe — sem pastilha (UX, 29 set). */}
-          <GroupLevelBadge rating={avgRating} genders={exploreGenders(avgGender, game.gender_restriction)} />
-        </div>
+      {pending && <CardState tone="warn">{t('agenda.state_line_request_sent')}</CardState>}
+      <div className="mt-3 flex items-center gap-2.5">
+        {/* A letra vem do género de quem entra na média (avg_gender). */}
+        <GroupLevelBadge rating={avgRating} genders={exploreGenders(avgGender, game.gender_restriction)} />
         {!pending && onJoin && (
-          <PrimaryButton
-            variant={openJoin ? 'lime' : 'ghost'}
-            disabled={busy}
-            onClick={onJoin}
-            className="ml-auto relative !py-2 !px-4 !text-sm"
-          >
-            {openJoin ? t('agenda.explore_join_club') : t('agenda.explore_request', { name: event.orgName })}
-          </PrimaryButton>
+          <div className="relative ml-auto">
+            <CardButton variant={openJoin ? 'lime' : 'out'} disabled={busy} onClick={onJoin}>
+              {openJoin ? t('agenda.explore_join_club') : t('agenda.explore_request', { name: event.orgName })}
+            </CardButton>
+          </div>
         )}
       </div>
-    </div>
+    </HomeCard>
   )
 }
 
@@ -544,7 +504,6 @@ export function friendsMatchTitle(m, userId, t) {
    Tocar abre a sessão. */
 export function FriendSessionCard({ event, userId, past = false }) {
   const { t, i18n } = useTranslation()
-  const mascot = mascotFor(event.kind === 'open' ? 'open' : 'friends')
   const games = event.raw.games
   const people = new Map()
   for (const g of games) {
@@ -582,12 +541,6 @@ export function FriendSessionCard({ event, userId, past = false }) {
   const to = !inSession ? null : event.id ? `/jogos-privados/sessao/${event.id}` : '/jogos-privados'
   const m = event.raw
 
-  let state = null
-  if (past || event.finished) state = <StateTag tone="grey" icon={CheckCircle2}>{t('agenda.state_finished')}</StateTag>
-  else if (running) state = <StateTag tone="live" icon={Play}>{t('ui.status_live')}</StateTag>
-  else if (inSession) state = <StateTag tone="in" icon={CheckCircle2}>{t('agenda.state_in')}</StateTag>
-  // «a rodar» só quando as duplas rodam (QA, 12 out: aparecia com duplas fixas).
-  const sessionKind = <KindLine kind={event.kind === 'open' ? 'open' : 'friends'} past={past} suffix={m.pairing_mode === 'rotating' ? t('agenda.session_rotating') : null} />
   // O ranking: antes de enviar, o que se escolheu ao criar; depois, o que
   // aconteceu (session_ranking_state, Dev 3). Sem ele, não se diz nada — dizia
   // «Conta para o ranking» num jogo com convidados que não contou (QA, 12 out).
@@ -598,39 +551,29 @@ export function FriendSessionCard({ event, userId, past = false }) {
         : rankingState === 'rejected' ? t('friends.list_rejected')
           : rankingState === 'not_ranked' ? t('friends.list_friendly') : null
 
+  // R1 (13 out): a moldura comum. Num clube é «Jogo em aberto», na cor do
+  // aberto; num grupo, «Jogo entre amigos» (Francisco, 28 set).
+  const sessionKindKey = event.kind === 'open' ? 'open' : 'friends'
+  const label = [t(KIND_STYLE[sessionKindKey].labelKey), m.pairing_mode === 'rotating' ? t('agenda.session_rotating') : null].filter(Boolean).join(' · ')
+  let pill = null
+  if (past || event.finished) pill = <BandPill tone="dark">{t('agenda.state_finished')}</BandPill>
+  else if (running) pill = <BandPill tone="dark">▶ {t('ui.status_live')}</BandPill>
+  else if (inSession) pill = <BandPill>✓ {t('home.next_in')}</BandPill>
   return (
-    <div className={`relative ${mascotCardClass(mascot)} rounded-card p-3.5 ${to ? 'press' : ''} ${cardFrame(event, past)}`}>
-      {to && <Link to={to} className="absolute inset-0" aria-label={title} />}
-      <CardMascot type={mascot} />
-      {/* Num clube é «Jogo em aberto · a rodar», com a cor do jogo em aberto;
-          num grupo, «Jogo entre amigos» (Francisco, 28 set). */}
-      <OrgHeader event={event} past={past} right={state} kind={sessionKind} mascot={!!mascot} />
-      {!event.orgName && <div className={`flex items-start justify-between gap-2 ${mascot ? 'pr-[80px]' : ''}`}>{sessionKind}{!mascot && state}</div>}
-      {!event.orgName && mascot && <MascotPill top="top-[54px]">{state}</MascotPill>}
-      {event.hasTime ? (
-        <p className={`text-[22px] font-extrabold leading-none mt-2.5 ${past ? 'text-muted' : 'text-ink-900'}`}>
-          {formatTime(event.startsAt, i18n.language, { hour: '2-digit', minute: '2-digit' })}
-        </p>
-      ) : (
-        <p className="flex items-center gap-1 text-xs font-extrabold text-muted mt-2.5"><Clock size={12} /> {t('agenda.no_time')}</p>
-      )}
-      <h3 className={`text-base leading-snug mt-1.5 ${past ? 'text-muted' : 'text-ink-900'} ${!event.orgName && mascot ? 'pr-[100px]' : ''}`}>{title}</h3>
-      {!event.orgName && <div className="mt-1"><Owner event={event} fallbackKey="agenda.owner_friends" /></div>}
-      {m.location && (
-        <p className="flex items-center gap-1.5 text-ink-700 text-[13px] mt-1.5">
-          <MapPin size={14} className="shrink-0" /> <span className="truncate">{m.location}</span>
-        </p>
-      )}
-      <p className="text-ink-700 text-[13px] mt-1.5">
-        {[rankingText, facts].filter(Boolean).join(' · ')}
-      </p>
-      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2 pt-2.5 mt-2.5 border-t border-ink-900/10">
-        <div className="flex items-center gap-2 min-w-0">
-          {/* A lotação são as pessoas da sessão (6/6), não os 4 de um jogo. */}
-          <PlayerAvatarRow players={all} max={all.length} size="sm" />
-        </div>
-      </div>
-    </div>
+    <HomeCard colors={kindColorsOf(sessionKindKey)} label={label} pill={pill}
+      time={event.hasTime ? formatTime(event.startsAt, i18n.language, HM) : '—'}
+      count={{ n: all.length, of: all.length, unit: t('homecard.unit_players') }}
+      mine={inSession && !event.finished} past={past} to={to} ariaLabel={title}>
+      <CardClub event={event} past={past} place={m.location || null} />
+      <CardTitle past={past}>{title}</CardTitle>
+      <CardChips>{[event.orgName ? m.location : null, rankingText, facts].filter(Boolean).join(' · ')}</CardChips>
+      {/* A lotação são as pessoas da sessão (6/6), não os 4 de um jogo. */}
+      <CardFoot people={all} slots={all.length}>
+        {inSession && !past && !event.finished && (
+          <span className="pointer-events-none whitespace-nowrap rounded-[14px] border-[1.5px] border-[#CFD2D7] bg-white px-[18px] py-[11px] font-display text-[14.5px] font-extrabold leading-none text-ink-900">{t('homecard.see')}</span>
+        )}
+      </CardFoot>
+    </HomeCard>
   )
 }
 
@@ -659,58 +602,35 @@ export function FriendsEventCard({ event, userId, orgSlug = null, invite = null,
   const draw = event.finished && m.winner_team === 'draw'
   const won = event.finished && myTeam && m.winner_team && !draw ? m.winner_team === myTeam : null
 
-  const mascot = mascotFor('friends')
+  // R1 (13 out): a moldura comum. Vagas: as pessoas do jogo (4).
+  const time = event.hasTime ? formatTime(event.startsAt, i18n.language, HM) : '—'
+  const label = t('agenda.kind_friends')
+  let pill = null
+  if (past || event.finished) pill = <BandPill tone="dark">{t('agenda.state_finished')}</BandPill>
+  else if (event.myState === 'invited') pill = <BandPill tone="dark">{t('agenda.state_invited')}</BandPill>
+  else if (event.mine) pill = <BandPill>✓ {t('home.next_in')}</BandPill>
+  const result = event.finished && m.score_a != null
+    ? <span className="text-xs font-extrabold text-ink-900 tabular-nums">{m.score_a}-{m.score_b}{draw ? <> · {t('agenda.result_draw')}</> : won != null && <> · {t(won ? 'agenda.result_win' : 'agenda.result_loss')}</>}</span>
+    : null
+  const showInvite = invite && !(event.finished && m.score_a != null)
   return (
-    <div className={`relative ${mascotCardClass(mascot)} rounded-card p-3.5 ${to ? 'press' : ''} ${cardFrame(event, past)}`}>
-      {to && <Link to={to} className="absolute inset-0" aria-label={title} />}
-      <CardMascot type={mascot} />
-
-      <OrgHeader event={event} past={past} right={state} kind={<KindLine kind="friends" past={past} />} mascot={!!mascot} />
-      {!event.orgName && <div className={`flex items-start justify-between gap-2 ${mascot ? 'pr-[80px]' : ''}`}><KindLine kind="friends" past={past} />{!mascot && state}</div>}
-      {!event.orgName && mascot && <MascotPill top="top-[54px]">{state}</MascotPill>}
-
-      {event.hasTime ? (
-        <p className={`text-[22px] font-extrabold leading-none mt-2.5 ${past ? 'text-muted' : 'text-ink-900'}`}>
-          {formatTime(event.startsAt, i18n.language, { hour: '2-digit', minute: '2-digit' })}
-        </p>
-      ) : (
-        <p className="flex items-center gap-1 text-xs font-extrabold text-muted mt-2.5"><Clock size={12} /> {t('agenda.no_time')}</p>
-      )}
-      <h3 className={`text-base leading-snug mt-1.5 ${past ? 'text-muted' : 'text-ink-900'} ${!event.orgName && mascot ? 'pr-[100px]' : ''}`}>{title}</h3>
-      {!event.orgName && <div className="mt-1"><Owner event={event} fallbackKey="agenda.owner_friends" /></div>}
-
-      {m.location && (
-        <p className="flex items-center gap-1.5 text-ink-700 text-[13px] mt-1.5">
-          <MapPin size={14} className="shrink-0" /> <span className="truncate">{m.location}</span>
-        </p>
-      )}
-      <p className="text-ink-700 text-[13px] mt-1.5">
-        {ranked ? t('agenda.friends_ranked') : t('gamedetails.badge_friendly')}
-      </p>
-
-      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2 pt-2.5 mt-2.5 border-t border-ink-900/10">
-        <div className="flex items-center gap-2 min-w-0">
-          <PlayerAvatarRow players={players} max={4} size="sm" />
-        </div>
-        {event.finished && m.score_a != null ? (
-          <span className="ml-auto text-xs font-extrabold text-ink-900 tabular-nums">
-            {m.score_a}-{m.score_b}{draw ? <> · {t('agenda.result_draw')}</> : won != null && <> · {t(won ? 'agenda.result_win' : 'agenda.result_loss')}</>}
-          </span>
-        ) : null}
-      </div>
-      {/* Convite: «Aceitar» a toda a largura e «Recusar» numa linha de texto
-          por baixo — botões nunca lado a lado (regra de 6 out; UX, 12 out). */}
-      {invite && !(event.finished && m.score_a != null) && (
-        <div className="relative z-[1] mt-2.5">
-          <PrimaryButton disabled={invite.busy} onClick={invite.onAccept} className="w-full">
-            {t('agenda.invite_accept')}
-          </PrimaryButton>
-          <button type="button" disabled={invite.busy} onClick={invite.onReject}
-            className="mt-1 w-full min-h-[40px] text-sm font-extrabold text-ink-700 hover:text-ink-900 disabled:opacity-40">
-            {t('agenda.invite_reject')}
-          </button>
-        </div>
-      )}
-    </div>
+    <HomeCard colors={kindColorsOf('friends')} label={label} pill={pill} time={time}
+      count={{ n: players.length, of: 4, unit: t('homecard.unit_players') }}
+      mine={event.mine && event.myState !== 'invited'} past={past} to={to} ariaLabel={title}>
+      <CardClub event={event} past={past} place={m.location || null} />
+      <CardTitle past={past}>{title}</CardTitle>
+      <CardChips>{[event.orgName ? m.location : null, ranked ? t('agenda.friends_ranked') : t('gamedetails.badge_friendly')].filter(Boolean).join(' · ')}</CardChips>
+      <CardFoot people={players} slots={4}>
+        {result || (showInvite ? (
+          <>
+            <CardButton disabled={invite.busy} onClick={invite.onAccept}>{t('agenda.invite_accept')}</CardButton>
+            <button type="button" disabled={invite.busy} onClick={(e) => { e.preventDefault(); e.stopPropagation(); invite.onReject() }}
+              className="relative p-1 font-display text-[12.5px] font-bold leading-none text-[#4F535A] underline underline-offset-[3px] disabled:opacity-40">
+              {t('agenda.invite_reject')}
+            </button>
+          </>
+        ) : null)}
+      </CardFoot>
+    </HomeCard>
   )
 }

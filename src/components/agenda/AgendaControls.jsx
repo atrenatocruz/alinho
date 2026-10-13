@@ -31,6 +31,18 @@ export function dayLabel(dayKey, t, lang) {
   return capitalize(short)
 }
 
+/** R1 (13 out): o cabeçalho de um dia em duas partes — «Hoje» em grande e
+ *  «segunda, 12 out» a cinzento; noutros dias, «Sábado» e «17 out». */
+export function dayParts(dayKey, t, lang) {
+  const today = toDayKey(new Date())
+  const d = fromDayKey(dayKey)
+  const part = (opts) => formatDate(d, lang, opts).replace(/\./g, '').replace(/-feira$/, '')
+  const date = `${d.getDate()} ${part({ month: 'short' })}`
+  const near = dayKey === today ? t('ui.today') : dayKey === addDays(today, 1) ? t('ui.tomorrow') : dayKey === addDays(today, -1) ? t('agenda.yesterday') : null
+  if (near) return { big: near, small: `${part({ weekday: 'long' })}, ${date}` }
+  return { big: capitalize(part({ weekday: 'long' })), small: date }
+}
+
 /* Sem setas (Francisco, 16 set): muda-se de dia a fazer scroll, e a data
    acompanha o dia que está no topo da lista. Tocar abre o mês. */
 // A data abre o mês para escolher outro dia; o calendário com o número de

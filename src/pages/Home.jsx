@@ -11,7 +11,7 @@ import { ConfirmSheet, EmptyState, PrimaryButton } from '../components/ui'
 import HomeSkeleton from '../components/home/HomeSkeleton'
 import { useSkeleton, useLoadTimeout } from '../components/Skeleton'
 import { GameEventCard, FriendsEventCard, ExploreEventCard } from '../components/agenda/EventCard'
-import { MonthSheet, HomeBar, HomeFiltersSheet, LocationChip, LocationSheet, ViewToggle, Sheet, dayLabel } from '../components/agenda/AgendaControls'
+import { MonthSheet, HomeBar, HomeFiltersSheet, LocationChip, LocationSheet, ViewToggle, Sheet, dayParts } from '../components/agenda/AgendaControls'
 import HomeSearch, { rememberSearch } from '../components/agenda/HomeSearch'
 import PlayedList from '../components/agenda/PlayedList'
 import { MapView } from '../components/agenda/MapView'
@@ -1086,9 +1086,17 @@ export default function Home() {
               ref={(el) => { if (el) dayRefs.current.set(dayKey, el); else dayRefs.current.delete(dayKey) }}
               className="space-y-2.5"
             >
-              <p className={`text-[11px] font-extrabold uppercase tracking-widest ${dayKey === today ? 'text-ink-900' : 'text-muted'}`}>
-                {dayLabel(dayKey, t, i18n.language)}
-              </p>
+              {/* R1 (13 out): «Hoje» em grande, a data a cinzento e, à direita, «5 jogos». */}
+              {(() => {
+                const dp = dayParts(dayKey, t, i18n.language)
+                return (
+                  <div className={`flex items-baseline gap-2 px-0.5 ${dayKey === firstUpcomingDay ? '' : 'border-t border-line pt-3.5'}`}>
+                    <b className="font-display text-[22px] font-black leading-none tracking-[-.02em] text-ink-900">{dp.big}</b>
+                    <span className="font-display text-[14px] font-semibold leading-none text-[#5B6068]">{dp.small}</span>
+                    {dayEvents.length > 0 && <em className="ml-auto font-mono text-[10.5px] not-italic leading-none tracking-[.06em] text-[#8A8E95]">{t('homecard.day_count', { count: dayEvents.length })}</em>}
+                  </div>
+                )
+              })()}
               {/* «A decorrer agora», o convite dos amigos e o «Marcar resultados»
                   passaram para o topo da Home (SPEC-2, 9 out). */}
               {dayEvents.length === 0 && emptyByFilters
