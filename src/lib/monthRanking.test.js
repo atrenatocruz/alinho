@@ -7,6 +7,7 @@ describe('ranking do mês: textos', () => {
     expect(shortName('Miguel  de Almeida')).toBe('Miguel A.')
     expect(shortName('Rita')).toBe('Rita')
     expect(shortName('Admin (Dev)')).toBe('Admin D.')
+    expect(shortName('Teste 2')).toBe('Teste 2')
     expect(shortName('')).toBe('—')
   })
   it('pontos com sinal; zero e negativos a cinzento', () => {

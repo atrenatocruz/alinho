@@ -827,7 +827,22 @@ export function FilterBar({ search = null, onSearch = null, lead = null, options
   }, [value, searching, ref])
   const close = () => { search?.onChange?.(''); setSearching(false) }
   const hasLupa = !!(search || onSearch)
+  // «›» à direita, só no computador (rato), enquanto houver mais para o lado
+  // (SPEC do R2, o more-r do protótipo — QA, 13 out). No telemóvel, o dedo.
+  const [more, setMore] = useState(false)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return undefined
+    const update = () => setMore(!searching && el.scrollWidth - el.clientWidth - el.scrollLeft > 4)
+    update()
+    el.addEventListener('scroll', update, { passive: true })
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null
+    ro?.observe(el)
+    return () => { el.removeEventListener('scroll', update); ro?.disconnect() }
+  }, [ref, searching, options, children])
+  const nudge = () => { const el = ref.current; if (el) el.scrollBy({ left: Math.round(el.clientWidth * 0.7), behavior: 'smooth' }) }
   return (
+    <div className="relative">
     <div ref={ref} role={searching ? undefined : 'group'} aria-label={searching ? undefined : label}
       className={`no-scrollbar -mx-4 flex cursor-grab items-center gap-1.5 overflow-x-auto px-4 py-1 active:cursor-grabbing ${className}`}>
       {searching ? (
@@ -859,6 +874,13 @@ export function FilterBar({ search = null, onSearch = null, lead = null, options
             : children}
         </>
       )}
+    </div>
+    {more && (
+      <button type="button" onClick={nudge} aria-label={t('ui.see_more_right')} tabIndex={-1}
+        className="absolute inset-y-0 -right-4 hidden w-[34px] items-center justify-end bg-gradient-to-r from-white/0 via-white to-white pr-2 text-lg font-black text-ink-500 [@media(hover:hover)_and_(pointer:fine)]:flex">
+        ›
+      </button>
+    )}
     </div>
   )
 }
@@ -1121,7 +1143,9 @@ export function AchievementCard({ achievementKey, category, rarity, earned = fal
   return (
     // onOpen: tocar abre o cartão animado (Perfil, pedido do Francisco a 11 out).
     <div
-      className={`rounded-ctrl border-2 p-3 text-center bg-surface ${meta.frame} ${meta.glow} ${onOpen ? 'press cursor-pointer' : ''}`}
+      // compact (Perfil, R7): cartão branco próprio, sem borda grossa — a
+      // raridade vê-se na moldura da medalha e na palavra colorida.
+      className={`p-3 text-center ${compact ? 'rounded-card border border-line bg-white' : `rounded-ctrl border-2 bg-surface ${meta.frame} ${meta.glow}`} ${onOpen ? 'press cursor-pointer' : ''}`}
       onErrorCapture={() => setMedalFailed(true)}
       {...(onOpen ? { role: 'button', tabIndex: 0, onClick: onOpen, onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() } } } : {})}
     >
