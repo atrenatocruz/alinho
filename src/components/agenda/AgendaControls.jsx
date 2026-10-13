@@ -7,7 +7,7 @@ import { RADIUS_OPTIONS } from '../../lib/explore'
 import { formatDate } from '../../lib/formatDate'
 import { toDayKey, fromDayKey, addDays, monthGrid, EVENT_KINDS, SHOW_OPTIONS, DEFAULT_FILTERS } from '../../lib/agenda'
 import { KIND_STYLE } from './EventCard'
-import { Chips } from '../ui'
+import { Chips, FilterBar, FilterPill } from '../ui'
 import TodayButton from '../TodayButton'
 import SearchField, { Realce, matchesQuery } from '../SearchField'
 import { useAuth } from '../../contexts/AuthContext'
@@ -502,7 +502,6 @@ export function dayChipLabel(dayKey, t, lang) {
 // FilterBar do ui.jsx, R4). Continua a sair daqui para quem já o importa.
 export { useDragScroll }
 
-const TAP = "relative before:absolute before:inset-x-0 before:-inset-y-1 before:content-['']"
 
 // Pela ordem da SPEC-1 (Tudo · Mixes · Jogos em aberto · Horários livres ·
 // Torneios · Liga · Aulas · Amigos), só os que existem. «Aulas» segue a mesma
@@ -513,65 +512,44 @@ const BAR_LABEL_KEY = { ...KIND_FILTER_KEY, friends: 'agenda.filter_kind_friends
 export function HomeBar({ filters, dayKey, onOpenSearch, onOpenDay, onOpenFilters, onKinds }) {
   const { t, i18n } = useTranslation()
   const { isLessonsEnabled } = useAuth()
-  const ref = useDragScroll()
   const kinds = BAR_KINDS.filter((k) => k !== 'lesson' || isLessonsEnabled)
   const all = filters.kinds.length >= EVENT_KINDS.length
   const badge = filtersBadge(filters)
-  const pill = (on) => `${TAP} shrink-0 inline-flex items-center gap-1.5 px-3 min-h-[36px] rounded-full text-[13px] font-extrabold border whitespace-nowrap select-none ${
-    on ? 'bg-ink-900 text-white border-ink-900' : 'bg-white text-ink-900 border-line'
-  }`
-  // A pastilha escolhida fica sempre à vista: a barra desliza até ela quando
-  // a escolha muda (UX, 12 out). Ao abrir, sem deslizar — salta logo.
-  const kindsKey = filters.kinds.join(',')
-  const shownOnce = useRef(false)
-  useEffect(() => {
-    const el = ref.current
-    const on = el?.querySelector('[data-kind][aria-pressed="true"]')
-    if (!el || !on) { shownOnce.current = true; return }
-    const box = el.getBoundingClientRect()
-    const r = on.getBoundingClientRect()
-    const pad = 16
-    let left = null
-    if (r.right > box.right - pad) left = el.scrollLeft + r.right - box.right + pad
-    else if (r.left < box.left + pad) left = el.scrollLeft - (box.left + pad - r.left)
-    if (left != null) el.scrollTo({ left, behavior: shownOnce.current ? 'smooth' : 'auto' })
-    shownOnce.current = true
-  }, [kindsKey, ref])
   // Um tipo de cada vez; tocar no escolhido, ou em «Tudo», volta a tudo.
   const pick = (k) => onKinds(k === null || (filters.kinds.length === 1 && filters.kinds[0] === k) ? [...EVENT_KINDS] : [k])
-  return (
-    <div ref={ref} className="flex items-center gap-1.5 overflow-x-auto no-scrollbar -mx-4 px-4 py-1 cursor-grab active:cursor-grabbing">
-      {/* A pastilha do dia: só com a barra presa (R2, 13 out). */}
+  // R4 (13 out): a barra comum do Bugs (FilterBar/FilterPill). A pastilha
+  // do dia vai antes da lupa (R2: só com a barra presa), por isso a lupa vai
+  // no «lead» e não pelo onSearch da FilterBar.
+  const lead = (
+    <>
       {onOpenDay && (
-        <button type="button" onClick={onOpenDay} className={pill(false)}>
-          {dayHeading(dayKey, i18n.language).short} <ChevronDown size={14} className="text-muted" />
-        </button>
+        <FilterPill chevron onClick={onOpenDay}>{dayHeading(dayKey, i18n.language).short}</FilterPill>
       )}
       {onOpenSearch && (
-        <button type="button" onClick={onOpenSearch} aria-label={t('agenda.search_open')} title={t('agenda.search_open')}
-          className={`${TAP} shrink-0 inline-flex items-center justify-center w-9 min-h-[36px] rounded-full border bg-white text-ink-900 border-line`}>
+        <FilterPill onClick={onOpenSearch} aria-label={t('agenda.search_open')} title={t('agenda.search_open')}>
           <Search size={16} />
-        </button>
+        </FilterPill>
       )}
-      <button type="button" onClick={onOpenFilters} className={pill(false)} aria-label={badge ? t('agenda.filters_on', { count: badge }) : undefined}>
+      <FilterPill onClick={onOpenFilters} aria-label={badge ? t('agenda.filters_on', { count: badge }) : undefined}>
         <SlidersHorizontal size={14} /> {t('agenda.filters')}
         {badge > 0 && <span className="ml-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-ink-900 px-1 text-[11px] text-white">{badge}</span>}
-      </button>
-      <span aria-hidden="true" className="mx-0.5 h-6 w-px shrink-0 bg-line" />
-      <button type="button" onClick={() => pick(null)} aria-pressed={all} className={pill(all)}>{t('agenda.kind_everything')}</button>
+      </FilterPill>
+    </>
+  )
+  return (
+    <FilterBar lead={lead} label={t('agenda.filters')}>
+      <FilterPill on={all} onClick={() => pick(null)}>{t('agenda.kind_everything')}</FilterPill>
       {kinds.map((k) => {
         const on = !all && filters.kinds.includes(k)
         return (
-          <button key={k} type="button" data-kind={k} onClick={() => pick(k)} aria-pressed={on} className={pill(on)}>
-            {k === 'free'
-              // Horários livres: só o contorno tracejado, como o cartão deles (UX, 11 out).
-              ? <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-full border-[1.5px] border-dashed" style={{ borderColor: on ? KIND_STYLE.free.color : '#D9826A' }} />
-              : <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: KIND_STYLE[k].color }} />}
+          <FilterPill key={k} on={on} data-kind={k} onClick={() => pick(k)} dot={k === 'free' ? null : KIND_STYLE[k].color}>
+            {/* Horários livres: só o contorno tracejado, como o cartão deles (UX, 11 out). */}
+            {k === 'free' && <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full border-[1.5px] border-dashed" style={{ borderColor: KIND_STYLE.free.color }} />}
             {t(BAR_LABEL_KEY[k])}
-          </button>
+          </FilterPill>
         )
       })}
-    </div>
+    </FilterBar>
   )
 }
 
