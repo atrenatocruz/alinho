@@ -20,6 +20,7 @@ import { formatRating, formatRatingMaybeProvisional, isProvisional, bandProgress
 import { XP_TIERS, tierFromXp, preTierProgress, formatXp } from '../lib/xp'
 import { AGE_LABEL_KEY, ageCategory } from '../lib/ageCategories'
 import { formatDate as formatDateLib } from '../lib/formatDate'
+import { useFrameList, FrameAround, FrameTitle } from '../components/FrameBits'
 import { dayText } from '../components/friends/dayText'
 import { sortVouchersForWallet, shareVoucherContact, unshareVoucherContact } from '../lib/vouchers'
 import ShareContactSheet from '../components/vouchers/ShareContactSheet'
@@ -78,6 +79,10 @@ export default function Profile() {
   // lista antiga) · array = as linhas.
   const [playedHistory, setPlayedHistory] = useState(undefined)
   const [titles, setTitles] = useState(null)
+  // A moldura do pódio do mês (#626): com ela, sai o aro do nível e a
+  // moldura fica à volta da foto; o título vem por baixo do nome.
+  const frameList = useFrameList(isGuest ? null : profile?.id)
+  const myFrame = frameList[0]?.frame || null
   const [globalRank, setGlobalRank] = useState(null)
   const [kudosTotal, setKudosTotal] = useState(0)
   const [trophyCatalog, setTrophyCatalog] = useState([])
@@ -609,8 +614,9 @@ export default function Profile() {
             const r = 35
             const circumference = 2 * Math.PI * r
             return (
-              <div className="relative w-20 h-20 shrink-0">
-                <svg viewBox="0 0 80 80" width="80" height="80" className="absolute inset-0 -rotate-90">
+              <div className={`relative w-20 h-20 shrink-0 ${myFrame ? 'mt-5 mb-3' : ''}`}>
+                <FrameAround frame={myFrame} photo={64} left={8} top={8} />
+                {!myFrame && <svg viewBox="0 0 80 80" width="80" height="80" className="absolute inset-0 -rotate-90">
                   <circle cx="40" cy="40" r={r} fill="none" strokeWidth="4" className="stroke-ink-200/50" />
                   <circle
                     cx="40" cy="40" r={r} fill="none" strokeWidth="4" strokeLinecap="round"
@@ -618,7 +624,7 @@ export default function Profile() {
                     strokeDasharray={circumference}
                     strokeDashoffset={circumference * (1 - pct / 100)}
                   />
-                </svg>
+                </svg>}
                 <button
                   type="button"
                   onClick={() => setPhotoMenuOpen(true)}
@@ -634,7 +640,7 @@ export default function Profile() {
                     <Avatar name={profile?.name} url={profile?.avatar_url} size="w-16 h-16 text-2xl" colorClass="bg-lime-400 text-ink-900" />
                   )}
                 </button>
-                {profile?.rating != null && (
+                {profile?.rating != null && !myFrame && (
                   <span className="absolute -top-2 left-1/2 -translate-x-1/2 z-10">
                     <RatingBadge rating={profile?.rating} gender={profile?.gender} />
                   </span>
@@ -703,6 +709,7 @@ export default function Profile() {
           })()}
           <div className="flex-1 min-w-0 pt-1">
             <h2 className="text-xl text-ink-900 truncate">{profile?.name}</h2>
+            <FrameTitle list={frameList} />
             {(() => {
               const bp = bandProgress(profile?.rating)
               const nextLabel = bp?.nextMin != null ? ratingBand(bp.nextMin, profile?.gender)?.label : null
@@ -713,6 +720,8 @@ export default function Profile() {
                       do aro (a equipa gostava mais assim, 11 set 2026), por
                       isso não se repete aqui. */}
                   <div className="mt-0.5 flex items-center gap-2">
+                    {/* Com moldura, o nível sai de cima da foto e vem para aqui. */}
+                    {myFrame && profile?.rating != null && <RatingBadge rating={profile?.rating} gender={profile?.gender} />}
                     <span className="text-2xl font-extrabold text-ink-900 tabular-nums leading-none">
                       {formatRatingMaybeProvisional(profile?.rating, profile?.rating_games)}
                     </span>

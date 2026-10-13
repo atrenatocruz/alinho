@@ -5605,5 +5605,17 @@
   "monthshare.text_ranking_global": "👑 Ranking podium on alinho.pt: {{names}}. Congratulations!",
   "monthshare.text_xp": "👑 Attendance podium at {{club}}: {{names}}. Congratulations!",
   "monthshare.text_xp_global": "👑 Attendance podium on alinho.pt: {{names}}. Congratulations!",
-  "monthshare.title_xp": "XP"
+  "monthshare.title_xp": "XP",
+  "frames.title_ouro": "Legendary Padel Player",
+  "frames.title_prata": "Padel Master",
+  "frames.title_bronze": "Bronze Wall",
+  "frames.global": "Overall ranking",
+  "frames.more_one": "{{count}} more",
+  "frames.more_other": "{{count}} more",
+  "frames.sheet_title": "Your frames",
+  "frames.sheet_body": "Won on last month's podium. You wear the best one until the end of this month.",
+  "frames.place": "Place {{place}}",
+  "frames.sheet_title_other": "Frames this month",
+  "frames.sheet_body_other": "Won on last month's podium. The best one is worn until the end of this month.",
+  "frames.in_use": "Wearing now"
 }
