@@ -26,7 +26,10 @@ export const MIX_NOTICE_KINDS = ['mix_joined', 'mix_unpublished', 'mix_not_finis
   'mix_finished',
   // Aprovar quem entra (2 out, Dev 3): o pedido a quem organiza, e a resposta
   // a quem pediu.
-  'mix_join_request', 'mix_request_accepted', 'mix_request_declined']
+  'mix_join_request', 'mix_request_accepted', 'mix_request_declined',
+  // As regras de um mix mudaram (preço, formato…) — quem organiza escolheu
+  // «Só este mix» ou «Este e os seguintes» (Dev 3, notify_mix_changed).
+  'mix_changed']
 
 export async function listMyUnreadNotifications(limit = 20) {
   const { data, error } = await supabase
