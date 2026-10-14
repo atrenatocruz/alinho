@@ -53,7 +53,7 @@ const durationText = (min) => {
 
 /** Os dados da lista, com os filtros. history null = as funções ainda não
  *  existem (PGRST202): o Perfil mostra a lista antiga. */
-export function usePlayedHistory({ query, kind }) {
+export function usePlayedHistory({ query, kind, enabled = true }) {
   const month = null // o «📅» salta para o mês, não filtra (UX, 14 out)
   const [rows, setRows] = useState([])
   const [total, setTotal] = useState(0)
@@ -65,14 +65,15 @@ export function usePlayedHistory({ query, kind }) {
   const q = query.trim() || null
 
   useEffect(() => {
+    // Só se pede quando se abre «Jogos»: o Perfil abre sem estas chamadas.
+    if (!enabled) return
     const my = ++seq.current
     setState('loading')
     const args = { p_kind: kind, p_query: q, p_month: month }
-    Promise.all([
-      supabase.rpc('get_my_played_history', { ...args, p_limit: PAGE }),
-      supabase.rpc('get_my_played_months', { p_kind: kind, p_query: q }),
-      supabase.rpc('get_my_played_kinds', { p_query: q }),
-    ]).then(([h, m, k]) => {
+    // Uma chamada de cada vez (PO, 14 out): primeiro a lista, que é o que se
+    // vê; os resumos dos meses e as contagens dos tipos vêm depois, sem
+    // prender o ecrã nem disputar a base com a lista.
+    supabase.rpc('get_my_played_history', { ...args, p_limit: PAGE }).then(async (h) => {
       if (my !== seq.current) return
       if (h.error) {
         if (errorKind(h.error) === 'not_ready') { setState('missing'); return }
@@ -84,11 +85,15 @@ export function usePlayedHistory({ query, kind }) {
       setRows(list)
       setTotal(h.data?.total ?? list.length)
       setHasMore(list.length >= PAGE)
-      setMonths(m.error ? [] : (m.data || []))
-      setKinds(k.error ? [] : (k.data || []))
       setState('ready')
+      const m = await supabase.rpc('get_my_played_months', { p_kind: kind, p_query: q })
+      if (my !== seq.current) return
+      setMonths(m.error ? [] : (m.data || []))
+      const k = await supabase.rpc('get_my_played_kinds', { p_query: q })
+      if (my !== seq.current) return
+      setKinds(k.error ? [] : (k.data || []))
     })
-  }, [kind, q, month])
+  }, [kind, q, month, enabled])
 
   const loadMore = useCallback(() => {
     if (!hasMore || state !== 'ready' || !rows.length) return

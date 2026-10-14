@@ -96,25 +96,30 @@ export function CardState({ tone = 'ok', children }) {
   )
 }
 
-/** As caras (até 4, depois «+N», e até 2 lugares livres a tracejado) e, à
- *  direita, o botão. */
+/** As caras (até 4, depois «+N») e, à direita, o botão. Lugares livres a
+ *  tracejado só nos jogos de até 4 lugares (jogo em aberto, amigos): um por
+ *  lugar, e caras e tracejados somam o total (1/4 = 1 cara e 3 tracejados).
+ *  Nos mixes e torneios, sem tracejados (Francisco via PO e UX, 14 out). */
 export function CardFoot({ people = [], slots = 0, children }) {
   const shown = people.slice(0, 4)
   const more = people.length - shown.length
-  const empty = more > 0 ? 0 : Math.min(2, Math.max(0, slots - people.length))
+  const empty = slots > 0 && slots <= 4 ? Math.max(0, slots - people.length) : 0
   return (
     <div className="mt-3 flex items-center gap-2.5">
       {/* isolate: a ordem das caras (zIndex 10 - i) fica só dentro da fila —
           a primeira cara (z 10) aparecia por cima do topo preso da Home (z-10)
           ao descer (Francisco, 13 out). */}
-      <div className="isolate flex">
+      <div className="isolate flex items-center">
         {shown.map((p, i) => (
-          <span key={p.id || i} className="-mr-2 rounded-full border-2 border-white" style={{ zIndex: 10 - i }}>
+          <span key={p.id || i} className="relative -mr-2 flex rounded-full border-2 border-white" style={{ zIndex: 10 - i }}>
             <Avatar name={p.name} url={p.avatar_url} size="w-7 h-7 text-[10px]" />
           </span>
         ))}
         {Array.from({ length: empty }, (_, i) => (
-          <span key={`e${i}`} aria-hidden="true" className="-mr-2 h-[32px] w-[32px] rounded-full border-2 border-dashed border-[#C9CCD1] bg-white" />
+          // Sobrepõem-se como as caras, com o anel branco: cada um tapa o
+          // anterior e não parece partido (UX, 14 out).
+          <span key={`e${i}`} aria-hidden="true" style={{ zIndex: 10 - shown.length - i, boxShadow: '0 0 0 2px #fff' }}
+            className="relative -mr-2 h-[28px] w-[28px] rounded-full border-2 border-dashed border-[#C9CCD1] bg-white" />
         ))}
         {more > 0 && (
           <span className="-mr-2 grid h-[32px] w-[32px] place-items-center rounded-full border-2 border-white bg-[#F1F2EE] font-display text-[10.5px] font-bold text-[#4F535A]">+{more}</span>
