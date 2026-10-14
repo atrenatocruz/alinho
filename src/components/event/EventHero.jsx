@@ -20,6 +20,7 @@ import { ChevronLeft, ChevronRight, Share2 } from 'lucide-react'
 import KindHero from '../KindHero'
 import { KIND_COLORS } from '../../lib/kindColors'
 import { Avatar } from '../ui'
+import FaceCircles from './FaceCircles'
 
 const ROUND = 'flex h-11 w-11 items-center justify-center rounded-full bg-black/25 text-white backdrop-blur-sm'
 
@@ -31,29 +32,13 @@ const ROUND = 'flex h-11 w-11 items-center justify-center rounded-full bg-black/
 function StatusBand({ kind, status }) {
   const c = KIND_COLORS[kind] || KIND_COLORS.mix
   const faces = status.faces || []
-  const shown = faces.slice(0, 4)
-  const extra = faces.length - shown.length
-  // Lugares livres a tracejado: só nos jogos de até 4 lugares (quem chama
-  // passa 0 nos mixes e torneios — Francisco via PO e UX, 14 out).
-  const empty = Math.min(4, Math.max(0, Number(status.slots) || 0))
+  // As caras e um tracejado por cada lugar que falta (FaceCircles: no máximo
+  // 6 círculos, com «+N» — R1, decisão do Francisco a 14 out). `slots` são os
+  // lugares que faltam (duplas, no torneio); 0 quando acabou.
+  const free = Math.max(0, Number(status.slots) || 0)
   return (
     <div className="mt-4 flex items-center gap-3 rounded-[16px] px-3.5 py-3" style={{ background: status.tone === 'grey' ? '#F1F2EE' : c.light }}>
-      {(shown.length > 0 || empty > 0) && (
-        <div className="isolate flex shrink-0 items-center">
-          {shown.map((p, i) => (
-            <span key={p.id || i} className={`relative rounded-full ring-2 ring-white ${i ? '-ml-2' : ''}`} style={{ zIndex: 10 - i }}>
-              <Avatar name={p.name} url={p.avatar_url} size="w-8 h-8 text-[11px]" />
-            </span>
-          ))}
-          {Array.from({ length: empty }, (_, i) => (
-            <span key={`e${i}`} aria-hidden="true" style={{ zIndex: 10 - shown.length - i, boxShadow: '0 0 0 2px #fff' }}
-              className={`relative h-8 w-8 rounded-full border-2 border-dashed border-[#C9CCD1] bg-white ${shown.length || i ? '-ml-2' : ''}`} />
-          ))}
-          {extra > 0 && (
-            <span className="-ml-2 flex h-8 min-w-[32px] items-center justify-center rounded-full bg-white px-1 text-[11px] font-extrabold text-ink-700 ring-2 ring-white">+{extra}</span>
-          )}
-        </div>
-      )}
+      <FaceCircles people={faces} free={free} size="md" moreBg={status.tone === 'grey' ? 'bg-white' : 'bg-[#F1F2EE]'} />
       <div className="min-w-0">
         {status.text && (
           <p className="flex items-center gap-1.5 text-[15px] font-extrabold leading-tight" style={{ color: status.tone === 'ok' ? '#15803D' : status.tone === 'grey' ? '#4F535A' : c.dark }}>

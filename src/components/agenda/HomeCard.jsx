@@ -8,7 +8,7 @@
 
    Só o aspeto: os dados e as ações vêm de cada cartão (EventCard, …). */
 import { Link } from 'react-router-dom'
-import { Avatar } from '../ui'
+import FaceCircles from '../event/FaceCircles'
 import { KIND_COLORS } from '../../lib/kindColors'
 
 /** As cores de um tipo: { strong, dark, light, line } (R0, kindColors). */
@@ -96,35 +96,14 @@ export function CardState({ tone = 'ok', children }) {
   )
 }
 
-/** As caras (até 4, depois «+N») e, à direita, o botão. Lugares livres a
- *  tracejado só nos jogos de até 4 lugares (jogo em aberto, amigos): um por
- *  lugar, e caras e tracejados somam o total (1/4 = 1 cara e 3 tracejados).
- *  Nos mixes e torneios, sem tracejados (Francisco via PO e UX, 14 out). */
-export function CardFoot({ people = [], slots = 0, children }) {
-  const shown = people.slice(0, 4)
-  const more = people.length - shown.length
-  const empty = slots > 0 && slots <= 4 ? Math.max(0, slots - people.length) : 0
+/** As caras e os lugares que faltam (FaceCircles: no máximo 6 círculos, com
+ *  «+N» — R1, decisão do Francisco a 14 out) e, à direita, o botão. `free`:
+ *  os lugares que faltam (duplas, no torneio); sem ele, `slots - pessoas`. */
+export function CardFoot({ people = [], slots = 0, free = null, children }) {
+  const missing = free ?? Math.max(0, slots - people.length)
   return (
     <div className="mt-3 flex items-center gap-2.5">
-      {/* isolate: a ordem das caras (zIndex 10 - i) fica só dentro da fila —
-          a primeira cara (z 10) aparecia por cima do topo preso da Home (z-10)
-          ao descer (Francisco, 13 out). */}
-      <div className="isolate flex items-center">
-        {shown.map((p, i) => (
-          <span key={p.id || i} className="relative -mr-2 flex rounded-full border-2 border-white" style={{ zIndex: 10 - i }}>
-            <Avatar name={p.name} url={p.avatar_url} size="w-7 h-7 text-[10px]" />
-          </span>
-        ))}
-        {Array.from({ length: empty }, (_, i) => (
-          // Sobrepõem-se como as caras, com o anel branco: cada um tapa o
-          // anterior e não parece partido (UX, 14 out).
-          <span key={`e${i}`} aria-hidden="true" style={{ zIndex: 10 - shown.length - i, boxShadow: '0 0 0 2px #fff' }}
-            className="relative -mr-2 h-[28px] w-[28px] rounded-full border-2 border-dashed border-[#C9CCD1] bg-white" />
-        ))}
-        {more > 0 && (
-          <span className="-mr-2 grid h-[32px] w-[32px] place-items-center rounded-full border-2 border-white bg-[#F1F2EE] font-display text-[10.5px] font-bold text-[#4F535A]">+{more}</span>
-        )}
-      </div>
+      <FaceCircles people={people} free={missing} size="sm" />
       {children && <div className="relative ml-auto flex flex-col items-stretch gap-1">{children}</div>}
     </div>
   )

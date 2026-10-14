@@ -2,7 +2,7 @@ import { Fragment, useState, useEffect, useLayoutEffect, useMemo, useRef } from 
 import { createPortal } from 'react-dom'
 import { Link, useSearchParams, useNavigationType, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { X, Check, ChevronLeft, ChevronDown } from 'lucide-react'
+import { Check, ChevronDown } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { takePendingOrgSlug } from '../lib/loginLinks'
 import { getClubProfile } from '../lib/clubProfile'
@@ -733,8 +733,7 @@ export default function Home() {
       document.removeEventListener('scroll', onScroll, { capture: true })
     }
   }, [])
-  // A pesquisa abre por baixo da linha do sítio (que volta a aparecer).
-  const searchTop = searchOpen ? Math.max(0, Math.round(topRowRef.current?.getBoundingClientRect().bottom ?? 64) + 4) : 0
+  // A pesquisa abre com o cabeçalho inteiro à vista (a linha do sítio volta).
   useEffect(() => { if (searchOpen) setCollapsed(false) }, [searchOpen])
   const allEvents = useMemo(() => applyFilters(events, DEFAULT_FILTERS, location), [events, location])
   const topRowH = collapsed ? (topRowRef.current?.offsetHeight || 0) + 6 : 0
@@ -1071,7 +1070,15 @@ export default function Home() {
         <HomeBar
           filters={filters}
           dayKey={visibleDay}
-          onOpenSearch={viewMode === 'list' ? openSearch : undefined}
+          // A pesquisa comum (SPEC 2026-10-14-pesquisa-regra-unica): a caixa
+          // abre no sítio da barra; o «✕» apaga e fecha. Só na lista.
+          search={viewMode === 'list' ? {
+            value: search,
+            onChange: setSearch,
+            placeholder: t('homesearch.placeholder'),
+            open: searchOpen,
+            onOpenChange: (v) => { if (v) openSearch(); else { rememberSearch(search); closeSearch() } },
+          } : null}
           // A pastilha do dia só com a barra presa (R2): parado, a data está em cima.
           onOpenDay={viewMode === 'list' && collapsed ? () => setMonthOpen(true) : undefined}
           onOpenFilters={() => setFiltersOpen(true)}
@@ -1142,39 +1149,15 @@ export default function Home() {
         </div>
       )}
 
-      {/* A pesquisa por cima da Home (Trello #547, 25 set): ecrã inteiro,
-          teclado aberto, «Fechar» limpa e volta à Home tal como estava. */}
+      {/* A pesquisa (Trello #547; SPEC 2026-10-14-pesquisa-regra-unica): a
+          caixa está na barra, lá em cima, e os resultados ficam no lugar da
+          lista do dia, por baixo do cabeçalho; ao fechar, a lista volta. */}
       {/* Portal para o body: dentro do bloco animado da página (transform) o
           `fixed` ficava preso a ele, e ao abrir a Home já com a pesquisa
           aberta o salto para «hoje» levava-a para fora do ecrã. */}
       {searchOpen && createPortal(
-        // A pesquisa (Home do futuro, SPEC-1, ponto 4): a barra dá lugar a
-        // «‹» e à caixa de texto, por baixo da linha do sítio, do mapa e do
-        // sino, e a lista dá lugar às sugestões ou aos resultados.
-        <div className="fixed inset-x-0 bottom-0 z-40 bg-white overflow-y-auto" style={{ top: searchTop }}>
-          <div className="max-w-lg mx-auto px-4">
-            <div className="sticky top-0 z-10 -mx-4 flex items-center gap-2 border-b border-line/70 bg-white px-4 py-2">
-              <button type="button" onClick={closeSearch} aria-label={t('common.back')}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-line bg-white text-ink-900">
-                <ChevronLeft size={18} />
-              </button>
-              <label className="flex-1 min-w-0 flex items-center gap-2 input-field !min-h-[44px] !border-[1.5px] !border-ink-900 !bg-white">
-                <input
-                  type="text"
-                  value={search}
-                  autoFocus
-                  onChange={(e) => setSearch(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') { rememberSearch(search); e.currentTarget.blur() } }}
-                  placeholder={t('homesearch.placeholder')}
-                  className="flex-1 min-w-0 bg-transparent outline-none text-base"
-                />
-                {search && (
-                  <button type="button" onClick={() => setSearch('')} aria-label={t('agenda.search_clear')} className="text-muted shrink-0">
-                    <X size={16} />
-                  </button>
-                )}
-              </label>
-            </div>
+        <div className="fixed inset-x-0 bottom-0 z-40 bg-ground overflow-y-auto" style={{ top: 'var(--home-bar-h, 120px)' }}>
+          <div className="max-w-lg mx-auto px-4 pt-3">
             <HomeSearch
               events={allEvents}
               query={search}

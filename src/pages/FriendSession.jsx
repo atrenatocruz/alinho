@@ -431,8 +431,8 @@ export default function FriendSession() {
             ) : null}
             status={{
               faces: accepted.map((i) => ({ id: i.invitee_id, name: i.name, avatar_url: i.avatar_url })),
-              // Tracejados só nos jogos de até 4 lugares (UX, 14 out).
-              slots: finished || slots > 4 ? 0 : Math.max(0, slots - accepted.length),
+              // Um tracejado por cada lugar que falta (R1, Francisco, 14 out).
+              slots: finished ? 0 : Math.max(0, slots - accepted.length),
               text,
               tone,
               meta: t('homecard.hero_meta_accepted', { n: accepted.length, total: slots }),

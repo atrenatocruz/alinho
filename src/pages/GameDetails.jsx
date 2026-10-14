@@ -3128,9 +3128,9 @@ export default function GameDetails() {
             ) : null}
             status={{
               faces: people.map((p) => ({ id: p.id, name: p.name, avatar_url: p.avatar_url })),
-              // Tracejados só nos jogos em aberto de até 4 lugares; nos mixes
-              // nunca, seja qual for o tamanho (R1; UX e QA, 14 out).
-              slots: done || !isOpenGame(game) || capacity > 4 ? 0 : free,
+              // Um tracejado por cada lugar que falta, com «+N» nos grandes (R1,
+              // Francisco, 14 out); nenhum depois de acabar.
+              slots: done ? 0 : free,
               text,
               tone,
               dot,
