@@ -1092,9 +1092,11 @@ export function PlanBadge({ tier, className = '' }) {
    pelo Francisco a 11 out), ~84 px. Por conquistar: a mesma medalha a
    cinzento, com um cadeado num círculo preto no canto de baixo. Sem medalha
    (ou se a imagem falhar), o ícone redondo de sempre. */
-function AchievementMedal({ url, locked, name }) {
+function AchievementMedal({ url, locked, name, max = 84 }) {
   return (
-    <span className="relative mx-auto block h-[84px] w-[84px]">
+    // Nunca mais larga do que o cartão (iPhone a 375 px, 13 out): encolhe com
+    // ele e fica sempre centrada, com a mesma folga dos dois lados.
+    <span className="relative mx-auto block aspect-square w-full" style={{ maxWidth: max }}>
       <img src={url} alt={name} loading="lazy" decoding="async" width="84" height="84"
         className={`h-full w-full object-contain ${locked ? 'opacity-[.55] [filter:grayscale(1)]' : ''}`} />
       {locked && (
@@ -1145,11 +1147,13 @@ export function AchievementCard({ achievementKey, category, rarity, earned = fal
     <div
       // compact (Perfil, R7): cartão branco próprio, sem borda grossa — a
       // raridade vê-se na moldura da medalha e na palavra colorida.
-      className={`p-3 text-center ${compact ? 'rounded-card border border-line bg-white' : `rounded-ctrl border-2 bg-surface ${meta.frame} ${meta.glow}`} ${onOpen ? 'press cursor-pointer' : ''}`}
+      // compact: como no protótipo, sem contorno, sombra leve, 10 px em cima
+      // e em baixo e 6 px dos lados.
+      className={`text-center ${compact ? 'rounded-card bg-white px-1.5 py-2.5 shadow-[0_1px_2px_rgba(17,17,17,0.06)]' : `p-3 rounded-ctrl border-2 bg-surface ${meta.frame} ${meta.glow}`} ${onOpen ? 'press cursor-pointer' : ''}`}
       onErrorCapture={() => setMedalFailed(true)}
       {...(onOpen ? { role: 'button', tabIndex: 0, onClick: onOpen, onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() } } } : {})}
     >
-      {medal ? <AchievementMedal url={medal} name={name} /> : (
+      {medal ? <AchievementMedal url={medal} name={name} max={compact ? 72 : 84} /> : (
         <span className={`inline-flex w-11 h-11 rounded-full items-center justify-center ${meta.medal}`}>
           <Icon size={22} className={meta.icon} />
         </span>
