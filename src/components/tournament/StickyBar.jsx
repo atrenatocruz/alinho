@@ -1,7 +1,8 @@
 // A categoria, os separadores e os dias presos ao descer (design-handoff/
 // 2026-10-11-torneio-topo-preso, aprovado para experimentar pelo Francisco a
 // 11 out). Ficam por baixo da barra do título (BackBar, 64 px + a margem do
-// telemóvel), com fundo branco e uma sombra leve; em cima, antes de descer,
+// telemóvel), no cinzento da página (R12b, 14 out: nunca branco) e com uma
+// sombra leve; em cima, antes de descer,
 // tudo como hoje. Mudar de categoria, de separador ou de dia na barra presa
 // leva ao início dessa lista, logo abaixo da barra — não ao topo da página.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
@@ -85,7 +86,7 @@ export function StickyTabs({ children, resetKey, shadow = true }) {
       {/* A mesma altura presa ou solta: o espaço que sai do meio (16 → 8 px)
           passa para baixo — senão a página saltava ao prender. */}
       <div ref={ref} style={{ top: BAR_TOP }}
-        className={`sticky z-[9] -mx-4 bg-white px-4 ${stuck ? `space-y-2 pb-4 pt-2 ${shadow ? SHADOW : ''}` : 'space-y-4 pb-2 pt-2'}`}>
+        className={`sticky z-[9] -mx-4 bg-ground px-4 ${stuck ? `space-y-2 pb-4 pt-2 ${shadow ? SHADOW : ''}` : 'space-y-4 pb-2 pt-2'}`}>
         {children}
       </div>
     </>
@@ -102,7 +103,7 @@ export function StickyDays({ children, resetKey }) {
     <>
       <div ref={sentinel} aria-hidden />
       <div ref={ref} style={{ top: 'var(--t-sticky-bottom, 0px)' }}
-        className={`sticky z-[8] -mx-4 mb-2 bg-white px-4 pb-2 ${stuck ? SHADOW : ''}`}>
+        className={`sticky z-[8] -mx-4 mb-2 bg-ground px-4 pb-2 ${stuck ? SHADOW : ''}`}>
         {children}
       </div>
     </>
