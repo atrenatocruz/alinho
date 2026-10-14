@@ -279,7 +279,7 @@ export default function FriendSession() {
   // sumia sem dizer porquê (#586, 13 out).
   // Quem aceitou e não criou: a linha verde (SPEC amigos-convidado, ponto 2).
   const organizerLine = iOrganize && !iAmCreator && (
-    <p className="mt-3 rounded-card border border-[#BBF7D0] bg-[#DCFCE7] px-3.5 py-2.5 text-sm text-[#14532D]">{t('friends.organizer_line')}</p>
+    <p className="mt-3 rounded-card bg-lime-100 px-3.5 py-2.5 text-sm text-[#3F6212]">{t('friends.organizer_line')}</p>
   )
   // «Sair do jogo»: só quem aceitou e não criou, e nunca depois de o jogo
   // contar para o ranking (Dev 3: already_counted).

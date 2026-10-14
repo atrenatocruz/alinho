@@ -151,7 +151,7 @@ export default function ChangePasswordSection() {
 
           {error && <p className="text-sm text-danger">{error}</p>}
           {done && (
-            <p role="status" className="flex items-start gap-2 rounded-ctrl border border-[#BBF7D0] bg-[#DCFCE7] px-3.5 py-3 text-sm font-extrabold text-[#14532D]">
+            <p role="status" className="flex items-start gap-2 rounded-ctrl bg-lime-100 px-3.5 py-3 text-sm font-extrabold text-[#3F6212]">
               <CheckCircle2 size={18} className="mt-px shrink-0" /> {t('profile.password_changed')}
             </p>
           )}

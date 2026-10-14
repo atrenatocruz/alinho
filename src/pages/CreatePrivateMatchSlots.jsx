@@ -170,7 +170,7 @@ export default function CreatePrivateMatchSlots() {
           <div>
             <p className={label}>{t('createprivatematch.your_dupla')}</p>
             <div className="space-y-2">
-              <div className="flex items-center gap-3 rounded-ctrl border border-[#BBF7D0] bg-[#DCFCE7] p-3">
+              <div className="flex items-center gap-3 rounded-ctrl bg-lime-100 p-3">
                 <Avatar name={profile?.name} url={profile?.avatar_url} size="w-9 h-9 text-sm" />
                 <p className="text-sm font-extrabold text-[#14532D]">{t('createprivatematch.you_suffix', { name: profile?.name })}</p>
               </div>
