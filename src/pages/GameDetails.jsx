@@ -5227,7 +5227,11 @@ export default function GameDetails() {
         const actions = [
           // R3b: «Editar o mix» é a primeira linha (saiu o «Editar» do topo).
           orgSlug && !['finished', 'cancelled'].includes(game.status) && { key: 'edit', label: t(isOpenGame(game) ? 'organizer.edit_open' : 'organizer.edit_mix'), hint: t('eventactions.edit_hint'),
-            onClick: () => navigate(`/gerir/${orgSlug}/editar/mix/${game.id}`) },
+            // O jogo em aberto tem o seu editor, o da publicação (QA, 14 out:
+            // pelo do mix dava «Este mix já não existe»).
+            onClick: () => navigate(isOpenGame(game) && game.open_batch_id
+              ? `/gerir/${orgSlug}/editar/em-aberto/${game.open_batch_id}`
+              : `/gerir/${orgSlug}/editar/mix/${game.id}`) },
           isSeriesDate && notStarted && { key: 'change', label: t('eventactions.change_one'), hint: t('eventactions.change_one_hint'), onClick: () => setChangeOneOpen(true) },
           // «Voltar a rascunho» (unpublish_mix, Dev 3) — regra nova do
           // Francisco (6 out): sempre, até o mix terminar, também com
