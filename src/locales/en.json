@@ -2688,6 +2688,8 @@
   "friends.not_enough": "Only {{count}} said yes. You need at least 4 people.",
   "friends.waiting_creator": "Waiting for {{name}} to form the teams.",
   "friends.claim_title": "You were added to a padel game",
+  "friends.claim_error_invite_not_found": "This invite doesn't exist anymore. Ask whoever invited you for another one.",
+  "friends.claim_error_invite_expired": "This invite has expired. Ask whoever invited you for another one.",
   "friends.form_teams_now": "Everyone accepted: now form the teams.",
   "friends.waiting_teams": "Waiting for the teams.",
   "friends.notice_invite": "{{name}} invited you to a game with friends · {{when}}.",
