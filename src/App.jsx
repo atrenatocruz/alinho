@@ -352,14 +352,14 @@ const PUBLIC_HEAD = {
   '/instrucoes': { title: 'Como funciona o alinho — mixes, níveis e WhatsApp', canonical: 'https://www.alinho.pt/instrucoes' },
   // Páginas do site (#619, 10 out): título e descrição próprios, no mesmo estilo.
   '/como-funciona': {
-    title: 'Como funciona a alinho.pt — mixes, nível, torneios e WhatsApp',
+    title: 'Como funciona o alinho.pt — mixes, nível, torneios e WhatsApp',
     canonical: 'https://www.alinho.pt/como-funciona',
-    description: 'Como funciona a alinho.pt: entra num mix pela app ou pelo WhatsApp, vê o teu nível subir, joga torneios e organiza o teu grupo de padel sem confusão.',
+    description: 'Como funciona o alinho.pt: entra num mix pela app ou pelo WhatsApp, vê o teu nível subir, joga torneios e organiza o teu grupo de padel sem confusão.',
   },
   '/novidades': {
-    title: 'Novidades da alinho.pt — o que mudou em cada versão',
+    title: 'Novidades do alinho.pt — o que mudou em cada versão',
     canonical: 'https://www.alinho.pt/novidades',
-    description: 'As mudanças de cada versão da alinho.pt, a mais recente em cima.',
+    description: 'As mudanças de cada versão do alinho.pt, a mais recente em cima.',
   },
 }
 function useRouteHead() {
