@@ -118,7 +118,7 @@ export default function FriendRounds({ match, games, invitees, players, iOrganiz
     // O jogo conta para o ranking uma vez, no fim (Francisco e Ruben, 8 out —
     // TEXTOS-RANKING.md): a ronda acabada diz só «Acabou», nunca «Contou».
     const tag = done
-      ? <span className="rounded-full bg-[#DCFCE7] px-2.5 py-0.5 text-xs font-extrabold text-[#14532D]">{t('friends.round_done')}</span>
+      ? <span className="rounded-full bg-lime-100 px-2.5 py-0.5 text-xs font-extrabold text-[#3F6212]">{t('friends.round_done')}</span>
       // Antes da hora do jogo nenhuma ronda está «A decorrer» (UX, 28 set).
       : live && !early
         ? <span className="rounded-full bg-danger/10 px-2.5 py-0.5 text-xs font-extrabold text-danger">{t('friends.round_live')}</span>

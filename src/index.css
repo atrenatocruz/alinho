@@ -44,14 +44,14 @@
 
   /* Color — ink (near-black + neutral grays). Primary family, replaces
      the old navy/blue ramp. */
-  --ink-50:  243 244 246;   /* #F3F4F6 — card background */
+  --ink-50:  244 245 241;   /* #F4F5F1 — caixas claras (era #F3F4F6; R12 — UX, 14 out: um cinzento só) */
   --ink-200: 156 163 175;   /* #9CA3AF — muted text, placeholders, icon borders */
   --ink-500: 75 85 99;      /* #4B5563 — supporting body copy, secondary labels */
   --ink-700: 31 41 55;      /* #1F2937 — high-hierarchy text, links, secondary btn border */
   --ink-900: 4 4 4;         /* #040404 — near black: headings, header/nav bg */
 
   /* Color — lime (the ball). ONE accent, used sparingly. */
-  --lime-100: 248 252 212;  /* #F8FCD4 — soft badge tint */
+  --lime-100: 244 248 220;  /* #F4F8DC — o lima-claro do «✓ Estás dentro» (R3); também «gravado», «contou» (era #F8FCD4; UX, 14 out) */
   --lime-400: 197 221 1;    /* #C5DD01 — CTA / confirmed states / brand accent */
   --lime-600: 153 178 0;    /* #99B200 — CTA hover/active (darker), accessible interactive text */
 
