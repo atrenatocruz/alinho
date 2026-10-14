@@ -1473,16 +1473,48 @@ RPC_MOCKS.get_month_ranking_months = () => {
 // PGRST202 (fica a lista antiga).
 const playedOff = () => localStorage.getItem('mockPlayedHistory') === 'off'
 const playedAgo = (d, h = 20) => { const x = new Date(); x.setDate(x.getDate() - d); x.setHours(h, 0, 0, 0); return x.toISOString() }
-RPC_MOCKS.get_my_played_history = () => (playedOff() ? { __error: 'Could not find the function', __code: 'PGRST202' } : {
-  total: 5,
-  rows: [
-    { kind: 'friends', event_id: 'pm-1', session_id: 'ses-1', title: null, starts_at: playedAgo(0, 18), org_name: null, org_slug: null, place: null, total: null, won: true, rounds_won: 3, rounds_played: 5, rating_delta: 12 },
-    { kind: 'tournament', event_id: 'tor-1', session_id: null, title: 'Torneio de Outono', category_code: 'M4', starts_at: playedAgo(2, 10), org_name: 'Dev Org', org_slug: 'dev-org', place: 1, total: 8, won: true, rating_delta: 20 },
-    { kind: 'mix', event_id: 'ag-finished-yesterday', session_id: null, title: 'Mix de segunda', starts_at: playedAgo(1), org_name: 'Smash Padel Almada', org_slug: 'smash-padel', format: 'sobe_desce', place: 4, total: 6, won: false, rating_delta: -6 },
-    { kind: 'mix', event_id: 'mix-am', session_id: null, title: 'Americano de quinta', starts_at: playedAgo(6), org_name: 'Dev Org', org_slug: 'dev-org', format: 'americano', place: 1, total: 8, won: true, rating_delta: 15 },
-    { kind: 'friends', event_id: 'pm-2', session_id: null, title: null, starts_at: playedAgo(9), org_name: 'Dev Org', org_slug: 'dev-org', place: null, total: null, won: false, rounds_won: 0, rounds_played: 1, rating_delta: null },
-  ],
-})
+// «Jogos com vida» (#636, migration_perfil_jogos_com_vida.sql): os casos do
+// desenho — 1.º com conquistas e kudos, 2.º num torneio (final), amigos
+// ganhos, 5.º com pontos a descer, empate amigável, por fechar, e um mês
+// antes. Filtros p_kind, p_query e p_month como a função a sério.
+const PLAYED_ROWS = () => [
+  { kind: 'mix', event_id: 'ag-finished-yesterday', title: 'Mix de segunda', starts_at: playedAgo(1), org_name: 'Maré Alta Padel', org_slug: 'mare-alta', format: 'sobe_desce', place: 1, total: 8, won: true, wins: 3, games: 4, rating_delta: 18, kudos: 2, achievements: [{ key: 'noite_perfeita', rarity: 'epico' }] },
+  { kind: 'tournament', event_id: 'tor-1', title: 'Open Maré Alta', category_code: 'M4', phase: 'final', starts_at: playedAgo(3, 10), org_name: 'Maré Alta Padel', partner_name: 'Tiago L.', place: 2, total: 16, won: false, wins: 4, games: 5, rating_delta: 22, kudos: 0, achievements: [{ key: 'final_four', rarity: 'raro' }] },
+  { kind: 'friends', event_id: 'pm-1', session_id: 'ses-1', title: null, starts_at: playedAgo(5, 18), location: 'Serra Azul Padel', team_a: ['Admin D.', 'Tiago L.'], team_b: ['Ana M.', 'Rui C.'], my_team: 'a', partner_name: 'Tiago L.', score_a: 3, score_b: 1, won: true, status: 'sent', ranking_state: 'ranked', rounds_won: 3, rounds_played: 4, duration_minutes: 90, rating_delta: 8, kudos: 0, achievements: [] },
+  { kind: 'mix', event_id: 'mix-terca', title: 'Mix de terça', starts_at: playedAgo(7), org_name: 'Serra Azul Padel', format: 'americano', place: 5, total: 8, won: false, wins: 1, games: 4, rating_delta: -12, kudos: 0, achievements: [] },
+  { kind: 'friends', event_id: 'pm-2', session_id: 'ses-2', title: null, starts_at: playedAgo(9, 18), location: 'Serra Azul Padel', team_a: ['Admin D.', 'Joana S.'], team_b: ['Pedro L.', 'Inês R.'], my_team: 'a', partner_name: 'Joana S.', score_a: 2, score_b: 2, won: false, status: 'sent', ranking_state: 'not_ranked', rounds_won: 2, rounds_played: 4, duration_minutes: 60, rating_delta: null, kudos: 0, achievements: [] },
+  { kind: 'friends', event_id: 'pm-3', session_id: 'ses-3', title: null, starts_at: playedAgo(10, 18), location: null, team_a: ['Admin D.', 'Rui C.'], team_b: ['Ana M.', 'Tiago L.'], my_team: 'a', partner_name: 'Rui C.', score_a: 1, score_b: 1, won: false, status: 'pending', ranking_state: null, rounds_won: 1, rounds_played: 2, rating_delta: null, kudos: 0, achievements: [] },
+  { kind: 'mix', event_id: 'mix-set', title: 'Mix de setembro', starts_at: playedAgo(40), org_name: 'Dev Org', format: 'sobe_desce', place: 3, total: 6, won: false, wins: 2, games: 4, rating_delta: 6, kudos: 1, achievements: [] },
+  { kind: 'mix', event_id: 'mix-set-2', title: 'Mix de sexta', starts_at: playedAgo(45), org_name: 'Serra Azul Padel', format: 'americano', place: 4, total: 8, won: false, wins: 2, games: 4, rating_delta: -3, kudos: 0, achievements: [] },
+  { kind: 'mix', event_id: 'mix-ago', title: 'Mix de agosto', starts_at: playedAgo(70), org_name: 'Maré Alta Padel', format: 'americano', place: 2, total: 8, won: false, wins: 3, games: 4, rating_delta: 10, kudos: 0, achievements: [] },
+  { kind: 'mix', event_id: 'mix-ago-2', title: 'Mix de verão', starts_at: playedAgo(75), org_name: 'Maré Alta Padel', format: 'sobe_desce', place: 6, total: 8, won: false, wins: 1, games: 4, rating_delta: -8, kudos: 0, achievements: [] },
+  { kind: 'mix', event_id: 'mix-ago-3', title: 'Mix de férias', starts_at: playedAgo(80), org_name: 'Dev Org', format: 'americano', place: 1, total: 6, won: true, wins: 4, games: 4, rating_delta: 20, kudos: 3, achievements: [] },
+]
+const playedFilter = ({ p_kind = null, p_query = null, p_month = null } = {}) => PLAYED_ROWS().filter((r) => (!p_kind || r.kind === p_kind)
+  && (!p_query || [r.title, r.org_name, r.location, r.partner_name, ...(r.team_a || []), ...(r.team_b || [])].join(' ').toLowerCase().includes(String(p_query).toLowerCase()))
+  && (!p_month || r.starts_at.slice(0, 7) === String(p_month).slice(0, 7)))
+const playedEmpty = () => localStorage.getItem('mockPlayedHistory') === 'empty'
+RPC_MOCKS.get_my_played_history = (params = {}) => {
+  if (playedOff()) return { __error: 'Could not find the function', __code: 'PGRST202' }
+  const rows = playedEmpty() ? [] : playedFilter(params).filter((r) => !params.p_before || r.starts_at < params.p_before)
+  return { total: rows.length, rows: rows.slice(0, params.p_limit || 50) }
+}
+RPC_MOCKS.get_my_played_months = (params = {}) => {
+  if (playedOff()) return { __error: 'Could not find the function', __code: 'PGRST202' }
+  const by = {}
+  for (const r of playedEmpty() ? [] : playedFilter(params)) {
+    const m = `${r.starts_at.slice(0, 7)}-01`
+    const o = (by[m] = by[m] || { month: m, games: 0, titles: 0, points: 0, kudos: 0 })
+    o.games += 1; o.titles += r.place === 1 ? 1 : 0; o.points += Math.round(r.rating_delta || 0); o.kudos += r.kudos || 0
+  }
+  return Object.values(by).sort((a, b) => (a.month < b.month ? 1 : -1))
+}
+RPC_MOCKS.get_my_played_kinds = (params = {}) => {
+  if (playedOff()) return { __error: 'Could not find the function', __code: 'PGRST202' }
+  const c = {}
+  for (const r of playedEmpty() ? [] : playedFilter({ p_query: params.p_query })) c[r.kind] = (c[r.kind] || 0) + 1
+  return ['mix', 'tournament', 'friends', 'open'].filter((k) => c[k]).map((k) => ({ kind: k, count: c[k] }))
+}
 RPC_MOCKS.get_player_titles = () => (playedOff() ? { __error: 'Could not find the function', __code: 'PGRST202' } : { mixes: 1, tournaments: 1, total: 2 })
 
 // Molduras do pódio do mês (#626). localStorage.mockFrames = 'off' → sem
