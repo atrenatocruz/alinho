@@ -1491,7 +1491,7 @@ const PLAYED_ROWS = () => [
   { kind: 'mix', event_id: 'mix-ago-3', title: 'Mix de férias', starts_at: playedAgo(80), org_name: 'Dev Org', format: 'americano', place: 1, total: 6, won: true, wins: 4, games: 4, rating_delta: 20, kudos: 3, achievements: [] },
 ]
 const playedFilter = ({ p_kind = null, p_query = null, p_month = null } = {}) => PLAYED_ROWS().filter((r) => (!p_kind || r.kind === p_kind)
-  && (!p_query || [r.title, r.org_name, r.location, r.partner_name, ...(r.team_a || []), ...(r.team_b || [])].join(' ').toLowerCase().includes(String(p_query).toLowerCase()))
+  && (!p_query || [r.title, r.org_name, r.location, r.partner_name, ...(r.team_a || []), ...(r.team_b || [])].join(' ').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().includes(String(p_query).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()))
   && (!p_month || r.starts_at.slice(0, 7) === String(p_month).slice(0, 7)))
 const playedEmpty = () => localStorage.getItem('mockPlayedHistory') === 'empty'
 RPC_MOCKS.get_my_played_history = (params = {}) => {
