@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom'
 import { useParams, useSearchParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import { useGoBack } from '../lib/useGoBack'
 import { useTranslation } from 'react-i18next'
-import { Plus, Calendar, Trash2, Edit2, Check, X, UserX, Clock, ArrowLeft, Camera, Settings, Copy, GraduationCap, Trophy, Lock, ChevronRight } from 'lucide-react'
+import { Plus, Calendar, Trash2, Check, X, UserX, Clock, ArrowLeft, Camera, Settings, Copy, GraduationCap, Trophy, Lock, ChevronRight, Ticket } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useGooglePlacesAutocomplete } from '../lib/useGooglePlacesAutocomplete'
@@ -13,7 +13,7 @@ import { createGroup } from '../lib/platformAdmin'
 import { listClubGroups, getOrganizationDeleteBlocker, deleteSelfServeGroup, transferOrganizationOwnership, setOrganizationPlan } from '../lib/organizations'
 import { formatRating } from '../lib/elo'
 import { formatDate as formatDateLib, formatTime as formatTimeLib } from '../lib/formatDate'
-import { Chips, DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal, ConfirmSheet, OrgKindBadge, PlanBadge, PLAN_TIERS, planName, Tabs, BackBar, StickyTop } from '../components/ui'
+import { Chips, DateField, DateTimeField, Avatar, Select, PrimaryButton, DangerConfirmModal, ConfirmSheet, PLAN_TIERS, planName, Tabs, BackBar, StickyTop, FilterBar } from '../components/ui'
 import { planLimitMessage, isMixLimitError, isMemberLimitError, limitsFor, nextPlanTier } from '../lib/plans'
 import { totalRounds, reverseClimbWarning, uiFormatOf, formatFieldsFor, FORMAT_LABEL_KEY, GENDER_RESTRICTION_LABEL_KEY, SCORING_FORMAT_LABEL_KEY } from '../lib/mixLogic'
 import { groupGamesBySeries } from '../lib/recurrenceGrouping'
@@ -53,6 +53,9 @@ import SeriesPage from '../components/mix/SeriesPage'
 import { setEventWhatsappPostTimes } from '../lib/whatsappHours'
 import { weekdayShort, launchDate } from '../lib/launchDay'
 import EventActionsSheet from '../components/EventActionsSheet'
+import CreateKindSheet from '../components/gerir/CreateKindSheet'
+import { CLUB_HERO, GROUP_HERO, KIND_COLORS } from '../lib/kindColors'
+import { semAcentos } from '../lib/semAcentos'
 import { cancelMixDate } from '../lib/mixCancel'
 
 
@@ -326,6 +329,10 @@ export default function GerirClube() {
   const [gameFilter, setGameFilter] = useState('upcoming')
   // «Ver o que já passou» com pastilhas por tipo (Histórico no Gerir, 27 set).
   const [pastKind, setPastKind] = useState('all')
+  // A lupa da barra dos tipos (R4/R9, 13 out): procura pelo nome do evento.
+  const [eventQuery, setEventQuery] = useState('')
+  const nomeDoItem = (i) => [i.nome, i.row?.title, i.row?.name, ...(i.jogos || []).map((g) => g.title)].filter(Boolean).join(' ')
+  const bateNome = (i) => !eventQuery.trim() || semAcentos(nomeDoItem(i)).includes(semAcentos(eventQuery.trim()))
   // As aulas já dadas de cada turma: series_id → { count, last }.
   const [turmasDadas, setTurmasDadas] = useState(new Map())
   const [savingPlan, setSavingPlan] = useState(false)
@@ -382,6 +389,8 @@ export default function GerirClube() {
   const [showCreateGroup, setShowCreateGroup] = useState(false)
   const [groupName, setGroupName] = useState('')
   const [creatingGroup, setCreatingGroup] = useState(false)
+  // «O que queres criar?» (R9).
+  const [createPicker, setCreatePicker] = useState(false)
   const [groupError, setGroupError] = useState('')
   // Nomes repetidos (27 set): avisa enquanto se escreve.
   const renameTaken = useOrgNameTaken(nameInput, { excludeId: org?.id, enabled: editingName && nameInput.trim() !== org?.name })
@@ -498,6 +507,7 @@ export default function GerirClube() {
     return itens
       .filter((i) => (passados ? i.terminado : !i.terminado))
       .filter((i) => pastKind === 'all' || i.tipo === pastKind)
+      .filter(bateNome)
       .sort((a, b) => {
         const x = a.quando ? new Date(a.quando).getTime() : 0
         const y = b.quando ? new Date(b.quando).getTime() : 0
@@ -565,6 +575,7 @@ export default function GerirClube() {
     }
     return itens
       .filter((i) => pastKind === 'all' || i.tipo === pastKind)
+      .filter(bateNome)
       .sort((a, b) => (b.quando ? new Date(b.quando).getTime() : 0) - (a.quando ? new Date(a.quando).getTime() : 0))
   }
 
@@ -2669,9 +2680,9 @@ export default function GerirClube() {
       type="button"
       onClick={() => { setVoucherScan(false); setActiveTab('redeem') }}
       aria-label={unusedVouchers ? t('gerirclube.vouchers_button_aria', { count: unusedVouchers }) : t('vouchers.title')}
-      className="inline-flex h-11 shrink-0 items-center gap-2 rounded-full bg-white/95 px-4 text-[15px] font-extrabold text-ink-900 shadow-card"
+      className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full border-[1.5px] border-[#E3E4E6] bg-white px-3 font-display text-[12.5px] font-extrabold text-ink-900"
     >
-      <span aria-hidden>🎁</span>
+      <Ticket size={16} aria-hidden="true" />
       {t('vouchers.title')}
       {unusedVouchers > 0 && (
         <span className="inline-flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-ink-900 px-1.5 text-xs font-extrabold text-lime-400">
@@ -2696,18 +2707,24 @@ export default function GerirClube() {
         // A barra fica sempre, por causa do «Vouchers»; o «‹» só para quem
         // tem mais de um clube/grupo, como antes.
         <BackBar
-          onBack={(adminOrganizations.length > 1 || currentUser?.is_platform_admin) ? goBack : undefined}
+          onBack={goBack}
           title={org?.name}
           right={vouchersButton}
           solid
         />
       )}
-      <div>
+      {/* R9 (13 out): a foto pequena (56 px; sem logótipo, o Alino do clube ou
+          do grupo, R0), «GERIR», o nome e as pastilhas «Clube» e «Plano». */}
+      <div className="!-mt-1 -mx-4 flex items-start gap-3.5 bg-white px-4 pb-4 pt-2">
+        <span className={`h-14 w-14 shrink-0 overflow-hidden ${isGroupOrg ? 'rounded-full' : 'rounded-[14px]'}`} aria-hidden="true">
+          <img src={org.group_logo_url || (isGroupOrg ? GROUP_HERO : CLUB_HERO)} alt="" loading="lazy"
+            className={`h-full w-full object-cover ${org.group_logo_url ? '' : 'object-[70%_30%]'}`} />
+        </span>
+        <div className="min-w-0 flex-1">
         {/* "Gerir" as a small label above, so the title is the group's name
             alone — as "Gerir: <nome>" it truncated to "Gerir: Grup…" on a
-            phone (Francisco, 15 set 2026). Kept outside the row below so the
-            QR/settings buttons line up with the title, not with this label. */}
-        <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{t('gerirclube.manage_label')}</p>
+            phone (Francisco, 15 set 2026). */}
+        <p className="font-mono text-[11px] font-bold uppercase tracking-widest text-muted">{t('gerirclube.manage_label')}</p>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             {editingName ? (
@@ -2731,31 +2748,25 @@ export default function GerirClube() {
               {renameError && <p role="alert" className="mt-1.5 text-sm font-extrabold text-danger">{renameError}</p>}
               </>
             ) : (
-              <h2 className="text-3xl font-bold text-ink-900 min-w-0 break-words">
+              <h2 className="min-w-0 break-words font-display text-[24px] font-black leading-tight tracking-[-.02em] text-ink-900">
                 {/* Wraps instead of truncating ("Smash Padel …"), and the pencil
                     sits inline right after the last word — as a flex item it
                     floated far right of a wrapped name (Francisco, 15 set 2026). */}
                 {org.name}
-                <button
-                  type="button"
-                  onClick={() => { setNameInput(org.name); setEditingName(true) }}
-                  aria-label={t('gerirclube.edit_name_aria')}
-                  className="ml-1.5 inline-flex align-middle -mt-1 w-8 h-8 items-center justify-center rounded-full text-muted hover:text-ink-900 hover:bg-ink-50 transition-colors duration-fast"
-                >
-                  <Edit2 size={16} />
-                </button>
               </h2>
             )}
-            {/* Etiqueta clube/grupo por baixo do nome, plano por baixo da frase —
-                tudo na mesma linha do GERIR ficava apertado (Francisco, 15 set 2026). */}
+            {/* As pastilhas «Clube» e «Plano Club», lado a lado por baixo do
+                nome (R9, 13 out). */}
             {org?.kind && (
-              <div className="mt-2"><OrgKindBadge kind={org.kind} /></div>
-            )}
-            <p className="text-gray-600 mt-2">{t(kk('gerirclube.subtitle'))}</p>
-            {org && (
-              <div className="mt-2"><PlanBadge tier={org.plan_tier} /></div>
+              // Pastilhas de contorno cinzento, como no protótipo (.gh .pills).
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                {[t(isGroupOrg ? 'clubprofile.kind_group' : 'clubprofile.kind_club'), t('gerir.plan_line', { plan: planName(org.plan_tier || 'free') })].map((txt) => (
+                  <span key={txt} className="rounded-full border border-[#E3E4E6] px-2 py-1 font-display text-[11px] font-bold leading-none text-[#4F535A]">{txt}</span>
+                ))}
+              </div>
             )}
           </div>
+        </div>
         </div>
       </div>
 
@@ -2767,7 +2778,7 @@ export default function GerirClube() {
         // cinco que deslizava, com a seta a dizer que havia mais, acabou com
         // a arrumação em Eventos · Pessoas · Clube (#419). Preso em cima, por
         // baixo do «‹», ao descer (R4, 13 out).
-        <StickyTop belowBackBar>
+        <StickyTop belowBackBar className="!mt-0">
           <Tabs
             value={activeTab}
             onChange={setActiveTab}
@@ -2777,6 +2788,24 @@ export default function GerirClube() {
               { value: 'settings', label: t(isGroupOrg ? 'gerirclube.tab_group' : 'gerirclube.tab_club') },
             ]}
           />
+          {/* R9 (13 out): a barra dos tipos, com a lupa, logo por baixo do
+              separador e presa com ele (R4, FilterBar). Filtra «A seguir» e
+              «Já passaram». */}
+          {activeTab === 'events' && !turmaAberta && (
+            <FilterBar
+              search={{ value: eventQuery, onChange: setEventQuery, placeholder: t('gerirclube.search_events') }}
+              options={[
+                { value: 'all', label: t('gerirclube.kind_all') },
+                { value: 'mix', label: t('gerirclube.kind_mixes'), dot: KIND_COLORS.mix.strong },
+                ...(isGroupOrg ? [] : [{ value: 'aberto', label: t('gerirclube.kind_open'), dot: KIND_COLORS.open.strong }]),
+                { value: 'torneio', label: t('gerirclube.kind_tournaments'), dot: KIND_COLORS.tournament.strong },
+                ...(isGroupOrg ? [] : [{ value: 'turma', label: t('gerirclube.kind_series'), dot: KIND_COLORS.lesson.strong }]),
+              ]}
+              value={pastKind}
+              onChange={setPastKind}
+              label={t('gerirclube.see_past')}
+            />
+          )}
         </StickyTop>
       )}
 
@@ -2801,31 +2830,33 @@ export default function GerirClube() {
                   set). Num grupo: mix e jogo entre amigos (Francisco, 28 set:
                   «falta o jogo entre amigos do grupo»). Secundarios: quatro blocos
                   lima seguidos competiam uns com os outros (DESIGN.md). */}
+              {/* R9 (13 out): um só botão preto «＋ Criar», a toda a largura, que
+                  abre «O que queres criar?» com um cartão por tipo, na cor do
+                  tipo. Os tipos e as regras de cada plano são os de antes. Pela
+                  ordem da Home: Mix, Jogos em aberto, (Jogo entre amigos),
+                  Torneio, Turma. */}
               {(() => {
-                const botoes = [
-                  ['mix', 'gerirclube.event_label_mix', true],
-                  ['amigos', 'gerirclube.create_friends', isGroupOrg],
+                const tipos = [
+                  ['mix', true],
                   // «Clube tem jogos em aberto; os grupos é que têm jogos entre
                   // amigos» (Francisco, 28 set). Os que já existam continuam na lista.
-                  ['aberto', 'gerirclube.tab_open_slots', canPlanEvents && !isGroupOrg],
-                  ['torneio', 'gerirclube.event_label_tournament', canPlanEvents && tournamentsReady],
-                  ['turma', 'gerirclube.event_label_series', !isGroupOrg && lessonsReady],
-                ].filter(([, , mostra]) => mostra)
+                  ['aberto', canPlanEvents && !isGroupOrg],
+                  ['amigos', isGroupOrg],
+                  ['torneio', canPlanEvents && tournamentsReady],
+                  ['turma', !isGroupOrg && lessonsReady],
+                ].filter(([, mostra]) => mostra).map(([tipo]) => tipo)
                 return (
-              // Um por linha, a toda a largura (UX, 10 out: a regra dos botões
-              // empilhados, de 6 out, vale também aqui).
-              <div className="grid grid-cols-1 gap-2">
-                {botoes.map(([tipo, texto]) => (
-                  <button
-                    key={tipo}
-                    type="button"
-                    onClick={() => abrirCriar(tipo)}
-                    className="btn-secondary !px-3 !py-2 !text-sm inline-flex items-center justify-center gap-1.5"
-                  >
-                    <Plus size={17} /> {t(texto)}
-                  </button>
-                ))}
-              </div>
+                  <>
+                    <button type="button" onClick={() => setCreatePicker(true)}
+                      className="press flex min-h-[52px] w-full items-center justify-center gap-1.5 rounded-ctrl bg-ink-900 text-base font-extrabold text-white">
+                      <Plus size={18} /> {t('gerirclube.create_button')}
+                    </button>
+                    {createPicker && (
+                      <CreateKindSheet orgName={org?.name || ''} kinds={tipos}
+                        onPick={(tipo) => { setCreatePicker(false); abrirCriar(tipo) }}
+                        onClose={() => setCreatePicker(false)} />
+                    )}
+                  </>
                 )
               })()}
 
@@ -3550,22 +3581,9 @@ export default function GerirClube() {
               {/* A lista, num cartao so. As duas abas «A decorrer / Futuros»
                   e «Terminados» sairam: e uma lista por data, e o que ja
                   passou fica num botao no fim (desenho de 23 set). */}
-              <div className="card space-y-4">
+              <div className="space-y-4">
 
-              {/* Pastilhas por tipo (filtro, regra única), por cima de «A seguir»
-                  e de «Já passaram» (SPEC 9 out). */}
-              {(
-                <Chips label={t('gerirclube.see_past')} value={pastKind} onChange={setPastKind}
-                  options={[
-                    { value: 'all', label: t('gerirclube.kind_all') },
-                    { value: 'mix', label: t('gerirclube.kind_mixes') },
-                    { value: 'torneio', label: t('gerirclube.kind_tournaments') },
-                    ...(org?.kind === 'group' ? [] : [
-                      { value: 'aberto', label: t('gerirclube.kind_open') },
-                      { value: 'turma', label: t('gerirclube.kind_series') },
-                    ]),
-                  ]} />
-              )}
+              {/* Os tipos estão na barra presa em cima (R9/R4, 13 out). */}
 
               <div className="space-y-3">
                 {/* «A SEGUIR · N», à vista (sai o «Ver o que vem aí»). */}
@@ -3592,7 +3610,7 @@ export default function GerirClube() {
                   // evento; a direita, uma acao so, escrita por extenso.
                   const tipo = item.tipo
                   const row = tipo === 'mix' ? item.entry.game : item.row
-                  let etiqueta, Icone, linha, detalhe, abrir, marca = null, acao = null, sufixo = null, privado = false, cinzento = false, porTerminar = false
+                  let etiqueta, Icone, linha, detalhe, abrir, marca = null, acao = null, sufixo = null, privado = false, cinzento = false, porTerminar = false, estado = null
                   if (tipo === 'turma') {
                     const quando = seriesWhen(t, row)
                     etiqueta = 'gerirclube.event_label_series'
@@ -3611,19 +3629,29 @@ export default function GerirClube() {
                       .filter((p) => p.status === 'confirmed')
                       .reduce((n, p) => n + 1 + (p.partner_id || p.partner_guest_id ? 1 : 0), 0)
                     const max = tipo === 'mix' ? (row.max_players || (row.num_courts || 1) * 4) : row.max_players
-                    const lugares = tipo === 'torneio' || !max ? null : t('gerirclube.spots_of', { count: confirmados, max })
                     // Torneio: duplas e, enquanto esta aberto, ate quando.
                     const prazo = tipo === 'torneio' && row.entries_deadline && new Date(`${row.entries_deadline}T23:59`) >= new Date()
                       ? t('gerirclube.entries_until', { date: quandoCurto(`${row.entries_deadline}T12:00`, false) })
                       : null
                     const duplas = tipo === 'torneio' && row.entry_count != null ? t('gerirclube.tournament_teams', { count: Number(row.entry_count) }) : null
                     const aDecorrer = tipo === 'mix' && isMixLive(row) ? t('gerirclube.status_in_progress') : null
+                    // O estado à direita (R9): «● A decorrer», «Completo» ou «Faltam N».
+                    estado = aDecorrer ? { texto: `● ${aDecorrer}`, tom: 'live' }
+                      : tipo !== 'torneio' && max && confirmados >= max ? { texto: t('gerirclube.state_full'), tom: 'cinza' }
+                        : tipo !== 'torneio' && max && confirmados > 0 ? { texto: t('gerirclube.state_missing', { count: max - confirmados }), tom: 'falta' }
+                          : null
                     etiqueta = { mix: 'gerirclube.event_label_mix', aberto: 'gerirclube.event_label_open', torneio: 'gerirclube.event_label_tournament' }[tipo]
                     Icone = { mix: Calendar, aberto: Clock, torneio: Trophy }[tipo]
                     linha = tipo === 'torneio' ? row.name : row.title
                     // O nível do mix no fim da linha, «… · MX4» (#577, designer 26 set).
                     const nivel = tipo === 'mix' && parseLevel(row.level) ? `${parseLevel(row.level).scale}${parseLevel(row.level).num}` : null
-                    detalhe = [item.quando ? quandoCurto(item.quando, tipo !== 'torneio') : null, tipo === 'mix' ? abreEm(row) : null, aDecorrer, lugares, duplas, prazo, nivel].filter(Boolean).join(' · ')
+                    // R9 (protótipo): o dia já está no quadrado — aqui só a hora,
+                    // «9/12 inscritos» e «recorrente» («22:30 · 9/12 inscritos ·
+                    // recorrente»).
+                    const hora = item.quando && tipo !== 'torneio' ? formatTimeLib(new Date(item.quando), i18n.language, { hour: '2-digit', minute: '2-digit' }) : null
+                    const inscritos = tipo === 'torneio' || !max ? null : `${confirmados}/${max} ${t('homecard.unit_signed')}`
+                    detalhe = [hora, tipo === 'mix' ? abreEm(row) : null, aDecorrer, inscritos, duplas, prazo, nivel,
+                      row.recurrence_id ? t('gerirclube.every_week') : null].filter(Boolean).join(' · ')
                     abrir = () => navigate(tipo === 'torneio' ? `/torneio/${row.slug || row.id}` : `/jogo/${row.id}`)
                     // Ações do evento (assunto 2): o mix que se repete aparece
                     // uma vez e abre a página da série; o que não se repete abre
@@ -3631,7 +3659,9 @@ export default function GerirClube() {
                     // Torneio: «Editar» à direita, igual ao mix (ações do evento,
                     // assunto 1 — os mesmos nomes em todos os eventos, 30 set).
                     // Abre o Editar do torneio na página dele.
-                    if (tipo === 'torneio' && row.status !== 'terminado' && row.status !== 'cancelado') {
+                    // R9 (UX, 13 out): sem a linha «Editar» por baixo — toda a
+                    // linha abre o torneio; só o rascunho leva os dois botões.
+                    if (tipo === 'torneio' && row.status === 'rascunho') {
                       acao = { texto: t('gerirclube.edit_action'), fazer: () => navigate(`/torneio/${row.slug || row.id}?admin=editar`), perigo: false }
                     }
                     // Rascunho (Francisco, 10 out): igual ao mix em rascunho —
@@ -3669,14 +3699,16 @@ export default function GerirClube() {
                       // «MIX · RECORRENTE», colado a etiqueta como na pagina do
                       // evento e na Home (#383) -- nunca numa etiqueta a parte.
                       if (row.recurrence_id) sufixo = t('ui.recurring')
-                      acao = { texto: t('gerirclube.edit_action'), fazer: () => abrirEdicaoMix(row), perigo: false }
+                      // R9 (UX, 13 out): sem a linha «Editar» por baixo — toda a
+                      // linha abre o mix, e o Editar está lá. Só o rascunho leva
+                      // os dois botões empilhados.
                       // Rascunho (Trello #544): «Mix · Rascunho», «só tu vês», e
                       // «Editar» + «Publicar» — só com «Publicar» o rascunho não
                       // se conseguia editar nem apagar (revisão da designer, 25 set).
                       if (isDraftMix(row)) {
                         sufixo = t('mixdraft.draft')
                         detalhe = [item.quando ? quandoCurto(item.quando, true) : null, t('mixdraft.only_you')].filter(Boolean).join(' · ')
-                        acao = { ...acao, publicar: () => setPublishing(row) }
+                        acao = { texto: t('gerirclube.edit_action'), fazer: () => abrirEdicaoMix(row), perigo: false, publicar: () => setPublishing(row) }
                       }
                     }
                     // Já jogado ou cancelado (acerto de 27 set, falha vista pelo
@@ -3698,66 +3730,78 @@ export default function GerirClube() {
                       acao = { texto: t('open_slots.cancel_button'), fazer: () => handleCancelOpenGame(row.id), perigo: true }
                     }
                   }
-                  // A cor do tipo, a mesma da Home e da pagina do evento
-                  // («Cores e pagina do evento», 17 set): fundo claro na linha,
-                  // etiqueta branca com o texto na cor.
-                  const cor = KIND_STYLE[{ mix: 'mix', aberto: 'open', torneio: 'tournament', turma: 'lesson' }[tipo]]
-                  // O rascunho fica sem cor e a tracejado até ser publicado.
+                  // R9 (13 out): a data num quadrado da cor forte do tipo (R0),
+                  // cinzento no que acabou ou foi cancelado; o nome e o detalhe;
+                  // à direita, o estado em pastilha e «›». Nos rascunhos, por
+                  // baixo, «Publicar» (preto) e «Editar» (contorno), empilhados.
+                  const kindKey = { mix: 'mix', aberto: 'open', torneio: 'tournament', turma: 'lesson' }[tipo]
+                  const corForte = KIND_COLORS[kindKey]?.strong || '#374151'
                   const rascunho = (tipo === 'mix' && isDraftMix(row)) || (tipo === 'torneio' && row.status === 'rascunho')
+                  const dia = item.quando ? new Date(item.quando) : null
+                  const pastilha = porTerminar ? { texto: t('pastevents.unfinished'), tom: 'falta' }
+                    : rascunho ? { texto: t('mixdraft.draft'), tom: 'rascunho' }
+                      : marca ? { texto: marca, tom: 'escuro' }
+                        : estado
+                  const TOM = {
+                    falta: 'bg-[#FFF1EA] text-[#C2410C]',
+                    live: 'bg-danger/10 text-danger',
+                    cinza: 'bg-ink-50 text-ink-700',
+                    escuro: 'bg-ink-900 text-white',
+                    rascunho: 'border border-dashed border-ink-300 text-ink-700',
+                  }
                   return (
-                    <div key={item.chave} className={`flex ${rascunho ? 'flex-col' : 'items-stretch'} rounded-ctrl border transition-[filter] duration-fast ${abrir ? 'hover:brightness-[0.98]' : ''} ${
-                      rascunho ? 'bg-white border-2 border-dashed border-ink-200' : cinzento ? 'bg-surface border-line' : cor.card
+                    <div key={item.chave} className={`rounded-[18px] bg-white transition-[filter] duration-fast ${abrir ? 'hover:brightness-[0.98]' : ''} ${
+                      rascunho ? 'border-2 border-dashed border-ink-200' : 'shadow-card'
                     }`}>
-                      <button type="button" onClick={abrir || undefined} disabled={!abrir} className="flex-1 min-w-0 text-left p-4 disabled:cursor-default">
-                        <span className="flex items-center justify-between gap-2">
-                          <span className={`inline-flex items-center gap-1 text-[11px] font-extrabold px-2 py-1 rounded-full ${rascunho || cinzento ? 'bg-ink-50 text-ink-700' : `bg-white ${cor.text}`}`}>
-                            <Icone size={12} /> {t(etiqueta)}{sufixo && <> · {sufixo}</>}
-                          </span>
-                          {privado && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-ink-900 px-2 py-[3px] text-[11px] font-semibold text-white">
-                              <Lock size={11} /> {t('tournament.admin.private')}
-                            </span>
-                          )}
-                          {marca && (
-                            <span className="rounded-full bg-ink-900 px-2 py-[3px] text-[11px] font-semibold text-white">{marca}</span>
-                          )}
-                          {porTerminar && (
-                            <span className="shrink-0 rounded-full border border-warning px-2 py-[2px] text-[11px] font-extrabold text-warning">{t('pastevents.unfinished')}</span>
+                      <button type="button" onClick={abrir || undefined} disabled={!abrir} className="flex w-full min-w-0 items-center gap-3 p-3.5 text-left disabled:cursor-default">
+                        <span className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-[14px] text-white"
+                          style={{ background: cinzento ? '#9CA3AF' : corForte }}>
+                          {tipo === 'turma' ? (
+                            <b className="font-mono text-sm font-extrabold uppercase">{String(linha || '').slice(0, 3)}</b>
+                          ) : (
+                            <>
+                              <b className="font-display text-[22px] font-extrabold leading-none">{dia ? dia.getDate() : '—'}</b>
+                              <span className="mt-0.5 font-mono text-[10px] font-bold uppercase">{dia ? dia.toLocaleDateString(i18n.language, { month: 'short' }).replace('.', '') : ''}</span>
+                            </>
                           )}
                         </span>
-                        <p className={`text-lg font-semibold mt-1 truncate ${cinzento ? 'text-muted' : 'text-ink-900'}`}>{linha}</p>
-                        <p className="text-sm text-muted mt-0.5">{detalhe}</p>
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-center gap-1.5">
+                            <span className={`truncate text-[16px] font-extrabold ${cinzento ? 'text-muted' : 'text-ink-900'}`}>{tipo === 'turma' ? t(etiqueta) : linha}</span>
+                            {privado && <Lock size={12} className="shrink-0 text-ink-500" aria-label={t('tournament.admin.private')} />}
+                          </span>
+                          <span className="mt-0.5 block text-sm leading-snug text-muted">
+                            {tipo === 'turma' ? `${linha} · ${detalhe}` : detalhe}{sufixo && !rascunho && tipo === 'mix' ? ` · ${sufixo.toLowerCase()}` : ''}
+                          </span>
+                        </span>
+                        {pastilha && !acao?.publicar && (
+                          <span className={`shrink-0 whitespace-nowrap rounded-full px-2 py-[3px] text-[12px] font-extrabold ${TOM[pastilha.tom]}`}>{pastilha.texto}</span>
+                        )}
+                        {abrir && <ChevronRight size={16} className="shrink-0 text-muted" />}
                       </button>
                       {acao && acao.publicar ? (
                         // Empilhados a toda a largura (UX, 10 out — botões nunca
-                        // lado a lado, também nos cartões do Gerir): «Publicar» a
-                        // preto em cima, «Editar» em contorno por baixo.
-                        <span className="flex flex-col gap-2 px-4 pb-4 -mt-1">
-                          <button
-                            type="button"
-                            onClick={acao.publicar}
-                            className="min-h-[44px] w-full rounded-ctrl bg-ink-900 px-4 text-sm font-extrabold text-white"
-                          >
+                        // lado a lado): «Publicar» a preto em cima, «Editar» em
+                        // contorno por baixo.
+                        <span className="flex flex-col gap-2 px-3.5 pb-3.5">
+                          <button type="button" onClick={acao.publicar}
+                            className="min-h-[44px] w-full rounded-ctrl bg-ink-900 px-4 text-sm font-extrabold text-white">
                             {t('mixdraft.publish')}
                           </button>
-                          <button
-                            type="button"
-                            onClick={acao.fazer}
-                            className="min-h-[44px] w-full rounded-ctrl border border-line bg-white px-4 text-sm font-extrabold text-ink-900"
-                          >
+                          <button type="button" onClick={acao.fazer}
+                            className="min-h-[44px] w-full rounded-ctrl border border-line bg-white px-4 text-sm font-extrabold text-ink-900">
                             {acao.texto}
                           </button>
                         </span>
                       ) : acao && (
-                        <button
-                          type="button"
-                          onClick={acao.fazer}
-                          className={`shrink-0 px-4 text-sm font-extrabold rounded-r-ctrl transition-colors duration-fast ${
-                            acao.perigo ? 'text-danger hover:bg-white/60' : 'text-ink-900 hover:bg-white/60'
-                          }`}
-                        >
-                          {acao.texto}
-                        </button>
+                        // As outras ações ficam por baixo, em texto: «Editar» (abre
+                        // o mesmo de antes) ou «Cancelar» (jogo em aberto antigo).
+                        <span className="flex justify-end border-t border-line px-3.5">
+                          <button type="button" onClick={acao.fazer}
+                            className={`min-h-[44px] px-1 text-sm font-extrabold ${acao.perigo ? 'text-danger' : 'text-ink-900'}`}>
+                            {acao.texto}
+                          </button>
+                        </span>
                       )}
                     </div>
                   )

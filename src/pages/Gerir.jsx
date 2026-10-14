@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Settings, Plus, Check, X, GraduationCap } from 'lucide-react'
+import { Settings, Plus, Check, X, GraduationCap, ChevronRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { Avatar, EmptyState, PrimaryButton, OrgKindBadge, PlanBadge, orgAvatarShape, PageHeader } from '../components/ui'
+import { Avatar, EmptyState, PrimaryButton, PageHeader } from '../components/ui'
 import PlayerSearch from '../components/PlayerSearch'
 import AdminDeleteAccountPanel from '../components/AdminDeleteAccountPanel'
 import { searchAnyPlayer, createOrganization, createSelfServeGroup } from '../lib/platformAdmin'
@@ -16,6 +16,8 @@ import { planName } from '../lib/plans'
 import { useHeaderActions } from '../contexts/HeaderActionsContext'
 import AppFeaturesPanel from '../components/AppFeaturesPanel'
 import OrgFinder from '../components/gerir/OrgFinder'
+import KindHero from '../components/KindHero'
+import { CLUB_HERO, GROUP_HERO } from '../lib/kindColors'
 
 
 export default function Gerir() {
@@ -143,7 +145,8 @@ export default function Gerir() {
   }
 
   const createGroupPanel = !isPlatformAdmin && (
-    <div className="card space-y-4">
+    // Num cartão tracejado (R9, 13 out).
+    <div className="space-y-4 rounded-[22px] border-2 border-dashed border-ink-200 bg-white p-4">
       {blockingGroup ? (
         <div>
           <h3 className="font-extrabold text-ink-900">{t('gerir.create_another_group_title')}</h3>
@@ -382,12 +385,8 @@ export default function Gerir() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <PageHeader title={t('gerir.title')}>{headerActions}</PageHeader>
-        <p className="text-muted text-sm pt-1">
-          {isPlatformAdmin ? t('gerir.subtitle_platform_admin') : t('gerir.subtitle')}
-        </p>
-      </div>
+      {/* Só o título, sem a frase por baixo (R9, UX 13 out). */}
+      <PageHeader title={t('gerir.title')}>{headerActions}</PageHeader>
 
       {createdClubBanner}
 
@@ -403,38 +402,52 @@ export default function Gerir() {
       {/* Clubes and Grupos never share a list: someone who manages a friends
           group and a club at the same time has to see at a glance which is
           which (Francisco, 15 set 2026 — Trello #177). */}
-      {clubsToShow.length <= 5 && [
-        { key: 'clubs', label: t('gerir.section_clubs'), orgs: clubsToShow.filter((o) => o.kind !== 'group') },
-        { key: 'groups', label: t('gerir.section_groups'), orgs: clubsToShow.filter((o) => o.kind === 'group') },
-      ].filter((section) => section.orgs.length > 0).map((section) => (
-        <div key={section.key} className="space-y-3">
-          <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted">{section.label}</p>
-          {section.orgs.map((org) => {
+      {/* R9 (13 out): «OS TEUS CLUBES E GRUPOS · N», um cartão por clube ou
+          grupo: em cima a foto ou o Alino (R0), o logótipo a passar por cima,
+          o nome, «Clube · Plano Club · és admin» e «›»; por baixo, em
+          pastilhas, «2 pedidos para entrar» (lima). O que tem a seguir por
+          tipo («2 mixes», «1 torneio») vem com a contagem do Dev 3, a 23.
+          Com mais de 5, fica o procurar e as pastilhas (OrgFinder). */}
+      {clubsToShow.length <= 5 && (
+        <div className="space-y-3">
+          <p className="font-mono text-[11px] font-bold uppercase tracking-widest text-ink-500">{t('gerir.your_orgs', { count: clubsToShow.length })}</p>
+          {clubsToShow.map((org) => {
             const pendingCount = joinRequestsByOrg.get(org.id) || 0
+            const group = org.kind === 'group'
             return (
               <Link
                 key={org.id}
                 to={pendingCount > 0 ? `/gerir/${org.slug}?tab=members` : `/gerir/${org.slug}`}
-                className="card press flex items-center gap-3.5 hover:shadow-lift"
+                className="press block overflow-hidden rounded-[22px] bg-white shadow-card"
               >
-                <Avatar name={org.name} url={org.group_logo_url} size="w-11 h-11 text-sm" shape={orgAvatarShape(org.kind)} />
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-extrabold text-ink-900 truncate">{org.name}</h3>
-                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                    <OrgKindBadge kind={org.kind} />
-                    <PlanBadge tier={org.plan_tier} />
-                  </div>
-                </div>
-                {pendingCount > 0 && (
-                  <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-lime-400 text-ink-900 text-[11px] font-extrabold tabular-nums shrink-0">
-                    {pendingCount}
+                <KindHero kind={group ? 'group' : 'club'} src={group ? GROUP_HERO : CLUB_HERO} className="h-[110px]" />
+                <div className="px-4 pb-4">
+                  {/* Clube quadrado (cantos de 28%), grupo redondo (regra de 18 set). */}
+                  <span className={`relative -mt-8 inline-block bg-white p-[3px] ${group ? 'rounded-full' : 'rounded-[28%]'}`}>
+                    <Avatar name={org.name} url={org.group_logo_url} size="w-14 h-14 text-lg" shape={group ? 'round' : 'square'} colorClass="bg-ink-900 text-lime-400" />
                   </span>
-                )}
+                  <div className="mt-1 flex items-center gap-2">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-display text-xl font-extrabold leading-tight text-ink-900 break-words">{org.name}</h3>
+                      <p className="mt-0.5 text-sm text-muted">
+                        {[t(group ? 'clubprofile.kind_group' : 'clubprofile.kind_club'), t('gerir.plan_line', { plan: planName(org.plan_tier || 'free') }), t('gerir.you_admin')].join(' · ')}
+                      </p>
+                    </div>
+                    <ChevronRight size={18} className="shrink-0 text-muted" />
+                  </div>
+                  {pendingCount > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      <span className="rounded-full bg-lime-400 px-3 py-1 text-sm font-extrabold text-ink-900">
+                        {t('gerir.join_requests_pill', { count: pendingCount })}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </Link>
             )
           })}
         </div>
-      ))}
+      )}
 
       {/* O Gerir serve primeiro para escolher o grupo: o «Criar outro
           grupo» vem por baixo da lista (UX, 12 out). */}
