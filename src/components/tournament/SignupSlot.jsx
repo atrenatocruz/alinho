@@ -255,7 +255,8 @@ export default function SignupSlot({ tournament, categories, category, my: first
         </ClashNotice>
       )}
       {canScore && !publicView && (
-        <div className="card flex items-center justify-between gap-3">
+        // Dentro da folha branca do topo: caixa #F4F5F1, sem sombra (UX, 14 out).
+        <div className="flex items-center justify-between gap-3 rounded-[16px] bg-[#F4F5F1] p-4">
           <p className="min-w-0 text-sm font-semibold text-ink-900">{t('tournament.score.link_title')}</p>
           <Link to={`/torneio/${tournament.slug || tournament.id}/marcar`}
             className="btn-secondary shrink-0 !px-4 inline-flex items-center">

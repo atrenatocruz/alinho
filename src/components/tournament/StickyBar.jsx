@@ -7,7 +7,8 @@
 // leva ao início dessa lista, logo abaixo da barra — não ao topo da página.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
-const BAR_TOP = 'calc(4rem + var(--safe-top, env(safe-area-inset-top, 0px)))'
+const SAFE_TOP = 'var(--safe-top, env(safe-area-inset-top, 0px))'
+const BAR_TOP = `calc(4rem + ${SAFE_TOP})`
 const SHADOW = 'shadow-[0_8px_12px_-10px_rgba(15,23,42,0.35)]'
 
 /** O que desliza: o <main> do Layout (overflow-y-auto), não a janela. */
@@ -73,7 +74,13 @@ function useBackToListStart(resetKey, sentinel, topPx, { pullUp = false } = {}) 
 /** A categoria e os separadores. `resetKey` muda ao trocar de categoria ou de
  *  separador; `shadow` sai quando há dias presos por baixo (Horário), para não
  *  ficarem duas sombras. */
-export function StickyTabs({ children, resetKey, pullKey = 0, shadow = true }) {
+// `belowBackBar`: com a barra do título presa por cima (Marcar resultados).
+// A página do torneio já não a tem (R3: o «‹» vive na capa) — aí a barra
+// prende-se logo no topo, abaixo da margem do telemóvel, e uma faixa da cor
+// do fundo tapa essa margem enquanto está presa (Francisco, iPhone, 14 out:
+// ficava um espaço em cima com o conteúdo a passar por trás). Aí sem sombra:
+// no cinzento da página, como os outros separadores (R12b; UX, 14 out).
+export function StickyTabs({ children, resetKey, pullKey = 0, shadow = true, belowBackBar = true }) {
   const ref = useRef(null)
   const sentinel = useRef(null)
   const measure = useRef((top, h) => {
@@ -91,8 +98,11 @@ export function StickyTabs({ children, resetKey, pullKey = 0, shadow = true }) {
       <div ref={sentinel} aria-hidden />
       {/* A mesma altura presa ou solta: o espaço que sai do meio (16 → 8 px)
           passa para baixo — senão a página saltava ao prender. */}
-      <div ref={ref} style={{ top: BAR_TOP }}
-        className={`sticky z-[9] -mx-4 bg-ground px-4 ${stuck ? `space-y-2 pb-4 pt-2 ${shadow ? SHADOW : ''}` : 'space-y-4 pb-2 pt-2'}`}>
+      <div ref={ref} style={{ top: belowBackBar ? BAR_TOP : SAFE_TOP }}
+        className={`sticky z-[9] -mx-4 bg-ground px-4 ${stuck ? `space-y-2 pb-4 pt-2 ${shadow && belowBackBar ? SHADOW : ''}` : 'space-y-4 pb-2 pt-2'}`}>
+        {stuck && !belowBackBar && (
+          <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-full bg-ground" style={{ height: SAFE_TOP }} />
+        )}
         {children}
       </div>
     </>
