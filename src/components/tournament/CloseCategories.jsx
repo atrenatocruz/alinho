@@ -18,13 +18,13 @@ import { tiedMatch } from '../../lib/tournamentScore'
 import { useTranslation } from 'react-i18next'
 import { finishCategory } from '../../lib/tournamentApi'
 import {
-  getCategoryBoard, listCategoriesAdmin, standingsOf,
+  listCategoriesAdmin, standingsOf,
   qualifiedFromGroups, qualifiersPerGroup, fillBracketFromGroups, clearBracketFromGroups,
 } from '../../lib/tournamentDraw'
 import { describeError } from '../../lib/errors'
 import { ConfirmSheet, Select } from '../ui'
 import { MonoLabel } from './TournamentBits'
-import { boardChanged } from './useCategoryBoard'
+import { boardChanged, readCategoryBoard } from './useCategoryBoard'
 
 const DRAWN = ['sorteada', 'a_decorrer']
 const OPEN_MATCH = ['marcado', 'a_decorrer']
@@ -322,7 +322,8 @@ export default function CloseCategories({ tournament, onChanged, onReady }) {
       const { categories = [] } = await listCategoriesAdmin(tournament.id)
       const sorted = [...categories].sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
       // Só se lê o quadro das que podem fechar; as outras não precisam.
-      const boards = await Promise.all(sorted.map((c) => (DRAWN.includes(c.status) ? getCategoryBoard(c.id) : null)))
+      // O quadro partilhado com o resto da página (um pedido por categoria).
+      const boards = await Promise.all(sorted.map((c) => (DRAWN.includes(c.status) ? readCategoryBoard(c.id) : null)))
       setRows(sorted.map((c, i) => ({ category: c, board: boards[i] })))
       setError(null)
     } catch (err) {
