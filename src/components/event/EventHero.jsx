@@ -33,18 +33,21 @@ function StatusBand({ kind, status }) {
   const faces = status.faces || []
   const shown = faces.slice(0, 4)
   const extra = faces.length - shown.length
-  const empty = Math.min(2, Math.max(0, Number(status.slots) || 0))
+  // Lugares livres a tracejado: só nos jogos de até 4 lugares (quem chama
+  // passa 0 nos mixes e torneios — Francisco via PO e UX, 14 out).
+  const empty = Math.min(4, Math.max(0, Number(status.slots) || 0))
   return (
     <div className="mt-4 flex items-center gap-3 rounded-[16px] px-3.5 py-3" style={{ background: status.tone === 'grey' ? '#F1F2EE' : c.light }}>
       {(shown.length > 0 || empty > 0) && (
-        <div className="flex shrink-0 items-center">
+        <div className="isolate flex shrink-0 items-center">
           {shown.map((p, i) => (
-            <span key={p.id || i} className={`rounded-full ring-2 ring-white ${i ? '-ml-2' : ''}`}>
+            <span key={p.id || i} className={`relative rounded-full ring-2 ring-white ${i ? '-ml-2' : ''}`} style={{ zIndex: 10 - i }}>
               <Avatar name={p.name} url={p.avatar_url} size="w-8 h-8 text-[11px]" />
             </span>
           ))}
           {Array.from({ length: empty }, (_, i) => (
-            <span key={`e${i}`} aria-hidden="true" className={`h-8 w-8 rounded-full border-2 border-dashed border-ink-200 bg-white ${shown.length || i ? '-ml-2' : ''}`} />
+            <span key={`e${i}`} aria-hidden="true" style={{ zIndex: 10 - shown.length - i, boxShadow: '0 0 0 2px #fff' }}
+              className={`relative h-8 w-8 rounded-full border-2 border-dashed border-[#C9CCD1] bg-white ${shown.length || i ? '-ml-2' : ''}`} />
           ))}
           {extra > 0 && (
             <span className="-ml-2 flex h-8 min-w-[32px] items-center justify-center rounded-full bg-white px-1 text-[11px] font-extrabold text-ink-700 ring-2 ring-white">+{extra}</span>

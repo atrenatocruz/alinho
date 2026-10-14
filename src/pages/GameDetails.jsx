@@ -263,6 +263,7 @@ export default function GameDetails() {
   // correctly render nothing for someone with no rating yet, Trello #176).
   const [ratingInfoById, setRatingInfoById] = useState({})
   const [finishedTab, setFinishedTab] = useState('stats') // 'stats' | 'duplas' | 'rondas' — tabs for a finished mix's results
+  const finishedTabsRef = useRef(null)
   const [editingMatchId, setEditingMatchId] = useState(null) // a scored match being corrected — re-opens its inputs (Trello #184)
   const [savingMatchId, setSavingMatchId] = useState(null) // match id currently being persisted by handleSaveScore — guards ScoreEntry's save button against a double-tap double-submit
   // Histórico IN/OUT (Trello #171) — só admins, e carregado apenas quando o
@@ -3126,7 +3127,8 @@ export default function GameDetails() {
             ) : null}
             status={{
               faces: people.map((p) => ({ id: p.id, name: p.name, avatar_url: p.avatar_url })),
-              slots: done ? 0 : free,
+              // Tracejados só nos jogos de até 4 lugares (UX, 14 out).
+              slots: done || capacity > 4 ? 0 : free,
               text,
               tone,
               dot,
@@ -3438,16 +3440,23 @@ export default function GameDetails() {
       {/* Tabs — a finished mix's results (stats, duplas, rounds) are shown
           one section at a time instead of stacked in a continuous scroll.
           Matches the tab-bar pattern from Comunidade.jsx. */}
+      {/* Tocar num separador sobe a página até ele ficar em cima, com o
+          conteúdo logo à vista, como no torneio (Francisco, 14 out). */}
       {game.status === 'finished' && rounds.length > 0 && (
+        <div ref={finishedTabsRef} className="scroll-mt-3">
         <Tabs
           value={finishedTab}
-          onChange={setFinishedTab}
+          onChange={(v) => {
+            setFinishedTab(v)
+            requestAnimationFrame(() => finishedTabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+          }}
           options={[
             { value: 'stats', label: t('gamedetails.tab_stats') },
             { value: 'duplas', label: t('gamedetails.tab_duplas') },
             { value: 'rondas', label: t('gamedetails.tab_rondas') },
           ].filter((tab) => !(showIndividualStandings && tab.value === 'duplas'))}
         />
+        </div>
       )}
 
       {/* Estatísticas do mix — classificação final por pontos */}
