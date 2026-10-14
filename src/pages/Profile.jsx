@@ -1065,6 +1065,14 @@ export default function Profile() {
         {/* Professor (Trello #283): o pedido saiu da Comunidade. */}
         <TeacherSection />
 
+        {/* Sair (UX, 13 out): saiu do topo de todas as páginas — o protótipo
+            só tem o sino — e fica aqui, antes do apagar conta, como a «Conta»
+            do protótipo. Do menu de baixo: Perfil e Sair. */}
+        <PrimaryButton variant="ghost" onClick={async () => { await signOut(); navigate('/login') }} className="w-full">
+          <LogOut size={20} />
+          {t('layout.sign_out')}
+        </PrimaryButton>
+
         {/* Apagar conta (Trello #306) — sempre o último do Perfil. */}
         <DeleteAccountSection />
         </>

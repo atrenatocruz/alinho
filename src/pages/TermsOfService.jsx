@@ -8,9 +8,11 @@ import { formatDate } from '../lib/formatDate'
 
 // Order here is the order sections render in — matches
 // terms.section_<key>_title / terms.section_<key>_body in pt.json/en.json.
+// Termos novos (BA, aprovados pelo Francisco a 13 out): ranking, prizes e
+// account são secções novas; a «pilot» passou a «Preços e planos».
 const SECTIONS = [
-  'intro', 'pilot', 'responsibilities', 'admins',
-  'whatsapp', 'liability', 'changes', 'law', 'contact',
+  'intro', 'pilot', 'responsibilities', 'admins', 'ranking', 'prizes',
+  'whatsapp', 'account', 'liability', 'changes', 'law', 'contact',
 ]
 
 export default function TermsOfService() {
@@ -42,9 +44,17 @@ export default function TermsOfService() {
             <h2 className="text-lg font-extrabold text-ink-900">
               {t(`terms.section_${key}_title`)}
             </h2>
-            <p className="text-sm text-muted leading-relaxed">
-              {t(`terms.section_${key}_body`)}
-            </p>
+            {/* Um texto com várias linhas é uma lista (as responsabilidades). */}
+            {(() => {
+              const lines = t(`terms.section_${key}_body`).split(/\n/)
+              return lines.length > 1 ? (
+                <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted leading-relaxed">
+                  {lines.map((line) => <li key={line}>{line}</li>)}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted leading-relaxed">{lines[0]}</p>
+              )
+            })()}
             {/* Quem gere o alinho até haver empresa (13 out). */}
             {key === 'intro' && (
               <p className="text-sm text-muted leading-relaxed">{t('terms.intro_founders', { names: founderNames(i18n.language), email: SUPPORT_EMAIL })}</p>
