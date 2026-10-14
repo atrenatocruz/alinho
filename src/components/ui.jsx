@@ -916,14 +916,17 @@ export function StickyTop({ children, belowBackBar = false, className = '' }) {
 }
 
 export function PrimaryButton({ variant = 'lime', className = '', children, ...props }) {
+  // O escurecer só enquanto o dedo está no botão: no telemóvel o hover ficava
+  // preso depois de deslizar a página (o lima a verde-escuro, Francisco, 14 out).
   const variants = {
-    lime:     'bg-lime-400 text-ink-900 hover:bg-lime-600 shadow-card',
-    navy:     'bg-ink-700 text-white hover:bg-ink-500 shadow-card',
+    lime:     'bg-lime-400 text-ink-900 [@media(hover:hover)]:hover:bg-lime-600 active:bg-lime-600 shadow-card',
+    navy:     'bg-ink-700 text-white [@media(hover:hover)]:hover:bg-ink-500 active:bg-ink-500 shadow-card',
     // A preto: as ações de quem organiza (o lima é das de jogador).
-    ink:      'bg-ink-900 text-white hover:bg-ink-700 shadow-card',
-    ghost:    'bg-surface text-ink-900 border border-line hover:bg-ink-50 hover:border-ink-200',
-    danger:   'bg-danger/10 text-danger hover:bg-danger/15',
-    whatsapp: 'bg-[#25D366] text-white hover:bg-[#20bd5a] shadow-card',
+    ink:      'bg-ink-900 text-white [@media(hover:hover)]:hover:bg-ink-700 active:bg-ink-700 shadow-card',
+    // Secundário: branco com contorno de 1,5 px (UX, 14 out; o #F4F5F1 é só das caixas).
+    ghost:    'bg-white text-ink-900 border-[1.5px] border-[#CFD2D7] [@media(hover:hover)]:hover:bg-ink-50 active:bg-ink-50 [@media(hover:hover)]:hover:border-ink-200 active:border-ink-200',
+    danger:   'bg-danger/10 text-danger [@media(hover:hover)]:hover:bg-danger/15 active:bg-danger/15',
+    whatsapp: 'bg-[#25D366] text-white [@media(hover:hover)]:hover:bg-[#20bd5a] active:bg-[#20bd5a] shadow-card',
   }
   return (
     <button
