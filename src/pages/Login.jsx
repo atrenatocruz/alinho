@@ -11,6 +11,8 @@ import { describeError } from '../lib/errors'
 import { ACCOUNT_DELETION_GRACE_DAYS } from '../lib/account'
 import { MIN_SIGNUP_AGE, isAtLeast, maxSignupBirthday } from '../lib/age'
 import { safeInternalPath, savePendingOrgSlug } from '../lib/loginLinks'
+import EmailField from '../components/EmailField'
+import { emailProblem } from '../lib/emailCheck'
 
 // Same pattern as Layout.jsx's header toggle, minus the profile persistence
 // (there's no profile yet pre-auth) — just the instant UI flip plus a
@@ -117,6 +119,10 @@ export default function Login() {
 
   // Login form state
   const [loginEmail, setLoginEmail] = useState('')
+  // Carregar no botão com o email mal escrito mostra o erro por baixo do
+  // campo, em vez da bolha do browser (13 out).
+  const [checkLoginEmail, setCheckLoginEmail] = useState(0)
+  const [checkSignupEmail, setCheckSignupEmail] = useState(0)
   const [loginPassword, setLoginPassword] = useState('')
 
   // Signup form state
@@ -138,6 +144,8 @@ export default function Login() {
 
   const handleLogin = async (e) => {
     e.preventDefault()
+    if (emailProblem(loginEmail)) { setCheckLoginEmail((n) => n + 1); return }
+    if (!loginPassword) { setError(t('login.error_missing_password')); return }
     setLoading(true)
     setError('')
 
@@ -155,6 +163,8 @@ export default function Login() {
 
   const handleSignup = async (e) => {
     e.preventDefault()
+    if (!signupName.trim()) { setError(t('login.error_missing_name')); return }
+    if (emailProblem(signupEmail)) { setCheckSignupEmail((n) => n + 1); return }
     setLoading(true)
     setError('')
 
@@ -320,18 +330,13 @@ export default function Login() {
 
           {/* Login Form */}
           {mode === 'login' && (
-            <form onSubmit={handleLogin} className="space-y-4 animate-fade-up">
+            // noValidate: sem as bolhas do browser (na língua dele); os erros
+            // são os da app, em português simples (13 out).
+            <form onSubmit={handleLogin} noValidate className="space-y-4 animate-fade-up">
               <div>
                 <label className={inputLabel}>{t('login.email_label')}</label>
-                <input
-                  type="email"
-                  value={loginEmail}
-                  onChange={(e) => setLoginEmail(e.target.value)}
-                  className="input-field"
-                  placeholder={t('login.email_placeholder')}
-                  autoComplete="email"
-                  required
-                />
+                <EmailField id="login-email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)}
+                  checkNow={checkLoginEmail} placeholder={t('login.email_placeholder')} />
               </div>
 
               <div>
@@ -373,7 +378,7 @@ export default function Login() {
           )}
 
           {mode === 'signup' && !confirmationSent && (
-            <form onSubmit={handleSignup} className="space-y-4 animate-fade-up">
+            <form onSubmit={handleSignup} noValidate className="space-y-4 animate-fade-up">
               <div>
                 <label className={inputLabel}>{t('login.fullname_label')}</label>
                 <input
@@ -389,15 +394,8 @@ export default function Login() {
 
               <div>
                 <label className={inputLabel}>{t('login.email_label')}</label>
-                <input
-                  type="email"
-                  value={signupEmail}
-                  onChange={(e) => setSignupEmail(e.target.value)}
-                  className="input-field"
-                  placeholder={t('login.email_placeholder')}
-                  autoComplete="email"
-                  required
-                />
+                <EmailField id="signup-email" value={signupEmail} onChange={(e) => setSignupEmail(e.target.value)}
+                  checkNow={checkSignupEmail} placeholder={t('login.email_placeholder')} />
               </div>
 
               <div>

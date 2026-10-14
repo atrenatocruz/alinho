@@ -6,11 +6,15 @@ import { PrimaryButton } from '../components/ui'
 import { Wordmark } from '../components/Layout'
 import { describeError } from '../lib/errors'
 import TurnstileWidget from '../components/TurnstileWidget'
+import EmailField from '../components/EmailField'
+import { emailProblem } from '../lib/emailCheck'
 
 export default function ForgotPassword() {
   const { t } = useTranslation()
   const { resetPassword } = useAuth()
   const [email, setEmail] = useState('')
+  // O erro do email por baixo do campo, sem a bolha do browser (13 out).
+  const [checkEmail, setCheckEmail] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   // Once true, always shows the same confirmation regardless of whether the
@@ -23,6 +27,7 @@ export default function ForgotPassword() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (emailProblem(email)) { setCheckEmail((n) => n + 1); return }
     setLoading(true)
     setError('')
     try {
@@ -71,21 +76,13 @@ export default function ForgotPassword() {
               </Link>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-4 animate-fade-up">
+            <form onSubmit={handleSubmit} noValidate className="space-y-4 animate-fade-up">
               <p className="text-muted text-sm">{t('login.forgot_password_body')}</p>
 
               <div>
                 <label className="block text-sm font-extrabold text-ink-900 mb-2">{t('login.email_label')}</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="input-field"
-                  placeholder={t('login.email_placeholder')}
-                  autoComplete="email"
-                  autoFocus
-                  required
-                />
+                <EmailField id="forgot-email" value={email} onChange={(e) => setEmail(e.target.value)}
+                  checkNow={checkEmail} placeholder={t('login.email_placeholder')} autoFocus />
               </div>
 
               {error && (
